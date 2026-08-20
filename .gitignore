@@ -1,0 +1,7 @@
+node_modules/
+client/dist/
+.venv/
+server/data/*.db
+.DS_Store
+*.log
+Pri-learning-final-production/

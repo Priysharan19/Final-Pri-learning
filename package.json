@@ -1,0 +1,18 @@
+{
+  "name": "pri-learning",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Pri Learning — the most powerful way to master maths. Years 7–12 adaptive practice, instant marking, and exam prep.",
+  "scripts": {
+    "setup": "npm install --prefix server && npm install --prefix client",
+    "dev": "node scripts/dev.js",
+    "build": "npm run build --prefix client",
+    "start": "node server/index.js",
+    "seed": "node server/seed.js",
+    "test": "node server/test/selfcheck.mjs && node client/test/inkcheck.mjs && node client/test/inkcheck-hard.mjs && node client/test/inkcheck-lines.mjs && node client/test/inkcheck-holdout.mjs",
+    "test:ink": "node client/test/inkcheck.mjs 40",
+    "test:lines": "node client/test/inkcheck-lines.mjs 40",
+    "test:e2e": "node client/test/tour-v4.js",
+    "test:holdout": "node client/test/inkcheck-holdout.mjs 24"
+  }
+}
