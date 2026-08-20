@@ -23,7 +23,7 @@ Run from this directory, in order. Each step writes into
 
 ```bash
 # 1 · CNN ensemble A (28px) + B (32px), both aspect-preserving
-node gen.mjs            # ~250k training renders -> /tmp/inktrain   (a few minutes)
+node gen.mjs            # 553,200 renders -> /tmp/inktrain   (a few minutes)
 ../../.venv/bin/python train.py                                   # ~30 min on 10 cores
 
 # 2 · model C (32px, aspect-FLOORED) appended as a third voter
@@ -103,3 +103,38 @@ generated, including the holdouts — they hold out a seed space, not a person.
 `npm run test:real` scores it; until a corpus exists there is no real-handwriting
 number for anything trained here. Never tune against a recorded corpus either —
 reading its failures is what would stop it being evidence.
+# Ink model experiments — 2026-08-21
+
+Baseline before any retrain (ink-100 recogniser, shipped model):
+  holdout1 n=24  94.6% lines, 98.7% chars, worst writer 79%
+  holdout2 n=40  93.2% lines, 98.2% chars, worst writer 57%
+
+## 1. ADOPTED — 513k samples, 20% style tail to 2.65, A28+B32+C32f
+  holdout1 n=24  95.2% lines, 98.9% chars, worst writer 86%
+  holdout2 n=40  94.5% lines, 98.4% chars, worst writer 71%
+  hard suite symbols 95.2% -> 96.3%
+  467 KB (A+B) / 798 KB with C. int8 ensemble val 93.98%.
+  Worst writer +14 points on the independent set — the heavy tail did what it was for.
+
+## 2. REJECTED — widened network (A 32/64/96/256, B 32/64/112/288)
+  int8 ensemble val 94.44% (up from 93.98%) but on the holdouts:
+  holdout1 n=24  95.5% (+0.3)
+  holdout2 n=40  94.1% (-0.4), worst writer 64% (-7)
+  1212 KB for TWO voters vs 467 KB.
+  Verdict: width buys mean accuracy and LOSES worst-case accuracy — it overfits the
+  bulk of the distribution. The third voter (aspect-floored C32) is worth more than
+  2.6x the parameters. Not adopted.
+
+## 3. REJECTED — heavier style tail (35% of samples, strength to 3.20)
+  holdout1 n=24  94.6%, worst writer 79%
+  holdout2 n=40  93.8%, worst writer 64%
+  Worse than the adopted recipe on every axis.
+  Verdict: past ~20%/2.65 the augmentation stops modelling bad handwriting and starts
+  being label noise, pulling the net off the distribution real writers occupy.
+
+## What this means
+The current recipe sits at a good local optimum for this architecture and this
+generator. More parameters and more distortion both make the worst writer worse.
+The remaining headroom is algorithmic (question-conditioned decoding, test-time
+augmentation on uncertain glyphs, a fuller page-level hand model) and, above all,
+REAL INK — every number above is measured on a simulator. See tools/ink-collect/.

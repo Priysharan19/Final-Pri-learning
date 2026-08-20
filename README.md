@@ -108,9 +108,13 @@ convolutional network ships **inside the bundle** and does the heavy lifting on 
      `client/src/ink/model-data.js`). Three int8-quantised conv nets vote over **56 shape classes**
      and their softmaxes are averaged: model **A** reads a 28² render, **B** a deeper/wider 32²
      render, and **C** a 32² render with an *aspect floor*, which exists so the tall-thin glyphs
-     (`1 l ( ) /`) are not all handed to the net as the same vertical smear. Trained on ~142,000
-     samples — style-varied glyph renders plus 10,000 real handwritten MNIST digits — through the
-     same deskewing rasteriser used at inference. **Validation accuracy 0.9395** for the ensemble
+     (`1 l ( ) /`) are not all handed to the net as the same vertical smear. Trained on **553,200
+     samples** — 543,200 style-varied glyph renders across the 56 classes plus 10,000 real
+     handwritten MNIST digits, split 513,163 train / 40,037 held-out validation — through the
+     same deskewing rasteriser used at inference. About a fifth of those renders come from a
+     deliberately harsh style tail, which is what moved the *worst* simulated writer rather than
+     the average (see the measured-accuracy block below). The counts are printed by
+     `node tools/ink-train/gen.mjs` and recorded in its manifest. **Validation accuracy 0.9395** for the ensemble
      (0.9316 / 0.9365 / 0.9339 for A / B / C) — read `val_acc` out of `model-data.js` itself, which
      is where those figures are recorded. The weights are 798 kB of base64 in
      `model-data.js`; the forward pass is plain JavaScript and takes a few milliseconds per symbol.
