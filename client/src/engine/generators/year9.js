@@ -4,14 +4,21 @@
 import { ri, rc, rs, nz, gcd, Frac, mcq, term, sgn, moneyPlain, r1, r2, r3, rad, NAMES } from '../qhelpers.js';
 import { figRightTriangle, figBoxPlot } from '../figures.js';
 
-const TRIPLES = [[3, 4, 5], [6, 8, 10], [5, 12, 13], [8, 15, 17], [9, 12, 15], [7, 24, 25], [20, 21, 29], [12, 16, 20]];
+const TRIPLES = [
+  [3, 4, 5], [6, 8, 10], [9, 12, 15], [12, 16, 20], [15, 20, 25], [18, 24, 30], [21, 28, 35], [24, 32, 40],
+  [5, 12, 13], [10, 24, 26], [15, 36, 39], [8, 15, 17], [16, 30, 34], [7, 24, 25], [14, 48, 50],
+  [20, 21, 29], [9, 40, 41], [12, 35, 37], [28, 45, 53], [11, 60, 61], [33, 56, 65], [16, 63, 65],
+  [13, 84, 85], [36, 77, 85], [39, 80, 89], [48, 55, 73], [65, 72, 97], [20, 99, 101]
+];
 
 export const year9 = {
 
   // ── Pythagoras ───────────────────────────────────────────────────────────
   'y9-pythagoras': (rng, diff) => {
     if (diff === 1) {
-      const [a, b, c] = rc(rng, TRIPLES);
+      const t = rc(rng, TRIPLES);
+      const swap = rc(rng, [true, false]);
+      const [a, b, c] = swap ? [t[1], t[0], t[2]] : t;
       return {
         prompt: `The right-angled triangle shown has shorter sides $${a}$ cm and $${b}$ cm. Find the length of the hypotenuse.`,
         figure: figRightTriangle({ base: `${a} cm`, height: `${b} cm`, hyp: '? cm' }),
@@ -62,19 +69,25 @@ export const year9 = {
         ]
       };
     }
-    const wall = ri(rng, 2, 4), ladder = rc(rng, [[6, 8, 10], [3, 4, 5], [5, 12, 13], [9, 12, 15]]);
-    const [aa, bb, cc] = ladder;
+    const t = rc(rng, TRIPLES.filter(x => x[2] <= 41));
+    const swap = rc(rng, [true, false]);
+    const [aa, bb, cc] = swap ? [t[1], t[0], t[2]] : t;
+    const story = rc(rng, [
+      { long: 'ladder', body: `A $${cc}$ m ladder leans against a vertical wall, with its foot $${aa}$ m from the base of the wall on level ground, as shown.`, ask: 'How far up the wall does the ladder reach?', hyp: `${cc} m (ladder)` },
+      { long: 'guy wire', body: `A $${cc}$ m guy wire runs from the top of a vertical mast to a peg $${aa}$ m from the mast's base on level ground.`, ask: 'How tall is the mast?', hyp: `${cc} m (wire)` },
+      { long: 'ramp', body: `A $${cc}$ m ramp rises from level ground, meeting it $${aa}$ m horizontally from the point directly below its top end.`, ask: 'How high is the top of the ramp above the ground?', hyp: `${cc} m (ramp)` }
+    ]);
     return {
-      prompt: `A $${cc}$ m ladder leans against a vertical wall, with its foot $${aa}$ m from the base of the wall on level ground, as shown. How far up the wall does the ladder reach?`,
-      figure: figRightTriangle({ base: `${aa} m`, height: '? m', hyp: `${cc} m (ladder)` }),
+      prompt: `${story.body} ${story.ask}`,
+      figure: figRightTriangle({ base: `${aa} m`, height: '? m', hyp: story.hyp }),
       answerType: 'numeric', answer: { value: bb }, answerSuffix: 'm',
       traps: [
-        { value: r2(Math.sqrt(cc * cc + aa * aa)), why: 'The ladder is the hypotenuse — the height is a shorter side, so *subtract* the squares.', tol: 0.02 },
-        { value: cc - aa, why: 'Draw the triangle: ladder² = distance² + height², so height $= \\sqrt{' + cc + '^2 - ' + aa + '^2}$.' }
+        { value: r2(Math.sqrt(cc * cc + aa * aa)), why: `The ${story.long} is the hypotenuse — the height is a shorter side, so *subtract* the squares.`, tol: 0.02 },
+        { value: cc - aa, why: `Draw the triangle: $${cc}^2 = ${aa}^2 + h^2$, so $h = \\sqrt{${cc}^2 - ${aa}^2}$.` }
       ],
-      hints: ['Sketch it: the ladder, wall and ground make a right-angled triangle.', 'The ladder is the hypotenuse.', `height $= \\sqrt{${cc}^2 - ${aa}^2}$.`],
+      hints: ['Sketch it: the sloping length, the vertical and the ground make a right-angled triangle.', `The ${story.long} is the hypotenuse.`, `height $= \\sqrt{${cc}^2 - ${aa}^2}$.`],
       steps: [
-        { h: 'Identify the triangle', d: `Ladder $= ${cc}$ (hypotenuse), ground distance $= ${aa}$, height $= h$` },
+        { h: 'Identify the triangle', d: `Hypotenuse $= ${cc}$, ground distance $= ${aa}$, height $= h$` },
         { h: 'Apply Pythagoras', d: `$h^2 = ${cc}^2 - ${aa}^2 = ${cc * cc - aa * aa}$` },
         { h: 'Square root', d: `$h = \\sqrt{${cc * cc - aa * aa}} = ${bb}$ m` }
       ]
@@ -84,7 +97,28 @@ export const year9 = {
   // ── Indices & scientific notation ────────────────────────────────────────
   'y9-indices-sci': (rng, diff) => {
     if (diff === 1) {
-      const b = rc(rng, [2, 3, 4, 5, 10]), p = b === 2 ? ri(rng, 2, 5) : ri(rng, 1, 3);
+      if (rng() < 0.4) {
+        const num = ri(rng, 2, 7);
+        let den = ri(rng, 2, 9);
+        while (den === num) den = ri(rng, 2, 9);
+        const n = ri(rng, 1, 3);
+        const g = new Frac(den ** n, num ** n);
+        return {
+          prompt: `Evaluate $\\left(\\dfrac{${num}}{${den}}\\right)^{-${n}}$, giving your answer as a fraction in simplest form.`,
+          answerType: 'numeric', answer: { value: g.value, simplestFraction: { n: g.n, d: g.d } },
+          inputHint: 'e.g. 9/4',
+          traps: [
+            { value: new Frac(num ** n, den ** n).value, why: 'A negative index flips the fraction over before the power is applied.' },
+            { value: -new Frac(num ** n, den ** n).value, why: 'A negative index doesn’t make the answer negative — it means “reciprocal”.' }
+          ].filter(t => Math.abs(t.value - g.value) > 1e-9),
+          hints: ['A negative index means take the reciprocal.', `$\\left(\\frac{${num}}{${den}}\\right)^{-${n}} = \\left(\\frac{${den}}{${num}}\\right)^{${n}}$.`, `Raise top and bottom to the power ${n}.`],
+          steps: [
+            { h: 'Flip the fraction', d: `$\\left(\\dfrac{${num}}{${den}}\\right)^{-${n}} = \\left(\\dfrac{${den}}{${num}}\\right)^{${n}}$` },
+            { h: 'Apply the power', d: `$= \\dfrac{${den ** n}}{${num ** n}} = ${g.latex()}$` }
+          ]
+        };
+      }
+      const b = rc(rng, [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]), p = b === 2 ? ri(rng, 2, 8) : b === 3 ? ri(rng, 1, 5) : b <= 5 ? ri(rng, 1, 4) : ri(rng, 1, 3);
       const f = new Frac(1, b ** p);
       return {
         prompt: `Evaluate $${b}^{-${p}}$, giving your answer as a fraction.`,
@@ -143,8 +177,9 @@ export const year9 = {
         ]
       };
     }
-    const a = ri(rng, 2, 5), p = ri(rng, 2, 4), q = ri(rng, 3, 6), r = ri(rng, 1, 2);
+    const p = ri(rng, 1, 6), q = ri(rng, 2, 8), r = ri(rng, 1, 4);
     const pow = p - q - r;
+    if (pow >= 0) return year9['y9-indices-sci'](rng, diff);
     return {
       prompt: `Simplify $\\dfrac{x^{${p}}}{x^{${q}} \\times x^{${r}}}$, giving your answer with a positive index (as a fraction).`,
       answerType: 'expression', answer: { expr: `1/x^${-pow}`, anyOf: [`x^(${pow})`], positiveOnly: true },
@@ -199,23 +234,25 @@ export const year9 = {
     }
     if (diff === 3) {
       const square = rc(rng, [true, false]);
-      const a = nz(rng, -8, 8);
+      const a = nz(rng, -12, 12);
+      const m = ri(rng, 1, 4);
       if (square) {
+        const lead = m === 1 ? '' : m;
         return {
-          prompt: `Expand $(x ${sgn(a)})^2$.`,
-          answerType: 'expression', answer: { expr: `x^2 + ${2 * a}x + ${a * a}` },
-          inputHint: 'e.g. x^2 + 6x + 9',
-          traps: [{ expr: `x^2 + ${a * a}`, why: `$(x ${sgn(a)})^2$ is a *perfect square* — it has a middle term $${2 * a}x$. Squaring doesn’t distribute over addition.` }],
-          hints: ['A perfect square: $(x + k)^2 = x^2 + 2kx + k^2$.', `Here $k = ${a}$, so the middle term is $2 \\times ${a} \\times x$.`, `$k^2 = ${a * a}$.`],
+          prompt: `Expand $(${lead}x ${sgn(a)})^2$.`,
+          answerType: 'expression', answer: { expr: `${m * m}x^2 + ${2 * m * a}x + ${a * a}` },
+          inputHint: 'e.g. 4x^2 + 12x + 9',
+          traps: [{ expr: `${m * m}x^2 + ${a * a}`, why: `$(${lead}x ${sgn(a)})^2$ is a *perfect square* — it has a middle term $${2 * m * a}x$. Squaring doesn’t distribute over addition.` }],
+          hints: ['A perfect square: $(px + k)^2 = p^2x^2 + 2pkx + k^2$.', `Here $p = ${m}$ and $k = ${a}$, so the middle term is $2 \\times ${m} \\times ${a} \\times x$.`, `$k^2 = ${a * a}$.`],
           steps: [
-            { h: 'Perfect-square identity', d: `$(x + k)^2 = x^2 + 2kx + k^2$ with $k = ${a}$` },
-            { h: 'Middle term', d: `$2(${a})x = ${2 * a}x$` },
+            { h: 'Perfect-square identity', d: `$(px + k)^2 = p^2x^2 + 2pkx + k^2$ with $p = ${m}$, $k = ${a}$` },
+            { h: 'Middle term', d: `$2(${m})(${a})x = ${2 * m * a}x$` },
             { h: 'Last term', d: `$(${a})^2 = ${a * a}$` },
-            { h: 'Result', d: `$x^2 ${sgn(2 * a)}x + ${a * a}$` }
+            { h: 'Result', d: `$${m * m}x^2 ${sgn(2 * m * a)}x + ${a * a}$` }
           ]
         };
       }
-      const k = ri(rng, 2, 9);
+      const k = ri(rng, 2, 20);
       return {
         prompt: `Expand $(x + ${k})(x - ${k})$.`,
         answerType: 'expression', answer: { expr: `x^2 - ${k * k}` },
@@ -232,41 +269,43 @@ export const year9 = {
         ]
       };
     }
-    const a = ri(rng, 2, 8);
-    const b = ri(rng, 1, 6);
+    const a = ri(rng, 2, 16);
+    const minus = rng() < 0.5;
+    const denom = minus ? `x - ${a}` : `x + ${a}`;
+    const result = minus ? `x + ${a}` : `x - ${a}`;
     if (rng() < 0.3) {
       return {
-        prompt: `Simplify $\\dfrac{x^2 - ${a * a}}{x + ${a}}$, showing **each line** of your working — factorise, then cancel.`,
+        prompt: `Simplify $\\dfrac{x^2 - ${a * a}}{${denom}}$, showing **each line** of your working — factorise, then cancel.`,
         answerType: 'working',
         answer: {
-          stepMeta: { kind: 'expression', canonical: `(x^2 - ${a * a})/(x + ${a})` },
+          stepMeta: { kind: 'expression', canonical: `(x^2 - ${a * a})/(${denom})` },
           minLines: 2,
-          final: { kind: 'expr', expr: `x - ${a}` },
-          canonicalWorking: `(x^2 - ${a * a})/(x + ${a})\n((x + ${a})(x - ${a}))/(x + ${a})\nx - ${a}`
+          final: { kind: 'expr', expr: result },
+          canonicalWorking: `(x^2 - ${a * a})/(${denom})\n((x + ${a})(x - ${a}))/(${denom})\n${result}`
         },
         inputHint: 'One line per step, ending with the simplified expression',
         traps: [],
-        hints: ['The numerator is a difference of two squares.', `$x^2 - ${a * a} = (x + ${a})(x - ${a})$.`, `Cancel the $(x + ${a})$ factors and end with the result on its own line.`],
+        hints: ['The numerator is a difference of two squares.', `$x^2 - ${a * a} = (x + ${a})(x - ${a})$.`, `Cancel the $(${denom})$ factors and end with the result on its own line.`],
         steps: [
           { h: 'Factorise the numerator', d: `$x^2 - ${a * a} = (x + ${a})(x - ${a})$` },
-          { h: 'Cancel the common factor', d: `$\\dfrac{(x + ${a})(x - ${a})}{x + ${a}} = x - ${a}$` },
-          { h: 'Note', d: `Valid for $x \\ne -${a}$` }
+          { h: 'Cancel the common factor', d: `$\\dfrac{(x + ${a})(x - ${a})}{${denom}} = ${result}$` },
+          { h: 'Note', d: `Valid for $x \\ne ${minus ? a : -a}$` }
         ]
       };
     }
     return {
-      prompt: `Simplify $\\dfrac{x^2 - ${a * a}}{x + ${a}}$.`,
-      answerType: 'expression', answer: { expr: `x - ${a}` },
+      prompt: `Simplify $\\dfrac{x^2 - ${a * a}}{${denom}}$.`,
+      answerType: 'expression', answer: { expr: result },
       inputHint: 'e.g. x - 5',
       traps: [
-        { expr: `x - ${a * a}`, why: 'Factorise the top first: $x^2 - ' + (a * a) + ' = (x+' + a + ')(x-' + a + ')$, then cancel the common bracket.' },
-        { expr: `x + ${a}`, why: 'After cancelling $(x + ' + a + ')$, the remaining factor is $(x - ' + a + ')$.' }
+        { expr: `x - ${a * a}`, why: `Factorise the top first: $x^2 - ${a * a} = (x + ${a})(x - ${a})$, then cancel the common bracket.` },
+        { expr: denom, why: `After cancelling $(${denom})$, the remaining factor is $(${result})$.` }
       ],
-      hints: ['The numerator is a difference of two squares.', `$x^2 - ${a * a} = (x + ${a})(x - ${a})$.`, `Cancel the $(x + ${a})$ factors.`],
+      hints: ['The numerator is a difference of two squares.', `$x^2 - ${a * a} = (x + ${a})(x - ${a})$.`, `Cancel the $(${denom})$ factors.`],
       steps: [
         { h: 'Factorise the numerator', d: `$x^2 - ${a * a} = (x + ${a})(x - ${a})$` },
-        { h: 'Cancel the common factor', d: `$\\dfrac{(x + ${a})(x - ${a})}{x + ${a}} = x - ${a}$` },
-        { h: 'Note', d: `Valid for $x \\ne -${a}$` }
+        { h: 'Cancel the common factor', d: `$\\dfrac{(x + ${a})(x - ${a})}{${denom}} = ${result}$` },
+        { h: 'Note', d: `Valid for $x \\ne ${minus ? a : -a}$` }
       ]
     };
   },
@@ -479,7 +518,7 @@ export const year9 = {
         ]
       };
     }
-    const m2 = ri(rng, 2, 9);
+    const m2 = ri(rng, 2, 40);
     const toCm = rc(rng, [true, false]);
     return toCm ? {
       prompt: `Convert $${m2}$ m² to cm².`,
@@ -631,71 +670,105 @@ export const year9 = {
   // ── Two-step experiments ─────────────────────────────────────────────────
   'y9-probability': (rng, diff) => {
     if (diff === 1) {
-      const want = rc(rng, [['two heads', 1], ['a head then a tail (in that order)', 1], ['at least one head', 3]]);
-      const f = new Frac(want[1], 4);
+      const n = ri(rng, 2, 4);
+      const total = 2 ** n;
+      const kind = rc(rng, ['exactly', 'at least', 'at most', 'sequence']);
+      const choose = (a, b) => { let v = 1; for (let i = 0; i < b; i++) v = v * (a - i) / (i + 1); return Math.round(v); };
+      let ways, desc;
+      if (kind === 'sequence') {
+        const seq = Array.from({ length: n }, () => rc(rng, ['H', 'T'])).join('');
+        ways = 1;
+        desc = `the exact sequence ${seq.split('').join('–')}`;
+      } else {
+        const k = kind === 'exactly' ? ri(rng, 0, n) : ri(rng, 1, kind === 'at least' ? n : n - 1);
+        ways = kind === 'exactly' ? choose(n, k)
+          : kind === 'at least' ? Array.from({ length: n - k + 1 }, (_, i) => choose(n, k + i)).reduce((s, v) => s + v, 0)
+            : Array.from({ length: k + 1 }, (_, i) => choose(n, i)).reduce((s, v) => s + v, 0);
+        desc = kind === 'exactly' && k === 0 ? 'no heads' : `${kind} ${k} head${k === 1 ? '' : 's'}`;
+      }
+      const f = new Frac(ways, total);
       return {
-        prompt: `A fair coin is tossed twice. Find the probability of getting **${want[0]}**, as a fraction in simplest form.`,
+        prompt: `A fair coin is tossed $${n}$ times. Find the probability of getting **${desc}**, as a fraction in simplest form.`,
         answerType: 'numeric', answer: { value: f.value, simplestFraction: { n: f.n, d: f.d } },
-        inputHint: 'e.g. 1/4',
-        traps: [{ value: 0.5, why: 'List the sample space first: HH, HT, TH, TT — four equally likely outcomes.' }],
-        hints: ['List every outcome of two tosses.', 'Sample space: HH, HT, TH, TT.', `Count the outcomes matching “${want[0]}”: ${want[1]} of 4.`],
+        inputHint: 'e.g. 3/8',
+        traps: [{ value: 0.5, why: `List the sample space first — ${n} tosses give $2^{${n}} = ${total}$ equally likely outcomes.` }].filter(t => Math.abs(t.value - f.value) > 1e-9),
+        hints: [`Each toss doubles the number of outcomes, so there are $2^{${n}} = ${total}$ in all.`, `Count how many of them give “${desc}”.`, `${ways} of ${total} outcomes match.`],
         steps: [
-          { h: 'Sample space', d: `HH, HT, TH, TT — 4 equally likely outcomes` },
-          { h: 'Favourable outcomes', d: `${want[1]} outcome${want[1] > 1 ? 's' : ''} match` },
-          { h: 'Probability', d: `$${f.latex()}$` }
+          { h: 'Sample space', d: `$2^{${n}} = ${total}$ equally likely outcomes` },
+          { h: 'Favourable outcomes', d: `${ways} outcome${ways === 1 ? '' : 's'} match` },
+          { h: 'Probability', d: `$\\dfrac{${ways}}{${total}} = ${f.latex()}$` }
         ]
       };
     }
     if (diff === 2) {
-      const target = ri(rng, 5, 9);
-      const ways = [0, 0, 1, 2, 3, 4, 5, 6, 5, 4, 3, 2, 1][target];
-      const f = new Frac(ways, 36);
+      const m = rc(rng, [4, 5, 6, 8]);
+      const kind = rc(rng, ['eq', 'ge', 'le']);
+      const target = ri(rng, kind === 'ge' ? 3 : 2, kind === 'le' ? 2 * m - 1 : 2 * m);
+      let ways = 0;
+      for (let i = 1; i <= m; i++) for (let j = 1; j <= m; j++) {
+        const s = i + j;
+        if (kind === 'eq' ? s === target : kind === 'ge' ? s >= target : s <= target) ways++;
+      }
+      const total = m * m;
+      const f = new Frac(ways, total);
+      const apparatus = m === 6 ? 'Two fair dice are rolled' : `Two fair spinners, each with $${m}$ equal sectors numbered $1$ to $${m}$, are spun`;
+      const label = kind === 'eq' ? `\\text{sum} = ${target}` : kind === 'ge' ? `\\text{sum} \\ge ${target}` : `\\text{sum} \\le ${target}`;
       return {
-        prompt: `Two fair dice are rolled and the results added. Find $P(\\text{sum} = ${target})$, as a fraction in simplest form.`,
+        prompt: `${apparatus} and the two results are added. Find $P(${label})$, as a fraction in simplest form.`,
         answerType: 'numeric', answer: { value: f.value, simplestFraction: { n: f.n, d: f.d } },
         inputHint: 'e.g. 5/36',
-        traps: [{ value: 1 / 11, why: 'The 11 possible sums are *not* equally likely — count ordered pairs out of 36.' }],
-        hints: ['How many equally likely (ordered) outcomes are there for two dice?', '36 outcomes. Now count the pairs summing to ' + target + '.', `There are ${ways} such pairs.`],
+        traps: [{ value: 1 / (2 * m - 1), why: `The ${2 * m - 1} possible sums are *not* equally likely — count ordered pairs out of ${total}.` }].filter(t => Math.abs(t.value - f.value) > 1e-9),
+        hints: [`How many equally likely ordered outcomes are there? $${m} \\times ${m} = ${total}$.`, `Now count the pairs with ${kind === 'eq' ? 'sum ' + target : kind === 'ge' ? 'sum at least ' + target : 'sum at most ' + target}.`, `There are ${ways} such pairs.`],
         steps: [
-          { h: 'Total outcomes', d: `$6 \\times 6 = 36$` },
-          { h: 'Count pairs summing to ' + target, d: `${ways} ordered pairs` },
-          { h: 'Probability', d: `$\\dfrac{${ways}}{36} = ${f.latex()}$` }
+          { h: 'Total outcomes', d: `$${m} \\times ${m} = ${total}$` },
+          { h: 'Count the favourable pairs', d: `${ways} ordered pairs` },
+          { h: 'Probability', d: `$\\dfrac{${ways}}{${total}} = ${f.latex()}$` }
         ]
       };
     }
     if (diff === 3) {
-      const red = ri(rng, 3, 6), blue = ri(rng, 2, 5);
+      const red = ri(rng, 2, 10), blue = ri(rng, 2, 10);
       const total = red + blue;
-      const f = new Frac(red * (red - 1), total * (total - 1));
+      const want = rc(rng, ['both red', 'both blue', 'one of each colour']);
+      const ways = want === 'both red' ? red * (red - 1)
+        : want === 'both blue' ? blue * (blue - 1)
+          : 2 * red * blue;
+      const f = new Frac(ways, total * (total - 1));
+      const naive = want === 'both red' ? (red / total) ** 2 : want === 'both blue' ? (blue / total) ** 2 : 2 * red * blue / (total * total);
       return {
-        prompt: `A bag holds $${red}$ red and $${blue}$ blue counters. Two counters are drawn **without replacement**. Find $P(\\text{both red})$, as a fraction in simplest form.`,
+        prompt: `A bag holds $${red}$ red and $${blue}$ blue counters. Two counters are drawn **without replacement**. Find $P(\\text{${want}})$, as a fraction in simplest form.`,
         answerType: 'numeric', answer: { value: f.value, simplestFraction: { n: f.n, d: f.d } },
         inputHint: 'e.g. 1/6',
-        traps: [{ value: (red / total) ** 2, why: `Without replacement the second draw has only ${total - 1} counters (and ${red - 1} reds) left — the probabilities change.` }],
-        hints: ['The first draw changes the bag for the second.', `First: $\\frac{${red}}{${total}}$. Then ${red - 1} reds remain of ${total - 1}.`, `Multiply along the branch: $\\frac{${red}}{${total}} \\times \\frac{${red - 1}}{${total - 1}}$.`],
+        traps: [{ value: naive, why: `Without replacement the second draw has only ${total - 1} counters left — the probabilities change between draws.` }].filter(t => Math.abs(t.value - f.value) > 1e-9),
+        hints: [
+          'The first draw changes the bag for the second.',
+          want === 'one of each colour' ? `Two orders work: red-then-blue and blue-then-red.` : `First: $\\frac{${want === 'both red' ? red : blue}}{${total}}$; then one fewer of that colour out of ${total - 1}.`,
+          `Multiply along each branch${want === 'one of each colour' ? ' and add the two orders' : ''}.`
+        ],
         steps: [
-          { h: 'First draw', d: `$P(\\text{red}) = \\dfrac{${red}}{${total}}$` },
-          { h: 'Second draw (one red gone)', d: `$P(\\text{red}) = \\dfrac{${red - 1}}{${total - 1}}$` },
-          { h: 'Multiply', d: `$\\dfrac{${red}}{${total}} \\times \\dfrac{${red - 1}}{${total - 1}} = ${f.latex()}$` }
+          { h: 'First draw', d: want === 'one of each colour' ? `$\\dfrac{${red}}{${total}}$ (red first) or $\\dfrac{${blue}}{${total}}$ (blue first)` : `$\\dfrac{${want === 'both red' ? red : blue}}{${total}}$` },
+          { h: 'Second draw', d: want === 'one of each colour' ? `$\\dfrac{${blue}}{${total - 1}}$ or $\\dfrac{${red}}{${total - 1}}$` : `$\\dfrac{${(want === 'both red' ? red : blue) - 1}}{${total - 1}}$` },
+          { h: 'Combine', d: `$\\dfrac{${ways}}{${total * (total - 1)}} = ${f.latex()}$` }
         ]
       };
     }
-    const pRain = rc(rng, [[1, 4], [1, 5], [3, 10], [2, 5]]);
-    const pWinRain = rc(rng, [[1, 2], [2, 5], [3, 5]]);
-    const pWinDry = rc(rng, [[3, 4], [4, 5], [7, 10]]);
+    const pRain = rc(rng, [[1, 4], [1, 5], [3, 10], [2, 5], [1, 2], [1, 3], [2, 3], [3, 5], [7, 10], [1, 10]]);
+    const pWinRain = rc(rng, [[1, 2], [2, 5], [3, 5], [1, 4], [3, 10], [1, 5], [1, 3], [2, 3]]);
+    const pWinDry = rc(rng, [[3, 4], [4, 5], [7, 10], [9, 10], [5, 8], [2, 3], [1, 2], [3, 5]]);
     const fR = new Frac(pRain[0], pRain[1]);
     const fWR = new Frac(pWinRain[0], pWinRain[1]);
     const fWD = new Frac(pWinDry[0], pWinDry[1]);
-    const win = fR.mul(fWR).add(new Frac(pRain[1] - pRain[0], pRain[1]).mul(fWD));
+    const fDry = new Frac(pRain[1] - pRain[0], pRain[1]);
+    const win = fR.mul(fWR).add(fDry.mul(fWD));
     return {
       prompt: `The probability of rain on match day is $${fR.latex()}$. If it rains, the Hawks win with probability $${fWR.latex()}$; if it stays dry, they win with probability $${fWD.latex()}$. Find the probability the Hawks **win**, as a fraction in simplest form.`,
       answerType: 'numeric', answer: { value: win.value, simplestFraction: { n: win.n, d: win.d } },
       inputHint: 'e.g. 7/10',
-      traps: [{ value: fWR.add(fWD).value / 2, why: 'The two win chances can’t just be averaged — weight each by how likely that weather is (a tree diagram helps).' }],
-      hints: ['Draw a tree: rain/dry, then win/lose on each branch.', 'Multiply along branches, then add the two “win” branches.', `$${fR.latex()} \\times ${fWR.latex()} + ${new Frac(pRain[1] - pRain[0], pRain[1]).latex()} \\times ${fWD.latex()}$.`],
+      traps: [{ value: fWR.add(fWD).value / 2, why: 'The two win chances can’t just be averaged — weight each by how likely that weather is (a tree diagram helps).' }].filter(t => Math.abs(t.value - win.value) > 1e-9),
+      hints: ['Draw a tree: rain/dry, then win/lose on each branch.', 'Multiply along branches, then add the two “win” branches.', `$${fR.latex()} \\times ${fWR.latex()} + ${fDry.latex()} \\times ${fWD.latex()}$.`],
       steps: [
         { h: 'Rain branch', d: `$${fR.latex()} \\times ${fWR.latex()} = ${fR.mul(fWR).latex()}$` },
-        { h: 'Dry branch', d: `$${new Frac(pRain[1] - pRain[0], pRain[1]).latex()} \\times ${fWD.latex()} = ${new Frac(pRain[1] - pRain[0], pRain[1]).mul(fWD).latex()}$` },
+        { h: 'Dry branch', d: `$${fDry.latex()} \\times ${fWD.latex()} = ${fDry.mul(fWD).latex()}$` },
         { h: 'Add the win branches', d: `$${win.latex()}$` }
       ]
     };

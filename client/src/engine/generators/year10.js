@@ -304,8 +304,9 @@ export const year10 = {
 
   // ── Surds & fractional indices ───────────────────────────────────────────
   'y10-surds': (rng, diff) => {
+    const SQUARE_FREE = [2, 3, 5, 6, 7, 10, 11, 13, 14, 15, 17, 19, 21, 22, 23, 26, 29, 30];
     if (diff === 1) {
-      const k = rc(rng, [2, 3, 4, 5]), r = rc(rng, [2, 3, 5, 6, 7, 10]);
+      const k = ri(rng, 2, 6), r = rc(rng, SQUARE_FREE.filter(v => v <= 23));
       const n = k * k * r;
       return {
         prompt: `Simplify $\\sqrt{${n}}$.`,
@@ -320,28 +321,52 @@ export const year10 = {
       };
     }
     if (diff === 2) {
-      const a = rc(rng, [2, 3, 5, 6]), b = rc(rng, [2, 3, 5, 7]);
-      const prod = a * b * (rc(rng, [true, false]) ? a : 1);
+      const a = rc(rng, [2, 3, 5, 6, 7, 10, 11, 13, 14, 15]);
+      const pool = [2, 3, 5, 6, 7, 8, 10, 12, 14, 15, 18, 20, 21, 22, 24, 27, 28, 30]
+        .filter(x => surdSimp(x * a).k > 1 && surdSimp(x * a).r > 1);
+      const b = rc(rng, pool.length ? pool : [8]);
+      const prod = a * b;
       const s = surdSimp(prod);
-      const c1 = ri(rng, 2, 5), c2 = ri(rng, 2, 4);
-      const kk = c1 * c2 * s.k;
       return {
-        prompt: `Simplify $${c1}\\sqrt{${prod / gcd(prod, prod)} === 1 ? '' : ''}$`.includes('===')
-          ? null : null // placeholder never hit
+        prompt: `Simplify $\\sqrt{${a}} \\times \\sqrt{${b}}$.`,
+        answerType: 'numeric', answer: { value: s.k * Math.sqrt(s.r), surdForm: { k: s.k, r: s.r } },
+        inputHint: 'e.g. 2sqrt(3)',
+        traps: [{ value: Math.sqrt(a + b), why: 'Roots multiply under one root: $\\sqrt{a}\\sqrt{b} = \\sqrt{ab}$ — the numbers multiply, they don’t add.', tol: 0.01 }],
+        hints: ['Combine under a single square root.', `$\\sqrt{${a}} \\times \\sqrt{${b}} = \\sqrt{${prod}}$.`, `Now extract the square factor: $${prod} = ${s.k * s.k} \\times ${s.r}$.`],
+        steps: [
+          { h: 'Multiply under one root', d: `$\\sqrt{${a} \\times ${b}} = \\sqrt{${prod}}$` },
+          { h: 'Extract the square factor', d: `$\\sqrt{${s.k * s.k} \\times ${s.r}} = ${surdLatex(s.k, s.r)}$` }
+        ]
       };
     }
     if (diff === 3) {
-      const a = ri(rng, 2, 6), b = rc(rng, [2, 3, 5, 7]);
-      const c = ri(rng, 1, 5);
-      const value = (a + Math.sqrt(b)) * (a - Math.sqrt(b));
+      const b = rc(rng, SQUARE_FREE.filter(v => v <= 15));
+      if (rng() < 0.45) {
+        const c = rc(rng, SQUARE_FREE.filter(v => v !== b && v <= 30));
+        return {
+          prompt: `Expand and simplify $(\\sqrt{${c}} + \\sqrt{${b}})(\\sqrt{${c}} - \\sqrt{${b}})$.`,
+          answerType: 'numeric', answer: { value: c - b },
+          traps: [
+            { value: c + b, why: 'This is a difference of two squares: the middle terms cancel and the last term is *subtracted*.' },
+            { value: c * b, why: `Only the outer and inner products cancel — the squares stay separate: $${c} - ${b}$.` }
+          ].filter(t => t.value !== c - b),
+          hints: ['This is a conjugate pair — difference of two squares.', `$(x+y)(x-y) = x^2 - y^2$ with $x = \\sqrt{${c}}$, $y = \\sqrt{${b}}$.`, `$(\\sqrt{${c}})^2 - (\\sqrt{${b}})^2 = ${c} - ${b}$.`],
+          steps: [
+            { h: 'Difference of two squares', d: `$(\\sqrt{${c}})^2 - (\\sqrt{${b}})^2$` },
+            { h: 'Evaluate', d: `$${c} - ${b} = ${c - b}$` },
+            { h: 'Note', d: 'The surds vanish — that’s why conjugates are used to rationalise denominators.' }
+          ]
+        };
+      }
+      const a = ri(rng, 2, 12);
       return {
         prompt: `Expand and simplify $(${a} + \\sqrt{${b}})(${a} - \\sqrt{${b}})$.`,
         answerType: 'numeric', answer: { value: a * a - b },
         traps: [
-          { value: a * a + b, why: 'This is a difference of two squares: $(a+b)(a-b) = a^2 - b^2$, and $(\\sqrt{' + b + '})^2 = ' + b + '$.' },
+          { value: a * a + b, why: `This is a difference of two squares: $(x+y)(x-y) = x^2 - y^2$, and $(\\sqrt{${b}})^2 = ${b}$.` },
           { value: a * a - Math.sqrt(b), why: `$(\\sqrt{${b}})^2 = ${b}$, not $\\sqrt{${b}}$.`, tol: 0.01 }
         ],
-        hints: ['This is a conjugate pair — difference of two squares.', `$(a+b)(a-b) = a^2 - b^2$ with $a = ${a}$, $b = \\sqrt{${b}}$.`, `$${a}^2 - (\\sqrt{${b}})^2 = ${a * a} - ${b}$.`],
+        hints: ['This is a conjugate pair — difference of two squares.', `$(x+y)(x-y) = x^2 - y^2$ with $x = ${a}$, $y = \\sqrt{${b}}$.`, `$${a}^2 - (\\sqrt{${b}})^2 = ${a * a} - ${b}$.`],
         steps: [
           { h: 'Difference of two squares', d: `$(${a})^2 - (\\sqrt{${b}})^2$` },
           { h: 'Evaluate', d: `$${a * a} - ${b} = ${a * a - b}$` },
@@ -349,23 +374,31 @@ export const year10 = {
         ]
       };
     }
-    const p = rc(rng, [4, 8, 9, 16, 25, 27]);
-    const isCube = p === 8 || p === 27;
-    const num2 = isCube ? 3 : 2;
-    const frac = rc(rng, isCube ? [[1, 3], [2, 3]] : [[1, 2], [3, 2]]);
-    const base = isCube ? Math.cbrt(p) : Math.sqrt(p);
-    const val = base ** frac[0];
+    const isCube = rng() < 0.4;
+    const root = isCube ? ri(rng, 2, 6) : ri(rng, 2, 12);
+    const p = isCube ? root ** 3 : root * root;
+    const den = isCube ? 3 : 2;
+    const numTop = rc(rng, isCube ? [1, 2, 4] : [1, 3, 5]);
+    const neg = rng() < 0.35;
+    const idx = neg ? -numTop : numTop;
+    const val = neg ? 1 / root ** numTop : root ** numTop;
     return {
-      prompt: `Evaluate $${p}^{${frac[0]}/${frac[1]}}$.`,
-      answerType: 'numeric', answer: { value: val },
+      prompt: `Evaluate $${p}^{${idx}/${den}}$.`,
+      answerType: 'numeric', answer: neg ? { value: val, simplestFraction: { n: 1, d: root ** numTop } } : { value: val },
+      inputHint: neg ? 'e.g. 1/81' : 'e.g. 27',
       traps: [
-        { value: p * frac[0] / frac[1], why: 'A fractional index is a root, not multiplication by the fraction.' },
-        { value: p ** frac[0] / frac[1], why: `Take the ${frac[1] === 2 ? 'square' : 'cube'} root *first*, then raise to the power ${frac[0]} — much smaller numbers.` }
+        { value: p * idx / den, why: 'A fractional index is a root, not multiplication by the fraction.' },
+        { value: neg ? -val : p ** numTop / den, why: `Take the ${den === 2 ? 'square' : 'cube'} root *first*, then raise to the power ${numTop}${neg ? ' and take the reciprocal' : ''} — much smaller numbers.` }
+      ].filter(t => Math.abs(t.value - val) > 1e-9),
+      hints: [
+        `The denominator ${den} means a ${den === 2 ? 'square' : 'cube'} root.`,
+        `$${p}^{1/${den}} = ${root}$.`,
+        neg ? `A negative index means the reciprocal: $\\dfrac{1}{${root}^{${numTop}}}$.` : `Then raise to the power ${numTop}: $${root}^{${numTop}}$.`
       ],
-      hints: [`The denominator ${frac[1]} means a ${frac[1] === 2 ? 'square' : 'cube'} root.`, `$${p}^{1/${frac[1]}} = ${base}$.`, `Then raise to the power ${frac[0]}: $${base}^{${frac[0]}}$.`],
       steps: [
-        { h: 'Root first', d: `$${p}^{1/${frac[1]}} = ${base}$` },
-        { h: 'Then the power', d: `$${base}^{${frac[0]}} = ${val}$` }
+        { h: 'Root first', d: `$${p}^{1/${den}} = ${root}$` },
+        { h: 'Then the power', d: `$${root}^{${numTop}} = ${root ** numTop}$` },
+        ...(neg ? [{ h: 'Negative index', d: `$${p}^{${idx}/${den}} = \\dfrac{1}{${root ** numTop}}$` }] : [])
       ]
     };
   },
@@ -437,8 +470,8 @@ export const year10 = {
   // ── Similarity & scale ───────────────────────────────────────────────────
   'y10-similarity': (rng, diff) => {
     if (diff === 1) {
-      const k = rc(rng, [1.5, 2, 2.5, 3, 4]);
-      const a = ri(rng, 4, 12);
+      const k = rc(rng, [1.5, 2, 2.5, 3, 3.5, 4, 5, 6]);
+      const a = ri(rng, 3, 20);
       return {
         prompt: `Two similar triangles have matching sides $${a}$ cm and $${a * k}$ cm. What is the scale factor from the smaller to the larger?`,
         answerType: 'numeric', answer: { value: k },
@@ -448,8 +481,8 @@ export const year10 = {
       };
     }
     if (diff === 2) {
-      const k = rc(rng, [1.5, 2, 2.5, 3]);
-      const a = ri(rng, 4, 10), b = ri(rng, 5, 12);
+      const k = rc(rng, [1.5, 2, 2.5, 3, 3.5, 4, 5]);
+      const a = ri(rng, 3, 16), b = ri(rng, 4, 20);
       return {
         prompt: `Triangles $ABC$ and $DEF$ are similar. $AB = ${a}$ cm matches $DE = ${a * k}$ cm, and $BC = ${b}$ cm matches $EF$. Find $EF$.`,
         answerType: 'numeric', answer: { value: b * k }, answerSuffix: 'cm',
@@ -465,8 +498,8 @@ export const year10 = {
       };
     }
     if (diff === 3) {
-      const k = rc(rng, [2, 3, 1.5, 2.5]);
-      const A = ri(rng, 8, 30);
+      const k = rc(rng, [1.5, 2, 2.5, 3, 3.5, 4, 5]);
+      const A = ri(rng, 6, 60);
       return {
         prompt: `Two similar figures have a length scale factor of $${k}$. The smaller figure has area $${A}$ cm². Find the area of the larger figure.`,
         answerType: 'numeric', answer: { value: A * k * k, tol: 0.01 }, answerSuffix: 'cm²',
@@ -478,8 +511,8 @@ export const year10 = {
         ]
       };
     }
-    const scale = rc(rng, [50000, 100000, 25000, 200000]);
-    const mapCm = ri(rng, 3, 12);
+    const scale = rc(rng, [10000, 20000, 25000, 40000, 50000, 80000, 100000, 150000, 200000, 250000, 500000]);
+    const mapCm = ri(rng, 2, 24);
     const km = mapCm * scale / 100000;
     return {
       prompt: `A map has scale $1 : ${scale.toLocaleString('en-AU')}$. Two towns are $${mapCm}$ cm apart on the map. What is the real distance between them, in kilometres?`,
@@ -606,8 +639,8 @@ export const year10 = {
       };
     }
     if (diff === 3) {
-      const pAB = rc(rng, [[1, 10], [1, 8], [3, 20], [1, 6]]);
-      const pB = rc(rng, [[1, 4], [3, 10], [2, 5], [1, 2]]);
+      const pAB = rc(rng, [[1, 10], [1, 8], [3, 20], [1, 6], [1, 12], [1, 5], [2, 15], [3, 25], [1, 20], [7, 40]]);
+      const pB = rc(rng, [[1, 4], [3, 10], [2, 5], [1, 2], [3, 5], [7, 10], [2, 3], [4, 5], [5, 8], [3, 4]]);
       const fAB = new Frac(pAB[0], pAB[1]);
       const fB = new Frac(pB[0], pB[1]);
       if (fAB.value >= fB.value) return year10['y10-probability'](rng, diff);
@@ -647,21 +680,3 @@ export const year10 = {
   }
 };
 
-// Fix the y10-surds D2 branch (placeholder above): product of surds, simplified.
-year10['y10-surds'] = ((orig) => (rng, diff) => {
-  if (diff !== 2) return orig(rng, diff);
-  const a = rc(rng, [2, 3, 6, 5]), b = rc(rng, [6, 10, 15, 12, 8].filter(x => surdSimp(x * a).k > 1 && surdSimp(x * a).r > 1));
-  const prod = a * b;
-  const s = surdSimp(prod);
-  return {
-    prompt: `Simplify $\\sqrt{${a}} \\times \\sqrt{${b}}$.`,
-    answerType: 'numeric', answer: { value: s.k * Math.sqrt(s.r), surdForm: { k: s.k, r: s.r } },
-    inputHint: 'e.g. 2sqrt(3)',
-    traps: [{ value: Math.sqrt(a + b), why: 'Roots multiply under one root: $\\sqrt{a}\\sqrt{b} = \\sqrt{ab}$ — the numbers multiply, they don’t add.', tol: 0.01 }],
-    hints: ['Combine under a single square root.', `$\\sqrt{${a}} \\times \\sqrt{${b}} = \\sqrt{${prod}}$.`, `Now extract the square factor: $${prod} = ${s.k * s.k} \\times ${s.r}$.`],
-    steps: [
-      { h: 'Multiply under one root', d: `$\\sqrt{${a} \\times ${b}} = \\sqrt{${prod}}$` },
-      { h: 'Extract the square factor', d: `$\\sqrt{${s.k * s.k} \\times ${s.r}} = ${surdLatex(s.k, s.r)}$` }
-    ]
-  };
-})(year10['y10-surds']);

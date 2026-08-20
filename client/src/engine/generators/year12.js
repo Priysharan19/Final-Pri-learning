@@ -3,6 +3,53 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { ri, rc, rs, nz, gcd, Frac, mcq, term, poly, sgn, moneyPlain, r1, r2, r3, NAMES } from '../qhelpers.js';
 
+// ── Exact values for trigonometric calculus ─────────────────────────────────
+
+/** Bracket a negative value so a generated expression string stays parseable. */
+const pn12 = v => v < 0 ? `(${v})` : String(v);
+
+/** An exact value p√r / q, reduced, as a typed answer, LaTeX and number. */
+function exactSurd(p, r, q) {
+  if (p === 0) return { typed: '0', tex: '0', val: 0 };
+  const g = gcd(Math.abs(p), q);
+  const n = p / g, d = q / g;
+  const base = r === 1 ? `${n}` : n === 1 ? `sqrt(${r})` : n === -1 ? `-sqrt(${r})` : `${n}sqrt(${r})`;
+  const baseTex = r === 1 ? `${n}` : n === 1 ? `\\sqrt{${r}}` : n === -1 ? `-\\sqrt{${r}}` : `${n}\\sqrt{${r}}`;
+  return {
+    typed: d === 1 ? base : `${base}/${d}`,
+    tex: d === 1 ? baseTex : `\\dfrac{${baseTex}}{${d}}`,
+    val: n * Math.sqrt(r) / d
+  };
+}
+
+/** sin and cos of the special angles, as {p, r, q} meaning p√r / q. */
+const EXACT_ANGLES = {
+  0: { sin: [0, 1, 1], cos: [1, 1, 1] },
+  30: { sin: [1, 1, 2], cos: [1, 3, 2] },
+  45: { sin: [1, 2, 2], cos: [1, 2, 2] },
+  60: { sin: [1, 3, 2], cos: [1, 1, 2] },
+  90: { sin: [1, 1, 1], cos: [0, 1, 1] },
+  120: { sin: [1, 3, 2], cos: [-1, 1, 2] },
+  135: { sin: [1, 2, 2], cos: [-1, 2, 2] },
+  150: { sin: [1, 1, 2], cos: [-1, 3, 2] },
+  180: { sin: [0, 1, 1], cos: [-1, 1, 1] }
+};
+
+/** An angle of `deg` degrees written exactly as a multiple of π. */
+function piDeg(deg, scale = 1) {
+  const n = deg, d = 180 * scale;
+  const g = gcd(n, d) || 1;
+  const p = n / g, q = d / g;
+  if (p === 0) return { typed: '0', tex: '0', val: 0 };
+  const head = p === 1 ? 'pi' : `${p}pi`;
+  const headTex = p === 1 ? '\\pi' : `${p}\\pi`;
+  return {
+    typed: q === 1 ? head : `${head}/${q}`,
+    tex: q === 1 ? headTex : `\\dfrac{${headTex}}{${q}}`,
+    val: p * Math.PI / q
+  };
+}
+
 export const year12 = {
 
   // ── Differentiation rules ────────────────────────────────────────────────
@@ -68,7 +115,7 @@ export const year12 = {
         ]
       };
     }
-    const a = ri(rng, 1, 2), b = nz(rng, -3, 3), n = ri(rng, 2, 3), x0 = ri(rng, 1, 2);
+    const a = ri(rng, 1, 3), b = nz(rng, -6, 6), n = ri(rng, 2, 4), x0 = ri(rng, 1, 3);
     const inner = a * x0 * x0 + b;
     if (inner === 0) return year12['y12-diff'](rng, diff);
     const val = n * Math.pow(inner, n - 1) * 2 * a * x0;
@@ -91,9 +138,9 @@ export const year12 = {
   // ── Applications of differentiation ──────────────────────────────────────
   'y12-appdiff': (rng, diff) => {
     if (diff === 1) {
-      const p = nz(rng, -4, 4);
-      let q = nz(rng, -4, 4);
-      if (q === p) q = p === 4 ? 3 : p + 1;
+      const p = nz(rng, -7, 7);
+      let q = nz(rng, -7, 7);
+      while (q === p) q = nz(rng, -7, 7);
       // y' = 3(x-p)(x-q) → y = x^3 - (3(p+q)/2)x^2 + 3pq x ; use scaled version y = 2x^3 - 3(p+q)x^2 + 6pq x for integer coefficients
       const A = 2, B = -3 * (p + q), C = 6 * p * q;
       return {
@@ -149,42 +196,86 @@ export const year12 = {
         ]
       };
     }
-    const per = rc(rng, [40, 60, 80, 100, 120]);
-    const side = per / 4;
+    const shape = ri(rng, 1, 3);
+    if (shape === 1) {
+      const per = ri(rng, 5, 50) * 4;
+      const side = per / 4;
+      return {
+        prompt: `A farmer has $${per}$ m of fencing to enclose a rectangular paddock. Using calculus (or otherwise), find the **maximum area** that can be enclosed.`,
+        answerType: 'numeric', answer: { value: side * side }, answerSuffix: 'm²',
+        traps: [
+          { value: per, why: `The perimeter is fixed at ${per} m — the answer is an *area*, maximised when the rectangle is a square.` },
+          { value: (per / 2) * (per / 2), why: `Width + length $= ${per / 2}$ (half the perimeter) — each side of the optimal square is $${side}$, not $${per / 2}$.` }
+        ],
+        hints: [`If the width is x, the length is $\\frac{${per} - 2x}{2} = ${per / 2} - x$.`, `Area $A(x) = x(${per / 2} - x)$. Differentiate and set to zero.`, `$A' = ${per / 2} - 2x = 0$ gives $x = ${side}$.`],
+        steps: [
+          { h: 'Model', d: `$A(x) = x(${per / 2} - x) = ${per / 2}x - x^2$` },
+          { h: 'Differentiate', d: `$A'(x) = ${per / 2} - 2x$` },
+          { h: 'Stationary point', d: `$${per / 2} - 2x = 0 \\Rightarrow x = ${side}$ (a maximum since $A'' = -2 < 0$)` },
+          { h: 'Maximum area', d: `$A = ${side} \\times ${side} = ${side * side}$ m² — a square` }
+        ]
+      };
+    }
+    if (shape === 2) {
+      const L = ri(rng, 5, 50) * 4;
+      const x = L / 4;
+      const area = x * (L - 2 * x);
+      return {
+        prompt: `A rectangular yard is fenced on three sides, the fourth being an existing brick wall. There is $${L}$ m of fencing available. Find the **maximum area** that can be enclosed.`,
+        answerType: 'numeric', answer: { value: area }, answerSuffix: 'm²',
+        traps: [
+          { value: (L / 4) ** 2, why: 'Only three sides are fenced, so the optimal shape is not a square — the side parallel to the wall is twice each of the others.' },
+          { value: L, why: 'That is the length of fencing, not an area.' }
+        ],
+        hints: [`Let the two sides perpendicular to the wall be $x$; the third side is $${L} - 2x$.`, `Area $A(x) = x(${L} - 2x)$. Differentiate and set to zero.`, `$A' = ${L} - 4x = 0$ gives $x = ${x}$.`],
+        steps: [
+          { h: 'Model', d: `$A(x) = x(${L} - 2x) = ${L}x - 2x^2$` },
+          { h: 'Differentiate', d: `$A'(x) = ${L} - 4x$` },
+          { h: 'Stationary point', d: `$x = ${x}$ (a maximum since $A'' = -4 < 0$)` },
+          { h: 'Maximum area', d: `$A = ${x} \\times ${L - 2 * x} = ${area}$ m²` }
+        ]
+      };
+    }
+    const S = ri(rng, 6, 60) * 2;
+    const half = S / 2;
     return {
-      prompt: `A farmer has $${per}$ m of fencing to enclose a rectangular paddock. Using calculus (or otherwise), find the **maximum area** that can be enclosed.`,
-      answerType: 'numeric', answer: { value: side * side }, answerSuffix: 'm²',
+      prompt: `Two positive numbers add to $${S}$. Using calculus, find the **greatest possible value of their product**.`,
+      answerType: 'numeric', answer: { value: half * half },
       traps: [
-        { value: per, why: 'The perimeter is fixed at ' + per + ' m — the answer is an *area*, maximised when the rectangle is a square.' },
-        { value: (per / 2) * (per / 2), why: `Width + length $= ${per / 2}$ (half the perimeter) — each side of the optimal square is $${side}$, not $${per / 2}$.` }
+        { value: S, why: 'That is the fixed sum — the question asks for the largest product.' },
+        { value: S * S, why: `The two numbers are $x$ and $${S} - x$; the product peaks at $x = ${half}$, giving $${half} \\times ${half}$.` }
       ],
-      hints: [`If the width is x, the length is $\\frac{${per} - 2x}{2} = ${per / 2} - x$.`, `Area $A(x) = x(${per / 2} - x)$. Differentiate and set to zero.`, `$A' = ${per / 2} - 2x = 0$ gives $x = ${side}$.`],
+      hints: [`Call the numbers $x$ and $${S} - x$.`, `$P(x) = x(${S} - x) = ${S}x - x^2$. Differentiate and set to zero.`, `$P' = ${S} - 2x = 0$ gives $x = ${half}$.`],
       steps: [
-        { h: 'Model', d: `$A(x) = x(${per / 2} - x) = ${per / 2}x - x^2$` },
-        { h: 'Differentiate', d: `$A'(x) = ${per / 2} - 2x$` },
-        { h: 'Stationary point', d: `$${per / 2} - 2x = 0 \\Rightarrow x = ${side}$ (a maximum since $A'' = -2 < 0$)` },
-        { h: 'Maximum area', d: `$A = ${side} \\times ${side} = ${side * side}$ m² — a square` }
+        { h: 'Model', d: `$P(x) = x(${S} - x) = ${S}x - x^2$` },
+        { h: 'Differentiate', d: `$P'(x) = ${S} - 2x$` },
+        { h: 'Stationary point', d: `$x = ${half}$ (a maximum since $P'' = -2 < 0$)` },
+        { h: 'Greatest product', d: `$${half} \\times ${half} = ${half * half}$` }
       ]
     };
   },
-
   // ── Integration ──────────────────────────────────────────────────────────
   'y12-integration': (rng, diff) => {
     if (diff === 1) {
-      const n = ri(rng, 2, 5);
-      const a = (n + 1) * ri(rng, 1, 3);
+      const n = ri(rng, 1, 7);
+      const a = (n + 1) * ri(rng, 1, 6);
+      const k = a / (n + 1);
+      const b = rng() < 0.5 ? nz(rng, -9, 9) : 0;
+      const tail = b === 0 ? '' : ` ${sgn(b)}`;
+      const ansTail = b === 0 ? '' : ` + ${b}*x`;
       return {
-        prompt: `Find $\\displaystyle\\int ${a}x^{${n}}\\,dx$. (You may omit the $+C$.)`,
-        answerType: 'expression', answer: { expr: `${a / (n + 1)}x^${n + 1}`, stripC: true },
-        inputHint: `e.g. ${a / (n + 1)}x^${n + 1} + C`,
+        prompt: `Find $\\displaystyle\\int \\left(${a}x^{${n}}${tail}\\right)\\,dx$. (You may omit the $+C$.)`,
+        answerType: 'expression', answer: { expr: `${k}*x^${n + 1}${ansTail}`, stripC: true },
+        inputHint: `e.g. ${k}x^${n + 1}${b === 0 ? '' : ` ${sgn(b)}x`} + C`,
         traps: [
-          { expr: `${a * n}x^${n - 1}`, why: 'That’s the *derivative* — integration goes the other way: raise the power, divide by the new power.' },
-          { expr: `${a}x^${n + 1}`, why: `Divide by the new power: $\\frac{${a}}{${n + 1}} = ${a / (n + 1)}$.` }
+          { expr: `${a * n}*x^${n - 1}`, why: 'That’s the *derivative* — integration goes the other way: raise the power, divide by the new power.' },
+          { expr: `${a}*x^${n + 1}${ansTail}`, why: `Divide by the new power: $\\frac{${a}}{${n + 1}} = ${k}$.` }
         ],
-        hints: ['Reverse the power rule: raise the power by 1, divide by the new power.', `$\\int x^{${n}} dx = \\frac{x^{${n + 1}}}{${n + 1}}$.`, `$\\frac{${a}}{${n + 1}} = ${a / (n + 1)}$.`],
+        hints: ['Reverse the power rule: raise each power by 1, divide by the new power.', `$\\int x^{${n}} dx = \\frac{x^{${n + 1}}}{${n + 1}}$.`, b === 0 ? `$\\frac{${a}}{${n + 1}} = ${k}$.` : `The constant $${b}$ integrates to $${b}x$.`],
         steps: [
           { h: 'Raise the power', d: `$x^{${n}} \\to \\dfrac{x^{${n + 1}}}{${n + 1}}$` },
-          { h: 'Keep the coefficient', d: `$\\displaystyle\\int ${a}x^{${n}} dx = \\dfrac{${a}}{${n + 1}}x^{${n + 1}} + C = ${a / (n + 1)}x^{${n + 1}} + C$` }
+          { h: 'Keep the coefficient', d: `$\\displaystyle\\int ${a}x^{${n}} dx = \\dfrac{${a}}{${n + 1}}x^{${n + 1}} = ${k}x^{${n + 1}}$` },
+          ...(b === 0 ? [] : [{ h: 'Integrate the constant', d: `$\\displaystyle\\int ${b}\\,dx = ${b}x$` }])
         ]
       };
     }
@@ -206,7 +297,7 @@ export const year12 = {
       };
     }
     if (diff === 3) {
-      const k = ri(rng, 1, 3), w = ri(rng, 2, 4);
+      const k = ri(rng, 1, 6), w = ri(rng, 2, 12);
       // area under y = k x (w - x) from 0 to w  = k w^3/6
       const area = k * w ** 3 / 6;
       return {
@@ -222,21 +313,21 @@ export const year12 = {
         ]
       };
     }
-    const c = ri(rng, 1, 4);
-    const w = ri(rng, 2, 4);
-    // Area between y = x + c*w... use y = x(w−x) + h? Keep simple: between line y = x and parabola y = x^2 from 0 to 1 scaled: y = kx vs y = x² intersect at k → area k³/6
-    const k = ri(rng, 2, 4);
-    const area = k ** 3 / 6;
+    const r1x = ri(rng, -6, 4);
+    const r2x = r1x + ri(rng, 1, 6);
+    const m = r1x + r2x, cc = -r1x * r2x;
+    const width = r2x - r1x;
+    const area = width ** 3 / 6;
+    const lineTex = m === 0 ? `${cc}` : `${term(m)}${cc === 0 ? '' : ` ${sgn(cc)}`}`;
     return {
-      prompt: `Find the area enclosed between the line $y = ${k}x$ and the parabola $y = x^2$.`,
+      prompt: `Find the area enclosed between the line $y = ${lineTex}$ and the parabola $y = x^2$.`,
       answerType: 'numeric', answer: { value: r3(area), tol: 0.002 }, answerSuffix: 'units²',
-      traps: [{ value: r3(k ** 3 / 2 - k ** 3 / 3), why: null }].filter(t => false),
-      hints: ['Find the intersection points first.', `$${k}x = x^2$ at $x = 0$ and $x = ${k}$.`, `Area $= \\int_0^{${k}} (\\text{top} - \\text{bottom})\\,dx = \\int_0^{${k}} (${k}x - x^2)\\,dx$.`],
+      traps: [{ value: r3(width ** 3 / 3), why: 'Integrate (top − bottom) across the interval between the intersections — halve nothing and double nothing.', tol: 0.002 }].filter(t => Math.abs(t.value - r3(area)) > 0.01),
+      hints: ['Find the intersection points first.', `$x^2 = ${lineTex}$ gives $x = ${r1x}$ and $x = ${r2x}$.`, `Area $= \\displaystyle\\int_{${r1x}}^{${r2x}} \\left(${lineTex} - x^2\\right)dx$.`],
       steps: [
-        { h: 'Intersections', d: `$${k}x = x^2 \\Rightarrow x(x - ${k}) = 0 \\Rightarrow x = 0, ${k}$` },
-        { h: 'Top minus bottom', d: `On $[0, ${k}]$ the line is above: $A = \\displaystyle\\int_0^{${k}}(${k}x - x^2)dx$` },
-        { h: 'Antiderivative', d: `$\\dfrac{${k}}{2}x^2 - \\dfrac{1}{3}x^3$` },
-        { h: 'Evaluate', d: `$\\dfrac{${k ** 3}}{2} - \\dfrac{${k ** 3}}{3} = ${r3(area)}$ units²` }
+        { h: 'Intersections', d: `$x^2 ${sgn(-m)}x ${sgn(-cc)} = 0 \\Rightarrow (x ${sgn(-r1x)})(x ${sgn(-r2x)}) = 0$, so $x = ${r1x}, ${r2x}$` },
+        { h: 'Top minus bottom', d: `Between the roots the line is above: $A = \\displaystyle\\int_{${r1x}}^{${r2x}}\\left(${lineTex} - x^2\\right)dx$` },
+        { h: 'Evaluate', d: `$A = \\dfrac{(${r2x} - ${r1x})^3}{6} = \\dfrac{${width ** 3}}{6} = ${r3(area)}$ units²` }
       ]
     };
   },
@@ -282,35 +373,58 @@ export const year12 = {
       };
     }
     if (diff === 3) {
-      const pick = rc(rng, [
-        { x: '\\pi/3', val: 0.5, typed: '1/2', desc: 'x = π/3' },
-        { x: '\\pi/6', val: Math.sqrt(3) / 2, typed: 'sqrt(3)/2', desc: 'x = π/6' },
-        { x: '\\pi/4', val: Math.SQRT2 / 2, typed: 'sqrt(2)/2', desc: 'x = π/4' },
-        { x: '0', val: 1, typed: '1', desc: 'x = 0' }
-      ]);
+      const fn = rc(rng, ['sin', 'cos']);
+      const m = ri(rng, 1, 4);
+      const A = rc(rng, [0, 30, 45, 60, 90, 120, 135, 150, 180]);
+      const x0 = piDeg(A, m);
+      // d/dx sin(mx) = m cos(mx);  d/dx cos(mx) = -m sin(mx)
+      const [p, r, q] = fn === 'sin' ? EXACT_ANGLES[A].cos : EXACT_ANGLES[A].sin;
+      const grad = exactSurd(fn === 'sin' ? m * p : -m * p, r, q);
+      const raw = exactSurd(fn === 'sin' ? EXACT_ANGLES[A].sin[0] : EXACT_ANGLES[A].cos[0], fn === 'sin' ? EXACT_ANGLES[A].sin[1] : EXACT_ANGLES[A].cos[1], fn === 'sin' ? EXACT_ANGLES[A].sin[2] : EXACT_ANGLES[A].cos[2]);
       return {
-        prompt: `If $y = \\sin(x)$, find the **exact** gradient of the curve at $x = ${pick.x === '0' ? '0' : `\\frac{${pick.x.split('/')[0]}}{${pick.x.split('/')[1]}}`}$.`,
-        answerType: 'numeric', answer: { value: pick.val, requireExact: true, canonicalInput: pick.typed },
-        inputHint: 'e.g. 1/2 or sqrt(3)/2',
-        traps: [{ value: Math.sin(pick.x === '0' ? 0 : pick.x === '\\pi/3' ? Math.PI / 3 : pick.x === '\\pi/6' ? Math.PI / 6 : Math.PI / 4), why: 'The gradient comes from the *derivative*, $y\' = \\cos(x)$ — not from sin itself.', tol: 0.001 }].filter(t => Math.abs(t.value - pick.val) > 0.002),
-        hints: ['Differentiate first.', `$y' = \\cos(x)$.`, `Evaluate $\\cos$ at the given angle using exact values.`],
+        prompt: `If $y = \\${fn}(${m === 1 ? '' : m}x)$, find the **exact** gradient of the curve at $x = ${x0.tex}$.`,
+        answerType: 'numeric', answer: { value: grad.val, requireExact: true, canonicalInput: grad.typed },
+        inputHint: 'e.g. 1/2 or -sqrt(3)/2',
+        traps: [{ value: raw.val, why: `The gradient comes from the *derivative* $y' = ${fn === 'sin' ? `${m === 1 ? '' : m}\\cos` : `-${m === 1 ? '' : m}\\sin`}(${m === 1 ? '' : m}x)$ — not from the original function.`, tol: 0.001 }].filter(t => Math.abs(t.value - grad.val) > 0.002),
+        hints: [
+          `Differentiate: $y' = ${fn === 'sin' ? `${m === 1 ? '' : m}\\cos(${m === 1 ? '' : m}x)` : `-${m === 1 ? '' : m}\\sin(${m === 1 ? '' : m}x)`}$.`,
+          `At $x = ${x0.tex}$ the inner angle is $${m === 1 ? '' : m} \\times ${x0.tex} = ${A}°$.`,
+          `Use the exact value of $\\${fn === 'sin' ? 'cos' : 'sin'} ${A}°$.`
+        ],
         steps: [
-          { h: 'Differentiate', d: `$y' = \\cos(x)$` },
-          { h: 'Exact value', d: `$\\cos(${pick.x === '0' ? '0' : pick.x}) = ${pick.typed.replace('sqrt(3)/2', '\\frac{\\sqrt{3}}{2}').replace('sqrt(2)/2', '\\frac{\\sqrt{2}}{2}').replace('1/2', '\\frac{1}{2}')}$` }
+          { h: 'Differentiate', d: `$y' = ${fn === 'sin' ? `${m === 1 ? '' : m}\\cos(${m === 1 ? '' : m}x)` : `-${m === 1 ? '' : m}\\sin(${m === 1 ? '' : m}x)`}$` },
+          { h: 'Inner angle', d: `$${m === 1 ? '' : m}\\left(${x0.tex}\\right) = ${A}°$` },
+          { h: 'Exact gradient', d: `$y' = ${grad.tex}$` }
         ]
       };
     }
-    const upper = rc(rng, [['\\pi/2', Math.PI / 2, 1], ['\\pi', Math.PI, 0], ['\\pi/6', Math.PI / 6, 0.5]]);
+    const fn = rc(rng, ['sin', 'cos']);
+    const m = ri(rng, 1, 3);
+    const k = ri(rng, 1, 4);
+    const A = fn === 'cos'
+      ? rc(rng, [30, 45, 60, 90, 120, 135, 150, 180])
+      : rc(rng, [60, 90, 120, 180]);
+    const upper = piDeg(A, m);
+    // ∫₀^b cos(mx) dx = sin(mb)/m ;  ∫₀^b sin(mx) dx = (1 − cos(mb))/m
+    const res = fn === 'cos'
+      ? exactSurd(k * EXACT_ANGLES[A].sin[0], EXACT_ANGLES[A].sin[1], m * EXACT_ANGLES[A].sin[2])
+      : exactSurd(k * (EXACT_ANGLES[A].cos[2] - EXACT_ANGLES[A].cos[0]), 1, m * EXACT_ANGLES[A].cos[2]);
+    const kTex = k === 1 ? '' : k;
+    const mTex = m === 1 ? '' : m;
     return {
-      prompt: `Evaluate $\\displaystyle\\int_{0}^{${upper[0]}} \\cos(x)\\,dx$ exactly.`,
-      answerType: 'numeric', answer: { value: upper[2], requireExact: true, canonicalInput: String(upper[2] === 0.5 ? '1/2' : upper[2]) },
+      prompt: `Evaluate $\\displaystyle\\int_{0}^{${upper.tex}} ${kTex}\\${fn}(${mTex}x)\\,dx$ exactly.`,
+      answerType: 'numeric', answer: { value: res.val, requireExact: true, canonicalInput: res.typed },
       inputHint: 'e.g. 1 or 1/2',
-      traps: [{ value: -upper[2] === 0 ? 9 : -upper[2], why: '$\\int\\cos = \\sin$, then evaluate $\\sin$ at the limits: $\\sin(b) - \\sin(0)$.', tol: 0.001 }].filter(t => t.value !== 9 && Math.abs(t.value - upper[2]) > 0.002),
-      hints: ['Antiderivative of cos is sin.', `$[\\sin x]_0^{${upper[0]}}$.`, `$\\sin(${upper[0]}) - \\sin(0)$.`],
+      traps: [{ value: -res.val, why: `$\\displaystyle\\int \\${fn}(${mTex}x)\\,dx = ${fn === 'cos' ? `\\frac{1}{${m}}\\sin(${mTex}x)` : `-\\frac{1}{${m}}\\cos(${mTex}x)`}$ — check the sign, then subtract the value at the lower limit.`, tol: 0.001 }].filter(t => Math.abs(t.value - res.val) > 0.002),
+      hints: [
+        `$\\displaystyle\\int \\${fn}(${mTex}x)\\,dx = ${fn === 'cos' ? `\\frac{1}{${m}}\\sin(${mTex}x)` : `-\\frac{1}{${m}}\\cos(${mTex}x)`}$.`,
+        `At the upper limit the inner angle is $${mTex}\\left(${upper.tex}\\right) = ${A}°$.`,
+        `Subtract the value at $x = 0$.`
+      ],
       steps: [
-        { h: 'Antiderivative', d: `$\\displaystyle\\int \\cos x\\,dx = \\sin x$` },
-        { h: 'Evaluate at the limits', d: `$\\sin(${upper[0]}) - \\sin(0) = ${upper[2] === 0.5 ? '\\tfrac{1}{2}' : upper[2]} - 0$` },
-        { h: 'Answer', d: `$${upper[2] === 0.5 ? '\\tfrac{1}{2}' : upper[2]}$` }
+        { h: 'Antiderivative', d: `$${kTex === '' ? '' : kTex}${fn === 'cos' ? `\\dfrac{1}{${m}}\\sin(${mTex}x)` : `-\\dfrac{1}{${m}}\\cos(${mTex}x)`}$` },
+        { h: 'Evaluate at the limits', d: `inner angle $${A}°$ at the top, $0°$ at the bottom` },
+        { h: 'Answer', d: `$${res.tex}$` }
       ]
     };
   },
@@ -335,7 +449,46 @@ export const year12 = {
       };
     }
     if (diff === 2) {
-      const a = ri(rng, 2, 5);
+      const a = ri(rng, 2, 9);
+      const shape = ri(rng, 1, 3);
+      if (shape === 1) {
+        const n = ri(rng, 2, 6);
+        return {
+          prompt: `Differentiate $y = \\ln(${a}x^{${n}})$ for $x > 0$.`,
+          answerType: 'expression', answer: { expr: `${n}/x`, positiveOnly: true },
+          inputHint: 'e.g. 3/x',
+          answerPrefix: 'dy/dx =',
+          traps: [
+            { expr: `1/(${a}*x^${n})`, why: `Split it first: $\\ln(${a}x^{${n}}) = \\ln ${a} + ${n}\\ln x$, which differentiates to $\\frac{${n}}{x}$.` },
+            { expr: `${a * n}/x`, why: `The constant $\\ln ${a}$ differentiates to zero — only the power $${n}$ survives.` }
+          ],
+          hints: ['Use the log laws to split it first.', `$\\ln(${a}x^{${n}}) = \\ln ${a} + ${n}\\ln x$.`, 'The constant term vanishes when differentiated.'],
+          steps: [
+            { h: 'Split with log laws', d: `$\\ln(${a}x^{${n}}) = \\ln ${a} + ${n}\\ln x$` },
+            { h: 'Differentiate', d: `$\\dfrac{d}{dx}\\ln ${a} = 0, \\quad \\dfrac{d}{dx}\\left(${n}\\ln x\\right) = \\dfrac{${n}}{x}$` },
+            { h: 'Answer', d: `$y' = \\dfrac{${n}}{x}$` }
+          ]
+        };
+      }
+      if (shape === 2) {
+        const b = nz(rng, -9, 9);
+        return {
+          prompt: `Differentiate $y = \\ln(${a}x ${sgn(b)})$.`,
+          answerType: 'expression', answer: { expr: `${a}/(${a}*x + ${pn12(b)})` },
+          inputHint: `e.g. ${a}/(${a}x ${sgn(b)})`,
+          answerPrefix: 'dy/dx =',
+          traps: [
+            { expr: `1/(${a}*x + ${pn12(b)})`, why: `Chain rule: multiply by the inner derivative $${a}$.` },
+            { expr: `1/x`, why: `A constant *inside* the bracket cannot be split off with a log law — use the chain rule instead.` }
+          ],
+          hints: ['Chain rule: $\\frac{d}{dx}\\ln u = \\frac{u\'}{u}$.', `$u = ${a}x ${sgn(b)}$, so $u' = ${a}$.`, `$y' = \\dfrac{${a}}{${a}x ${sgn(b)}}$.`],
+          steps: [
+            { h: 'Chain rule for logs', d: `$\\dfrac{d}{dx}\\ln u = \\dfrac{u'}{u}$` },
+            { h: 'Inner derivative', d: `$u = ${a}x ${sgn(b)} \\Rightarrow u' = ${a}$` },
+            { h: 'Answer', d: `$y' = \\dfrac{${a}}{${a}x ${sgn(b)}}$` }
+          ]
+        };
+      }
       return {
         prompt: `Differentiate $y = \\ln(${a}x)$ for $x > 0$.`,
         answerType: 'expression', answer: { expr: `1/x`, positiveOnly: true },
@@ -354,9 +507,9 @@ export const year12 = {
       };
     }
     if (diff === 3) {
-      const P0 = rc(rng, [200, 500, 1000, 4000]);
-      const kPct = rc(rng, [5, 8, 10, 12]);
-      const t = ri(rng, 3, 10);
+      const P0 = rc(rng, [150, 200, 250, 400, 500, 800, 1000, 1500, 2000, 4000, 5000]);
+      const kPct = rc(rng, [4, 5, 6, 8, 10, 12, 15, 20]);
+      const t = ri(rng, 2, 14);
       const val = P0 * Math.exp(kPct / 100 * t);
       return {
         prompt: `A bacteria population grows according to $N(t) = ${P0}e^{${kPct / 100}t}$ (t in hours). Find the population after $${t}$ hours, to the nearest whole number.`,
@@ -369,17 +522,20 @@ export const year12 = {
         ]
       };
     }
-    const kPct = rc(rng, [4, 5, 6, 8, 10]);
-    const tDouble = Math.log(2) / (kPct / 100);
+    const kPct = rc(rng, [2, 2.5, 3, 3.5, 4, 4.5, 5, 6, 7, 8, 9, 10, 12, 15]);
+    const mult = rc(rng, [2, 3, 4, 5, 10]);
+    const k = kPct / 100;
+    const tGrow = Math.log(mult) / k;
+    const word = mult === 2 ? 'double' : mult === 3 ? 'triple' : `grow to $${mult}$ times its starting value`;
     return {
-      prompt: `An investment grows continuously at rate $k = ${kPct / 100}$ per year: $A(t) = A_0 e^{${kPct / 100}t}$. How long until it **doubles**? Answer in years, correct to 1 decimal place.`,
-      answerType: 'numeric', answer: { value: r1(tDouble), tol: 0.06 }, answerSuffix: 'years',
-      traps: [{ value: r1(100 / kPct), why: `That's the simple-interest doubling estimate — with continuous growth, solve $e^{${kPct / 100}t} = 2$ using ln.`, tol: 0.5 }].filter(t => Math.abs(t.value - r1(tDouble)) > 1),
-      hints: ['Set $A(t) = 2A_0$.', `$e^{${kPct / 100}t} = 2$ — take ln of both sides.`, `$t = \\dfrac{\\ln 2}{${kPct / 100}}$.`],
+      prompt: `An investment grows continuously at rate $k = ${k}$ per year: $A(t) = A_0 e^{${k}t}$. How long until it **${word}**? Answer in years, correct to 1 decimal place.`,
+      answerType: 'numeric', answer: { value: r1(tGrow), tol: 0.06 }, answerSuffix: 'years',
+      traps: [{ value: r1(100 * (mult - 1) / kPct), why: `That's the simple-interest estimate — with continuous growth, solve $e^{${k}t} = ${mult}$ using ln.`, tol: 0.5 }].filter(t => Math.abs(t.value - r1(tGrow)) > 1),
+      hints: [`Set $A(t) = ${mult}A_0$.`, `$e^{${k}t} = ${mult}$ — take ln of both sides.`, `$t = \\dfrac{\\ln ${mult}}{${k}}$.`],
       steps: [
-        { h: 'Doubling condition', d: `$A_0e^{${kPct / 100}t} = 2A_0 \\Rightarrow e^{${kPct / 100}t} = 2$` },
-        { h: 'Take ln', d: `$${kPct / 100}t = \\ln 2 = ${r3(Math.log(2))}$` },
-        { h: 'Solve', d: `$t = \\dfrac{${r3(Math.log(2))}}{${kPct / 100}} \\approx ${r1(tDouble)}$ years` }
+        { h: 'Growth condition', d: `$A_0e^{${k}t} = ${mult}A_0 \\Rightarrow e^{${k}t} = ${mult}$` },
+        { h: 'Take ln', d: `$${k}t = \\ln ${mult} = ${r3(Math.log(mult))}$` },
+        { h: 'Solve', d: `$t = \\dfrac{${r3(Math.log(mult))}}{${k}} \\approx ${r1(tGrow)}$ years` }
       ]
     };
   },
@@ -478,8 +634,8 @@ export const year12 = {
       };
     }
     if (diff === 2) {
-      const dep = rc(rng, [500, 1000, 2000]);
-      const rr = rc(rng, [5, 6, 8]);
+      const dep = rc(rng, [250, 400, 500, 600, 750, 1000, 1200, 1500, 2000, 2500, 3000]);
+      const rr = rc(rng, [3, 4, 4.5, 5, 5.5, 6, 7, 8, 9, 10]);
       const g = 1 + rr / 100;
       const total = dep * (g ** 3 + g ** 2 + g);
       return {
@@ -515,10 +671,10 @@ export const year12 = {
         ]
       };
     }
-    const L = rc(rng, [10000, 20000, 15000]);
-    const rr = rc(rng, [6, 12]);
-    const rMonthly = rr === 6 ? 0.005 : 0.01;
-    const M = rc(rng, [300, 400, 500]);
+    const L = rc(rng, [8000, 10000, 12000, 15000, 18000, 20000, 25000, 30000]);
+    const rr = rc(rng, [6, 9, 12, 15, 18]);
+    const rMonthly = rr / 1200;
+    const M = rc(rng, [250, 300, 350, 400, 450, 500, 600, 750]);
     const b1 = L * (1 + rMonthly) - M;
     const b2 = b1 * (1 + rMonthly) - M;
     return {
@@ -541,37 +697,40 @@ export const year12 = {
   'y12-stats': (rng, diff) => {
     if (diff === 1) {
       const vals = [0, 1, 2, 3];
-      let p1 = ri(rng, 1, 4), p2 = ri(rng, 1, 4), p3 = ri(rng, 1, 3);
-      const den = 10;
-      if (p1 + p2 + p3 >= den) { p1 = 2; p2 = 3; p3 = 1; }
+      const den = 20;
+      let p1 = ri(rng, 1, 9), p2 = ri(rng, 1, 9), p3 = ri(rng, 1, 8);
+      while (p1 + p2 + p3 >= den) { p1 = ri(rng, 1, 9); p2 = ri(rng, 1, 9); p3 = ri(rng, 1, 8); }
       const p0 = den - p1 - p2 - p3;
       const probs = [p0, p1, p2, p3];
       const E = vals.reduce((s, v, i) => s + v * probs[i] / den, 0);
       return {
-        prompt: `A discrete random variable $X$ has $P(X=0) = ${p0 / 10}$, $P(X=1) = ${p1 / 10}$, $P(X=2) = ${p2 / 10}$, $P(X=3) = ${p3 / 10}$. Find $E(X)$.`,
+        prompt: `A discrete random variable $X$ has $P(X=0) = ${p0 / den}$, $P(X=1) = ${p1 / den}$, $P(X=2) = ${p2 / den}$, $P(X=3) = ${p3 / den}$. Find $E(X)$.`,
         answerType: 'numeric', answer: { value: r2(E), tol: 0.011 },
         traps: [{ value: 1.5, why: 'E(X) weights each value by its probability: $\\sum x\\,P(X=x)$ — not the midpoint of the values.', tol: 0.011 }].filter(t => Math.abs(t.value - r2(E)) > 0.03),
-        hints: ['$E(X) = \\sum x \\cdot P(X = x)$.', `$0(${p0 / 10}) + 1(${p1 / 10}) + 2(${p2 / 10}) + 3(${p3 / 10})$.`, `$= ${p1 / 10} + ${2 * p2 / 10} + ${3 * p3 / 10}$.`],
+        hints: ['$E(X) = \\sum x \\cdot P(X = x)$.', `$0(${p0 / den}) + 1(${p1 / den}) + 2(${p2 / den}) + 3(${p3 / den})$.`, `$= ${r3(p1 / den)} + ${r3(2 * p2 / den)} + ${r3(3 * p3 / den)}$.`],
         steps: [
           { h: 'Expected value formula', d: `$E(X) = \\sum x\\,P(X{=}x)$` },
-          { h: 'Substitute', d: `$0 \\times ${p0 / 10} + 1 \\times ${p1 / 10} + 2 \\times ${p2 / 10} + 3 \\times ${p3 / 10}$` },
+          { h: 'Substitute', d: `$0 \\times ${p0 / den} + 1 \\times ${p1 / den} + 2 \\times ${p2 / den} + 3 \\times ${p3 / den}$` },
           { h: 'Evaluate', d: `$E(X) = ${r2(E)}$` }
         ]
       };
     }
     if (diff === 2) {
-      const a = ri(rng, 1, 3), b = 10 - 2 * a;
-      const E = (0 * a + 1 * b + 2 * a) / 10;
-      const EX2 = (0 * a + 1 * b + 4 * a) / 10;
+      const den = 20;
+      let a = ri(rng, 1, 12), c = ri(rng, 1, 12);
+      while (a + c >= den) { a = ri(rng, 1, 12); c = ri(rng, 1, 12); }
+      const b = den - a - c;
+      const E = (0 * a + 1 * b + 2 * c) / den;
+      const EX2 = (0 * a + 1 * b + 4 * c) / den;
       const V = EX2 - E * E;
       return {
-        prompt: `$X$ takes values $0, 1, 2$ with $P(X=0) = ${a / 10}$, $P(X=1) = ${b / 10}$, $P(X=2) = ${a / 10}$. Find $\\text{Var}(X)$, correct to 2 decimal places.`,
+        prompt: `$X$ takes values $0, 1, 2$ with $P(X=0) = ${a / den}$, $P(X=1) = ${b / den}$, $P(X=2) = ${c / den}$. Find $\\text{Var}(X)$, correct to 2 decimal places.`,
         answerType: 'numeric', answer: { value: r2(V), tol: 0.011 },
         traps: [
           { value: r2(EX2), why: `$${r2(EX2)}$ is $E(X^2)$ — subtract $[E(X)]^2 = ${r2(E * E)}$ for the variance.`, tol: 0.011 },
           { value: r2(EX2 - E), why: 'Var(X) subtracts the *square* of the mean: $E(X^2) - [E(X)]^2$.', tol: 0.011 }
         ].filter(t => Math.abs(t.value - r2(V)) > 0.02),
-        hints: ['$\\text{Var}(X) = E(X^2) - [E(X)]^2$.', `$E(X) = ${r2(E)}$ (by symmetry).`, `$E(X^2) = 0^2(${a / 10}) + 1^2(${b / 10}) + 2^2(${a / 10}) = ${r2(EX2)}$.`],
+        hints: ['$\\text{Var}(X) = E(X^2) - [E(X)]^2$.', `$E(X) = ${r2(E)}$.`, `$E(X^2) = 0^2(${a / den}) + 1^2(${b / den}) + 2^2(${c / den}) = ${r2(EX2)}$.`],
         steps: [
           { h: 'Mean', d: `$E(X) = ${r2(E)}$` },
           { h: 'Second moment', d: `$E(X^2) = ${r2(EX2)}$` },
@@ -580,9 +739,9 @@ export const year12 = {
       };
     }
     if (diff === 3) {
-      const mu = rc(rng, [60, 65, 70, 100, 50]);
-      const sd = rc(rng, [5, 8, 10, 12, 15]);
-      const z = rc(rng, [-2, -1.5, -1, 0.5, 1, 1.5, 2, 2.5]);
+      const mu = rc(rng, [40, 45, 50, 55, 60, 65, 70, 75, 80, 90, 100, 110]);
+      const sd = rc(rng, [2, 4, 5, 6, 8, 10, 12, 15, 20]);
+      const z = rc(rng, [-2.5, -2, -1.5, -1, -0.5, 0.5, 1, 1.5, 2, 2.5]);
       const x = mu + z * sd;
       return {
         prompt: `Test scores are normally distributed with mean $${mu}$ and standard deviation $${sd}$. Find the **z-score** of a mark of $${x}$.`,
@@ -599,14 +758,20 @@ export const year12 = {
         ]
       };
     }
-    const mu = rc(rng, [100, 60, 70, 50]);
-    const sd = rc(rng, [10, 5, 8]);
+    const mu = rc(rng, [40, 45, 50, 55, 60, 64, 70, 75, 80, 90, 100, 120]);
+    const sd = rc(rng, [2, 3, 4, 5, 6, 8, 10, 12, 15]);
     const pick = rc(rng, [
       { lo: mu - sd, hi: mu + sd, pct: 68 },
       { lo: mu - 2 * sd, hi: mu + 2 * sd, pct: 95 },
+      { lo: mu - 3 * sd, hi: mu + 3 * sd, pct: 99.7 },
       { lo: mu, hi: mu + sd, pct: 34 },
+      { lo: mu - sd, hi: mu, pct: 34 },
       { lo: mu, hi: mu + 2 * sd, pct: 47.5 },
-      { lo: mu + sd, hi: mu + 2 * sd, pct: 13.5 }
+      { lo: mu - 2 * sd, hi: mu, pct: 47.5 },
+      { lo: mu + sd, hi: mu + 2 * sd, pct: 13.5 },
+      { lo: mu - 2 * sd, hi: mu - sd, pct: 13.5 },
+      { lo: mu - sd, hi: mu + 2 * sd, pct: 81.5 },
+      { lo: mu + 2 * sd, hi: mu + 3 * sd, pct: 2.35 }
     ]);
     return {
       prompt: `Heights are normally distributed with mean $${mu}$ and standard deviation $${sd}$. Using the empirical (68–95–99.7) rule, what **percentage** of values lie between $${pick.lo}$ and $${pick.hi}$?`,
@@ -654,9 +819,9 @@ export const year12 = {
       };
     }
     if (diff === 3) {
-      const p = ri(rng, 1, 4);
-      let q = ri(rng, 1, 4);
-      if (q === p) q = p + 1;
+      const p = ri(rng, 1, 12);
+      let q = ri(rng, 1, 12);
+      while (q === p) q = ri(rng, 1, 12);
       // v(t) = 3(t-p)(t-q) = 3t^2 -3(p+q)t + 3pq
       const B = -3 * (p + q), C = 3 * p * q;
       return {
@@ -672,7 +837,7 @@ export const year12 = {
         ]
       };
     }
-    const a = ri(rng, 2, 6) * 2, x0 = ri(rng, 1, 10), T = ri(rng, 2, 4);
+    const a = ri(rng, 1, 12) * 2, x0 = ri(rng, 1, 20), T = ri(rng, 2, 6);
     // v(t) = a t  → x = a t²/2 + x0
     const xT = a * T * T / 2 + x0;
     return {

@@ -2,24 +2,69 @@
 // Pri Learning · Write-to-answer surface
 // Ink canvas + toolbar + live on-device recognition with per-symbol
 // tap-to-correct. The recognised lines feed Step Check; the final line is
-// submitted as the answer.
+// submitted as the answer, together with how sure the engine is that it read
+// that line right — see "How sure the reading is" below.
 // ─────────────────────────────────────────────────────────────────────────────
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import InkCanvas from './InkCanvas.jsx';
 import { recognize, exprToLatex } from './recognizer.js';
 import { ALPHABET } from './templates.js';
+import { classOfSymbol } from './classes.js';
 import { ensurePersonalLoaded, addPersonal } from './personal.js';
 import { MathText } from '../lib/latex.jsx';
 
 const NICE = { pi: 'π', theta: 'θ', sqrt: '√', percent: '%' };
 const showSym = s => NICE[s] || s;
 
+// ── How sure the reading is ──────────────────────────────────────────────────
+// The line a mark is awarded or withheld on travels with the engine's own
+// account of how much of a guess it was — minConf, margin and the glyph
+// responsible — so a caller can stop and ask before a wrong reading is marked.
+// Two things are added on the way through: the id of the glyph the engine
+// named, which is what the tap-to-correct picker opens on, and the runner-up
+// worth showing beside it. A runner-up inside the glyph's own CNN class is the
+// same ink under another name (1/l, 0/o) and is no use as a question, so it is
+// skipped here exactly as the engine skips it when measuring the margin.
+// Older builds returned none of this; the same three are then derived from the
+// per-symbol confidences that have always been there, so a caller sees one
+// shape either way.
+const rivalOf = (s) => {
+  const cls = classOfSymbol(s.sym);
+  return (s.alts || []).find(a => a.sym !== s.sym && classOfSymbol(a.sym) !== cls) || null;
+};
+
+function readingConfidence(result) {
+  const syms = result.lines.flatMap(l => l.symbols || []);
+  let minConf = 1, margin = 1, weakest = null;
+  syms.forEach((s, index) => {
+    const conf = typeof s.conf === 'number' ? s.conf : 1;
+    const rival = rivalOf(s);
+    const gap = Math.max(0, Math.min(1, conf - (rival ? rival.conf : 0)));
+    if (conf < minConf) minConf = conf;
+    if (gap < margin) margin = gap;
+    if (!weakest || conf < weakest.conf) {
+      weakest = { id: s.id, index, sym: s.sym, conf, alts: s.alts || [], rival };
+    }
+  });
+  const named = result.weakest ? syms[result.weakest.index] : null;
+  return {
+    minConf: typeof result.minConf === 'number' ? result.minConf : minConf,
+    margin: typeof result.margin === 'number' ? result.margin : margin,
+    weakest: result.weakest
+      ? { ...result.weakest, id: named?.id ?? weakest?.id ?? null, rival: named ? rivalOf(named) : null }
+      : weakest
+  };
+}
+
 /**
  * lineVerdicts: optional array aligned with recognised lines, e.g.
  * [{status:'ok'}, {status:'break', note:'…'}] — drawn as a teacher-style
  * ✓/✗ overlay on the ink itself and as badges in the reading panel.
+ * focusSymbol: id of a glyph the caller wants checked. Its picker opens on the
+ * student's behalf with the first alternative focused, so a correction is one
+ * tap rather than a hunt.
  */
-export default function InkAnswer({ onRecognized, height = 300, disabled, lineVerdicts = null }) {
+export default function InkAnswer({ onRecognized, height = 300, disabled, lineVerdicts = null, focusSymbol = null }) {
   const canvasRef = useRef(null);
   const [tool, setTool] = useState('pen');
   const [finger, setFinger] = useState(false);
@@ -29,15 +74,21 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
   const [extraHeight, setExtraHeight] = useState(0);
   const timerRef = useRef(null);
   const strokesRef = useRef([]);
+  const pickerRef = useRef(null);
+  const focusedRef = useRef(null);
 
   const runRecognition = useCallback((strokes, ovr) => {
     const r = recognize(strokes, ovr);
     setRec(r);
+    const sure = readingConfidence(r);
     onRecognized?.({
       lines: r.lines.map(l => l.text),
       lineBoxes: r.lines.map(l => l.box),
       text: r.text,
       answerLine: r.lines.length ? r.lines[r.lines.length - 1].text : '',
+      minConf: sure.minConf,
+      margin: sure.margin,
+      weakest: sure.weakest,
       strokes
     });
   }, [onRecognized]);
@@ -50,6 +101,21 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
 
   useEffect(() => { ensurePersonalLoaded(); }, []);
   useEffect(() => () => timerRef.current && clearTimeout(timerRef.current), []);
+
+  // Open on a newly-named glyph only. Re-running on every recognition would
+  // reopen the picker the moment a correction closed it.
+  useEffect(() => {
+    if (!focusSymbol) { focusedRef.current = null; return; }
+    if (focusedRef.current === focusSymbol) return;
+    const sym = rec.lines.flatMap(l => l.symbols).find(s => s.id === focusSymbol);
+    if (!sym) return;
+    focusedRef.current = focusSymbol;
+    setPicker({ id: sym.id, alts: sym.alts || [] });
+  }, [focusSymbol, rec]);
+
+  useEffect(() => {
+    if (picker && picker.id === focusSymbol) pickerRef.current?.querySelector('button')?.focus();
+  }, [picker, focusSymbol]);
 
   const applyOverride = (id, sym) => {
     const next = { ...overrides, [id]: sym };
@@ -158,7 +224,10 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
                     type="button"
                     key={s.id}
                     className={`ink-sym ${s.conf < 0.45 ? 'shaky' : ''}`}
-                    title="Tap to correct"
+                    style={s.id === focusSymbol
+                      ? { outline: '2px solid var(--brand-1)', outlineOffset: 2, borderRadius: 4 }
+                      : undefined}
+                    title={s.id === focusSymbol ? 'Check this one' : 'Tap to correct'}
                     onClick={() => setPicker(picker?.id === s.id ? null : { id: s.id, alts: s.alts })}
                   >{showSym(s.sym)}</button>
                 ))}
@@ -166,7 +235,7 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
             </div>
           ))}
           {picker && (
-            <div className="ink-picker">
+            <div className="ink-picker" ref={pickerRef}>
               <div className="ink-picker-row">
                 {picker.alts.map(a => (
                   <button type="button" key={a.sym} className="ink-pick" onClick={() => applyOverride(picker.id, a.sym)}>

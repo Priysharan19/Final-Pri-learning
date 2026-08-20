@@ -13,7 +13,6 @@ import {
 } from './store.js';
 import { CURRICULUM, STREAM_CURRICULUM, PATHWAYS, streamSubtopics, SUBTOPIC_BY_ID, subtopicsForYear, scopeForYear, DIFF_LABELS } from '../engine/curriculum.js';
 import { generateQuestion } from '../engine/generators/index.js';
-import { multipartForYear, generateMultipart } from '../engine/generators/multipart.js';
 import { checkAnswer, stepCheck } from '../engine/checker.js';
 import {
   START_RATING, updateRating, masteryOf, masteryBand, pickDifficulty, pickNext,
@@ -251,17 +250,17 @@ async function openProfileData(p, password) {
 
 /** Seal any of a profile's private rows that are still lying about in the clear. */
 async function encryptRows(pid) {
-  for (const st of ENCRYPTED_STORES) {
-    const raw = await rawByIndex(st, 'pid', pid).catch(() => []);
+  for (const [st, owner] of ENCRYPTED_STORES) {
+    const raw = await rawByIndex(st, owner, pid).catch(() => []);
     if (!raw.length || raw.every(r => !!r.sealed)) continue;
-    for (const row of await byIndex(st, 'pid', pid).catch(() => [])) await put(st, row);
+    for (const row of await byIndex(st, owner, pid).catch(() => [])) await put(st, row);
   }
 }
 
 /** Give a profile's rows back in the clear, then give up the key. Order matters. */
 async function decryptRows(pid) {
   const snapshot = [];
-  for (const st of ENCRYPTED_STORES) snapshot.push([st, await byIndex(st, 'pid', pid).catch(() => [])]);
+  for (const [st, owner] of ENCRYPTED_STORES) snapshot.push([st, await byIndex(st, owner, pid).catch(() => [])]);
   dropDataKeys();
   for (const [st, rows] of snapshot) for (const row of rows) await put(st, row);
 }
@@ -305,6 +304,21 @@ async function publicUser(p, nowMs = Date.now()) {
 }
 
 // ── Question serving ─────────────────────────────────────────────────────────
+
+// The structured Section II bank is 26 kB of question text that only a practice
+// paper ever reaches, so — like the year and stream banks behind
+// engine/generators/index.js — it is a dynamic chunk rather than freight in the
+// entry bundle. A chunk that could not be fetched is not remembered as loaded,
+// so one unreachable fetch costs one paper rather than every paper after it.
+let multipartBank = null;
+
+function loadMultipart() {
+  if (!multipartBank) {
+    multipartBank = import('../engine/generators/multipart.js')
+      .catch(err => { multipartBank = null; throw err; });
+  }
+  return multipartBank;
+}
 
 function criteriaFor(q) {
   const steps = q.steps || [];
@@ -1052,15 +1066,11 @@ const routes = {
     }
     // Working-type questions mark every submitted line — surface that report
     if (!stepReport && result.stepReport) stepReport = result.stepReport;
-    const isFast = row.mode === 'rush' || row.mode === 'match';
-    if (!result.correct && !result.invalid && !isFast && (row.tries || 0) < 1) {
-      row.tries = (row.tries || 0) + 1;
-      await put('questions', row);
-      return { correct: false, resolved: false, triesLeft: 1, feedback: feedback || 'Not quite — check your working and try once more.', stepReport };
-    }
-    if (result.invalid && !isFast) {
-      return { correct: false, resolved: false, triesLeft: Math.max(0, 1 - (row.tries || 0)), invalid: true, feedback, stepReport };
-    }
+    // The student's own work is stored before any early return below. A first
+    // wrong answer sends them back for another try, and losing the ink at that
+    // point would mean their handwriting could never be replayed in History and
+    // the marker would have nothing to draw its per-line ticks on — the attempt
+    // they most want to look back at is the one they got wrong.
     const scribbleStrokes = Array.isArray(scribble) && scribble.length ? safeStrokes(scribble, 400) : null;
     if ((ink && ink.strokes?.length) || photo || scribbleStrokes) {
       await put('inks', {
@@ -1069,6 +1079,16 @@ const routes = {
         scribble: scribbleStrokes,
         createdAt: Date.now()
       });
+    }
+
+    const isFast = row.mode === 'rush' || row.mode === 'match';
+    if (!result.correct && !result.invalid && !isFast && (row.tries || 0) < 1) {
+      row.tries = (row.tries || 0) + 1;
+      await put('questions', row);
+      return { correct: false, resolved: false, triesLeft: 1, feedback: feedback || 'Not quite — check your working and try once more.', stepReport };
+    }
+    if (result.invalid && !isFast) {
+      return { correct: false, resolved: false, triesLeft: Math.max(0, 1 - (row.tries || 0)), invalid: true, feedback, stepReport };
     }
     const meta = await resolve(p, row, q, result.correct, answer, ms, row.mode, !!viaInk);
     return {
@@ -1124,6 +1144,7 @@ const routes = {
       qids.push(row.id);
     }
     // Section II: one structured multipart question, HSC-style
+    const { multipartForYear, generateMultipart } = await loadMultipart();
     const mpIds = multipartForYear(year, examPw || 'advanced');
     if (mpIds.length) {
       const mpId = mpIds[Math.floor(Math.random() * mpIds.length)];

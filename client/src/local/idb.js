@@ -52,20 +52,45 @@ export function openDB() {
 // IndexedDB to find a row, never enough to read one — and everything else in
 // the row is sealed under that profile's data key with its own random IV.
 //
+// Every store that hangs off a profile is in the table: not only the questions
+// and the handwriting, but the day-by-day record of when a child sat down and
+// how they went, which is the part a thief can read without understanding any
+// maths. `owner` names the field that says whose row it is, because a teacher's
+// imported files hang off `teacherPid` rather than `pid`.
+//
+// `customQs` is the one profile-owned store deliberately left out: a teacher's
+// custom questions are read by the students they are set to, signed in under
+// their own keys on the same iPad, so sealing them to the author would lock out
+// the readers they were written for.
+//
+// What a raw dump still shows is the composite lookup keys — `${pid}:${date}`,
+// `${pid}:${subtopic}`, `${taskId}:${pid}` — so the existence of a row and the
+// label it hangs off survive. Every count, mark, answer and stroke inside it
+// does not. Closing that last edge means changing the key paths themselves,
+// which is a schema migration rather than a change of cipher.
+//
 // Keys live in this module's memory for the length of a session and are never
 // written anywhere. No password means no key, which means the rows stay
 // ciphertext no matter what the rest of the app is told about who is signed in.
 
 const SEALED_STORES = {
-  ratings: ['key', 'pid'],
-  attempts: ['id', 'pid'],
-  questions: ['id', 'pid'],
-  exams: ['id', 'pid'],
-  inks: ['id', 'pid']
+  ratings: { owner: 'pid', clear: ['key', 'pid'] },
+  attempts: { owner: 'pid', clear: ['id', 'pid'] },
+  questions: { owner: 'pid', clear: ['id', 'pid'] },
+  reviews: { owner: 'pid', clear: ['key', 'pid'] },
+  exams: { owner: 'pid', clear: ['id', 'pid'] },
+  badges: { owner: 'pid', clear: ['key', 'pid'] },
+  activity: { owner: 'pid', clear: ['key', 'pid'] },
+  rushRuns: { owner: 'pid', clear: ['id', 'pid'] },
+  matchRuns: { owner: 'pid', clear: ['id', 'pid'] },
+  inks: { owner: 'pid', clear: ['id', 'pid'] },
+  taskProgress: { owner: 'pid', clear: ['key', 'pid', 'taskId'] },
+  bookmarks: { owner: 'pid', clear: ['key', 'pid'] },
+  progressImports: { owner: 'teacherPid', clear: ['id', 'teacherPid'] }
 };
 
-/** The stores whose rows follow a profile's protection. */
-export const ENCRYPTED_STORES = Object.keys(SEALED_STORES);
+/** The stores whose rows follow a profile's protection, each with its owner field. */
+export const ENCRYPTED_STORES = Object.entries(SEALED_STORES).map(([store, s]) => [store, s.owner]);
 
 const dataKeys = new Map();
 
@@ -91,23 +116,24 @@ export async function openField(pid, sealed) {
 }
 
 async function seal(store, value) {
-  const keep = SEALED_STORES[store];
-  if (!keep || !value || typeof value !== 'object') return value;
-  const key = dataKeys.get(value.pid);
+  const spec = SEALED_STORES[store];
+  if (!spec || !value || typeof value !== 'object') return value;
+  const key = dataKeys.get(value[spec.owner]);
   if (!key) return value;
   const row = {};
   const priv = {};
   for (const [k, v] of Object.entries(value)) {
     if (k === 'sealed') continue;
-    if (keep.includes(k)) row[k] = v; else priv[k] = v;
+    if (spec.clear.includes(k)) row[k] = v; else priv[k] = v;
   }
   row.sealed = await sealValue(key, priv);
   return row;
 }
 
-async function unseal(row) {
-  if (!row?.sealed) return row;
-  const key = dataKeys.get(row.pid);
+async function unseal(store, row) {
+  const spec = SEALED_STORES[store];
+  if (!spec || !row?.sealed) return row;
+  const key = dataKeys.get(row[spec.owner]);
   if (!key) return undefined;
   const priv = await openValue(key, row.sealed);
   if (priv === undefined || priv === null) return undefined;
@@ -115,7 +141,8 @@ async function unseal(row) {
   return { ...priv, ...clear };
 }
 
-const unsealAll = rows => Promise.all(rows.map(unseal)).then(list => list.filter(r => r !== undefined));
+const unsealAll = (store, rows) =>
+  Promise.all(rows.map(r => unseal(store, r))).then(list => list.filter(r => r !== undefined));
 
 function tx(db, store, mode = 'readonly') {
   return db.transaction(store, mode).objectStore(store);
@@ -128,7 +155,7 @@ const wrap = req => new Promise((resolve, reject) => {
 
 export async function get(store, key) {
   const db = await openDB();
-  return unseal(await wrap(tx(db, store).get(key)));
+  return unseal(store, await wrap(tx(db, store).get(key)));
 }
 export async function put(store, value) {
   const db = await openDB();
@@ -140,11 +167,11 @@ export async function del(store, key) {
 }
 export async function all(store) {
   const db = await openDB();
-  return unsealAll(await wrap(tx(db, store).getAll()));
+  return unsealAll(store, await wrap(tx(db, store).getAll()));
 }
 export async function byIndex(store, index, value) {
   const db = await openDB();
-  return unsealAll(await wrap(tx(db, store).index(index).getAll(value)));
+  return unsealAll(store, await wrap(tx(db, store).index(index).getAll(value)));
 }
 export async function add(store, value) {
   const db = await openDB();

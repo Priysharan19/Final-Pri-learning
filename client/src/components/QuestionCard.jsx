@@ -4,13 +4,13 @@
 // photo), an evaluation card with reasoning, worked solution, final answer and
 // an HSC-style criteria table. All marking logic is the verified v3 engine.
 // ─────────────────────────────────────────────────────────────────────────────
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../api.js';
 import { MathText } from '../lib/latex.jsx';
 import { useApp } from '../App.jsx';
 import InkCanvas from '../ink/InkCanvas.jsx';
-import { exprToLatex } from '../ink/recognizer.js';
 import { sanitizeFigure } from '../lib/sanitize.js';
+import { clearDraft, queueDraft, readDraft } from './drafts.js';
 
 const DIFF_CLASS = { 1: 'tag-d1', 2: 'tag-d2', 3: 'tag-d3', 4: 'tag-d4' };
 const SYMBOLS = ['π', '√(', '^', '±', '×', '÷', '≤', '≥', '≠', '°', 'θ', '(', ')', '/', ':'];
@@ -30,18 +30,37 @@ export const SR_ONLY = {
 // It arrives as a chunk of its own, so opening the write tab can fail the way
 // any fetch can. The in-flight promise is remembered only while it is still
 // alive — the moment it rejects it is dropped, because a memo held past a
-// rejection leaves the tab dead until the whole app is reloaded. A load retries
-// a bounded number of times, and one that genuinely cannot finish says so.
-const INK_RETRIES = 2;
+// rejection leaves the tab dead until the whole app is reloaded.
+//
+// Dropping the memo is not enough on its own: a module that failed to fetch is
+// remembered by the browser itself, so importing the SAME specifier a second
+// time replays the stored rejection without a single byte crossing the network.
+// A retry loop over one specifier therefore retries nothing. Every attempt below
+// asks for a specifier carrying its own query string, which is a URL the
+// document has never requested and so a fetch that genuinely happens. They are
+// spelled out one per line because a bundler emits a chunk only for a specifier
+// it can see; four specifiers is four real attempts, and once they are spent
+// only a reload has anything new to try.
+const INK_SOURCES = [
+  () => import('../ink/InkAnswer.jsx'),
+  () => import('../ink/InkAnswer.jsx?retry=1'),
+  () => import('../ink/InkAnswer.jsx?retry=2'),
+  () => import('../ink/InkAnswer.jsx?retry=3')
+];
+const INK_RETRIES = 1;          // spent automatically; the rest belong to the student
 const INK_BACKOFF_MS = 350;
 
 let inkModule = null;
 let inkPending = null;
+let inkSpent = 0;               // module scope: a specifier once asked for stays asked for
 
-function fetchInk(attempt = 0) {
-  return import('../ink/InkAnswer.jsx').catch(err => {
-    if (attempt >= INK_RETRIES) throw err;
-    return new Promise(done => setTimeout(done, INK_BACKOFF_MS * (attempt + 1))).then(() => fetchInk(attempt + 1));
+const inkExhausted = () => inkSpent >= INK_SOURCES.length;
+
+function fetchInk(retries = INK_RETRIES) {
+  if (inkExhausted()) return Promise.reject(new Error('No untried address left for the handwriting engine.'));
+  return INK_SOURCES[inkSpent++]().catch(err => {
+    if (retries <= 0 || inkExhausted()) throw err;
+    return new Promise(done => setTimeout(done, INK_BACKOFF_MS)).then(() => fetchInk(retries - 1));
   });
 }
 
@@ -54,6 +73,94 @@ function loadInk() {
     );
   }
   return inkPending;
+}
+
+// ── exprToLatex, kept off the entry chunk ────────────────────────────────────
+// The helper lives in the recogniser, whose graph reaches nn.js and the 798 kB
+// of weights behind it. A static import would put all of that in the entry's
+// preload list for the sake of one string transform, so it is fetched only when
+// something on screen genuinely needs it. In write mode the module is already
+// in memory and this resolves in the same tick; a typed answer asks for it only
+// once it contains notation the helper would actually rewrite — plain algebra
+// like 2x+3 comes out of exprToLatex unchanged, so it previews as written.
+const TEX_WORTH = /sqrt|theta|pi|LHS|RHS|sin|cos|tan|sec|csc|cot|ln|log|<=|>=|!=|[\^*/%°±\\]/i;
+
+let latexFn = null;
+let latexPending = null;
+
+function loadLatex() {
+  if (latexFn) return Promise.resolve(latexFn);
+  if (!latexPending) {
+    latexPending = import('../ink/recognizer.js').then(
+      mod => { latexFn = mod.exprToLatex; latexPending = null; return latexFn; },
+      err => { latexPending = null; throw err; }
+    );
+  }
+  return latexPending;
+}
+
+// ── Never lose a mark to a misread ───────────────────────────────────────────
+// Marking an answer the student got right is the worst thing this app can do:
+// it feeds a wrong outcome to the Elo update, the mark predictor and the
+// misconception tags at once, and the student has no way to appeal. So no mark
+// is awarded or withheld on a reading the engine was unsure of — an uncertain
+// answer line becomes a one-tap confirmation instead of a submission.
+//
+// The thresholds come from the confidence distribution measured over 3,920
+// simulated answer lines — the writer model of the holdout suites, run on two
+// seeds none of them use, against recognize()'s own minConf and margin:
+//
+//   glyph confidence < 0.55        catch 22.5% / 15.9% of misreads   cost 4.4% / 4.9%
+//   top-2 gap        < 0.15        catch 28.4% / 22.4%               cost 6.5% / 7.1%
+//   reading is not well-formed     catch 27.5% / 28.0%               cost 0.0% / 0.0%
+//   all three together             catch 56.3% / 49.5%               cost 6.9% / 6.8%
+//
+// "cost" is the share of correctly-read lines that get the extra tap. 0.55 is
+// chosen over anything higher because the curve is flat through it — 0.50 to
+// 0.65 buys 4 points of catch for 0.7 of cost — and because it sits just above
+// the 0.45 at which the reading panel already draws a glyph as shaky, so the
+// glyphs the student sees marked are the same glyphs that ask to be confirmed.
+//
+// The well-formedness test is free: across all 3,711 correctly-read lines in
+// those runs it flagged none, because a correct reading of school maths does
+// not come out with a stray '?', an unclosed bracket, a doubled operator or a
+// dangling '='.
+//
+// All three run over the whole reading rather than the answer line alone —
+// minConf and margin because that is the scope the engine reports them at, and
+// well-formedness because a working question is marked line by line. On a
+// multi-line answer that compounds: three lines carry roughly three times one
+// line's chance of asking. That is the right direction to err in when every one
+// of those lines is worth a mark.
+const CONFIRM_CONF = 0.55;
+const CONFIRM_MARGIN = 0.15;
+
+function readsAsMaths(text) {
+  // Spaces out first: the layout pass puts them around fractions, and a gap
+  // between two operators would otherwise hide the pair from the last test.
+  const t = String(text || '').replace(/\s+/g, '');
+  if (!t) return true;
+  if (t.includes('?')) return false;
+  let depth = 0;
+  for (const ch of t) {
+    if (ch === '(') depth++;
+    else if (ch === ')' && --depth < 0) return false;
+  }
+  if (depth !== 0) return false;
+  if (/[+\-*/=<>^.]$/.test(t)) return false;
+  if (/^[+*/=<>^]/.test(t) || /^\.(?!\d)/.test(t)) return false;
+  return !/[+\-*/=<>^]{2,}/.test(t.replace(/<=|>=|!=|=-|\(-/g, 'A'));
+}
+
+/** What is doubtful about this reading, or null when it can be trusted. */
+function doubtOf(ink) {
+  const lines = ink?.lines || [];
+  if (!lines.length) return null;
+  const weakest = ink.weakest || null;
+  if (!lines.every(readsAsMaths)) return { why: 'shape', weakest };
+  if (typeof ink.minConf === 'number' && ink.minConf < CONFIRM_CONF) return { why: 'glyph', weakest };
+  if (typeof ink.margin === 'number' && ink.margin < CONFIRM_MARGIN) return { why: 'rival', weakest };
+  return null;
 }
 
 export default function QuestionCard({ question, why, reason, onResolved, onNext, onRedo, compact = false }) {
@@ -78,15 +185,21 @@ export default function QuestionCard({ question, why, reason, onResolved, onNext
   const [elapsed, setElapsed] = useState(0);
   const [inkPhase, setInkPhase] = useState(() => (inkModule ? 'ready' : 'idle'));   // idle | loading | ready | failed
   const [inkTry, setInkTry] = useState(0);
+  const [toTex, setToTex] = useState(() => latexFn);
+  const [checking, setChecking] = useState(false);
+  const [vouched, setVouched] = useState(null);     // the exact reading the student stood behind
   const startRef = useRef(Date.now());
   const inputRef = useRef(null);
   const scribbleRef = useRef(null);
   const photoInputRef = useRef(null);
 
   useEffect(() => {
-    setAnswer(''); setMcqSel(null); setInkResult(null); setHints([]); setHintsLeft(question.hintsAvailable);
-    setShowWorking(false); setWorking(''); setState({ phase: 'answering' }); setBusy(false);
+    const draft = readDraft('question', question.id);
+    setAnswer(draft?.typed || ''); setMcqSel(null); setInkResult(null); setHints([]); setHintsLeft(question.hintsAvailable);
+    setWorking(draft?.working || ''); setShowWorking(!!draft?.working);
+    setState({ phase: 'answering' }); setBusy(false);
     setSelfMarks({}); setSelfSaved(false); setPhoto(null); setBookmarked(false); setElapsed(0);
+    setChecking(false); setVouched(null);
     startRef.current = Date.now();
     if (mode === 'type') setTimeout(() => inputRef.current?.focus(), 60);
   }, [question.id]); // eslint-disable-line
@@ -120,13 +233,77 @@ export default function QuestionCard({ question, why, reason, onResolved, onNext
   }, [writeMode, inkTry]);
 
   const InkAnswer = inkPhase === 'ready' ? inkModule?.default : null;
+  const inkStuck = inkPhase === 'failed' && inkExhausted();
 
   const figure = useMemo(() => sanitizeFigure(question.figure), [question.figure]);
 
+  // The recogniser is only fetched once something on screen needs its LaTeX.
+  // Outside write mode the only strings that reach texOf are these two.
+  const wantsTex = !isMcq && (writeMode || TEX_WORTH.test(answer) || TEX_WORTH.test(working));
+  useEffect(() => {
+    if (!wantsTex || toTex) return;
+    let live = true;
+    loadLatex().then(fn => { if (live) setToTex(() => fn); }, () => { });
+    return () => { live = false; };
+  }, [wantsTex, toTex]);
+
+  const texOf = useCallback((s) => {
+    const raw = String(s ?? '');
+    if (!toTex) return raw.replace(/\\/g, '');
+    try { return toTex(raw); } catch { return raw.replace(/\\/g, ''); }
+  }, [toTex]);
+
   const typedPreview = useMemo(() => {
-    if (!answer.trim() || /^[\d\s.]+$/.test(answer)) return null;
-    try { return exprToLatex(answer.trim()); } catch { return null; }
-  }, [answer]);
+    const a = answer.trim();
+    if (!a || /^[\d\s.]+$/.test(a)) return null;
+    if (!toTex) return TEX_WORTH.test(a) ? null : a;
+    try { return toTex(a); } catch { return null; }
+  }, [answer, toTex]);
+
+  // ── Work in progress, written where a crash cannot reach it ────────────────
+  // React state is gone the instant a render throws, so the typed answer and
+  // working go to the draft store as they are typed — coalesced, so a burst of
+  // keystrokes is one write — and are cleared the moment the attempt is marked.
+  // Ink strokes stay out on purpose: the store is for JSON-small records.
+  const stash = (typed, wk) => {
+    if (resolved) return;
+    if (!String(typed).trim() && !String(wk).trim()) { clearDraft('question', question.id); return; }
+    queueDraft('question', question.id, { typed, working: wk }, {
+      label: question.subtopicName, note: 'Answer in progress', path: '/practice'
+    });
+  };
+  const editAnswer = (v) => { setAnswer(v); stash(v, working); };
+  const editWorking = (v) => { setWorking(v); stash(answer, v); };
+
+  useEffect(() => { if (resolved) clearDraft('question', question.id); }, [resolved, question.id]);
+
+  // Only handwriting is gated: typing and photo carry no reading to doubt.
+  const doubt = useMemo(
+    () => (writeMode && !resolved ? doubtOf(inkResult) : null),
+    [writeMode, resolved, inkResult]
+  );
+  const reading = inkResult?.answerLine || '';
+  const needsCheck = !!doubt && !!reading && vouched !== reading;
+  const checkFocus = needsCheck && checking ? (doubt.weakest?.id || null) : null;
+
+  useEffect(() => { if (!needsCheck && checking) setChecking(false); }, [needsCheck, checking]);
+
+  // Said as a question about the ink, never as a complaint about the student.
+  const checkCopy = useMemo(() => {
+    if (!doubt) return '';
+    const nice = s => ({ pi: 'π', theta: 'θ', sqrt: '√', percent: '%' })[s] || s;
+    if (doubt.why === 'shape') {
+      return 'That doesn’t quite come out as finished maths, so a symbol may have come through wrong. Tap any symbol below to change it.';
+    }
+    // Name a runner-up only when it is genuinely close and genuinely different:
+    // offering "1 or l?" on a number is a question with no useful answer.
+    const w = doubt.weakest;
+    const rival = w?.rival || w?.alts?.find(a => a.sym !== w.sym) || null;
+    const contested = rival && rival.conf >= w.conf - CONFIRM_MARGIN;
+    if (w && contested) return `I read one symbol as “${nice(w.sym)}”, but “${nice(rival.sym)}” was close behind. Tap the right one below.`;
+    if (w) return `One symbol was a close call — I read it as “${nice(w.sym)}”. Tap it below if that isn’t it.`;
+    return 'One symbol was a close call. Tap it below if I read it wrong.';
+  }, [doubt]);
 
   const flipMode = (m) => {
     setMode(m);
@@ -137,15 +314,25 @@ export default function QuestionCard({ question, why, reason, onResolved, onNext
 
   const insertSym = (s) => {
     const el = inputRef.current;
-    if (!el) { setAnswer(a => a + s); return; }
-    const st = el.selectionStart ?? el.value.length, en = el.selectionEnd ?? el.value.length;
-    const setV = isWorking ? setWorking : setAnswer;
-    setV(v => v.slice(0, st) + s + v.slice(en));
-    requestAnimationFrame(() => { el.focus(); el.setSelectionRange(st + s.length, st + s.length); });
+    const cur = isWorking ? working : answer;
+    const st = el?.selectionStart ?? cur.length, en = el?.selectionEnd ?? cur.length;
+    const next = cur.slice(0, st) + s + cur.slice(en);
+    if (isWorking) editWorking(next); else editAnswer(next);
+    if (el) requestAnimationFrame(() => { el.focus(); el.setSelectionRange(st + s.length, st + s.length); });
   };
 
-  async function submit() {
+  /** One tap: the student stands behind this reading, and it goes. */
+  function acceptReading() {
+    setVouched(reading);
+    setChecking(false);
+    submit(reading);
+  }
+
+  // Every submit control leads here, so the confirmation step cannot be walked
+  // around: a reading in doubt turns the press into the question instead.
+  async function submit(vouchedNow) {
     if (busy || resolved) return;
+    if (needsCheck && vouchedNow !== reading) { setChecking(true); return; }
     let given, steps, viaInk = false, ink;
     if (isMcq) {
       given = mcqSel;
@@ -413,7 +600,7 @@ export default function QuestionCard({ question, why, reason, onResolved, onNext
                     style={{ background: 'none', border: 'none', outline: 'none', color: 'var(--ink)' }}
                     placeholder={question.inputHint || 'Show every line of your working — each line is marked.\nFinish with the result you were asked to reach.'}
                     value={working} disabled={resolved}
-                    onChange={e => setWorking(e.target.value)}
+                    onChange={e => editWorking(e.target.value)}
                     rows={6}
                   />
                 ) : (
@@ -425,7 +612,7 @@ export default function QuestionCard({ question, why, reason, onResolved, onNext
                       placeholder={question.inputHint || 'Your answer…'}
                       value={answer}
                       disabled={resolved}
-                      onChange={e => setAnswer(e.target.value)}
+                      onChange={e => editAnswer(e.target.value)}
                       onKeyDown={e => { if (e.key === 'Enter') submit(); }}
                       autoCapitalize="none" autoCorrect="off" spellCheck={false}
                     />
@@ -444,7 +631,7 @@ export default function QuestionCard({ question, why, reason, onResolved, onNext
                       <textarea
                         className="input" style={{ marginTop: 8 }}
                         placeholder={'One step per line, e.g.\n2x + 3 = 13\n2x = 10\nx = 5'}
-                        value={working} onChange={e => setWorking(e.target.value)}
+                        value={working} onChange={e => editWorking(e.target.value)}
                       />
                     )}
                   </div>
@@ -454,7 +641,7 @@ export default function QuestionCard({ question, why, reason, onResolved, onNext
                 <span className="editor-brand">✒ Pri Ink Engine</span>
                 <span style={{ flex: 1 }} />
                 {!resolved && (
-                  <button className={`btn btn-primary ${canSubmit ? 'btn-glow' : ''}`} onClick={submit} disabled={busy || !canSubmit}>
+                  <button className={`btn btn-primary ${canSubmit ? 'btn-glow' : ''}`} onClick={() => submit()} disabled={busy || !canSubmit}>
                     {busy ? 'Marking…' : '➤ Submit Answer'}
                   </button>
                 )}
@@ -463,16 +650,22 @@ export default function QuestionCard({ question, why, reason, onResolved, onNext
           ) : (
             <div className="ink-row">
               <div className="editor-shell" style={{ flex: 1, minWidth: 0 }}>
-                {InkAnswer && <InkAnswer onRecognized={setInkResult} height={380} lineVerdicts={lineVerdicts} disabled={resolved} />}
+                {InkAnswer && (
+                  <InkAnswer onRecognized={setInkResult} height={380} lineVerdicts={lineVerdicts}
+                    disabled={resolved} focusSymbol={checkFocus} />
+                )}
                 {inkPhase === 'failed' && (
                   <div className="editor-body">
                     <div className="error-box" role="alert" style={{ marginBottom: 0 }}>
                       <b>Handwriting couldn’t load.</b> The recogniser is kept in a file of its own and this
-                      device couldn’t read it just now. Nothing you have done is lost — try again, or answer
-                      by typing.
+                      device couldn’t read it just now. Nothing you have done is lost — {inkStuck
+                        ? 'reload the app, or answer by typing.'
+                        : 'try again, or answer by typing.'}
                     </div>
                     <div className="row" style={{ marginTop: 12 }}>
-                      <button className="btn btn-ghost btn-sm" onClick={() => setInkTry(n => n + 1)}>Try again</button>
+                      {inkStuck
+                        ? <button className="btn btn-ghost btn-sm" onClick={() => window.location.reload()}>Reload Pri Learning</button>
+                        : <button className="btn btn-ghost btn-sm" onClick={() => setInkTry(n => n + 1)}>Try again</button>}
                       <button className="btn btn-quiet btn-sm" onClick={() => flipMode('type')}>Type the answer instead</button>
                     </div>
                   </div>
@@ -483,18 +676,40 @@ export default function QuestionCard({ question, why, reason, onResolved, onNext
                     <p className="muted" role="status" style={{ marginTop: 10 }}>Warming up the handwriting engine…</p>
                   </div>
                 )}
+                {needsCheck && checking && (
+                  <div className="editor-body" role="status"
+                    style={{ borderTop: '1px solid var(--hairline)', background: 'var(--brand-soft)' }}>
+                    <div className="spread" style={{ gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+                      <div>
+                        <b>Check this reading first</b>
+                        <div className="muted" style={{ fontSize: 13, marginTop: 2 }}>{checkCopy}</div>
+                        <div style={{ marginTop: 6 }}>
+                          reading it as&nbsp;<MathText text={`$${texOf(reading)}$`} />
+                        </div>
+                      </div>
+                      <div className="row" style={{ gap: 8 }}>
+                        <button className="btn btn-primary btn-sm" onClick={acceptReading} disabled={busy}>
+                          ✓ That’s what I wrote
+                        </button>
+                        <button className="btn btn-quiet btn-sm" onClick={() => setChecking(false)}>Keep writing</button>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 {InkAnswer && (
                   <div className="editor-foot no-print">
                     <span className="editor-brand">✒ Pri Ink Engine — on-device recognition</span>
                     <span style={{ flex: 1 }} />
-                    {inkResult?.answerLine && (
+                    {inkResult?.answerLine && !needsCheck && (
                       <span className="muted" style={{ marginRight: 10 }}>
-                        submitting: <MathText text={`$${safeLatex(isWorking ? inkResult.lines[inkResult.lines.length - 1] : inkResult.answerLine)}$`} />
+                        submitting: <MathText text={`$${texOf(isWorking ? inkResult.lines[inkResult.lines.length - 1] : inkResult.answerLine)}$`} />
                       </span>
                     )}
                     {!resolved && (
-                      <button className={`btn btn-primary ${canSubmit ? 'btn-glow' : ''}`} onClick={submit} disabled={busy || !canSubmit}>
-                        {busy ? 'Marking…' : '➤ Submit Answer'}
+                      <button
+                        className={`btn ${needsCheck ? 'btn-ghost' : `btn-primary ${canSubmit ? 'btn-glow' : ''}`}`}
+                        onClick={() => submit()} disabled={busy || !canSubmit}>
+                        {busy ? 'Marking…' : needsCheck ? 'Check this reading first' : '➤ Submit Answer'}
                       </button>
                     )}
                   </div>
@@ -563,7 +778,7 @@ export default function QuestionCard({ question, why, reason, onResolved, onNext
             <div className="your-answer">
               <div className="sc-label">Your answer</div>
               {answerLines.map((l, i) => (
-                <div className="ya-line" key={i}><MathText text={`$${safeLatex(l)}$`} /></div>
+                <div className="ya-line" key={i}><MathText text={`$${texOf(l)}$`} /></div>
               ))}
               {photo && <div className="photo-thumb" style={{ marginTop: 8 }}><img src={photo} alt="Attached working" /></div>}
             </div>
@@ -641,7 +856,7 @@ export default function QuestionCard({ question, why, reason, onResolved, onNext
       {!resolved && (
         <div className="row no-print" style={{ marginTop: 18, flexWrap: 'wrap' }}>
           {isMcq && (
-            <button className={`btn btn-primary ${canSubmit ? 'btn-glow' : ''}`} onClick={submit} disabled={busy || !canSubmit}>
+            <button className={`btn btn-primary ${canSubmit ? 'btn-glow' : ''}`} onClick={() => submit()} disabled={busy || !canSubmit}>
               {busy ? 'Marking…' : '➤ Submit Answer'}
             </button>
           )}
@@ -728,10 +943,6 @@ function attachPhoto(e, setPhoto) {
   };
   img.src = url;
   e.target.value = '';
-}
-
-function safeLatex(s) {
-  try { return exprToLatex(String(s)); } catch { return String(s).replace(/\\/g, ''); }
 }
 
 function fmtTime(s) {

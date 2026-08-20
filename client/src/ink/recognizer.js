@@ -129,6 +129,19 @@ for (const [sym, variants] of Object.entries(TEMPLATES)) {
 // moves any writer back onto the upright distribution the engine was built
 // for. Absolute-angle tests become hand-relative for free, which is how a
 // human reads a slanted "1": against the writing around it, not the vertical.
+//
+// Lean is not the hand's only page-wide constant — aspect, x-height and
+// inter-glyph spacing are too — but it is the only one worth cancelling here,
+// which was settled by measurement rather than assumed. Removing a writer's
+// aspect EXACTLY is worth about a point of line accuracy (measured against a
+// simulator with the aspect switched off), yet the estimate has to come from
+// the handful of glyphs one answer contains, whose symbol MIX moves the median
+// further than any hand does: aspect has no natural zero to be measured
+// against, the way slant has upright and spacing has the writer's own glyph
+// width. Estimated rather than given, it costs more than it returns. Feeding a
+// measured inter-glyph spacing into the segmenter's gap thresholds was built
+// and measured the same way and moved nothing: those thresholds are already
+// spacing-robust across the range a hand varies over.
 
 const nearStraight = (pts) => {
   if (pts.length < 2) return true;
@@ -939,7 +952,7 @@ export function classify(group, medianH) {
   };
   const cand = blend(probs);
 
-  // ④ NO test-time augmentation — measured, not assumed.
+  // ④ NO test-time augmentation — measured, not assumed, and measured twice.
   // A rotation vote used to run for glyphs scoring under 0.35. Two things were
   // wrong with it. The trigger fired on 0.5% of glyphs, because this classifier
   // is confidently wrong far more often than it is unsure (a wrong glyph's
@@ -950,7 +963,24 @@ export function classify(group, medianH) {
   // plain. The cause is that the nets were trained through this same deskewing
   // rasteriser on style-varied renders, so these are the very axes training
   // already made them invariant to; averaging over an invariance only adds
-  // variance. Removing it also gives back the extra ensemble passes.
+  // variance.
+  //
+  // The obvious repair — keep the averaging but spend it only where the
+  // ensemble is unsure — was built and measured here: five aug.js views at
+  // strength 0.35, log-averaged with the plain pass, re-ranked on the raw ink,
+  // fired on the least-confident glyphs by calibrated share. It is genuinely
+  // better AT CLASSIFYING. Gated to the least-confident ~4%, heavily distorted
+  // symbols go 96.3% -> 96.5% (96.6% if the average is only accepted when it
+  // sharpens the decision) and the messy scenes 14/15 -> 15/15, for ~77ms on
+  // each glyph that trips the gate and nothing on the rest.
+  //
+  // It still does not ship, because the LINE suite pays for it: 93.3% -> 92.9%
+  // exact and 97.9% -> 97.4% chars, at every gate loose enough to fire on more
+  // than half a per cent of glyphs. Confidence is not only an answer here — it
+  // drives mergeRetry, splitRetry and the beam's candidate lists — so a
+  // classifier that is better in isolation and reports different confidence is
+  // not automatically a better RECOGNISER. Isolated-glyph accuracy is the
+  // metric that does not matter; the line is what the student sees.
 
   // symbol-level alts, class members expanded with the maths-prior first
   const mass = scoreMass(cand);
@@ -1626,13 +1656,152 @@ function lineFormScore(syms) {
   return sc;
 }
 
+// ── Question context ─────────────────────────────────────────────────────────
+// Every general handwriting engine — MyScript, Apple's, any server LLM — reads
+// ink in a vacuum. This app does not have to: it set the question, so it knows
+// which symbols the topic can even contain, what shape the answer takes, and
+// what the correct answer is. Three priors no general recogniser can have.
+//
+// THE DANGER, and the reason all of it is capped: a prior strong enough to turn
+// a WRONG answer into the expected one destroys the product. Equivalence
+// marking, misconception tagging and Step Check all read the recognised string,
+// so an engine that quietly repairs 7/8 into 3/4 because 3/4 was the answer
+// tells a student they were right when they were not, and the tagging that
+// would have caught the misconception never fires. Misreading is a bug; lying
+// to a student about their own working is worse than a bug.
+//
+// The context is therefore worth exactly one thing: breaking ties the ink could
+// not settle. It enters as a single additive term on a COMPLETED hypothesis,
+// clamped to CTX_CAP the way rerank.js clamps the geometry correction, and the
+// expected answer is offered as ONE more candidate path which must be spellable
+// entirely out of readings the ink itself proposed — never out of a symbol the
+// classifier never saw. client/test/inkcheck-context.mjs renders deliberately
+// wrong-but-plausible answers, recognises them with ctx.expected set to the
+// CORRECT answer, and fails if any reading becomes the expected answer, drifts
+// toward it, or ends up less faithful to the ink than it was without the
+// context. That suite is the licence for this feature.
+
+// How much a completed reading can gain or lose from everything the question
+// knows. Beam scores are log-likelihood plus GRAMMAR_WEIGHT × grammar, in which
+// one confidently misread glyph is worth upwards of a nat — so these can decide
+// a coin flip and can decide nothing else.
+//
+// The two halves of the context are not equally dangerous and do not share a
+// leash. The alphabet and the answer's shape are ANSWER-BLIND: they say what
+// the topic can contain, not what this student should have written, so pushing
+// a reading toward them can never manufacture agreement with the mark scheme —
+// a wrong answer in the right alphabet stays wrong. Those two get the larger
+// budget between them. The expected answer gets its own, much smaller one.
+const CTX_CAP = 0.40;        // the two answer-blind terms together
+const CTX_ALPHABET = 0.22;   // per glyph outside the topic's symbol set
+const CTX_TYPE = 0.30;       // the reading has the shape the generator asked for
+// The expected answer is worth a fraction of what one confidently misread
+// glyph costs. inkcheck-context.mjs locates that edge rather than guessing at
+// it: the suite is clean here and at 0.18, and at 0.30 it catches the prior
+// turning a student's "0.15" into the "0.75" it was told to expect — the 1/7
+// near-tie this classifier is worst at, which is exactly where a stronger
+// prior does its damage.
+const CTX_EXPECT = 0.15;     // the reading IS the expected answer
+
+// The cap alone is not enough of a leash for the expected answer, because a
+// scalar cannot tell a near-tie from a confident misread — and it is only over
+// near-ties that the question has any business speaking. So the expected
+// reading has to clear a structural gate as well: at every glyph, the symbol it
+// asks for must already be worth at least this share of that glyph's leading
+// candidate. Where the ink is confident the share is nowhere near met and the
+// expected answer is not offered at all, whatever the cap says. Measured
+// against inkcheck-context.mjs: at a share of 0.70 the suite still catches the
+// prior rewriting wrong answers, and at 0.90 — where the expected symbol has to
+// sit within a tenth of the leader, a genuine coin flip — it is clean.
+const CTX_EXPECT_SHARE = 0.90;
+
+/** Callers write maths; the beam speaks recogniser symbols. */
+const CTX_ALIAS = { '%': 'percent', '°': 'deg', '±': 'pm', '÷': 'div', '×': '*', '−': '-' };
+const ctxSym = (t) => CTX_ALIAS[t] || t;
+
+// Longest-first, so 'cosec' beats 'cos', 'theta' beats 't' and '<=' beats '<'.
+const CTX_WORDS = ['cosec', 'theta', 'sqrt', 'sec', 'csc', 'cot', 'sin', 'cos', 'tan',
+  'log', 'LHS', 'RHS', 'ln', 'pi', '<=', '>=', '!='];
+
+/** Split an expected answer into the symbols a line of glyphs would carry. A
+ *  function's brackets go first: the decoder locks "sin" as one glyph and the
+ *  student never drew the parentheses assembleLine prints around its argument. */
+function ctxTokens(text) {
+  const t = String(text).replace(/\s+/g, '')
+    .replace(/(sin|cos|tan|sec|csc|cosec|cot|ln|log)\(([^()]*)\)/g, '$1$2');
+  const out = [];
+  let i = 0;
+  while (i < t.length) {
+    const word = CTX_WORDS.find(w => t.startsWith(w, i));
+    if (word) { out.push(word); i += word.length; continue; }
+    out.push(ctxSym(t[i]));
+    i++;
+  }
+  return out;
+}
+
+/** Does a reading have the shape this question's generator produces? The names
+ *  are the generator's own. 'set' is matched only on the weaker property its
+ *  members share — the alphabet carries no separator glyph, so by symbols alone
+ *  a set is indistinguishable from a run of values. */
+const CTX_SHAPE = {
+  integer: t => /^-?[0-9]+$/.test(t),
+  fraction: t => /^-?[0-9]+\/-?[0-9]+$/.test(t),
+  decimal: t => /^-?[0-9]+\.[0-9]+$/.test(t),
+  ratio: t => /^[0-9]+(:[0-9]+)+$/.test(t),
+  point: t => /^\(.*\)$/.test(t),
+  percent: t => /^-?[0-9]+(\.[0-9]+)?%$/.test(t),
+  expression: t => /[a-zA-Z]/.test(t) || /[+\-*/^]/.test(t),
+  equation: t => t.includes('='),
+  set: t => /^[0-9.\-]+$/.test(t)
+};
+
+/** Everything the question knows, folded into one capped term over a completed
+ *  reading. Returns a scorer, or null when there is no usable context. */
+function ctxScorer(ctx, candLists) {
+  if (!ctx) return null;
+  const alphabet = Array.isArray(ctx.alphabet) && ctx.alphabet.length
+    ? new Set(ctx.alphabet.map(ctxSym)) : null;
+  const shape = CTX_SHAPE[String(ctx.answerType || '').toLowerCase()] || null;
+  let expect = ctx.expected ? ctxTokens(ctx.expected) : null;
+  // near-tie gate: every glyph the expected answer needs must already be a
+  // live reading of that glyph's own ink, not merely a symbol in the alphabet
+  if (expect && (expect.length !== candLists.length || !expect.every((t, i) => {
+    const c = candLists[i].find(x => x.sym === t);
+    if (!c) return false;
+    let top = 0;
+    for (const x of candLists[i]) if (x.conf > top) top = x.conf;
+    return c.conf >= CTX_EXPECT_SHARE * top;
+  }))) expect = null;
+  if (!alphabet && !shape && !expect) return null;
+  // A locked glyph reads the same in every hypothesis, so charging it for
+  // sitting outside the alphabet spends the cap without separating anything.
+  const free = candLists.map(l => l.length > 1);
+  const want = expect ? expect.join(' ') : null;
+  return {
+    tokens: expect,
+    score(syms) {
+      let v = 0;
+      if (alphabet) {
+        for (let i = 0; i < syms.length; i++) {
+          if (free[i] && !alphabet.has(syms[i])) v -= CTX_ALPHABET;
+        }
+      }
+      if (shape && shape(syms.map(printable).join(''))) v += CTX_TYPE;
+      v = Math.max(-CTX_CAP, Math.min(CTX_CAP, v));
+      if (want && syms.join(' ') === want) v += CTX_EXPECT;
+      return v;
+    }
+  };
+}
+
 const GRAMMAR_WEIGHT = 1.20;
 const BEAM_WIDTH = 40;
 const MAX_CANDS = 5;
 
 /** Re-decode a line over each symbol's candidate list. Locked symbols
  *  (overrides, composites/function names) keep a single candidate. */
-function beamRepair(line, overrides, medianH) {
+function beamRepair(line, overrides, medianH, ctx = null) {
   if (line.length < 2) return line;
 
   // Transitions INTO a raised glyph are exponents, not baseline text: x^2 is a
@@ -1774,6 +1943,7 @@ function beamRepair(line, overrides, medianH) {
     if (unitSlot[i]) g += cat === 'p' ? 0.55 : (cat === 'd' || cat === 'v') ? -0.30 : 0;
     return { cat, delta: Math.log(conf) + GRAMMAR_WEIGHT * g };
   };
+  const qctx = ctxScorer(ctx, candLists);
   let beamsAt = Array.from({ length: line.length + 1 }, () => []);
   beamsAt[0].push({ syms: [], arcs: [], score: 0, prevCat: '^' });
   for (let i = 0; i < line.length; i++) {
@@ -1793,9 +1963,28 @@ function beamRepair(line, overrides, medianH) {
       }
     }
   }
+  // The expected answer as ONE more path. It is built out of the candidate
+  // lists the ink produced and scored by exactly the same arcs as every other
+  // hypothesis — the question's only privilege is the capped bonus below. A
+  // student who wrote something else has a glyph somewhere whose ink never
+  // proposed the symbol this path needs, and the path simply does not exist.
+  if (qctx && qctx.tokens) {
+    let score = 0, prevCat = '^';
+    const arcs = [];
+    for (let i = 0; i < line.length; i++) {
+      const c = candLists[i].find(x => x.sym === qctx.tokens[i]);
+      const r = arcScore({ prevCat }, c.sym, c.conf, i);
+      score += r.delta;
+      prevCat = r.cat;
+      arcs.push({ i, n: 1, sym: c.sym, conf: c.conf });
+    }
+    beamsAt[line.length].push({ syms: qctx.tokens.slice(), arcs, score, prevCat });
+  }
+
   let best = null, bestTotal = -Infinity;
   for (const b of beamsAt[line.length]) {
-    const total = b.score + GRAMMAR_WEIGHT * (bigramScore(b.prevCat, '$', '$') + lineFormScore(b.syms));
+    const total = b.score + GRAMMAR_WEIGHT * (bigramScore(b.prevCat, '$', '$') + lineFormScore(b.syms)) +
+      (qctx ? qctx.score(b.syms) : 0);
     if (total > bestTotal) { bestTotal = total; best = b; }
   }
   if (!best) return line;
@@ -1856,17 +2045,59 @@ function classifyCached(group, medianH) {
   return res;
 }
 
+// ── Confidence summary ───────────────────────────────────────────────────────
+// Three numbers a marking gate needs and could not previously get from a
+// reading: how weak its weakest glyph is, how close its closest call was, and
+// which glyph to put in front of the student when it wants to ask.
+//
+// The margin deliberately ignores CNN class twins. A '0' whose runner-up is
+// 'o' is not a coin flip — it is a certain shape with two readings, settled
+// later by the language decoder (the same reasoning scoreMass() is built on).
+// Counting twins would report every round glyph on the page as a tie and the
+// margin would carry no information at all.
+//
+// A reading can leave a glyph whose primary symbol scores BELOW one of its own
+// alternatives: the grammar beam overrode the ink. That is a genuine zero
+// margin, so the gap is clamped at 0 rather than allowed to go negative.
+function confidenceSummary(lines) {
+  let minConf = 1, margin = 1, weakest = null, index = 0;
+  for (const ls of lines) {
+    for (const s of ls) {
+      const cls = classOfSymbol(s.sym);
+      let runnerUp = 0;
+      for (const a of s.alts || []) {
+        if (classOfSymbol(a.sym) === cls) continue;
+        if (a.conf > runnerUp) runnerUp = a.conf;
+      }
+      const gap = Math.max(0, Math.min(1, s.conf - runnerUp));
+      if (gap < margin) margin = gap;
+      if (s.conf < minConf) {
+        minConf = s.conf;
+        weakest = { index, sym: s.sym, conf: s.conf, alts: s.alts || [] };
+      }
+      index++;
+    }
+  }
+  return { minConf, margin, weakest };
+}
+
 // ── Public API ───────────────────────────────────────────────────────────────
 
 /**
  * Recognize handwriting.
  * strokes: [{points: [{x, y, p, t}]}]
  * overrides: {symbolId: sym} — user corrections applied before assembly
- * Returns { lines: [{text, symbols, box}], text, symbols }
+ * ctx: optional question context — see the QUESTION CONTEXT section above
+ * Returns { lines: [{text, symbols, box}], text, symbols,
+ *           minConf, margin, weakest }
+ *   minConf  lowest per-glyph confidence in the reading (1 when there is none)
+ *   margin   smallest top-1 minus top-2 gap, twins excluded (1 when there is none)
+ *   weakest  { index, sym, conf, alts } for the least-confident glyph, or null.
+ *            index counts glyphs across the whole reading, in reading order.
  */
-export function recognize(strokes, overrides = {}) {
+export function recognize(strokes, overrides = {}, ctx = null) {
   let groups = segment(strokes);
-  if (!groups.length) return { lines: [], text: '', symbols: [] };
+  if (!groups.length) return { lines: [], text: '', symbols: [], minConf: 1, margin: 1, weakest: null };
   let heights = groups.map(g => Math.max(g.box.w, g.box.h)).sort((a, b) => a - b);
   let medianH = heights[Math.floor(heights.length / 2)] || 20;
 
@@ -1971,7 +2202,7 @@ export function recognize(strokes, overrides = {}) {
   linesPre.forEach(slashBetweenDigits);
 
   // grammar beam: uncertain lines re-decoded against the maths-syntax prior
-  linesPre = linesPre.map(ls => beamRepair(ls, overrides, medianH));
+  linesPre = linesPre.map(ls => beamRepair(ls, overrides, medianH, ctx));
 
   // the beam can turn a misread bracket back into the digit it was, putting a
   // slash between digits for the first time — the geometry test above then has
@@ -2022,7 +2253,10 @@ export function recognize(strokes, overrides = {}) {
     };
   });
 
-  return { lines, text: lines.map(l => l.text).join('\n'), symbols };
+  return {
+    lines, text: lines.map(l => l.text).join('\n'), symbols,
+    ...confidenceSummary(linesPre)
+  };
 }
 
 /** Convert a recognized expr string into LaTeX for a KaTeX preview. */

@@ -45,9 +45,9 @@ Storage API — and one tap exports a full backup file.
 > against IndexedDB. Any static file server works just as well. See **[`server/README.md`](server/README.md)**.
 
 Development: `npm run dev` (Vite on :5173, alongside the legacy server on :4000). Tests: `npm test`
-(engine + handwriting suites), `npm run test:ink` (handwriting only), `npm run test:e2e` (Playwright
-iPad tour against a running server). Accuracy figures and the exact commands behind them are in
-**[Measured accuracy](#measured-accuracy)** below.
+(engine self-check, backend, security, then five handwriting suites), `npm run test:ink`
+(handwriting only), `npm run test:e2e` (Playwright iPad tour against a running server). Accuracy
+figures and the exact commands behind them are in **[Measured accuracy](#measured-accuracy)** below.
 
 **Native iPad app:** `ios/PriLearning.swiftpm` is a complete Swift project — open it in
 Swift Playground on the iPad itself (no Mac needed) or in Xcode 15+ and press Run. It bundles the
@@ -62,7 +62,7 @@ to. Nothing in this project compares the two products head to head.
 
 | Leibniz | Pri Learning |
 |---|---|
-| Unlimited exam-style questions per syllabus dot point (Yr 11–12 focus) | **84 parameterized generators across Years 7–12** × 4 difficulty tiers (D1 Foundation → D4 Exam Extension) — unlimited, fresh every time, incl. diagram questions with generated SVG figures |
+| Unlimited exam-style questions per syllabus dot point (Yr 11–12 focus) | **84 parameterized generators across Years 7–12** × 4 difficulty tiers (D1 Foundation → D4 Exam Extension) — every question built from a seed rather than drawn from a fixed pool, so the space is counted rather than asserted (`node tools/count-questions.mjs`, [figures below](#measured-accuracy)); incl. diagram questions with generated SVG figures |
 | HSC courses: Standard, Advanced, Extension 1, Extension 2 | **Full pathway support**: Standard (MS-F/A/M/S/N), Advanced, Extension 1 (ME — vectors, induction, projectiles, further calculus) and Extension 2 (MEX — proof, complex numbers, mechanics), each with its own syllabus scope, exams, predictor and skill map sections |
 | Syllabus-aligned content | Every subtopic carries its **NESA topic code** (MA4-/MA5-/MA-/MS-/ME-/MEX-) on tiles, drawers and reports |
 | Multi-part structured exam questions | **Section II multipart questions** — one stem, parts (a)(b)(c) with per-part marks, “hence” chains, marked part by part in review and printed papers |
@@ -110,8 +110,9 @@ convolutional network ships **inside the bundle** and does the heavy lifting on 
      render, and **C** a 32² render with an *aspect floor*, which exists so the tall-thin glyphs
      (`1 l ( ) /`) are not all handed to the net as the same vertical smear. Trained on ~142,000
      samples — style-varied glyph renders plus 10,000 real handwritten MNIST digits — through the
-     same deskewing rasteriser used at inference. **Validation accuracy 0.9638** for the ensemble
-     (0.9583 / 0.9652 / 0.9618 for A / B / C). The weights are 798 kB of base64 in
+     same deskewing rasteriser used at inference. **Validation accuracy 0.9395** for the ensemble
+     (0.9316 / 0.9365 / 0.9339 for A / B / C) — read `val_acc` out of `model-data.js` itself, which
+     is where those figures are recorded. The weights are 798 kB of base64 in
      `model-data.js`; the forward pass is plain JavaScript and takes a few milliseconds per symbol.
    - **Structural detectors** run first and override the net where shape geometry is decisive and
      the net is weak: lines, =, +, t, ÷, ±, ≠, ≤, ≥, °, dots, radicals.
@@ -137,14 +138,16 @@ ship the app — the trained assets are committed.
 ## Measured accuracy
 
 <!-- ═══════════════════════════════════════════════════════════════════════════
-     ACCURACY BLOCK — the only place in this README that quotes a number.
+     ACCURACY BLOCK — every measured figure in this README lives here, beside
+     the command that produced it. The one figure quoted outside it, the model's
+     val_acc in "The handwriting engine", is read straight out of model-data.js.
      To update: run each command below, paste its final line, and change the
      "last measured" date. Every figure is the literal output of the command
      beside it, against the model currently in client/src/ink/model-data.js.
      Never quote a figure without the command and the n that produced it.
      ═══════════════════════════════════════════════════════════════════════════ -->
 
-**Last measured: 2026-08-21**, against `client/src/ink/model-data.js` (v7 ensemble, val_acc 0.9638).
+**Last measured: 2026-08-21**, against `client/src/ink/model-data.js` (v7 ensemble, val_acc 0.9395).
 
 ### Question generators
 
@@ -152,21 +155,50 @@ ship the app — the trained assets are committed.
 |---|---|---|
 | `node server/test/selfcheck.mjs` | 30 seeds × 4 difficulties × 84 subtopics | **10,080 / 10,080** self-checks passed |
 | `node server/test/selfcheck.mjs` | 14 multipart questions × 25 seeds | **1,050 / 1,050** part-checks passed |
-| `node tools/count-questions.mjs` | 3,000 samples × 336 cells | 420 authored forms; **288,420 distinct questions observed** (Chao1 estimate ≈ 19.3 M) |
+| `node tools/count-questions.mjs` | 3,000 samples × 336 cells | 336 authored forms; **318,632 distinct questions observed** (Chao1 estimate ≈ 24.0 M); thinnest cell **54** |
+| `node tools/count-questions.mjs 3000 server` | 3,000 samples × 336 cells | 420 authored forms; 343,072 observed (Chao1 ≈ 23.4 M) — *not a product figure* |
 
 Every generated question's own canonical answer must pass its own marker, with a well-formed payload
 and no `NaN`/`undefined` anywhere in prompt, steps or hints.
+
+**The two census rows are not two measurements of the same thing.** The first counts
+`client/src/engine/generators/` — the registry the app actually serves. The second adds
+`server/engine/generators/extras.js`, 84 further authored forms that exist only on the server side
+and are exercised by `selfcheck.mjs`; nothing in the shipped bundle can reach them. The server
+figure was quoted here as the product's number for some time. It is not: the first row is.
+
+**"Unlimited" is a claim about the space as a whole, and it only means something cell by cell.** The
+same command ends by listing its thinnest (subtopic × difficulty) cells, because a cell that hands
+back the same question for every seed is invisible inside a total that large and is exactly what a
+student meets. At 3,000 seeds per cell:
+
+<!-- THIN-CELL LINE — re-run `node tools/count-questions.mjs` and paste its
+     "cells returning" figures here. Do not soften this sentence; if cells are
+     thin, say the number. -->
+
+- **0 of 336 cells return a single distinct question.** No cell is a fixed pool of one.
+- **0 cells return ten or fewer.** The thinnest holds **54** distinct questions, and the command
+  lists any cell at ten or below by name — an empty list is the passing result.
+
+So the claim the feature table makes is: the bank is unlimited in aggregate *and* no cell in it is a
+short loop. Both halves are measured, neither is asserted. Re-run the command before repeating
+either — this paragraph has been wrong before, at 12 single-question cells, and the only thing that
+caught it was running the count.
+
 
 ### Handwriting
 
 | Command | n | Result |
 |---|---|---|
-| `node client/test/inkcheck.mjs` | 30 trials × 56 template symbols = 1,680 | **1,650 / 1,680 (98%)** symbol self-recognition; probes **220 / 220 (100%)**; layout **13 / 13**; two-digit combos **100 / 100** |
-| `node client/test/inkcheck-hard.mjs` | 24 trials × 55 template symbols = 1,320 | **1,257 / 1,320 (95.2%)** under heavy distortion; scenes **14 / 15**; messy digit strings **38 / 40 (95%)** |
-| `node client/test/inkcheck-lines.mjs` | 30 lines × 6 style conditions = 180 lines | **167 / 180 (92.8%)** lines exact, **98.2%** chars; 1% drop when cramped |
-| `node client/test/inkcheck-holdout.mjs 24` | 24 simulated writers × 14 lines = 336 lines | **94.6%** lines exact, **98.7%** chars, **worst writer 79%** |
-| `node client/test/inkcheck-holdout2.mjs 40` | 40 simulated writers × 14 lines = 560 lines | **93.2%** lines exact, **98.2%** chars, **worst writer 57%** |
-| `node client/test/inkcheck-real.mjs` | 0 corpora recorded | **no score — there is no real-handwriting number yet** |
+| `node client/test/inkcheck.mjs 40` | 40 trials × 56 template symbols = 2,240 | **2,177 / 2,240 (97%)** symbol self-recognition; probes **219 / 220 (100%)**; layout **13 / 13**; two-digit combos **100 / 100** |
+| `node client/test/inkcheck-hard.mjs` | 24 trials × 55 template symbols = 1,320 | **1,271 / 1,320 (96.3%)** under heavy distortion; scenes **14 / 15**; messy digit strings **38 / 40 (95%)** |
+| `node client/test/inkcheck-lines.mjs 40` | 40 lines × 6 style conditions = 240 lines | **224 / 240 (93.3%)** lines exact, **97.9%** chars; **7% drop when cramped** |
+| `node client/test/inkcheck-holdout.mjs 24` | 24 simulated writers × 14 lines = 336 lines | **320 / 336 (95.2%)** lines exact, **98.9%** chars, **worst writer 86%** |
+| `node client/test/inkcheck-holdout2.mjs 40` | 40 simulated writers × 14 lines = 560 lines | **529 / 560 (94.5%)** lines exact, **98.4%** chars, **worst writer 71%** |
+| `npm run test:real` | 0 corpora recorded | **no score — there is no real-handwriting number yet** |
+
+Each command is quoted with the argument `npm test` passes it. Run it with a different `n` and you
+get a different number — see the last bullet below.
 
 Read these in the right order, because they do not all mean the same thing:
 
@@ -174,23 +206,28 @@ Read these in the right order, because they do not all mean the same thing:
   per simulated student, the way real handwriting works — over a seed space no tuning pass has ever
   executed. `inkcheck-holdout.mjs` was originally the held-out suite, but the v8 accuracy work read
   its failures (the misreads *are* the diagnosis), which spent its independence; holdout #2 replaced
-  it and is still untouched. When holdout #2 gets studied in turn, a third must be added.
+  it and is still untouched. Neither may be tuned against now — a spent holdout is still not a
+  target. When holdout #2 gets studied in turn, a third must be added.
+  **`tools/ink-train/README.md` states this identically**, at the point where a retrain is validated;
+  if those two ever disagree again, the one claiming more independence is the wrong one.
 - **`inkcheck.mjs`, `inkcheck-hard.mjs` and `inkcheck-lines.mjs` are tuning targets**, not evidence.
   They are regression guards. Anything tuned against is eventually tuned *to*.
 - **The worst-writer figure matters more than the mean.** At 40 writers one simulated hand scores
-  **57%**. A student the engine cannot read does not care about the average, and no headline number
-  should hide that gap.
+  **71%** — nearly 24 points below the 94.5% headline. A student the engine cannot read does not care
+  about the average, and no headline number should hide that gap. Quote the pair or neither.
 - **Run these yourself before quoting them.** The commands above take the sample size as their last
   argument and default to a *smaller, more flattering* one — `inkcheck-holdout.mjs` with no argument
-  reports 96.4% / 99.2% / worst writer 86% off just 12 writers. Larger n is the honest n.
+  reports **97.0% / 99.2% / worst writer 86%** off just 12 writers, against **95.2% / 98.9% / 86%**
+  at the 24 writers `npm test` runs. Larger n is the honest n.
 
 ### The gap this table admits
 
-**Every figure above is measured on ink this repo generated itself.** Synthetic strokes carry the
-same assumptions the recogniser was built on, so these numbers prove the engine is internally
-consistent — not that it can read a Year 9 student's handwriting on a Tuesday afternoon. **There is
-currently no real-handwriting benchmark for this engine**, and that is the biggest outstanding gap in
-the project's evidence.
+**Every handwriting figure above — all five suites, without exception — is measured on ink this repo
+generated itself.** Synthetic strokes carry the same assumptions the recogniser was built on, so
+these numbers prove the engine is internally consistent — not that it can read a Year 9 student's
+handwriting on a Tuesday afternoon. The held-out suites hold out a *seed space*, not a person; that
+makes them honest about tuning, not about real hands. **There is currently no real-handwriting
+benchmark for this engine**, and that is the biggest outstanding gap in the project's evidence.
 
 The tooling to close it exists and is wired up:
 
@@ -198,7 +235,8 @@ The tooling to close it exists and is wired up:
   write its 60 prompts with the Pencil (naturally — messy ink is the point), save the corpus file
   into `client/test/ink-corpus/`. It records strokes in exactly the shape `recognize()` consumes, so
   a corpus scores directly with no conversion. See `tools/ink-collect/README.md`.
-- **`node client/test/inkcheck-real.mjs`** — scores against every corpus in `client/test/ink-corpus/`,
+- **`npm run test:real`** (`node client/test/inkcheck-real.mjs`) — scores against every corpus in
+  `client/test/ink-corpus/`,
   reports pencil and finger corpora separately, and warns below five writers. With no corpus it says
   so plainly and exits clean; it never invents a score. `--strict` makes an empty corpus a failure
   once data exists.
@@ -234,18 +272,24 @@ set's failures, it stops being evidence.
   questions/match/paper export/history/backup/task packs/progress files. No network, ever.
 - **`server/`** — **legacy, and not what the app talks to.** The Express app (`index.js`, `routes/`,
   `auth.js`, `db.js`, `badges.js`, `seed.js`) is a pre-local-first, SQLite-backed API that no client
-  code calls. `server/engine/` is now a set of one-line re-export shims pointing at
-  `client/src/engine/` — the dependency runs server → client, never the reverse. Two things under
-  `server/` *are* live: **`server/test/selfcheck.mjs`** (the 10,080-check gate, first command in
-  `npm test`) and **`server/engine/generators/extras.js`** (84 extra authored question forms that
-  exist nowhere else). Read **[`server/README.md`](server/README.md)** before deleting anything here.
+  code calls. `server/engine/` is now re-export shims pointing at `client/src/engine/` — the
+  dependency runs server → client, never the reverse, and `generateQuestion` is literally the client's
+  own function object, not a copy of it. Two things under `server/` *are* live:
+  **`server/test/selfcheck.mjs`** (the 10,080-check gate, first command in `npm test`) and
+  **`server/engine/generators/extras.js`** (84 extra authored question forms that exist nowhere else,
+  layered onto the registry by `server/engine/generators/index.js` — the one shim that adds anything).
+  Nothing in the shipped client can reach the extras. Read
+  **[`server/README.md`](server/README.md)** before deleting anything here.
 - **`tools/`** — `ink-train/` (retraining the CNN ensemble and the re-ranker),
-  `ink-collect/` (real-handwriting capture), `count-questions.mjs` (question-space estimate).
+  `ink-collect/` (real-handwriting capture), `count-questions.mjs` (question-space census — censuses
+  the client registry by default, `… 3000 server` for the extras-inflated server figure).
 
 ## Verification
 
-Run `npm test`: the generator self-check followed by the ink suites. Every number it prints, plus the
-two suites it does not run (`inkcheck-holdout2.mjs`, `inkcheck-real.mjs`), is tabulated with its
+Run `npm test`: the generator self-check, the backend and security checks, then the five ink suites —
+`inkcheck`, `inkcheck-hard`, `inkcheck-lines`, `inkcheck-holdout` **and `inkcheck-holdout2`**, each
+with the sample size quoted in the table above. The one suite `npm test` does not run is
+`inkcheck-real.mjs`, which has no corpus to score. Every number it prints is tabulated with its
 sample size in **[Measured accuracy](#measured-accuracy)** above.
 
 Beyond the automated suites, `npm run test:e2e` drives a Playwright iPad-viewport end-to-end tour

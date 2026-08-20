@@ -9,9 +9,27 @@
 // glyph renders + 10,000 real handwritten MNIST digits; runs in plain JS in a
 // few milliseconds per symbol. Same deskewing rasterizer as training.
 // ─────────────────────────────────────────────────────────────────────────────
-import MODEL from './model-data.js';
 import { CLASSES } from './classes.js';
 import { rasterize } from './raster.js';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Weights
+// ~798 kB of quantised weights, read by this file and nothing else, so they
+// arrive over a dynamic edge. A static `import` would put them in the static
+// graph of everything that reaches the recogniser, which is how they stayed in
+// the initial load even after being split into a chunk of their own: a chunk the
+// entry still statically imports is still a file the browser must have before it
+// can run anything. Over a dynamic edge the fetch happens when something first
+// pulls the recogniser in — the write-to-answer surface, itself behind an
+// import() — instead of on a cold open of the app.
+//
+// Awaiting it here rather than inside nnClassify leaves the weights an ordinary
+// module-scope constant, so the whole recogniser stays synchronous and stays
+// fast once loaded, and the ink suites go on importing it in Node and calling it
+// straight away: resolving this module is what waited.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const MODEL = (await import('./model-data.js')).default;
 
 const b64ToI8 = (b64) => {
   const bin = atob(b64);

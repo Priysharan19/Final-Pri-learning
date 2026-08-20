@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Pri Learning · Year 11 generators (Advanced foundations)
 // ─────────────────────────────────────────────────────────────────────────────
-import { ri, rc, rs, nz, gcd, Frac, mcq, term, poly, sgn, r1, r2, r3, rad, NAMES } from '../qhelpers.js';
+import { ri, rc, rs, nz, Frac, mcq, term, poly, sgn, r1, r2, r3, rad, NAMES } from '../qhelpers.js';
 
 const factorial = n => n <= 1 ? 1 : n * factorial(n - 1);
 const nCr = (n, r) => Math.round(factorial(n) / (factorial(r) * factorial(n - r)));
@@ -13,6 +13,27 @@ const EXACT = {
   45: { sin: ['\\frac{\\sqrt{2}}{2}', 'sqrt(2)/2', Math.SQRT2 / 2], cos: ['\\frac{\\sqrt{2}}{2}', 'sqrt(2)/2', Math.SQRT2 / 2], tan: ['1', '1', 1] },
   60: { sin: ['\\frac{\\sqrt{3}}{2}', 'sqrt(3)/2', Math.sqrt(3) / 2], cos: ['\\frac{1}{2}', '1/2', 0.5], tan: ['\\sqrt{3}', 'sqrt(3)', Math.sqrt(3)] }
 };
+
+/** Exact values at the quadrantal angles as well as the special triangles. */
+const QUAD_EXACT = {
+  0: { sin: ['0', '0', 0], cos: ['1', '1', 1], tan: ['0', '0', 0] },
+  30: EXACT[30], 45: EXACT[45], 60: EXACT[60],
+  90: { sin: ['1', '1', 1], cos: ['0', '0', 0], tan: null },
+  180: { sin: ['0', '0', 0], cos: ['-1', '-1', -1], tan: ['0', '0', 0] },
+  270: { sin: ['-1', '-1', -1], cos: ['0', '0', 0], tan: null },
+  360: { sin: ['0', '0', 0], cos: ['1', '1', 1], tan: ['0', '0', 0] }
+};
+
+/** Every solution of sin/cos/tan θ = v in [lo, hi], scanned in whole degrees. */
+function solveTrigDegY11(fn, v, lo, hi) {
+  const out = [];
+  for (let d = lo; d <= hi; d++) {
+    if (fn === 'tan' && Math.abs(((d % 180) + 180) % 180 - 90) < 1e-9) continue;
+    const y = fn === 'sin' ? Math.sin(rad(d)) : fn === 'cos' ? Math.cos(rad(d)) : Math.tan(rad(d));
+    if (Math.abs(y - v) < 1e-9) out.push(d);
+  }
+  return out;
+}
 
 export const year11 = {
 
@@ -152,17 +173,22 @@ export const year11 = {
         ]
       };
     }
-    const p = nz(rng, -6, 6);
-    const b = -2 * p; const k = p * p; // x^2 + bx + k has equal roots
+    const a = ri(rng, 1, 5);
+    const p = nz(rng, -12, 12);
+    const b = -2 * a * p, k = a * p * p;
+    const lead = a === 1 ? '' : a;
     return {
-      prompt: `Find the value of $k$ for which $x^2 ${sgn(b)}x + k = 0$ has **equal roots**.`,
+      prompt: `Find the value of $k$ for which $${lead}x^2 ${sgn(b)}x + k = 0$ has **equal roots**.`,
       answerType: 'numeric', answer: { value: k }, answerPrefix: 'k =',
-      traps: [{ value: -k, why: 'Equal roots need $\\Delta = b^2 - 4k = 0$, so $k = b^2/4 > 0$ here.' }].filter(t => t.value !== k),
-      hints: ['Equal roots ⇔ discriminant = 0.', `$\\Delta = (${b})^2 - 4k = 0$.`, `$4k = ${b * b}$.`],
+      traps: [
+        { value: -k, why: `Equal roots need $\\Delta = b^2 - 4ak = 0$, so $k = \\frac{b^2}{4a} > 0$ here.` },
+        { value: b * b / 4, why: `The discriminant is $b^2 - 4ak$ — divide by $4a = ${4 * a}$, not by 4.` }
+      ].filter(t => t.value !== k),
+      hints: ['Equal roots ⇔ discriminant = 0.', `$\\Delta = (${b})^2 - 4(${a})k = 0$.`, `$${4 * a}k = ${b * b}$.`],
       steps: [
-        { h: 'Set Δ = 0', d: `$(${b})^2 - 4k = 0$` },
-        { h: 'Solve', d: `$4k = ${b * b}$, so $k = ${k}$` },
-        { h: 'Check', d: `$x^2 ${sgn(b)}x + ${k} = (x ${sgn(-p)})^2$ ✓` }
+        { h: 'Set Δ = 0', d: `$(${b})^2 - 4(${a})k = 0$` },
+        { h: 'Solve', d: `$${4 * a}k = ${b * b}$, so $k = ${k}$` },
+        { h: 'Check', d: `$${lead}x^2 ${sgn(b)}x + ${k} = ${lead}(x ${sgn(-p)})^2$ ✓` }
       ]
     };
   },
@@ -239,8 +265,7 @@ export const year11 = {
   // ── Further linear functions ─────────────────────────────────────────────
   'y11-lines': (rng, diff) => {
     if (diff === 1) {
-      const p = nz(rng, -4, 4), q = ri(rng, 2, 5) * (rc(rng, [1, -1]));
-      const f = new Frac(-q, p * q / gcd(Math.abs(p * q), 1) === 0 ? 1 : p); // perpendicular to m = p/q
+      const p = nz(rng, -9, 9), q = ri(rng, 2, 9) * rc(rng, [1, -1]);
       const m = new Frac(p, q);
       const perp = new Frac(-q, p);
       return {
@@ -318,25 +343,58 @@ export const year11 = {
   // ── Trig ratios & exact values ───────────────────────────────────────────
   'y11-trigfunc': (rng, diff) => {
     if (diff === 1) {
-      const ang = rc(rng, [30, 45, 60]);
-      const fn = rc(rng, ['sin', 'cos', 'tan']);
-      const [ltx, typed, val] = EXACT[ang][fn];
+      const shape = ri(rng, 1, 3);
+      if (shape === 1) {
+        const ang = rc(rng, [0, 30, 45, 60, 90, 180, 270, 360]);
+        const fns = QUAD_EXACT[ang].tan === null ? ['sin', 'cos'] : ['sin', 'cos', 'tan'];
+        const fn = rc(rng, fns);
+        const [ltx, typed, val] = QUAD_EXACT[ang][fn];
+        return {
+          prompt: `Write down the **exact value** of $\\${fn}(${ang}°)$.`,
+          answerType: 'numeric', answer: { value: val, requireExact: true, canonicalInput: typed },
+          inputHint: 'e.g. sqrt(3)/2 or 1/2',
+          traps: [],
+          hints: ['Picture the special triangles: 45–45–90 (sides 1,1,√2) and 30–60–90 (sides 1,√3,2), and the unit circle for 0°, 90°, 180°, 270°, 360°.', fn === 'tan' ? 'tan = opposite ÷ adjacent.' : `${fn} = ${fn === 'sin' ? 'opposite ÷ hypotenuse' : 'adjacent ÷ hypotenuse'}.`, `The exact value is $${ltx}$.`],
+          steps: [
+            { h: 'Where the angle sits', d: ang % 90 === 0 ? 'Read it straight off the unit circle' : ang === 45 ? 'Right isosceles triangle with sides $1, 1, \\sqrt{2}$' : 'Half an equilateral triangle: sides $1, \\sqrt{3}, 2$' },
+            { h: 'Read the ratio', d: `$\\${fn}(${ang}°) = ${ltx}$` }
+          ]
+        };
+      }
+      if (shape === 2) {
+        const ang = rc(rng, [0, 30, 45, 60, 90]);
+        const fns = QUAD_EXACT[ang].tan === null ? ['sin', 'cos'] : ['sin', 'cos', 'tan'];
+        const fn = rc(rng, fns);
+        const [ltx, , val] = QUAD_EXACT[ang][fn];
+        return {
+          prompt: `For which angle $\\theta$ with $0° \\le \\theta \\le 90°$ does $\\${fn}(\\theta) = ${ltx}$? Give your answer in degrees.`,
+          answerType: 'numeric', answer: { value: ang }, answerSuffix: '°',
+          traps: [{ value: 90 - ang, why: `That is the complement — $\\${fn === 'sin' ? 'cos' : 'sin'}$ of it would give $${ltx}$ instead.` }].filter(t => t.value !== ang && fn !== 'tan'),
+          hints: ['Work backwards through the special triangles.', `Which of 0°, 30°, 45°, 60°, 90° has $\\${fn} = ${ltx}$?`, `$\\theta = ${ang}°$.`],
+          steps: [{ h: 'Read the table backwards', d: `$\\${fn}(${ang}°) = ${ltx}$, so $\\theta = ${ang}°$` }]
+        };
+      }
+      const ang = rc(rng, [0, 30, 45, 60, 90, 180, 270, 360]);
+      const fns = QUAD_EXACT[ang].tan === null ? ['sin', 'cos'] : ['sin', 'cos', 'tan'];
+      const fn = rc(rng, fns);
+      const [ltx, , val] = QUAD_EXACT[ang][fn];
       return {
-        prompt: `Write down the **exact value** of $\\${fn}(${ang}°)$.`,
-        answerType: 'numeric', answer: { value: val, requireExact: true, canonicalInput: typed },
-        inputHint: 'e.g. sqrt(3)/2 or 1/2',
+        prompt: `Find $\\${fn}(${ang}°)$, correct to 3 decimal places.`,
+        answerType: 'numeric', answer: { value: r3(val), tol: 0.0006 },
         traps: [],
-        hints: ['Picture the special triangles: 45–45–90 (sides 1,1,√2) and 30–60–90 (sides 1,√3,2).', fn === 'tan' ? 'tan = opposite ÷ adjacent in the special triangle.' : `${fn} = ${fn === 'sin' ? 'opposite ÷ hypotenuse' : 'adjacent ÷ hypotenuse'}.`, `The exact value is $${ltx}$.`],
+        hints: ['Make sure your calculator is in degree mode.', `The exact value is $${ltx}$.`, 'Round to 3 decimal places.'],
         steps: [
-          { h: 'Special triangle', d: ang === 45 ? 'Right isosceles triangle with sides $1, 1, \\sqrt{2}$' : 'Half an equilateral triangle: sides $1, \\sqrt{3}, 2$' },
-          { h: 'Read the ratio', d: `$\\${fn}(${ang}°) = ${ltx}$` }
+          { h: 'Exact value', d: `$\\${fn}(${ang}°) = ${ltx}$` },
+          { h: 'As a decimal', d: `$\\approx ${r3(val)}$` }
         ]
       };
     }
     if (diff === 2) {
       const base = rc(rng, [30, 45, 60]);
       const quad = rc(rng, [2, 3, 4]);
-      const ang = quad === 2 ? 180 - base : quad === 3 ? 180 + base : 360 - base;
+      const turn = rc(rng, [-360, 0, 360]);
+      const principal = quad === 2 ? 180 - base : quad === 3 ? 180 + base : 360 - base;
+      const ang = principal + turn;
       const fn = rc(rng, ['sin', 'cos', 'tan']);
       const sign = fn === 'sin' ? (quad === 2 ? 1 : -1) : fn === 'cos' ? (quad === 4 ? 1 : -1) : (quad === 3 ? 1 : -1);
       const [ltx, typed, val] = EXACT[base][fn];
@@ -347,41 +405,55 @@ export const year11 = {
         answerType: 'numeric', answer: { value: signed, requireExact: true, canonicalInput: typedSigned },
         inputHint: 'e.g. -sqrt(3)/2',
         traps: [{ value: -signed, why: `Quadrant ${quad}: ${['', 'all ratios positive', 'only sin positive', 'only tan positive', 'only cos positive'][quad]} (ASTC).`, tol: 0.001 }],
-        hints: [`$${ang}°$ lies in quadrant ${quad} — which ratios are positive there (ASTC)?`, `Reference angle: $${base}°$.`, `$\\${fn}(${base}°) = ${ltx}$; apply the quadrant sign (${sign === 1 ? '+' : '−'}).`],
+        hints: [
+          turn === 0 ? `$${ang}°$ lies in quadrant ${quad} — which ratios are positive there (ASTC)?` : `Add or subtract $360°$ first: $${ang}°$ is coterminal with $${principal}°$, in quadrant ${quad}.`,
+          `Reference angle: $${base}°$.`,
+          `$\\${fn}(${base}°) = ${ltx}$; apply the quadrant sign (${sign === 1 ? '+' : '−'}).`
+        ],
         steps: [
-          { h: 'Reference angle', d: `$${ang}° → ${base}°$ (distance from the x-axis)` },
+          ...(turn === 0 ? [] : [{ h: 'Coterminal angle', d: `$${ang}° ${turn > 0 ? '-' : '+'} 360° = ${principal}°$` }]),
+          { h: 'Reference angle', d: `$${principal}° → ${base}°$ (distance from the x-axis)` },
           { h: 'Quadrant sign (ASTC)', d: `Quadrant ${quad}: $\\${fn}$ is ${sign === 1 ? 'positive' : 'negative'}` },
           { h: 'Exact value', d: `$\\${fn}(${ang}°) = ${sign === -1 ? '-' : ''}${ltx}$` }
         ]
       };
     }
     if (diff === 3) {
-      const pick = rc(rng, [
-        { fn: 'sin', val: '\\frac{1}{2}', sols: [30, 150], hint: 'sin is positive in quadrants 1 and 2' },
-        { fn: 'sin', val: '\\frac{\\sqrt{3}}{2}', sols: [60, 120], hint: 'sin is positive in quadrants 1 and 2' },
-        { fn: 'cos', val: '\\frac{1}{2}', sols: [60, 300], hint: 'cos is positive in quadrants 1 and 4' },
-        { fn: 'cos', val: '-\\frac{1}{2}', sols: [120, 240], hint: 'cos is negative in quadrants 2 and 3' },
-        { fn: 'tan', val: '1', sols: [45, 225], hint: 'tan is positive in quadrants 1 and 3' },
-        { fn: 'tan', val: '-1', sols: [135, 315], hint: 'tan is negative in quadrants 2 and 4' }
-      ]);
+      const fn = rc(rng, ['sin', 'cos', 'tan']);
+      const base = rc(rng, [30, 45, 60]);
+      const neg = rc(rng, [true, false]);
+      const [ltx] = EXACT[base][fn];
+      const valTex = `${neg ? '-' : ''}${ltx}`;
+      const target = (neg ? -1 : 1) * EXACT[base][fn][2];
+      const dom = rc(rng, [[0, 360], [-180, 180], [0, 720], [-360, 0]]);
+      const sols = solveTrigDegY11(fn, target, dom[0], dom[1]);
+      const quadNote = fn === 'sin' ? (neg ? 'sin is negative in quadrants 3 and 4' : 'sin is positive in quadrants 1 and 2')
+        : fn === 'cos' ? (neg ? 'cos is negative in quadrants 2 and 3' : 'cos is positive in quadrants 1 and 4')
+          : (neg ? 'tan is negative in quadrants 2 and 4' : 'tan is positive in quadrants 1 and 3');
       return {
-        prompt: `Solve $\\${pick.fn}(\\theta) = ${pick.val}$ for $0° \\le \\theta \\le 360°$. Give all solutions in degrees.`,
-        answerType: 'set', answer: { values: pick.sols }, answerSuffix: '°',
+        prompt: `Solve $\\${fn}(\\theta) = ${valTex}$ for $${dom[0]}° \\le \\theta \\le ${dom[1]}°$. Give all solutions in degrees.`,
+        answerType: 'set', answer: { values: sols, tol: 0.01 }, answerSuffix: '°',
         inputHint: 'e.g. 30, 150',
-        traps: [{ value: pick.sols[0], why: 'There are *two* solutions in a full turn — use the quadrant diagram (ASTC) to find the second.' }],
-        hints: ['Find the reference angle first, then use ASTC for quadrants.', pick.hint + '.', `Solutions: $${pick.sols.join('°, ')}°$.`],
+        traps: [{ value: sols.length ? sols[0] + base : base, why: `Use the quadrant diagram (ASTC): ${quadNote}.` }].filter(t => !sols.includes(t.value)),
+        hints: [`The reference angle is $${base}°$.`, quadNote + '.', `Sweep the whole interval: $\\theta = ${sols.join('°, ')}°$.`],
         steps: [
-          { h: 'Reference angle', d: `$\\${pick.fn}^{-1}$ of the magnitude gives $${pick.sols[0] <= 90 ? pick.sols[0] : 180 - pick.sols[0]}°$` },
-          { h: 'Locate quadrants', d: pick.hint },
-          { h: 'Solutions', d: `$\\theta = ${pick.sols.join('°, ')}°$` }
+          { h: 'Reference angle', d: `$\\${fn}(${base}°) = ${ltx}$` },
+          { h: 'Locate quadrants', d: quadNote },
+          { h: 'Solutions', d: `$\\theta = ${sols.join('°, ')}°$` }
         ]
       };
     }
     const pick = rc(rng, [
       { p: '\\sin^2(\\theta) + \\cos^2(\\theta)', a: '$1$', d1: '$\\sin(2\\theta)$', d2: '$2$', why1: 'This is the Pythagorean identity — it collapses to a constant.' },
       { p: '1 - \\cos^2(\\theta)', a: '$\\sin^2(\\theta)$', d1: '$\\cos^2(\\theta)$', d2: '$1$', why1: 'Rearrange $\\sin^2\\theta + \\cos^2\\theta = 1$.' },
+      { p: '1 - \\sin^2(\\theta)', a: '$\\cos^2(\\theta)$', d1: '$\\sin^2(\\theta)$', d2: '$1$', why1: 'Rearrange $\\sin^2\\theta + \\cos^2\\theta = 1$ the other way.' },
       { p: '\\tan(\\theta)\\cos(\\theta)', a: '$\\sin(\\theta)$', d1: '$\\cos(\\theta)$', d2: '$1$', why1: '$\\tan\\theta = \\frac{\\sin\\theta}{\\cos\\theta}$, so the cosines cancel.' },
-      { p: '\\dfrac{\\sin(\\theta)}{\\tan(\\theta)}', a: '$\\cos(\\theta)$', d1: '$\\sin^2(\\theta)$', d2: '$1$', why1: 'Write tan as sin/cos and simplify the compound fraction.' }
+      { p: '\\dfrac{\\sin(\\theta)}{\\tan(\\theta)}', a: '$\\cos(\\theta)$', d1: '$\\sin^2(\\theta)$', d2: '$1$', why1: 'Write tan as sin/cos and simplify the compound fraction.' },
+      { p: '\\dfrac{\\sin(\\theta)}{\\cos(\\theta)}', a: '$\\tan(\\theta)$', d1: '$\\cot(\\theta)$', d2: '$1$', why1: 'This ratio *is* the definition of tan.' },
+      { p: '\\dfrac{1 - \\cos^2(\\theta)}{\\sin(\\theta)}', a: '$\\sin(\\theta)$', d1: '$\\cos(\\theta)$', d2: '$\\tan(\\theta)$', why1: 'The top is $\\sin^2\\theta$; one factor cancels with the bottom.' },
+      { p: '\\sin(\\theta)\\tan(\\theta) + \\cos(\\theta)', a: '$\\dfrac{1}{\\cos(\\theta)}$', d1: '$\\sin(\\theta)$', d2: '$1$', why1: 'Put both terms over $\\cos\\theta$: the top becomes $\\sin^2\\theta + \\cos^2\\theta = 1$.' },
+      { p: '\\cos^2(\\theta) - 1', a: '$-\\sin^2(\\theta)$', d1: '$\\sin^2(\\theta)$', d2: '$1$', why1: 'It is the negative of $1 - \\cos^2\\theta$ — mind the sign.' },
+      { p: '\\tan^2(\\theta)\\cos^2(\\theta)', a: '$\\sin^2(\\theta)$', d1: '$\\cos^2(\\theta)$', d2: '$1$', why1: 'Square the identity $\\tan\\theta\\cos\\theta = \\sin\\theta$.' }
     ]);
     const m = mcq(rng, pick.a, [{ text: pick.d1, why: pick.why1 }, { text: pick.d2 }, { text: '$0$' }]);
     return {
@@ -471,28 +543,42 @@ export const year11 = {
   // ── Exponentials & logarithms ────────────────────────────────────────────
   'y11-explog': (rng, diff) => {
     if (diff === 1) {
-      const base = rc(rng, [2, 3, 5, 10]);
-      const p = base === 2 ? ri(rng, 3, 6) : base === 10 ? ri(rng, 2, 4) : ri(rng, 2, 4);
+      const base = rc(rng, [2, 3, 4, 5, 6, 7, 8, 9, 10]);
+      const p = base === 2 ? ri(rng, 2, 10) : base === 3 ? ri(rng, 2, 7) : base <= 5 ? ri(rng, 2, 5) : ri(rng, 2, 4);
+      const recip = rng() < 0.4;
+      const argTex = recip ? `\\dfrac{1}{${base ** p}}` : `${base ** p}`;
+      const ans = recip ? -p : p;
       return {
-        prompt: `Evaluate $\\log_{${base}}(${base ** p})$.`,
-        answerType: 'numeric', answer: { value: p },
+        prompt: `Evaluate $\\log_{${base}}\\left(${argTex}\\right)$.`,
+        answerType: 'numeric', answer: { value: ans },
         traps: [
-          { value: base ** p / base, why: `A logarithm asks “what power?”: $${base}^{?} = ${base ** p}$.` },
+          { value: recip ? p : base ** p / base, why: recip ? `A reciprocal argument gives a *negative* index: $\\frac{1}{${base ** p}} = ${base}^{-${p}}$.` : `A logarithm asks “what power?”: $${base}^{?} = ${base ** p}$.` },
           { value: p * base, why: `$\\log_{${base}}$ returns just the exponent — no multiplying by the base.` }
-        ],
-        hints: ['A log asks: base to what power gives this number?', `$${base}^{?} = ${base ** p}$.`, `$${base}^{${p}} = ${base ** p}$.`],
+        ].filter(t => t.value !== ans),
+        hints: ['A log asks: base to what power gives this number?', `$${base}^{?} = ${recip ? `\\frac{1}{${base ** p}}` : base ** p}$.`, `$${base}^{${ans}} = ${recip ? `\\frac{1}{${base ** p}}` : base ** p}$.`],
         steps: [
-          { h: 'Rewrite as a power question', d: `$${base}^{x} = ${base ** p}$` },
-          { h: 'Answer', d: `$x = ${p}$` }
+          { h: 'Rewrite as a power question', d: `$${base}^{x} = ${argTex}$` },
+          ...(recip ? [{ h: 'Negative index', d: `$\\dfrac{1}{${base ** p}} = ${base}^{-${p}}$` }] : []),
+          { h: 'Answer', d: `$x = ${ans}$` }
         ]
       };
     }
     if (diff === 2) {
-      const pick = rc(rng, [
-        { base: 10, x: 4, y: 25, res: 2 }, { base: 10, x: 2, y: 50, res: 2 }, { base: 10, x: 8, y: 125, res: 3 },
-        { base: 2, x: 12, y: 3, res: 2, op: '-' }, { base: 3, x: 54, y: 2, res: 3, op: '-' }, { base: 2, x: 40, y: 5, res: 3, op: '-' }
-      ]);
-      const op = pick.op || '+';
+      const base = rc(rng, [2, 3, 5, 10]);
+      const op = rc(rng, ['+', '-']);
+      let pick;
+      if (op === '+') {
+        const res = base === 2 ? ri(rng, 3, 8) : base === 3 ? ri(rng, 2, 5) : ri(rng, 2, 4);
+        const N = base ** res;
+        const divisors = [];
+        for (let d = 2; d * d <= N; d++) if (N % d === 0) { divisors.push(d); if (d !== N / d) divisors.push(N / d); }
+        const x = divisors.length ? rc(rng, divisors) : base;
+        pick = { base, x, y: N / x, res };
+      } else {
+        const res = base === 2 ? ri(rng, 2, 6) : base === 3 ? ri(rng, 1, 4) : ri(rng, 1, 3);
+        const y = ri(rng, 2, 15);
+        pick = { base, x: y * base ** res, y, res };
+      }
       return {
         prompt: `Evaluate $\\log_{${pick.base}}(${pick.x}) ${op} \\log_{${pick.base}}(${pick.y})$.`,
         answerType: 'numeric', answer: { value: pick.res },
@@ -505,9 +591,9 @@ export const year11 = {
       };
     }
     if (diff === 3) {
-      const base = rc(rng, [2, 3, 5]);
-      const shift = ri(rng, -2, 2);
-      const p = ri(rng, 2, base === 2 ? 6 : 4);
+      const base = rc(rng, [2, 3, 4, 5, 6, 7]);
+      const shift = ri(rng, -4, 4);
+      const p = ri(rng, 2, base === 2 ? 8 : base === 3 ? 5 : 4);
       const x = p - shift;
       return {
         prompt: `Solve $${base}^{x ${sgn(shift)}} = ${base ** p}$.`.replace(' + 0', ''),
@@ -522,8 +608,8 @@ export const year11 = {
         ]
       };
     }
-    const base = rc(rng, [2, 3, 5, 7]);
-    const target = ri(rng, 20, 90);
+    const base = rc(rng, [2, 3, 4, 5, 6, 7, 8, 9, 11, 13]);
+    const target = ri(rng, 15, 400);
     const x = Math.log(target) / Math.log(base);
     return {
       prompt: `Solve $${base}^x = ${target}$, correct to 2 decimal places.`,
@@ -544,7 +630,7 @@ export const year11 = {
   // ── Introduction to differentiation ──────────────────────────────────────
   'y11-diff': (rng, diff) => {
     if (diff === 1) {
-      const a = nz(rng, 2, 7), n = ri(rng, 2, 6);
+      const a = nz(rng, -9, 9), n = ri(rng, 2, 9);
       return {
         prompt: `Differentiate $y = ${a}x^{${n}}$.`,
         answerType: 'expression', answer: { expr: `${a * n}x^${n - 1}` },
@@ -614,7 +700,7 @@ export const year11 = {
   // ── Probability & counting ───────────────────────────────────────────────
   'y11-probability': (rng, diff) => {
     if (diff === 1) {
-      const n = ri(rng, 5, 10), r = ri(rng, 2, Math.min(4, n - 1));
+      const n = ri(rng, 5, 14), r = ri(rng, 2, Math.min(6, n - 1));
       const useC = rc(rng, [true, false]);
       const val = useC ? nCr(n, r) : nPr(n, r);
       return {
@@ -632,8 +718,25 @@ export const year11 = {
       };
     }
     if (diff === 2) {
-      const word = rc(rng, ['PENCIL', 'NUMBER', 'WOMBAT', 'FRIEND', 'PYTHON', 'GARDEN']);
+      const word = rc(rng, ['CAT', 'DOGS', 'BIRD', 'PLANT', 'HORSE', 'MUSIC', 'PENCIL', 'NUMBER', 'WOMBAT', 'FRIEND', 'PYTHON', 'GARDEN', 'JUMPED', 'FLOWER', 'MONKEY', 'BRIDGE', 'CANDLES', 'DOLPHIN', 'JACKETS', 'MERCURY', 'PROBLEMS', 'FLAMINGO']);
       const n = word.length;
+      if (rng() < 0.55) {
+        const r = ri(rng, 2, n - 1);
+        const val = nPr(n, r);
+        return {
+          prompt: `How many different $${r}$-letter arrangements can be made from the letters of **${word}**, using each letter at most once? (All its letters are distinct.)`,
+          answerType: 'numeric', answer: { value: val },
+          traps: [
+            { value: nCr(n, r), why: 'The letters are arranged in order, so this is a permutation — do not divide by $' + r + '!$.' },
+            { value: n ** r, why: 'Each letter may be used at most once, so the number of choices shrinks: ' + Array.from({ length: r }, (_, i) => n - i).join(' × ') + '.' }
+          ].filter(t => t.value !== val),
+          hints: [`There are ${n} choices for the first letter, ${n - 1} for the second, and so on.`, `That is $^{${n}}P_{${r}} = \\frac{${n}!}{(${n - r})!}$.`, `$${Array.from({ length: r }, (_, i) => n - i).join(' \\times ')}$.`],
+          steps: [
+            { h: 'Multiplication principle', d: `$${Array.from({ length: r }, (_, i) => n - i).join(' \\times ')}$` },
+            { h: 'Evaluate', d: `$^{${n}}P_{${r}} = ${val}$` }
+          ]
+        };
+      }
       return {
         prompt: `How many different arrangements can be made using **all** the letters of the word ${word}? (All its letters are distinct.)`,
         answerType: 'numeric', answer: { value: factorial(n) },
@@ -649,7 +752,7 @@ export const year11 = {
       };
     }
     if (diff === 3) {
-      const n = ri(rng, 7, 12), r = ri(rng, 3, 4);
+      const n = ri(rng, 6, 18), r = ri(rng, 2, 6);
       return {
         prompt: `A school must pick a committee of $${r}$ students from a group of $${n}$. How many different committees are possible?`,
         answerType: 'numeric', answer: { value: nCr(n, r) },
@@ -661,7 +764,7 @@ export const year11 = {
         ]
       };
     }
-    const nA = ri(rng, 3, 6), nB = ri(rng, 3, 6);
+    const nA = ri(rng, 2, 12), nB = ri(rng, 2, 12);
     const total = nA + nB;
     const f = new Frac(nA * (nA - 1) + nB * (nB - 1), total * (total - 1));
     return {

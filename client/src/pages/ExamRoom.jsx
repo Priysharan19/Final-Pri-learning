@@ -1,8 +1,18 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// Pri Learning · Exam room — one timed paper, answered question by question and
+// marked in a single pass at the end.
+// Everything the student writes lives in `answers`/`workings` until that pass,
+// which makes this the screen with the most to lose to a thrown render: an
+// hour's paper is React state and nothing else. So the paper is mirrored to the
+// draft store as it is filled in, and picked back up — clock included — if the
+// screen ever has to be rebuilt from scratch.
+// ─────────────────────────────────────────────────────────────────────────────
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
 import { MathText } from '../lib/latex.jsx';
 import { useApp } from '../App.jsx';
+import { clearDraft, queueDraft, readDraft } from '../components/drafts.js';
 
 export default function ExamRoom() {
   const { id } = useParams();
@@ -16,16 +26,34 @@ export default function ExamRoom() {
   const [left, setLeft] = useState(null);
   const [result, setResult] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [resumed, setResumed] = useState(false);
   const startRef = useRef(Date.now());
 
   useEffect(() => {
     api.get(`/exams/${id}`).then(r => {
-      setExam(r.exam);
       if (r.exam.finishedAt && r.exam.detail) {
+        // A submitted paper has nothing left to recover, and a draft that
+        // outlived its submit would only resurrect it.
+        clearDraft('exam', id);
+        setExam(r.exam);
         setResult({ score: r.exam.score, total: r.exam.total, pct: Math.round(100 * r.exam.score / r.exam.total), detail: r.exam.detail });
-      } else {
-        setLeft(r.exam.durationMin * 60);
+        return;
       }
+      const draft = readDraft('exam', id);
+      if (draft) {
+        setAnswers(draft.answers || {});
+        setWorkings(draft.workings || {});
+        setShowWk(Object.fromEntries(Object.keys(draft.workings || {}).map(k => [k, true])));
+        setCur(Math.min(draft.cur || 0, r.exam.questions.length - 1));
+        startRef.current = draft.startedAt || Date.now();
+        setResumed(true);
+      }
+      setExam(r.exam);
+      // The clock is read off the paper's own start time, not restarted: a
+      // crash is not extra time, and picking the paper up an hour later should
+      // land exactly where it would have without the crash.
+      const spent = Math.floor((Date.now() - startRef.current) / 1000);
+      setLeft(Math.max(0, r.exam.durationMin * 60 - spent));
     }).catch(() => nav('/exams'));
   }, [id, nav]);
 
@@ -43,11 +71,23 @@ export default function ExamRoom() {
       : (answers[q.id] !== '' && answers[q.id] != null)).length;
   }, [answers, exam]);
 
+  // Mirror the paper as it is filled in. queueDraft coalesces, so a burst of
+  // keystrokes is one write, and it flushes when the tab hides or goes away.
+  useEffect(() => {
+    if (!exam || result || exam.finishedAt) return;
+    queueDraft('exam', id, { answers, workings, cur, startedAt: startRef.current }, {
+      label: exam.title,
+      note: `${answeredCount} of ${exam.questions.length} answered`,
+      path: `/exams/${id}`
+    });
+  }, [answers, workings, cur, exam, result, id, answeredCount]);
+
   async function submit() {
     if (busy || result) return;
     setBusy(true);
     try {
       const r = await api.post(`/exams/${id}/submit`, { answers, workings, ms: Date.now() - startRef.current });
+      clearDraft('exam', id);
       setResult(r);
       celebrate(r);
       refreshUser();
@@ -179,7 +219,10 @@ export default function ExamRoom() {
       <div className="card exam-head">
         <div>
           <b>{exam.title}</b>
-          <div className="muted" style={{ fontSize: 12.5 }}>{answeredCount}/{exam.questions.length} answered</div>
+          <div className="muted" style={{ fontSize: 12.5 }}>
+            {answeredCount}/{exam.questions.length} answered
+            {resumed && ' · picked up where you left off'}
+          </div>
         </div>
         <span className={`exam-timer ${left < 120 ? 'low' : ''}`} style={{ marginLeft: 'auto' }}>
           ⏱ {mins}:{String(secs).padStart(2, '0')}

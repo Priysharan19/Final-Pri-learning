@@ -30,8 +30,26 @@ function mstWeight(n, edges) {
   }
   return total;
 }
-const TOPO5 = [[0, 1], [1, 2], [2, 3], [3, 4], [4, 0], [1, 4], [1, 3]];
-const TOPO4 = [[0, 1], [1, 3], [0, 2], [2, 3], [1, 2]];
+/** A random connected weighted network: a random spanning tree plus extra links. */
+function randomNetwork(rng, n, extra, wLo = 2, wHi = 9) {
+  const edges = [];
+  const seen = new Set();
+  for (let i = 1; i < n; i++) {
+    const parent = ri(rng, 0, i - 1);
+    seen.add(`${parent}-${i}`);
+    edges.push([parent, i, ri(rng, wLo, wHi)]);
+  }
+  const want = n - 1 + extra;
+  for (let guard = 80; edges.length < want && guard > 0; guard--) {
+    const a = ri(rng, 0, n - 1), b = ri(rng, 0, n - 1);
+    if (a === b) continue;
+    const key = `${Math.min(a, b)}-${Math.max(a, b)}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    edges.push([Math.min(a, b), Math.max(a, b), ri(rng, wLo, wHi)]);
+  }
+  return edges;
+}
 
 export const streamsStandard = {
 
@@ -146,7 +164,7 @@ export const streamsStandard = {
         ]
       };
     }
-    const age = ri(rng, 3, 11), adult = rc(rng, [30, 40, 45, 50, 60]);
+    const age = ri(rng, 2, 14), adult = rc(rng, [20, 25, 30, 36, 40, 45, 50, 60, 75, 80, 90, 100]);
     const dose = age * adult / (age + 12);
     return {
       prompt: `Young's formula for a child's medicine dose is $D = \\dfrac{yA}{y + 12}$, where $y$ is the child's age and $A$ the adult dose. Find the dose for a $${age}$-year-old when the adult dose is $${adult}$ mL, correct to 1 decimal place.`,
@@ -188,22 +206,42 @@ export const streamsStandard = {
       };
     }
     if (diff === 3) {
-      const meas = rc(rng, [24, 36, 48, 62, 78]);
-      const prec = rc(rng, [1, 0.1]);
-      const absErr = prec / 2;
-      const pctErr = absErr / meas * 100;
+      const unit = rc(rng, [
+        { name: 'centimetre', sym: 'cm', prec: 1 },
+        { name: 'millimetre', sym: 'mm', prec: 1 },
+        { name: 'metre', sym: 'm', prec: 1 },
+        { name: 'gram', sym: 'g', prec: 1 },
+        { name: 'tenth of a second', sym: 's', prec: 0.1 },
+        { name: 'tenth of a kilogram', sym: 'kg', prec: 0.1 }
+      ]);
+      const meas = unit.prec === 1 ? ri(rng, 12, 96) : ri(rng, 25, 480) / 10;
+      const absErr = unit.prec / 2;
+      const pct = absErr / meas * 100;
+      const wantAbs = rng() < 0.3;
       return {
-        prompt: `A length is measured as $${prec === 1 ? meas : meas / 10}$ ${prec === 1 ? 'cm, to the nearest centimetre' : 'cm, to the nearest millimetre'}. Find the **percentage error**, correct to 2 decimal places. (Absolute error = half the precision.)`,
-        answerType: 'numeric', answer: { value: r2(absErr / (prec === 1 ? meas : meas / 10) * 100), tol: 0.011 }, answerSuffix: '%',
-        traps: [{ value: r2(prec / (prec === 1 ? meas : meas / 10) * 100), why: 'The absolute error is HALF the smallest unit of measurement.', tol: 0.011 }],
-        hints: ['Absolute error = half the precision.', `Absolute error $= ${absErr}$ ${prec === 1 ? 'cm' : 'cm'}.`, 'Percentage error = absolute error ÷ measurement × 100.'],
+        prompt: wantAbs
+          ? `A quantity is measured as $${meas}$ ${unit.sym}, to the nearest ${unit.name}. State the **absolute error**.`
+          : `A quantity is measured as $${meas}$ ${unit.sym}, to the nearest ${unit.name}. Find the **percentage error**, correct to 2 decimal places. (Absolute error = half the precision.)`,
+        answerType: 'numeric',
+        answer: wantAbs ? { value: absErr } : { value: r2(pct), tol: 0.011 },
+        answerSuffix: wantAbs ? unit.sym : '%',
+        traps: wantAbs
+          ? [{ value: unit.prec, why: 'The absolute error is HALF the smallest unit of measurement.' }]
+          : [{ value: r2(unit.prec / meas * 100), why: 'The absolute error is HALF the smallest unit of measurement.', tol: 0.011 }],
+        hints: [
+          'Absolute error = half the precision of the instrument.',
+          `Half of $${unit.prec}$ ${unit.sym} is $${absErr}$ ${unit.sym}.`,
+          wantAbs ? 'That is the answer.' : 'Percentage error = absolute error ÷ measurement × 100.'
+        ],
         steps: [
-          { h: 'Absolute error', d: `$\\dfrac{${prec}}{2} = ${absErr}$ cm` },
-          { h: 'Percentage error', d: `$\\dfrac{${absErr}}{${prec === 1 ? meas : meas / 10}} \\times 100 \\approx ${r2(absErr / (prec === 1 ? meas : meas / 10) * 100)}\\%$` }
+          { h: 'Absolute error', d: `$\\dfrac{${unit.prec}}{2} = ${absErr}$ ${unit.sym}` },
+          wantAbs
+            ? { h: 'Answer', d: `$${absErr}$ ${unit.sym}` }
+            : { h: 'Percentage error', d: `$\\dfrac{${absErr}}{${meas}} \\times 100 \\approx ${r2(pct)}\\%$` }
         ]
       };
     }
-    const l = ri(rng, 15, 40) / 10, w = ri(rng, 10, 30) / 10, d = rc(rng, [0.2, 0.25, 0.3]);
+    const l = ri(rng, 12, 60) / 10, w = ri(rng, 8, 45) / 10, d = rc(rng, [0.15, 0.2, 0.25, 0.3, 0.35, 0.4]);
     const litres = l * w * d * 1000;
     return {
       prompt: `A garden bed $${l}$ m long and $${w}$ m wide is filled with soil to a depth of $${d}$ m. How many **litres** of soil is that? (1 m³ = 1000 L)`,
@@ -220,8 +258,8 @@ export const streamsStandard = {
   // ── MS-M2 · Energy & running costs ───────────────────────────────────────
   'ms11-energy': (rng, diff) => {
     if (diff === 1) {
-      const watts = rc(rng, [800, 1200, 1500, 2000, 2400]);
-      const hrs = ri(rng, 2, 8);
+      const watts = rc(rng, [600, 750, 800, 1000, 1200, 1400, 1500, 1800, 2000, 2200, 2400, 2600]);
+      const hrs = ri(rng, 2, 12);
       const kwh = watts / 1000 * hrs;
       return {
         prompt: `A $${watts}$ W heater runs for $${hrs}$ hours. How much energy does it use, in kilowatt-hours (kWh)?`,
@@ -235,8 +273,8 @@ export const streamsStandard = {
       };
     }
     if (diff === 2) {
-      const kwh = ri(rng, 4, 18);
-      const centsRate = rc(rng, [28, 30, 32, 35]);
+      const kwh = ri(rng, 4, 40);
+      const centsRate = rc(rng, [24, 26, 28, 30, 32, 35, 38, 42]);
       const cost = kwh * centsRate / 100;
       return {
         prompt: `Electricity costs $${centsRate}$ c/kWh. Find the cost of using $${kwh}$ kWh, in dollars.`,
@@ -264,8 +302,8 @@ export const streamsStandard = {
         ]
       };
     }
-    const oldW = rc(rng, [2400, 2000]), newW = rc(rng, [800, 600]);
-    const hrs = ri(rng, 3, 6), rate = 0.32;
+    const oldW = rc(rng, [1600, 1800, 2000, 2200, 2400, 2800]), newW = rc(rng, [400, 500, 600, 750, 800, 1000]);
+    const hrs = ri(rng, 2, 9), rate = rc(rng, [0.28, 0.3, 0.32, 0.35, 0.38]);
     const saving = (oldW - newW) / 1000 * hrs * 365 * rate;
     return {
       prompt: `Replacing a $${oldW}$ W appliance with a $${newW}$ W one (used $${hrs}$ h/day, electricity at \\$0.32/kWh) saves how much per **year**, to the nearest dollar?`,
@@ -339,23 +377,55 @@ export const streamsStandard = {
         ]
       };
     }
-    const m = mcq(rng, 'The median — it is not dragged by the extreme value', [
-      { text: 'The mean — it uses every data value', why: 'Using every value is exactly why the mean gets dragged toward the outlier.' },
-      { text: 'The mode — it is always in the middle', why: 'The mode is the most frequent value — it can sit anywhere.' },
-      { text: 'The range — it measures the centre' }
-    ]);
+    if (rng() < 0.25) {
+      const m = mcq(rng, 'The median — it is not dragged by the extreme value', [
+        { text: 'The mean — it uses every data value', why: 'Using every value is exactly why the mean gets dragged toward the outlier.' },
+        { text: 'The mode — it is always in the middle', why: 'The mode is the most frequent value — it can sit anywhere.' },
+        { text: 'The range — it measures the centre' }
+      ]);
+      return {
+        prompt: `A suburb's house prices include one extreme mansion. Which measure of centre best represents a **typical** price, and why?`,
+        answerType: 'mcq', answer: { correctIndex: m.correctIndex, optionTraps: m.optionTraps }, mcqOptions: m.options,
+        hints: ['Think about which measures an outlier can drag.', 'The mean moves toward extreme values; the median resists.', 'Median.'],
+        steps: [{ h: 'Outliers and centre', d: 'Extreme values pull the mean but barely move the median — so the median best represents a typical price.' }]
+      };
+    }
+    const size = rc(rng, [7, 9, 11]);
+    const vals = [ri(rng, 3, 20)];
+    for (let i = 1; i < size; i++) vals.push(vals[i - 1] + ri(rng, 1, 7));
+    const half = (size - 1) / 2;
+    const lower = vals.slice(0, half), upper = vals.slice(half + 1);
+    const med = arr => arr.length % 2 ? arr[(arr.length - 1) / 2] : (arr[arr.length / 2 - 1] + arr[arr.length / 2]) / 2;
+    const Q1 = med(lower), Q2 = vals[half], Q3 = med(upper);
+    const iqr = Q3 - Q1;
+    const wantFence = rng() < 0.4;
+    const fence = Q3 + 1.5 * iqr;
     return {
-      prompt: `A suburb's house prices include one extreme mansion. Which measure of centre best represents a **typical** price, and why?`,
-      answerType: 'mcq', answer: { correctIndex: m.correctIndex, optionTraps: m.optionTraps }, mcqOptions: m.options,
-      hints: ['Think about which measures an outlier can drag.', 'The mean moves toward extreme values; the median resists.', 'Median.'],
-      steps: [{ h: 'Outliers and centre', d: 'Extreme values pull the mean but barely move the median — so the median best represents a typical price.' }]
+      prompt: wantFence
+        ? `The ordered data set is $${vals.join(',\\ ')}$. Using the $1.5 \\times IQR$ rule, find the **upper fence** $Q_3 + 1.5 \\times IQR$ above which a value counts as an outlier.`
+        : `The ordered data set is $${vals.join(',\\ ')}$. Find the **interquartile range**.`,
+      answerType: 'numeric', answer: { value: wantFence ? fence : iqr, tol: 0.011 },
+      traps: wantFence
+        ? [{ value: Q3 + iqr, why: 'The fence sits $1.5$ interquartile ranges above $Q_3$, not one.', tol: 0.011 }]
+        : [{ value: vals[size - 1] - vals[0], why: 'That is the full range — the IQR uses only the middle half, $Q_3 - Q_1$.' }],
+      hints: [
+        `There are ${size} values, so the median is the ${half + 1}th, namely $${Q2}$.`,
+        `$Q_1$ is the median of the ${half} values below it ($${Q1}$); $Q_3$ is the median of the ${half} above it ($${Q3}$).`,
+        wantFence ? `$IQR = ${iqr}$, so the fence is $${Q3} + 1.5 \\times ${iqr}$.` : `$IQR = ${Q3} - ${Q1}$.`
+      ],
+      steps: [
+        { h: 'Median', d: `$Q_2 = ${Q2}$ (the ${half + 1}th of ${size} values)` },
+        { h: 'Quartiles', d: `$Q_1 = ${Q1}$, $Q_3 = ${Q3}$` },
+        wantFence
+          ? { h: 'Upper fence', d: `$IQR = ${iqr}$, so the fence is $${Q3} + 1.5(${iqr}) = ${fence}$` }
+          : { h: 'Interquartile range', d: `$${Q3} - ${Q1} = ${iqr}$` }
+      ]
     };
   },
-
   // ── MS-S1 · Relative frequency & probability ─────────────────────────────
   'ms11-relfreq': (rng, diff) => {
     if (diff === 1) {
-      const good = ri(rng, 3, 9), bad = ri(rng, 2, 6);
+      const good = ri(rng, 2, 15), bad = ri(rng, 2, 12);
       const f = new Frac(good, good + bad);
       return {
         prompt: `A box has $${good}$ working batteries and $${bad}$ flat ones. One is chosen at random. Find $P(\\text{working})$ as a fraction in simplest form.`,
@@ -367,7 +437,7 @@ export const streamsStandard = {
       };
     }
     if (diff === 2) {
-      const made = ri(rng, 30, 90), total = rc(rng, [100, 120, 150, 200]);
+      const made = ri(rng, 20, 95), total = rc(rng, [80, 100, 120, 125, 150, 160, 200, 250]);
       return {
         prompt: `A basketballer made $${made}$ of her last $${total}$ free throws. Using relative frequency, estimate $P(\\text{make})$ as a decimal.`,
         answerType: 'numeric', answer: { value: r3(made / total), tol: 0.002 },
@@ -377,9 +447,9 @@ export const streamsStandard = {
       };
     }
     if (diff === 3) {
-      const p = rc(rng, [[1, 5], [3, 10], [1, 4], [2, 5]]);
+      const p = rc(rng, [[1, 5], [3, 10], [1, 4], [2, 5], [1, 2], [3, 5], [7, 10], [1, 8], [3, 8], [5, 8], [1, 3], [2, 3]]);
       const f = new Frac(p[0], p[1]);
-      const n = p[1] * ri(rng, 8, 15);
+      const n = p[1] * ri(rng, 5, 22);
       return {
         prompt: `The probability a customer pays cash is $${f.latex()}$. Out of $${n}$ customers, how many would you **expect** to pay cash?`,
         answerType: 'numeric', answer: { value: f.value * n },
@@ -406,9 +476,9 @@ export const streamsStandard = {
   // ── MS-F4 · Investments & loans ──────────────────────────────────────────
   'ms12-loans': (rng, diff) => {
     if (diff === 1) {
-      const P = ri(rng, 4, 20) * 1000;
-      const rr = rc(rng, [3, 4, 5, 6]);
-      const n = ri(rng, 2, 6);
+      const P = ri(rng, 3, 40) * 500;
+      const rr = rc(rng, [2.5, 3, 3.5, 4, 4.5, 5, 5.5, 6, 7, 8]);
+      const n = ri(rng, 2, 10);
       const A = P * (1 + rr / 100) ** n;
       return {
         prompt: `${moneyPlain(P)} is invested at $${rr}\\%$ p.a. compounding annually for $${n}$ years. Find the final value, to the nearest cent.`,
@@ -419,9 +489,9 @@ export const streamsStandard = {
       };
     }
     if (diff === 2) {
-      const L = rc(rng, [300000, 400000, 500000]);
-      const monthly = rc(rng, [0.4, 0.5]);
-      const repay = rc(rng, [2200, 2600, 3000]);
+      const L = rc(rng, [180000, 220000, 250000, 280000, 300000, 350000, 400000, 450000, 500000, 620000, 750000]);
+      const monthly = rc(rng, [0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6]);
+      const repay = rc(rng, [1400, 1800, 2000, 2200, 2400, 2600, 3000, 3400, 3800]);
       const interest = L * monthly / 100;
       const owing = L + interest - repay;
       return {
@@ -439,9 +509,9 @@ export const streamsStandard = {
       };
     }
     if (diff === 3) {
-      const L = rc(rng, [20000, 30000, 40000]);
-      const m = rc(rng, [0.6, 0.75, 1]);
-      const repay = rc(rng, [800, 1000, 1200]);
+      const L = rc(rng, [12000, 15000, 18000, 20000, 25000, 30000, 35000, 40000, 48000]);
+      const m = rc(rng, [0.5, 0.6, 0.7, 0.75, 0.8, 0.9, 1, 1.2]);
+      const repay = rc(rng, [500, 600, 750, 800, 900, 1000, 1200, 1500]);
       const b1 = L * (1 + m / 100) - repay;
       const b2 = b1 * (1 + m / 100) - repay;
       const interestPaid = b2 - L + 2 * repay;
@@ -457,10 +527,10 @@ export const streamsStandard = {
         ]
       };
     }
-    const P = rc(rng, [10000, 15000, 20000]);
-    const flat = rc(rng, [8, 9]);
-    const comp = rc(rng, [6, 7]);
-    const yrs = 3;
+    const P = rc(rng, [5000, 8000, 10000, 12000, 15000, 20000, 25000, 30000]);
+    const flat = rc(rng, [6, 7, 8, 9, 10, 11, 12]);
+    const comp = rc(rng, [5, 6, 7, 8, 9]);
+    const yrs = ri(rng, 2, 6);
     const flatTotal = P * flat / 100 * yrs;
     const compTotal = P * (1 + comp / 100) ** yrs - P;
     return {
@@ -478,134 +548,154 @@ export const streamsStandard = {
 
   // ── MS-F5 · Annuities ────────────────────────────────────────────────────
   'ms12-annuity': (rng, diff) => {
-    const factors = { 4: { 3: 3.1216, 5: 3.153 }, 5: { 3: 3.1525 } };
+    const RATES = [3, 3.5, 4, 4.5, 5, 5.5, 6, 7, 8];
     if (diff === 1) {
-      const a = rc(rng, [1000, 2000, 5000]);
-      const rr = rc(rng, [4, 5, 6]);
-      const n = rc(rng, [3, 4]);
+      const a = rc(rng, [500, 750, 1000, 1200, 1500, 2000, 2500, 3000, 4000, 5000]);
+      const rr = rc(rng, RATES);
+      const n = ri(rng, 3, 8);
       const factor = ((1 + rr / 100) ** n - 1) / (rr / 100);
       return {
         prompt: `An annuity table gives a future-value factor of $${r3(factor)}$ for $${n}$ yearly contributions at $${rr}\\%$ p.a. Find the future value of ${moneyPlain(a)} contributed each year, to the nearest cent.`,
-        answerType: 'numeric', answer: { value: r2(a * factor), tol: 0.51 }, answerPrefix: '$',
+        answerType: 'numeric', answer: { value: r2(a * r3(factor)), tol: 0.51 }, answerPrefix: '$',
         traps: [{ value: a * n, why: 'The factor already includes the compounding — multiply the contribution by the factor.', tol: 0.02 }],
         hints: ['FV = contribution × factor.', `$${a} \\times ${r3(factor)}$.`, 'Round to the nearest cent.'],
         steps: [{ h: 'Multiply by the table factor', d: `$${a} \\times ${r3(factor)} = ${r2(a * r3(factor))}$` }]
       };
     }
     if (diff === 2) {
-      const a = rc(rng, [1200, 1500, 2400]);
-      const rr = rc(rng, [4, 5, 6, 8]);
+      const a = rc(rng, [600, 800, 1000, 1200, 1500, 1800, 2000, 2400, 3000, 3600]);
+      const rr = rc(rng, RATES);
+      const n = ri(rng, 3, 5);
       const g = 1 + rr / 100;
-      const fv = a * (g * g + g + 1);
+      let fv = 0;
+      for (let k = 0; k < n; k++) fv += a * g ** k;
+      const wrong = fv * g;
       return {
-        prompt: `${moneyPlain(a)} is deposited at the **end** of each year for 3 years at $${rr}\\%$ p.a. compound. Find the future value at the end of year 3, to the nearest cent.`,
+        prompt: `${moneyPlain(a)} is deposited at the **end** of each year for $${n}$ years at $${rr}\\%$ p.a. compound. Find the future value at the end of year $${n}$, to the nearest cent.`,
         answerType: 'numeric', answer: { value: r2(fv), tol: 0.02 }, answerPrefix: '$',
-        traps: [{ value: r2(a * (g ** 3 + g ** 2 + g)), why: 'End-of-year deposits: the final deposit earns no interest — powers are 2, 1, 0.', tol: 0.02 }],
-        hints: ['Track each deposit separately.', `Deposit 1 compounds 2 years, deposit 2 one year, deposit 3 none.`, `$${a}(${g}^2 + ${g} + 1)$.`],
+        traps: [{ value: r2(wrong), why: 'End-of-year deposits: the final deposit earns no interest at all, so the powers run from $n-1$ down to 0.', tol: 0.02 }],
+        hints: ['Track each deposit separately.', `Deposit 1 compounds for ${n - 1} years, the last one for none.`, `$${a}\\left(${r3(g)}^{${n - 1}} + \\cdots + ${r3(g)} + 1\\right)$.`],
         steps: [
-          { h: 'Each deposit grows', d: `$${a}(${g})^2 + ${a}(${g}) + ${a}$` },
+          { h: 'Each deposit grows', d: `$${Array.from({ length: n }, (_, k) => `${a}(${r3(g)})^{${n - 1 - k}}`).join(' + ')}$` },
           { h: 'Total', d: `$${r2(fv)}$` }
         ]
       };
     }
     if (diff === 3) {
-      const target = rc(rng, [20000, 30000, 50000]);
-      const rr = rc(rng, [4, 5]);
-      const n = rc(rng, [5, 6]);
+      const target = rc(rng, [10000, 15000, 20000, 25000, 30000, 40000, 50000, 60000, 80000, 100000]);
+      const rr = rc(rng, RATES);
+      const n = ri(rng, 4, 10);
       const factor = ((1 + rr / 100) ** n - 1) / (rr / 100);
-      const contrib = target / factor;
+      const contrib = target / r3(factor);
       return {
         prompt: `Using the future-value factor $${r3(factor)}$ (for $${n}$ years at $${rr}\\%$), what yearly contribution grows to ${moneyPlain(target)}? Answer to the nearest cent.`,
         answerType: 'numeric', answer: { value: r2(contrib), tol: 0.51 }, answerPrefix: '$',
         traps: [{ value: r2(target / n), why: 'Divide by the annuity factor, not the number of years — interest does part of the work.', tol: 0.51 }],
         hints: ['Contribution = target ÷ factor.', `$${target} \\div ${r3(factor)}$.`, 'The factor accounts for all the compounding.'],
-        steps: [{ h: 'Divide by the factor', d: `$\\dfrac{${target}}{${r3(factor)}} = ${r2(target / r3(factor))}$` }]
+        steps: [{ h: 'Divide by the factor', d: `$\\dfrac{${target}}{${r3(factor)}} = ${r2(contrib)}$` }]
       };
     }
-    const payout = rc(rng, [5000, 8000, 10000]);
-    const rr = rc(rng, [4, 5, 6]);
-    const n = 3;
+    const payout = rc(rng, [2000, 3000, 4000, 5000, 6000, 8000, 10000, 12000, 15000]);
+    const rr = rc(rng, RATES);
+    const n = ri(rng, 3, 6);
     const g = 1 + rr / 100;
-    const pv = payout / g + payout / g ** 2 + payout / g ** 3;
+    let pv = 0;
+    for (let k = 1; k <= n; k++) pv += payout / g ** k;
     return {
       prompt: `An annuity pays ${moneyPlain(payout)} at the end of each year for $${n}$ years, with money valued at $${rr}\\%$ p.a. Find its **present value** (the lump sum equivalent today), to the nearest cent.`,
       answerType: 'numeric', answer: { value: r2(pv), tol: 0.03 }, answerPrefix: '$',
-      traps: [{ value: payout * n, why: `Future payments are worth *less* today — discount each by $(1.0${rr})^t$.`, tol: 0.02 }],
-      hints: ['Discount each payment back to today.', `Year t payment is worth $\\frac{${payout}}{${g}^t}$ now.`, 'Add the three discounted values.'],
+      traps: [{ value: payout * n, why: `Future payments are worth *less* today — discount each by $${r3(g)}^t$.`, tol: 0.02 }],
+      hints: ['Discount each payment back to today.', `The year-$t$ payment is worth $\\frac{${payout}}{${r3(g)}^t}$ now.`, `Add all $${n}$ discounted values.`],
       steps: [
-        { h: 'Discount each payout', d: `$\\dfrac{${payout}}{${g}} + \\dfrac{${payout}}{${g}^2} + \\dfrac{${payout}}{${g}^3}$` },
-        { h: 'Evaluate', d: `$${r2(payout / g)} + ${r2(payout / g ** 2)} + ${r2(payout / g ** 3)} = ${r2(pv)}$` }
+        { h: 'Discount each payout', d: `$${Array.from({ length: n }, (_, k) => `\\dfrac{${payout}}{${r3(g)}^{${k + 1}}}`).join(' + ')}$` },
+        { h: 'Evaluate', d: `$${r2(pv)}$` }
       ]
     };
   },
 
   // ── MS-N2/N3 · Networks ──────────────────────────────────────────────────
   'ms12-networks': (rng, diff) => {
-    const nodes5 = ['A', 'B', 'C', 'D', 'E'];
-    const nodes4 = ['A', 'B', 'C', 'D'];
+    const LETTERS = ['A', 'B', 'C', 'D', 'E', 'F'];
+    const degreeOf = (edges, v) => edges.filter(([a, b]) => a === v || b === v).length;
     if (diff === 1) {
-      const edges = TOPO5.map(([a, b]) => [a, b, ri(rng, 2, 9)]);
-      const deg = edges.filter(([a, b]) => a === 1 || b === 1).length;
+      const n = ri(rng, 4, 6);
+      const edges = randomNetwork(rng, n, ri(rng, 1, 3));
+      const v = ri(rng, 0, n - 1);
+      const nodes = LETTERS.slice(0, n);
+      const deg = degreeOf(edges, v);
       return {
-        prompt: `For the network shown, state the **degree** of vertex $B$ (the number of edges meeting it).`,
-        figure: figNetwork({ nodes: nodes5, edges }),
+        prompt: `The network below has $${n}$ vertices and $${edges.length}$ edges. State the **degree** of vertex $${nodes[v]}$ (the number of edges meeting it).`,
+        figure: figNetwork({ nodes, edges }),
         answerType: 'numeric', answer: { value: deg },
-        traps: [{ value: edges.length, why: 'Count only the edges that touch B, not every edge in the network.' }],
-        hints: ['Degree counts the edges at that vertex.', 'Trace each edge that touches B.', `B has ${deg} edges.`],
-        steps: [{ h: 'Count edges at B', d: `${deg} edges meet vertex B, so deg(B) = ${deg}` }]
+        traps: [{ value: edges.length, why: `Count only the edges that touch ${nodes[v]}, not every edge in the network.` }].filter(t => t.value !== deg),
+        hints: ['Degree counts the edges at that vertex.', `Trace each edge that touches ${nodes[v]}.`, `${nodes[v]} has ${deg} ${deg === 1 ? 'edge' : 'edges'}.`],
+        steps: [
+          { h: `Count edges at ${nodes[v]}`, d: `${deg} ${deg === 1 ? 'edge meets' : 'edges meet'} vertex ${nodes[v]}, so deg(${nodes[v]}) = ${deg}` },
+          { h: 'Check', d: `The degrees of all $${n}$ vertices add to $2 \\times ${edges.length} = ${2 * edges.length}$` }
+        ]
       };
     }
     if (diff === 2) {
-      const edges = TOPO4.map(([a, b]) => [a, b, ri(rng, 2, 9)]);
-      const best = dijkstra(4, edges, 0, 3);
+      const n = 4;
+      const edges = randomNetwork(rng, n, ri(rng, 1, 2), 1, 14);
+      const t = ri(rng, 1, n - 1);
+      const nodes = LETTERS.slice(0, n);
+      const best = dijkstra(n, edges, 0, t);
+      const direct = edges.find(([a, b]) => (a === 0 && b === t) || (a === t && b === 0));
       return {
-        prompt: `The network shows travel times in minutes. Find the length of the **shortest path** from $A$ to $D$.`,
-        figure: figNetwork({ nodes: nodes4, edges }),
+        prompt: `The network below shows travel times in minutes between $${n}$ stops. Find the length of the **shortest path** from $A$ to $${nodes[t]}$.`,
+        figure: figNetwork({ nodes, edges }),
         answerType: 'numeric', answer: { value: best }, answerSuffix: 'min',
-        traps: [{ value: edges.filter(([a, b]) => (a === 0 && b === 1) || (a === 1 && b === 3)).reduce((s, e) => s + e[2], 0) || best + 2, why: 'Compare every route — the obvious one isn’t always shortest.' }].filter(t => t.value !== best),
-        hints: ['List every route from A to D.', 'Add the weights along each route.', 'Take the smallest total.'],
+        traps: [{ value: direct ? direct[2] : best + 3, why: 'A direct edge is not always the quickest route — compare it with the paths that go via another stop.' }].filter(t2 => t2.value !== best),
+        hints: [`List every route from A to ${nodes[t]}.`, 'Add the weights along each route.', 'Take the smallest total.'],
         steps: [
-          { h: 'Compare routes', d: 'Add the weights along each possible path from A to D' },
+          { h: 'Compare routes', d: `Add the weights along each possible path from A to ${nodes[t]}` },
           { h: 'Shortest', d: `$${best}$ minutes` }
         ]
       };
     }
     if (diff === 3) {
-      const edges = TOPO5.map(([a, b]) => [a, b, ri(rng, 2, 9)]);
-      const best = dijkstra(5, edges, 0, 3);
+      const n = ri(rng, 5, 6);
+      const edges = randomNetwork(rng, n, ri(rng, 2, 4));
+      const t = ri(rng, 2, n - 1);
+      const nodes = LETTERS.slice(0, n);
+      const best = dijkstra(n, edges, 0, t);
       return {
-        prompt: `The network shows cable lengths in metres between junctions. Find the **shortest path** from $A$ to $D$.`,
-        figure: figNetwork({ nodes: nodes5, edges }),
+        prompt: `The network below shows cable lengths in metres between $${n}$ junctions. Find the **shortest path** from $A$ to $${nodes[t]}$.`,
+        figure: figNetwork({ nodes, edges }),
         answerType: 'numeric', answer: { value: best }, answerSuffix: 'm',
         traps: [],
-        hints: ['Work outward from A, recording the best distance to each junction.', 'Routes may pass through B, E or C.', 'Take the minimum total.'],
+        hints: ['Work outward from A, recording the best distance to each junction.', 'A longer-looking route through the middle can still be shorter overall.', 'Take the minimum total.'],
         steps: [
           { h: 'Systematic comparison (Dijkstra)', d: 'Grow the set of settled vertices, always taking the nearest unsettled one' },
-          { h: 'Shortest A → D', d: `$${best}$ m` }
+          { h: `Shortest A → ${nodes[t]}`, d: `$${best}$ m` }
         ]
       };
     }
-    const edges = TOPO5.map(([a, b]) => [a, b, ri(rng, 2, 9)]);
-    const total = mstWeight(5, edges);
+    const n = ri(rng, 5, 6);
+    const edges = randomNetwork(rng, n, ri(rng, 2, 4), 2, 14);
+    const nodes = LETTERS.slice(0, n);
+    const total = mstWeight(n, edges);
+    const all = edges.reduce((s, e) => s + e[2], 0);
     return {
-      prompt: `The network shows the cost (in \\$100s) of connecting five towns with fibre. Find the total cost of the **minimum spanning tree** — the cheapest way to connect all towns.`,
-      figure: figNetwork({ nodes: nodes5, edges }),
+      prompt: `The network below shows the cost (in \\$100s) of each possible fibre link between $${n}$ towns. Find the total cost of the **minimum spanning tree** — the cheapest way to connect every town.`,
+      figure: figNetwork({ nodes, edges }),
       answerType: 'numeric', answer: { value: total },
-      traps: [{ value: edges.reduce((s, e) => s + e[2], 0), why: 'A spanning tree uses only enough edges to connect every town (4 edges for 5 towns) — not all of them.' }],
-      hints: ['Pick the cheapest edges that never make a loop.', 'A spanning tree for 5 towns uses exactly 4 edges.', 'Keep taking the cheapest non-loop edge (Kruskal).'],
+      traps: [{ value: all, why: `A spanning tree uses only enough links to connect every town (${n - 1} edges for ${n} towns) — not all ${edges.length}.` }].filter(t => t.value !== total),
+      hints: ['Pick the cheapest links that never close a loop.', `A spanning tree for ${n} towns uses exactly ${n - 1} links.`, 'Keep taking the cheapest non-loop link (Kruskal).'],
       steps: [
-        { h: "Kruskal's idea", d: 'Sort edges by weight; take each unless it closes a loop' },
-        { h: 'Minimum total', d: `$${total}$ (× \\$100)` }
+        { h: "Kruskal's idea", d: 'Sort the links by cost; take each unless it closes a loop' },
+        { h: 'Minimum total', d: `$${total}$ (× \\$100), using ${n - 1} of the ${edges.length} links` }
       ]
     };
   },
 
   // ── MS-S5 · Normal distribution ──────────────────────────────────────────
   'ms12-normal': (rng, diff) => {
-    const mu = rc(rng, [60, 65, 70, 100]);
-    const sd = rc(rng, [5, 8, 10]);
+    const mu = rc(rng, [40, 45, 50, 55, 60, 64, 65, 70, 75, 80, 90, 100, 120, 150]);
+    const sd = rc(rng, [2, 3, 4, 5, 6, 8, 10, 12, 15, 20]);
     if (diff === 1) {
-      const z = rc(rng, [-2, -1.5, -1, 0.5, 1, 1.5, 2]);
+      const z = rc(rng, [-2.5, -2, -1.5, -1, -0.5, 0.5, 1, 1.5, 2, 2.5]);
       const x = mu + z * sd;
       return {
         prompt: `Scores are normally distributed with mean $${mu}$ and standard deviation $${sd}$. Find the $z$-score of a result of $${x}$.`,
@@ -619,8 +709,18 @@ export const streamsStandard = {
       const pick = rc(rng, [
         { lo: mu - sd, hi: mu + sd, pct: 68 },
         { lo: mu - 2 * sd, hi: mu + 2 * sd, pct: 95 },
+        { lo: mu - 3 * sd, hi: mu + 3 * sd, pct: 99.7 },
         { lo: mu, hi: mu + 2 * sd, pct: 47.5 },
-        { lo: mu - sd, hi: mu, pct: 34 }
+        { lo: mu - 2 * sd, hi: mu, pct: 47.5 },
+        { lo: mu - sd, hi: mu, pct: 34 },
+        { lo: mu, hi: mu + sd, pct: 34 },
+        { lo: mu + sd, hi: mu + 2 * sd, pct: 13.5 },
+        { lo: mu - 2 * sd, hi: mu - sd, pct: 13.5 },
+        { lo: mu - sd, hi: mu + 2 * sd, pct: 81.5 },
+        { lo: mu - 2 * sd, hi: mu + sd, pct: 81.5 },
+        { lo: mu - 3 * sd, hi: mu, pct: 49.85 },
+        { lo: mu + 2 * sd, hi: mu + 3 * sd, pct: 2.35 },
+        { lo: mu - 3 * sd, hi: mu - 2 * sd, pct: 2.35 }
       ]);
       return {
         prompt: `Heights are normal with mean $${mu}$ and sd $${sd}$. Using the 68–95–99.7 rule, what **percentage** lies between $${pick.lo}$ and $${pick.hi}$?`,
@@ -634,7 +734,7 @@ export const streamsStandard = {
       };
     }
     if (diff === 3) {
-      const s1 = mu + rc(rng, [1, 1.5]) * sd, s2 = mu + rc(rng, [0.5, 0.8]) * sd;
+      const s1 = mu + rc(rng, [0.6, 0.8, 1, 1.2, 1.4, 1.5, 1.8, 2, 2.4]) * sd, s2 = mu + rc(rng, [0.2, 0.25, 0.4, 0.5, 0.6, 0.75, 0.8]) * sd;
       const m = mcq(rng, `The first result — its z-score of $${r2((s1 - mu) / sd)}$ is higher`, [
         { text: `The second result — it is closer to the mean`, why: 'Closer to the mean means a *less* impressive result — higher z wins.' },
         { text: 'They are equally good because both are above the mean' },
@@ -650,7 +750,7 @@ export const streamsStandard = {
         ]
       };
     }
-    const z = rc(rng, [-1.5, -1, 1, 1.5, 2]);
+    const z = rc(rng, [-2.5, -2, -1.8, -1.5, -1.25, -1, -0.75, -0.5, 0.5, 0.75, 1, 1.25, 1.5, 1.8, 2, 2.5]);
     return {
       prompt: `Results are normal with mean $${mu}$ and sd $${sd}$. What raw score has a $z$-score of $${z}$?`,
       answerType: 'numeric', answer: { value: mu + z * sd },
@@ -662,23 +762,55 @@ export const streamsStandard = {
 
   // ── MS-S4 · Bivariate data ───────────────────────────────────────────────
   'ms12-bivariate': (rng, diff) => {
-    const a = ri(rng, 5, 30), b = rc(rng, [1.5, 2, 2.5, 3, 4]);
+    const CONTEXTS = [
+      { x: 'hours of study', y: 'exam mark', up: true },
+      { x: 'hours of TV watched', y: 'exam mark', up: false },
+      { x: 'daily maximum temperature', y: 'ice-cream sales', up: true },
+      { x: 'age of a car', y: 'resale value', up: false },
+      { x: 'weekly training hours', y: 'resting heart rate', up: false },
+      { x: 'advertising spend', y: 'monthly sales', up: true },
+      { x: 'altitude', y: 'boiling point of water', up: false },
+      { x: 'rainfall', y: 'reservoir level', up: true },
+      { x: 'number of absences', y: 'final grade', up: false },
+      { x: 'engine size', y: 'fuel consumption', up: true }
+    ];
+    const a = ri(rng, 5, 40), b = rc(rng, [0.5, 0.8, 1.2, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5]);
     if (diff === 1) {
-      const down = rc(rng, [true, false]);
-      const m = mcq(rng, down ? 'Negative — as one variable increases, the other decreases' : 'Positive — the variables increase together', [
-        { text: down ? 'Positive — the variables increase together' : 'Negative — as one increases, the other decreases', why: 'Check the slope direction of the cloud of points.' },
-        { text: 'Zero — the points form a perfect line' },
-        { text: 'Cannot tell from a scatterplot' }
-      ]);
+      if (rng() < 0.45) {
+        const ctx = rc(rng, CONTEXTS);
+        const m = mcq(rng, ctx.up ? 'Positive — the variables increase together' : 'Negative — as one variable increases, the other decreases', [
+          { text: ctx.up ? 'Negative — as one increases, the other decreases' : 'Positive — the variables increase together', why: 'Check the direction the cloud of points slopes.' },
+          { text: 'Zero — the points form a perfect line' },
+          { text: 'Cannot tell from a scatterplot' }
+        ]);
+        return {
+          prompt: `A scatterplot of **${ctx.x}** against **${ctx.y}** shows ${ctx.y} ${ctx.up ? 'rising' : 'falling'} as ${ctx.x} rises. What type of **correlation** is this?`,
+          answerType: 'mcq', answer: { correctIndex: m.correctIndex, optionTraps: m.optionTraps }, mcqOptions: m.options,
+          hints: ['Correlation describes the direction of the trend.', ctx.up ? 'Both rise together.' : 'One goes up, the other goes down.', ctx.up ? 'Positive.' : 'Negative.'],
+          steps: [{ h: 'Direction of association', d: ctx.up ? 'Rising together → positive correlation' : 'Rising x with falling y → negative correlation' }]
+        };
+      }
+      const n = 5;
+      const xm = ri(rng, 4, 20), ym = ri(rng, 10, 60);
+      const xs = Array.from({ length: n - 1 }, () => xm + nz(rng, -3, 3));
+      const ys = Array.from({ length: n - 1 }, () => ym + nz(rng, -8, 8));
+      xs.push(xm * n - xs.reduce((s, v) => s + v, 0));
+      ys.push(ym * n - ys.reduce((s, v) => s + v, 0));
       return {
-        prompt: `A scatterplot of ${down ? 'hours of TV watched vs exam mark shows marks falling as TV hours rise' : 'hours of study vs exam mark shows marks rising with study time'}. What type of **correlation** is this?`,
-        answerType: 'mcq', answer: { correctIndex: m.correctIndex, optionTraps: m.optionTraps }, mcqOptions: m.options,
-        hints: ['Correlation describes the direction of the trend.', down ? 'One goes up, the other goes down.' : 'Both rise together.', down ? 'Negative.' : 'Positive.'],
-        steps: [{ h: 'Direction of association', d: down ? 'Rising x with falling y → negative correlation' : 'Rising together → positive correlation' }]
+        prompt: `A least-squares line always passes through the mean point $(\\bar{x}, \\bar{y})$. For the data $x: ${xs.join(',\\ ')}$ and $y: ${ys.join(',\\ ')}$, find that mean point.`,
+        answerType: 'point', answer: { x: xm, y: ym },
+        inputHint: 'e.g. (12, 34)',
+        traps: [{ why: 'Average the x-values and the y-values separately, then write the result as a coordinate pair.' }],
+        hints: [`Add the ${n} x-values and divide by ${n}.`, `Do the same for the y-values.`, `$(\\bar{x}, \\bar{y}) = (${xm}, ${ym})$.`],
+        steps: [
+          { h: 'Mean of x', d: `$${xs.join(' + ')} = ${xm * n}$, and $${xm * n} \\div ${n} = ${xm}$` },
+          { h: 'Mean of y', d: `$${ys.join(' + ')} = ${ym * n}$, and $${ym * n} \\div ${n} = ${ym}$` },
+          { h: 'Mean point', d: `$(${xm}, ${ym})$` }
+        ]
       };
     }
     if (diff === 2) {
-      const x = ri(rng, 3, 12);
+      const x = ri(rng, 3, 20);
       return {
         prompt: `A line of best fit for plant growth is $h = ${a} + ${b}w$, where $w$ is weeks and $h$ height in cm. **Predict** the height after $${x}$ weeks.`,
         answerType: 'numeric', answer: { value: r1(a + b * x), tol: 0.06 }, answerSuffix: 'cm',
@@ -688,6 +820,21 @@ export const streamsStandard = {
       };
     }
     if (diff === 3) {
+      if (rng() < 0.45) {
+        const target = a + b * ri(rng, 4, 18);
+        const w = r2((target - a) / b);
+        return {
+          prompt: `For the fitted line $h = ${a} + ${b}w$ (height in cm after $w$ weeks), after how many **weeks** does the model predict a height of $${r1(target)}$ cm?`,
+          answerType: 'numeric', answer: { value: w, tol: 0.011 }, answerSuffix: 'weeks',
+          traps: [{ value: r2(target / b), why: `Subtract the intercept $${a}$ before dividing by the gradient $${b}$.`, tol: 0.011 }],
+          hints: ['Substitute the height and solve for w.', `$${r1(target)} = ${a} + ${b}w$.`, `$w = \\frac{${r1(target)} - ${a}}{${b}}$.`],
+          steps: [
+            { h: 'Set up', d: `$${a} + ${b}w = ${r1(target)}$` },
+            { h: 'Subtract the intercept', d: `$${b}w = ${r1(target - a)}$` },
+            { h: 'Divide by the gradient', d: `$w = ${w}$ weeks` }
+          ]
+        };
+      }
       return {
         prompt: `For the fitted line $h = ${a} + ${b}w$ (height in cm after $w$ weeks), by how many cm does the model say the plant grows **each week**?`,
         answerType: 'numeric', answer: { value: b }, answerSuffix: 'cm/week',
@@ -696,16 +843,35 @@ export const streamsStandard = {
         steps: [{ h: 'Interpret the gradient', d: `Each extra week adds $${b}$ cm — that's the slope of the line.` }]
       };
     }
-    const m = mcq(rng, 'Extrapolation — predicting far outside the measured data range is unreliable', [
-      { text: 'Interpolation — predicting inside the data range is invalid', why: 'Interpolation (inside the range) is the *safe* kind of prediction.' },
-      { text: 'The prediction is fine because the line extends forever' },
-      { text: 'Correlation proves causation, so the estimate is exact' }
-    ]);
+    if (rng() < 0.3) {
+      const m = mcq(rng, 'Extrapolation — predicting far outside the measured data range is unreliable', [
+        { text: 'Interpolation — predicting inside the data range is invalid', why: 'Interpolation (inside the range) is the *safe* kind of prediction.' },
+        { text: 'The prediction is fine because the line extends forever' },
+        { text: 'Correlation proves causation, so the estimate is exact' }
+      ]);
+      const far = ri(rng, 40, 90);
+      return {
+        prompt: `A line of best fit was built from plants measured for 1–10 weeks. A student uses it to predict the height at week $${far}$. What's the statistical problem with this?`,
+        answerType: 'mcq', answer: { correctIndex: m.correctIndex, optionTraps: m.optionTraps }, mcqOptions: m.options,
+        hints: ['Where does that week sit relative to the data?', 'Far outside the measured range.', 'That’s extrapolation.'],
+        steps: [{ h: 'Extrapolation risk', d: 'Outside the observed range the linear pattern may not continue — predictions there are unreliable.' }]
+      };
+    }
+    const x0 = ri(rng, 2, 18);
+    const predicted = a + b * x0;
+    const resid = rc(rng, [-6, -5, -4, -3, -2.5, -2, -1.5, 1.5, 2, 2.5, 3, 4, 5, 6]);
+    const observed = r1(predicted + resid);
+    const answer = r1(observed - predicted);
     return {
-      prompt: `A line of best fit was built from plants measured for 1–10 weeks. A student uses it to predict height at week 60. What's the statistical problem with this?`,
-      answerType: 'mcq', answer: { correctIndex: m.correctIndex, optionTraps: m.optionTraps }, mcqOptions: m.options,
-      hints: ['Where does week 60 sit relative to the data?', 'Far outside the measured range.', 'That’s extrapolation.'],
-      steps: [{ h: 'Extrapolation risk', d: 'Outside the observed range the linear pattern may not continue — predictions there are unreliable.' }]
+      prompt: `The least-squares line for plant growth is $h = ${a} + ${b}w$. A plant measured at week $${x0}$ was actually $${observed}$ cm tall. Find the **residual** for that data point.`,
+      answerType: 'numeric', answer: { value: answer, tol: 0.06 }, answerSuffix: 'cm',
+      traps: [{ value: -answer, why: 'Residual = observed − predicted, in that order — the sign tells you whether the point sits above or below the line.', tol: 0.06 }],
+      hints: ['Residual = observed value − predicted value.', `Predicted: $${a} + ${b}(${x0}) = ${r1(predicted)}$ cm.`, `$${observed} - ${r1(predicted)}$.`],
+      steps: [
+        { h: 'Predict from the line', d: `$h = ${a} + ${b}(${x0}) = ${r1(predicted)}$ cm` },
+        { h: 'Residual', d: `$${observed} - ${r1(predicted)} = ${answer}$ cm` },
+        { h: 'Interpret', d: `The point lies ${answer > 0 ? 'above' : 'below'} the line, so the model ${answer > 0 ? 'under' : 'over'}-predicts here.` }
+      ]
     };
   },
 

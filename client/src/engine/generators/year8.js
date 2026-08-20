@@ -9,23 +9,33 @@ export const year8 = {
   // ── Index notation & laws ────────────────────────────────────────────────
   'y8-indices': (rng, diff) => {
     if (diff === 1) {
-      const b = ri(rng, 2, 5), p = ri(rng, 2, b === 2 ? 6 : 4);
-      const val = b ** p;
+      const b = ri(rng, 2, 9), p = ri(rng, 2, b === 2 ? 9 : b === 3 ? 6 : b <= 5 ? 5 : 4);
+      const negBase = rng() < 0.35;
+      const val = (negBase && p % 2 === 1 ? -1 : 1) * b ** p;
+      const baseTex = negBase ? `(-${b})` : `${b}`;
+      const factor = negBase ? `(-${b})` : `${b}`;
       return {
-        prompt: `Evaluate $${b}^{${p}}$.`,
+        prompt: `Evaluate $${baseTex}^{${p}}$.`,
         answerType: 'numeric', answer: { value: val },
-        traps: [{ value: b * p, why: `$${b}^{${p}}$ means ${b} multiplied by itself ${p} times — not $${b} \\times ${p}$.` }],
-        hints: [`$${b}^{${p}}$ means repeated multiplication.`, `Write it out: $${Array(p).fill(b).join(' \\times ')}$.`, `Build it up: $${b}^2 = ${b * b}$, then keep multiplying by ${b}.`],
+        traps: [
+          { value: b * p, why: `$${baseTex}^{${p}}$ means ${negBase ? `$-${b}$` : b} multiplied by itself ${p} times — not $${b} \\times ${p}$.` },
+          { value: -val, why: negBase ? `An even number of negative factors gives a positive product, an odd number gives a negative one — here there are ${p}.` : 'A positive base raised to a whole-number power is always positive.' }
+        ].filter(t => t.value !== val),
+        hints: [
+          `$${baseTex}^{${p}}$ means repeated multiplication.`,
+          `Write it out: $${Array(p).fill(factor).join(' \\times ')}$.`,
+          negBase ? `${p % 2 === 0 ? 'An even' : 'An odd'} number of negative factors, so the answer is ${p % 2 === 0 ? 'positive' : 'negative'}.` : `Build it up: $${b}^2 = ${b * b}$, then keep multiplying by ${b}.`
+        ],
         steps: [
-          { h: 'Expand the power', d: `$${b}^{${p}} = ${Array(p).fill(b).join(' \\times ')}$` },
+          { h: 'Expand the power', d: `$${baseTex}^{${p}} = ${Array(p).fill(factor).join(' \\times ')}$` },
           { h: 'Multiply', d: `$= ${val}$` }
         ]
       };
     }
     if (diff === 2) {
-      const p = ri(rng, 2, 6), q = ri(rng, 2, 6);
+      const p = ri(rng, 2, 9), q = ri(rng, 2, 9);
       const div = rc(rng, [true, false]);
-      const big = Math.max(p, q) + ri(rng, 1, 3);
+      const big = Math.max(p, q) + ri(rng, 1, 5);
       const [e1, e2] = div ? [big, Math.min(p, q)] : [p, q];
       const ansP = div ? e1 - e2 : e1 + e2;
       return {
@@ -41,7 +51,7 @@ export const year8 = {
       };
     }
     if (diff === 3) {
-      const p = ri(rng, 2, 4), q = ri(rng, 2, 4), r = ri(rng, 1, 4);
+      const p = ri(rng, 2, 5), q = ri(rng, 2, 5), r = ri(rng, 1, 6);
       const ansP = p * q + r;
       return {
         prompt: `Simplify $(x^{${p}})^{${q}} \\times x^{${r}}$, giving your answer in index form.`,
@@ -375,7 +385,7 @@ export const year8 = {
   // ── Circles ──────────────────────────────────────────────────────────────
   'y8-circles': (rng, diff) => {
     if (diff === 1) {
-      const r = ri(rng, 3, 12);
+      const r = ri(rng, 3, 40);
       const useD = rc(rng, [true, false]);
       const C = 2 * Math.PI * r;
       return {
@@ -392,7 +402,7 @@ export const year8 = {
       };
     }
     if (diff === 2) {
-      const r = ri(rng, 3, 11);
+      const r = ri(rng, 3, 40);
       const useD = rc(rng, [true, false]);
       const A = Math.PI * r * r;
       return {
@@ -412,24 +422,47 @@ export const year8 = {
       };
     }
     if (diff === 3) {
-      const r = ri(rng, 4, 12);
-      const P = Math.PI * r + 2 * r;
+      const r = ri(rng, 3, 40);
+      const part = rc(rng, ['semicircle', 'quarter circle']);
+      const arc = part === 'semicircle' ? Math.PI * r : Math.PI * r / 2;
+      const straight = part === 'semicircle' ? 2 * r : 2 * r;
+      const P = arc + straight;
+      const edgeNote = part === 'semicircle' ? 'the straight diameter' : 'two straight radii';
       return {
-        prompt: `Find the **perimeter** of a semicircle with radius $${r}$ cm, correct to 1 decimal place. (Don't forget the straight edge.)`,
+        prompt: `Find the **perimeter** of a ${part} with radius $${r}$ cm, correct to 1 decimal place. (Don't forget ${edgeNote}.)`,
         answerType: 'numeric', answer: { value: r1(P), tol: 0.06 }, answerSuffix: 'cm',
         traps: [
-          { value: r1(Math.PI * r), why: 'That’s only the curved part — the perimeter also includes the straight diameter.', tol: 0.06 },
-          { value: r1(Math.PI * r + r), why: 'The straight edge is the *diameter* ($2r$), not the radius.', tol: 0.06 }
+          { value: r1(arc), why: `That’s only the curved part — the perimeter also includes ${edgeNote}.`, tol: 0.06 },
+          { value: r1(arc + r), why: part === 'semicircle' ? 'The straight edge is the *diameter* ($2r$), not the radius.' : 'A quarter circle has *two* straight radii, not one.', tol: 0.06 }
         ],
-        hints: ['A semicircle’s boundary = half the circumference + the diameter.', `Curved part: $\\frac{1}{2} \\times 2\\pi \\times ${r} = \\pi \\times ${r}$.`, `Add the diameter: $${2 * r}$.`],
+        hints: [
+          `A ${part}’s boundary = ${part === 'semicircle' ? 'half' : 'a quarter'} of the circumference + ${edgeNote}.`,
+          `Curved part: $\\tfrac{1}{${part === 'semicircle' ? 2 : 4}} \\times 2\\pi \\times ${r} = ${r3(arc)}\\ldots$`,
+          `Add the straight edges: $${straight}$.`
+        ],
         steps: [
-          { h: 'Curved edge', d: `$\\tfrac{1}{2} \\times 2\\pi r = \\pi \\times ${r} = ${r3(Math.PI * r)}\\ldots$` },
-          { h: 'Straight edge', d: `diameter $= ${2 * r}$` },
-          { h: 'Total', d: `$${r3(Math.PI * r)}\\ldots + ${2 * r} \\approx ${r1(P)}$ cm` }
+          { h: 'Curved edge', d: `$\\tfrac{1}{${part === 'semicircle' ? 2 : 4}} \\times 2\\pi \\times ${r} = ${r3(arc)}\\ldots$` },
+          { h: 'Straight edges', d: `$${straight}$ cm` },
+          { h: 'Total', d: `$${r3(arc)}\\ldots + ${straight} \\approx ${r1(P)}$ cm` }
         ]
       };
     }
-    const r = ri(rng, 3, 10);
+    const r = ri(rng, 3, 40);
+    const fromArea = rng() < 0.4;
+    if (fromArea) {
+      const A = r1(Math.PI * r * r);
+      return {
+        prompt: `A circular pond has area $${A}$ m². Find its radius, correct to 1 decimal place.`,
+        answerType: 'numeric', answer: { value: r, tol: 0.06 }, answerSuffix: 'm',
+        traps: [{ value: r1(A / Math.PI), why: 'Dividing by $\\pi$ gives $r^2$ — take the square root as well.', tol: 0.06 }],
+        hints: ['Rearrange $A = \\pi r^2$.', `$r^2 = \\dfrac{${A}}{\\pi} = ${r3(A / Math.PI)}\\ldots$`, 'Now take the square root.'],
+        steps: [
+          { h: 'Rearrange the formula', d: `$r = \\sqrt{\\dfrac{A}{\\pi}}$` },
+          { h: 'Substitute', d: `$r = \\sqrt{\\dfrac{${A}}{\\pi}} = \\sqrt{${r3(A / Math.PI)}\\ldots}$` },
+          { h: 'Round', d: `$r \\approx ${r}$ m` }
+        ]
+      };
+    }
     const C = r1(2 * Math.PI * r);
     return {
       prompt: `A circular running track has circumference $${C}$ m. Find its radius, correct to 1 decimal place.`,
@@ -535,26 +568,26 @@ export const year8 = {
       };
     }
     if (diff === 3) {
-      const ms = rc(rng, [5, 10, 15, 20, 25, 30]);
-      const kmh = ms * 3.6;
+      const ms = ri(rng, 2, 35);
+      const kmh = r1(ms * 3.6);
       const toKmh = rc(rng, [true, false]);
       return toKmh ? {
         prompt: `A sprinter runs at $${ms}$ m/s. Convert this speed to km/h.`,
-        answerType: 'numeric', answer: { value: r2(kmh), tol: 0.01 }, answerSuffix: 'km/h',
+        answerType: 'numeric', answer: { value: kmh, tol: 0.011 }, answerSuffix: 'km/h',
         traps: [{ value: r2(ms / 3.6), why: 'm/s → km/h multiplies by 3.6 (3600 seconds per hour, ÷1000 m per km).' }],
         hints: ['How many seconds in an hour? How many metres in a km?', `Per hour: $${ms} \\times 3600$ m.`, `Divide by 1000 for km: $\\times 3.6$ overall.`],
         steps: [
           { h: 'Metres per hour', d: `$${ms} \\times 3600 = ${ms * 3600}$ m/h` },
-          { h: 'Convert to km', d: `$${ms * 3600} \\div 1000 = ${r2(kmh)}$ km/h` }
+          { h: 'Convert to km', d: `$${ms * 3600} \\div 1000 = ${kmh}$ km/h` }
         ]
       } : {
         prompt: `A car travels at $${kmh}$ km/h. Convert this speed to m/s.`,
         answerType: 'numeric', answer: { value: ms, tol: 0.01 }, answerSuffix: 'm/s',
         traps: [{ value: r2(kmh * 3.6), why: 'km/h → m/s *divides* by 3.6.' }],
-        hints: ['Convert km to m, and hours to seconds.', `$${kmh}$ km/h $= ${kmh * 1000}$ m per 3600 s.`, `Divide: $${kmh * 1000} \\div 3600$.`],
+        hints: ['Convert km to m, and hours to seconds.', `$${kmh}$ km/h $= ${r1(kmh * 1000)}$ m per 3600 s.`, `Divide: $${r1(kmh * 1000)} \\div 3600$.`],
         steps: [
-          { h: 'Metres per hour', d: `$${kmh} \\times 1000 = ${kmh * 1000}$ m/h` },
-          { h: 'Per second', d: `$${kmh * 1000} \\div 3600 = ${ms}$ m/s` }
+          { h: 'Metres per hour', d: `$${kmh} \\times 1000 = ${r1(kmh * 1000)}$ m/h` },
+          { h: 'Per second', d: `$${r1(kmh * 1000)} \\div 3600 = ${ms}$ m/s` }
         ]
       };
     }
@@ -595,13 +628,15 @@ export const year8 = {
       };
     }
     if (diff === 2) {
-      const p = rc(rng, [[3, 10], [2, 5], [7, 20], [1, 4], [3, 8], [9, 20]]);
+      const p = rc(rng, [[3, 10], [2, 5], [7, 20], [1, 4], [3, 8], [9, 20], [1, 3], [1, 5], [2, 7], [3, 7], [5, 12], [7, 12], [1, 8], [5, 8], [11, 20], [13, 20], [4, 15], [7, 15], [2, 9], [5, 9], [1, 6], [5, 6], [3, 16], [9, 16], [1, 2], [2, 3], [3, 4], [4, 5], [5, 11], [7, 18]]);
       const f = new Frac(p[0], p[1]);
       const comp = new Frac(p[1] - p[0], p[1]);
+      const asDecimal = rng() < 0.45;
       return {
-        prompt: `The probability that it rains tomorrow is $${f.latex()}$. Find the probability that it does **not** rain, as a fraction in simplest form.`,
-        answerType: 'numeric', answer: { value: comp.value, simplestFraction: { n: comp.n, d: comp.d } },
-        inputHint: 'e.g. 7/10',
+        prompt: `The probability that it rains tomorrow is $${f.latex()}$. Find the probability that it does **not** rain, ${asDecimal ? 'correct to 3 decimal places' : 'as a fraction in simplest form'}.`,
+        answerType: 'numeric',
+        answer: asDecimal ? { value: r3(comp.value), tol: 0.0006 } : { value: comp.value, simplestFraction: { n: comp.n, d: comp.d } },
+        inputHint: asDecimal ? 'e.g. 0.7' : 'e.g. 7/10',
         traps: [{ value: f.value, why: 'That’s the probability it *does* rain — the complement is 1 minus that.' }],
         hints: ['“Rain” and “no rain” cover all possibilities.', 'Complement rule: $P(\\text{not } A) = 1 - P(A)$.', `$1 - ${f.latex()} = \\frac{${p[1]} - ${p[0]}}{${p[1]}}$.`],
         steps: [
@@ -611,8 +646,8 @@ export const year8 = {
       };
     }
     if (diff === 3) {
-      const p = rc(rng, [[1, 6], [1, 4], [3, 10], [2, 5], [1, 5]]);
-      const trials = p[1] * ri(rng, 5, 12) * (p[1] <= 5 ? 2 : 1);
+      const p = rc(rng, [[1, 6], [1, 4], [3, 10], [2, 5], [1, 5], [1, 3], [2, 3], [3, 4], [1, 2], [5, 6], [3, 8], [1, 8], [7, 10], [2, 9], [4, 15]]);
+      const trials = p[1] * ri(rng, 4, 20) * (p[1] <= 5 ? 2 : 1);
       const f = new Frac(p[0], p[1]);
       const expected = f.value * trials;
       return {

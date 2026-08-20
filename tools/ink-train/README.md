@@ -69,17 +69,37 @@ unable to make, never overrule a confident net.
 
 ## Validating a change
 
-`npm test` runs four suites. The one that matters is the last:
+`npm test` runs five ink suites, after the engine, backend and security checks.
+The one that matters is the last:
 
 - `inkcheck.mjs` — clean symbols, layout, LaTeX. A regression guard.
 - `inkcheck-hard.mjs` — heavy distortion, scenes, digit strings.
 - `inkcheck-lines.mjs` — line-level accuracy. The tuning target.
-- `inkcheck-holdout.mjs` — **the honest number.** Different seed space,
-  different expressions, and a *writer* model (one consistent hand per
+- `inkcheck-holdout.mjs` — holdout #1, and **no longer independent.** It was the
+  held-out suite until the v8 accuracy work read its failures — the misreads
+  *are* the diagnosis, so reading them is what spends a holdout. Treat it as a
+  regression guard now.
+- `inkcheck-holdout2.mjs` — holdout #2, **the honest number.** Different seed
+  space, different expressions, and a *writer* model (one consistent hand per
   simulated student, as real handwriting is) rather than per-glyph randomness.
+  No tuning pass has ever executed it.
 
-Do not tune against the held-out suite. Anything tuned against is eventually
-tuned *to*, which is the whole reason it is separate.
+Do not tune against either holdout. A spent holdout does not become a target;
+it becomes a guard. Anything tuned against is eventually tuned *to*, which is
+the whole reason holdout #2 is separate — and when a retrain has to read holdout
+#2's failures to make progress, that spends it too, and a third suite must be
+added before the next one.
 
-Watch the worst-writer figure it prints as closely as the mean. A student whose
-hand the engine cannot read does not care about the average.
+`README.md` (**Measured accuracy**) says the same thing, and carries the current
+figures with the `n` that produced each. If the two ever disagree, the one
+claiming more independence is the wrong one.
+
+Watch the worst-writer figure each holdout prints as closely as the mean. A
+student whose hand the engine cannot read does not care about the average.
+
+And none of it is real ink. Every suite above scores strokes this repo
+generated, including the holdouts — they hold out a seed space, not a person.
+`tools/ink-collect/index.html` captures genuine Pencil handwriting, and
+`npm run test:real` scores it; until a corpus exists there is no real-handwriting
+number for anything trained here. Never tune against a recorded corpus either —
+reading its failures is what would stop it being evidence.

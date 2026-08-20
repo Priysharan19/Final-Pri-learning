@@ -22,6 +22,14 @@ const SIZES = [32];
 const MIN_ASPECT = 0.25;   // model C: relieve tall-thin glyphs of resolution famine
 const N_SYNTH_TRAIN = Number(process.env.PRI_SYNTH_TRAIN || 9000);
 const N_SYNTH_VAL = Number(process.env.PRI_SYNTH_VAL || 700);
+
+// How much of the set is deliberately hard. The worst simulated writer scores far
+// below the mean because almost nothing in training looked like that student, so
+// these are the knobs that move the worst-writer number rather than the average.
+const CLEAN_SHARE = Number(process.env.PRI_CLEAN_SHARE || 0.08);
+const TAIL_SHARE = Number(process.env.PRI_TAIL_SHARE || 0.20);
+const TAIL_FROM = Number(process.env.PRI_TAIL_FROM || 1.70);
+const TAIL_TO = Number(process.env.PRI_TAIL_TO || 2.65);
 const MNIST_DIR = '/tmp/mn/node_modules/mnist/src/digits';
 
 // seeds per class = template variants of all member symbols
@@ -82,9 +90,9 @@ function synthStrokes(cls, rng) {
   // The clean slice stays, because a net trained only on distortion drifts off
   // the neat hands that are most of the population.
   const r = rng();
-  const strength = r < 0.08 ? 0.15
-    : r < 0.80 ? 0.45 + rng() * 1.25
-      : 1.70 + rng() * 0.95;
+  const strength = r < CLEAN_SHARE ? 0.15
+    : r < 1 - TAIL_SHARE ? 0.45 + rng() * 1.25
+      : TAIL_FROM + rng() * (TAIL_TO - TAIL_FROM);
   return stylize(strokes, rng, strength, { bowScale: LOW_BOW.has(cls) ? 0.3 : 1 });
 }
 
