@@ -1,5 +1,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Pri Learning · Achievements
+// Pri Learning · Achievements — UNUSED LEGACY
+// The badges the app actually awards are in client/src/local/badges.js, checked
+// against IndexedDB. This SQLite-backed copy is only reachable from the dead
+// Express routes. See server/README.md.
 // ─────────────────────────────────────────────────────────────────────────────
 import { db, streakFor, sydneyHour } from './db.js';
 import { levelFromXp } from './engine/adaptive.js';

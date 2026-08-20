@@ -76,9 +76,9 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
         <button type="button" className={`ink-tool ${tool === 'pen' ? 'on' : ''}`} onClick={() => setTool('pen')} title="Pen">✒️ Pen</button>
         <button type="button" className={`ink-tool ${tool === 'eraser' ? 'on' : ''}`} onClick={() => setTool('eraser')} title="Eraser">◻️ Eraser</button>
         <span className="ink-sep" />
-        <button type="button" className="ink-tool" onClick={act('undo')} title="Undo">↩︎</button>
-        <button type="button" className="ink-tool" onClick={act('redo')} title="Redo">↪︎</button>
-        <button type="button" className="ink-tool" onClick={act('clear')} title="Clear">🗑</button>
+        <button type="button" className="ink-tool" onClick={act('undo')} title="Undo" aria-label="Undo last stroke">↩︎</button>
+        <button type="button" className="ink-tool" onClick={act('redo')} title="Redo" aria-label="Redo last stroke">↪︎</button>
+        <button type="button" className="ink-tool" onClick={act('clear')} title="Clear" aria-label="Clear all handwriting">🗑</button>
         <span className="ink-sep" />
         <button type="button" className="ink-tool" onClick={() => setExtraHeight(h => Math.min(400, h + 120))} title="More space">＋ space</button>
         <span className="ink-sep" />

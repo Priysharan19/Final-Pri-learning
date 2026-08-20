@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation, useSearchParams } from 'react-router-dom';
 import { api } from '../api.js';
 import { useApp } from '../App.jsx';
-import QuestionCard from '../components/QuestionCard.jsx';
+import QuestionCard, { SR_ONLY } from '../components/QuestionCard.jsx';
 
 export default function Practice() {
   const { user } = useApp();
@@ -59,9 +59,14 @@ export default function Practice() {
 
   const course = (user.courseLabel || 'Mathematics').replace(/^Year \d+\s*·\s*/, '');
   const metaLine = `Year ${serve?.question?.year ?? user.year} · ${course}`;
+  const heading = serve?.question?.subtopicName
+    || (taskId ? 'Task practice' : subtopic ? 'Topic practice' : 'Smart practice');
 
   return (
     <div style={{ position: 'relative', paddingBottom: 70 }}>
+      {/* the question itself is the page's visual title; this names it for a reader */}
+      <h1 style={SR_ONLY}>Practice · {heading}</h1>
+
       {error && (
         <div className="qpage">
           <p className="error-box">{error}</p>
@@ -92,22 +97,23 @@ export default function Practice() {
       {/* bottom context pill */}
       <div className="ctx-pill no-print">
         <div className="ctx-pill-info">
-          <button className="genbar-toggle" title="Session" style={{ padding: 0 }}>⌃</button>
+          <span className="genbar-toggle" style={{ padding: 0, cursor: 'default' }} aria-hidden="true">⌃</span>
           <div>
             <div className="ctx-pill-meta">
               {metaLine}
               {session.answered > 0 && <> · session {session.correct}/{session.answered} · +{session.xp} XP</>}
             </div>
             <div className="ctx-pill-name">
-              {serve?.question?.subtopicName || (taskId ? 'Task practice' : subtopic ? 'Topic practice' : 'Smart practice')}
+              {heading}
               {dotpoint != null && <span className="muted"> · dot point {Number(dotpoint) + 1}</span>}
             </div>
           </div>
           {(subtopic || taskId || difficulty) && (
-            <button className="btn btn-quiet btn-sm" title="Clear filters — back to smart practice" onClick={() => setParams({})}>✕</button>
+            <button className="btn btn-quiet btn-sm" title="Clear filters — back to smart practice"
+              aria-label="Clear filters — back to smart practice" onClick={() => setParams({})}>✕</button>
           )}
         </div>
-        <button className="ctx-next" title="Next question" onClick={load}>›</button>
+        <button className="ctx-next" title="Next question" aria-label="Next question" onClick={load}>›</button>
       </div>
     </div>
   );

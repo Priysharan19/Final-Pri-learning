@@ -8,9 +8,9 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../api.js';
 import { MathText } from '../lib/latex.jsx';
 import { useApp } from '../App.jsx';
-import InkAnswer from '../ink/InkAnswer.jsx';
 import InkCanvas from '../ink/InkCanvas.jsx';
 import { exprToLatex } from '../ink/recognizer.js';
+import { sanitizeFigure } from '../lib/sanitize.js';
 
 const DIFF_CLASS = { 1: 'tag-d1', 2: 'tag-d2', 3: 'tag-d3', 4: 'tag-d4' };
 const SYMBOLS = ['π', '√(', '^', '±', '×', '÷', '≤', '≥', '≠', '°', 'θ', '(', ')', '/', ':'];
@@ -19,6 +19,42 @@ const preferMode = () => {
   if (saved) return saved;
   return (window.matchMedia?.('(pointer: coarse)').matches ?? false) ? 'write' : 'type';
 };
+
+/** Off-screen but spoken — for names and announcements the page shows visually. */
+export const SR_ONLY = {
+  position: 'absolute', width: 1, height: 1, padding: 0, margin: -1,
+  overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap', border: 0
+};
+
+// ── The writing surface, fetched the first time it is asked for ──────────────
+// It arrives as a chunk of its own, so opening the write tab can fail the way
+// any fetch can. The in-flight promise is remembered only while it is still
+// alive — the moment it rejects it is dropped, because a memo held past a
+// rejection leaves the tab dead until the whole app is reloaded. A load retries
+// a bounded number of times, and one that genuinely cannot finish says so.
+const INK_RETRIES = 2;
+const INK_BACKOFF_MS = 350;
+
+let inkModule = null;
+let inkPending = null;
+
+function fetchInk(attempt = 0) {
+  return import('../ink/InkAnswer.jsx').catch(err => {
+    if (attempt >= INK_RETRIES) throw err;
+    return new Promise(done => setTimeout(done, INK_BACKOFF_MS * (attempt + 1))).then(() => fetchInk(attempt + 1));
+  });
+}
+
+function loadInk() {
+  if (inkModule) return Promise.resolve(inkModule);
+  if (!inkPending) {
+    inkPending = fetchInk().then(
+      mod => { inkModule = mod; inkPending = null; return mod; },
+      err => { inkPending = null; throw err; }
+    );
+  }
+  return inkPending;
+}
 
 export default function QuestionCard({ question, why, reason, onResolved, onNext, onRedo, compact = false }) {
   const { celebrate, refreshUser, refreshDue, refreshRecent, toast } = useApp();
@@ -40,6 +76,8 @@ export default function QuestionCard({ question, why, reason, onResolved, onNext
   const [selfSaved, setSelfSaved] = useState(false);
   const [photo, setPhoto] = useState(null);
   const [elapsed, setElapsed] = useState(0);
+  const [inkPhase, setInkPhase] = useState(() => (inkModule ? 'ready' : 'idle'));   // idle | loading | ready | failed
+  const [inkTry, setInkTry] = useState(0);
   const startRef = useRef(Date.now());
   const inputRef = useRef(null);
   const scribbleRef = useRef(null);
@@ -68,6 +106,22 @@ export default function QuestionCard({ question, why, reason, onResolved, onNext
   const hintsUsed = hints.length;
   const credit = Math.max(0.55, 1 - 0.15 * hintsUsed);
   const writeMode = mode === 'write';
+
+  useEffect(() => {
+    if (!writeMode) return;
+    if (inkModule) { setInkPhase('ready'); return; }
+    let live = true;
+    setInkPhase('loading');
+    loadInk().then(
+      () => { if (live) setInkPhase('ready'); },
+      () => { if (live) setInkPhase('failed'); }
+    );
+    return () => { live = false; };
+  }, [writeMode, inkTry]);
+
+  const InkAnswer = inkPhase === 'ready' ? inkModule?.default : null;
+
+  const figure = useMemo(() => sanitizeFigure(question.figure), [question.figure]);
 
   const typedPreview = useMemo(() => {
     if (!answer.trim() || /^[\d\s.]+$/.test(answer)) return null;
@@ -226,6 +280,21 @@ export default function QuestionCard({ question, why, reason, onResolved, onNext
   const shownMarks = Math.round(earnedMarks * credit * 10) / 10;
   const pct = totalMarks ? Math.round(100 * shownMarks / totalMarks) : 0;
 
+  // The verdict lands in the middle of a long page. Spoken as one sentence, a
+  // screen reader hears whether the answer was right without hunting for it.
+  const verdictSpeech = useMemo(() => {
+    if (state.phase === 'retry') {
+      return state.res?.invalid
+        ? `I couldn’t read that. ${state.res.feedback || ''}`
+        : `Not quite. ${state.res?.feedback || 'Have another look and try again — you have one more go.'}`;
+    }
+    if (!resolved) return '';
+    const marks = `${verdictGood ? shownMarks : earnedMarks} out of ${totalMarks} marks.`;
+    if (res.revealed) return `Solution revealed. ${marks}`;
+    if (verdictGood) return `Correct. ${marks}`;
+    return `Not correct. ${marks}${res.solution?.answerText ? ` Expected ${res.solution.answerText}.` : ''}`;
+  }, [state.phase, state.res, resolved, res, verdictGood, shownMarks, earnedMarks, totalMarks]);
+
   const answerLines = isMcq ? [] : writeMode
     ? (inkResult?.lines || [])
     : isWorking ? working.split('\n').filter(Boolean)
@@ -235,9 +304,9 @@ export default function QuestionCard({ question, why, reason, onResolved, onNext
     <div className="qpage">
       {/* left action rail */}
       <div className="q-rail no-print">
-        <button className={`q-rail-btn ${bookmarked ? 'on' : ''}`} title="Favorite" onClick={toggleBookmark}>☆</button>
-        <button className={`q-rail-btn ${showWhy ? 'on' : ''}`} title="Why this question?" onClick={() => setShowWhy(s => !s)}>ⓘ</button>
-        <button className={`q-rail-btn ${showScribble ? 'on' : ''}`} title="Scribble pad" onClick={() => setShowScribble(s => !s)}>✎</button>
+        <button className={`q-rail-btn ${bookmarked ? 'on' : ''}`} title="Favorite" aria-label="Favorite this question" aria-pressed={bookmarked} onClick={toggleBookmark}>☆</button>
+        <button className={`q-rail-btn ${showWhy ? 'on' : ''}`} title="Why this question?" aria-label="Why this question?" aria-pressed={showWhy} onClick={() => setShowWhy(s => !s)}>ⓘ</button>
+        <button className={`q-rail-btn ${showScribble ? 'on' : ''}`} title="Scribble pad" aria-label="Scribble pad" aria-pressed={showScribble} onClick={() => setShowScribble(s => !s)}>✎</button>
       </div>
 
       {/* hint bulbs */}
@@ -272,7 +341,7 @@ export default function QuestionCard({ question, why, reason, onResolved, onNext
       {showWhy && why && <p className="muted" style={{ marginBottom: 12 }}>{why}</p>}
 
       <MathText block className="q-prompt" text={question.prompt} />
-      {question.figure && <div className="q-figure" dangerouslySetInnerHTML={{ __html: question.figure }} />}
+      {figure && <div className="q-figure" dangerouslySetInnerHTML={{ __html: figure }} />}
 
       {resolved && (
         <div className="row no-print" style={{ margin: '14px 0 2px' }}>
@@ -301,15 +370,18 @@ export default function QuestionCard({ question, why, reason, onResolved, onNext
       ) : (
         <>
           <div className="mode-tabs no-print">
-            <button className={`mode-tab ${mode === 'type' ? 'on' : ''}`} title="Maths editor — type equations and working" onClick={() => flipMode('type')}>T</button>
-            <button className={`mode-tab ${mode === 'write' ? 'on' : ''}`} title="Handwriting — draw with pencil or finger" onClick={() => flipMode('write')}>✎</button>
-            <button className={`mode-tab ${mode === 'photo' ? 'on' : ''}`} title="Photo — attach handwritten work" onClick={() => flipMode('photo')}>▣</button>
+            <button className={`mode-tab ${mode === 'type' ? 'on' : ''}`} title="Maths editor — type equations and working"
+              aria-label="Answer by typing" onClick={() => flipMode('type')}>T</button>
+            <button className={`mode-tab ${mode === 'write' ? 'on' : ''}`} title="Handwriting — draw with pencil or finger"
+              aria-label="Answer by handwriting" onClick={() => flipMode('write')}>✎</button>
+            <button className={`mode-tab ${mode === 'photo' ? 'on' : ''}`} title="Photo — attach handwritten work"
+              aria-label="Answer with a photo of your working" onClick={() => flipMode('photo')}>▣</button>
           </div>
 
           {mode !== 'write' ? (
             <div className={`editor-shell ${resolved ? 'ink-disabled' : ''}`}>
               <div className="editor-toolbar">
-                <button className={`editor-tool ${showSyms ? 'on' : ''}`} title="Symbol palette" onClick={() => setShowSyms(s => !s)}>Σ</button>
+                <button className={`editor-tool ${showSyms ? 'on' : ''}`} title="Symbol palette" aria-label="Symbol palette" aria-pressed={showSyms} onClick={() => setShowSyms(s => !s)}>Σ</button>
                 <span className="editor-hint"><span className="kbd">{isWorking ? '⏎' : 'type'}</span> {isWorking ? 'one line of working per row' : 'to write math — it reads naturally'}</span>
                 <span style={{ flex: 1 }} />
                 {question.answerSuffix && <span className="answer-suffix">answer in {question.answerSuffix}</span>}
@@ -328,7 +400,7 @@ export default function QuestionCard({ question, why, reason, onResolved, onNext
                       ? <button className="btn btn-ghost" onClick={() => photoInputRef.current?.click()}>▣ Attach a photo of your working</button>
                       : (
                         <div className="photo-attach">
-                          <div className="photo-thumb"><img src={photo} alt="Paper working" /><button onClick={() => setPhoto(null)}>✕</button></div>
+                          <div className="photo-thumb"><img src={photo} alt="Paper working" /><button aria-label="Remove photo" onClick={() => setPhoto(null)}>✕</button></div>
                           <span className="muted">Saved with this attempt. Type your final answer below so it can be marked.</span>
                         </div>
                       )}
@@ -391,21 +463,42 @@ export default function QuestionCard({ question, why, reason, onResolved, onNext
           ) : (
             <div className="ink-row">
               <div className="editor-shell" style={{ flex: 1, minWidth: 0 }}>
-                <InkAnswer onRecognized={setInkResult} height={380} lineVerdicts={lineVerdicts} disabled={resolved} />
-                <div className="editor-foot no-print">
-                  <span className="editor-brand">✒ Pri Ink Engine — on-device recognition</span>
-                  <span style={{ flex: 1 }} />
-                  {inkResult?.answerLine && (
-                    <span className="muted" style={{ marginRight: 10 }}>
-                      submitting: <MathText text={`$${safeLatex(isWorking ? inkResult.lines[inkResult.lines.length - 1] : inkResult.answerLine)}$`} />
-                    </span>
-                  )}
-                  {!resolved && (
-                    <button className={`btn btn-primary ${canSubmit ? 'btn-glow' : ''}`} onClick={submit} disabled={busy || !canSubmit}>
-                      {busy ? 'Marking…' : '➤ Submit Answer'}
-                    </button>
-                  )}
-                </div>
+                {InkAnswer && <InkAnswer onRecognized={setInkResult} height={380} lineVerdicts={lineVerdicts} disabled={resolved} />}
+                {inkPhase === 'failed' && (
+                  <div className="editor-body">
+                    <div className="error-box" role="alert" style={{ marginBottom: 0 }}>
+                      <b>Handwriting couldn’t load.</b> The recogniser is kept in a file of its own and this
+                      device couldn’t read it just now. Nothing you have done is lost — try again, or answer
+                      by typing.
+                    </div>
+                    <div className="row" style={{ marginTop: 12 }}>
+                      <button className="btn btn-ghost btn-sm" onClick={() => setInkTry(n => n + 1)}>Try again</button>
+                      <button className="btn btn-quiet btn-sm" onClick={() => flipMode('type')}>Type the answer instead</button>
+                    </div>
+                  </div>
+                )}
+                {(inkPhase === 'idle' || inkPhase === 'loading') && (
+                  <div className="editor-body">
+                    <div className="skeleton" style={{ height: 380 }} />
+                    <p className="muted" role="status" style={{ marginTop: 10 }}>Warming up the handwriting engine…</p>
+                  </div>
+                )}
+                {InkAnswer && (
+                  <div className="editor-foot no-print">
+                    <span className="editor-brand">✒ Pri Ink Engine — on-device recognition</span>
+                    <span style={{ flex: 1 }} />
+                    {inkResult?.answerLine && (
+                      <span className="muted" style={{ marginRight: 10 }}>
+                        submitting: <MathText text={`$${safeLatex(isWorking ? inkResult.lines[inkResult.lines.length - 1] : inkResult.answerLine)}$`} />
+                      </span>
+                    )}
+                    {!resolved && (
+                      <button className={`btn btn-primary ${canSubmit ? 'btn-glow' : ''}`} onClick={submit} disabled={busy || !canSubmit}>
+                        {busy ? 'Marking…' : '➤ Submit Answer'}
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
               {inkComments && (
                 <aside className="ink-comments">
@@ -426,14 +519,16 @@ export default function QuestionCard({ question, why, reason, onResolved, onNext
         </>
       )}
 
+      <div style={SR_ONLY} role="status" aria-live="polite" aria-atomic="true">{verdictSpeech}</div>
+
       {/* scribble pad */}
       {showScribble && !resolved && (
         <div className="editor-shell" style={{ marginTop: 12 }}>
           <div className="editor-toolbar">
             <span className="editor-hint">Scribble pad — rough work, never marked</span>
             <span style={{ flex: 1 }} />
-            <button className="editor-tool" onClick={() => scribbleRef.current?.undo()}>↩</button>
-            <button className="editor-tool" onClick={() => scribbleRef.current?.clear()}>🗑</button>
+            <button className="editor-tool" aria-label="Undo scribble" onClick={() => scribbleRef.current?.undo()}>↩</button>
+            <button className="editor-tool" aria-label="Clear the scribble pad" onClick={() => scribbleRef.current?.clear()}>🗑</button>
           </div>
           <InkCanvas ref={scribbleRef} height={200} guides={false} ariaLabel="Scribble pad" />
         </div>

@@ -4,12 +4,18 @@ import { BrowserRouter } from 'react-router-dom';
 import '@fontsource-variable/inter';
 import './theme.css';
 import App from './App.jsx';
+import ErrorBoundary from './components/ErrorBoundary.jsx';
 
+// The root boundary sits outside the router so that everything is covered —
+// the boot screen, the whole Login and cold-start path, the topbar, the account
+// menu, the sidebar, the toasts and the mobile nav, not only the routes.
 createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <BrowserRouter>
-      <App />
-    </BrowserRouter>
+    <ErrorBoundary scope="app">
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>
+    </ErrorBoundary>
   </React.StrictMode>
 );
 

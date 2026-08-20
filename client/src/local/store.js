@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Pri Learning · Local data helpers (streaks, activity, ratings) over IndexedDB
 // ─────────────────────────────────────────────────────────────────────────────
-import { get, put, byIndex } from './idb.js';
+import { get, put, byIndex, dropDataKeys } from './idb.js';
 
 export function sydneyDate(ms = Date.now()) {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Australia/Sydney', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(ms));
@@ -61,5 +61,16 @@ export async function putRating(pid, subtopic, data) {
   await put('ratings', { key: `${pid}:${subtopic}`, pid, subtopic, ...data });
 }
 
+// ── Which profile the UI is showing ──────────────────────────────────────────
+// This is a convenience, not a credential: anyone can write the key, so nothing
+// that matters may be granted on the strength of it. A protected profile is
+// reachable only while its data key is held in memory, and switching away —
+// or signing out — gives that key up here, at the one place the selection
+// changes. Whoever edits the key afterwards is left holding ciphertext.
+
 export const currentPid = () => localStorage.getItem('pri-current-profile');
-export const setCurrentPid = pid => pid ? localStorage.setItem('pri-current-profile', pid) : localStorage.removeItem('pri-current-profile');
+export const setCurrentPid = pid => {
+  dropDataKeys(pid || null);
+  if (pid) localStorage.setItem('pri-current-profile', pid);
+  else localStorage.removeItem('pri-current-profile');
+};

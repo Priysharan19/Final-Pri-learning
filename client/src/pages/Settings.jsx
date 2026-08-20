@@ -4,6 +4,7 @@ import { useApp } from '../App.jsx';
 import { downloadJSON, readJSONFile, dateStamp } from '../lib/files.js';
 import Calibrate from '../ink/Calibrate.jsx';
 import { personalStats, clearPersonal, ensurePersonalLoaded } from '../ink/personal.js';
+import { MIN_PASSWORD, PasswordMeter, passwordVerdict } from './Login.jsx';
 
 const AVATARS = ['🚀', '🦊', '🐨', '🦉', '🌟', '🐯', '🍀', '🎧', '🦄', '⚡', '🌊', '🧠'];
 const COURSES = [['nsw', 'NSW · HSC'], ['vic', 'VIC · VCE'], ['qld', 'QLD · QCE'], ['wa', 'WA · WACE'], ['sa', 'SA · SACE'], ['ib', 'IB']];
@@ -61,8 +62,6 @@ const SECTIONS = [
   ['help', '?', 'Help & Safety'],
 ];
 
-const PROV_NAMES = { apple: 'Apple (on-device)', google: 'Google (on-device)', email: 'Email' };
-
 function SecuritySection({ toast }) {
   const { user, setUser } = useApp();
   const [email, setEmail] = useState(user.email || '');
@@ -70,6 +69,7 @@ function SecuritySection({ toast }) {
   const [pwOpen, setPwOpen] = useState(false);
   const [pw, setPw] = useState({ current: '', next: '', next2: '' });
   const [busy, setBusy] = useState(false);
+  const pwVerdict = passwordVerdict(pw.next, { name: user.name, email: user.email || '' });
 
   const saveEmail = async () => {
     setBusy(true);
@@ -82,7 +82,10 @@ function SecuritySection({ toast }) {
   };
 
   const savePassword = async (remove = false) => {
-    if (!remove && pw.next !== pw.next2) { toast(<span>Those passwords don’t match.</span>); return; }
+    if (!remove) {
+      if (!pwVerdict.ok) { toast(<span>{pwVerdict.note}</span>); return; }
+      if (pw.next !== pw.next2) { toast(<span>Those passwords don’t match.</span>); return; }
+    }
     setBusy(true);
     try {
       const r = await api.post('/profiles/password', { current: pw.current, next: remove ? '' : pw.next });
@@ -96,20 +99,21 @@ function SecuritySection({ toast }) {
     <div className="card">
       <h2 style={{ marginBottom: 8 }}>⚿ Account & Security</h2>
       <div className="set-row">
-        <span className="set-k">Sign-in method</span>
-        <span className="set-v">{PROV_NAMES[user.provider] || 'Local profile'}</span>
+        <span className="set-k">Account type</span>
+        <span className="set-v">Private profile on this device — no sign-in service</span>
       </div>
       <div className="set-row">
         <span className="set-k">Email</span>
         {!editEmail ? (
           <span className="set-v" style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
             {user.email || <span className="muted">not set</span>}
-            <button className="btn btn-quiet btn-sm" onClick={() => { setEmail(user.email || ''); setEditEmail(true); }}>✎</button>
+            <button className="btn btn-quiet btn-sm" aria-label="Edit account email"
+              onClick={() => { setEmail(user.email || ''); setEditEmail(true); }}>✎</button>
           </span>
         ) : (
           <span style={{ display: 'flex', gap: 8 }}>
             <input className="input" type="email" value={email} placeholder="you@example.com" style={{ width: 220 }}
-              onChange={e => setEmail(e.target.value)} />
+              aria-label="Account email" onChange={e => setEmail(e.target.value)} />
             <button className="btn btn-primary btn-sm" disabled={busy} onClick={saveEmail}>Save</button>
             <button className="btn btn-quiet btn-sm" onClick={() => setEditEmail(false)}>Cancel</button>
           </span>
@@ -128,20 +132,24 @@ function SecuritySection({ toast }) {
             {user.hasPassword && (
               <div className="field" style={{ gridColumn: '1 / -1' }}>
                 <label className="label">Current password</label>
-                <input className="input" type="password" value={pw.current} onChange={e => setPw(p => ({ ...p, current: e.target.value }))} />
+                <input className="input" type="password" value={pw.current} aria-label="Current password"
+                  onChange={e => setPw(p => ({ ...p, current: e.target.value }))} />
               </div>
             )}
             <div className="field">
               <label className="label">New password</label>
-              <input className="input" type="password" value={pw.next} onChange={e => setPw(p => ({ ...p, next: e.target.value }))} />
+              <input className="input" type="password" value={pw.next} aria-label="New password"
+                onChange={e => setPw(p => ({ ...p, next: e.target.value }))} />
             </div>
             <div className="field">
               <label className="label">Repeat it</label>
-              <input className="input" type="password" value={pw.next2} onChange={e => setPw(p => ({ ...p, next2: e.target.value }))} />
+              <input className="input" type="password" value={pw.next2} aria-label="Repeat new password"
+                onChange={e => setPw(p => ({ ...p, next2: e.target.value }))} />
             </div>
           </div>
-          <div className="row">
-            <button className="btn btn-primary btn-sm" disabled={busy || pw.next.length < 4} onClick={() => savePassword(false)}>
+          <PasswordMeter verdict={pwVerdict} />
+          <div className="row" style={{ marginTop: 12 }}>
+            <button className="btn btn-primary btn-sm" disabled={busy || !pwVerdict.ok} onClick={() => savePassword(false)}>
               {user.hasPassword ? 'Change password' : 'Turn protection on'}
             </button>
             {user.hasPassword && (
@@ -149,7 +157,8 @@ function SecuritySection({ toast }) {
             )}
           </div>
           <p className="muted" style={{ marginTop: 10, fontSize: 12.5 }}>
-            Stored as a salted PBKDF2 hash in this device’s storage — it locks your profile on this iPad, and is never uploaded anywhere.
+            At least {MIN_PASSWORD} characters. Stored as a salted PBKDF2 hash in this device’s storage — it locks
+            your profile on this iPad, and is never uploaded anywhere.
           </p>
         </div>
       )}
@@ -167,7 +176,7 @@ export default function Settings() {
   const [form, setForm] = useState({ name: user.name, year: user.year, dailyGoal: user.dailyGoal, course: user.course, avatar: user.avatar, pathway: user.pathway || 'advanced' });
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [del, setDel] = useState(null);   // { name, password, error, busy } while the wipe is being confirmed
 
   const goto = (k) => {
     setActive(k);
@@ -195,9 +204,33 @@ export default function Settings() {
     setUser(null);
   }
 
+  // ── Deleting a profile ─────────────────────────────────────────────────────
+  // The profile store turns away a protected profile that arrives without its
+  // password, and any profile that arrives without an explicit confirmation.
+  // Both are gathered from the person doing it rather than filled in on their
+  // behalf: the password is typed, and `confirmName` carries the name they
+  // typed back, so a mis-click can never satisfy either check.
   async function deleteProfile() {
-    await api.post('/profiles/delete', { id: user.id });
-    setUser(null);
+    const typed = (del?.name || '').trim();
+    const expected = String(user.name || '').trim();
+    if (typed.toLowerCase() !== expected.toLowerCase()) {
+      setDel(d => ({ ...d, error: `Type the profile name — “${expected}” — to confirm.` }));
+      return;
+    }
+    if (user.hasPassword && !del?.password) {
+      setDel(d => ({ ...d, error: 'Enter this profile’s password to delete it.' }));
+      return;
+    }
+    setDel(d => ({ ...d, error: '', busy: true }));
+    try {
+      await api.post('/profiles/delete', {
+        id: user.id, password: del?.password || undefined, confirm: true, confirmName: typed
+      });
+      setUser(null);
+    } catch (e) {
+      setDel(d => (d ? { ...d, error: e.message, busy: false } : d));
+      toast(<span>{e.message}</span>);
+    }
   }
 
   async function exportBackup() {
@@ -390,10 +423,43 @@ export default function Settings() {
             <hr className="divider" />
             <div className="row" style={{ flexWrap: 'wrap' }}>
               <button className="btn btn-ghost btn-sm" onClick={switchProfile}>Switch profile</button>
-              {!confirmDelete
-                ? <button className="btn btn-quiet btn-sm" onClick={() => setConfirmDelete(true)}>Delete this profile…</button>
-                : <button className="btn btn-sm" style={{ background: 'var(--bad)', color: '#fff', borderColor: 'var(--bad)' }} onClick={deleteProfile}>Really delete “{user.name}” and all its data</button>}
+              {!del && (
+                <button className="btn btn-quiet btn-sm" onClick={() => setDel({ name: '', password: '', error: '', busy: false })}>
+                  Delete this profile…
+                </button>
+              )}
             </div>
+            {del && (
+              <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--hairline)' }}>
+                <p className="sub" style={{ marginBottom: 12 }}>
+                  Deleting “{user.name}” wipes its ratings, attempts, exams, favourites and learned handwriting
+                  from this iPad. Nothing is held anywhere else — export a full backup first if there is any
+                  chance you want it back.
+                </p>
+                {del.error && <div className="error-box">{del.error}</div>}
+                <div className="grid cols-2" style={{ gap: 12 }}>
+                  <div className="field" style={{ marginBottom: 0 }}>
+                    <label className="label">Type “{user.name}” to confirm</label>
+                    <input className="input" value={del.name} placeholder={user.name} aria-label={`Type ${user.name} to confirm deletion`}
+                      onChange={e => setDel(d => ({ ...d, name: e.target.value }))} />
+                  </div>
+                  {user.hasPassword && (
+                    <div className="field" style={{ marginBottom: 0 }}>
+                      <label className="label">Profile password</label>
+                      <input className="input" type="password" value={del.password} aria-label="Profile password"
+                        onChange={e => setDel(d => ({ ...d, password: e.target.value }))} />
+                    </div>
+                  )}
+                </div>
+                <div className="row" style={{ marginTop: 12 }}>
+                  <button className="btn btn-sm" style={{ background: 'var(--bad)', color: '#fff', borderColor: 'var(--bad)' }}
+                    disabled={del.busy} onClick={deleteProfile}>
+                    {del.busy ? 'Deleting…' : `Really delete “${user.name}” and all its data`}
+                  </button>
+                  <button className="btn btn-quiet btn-sm" disabled={del.busy} onClick={() => setDel(null)}>Cancel</button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* ── Help ── */}

@@ -1,6 +1,9 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Pri Learning · Seed a demo account with ~6 weeks of realistic practice
+// Pri Learning · Seed a demo account with ~6 weeks of practice — UNUSED LEGACY
 // Run: npm run seed
+// This fills the legacy SQLite database, which the app never reads. The demo
+// the product offers ("Try the demo") is built on-device by
+// client/src/local/demoSeed.js. See server/README.md.
 // ─────────────────────────────────────────────────────────────────────────────
 import bcrypt from 'bcryptjs';
 import { randomUUID } from 'node:crypto';

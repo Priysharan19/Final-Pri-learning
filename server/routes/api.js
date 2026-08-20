@@ -1,5 +1,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Pri Learning · API routes
+// Pri Learning · API routes — UNUSED LEGACY
+// 18 Express routes that no client code calls. The live equivalents are the
+// 51 local routes in client/src/local/backend.js, dispatched in-browser against
+// IndexedDB. See server/README.md.
 // ─────────────────────────────────────────────────────────────────────────────
 import { Router } from 'express';
 import { randomUUID } from 'node:crypto';

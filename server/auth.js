@@ -1,5 +1,9 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Pri Learning · Auth: cookie sessions, register/login/demo
+// Pri Learning · Auth: cookie sessions, register/login/demo — UNUSED LEGACY
+// 4 Express routes that no client code calls. Profiles in the shipped app are
+// local and passwordless-by-default: client/src/local/auth.js hashes in the
+// browser and client/src/local/backend.js owns the profile routes. There are no
+// accounts and no sessions on any server. See server/README.md.
 // ─────────────────────────────────────────────────────────────────────────────
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';

@@ -1,0 +1,199 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Pri Learning · CI
+#
+# Two things have to hold on every push: the app is still correct, and the
+# handwriting engine is still accurate.
+#
+# Correctness comes from `npm test`, which is the single list of suites in this
+# repo — this file never names a suite file of its own, so a suite added to
+# package.json is a suite that runs here, with no second list to fall out of
+# step with the first.
+#
+# Accuracy is enforced here rather than in the suites, because the held-out ink
+# suites print a score and exit 0 whatever the score is: on their own,
+# handwriting accuracy could fall to nothing and this workflow would stay green.
+# The gate below reads the SCORE lines out of the `npm test` log and fails the
+# job when one of them is under its floor. A suite that printed no SCORE line at
+# all is reported as not measured and fails too — a check that did not run is
+# never a check that passed.
+# ─────────────────────────────────────────────────────────────────────────────
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  suites:
+    name: Suites and accuracy gates
+    runs-on: ubuntu-latest
+
+    env:
+      # ╔═════════════════════════════════════════════════════════════════════╗
+      # ║  HANDWRITING ACCURACY FLOORS — the only numbers to edit here        ║
+      # ║                                                                     ║
+      # ║  Both suites are deterministic: a fixed seed and a fixed writer      ║
+      # ║  count give the same score on every machine, so these sit just       ║
+      # ║  under the measured figure rather than far below it.                 ║
+      # ║                                                                     ║
+      # ║    measured 2026-08-21   held-out #1 (n=24)  94.6% lines, worst 79%  ║
+      # ║                          held-out #2 (n=40)  93.2% lines, worst 57%  ║
+      # ║                                                                     ║
+      # ║  Raise these when a retrain raises the measured figures. Never       ║
+      # ║  lower one to make a build pass: a score under its floor is the      ║
+      # ║  regression the floor exists to catch.                               ║
+      # ╚═════════════════════════════════════════════════════════════════════╝
+      HOLDOUT1_LINES: "93.5"
+      HOLDOUT1_WORST: "75"
+      HOLDOUT2_LINES: "92.0"
+      HOLDOUT2_WORST: "52"
+      # Real ink has no floor yet because client/test/ink-corpus/ ships empty.
+      # When a corpus lands, add REALINK_LINES here and turn the "Real ink"
+      # step below into a gate the same way the two above are gates.
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: |
+            client/package-lock.json
+            server/package-lock.json
+
+      # The suites are dependency-free by design — they stand up their own
+      # IndexedDB, localStorage and DOMParser — so nothing is installed here.
+      # If that ever stops being true, this step is where it will show up.
+      - name: Every suite npm test runs
+        id: suites
+        run: |
+          set -o pipefail
+          npm test 2>&1 | tee suites.log
+
+      - name: Handwriting accuracy gate
+        if: always()
+        run: |
+          set -uo pipefail
+          fail=0
+          rows=""
+
+          # Pull "<PREFIX> SCORE — 94.6% lines, 98.7% chars, worst writer 79%"
+          # out of the npm test log and hold it to its floor.
+          gate () {
+            name="$1"; prefix="$2"; min_lines="$3"; min_worst="$4"
+            score="$(grep -F "$prefix SCORE" suites.log | tail -n 1)"
+            if [ -z "$score" ]; then
+              echo "::error::$name printed no SCORE line — it did not run, so it did not pass"
+              rows="$rows| $name | not measured | not measured | NOT MEASURED |\n"
+              fail=1
+              return
+            fi
+            echo "  $score"
+            lines="$(printf '%s' "$score" | sed -n 's/.*SCORE — \([0-9][0-9.]*\)% lines.*/\1/p')"
+            worst="$(printf '%s' "$score" | sed -n 's/.*worst writer \([0-9][0-9.]*\)%.*/\1/p')"
+            if [ -z "$lines" ] || [ -z "$worst" ]; then
+              echo "::error::$name printed a SCORE line this gate could not read: $score"
+              rows="$rows| $name | unreadable | unreadable | NOT MEASURED |\n"
+              fail=1
+              return
+            fi
+            verdict="PASS"
+            if ! awk -v a="$lines" -v b="$min_lines" 'BEGIN { exit !(a + 0 >= b + 0) }'; then
+              echo "::error::$name lines accuracy $lines% is under the floor of $min_lines%"
+              verdict="FAIL"
+              fail=1
+            fi
+            if ! awk -v a="$worst" -v b="$min_worst" 'BEGIN { exit !(a + 0 >= b + 0) }'; then
+              echo "::error::$name worst writer $worst% is under the floor of $min_worst%"
+              verdict="FAIL"
+              fail=1
+            fi
+            rows="$rows| $name | $lines% (floor $min_lines%) | $worst% (floor $min_worst%) | $verdict |\n"
+          }
+
+          if [ ! -s suites.log ]; then
+            echo "::error::npm test produced no log, so no accuracy figure was measured"
+            exit 1
+          fi
+
+          gate "Held-out #1" "HELD-OUT" "$HOLDOUT1_LINES" "$HOLDOUT1_WORST"
+          gate "Held-out #2" "HELD-OUT-2" "$HOLDOUT2_LINES" "$HOLDOUT2_WORST"
+
+          {
+            echo "### Handwriting accuracy"
+            echo
+            echo "| suite | lines | worst writer | verdict |"
+            echo "|---|---|---|---|"
+            printf '%b' "$rows"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          exit $fail
+
+      # Real handwriting, from people rather than a writer model. It is the
+      # figure that matters most and the one this repo cannot measure yet:
+      # client/test/ink-corpus/ ships empty, and the suite exits 0 on an empty
+      # corpus. So it is run for visibility and reported as not measured — it is
+      # never counted towards a green build.
+      - name: Real ink (reported, not a gate)
+        if: always()
+        run: |
+          set -uo pipefail
+          out="$(npm run --silent test:real 2>&1)" || true
+          printf '%s\n' "$out"
+          score="$(printf '%s\n' "$out" | grep -F "REAL-INK SCORE" | tail -n 1)"
+          case "$score" in
+            *"none"*|"")
+              echo "::notice::real ink was not measured — no corpus in client/test/ink-corpus/"
+              state="NOT MEASURED — no corpus"
+              ;;
+            *) state="$score (no floor set yet)" ;;
+          esac
+          {
+            echo
+            echo "### Real ink"
+            echo
+            echo "$state"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Suite log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: suites-log
+          path: suites.log
+          if-no-files-found: warn
+
+  build:
+    name: Client build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+
+      - name: Install client dependencies
+        run: npm ci --prefix client
+
+      - name: Build
+        run: npm run build
+
+      # The app is local-first and has to work with no network at all, so the
+      # built page and stylesheets are read for anything they would go and
+      # fetch. Only what the browser actually loads is checked — a URL inside a
+      # vendor's error message is a string, not a request.
+      - name: The built page fetches nothing remote
+        run: |
+          set -uo pipefail
+          hits="$(find client/dist \( -name '*.html' -o -name '*.css' \) -print0 \
+            | xargs -0 grep -noIE '(src|href)="https?://|@import[^;]*https?://|url\(https?://' 2>/dev/null || true)"
+          if [ -n "$hits" ]; then
+            printf '%s\n' "$hits"
+            echo "::error::the built client loads something over the network — this app ships offline"
+            exit 1
+          fi
+          echo "the built page and stylesheets load nothing remote"

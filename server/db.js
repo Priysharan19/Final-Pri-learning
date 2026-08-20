@@ -1,5 +1,9 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Pri Learning · SQLite persistence
+// Pri Learning · SQLite persistence — UNUSED LEGACY
+// No user data ever reaches this database. The shipped app stores everything in
+// IndexedDB on the device (client/src/local/idb.js + store.js), which is what
+// makes the product work offline and without an account. Importing this module
+// creates server/data/ as a side effect. See server/README.md.
 // ─────────────────────────────────────────────────────────────────────────────
 import Database from 'better-sqlite3';
 import { mkdirSync } from 'node:fs';

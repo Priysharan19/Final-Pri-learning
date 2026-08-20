@@ -7,12 +7,15 @@ torch.manual_seed(23); np.random.seed(23); torch.set_num_threads(10)
 # Same device policy as train.py — see the note there.
 DEV = torch.device('mps') if torch.backends.mps.is_available() else torch.device('cpu')
 print('device:', DEV)
-SP='/tmp'
-D=f'{SP}/inktrainC'; BASE=f'{SP}/train/model-data.new.js'; OUT=f'{SP}/train/model-data.abc.js'
+import os
+SP = os.environ.get('PRI_SCRATCH', '/tmp')
+D = f'{SP}/inktrainC'
+BASE = os.environ.get('PRI_BASE_JS', f'{SP}/train/model-data.new.js')
+OUT = os.environ.get('PRI_OUT_JS', f'{SP}/train/model-data.abc.js')
 man=json.load(open(f'{D}/manifest.json')); C=len(man['classes'])
 def load(name,size,n):
-    x=np.frombuffer(open(f'{D}/{name}{size}.img','rb').read(),dtype=np.uint8).reshape(n,1,size,size).astype(np.float32)/255.0
-    return torch.from_numpy(x)
+    x=np.frombuffer(open(f'{D}/{name}{size}.img','rb').read(),dtype=np.uint8).reshape(n,1,size,size)
+    return torch.from_numpy(x.copy())
 yt=torch.from_numpy(np.frombuffer(open(f'{D}/train.lbl','rb').read(),dtype=np.uint8).astype(np.int64))
 yv=torch.from_numpy(np.frombuffer(open(f'{D}/val.lbl','rb').read(),dtype=np.uint8).astype(np.int64))
 class NetC(nn.Module):
@@ -37,13 +40,13 @@ sched=torch.optim.lr_scheduler.CosineAnnealingLR(opt,T_max=14); BS=256
 def ev():
     net.eval(); c=0
     with torch.no_grad():
-        for i in range(0,len(xv),1024): c+=(net(xv[i:i+1024].to(DEV)).argmax(1).cpu()==yv[i:i+1024]).sum().item()
+        for i in range(0,len(xv),1024): c+=(net(xv[i:i+1024].to(DEV).float().div_(255.0)).argmax(1).cpu()==yv[i:i+1024]).sum().item()
     net.train(); return c/len(xv)
 t0=time.time()
 for e in range(int(__import__('os').environ.get('PRI_EPOCHS_C', 18))):
     perm=torch.randperm(len(xt)); tot=cor=0; ls=0.0
     for i in range(0,len(xt),BS):
-        idx=perm[i:i+BS]; xb,yb=cutout(xt[idx]).to(DEV),yt[idx].to(DEV)
+        idx=perm[i:i+BS]; xb=cutout(xt[idx].to(DEV).float().div_(255.0)); yb=yt[idx].to(DEV)
         out=net(xb); loss=F.cross_entropy(out,yb,label_smoothing=0.05)
         opt.zero_grad(); loss.backward(); opt.step()
         ls+=loss.item()*len(idx); tot+=len(idx); cor+=(out.argmax(1)==yb).sum().item()

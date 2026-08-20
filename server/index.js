@@ -1,5 +1,18 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Pri Learning · Server entry
+// Pri Learning · Server entry — UNUSED LEGACY
+//
+// The shipped app never calls this server. The real backend is
+// client/src/local/backend.js: 51 routes served from IndexedDB inside the
+// browser, offline, with no network call of any kind. This file and what it
+// imports (routes/api.js, auth.js, db.js, badges.js, seed.js) are the
+// pre-local-first Express implementation, kept for reference.
+//
+// Note that it is not merely a static host: the two routers below mount 22 live
+// API routes ahead of the static fallback. They answer if something calls them;
+// nothing in the client does.
+//
+// Deleting server/ is not a no-op — server/engine/ and server/test/ live under
+// it and ARE used. Read server/README.md first.
 // ─────────────────────────────────────────────────────────────────────────────
 import express from 'express';
 import cookieParser from 'cookie-parser';

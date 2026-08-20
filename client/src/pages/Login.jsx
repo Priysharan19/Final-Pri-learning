@@ -1,6 +1,10 @@
-// Landing + sign-in — multi-profile on-device accounts with Apple/Google/email
-// style flows. 100% local: the provider buttons create private profiles on this
-// iPad (no Apple/Google servers are contacted; nothing ever leaves the device).
+// ─────────────────────────────────────────────────────────────────────────────
+// Pri Learning · Landing + profile entry
+// There is no sign-in service behind this screen, and nothing here pretends
+// otherwise. A profile is a record in this iPad's own storage — created here,
+// unlocked here, wiped here. No provider is contacted, no address is verified,
+// no password can be reset by anyone but the person holding the device.
+// ─────────────────────────────────────────────────────────────────────────────
 import React, { useEffect, useMemo, useState } from 'react';
 import { api } from '../api.js';
 import { useApp, Logo } from '../App.jsx';
@@ -39,23 +43,124 @@ export function MathField({ n = 90 }) {
   );
 }
 
-/* ── provider marks (drawn in-house, monochrome, no third-party assets) ── */
+/* ── in-house marks: this device, and the lock that keeps a profile shut ── */
 const Marks = {
-  apple: <svg viewBox="0 0 24 24" width="17" height="17" fill="currentColor" aria-hidden="true"><path d="M17.05 12.9c-.02-2.05 1.67-3.03 1.75-3.08-.96-1.4-2.44-1.59-2.97-1.61-1.26-.13-2.46.74-3.1.74-.64 0-1.63-.72-2.68-.7-1.38.02-2.65.8-3.36 2.03-1.43 2.48-.37 6.16 1.03 8.18.68.99 1.49 2.1 2.55 2.06 1.02-.04 1.41-.66 2.65-.66 1.24 0 1.59.66 2.67.64 1.1-.02 1.8-1 2.47-2 .78-1.14 1.1-2.25 1.12-2.31-.02-.01-2.14-.82-2.13-3.29Z" /><path d="M15.02 6.88c.56-.68.94-1.63.84-2.58-.81.03-1.79.54-2.37 1.22-.52.6-.98 1.57-.86 2.5.9.07 1.83-.46 2.39-1.14Z" /></svg>,
-  google: <span className="mark-g" aria-hidden="true">G</span>,
-  email: <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><rect x="3" y="5.5" width="18" height="13" rx="2" /><path d="m4 7 8 6 8-6" /></svg>,
+  device: <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><rect x="4.5" y="2.5" width="15" height="19" rx="2.2" /><path d="M9.6 5.1h4.8" /><path d="M9.9 18.6h4.2" /></svg>,
   lock: <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><rect x="5" y="10.5" width="14" height="9.5" rx="1.8" /><path d="M8 10.5V7.8a4 4 0 0 1 8 0v2.7" /></svg>,
 };
-const PROVIDER_LABEL = { apple: 'Apple', google: 'Google', email: 'Email' };
+
+// ── Password rules ───────────────────────────────────────────────────────────
+// The client half of the on-device gate. A profile password guards a device
+// somebody is already holding, so the only defences worth measuring are length
+// and not being one of the handful of values that get tried first.
+
+export const MIN_PASSWORD = 8;
+
+const OBVIOUS = new Set([
+  'password', 'password1', 'password123', 'passw0rd', '12345678', '123456789', '1234567890',
+  'qwertyui', 'qwerty123', 'abcd1234', 'letmein1', 'iloveyou', 'trustno1', 'changeme',
+  'football', 'baseball', 'superman', 'sunshine', 'princess', 'welcome1', 'starwars',
+  'prilearning', 'mathsrules', 'maths123', 'schoolwork'
+]);
+
+const RUNS = ['abcdefghijklmnopqrstuvwxyz', '01234567890', 'qwertyuiop', 'asdfghjkl', 'zxcvbnm'];
+
+const isRun = (s) => RUNS.some(run => run.includes(s) || [...run].reverse().join('').includes(s));
+
+/**
+ * The verdict behind the strength meter. `ok` is the same gate the submit
+ * button uses, so the meter can never call something strong that the profile
+ * store will turn away.
+ */
+export function passwordVerdict(raw, { name = '', email = '' } = {}) {
+  const pw = String(raw || '');
+  if (!pw) return { score: 0, label: '', note: `At least ${MIN_PASSWORD} characters.`, ok: false };
+  if (pw.length < MIN_PASSWORD) {
+    const missing = MIN_PASSWORD - pw.length;
+    return { score: 0, label: 'Too short', note: `${missing} more character${missing === 1 ? '' : 's'} to go.`, ok: false };
+  }
+  const flat = pw.toLowerCase();
+  if (OBVIOUS.has(flat)) return { score: 0, label: 'Too easy to guess', note: 'One of the first values anyone tries.', ok: false };
+  if (/^(.)\1+$/.test(pw)) return { score: 0, label: 'Too easy to guess', note: 'A single character repeated is a single guess.', ok: false };
+  if (isRun(flat)) return { score: 0, label: 'Too easy to guess', note: 'That is a straight run across the keyboard.', ok: false };
+  const mine = [name, String(email).split('@')[0]].map(s => String(s).trim().toLowerCase()).filter(s => s.length >= 3);
+  if (mine.some(s => flat.includes(s) || s.includes(flat))) {
+    return { score: 0, label: 'Too easy to guess', note: 'Anyone looking at the profile list can already read this.', ok: false };
+  }
+  const variety = [/[a-z]/, /[A-Z]/, /\d/, /[^A-Za-z0-9]/].filter(re => re.test(pw)).length;
+  const score = Math.min(3, (pw.length >= 16 ? 3 : pw.length >= 12 ? 2 : 1) + (variety >= 3 ? 1 : 0));
+  return {
+    score,
+    label: ['', 'Fair', 'Good', 'Strong'][score],
+    note: score >= 3 ? 'Long and varied — this one holds up.'
+      : score === 2 ? 'Solid. A few more characters would make it stronger still.'
+        : 'Past the minimum. Extra length buys more than extra symbols do.',
+    ok: true
+  };
+}
+
+/** Live read-out for a password field: a bar, a word, and what to do next. */
+export function PasswordMeter({ verdict }) {
+  const pct = verdict.ok ? [0, 45, 74, 100][verdict.score] : 10;
+  const tone = !verdict.ok ? 'var(--bad)'
+    : verdict.score >= 3 ? 'var(--good)'
+      : verdict.score === 2 ? 'var(--cream)' : 'var(--warn)';
+  return (
+    <div style={{ marginTop: 10 }}>
+      <div className="meter"><i style={{ width: `${pct}%`, background: tone }} /></div>
+      <p className="muted" role="status" style={{ marginTop: 6, fontSize: 12.5 }}>
+        {verdict.label && <><b style={{ color: tone }}>{verdict.label}</b> — </>}{verdict.note}
+      </p>
+    </div>
+  );
+}
+
+// ── Sign-in lockout ──────────────────────────────────────────────────────────
+// After repeated wrong passwords the profile store refuses for a while. The
+// deadline arrives either as an instant or as the time left, so both are read.
+// When neither is given the store's own words are shown and the field stays
+// live: inventing a countdown would be a guess dressed up as a fact.
+
+const REMAINING_KEYS = [['retryAfterMs', 1], ['lockedMs', 1], ['remainingMs', 1], ['retryAfter', 1000], ['lockedFor', 1000], ['lockedSeconds', 1000]];
+const SPOKEN_WAIT = /(\d+)\s*(second|minute|hour)/i;
+const WAIT_UNIT = { second: 1000, minute: 60000, hour: 3600000 };
+
+const isLockout = (err) =>
+  err?.status === 429 || err?.locked === true || err?.lockedOut === true ||
+  /too many|locked out|try again in/i.test(String(err?.message || ''));
+
+function lockDeadline(err) {
+  for (const key of ['lockedUntil', 'lockUntil', 'until']) {
+    const n = Number(err?.[key]);
+    if (Number.isFinite(n) && n > 0) return n < 1e12 ? n * 1000 : n;
+  }
+  for (const [key, unit] of REMAINING_KEYS) {
+    const n = Number(err?.[key]);
+    if (Number.isFinite(n) && n > 0) return Date.now() + n * unit;
+  }
+  const spoken = SPOKEN_WAIT.exec(String(err?.message || ''));
+  return spoken ? Date.now() + Number(spoken[1]) * WAIT_UNIT[spoken[2].toLowerCase()] : 0;
+}
+
+function fmtWait(ms) {
+  const secs = Math.max(1, Math.ceil(ms / 1000));
+  if (secs < 60) return `${secs} second${secs === 1 ? '' : 's'}`;
+  const mins = Math.ceil(secs / 60);
+  if (mins < 60) return `${mins} minute${mins === 1 ? '' : 's'}`;
+  const hours = Math.ceil(mins / 60);
+  return `${hours} hour${hours === 1 ? '' : 's'}`;
+}
 
 export default function Login() {
   const { setUser, refreshDue } = useApp();
   const [profiles, setProfiles] = useState(null);
   const [stage, setStage] = useState('hero');   // hero | pick | method | create
-  const [provider, setProvider] = useState('email');
+  const [withEmail, setWithEmail] = useState(true);
   const [form, setForm] = useState({ name: '', email: '', password: '', password2: '', year: 12, avatar: '🚀', role: 'student', course: 'nsw', pathway: 'advanced', protect: false });
   const [unlockId, setUnlockId] = useState(null);   // profile awaiting its password
   const [unlockPw, setUnlockPw] = useState('');
+  const [lock, setLock] = useState(null);           // { id, until } while a profile is shut out
+  const [now, setNow] = useState(Date.now());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
@@ -67,6 +172,20 @@ export default function Login() {
     if (profiles && profiles.length && stage === 'hero' && localStorage.getItem('pri-seen-hero')) setStage('pick');
   }, [profiles, stage]);
 
+  useEffect(() => {
+    if (!lock) return;
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [lock]);
+
+  useEffect(() => { if (lock && lock.until <= now) { setLock(null); setError(''); } }, [lock, now]);
+
+  const lockedFor = lock && lock.until > now ? lock.until - now : 0;
+  const pwVerdict = useMemo(
+    () => passwordVerdict(form.password, { name: form.name, email: withEmail ? form.email : '' }),
+    [form.password, form.name, form.email, withEmail]
+  );
+
   async function go(path, body) {
     setBusy(true); setError('');
     try {
@@ -75,6 +194,11 @@ export default function Login() {
     } catch (e) {
       setError(e.message);
       if (e.needsPassword && body?.id) setUnlockId(body.id);
+      if (path === '/profiles/select' && body?.id && isLockout(e)) {
+        const until = lockDeadline(e);
+        setUnlockId(body.id);
+        if (until > Date.now()) { setLock({ id: body.id, until }); setNow(Date.now()); }
+      }
     }
     finally { setBusy(false); }
   }
@@ -87,19 +211,22 @@ export default function Login() {
     else go('/profiles/select', { id: p.id });
   };
 
-  const startProvider = (prov) => {
-    setProvider(prov); setError('');
+  const startCreate = (useEmail) => {
+    setWithEmail(useEmail); setError('');
     setForm(f => ({ ...f, password: '', password2: '', protect: false }));
     setStage('create');
   };
 
   const create = () => {
-    if (form.protect && form.password !== form.password2) { setError('Those passwords don’t match.'); return; }
+    if (form.protect) {
+      if (!pwVerdict.ok) { setError(pwVerdict.note); return; }
+      if (form.password !== form.password2) { setError('Those passwords don’t match.'); return; }
+    }
     go('/profiles', {
       name: form.name, year: form.year, avatar: form.avatar, role: form.role,
       course: form.course, pathway: form.pathway,
-      email: form.email || undefined, provider,
-      password: form.protect && form.password ? form.password : undefined
+      email: withEmail && form.email ? form.email : undefined,
+      password: form.protect ? form.password : undefined
     });
   };
 
@@ -147,30 +274,39 @@ export default function Login() {
               <p className="sub" style={{ marginBottom: 16 }}>Pick your profile to continue.</p>
               {error && <div className="error-box" style={{ marginBottom: 12 }}>{error}</div>}
               <div className="acct-list">
-                {(profiles || []).map(p => (
-                  <div key={p.id} className={`acct-row-wrap ${unlockId === p.id ? 'open' : ''}`}>
-                    <button className="acct-row" disabled={busy} onClick={() => pickProfile(p)}>
-                      <span className="acct-avatar">{p.avatar || '🙂'}</span>
-                      <span className="acct-main">
-                        <span className="acct-name">{p.name}</span>
-                        <span className="acct-sub">
-                          {p.role === 'teacher' ? 'Teacher' : `Year ${p.year}`}
-                          {p.email ? ` · ${p.email}` : ''}{p.isDemo ? ' · demo' : ''}
+                {(profiles || []).map(p => {
+                  const shut = lock?.id === p.id && lockedFor > 0;
+                  return (
+                    <div key={p.id} className={`acct-row-wrap ${unlockId === p.id ? 'open' : ''}`}>
+                      <button className="acct-row" disabled={busy} onClick={() => pickProfile(p)}>
+                        <span className="acct-avatar">{p.avatar || '🙂'}</span>
+                        <span className="acct-main">
+                          <span className="acct-name">{p.name}</span>
+                          <span className="acct-sub">
+                            {p.role === 'teacher' ? 'Teacher' : `Year ${p.year}`}
+                            {p.email ? ` · ${p.email}` : ''}{p.isDemo ? ' · demo' : ''}
+                          </span>
                         </span>
-                      </span>
-                      {p.provider && <span className={`prov-badge prov-${p.provider}`} title={`${PROVIDER_LABEL[p.provider]} profile`}>{Marks[p.provider]}</span>}
-                      {p.hasPassword && <span className="acct-lock" title="Password protected">{Marks.lock}</span>}
-                      <span className="acct-go">→</span>
-                    </button>
-                    {unlockId === p.id && p.hasPassword && (
-                      <form className="acct-unlock" onSubmit={e => { e.preventDefault(); go('/profiles/select', { id: p.id, password: unlockPw }); }}>
-                        <input className="input" type="password" placeholder="Password" autoFocus value={unlockPw}
-                          onChange={e => setUnlockPw(e.target.value)} />
-                        <button className="btn btn-primary btn-sm" disabled={busy || !unlockPw} type="submit">Unlock</button>
-                      </form>
-                    )}
-                  </div>
-                ))}
+                        {p.hasPassword && <span className="acct-lock" role="img" aria-label="Password protected">{Marks.lock}</span>}
+                        <span className="acct-go" aria-hidden="true">→</span>
+                      </button>
+                      {unlockId === p.id && p.hasPassword && (
+                        <>
+                          <form className="acct-unlock" onSubmit={e => { e.preventDefault(); if (!shut) go('/profiles/select', { id: p.id, password: unlockPw }); }}>
+                            <input className="input" type="password" placeholder="Password" autoFocus value={unlockPw} disabled={shut}
+                              aria-label={`Password for ${p.name}`} onChange={e => setUnlockPw(e.target.value)} />
+                            <button className="btn btn-primary btn-sm" disabled={busy || shut || !unlockPw} type="submit">Unlock</button>
+                          </form>
+                          {shut && (
+                            <p className="muted" role="status" style={{ padding: '0 13px 12px', margin: 0, fontSize: 12.5 }}>
+                              Locked for another {fmtWait(lockedFor)}.
+                            </p>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
               <button className="btn btn-ghost" style={{ width: '100%', marginTop: 14 }} disabled={busy} onClick={() => { setError(''); setStage('method'); }}>
                 ＋ Add another profile
@@ -185,22 +321,25 @@ export default function Login() {
 
           {stage === 'method' && (
             <div className="card auth-card slide-up">
-              <h2 style={{ marginBottom: 4 }}>Create your account</h2>
-              <p className="sub" style={{ marginBottom: 18 }}>Choose how you’d like to sign in.</p>
+              <div className="row" style={{ gap: 10, marginBottom: 6 }}>
+                <span className="prov-badge lg">{Marks.device}</span>
+                <h2 style={{ margin: 0 }}>A private profile on this iPad</h2>
+              </div>
+              <p className="sub" style={{ marginBottom: 18 }}>
+                No account is registered and no service is signed in to. Choose how this profile
+                should be labelled — everything after that works the same either way.
+              </p>
               {error && <div className="error-box" style={{ marginBottom: 12 }}>{error}</div>}
-              <button className="sso-btn sso-apple" disabled={busy} onClick={() => startProvider('apple')}>
-                {Marks.apple}<span>Continue with Apple</span>
-              </button>
-              <button className="sso-btn sso-google" disabled={busy} onClick={() => startProvider('google')}>
-                {Marks.google}<span>Continue with Google</span>
+              <button className="sso-btn sso-email" disabled={busy} onClick={() => startCreate(true)}>
+                <span>Continue with email</span>
               </button>
               <div className="sso-or"><i />or<i /></div>
-              <button className="sso-btn sso-email" disabled={busy} onClick={() => startProvider('email')}>
-                {Marks.email}<span>Continue with email</span>
+              <button className="sso-btn sso-email" disabled={busy} onClick={() => startCreate(false)}>
+                <span>Continue without an email</span>
               </button>
               <p className="auth-note">
-                Pri Learning is fully private: these create <b>on-device</b> profiles linked to your name and email.
-                No Apple or Google servers are contacted — nothing leaves this iPad.
+                A profile lives on <b>this iPad</b> and nowhere else. An address, if you give one, only
+                tells profiles apart here — it is never verified, never used to sign in, and never sent.
               </p>
               {profiles?.length > 0 && (
                 <button className="btn btn-quiet btn-sm" style={{ width: '100%', marginTop: 6 }} onClick={() => { setError(''); setStage('pick'); }}>← Back to profiles</button>
@@ -218,15 +357,12 @@ export default function Login() {
           {stage === 'create' && (
             <div className="card auth-card slide-up">
               <div className="row" style={{ gap: 10, marginBottom: 6 }}>
-                <span className={`prov-badge lg prov-${provider}`}>{Marks[provider]}</span>
-                <h2 style={{ margin: 0 }}>
-                  {provider === 'apple' ? 'Continue with Apple' : provider === 'google' ? 'Continue with Google' : 'Continue with email'}
-                </h2>
+                <span className="prov-badge lg">{Marks.device}</span>
+                <h2 style={{ margin: 0 }}>A private profile on this iPad</h2>
               </div>
               <p className="sub" style={{ marginBottom: 14 }}>
-                {provider === 'email'
-                  ? 'Your details stay in this iPad’s storage — never uploaded.'
-                  : `A private on-device profile with your ${PROVIDER_LABEL[provider]} name and email — no servers involved.`}
+                Your name, your work and the handwriting model that learns your hand live in this device’s
+                storage — and all of it runs with the Wi-Fi off.
               </p>
               {error && <div className="error-box" style={{ marginBottom: 12 }}>{error}</div>}
 
@@ -235,11 +371,16 @@ export default function Login() {
                 <input className="input" value={form.name} autoFocus placeholder="e.g. Priysharan"
                   onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
               </div>
-              <div className="field">
-                <label className="label">Email <span className="muted">(optional)</span></label>
-                <input className="input" type="email" value={form.email} placeholder={provider === 'apple' ? 'you@icloud.com' : provider === 'google' ? 'you@gmail.com' : 'you@example.com'}
-                  onChange={e => setForm(f => ({ ...f, email: e.target.value }))} />
-              </div>
+              {withEmail && (
+                <div className="field">
+                  <label className="label">Email <span className="muted">(optional)</span></label>
+                  <input className="input" type="email" value={form.email} placeholder="you@example.com"
+                    onChange={e => setForm(f => ({ ...f, email: e.target.value }))} />
+                  <p className="muted" style={{ marginTop: 6, fontSize: 12.5 }}>
+                    Only to tell profiles apart on this device — never verified, never sent.
+                  </p>
+                </div>
+              )}
 
               <div className="field">
                 <label className="label">I am a…</label>
@@ -288,7 +429,7 @@ export default function Login() {
                 <label className="label">Avatar</label>
                 <div className="avatar-row">
                   {AVATARS.map(a => (
-                    <button key={a} className={`avatar-pick ${form.avatar === a ? 'on' : ''}`} onClick={() => setForm(f => ({ ...f, avatar: a }))}>{a}</button>
+                    <button key={a} className={`avatar-pick ${form.avatar === a ? 'on' : ''}`} aria-label={`Avatar ${a}`} onClick={() => setForm(f => ({ ...f, avatar: a }))}>{a}</button>
                   ))}
                 </div>
               </div>
@@ -299,23 +440,32 @@ export default function Login() {
                   <span>Protect this profile with a password</span>
                 </label>
                 {form.protect && (
-                  <div className="grid cols-2" style={{ gap: 12, marginTop: 10 }}>
-                    <input className="input" type="password" placeholder="Password" value={form.password}
-                      onChange={e => setForm(f => ({ ...f, password: e.target.value }))} />
-                    <input className="input" type="password" placeholder="Repeat password" value={form.password2}
-                      onChange={e => setForm(f => ({ ...f, password2: e.target.value }))} />
-                  </div>
+                  <>
+                    <div className="grid cols-2" style={{ gap: 12, marginTop: 10 }}>
+                      <input className="input" type="password" placeholder="Password" value={form.password} aria-label="Password"
+                        onChange={e => setForm(f => ({ ...f, password: e.target.value }))} />
+                      <input className="input" type="password" placeholder="Repeat password" value={form.password2} aria-label="Repeat password"
+                        onChange={e => setForm(f => ({ ...f, password2: e.target.value }))} />
+                    </div>
+                    <PasswordMeter verdict={pwVerdict} />
+                  </>
                 )}
               </div>
 
               <div className="row" style={{ marginTop: 18 }}>
                 <button className="btn btn-primary btn-lg" style={{ flex: 1 }}
-                  disabled={busy || !form.name.trim() || (form.protect && form.password.length < 4)}
+                  disabled={busy || !form.name.trim() || (form.protect && !pwVerdict.ok)}
                   onClick={create}>
                   {busy ? 'One moment…' : 'Start learning'}
                 </button>
                 <button className="btn btn-quiet" onClick={() => { setError(''); setStage('method'); }}>Back</button>
               </div>
+
+              <p className="auth-note">
+                No verification email, no reset link, no one to ask: a profile is a record on
+                <b> this iPad</b> and nowhere else. A password keeps it to yourself — stored as a salted
+                hash in the device’s own storage, never uploaded, and only you can lift it.
+              </p>
             </div>
           )}
 

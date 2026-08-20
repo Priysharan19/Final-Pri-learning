@@ -1,19 +1,27 @@
-// Registry of all question generators, keyed by subtopic id.
-import { year7 } from './year7.js';
-import { year8 } from './year8.js';
-import { year9 } from './year9.js';
-import { year10 } from './year10.js';
-import { year11 } from './year11.js';
-import { year12 } from './year12.js';
-import { streamsStandard } from './streams-standard.js';
-import { streamsExt } from './streams-ext.js';
+// ─────────────────────────────────────────────────────────────────────────────
+// Pri Learning · Generator registry — client registry + server-only extra forms
+//
+// The generators themselves have ONE source of truth: client/src/engine/. Two
+// things are added here.
+//
+// First, the client loads its year/stream banks lazily, one dynamic chunk per
+// bank, so `GENERATORS` starts empty and fills as a student navigates. Every
+// server-side caller is synchronous and may touch any year at any moment, so
+// this module awaits all eight banks once at import time and hands on a fully
+// populated registry. Without that, `Object.keys(GENERATORS)` is [] and the
+// self-check silently measures nothing.
+//
+// Second, extras.js — 84 further authored forms that ship on the server side
+// alone — and the seeded picker that chooses between a subtopic's base
+// generator and its extras.
+// ─────────────────────────────────────────────────────────────────────────────
+import { GENERATORS, loadAllBanks } from '../../../client/src/engine/generators/index.js';
 import { EXTRA_FORMS } from './extras.js';
 import { makeRng } from '../qhelpers.js';
 
-export const GENERATORS = {
-  ...year7, ...year8, ...year9, ...year10, ...year11, ...year12,
-  ...streamsStandard, ...streamsExt,
-};
+await loadAllBanks();
+
+export { GENERATORS };
 
 /** Number of authored forms behind a (subtopic, difficulty) cell: the base
  *  generator counts as one; extras add more. */

@@ -2,6 +2,7 @@
 // Pri Learning · IndexedDB — everything lives on this device.
 // Tiny promise wrapper + schema. No servers, no cloud: your data stays yours.
 // ─────────────────────────────────────────────────────────────────────────────
+import { sealValue, openValue } from './auth.js';
 
 const DB_NAME = 'pri-learning';
 const DB_VERSION = 2;
@@ -44,6 +45,78 @@ export function openDB() {
   return dbPromise;
 }
 
+// ── Encryption at rest ───────────────────────────────────────────────────────
+// A password is only protection if the data is unreadable without it, so a
+// protected profile's private records are stored as ciphertext. Each store
+// below keeps its key path and its index paths in the clear — enough for
+// IndexedDB to find a row, never enough to read one — and everything else in
+// the row is sealed under that profile's data key with its own random IV.
+//
+// Keys live in this module's memory for the length of a session and are never
+// written anywhere. No password means no key, which means the rows stay
+// ciphertext no matter what the rest of the app is told about who is signed in.
+
+const SEALED_STORES = {
+  ratings: ['key', 'pid'],
+  attempts: ['id', 'pid'],
+  questions: ['id', 'pid'],
+  exams: ['id', 'pid'],
+  inks: ['id', 'pid']
+};
+
+/** The stores whose rows follow a profile's protection. */
+export const ENCRYPTED_STORES = Object.keys(SEALED_STORES);
+
+const dataKeys = new Map();
+
+export const setDataKey = (pid, key) => { dataKeys.set(pid, key); };
+export const dataKeyFor = pid => dataKeys.get(pid);
+export const hasDataKey = pid => dataKeys.has(pid);
+
+/** Give up every key except one. Logout and profile switching both land here. */
+export function dropDataKeys(keepPid = null) {
+  for (const pid of [...dataKeys.keys()]) if (pid !== keepPid) dataKeys.delete(pid);
+}
+
+/** Seal one value under a profile's key, for fields kept on the profile itself. */
+export async function sealField(pid, value) {
+  const key = dataKeys.get(pid);
+  return key ? sealValue(key, value) : null;
+}
+
+/** Open a field sealed by sealField, or undefined without the key. */
+export async function openField(pid, sealed) {
+  const key = dataKeys.get(pid);
+  return key && sealed ? openValue(key, sealed) : undefined;
+}
+
+async function seal(store, value) {
+  const keep = SEALED_STORES[store];
+  if (!keep || !value || typeof value !== 'object') return value;
+  const key = dataKeys.get(value.pid);
+  if (!key) return value;
+  const row = {};
+  const priv = {};
+  for (const [k, v] of Object.entries(value)) {
+    if (k === 'sealed') continue;
+    if (keep.includes(k)) row[k] = v; else priv[k] = v;
+  }
+  row.sealed = await sealValue(key, priv);
+  return row;
+}
+
+async function unseal(row) {
+  if (!row?.sealed) return row;
+  const key = dataKeys.get(row.pid);
+  if (!key) return undefined;
+  const priv = await openValue(key, row.sealed);
+  if (priv === undefined || priv === null) return undefined;
+  const { sealed, ...clear } = row;
+  return { ...priv, ...clear };
+}
+
+const unsealAll = rows => Promise.all(rows.map(unseal)).then(list => list.filter(r => r !== undefined));
+
 function tx(db, store, mode = 'readonly') {
   return db.transaction(store, mode).objectStore(store);
 }
@@ -55,11 +128,11 @@ const wrap = req => new Promise((resolve, reject) => {
 
 export async function get(store, key) {
   const db = await openDB();
-  return wrap(tx(db, store).get(key));
+  return unseal(await wrap(tx(db, store).get(key)));
 }
 export async function put(store, value) {
   const db = await openDB();
-  return wrap(tx(db, store, 'readwrite').put(value));
+  return wrap(tx(db, store, 'readwrite').put(await seal(store, value)));
 }
 export async function del(store, key) {
   const db = await openDB();
@@ -67,28 +140,58 @@ export async function del(store, key) {
 }
 export async function all(store) {
   const db = await openDB();
-  return wrap(tx(db, store).getAll());
+  return unsealAll(await wrap(tx(db, store).getAll()));
 }
 export async function byIndex(store, index, value) {
   const db = await openDB();
-  return wrap(tx(db, store).index(index).getAll(value));
+  return unsealAll(await wrap(tx(db, store).index(index).getAll(value)));
 }
 export async function add(store, value) {
   const db = await openDB();
-  return wrap(tx(db, store, 'readwrite').add(value));
+  return wrap(tx(db, store, 'readwrite').add(await seal(store, value)));
 }
 export async function clear(store) {
   const db = await openDB();
   return wrap(tx(db, store, 'readwrite').clear());
 }
 
-/** Delete every record belonging to a profile (profile removal). */
+/**
+ * Rows exactly as they sit on disk, ciphertext included. Only migration and
+ * deletion use this: both need to reach records they are not entitled to read.
+ */
+export async function rawByIndex(store, index, value) {
+  const db = await openDB();
+  return wrap(tx(db, store).index(index).getAll(value));
+}
+
+// Every store that hangs off a profile, and the index that finds its rows.
+const PROFILE_STORES = [
+  ['ratings', 'pid'], ['attempts', 'pid'], ['questions', 'pid'], ['reviews', 'pid'],
+  ['exams', 'pid'], ['badges', 'pid'], ['activity', 'pid'], ['rushRuns', 'pid'],
+  ['matchRuns', 'pid'], ['inks', 'pid'], ['taskProgress', 'pid'], ['bookmarks', 'pid'],
+  ['customQs', 'ownerPid'], ['progressImports', 'teacherPid']
+];
+
+/**
+ * Delete every record belonging to a profile (profile removal). Rows are found
+ * through their index rather than by reading them, so a locked profile is
+ * erased just as completely as an open one, and the class rolls and tasks that
+ * merely mention the profile are cleaned up with it.
+ */
 export async function wipeProfile(pid) {
-  const stores = ['ratings', 'attempts', 'questions', 'reviews', 'exams', 'badges', 'activity', 'rushRuns', 'matchRuns', 'inks', 'taskProgress'];
-  for (const s of stores) {
-    const rows = await byIndex(s, 'pid', pid).catch(() => []);
-    for (const r of rows) await del(s, r.id ?? r.key);
+  for (const [store, index] of PROFILE_STORES) {
+    const rows = await rawByIndex(store, index, pid).catch(() => []);
+    for (const r of rows) await del(store, r.id ?? r.key);
   }
+  for (const c of await all('classes')) {
+    if (c.teacherPid === pid) { await del('classes', c.id); continue; }
+    if (c.studentPids?.includes(pid)) {
+      c.studentPids = c.studentPids.filter(x => x !== pid);
+      await put('classes', c);
+    }
+  }
+  for (const t of await all('tasks')) if (t.ownerPid === pid) await del('tasks', t.id);
+  dataKeys.delete(pid);
   await del('profiles', pid);
 }
 

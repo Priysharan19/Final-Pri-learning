@@ -28,8 +28,10 @@ man = json.load(open(f'{D}/manifest.json'))
 C = len(man['classes'])
 
 def load(name, size, n):
-    x = np.frombuffer(open(f'{D}/{name}{size}.img','rb').read(), dtype=np.uint8).reshape(n, 1, size, size).astype(np.float32)/255.0
-    return torch.from_numpy(x)
+    # uint8 in memory, float only per batch — the float32 form of this corpus is
+    # ~2 GB per resolution and will not co-exist with a second model's copy.
+    x = np.frombuffer(open(f'{D}/{name}{size}.img','rb').read(), dtype=np.uint8).reshape(n, 1, size, size)
+    return torch.from_numpy(x.copy())
 
 def load_lbl(name, n):
     return torch.from_numpy(np.frombuffer(open(f'{D}/{name}.lbl','rb').read(), dtype=np.uint8).astype(np.int64))
@@ -87,7 +89,6 @@ def train_model(net, size, epochs, tag):
     xt = load('train', size, man['train']); xv = load('val', size, man['val'])
     print(f'[{tag}] train {tuple(xt.shape)} val {tuple(xv.shape)} params {sum(p.numel() for p in net.parameters())}')
     net = net.to(DEV)
-    xv = xv.to(DEV)
     opt = torch.optim.Adam(net.parameters(), lr=1.2e-3)
     sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=epochs)
     BS = 256
@@ -95,7 +96,8 @@ def train_model(net, size, epochs, tag):
         net.eval(); correct = 0
         with torch.no_grad():
             for i in range(0, len(xv), 1024):
-                correct += (net(xv[i:i+1024]).argmax(1).cpu() == yv[i:i+1024]).sum().item()
+                xb = xv[i:i+1024].to(DEV).float().div_(255.0)
+                correct += (net(xb).argmax(1).cpu() == yv[i:i+1024]).sum().item()
         net.train(); return correct/len(xv)
     t0 = time.time()
     for epoch in range(epochs):
@@ -103,7 +105,8 @@ def train_model(net, size, epochs, tag):
         tot, correct, lsum = 0, 0, 0.0
         for i in range(0, len(xt), BS):
             idx = perm[i:i+BS]
-            xb, yb = cutout(xt[idx]).to(DEV), yt[idx].to(DEV)
+            xb = cutout(xt[idx].to(DEV).float().div_(255.0))
+            yb = yt[idx].to(DEV)
             out = net(xb)
             loss = F.cross_entropy(out, yb, label_smoothing=0.05)
             opt.zero_grad(); loss.backward(); opt.step()
@@ -112,11 +115,13 @@ def train_model(net, size, epochs, tag):
         sched.step()
         print(f'[{tag}] epoch {epoch+1}/{epochs}: loss {lsum/tot:.4f} train {100*correct/tot:.2f}% val {100*evaluate():.2f}% ({time.time()-t0:.0f}s)', flush=True)
     acc = evaluate()
-    print(f'[{tag}] FINAL VAL ACC {100*acc:.2f}%')
+    print(f'[{tag}] FINAL VAL ACC {100*acc:.2f}%', flush=True)
+    del xt
+    import gc; gc.collect()
     # logits on val for ensemble measurement
     net.eval()
     with torch.no_grad():
-        probs = torch.cat([F.softmax(net(xv[i:i+1024]), 1).cpu() for i in range(0, len(xv), 1024)])
+        probs = torch.cat([F.softmax(net(xv[i:i+1024].to(DEV).float().div_(255.0)), 1).cpu() for i in range(0, len(xv), 1024)])
     return acc, probs, xv
 
 netA = NetA(); accA, probsA, xvA = train_model(netA, 28, int(os.environ.get('PRI_EPOCHS_A', 18)), 'A28')
@@ -171,7 +176,7 @@ def requant(net, ex):
             getattr(net, k).weight.copy_(torch.from_numpy(dq(ex[k+'w'])).to(DEV))
 requant(netA, model['models'][0]); requant(netB, model['models'][1])
 with torch.no_grad():
-    pA = torch.cat([F.softmax(netA(xvA[i:i+1024]),1).cpu() for i in range(0, len(xvA), 1024)])
-    pB = torch.cat([F.softmax(netB(xvB[i:i+1024]),1).cpu() for i in range(0, len(xvB), 1024)])
+    pA = torch.cat([F.softmax(netA(xvA[i:i+1024].to(DEV).float().div_(255.0)),1).cpu() for i in range(0, len(xvA), 1024)])
+    pB = torch.cat([F.softmax(netB(xvB[i:i+1024].to(DEV).float().div_(255.0)),1).cpu() for i in range(0, len(xvB), 1024)])
 accQ = (((pA+pB)/2).argmax(1) == yv).float().mean().item()
 print(f'INT8 ENSEMBLE VAL ACC {100*accQ:.2f}%')

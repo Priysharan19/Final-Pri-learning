@@ -9,10 +9,16 @@
     "build": "npm run build --prefix client",
     "start": "node server/index.js",
     "seed": "node server/seed.js",
-    "test": "node server/test/selfcheck.mjs && node client/test/inkcheck.mjs && node client/test/inkcheck-hard.mjs && node client/test/inkcheck-lines.mjs && node client/test/inkcheck-holdout.mjs",
+    "test": "npm run test:engine && npm run test:backend && npm run test:security && npm run test:ink && npm run test:hard && npm run test:lines && npm run test:holdout && npm run test:holdout2",
+    "test:engine": "node server/test/selfcheck.mjs",
+    "test:backend": "node client/test/backend-check.mjs",
+    "test:security": "node client/test/security-check.mjs",
     "test:ink": "node client/test/inkcheck.mjs 40",
+    "test:hard": "node client/test/inkcheck-hard.mjs",
     "test:lines": "node client/test/inkcheck-lines.mjs 40",
-    "test:e2e": "node client/test/tour-v4.js",
-    "test:holdout": "node client/test/inkcheck-holdout.mjs 24"
+    "test:holdout": "node client/test/inkcheck-holdout.mjs 24",
+    "test:holdout2": "node client/test/inkcheck-holdout2.mjs 40",
+    "test:real": "node client/test/inkcheck-real.mjs",
+    "test:e2e": "node client/test/tour-v4.js"
   }
 }

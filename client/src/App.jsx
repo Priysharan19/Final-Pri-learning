@@ -3,6 +3,8 @@ import { Routes, Route, NavLink, useLocation, useNavigate, Navigate } from 'reac
 import { api } from './api.js';
 import { requestPersistentStorage } from './local/idb.js';
 import { setPersonalProfile } from './ink/personal.js';
+import ErrorBoundary from './components/ErrorBoundary.jsx';
+import { setDraftProfile } from './components/drafts.js';
 import Login from './pages/Login.jsx';
 import Home from './pages/Home.jsx';
 import Practice from './pages/Practice.jsx';
@@ -83,22 +85,52 @@ export default function App() {
     try { const r = await api.post('/history/list', { limit: 4 }); setRecent(r.items || []); } catch { setRecent([]); }
   }, []);
 
-  useEffect(() => { refreshUser().then(u => { if (u) { refreshDue(); refreshRecent(); } }); }, [refreshUser, refreshDue, refreshRecent]);
+  // The refreshers swallow their own failures, but a throw anywhere else in this
+  // chain would escape as an unhandled rejection, offline and unseen.
+  useEffect(() => {
+    refreshUser().then(u => { if (u) { refreshDue(); refreshRecent(); } }).catch(() => { });
+  }, [refreshUser, refreshDue, refreshRecent]);
 
   // Guard months of practice from storage eviction — ask the browser once per boot.
   useEffect(() => { requestPersistentStorage(); }, []);
 
-  // Each profile keeps its OWN learned handwriting — retarget the bank on switch.
-  useEffect(() => { setPersonalProfile(user?.id || null); }, [user?.id]);
+  // Each profile keeps its OWN learned handwriting and its OWN unsent drafts —
+  // retarget both banks on switch so nobody inherits another student's work.
+  useEffect(() => {
+    setPersonalProfile(user?.id || null);
+    setDraftProfile(user?.id || null);
+  }, [user?.id]);
 
   useEffect(() => {
     document.documentElement.dataset.theme = user?.theme === 'light' ? 'light' : 'dark';
   }, [user?.theme]);
 
+  const pageTitle = useMemo(
+    () => TITLES[loc.pathname] || (loc.pathname.startsWith('/exams') ? 'Exam' : null),
+    [loc.pathname]
+  );
+
   useEffect(() => {
-    const t = TITLES[loc.pathname] || (loc.pathname.startsWith('/exams') ? 'Exam' : null);
-    document.title = t ? `${t} · Pri Learning` : 'Pri Learning';
+    document.title = pageTitle ? `${pageTitle} · Pri Learning` : 'Pri Learning';
+  }, [pageTitle]);
+
+  // <main> is keyed on the path, so every navigation replaces the node and focus
+  // drops to <body>: a keyboard or VoiceOver user is left at the top of the
+  // document with no idea the page changed. Put focus on the new page instead,
+  // but never on first paint — that would steal focus from the boot screen.
+  const mainRef = useRef(null);
+  const navigatedRef = useRef(false);
+  useEffect(() => {
+    if (!navigatedRef.current) { navigatedRef.current = true; return; }
+    window.scrollTo({ top: 0 });
+    mainRef.current?.focus({ preventScroll: true });
   }, [loc.pathname]);
+
+  const skipToMain = (e) => {
+    e.preventDefault();
+    window.scrollTo({ top: 0 });
+    mainRef.current?.focus({ preventScroll: true });
+  };
 
   const toast = useCallback((content, ms = 3800, kind = '') => {
     const id = Math.random().toString(36).slice(2);
@@ -139,13 +171,14 @@ export default function App() {
     : NAV;
 
   const switchProfile = async () => {
-    await api.post('/auth/logout');
+    try { await api.post('/auth/logout'); } catch { }
     setUser(null);
   };
 
   return (
     <AppCtx.Provider value={ctx}>
       <div className="shell">
+        <a className="skip-link" href="#main" onClick={skipToMain}>Skip to main content</a>
         <header className="topbar">
           <Logo onClick={() => nav('/')} />
           <div className="top-stats">
@@ -171,26 +204,29 @@ export default function App() {
           </aside>
 
           <div className="main">
-            <main className="content fade-in" key={loc.pathname}>
-              <Routes>
-                <Route path="/" element={<Home />} />
-                <Route path="/practice" element={<Practice />} />
-                <Route path="/progress" element={<Progress />} />
-                <Route path="/map" element={<Navigate to="/progress?tab=map" replace />} />
-                <Route path="/stats" element={<Navigate to="/progress" replace />} />
-                <Route path="/badges" element={<Navigate to="/progress" replace />} />
-                <Route path="/tasks" element={<Tasks />} />
-                <Route path="/teach" element={<Teach />} />
-                <Route path="/exams" element={<Exams />} />
-                <Route path="/exams/:id" element={<ExamRoom />} />
-                <Route path="/rush" element={<Rush />} />
-                <Route path="/match" element={<Match />} />
-                <Route path="/favorites" element={<Favorites />} />
-                <Route path="/classes" element={<Classes />} />
-                <Route path="/history" element={<History />} />
-                <Route path="/settings" element={<Settings />} />
-                <Route path="*" element={<Navigate to="/" replace />} />
-              </Routes>
+            <main className="content fade-in" id="main" tabIndex={-1} ref={mainRef}
+              aria-label={pageTitle || 'Pri Learning'} key={loc.pathname}>
+              <ErrorBoundary scope="route" resetKey={loc.pathname} onHome={() => nav('/')}>
+                <Routes>
+                  <Route path="/" element={<Home />} />
+                  <Route path="/practice" element={<Practice />} />
+                  <Route path="/progress" element={<Progress />} />
+                  <Route path="/map" element={<Navigate to="/progress?tab=map" replace />} />
+                  <Route path="/stats" element={<Navigate to="/progress" replace />} />
+                  <Route path="/badges" element={<Navigate to="/progress" replace />} />
+                  <Route path="/tasks" element={<Tasks />} />
+                  <Route path="/teach" element={<Teach />} />
+                  <Route path="/exams" element={<Exams />} />
+                  <Route path="/exams/:id" element={<ExamRoom />} />
+                  <Route path="/rush" element={<Rush />} />
+                  <Route path="/match" element={<Match />} />
+                  <Route path="/favorites" element={<Favorites />} />
+                  <Route path="/classes" element={<Classes />} />
+                  <Route path="/history" element={<History />} />
+                  <Route path="/settings" element={<Settings />} />
+                  <Route path="*" element={<Navigate to="/" replace />} />
+                </Routes>
+              </ErrorBoundary>
             </main>
           </div>
         </div>
@@ -246,25 +282,65 @@ function initials(name = '') {
   return name.split(/\s+/).map(w => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || 'PL';
 }
 
-const ProviderMini = {
-  apple: <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor" aria-hidden="true"><path d="M17.05 12.9c-.02-2.05 1.67-3.03 1.75-3.08-.96-1.4-2.44-1.59-2.97-1.61-1.26-.13-2.46.74-3.1.74-.64 0-1.63-.72-2.68-.7-1.38.02-2.65.8-3.36 2.03-1.43 2.48-.37 6.16 1.03 8.18.68.99 1.49 2.1 2.55 2.06 1.02-.04 1.41-.66 2.65-.66 1.24 0 1.59.66 2.67.64 1.1-.02 1.8-1 2.47-2 .78-1.14 1.1-2.25 1.12-2.31-.02-.01-2.14-.82-2.13-3.29Z" /><path d="M15.02 6.88c.56-.68.94-1.63.84-2.58-.81.03-1.79.54-2.37 1.22-.52.6-.98 1.57-.86 2.5.9.07 1.83-.46 2.39-1.14Z" /></svg>,
-  google: <span style={{ fontWeight: 700, fontSize: 10.5, border: '1.4px solid currentColor', borderRadius: '50%', width: 14, height: 14, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}>G</span>,
-  email: <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.9" aria-hidden="true"><rect x="3" y="5.5" width="18" height="13" rx="2" /><path d="m4 7 8 6 8-6" /></svg>,
-};
+/* One honest mark for every profile: this app has no OAuth of any kind, so an
+   Apple or Google glyph here would claim a sign-in that never happened. */
+const DeviceMark = (
+  <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor"
+    strokeWidth="1.7" strokeLinecap="round" aria-hidden="true">
+    <rect x="6" y="2.5" width="12" height="19" rx="2.4" />
+    <path d="M10.5 5.4h3" /><path d="M12 18.3h.01" />
+  </svg>
+);
 
 function AccountMenu({ user, onSwitch }) {
   const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(0);
   const nav = useNavigate();
   const ref = useRef(null);
+  const btnRef = useRef(null);
+  const itemRefs = useRef([]);
+
+  const items = [
+    { key: 'settings', label: 'Account settings', run: () => nav('/settings') },
+    { key: 'progress', label: 'My progress', run: () => nav('/progress') },
+    { key: 'switch', label: 'Switch profile', run: onSwitch, sep: true },
+  ];
+  const last = items.length - 1;
+
   useEffect(() => {
     if (!open) return;
-    const close = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
-    document.addEventListener('pointerdown', close);
-    return () => document.removeEventListener('pointerdown', close);
+    const away = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('pointerdown', away);
+    return () => document.removeEventListener('pointerdown', away);
   }, [open]);
+
+  // The APG menu pattern in full: opening moves focus into the menu, the active
+  // item is the only tab stop, and Escape hands focus back to the button.
+  useEffect(() => { if (open) itemRefs.current[active]?.focus(); }, [open, active]);
+
+  const openAt = (i) => { setActive(i); setOpen(true); };
+  const shut = (toButton) => { setOpen(false); if (toButton) btnRef.current?.focus(); };
+
+  const onButtonKey = (e) => {
+    if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openAt(0); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); openAt(last); }
+    else if (e.key === 'Escape') shut(false);
+  };
+
+  const onMenuKey = (e) => {
+    if (e.key === 'ArrowDown') { e.preventDefault(); setActive(i => (i >= last ? 0 : i + 1)); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); setActive(i => (i <= 0 ? last : i - 1)); }
+    else if (e.key === 'Home') { e.preventDefault(); setActive(0); }
+    else if (e.key === 'End') { e.preventDefault(); setActive(last); }
+    else if (e.key === 'Escape') { e.preventDefault(); shut(true); }
+    else if (e.key === 'Tab') setOpen(false);
+  };
+
   return (
     <div className="acct-menu-wrap" ref={ref}>
-      <button className="user-chip" onClick={() => setOpen(o => !o)} title="Account"
+      <button className="user-chip" id="acct-menu-btn" ref={btnRef} title="Account"
+        aria-haspopup="menu" aria-expanded={open}
+        onClick={() => (open ? shut(false) : openAt(0))} onKeyDown={onButtonKey}
         style={{ background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>
         <span className="user-avatar">{user.avatar && user.avatar !== '🙂' ? user.avatar : initials(user.name)}</span>
         {user.name.split(' ')[0]}
@@ -277,25 +353,22 @@ function AccountMenu({ user, onSwitch }) {
             <span style={{ minWidth: 0 }}>
               <span className="acct-name" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 {user.name}
-                {user.provider && <span style={{ color: 'var(--ink-3)', display: 'inline-flex' }}>{ProviderMini[user.provider]}</span>}
+                <span className="acct-local-mark" role="img" aria-label="Profile stored on this device">{DeviceMark}</span>
               </span>
               <span className="acct-sub">{user.email || user.courseLabel}</span>
             </span>
           </div>
-          <button className="acct-menu-item" onClick={() => { setOpen(false); nav('/settings'); }}>
-            Account settings
-          </button>
-          <button className="acct-menu-item" onClick={() => { setOpen(false); nav('/progress'); }}>
-            My progress
-          </button>
-          <div className="acct-menu-foot">
-            <button className="acct-menu-item" onClick={() => { setOpen(false); onSwitch(); }}>
-              Switch profile <span style={{ marginLeft: 'auto', color: 'var(--ink-3)' }}>→</span>
-            </button>
-            <div style={{ padding: '7px 10px 4px', fontSize: 11.5, color: 'var(--ink-3)' }}>
-              All data stays on this iPad — private by design.
-            </div>
+          <div className="acct-menu-list" role="menu" aria-labelledby="acct-menu-btn" onKeyDown={onMenuKey}>
+            {items.map((it, i) => (
+              <button key={it.key} role="menuitem" className={`acct-menu-item${it.sep ? ' sep' : ''}`}
+                tabIndex={i === active ? 0 : -1} ref={el => { itemRefs.current[i] = el; }}
+                onClick={() => { setOpen(false); it.run(); }}>
+                {it.label}
+                {it.sep && <span style={{ marginLeft: 'auto', color: 'var(--ink-3)' }}>→</span>}
+              </button>
+            ))}
           </div>
+          <div className="acct-menu-note">All data stays on this iPad — private by design.</div>
         </div>
       )}
     </div>
