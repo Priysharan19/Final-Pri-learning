@@ -4,6 +4,9 @@
 import json, base64, time
 import numpy as np, torch, torch.nn as nn, torch.nn.functional as F
 torch.manual_seed(23); np.random.seed(23); torch.set_num_threads(10)
+# Same device policy as train.py — see the note there.
+DEV = torch.device('mps') if torch.backends.mps.is_available() else torch.device('cpu')
+print('device:', DEV)
 SP='/tmp'
 D=f'{SP}/inktrainC'; BASE=f'{SP}/train/model-data.new.js'; OUT=f'{SP}/train/model-data.abc.js'
 man=json.load(open(f'{D}/manifest.json')); C=len(man['classes'])
@@ -29,18 +32,18 @@ def cutout(xb):
         xb[i,:,y0:y0+sz,x0:x0+sz]=0
     return xb
 xt=load('train',32,man['train']); xv=load('val',32,man['val'])
-net=NetC(); opt=torch.optim.Adam(net.parameters(),lr=1.2e-3)
+net=NetC().to(DEV); opt=torch.optim.Adam(net.parameters(),lr=1.2e-3)
 sched=torch.optim.lr_scheduler.CosineAnnealingLR(opt,T_max=14); BS=256
 def ev():
     net.eval(); c=0
     with torch.no_grad():
-        for i in range(0,len(xv),1024): c+=(net(xv[i:i+1024]).argmax(1)==yv[i:i+1024]).sum().item()
+        for i in range(0,len(xv),1024): c+=(net(xv[i:i+1024].to(DEV)).argmax(1).cpu()==yv[i:i+1024]).sum().item()
     net.train(); return c/len(xv)
 t0=time.time()
-for e in range(14):
+for e in range(int(__import__('os').environ.get('PRI_EPOCHS_C', 18))):
     perm=torch.randperm(len(xt)); tot=cor=0; ls=0.0
     for i in range(0,len(xt),BS):
-        idx=perm[i:i+BS]; xb,yb=cutout(xt[idx]),yt[idx]
+        idx=perm[i:i+BS]; xb,yb=cutout(xt[idx]).to(DEV),yt[idx].to(DEV)
         out=net(xb); loss=F.cross_entropy(out,yb,label_smoothing=0.05)
         opt.zero_grad(); loss.backward(); opt.step()
         ls+=loss.item()*len(idx); tot+=len(idx); cor+=(out.argmax(1)==yb).sum().item()
@@ -48,10 +51,10 @@ for e in range(14):
     print(f'[C32f] epoch {e+1}/14: loss {ls/tot:.4f} train {100*cor/tot:.2f}% val {100*ev():.2f}% ({time.time()-t0:.0f}s)',flush=True)
 accC=ev(); print(f'[C32f] FINAL VAL ACC {100*accC:.2f}%')
 def q(t):
-    a=t.detach().numpy().astype(np.float32); s=float(np.max(np.abs(a))/127.0) or 1e-8
+    a=t.detach().cpu().numpy().astype(np.float32); s=float(np.max(np.abs(a))/127.0) or 1e-8
     return {'shape':list(a.shape),'scale':s,'b64':base64.b64encode(np.clip(np.round(a/s),-127,127).astype(np.int8).tobytes()).decode()}
 def fb(t):
-    a=t.detach().numpy().astype(np.float32)
+    a=t.detach().cpu().numpy().astype(np.float32)
     return {'shape':list(a.shape),'b64':base64.b64encode(a.tobytes()).decode()}
 src=open(BASE).read(); model=json.loads(src[src.index('export default ')+len('export default '):].rstrip().rstrip(';'))
 model['models'].append({'img':32,'minAspect':0.25,'val_acc':round(accC,4),

@@ -20,8 +20,8 @@ mkdirSync(OUT, { recursive: true });
 
 const SIZES = [32];
 const MIN_ASPECT = 0.25;   // model C: relieve tall-thin glyphs of resolution famine
-const N_SYNTH_TRAIN = 4200;
-const N_SYNTH_VAL = 320;
+const N_SYNTH_TRAIN = Number(process.env.PRI_SYNTH_TRAIN || 9000);
+const N_SYNTH_VAL = Number(process.env.PRI_SYNTH_VAL || 700);
 const MNIST_DIR = '/tmp/mn/node_modules/mnist/src/digits';
 
 // seeds per class = template variants of all member symbols
@@ -71,7 +71,20 @@ function synthStrokes(cls, rng) {
   const seeds = seedsFor[cls];
   const variant = seeds[Math.floor(rng() * seeds.length)];
   const strokes = variant.map(st => st.map(p => p.slice()));
-  const strength = rng() < 0.1 ? 0.15 : 0.45 + rng() * 1.25;   // keep some clean
+  // Style strength is a THREE-part mixture, not a uniform band.
+  //
+  // The old range topped out at 1.70, which is a tidy hand having a bad day —
+  // not a genuinely difficult one. The held-out suites score a *worst* writer
+  // far below their mean precisely because nothing in training looked like that
+  // student, so the net never learned where those glyphs live. The heavy tail
+  // below (~20% of samples, up to 2.65) is aimed squarely at that writer.
+  //
+  // The clean slice stays, because a net trained only on distortion drifts off
+  // the neat hands that are most of the population.
+  const r = rng();
+  const strength = r < 0.08 ? 0.15
+    : r < 0.80 ? 0.45 + rng() * 1.25
+      : 1.70 + rng() * 0.95;
   return stylize(strokes, rng, strength, { bowScale: LOW_BOW.has(cls) ? 0.3 : 1 });
 }
 

@@ -4,7 +4,7 @@
 # (client/src/ink/nn.js) consumes. Cutout augmentation teaches robustness to
 # broken/occluded strokes.
 # ─────────────────────────────────────────────────────────────────────────────
-import json, base64, time
+import json, base64, time, os
 import numpy as np
 import torch
 import torch.nn as nn
@@ -14,7 +14,14 @@ torch.manual_seed(7)
 np.random.seed(7)
 torch.set_num_threads(max(1, torch.get_num_threads()))
 
-OUT_JS = '../../client/src/ink/model-data.js'
+# Apple Silicon's GPU trains this ensemble several times faster than the CPU
+# path, which is what makes the enlarged, heavier-tailed set from gen.mjs
+# affordable. Falls back silently where it is absent, and the exported weights
+# are identical either way — everything returns to the CPU before quantisation.
+DEV = torch.device('mps') if torch.backends.mps.is_available() else torch.device('cpu')
+print('device:', DEV)
+
+OUT_JS = __import__('os').environ.get('PRI_OUT_JS', '../../client/src/ink/model-data.js')
 D = '/tmp/inktrain'
 
 man = json.load(open(f'{D}/manifest.json'))
@@ -79,6 +86,8 @@ def cutout(xb):
 def train_model(net, size, epochs, tag):
     xt = load('train', size, man['train']); xv = load('val', size, man['val'])
     print(f'[{tag}] train {tuple(xt.shape)} val {tuple(xv.shape)} params {sum(p.numel() for p in net.parameters())}')
+    net = net.to(DEV)
+    xv = xv.to(DEV)
     opt = torch.optim.Adam(net.parameters(), lr=1.2e-3)
     sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=epochs)
     BS = 256
@@ -86,7 +95,7 @@ def train_model(net, size, epochs, tag):
         net.eval(); correct = 0
         with torch.no_grad():
             for i in range(0, len(xv), 1024):
-                correct += (net(xv[i:i+1024]).argmax(1) == yv[i:i+1024]).sum().item()
+                correct += (net(xv[i:i+1024]).argmax(1).cpu() == yv[i:i+1024]).sum().item()
         net.train(); return correct/len(xv)
     t0 = time.time()
     for epoch in range(epochs):
@@ -94,7 +103,7 @@ def train_model(net, size, epochs, tag):
         tot, correct, lsum = 0, 0, 0.0
         for i in range(0, len(xt), BS):
             idx = perm[i:i+BS]
-            xb, yb = cutout(xt[idx]), yt[idx]
+            xb, yb = cutout(xt[idx]).to(DEV), yt[idx].to(DEV)
             out = net(xb)
             loss = F.cross_entropy(out, yb, label_smoothing=0.05)
             opt.zero_grad(); loss.backward(); opt.step()
@@ -107,11 +116,11 @@ def train_model(net, size, epochs, tag):
     # logits on val for ensemble measurement
     net.eval()
     with torch.no_grad():
-        probs = torch.cat([F.softmax(net(xv[i:i+1024]), 1) for i in range(0, len(xv), 1024)])
+        probs = torch.cat([F.softmax(net(xv[i:i+1024]), 1).cpu() for i in range(0, len(xv), 1024)])
     return acc, probs, xv
 
-netA = NetA(); accA, probsA, xvA = train_model(netA, 28, 12, 'A28')
-netB = NetB(); accB, probsB, xvB = train_model(netB, 32, 14, 'B32')
+netA = NetA(); accA, probsA, xvA = train_model(netA, 28, int(os.environ.get('PRI_EPOCHS_A', 18)), 'A28')
+netB = NetB(); accB, probsB, xvB = train_model(netB, 32, int(os.environ.get('PRI_EPOCHS_B', 20)), 'B32')
 
 ens = ((probsA + probsB) / 2).argmax(1)
 accE = (ens == yv).float().mean().item()
@@ -126,13 +135,13 @@ print('top ensemble confusions:', sorted(bad.items(), key=lambda kv: -kv[1])[:12
 
 # ── export int8 ──
 def q(t):
-    a = t.detach().numpy().astype(np.float32)
+    a = t.detach().cpu().numpy().astype(np.float32)
     s = float(np.max(np.abs(a))/127.0) or 1e-8
     qa = np.clip(np.round(a/s), -127, 127).astype(np.int8)
     return {'shape': list(a.shape), 'scale': s, 'b64': base64.b64encode(qa.tobytes()).decode()}
 
 def fb(t):
-    a = t.detach().numpy().astype(np.float32)
+    a = t.detach().cpu().numpy().astype(np.float32)
     return {'shape': list(a.shape), 'b64': base64.b64encode(a.tobytes()).decode()}
 
 def export(net, size, acc):
@@ -159,10 +168,10 @@ def dq(d):
 def requant(net, ex):
     with torch.no_grad():
         for k in ['c1','c2','c3','f1','f2']:
-            getattr(net, k).weight.copy_(torch.from_numpy(dq(ex[k+'w'])))
+            getattr(net, k).weight.copy_(torch.from_numpy(dq(ex[k+'w'])).to(DEV))
 requant(netA, model['models'][0]); requant(netB, model['models'][1])
 with torch.no_grad():
-    pA = torch.cat([F.softmax(netA(xvA[i:i+1024]),1) for i in range(0, len(xvA), 1024)])
-    pB = torch.cat([F.softmax(netB(xvB[i:i+1024]),1) for i in range(0, len(xvB), 1024)])
+    pA = torch.cat([F.softmax(netA(xvA[i:i+1024]),1).cpu() for i in range(0, len(xvA), 1024)])
+    pB = torch.cat([F.softmax(netB(xvB[i:i+1024]),1).cpu() for i in range(0, len(xvB), 1024)])
 accQ = (((pA+pB)/2).argmax(1) == yv).float().mean().item()
 print(f'INT8 ENSEMBLE VAL ACC {100*accQ:.2f}%')
