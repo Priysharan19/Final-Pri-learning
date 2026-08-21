@@ -302,23 +302,15 @@ enum MathDecoder {
         }
     }
 
-    /// Brackets, x-shaped marks and theta recovered from the original ink.
-    ///
-    /// Vision reads a hand-drawn '(' as a '1' or an 'l' very readily — upright,
-    /// narrow, one stroke, and on a maths line a lone '1' is perfectly ordinary
-    /// so nothing in the text argues against it. The ink does: a bracket BOWS,
-    /// consistently, to one side of the line joining its ends, and a '1' does
-    /// not. Which side it bows to says which bracket it is.
+    /// Repair hand-drawn bracket shapes after the trace geometry pass has
+    /// already run exactly once in MathInkRecognizer. Keeping bracket repair
+    /// separate prevents DP ownership and structural recovery from mutating the
+    /// same line twice.
     static func repairBrackets(
         _ glyphs: inout [DecodedGlyph],
         strokes: [InkStroke],
         glyphHeight: CGFloat
     ) {
-        // Do the narrow classifiers first. Bracket rollback below only rolls
-        // back bracket guesses, not geometry already proven by two independent
-        // strokes.
-        MathShapeClassifier.repair(&glyphs, strokes: strokes, glyphHeight: glyphHeight)
-
         let upright: Set<String> = ["1", "l", "I", "|", "/", "\\", "t", "i", "j"]
         let original = glyphs.map(\.symbol)
         var changed = false
