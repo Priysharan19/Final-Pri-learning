@@ -1,0 +1,332 @@
+name: Apply Real Pencil Fix Once
+
+on:
+  push:
+    branches:
+      - agent/native-ink-v9
+    paths:
+      - '.github/workflows/apply-real-pencil-fix-once.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+
+      - name: Apply screenshot-driven native ink fixes
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path, old, new):
+              p = Path(path)
+              text = p.read_text()
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'{path}: expected one match, found {count}')
+              p.write_text(text.replace(old, new, 1))
+
+          # 1) Raised powers are line-members, not standalone lines.
+          replace_once(
+              'ios/PriLearning.swiftpm/Ink/InkLineSegmenter.swift',
+              '''                let smallMark = item.element.bounds.height < 0.35 * glyphSize
+                if smallMark {
+                    let above = band.lowerBound - centre
+                    let below = centre - band.upperBound
+                    // Reaching further up than down: dots and powers live
+                    // above the band, and only commas hang below it.
+                    guard above <= 0.95 * glyphSize, below <= 0.45 * glyphSize else { continue }
+                    let distance = max(0, max(above, below))
+                    let score = glyphSize - distance      // nearer band wins
+                    if score > bestOverlap { bestOverlap = score; bestGroup = index }
+                    continue
+                }
+''',
+              '''                let height = item.element.bounds.height
+                let width = item.element.bounds.width
+                let bandHeight = max(1, band.upperBound - band.lowerBound)
+                let smallMark = height < 0.35 * glyphSize
+                // A power such as the `2` in x² is not necessarily tiny enough
+                // for the dot/decimal rule above. It is, however, compact and
+                // raised relative to the body band. Treat that geometry as line
+                // membership evidence BEFORE opening a new line; otherwise a
+                // perfectly readable x² can become two recognition lines.
+                let compactRaisedMark = height < 0.92 * glyphSize
+                    && width <= 1.05 * glyphSize
+                    && centre < band.lowerBound + 0.58 * bandHeight
+                if smallMark || compactRaisedMark {
+                    let above = band.lowerBound - centre
+                    let below = centre - band.upperBound
+                    // Powers may sit a little higher than dots while still
+                    // belonging to the base immediately below/left of them.
+                    let aboveAllowance = compactRaisedMark ? 1.10 * glyphSize : 0.95 * glyphSize
+                    guard above <= aboveAllowance, below <= 0.45 * glyphSize else { continue }
+                    let distance = max(0, max(above, below))
+                    let score = glyphSize - distance      // nearer band wins
+                    if score > bestOverlap { bestOverlap = score; bestGroup = index }
+                    continue
+                }
+''')
+
+          # 2) Actually run the geometry/DP repair layer in the live recognizer.
+          replace_once(
+              'ios/PriLearning.swiftpm/Ink/MathInkRecognizer.swift',
+              '''            glyphs = decoded
+            unread = decoded.isEmpty
+''',
+              '''            glyphs = decoded
+            if !glyphs.isEmpty {
+                // Production must use the same trace/geometry repair system
+                // exercised by the deterministic self-checks. This is where
+                // `=`, `+`, x-shaped marks and count-mismatch ownership get a
+                // chance to overrule impossible OCR geometry.
+                MathShapeClassifier.repair(&glyphs, strokes: strokes, glyphHeight: line.glyphHeight)
+            }
+            unread = glyphs.isEmpty
+''')
+
+          replace_once(
+              'ios/PriLearning.swiftpm/Ink/MathInkRecognizer.swift',
+              '''        var glyphs = decodeGlyphs(strokeIndexes: indexes, strokes: strokes,
+                                  glyphHeight: glyphHeight, generation: generation)
+        guard generationIsCurrent(generation), !glyphs.isEmpty else { return "" }
+        MathDecoder.repairBrackets(&glyphs, strokes: strokes, glyphHeight: glyphHeight)
+''',
+              '''        var glyphs = decodeGlyphs(strokeIndexes: indexes, strokes: strokes,
+                                  glyphHeight: glyphHeight, generation: generation)
+        guard generationIsCurrent(generation), !glyphs.isEmpty else { return "" }
+        MathShapeClassifier.repair(&glyphs, strokes: strokes, glyphHeight: glyphHeight)
+        MathDecoder.repairBrackets(&glyphs, strokes: strokes, glyphHeight: glyphHeight)
+''')
+
+          replace_once(
+              'ios/PriLearning.swiftpm/Ink/MathInkRecognizer.swift',
+              '''        let exact = symbols.count == marks.count
+        var glyphs: [DecodedGlyph] = []
+        for (position, symbol) in symbols.enumerated() {
+            let markIndex = exact
+                ? position
+                : min(marks.count - 1, position * marks.count / max(symbols.count, 1))
+            let mark = marks[markIndex]
+            let agreed = reading.agreement[position] ?? [:]
+            let support = agreed[symbol] ?? 1
+            let rivals = agreed
+                .filter { $0.key != symbol }
+                .sorted { $0.value > $1.value }
+                .map { (symbol: $0.key, confidence: $0.value) }
+            let raised = mark.isRaised && (exact || !MathAlphabet.binaryOperators.contains(symbol))
+            glyphs.append(DecodedGlyph(
+                symbol: symbol,
+                box: mark.bounds,
+                confidence: min(1, 0.45 * reading.confidence + 0.55 * support),
+                alternatives: rivals,
+                isSuperscript: raised,
+                strokeIndexes: mark.strokeIndexes.sorted(),
+                approximate: !exact
+            ))
+        }
+''',
+              '''        // Never smear OCR characters proportionally across Pencil marks.
+        // Count disagreement is exactly when ownership is uncertain, so use the
+        // dynamic-programming trace aligner that can leave real ink unexplained
+        // and can drop hallucinated OCR symbols instead of shifting every symbol.
+        let spatialMarks = marks.map {
+            InkSpatialMark(strokeIndexes: $0.strokeIndexes.sorted(), bounds: $0.bounds, isRaised: $0.isRaised)
+        }
+        let alignment = InkSymbolAligner.align(
+            symbols: symbols,
+            agreement: reading.agreement,
+            marks: spatialMarks,
+            strokes: strokes,
+            glyphHeight: glyphHeight
+        )
+        let exact = symbols.count == marks.count
+            && alignment.approximateSymbols.isEmpty
+            && alignment.unmatchedMarks.isEmpty
+        var glyphs: [DecodedGlyph] = []
+        for (position, symbol) in symbols.enumerated() {
+            guard position < alignment.symbolToMark.count,
+                  let markIndex = alignment.symbolToMark[position],
+                  marks.indices.contains(markIndex) else {
+                // OCR produced a symbol with no defensible Pencil owner.
+                continue
+            }
+            let mark = marks[markIndex]
+            let agreed = reading.agreement[position] ?? [:]
+            let support = agreed[symbol] ?? 1
+            let rivals = agreed
+                .filter { $0.key != symbol }
+                .sorted { $0.value > $1.value }
+                .map { (symbol: $0.key, confidence: $0.value) }
+            let approximate = alignment.approximateSymbols.contains(position)
+            let raised = mark.isRaised && !MathAlphabet.binaryOperators.contains(symbol)
+            glyphs.append(DecodedGlyph(
+                symbol: symbol,
+                box: mark.bounds,
+                confidence: min(1, 0.45 * reading.confidence + 0.55 * support),
+                alternatives: rivals,
+                isSuperscript: raised,
+                strokeIndexes: mark.strokeIndexes.sorted(),
+                approximate: approximate
+            ))
+        }
+''')
+
+          # 3) Geometry is authoritative for decisive = and + traces.
+          replace_once(
+              'ios/PriLearning.swiftpm/Ink/MathShapeClassifier.swift',
+              '''            let original = glyphs[i].symbol
+
+            // A handwritten y has two upper arms that meet, with one stroke
+''',
+              '''            let original = glyphs[i].symbol
+
+            // Two aligned horizontal Pencil strokes are structural evidence for
+            // equals. Text OCR frequently collapses them to one minus; the trace
+            // geometry is stronger evidence than that raster hypothesis.
+            if isEquals(members, glyphHeight: glyphHeight) {
+                if original != "=" {
+                    glyphs[i].alternatives = adding(original, confidence: glyphs[i].confidence,
+                                                     to: glyphs[i].alternatives)
+                }
+                glyphs[i].symbol = "="
+                glyphs[i].confidence = max(glyphs[i].confidence, 0.94)
+                glyphs[i].approximate = false
+                continue
+            }
+
+            // A centred horizontal/vertical cross is a plus. Keep this narrow so
+            // a diagonal 4 or a top-heavy handwritten t does not qualify.
+            if isPlus(members, glyphHeight: glyphHeight) {
+                if original != "+" {
+                    glyphs[i].alternatives = adding(original, confidence: glyphs[i].confidence,
+                                                     to: glyphs[i].alternatives)
+                }
+                glyphs[i].symbol = "+"
+                glyphs[i].confidence = max(glyphs[i].confidence, 0.92)
+                glyphs[i].approximate = false
+                continue
+            }
+
+            // A handwritten y has two upper arms that meet, with one stroke
+''')
+
+          replace_once(
+              'ios/PriLearning.swiftpm/Ink/MathShapeClassifier.swift',
+              '''    private static func structuralSymbol(_ strokes: [InkStroke], glyphHeight: CGFloat) -> String? {
+        if isEquals(strokes, glyphHeight: glyphHeight) { return "=" }
+        if let bracket = bracket(strokes, glyphHeight: glyphHeight) { return bracket }
+''',
+              '''    private static func structuralSymbol(_ strokes: [InkStroke], glyphHeight: CGFloat) -> String? {
+        if isEquals(strokes, glyphHeight: glyphHeight) { return "=" }
+        if isPlus(strokes, glyphHeight: glyphHeight) { return "+" }
+        if let bracket = bracket(strokes, glyphHeight: glyphHeight) { return bracket }
+''')
+
+          replace_once(
+              'ios/PriLearning.swiftpm/Ink/MathShapeClassifier.swift',
+              '''    private static func isEquals(_ strokes: [InkStroke], glyphHeight: CGFloat) -> Bool {
+''',
+              '''    private static func isPlus(_ strokes: [InkStroke], glyphHeight: CGFloat) -> Bool {
+        guard strokes.count == 2 else { return false }
+        let pairs = [(strokes[0], strokes[1]), (strokes[1], strokes[0])]
+        for (horizontal, vertical) in pairs {
+            guard isHorizontal(horizontal),
+                  let v0 = vertical.points.first, let v1 = vertical.points.last,
+                  vertical.pathLength > 0 else { continue }
+            let vdx = v1.x - v0.x, vdy = v1.y - v0.y
+            let vChord = hypot(vdx, vdy)
+            guard vChord > 2,
+                  vChord / vertical.pathLength >= 0.80,
+                  abs(vdy) >= 0.90 * vChord,
+                  abs(vdx) <= 0.32 * vChord else { continue }
+
+            let union = horizontal.bounds.union(vertical.bounds)
+            guard union.width >= 0.30 * glyphHeight,
+                  union.height >= 0.30 * glyphHeight else { continue }
+            let ratio = union.width / max(union.height, 1)
+            guard ratio >= 0.42, ratio <= 2.30,
+                  let h0 = horizontal.points.first, let h1 = horizontal.points.last else { continue }
+            if interiorIntersection(
+                CGPoint(x: h0.x, y: h0.y), CGPoint(x: h1.x, y: h1.y),
+                CGPoint(x: v0.x, y: v0.y), CGPoint(x: v1.x, y: v1.y)
+            ) { return true }
+        }
+        return false
+    }
+
+    private static func isEquals(_ strokes: [InkStroke], glyphHeight: CGFloat) -> Bool {
+''')
+
+          # 4) Turn the screenshot failure into deterministic native tests.
+          replace_once(
+              'ios/PriLearning.swiftpm/Ink/InkGeometrySelfCheck.swift',
+              '''        var plus = [glyph("4", strokes: [0, 1], box: vertical.bounds.union(horizontal.bounds))]
+        MathShapeClassifier.repair(&plus, strokes: [vertical, horizontal], glyphHeight: 40)
+        check("plus is not misclassified as x", plus[0].symbol == "4")
+''',
+              '''        var plus = [glyph("4", strokes: [0, 1], box: vertical.bounds.union(horizontal.bounds))]
+        MathShapeClassifier.repair(&plus, strokes: [vertical, horizontal], glyphHeight: 40)
+        check("axis-aligned cross recovers plus", plus[0].symbol == "+")
+
+        // Real-iPad regression: x² written on the first of two lines must not
+        // create a phantom third line for the raised `2`.
+        let l1EqTop = stroke([(0, 38), (14, 38)])
+        let l1EqBottom = stroke([(0, 44), (14, 44)])
+        let l1XDown = stroke([(20, 30), (27, 40), (34, 50)])
+        let l1XUp = stroke([(20, 50), (27, 40), (34, 30)])
+        let l1Power = stroke([(37, 26), (41, 18), (45, 22), (38, 28), (46, 28)])
+        let l1Minus = stroke([(52, 42), (67, 42)])
+        let l2EqTop = stroke([(0, 88), (14, 88)])
+        let l2EqBottom = stroke([(0, 94), (14, 94)])
+        let l2XDown = stroke([(20, 80), (27, 90), (34, 100)])
+        let l2XUp = stroke([(20, 100), (27, 90), (34, 80)])
+        let segmented = InkLineSegmenter.segment([
+            l1EqTop, l1EqBottom, l1XDown, l1XUp, l1Power, l1Minus,
+            l2EqTop, l2EqBottom, l2XDown, l2XUp
+        ])
+        let topLine = segmented.min { $0.band.lowerBound < $1.band.lowerBound }
+        check("raised power stays on its base line",
+              segmented.count == 2 && topLine?.strokeIndexes.contains(4) == true)
+''')
+
+          replace_once(
+              'scripts/ink-native-check.mjs',
+              'const EXPECTED_GEOMETRY_CHECKS = 11;',
+              'const EXPECTED_GEOMETRY_CHECKS = 12;')
+
+          # 5) Do not blame the student's handwriting when the machine is unsure.
+          replace_once(
+              'client/src/ink/InkAnswer.jsx',
+              "? 'The handwriting evidence is genuinely ambiguous; the highlighted symbol needs confirmation.'",
+              "? 'PRI is not confident in this reading yet; check the highlighted symbol or rewrite the line if it looks wrong.'")
+          PY
+
+      - name: Rebuild and synchronize the iPad web bundle
+        run: |
+          npm ci --prefix client
+          npm run build
+          npm run sync:ios
+
+      - name: Commit fixes and remove one-shot workflow
+        shell: bash
+        run: |
+          rm -f .github/workflows/apply-real-pencil-fix-once.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add ios/PriLearning.swiftpm client/src/ink/InkAnswer.jsx scripts/ink-native-check.mjs .github/workflows/apply-real-pencil-fix-once.yml
+          git commit -m 'Fix real iPad algebra handwriting recognition'
+          git push origin HEAD:${{ github.ref_name }}
