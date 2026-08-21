@@ -1,0 +1,53 @@
+# Native iPad handwriting validation.
+#
+# The main CI jobs intentionally stay Linux-only. This job exists because the
+# production iPad reader depends on PencilKit + Vision and therefore cannot be
+# compiled or benchmarked honestly anywhere except an Apple runner.
+name: Native Ink
+
+on:
+  push:
+    paths:
+      - 'ios/PriLearning.swiftpm/**'
+      - 'client/src/ink/native.js'
+      - 'client/test/native-ink-check.mjs'
+      - 'scripts/ink-native-check.mjs'
+      - '.github/workflows/native-ink.yml'
+  pull_request:
+    paths:
+      - 'ios/PriLearning.swiftpm/**'
+      - 'client/src/ink/native.js'
+      - 'client/test/native-ink-check.mjs'
+      - 'scripts/ink-native-check.mjs'
+      - '.github/workflows/native-ink.yml'
+
+concurrency:
+  group: native-ink-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  native-ink:
+    name: Swift build, Vision benchmark and bridge smoke test
+    runs-on: macos-15
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Apple toolchain
+        run: |
+          xcodebuild -version
+          xcrun simctl list devices available | grep -m 1 'iPad' >/dev/null || {
+            echo '::error::No iPad simulator is available on this runner'
+            exit 1
+          }
+
+      - name: JS ↔ Swift ink contract
+        run: npm run test:ink:bridge
+
+      - name: Native PencilKit + Vision self-check
+        run: npm run test:ink:native

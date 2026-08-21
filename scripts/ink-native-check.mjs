@@ -4,10 +4,8 @@
 // suite runs anywhere.
 //
 // It builds the app, installs it, launches it with --ink-selfcheck, and reads
-// the result back out of the system log. It fails when the character accuracy
-// drops below the floor below, or when the bridge smoke test does not pass —
-// so a change that quietly breaks the writing surface is caught here rather
-// than by a student.
+// the result back out of the system log. It fails when either accuracy or exact
+// expression coverage regresses, or when the bridge smoke test does not pass.
 //
 // Usage: npm run test:ink:native [-- --device "iPad Air 11-inch (M4)"]
 // ─────────────────────────────────────────────────────────────────────────────
@@ -21,10 +19,12 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const PACKAGE = join(HERE, '../ios/PriLearning.swiftpm');
 const BUNDLE_ID = 'com.prilearning.app';
 
-// The floor, not the target. It is set below the score the pipeline reaches so
-// that ordinary drift does not fail the build, and far enough above chance
-// that a broken stage cannot slip through.
+// Floors prevent regression; they are deliberately not presented as targets.
+// Raise them only after the measured benchmark rises. Never lower them to make
+// a change pass.
 const ACCURACY_FLOOR = 85;
+const EXACT_FLOOR = 6;
+const EXPECTED_CASES = 10;
 
 const argOf = (name) => {
   const i = process.argv.indexOf(`--${name}`);
@@ -50,8 +50,6 @@ function ensureBooted(device) {
   if (new RegExp(`${device.replace(/[()]/g, '\\$&')}.*Booted`).test(list)) return;
   console.log(`Booting ${device}…`);
   try { run('xcrun', ['simctl', 'boot', device]); } catch { /* already booting */ }
-  // simctl bootstatus can hang past the point the device is usable; polling the
-  // device list is the thing that actually settles.
   for (let i = 0; i < 60; i++) {
     if (/Booted/.test(run('xcrun', ['simctl', 'list', 'devices']).split('\n')
       .filter(l => l.includes(device)).join('\n'))) return;
@@ -100,11 +98,25 @@ for (const line of lines) console.log(`  ${line.replace(/^PRIINK\s*/, '')}`);
 const summary = lines.find(l => l.includes('character accuracy'));
 const bridge = lines.find(l => l.startsWith('PRIINK bridge mounted'));
 const accuracy = summary ? Number(/accuracy ([\d.]+)%/.exec(summary)?.[1] ?? 0) : 0;
+const exactMatch = summary ? /(\d+)\/(\d+) exact/.exec(summary) : null;
+const exact = Number(exactMatch?.[1] ?? 0);
+const cases = Number(exactMatch?.[2] ?? 0);
+const perf = lines
+  .map(l => /PRIINK perf recognition .* ([\d.]+)ms/.exec(l))
+  .filter(Boolean)
+  .map(m => Number(m[1]));
 
 const problems = [];
 if (!summary) problems.push('the self-check did not report a score');
-else if (accuracy < ACCURACY_FLOOR) {
-  problems.push(`character accuracy ${accuracy}% is below the ${ACCURACY_FLOOR}% floor`);
+else {
+  if (accuracy < ACCURACY_FLOOR) {
+    problems.push(`character accuracy ${accuracy}% is below the ${ACCURACY_FLOOR}% floor`);
+  }
+  if (cases !== EXPECTED_CASES) {
+    problems.push(`native benchmark ran ${cases} cases; expected ${EXPECTED_CASES}`);
+  } else if (exact < EXACT_FLOOR) {
+    problems.push(`exact expressions ${exact}/${cases} is below the ${EXACT_FLOOR}/${EXPECTED_CASES} floor`);
+  }
 }
 if (!bridge) problems.push('the bridge smoke test did not report');
 else {
@@ -115,8 +127,14 @@ else {
 }
 
 console.log('');
+if (perf.length) {
+  const sorted = [...perf].sort((a, b) => a - b);
+  const median = sorted[Math.floor(sorted.length / 2)];
+  console.log(`Simulator recognition timing sample: median ${median.toFixed(1)} ms across ${perf.length} bridge reading(s).`);
+  console.log('This is software recognition time, not Apple Pencil touch-to-photon latency.');
+}
 if (problems.length) {
   for (const problem of problems) console.log(`FAIL — ${problem}`);
   process.exit(1);
 }
-console.log(`PASS — character accuracy ${accuracy}%, bridge round trip clean`);
+console.log(`PASS — character accuracy ${accuracy}%, exact ${exact}/${cases}, bridge round trip clean`);
