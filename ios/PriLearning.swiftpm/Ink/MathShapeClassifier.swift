@@ -120,7 +120,11 @@ enum MathShapeClassifier {
         let lineBox = glyphs.dropFirst().reduce(glyphs[0].box) { $0.union($1.box) }
         let minY = lineBox.minY - 0.45 * glyphHeight
         let maxY = lineBox.maxY + 0.45 * glyphHeight
-        let minX = lineBox.minX - 0.45 * glyphHeight
+        // OCR frequently omits a continuation '=' at the very beginning of a
+        // handwritten working line. Search symmetrically far enough to the left
+        // for a physically proven structure instead of assuming every omission
+        // occurs after the last recognised glyph.
+        let minX = lineBox.minX - 2.20 * glyphHeight
         let maxX = lineBox.maxX + 1.35 * glyphHeight
         let indexes = strokes.indices.filter { index in
             let stroke = strokes[index]
@@ -217,10 +221,9 @@ enum MathShapeClassifier {
         let lineBox = glyphs.dropFirst().reduce(glyphs[0].box) { $0.union($1.box) }
         let minY = lineBox.minY - 0.35 * glyphHeight
         let maxY = lineBox.maxY + 0.35 * glyphHeight
-        let minX = lineBox.minX - 0.35 * glyphHeight
-        // A missing final `=1`, bracket or other narrow structure can span more
-        // than one glyph beyond the last OCR-owned box. This is only a SEARCH
-        // window: actual insertion still requires decisive geometry below.
+        // Search both sides of the OCR-owned span. The insertion rule below is
+        // still geometry-only, so widening the search does not invent symbols.
+        let minX = lineBox.minX - 2.20 * glyphHeight
         let maxX = lineBox.maxX + 2.20 * glyphHeight
 
         let indexes = strokes.indices.filter { index in
