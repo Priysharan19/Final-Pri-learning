@@ -28,11 +28,11 @@ private final class InkRecognitionToken {
 /// Transparent clipping container for the native canvas.
 ///
 /// UIKit's default hit testing may return a transparent UIView itself even when
-/// the point is not inside any interactive child. Because this view can span a
-/// large part of the page, that behaviour would swallow taps intended for the
-/// WKWebView underneath. Only real descendants (the native writing surface)
-/// are allowed to become hit-test targets; empty transparent space passes
-/// straight through to the web app.
+/// the point is not inside any interactive child. Only real descendants are
+/// allowed to become hit-test targets; empty transparent space passes straight
+/// through to the WKWebView. `applyLayout()` also constrains this view's physical
+/// frame to the visible handwriting rectangle, so passthrough is a second line
+/// of defence rather than the only thing protecting web controls.
 private final class InkPassthroughClipView: UIView {
     override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
         let hit = super.hitTest(point, with: event)
@@ -69,6 +69,7 @@ final class InkBridge: NSObject, InkSurfaceDelegate {
         self.webView = webView
         clipView.clipsToBounds = true
         clipView.backgroundColor = .clear
+        clipView.isOpaque = false
         clipView.isHidden = true
         surface.delegate = self
         clipView.addSubview(surface)
@@ -109,6 +110,8 @@ final class InkBridge: NSObject, InkSurfaceDelegate {
             learnedCorrectionKeys.removeAll()
             isMounted = false
             clipView.isHidden = true
+            clipView.frame = .zero
+            surface.frame = .zero
 
         case "appearance":
             applyAppearance(message)
@@ -153,17 +156,32 @@ final class InkBridge: NSObject, InkSurfaceDelegate {
 
     private func applyLayout() {
         guard isMounted, let webView else { return }
+
         let delta = CGPoint(
             x: webView.scrollView.contentOffset.x - reportedOffset.x,
             y: webView.scrollView.contentOffset.y - reportedOffset.y
         )
-        let clip = reportedClip.isEmpty ? webView.bounds : reportedClip
-        clipView.frame = clip
+        let viewportClip = reportedClip.isEmpty ? webView.bounds : reportedClip
+        let movedFrame = reportedFrame.offsetBy(dx: -delta.x, dy: -delta.y)
+        let visible = movedFrame.intersection(viewportClip)
+
+        guard !visible.isNull, !visible.isEmpty,
+              visible.width.isFinite, visible.height.isFinite else {
+            clipView.frame = .zero
+            surface.frame = .zero
+            return
+        }
+
+        // The native view now physically occupies only the visible handwriting
+        // area. The full PencilKit surface remains positioned relative to that
+        // clipped window so partially scrolled handwriting stays geometrically
+        // aligned without placing a transparent view over unrelated controls.
+        clipView.frame = visible
         surface.frame = CGRect(
-            x: reportedFrame.minX - delta.x - clip.minX,
-            y: reportedFrame.minY - delta.y - clip.minY,
-            width: reportedFrame.width,
-            height: reportedFrame.height
+            x: movedFrame.minX - visible.minX,
+            y: movedFrame.minY - visible.minY,
+            width: movedFrame.width,
+            height: movedFrame.height
         )
     }
 
