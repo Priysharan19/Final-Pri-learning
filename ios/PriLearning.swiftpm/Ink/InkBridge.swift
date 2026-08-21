@@ -178,6 +178,13 @@ final class InkBridge: NSObject, InkSurfaceDelegate {
         recognizer.cancelActiveVision()
     }
 
+    /// Pen-down is the earliest reliable native signal that the user is writing
+    /// again. Stop stale Vision immediately; do not wait for the new stroke to
+    /// finish before giving PencilKit uncontested resources.
+    func inkSurfaceDidBeginStroke(_ surface: InkSurfaceView) {
+        markInkMutation()
+    }
+
     func inkSurface(_ surface: InkSurfaceView, didAppend stroke: InkStroke, at index: Int) {
         markInkMutation()
         emitStrokeDelta(stroke, at: index)
