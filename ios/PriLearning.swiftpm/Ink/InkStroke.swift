@@ -13,12 +13,22 @@ import CoreGraphics
 import Foundation
 import PencilKit
 
-/// A single sampled point along a stroke. `w` is the ink width at that point,
-/// carried so the web side can redraw a stroke exactly as it was written.
+/// A single sampled point along a stroke.
+///
+/// `x`, `y` and `w` remain the backwards-compatible drawing contract. The
+/// optional values preserve the ONLINE ink signal PencilKit already captured:
+/// time, pressure and Pencil orientation. Older saved attempts simply leave
+/// them nil. Keeping these features matters because a handwriting engine can
+/// distinguish shapes that raster OCR sees as identical by how the mark was
+/// produced, not only by its final pixels.
 struct InkPoint {
     var x: CGFloat
     var y: CGFloat
     var w: CGFloat
+    var t: TimeInterval? = nil
+    var force: CGFloat? = nil
+    var azimuth: CGFloat? = nil
+    var altitude: CGFloat? = nil
 }
 
 struct InkStroke {
@@ -55,6 +65,21 @@ struct InkStroke {
         guard !points.isEmpty else { return 0 }
         return points.reduce(0) { $0 + $1.w } / CGFloat(points.count)
     }
+
+    /// Duration and pressure are deliberately optional. Synthetic benchmark
+    /// strokes and old drafts have no timing signal; real Pencil strokes do.
+    var duration: TimeInterval? {
+        guard let first = points.compactMap(\.t).first,
+              let last = points.compactMap(\.t).last,
+              last >= first else { return nil }
+        return last - first
+    }
+
+    var meanForce: CGFloat? {
+        let values = points.compactMap(\.force)
+        guard !values.isEmpty else { return nil }
+        return values.reduce(0, +) / CGFloat(values.count)
+    }
 }
 
 // MARK: - PencilKit bridge
@@ -76,14 +101,30 @@ enum StrokeCodec {
         let transform = stroke.transform
         for point in stroke.path.interpolatedPoints(by: .distance(sampleStep)) {
             let location = point.location.applying(transform)
-            points.append(InkPoint(x: location.x, y: location.y, w: point.size.width))
+            points.append(InkPoint(
+                x: location.x,
+                y: location.y,
+                w: point.size.width,
+                t: point.timeOffset,
+                force: point.force,
+                azimuth: point.azimuth,
+                altitude: point.altitude
+            ))
         }
         // A tap leaves a path with a single control point and no interpolated
         // span — the dot of an 'i' is a real glyph, so it is kept rather than
         // dropped for being zero length.
         if points.isEmpty, let only = stroke.path.first {
             let location = only.location.applying(transform)
-            points.append(InkPoint(x: location.x, y: location.y, w: only.size.width))
+            points.append(InkPoint(
+                x: location.x,
+                y: location.y,
+                w: only.size.width,
+                t: only.timeOffset,
+                force: only.force,
+                azimuth: only.azimuth,
+                altitude: only.altitude
+            ))
         }
         return InkStroke(points: points)
     }
@@ -93,23 +134,24 @@ enum StrokeCodec {
     }
 
     /// Rebuild a drawing from strokes the web layer supplies — restoring a
-    /// saved draft, or replaying an attempt.
+    /// saved draft, or replaying an attempt. Rich Pencil signal is restored
+    /// when present and sensible defaults keep old x/y/w-only drafts valid.
     static func drawing(from strokes: [InkStroke], color: UIColor) -> PKDrawing {
         let ink = PKInk(.pen, color: color)
         let built: [PKStroke] = strokes.compactMap { stroke in
             guard !stroke.points.isEmpty else { return nil }
-            var time: TimeInterval = 0
+            var syntheticTime: TimeInterval = 0
             let controlPoints: [PKStrokePoint] = stroke.points.map { p in
-                defer { time += 1.0 / 120.0 }
+                defer { syntheticTime += 1.0 / 120.0 }
                 let width = max(1, p.w)
                 return PKStrokePoint(
                     location: CGPoint(x: p.x, y: p.y),
-                    timeOffset: time,
+                    timeOffset: p.t ?? syntheticTime,
                     size: CGSize(width: width, height: width),
                     opacity: 1,
-                    force: 1,
-                    azimuth: 0,
-                    altitude: .pi / 2
+                    force: p.force ?? 1,
+                    azimuth: p.azimuth ?? 0,
+                    altitude: p.altitude ?? .pi / 2
                 )
             }
             // PKStrokePath needs at least two control points to describe a
@@ -130,9 +172,19 @@ extension InkStroke {
     /// CGFloat is not a JSON type — JSONSerialization refuses an object graph
     /// containing one and hands back nil, which would mean the page silently
     /// never hearing about a single stroke. Every number crossing the bridge
-    /// is a Double.
+    /// is a Double. Optional online-signal fields are additive, so older web
+    /// code that only reads x/y/w remains compatible.
     var jsonObject: [String: Any] {
-        ["points": points.map { ["x": Double($0.x), "y": Double($0.y), "w": Double($0.w)] }]
+        ["points": points.map { p -> [String: Any] in
+            var object: [String: Any] = [
+                "x": Double(p.x), "y": Double(p.y), "w": Double(p.w)
+            ]
+            if let t = p.t { object["t"] = t }
+            if let force = p.force { object["p"] = Double(force) }
+            if let azimuth = p.azimuth { object["az"] = Double(azimuth) }
+            if let altitude = p.altitude { object["alt"] = Double(altitude) }
+            return object
+        }]
     }
 
     init?(json: Any) {
@@ -140,7 +192,15 @@ extension InkStroke {
               let raw = dict["points"] as? [[String: Any]] else { return nil }
         let parsed: [InkPoint] = raw.compactMap { p in
             guard let x = InkStroke.number(p["x"]), let y = InkStroke.number(p["y"]) else { return nil }
-            return InkPoint(x: x, y: y, w: InkStroke.number(p["w"]) ?? 3)
+            return InkPoint(
+                x: x,
+                y: y,
+                w: InkStroke.number(p["w"]) ?? 3,
+                t: InkStroke.time(p["t"]),
+                force: InkStroke.number(p["p"]),
+                azimuth: InkStroke.number(p["az"]),
+                altitude: InkStroke.number(p["alt"])
+            )
         }
         guard !parsed.isEmpty else { return nil }
         self.points = parsed
@@ -152,6 +212,12 @@ extension InkStroke {
         if let n = value as? NSNumber { return CGFloat(n.doubleValue) }
         if let d = value as? Double { return CGFloat(d) }
         if let f = value as? CGFloat { return f }
+        return nil
+    }
+
+    private static func time(_ value: Any?) -> TimeInterval? {
+        if let n = value as? NSNumber { return n.doubleValue }
+        if let d = value as? Double { return d }
         return nil
     }
 }
