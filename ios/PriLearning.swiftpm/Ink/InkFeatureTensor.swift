@@ -88,9 +88,11 @@ struct InkFeatureTensor {
 
                 let forceMask: CGFloat = point.force == nil ? 0 : 1
                 let force = clamp(point.force ?? 0)
-                let orientationMask: CGFloat = (point.azimuth != nil && point.altitude != nil) ? 1 : 0
-                let azimuth = point.azimuth ?? 0
-                let altitude = point.altitude.map { clamp($0 / (.pi / 2)) } ?? 0
+                let hasOrientation = point.azimuth != nil && point.altitude != nil
+                let orientationMask: CGFloat = hasOrientation ? 1 : 0
+                let azimuthSin = hasOrientation ? sin(point.azimuth ?? 0) : 0
+                let azimuthCos = hasOrientation ? cos(point.azimuth ?? 0) : 0
+                let altitude = hasOrientation ? clamp((point.altitude ?? 0) / (.pi / 2)) : 0
                 let widthNorm = clamp((point.w / diagonal) * 20)
 
                 rows.append([
@@ -99,7 +101,7 @@ struct InkFeatureTensor {
                     f(dx), f(dy), f(dt120), f(speed),
                     f(turnSin), f(turnCos),
                     f(force), f(forceMask),
-                    f(sin(azimuth)), f(cos(azimuth)), f(altitude), f(orientationMask),
+                    f(azimuthSin), f(azimuthCos), f(altitude), f(orientationMask),
                     f(widthNorm),
                     pointIndex == 0 ? 1 : 0,
                     pointIndex == stroke.points.count - 1 ? 1 : 0,
