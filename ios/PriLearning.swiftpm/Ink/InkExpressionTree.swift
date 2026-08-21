@@ -170,10 +170,10 @@ enum InkExpressionTreeBuilder {
                 let inner = buildSequence(innerSymbols, edges: edges, scope: "\(scope)-g-\(index)")
                 let ids = [symbol.id, symbols[close].id] + inner.flatMap(\.sourceSymbolIDs)
                 let strokes = symbol.strokeIndexes + symbols[close].strokeIndexes + inner.flatMap(\.strokeIndexes)
+                let bracketConfidence = min(symbol.confidence, symbols[close].confidence)
                 result.append(InkExpressionTreeNode(
                     id: "tree-\(scope)-group-\(index)", kind: .group, value: nil,
-                    confidence: min(symbol.confidence, symbols[close].confidence,
-                                    minimumConfidence(inner)),
+                    confidence: min(bracketConfidence, minimumConfidence(inner)),
                     sourceSymbolIDs: unique(ids), strokeIndexes: uniqueInts(strokes), children: inner
                 ))
                 index = close + 1
@@ -260,8 +260,6 @@ enum InkExpressionTreeBuilder {
             let run = symbols[start..<(start + letters.count)].map { $0.symbol.lowercased() }
             if run == letters { return (name, start + letters.count) }
         }
-        // `sqrt` can also arrive as one canonical symbol rather than four OCR
-        // letters. Treat that representation as the same function.
         if symbols[start].symbol.lowercased() == "sqrt" { return ("sqrt", start + 1) }
         return nil
     }
