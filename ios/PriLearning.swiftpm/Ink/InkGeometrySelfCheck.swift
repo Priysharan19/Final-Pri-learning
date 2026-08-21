@@ -94,6 +94,16 @@ enum InkGeometrySelfCheck {
         check("approximate ownership cannot hide trailing one after equals",
               missing.sorted(by: { $0.box.midX < $1.box.midX }).suffix(2).map(\.symbol) == ["=", "1"])
 
+        // The aligner may do the right thing and drop every bad OCR symbol. The
+        // remaining glyphs are then exact, but real trailing ink still exists.
+        // Recovery must be trace-driven rather than requiring an approximate
+        // OCR survivor or `=1` disappears permanently.
+        var exactSurvivor = [glyph("x", strokes: [0], box: first.bounds)]
+        MathShapeClassifier.repair(&exactSurvivor,
+                                   strokes: [first, eqTop, eqBottom, finalOne], glyphHeight: 40)
+        check("exact survivors still recover unexplained trailing equals and one",
+              exactSurvivor.sorted(by: { $0.box.midX < $1.box.midX }).map(\.symbol) == ["x", "=", "1"])
+
         if failures.isEmpty {
             NSLog("PRIINK geometry PASS %d/%d", checks, checks)
         } else {
