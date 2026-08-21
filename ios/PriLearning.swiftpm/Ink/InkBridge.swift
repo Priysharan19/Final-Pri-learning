@@ -44,6 +44,13 @@ final class InkBridge: NSObject, InkSurfaceDelegate {
     private weak var webView: WKWebView?
     private var recognitionToken: InkRecognitionToken?
 
+    // The correction UI already sends its current override map back with every
+    // recognition request. Keeping the prior native Reading lets the shell turn
+    // an explicit correction into a bounded personal feature prototype without
+    // adding another cross-language message or storing raw handwriting.
+    private var lastReading: Reading?
+    private var learnedCorrectionKeys: Set<String> = []
+
     /// Every payload the page would receive, for the bridge smoke test. Nil in
     /// the app — the page is the only listener there.
     var onEmit: (([String: Any]) -> Void)?
@@ -80,6 +87,8 @@ final class InkBridge: NSObject, InkSurfaceDelegate {
         switch op {
         case "mount":
             cancelRecognition()
+            lastReading = nil
+            learnedCorrectionKeys.removeAll()
             applyAppearance(message)
             updateGeometry(message)
             // A mount is a fresh sheet: the page mounts one writing area per
@@ -98,6 +107,8 @@ final class InkBridge: NSObject, InkSurfaceDelegate {
 
         case "unmount":
             cancelRecognition()
+            lastReading = nil
+            learnedCorrectionKeys.removeAll()
             isMounted = false
             clipView.isHidden = true
 
@@ -216,17 +227,81 @@ final class InkBridge: NSObject, InkSurfaceDelegate {
         }
     }
 
-    // MARK: - Recognition
+    // MARK: - Recognition / personalization
 
     private func cancelRecognition() {
         recognitionToken?.cancel()
         recognitionToken = nil
     }
 
+    /// Convert a correction the student explicitly made in the existing picker
+    /// into a tiny feature prototype. Approximate OCR ownership is excluded:
+    /// learning from the wrong strokes is worse than learning nothing.
+    private func learnExplicitCorrections(
+        overrides: [String: String],
+        reading: Reading?,
+        strokes: [InkStroke]
+    ) {
+        guard let reading else { return }
+        let symbols = reading.lines.flatMap(\.symbols)
+        for (id, intended) in overrides {
+            guard let original = symbols.first(where: { $0.id == id }),
+                  original.symbol != intended,
+                  !original.approximate,
+                  !original.strokeIndexes.isEmpty else { continue }
+            let signature = "\(id)|\(intended)|\(original.strokeIndexes.map(String.init).joined(separator: ","))"
+            guard !learnedCorrectionKeys.contains(signature) else { continue }
+            let members = original.strokeIndexes.compactMap {
+                strokes.indices.contains($0) ? strokes[$0] : nil
+            }
+            guard !members.isEmpty else { continue }
+            InkPersonalizationStore.shared.learn(symbol: intended, strokes: members)
+            learnedCorrectionKeys.insert(signature)
+        }
+    }
+
+    /// Add only conservative personal overrides to a first-pass reading. The
+    /// second recognizer pass receives those as ordinary locked corrections, so
+    /// fractions, powers, function names and maths assembly all run normally;
+    /// personalization never edits the final string behind the decoder's back.
+    private func personalOverrides(
+        for reading: Reading,
+        strokes: [InkStroke],
+        userOverrides: [String: String]
+    ) -> [String: String] {
+        var merged = userOverrides
+        for symbol in reading.lines.flatMap(\.symbols) {
+            guard merged[symbol.id] == nil,
+                  !symbol.approximate,
+                  symbol.confidence < 0.86,
+                  !symbol.strokeIndexes.isEmpty else { continue }
+            let members = symbol.strokeIndexes.compactMap {
+                strokes.indices.contains($0) ? strokes[$0] : nil
+            }
+            guard !members.isEmpty,
+                  let suggestion = InkPersonalizationStore.shared.suggestion(
+                    for: members,
+                    current: symbol.symbol,
+                    alternatives: symbol.alternatives.map(\.symbol),
+                    globalConfidence: symbol.confidence
+                  ),
+                  suggestion.symbol != symbol.symbol else { continue }
+            merged[symbol.id] = suggestion.symbol
+            if ProcessInfo.processInfo.arguments.contains("--ink-selfcheck") {
+                NSLog("PRIINK personal %@→%@ conf=%.2f d=%.3f margin=%.3f",
+                      symbol.symbol as NSString, suggestion.symbol as NSString,
+                      suggestion.confidence, suggestion.distance, suggestion.margin)
+            }
+        }
+        return merged
+    }
+
     private func recognize(requestId: Int, overrides: [String: String]) {
         // `surface.strokes` is a cached value, not a fresh conversion of the
         // entire PKDrawing. The snapshot is immutable for this request.
         let strokes = surface.strokes
+        learnExplicitCorrections(overrides: overrides, reading: lastReading, strokes: strokes)
+
         recognitionToken?.cancel()
         let token = InkRecognitionToken()
         recognitionToken = token
@@ -237,7 +312,14 @@ final class InkBridge: NSObject, InkSurfaceDelegate {
             let started = DispatchTime.now().uptimeNanoseconds
             os_signpost(.begin, log: self.performanceLog, name: "InkRecognition",
                         signpostID: signpostID, "%{public}d strokes", strokes.count)
-            let reading = self.recognizer.read(strokes: strokes, overrides: overrides)
+
+            let first = self.recognizer.read(strokes: strokes, overrides: overrides)
+            guard !token.isCancelled else { return }
+            let personalized = self.personalOverrides(for: first, strokes: strokes, userOverrides: overrides)
+            let reading = personalized == overrides
+                ? first
+                : self.recognizer.read(strokes: strokes, overrides: personalized)
+
             os_signpost(.end, log: self.performanceLog, name: "InkRecognition", signpostID: signpostID)
             guard !token.isCancelled else { return }
 
@@ -247,6 +329,7 @@ final class InkBridge: NSObject, InkSurfaceDelegate {
             payload["reqId"] = requestId
             DispatchQueue.main.async { [weak self] in
                 guard let self, !token.isCancelled, self.isMounted else { return }
+                self.lastReading = reading
                 if ProcessInfo.processInfo.arguments.contains("--ink-selfcheck") {
                     NSLog("PRIINK perf recognition req=%d strokes=%d %.1fms", requestId, strokes.count, elapsedMs)
                 }
