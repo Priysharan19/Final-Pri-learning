@@ -2,17 +2,18 @@
 // Pri Learning · Bounded native handwriting personalization
 //
 // A student's ambiguous shapes are usually consistent: their 1, y, theta or x
-// tends to look the same every time. Global recognition should remain the
-// authority, but repeated explicit corrections are useful evidence when the
-// same ambiguous shape appears again.
+// tends to look the same every time. Global recognition remains the authority,
+// while repeated EXPLICIT corrections provide weak evidence for future
+// low-confidence readings made by the SAME profile.
 //
 // Privacy / safety properties:
+// - profile-scoped: one student's hand never influences another student's
 // - stores feature vectors only, never raw Pencil coordinates or images
-// - bounded to a small number of samples
+// - bounded per profile and per symbol
 // - requires repeated examples before making a suggestion
 // - only compares symbols inside known visual-confusion families
 // - never overrides a high-confidence global reading
-// - can be reset completely
+// - can be reset per profile or completely
 // ─────────────────────────────────────────────────────────────────────────────
 import CoreGraphics
 import Foundation
@@ -29,6 +30,9 @@ final class InkPersonalizationStore {
     }
 
     private struct Sample: Codable {
+        // Optional so a pre-profile v1 store can still decode. Unscoped legacy
+        // rows are intentionally ignored rather than assigned to the next user.
+        var profile: String?
         var symbol: String
         var features: [Double]
         var created: TimeInterval
@@ -37,7 +41,8 @@ final class InkPersonalizationStore {
     private let lock = NSLock()
     private let defaults: UserDefaults
     private let key = "pri.nativeInk.personalization.v1"
-    private let maxTotalSamples = 96
+    private let maxTotalSamples = 384
+    private let maxSamplesPerProfile = 96
     private let maxSamplesPerSymbol = 12
     private let minimumSamplesForInfluence = 2
     private var samples: [Sample] = []
@@ -61,21 +66,28 @@ final class InkPersonalizationStore {
         load()
     }
 
-    var sampleCount: Int {
+    func sampleCount(profile rawProfile: String? = nil) -> Int {
         lock.lock(); defer { lock.unlock() }
-        return samples.count
+        guard let profile = Self.profile(rawProfile) else { return samples.count }
+        return samples.filter { $0.profile == profile }.count
     }
 
-    func reset() {
+    func reset(profile rawProfile: String? = nil) {
         lock.lock()
-        samples.removeAll()
-        defaults.removeObject(forKey: key)
+        if let profile = Self.profile(rawProfile) {
+            samples.removeAll { $0.profile == profile }
+            persistLocked()
+        } else {
+            samples.removeAll()
+            defaults.removeObject(forKey: key)
+        }
         lock.unlock()
     }
 
     /// Learn only from a correction whose symbol was tied to exact Pencil
     /// strokes. Callers enforce that ownership rule before reaching this API.
-    func learn(symbol rawSymbol: String, strokes: [InkStroke]) {
+    func learn(profile rawProfile: String, symbol rawSymbol: String, strokes: [InkStroke]) {
+        guard let profile = Self.profile(rawProfile) else { return }
         let symbol = Self.canonical(rawSymbol)
         guard Self.family(containing: symbol) != nil,
               let vector = Self.features(strokes), vector.count == Self.featureCount else { return }
@@ -85,21 +97,35 @@ final class InkPersonalizationStore {
 
         // A repeated callback for the same correction should not fill the
         // bounded store with copies. Feature-near duplicates are one example.
-        let existingForSymbol = samples.filter { $0.symbol == symbol }
+        let existingForSymbol = samples.filter { $0.profile == profile && $0.symbol == symbol }
         if existingForSymbol.contains(where: { Self.distance($0.features, vector) < 0.025 }) {
             return
         }
 
-        samples.append(Sample(symbol: symbol, features: vector,
+        samples.append(Sample(profile: profile, symbol: symbol, features: vector,
                               created: Date().timeIntervalSince1970))
 
-        // Keep the newest examples of each hand-written symbol.
-        let same = samples.indices.filter { samples[$0].symbol == symbol }
+        // Keep the newest examples of this symbol for this hand.
+        let same = samples.indices.filter {
+            samples[$0].profile == profile && samples[$0].symbol == symbol
+        }
         if same.count > maxSamplesPerSymbol {
             let remove = same.sorted { samples[$0].created < samples[$1].created }
                 .prefix(same.count - maxSamplesPerSymbol)
             for index in remove.sorted(by: >) { samples.remove(at: index) }
         }
+
+        // Bound each profile independently so a sibling cannot evict another
+        // sibling's entire hand just by using the app more often.
+        let own = samples.indices.filter { samples[$0].profile == profile }
+        if own.count > maxSamplesPerProfile {
+            let remove = own.sorted { samples[$0].created < samples[$1].created }
+                .prefix(own.count - maxSamplesPerProfile)
+            for index in remove.sorted(by: >) { samples.remove(at: index) }
+        }
+
+        // A final device-wide cap prevents abandoned profiles accumulating
+        // indefinitely. Eviction is oldest-first and never changes attribution.
         if samples.count > maxTotalSamples {
             samples.sort { $0.created < $1.created }
             samples.removeFirst(samples.count - maxTotalSamples)
@@ -111,36 +137,32 @@ final class InkPersonalizationStore {
     /// It needs at least two corrected examples, a close feature match and a
     /// useful margin over the next trained symbol in the same ambiguity family.
     func suggestion(
+        profile rawProfile: String,
         for strokes: [InkStroke],
         current rawCurrent: String,
         alternatives rawAlternatives: [String],
         globalConfidence: Double
     ) -> Suggestion? {
-        // Personal history may resolve ambiguity; it may not overrule a global
-        // result that is already strong.
-        guard globalConfidence < 0.86,
+        guard let profile = Self.profile(rawProfile),
+              globalConfidence < 0.86,
               let vector = Self.features(strokes) else { return nil }
         let current = Self.canonical(rawCurrent)
         guard let family = Self.family(containing: current) else { return nil }
         let explicit = Set(rawAlternatives.map(Self.canonical))
-        let familySet = Set(family)
 
         lock.lock()
-        let snapshot = samples
+        let snapshot = samples.filter { $0.profile == profile }
         lock.unlock()
 
         var scores: [(symbol: String, distance: Double, count: Int)] = []
         for symbol in family where symbol != current {
-            // A trained family member is allowed even when Vision omitted it,
-            // but only inside the same tightly defined visual confusion set.
-            guard familySet.contains(symbol) else { continue }
             let own = snapshot.filter { $0.symbol == symbol }
             guard own.count >= minimumSamplesForInfluence else { continue }
             let distances = own.map { Self.distance($0.features, vector) }.sorted()
             let take = min(3, distances.count)
             let mean = distances.prefix(take).reduce(0, +) / Double(take)
-            // If Vision itself also offered the symbol, that independent signal
-            // gives a small preference without making the model authoritative.
+            // If Vision independently offered the symbol, that signal earns a
+            // small preference without making either engine authoritative.
             let adjusted = max(0, mean - (explicit.contains(symbol) ? 0.025 : 0))
             scores.append((symbol, adjusted, own.count))
         }
@@ -150,9 +172,8 @@ final class InkPersonalizationStore {
         let secondDistance = scores.dropFirst().first?.distance ?? 1.0
         let margin = secondDistance - best.distance
 
-        // These are conservative gates in normalized feature space, not values
-        // tuned to the ten-expression OCR benchmark. The deterministic native
-        // self-check below verifies their behavior directly.
+        // Conservative normalized-feature gates. They are deliberately not
+        // tuned to the ten-expression Vision benchmark.
         guard best.distance <= 0.24, margin >= 0.055 else { return nil }
         let closeness = max(0, min(1, 1 - best.distance / 0.24))
         let repetition = min(1, Double(best.count) / 5.0)
@@ -166,7 +187,9 @@ final class InkPersonalizationStore {
     private static let featureCount = 12
 
     /// Translation- and scale-normalized features that describe how a glyph was
-    /// produced, not where it happened to sit on the page.
+    /// produced, not where it happened to sit on the page. The last feature can
+    /// use the online timing/pressure signal when real Pencil data supplies it;
+    /// synthetic and legacy strokes simply fall back to zero.
     private static func features(_ strokes: [InkStroke]) -> [Double]? {
         let live = strokes.filter { !$0.isEmpty }
         guard !live.isEmpty else { return nil }
@@ -278,6 +301,12 @@ final class InkPersonalizationStore {
 
     // MARK: - Persistence / families
 
+    private static func profile(_ raw: String?) -> String? {
+        let value = raw?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard !value.isEmpty, value.count <= 160 else { return nil }
+        return value
+    }
+
     private static func canonical(_ symbol: String) -> String {
         switch symbol {
         case "×", "✕": return "*"
@@ -293,7 +322,9 @@ final class InkPersonalizationStore {
     private func load() {
         guard let data = defaults.data(forKey: key),
               let decoded = try? JSONDecoder().decode([Sample].self, from: data) else { return }
-        samples = Array(decoded.suffix(maxTotalSamples))
+        // Keep bounded modern rows. Legacy nil-profile rows decode but can
+        // influence nobody, so discard them during the first scoped load.
+        samples = Array(decoded.filter { Self.profile($0.profile) != nil }.suffix(maxTotalSamples))
     }
 
     private func persistLocked() {
