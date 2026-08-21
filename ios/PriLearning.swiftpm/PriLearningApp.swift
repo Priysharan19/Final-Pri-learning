@@ -13,8 +13,8 @@ struct PriLearningApp: App {
     init() {
         // Scores the native reading pipeline against expressions whose answer
         // is known, then runs deterministic trace-alignment, personalization,
-        // geometry, frontier-representation, selective-trust and independent-
-        // expert fusion checks. Off unless explicitly requested by the
+        // geometry, frontier-representation, selective-trust, expert-fusion and
+        // online feature-tensor checks. Off unless explicitly requested by the
         // simulator validation harness.
         if ProcessInfo.processInfo.arguments.contains("--ink-selfcheck") {
             DispatchQueue.global(qos: .userInitiated).async {
@@ -25,6 +25,7 @@ struct PriLearningApp: App {
                 InkFrontierSelfCheck.run()
                 InkAcceptanceSelfCheck.run()
                 InkExpertFusionSelfCheck.run()
+                InkFeatureTensorSelfCheck.run()
             }
         }
     }
