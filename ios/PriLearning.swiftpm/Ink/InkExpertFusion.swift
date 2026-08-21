@@ -14,9 +14,6 @@
 // - symbol-count disagreement is evidence of under/over recognition;
 // - structural/trace risk blocks consensus rescue;
 // - a local CLARIFY decision is never promoted automatically.
-//
-// Production calibration must be fitted on a locked, writer-separated real
-// Apple Pencil set. Until then providers set `calibratedForProduction = false`.
 // ─────────────────────────────────────────────────────────────────────────────
 import Foundation
 
@@ -24,13 +21,8 @@ struct InkExpertHypothesis: Sendable {
     let text: String
     let confidence: Double
     let sourceID: String
-    /// Sources sharing an independence group reuse substantially the same model
-    /// or representation and therefore count as ONE vote.
     let independenceGroup: String
     let calibratedForProduction: Bool
-    /// Optional independent estimate of semantic symbol count. A provider that
-    /// cannot produce a trustworthy count should leave this nil rather than
-    /// deriving a fake-precise number from its output string.
     let symbolCount: Int?
 
     init(
@@ -79,18 +71,11 @@ enum InkExpertFusion {
     private static let independentExpertsForRescue = 2
 
     private static let confusionFamilies: [Set<String>] = [
-        ["1", "l", "I", "|", "y"],
-        ["0", "o", "O", "theta"],
-        ["2", "z", "Z"],
-        ["5", "s", "S"],
-        ["6", "b", "G"],
-        ["7", "T", "1"],
-        ["8", "B", "3"],
-        ["9", "g", "q", "4"],
-        ["x", "*", "×", "✕", "4", "k"],
-        ["r", "v", "u"],
-        ["+", "t"],
-        ["c", "("]
+        ["1", "l", "I", "|", "y"], ["0", "o", "O", "theta"],
+        ["2", "z", "Z"], ["5", "s", "S"], ["6", "b", "G"],
+        ["7", "T", "1"], ["8", "B", "3"], ["9", "g", "q", "4"],
+        ["x", "*", "×", "✕", "4", "k"], ["r", "v", "u"],
+        ["+", "t"], ["c", "("]
     ]
 
     static func fuse(
@@ -105,9 +90,6 @@ enum InkExpertFusion {
                                          reasons: ["no-local-reading"], agreeingGroups: [], disagreeingGroups: [])
         }
 
-        // Independence-aware dedupe: keep only the strongest hypothesis from a
-        // model family. Multiple crops/raster scales may improve that model's
-        // internal inference, but they must not multiply its vote externally.
         var byGroup: [String: InkExpertHypothesis] = [:]
         for expert in rawExperts where !expert.independenceGroup.isEmpty {
             let current = byGroup[expert.independenceGroup]
@@ -116,7 +98,6 @@ enum InkExpertFusion {
             }
         }
         let experts = Array(byGroup.values)
-
         let agreeing = experts.filter { canonical($0.text) == local }
         let disagreeing = experts.filter { canonical($0.text) != local && !canonical($0.text).isEmpty }
         let agreeingGroups = agreeing.map(\.independenceGroup).sorted()
@@ -130,14 +111,10 @@ enum InkExpertFusion {
         }
         if explicitCountMismatch { reasons.append("independent-symbol-count-mismatch") }
 
-        let hardConfusion = disagreeing.contains {
-            differsOnlyByHardConfusion(local, canonical($0.text))
-        }
+        let hardConfusion = disagreeing.contains { differsOnlyByHardConfusion(local, canonical($0.text)) }
         if hardConfusion { reasons.append("hard-visual-confusion-disagreement") }
 
-        let trusted = experts.filter {
-            $0.calibratedForProduction && $0.confidence >= trustedExpertFloor
-        }
+        let trusted = experts.filter { $0.calibratedForProduction && $0.confidence >= trustedExpertFloor }
         let trustedAgreeing = trusted.filter { canonical($0.text) == local }
         let trustedAlternatives = Dictionary(grouping: trusted.filter { canonical($0.text) != local }) {
             canonical($0.text)
@@ -146,9 +123,6 @@ enum InkExpertFusion {
             .filter { !$0.key.isEmpty && Set($0.value.map(\.independenceGroup)).count >= independentExpertsForRescue }
             .max { lhs, rhs in lhs.value.count < rhs.value.count }
 
-        // Local clarification is an explicit safety decision. More inference
-        // may suggest what to show in the picker, but it never turns ambiguous
-        // ink into an automatic mark behind the student's back.
         if localDecision.status == .clarify {
             reasons.append("local-clarification-is-sticky")
             return InkExpertFusionResult(text: reading.text, status: .clarify, autoAccept: false,
@@ -156,9 +130,6 @@ enum InkExpertFusion {
                                          disagreeingGroups: disagreeingGroups)
         }
 
-        // Two calibrated, genuinely independent experts agreeing on a DIFFERENT
-        // expression is strong evidence that the local result deserves another
-        // look, but not authority to overwrite the student's ink.
         if let alternative = strongAlternative {
             reasons.append("multiple-calibrated-experts-disagree-with-local")
             if !alternative.key.isEmpty { reasons.append("alternative-requires-student-confirmation") }
@@ -167,9 +138,6 @@ enum InkExpertFusion {
                                          disagreeingGroups: disagreeingGroups)
         }
 
-        // A known lookalike conflict or independent count conflict is exactly
-        // where majority/context guessing is dangerous. Route it to one-tap
-        // clarification even if the local model had initially been confident.
         if hardConfusion || explicitCountMismatch {
             return InkExpertFusionResult(text: reading.text, status: .clarify, autoAccept: false,
                                          reasons: unique(reasons), agreeingGroups: agreeingGroups,
@@ -177,9 +145,6 @@ enum InkExpertFusion {
         }
 
         if localDecision.autoAccept {
-            // External evidence is advisory for a clean local reading. A single
-            // dissent is not enough to demote it; two trusted independent
-            // dissenters were already caught by `strongAlternative` above.
             return InkExpertFusionResult(text: reading.text, status: .accept, autoAccept: true,
                                          reasons: [], agreeingGroups: agreeingGroups,
                                          disagreeingGroups: disagreeingGroups)
@@ -192,10 +157,6 @@ enum InkExpertFusion {
             && reading.margin >= rescueLocalMarginFloor
         let independentTrustedAgreement = Set(trustedAgreeing.map(\.independenceGroup)).count
 
-        // Consensus rescue is intentionally narrow. It upgrades only a
-        // BORDERLINE local REVIEW to ACCEPT when two calibrated independent
-        // experts corroborate the SAME reading and provenance/structure are
-        // already clean. It never changes the text itself.
         if localDecision.status == .review,
            structuralClean,
            localPlausible,
@@ -217,8 +178,7 @@ enum InkExpertFusion {
     }
 
     private static func canonical(_ raw: String) -> String {
-        raw
-            .replacingOccurrences(of: "\\(", with: "")
+        raw.replacingOccurrences(of: "\\(", with: "")
             .replacingOccurrences(of: "\\)", with: "")
             .replacingOccurrences(of: "\\[", with: "")
             .replacingOccurrences(of: "\\]", with: "")
@@ -230,8 +190,7 @@ enum InkExpertFusion {
     }
 
     private static func differsOnlyByHardConfusion(_ lhs: String, _ rhs: String) -> Bool {
-        let a = semanticTokens(lhs)
-        let b = semanticTokens(rhs)
+        let a = semanticTokens(lhs), b = semanticTokens(rhs)
         guard a.count == b.count else { return false }
         var difference: (String, String)?
         for (x, y) in zip(a, b) where x != y {
@@ -239,27 +198,19 @@ enum InkExpertFusion {
             difference = (x, y)
         }
         guard let difference else { return false }
-        return confusionFamilies.contains { family in
-            family.contains(difference.0) && family.contains(difference.1)
-        }
+        return confusionFamilies.contains { $0.contains(difference.0) && $0.contains(difference.1) }
     }
 
-    /// Lightweight semantic tokenization used only for consistency checks. It
-    /// keeps common multi-character math names atomic and otherwise preserves
-    /// each visible symbol. This is NOT the expression parser.
     private static func semanticTokens(_ raw: String) -> [String] {
         let text = canonical(raw)
         let names = ["theta", "sqrt", "sin", "cos", "tan", "sec", "csc", "cot", "log", "ln", "pi"]
-        var out: [String] = []
-        var i = text.startIndex
+        var out: [String] = [], i = text.startIndex
         while i < text.endIndex {
             let tail = text[i...]
             if let name = names.first(where: { tail.hasPrefix($0) }) {
-                out.append(name)
-                i = text.index(i, offsetBy: name.count)
+                out.append(name); i = text.index(i, offsetBy: name.count)
             } else {
-                out.append(String(text[i]))
-                i = text.index(after: i)
+                out.append(String(text[i])); i = text.index(after: i)
             }
         }
         return out
@@ -272,14 +223,10 @@ enum InkExpertFusion {
 }
 
 extension OnlineInkHypothesis {
-    /// External providers start uncalibrated. Promotion is enabled only after
-    /// a provider/version has passed the locked writer-separated calibration
-    /// protocol; until then its agreement is useful for diagnostics and its
-    /// disagreement can still trigger a safer clarification.
     func fusionEvidence(
         independenceGroup: String? = nil,
         calibratedForProduction: Bool = false,
-        symbolCount: Int? = nil
+        symbolCount overrideCount: Int? = nil
     ) -> InkExpertHypothesis {
         InkExpertHypothesis(
             text: text.isEmpty ? (latex ?? "") : text,
@@ -287,7 +234,7 @@ extension OnlineInkHypothesis {
             sourceID: source,
             independenceGroup: independenceGroup ?? source,
             calibratedForProduction: calibratedForProduction,
-            symbolCount: symbolCount
+            symbolCount: overrideCount ?? symbolCount
         )
     }
 }
