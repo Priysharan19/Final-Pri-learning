@@ -12,11 +12,13 @@ import SwiftUI
 struct PriLearningApp: App {
     init() {
         // Scores the native reading pipeline against expressions whose answer
-        // is known, and reports it to the system log. Off unless asked for.
+        // is known, then runs deterministic geometry checks. Off unless asked
+        // for. Geometry runs last so its verdict cannot be lost behind the
+        // longer Vision benchmark in simulator log collection.
         if ProcessInfo.processInfo.arguments.contains("--ink-selfcheck") {
             DispatchQueue.global(qos: .userInitiated).async {
-                InkGeometrySelfCheck.run()
                 InkSelfCheck.run()
+                InkGeometrySelfCheck.run()
             }
         }
     }
