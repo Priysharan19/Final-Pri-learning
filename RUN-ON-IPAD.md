@@ -49,11 +49,44 @@ the offline copy), and Settings reports native sandbox storage.
 
 ```bash
 npm run build
-rm -rf ios/PriLearning.swiftpm/Resources/Web
-cp -r client/dist ios/PriLearning.swiftpm/Resources/Web
+npm run sync:ios
 ```
 
 Then press Run again in Swift Playground / Xcode.
+
+`npm run sync:ios` fingerprints both trees and copies only what differs, leaving
+`Resources/Web/icons/` alone. `npm run check:ios` exits non-zero when the bundle
+has drifted from the build, and CI gates on it — the bundle went stale three
+times in one day while it was a hand-typed `rm -rf` + `cp`, which is how the
+iPad app ended up shipping a marketing claim that had already been removed
+everywhere else.
+
+## Option C — Safari over your local network, for quick UI iteration
+
+Fastest loop when you are changing screens and want to look at them on glass,
+but read the limitation before trusting anything you see.
+
+```bash
+npm run build
+node scripts/serve-lan.mjs
+```
+
+It prints a `http://<your-mac>:4188` address. Type it into Safari on the iPad,
+on the same Wi-Fi.
+
+**What does not work over plain `http`, and why.** iOS only exposes
+`crypto.subtle` in a *secure context* — HTTPS, or `localhost`. A LAN IP is
+neither. So on this route:
+
+- password-protected profiles cannot be created or opened (the vault needs
+  PBKDF2 through `crypto.subtle`),
+- encryption at rest is therefore not exercised at all,
+- the service worker will not register, so there is no offline mode and
+  *Add to Home Screen* gives you a bookmark rather than a real installed PWA.
+
+Everything else — the whole question engine, marking, the Apple Pencil canvas
+and the recogniser — runs normally. Use this route to look at screens; use
+Option A when you want to test the app as a student would actually have it.
 
 ## Why this architecture
 

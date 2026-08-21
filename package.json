@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Pri Learning \u2014 Years 7\u201312 maths practice with HSC-style marking and on-device handwriting recognition. Runs entirely offline; nothing leaves the iPad.",
+  "description": "Pri Learning — Years 7–12 maths practice with HSC-style marking and on-device handwriting recognition. Runs entirely offline; nothing leaves the iPad.",
   "scripts": {
     "setup": "npm install --prefix server && npm install --prefix client",
     "dev": "node scripts/dev.js",
@@ -27,6 +27,7 @@
     "test:e2e": "node client/test/e2e.mjs",
     "test:a11y": "node client/test/a11y-check.mjs",
     "sync:ios": "node scripts/sync-ios.mjs",
-    "check:ios": "node scripts/sync-ios.mjs --check"
+    "check:ios": "node scripts/sync-ios.mjs --check",
+    "serve:lan": "node scripts/serve-lan.mjs"
   }
 }
