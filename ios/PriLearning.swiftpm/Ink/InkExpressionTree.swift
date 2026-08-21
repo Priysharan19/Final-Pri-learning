@@ -16,7 +16,7 @@ enum InkExpressionTreeKind: String {
     case group
     case functionCall
     case power
-    case subscript
+    case subscriptNode = "subscript"
     case fraction
     case numerator
     case denominator
@@ -214,7 +214,7 @@ enum InkExpressionTreeBuilder {
                     children: subChildren
                 )
                 node = InkExpressionTreeNode(
-                    id: "tree-\(scope)-subscript-\(index)", kind: .subscript, value: nil,
+                    id: "tree-\(scope)-subscript-\(index)", kind: .subscriptNode, value: nil,
                     confidence: min(node.confidence, sub.confidence),
                     sourceSymbolIDs: unique(node.sourceSymbolIDs + sub.sourceSymbolIDs),
                     strokeIndexes: uniqueInts(node.strokeIndexes + sub.strokeIndexes),
