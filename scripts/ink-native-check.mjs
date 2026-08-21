@@ -28,7 +28,7 @@ const ACCURACY_FLOOR = 99;
 const EXACT_FLOOR = 9;
 const EXPECTED_CASES = 10;
 const EXPECTED_ALIGNMENT_CHECKS = 6;
-const EXPECTED_PERSONALIZATION_CHECKS = 8;
+const EXPECTED_PERSONALIZATION_CHECKS = 10;
 const EXPECTED_GEOMETRY_CHECKS = 10;
 
 const argOf = (name) => {
@@ -91,8 +91,6 @@ for (let i = 0; i < 40; i++) {
   lines = log.split('\n')
     .filter(l => l.includes('PRIINK') && !l.includes("'log'"))
     .map(l => l.slice(l.indexOf('PRIINK')));
-  // Do not stop at the bridge line: deterministic checks run after the Vision
-  // benchmark. An early break would turn "still running" into a false failure.
   const hasSummary = lines.some(l => l.includes('character accuracy'));
   const hasBridge = lines.some(l => l.startsWith('PRIINK bridge mounted'));
   const hasAlignment = lines.some(l => l.startsWith('PRIINK alignment '));
@@ -101,8 +99,6 @@ for (let i = 0; i < 40; i++) {
   if (hasSummary && hasBridge && hasAlignment && hasPersonalization && hasGeometry) break;
 }
 
-// The log window can still hold an earlier run; only the latest one is this
-// run's result.
 const started = lines.map((l, i) => [l, i]).filter(([l]) => l.includes('native ink self-check'));
 if (started.length) lines = lines.slice(started[started.length - 1][1]);
 for (const line of lines) console.log(`  ${line.replace(/^PRIINK\s*/, '')}`);
@@ -133,14 +129,9 @@ const perf = lines
 const problems = [];
 if (!summary) problems.push('the self-check did not report a score');
 else {
-  if (accuracy < ACCURACY_FLOOR) {
-    problems.push(`character accuracy ${accuracy}% is below the ${ACCURACY_FLOOR}% floor`);
-  }
-  if (cases !== EXPECTED_CASES) {
-    problems.push(`native benchmark ran ${cases} cases; expected ${EXPECTED_CASES}`);
-  } else if (exact < EXACT_FLOOR) {
-    problems.push(`exact expressions ${exact}/${cases} is below the ${EXACT_FLOOR}/${EXPECTED_CASES} floor`);
-  }
+  if (accuracy < ACCURACY_FLOOR) problems.push(`character accuracy ${accuracy}% is below the ${ACCURACY_FLOOR}% floor`);
+  if (cases !== EXPECTED_CASES) problems.push(`native benchmark ran ${cases} cases; expected ${EXPECTED_CASES}`);
+  else if (exact < EXACT_FLOOR) problems.push(`exact expressions ${exact}/${cases} is below the ${EXACT_FLOOR}/${EXPECTED_CASES} floor`);
 }
 if (!alignment) problems.push('the deterministic trace-alignment checks did not report');
 else if (!alignmentMatch || alignmentPassed !== EXPECTED_ALIGNMENT_CHECKS || alignmentCases !== EXPECTED_ALIGNMENT_CHECKS) {
