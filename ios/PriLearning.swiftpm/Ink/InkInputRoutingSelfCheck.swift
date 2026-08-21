@@ -1,10 +1,11 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Pri Learning · Native ink input-routing self-check
 //
-// Prevents the transparent native overlay from swallowing WKWebView controls.
-// The clip view may cover most of the page for clipping, but only the actual
-// writing child is allowed to become a hit-test target.
+// Prevents the transparent native overlay from swallowing WKWebView controls
+// and proves the PencilKit surface keeps an explicit Pencil-only policy unless
+// finger drawing is deliberately enabled.
 // ─────────────────────────────────────────────────────────────────────────────
+import PencilKit
 import UIKit
 import WebKit
 
@@ -32,30 +33,38 @@ enum InkInputRoutingSelfCheck {
             "scrollX": 0, "scrollY": 0,
             "ink": "#efece1"
         ])
-        // Finger mode lets a nil UIEvent exercise the actual writing child in
-        // this deterministic test. Production remains pencilOnly by default.
-        bridge.handle(["op": "tool", "tool": "pen", "finger": true])
 
         guard container.subviews.count >= 2 else {
-            NSLog("PRIINK input FAIL 0/3: overlay missing")
+            NSLog("PRIINK input FAIL 0/5: overlay missing")
             return
         }
 
         let clip = container.subviews[1]
-        let surface = clip.subviews.first
+        guard let surface = clip.subviews.first as? InkSurfaceView else {
+            NSLog("PRIINK input FAIL 0/5: writing surface missing")
+            return
+        }
+
+        // In production mode only Pencil is a drawing input. Finger touches in
+        // the writing region are intentionally allowed to fall through so the
+        // surrounding WKWebView can continue to scroll/navigate naturally.
+        bridge.handle(["op": "tool", "tool": "pen", "finger": false])
+        check("PencilKit policy is pencilOnly",
+              surface.canvas.drawingPolicy == .pencilOnly)
+
+        let pencilRaw = NSNumber(value: UITouch.TouchType.pencil.rawValue)
+        check("drawing recognizer explicitly accepts Pencil",
+              surface.canvas.drawingGestureRecognizer.allowedTouchTypes == [pencilRaw])
 
         // Inside clipping rect, above the writing surface: must fall through.
         check("transparent clip space passes through",
               clip.hitTest(CGPoint(x: 20, y: 20), with: nil) == nil)
 
-        // Inside the actual writing surface: a descendant must own the touch.
-        if let surface {
-            let point = CGPoint(x: surface.frame.midX, y: surface.frame.midY)
-            check("writing surface remains interactive",
-                  clip.hitTest(point, with: nil) != nil)
-        } else {
-            check("writing surface remains interactive", false)
-        }
+        // A nil/early UIEvent must not cause the wrapper to reject the real
+        // writing child before PencilKit has a chance to classify the touch.
+        let point = CGPoint(x: surface.frame.midX, y: surface.frame.midY)
+        check("writing surface survives early hit testing",
+              clip.hitTest(point, with: nil) != nil)
 
         bridge.handle(["op": "unmount"])
         check("unmounted overlay cannot intercept input",
