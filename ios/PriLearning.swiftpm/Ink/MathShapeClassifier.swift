@@ -182,15 +182,20 @@ enum MathShapeClassifier {
         strokes: [InkStroke],
         glyphHeight: CGFloat
     ) {
-        guard glyphs.contains(where: \.approximate), glyphs.count >= 2 else { return }
+        // Realignment may correctly DROP every approximate OCR hallucination,
+        // leaving only exact surviving glyphs while genuine trailing ink is
+        // still unexplained. Recovery must therefore be driven by trace
+        // ownership, not by the existence of an approximate glyph.
+        guard !glyphs.isEmpty else { return }
 
         let lineBox = glyphs.dropFirst().reduce(glyphs[0].box) { $0.union($1.box) }
         let minY = lineBox.minY - 0.35 * glyphHeight
         let maxY = lineBox.maxY + 0.35 * glyphHeight
         let minX = lineBox.minX - 0.35 * glyphHeight
-        // A missing final digit/operator is commonly just outside the last
-        // proportionally assigned box, so leave one body-glyph of headroom.
-        let maxX = lineBox.maxX + 1.20 * glyphHeight
+        // A missing final `=1`, bracket or other narrow structure can span more
+        // than one glyph beyond the last OCR-owned box. This is only a SEARCH
+        // window: actual insertion still requires decisive geometry below.
+        let maxX = lineBox.maxX + 2.20 * glyphHeight
 
         let indexes = strokes.indices.filter { index in
             let stroke = strokes[index]
@@ -199,10 +204,8 @@ enum MathShapeClassifier {
             return b.midY >= minY && b.midY <= maxY && b.midX >= minX && b.midX <= maxX
         }
         let lineClusters = clusters(indexes: indexes, strokes: strokes)
-        // Once the OCR-to-mark mapping is approximate, matching counts do not
-        // restore trust: three OCR glyphs can still own the wrong three marks.
-        // Geometry is allowed to re-anchor proven structures regardless of the
-        // two counts, while every recovery below remains narrowly classified.
+        // Matching counts are never a trust signal. Geometry may re-anchor only
+        // structures that are independently proven by the predicates below.
         guard !lineClusters.isEmpty else { return }
 
         for cluster in lineClusters {
