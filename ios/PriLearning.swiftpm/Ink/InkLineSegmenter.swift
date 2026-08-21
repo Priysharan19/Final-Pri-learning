@@ -84,20 +84,38 @@ enum InkLineSegmenter {
                 let width = item.element.bounds.width
                 let bandHeight = max(1, band.upperBound - band.lowerBound)
                 let smallMark = height < 0.35 * glyphSize
+
                 // A power such as the `2` in x² is not always tiny enough for
                 // the dot rule. It is compact and raised relative to the body
-                // band, which is strong evidence that it belongs to the same
-                // written line instead of opening a phantom third line.
+                // band. Vertical position alone is not sufficient, however: a
+                // compact mark from the next written line can be vertically
+                // close as well. Require local horizontal attachment to the
+                // group that is claiming it so the exponent stays with its base.
                 let compactRaisedMark = height < 0.92 * glyphSize
                     && width <= 1.05 * glyphSize
                     && centre < band.lowerBound + 0.58 * bandHeight
-                if smallMark || compactRaisedMark {
+                let groupBounds = group.dropFirst().reduce(group[0].element.bounds) {
+                    $0.union($1.element.bounds)
+                }
+                let horizontalGap = item.element.bounds.minX - groupBounds.maxX
+                let xOverlap = min(item.element.bounds.maxX, groupBounds.maxX)
+                    - max(item.element.bounds.minX, groupBounds.minX)
+                let locallyAttached = xOverlap >= 0
+                    || (horizontalGap >= -0.30 * glyphSize && horizontalGap <= 1.35 * glyphSize)
+
+                if smallMark || (compactRaisedMark && locallyAttached) {
                     let above = band.lowerBound - centre
                     let below = centre - band.upperBound
                     let aboveAllowance = compactRaisedMark ? 1.10 * glyphSize : 0.95 * glyphSize
                     guard above <= aboveAllowance, below <= 0.45 * glyphSize else { continue }
                     let distance = max(0, max(above, below))
-                    let score = glyphSize - distance      // nearer band wins
+                    // Proximity in x breaks ties between vertically similar
+                    // candidate lines without turning horizontal distance into
+                    // an absolute requirement for dots/minus signs.
+                    let attachmentBonus = compactRaisedMark && locallyAttached
+                        ? max(0, 0.30 * glyphSize - max(0, horizontalGap))
+                        : 0
+                    let score = glyphSize - distance + attachmentBonus
                     if score > bestOverlap { bestOverlap = score; bestGroup = index }
                     continue
                 }
