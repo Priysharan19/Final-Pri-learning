@@ -288,6 +288,13 @@ enum InkSymbolAligner {
             return members.count == 1 && looksHorizontal(members) ? -0.10 : 0.78
         }
         if ["1", "l", "i", "I", "|"].contains(symbol) {
+            // A vertical-family glyph cannot defensibly own a proven equals
+            // sign or a long horizontal stroke. This forces an OCR duplicate
+            // or hallucination to remain ownerless instead of stealing real
+            // structural ink from a later recovery pass.
+            if looksEquals(members, glyphHeight: glyphHeight) || looksHorizontal(members) {
+                return 1.08
+            }
             return looksVerticalOne(members, glyphHeight: glyphHeight) ? -0.10 : 0.46
         }
         if symbol == "." {
