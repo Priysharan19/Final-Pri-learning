@@ -19,6 +19,7 @@ const EXPECTED_CASES = 10;
 const EXPECTED_ALIGNMENT_CHECKS = 6;
 const EXPECTED_PERSONALIZATION_CHECKS = 10;
 const EXPECTED_GEOMETRY_CHECKS = 13;
+const EXPECTED_REAL_PENCIL_CHECKS = 6;
 const EXPECTED_FRONTIER_CHECKS = 12;
 const EXPECTED_ACCEPTANCE_CHECKS = 7;
 const EXPECTED_FUSION_CHECKS = 11;
@@ -112,6 +113,7 @@ for (let i = 0; i < 40; i++) {
   const hasAlignment = lines.some(l => l.startsWith('PRIINK alignment '));
   const hasPersonalization = lines.some(l => l.startsWith('PRIINK personalization '));
   const hasGeometry = lines.some(l => l.startsWith('PRIINK geometry '));
+  const hasRealPencil = lines.some(l => l.startsWith('PRIINK real-pencil '));
   const hasFrontier = lines.some(l => l.startsWith('PRIINK frontier '));
   const hasAcceptance = lines.some(l => l.startsWith('PRIINK acceptance '));
   const hasFusion = lines.some(l => l.startsWith('PRIINK fusion '));
@@ -119,7 +121,8 @@ for (let i = 0; i < 40; i++) {
   const hasStructural = lines.some(l => l.startsWith('PRIINK structural '));
   const hasInput = lines.some(l => l.startsWith('PRIINK input '));
   if (hasSummary && hasBridge && hasAlignment && hasPersonalization && hasGeometry
-      && hasFrontier && hasAcceptance && hasFusion && hasTensor && hasStructural && hasInput) break;
+      && hasRealPencil && hasFrontier && hasAcceptance && hasFusion && hasTensor
+      && hasStructural && hasInput) break;
 }
 
 const started = lines.map((l, i) => [l, i]).filter(([l]) => l.includes('native ink self-check'));
@@ -131,6 +134,7 @@ const bridge = lines.find(l => l.startsWith('PRIINK bridge mounted'));
 const alignment = [...lines].reverse().find(l => l.startsWith('PRIINK alignment '));
 const personalization = [...lines].reverse().find(l => l.startsWith('PRIINK personalization '));
 const geometry = [...lines].reverse().find(l => l.startsWith('PRIINK geometry '));
+const realPencil = [...lines].reverse().find(l => l.startsWith('PRIINK real-pencil '));
 const frontier = [...lines].reverse().find(l => l.startsWith('PRIINK frontier '));
 const acceptance = [...lines].reverse().find(l => l.startsWith('PRIINK acceptance '));
 const fusion = [...lines].reverse().find(l => l.startsWith('PRIINK fusion '));
@@ -149,6 +153,7 @@ const parseGate = (line) => {
 const a = parseGate(alignment);
 const p = parseGate(personalization);
 const g = parseGate(geometry);
+const r = parseGate(realPencil);
 const f = parseGate(frontier);
 const q = parseGate(acceptance);
 const u = parseGate(fusion);
@@ -177,6 +182,7 @@ const checkGate = (label, line, parsed, expected) => {
 checkGate('trace-alignment', alignment, a, EXPECTED_ALIGNMENT_CHECKS);
 checkGate('personalization safety', personalization, p, EXPECTED_PERSONALIZATION_CHECKS);
 checkGate('geometry', geometry, g, EXPECTED_GEOMETRY_CHECKS);
+checkGate('real-Pencil failure', realPencil, r, EXPECTED_REAL_PENCIL_CHECKS);
 checkGate('frontier representation', frontier, f, EXPECTED_FRONTIER_CHECKS);
 checkGate('selective acceptance', acceptance, q, EXPECTED_ACCEPTANCE_CHECKS);
 checkGate('expert fusion safety', fusion, u, EXPECTED_FUSION_CHECKS);
@@ -205,4 +211,4 @@ if (problems.length) {
   for (const problem of problems) console.log(`FAIL — ${problem}`);
   process.exit(1);
 }
-console.log(`PASS — character accuracy ${accuracy}%, exact ${exact}/${cases}, alignment ${a.passed}/${a.cases}, personalization ${p.passed}/${p.cases}, geometry ${g.passed}/${g.cases}, frontier ${f.passed}/${f.cases}, acceptance ${q.passed}/${q.cases}, fusion ${u.passed}/${u.cases}, tensor ${t.passed}/${t.cases}, structural ${s.passed}/${s.cases}, input ${i.passed}/${i.cases}, bridge round trip clean`);
+console.log(`PASS — character accuracy ${accuracy}%, exact ${exact}/${cases}, alignment ${a.passed}/${a.cases}, personalization ${p.passed}/${p.cases}, geometry ${g.passed}/${g.cases}, real-Pencil ${r.passed}/${r.cases}, frontier ${f.passed}/${f.cases}, acceptance ${q.passed}/${q.cases}, fusion ${u.passed}/${u.cases}, tensor ${t.passed}/${t.cases}, structural ${s.passed}/${s.cases}, input ${i.passed}/${i.cases}, bridge round trip clean`);
