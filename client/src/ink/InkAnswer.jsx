@@ -2,8 +2,9 @@
 // Pri Learning · Write-to-answer surface
 // Ink canvas + toolbar + live on-device recognition with per-symbol
 // tap-to-correct. The recognised lines feed Step Check; the final line is
-// submitted as the answer, together with how sure the engine is that it read
-// that line right — see "How sure the reading is" below.
+// submitted together with both confidence evidence and an explicit selective
+// trust decision. A non-authoritative reading may be shown for correction, but
+// callers can no longer mistake it for safe marking input.
 // ─────────────────────────────────────────────────────────────────────────────
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import InkCanvas from './InkCanvas.jsx';
@@ -31,6 +32,10 @@ const Surface = NATIVE_INK ? NativeInkCanvas : InkCanvas;
  * can come back with nothing at all, and a step the student wrote must never
  * vanish because of it. Those lines, and only those, are read by the web
  * engine instead, on that line's own strokes.
+ *
+ * A secondary-engine rescue is useful evidence, but until that cross-engine
+ * confidence is calibrated on writer-separated real ink it is NOT silently
+ * auto-authoritative. The student sees it and can confirm/correct it.
  */
 function readUnreadLines(reading, strokes, overrides) {
   let healed = false;
@@ -60,24 +65,24 @@ function readUnreadLines(reading, strokes, overrides) {
     };
   });
   if (!healed) return reading;
-  // The engine's own confidence summary described the reading before the swap;
-  // dropping it makes the caller derive a fresh one from the symbols that are
-  // actually being shown.
-  return { lines, text: lines.map(l => l.text).join('\n') };
+  // The native confidence summary described the reading before the secondary
+  // rescue. Drop it and mark the fused result non-authoritative until a future
+  // calibrated ensemble has actually measured this path.
+  return {
+    lines,
+    text: lines.map(l => l.text).join('\n'),
+    decision: {
+      status: 'review',
+      autoAccept: false,
+      policy: 'secondary-rescue-uncalibrated',
+      reasons: ['native-unread-line-healed-by-secondary-engine'],
+      focusSymbol: null
+    },
+    safeToAutoAccept: false
+  };
 }
 
 // ── How sure the reading is ──────────────────────────────────────────────────
-// The line a mark is awarded or withheld on travels with the engine's own
-// account of how much of a guess it was — minConf, margin and the glyph
-// responsible — so a caller can stop and ask before a wrong reading is marked.
-// Two things are added on the way through: the id of the glyph the engine
-// named, which is what the tap-to-correct picker opens on, and the runner-up
-// worth showing beside it. A runner-up inside the glyph's own CNN class is the
-// same ink under another name (1/l, 0/o) and is no use as a question, so it is
-// skipped here exactly as the engine skips it when measuring the margin.
-// Older builds returned none of this; the same three are then derived from the
-// per-symbol confidences that have always been there, so a caller sees one
-// shape either way.
 const rivalOf = (s) => {
   const cls = classOfSymbol(s.sym);
   return (s.alts || []).find(a => a.sym !== s.sym && classOfSymbol(a.sym) !== cls) || null;
@@ -102,7 +107,9 @@ function readingConfidence(result) {
     margin: typeof result.margin === 'number' ? result.margin : margin,
     weakest: result.weakest
       ? { ...result.weakest, id: named?.id ?? weakest?.id ?? null, rival: named ? rivalOf(named) : null }
-      : weakest
+      : weakest,
+    decision: result.decision || null,
+    safeToAutoAccept: result.safeToAutoAccept === true || result.decision?.autoAccept === true
   };
 }
 
@@ -139,21 +146,45 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
       minConf: sure.minConf,
       margin: sure.margin,
       weakest: sure.weakest,
+      decision: sure.decision,
+      safeToAutoAccept: sure.safeToAutoAccept,
       strokes
     });
   }, [onRecognized]);
 
   const runRecognition = useCallback((strokes, ovr) => {
-    if (!NATIVE_INK) { publish(recognize(strokes, ovr), strokes); return; }
+    if (!NATIVE_INK) {
+      // Browser recognition has no calibrated selective policy yet. Preserve
+      // existing functionality, but never advertise it as auto-authoritative.
+      const web = recognize(strokes, ovr);
+      publish({
+        ...web,
+        decision: {
+          status: 'review', autoAccept: false, policy: 'web-uncalibrated',
+          reasons: ['web-recognizer-has-no-real-ink-calibration'], focusSymbol: web.weakest?.id ?? null
+        },
+        safeToAutoAccept: false
+      }, strokes);
+      return;
+    }
     // The shell reads on its own thread, so replies can land out of order —
     // only the newest request is allowed to reach the panel.
     const seq = ++readSeqRef.current;
     nativeInk.recognize(ovr).then(reading => {
       if (seq !== readSeqRef.current) return;
-      publish(
-        reading ? readUnreadLines(reading, strokes, ovr) : recognize(strokes, ovr),
-        strokes
-      );
+      if (reading) {
+        publish(readUnreadLines(reading, strokes, ovr), strokes);
+      } else {
+        const fallback = recognize(strokes, ovr);
+        publish({
+          ...fallback,
+          decision: {
+            status: 'review', autoAccept: false, policy: 'native-timeout-web-rescue',
+            reasons: ['native-recognizer-unavailable'], focusSymbol: fallback.weakest?.id ?? null
+          },
+          safeToAutoAccept: false
+        }, strokes);
+      }
     });
   }, [publish]);
 
@@ -166,20 +197,22 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
   useEffect(() => { ensurePersonalLoaded(); }, []);
   useEffect(() => () => timerRef.current && clearTimeout(timerRef.current), []);
 
-  // Open on a newly-named glyph only. Re-running on every recognition would
-  // reopen the picker the moment a correction closed it.
+  const requestedFocus = focusSymbol || rec.decision?.focusSymbol || null;
+
+  // Open on a newly-named glyph only. A trust-policy clarification uses the
+  // same picker as teacher-requested focus, so ambiguity remains a one-tap fix.
   useEffect(() => {
-    if (!focusSymbol) { focusedRef.current = null; return; }
-    if (focusedRef.current === focusSymbol) return;
-    const sym = rec.lines.flatMap(l => l.symbols).find(s => s.id === focusSymbol);
+    if (!requestedFocus) { focusedRef.current = null; return; }
+    if (focusedRef.current === requestedFocus) return;
+    const sym = rec.lines.flatMap(l => l.symbols || []).find(s => s.id === requestedFocus);
     if (!sym) return;
-    focusedRef.current = focusSymbol;
+    focusedRef.current = requestedFocus;
     setPicker({ id: sym.id, alts: sym.alts || [] });
-  }, [focusSymbol, rec]);
+  }, [requestedFocus, rec]);
 
   useEffect(() => {
-    if (picker && picker.id === focusSymbol) pickerRef.current?.querySelector('button')?.focus();
-  }, [picker, focusSymbol]);
+    if (picker && picker.id === requestedFocus) pickerRef.current?.querySelector('button')?.focus();
+  }, [picker, requestedFocus]);
 
   const applyOverride = (id, sym) => {
     const next = { ...overrides, [id]: sym };
@@ -202,6 +235,8 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
     setPicker(null);
     canvasRef.current?.[fn]();
   };
+
+  const needsCheck = rec.decision && rec.decision.autoAccept === false && rec.lines.length > 0;
 
   return (
     <div className={`ink-answer ${disabled ? 'ink-disabled' : ''}`}>
@@ -249,19 +284,14 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
                 const b = line.box;
                 return (
                   <React.Fragment key={li}>
-                    {/* teacher-style box drawn around the whole step */}
-                    <span
-                      className={`ink-linebox ${good ? 'good' : 'bad'}`}
-                      style={{ left: b.x - 9, top: b.y - 7, width: b.w + 18, height: b.h + 14 }}
-                    />
-                    <span
-                      className={`ink-verdict ${good ? 'good' : 'bad'}`}
+                    <span className={`ink-linebox ${good ? 'good' : 'bad'}`}
+                      style={{ left: b.x - 9, top: b.y - 7, width: b.w + 18, height: b.h + 14 }} />
+                    <span className={`ink-verdict ${good ? 'good' : 'bad'}`}
                       style={{ top: b.y + b.h / 2 - 14, left: b.x + b.w + 16 }}
-                      title={v.note || (good ? 'This line checks out' : 'The maths breaks on this line')}
-                    >{good ? '✓' : '✗'}</span>
-                    {bad && (
-                      <span className="ink-underline" style={{ left: b.x - 5, top: b.y + b.h + 5, width: b.w + 14 }} />
-                    )}
+                      title={v.note || (good ? 'This line checks out' : 'The maths breaks on this line')}>
+                      {good ? '✓' : '✗'}
+                    </span>
+                    {bad && <span className="ink-underline" style={{ left: b.x - 5, top: b.y + b.h + 5, width: b.w + 14 }} />}
                     {showNote && (
                       <span className="ink-note" style={{ left: Math.max(4, b.x - 2), top: b.y + b.h + 16 }}>
                         <b>✗ the mistake is here</b>{v.note ? <> — {v.note}</> : null}
@@ -278,6 +308,16 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
       {rec.lines.length > 0 && (
         <div className="ink-preview">
           <div className="ink-preview-title" id="ink-reading">I'm reading:</div>
+          {needsCheck && (
+            <div role="status" aria-live="polite" style={{
+              margin: '6px 0 10px', padding: '9px 11px', border: '1px solid var(--brand-1)', borderRadius: 6
+            }}>
+              <b>Check this reading before it is marked.</b>{' '}
+              {rec.decision?.status === 'clarify'
+                ? 'The handwriting evidence is genuinely ambiguous; the highlighted symbol needs confirmation.'
+                : 'I do not have enough independent evidence to auto-accept this interpretation yet.'}
+            </div>
+          )}
           {rec.lines.map((line, li) => (
             <div className="ink-line" key={li}>
               <span className="ink-line-n" aria-hidden="true">{li + 1}</span>
@@ -297,10 +337,10 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
                     type="button"
                     key={s.id}
                     className={`ink-sym ${s.conf < 0.45 ? 'shaky' : ''}`}
-                    style={s.id === focusSymbol
+                    style={s.id === requestedFocus
                       ? { outline: '2px solid var(--brand-1)', outlineOffset: 2, borderRadius: 4 }
                       : undefined}
-                    title={s.id === focusSymbol ? 'Check this one' : 'Tap to correct'}
+                    title={s.id === requestedFocus ? 'Check this one' : 'Tap to correct'}
                     aria-label={`Line ${li + 1}, symbol read as “${showSym(s.sym)}”${s.conf < 0.45 ? ', a shaky reading' : ''} — change it`}
                     aria-expanded={picker?.id === s.id}
                     onClick={() => setPicker(picker?.id === s.id ? null : { id: s.id, alts: s.alts })}
