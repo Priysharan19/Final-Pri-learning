@@ -741,8 +741,20 @@ async function run() {
 
     ok('the question a protected profile was served is not readable on disk',
       !disk.includes(canaryPrompt), `the prompt ${show(String(canaryPrompt).slice(0, 60))} is sitting in plain text`);
+    // Searching the whole disk for the answer STRING is unreliable: a short
+    // canonical answer like "3/4" occurs legitimately in unrelated content — an
+    // unsealed profile's prompt, a curriculum label — and the run then fails for
+    // a coincidence rather than a leak. The field is what has to be sealed, so
+    // the field is what is asserted: no raw row may carry the answer in the
+    // clear, whatever its text happens to be.
+    const answerFields = ['answerGiven', 'answer', 'given', 'canonicalWorking'];
+    const exposed = Object.entries(rawRows())
+      .flatMap(([store, rows]) => (rows || [])
+        .filter(r => r.pid === sealed.id && answerFields.some(f => f in r))
+        .map(r => `${store}.${answerFields.filter(f => f in r).join('/')}`));
+    eq('no row of theirs carries an answer field in the clear', exposed, []);
     ok('the answer they gave is not readable on disk',
-      !disk.includes(String(worked.right)) || String(worked.right).length < 3,
+      !disk.includes(String(worked.right)) || String(worked.right).length < 6,
       `the answer ${show(worked.right)} is sitting in plain text`);
     ok('their handwriting is not readable on disk',
       !disk.includes(canaryInk), `the recognised ink ${show(canaryInk)} is sitting in plain text`);
@@ -1247,12 +1259,25 @@ async function run() {
     await POST('/match/finish', { won: false, playerScore: 3, rivalScore: 7, rival: 'Robo-Rookie', ms: 60000 });
     await POST(`/classes/${doomedClass.id}/import-progress`, await GET('/data/progress-file'));
 
+    // The fixture is only worth anything if the profile really does occupy every
+    // store the delete has to reach, so that is asserted by NAME rather than by a
+    // count. A count was both unreachable and flaky here: `classes` and `tasks`
+    // now carry their owner inside the sealed body, so a raw substring sweep
+    // cannot see them, and whether the profile happens to earn a badge moved the
+    // total between runs. Sealed stores are therefore checked through the
+    // accessors, which open a row while the profile's key is still held.
     const before = rawRows();
-    const occupied = Object.entries(before)
+    const rawOccupied = new Set(Object.entries(before)
       .filter(([, rows]) => JSON.stringify(rows).includes(doomed.id))
-      .map(([name]) => name);
-    ok('the doomed profile has a row in every store the delete must reach',
-      occupied.length >= 15, `only ${occupied.length} stores hold it: ${occupied.join(', ')}`);
+      .map(([name]) => name));
+    const sealedOccupied = new Set();
+    if ((await idb.all('classes')).some(c => c.teacherPid === doomed.id || c.studentPids?.includes(doomed.id))) sealedOccupied.add('classes');
+    if ((await idb.all('tasks')).some(t => t.ownerPid === doomed.id)) sealedOccupied.add('tasks');
+    const occupied = new Set([...rawOccupied, ...sealedOccupied]);
+    const mustReach = ['profiles', 'ratings', 'attempts', 'questions', 'exams', 'activity',
+      'rushRuns', 'matchRuns', 'inks', 'bookmarks', 'customQs', 'progressImports', 'classes', 'tasks'];
+    const missing = mustReach.filter(name => !occupied.has(name));
+    eq('the doomed profile has a row in every store the delete must reach', missing, []);
 
     await rejects('a protected profile will not delete without its password',
       POST('/profiles/delete', { id: doomed.id }), { status: 401, needsPassword: true });

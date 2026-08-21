@@ -8,7 +8,7 @@ import {
 } from './auth.js';
 
 const DB_NAME = 'pri-learning';
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 
 let dbPromise = null;
 
@@ -20,13 +20,19 @@ export function openDB() {
       const db = req.result;
       // A store that already exists can still be missing an index this build
       // needs, so the two cases share one path: make it if it is not there,
-      // then make sure every index on it is.
-      const mk = (name, opts, indexes = []) => {
+      // then make sure every index on it is. `gone` names indexes an earlier
+      // build made over a field this one no longer writes: they index nothing
+      // once the rows are re-sealed, and an index named after a field that is
+      // no longer on the row is a claim about the schema that is not true.
+      const mk = (name, opts, indexes = [], gone = []) => {
         const st = db.objectStoreNames.contains(name)
           ? req.transaction.objectStore(name)
           : db.createObjectStore(name, opts);
         for (const [iname, keyPath] of indexes) {
           if (!st.indexNames?.contains?.(iname)) st.createIndex(iname, keyPath);
+        }
+        for (const iname of gone) {
+          if (st.indexNames?.contains?.(iname)) st.deleteIndex(iname);
         }
       };
       mk('profiles', { keyPath: 'id' });
@@ -40,8 +46,12 @@ export function openDB() {
       mk('rushRuns', { keyPath: 'id', autoIncrement: true }, [['pid', 'pid']]);
       mk('matchRuns', { keyPath: 'id', autoIncrement: true }, [['pid', 'pid']]);
       mk('inks', { keyPath: 'id' }, [['pid', 'pid']]);                     // saved handwriting
-      mk('classes', { keyPath: 'id' }, [['teacherPid', 'teacherPid']]);
-      mk('tasks', { keyPath: 'id' }, [['classId', 'classId'], ['ownerPid', 'ownerPid']]);
+      // No index on either: the ids that say whose class this is, and which
+      // class a task belongs to, are inside the sealed body now, and an index
+      // is a copy of a field in the clear. Both stores hold a handful of rows
+      // a teacher made by hand, so they are read whole and filtered.
+      mk('classes', { keyPath: 'id' }, [], ['teacherPid']);
+      mk('tasks', { keyPath: 'id' }, [], ['classId', 'ownerPid']);
       mk('taskProgress', { keyPath: 'key' }, [['pid', 'pid'], ['taskId', 'taskId']]); // `${taskId}:${pid}`
       mk('customQs', { keyPath: 'id' }, [['ownerPid', 'ownerPid']]);
       mk('progressImports', { keyPath: 'id' }, [['teacherPid', 'teacherPid']]); // imported student progress files
@@ -79,27 +89,47 @@ export function openDB() {
 // written anywhere. No password means no key, which means the rows stay
 // ciphertext no matter what the rest of the app is told about who is signed in.
 
-// ── Keys that said too much ──────────────────────────────────────────────────
-// Sealing the values left the composite primary keys in the clear, and those
-// keys carried content: `${pid}:${date}` in `activity` is one row per day, so
-// the exact calendar of a child's study was readable without the password;
-// `${pid}:${subtopic}` in `ratings` and `reviews` named every topic they had
-// touched; `${pid}:${badgeId}` named every achievement earned; and
-// `${taskId}:${pid}` in `taskProgress` joined to the unsealed `tasks` store, so
-// the work a child had been set was readable too.
+// ── Keys that said too much, and who that was fixed for ──────────────────────
+// A PROTECTED profile's composite keys are blinded. An unprotected profile's
+// are not, and cannot be: blinding is keyed to the profile's own data key, and
+// a profile with no password has no data key. Say the whole of that first,
+// because this comment used to open with "those keys are now blinded" and put
+// the exception a hundred and seventy lines further down, where a reader who
+// had stopped at the good news would never reach it.
 //
-// Those keys are now blinded. `blind` marks a store whose primary key is a
-// composite of the owner's id and something that means something, and says
-// which end of it the owner's id sits at. On the way to disk the identifying
-// half is replaced by a keyed hash — HMAC-SHA-256 under a subkey derived from
-// that profile's own data key, domain-separated by store name — so the row
-// lands at `${owner}#<24 opaque characters>`. The same input always gives the
-// same opaque key for that profile, which is what keeps `get` by key working;
-// it means nothing at all without the key, and it cannot be compared across
+// So, for a profile with no password, on disk today and by design:
+//
+//   · `activity`  — `${pid}:2026-08-21`, one row per day, the exact calendar.
+//   · `ratings`, `reviews` — `${pid}:y10-trig`, naming every idea touched.
+//   · `badges`    — `${pid}:first-steps`, naming every achievement earned.
+//   · `taskProgress` — `${taskId}:${pid}`, and the row body beside it.
+//
+// That is not a leak this file can close. The row's *contents* are in the clear
+// for such a profile too — there is no key to seal them with — so blinding its
+// keys would hide a date that is written out in full two fields to the right.
+// An unprotected profile is unprotected; what that costs is set out again at
+// "A profile with no password" below, and the honest fix is a password.
+//
+// What that leaves this file responsible for is the JOIN, which is a different
+// thing and was a real bug: an unprotected child's clear `taskProgress` key
+// used to lead, through a task and a class both carrying their owner in the
+// clear, to the name of the protected teacher whose roll they were on. A
+// profile with no password gives up its own work; it must not give up somebody
+// else's. That is closed under "Sharing a record between profiles" below.
+//
+// ── How a protected profile's keys are blinded ───────────────────────────────
+// `blind` marks a store whose primary key is a composite of the owner's id and
+// something that means something, and says which end of it the owner's id sits
+// at. On the way to disk the identifying half is replaced by a keyed hash —
+// HMAC-SHA-256 under a subkey derived from that profile's own data key,
+// domain-separated by store name — so the row lands at
+// `${owner}#<24 opaque characters>`. The same input always gives the same
+// opaque key for that profile, which is what keeps `get` by key working; it
+// means nothing at all without the key, and it cannot be compared across
 // profiles. The plaintext key travels inside the sealed blob and is put back on
 // the row when it is opened, so the app above this file never sees the
-// difference and `taskProgress` keeps its `taskId` — now sealed with the rest
-// of the row rather than standing in the open next to an unsealed task.
+// difference and `taskProgress` keeps its `taskId` — sealed with the rest of
+// the row rather than standing in the open next to a task.
 //
 // A blinded row is checked against its own slot when it is opened: a blob moved
 // to another key by hand no longer opens, because the key it claims no longer
@@ -171,19 +201,28 @@ const SEALED_STORES = {
   taskProgress: { owner: 'pid', clear: ['key', 'pid'], blind: 'tail' },
   bookmarks: { owner: 'pid', clear: ['key', 'pid'], blind: 'head' },
   progressImports: { owner: 'teacherPid', clear: ['id', 'teacherPid'] },
-  classes: { owner: 'teacherPid', clear: ['id', 'teacherPid'], share: rollOf },
-  tasks: { owner: 'ownerPid', clear: ['id', 'ownerPid', 'classId'], share: readersOfTask },
+  classes: { owner: 'teacherPid', clear: ['id'], share: rollOf },
+  tasks: { owner: 'ownerPid', clear: ['id'], share: readersOfTask },
   profiles: { owner: 'id', clear: CLEAR_ON_PROFILE, partial: true }
 };
 
 /**
  * The stores whose rows follow a profile's protection, each with its owner
- * field. `profiles` is not among them: it is reached by its own primary key
- * rather than by an index, and it is sealed field by field rather than row by
- * row, so the sweeps that seal and unseal a profile's records leave it alone.
+ * field. Two kinds are not among them.
+ *
+ * `profiles` is reached by its own primary key rather than by an index, and it
+ * is sealed field by field rather than row by row, so the sweeps that seal and
+ * unseal a profile's records leave it alone.
+ *
+ * The shared stores are out for a stronger reason: their rows do not follow one
+ * profile's protection at all. A class is sealed to its teacher and its whole
+ * roll at once and stays sealed whatever any one of those people does about a
+ * password, and the owner's id is inside the blob rather than on the row, so
+ * there is no clear field left to find them by. `alignSharedRows` and
+ * `sweepSharedRows` below are what keeps them current instead.
  */
 export const ENCRYPTED_STORES = Object.entries(SEALED_STORES)
-  .filter(([, spec]) => !spec.partial)
+  .filter(([, spec]) => !spec.partial && !spec.share)
   .map(([store, spec]) => [store, spec.owner]);
 
 // ── What a row count still says ──────────────────────────────────────────────
@@ -252,15 +291,32 @@ const seqs = new Map();
 // `wraps` (equal-sized blobs, padded to a bucket and shuffled, none of which
 // says who it is for).
 //
-// What stays in the clear, and why:
-//   · `id` — the primary key. A uuid.
-//   · `teacherPid` / `ownerPid` — the owner index, which is how the sweeps that
-//     seal, unseal and delete a profile's rows find them without reading them.
-//   · `classId` on a task — the index the analytics page reads a class's tasks
-//     through. A uuid that leads to a row which is itself sealed, so the join
-//     the audit walked now stops at the class row instead of continuing into
-//     its roll. What is left of it is that two tasks belong to the same
-//     unnamed class.
+// What stays in the clear: `id`, the primary key, and nothing else. A uuid.
+//
+// ── The join, and why the owner had to come off the row ──────────────────────
+// `teacherPid`, `ownerPid` and `classId` used to sit beside it, as the indexes
+// the sweeps and the analytics page read rows through, and they were argued for
+// on the grounds that each one only leads to another sealed row. That argument
+// was wrong, and what made it wrong was arriving from the other end.
+//
+// A child with no password has no key, so their `taskProgress` row sits at the
+// plaintext key `${taskId}:${pid}` — which cannot be helped, and on its own
+// says only that some profile did some work. But `taskId` named a `tasks` row,
+// whose `ownerPid` and `classId` were clear; `classId` named a `classes` row,
+// whose `teacherPid` was clear. Three hops, no key at any of them, and the
+// answer was "this child is on that teacher's roll", checked against a real
+// class list and correct. The unprotected profile was giving up the protected
+// teacher's roster, which is not its to give.
+//
+// So the linking ids are in the sealed body now. A dump with no key holds, for
+// each of these rows, a uuid primary key, an `epk`, a shuffled bucket of
+// equal-sized `wraps` and one blob. Nothing joins one to another, and nothing
+// joins either to a profile. What that leaves readable is set out at "What an
+// attacker can still infer" below, because it is not nothing.
+//
+// The cost is two index lookups turned into scans of stores that hold a handful
+// of hand-made rows each, and a `wipeProfile` that has to open a shared row to
+// find out whether it is deleting it. Both are priced in where they happen.
 //
 // ── A profile with no password ───────────────────────────────────────────────
 // This is where the scheme was broken, and the break was not an edge case. The
@@ -317,6 +373,47 @@ const seqs = new Map();
 // unaddressable reader loses sight of it until they take a password. Every
 // browser this app ships on stores CryptoKeys; the fallback is a refusal to
 // degrade quietly, not a path anybody is expected to take.
+//
+// ── What an attacker can still infer ─────────────────────────────────────────
+// Stated exactly, for a raw copy of these records — an IndexedDB export, a file
+// pulled off the device, a JSON dump — with no password and no key held.
+//
+// Readable, and deliberately so:
+//   · every profile's `id`, `name`, `avatar`, `year` and `role`. So the picker
+//     can be drawn while everything is locked; the reasons are beside
+//     CLEAR_ON_PROFILE. It follows that a dump names who the teachers are and
+//     who the children are, by role, before any of the below.
+//   · which profiles have a password (`auth`) and which do not.
+//   · for a profile with NO password: everything it owns. Its ratings, its
+//     activity calendar, its badges, its handwriting, its `taskProgress` rows
+//     with the `taskId` in them. Not because of any of the machinery here —
+//     because it has no key, and nothing can be sealed to nobody.
+//   · how many classes and how many tasks exist, and how many rows a profile
+//     has in each store. Counts, never contents; the reasoning is at "What a
+//     row count still says".
+//   · roughly how many people a shared record is addressed to. `wraps` is
+//     padded to a bucket of four, so a class of three and a class of one look
+//     alike, but a class of thirty does not look like a class of three. A task
+//     and the class it was set to therefore fall in the same bucket, which is a
+//     weak hint that they might belong together — one that thirty other tasks
+//     in the same bucket make useless, and that says nothing about who.
+//
+// Not readable from the records alone, and this is what changed:
+//   · which teacher owns a class, or set a task.
+//   · which class a task belongs to.
+//   · who is on any roll.
+//   · therefore: which teacher any child is taught by. A `taskProgress` row in
+//     the clear now ends at "this profile did four questions of some task".
+//
+// The line this does not cross, restated because it is the one people get
+// wrong: a copy of the browser's own key store is not a copy of the records. It
+// carries `share-wrap`, and `share-wrap` opens the private half of every
+// unprotected profile's keypair — so an attacker holding that can open any
+// class or task addressed to any child with no password, and read the roll, the
+// title and the subtopics from inside the blob. Sealing a record to a profile
+// with no password keeps it out of a file; it cannot keep it from somebody
+// holding the device and its key store. Only a password does that, and only for
+// the profile that has one.
 
 const shareIds = new Map();        // pid → { pub, sec }
 const shareIdentities = new Map(); // pid → imported private half
@@ -842,7 +939,10 @@ async function unsealShared(store, spec, row) {
   const { sealedTo, ...rest } = priv;
   const { sealed, epk, wraps, ...clear } = row;
   const out = { ...rest, ...clear };
-  if (opened.pid !== row[spec.owner]) {
+  // Whose row this is comes out of the blob, not off the row: the owner's id is
+  // not on the row any more. Reading it from the row instead would make every
+  // opener look like a reader, and a reader's write re-seals to the roll.
+  if (opened.pid !== out[spec.owner]) {
     Object.defineProperty(out, AS_READER, { value: opened.pid, enumerable: false, configurable: true });
   }
   if (Array.isArray(sealedTo)) {
@@ -1249,21 +1349,34 @@ export async function rawByIndex(store, index, value) {
   return readIndex(store, index, value);
 }
 
-// Every store that hangs off a profile, and the index that finds its rows.
+// Every store that hangs off one profile and carries its id in the clear, with
+// the index that finds those rows. The shared stores are not in the list:
+// nothing on one of their rows says whose it is any more.
 const PROFILE_STORES = [
   ['ratings', 'pid'], ['attempts', 'pid'], ['questions', 'pid'], ['reviews', 'pid'],
   ['exams', 'pid'], ['badges', 'pid'], ['activity', 'pid'], ['rushRuns', 'pid'],
   ['matchRuns', 'pid'], ['inks', 'pid'], ['taskProgress', 'pid'], ['bookmarks', 'pid'],
-  ['customQs', 'ownerPid'], ['progressImports', 'teacherPid'],
-  ['classes', 'teacherPid'], ['tasks', 'ownerPid']
+  ['customQs', 'ownerPid'], ['progressImports', 'teacherPid']
 ];
 
 /**
- * Delete every record belonging to a profile (profile removal). Rows are found
- * through their index rather than by reading them, and deleted at the key they
- * are actually sitting at, so a locked profile — whose keys mean nothing to
- * anyone without its password — is erased just as completely as an open one,
- * and the classes and tasks it owned go with it.
+ * Delete every record belonging to a profile (profile removal).
+ *
+ * Rows in the stores above are found through their index rather than by reading
+ * them, and deleted at the key they are actually sitting at, so a profile whose
+ * password nobody here holds — its keys meaning nothing without it — is erased
+ * just as completely as an open one.
+ *
+ * The classes and tasks it owned cost more than they used to. The id that says
+ * whose they are is inside the blob now, so there is no index to sweep and no
+ * field to match: each row has to be opened to find out. That is why the delete
+ * route takes the profile's key on the way past — a protected profile is asked
+ * for its password to delete it either way, and the key that password opens is
+ * what lets its classes and tasks go with it. A row that cannot be opened is
+ * left where it is, and what is left is sealed to a keypair that is about to
+ * stop existing: unreadable afterwards by anybody, this file included. A record
+ * an older build wrote in the clear still carries its owner field and still
+ * comes back from `all()` carrying it, so those are matched and deleted too.
  *
  * The rolls of classes it merely appeared on are then cleaned of it, as far as
  * that can be done: a roll this profile can read is rewritten without it, and
@@ -1276,6 +1389,12 @@ export async function wipeProfile(pid) {
   for (const [store, index] of PROFILE_STORES) {
     const rows = await rawByIndex(store, index, pid).catch(() => []);
     for (const r of rows) await del(store, r.id ?? r.key);
+  }
+  for (const [store, spec] of Object.entries(SEALED_STORES)) {
+    if (!spec.share) continue;
+    for (const row of await all(store)) {
+      if (row?.[spec.owner] === pid) await del(store, row.id);
+    }
   }
   for (const c of await all('classes')) {
     if (c.studentPids?.includes(pid)) {

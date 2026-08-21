@@ -114,11 +114,23 @@ export async function rewrapVault(key, password) {
 // ── Record cipher ────────────────────────────────────────────────────────────
 // AES-GCM is a stream cipher with a tag on the end: the ciphertext is exactly
 // as long as the plaintext plus sixteen bytes. That length is readable without
-// any key, and it is not nothing. A ratings row seals `{key, subtopic, …}`, so
-// its ciphertext length moved one byte for every character of the subtopic id
-// it was hiding — and two of the fifty-four ids in the curriculum are the only
-// id of their length, which meant that for those two the blinded key was
-// undone by the size of the blob sitting next to it.
+// any key, and it is not nothing. A ratings row seals
+// `{subtopic, rating, attempts, correct, last_at, dp, traps, recent, key}`, and
+// the subtopic id is not in there once. It is in `subtopic`; in the plaintext
+// key, which travels inside the blob so the blinded key on the row can be
+// checked against it; in the key of every dot-point entry, which is `<id>.N`;
+// in the key of every trap, which is `<id>.t<hash>`; and again in each trap's
+// `dotpoint`. So the ciphertext length moves by the length of that id times
+// however many times the row is currently carrying it — three or four times on
+// a row one question old, twenty-one at the ceiling, because every subtopic has
+// exactly three dot points and MAX_TRAPS_PER_SUBTOPIC is eight.
+//
+// The curriculum ships eighty-four subtopic ids, seven characters to twenty, a
+// spread of thirteen. Exactly one — `y11-sine-cosine-rule`, at twenty — is the
+// only id of its length, so for that one the length named the id outright; the
+// rest sit in groups of two to fifteen, where it narrows rather than names.
+// Either way it was the blinded key being undone by the size of the blob
+// sitting next to it.
 //
 // So every record is padded to a bucket before it is sealed. The padding is
 // spaces on the end of the JSON, which `JSON.parse` already ignores: nothing is
@@ -126,36 +138,79 @@ export async function rewrapVault(key, password) {
 // written by an older build — unpadded — still opens.
 //
 // The first bucket used to be sixty-four bytes, and sixty-four bytes was not
-// enough. The curriculum's eighty-four subtopic ids run from seven characters
-// to twenty, a spread of thirteen, and a ratings row carries its id more than
-// once — in `subtopic`, in the plaintext key, and again in every dot-point
-// entry. That put fresh rows either side of a boundary: two bands, 272 and 336
-// bytes of ciphertext, splitting the eighty-four ids between them. One band is
-// about a bit, and a bit is what the blinded key was there to take away.
+// enough: it split the eighty-four fresh rows across three bands — 272 × 31,
+// 336 × 41 and 400 × 12 bytes of ciphertext in the run this was last measured
+// on. A 128-byte step leaves two bands and a 256-byte step still leaves two;
+// 512 is the first step that holds all eighty-four in one, so that is the small
+// bucket. Above it the steps stay as they were: 512 up to sixteen kilobytes,
+// then 4096 for handwriting and exam papers, which are big enough that a fine
+// bucket would cost more than the leak is worth.
 //
-// The small bucket is therefore 512 bytes. Measured over the whole curriculum,
-// every ratings row lands in one band and stays there as it fills up — a fresh
-// row (181–207 bytes of JSON) and a well-used one (279–318) are both 512, so
-// the band no longer separates the ids and no longer separates a new topic
-// from a practised one. Reviews, activity, badges and bookmarks are smaller
-// still and all sit in that same first band. Above it the steps stay as they
-// were: 512 up to sixteen kilobytes, then 4096 for handwriting and exam
-// papers, which are big enough that a fine bucket would cost more than the
-// leak is worth.
+// ── What that bought, measured on rows the real submit path writes ───────────
+// Not on a sketch of a row. Driven through local/backend.js against the
+// in-memory IndexedDB that client/test/backend-check.mjs stands up, with
+// `Math.random` seeded so a run repeats, and read back out of the raw store
+// rather than through this file. These figures move when the curriculum, the
+// dot-point count or MAX_TRAPS_PER_SUBTOPIC moves; re-measure before repeating
+// them.
+//
+//   · A fresh row is covered, and this is the part that works. One answered
+//     question on each of the eighty-four subtopics writes rows of 246–359
+//     bytes of JSON, and all eighty-four land at 528 bytes of ciphertext. A
+//     fresh row's length says nothing about which id is in it.
+//
+//   · A used row is not covered. Three hundred questions answered to
+//     resolution wrote eighteen ratings rows of 341–1,209 bytes, landing
+//     528 × 2–6, 1,040 × 10–15 and 1,552 × 0–2 on disk across four seeded
+//     runs — two bands always, three when a subtopic collects enough traps.
+//     So the band DOES separate a new topic from a practised one, and a
+//     heavily practised one from the rest. This comment claimed the opposite
+//     for as long as the claim went unmeasured.
+//
+//   · The id-driven part of that, with the row shape held fixed and only the id
+//     moving across all eighty-four: 39 bytes while the row carries the id
+//     three times, 52 at four, 65 at five, 91 at seven, 117 at nine, 143 at
+//     eleven, and 273 at the ceiling of three dot points and eight traps, where
+//     it appears twenty-one times. That is 7.6% to 53.3% of a 512-byte bucket,
+//     not the "at most three times, so under 8%" this said before.
+//
+//   · Whether that spread is enough to decide the bucket on its own depends on
+//     where the rest of the row falls, and it is not monotone in the count. On
+//     a row of three dot points and a mid-length trap label, the eighty-four
+//     ids span 948–1,091 bytes at three traps and straddle 1,024; 1,476–1,697
+//     at six and straddle 1,536; 1,828–2,101 at eight and straddle 2,048. At
+//     four, five and seven traps the whole span sits inside one bucket. So for
+//     some rows the band is partly a function of the id again, and which rows
+//     those are cannot be read off the occurrence count alone.
+//
+// ── Why the first bucket is not simply widened ───────────────────────────────
+// The largest ratings row this build can write is 2,813 bytes — twenty
+// characters of id, three dot points, eight traps at the 140-character label
+// cap — so holding every one of them in a single band needs a 4,096-byte first
+// bucket, and that bucket is not the ratings store's alone. Three hundred
+// answered questions leave a profile holding 646 sealed rows: 300 `attempts` at
+// 241–277 bytes, 300 `questions` at 699–3,070, 18 `ratings`, 18 `reviews` at
+// 212–242, nine or ten `badges` at 93–109 and one `activity` row at 145. That is
+// 589–609 kB on disk at the 512-byte step and 2.53 MB at 4,096. On the small
+// rows the factor is worse than the total says: every one of the 300 `attempts`
+// rows would go from 528 bytes to 4,112, turning 155 kB into 1.18 MB. That is
+// eight times the storage on every small row a profile writes, on an iPad
+// holding months of practice, to buy one band back on the store with the least
+// of it left to give — and it would still only move the boundary, since a row
+// that keeps growing crosses any fixed step eventually. The step stays at 512
+// and the residual is written down instead.
 //
 // The residual, stated exactly rather than rounded to nothing. Padding does not
 // erase length, it quantises it, so what is left is:
-//   · which band a record is in — with 512-byte steps, "under half a kilobyte"
-//     for every practice row a profile writes until it has grown past that.
+//   · which band a record is in — "under half a kilobyte" for a fresh practice
+//     row, and past that a coarse measure of how much work is in the row.
 //   · a row whose contents sit within one id-spread of a bucket boundary can
-//     still be pushed over it by the id. The id appears at most three times in
-//     a ratings row, so the widest that effect can be is 3 × 13 = 39 bytes of
-//     the 512 in a bucket: under 8% of the possible fill states, against 61%
-//     at the old 64-byte step. It is smaller, not gone, and it is only gone for
-//     a record whose length is fixed — which none of these are.
+//     still be pushed over it by the id, by the amounts measured above.
 //   · the two large steps are coarse in absolute terms but wide in relative
 //     terms, so a 40 kB ink and a 44 kB ink are the same band while a 4 kB one
 //     is not.
+//   · it is only ever gone for a record whose length is fixed, and none of
+//     these are.
 
 const padStep = (n) => (n < 16384 ? 512 : 4096);
 

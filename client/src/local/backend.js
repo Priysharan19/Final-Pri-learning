@@ -27,7 +27,7 @@ import {
 import { BADGES, checkBadges } from './badges.js';
 import {
   hashPassword, verifyPassword, needsRehash,
-  createVault, openVault, rewrapVault, blindHash
+  createVault, openVault, rewrapVault, blindHash, sealValue, openValue
 } from './auth.js';
 import { sanitizeFigure, sanitizeText } from '../lib/sanitize.js';
 
@@ -557,6 +557,20 @@ async function openProfileData(p, password) {
   }
   await encryptRows(p.id);
   if (p.email) await setProfileEmail(p, p.email);
+}
+
+/**
+ * Bring a profile's data key into memory and do nothing else with it.
+ * `openProfileData` above does the housekeeping a sign-in wants — minting a
+ * vault the first time, sweeping rows that predate it, re-indexing an address —
+ * and a delete wants none of that. It needs the key for one reason: the classes
+ * and tasks this profile owns say so only inside their sealed bodies now, so
+ * they cannot be found, and therefore cannot be deleted, without it.
+ */
+async function takeDataKey(p, password) {
+  if (!p.vault) return;
+  const key = await openVault(password, p.vault);
+  if (key) setDataKey(p.id, key);
 }
 
 /** Seal any of a profile's private rows that are still lying about in the clear. */
@@ -1243,13 +1257,17 @@ const routes = {
   // Deleting a profile is final, so it always costs something: the password on a
   // protected profile, an explicit confirmation on one without. The two refusals
   // carry different shapes so the UI knows which to ask for.
+  //
+  // The password is spent on the key as well as on the check. A teacher's
+  // classes and tasks carry nothing in the clear that says whose they are, so
+  // the wipe has to open them to take them, and only this password opens them.
   'POST /profiles/delete': async (body) => {
     const { id, password, confirm } = body || {};
     const p = await get('profiles', id);
     if (!p) throw Object.assign(new Error('Profile not found'), { status: 404 });
     if (p.auth) {
       if (!password) throw Object.assign(new Error('Enter this profile’s password to delete it.'), { status: 401, needsPassword: true });
-      await withPassword(id, password, null);
+      await withPassword(id, password, takeDataKey);
     } else if (confirm !== true) {
       throw Object.assign(new Error('Deleting this profile erases its work for good.'), { status: 400, needsConfirm: true });
     }
@@ -1995,7 +2013,11 @@ const routes = {
         weakest, imported: true, importedAt: imp.importedAt
       });
     }
-    const tasks = await byIndex('tasks', 'classId', params.id);
+    // Which class a task belongs to is inside the task's sealed body, so this
+    // is a scan and a filter rather than an index lookup. The store holds the
+    // tasks one teacher typed out by hand, and only the ones this profile can
+    // open come back at all.
+    const tasks = (await all('tasks')).filter(t => t.classId === params.id);
     const taskRows = [];
     for (const t of tasks) {
       const progress = [];

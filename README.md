@@ -101,7 +101,7 @@ to. Nothing in this project compares the two products head to head.
 | Full exam paper downloads | Any generated paper renders as a **print-ready sheet** — questions with figures up front, marking criteria and worked solutions behind, multipart included — then `window.print()` hands it to the browser, where **Save as PDF** produces the file. The app formats the paper (there is a dedicated print stylesheet); it does not generate the PDF itself |
 | Scribble pad (rough work, never submitted) | Collapsible scribble pad on every question — **saved with the attempt** and replayable in History |
 | Progress at “idea level” | Per-subtopic ratings, mastery bands, strand analytics, activity calendar, printable progress report |
-| Account data in the cloud | **Data safety, locally**: persistent-storage protection, storage usage meter, **encryption at rest** on password-protected profiles (15 stores sealed row by row under a per-profile AES-GCM-256 key, and the profile record itself sealed field by field on top — [counted below](#architecture)), and **one-file full backup/restore** that moves your entire history between devices |
+| Account data in the cloud | **Data safety, locally**: persistent-storage protection, storage usage meter, **encryption at rest** on password-protected profiles (13 stores sealed row by row under a per-profile AES-GCM-256 key, two more sealed to a whole class roll, and the profile record itself sealed field by field on top — [counted below](#architecture)), and **one-file full backup/restore** that moves your entire history between devices. What that does **not** cover — row counts, and a profile with no password — is in [What is not done](#what-is-not-done) |
 | Free tier limits (5/day), Pro $9.99/mo | **No daily cap, no tiers, nothing to pay** — it's your device doing the work. "Unlimited" is bounded, and the [census below](#measured-accuracy) says where: questions are built from a seed rather than drawn from a pool, so the space is large (**344,798** distinct observed) but finite, and the thinnest (subtopic × difficulty) cell holds **54** |
 | — | Plus: streaks & XP levels, 22 achievements, 90-second Rush, spaced-review scheduler, dark/light themes, offline PWA, multi-profile |
 
@@ -153,9 +153,11 @@ convolutional network ships **inside the bundle** and does the heavy lifting on 
      bytes and 798,303 characters — the two-byte gap is that em dash, not a miscount.)
      The forward pass is plain JavaScript and costs **14.6 ms per symbol** for all three voters —
      the median of three timed runs of 1,000 `nnClassify` calls after 1,000 warmup calls, on Node
-     24.19 on Apple Silicon. `npm test` does not print this one, so here is the loop that does; it is
-     a property of the machine as much as of the code, and a different machine will say something
-     else:
+     v24.19.0 on an Apple M4. The loop below was executed **seven times** to write that figure down:
+     the individual runs spanned 14.50–14.71 ms and the seven medians were 14.5 or 14.6, so the
+     quoted number is the loop's own answer and not the best of a spread. `npm test` does not print
+     this one, so here is the loop that does; it is a property of the machine as much as of the code,
+     and a different machine will say something else — quote it with the machine or not at all:
 
      ```bash
      node --input-type=module -e "
@@ -237,9 +239,15 @@ ship the app — the trained assets are committed.
        · two figures here have no committed command and carry the exact loop
          that produces them instead: the 14.6 ms per-symbol forward pass, which
          is machine-dependent, and the y7-area 155/145 branch split.
+       · the sealed-store count is quoted twice — the feature matrix and
+         "Architecture" — and it is read out of ENCRYPTED_STORES by the command
+         beside it in "Architecture", not from this block. It has already been
+         wrong in both places at once: both said 15 after the export stopped
+         counting the two shared stores. Change it where the command is, then
+         in the feature matrix, and never write it from memory.
      ═══════════════════════════════════════════════════════════════════════════ -->
 
-**Last measured: 2026-08-21 12:26**, against `client/src/ink/model-data.js` (v7 ensemble,
+**Last measured: 2026-08-21 14:10**, against `client/src/ink/model-data.js` (v7 ensemble,
 val_acc 0.9395). The two `count-questions.mjs` rows move whenever a generator changes, and they moved
 three times in the twenty minutes this block was last checked. **A date has never once caught a stale
 figure here** — this block sat at 330,930 observed and 227/252 dot points under a stamp reading the
@@ -423,15 +431,21 @@ set's failures, it stops being evidence.
 ## What is not done
 
 <!-- ═══════════════════════════════════════════════════════════════════════════
-     NOT-DONE BLOCK — the four gaps a reader finds on their own within an hour.
+     NOT-DONE BLOCK — the six gaps a reader finds on their own within an hour.
      Naming them here is worth more than making them findable. Each bullet
      carries the command or the file that proves the gap is real, so this
      section is checkable in both directions: nothing here may be softened
      while the check below it still says what it says, and a bullet whose
      check stops being true should be deleted rather than reworded.
+
+     Two of the six are limits on the encryption the feature table advertises.
+     They are here because client/src/local/idb.js and client/src/local/auth.js
+     both document them at length and this README used to claim "never enough
+     to read one" and stop. Where the code is more honest than the README, the
+     README is the thing that is wrong.
      ═══════════════════════════════════════════════════════════════════════════ -->
 
-Everything above is either measured or labelled as unmeasured. This section is the other half: four
+Everything above is either measured or labelled as unmeasured. This section is the other half: six
 things a reader would reasonably assume are here, and are not. None of them is a defect — they are
 the edge of what this repo can currently show.
 
@@ -453,6 +467,88 @@ the edge of what this repo can currently show.
   no wrapped key. Practise on the iPad and then on a laptop and you have two separate students as far
   as this app is concerned. That is the price of having no account and no server, and it is a price,
   not a feature.
+
+- **Encryption at rest hides what a row says, never that it exists — the row counts leak.** This is
+  an accepted, deliberate limit, argued out in `client/src/local/idb.js` under *"What a row count
+  still says"*, and this README used to stop at "never enough to read one". Sealing a row hides its
+  contents and blinding its key hides which idea it is about, but the row is still there and the
+  profile that owns it is still written beside it in the clear — that is exactly what lets IndexedDB
+  find it again. So a raw copy of the database, with **no password and no key held**, still counts:
+  how many days were studied (`activity`, one row per day), how many subtopics were practised
+  (`ratings`, one row each), how many ideas reached the revision schedule (`reviews`), how many
+  achievements were earned (`badges`), and how much work in total (`attempts`, `questions`, `exams`,
+  `rushRuns`, `matchRuns`, `inks`). Never *which* day, *which* subtopic or *which* badge — but the
+  counts are exact, and a count of zero reads as clearly as a count of two hundred. The clear field
+  that makes it countable is exported store by store:
+
+  ```bash
+  node --input-type=module -e "
+  import {ENCRYPTED_STORES} from './client/src/local/idb.js';
+  console.log(ENCRYPTED_STORES.map(([s, owner]) => s + ' keeps ' + owner + ' in the clear').join('\n'));"
+  # ratings keeps pid in the clear   … 13 lines, one per sealed store
+  ```
+
+  Record *length* is a second channel, and padding narrows it rather than closing it. Every record is
+  grown with spaces to a 512-byte bucket before it is sealed, which is enough to make a fresh
+  `ratings` row say nothing about which topic it is — one answered question on each of the 84
+  subtopics writes rows of **246–359 bytes of JSON that all land at 528 bytes of ciphertext** — and
+  not enough to hide a practised topic from a new one: **300 questions answered to resolution left 18
+  `ratings` rows spread across the 528, 1,040 and 1,552-byte bands**. `client/src/local/auth.js`
+  states that residual exactly, beside the code that does the padding, including how much of it the
+  subtopic id alone accounts for. Decoy rows would move the counts and were weighed and refused; the
+  reasoning is written where the decision is, so the trade was made in the open rather than missed.
+
+- **A profile with no password gets none of that, and no password is the default.** Every guarantee
+  in the paragraph above is bought with a key derived from a password. A profile that has none has no
+  key, so nothing is sealed for it at all — not the rows, and not the keys they sit at, because
+  blinding is derived from the same data key. Driven through the real backend, an unprotected
+  profile's eight answered questions leave `ratings` at `<pid>:y9-algebra`, `activity` at
+  `<pid>:2026-08-21` and `badges` at `<pid>:first-steps`, **zero of those rows sealed**, and the
+  bodies beside them — rating, attempts, per-dot-point history — in plain JSON. This is the case that
+  matters most and is least likely to be noticed: the standard classroom setup is a teacher with a
+  password and children without one, so a child on a shared iPad is the likeliest unprotected profile
+  in the app. One answered question is enough to show it, through the real backend:
+
+  ```bash
+  node --input-type=module -e "
+  import {installBrowserEnv, rawRows} from './client/test/backend-check.mjs';
+  installBrowserEnv();
+  const {dispatch} = await import('./client/src/local/backend.js');
+  const {loadAllBanks} = await import('./client/src/engine/generators/index.js');
+  await loadAllBanks();
+  const kid = (await dispatch('POST', '/profiles', {name: 'Child', year: 9})).user;
+  const q = (await dispatch('POST', '/practice/next', {})).question;
+  for (let i = 0; i < 2; i++) await dispatch('POST', '/practice/' + q.id + '/submit', {answer: '0', ms: 5000});
+  const rows = Object.entries(rawRows()).flatMap(([s, rs]) =>
+    rs.filter(r => r.pid === kid.id).map(r => s + ' @ ' + (r.key ?? r.id) + (r.sealed ? ' [sealed]' : '')));
+  console.log(rows.length + ' rows, ' + rows.filter(r => r.includes('[sealed]')).length + ' sealed');
+  console.log(rows.join('\n'));"
+  # 4 rows, 0 sealed
+  # ratings   @ <pid>:y9-probability
+  # attempts  @ <pid>:000000000001
+  # questions @ <uuid>
+  # activity  @ <pid>:2026-08-21
+  ```
+
+  The subtopic and the date are in those keys, unblinded, and the row bodies beside them are not
+  sealed at all. Run the same profile with `{name: 'Child', year: 9, password: 'anything-at-all'}` and
+  the same four rows come back **4 sealed**, with the two keys that named something — the subtopic and
+  the date — replaced by opaque tags (`<pid>#h8zY8jp47UZ-mlLAVle4-JjI`). The other two keys are a
+  per-profile counter and a uuid, which named nothing to begin with.
+
+  One thing such a profile *does* get, stated precisely because it is easy to read as more than it
+  is: every profile carries a sharing keypair from the moment its row is first written, and where
+  there is no password the private half is sealed under a non-extractable AES key this install keeps
+  in its `device` store. That keeps class names, rolls, task titles and subtopic lists out of a *copy
+  of the records* — an export, a JSON dump, a file pulled off the iPad — which is the attack that
+  closed. It is not a password and does not stand in for one: anyone holding the device picks that
+  child out of the picker with nothing to type, script running as this origin can use the wrapping
+  key without ever exporting it, and a backup carrying the browser's own key store carries the
+  wrapping key with it. The line it draws is *"the data does not leave"*, not *"the person holding
+  the device cannot read it"* — and for a profile with no password there is no key material anywhere
+  on the device that could draw the second line. `client/src/local/idb.js` says the same at *"A
+  profile with no password"* and at *"What an attacker can still infer"*. The only fix is a password,
+  and only for the profile that takes one.
 
 - **No teacher has reviewed any of this, and nothing has been checked against NESA.** The 84
   subtopics, 252 dot points, exam weights and topic codes in `client/src/engine/curriculum.js` were
@@ -495,26 +591,33 @@ the edge of what this repo can currently show.
 ## Architecture
 
 - **Client (the whole product)** — React 18 + Vite PWA. The maths engine, marker, adaptive model,
-  generators, badges and seeding all run in the browser; IndexedDB (schema v3, persistent-storage
+  generators, badges and seeding all run in the browser; IndexedDB (schema v4, persistent-storage
   protected) stores profiles, ratings, attempts, ink + scribbles + photos, exams, tasks, classes,
   bookmarks, progress imports and analytics. On a password-protected profile those rows are
-  **encrypted at rest** — **15 stores sealed row by row** under a per-profile AES-GCM-256 data key,
+  **encrypted at rest** — **13 stores sealed row by row** under a per-profile AES-GCM-256 data key,
   itself wrapped by a PBKDF2-SHA256 (600,000-iteration) key derived from the password; key paths and
-  index paths stay in the clear so IndexedDB can still find a row, never enough to read one. The
-  `profiles` store is a sixteenth and is handled differently — sealed **field by field** rather than
-  row by row, because the profile picker and the password gate have to draw before anyone has proved
-  who they are, so `id`, `name`, `avatar`, `year`, `role`, the PBKDF2 verifier and the wrapped key
-  stay legible while the rest of the record stays shut. Count the fifteen rather than trusting this
-  sentence — the list is exported:
+  index paths stay in the clear so IndexedDB can still find a row, never enough to read one. Count
+  the thirteen rather than trusting this sentence — the list is exported, with the field each store
+  keeps in the clear:
 
   ```bash
   node --input-type=module -e "
   import {ENCRYPTED_STORES} from './client/src/local/idb.js';
   console.log(ENCRYPTED_STORES.length + ' stores: ' + ENCRYPTED_STORES.map(([s]) => s).join(', '));"
-  # 15 stores: ratings, attempts, questions, reviews, exams, badges, activity, rushRuns,
-  #            matchRuns, inks, taskProgress, bookmarks, progressImports, classes, tasks
+  # 13 stores: ratings, attempts, questions, reviews, exams, badges, activity, rushRuns,
+  #            matchRuns, inks, taskProgress, bookmarks, progressImports
   ```
 
+  Three more stores are sealed and are deliberately *not* in that list, because their rows do not
+  follow one profile's protection. `classes` and `tasks` are read by a teacher and by every student
+  on the roll — different profiles, different keys — so each record is sealed under a key of its own
+  and that key sealed once per reader against their public half, with the reader list padded to a
+  bucket so its length is not the size of the class. `profiles` is sealed **field by field** rather
+  than row by row, because the profile picker and the password gate have to draw before anyone has
+  proved who they are, so `id`, `name`, `avatar`, `year`, `role`, the PBKDF2 verifier and the wrapped
+  key stay legible while the rest of the record stays shut. `customQs` is the one profile-owned store
+  left unsealed on purpose: a teacher's custom questions are answered by students signed in under
+  their own keys. What none of this covers is in [What is not done](#what-is-not-done).
   A service worker precaches the app shell for full offline use.
 - **`client/src/engine/`** — **the single source of truth for the maths engine.** Expression
   parser/evaluator, equivalence checker + Step Check + working-marker, curriculum (84 subtopics incl.
