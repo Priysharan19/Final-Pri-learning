@@ -4,9 +4,9 @@
 // suite runs anywhere.
 //
 // It builds the app, installs it, launches it with --ink-selfcheck, and reads
-// the result back out of the system log. It fails when either accuracy or exact
-// expression coverage regresses, when the deterministic geometry checks fail,
-// or when the bridge smoke test does not pass.
+// the result back out of the system log. It fails when accuracy/exact-expression
+// coverage regresses, when deterministic trace alignment or geometry checks
+// fail, or when the bridge smoke test does not pass.
 //
 // Usage: npm run test:ink:native [-- --device "iPad Air 11-inch (M4)"]
 // ─────────────────────────────────────────────────────────────────────────────
@@ -21,12 +21,13 @@ const PACKAGE = join(HERE, '../ios/PriLearning.swiftpm');
 const BUNDLE_ID = 'com.prilearning.app';
 
 // Floors prevent regression; they are deliberately not presented as targets.
-// V9 has now demonstrated 99.0% characters and 9/10 exact on this fixed native
+// V9 has demonstrated 99.0% characters and 9/10 exact on this fixed native
 // simulator corpus. A future change is not allowed to quietly fall back to the
 // old 85% / 6-of-10 gate and still call itself healthy.
 const ACCURACY_FLOOR = 99;
 const EXACT_FLOOR = 9;
 const EXPECTED_CASES = 10;
+const EXPECTED_ALIGNMENT_CHECKS = 6;
 const EXPECTED_GEOMETRY_CHECKS = 10;
 
 const argOf = (name) => {
@@ -89,13 +90,14 @@ for (let i = 0; i < 40; i++) {
   lines = log.split('\n')
     .filter(l => l.includes('PRIINK') && !l.includes("'log'"))
     .map(l => l.slice(l.indexOf('PRIINK')));
-  // Do not stop at the bridge line: geometry intentionally runs after the
-  // Vision benchmark, and an early break used to produce a false "not
-  // reported" failure even when the app was still finishing its checks.
+  // Do not stop at the bridge line: deterministic alignment and geometry run
+  // after the Vision benchmark. An early break would turn "still running" into
+  // a false "not reported" result.
   const hasSummary = lines.some(l => l.includes('character accuracy'));
   const hasBridge = lines.some(l => l.startsWith('PRIINK bridge mounted'));
+  const hasAlignment = lines.some(l => l.startsWith('PRIINK alignment '));
   const hasGeometry = lines.some(l => l.startsWith('PRIINK geometry '));
-  if (hasSummary && hasBridge && hasGeometry) break;
+  if (hasSummary && hasBridge && hasAlignment && hasGeometry) break;
 }
 
 // The log window can still hold an earlier run; only the latest one is this
@@ -106,11 +108,15 @@ for (const line of lines) console.log(`  ${line.replace(/^PRIINK\s*/, '')}`);
 
 const summary = lines.find(l => l.includes('character accuracy'));
 const bridge = lines.find(l => l.startsWith('PRIINK bridge mounted'));
+const alignment = [...lines].reverse().find(l => l.startsWith('PRIINK alignment '));
 const geometry = [...lines].reverse().find(l => l.startsWith('PRIINK geometry '));
 const accuracy = summary ? Number(/accuracy ([\d.]+)%/.exec(summary)?.[1] ?? 0) : 0;
 const exactMatch = summary ? /(\d+)\/(\d+) exact/.exec(summary) : null;
 const exact = Number(exactMatch?.[1] ?? 0);
 const cases = Number(exactMatch?.[2] ?? 0);
+const alignmentMatch = alignment ? /PASS (\d+)\/(\d+)/.exec(alignment) : null;
+const alignmentPassed = Number(alignmentMatch?.[1] ?? 0);
+const alignmentCases = Number(alignmentMatch?.[2] ?? 0);
 const geometryMatch = geometry ? /PASS (\d+)\/(\d+)/.exec(geometry) : null;
 const geometryPassed = Number(geometryMatch?.[1] ?? 0);
 const geometryCases = Number(geometryMatch?.[2] ?? 0);
@@ -130,6 +136,10 @@ else {
   } else if (exact < EXACT_FLOOR) {
     problems.push(`exact expressions ${exact}/${cases} is below the ${EXACT_FLOOR}/${EXPECTED_CASES} floor`);
   }
+}
+if (!alignment) problems.push('the deterministic trace-alignment checks did not report');
+else if (!alignmentMatch || alignmentPassed !== EXPECTED_ALIGNMENT_CHECKS || alignmentCases !== EXPECTED_ALIGNMENT_CHECKS) {
+  problems.push(`trace-alignment regression check failed: ${alignment.replace(/^PRIINK\s*/, '')}`);
 }
 if (!geometry) problems.push('the deterministic geometry checks did not report');
 else if (!geometryMatch || geometryPassed !== EXPECTED_GEOMETRY_CHECKS || geometryCases !== EXPECTED_GEOMETRY_CHECKS) {
@@ -154,4 +164,4 @@ if (problems.length) {
   for (const problem of problems) console.log(`FAIL — ${problem}`);
   process.exit(1);
 }
-console.log(`PASS — character accuracy ${accuracy}%, exact ${exact}/${cases}, geometry ${geometryPassed}/${geometryCases}, bridge round trip clean`);
+console.log(`PASS — character accuracy ${accuracy}%, exact ${exact}/${cases}, alignment ${alignmentPassed}/${alignmentCases}, geometry ${geometryPassed}/${geometryCases}, bridge round trip clean`);
