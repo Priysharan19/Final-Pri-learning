@@ -419,7 +419,28 @@ Read these in the right order, because they do not all mean the same thing:
 ### The gap this table admits
 
 **Every handwriting figure above — all six suites, without exception — is measured on ink this repo
-generated itself.** Synthetic strokes carry the same assumptions the recogniser was built on, so
+generated itself.** They also all describe the *web* recogniser, which on an iPad is now the fallback
+rather than the reader — see the native suite below.
+
+### The native reader, and what its number is worth
+
+`npm run test:ink:native` scores the iPad's actual reading pipeline — PencilKit ink, Vision, the
+maths decoder — at **94.8% character accuracy, 6 of 10 expressions exactly right**, and smoke-tests
+the JS↔Swift bridge end to end (surface mounts, positions, strokes survive the round trip, the
+reading comes back in the shape the reading panel expects). `npm run test:ink:bridge` checks both
+sides of that contract and needs nothing but node, so it runs in `npm test`; the native suite needs
+Xcode and a simulator, so it does not.
+
+That 94.8% is measured on synthetic ink too. It is worth more than the web engine's figures for
+exactly one reason: **Vision has no relationship to this repo's stroke data**, so it is not the
+closed loop the web numbers are — the old engine was scored against jittered copies of the templates
+it matched against. The remaining misses are the model reading a single glyph wrongly (a `y` as a
+`1`, an `x` as a `4`), not the pipeline mis-assembling; tuning further against ten synthetic
+expressions would be fitting to the template font.
+
+It is still not a real-handwriting benchmark, and the gap below is still the project's biggest.
+
+ Synthetic strokes carry the same assumptions the recogniser was built on, so
 these numbers prove the engine is internally consistent — not that it can read a Year 9 student's
 handwriting on a Tuesday afternoon. The held-out suites hold out a *seed space*, not a person; that
 makes them honest about tuning, not about real hands. **There is currently no real-handwriting
@@ -689,7 +710,21 @@ the edge of what this repo can currently show.
   SVG figure builders, Elo/mastery/scheduler/predictor (HSC-band calibrated — it maps a computed mark
   onto the published cut-offs; no real mark has been compared against it)/priorities, 84 question
   generators + 14 multipart exam questions.
-- **`client/src/ink/`** — ink canvas (`InkCanvas.jsx`), the $P template library (`templates.js`),
+- **`ios/PriLearning.swiftpm/Ink/`** — **the writing surface and the reader on the iPad, and both
+  are native.** `InkSurface.swift` is a `PKCanvasView` — PencilKit, the ink engine Notes is built on —
+  floated over the page's writing area; `InkBridge.swift` is the page's half of it. Reading is
+  Vision's on-device handwriting model (`MathInkRecognizer.swift`) with a maths decoder over it
+  (`MathDecoder.swift`: one spelling per mark, letter/digit twins settled by neighbours, function
+  names locked, brackets recovered from the ink's own bow, powers read off where the ink sits),
+  fed by `InkLineSegmenter.swift`, `FractionFinder.swift` and `InkRasterizer.swift`. It returns
+  exactly the shape `recognize()` always returned, so nothing downstream changed.
+  **`RUN-ON-IPAD.md` explains why neither could stay in the page**: pointer events reach a web canvas
+  after the compositor, and the web recogniser was scored against jittered copies of its own
+  templates. `InkSelfCheck.swift` scores the pipeline — see `npm run test:ink:native`.
+- **`client/src/ink/`** — **the browser surface, and the app's per-line fallback.** In the iPad app
+  `NativeInkCanvas.jsx` and `native.js` stand in for the canvas below and hand recognition to the
+  shell; everything here still runs in a browser, and still reads any single line Vision returns
+  nothing for. Ink canvas (`InkCanvas.jsx`), the $P template library (`templates.js`),
   **the bundled CNN: `nn.js` (on-device forward pass), `model-data.js` (a 798 kB module carrying
   597 kB of trained int8 weights as base64, 3 voters) and `classes.js` (the 56 shape classes it
   predicts)**, the deskewing rasteriser (`raster.js`), stroke smoothing (`smooth.js`), shape

@@ -7,6 +7,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import InkCanvas from './InkCanvas.jsx';
+import NativeInkCanvas from './NativeInkCanvas.jsx';
+import { nativeInk, nativeInkAvailable } from './native.js';
 import { recognize, exprToLatex } from './recognizer.js';
 import { ALPHABET } from './templates.js';
 import { classOfSymbol } from './classes.js';
@@ -15,6 +17,54 @@ import { MathText } from '../lib/latex.jsx';
 
 const NICE = { pi: 'π', theta: 'θ', sqrt: '√', percent: '%' };
 const showSym = s => NICE[s] || s;
+
+// ── Which surface, which engine ──────────────────────────────────────────────
+// In the iPad app the ink is a PencilKit canvas and the reading comes from the
+// on-device Vision handwriting model. Anywhere else — a browser, the dev
+// server — it is the web canvas and the web engine. The decision is made once,
+// at module load, and nothing below this line depends on the answer.
+const NATIVE_INK = nativeInkAvailable();
+const Surface = NATIVE_INK ? NativeInkCanvas : InkCanvas;
+
+/**
+ * Vision reads lines. A line too short to be text — a lone "x", a bare "3" —
+ * can come back with nothing at all, and a step the student wrote must never
+ * vanish because of it. Those lines, and only those, are read by the web
+ * engine instead, on that line's own strokes.
+ */
+function readUnreadLines(reading, strokes, overrides) {
+  let healed = false;
+  const lines = reading.lines.map((line, li) => {
+    if (!line.unread || !line.strokeIdxs?.length) return line;
+    const own = line.strokeIdxs.map(i => strokes[i]).filter(Boolean);
+    if (!own.length) return line;
+    let fallback;
+    try { fallback = recognize(own, overrides); } catch { return line; }
+    const first = fallback.lines[0];
+    if (!first || !first.text) return line;
+    healed = true;
+    return {
+      ...line,
+      text: first.text,
+      box: first.box,
+      // Ids are namespaced so a correction on a web-read line cannot collide
+      // with one on a Vision-read line, and stroke indexes are mapped back to
+      // the page so "learn from this correction" trains on the right ink.
+      symbols: first.symbols.map(sym => ({
+        ...sym,
+        id: `w${li}_${sym.id}`,
+        strokeIdxs: (sym.strokeIdxs || [])
+          .map(i => line.strokeIdxs[i])
+          .filter(i => i !== undefined)
+      }))
+    };
+  });
+  if (!healed) return reading;
+  // The engine's own confidence summary described the reading before the swap;
+  // dropping it makes the caller derive a fresh one from the symbols that are
+  // actually being shown.
+  return { lines, text: lines.map(l => l.text).join('\n') };
+}
 
 // ── How sure the reading is ──────────────────────────────────────────────────
 // The line a mark is awarded or withheld on travels with the engine's own
@@ -73,12 +123,12 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
   const [picker, setPicker] = useState(null); // {id, alts}
   const [extraHeight, setExtraHeight] = useState(0);
   const timerRef = useRef(null);
+  const readSeqRef = useRef(0);
   const strokesRef = useRef([]);
   const pickerRef = useRef(null);
   const focusedRef = useRef(null);
 
-  const runRecognition = useCallback((strokes, ovr) => {
-    const r = recognize(strokes, ovr);
+  const publish = useCallback((r, strokes) => {
     setRec(r);
     const sure = readingConfidence(r);
     onRecognized?.({
@@ -92,6 +142,20 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
       strokes
     });
   }, [onRecognized]);
+
+  const runRecognition = useCallback((strokes, ovr) => {
+    if (!NATIVE_INK) { publish(recognize(strokes, ovr), strokes); return; }
+    // The shell reads on its own thread, so replies can land out of order —
+    // only the newest request is allowed to reach the panel.
+    const seq = ++readSeqRef.current;
+    nativeInk.recognize(ovr).then(reading => {
+      if (seq !== readSeqRef.current) return;
+      publish(
+        reading ? readUnreadLines(reading, strokes, ovr) : recognize(strokes, ovr),
+        strokes
+      );
+    });
+  }, [publish]);
 
   const onStrokesChange = useCallback((strokes) => {
     strokesRef.current = strokes;
@@ -121,9 +185,12 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
     const next = { ...overrides, [id]: sym };
     setOverrides(next);
     setPicker(null);
-    // learn from the correction: this exact ink now belongs to that symbol
+    // Learn from the correction: this exact ink now belongs to that symbol.
+    // Unless the reading could not tie the symbol to one mark exactly (`approx`)
+    // — then the strokes under it are a fair guess, and training on a guess
+    // teaches the engine the wrong shape.
     const symbol = rec.lines.flatMap(l => l.symbols).find(s => s.id === id);
-    if (symbol?.strokeIdxs?.length) {
+    if (symbol?.strokeIdxs?.length && !symbol.approx) {
       const strokes = symbol.strokeIdxs.map(i => strokesRef.current[i]).filter(Boolean);
       if (strokes.length) addPersonal(sym, strokes, 'correction');
     }
@@ -152,15 +219,18 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
         <button type="button" className={`ink-tool ${finger ? 'on' : ''}`} title="Draw with a finger too (otherwise fingers scroll once a Pencil is seen)"
           aria-label="Draw with a finger as well as a Pencil" aria-pressed={finger}
           onClick={() => setFinger(f => !f)}>☝ Finger</button>
-        <span className="ink-hint">Write each step on its own line · Apple Pencil ready</span>
+        <span className="ink-hint">
+          Write each step on its own line · {NATIVE_INK ? 'Apple Pencil' : 'Pencil or finger'}
+        </span>
       </div>
 
       <div className="ink-stage">
-        <InkCanvas
+        <Surface
           ref={canvasRef}
           height={height + extraHeight}
           tool={tool}
           fingerMode={finger ? 'finger' : 'auto'}
+          disabled={disabled}
           onStrokesChange={onStrokesChange}
           ariaLabel="Handwriting answer space"
         />
