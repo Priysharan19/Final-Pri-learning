@@ -117,12 +117,21 @@ enum MathGrammar {
 
         // Operators need something on both sides. A leading minus is a sign,
         // not a break, and so is one straight after '=', '(' or another
-        // operator — "x = -3" and "2^(-1)" are ordinary maths.
+        // operator — "x = -3" and "2^(-1)" are ordinary maths. A leading '='
+        // is also valid in handwritten working: students commonly continue an
+        // equality on the next line as "= ...". Treat that as positive maths
+        // evidence instead of making the wrong leading '-' artificially win.
         let chars = Array(s)
         for (i, ch) in chars.enumerated() {
             guard "+*/=<>^".contains(ch) else { continue }
-            if i == 0 || i == chars.count - 1 { score -= 0.16 }
-            else if "+*/=<>^".contains(chars[i - 1]) && !(ch == "=" && chars[i - 1] == "!") { score -= 0.12 }
+            if i == 0 {
+                if ch == "=" && i + 1 < chars.count { score += 0.05 }
+                else { score -= 0.16 }
+            } else if i == chars.count - 1 {
+                score -= 0.16
+            } else if "+*/=<>^".contains(chars[i - 1]) && !(ch == "=" && chars[i - 1] == "!") {
+                score -= 0.12
+            }
         }
         if let last = chars.last, "+-*/=<>^".contains(last) { score -= 0.12 }
 
