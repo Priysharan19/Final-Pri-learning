@@ -80,13 +80,22 @@ enum InkLineSegmenter {
                 // put "sin(x)" on two lines, the dot on one and the rest on
                 // the other. Small marks are judged on how far from the band
                 // they sit; anything full height is judged on overlap.
-                let smallMark = item.element.bounds.height < 0.35 * glyphSize
-                if smallMark {
+                let height = item.element.bounds.height
+                let width = item.element.bounds.width
+                let bandHeight = max(1, band.upperBound - band.lowerBound)
+                let smallMark = height < 0.35 * glyphSize
+                // A power such as the `2` in x² is not always tiny enough for
+                // the dot rule. It is compact and raised relative to the body
+                // band, which is strong evidence that it belongs to the same
+                // written line instead of opening a phantom third line.
+                let compactRaisedMark = height < 0.92 * glyphSize
+                    && width <= 1.05 * glyphSize
+                    && centre < band.lowerBound + 0.58 * bandHeight
+                if smallMark || compactRaisedMark {
                     let above = band.lowerBound - centre
                     let below = centre - band.upperBound
-                    // Reaching further up than down: dots and powers live
-                    // above the band, and only commas hang below it.
-                    guard above <= 0.95 * glyphSize, below <= 0.45 * glyphSize else { continue }
+                    let aboveAllowance = compactRaisedMark ? 1.10 * glyphSize : 0.95 * glyphSize
+                    guard above <= aboveAllowance, below <= 0.45 * glyphSize else { continue }
                     let distance = max(0, max(above, below))
                     let score = glyphSize - distance      // nearer band wins
                     if score > bestOverlap { bestOverlap = score; bestGroup = index }
