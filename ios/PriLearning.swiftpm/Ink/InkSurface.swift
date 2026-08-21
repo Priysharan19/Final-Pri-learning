@@ -48,6 +48,9 @@ final class InkSurfaceView: UIView, PKCanvasViewDelegate {
         canvas.isScrollEnabled = false
         canvas.bounces = false
         canvas.bouncesZoom = false
+        canvas.alwaysBounceHorizontal = false
+        canvas.alwaysBounceVertical = false
+        canvas.delaysContentTouches = false
         canvas.minimumZoomScale = 1
         canvas.maximumZoomScale = 1
         canvas.showsVerticalScrollIndicator = false
@@ -72,11 +75,28 @@ final class InkSurfaceView: UIView, PKCanvasViewDelegate {
 
     // MARK: - Touch routing
 
+    /// Let PencilKit decide Pencil acceptance through `drawingPolicy`; this
+    /// wrapper only passes *definite* finger input through to the WKWebView.
+    ///
+    /// Earlier code returned nil whenever UIKit had not yet populated
+    /// `UIEvent.allTouches`. That can happen during the early hit-test phase and
+    /// risks rejecting a real Pencil before PKCanvasView sees it. Unknown/empty
+    /// events therefore stay on the canvas; only an event that positively
+    /// contains direct finger touches and no Pencil is passed through.
     override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
         guard let hit = super.hitTest(point, with: event) else { return nil }
         if fingerDrawingEnabled { return hit }
-        let touches = event?.allTouches ?? []
-        return touches.contains(where: { $0.type == .pencil }) ? hit : nil
+
+        guard let touches = event?.allTouches, !touches.isEmpty else {
+            return hit
+        }
+        if touches.contains(where: { $0.type == .pencil }) {
+            return hit
+        }
+        if touches.allSatisfy({ $0.type == .direct }) {
+            return nil
+        }
+        return hit
     }
 
     // MARK: - Tools
@@ -96,6 +116,14 @@ final class InkSurfaceView: UIView, PKCanvasViewDelegate {
 
     private func applyDrawingPolicy() {
         canvas.drawingPolicy = fingerDrawingEnabled ? .anyInput : .pencilOnly
+        // Make the drawing recognizer's intent explicit as well as setting the
+        // PencilKit policy. This removes finger/Pencil arbitration from the
+        // critical path while preserving optional finger-drawing mode.
+        let direct = NSNumber(value: UITouch.TouchType.direct.rawValue)
+        let pencil = NSNumber(value: UITouch.TouchType.pencil.rawValue)
+        canvas.drawingGestureRecognizer.allowedTouchTypes = fingerDrawingEnabled
+            ? [direct, pencil]
+            : [pencil]
     }
 
     // MARK: - History / stroke lifecycle
