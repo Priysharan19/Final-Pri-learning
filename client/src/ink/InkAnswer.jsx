@@ -138,13 +138,25 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
   const publish = useCallback((r, strokes) => {
     setRec(r);
     const sure = readingConfidence(r);
+
+    // QuestionCard already has a battle-tested one-tap confirmation gate keyed
+    // by minConf/margin. Structural policy is newer than that interface. Until
+    // every parent consumes `safeToAutoAccept` directly, route a native REVIEW /
+    // CLARIFY through the SAME gate by exposing conservative compatibility
+    // values while preserving the raw evidence separately. This does not change
+    // the recognizer's own confidence; `rawMinConf` / `rawMargin` retain it.
+    const gateMinConf = sure.safeToAutoAccept ? sure.minConf : Math.min(sure.minConf, 0.54);
+    const gateMargin = sure.safeToAutoAccept ? sure.margin : Math.min(sure.margin, 0.14);
+
     onRecognized?.({
       lines: r.lines.map(l => l.text),
       lineBoxes: r.lines.map(l => l.box),
       text: r.text,
       answerLine: r.lines.length ? r.lines[r.lines.length - 1].text : '',
-      minConf: sure.minConf,
-      margin: sure.margin,
+      minConf: gateMinConf,
+      margin: gateMargin,
+      rawMinConf: sure.minConf,
+      rawMargin: sure.margin,
       weakest: sure.weakest,
       decision: sure.decision,
       safeToAutoAccept: sure.safeToAutoAccept,
