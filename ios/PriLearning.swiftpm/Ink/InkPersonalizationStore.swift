@@ -45,7 +45,7 @@ final class InkPersonalizationStore {
     private let maxSamplesPerProfile = 96
     private let maxSamplesPerSymbol = 12
     private let minimumSamplesForInfluence = 2
-    private var samples: [Sample] = []
+    var samples: [Sample] = []
 
     private static let families: [[String]] = [
         ["1", "l", "I", "|", "y", "(", ")"],
@@ -96,9 +96,11 @@ final class InkPersonalizationStore {
         defer { lock.unlock() }
 
         // A repeated callback for the same correction should not fill the
-        // bounded store with copies. Feature-near duplicates are one example.
+        // bounded store with copies. Only almost-identical feature vectors are
+        // collapsed; natural variation from the same writer is independent
+        // evidence and must remain available for personalization.
         let existingForSymbol = samples.filter { $0.profile == profile && $0.symbol == symbol }
-        if existingForSymbol.contains(where: { Self.distance($0.features, vector) < 0.025 }) {
+        if existingForSymbol.contains(where: { Self.distance($0.features, vector) < 0.002 }) {
             return
         }
 
