@@ -29,6 +29,8 @@ actor CoreMLStrokeRecognizer: OnlineInkRecognizing {
 
     private let model: MLModel
     private let maxPoints: Int
+    nonisolated let calibratedForProduction: Bool
+    nonisolated let calibrationExamples: Int
 
     init(model: MLModel) throws {
         let metadata = model.modelDescription.metadata[MLModelMetadataKey.creatorDefinedKey] as? [String: String] ?? [:]
@@ -36,13 +38,13 @@ actor CoreMLStrokeRecognizer: OnlineInkRecognizing {
               metadata["pri.acceptance_authority"] == "false" else {
             throw Failure.contractMismatch
         }
+        let examples = Int(metadata["pri.calibration_examples"] ?? "0") ?? 0
         self.model = model
         self.maxPoints = max(1, Int(metadata["pri.max_points"] ?? "1024") ?? 1024)
+        self.calibrationExamples = examples
+        self.calibratedForProduction = examples > 0
     }
 
-    /// Loads a model only when a compiled model resource is actually present.
-    /// Absence is normal on source checkouts before a real calibrated model has
-    /// been trained; callers should keep the local structural recognizer active.
     static func bundled() -> CoreMLStrokeRecognizer? {
         guard let url = Bundle.main.url(forResource: "PriInkOnline", withExtension: "mlmodelc") else {
             return nil
@@ -60,15 +62,19 @@ actor CoreMLStrokeRecognizer: OnlineInkRecognizing {
         guard tensor.pointCount <= maxPoints else { throw Failure.inputTooLong }
 
         let points = try MLMultiArray(
-            shape: [1, NSNumber(value: maxPoints), NSNumber(value: tensor.featureCount)],
+            shape: [NSNumber(value: 1), NSNumber(value: maxPoints), NSNumber(value: tensor.featureCount)],
             dataType: .float32
         )
-        let valid = try MLMultiArray(shape: [1, NSNumber(value: maxPoints)], dataType: .float32)
-        for i in 0..<points.count { points[i] = 0 }
-        for i in 0..<valid.count { valid[i] = 0 }
+        let valid = try MLMultiArray(
+            shape: [NSNumber(value: 1), NSNumber(value: maxPoints)], dataType: .float32
+        )
+        let zero = NSNumber(value: Float(0))
+        let one = NSNumber(value: Float(1))
+        for i in 0..<points.count { points[i] = zero }
+        for i in 0..<valid.count { valid[i] = zero }
 
         for (time, row) in tensor.rows.enumerated() {
-            valid[time] = 1
+            valid[time] = one
             for (feature, value) in row.enumerated() {
                 points[time * tensor.featureCount + feature] = NSNumber(value: value)
             }
@@ -110,8 +116,6 @@ actor CoreMLStrokeRecognizer: OnlineInkRecognizing {
         if emittedConfidences.isEmpty {
             confidence = 0
         } else {
-            // Geometric mean punishes one very weak emitted token more than a
-            // simple average, which is useful for selective acceptance.
             let logMean = emittedConfidences.reduce(0.0) { $0 + log(max($1, 1e-8)) }
                 / Double(emittedConfidences.count)
             confidence = min(1, max(0, exp(logMean)))
@@ -131,7 +135,8 @@ actor CoreMLStrokeRecognizer: OnlineInkRecognizing {
         var winner = 0
         var maximum = -Double.infinity
         for cls in 0..<classes {
-            let value = logits[[0, NSNumber(value: time), NSNumber(value: cls)]].doubleValue
+            let index = [NSNumber(value: 0), NSNumber(value: time), NSNumber(value: cls)]
+            let value = logits[index].doubleValue
             values[cls] = value
             if value > maximum { maximum = value; winner = cls }
         }
