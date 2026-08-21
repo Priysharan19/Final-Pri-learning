@@ -2,8 +2,8 @@
 // Pri Learning · Native personalization safety checks
 //
 // Proves the bounded learner can help a repeated ambiguous hand while refusing
-// to overrule strong global recognition or leak influence across unrelated
-// symbol families. Uses an isolated UserDefaults suite so CI never contaminates
+// to overrule strong global recognition or leak influence across students or
+// unrelated symbol families. Uses isolated UserDefaults so CI never contaminates
 // a real student's personal prototypes.
 // ─────────────────────────────────────────────────────────────────────────────
 import CoreGraphics
@@ -19,6 +19,8 @@ enum InkPersonalizationSelfCheck {
         }
         defer { defaults.removePersistentDomain(forName: suite) }
         let store = InkPersonalizationStore(defaults: defaults)
+        let studentA = "selfcheck-student-a"
+        let studentB = "selfcheck-student-b"
 
         var failures: [String] = []
         var checks = 0
@@ -31,39 +33,49 @@ enum InkPersonalizationSelfCheck {
         let y2 = yVariant(dx: 1.4, tail: 2.0, speed: 0.92)
         let yQuery = yVariant(dx: 0.7, tail: 0.8, speed: 0.96)
 
-        store.learn(symbol: "y", strokes: y1)
+        store.learn(profile: studentA, symbol: "y", strokes: y1)
         check("one correction cannot influence recognition",
-              store.suggestion(for: yQuery, current: "1", alternatives: ["y"],
+              store.suggestion(profile: studentA, for: yQuery, current: "1", alternatives: ["y"],
                                globalConfidence: 0.61) == nil)
 
-        store.learn(symbol: "y", strokes: y2)
-        let learned = store.suggestion(for: yQuery, current: "1", alternatives: ["y"],
+        store.learn(profile: studentA, symbol: "y", strokes: y2)
+        let learned = store.suggestion(profile: studentA, for: yQuery, current: "1", alternatives: ["y"],
                                        globalConfidence: 0.61)
         check("repeated similar y corrections can resolve ambiguous 1", learned?.symbol == "y")
         check("personal suggestion remains below global high-confidence authority",
               (learned?.confidence ?? 1) <= 0.82)
 
         check("strong global reading is never overridden",
-              store.suggestion(for: yQuery, current: "1", alternatives: ["y"],
+              store.suggestion(profile: studentA, for: yQuery, current: "1", alternatives: ["y"],
                                globalConfidence: 0.94) == nil)
+        check("one student's hand never influences another profile",
+              store.suggestion(profile: studentB, for: yQuery, current: "1", alternatives: ["y"],
+                               globalConfidence: 0.61) == nil)
 
         let zero = ovalVariant(flatten: 0)
-        store.learn(symbol: "theta", strokes: thetaVariant(flatten: 0))
-        store.learn(symbol: "theta", strokes: thetaVariant(flatten: 1.2))
-        let thetaSuggestion = store.suggestion(for: thetaVariant(flatten: 0.5), current: "0",
+        store.learn(profile: studentA, symbol: "theta", strokes: thetaVariant(flatten: 0))
+        store.learn(profile: studentA, symbol: "theta", strokes: thetaVariant(flatten: 1.2))
+        let thetaSuggestion = store.suggestion(profile: studentA,
+                                               for: thetaVariant(flatten: 0.5), current: "0",
                                                alternatives: ["theta"], globalConfidence: 0.58)
         check("theta habit can resolve an ambiguous zero family", thetaSuggestion?.symbol == "theta")
         check("theta history does not turn an ordinary zero into unrelated y",
-              store.suggestion(for: zero, current: "0", alternatives: ["y"],
+              store.suggestion(profile: studentA, for: zero, current: "0", alternatives: ["y"],
                                globalConfidence: 0.58)?.symbol != "y")
 
         // Duplicate callbacks from the same correction are intentionally one
-        // prototype, and reset really removes the persisted personal hand.
-        let beforeDuplicate = store.sampleCount
-        store.learn(symbol: "y", strokes: y2)
-        check("duplicate correction does not inflate the store", store.sampleCount == beforeDuplicate)
+        // prototype, and profile reset removes only that student's hand.
+        let beforeDuplicate = store.sampleCount(profile: studentA)
+        store.learn(profile: studentA, symbol: "y", strokes: y2)
+        check("duplicate correction does not inflate the store",
+              store.sampleCount(profile: studentA) == beforeDuplicate)
+        store.learn(profile: studentB, symbol: "theta", strokes: thetaVariant(flatten: 2.2))
+        let bCount = store.sampleCount(profile: studentB)
+        store.reset(profile: studentA)
+        check("profile reset removes only that student's prototypes",
+              store.sampleCount(profile: studentA) == 0 && store.sampleCount(profile: studentB) == bCount)
         store.reset()
-        check("personal handwriting can be reset completely", store.sampleCount == 0)
+        check("device-wide reset removes all personal handwriting", store.sampleCount() == 0)
 
         if failures.isEmpty {
             NSLog("PRIINK personalization PASS %d/%d", checks, checks)
