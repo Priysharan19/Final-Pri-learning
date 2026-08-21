@@ -1,6 +1,6 @@
 import Foundation
 
-/// A recognition hypothesis from an online-ink engine.  The native structural
+/// A recognition hypothesis from an online-ink engine. The native structural
 /// decoder can compare these with Vision/geometry rather than treating any
 /// provider as ground truth.
 struct OnlineInkHypothesis: Sendable {
@@ -8,6 +8,9 @@ struct OnlineInkHypothesis: Sendable {
     let latex: String?
     let confidence: Double
     let source: String
+    /// Optional count from a head that is independent of text decoding. A
+    /// provider that only counts its own output must leave this nil.
+    let symbolCount: Int? = nil
 }
 
 protocol OnlineInkRecognizing: Sendable {
@@ -17,8 +20,8 @@ protocol OnlineInkRecognizing: Sendable {
 /// Mathpix's stroke endpoint consumes the same vector representation we already
 /// have from PencilKit, avoiding an unnecessary bitmap/OCR round trip.
 ///
-/// SECURITY: this client accepts only a short-lived app token.  A Mathpix
-/// app_key must never be compiled into the iPad application.  Production code
+/// SECURITY: this client accepts only a short-lived app token. A Mathpix
+/// app_key must never be compiled into the iPad application. Production code
 /// should obtain app_token + strokes_session_id from an authenticated PRI
 /// backend endpoint.
 actor MathpixStrokeRecognizer: OnlineInkRecognizing {
@@ -81,7 +84,8 @@ actor MathpixStrokeRecognizer: OnlineInkRecognizing {
         let latex = json["latex_styled"] as? String
         let confidence = max(0, min(1, json["confidence"] as? Double ?? json["confidence_rate"] as? Double ?? 0.5))
         guard !text.isEmpty || !(latex ?? "").isEmpty else { return [] }
-        return [OnlineInkHypothesis(text: text, latex: latex, confidence: confidence, source: "mathpix-strokes")]
+        return [OnlineInkHypothesis(text: text, latex: latex, confidence: confidence,
+                                    source: "mathpix-strokes")]
     }
 }
 
