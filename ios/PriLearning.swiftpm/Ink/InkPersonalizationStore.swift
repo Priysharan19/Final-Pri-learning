@@ -45,7 +45,7 @@ final class InkPersonalizationStore {
     private let maxSamplesPerProfile = 96
     private let maxSamplesPerSymbol = 12
     private let minimumSamplesForInfluence = 2
-    var samples: [Sample] = []
+    private var samples: [Sample] = []
 
     private static let families: [[String]] = [
         ["1", "l", "I", "|", "y", "(", ")"],
