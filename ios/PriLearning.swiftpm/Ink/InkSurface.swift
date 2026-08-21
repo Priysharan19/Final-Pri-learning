@@ -50,6 +50,11 @@ final class InkSurfaceView: UIView, PKCanvasViewDelegate {
     private var suppressChangeEvents = false
     private let historyLimit = 60
 
+    /// Passive high-fidelity observation of the same Pencil stream PencilKit
+    /// renders. It records real coalesced touches only; predicted samples stay
+    /// in the rendering path and never enter recognition/training evidence.
+    private let pencilTelemetry = InkPencilTelemetryRecognizer()
+
     override init(frame: CGRect) {
         super.init(frame: frame)
         addSubview(canvas)
@@ -76,6 +81,11 @@ final class InkSurfaceView: UIView, PKCanvasViewDelegate {
         // Pinning the canvas to the light style turns it off; the canvas itself
         // is transparent, so nothing else about it changes.
         canvas.overrideUserInterfaceStyle = .light
+
+        // This recognizer cannot prevent or cancel PencilKit's own gestures; it
+        // only observes the same hardware samples for the recognition stream.
+        canvas.addGestureRecognizer(pencilTelemetry)
+        pencilTelemetry.nominalWidth = penWidth
         applyTool()
         applyDrawingPolicy()
     }
@@ -104,14 +114,20 @@ final class InkSurfaceView: UIView, PKCanvasViewDelegate {
     // MARK: - Tools
 
     private func applyTool() {
+        pencilTelemetry.nominalWidth = penWidth
         switch tool {
         case .pen:
+            pencilTelemetry.captureEnabled = true
             // PencilKit keeps the device's pressure/azimuth/altitude and system
             // prediction in the rendered PKStroke. We only choose the nominal
             // pen width here; no custom smoothing is inserted in front of it.
             canvas.tool = PKInkingTool(.pen, color: inkColor, width: penWidth)
         case .eraser:
             // Whole strokes, matching how the app's eraser has always behaved.
+            // Eraser Pencil touches are not handwriting evidence and are never
+            // allowed into the telemetry queue.
+            pencilTelemetry.captureEnabled = false
+            pencilTelemetry.clearPending()
             canvas.tool = PKEraserTool(.vector)
         }
     }
@@ -129,15 +145,16 @@ final class InkSurfaceView: UIView, PKCanvasViewDelegate {
     func canvasViewDidEndUsingTool(_ canvasView: PKCanvasView) {
         guard !suppressChangeEvents else { return }
 
-        // Pen input is append-only in the normal case. Sample just the stroke
-        // that finished, cache it, and send a delta. If PencilKit reports any
-        // other shape of change, fall back to a full resync rather than risk a
-        // cache that no longer describes the drawing on screen.
+        // Pen input is append-only in the normal case. Use the actual coalesced
+        // Pencil samples when they geometrically match the PKStroke that just
+        // finished; fall back to deterministic PencilKit spline sampling on
+        // simulator/legacy paths where raw telemetry was unavailable.
         let drawingStrokes = canvasView.drawing.strokes
         if tool == .pen,
            drawingStrokes.count == cachedStrokes.count + 1,
            let last = drawingStrokes.last {
-            let stroke = StrokeCodec.stroke(from: last)
+            let fallback = StrokeCodec.stroke(from: last)
+            let stroke = pencilTelemetry.takeCompletedStroke(matching: fallback.bounds) ?? fallback
             cachedStrokes.append(stroke)
             delegate?.inkSurface(self, didAppend: stroke, at: cachedStrokes.count - 1)
             return
@@ -167,6 +184,7 @@ final class InkSurfaceView: UIView, PKCanvasViewDelegate {
     func clear() {
         guard !canvas.drawing.strokes.isEmpty else {
             cachedStrokes.removeAll(keepingCapacity: true)
+            pencilTelemetry.clearPending()
             return
         }
         pushHistory()
@@ -175,6 +193,7 @@ final class InkSurfaceView: UIView, PKCanvasViewDelegate {
 
     private func replaceDrawing(_ drawing: PKDrawing, knownStrokes: [InkStroke]? = nil) {
         suppressChangeEvents = true
+        pencilTelemetry.clearPending()
         canvas.drawing = drawing
         cachedStrokes = knownStrokes ?? StrokeCodec.strokes(from: drawing)
         suppressChangeEvents = false
@@ -182,6 +201,9 @@ final class InkSurfaceView: UIView, PKCanvasViewDelegate {
     }
 
     private func resyncCacheAndNotify() {
+        // A destructive PencilKit operation changes arbitrary stroke identity;
+        // discard any unpaired telemetry rather than risk cross-stroke ownership.
+        pencilTelemetry.clearPending()
         cachedStrokes = StrokeCodec.strokes(from: canvas.drawing)
         delegate?.inkSurfaceDidReplaceStrokes(self)
     }
