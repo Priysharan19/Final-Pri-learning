@@ -102,7 +102,11 @@ enum MathShapeClassifier {
             return b.midY >= minY && b.midY <= maxY && b.midX >= minX && b.midX <= maxX
         }
         let lineClusters = clusters(indexes: indexes, strokes: strokes)
-        guard lineClusters.count > glyphs.count else { return }
+        // Once the OCR-to-mark mapping is approximate, matching counts do not
+        // restore trust: three OCR glyphs can still own the wrong three marks.
+        // Geometry is allowed to re-anchor proven structures regardless of the
+        // two counts, while every recovery below remains narrowly classified.
+        guard !lineClusters.isEmpty else { return }
 
         for cluster in lineClusters {
             let members = cluster.strokeIndexes.map { strokes[$0] }
