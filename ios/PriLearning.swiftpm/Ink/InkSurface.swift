@@ -9,22 +9,14 @@ import PencilKit
 import UIKit
 
 protocol InkSurfaceDelegate: AnyObject {
-    /// Fires at tool contact, before a new path develops. Recognition uses this
-    /// only to abort stale inference; no serialization or recognition is started.
     func inkSurfaceDidBeginStroke(_ surface: InkSurfaceView)
-    /// Ordinary pen input appends one final stroke. Keeping this incremental is
-    /// what prevents a long page from being re-sampled and re-serialized every
-    /// time the Pencil comes off the glass.
     func inkSurface(_ surface: InkSurfaceView, didAppend stroke: InkStroke, at index: Int)
-    /// Erase/undo/redo/restore can change arbitrary indexes, so those operations
-    /// deliberately publish a full snapshot.
     func inkSurfaceDidReplaceStrokes(_ surface: InkSurfaceView)
 }
 
 final class InkSurfaceView: UIView, PKCanvasViewDelegate {
 
     weak var delegate: InkSurfaceDelegate?
-
     let canvas = PKCanvasView()
 
     var fingerDrawingEnabled = false { didSet { applyDrawingPolicy() } }
@@ -42,7 +34,6 @@ final class InkSurfaceView: UIView, PKCanvasViewDelegate {
     private var cachedStrokes: [InkStroke] = []
     private var suppressChangeEvents = false
     private let historyLimit = 60
-
     private let pencilTelemetry = InkPencilTelemetryRecognizer()
 
     override init(frame: CGRect) {
@@ -64,8 +55,7 @@ final class InkSurfaceView: UIView, PKCanvasViewDelegate {
         canvas.contentInsetAdjustmentBehavior = .never
         canvas.overrideUserInterfaceStyle = .light
 
-        // Passive observer only. It cannot prevent/cancel PencilKit gestures and
-        // records real coalesced samples; PencilKit alone owns visible rendering.
+        // Passive observer only. PencilKit alone owns visible rendering.
         canvas.addGestureRecognizer(pencilTelemetry)
         pencilTelemetry.nominalWidth = penWidth
         applyTool()
@@ -111,8 +101,7 @@ final class InkSurfaceView: UIView, PKCanvasViewDelegate {
     // MARK: - History / stroke lifecycle
 
     func canvasViewDidBeginUsingTool(_ canvasView: PKCanvasView) {
-        // Abort stale recognition at pen-down. This callback must stay O(1): it
-        // deliberately performs no sampling, conversion, JSON or recognition.
+        // O(1) pen-down callback: abort stale recognition, then let PencilKit run.
         delegate?.inkSurfaceDidBeginStroke(self)
         pushHistory()
     }
@@ -124,8 +113,12 @@ final class InkSurfaceView: UIView, PKCanvasViewDelegate {
         if tool == .pen,
            drawingStrokes.count == cachedStrokes.count + 1,
            let last = drawingStrokes.last {
-            let fallback = StrokeCodec.stroke(from: last)
-            let stroke = pencilTelemetry.takeCompletedStroke(matching: fallback.bounds) ?? fallback
+            // Common physical-Pencil path: match the completed coalesced trace
+            // against PencilKit's O(1) rendered bounds and avoid walking the
+            // B-spline at pen-up. Only simulator/legacy/mismatch paths pay for
+            // the deterministic 1.5pt fallback sampling.
+            let stroke = pencilTelemetry.takeCompletedStroke(matching: last.renderBounds)
+                ?? StrokeCodec.stroke(from: last)
             cachedStrokes.append(stroke)
             delegate?.inkSurface(self, didAppend: stroke, at: cachedStrokes.count - 1)
             return
