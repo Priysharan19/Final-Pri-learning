@@ -31,7 +31,10 @@ final class InkPencilTelemetryRecognizer: UIGestureRecognizer, UIGestureRecogniz
     convenience init() { self.init(target: nil, action: nil) }
 
     required init?(coder: NSCoder) {
-        super.init(coder: coder)
+        // UIGestureRecognizer's target/action initializer is the designated
+        // initializer available to Swift subclasses. This view is never decoded
+        // from an archive, but satisfying NSCoder keeps the subclass contract valid.
+        super.init(target: nil, action: nil)
         configureForPassivePencilObservation()
     }
 
@@ -40,8 +43,6 @@ final class InkPencilTelemetryRecognizer: UIGestureRecognizer, UIGestureRecogniz
         delaysTouchesBegan = false
         delaysTouchesEnded = false
         requiresExclusiveTouchType = false
-        // Do not even enter recognizer arbitration for finger/palm touches. This
-        // keeps one-finger page scrolling entirely out of the telemetry path.
         allowedTouchTypes = [NSNumber(value: UITouch.TouchType.pencil.rawValue)]
         delegate = self
         current.reserveCapacity(320)
@@ -111,9 +112,6 @@ final class InkPencilTelemetryRecognizer: UIGestureRecognizer, UIGestureRecogniz
         strokeStartTimestamp = nil
     }
 
-    /// Returns the oldest completed raw Pencil trace if it geometrically agrees
-    /// with the PKStroke PencilKit just finalized. The agreement guard prevents
-    /// stale gesture/eraser data being attached to the wrong mathematical mark.
     func takeCompletedStroke(matching finalBounds: CGRect) -> InkStroke? {
         guard !completed.isEmpty else { return nil }
         let raw = completed.removeFirst()
@@ -132,8 +130,6 @@ final class InkPencilTelemetryRecognizer: UIGestureRecognizer, UIGestureRecogniz
 
     private func appendActualSamples(for touch: UITouch, event: UIEvent) {
         guard current.count < maximumSamplesPerStroke else { return }
-        // Coalesced touches are real historical hardware samples. Never call
-        // predictedTouches(for:): predictions belong only to PencilKit's renderer.
         let samples = event.coalescedTouches(for: touch) ?? [touch]
         for sample in samples where sample.type == .pencil {
             if current.count >= maximumSamplesPerStroke { break }
@@ -164,8 +160,6 @@ final class InkPencilTelemetryRecognizer: UIGestureRecognizer, UIGestureRecogniz
             altitude: touch.altitudeAngle
         )
 
-        // UIKit may include the delivered touch again in its coalesced array.
-        // Use squared distance to avoid a sqrt in the nib's hot path.
         if let last = current.last {
             let dt = abs((last.t ?? 0) - relativeTime)
             let dx = last.x - point.x
