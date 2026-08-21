@@ -3,7 +3,7 @@
 //
 // These checks exercise the small, stroke-based maths classifiers without
 // involving Vision. That makes failures attributable: a Vision model revision
-// cannot hide a regression in our own x/×, theta or uncertainty logic.
+// cannot hide a regression in our own geometry or uncertainty logic.
 // ─────────────────────────────────────────────────────────────────────────────
 import CoreGraphics
 import Foundation
@@ -44,6 +44,12 @@ enum InkGeometrySelfCheck {
         MathShapeClassifier.repair(&zero, strokes: [loop], glyphHeight: 40)
         check("plain zero remains zero", zero[0].symbol == "0")
 
+        let yArm = stroke([(8, 8), (16, 18), (22, 26)])
+        let yDescender = stroke([(34, 8), (28, 20), (23, 32), (19, 44), (15, 58)])
+        var y = [glyph("1", strokes: [0, 1], box: yArm.bounds.union(yDescender.bounds))]
+        MathShapeClassifier.repair(&y, strokes: [yArm, yDescender], glyphHeight: 50)
+        check("two arms plus descender recovers y from 1", y[0].symbol == "y")
+
         var variableContext = [
             glyph("2", strokes: [], box: CGRect(x: 0, y: 0, width: 8, height: 16)),
             glyph("*", strokes: [], box: CGRect(x: 10, y: 0, width: 12, height: 16)),
@@ -69,6 +75,23 @@ enum InkGeometrySelfCheck {
         check("ambiguous lhs 1 surfaces y alternative",
               ambiguous[0].alternatives.contains(where: { $0.symbol == "y" }) && ambiguous[0].confidence <= 0.78)
 
+        // Reproduce the architectural failure mode behind `sin(x)=1 → sin(x1`:
+        // Vision returned fewer symbols than spatial clusters, so an '=' owned
+        // by an approximate '1' and a final vertical mark disappeared. Geometry
+        // must re-anchor the equals and restore the trailing 1.
+        let first = stroke([(5, 5), (5, 35)])
+        let eqTop = stroke([(20, 15), (34, 15)])
+        let eqBottom = stroke([(20, 23), (34, 23)])
+        let finalOne = stroke([(47, 5), (47, 35)])
+        var missing = [
+            glyph("x", strokes: [0], box: first.bounds, approximate: true),
+            glyph("1", strokes: [1, 2], box: eqTop.bounds.union(eqBottom.bounds), approximate: true)
+        ]
+        MathShapeClassifier.repair(&missing, strokes: [first, eqTop, eqBottom, finalOne], glyphHeight: 40)
+        check("approximate layout re-anchors swallowed equals", missing.contains(where: { $0.symbol == "=" }))
+        check("approximate layout restores trailing one after equals",
+              missing.sorted(by: { $0.box.midX < $1.box.midX }).suffix(2).map(\.symbol) == ["=", "1"])
+
         if failures.isEmpty {
             NSLog("PRIINK geometry PASS %d/%d", checks, checks)
         } else {
@@ -81,11 +104,12 @@ enum InkGeometrySelfCheck {
         _ symbol: String,
         strokes: [Int],
         box: CGRect,
-        confidence: Double = 0.7
+        confidence: Double = 0.7,
+        approximate: Bool = false
     ) -> DecodedGlyph {
         DecodedGlyph(symbol: symbol, box: box, confidence: confidence,
                      alternatives: [], isSuperscript: false,
-                     strokeIndexes: strokes, approximate: false)
+                     strokeIndexes: strokes, approximate: approximate)
     }
 
     private static func stroke(_ tuples: [(CGFloat, CGFloat)]) -> InkStroke {
