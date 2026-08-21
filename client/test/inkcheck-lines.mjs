@@ -137,7 +137,7 @@ for (const cond of CONDITIONS) {
 console.log('\nLine-level recognition (exact string match, and per-character accuracy)\n');
 for (const r of rows) {
   const cAcc = 100 * (1 - r.errs / r.chars);
-  console.log(`  ${r.cond.padEnd(16)} exact ${String(r.exact).padStart(3)}/${PER} (${String(Math.round(100 * r.exact / PER)).padStart(3)}%)   chars ${cAcc.toFixed(1)}%`);
+  console.log(`  ${r.cond.padEnd(16)} exact ${String(r.exact).padStart(3)}/${PER} (${String(r.exact === PER ? '100' : Math.min(99.9, 100 * r.exact / PER).toFixed(1)).padStart(5)}%)   chars ${cAcc.toFixed(1)}%`);
 }
 const exactPct = 100 * totExact / totLines;
 const charPct = 100 * (1 - totErrs / totChars);

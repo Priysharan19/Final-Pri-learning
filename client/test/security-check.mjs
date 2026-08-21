@@ -576,19 +576,27 @@ async function run() {
     backup.profile.name = `Mallory ${EVIL}`;
     backup.profile.avatar = EVIL;
     backup.profile.role = 'teacher';
-    backup.stores.questions[0].payload.prompt = `Poisoned ${EVIL}`;
-    backup.stores.questions[0].payload.figure = '<svg><foreignObject><script>alert(1)</script></foreignObject></svg>';
-    backup.stores.questions[0].payload.steps = [{ h: EVIL, d: EVIL }];
-    backup.stores.questions.push(structuredClone(backup.stores.questions[0]));
-    backup.stores.questions[1].id = `${backup.stores.questions[1].id}-clean`;
-    backup.stores.questions[1].payload.prompt = 'A perfectly ordinary question';
-    backup.stores.questions[1].payload.figure = good;
+    // Export order is random-uuid order and a multipart question's payload
+    // carries `stem`, not `prompt` — poisoning a field history never reads
+    // would make this group pass for the wrong reason, roughly one run in ten.
+    // Pick the target by shape, not by position.
+    const target = backup.stores.questions.findIndex(r => typeof r.payload?.prompt === 'string');
+    ok('the backup holds a single-part question to poison', target >= 0,
+      show(backup.stores.questions.map(r => Object.keys(r.payload || {}).slice(0, 4))));
+    backup.stores.questions[target].payload.prompt = `Poisoned ${EVIL}`;
+    backup.stores.questions[target].payload.figure = '<svg><foreignObject><script>alert(1)</script></foreignObject></svg>';
+    backup.stores.questions[target].payload.steps = [{ h: EVIL, d: EVIL }];
+    const clean = structuredClone(backup.stores.questions[target]);
+    clean.id = `${clean.id}-clean`;
+    clean.payload.prompt = 'A perfectly ordinary question';
+    clean.payload.figure = good;
+    backup.stores.questions.push(clean);
     if (backup.stores.exams[0]?.detail?.[0]) {
       backup.stores.exams[0].detail[0].figure = '<svg onload=alert(1)><text>x</text></svg>';
       backup.stores.exams[0].detail[0].prompt = `Exam ${EVIL}`;
     }
     backup.stores.attempts[0].answerGiven = EVIL;
-    backup.stores.inks = [{ id: backup.stores.questions[0].id, pid: 'anything', strokes: [{ points: [{ x: 1, y: 2 }] }], recognized: EVIL, photo: 'javascript:alert(1)', scribble: null, createdAt: 1 }];
+    backup.stores.inks = [{ id: backup.stores.questions[target].id, pid: 'anything', strokes: [{ points: [{ x: 1, y: 2 }] }], recognized: EVIL, photo: 'javascript:alert(1)', scribble: null, createdAt: 1 }];
     backup.stores.badges.push({ key: 'zzz:__proto__', pid: 'zzz', badgeId: '__proto__', earnedAt: 1 });
 
     const restored = (await POST('/data/import', backup)).user;

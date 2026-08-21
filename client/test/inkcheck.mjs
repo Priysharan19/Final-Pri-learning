@@ -51,7 +51,11 @@ for (const [sym, variants] of Object.entries(TEMPLATES)) {
   }
 }
 const total = pass + fail;
-console.log(`\nSymbol self-recognition: ${pass}/${total} (${Math.round(100 * pass / total)}%)`);
+// Percentages here are evidence, so they round DOWN and 100% is reserved for a
+// clean sweep. A project whose standard is "no fake 100%" cannot have its own
+// tools printing 219/220 as 100%.
+const pct = (n, d) => d === 0 ? '0' : n === d ? '100' : Math.min(99.9, 100 * n / d).toFixed(1);
+console.log(`\nSymbol self-recognition: ${pass}/${total} (${pct(pass, total)}%)`);
 const confList = Object.entries(confusions).sort((a, b) => b[1] - a[1]);
 if (confList.length) console.log('confusions:', confList.slice(0, 12).map(([k, v]) => `${k}×${v}`).join('  '));
 
@@ -94,7 +98,7 @@ for (const [sym, variants] of Object.entries(PROBES)) {
     else { pfail++; pconf.push(`${sym}→${res.sym}`); }
   }
 }
-console.log(`Probe generalisation: ${ppass}/${ppass + pfail} (${Math.round(100 * ppass / (ppass + pfail))}%)`);
+console.log(`Probe generalisation: ${ppass}/${ppass + pfail} (${pct(ppass, ppass + pfail)}%)`);
 if (pconf.length) console.log('probe confusions:', [...new Set(pconf)].join('  '));
 
 // ── 3. Layout scenes ─────────────────────────────────────────────────────────
@@ -228,5 +232,5 @@ console.log(`exprToLatex: ${lpass}/${lx.length}`);
 
 const layoutPass = layoutTests.filter(Boolean).length;
 const okAll = pass / total >= 0.93 && ppass / (ppass + pfail) >= 0.85 && layoutPass === layoutTests.length && lpass === lx.length && comboFails === 0;
-console.log(`\n${okAll ? '✔ RECOGNIZER SUITE PASSED' : '✖ RECOGNIZER SUITE FAILED'} — self ${Math.round(100 * pass / total)}%, probes ${Math.round(100 * ppass / (ppass + pfail))}%, layout ${layoutPass}/${layoutTests.length}`);
+console.log(`\n${okAll ? '✔ RECOGNIZER SUITE PASSED' : '✖ RECOGNIZER SUITE FAILED'} — self ${pct(pass, total)}%, probes ${pct(ppass, ppass + pfail)}%, layout ${layoutPass}/${layoutTests.length}`);
 process.exit(okAll ? 0 : 1);

@@ -734,7 +734,11 @@ export const streamsStandard = {
       };
     }
     if (diff === 3) {
-      const s1 = mu + rc(rng, [0.6, 0.8, 1, 1.2, 1.4, 1.5, 1.8, 2, 2.4]) * sd, s2 = mu + rc(rng, [0.2, 0.25, 0.4, 0.5, 0.6, 0.75, 0.8]) * sd;
+      // The two z-multiplier sets must not overlap, or the question asks which
+      // of two identical results is better and marks 'equally good' wrong.
+      const z1 = rc(rng, [1, 1.2, 1.4, 1.5, 1.8, 2, 2.4]);
+      const z2 = rc(rng, [0.2, 0.25, 0.4, 0.5, 0.6, 0.75, 0.8]);
+      const s1 = mu + z1 * sd, s2 = mu + z2 * sd;
       const m = mcq(rng, `The first result — its z-score of $${r2((s1 - mu) / sd)}$ is higher`, [
         { text: `The second result — it is closer to the mean`, why: 'Closer to the mean means a *less* impressive result — higher z wins.' },
         { text: 'They are equally good because both are above the mean' },

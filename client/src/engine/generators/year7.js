@@ -502,7 +502,12 @@ export const year7 = {
     }
     const x = ri(rng, 15, 40);
     const a = ri(rng, 2, 4), b = ri(rng, 5, 30);
-    const c = rc(rng, [1, 2]), d2 = a * x + b - c * x;
+    // c must differ from a, or the two expressions are the same one written
+    // twice: 2x+9 = 2x+9 holds for every x, and the question asserts a single
+    // answer. a is drawn from 2..4, so [1, 2] collides on a === 2.
+    let c = rc(rng, [1, 2]);
+    while (c === a) c = rc(rng, [1, 2]);
+    const d2 = a * x + b - c * x;
     return {
       prompt: `Two vertically opposite angles are $(${a}x ${sgn(b)})°$ and $(${c}x ${sgn(d2)})°$. Find $x$.`,
       answerType: 'numeric', answer: { value: x }, answerPrefix: 'x =',

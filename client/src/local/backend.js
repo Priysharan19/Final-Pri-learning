@@ -11,12 +11,18 @@ import {
   sydneyDate, streakFor, bumpActivity, setPredictedToday,
   ratingsFor, getRating, putRating, currentPid, setCurrentPid, activityFor
 } from './store.js';
-import { CURRICULUM, STREAM_CURRICULUM, PATHWAYS, streamSubtopics, SUBTOPIC_BY_ID, subtopicsForYear, scopeForYear, DIFF_LABELS } from '../engine/curriculum.js';
+import {
+  CURRICULUM, STREAM_CURRICULUM, PATHWAYS, streamSubtopics, SUBTOPIC_BY_ID, subtopicsForYear,
+  scopeForYear, DIFF_LABELS, dotpointsFor, dotpointById, dotpointAt
+} from '../engine/curriculum.js';
 import { generateQuestion } from '../engine/generators/index.js';
 import { checkAnswer, stepCheck } from '../engine/checker.js';
 import {
   START_RATING, updateRating, masteryOf, masteryBand, pickDifficulty, pickNext,
-  nextReview, predictMark, priorities, xpFor, levelFromXp, bandFor
+  predictMark, priorities, xpFor, levelFromXp, bandFor,
+  pickDotpoint, scheduleReview, migrateReview, gradeFor,
+  retrievability, misconceptionKey, misconceptionLabel, activeTraps, trapPressureOf,
+  TRAP_ACTIVE_AT, TRAP_CREDIT_FORGET
 } from '../engine/adaptive.js';
 import { BADGES, checkBadges } from './badges.js';
 import {
@@ -55,8 +61,242 @@ const cleanPathway = (raw, year) => {
   return raw;
 };
 
-// Dot point ↔ difficulty mapping (each subtopic has 3 dot points)
-const DP_DIFFS = [[1, 2], [2, 3], [3, 4]];
+// ── Syllabus dot points ──────────────────────────────────────────────────────
+// A subtopic is three syllabus dot points, and they are not one skill: "find
+// the gradient through two points" and "sketch from an equation" live under one
+// heading and fail for different reasons. Progress is therefore tracked at
+// dot-point resolution and the next question is chosen there.
+//
+// curriculum.js owns the identities — `dotpointsFor`, `dotpointById`, and
+// `difficultiesForDotpoint`, which lists the difficulties whose authored form
+// actually exercises a dot point and returns [] when nothing does. The
+// generator bank takes `generateQuestion(subtopicId, difficulty, seed,
+// dotpointId)` and answers with `dotpoints` (every dot point the question
+// exercises), `dotpoint` (the one id when the question pins to exactly one),
+// and `dotpointExact` (whether a requested one was delivered).
+//
+// That last flag is why nothing here has to guess. A dot point with no form
+// behind it is never offered as a dot point: the request is served at subtopic
+// level and the reply says so, rather than telling a student they are drilling
+// something the bank cannot produce.
+
+/** Is there an authored form that actually exercises this dot point? */
+const dotpointIsGeneratable = (dp) => !!dp && (dp.forms || []).length > 0;
+
+/**
+ * The dot points one generated question counts towards. `dotpoints` is the
+ * bank's own list; `dotpoint` is its single-id form. Anything the curriculum
+ * does not recognise is dropped rather than stored under a name nothing owns.
+ */
+function dotpointsCredited(q) {
+  const raw = Array.isArray(q?.dotpoints) && q.dotpoints.length ? q.dotpoints : (q?.dotpoint ? [q.dotpoint] : []);
+  return [...new Set(raw.map(id => dotpointOf(q.subtopic, id)?.id).filter(Boolean))];
+}
+
+/** The dot points of a subtopic that a generator can really deliver. */
+const generatableDotpoints = (subtopicId) => dotpointsFor(subtopicId).filter(dotpointIsGeneratable);
+
+// How far the difficulty may be dragged from the success target to reach a dot
+// point: one rung. Two is the difference between "a stretch" and "a wall".
+const DOTPOINT_DRIFT = 1;
+
+/** The difficulty closest to `want` among those that deliver a dot point. */
+const nearestForm = (forms, want) => (forms || []).length
+  ? forms.reduce((best, f) => (Math.abs(f - want) < Math.abs(best - want) ? f : best))
+  : want;
+
+/**
+ * Pick the dot point of a subtopic that most needs work, and the difficulty to
+ * ask it at. `fixed` is a difficulty the caller has already committed to — the
+ * pool is then limited to dot points an authored form delivers at exactly that
+ * difficulty, because a dot point that cannot be reached there is not a choice,
+ * it is a promise that would be broken on the next line.
+ */
+function chooseDotpoint(subtopicId, ratingRow, { fixed = null, want = 2, prefer = null, nowMs = Date.now() } = {}) {
+  let pool = generatableDotpointStates(subtopicId, ratingRow);
+  // A dot point is only reachable through the difficulties whose authored form
+  // exercises it, and some are reachable at one rung only. That constraint is
+  // not allowed to overrule the success target: a dot point whose only form is
+  // two rungs above what this student should be seeing is dropped from the
+  // pool, and the question is served at subtopic level instead. Aiming at the
+  // finer target is worth nothing if the price is a wall of D4.
+  pool = fixed
+    ? pool.filter(dp => dp.forms.includes(fixed))
+    : pool.filter(dp => Math.abs(nearestForm(dp.forms, want) - want) <= DOTPOINT_DRIFT);
+  // A misconception lives on a dot point. When one is being hunted, that dot
+  // point is the place to hunt it, not wherever the ranking would have gone.
+  const preferred = prefer ? pool.find(dp => dp.id === prefer) : null;
+  const dp = preferred || pickDotpoint(pool, { rand: Math.random(), nowMs });
+  if (!dp) return { dp: null, difficulty: fixed || want };
+  if (fixed) return { dp, difficulty: fixed };
+  const aimed = dp.attempts ? pickDifficulty(dp.rating, dp.attempts, { state: dp, nowMs }) : want;
+  const d = nearestForm(dp.forms, aimed);
+  return { dp, difficulty: Math.abs(d - want) <= DOTPOINT_DRIFT ? d : nearestForm(dp.forms, want) };
+}
+
+/** The dot point of `subtopicId` named by an id, a slug key, or an ordinal. */
+function dotpointOf(subtopicId, ref) {
+  if (ref === undefined || ref === null || ref === '') return null;
+  const dp = (typeof ref === 'number' || /^\d+$/.test(String(ref)))
+    ? dotpointAt(subtopicId, Number(ref))
+    : dotpointById(String(ref));
+  return dp && dp.subtopic === subtopicId ? dp : null;
+}
+
+// ── Interleaving memory ──────────────────────────────────────────────────────
+// What Smart Practice has served this session, newest first, so the picker can
+// refuse to serve the same subtopic five times in a row. It is deliberately not
+// stored: interleaving is a property of a sitting, and a student who closes the
+// app and comes back tomorrow is starting a new one. Kept per profile and
+// bounded, so a long-lived tab cannot grow it.
+
+const SERVED_WINDOW = 8;
+const SERVED_PROFILES = 6;
+const servedByPid = new Map();
+
+const recentlyServed = pid => servedByPid.get(pid) || [];
+
+function noteServed(pid, subtopicId) {
+  const list = [subtopicId, ...(servedByPid.get(pid) || [])].slice(0, SERVED_WINDOW);
+  servedByPid.set(pid, list);
+  while (servedByPid.size > SERVED_PROFILES) servedByPid.delete(servedByPid.keys().next().value);
+}
+
+// ── Dot-point and misconception state ────────────────────────────────────────
+// Both hang off the subtopic's existing rating row rather than a new store, so
+// a device that already holds a year of work keeps it: a row written before any
+// of this existed simply has no `dp` and no `traps`, and reads as an empty one.
+
+// How many recent outcomes a rating row remembers, and how many of them the
+// success target looks at when deciding whether a student is wobbling.
+const RECENT_WINDOW = 8;
+const RECENT_LOOKBACK = 3;
+
+const EMPTY_DP = () => ({ rating: START_RATING, attempts: 0, correct: 0, last_at: null });
+
+/** How many of the last few attempts in a subtopic went wrong. */
+const recentWrongOf = (st) =>
+  (Array.isArray(st?.recent) ? st.recent : []).slice(0, RECENT_LOOKBACK).filter(v => !v).length;
+
+const dpStateOf = (ratingRow, dotpointId) =>
+  (ratingRow?.dp && ratingRow.dp[dotpointId]) || EMPTY_DP();
+
+/** Dot-point rows in the shape the picker ranks, restricted to what can be generated. */
+function generatableDotpointStates(subtopicId, ratingRow) {
+  return generatableDotpoints(subtopicId)
+    .map(dp => ({
+      id: dp.id, index: dp.ordinal, text: dp.text, forms: dp.forms,
+      ...dpStateOf(ratingRow, dp.id), traps: trapsForDotpoint(ratingRow?.traps, dp.id)
+    }));
+}
+
+const trapsForDotpoint = (traps, dotpointId) => Object.fromEntries(
+  Object.entries(traps || {}).filter(([, t]) => t && t.dotpoint === dotpointId)
+);
+
+// A misconception ledger is capped so it cannot grow without bound on a device
+// that never syncs anywhere; the least recently seen slip is the one that goes.
+const MAX_TRAPS_PER_SUBTOPIC = 8;
+
+function trimTraps(traps) {
+  const keys = Object.keys(traps);
+  if (keys.length <= MAX_TRAPS_PER_SUBTOPIC) return traps;
+  const keep = keys
+    .sort((a, b) => (traps[b].lastAt || 0) - (traps[a].lastAt || 0))
+    .slice(0, MAX_TRAPS_PER_SUBTOPIC);
+  return Object.fromEntries(keep.map(k => [k, traps[k]]));
+}
+
+/** The trap whose explanation the marker just handed back, if it was one. */
+function trapHitBy(q, feedback) {
+  if (!feedback) return null;
+  const text = String(feedback);
+  const pool = [
+    ...(Array.isArray(q?.traps) ? q.traps : []),
+    ...Object.values(q?.answer?.optionTraps || {}).map(why => ({ why }))
+  ];
+  const hit = pool.find(t => t && String(t.why) === text);
+  return hit ? { why: String(hit.why) } : null;
+}
+
+/**
+ * Record one wrong answer against the misconception it encodes. Counted once
+ * per question, so answering the same question wrongly twice is one slip.
+ * Rush and Match are 90-second games: a wrong answer there is usually the clock
+ * rather than a wrong idea, and counting it would name a weakness the student
+ * does not have.
+ */
+async function recordTrap(pid, row, q, feedback) {
+  if (row.trapKey || q.custom || !q.subtopic) return null;
+  if (row.mode === 'rush' || row.mode === 'match') return null;
+  const hit = trapHitBy(q, feedback);
+  if (!hit) return null;
+  const key = misconceptionKey(q.subtopic, hit.why);
+  if (!key) return null;
+  const now = Date.now();
+  const st = (await getRating(pid, q.subtopic)) || { rating: START_RATING, attempts: 0, correct: 0, last_at: null };
+  const traps = { ...(st.traps || {}) };
+  const prev = traps[key] || { n: 0, credit: 0, firstAt: now };
+  traps[key] = {
+    n: Math.min(9, (prev.n || 0) + 1), credit: 0, firstAt: prev.firstAt || now, lastAt: now,
+    label: safeLabel(misconceptionLabel(hit.why), 140),
+    dotpoint: q.dotpoint || prev.dotpoint || null
+  };
+  await putRating(pid, q.subtopic, { ...st, traps: trimTraps(traps) });
+  row.trapKey = key;
+  return key;
+}
+
+/**
+ * The named weakness to tell the student about, once a slip has happened often
+ * enough to be a pattern. A first occurrence gets the question's own feedback
+ * and nothing more — being told you "keep" doing something you did once is
+ * both wrong and discouraging.
+ */
+async function namedTrap(pid, subtopicId, key) {
+  if (!key || !subtopicId) return null;
+  const st = await getRating(pid, subtopicId);
+  const t = st?.traps?.[key];
+  if (!t || t.n < TRAP_ACTIVE_AT) return null;
+  return { key, label: t.label, count: t.n };
+}
+
+/**
+ * A clean, unaided correct answer is evidence the slip is receding, so every
+ * trap in that subtopic banks a credit. Two credits stop it being surfaced or
+ * steering the queue; four and it is forgotten. A hinted or second-try answer
+ * banks nothing — it is not evidence the student can do it unaided.
+ */
+function decayTraps(traps) {
+  const out = {};
+  for (const [key, t] of Object.entries(traps || {})) {
+    const credit = (Number(t?.credit) || 0) + 1;
+    if (credit < TRAP_CREDIT_FORGET) out[key] = { ...t, credit };
+  }
+  return out;
+}
+
+/**
+ * Every live misconception across the syllabus, worst first — a weakness with
+ * a name on it. "You keep reading the vertex off with the sign of the bracket"
+ * is something a student can fix this afternoon; "Quadratics · 41%" is not.
+ */
+function namedWeaknesses(ratings, nowMs = Date.now(), limit = 6) {
+  const out = [];
+  for (const [subtopic, st] of Object.entries(ratings || {})) {
+    const sub = SUBTOPIC_BY_ID[subtopic];
+    if (!sub) continue;
+    for (const t of activeTraps(st.traps, nowMs)) {
+      const dp = dotpointOf(subtopic, t.dotpoint);
+      out.push({
+        key: t.key, subtopic, subtopicName: sub.name, strand: sub.strand,
+        label: t.label, count: t.n, lastAt: t.lastAt,
+        dotpoint: dp ? dp.id : null, dotpointText: dp ? dp.text : null
+      });
+    }
+  }
+  return out.sort((a, b) => b.count - a.count || b.lastAt - a.lastAt).slice(0, limit);
+}
 
 // Every per-profile store included in a full backup file
 const BACKUP_STORES = ['ratings', 'attempts', 'questions', 'reviews', 'exams', 'badges', 'activity', 'rushRuns', 'matchRuns', 'inks', 'taskProgress', 'bookmarks'];
@@ -108,6 +348,46 @@ const safeStrokes = (v, max) => (Array.isArray(v) ? v : []).slice(0, max)
 const safePhoto = (v) => {
   if (typeof v !== 'string' || v.length > MAX_PHOTO || !PHOTO_RE.test(v)) return null;
   return /[^A-Za-z0-9+/=]/.test(v.slice(v.indexOf(',') + 1)) ? null : v;
+};
+
+/** A modelled quantity: in range, or absent so the model derives it again. */
+const safeSpan = (v, lo, hi) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : null;
+};
+
+// Dot-point ids and misconception keys become object keys, so both maps are
+// rebuilt key by key through the id allowlist — a file cannot name `__proto__`
+// as a dot point — and both are capped so one cannot be used to grow a row.
+const MAX_DP_ROWS = 12;
+
+const safeDotpointStats = (v) => {
+  const out = {};
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return out;
+  for (const [rawKey, s] of Object.entries(v).slice(0, MAX_DP_ROWS)) {
+    const key = safeId(rawKey);
+    if (!key || !s || typeof s !== 'object') continue;
+    out[key] = {
+      rating: safeNum(s.rating, START_RATING), attempts: safeInt(s.attempts, 0, 1e7, 0),
+      correct: safeInt(s.correct, 0, 1e7, 0), last_at: safeTime(s.last_at)
+    };
+  }
+  return out;
+};
+
+const safeTrapLedger = (v) => {
+  const out = {};
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return out;
+  for (const [rawKey, t] of Object.entries(v).slice(0, MAX_TRAPS_PER_SUBTOPIC)) {
+    const key = safeId(rawKey);
+    if (!key || !t || typeof t !== 'object') continue;
+    out[key] = {
+      n: safeInt(t.n, 0, 9, 0), credit: safeInt(t.credit, 0, 9, 0),
+      firstAt: safeTime(t.firstAt), lastAt: safeTime(t.lastAt),
+      label: safeLabel(t.label, 140), dotpoint: safeId(t.dotpoint)
+    };
+  }
+  return out;
 };
 
 // ── Profile helpers ──────────────────────────────────────────────────────────
@@ -368,9 +648,11 @@ function sanitize(q, row) {
     };
   }
   const s = SUBTOPIC_BY_ID[q.subtopic];
+  const dp = s ? dotpointOf(q.subtopic, q.dotpoint) : null;
   return {
     id: row.id, subtopic: q.subtopic, subtopicName: q.custom ? q.customName || 'Custom question' : (s?.name || q.subtopic),
     year: s?.year, strand: s?.strand,
+    dotpoint: dp ? dp.id : null, dotpointText: dp ? dp.text : null, dotpointIndex: dp ? dp.ordinal : null,
     difficulty: q.difficulty, diffLabel: DIFF_LABELS[q.difficulty] || 'Custom',
     prompt: q.prompt, answerType: q.answerType, mcqOptions: q.mcqOptions,
     figure: safeFigure(q.figure), code: s?.code || null,
@@ -383,11 +665,50 @@ function sanitize(q, row) {
   };
 }
 
-async function createQuestion(pid, subtopic, difficulty, mode, examId = null, taskId = null, customQ = null) {
-  const q = customQ ? { ...customQ, custom: true } : generateQuestion(subtopic, difficulty);
-  const row = { id: uuid(), pid, subtopic: q.subtopic || 'custom', difficulty: q.difficulty || 2, payload: q, mode, examId, taskId, answered: 0, tries: 0, hintsUsed: 0, createdAt: Date.now() };
+// How many seeds to look through when a specific misconception is being
+// hunted. Generation is a few hundred microseconds of local arithmetic and
+// nothing is written until one is chosen, so this costs a student nothing —
+// but it is bounded, because a trap the bank cannot produce must not spin.
+const TRAP_SEEK_TRIES = 12;
+
+/**
+ * Generate a question, optionally aimed at one dot point and one misconception.
+ * Returns the payload and an honest account of what was actually honoured, so
+ * a caller never claims a focus the generator did not deliver.
+ */
+function generateFocused(subtopic, difficulty, { dotpointId = null, trapKey = null } = {}) {
+  const want = dotpointIsGeneratable(dotpointOf(subtopic, dotpointId)) ? dotpointId : null;
+  // `dotpointExact` is the bank's own word for whether the question it just
+  // built really exercises what was asked for. It is the only thing allowed to
+  // decide that a dot point was practised.
+  const delivered = q => (want && q?.dotpointExact ? want : null);
+  const gen = () => generateQuestion(subtopic, difficulty, undefined, want || undefined);
+  if (!trapKey) {
+    const q = gen();
+    return { q, dotpoint: delivered(q), trapKey: null };
+  }
+  let first = null;
+  for (let i = 0; i < TRAP_SEEK_TRIES; i++) {
+    const q = gen();
+    if (!first) first = q;
+    const probes = (Array.isArray(q.traps) ? q.traps : [])
+      .concat(Object.values(q.answer?.optionTraps || {}).map(why => ({ why })));
+    if (probes.some(t => misconceptionKey(subtopic, t.why) === trapKey)) {
+      return { q, dotpoint: delivered(q), trapKey };
+    }
+  }
+  return { q: first, dotpoint: delivered(first), trapKey: null };
+}
+
+async function createQuestion(pid, subtopic, difficulty, mode, examId = null, taskId = null, customQ = null, focus = null) {
+  const made = customQ ? null : generateFocused(subtopic, difficulty, focus || {});
+  const q = customQ ? { ...customQ, custom: true } : made.q;
+  const row = {
+    id: uuid(), pid, subtopic: q.subtopic || 'custom', difficulty: q.difficulty || 2, payload: q,
+    mode, examId, taskId, answered: 0, tries: 0, hintsUsed: 0, createdAt: Date.now()
+  };
   await put('questions', row);
-  return { row, payload: q };
+  return { row, payload: q, dotpoint: made?.dotpoint || null, trapKey: made?.trapKey || null };
 }
 
 function displayAnswer(q) {
@@ -420,20 +741,53 @@ async function resolve(profile, row, q, correct, answerGiven, ms, mode, viaInk =
 
   if (!isRush && !isCustom) {
     ratingAfter = updateRating(st.rating, st.attempts, q.difficulty, correct, effHints);
+
+    // Dot-point resolution. The bank says which dot points a question actually
+    // exercises; each of them takes the result. A question that spans two of
+    // them is evidence about both — we cannot say which one a wrong answer
+    // came from, and pretending we can would put a made-up number on a screen.
+    // A question that names none moves only the subtopic, exactly as before.
+    const dp = { ...(st.dp || {}) };
+    for (const dpId of dotpointsCredited(q)) {
+      const prev = dpStateOf(st, dpId);
+      dp[dpId] = {
+        rating: updateRating(prev.rating, prev.attempts, q.difficulty, correct, effHints),
+        attempts: prev.attempts + 1,
+        correct: prev.correct + (correct ? 1 : 0),
+        last_at: now
+      };
+    }
+
+    // A clean correct answer walks every live misconception in this subtopic
+    // back one step; a hinted or second-try one leaves the ledger alone.
+    const clean = correct && !(row.hintsUsed || 0) && !(row.tries || 0);
+    const traps = clean ? decayTraps(st.traps) : (st.traps || {});
+
+    // The last few outcomes, newest first. Long-run mastery is an average, and
+    // an average cannot tell "steady at 60%" from "was fine, just missed the
+    // last three" — which are different students needing different questions.
+    const recent = [correct ? 1 : 0, ...(Array.isArray(st.recent) ? st.recent : [])].slice(0, RECENT_WINDOW);
+
     await putRating(pid, q.subtopic, {
-      rating: ratingAfter, attempts: st.attempts + 1, correct: st.correct + (correct ? 1 : 0), last_at: now
+      rating: ratingAfter, attempts: st.attempts + 1, correct: st.correct + (correct ? 1 : 0), last_at: now,
+      dp, traps, recent
     });
   }
 
   if ((mode === 'practice' || mode === 'review' || mode === 'task') && !isCustom) {
+    // Spaced review, FSRS-5. The grade carries more than right/wrong: a correct
+    // answer that needed a hint or a second try is Hard, and a clean fast one is
+    // Easy, so two students who both "got it" are not scheduled the same.
     const key = `${pid}:${q.subtopic}`;
     const rev = await get('reviews', key);
+    const grade = gradeFor({
+      correct, hintsUsed: row.hintsUsed || 0, tries: row.tries || 0,
+      ms: ms || 0, difficulty: q.difficulty || 2
+    });
     if (rev) {
-      const days = nextReview(rev.intervalDays, correct, q.difficulty);
-      await put('reviews', { ...rev, dueAt: now + days * DAY, intervalDays: days });
+      await put('reviews', { ...rev, subtopic: q.subtopic, ...scheduleReview(rev, grade, now) });
     } else if (st.attempts + 1 >= 3) {
-      const days = correct ? 2 : 1;
-      await put('reviews', { key, pid, subtopic: q.subtopic, dueAt: now + days * DAY, intervalDays: days });
+      await put('reviews', { key, pid, subtopic: q.subtopic, ...scheduleReview(null, grade, now) });
     }
   }
 
@@ -569,6 +923,7 @@ function safePayload(src) {
   if (!src || typeof src !== 'object' || Array.isArray(src)) return null;
   const out = {};
   for (const k of PAYLOAD_KEYS) if (src[k] !== undefined) out[k] = src[k];
+  out.dotpoint = safeId(src.dotpoint) || undefined;
   out.customName = safeLabel(src.customName, 60) || undefined;
   out.title = safeLabel(src.title, 200) || undefined;
   out.stem = sanitizeText(src.stem, 4000) || undefined;
@@ -650,14 +1005,30 @@ const IMPORT_ROWS = {
     return subtopic && {
       key: `${pid}:${subtopic}`, pid, subtopic,
       rating: safeNum(r.rating, START_RATING), attempts: safeInt(r.attempts, 0, 1e7, 0),
-      correct: safeInt(r.correct, 0, 1e7, 0), last_at: safeTime(r.last_at)
+      correct: safeInt(r.correct, 0, 1e7, 0), last_at: safeTime(r.last_at),
+      dp: safeDotpointStats(r.dp), traps: safeTrapLedger(r.traps),
+      recent: (Array.isArray(r.recent) ? r.recent : []).slice(0, RECENT_WINDOW).map(v => (v ? 1 : 0))
     };
   },
   reviews: (r, pid) => {
     const subtopic = safeId(r.subtopic);
+    // The FSRS state is the student's memory model for this idea. A restore
+    // that dropped it would silently reset every interval to day one, so it
+    // comes across with the row — rebuilt field by field like everything else,
+    // and derived from `intervalDays` when the file predates the model.
     return subtopic && {
       key: `${pid}:${subtopic}`, pid, subtopic,
-      dueAt: safeTime(r.dueAt) || Date.now(), intervalDays: safeInt(r.intervalDays, 0, 3650, 1)
+      dueAt: safeTime(r.dueAt) || Date.now(), intervalDays: safeInt(r.intervalDays, 0, 3650, 1),
+      stability: safeSpan(r.stability, 0.1, 3650),
+      fsrsDifficulty: safeSpan(r.fsrsDifficulty, 1, 10),
+      // A file that predates the memory model has no `reps`. Defaulting it to 0
+      // is what tells scheduleReview this is a brand-new item, which throws away
+      // the schedule the row's own intervalDays describes — so a restore would
+      // quietly reset a year of revision to day one. An interval on the row is
+      // itself evidence the student has seen this idea at least once.
+      reps: Number.isFinite(r?.reps) ? safeInt(r.reps, 0, 1e6, 0) : (safeInt(r.intervalDays, 0, 3650, 1) > 0 ? 1 : 0),
+      lapses: safeInt(r.lapses, 0, 1e6, 0),
+      lastAt: safeTime(r.lastAt)
     };
   },
   badges: (r, pid) => {
@@ -943,6 +1314,17 @@ const routes = {
     const reviews = await byIndex('reviews', 'pid', p.id);
     const due = new Set(reviews.filter(r => r.dueAt <= Date.now()).map(r => r.subtopic));
     const now = Date.now();
+    /** Dot points with their own mastery, and an honest `generated` flag. */
+    const dotpointRows = (s, st) => dotpointsFor(s.id).map(dp => {
+      const d = dpStateOf(st, dp.id);
+      const m = d.attempts ? masteryOf(d.rating, d.attempts, d.last_at, now) : 0;
+      return {
+        id: dp.id, key: dp.key, text: dp.text, difficulties: dp.forms,
+        mastery: Math.round(m * 100), band: d.attempts ? masteryBand(m) : 'unseen',
+        attempts: d.attempts, correct: d.correct,
+        generated: dotpointIsGeneratable(dp)
+      };
+    });
     const years = CURRICULUM.map(y => ({
       year: y.year, title: y.title, caption: y.caption,
       courseLabel: courseLabel(p.course || 'nsw', y.year),
@@ -951,7 +1333,7 @@ const routes = {
         const m = st ? masteryOf(st.rating, st.attempts, st.last_at, now) : 0;
         return {
           id: s.id, name: s.name, strand: s.strand, weight: s.weight, code: s.code || null,
-          dotpoints: s.dotpoints.map((dp, i) => ({ text: dp, difficulties: DP_DIFFS[i] || [2, 3] })),
+          dotpoints: dotpointRows(s, st),
           mastery: Math.round(m * 100), band: st ? masteryBand(m) : 'unseen',
           attempts: st?.attempts || 0, correct: st?.correct || 0,
           due: due.has(s.id), rating: st?.rating || null
@@ -976,7 +1358,7 @@ const routes = {
           const m = st ? masteryOf(st.rating, st.attempts, st.last_at, now) : 0;
           return {
             id: s2.id, name: s2.name, strand: s2.strand, weight: s2.weight, code: s2.code,
-            dotpoints: s2.dotpoints.map((dp, i) => ({ text: dp, difficulties: DP_DIFFS[i] || [2, 3] })),
+            dotpoints: dotpointRows(s2, st),
             mastery: Math.round(m * 100), band: st ? masteryBand(m) : 'unseen',
             attempts: st?.attempts || 0, correct: st?.correct || 0,
             due: due.has(s2.id), rating: st?.rating || null
@@ -1006,31 +1388,90 @@ const routes = {
       }
       const sub = task.subtopics[done % task.subtopics.length];
       const st = await getRating(p.id, sub);
-      const d = pickDifficulty(st?.rating ?? START_RATING, st?.attempts ?? 0);
-      const { row, payload } = await createQuestion(p.id, sub, d, 'task', null, taskId);
+      const aim = pickDifficulty(st?.rating ?? START_RATING, st?.attempts ?? 0, { state: st || {}, nowMs: Date.now() });
+      const { dp, difficulty: d } = chooseDotpoint(sub, st, { want: aim });
+      const { row, payload } = await createQuestion(p.id, sub, d, 'task', null, taskId, null, { dotpointId: dp?.id || null });
       return { question: sanitize(payload, row), reason: 'task', why: `Task: ${task.title} — question ${done + 1} of ${task.count}.` };
     }
+    const now = Date.now();
     let choice;
     if (mode === 'topic' && subtopic && SUBTOPIC_BY_ID[subtopic]) {
+      const sub = SUBTOPIC_BY_ID[subtopic];
       const st = await getRating(p.id, subtopic);
-      let d;
-      if (dotpoint !== undefined && dotpoint !== null && DP_DIFFS[dotpoint]) {
-        const opts = DP_DIFFS[dotpoint];
-        const pref = pickDifficulty(st?.rating ?? START_RATING, st?.attempts ?? 0);
-        d = opts.includes(pref) ? pref : opts[Math.random() < 0.5 ? 0 : opts.length - 1];
-      } else {
-        d = difficulty ? Math.min(4, Math.max(1, Number(difficulty))) : pickDifficulty(st?.rating ?? START_RATING, st?.attempts ?? 0);
+      const asked = dotpointOf(subtopic, dotpoint);
+      const real = dotpointIsGeneratable(asked);
+      const dpState = asked ? dpStateOf(st, asked.id) : null;
+      // Difficulty is read off whichever rating actually describes what is
+      // about to be asked: the dot point's own when one is in play, the
+      // subtopic's otherwise.
+      const basis = dpState && dpState.attempts ? dpState
+        : { rating: st?.rating ?? START_RATING, attempts: st?.attempts ?? 0, correct: st?.correct ?? 0, last_at: st?.last_at ?? 0 };
+      let d = difficulty
+        ? Math.min(4, Math.max(1, Number(difficulty)))
+        : pickDifficulty(basis.rating, basis.attempts, {
+          state: { ...basis, trapPressure: trapPressureOf(st?.traps, now), recentWrong: recentWrongOf(st) }, nowMs: now
+        });
+      // Only the difficulties whose authored form exercises this dot point can
+      // deliver it, so the choice is snapped into that set rather than sent as
+      // a wish the generator has to talk itself out of.
+      if (real && !difficulty) d = nearestForm(asked.forms, d);
+      // "Practise this topic" with no dot point named still gets practised at
+      // dot-point resolution: the one inside it with the least behind it wins.
+      let auto = null;
+      if (!asked) {
+        const chosen = chooseDotpoint(subtopic, st, {
+          fixed: difficulty ? d : null, want: d, prefer: activeTraps(st?.traps, now)[0]?.dotpoint || null, nowMs: now
+        });
+        auto = chosen.dp;
+        d = chosen.difficulty;
       }
-      choice = { subtopic, difficulty: d, reason: 'topic', why: dotpoint != null ? `Focused on dot point ${dotpoint + 1} of this subtopic.` : 'Focused practice on your chosen topic.' };
+      // Two explanations, and which one is sent is decided after the question
+      // exists — because until the bank has built it, whether it really lands
+      // on that dot point is a guess. Where no authored form exercises the
+      // requested dot point at all, the reply says the topic is the target.
+      // Claiming otherwise would be worse than not having the feature.
+      const whyPlain = asked && !real
+        ? `Focused practice on ${sub.name} — no question form covers this dot point on its own yet.`
+        : `Focused practice on ${sub.name}.`;
+      choice = {
+        subtopic, difficulty: d, reason: 'topic', dotpoint: real ? asked.id : (auto?.id || null),
+        trap: activeTraps(st?.traps, now)[0] || null,
+        whyPlain,
+        why: real ? `Focused on this dot point: ${asked.text}`
+          : auto ? `Focused practice on ${sub.name}. Dot point: ${auto.text}`
+            : whyPlain
+      };
     } else {
       const ratings = await ratingsFor(p.id);
       const reviews = await byIndex('reviews', 'pid', p.id);
-      const reviewsDue = reviews.filter(r => r.dueAt <= Date.now()).sort((a, b) => a.dueAt - b.dueAt).map(r => ({ subtopic: r.subtopic }));
-      choice = pickNext({ ratings, reviewsDue, year: p.year, pathway: pathwayOf(p), rand: Math.random() });
+      const reviewsDue = reviews.filter(r => r.dueAt <= now).sort((a, b) => a.dueAt - b.dueAt);
+      choice = pickNext({
+        ratings, reviewsDue, year: p.year, pathway: pathwayOf(p),
+        rand: Math.random(), recent: recentlyServed(p.id), nowMs: now
+      });
       if (difficulty) choice = { ...choice, difficulty: Math.min(4, Math.max(1, Number(difficulty))) };
+      // Within the chosen subtopic, aim at the dot point that needs it most —
+      // but only ever at one the bank can really produce.
+      const chosen = chooseDotpoint(choice.subtopic, ratings[choice.subtopic], {
+        fixed: difficulty ? choice.difficulty : null, want: choice.difficulty,
+        prefer: choice.trap?.dotpoint || null, nowMs: now
+      });
+      choice.whyPlain = choice.why;
+      if (chosen.dp) {
+        choice = { ...choice, dotpoint: chosen.dp.id, difficulty: chosen.difficulty, why: `${choice.why} Dot point: ${chosen.dp.text}` };
+      }
+      noteServed(p.id, choice.subtopic);
     }
-    const { row, payload } = await createQuestion(p.id, choice.subtopic, choice.difficulty, choice.reason === 'review' ? 'review' : 'practice');
-    return { question: sanitize(payload, row), reason: choice.reason, why: choice.why };
+    const focus = { dotpointId: choice.dotpoint || null, trapKey: choice.trap?.key || null };
+    const { row, payload, dotpoint: served, trapKey } = await createQuestion(
+      p.id, choice.subtopic, choice.difficulty, choice.reason === 'review' ? 'review' : 'practice', null, null, null, focus
+    );
+    return {
+      question: sanitize(payload, row), reason: choice.reason,
+      why: served || !choice.dotpoint ? choice.why : choice.whyPlain,
+      dotpoint: served, target: choice.target ?? null,
+      misconception: trapKey ? choice.trap?.label || null : null
+    };
   },
 
   'POST /practice/:id/hint': async (body, params) => {
@@ -1059,6 +1500,11 @@ const routes = {
     if (!result.correct && q.answerType === 'mcq' && q.answer.optionTraps) {
       feedback = q.answer.optionTraps[Number(answer)] || feedback;
     }
+    // A wrong answer that landed on a designed distractor is not a random miss:
+    // the trap names the misconception behind it. Counted here, before the
+    // two-try branch below, because the first attempt is the honest evidence.
+    let trapHit = null;
+    if (!result.correct && !result.invalid) trapHit = await recordTrap(p.id, row, q, feedback);
     let stepReport = null;
     const meta0 = stepMetaFor(q);
     if (steps && meta0) {
@@ -1085,7 +1531,7 @@ const routes = {
     if (!result.correct && !result.invalid && !isFast && (row.tries || 0) < 1) {
       row.tries = (row.tries || 0) + 1;
       await put('questions', row);
-      return { correct: false, resolved: false, triesLeft: 1, feedback: feedback || 'Not quite — check your working and try once more.', stepReport };
+      return { correct: false, resolved: false, triesLeft: 1, feedback: feedback || 'Not quite — check your working and try once more.', stepReport, misconception: await namedTrap(p.id, q.subtopic, trapHit) };
     }
     if (result.invalid && !isFast) {
       return { correct: false, resolved: false, triesLeft: Math.max(0, 1 - (row.tries || 0)), invalid: true, feedback, stepReport };
@@ -1093,6 +1539,7 @@ const routes = {
     const meta = await resolve(p, row, q, result.correct, answer, ms, row.mode, !!viaInk);
     return {
       correct: result.correct, resolved: true, feedback, stepReport,
+      misconception: await namedTrap(p.id, q.subtopic, trapHit),
       solution: { steps: q.steps, answerText: displayAnswer(q), criteria: criteriaFor(q), solutionText: q.solutionText },
       ...meta
     };
@@ -1113,7 +1560,18 @@ const routes = {
     const p = await requireProfile();
     const now = Date.now();
     const rows = (await byIndex('reviews', 'pid', p.id)).sort((a, b) => a.dueAt - b.dueAt);
-    const decorate = r => ({ subtopic: r.subtopic, due_at: r.dueAt, interval_days: r.intervalDays, name: SUBTOPIC_BY_ID[r.subtopic]?.name, year: SUBTOPIC_BY_ID[r.subtopic]?.year, strand: SUBTOPIC_BY_ID[r.subtopic]?.strand });
+    // `recall` is the model's estimate of how much of this is still there right
+    // now, which is the thing a student can act on — an interval is only the
+    // bookkeeping behind it.
+    const decorate = r => {
+      const st = migrateReview(r, now);
+      return {
+        subtopic: r.subtopic, due_at: r.dueAt, interval_days: r.intervalDays,
+        recall: Math.round(100 * retrievability(Math.max(0, (now - st.lastAt) / DAY), st.stability)),
+        stability_days: Math.round(st.stability * 10) / 10, lapses: st.lapses, reps: st.reps,
+        name: SUBTOPIC_BY_ID[r.subtopic]?.name, year: SUBTOPIC_BY_ID[r.subtopic]?.year, strand: SUBTOPIC_BY_ID[r.subtopic]?.strand
+      };
+    };
     return {
       due: rows.filter(r => r.dueAt <= now).map(decorate),
       upcoming: rows.filter(r => r.dueAt > now && r.dueAt < now + 7 * DAY).map(decorate)
@@ -1275,6 +1733,10 @@ const routes = {
         } catch { }
       }
       totalMarks += qMarks; marksAwarded += awarded;
+      // An exam answer that landed on a designed distractor is the same
+      // evidence a practice one is, and under exam conditions it is better
+      // evidence — so it is counted here too.
+      if (!row.answered && !result.correct) await recordTrap(p.id, row, q, result.feedback);
       if (!row.answered) await resolve(p, row, q, !!result.correct, given ?? '', Math.round(totalMs / nQ), 'exam');
       detail.push({
         id: qid, subtopic: q.subtopic, subtopicName: SUBTOPIC_BY_ID[q.subtopic]?.name,
@@ -1376,7 +1838,9 @@ const routes = {
     const pid = p.id;
     const ratings = await ratingsFor(pid);
     const pred = predictMark(ratings, p.year, now, pathwayOf(p));
-    const prio = priorities(ratings, p.year, now, 5, pathwayOf(p));
+    const misconceptions = namedWeaknesses(ratings, now);
+    const notes = Object.fromEntries(misconceptions.map(m => [m.subtopic, `keeps repeating: ${m.label}`]));
+    const prio = priorities(ratings, p.year, now, 5, pathwayOf(p), notes);
     const days = await activityFor(pid);
     let lastPred = null;
     const trajectory = days.map(d => { if (d.predicted != null) lastPred = d.predicted; return { date: d.date, predicted: lastPred }; }).filter(d => d.predicted != null);
@@ -1402,7 +1866,7 @@ const routes = {
     const inkCount = attempts.filter(a => a.viaInk).length;
     const recent = attempts.slice(-15).reverse().map(a => ({ subtopic: a.subtopic, difficulty: a.difficulty, correct: a.correct, created_at: a.createdAt, mode: a.mode, name: SUBTOPIC_BY_ID[a.subtopic]?.name || 'Custom question' }));
     return {
-      predicted: pred, trajectory, priorities: prio, strands,
+      predicted: pred, trajectory, priorities: prio, strands, misconceptions,
       activity: days.slice(-120), totals, byDiff, bestRush,
       matchWins: matchRuns.filter(r => r.won).length, matchPlayed: matchRuns.length,
       examCount: exams.filter(e => e.finishedAt).length, inkCount, recent,
@@ -1431,6 +1895,7 @@ const routes = {
     return {
       student: { name: p.name, year: p.year, course: courseLabel(p.course || 'nsw', p.year, pathwayOf(p)) },
       generatedAt: now, predicted: pred, subtopics: rows,
+      misconceptions: namedWeaknesses(ratings, now),
       strengths: [...rows].filter(r => r.attempts >= 3).sort((a, b) => b.mastery - a.mastery).slice(0, 3),
       focus: [...rows].sort((a, b) => a.mastery - b.mastery).slice(0, 3),
       weekly: acts.slice(-28),

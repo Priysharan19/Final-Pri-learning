@@ -17,6 +17,24 @@
 //                      exercised by server/test/selfcheck.mjs. Never shipped.
 // Quote the client figure for anything about the product.
 //
+// ── This tool does NOT answer the dot-point question ─────────────────────────
+// The cell this censuses is (subtopic × difficulty). It is not a dot point, and
+// a large total here says nothing about whether a student who asks for ONE
+// syllabus dot point gets anything back. That is a different measurement with a
+// different failure mode — a dot point with zero generators behind it is
+// invisible inside a total of a third of a million — and it has its own tool:
+//
+//   node tools/dotpoint-coverage.mjs     per dot point: which difficulties'
+//                                        authored forms exercise it, how many
+//                                        distinct questions that reaches, and
+//                                        which dot points reach NONE.
+//
+// The two are deliberately comparable: dotpoint-coverage.mjs canonicalises a
+// question exactly as `canon()` below does, so the counts are the same kind of
+// number. They are not, however, the same total — a question that exercises two
+// dot points is counted once here and once under each dot point there. Use this
+// tool for "how big is the bank", that one for "is any dot point empty".
+//
 // Usage: node tools/count-questions.mjs [samplesPerCell] [client|server]
 // ─────────────────────────────────────────────────────────────────────────────
 import { MULTIPART, generateMultipart } from '../client/src/engine/generators/multipart.js';
@@ -111,3 +129,12 @@ console.log('fewest in any one cell:', perCell.reduce((a, b) => (b.observed < a.
 for (const c of [...single, ...thin].sort((a, b) => a.observed - b.observed || a.cell.localeCompare(b.cell))) {
   console.log(`  ${c.cell.padEnd(28)} ${String(c.observed).padStart(3)}`);
 }
+
+// ── What this census cannot see ──────────────────────────────────────────────
+// Every cell above can be healthy while a syllabus dot point still has nothing
+// behind it, because a cell is (subtopic × difficulty) and a dot point is not.
+// Say so at the point someone reads the total, not only in the header.
+console.log('');
+console.log('NOTE: cells here are (subtopic × difficulty) — NOT syllabus dot points.');
+console.log('      For per-dot-point reach, and which dot points reach nothing:');
+console.log('        node tools/dotpoint-coverage.mjs');

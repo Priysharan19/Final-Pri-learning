@@ -581,3 +581,231 @@ export function yearOfSubtopic(id) {
 }
 
 export const DIFF_LABELS = { 1: 'D1 · Foundation', 2: 'D2 · Intermediate', 3: 'D3 · Advanced', 4: 'D4 · Exam Extension' };
+
+// ── Dot points ───────────────────────────────────────────────────────────────
+// The product is sold per dot point — "practise a single dot point" — so a dot
+// point needs an identity of its own. 84 subtopics × 3 dot points = 252. The
+// plain-string `dotpoints` arrays above are untouched: everything the UI renders
+// still reads them directly. What follows is a parallel index over the same
+// strings.
+//
+// An id is `subtopicId.ordinal`, 1-based — short enough for a URL and for a
+// stored mastery row. The ordinal is resolved once, here, and frozen into
+// DOTPOINTS, so nothing downstream re-derives it from a live array index. An id
+// built on position alone would silently re-point at a different skill if a dot
+// point were ever inserted or reordered, so every dot point also carries `key`,
+// a slug of its own wording; `dotpointById` accepts either form, which means
+// `y7-integers#compare-order-and-locate` survives a reshuffle that
+// `y7-integers.1` would not.
+
+const SLUG_MIN_WORDS = 4;
+
+function slugWords(text) {
+  return String(text).toLowerCase().replace(/[^a-z0-9\s]+/g, ' ').trim().split(/\s+/).filter(Boolean);
+}
+
+/** Slugs for one subtopic's dot points, widened word by word until distinct. */
+function uniqueSlugs(texts) {
+  const words = texts.map(slugWords);
+  let n = SLUG_MIN_WORDS;
+  let slugs = words.map(w => w.slice(0, n).join('-'));
+  const longest = words.reduce((m, w) => Math.max(m, w.length), 0);
+  while (n < longest && new Set(slugs).size !== slugs.length) {
+    n++;
+    slugs = words.map(w => w.slice(0, n).join('-'));
+  }
+  // Wording that is identical up to the last word can still collide; the
+  // ordinal is the tie-break of last resort so an id is never ambiguous.
+  const seen = new Set();
+  return slugs.map((s, i) => {
+    const v = seen.has(s) ? `${s}-${i + 1}` : s;
+    seen.add(v);
+    return v;
+  });
+}
+
+// ── Which authored form exercises which dot point ────────────────────────────
+// One entry per subtopic: four slots, one per difficulty (D1–D4), each holding
+// the 0-based ordinals of the dot points that difficulty's authored form
+// actually assesses. `'*'` means a form genuinely spans the whole subtopic; an
+// empty array means the form is real practice for the subtopic but assesses no
+// dot point in the list — a prerequisite drill, or a skill the syllabus wording
+// does not name. Empty is not a placeholder for "not looked at yet": every one
+// of the 336 slots below was read against the question it generates, and the
+// dot points with nothing behind them are reported rather than papered over.
+//
+// This is a registry-side declaration, keyed by subtopic and difficulty, and it
+// can only ever be as fine-grained as a cell. A bank that wants per-question
+// precision — a form that asks about perimeter on one branch and area on the
+// next — declares it at the source instead; see `generateQuestion`.
+
+export const DOTPOINT_FORMS = Object.freeze({
+  // ── Year 7 ────────────────────────────────────────────────────────────────
+  'y7-integers': [[1], [1, 2], [2], [1]],
+  'y7-fractions': [[0], [1], [2], [2]],
+  'y7-decimals-perc': [[0], [2], [0, 1], [2]],
+  'y7-ratio': [[0], [1], [1], [2]],
+  'y7-algebra': [[1], [2], [2], [2]],
+  'y7-equations': [[0, 1], [0, 1], [0, 1], [1, 2]],
+  'y7-angles': [[0], [1], [2], [0]],
+  'y7-area': [[0, 1], [1], [2], [2]],
+  'y7-data': [[0], [0], [0], [0]],
+  // ── Year 8 ────────────────────────────────────────────────────────────────
+  'y8-indices': [[0], [1], [1, 2], [1, 2]],
+  'y8-percentages': [[0], [1], [1, 2], [0, 1]],
+  'y8-algebra': [[0], [1], [0], [1]],
+  'y8-equations': [[], [0], [1], [2]],
+  'y8-linear': [[0], [1], [2], []],
+  'y8-circles': [[0], [1], [2], [0, 1]],
+  'y8-volume': [[0], [0], [1], [0, 2]],
+  'y8-rates': [[0], [0], [1], [0]],
+  'y8-probability': [[0], [1], [2], [2]],
+  // ── Year 9 ────────────────────────────────────────────────────────────────
+  'y9-pythagoras': [[0], [1], [0], [1, 2]],
+  'y9-indices-sci': [[0], [1], [2], [0]],
+  'y9-algebra': [[0], [0], [1], [1, 2]],
+  'y9-linear': [[0], [0], [2], [0, 2]],
+  'y9-trig': [[0], [0], [1], [2]],
+  'y9-surface-area': [[0], [0], [1], [2]],
+  'y9-simint': [[0], [0], [1], [1]],
+  'y9-data': [[0], [0], [1], [2]],
+  'y9-probability': [[0], [0, 2], [1], [0, 1]],
+  // ── Year 10 ───────────────────────────────────────────────────────────────
+  'y10-quadratics': [[1], [0], [0, 1], [2]],
+  'y10-nonlinear': [[0, 1], [0], [0], [0]],
+  'y10-simeq': [[0], [1], [1], [2]],
+  'y10-trig': [[0], [0], [1], [1, 2]],
+  'y10-surds': [[0], [0], [1], [2]],
+  'y10-compound': [[0], [0], [2], [1]],
+  'y10-similarity': [[0], [1], [2], [0]],
+  'y10-stats': [[0], [0, 1], [0, 1], [0, 1]],
+  'y10-probability': [[0], [0, 1], [1], [2]],
+  // ── Year 11 Advanced ──────────────────────────────────────────────────────
+  'y11-functions': [[0], [1], [1], [0]],
+  'y11-quadfunc': [[1], [1], [2], [1]],
+  'y11-polynomials': [[0], [0], [1], [1]],
+  'y11-lines': [[0], [0, 1], [0, 1], [2]],
+  'y11-trigfunc': [[0], [0, 1], [2], []],
+  'y11-sine-cosine-rule': [[0], [0], [1], [2]],
+  'y11-explog': [[1], [0], [2], [0, 2]],
+  'y11-diff': [[0], [0], [1], [2]],
+  'y11-probability': [[1], [0, 1], [1], [0]],
+  // ── Year 12 Advanced ──────────────────────────────────────────────────────
+  'y12-diff': [[2], [0], [1], [2]],
+  'y12-appdiff': [[0], [0], [1], [2]],
+  'y12-integration': [[0], [1], [2], [2]],
+  'y12-trigcalc': [[0], [1], [0], [1]],
+  'y12-explogcalc': [[0], [0], [2], [2]],
+  'y12-series': [[0], [0], [1], [2]],
+  'y12-financial': [[], [0, 1], [0, 1], [2]],
+  'y12-stats': [[0], [0], [1], [2]],
+  'y12-motion': [[0], [0], [0, 2], [0]],
+  // ── Standard · Year 11 ────────────────────────────────────────────────────
+  'ms11-earning': [[0], [0], [0], [1]],
+  'ms11-formulas': [[0], [1], [0, 2], [0, 2]],
+  'ms11-measure': [[2], [0], [1], [0, 2]],
+  'ms11-energy': [[0], [1], [2], [0, 1]],
+  'ms11-data': [[0], [0], [2], [0, 2]],
+  'ms11-relfreq': [[0], [1], [2], [0]],
+  // ── Standard · Year 12 ────────────────────────────────────────────────────
+  'ms12-loans': [[0], [1], [1], [0, 2]],
+  'ms12-annuity': [[0], [0, 2], [0, 2], [1]],
+  'ms12-networks': [[0], [1], [1], [2]],
+  'ms12-normal': [[0], [1], [0, 2], [0]],
+  'ms12-bivariate': [[0], [1], [1], [1, 2]],
+  'ms12-nonright': [[0], [1], [2], [1]],
+  // ── Extension 1 · Year 11 ─────────────────────────────────────────────────
+  'me11-poly': [[0], [0], [1], [0]],
+  'me11-functions': [[0], [0], [0], [0]],
+  'me11-trigid': [[0], [0, 1], [2], [2]],
+  'me11-inversetrig': [[0], [0, 1], [2], [1, 2]],
+  'me11-comb': [[0, 1], [0], [1], [2]],
+  'me11-rates': [[1], [1], [0], [1]],
+  // ── Extension 1 · Year 12 ─────────────────────────────────────────────────
+  'me12-induction': [[0, 2], [0, 2], [1], [0, 2]],
+  'me12-vectors': [[0], [1], [1], [2]],
+  'me12-trigeq': [[0, 2], [0, 2], [0, 2], [1, 2]],
+  'me12-calc': [[0], [0], [1], [0]],
+  'me12-binomial': [[0], [1], [1], [0, 2]],
+  'me12-projectile': [[2], [0], [0], [1]],
+  // ── Extension 2 · Year 12 ─────────────────────────────────────────────────
+  'mex-proof': [[2], [0], [1], [1]],
+  'mex-complex': [[0], [0], [1], [2]],
+  'mex-demoivre': [[0], [0], [1], [2]],
+  'mex-integration': [[0], [0], [1], [0]],
+  'mex-vectors': [[0], [0], [1], [2]],
+  'mex-mechanics': [[0], [1], [1], [2]]
+});
+
+export const DIFFICULTIES = [1, 2, 3, 4];
+
+/**
+ * The dot point ordinals the registry says the authored form for
+ * (subtopic, difficulty) exercises. Returns [] when nothing is declared and
+ * when a form is declared to assess no dot point — the two are told apart by
+ * `DOTPOINT_FORMS[subtopicId]` being absent rather than by this result.
+ */
+export function formDotpointOrdinals(subtopicId, difficulty) {
+  const row = DOTPOINT_FORMS[subtopicId];
+  if (!row) return [];
+  const slot = row[Math.min(4, Math.max(1, difficulty | 0)) - 1];
+  if (slot === '*') return (SUBTOPIC_BY_ID[subtopicId]?.dotpoints || []).map((_, i) => i);
+  return Array.isArray(slot) ? slot : [];
+}
+
+const DOTPOINT_INDEX = Object.create(null);
+
+/** Every dot point in the syllabus, in syllabus order. */
+export const DOTPOINTS = SUBTOPICS.flatMap(s => {
+  const slugs = uniqueSlugs(s.dotpoints || []);
+  return (s.dotpoints || []).map((text, i) => {
+    const dp = Object.freeze({
+      id: `${s.id}.${i + 1}`,
+      key: `${s.id}#${slugs[i]}`,
+      subtopic: s.id,
+      subtopicName: s.name,
+      year: s.year,
+      strand: s.strand,
+      code: s.code || '',
+      ordinal: i,
+      text,
+      // The difficulties whose authored form exercises this dot point. Empty
+      // means no generator stands behind it — the coverage tool lists these.
+      forms: Object.freeze(DIFFICULTIES.filter(d => formDotpointOrdinals(s.id, d).includes(i)))
+    });
+    DOTPOINT_INDEX[dp.id] = dp;
+    DOTPOINT_INDEX[dp.key] = dp;
+    return dp;
+  });
+});
+
+/** Look a dot point up by `subtopic.ordinal` id or by its `subtopic#slug` key. */
+export function dotpointById(id) {
+  return DOTPOINT_INDEX[String(id ?? '')] || null;
+}
+
+/** The dot points of one subtopic, in syllabus order. */
+export function dotpointsFor(subtopicId) {
+  return DOTPOINTS.filter(dp => dp.subtopic === subtopicId);
+}
+
+/** The dot point at a 0-based ordinal within a subtopic, or null. */
+export function dotpointAt(subtopicId, ordinal) {
+  return dotpointById(`${subtopicId}.${(ordinal | 0) + 1}`);
+}
+
+/** The dot points the registry says (subtopic, difficulty) exercises. */
+export function formDotpoints(subtopicId, difficulty) {
+  return formDotpointOrdinals(subtopicId, difficulty)
+    .map(i => dotpointAt(subtopicId, i))
+    .filter(Boolean);
+}
+
+/**
+ * The difficulties that can actually deliver a dot point — [] when no authored
+ * form exercises it. This is what a caller should consult before promising a
+ * student practice on one specific dot point.
+ */
+export function difficultiesForDotpoint(id) {
+  return dotpointById(id)?.forms ?? [];
+}
