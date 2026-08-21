@@ -135,28 +135,52 @@ enum MathShapeClassifier {
             }
         }
 
-        // If Vision swallowed the final narrow mark in "...=1", a structural
-        // '=' immediately to its left makes a tall straight unowned mark a
-        // safe digit-1 hypothesis. Keep l/I as alternatives rather than
-        // pretending geometry distinguishes identical handwriting.
-        let owned = Set(glyphs.flatMap(\.strokeIndexes))
-        for cluster in lineClusters where Set(cluster.strokeIndexes).isDisjoint(with: owned) {
+        // Approximate glyph ownership is an interpolation guess, not evidence.
+        // It must never hide a real spatial mark from the recovery pass. Only
+        // stroke indexes attached to exact/re-anchored glyphs are authoritative.
+        // If the guessed owner is the best place to put a recovered `1`, reuse
+        // that glyph rather than appending a duplicate.
+        let exactOwned = Set(glyphs.filter { !$0.approximate }.flatMap(\.strokeIndexes))
+        for cluster in lineClusters where Set(cluster.strokeIndexes).isDisjoint(with: exactOwned) {
             let members = cluster.strokeIndexes.map { strokes[$0] }
             guard isLikelyOne(members, glyphHeight: glyphHeight) else { continue }
             let hasEqualsToLeft = glyphs.contains {
-                $0.symbol == "=" && $0.box.maxX <= cluster.bounds.midX
+                $0.symbol == "=" && !$0.approximate && $0.box.maxX <= cluster.bounds.midX
                     && cluster.bounds.midX - $0.box.maxX <= 1.25 * glyphHeight
             }
             guard hasEqualsToLeft else { continue }
-            glyphs.append(DecodedGlyph(
-                symbol: "1",
-                box: cluster.bounds,
-                confidence: 0.68,
-                alternatives: [("l", 0.24), ("I", 0.18)],
-                isSuperscript: false,
-                strokeIndexes: cluster.strokeIndexes.sorted(),
-                approximate: false
-            ))
+
+            if let approximateOwner = glyphs.indices.first(where: {
+                glyphs[$0].approximate
+                    && !Set(glyphs[$0].strokeIndexes).isDisjoint(with: cluster.strokeIndexes)
+            }) {
+                let old = glyphs[approximateOwner].symbol
+                if old != "1" {
+                    glyphs[approximateOwner].alternatives = adding(
+                        old, confidence: glyphs[approximateOwner].confidence,
+                        to: glyphs[approximateOwner].alternatives
+                    )
+                }
+                glyphs[approximateOwner].symbol = "1"
+                glyphs[approximateOwner].box = cluster.bounds
+                glyphs[approximateOwner].strokeIndexes = cluster.strokeIndexes.sorted()
+                glyphs[approximateOwner].confidence = max(glyphs[approximateOwner].confidence, 0.68)
+                glyphs[approximateOwner].alternatives = adding(
+                    "l", confidence: 0.24,
+                    to: adding("I", confidence: 0.18, to: glyphs[approximateOwner].alternatives)
+                )
+                glyphs[approximateOwner].approximate = false
+            } else {
+                glyphs.append(DecodedGlyph(
+                    symbol: "1",
+                    box: cluster.bounds,
+                    confidence: 0.68,
+                    alternatives: [("l", 0.24), ("I", 0.18)],
+                    isSuperscript: false,
+                    strokeIndexes: cluster.strokeIndexes.sorted(),
+                    approximate: false
+                ))
+            }
         }
 
         glyphs.sort { lhs, rhs in
