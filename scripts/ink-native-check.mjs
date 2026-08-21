@@ -5,8 +5,8 @@
 //
 // It builds the app, installs it, launches it with --ink-selfcheck, and reads
 // the result back out of the system log. It fails when accuracy/exact-expression
-// coverage regresses, when deterministic trace alignment or geometry checks
-// fail, or when the bridge smoke test does not pass.
+// coverage regresses, when deterministic trace alignment, personalization or
+// geometry checks fail, or when the bridge smoke test does not pass.
 //
 // Usage: npm run test:ink:native [-- --device "iPad Air 11-inch (M4)"]
 // ─────────────────────────────────────────────────────────────────────────────
@@ -28,6 +28,7 @@ const ACCURACY_FLOOR = 99;
 const EXACT_FLOOR = 9;
 const EXPECTED_CASES = 10;
 const EXPECTED_ALIGNMENT_CHECKS = 6;
+const EXPECTED_PERSONALIZATION_CHECKS = 8;
 const EXPECTED_GEOMETRY_CHECKS = 10;
 
 const argOf = (name) => {
@@ -90,14 +91,14 @@ for (let i = 0; i < 40; i++) {
   lines = log.split('\n')
     .filter(l => l.includes('PRIINK') && !l.includes("'log'"))
     .map(l => l.slice(l.indexOf('PRIINK')));
-  // Do not stop at the bridge line: deterministic alignment and geometry run
-  // after the Vision benchmark. An early break would turn "still running" into
-  // a false "not reported" result.
+  // Do not stop at the bridge line: deterministic checks run after the Vision
+  // benchmark. An early break would turn "still running" into a false failure.
   const hasSummary = lines.some(l => l.includes('character accuracy'));
   const hasBridge = lines.some(l => l.startsWith('PRIINK bridge mounted'));
   const hasAlignment = lines.some(l => l.startsWith('PRIINK alignment '));
+  const hasPersonalization = lines.some(l => l.startsWith('PRIINK personalization '));
   const hasGeometry = lines.some(l => l.startsWith('PRIINK geometry '));
-  if (hasSummary && hasBridge && hasAlignment && hasGeometry) break;
+  if (hasSummary && hasBridge && hasAlignment && hasPersonalization && hasGeometry) break;
 }
 
 // The log window can still hold an earlier run; only the latest one is this
@@ -109,6 +110,7 @@ for (const line of lines) console.log(`  ${line.replace(/^PRIINK\s*/, '')}`);
 const summary = lines.find(l => l.includes('character accuracy'));
 const bridge = lines.find(l => l.startsWith('PRIINK bridge mounted'));
 const alignment = [...lines].reverse().find(l => l.startsWith('PRIINK alignment '));
+const personalization = [...lines].reverse().find(l => l.startsWith('PRIINK personalization '));
 const geometry = [...lines].reverse().find(l => l.startsWith('PRIINK geometry '));
 const accuracy = summary ? Number(/accuracy ([\d.]+)%/.exec(summary)?.[1] ?? 0) : 0;
 const exactMatch = summary ? /(\d+)\/(\d+) exact/.exec(summary) : null;
@@ -117,6 +119,9 @@ const cases = Number(exactMatch?.[2] ?? 0);
 const alignmentMatch = alignment ? /PASS (\d+)\/(\d+)/.exec(alignment) : null;
 const alignmentPassed = Number(alignmentMatch?.[1] ?? 0);
 const alignmentCases = Number(alignmentMatch?.[2] ?? 0);
+const personalizationMatch = personalization ? /PASS (\d+)\/(\d+)/.exec(personalization) : null;
+const personalizationPassed = Number(personalizationMatch?.[1] ?? 0);
+const personalizationCases = Number(personalizationMatch?.[2] ?? 0);
 const geometryMatch = geometry ? /PASS (\d+)\/(\d+)/.exec(geometry) : null;
 const geometryPassed = Number(geometryMatch?.[1] ?? 0);
 const geometryCases = Number(geometryMatch?.[2] ?? 0);
@@ -141,6 +146,10 @@ if (!alignment) problems.push('the deterministic trace-alignment checks did not 
 else if (!alignmentMatch || alignmentPassed !== EXPECTED_ALIGNMENT_CHECKS || alignmentCases !== EXPECTED_ALIGNMENT_CHECKS) {
   problems.push(`trace-alignment regression check failed: ${alignment.replace(/^PRIINK\s*/, '')}`);
 }
+if (!personalization) problems.push('the native personalization safety checks did not report');
+else if (!personalizationMatch || personalizationPassed !== EXPECTED_PERSONALIZATION_CHECKS || personalizationCases !== EXPECTED_PERSONALIZATION_CHECKS) {
+  problems.push(`personalization safety check failed: ${personalization.replace(/^PRIINK\s*/, '')}`);
+}
 if (!geometry) problems.push('the deterministic geometry checks did not report');
 else if (!geometryMatch || geometryPassed !== EXPECTED_GEOMETRY_CHECKS || geometryCases !== EXPECTED_GEOMETRY_CHECKS) {
   problems.push(`geometry regression check failed: ${geometry.replace(/^PRIINK\s*/, '')}`);
@@ -164,4 +173,4 @@ if (problems.length) {
   for (const problem of problems) console.log(`FAIL — ${problem}`);
   process.exit(1);
 }
-console.log(`PASS — character accuracy ${accuracy}%, exact ${exact}/${cases}, alignment ${alignmentPassed}/${alignmentCases}, geometry ${geometryPassed}/${geometryCases}, bridge round trip clean`);
+console.log(`PASS — character accuracy ${accuracy}%, exact ${exact}/${cases}, alignment ${alignmentPassed}/${alignmentCases}, personalization ${personalizationPassed}/${personalizationCases}, geometry ${geometryPassed}/${geometryCases}, bridge round trip clean`);
