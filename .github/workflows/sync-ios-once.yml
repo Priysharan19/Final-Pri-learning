@@ -1,16 +1,13 @@
 name: One-time native ink repair and iOS sync
 
-on:
-  push:
-    branches: [agent/native-ink-v9]
-    paths:
-      - '.github/workflows/sync-ios-once.yml'
+on: [push]
 
 permissions:
   contents: write
 
 jobs:
   repair:
+    if: github.ref == 'refs/heads/agent/native-ink-v9'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
