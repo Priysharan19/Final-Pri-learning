@@ -13,9 +13,10 @@ struct PriLearningApp: App {
     init() {
         // Scores the native reading pipeline against expressions whose answer
         // is known, then runs deterministic alignment, personalization,
-        // geometry, provenance, selective-trust, expert-fusion, online-feature,
-        // structural-tree/count/refinement and native input-routing checks. Off
-        // unless explicitly requested by the simulator validation harness.
+        // geometry, real-Pencil failure regressions, provenance, selective
+        // trust, expert-fusion, online-feature, structural-tree/count/refinement
+        // and native input-routing checks. Off unless explicitly requested by
+        // the simulator validation harness.
         if ProcessInfo.processInfo.arguments.contains("--ink-selfcheck") {
             // Do not run the UIKit/PencilKit routing check concurrently with
             // SwiftUI scene construction. That race can terminate the simulator
@@ -29,6 +30,7 @@ struct PriLearningApp: App {
                 InkAlignmentSelfCheck.run()
                 InkPersonalizationSelfCheck.run()
                 InkGeometrySelfCheck.run()
+                InkRealPencilSelfCheck.run()
                 InkFrontierSelfCheck.run()
                 InkAcceptanceSelfCheck.run()
                 InkExpertFusionSelfCheck.run()
