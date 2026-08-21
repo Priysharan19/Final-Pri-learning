@@ -12,10 +12,10 @@ import SwiftUI
 struct PriLearningApp: App {
     init() {
         // Scores the native reading pipeline against expressions whose answer
-        // is known, then runs deterministic trace-alignment, personalization,
-        // geometry, frontier-representation, selective-trust, expert-fusion and
-        // online feature-tensor checks. Off unless explicitly requested by the
-        // simulator validation harness.
+        // is known, then runs deterministic alignment, personalization,
+        // geometry, provenance, selective-trust, expert-fusion, online-feature
+        // and structural-tree/count/refinement checks. Off unless explicitly
+        // requested by the simulator validation harness.
         if ProcessInfo.processInfo.arguments.contains("--ink-selfcheck") {
             DispatchQueue.global(qos: .userInitiated).async {
                 InkSelfCheck.run()
@@ -26,6 +26,7 @@ struct PriLearningApp: App {
                 InkAcceptanceSelfCheck.run()
                 InkExpertFusionSelfCheck.run()
                 InkFeatureTensorSelfCheck.run()
+                InkStructuralIntelligenceSelfCheck.run()
             }
         }
     }
