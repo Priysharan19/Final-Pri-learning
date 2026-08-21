@@ -2,13 +2,6 @@
 // Runs the NATIVE reading pipeline's self-check on an iPad simulator and
 // reports what it scored. Needs Xcode and a Mac; everything else in the test
 // suite runs anywhere.
-//
-// It builds the app, installs it, launches it with --ink-selfcheck, and reads
-// the result back out of the system log. It fails when accuracy/exact-expression
-// coverage regresses, when deterministic trace alignment, personalization or
-// geometry checks fail, or when the bridge smoke test does not pass.
-//
-// Usage: npm run test:ink:native [-- --device "iPad Air 11-inch (M4)"]
 // ─────────────────────────────────────────────────────────────────────────────
 import { execFileSync, execSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
@@ -21,15 +14,16 @@ const PACKAGE = join(HERE, '../ios/PriLearning.swiftpm');
 const BUNDLE_ID = 'com.prilearning.app';
 
 // Floors prevent regression; they are deliberately not presented as targets.
-// V9 has demonstrated 99.0% characters and 9/10 exact on this fixed native
-// simulator corpus. A future change is not allowed to quietly fall back to the
-// old 85% / 6-of-10 gate and still call itself healthy.
+// V9 demonstrated 99.0% characters and 9/10 exact on this fixed simulator
+// corpus. New architecture must preserve those results while adding stronger
+// deterministic structure/provenance guarantees.
 const ACCURACY_FLOOR = 99;
 const EXACT_FLOOR = 9;
 const EXPECTED_CASES = 10;
 const EXPECTED_ALIGNMENT_CHECKS = 6;
 const EXPECTED_PERSONALIZATION_CHECKS = 10;
 const EXPECTED_GEOMETRY_CHECKS = 10;
+const EXPECTED_FRONTIER_CHECKS = 12;
 
 const argOf = (name) => {
   const i = process.argv.indexOf(`--${name}`);
@@ -96,7 +90,8 @@ for (let i = 0; i < 40; i++) {
   const hasAlignment = lines.some(l => l.startsWith('PRIINK alignment '));
   const hasPersonalization = lines.some(l => l.startsWith('PRIINK personalization '));
   const hasGeometry = lines.some(l => l.startsWith('PRIINK geometry '));
-  if (hasSummary && hasBridge && hasAlignment && hasPersonalization && hasGeometry) break;
+  const hasFrontier = lines.some(l => l.startsWith('PRIINK frontier '));
+  if (hasSummary && hasBridge && hasAlignment && hasPersonalization && hasGeometry && hasFrontier) break;
 }
 
 const started = lines.map((l, i) => [l, i]).filter(([l]) => l.includes('native ink self-check'));
@@ -108,19 +103,20 @@ const bridge = lines.find(l => l.startsWith('PRIINK bridge mounted'));
 const alignment = [...lines].reverse().find(l => l.startsWith('PRIINK alignment '));
 const personalization = [...lines].reverse().find(l => l.startsWith('PRIINK personalization '));
 const geometry = [...lines].reverse().find(l => l.startsWith('PRIINK geometry '));
+const frontier = [...lines].reverse().find(l => l.startsWith('PRIINK frontier '));
 const accuracy = summary ? Number(/accuracy ([\d.]+)%/.exec(summary)?.[1] ?? 0) : 0;
 const exactMatch = summary ? /(\d+)\/(\d+) exact/.exec(summary) : null;
 const exact = Number(exactMatch?.[1] ?? 0);
 const cases = Number(exactMatch?.[2] ?? 0);
-const alignmentMatch = alignment ? /PASS (\d+)\/(\d+)/.exec(alignment) : null;
-const alignmentPassed = Number(alignmentMatch?.[1] ?? 0);
-const alignmentCases = Number(alignmentMatch?.[2] ?? 0);
-const personalizationMatch = personalization ? /PASS (\d+)\/(\d+)/.exec(personalization) : null;
-const personalizationPassed = Number(personalizationMatch?.[1] ?? 0);
-const personalizationCases = Number(personalizationMatch?.[2] ?? 0);
-const geometryMatch = geometry ? /PASS (\d+)\/(\d+)/.exec(geometry) : null;
-const geometryPassed = Number(geometryMatch?.[1] ?? 0);
-const geometryCases = Number(geometryMatch?.[2] ?? 0);
+
+const parseGate = (line) => {
+  const match = line ? /PASS (\d+)\/(\d+)/.exec(line) : null;
+  return { match, passed: Number(match?.[1] ?? 0), cases: Number(match?.[2] ?? 0) };
+};
+const a = parseGate(alignment);
+const p = parseGate(personalization);
+const g = parseGate(geometry);
+const f = parseGate(frontier);
 const perf = lines
   .map(l => /PRIINK perf recognition .* ([\d.]+)ms/.exec(l))
   .filter(Boolean)
@@ -133,18 +129,18 @@ else {
   if (cases !== EXPECTED_CASES) problems.push(`native benchmark ran ${cases} cases; expected ${EXPECTED_CASES}`);
   else if (exact < EXACT_FLOOR) problems.push(`exact expressions ${exact}/${cases} is below the ${EXACT_FLOOR}/${EXPECTED_CASES} floor`);
 }
-if (!alignment) problems.push('the deterministic trace-alignment checks did not report');
-else if (!alignmentMatch || alignmentPassed !== EXPECTED_ALIGNMENT_CHECKS || alignmentCases !== EXPECTED_ALIGNMENT_CHECKS) {
-  problems.push(`trace-alignment regression check failed: ${alignment.replace(/^PRIINK\s*/, '')}`);
-}
-if (!personalization) problems.push('the native personalization safety checks did not report');
-else if (!personalizationMatch || personalizationPassed !== EXPECTED_PERSONALIZATION_CHECKS || personalizationCases !== EXPECTED_PERSONALIZATION_CHECKS) {
-  problems.push(`personalization safety check failed: ${personalization.replace(/^PRIINK\s*/, '')}`);
-}
-if (!geometry) problems.push('the deterministic geometry checks did not report');
-else if (!geometryMatch || geometryPassed !== EXPECTED_GEOMETRY_CHECKS || geometryCases !== EXPECTED_GEOMETRY_CHECKS) {
-  problems.push(`geometry regression check failed: ${geometry.replace(/^PRIINK\s*/, '')}`);
-}
+
+const checkGate = (label, line, parsed, expected) => {
+  if (!line) problems.push(`${label} checks did not report`);
+  else if (!parsed.match || parsed.passed !== expected || parsed.cases !== expected) {
+    problems.push(`${label} regression check failed: ${line.replace(/^PRIINK\s*/, '')}`);
+  }
+};
+checkGate('trace-alignment', alignment, a, EXPECTED_ALIGNMENT_CHECKS);
+checkGate('personalization safety', personalization, p, EXPECTED_PERSONALIZATION_CHECKS);
+checkGate('geometry', geometry, g, EXPECTED_GEOMETRY_CHECKS);
+checkGate('frontier representation', frontier, f, EXPECTED_FRONTIER_CHECKS);
+
 if (!bridge) problems.push('the bridge smoke test did not report');
 else {
   if (!/mounted=yes/.test(bridge)) problems.push('the writing surface did not mount');
@@ -155,7 +151,7 @@ else {
 
 console.log('');
 if (perf.length) {
-  const sorted = [...perf].sort((a, b) => a - b);
+  const sorted = [...perf].sort((x, y) => x - y);
   const median = sorted[Math.floor(sorted.length / 2)];
   console.log(`Simulator recognition timing sample: median ${median.toFixed(1)} ms across ${perf.length} bridge reading(s).`);
   console.log('This is software recognition time, not Apple Pencil touch-to-photon latency.');
@@ -164,4 +160,4 @@ if (problems.length) {
   for (const problem of problems) console.log(`FAIL — ${problem}`);
   process.exit(1);
 }
-console.log(`PASS — character accuracy ${accuracy}%, exact ${exact}/${cases}, alignment ${alignmentPassed}/${alignmentCases}, personalization ${personalizationPassed}/${personalizationCases}, geometry ${geometryPassed}/${geometryCases}, bridge round trip clean`);
+console.log(`PASS — character accuracy ${accuracy}%, exact ${exact}/${cases}, alignment ${a.passed}/${a.cases}, personalization ${p.passed}/${p.cases}, geometry ${g.passed}/${g.cases}, frontier ${f.passed}/${f.cases}, bridge round trip clean`);

@@ -12,16 +12,15 @@ import SwiftUI
 struct PriLearningApp: App {
     init() {
         // Scores the native reading pipeline against expressions whose answer
-        // is known, then runs deterministic trace-alignment, personalization
-        // safety and geometry checks. Off unless asked for. Deterministic checks
-        // run after the Vision pass so their verdicts cannot be lost behind the
-        // longer benchmark in simulator log collection.
+        // is known, then runs deterministic trace-alignment, personalization,
+        // geometry and frontier-representation checks. Off unless asked for.
         if ProcessInfo.processInfo.arguments.contains("--ink-selfcheck") {
             DispatchQueue.global(qos: .userInitiated).async {
                 InkSelfCheck.run()
                 InkAlignmentSelfCheck.run()
                 InkPersonalizationSelfCheck.run()
                 InkGeometrySelfCheck.run()
+                InkFrontierSelfCheck.run()
             }
         }
     }
@@ -36,8 +35,6 @@ struct PriLearningApp: App {
 struct ContentView: View {
     var body: some View {
         ZStack {
-            // The app's page background, extended under the status bar and
-            // home indicator so the shell never shows a white flash.
             Color(red: 14 / 255, green: 17 / 255, blue: 23 / 255)
                 .ignoresSafeArea()
             WebShell()

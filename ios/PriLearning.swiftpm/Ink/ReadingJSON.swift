@@ -1,11 +1,10 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Pri Learning · Reading → page
 //
-// The native reading is handed over in EXACTLY the shape the web engine has
-// always returned: same keys, same box conventions, same per-symbol
-// alternatives. Everything downstream — the reading panel, tap-to-correct,
-// "check this reading first", the ✓/✗ overlay, Step Check, the marker — is
-// untouched by where the reading came from.
+// The native reading keeps the legacy web-engine fields stable, then adds a
+// trace-provenance structure graph. Existing consumers continue to read the
+// same text/symbol keys; newer diagnostics and future neural ensembles can use
+// the additive `structure` field without guessing stroke ownership from text.
 // ─────────────────────────────────────────────────────────────────────────────
 import CoreGraphics
 import Foundation
@@ -14,10 +13,6 @@ private func alternativesJSON(_ alternatives: [(symbol: String, confidence: Doub
     alternatives.map { ["sym": $0.symbol, "conf": $0.confidence] }
 }
 
-/// Symbol boxes are the bbox form the web engine emits; line boxes are the
-/// {x, y, w, h} form the ✓/✗ overlay positions itself with.
-/// Every number is a Double: CGFloat is not a JSON type, and JSONSerialization
-/// answers an object graph containing one with nil rather than an error.
 private func symbolBoxJSON(_ box: CGRect) -> [String: Any] {
     [
         "x1": Double(box.minX), "y1": Double(box.minY),
@@ -56,11 +51,13 @@ extension ReadingLine {
 
 extension Reading {
     var jsonObject: [String: Any] {
+        let structure = InkStructureGraphBuilder.build(from: self)
         var payload: [String: Any] = [
             "lines": lines.map(\.jsonObject),
             "text": text,
             "minConf": minConfidence,
-            "margin": margin
+            "margin": margin,
+            "structure": structure.jsonObject
         ]
         if let weakest {
             payload["weakest"] = [
