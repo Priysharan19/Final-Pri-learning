@@ -26,7 +26,7 @@ const BUNDLE_ID = 'com.prilearning.app';
 const ACCURACY_FLOOR = 85;
 const EXACT_FLOOR = 6;
 const EXPECTED_CASES = 10;
-const EXPECTED_GEOMETRY_CHECKS = 7;
+const EXPECTED_GEOMETRY_CHECKS = 10;
 
 const argOf = (name) => {
   const i = process.argv.indexOf(`--${name}`);
@@ -88,7 +88,13 @@ for (let i = 0; i < 40; i++) {
   lines = log.split('\n')
     .filter(l => l.includes('PRIINK') && !l.includes("'log'"))
     .map(l => l.slice(l.indexOf('PRIINK')));
-  if (lines.some(l => l.startsWith('PRIINK bridge mounted'))) break;
+  // Do not stop at the bridge line: geometry intentionally runs after the
+  // Vision benchmark, and an early break used to produce a false "not
+  // reported" failure even when the app was still finishing its checks.
+  const hasSummary = lines.some(l => l.includes('character accuracy'));
+  const hasBridge = lines.some(l => l.startsWith('PRIINK bridge mounted'));
+  const hasGeometry = lines.some(l => l.startsWith('PRIINK geometry '));
+  if (hasSummary && hasBridge && hasGeometry) break;
 }
 
 // The log window can still hold an earlier run; only the latest one is this
