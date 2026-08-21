@@ -12,6 +12,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import CoreGraphics
 import UIKit
+import UIKit.UIGestureRecognizerSubclass
 
 final class InkPencilTelemetryRecognizer: UIGestureRecognizer, UIGestureRecognizerDelegate {
     var captureEnabled = true
