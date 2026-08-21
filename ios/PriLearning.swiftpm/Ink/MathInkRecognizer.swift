@@ -47,6 +47,12 @@ final class MathInkRecognizer {
     private var lineCache: [String: [DecodedGlyph]] = [:]
     private static let lineCacheLimit = 64
 
+    /// Vision is synchronous at the request-handler call site, but VNRequest
+    /// itself is cancellable. Keep the active request behind a tiny lock so a
+    /// newly arriving Pencil stroke can stop stale analysis immediately.
+    private let visionLock = NSLock()
+    private var activeVisionRequest: VNRequest?
+
     static var trace = false
     static var traceLabel = "line"
 
@@ -65,6 +71,13 @@ final class MathInkRecognizer {
         "+": ["t", "*"], "-": ["_", "="], "=": ["-", "±"], "/": ["1", "\\"],
         "(": ["c", "["], ")": [")", "]"], ".": [",", "-"]
     ]
+
+    func cancelActiveVision() {
+        visionLock.lock()
+        let request = activeVisionRequest
+        visionLock.unlock()
+        request?.cancel()
+    }
 
     // MARK: Entry point
 
@@ -313,12 +326,28 @@ final class MathInkRecognizer {
         return glyphs
     }
 
+    /// Shape-aware cache fingerprint. Bounding boxes + point counts are not
+    /// sufficient: two different marks can share both and must never reuse the
+    /// same OCR result. Representative normalized trajectory points make such
+    /// collisions vanishingly unlikely while keeping this key cheap to build.
     private static func digest(of strokes: [InkStroke], glyphHeight: CGFloat) -> String {
-        var parts: [String] = [String(format: "%.1f", glyphHeight)]
+        var parts: [String] = [String(format: "%.2f", glyphHeight)]
         for stroke in strokes {
             let b = stroke.bounds
-            parts.append(String(format: "%.1f,%.1f,%.1f,%.1f,%d",
-                                b.minX, b.minY, b.maxX, b.maxY, stroke.points.count))
+            var component = String(format: "%.2f,%.2f,%.2f,%.2f,%d",
+                                   b.minX, b.minY, b.maxX, b.maxY, stroke.points.count)
+            let count = stroke.points.count
+            if count > 0 {
+                let sampleCount = min(9, count)
+                for sample in 0..<sampleCount {
+                    let index = sampleCount == 1 ? 0 : sample * (count - 1) / (sampleCount - 1)
+                    let point = stroke.points[index]
+                    let nx = b.width > 0 ? (point.x - b.minX) / b.width : 0
+                    let ny = b.height > 0 ? (point.y - b.minY) / b.height : 0
+                    component += String(format: ",%.3f,%.3f", nx, ny)
+                }
+            }
+            parts.append(component)
         }
         return parts.joined(separator: ";")
     }
@@ -362,11 +391,6 @@ final class MathInkRecognizer {
         }
     }
 
-    /// One accurate view is still the normal fast path. Only a suspicious line
-    /// — OCR symbol count disagrees with spatial ink clusters, or the result is
-    /// structurally implausible as maths — pays for additional independent
-    /// raster scales. This gives ensemble robustness without tripling latency
-    /// on every Pencil stroke.
     private func read(
         _ strokes: [InkStroke],
         glyphHeight: CGFloat,
@@ -439,11 +463,6 @@ final class MathInkRecognizer {
         return assemble(observations)
     }
 
-    /// Fuse independent views by three signals that fail differently:
-    /// Vision confidence (appearance), MathGrammar (semantic validity), and the
-    /// number of spatial ink clusters (segmentation evidence). Consensus across
-    /// scales receives a small bonus; it can never rescue structurally bad text
-    /// by popularity alone.
     private func fuse(_ readings: [LineReading], expectedMarks: Int) -> LineReading {
         let grouped = Dictionary(grouping: readings) { Self.respell($0.text) }
         var winner = readings[0]
@@ -465,9 +484,6 @@ final class MathInkRecognizer {
             }
         }
 
-        // Calibrate alternatives from every view that has the same number of
-        // symbols as the winning segmentation. A differing-length reading is
-        // evidence about segmentation, not a position-by-position vote.
         let winnerSymbols = Self.symbols(of: winner.text)
         var tally: [Int: [String: Double]] = [:]
         for reading in readings where Self.symbols(of: reading.text).count == winnerSymbols.count {
@@ -500,11 +516,6 @@ final class MathInkRecognizer {
             + 0.20 * countFit
     }
 
-    /// Beam-decode across Vision observations. The old implementation picked a
-    /// winner independently for each fragment, which can create a globally bad
-    /// equation even when a lower-ranked fragment candidate makes the complete
-    /// line valid. The beam postpones that commitment until the whole line is
-    /// available, analogous to sequence decoders used in HMER systems.
     private func assemble(_ observations: [VNRecognizedTextObservation]) -> LineReading? {
         let ordered = observations.sorted { $0.boundingBox.minX < $1.boundingBox.minX }
         var beams = [Beam(text: "", confidenceSum: 0, pieces: 0, agreement: [:])]
@@ -531,9 +542,6 @@ final class MathInkRecognizer {
                 }
             }
 
-            // During expansion use appearance confidence only. Applying maths
-            // grammar to a half-built fragment would punish legitimate pieces
-            // such as a trailing '=' before its right-hand side arrives.
             next.sort { lhs, rhs in
                 if lhs.meanConfidence != rhs.meanConfidence {
                     return lhs.meanConfidence > rhs.meanConfidence
@@ -574,6 +582,18 @@ final class MathInkRecognizer {
         request.recognitionLanguages = ["en-US"]
         request.revision = VNRecognizeTextRequestRevision3
         request.minimumTextHeight = 0
+        // Apple documents this as the resource-burden hint for Vision work.
+        // Pencil rendering is more latency-sensitive than recognition.
+        request.preferBackgroundProcessing = true
+
+        visionLock.lock()
+        activeVisionRequest = request
+        visionLock.unlock()
+        defer {
+            visionLock.lock()
+            if activeVisionRequest === request { activeVisionRequest = nil }
+            visionLock.unlock()
+        }
 
         let handler = VNImageRequestHandler(cgImage: image, orientation: .up, options: [:])
         do {
