@@ -122,6 +122,16 @@ enum MathGrammar {
         // equality on the next line as "= ...". Treat that as positive maths
         // evidence instead of making the wrong leading '-' artificially win.
         let chars = Array(s)
+
+        // `=` and `-` are a frequent handwriting confusion. A true negative
+        // expression beginning with '-' remains perfectly legal, but one OCR
+        // raster is not enough evidence to stop the adaptive recognition pass
+        // there. A small score haircut pushes such a reading below the cheap
+        // single-view threshold while barely affecting final multi-view fusion.
+        if chars.first == "-", equals == 0, chars.count > 2 {
+            score -= 0.10
+        }
+
         for (i, ch) in chars.enumerated() {
             guard "+*/=<>^".contains(ch) else { continue }
             if i == 0 {
