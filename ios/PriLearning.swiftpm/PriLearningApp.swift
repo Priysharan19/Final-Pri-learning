@@ -17,7 +17,14 @@ struct PriLearningApp: App {
         // structural-tree/count/refinement and native input-routing checks. Off
         // unless explicitly requested by the simulator validation harness.
         if ProcessInfo.processInfo.arguments.contains("--ink-selfcheck") {
+            // Do not run the UIKit/PencilKit routing check concurrently with
+            // SwiftUI scene construction. That race can terminate the simulator
+            // process before the recognition suite emits its first diagnostic.
+            // Run the non-UI evidence suite first, then schedule the one
+            // MainActor-only check after the application has finished starting.
+            NSLog("PRIINK self-check scheduled")
             DispatchQueue.global(qos: .userInitiated).async {
+                NSLog("PRIINK self-check worker started")
                 InkSelfCheck.run()
                 InkAlignmentSelfCheck.run()
                 InkPersonalizationSelfCheck.run()
@@ -27,9 +34,9 @@ struct PriLearningApp: App {
                 InkExpertFusionSelfCheck.run()
                 InkFeatureTensorSelfCheck.run()
                 InkStructuralIntelligenceSelfCheck.run()
-            }
-            DispatchQueue.main.async {
-                InkInputRoutingSelfCheck.run()
+                DispatchQueue.main.async {
+                    InkInputRoutingSelfCheck.run()
+                }
             }
         }
     }
