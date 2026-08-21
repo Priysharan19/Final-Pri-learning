@@ -12,7 +12,7 @@
 // The API is InkCanvas's, method for method, so InkAnswer neither knows nor
 // cares which surface it is holding.
 // ─────────────────────────────────────────────────────────────────────────────
-import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
+import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useRef } from 'react';
 import { nativeInk } from './native.js';
 
 const NativeInkCanvas = forwardRef(function NativeInkCanvas({
@@ -21,12 +21,13 @@ const NativeInkCanvas = forwardRef(function NativeInkCanvas({
 }, ref) {
   const wrapRef = useRef(null);
   const strokesRef = useRef([]);
-  const [, force] = useState(0);
 
   const notify = useCallback((strokes) => {
     strokesRef.current = strokes;
     onStrokesChange?.(strokes);
-    force(x => x + 1);
+    // Nothing this component renders depends on the stroke array: PencilKit
+    // already rendered the ink. Re-rendering React after every Pencil stroke
+    // only steals main-thread time from scrolling/layout and buys no pixels.
   }, [onStrokesChange]);
 
   useEffect(() => {
@@ -36,10 +37,11 @@ const NativeInkCanvas = forwardRef(function NativeInkCanvas({
     nativeInk.mount(element);
     const stopListening = nativeInk.onStrokes(notify);
 
-    // The shell follows scrolling itself, from the web view's own offset. What
-    // it cannot see is the page RESHAPING under it — a banner appearing above
-    // the writing area, "+ space" making it taller, a rotation — so those are
-    // what is reported, coalesced to one message per frame.
+    // The shell follows scrolling itself, from WKWebView.scrollView's content
+    // offset at native display cadence. Sending viewport geometry across the JS
+    // bridge on every finger-scroll frame both duplicates that work and risks
+    // fighting the native position update. Only actual layout/size changes are
+    // reported here.
     let queued = 0;
     const report = () => {
       queued = 0;
@@ -50,7 +52,6 @@ const NativeInkCanvas = forwardRef(function NativeInkCanvas({
     const observer = new ResizeObserver(schedule);
     observer.observe(element);
     observer.observe(document.documentElement);
-    window.addEventListener('scroll', schedule, { passive: true, capture: true });
     window.addEventListener('resize', schedule, { passive: true });
     const themeWatcher = new MutationObserver(() => nativeInk.setAppearance());
     themeWatcher.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
@@ -59,7 +60,6 @@ const NativeInkCanvas = forwardRef(function NativeInkCanvas({
       if (queued) cancelAnimationFrame(queued);
       observer.disconnect();
       themeWatcher.disconnect();
-      window.removeEventListener('scroll', schedule, { capture: true });
       window.removeEventListener('resize', schedule);
       stopListening();
       nativeInk.unmount();
