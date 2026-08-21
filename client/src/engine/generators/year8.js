@@ -108,7 +108,9 @@ export const year8 = {
       const base = rc(rng, [40, 60, 80, 120, 150, 200, 240]);
       const pct = rc(rng, [10, 15, 20, 25, 30, 50]);
       const inc = rc(rng, [true, false]);
-      const ansV = inc ? base * (1 + pct / 100) : base * (1 - pct / 100);
+      // Scaling by a whole percentage before dividing keeps the key exact:
+      // base * (1 + pct/100) went through 1.15 and keyed 229.99999999999997.
+      const ansV = base * (inc ? 100 + pct : 100 - pct) / 100;
       return {
         prompt: `${inc ? 'Increase' : 'Decrease'} $${base}$ by $${pct}\\%$.`,
         answerType: 'numeric', answer: { value: ansV },
@@ -141,14 +143,14 @@ export const year8 = {
       const cost = rc(rng, [50, 80, 120, 160, 200, 250]);
       const pct = rc(rng, [15, 20, 25, 30, 40, 60]);
       const profit = rc(rng, [true, false]);
-      const sell = profit ? cost * (1 + pct / 100) : cost * (1 - pct / 100);
+      const sell = cost * (profit ? 100 + pct : 100 - pct) / 100;
       return {
         prompt: `A retailer buys ${rc(rng, ITEMS).name} for ${moneyPlain(cost)} and sells it for ${moneyPlain(sell)}. Find the percentage ${profit ? 'profit' : 'loss'}.`,
         answerType: 'numeric', answer: { value: pct, percent: true }, answerSuffix: '%',
         traps: [{ value: r1(Math.abs(sell - cost) / sell * 100), why: 'Percentage profit or loss is measured against the *cost* price, not the selling price.' }],
         hints: [`Find the actual ${profit ? 'profit' : 'loss'} in dollars first.`, `${profit ? 'Profit' : 'Loss'} $= ${moneyPlain(Math.abs(sell - cost))}$. Now compare it with the cost.`, `$\\frac{${Math.abs(sell - cost)}}{${cost}} \\times 100$.`],
         steps: [
-          { h: profit ? 'Profit' : 'Loss', d: `$${Math.abs(sell - cost).toFixed(2).replace(/\\.00$/, '')} = |${sell} - ${cost}|$ dollars` },
+          { h: profit ? 'Profit' : 'Loss', d: `$${Math.abs(sell - cost).toFixed(2).replace(/\.00$/, '')} = |${sell} - ${cost}|$ dollars` },
           { h: 'Divide by the cost price', d: `$\\dfrac{${Math.abs(sell - cost)}}{${cost}} = ${r3(Math.abs(sell - cost) / cost)}$` },
           { h: 'As a percentage', d: `$${r3(Math.abs(sell - cost) / cost)} \\times 100\\% = ${pct}\\%$` }
         ]
@@ -805,7 +807,9 @@ export const year8 = {
       const p = rc(rng, [[1, 6], [1, 4], [3, 10], [2, 5], [1, 5], [1, 3], [2, 3], [3, 4], [1, 2], [5, 6], [3, 8], [1, 8], [7, 10], [2, 9], [4, 15]]);
       const trials = p[1] * ri(rng, 4, 20) * (p[1] <= 5 ? 2 : 1);
       const f = new Frac(p[0], p[1]);
-      const expected = f.value * trials;
+      // trials is a multiple of the denominator, so the count is a whole number —
+      // but only if it is divided last: f.value * trials keyed 118.99999999999999.
+      const expected = f.n * trials / f.d;
       return {
         prompt: `A spinner lands on gold with probability $${f.latex()}$. If it is spun $${trials}$ times, how many golds would you **expect**?`,
         answerType: 'numeric', answer: { value: expected },

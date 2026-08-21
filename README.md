@@ -74,11 +74,11 @@ to. Nothing in this project compares the two products head to head.
 
 | Leibniz | Pri Learning |
 |---|---|
-| Unlimited exam-style questions per syllabus dot point (Yr 11–12 focus) | **84 parameterized generators across Years 7–12** × 4 difficulty tiers (D1 Foundation → D4 Exam Extension) — every question built from a seed rather than drawn from a fixed pool, so the space is counted rather than asserted (`node tools/count-questions.mjs`, [figures below](#measured-accuracy)); incl. diagram questions with generated SVG figures. **Per *dot point*, not yet everywhere:** forms are authored per (subtopic × difficulty) and tagged to the dot points they assess, which reaches **227 of 252 dot points (90.1%)** — 195 exactly, 32 only alongside a sibling — and leaves **25 with no generator behind them** (`node tools/dotpoint-coverage.mjs` names all 25) |
+| Unlimited exam-style questions per syllabus dot point (Yr 11–12 focus) | **84 parameterized generators across Years 7–12** × 4 difficulty tiers (D1 Foundation → D4 Exam Extension) — every question built from a seed rather than drawn from a fixed pool, so the space is counted rather than asserted (`node tools/count-questions.mjs`, [figures below](#measured-accuracy)); incl. diagram questions with generated SVG figures. **Per *dot point*, now everywhere — read the second number too:** forms are authored per (subtopic × difficulty) and tagged to the dot points they assess, which reaches **252 of 252 dot points (100.0%)** — **220 exactly**, 32 only alongside a sibling — and leaves **0 with no generator behind them** (`node tools/dotpoint-coverage.mjs`). A shared dot point is practised but cannot be *labelled*, so 220 is the number to quote where precision matters; [the census below](#measured-accuracy) keeps both halves together |
 | HSC courses: Standard, Advanced, Extension 1, Extension 2 | **Full pathway support**: Standard (MS-F/A/M/S/N), Advanced, Extension 1 (ME — vectors, induction, projectiles, further calculus) and Extension 2 (MEX — proof, complex numbers, mechanics), each with its own syllabus scope, exams, predictor and skill map sections |
-| Syllabus-aligned content | Every subtopic carries its **NESA topic code** (MA4-/MA5-/MA-/MS-/ME-/MEX-) on tiles, drawers and reports |
+| Syllabus-aligned content | Every subtopic carries a code, shown on tiles, drawers and reports — for Years 11–12 the real **NESA course topic code** (48 subtopics: `MA-F1`, `MS-A1`, `ME-V1`, `MEX-P1/P2` …); for Years 7–10 a stage-and-strand label of this project's own devising (36 subtopics: `MA4 · Number`, `MA5 · Algebra` …), which is **not** a NESA outcome code. Neither set has been checked against a NESA document — [What is not done](#what-is-not-done) says so and gives the count |
 | Multi-part structured exam questions | **Section II multipart questions** — one stem, parts (a)(b)(c) with per-part marks, “hence” chains, marked part by part in review and printed papers |
-| Filter by topic, subtopic and dot point | Skill Map (and the Home filter chips) → any subtopic → **practise a single dot point**. Each dot point carries a stable id and resolves to the difficulties whose authored form actually assesses it, so two dot points of one subtopic no longer share a pool by default — and a generated question reports which dot points it exercises. A question is only *labelled* with the dot point you asked for when it can be shown to be on it — the generator declared that dot point for the branch it took, or the one declaration behind the question names it and nothing else. Both the **25 dot points no form reaches** and the **32 no form reaches alone** therefore fall back to subtopic-level practice with `dotpoint: null` on the payload, and so does a request whose difficulty lands on a shared form of an otherwise exactly-targeted dot point. A sibling's question is never handed back labelled as the dot point you asked for |
+| Filter by topic, subtopic and dot point | Skill Map (and the Home filter chips) → any subtopic → **practise a single dot point**. Each dot point carries a stable id and resolves to the difficulties whose authored form actually assesses it, so two dot points of one subtopic no longer share a pool by default — and a generated question reports which dot points it exercises. A question is only *labelled* with the dot point you asked for when it can be shown to be on it — the generator declared that dot point for the branch it took, or the one declaration behind the question names it and nothing else. Every dot point now has a form behind it, but the **32 that no form reaches alone** still fall back to subtopic-level practice with `dotpoint: null` on the payload, and so does a request whose difficulty lands on a shared form of an otherwise exactly-targeted dot point. A sibling's question is never handed back labelled as the dot point you asked for |
 | “Mathematically optimised recommendation” | Elo-based Smart Practice targeting ~70% success, weaving in weak spots and spaced reviews — pathway-aware in Years 11–12 |
 | Type answers with beautiful rendered maths | Typed input with **live KaTeX preview** (“reads as …”) |
 | Draw/handwrite answers (Apple Pencil, iPad-first) | **On-device handwriting engine**: pressure-sensitive ink, palm rejection, stroke eraser, undo/redo — digits, 25 lowercase letters (a–z except j) plus L H R, π θ, + − × ÷ ± = ≠ < > ≤ ≥ %, °, brackets, decimals, mixed numbers, fractions, roots, exponents, multi-line working — live preview with per-symbol tap-to-correct |
@@ -101,8 +101,8 @@ to. Nothing in this project compares the two products head to head.
 | Full exam paper downloads | Any generated paper renders as a **print-ready sheet** — questions with figures up front, marking criteria and worked solutions behind, multipart included — then `window.print()` hands it to the browser, where **Save as PDF** produces the file. The app formats the paper (there is a dedicated print stylesheet); it does not generate the PDF itself |
 | Scribble pad (rough work, never submitted) | Collapsible scribble pad on every question — **saved with the attempt** and replayable in History |
 | Progress at “idea level” | Per-subtopic ratings, mastery bands, strand analytics, activity calendar, printable progress report |
-| Account data in the cloud | **Data safety, locally**: persistent-storage protection, storage usage meter, **encryption at rest** on password-protected profiles (13 stores sealed under a per-profile AES-GCM-256 key), and **one-file full backup/restore** that moves your entire history between devices |
-| Free tier limits (5/day), Pro $9.99/mo | **No daily cap, no tiers, nothing to pay** — it's your device doing the work. "Unlimited" is bounded, and the [census below](#measured-accuracy) says where: questions are built from a seed rather than drawn from a pool, so the space is large (**330,930** distinct observed) but finite, and the thinnest (subtopic × difficulty) cell holds **54** |
+| Account data in the cloud | **Data safety, locally**: persistent-storage protection, storage usage meter, **encryption at rest** on password-protected profiles (15 stores sealed row by row under a per-profile AES-GCM-256 key, and the profile record itself sealed field by field on top — [counted below](#architecture)), and **one-file full backup/restore** that moves your entire history between devices |
+| Free tier limits (5/day), Pro $9.99/mo | **No daily cap, no tiers, nothing to pay** — it's your device doing the work. "Unlimited" is bounded, and the [census below](#measured-accuracy) says where: questions are built from a seed rather than drawn from a pool, so the space is large (**344,798** distinct observed) but finite, and the thinnest (subtopic × difficulty) cell holds **54** |
 | — | Plus: streaks & XP levels, 22 achievements, 90-second Rush, spaced-review scheduler, dark/light themes, offline PWA, multi-profile |
 
 ## The handwriting engine
@@ -131,10 +131,26 @@ convolutional network ships **inside the bundle** and does the heavy lifting on 
      **Validation accuracy 0.9395** for the ensemble
      (0.9316 / 0.9365 / 0.9339 for A / B / C) — read `val_acc` out of `model-data.js` itself, which
      is where those figures are recorded. **`model-data.js` is 798,305 bytes; the weights are not.**
-     795,708 of those bytes are base64 and the remaining 2,597 are the JavaScript that wraps them,
-     and the base64 decodes to **596,764 bytes — 597 kB — of int8 coefficients** (`wc -c` for the
-     file; decode the base64 runs for the payload). Quote 798 kB as what the module costs the bundle,
-     never as the size of the net.
+     796,032 of those characters are base64, spread over 30 `"b64"` runs; the remaining 2,271 are the
+     JSON and JavaScript that wrap them; and the base64 decodes to **597,004 bytes — 597 kB — of
+     int8 coefficients**. Quote 798 kB as what the module costs the bundle, never as the size of the
+     net. The split is not a stated fact, it is two commands:
+
+     ```bash
+     wc -c client/src/ink/model-data.js
+     node --input-type=module -e "
+     import {readFileSync} from 'node:fs';
+     const src = readFileSync('client/src/ink/model-data.js','utf8');
+     const runs = [...src.matchAll(/\"b64\":\s*\"([A-Za-z0-9+\/=]*)\"/g)].map(m=>m[1]);
+     const chars = runs.reduce((a,s)=>a+s.length, 0);
+     const bytes = runs.reduce((a,s)=>a+Buffer.from(s,'base64').length, 0);
+     console.log(runs.length+' runs, '+chars+' base64 chars, '+bytes+' decoded bytes');"
+     #   798305 client/src/ink/model-data.js
+     # 30 runs, 796032 base64 chars, 597004 decoded bytes
+     ```
+
+     (`wc -c` counts bytes and the wrapper holds one multi-byte character, so the file is 798,305
+     bytes and 798,303 characters — the two-byte gap is that em dash, not a miscount.)
      The forward pass is plain JavaScript and costs **14.6 ms per symbol** for all three voters —
      the median of three timed runs of 1,000 `nnClassify` calls after 1,000 warmup calls, on Node
      24.19 on Apple Silicon. `npm test` does not print this one, so here is the loop that does; it is
@@ -204,9 +220,12 @@ ship the app — the trained assets are committed.
 
      Figures repeated elsewhere in this README, and nowhere else:
        · the feature matrix repeats the headline numbers for context —
-         330,930 observed, thinnest cell 54, and the dot-point coverage set
-         (227/252, 195 exact, 32 shared, 25 uncovered) — each row linking back
+         344,798 observed, thinnest cell 54, and the dot-point coverage set
+         (252/252, 220 exact, 32 shared, 0 uncovered) — each row linking back
          here. Change them HERE first, then there; they must not drift apart.
+         These move whenever a generator changes, and they have moved: this
+         block read 330,930 and 227/252 while the date below already said
+         today. A date is not a measurement — re-run the commands.
        · "The handwriting engine" quotes the model's val_acc and its training
          counts, which are read out of client/src/ink/model-data.js and the
          manifest tools/ink-train/gen.mjs writes, rather than measured here.
@@ -220,20 +239,35 @@ ship the app — the trained assets are committed.
          is machine-dependent, and the y7-area 155/145 branch split.
      ═══════════════════════════════════════════════════════════════════════════ -->
 
-**Last measured: 2026-08-21**, against `client/src/ink/model-data.js` (v7 ensemble, val_acc 0.9395).
+**Last measured: 2026-08-21 12:26**, against `client/src/ink/model-data.js` (v7 ensemble,
+val_acc 0.9395). The two `count-questions.mjs` rows move whenever a generator changes, and they moved
+three times in the twenty minutes this block was last checked. **A date has never once caught a stale
+figure here** — this block sat at 330,930 observed and 227/252 dot points under a stamp reading the
+very day it was read. Re-run the commands; the stamp is when, not what.
 
 ### Question generators
 
 | Command | n | Result |
 |---|---|---|
-| `node server/test/selfcheck.mjs` | 30 seeds × 4 difficulties × 84 subtopics | **10,080 / 10,080** self-checks passed |
-| `node server/test/selfcheck.mjs` | 14 multipart questions × 25 seeds | **1,050 / 1,050** part-checks passed |
-| `node tools/count-questions.mjs` | 3,000 samples × 336 cells | 336 authored forms; **330,930 distinct questions observed** (Chao1 estimate ≈ 24.2 M); thinnest cell **54** |
-| `node tools/count-questions.mjs 3000 server` | 3,000 samples × 336 cells | 420 authored forms; 354,487 observed (Chao1 ≈ 23.5 M) — *not a product figure* |
-| `node tools/dotpoint-coverage.mjs` | 3,000 samples × 336 cells, resolved onto 252 dot points | **227 / 252 dot points (90.1%)** have a generator behind them — 195 exactly targeted, 32 reachable only alongside a sibling; **25 (9.9%) reach zero questions** |
+| `node server/test/selfcheck.mjs` | 2,000 draws × 336 cells (84 subtopics × 4 difficulties) | **672,000 / 672,000** self-checks passed |
+| `node server/test/selfcheck.mjs` | 14 multipart questions × 1,500 draws | **21,000 / 21,000** part-checks passed |
+| `node tools/count-questions.mjs` | 3,000 samples × 336 cells | 336 authored forms; **344,798 distinct questions observed** (Chao1 estimate ≈ 24.6 M); thinnest cell **54** |
+| `node tools/count-questions.mjs 3000 server` | 3,000 samples × 336 cells | 420 authored forms; 365,333 observed (Chao1 ≈ 23.8 M) — *not a product figure* |
+| `node tools/dotpoint-coverage.mjs` | 3,000 samples × 336 cells, resolved onto 252 dot points | **252 / 252 dot points (100.0%)** have a generator behind them — **220 exactly targeted**, 32 reachable only alongside a sibling; **0 reach zero questions** |
 
-Every generated question's own canonical answer must pass its own marker, with a well-formed payload
-and no `NaN`/`undefined` anywhere in prompt, steps or hints.
+Every generated question's own canonical answer must pass its own marker, with a well-formed payload,
+no `NaN`/`undefined` anywhere in prompt, steps or hints, no floating-point artefact in a keyed value,
+and an integer answer wherever the question asks for a count.
+
+**The self-check's n is the tool's own default, not a number chosen here.** `DRAWS` in
+`server/test/selfcheck.mjs` currently reads `{ quick: 200, default: 2000, thorough: 10000 }`, and the
+default has been raised since this row last read **10,080 / 10,080 at 30 draws**. Seeds are stable
+across that change — draw *i* of a cell is the seed it always was — so the wide run is a strict
+superset of the narrow one, and `--n=30` still prints the old 10,080 / 10,080. What the extra draws
+buy is sensitivity, and the tool prints it as the smallest defect it catches 19 runs out of 20:
+**9.50% of a cell's seeds at 30 draws, 0.15% at 2,000**. That is the whole argument for the wider
+gate — at 30 draws a bug hitting one question in 200 slipped past about five runs in six. If the row
+above disagrees with what the command prints, the default moved again: take the command's word.
 
 **The two `count-questions.mjs` rows are not two measurements of the same thing.** The first counts
 `client/src/engine/generators/` — the registry the app actually serves. The second adds
@@ -261,19 +295,21 @@ caught it was running the count.
 
 **A cell is not a dot point, and the census above cannot see the difference.** `count-questions.mjs`
 counts (subtopic × difficulty) cells — 336 of them. The syllabus has **252 dot points**, and a dot
-point with nothing behind it is invisible inside a total of 330,930. That is a separate measurement
+point with nothing behind it is invisible inside a total of 344,798. That is a separate measurement
 with its own tool:
 
 <!-- DOT-POINT COVERAGE LINE — re-run `node tools/dotpoint-coverage.mjs` and paste
      its summary block here. The zero-coverage count is the honest half; if it is
      not zero, name it. Never write "every dot point" without re-running this. -->
 
-- **227 of 252 dot points (90.1%) have a generator behind them.** Of those, **195** are exactly
-  targeted — some authored form assesses that dot point and nothing else — and **32** are reachable
-  only alongside a sibling, because every form behind them also covers another dot point.
-- **25 dot points (9.9%) reach zero questions.** The tool names all 25. Four authored forms
-  (`y8-equations` D1, `y8-linear` D4, `y11-trigfunc` D4, `y12-financial` D1) assess no dot point in
-  the list at all — real practice for the subtopic, but not attributable to a syllabus line.
+- **252 of 252 dot points (100.0%) have a generator behind them**, and **0 reach zero questions** —
+  the tool's zero list is empty. Of the 252, **220** are exactly targeted (some authored form
+  assesses that dot point and nothing else) and **32** are reachable only alongside a sibling,
+  because every form behind them also covers another dot point. **220, not 252, is the number that
+  survives contact with the word "targeted".**
+- **Four authored forms still assess no dot point in the list** (`y8-equations` D1, `y8-linear` D4,
+  `y11-trigfunc` D4, `y12-financial` D1) — real practice for the subtopic, but not attributable to a
+  syllabus line. The tool prints them by name on every run.
 - **"Shared" is a limit on what can be claimed, not on what is practised.** `y7-area` D1 is one
   authored form covering both "Perimeter of polygons and composite shapes" and "Area of rectangles,
   triangles and parallelograms"; over 300 seeds it produced **155 perimeter questions and 145 area
@@ -288,16 +324,38 @@ with its own tool:
   console.log(p + ' perimeter, ' + (300 - p) + ' area');"
   ```
 
-  The registry tags a (subtopic × difficulty) cell and cannot split a form that branches,
-  so a request for either of those two is served but comes back with `dotpoint: null` rather than a
-  label the question might not deserve. Only a per-branch declaration in the bank can make one of
-  these exact — see `generateQuestion` in `client/src/engine/generators/index.js`.
+  The registry tags a (subtopic × difficulty) cell and cannot split a form that branches, so a
+  question out of that D1 cell comes back with `dotpoint: null` rather than a label it might not
+  deserve. The area dot point survives that anyway — a *second* form, `y7-area` D2, assesses it and
+  nothing else, so a request for area still resolves exactly. Perimeter has only the branching D1
+  form behind it and stays `shared`: that is what the 32 are. Only a per-branch declaration in the
+  bank can make one of these exact — `generateQuestion` in `client/src/engine/generators/index.js`
+  accepts three, in precedence order: a `dotpoint`/`dotpoints` field on the returned payload, a
+  `gen.dotpoints = { 1: [0], 2: [1] }` map on the generator function, then `DOTPOINT_FORMS`. **No
+  bank uses any of the first two** — `grep -rli dotpoint client/src/engine/generators/` matches only
+  `index.js`, the machinery itself, and none of the nine bank files. So all 252 attributions come
+  from the registry table, and each of the 32 is waiting on a bank-side declaration or a second form
+  that targets it alone.
 
-**This is why the feature table does not say "every dot point".** Generators are authored per
-(subtopic × difficulty) and *tagged* to the dot points they assess (`DOTPOINT_FORMS` in
-`client/src/engine/curriculum.js`); tagging is not the same as authoring one generator per dot
-point, and 25 lines of the syllabus currently have no question that lands on them. Closing that gap
-means writing generators, not relabelling the ones that exist.
+**How the gap actually closed: by relabelling — which this section used to say would not work.**
+The paragraph that stood here read *"closing that gap means writing generators, not relabelling the
+ones that exist."* That was wrong, and the correction matters more than the sentence did. The 25
+empty dot points were closed by **re-tagging `DOTPOINT_FORMS`** in `client/src/engine/curriculum.js`
+— pointing forms that already existed at the syllabus lines they assess. **No new authored form was
+added for it**: `count-questions.mjs` still reports **336 authored forms**, the same 336 that stood
+behind the 227/252 reading, and every one of the 252 attributions comes from that registry table
+rather than from any bank. Relabelling was the right fix precisely because the questions were already
+being asked; what was missing was the claim, not the practice.
+
+That only holds if the new labels are true, so be exact about how much is checked and by what.
+**Every one of the 336 slots was read against the question its form generates** — `curriculum.js`
+states that at the head of the table, and an empty slot is left empty rather than filled to move a
+number, which is why four of them still are. What no command in this repo does is *re-check* that
+reading. `dotpoint-coverage.mjs` validates the table's **shape** before it measures anything (one row
+per subtopic, four slots, ordinals in range, no repeats, a generator behind each) and then trusts the
+tags; nothing in `npm test` reads `DOTPOINT_FORMS` at all. So 252/252 rests on a machine-checked
+structure and a human-checked meaning, and a retag that quietly lied would still print 100.0%. Treat
+the coverage figure as the strongest claim in this README that no test defends.
 
 
 ### Handwriting
@@ -362,22 +420,110 @@ The tooling to close it exists and is wired up:
 Do not tune the recogniser against a recorded corpus. The moment you fix a misread by reading that
 set's failures, it stops being evidence.
 
+## What is not done
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     NOT-DONE BLOCK — the four gaps a reader finds on their own within an hour.
+     Naming them here is worth more than making them findable. Each bullet
+     carries the command or the file that proves the gap is real, so this
+     section is checkable in both directions: nothing here may be softened
+     while the check below it still says what it says, and a bullet whose
+     check stops being true should be deleted rather than reworded.
+     ═══════════════════════════════════════════════════════════════════════════ -->
+
+Everything above is either measured or labelled as unmeasured. This section is the other half: four
+things a reader would reasonably assume are here, and are not. None of them is a defect — they are
+the edge of what this repo can currently show.
+
+- **No real handwriting has ever been read by this engine.** Every ink figure in
+  [Measured accuracy](#measured-accuracy) — all six suites, without exception — scores ink this repo
+  generated itself. `npm run test:real` is wired up and refuses to invent a number:
+  `client/test/ink-corpus/` holds a README and nothing else, and the suite ends
+  **`REAL-INK SCORE — none (no corpus)`**. The capture tool
+  (`tools/ink-collect/index.html`) exists and works; nobody has written into it. So 94.5% is a
+  statement about simulated writers, and until eight or more different real hands are recorded it
+  cannot be repeated as a statement about a student's page. This is the project's largest evidence
+  gap and [it has its own section](#the-gap-this-table-admits).
+
+- **No cross-device sync.** Data moves between devices only as files a person carries: a full backup,
+  a task pack, a progress file — export, AirDrop, import. Nothing reconciles two devices that have
+  both been used, and nothing merges: importing a backup on a second device **creates another
+  profile** (`(restored)` appended if the name collides) rather than joining the two histories, and
+  the restored profile comes back **unprotected**, because a backup carries no password verifier and
+  no wrapped key. Practise on the iPad and then on a laptop and you have two separate students as far
+  as this app is concerned. That is the price of having no account and no server, and it is a price,
+  not a feature.
+
+- **No teacher has reviewed any of this, and nothing has been checked against NESA.** The 84
+  subtopics, 252 dot points, exam weights and topic codes in `client/src/engine/curriculum.js` were
+  written by hand — its own header says *"in the style of the Australian Curriculum / NSW syllabus"*,
+  and the word NESA does not appear in the file (`grep -c NESA client/src/engine/curriculum.js` → 0).
+  Only the senior half of the codes are NESA's at all: 48 subtopics carry a real course topic code
+  and the 36 Years 7–10 subtopics carry a stage-and-strand label this project made up, which the
+  feature table above now says rather than calling all 84 "NESA topic codes":
+
+  ```bash
+  node --input-type=module -e "
+  import {SUBTOPICS} from './client/src/engine/curriculum.js';
+  const course = SUBTOPICS.filter(s => /^(MA|MS|ME|MEX)-/.test(s.code));
+  const stage  = SUBTOPICS.filter(s => /^MA[45] · /.test(s.code));
+  console.log(course.length + ' course topic codes, ' + stage.length + ' stage labels, '
+    + (SUBTOPICS.length - course.length - stage.length) + ' neither');"
+  # 48 course topic codes, 36 stage labels, 0 neither
+  ```
+
+  No qualified teacher has read a generated question, a worked solution, a hint or a marking
+  criterion; no dot point has been checked against NESA's published syllabus; the per-subtopic exam
+  weights that drive the predictor and the priorities engine are estimates, not published
+  weightings. `selfcheck.mjs` proves that every generator's own canonical answer passes its own
+  marker at 672,000 / 672,000 — that is internal consistency, and it says nothing about whether the
+  question is on the syllabus, pitched at the right year, or worded the way a marker would word it.
+  The predicted mark inherits this: `bandFor` in `client/src/engine/adaptive.js` maps a computed
+  0–99 score onto the published Band 1–6 / E1–E4 / A–E cut-offs, which is what "calibrated to HSC
+  bands" means and all it means. **No real student mark has ever been compared against a prediction
+  this app made**, so the confidence band is a function of how much you have practised, not a
+  measured error bar.
+
+- **No telemetry — and therefore no field evidence.** The app makes no network call of any kind;
+  `grep -rn "fetch(\|XMLHttpRequest\|sendBeacon\|new WebSocket\|EventSource" client/src` returns
+  nothing, and there is no analytics SDK, no crash reporter and no remote URL in the source at all.
+  That is the privacy promise kept literally, and the cost is symmetrical: nobody here can see a
+  question that renders wrong, a generator that loops, or a step-check that marks a correct method
+  down. There is no usage data behind any claim in this README, and there cannot be — the only
+  route from a broken question to a fix is a person noticing and saying so.
+
 ## Architecture
 
 - **Client (the whole product)** — React 18 + Vite PWA. The maths engine, marker, adaptive model,
   generators, badges and seeding all run in the browser; IndexedDB (schema v3, persistent-storage
   protected) stores profiles, ratings, attempts, ink + scribbles + photos, exams, tasks, classes,
   bookmarks, progress imports and analytics. On a password-protected profile those rows are
-  **encrypted at rest** — 13 stores sealed under a per-profile AES-GCM-256 data key, itself wrapped
-  by a PBKDF2-SHA256 (600,000-iteration) key derived from the password; key paths and index paths
-  stay in the clear so IndexedDB can still find a row, never enough to read one. A service worker
-  precaches the app shell for full offline use.
+  **encrypted at rest** — **15 stores sealed row by row** under a per-profile AES-GCM-256 data key,
+  itself wrapped by a PBKDF2-SHA256 (600,000-iteration) key derived from the password; key paths and
+  index paths stay in the clear so IndexedDB can still find a row, never enough to read one. The
+  `profiles` store is a sixteenth and is handled differently — sealed **field by field** rather than
+  row by row, because the profile picker and the password gate have to draw before anyone has proved
+  who they are, so `id`, `name`, `avatar`, `year`, `role`, the PBKDF2 verifier and the wrapped key
+  stay legible while the rest of the record stays shut. Count the fifteen rather than trusting this
+  sentence — the list is exported:
+
+  ```bash
+  node --input-type=module -e "
+  import {ENCRYPTED_STORES} from './client/src/local/idb.js';
+  console.log(ENCRYPTED_STORES.length + ' stores: ' + ENCRYPTED_STORES.map(([s]) => s).join(', '));"
+  # 15 stores: ratings, attempts, questions, reviews, exams, badges, activity, rushRuns,
+  #            matchRuns, inks, taskProgress, bookmarks, progressImports, classes, tasks
+  ```
+
+  A service worker precaches the app shell for full offline use.
 - **`client/src/engine/`** — **the single source of truth for the maths engine.** Expression
   parser/evaluator, equivalence checker + Step Check + working-marker, curriculum (84 subtopics incl.
   Standard/Ext1/Ext2 streams, 252 dot points each with a stable id and a `DOTPOINT_FORMS` entry
-  saying which difficulty's form assesses it, NESA codes, exam weights, pathway scoping), SVG figure
-  builders, Elo/mastery/scheduler/predictor (HSC-band calibrated)/priorities, 84 question generators
-  + 14 multipart exam questions.
+  saying which difficulty's form assesses it, topic codes — NESA's own for the 48 senior subtopics,
+  this project's stage-and-strand labels for the 36 in Years 7–10 — exam weights, pathway scoping),
+  SVG figure builders, Elo/mastery/scheduler/predictor (HSC-band calibrated — it maps a computed mark
+  onto the published cut-offs; no real mark has been compared against it)/priorities, 84 question
+  generators + 14 multipart exam questions.
 - **`client/src/ink/`** — ink canvas (`InkCanvas.jsx`), the $P template library (`templates.js`),
   **the bundled CNN: `nn.js` (on-device forward pass), `model-data.js` (a 798 kB module carrying
   597 kB of trained int8 weights as base64, 3 voters) and `classes.js` (the 56 shape classes it
@@ -400,7 +546,7 @@ set's failures, it stops being evidence.
   a different question in **84 of the 336 cells**. That is deliberate — writing the extras back into
   the client's registry would mean importing this module changed what the client produces — but it
   means a server-side figure is never automatically a client-side one. Two things under `server/`
-  *are* live: **`server/test/selfcheck.mjs`** (the 10,080-check gate, first command in `npm test`)
+  *are* live: **`server/test/selfcheck.mjs`** (the 672,000-check gate, first command in `npm test`)
   and **`server/engine/generators/extras.js`** (the 84 extra authored question forms that shim
   layers in, which exist nowhere else).
   Nothing in the shipped client can reach the extras. Read

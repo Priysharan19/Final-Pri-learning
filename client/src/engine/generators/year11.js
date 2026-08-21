@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Pri Learning · Year 11 generators (Advanced foundations)
 // ─────────────────────────────────────────────────────────────────────────────
-import { ri, rc, rs, nz, Frac, mcq, term, poly, sgn, r1, r2, r3, rad, NAMES } from '../qhelpers.js';
+import { ri, rc, rs, nz, Frac, mcq, term, poly, sgn, surdLatex, surdStr, r1, r2, r3, rad, NAMES } from '../qhelpers.js';
 
 const factorial = n => n <= 1 ? 1 : n * factorial(n - 1);
 const nCr = (n, r) => Math.round(factorial(n) / (factorial(r) * factorial(n - r)));
@@ -326,13 +326,23 @@ export const year11 = {
       const b = nz(rng, -3, 3), c = nz(rng, -5, 5);
       // Build P with (x - root) as a factor: P = (x - root)(x^2 + bx + c)
       const B = b - root, C = c - root * b, D = -root * c;
-      const wrong1 = root + 1 === 0 ? root + 2 : root + 1;
-      const wrong2 = -root === root ? root - 1 : -root;
-      const m = mcq(rng, `$(x ${sgn(-root)})$`, [
-        { text: `$(x ${sgn(-wrong2)})$`, why: `Test it: $P(${wrong2}) \\ne 0$. A factor $(x - r)$ needs $P(r) = 0$.` },
-        { text: `$(x ${sgn(-wrong1)})$`, why: `$P(${wrong1}) \\ne 0$, so this is not a factor.` },
-        { text: `$(x ${sgn(root)})$`, why: `Careful with signs: $(x ${sgn(root)})$ is zero at $x = ${-root}$, and $P(${-root}) \\ne 0$.` }
-      ]);
+      // The quadratic factor is free to factorise over the integers too, so a
+      // distractor built by nudging the keyed root — (x + root), (x - root ± 1) —
+      // can land on a second genuine factor and be marked wrong. Every candidate
+      // is put through the factor theorem before it is offered: only roots with
+      // P(r) ≠ 0 survive, and the feedback quotes the value that rules them out.
+      const P = r => r ** 3 + B * r * r + C * r + D;
+      const offered = [];
+      for (const r of [-root, root + 1, root - 1, root + 2, root - 2, root + 3, root - 3, root + 5, root - 5]) {
+        if (r !== 0 && P(r) !== 0 && !offered.includes(r)) offered.push(r);
+        if (offered.length === 3) break;
+      }
+      const m = mcq(rng, `$(x ${sgn(-root)})$`, offered.map(r => ({
+        text: `$(x ${sgn(-r)})$`,
+        why: r === -root
+          ? `Careful with signs: $(x ${sgn(-r)})$ is zero at $x = ${r}$, and $P(${r}) = ${P(r)} \\ne 0$.`
+          : `Test it with the factor theorem: $P(${r}) = ${P(r)} \\ne 0$, so $(x ${sgn(-r)})$ is not a factor.`
+      })));
       return {
         prompt: `Which of these is a factor of $P(x) = ${poly([1, B, C, D])}$?`,
         answerType: 'mcq', answer: { correctIndex: m.correctIndex, optionTraps: m.optionTraps }, mcqOptions: m.options,
@@ -504,53 +514,89 @@ export const year11 = {
   // ── Trig ratios & exact values ───────────────────────────────────────────
   'y11-trigfunc': (rng, diff) => {
     if (diff === 1) {
+      // Every branch here is the special-triangle table for 30°, 45° and 60°,
+      // which is the single dot point this cell is declared against. Quadrantal
+      // angles and calculator decimals belong to "angles of any magnitude" and
+      // are asked at D2, which declares that dot point as well.
       const shape = ri(rng, 1, 3);
       if (shape === 1) {
-        const ang = rc(rng, [0, 30, 45, 60, 90, 180, 270, 360]);
-        const fns = QUAD_EXACT[ang].tan === null ? ['sin', 'cos'] : ['sin', 'cos', 'tan'];
-        const fn = rc(rng, fns);
-        const [ltx, typed, val] = QUAD_EXACT[ang][fn];
+        const ang = rc(rng, [30, 45, 60]);
+        const fn = rc(rng, ['sin', 'cos', 'tan']);
+        const [ltx, typed, val] = EXACT[ang][fn];
         return {
           prompt: `Write down the **exact value** of $\\${fn}(${ang}°)$.`,
           answerType: 'numeric', answer: { value: val, requireExact: true, canonicalInput: typed },
           inputHint: 'e.g. sqrt(3)/2 or 1/2',
           traps: [],
-          hints: ['Picture the special triangles: 45–45–90 (sides 1,1,√2) and 30–60–90 (sides 1,√3,2), and the unit circle for 0°, 90°, 180°, 270°, 360°.', fn === 'tan' ? 'tan = opposite ÷ adjacent.' : `${fn} = ${fn === 'sin' ? 'opposite ÷ hypotenuse' : 'adjacent ÷ hypotenuse'}.`, `The exact value is $${ltx}$.`],
+          hints: ['Picture the special triangles: 45–45–90 (sides 1, 1, √2) and 30–60–90 (sides 1, √3, 2).', fn === 'tan' ? 'tan = opposite ÷ adjacent.' : `${fn} = ${fn === 'sin' ? 'opposite ÷ hypotenuse' : 'adjacent ÷ hypotenuse'}.`, `The exact value is $${ltx}$.`],
           steps: [
-            { h: 'Where the angle sits', d: ang % 90 === 0 ? 'Read it straight off the unit circle' : ang === 45 ? 'Right isosceles triangle with sides $1, 1, \\sqrt{2}$' : 'Half an equilateral triangle: sides $1, \\sqrt{3}, 2$' },
+            { h: 'Which triangle', d: ang === 45 ? 'Right isosceles triangle with sides $1, 1, \\sqrt{2}$' : 'Half an equilateral triangle: sides $1, \\sqrt{3}, 2$' },
             { h: 'Read the ratio', d: `$\\${fn}(${ang}°) = ${ltx}$` }
           ]
         };
       }
       if (shape === 2) {
-        const ang = rc(rng, [0, 30, 45, 60, 90]);
-        const fns = QUAD_EXACT[ang].tan === null ? ['sin', 'cos'] : ['sin', 'cos', 'tan'];
-        const fn = rc(rng, fns);
-        const [ltx, , val] = QUAD_EXACT[ang][fn];
+        const ang = rc(rng, [30, 45, 60]);
+        const fn = rc(rng, ['sin', 'cos', 'tan']);
+        const [ltx] = EXACT[ang][fn];
         return {
           prompt: `For which angle $\\theta$ with $0° \\le \\theta \\le 90°$ does $\\${fn}(\\theta) = ${ltx}$? Give your answer in degrees.`,
           answerType: 'numeric', answer: { value: ang }, answerSuffix: '°',
-          traps: [{ value: 90 - ang, why: `That is the complement — $\\${fn === 'sin' ? 'cos' : 'sin'}$ of it would give $${ltx}$ instead.` }].filter(t => t.value !== ang && fn !== 'tan'),
-          hints: ['Work backwards through the special triangles.', `Which of 0°, 30°, 45°, 60°, 90° has $\\${fn} = ${ltx}$?`, `$\\theta = ${ang}°$.`],
+          traps: [{ value: 90 - ang, why: `That is the complement — $\\${fn === 'sin' ? 'cos' : 'sin'}(${90 - ang}°)$ is what equals $${ltx}$.` }].filter(t => t.value !== ang && fn !== 'tan'),
+          hints: ['Work backwards through the special triangles.', `Which of 30°, 45°, 60° has $\\${fn} = ${ltx}$?`, `$\\theta = ${ang}°$.`],
           steps: [{ h: 'Read the table backwards', d: `$\\${fn}(${ang}°) = ${ltx}$, so $\\theta = ${ang}°$` }]
         };
       }
-      const ang = rc(rng, [0, 30, 45, 60, 90, 180, 270, 360]);
-      const fns = QUAD_EXACT[ang].tan === null ? ['sin', 'cos'] : ['sin', 'cos', 'tan'];
-      const fn = rc(rng, fns);
-      const [ltx, , val] = QUAD_EXACT[ang][fn];
+      // The same three exact values, used rather than recited: the hypotenuse is
+      // even, so every side comes out as a whole number or a whole multiple of
+      // √2 or √3 — never a rounded decimal.
+      const ang = rc(rng, [30, 45, 60]);
+      const hyp = 2 * ri(rng, 1, 10);
+      const wantOpp = rc(rng, [true, false]);
+      const fn = wantOpp ? 'sin' : 'cos';
+      const [ltx] = EXACT[ang][fn];
+      const half = hyp / 2;
+      const under = ang === 45 ? 2 : (ang === 30) === wantOpp ? 1 : 3;
       return {
-        prompt: `Find $\\${fn}(${ang}°)$, correct to 3 decimal places.`,
-        answerType: 'numeric', answer: { value: r3(val), tol: 0.0006 },
-        traps: [],
-        hints: ['Make sure your calculator is in degree mode.', `The exact value is $${ltx}$.`, 'Round to 3 decimal places.'],
+        prompt: `A right-angled triangle has hypotenuse $${hyp}$ cm and an acute angle of $${ang}°$. Using the **exact value** of $\\${fn}(${ang}°)$, find the exact length of the side ${wantOpp ? 'opposite' : 'adjacent to'} that angle.`,
+        answerType: 'numeric',
+        answer: { value: half * Math.sqrt(under), requireExact: true, canonicalInput: surdStr(half, under) },
+        answerSuffix: 'cm', inputHint: 'e.g. 4sqrt(3)',
+        traps: [{ value: hyp * Math.sqrt(under), why: `$\\${fn}(${ang}°) = ${ltx}$ — the hypotenuse is multiplied by the whole ratio, and its denominator is 2.`, tol: 0.001 }],
+        hints: [`$\\${fn}(${ang}°) = \\dfrac{\\text{${wantOpp ? 'opposite' : 'adjacent'}}}{\\text{hypotenuse}}$.`,
+          `So the side is $${hyp} \\times \\${fn}(${ang}°)$.`,
+          `$\\${fn}(${ang}°) = ${ltx}$ exactly — leave the surd in the answer.`],
         steps: [
+          { h: 'Name the ratio', d: `$\\${fn}(${ang}°) = \\dfrac{\\text{${wantOpp ? 'opp' : 'adj'}}}{${hyp}}$` },
           { h: 'Exact value', d: `$\\${fn}(${ang}°) = ${ltx}$` },
-          { h: 'As a decimal', d: `$\\approx ${r3(val)}$` }
+          { h: 'Multiply out', d: `$${hyp} \\times ${ltx} = ${surdLatex(half, under)}$ cm` }
         ]
       };
     }
     if (diff === 2) {
+      // Two ways into angles of any magnitude. The quadrantal angles are read
+      // straight off the unit circle; every other angle is carried back to a
+      // special-triangle reference angle and given a sign by ASTC.
+      if (rng() < 0.3) {
+        const ang = rc(rng, [0, 90, 180, 270, 360]);
+        const fns = QUAD_EXACT[ang].tan === null ? ['sin', 'cos'] : ['sin', 'cos', 'tan'];
+        const fn = rc(rng, fns);
+        const [ltx, typed, val] = QUAD_EXACT[ang][fn];
+        const point = ang === 0 || ang === 360 ? '(1, 0)' : ang === 90 ? '(0, 1)' : ang === 180 ? '(-1, 0)' : '(0, -1)';
+        return {
+          prompt: `On the unit circle, the point at $${ang}°$ is $${point}$. Write down the **exact value** of $\\${fn}(${ang}°)$.`,
+          answerType: 'numeric', answer: { value: val, requireExact: true, canonicalInput: typed },
+          inputHint: 'e.g. 0 or -1',
+          traps: [],
+          hints: [`A point on the unit circle at $\\theta$ is $(\\cos\\theta, \\sin\\theta)$.`,
+            `At $${ang}°$ that point is $${point}$.`,
+            fn === 'tan' ? `$\\tan\\theta = \\dfrac{\\sin\\theta}{\\cos\\theta}$.` : `Read off the ${fn === 'cos' ? 'x' : 'y'}-coordinate.`],
+          steps: [
+            { h: 'The point', d: `$(\\cos ${ang}°, \\sin ${ang}°) = ${point}$` },
+            { h: 'Read the ratio', d: `$\\${fn}(${ang}°) = ${ltx}$` }
+          ]
+        };
+      }
       const base = rc(rng, [30, 45, 60]);
       const quad = rc(rng, [2, 3, 4]);
       const turn = rc(rng, [-360, 0, 360]);

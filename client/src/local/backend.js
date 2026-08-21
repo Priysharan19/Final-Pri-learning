@@ -412,26 +412,57 @@ async function requireProfile() {
   return p;
 }
 
-/**
- * What the picker may show of an address: enough to recognise your own account,
- * never enough to confirm someone else's to whoever is holding the iPad.
- */
+// ── What the picker may say about an address ─────────────────────────────────
+// The picker is drawn before anybody proves who they are, so every field it
+// reads is a field a stranger holding the iPad is shown. It used to be handed
+// `m•••@example.com`, stored in the clear on the profile row, and that one
+// string undid the keyed index sitting next to it: the audit needed no key, no
+// crypto and no password — it masked a five-entry guess list by the same rule,
+// exactly one entry came out `m•••@example.com`, and the address was named.
+// A masking rule is a hash with a tiny output and no key, and a hash with no key
+// over a guessable value confirms guesses. That is all it ever was.
+//
+// So nothing derived from an address is stored any more. What the picker gets
+// depends on what the row is already giving away, and on nothing else:
+//
+//   · A profile with no password has its address in the clear on its row, along
+//     with its name, its year and everything else it owns, because that is what
+//     having no password means. Masking it for the picker withholds nothing
+//     from a dump — the address is right there — but it does keep the whole
+//     thing off a screen in a classroom, so the mask is computed at render time
+//     from the address itself and never written down.
+//
+//   · A protected profile's address is sealed. The picker gets one bit —
+//     "this account has an email on it" — drawn as a placeholder that is
+//     identical for every such profile. One bit cannot be run against a guess
+//     list. What it buys is real and small: somebody who has an account with an
+//     address and one without can tell which row is which.
+//
+// Two protected profiles with the same name, the same avatar and both carrying
+// addresses are therefore not told apart by this line, and that is the deliberate
+// cost. The distinguishing the picker does is by name and avatar, both of which
+// the owner chooses; anything more would have to be a stable function of the
+// address on a row anyone can read, which is the thing that was wrong.
+
+const SEALED_MARK = '•••';
+
+/** A mask for an address that is already legible on the row it sits on. */
 function maskAddress(email) {
   const at = String(email || '').indexOf('@');
   return at < 1 ? null : `${email[0]}•••${email.slice(at)}`;
 }
-const maskedEmail = p => p.emailMask || maskAddress(p.email);
+
+const maskedEmail = p => maskAddress(p.email) || (p.emailSealed || p.emailHash ? SEALED_MARK : null);
 
 /**
  * Store an address on a profile: sealed under the profile's own key when it has
- * one, with a mask for the picker and a blind index so two profiles can be told
- * apart without either address being readable.
+ * one, and a blind index either way so two profiles can be told apart without
+ * either address being readable.
  */
 async function setProfileEmail(p, email) {
   delete p.email; delete p.emailSealed; delete p.emailHash; delete p.emailMask;
   if (!email) return;
   p.emailHash = await blindHash(email);
-  p.emailMask = maskAddress(email);
   if (p.auth && hasDataKey(p.id)) p.emailSealed = await sealField(p.id, email);
   else p.email = email;
 }

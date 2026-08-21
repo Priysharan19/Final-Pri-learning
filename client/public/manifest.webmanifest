@@ -1,7 +1,7 @@
 {
   "name": "Pri Learning",
   "short_name": "Pri Learning",
-  "description": "The most powerful way to master maths — adaptive practice, handwriting marking and exam prep for Years 7–12. Fully offline.",
+  "description": "Adaptive Years 7–12 maths practice, generated and marked on your device — handwriting recognition, HSC-style marking and exam papers. Fully offline.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

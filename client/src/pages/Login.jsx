@@ -238,8 +238,9 @@ export default function Login() {
         <div className="auth-col fade-in">
           <Logo large />
           <div className="hero-kicker">NSW · HSC · VCE · QCE · WACE · SACE · IB</div>
-          <h1 className="hero-title">The most powerful way to<br />master <span className="gold">Mathematics</span></h1>
-          <p className="hero-sub">Over 1.3 million distinct exam-style questions to every dot point · line-by-line marking of handwritten working · entirely on this iPad.</p>
+          <h1 className="hero-title">Write it by hand.<br />Get it marked like the <span className="gold">HSC</span>.</h1>
+          <p className="hero-sub">344,798 measured distinct questions across all 252 syllabus dot points · your working
+            marked line by line, with method marks · entirely on this iPad, offline.</p>
           <div className="row" style={{ marginTop: 34 }}>
             <button className="btn btn-primary btn-lg btn-glow" onClick={enter}>Get Started</button>
           </div>

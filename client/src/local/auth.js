@@ -123,16 +123,41 @@ export async function rewrapVault(key, password) {
 // So every record is padded to a bucket before it is sealed. The padding is
 // spaces on the end of the JSON, which `JSON.parse` already ignores: nothing is
 // recorded on the row, nothing has to be stripped on the way out, and a record
-// written by an older build — unpadded — still opens. The buckets grow with the
-// record so the cost stays proportional: sixty-four bytes while a record is
-// small, then larger steps for handwriting and exam papers, which are big
-// enough that a fine bucket would cost more than the leak is worth.
+// written by an older build — unpadded — still opens.
 //
-// What is left is the bucket itself. A padded record says which of a handful of
-// size bands it is in, and no more; every subtopic id in the curriculum now
-// lands in the same band as every other.
+// The first bucket used to be sixty-four bytes, and sixty-four bytes was not
+// enough. The curriculum's eighty-four subtopic ids run from seven characters
+// to twenty, a spread of thirteen, and a ratings row carries its id more than
+// once — in `subtopic`, in the plaintext key, and again in every dot-point
+// entry. That put fresh rows either side of a boundary: two bands, 272 and 336
+// bytes of ciphertext, splitting the eighty-four ids between them. One band is
+// about a bit, and a bit is what the blinded key was there to take away.
+//
+// The small bucket is therefore 512 bytes. Measured over the whole curriculum,
+// every ratings row lands in one band and stays there as it fills up — a fresh
+// row (181–207 bytes of JSON) and a well-used one (279–318) are both 512, so
+// the band no longer separates the ids and no longer separates a new topic
+// from a practised one. Reviews, activity, badges and bookmarks are smaller
+// still and all sit in that same first band. Above it the steps stay as they
+// were: 512 up to sixteen kilobytes, then 4096 for handwriting and exam
+// papers, which are big enough that a fine bucket would cost more than the
+// leak is worth.
+//
+// The residual, stated exactly rather than rounded to nothing. Padding does not
+// erase length, it quantises it, so what is left is:
+//   · which band a record is in — with 512-byte steps, "under half a kilobyte"
+//     for every practice row a profile writes until it has grown past that.
+//   · a row whose contents sit within one id-spread of a bucket boundary can
+//     still be pushed over it by the id. The id appears at most three times in
+//     a ratings row, so the widest that effect can be is 3 × 13 = 39 bytes of
+//     the 512 in a bucket: under 8% of the possible fill states, against 61%
+//     at the old 64-byte step. It is smaller, not gone, and it is only gone for
+//     a record whose length is fixed — which none of these are.
+//   · the two large steps are coarse in absolute terms but wide in relative
+//     terms, so a 40 kB ink and a 44 kB ink are the same band while a 4 kB one
+//     is not.
 
-const padStep = (n) => (n < 1024 ? 64 : n < 16384 ? 512 : 4096);
+const padStep = (n) => (n < 16384 ? 512 : 4096);
 
 /** One record's encoded JSON, grown with spaces to the top of its bucket. */
 function padded(bytes) {
@@ -197,21 +222,45 @@ export async function openValue(key, sealed) {
 // So the index is keyed, under a secret belonging to the install rather than to
 // any profile. What matters is where that secret lives: a random value written
 // into a row would be dumped alongside everything else and would buy nothing.
-// This one is an HMAC key generated as **non-extractable**. The browser stores
-// it, the record that holds it can be read, and what comes back is a handle
-// with no key material in it — `exportKey` refuses, and a dump of the records
-// yields an opaque object. The address index therefore cannot be recomputed by
-// anyone holding a copy of the database; it can only be computed by code
-// running as this origin on this install.
+// This one is an HMAC key generated as non-extractable, so the value stored in
+// the record is a handle rather than bytes and `exportKey` refuses it.
+//
+// What that is worth, said plainly, because an earlier draft of this comment
+// said more than it could keep and the audit was right to call it in:
+//
+//   · A copy of the *records* — a JSON dump, an export, rows read out and sent
+//     somewhere — does not carry the key. The handle serialises to nothing an
+//     attacker can sign with, so the index cannot be recomputed away from this
+//     install and a guess list run against a stolen file gets no answer. That
+//     is the whole of what non-extractability buys, and it is worth having.
+//
+//   · Anything that can run as this origin can still ask the oracle, whether or
+//     not it goes anywhere near this file. It does not need `exportKey` and it
+//     does not need to import auth.js: open the database, read the handle out
+//     of `device`, call `crypto.subtle.sign()` with it over a guess list, and
+//     the matching entry is the address. A key you can use is a key you can
+//     use. Non-extractable means the material does not come back to script; it
+//     does not mean the operations are unavailable.
+//
+//   · A device backup is not the same thing as a record dump, and the
+//     difference matters here. Non-extractability is an API refusal enforced by
+//     the runtime, not an absence of key material — the bytes exist and the
+//     browser keeps them so it can restore the key on the next load. A backup
+//     that carries the browser's own key store carries the sixty-four bytes of
+//     this HMAC key with it; run through node:crypto's KeyObject rather than
+//     WebCrypto, the same key exports cleanly. So the honest boundary is
+//     "records" and not "device": whoever holds a full image of this install
+//     holds the index key, and can confirm an address from a guess list.
 //
 // The trade-off that forces this shape: duplicate detection genuinely has to
 // compare against profiles nobody has unlocked. "Is this address already on
 // this iPad" is asked while creating a *new* profile, when no other profile's
 // key is in memory, so the comparison cannot be made under a profile key — it
-// has to be made under a key the device holds on everyone's behalf. That is the
-// residual: an attacker who can run script as this origin can still ask the
-// oracle. One who has only the data — a device backup, a copied profile
-// directory, another page reading the same IndexedDB — cannot.
+// has to be made under a key the device holds on everyone's behalf. A password
+// cannot be in that position, so nothing here can be as strong as a password.
+// The index is a reduction, not a seal: it takes the address off the row and
+// out of any file that leaves the device, and it leaves the device itself as
+// the place the question can still be asked.
 //
 // Values carry a version tag so an old unkeyed digest is never mistaken for a
 // current one; local/idb.js re-keys what it can and drops what it cannot.
@@ -262,9 +311,11 @@ export const isBlindIndex = (v) => typeof v === 'string' && v.startsWith(BLIND_T
 // readers it was written for; leaving it in the clear is what the audit found.
 //
 // The way out is that the author never needs a reader's key — only something
-// public belonging to them. Every protected profile carries an ECDH keypair:
-// the public half sits in the clear on the profile row, the private half lives
-// inside that profile's own sealed blob and is therefore behind its password.
+// public belonging to them. Every profile carries an ECDH keypair: the public
+// half sits in the clear on the profile row, and the private half is kept
+// behind whatever that profile actually has (local/idb.js decides where — its
+// own password when it has one, this install's wrapping key when it does not,
+// and it says exactly what the second of those is and is not worth).
 // A shared record is sealed under a fresh random record key, and that record
 // key is sealed once per reader against their public half.
 //

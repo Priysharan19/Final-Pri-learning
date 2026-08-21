@@ -295,7 +295,10 @@ export const streamsStandard = {
   'ms11-measure': (rng, diff) => {
     if (diff === 1) {
       const m = ri(rng, 2, 9), cm = ri(rng, 10, 90);
-      const total = m + cm / 100;
+      // m + cm/100 adds two binary approximations and keys artefacts such as
+      // 4.8100000000000005, which then prints as the worked answer. Combining
+      // to whole centimetres first leaves a single exactly-rounded division.
+      const total = (m * 100 + cm) / 100;
       return {
         prompt: `A hallway is $${m}$ m $${cm}$ cm long. Write this length in metres.`,
         answerType: 'numeric', answer: { value: total }, answerSuffix: 'm',
@@ -658,23 +661,47 @@ export const streamsStandard = {
       const n = p[1] * ri(rng, 5, 22);
       return {
         prompt: `The probability a customer pays cash is $${f.latex()}$. Out of $${n}$ customers, how many would you **expect** to pay cash?`,
-        answerType: 'numeric', answer: { value: f.value * n },
+        // n is a multiple of the denominator, so the expected number is whole —
+        // provided the division comes last. f.value * n keyed 118.99999999999999.
+        answerType: 'numeric', answer: { value: f.n * n / f.d },
         traps: [{ value: n / p[0], why: `Expected number = probability × number of trials.` }],
-        hints: ['Expected = P × n.', `$${f.latex()} \\times ${n}$.`, `= ${f.value * n}.`],
-        steps: [{ h: 'Expected number', d: `$${f.latex()} \\times ${n} = ${f.value * n}$` }]
+        hints: ['Expected = P × n.', `$${f.latex()} \\times ${n}$.`, `= ${f.n * n / f.d}.`],
+        steps: [{ h: 'Expected number', d: `$${f.latex()} \\times ${n} = ${f.n * n / f.d}$` }]
       };
     }
+    // This cell is declared against "probability from equally likely outcomes",
+    // and now asks it: one of the N people in the table is picked at random and
+    // every person is equally likely, so P(E) is a count of the cells E covers.
+    // The conditional probability this form used to ask — P(adult | exercises) —
+    // is not a dot point of MS-S1 at all, so the app was reporting an exact
+    // dot-point match while serving a skill from somewhere else entirely.
     const aYes = ri(rng, 12, 30), aNo = ri(rng, 8, 20), bYes = ri(rng, 10, 25), bNo = ri(rng, 6, 18);
-    const f = new Frac(aYes, aYes + bYes);
+    const N = aYes + aNo + bYes + bNo;
+    const kind = ri(rng, 0, 2);
+    const event = kind === 0 ? 'an adult who exercises' : kind === 1 ? 'an adult **or** exercises (or both)' : 'does not exercise';
+    const count = kind === 0 ? aYes : kind === 1 ? aYes + aNo + bYes : aNo + bNo;
+    const f = new Frac(count, N);
+    const doubleCounted = new Frac((aYes + aNo) + (aYes + bYes), N);
     return {
-      prompt: `A two-way table: Adults — $${aYes}$ exercise, $${aNo}$ don't; Teens — $${bYes}$ exercise, $${bNo}$ don't. Given a person **exercises**, find the probability they are an adult (simplest-form fraction).`,
+      prompt: `A two-way table: Adults — $${aYes}$ exercise, $${aNo}$ don't; Teens — $${bYes}$ exercise, $${bNo}$ don't. One of the $${N}$ people is chosen at random, each equally likely. Find the probability that the person chosen ${kind === 2 ? '' : 'is '}${event}, as a fraction in simplest form.`,
       answerType: 'numeric', answer: { value: f.value, simplestFraction: { n: f.n, d: f.d } },
       inputHint: 'e.g. 3/5',
-      traps: [{ value: aYes / (aYes + aNo + bYes + bNo), why: '“Given that they exercise” restricts the total to the exercisers column.' }],
-      hints: ['The condition narrows the world to exercisers.', `Exercisers: $${aYes} + ${bYes} = ${aYes + bYes}$.`, `Adults among them: ${aYes}.`],
+      traps: [
+        kind === 1
+          ? { value: doubleCounted.value, why: `Adults and exercisers overlap: the $${aYes}$ adults who exercise are in both totals, so they get counted twice. Subtract the overlap once.` }
+          : { value: kind === 0 ? aYes / (aYes + aNo) : (aNo + bNo) / (aYes + bYes), why: 'Every one of the $' + N + '$ people is equally likely, so the denominator is the whole table — not one of its rows or columns.' }
+      ].filter(t => t.value !== f.value),
+      hints: [`Each of the $${N}$ people is equally likely, so $P = \\dfrac{\\text{people in the event}}{${N}}$.`,
+        kind === 0 ? `Adults who exercise: one cell of the table, $${aYes}$.`
+          : kind === 1 ? `Count the adults ($${aYes + aNo}$) and the exercisers ($${aYes + bYes}$), then take the overlap ($${aYes}$) off once.`
+            : `People who don't exercise: $${aNo} + ${bNo} = ${aNo + bNo}$.`,
+        `That is $\\dfrac{${count}}{${N}}$ — now simplify.`],
       steps: [
-        { h: 'Restrict to the condition', d: `Exercisers: $${aYes + bYes}$` },
-        { h: 'Conditional probability', d: `$\\dfrac{${aYes}}{${aYes + bYes}} = ${f.latex()}$` }
+        { h: 'The whole table', d: `$${aYes} + ${aNo} + ${bYes} + ${bNo} = ${N}$ equally likely people` },
+        kind === 1
+          ? { h: 'Add, then remove the overlap', d: `$${aYes + aNo} + ${aYes + bYes} - ${aYes} = ${count}$` }
+          : { h: 'Count the event', d: kind === 0 ? `Adults who exercise: $${count}$` : `$${aNo} + ${bNo} = ${count}$` },
+        { h: 'Probability', d: `$\\dfrac{${count}}{${N}} = ${f.latex()}$` }
       ]
     };
   },
@@ -709,7 +736,7 @@ export const streamsStandard = {
         ],
         hints: ['Each month: add interest, then subtract the repayment.', `Interest: $${monthly}\\% \\times ${L} = ${r2(interest)}$.`, `$${L} + ${r2(interest)} - ${repay}$.`],
         steps: [
-          { h: 'Interest for the month', d: `$${L} \\times ${monthly / 100} = ${r2(interest)}$` },
+          { h: 'Interest for the month', d: `$${L} \\times \\dfrac{${monthly}}{100} = ${r2(interest)}$` },
           { h: 'Balance owing', d: `$${L} + ${r2(interest)} - ${repay} = ${r2(owing)}$` }
         ]
       };

@@ -133,15 +133,26 @@ const CLEAR_ON_PROFILE = [
   'failCount', 'lockedUntil',
   // Address material that is already reduced: a blind index keyed to this
   // install, used to answer "is this address taken" without saying whose and
-  // without answering a guess list, a mask the picker shows
-  // (`a•••@example.com`), and the sealed address itself.
-  'emailHash', 'emailMask', 'emailSealed',
+  // without answering a guess list, and the sealed address itself. There used
+  // to be a third thing here — a mask, `m•••@example.com`, in the clear beside
+  // the keyed hash — and it gave away for free exactly what the hash was keyed
+  // to withhold: an auditor with no key at all ran a five-entry guess list
+  // through the same masking rule and one entry matched, naming the address.
+  // Nothing derived from an address is written on a locked row any more; what
+  // the picker shows instead is decided in local/backend.js.
+  'emailHash', 'emailSealed',
   // The public half of this profile's sharing keypair. A teacher has to be able
   // to address a class roll to a student who is not signed in, so the half that
   // does the addressing must be legible while that student is locked. It is a
-  // random point on a curve: it names nobody, and the private half that opens
-  // what is addressed to it lives inside this profile's own sealed blob.
+  // random point on a curve: it names nobody.
   'pub',
+  // The private half, when this profile has no password to keep it behind —
+  // sealed under the install's wrapping key rather than written out. What that
+  // is worth is set out at "A profile with no password" below; the short of it
+  // is that it keeps shared records out of a copy of the database, and it is
+  // not a substitute for a password. A protected profile has no `secWrapped`:
+  // its private half lives inside its own password-sealed blob.
+  'secWrapped',
   // The sample profile is never protected, and the picker tags it as the demo.
   'isDemo'
 ];
@@ -251,37 +262,88 @@ const seqs = new Map();
 //     its roll. What is left of it is that two tasks belong to the same
 //     unnamed class.
 //
-// Two limits worth naming. A record is only as sealed as its readers: if any
-// reader has no sharing keypair — an unprotected profile, or a protected one
-// that nobody has opened since this build arrived — the record cannot be
-// addressed to them and is written in the clear rather than locked away from
-// somebody entitled to read it. That is the honest shape of shared data and it
-// is the same rule `customQs` is excluded under, only enforced instead of
-// assumed. A record in that state closes itself as soon as the last of its
-// people has been opened once: sealing needs public halves and not private
-// ones, so the next sign-in of anybody on it does the work, owner or not.
+// ── A profile with no password ───────────────────────────────────────────────
+// This is where the scheme was broken, and the break was not an edge case. The
+// rule used to be that a record is sealed only when every one of its people has
+// a sharing keypair, and only a *protected* profile ever got one — the keypair
+// was minted when a password unlocked the profile, and its private half lived
+// inside the blob that password opened. A profile created without a password —
+// which is the default, and which is what a class of children on a shared iPad
+// have — never got one. So a class with one such child on the roll fell
+// straight through to "write it in the clear", and a raw dump gave up the class
+// name, the whole roll, the task title and the exact list of subtopics. That is
+// the standard classroom setup, not a corner of it: teacher has a password,
+// children do not.
 //
-// It runs the other way too, and has to. A student who gives up their password
-// can no longer be addressed, and a record left sealed to the rest of the class
-// is a record they have been quietly dropped from — so the owner writes it back
-// in the clear, which is the truthful state for a record one of whose readers
-// has no protection. That direction is the owner's alone: a reader who cannot
-// re-seal is refused the write outright rather than being allowed to leave
-// somebody else's record lying open.
+// Every profile now has a sharing keypair from the moment its row is first
+// written, password or no password, so the fall-through is gone. The question
+// that used to be dodged has to be answered instead: where does the private
+// half of an unprotected profile's keypair live? Writing it beside the public
+// half would be worse than useless — the record would look sealed while the key
+// that opens it sat two fields away — so it is sealed under a wrapping key this
+// install holds in the `device` store, a non-extractable AES-GCM key stored as
+// a handle rather than as bytes.
+//
+// What that buys, and what it does not, because the difference is the whole of
+// the honest answer:
+//
+//   · It stops the record travelling. A copy of these rows — an export, a
+//     JSON dump, a file pulled off the device, anything short of the browser's
+//     own key store — no longer carries the class name, the roll, the task
+//     title or the subtopics, because the wrap cannot be undone from the
+//     records alone. That is the attack the audit ran, and it is closed.
+//
+//   · It is not a password and must not be read as one. An unprotected profile
+//     is unprotected: anyone holding this iPad can pick that child out of the
+//     picker with nothing to type and be shown the same homework. Script
+//     running as this origin can use the wrapping handle directly. A backup
+//     that carries the browser's key store carries the wrapping key with it.
+//     The boundary this draws is "the data does not leave", not "the person
+//     holding the device cannot read it" — and for a profile with no password
+//     there is no key material anywhere on the device that could draw the
+//     second line, which is what having no password means.
+//
+// A protected profile that nobody has opened since this build arrived is in the
+// same position — its blob cannot be written without its password — so it is
+// given a keypair the same way, wrapped to the device, and the first unlock
+// moves the private half into its own blob and drops the wrapped copy. The
+// public half never changes across that move, so nothing addressed to it has to
+// be re-sealed.
+//
+// One limit is left and it is real: a browser that refuses to keep a CryptoKey
+// in a record has nowhere to put the wrapping key. There, a profile with no
+// password gets no keypair, `readerPubs` comes back short, and the record is
+// sealed to the people it *can* reach — never written in the clear, but the
+// unaddressable reader loses sight of it until they take a password. Every
+// browser this app ships on stores CryptoKeys; the fallback is a refusal to
+// degrade quietly, not a path anybody is expected to take.
 
 const shareIds = new Map();        // pid → { pub, sec }
 const shareIdentities = new Map(); // pid → imported private half
 const shareKeys = new Map();       // `${pid}|${epk}` → agreed key for that record
+
+// The profiles this install can act for with nothing typed: the ones with no
+// password, whose private half is wrapped to the device rather than to a
+// password. Rebuilt whenever any profile row is written, because that is the
+// only thing that can move a profile in or out of the list.
+let clearIds = null;
 
 /** The readers of a class: everyone on its roll. */
 function rollOf(row) {
   return Array.isArray(row?.studentPids) ? row.studentPids : [];
 }
 
-/** The readers of a task: the class it was set to, if it can be read at all. */
+/**
+ * The readers of a task: everyone on the class it was set to. Null — which is
+ * not the same as nobody — when the class is there but sealed to people none of
+ * whom are here, because re-sealing a task to a roll we cannot read would seal
+ * it away from the children it was set for. A task with no class at all
+ * genuinely has no readers and says so.
+ */
 async function readersOfTask(row) {
   if (!row?.classId) return [];
   const klass = await unseal('classes', await readKey('classes', row.classId).catch(() => null));
+  if (klass === undefined) return null;
   return klass ? [klass.teacherPid, ...rollOf(klass)] : [];
 }
 
@@ -362,11 +424,19 @@ const DISK_KEY = Symbol('pri-disk-key');
 
 // Who opened a shared row, when it was not its owner. Such a reader may write
 // to it — a class roll loses a student when that student's profile is deleted —
-// and may re-seal it, because sealing needs only public halves. What they may
-// not do is turn a sealed record back into a clear one. Marked on the row as it
-// is read rather than inferred at write time, because by then the difference is
-// invisible.
+// and may re-seal it, because sealing needs only public halves. Marked on the
+// row as it is read rather than inferred at write time, because by then the
+// difference is invisible.
 const AS_READER = Symbol('pri-read-as-reader');
+
+// The public halves a shared row was actually sealed to, carried out of the
+// blob rather than off the row so that reading it costs the key. It is what
+// lets the sweep below tell "this record is addressed to exactly the people on
+// it today" from "it is sealed, to somebody, once" — a roll that changed, or a
+// reader whose keypair had to be minted again, both show up here and nowhere
+// else. A list of public keys on the row instead would answer "is this roll the
+// one I am guessing" to anyone holding the dump, which is the roll itself.
+const SEALED_TO = Symbol('pri-sealed-to');
 
 const dataKeys = new Map();
 const blindKeys = new Map();
@@ -446,7 +516,7 @@ async function seal(store, value) {
   if (!spec || !value || typeof value !== 'object') return value;
   if (spec.share) return sealShared(store, spec, value);
   const key = dataKeys.get(value[spec.owner]);
-  if (!key) return spec.partial ? withoutShareKeys(value) : value;
+  if (!key) return spec.partial ? await clearProfileRow(value) : value;
 
   const row = {};
   const priv = {};
@@ -483,19 +553,38 @@ async function seal(store, value) {
 }
 
 /**
- * A profile giving up its password is written with no key held, which is the
- * one moment its sharing keypair has to go. The private half lives inside the
- * blob that is about to stop existing, and leaving it behind in the clear would
- * be worse than never having had one: the records addressed to this profile
- * would still look sealed while the key that opens them sat in the dump. Losing
- * the public half with it is what tells the sealing rule the truth — this
- * profile can no longer be addressed, so a class it is on goes back to being
- * written in the clear the next time its owner writes to it.
+ * A profile row on its way to disk with no key of its own held. Two different
+ * situations arrive here and they must not be confused:
+ *
+ *   · A profile with no password — created that way, or one that has just given
+ *     one up. Its sharing keypair is kept, because a profile that cannot be
+ *     addressed is a profile whose class has to be written in the clear, and
+ *     that is the hole this pass exists to close. The private half is sealed
+ *     under the install's wrapping key on the way past; the plaintext `sec`
+ *     that the caller may be holding — it was inside the blob a moment ago —
+ *     never reaches the row.
+ *
+ *   · A protected profile written while it is locked: the failure counter after
+ *     a wrong password, the last-active stamp, a row read for the picker and
+ *     written back. Its private half is inside the blob nobody here can open,
+ *     so nothing about its keypair may be touched — least of all replaced,
+ *     which would orphan every record already addressed to it.
  */
-function withoutShareKeys(value) {
-  if (value.auth || (value.pub === undefined && value.sec === undefined)) return value;
+async function clearProfileRow(value) {
   const row = { ...value };
-  delete row.pub; delete row.sec;
+  const sec = typeof row.sec === 'string' ? row.sec : null;
+  delete row.sec;
+  delete row.emailMask;
+  if (row.auth) return row;
+  if (row.pub && row.secWrapped) return row;
+
+  const wrap = await deviceWrapKey();
+  if (!wrap) { delete row.pub; delete row.secWrapped; return row; }
+  const pair = row.pub && sec ? { pub: row.pub, sec } : shareIds.get(row.id) || await createShareKeys();
+  row.pub = pair.pub;
+  row.secWrapped = await sealValue(wrap, pair.sec);
+  shareIds.set(row.id, pair);
+  shareIdentities.delete(row.id);
   return row;
 }
 
@@ -515,6 +604,14 @@ async function carryProfileFields(pid, key, row, priv) {
     if (!row.pub) row.pub = share.pub;
     if (!priv.sec) priv.sec = share.sec;
   }
+  // The private half lives in exactly one place. Once it is inside the blob
+  // this password opens, the copy wrapped to the install goes with the rest of
+  // what a password makes unnecessary.
+  if (priv.sec) delete row.secWrapped;
+  // Nothing derived from an address is written on the clear side of the row.
+  // The mask that used to sit here answered a guess list on its own; sealing it
+  // would only move a value nothing reads, so it is dropped outright.
+  delete priv.emailMask;
   if (isBlindIndex(row.emailHash)) return;
   const address = row.emailSealed ? await openValue(key, row.emailSealed) : row.email;
   if (typeof address === 'string' && address) row.emailHash = await blindHash(address);
@@ -523,22 +620,98 @@ async function carryProfileFields(pid, key, row, priv) {
 
 /**
  * The public halves a shared record has to be addressed to: its owner's, and
- * every reader's. Null when it cannot be sealed at all, which is when somebody
- * entitled to read it has no sharing keypair — an unprotected profile, or a
- * protected one nobody has opened since this build arrived.
+ * every reader's. A profile that has none yet is given one here rather than
+ * being allowed to drag the whole record into the clear, which is what used to
+ * happen and is the bug this pass exists to remove.
+ *
+ * `short` says somebody entitled to read it could not be addressed at all. On
+ * this app's browsers that never happens; where it does — no wrapping key to
+ * put a keyless profile's private half behind — the record is still sealed to
+ * everyone else rather than opened up to everybody, and the one who could not
+ * be reached loses sight of it until they take a password.
  */
 async function readerPubs(owner, readers) {
   const pubs = [];
   const seen = new Set();
+  let short = false;
   for (const pid of [owner, ...(readers || [])]) {
     if (!pid || seen.has(pid)) continue;
     seen.add(pid);
-    const row = await readKey('profiles', pid).catch(() => null);
-    if (!row) continue;
-    if (!row.pub) return null;
-    pubs.push(row.pub);
+    const pub = await pubOf(pid);
+    if (pub === undefined) continue;            // no such profile: nobody to address
+    if (pub === null) { short = true; continue; }
+    pubs.push(pub);
   }
-  return pubs.length ? pubs : null;
+  return { pubs, short };
+}
+
+/** A profile's public half — minted and written if the row has none. */
+async function pubOf(pid) {
+  const held = shareIds.get(pid);
+  if (held) return held.pub;
+  const row = await readKey('profiles', pid).catch(() => null);
+  if (!row) return undefined;
+  if (row.pub) return row.pub;
+  return (await mintShare(pid, row))?.pub ?? null;
+}
+
+/** The keypair inside a row's device-wrapped copy, or null if there is not one. */
+async function unwrapShare(row) {
+  if (!row?.pub || !row?.secWrapped) return null;
+  const wrap = await deviceWrapKey();
+  const sec = wrap ? await openValue(wrap, row.secWrapped) : undefined;
+  return typeof sec === 'string' && sec ? { pub: row.pub, sec } : null;
+}
+
+/**
+ * Give a profile a sharing keypair and put it where that profile can keep it:
+ * inside its own blob when this session holds its key, wrapped to the install
+ * otherwise. Null when there is nowhere at all — no key held and no wrapping
+ * key — because minting one we cannot store would address records to a half
+ * nobody will ever hold again.
+ */
+async function mintShare(pid, row) {
+  const pair = await createShareKeys();
+  if (dataKeys.has(pid)) {
+    const opened = await unseal('profiles', row);
+    const next = opened ? await seal('profiles', { ...opened, ...pair }) : null;
+    if (next?.sealed) {
+      await writeRaw('profiles', next);
+      shareIds.set(pid, pair);
+      shareIdentities.delete(pid);
+      return pair;
+    }
+  }
+  const wrap = await deviceWrapKey();
+  if (!wrap) return null;
+  const next = { ...row, pub: pair.pub, secWrapped: await sealValue(wrap, pair.sec) };
+  delete next.sec;
+  await writeRaw('profiles', next);
+  shareIds.set(pid, pair);
+  shareIdentities.delete(pid);
+  return pair;
+}
+
+/**
+ * Whether this session may write a shared record on a profile's behalf: its key
+ * is held, or it has no key to hold. A profile with no password is open to
+ * whoever is holding the iPad — that is what having no password means — and
+ * refusing to maintain its records here would protect nobody while quietly
+ * breaking the class its teacher set.
+ */
+async function actingAs(pid) {
+  if (typeof pid !== 'string' || !pid) return false;
+  if (dataKeys.has(pid)) return true;
+  const row = await readKey('profiles', pid).catch(() => null);
+  return !!row && !row.auth;
+}
+
+/** Whether a record's sealed-to list still names exactly today's readers. */
+function sameAudience(was, now) {
+  if (!Array.isArray(was) || was.length !== now.length) return false;
+  const a = [...was].sort();
+  const b = [...now].sort();
+  return a.every((v, i) => v === b[i]);
 }
 
 /**
@@ -546,35 +719,51 @@ async function readerPubs(owner, readers) {
  *
  * Sealing one needs nobody's private key — only the public halves it is being
  * addressed to — so it is not the owner's job alone. Anyone the record is for
- * may do it, which is what lets a class that could not be sealed last time seal
- * itself at the next sign-in of whichever of its people comes back first. What
- * is required is that somebody it belongs to is actually here: the owner, or
- * the reader whose key opened this copy of it. Without that the row is written
- * as it stands, which is how a profile giving up its password gets its classes
- * back in the clear — and a reader who cannot re-seal is refused the write
- * outright rather than allowed to leave a sealed record open.
+ * may do it, which is what lets a class sealed to yesterday's roll be brought
+ * up to today's by whichever of its people signs in first. What is required is
+ * that somebody it belongs to is actually here: the owner, or the reader whose
+ * key opened this copy of it. `authorised` is the install's own startup sweep,
+ * which seals rows an older build left in the clear — a row anybody could
+ * already read loses nothing by being closed, and waiting for its teacher to
+ * come back is how it stayed open in the first place.
+ *
+ * There is no path from here that writes a sealed record back into the clear.
+ * That used to exist, for a reader who had given up their password and could no
+ * longer be addressed; profiles keep their sharing keypair through that change
+ * now, so the case is gone and the door with it.
  */
-async function sealShared(store, spec, value) {
+async function sealShared(store, spec, value, authorised = false) {
   const opener = value[AS_READER];
-  const entitled = dataKeys.has(value[spec.owner]) || (typeof opener === 'string' && dataKeys.has(opener));
-  const pubs = entitled ? await readerPubs(value[spec.owner], await spec.share(value)) : null;
-  if (!pubs) {
-    // A row still carrying its blob is one nobody here has opened. Writing it
-    // as it stands would put the clear fields back and drop the ciphertext with
-    // everything in it, so the write is refused instead.
-    if (opener || value.sealed !== undefined) return null;
-    if (value.epk === undefined && value.wraps === undefined) return value;
+  const entitled = authorised || await actingAs(value[spec.owner]) || await actingAs(opener);
+  // A row nobody here is entitled to write is left exactly as it sits. Writing
+  // it would put the clear fields back and drop the ciphertext with everything
+  // in it, which is a worse outcome than the write not happening.
+  if (!entitled) return null;
+
+  // Nor one whose readers cannot be established: sealing it to the owner alone
+  // would drop a whole class off a record that is theirs to read.
+  const readers = await spec.share(value);
+  if (readers === null) return null;
+
+  const { pubs } = await readerPubs(value[spec.owner], readers);
+  if (!pubs.length) {
+    // Nowhere to address it at all: no wrapping key on this browser and no
+    // password on the owner either, so there is no key material on this device
+    // that could hold it. That state is named in the comment above rather than
+    // arrived at quietly, and it is the only way a shared row is ever written
+    // out in the open.
     const clear = { ...value };
-    delete clear.epk; delete clear.wraps;
+    delete clear.epk; delete clear.wraps; delete clear.sealed;
     return clear;
   }
 
   const row = {};
   const priv = {};
   for (const [k, v] of Object.entries(value)) {
-    if (k === 'sealed' || k === 'epk' || k === 'wraps') continue;
+    if (k === 'sealed' || k === 'epk' || k === 'wraps' || k === 'sealedTo') continue;
     if (spec.clear.includes(k)) row[k] = v; else priv[k] = v;
   }
+  priv.sealedTo = pubs;
 
   const secret = rand(32);
   const record = await subtle().importKey('raw', secret, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
@@ -585,9 +774,19 @@ async function sealShared(store, spec, value) {
   return row;
 }
 
-/** The record key inside a shared row, for whichever held profile it opens to. */
+/**
+ * The record key inside a shared row, for whichever profile this session can
+ * act as. Two kinds qualify and both have to: a protected profile whose
+ * password is held, and a profile with no password, whose private half this
+ * install can unwrap on its own. Leaving the second kind out is what made a
+ * class with one unprotected child on the roll unreadable-by-anyone and
+ * therefore written in the clear.
+ */
 async function openShared(row) {
-  for (const pid of dataKeys.keys()) {
+  const tried = new Set();
+  for (const pid of [...dataKeys.keys(), ...(await unlockedIds())]) {
+    if (tried.has(pid)) continue;
+    tried.add(pid);
     const at = `${pid}|${row.epk}`;
     let agreed = shareKeys.get(at);
     if (!agreed) {
@@ -602,15 +801,30 @@ async function openShared(row) {
   return null;
 }
 
-/** This profile's private half, imported once and kept for the session. */
+/** Every profile this install can act for with nothing typed. */
+function unlockedIds() {
+  clearIds ||= readAll('profiles')
+    .then(rows => rows.filter(r => r && !r.auth && r.pub && r.secWrapped).map(r => r.id))
+    .catch(() => []);
+  return clearIds;
+}
+
+/**
+ * This profile's private half, imported once and kept for the session. It comes
+ * from its own blob when a password has opened one, and from the copy wrapped
+ * to this install when the profile has no password to open.
+ */
 function shareIdentityFor(pid) {
   let held = shareIdentities.get(pid);
   if (!held) {
     held = (async () => {
       const kept = shareIds.get(pid);
       if (kept) return shareIdentity(kept.sec).catch(() => null);
-      const opened = await unseal('profiles', await readKey('profiles', pid).catch(() => null));
-      return opened?.sec ? shareIdentity(opened.sec).catch(() => null) : null;
+      const row = await readKey('profiles', pid).catch(() => null);
+      if (!row) return null;
+      const opened = dataKeys.has(pid) ? await unseal('profiles', row) : null;
+      const sec = opened?.sec || (await unwrapShare(row))?.sec;
+      return sec ? shareIdentity(sec).catch(() => null) : null;
     })();
     shareIdentities.set(pid, held);
   }
@@ -625,10 +839,14 @@ async function unsealShared(store, spec, row) {
   const priv = await openValue(opened.key, row.sealed);
   if (priv === undefined || priv === null || typeof priv !== 'object') return undefined;
 
+  const { sealedTo, ...rest } = priv;
   const { sealed, epk, wraps, ...clear } = row;
-  const out = { ...priv, ...clear };
+  const out = { ...rest, ...clear };
   if (opened.pid !== row[spec.owner]) {
     Object.defineProperty(out, AS_READER, { value: opened.pid, enumerable: false, configurable: true });
+  }
+  if (Array.isArray(sealedTo)) {
+    Object.defineProperty(out, SEALED_TO, { value: sealedTo, enumerable: false, configurable: true });
   }
   return out;
 }
@@ -691,24 +909,55 @@ const wrap = req => new Promise((resolve, reject) => {
 const readKey = async (store, key) => wrap(tx(await openDB(), store).get(key));
 const readAll = async (store) => wrap(tx(await openDB(), store).getAll());
 const readIndex = async (store, index, value) => wrap(tx(await openDB(), store).index(index).getAll(value));
-const writeRaw = async (store, row) => wrap(tx(await openDB(), store, 'readwrite').put(row));
-const deleteRaw = async (store, key) => wrap(tx(await openDB(), store, 'readwrite').delete(key));
+
+// Writing a profile row is the only thing that can move a profile in or out of
+// the list of ones this install can act for on its own, so the list is dropped
+// here rather than at each of the several places that write one.
+const touched = (store) => { if (store === 'profiles') clearIds = null; };
+
+const writeRaw = async (store, row) => { touched(store); return wrap(tx(await openDB(), store, 'readwrite').put(row)); };
+const deleteRaw = async (store, key) => { touched(store); return wrap(tx(await openDB(), store, 'readwrite').delete(key)); };
 
 // ── This install's own secrets ───────────────────────────────────────────────
-// One row, in a store of its own, holding the HMAC key the address index is
-// computed under. It is generated non-extractable, so what a dump of this store
-// yields is a handle with no key material behind it — which is the whole point
-// of keying the index in the first place, and is written out in auth.js beside
-// the scheme. A browser that will not keep a key in a record falls back to one
-// held for this session, which keeps the index safe and costs duplicate
-// detection across a reload rather than trading the secret away.
+// Two rows, in a store of its own. Both are generated non-extractable, so what
+// a dump of this store yields is a handle rather than key material — and what
+// that is and is not worth is set out in full in auth.js beside the index
+// scheme. The short version: a copy of the records does not carry these keys,
+// an image of the browser's own key store does, and anything running as this
+// origin can use them without needing either.
+//
+//   · `blind-index` — the HMAC key the address index is computed under. A
+//     browser that will not keep a key in a record falls back to one held for
+//     this session, which keeps the index safe and costs duplicate detection
+//     across a reload rather than trading the secret away.
+//
+//   · `share-wrap` — the AES key a profile with no password keeps its sharing
+//     private half behind. There is deliberately no session fallback here: a
+//     key that dies at reload would seal a child's class list away from them
+//     for good, so a browser that cannot store it gets no wrapped keypair and
+//     the sealing rule is told the truth instead.
 
 const DEVICE_STORE = 'device';
 const BLIND_ROW = 'blind-index';
+const WRAP_ROW = 'share-wrap';
 
 let deviceJob = null;
+let wrapJob = null;
 
-const deviceReady = () => (deviceJob ||= migrateDevice().catch(() => { }));
+const deviceReady = () => (deviceJob ||= migrateInstall().catch(() => { }));
+
+/** The install's wrapping key, or null when this browser will not keep one. */
+function deviceWrapKey() {
+  wrapJob ||= (async () => {
+    const held = await readKey(DEVICE_STORE, WRAP_ROW).catch(() => null);
+    if (held?.key?.type === 'secret') return held.key;
+    const made = await subtle().generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+    await writeRaw(DEVICE_STORE, { id: WRAP_ROW, key: made });
+    const back = await readKey(DEVICE_STORE, WRAP_ROW);
+    return back?.key?.type === 'secret' ? back.key : null;
+  })().catch(() => null);
+  return wrapJob;
+}
 
 async function loadBlindSecret() {
   const held = await readKey(DEVICE_STORE, BLIND_ROW).catch(() => null);
@@ -725,43 +974,114 @@ async function loadBlindSecret() {
 useDeviceSecret(loadBlindSecret);
 
 /**
- * Drop every address index an older build wrote. Those were an unkeyed digest
- * of the address itself, which a five-entry guess list confirms in a moment, so
- * leaving one in place would leave the hole open for every device that already
- * has one. A profile whose address is in the clear anyway — an unprotected one
- * — is simply re-indexed under the install's key; a protected profile's index
- * is dropped and rebuilt the first time its own key opens the sealed address,
- * which is the one moment this device can read it. Between the two, duplicate
- * detection cannot see that profile's address; the address itself is untouched.
+ * What this install owes every device that already has data on it, done once
+ * per load and before any read or write is allowed through.
  */
-async function migrateDevice() {
-  const rows = await readAll('profiles').catch(() => []);
-  for (const row of rows) {
-    if (!row || typeof row.emailHash !== 'string' || isBlindIndex(row.emailHash)) continue;
+async function migrateInstall() {
+  await sweepProfileRows();
+  await sweepSharedRows();
+}
+
+/**
+ * Two things older builds left on profile rows, both of which hand an address
+ * to somebody holding nothing but the database.
+ *
+ * The address index used to be an unkeyed digest of the address itself, which a
+ * five-entry guess list confirms in a moment. A profile whose address is in the
+ * clear anyway — an unprotected one — is simply re-indexed under the install's
+ * key; a protected profile's index is dropped and rebuilt the first time its
+ * own key opens the sealed address, which is the one moment this device can
+ * read it. Between the two, duplicate detection cannot see that profile's
+ * address; the address itself is untouched.
+ *
+ * The mask is worse and is not repaired, only removed. `m•••@example.com` sat
+ * in the clear beside the keyed hash, and it needed no key and no crypto at
+ * all: mask a guess list by the same rule and the entry that matches is the
+ * address. It is deleted wherever it is found, on protected and unprotected
+ * rows alike, and nothing writes another.
+ */
+async function sweepProfileRows() {
+  for (const row of await readAll('profiles').catch(() => [])) {
+    if (!row) continue;
+    const stale = typeof row.emailHash === 'string' && !isBlindIndex(row.emailHash);
+    if (!stale && row.emailMask === undefined && row.sec === undefined) continue;
     const next = { ...row };
-    if (typeof row.email === 'string' && row.email) next.emailHash = await blindHash(row.email);
-    else delete next.emailHash;
+    delete next.emailMask;
+    delete next.sec;
+    if (stale) {
+      if (typeof row.email === 'string' && row.email) next.emailHash = await blindHash(row.email);
+      else delete next.emailHash;
+    }
     await writeRaw('profiles', next).catch(() => { });
   }
 }
 
 /**
- * Make sure a profile can be addressed by the people who share records with it.
- * Minted once and then kept in memory for the session, so the copy of the
- * profile the app is holding cannot write over it on its way back to disk.
+ * Bring the shared records on this device up to what this build stores. Two
+ * states arrive here from older ones, and neither can wait for a teacher to
+ * sign in — sealing needs only the public halves of a record's people, and any
+ * that are missing are minted on the spot:
+ *
+ *   · a class or a task still in the clear: written before this scheme existed,
+ *     or written by the build whose sealing rule fell through the moment one
+ *     child on the roll had no password. Its name, its roll and its subtopics
+ *     are readable by anyone holding the file.
+ *   · one sealed before records were padded to the current bucket, whose
+ *     ciphertext length still measures a class name.
+ *   · one sealed to a keypair somebody no longer holds. `alignSharedRows`
+ *     catches this for a profile that has a password to sign in with; a profile
+ *     that has none never signs in, so its records would have nothing to put
+ *     them right. This is where they get it.
+ *
+ * The rule holds in one direction only: this closes rows, it never opens them.
+ * A row that cannot be opened here is left exactly as it is — including one
+ * whose class roll cannot be read, because a task re-sealed without its roll is
+ * a task taken off the children it was set for.
+ */
+async function sweepSharedRows() {
+  for (const [store, spec] of Object.entries(SEALED_STORES)) {
+    if (!spec.share) continue;
+    for (const raw of await readAll(store).catch(() => [])) {
+      if (!raw) continue;
+      const row = raw.sealed ? await unseal(store, raw).catch(() => undefined) : raw;
+      if (row === undefined) continue;
+      const readers = await spec.share(row);
+      if (readers === null) continue;
+      const { pubs } = await readerPubs(row[spec.owner], readers);
+      if (!pubs.length) continue;
+      if (raw.sealed && isPadded(raw.sealed) && sameAudience(row[SEALED_TO], pubs)) continue;
+      const moved = await sealShared(store, spec, row, true).catch(() => null);
+      if (moved?.sealed) await writeRaw(store, moved).catch(() => { });
+    }
+  }
+}
+
+/**
+ * Make sure a profile can be addressed by the people who share records with it,
+ * the moment its password opens it. Minted once and then kept in memory for the
+ * session, so the copy of the profile the app is holding cannot write over it
+ * on its way back to disk.
+ *
+ * A profile that already had a pair keeps it, and that matters more than it
+ * looks. A pair wrapped to the install — because this profile had no password
+ * when a class first needed to address it, or because nobody had opened it
+ * since this build arrived — is adopted rather than replaced: the same public
+ * half, so every record already sealed to it stays readable, with the private
+ * half moving out of the install's wrapping key and into the blob this password
+ * opens. A new pair here would silently orphan the lot.
  */
 async function ensureShareKeys(pid) {
   const row = await readKey('profiles', pid).catch(() => null);
   const opened = row ? await unseal('profiles', row) : null;
   if (opened?.pub && opened?.sec) { shareIds.set(pid, { pub: opened.pub, sec: opened.sec }); return; }
-  const made = await createShareKeys();
+  const made = await unwrapShare(row) || await createShareKeys();
   shareIds.set(pid, made);
   shareIdentities.delete(pid);
   // A brand-new profile takes its key before its row exists. Holding the pair
   // is enough: the row picks it up the moment the profile is first written.
   if (!opened) return;
   const sealedRow = await seal('profiles', { ...opened, ...made });
-  if (sealedRow) await writeRaw('profiles', sealedRow).catch(() => { });
+  if (sealedRow?.sealed) await writeRaw('profiles', sealedRow).catch(() => { });
 }
 
 /**
@@ -804,25 +1124,27 @@ async function resealRows(pid) {
 }
 
 /**
- * Bring the classes and tasks this profile is part of into line with who can
- * be addressed today. The rule is that a shared record is sealed exactly when
- * every one of its people has a sharing keypair, and both halves of it have to
- * be maintained or the record ends up either readable when it need not be or
- * unreadable by somebody entitled to it:
+ * Bring the classes and tasks this profile is part of into line with who is on
+ * them today. A shared record should be sealed to exactly the public halves of
+ * its people, and the row remembers — inside the blob, never on it — which
+ * halves those were when it was written. Two things put that out of date
+ * between one write and the next:
  *
- *   · a record still in the clear that could now be sealed — written before it
- *     was sealed at all, or last written while somebody on the roll had no
- *     keypair yet. Any of its people may do this, owner or not, because sealing
- *     needs public halves only; so it closes at the next sign-in of whoever
- *     comes back first rather than waiting for its teacher.
- *   · a sealed record that can no longer be addressed to everyone on it,
- *     because one of them has given up their password. That one is the owner's
- *     to write, and giving it back in the clear is the only way to leave it
- *     readable by the person it was set for. A reader who finds it in that
- *     state leaves it alone rather than unsealing somebody else's record.
+ *   · a record still in the clear that could now be sealed. The install's own
+ *     sweep gets most of these at startup; this catches one whose people could
+ *     not all be addressed then and can be now.
+ *   · a record sealed to a keypair somebody no longer holds. A profile keeps
+ *     its pair across taking and giving up a password, so the only way here is
+ *     the wrapping key going missing and a fresh pair being minted in its
+ *     place. Whoever can still open the record re-seals it to the new list,
+ *     which is what puts the reader back in rather than leaving them locked out
+ *     of a record that is nominally theirs.
+ *   · a record sealed before blobs were padded to the current bucket, whose
+ *     length still measures the class name inside it. The install's own sweep
+ *     gets the ones it can open without a password; this gets the rest.
  *
- * Both classes and tasks are swept, because they change independently: a class
- * that goes back to the clear leaves its tasks sealed behind it otherwise.
+ * Any of a record's people may do this, owner or not, because sealing needs
+ * public halves only. Both stores are swept, because they change independently.
  */
 async function alignSharedRows(pid) {
   for (const [store, spec] of Object.entries(SEALED_STORES)) {
@@ -833,14 +1155,16 @@ async function alignSharedRows(pid) {
       const row = raw.sealed ? await unseal(store, raw) : raw;
       if (row === undefined) continue;
       const readers = await spec.share(row);
+      if (readers === null) continue;
       const owned = row[spec.owner] === pid;
       if (!owned && !readers.includes(pid)) continue;
-      const addressable = !!(await readerPubs(row[spec.owner], readers));
-      if (addressable === !!raw.sealed) continue;
+      const { pubs } = await readerPubs(row[spec.owner], readers);
+      if (!pubs.length) continue;
+      if (raw.sealed && isPadded(raw.sealed) && sameAudience(row[SEALED_TO], pubs)) continue;
       const mine = { ...row };
       if (!owned) Object.defineProperty(mine, AS_READER, { value: pid, enumerable: false, configurable: true });
       const moved = await seal(store, mine);
-      if (moved) await writeRaw(store, moved);
+      if (moved?.sealed) await writeRaw(store, moved);
     }
   }
 }
@@ -911,6 +1235,7 @@ export async function add(store, value) {
 }
 export async function clear(store) {
   await ready();
+  touched(store);
   return wrap(tx(await openDB(), store, 'readwrite').clear());
 }
 

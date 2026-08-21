@@ -966,19 +966,27 @@ export const streamsExt = {
         ]
       };
     }
-    const n = ri(rng, 5, 12), r = ri(rng, 3, 6);
-    const val = nCr(n + r - 1, r);
+    // A third pigeonhole count. The stars-and-bars question that used to sit
+    // here was a selection with repetition, not the pigeonhole principle, and
+    // this cell is the only route to that dot point — so every branch of it now
+    // forces a worst case. Here it is PAIRS being forced: the worst case leaves
+    // one sock of every colour unpaired before any pair is completed.
+    const colours = ri(rng, 3, 12), pairs = ri(rng, 2, 5);
+    const worst = colours + 2 * (pairs - 1);
+    const val = worst + 1;
     return {
-      prompt: `A bakery sells $${n}$ kinds of muffin and has plenty of each. In how many ways can you fill a box with $${r}$ muffins, if only the number of each kind matters?`,
+      prompt: `A drawer holds plenty of socks in $${colours}$ colours, and the light is off. What is the **minimum** number of socks you must take to *guarantee* $${pairs}$ matching pairs? (Pigeonhole principle.)`,
       answerType: 'numeric', answer: { value: val },
       traps: [
-        { value: nCr(n, r), why: 'Repeats are allowed here, so this is a selection *with* repetition: $\\binom{n + r - 1}{r}$.' },
-        { value: n ** r, why: 'The muffins in the box are not ordered — counting $n^r$ sequences counts the same box many times.' }
+        { value: 2 * pairs, why: `Those $${2 * pairs}$ socks could be $${2 * pairs}$ different colours. The guarantee has to beat the worst case, not the best one.` },
+        { value: worst, why: `$${worst}$ socks can still be one of each colour plus $${2 * (pairs - 1)}$ more — that is only $${pairs - 1}$ pair${pairs - 1 === 1 ? '' : 's'}, so one further sock is needed.` }
       ],
-      hints: ['Repetition is allowed and order does not matter.', `Stars and bars: ${r} stars and ${n - 1} bars in a row.`, `$\\binom{${n + r - 1}}{${r}}$.`],
+      hints: [`Worst case first: one sock of each of the $${colours}$ colours pairs up with nothing.`,
+        `On top of those, $${2 * (pairs - 1)}$ socks make only $${pairs - 1}$ pair${pairs - 1 === 1 ? '' : 's'}.`,
+        'Every sock after that must complete the next pair.'],
       steps: [
-        { h: 'Stars and bars', d: `${r} muffins (stars) split by ${n - 1} dividers (bars)` },
-        { h: 'Count the layouts', d: `$\\binom{${n} + ${r} - 1}{${r}} = ${val}$` }
+        { h: 'Worst case', d: `$${colours} + 2 \\times ${pairs - 1} = ${worst}$ socks give only $${pairs - 1}$ pair${pairs - 1 === 1 ? '' : 's'}` },
+        { h: 'Pigeonhole', d: `One more sock forces pair $${pairs}$: $${val}$` }
       ]
     };
   },
@@ -1141,18 +1149,22 @@ export const streamsExt = {
       };
     }
     if (diff === 3) {
+      // The multiple is called p, not the usual m. checker.js strips a trailing
+      // unit before marking and its UNIT_TAIL pattern includes a bare m, s, h
+      // and l — so "1 + 8m" arrives as "1 + 8" and a correct answer written in
+      // that order is marked wrong, while the "8m" trap never fires at all.
       if (rng() < 0.55) {
         const b = ri(rng, 3, 20), d = b - 1;
         return {
-          prompt: `To prove $${b}^n - 1$ is divisible by $${d}$ by induction, assume $${b}^k - 1 = ${d}m$. Then $${b}^{k+1} - 1 = ${b}\\cdot${b}^k - 1 = ${b}(${d}m + 1) - 1 = ${d}(\\;?\\;)$. Find the bracket.`,
-          answerType: 'expression', answer: { expr: `${b}m + 1` },
-          inputHint: `e.g. ${b}m + 1`,
-          traps: [{ expr: `${b}m`, why: `Expand carefully: $${b}(${d}m + 1) - 1 = ${b * d}m + ${b} - 1 = ${d}(${b}m) + ${d}$, and that trailing $${d}$ folds into the bracket as $+1$.` }],
-          hints: [`Expand $${b}(${d}m + 1) - 1$.`, `$= ${b * d}m + ${b - 1}$.`, `Take out ${d}: $${d}(${b}m + 1)$.`],
+          prompt: `To prove $${b}^n - 1$ is divisible by $${d}$ by induction, assume $${b}^k - 1 = ${d}p$. Then $${b}^{k+1} - 1 = ${b}\\cdot${b}^k - 1 = ${b}(${d}p + 1) - 1 = ${d}(\\;?\\;)$. Find the bracket.`,
+          answerType: 'expression', answer: { expr: `${b}p + 1` },
+          inputHint: `e.g. ${b}p + 1`,
+          traps: [{ expr: `${b}p`, why: `Expand carefully: $${b}(${d}p + 1) - 1 = ${b * d}p + ${b} - 1 = ${d}(${b}p) + ${d}$, and that trailing $${d}$ folds into the bracket as $+1$.` }],
+          hints: [`Expand $${b}(${d}p + 1) - 1$.`, `$= ${b * d}p + ${b - 1}$.`, `Take out ${d}: $${d}(${b}p + 1)$.`],
           steps: [
-            { h: 'Substitute the assumption', d: `$${b}^{k+1} - 1 = ${b}(${d}m + 1) - 1$` },
-            { h: 'Expand', d: `$= ${b * d}m + ${b} - 1 = ${b * d}m + ${d}$` },
-            { h: 'Factor', d: `$= ${d}(${b}m + 1)$ — divisible by ${d} ✓` }
+            { h: 'Substitute the assumption', d: `$${b}^{k+1} - 1 = ${b}(${d}p + 1) - 1$` },
+            { h: 'Expand', d: `$= ${b * d}p + ${b} - 1 = ${b * d}p + ${d}$` },
+            { h: 'Factor', d: `$= ${d}(${b}p + 1)$ — divisible by ${d} ✓` }
           ]
         };
       }
@@ -1160,15 +1172,15 @@ export const streamsExt = {
       const b = c + ri(rng, 1, 9);
       const d = b - c;
       return {
-        prompt: `To prove $${b}^n - ${c}^n$ is divisible by $${d}$ by induction, assume $${b}^k - ${c}^k = ${d}m$. Then $${b}^{k+1} - ${c}^{k+1} = ${b}(${b}^k - ${c}^k) + ${c}^k(${b} - ${c}) = ${d}(\\;?\\;)$. Find the bracket.`,
-        answerType: 'expression', answer: { expr: `${b}m + ${c}^k`, anyOf: [`${b}*m + ${c}^k`] },
-        inputHint: `e.g. ${b}m + ${c}^k`,
-        traps: [{ expr: `${b}m`, why: `The term $${c}^k(${b} - ${c}) = ${d}\\cdot${c}^k$ also carries a factor of ${d} — it belongs inside the bracket.` }],
-        hints: [`Split it as $${b}(${b}^k - ${c}^k) + ${c}^k(${b} - ${c})$.`, `The first piece is $${b}\\cdot${d}m$; the second is $${d}\\cdot${c}^k$.`, `Take out the common factor ${d}.`],
+        prompt: `To prove $${b}^n - ${c}^n$ is divisible by $${d}$ by induction, assume $${b}^k - ${c}^k = ${d}p$. Then $${b}^{k+1} - ${c}^{k+1} = ${b}(${b}^k - ${c}^k) + ${c}^k(${b} - ${c}) = ${d}(\\;?\\;)$. Find the bracket.`,
+        answerType: 'expression', answer: { expr: `${b}p + ${c}^k`, anyOf: [`${b}*p + ${c}^k`] },
+        inputHint: `e.g. ${b}p + ${c}^k`,
+        traps: [{ expr: `${b}p`, why: `The term $${c}^k(${b} - ${c}) = ${d}\\cdot${c}^k$ also carries a factor of ${d} — it belongs inside the bracket.` }],
+        hints: [`Split it as $${b}(${b}^k - ${c}^k) + ${c}^k(${b} - ${c})$.`, `The first piece is $${b}\\cdot${d}p$; the second is $${d}\\cdot${c}^k$.`, `Take out the common factor ${d}.`],
         steps: [
           { h: 'Rewrite the next case', d: `$${b}^{k+1} - ${c}^{k+1} = ${b}(${b}^k - ${c}^k) + ${c}^k(${b} - ${c})$` },
-          { h: 'Substitute the assumption', d: `$= ${b}(${d}m) + ${d}\\cdot${c}^k$` },
-          { h: 'Factor', d: `$= ${d}(${b}m + ${c}^k)$ — divisible by ${d} ✓` }
+          { h: 'Substitute the assumption', d: `$= ${b}(${d}p) + ${d}\\cdot${c}^k$` },
+          { h: 'Factor', d: `$= ${d}(${b}p + ${c}^k)$ — divisible by ${d} ✓` }
         ]
       };
     }
@@ -1443,15 +1455,22 @@ export const streamsExt = {
     if (diff === 2) {
       const c = ri(rng, 1, 6), hi = ri(rng, 1, 4), n = ri(rng, 1, 3);
       const uLo = c, uHi = hi * hi + c;
-      const exact = (uHi ** (n + 1) - uLo ** (n + 1)) / (n + 1);
+      // The value of this integral is a rational number and is very often not a
+      // whole one. Dividing in floating point keyed artefacts like
+      // 3045.3333333333335 and printed them as the model answer, so the value is
+      // carried as an exact fraction and displayed as one.
+      const exact = new Frac(uHi ** (n + 1) - uLo ** (n + 1), n + 1);
+      const noLimitShift = new Frac(uHi ** (n + 1), n + 1);
       return {
         prompt: `Evaluate $\\displaystyle\\int_0^{${hi}} 2x(x^2 + ${c})^{${n}}\\,dx$ using the substitution $u = x^2 + ${c}$.`,
-        answerType: 'numeric', answer: { value: exact },
-        traps: [{ value: (uHi ** (n + 1) - 0) / (n + 1), why: `Change the limits too: when $x = 0$, $u = ${c}$ — not 0.` }].filter(t => t.value !== exact),
+        answerType: 'numeric',
+        answer: { value: exact.value, requireExact: true, canonicalInput: exact.str(), tol: 0.0005 },
+        inputHint: 'e.g. 128/3 or 42',
+        traps: [{ value: noLimitShift.value, why: `Change the limits too: when $x = 0$, $u = ${c}$ — not 0.`, tol: 0.0005 }].filter(t => t.value !== exact.value),
         hints: [`Change the limits: $x = 0 \\to u = ${uLo}$; $x = ${hi} \\to u = ${uHi}$.`, `$\\int_{${uLo}}^{${uHi}} u^{${n}}\\,du$.`, `$= \\left[\\frac{u^{${n + 1}}}{${n + 1}}\\right]_{${uLo}}^{${uHi}}$.`],
         steps: [
           { h: 'New limits', d: `$x: 0 \\to ${hi}$ becomes $u: ${uLo} \\to ${uHi}$` },
-          { h: 'Integrate', d: `$\\int_{${uLo}}^{${uHi}} u^{${n}}du = \\left[\\tfrac{u^{${n + 1}}}{${n + 1}}\\right]_{${uLo}}^{${uHi}} = ${exact}$` }
+          { h: 'Integrate', d: `$\\int_{${uLo}}^{${uHi}} u^{${n}}du = \\left[\\tfrac{u^{${n + 1}}}{${n + 1}}\\right]_{${uLo}}^{${uHi}} = \\dfrac{${uHi ** (n + 1)} - ${uLo ** (n + 1)}}{${n + 1}} = ${exact.latex()}$` }
         ]
       };
     }
@@ -1579,7 +1598,7 @@ export const streamsExt = {
         prompt: `A free-throw shooter scores with probability $${p}$. In $${n}$ independent shots, find $P(\\text{exactly } ${k} \\text{ scores})$, correct to 4 decimal places.`,
         answerType: 'numeric', answer: { value: Math.round(val * 10000) / 10000, tol: 0.0006 },
         traps: [{ value: Math.round(p ** k * (1 - p) ** (n - k) * 10000) / 10000, why: `Include the $\\binom{${n}}{${k}}$ ways to choose WHICH shots score.`, tol: 0.0006 }],
-        hints: ['Binomial: $P(X{=}k) = \\binom{n}{k}p^k(1-p)^{n-k}$.', `$\\binom{${n}}{${k}} = ${nCr(n, k)}$.`, `$${nCr(n, k)} \\times ${p}^{${k}} \\times ${1 - p}^{${n - k}}$.`],
+        hints: ['Binomial: $P(X{=}k) = \\binom{n}{k}p^k(1-p)^{n-k}$.', `$\\binom{${n}}{${k}} = ${nCr(n, k)}$.`, `$${nCr(n, k)} \\times ${p}^{${k}} \\times ${r2(1 - p)}^{${n - k}}$.`],
         steps: [
           { h: 'Binomial formula', d: `$P = \\binom{${n}}{${k}}(${p})^{${k}}(${r2(1 - p)})^{${n - k}}$` },
           { h: 'Evaluate', d: `$\\approx ${Math.round(val * 10000) / 10000}$` }

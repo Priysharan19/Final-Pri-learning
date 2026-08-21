@@ -224,12 +224,20 @@ export const year7 = {
         ]
       };
     }
-    const total = rc(rng, [60, 80, 120, 90, 150]);
-    const f1 = rc(rng, [new Frac(1, 4), new Frac(2, 5), new Frac(1, 3), new Frac(3, 10)]);
-    const f2 = rc(rng, [new Frac(1, 2), new Frac(1, 3), new Frac(2, 3)]);
-    const first = f1.mul(new Frac(total)).value;
+    // Songs are counted, so every stage has to land on a whole number. Tuesday's
+    // fraction is applied to what Monday leaves, so it is the REMAINDER that has
+    // to divide, not the total — picking the two fractions independently keyed
+    // answers like 33.33333333333333 songs. Each fraction is drawn from the
+    // candidates that divide the quantity it acts on; both pools are non-empty
+    // for every total below, which is checked in the census run.
+    const total = rc(rng, [60, 80, 90, 120, 150, 180, 240]);
+    const [fn1, fd1] = rc(rng, [[1, 4], [2, 5], [1, 3], [3, 10], [1, 5], [1, 6]].filter(([, d]) => total % d === 0));
+    const f1 = new Frac(fn1, fd1);
+    const first = total / fd1 * fn1;
     const rest = total - first;
-    const second = f2.mul(new Frac(rest)).value;
+    const [fn2, fd2] = rc(rng, [[1, 2], [1, 3], [2, 3], [3, 4], [2, 5]].filter(([, d]) => rest % d === 0));
+    const f2 = new Frac(fn2, fd2);
+    const second = rest / fd2 * fn2;
     const left = rest - second;
     const name = rc(rng, NAMES);
     return {
@@ -293,9 +301,14 @@ export const year7 = {
         ]
       };
     }
+    // Students are counted, so both ends of a reverse percentage have to be
+    // whole numbers. Drawing the part first and dividing keyed clubs of 67.5
+    // students, so the club size is chosen first and the part read off it —
+    // every size below is divisible by 4, 5 and 10, so each percentage lands on
+    // a whole number of students.
     const pct = rc(rng, [20, 25, 30, 40, 60, 75]);
-    const part = rc(rng, [18, 24, 27, 30, 36, 42, 45, 54, 60]);
-    const whole = part * 100 / pct;
+    const whole = rc(rng, [40, 60, 80, 100, 120, 140, 160, 180, 200, 240, 300]);
+    const part = whole * pct / 100;
     return {
       prompt: `$${pct}\\%$ of the students at a chess club are in Year 7 — that's $${part}$ students. How many students are in the club altogether?`,
       answerType: 'numeric', answer: { value: whole },
@@ -499,28 +512,33 @@ export const year7 = {
         };
       }
       if (kind === 3) {
+        // The pronumeral is y, not m. checker.js strips a trailing unit from a
+        // typed answer, and its UNIT_TAIL pattern includes a bare m, s, h and l —
+        // so an expression answer that ENDS in one of those letters is silently
+        // truncated ("2m" arrives as "2", "9b + 11m" as "9b + 11") and the
+        // student's correct answer is marked wrong. Ages in y years dodge it.
         const gap = ri(rng, 2, 9), t = ri(rng, 1, 8), older = rc(rng, [true, false]);
         const [n1, n2] = rs(rng, NAMES).slice(0, 2);
         const c = 2 * t + (older ? gap : -gap);
         return {
-          prompt: `${n1} is $m$ years old. ${n2} is $${gap}$ years ${older ? 'older' : 'younger'} than ${n1}. Write an expression in simplest form for the **sum of their two ages in $${t}$ years' time**.`,
-          answerType: 'expression', answer: { expr: c === 0 ? '2m' : `2m ${sgn(c)}` },
-          inputHint: 'e.g. 2m + 7',
-          traps: [{ expr: `2m ${sgn(older ? gap : -gap)}`, why: `Both of them get $${t}$ years older, so the total goes up by $2 \\times ${t} = ${2 * t}$, not by $${t}$.` }],
-          hints: [`${n2}'s age now is $m ${sgn(older ? gap : -gap)}$.`,
-            `In $${t}$ years add $${t}$ to **each** age: $m + ${t}$ and $m ${sgn(older ? gap : -gap)} + ${t}$.`,
+          prompt: `${n1} is $y$ years old. ${n2} is $${gap}$ years ${older ? 'older' : 'younger'} than ${n1}. Write an expression in simplest form for the **sum of their two ages in $${t}$ years' time**.`,
+          answerType: 'expression', answer: { expr: c === 0 ? '2y' : `2y ${sgn(c)}` },
+          inputHint: 'e.g. 2y + 7',
+          traps: [{ expr: `2y ${sgn(older ? gap : -gap)}`, why: `Both of them get $${t}$ years older, so the total goes up by $2 \\times ${t} = ${2 * t}$, not by $${t}$.` }],
+          hints: [`${n2}'s age now is $y ${sgn(older ? gap : -gap)}$.`,
+            `In $${t}$ years add $${t}$ to **each** age: $y + ${t}$ and $y ${sgn(older ? gap : -gap)} + ${t}$.`,
             'Now add the two expressions and collect like terms.'],
           steps: [
-            { h: 'Ages now', d: `${n1}: $m$, ${n2}: $m ${sgn(older ? gap : -gap)}$` },
-            { h: `Ages in ${t} years`, d: `$m + ${t}$ and $m ${sgn((older ? gap : -gap) + t)}$` },
-            { h: 'Add and collect', d: `$2m ${sgn(c)}$` }
+            { h: 'Ages now', d: `${n1}: $y$, ${n2}: $y ${sgn(older ? gap : -gap)}$` },
+            { h: `Ages in ${t} years`, d: `$y + ${t}$ and $y ${sgn((older ? gap : -gap) + t)}$` },
+            { h: 'Add and collect', d: `$2y ${sgn(c)}$` }
           ]
         };
       }
       const flag = ri(rng, 3, 12), rate = ri(rng, 2, 9);
       const ctx = rc(rng, [
         { job: 'A taxi', fee: 'flagfall', per: 'per kilometre', v: 'k', unit: 'kilometres' },
-        { job: 'A court hire', fee: 'booking fee', per: 'per hour', v: 'h', unit: 'hours' }
+        { job: 'A court hire', fee: 'booking fee', per: 'per hour', v: 't', unit: 'hours' }
       ]);
       return {
         prompt: `${ctx.job} charges a \\$${flag} ${ctx.fee} plus \\$${rate} ${ctx.per}. Write an expression for the total cost, in dollars, of $${ctx.v}$ ${ctx.unit}.`,
