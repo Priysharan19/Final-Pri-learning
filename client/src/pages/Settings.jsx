@@ -256,7 +256,12 @@ export default function Settings() {
     try {
       const data = await readJSONFile(f);
       const r = await api.post('/data/import', data);
-      toast(<span>Backup restored — {r.rows.toLocaleString()} records</span>);
+      // A restored profile has no password, so if the original had one the user
+      // has just lost that protection. Saying "restored" and nothing else lets
+      // them walk away believing the profile is still locked.
+      toast(r.unprotected
+        ? <span>Backup restored — {r.rows.toLocaleString()} records. This profile has <strong>no password</strong>; set one in Account to protect it again.</span>
+        : <span>Backup restored — {r.rows.toLocaleString()} records</span>);
       setUser(r.user);
     } catch (err) { toast(<span>{err.message}</span>); }
   }
@@ -411,8 +416,11 @@ export default function Settings() {
             <h2 style={{ marginBottom: 8 }}>⇅ Data & Backup</h2>
             <p className="sub" style={{ marginBottom: 12 }}>
               One JSON file holds everything — profile, ratings, attempts, exams, handwriting. Restore it on any
-              device to continue exactly where you left off. Progress files are small summaries you can AirDrop
-              to a teacher, who imports them into class analytics.
+              device to pick up where you left off. The file itself is <strong>not</strong> encrypted and a restored
+              profile comes back <strong>without its password</strong>, because a backup carries no password
+              verifier — set one again after restoring to re-protect it. Keep the file somewhere you would be happy
+              to keep a notebook. Progress files are small summaries you can AirDrop to a teacher, who imports them
+              into class analytics.
             </p>
             <div className="row" style={{ flexWrap: 'wrap', gap: 8 }}>
               <button className="btn btn-ghost btn-sm" onClick={exportBackup}>Export full backup</button>

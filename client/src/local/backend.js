@@ -1980,6 +1980,15 @@ const routes = {
     const staying = (c.studentPids || []).filter(id => !leaving.has(id));
     c.studentPids = [...new Set([...staying, ...joining.filter(id => known.has(id))])];
     await put('classes', c);
+    // Re-sealing the class alone leaves the homework hanging off it sealed to
+    // the OLD roll, so a student enrolled mid-term cannot open a task that
+    // already exists — their task list looks empty and starting one 404s. The
+    // background repair only runs on the teacher's next password sign-in, which
+    // is typically after they have handed the iPad over. Re-seal here, while the
+    // teacher's key is in hand and the roll is what they just set.
+    for (const t of await all('tasks')) {
+      if (t.classId === c.id) await put('tasks', t);
+    }
     return { class: c };
   },
   'GET /classes/:id/analytics': async (body, params) => {
@@ -2199,7 +2208,8 @@ const routes = {
       }
     }
     setCurrentPid(newPid);
-    return { user: await publicUser(prof), rows };
+    // The caller needs to know protection was dropped, not just that rows landed.
+    return { user: await publicUser(prof), rows, unprotected: true };
   },
 
   'GET /tasks/:id/pack': async (body, params) => {
