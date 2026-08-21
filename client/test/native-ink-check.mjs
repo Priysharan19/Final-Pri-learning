@@ -108,9 +108,20 @@ check('recognize sends a request id and the corrections so far',
   request.op === 'recognize' && Number.isInteger(request.reqId)
   && request.overrides.n0_2 === 'x');
 
-window.__priInkReceive({ type: 'reading', reqId: request.reqId, text: 'x=3', lines: [] });
+window.__priInkReceive({
+  type: 'reading', reqId: request.reqId, text: 'x=3', lines: [],
+  decision: {
+    status: 'clarify', autoAccept: false, policy: 'selective-v1-provisional',
+    reasons: ['candidate-margin-below-auto-accept'], focusSymbol: 'n0_2'
+  },
+  safeToAutoAccept: false
+});
 const reading = await pending;
 check('a reply resolves the matching request', reading?.text === 'x=3');
+check('the no-guess decision survives the native→JS bridge intact',
+  reading?.safeToAutoAccept === false
+  && reading?.decision?.status === 'clarify'
+  && reading?.decision?.focusSymbol === 'n0_2');
 
 const stray = nativeInk.recognize({});
 window.__priInkReceive({ type: 'reading', reqId: 99999, text: 'wrong', lines: [] });
