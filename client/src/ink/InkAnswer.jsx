@@ -326,8 +326,8 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
             }}>
               <b>Check this reading before it is marked.</b>{' '}
               {rec.decision?.status === 'clarify'
-                ? 'The handwriting evidence is genuinely ambiguous; the highlighted symbol needs confirmation.'
-                : 'I do not have enough independent evidence to auto-accept this interpretation yet.'}
+                ? "PRI isn't confident in this reading yet; check the highlighted symbol or rewrite the line if it looks wrong."
+                : 'PRI does not have enough independent evidence to auto-accept this interpretation yet.'}
             </div>
           )}
           {rec.lines.map((line, li) => (
