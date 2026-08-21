@@ -31,9 +31,6 @@ final class InkBridge: NSObject, InkSurfaceDelegate {
     private let surface = InkSurfaceView()
     private let recognizer = MathInkRecognizer()
     private let personalization = InkPersonalizationStore.shared
-    // Recognition is interactive but never latency-critical relative to the nib.
-    // Utility QoS prevents a Vision pass from competing with PencilKit's display
-    // path while the student begins the next symbol.
     private let recognitionQueue = DispatchQueue(label: "com.prilearning.ink.recognize", qos: .utility)
     private let encodingQueue = DispatchQueue(label: "com.prilearning.ink.encode", qos: .utility)
     private let performanceLog = OSLog(subsystem: "com.prilearning.app", category: "InkPerformance")
@@ -43,9 +40,6 @@ final class InkBridge: NSObject, InkSurfaceDelegate {
     private var lastReading: Reading?
     private var learnedCorrectionKeys: Set<String> = []
 
-    /// Native quiet-window guard. The web side also debounces, but the native
-    /// boundary is authoritative because other callers/self-checks can request
-    /// recognition directly.
     private var lastInkMutationNanos: UInt64 = 0
     private static let recognitionQuietNanos: UInt64 = 380_000_000
 
@@ -180,9 +174,8 @@ final class InkBridge: NSObject, InkSurfaceDelegate {
 
     private func markInkMutation() {
         lastInkMutationNanos = DispatchTime.now().uptimeNanoseconds
-        // Drop stale recognition as soon as the next real mark lands instead of
-        // waiting for the web debounce to issue a replacement request.
         recognitionToken?.cancel()
+        recognizer.cancelActiveVision()
     }
 
     func inkSurface(_ surface: InkSurfaceView, didAppend stroke: InkStroke, at index: Int) {
@@ -219,6 +212,7 @@ final class InkBridge: NSObject, InkSurfaceDelegate {
 
     private func cancelRecognition() {
         recognitionToken?.cancel()
+        recognizer.cancelActiveVision()
         recognitionToken = nil
     }
 
@@ -289,6 +283,7 @@ final class InkBridge: NSObject, InkSurfaceDelegate {
                                  reading: lastReading, strokes: strokes)
 
         recognitionToken?.cancel()
+        recognizer.cancelActiveVision()
         let token = InkRecognitionToken()
         recognitionToken = token
         let signpostID = OSSignpostID(log: performanceLog)
