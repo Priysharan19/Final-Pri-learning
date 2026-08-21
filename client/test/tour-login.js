@@ -1,131 +1,146 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// E2E: the v6 sign-in system — Apple/Google/email on-device flows, password
-// protection, profile switching, account menu, daily-goal card.
+// Pri Learning · E2E flow — the profile gate.
+//
+// There is no sign-in service behind this screen, which is exactly why it has
+// to be driven: the whole gate is client code. A profile is created here, the
+// picker lists it here, and the only thing standing between a sibling and six
+// months of somebody else's work is a password check that runs in this tab.
+//
+// So this flow asserts the gate, not the pixels: a profile that is made appears
+// in the picker; an unprotected one opens on a tap; a protected one refuses the
+// wrong password, says so, stays shut, and opens on the right one. The weak-
+// password rule is asserted through the button it disables rather than through
+// the copy beside it, because the copy is not what protects anybody.
+//
+// Run on its own:  node client/test/tour-login.js
 // ─────────────────────────────────────────────────────────────────────────────
-import { chromium } from '@playwright/test';
-import { mkdirSync } from 'node:fs';
+import { pathToFileURL } from 'node:url';
 
-const BASE = 'http://localhost:4000';
-mkdirSync('shots', { recursive: true });
-const shot = (p, name) => p.screenshot({ path: `shots/login-${name}.png` });
+const STUDENT = { name: 'Ada Lovelace', email: 'ada@example.com', year: 9 };
+const LOCKED = { name: 'Grace Hopper', year: 11, password: 'brass-monkey-42' };
+const WRONG = 'not-the-password';
 
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
-const ctx = await b.newContext({ viewport: { width: 1440, height: 860 }, deviceScaleFactor: 1.5 });
-const page = await ctx.newPage();
-page.on('pageerror', e => console.log('PAGEERROR:', e.message));
-let failures = 0;
-const check = (name, ok) => { console.log(`${ok ? 'PASS' : 'FAIL'} ${name}`); if (!ok) failures++; };
+/** The account menu is the only way out of a signed-in session. */
+async function switchProfile(page) {
+  await page.locator('.user-chip').click();
+  await page.getByRole('menuitem', { name: 'Switch profile' }).click();
+  await page.waitForSelector('.acct-list', { timeout: 15000 });
+}
 
-await page.goto(BASE);
-await page.waitForTimeout(1000);
+export const flow = {
+  id: 'login',
+  name: 'Login · profiles, the picker, passwords',
 
-// 1 · hero → sign-in methods
-await page.getByRole('button', { name: 'Get Started' }).click();
-await page.waitForTimeout(500);
-check('method stage shows Apple/Google/email',
-  await page.getByRole('button', { name: /Continue with Apple/ }).isVisible() &&
-  await page.getByRole('button', { name: /Continue with Google/ }).isVisible() &&
-  await page.getByRole('button', { name: /Continue with email/ }).isVisible());
-check('on-device disclosure shown', (await page.locator('.auth-note').textContent()).includes('on-device'));
-await shot(page, '01-methods');
+  async run({ page, check, goto, createProfile, mathText }) {
+    // ── 1 · the landing screen ───────────────────────────────────────────────
+    await goto('/');
+    await check('the landing hero renders',
+      await page.locator('.hero-title').isVisible(),
+      'no .hero-title on a first visit with no profiles');
+    await check('the hero offers the only way in',
+      await page.getByRole('button', { name: 'Get Started' }).isVisible());
 
-// 2 · Apple flow with password protection
-await page.getByRole('button', { name: /Continue with Apple/ }).click();
-await page.waitForTimeout(400);
-check('apple create headed', (await page.locator('h2').first().textContent()).includes('Apple'));
-await page.getByPlaceholder('e.g. Priysharan').fill('Pri Tripathi');
-await page.locator('input[type=email]').fill('pri@icloud.com');
-await page.locator('.check-row input').check();
-await page.waitForTimeout(200);
-await page.getByPlaceholder('Password', { exact: true }).fill('mypin');
-await page.getByPlaceholder('Repeat password').fill('mypin');
-await shot(page, '02-apple-create');
-await page.getByRole('button', { name: 'Start learning' }).click();
-await page.waitForTimeout(1100);
-check('landed on Home', await page.locator('.home-greet').isVisible());
-check('goal ring on Home', await page.locator('.goal-ring').isVisible());
-await shot(page, '03-home-goal');
+    // ── 2 · the method stage is honest about what it is ──────────────────────
+    await page.getByRole('button', { name: 'Get Started' }).click();
+    await page.waitForSelector('.sso-btn', { timeout: 15000 });
+    const methods = await page.locator('.sso-btn').allInnerTexts();
+    await check('both on-device paths are offered',
+      methods.some(t => /Continue with email/.test(t)) && methods.some(t => /Continue without an email/.test(t)),
+      `sign-in buttons read ${JSON.stringify(methods)}`);
+    const disclosure = await page.locator('.auth-note').innerText();
+    await check('the screen says a profile lives on this device only',
+      /this (iPad|device)/i.test(disclosure) && /never (sent|uploaded|leaves)/i.test(disclosure),
+      `disclosure reads ${JSON.stringify(disclosure.slice(0, 120))}`);
 
-// 3 · account menu
-await page.locator('.user-chip').click();
-await page.waitForTimeout(300);
-check('account menu shows email', (await page.locator('.acct-menu').textContent()).includes('pri@icloud.com'));
-await shot(page, '04-account-menu');
-await page.getByRole('button', { name: /Switch profile/ }).click();
-await page.waitForTimeout(700);
+    // ── 3 · a profile is created and signs straight in ───────────────────────
+    await goto('/');
+    await createProfile(STUDENT);
+    const greet = await page.locator('.home-greet').innerText();
+    await check('creating a profile lands on Home as that student',
+      greet.includes('Ada'), `Home greeting reads ${JSON.stringify(greet)}`);
+    await check('the account chip carries the new profile',
+      (await page.locator('.user-chip').innerText()).includes('Ada'));
 
-// 4 · picker shows the protected apple profile
-check('picker lists profile', await page.locator('.acct-row', { hasText: 'Pri Tripathi' }).isVisible());
-check('provider badge shown', await page.locator('.prov-badge.prov-apple').first().isVisible());
-check('lock shown', await page.locator('.acct-lock').first().isVisible());
-await shot(page, '05-picker');
+    // ── 4 · it is in the picker, and it is not locked ────────────────────────
+    await switchProfile(page);
+    const ada = page.locator('.acct-row', { hasText: STUDENT.name });
+    await check('the new profile appears in the picker', await ada.count() === 1,
+      `${await page.locator('.acct-row').count()} rows in the picker`);
+    await check('the picker shows which year the profile is in',
+      /Year 9/.test(await ada.innerText()), `row reads ${JSON.stringify(await ada.innerText())}`);
+    await check('an unprotected profile carries no lock',
+      await ada.locator('.acct-lock').count() === 0);
 
-// 5 · wrong password rejected, right one unlocks
-await page.locator('.acct-row', { hasText: 'Pri Tripathi' }).click();
-await page.waitForTimeout(300);
-await page.locator('.acct-unlock input').fill('nope');
-await page.getByRole('button', { name: 'Unlock' }).click();
-await page.waitForTimeout(400);
-check('wrong password rejected', await page.locator('.error-box').isVisible());
-await shot(page, '06-wrong-pass');
-await page.locator('.acct-unlock input').fill('mypin');
-await page.getByRole('button', { name: 'Unlock' }).click();
-await page.waitForTimeout(900);
-check('unlocked to Home', await page.locator('.home-greet').isVisible());
+    // ── 5 · a weak password cannot be set ────────────────────────────────────
+    await page.getByRole('button', { name: 'Add another profile' }).click();
+    await page.waitForSelector('.sso-btn', { timeout: 15000 });
+    await page.getByRole('button', { name: 'Continue without an email' }).click();
+    await page.waitForSelector('.auth-card input.input', { timeout: 15000 });
+    await page.getByPlaceholder('e.g. Priysharan').fill(LOCKED.name);
+    await page.locator('.auth-card select').first().selectOption(String(LOCKED.year));
+    await page.locator('.check-row input[type=checkbox]').check();
+    const start = page.getByRole('button', { name: 'Start learning' });
 
-// 6 · switch → add a Google profile (no password)
-await page.locator('.user-chip').click();
-await page.waitForTimeout(250);
-await page.getByRole('button', { name: /Switch profile/ }).click();
-await page.waitForTimeout(600);
-await page.getByRole('button', { name: /Add another profile/ }).click();
-await page.waitForTimeout(350);
-await page.getByRole('button', { name: /Continue with Google/ }).click();
-await page.waitForTimeout(350);
-await page.getByPlaceholder('e.g. Priysharan').fill('Guest Gauss');
-await page.locator('input[type=email]').fill('gauss@gmail.com');
-await page.getByRole('button', { name: 'Start learning' }).click();
-await page.waitForTimeout(1000);
-check('second profile active', (await page.locator('.user-chip').textContent()).includes('Guest'));
+    await page.getByLabel('Password', { exact: true }).fill('short');
+    await page.getByLabel('Repeat password').fill('short');
+    await check('a too-short password cannot be submitted', await start.isDisabled(),
+      'Start learning was live with a 5-character password');
 
-// 7 · duplicate email rejected
-await page.locator('.user-chip').click();
-await page.waitForTimeout(250);
-await page.getByRole('button', { name: /Switch profile/ }).click();
-await page.waitForTimeout(600);
-await page.getByRole('button', { name: /Add another profile/ }).click();
-await page.waitForTimeout(300);
-await page.getByRole('button', { name: /Continue with email/ }).click();
-await page.waitForTimeout(300);
-await page.getByPlaceholder('e.g. Priysharan').fill('Copycat');
-await page.locator('input[type=email]').fill('pri@icloud.com');
-await page.getByRole('button', { name: 'Start learning' }).click();
-await page.waitForTimeout(500);
-check('duplicate email rejected', (await page.locator('.error-box').textContent()).includes('already belongs'));
-await shot(page, '07-dup-email');
+    await page.getByLabel('Password', { exact: true }).fill('password123');
+    await page.getByLabel('Repeat password').fill('password123');
+    await check('a guessable password cannot be submitted', await start.isDisabled(),
+      'Start learning was live with "password123"');
+    await check('the meter says why', /guess/i.test(await mathText('.auth-card .meter + p') || ''),
+      `meter note reads ${JSON.stringify(await mathText('.auth-card .meter + p'))}`);
 
-// 8 · back to picker → both profiles listed, then Settings security section
-await page.getByRole('button', { name: 'Back' }).click();
-await page.waitForTimeout(300);
-await page.getByRole('button', { name: /Back to profiles/ }).click();
-await page.waitForTimeout(400);
-check('both profiles listed', await page.locator('.acct-row').count() >= 2);
-await page.locator('.acct-row', { hasText: 'Guest Gauss' }).click();
-await page.waitForTimeout(900);
-await page.goto(`${BASE}/settings`);
-await page.waitForTimeout(800);
-check('security section present', await page.locator('h2', { hasText: 'Account & Security' }).isVisible());
-const secCard = page.locator('.card', { has: page.locator('h2', { hasText: 'Account & Security' }) });
-check('shows google sign-in method', (await secCard.textContent()).includes('Google (on-device)'));
-await secCard.getByRole('button', { name: 'Set password' }).click();
-await page.waitForTimeout(300);
-await secCard.locator('input[type=password]').nth(0).fill('gauss1');
-await secCard.locator('input[type=password]').nth(1).fill('gauss1');
-await secCard.getByRole('button', { name: 'Turn protection on' }).click();
-await page.waitForTimeout(600);
-check('password turned on', (await secCard.textContent()).includes('On — asked at sign-in'));
-await shot(page, '08-security');
+    // ── 6 · a protected profile is created ───────────────────────────────────
+    await page.getByLabel('Password', { exact: true }).fill(LOCKED.password);
+    await page.getByLabel('Repeat password').fill(LOCKED.password);
+    await check('a strong password unlocks the submit', await start.isEnabled(),
+      'Start learning stayed disabled with a strong password');
+    await start.click();
+    await page.waitForSelector('.home-greet', { timeout: 30000 });
+    await check('the protected profile signs in on creation',
+      (await page.locator('.home-greet').innerText()).includes('Grace'));
 
-await b.close();
-console.log(failures === 0 ? '\n✔ LOGIN TOUR PASSED' : `\n✖ LOGIN TOUR FAILED (${failures})`);
-process.exit(failures === 0 ? 0 : 1);
+    // ── 7 · the picker marks it shut ─────────────────────────────────────────
+    await switchProfile(page);
+    const grace = page.locator('.acct-row', { hasText: LOCKED.name });
+    await check('both profiles are listed', await page.locator('.acct-row').count() === 2,
+      `${await page.locator('.acct-row').count()} rows, expected 2`);
+    await check('the protected profile shows a lock', await grace.locator('.acct-lock').count() === 1);
+
+    // ── 8 · the wrong password is refused ────────────────────────────────────
+    await grace.click();
+    await page.waitForSelector('.acct-unlock input', { timeout: 15000 });
+    await page.locator('.acct-unlock input').fill(WRONG);
+    await page.getByRole('button', { name: 'Unlock' }).click();
+    await page.waitForSelector('.error-box', { timeout: 15000 });
+    const refusal = await page.locator('.error-box').innerText();
+    await check('a wrong password is refused', /wrong password/i.test(refusal),
+      `refusal reads ${JSON.stringify(refusal)}`);
+    await check('a wrong password leaves the profile shut',
+      await page.locator('.acct-list').count() === 1 && await page.locator('.home-greet').count() === 0,
+      'the app left the picker after a wrong password');
+
+    // ── 9 · the right password opens it ──────────────────────────────────────
+    await page.locator('.acct-unlock input').fill(LOCKED.password);
+    await page.getByRole('button', { name: 'Unlock' }).click();
+    await page.waitForSelector('.home-greet', { timeout: 30000 });
+    await check('the right password opens the profile',
+      (await page.locator('.home-greet').innerText()).includes('Grace'),
+      `Home greeting reads ${JSON.stringify(await page.locator('.home-greet').innerText())}`);
+
+    // ── 10 · the unprotected one still opens on a tap ────────────────────────
+    await switchProfile(page);
+    await page.locator('.acct-row', { hasText: STUDENT.name }).click();
+    await page.waitForSelector('.home-greet', { timeout: 30000 });
+    await check('an unprotected profile opens without a password',
+      (await page.locator('.home-greet').innerText()).includes('Ada'));
+  }
+};
+
+if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {
+  const { runOne } = await import('./e2e.mjs');
+  process.exit(await runOne(flow) ? 1 : 0);
+}

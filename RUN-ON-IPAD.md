@@ -58,8 +58,9 @@ Then press Run again in Swift Playground / Xcode.
 ## Why this architecture
 
 The engine (expression equivalence, 84 generators, the $P handwriting
-recogniser, Elo adaptive model) is ~40k lines of battle-tested code with
-10,000+ automated checks. Shipping it inside the Swift app keeps 100% of that
+recogniser, Elo adaptive model) is ~17,300 lines, and the repo's suites run
+693,000+ automated checks over it (`npm test`). None of it has been used by a
+student yet — there is no field evidence of any kind. Shipping it inside the Swift app keeps 100% of that
 verified behaviour while the app itself is fully native at the edges — icon,
 full-screen launch, share sheet, camera, sandbox storage. This is the same
 approach many production iPad apps use. A screen-by-screen Swift/SwiftUI port

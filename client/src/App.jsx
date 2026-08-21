@@ -53,11 +53,17 @@ const TITLES = {
 };
 
 export function Logo({ large = false, onClick }) {
+  // With an onClick this is a control, so it has to be one: a bare <span> takes
+  // the click and gives a keyboard no way to follow it.
+  const Tag = onClick ? 'button' : 'span';
+  const controlProps = onClick
+    ? { type: 'button', onClick, 'aria-label': 'Pri Learning — go to Home' }
+    : {};
   return (
-    <span className={`logo ${large ? 'logo-lg' : ''}`} onClick={onClick}>
+    <Tag className={`logo ${large ? 'logo-lg' : ''}${onClick ? ' logo-btn' : ''}`} {...controlProps}>
       <span className="logo-bb">P</span>
       <span className="logo-name">ri Learning<span className="logo-dot">.</span></span>
-    </span>
+    </Tag>
   );
 }
 
@@ -263,7 +269,10 @@ function SidebarHistory({ recent }) {
           <button key={it.id} className="hist-mini" onClick={() => nav('/history')}>
             <div className="hist-mini-top">
               <span className="hist-mini-name">{it.subtopicName}</span>
-              <span className={`hist-mini-pct ${cls}`}>{it.correct === true ? '100% ✓' : it.correct === false ? '0.0% ✗' : '—'}</span>
+              <span className={`hist-mini-pct ${cls}`}
+                aria-label={it.correct === true ? 'Correct' : it.correct === false ? 'Incorrect' : 'Not marked yet'}>
+                {it.correct === true ? '100% ✓' : it.correct === false ? '0.0% ✗' : '—'}
+              </span>
             </div>
             <div className="hist-mini-preview">{stripTex(it.prompt)}</div>
             <div className="hist-mini-tags">
@@ -387,8 +396,10 @@ function ThemeToggle() {
     try { await api.patch('/me', { theme }); } catch { }
   };
   return (
-    <button className="btn btn-quiet btn-sm" onClick={flip} title="Toggle theme" style={{ padding: '6px 9px' }}>
-      {user.theme === 'light' ? '☾' : '☼'}
+    <button className="btn btn-quiet btn-sm" onClick={flip}
+      aria-label={user.theme === 'light' ? 'Switch to dark theme' : 'Switch to light theme'}
+      style={{ padding: '6px 9px' }}>
+      <span aria-hidden="true">{user.theme === 'light' ? '☾' : '☼'}</span>
     </button>
   );
 }

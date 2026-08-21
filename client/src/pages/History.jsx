@@ -93,6 +93,7 @@ export default function History() {
 
   return (
     <div className="grid" style={{ gap: 18 }}>
+      <h1 className="sr-only">Question history</h1>
       <div className="spread" style={{ flexWrap: 'wrap', gap: 12 }}>
         <div>
           <h2>Your question history</h2>
@@ -101,9 +102,10 @@ export default function History() {
         <span className="chip">{data ? `${data.total.toLocaleString()} question${data.total === 1 ? '' : 's'}` : '…'}</span>
       </div>
 
-      <div className="row" style={{ flexWrap: 'wrap', gap: 8 }}>
+      <div className="row" role="group" aria-label="Filter your history" style={{ flexWrap: 'wrap', gap: 8 }}>
         {FILTERS.map(([k, label]) => (
-          <button key={k} className={`pill-opt ${filter === k ? 'on' : ''}`} onClick={() => { setFilter(k); setPage(0); }}>{label}</button>
+          <button key={k} className={`pill-opt ${filter === k ? 'on' : ''}`} aria-pressed={filter === k}
+            onClick={() => { setFilter(k); setPage(0); }}>{label}</button>
         ))}
       </div>
 
@@ -117,17 +119,20 @@ export default function History() {
         {data && data.items.map(item => (
           <div key={item.id} className="hist-row">
             <button className={`hist-star ${item.bookmarked ? 'on' : ''}`} title={item.bookmarked ? 'Remove bookmark' : 'Bookmark this question'}
+              aria-label={`${item.bookmarked ? 'Remove' : 'Add'} the bookmark on this ${item.subtopicName} question`}
+              aria-pressed={!!item.bookmarked}
               onClick={() => toggleBookmark(item.id)}>{item.bookmarked ? '★' : '☆'}</button>
             <button className="hist-main" onClick={() => openDetail(item.id)}>
               <div className="hist-top">
                 <span className={`hist-verdict ${item.correct ? 'good' : item.correct === false ? 'bad' : ''}`}>
                   {item.correct ? '✔' : item.correct === false ? '✖' : '·'}
+                  <span className="sr-only">{item.correct ? 'Correct' : item.correct === false ? 'Incorrect' : 'Not marked'}</span>
                 </span>
                 <span className="hist-name">{item.subtopicName}</span>
                 <span className="tag">D{item.difficulty}</span>
                 <span className="tag">{MODE_LABEL[item.mode] || item.mode}</span>
-                {item.viaInk && <span className="tag" title="Answered by handwriting">✍️</span>}
-                {item.hasPhoto && <span className="tag" title="Paper working photo attached">📷</span>}
+                {item.viaInk && <span className="tag" title="Answered by handwriting">✍️<span className="sr-only"> answered by handwriting</span></span>}
+                {item.hasPhoto && <span className="tag" title="Paper working photo attached">📷<span className="sr-only"> photo of paper working attached</span></span>}
                 <span className="muted" style={{ marginLeft: 'auto', fontSize: 12, whiteSpace: 'nowrap' }}>
                   {new Date(item.answeredAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}
                 </span>

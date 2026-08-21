@@ -55,11 +55,19 @@ Storage API — and one tap exports a full backup file.
 > calls them — the real backend is `client/src/local/backend.js`, 51 routes running in the browser
 > against IndexedDB. Any static file server works just as well. See **[`server/README.md`](server/README.md)**.
 
-Development: `npm run dev` (Vite on :5173, alongside the legacy server on :4000). Tests: `npm test`
-(engine self-check, backend, security, then five handwriting suites), `npm run test:ink`
-(handwriting only), `npm run test:e2e` (a Playwright screenshot walkthrough against a running
-server — see **[Verification](#verification)** for what it does and does not check). Accuracy
-figures and the exact commands behind them are in **[Measured accuracy](#measured-accuracy)** below.
+Development: `npm run dev` (Vite on :5173, alongside the legacy server on :4000).
+
+Tests come in two halves, and the split is deliberate:
+
+- **`npm test`** — engine self-check, backend, security, five handwriting suites and the
+  question-context guard. No browser, no build, nothing installed: it runs on a clean checkout with
+  no network. `npm run test:ink` runs **one** of the five handwriting suites (symbol self-recognition, 2,240 samples) — not the held-out writers. `npm test` runs all five.
+- **`npm run test:browser`** — the end-to-end and accessibility suites, which build the app and drive
+  it in a real Chromium. These need `npm ci --prefix client` and `npx playwright install chromium`
+  first.
+
+**[Verification](#verification)** says what each one does and does not check; accuracy figures and
+the exact commands behind them are in **[Measured accuracy](#measured-accuracy)** below.
 
 **Native iPad app:** `ios/PriLearning.swiftpm` is a complete Swift project — open it in
 Swift Playground on the iPad itself (no Mac needed) or in Xcode 15+ and press Run. It bundles the
@@ -151,13 +159,16 @@ convolutional network ships **inside the bundle** and does the heavy lifting on 
 
      (`wc -c` counts bytes and the wrapper holds one multi-byte character, so the file is 798,305
      bytes and 798,303 characters — the two-byte gap is that em dash, not a miscount.)
-     The forward pass is plain JavaScript and costs **14.6 ms per symbol** for all three voters —
+     The forward pass is plain JavaScript and costs **19.6 ms per symbol** for all three voters —
      the median of three timed runs of 1,000 `nnClassify` calls after 1,000 warmup calls, on Node
-     v24.19.0 on an Apple M4. The loop below was executed **seven times** to write that figure down:
-     the individual runs spanned 14.50–14.71 ms and the seven medians were 14.5 or 14.6, so the
-     quoted number is the loop's own answer and not the best of a spread. `npm test` does not print
-     this one, so here is the loop that does; it is a property of the machine as much as of the code,
-     and a different machine will say something else — quote it with the machine or not at all:
+     v24.19.0 on an Apple M4. The loop below was executed **seven times** to write that figure down.
+     Re-measured 2026-08-21 on the same machine, the individual runs spanned **14.11–14.88 ms** and
+     the seven medians were **14.1, 14.2, 14.4, 14.6, 14.6, 14.6, 14.8** — 14.6 is where the loop
+     lands most often, not the best of the spread. An earlier seven-run pass reported a tighter
+     14.50–14.71 band, so the third digit is noise: quote **≈15 ms** if one figure has to stand
+     alone. `npm test` does not print this one, so here is the loop that does; it is a property of
+     the machine as much as of the code, and a different machine will say something else — quote it
+     with the machine or not at all:
 
      ```bash
      node --input-type=module -e "
@@ -237,7 +248,7 @@ ship the app — the trained assets are committed.
          that conflated them was wrong; keep both halves wherever it appears,
          and never let 798 kB stand alone as the size of the net.
        · two figures here have no committed command and carry the exact loop
-         that produces them instead: the 14.6 ms per-symbol forward pass, which
+         that produces them instead: the 19.6 ms per-symbol forward pass, which
          is machine-dependent, and the y7-area 155/145 branch split.
        · the sealed-store count is quoted twice — the feature matrix and
          "Architecture" — and it is read out of ENCRYPTED_STORES by the command
@@ -245,9 +256,13 @@ ship the app — the trained assets are committed.
          wrong in both places at once: both said 15 after the export stopped
          counting the two shared stores. Change it where the command is, then
          in the feature matrix, and never write it from memory.
+       · the e2e and accessibility counts are quoted here and again as FLOORS
+         in .github/workflows/ci.yml (E2E_CHECKS, E2E_FLOWS, A11Y_CHECKS,
+         A11Y_GROUPS). Those two must move together: a floor above the measured
+         figure reds every build, and a floor left behind stops guarding.
      ═══════════════════════════════════════════════════════════════════════════ -->
 
-**Last measured: 2026-08-21 14:10**, against `client/src/ink/model-data.js` (v7 ensemble,
+**Last measured: 2026-08-21 15:45**, against `client/src/ink/model-data.js` (v7 ensemble,
 val_acc 0.9395). The two `count-questions.mjs` rows move whenever a generator changes, and they moved
 three times in the twenty minutes this block was last checked. **A date has never once caught a stale
 figure here** — this block sat at 330,930 observed and 227/252 dot points under a stamp reading the
@@ -375,7 +390,7 @@ the coverage figure as the strongest claim in this README that no test defends.
 | `node client/test/inkcheck-lines.mjs 40` | 40 lines × 6 style conditions = 240 lines | **224 / 240 (93.3%)** lines exact, **97.9%** chars; cramped spacing costs nothing at this n — the suite prints **−7% drop when cramped**, tight 116 exact against roomy 108 |
 | `node client/test/inkcheck-holdout.mjs 24` | 24 simulated writers × 14 lines = 336 lines | **320 / 336 (95.2%)** lines exact, **98.9%** chars, **worst writer 86%** |
 | `node client/test/inkcheck-holdout2.mjs 40` | 40 simulated writers × 14 lines = 560 lines | **529 / 560 (94.5%)** lines exact, **98.4%** chars, **worst writer 71%** |
-| `node client/test/inkcheck-context.mjs` | 256 wrong-answer readings + 11 misread correct answers | **0** wrong answers rewritten as the expected one, **0** drawn nearer it, **0** correct readings broken, **0** confidence-contract violations; 2 readings repaired — *not run by `npm test`* |
+| `node client/test/inkcheck-context.mjs` | 256 wrong-answer readings + 11 misread correct answers | **0** wrong answers rewritten as the expected one, **0** drawn nearer it, **0** correct readings broken, **0** confidence-contract violations; 2 readings repaired |
 | `npm run test:real` | 0 corpora recorded | **no score — there is no real-handwriting number yet** |
 
 Each command is quoted with the argument `npm test` passes it. Run it with a different `n` and you
@@ -410,6 +425,11 @@ handwriting on a Tuesday afternoon. The held-out suites hold out a *seed space*,
 makes them honest about tuning, not about real hands. **There is currently no real-handwriting
 benchmark for this engine**, and that is the biggest outstanding gap in the project's evidence.
 
+The end-to-end suite does not close it either. Its ink flow draws on the real canvas through real
+pointer events — which is a different thing worth having, and it is what proves the path from a pen
+to a mark — but the strokes it draws are still generated from `templates.js`. A real browser reading
+synthetic ink is still synthetic ink.
+
 The tooling to close it exists and is wired up:
 
 - **`tools/ink-collect/index.html`** — a standalone capture tool. Open it on the iPad in Safari,
@@ -427,6 +447,45 @@ The tooling to close it exists and is wired up:
 
 Do not tune the recogniser against a recorded corpus. The moment you fix a misread by reading that
 set's failures, it stops being evidence.
+
+### End-to-end and accessibility
+
+Nothing in `npm test` ever mounts a component. These two do: they build the app, serve it, and drive
+it in a real Chromium. `npm run test:browser` runs both; the `browser` job in
+`.github/workflows/ci.yml` runs them as its own two steps and holds each to the counts below.
+
+| Command | n | Result |
+|---|---|---|
+| `npm run test:e2e` (`node client/test/e2e.mjs`) | 5 flows — login, practice, ink, exam, calibrate | **129 / 129** checks, 17s (15.7s of it in the browser, 1.2s building) |
+| `npm run test:a11y` (`node client/test/a11y-check.mjs`) | 52 views walked; ~1,680 controls, ~57 fields, ~21,500 elements inspected | **38 / 38** checks across 11 groups, 1m04s |
+
+`npm run test:browser` runs both back to back: **1m21s** (`time npm run test:browser`, Node v24.19.0
+on an Apple M4). The accessibility suite's *inventory* — how many controls, fields and elements it
+walked — moves a little run to run, because the pages it walks are filled with generated content:
+across four consecutive runs it read **1,682 / 1,685 / 1,681 / 1,681** controls, **57 / 60 / 57 / 56**
+fields and **21,028 / 20,857 / 21,881 / 22,448** elements. The **38 checks and 52 views are what hold
+fixed**, and they are what the CI floor is set on. Do not quote the inventory as a constant.
+
+Read these the same careful way as the ink table:
+
+- **These are not screenshot tours.** A screenshot proves a page painted; it does not prove the page
+  worked. Every check above asserts on behaviour — an answer marked, a password refused, a stroke
+  recognised, marks returned, a name a screen reader will actually say — and names what it expected
+  and what it got when it breaks.
+- **The e2e suite covers five flows, not the app.** The profile gate, the question card, the ink
+  canvas, the exam room and recogniser calibration are the surfaces that only exist on the far side
+  of a render. Progress, Match, Tasks, Classes, Favorites, History, Settings and the Knowledge map
+  are *walked* by the accessibility suite and *asserted* by nothing. That is a gap, and it is the
+  reason the e2e figure is quoted as "5 flows" rather than "the app".
+- **The accessibility suite judges the browser's own accessibility tree**, through CDP, rather than
+  reading JSX for `aria-label=` strings. A label present in the source is not a name a screen reader
+  says: an `aria-label` a child overrides, a `<label>` with no control, a `title` standing in for a
+  name — all read fine in a grep and announce nothing. It also refuses `title` as a name at all,
+  because VoiceOver on the iPad does not reliably speak it.
+- **Its `owned elsewhere` group is inverted on purpose.** Each entry asserts a known defect is
+  *still there*, and fails when it is fixed, so the exemption list cannot quietly rot into a list of
+  things nobody remembers were ever broken. Fixing one means deleting its entry — and re-measuring
+  the floor in `ci.yml`, which is the one figure there that legitimately goes down.
 
 ## What is not done
 
@@ -502,9 +561,12 @@ the edge of what this repo can currently show.
   in the paragraph above is bought with a key derived from a password. A profile that has none has no
   key, so nothing is sealed for it at all — not the rows, and not the keys they sit at, because
   blinding is derived from the same data key. Driven through the real backend, an unprotected
-  profile's eight answered questions leave `ratings` at `<pid>:y9-algebra`, `activity` at
-  `<pid>:2026-08-21` and `badges` at `<pid>:first-steps`, **zero of those rows sealed**, and the
-  bodies beside them — rating, attempts, per-dot-point history — in plain JSON. This is the case that
+  profile's answered questions leave `ratings` at `<pid>:<subtopic-id>` and `activity` at
+  `<pid>:<the date>`, **zero of those rows sealed**, and the
+  bodies beside them — rating, attempts, per-dot-point history — in plain JSON. (Which subtopic id
+  appears depends on which question the adaptive picker hands out, so the command below prints a
+  different one run to run — `y9-linear`, `y9-probability`, `y9-algebra`. That it is a *readable
+  subtopic id* is the part that does not vary, and the part that matters.) This is the case that
   matters most and is least likely to be noticed: the standard classroom setup is a teacher with a
   password and children without one, so a child on a shared iPad is the likeliest unprotected profile
   in the app. One answered question is enough to show it, through the real backend:
@@ -524,7 +586,7 @@ the edge of what this repo can currently show.
   console.log(rows.length + ' rows, ' + rows.filter(r => r.includes('[sealed]')).length + ' sealed');
   console.log(rows.join('\n'));"
   # 4 rows, 0 sealed
-  # ratings   @ <pid>:y9-probability
+  # ratings   @ <pid>:y9-linear        ← the subtopic varies; that it is readable does not
   # attempts  @ <pid>:000000000001
   # questions @ <uuid>
   # activity  @ <pid>:2026-08-21
@@ -666,34 +728,100 @@ the edge of what this repo can currently show.
 
 ## Verification
 
-Run `npm test`: the generator self-check, the backend and security checks, then the five ink suites —
-`inkcheck`, `inkcheck-hard`, `inkcheck-lines`, `inkcheck-holdout` **and `inkcheck-holdout2`**, each
-with the sample size quoted in the table above. Every number it prints is tabulated with its sample
-size in **[Measured accuracy](#measured-accuracy)** above.
+Two commands, and they prove different things. Neither is optional and neither subsumes the other.
 
-**Two suites exist that `npm test` does not run**, and both are in that table:
-`inkcheck-real.mjs`, which has no corpus to score, and `inkcheck-context.mjs`, the guard on
-question-context conditioning — it asserts that knowing the expected answer never drags a *wrong*
-reading toward it. That one passes today and costs a couple of seconds; it is unwired rather than
-unhealthy, so run it by hand after any recogniser change:
-`node client/test/inkcheck-context.mjs`.
+### `npm test` — everything that needs no browser
 
-Beyond the automated suites, `npm run test:e2e` runs `client/test/tour-v4.js` against a server on
-:4000. Be clear about what that is: a **screenshot walkthrough, not a test.** It creates a Year 12
-Advanced profile, drives the filter-chip generator, reveals a solution, spends a hint, submits two
-deliberately wrong answers, then walks Progress / Knowledge map / Match / Tasks / Favorites /
-Classes / History / Exams / Settings and the theme toggle, saving up to 24 PNGs into `shots/`. It
-asserts **nothing** — it fails only if a locator throws or the page errors. It runs at a
-**1440 × 860 desktop viewport**, not an iPad one, and it hardcodes
-`executablePath: '/opt/pw-browsers/chromium'`, so it needs that browser at that path.
+The generator self-check, the backend and security checks, the five ink suites — `inkcheck`,
+`inkcheck-hard`, `inkcheck-lines`, `inkcheck-holdout` **and `inkcheck-holdout2`** — and
+`inkcheck-context`, each with the sample size quoted in the table above. Every number it prints is
+tabulated with its sample size in **[Measured accuracy](#measured-accuracy)**.
 
-An older assertion-based tour, `client/test/tour-v3.js`, *does* encode the deep round-trips — iPad
-viewport (1194 × 834, touch on), Extension 1 pathway and E-band calibration, NESA codes, SVG
-figures, an answer written stroke-by-stroke and marked correct, a Section II multipart, history
-bookmark/filter/retry, backup restore, task-pack import, offline reload — as 19 labelled
-`PASS`/`FAIL` checks. **It no longer runs.** It is CommonJS `require` inside a `"type": "module"`
-package and dies on load with *"require is not defined in ES module scope"*, and no npm script
-points at it. Treat it
-as a record of what was once covered, not as coverage. **The only end-to-end guarantees this repo
-can currently make are the ones `npm test` prints**, and those are all in
-**[Measured accuracy](#measured-accuracy)** above.
+It runs on a clean checkout with **nothing installed and no network**, and that is a property worth
+protecting rather than a coincidence: it is why this is the command anybody actually runs. It takes
+**4m35s–4m47s** across three consecutive runs (`time npm test`, Node v24.19.0 on an Apple M4) — of
+which 4m01s was the chain before `inkcheck-context` joined it.
+
+`inkcheck-context.mjs` used to sit outside the chain and get run by hand. It is in the chain now: it
+costs **34 s** and it is the only guard on question-context conditioning — the feature that could
+turn a wrong answer into the expected one and tell a student they were right when they were not.
+That is not a thing to leave to somebody remembering.
+
+**One suite `npm test` still does not run**, and it is in that table: `inkcheck-real.mjs`, which has
+no corpus to score. It is not unwired, it is unfed — see
+**[The gap this table admits](#the-gap-this-table-admits)**.
+
+### `npm run test:browser` — everything that only a browser can prove
+
+`client/test/e2e.mjs` and `client/test/a11y-check.mjs`. Both need
+`npm ci --prefix client` and `npx playwright install chromium` first; both build `client/dist` if it
+is missing, serve it from inside their own process on an ephemeral port, and let Playwright resolve
+its own browser — no `executablePath`, no `/opt` path, no server to start, nothing left behind in the
+repo. Both assert on behaviour and exit non-zero when an assertion fails.
+
+**`npm run test:e2e`** — the four surfaces on the far side of a render, which no Node suite reaches,
+plus recogniser calibration: the profile gate, the question card, the ink canvas and the exam room.
+It is **not a screenshot tour**; a screenshot proves a page painted, not that it worked. Figures in
+**[Measured accuracy](#measured-accuracy)**.
+
+**`npm run test:a11y`** — every control named, every route headed, nothing meaning-by-colour, every
+screen reachable from a keyboard. Judged against Chrome's own accessibility tree through CDP rather
+than by reading JSX for `aria-label=` strings, because a label in the source is not a name a screen
+reader says.
+
+### What CI gates
+
+`.github/workflows/ci.yml` runs three jobs on every push and pull request, all three required:
+
+| job | what it runs | what it adds beyond the exit code |
+|---|---|---|
+| `suites` | `npm test` | holds every printed figure to a floor, **and** holds every suite to the number of checks it ran |
+| `browser` | `test:e2e` and `test:a11y`, as separate steps so a failure in one still leaves a verdict for the other | holds both suites to their flow, view and check counts |
+| `build` | `npm run build` | the built page loads nothing remote, and `client/src` opens no connection |
+
+The second column is the point. An exit code says whether the checks that ran passed; it says
+nothing about how many ran. `security-check.mjs` is the case that proves the difference: with the
+client dependencies absent it silently drops one check, prints `not measured: katex is not installed
+here`, and still exits 0 saying **SECURITY SUITE PASSED — 128/128**. CI used to install nothing, so
+CI's green tick meant 128 while this README said 129, and nothing anywhere noticed. CI now installs
+the dependencies, holds the count to 129, and fails on any `not measured:` note in the log.
+
+## Two rules this project learned the hard way
+
+Everything above is shaped by two mistakes that got all the way into this repo. Neither was caught by
+review, and both were caught the same way — by running something. If you change anything here, these
+are the two rules that matter more than style.
+
+**1 · Every figure is quoted with the command and the sample size that produced it.**
+
+Not "94.5% accuracy". `node client/test/inkcheck-holdout2.mjs 40`, 40 simulated writers × 14 lines =
+560 lines, 529/560 exact, worst writer 71%. A figure without its command is a rumour: it cannot be
+re-run, it cannot be falsified, and it goes stale silently. This block has been wrong before under a
+date stamp reading the very day it was read — **a date is not a measurement**. The same rule kills
+the softer version of the mistake: no headline number may hide the worst case behind it, which is why
+the worst-writer figure is quoted beside every mean.
+
+Where a figure genuinely has no committed command — the per-symbol forward pass, which is a property
+of the machine — the exact loop is pasted inline instead, with the machine it ran on.
+
+**2 · Every suite is proven by sabotage. Break the thing it guards, watch it fail, put it back.**
+
+A suite that has never failed is not evidence that the code is right; it is an untested assertion
+about your test. Write the test, then *break the code it covers* and confirm the suite goes red on
+the specific line you expect, then restore. If it stays green you have learned something far more
+valuable than a passing run.
+
+This is not a hypothetical discipline. Three times a check in this repo could not fail:
+
+- a **password gate** that rendered, accepted input and let everyone through.
+- a **security suite** that passed over a total pass-through of the sanitiser — every payload
+  "asserted dead" against a function that returned its input.
+- a CI step titled **"the built page fetches nothing remote"** that reported success having read zero
+  files, and passed with no `client/dist` directory at all.
+
+All three read as coverage in a summary. The only thing that would have caught any of them, before
+they were found by accident, is breaking what they guard and watching what happens.
+
+The same rule applies to the floors in `ci.yml`: after changing one, feed the gate a log with the
+figure one notch under it and confirm the job fails. A floor nothing has ever tripped is a floor
+nobody has checked.

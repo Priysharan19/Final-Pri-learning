@@ -9,9 +9,9 @@ unit.
 `index.js`, `routes/api.js`, `auth.js`, `db.js`, `badges.js` and `seed.js` are
 roughly 11,000 lines implementing an account-based, SQLite-backed API. Nothing in
 the shipped product calls any of it: there is no `fetch()` anywhere in
-`client/src/`. The one remaining trace is the dev-only `/api →
-http://localhost:4000` proxy in `client/vite.config.js`, which is vestigial —
-nothing ever requests `/api`.
+`client/src/`. No trace of it remains on the client side either: the dev-only
+`/api → http://localhost:4000` proxy that used to sit in `client/vite.config.js`
+has been removed (`grep -n proxy client/vite.config.js` finds nothing).
 
 The real backend is **`client/src/local/backend.js`** — 51 routes dispatched
 in-process against IndexedDB, in the browser, on the device. That is what makes
@@ -41,7 +41,7 @@ clone without an install step.
 |---|---|---|
 | `server/engine/**` | **alive** — thin re-export shims | `server/test/selfcheck.mjs`, `tools/count-questions.mjs` |
 | `server/engine/generators/extras.js` | **alive and unique** — 84 authored question forms that exist nowhere else | the shim in `generators/index.js` |
-| `server/test/selfcheck.mjs` | **alive** — the 10,080-check gate | `npm test` (first command in the chain) |
+| `server/test/selfcheck.mjs` | **alive** — the engine gate, 672,000 self-checks at its 2,000-draw default | `npm test` (first command in the chain) |
 | `server/index.js`, `routes/`, `auth.js`, `db.js`, `badges.js`, `seed.js` | dead | nothing |
 | `server/package.json`, `package-lock.json` | needed only by the dead app | `npm run setup` |
 
@@ -76,7 +76,7 @@ no server at all. These break:
 
 1. **`npm test` stops working entirely.** Its first command is
    `node server/test/selfcheck.mjs`; the chain fails before any ink suite runs.
-   The 10,080-check correctness gate on the question generators is gone with it.
+   The 672,000-check correctness gate on the question generators is gone with it.
 2. **The 84 extra question forms are gone.** `extras.js` lives only here, so the
    authored-form count drops from 420 to 336. `tools/count-questions.mjs` keeps
    running — it censuses the client registry by default and only reaches into
@@ -87,8 +87,9 @@ no server at all. These break:
 4. **`npm run dev` breaks** — `scripts/dev.js` spawns `server/index.js` as one of
    its two processes.
 5. **`npm run setup` breaks** — it runs `npm install --prefix server`.
-6. **`npm run test:e2e` breaks** — `client/test/tour-v4.js` drives
-   `http://localhost:4000`, which only `npm start` serves.
+6. Nothing else. **`npm run test:e2e` is unaffected** — `client/test/e2e.mjs`
+   stands up its own static server on an ephemeral port and never touches
+   `:4000`; the legacy Express app is deliberately not involved.
 
 A safe removal is therefore not `rm -rf server/`. It is: move
 `server/test/selfcheck.mjs` and `server/engine/generators/extras.js` into

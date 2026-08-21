@@ -65,14 +65,17 @@ export default function Calibrate({ onDone, toast }) {
         <span style={{ flex: 1 }} />
         <span className="muted">{idx + 1} / {PROMPTS.length}</span>
       </div>
-      <div style={{ padding: '16px 18px 6px', textAlign: 'center' }}>
+      <div style={{ padding: '16px 18px 6px', textAlign: 'center' }} role="status">
         <div className="muted" style={{ fontSize: 13 }}>Write this symbol the way YOU write it, then save:</div>
-        <div style={{ fontSize: 54, lineHeight: 1.3, fontFamily: 'var(--font)' }}>{label}</div>
+        <div style={{ fontSize: 54, lineHeight: 1.3, fontFamily: 'var(--font)' }}>
+          {label}<span className="sr-only"> — symbol {idx + 1} of {PROMPTS.length}</span>
+        </div>
       </div>
       <InkCanvas ref={canvasRef} height={190} guides={false} ariaLabel={`Write ${label}`} />
       <div className="row" style={{ padding: '10px 14px', borderTop: '1px solid var(--hairline)' }}>
         <button className="btn btn-quiet btn-sm" onClick={() => canvasRef.current?.clear()}>Clear</button>
         <button className="btn btn-quiet btn-sm" onClick={advance}>Skip</button>
+        <span className="sr-only" role="status">{saved} sample{saved === 1 ? '' : 's'} saved so far</span>
         <span style={{ flex: 1 }} />
         <button className="btn btn-quiet btn-sm" onClick={onDone}>Stop</button>
         <button className="btn btn-primary btn-sm" onClick={save}>Save & next →</button>

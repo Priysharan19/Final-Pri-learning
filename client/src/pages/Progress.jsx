@@ -35,11 +35,16 @@ export default function Progress() {
 
   const setTab = t => setParams(t === 'overview' ? {} : { tab: t });
 
+  const tabName = { overview: 'Overview', priorities: 'Priorities', map: 'Knowledge map' }[tab] || 'Overview';
+
   return (
     <div>
+      {/* The page draws no title of its own — the tab strip is the title bar —
+          so the heading a screen reader needs is spoken rather than drawn. */}
+      <h1 className="sr-only">Progress — {tabName}</h1>
       <div className="page-tabs no-print">
         {[['overview', 'Overview'], ['priorities', 'Priorities'], ['map', 'Knowledge map']].map(([k, label]) => (
-          <button key={k} className={`page-tab ${tab === k ? 'on' : ''}`} onClick={() => setTab(k)}>{label}</button>
+          <button key={k} className={`page-tab ${tab === k ? 'on' : ''}`} aria-pressed={tab === k} onClick={() => setTab(k)}>{label}</button>
         ))}
       </div>
 
@@ -65,7 +70,8 @@ function Overview({ stats, curriculum, section, sections, sectionKey, setSection
   return (
     <div className="grid" style={{ gap: 18 }}>
       <div className="row no-print" style={{ flexWrap: 'wrap' }}>
-        <select className="input" style={{ width: 260 }} value={sectionKey} onChange={e => setSectionKey(e.target.value)}>
+        <label className="sr-only" htmlFor="progress-scope">Year or course to show</label>
+        <select className="input" id="progress-scope" style={{ width: 260 }} value={sectionKey} onChange={e => setSectionKey(e.target.value)}>
           {sections.map(sc => <option key={sc.key} value={sc.key}>{sc.label}</option>)}
         </select>
       </div>
@@ -92,7 +98,8 @@ function Overview({ stats, curriculum, section, sections, sectionKey, setSection
         <div style={{ padding: '18px 22px' }}>
           <div className="spread">
             <h3>Demonstrated Mark History</h3>
-            <select className="input" style={{ width: 130, padding: '5px 10px', fontSize: 13.5 }} value={range} onChange={e => setRange(e.target.value)}>
+            <label className="sr-only" htmlFor="progress-range">Range of mark history to show</label>
+            <select className="input" id="progress-range" style={{ width: 130, padding: '5px 10px', fontSize: 13.5 }} value={range} onChange={e => setRange(e.target.value)}>
               <option value="all">All time</option>
               <option value="60">60 days</option>
               <option value="30">30 days</option>
@@ -176,7 +183,7 @@ function SyllabusBoard({ subs, nav }) {
     <table className="syl-table" style={{ marginTop: 8 }}>
       <thead>
         <tr className="syl-head-row">
-          <th style={{ textAlign: 'right', paddingRight: 16 }}> </th>
+          <th style={{ textAlign: 'right', paddingRight: 16 }}><span className="sr-only">Topic</span></th>
           {['B1', 'B2', 'B3', 'B4', 'B5', 'B6'].map(b => <th key={b} style={{ width: 64 }}>{b}</th>)}
           <th style={{ paddingLeft: 14 }}>Dot points</th>
         </tr>
@@ -186,23 +193,41 @@ function SyllabusBoard({ subs, nav }) {
           <React.Fragment key={strand}>
             <tr><td colSpan={8} style={{ border: 'none', paddingTop: 14 }}><span className="sc-label" style={{ margin: 0 }}>{strand}</span></td></tr>
             {rows.map(s => (
-              <tr key={s.id} style={{ cursor: 'pointer' }} onClick={() => nav(`/practice?subtopic=${s.id}`)} title="Practise this topic">
-                <td className="syl-name">{s.name}{s.due && <span title="Review due" style={{ color: 'var(--warn)' }}> ●</span>}</td>
+              <tr key={s.id}>
+                <td className="syl-name">
+                  {/* the row used to navigate from an onClick on the <tr> itself,
+                      which no keyboard could reach. The cell's own text is the
+                      control now, drawn with no chrome so the table is unchanged. */}
+                  <button onClick={() => nav(`/practice?subtopic=${s.id}`)} title="Practise this topic"
+                    style={{ background: 'none', border: 'none', padding: 0, font: 'inherit', color: 'inherit', cursor: 'pointer', textAlign: 'inherit', width: '100%' }}>
+                    {s.name}{s.due && <span style={{ color: 'var(--warn)' }}> ●<span className="sr-only"> review due</span></span>}
+                    <span className="sr-only"> — practise this topic</span>
+                  </button>
+                </td>
                 <td colSpan={6} className="syl-band-cell">
-                  <div className="syl-guide">
+                  {/* the bar's position and colour ARE the mastery figure, so the
+                      figure itself is spoken and the drawing is decoration */}
+                  <div className="syl-guide" aria-hidden="true">
                     <span className="dotline" />
                     {s.attempts >= 3
                       ? <span className="syl-bandbar" style={{ left: `${Math.max(2, s.mastery * 0.94)}%`, width: 26, background: rampFor(s.mastery) }} />
                       : <span className="syl-nopred">No prediction</span>}
                   </div>
+                  <span className="sr-only">
+                    {s.attempts >= 3 ? `${s.mastery}% mastery` : 'not enough attempts yet to predict a band'}
+                  </span>
                 </td>
                 <td>
-                  <div className="syl-sq-wrap">
+                  <div className="syl-sq-wrap" aria-hidden="true">
                     {(s.dotpoints || []).map((dp, i) => (
                       <span key={i} className="syl-sq" title={typeof dp === 'string' ? dp : dp.text}
                         style={s.attempts > 0 ? { background: rampFor(s.mastery), borderColor: 'transparent', opacity: 0.55 + 0.45 * (s.mastery / 100) } : {}} />
                     ))}
                   </div>
+                  <span className="sr-only">
+                    {(s.dotpoints || []).length} dot point{(s.dotpoints || []).length === 1 ? '' : 's'}
+                    {s.attempts > 0 ? ` · ${s.attempts} attempt${s.attempts === 1 ? '' : 's'}` : ' · not started'}
+                  </span>
                 </td>
               </tr>
             ))}
@@ -447,6 +472,8 @@ function KnowledgeMap({ curriculum, user, nav }) {
     <div className="kmap-wrap">
       <canvas
         ref={canvasRef} className="kmap-canvas"
+        role="img"
+        aria-label={`Knowledge map — ${totalIdeas} syllabus ideas from Years 7 to 12, drawn as dots that brighten with mastery. Open “Curriculum” below for the same topics as a list.`}
         onMouseMove={onMove}
         onMouseDown={e => {
           const rect = canvasRef.current.getBoundingClientRect();
@@ -466,7 +493,7 @@ function KnowledgeMap({ curriculum, user, nav }) {
         <div className="kmap-panel">
           <div className="spread">
             <div className="card-title" style={{ margin: 0 }}>Curriculum</div>
-            <button className="btn btn-quiet btn-sm" onClick={() => setPanelOpen(false)}>✕</button>
+            <button className="btn btn-quiet btn-sm" aria-label="Close the curriculum list" onClick={() => setPanelOpen(false)}>✕</button>
           </div>
           <CurriculumList curriculum={curriculum} focusSub={focusSub} setFocusSub={setFocusSub} nav={nav} />
         </div>
@@ -476,7 +503,8 @@ function KnowledgeMap({ curriculum, user, nav }) {
         <div className="card kmap-welcome">
           <div className="spread">
             <h3>Your Knowledge Space</h3>
-            <button className="btn btn-quiet btn-sm" onClick={() => { setWelcome(false); localStorage.setItem('pri-kmap-hello', 'off'); }}>✕</button>
+            <button className="btn btn-quiet btn-sm" aria-label="Dismiss this introduction"
+              onClick={() => { setWelcome(false); localStorage.setItem('pri-kmap-hello', 'off'); }}>✕</button>
           </div>
           <p className="sub" style={{ marginTop: 8 }}>
             Every dot is one syllabus idea from Years 7–12. Ideas you’ve practised glow — colour shows strength.
@@ -487,13 +515,13 @@ function KnowledgeMap({ curriculum, user, nav }) {
       )}
 
       <div className="kmap-foot">
-        <button className="btn btn-ghost btn-sm" onClick={() => setPanelOpen(o => !o)}>☰ Curriculum</button>
+        <button className="btn btn-ghost btn-sm" aria-expanded={panelOpen} onClick={() => setPanelOpen(o => !o)}>☰ Curriculum</button>
         <span className="kmap-legend">Needs work <span className="kmap-grad" /> Strong</span>
       </div>
       <div className="kmap-count">{totalIdeas.toLocaleString()} ideas</div>
 
       {tip && (
-        <div className="kmap-tip" style={{ left: tip.x, top: tip.y }}>
+        <div className="kmap-tip" aria-hidden="true" style={{ left: tip.x, top: tip.y }}>
           <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>{tip.n.sec} · {tip.n.sub.strand}{tip.n.sub.code ? ` · ${tip.n.sub.code}` : ''}</div>
           <div style={{ marginTop: 2 }}><b>{tip.n.sub.name}</b></div>
           <div style={{ marginTop: 2 }}>{tip.n.dpText}</div>
@@ -517,7 +545,8 @@ function CurriculumList({ curriculum, focusSub, setFocusSub, nav }) {
     <div style={{ marginTop: 10 }}>
       {sections.map(sec => (
         <div key={sec.key} style={{ marginBottom: 4 }}>
-          <button className="nav-item" style={{ width: '100%' }} onClick={() => setOpenKey(openKey === sec.key ? null : sec.key)}>
+          <button className="nav-item" style={{ width: '100%' }} aria-expanded={openKey === sec.key}
+            onClick={() => setOpenKey(openKey === sec.key ? null : sec.key)}>
             <span style={{ flex: 1 }}>{sec.label}</span>
             <span className="muted">{openKey === sec.key ? '⌄' : '›'}</span>
           </button>
@@ -525,10 +554,10 @@ function CurriculumList({ curriculum, focusSub, setFocusSub, nav }) {
             <div key={s.id} className="row" style={{ padding: '5px 8px 5px 16px' }}>
               <button className="btn btn-quiet btn-sm" style={{ flex: 1, justifyContent: 'flex-start', textAlign: 'left', gap: 8, color: focusSub === s.id ? 'var(--gold)' : undefined }}
                 onClick={() => setFocusSub(focusSub === s.id ? null : s.id)}>
-                <span className="lg-dot" style={{ background: s.attempts > 0 ? rampFor(s.mastery) : 'var(--surface-3)', marginRight: 0 }} />
+                <span className="lg-dot" aria-hidden="true" style={{ background: s.attempts > 0 ? rampFor(s.mastery) : 'var(--surface-3)', marginRight: 0 }} />
                 <span style={{ flex: 1, fontSize: 13 }}>{s.name}</span>
               </button>
-              <button className="btn btn-ghost btn-sm" onClick={() => nav(`/practice?subtopic=${s.id}`)}>▸</button>
+              <button className="btn btn-ghost btn-sm" aria-label={`Practise ${s.name}`} onClick={() => nav(`/practice?subtopic=${s.id}`)}>▸</button>
             </div>
           ))}
         </div>

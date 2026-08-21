@@ -112,7 +112,7 @@ function SecuritySection({ toast }) {
           </span>
         ) : (
           <span style={{ display: 'flex', gap: 8 }}>
-            <input className="input" type="email" value={email} placeholder="you@example.com" style={{ width: 220 }}
+            <input className="input" id="set-email" type="email" value={email} placeholder="you@example.com" style={{ width: 220 }}
               aria-label="Account email" onChange={e => setEmail(e.target.value)} />
             <button className="btn btn-primary btn-sm" disabled={busy} onClick={saveEmail}>Save</button>
             <button className="btn btn-quiet btn-sm" onClick={() => setEditEmail(false)}>Cancel</button>
@@ -131,19 +131,19 @@ function SecuritySection({ toast }) {
           <div className="grid cols-2" style={{ gap: 12 }}>
             {user.hasPassword && (
               <div className="field" style={{ gridColumn: '1 / -1' }}>
-                <label className="label">Current password</label>
-                <input className="input" type="password" value={pw.current} aria-label="Current password"
+                <label className="label" htmlFor="set-pw-current">Current password</label>
+                <input className="input" id="set-pw-current" type="password" value={pw.current} aria-label="Current password"
                   onChange={e => setPw(p => ({ ...p, current: e.target.value }))} />
               </div>
             )}
             <div className="field">
-              <label className="label">New password</label>
-              <input className="input" type="password" value={pw.next} aria-label="New password"
+              <label className="label" htmlFor="set-pw-next">New password</label>
+              <input className="input" id="set-pw-next" type="password" value={pw.next} aria-label="New password"
                 onChange={e => setPw(p => ({ ...p, next: e.target.value }))} />
             </div>
             <div className="field">
-              <label className="label">Repeat it</label>
-              <input className="input" type="password" value={pw.next2} aria-label="Repeat new password"
+              <label className="label" htmlFor="set-pw-next2">Repeat it</label>
+              <input className="input" id="set-pw-next2" type="password" value={pw.next2} aria-label="Repeat new password"
                 onChange={e => setPw(p => ({ ...p, next2: e.target.value }))} />
             </div>
           </div>
@@ -328,28 +328,30 @@ export default function Settings() {
             ) : (
               <div style={{ marginTop: 12 }}>
                 <div className="field">
-                  <label className="label">Name</label>
-                  <input className="input" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
+                  <label className="label" htmlFor="set-name">Name</label>
+                  <input className="input" id="set-name" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
                 </div>
                 <div className="field">
-                  <label className="label">Avatar</label>
-                  <div className="avatar-row">
+                  <div className="label" id="set-avatar">Avatar</div>
+                  <div className="avatar-row" role="group" aria-labelledby="set-avatar">
                     {AVATARS.map(a => (
-                      <button key={a} className={`avatar-pick ${form.avatar === a ? 'on' : ''}`} onClick={() => setForm(f => ({ ...f, avatar: a }))}>{a}</button>
+                      <button key={a} className={`avatar-pick ${form.avatar === a ? 'on' : ''}`}
+                        aria-label={`Avatar ${a}`} aria-pressed={form.avatar === a}
+                        onClick={() => setForm(f => ({ ...f, avatar: a }))}>{a}</button>
                     ))}
                   </div>
                 </div>
                 {user.role !== 'teacher' && (
                   <div className="grid cols-2" style={{ gap: 12 }}>
                     <div className="field">
-                      <label className="label">School year</label>
-                      <select className="input" value={form.year} onChange={e => setForm(f => ({ ...f, year: Number(e.target.value) }))}>
+                      <label className="label" htmlFor="set-year">School year</label>
+                      <select className="input" id="set-year" value={form.year} onChange={e => setForm(f => ({ ...f, year: Number(e.target.value) }))}>
                         {[7, 8, 9, 10, 11, 12].map(y => <option key={y} value={y}>Year {y}</option>)}
                       </select>
                     </div>
                     <div className="field">
-                      <label className="label">Syllabus</label>
-                      <select className="input" value={form.course} onChange={e => setForm(f => ({ ...f, course: e.target.value }))}>
+                      <label className="label" htmlFor="set-course">Syllabus</label>
+                      <select className="input" id="set-course" value={form.course} onChange={e => setForm(f => ({ ...f, course: e.target.value }))}>
                         {COURSES.map(([k, label]) => <option key={k} value={k}>{label}</option>)}
                       </select>
                     </div>
@@ -357,8 +359,8 @@ export default function Settings() {
                 )}
                 {user.role !== 'teacher' && form.year >= 11 && (
                   <div className="field">
-                    <label className="label">HSC pathway</label>
-                    <div className="pathway-row">
+                    <div className="label" id="set-pathway">HSC pathway</div>
+                    <div className="pathway-row" role="group" aria-labelledby="set-pathway">
                       {PATHWAY_OPTS.filter(([k]) => k !== 'ext2' || form.year === 12).map(([k, name, desc]) => (
                         <button key={k} type="button" className={`pathway-pick ${form.pathway === k ? 'on' : ''}`}
                           onClick={() => setForm(f => ({ ...f, pathway: k }))}>
@@ -370,8 +372,8 @@ export default function Settings() {
                   </div>
                 )}
                 <div className="field">
-                  <label className="label">Daily goal — {form.dailyGoal} questions</label>
-                  <input type="range" min="3" max="40" value={form.dailyGoal} style={{ width: '100%', accentColor: 'var(--gold)' }}
+                  <label className="label" htmlFor="set-goal">Daily goal — {form.dailyGoal} questions</label>
+                  <input type="range" id="set-goal" min="3" max="40" value={form.dailyGoal} style={{ width: '100%', accentColor: 'var(--gold)' }}
                     onChange={e => setForm(f => ({ ...f, dailyGoal: Number(e.target.value) }))} />
                 </div>
                 <div className="row">
@@ -396,8 +398,8 @@ export default function Settings() {
           <div className="card" ref={el => secRefs.current.appearance = el}>
             <h2 style={{ marginBottom: 12 }}>◐ Appearance</h2>
             <div className="row">
-              <button className={`gen-opt ${user.theme !== 'light' ? 'on' : ''}`} style={{ width: 160 }} onClick={() => setTheme('dark')}>Dark — blackboard</button>
-              <button className={`gen-opt ${user.theme === 'light' ? 'on' : ''}`} style={{ width: 160 }} onClick={() => setTheme('light')}>Light — paper</button>
+              <button className={`gen-opt ${user.theme !== 'light' ? 'on' : ''}`} aria-pressed={user.theme !== 'light'} style={{ width: 160 }} onClick={() => setTheme('dark')}>Dark — blackboard</button>
+              <button className={`gen-opt ${user.theme === 'light' ? 'on' : ''}`} aria-pressed={user.theme === 'light'} style={{ width: 160 }} onClick={() => setTheme('light')}>Light — paper</button>
             </div>
           </div>
 
@@ -444,17 +446,17 @@ export default function Settings() {
                   from this iPad. Nothing is held anywhere else — export a full backup first if there is any
                   chance you want it back.
                 </p>
-                {del.error && <div className="error-box">{del.error}</div>}
+                {del.error && <div className="error-box" role="alert">{del.error}</div>}
                 <div className="grid cols-2" style={{ gap: 12 }}>
                   <div className="field" style={{ marginBottom: 0 }}>
-                    <label className="label">Type “{user.name}” to confirm</label>
-                    <input className="input" value={del.name} placeholder={user.name} aria-label={`Type ${user.name} to confirm deletion`}
+                    <label className="label" htmlFor="set-del-name">Type “{user.name}” to confirm</label>
+                    <input className="input" id="set-del-name" value={del.name} placeholder={user.name} aria-label={`Type ${user.name} to confirm deletion`}
                       onChange={e => setDel(d => ({ ...d, name: e.target.value }))} />
                   </div>
                   {user.hasPassword && (
                     <div className="field" style={{ marginBottom: 0 }}>
-                      <label className="label">Profile password</label>
-                      <input className="input" type="password" value={del.password} aria-label="Profile password"
+                      <label className="label" htmlFor="set-del-pw">Profile password</label>
+                      <input className="input" id="set-del-pw" type="password" value={del.password} aria-label="Profile password"
                         onChange={e => setDel(d => ({ ...d, password: e.target.value }))} />
                     </div>
                   )}

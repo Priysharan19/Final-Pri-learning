@@ -105,28 +105,31 @@ export default function Home() {
       {/* ── The question generator ── */}
       <div className="genbar">
         <div className={`genbar-head ${open ? 'open' : ''}`}>
-          <button className="genbar-toggle" onClick={() => setOpen(o => !o)} aria-label="Toggle filters">{open ? '⌄' : '⌃'}</button>
+          <button className="genbar-toggle" onClick={() => setOpen(o => !o)}
+            aria-label={open ? 'Hide the question filters' : 'Show the question filters'}
+            aria-expanded={open} aria-controls="gen-panel">{open ? '⌄' : '⌃'}</button>
           {chips.length === 0 ? (
             <button className="genbar-empty" onClick={() => setOpen(true)}>
               {open ? 'No filters applied' : 'Click to configure filters'}
             </button>
           ) : (
-            <div className="genbar-chips" onClick={() => setOpen(true)}>
+            <div className="genbar-chips">
               {chips.map(c => (
                 <span className="chip" key={c.k}>{c.label}
-                  <button className="chip-x" onClick={e => { e.stopPropagation(); c.clear(); }}>✕</button>
+                  <button className="chip-x" aria-label={`Remove the ${c.label} filter`}
+                    onClick={e => { e.stopPropagation(); c.clear(); }}>✕</button>
                 </span>
               ))}
             </div>
           )}
           {chips.length > 0 && (
-            <button className="editor-tool" title="Clear all filters" onClick={resetAll}>↺</button>
+            <button className="editor-tool" title="Clear all filters" aria-label="Clear all filters" onClick={resetAll}>↺</button>
           )}
           <button className="btn btn-primary" style={{ padding: '7px 18px' }} onClick={generate}>Generate</button>
         </div>
 
         {open && (
-          <div className="gen-panel">
+          <div className="gen-panel" id="gen-panel">
             <div className="gen-cats">
               {[
                 ['year', 'Year'], ['course', 'Course'], ['topics', 'Topics'],
@@ -243,7 +246,8 @@ export default function Home() {
         </div>
         {!promoGone && (
           <div className="home-card">
-            <button className="home-card-x" onClick={() => { setPromoGone(true); localStorage.setItem('pri-home-promo', 'off'); }}>✕</button>
+            <button className="home-card-x" aria-label="Dismiss the adaptive engine card"
+              onClick={() => { setPromoGone(true); localStorage.setItem('pri-home-promo', 'off'); }}>✕</button>
             <span className="sc-label" style={{ margin: 0 }}>Adaptive engine</span>
             <div className="spread" style={{ marginTop: 8, flexWrap: 'wrap', gap: 14 }}>
               <div style={{ fontSize: 21, lineHeight: 1.35, maxWidth: 300 }}>
@@ -358,12 +362,17 @@ function DiamondTrack({ recent }) {
     return <div className="muted" style={{ marginTop: 20 }}>Your first questions will appear here.</div>;
   }
   const color = a => a.correct ? 'var(--m5)' : 'var(--m1)';
+  // Right and wrong were a red diamond and a green one, and a tooltip: nothing
+  // a screen reader or a colour-blind student could read. The verdict is spelled
+  // out beside each mark, off-screen, and the joining bars are decoration.
   return (
-    <div className="diamond-track">
+    <div className="diamond-track" role="group" aria-label="Your most recent questions, oldest first">
       {items.map((a, i) => (
         <React.Fragment key={i}>
-          {i > 0 && <span className="diamond-link" style={{ background: `linear-gradient(90deg, ${color(items[i - 1])}, ${color(a)})` }} />}
-          <span className="diamond" style={{ background: color(a) }} title={`${a.name} — ${a.correct ? 'correct' : 'incorrect'}`} />
+          {i > 0 && <span className="diamond-link" aria-hidden="true" style={{ background: `linear-gradient(90deg, ${color(items[i - 1])}, ${color(a)})` }} />}
+          <span className="diamond" style={{ background: color(a) }} title={`${a.name} — ${a.correct ? 'correct' : 'incorrect'}`}>
+            <span className="sr-only">{a.name} — {a.correct ? 'correct' : 'incorrect'}</span>
+          </span>
         </React.Fragment>
       ))}
     </div>

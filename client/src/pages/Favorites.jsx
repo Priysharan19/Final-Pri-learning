@@ -29,7 +29,7 @@ export default function Favorites() {
         <h1 style={{ marginBottom: 18 }}>Favorites</h1>
         <div className="locked-wrap" style={{ border: '1px dashed var(--hairline-strong)', borderRadius: 6 }}>
           <div className="locked-card">
-            <div className="locked-icon">☆</div>
+            <div className="locked-icon" aria-hidden="true">☆</div>
             <div className="locked-title">No favorites yet</div>
             <div className="locked-sub">Star any question — from the question page or your history — and it lands here for quick revision.</div>
             <button className="btn btn-ghost" onClick={() => nav('/history')}>Open History</button>
@@ -48,10 +48,13 @@ export default function Favorites() {
       <div className="card card-flush">
         {data.items.map(it => (
           <div className="hist-row" key={it.id}>
-            <button className="hist-star on" title="Remove from favorites" onClick={() => unstar(it.id)}>★</button>
+            <button className="hist-star on" title="Remove from favorites"
+              aria-label={`Remove this ${it.subtopicName} question from favorites`} onClick={() => unstar(it.id)}>★</button>
             <div className="hist-main" style={{ cursor: 'default' }}>
               <div className="hist-top">
-                <span className={`hist-verdict ${it.correct ? 'good' : 'bad'}`}>{it.correct ? '✓' : '✗'}</span>
+                <span className={`hist-verdict ${it.correct ? 'good' : 'bad'}`}>
+                  {it.correct ? '✓' : '✗'}<span className="sr-only">{it.correct ? 'Correct' : 'Incorrect'}</span>
+                </span>
                 <span className="hist-name">{it.subtopicName}</span>
                 <span className="tag">D{it.difficulty}</span>
                 {it.mode !== 'practice' && <span className="tag">{it.mode}</span>}

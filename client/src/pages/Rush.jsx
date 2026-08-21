@@ -72,7 +72,8 @@ export default function Rush() {
   if (phase === 'lobby') {
     return (
       <div className="card qcard" style={{ textAlign: 'center', padding: 40 }}>
-        <div style={{ fontSize: 46 }}>⚡</div>
+        <h1 className="sr-only">Rapid Fire</h1>
+        <div style={{ fontSize: 46 }} aria-hidden="true">⚡</div>
         <h2 style={{ margin: '10px 0 6px' }}>Rush — 90 seconds, maximum questions</h2>
         <p className="sub" style={{ maxWidth: 460, margin: '0 auto 20px' }}>
           Rapid-fire fundamentals from your year and the one below. Build a combo for bragging rights.
@@ -86,6 +87,7 @@ export default function Rush() {
   if (phase === 'done') {
     return (
       <div className="card qcard" style={{ textAlign: 'center', padding: 40 }}>
+        <h1 className="sr-only">Rapid Fire — finished</h1>
         <div className="card-title">Time!</div>
         <div className="hero-num">{correct}</div>
         <p className="sub" style={{ marginTop: 4 }}>correct in 90 seconds · best combo <b className="rush-combo">×{bestCombo}</b></p>
@@ -107,14 +109,15 @@ export default function Rush() {
 
   return (
     <div className="grid" style={{ gap: 16, maxWidth: 680, margin: '0 auto' }}>
+      <h1 className="sr-only">Rapid Fire — in play</h1>
       <div className="spread">
-        <span className={`rush-timer ${left <= 10 ? 'delta-down' : ''}`}>{left}s</span>
+        <span className={`rush-timer ${left <= 10 ? 'delta-down' : ''}`} role="timer" aria-label={`${left} seconds left`}>{left}s</span>
         <div className="row">
           <span className="chip">✔ <b>{correct}</b></span>
           <span className="chip">combo <b className="rush-combo">×{combo}</b></span>
         </div>
       </div>
-      <div className="goalbar"><i style={{ width: `${(left / 90) * 100}%` }} /></div>
+      <div className="goalbar" aria-hidden="true"><i style={{ width: `${(left / 90) * 100}%` }} /></div>
 
       <div className={`card ${flash === 'good' ? 'rush-flash-good' : flash === 'bad' ? 'rush-flash-bad' : ''}`}>
         <div className="q-meta">
@@ -135,7 +138,7 @@ export default function Rush() {
         ) : (
           <div className="answer-row">
             {q.answerPrefix && <span className="answer-prefix"><MathText text={q.answerPrefix} /></span>}
-            <input ref={inputRef} className="input answer-input" value={answer} placeholder={q.inputHint || 'Answer + Enter'}
+            <input ref={inputRef} className="input answer-input" value={answer} aria-label="Your answer" placeholder={q.inputHint || 'Answer + Enter'}
               onChange={e => setAnswer(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter' && answer.trim()) answerCurrent(answer); }} />
             <button className="btn btn-primary" disabled={!answer.trim()} onClick={() => answerCurrent(answer)}>Go</button>

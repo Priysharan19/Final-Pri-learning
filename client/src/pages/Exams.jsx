@@ -29,6 +29,8 @@ export default function Exams() {
 
   return (
     <div className="grid cols-2" style={{ alignItems: 'start' }}>
+      {/* the printable paper brings its own <h1>, so this one steps aside */}
+      {!paper && <h1 className="sr-only">Exams</h1>}
       <div className="card">
         <div className="card-title">Sit a practice paper</div>
         <p className="sub" style={{ marginBottom: 18 }}>
@@ -36,23 +38,23 @@ export default function Exams() {
           through to exam-extension finishers. No hints, one shot, full worked solutions afterwards.
         </p>
         <div className="field">
-          <label className="label">Year level</label>
-          <select className="input" value={cfg.year} onChange={e => setCfg(c => ({ ...c, year: Number(e.target.value) }))}>
+          <label className="label" htmlFor="exam-year">Year level</label>
+          <select className="input" id="exam-year" value={cfg.year} onChange={e => setCfg(c => ({ ...c, year: Number(e.target.value) }))}>
             {[7, 8, 9, 10, 11, 12].map(y => <option key={y} value={y}>Year {y}{y === user.year ? ' · yours' : ''}</option>)}
           </select>
         </div>
         <div className="grid cols-2" style={{ gap: 12 }}>
           <div className="field">
-            <label className="label">Questions</label>
-            <select className="input" value={cfg.length} onChange={e => setCfg(c => ({ ...c, length: Number(e.target.value), minutes: Number(e.target.value) * 3 }))}>
+            <label className="label" htmlFor="exam-length">Questions</label>
+            <select className="input" id="exam-length" value={cfg.length} onChange={e => setCfg(c => ({ ...c, length: Number(e.target.value), minutes: Number(e.target.value) * 3 }))}>
               <option value={10}>10 — quick paper</option>
               <option value={15}>15 — standard</option>
               <option value={20}>20 — full paper</option>
             </select>
           </div>
           <div className="field">
-            <label className="label">Time limit</label>
-            <select className="input" value={cfg.minutes} onChange={e => setCfg(c => ({ ...c, minutes: Number(e.target.value) }))}>
+            <label className="label" htmlFor="exam-minutes">Time limit</label>
+            <select className="input" id="exam-minutes" value={cfg.minutes} onChange={e => setCfg(c => ({ ...c, minutes: Number(e.target.value) }))}>
               {[15, 20, 30, 45, 60].map(m => <option key={m} value={m}>{m} minutes</option>)}
             </select>
           </div>
@@ -79,7 +81,8 @@ export default function Exams() {
                 {e.score}/{e.total} · {Math.round(100 * e.score / e.total)}%
               </span>
               : <span className="tag tag-brand">In progress</span>}
-            <button className="btn btn-quiet btn-sm" title="Download as printable paper" onClick={() => openPaper(e.id)}>🖨</button>
+            <button className="btn btn-quiet btn-sm" title="Download as printable paper"
+              aria-label={`Open “${e.title}” as a printable paper`} onClick={() => openPaper(e.id)}>🖨</button>
             <button className="btn btn-ghost btn-sm" onClick={() => nav(`/exams/${e.id}`)}>{e.finished_at ? 'Review' : 'Resume'}</button>
           </div>
         ))}

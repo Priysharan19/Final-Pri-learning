@@ -13,7 +13,14 @@ import { sanitizeFigure } from '../lib/sanitize.js';
 import { clearDraft, queueDraft, readDraft } from './drafts.js';
 
 const DIFF_CLASS = { 1: 'tag-d1', 2: 'tag-d2', 3: 'tag-d3', 4: 'tag-d4' };
-const SYMBOLS = ['π', '√(', '^', '±', '×', '÷', '≤', '≥', '≠', '°', 'θ', '(', ')', '/', ':'];
+// Each key carries the name of the thing it inserts, because "≥" and "√(" are
+// read out as punctuation — or not at all — by a screen reader.
+const SYMBOLS = [
+  ['π', 'pi'], ['√(', 'square root'], ['^', 'to the power of'], ['±', 'plus or minus'],
+  ['×', 'multiply'], ['÷', 'divide'], ['≤', 'less than or equal to'], ['≥', 'greater than or equal to'],
+  ['≠', 'not equal to'], ['°', 'degrees'], ['θ', 'theta'], ['(', 'open bracket'],
+  [')', 'close bracket'], ['/', 'divided by'], [':', 'ratio']
+];
 const preferMode = () => {
   const saved = localStorage.getItem('pri-input-mode');
   if (saved) return saved;
@@ -503,6 +510,7 @@ export default function QuestionCard({ question, why, reason, onResolved, onNext
             <button key={i} className={`hint-bulb ${i < hintsUsed ? 'lit' : ''}`}
               disabled={resolved || i !== hintsUsed}
               title={`Hint ${i + 1} — costs 15% credit`}
+              aria-label={`Reveal hint ${i + 1} of ${question.hintsAvailable} — costs 15% of the credit for this question`}
               onClick={getHint}>
               <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.7"><path d="M9.5 18h5M10 21h4M12 3a6 6 0 0 0-3.4 10.9c.7.5 1.1 1.2 1.2 2.1h4.4c.1-.9.5-1.6 1.2-2.1A6 6 0 0 0 12 3Z" /></svg>
               <sup>{i + 1}</sup>
@@ -575,7 +583,9 @@ export default function QuestionCard({ question, why, reason, onResolved, onNext
               </div>
               {showSyms && (
                 <div className="sym-palette">
-                  {SYMBOLS.map(s => <button key={s} className="sym-key" onClick={() => insertSym(s)}>{s}</button>)}
+                  {SYMBOLS.map(([sym, name]) => (
+                    <button key={sym} className="sym-key" aria-label={`Insert ${name}`} onClick={() => insertSym(sym)}>{sym}</button>
+                  ))}
                 </div>
               )}
               <div className="editor-body">
@@ -597,6 +607,7 @@ export default function QuestionCard({ question, why, reason, onResolved, onNext
                   <textarea
                     ref={inputRef}
                     className="working-input"
+                    aria-label="Your working — one line per row, every line is marked"
                     style={{ background: 'none', border: 'none', outline: 'none', color: 'var(--ink)' }}
                     placeholder={question.inputHint || 'Show every line of your working — each line is marked.\nFinish with the result you were asked to reach.'}
                     value={working} disabled={resolved}
@@ -609,6 +620,7 @@ export default function QuestionCard({ question, why, reason, onResolved, onNext
                     <input
                       ref={inputRef}
                       className="answer-input"
+                      aria-label={`Your answer${question.answerSuffix ? ` in ${question.answerSuffix}` : ''}`}
                       placeholder={question.inputHint || 'Your answer…'}
                       value={answer}
                       disabled={resolved}
@@ -630,6 +642,7 @@ export default function QuestionCard({ question, why, reason, onResolved, onNext
                     {showWorking && (
                       <textarea
                         className="input" style={{ marginTop: 8 }}
+                        aria-label="Your working for partial credit — one step per line"
                         placeholder={'One step per line, e.g.\n2x + 3 = 13\n2x = 10\nx = 5'}
                         value={working} onChange={e => editWorking(e.target.value)}
                       />

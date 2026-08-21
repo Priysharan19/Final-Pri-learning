@@ -129,8 +129,8 @@ export default function Match() {
             <div className="card card-flush">
               <div className="card-head"><span className="sc-label" style={{ margin: 0 }}>⚔ Start match</span></div>
               <div style={{ padding: '14px 16px' }}>
-                <div className="label">Rival</div>
-                <div className="grid" style={{ gap: 8 }}>
+                <div className="label" id="match-rival">Rival</div>
+                <div className="grid" role="group" aria-labelledby="match-rival" style={{ gap: 8 }}>
                   {RIVALS.map(r => (
                     <button key={r.key} className={`gen-opt ${rivalKey === r.key ? 'on' : ''}`} style={{ textAlign: 'left', display: 'flex', gap: 10, alignItems: 'center' }}
                       onClick={() => setRivalKey(r.key)}>
@@ -140,8 +140,8 @@ export default function Match() {
                     </button>
                   ))}
                 </div>
-                <div className="label" style={{ marginTop: 14 }}>Arena</div>
-                <div className="pill-select">
+                <div className="label" id="match-arena" style={{ marginTop: 14 }}>Arena</div>
+                <div className="pill-select" role="group" aria-labelledby="match-arena">
                   {STRANDS.map(s => (
                     <button key={s || 'all'} className={`pill-opt ${strand === s ? 'on' : ''}`} onClick={() => setStrand(s)}>
                       {s === null ? 'Everything' : s === 'Statistics & Probability' ? 'Statistics' : s}
@@ -195,7 +195,8 @@ export default function Match() {
   if (phase === 'done') {
     return (
       <div className="card qcard" style={{ textAlign: 'center', padding: 40 }}>
-        <div style={{ fontSize: 46 }}>{result.won ? '♛' : '⚑'}</div>
+        <h1 className="sr-only">Match Mode — result</h1>
+        <div style={{ fontSize: 46 }} aria-hidden="true">{result.won ? '♛' : '⚑'}</div>
         <h2 style={{ margin: '10px 0 4px' }}>{result.won ? `You beat ${game.rival.name}` : `${game.rival.name} takes it`}</h2>
         <p className="sub">Final score {me} — {rival}{result.won ? ' · glorious.' : ' · rematch?'}</p>
         <p className="muted" style={{ marginTop: 8 }}>Career: {result.wins} win{result.wins === 1 ? '' : 's'} from {result.played} match{result.played === 1 ? '' : 'es'}</p>
@@ -211,17 +212,18 @@ export default function Match() {
   const q = game.questions[idx];
   return (
     <div className="grid" style={{ gap: 16, maxWidth: 760, margin: '0 auto' }}>
+      <h1 className="sr-only">Match Mode — racing {game.rival.name}</h1>
       <div className="card">
-        <div className="race-track">
+        <div className="race-track" role="status" aria-label={`You ${me}, ${game.rival.name} ${rival}, first to ${game.total}`}>
           <div className="race-lane">
-            <span className="race-face">{user.avatar || '🙋'}</span>
-            <div className="race-bar race-you"><i style={{ width: `${(me / game.total) * 100}%` }} /></div>
-            <span className="race-score">{me}</span>
+            <span className="race-face" aria-hidden="true">{user.avatar || '🙋'}</span>
+            <div className="race-bar race-you" aria-hidden="true"><i style={{ width: `${(me / game.total) * 100}%` }} /></div>
+            <span className="race-score" aria-hidden="true">{me}</span>
           </div>
           <div className="race-lane">
-            <span className="race-face">{game.rival.avatar}</span>
-            <div className="race-bar race-rival"><i style={{ width: `${(rival / game.total) * 100}%` }} /></div>
-            <span className="race-score">{rival}</span>
+            <span className="race-face" aria-hidden="true">{game.rival.avatar}</span>
+            <div className="race-bar race-rival" aria-hidden="true"><i style={{ width: `${(rival / game.total) * 100}%` }} /></div>
+            <span className="race-score" aria-hidden="true">{rival}</span>
           </div>
         </div>
         <div className={`card ${flash === 'good' ? 'rush-flash-good' : flash === 'bad' ? 'rush-flash-bad' : ''}`} style={{ padding: 16 }}>
@@ -243,7 +245,7 @@ export default function Match() {
           ) : (
             <div className="answer-row">
               {q.answerPrefix && <span className="answer-prefix"><MathText text={q.answerPrefix} /></span>}
-              <input ref={inputRef} className="input answer-input" value={answer} placeholder={q.inputHint || 'Answer + Enter'}
+              <input ref={inputRef} className="input answer-input" value={answer} aria-label="Your answer" placeholder={q.inputHint || 'Answer + Enter'}
                 onChange={e => setAnswer(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter' && answer.trim()) answerCurrent(answer); }}
                 autoCapitalize="none" autoCorrect="off" spellCheck={false} />

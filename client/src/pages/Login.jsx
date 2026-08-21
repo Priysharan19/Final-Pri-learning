@@ -107,7 +107,7 @@ export function PasswordMeter({ verdict }) {
       : verdict.score === 2 ? 'var(--cream)' : 'var(--warn)';
   return (
     <div style={{ marginTop: 10 }}>
-      <div className="meter"><i style={{ width: `${pct}%`, background: tone }} /></div>
+      <div className="meter" aria-hidden="true"><i style={{ width: `${pct}%`, background: tone }} /></div>
       <p className="muted" role="status" style={{ marginTop: 6, fontSize: 12.5 }}>
         {verdict.label && <><b style={{ color: tone }}>{verdict.label}</b> — </>}{verdict.note}
       </p>
@@ -257,8 +257,15 @@ export default function Login() {
     <div className="auth-wrap">
       <MathField n={70} />
       <div className="auth-split fade-in">
-        <div className="auth-brand" onClick={() => setStage('hero')}>
-          <Logo large />
+        <div className="auth-brand">
+          {/* The whole panel used to navigate from an onClick on a <div>: a
+              mouse-only route back to the welcome screen. It is a real button
+              on the wordmark now, drawn with no chrome of its own. */}
+          <button type="button" onClick={() => setStage('hero')}
+            aria-label="Back to the Pri Learning welcome screen"
+            style={{ display: 'block', background: 'none', border: 'none', padding: 0, margin: 0, font: 'inherit', color: 'inherit', cursor: 'pointer' }}>
+            <Logo large />
+          </button>
           <div className="hero-kicker" style={{ marginTop: 14 }}>Years 7–12 · HSC ready</div>
           <div className="auth-points">
             <div className="auth-point"><span className="auth-tick">✓</span>1,300,000+ distinct questions across every syllabus dot point</div>
@@ -269,6 +276,11 @@ export default function Login() {
         </div>
 
         <div className="auth-panel">
+          {/* Each stage draws its own title as an <h2> sized for its card, so the
+              page's one heading is spoken rather than drawn. */}
+          <h1 className="sr-only">
+            {stage === 'pick' ? 'Choose a profile' : stage === 'method' ? 'Add a profile to this iPad' : 'Create a profile'}
+          </h1>
           {stage === 'pick' && (
             <div className="card auth-card slide-up">
               <h2 style={{ marginBottom: 4 }}>Who’s practising?</h2>
@@ -368,14 +380,14 @@ export default function Login() {
               {error && <div className="error-box" style={{ marginBottom: 12 }}>{error}</div>}
 
               <div className="field">
-                <label className="label">Name</label>
-                <input className="input" value={form.name} autoFocus placeholder="e.g. Priysharan"
+                <label className="label" htmlFor="signup-name">Name</label>
+                <input className="input" id="signup-name" value={form.name} autoFocus placeholder="e.g. Priysharan"
                   onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
               </div>
               {withEmail && (
                 <div className="field">
-                  <label className="label">Email <span className="muted">(optional)</span></label>
-                  <input className="input" type="email" value={form.email} placeholder="you@example.com"
+                  <label className="label" htmlFor="signup-email">Email <span className="muted">(optional)</span></label>
+                  <input className="input" id="signup-email" type="email" value={form.email} placeholder="you@example.com"
                     onChange={e => setForm(f => ({ ...f, email: e.target.value }))} />
                   <p className="muted" style={{ marginTop: 6, fontSize: 12.5 }}>
                     Only to tell profiles apart on this device — never verified, never sent.
@@ -384,8 +396,8 @@ export default function Login() {
               )}
 
               <div className="field">
-                <label className="label">I am a…</label>
-                <div className="pill-select">
+                <div className="label" id="signup-role">I am a…</div>
+                <div className="pill-select" role="group" aria-labelledby="signup-role">
                   <button className={`pill-opt ${form.role === 'student' ? 'on' : ''}`} onClick={() => setForm(f => ({ ...f, role: 'student' }))}>Student</button>
                   <button className={`pill-opt ${form.role === 'teacher' ? 'on' : ''}`} onClick={() => setForm(f => ({ ...f, role: 'teacher' }))}>Teacher</button>
                 </div>
@@ -393,14 +405,14 @@ export default function Login() {
               {form.role === 'student' && (
                 <div className="grid cols-2" style={{ gap: 12 }}>
                   <div className="field">
-                    <label className="label">School year</label>
-                    <select className="input" value={form.year} onChange={e => setForm(f => ({ ...f, year: Number(e.target.value) }))}>
+                    <label className="label" htmlFor="signup-year">School year</label>
+                    <select className="input" id="signup-year" value={form.year} onChange={e => setForm(f => ({ ...f, year: Number(e.target.value) }))}>
                       {[7, 8, 9, 10, 11, 12].map(y => <option key={y} value={y}>Year {y}</option>)}
                     </select>
                   </div>
                   <div className="field">
-                    <label className="label">Syllabus</label>
-                    <select className="input" value={form.course} onChange={e => setForm(f => ({ ...f, course: e.target.value }))}>
+                    <label className="label" htmlFor="signup-course">Syllabus</label>
+                    <select className="input" id="signup-course" value={form.course} onChange={e => setForm(f => ({ ...f, course: e.target.value }))}>
                       <option value="nsw">NSW · HSC</option>
                       <option value="vic">VIC · VCE</option>
                       <option value="qld">QLD · QCE</option>
@@ -413,8 +425,8 @@ export default function Login() {
               )}
               {form.role === 'student' && form.year >= 11 && (
                 <div className="field">
-                  <label className="label">HSC pathway</label>
-                  <div className="pathway-row">
+                  <div className="label" id="signup-pathway">HSC pathway</div>
+                  <div className="pathway-row" role="group" aria-labelledby="signup-pathway">
                     {[['standard', 'Standard'], ['advanced', 'Advanced'], ['ext1', 'Extension 1'], ['ext2', 'Extension 2']]
                       .filter(([k]) => k !== 'ext2' || form.year === 12)
                       .map(([k, name]) => (
@@ -427,8 +439,8 @@ export default function Login() {
                 </div>
               )}
               <div className="field">
-                <label className="label">Avatar</label>
-                <div className="avatar-row">
+                <div className="label" id="signup-avatar">Avatar</div>
+                <div className="avatar-row" role="group" aria-labelledby="signup-avatar">
                   {AVATARS.map(a => (
                     <button key={a} className={`avatar-pick ${form.avatar === a ? 'on' : ''}`} aria-label={`Avatar ${a}`} onClick={() => setForm(f => ({ ...f, avatar: a }))}>{a}</button>
                   ))}
@@ -443,9 +455,9 @@ export default function Login() {
                 {form.protect && (
                   <>
                     <div className="grid cols-2" style={{ gap: 12, marginTop: 10 }}>
-                      <input className="input" type="password" placeholder="Password" value={form.password} aria-label="Password"
+                      <input className="input" id="signup-password" type="password" placeholder="Password" value={form.password} aria-label="Password"
                         onChange={e => setForm(f => ({ ...f, password: e.target.value }))} />
-                      <input className="input" type="password" placeholder="Repeat password" value={form.password2} aria-label="Repeat password"
+                      <input className="input" id="signup-password2" type="password" placeholder="Repeat password" value={form.password2} aria-label="Repeat password"
                         onChange={e => setForm(f => ({ ...f, password2: e.target.value }))} />
                     </div>
                     <PasswordMeter verdict={pwVerdict} />

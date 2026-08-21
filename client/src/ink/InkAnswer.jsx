@@ -139,16 +139,18 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
   return (
     <div className={`ink-answer ${disabled ? 'ink-disabled' : ''}`}>
       <div className="ink-toolbar">
-        <button type="button" className={`ink-tool ${tool === 'pen' ? 'on' : ''}`} onClick={() => setTool('pen')} title="Pen">✒️ Pen</button>
-        <button type="button" className={`ink-tool ${tool === 'eraser' ? 'on' : ''}`} onClick={() => setTool('eraser')} title="Eraser">◻️ Eraser</button>
+        <button type="button" className={`ink-tool ${tool === 'pen' ? 'on' : ''}`} aria-pressed={tool === 'pen'} onClick={() => setTool('pen')} title="Pen">✒️ Pen</button>
+        <button type="button" className={`ink-tool ${tool === 'eraser' ? 'on' : ''}`} aria-pressed={tool === 'eraser'} onClick={() => setTool('eraser')} title="Eraser">◻️ Eraser</button>
         <span className="ink-sep" />
         <button type="button" className="ink-tool" onClick={act('undo')} title="Undo" aria-label="Undo last stroke">↩︎</button>
         <button type="button" className="ink-tool" onClick={act('redo')} title="Redo" aria-label="Redo last stroke">↪︎</button>
         <button type="button" className="ink-tool" onClick={act('clear')} title="Clear" aria-label="Clear all handwriting">🗑</button>
         <span className="ink-sep" />
-        <button type="button" className="ink-tool" onClick={() => setExtraHeight(h => Math.min(400, h + 120))} title="More space">＋ space</button>
+        <button type="button" className="ink-tool" aria-label="Add more writing space"
+          onClick={() => setExtraHeight(h => Math.min(400, h + 120))} title="More space">＋ space</button>
         <span className="ink-sep" />
         <button type="button" className={`ink-tool ${finger ? 'on' : ''}`} title="Draw with a finger too (otherwise fingers scroll once a Pencil is seen)"
+          aria-label="Draw with a finger as well as a Pencil" aria-pressed={finger}
           onClick={() => setFinger(f => !f)}>☝ Finger</button>
         <span className="ink-hint">Write each step on its own line · Apple Pencil ready</span>
       </div>
@@ -205,13 +207,14 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
 
       {rec.lines.length > 0 && (
         <div className="ink-preview">
-          <div className="ink-preview-title">I'm reading:</div>
+          <div className="ink-preview-title" id="ink-reading">I'm reading:</div>
           {rec.lines.map((line, li) => (
             <div className="ink-line" key={li}>
-              <span className="ink-line-n">{li + 1}</span>
+              <span className="ink-line-n" aria-hidden="true">{li + 1}</span>
               {lineVerdicts && lineVerdicts[li] && ['ok', 'break', 'wrong'].includes(lineVerdicts[li].status) && (
                 <span className={`ink-line-verdict ${lineVerdicts[li].status === 'ok' ? 'good' : 'bad'}`}>
                   {lineVerdicts[li].status === 'ok' ? '✓' : '✗'}
+                  <span className="sr-only">Line {li + 1} {lineVerdicts[li].status === 'ok' ? 'checks out' : 'is where the maths breaks'}. </span>
                 </span>
               )}
               <span className="ink-line-math"><MathText text={`$${exprToLatex(line.text) || '\\;'}$`} /></span>
@@ -228,6 +231,8 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
                       ? { outline: '2px solid var(--brand-1)', outlineOffset: 2, borderRadius: 4 }
                       : undefined}
                     title={s.id === focusSymbol ? 'Check this one' : 'Tap to correct'}
+                    aria-label={`Line ${li + 1}, symbol read as “${showSym(s.sym)}”${s.conf < 0.45 ? ', a shaky reading' : ''} — change it`}
+                    aria-expanded={picker?.id === s.id}
                     onClick={() => setPicker(picker?.id === s.id ? null : { id: s.id, alts: s.alts })}
                   >{showSym(s.sym)}</button>
                 ))}
@@ -235,17 +240,20 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
             </div>
           ))}
           {picker && (
-            <div className="ink-picker" ref={pickerRef}>
+            <div className="ink-picker" ref={pickerRef} role="group" aria-label="Change this symbol">
               <div className="ink-picker-row">
                 {picker.alts.map(a => (
-                  <button type="button" key={a.sym} className="ink-pick" onClick={() => applyOverride(picker.id, a.sym)}>
+                  <button type="button" key={a.sym} className="ink-pick"
+                    aria-label={`Change it to “${showSym(a.sym)}” — ${Math.round(a.conf * 100)}% sure`}
+                    onClick={() => applyOverride(picker.id, a.sym)}>
                     {showSym(a.sym)} <small>{Math.round(a.conf * 100)}%</small>
                   </button>
                 ))}
               </div>
               <div className="ink-picker-all">
                 {ALPHABET.map(s => (
-                  <button type="button" key={s} className="ink-pick tiny" onClick={() => applyOverride(picker.id, s)}>{showSym(s)}</button>
+                  <button type="button" key={s} className="ink-pick tiny" aria-label={`Change it to “${showSym(s)}”`}
+                    onClick={() => applyOverride(picker.id, s)}>{showSym(s)}</button>
                 ))}
               </div>
             </div>

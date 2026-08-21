@@ -1,5 +1,5 @@
 // Tasks — assigned by a teacher on this device, or set for yourself.
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
 import { useApp } from '../App.jsx';
@@ -12,6 +12,7 @@ export default function Tasks() {
   const [curriculum, setCurriculum] = useState(null);
   const [creating, setCreating] = useState(false);
   const [form, setForm] = useState({ title: '', subtopics: [], count: 10 });
+  const packRef = useRef(null);
   const nav = useNavigate();
 
   const load = () => api.get('/tasks').then(r => setTasks(r.tasks)).catch(() => setTasks([]));
@@ -48,16 +49,18 @@ export default function Tasks() {
 
   return (
     <div className="grid" style={{ gap: 18 }}>
+      <h1 className="sr-only">Tasks</h1>
       <div className="spread" style={{ flexWrap: 'wrap', gap: 10 }}>
         <div>
           <h2>Tasks</h2>
           <p className="sub" style={{ marginTop: 3 }}>Assignments from your teacher on this device, plus goals you set yourself.</p>
         </div>
         <div className="row">
-          <label className="btn btn-ghost" style={{ cursor: 'pointer' }}>
-            📦 Import task pack
-            <input type="file" accept=".json,application/json" style={{ display: 'none' }} onChange={importPack} />
-          </label>
+          {/* this was a <label> wrapping a display:none file input — clickable
+              with a mouse, unreachable with a keyboard, because a hidden input
+              is not focusable and a label is not a control */}
+          <button className="btn btn-ghost" onClick={() => packRef.current?.click()}>📦 Import task pack</button>
+          <input ref={packRef} type="file" accept=".json,application/json" style={{ display: 'none' }} onChange={importPack} />
           <button className="btn btn-primary" onClick={() => setCreating(c => !c)}>{creating ? 'Cancel' : '＋ Set myself a task'}</button>
         </div>
       </div>
@@ -65,13 +68,13 @@ export default function Tasks() {
       {creating && (
         <div className="card">
           <div className="field">
-            <label className="label">Task name</label>
-            <input className="input" value={form.title} placeholder="e.g. Trig tune-up before Friday"
+            <label className="label" htmlFor="task-title">Task name</label>
+            <input className="input" id="task-title" value={form.title} placeholder="e.g. Trig tune-up before Friday"
               onChange={e => setForm(f => ({ ...f, title: e.target.value }))} />
           </div>
           <div className="field">
-            <label className="label">Topics ({form.subtopics.length} selected)</label>
-            <div className="pill-select">
+            <div className="label" id="task-topics">Topics ({form.subtopics.length} selected)</div>
+            <div className="pill-select" role="group" aria-labelledby="task-topics">
               {mySubtopics.map(s => (
                 <button key={s.id} className={`pill-opt ${form.subtopics.includes(s.id) ? 'on' : ''}`}
                   onClick={() => setForm(f => ({ ...f, subtopics: f.subtopics.includes(s.id) ? f.subtopics.filter(x => x !== s.id) : [...f.subtopics, s.id] }))}>
@@ -81,8 +84,8 @@ export default function Tasks() {
             </div>
           </div>
           <div className="field" style={{ maxWidth: 260 }}>
-            <label className="label">Questions — {form.count}</label>
-            <input type="range" min="5" max="30" step="5" value={form.count} style={{ width: '100%', accentColor: 'var(--brand-1)' }}
+            <label className="label" htmlFor="task-count">Questions — {form.count}</label>
+            <input type="range" id="task-count" min="5" max="30" step="5" value={form.count} style={{ width: '100%', accentColor: 'var(--brand-1)' }}
               onChange={e => setForm(f => ({ ...f, count: Number(e.target.value) }))} />
           </div>
           <button className="btn btn-primary" disabled={!form.subtopics.length} onClick={create}>Create task</button>

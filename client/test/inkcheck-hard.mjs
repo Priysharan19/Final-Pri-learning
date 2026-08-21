@@ -113,17 +113,24 @@ for (let t = 0; t < 40; t++) {
 }
 console.log(`Messy digit strings: ${dPass}/${dTot} (${(100 * dPass / dTot).toFixed(0)}%)`);
 
-// ── 4. Personal learning: an alien glyph becomes readable after ONE sample ──
+// ── 4. Personal learning: a MISREAD glyph becomes right after ONE sample ─────
+// This check has to prove two things, and until now it proved neither. It used a
+// European crossed 7, which the stock templates already read as "7" — so the
+// assertion `after.sym === '7'` held with addPersonal deleted entirely. A check
+// that passes with the feature removed is not a check.
+// The barred one below is genuinely misread: the stock recogniser calls it "2".
+// So the glyph is asserted WRONG first and RIGHT after a single correction, and
+// deleting addPersonal now fails the suite.
 const { addPersonal } = await import('../src/ink/personal.js');
 const L = (x1, y1, x2, y2, n = 10) => Array.from({ length: n }, (_, i) => [x1 + (x2 - x1) * i / (n - 1), y1 + (y2 - y1) * i / (n - 1)]);
-// a European crossed 7 — not in the stock templates
-const crossed7 = [L(26, 16, 74, 14), L(74, 14, 44, 88), L(32, 52, 64, 50)];
+const barred1 = [L(50, 12, 50, 88), L(30, 88, 70, 88), L(34, 26, 50, 12)];
 const mk = (v, x, y, s) => v.map(st => ({ points: st.map(([px, py]) => ({ x: x + px / 100 * s, y: y + py / 100 * s })) }));
-const before = classifyOne(mk(crossed7, 10, 10, 60));
-await addPersonal('7', mk(crossed7, 0, 0, 100), 'test');
-const after = classifyOne(mk(crossed7, 40, 25, 52));
-const learned = after.sym === '7';
-console.log(`Personal learning: before="${before.sym}" → after one correction="${after.sym}" ${learned ? 'PASS' : 'FAIL'}`);
+const before = classifyOne(mk(barred1, 10, 10, 60));
+await addPersonal('1', mk(barred1, 0, 0, 100), 'test');
+const after = classifyOne(mk(barred1, 40, 25, 52));
+const misreadFirst = before.sym !== '1';
+const learned = misreadFirst && after.sym === '1';
+console.log(`Personal learning: before="${before.sym}"${misreadFirst ? '' : ' (NOT A MISREAD — this check proves nothing)'} → after one correction="${after.sym}" ${learned ? 'PASS' : 'FAIL'}`);
 
 const okAll = pass / tot >= 0.87 && sPass / sTot >= 0.86 && dPass / dTot >= 0.85 && learned;
 console.log(`\n${okAll ? '✔ HARD SUITE PASSED' : '✖ HARD SUITE FAILED'} — symbols ${(100 * pass / tot).toFixed(1)}%, scenes ${sPass}/${sTot}, digit strings ${(100 * dPass / dTot).toFixed(0)}%, learns-your-hand ${learned ? 'yes' : 'NO'}`);

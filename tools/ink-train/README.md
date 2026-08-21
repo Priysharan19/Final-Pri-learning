@@ -113,7 +113,7 @@ Baseline before any retrain (ink-100 recogniser, shipped model):
   holdout1 n=24  95.2% lines, 98.9% chars, worst writer 86%
   holdout2 n=40  94.5% lines, 98.4% chars, worst writer 71%
   hard suite symbols 95.2% -> 96.3%
-  467 KB (A+B) / 798 KB with C. int8 ensemble val 93.98%.
+  467 KB (A+B) / 798 KB with C. int8 ensemble val 0.9395, as recorded in model-data.js.
   Worst writer +14 points on the independent set — the heavy tail did what it was for.
 
 ## 2. REJECTED — widened network (A 32/64/96/256, B 32/64/112/288)

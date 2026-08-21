@@ -101,9 +101,13 @@ export default function ExamRoom() {
     const pct = result.pct ?? Math.round(100 * result.score / result.total);
     return (
       <div className="grid" style={{ gap: 18, maxWidth: 860, margin: '0 auto' }}>
+        <h1 className="sr-only">{exam.title} — marked</h1>
         <div className="card" style={{ textAlign: 'center', padding: 34 }}>
           <div className="card-title">{exam.title}</div>
-          <div className="hero-num" style={{ color: pct >= 80 ? 'var(--good)' : pct >= 50 ? 'var(--ink)' : 'var(--bad)' }}>{pct}%</div>
+          {/* the big number is tinted good / neutral / bad; the tint is spelled out */}
+          <div className="hero-num" style={{ color: pct >= 80 ? 'var(--good)' : pct >= 50 ? 'var(--ink)' : 'var(--bad)' }}>
+            {pct}%<span className="sr-only"> of the paper's marks — {pct >= 80 ? 'a strong result' : pct >= 50 ? 'a fair result' : 'below half'}</span>
+          </div>
           <p className="sub" style={{ marginTop: 6 }}>{result.score} of {result.total} marks · {
             pct >= 90 ? 'Outstanding — Band 6 territory.' :
               pct >= 80 ? 'Excellent work — exam ready.' :
@@ -122,7 +126,10 @@ export default function ExamRoom() {
               <span className="tag">Q{i + 1}</span>
               <span className="tag">{d.title}</span>
               <span className="tag tag-brand">Structured</span>
-              <span className="tag" style={{ color: d.awarded === d.marks ? 'var(--good)' : d.awarded > 0 ? 'var(--warn)' : 'var(--bad)' }}>{d.awarded}/{d.marks} marks</span>
+              <span className="tag" style={{ color: d.awarded === d.marks ? 'var(--good)' : d.awarded > 0 ? 'var(--warn)' : 'var(--bad)' }}>
+                {d.awarded}/{d.marks} marks
+                <span className="sr-only"> — {d.awarded === d.marks ? 'all earned' : d.awarded > 0 ? 'partly earned' : 'none earned'}</span>
+              </span>
             </div>
             <MathText block className="q-prompt" style={{ fontSize: 16 }} text={d.stem} />
             {d.figure && <div className="q-figure" dangerouslySetInnerHTML={{ __html: d.figure }} />}
@@ -131,7 +138,9 @@ export default function ExamRoom() {
                 <div className="row" style={{ gap: 8, alignItems: 'baseline' }}>
                   <b>({pt.key})</b>
                   <span style={{ flex: 1 }}><MathText text={pt.prompt} /></span>
-                  <span className="tag" style={{ color: pt.correct ? 'var(--good)' : 'var(--bad)' }}>{pt.awarded}/{pt.marks}</span>
+                  <span className="tag" style={{ color: pt.correct ? 'var(--good)' : 'var(--bad)' }}>
+                    {pt.awarded}/{pt.marks}<span className="sr-only"> marks — {pt.correct ? 'correct' : 'incorrect'}</span>
+                  </span>
                 </div>
                 <div className="row" style={{ flexWrap: 'wrap', gap: 16, fontSize: 14, marginTop: 4 }}>
                   <span>Yours: <b>{pt.answerType === 'mcq' ? (pt.given !== '' && pt.given != null ? 'ABCD'[Number(pt.given)] ?? '—' : '—') : (pt.given || '—')}</b></span>
@@ -216,6 +225,7 @@ export default function ExamRoom() {
 
   return (
     <div className="grid" style={{ gap: 16, maxWidth: 860, margin: '0 auto' }}>
+      <h1 className="sr-only">{exam.title}</h1>
       <div className="card exam-head">
         <div>
           <b>{exam.title}</b>
@@ -226,6 +236,7 @@ export default function ExamRoom() {
         </div>
         <span className={`exam-timer ${left < 120 ? 'low' : ''}`} style={{ marginLeft: 'auto' }}>
           ⏱ {mins}:{String(secs).padStart(2, '0')}
+          <span className="sr-only"> left{left < 120 ? ' — under two minutes' : ''}</span>
         </span>
         <button className="btn btn-primary" onClick={submit} disabled={busy}>
           {busy ? 'Marking…' : 'Submit paper'}
@@ -236,6 +247,8 @@ export default function ExamRoom() {
         {exam.questions.map((qq, i) => (
           <button key={qq.id}
             className={`exam-dot ${i === cur ? 'cur' : ''} ${answers[qq.id] ? 'done' : ''}`}
+            aria-label={`Question ${i + 1}${answers[qq.id] ? ', answered' : ', not answered yet'}`}
+            aria-current={i === cur ? 'true' : undefined}
             onClick={() => setCur(i)}>{i + 1}</button>
         ))}
       </div>
@@ -273,6 +286,7 @@ export default function ExamRoom() {
                   <div className="answer-row">
                     {pt.answerPrefix && <span className="answer-prefix"><MathText text={pt.answerPrefix} /></span>}
                     <input className="input answer-input" placeholder={pt.inputHint || 'Your answer…'}
+                      aria-label={`Your answer to part (${pt.key})`}
                       value={answers[`${q.id}::${pt.key}`] || ''}
                       onChange={e => setAnswers(a => ({ ...a, [`${q.id}::${pt.key}`]: e.target.value }))} />
                     {pt.answerSuffix && <span className="answer-suffix">{pt.answerSuffix}</span>}
@@ -300,6 +314,7 @@ export default function ExamRoom() {
         ) : q.answerType === 'working' ? (
           <div>
             <textarea className="input working-input" rows={6}
+              aria-label="Your working — one line per row, every line earns marks"
               placeholder={q.inputHint || 'Show every line of your working — each line earns marks.'}
               value={answers[q.id] || ''}
               onChange={e => setAnswers(a => ({ ...a, [q.id]: e.target.value }))} />
@@ -309,6 +324,7 @@ export default function ExamRoom() {
           <div className="answer-row">
             {q.answerPrefix && <span className="answer-prefix"><MathText text={q.answerPrefix} /></span>}
             <input className="input answer-input" placeholder={q.inputHint || 'Your answer…'}
+              aria-label={`Your answer to question ${cur + 1}`}
               value={answers[q.id] || ''}
               onChange={e => setAnswers(a => ({ ...a, [q.id]: e.target.value }))}
               onKeyDown={e => { if (e.key === 'Enter' && cur < exam.questions.length - 1) setCur(c => c + 1); }} />
@@ -324,6 +340,7 @@ export default function ExamRoom() {
             {showWk[q.id] && (
               <>
                 <textarea className="input" style={{ marginTop: 8 }} rows={4}
+                  aria-label="Your working for partial credit — one step per line"
                   placeholder={'One step per line — if your final answer is wrong,\ncorrect working lines still earn marks.'}
                   value={workings[q.id] || ''}
                   onChange={e => setWorkings(w => ({ ...w, [q.id]: e.target.value }))} />

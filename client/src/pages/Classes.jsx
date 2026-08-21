@@ -43,7 +43,7 @@ export default function Classes() {
       {joined.length === 0 ? (
         <div className="locked-wrap">
           <div className="card locked-card" style={{ padding: 40 }}>
-            <div className="locked-icon">🎓</div>
+            <div className="locked-icon" aria-hidden="true">🎓</div>
             <div className="locked-title">No classes yet</div>
             <div className="locked-sub">
               Join a class with a <b>class pack</b> — a small file your teacher exports from their Pri Learning

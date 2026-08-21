@@ -1,206 +1,179 @@
-// Pri Learning v3 — E2E tour: pathways, figures, multipart exams, history,
-// backup/restore, task packs, storage safety. iPad viewport, real interactions.
-// Usage: build the client, start the server (npm start), install playwright,
-// then: node client/test/tour-v3.js   (screenshots land in ./shots)
-const { chromium } = require('playwright');
-const fs = require('fs');
-const BASE = 'http://localhost:4000';
-fs.mkdirSync('shots', { recursive: true });
+// ─────────────────────────────────────────────────────────────────────────────
+// Pri Learning · E2E flow — practice, and the marking behind it.
+//
+// The engine suite proves 672,000 generated questions have correct answers. It
+// cannot prove that the answer a student types in the browser ever reaches the
+// checker, that a wrong one comes back wrong, or that the worked solution the
+// engine wrote is the one the card renders. That gap is this flow.
+//
+// HOW A CORRECT ANSWER IS KNOWN WITHOUT CHEATING. Nothing here reads the
+// question's answer out of storage — it is sealed, and a test that unsealed it
+// would be testing its own copy of the maths. Instead the flow answers wrongly
+// twice, which is what a student gets for two misses: the card resolves and
+// prints the worked solution and the final answer. It then presses the card's
+// own "Redo Question", which regenerates the SAME question from the SAME seed,
+// and types back what the solution just said. If the marking works, that is
+// correct. If the seed does not hold, the prompts differ and the flow says so
+// before it ever gets to the answer.
+//
+// Run on its own:  node client/test/tour-v3.js
+// ─────────────────────────────────────────────────────────────────────────────
+import { pathToFileURL } from 'node:url';
 
-(async () => {
-  const { TEMPLATES } = await import(new URL('../src/ink/templates.js', require('url').pathToFileURL(__filename)).href);
-  const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
-  const ctx = await browser.newContext({
-    viewport: { width: 1194, height: 834 },
-    deviceScaleFactor: 2,
-    hasTouch: true,
-    acceptDownloads: true
-  });
-  const page = await ctx.newPage();
-  page.on('pageerror', e => console.log('PAGE ERROR:', e.message));
-  let failures = 0;
-  const shot = async (name, opts = {}) => {
-    await page.waitForTimeout(opts.wait ?? 600);
-    await page.screenshot({ path: `shots/${name}.png`, fullPage: opts.full || false });
-    console.log('📸', name);
-  };
-  const ok = (name, cond) => { console.log(cond ? 'PASS' : 'FAIL', name); if (!cond) failures++; };
+const TOPIC = 'y7-equations';
+const SURELY_WRONG = '-987654';
+const MAX_SKIPS = 12;
 
-  // ── 1. Create a Year 12 Extension 1 student ──
-  await page.goto(BASE + '/');
-  await page.waitForSelector('.profile-tile', { timeout: 15000 });
-  await page.click('.profile-tile.new');
-  await page.fill('input[placeholder="e.g. Priysharan"]', 'Pri');
-  await page.selectOption('select >> nth=0', '12');
-  await page.waitForSelector('.pathway-pick', { timeout: 5000 });
-  await shot('v3-01-pathway-picker');
-  await page.click('.pathway-pick:has-text("Extension 1")');
-  await page.click('button:has-text("Start learning")');
-  await page.waitForSelector('text=Predicted exam mark', { timeout: 15000 });
-  const bandChip = await page.$eval('.band-chip', el => el.textContent).catch(() => '');
-  ok('E-band calibration shown for Extension 1 student', /^E[1-4]$/.test(bandChip.trim()));
-  await shot('v3-02-dashboard-band');
+const SUBMIT = { name: 'Submit Answer' };
 
-  // ── 2. Skill map shows Extension stream sections with NESA codes ──
-  await page.goto(BASE + '/map');
-  await page.waitForSelector('.node', { timeout: 10000 });
-  const sectionOpts = await page.$$eval('.spread select option', els => els.map(e => e.value));
-  ok('stream sections in skill map', sectionOpts.includes('ext1-12'));
-  await page.selectOption('.spread select', 'ext1-12');
-  await page.waitForTimeout(400);
-  const codeChip = await page.$eval('.node-code', el => el.textContent).catch(() => '');
-  ok('NESA topic codes on tiles', /^ME-/.test(codeChip));
-  await shot('v3-03-skillmap-ext1');
+export const flow = {
+  id: 'practice',
+  name: 'Practice · a question, marked both ways',
 
-  // ── 3. Figures: a diagram renders inside the question card ──
-  await page.goto(BASE + '/practice?subtopic=y9-pythagoras');
-  await page.waitForSelector('.q-prompt', { timeout: 15000 });
-  const hasFigure = await page.waitForSelector('.q-figure svg', { timeout: 6000 }).then(() => true).catch(() => false);
-  ok('SVG figure rendered with the question', hasFigure);
-  await shot('v3-04-figure-question');
+  async run({ page, ctx, base, check, goto, createProfile, mathText, settle }) {
+    await goto('/');
+    await createProfile({ name: 'Blaise Pascal', year: 7 });
 
-  // ── 4. Handwriting still marks correctly (regression) + supplementary figure ──
-  await page.goto(BASE + '/practice?subtopic=y7-angles');
-  await page.waitForSelector('.q-prompt', { timeout: 15000 });
-  await page.click('.mode-tab:has-text("Write")');
-  await page.waitForSelector('.ink-canvas', { timeout: 8000 });
-  const promptText = await page.$eval('.q-prompt', el => el.textContent);
-  let expected = null;
-  const m1 = promptText.match(/One of them is\s*(\d+)/);
-  if (m1) expected = String((promptText.includes('complementary') ? 90 : 180) - Number(m1[1]));
-  const m2 = promptText.match(/Three of them are\s*(\d+)°?,\s*(\d+)°?\s*and\s*(\d+)/);
-  if (!expected && m2) expected = String(360 - Number(m2[1]) - Number(m2[2]) - Number(m2[3]));
-  const m3 = promptText.match(/angles?\s+of\s+(\d+)°?\s+and\s+x/);
-  if (!expected && m3) expected = String(180 - Number(m3[1]));
-  if (expected) {
-    const canvas = await page.$('.ink-canvas');
-    const box = await canvas.boundingBox();
-    const SIZE = 90;
-    let ox = box.x + 40, oy = box.y + 60;
-    for (const ch of expected) {
-      const variant = TEMPLATES[ch][0];
-      for (const stroke of variant) {
-        const pts = stroke.map(([px, py]) => [ox + px / 100 * SIZE * 0.7, oy + py / 100 * SIZE]);
-        await page.mouse.move(pts[0][0], pts[0][1]);
-        await page.mouse.down();
-        for (const [x, y] of pts) { await page.mouse.move(x, y, { steps: 2 }); }
-        await page.mouse.up();
-        await page.waitForTimeout(60);
-      }
-      ox += SIZE * 0.75;
+    // ── 1 · a question renders ───────────────────────────────────────────────
+    await page.goto(`${base}/practice?subtopic=${TOPIC}`, { waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('.q-prompt', { timeout: 30000 });
+    const firstPrompt = await mathText('.q-prompt');
+    await check('a question renders with a prompt', !!firstPrompt && firstPrompt.length > 8,
+      `prompt reads ${JSON.stringify(firstPrompt)}`);
+    await check('the card names the topic it came from',
+      (await page.locator('.q-topmeta').innerText()).includes('Linear Equations'),
+      `topmeta reads ${JSON.stringify(await page.locator('.q-topmeta').innerText())}`);
+    await check('the question is on the clock',
+      /\d+:\d\d/.test(await page.locator('.q-timer').innerText()));
+
+    // ── 2 · find one that takes a typed answer ───────────────────────────────
+    // The card opens in handwriting mode on a touch device, so typing is asked
+    // for explicitly. Multiple choice and full-working questions are answered by
+    // other controls and are covered elsewhere; this flow is about the box.
+    const answerBox = page.locator('.editor-body input.answer-input');
+    const typeTab = page.getByRole('button', { name: 'Answer by typing' });
+    await check('the card offers all three ways of answering',
+      await page.locator('.mode-tab').count() === 3,
+      `${await page.locator('.mode-tab').count()} mode tabs, expected type, write and photo`);
+
+    let skips = 0;
+    for (; ;) {
+      if (await typeTab.count()) await typeTab.click();
+      await settle();
+      if (await answerBox.count() === 1 || skips++ >= MAX_SKIPS) break;
+      await page.locator('.ctx-next').click();
+      await page.waitForSelector('.q-prompt', { timeout: 30000 });
     }
-    await page.waitForTimeout(800);
-    await page.click('button:has-text("Mark my writing")');
-    await page.waitForSelector('.verdict', { timeout: 10000 });
-    ok('handwritten answer marked correct', !!(await page.$('.verdict-good')));
-    await page.click('button:has-text("Next question")').catch(() => { });
-    await page.waitForTimeout(500);
-  } else {
-    console.log('skip handwriting (unrecognised prompt shape):', promptText.slice(0, 80));
-    // answer via typing so history has an entry
-    await page.click('.mode-tab:has-text("Type")');
-    await page.click('button:has-text("Show solution")');
-    await page.waitForTimeout(400);
+    if (!await check('a typed-answer question was served', await answerBox.count() === 1,
+      `${MAX_SKIPS} questions from ${TOPIC} and none of them had an answer box`)) return;
+
+    const prompt = await mathText('.q-prompt');
+
+    // ── 3 · a wrong answer is marked wrong ───────────────────────────────────
+    await answerBox.fill(SURELY_WRONG);
+    await page.getByRole('button', SUBMIT).click();
+    await page.waitForSelector('.verdict-bad', { timeout: 20000 });
+    await check('a wrong answer is marked wrong',
+      /not quite|couldn’t read/i.test(await page.locator('.verdict-bad').innerText()),
+      `verdict reads ${JSON.stringify(await page.locator('.verdict-bad').innerText())}`);
+    await check('a first miss is not the end of the question',
+      await page.locator('.eval-card').count() === 0,
+      'the card resolved on the first wrong answer instead of offering another go');
+
+    // ── 4 · the second miss resolves it, with the solution ───────────────────
+    await answerBox.fill(SURELY_WRONG + '1');
+    await page.getByRole('button', SUBMIT).click();
+    await page.waitForSelector('.eval-card', { timeout: 20000 });
+    const evalText = await page.locator('.eval-card').innerText();
+    await check('two misses resolve the question — there is no third try',
+      await page.getByRole('button', SUBMIT).count() === 0,
+      'the submit button was still live after the question resolved');
+    await check('the evaluation says what was expected', /Expected:/.test(evalText),
+      `evaluation reads ${JSON.stringify(evalText.replace(/\s+/g, ' ').slice(0, 160))}`);
+    await check('no marks are awarded for a wrong answer',
+      /\b0 \/ \d+\b/.test(await page.locator('.eval-marks').innerText()),
+      `marks read ${JSON.stringify(await page.locator('.eval-marks').innerText())}`);
+
+    await check('the worked solution appears', await page.locator('.solution-block').count() === 1);
+    const steps = await page.locator('.solution-block .step').count();
+    await check('the worked solution is worked, step by step', steps >= 1, `${steps} steps rendered`);
+    await check('the marking criteria are shown',
+      await page.locator('.criteria-table tbody tr').count() >= 1);
+
+    const answer = (await mathText('.final-answer') || '').replace(/^Final answer\s*/i, '').trim();
+    if (!await check('the final answer is stated', answer.length > 0,
+      'the solution block carried no .final-answer')) return;
+
+    // ── 5 · the same question again, answered correctly ──────────────────────
+    await page.locator('.redo-chip').click();
+    await page.waitForSelector('.editor-body input.answer-input', { timeout: 30000 });
+    await settle();
+    const again = await mathText('.q-prompt');
+    if (!await check('"Redo Question" brings back the same question, same numbers',
+      again === prompt, `first: ${JSON.stringify(prompt)}\n      again: ${JSON.stringify(again)}`)) return;
+
+    await page.locator('.editor-body input.answer-input').fill(answer);
+    await page.getByRole('button', SUBMIT).click();
+    await page.waitForSelector('.eval-card', { timeout: 20000 });
+    // Full marks is the signal, not the wording: the card only awards every
+    // mark when the checker said the answer was right.
+    const marked = (await page.locator('.eval-card').innerText()).replace(/\s+/g, ' ');
+    const marks = (await page.locator('.eval-marks').innerText()).replace(/\s+/g, ' ').trim();
+    await check(`the answer the solution gave (${JSON.stringify(answer)}) is marked correct`,
+      /^(\d+(?:\.\d)?) \/ \1 marks \(100%\)/.test(marks), `marks read ${JSON.stringify(marks)}`);
+    await check('a correct answer is not told what was expected instead',
+      !/Expected:/.test(marked), `evaluation reads ${JSON.stringify(marked.slice(0, 160))}`);
+    await check('the session counter agrees it was right',
+      /session 1\/2/.test(await page.locator('.ctx-pill-meta').innerText()),
+      `context pill reads ${JSON.stringify(await page.locator('.ctx-pill-meta').innerText())}`);
+
+    // ── 6 · both attempts were kept ──────────────────────────────────────────
+    await page.goto(`${base}/history`, { waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('.hist-row', { timeout: 30000 });
+    const rows = await page.locator('.hist-row').count();
+    await check('every resolved question is in History', rows === 2, `${rows} rows, expected 2`);
+    const scores = await page.locator('.hist-row').allInnerTexts();
+    await check('History remembers which one was right',
+      scores.some(t => t.includes('✔')) && scores.some(t => t.includes('✖')),
+      `rows read ${JSON.stringify(scores.map(t => t.replace(/\s+/g, ' ').slice(0, 60)))}`);
+    await check('both attempts are on the same question',
+      scores.every(t => t.includes('Linear Equations')),
+      `rows read ${JSON.stringify(scores.map(t => t.replace(/\s+/g, ' ').slice(0, 60)))}`);
+
+    // ── 7 · a question that comes with a diagram ─────────────────────────────
+    await page.goto(`${base}/practice?subtopic=y9-pythagoras`, { waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('.q-prompt', { timeout: 30000 });
+    let figure = false;
+    for (let i = 0; i < 6 && !figure; i++) {
+      figure = await page.locator('.q-figure svg').count() > 0;
+      if (figure) break;
+      await page.locator('.ctx-next').click();
+      await page.waitForSelector('.q-prompt', { timeout: 30000 });
+      await settle();
+    }
+    await check('a geometry question draws its own figure', figure,
+      'six Pythagoras questions and not one of them rendered an SVG figure');
+
+    // ── 8 · and all of it works with the network gone ───────────────────────
+    // The headline claim on the landing page. It rests on the service worker
+    // having precached the build, which is a thing only a browser can be asked.
+    await page.goto(`${base}/`, { waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('.home-greet', { timeout: 30000 });
+    const claimed = await page.waitForFunction(() => !!navigator.serviceWorker?.controller, null, { timeout: 30000 })
+      .then(() => true).catch(() => false);
+    if (await check('the service worker takes charge of the page', claimed,
+      'no worker claimed the client, so nothing was cached to go offline with')) {
+      await ctx.setOffline(true);
+      await page.reload({ waitUntil: 'domcontentloaded' }).catch(() => { });
+      const up = await page.waitForSelector('.home-greet', { timeout: 30000 }).then(() => true).catch(() => false);
+      await check('the app opens again with the network switched off', up,
+        'a reload with the network down did not reach Home');
+      await ctx.setOffline(false);
+    }
   }
+};
 
-  // ── 5. Exam: Section II multipart + marks-based results ──
-  await page.goto(BASE + '/exams');
-  await page.waitForSelector('button:has-text("Start exam")', { timeout: 8000 });
-  await page.click('button:has-text("Start exam")');
-  await page.waitForSelector('.exam-timer', { timeout: 20000 });
-  const dotCount = await page.$$eval('.exam-dot', els => els.length);
-  ok('exam includes a Section II structured question (11 = 10 + 1)', dotCount === 11);
-  await page.click(`.exam-dot >> nth=${dotCount - 1}`);
-  await page.waitForTimeout(400);
-  const structured = await page.$('.tag:has-text("Structured")');
-  ok('multipart question renders with parts', !!structured);
-  const partInputs = await page.$$eval('.answer-row input, .mcq', els => els.length);
-  ok('multipart parts have their own inputs', partInputs >= 2);
-  await shot('v3-05-exam-multipart', { full: true });
-  // partial-credit working toggle exists on an eligible single question
-  let workingToggleSeen = false;
-  for (let i = 0; i < dotCount - 1 && !workingToggleSeen; i++) {
-    await page.click(`.exam-dot >> nth=${i}`);
-    await page.waitForTimeout(150);
-    workingToggleSeen = !!(await page.$('button:has-text("Show working for partial credit")'));
-  }
-  // ~3% of random papers contain no step-checkable single questions — treat
-  // absence as a soft warning rather than a hard failure.
-  if (workingToggleSeen) ok('partial-credit working toggle available', true);
-  else console.log('WARN partial-credit toggle not in this paper’s sample (rare, sampling-dependent)');
-  await page.click('button:has-text("Submit paper")');
-  await page.waitForSelector('.hero-num', { timeout: 20000 });
-  const resultsText = await page.$eval('body', el => el.textContent);
-  ok('results are marks-based', /of \d+ marks/.test(resultsText));
-  ok('multipart marked part-by-part in review', /Structured/.test(resultsText));
-  await shot('v3-06-exam-results', { full: false });
-
-  // ── 6. History: browse, bookmark, retry with same numbers ──
-  await page.goto(BASE + '/history');
-  await page.waitForSelector('.hist-row', { timeout: 10000 });
-  const histCount = await page.$$eval('.hist-row', els => els.length);
-  ok('history lists answered questions', histCount >= 2);
-  await page.click('.hist-star >> nth=0');
-  await page.waitForTimeout(300);
-  const starred = await page.$('.hist-star.on');
-  ok('bookmark toggles', !!starred);
-  await page.click('.pill-opt:has-text("Bookmarked")');
-  await page.waitForTimeout(400);
-  ok('bookmark filter works', (await page.$$eval('.hist-row', els => els.length)) >= 1);
-  await page.click('.pill-opt:has-text("All")');
-  await page.waitForTimeout(400);
-  await shot('v3-07-history');
-  const retryBtn = await page.$('button:has-text("↻ Same")');
-  if (retryBtn) {
-    await retryBtn.click();
-    await page.waitForSelector('text=Retry from History', { timeout: 8000 });
-    ok('retry same-numbers hands question to Practice', true);
-  } else ok('retry same-numbers hands question to Practice', false);
-
-  // ── 7. Data safety: persisted storage + backup export/restore round-trip ──
-  await page.goto(BASE + '/settings');
-  await page.waitForSelector('text=Data safety', { timeout: 8000 });
-  await shot('v3-08-data-safety');
-  const [download] = await Promise.all([
-    page.waitForEvent('download', { timeout: 10000 }),
-    page.click('button:has-text("Export full backup")')
-  ]);
-  const backupPath = 'shots/backup-roundtrip.json';
-  await download.saveAs(backupPath);
-  const backup = JSON.parse(fs.readFileSync(backupPath, 'utf8'));
-  ok('backup file has profile + stores', backup.format === 'pri-learning-backup' && !!backup.profile && !!backup.stores.ratings);
-  await page.setInputFiles('.card:has-text("Data safety") input[type=file]', backupPath);
-  await page.waitForTimeout(1200);
-  await page.goto(BASE + '/settings');
-  await page.waitForSelector('text=Data safety', { timeout: 8000 });
-  const nameVal = await page.$eval('.card:has-text("Profile") input', el => el.value);
-  ok('backup restored as a new profile', nameVal === 'Pri (restored)');
-
-  // ── 8. Task pack import (classroom file exchange) ──
-  const pack = {
-    format: 'pri-task-pack', version: 1, teacher: 'Ms Chen',
-    task: { title: 'Angles warm-up', mode: 'subtopics', subtopics: ['y7-angles'], count: 5 }
-  };
-  fs.writeFileSync('shots/taskpack.json', JSON.stringify(pack));
-  await page.goto(BASE + '/tasks');
-  await page.waitForSelector('text=Import task pack', { timeout: 8000 });
-  await page.setInputFiles('label:has-text("Import task pack") input[type=file]', 'shots/taskpack.json');
-  await page.waitForTimeout(800);
-  const taskText = await page.$eval('body', el => el.textContent);
-  ok('task pack imported into Tasks', taskText.includes('Angles warm-up'));
-  await shot('v3-09-taskpack');
-
-  // ── 9. Offline reload still works (regression) ──
-  await page.goto(BASE + '/');
-  await page.waitForSelector('text=Predicted exam mark', { timeout: 10000 });
-  await page.waitForTimeout(1500);
-  await ctx.setOffline(true);
-  await page.reload().catch(() => { });
-  const offlineOk = await page.waitForSelector('text=Predicted exam mark', { timeout: 10000 }).then(() => true).catch(() => false);
-  ok('fully offline reload', offlineOk);
-  await ctx.setOffline(false);
-
-  await browser.close();
-  console.log(failures ? `tour done — ${failures} FAILURES` : 'tour done — all green ✔');
-  process.exit(failures ? 1 : 0);
-})().catch(e => { console.error('TOUR FAILED:', e.message); process.exit(1); });
+if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {
+  const { runOne } = await import('./e2e.mjs');
+  process.exit(await runOne(flow) ? 1 : 0);
+}

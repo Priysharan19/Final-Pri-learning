@@ -1,6 +1,6 @@
 // Teacher Studio — classes, assigned tasks, class analytics and custom
 // questions, all with local profiles on this device.
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { api } from '../api.js';
 import { downloadJSON, readJSONFile, dateStamp } from '../lib/files.js';
 import { MathText } from '../lib/latex.jsx';
@@ -16,6 +16,7 @@ export default function Teach() {
   const [showQBuilder, setShowQBuilder] = useState(false);
   const [qForm, setQForm] = useState({ name: '', prompt: '', answerType: 'numeric', value: '', expr: '', mcqOptions: ['', '', '', ''], correctIndex: 0, solutionText: '', hint: '', difficulty: 2 });
   const [msg, setMsg] = useState('');
+  const progressRef = useRef(null);
 
   const load = async () => {
     const r = await api.get('/classes');
@@ -80,23 +81,26 @@ export default function Teach() {
 
   return (
     <div className="grid" style={{ gap: 18 }}>
-      {msg && <div className="card" style={{ padding: '10px 16px', color: 'var(--good)', fontWeight: 650 }}>{msg}</div>}
+      <h1 className="sr-only">Teacher Studio</h1>
+      {msg && <div className="card" role="status" style={{ padding: '10px 16px', color: 'var(--good)', fontWeight: 650 }}>{msg}</div>}
 
       <div className="grid cols-2" style={{ alignItems: 'start' }}>
         <div className="card">
           <div className="card-title">Your classes</div>
           {data?.classes.map(c => (
-            <div key={c.id} className={`prio-item`} style={{ cursor: 'pointer' }} onClick={() => setSelClass(c.id)}>
-              <span className="prio-rank">{c.students.length}</span>
-              <div style={{ flex: 1 }}>
+            <div key={c.id} className="prio-item">
+              <span className="prio-rank">{c.students.length}<span className="sr-only"> students</span></span>
+              {/* selecting the class used to be an onClick on this row's <div> */}
+              <button onClick={() => setSelClass(c.id)} aria-pressed={selClass === c.id}
+                style={{ flex: 1, background: 'none', border: 'none', padding: 0, font: 'inherit', color: 'inherit', cursor: 'pointer', textAlign: 'left' }}>
                 <div style={{ fontWeight: 650 }}>{c.name}</div>
                 <div className="muted" style={{ fontSize: 12.5 }}>{c.students.map(s => s.name).join(', ') || 'No students yet'}</div>
-              </div>
+              </button>
               {selClass === c.id && <span className="tag tag-brand">selected</span>}
             </div>
           ))}
           <div className="row" style={{ marginTop: 12 }}>
-            <input className="input" placeholder="New class name (e.g. 10MaA)" value={newClass}
+            <input className="input" aria-label="New class name" placeholder="New class name (e.g. 10MaA)" value={newClass}
               onChange={e => setNewClass(e.target.value)} onKeyDown={e => e.key === 'Enter' && createClass()} />
             <button className="btn btn-primary" onClick={createClass}>Create</button>
           </div>
@@ -130,26 +134,26 @@ export default function Teach() {
           <div className="grid cols-2" style={{ gap: 14 }}>
             <div>
               <div className="field">
-                <label className="label">Title</label>
-                <input className="input" value={taskForm.title} placeholder="e.g. Quadratics revision"
+                <label className="label" htmlFor="teach-task-title">Title</label>
+                <input className="input" id="teach-task-title" value={taskForm.title} placeholder="e.g. Quadratics revision"
                   onChange={e => setTaskForm(f => ({ ...f, title: e.target.value }))} />
               </div>
               <div className="grid cols-2" style={{ gap: 10 }}>
                 <div className="field">
-                  <label className="label">Questions — {taskForm.count}</label>
-                  <input type="range" min="5" max="30" step="5" value={taskForm.count} style={{ width: '100%', accentColor: 'var(--brand-1)' }}
+                  <label className="label" htmlFor="teach-task-count">Questions — {taskForm.count}</label>
+                  <input type="range" id="teach-task-count" min="5" max="30" step="5" value={taskForm.count} style={{ width: '100%', accentColor: 'var(--brand-1)' }}
                     onChange={e => setTaskForm(f => ({ ...f, count: Number(e.target.value) }))} disabled={taskForm.customIds.length > 0} />
                 </div>
                 <div className="field">
-                  <label className="label">Due in — {taskForm.days} days</label>
-                  <input type="range" min="1" max="21" value={taskForm.days} style={{ width: '100%', accentColor: 'var(--brand-1)' }}
+                  <label className="label" htmlFor="teach-task-days">Due in — {taskForm.days} days</label>
+                  <input type="range" id="teach-task-days" min="1" max="21" value={taskForm.days} style={{ width: '100%', accentColor: 'var(--brand-1)' }}
                     onChange={e => setTaskForm(f => ({ ...f, days: Number(e.target.value) }))} />
                 </div>
               </div>
               {customs.length > 0 && (
                 <div className="field">
-                  <label className="label">Or use your custom questions</label>
-                  <div className="pill-select">
+                  <div className="label" id="teach-customs">Or use your custom questions</div>
+                  <div className="pill-select" role="group" aria-labelledby="teach-customs">
                     {customs.map(c => (
                       <button key={c.id} className={`pill-opt ${taskForm.customIds.includes(c.id) ? 'on' : ''}`}
                         onClick={() => setTaskForm(f => ({ ...f, customIds: f.customIds.includes(c.id) ? f.customIds.filter(x => x !== c.id) : [...f.customIds, c.id] }))}>
@@ -164,8 +168,8 @@ export default function Teach() {
               </button>
             </div>
             <div className="field">
-              <label className="label">Generated topics ({taskForm.subtopics.length})</label>
-              <div className="pill-select" style={{ maxHeight: 260, overflowY: 'auto' }}>
+              <div className="label" id="teach-topics">Generated topics ({taskForm.subtopics.length})</div>
+              <div className="pill-select" role="group" aria-labelledby="teach-topics" style={{ maxHeight: 260, overflowY: 'auto' }}>
                 {allSubtopics.map(s => (
                   <button key={s.id} className={`pill-opt ${taskForm.subtopics.includes(s.id) ? 'on' : ''}`}
                     onClick={() => setTaskForm(f => ({ ...f, subtopics: f.subtopics.includes(s.id) ? f.subtopics.filter(x => x !== s.id) : [...f.subtopics, s.id] }))}>
@@ -182,9 +186,11 @@ export default function Teach() {
         <div className="card">
           <div className="spread">
             <div className="card-title" style={{ marginBottom: 0 }}>Class analytics — {analytics.class.name}</div>
-            <label className="btn btn-ghost btn-sm" style={{ cursor: 'pointer' }}>
-              📥 Import progress file
-              <input type="file" accept=".json,application/json" style={{ display: 'none' }}
+            <button className="btn btn-ghost btn-sm" onClick={() => progressRef.current?.click()}>📥 Import progress file</button>
+          </div>
+          {/* a hidden file input behind a <label> is a control a keyboard cannot
+              reach: the input is not focusable and the label is not a button */}
+          <input ref={progressRef} type="file" accept=".json,application/json" style={{ display: 'none' }}
                 onChange={async e => {
                   const f = e.target.files?.[0];
                   e.target.value = '';
@@ -196,8 +202,6 @@ export default function Teach() {
                     api.get(`/classes/${selClass}/analytics`).then(setAnalytics);
                   } catch (err) { setMsg(`⚠️ ${err.message}`); }
                 }} />
-            </label>
-          </div>
           <p className="muted" style={{ margin: '6px 0 10px' }}>Students on other iPads export a progress file from Settings — import it here and they appear below alongside on-device profiles.</p>
           <table className="table">
             <thead><tr><th>Student</th><th>Predicted</th><th>Answered</th><th>Accuracy</th><th>Streak</th><th>Weakest area</th></tr></thead>
@@ -265,55 +269,56 @@ export default function Teach() {
           <div style={{ marginTop: 14 }}>
             <div className="grid cols-2" style={{ gap: 12 }}>
               <div className="field">
-                <label className="label">Name</label>
-                <input className="input" value={qForm.name} onChange={e => setQForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Surds warm-up 1" />
+                <label className="label" htmlFor="cq-name">Name</label>
+                <input className="input" id="cq-name" value={qForm.name} onChange={e => setQForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Surds warm-up 1" />
               </div>
               <div className="field">
-                <label className="label">Difficulty</label>
-                <select className="input" value={qForm.difficulty} onChange={e => setQForm(f => ({ ...f, difficulty: Number(e.target.value) }))}>
+                <label className="label" htmlFor="cq-difficulty">Difficulty</label>
+                <select className="input" id="cq-difficulty" value={qForm.difficulty} onChange={e => setQForm(f => ({ ...f, difficulty: Number(e.target.value) }))}>
                   {[1, 2, 3, 4].map(d => <option key={d} value={d}>D{d}</option>)}
                 </select>
               </div>
             </div>
             <div className="field">
-              <label className="label">Prompt (use $…$ for maths, e.g. Solve $2x + 1 = 9$)</label>
-              <textarea className="input" style={{ fontFamily: 'inherit' }} value={qForm.prompt} onChange={e => setQForm(f => ({ ...f, prompt: e.target.value }))} />
+              <label className="label" htmlFor="cq-prompt">Prompt (use $…$ for maths, e.g. Solve $2x + 1 = 9$)</label>
+              <textarea className="input" id="cq-prompt" style={{ fontFamily: 'inherit' }} value={qForm.prompt} onChange={e => setQForm(f => ({ ...f, prompt: e.target.value }))} />
               {qForm.prompt && <div className="typed-preview" style={{ marginTop: 8 }}><MathText text={qForm.prompt} /></div>}
             </div>
             <div className="field">
-              <label className="label">Answer type</label>
-              <div className="pill-select">
+              <div className="label" id="cq-type">Answer type</div>
+              <div className="pill-select" role="group" aria-labelledby="cq-type">
                 {['numeric', 'expression', 'mcq'].map(t => (
                   <button key={t} className={`pill-opt ${qForm.answerType === t ? 'on' : ''}`} onClick={() => setQForm(f => ({ ...f, answerType: t }))}>{t}</button>
                 ))}
               </div>
             </div>
             {qForm.answerType === 'numeric' && (
-              <div className="field"><label className="label">Correct value</label>
-                <input className="input" value={qForm.value} onChange={e => setQForm(f => ({ ...f, value: e.target.value }))} placeholder="e.g. 4" /></div>
+              <div className="field"><label className="label" htmlFor="cq-value">Correct value</label>
+                <input className="input" id="cq-value" value={qForm.value} onChange={e => setQForm(f => ({ ...f, value: e.target.value }))} placeholder="e.g. 4" /></div>
             )}
             {qForm.answerType === 'expression' && (
-              <div className="field"><label className="label">Correct expression</label>
-                <input className="input" value={qForm.expr} onChange={e => setQForm(f => ({ ...f, expr: e.target.value }))} placeholder="e.g. 2x + 6 (equivalent forms accepted automatically)" /></div>
+              <div className="field"><label className="label" htmlFor="cq-expr">Correct expression</label>
+                <input className="input" id="cq-expr" value={qForm.expr} onChange={e => setQForm(f => ({ ...f, expr: e.target.value }))} placeholder="e.g. 2x + 6 (equivalent forms accepted automatically)" /></div>
             )}
             {qForm.answerType === 'mcq' && (
               <div className="field">
-                <label className="label">Options (tap the correct one)</label>
+                <div className="label">Options (tap the correct one)</div>
                 {qForm.mcqOptions.map((o, i) => (
                   <div className="row" key={i} style={{ marginBottom: 6 }}>
-                    <button className={`mcq-key ${qForm.correctIndex === i ? '' : ''}`}
+                    <button className="mcq-key" aria-label={`Mark option ${'ABCD'[i]} as the correct answer`}
+                      aria-pressed={qForm.correctIndex === i}
                       style={{ background: qForm.correctIndex === i ? 'var(--good)' : undefined, color: qForm.correctIndex === i ? '#04150c' : undefined, border: 'none', cursor: 'pointer' }}
                       onClick={() => setQForm(f => ({ ...f, correctIndex: i }))}>{'ABCD'[i]}</button>
-                    <input className="input" value={o} onChange={e => setQForm(f => ({ ...f, mcqOptions: f.mcqOptions.map((x, j) => j === i ? e.target.value : x) }))} />
+                    <input className="input" aria-label={`Option ${'ABCD'[i]}`} value={o} onChange={e => setQForm(f => ({ ...f, mcqOptions: f.mcqOptions.map((x, j) => j === i ? e.target.value : x) }))} />
                   </div>
                 ))}
               </div>
             )}
             <div className="grid cols-2" style={{ gap: 12 }}>
-              <div className="field"><label className="label">Worked solution</label>
-                <textarea className="input" style={{ fontFamily: 'inherit' }} value={qForm.solutionText} onChange={e => setQForm(f => ({ ...f, solutionText: e.target.value }))} /></div>
-              <div className="field"><label className="label">Hint (optional)</label>
-                <textarea className="input" style={{ fontFamily: 'inherit' }} value={qForm.hint} onChange={e => setQForm(f => ({ ...f, hint: e.target.value }))} /></div>
+              <div className="field"><label className="label" htmlFor="cq-solution">Worked solution</label>
+                <textarea className="input" id="cq-solution" style={{ fontFamily: 'inherit' }} value={qForm.solutionText} onChange={e => setQForm(f => ({ ...f, solutionText: e.target.value }))} /></div>
+              <div className="field"><label className="label" htmlFor="cq-hint">Hint (optional)</label>
+                <textarea className="input" id="cq-hint" style={{ fontFamily: 'inherit' }} value={qForm.hint} onChange={e => setQForm(f => ({ ...f, hint: e.target.value }))} /></div>
             </div>
             <button className="btn btn-primary" disabled={!qForm.prompt.trim()} onClick={saveCustomQ}>Save question</button>
           </div>

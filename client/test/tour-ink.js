@@ -1,137 +1,193 @@
-// Ink mistake-pointing verification: writes a WRONG answer by hand, checks the
-// engine pins the exact line (✗ + red underline + margin note on the ink),
-// then corrects it by hand and checks the green ✓ lands on the ink too.
-// Run: node client/test/tour-ink.js   (server on :4000 serving client/dist)
-import { chromium } from '@playwright/test';
-import { mkdirSync } from 'node:fs';
+// ─────────────────────────────────────────────────────────────────────────────
+// Pri Learning · E2E flow — handwriting, through the real canvas.
+//
+// This is the assertion the project has been missing. Five suites measure the
+// recogniser — 40 trials a symbol, held-out writers, whole lines of working —
+// and every one of them calls recognize() directly in Node. None of them mounts
+// the canvas. So the entire path between a pen and a mark is untested: pointer
+// capture, the 1€ filter, coalesced-event accumulation, the stroke buffer, the
+// 240 ms debounce, the reading panel, the confidence gate that can hold a
+// submit back, and the answer the card finally posts. A regression anywhere in
+// there would leave all five ink suites green and the app unusable.
+//
+// So this flow writes an answer by hand — real pointer events, one stroke at a
+// time, from the same template geometry the recogniser suites are scored on —
+// and follows it all the way to a mark. It knows what the answer is the same
+// way tour-v3 does: miss twice, read the worked solution, then press the card's
+// own "Redo Question" and hand-write the answer it just gave.
+//
+// Run on its own:  node client/test/tour-ink.js
+// ─────────────────────────────────────────────────────────────────────────────
+import { pathToFileURL } from 'node:url';
 import { TEMPLATES } from '../src/ink/templates.js';
 
-const BASE = 'http://localhost:4000';
-const OUT = new URL('../../shots/', import.meta.url).pathname;
-mkdirSync(OUT, { recursive: true });
+const TOPIC = 'y7-equations';
+const SURELY_WRONG = '-987654';
+const MAX_QUESTIONS = 8;
 
-let failures = 0;
-const ok = (name, cond) => { console.log(cond ? 'PASS' : 'FAIL', name); if (!cond) failures++; };
+// Glyph geometry, matched to the shape the recogniser suites score against:
+// a little taller than wide, with a clear gap between neighbours so the
+// segmenter has something to cut on.
+const GLYPH_W = 58;
+const GLYPH_H = 84;
+const ADVANCE = 66;
 
-async function drawText(page, canvasBox, text, oy = 46) {
-  const SIZE = 64;
-  let ox = canvasBox.x + 36;
+const SUBMIT = { name: 'Submit Answer' };
+
+/** Write one line of glyphs onto the canvas with the mouse, stroke by stroke. */
+async function handwrite(page, box, text, { x = 40, y = 34 } = {}) {
+  let ox = box.x + x;
   for (const ch of text) {
     const variant = TEMPLATES[ch]?.[0];
-    if (!variant) continue;
+    if (!variant) throw new Error(`no template for ${JSON.stringify(ch)}`);
     for (const stroke of variant) {
-      const pts = stroke.map(([px, py]) => [ox + px / 100 * SIZE * 0.7, canvasBox.y + oy + py / 100 * SIZE]);
+      const pts = stroke.map(([px, py]) => [
+        ox + (px / 100) * GLYPH_W,
+        box.y + y + (py / 100) * GLYPH_H
+      ]);
       await page.mouse.move(pts[0][0], pts[0][1]);
       await page.mouse.down();
-      for (const [x, y] of pts) await page.mouse.move(x, y, { steps: 2 });
+      for (const [px, py] of pts) await page.mouse.move(px, py);
       await page.mouse.up();
-      await page.waitForTimeout(50);
     }
-    ox += SIZE * 1.05;
+    ox += ADVANCE;
   }
-  await page.waitForTimeout(900); // recognition debounce
+  await page.waitForTimeout(600);   // the recogniser runs 240 ms after the last point
 }
 
-async function main() {
-  const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
-  const ctx = await browser.newContext({ viewport: { width: 1440, height: 860 }, deviceScaleFactor: 1.5, hasTouch: true });
-  const page = await ctx.newPage();
-  page.on('pageerror', e => console.log('PAGEERROR:', e.message));
+/** What the reading panel says it read, line by line. */
+const reading = (page) => page.locator('.ink-line .ink-syms').allInnerTexts()
+  .then(lines => lines.map(l => l.replace(/\s+/g, '')));
 
-  // fresh Year 7 profile
-  await page.goto(BASE);
-  await page.waitForTimeout(900);
-  await page.getByRole('button', { name: 'Get Started' }).click();
-  await page.waitForTimeout(350);
-  await page.getByRole('button', { name: /Continue with email/ }).click();
-  await page.waitForTimeout(400);
-  await page.getByPlaceholder('e.g. Priysharan').fill('Ink Tester');
-  await page.locator('select').first().selectOption('7');
-  await page.getByRole('button', { name: 'Start learning' }).click();
-  await page.waitForTimeout(900);
+export const flow = {
+  id: 'ink',
+  name: 'Ink · handwriting on the real canvas',
 
-  // deterministic numeric question
-  await page.goto(`${BASE}/practice?subtopic=y7-angles`);
-  await page.waitForSelector('.q-prompt', { timeout: 15000 });
-  await page.locator('.mode-tab').nth(1).click(); // ✎ write
-  await page.waitForSelector('.ink-canvas', { timeout: 8000 });
+  async run({ page, base, check, note, goto, createProfile, mathText, settle }) {
+    await goto('/');
+    await createProfile({ name: 'Ada Byron', year: 7 });
 
-  const promptText = await page.$eval('.q-prompt', el => el.textContent);
-  let expected = null;
-  const m1 = promptText.match(/One of them is\s*(\d+)/);
-  if (m1) expected = String((promptText.includes('complementary') ? 90 : 180) - Number(m1[1]));
-  const m2 = promptText.match(/Three of them are\s*(\d+)°?,\s*(\d+)°?\s*and\s*(\d+)/);
-  if (!expected && m2) expected = String(360 - Number(m2[1]) - Number(m2[2]) - Number(m2[3]));
-  const m3 = promptText.match(/angles?\s+of\s+(\d+)°?\s+and\s+x/);
-  if (!expected && m3) expected = String(180 - Number(m3[1]));
-  if (!expected) { console.log('SKIP: unrecognised prompt:', promptText.slice(0, 90)); process.exit(0); }
-  const wrong = String(Number(expected) + 10);
-  console.log('prompt expects', expected, '— writing wrong answer', wrong);
+    // ── 1 · miss twice to learn the answer, on a question worth writing ──────
+    // Only a short whole number is hand-written here. Every glyph the flow draws
+    // has to come from the template set, and an answer of "3/8" or "12.5 cm"
+    // would be testing the layout engine's fraction stacking rather than the
+    // path from a stroke to a mark.
+    await page.goto(`${base}/practice?subtopic=${TOPIC}`, { waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('.q-prompt', { timeout: 30000 });
 
-  const canvas = await page.$('.ink-canvas');
-  const box = await canvas.boundingBox();
+    const typeTab = page.getByRole('button', { name: 'Answer by typing' });
+    const answerBox = page.locator('.editor-body input.answer-input');
+    let answer = null;
+    let asked = 0;
+    for (; asked < MAX_QUESTIONS && !answer; asked++) {
+      if (await typeTab.count()) await typeTab.click();
+      await settle();
+      if (await answerBox.count() === 1) {
+        await answerBox.fill(SURELY_WRONG);
+        await page.getByRole('button', SUBMIT).click();
+        await page.waitForSelector('.verdict-bad', { timeout: 20000 });
+        await answerBox.fill(SURELY_WRONG + '1');
+        await page.getByRole('button', SUBMIT).click();
+        await page.waitForSelector('.eval-card', { timeout: 20000 });
+        const stated = (await mathText('.final-answer') || '').replace(/^Final answer\s*/i, '').trim();
+        const digits = /^(?:[a-z]\s*=\s*)?(-?\d{1,3})$/i.exec(stated);
+        if (digits) { answer = digits[1]; break; }
+      }
+      await page.locator('.ctx-next').click();
+      await page.waitForSelector('.q-prompt', { timeout: 30000 });
+    }
+    if (!await check('a question with a short whole-number answer was found', !!answer,
+      `${asked} questions from ${TOPIC} and none had an answer worth hand-writing`)) return;
 
-  // 1 · wrong answer by hand → submit → ✗ pinned on the ink line
-  await drawText(page, box, wrong);
-  await page.getByRole('button', { name: /Submit Answer/ }).click();
-  await page.waitForTimeout(1200);
-  const badPin = await page.$('.ink-verdict.bad');
-  const badBox = await page.$('.ink-linebox.bad');
-  const note = await page.$('.ink-note');
-  const comments = await page.$('.ink-comments .ink-comment.bad');
-  ok('✗ verdict pinned on the handwritten line', !!badPin);
-  ok('red box drawn around the exact step', !!badBox);
-  ok('margin note explains the mistake', !!note);
-  ok('comments panel carries the mistake card', !!comments);
-  await page.screenshot({ path: `${OUT}ink-1-wrong-pinned.png` });
+    const prompt = await mathText('.q-prompt');
+    await page.locator('.redo-chip').click();
+    await page.waitForSelector('.q-prompt', { timeout: 30000 });
+    await settle();
+    if (!await check('the same question comes back for the handwritten attempt',
+      await mathText('.q-prompt') === prompt,
+      `first: ${JSON.stringify(prompt)}\n      again: ${JSON.stringify(await mathText('.q-prompt'))}`)) return;
 
-  // 2 · erase, write a two-line correct working → green boxes on every step
-  await page.locator('.ink-tool[title="Clear"]').click();
-  await page.waitForTimeout(400);
-  // two lines of working: a consistent chain ending in the answer
-  await drawText(page, box, expected, 30);
-  await drawText(page, box, expected, 150);
-  try {
-    await page.waitForSelector('.editor-foot .btn-primary:not([disabled])', { timeout: 8000 });
-    await page.getByRole('button', { name: /Submit Answer/ }).click({ timeout: 8000 });
-  } catch (e) {
-    const reading = await page.$$eval('.ink-line-math', els => els.map(el => el.textContent));
-    const btns = await page.$$eval('button', els => els.filter(b => /Submit/.test(b.textContent)).map(b => `${b.textContent} disabled=${b.disabled}`));
-    console.log('DEBUG reading:', JSON.stringify(reading), 'buttons:', JSON.stringify(btns));
-    await page.screenshot({ path: `${OUT}ink-debug.png` });
-    throw e;
+    // ── 2 · the canvas mounts ────────────────────────────────────────────────
+    await page.getByRole('button', { name: 'Answer by handwriting' }).click();
+    await page.waitForSelector('.ink-canvas-live', { timeout: 30000 });
+    const canvas = page.locator('.ink-canvas-live');
+    const box = await canvas.boundingBox();
+    await check('the handwriting canvas mounts with a drawable area',
+      !!box && box.width > 200 && box.height > 200,
+      `canvas box ${JSON.stringify(box)}`);
+    await check('an empty canvas is reading nothing',
+      await page.locator('.ink-preview').count() === 0,
+      'the reading panel was up before a single stroke was drawn');
+
+    // ── 3 · strokes drawn with the pointer are captured ──────────────────────
+    await handwrite(page, box, '1');
+    await check('a stroke drawn with the pointer reaches the canvas',
+      await page.locator('.ink-line').count() === 1,
+      'nothing was captured — pointer events are not reaching InkCanvas');
+
+    await page.locator('.ink-tool[title="Clear"]').click();
+    await settle();
+    await check('Clear empties the canvas', await page.locator('.ink-preview').count() === 0,
+      `${await page.locator('.ink-line').count()} lines survived a Clear`);
+
+    // Two glyphs, fixed, whatever the question turned out to be: this is the
+    // segmenter's job as well as the classifier's, and the answer below may
+    // only be one digit long.
+    await handwrite(page, box, '42');
+    await check('two glyphs side by side are cut apart and read',
+      (await reading(page))[0] === '42', `read ${JSON.stringify(await reading(page))}`);
+    await page.locator('.ink-tool[title="Clear"]').click();
+    await settle();
+
+    // ── 4 · the answer, written by hand, is read back ────────────────────────
+    await handwrite(page, box, answer);
+    const lines = await reading(page);
+    await check('the writing is read as one line', lines.length === 1,
+      `read ${lines.length} lines: ${JSON.stringify(lines)}`);
+    if (!await check(`the recogniser read the handwriting as ${JSON.stringify(answer)}`,
+      lines[0] === answer, `read ${JSON.stringify(lines[0])}`)) return;
+
+    const asMaths = await mathText('.ink-line-math');
+    await check('the reading is set as maths, not as loose characters',
+      !!asMaths && asMaths.length > 0, `reading panel renders ${JSON.stringify(asMaths)}`);
+
+    // ── 5 · a handwritten answer is marked ───────────────────────────────────
+    // A reading the engine is unsure of turns the submit into a confirmation
+    // step instead. That is the designed behaviour, so it is walked, not
+    // side-stepped: the flow stands behind its reading and the submit goes.
+    const confirm = page.getByRole('button', { name: 'That’s what I wrote' });
+    await page.locator('.editor-foot button.btn').last().click();
+    if (await confirm.count()) {
+      note('the engine was unsure enough of its reading to ask first, so the flow confirmed it — the designed path, walked rather than side-stepped');
+      await confirm.click();
+    }
+    await page.waitForSelector('.eval-card', { timeout: 20000 });
+    const marked = (await page.locator('.eval-card').innerText()).replace(/\s+/g, ' ');
+    const marks = (await page.locator('.eval-marks').innerText()).replace(/\s+/g, ' ').trim();
+    await check('the handwritten answer is marked correct — every mark awarded',
+      /^(\d+(?:\.\d)?) \/ \1 marks \(100%\)/.test(marks), `marks read ${JSON.stringify(marks)}`);
+    await check('and it is not told what was expected instead',
+      !/Expected:/.test(marked), `evaluation reads ${JSON.stringify(marked.slice(0, 200))}`);
+    await check('the ink is ticked on the page itself',
+      await page.locator('.ink-verdict.good').count() >= 1,
+      'the marker drew no ✓ on the student’s own writing');
+
+    // ── 6 · the writing was kept with the attempt ────────────────────────────
+    await page.goto(`${base}/history`, { waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('.hist-row', { timeout: 30000 });
+    await page.locator('.hist-main').first().click();
+    await page.waitForSelector('.hist-detail', { timeout: 20000 });
+    const detail = (await page.locator('.hist-detail').innerText()).replace(/\s+/g, ' ');
+    await check('the strokes themselves were kept with the attempt',
+      detail.includes('Your handwriting'),
+      `detail reads ${JSON.stringify(detail.slice(0, 200))}`);
+    await check('and the reading was kept beside them',
+      detail.includes(`read as \u201c${answer}\u201d`),
+      `detail reads ${JSON.stringify(detail.slice(0, 200))}`);
   }
-  await page.waitForTimeout(1400);
-  ok('marked correct on second try', !!(await page.$('.verdict-good, .eval-head')) && !(await page.$('.ink-linebox.bad')));
-  ok('✓ verdict on the corrected ink', !!(await page.$('.ink-verdict.good')));
-  ok('green box drawn around the correct step', !!(await page.$('.ink-linebox.good')));
-  await page.screenshot({ path: `${OUT}ink-2-correct.png` });
+};
 
-  // 3 · multi-line working (typed) — Step Check pins the broken line
-  await page.goto(`${BASE}/practice?subtopic=y7-equations`);
-  await page.waitForSelector('.q-prompt', { timeout: 15000 });
-  await page.locator('.mode-tab').nth(0).click();
-  const p2 = await page.$eval('.q-prompt', el => el.textContent);
-  console.log('typed-working prompt:', p2.slice(0, 90));
-  const toggle = page.getByRole('button', { name: /Show working for partial credit/ });
-  const ansInput = page.locator('.editor-body input.answer-input');
-  if (await toggle.count() && await ansInput.count()) {
-    await toggle.click();
-    // a chain whose second line breaks on purpose
-    await page.locator('.editor-body textarea.input').fill('2x + 3 = 13\n2x = 11\nx = 5.5');
-    await ansInput.fill('5.5');
-    await page.getByRole('button', { name: /Submit Answer/ }).click();
-    await page.waitForTimeout(1200);
-    const breakLine = await page.$('.stepcheck-line.sc-break');
-    ok('typed Step Check highlights the broken line', !!breakLine);
-    await page.screenshot({ path: `${OUT}ink-3-stepcheck.png` });
-  } else {
-    console.log('SKIP typed working (no steps support on this question)');
-  }
-
-  await browser.close();
-  console.log(failures ? `INK TOUR: ${failures} FAILURES` : 'INK TOUR: ALL PASS');
-  process.exit(failures ? 1 : 0);
+if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {
+  const { runOne } = await import('./e2e.mjs');
+  process.exit(await runOne(flow) ? 1 : 0);
 }
-
-main().catch(e => { console.error('INK TOUR FAILED:', e.message); process.exit(1); });

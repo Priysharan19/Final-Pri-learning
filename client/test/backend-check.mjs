@@ -3,7 +3,7 @@
 //
 // client/src/local/backend.js IS the platform: every route the UI calls lives
 // there, over IndexedDB, with no server behind it. The maths engine underneath
-// it carries 10,080 self-checks; this applies the same standard to the layer
+// it carries 672,000 self-checks; this applies the same standard to the layer
 // above. Every check below drives a real endpoint through the real dispatch(),
 // and asserts what came back — never that a call "did not throw", and never
 // against objects the suite built for itself.
