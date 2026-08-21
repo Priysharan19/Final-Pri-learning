@@ -48,10 +48,12 @@ final class MathInkRecognizer {
     private static let lineCacheLimit = 64
 
     /// Vision is synchronous at the request-handler call site, but VNRequest
-    /// itself is cancellable. Keep the active request behind a tiny lock so a
-    /// newly arriving Pencil stroke can stop stale analysis immediately.
+    /// itself is cancellable. The generation invalidates the complete adaptive
+    /// recognition pass, not only whichever Vision request happens to be active
+    /// when the next Pencil contact arrives.
     private let visionLock = NSLock()
     private var activeVisionRequest: VNRequest?
+    private var cancellationGeneration: UInt64 = 0
 
     static var trace = false
     static var traceLabel = "line"
@@ -74,14 +76,26 @@ final class MathInkRecognizer {
 
     func cancelActiveVision() {
         visionLock.lock()
+        cancellationGeneration &+= 1
         let request = activeVisionRequest
         visionLock.unlock()
         request?.cancel()
     }
 
+    private func generationSnapshot() -> UInt64 {
+        visionLock.lock(); defer { visionLock.unlock() }
+        return cancellationGeneration
+    }
+
+    private func generationIsCurrent(_ generation: UInt64) -> Bool {
+        visionLock.lock(); defer { visionLock.unlock() }
+        return generation == cancellationGeneration
+    }
+
     // MARK: Entry point
 
     func read(strokes: [InkStroke], overrides: [String: String]) -> Reading {
+        let generation = generationSnapshot()
         let live = strokes.filter { !$0.isEmpty }
         guard !live.isEmpty else {
             return Reading(lines: [], text: "", minConfidence: 1, margin: 1, weakest: nil)
@@ -103,6 +117,7 @@ final class MathInkRecognizer {
 
         var readLines: [ReadingLine] = []
         for (lineIndex, line) in lines.enumerated() {
+            guard generationIsCurrent(generation) else { break }
             let blocks = fractions.filter { block in
                 let y = block.bar.midY
                 return y >= line.band.lowerBound - line.glyphHeight
@@ -110,7 +125,8 @@ final class MathInkRecognizer {
             }
             readLines.append(readLine(line, lineIndex: lineIndex, fractions: blocks,
                                       strokes: strokes, pageGlyph: pageGlyph,
-                                      overrides: overrides))
+                                      overrides: overrides,
+                                      generation: generation))
         }
         return summarise(readLines)
     }
@@ -123,25 +139,29 @@ final class MathInkRecognizer {
         fractions: [FractionBlock],
         strokes: [InkStroke],
         pageGlyph: CGFloat,
-        overrides: [String: String]
+        overrides: [String: String],
+        generation: UInt64
     ) -> ReadingLine {
         var glyphs: [DecodedGlyph] = []
         var locked: Set<Int> = []
         var unread = false
 
-        if !line.strokes.isEmpty {
+        if !line.strokes.isEmpty, generationIsCurrent(generation) {
             let decoded = decodeGlyphs(
                 strokeIndexes: line.strokeIndexes,
                 strokes: strokes,
-                glyphHeight: line.glyphHeight
+                glyphHeight: line.glyphHeight,
+                generation: generation
             )
             glyphs = decoded
             unread = decoded.isEmpty
         }
 
-        for block in fractions {
-            let numerator = readNested(block.numerator, strokes: strokes, pageGlyph: pageGlyph)
-            let denominator = readNested(block.denominator, strokes: strokes, pageGlyph: pageGlyph)
+        for block in fractions where generationIsCurrent(generation) {
+            let numerator = readNested(block.numerator, strokes: strokes,
+                                       pageGlyph: pageGlyph, generation: generation)
+            let denominator = readNested(block.denominator, strokes: strokes,
+                                         pageGlyph: pageGlyph, generation: generation)
             let text = "(\(numerator.isEmpty ? "?" : numerator))/(\(denominator.isEmpty ? "?" : denominator))"
             let glyph = DecodedGlyph(
                 symbol: text,
@@ -156,6 +176,11 @@ final class MathInkRecognizer {
             locked.insert(insertAt)
             locked = Set(locked.map { $0 >= insertAt && $0 != insertAt ? $0 + 1 : $0 })
             unread = false
+        }
+
+        guard generationIsCurrent(generation) else {
+            return ReadingLine(text: "", box: line.bounds, symbols: [],
+                               strokeIndexes: line.strokeIndexes, unread: true)
         }
 
         for i in glyphs.indices {
@@ -200,12 +225,19 @@ final class MathInkRecognizer {
                            strokeIndexes: line.strokeIndexes, unread: unread)
     }
 
-    private func readNested(_ indexes: [Int], strokes: [InkStroke], pageGlyph: CGFloat) -> String {
+    private func readNested(
+        _ indexes: [Int],
+        strokes: [InkStroke],
+        pageGlyph: CGFloat,
+        generation: UInt64
+    ) -> String {
+        guard generationIsCurrent(generation) else { return "" }
         let members = indexes.compactMap { strokes.indices.contains($0) ? strokes[$0] : nil }
         guard !members.isEmpty else { return "" }
         let glyphHeight = InkLineSegmenter.pageGlyphSize(members)
-        var glyphs = decodeGlyphs(strokeIndexes: indexes, strokes: strokes, glyphHeight: glyphHeight)
-        guard !glyphs.isEmpty else { return "" }
+        var glyphs = decodeGlyphs(strokeIndexes: indexes, strokes: strokes,
+                                  glyphHeight: glyphHeight, generation: generation)
+        guard generationIsCurrent(generation), !glyphs.isEmpty else { return "" }
         MathDecoder.repairBrackets(&glyphs, strokes: strokes, glyphHeight: glyphHeight)
         let locked = MathDecoder.lockFunctionNames(&glyphs)
         MathDecoder.applyContext(&glyphs, locked: locked)
@@ -268,8 +300,10 @@ final class MathInkRecognizer {
     private func decodeGlyphs(
         strokeIndexes: [Int],
         strokes: [InkStroke],
-        glyphHeight: CGFloat
+        glyphHeight: CGFloat,
+        generation: UInt64
     ) -> [DecodedGlyph] {
+        guard generationIsCurrent(generation) else { return [] }
         var marks = clusters(of: strokeIndexes, strokes: strokes)
         guard !marks.isEmpty else { return [] }
         markRaised(&marks, glyphHeight: glyphHeight)
@@ -284,9 +318,11 @@ final class MathInkRecognizer {
             members,
             glyphHeight: glyphHeight,
             label: MathInkRecognizer.traceLabel,
-            expectedMarks: marks.count
+            expectedMarks: marks.count,
+            generation: generation
         ) else { return [] }
 
+        guard generationIsCurrent(generation) else { return [] }
         let symbols = MathInkRecognizer.symbols(of: reading.text)
         guard !symbols.isEmpty else { return [] }
 
@@ -395,8 +431,10 @@ final class MathInkRecognizer {
         _ strokes: [InkStroke],
         glyphHeight: CGFloat,
         label: String,
-        expectedMarks: Int
+        expectedMarks: Int,
+        generation: UInt64
     ) -> LineReading? {
+        guard generationIsCurrent(generation) else { return nil }
         let primaryAttempt: (scale: CGFloat, level: VNRequestTextRecognitionLevel) = (1.0, .accurate)
         var readings: [LineReading] = []
 
@@ -405,8 +443,10 @@ final class MathInkRecognizer {
             glyphHeight: glyphHeight,
             label: label,
             scale: primaryAttempt.scale,
-            level: primaryAttempt.level
+            level: primaryAttempt.level,
+            generation: generation
         ) {
+            guard generationIsCurrent(generation) else { return nil }
             readings.append(primary)
             let count = Self.symbols(of: primary.text).count
             let grammar = MathGrammar.score(Self.respell(primary.text))
@@ -425,18 +465,20 @@ final class MathInkRecognizer {
             (1.00, .fast)
         ]
         for attempt in rescueAttempts {
+            guard generationIsCurrent(generation) else { return nil }
             if let reading = runVisionAttempt(
                 strokes,
                 glyphHeight: glyphHeight,
                 label: label,
                 scale: attempt.scale,
-                level: attempt.level
+                level: attempt.level,
+                generation: generation
             ) {
                 readings.append(reading)
             }
         }
 
-        guard !readings.isEmpty else { return nil }
+        guard generationIsCurrent(generation), !readings.isEmpty else { return nil }
         return fuse(readings, expectedMarks: expectedMarks)
     }
 
@@ -445,13 +487,18 @@ final class MathInkRecognizer {
         glyphHeight: CGFloat,
         label: String,
         scale: CGFloat,
-        level: VNRequestTextRecognitionLevel
+        level: VNRequestTextRecognitionLevel,
+        generation: UInt64
     ) -> LineReading? {
-        guard let raster = InkRasterizer.render(
-            strokes: strokes,
-            glyphHeight: glyphHeight / scale
-        ) else { return nil }
-        let observations = recognizeText(in: raster.image, level: level)
+        guard generationIsCurrent(generation),
+              let raster = InkRasterizer.render(
+                strokes: strokes,
+                glyphHeight: glyphHeight / scale
+              ),
+              generationIsCurrent(generation)
+        else { return nil }
+        let observations = recognizeText(in: raster.image, level: level, generation: generation)
+        guard generationIsCurrent(generation) else { return nil }
         if MathInkRecognizer.trace {
             MathInkRecognizer.dump(raster.image, label: label)
             NSLog("PRIINK   %@ %dx%d level=%@ x%.2f observations=%d", label as NSString,
@@ -574,19 +621,26 @@ final class MathInkRecognizer {
 
     private func recognizeText(
         in image: CGImage,
-        level: VNRequestTextRecognitionLevel
+        level: VNRequestTextRecognitionLevel,
+        generation: UInt64
     ) -> [VNRecognizedTextObservation] {
+        guard generationIsCurrent(generation) else { return [] }
         let request = VNRecognizeTextRequest()
         request.recognitionLevel = level
         request.usesLanguageCorrection = false
         request.recognitionLanguages = ["en-US"]
         request.revision = VNRecognizeTextRequestRevision3
         request.minimumTextHeight = 0
-        // Apple documents this as the resource-burden hint for Vision work.
-        // Pencil rendering is more latency-sensitive than recognition.
-        request.preferBackgroundProcessing = true
 
+        // Keep Vision interactive. `preferBackgroundProcessing` caused the
+        // simulator benchmark to stop producing timely results. PencilKit is
+        // protected instead by the native quiet window, utility-QoS queue and
+        // explicit pen-down cancellation of this entire generation.
         visionLock.lock()
+        guard generation == cancellationGeneration else {
+            visionLock.unlock()
+            return []
+        }
         activeVisionRequest = request
         visionLock.unlock()
         defer {
@@ -601,6 +655,7 @@ final class MathInkRecognizer {
         } catch {
             return []
         }
+        guard generationIsCurrent(generation) else { return [] }
         return request.results ?? []
     }
 
