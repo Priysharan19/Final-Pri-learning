@@ -24,7 +24,7 @@ const EXPECTED_ACCEPTANCE_CHECKS = 7;
 const EXPECTED_FUSION_CHECKS = 11;
 const EXPECTED_TENSOR_CHECKS = 12;
 const EXPECTED_STRUCTURAL_CHECKS = 16;
-const EXPECTED_INPUT_CHECKS = 3;
+const EXPECTED_INPUT_CHECKS = 5;
 
 const argOf = (name) => {
   const i = process.argv.indexOf(`--${name}`);
