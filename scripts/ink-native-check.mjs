@@ -21,10 +21,11 @@ const PACKAGE = join(HERE, '../ios/PriLearning.swiftpm');
 const BUNDLE_ID = 'com.prilearning.app';
 
 // Floors prevent regression; they are deliberately not presented as targets.
-// Raise them only after the measured benchmark rises. Never lower them to make
-// a change pass.
-const ACCURACY_FLOOR = 85;
-const EXACT_FLOOR = 6;
+// V9 has now demonstrated 99.0% characters and 9/10 exact on this fixed native
+// simulator corpus. A future change is not allowed to quietly fall back to the
+// old 85% / 6-of-10 gate and still call itself healthy.
+const ACCURACY_FLOOR = 99;
+const EXACT_FLOOR = 9;
 const EXPECTED_CASES = 10;
 const EXPECTED_GEOMETRY_CHECKS = 10;
 
