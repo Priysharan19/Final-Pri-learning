@@ -10,7 +10,21 @@ struct OnlineInkHypothesis: Sendable {
     let source: String
     /// Optional count from a head that is independent of text decoding. A
     /// provider that only counts its own output must leave this nil.
-    let symbolCount: Int? = nil
+    let symbolCount: Int?
+
+    init(
+        text: String,
+        latex: String?,
+        confidence: Double,
+        source: String,
+        symbolCount: Int? = nil
+    ) {
+        self.text = text
+        self.latex = latex
+        self.confidence = min(1, max(0, confidence))
+        self.source = source
+        self.symbolCount = symbolCount
+    }
 }
 
 protocol OnlineInkRecognizing: Sendable {
