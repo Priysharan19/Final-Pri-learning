@@ -154,7 +154,13 @@ final class MathInkRecognizer {
                 generation: generation
             )
             glyphs = decoded
-            unread = decoded.isEmpty
+            if !glyphs.isEmpty {
+                // This is the live production call that was previously missing:
+                // the DP trace aligner and decisive Pencil geometry must actually
+                // participate before grammar turns OCR hypotheses into maths.
+                MathShapeClassifier.repair(&glyphs, strokes: strokes, glyphHeight: line.glyphHeight)
+            }
+            unread = glyphs.isEmpty
         }
 
         for block in fractions where generationIsCurrent(generation) {
@@ -238,6 +244,7 @@ final class MathInkRecognizer {
         var glyphs = decodeGlyphs(strokeIndexes: indexes, strokes: strokes,
                                   glyphHeight: glyphHeight, generation: generation)
         guard generationIsCurrent(generation), !glyphs.isEmpty else { return "" }
+        MathShapeClassifier.repair(&glyphs, strokes: strokes, glyphHeight: glyphHeight)
         MathDecoder.repairBrackets(&glyphs, strokes: strokes, glyphHeight: glyphHeight)
         let locked = MathDecoder.lockFunctionNames(&glyphs)
         MathDecoder.applyContext(&glyphs, locked: locked)
@@ -326,12 +333,32 @@ final class MathInkRecognizer {
         let symbols = MathInkRecognizer.symbols(of: reading.text)
         guard !symbols.isEmpty else { return [] }
 
+        // Count disagreement is exactly when proportional assignment is least
+        // defensible. Align OCR symbols to spatial Pencil marks with DP so an
+        // OCR hallucination can remain ownerless and real unexplained ink can be
+        // recovered structurally instead of shifting every later symbol.
+        let spatialMarks = marks.map {
+            InkSpatialMark(strokeIndexes: $0.strokeIndexes.sorted(), bounds: $0.bounds, isRaised: $0.isRaised)
+        }
+        let alignment = InkSymbolAligner.align(
+            symbols: symbols,
+            agreement: reading.agreement,
+            marks: spatialMarks,
+            strokes: strokes,
+            glyphHeight: glyphHeight
+        )
         let exact = symbols.count == marks.count
+            && alignment.approximateSymbols.isEmpty
+            && alignment.unmatchedMarks.isEmpty
+
         var glyphs: [DecodedGlyph] = []
         for (position, symbol) in symbols.enumerated() {
-            let markIndex = exact
-                ? position
-                : min(marks.count - 1, position * marks.count / max(symbols.count, 1))
+            guard position < alignment.symbolToMark.count,
+                  let markIndex = alignment.symbolToMark[position],
+                  marks.indices.contains(markIndex) else {
+                // Vision produced a character with no defensible Pencil owner.
+                continue
+            }
             let mark = marks[markIndex]
             let agreed = reading.agreement[position] ?? [:]
             let support = agreed[symbol] ?? 1
@@ -339,7 +366,8 @@ final class MathInkRecognizer {
                 .filter { $0.key != symbol }
                 .sorted { $0.value > $1.value }
                 .map { (symbol: $0.key, confidence: $0.value) }
-            let raised = mark.isRaised && (exact || !MathAlphabet.binaryOperators.contains(symbol))
+            let approximate = alignment.approximateSymbols.contains(position)
+            let raised = mark.isRaised && !MathAlphabet.binaryOperators.contains(symbol)
             glyphs.append(DecodedGlyph(
                 symbol: symbol,
                 box: mark.bounds,
@@ -347,7 +375,7 @@ final class MathInkRecognizer {
                 alternatives: rivals,
                 isSuperscript: raised,
                 strokeIndexes: mark.strokeIndexes.sorted(),
-                approximate: !exact
+                approximate: approximate
             ))
         }
 
