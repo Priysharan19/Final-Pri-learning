@@ -38,6 +38,33 @@ enum MathShapeClassifier {
             let members = indexes.map { strokes[$0] }
             let original = glyphs[i].symbol
 
+            // Two parallel horizontal Pencil strokes are stronger evidence for
+            // '=' than a text OCR guess of '-'. This is deliberately geometric.
+            if isEquals(members, glyphHeight: glyphHeight) {
+                if original != "=" {
+                    glyphs[i].alternatives = adding(original, confidence: glyphs[i].confidence,
+                                                     to: glyphs[i].alternatives)
+                }
+                glyphs[i].symbol = "="
+                glyphs[i].confidence = max(glyphs[i].confidence, 0.94)
+                glyphs[i].approximate = false
+                continue
+            }
+
+            // A centred horizontal/vertical cross is a plus. Requiring straight,
+            // axis-aligned strokes and an interior intersection keeps this much
+            // narrower than simply treating every two-stroke mark as '+'.
+            if isPlus(members, glyphHeight: glyphHeight) {
+                if original != "+" {
+                    glyphs[i].alternatives = adding(original, confidence: glyphs[i].confidence,
+                                                     to: glyphs[i].alternatives)
+                }
+                glyphs[i].symbol = "+"
+                glyphs[i].confidence = max(glyphs[i].confidence, 0.92)
+                glyphs[i].approximate = false
+                continue
+            }
+
             // A handwritten y has two upper arms that meet, with one stroke
             // continuing well below the junction. That descender is strong
             // evidence a plain OCR "1" cannot see.
@@ -52,18 +79,17 @@ enum MathShapeClassifier {
                 continue
             }
 
-            // A two-stroke diagonal cross is an x-shaped mark regardless of
-            // whether OCR called it x, ×, *, 4 or k. We preserve the semantic
-            // x-vs-multiply decision for MathDecoder.applyContext: geometry can
-            // prove the shape, neighbours decide what that shape means.
-            if ["4", "k", "x", "*", "×", "✕"].contains(original),
-               isDiagonalCross(members, glyphHeight: glyphHeight) {
+            // Two straight crossing diagonals prove an x-shaped mark regardless
+            // of what OCR called it. This is critical for real Pencil cases where
+            // Vision calls an obvious handwritten x '2' or even '21'. Semantic
+            // x-vs-multiply meaning remains MathDecoder's job.
+            if isDiagonalCross(members, glyphHeight: glyphHeight) {
                 if original != "*" {
                     glyphs[i].alternatives = adding(original, confidence: glyphs[i].confidence,
                                                      to: glyphs[i].alternatives)
                 }
                 glyphs[i].symbol = "*"
-                glyphs[i].confidence = max(glyphs[i].confidence, 0.84)
+                glyphs[i].confidence = max(glyphs[i].confidence, 0.90)
                 continue
             }
 
@@ -224,13 +250,23 @@ enum MathShapeClassifier {
                 glyphs[owner].symbol = proven
                 glyphs[owner].box = cluster.bounds
                 glyphs[owner].strokeIndexes = cluster.strokeIndexes.sorted()
-                glyphs[owner].confidence = max(glyphs[owner].confidence, 0.83)
+                glyphs[owner].confidence = max(glyphs[owner].confidence, 0.88)
                 glyphs[owner].approximate = false
+
+                // If OCR emitted two characters for one physically proven mark
+                // (for example `21` over a two-stroke handwritten x), keeping a
+                // second approximate glyph with the SAME strokes recreates the
+                // hallucination downstream. Collapse those duplicate owners.
+                let redundant = glyphs.indices.filter { index in
+                    index != owner && glyphs[index].approximate
+                        && !Set(glyphs[index].strokeIndexes).isDisjoint(with: cluster.strokeIndexes)
+                }
+                for index in redundant.reversed() { glyphs.remove(at: index) }
             } else {
                 glyphs.append(DecodedGlyph(
                     symbol: proven,
                     box: cluster.bounds,
-                    confidence: 0.83,
+                    confidence: 0.88,
                     alternatives: [],
                     isSuperscript: false,
                     strokeIndexes: cluster.strokeIndexes.sorted(),
@@ -316,10 +352,39 @@ enum MathShapeClassifier {
 
     private static func structuralSymbol(_ strokes: [InkStroke], glyphHeight: CGFloat) -> String? {
         if isEquals(strokes, glyphHeight: glyphHeight) { return "=" }
+        if isPlus(strokes, glyphHeight: glyphHeight) { return "+" }
         if let bracket = bracket(strokes, glyphHeight: glyphHeight) { return bracket }
         if isDiagonalCross(strokes, glyphHeight: glyphHeight) { return "*" }
         if isTheta(strokes, glyphHeight: glyphHeight) { return "theta" }
         return nil
+    }
+
+    private static func isPlus(_ strokes: [InkStroke], glyphHeight: CGFloat) -> Bool {
+        guard strokes.count == 2 else { return false }
+        let pairs = [(strokes[0], strokes[1]), (strokes[1], strokes[0])]
+        for (horizontal, vertical) in pairs {
+            guard isHorizontal(horizontal),
+                  let v0 = vertical.points.first, let v1 = vertical.points.last,
+                  vertical.pathLength > 0 else { continue }
+            let vdx = v1.x - v0.x, vdy = v1.y - v0.y
+            let vChord = hypot(vdx, vdy)
+            guard vChord > 2,
+                  vChord / vertical.pathLength >= 0.80,
+                  abs(vdy) >= 0.90 * vChord,
+                  abs(vdx) <= 0.32 * vChord else { continue }
+
+            let union = horizontal.bounds.union(vertical.bounds)
+            guard union.width >= 0.30 * glyphHeight,
+                  union.height >= 0.30 * glyphHeight else { continue }
+            let ratio = union.width / max(union.height, 1)
+            guard ratio >= 0.42, ratio <= 2.30,
+                  let h0 = horizontal.points.first, let h1 = horizontal.points.last else { continue }
+            if interiorIntersection(
+                CGPoint(x: h0.x, y: h0.y), CGPoint(x: h1.x, y: h1.y),
+                CGPoint(x: v0.x, y: v0.y), CGPoint(x: v1.x, y: v1.y)
+            ) { return true }
+        }
+        return false
     }
 
     private static func isEquals(_ strokes: [InkStroke], glyphHeight: CGFloat) -> Bool {
