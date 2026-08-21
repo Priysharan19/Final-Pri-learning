@@ -24,6 +24,7 @@ const EXPECTED_ACCEPTANCE_CHECKS = 7;
 const EXPECTED_FUSION_CHECKS = 11;
 const EXPECTED_TENSOR_CHECKS = 12;
 const EXPECTED_STRUCTURAL_CHECKS = 16;
+const EXPECTED_INPUT_CHECKS = 3;
 
 const argOf = (name) => {
   const i = process.argv.indexOf(`--${name}`);
@@ -116,8 +117,9 @@ for (let i = 0; i < 40; i++) {
   const hasFusion = lines.some(l => l.startsWith('PRIINK fusion '));
   const hasTensor = lines.some(l => l.startsWith('PRIINK tensor '));
   const hasStructural = lines.some(l => l.startsWith('PRIINK structural '));
+  const hasInput = lines.some(l => l.startsWith('PRIINK input '));
   if (hasSummary && hasBridge && hasAlignment && hasPersonalization && hasGeometry
-      && hasFrontier && hasAcceptance && hasFusion && hasTensor && hasStructural) break;
+      && hasFrontier && hasAcceptance && hasFusion && hasTensor && hasStructural && hasInput) break;
 }
 
 const started = lines.map((l, i) => [l, i]).filter(([l]) => l.includes('native ink self-check'));
@@ -134,6 +136,7 @@ const acceptance = [...lines].reverse().find(l => l.startsWith('PRIINK acceptanc
 const fusion = [...lines].reverse().find(l => l.startsWith('PRIINK fusion '));
 const tensor = [...lines].reverse().find(l => l.startsWith('PRIINK tensor '));
 const structural = [...lines].reverse().find(l => l.startsWith('PRIINK structural '));
+const input = [...lines].reverse().find(l => l.startsWith('PRIINK input '));
 const accuracy = summary ? Number(/accuracy ([\d.]+)%/.exec(summary)?.[1] ?? 0) : 0;
 const exactMatch = summary ? /(\d+)\/(\d+) exact/.exec(summary) : null;
 const exact = Number(exactMatch?.[1] ?? 0);
@@ -151,6 +154,7 @@ const q = parseGate(acceptance);
 const u = parseGate(fusion);
 const t = parseGate(tensor);
 const s = parseGate(structural);
+const i = parseGate(input);
 const perf = lines
   .map(l => /PRIINK perf recognition .* ([\d.]+)ms/.exec(l))
   .filter(Boolean)
@@ -178,6 +182,7 @@ checkGate('selective acceptance', acceptance, q, EXPECTED_ACCEPTANCE_CHECKS);
 checkGate('expert fusion safety', fusion, u, EXPECTED_FUSION_CHECKS);
 checkGate('online-ink tensor', tensor, t, EXPECTED_TENSOR_CHECKS);
 checkGate('structural intelligence', structural, s, EXPECTED_STRUCTURAL_CHECKS);
+checkGate('native input routing', input, i, EXPECTED_INPUT_CHECKS);
 
 if (!bridge) problems.push('the bridge smoke test did not report');
 else {
@@ -198,4 +203,4 @@ if (problems.length) {
   for (const problem of problems) console.log(`FAIL — ${problem}`);
   process.exit(1);
 }
-console.log(`PASS — character accuracy ${accuracy}%, exact ${exact}/${cases}, alignment ${a.passed}/${a.cases}, personalization ${p.passed}/${p.cases}, geometry ${g.passed}/${g.cases}, frontier ${f.passed}/${f.cases}, acceptance ${q.passed}/${q.cases}, fusion ${u.passed}/${u.cases}, tensor ${t.passed}/${t.cases}, structural ${s.passed}/${s.cases}, bridge round trip clean`);
+console.log(`PASS — character accuracy ${accuracy}%, exact ${exact}/${cases}, alignment ${a.passed}/${a.cases}, personalization ${p.passed}/${p.cases}, geometry ${g.passed}/${g.cases}, frontier ${f.passed}/${f.cases}, acceptance ${q.passed}/${q.cases}, fusion ${u.passed}/${u.cases}, tensor ${t.passed}/${t.cases}, structural ${s.passed}/${s.cases}, input ${i.passed}/${i.cases}, bridge round trip clean`);
