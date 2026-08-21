@@ -61,40 +61,39 @@ times in one day while it was a hand-typed `rm -rf` + `cp`, which is how the
 iPad app ended up shipping a marketing claim that had already been removed
 everywhere else.
 
-## Option C — Safari over your local network, for quick UI iteration
+## Option C — installed from your Mac over Wi-Fi, no Swift Playgrounds
 
-Fastest loop when you are changing screens and want to look at them on glass,
-but read the limitation before trusting anything you see.
+Gives you a real installed app — full screen, its own Home Screen icon, offline,
+passwords working — without Xcode or Swift Playgrounds. Serve it over HTTPS and
+use *Add to Home Screen*.
 
 ```bash
 npm run build
-node scripts/serve-lan.mjs
+npm run serve:lan
 ```
 
-It prints a `http://<your-mac>:4188` address. Type it into Safari on the iPad,
-on the same Wi-Fi.
+It prints two addresses. Do the certificate step once:
 
-**What does not work over plain `http`, and why.** iOS only exposes
-`crypto.subtle` in a *secure context* — HTTPS, or `localhost`. A LAN IP is
-neither. So on this route:
+1. On the iPad, open the **certificate** address it prints (plain `http`, port
+   +1) and let Safari download the profile.
+2. **Settings → General → VPN & Device Management** → install the downloaded
+   profile.
+3. **Settings → General → About → Certificate Trust Settings** → turn it on for
+   "Pri Learning (local)".
 
-- password-protected profiles cannot be created or opened (the vault needs
-  PBKDF2 through `crypto.subtle`),
-- encryption at rest is therefore not exercised at all,
-- the service worker will not register, so there is no offline mode and
-  *Add to Home Screen* gives you a bookmark rather than a real installed PWA.
+Then open the **https** address in Safari and use **Share → Add to Home Screen**.
+It launches full screen with no browser chrome.
 
-Everything else — the whole question engine, marking, the Apple Pencil canvas
-and the recogniser — runs normally. Use this route to look at screens; use
-Option A when you want to test the app as a student would actually have it.
+**Why HTTPS and not plain http.** iOS exposes `crypto.subtle` and registers a
+service worker only in a *secure context*. A LAN IP over `http` is not one, so
+on plain http password-protected profiles cannot be opened, encryption at rest
+is never exercised, and *Add to Home Screen* gives a bookmark rather than an
+installed app with an offline copy. `npm run serve:lan -- --http` is available
+if you want the reduced-capability route with no trust step.
 
-## Why this architecture
+The certificate is generated once into `scripts/.lan-cert/` (git-ignored) and
+names your Mac's current LAN address. If your Mac's IP changes, the next run
+regenerates it and you repeat the trust step.
 
-The engine (expression equivalence, 84 generators, the $P handwriting
-recogniser, Elo adaptive model) is ~17,300 lines, and the repo's suites run
-693,000+ automated checks over it (`npm test`). None of it has been used by a
-student yet — there is no field evidence of any kind. Shipping it inside the Swift app keeps 100% of that
-verified behaviour while the app itself is fully native at the edges — icon,
-full-screen launch, share sheet, camera, sandbox storage. This is the same
-approach many production iPad apps use. A screen-by-screen Swift/SwiftUI port
-of the engine can be done incrementally later without users losing anything.
+Option A is still the one to use before you believe anything about how the app
+behaves for a student — it is the artefact you would actually ship.
