@@ -28,8 +28,6 @@ class CoreMLWrapper(nn.Module):
         self.count_temperature = float(count_temperature)
 
     def forward(self, points: torch.Tensor, valid: torch.Tensor):
-        # `valid` is [B,T] float32 (1 real, 0 padding) because that converts more
-        # reliably across Core ML backends than exposing a boolean public input.
         mask = valid < 0.5
         out = self.model(points, mask)
         return (
@@ -43,7 +41,10 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("checkpoint")
     parser.add_argument("calibration")
-    parser.add_argument("--output", default="ios/PriLearning.swiftpm/Resources/PriInkOnline.mlpackage")
+    parser.add_argument(
+        "--output",
+        default="ios/PriLearning.swiftpm/Resources/Models/PriInkOnline.mlpackage",
+    )
     parser.add_argument("--max-points", type=int, default=1024)
     parser.add_argument("--minimum-ios", type=int, default=16)
     parser.add_argument("--compute-precision", choices=["float16", "float32"], default="float16")
@@ -79,11 +80,7 @@ def main() -> None:
     valid[:, :8] = 1
     traced = torch.jit.trace(wrapper, (points, valid), strict=False)
 
-    target_map = {
-        16: ct.target.iOS16,
-        17: ct.target.iOS17,
-        18: ct.target.iOS18,
-    }
+    target_map = {16: ct.target.iOS16, 17: ct.target.iOS17, 18: ct.target.iOS18}
     target = target_map.get(args.minimum_ios)
     if target is None:
         raise SystemExit("--minimum-ios must be 16, 17 or 18 for this exporter")
