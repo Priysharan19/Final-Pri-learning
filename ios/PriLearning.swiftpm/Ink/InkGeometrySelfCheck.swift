@@ -25,11 +25,27 @@ enum InkGeometrySelfCheck {
         MathShapeClassifier.repair(&crossed, strokes: [down, up], glyphHeight: 40)
         check("diagonal cross recovers x-shaped mark", crossed[0].symbol == "*")
 
+        // Real-device failure: Vision called one two-stroke x `21`. Two OCR
+        // characters must not survive when the physical trace proves one
+        // crossed mark.
+        let crossBox = down.bounds.union(up.bounds)
+        var duplicatedCross = [
+            glyph("2", strokes: [0, 1], box: CGRect(x: crossBox.minX, y: crossBox.minY,
+                                                     width: crossBox.width / 2, height: crossBox.height),
+                  approximate: true),
+            glyph("1", strokes: [0, 1], box: CGRect(x: crossBox.midX, y: crossBox.minY,
+                                                     width: crossBox.width / 2, height: crossBox.height),
+                  approximate: true)
+        ]
+        MathShapeClassifier.repair(&duplicatedCross, strokes: [down, up], glyphHeight: 40)
+        check("OCR 21 over one crossed x collapses to one x-shaped mark",
+              duplicatedCross.count == 1 && duplicatedCross[0].symbol == "*")
+
         let vertical = stroke([(20, 5), (20, 20), (20, 35)])
         let horizontal = stroke([(5, 20), (20, 20), (35, 20)])
         var plus = [glyph("4", strokes: [0, 1], box: vertical.bounds.union(horizontal.bounds))]
         MathShapeClassifier.repair(&plus, strokes: [vertical, horizontal], glyphHeight: 40)
-        check("plus is not misclassified as x", plus[0].symbol == "4")
+        check("axis-aligned cross recovers plus", plus[0].symbol == "+")
 
         let loop = stroke([
             (20, 5), (29, 8), (35, 16), (36, 25), (31, 34), (21, 38),
@@ -76,10 +92,7 @@ enum InkGeometrySelfCheck {
               ambiguous[0].alternatives.contains(where: { $0.symbol == "y" }) && ambiguous[0].confidence <= 0.78)
 
         // Reproduce the architectural failure mode behind `sin(x)=1 → sin(x1`:
-        // proportional OCR ownership is only approximate. The final `1` can
-        // therefore already be claimed by the wrong OCR glyph even though its
-        // geometry sits plainly to the right of a recovered equals sign. An
-        // approximate owner must never block stronger stroke evidence.
+        // approximate OCR ownership must never block stronger stroke evidence.
         let first = stroke([(5, 5), (5, 35)])
         let eqTop = stroke([(20, 15), (34, 15)])
         let eqBottom = stroke([(20, 23), (34, 23)])
@@ -96,13 +109,32 @@ enum InkGeometrySelfCheck {
 
         // The aligner may do the right thing and drop every bad OCR symbol. The
         // remaining glyphs are then exact, but real trailing ink still exists.
-        // Recovery must be trace-driven rather than requiring an approximate
-        // OCR survivor or `=1` disappears permanently.
         var exactSurvivor = [glyph("x", strokes: [0], box: first.bounds)]
         MathShapeClassifier.repair(&exactSurvivor,
                                    strokes: [first, eqTop, eqBottom, finalOne], glyphHeight: 40)
         check("exact survivors still recover unexplained trailing equals and one",
               exactSurvivor.sorted(by: { $0.box.midX < $1.box.midX }).map(\.symbol) == ["x", "=", "1"])
+
+        // Exact real-iPad segmentation failure: two handwritten algebra lines,
+        // first containing x². The raised 2 must remain on line one instead of
+        // becoming a phantom third recognition line.
+        let l1EqTop = stroke([(0, 38), (14, 38)])
+        let l1EqBottom = stroke([(0, 44), (14, 44)])
+        let l1XDown = stroke([(20, 30), (27, 40), (34, 50)])
+        let l1XUp = stroke([(20, 50), (27, 40), (34, 30)])
+        let l1Power = stroke([(37, 26), (41, 18), (45, 22), (38, 28), (46, 28)])
+        let l1Minus = stroke([(52, 42), (67, 42)])
+        let l2EqTop = stroke([(0, 88), (14, 88)])
+        let l2EqBottom = stroke([(0, 94), (14, 94)])
+        let l2XDown = stroke([(20, 80), (27, 90), (34, 100)])
+        let l2XUp = stroke([(20, 100), (27, 90), (34, 80)])
+        let segmented = InkLineSegmenter.segment([
+            l1EqTop, l1EqBottom, l1XDown, l1XUp, l1Power, l1Minus,
+            l2EqTop, l2EqBottom, l2XDown, l2XUp
+        ])
+        let topLine = segmented.min { $0.band.lowerBound < $1.band.lowerBound }
+        check("raised power stays on its base line",
+              segmented.count == 2 && topLine?.strokeIndexes.contains(4) == true)
 
         if failures.isEmpty {
             NSLog("PRIINK geometry PASS %d/%d", checks, checks)
