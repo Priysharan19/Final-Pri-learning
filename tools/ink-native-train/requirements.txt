@@ -1,0 +1,5 @@
+numpy>=2.0,<3
+# Keep PyTorch/coremltools compatible with the Mac used for export. The exporter
+# records contract metadata and must be rerun when either stack changes.
+torch>=2.6,<3
+coremltools>=8.1,<9
