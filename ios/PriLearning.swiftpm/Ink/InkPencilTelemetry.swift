@@ -1,11 +1,10 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Pri Learning · High-fidelity Apple Pencil telemetry
 //
-// PencilKit is still the renderer: it owns the system's low-latency predicted
-// path and makes writing feel like Notes. Recognition, however, benefits from
-// the ACTUAL touch samples that produced that path. UIKit exposes additional
-// coalesced samples between delivered events; these preserve timing, pressure
-// and orientation that distance-resampling a final PKStroke can blur away.
+// PencilKit remains the renderer and owns the system low-latency/predicted path.
+// This recognizer is intentionally passive: it samples only real coalesced Pencil
+// events for recognition/training and is designed to add as little main-thread
+// work as possible while the nib is moving.
 //
 // Predicted touches are intentionally NEVER read here. They are temporary UI
 // guesses and must not enter recognition, personalization or training data.
@@ -22,25 +21,38 @@ final class InkPencilTelemetryRecognizer: UIGestureRecognizer, UIGestureRecogniz
     private var strokeStartTimestamp: TimeInterval?
     private var completed: [InkStroke] = []
     private let completedLimit = 4
+    private let maximumSamplesPerStroke = 4096
 
     override init(target: Any?, action: Selector?) {
         super.init(target: target, action: action)
-        cancelsTouchesInView = false
-        delaysTouchesBegan = false
-        delaysTouchesEnded = false
-        requiresExclusiveTouchType = false
-        delegate = self
+        configureForPassivePencilObservation()
     }
 
     convenience init() { self.init(target: nil, action: nil) }
 
     required init?(coder: NSCoder) {
         super.init(coder: coder)
+        configureForPassivePencilObservation()
+    }
+
+    private func configureForPassivePencilObservation() {
         cancelsTouchesInView = false
         delaysTouchesBegan = false
         delaysTouchesEnded = false
         requiresExclusiveTouchType = false
+        // Do not even enter recognizer arbitration for finger/palm touches. This
+        // keeps one-finger page scrolling entirely out of the telemetry path.
+        allowedTouchTypes = [NSNumber(value: UITouch.TouchType.pencil.rawValue)]
         delegate = self
+        current.reserveCapacity(320)
+        completed.reserveCapacity(completedLimit)
+    }
+
+    func gestureRecognizer(
+        _ gestureRecognizer: UIGestureRecognizer,
+        shouldReceive touch: UITouch
+    ) -> Bool {
+        captureEnabled && touch.type == .pencil
     }
 
     func gestureRecognizer(
@@ -88,8 +100,6 @@ final class InkPencilTelemetryRecognizer: UIGestureRecognizer, UIGestureRecogniz
     }
 
     override func reset() {
-        // Completed traces live in a separate queue and survive UIKit resetting
-        // the recognizer after `.ended`; only the in-flight state is cleared.
         current.removeAll(keepingCapacity: true)
         strokeStartTimestamp = nil
         super.reset()
@@ -103,7 +113,7 @@ final class InkPencilTelemetryRecognizer: UIGestureRecognizer, UIGestureRecogniz
 
     /// Returns the oldest completed raw Pencil trace if it geometrically agrees
     /// with the PKStroke PencilKit just finalized. The agreement guard prevents
-    /// a stale eraser/gesture trace from ever being attached to the wrong mark.
+    /// stale gesture/eraser data being attached to the wrong mathematical mark.
     func takeCompletedStroke(matching finalBounds: CGRect) -> InkStroke? {
         guard !completed.isEmpty else { return nil }
         let raw = completed.removeFirst()
@@ -111,20 +121,22 @@ final class InkPencilTelemetryRecognizer: UIGestureRecognizer, UIGestureRecogniz
 
         let a = raw.bounds
         let b = finalBounds
-        let centreDistance = hypot(a.midX - b.midX, a.midY - b.midY)
+        let dx = a.midX - b.midX
+        let dy = a.midY - b.midY
         let reference = max(18, hypot(b.width, b.height) * 0.55)
         let expanded = b.insetBy(dx: -max(10, 0.25 * max(b.width, 1)),
                                  dy: -max(10, 0.25 * max(b.height, 1)))
-        guard centreDistance <= reference, expanded.intersects(a) else { return nil }
+        guard dx * dx + dy * dy <= reference * reference, expanded.intersects(a) else { return nil }
         return raw
     }
 
     private func appendActualSamples(for touch: UITouch, event: UIEvent) {
-        // coalescedTouches are real historical hardware samples. We explicitly
-        // do not call predictedTouches(for:), because predictions are allowed
-        // to be wrong and are replaced by real samples on subsequent events.
+        guard current.count < maximumSamplesPerStroke else { return }
+        // Coalesced touches are real historical hardware samples. Never call
+        // predictedTouches(for:): predictions belong only to PencilKit's renderer.
         let samples = event.coalescedTouches(for: touch) ?? [touch]
         for sample in samples where sample.type == .pencil {
+            if current.count >= maximumSamplesPerStroke { break }
             append(sample)
         }
     }
@@ -152,10 +164,13 @@ final class InkPencilTelemetryRecognizer: UIGestureRecognizer, UIGestureRecogniz
             altitude: touch.altitudeAngle
         )
 
-        if let last = current.last,
-           abs((last.t ?? 0) - relativeTime) < 0.000_001,
-           hypot(last.x - point.x, last.y - point.y) < 0.01 {
-            return
+        // UIKit may include the delivered touch again in its coalesced array.
+        // Use squared distance to avoid a sqrt in the nib's hot path.
+        if let last = current.last {
+            let dt = abs((last.t ?? 0) - relativeTime)
+            let dx = last.x - point.x
+            let dy = last.y - point.y
+            if dt < 0.000_001 && dx * dx + dy * dy < 0.0001 { return }
         }
         current.append(point)
     }
