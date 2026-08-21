@@ -25,9 +25,24 @@ private final class InkRecognitionToken {
     }
 }
 
+/// Transparent clipping container for the native canvas.
+///
+/// UIKit's default hit testing may return a transparent UIView itself even when
+/// the point is not inside any interactive child. Because this view can span a
+/// large part of the page, that behaviour would swallow taps intended for the
+/// WKWebView underneath. Only real descendants (the native writing surface)
+/// are allowed to become hit-test targets; empty transparent space passes
+/// straight through to the web app.
+private final class InkPassthroughClipView: UIView {
+    override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
+        let hit = super.hitTest(point, with: event)
+        return hit === self ? nil : hit
+    }
+}
+
 final class InkBridge: NSObject, InkSurfaceDelegate {
 
-    private let clipView = UIView()
+    private let clipView = InkPassthroughClipView()
     private let surface = InkSurfaceView()
     private let recognizer = MathInkRecognizer()
     private let personalization = InkPersonalizationStore.shared
@@ -178,9 +193,6 @@ final class InkBridge: NSObject, InkSurfaceDelegate {
         recognizer.cancelActiveVision()
     }
 
-    /// Pen-down is the earliest reliable native signal that the user is writing
-    /// again. Stop stale Vision immediately; do not wait for the new stroke to
-    /// finish before giving PencilKit uncontested resources.
     func inkSurfaceDidBeginStroke(_ surface: InkSurfaceView) {
         markInkMutation()
     }
@@ -368,8 +380,6 @@ final class InkBridge: NSObject, InkSurfaceDelegate {
         }
     }
 }
-
-// MARK: - Colour
 
 extension UIColor {
     convenience init?(hex: String) {
