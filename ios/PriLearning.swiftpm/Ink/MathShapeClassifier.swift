@@ -21,11 +21,15 @@ enum MathShapeClassifier {
         strokes: [InkStroke],
         glyphHeight: CGFloat
     ) {
-        // When whole-line Vision returned fewer characters than there are ink
-        // marks, the recogniser used to spread those characters proportionally
-        // over the page. That can silently consume a ')' or '='. Recover only
-        // structures whose geometry is independently decisive, then let the
-        // ordinary maths decoder handle semantics.
+        // Proportional OCR→stroke ownership is not evidence. Before any narrow
+        // classifier runs, align the OCR sequence to the actual Pencil marks
+        // with dynamic programming. This preserves unexplained ink and can drop
+        // hallucinated OCR characters instead of stretching either side until
+        // the counts happen to agree.
+        realignApproximateOwnership(&glyphs, strokes: strokes, glyphHeight: glyphHeight)
+
+        // Any ink that remains unexplained after alignment gets a second pass
+        // for structures whose geometry is independently decisive.
         recoverApproximateLayout(&glyphs, strokes: strokes, glyphHeight: glyphHeight)
 
         for i in glyphs.indices where !glyphs[i].approximate {
@@ -74,6 +78,99 @@ enum MathShapeClassifier {
                 }
                 glyphs[i].symbol = "theta"
                 glyphs[i].confidence = max(glyphs[i].confidence, 0.86)
+            }
+        }
+    }
+
+    // MARK: - Trace-to-symbol realignment
+
+    private static func realignApproximateOwnership(
+        _ glyphs: inout [DecodedGlyph],
+        strokes: [InkStroke],
+        glyphHeight: CGFloat
+    ) {
+        guard glyphs.contains(where: \.approximate), !glyphs.isEmpty else { return }
+
+        let lineBox = glyphs.dropFirst().reduce(glyphs[0].box) { $0.union($1.box) }
+        let minY = lineBox.minY - 0.45 * glyphHeight
+        let maxY = lineBox.maxY + 0.45 * glyphHeight
+        let minX = lineBox.minX - 0.45 * glyphHeight
+        let maxX = lineBox.maxX + 1.35 * glyphHeight
+        let indexes = strokes.indices.filter { index in
+            let stroke = strokes[index]
+            guard !stroke.isEmpty else { return false }
+            let b = stroke.bounds
+            return b.midY >= minY && b.midY <= maxY && b.midX >= minX && b.midX <= maxX
+        }
+        let lineClusters = clusters(indexes: indexes, strokes: strokes)
+        guard !lineClusters.isEmpty else { return }
+
+        var evidence: [Int: [String: Double]] = [:]
+        for (position, glyph) in glyphs.enumerated() {
+            var votes: [String: Double] = [glyph.symbol: max(0.05, min(1, glyph.confidence))]
+            for alternative in glyph.alternatives {
+                votes[alternative.symbol] = max(votes[alternative.symbol] ?? 0,
+                                                max(0.02, min(1, alternative.confidence)))
+            }
+            let total = votes.values.reduce(0, +)
+            evidence[position] = total > 0 ? votes.mapValues { $0 / total } : votes
+        }
+
+        let marks = lineClusters.map {
+            InkSpatialMark(strokeIndexes: $0.strokeIndexes.sorted(), bounds: $0.bounds, isRaised: false)
+        }
+        let alignment = InkSymbolAligner.align(
+            symbols: glyphs.map(\.symbol),
+            agreement: evidence,
+            marks: marks,
+            strokes: strokes,
+            glyphHeight: glyphHeight
+        )
+
+        let mappedCounts = Dictionary(grouping: alignment.symbolToMark.compactMap { $0 }, by: { $0 })
+            .mapValues(\.count)
+        var occurrence: [Int: Int] = [:]
+        var rebuilt: [DecodedGlyph] = []
+        rebuilt.reserveCapacity(glyphs.count)
+
+        for (position, original) in glyphs.enumerated() {
+            guard position < alignment.symbolToMark.count,
+                  let markIndex = alignment.symbolToMark[position],
+                  lineClusters.indices.contains(markIndex) else {
+                // OCR hallucinated a symbol for which the trace has no owner.
+                // Dropping it is safer than assigning a neighbouring stroke and
+                // then teaching personalization from the false ownership.
+                continue
+            }
+
+            let cluster = lineClusters[markIndex]
+            var glyph = original
+            let count = mappedCounts[markIndex] ?? 1
+            let order = occurrence[markIndex, default: 0]
+            occurrence[markIndex] = order + 1
+
+            if count > 1 {
+                // Joined handwriting: preserve both OCR symbols but partition
+                // the visual box so ordering and downstream layout stay sane.
+                let slice = cluster.bounds.width / CGFloat(count)
+                glyph.box = CGRect(x: cluster.bounds.minX + CGFloat(order) * slice,
+                                   y: cluster.bounds.minY,
+                                   width: max(slice, 0.001),
+                                   height: cluster.bounds.height)
+            } else {
+                glyph.box = cluster.bounds
+            }
+            glyph.strokeIndexes = cluster.strokeIndexes.sorted()
+            glyph.approximate = alignment.approximateSymbols.contains(position) || count > 1
+            rebuilt.append(glyph)
+        }
+
+        if !rebuilt.isEmpty {
+            glyphs = rebuilt
+            if MathInkRecognizer.trace {
+                NSLog("PRIINK   trace-align symbols=%d marks=%d unmatched=%d cost=%.3f",
+                      rebuilt.count, lineClusters.count, alignment.unmatchedMarks.count,
+                      alignment.totalCost)
             }
         }
     }
