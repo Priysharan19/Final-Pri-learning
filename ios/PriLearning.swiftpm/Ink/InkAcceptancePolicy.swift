@@ -29,9 +29,14 @@ struct InkAcceptanceDecision {
 }
 
 enum InkAcceptancePolicy {
-    static let policyName = "selective-v1-provisional"
+    static let policyName = "selective-v2-structural"
 
-    static func evaluate(reading: Reading, structure: InkStructureGraph) -> InkAcceptanceDecision {
+    static func evaluate(
+        reading: Reading,
+        structure: InkStructureGraph,
+        countEvidence: InkSymbolCountEvidence? = nil,
+        tree: InkExpressionTree? = nil
+    ) -> InkAcceptanceDecision {
         guard !reading.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             return InkAcceptanceDecision(status: .empty, autoAccept: false, policy: policyName,
                                          reasons: ["no-reading"], focusSymbolID: nil)
@@ -45,17 +50,29 @@ enum InkAcceptancePolicy {
         if reading.minConfidence < 0.88 { reasons.append("recognition-confidence-below-auto-accept") }
         if reading.margin < 0.18 { reasons.append("candidate-margin-below-auto-accept") }
         if structure.evidenceScore < 0.84 { reasons.append("structural-evidence-below-auto-accept") }
+        if let countEvidence, countEvidence.mismatch {
+            reasons.append("independent-symbol-count-mismatch")
+        }
+        if let tree {
+            reasons.append(contentsOf: tree.riskFlags)
+            if tree.sourceCoverage < 0.995 { reasons.append("expression-tree-source-gap") }
+        }
+        reasons = unique(reasons)
 
         let focus = reading.weakest?.id
 
         // These are direct signs that the current interpretation is too weak to
         // even be treated as a plausible automatic result. Ask the student to
         // resolve the smallest ambiguous unit instead of guessing.
+        let severeCountMismatch = countEvidence.map { $0.mismatch && $0.confidence >= 0.85 } ?? false
+        let severeTreeGap = tree.map { $0.sourceCoverage < 0.90 } ?? false
         let severe = reading.lines.contains(where: \.unread)
             || structure.riskFlags.contains("unbalanced-brackets")
             || reading.minConfidence < 0.55
             || reading.margin < 0.06
             || structure.traceCoverage < 0.75
+            || severeCountMismatch
+            || severeTreeGap
 
         if severe {
             return InkAcceptanceDecision(status: .clarify, autoAccept: false, policy: policyName,
@@ -65,7 +82,8 @@ enum InkAcceptancePolicy {
 
         // Auto-accept only when the independent evidence channels agree: the
         // local recognizer is confident, alternatives are separated, trace
-        // ownership is exact and the 2-D structure has no known risk flag.
+        // ownership is exact, the 2-D tree is fully backed by symbols and the
+        // geometry-only count does not indicate a lost/duplicated object.
         if reasons.isEmpty && structure.riskFlags.isEmpty {
             return InkAcceptanceDecision(status: .accept, autoAccept: true, policy: policyName,
                                          reasons: [], focusSymbolID: focus)
@@ -78,6 +96,11 @@ enum InkAcceptancePolicy {
         return InkAcceptanceDecision(status: .review, autoAccept: false, policy: policyName,
                                      reasons: reasons.isEmpty ? structure.riskFlags : reasons,
                                      focusSymbolID: focus)
+    }
+
+    private static func unique(_ values: [String]) -> [String] {
+        var seen = Set<String>()
+        return values.filter { seen.insert($0).inserted }
     }
 }
 
