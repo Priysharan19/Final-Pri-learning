@@ -14,7 +14,10 @@ struct PriLearningApp: App {
         // Scores the native reading pipeline against expressions whose answer
         // is known, and reports it to the system log. Off unless asked for.
         if ProcessInfo.processInfo.arguments.contains("--ink-selfcheck") {
-            DispatchQueue.global(qos: .userInitiated).async { InkSelfCheck.run() }
+            DispatchQueue.global(qos: .userInitiated).async {
+                InkGeometrySelfCheck.run()
+                InkSelfCheck.run()
+            }
         }
     }
 

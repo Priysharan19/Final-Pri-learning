@@ -1,0 +1,94 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// Pri Learning · Deterministic geometry regression checks
+//
+// These checks exercise the small, stroke-based maths classifiers without
+// involving Vision. That makes failures attributable: a Vision model revision
+// cannot hide a regression in our own x/×, theta or uncertainty logic.
+// ─────────────────────────────────────────────────────────────────────────────
+import CoreGraphics
+import Foundation
+
+enum InkGeometrySelfCheck {
+
+    static func run() {
+        var failures: [String] = []
+        var checks = 0
+
+        func check(_ name: String, _ condition: @autoclosure () -> Bool) {
+            checks += 1
+            if !condition() { failures.append(name) }
+        }
+
+        let down = stroke([(8, 8), (20, 20), (32, 32)])
+        let up = stroke([(8, 32), (20, 20), (32, 8)])
+        var crossed = [glyph("4", strokes: [0, 1], box: down.bounds.union(up.bounds))]
+        MathShapeClassifier.repair(&crossed, strokes: [down, up], glyphHeight: 40)
+        check("diagonal cross recovers x-shaped mark", crossed[0].symbol == "*")
+
+        let vertical = stroke([(20, 5), (20, 20), (20, 35)])
+        let horizontal = stroke([(5, 20), (20, 20), (35, 20)])
+        var plus = [glyph("4", strokes: [0, 1], box: vertical.bounds.union(horizontal.bounds))]
+        MathShapeClassifier.repair(&plus, strokes: [vertical, horizontal], glyphHeight: 40)
+        check("plus is not misclassified as x", plus[0].symbol == "4")
+
+        let loop = stroke([
+            (20, 5), (29, 8), (35, 16), (36, 25), (31, 34), (21, 38),
+            (12, 34), (6, 25), (7, 15), (12, 8), (20, 5)
+        ])
+        let thetaBar = stroke([(8, 22), (20, 21.5), (34, 21)])
+        var theta = [glyph("0", strokes: [0, 1], box: loop.bounds.union(thetaBar.bounds))]
+        MathShapeClassifier.repair(&theta, strokes: [loop, thetaBar], glyphHeight: 40)
+        check("oval plus internal bar recovers theta", theta[0].symbol == "theta")
+
+        var zero = [glyph("0", strokes: [0], box: loop.bounds)]
+        MathShapeClassifier.repair(&zero, strokes: [loop], glyphHeight: 40)
+        check("plain zero remains zero", zero[0].symbol == "0")
+
+        var variableContext = [
+            glyph("2", strokes: [], box: CGRect(x: 0, y: 0, width: 8, height: 16)),
+            glyph("*", strokes: [], box: CGRect(x: 10, y: 0, width: 12, height: 16)),
+            glyph("y", strokes: [], box: CGRect(x: 24, y: 0, width: 10, height: 16))
+        ]
+        MathDecoder.applyContext(&variableContext, locked: [])
+        check("x-shaped mark in algebraic context becomes variable x", variableContext[1].symbol == "x")
+
+        var multiplyContext = [
+            glyph("2", strokes: [], box: CGRect(x: 0, y: 0, width: 8, height: 16)),
+            glyph("*", strokes: [], box: CGRect(x: 10, y: 0, width: 12, height: 16)),
+            glyph("3", strokes: [], box: CGRect(x: 24, y: 0, width: 8, height: 16))
+        ]
+        MathDecoder.applyContext(&multiplyContext, locked: [])
+        check("digit cross digit remains multiplication", multiplyContext[1].symbol == "*")
+
+        var ambiguous = [
+            glyph("1", strokes: [], box: CGRect(x: 0, y: 0, width: 5, height: 16), confidence: 0.96),
+            glyph("=", strokes: [], box: CGRect(x: 8, y: 4, width: 10, height: 8)),
+            glyph("3", strokes: [], box: CGRect(x: 22, y: 0, width: 8, height: 16))
+        ]
+        MathDecoder.applyContext(&ambiguous, locked: [])
+        check("ambiguous lhs 1 surfaces y alternative",
+              ambiguous[0].alternatives.contains(where: { $0.symbol == "y" }) && ambiguous[0].confidence <= 0.78)
+
+        if failures.isEmpty {
+            NSLog("PRIINK geometry PASS %d/%d", checks, checks)
+        } else {
+            NSLog("PRIINK geometry FAIL %d/%d: %@", checks - failures.count, checks,
+                  failures.joined(separator: ", ") as NSString)
+        }
+    }
+
+    private static func glyph(
+        _ symbol: String,
+        strokes: [Int],
+        box: CGRect,
+        confidence: Double = 0.7
+    ) -> DecodedGlyph {
+        DecodedGlyph(symbol: symbol, box: box, confidence: confidence,
+                     alternatives: [], isSuperscript: false,
+                     strokeIndexes: strokes, approximate: false)
+    }
+
+    private static func stroke(_ tuples: [(CGFloat, CGFloat)]) -> InkStroke {
+        InkStroke(points: tuples.map { InkPoint(x: $0.0, y: $0.1, w: 3) })
+    }
+}

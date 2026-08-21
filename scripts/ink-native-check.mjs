@@ -5,7 +5,8 @@
 //
 // It builds the app, installs it, launches it with --ink-selfcheck, and reads
 // the result back out of the system log. It fails when either accuracy or exact
-// expression coverage regresses, or when the bridge smoke test does not pass.
+// expression coverage regresses, when the deterministic geometry checks fail,
+// or when the bridge smoke test does not pass.
 //
 // Usage: npm run test:ink:native [-- --device "iPad Air 11-inch (M4)"]
 // ─────────────────────────────────────────────────────────────────────────────
@@ -25,6 +26,7 @@ const BUNDLE_ID = 'com.prilearning.app';
 const ACCURACY_FLOOR = 85;
 const EXACT_FLOOR = 6;
 const EXPECTED_CASES = 10;
+const EXPECTED_GEOMETRY_CHECKS = 7;
 
 const argOf = (name) => {
   const i = process.argv.indexOf(`--${name}`);
@@ -97,10 +99,14 @@ for (const line of lines) console.log(`  ${line.replace(/^PRIINK\s*/, '')}`);
 
 const summary = lines.find(l => l.includes('character accuracy'));
 const bridge = lines.find(l => l.startsWith('PRIINK bridge mounted'));
+const geometry = [...lines].reverse().find(l => l.startsWith('PRIINK geometry '));
 const accuracy = summary ? Number(/accuracy ([\d.]+)%/.exec(summary)?.[1] ?? 0) : 0;
 const exactMatch = summary ? /(\d+)\/(\d+) exact/.exec(summary) : null;
 const exact = Number(exactMatch?.[1] ?? 0);
 const cases = Number(exactMatch?.[2] ?? 0);
+const geometryMatch = geometry ? /PASS (\d+)\/(\d+)/.exec(geometry) : null;
+const geometryPassed = Number(geometryMatch?.[1] ?? 0);
+const geometryCases = Number(geometryMatch?.[2] ?? 0);
 const perf = lines
   .map(l => /PRIINK perf recognition .* ([\d.]+)ms/.exec(l))
   .filter(Boolean)
@@ -117,6 +123,10 @@ else {
   } else if (exact < EXACT_FLOOR) {
     problems.push(`exact expressions ${exact}/${cases} is below the ${EXACT_FLOOR}/${EXPECTED_CASES} floor`);
   }
+}
+if (!geometry) problems.push('the deterministic geometry checks did not report');
+else if (!geometryMatch || geometryPassed !== EXPECTED_GEOMETRY_CHECKS || geometryCases !== EXPECTED_GEOMETRY_CHECKS) {
+  problems.push(`geometry regression check failed: ${geometry.replace(/^PRIINK\s*/, '')}`);
 }
 if (!bridge) problems.push('the bridge smoke test did not report');
 else {
@@ -137,4 +147,4 @@ if (problems.length) {
   for (const problem of problems) console.log(`FAIL — ${problem}`);
   process.exit(1);
 }
-console.log(`PASS — character accuracy ${accuracy}%, exact ${exact}/${cases}, bridge round trip clean`);
+console.log(`PASS — character accuracy ${accuracy}%, exact ${exact}/${cases}, geometry ${geometryPassed}/${geometryCases}, bridge round trip clean`);
