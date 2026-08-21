@@ -25,6 +25,7 @@ const EXPECTED_PERSONALIZATION_CHECKS = 10;
 const EXPECTED_GEOMETRY_CHECKS = 11;
 const EXPECTED_FRONTIER_CHECKS = 12;
 const EXPECTED_ACCEPTANCE_CHECKS = 7;
+const EXPECTED_FUSION_CHECKS = 11;
 
 const argOf = (name) => {
   const i = process.argv.indexOf(`--${name}`);
@@ -114,7 +115,9 @@ for (let i = 0; i < 40; i++) {
   const hasGeometry = lines.some(l => l.startsWith('PRIINK geometry '));
   const hasFrontier = lines.some(l => l.startsWith('PRIINK frontier '));
   const hasAcceptance = lines.some(l => l.startsWith('PRIINK acceptance '));
-  if (hasSummary && hasBridge && hasAlignment && hasPersonalization && hasGeometry && hasFrontier && hasAcceptance) break;
+  const hasFusion = lines.some(l => l.startsWith('PRIINK fusion '));
+  if (hasSummary && hasBridge && hasAlignment && hasPersonalization && hasGeometry
+      && hasFrontier && hasAcceptance && hasFusion) break;
 }
 
 const started = lines.map((l, i) => [l, i]).filter(([l]) => l.includes('native ink self-check'));
@@ -128,6 +131,7 @@ const personalization = [...lines].reverse().find(l => l.startsWith('PRIINK pers
 const geometry = [...lines].reverse().find(l => l.startsWith('PRIINK geometry '));
 const frontier = [...lines].reverse().find(l => l.startsWith('PRIINK frontier '));
 const acceptance = [...lines].reverse().find(l => l.startsWith('PRIINK acceptance '));
+const fusion = [...lines].reverse().find(l => l.startsWith('PRIINK fusion '));
 const accuracy = summary ? Number(/accuracy ([\d.]+)%/.exec(summary)?.[1] ?? 0) : 0;
 const exactMatch = summary ? /(\d+)\/(\d+) exact/.exec(summary) : null;
 const exact = Number(exactMatch?.[1] ?? 0);
@@ -142,6 +146,7 @@ const p = parseGate(personalization);
 const g = parseGate(geometry);
 const f = parseGate(frontier);
 const q = parseGate(acceptance);
+const u = parseGate(fusion);
 const perf = lines
   .map(l => /PRIINK perf recognition .* ([\d.]+)ms/.exec(l))
   .filter(Boolean)
@@ -166,6 +171,7 @@ checkGate('personalization safety', personalization, p, EXPECTED_PERSONALIZATION
 checkGate('geometry', geometry, g, EXPECTED_GEOMETRY_CHECKS);
 checkGate('frontier representation', frontier, f, EXPECTED_FRONTIER_CHECKS);
 checkGate('selective acceptance', acceptance, q, EXPECTED_ACCEPTANCE_CHECKS);
+checkGate('expert fusion safety', fusion, u, EXPECTED_FUSION_CHECKS);
 
 if (!bridge) problems.push('the bridge smoke test did not report');
 else {
@@ -186,4 +192,4 @@ if (problems.length) {
   for (const problem of problems) console.log(`FAIL — ${problem}`);
   process.exit(1);
 }
-console.log(`PASS — character accuracy ${accuracy}%, exact ${exact}/${cases}, alignment ${a.passed}/${a.cases}, personalization ${p.passed}/${p.cases}, geometry ${g.passed}/${g.cases}, frontier ${f.passed}/${f.cases}, acceptance ${q.passed}/${q.cases}, bridge round trip clean`);
+console.log(`PASS — character accuracy ${accuracy}%, exact ${exact}/${cases}, alignment ${a.passed}/${a.cases}, personalization ${p.passed}/${p.cases}, geometry ${g.passed}/${g.cases}, frontier ${f.passed}/${f.cases}, acceptance ${q.passed}/${q.cases}, fusion ${u.passed}/${u.cases}, bridge round trip clean`);
