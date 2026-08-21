@@ -1,14 +1,15 @@
 # Pri Learning
 
-**The most powerful way to master maths — built for iPad, powered entirely by your device.**
+**Adaptive Years 7–12 maths practice, built for iPad and run entirely by your device — questions
+generated, handwriting read and answers marked without a network.**
 
-Adaptive Years 7–12 maths practice with an on-device handwriting engine: write your working with an
-Apple Pencil, watch it turn into maths in real time, and get it marked line by line — with teacher-style
-✓/✗ annotations appearing on your own ink. It sets out to cover the ground Leibniz
-(start.leibniz.com.au) covers — the table below says exactly what that means, feature by feature —
-and everything runs **100% locally**: no accounts, no cloud, no API keys, fully offline once installed.
-The one piece of machine learning it uses ships *inside* the app: a 798 kB convolutional net that
-runs in your browser, not on anyone's server.
+Write your working with an Apple Pencil, watch it turn into maths in real time, and get it marked
+line by line — with teacher-style ✓/✗ annotations appearing on your own ink. It sets out to cover
+the ground Leibniz (start.leibniz.com.au) covers — the table below says exactly what that means,
+feature by feature — and everything runs **100% locally**: no accounts, no cloud, no API keys, fully
+offline once installed. The one piece of machine learning it uses ships *inside* the app: a
+convolutional net whose weights are **597 kB** of int8 coefficients, running in your browser rather
+than on anyone's server.
 
 **v4 — a Leibniz-inspired redesign.** The whole interface now speaks the same visual
 language as the reference platform: near-black paper, Computer Modern serif throughout (the bundled
@@ -23,13 +24,15 @@ performance board), Priorities and a zoomable Knowledge-map constellation of eve
 Match Mode with rival ratings and a leaderboard; plus Tasks, Favorites, Classes and sectioned
 Settings. The hover sidebar carries your recent Question History, exactly where you'd expect it.
 
-The redesign was not skin-deep, and the layers under it are not the v3 ones. The generator banks
+**What changed between v3 and v4 is history, not measurement.** As a changelog: the generator banks
 were rewritten; the recogniser gained a Platt-calibrated confidence contract and question-context
-conditioning; the CNN ensemble was retrained; and the local data model added encryption at rest for
-password-protected profiles. What carried over is the *shape* of the thing — the same 10,080-check
-generator gate, marks-based exams, the same local-first storage contract — not the code behind it.
-So nothing in this README is inherited from v3: every figure in
-**[Measured accuracy](#measured-accuracy)** was measured against what is in the repo today.
+conditioning; the CNN ensemble was retrained; the local data model added encryption at rest for
+password-protected profiles; and what carried over is the *shape* of the thing — a self-check gate
+over every generator, marks-based exams, the same local-first storage contract. Read that list as
+provenance and nothing more: there is no v3 in this repo and no command here compares the two, so
+none of it is a measured claim. The load-bearing half is the part that *is* checkable — every figure
+in **[Measured accuracy](#measured-accuracy)** was produced, at the stated n, by running the command
+beside it against the code and the model in this repo today.
 
 ## Quick start
 
@@ -39,8 +42,10 @@ npm run build     # builds the app
 npm start         # serves at http://localhost:4000
 ```
 
-Open **http://localhost:4000** — create a profile or hit **“Try the demo”** (six weeks of history is
-generated on-device in about a second). On an iPad, open it in Safari and use
+Open **http://localhost:4000** — create a profile or hit **“Try the demo”** (`demoSeed.js` walks 46
+days, just over six weeks, and builds every attempt on-device with the same engine that sets and
+marks your questions). It runs in the browser against IndexedDB, so nothing in this repo can time it
+from the command line and no timing is quoted for it. On an iPad, open it in Safari and use
 **Share → Add to Home Screen**: it installs as a full-screen app and works completely offline from
 then on. All data lives in the device's IndexedDB, protected from eviction via the Persistent
 Storage API — and one tap exports a full backup file.
@@ -73,7 +78,7 @@ to. Nothing in this project compares the two products head to head.
 | HSC courses: Standard, Advanced, Extension 1, Extension 2 | **Full pathway support**: Standard (MS-F/A/M/S/N), Advanced, Extension 1 (ME — vectors, induction, projectiles, further calculus) and Extension 2 (MEX — proof, complex numbers, mechanics), each with its own syllabus scope, exams, predictor and skill map sections |
 | Syllabus-aligned content | Every subtopic carries its **NESA topic code** (MA4-/MA5-/MA-/MS-/ME-/MEX-) on tiles, drawers and reports |
 | Multi-part structured exam questions | **Section II multipart questions** — one stem, parts (a)(b)(c) with per-part marks, “hence” chains, marked part by part in review and printed papers |
-| Filter by topic, subtopic and dot point | Skill Map (and the Home filter chips) → any subtopic → **practise a single dot point**. Each dot point carries a stable id and resolves to the difficulties whose authored form actually assesses it, so two dot points of one subtopic no longer share a pool by default — and a generated question reports which dot points it exercises. Ask for the **25 dot points no form reaches** and the request falls back to subtopic-level practice with `dotpoint: null` on the payload — a sibling's question is never handed back labelled as the dot point you asked for |
+| Filter by topic, subtopic and dot point | Skill Map (and the Home filter chips) → any subtopic → **practise a single dot point**. Each dot point carries a stable id and resolves to the difficulties whose authored form actually assesses it, so two dot points of one subtopic no longer share a pool by default — and a generated question reports which dot points it exercises. A question is only *labelled* with the dot point you asked for when it can be shown to be on it — the generator declared that dot point for the branch it took, or the one declaration behind the question names it and nothing else. Both the **25 dot points no form reaches** and the **32 no form reaches alone** therefore fall back to subtopic-level practice with `dotpoint: null` on the payload, and so does a request whose difficulty lands on a shared form of an otherwise exactly-targeted dot point. A sibling's question is never handed back labelled as the dot point you asked for |
 | “Mathematically optimised recommendation” | Elo-based Smart Practice targeting ~70% success, weaving in weak spots and spaced reviews — pathway-aware in Years 11–12 |
 | Type answers with beautiful rendered maths | Typed input with **live KaTeX preview** (“reads as …”) |
 | Draw/handwrite answers (Apple Pencil, iPad-first) | **On-device handwriting engine**: pressure-sensitive ink, palm rejection, stroke eraser, undo/redo — digits, 25 lowercase letters (a–z except j) plus L H R, π θ, + − × ÷ ± = ≠ < > ≤ ≥ %, °, brackets, decimals, mixed numbers, fractions, roots, exponents, multi-line working — live preview with per-symbol tap-to-correct |
@@ -97,7 +102,7 @@ to. Nothing in this project compares the two products head to head.
 | Scribble pad (rough work, never submitted) | Collapsible scribble pad on every question — **saved with the attempt** and replayable in History |
 | Progress at “idea level” | Per-subtopic ratings, mastery bands, strand analytics, activity calendar, printable progress report |
 | Account data in the cloud | **Data safety, locally**: persistent-storage protection, storage usage meter, **encryption at rest** on password-protected profiles (13 stores sealed under a per-profile AES-GCM-256 key), and **one-file full backup/restore** that moves your entire history between devices |
-| Free tier limits (5/day), Pro $9.99/mo | **No daily cap, no tiers, nothing to pay** — it's your device doing the work. "Unlimited" is bounded, and the [census below](#measured-accuracy) says where: questions are built from a seed rather than drawn from a pool, so the space is large (**318,632** distinct observed) but finite, and the thinnest (subtopic × difficulty) cell holds **54** |
+| Free tier limits (5/day), Pro $9.99/mo | **No daily cap, no tiers, nothing to pay** — it's your device doing the work. "Unlimited" is bounded, and the [census below](#measured-accuracy) says where: questions are built from a seed rather than drawn from a pool, so the space is large (**330,930** distinct observed) but finite, and the thinnest (subtopic × difficulty) cell holds **54** |
 | — | Plus: streaks & XP levels, 22 achievements, 90-second Rush, spaced-review scheduler, dark/light themes, offline PWA, multi-profile |
 
 ## The handwriting engine
@@ -121,12 +126,34 @@ convolutional network ships **inside the bundle** and does the heavy lifting on 
      same deskewing rasteriser used at inference. About a fifth of those renders come from a
      deliberately harsh style tail, which is what moved the *worst* simulated writer rather than
      the average (see the measured-accuracy block below). The counts are printed by
-     `node tools/ink-train/gen.mjs` and recorded in its manifest. **Validation accuracy 0.9395** for the ensemble
+     `node tools/ink-train/gen.mjs` and recorded in the manifest it writes to
+     `/tmp/inktrain/manifest.json`, which is not committed — regenerate it to check them.
+     **Validation accuracy 0.9395** for the ensemble
      (0.9316 / 0.9365 / 0.9339 for A / B / C) — read `val_acc` out of `model-data.js` itself, which
-     is where those figures are recorded. The weights are 798 kB of base64 in
-     `model-data.js`; the forward pass is plain JavaScript and costs **14.1 ms per symbol** for all three voters
-     (median of three timed runs of 1,000 `nnClassify` calls after 1,000 warmup calls, Node 24 on
-     Apple Silicon). A whole line of working is a few dozen symbols, so recognition is well inside
+     is where those figures are recorded. **`model-data.js` is 798,305 bytes; the weights are not.**
+     795,708 of those bytes are base64 and the remaining 2,597 are the JavaScript that wraps them,
+     and the base64 decodes to **596,764 bytes — 597 kB — of int8 coefficients** (`wc -c` for the
+     file; decode the base64 runs for the payload). Quote 798 kB as what the module costs the bundle,
+     never as the size of the net.
+     The forward pass is plain JavaScript and costs **14.6 ms per symbol** for all three voters —
+     the median of three timed runs of 1,000 `nnClassify` calls after 1,000 warmup calls, on Node
+     24.19 on Apple Silicon. `npm test` does not print this one, so here is the loop that does; it is
+     a property of the machine as much as of the code, and a different machine will say something
+     else:
+
+     ```bash
+     node --input-type=module -e "
+     import {nnClassify} from './client/src/ink/nn.js';
+     import {TEMPLATES} from './client/src/ink/templates.js';
+     const s = Object.values(TEMPLATES).map(v => v[0]);
+     const run = () => { const t = process.hrtime.bigint();
+       for (let i = 0; i < 1000; i++) nnClassify(s[i % s.length]);
+       return Number(process.hrtime.bigint() - t) / 1e6 / 1000; };
+     run(); const r = [run(), run(), run()].sort((a, b) => a - b);
+     console.log(r[1].toFixed(1) + ' ms per symbol');"
+     ```
+
+     A whole line of working is a few dozen symbols, so recognition is well inside
      the gap between a student finishing a line and looking up.
    - **Structural detectors** run first and override the net where shape geometry is decisive and
      the net is weak: lines, =, +, t, ÷, ±, ≠, ≤, ≥, °, dots, radicals.
@@ -177,12 +204,20 @@ ship the app — the trained assets are committed.
 
      Figures repeated elsewhere in this README, and nowhere else:
        · the feature matrix repeats the headline numbers for context —
-         318,632 observed, thinnest cell 54, and the dot-point coverage set
+         330,930 observed, thinnest cell 54, and the dot-point coverage set
          (227/252, 195 exact, 32 shared, 25 uncovered) — each row linking back
          here. Change them HERE first, then there; they must not drift apart.
        · "The handwriting engine" quotes the model's val_acc and its training
          counts, which are read out of client/src/ink/model-data.js and the
          manifest tools/ink-train/gen.mjs writes, rather than measured here.
+       · the model's size is quoted three times — the opening paragraph, "The
+         handwriting engine" and "Architecture" — as 597 kB of weights inside a
+         798 kB module. Those two are different quantities and the sentence
+         that conflated them was wrong; keep both halves wherever it appears,
+         and never let 798 kB stand alone as the size of the net.
+       · two figures here have no committed command and carry the exact loop
+         that produces them instead: the 14.6 ms per-symbol forward pass, which
+         is machine-dependent, and the y7-area 155/145 branch split.
      ═══════════════════════════════════════════════════════════════════════════ -->
 
 **Last measured: 2026-08-21**, against `client/src/ink/model-data.js` (v7 ensemble, val_acc 0.9395).
@@ -193,8 +228,8 @@ ship the app — the trained assets are committed.
 |---|---|---|
 | `node server/test/selfcheck.mjs` | 30 seeds × 4 difficulties × 84 subtopics | **10,080 / 10,080** self-checks passed |
 | `node server/test/selfcheck.mjs` | 14 multipart questions × 25 seeds | **1,050 / 1,050** part-checks passed |
-| `node tools/count-questions.mjs` | 3,000 samples × 336 cells | 336 authored forms; **318,632 distinct questions observed** (Chao1 estimate ≈ 24.0 M); thinnest cell **54** |
-| `node tools/count-questions.mjs 3000 server` | 3,000 samples × 336 cells | 420 authored forms; 343,072 observed (Chao1 ≈ 23.4 M) — *not a product figure* |
+| `node tools/count-questions.mjs` | 3,000 samples × 336 cells | 336 authored forms; **330,930 distinct questions observed** (Chao1 estimate ≈ 24.2 M); thinnest cell **54** |
+| `node tools/count-questions.mjs 3000 server` | 3,000 samples × 336 cells | 420 authored forms; 354,487 observed (Chao1 ≈ 23.5 M) — *not a product figure* |
 | `node tools/dotpoint-coverage.mjs` | 3,000 samples × 336 cells, resolved onto 252 dot points | **227 / 252 dot points (90.1%)** have a generator behind them — 195 exactly targeted, 32 reachable only alongside a sibling; **25 (9.9%) reach zero questions** |
 
 Every generated question's own canonical answer must pass its own marker, with a well-formed payload
@@ -226,7 +261,7 @@ caught it was running the count.
 
 **A cell is not a dot point, and the census above cannot see the difference.** `count-questions.mjs`
 counts (subtopic × difficulty) cells — 336 of them. The syllabus has **252 dot points**, and a dot
-point with nothing behind it is invisible inside a total of 318,632. That is a separate measurement
+point with nothing behind it is invisible inside a total of 330,930. That is a separate measurement
 with its own tool:
 
 <!-- DOT-POINT COVERAGE LINE — re-run `node tools/dotpoint-coverage.mjs` and paste
@@ -239,6 +274,24 @@ with its own tool:
 - **25 dot points (9.9%) reach zero questions.** The tool names all 25. Four authored forms
   (`y8-equations` D1, `y8-linear` D4, `y11-trigfunc` D4, `y12-financial` D1) assess no dot point in
   the list at all — real practice for the subtopic, but not attributable to a syllabus line.
+- **"Shared" is a limit on what can be claimed, not on what is practised.** `y7-area` D1 is one
+  authored form covering both "Perimeter of polygons and composite shapes" and "Area of rectangles,
+  triangles and parallelograms"; over 300 seeds it produced **155 perimeter questions and 145 area
+  questions**:
+
+  ```bash
+  node --input-type=module -e "
+  import {generateQuestion, loadAllBanks} from './client/src/engine/generators/index.js';
+  await loadAllBanks();
+  let p = 0; for (let i = 0; i < 300; i++)
+    if (/perimeter/i.test(generateQuestion('y7-area', 1, 1000 + i).prompt)) p++;
+  console.log(p + ' perimeter, ' + (300 - p) + ' area');"
+  ```
+
+  The registry tags a (subtopic × difficulty) cell and cannot split a form that branches,
+  so a request for either of those two is served but comes back with `dotpoint: null` rather than a
+  label the question might not deserve. Only a per-branch declaration in the bank can make one of
+  these exact — see `generateQuestion` in `client/src/engine/generators/index.js`.
 
 **This is why the feature table does not say "every dot point".** Generators are authored per
 (subtopic × difficulty) and *tagged* to the dot points they assess (`DOTPOINT_FORMS` in
@@ -253,7 +306,7 @@ means writing generators, not relabelling the ones that exist.
 |---|---|---|
 | `node client/test/inkcheck.mjs 40` | 40 trials × 56 template symbols = 2,240 | **2,177 / 2,240 (97.2%)** symbol self-recognition; probes **219 / 220 (99.5%)**; layout **13 / 13**; two-digit combos **100 / 100** |
 | `node client/test/inkcheck-hard.mjs` | 24 trials × 55 template symbols = 1,320 | **1,271 / 1,320 (96.3%)** under heavy distortion; scenes **14 / 15**; messy digit strings **38 / 40 (95%)** |
-| `node client/test/inkcheck-lines.mjs 40` | 40 lines × 6 style conditions = 240 lines | **224 / 240 (93.3%)** lines exact, **97.9%** chars; **7% drop when cramped** |
+| `node client/test/inkcheck-lines.mjs 40` | 40 lines × 6 style conditions = 240 lines | **224 / 240 (93.3%)** lines exact, **97.9%** chars; cramped spacing costs nothing at this n — the suite prints **−7% drop when cramped**, tight 116 exact against roomy 108 |
 | `node client/test/inkcheck-holdout.mjs 24` | 24 simulated writers × 14 lines = 336 lines | **320 / 336 (95.2%)** lines exact, **98.9%** chars, **worst writer 86%** |
 | `node client/test/inkcheck-holdout2.mjs 40` | 40 simulated writers × 14 lines = 560 lines | **529 / 560 (94.5%)** lines exact, **98.4%** chars, **worst writer 71%** |
 | `node client/test/inkcheck-context.mjs` | 256 wrong-answer readings + 11 misread correct answers | **0** wrong answers rewritten as the expected one, **0** drawn nearer it, **0** correct readings broken, **0** confidence-contract violations; 2 readings repaired — *not run by `npm test`* |
@@ -312,7 +365,7 @@ set's failures, it stops being evidence.
 ## Architecture
 
 - **Client (the whole product)** — React 18 + Vite PWA. The maths engine, marker, adaptive model,
-  generators, badges and seeding all run in the browser; IndexedDB (schema v2, persistent-storage
+  generators, badges and seeding all run in the browser; IndexedDB (schema v3, persistent-storage
   protected) stores profiles, ratings, attempts, ink + scribbles + photos, exams, tasks, classes,
   bookmarks, progress imports and analytics. On a password-protected profile those rows are
   **encrypted at rest** — 13 stores sealed under a per-profile AES-GCM-256 data key, itself wrapped
@@ -326,9 +379,10 @@ set's failures, it stops being evidence.
   builders, Elo/mastery/scheduler/predictor (HSC-band calibrated)/priorities, 84 question generators
   + 14 multipart exam questions.
 - **`client/src/ink/`** — ink canvas (`InkCanvas.jsx`), the $P template library (`templates.js`),
-  **the bundled CNN: `nn.js` (on-device forward pass), `model-data.js` (798 kB of trained
-  int8 weights, 3 voters) and `classes.js` (the 56 shape classes it predicts)**, the deskewing
-  rasteriser (`raster.js`), stroke smoothing (`smooth.js`), shape features (`features.js`), geometry re-ranker
+  **the bundled CNN: `nn.js` (on-device forward pass), `model-data.js` (a 798 kB module carrying
+  597 kB of trained int8 weights as base64, 3 voters) and `classes.js` (the 56 shape classes it
+  predicts)**, the deskewing rasteriser (`raster.js`), stroke smoothing (`smooth.js`), shape
+  features (`features.js`), geometry re-ranker
   (`rerank.js` + `rerank-data.js`), per-profile learned templates (`personal.js`), stroke
   augmentation (`aug.js`), the recogniser itself (`recognizer.js`: segmentation → classification →
   decode → layout) and the write-to-answer UI with verdict overlay (`InkAnswer.jsx`).

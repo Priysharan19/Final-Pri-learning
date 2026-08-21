@@ -55,21 +55,75 @@ export const year11 = {
       };
     }
     if (diff === 2) {
-      const k = nz(rng, -8, 8);
-      const kind = rc(rng, ['sqrt', 'recip']);
-      const correct = kind === 'sqrt' ? `$x \\ge ${-k}$` : `$x \\ne ${-k}$`;
-      const m = mcq(rng, correct, [
-        { text: kind === 'sqrt' ? `$x \\ne ${-k}$` : `$x \\ge ${-k}$`, why: kind === 'sqrt' ? 'Square roots need the *inside* to be ≥ 0 — it’s an inequality, not a single excluded point.' : 'A denominator only fails at the point where it is zero — exclude that single value.' },
-        { text: kind === 'sqrt' ? `$x \\ge ${k}$` : `$x \\ne ${k}$`, why: `Solve ${kind === 'sqrt' ? `$x ${sgn(k)} \\ge 0$` : `$x ${sgn(k)} = 0$`} — mind the sign when moving ${k} across.` },
-        { text: 'All real x' }
-      ]);
+      // Symmetry and the horizontal line test — properties read off the rule
+      // rather than off a picture.
+      const branch = ri(rng, 0, 2);
+      if (branch === 0) {
+        const shape = rc(rng, ['even', 'odd', 'neither']);
+        const a = nz(rng, -4, 4), b = nz(rng, -6, 6), c = nz(rng, -9, 9);
+        const rule = shape === 'even' ? poly([a, 0, b, 0, c])
+          : shape === 'odd' ? poly([a, 0, b, 0])
+            : poly([a, b, 0, c]);
+        const label = shape === 'even' ? 'Even' : shape === 'odd' ? 'Odd' : 'Neither even nor odd';
+        const m = mcq(rng, label, [
+          { text: shape === 'even' ? 'Odd' : 'Even', why: shape === 'even' ? 'Every power of $x$ here is even, so replacing $x$ by $-x$ changes nothing: $f(-x) = f(x)$, which is the definition of even.' : shape === 'odd' ? 'Every power of $x$ here is odd, so $f(-x) = -f(x)$ — the graph has point symmetry about the origin, not mirror symmetry in the $y$-axis.' : 'Mixing odd and even powers breaks both symmetries, so $f(-x)$ equals neither $f(x)$ nor $-f(x)$.' },
+          { text: shape === 'neither' ? 'Odd' : 'Neither even nor odd', why: shape === 'neither' ? 'The $x^{3}$ term flips sign but the $x^{2}$ term does not, so $f(-x) \\ne -f(x)$.' : `Work out $f(-x)$ in full: it comes back as ${shape === 'even' ? '$f(x)$' : '$-f(x)$'} exactly, so the function does have a symmetry.` },
+          { text: 'Both even and odd', why: 'Only the zero function is both — any function that is both must satisfy $f(x) = -f(x)$ for every $x$.' }
+        ]);
+        return {
+          prompt: `Classify $f(x) = ${rule}$ as **even**, **odd**, or **neither**.`,
+          answerType: 'mcq', answer: { correctIndex: m.correctIndex, optionTraps: m.optionTraps }, mcqOptions: m.options,
+          hints: ['Replace every $x$ with $-x$ and simplify.',
+            'Even means $f(-x) = f(x)$; odd means $f(-x) = -f(x)$.',
+            shape === 'neither' ? 'Look at the powers: a mix of odd and even powers means neither symmetry survives.' : `Here every power of $x$ present is ${shape === 'even' ? 'even' : 'odd'}.`],
+          steps: [
+            { h: 'Form f(−x)', d: shape === 'even' ? `$f(-x) = ${a}(-x)^4 ${sgn(b)}(-x)^2 ${sgn(c)} = ${rule}$` : shape === 'odd' ? `$f(-x) = ${a}(-x)^3 ${sgn(b)}(-x) = ${poly([-a, 0, -b, 0])}$` : `$f(-x) = ${a}(-x)^3 ${sgn(b)}(-x)^2 ${sgn(c)} = ${poly([-a, b, 0, c])}$` },
+            { h: 'Compare with f(x)', d: shape === 'even' ? '$f(-x) = f(x)$' : shape === 'odd' ? '$f(-x) = -f(x)$' : '$f(-x)$ is neither $f(x)$ nor $-f(x)$' },
+            { h: 'Classify', d: label }
+          ]
+        };
+      }
+      if (branch === 1) {
+        const oneToOne = rc(rng, [true, false]);
+        const c = nz(rng, -8, 8);
+        const g = oneToOne
+          ? rc(rng, [{ tex: `${term(nz(rng, -6, 6))} ${sgn(c)}`, why: 'a straight line with non-zero gradient' }, { tex: `x^3 ${sgn(c)}`, why: 'a cubic that increases everywhere' }])
+          : rc(rng, [{ tex: `x^2 ${sgn(c)}`, why: 'a parabola' }, { tex: `x^4 ${sgn(c)}`, why: 'a curve symmetric in the $y$-axis' }, { tex: `|x| ${sgn(c)}`, why: 'a V-shaped graph' }]);
+        const m = mcq(rng, oneToOne ? 'Yes — no horizontal line meets the graph more than once' : `No — a horizontal line such as $y = ${c + 4}$ meets the graph twice`, [
+          { text: oneToOne ? `No — a horizontal line such as $y = ${c + 4}$ meets the graph twice` : 'Yes — no horizontal line meets the graph more than once', why: oneToOne ? `This graph is ${g.why}: it never turns back, so each height is reached at most once.` : `This graph is ${g.why}: it is symmetric about a vertical line, so heights above the turning point are reached twice.` },
+          { text: 'No — it fails the vertical line test', why: 'The vertical line test decides whether a rule is a *function* at all. This rule gives exactly one output per input, so it passes that test; one-to-one is the **horizontal** line test.' },
+          { text: 'Yes — it passes the vertical line test', why: 'Passing the vertical line test only makes it a function. Being one-to-one is a stronger condition, tested with horizontal lines.' }
+        ]);
+        return {
+          prompt: `Is $f(x) = ${g.tex}$ a **one-to-one** function on its natural domain?`,
+          answerType: 'mcq', answer: { correctIndex: m.correctIndex, optionTraps: m.optionTraps }, mcqOptions: m.options,
+          hints: ['One-to-one means different inputs always give different outputs.',
+            'Test it with horizontal lines: can any height be reached twice?',
+            `Picture the graph — it is ${g.why}.`],
+          steps: [
+            { h: 'Sketch the shape', d: `$f$ is ${g.why}` },
+            { h: 'Apply the horizontal line test', d: oneToOne ? 'Every horizontal line meets it at most once' : `The line $y = ${c + 4}$ meets it twice` },
+            { h: 'Conclude', d: oneToOne ? '$f$ is one-to-one' : '$f$ is not one-to-one' }
+          ]
+        };
+      }
+      const h = nz(rng, -6, 6), k = nz(rng, -9, 9);
+      const b = -2 * h, c = h * h + k;
+      const wantLeft = rc(rng, [true, false]);
       return {
-        prompt: `State the domain of $f(x) = ${kind === 'sqrt' ? `\\sqrt{x ${sgn(k)}}` : `\\dfrac{1}{x ${sgn(k)}}`}$.`,
-        answerType: 'mcq', answer: { correctIndex: m.correctIndex, optionTraps: m.optionTraps }, mcqOptions: m.options,
-        hints: [kind === 'sqrt' ? 'What can’t you square-root (in the reals)?' : 'What can’t you divide by?', kind === 'sqrt' ? `Require $x ${sgn(k)} \\ge 0$.` : `Exclude $x ${sgn(k)} = 0$.`, `Solve for x: ${kind === 'sqrt' ? `$x \\ge ${-k}$` : `$x \\ne ${-k}$`}.`],
+        prompt: `$f(x) = x^2 ${sgn(b)}x ${sgn(c)}$ is not one-to-one on all of $\\mathbb{R}$. Find the ${wantLeft ? '**largest** value of $p$ for which $f$ restricted to $x \\le p$' : '**smallest** value of $p$ for which $f$ restricted to $x \\ge p$'} is one-to-one.`,
+        answerType: 'numeric', answer: { value: h }, answerPrefix: 'p =',
+        traps: [
+          { value: k, why: `$${k}$ is the *minimum value* of $f$ — a $y$-value. The restriction is on $x$, so you need the $x$-coordinate of the turning point.` },
+          { value: b, why: `The axis of symmetry is $x = -\\dfrac{b}{2a} = -\\dfrac{${b}}{2}$, not $b$ itself.` }
+        ].filter(t => t.value !== h),
+        hints: ['A parabola is one-to-one exactly on one side of its axis of symmetry.',
+          `The axis of symmetry is $x = -\\dfrac{b}{2a}$.`,
+          `Here $a = 1$ and $b = ${b}$.`],
         steps: [
-          { h: kind === 'sqrt' ? 'Radicand must be ≥ 0' : 'Denominator must be ≠ 0', d: kind === 'sqrt' ? `$x ${sgn(k)} \\ge 0$` : `$x ${sgn(k)} \\ne 0$` },
-          { h: 'Solve', d: kind === 'sqrt' ? `$x \\ge ${-k}$` : `$x \\ne ${-k}$` }
+          { h: 'Where does the parabola turn?', d: `$x = -\\dfrac{${b}}{2 \\times 1} = ${h}$` },
+          { h: 'Cut there', d: `On $x ${wantLeft ? '\\le' : '\\ge'} ${h}$ the curve only ${wantLeft ? 'falls' : 'rises'}, so no height repeats` },
+          { h: 'Answer', d: `$p = ${h}$` }
         ]
       };
     }
@@ -131,25 +185,68 @@ export const year11 = {
       };
     }
     if (diff === 2) {
-      const kind = rc(rng, ['two', 'one', 'none']);
-      let a, b, c;
-      if (kind === 'one') { const p = nz(rng, -5, 5); a = 1; b = -2 * p; c = p * p; }
-      else if (kind === 'two') { a = 1; b = nz(rng, -6, 6); c = (b * b - ri(rng, 1, 12) - 4) / 4; c = Math.floor(c); if (b * b - 4 * c <= 0) c = Math.floor((b * b - 4) / 4) - 1; }
-      else { a = 1; b = nz(rng, -4, 4); c = Math.ceil((b * b + 4) / 4) + ri(rng, 1, 5); }
-      const disc = b * b - 4 * a * c;
-      const label = disc > 0 ? 'Two distinct real roots' : disc === 0 ? 'Exactly one real root (a repeated root)' : 'No real roots';
-      const m = mcq(rng, label, [
-        { text: disc > 0 ? 'No real roots' : 'Two distinct real roots', why: `Check the sign of $\\Delta = ${disc}$: positive → two roots, zero → one, negative → none.` },
-        { text: disc === 0 ? 'Two distinct real roots' : 'Exactly one real root (a repeated root)', why: `$\\Delta = ${disc}$ — only $\\Delta = 0$ gives a repeated single root.` },
-        { text: 'Cannot tell without solving fully' }
-      ]);
+      // Completing the square, then reading the turning point straight out of
+      // the a(x − h)² + k form.
+      const branch = ri(rng, 0, 2);
+      if (branch === 0) {
+        const h = nz(rng, -9, 9), k = nz(rng, -15, 15);
+        const b = -2 * h, c = h * h + k;
+        return {
+          prompt: `By completing the square, find the **vertex** of $y = x^2 ${sgn(b)}x ${sgn(c)}$.`,
+          answerType: 'point', answer: { x: h, y: k },
+          inputHint: 'e.g. (3, -4)',
+          traps: [{ why: `Half of $${b}$ is $${b / 2}$, so the bracket is $(x ${sgn(b / 2)})^2$ and the vertex $x$ is its opposite, $${h}$.` }],
+          hints: [`Halve the coefficient of $x$: $${b} \\div 2 = ${b / 2}$.`,
+            `$x^2 ${sgn(b)}x = (x ${sgn(b / 2)})^2 - ${h * h}$.`,
+            `So $y = (x ${sgn(b / 2)})^2 - ${h * h} ${sgn(c)}$ — now tidy the constants.`],
+          steps: [
+            { h: 'Halve and square the x-coefficient', d: `$\\left(\\dfrac{${b}}{2}\\right)^2 = ${h * h}$` },
+            { h: 'Complete the square', d: `$x^2 ${sgn(b)}x ${sgn(c)} = (x ${sgn(b / 2)})^2 - ${h * h} ${sgn(c)}$` },
+            { h: 'Tidy the constant', d: `$y = (x ${sgn(b / 2)})^2 ${sgn(k)}$` },
+            { h: 'Vertex', d: `$(${h}, ${k})$` }
+          ]
+        };
+      }
+      if (branch === 1) {
+        const a = rc(rng, [2, 3, -1, -2, 4]);
+        const h = nz(rng, -6, 6), k = nz(rng, -14, 14);
+        const b = -2 * a * h, c = a * h * h + k;
+        const lead = a === 1 ? '' : a === -1 ? '-' : a;
+        return {
+          prompt: `By completing the square, find the **vertex** of $y = ${lead}x^2 ${sgn(b)}x ${sgn(c)}$.`,
+          answerType: 'point', answer: { x: h, y: k },
+          inputHint: 'e.g. (-2, 5)',
+          traps: [{ why: `Take the factor of $${a}$ out of the $x^2$ and $x$ terms **first**: $${lead}\\left(x^2 ${sgn(b / a)}x\\right) ${sgn(c)}$.` }],
+          hints: [`Factor $${a}$ out of the first two terms: $${lead}\\left(x^2 ${sgn(b / a)}x\\right) ${sgn(c)}$.`,
+            `Inside the bracket, half of $${b / a}$ is $${-h}$, so it becomes $(x ${sgn(-h)})^2 - ${h * h}$.`,
+            `Multiply the $-${h * h}$ back out by $${a}$ before combining with $${c}$.`],
+          steps: [
+            { h: 'Take out the leading coefficient', d: `$y = ${lead}\\left(x^2 ${sgn(b / a)}x\\right) ${sgn(c)}$` },
+            { h: 'Complete the square inside', d: `$x^2 ${sgn(b / a)}x = (x ${sgn(-h)})^2 - ${h * h}$` },
+            { h: 'Expand the outside factor back in', d: `$y = ${lead}(x ${sgn(-h)})^2 ${sgn(-a * h * h)} ${sgn(c)}$` },
+            { h: 'Vertex', d: `$y = ${lead}(x ${sgn(-h)})^2 ${sgn(k)}$, so the vertex is $(${h}, ${k})$` }
+          ]
+        };
+      }
+      const a = rc(rng, [1, 1, 2, 3, -1, -2]);
+      const h = nz(rng, -7, 7), k = nz(rng, -14, 14);
+      const b = -2 * a * h, c = a * h * h + k;
+      const lead = a === 1 ? '' : a === -1 ? '-' : a;
+      const up = a > 0;
       return {
-        prompt: `Without solving, determine the nature of the roots of $x^2 ${sgn(b)}x ${sgn(c)} = 0$.`,
-        answerType: 'mcq', answer: { correctIndex: m.correctIndex, optionTraps: m.optionTraps }, mcqOptions: m.options,
-        hints: ['Compute the discriminant.', `$\\Delta = (${b})^2 - 4(1)(${c}) = ${disc}$.`, disc > 0 ? 'Positive Δ → two distinct real roots.' : disc === 0 ? 'Zero Δ → one repeated root.' : 'Negative Δ → no real roots.'],
+        prompt: `By completing the square, find the **${up ? 'minimum' : 'maximum'} value** of $y = ${lead}x^2 ${sgn(b)}x ${sgn(c)}$.`,
+        answerType: 'numeric', answer: { value: k }, answerPrefix: 'y =',
+        traps: [
+          { value: h, why: `$${h}$ is the value of $x$ where the ${up ? 'minimum' : 'maximum'} happens. The question asks for the value of $y$ there.` },
+          { value: c, why: `$${c}$ is $y$ when $x = 0$, which is not the turning point unless the vertex sits on the $y$-axis.` }
+        ].filter(t => t.value !== k),
+        hints: [`Write it as $y = ${lead}(x - h)^2 + k$; the turning value is $k$.`,
+          `Factor out $${a}$ and complete the square: $x^2 ${sgn(b / a)}x = (x ${sgn(-h)})^2 - ${h * h}$.`,
+          `That gives $y = ${lead}(x ${sgn(-h)})^2 ${sgn(k)}$.`],
         steps: [
-          { h: 'Discriminant', d: `$\\Delta = ${b * b} - ${4 * c} = ${disc}$` },
-          { h: 'Interpret', d: `$\\Delta ${disc > 0 ? '> 0' : disc === 0 ? '= 0' : '< 0'}$ → ${label.toLowerCase()}` }
+          { h: 'Completed square form', d: `$y = ${lead}(x ${sgn(-h)})^2 ${sgn(k)}$` },
+          { h: 'The squared term', d: `$(x ${sgn(-h)})^2 \\ge 0$, and it is $0$ only at $x = ${h}$` },
+          { h: `${up ? 'Minimum' : 'Maximum'} value`, d: `$y = ${k}$, reached at $x = ${h}$` }
         ]
       };
     }
@@ -246,18 +343,82 @@ export const year11 = {
         ]
       };
     }
-    const root = nz(rng, -3, 3);
-    const b = nz(rng, -4, 4), c = nz(rng, -6, 6);
-    const k = -(root ** 3 + b * root * root + c * root);
+    // Solving polynomial equations: find one root, factorise, then finish with
+    // the null factor law.
+    const branch = ri(rng, 0, 2);
+    if (branch === 0) {
+      const roots = [];
+      for (let guard = 0; roots.length < 3 && guard < 60; guard++) {
+        const r = nz(rng, -6, 6);
+        if (!roots.includes(r)) roots.push(r);
+      }
+      if (roots.length < 3) return year11['y11-polynomials'](rng, diff);
+      const [p, q, s] = roots;
+      const a = rc(rng, [1, 1, 2, 3]);
+      const c3 = a, c2 = -a * (p + q + s), c1 = a * (p * q + p * s + q * s), c0 = -a * p * q * s;
+      return {
+        prompt: `Solve $${poly([c3, c2, c1, c0])} = 0$.`,
+        answerType: 'set', answer: { values: [p, q, s] },
+        inputHint: 'e.g. x = -2, 1, 4',
+        traps: [
+          { value: -p, why: `A factor $(x ${sgn(-p)})$ is zero at $x = ${p}$, not $x = ${-p}$ — the sign flips when you solve.` },
+          { value: c0, why: 'The constant term is $-a\\,pqr$; the roots are the numbers that make each factor vanish, not the coefficients themselves.' }
+        ],
+        hints: [`Try small factors of $${Math.abs(c0)}$ until one makes the polynomial zero — $x = ${p}$ works.`,
+          `Divide by $(x ${sgn(-p)})$ to get $${a === 1 ? '' : a}\\left(x ${sgn(-q)}\\right)\\left(x ${sgn(-s)}\\right)$.`,
+          'Then set every factor to zero in turn.'],
+        steps: [
+          { h: 'Find one root by trial', d: `$P(${p}) = 0$, so $(x ${sgn(-p)})$ is a factor` },
+          { h: 'Factorise fully', d: `$${poly([c3, c2, c1, c0])} = ${a === 1 ? '' : a}(x ${sgn(-p)})(x ${sgn(-q)})(x ${sgn(-s)})$` },
+          { h: 'Null factor law', d: `$x = ${p}$, $x = ${q}$ or $x = ${s}$` }
+        ]
+      };
+    }
+    if (branch === 1) {
+      const p = nz(rng, -6, 6);
+      let q = nz(rng, -6, 6);
+      if (q === p) q = p > 0 ? p - 1 || -1 : p + 1 || 1;
+      const a = rc(rng, [1, 1, 2, 3]);
+      const c3 = a, c2 = -a * (2 * p + q), c1 = a * (p * p + 2 * p * q), c0 = -a * p * p * q;
+      return {
+        prompt: `Solve $${poly([c3, c2, c1, c0])} = 0$, listing each **distinct** solution once.`,
+        answerType: 'set', answer: { values: [p, q] },
+        inputHint: 'e.g. x = -3, 2',
+        traps: [
+          { value: -p, why: `$(x ${sgn(-p)})^2 = 0$ gives $x = ${p}$ — solving a bracket flips the sign of the number inside.` },
+          { value: c0, why: 'The roots are the values that make the factors vanish, not the coefficients of the polynomial.' }
+        ],
+        hints: [`$x = ${p}$ satisfies the equation — and it turns out to be a **repeated** root.`,
+          `The full factorisation is $${a === 1 ? '' : a}(x ${sgn(-p)})^2(x ${sgn(-q)})$.`,
+          'A repeated factor still contributes only one distinct solution.'],
+        steps: [
+          { h: 'Find a root', d: `$P(${p}) = 0$` },
+          { h: 'Factorise fully', d: `$${poly([c3, c2, c1, c0])} = ${a === 1 ? '' : a}(x ${sgn(-p)})^2(x ${sgn(-q)})$` },
+          { h: 'Null factor law', d: `$(x ${sgn(-p)})^2 = 0 \\Rightarrow x = ${p}$ (twice); $\\ x ${sgn(-q)} = 0 \\Rightarrow x = ${q}$` },
+          { h: 'Distinct solutions', d: `$x = ${p}$ or $x = ${q}$` }
+        ]
+      };
+    }
+    const p = ri(rng, 1, 6);
+    let q = ri(rng, 1, 6);
+    if (q === p) q = p === 6 ? 1 : p + 1;
+    const b4 = -(p * p + q * q), c4 = p * p * q * q;
     return {
-      prompt: `Find $k$ so that $(x ${sgn(-root)})$ is a factor of $P(x) = x^3 ${sgn(b)}x^2 ${sgn(c)}x + k$.`,
-      answerType: 'numeric', answer: { value: k }, answerPrefix: 'k =',
-      traps: [{ value: -k, why: `Set $P(${root}) = 0$ and solve — watch the sign when isolating k.` }].filter(t => t.value !== k),
-      hints: ['Factor theorem: substitute the root and set the result to zero.', `$P(${root}) = 0$.`, `$${root ** 3 + b * root * root + c * root} + k = 0$.`],
+      prompt: `Solve $x^4 ${sgn(b4)}x^2 ${sgn(c4)} = 0$.`,
+      answerType: 'set', answer: { values: [p, -p, q, -q] },
+      inputHint: 'e.g. x = -3, -1, 1, 3',
+      traps: [
+        { value: p * p, why: `Careful — $x^2 = ${p * p}$ is only halfway. Take the square root of both sides, and remember it gives $\\pm$.` },
+        { value: -b4, why: 'That is the sum of the two $x^2$ values, not a solution of the original equation.' }
+      ],
+      hints: ['Let $u = x^2$ — the equation becomes a quadratic in $u$.',
+        `$u^2 ${sgn(b4)}u ${sgn(c4)} = 0$ factorises as $(u - ${p * p})(u - ${q * q}) = 0$.`,
+        `So $x^2 = ${p * p}$ or $x^2 = ${q * q}$ — and each gives **two** values of $x$.`],
       steps: [
-        { h: 'Factor theorem', d: `$P(${root}) = 0$` },
-        { h: 'Substitute', d: `$${root ** 3} ${sgn(b * root * root)} ${sgn(c * root)} + k = 0$` },
-        { h: 'Solve', d: `$k = ${k}$` }
+        { h: 'Substitute u = x²', d: `$u^2 ${sgn(b4)}u ${sgn(c4)} = 0$` },
+        { h: 'Factorise', d: `$(u - ${p * p})(u - ${q * q}) = 0$` },
+        { h: 'Back-substitute', d: `$x^2 = ${p * p}$ or $x^2 = ${q * q}$` },
+        { h: 'Square root both sides', d: `$x = \\pm${p}$ or $x = \\pm${q}$` }
       ]
     };
   },
@@ -752,15 +913,91 @@ export const year11 = {
       };
     }
     if (diff === 3) {
-      const n = ri(rng, 6, 18), r = ri(rng, 2, 6);
+      // Conditional probability by formula: P(A|B) = P(A ∩ B) / P(B), read off
+      // a two-way table or supplied as probabilities.
+      const branch = ri(rng, 0, 2);
+      if (branch === 0) {
+        const ctx = rc(rng, [
+          { rows: ['Bus', 'Walk'], cols: ['On time', 'Late'], row: 'travel', col: 'arrival', unit: 'students' },
+          { rows: ['Senior', 'Junior'], cols: ['Passed', 'Failed'], row: 'year group', col: 'result', unit: 'candidates' },
+          { rows: ['Cat owner', 'No cat'], cols: ['Allergic', 'Not allergic'], row: 'pet', col: 'allergy status', unit: 'people' }
+        ]);
+        const t = [[ri(rng, 4, 30), ri(rng, 4, 30)], [ri(rng, 4, 30), ri(rng, 4, 30)]];
+        const givenRow = rc(rng, [true, false]);
+        const gi = ri(rng, 0, 1), wi = ri(rng, 0, 1);
+        const num = givenRow ? t[gi][wi] : t[wi][gi];
+        const den = givenRow ? t[gi][0] + t[gi][1] : t[0][gi] + t[1][gi];
+        const f = new Frac(num, den);
+        const total = t[0][0] + t[0][1] + t[1][0] + t[1][1];
+        const table = `\\begin{array}{l|cc|c} & \\text{${ctx.cols[0]}} & \\text{${ctx.cols[1]}} & \\text{Total} \\\\ \\hline ` +
+          `\\text{${ctx.rows[0]}} & ${t[0][0]} & ${t[0][1]} & ${t[0][0] + t[0][1]} \\\\ ` +
+          `\\text{${ctx.rows[1]}} & ${t[1][0]} & ${t[1][1]} & ${t[1][0] + t[1][1]} \\\\ \\hline ` +
+          `\\text{Total} & ${t[0][0] + t[1][0]} & ${t[0][1] + t[1][1]} & ${total} \\end{array}`;
+        const givenLabel = givenRow ? ctx.rows[gi] : ctx.cols[gi];
+        const wantLabel = givenRow ? ctx.cols[wi] : ctx.rows[wi];
+        return {
+          prompt: `The two-way table records the ${ctx.row} and ${ctx.col} of $${total}$ ${ctx.unit}.\n\n$${table}$\n\nOne of them is chosen at random. Given that the chosen one is **${givenLabel.toLowerCase()}**, find the probability that it is **${wantLabel.toLowerCase()}**. Give your answer as a fraction in simplest form.`,
+          answerType: 'numeric', answer: { value: f.value, simplestFraction: { n: f.n, d: f.d } },
+          inputHint: 'e.g. 3/7',
+          traps: [
+            { value: num / total, why: `Dividing by $${total}$ answers a different question — the *unconditional* probability. Conditioning on “${givenLabel.toLowerCase()}” shrinks the sample space to those $${den}$.` },
+            { value: (den - num) / den, why: 'That is the probability of the **other** outcome within the same group — check which column or row the question asks for.' }
+          ].filter(t => Math.abs(t.value - f.value) > 1e-9),
+          hints: [`$P(A \\mid B) = \\dfrac{P(A \\cap B)}{P(B)}$, which with counts is $\\dfrac{n(A \\cap B)}{n(B)}$.`,
+            `Being told “${givenLabel.toLowerCase()}” restricts you to $${den}$ ${ctx.unit}.`,
+            `Of those, $${num}$ are ${wantLabel.toLowerCase()}.`],
+          steps: [
+            { h: 'Restrict the sample space', d: `Only the ${givenLabel.toLowerCase()} ${ctx.unit} count: $n(B) = ${den}$` },
+            { h: 'Count the favourable cases', d: `$n(A \\cap B) = ${num}$` },
+            { h: 'Divide and simplify', d: `$P(A \\mid B) = \\dfrac{${num}}{${den}} = ${f.latex()}$` }
+          ]
+        };
+      }
+      const N = rc(rng, [20, 24, 25, 30, 40, 50]);
+      if (branch === 1) {
+        const both = ri(rng, 2, Math.floor(N / 4));
+        const onlyA = ri(rng, 2, Math.floor(N / 4));
+        const onlyB = ri(rng, 2, Math.floor(N / 4));
+        const pA = new Frac(both + onlyA, N), pB = new Frac(both + onlyB, N);
+        const pU = new Frac(both + onlyA + onlyB, N);
+        const f = new Frac(both, both + onlyB);
+        return {
+          prompt: `For two events, $P(A) = ${pA.latex()}$, $P(B) = ${pB.latex()}$ and $P(A \\cup B) = ${pU.latex()}$. Find $P(A \\mid B)$ as a fraction in simplest form.`,
+          answerType: 'numeric', answer: { value: f.value, simplestFraction: { n: f.n, d: f.d } },
+          inputHint: 'e.g. 2/5',
+          traps: [
+            { value: new Frac(both, N).value, why: `$\\dfrac{${both}}{${N}}$ is $P(A \\cap B)$ itself. The conditional probability divides that by $P(B)$.` },
+            { value: pA.value, why: 'Conditioning on $B$ changes the answer — $P(A \\mid B) = P(A)$ only when the events are independent, and here they are not.' }
+          ].filter(t => Math.abs(t.value - f.value) > 1e-9),
+          hints: ['Start with the addition rule: $P(A \\cap B) = P(A) + P(B) - P(A \\cup B)$.',
+            `$P(A \\cap B) = ${pA.latex()} + ${pB.latex()} - ${pU.latex()} = ${new Frac(both, N).latex()}$.`,
+            `Then $P(A \\mid B) = \\dfrac{P(A \\cap B)}{P(B)} = ${new Frac(both, N).latex()} \\div ${pB.latex()}$.`],
+          steps: [
+            { h: 'Addition rule', d: `$P(A \\cap B) = P(A) + P(B) - P(A \\cup B) = ${new Frac(both, N).latex()}$` },
+            { h: 'Conditional probability formula', d: `$P(A \\mid B) = \\dfrac{P(A \\cap B)}{P(B)}$` },
+            { h: 'Divide', d: `$= ${new Frac(both, N).latex()} \\div ${pB.latex()} = ${f.latex()}$` }
+          ]
+        };
+      }
+      const nB = ri(rng, 4, N - 4);
+      const both = ri(rng, 1, nB - 1);
+      const pB = new Frac(nB, N), pAgB = new Frac(both, nB);
+      const f = new Frac(both, N);
       return {
-        prompt: `A school must pick a committee of $${r}$ students from a group of $${n}$. How many different committees are possible?`,
-        answerType: 'numeric', answer: { value: nCr(n, r) },
-        traps: [{ value: nPr(n, r), why: 'A committee has no order — divide the ordered count by $' + r + '!$ (use combinations).' }],
-        hints: ['Does the order of committee members matter?', 'No order → combinations.', `$^{${n}}C_{${r}} = \\frac{${n}!}{${r}!(${n - r})!}$.`],
+        prompt: `For two events, $P(B) = ${pB.latex()}$ and $P(A \\mid B) = ${pAgB.latex()}$. Find $P(A \\cap B)$ as a fraction in simplest form.`,
+        answerType: 'numeric', answer: { value: f.value, simplestFraction: { n: f.n, d: f.d } },
+        inputHint: 'e.g. 1/6',
+        traps: [
+          { value: pAgB.value / pB.value, why: 'The formula has been used upside down: rearranging $P(A \\mid B) = \\dfrac{P(A \\cap B)}{P(B)}$ gives $P(A \\cap B) = P(A \\mid B) \\times P(B)$.' },
+          { value: pAgB.value, why: `$P(A \\mid B)$ already assumes $B$ has happened. $P(A \\cap B)$ asks for the chance that **both** happen, which is smaller.` }
+        ].filter(t => Math.abs(t.value - f.value) > 1e-9),
+        hints: ['Rearrange $P(A \\mid B) = \\dfrac{P(A \\cap B)}{P(B)}$.',
+          `That gives $P(A \\cap B) = P(A \\mid B) \\times P(B)$.`,
+          `$${pAgB.latex()} \\times ${pB.latex()}$.`],
         steps: [
-          { h: 'Order doesn’t matter', d: `Use $^{${n}}C_{${r}}$` },
-          { h: 'Evaluate', d: `$^{${n}}C_{${r}} = \\dfrac{${nPr(n, r)}}{${factorial(r)}} = ${nCr(n, r)}$` }
+          { h: 'Rearrange the formula', d: `$P(A \\cap B) = P(A \\mid B) \\times P(B)$` },
+          { h: 'Substitute', d: `$= ${pAgB.latex()} \\times ${pB.latex()}$` },
+          { h: 'Multiply and simplify', d: `$= ${f.latex()}$` }
         ]
       };
     }

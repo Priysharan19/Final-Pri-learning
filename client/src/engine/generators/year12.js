@@ -3,6 +3,39 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { ri, rc, rs, nz, gcd, Frac, mcq, term, poly, sgn, moneyPlain, r1, r2, r3, NAMES } from '../qhelpers.js';
 
+// ── Motion graph ─────────────────────────────────────────────────────────────
+// engine/figures.js has no time-series builder, so the piecewise-linear graph
+// below is drawn here. It emits only the tags and attributes the figure
+// sanitiser allows — svg, g, line, polyline, circle, text.
+
+const MOTION_ACCENT = '#3987e5';
+const MN = v => Math.round(v * 100) / 100;
+
+function figMotion({ pts, yLabel, tMax, vMin, vMax }) {
+  const W = 360, H = 250, L = 46, B = 40;
+  const X = t => L + t / tMax * (W - L - 18);
+  const Y = v => (H - B) - (v - vMin) / (vMax - vMin) * (H - B - 22);
+  const zero = Y(0);
+  let inner = `<line x1="${L}" y1="${MN(zero)}" x2="${W - 12}" y2="${MN(zero)}"/><line x1="${L}" y1="16" x2="${L}" y2="${H - B}"/>`;
+  const tStep = tMax > 12 ? 2 : 1;
+  for (let t = tStep; t <= tMax; t += tStep) {
+    inner += `<line x1="${MN(X(t))}" y1="${MN(zero - 4)}" x2="${MN(X(t))}" y2="${MN(zero + 4)}"/>`;
+    if (t % (tStep * 2) === 0) inner += `<text x="${MN(X(t))}" y="${MN(zero + 18)}" fill="currentColor" stroke="none" font-size="11" font-family="Inter, system-ui, sans-serif" text-anchor="middle">${t}</text>`;
+  }
+  const vStep = (vMax - vMin) > 24 ? 5 : 2;
+  for (let v = Math.ceil(vMin / vStep) * vStep; v <= vMax; v += vStep) {
+    if (v === 0) continue;
+    inner += `<line x1="${L - 4}" y1="${MN(Y(v))}" x2="${L + 4}" y2="${MN(Y(v))}"/>`;
+    inner += `<text x="${L - 14}" y="${MN(Y(v) + 4)}" fill="currentColor" stroke="none" font-size="11" font-family="Inter, system-ui, sans-serif" text-anchor="middle">${v}</text>`;
+  }
+  inner += `<polyline points="${pts.map(([t, v]) => `${MN(X(t))},${MN(Y(v))}`).join(' ')}" stroke="${MOTION_ACCENT}" stroke-width="2.2"/>`;
+  for (const [t, v] of pts) inner += `<circle cx="${MN(X(t))}" cy="${MN(Y(v))}" r="3.4" fill="${MOTION_ACCENT}" stroke="none"/>`;
+  inner += `<text x="${W - 22}" y="${MN(zero - 9)}" fill="currentColor" stroke="none" font-size="12" font-family="Inter, system-ui, sans-serif" text-anchor="middle">t (s)</text>`;
+  inner += `<text x="${L + 26}" y="13" fill="currentColor" stroke="none" font-size="12" font-family="Inter, system-ui, sans-serif" text-anchor="middle">${yLabel}</text>`;
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Motion graph" style="max-width:360px;width:100%;height:auto;display:block">` +
+    `<g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round">${inner}</g></svg>`;
+}
+
 // ── Exact values for trigonometric calculus ─────────────────────────────────
 
 /** Bracket a negative value so a generated expression string stays parseable. */
@@ -398,33 +431,86 @@ export const year12 = {
         ]
       };
     }
-    const fn = rc(rng, ['sin', 'cos']);
-    const m = ri(rng, 1, 3);
-    const k = ri(rng, 1, 4);
-    const A = fn === 'cos'
-      ? rc(rng, [30, 45, 60, 90, 120, 135, 150, 180])
-      : rc(rng, [60, 90, 120, 180]);
-    const upper = piDeg(A, m);
-    // ∫₀^b cos(mx) dx = sin(mb)/m ;  ∫₀^b sin(mx) dx = (1 − cos(mb))/m
-    const res = fn === 'cos'
-      ? exactSurd(k * EXACT_ANGLES[A].sin[0], EXACT_ANGLES[A].sin[1], m * EXACT_ANGLES[A].sin[2])
-      : exactSurd(k * (EXACT_ANGLES[A].cos[2] - EXACT_ANGLES[A].cos[0]), 1, m * EXACT_ANGLES[A].cos[2]);
-    const kTex = k === 1 ? '' : k;
-    const mTex = m === 1 ? '' : m;
+    // Stationary points and horizontal tangents: the calculus produces a trig
+    // equation, and solving it exactly is the work.
+    const branch = ri(rng, 0, 2);
+    if (branch === 0) {
+      const pair = rc(rng, [
+        { cTex: '2', bTex: '', cosDeg: 60, sinDeg: 30, ratio: '\\dfrac{1}{2}' },
+        { cTex: '\\sqrt{2}', bTex: '', cosDeg: 45, sinDeg: 45, ratio: '\\dfrac{1}{\\sqrt{2}}' },
+        { cTex: '2', bTex: '\\sqrt{3}', cosDeg: 30, sinDeg: 60, ratio: '\\dfrac{\\sqrt{3}}{2}' }
+      ]);
+      const trig = rc(rng, ['sin', 'cos']);
+      const plus = rc(rng, [true, false]);
+      const c0 = nz(rng, -9, 9);
+      const eqFn = trig === 'sin' ? 'cos' : 'sin';
+      const negRhs = trig === 'sin' ? plus : !plus;
+      const acute = trig === 'sin' ? pair.cosDeg : pair.sinDeg;
+      const deg = trig === 'sin' ? (negRhs ? 180 - acute : acute) : (negRhs ? 180 + acute : acute);
+      const other = trig === 'sin' ? 360 - deg : (deg <= 180 ? 180 - deg : 540 - deg);
+      const root = piDeg(deg), alt = piDeg(other);
+      const rhs = `${negRhs ? '-' : ''}${pair.ratio}`;
+      return {
+        prompt: `The curve $y = ${pair.cTex}\\${trig} x ${plus ? '+' : '-'} ${pair.bTex}x ${sgn(c0)}$ has horizontal tangents. Find the **smallest positive** value of $x$ at which this happens, giving an exact answer.`,
+        answerType: 'numeric', answer: { value: root.val, requireExact: true, canonicalInput: root.typed, tol: 0.0005 },
+        inputHint: 'e.g. pi/3',
+        traps: [
+          { value: alt.val, why: `That is a genuine solution of the equation, but a larger one — the question asks for the **smallest** positive value, which is $${root.tex}$.`, tol: 0.0005 },
+          { value: piDeg(trig === 'sin' ? (negRhs ? acute : 180 - acute) : (negRhs ? acute : 180 + acute)).val, why: `Check the sign when you move the $${pair.bTex || ''}x$ term across: the equation is $\\${eqFn} x = ${rhs}$.`, tol: 0.0005 }
+        ].filter(t => Math.abs(t.value - root.val) > 0.001),
+        hints: [`A horizontal tangent means $\\dfrac{dy}{dx} = 0$.`,
+          `$\\dfrac{dy}{dx} = ${trig === 'sin' ? `${pair.cTex}\\cos x ${plus ? '+' : '-'} ${pair.bTex || '1'}` : `-${pair.cTex}\\sin x ${plus ? '+' : '-'} ${pair.bTex || '1'}`}$ — the constant $${c0}$ differentiates away.`,
+          `Setting that to zero gives $\\${eqFn} x = ${rhs}$.`],
+        steps: [
+          { h: 'Differentiate', d: `$\\dfrac{dy}{dx} = ${trig === 'sin' ? `${pair.cTex}\\cos x ${plus ? '+' : '-'} ${pair.bTex || '1'}` : `-${pair.cTex}\\sin x ${plus ? '+' : '-'} ${pair.bTex || '1'}`}$` },
+          { h: 'Set the derivative to zero', d: `$\\${eqFn} x = ${rhs}$` },
+          { h: 'Solve over the positive reals', d: `$x = ${root.tex}$ or $x = ${alt.tex}$, and so on every $2\\pi$` },
+          { h: 'Smallest positive solution', d: `$x = ${root.tex}$` }
+        ]
+      };
+    }
+    if (branch === 1) {
+      const a = ri(rng, 1, 6), m0 = ri(rng, 1, 4);
+      const trig = rc(rng, ['sin', 'cos']);
+      const deg = trig === 'sin' ? 90 : 180;
+      const root = piDeg(deg, m0);
+      const alt = piDeg(deg + 180, m0);
+      return {
+        prompt: `Find the **smallest positive** value of $x$ at which the curve $y = ${a === 1 ? '' : a}\\${trig}(${m0 === 1 ? '' : m0}x)$ has a stationary point. Give an exact answer.`,
+        answerType: 'numeric', answer: { value: root.val, requireExact: true, canonicalInput: root.typed, tol: 0.0005 },
+        inputHint: 'e.g. pi/4',
+        traps: [
+          { value: alt.val, why: `That is the *next* stationary point. Between them the curve turns once, so the smallest positive one is $${root.tex}$.`, tol: 0.0005 },
+          { value: piDeg(deg).val, why: `The inner $${m0 === 1 ? '' : m0}x$ matters: the derivative vanishes when $${m0 === 1 ? 'x' : `${m0}x`} = ${piDeg(deg).tex}$, so divide by $${m0}$.`, tol: 0.0005 }
+        ].filter(t => Math.abs(t.value - root.val) > 0.001),
+        hints: [`$\\dfrac{dy}{dx} = ${trig === 'sin' ? `${a * m0}\\cos(${m0 === 1 ? '' : m0}x)` : `-${a * m0}\\sin(${m0 === 1 ? '' : m0}x)`}$.`,
+          `Set it to zero: $\\${trig === 'sin' ? 'cos' : 'sin'}(${m0 === 1 ? '' : m0}x) = 0$.`,
+          `The smallest positive solution of $\\${trig === 'sin' ? 'cos' : 'sin'}\\theta = 0$ is $\\theta = ${piDeg(deg).tex}$${m0 === 1 ? '.' : ` — now divide by $${m0}$.`}`],
+        steps: [
+          { h: 'Differentiate', d: `$\\dfrac{dy}{dx} = ${trig === 'sin' ? `${a * m0}\\cos(${m0 === 1 ? '' : m0}x)` : `-${a * m0}\\sin(${m0 === 1 ? '' : m0}x)`}$` },
+          { h: 'Solve the trig equation', d: `$\\${trig === 'sin' ? 'cos' : 'sin'}(${m0 === 1 ? '' : m0}x) = 0 \\Rightarrow ${m0 === 1 ? 'x' : `${m0}x`} = ${piDeg(deg).tex}$` },
+          { h: m0 === 1 ? 'Read off the solution' : 'Divide by the inner coefficient', d: `$x = ${root.tex}$` }
+        ]
+      };
+    }
+    const a = ri(rng, 1, 6), m0 = ri(rng, 1, 4);
+    const trig = rc(rng, ['sin', 'cos']);
+    const count = trig === 'sin' ? 2 * m0 : 2 * m0 + 1;
     return {
-      prompt: `Evaluate $\\displaystyle\\int_{0}^{${upper.tex}} ${kTex}\\${fn}(${mTex}x)\\,dx$ exactly.`,
-      answerType: 'numeric', answer: { value: res.val, requireExact: true, canonicalInput: res.typed },
-      inputHint: 'e.g. 1 or 1/2',
-      traps: [{ value: -res.val, why: `$\\displaystyle\\int \\${fn}(${mTex}x)\\,dx = ${fn === 'cos' ? `\\frac{1}{${m}}\\sin(${mTex}x)` : `-\\frac{1}{${m}}\\cos(${mTex}x)`}$ — check the sign, then subtract the value at the lower limit.`, tol: 0.001 }].filter(t => Math.abs(t.value - res.val) > 0.002),
-      hints: [
-        `$\\displaystyle\\int \\${fn}(${mTex}x)\\,dx = ${fn === 'cos' ? `\\frac{1}{${m}}\\sin(${mTex}x)` : `-\\frac{1}{${m}}\\cos(${mTex}x)`}$.`,
-        `At the upper limit the inner angle is $${mTex}\\left(${upper.tex}\\right) = ${A}°$.`,
-        `Subtract the value at $x = 0$.`
+      prompt: `How many stationary points does $y = ${a === 1 ? '' : a}\\${trig}(${m0 === 1 ? '' : m0}x)$ have in the domain $0 \\le x \\le 2\\pi$?`,
+      answerType: 'numeric', answer: { value: count },
+      traps: [
+        { value: trig === 'sin' ? 2 * m0 + 1 : 2 * m0, why: trig === 'sin' ? `$\\cos(${m0 === 1 ? '' : m0}x) = 0$ has no solution at either endpoint, so there are exactly $${2 * m0}$.` : `$\\sin(${m0 === 1 ? '' : m0}x) = 0$ is satisfied at **both** endpoints $x = 0$ and $x = 2\\pi$, so both count.` },
+        { value: m0, why: `Over $0 \\le x \\le 2\\pi$ the inner angle $${m0 === 1 ? 'x' : `${m0}x`}$ sweeps through $${2 * m0}\\pi$, which is $${m0}$ full turns — and each turn contains more than one stationary point.` }
       ],
+      hints: [`$\\dfrac{dy}{dx} = ${trig === 'sin' ? `${a * m0}\\cos(${m0 === 1 ? '' : m0}x)` : `-${a * m0}\\sin(${m0 === 1 ? '' : m0}x)`}$.`,
+        `Let $\\theta = ${m0 === 1 ? 'x' : `${m0}x`}$. As $x$ runs from $0$ to $2\\pi$, $\\theta$ runs from $0$ to $${2 * m0}\\pi$.`,
+        `Count the solutions of $\\${trig === 'sin' ? 'cos' : 'sin'}\\theta = 0$ in that range — including the endpoints if they qualify.`],
       steps: [
-        { h: 'Antiderivative', d: `$${kTex === '' ? '' : kTex}${fn === 'cos' ? `\\dfrac{1}{${m}}\\sin(${mTex}x)` : `-\\dfrac{1}{${m}}\\cos(${mTex}x)`}$` },
-        { h: 'Evaluate at the limits', d: `inner angle $${A}°$ at the top, $0°$ at the bottom` },
-        { h: 'Answer', d: `$${res.tex}$` }
+        { h: 'Differentiate', d: `$\\dfrac{dy}{dx} = ${trig === 'sin' ? `${a * m0}\\cos(${m0 === 1 ? '' : m0}x)` : `-${a * m0}\\sin(${m0 === 1 ? '' : m0}x)`}$` },
+        { h: 'Substitute θ', d: `$\\theta = ${m0 === 1 ? 'x' : `${m0}x`}$ runs over $0 \\le \\theta \\le ${2 * m0}\\pi$` },
+        { h: 'Count the zeros', d: trig === 'sin' ? `$\\cos\\theta = 0$ at $\\theta = \\dfrac{\\pi}{2}, \\dfrac{3\\pi}{2}, \\ldots$ — $${count}$ of them` : `$\\sin\\theta = 0$ at $\\theta = 0, \\pi, 2\\pi, \\ldots, ${2 * m0}\\pi$ — $${count}$ of them` },
+        { h: 'Answer', d: `$${count}$ stationary points` }
       ]
     };
   },
@@ -449,60 +535,92 @@ export const year12 = {
       };
     }
     if (diff === 2) {
-      const a = ri(rng, 2, 9);
-      const shape = ri(rng, 1, 3);
+      // Integrating the exponential and reciprocal families — the two standard
+      // results, with the chain rule running backwards.
+      const shape = ri(rng, 1, 4);
       if (shape === 1) {
-        const n = ri(rng, 2, 6);
+        const a = ri(rng, 2, 7), m = ri(rng, 1, 9);
+        const mTex = m === 1 ? '' : m;
         return {
-          prompt: `Differentiate $y = \\ln(${a}x^{${n}})$ for $x > 0$.`,
-          answerType: 'expression', answer: { expr: `${n}/x`, positiveOnly: true },
-          inputHint: 'e.g. 3/x',
-          answerPrefix: 'dy/dx =',
+          prompt: `Find $\\displaystyle\\int ${a * m}e^{${a}x}\\,dx$. (You may omit the $+C$.)`,
+          answerType: 'expression', answer: { expr: `${m}*e^(${a}*x)`, stripC: true },
+          inputHint: `e.g. ${mTex}e^(${a}x) + C`,
+          answerPrefix: '∫ =',
           traps: [
-            { expr: `1/(${a}*x^${n})`, why: `Split it first: $\\ln(${a}x^{${n}}) = \\ln ${a} + ${n}\\ln x$, which differentiates to $\\frac{${n}}{x}$.` },
-            { expr: `${a * n}/x`, why: `The constant $\\ln ${a}$ differentiates to zero — only the power $${n}$ survives.` }
+            { expr: `${a * a * m}*e^(${a}*x)`, why: `That is the *derivative*. Integrating $e^{${a}x}$ **divides** by $${a}$ rather than multiplying by it.` },
+            { expr: `${a * m}*e^(${a}*x)`, why: `The $\\dfrac{1}{${a}}$ from the inner coefficient has been left out: $${a * m} \\div ${a} = ${m}$.` }
           ],
-          hints: ['Use the log laws to split it first.', `$\\ln(${a}x^{${n}}) = \\ln ${a} + ${n}\\ln x$.`, 'The constant term vanishes when differentiated.'],
+          hints: [`$\\displaystyle\\int e^{ax}\\,dx = \\dfrac{1}{a}e^{ax} + C$.`,
+            `Here $a = ${a}$, so the integral picks up a factor of $\\dfrac{1}{${a}}$.`,
+            `$${a * m} \\times \\dfrac{1}{${a}} = ${m}$.`],
           steps: [
-            { h: 'Split with log laws', d: `$\\ln(${a}x^{${n}}) = \\ln ${a} + ${n}\\ln x$` },
-            { h: 'Differentiate', d: `$\\dfrac{d}{dx}\\ln ${a} = 0, \\quad \\dfrac{d}{dx}\\left(${n}\\ln x\\right) = \\dfrac{${n}}{x}$` },
-            { h: 'Answer', d: `$y' = \\dfrac{${n}}{x}$` }
+            { h: 'Standard integral', d: `$\\displaystyle\\int e^{${a}x}\\,dx = \\dfrac{1}{${a}}e^{${a}x} + C$` },
+            { h: 'Keep the coefficient', d: `$\\displaystyle\\int ${a * m}e^{${a}x}\\,dx = \\dfrac{${a * m}}{${a}}e^{${a}x} + C$` },
+            { h: 'Simplify', d: `$= ${mTex}e^{${a}x} + C$` },
+            { h: 'Check by differentiating', d: `$\\dfrac{d}{dx}\\left(${mTex}e^{${a}x}\\right) = ${a * m}e^{${a}x}$ ✓` }
           ]
         };
       }
       if (shape === 2) {
-        const b = nz(rng, -9, 9);
+        const k = ri(rng, 2, 12), m = nz(rng, -9, 9);
+        const mx = `${m >= 0 ? '+' : '-'} ${term(Math.abs(m))}`;
         return {
-          prompt: `Differentiate $y = \\ln(${a}x ${sgn(b)})$.`,
-          answerType: 'expression', answer: { expr: `${a}/(${a}*x + ${pn12(b)})` },
-          inputHint: `e.g. ${a}/(${a}x ${sgn(b)})`,
-          answerPrefix: 'dy/dx =',
+          prompt: `Find $\\displaystyle\\int \\left(\\dfrac{${k}}{x} ${sgn(m)}\\right)\\,dx$ for $x > 0$. (You may omit the $+C$.)`,
+          answerType: 'expression', answer: { expr: `${k}*ln(x) + ${pn12(m)}*x`, stripC: true, positiveOnly: true },
+          inputHint: `e.g. ${k}ln(x) ${mx} + C`,
+          answerPrefix: '∫ =',
           traps: [
-            { expr: `1/(${a}*x + ${pn12(b)})`, why: `Chain rule: multiply by the inner derivative $${a}$.` },
-            { expr: `1/x`, why: `A constant *inside* the bracket cannot be split off with a log law — use the chain rule instead.` }
+            { expr: `${k}*ln(x) + ${pn12(m)}`, why: `The constant $${m}$ integrates to $${term(m)}$, not to $${m}$ — every term gains a power of $x$ except the $\\dfrac{1}{x}$.` },
+            { expr: `-${k}/(x^2) + ${pn12(m)}*x`, why: `That differentiates $\\dfrac{${k}}{x}$ instead of integrating it. The standard result is $\\displaystyle\\int \\dfrac{1}{x}\\,dx = \\ln x + C$.` }
           ],
-          hints: ['Chain rule: $\\frac{d}{dx}\\ln u = \\frac{u\'}{u}$.', `$u = ${a}x ${sgn(b)}$, so $u' = ${a}$.`, `$y' = \\dfrac{${a}}{${a}x ${sgn(b)}}$.`],
+          hints: [`$\\displaystyle\\int \\dfrac{1}{x}\\,dx = \\ln x + C$ — the one power the reverse power rule cannot handle.`,
+            `So $\\displaystyle\\int \\dfrac{${k}}{x}\\,dx = ${k}\\ln x$.`,
+            `And $\\displaystyle\\int ${m}\\,dx = ${term(m)}$.`],
           steps: [
-            { h: 'Chain rule for logs', d: `$\\dfrac{d}{dx}\\ln u = \\dfrac{u'}{u}$` },
-            { h: 'Inner derivative', d: `$u = ${a}x ${sgn(b)} \\Rightarrow u' = ${a}$` },
-            { h: 'Answer', d: `$y' = \\dfrac{${a}}{${a}x ${sgn(b)}}$` }
+            { h: 'The reciprocal term', d: `$\\displaystyle\\int \\dfrac{${k}}{x}\\,dx = ${k}\\ln x$` },
+            { h: 'The constant term', d: `$\\displaystyle\\int ${m}\\,dx = ${term(m)}$` },
+            { h: 'Add them', d: `$${k}\\ln x ${mx} + C$` }
           ]
         };
       }
+      if (shape === 3) {
+        const a = ri(rng, 2, 6), m = ri(rng, 1, 6), b = ri(rng, 1, 9);
+        const mTex = m === 1 ? '' : m;
+        return {
+          prompt: `Find $\\displaystyle\\int \\dfrac{${a * m}}{${a}x + ${b}}\\,dx$ for $x > 0$. (You may omit the $+C$.)`,
+          answerType: 'expression', answer: { expr: `${m}*ln(${a}*x + ${b})`, stripC: true, positiveOnly: true },
+          inputHint: `e.g. ${mTex}ln(${a}x + ${b}) + C`,
+          answerPrefix: '∫ =',
+          traps: [
+            { expr: `${a * m}*ln(${a}*x + ${b})`, why: `Reversing the chain rule divides by the inner derivative $${a}$: $${a * m} \\div ${a} = ${m}$.` },
+            { expr: `${a * m}*ln(x)`, why: `The whole bracket $${a}x + ${b}$ goes inside the logarithm — it cannot be reduced to $\\ln x$.` }
+          ],
+          hints: [`$\\displaystyle\\int \\dfrac{f'(x)}{f(x)}\\,dx = \\ln f(x) + C$.`,
+            `Here $f(x) = ${a}x + ${b}$ and $f'(x) = ${a}$.`,
+            m === 1 ? `The top is already exactly $f'(x)$, so the integral is $\\ln f(x) + C$ straight away.` : `Rewrite the top as $${m} \\times ${a}$ so that $f'(x)$ is visible on top.`],
+          steps: [
+            { h: 'Spot the form', d: m === 1 ? `The top, $${a}$, is exactly the derivative of the bottom` : `$\\dfrac{${a * m}}{${a}x + ${b}} = ${m} \\times \\dfrac{${a}}{${a}x + ${b}}$` },
+            { h: 'Apply the standard result', d: `$\\displaystyle\\int \\dfrac{${a}}{${a}x + ${b}}\\,dx = \\ln(${a}x + ${b}) + C$` },
+            { h: m === 1 ? 'Answer' : 'Restore the coefficient', d: `$= ${mTex}\\ln(${a}x + ${b}) + C$` }
+          ]
+        };
+      }
+      const k = ri(rng, 2, 9), p = ri(rng, 2, 9);
       return {
-        prompt: `Differentiate $y = \\ln(${a}x)$ for $x > 0$.`,
-        answerType: 'expression', answer: { expr: `1/x`, positiveOnly: true },
-        inputHint: 'e.g. 1/x',
-        answerPrefix: 'dy/dx =',
+        prompt: `Evaluate $\\displaystyle\\int_{1}^{${p}} \\dfrac{${k}}{x}\\,dx$, giving an exact answer.`,
+        answerType: 'numeric', answer: { value: k * Math.log(p), requireExact: true, canonicalInput: `${k}ln(${p})`, tol: 0.0005 },
+        inputHint: `e.g. ${k}ln(${p})`,
         traps: [
-          { expr: `1/(${a}x)`, why: `Chain rule: $\\frac{1}{${a}x} \\times ${a} = \\frac{1}{x}$ — the ${a}s cancel. (Or: $\\ln(${a}x) = \\ln ${a} + \\ln x$.)` },
-          { expr: `${a}/x`, why: `$\\ln(${a}x) = \\ln ${a} + \\ln x$, and the constant $\\ln ${a}$ differentiates to zero — no ${a} survives.` }
+          { value: k * Math.log(p) / p, why: `The antiderivative of $\\dfrac{${k}}{x}$ is $${k}\\ln x$ — there is no extra division by the limit.`, tol: 0.0005 },
+          { value: k * (p - 1), why: `$\\displaystyle\\int \\dfrac{1}{x}\\,dx$ is $\\ln x$, not $x$ — the reverse power rule breaks down for the power $-1$.`, tol: 0.0005 }
         ],
-        hints: ['Use the log law to split it first: $\\ln(ab) = \\ln a + \\ln b$.', `$\\ln(${a}x) = \\ln ${a} + \\ln x$.`, 'The constant term vanishes when differentiated.'],
+        hints: [`$\\displaystyle\\int \\dfrac{${k}}{x}\\,dx = ${k}\\ln x + C$.`,
+          `So the value is $\\left[${k}\\ln x\\right]_{1}^{${p}} = ${k}\\ln ${p} - ${k}\\ln 1$.`,
+          `$\\ln 1 = 0$.`],
         steps: [
-          { h: 'Split with a log law', d: `$\\ln(${a}x) = \\ln ${a} + \\ln x$` },
-          { h: 'Differentiate', d: `$\\dfrac{d}{dx}\\ln ${a} = 0, \\quad \\dfrac{d}{dx}\\ln x = \\dfrac{1}{x}$` },
-          { h: 'Answer', d: `$y' = \\dfrac{1}{x}$` }
+          { h: 'Antiderivative', d: `$\\displaystyle\\int \\dfrac{${k}}{x}\\,dx = ${k}\\ln x$` },
+          { h: 'Substitute the limits', d: `$${k}\\ln ${p} - ${k}\\ln 1$` },
+          { h: 'Simplify', d: `$\\ln 1 = 0$, so the integral is $${k}\\ln ${p}$` }
         ]
       };
     }
@@ -804,17 +922,99 @@ export const year12 = {
       };
     }
     if (diff === 2) {
-      const a = nz(rng, 1, 3), b = nz(rng, -6, 6), t = ri(rng, 1, 4);
-      const acc = 6 * a * t + 2 * b;
+      // Reading a velocity–time graph: gradients are accelerations, areas are
+      // distances, and the height has to come off the vertical scale.
+      const ask = ri(rng, 0, 3);
+      const t1 = ri(rng, 2, 4);
+      const acc1 = ri(rng, 1, 4);
+      const vTop = t1 * acc1;
+      const t2 = t1 + ri(rng, 2, 5);
+      const d3 = rc(rng, [1, 2, 3, 4].filter(d => vTop % d === 0));
+      const t3 = t2 + d3;
+      const back = ask === 3 ? true : rc(rng, [true, false]);
+      const d4 = ri(rng, 2, 4);
+      const t4 = t3 + d4;
+      const vEnd = back ? -ri(rng, 2, 6) : 0;
+      const figure = figMotion({
+        pts: [[0, 0], [t1, vTop], [t2, vTop], [t3, 0], [t4, vEnd]],
+        yLabel: 'v (m/s)', tMax: t4, vMin: Math.min(0, vEnd) - 2, vMax: vTop + 2
+      });
+      const lead = `The velocity–time graph shows a particle over the first $${t4}$ seconds of its motion. It accelerates uniformly from rest until $t = ${t1}$, travels at constant velocity until $t = ${t2}$, slows uniformly to rest at $t = ${t3}$${back ? `, then moves in the negative direction until $t = ${t4}$` : ` and stays at rest until $t = ${t4}$`}.`;
+      const areaUp = vTop * (t1 + d3) / 2 + (t2 - t1) * vTop;
+      if (ask === 0) {
+        return {
+          prompt: `${lead}\n\nFind the particle's **acceleration** during the first $${t1}$ seconds.`,
+          figure,
+          answerType: 'numeric', answer: { value: acc1 }, answerSuffix: 'm/s²',
+          traps: [
+            { value: vTop, why: `$${vTop}$ m/s is the velocity the particle reaches. Acceleration is the **gradient** of the graph, so divide that rise by the $${t1}$ seconds it took.` },
+            { value: vTop * t1 / 2, why: 'That is the area under the first segment, which gives a distance in metres — the gradient is what gives acceleration.' }
+          ],
+          hints: ['On a velocity–time graph, acceleration is the gradient of the line.',
+            `Read the velocity the particle reaches at $t = ${t1}$ off the vertical axis.`,
+            `Gradient $= \\dfrac{${vTop} - 0}{${t1} - 0}$.`],
+          steps: [
+            { h: 'Read the rise', d: `The velocity climbs from $0$ to $${vTop}$ m/s` },
+            { h: 'Read the run', d: `It takes $${t1}$ s` },
+            { h: 'Gradient', d: `$a = \\dfrac{${vTop}}{${t1}} = ${acc1}$ m/s²` }
+          ]
+        };
+      }
+      if (ask === 1) {
+        return {
+          prompt: `${lead}\n\nFind the particle's **acceleration** between $t = ${t2}$ and $t = ${t3}$.`,
+          figure,
+          answerType: 'numeric', answer: { value: -vTop / d3 }, answerSuffix: 'm/s²',
+          traps: [
+            { value: vTop / d3, why: 'The velocity is *falling* over this interval, so the gradient — and the acceleration — is negative.' },
+            { value: 0, why: `The graph is only flat between $t = ${t1}$ and $t = ${t2}$. From $t = ${t2}$ onwards it slopes down towards the axis.` }
+          ],
+          hints: ['Acceleration is again the gradient, and a falling line has a negative gradient.',
+            `Over this interval the velocity drops from $${vTop}$ m/s to $0$.`,
+            `Gradient $= \\dfrac{0 - ${vTop}}{${t3} - ${t2}}$.`],
+          steps: [
+            { h: 'Change in velocity', d: `$0 - ${vTop} = -${vTop}$ m/s` },
+            { h: 'Time taken', d: `$${t3} - ${t2} = ${d3}$ s` },
+            { h: 'Gradient', d: `$a = \\dfrac{-${vTop}}{${d3}} = ${-vTop / d3}$ m/s²` }
+          ]
+        };
+      }
+      if (ask === 2) {
+        return {
+          prompt: `${lead}\n\nHow far does the particle travel in the first $${t3}$ seconds?`,
+          figure,
+          answerType: 'numeric', answer: { value: areaUp }, answerSuffix: 'm',
+          traps: [
+            { value: vTop * t3, why: 'That treats the whole $' + t3 + '$ seconds as though the particle were at top speed. It only reaches $' + vTop + '$ m/s at $t = ' + t1 + '$, and slows again after $t = ' + t2 + '$.' },
+            { value: vTop / t1, why: 'That is the acceleration. Distance is the **area** under a velocity–time graph, not its gradient.' }
+          ],
+          hints: ['Distance travelled is the area under a velocity–time graph.',
+            `Split it into a triangle, a rectangle and a triangle: bases $${t1}$, $${t2 - t1}$ and $${d3}$, all at height $${vTop}$ m/s.`,
+            `$\\tfrac{1}{2}(${t1})(${vTop}) + (${t2 - t1})(${vTop}) + \\tfrac{1}{2}(${d3})(${vTop})$.`],
+          steps: [
+            { h: 'Speeding-up triangle', d: `$\\tfrac{1}{2} \\times ${t1} \\times ${vTop} = ${t1 * vTop / 2}$ m` },
+            { h: 'Constant-speed rectangle', d: `$${t2 - t1} \\times ${vTop} = ${(t2 - t1) * vTop}$ m` },
+            { h: 'Slowing-down triangle', d: `$\\tfrac{1}{2} \\times ${d3} \\times ${vTop} = ${d3 * vTop / 2}$ m` },
+            { h: 'Total distance', d: `$${t1 * vTop / 2} + ${(t2 - t1) * vTop} + ${d3 * vTop / 2} = ${areaUp}$ m` }
+          ]
+        };
+      }
+      const areaDown = d4 * Math.abs(vEnd) / 2;
       return {
-        prompt: `A particle has displacement $x(t) = ${poly([a, b, 0, 0], 't').replace(/( \+ 0)+$/, '')}$ metres. Find its **acceleration** at $t = ${t}$ seconds.`,
-        answerType: 'numeric', answer: { value: acc }, answerSuffix: 'm/s²',
-        traps: [{ value: 3 * a * t * t + 2 * b * t, why: 'That’s the velocity — acceleration is the *second* derivative of displacement.' }].filter(tr => tr.value !== acc),
-        hints: ['Differentiate twice.', `$v = ${poly([3 * a, 2 * b, 0], 't').replace(/ \+ 0$/, '')}$, then $a(t) = ${poly([6 * a, 2 * b], 't')}$.`, `Substitute $t = ${t}$.`],
+        prompt: `${lead}\n\nFind the particle's **displacement** over the whole $${t4}$ seconds.`,
+        figure,
+        answerType: 'numeric', answer: { value: areaUp - areaDown }, answerSuffix: 'm',
+        traps: [
+          { value: areaUp + areaDown, why: `That is the total **distance** travelled. Displacement counts the area below the axis as negative, because the particle is heading back the way it came.` },
+          { value: areaUp, why: `The final $${d4}$ seconds still move the particle — backwards. That area has to be subtracted, not ignored.` }
+        ],
+        hints: ['Displacement is the *signed* area: above the axis counts as positive, below as negative.',
+          `The area above the axis, up to $t = ${t3}$, is $${areaUp}$ m.`,
+          `Below the axis you have a triangle of base $${d4}$ and height $${Math.abs(vEnd)}$.`],
         steps: [
-          { h: 'First derivative (velocity)', d: `$v(t) = ${poly([3 * a, 2 * b, 0], 't').replace(/ \+ 0$/, '')}$` },
-          { h: 'Second derivative (acceleration)', d: `$a(t) = ${poly([6 * a, 2 * b], 't')}$` },
-          { h: 'Substitute', d: `$a(${t}) = ${6 * a}(${t}) ${sgn(2 * b)} = ${acc}$ m/s²` }
+          { h: 'Area above the axis', d: `$${areaUp}$ m (forwards)` },
+          { h: 'Area below the axis', d: `$\\tfrac{1}{2} \\times ${d4} \\times ${Math.abs(vEnd)} = ${areaDown}$ m (backwards)` },
+          { h: 'Signed total', d: `$${areaUp} - ${areaDown} = ${areaUp - areaDown}$ m` }
         ]
       };
     }

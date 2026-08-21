@@ -255,19 +255,84 @@ export const streamsExt = {
         ]
       };
     }
-    const root = nz(rng, -3, 3), b2 = nz(rng, -3, 3), c2 = nz(rng, -5, 5);
-    // P(x) = (x - root)(x² + b2 x + c2)
-    const B = b2 - root, C = c2 - root * b2, D = -root * c2;
+    // Solving over the rationals: the rational root theorem narrows the search,
+    // and the factors that come out need not have leading coefficient 1.
+    const branch = ri(rng, 0, 2);
+    if (branch === 0) {
+      const p = rc(rng, [2, 3]);
+      let q = nz(rng, -7, 7);
+      for (let guard = 0; gcd(Math.abs(q), p) !== 1 && guard < 40; guard++) q = nz(rng, -7, 7);
+      if (gcd(Math.abs(q), p) !== 1) return streamsExt['me11-poly'](rng, diff);
+      const r = nz(rng, -5, 5);
+      let s = nz(rng, -5, 5);
+      if (s === r) s = r === 5 ? -1 : r + 1;
+      const c3 = p, c2 = -(p * (r + s) + q), c1 = p * r * s + q * (r + s), c0 = -q * r * s;
+      return {
+        prompt: `Solve $${poly([c3, c2, c1, c0])} = 0$ over the rationals.`,
+        answerType: 'set', answer: { values: [q / p, r, s] },
+        inputHint: 'e.g. x = 3/2, -1, 4',
+        traps: [
+          { value: q, why: `A factor $(${p}x ${sgn(-q)})$ is zero at $x = \\dfrac{${q}}{${p}}$, not at $x = ${q}$ — divide by the leading $${p}$.` },
+          { value: c0, why: 'The rational root theorem says a root is $\\pm\\dfrac{\\text{factor of the constant}}{\\text{factor of the leading coefficient}}$ — the constant term itself is rarely a root.' }
+        ],
+        hints: [`By the rational root theorem any rational root is $\\pm\\dfrac{p}{q}$ with $p \\mid ${Math.abs(c0)}$ and $q \\mid ${p}$.`,
+          `Testing the integer candidates finds $x = ${r}$, so $(x ${sgn(-r)})$ is a factor.`,
+          `Dividing out leaves $(${p}x ${sgn(-q)})(x ${sgn(-s)})$, and one root is a fraction.`],
+        steps: [
+          { h: 'Candidate rational roots', d: `$\\pm\\dfrac{\\text{factors of } ${Math.abs(c0)}}{\\text{factors of } ${p}}$` },
+          { h: 'Factorise fully', d: `$${poly([c3, c2, c1, c0])} = (${p}x ${sgn(-q)})(x ${sgn(-r)})(x ${sgn(-s)})$` },
+          { h: 'Null factor law', d: `$x = \\dfrac{${q}}{${p}}$, $\\ x = ${r}$, $\\ x = ${s}$` }
+        ]
+      };
+    }
+    if (branch === 1) {
+      const p = rc(rng, [2, 3]), r = rc(rng, [2, 3]);
+      let q = nz(rng, -5, 5), s = nz(rng, -5, 5);
+      for (let guard = 0; (gcd(Math.abs(q), p) !== 1 || gcd(Math.abs(s), r) !== 1 || q * r === s * p) && guard < 60; guard++) {
+        q = nz(rng, -5, 5); s = nz(rng, -5, 5);
+      }
+      if (gcd(Math.abs(q), p) !== 1 || gcd(Math.abs(s), r) !== 1 || q * r === s * p) return streamsExt['me11-poly'](rng, diff);
+      const t = nz(rng, -4, 4);
+      const c3 = p * r, c2 = -(p * s + q * r + p * r * t), c1 = q * s + (p * s + q * r) * t, c0 = -q * s * t;
+      return {
+        prompt: `Solve $${poly([c3, c2, c1, c0])} = 0$ over the rationals.`,
+        answerType: 'set', answer: { values: [q / p, s / r, t] },
+        inputHint: 'e.g. x = 1/2, -2/3, 4',
+        traps: [
+          { value: q * s, why: 'Two of the three roots here are fractions — the leading coefficient does not divide out neatly into integer roots.' },
+          { value: t, why: `$x = ${t}$ is only **one** of the three solutions; the question asks for all of them.` }
+        ],
+        hints: [`The leading coefficient is $${c3} = ${p} \\times ${r}$, so denominators of $${p}$ and $${r}$ are both possible.`,
+          `The integer root is $x = ${t}$; divide $(x ${sgn(-t)})$ out first.`,
+          `What is left factorises as $(${p}x ${sgn(-q)})(${r}x ${sgn(-s)})$.`],
+        steps: [
+          { h: 'Find the integer root', d: `$P(${t}) = 0$, so $(x ${sgn(-t)})$ is a factor` },
+          { h: 'Factorise the quadratic left behind', d: `$(${p}x ${sgn(-q)})(${r}x ${sgn(-s)})$` },
+          { h: 'Null factor law', d: `$x = \\dfrac{${q}}{${p}}$, $\\ x = \\dfrac{${s}}{${r}}$, $\\ x = ${t}$` }
+        ]
+      };
+    }
+    const p = rc(rng, [2, 3]);
+    let q = nz(rng, -6, 6);
+    for (let guard = 0; gcd(Math.abs(q), p) !== 1 && guard < 40; guard++) q = nz(rng, -6, 6);
+    if (gcd(Math.abs(q), p) !== 1) return streamsExt['me11-poly'](rng, diff);
+    const t = nz(rng, -5, 5);
+    const c3 = p * p, c2 = -(2 * p * q + p * p * t), c1 = q * q + 2 * p * q * t, c0 = -q * q * t;
     return {
-      prompt: `Given that $(x ${sgn(-root)})$ is a factor of $P(x) = ${poly([1, B, C, D])}$, find the **quotient** when $P(x)$ is divided by it.`,
-      answerType: 'expression', answer: { expr: `x^2 + ${b2}x + ${c2}` },
-      inputHint: 'e.g. x^2 + 3x - 2',
-      traps: [{ expr: `x^2 + ${B}x + ${C}`, why: 'Divide properly (or equate coefficients) — the quotient’s coefficients change when the factor is removed.' }],
-      hints: ['Write $P(x) = (x ' + sgn(-root) + ')(x^2 + bx + c)$ and equate coefficients.', `Matching $x^2$: $b ${sgn(-root)}$ gives $b = ${b2}$.`, `Matching constants: $${-root} \\times c = ${D}$, so $c = ${c2}$.`],
+      prompt: `Solve $${poly([c3, c2, c1, c0])} = 0$ over the rationals, listing each **distinct** solution once.`,
+      answerType: 'set', answer: { values: [q / p, t] },
+      inputHint: 'e.g. x = 3/2, -4',
+      traps: [
+        { value: q, why: `$(${p}x ${sgn(-q)})^2 = 0$ gives $x = \\dfrac{${q}}{${p}}$ — the leading $${p}$ still has to be divided out.` },
+        { value: c0, why: 'The constant term is not a root here. Use the rational root theorem to narrow the candidates first.' }
+      ],
+      hints: [`The cubic has a **repeated** rational factor.`,
+        `$x = ${t}$ is one root; dividing $(x ${sgn(-t)})$ out leaves a perfect square.`,
+        `That square is $(${p}x ${sgn(-q)})^2$.`],
       steps: [
-        { h: 'Set up the product', d: `$P(x) = (x ${sgn(-root)})(x^2 + bx + c)$` },
-        { h: 'Equate coefficients', d: `$b = ${b2}$, $\\ c = ${c2}$` },
-        { h: 'Quotient', d: `$x^2 ${sgn(b2)}x ${sgn(c2)}$` }
+        { h: 'Factorise', d: `$${poly([c3, c2, c1, c0])} = (${p}x ${sgn(-q)})^2(x ${sgn(-t)})$` },
+        { h: 'Null factor law', d: `$(${p}x ${sgn(-q)})^2 = 0 \\Rightarrow x = \\dfrac{${q}}{${p}}$ (twice); $\\ x = ${t}$` },
+        { h: 'Distinct solutions', d: `$x = \\dfrac{${q}}{${p}}$ or $x = ${t}$` }
       ]
     };
   },
@@ -291,16 +356,66 @@ export const streamsExt = {
       };
     }
     if (diff === 2) {
-      const a = nz(rng, 2, 4), b = nz(rng, -6, 6), target = nz(rng, -5, 8);
-      const x = a * target + b;
+      // An inverse exists only where the function is one-to-one, and the
+      // inverse inherits its domain from the original function's range.
+      const branch = ri(rng, 0, 2);
+      if (branch === 0) {
+        const a = rc(rng, [1, 1, 2, 3, -1, -2]);
+        const h = nz(rng, -6, 6), k = nz(rng, -9, 9);
+        const b = -2 * a * h, c = a * h * h + k;
+        const lead = a === 1 ? '' : a === -1 ? '-' : a;
+        const wantLeft = rc(rng, [true, false]);
+        return {
+          prompt: `$f(x) = ${lead}x^2 ${sgn(b)}x ${sgn(c)}$ has no inverse function, because it is not one-to-one. Find the ${wantLeft ? '**largest** value of $p$ for which the restriction to $x \\le p$' : '**smallest** value of $p$ for which the restriction to $x \\ge p$'} does have an inverse function.`,
+          answerType: 'numeric', answer: { value: h }, answerPrefix: 'p =',
+          traps: [
+            { value: k, why: `$${k}$ is the ${a > 0 ? 'minimum' : 'maximum'} **value** of $f$. The restriction is a condition on $x$, so you want the $x$-coordinate of the vertex.` },
+            { value: c, why: `$${c}$ is $f(0)$. The vertex sits at $x = -\\dfrac{b}{2a} = -\\dfrac{${b}}{${2 * a}}$.` }
+          ].filter(t => t.value !== h),
+          hints: ['A parabola fails the horizontal line test only because it doubles back at its vertex.',
+            'Restrict to one side of the axis of symmetry and it becomes one-to-one.',
+            `Axis of symmetry: $x = -\\dfrac{b}{2a} = -\\dfrac{${b}}{${2 * a}}$.`],
+          steps: [
+            { h: 'Locate the vertex', d: `$x = -\\dfrac{${b}}{${2 * a}} = ${h}$` },
+            { h: 'Restrict to one branch', d: `On $x ${wantLeft ? '\\le' : '\\ge'} ${h}$, $f$ is ${(a > 0) === wantLeft ? 'strictly decreasing' : 'strictly increasing'}, hence one-to-one` },
+            { h: 'Answer', d: `$p = ${h}$` }
+          ]
+        };
+      }
+      if (branch === 1) {
+        const a = ri(rng, 2, 5), h = nz(rng, -4, 4), k = nz(rng, -6, 6);
+        return {
+          prompt: `$f(x) = ${a}\\sqrt{x ${sgn(-h)}} ${sgn(k)}$ has domain $x \\ge ${h}$. State the **domain of $f^{-1}$**, in the form $x \\ge c$.`,
+          answerType: 'numeric', answer: { value: k }, answerPrefix: 'x ≥',
+          traps: [
+            { value: h, why: `$x \\ge ${h}$ is the domain of $f$ itself. The domain of $f^{-1}$ is the **range** of $f$, which is a set of $y$-values of $f$.` },
+            { value: -k, why: `At the left end of the domain the surd is $0$, leaving $f(${h}) = ${k}$ — watch the sign of the constant.` }
+          ].filter(t => t.value !== k),
+          hints: ['The domain of $f^{-1}$ is exactly the range of $f$.',
+            `$\\sqrt{x ${sgn(-h)}} \\ge 0$, and it equals $0$ when $x = ${h}$.`,
+            `So $f(x) \\ge ${a} \\times 0 ${sgn(k)} = ${k}$.`],
+          steps: [
+            { h: 'Smallest value of the surd', d: `$\\sqrt{x ${sgn(-h)}} = 0$ at $x = ${h}$` },
+            { h: 'Range of f', d: `$f(x) \\ge ${k}$, and it grows without bound` },
+            { h: 'Domain of the inverse', d: `$x \\ge ${k}$` }
+          ]
+        };
+      }
+      const a = nz(rng, -6, 6), h = nz(rng, -5, 5), k = nz(rng, -5, 5);
       return {
-        prompt: `If $f(x) = ${a}x ${sgn(b)}$, evaluate $f^{-1}(${x})$.`,
-        answerType: 'numeric', answer: { value: target },
-        traps: [{ value: a * x + b, why: `That's $f(${x})$ — the inverse asks which input gives ${x}.` }],
-        hints: [`$f^{-1}(${x})$ asks: what input makes $f$ output ${x}?`, `Solve $${a}x ${sgn(b)} = ${x}$.`, `$x = ${target}$.`],
+        prompt: `$f(x) = \\dfrac{${a}}{x ${sgn(-h)}} ${sgn(k)}$ has domain $x \\ne ${h}$. Its inverse $f^{-1}$ also has exactly one value missing from its domain. State that value.`,
+        answerType: 'numeric', answer: { value: k }, answerPrefix: 'x =',
+        traps: [
+          { value: h, why: `$x = ${h}$ is excluded from the domain of $f$. The domain of $f^{-1}$ is the **range** of $f$, and the value $f$ never takes is $${k}$.` },
+          { value: a, why: `$${a}$ is the numerator, not the asymptote. The value $f$ never reaches is the constant it has been shifted by.` }
+        ].filter(t => t.value !== k),
+        hints: ['The domain of $f^{-1}$ is the range of $f$, so ask which $y$-value $f$ never produces.',
+          `$\\dfrac{${a}}{x ${sgn(-h)}}$ can be any non-zero number, but never $0$.`,
+          `So $f(x)$ can be anything except $0 ${sgn(k)}$.`],
         steps: [
-          { h: 'Set up', d: `$${a}t ${sgn(b)} = ${x}$` },
-          { h: 'Solve', d: `$t = ${target}$, so $f^{-1}(${x}) = ${target}$` }
+          { h: 'The fraction is never zero', d: `$\\dfrac{${a}}{x ${sgn(-h)}} \\ne 0$ for every $x$ in the domain` },
+          { h: 'Range of f', d: `$f(x) \\ne ${k}$` },
+          { h: 'Domain of the inverse', d: `$f^{-1}$ has domain $x \\ne ${k}$` }
         ]
       };
     }
@@ -318,56 +433,78 @@ export const streamsExt = {
         ]
       };
     }
-    const shape = ri(rng, 1, 3);
-    if (shape === 1) {
-      const a = nz(rng, -5, 5), c = nz(rng, -6, 6);
-      let b = nz(rng, -9, 9);
-      while (b === a * c) b = nz(rng, -9, 9);          // b = ac makes f constant
-      const numTex = a === 1 ? `x ${sgn(b)}` : a === -1 ? `-x ${sgn(b)}` : `${a}x ${sgn(b)}`;
+    // Composites and inverses together: undoing two operations means undoing
+    // them in the reverse order.
+    const a = nz(rng, -5, 5), b = nz(rng, -9, 9);
+    const c = nz(rng, -5, 5), d = nz(rng, -9, 9);
+    const K = a * d + b, A = a * c;
+    const fTex = `${a === 1 ? '' : a === -1 ? '-' : a}x ${sgn(b)}`;
+    const gTex = `${c === 1 ? '' : c === -1 ? '-' : c}x ${sgn(d)}`;
+    // A negative denominator reads badly, so the minus sign moves to the top.
+    const overA = kk => (A > 0 ? `\\dfrac{x ${sgn(-kk)}}{${A}}` : `\\dfrac{${kk} - x}{${-A}}`);
+    const branch = ri(rng, 0, 2);
+    if (branch === 0) {
       return {
-        prompt: `Find the inverse function of $f(x) = \\dfrac{${numTex}}{x ${sgn(c)}}$.`,
-        answerType: 'expression', answer: { expr: `(${pn(b)} - ${pn(c)}*x)/(x - ${pn(a)})`, anyOf: [`(${pn(c)}*x - ${pn(b)})/(${pn(a)} - x)`] },
-        inputHint: 'e.g. (5 - 2x)/(x - 3)',
-        answerPrefix: 'f⁻¹(x) =',
-        traps: [{ expr: `(x ${sgn(c)})/(${pn(a)}*x + ${pn(b)})`, why: 'The inverse is not the reciprocal — swap $x$ and $y$, then make $y$ the subject.' }],
-        hints: ['Write $y = f(x)$, swap $x$ and $y$, then solve for $y$.', `$x(y ${sgn(c)}) = ${a === 1 ? 'y' : a === -1 ? '-y' : `${a}y`} ${sgn(b)}$ — gather the $y$ terms on one side.`, `$y(x - ${a}) = ${b} - ${c}x$.`],
+        prompt: `For $f(x) = ${fTex}$ and $g(x) = ${gTex}$, find $(f \\circ g)^{-1}(x)$.`,
+        answerType: 'expression', answer: { expr: `(x - ${pn(K)})/(${pn(A)})` },
+        inputHint: 'e.g. (x - 5)/6',
+        answerPrefix: '(f ∘ g)⁻¹(x) =',
+        traps: [
+          { expr: `(x - ${pn(b)})/(${pn(a)}) * ${pn(c)} + ${pn(d)}`, why: `That composes the inverses the wrong way round. Undoing $f$ then $g$ means $g^{-1}$ **after** $f^{-1}$, i.e. $g^{-1}(f^{-1}(x))$.` },
+          { expr: `${pn(A)}*x + ${pn(K)}`, why: `That is $f(g(x))$ itself, not its inverse — the inverse has to be solved for.` }
+        ],
+        hints: [`Build the composite first: $f(g(x)) = ${a === 1 ? '' : a === -1 ? '-' : a}(${gTex}) ${sgn(b)}$.`,
+          `That simplifies to $${A}x ${sgn(K)}$.`,
+          `Now invert the single linear function: swap $x$ and $y$ and solve.`],
         steps: [
-          { h: 'Swap x and y', d: `$x = \\dfrac{${a === 1 ? 'y' : a === -1 ? '-y' : `${a}y`} ${sgn(b)}}{y ${sgn(c)}}$` },
-          { h: 'Clear the fraction', d: `$xy ${sgn(c)}x = ${a === 1 ? 'y' : a === -1 ? '-y' : `${a}y`} ${sgn(b)}$` },
-          { h: 'Gather the y terms', d: `$y(x - ${a}) = ${b} - ${c}x$` },
-          { h: 'Inverse', d: `$f^{-1}(x) = \\dfrac{${b} - ${c}x}{x - ${a}}$, $x \\ne ${a}$` }
+          { h: 'Form the composite', d: `$f(g(x)) = ${a === 1 ? '' : a === -1 ? '-' : a}(${gTex}) ${sgn(b)} = ${A}x ${sgn(K)}$` },
+          { h: 'Swap x and y', d: `$x = ${A}y ${sgn(K)}$` },
+          { h: 'Solve for y', d: `$(f \\circ g)^{-1}(x) = ${overA(K)}$` },
+          { h: 'Same thing the other way', d: `$g^{-1}(f^{-1}(x))$ gives the same rule — inverses of a composite unwind in reverse order.` }
         ]
       };
     }
-    if (shape === 2) {
-      const a = ri(rng, 2, 5), h = nz(rng, -4, 4), k = nz(rng, -6, 6);
+    if (branch === 1) {
+      const t = nz(rng, -4, 6);
+      const val = A * t + K;
       return {
-        prompt: `The function $f(x) = ${a}\\sqrt{x ${sgn(-h)}} ${sgn(k)}$ has domain $x \\ge ${h}$. Find $f^{-1}(x)$.`,
-        answerType: 'expression', answer: { expr: `((x - ${pn(k)})/${a})^2 + ${pn(h)}`, anyOf: [`(x - ${pn(k)})^2/${a * a} + ${pn(h)}`] },
-        inputHint: 'e.g. ((x - 1)/2)^2 + 3',
-        answerPrefix: 'f⁻¹(x) =',
-        traps: [{ expr: `sqrt((x - ${pn(k)})/${a}) + ${pn(h)}`, why: 'Undo a square root by squaring — the inverse of $\\sqrt{\\ }$ is not another $\\sqrt{\\ }$.' }],
-        hints: ['Swap $x$ and $y$, then peel the operations off in reverse.', `${k >= 0 ? 'Subtract' : 'Add'} ${Math.abs(k)}, then divide by ${a}.`, 'Square last, then undo the horizontal shift.'],
+        prompt: `For $f(x) = ${fTex}$ and $g(x) = ${gTex}$, evaluate $(f \\circ g)^{-1}(${val})$.`,
+        answerType: 'numeric', answer: { value: t },
+        traps: [
+          { value: A * val + K, why: `That is $f(g(${val}))$. The inverse asks the opposite question: which input does the composite send to $${val}$?` },
+          { value: (val - b) / a, why: `That only undoes $f$. There is still $g$ to undo afterwards.` }
+        ].filter(tr => tr.value !== t),
+        hints: [`$(f \\circ g)^{-1}(${val})$ asks: what value of $x$ makes $f(g(x)) = ${val}$?`,
+          `The composite is $f(g(x)) = ${A}x ${sgn(K)}$.`,
+          `Solve $${A}x ${sgn(K)} = ${val}$.`],
         steps: [
-          { h: 'Swap x and y', d: `$x = ${a}\\sqrt{y ${sgn(-h)}} ${sgn(k)}$` },
-          { h: 'Isolate the surd', d: `$\\sqrt{y ${sgn(-h)}} = \\dfrac{x ${sgn(-k)}}{${a}}$` },
-          { h: 'Square and rearrange', d: `$f^{-1}(x) = \\left(\\dfrac{x ${sgn(-k)}}{${a}}\\right)^2 ${sgn(h)}$, $x \\ge ${k}$` }
+          { h: 'Form the composite', d: `$f(g(x)) = ${A}x ${sgn(K)}$` },
+          { h: 'Set it equal to the value', d: `$${A}x ${sgn(K)} = ${val}$` },
+          { h: 'Solve', d: `$x = ${t}$` },
+          { h: 'Check', d: `$g(${t}) = ${c * t + d}$, and $f(${c * t + d}) = ${val}$ ✓` }
         ]
       };
     }
-    const a = nz(rng, -6, 6), h = nz(rng, -5, 5), k = nz(rng, -5, 5);
+    // The wrong-order composite must genuinely differ, or the distractor would
+    // be a second correct answer.
+    if (b * (1 - c) === d * (1 - a)) return streamsExt['me11-functions'](rng, diff);
+    const wrongK = d + b * c;
+    const m = mcq(rng, '$g^{-1}\\!\\left(f^{-1}(x)\\right)$', [
+      { text: '$f^{-1}\\!\\left(g^{-1}(x)\\right)$', why: `Composites unwind in reverse: $f \\circ g$ applies $g$ first, so its inverse must undo $f$ first. For these two rules the orders really do differ — this one gives $${overA(wrongK)}$, while the correct one gives $${overA(K)}$.` },
+      { text: '$\\dfrac{1}{f(g(x))}$', why: 'An inverse **function** reverses the mapping; it is not the reciprocal of the output.' },
+      { text: '$f^{-1}(x) \\times g^{-1}(x)$', why: 'Composition is applying one function to the output of another, not multiplying the two results.' }
+    ]);
     return {
-      prompt: `Find the inverse function of $f(x) = \\dfrac{${a}}{x ${sgn(-h)}} ${sgn(k)}$, $x \\ne ${h}$.`,
-      answerType: 'expression', answer: { expr: `${pn(a)}/(x - ${pn(k)}) + ${pn(h)}` },
-      inputHint: 'e.g. 4/(x - 1) + 2',
-      answerPrefix: 'f⁻¹(x) =',
-      traps: [{ expr: `(x - ${pn(k)})/${pn(a)} + ${pn(h)}`, why: 'A reciprocal is undone by another reciprocal, not by dividing.' }],
-      hints: ['Swap $x$ and $y$, then unwrap: subtract the constant, take reciprocals, shift back.', `$x ${sgn(-k)} = \\dfrac{${a}}{y ${sgn(-h)}}$.`, `$y ${sgn(-h)} = \\dfrac{${a}}{x ${sgn(-k)}}$.`],
+      prompt: `$f(x) = ${fTex}$ and $g(x) = ${gTex}$ are one-to-one functions. Which expression is equal to $(f \\circ g)^{-1}(x)$?`,
+      answerType: 'mcq', answer: { correctIndex: m.correctIndex, optionTraps: m.optionTraps }, mcqOptions: m.options,
+      hints: ['Think about the order the two functions are applied in.',
+        '$(f \\circ g)(x)$ applies $g$ first, then $f$.',
+        'To undo it, strip off the **last** thing that was done first.'],
       steps: [
-        { h: 'Swap x and y', d: `$x = \\dfrac{${a}}{y ${sgn(-h)}} ${sgn(k)}$` },
-        { h: 'Isolate the fraction', d: `$x ${sgn(-k)} = \\dfrac{${a}}{y ${sgn(-h)}}$` },
-        { h: 'Take reciprocals', d: `$y ${sgn(-h)} = \\dfrac{${a}}{x ${sgn(-k)}}$` },
-        { h: 'Inverse', d: `$f^{-1}(x) = \\dfrac{${a}}{x ${sgn(-k)}} ${sgn(h)}$, $x \\ne ${k}$` }
+        { h: 'Order of operations', d: `$(f \\circ g)(x) = f(g(x))$ — $g$ first, then $f$` },
+        { h: 'Undo in reverse', d: 'Undo $f$ first, then undo $g$' },
+        { h: 'Result', d: `$(f \\circ g)^{-1}(x) = g^{-1}\\!\\left(f^{-1}(x)\\right)$` },
+        { h: 'Here', d: `with $f(x) = ${fTex}$ and $g(x) = ${gTex}$, both sides come to $${overA(K)}$` }
       ]
     };
   },
@@ -899,18 +1036,74 @@ export const streamsExt = {
         ]
       };
     }
-    const half = rc(rng, [4, 5, 6, 8, 10, 12, 15, 20, 24, 30]);
-    const k = Math.log(2) / half;
-    const t = ri(rng, 7, 45);
-    const frac = Math.exp(-k * t);
+    // Motion described by derivatives: velocity and acceleration are what the
+    // derivatives of the displacement mean, and a = d(½v²)/dx when v is given
+    // as a function of position.
+    const branch = ri(rng, 0, 2);
+    if (branch === 0) {
+      const A = nz(rng, -6, 6), B = 2 * nz(rng, -6, 6), C = ri(rng, 1, 20);
+      const x0 = nz(rng, -5, 5);
+      const vsq = A * x0 * x0 + B * x0 + C;
+      if (vsq <= 0) return streamsExt['me11-rates'](rng, diff);
+      const acc = A * x0 + B / 2;
+      return {
+        prompt: `A particle moves in a straight line so that $v^2 = ${poly([A, B, C], 'x')}$, where $x$ is its displacement in metres. Find its **acceleration** when $x = ${x0}$.`,
+        answerType: 'numeric', answer: { value: acc }, answerSuffix: 'm/s²',
+        traps: [
+          { value: 2 * A * x0 + B, why: `That is $\\dfrac{d(v^2)}{dx}$. Acceleration is $\\dfrac{d}{dx}\\left(\\tfrac{1}{2}v^2\\right)$, so it is half as big.` },
+          { value: vsq, why: `$${vsq}$ is $v^2$ at that point, not the acceleration — differentiate before substituting.` }
+        ].filter(t => t.value !== acc),
+        hints: [`For motion given in terms of position, $a = \\dfrac{d}{dx}\\left(\\dfrac{1}{2}v^2\\right)$.`,
+          `Halve first: $\\tfrac{1}{2}v^2 = \\tfrac{1}{2}\\left(${poly([A, B, C], 'x')}\\right)$.`,
+          `Differentiate with respect to $x$, then substitute $x = ${x0}$.`],
+        steps: [
+          { h: 'Use a = d(½v²)/dx', d: `$\\tfrac{1}{2}v^2 = \\tfrac{1}{2}\\left(${poly([A, B, C], 'x')}\\right)$` },
+          { h: 'Differentiate', d: `$a = ${poly([A, B / 2], 'x')}$` },
+          { h: 'Substitute', d: `$a = ${A}(${x0}) ${sgn(B / 2)} = ${acc}$ m/s²` }
+        ]
+      };
+    }
+    if (branch === 1) {
+      const amp = ri(rng, 2, 9), n = ri(rng, 2, 5);
+      const xAt = nz(rng, -amp + 1, amp - 1);
+      const acc = -n * n * xAt;
+      return {
+        prompt: `A particle moves so that its displacement is $x = ${amp}\\cos(${n}t)$ metres. Find its **acceleration** at the instant when $x = ${xAt}$ metres.`,
+        answerType: 'numeric', answer: { value: acc }, answerSuffix: 'm/s²',
+        traps: [
+          { value: n * n * xAt, why: `Differentiating $\\cos$ twice brings down $-${n}^2$, so the acceleration points back towards the centre — the sign matters.` },
+          { value: -n * xAt, why: `The chain rule contributes a factor of $${n}$ on **each** differentiation, so $\\ddot{x}$ carries $${n}^2 = ${n * n}$.` }
+        ].filter(t => t.value !== acc),
+        hints: [`Differentiate twice: $\\dot{x} = -${amp * n}\\sin(${n}t)$.`,
+          `$\\ddot{x} = -${amp * n * n}\\cos(${n}t)$.`,
+          `Notice that $\\ddot{x} = -${n * n}x$ — so you never need $t$ at all.`],
+        steps: [
+          { h: 'First derivative', d: `$\\dot{x} = -${amp * n}\\sin(${n}t)$` },
+          { h: 'Second derivative', d: `$\\ddot{x} = -${amp * n * n}\\cos(${n}t) = -${n * n}x$` },
+          { h: 'Substitute the displacement', d: `$a = -${n * n}(${xAt}) = ${acc}$ m/s²` }
+        ]
+      };
+    }
+    let pR = ri(rng, 1, 5), qR = ri(rng, 2, 8);
+    if (qR <= pR) qR = pR + 2;
+    if ((pR + qR) % 2 !== 0) qR += 1;
+    const B2 = -3 * (pR + qR), C2 = 3 * pR * qR;
+    const acc = 3 * (pR - qR);
     return {
-      prompt: `A radioactive isotope has a half-life of $${half}$ years (so $M = M_0e^{-kt}$ with $k = \\frac{\\ln 2}{${half}}$). What **fraction** of the original mass remains after $${t}$ years, correct to 3 decimal places?`,
-      answerType: 'numeric', answer: { value: r3(frac), tol: 0.002 },
-      traps: [{ value: r3(1 - t / half / 10), why: 'Decay is exponential, not linear — evaluate $e^{-kt}$.', tol: 0.002 }].filter(tr => Math.abs(tr.value - r3(frac)) > 0.01),
-      hints: [`$k = \\frac{\\ln 2}{${half}} = ${r3(k)}$.`, `Fraction left $= e^{-${r3(k)} \\times ${t}}$.`, 'Evaluate to 3 dp.'],
+      prompt: `A particle's displacement is $x = ${poly([1, B2 / 2, C2, 0], 't')}$ metres at time $t$ seconds. Find its **acceleration** at the first instant it is at rest.`,
+      answerType: 'numeric', answer: { value: acc }, answerSuffix: 'm/s²',
+      traps: [
+        { value: -acc, why: `The particle is first at rest at $t = ${pR}$, where the velocity is still falling — so the acceleration there is negative.` },
+        { value: B2, why: `That is the acceleration at $t = 0$. The particle is not at rest then — it first stops at $t = ${pR}$.` }
+      ].filter(t => t.value !== acc),
+      hints: ['At rest means $v = 0$, so differentiate once and solve.',
+        `$v = ${poly([3, B2, C2], 't')} = 3(t - ${pR})(t - ${qR})$.`,
+        `The first rest is at $t = ${pR}$; now differentiate again and substitute.`],
       steps: [
-        { h: 'Decay constant', d: `$k = \\frac{\\ln 2}{${half}} = ${r3(k)}$` },
-        { h: 'Fraction remaining', d: `$e^{-${r3(k)}(${t})} \\approx ${r3(frac)}$` }
+        { h: 'Velocity', d: `$v = \\dot{x} = ${poly([3, B2, C2], 't')} = 3(t - ${pR})(t - ${qR})$` },
+        { h: 'First time at rest', d: `$t = ${pR}$ s` },
+        { h: 'Acceleration', d: `$a = \\ddot{x} = ${poly([6, B2], 't')}$` },
+        { h: 'Substitute', d: `$a = 6(${pR}) ${sgn(B2)} = ${acc}$ m/s²` }
       ]
     };
   },
@@ -1309,19 +1502,69 @@ export const streamsExt = {
         ]
       };
     }
-    const k = ri(rng, 1, 20);
-    const a = ri(rng, 1, 4);
-    const hi = ri(rng, 1, 4);
-    const exact = 0.5 * a * Math.log((hi * hi + k) / k);
+    // Areas involving inverse functions: reflecting in y = x turns an area
+    // measured from the y-axis into one measured from the x-axis, and the
+    // bounding rectangle is what links the two.
+    const branch = ri(rng, 0, 2);
+    if (branch === 0) {
+      const n = ri(rng, 2, 5), a = ri(rng, 1, 5);
+      const area = new Frac(n * Math.pow(a, n + 1), n + 1);
+      return {
+        prompt: `Find the exact area of the region bounded by the curve $y = x^{${n}}$ (for $x \\ge 0$), the $y$-axis, and the line $y = ${Math.pow(a, n)}$.`,
+        answerType: 'numeric', answer: { value: area.value, requireExact: true, canonicalInput: area.str(), tol: 0.0005 },
+        inputHint: 'e.g. 27/4',
+        traps: [
+          { value: new Frac(Math.pow(a, n + 1), n + 1).value, why: `That is the area between the curve and the **$x$**-axis. The region asked for is the rest of the rectangle, above the curve.`, tol: 0.0005 },
+          { value: Math.pow(a, n + 1), why: `$${a} \\times ${Math.pow(a, n)} = ${Math.pow(a, n + 1)}$ is the whole enclosing rectangle — the area under the curve still has to come off it.`, tol: 0.0005 }
+        ],
+        hints: [`The region reaches from the $y$-axis across to the curve, between $y = 0$ and $y = ${Math.pow(a, n)}$.`,
+          `Rather than integrating $x = y^{1/${n}}$, take the rectangle $0 \\le x \\le ${a}$, $0 \\le y \\le ${Math.pow(a, n)}$ and subtract the area under the curve.`,
+          `$\\displaystyle\\int_0^{${a}} x^{${n}}\\,dx = \\dfrac{${a}^{${n + 1}}}{${n + 1}} = ${new Frac(Math.pow(a, n + 1), n + 1).latex()}$.`],
+        steps: [
+          { h: 'The bounding rectangle', d: `Width $${a}$, height $${Math.pow(a, n)}$, so area $${Math.pow(a, n + 1)}$` },
+          { h: 'Area under the curve', d: `$\\displaystyle\\int_0^{${a}} x^{${n}}\\,dx = ${new Frac(Math.pow(a, n + 1), n + 1).latex()}$` },
+          { h: 'Subtract', d: `$${Math.pow(a, n + 1)} - ${new Frac(Math.pow(a, n + 1), n + 1).latex()} = ${area.latex()}$` }
+        ]
+      };
+    }
+    if (branch === 1) {
+      const pI = ri(rng, 2, 8), qI = ri(rng, 2, 12);
+      const A = ri(rng, 1, pI * qI - 1);
+      return {
+        prompt: `$f$ is an increasing function with $f(0) = 0$ and $f(${pI}) = ${qI}$, and $\\displaystyle\\int_0^{${pI}} f(x)\\,dx = ${A}$. Find $\\displaystyle\\int_0^{${qI}} f^{-1}(y)\\,dy$.`,
+        answerType: 'numeric', answer: { value: pI * qI - A },
+        traps: [
+          { value: A, why: `The two integrals are equal only when the curve happens to be symmetric in $y = x$. In general they fill the rectangle between them.` },
+          { value: pI * qI, why: `$${pI} \\times ${qI} = ${pI * qI}$ is the whole rectangle. The area under $f$ still has to be taken off it.` }
+        ].filter(t => t.value !== pI * qI - A),
+        hints: ['Reflecting the graph in $y = x$ turns $f$ into $f^{-1}$ and swaps the two axes.',
+          `Together the two regions exactly fill the rectangle $0 \\le x \\le ${pI}$, $0 \\le y \\le ${qI}$.`,
+          `So $\\displaystyle\\int_0^{${pI}} f + \\int_0^{${qI}} f^{-1} = ${pI} \\times ${qI}$.`],
+        steps: [
+          { h: 'The rectangle identity', d: `$\\displaystyle\\int_0^{a} f(x)\\,dx + \\int_0^{f(a)} f^{-1}(y)\\,dy = a\\,f(a)$` },
+          { h: 'Substitute', d: `$${A} + \\displaystyle\\int_0^{${qI}} f^{-1}(y)\\,dy = ${pI} \\times ${qI} = ${pI * qI}$` },
+          { h: 'Rearrange', d: `$\\displaystyle\\int_0^{${qI}} f^{-1}(y)\\,dy = ${pI * qI} - ${A} = ${pI * qI - A}$` }
+        ]
+      };
+    }
+    const k = ri(rng, 2, 9);
+    const val = k * Math.log(k) - k + 1;
     return {
-      prompt: `Evaluate $\\displaystyle\\int_0^{${hi}} \\dfrac{${a === 1 ? '' : a}x}{x^2 + ${k}}\\,dx$, correct to 3 decimal places. (Hint: the top is almost the derivative of the bottom.)`,
-      answerType: 'numeric', answer: { value: r3(exact), tol: 0.002 },
-      traps: [{ value: r3(a * Math.log((hi * hi + k) / k)), why: `The derivative of $x^2 + ${k}$ is $2x$ — you need a factor of $\\frac{1}{2}$ out the front.`, tol: 0.002 }].filter(t => Math.abs(t.value - r3(exact)) > 0.004),
-      hints: [`$\\frac{d}{dx}(x^2 + ${k}) = 2x$, so write the top as $\\frac{${a}}{2}(2x)$.`, `$\\frac{${a}}{2}\\left[\\ln(x^2 + ${k})\\right]_0^{${hi}}$.`, `$= \\frac{${a}}{2}\\ln\\frac{${hi * hi + k}}{${k}}$.`],
+      prompt: `The curve $y = \\ln x$ is the reflection of $y = e^{x}$ in the line $y = x$. Find the exact area of the region bounded by $y = \\ln x$, the $x$-axis and the line $x = ${k}$.`,
+      answerType: 'numeric', answer: { value: val, requireExact: true, canonicalInput: `${k}ln(${k}) - ${k - 1}`, tol: 0.0005 },
+      inputHint: `e.g. ${k}ln(${k}) - ${k - 1}`,
+      traps: [
+        { value: k * Math.log(k), why: `That is $x\\ln x$ evaluated at $x = ${k}$. The antiderivative is $x\\ln x - x$, and the value at the lower limit $x = 1$ has to be subtracted as well.`, tol: 0.0005 },
+        { value: Math.log(k), why: `$\\ln ${k}$ is the **height** of the region at its right-hand edge, not its area.`, tol: 0.0005 }
+      ],
+      hints: [`$y = \\ln x$ meets the $x$-axis at $x = 1$, so the region runs from $x = 1$ to $x = ${k}$.`,
+        `Reflect: the same area sits between $y = e^{x}$, the $y$-axis and $y = \\ln ${k}$ — or integrate by parts directly.`,
+        `$\\displaystyle\\int \\ln x\\,dx = x\\ln x - x$.`],
       steps: [
-        { h: 'Recognise the log form', d: `$\\int\\frac{f'(x)}{f(x)}dx = \\ln|f(x)|$` },
-        { h: 'Adjust the constant', d: `$\\frac{${a}}{2}\\left[\\ln(x^2 + ${k})\\right]_0^{${hi}} = \\frac{${a}}{2}\\ln\\dfrac{${hi * hi + k}}{${k}}$` },
-        { h: 'Evaluate', d: `$\\approx ${r3(exact)}$` }
+        { h: 'Where the region starts', d: `$\\ln x = 0$ at $x = 1$` },
+        { h: 'Antiderivative', d: `$\\displaystyle\\int \\ln x\\,dx = x\\ln x - x$` },
+        { h: 'Evaluate', d: `$\\left[x\\ln x - x\\right]_{1}^{${k}} = (${k}\\ln ${k} - ${k}) - (0 - 1)$` },
+        { h: 'Exact area', d: `$${k}\\ln ${k} - ${k - 1}$` }
       ]
     };
   },
@@ -1823,37 +2066,74 @@ export const streamsExt = {
         ]
       };
     }
-    const c = ri(rng, 1, 9);
-    const cTex = c === 1 ? '' : c;
-    if (rng() < 0.6) {
-      const n = ri(rng, 1, 4);
-      const m = n === 1 ? rc(rng, [1, 2]) : 1;
-      const top = Math.exp(m * (n + 1));
-      const val = c * (top * (m * (n + 1) - 1) + 1) / ((n + 1) * (n + 1));
-      const upper = m === 1 ? 'e' : `e^{${m}}`;
+    // Definite integrals by substitution: change the variable and change the
+    // limits with it, so nothing has to be substituted back.
+    const branch = ri(rng, 0, 2);
+    if (branch === 0) {
+      const n = rc(rng, [1, 1, 2]), a = ri(rng, 1, 3), k = ri(rng, 1, 5), mth = ri(rng, 1, 4);
+      const coef = 2 * (n + 1) * mth;
+      const uHi = a * a + k;
+      const val = mth * (Math.pow(uHi, n + 1) - Math.pow(k, n + 1));
       return {
-        prompt: `Using integration by parts, evaluate $\\displaystyle\\int_1^{${upper}} ${cTex}x^{${n}}\\ln x\\,dx$, correct to 3 decimal places.`,
-        answerType: 'numeric', answer: { value: r3(val), tol: 0.002 },
-        traps: [{ value: r3(c * top * m / (n + 1)), why: `Parts with $u = \\ln x$ leaves a second integral $\\int \\frac{x^{${n}}}{${n + 1}}dx$ to subtract.`, tol: 0.002 }].filter(t => Math.abs(t.value - r3(val)) > 0.004),
-        hints: [`$u = \\ln x$, $dv = ${cTex}x^{${n}}dx$.`, `Antiderivative: $${cTex}\\left(\\frac{x^{${n + 1}}}{${n + 1}}\\ln x - \\frac{x^{${n + 1}}}{${(n + 1) ** 2}}\\right)$.`, `Evaluate between $1$ and $${upper}$.`],
+        prompt: `Using the substitution $u = x^2 + ${k}$, evaluate $\\displaystyle\\int_0^{${a}} ${coef}x\\left(x^2 + ${k}\\right)^{${n}}\\,dx$.`,
+        answerType: 'numeric', answer: { value: val },
+        traps: [
+          { value: mth * Math.pow(uHi, n + 1), why: `The lower limit becomes $u = 0^2 + ${k} = ${k}$, not $u = 0$ — so $${mth} \\times ${k}^{${n + 1}}$ still has to come off.` },
+          { value: 2 * val, why: `$du = 2x\\,dx$, so the $x\\,dx$ in the integral is $\\tfrac{1}{2}du$ — that factor of $\\tfrac{1}{2}$ is easy to drop.` }
+        ].filter(t => t.value !== val),
+        hints: [`$u = x^2 + ${k} \\Rightarrow du = 2x\\,dx$, so $x\\,dx = \\tfrac{1}{2}du$.`,
+          `Change the limits too: $x = 0 \\Rightarrow u = ${k}$ and $x = ${a} \\Rightarrow u = ${uHi}$.`,
+          `The integral becomes $\\displaystyle\\int_{${k}}^{${uHi}} ${coef / 2}u^{${n}}\\,du$.`],
         steps: [
-          { h: 'Parts', d: `$u = \\ln x,\\ dv = ${cTex}x^{${n}}dx$` },
-          { h: 'Antiderivative', d: `$${cTex}\\left(\\frac{x^{${n + 1}}}{${n + 1}}\\ln x - \\frac{x^{${n + 1}}}{${(n + 1) ** 2}}\\right)$` },
-          { h: 'Evaluate', d: `$\\approx ${r3(val)}$` }
+          { h: 'Substitute', d: `$u = x^2 + ${k}$, $\\ du = 2x\\,dx$` },
+          { h: 'Change the limits', d: `$x: 0 \\to ${a}$ becomes $u: ${k} \\to ${uHi}$` },
+          { h: 'Rewrite', d: `$\\displaystyle\\int_{${k}}^{${uHi}} ${coef / 2}u^{${n}}\\,du = \\left[${mth}u^{${n + 1}}\\right]_{${k}}^{${uHi}}$` },
+          { h: 'Evaluate', d: `$${mth}\\left(${uHi}^{${n + 1}} - ${k}^{${n + 1}}\\right) = ${val}$` }
         ]
       };
     }
-    const h = ri(rng, 1, 3);
-    const val = c * (Math.exp(h) * (h * h - 2 * h + 2) - 2);
+    if (branch === 1) {
+      const n = ri(rng, 2, 6), c = ri(rng, 2, 12);
+      const f = new Frac(c, n + 1);
+      return {
+        prompt: `Using the substitution $u = \\sin x$, evaluate $\\displaystyle\\int_0^{\\pi/2} ${c}\\sin^{${n}}x\\,\\cos x\\,dx$ exactly.`,
+        answerType: 'numeric', answer: { value: f.value, requireExact: true, canonicalInput: f.str(), tol: 0.0005 },
+        inputHint: 'e.g. 4/3',
+        traps: [
+          { value: c, why: `The limits become $u: 0 \\to 1$, and $\\displaystyle\\int_0^1 u^{${n}}\\,du = \\dfrac{1}{${n + 1}}$ — not $1$.`, tol: 0.0005 },
+          { value: new Frac(c, n).value, why: `Raise the index by one before dividing: $\\displaystyle\\int u^{${n}}\\,du = \\dfrac{u^{${n + 1}}}{${n + 1}}$.`, tol: 0.0005 }
+        ],
+        hints: [`$u = \\sin x \\Rightarrow du = \\cos x\\,dx$, which is exactly the leftover factor.`,
+          `Limits: $x = 0 \\Rightarrow u = 0$ and $x = \\dfrac{\\pi}{2} \\Rightarrow u = 1$.`,
+          `So the integral is $\\displaystyle\\int_0^{1} ${c}u^{${n}}\\,du$.`],
+        steps: [
+          { h: 'Substitute', d: `$u = \\sin x$, $\\ du = \\cos x\\,dx$` },
+          { h: 'Change the limits', d: `$x: 0 \\to \\dfrac{\\pi}{2}$ becomes $u: 0 \\to 1$` },
+          { h: 'Rewrite and integrate', d: `$\\displaystyle\\int_0^{1} ${c}u^{${n}}\\,du = \\left[\\dfrac{${c}u^{${n + 1}}}{${n + 1}}\\right]_0^{1}$` },
+          { h: 'Evaluate', d: `$= ${f.latex()}$` }
+        ]
+      };
+    }
+    const trip = rc(rng, [[3, 4, 5], [4, 3, 5], [6, 8, 10], [8, 6, 10], [5, 12, 13], [12, 5, 13], [15, 8, 17], [8, 15, 17]]);
+    const a = trip[0], j = trip[1], t = trip[2];
+    const k = j * j;
+    const f = new Frac(t * t * t - j * j * j, 3);
     return {
-      prompt: `Integration by parts twice: evaluate $\\displaystyle\\int_0^{${h}} ${cTex}x^2 e^{x}\\,dx$, correct to 3 decimal places.`,
-      answerType: 'numeric', answer: { value: r3(val), tol: 0.002 },
-      traps: [{ value: r3(c * Math.exp(h) * (h * h - 2 * h)), why: 'Applying parts twice leaves three terms: $x^2e^x - 2xe^x + 2e^x$ — the last one is easy to lose.', tol: 0.002 }].filter(t => Math.abs(t.value - r3(val)) > 0.004),
-      hints: ['First pass: $u = x^2$, $dv = e^x dx$ leaves $-2\\int xe^x dx$.', 'Second pass on $\\int xe^x dx = (x-1)e^x$.', `Antiderivative: $${cTex}e^x(x^2 - 2x + 2)$.`],
+      prompt: `Using the substitution $u = x^2 + ${k}$, evaluate $\\displaystyle\\int_0^{${a}} x\\sqrt{x^2 + ${k}}\\,dx$ exactly.`,
+      answerType: 'numeric', answer: { value: f.value, requireExact: true, canonicalInput: f.str(), tol: 0.0005 },
+      inputHint: 'e.g. 98/3',
+      traps: [
+        { value: 2 * f.value, why: `$du = 2x\\,dx$, so $x\\,dx = \\tfrac{1}{2}du$ — halving is part of the substitution.`, tol: 0.0005 },
+        { value: new Frac(t * t * t, 3).value, why: `The lower limit is $u = ${k}$, not $u = 0$, so $\\dfrac{${j}^3}{3}$ has to be subtracted.`, tol: 0.0005 }
+      ],
+      hints: [`$u = x^2 + ${k} \\Rightarrow \\tfrac{1}{2}du = x\\,dx$.`,
+        `Limits: $x = 0 \\Rightarrow u = ${k}$ and $x = ${a} \\Rightarrow u = ${t * t}$.`,
+        `$\\displaystyle\\int_{${k}}^{${t * t}} \\tfrac{1}{2}u^{1/2}\\,du = \\left[\\dfrac{u^{3/2}}{3}\\right]_{${k}}^{${t * t}}$, and both ends are perfect squares.`],
       steps: [
-        { h: 'Parts, first pass', d: `$x^2e^x - 2\\displaystyle\\int xe^x\\,dx$` },
-        { h: 'Parts, second pass', d: `$\\int xe^x dx = (x - 1)e^x$, so the antiderivative is $${cTex}e^x(x^2 - 2x + 2)$` },
-        { h: 'Evaluate', d: `$${cTex}\\left[e^{${h}}(${h * h - 2 * h + 2}) - 2\\right] \\approx ${r3(val)}$` }
+        { h: 'Substitute', d: `$u = x^2 + ${k}$, $\\ x\\,dx = \\tfrac{1}{2}du$` },
+        { h: 'Change the limits', d: `$x: 0 \\to ${a}$ becomes $u: ${k} \\to ${t * t}$` },
+        { h: 'Integrate', d: `$\\tfrac{1}{2}\\displaystyle\\int_{${k}}^{${t * t}} u^{1/2}\\,du = \\left[\\dfrac{u^{3/2}}{3}\\right]_{${k}}^{${t * t}}$` },
+        { h: 'Evaluate', d: `$\\dfrac{${t}^3 - ${j}^3}{3} = ${f.latex()}$` }
       ]
     };
   },

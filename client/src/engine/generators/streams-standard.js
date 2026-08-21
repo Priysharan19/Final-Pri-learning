@@ -4,6 +4,56 @@
 import { ri, rc, rs, nz, Frac, mcq, moneyPlain, r1, r2, r3, rad, NAMES } from '../qhelpers.js';
 import { figNetwork } from '../figures.js';
 
+// ── Statistical displays ─────────────────────────────────────────────────────
+// engine/figures.js draws a box plot but neither a histogram nor a dot plot.
+// Both builders below emit only the tags and attributes the figure sanitiser
+// allows — svg, g, line, rect, circle, text.
+
+const MS_ACCENT = '#3987e5';
+const SN = v => Math.round(v * 100) / 100;
+const sTxt = (x, y, s, size = 11.5) =>
+  `<text x="${SN(x)}" y="${SN(y)}" fill="currentColor" stroke="none" font-size="${size}" font-family="Inter, system-ui, sans-serif" text-anchor="middle">${s}</text>`;
+
+function figHistogram(values, freqs, label) {
+  const W = 380, H = 250, L = 44, B = 48;
+  const n = values.length;
+  const bw = (W - L - 16) / n;
+  const top = Math.max(...freqs) + 1;
+  const Y = f => (H - B) - f / top * (H - B - 22);
+  let inner = `<line x1="${L}" y1="${H - B}" x2="${W - 12}" y2="${H - B}"/><line x1="${L}" y1="16" x2="${L}" y2="${H - B}"/>`;
+  const step = top > 12 ? 2 : 1;
+  for (let f = step; f < top; f += step) {
+    inner += `<line x1="${L - 4}" y1="${SN(Y(f))}" x2="${L}" y2="${SN(Y(f))}"/>` + sTxt(L - 14, Y(f) + 4, f);
+  }
+  values.forEach((v, i) => {
+    const x = L + i * bw + 3;
+    inner += `<rect x="${SN(x)}" y="${SN(Y(freqs[i]))}" width="${SN(bw - 6)}" height="${SN((H - B) - Y(freqs[i]))}" fill="${MS_ACCENT}" fill-opacity="0.22" stroke="currentColor"/>`;
+    inner += sTxt(L + i * bw + bw / 2, H - B + 18, v);
+  });
+  inner += sTxt((L + W) / 2, H - 10, label, 12);
+  inner += sTxt(L + 22, 12, 'Frequency', 12);
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Histogram" style="max-width:380px;width:100%;height:auto;display:block">` +
+    `<g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round">${inner}</g></svg>`;
+}
+
+function figDots(values, freqs, label) {
+  const W = 380, gap = Math.min(52, (W - 76) / Math.max(1, values.length - 1));
+  const tallest = Math.max(...freqs);
+  const H = 74 + tallest * 15;
+  const X = i => 46 + i * gap;
+  const baseY = H - 40;
+  let inner = `<line x1="32" y1="${baseY}" x2="${SN(X(values.length - 1) + 26)}" y2="${baseY}"/>`;
+  values.forEach((v, i) => {
+    inner += `<line x1="${SN(X(i))}" y1="${baseY - 4}" x2="${SN(X(i))}" y2="${baseY + 5}"/>` + sTxt(X(i), baseY + 22, v, 12.5);
+    for (let c = 0; c < freqs[i]; c++) {
+      inner += `<circle cx="${SN(X(i))}" cy="${SN(baseY - 12 - c * 15)}" r="4.6" fill="${MS_ACCENT}" stroke="none"/>`;
+    }
+  });
+  inner += sTxt((32 + X(values.length - 1) + 26) / 2, H - 8, label, 12);
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Dot plot" style="max-width:380px;width:100%;height:auto;display:block">` +
+    `<g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round">${inner}</g></svg>`;
+}
+
 // ── Tiny graph algorithms for MS-N ───────────────────────────────────────────
 function dijkstra(n, edges, from, to) {
   const dist = Array(n).fill(Infinity);
@@ -86,18 +136,81 @@ export const streamsStandard = {
       };
     }
     if (diff === 3) {
-      const retainer = rc(rng, [350, 400, 450, 500]);
-      const pct = rc(rng, [2, 2.5, 3, 4]);
-      const sales = ri(rng, 15, 60) * 1000;
-      const pay = retainer + sales * pct / 100;
+      // Comparing pay structures: two offers only line up once they are put on
+      // the same footing — same period, same hours, same sales.
+      const branch = ri(rng, 0, 2);
+      if (branch === 0) {
+        const rate = rc(rng, [24, 26, 28, 30, 32, 34]);
+        const hrs = ri(rng, 30, 40);
+        const weeklyA = rate * hrs;
+        const gap = 5 * ri(rng, 4, 40) * rc(rng, [1, -1]);
+        const weeklyB = weeklyA + gap;
+        if (weeklyB <= 0) return streamsStandard['ms11-earning'](rng, diff);
+        const annualB = weeklyB * 52;
+        const better = gap > 0 ? 'B' : 'A';
+        return {
+          prompt: `**Job A** pays ${moneyPlain(rate)} per hour for a $${hrs}$-hour week.\n**Job B** pays an annual salary of ${moneyPlain(annualB)}.\n\nTaking a year as $52$ weeks, how much more per week does the better-paying job offer?`,
+          answerType: 'numeric', answer: { value: Math.abs(gap), tol: 0.02 }, answerPrefix: '$',
+          traps: [
+            { value: r2(Math.abs(annualB - weeklyA)), why: `That compares a **year** of Job B with a **week** of Job A. Divide the salary by $52$ first so both are weekly figures.`, tol: 0.02 },
+            { value: r2(Math.abs(annualB / 12 - weeklyA)), why: 'That divides the salary into **months**, then compares a month with a week. The question asks for weekly figures, so divide by $52$.', tol: 0.02 }
+          ],
+          hints: ['Put both jobs on the same footing — a weekly figure for each.',
+            `Job A: $${hrs} \\times ${rate} = ${weeklyA}$ per week.`,
+            `Job B: $${annualB} \\div 52 = ${weeklyB}$ per week.`],
+          steps: [
+            { h: 'Weekly pay, Job A', d: `$${hrs} \\times ${rate} = ${weeklyA}$ → ${moneyPlain(weeklyA)}` },
+            { h: 'Weekly pay, Job B', d: `$${annualB} \\div 52 = ${weeklyB}$ → ${moneyPlain(weeklyB)}` },
+            { h: 'Compare', d: `Job ${better} pays ${moneyPlain(Math.abs(gap))} more each week.` }
+          ]
+        };
+      }
+      if (branch === 1) {
+        const flat = 50 * ri(rng, 16, 30);
+        const retainer = 50 * ri(rng, 6, 12);
+        const pct = rc(rng, [2, 2.5, 4, 5]);
+        const sales = 1000 * ri(rng, 8, 40);
+        const payB = retainer + sales * pct / 100;
+        if (Math.abs(payB - flat) < 1) return streamsStandard['ms11-earning'](rng, diff);
+        const aWins = flat > payB;
+        const m = mcq(rng, `Plan ${aWins ? 'A' : 'B'}, by ${moneyPlain(Math.abs(flat - payB))}`, [
+          { text: `Plan ${aWins ? 'B' : 'A'}, by ${moneyPlain(Math.abs(flat - payB))}`, why: `Plan A pays ${moneyPlain(flat)} and Plan B pays ${moneyPlain(payB)} this week, so it is Plan ${aWins ? 'A' : 'B'} that comes out ahead.` },
+          { text: `Plan B, by ${moneyPlain(sales * pct / 100)}`, why: `${moneyPlain(sales * pct / 100)} is the commission on its own — Plan B also pays the ${moneyPlain(retainer)} retainer, and the two plans then have to be compared.` },
+          { text: 'They pay the same this week', why: `They do not: ${moneyPlain(flat)} against ${moneyPlain(payB)}.` }
+        ]);
+        return {
+          prompt: `A sales assistant may be paid under either plan.\n**Plan A:** a flat ${moneyPlain(flat)} per week.\n**Plan B:** a retainer of ${moneyPlain(retainer)} per week plus $${pct}\\%$ commission on sales.\n\nIn a week with ${moneyPlain(sales)} of sales, which plan pays more, and by how much?`,
+          answerType: 'mcq', answer: { correctIndex: m.correctIndex, optionTraps: m.optionTraps }, mcqOptions: m.options,
+          hints: ['Work out what each plan pays in this particular week, then subtract.',
+            `Plan B commission: $${pct}\\%$ of ${moneyPlain(sales)} $= ${moneyPlain(sales * pct / 100)}$.`,
+            `Plan B total: ${moneyPlain(retainer)} $+$ ${moneyPlain(sales * pct / 100)}.`],
+          steps: [
+            { h: 'Plan A', d: `${moneyPlain(flat)}` },
+            { h: 'Plan B commission', d: `$${pct / 100} \\times ${sales} = ${r2(sales * pct / 100)}$ → ${moneyPlain(sales * pct / 100)}` },
+            { h: 'Plan B total', d: `$${retainer} + ${r2(sales * pct / 100)} = ${r2(payB)}$ → ${moneyPlain(payB)}` },
+            { h: 'Difference', d: `Plan ${aWins ? 'A' : 'B'} pays ${moneyPlain(Math.abs(flat - payB))} more.` }
+          ]
+        };
+      }
+      const pct = rc(rng, [2, 2.5, 4, 5]);
+      const breakEven = 1000 * ri(rng, 6, 30);
+      const retainer = 50 * ri(rng, 6, 14);
+      const flat = retainer + breakEven * pct / 100;
       return {
-        prompt: `A salesperson earns a retainer of ${moneyPlain(retainer)} per week plus $${pct}\\%$ commission on sales. Find their pay in a week with ${moneyPlain(sales)} of sales.`,
-        answerType: 'numeric', answer: { value: r2(pay), tol: 0.02 }, answerPrefix: '$',
-        traps: [{ value: r2(sales * pct / 100), why: 'Don’t forget the fixed retainer on top of commission.', tol: 0.02 }],
-        hints: ['Pay = retainer + commission.', `Commission: $${pct}\\% \\times ${sales}$.`, `Add ${moneyPlain(retainer)}.`],
+        prompt: `A salesperson is offered two pay structures.\n**Plan A:** a flat ${moneyPlain(flat)} per week, whatever they sell.\n**Plan B:** a retainer of ${moneyPlain(retainer)} per week plus $${pct}\\%$ commission on sales.\n\nWhat weekly sales figure makes the two plans pay **exactly the same**?`,
+        answerType: 'numeric', answer: { value: breakEven, tol: 0.02 }, answerPrefix: '$',
+        traps: [
+          { value: r2(flat * 100 / pct), why: `The retainer is paid whatever happens, so only the **difference** ${moneyPlain(flat)} $-$ ${moneyPlain(retainer)} $= ${moneyPlain(flat - retainer)}$ has to be earned in commission.`, tol: 0.02 },
+          { value: r2(flat - retainer), why: `${moneyPlain(flat - retainer)} is the **commission** that has to be earned, not the sales that generate it. Divide by the rate: $${flat - retainer} \\div ${pct / 100}$.`, tol: 0.02 }
+        ],
+        hints: ['Set the two weekly pays equal and solve for the sales.',
+          `$${flat} = ${retainer} + ${pct / 100}S$.`,
+          `So $${pct / 100}S = ${flat - retainer}$.`],
         steps: [
-          { h: 'Commission', d: `$${pct / 100} \\times ${sales} = ${r2(sales * pct / 100)}$` },
-          { h: 'Add the retainer', d: `$${retainer} + ${r2(sales * pct / 100)} = ${r2(pay)}$ → ${moneyPlain(r2(pay))}` }
+          { h: 'Set the plans equal', d: `$${flat} = ${retainer} + ${pct / 100}S$` },
+          { h: 'Subtract the retainer', d: `$${pct / 100}S = ${flat} - ${retainer} = ${flat - retainer}$` },
+          { h: 'Divide by the commission rate', d: `$S = ${flat - retainer} \\div ${pct / 100} = ${breakEven}$ → ${moneyPlain(breakEven)}` },
+          { h: 'Check', d: `At ${moneyPlain(breakEven)} of sales Plan B pays $${retainer} + ${r2(breakEven * pct / 100)} = ${flat}$ ✓` }
         ]
       };
     }
@@ -340,23 +453,116 @@ export const streamsStandard = {
       };
     }
     if (diff === 2) {
-      const vals = [0, 1, 2, 3];
-      const freqs = [ri(rng, 2, 6), ri(rng, 4, 9), ri(rng, 3, 8), ri(rng, 1, 5)];
-      const totalF = freqs.reduce((s, v) => s + v, 0);
-      // median position
-      const pos = (totalF + 1) / 2;
-      let cum = 0, median = 0;
-      for (let i = 0; i < 4; i++) { cum += freqs[i]; if (cum >= pos) { median = vals[i]; break; } }
+      // Reading a statistical display: the same tally shown as a histogram or a
+      // dot plot, with every answer taken off the picture.
+      const ctx = rc(rng, [
+        { phrase: 'number of cars per household', who: 'households', one: 'household', item: 'cars', axis: 'Cars per household', top: 0 },
+        { phrase: 'number of shifts worked last week', who: 'casual staff', one: 'staff member', item: 'shifts', axis: 'Shifts worked', top: 2 },
+        { phrase: 'number of nights away last month', who: 'travellers', one: 'traveller', item: 'nights', axis: 'Nights away', top: 6 },
+        { phrase: 'number of medical appointments last year', who: 'patients', one: 'patient', item: 'appointments', axis: 'Appointments', top: 6 },
+        { phrase: 'number of parcels delivered in an hour', who: 'drivers', one: 'driver', item: 'parcels', axis: 'Parcels per hour', top: 6 }
+      ]);
+      const n = rc(rng, [5, 6]);
+      const base = ri(rng, 0, ctx.top);
+      const values = Array.from({ length: n }, (_, i) => base + i);
+      const freqs = Array.from({ length: n }, () => ri(rng, 1, 7));
+      let top = 0, ties = 0;
+      freqs.forEach(f => { if (f > top) { top = f; ties = 1; } else if (f === top) ties++; });
+      if (ties > 1) freqs[freqs.indexOf(top)] = top + 1;
       const modeIdx = freqs.indexOf(Math.max(...freqs));
-      const which = rc(rng, ['median', 'mode']);
+      const total = freqs.reduce((s, f) => s + f, 0);
+      const asDots = rc(rng, [true, false]);
+      const display = asDots ? 'dot plot' : 'histogram';
+      const figure = asDots ? figDots(values, freqs, ctx.axis) : figHistogram(values, freqs, ctx.axis);
+      const readOff = asDots ? 'Count the dots in each column' : 'Read the height of each column';
+      const range = `$${base}$ to $${base + n - 1}$`;
+      const lead = withTotal => `The ${display} shows the ${ctx.phrase} for ${withTotal ? `all $${total}$ ` : 'a group of '}${ctx.who}, for values from ${range}.`;
+      const ask = ri(rng, 0, 3);
+      if (ask === 0) {
+        return {
+          prompt: `${lead(false)}\n\nHow many ${ctx.who} were surveyed altogether?`,
+          figure,
+          answerType: 'numeric', answer: { value: total },
+          traps: [
+            { value: n, why: `That counts the ${asDots ? 'columns' : 'bars'}, which is how many different values appear — not how many ${ctx.who} there are.` },
+            { value: Math.max(...freqs), why: 'That is the tallest frequency on its own. Every column has to be added in.' }
+          ].filter(t => t.value !== total),
+          hints: [`Each ${asDots ? 'dot' : 'unit of column height'} stands for one ${ctx.one}.`,
+            `${readOff} and add them.`,
+            `$${freqs.join(' + ')}$.`],
+          steps: [
+            { h: readOff, d: `$${freqs.join(',\\ ')}$` },
+            { h: 'Add the frequencies', d: `$${freqs.join(' + ')} = ${total}$` }
+          ]
+        };
+      }
+      if (ask === 1) {
+        return {
+          prompt: `${lead(true)}\n\nWhat is the **mode**?`,
+          figure,
+          answerType: 'numeric', answer: { value: values[modeIdx] },
+          traps: [{ value: freqs[modeIdx], why: `$${freqs[modeIdx]}$ is how *often* the mode occurs — the height of the tallest column. The mode is the value that column sits above.` }].filter(t => t.value !== values[modeIdx]),
+          hints: ['The mode is the value that occurs most often.',
+            `Find the ${asDots ? 'tallest stack of dots' : 'tallest bar'}.`,
+            `Its height is $${freqs[modeIdx]}$; read the value underneath it.`],
+          steps: [
+            { h: `Find the tallest ${asDots ? 'stack' : 'bar'}`, d: `Height $${freqs[modeIdx]}$` },
+            { h: 'Read its value', d: `Mode $= ${values[modeIdx]}$ ${ctx.item}` }
+          ]
+        };
+      }
+      if (ask === 2) {
+        const ci = ri(rng, 1, n - 2);
+        const cut = values[ci];
+        const atLeast = freqs.slice(ci).reduce((s, f) => s + f, 0);
+        const pct = r1(100 * atLeast / total);
+        const wantPct = rc(rng, [true, false]);
+        return {
+          prompt: `${lead(true)}\n\n${wantPct ? `What **percentage** of the ${ctx.who}` : `How many ${ctx.who}`} recorded **at least $${cut}$** ${ctx.item}?${wantPct ? ' Give your answer correct to 1 decimal place.' : ''}`,
+          figure,
+          answerType: 'numeric', answer: wantPct ? { value: pct, tol: 0.06 } : { value: atLeast }, answerSuffix: wantPct ? '%' : undefined,
+          traps: [
+            { value: wantPct ? r1(100 * (atLeast - freqs[ci]) / total) : atLeast - freqs[ci], why: `“At least $${cut}$” includes $${cut}$ itself, so the column at $${cut}$ counts too.`, tol: 0.06 },
+            { value: wantPct ? r1(100 * (total - atLeast) / total) : total - atLeast, why: `That describes the ${ctx.who} *below* $${cut}$ — the complement of what was asked.`, tol: 0.06 }
+          ].filter(t => Math.abs(t.value - (wantPct ? pct : atLeast)) > 0.07),
+          hints: [`“At least $${cut}$” takes in the columns for $${values.slice(ci).join(',\\ ')}$.`,
+            `Those frequencies add to $${freqs.slice(ci).join(' + ')} = ${atLeast}$.`,
+            wantPct ? `Now write that as a percentage of the $${total}$ surveyed: $\\dfrac{${atLeast}}{${total}} \\times 100$.` : `That is your answer: $${atLeast}$.`],
+          steps: [
+            { h: 'Which columns qualify?', d: `$${values.slice(ci).join(',\\ ')}$` },
+            { h: 'Add their frequencies', d: `$${freqs.slice(ci).join(' + ')} = ${atLeast}$` },
+            ...(wantPct ? [{ h: 'Convert to a percentage', d: `$\\dfrac{${atLeast}}{${total}} \\times 100 = ${pct}\\%$` }] : [])
+          ]
+        };
+      }
+      const pos = (total + 1) / 2;
+      let cum = 0, lower = null, upper = null;
+      for (let i = 0; i < n; i++) {
+        const before = cum;
+        cum += freqs[i];
+        if (lower === null && cum >= Math.floor(pos)) lower = values[i];
+        if (upper === null && cum >= Math.ceil(pos)) upper = values[i];
+        if (before >= cum) continue;
+      }
+      const median = (lower + upper) / 2;
+      const cumulative = freqs.map((_, i) => freqs.slice(0, i + 1).reduce((s, f) => s + f, 0));
       return {
-        prompt: `A survey of cars per household: value $0$ (frequency $${freqs[0]}$), $1$ (${'$' + freqs[1] + '$'}), $2$ (${'$' + freqs[2] + '$'}), $3$ (${'$' + freqs[3] + '$'}). Find the **${which}**.`,
-        answerType: 'numeric', answer: { value: which === 'median' ? median : vals[modeIdx] },
-        traps: [{ value: which === 'median' ? vals[modeIdx] : median, why: which === 'median' ? 'That’s the mode — the median is the middle of all ' + totalF + ' responses.' : 'That’s the median — the mode is the most frequent value.' }],
-        hints: [which === 'median' ? `There are ${totalF} data values — find the middle one using cumulative frequency.` : 'The mode has the highest frequency.', which === 'median' ? `The middle position is ${(totalF + 1) / 2}.` : `The biggest frequency is ${Math.max(...freqs)}.`, `Answer: ${which === 'median' ? median : vals[modeIdx]}.`],
-        steps: which === 'median'
-          ? [{ h: 'Total responses', d: `$${totalF}$` }, { h: 'Middle position', d: `$\\frac{${totalF} + 1}{2} = ${(totalF + 1) / 2}$` }, { h: 'Cumulative count reaches it at', d: `value $${median}$` }]
-          : [{ h: 'Highest frequency', d: `$${Math.max(...freqs)}$, at value $${vals[modeIdx]}$` }]
+        prompt: `${lead(true)}\n\nFind the **median**.`,
+        figure,
+        answerType: 'numeric', answer: { value: median },
+        traps: [
+          { value: values[modeIdx], why: 'That is the mode — the tallest column. The median is the middle value once all the data is put in order.' },
+          { value: (values[0] + values[n - 1]) / 2, why: 'The median is the middle of the **data**, not the midpoint of the range of values — the frequencies decide where it falls.' }
+        ].filter(t => t.value !== median),
+        hints: [`There are $${total}$ values altogether, so the median sits at position $\\dfrac{${total} + 1}{2} = ${pos}$.`,
+          `Build a running total across the columns: $${cumulative.join(',\\ ')}$.`,
+          `Find the first running total that reaches position $${pos}$.`],
+        steps: [
+          { h: 'Median position', d: `$\\dfrac{${total} + 1}{2} = ${pos}$` },
+          { h: 'Cumulative frequencies', d: `$${values.map((v, i) => `${v}: ${cumulative[i]}`).join(',\\ ')}$` },
+          { h: 'Locate the position', d: total % 2 === 1 ? `Position $${pos}$ falls on the value $${median}$` : `Positions $${total / 2}$ and $${total / 2 + 1}$ fall on $${lower}$ and $${upper}$` },
+          { h: 'Median', d: `$${median}$` }
+        ]
       };
     }
     if (diff === 3) {

@@ -1,8 +1,84 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Pri Learning · Year 10 generators
 // ─────────────────────────────────────────────────────────────────────────────
-import { ri, rc, rs, nz, gcd, Frac, mcq, term, sgn, moneyPlain, r1, r2, r3, rad, surdSimp, surdLatex, surdStr, NAMES } from '../qhelpers.js';
+import { ri, rc, rs, nz, distinct, gcd, Frac, mcq, term, sgn, moneyPlain, r1, r2, r3, rad, surdSimp, surdLatex, surdStr, NAMES } from '../qhelpers.js';
 import { figRightTriangle, figBearing, figParabola } from '../figures.js';
+
+// ── Curves and scatterplots ──────────────────────────────────────────────────
+// engine/figures.js draws a parabola but neither an exponential/hyperbolic
+// curve nor a scatterplot. Both builders below stay inside the tag and
+// attribute vocabulary the figure sanitiser allows — svg, g, line, path,
+// circle, text — so what they emit survives the round trip unchanged.
+
+const PLOT_ACCENT = '#3987e5';
+const PLOT_WARN = '#f59e0b';
+const PN = v => Math.round(v * 100) / 100;
+const plotText = (x, y, s, size = 12) =>
+  `<text x="${PN(x)}" y="${PN(y)}" fill="currentColor" stroke="none" font-size="${size}" font-family="Inter, system-ui, sans-serif" text-anchor="middle">${s}</text>`;
+
+/** y = f(x) on signed axes, with optional dashed asymptotes and one marked point. */
+function figCurve({ f, hAsym, vAsym, mark, span = 6, high = 5 }) {
+  const W = 330, H = 250;
+  const X = x => W / 2 + x * (W / 2 - 22) / span;
+  const Y = y => H / 2 - y * (H / 2 - 24) / high;
+  let inner = `<line x1="14" y1="${H / 2}" x2="${W - 14}" y2="${H / 2}"/><line x1="${W / 2}" y1="14" x2="${W / 2}" y2="${H - 14}"/>`;
+  inner += `<path d="M ${W - 20} ${H / 2 - 4} l 8 4 l -8 4"/><path d="M ${W / 2 - 4} 20 l 4 -8 l 4 8"/>`;
+  for (let t = -span + 1; t <= span - 1; t++) {
+    if (!t) continue;
+    inner += `<line x1="${PN(X(t))}" y1="${H / 2 - 4}" x2="${PN(X(t))}" y2="${H / 2 + 4}"/>`;
+    if (t % 2 === 0) inner += plotText(X(t), H / 2 + 18, t, 11);
+  }
+  for (let t = -high + 1; t <= high - 1; t++) {
+    if (!t) continue;
+    inner += `<line x1="${W / 2 - 4}" y1="${PN(Y(t))}" x2="${W / 2 + 4}" y2="${PN(Y(t))}"/>`;
+    if (t % 2 === 0) inner += plotText(W / 2 - 16, Y(t) + 4, t, 11);
+  }
+  if (hAsym != null) inner += `<line x1="16" y1="${PN(Y(hAsym))}" x2="${W - 16}" y2="${PN(Y(hAsym))}" stroke="${PLOT_WARN}" stroke-dasharray="5 4"/>`;
+  if (vAsym != null) inner += `<line x1="${PN(X(vAsym))}" y1="16" x2="${PN(X(vAsym))}" y2="${H - 16}" stroke="${PLOT_WARN}" stroke-dasharray="5 4"/>`;
+  // Sampled in runs: a run of one point would draw as a round dot and read as
+  // a marked coordinate, so only runs of two or more become a subpath.
+  const runs = [];
+  let run = [];
+  for (let px = -span; px <= span + 1e-9; px += 0.06) {
+    const py = f(px);
+    if (!Number.isFinite(py) || py < -high || py > high) { if (run.length > 1) runs.push(run); run = []; continue; }
+    run.push(`${PN(X(px))} ${PN(Y(py))}`);
+  }
+  if (run.length > 1) runs.push(run);
+  const d = runs.map(r => `M ${r[0]} ` + r.slice(1).map(pt => `L ${pt}`).join(' ')).join(' ');
+  if (d) inner += `<path d="${d}" stroke="${PLOT_ACCENT}" stroke-width="2.2"/>`;
+  if (mark) {
+    inner += `<circle cx="${PN(X(mark[0]))}" cy="${PN(Y(mark[1]))}" r="4" fill="${PLOT_ACCENT}" stroke="none"/>`;
+    const lx = Math.min(W - 34, Math.max(36, X(mark[0]) + (mark[0] < 0 ? -32 : 32)));
+    inner += plotText(lx, Y(mark[1]) - 10, `(${mark[0]}, ${mark[1]})`, 11.5);
+  }
+  inner += plotText(W - 12, H / 2 + 18, 'x', 12.5) + plotText(W / 2 + 14, 22, 'y', 12.5);
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Curve on coordinate axes" style="max-width:330px;width:100%;height:auto;display:block">` +
+    `<g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round">${inner}</g></svg>`;
+}
+
+/** Scatterplot in the first quadrant; `line` draws a line of best fit. */
+function figScatter({ pts, xMax, yMax, xLabel, yLabel, line }) {
+  const W = 360, H = 260, L = 46, B = 42;
+  const X = x => L + x / xMax * (W - L - 18);
+  const Y = y => H - B - y / yMax * (H - B - 22);
+  let inner = `<line x1="${L}" y1="${H - B}" x2="${W - 12}" y2="${H - B}"/><line x1="${L}" y1="16" x2="${L}" y2="${H - B}"/>`;
+  const xStep = Math.max(1, Math.round(xMax / 5)), yStep = Math.max(1, Math.round(yMax / 5));
+  for (let t = xStep; t <= xMax; t += xStep) {
+    inner += `<line x1="${PN(X(t))}" y1="${H - B}" x2="${PN(X(t))}" y2="${H - B + 5}"/>` + plotText(X(t), H - B + 19, t, 11);
+  }
+  for (let t = yStep; t <= yMax; t += yStep) {
+    inner += `<line x1="${L - 5}" y1="${PN(Y(t))}" x2="${L}" y2="${PN(Y(t))}"/>` + plotText(L - 18, Y(t) + 4, t, 11);
+  }
+  if (line) {
+    inner += `<line x1="${PN(X(line[0][0]))}" y1="${PN(Y(line[0][1]))}" x2="${PN(X(line[1][0]))}" y2="${PN(Y(line[1][1]))}" stroke="${PLOT_WARN}" stroke-width="1.8"/>`;
+  }
+  for (const [px, py] of pts) inner += `<circle cx="${PN(X(px))}" cy="${PN(Y(py))}" r="4" fill="${PLOT_ACCENT}" stroke="none"/>`;
+  inner += plotText((L + W) / 2, H - 8, xLabel, 12);
+  inner += plotText(L + 46, 12, yLabel, 11.5);
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Scatterplot" style="max-width:360px;width:100%;height:auto;display:block">` +
+    `<g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round">${inner}</g></svg>`;
+}
 
 export const year10 = {
 
@@ -150,18 +226,117 @@ export const year10 = {
         ]
       };
     }
-    const h = nz(rng, -5, 5), k = nz(rng, -9, 9);
-    const b = -2 * h, c = h * h + k;
+    // Reading exponential and hyperbolic graphs: the dashed lines are the
+    // asymptotes, and the marked point is what pins the remaining parameter.
+    if (rc(rng, [true, false])) {
+      const h = ri(rng, -3, 3), c = ri(rng, -3, 3);
+      const k = nz(rng, -6, 6);
+      const t = rc(rng, [1, -1, 2, -2]);
+      if (k % t !== 0) return year10['y10-nonlinear'](rng, diff);
+      const px = h + t, py = k / t + c;
+      if (Math.abs(px) > 5 || Math.abs(py) > 4 || (px === 0 && py === 0)) return year10['y10-nonlinear'](rng, diff);
+      const figure = figCurve({ f: x => k / (x - h) + c, hAsym: c, vAsym: h, mark: [px, py] });
+      const ask = ri(rng, 0, 2);
+      if (ask === 0) {
+        return {
+          prompt: `The hyperbola shown passes through the marked point $(${px}, ${py})$. Its asymptotes are drawn as dashed lines. State the equation of the **vertical asymptote**.`,
+          figure,
+          answerType: 'numeric', answer: { value: h }, answerPrefix: 'x =',
+          traps: [{ value: c, why: 'That is the *horizontal* asymptote — the dashed line the curve flattens out along. A vertical asymptote is the value of $x$ the curve never reaches.' }].filter(t => t.value !== h),
+          hints: ['A vertical asymptote is the $x$-value the curve rushes away from without ever touching.',
+            'Find the dashed line that runs straight up and down.',
+            `It crosses the $x$-axis at $x = ${h}$.`],
+          steps: [
+            { h: 'Find the upright dashed line', d: `It sits at $x = ${h}$` },
+            { h: 'Write the equation', d: `$x = ${h}$` }
+          ]
+        };
+      }
+      if (ask === 1) {
+        return {
+          prompt: `The hyperbola shown passes through the marked point $(${px}, ${py})$. State the equation of the **horizontal asymptote** — the value $y$ approaches as $x$ grows large.`,
+          figure,
+          answerType: 'numeric', answer: { value: c }, answerPrefix: 'y =',
+          traps: [{ value: h, why: 'That is the *vertical* asymptote. The horizontal one is the level the curve flattens towards on the far left and far right.' }].filter(t => t.value !== c),
+          hints: ['Follow the right-hand branch out to the right — what height does it settle at?',
+            'That level is the horizontal dashed line.',
+            `It crosses the $y$-axis at $y = ${c}$.`],
+          steps: [
+            { h: 'Follow the curve outwards', d: `Both branches flatten towards the same level` },
+            { h: 'Read the level', d: `$y = ${c}$` }
+          ]
+        };
+      }
+      return {
+        prompt: `The hyperbola shown has equation $y = \\dfrac{k}{x - h} + c$. From the graph its asymptotes are $x = ${h}$ and $y = ${c}$, and it passes through the marked point $(${px}, ${py})$. Find $k$.`,
+        figure,
+        answerType: 'numeric', answer: { value: k },
+        traps: [
+          { value: py, why: `$k$ is not the $y$-value of the point. Substitute the point into $y = \\dfrac{k}{x - ${h}} ${sgn(c)}$ and solve.` },
+          { value: -k, why: 'Check the sign of $x - h$ at the marked point — a point to the left of the vertical asymptote makes that bracket negative.' }
+        ].filter(t => t.value !== k),
+        hints: [`Substitute $x = ${px}$ and $y = ${py}$ into $y = \\dfrac{k}{x - ${h}} ${sgn(c)}$.`,
+          `First move the $${c}$ across: $${py} ${sgn(-c)} = \\dfrac{k}{${px} ${sgn(-h)}}$.`,
+          `That is $${py - c} = \\dfrac{k}{${t}}$.`],
+        steps: [
+          { h: 'Substitute the point', d: `$${py} = \\dfrac{k}{${px} ${sgn(-h)}} ${sgn(c)}$` },
+          { h: 'Subtract the horizontal asymptote', d: `$${py} ${sgn(-c)} = ${py - c} = \\dfrac{k}{${t}}$` },
+          { h: 'Multiply through', d: `$k = ${py - c} \\times ${t < 0 ? `(${t})` : t} = ${k}$` }
+        ]
+      };
+    }
+    const a = ri(rng, 1, 4), b = rc(rng, [2, 3]), c = nz(rng, -4, 3);
+    const y0 = a + c, y1 = a * b + c;
+    if (Math.abs(y1) > 4 || Math.abs(y0) > 4) return year10['y10-nonlinear'](rng, diff);
+    const figure = figCurve({ f: x => a * Math.pow(b, x) + c, hAsym: c, mark: [1, y1] });
+    const ask = ri(rng, 0, 2);
+    if (ask === 0) {
+      return {
+        prompt: `The exponential curve shown passes through the marked point $(1, ${y1})$. State the equation of its **horizontal asymptote** — the value $y$ approaches as $x \\to -\\infty$.`,
+        figure,
+        answerType: 'numeric', answer: { value: c }, answerPrefix: 'y =',
+        traps: [{ value: y0, why: `$${y0}$ is where the curve crosses the $y$-axis. The asymptote is the level it flattens towards further left, which it never quite reaches.` }].filter(t => t.value !== c),
+        hints: ['Follow the curve to the **left** — it flattens out but never quite lands.',
+          'That level is drawn as the dashed line.',
+          `It sits at $y = ${c}$.`],
+        steps: [
+          { h: 'Follow the curve leftwards', d: 'The curve flattens towards a fixed level' },
+          { h: 'Read the dashed line', d: `$y = ${c}$` }
+        ]
+      };
+    }
+    if (ask === 1) {
+      return {
+        prompt: `The exponential curve shown has equation $y = a \\times b^{x} ${sgn(c)}$ and passes through the marked point $(1, ${y1})$. State the coordinates of its **$y$-intercept**.`,
+        figure,
+        answerType: 'point', answer: { x: 0, y: y0 },
+        inputHint: 'e.g. (0, 5)',
+        traps: [{ why: `The $y$-intercept has $x = 0$. Since $b^{0} = 1$, that puts $y = a ${sgn(c)}$ — read it straight off where the curve crosses the vertical axis.` }],
+        hints: ['The $y$-intercept is where the curve crosses the vertical axis, so $x = 0$.',
+          `$b^{0} = 1$ for any base, so $y = a \\times 1 ${sgn(c)}$.`,
+          `Read the crossing height off the graph: $y = ${y0}$.`],
+        steps: [
+          { h: 'Set x = 0', d: `$y = a \\times b^{0} ${sgn(c)} = a ${sgn(c)}$` },
+          { h: 'Read it off the graph', d: `The curve crosses the $y$-axis at $y = ${y0}$` },
+          { h: 'Write as a point', d: `$(0, ${y0})$` }
+        ]
+      };
+    }
     return {
-      prompt: `By completing the square, find the vertex of $y = x^2 ${sgn(b)}x ${sgn(c)}$.`.replace('+ 0x ', ''),
-      answerType: 'point', answer: { x: h, y: k },
-      inputHint: 'e.g. (2, -7)',
-      traps: [{ why: `Half the x-coefficient is $${b / 2}$ — the vertex x is its opposite, $${h}$, and y comes from substituting back.` }],
-      hints: ['Halve the x-coefficient and square it.', `$x^2 ${sgn(b)}x = (x ${sgn(b / 2)})^2 - ${(b / 2) * (b / 2)}$.`, `So $y = (x ${sgn(b / 2)})^2 ${sgn(k)}$ — read the vertex off.`],
+      prompt: `The exponential curve shown has equation $y = a \\times b^{x} + c$. From the graph its horizontal asymptote is $y = ${c}$, it crosses the $y$-axis at $(0, ${y0})$, and it passes through $(1, ${y1})$. Find the **base $b$**.`,
+      figure,
+      answerType: 'numeric', answer: { value: b },
+      traps: [
+        { value: y1 - y0, why: 'An exponential curve **multiplies** by $b$ for each step of $1$ in $x$; the difference between the two heights is not the base.' },
+        { value: r2(y1 / y0), why: `The $${c}$ has to be stripped off both heights first — the multiplying happens to the $a b^{x}$ part, not to the shift.` }
+      ].filter(t => t.value !== b),
+      hints: [`Subtract the asymptote from both heights: $${y0} ${sgn(-c)} = ${y0 - c}$ and $${y1} ${sgn(-c)} = ${y1 - c}$.`,
+        `Those are $a$ and $ab$, so $a = ${y0 - c}$.`,
+        `Then $b = ${y1 - c} \\div ${y0 - c}$.`],
       steps: [
-        { h: 'Complete the square', d: `$x^2 ${sgn(b)}x = \\left(x ${sgn(b / 2)}\\right)^2 - ${(b / 2) * (b / 2)}$` },
-        { h: 'Rewrite y', d: `$y = (x ${sgn(b / 2)})^2 - ${(b / 2) * (b / 2)} ${sgn(c)} = (x ${sgn(b / 2)})^2 ${sgn(k)}$` },
-        { h: 'Vertex', d: `$(${h}, ${k})$` }
+        { h: 'Strip off the shift', d: `$a b^{0} = ${y0} ${sgn(-c)} = ${a}$, $\\quad a b^{1} = ${y1} ${sgn(-c)} = ${a * b}$` },
+        { h: 'Divide consecutive values', d: `$\\dfrac{ab}{a} = \\dfrac{${a * b}}{${a}} = ${b}$` },
+        { h: 'Base', d: `$b = ${b}$` }
       ]
     };
   },
@@ -572,20 +747,86 @@ export const year10 = {
       };
     }
     if (diff === 3) {
-      const base = ri(rng, 20, 40);
-      const data = [base, base + 2, base + 3, base + 5, base + 6];
-      const out = base + ri(rng, 30, 60);
-      const meanBefore = data.reduce((s, v) => s + v, 0) / 5;
-      const meanAfter = (data.reduce((s, v) => s + v, 0) + out) / 6;
+      // Reading a scatterplot: which way the cloud slopes, how tightly it
+      // clusters, and what that says about the two variables.
+      const ctx = rc(rng, [
+        { xL: 'Hours of study', yL: 'Test mark (%)', up: true, who: 'students', rise: 'the more they study, the higher they score', fall: 'the more they study, the lower they score' },
+        { xL: 'Hours of TV per week', yL: 'Test mark (%)', up: false, who: 'students', rise: 'more television goes with higher marks', fall: 'more television goes with lower marks' },
+        { xL: 'Age of car (years)', yL: 'Resale value (thousands)', up: false, who: 'cars', rise: 'older cars are worth more', fall: 'older cars are worth less' },
+        { xL: 'Rainfall (mm)', yL: 'Grass height (cm)', up: true, who: 'plots', rise: 'more rain goes with taller grass', fall: 'more rain goes with shorter grass' },
+        { xL: 'Daily maximum (°C)', yL: 'Hot drinks sold', up: false, who: 'days', rise: 'warmer days sell more hot drinks', fall: 'warmer days sell fewer hot drinks' }
+      ]);
+      const n = ri(rng, 8, 13);
+      const xs = distinct(rng, n, () => ri(rng, 1, 14)).sort((a, b) => a - b);
+      if (xs.length < n) return year10['y10-stats'](rng, diff);
+      const m = (ctx.up ? 1 : -1) * ri(rng, 2, 4);
+      const base = ctx.up ? ri(rng, 8, 18) : ri(rng, 52, 64);
+      const noise = xs.map(() => rc(rng, [-3, -2, -1, 1, 2, 3]));
+      const ys = xs.map((x, i) => m * x + base + noise[i]);
+      if (Math.min(...ys) < 3 || Math.max(...ys) > 78) return year10['y10-stats'](rng, diff);
+      const yMax = Math.ceil(Math.max(...ys) / 10) * 10;
+      const above = noise.filter(v => v > 0).length;
+      const figure = figScatter({
+        pts: xs.map((x, i) => [x, ys[i]]), xMax: 15, yMax,
+        xLabel: ctx.xL, yLabel: ctx.yL,
+        line: [[xs[0], m * xs[0] + base], [xs[n - 1], m * xs[n - 1] + base]]
+      });
+      const ask = ri(rng, 0, 2);
+      if (ask === 0) {
+        const mm = mcq(rng, `A strong ${ctx.up ? 'positive' : 'negative'} association`, [
+          { text: `A strong ${ctx.up ? 'negative' : 'positive'} association`, why: `The cloud of points runs ${ctx.up ? 'up' : 'down'} to the right, so as ${ctx.xL.toLowerCase()} increases the ${ctx.yL.toLowerCase()} ${ctx.up ? 'increases' : 'decreases'}.` },
+          { text: `A weak ${ctx.up ? 'positive' : 'negative'} association`, why: 'The direction is right, but the points hug the line closely rather than scattering loosely — that makes the association strong.' },
+          { text: 'No association', why: 'There is a clear pattern here: the points march steadily in one direction rather than sitting in a shapeless cloud.' }
+        ]);
+        return {
+          prompt: `The scatterplot shows ${ctx.yL.toLowerCase()} against ${ctx.xL.toLowerCase()} for $${n}$ ${ctx.who}. Describe the association between the two variables.`,
+          figure,
+          answerType: 'mcq', answer: { correctIndex: mm.correctIndex, optionTraps: mm.optionTraps }, mcqOptions: mm.options,
+          hints: ['Ask two questions: which way does the cloud slope, and how tightly do the points hug that slope?',
+            `Reading left to right, the points head ${ctx.up ? 'upwards' : 'downwards'} — that fixes the direction.`,
+            'They sit very close to a straight line, so the association is strong rather than weak.'],
+          steps: [
+            { h: 'Direction', d: `The points fall from left to right? ${ctx.up ? 'No — they rise, so the association is positive.' : 'Yes — they fall, so the association is negative.'}` },
+            { h: 'Strength', d: 'The points cluster tightly about a straight line, so the association is strong.' },
+            { h: 'Describe it', d: `A strong ${ctx.up ? 'positive' : 'negative'} association.` }
+          ]
+        };
+      }
+      if (ask === 1) {
+        return {
+          prompt: `The scatterplot shows ${ctx.yL.toLowerCase()} against ${ctx.xL.toLowerCase()} for $${n}$ ${ctx.who}, with a line of best fit drawn. How many of the $${n}$ points lie **above** the line?`,
+          figure,
+          answerType: 'numeric', answer: { value: above },
+          traps: [
+            { value: n - above, why: 'That is the count *below* the line — read the question’s direction carefully.' },
+            { value: n, why: 'A line of best fit runs through the middle of the cloud, so points sit on both sides of it.' }
+          ].filter(t => t.value !== above),
+          hints: ['Take the points one at a time and ask whether each sits over or under the drawn line.',
+            'No point sits exactly on the line here, so every one of them counts once.',
+            `Counting the ones above gives $${above}$ out of $${n}$.`],
+          steps: [
+            { h: 'Check each point against the line', d: `$${n}$ points in total, none of them on the line` },
+            { h: 'Count the ones above', d: `$${above}$ above, $${n - above}$ below` },
+            { h: 'Answer', d: `$${above}$` }
+          ]
+        };
+      }
+      const mm = mcq(rng, `As ${ctx.xL.toLowerCase()} increases, ${ctx.yL.toLowerCase()} tends to **${ctx.up ? 'increase' : 'decrease'}** — ${ctx.up ? ctx.rise : ctx.fall}.`, [
+        { text: `As ${ctx.xL.toLowerCase()} increases, ${ctx.yL.toLowerCase()} tends to **${ctx.up ? 'decrease' : 'increase'}** — ${ctx.up ? ctx.fall : ctx.rise}.`, why: `The points climb ${ctx.up ? 'up' : 'down'} to the right, which is the opposite of this description.` },
+        { text: 'There is no relationship between the two variables.', why: 'The points follow a clear straight-line trend, so a relationship is plainly visible.' },
+        { text: `Every extra unit of ${ctx.xL.toLowerCase()} changes ${ctx.yL.toLowerCase()} by exactly the same amount.`, why: 'The points only *cluster* about a line — they do not sit on it, so the change is a tendency rather than an exact rule.' }
+      ]);
       return {
-        prompt: `Five house sales in a street have a mean of ${moneyPlain(meanBefore * 10000)}. A sixth house sells for much more, at ${moneyPlain(out * 10000)}. The data (in \\$10k units) is $${data.join(', ')}$ plus $${out}$. Find the new mean (in \\$10k units), correct to 2 decimal places.`,
-        answerType: 'numeric', answer: { value: r2(meanAfter), tol: 0.011 },
-        traps: [{ value: r2((meanBefore + out) / 2), why: 'You can’t average the old mean with the new value directly — rebuild the total: old total + new value, over 6.' }],
-        hints: ['Recover the total of the first five from the mean.', `Old total $= ${meanBefore} \\times 5 = ${meanBefore * 5}$.`, `New mean $= (${meanBefore * 5} + ${out}) \\div 6$.`],
+        prompt: `The scatterplot shows ${ctx.yL.toLowerCase()} against ${ctx.xL.toLowerCase()} for $${n}$ ${ctx.who}. Which statement best describes what the graph shows?`,
+        figure,
+        answerType: 'mcq', answer: { correctIndex: mm.correctIndex, optionTraps: mm.optionTraps }, mcqOptions: mm.options,
+        hints: ['Read the plot from left to right and watch what happens to the height of the points.',
+          `Here they head ${ctx.up ? 'upwards' : 'downwards'}.`,
+          'Then check the wording: does the statement claim a *tendency*, or an exact rule the points do not obey?'],
         steps: [
-          { h: 'Old total', d: `$${meanBefore} \\times 5 = ${meanBefore * 5}$` },
-          { h: 'Add the outlier', d: `$${meanBefore * 5} + ${out} = ${meanBefore * 5 + out}$` },
-          { h: 'New mean', d: `$\\dfrac{${meanBefore * 5 + out}}{6} = ${r2(meanAfter)}$ — dragged up by the outlier` }
+          { h: 'Direction of the trend', d: `Left to right, the points ${ctx.up ? 'rise' : 'fall'}` },
+          { h: 'Translate into context', d: `So ${ctx.up ? ctx.rise : ctx.fall}` },
+          { h: 'Tendency, not a rule', d: 'The scatter about the line means this describes a general tendency.' }
         ]
       };
     }

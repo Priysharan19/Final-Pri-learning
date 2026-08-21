@@ -77,9 +77,12 @@ no server at all. These break:
 1. **`npm test` stops working entirely.** Its first command is
    `node server/test/selfcheck.mjs`; the chain fails before any ink suite runs.
    The 10,080-check correctness gate on the question generators is gone with it.
-2. **The 84 extra question forms are gone.** `extras.js` lives only here. The
-   authored-form count drops from 420 to 336, and `tools/count-questions.mjs`
-   stops running at all (it imports `formCount` from `server/engine/`).
+2. **The 84 extra question forms are gone.** `extras.js` lives only here, so the
+   authored-form count drops from 420 to 336. `tools/count-questions.mjs` keeps
+   running — it censuses the client registry by default and only reaches into
+   `server/engine/` in its optional `server` mode, where `formCount` is read as
+   an optional export. That mode, and the 420 figure only it can report, go with
+   the directory.
 3. **`npm start` and `npm run seed` disappear** (both point at files in here).
 4. **`npm run dev` breaks** — `scripts/dev.js` spawns `server/index.js` as one of
    its two processes.
@@ -90,9 +93,10 @@ no server at all. These break:
 A safe removal is therefore not `rm -rf server/`. It is: move
 `server/test/selfcheck.mjs` and `server/engine/generators/extras.js` into
 `client/` (folding the extras layer into `client/src/engine/generators/index.js`
-so the client can generate all 420 forms), repoint `tools/count-questions.mjs`,
-rewrite the root `scripts` block, and give the built client a different static
-host. Only then does the Express app become genuinely free to go.
+so the client can generate all 420 forms), retire the now-redundant `server`
+mode in `tools/count-questions.mjs`, rewrite the root `scripts` block, and give
+the built client a different static host. Only then does the Express app become
+genuinely free to go.
 
 Keeping it costs nothing at runtime — it is never imported by the app and never
 bundled by Vite.

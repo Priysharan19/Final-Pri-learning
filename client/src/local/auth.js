@@ -112,11 +112,57 @@ export async function rewrapVault(key, password) {
 }
 
 // ── Record cipher ────────────────────────────────────────────────────────────
+// AES-GCM is a stream cipher with a tag on the end: the ciphertext is exactly
+// as long as the plaintext plus sixteen bytes. That length is readable without
+// any key, and it is not nothing. A ratings row seals `{key, subtopic, …}`, so
+// its ciphertext length moved one byte for every character of the subtopic id
+// it was hiding — and two of the fifty-four ids in the curriculum are the only
+// id of their length, which meant that for those two the blinded key was
+// undone by the size of the blob sitting next to it.
+//
+// So every record is padded to a bucket before it is sealed. The padding is
+// spaces on the end of the JSON, which `JSON.parse` already ignores: nothing is
+// recorded on the row, nothing has to be stripped on the way out, and a record
+// written by an older build — unpadded — still opens. The buckets grow with the
+// record so the cost stays proportional: sixty-four bytes while a record is
+// small, then larger steps for handwriting and exam papers, which are big
+// enough that a fine bucket would cost more than the leak is worth.
+//
+// What is left is the bucket itself. A padded record says which of a handful of
+// size bands it is in, and no more; every subtopic id in the curriculum now
+// lands in the same band as every other.
+
+const padStep = (n) => (n < 1024 ? 64 : n < 16384 ? 512 : 4096);
+
+/** One record's encoded JSON, grown with spaces to the top of its bucket. */
+function padded(bytes) {
+  const step = padStep(bytes.length);
+  const want = Math.ceil(bytes.length / step) * step;
+  if (want === bytes.length) return bytes;
+  const out = new Uint8Array(want).fill(0x20);
+  out.set(bytes);
+  return out;
+}
+
+/**
+ * Whether a sealed blob's ciphertext already stands at the top of a bucket.
+ * Read off the length alone, because that is the only thing about a record an
+ * unpadded one gives away and the only thing this has to put right — so a
+ * device carrying records from an older build can be swept without every row
+ * being opened to find out.
+ */
+export function isPadded(sealed) {
+  const ct = sealed?.ct;
+  if (typeof ct !== 'string' || !ct.length || ct.length % 4) return false;
+  const tail = ct.endsWith('==') ? 2 : ct.endsWith('=') ? 1 : 0;
+  const n = (ct.length / 4) * 3 - tail - 16;
+  return n > 0 && n % padStep(n) === 0;
+}
 
 /** → { iv, ct } for one record's private fields. A fresh IV every single time. */
 export async function sealValue(key, value) {
   const iv = rand(IV_BYTES);
-  const bytes = new TextEncoder().encode(JSON.stringify(value ?? null));
+  const bytes = padded(new TextEncoder().encode(JSON.stringify(value ?? null)));
   const ct = await subtle().encrypt({ name: 'AES-GCM', iv }, key, bytes);
   return { iv: b64(iv), ct: b64(ct) };
 }
@@ -130,12 +176,173 @@ export async function openValue(key, sealed) {
   } catch { return undefined; }
 }
 
+// ── The blind index for addresses ────────────────────────────────────────────
+// This was a plain SHA-256 of `pri-learning:${address}`, and it was described
+// as non-reversible. That was true and it was beside the point. Nobody reverses
+// a hash of an email address: they guess. An auditor with the raw database and
+// no password at all recovered a real address from a five-entry guess list,
+// because an unkeyed hash of a low-entropy value is a confirmation oracle — and
+// it sat in the clear on the same row as the sealed copy of the address it was
+// supposed to be protecting.
+//
+// Of the three usual repairs, two do not survive contact with this attack:
+//
+//   · A per-profile salt stops one precomputed table covering every device. It
+//     does nothing here, because the salt is on the row the attacker is already
+//     reading, and five guesses is five hashes either way.
+//   · A slow KDF prices a guess. Five guesses against six hundred thousand
+//     PBKDF2 iterations is under two seconds — and the cost is paid again by
+//     the profile picker on every keystroke that checks an address.
+//
+// So the index is keyed, under a secret belonging to the install rather than to
+// any profile. What matters is where that secret lives: a random value written
+// into a row would be dumped alongside everything else and would buy nothing.
+// This one is an HMAC key generated as **non-extractable**. The browser stores
+// it, the record that holds it can be read, and what comes back is a handle
+// with no key material in it — `exportKey` refuses, and a dump of the records
+// yields an opaque object. The address index therefore cannot be recomputed by
+// anyone holding a copy of the database; it can only be computed by code
+// running as this origin on this install.
+//
+// The trade-off that forces this shape: duplicate detection genuinely has to
+// compare against profiles nobody has unlocked. "Is this address already on
+// this iPad" is asked while creating a *new* profile, when no other profile's
+// key is in memory, so the comparison cannot be made under a profile key — it
+// has to be made under a key the device holds on everyone's behalf. That is the
+// residual: an attacker who can run script as this origin can still ask the
+// oracle. One who has only the data — a device backup, a copied profile
+// directory, another page reading the same IndexedDB — cannot.
+//
+// Values carry a version tag so an old unkeyed digest is never mistaken for a
+// current one; local/idb.js re-keys what it can and drops what it cannot.
+
+const BLIND_TAG = 'b1:';
+
+let loadSecret = null;
+let secretHeld = null;
+
+/** Where the install's index key is kept. Installed by local/idb.js at import. */
+export function useDeviceSecret(load) {
+  loadSecret = load;
+  secretHeld = null;
+}
+
 /**
- * A stable, non-reversible index for an address. Two profiles can be told apart
- * without either address being readable on disk, and a picker can say “taken”
- * without saying whose.
+ * The install's index key. With no store behind it — auth.js used on its own —
+ * a key is minted for this session, so nothing weak is ever written instead.
+ */
+function deviceSecret() {
+  if (!secretHeld) {
+    secretHeld = (async () => {
+      const held = loadSecret ? await loadSecret().catch(() => null) : null;
+      return held || subtle().generateKey({ name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+    })();
+  }
+  return secretHeld;
+}
+
+/**
+ * A stable index for an address, keyed to this install. Two profiles can be
+ * told apart without either address being readable on disk, and a picker can
+ * say “taken” without saying whose — and without a guess list saying whose
+ * either.
  */
 export async function blindHash(text) {
   const bytes = new TextEncoder().encode(`pri-learning:${String(text).toLowerCase()}`);
-  return b64(await subtle().digest('SHA-256', bytes));
+  return BLIND_TAG + b64(await subtle().sign('HMAC', await deviceSecret(), bytes));
+}
+
+/** True for an index written by this scheme rather than the unkeyed one. */
+export const isBlindIndex = (v) => typeof v === 'string' && v.startsWith(BLIND_TAG);
+
+// ── Sharing one record between profiles ──────────────────────────────────────
+// A class roll and the tasks hanging off it are read by the teacher who set
+// them and by the students they were set to, and those are different profiles
+// with different keys. Sealing such a record to its author would lock out the
+// readers it was written for; leaving it in the clear is what the audit found.
+//
+// The way out is that the author never needs a reader's key — only something
+// public belonging to them. Every protected profile carries an ECDH keypair:
+// the public half sits in the clear on the profile row, the private half lives
+// inside that profile's own sealed blob and is therefore behind its password.
+// A shared record is sealed under a fresh random record key, and that record
+// key is sealed once per reader against their public half.
+//
+// One ephemeral keypair covers the whole record, so a reader does one key
+// agreement and then trial-opens the boxes — the box that opens is theirs.
+// Nothing on the row says who a box is for: an attacker sees a public key that
+// is used once and never again, and a list of equal-sized blobs.
+//
+// The list is padded to a bucket, because its length would otherwise be the
+// size of the class. Decoys are indistinguishable from boxes: a box is a random
+// IV over the encryption of thirty-two random bytes, and a decoy is the same
+// number of random bytes.
+
+const SHARE_INFO = 'pri-learning:record-share/v1';
+const SHARE_CURVE = { name: 'ECDH', namedCurve: 'P-256' };
+const BOX_BYTES = IV_BYTES + KEY_BYTES + 16;
+const ROLL_BUCKET = 4;
+
+const sharePublic = (pub) => subtle().importKey('raw', unb64(pub), SHARE_CURVE, false, []);
+
+/** Re-import a profile's private half, ready to agree a key with a sender. */
+export const shareIdentity = (sec) => subtle().importKey('pkcs8', unb64(sec), SHARE_CURVE, false, ['deriveBits']);
+
+/** A fresh sharing identity: `pub` for the clear side of a profile row, `sec` for its blob. */
+export async function createShareKeys() {
+  const pair = await subtle().generateKey(SHARE_CURVE, true, ['deriveBits']);
+  return {
+    pub: b64(await subtle().exportKey('raw', pair.publicKey)),
+    sec: b64(await subtle().exportKey('pkcs8', pair.privateKey))
+  };
+}
+
+/** The one-record key two halves of an agreement arrive at, named for its use. */
+async function agreed(priv, pub) {
+  const bits = await subtle().deriveBits({ name: 'ECDH', public: pub }, priv, 256);
+  const seed = await subtle().importKey('raw', bits, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const raw = await subtle().sign('HMAC', seed, new TextEncoder().encode(SHARE_INFO));
+  return subtle().importKey('raw', raw, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
+}
+
+/** The key this profile would use to open boxes sent under `epk`, or null. */
+export async function shareKeyFrom(identity, epk) {
+  try { return await agreed(identity, await sharePublic(epk)); }
+  catch { return null; }
+}
+
+/** Seal one secret to a list of public halves → { epk, boxes }, padded and shuffled. */
+export async function sealToReaders(pubs, secret) {
+  const eph = await subtle().generateKey(SHARE_CURVE, true, ['deriveBits']);
+  const boxes = [];
+  for (const pub of pubs) {
+    const key = await agreed(eph.privateKey, await sharePublic(pub));
+    const iv = rand(IV_BYTES);
+    const ct = new Uint8Array(await subtle().encrypt({ name: 'AES-GCM', iv }, key, secret));
+    const box = new Uint8Array(iv.length + ct.length);
+    box.set(iv);
+    box.set(ct, iv.length);
+    boxes.push(b64(box));
+  }
+  const want = Math.max(ROLL_BUCKET, Math.ceil(boxes.length / ROLL_BUCKET) * ROLL_BUCKET);
+  while (boxes.length < want) boxes.push(b64(rand(BOX_BYTES)));
+  const draw = new Uint32Array(rand(4 * boxes.length).buffer);
+  for (let i = boxes.length - 1; i > 0; i--) {
+    const j = draw[i] % (i + 1);
+    [boxes[i], boxes[j]] = [boxes[j], boxes[i]];
+  }
+  return { epk: b64(await subtle().exportKey('raw', eph.publicKey)), boxes };
+}
+
+/** The secret in whichever box this key opens, or null if none of them is ours. */
+export async function openFromReaders(key, boxes) {
+  if (!key || !Array.isArray(boxes)) return null;
+  for (const b of boxes) {
+    try {
+      const raw = unb64(b);
+      const out = await subtle().decrypt({ name: 'AES-GCM', iv: raw.subarray(0, IV_BYTES) }, key, raw.subarray(IV_BYTES));
+      return new Uint8Array(out);
+    } catch { /* not addressed to this reader */ }
+  }
+  return null;
 }

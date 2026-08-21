@@ -156,9 +156,14 @@ export function mcq(rng, correct, distractors) {
     ds.push(typeof d === 'string' ? { text } : d);
     if (ds.length === 3) break;
   }
-  // pad if duplicates collapsed the pool
-  let pad = 1;
-  while (ds.length < 3) { ds.push({ text: `${correct} ${' '.repeat(pad)}` }); pad++; }
+  // If duplicates collapsed the pool, offer FEWER options. The previous version
+  // padded to four by repeating the correct answer with trailing spaces, which
+  // renders identically to the keyed option and is marked wrong — a student who
+  // reads the maths correctly and picks the matching text loses the mark. A
+  // three-option question is honest; a fourth option that is secretly the answer
+  // is not. A cell with no distinct distractor at all is a generator defect, so
+  // it throws rather than shipping an unanswerable question.
+  if (!ds.length) throw new Error(`mcq: every distractor collapsed into the correct answer "${correct}"`);
   const all = rs(rng, [{ text: correct, ok: true }, ...ds]);
   const correctIndex = all.findIndex(o => o.ok);
   const optionTraps = {};

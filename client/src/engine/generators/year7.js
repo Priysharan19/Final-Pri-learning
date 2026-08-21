@@ -1,28 +1,119 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Pri Learning · Year 7 generators
 // ─────────────────────────────────────────────────────────────────────────────
-import { ri, rc, rs, nz, gcd, Frac, mcq, term, bin, sgn, money, moneyPlain, num, r1, r2, r3, NAMES, ITEMS } from '../qhelpers.js';
+import { ri, rc, rs, nz, distinct, gcd, Frac, mcq, term, bin, sgn, money, moneyPlain, num, r1, r2, r3, NAMES, ITEMS } from '../qhelpers.js';
 import { figStraightLineAngles, figAnglesAtPoint, figParallelLines, figRect, figLShape } from '../figures.js';
+
+// ── Dot plot ─────────────────────────────────────────────────────────────────
+// Drawn here rather than imported because engine/figures.js has no dot-plot
+// builder; the markup uses only the tags and attributes the figure sanitiser
+// allowlists (svg / g / line / circle / text), so it survives untouched.
+
+const DOT_ACCENT = '#3987e5';
+
+function figDotPlot(values, counts, label) {
+  const W = 380, step = Math.min(52, (W - 76) / Math.max(1, values.length - 1));
+  const tallest = Math.max(...counts);
+  const H = 74 + tallest * 15;
+  const X = i => 46 + i * step;
+  const baseY = H - 40;
+  let inner = `<line x1="32" y1="${baseY}" x2="${Math.round(X(values.length - 1) + 26)}" y2="${baseY}"/>`;
+  values.forEach((v, i) => {
+    inner += `<line x1="${Math.round(X(i))}" y1="${baseY - 4}" x2="${Math.round(X(i))}" y2="${baseY + 5}"/>`;
+    inner += `<text x="${Math.round(X(i))}" y="${baseY + 22}" fill="currentColor" stroke="none" font-size="12.5" font-family="Inter, system-ui, sans-serif" text-anchor="middle">${v}</text>`;
+    for (let c = 0; c < counts[i]; c++) {
+      inner += `<circle cx="${Math.round(X(i))}" cy="${baseY - 12 - c * 15}" r="4.6" fill="${DOT_ACCENT}" stroke="none"/>`;
+    }
+  });
+  inner += `<text x="${Math.round((32 + X(values.length - 1) + 26) / 2)}" y="${H - 8}" fill="currentColor" stroke="none" font-size="12" font-family="Inter, system-ui, sans-serif" text-anchor="middle">${label}</text>`;
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Dot plot" style="max-width:380px;width:100%;height:auto;display:block">` +
+    `<g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round">${inner}</g></svg>`;
+}
 
 export const year7 = {
 
   // ── Integers & order of operations ────────────────────────────────────────
   'y7-integers': (rng, diff) => {
     if (diff === 1) {
-      const a = ri(rng, -12, 12), b = nz(rng, -12, 12);
-      const op = rc(rng, ['+', '−']);
-      const ansV = op === '+' ? a + b : a - b;
-      const bTex = b < 0 ? `(${b})` : `${b}`;
+      // Comparing, ordering and locating integers — every branch is answered by
+      // reading positions on the line rather than by computing with the values.
+      const kind = ri(rng, 0, 3);
+      if (kind === 0) {
+        const vals = distinct(rng, 5, () => ri(rng, -20, 20));
+        const sorted = [...vals].sort((a, b) => a - b);
+        const fromLeft = rc(rng, [true, false]);
+        const k = ri(rng, 2, 4);
+        const place = ['1st', '2nd', '3rd', '4th', '5th'][k - 1];
+        const ansV = fromLeft ? sorted[k - 1] : sorted[5 - k];
+        return {
+          prompt: `These five integers are plotted on a number line: $${vals.join(',\\ ')}$. Which one is the **${place} from the ${fromLeft ? 'left' : 'right'}**?`,
+          answerType: 'numeric', answer: { value: ansV },
+          traps: [
+            { value: vals[k - 1], why: 'That’s the ' + place + ' value in the *listed* order — put them in order along the number line first.' },
+            { value: fromLeft ? sorted[5 - k] : sorted[k - 1], why: `You counted from the wrong end: on a number line the smallest integer sits furthest **left**.` }
+          ].filter(t => t.value !== ansV),
+          hints: ['On a number line the integers run smallest on the left to largest on the right.',
+            `Ordered smallest to largest: $${sorted.join(',\\ ')}$.`,
+            `Now count ${k} place${k === 1 ? '' : 's'} in from the ${fromLeft ? 'left' : 'right'}.`],
+          steps: [
+            { h: 'Order them along the line', d: `$${sorted.join(' < ')}$` },
+            { h: `Count in from the ${fromLeft ? 'left' : 'right'}`, d: `The ${place} is $${ansV}$` }
+          ]
+        };
+      }
+      if (kind === 1) {
+        const a = ri(rng, -20, 8);
+        const b = a + 2 * ri(rng, 2, 10);
+        const mid = (a + b) / 2;
+        return {
+          prompt: `Which integer sits exactly **halfway between** $${a}$ and $${b}$ on a number line?`,
+          answerType: 'numeric', answer: { value: mid },
+          traps: [
+            { value: a + b, why: 'Adding the two ends gives a point far off the line — halfway means the *average* of the two ends.' },
+            { value: (b - a) / 2, why: `$${(b - a) / 2}$ is how far the halfway point is from each end, not where it is. Start at $${a}$ and move that far right.` }
+          ].filter(t => t.value !== mid),
+          hints: ['The halfway point is the same distance from each end.',
+            `The gap from $${a}$ to $${b}$ is $${b - a}$ units, so halfway is $${(b - a) / 2}$ units in from each end.`,
+            `Move $${(b - a) / 2}$ units right from $${a}$.`],
+          steps: [
+            { h: 'Length of the gap', d: `$${b} - (${a}) = ${b - a}$ units` },
+            { h: 'Half the gap', d: `$${b - a} \\div 2 = ${(b - a) / 2}$ units` },
+            { h: 'Step in from the left end', d: `$${a} + ${(b - a) / 2} = ${mid}$` }
+          ]
+        };
+      }
+      if (kind === 2) {
+        const a = ri(rng, -20, 20);
+        let b = ri(rng, -20, 20);
+        while (b === a) b = ri(rng, -20, 20);
+        const lo = Math.min(a, b), hi = Math.max(a, b);
+        return {
+          prompt: `How many units apart are $${a}$ and $${b}$ on a number line?`,
+          answerType: 'numeric', answer: { value: hi - lo }, answerSuffix: 'units',
+          traps: [{ value: Math.abs(a + b), why: 'Distance along the line is the *difference* between the two positions, not their sum.' }].filter(t => t.value !== hi - lo),
+          hints: ['Distance on a number line is always positive — it counts the steps between the two marks.',
+            `The left-hand mark is $${lo}$ and the right-hand mark is $${hi}$.`,
+            `Work out $${hi} - (${lo})$.`],
+          steps: [
+            { h: 'Identify left and right', d: `$${lo}$ is left of $${hi}$` },
+            { h: 'Subtract', d: `$${hi} - (${lo}) = ${hi - lo}$ units` }
+          ]
+        };
+      }
+      const start = ri(rng, -14, 14);
+      const jump = ri(rng, 3, 22);
+      const left = rc(rng, [true, false]);
+      const land = left ? start - jump : start + jump;
       return {
-        prompt: `Evaluate $${a} ${op === '+' ? '+' : '-'} ${bTex}$.`,
-        answerType: 'numeric', answer: { value: ansV },
-        traps: [{ value: op === '+' ? a - b : a + b, why: `Careful with the sign of ${b} — ${op === '+' ? 'adding' : 'subtracting'} a negative flips the direction on the number line.` }],
-        hints: ['Picture a number line: where do you start, and which way do you move?',
-          b < 0 ? `${op === '+' ? 'Adding' : 'Subtracting'} a negative is the same as ${op === '+' ? 'subtracting' : 'adding'} its opposite.` : 'Move right for adding a positive, left for subtracting.',
-          `Start at ${a} and move ${Math.abs(op === '+' ? b : -b)} ${(op === '+' ? b : -b) >= 0 ? 'right' : 'left'}.`],
+        prompt: `A counter starts at $${start}$ on a number line and moves $${jump}$ units to the **${left ? 'left' : 'right'}**. Which integer does it land on?`,
+        answerType: 'numeric', answer: { value: land },
+        traps: [{ value: left ? start + jump : start - jump, why: `Moving ${left ? 'left' : 'right'} makes the value ${left ? 'smaller' : 'larger'} — you moved the other way.` }],
+        hints: [`Moving left makes an integer smaller; moving right makes it larger.`,
+          `Start at $${start}$ and ${left ? 'subtract' : 'add'} $${jump}$.`,
+          `$${start} ${left ? '-' : '+'} ${jump}$.`],
         steps: [
-          { h: 'Rewrite without double signs', d: `$${a} ${op === '+' ? '+' : '-'} ${bTex} = ${a} ${(op === '+' ? b : -b) >= 0 ? '+' : '-'} ${Math.abs(op === '+' ? b : -b)}$` },
-          { h: 'Move along the number line', d: `Start at $${a}$, move $${Math.abs(op === '+' ? b : -b)}$ ${(op === '+' ? b : -b) >= 0 ? 'right' : 'left'}: $${ansV}$` }
+          { h: 'Which way along the line?', d: `${left ? 'Left, so subtract' : 'Right, so add'} $${jump}$` },
+          { h: 'Land on', d: `$${start} ${left ? '-' : '+'} ${jump} = ${land}$` }
         ]
       };
     }
@@ -330,17 +421,122 @@ export const year7 = {
       };
     }
     if (diff === 3) {
-      const k = ri(rng, 2, 7), a = nz(rng, 2, 6), b = nz(rng, -8, 8);
+      // A pronumeral stands for a number nobody has told you yet: read the
+      // words, build the expression they describe, then tidy it up.
+      const kind = ri(rng, 0, 4);
+      if (kind === 0) {
+        const a = ri(rng, 2, 6), b = ri(rng, 1, 15);
+        const wantArea = rc(rng, [true, false]);
+        const P = `${2 * a + 2}x + ${2 * b}`, A = `${a}x^2 + ${b}x`;
+        return {
+          prompt: `A rectangle is $x$ cm wide, and its length is $${b}$ cm more than $${a}$ times its width. Write an expression in simplest form for its **${wantArea ? 'area, in cm²' : 'perimeter, in cm'}**.`,
+          answerType: 'expression', answer: { expr: wantArea ? A : P },
+          inputHint: wantArea ? 'e.g. 3x^2 + 5x' : 'e.g. 8x + 10',
+          traps: wantArea
+            ? [{ expr: `${a}x + ${b}`, why: 'That is the length on its own. Area = length × width, so it still has to be multiplied by the width $x$.' }]
+            : [{ expr: `${a + 1}x + ${b}`, why: 'That is one length plus one width — a perimeter goes all the way round, so it needs **two** of each.' }],
+          hints: [`Write the length first: $${a}$ times the width, plus $${b}$, is $${a}x ${sgn(b)}$.`,
+            wantArea ? 'Area of a rectangle = length × width.' : 'Perimeter = 2 × length + 2 × width.',
+            wantArea ? `Multiply $x$ through $(${a}x ${sgn(b)})$.` : `Expand $2(${a}x ${sgn(b)}) + 2x$, then collect like terms.`],
+          steps: [
+            { h: 'Name both sides', d: `Width $= x$, length $= ${a}x ${sgn(b)}$` },
+            wantArea
+              ? { h: 'Length × width', d: `$x(${a}x ${sgn(b)}) = ${a}x^2 ${sgn(b)}x$` }
+              : { h: 'Two of each side', d: `$2(${a}x ${sgn(b)}) + 2x = ${2 * a}x ${sgn(2 * b)} + 2x$` },
+            { h: 'Simplest form', d: `$${wantArea ? A : P}$` }
+          ]
+        };
+      }
+      if (kind === 1) {
+        const k = ri(rng, 3, 5), step = rc(rng, [1, 2]);
+        const adj = step === 1 ? '' : rc(rng, ['even ', 'odd ']);
+        const smallest = rc(rng, [true, false]);
+        const offsets = Array.from({ length: k }, (_, i) => (smallest ? i : i - (k - 1)) * step);
+        const c = offsets.reduce((s, v) => s + v, 0);
+        const listed = offsets.map(o => o === 0 ? 'n' : `n ${sgn(o)}`).join(',\\ ');
+        return {
+          prompt: `The **${smallest ? 'smallest' : 'largest'}** of $${k}$ consecutive ${adj}numbers is $n$. Write an expression in simplest form for their **sum**.`,
+          answerType: 'expression', answer: { expr: `${k}n ${sgn(c)}` },
+          inputHint: 'e.g. 3n + 6',
+          traps: [
+            { expr: `${k}n`, why: `You collected the $n$ terms but dropped the extras — the other numbers are ${smallest ? 'bigger' : 'smaller'} than $n$, and those differences add up too.` },
+            { expr: `n ${sgn(c)}`, why: `There are $${k}$ numbers in the list, and each of them contributes one $n$.` }
+          ],
+          hints: [`Each step along the list ${smallest ? 'adds' : 'subtracts'} $${step}$.`,
+            `The ${k} numbers are $${listed}$.`,
+            `Collect: $${k}$ lots of $n$, and $${offsets.filter(o => o !== 0).map(o => o > 0 ? `+${o}` : `${o}`).join(' ')}$.`],
+          steps: [
+            { h: 'Write the list', d: `$${listed}$` },
+            { h: 'Add the $n$ terms', d: `$${k} \\times n = ${k}n$` },
+            { h: 'Add the constants', d: `$${offsets.join(' + ').replace(/\+ -/g, '- ')} = ${c}$` },
+            { h: 'Sum', d: `$${k}n ${sgn(c)}$` }
+          ]
+        };
+      }
+      if (kind === 2) {
+        const a = ri(rng, 2, 12), b = ri(rng, 2, 12);
+        const ctx = rc(rng, [
+          { one: 'movie ticket', ones: 'movie tickets', p: 'p', two: 'tub of popcorn', twos: 'tubs of popcorn', q: 'c' },
+          { one: 'novel', ones: 'novels', p: 'b', two: 'magazine', twos: 'magazines', q: 'n' },
+          { one: 'bus fare', ones: 'bus fares', p: 'f', two: 'ferry fare', twos: 'ferry fares', q: 'y' }
+        ]);
+        return {
+          prompt: `One ${ctx.one} costs $${ctx.p}$ dollars and one ${ctx.two} costs $${ctx.q}$ dollars. Write an expression for the total cost of $${a}$ ${ctx.ones} and $${b}$ ${ctx.twos}.`,
+          answerType: 'expression', answer: { expr: `${a}${ctx.p} + ${b}${ctx.q}` },
+          inputHint: `e.g. 4${ctx.p} + 3${ctx.q}`,
+          traps: [
+            { expr: `${a + b}${ctx.p}`, why: `$${ctx.p}$ and $${ctx.q}$ stand for two different prices, so $${a}${ctx.p}$ and $${b}${ctx.q}$ are unlike terms — they cannot be added into one.` },
+            { expr: `${a * b}${ctx.p}${ctx.q}`, why: 'The two purchases are added, not multiplied — you buy some of each.' }
+          ],
+          hints: [`$${a}$ items at $${ctx.p}$ dollars each costs $${a} \\times ${ctx.p}$.`,
+            `Do the same for the ${ctx.twos}: $${b} \\times ${ctx.q}$.`,
+            'Add the two costs — and leave them as separate terms, because they are unlike.'],
+          steps: [
+            { h: `Cost of the ${ctx.ones}`, d: `$${a} \\times ${ctx.p} = ${a}${ctx.p}$` },
+            { h: `Cost of the ${ctx.twos}`, d: `$${b} \\times ${ctx.q} = ${b}${ctx.q}$` },
+            { h: 'Total', d: `$${a}${ctx.p} + ${b}${ctx.q}$ (unlike terms, so it stops here)` }
+          ]
+        };
+      }
+      if (kind === 3) {
+        const gap = ri(rng, 2, 9), t = ri(rng, 1, 8), older = rc(rng, [true, false]);
+        const [n1, n2] = rs(rng, NAMES).slice(0, 2);
+        const c = 2 * t + (older ? gap : -gap);
+        return {
+          prompt: `${n1} is $m$ years old. ${n2} is $${gap}$ years ${older ? 'older' : 'younger'} than ${n1}. Write an expression in simplest form for the **sum of their two ages in $${t}$ years' time**.`,
+          answerType: 'expression', answer: { expr: c === 0 ? '2m' : `2m ${sgn(c)}` },
+          inputHint: 'e.g. 2m + 7',
+          traps: [{ expr: `2m ${sgn(older ? gap : -gap)}`, why: `Both of them get $${t}$ years older, so the total goes up by $2 \\times ${t} = ${2 * t}$, not by $${t}$.` }],
+          hints: [`${n2}'s age now is $m ${sgn(older ? gap : -gap)}$.`,
+            `In $${t}$ years add $${t}$ to **each** age: $m + ${t}$ and $m ${sgn(older ? gap : -gap)} + ${t}$.`,
+            'Now add the two expressions and collect like terms.'],
+          steps: [
+            { h: 'Ages now', d: `${n1}: $m$, ${n2}: $m ${sgn(older ? gap : -gap)}$` },
+            { h: `Ages in ${t} years`, d: `$m + ${t}$ and $m ${sgn((older ? gap : -gap) + t)}$` },
+            { h: 'Add and collect', d: `$2m ${sgn(c)}$` }
+          ]
+        };
+      }
+      const flag = ri(rng, 3, 12), rate = ri(rng, 2, 9);
+      const ctx = rc(rng, [
+        { job: 'A taxi', fee: 'flagfall', per: 'per kilometre', v: 'k', unit: 'kilometres' },
+        { job: 'A court hire', fee: 'booking fee', per: 'per hour', v: 'h', unit: 'hours' }
+      ]);
       return {
-        prompt: `Expand $${k}(${a}x ${sgn(b)})$.`,
-        answerType: 'expression', answer: { expr: `${k * a}x + ${k * b}` },
-        inputHint: 'e.g. 6x + 15',
-        traps: [{ expr: `${k * a}x + ${b}`, why: `The ${k} multiplies *every* term inside the bracket — including ${b}.` }],
-        hints: ['Multiply everything inside the bracket by the number outside.', `$${k} \\times ${a === 1 ? '' : a}x$ and $${k} \\times ${b}$.`, `$= ${k * a}x ${sgn(k * b)}$.`],
+        prompt: `${ctx.job} charges a \\$${flag} ${ctx.fee} plus \\$${rate} ${ctx.per}. Write an expression for the total cost, in dollars, of $${ctx.v}$ ${ctx.unit}.`,
+        answerType: 'expression', answer: { expr: `${rate}${ctx.v} + ${flag}` },
+        inputHint: `e.g. 3${ctx.v} + 5`,
+        traps: [
+          { expr: `${rate + flag}${ctx.v}`, why: `The \\$${flag} ${ctx.fee} is charged once, no matter how many ${ctx.unit} — it is a constant, not part of the $${ctx.v}$ term.` },
+          { expr: `${rate}${ctx.v}`, why: `That leaves out the \\$${flag} ${ctx.fee}, which is paid on every trip.` }
+        ],
+        hints: [`The part that changes is \\$${rate} for each of the $${ctx.v}$ ${ctx.unit}.`,
+          `That variable part is $${rate} \\times ${ctx.v} = ${rate}${ctx.v}$.`,
+          `The \\$${flag} is added once at the end.`],
         steps: [
-          { h: 'Multiply the first term', d: `$${k} \\times ${a === 1 ? 'x' : `${a}x`} = ${k * a}x$` },
-          { h: 'Multiply the second term', d: `$${k} \\times ${b < 0 ? `(${b})` : b} = ${k * b}$` },
-          { h: 'Result', d: `$${k * a}x ${sgn(k * b)}$` }
+          { h: 'The part that depends on the trip', d: `$${rate} \\times ${ctx.v} = ${rate}${ctx.v}$` },
+          { h: 'The fixed part', d: `\\$${flag}, charged once` },
+          { h: 'Total cost', d: `$${rate}${ctx.v} + ${flag}$` }
         ]
       };
     }
@@ -595,13 +791,53 @@ export const year7 = {
       let data = [modeV, modeV, ri(rng, base, base + 9), ri(rng, base, base + 9), ri(rng, base + 1, base + 10)];
       data = data.map((v, i) => (i > 1 && v === modeV ? v + 1 : v));
       data = rs(rng, data);
-      const wantMode = rc(rng, [true, false]);
       const sorted = [...data].sort((a, b) => a - b);
       const range = sorted[4] - sorted[0];
+      const measure = rc(rng, ['mode', 'range', 'median', 'mean']);
+      if (measure === 'median') {
+        return {
+          prompt: `Here are five quiz scores: $${data.join(',\\ ')}$. Find the **median**.`,
+          answerType: 'numeric', answer: { value: sorted[2] },
+          traps: [
+            { value: data[2], why: 'The median is the middle of the **ordered** list — sort the scores before picking the middle one.' },
+            { value: range, why: 'That’s the range. The median is the middle value once the list is in order.' }
+          ].filter(t => t.value !== sorted[2]),
+          hints: ['Put the five scores in order from smallest to largest first.',
+            `Ordered: $${sorted.join(',\\ ')}$.`,
+            'With five values, the median is the 3rd one.'],
+          steps: [
+            { h: 'Sort the data', d: `$${sorted.join(',\\ ')}$` },
+            { h: 'Take the middle value', d: `The 3rd of 5 values: median $= ${sorted[2]}$` }
+          ]
+        };
+      }
+      if (measure === 'mean') {
+        const mean = ri(rng, 5, 16);
+        const offs = Array.from({ length: 4 }, () => ri(rng, -4, 4));
+        const last = -offs.reduce((s, v) => s + v, 0);
+        if (Math.abs(last) > 4) return year7['y7-data'](rng, diff);
+        const shown = rs(rng, [...offs, last].map(o => mean + o));
+        const clean = [...shown].sort((a, b) => a - b);
+        const sum = mean * 5;
+        return {
+          prompt: `Here are five quiz scores: $${shown.join(',\\ ')}$. Find the **mean**.`,
+          answerType: 'numeric', answer: { value: mean },
+          traps: [
+            { value: sum, why: 'That’s the total. The mean shares that total equally between all 5 scores, so divide by 5.' },
+            { value: clean[2], why: 'That’s the median — the mean adds every score and divides by how many there are.' }
+          ].filter(t => t.value !== mean),
+          hints: ['Mean = total ÷ how many values.', `Add the five scores first: $${shown.join(' + ')}$.`, `The total is $${sum}$ — now divide by 5.`],
+          steps: [
+            { h: 'Add the scores', d: `$${shown.join(' + ')} = ${sum}$` },
+            { h: 'Divide by 5', d: `$${sum} \\div 5 = ${mean}$` }
+          ]
+        };
+      }
+      const wantMode = measure === 'mode';
       return {
         prompt: `Here are five quiz scores: $${data.join(',\\ ')}$. Find the **${wantMode ? 'mode' : 'range'}**.`,
         answerType: 'numeric', answer: { value: wantMode ? modeV : range },
-        traps: [{ value: wantMode ? range : modeV, why: wantMode ? 'That’s the range — the mode is the most frequent value.' : 'That’s the mode — the range is highest minus lowest.' }],
+        traps: [{ value: wantMode ? range : modeV, why: wantMode ? 'That’s the range — the mode is the most frequent value.' : 'That’s the mode — the range is highest minus lowest.' }].filter(t => t.value !== (wantMode ? modeV : range)),
         hints: [wantMode ? 'The mode is the value that appears most often.' : 'The range measures spread: highest − lowest.', `Sorted: $${sorted.join(', ')}$.`, wantMode ? `Which value appears twice?` : `$${sorted[4]} - ${sorted[0]}$.`],
         steps: [
           { h: 'Sort the data', d: `$${sorted.join(',\\ ')}$` },
@@ -610,42 +846,203 @@ export const year7 = {
       };
     }
     if (diff === 2) {
-      const n = rc(rng, [4, 5, 6]);
-      const mean = ri(rng, 5, 15);
-      let data = Array.from({ length: n - 1 }, () => ri(rng, mean - 4, mean + 4));
-      const last = mean * n - data.reduce((s, v) => s + v, 0);
-      if (last < 0 || last > mean + 12) return year7['y7-data'](rng, diff);
-      data.push(last);
-      data = rs(rng, data);
+      // Reading a display rather than a list: the same tally is shown either as
+      // a frequency table or as a dot plot, and every question is answered off
+      // the display.
+      const ctx = rc(rng, [
+        { label: 'Goals', phrase: 'number of goals scored in a netball season', who: 'players', one: 'player', item: 'goals', top: 6 },
+        { label: 'Pets', phrase: 'number of pets owned', who: 'students', one: 'student', item: 'pets', top: 1 },
+        { label: 'Siblings', phrase: 'number of siblings', who: 'students', one: 'student', item: 'siblings', top: 1 },
+        { label: 'Books', phrase: 'number of books read over the holidays', who: 'students', one: 'student', item: 'books', top: 4 },
+        { label: 'Score', phrase: 'score on a short spelling quiz', who: 'students', one: 'student', item: 'marks', top: 6 }
+      ]);
+      const n = rc(rng, [5, 6]);
+      const base = ri(rng, 0, ctx.top);
+      const values = Array.from({ length: n }, (_, i) => base + i);
+      const freqs = Array.from({ length: n }, () => ri(rng, 1, 6));
+      let top = 0, ties = 0;
+      freqs.forEach(f => { if (f > top) { top = f; ties = 1; } else if (f === top) ties++; });
+      if (ties > 1) freqs[freqs.indexOf(top)] = top + 1;
+      const modeIdx = freqs.indexOf(Math.max(...freqs));
+      const total = freqs.reduce((s, f) => s + f, 0);
+      const asDots = ri(rng, 0, 2) === 0;
+      const display = asDots ? 'dot plot' : 'frequency table';
+      const table = `\\begin{array}{c|${'c'.repeat(n)}} \\text{${ctx.label}} & ${values.join(' & ')} \\\\ \\hline \\text{Frequency} & ${freqs.join(' & ')} \\end{array}`;
+      const tail = asDots ? '' : `\n\n$${table}$`;
+      const lead = withTotal => (withTotal
+        ? `The ${display} shows the ${ctx.phrase} for each of $${total}$ ${ctx.who}.`
+        : `The ${display} shows the ${ctx.phrase} for a group of ${ctx.who}.`) + tail;
+      const figure = asDots ? figDotPlot(values, freqs, ctx.label) : undefined;
+      const readOff = asDots ? 'Count the dots in each column' : 'Read along the frequency row';
+      const people = k => `${k} ${k === 1 ? ctx.one : ctx.who}`;
+      const ask = ri(rng, 0, 3);
+      if (ask === 0) {
+        return {
+          prompt: `${lead(false)}\n\nHow many ${ctx.who} are in the data set altogether?`,
+          figure,
+          answerType: 'numeric', answer: { value: total },
+          traps: [
+            { value: n, why: `That is how many *different* ${ctx.item} counts appear, not how many ${ctx.who} there are. Add the frequencies instead.` },
+            { value: values.reduce((s, v) => s + v, 0), why: `You added the ${ctx.label} row. The frequencies are the row that counts ${ctx.who}.` }
+          ].filter(t => t.value !== total),
+          hints: [`Each ${asDots ? 'dot' : 'unit of frequency'} stands for one of the ${ctx.who}.`,
+            `${readOff} and add them all up.`,
+            `$${freqs.join(' + ')}$.`],
+          steps: [
+            { h: readOff, d: `$${freqs.join(',\\ ')}$` },
+            { h: 'Add the frequencies', d: `$${freqs.join(' + ')} = ${total}$` }
+          ]
+        };
+      }
+      if (ask === 1) {
+        return {
+          prompt: `${lead(true)}\n\nWhat is the **mode** of the ${ctx.item}?`,
+          figure,
+          answerType: 'numeric', answer: { value: values[modeIdx] },
+          traps: [{ value: freqs[modeIdx], why: `That is *how often* the mode occurs. The mode is the ${ctx.label} value itself — the one with the ${asDots ? 'tallest column of dots' : 'largest frequency'}.` }].filter(t => t.value !== values[modeIdx]),
+          hints: ['The mode is the value that occurs most often.',
+            `Find the ${asDots ? 'tallest column' : 'biggest number in the frequency row'}.`,
+            `The largest frequency is $${freqs[modeIdx]}$ — now read off which ${ctx.label} value sits with it.`],
+          steps: [
+            { h: 'Find the largest frequency', d: `$${freqs[modeIdx]}$` },
+            { h: 'Read off its value', d: `Mode $= ${values[modeIdx]}$ ${ctx.item}` }
+          ]
+        };
+      }
+      if (ask === 2) {
+        const ci = ri(rng, 1, n - 2);
+        const cut = values[ci];
+        const atLeast = freqs.slice(ci).reduce((s, f) => s + f, 0);
+        return {
+          prompt: `${lead(true)}\n\nHow many ${ctx.who} recorded **at least $${cut}$** ${ctx.item}?`,
+          figure,
+          answerType: 'numeric', answer: { value: atLeast },
+          traps: [
+            { value: atLeast - freqs[ci], why: `“At least $${cut}$” includes $${cut}$ itself, so the ${people(freqs[ci])} on $${cut}$ count as well.` },
+            { value: total - atLeast, why: `That counts the ${ctx.who} *below* $${cut}$ — the complement of what was asked.` }
+          ].filter(t => t.value !== atLeast),
+          hints: [`“At least $${cut}$” means $${cut}$ or more.`,
+            `So the columns for $${values.slice(ci).join(',\\ ')}$ all count.`,
+            `Add those frequencies: $${freqs.slice(ci).join(' + ')}$.`],
+          steps: [
+            { h: 'Which values qualify?', d: `$${values.slice(ci).join(',\\ ')}$` },
+            { h: 'Add their frequencies', d: `$${freqs.slice(ci).join(' + ')} = ${atLeast}$` }
+          ]
+        };
+      }
+      const hi = ri(rng, 0, n - 1);
+      let lo = ri(rng, 0, n - 1);
+      if (freqs[hi] <= freqs[lo]) lo = freqs.indexOf(Math.min(...freqs));
+      if (freqs[hi] <= freqs[lo]) return year7['y7-data'](rng, diff);
       return {
-        prompt: `Find the mean of: $${data.join(',\\ ')}$.`,
-        answerType: 'numeric', answer: { value: mean },
-        traps: [{ value: data.reduce((s, v) => s + v, 0), why: `That's the total — divide by how many values there are (${n}).` }],
-        hints: ['Mean = total ÷ number of values.', `Add them up first: what's the total?`, `Total is ${mean * n}; divide by ${n}.`],
+        prompt: `${lead(true)}\n\nHow many **more** ${ctx.who} recorded $${values[hi]}$ ${ctx.item} than recorded $${values[lo]}$ ${ctx.item}?`,
+        figure,
+        answerType: 'numeric', answer: { value: freqs[hi] - freqs[lo] },
+        traps: [
+          { value: freqs[hi] + freqs[lo], why: 'That is the combined total. “How many more” asks for the **difference** between the two frequencies.' },
+          { value: values[hi] - values[lo], why: `You subtracted the ${ctx.label} values. Compare the frequencies — how many ${ctx.who} sit in each column.` }
+        ].filter(t => t.value !== freqs[hi] - freqs[lo]),
+        hints: [`Read the frequency for $${values[hi]}$ and the frequency for $${values[lo]}$.`,
+          `They are $${freqs[hi]}$ and $${freqs[lo]}$.`,
+          `Subtract: $${freqs[hi]} - ${freqs[lo]}$.`],
         steps: [
-          { h: 'Add the values', d: `$${data.join(' + ')} = ${mean * n}$` },
-          { h: `Divide by ${n}`, d: `$${mean * n} \\div ${n} = ${mean}$` }
+          { h: `Frequency of ${values[hi]}`, d: `${people(freqs[hi])}` },
+          { h: `Frequency of ${values[lo]}`, d: `${people(freqs[lo])}` },
+          { h: 'Difference', d: `$${freqs[hi]} - ${freqs[lo]} = ${freqs[hi] - freqs[lo]}$` }
         ]
       };
     }
     if (diff === 3) {
-      const n = 6;
-      let data = Array.from({ length: n }, () => ri(rng, 2, 20)).sort((a, b) => a - b);
-      if (data[2] === data[3]) data[3] += 1;
-      const med = (data[2] + data[3]) / 2;
-      const shown = rs(rng, data);
+      // Which average actually describes this data set? Every distractor here
+      // is false for the data shown, not merely second-best.
+      const kind = ri(rng, 0, 2);
+      if (kind === 0) {
+        const ctx = rc(rng, [
+          { story: 'the wait, in minutes, for each of 8 customers at a café', typ: 'a typical wait' },
+          { story: 'the money, in dollars, each of 8 people gave to a fundraiser', typ: 'a typical donation' },
+          { story: 'the time, in seconds, each of 8 students took to solve a puzzle', typ: 'a typical time' }
+        ]);
+        const lo = ri(rng, 4, 16);
+        const core = distinct(rng, 7, () => ri(rng, lo, lo + 11)).sort((a, b) => a - b);
+        if (core.length < 7) return year7['y7-data'](rng, diff);
+        const out = core[6] + ri(rng, 45, 90);
+        const sorted = [...core, out];
+        const med = (sorted[3] + sorted[4]) / 2;
+        const meanV = sorted.reduce((s, v) => s + v, 0) / 8;
+        const shown = rs(rng, sorted);
+        const m = mcq(rng, 'The median, because a single very large value drags the mean away from the rest', [
+          { text: 'The mean, because it uses every value', why: `The mean is $\\approx ${r1(meanV)}$ — pulled up by the one value of $${out}$. The median is $${num(med)}$, which sits among the other seven.` },
+          { text: 'The mode, because it is the most common value', why: 'Every value in this set occurs exactly once, so there is no mode to quote.' },
+          { text: 'The range, because it shows how spread out the data is', why: 'The range measures **spread**, not centre — it is not a measure of centre at all.' }
+        ]);
+        return {
+          prompt: `A record was kept of ${ctx.story}: $${shown.join(',\\ ')}$.\n\nWhich measure of centre best describes ${ctx.typ}?`,
+          answerType: 'mcq', answer: { correctIndex: m.correctIndex, optionTraps: m.optionTraps }, mcqOptions: m.options,
+          hints: ['Look at the data first — is there a value far away from all the others?',
+            `Seven values sit between $${core[0]}$ and $${core[6]}$; the eighth is $${out}$.`,
+            'The mean is affected by every value, so an extreme one drags it. The median only cares about position.'],
+          steps: [
+            { h: 'Order the data', d: `$${sorted.join(',\\ ')}$` },
+            { h: 'Spot the outlier', d: `$${out}$ sits far above the other seven` },
+            { h: 'Compare the two averages', d: `Mean $\\approx ${r1(meanV)}$, median $= ${num(med)}$` },
+            { h: 'Choose', d: `The median is the better description of ${ctx.typ}, because it is not dragged by the outlier.` }
+          ]
+        };
+      }
+      if (kind === 1) {
+        const ctx = rc(rng, [
+          { setting: 'A canteen', thing: 'smoothie flavour', cats: ['mango', 'berry', 'banana', 'citrus'], who: 'orders', act: 'blend most of' },
+          { setting: 'A sports club', thing: 'jersey colour', cats: ['navy', 'red', 'green', 'gold'], who: 'votes', act: 'order most of' },
+          { setting: 'A canteen', thing: 'sandwich filling', cats: ['ham', 'salad', 'chicken', 'cheese'], who: 'orders', act: 'make most of' }
+        ]);
+        const counts = distinct(rng, 4, () => ri(rng, 3, 24));
+        if (counts.length < 4) return year7['y7-data'](rng, diff);
+        const best = counts.indexOf(Math.max(...counts));
+        const total = counts.reduce((s, v) => s + v, 0);
+        const listed = ctx.cats.map((c, i) => `${c} ${counts[i]}`).join(', ');
+        const m = mcq(rng, `The mode — ${ctx.cats[best]}, the ${ctx.thing} chosen most often`, [
+          { text: 'The mean, because it takes every response into account', why: `You cannot add ${ctx.cats[0]} to ${ctx.cats[1]} — the ${ctx.thing} is a category, not a number, so a mean cannot be calculated.` },
+          { text: 'The median, because it sits in the middle', why: `Category names have no numerical order, so there is no “middle” ${ctx.thing} to find.` },
+          { text: 'The range, because it covers all the choices', why: 'The range is highest minus lowest — it needs numbers, and it measures spread rather than centre.' }
+        ]);
+        return {
+          prompt: `${ctx.setting} recorded the ${ctx.thing} chosen across all $${total}$ ${ctx.who}: ${listed}.\n\nWhich measure of centre should they use to decide which ${ctx.thing} to ${ctx.act} next time?`,
+          answerType: 'mcq', answer: { correctIndex: m.correctIndex, optionTraps: m.optionTraps }, mcqOptions: m.options,
+          hints: [`Ask first: is ${ctx.thing} a **number** or a **category**?`,
+            'Means and medians need numbers you can add or put in order.',
+            'Only one measure of centre works for categorical data.'],
+          steps: [
+            { h: 'Classify the data', d: `${ctx.thing.charAt(0).toUpperCase() + ctx.thing.slice(1)} is categorical — the values are names, not numbers.` },
+            { h: 'Rule out mean and median', d: 'Neither adding nor ordering makes sense for category names.' },
+            { h: 'Use the mode', d: `The most frequent category is **${ctx.cats[best]}** ($${counts[best]}$ ${ctx.who}).` }
+          ]
+        };
+      }
+      const base = ri(rng, 20, 60);
+      const core = distinct(rng, 6, () => ri(rng, base, base + 12)).sort((a, b) => a - b);
+      if (core.length < 6) return year7['y7-data'](rng, diff);
+      const out = base + ri(rng, 90, 160);
+      const sorted = [...core, out];
+      const shown = rs(rng, sorted);
+      const total = sorted.reduce((s, v) => s + v, 0);
+      const meanBefore = total / 7, meanAfter = (total - out) / 6;
+      const medBefore = sorted[3], medAfter = (core[2] + core[3]) / 2;
+      const m = mcq(rng, 'The mean', [
+        { text: 'The median', why: `The median only moves from $${medBefore}$ to $${num(medAfter)}$ — a change of $${num(Math.abs(medBefore - medAfter))}$, far less than the mean’s.` },
+        { text: 'The mode', why: 'No value is repeated in this set, so there is no mode either before or after.' },
+        { text: 'All three change by the same amount', why: `They do not: the mean moves by $\\approx ${r1(Math.abs(meanBefore - meanAfter))}$ while the median moves by $${num(Math.abs(medBefore - medAfter))}$.` }
+      ]);
       return {
-        prompt: `The daily screen-time (hours) of six students was: $${shown.join(',\\ ')}$. Find the **median**.`,
-        answerType: 'numeric', answer: { value: med },
-        traps: [
-          { value: (shown[2] + shown[3]) / 2, why: 'Sort the data first — the median is the middle of the *ordered* list.' },
-          { value: data[2], why: 'With an even number of values, the median is the average of the two middle values.' }
-        ],
-        hints: ['Put the values in order first.', `Ordered: $${data.join(', ')}$. With 6 values, the median sits between the 3rd and 4th.`, `Average $${data[2]}$ and $${data[3]}$.`],
+        prompt: `Seven students recorded the minutes they spent on homework: $${shown.join(',\\ ')}$. The largest value was later found to be a recording error and was removed.\n\n**Which measure of centre changed the most** when it was removed?`,
+        answerType: 'mcq', answer: { correctIndex: m.correctIndex, optionTraps: m.optionTraps }, mcqOptions: m.options,
+        hints: ['Work out each measure before and after removing the value.',
+          `Before: mean $\\approx ${r1(meanBefore)}$, median $= ${medBefore}$.`,
+          `After: mean $\\approx ${r1(meanAfter)}$, median $= ${num(medAfter)}$.`],
         steps: [
-          { h: 'Order the data', d: `$${data.join(',\\ ')}$` },
-          { h: 'Locate the middle pair', d: `3rd and 4th values: $${data[2]}$ and $${data[3]}$` },
-          { h: 'Average them', d: `$\\dfrac{${data[2]} + ${data[3]}}{2} = ${med}$` }
+          { h: 'Order the data', d: `$${sorted.join(',\\ ')}$` },
+          { h: 'Before removal', d: `Mean $\\approx ${r1(meanBefore)}$, median $= ${medBefore}$` },
+          { h: 'After removal', d: `Mean $\\approx ${r1(meanAfter)}$, median $= ${num(medAfter)}$` },
+          { h: 'Compare the shifts', d: `Mean moved $\\approx ${r1(Math.abs(meanBefore - meanAfter))}$; median moved $${num(Math.abs(medBefore - medAfter))}$ — the mean is the one an outlier distorts.` }
         ]
       };
     }

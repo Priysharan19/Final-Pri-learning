@@ -4,6 +4,21 @@
 import { ri, rc, rs, nz, gcd, Frac, mcq, term, sgn, moneyPlain, r1, r2, r3, NAMES, ITEMS } from '../qhelpers.js';
 import { figCircle } from '../figures.js';
 
+/**
+ * One index-form term written twice: `tex` for the prompt, `expr` for the
+ * answer key. Zero indices are dropped, so the zero-index law shows up in the
+ * answer as a vanished pronumeral rather than as `a^0`.
+ */
+function idxParts(coef, vars) {
+  const live = vars.filter(([, e]) => e !== 0);
+  const tex = live.map(([v, e]) => (e === 1 ? v : `${v}^{${e}}`)).join('');
+  const body = live.map(([v, e]) => (e === 1 ? v : `${v}^${e}`)).join('*');
+  return {
+    tex: `${coef === 1 && tex ? '' : coef}${tex}`,
+    expr: body ? `${coef}*${body}` : String(coef)
+  };
+}
+
 export const year8 = {
 
   // ── Index notation & laws ────────────────────────────────────────────────
@@ -200,22 +215,102 @@ export const year8 = {
         ]
       };
     }
-    const g = ri(rng, 2, 4), p = ri(rng, 2, 5), q = nz(rng, 2, 7);
-    const A = g * p, B = g * q;
+    // Index laws applied to whole algebraic expressions — coefficients and
+    // pronumerals handled separately, and every resulting index left positive.
+    const kind = ri(rng, 0, 3);
+    if (kind === 0) {
+      const A = ri(rng, 2, 8), B = ri(rng, 2, 8);
+      const p = ri(rng, 1, 5), q = ri(rng, 1, 4), r = ri(rng, 1, 5), s = ri(rng, 1, 4);
+      const ans = idxParts(A * B, [['a', p + r], ['b', q + s]]);
+      const left = idxParts(A, [['a', p], ['b', q]]), right = idxParts(B, [['a', r], ['b', s]]);
+      return {
+        prompt: `Simplify $${left.tex} \\times ${right.tex}$.`,
+        answerType: 'expression', answer: { expr: ans.expr, positiveOnly: true },
+        inputHint: 'e.g. 12a^5b^3',
+        traps: [
+          { expr: idxParts(A * B, [['a', p * r], ['b', q * s]]).expr, why: 'Multiplying powers of the same base **adds** the indices — multiplying them is the power-of-a-power law, which is not what is happening here.' },
+          { expr: idxParts(A + B, [['a', p + r], ['b', q + s]]).expr, why: `The number parts are multiplied, not added: $${A} \\times ${B} = ${A * B}$.` }
+        ],
+        hints: ['Deal with the numbers, the $a$s and the $b$s separately.',
+          `Numbers: $${A} \\times ${B} = ${A * B}$.`,
+          `Same base, so add the indices: $a^{${p}} \\times a^{${r}} = a^{${p + r}}$ and $b^{${q}} \\times b^{${s}} = b^{${q + s}}$.`],
+        steps: [
+          { h: 'Multiply the coefficients', d: `$${A} \\times ${B} = ${A * B}$` },
+          { h: 'Add the indices, base by base', d: `$a^{${p}} \\times a^{${r}} = a^{${p + r}}$, $\\quad b^{${q}} \\times b^{${s}} = b^{${q + s}}$` },
+          { h: 'Put it together', d: `$${ans.tex}$` }
+        ]
+      };
+    }
+    if (kind === 1) {
+      const B = ri(rng, 2, 7), k = ri(rng, 2, 9);
+      const A = B * k;
+      const r = ri(rng, 1, 4), s = ri(rng, 1, 3);
+      const p = r + ri(rng, 1, 4), q = s + ri(rng, 1, 3);
+      const ans = idxParts(k, [['a', p - r], ['b', q - s]]);
+      const top = idxParts(A, [['a', p], ['b', q]]), bot = idxParts(B, [['a', r], ['b', s]]);
+      return {
+        prompt: `Simplify $\\dfrac{${top.tex}}{${bot.tex}}$.`,
+        answerType: 'expression', answer: { expr: ans.expr, positiveOnly: true },
+        inputHint: 'e.g. 3a^2b',
+        traps: [
+          { expr: idxParts(A - B, [['a', p - r], ['b', q - s]]).expr, why: `The coefficients are **divided**, not subtracted: $${A} \\div ${B} = ${k}$.` },
+          { expr: idxParts(k, [['a', p], ['b', q]]).expr, why: 'The indices on the bottom have to come off the top ones — subtract them.' }
+        ],
+        hints: ['Divide the number parts, then handle each base.',
+          `Numbers: $${A} \\div ${B} = ${k}$.`,
+          `Same base on top and bottom, so subtract the indices: $a^{${p}} \\div a^{${r}} = a^{${p - r}}$.`],
+        steps: [
+          { h: 'Divide the coefficients', d: `$${A} \\div ${B} = ${k}$` },
+          { h: 'Subtract the indices, base by base', d: `$a^{${p}} \\div a^{${r}} = a^{${p - r}}$, $\\quad b^{${q}} \\div b^{${s}} = b^{${q - s}}$` },
+          { h: 'Put it together', d: `$${ans.tex}$` }
+        ]
+      };
+    }
+    if (kind === 2) {
+      const c = ri(rng, 2, 5), n = ri(rng, 2, 3);
+      const p = ri(rng, 1, 4), q = ri(rng, 1, 3);
+      const inner = idxParts(c, [['x', p], ['y', q]]);
+      const ans = idxParts(Math.pow(c, n), [['x', p * n], ['y', q * n]]);
+      return {
+        prompt: `Simplify $\\left(${inner.tex}\\right)^{${n}}$.`,
+        answerType: 'expression', answer: { expr: ans.expr, positiveOnly: true },
+        inputHint: 'e.g. 9x^6y^2',
+        traps: [
+          { expr: idxParts(c, [['x', p * n], ['y', q * n]]).expr, why: `The power outside applies to **every** factor inside, including the $${c}$: $${c}^{${n}} = ${Math.pow(c, n)}$.` },
+          { expr: idxParts(Math.pow(c, n), [['x', p + n], ['y', q + n]]).expr, why: 'A power of a power **multiplies** the indices — adding is for multiplying two terms together.' }
+        ],
+        hints: ['Everything inside the bracket is raised to the outside power.',
+          `$${c}^{${n}} = ${Math.pow(c, n)}$.`,
+          `$(x^{${p}})^{${n}} = x^{${p} \\times ${n}} = x^{${p * n}}$.`],
+        steps: [
+          { h: 'Raise the coefficient', d: `$${c}^{${n}} = ${Math.pow(c, n)}$` },
+          { h: 'Multiply the indices', d: `$(x^{${p}})^{${n}} = x^{${p * n}}$, $\\quad (y^{${q}})^{${n}} = y^{${q * n}}$` },
+          { h: 'Put it together', d: `$${ans.tex}$` }
+        ]
+      };
+    }
+    const B = ri(rng, 2, 6), k = ri(rng, 2, 9);
+    const A = B * k;
+    const p = ri(rng, 2, 6), s = ri(rng, 1, 3);
+    const q = s + ri(rng, 1, 4);
+    const ans = idxParts(k, [['m', 0], ['n', q - s]]);
+    const top = idxParts(A, [['m', p], ['n', q]]), bot = idxParts(B, [['m', p], ['n', s]]);
     return {
-      prompt: `Factorise $${A}x^2 ${sgn(B)}x$ fully.`,
-      answerType: 'expression', answer: { expr: `${g}x(${p}x + ${q})`, positiveOnly: true },
-      inputHint: `e.g. ${g}x(2x + 5)`,
+      prompt: `Simplify $\\dfrac{${top.tex}}{${bot.tex}}$.`,
+      answerType: 'expression', answer: { expr: ans.expr, positiveOnly: true },
+      inputHint: 'e.g. 4n^3',
       traps: [
-        { expr: `${g}(${p}x^2 + ${q}x)`, why: 'Both terms also share an $x$ — take it out along with the number.' },
-        { expr: `x(${A}x + ${B})`, why: `Both terms also share the number ${g} — the highest common factor is ${g}x.` }
+        { expr: idxParts(k, [['m', p], ['n', q - s]]).expr, why: `Both $m$ powers are $m^{${p}}$, so they cancel completely — no $m$ is left in the answer.` },
+        { expr: idxParts(k, [['m', 0], ['n', q + s]]).expr, why: 'Dividing powers of the same base subtracts the indices.' }
       ],
-      hints: ['Both terms share a number *and* a power of x.', `$\\text{HCF} = ${g}x$.`, `$${A}x^2 \\div ${g}x = ${p}x$ and $${B}x \\div ${g}x = ${q}$.`],
+      hints: ['Take the numbers, the $m$s and the $n$s one at a time.',
+        `$m^{${p}} \\div m^{${p}} = m^{0}$ — and anything (except 0) to the power 0 is $1$.`,
+        `$n^{${q}} \\div n^{${s}} = n^{${q - s}}$, and $${A} \\div ${B} = ${k}$.`],
       steps: [
-        { h: 'Common factor', d: `$\\text{HCF}(${A}x^2, ${B}x) = ${g}x$` },
-        { h: 'Divide each term', d: `$${A}x^2 \\div ${g}x = ${p}x$, $\\quad ${B}x \\div ${g}x = ${q}$` },
-        { h: 'Write as a product', d: `$${g}x(${p}x ${sgn(q)})$` },
-        { h: 'Check', d: `Expanding gives $${A}x^2 ${sgn(B)}x$ ✓` }
+        { h: 'Divide the coefficients', d: `$${A} \\div ${B} = ${k}$` },
+        { h: 'The m terms', d: `$m^{${p}} \\div m^{${p}} = m^{0} = 1$` },
+        { h: 'The n terms', d: `$n^{${q}} \\div n^{${s}} = n^{${q - s}}$` },
+        { h: 'Put it together', d: `$${ans.tex}$` }
       ]
     };
   },
@@ -539,14 +634,75 @@ export const year8 = {
   // ── Rates, speed & time ──────────────────────────────────────────────────
   'y8-rates': (rng, diff) => {
     if (diff === 1) {
-      const t = ri(rng, 2, 6), v = ri(rng, 40, 110);
-      const d = v * t;
+      // Unit pricing: put both sizes on the same footing before comparing.
+      const kind = ri(rng, 0, 2);
+      if (kind === 0) {
+        const ctx = rc(rng, [
+          { item: 'apple juice', big: 'litre', small: 'mL', per: 1000, sizes: [250, 500, 750, 1500, 2000] },
+          { item: 'laundry powder', big: 'kilogram', small: 'g', per: 1000, sizes: [250, 500, 750, 1500, 2000] }
+        ]);
+        const unitCents = 4 * ri(rng, 60, 225);
+        const size = rc(rng, ctx.sizes);
+        const priceCents = unitCents * size / ctx.per;
+        const unit = unitCents / 100, price = priceCents / 100;
+        const held = size / ctx.per;
+        return {
+          prompt: `A $${size}$ ${ctx.small} pack of ${ctx.item} costs ${moneyPlain(price)}. What is the cost per ${ctx.big}?`,
+          answerType: 'numeric', answer: { value: unit, tol: 0.005 }, answerPrefix: '$',
+          traps: [
+            { value: r2(unit / 10), why: `That is the cost per $100$ ${ctx.small}. One ${ctx.big} is $${ctx.per}$ ${ctx.small} — ten times as much again.`, tol: 0.005 },
+            { value: r2(price * held), why: `You multiplied by $${r3(held)}$. The pack holds $${r3(held)}$ ${ctx.big}s, so to price one ${ctx.big} you **divide** by $${r3(held)}$.`, tol: 0.005 }
+          ],
+          hints: [`One ${ctx.big} is $${ctx.per}$ ${ctx.small}.`,
+            `So the pack holds $${size} \\div ${ctx.per} = ${r3(held)}$ ${ctx.big}s.`,
+            `Cost per ${ctx.big} $= ${r2(price)} \\div ${r3(held)}$.`],
+          steps: [
+            { h: `How many ${ctx.big}s in the pack?`, d: `$${size} \\div ${ctx.per} = ${r3(held)}$` },
+            { h: 'Price for one', d: `$${r2(price)} \\div ${r3(held)} = ${r2(unit)}$` },
+            { h: 'Unit price', d: `${moneyPlain(unit)} per ${ctx.big}` }
+          ]
+        };
+      }
+      if (kind === 1) {
+        const packs = ri(rng, 3, 12);
+        const each = ri(rng, 35, 480);
+        const total = packs * each;
+        return {
+          prompt: `A multipack of $${packs}$ identical muesli bars costs ${moneyPlain(total / 100)}. What is the cost of **one** bar?`,
+          answerType: 'numeric', answer: { value: each / 100, tol: 0.005 }, answerPrefix: '$',
+          traps: [{ value: r2(total / 100 * packs), why: `Sharing ${moneyPlain(total / 100)} between $${packs}$ bars means **dividing** by $${packs}$.`, tol: 0.005 }],
+          hints: ['Unit price = total price ÷ number of items.',
+            `$${r2(total / 100)} \\div ${packs}$.`,
+            `Work in cents if it helps: $${total} \\div ${packs}$ cents.`],
+          steps: [
+            { h: 'Total in cents', d: `$${total}$ cents` },
+            { h: `Divide by ${packs}`, d: `$${total} \\div ${packs} = ${each}$ cents` },
+            { h: 'Cost of one bar', d: `${moneyPlain(each / 100)}` }
+          ]
+        };
+      }
+      const item = rc(rng, ['rolled oats', 'rice', 'dog biscuits', 'pasta']);
+      const uA = ri(rng, 45, 320), uB = ri(rng, 45, 320);
+      if (uA === uB) return year8['y8-rates'](rng, diff);
+      const mA = rc(rng, [200, 300, 400, 500]), mB = rc(rng, [600, 800, 900, 1200]);
+      const pA = uA * mA / 100, pB = uB * mB / 100;
+      const aWins = uA < uB;
+      const m = mcq(rng, `The $${aWins ? mA : mB}$ g pack, at $${r2(Math.min(uA, uB))}$c per 100 g`, [
+        { text: `The $${aWins ? mB : mA}$ g pack, at $${r2(Math.max(uA, uB))}$c per 100 g`, why: 'That pack costs **more** for the same 100 g — the best buy is the one with the *lowest* unit price.' },
+        { text: `The $${mB}$ g pack, because you get more for your money in a bigger pack`, why: 'Bigger is not automatically cheaper per 100 g — you have to work the unit prices out and compare them.' },
+        { text: `The $${mA}$ g pack, because it has the smaller price tag`, why: 'A smaller total price just means a smaller pack. Compare the cost of the *same amount* from each.' }
+      ]);
       return {
-        prompt: `A car travels $${d}$ km in $${t}$ hours. Find its average speed.`,
-        answerType: 'numeric', answer: { value: v }, answerSuffix: 'km/h',
-        traps: [{ value: d * t, why: 'Speed = distance ÷ time (multiplying gives a meaningless number here).' }],
-        hints: ['Speed = distance ÷ time.', `$${d} \\div ${t}$.`, `That's ${v} km each hour.`],
-        steps: [{ h: 'Apply s = d ÷ t', d: `$s = \\dfrac{${d}}{${t}} = ${v}$ km/h` }]
+        prompt: `A $${mA}$ g pack of ${item} costs ${moneyPlain(pA / 100)} and a $${mB}$ g pack costs ${moneyPlain(pB / 100)}. Which is the better buy?`,
+        answerType: 'mcq', answer: { correctIndex: m.correctIndex, optionTraps: m.optionTraps }, mcqOptions: m.options,
+        hints: ['You cannot compare the price tags directly — the packs hold different amounts.',
+          'Work out what 100 g costs from each pack.',
+          `$${pA} \\div ${mA / 100}$ and $${pB} \\div ${mB / 100}$, both in cents.`],
+        steps: [
+          { h: `Unit price, ${mA} g pack`, d: `$${pA} \\div ${mA / 100} = ${r2(uA)}$c per 100 g` },
+          { h: `Unit price, ${mB} g pack`, d: `$${pB} \\div ${mB / 100} = ${r2(uB)}$c per 100 g` },
+          { h: 'Compare', d: `$${r2(Math.min(uA, uB))} < ${r2(Math.max(uA, uB))}$, so the $${aWins ? mA : mB}$ g pack is the better buy.` }
+        ]
       };
     }
     if (diff === 2) {

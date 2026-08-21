@@ -313,6 +313,46 @@ export const year9 = {
   // ── Coordinate geometry ──────────────────────────────────────────────────
   'y9-linear': (rng, diff) => {
     if (diff === 1) {
+      const task = rc(rng, ['midpoint', 'gradient', 'distance']);
+      if (task === 'gradient') {
+        const ax = ri(rng, -6, 6), ay = ri(rng, -6, 6);
+        const run = ri(rng, 1, 5) * rc(rng, [1, -1]), m = nz(rng, -4, 4);
+        const bx = ax + run, by = ay + m * run;
+        return {
+          prompt: `Find the gradient of the line through $(${ax}, ${ay})$ and $(${bx}, ${by})$.`,
+          answerType: 'numeric', answer: { value: m },
+          traps: [
+            { value: (bx - ax) / (by - ay), why: 'Gradient is **rise over run** — the change in $y$ goes on top.' },
+            { value: -m, why: `Subtract the points in the **same order** top and bottom: starting from $(${ax}, ${ay})$ on top means starting from it underneath too.` }
+          ].filter(t => t.value !== m),
+          hints: ['Gradient $m = \\dfrac{\\text{rise}}{\\text{run}} = \\dfrac{y_2 - y_1}{x_2 - x_1}$.',
+            `Rise $= ${by} - (${ay}) = ${by - ay}$, run $= ${bx} - (${ax}) = ${bx - ax}$.`,
+            `$m = \\dfrac{${by - ay}}{${bx - ax}}$.`],
+          steps: [
+            { h: 'Rise', d: `$${by} - (${ay}) = ${by - ay}$` },
+            { h: 'Run', d: `$${bx} - (${ax}) = ${bx - ax}$` },
+            { h: 'Divide', d: `$m = \\dfrac{${by - ay}}{${bx - ax}} = ${m}$` }
+          ]
+        };
+      }
+      if (task === 'distance') {
+        const [dx, dy, dist] = rc(rng, TRIPLES.slice(0, 4));
+        const ax = ri(rng, -6, 6), ay = ri(rng, -6, 6);
+        const bx = ax + dx * rc(rng, [1, -1]), by = ay + dy * rc(rng, [1, -1]);
+        return {
+          prompt: `Find the distance between $(${ax}, ${ay})$ and $(${bx}, ${by})$.`,
+          answerType: 'numeric', answer: { value: dist }, answerSuffix: 'units',
+          traps: [{ value: dx + dy, why: 'You cannot walk straight along the horizontal and then the vertical — the direct distance is the hypotenuse, found with Pythagoras.' }].filter(t => t.value !== dist),
+          hints: ['Draw the right-angled triangle with a horizontal and a vertical side.',
+            `Run $= ${dx}$, rise $= ${dy}$.`,
+            `$d = \\sqrt{${dx}^2 + ${dy}^2} = \\sqrt{${dx * dx + dy * dy}}$.`],
+          steps: [
+            { h: 'Horizontal and vertical changes', d: `$\\Delta x = ${dx}, \\ \\Delta y = ${dy}$` },
+            { h: 'Pythagoras', d: `$d = \\sqrt{${dx}^2 + ${dy}^2} = \\sqrt{${dx * dx + dy * dy}}$` },
+            { h: 'Evaluate', d: `$d = ${dist}$ units` }
+          ]
+        };
+      }
       const x1 = ri(rng, -6, 6), y1 = ri(rng, -6, 6);
       const x2 = x1 + 2 * ri(rng, 1, 4) * rc(rng, [1, -1]), y2 = y1 + 2 * nz(rng, -4, 4) / 2 * 2;
       const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
@@ -330,18 +370,74 @@ export const year9 = {
       };
     }
     if (diff === 2) {
-      const [dx, dy, dist] = rc(rng, TRIPLES.slice(0, 5));
-      const x1 = ri(rng, -5, 5), y1 = ri(rng, -5, 5);
-      const x2 = x1 + dx * rc(rng, [1, -1]), y2 = y1 + dy * rc(rng, [1, -1]);
+      // Turning an equation into a graph: the intercept method, a table of
+      // values, and testing whether a point is on the line.
+      const kind = ri(rng, 0, 2);
+      if (kind === 0) {
+        const a = ri(rng, 1, 6), b = ri(rng, 1, 6);
+        const L = a * b / gcd(a, b);
+        const c = L * nz(rng, -9, 9);
+        const xInt = c / a, yInt = c / b;
+        const wantX = rc(rng, [true, false]);
+        const lhs = `${term(a, 'x')} + ${term(b, 'y')}`;
+        return {
+          prompt: `The line $${lhs} = ${c}$ is to be sketched by plotting its two intercepts. Find the **${wantX ? 'x' : 'y'}-intercept**, as a coordinate pair.`,
+          answerType: 'point', answer: { x: wantX ? xInt : 0, y: wantX ? 0 : yInt },
+          inputHint: 'e.g. (3, 0)',
+          traps: [
+            { why: `On the ${wantX ? 'x' : 'y'}-axis the **${wantX ? 'y' : 'x'}**-coordinate is $0$ — substitute $${wantX ? 'y' : 'x'} = 0$ and solve for $${wantX ? 'x' : 'y'}$.` }
+          ],
+          hints: [`Every point on the ${wantX ? 'x' : 'y'}-axis has $${wantX ? 'y' : 'x'} = 0$.`,
+            `Put $${wantX ? 'y' : 'x'} = 0$ into the equation: $${wantX ? term(a, 'x') : term(b, 'y')} = ${c}$.`,
+            `Divide both sides by $${wantX ? a : b}$.`],
+          steps: [
+            { h: `Set ${wantX ? 'y' : 'x'} = 0`, d: `$${wantX ? term(a, 'x') : term(b, 'y')} = ${c}$` },
+            { h: 'Solve', d: `$${wantX ? 'x' : 'y'} = ${c} \\div ${wantX ? a : b} = ${wantX ? xInt : yInt}$` },
+            { h: 'Write as a point', d: `$(${wantX ? xInt : 0}, ${wantX ? 0 : yInt})$` }
+          ]
+        };
+      }
+      if (kind === 1) {
+        const m = nz(rng, -5, 5), c = ri(rng, -9, 9), k = nz(rng, -6, 6);
+        const y = m * k + c;
+        return {
+          prompt: `A table of values is being built to graph $y = ${term(m)} ${sgn(c)}$. What is the value of $y$ when $x = ${k}$?`,
+          answerType: 'numeric', answer: { value: y }, answerPrefix: 'y =',
+          traps: [
+            { value: m + k + c, why: `$${term(m)}$ means $${m} \\times x$, so substitute $${m} \\times (${k})$ rather than adding.` },
+            { value: m * k - c, why: `The constant keeps its sign: it is $${sgn(c)}$, so add $${c}$ to $${m * k}$.` }
+          ].filter(t => t.value !== y),
+          hints: [`Replace every $x$ with $${k < 0 ? `(${k})` : k}$.`,
+            `$y = ${m} \\times ${k < 0 ? `(${k})` : k} ${sgn(c)}$.`,
+            `$${m} \\times ${k < 0 ? `(${k})` : k} = ${m * k}$.`],
+          steps: [
+            { h: 'Substitute', d: `$y = ${m}(${k}) ${sgn(c)}$` },
+            { h: 'Multiply', d: `$${m} \\times ${k < 0 ? `(${k})` : k} = ${m * k}$` },
+            { h: 'Add the constant', d: `$y = ${m * k} ${sgn(c)} = ${y}$` }
+          ]
+        };
+      }
+      const m = nz(rng, -4, 4), c = ri(rng, -8, 8);
+      const px = nz(rng, -5, 5);
+      const py = m * px + c;
+      const shift = rc(rng, [1, 2, 3, -1, -2, -3]);
+      const qx = nz(rng, -5, 5), qoff = rc(rng, [2, -2, 4, -4]);
+      const swapOk = px !== py && m * py + c !== px;
+      const opts = mcq(rng, `$(${px}, ${py})$`, [
+        { text: `$(${px}, ${py + shift})$`, why: `Substituting $x = ${px}$ gives $y = ${py}$, not $${py + shift}$ — that point sits ${shift > 0 ? 'above' : 'below'} the line.` },
+        ...(swapOk ? [{ text: `$(${py}, ${px})$`, why: 'Coordinates are written $(x, y)$ — these two have been swapped.' }] : []),
+        { text: `$(${qx}, ${m * qx + c + qoff})$`, why: `Substituting $x = ${qx}$ into the equation gives $y = ${m * qx + c}$, so this pair does not satisfy it.` },
+        { text: `$(${px + 1}, ${py})$`, why: `Moving one step right along the line changes $y$ by the gradient $${m}$, so the partner of $x = ${px + 1}$ is $y = ${m * (px + 1) + c}$.` }
+      ]);
       return {
-        prompt: `Find the distance between $(${x1}, ${y1})$ and $(${x2}, ${y2})$.`,
-        answerType: 'numeric', answer: { value: dist },
-        traps: [{ value: Math.abs(x2 - x1) + Math.abs(y2 - y1), why: 'Distance uses Pythagoras on the horizontal and vertical changes — not their sum.' }],
-        hints: ['Form a right-angled triangle from the two points.', `Run $= |${x2} - ${x1}| = ${Math.abs(x2 - x1)}$, rise $= |${y2} - ${y1}| = ${Math.abs(y2 - y1)}$.`, `$d = \\sqrt{${Math.abs(x2 - x1)}^2 + ${Math.abs(y2 - y1)}^2}$.`],
+        prompt: `Which of these points lies **on** the line $y = ${term(m)} ${sgn(c)}$?`,
+        answerType: 'mcq', answer: { correctIndex: opts.correctIndex, optionTraps: opts.optionTraps }, mcqOptions: opts.options,
+        hints: ['A point is on a line exactly when its coordinates satisfy the equation.',
+          'Substitute each x-value and see what y the equation gives.',
+          `For example $x = ${px}$ gives $y = ${m}(${px}) ${sgn(c)} = ${py}$.`],
         steps: [
-          { h: 'Horizontal and vertical changes', d: `$\\Delta x = ${Math.abs(x2 - x1)}, \\ \\Delta y = ${Math.abs(y2 - y1)}$` },
-          { h: 'Distance formula', d: `$d = \\sqrt{${Math.abs(x2 - x1)}^2 + ${Math.abs(y2 - y1)}^2} = \\sqrt{${dx * dx + dy * dy}}$` },
-          { h: 'Evaluate', d: `$d = ${dist}$` }
+          { h: 'Test the x-values', d: `$x = ${px}: \\ y = ${m}(${px}) ${sgn(c)} = ${py}$` },
+          { h: 'Match against the options', d: `Only $(${px}, ${py})$ has the $y$ the equation produces.` }
         ]
       };
     }
@@ -583,14 +679,75 @@ export const year9 = {
         ]
       };
     }
+    // Comparing two simple-interest offers: the winner is never decided by the
+    // rate alone, so every branch needs both accounts worked out in full.
+    const kind = ri(rng, 0, 2);
+    if (kind === 2) {
+      const n2 = ri(rng, 2, 8);
+      const rInt = rc(rng, [2, 3, 4, 5, 6]);
+      const need = rInt * n / n2;
+      if (n2 === n || (need * 4) % 1 !== 0 || need < 1 || need > 12) return year9['y9-simint'](rng, diff);
+      const Iboth = P * rInt / 100 * n;
+      return {
+        prompt: `**Option A:** ${moneyPlain(P)} invested at $${rInt}\\%$ p.a. simple interest for $${n}$ years.\n**Option B:** the same ${moneyPlain(P)} invested for $${n2}$ years.\n\nWhat annual simple-interest rate must Option B pay for the two options to earn **exactly the same interest**?`,
+        answerType: 'numeric', answer: { value: need, tol: 0.005, percent: true }, answerSuffix: '% p.a.',
+        traps: [
+          { value: rInt, why: `Option B runs for $${n2}$ years, not $${n}$, so the same rate would earn a different amount of interest.`, tol: 0.005 },
+          { value: r2(rInt * n2 / n), why: `The rate and the time trade off the other way round: fewer years needs a **higher** rate. Use $r_B = \\dfrac{r_A \\times ${n}}{${n2}}$.`, tol: 0.005 }
+        ].filter(t => Math.abs(t.value - need) > 0.01),
+        hints: [`Work out Option A’s interest first: $I = Prn$.`,
+          `$I = ${P} \\times ${rInt / 100} \\times ${n} = ${r2(Iboth)}$.`,
+          `Now solve $${P} \\times \\dfrac{r}{100} \\times ${n2} = ${r2(Iboth)}$ for $r$.`],
+        steps: [
+          { h: 'Interest from Option A', d: `$I = ${P} \\times ${rInt / 100} \\times ${n} = ${r2(Iboth)}$ → ${moneyPlain(Iboth)}` },
+          { h: 'Same principal, so the rate × time must match', d: `$r_B \\times ${n2} = ${rInt} \\times ${n} = ${rInt * n}$` },
+          { h: 'Solve for the rate', d: `$r_B = \\dfrac{${rInt * n}}{${n2}} = ${need}\\%$ p.a.` }
+        ]
+      };
+    }
+    const P2 = ri(rng, 2, 20) * 500;
+    const rateB = rc(rng, [2, 2.5, 3, 3.5, 4, 4.5, 5, 6]);
+    const n2 = ri(rng, 2, 8);
+    const IB = P2 * rateB / 100 * n2;
+    if (Math.abs(IB - I) < 0.005) return year9['y9-simint'](rng, diff);
+    const aWins = I > IB;
+    const gap = Math.abs(I - IB);
+    const setup = `**Option A:** ${moneyPlain(P)} at $${rr}\\%$ p.a. simple interest for $${n}$ years.\n**Option B:** ${moneyPlain(P2)} at $${rateB}\\%$ p.a. simple interest for $${n2}$ years.`;
+    if (kind === 0) {
+      return {
+        prompt: `${rc(rng, NAMES)} is choosing between two simple-interest accounts.\n\n${setup}\n\nHow much **more interest** does the better option earn?`,
+        answerType: 'numeric', answer: { value: r2(gap), tol: 0.005 }, answerPrefix: '$',
+        traps: [
+          { value: r2(Math.abs((P + I) - (P2 + IB))), why: 'That compares the **final balances**, which also differ because the two deposits are different. The question asks only about the interest.', tol: 0.005 },
+          { value: r2(I + IB), why: 'The two amounts of interest are compared, not combined — subtract the smaller from the larger.', tol: 0.005 }
+        ].filter(t => Math.abs(t.value - r2(gap)) > 0.01),
+        hints: ['Work out $I = Prn$ separately for each option, then subtract.',
+          `Option A: $${P} \\times ${rr / 100} \\times ${n} = ${r2(I)}$.`,
+          `Option B: $${P2} \\times ${rateB / 100} \\times ${n2} = ${r2(IB)}$.`],
+        steps: [
+          { h: 'Interest from Option A', d: `$I_A = ${P} \\times ${rr / 100} \\times ${n} = ${r2(I)}$ → ${moneyPlain(I)}` },
+          { h: 'Interest from Option B', d: `$I_B = ${P2} \\times ${rateB / 100} \\times ${n2} = ${r2(IB)}$ → ${moneyPlain(IB)}` },
+          { h: 'Difference', d: `Option ${aWins ? 'A' : 'B'} earns $${r2(Math.max(I, IB))} - ${r2(Math.min(I, IB))} = ${r2(gap)}$ more → ${moneyPlain(gap)}` }
+        ]
+      };
+    }
+    const better = aWins ? 'A' : 'B';
+    const worse = aWins ? 'B' : 'A';
+    const m = mcq(rng, `Option ${better}, earning ${moneyPlain(Math.max(I, IB))} in interest`, [
+      { text: `Option ${worse}, earning ${moneyPlain(Math.min(I, IB))} in interest`, why: `${moneyPlain(Math.min(I, IB))} is the **smaller** amount of interest — Option ${better} earns ${moneyPlain(Math.max(I, IB))}.` },
+      { text: `Option ${better}, earning ${moneyPlain(I + IB)} in interest`, why: 'The right option, but that figure adds both accounts together instead of reporting one of them.' },
+      { text: 'Neither — they earn the same interest', why: `They do not: ${moneyPlain(I)} against ${moneyPlain(IB)}.` }
+    ]);
     return {
-      prompt: `How many years will it take ${moneyPlain(P)} to earn ${moneyPlain(I)} at $${rr}\\%$ p.a. simple interest?`,
-      answerType: 'numeric', answer: { value: n, tol: 0.01 }, answerSuffix: 'years',
-      traps: [{ value: r2(I / P), why: 'Divide the interest by the interest *per year* ($P \\times r$), not by the principal alone.' }],
-      hints: ['Rearrange $I = Prn$ for $n$.', `Interest per year: $${P} \\times ${rr / 100} = ${P * rr / 100}$.`, `$n = ${I} \\div ${P * rr / 100}$.`],
+      prompt: `${setup}\n\nWhich option earns more interest, and how much interest does it earn?`,
+      answerType: 'mcq', answer: { correctIndex: m.correctIndex, optionTraps: m.optionTraps }, mcqOptions: m.options,
+      hints: ['A higher rate does not settle it — the principal and the number of years matter just as much.',
+        'Apply $I = Prn$ to each option.',
+        `Option A gives $${r2(I)}$; now do the same for Option B.`],
       steps: [
-        { h: 'Interest per year', d: `$Pr = ${P} \\times ${rr / 100} = ${P * rr / 100}$` },
-        { h: 'Divide', d: `$n = \\dfrac{${I}}{${P * rr / 100}} = ${n}$ years` }
+        { h: 'Interest from Option A', d: `$I_A = ${P} \\times ${rr / 100} \\times ${n} = ${r2(I)}$ → ${moneyPlain(I)}` },
+        { h: 'Interest from Option B', d: `$I_B = ${P2} \\times ${rateB / 100} \\times ${n2} = ${r2(IB)}$ → ${moneyPlain(IB)}` },
+        { h: 'Compare', d: `${moneyPlain(Math.max(I, IB))} > ${moneyPlain(Math.min(I, IB))}, so Option ${better} is ahead.` }
       ]
     };
   },
