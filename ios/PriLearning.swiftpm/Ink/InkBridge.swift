@@ -37,6 +37,7 @@ final class InkBridge: NSObject, InkSurfaceDelegate {
     private let clipView = UIView()
     private let surface = InkSurfaceView()
     private let recognizer = MathInkRecognizer()
+    private let personalization = InkPersonalizationStore.shared
     private let recognitionQueue = DispatchQueue(label: "com.prilearning.ink.recognize", qos: .userInitiated)
     private let encodingQueue = DispatchQueue(label: "com.prilearning.ink.encode", qos: .utility)
     private let performanceLog = OSLog(subsystem: "com.prilearning.app", category: "InkPerformance")
@@ -47,7 +48,7 @@ final class InkBridge: NSObject, InkSurfaceDelegate {
     // The correction UI already sends its current override map back with every
     // recognition request. Keeping the prior native Reading lets the shell turn
     // an explicit correction into a bounded personal feature prototype without
-    // adding another cross-language message or storing raw handwriting.
+    // adding another raw-ink persistence path.
     private var lastReading: Reading?
     private var learnedCorrectionKeys: Set<String> = []
 
@@ -137,7 +138,8 @@ final class InkBridge: NSObject, InkSurfaceDelegate {
         case "recognize":
             let requestId = message["reqId"] as? Int ?? 0
             let overrides = message["overrides"] as? [String: String] ?? [:]
-            recognize(requestId: requestId, overrides: overrides)
+            let profile = message["profile"] as? String
+            recognize(requestId: requestId, overrides: overrides, profile: profile)
 
         default:
             break
@@ -154,7 +156,6 @@ final class InkBridge: NSObject, InkSurfaceDelegate {
 
     private func applyLayout() {
         guard isMounted, let webView else { return }
-        // How far the page has scrolled since it last told us where it was.
         let delta = CGPoint(
             x: webView.scrollView.contentOffset.x - reportedOffset.x,
             y: webView.scrollView.contentOffset.y - reportedOffset.y
@@ -174,8 +175,6 @@ final class InkBridge: NSObject, InkSurfaceDelegate {
             surface.inkColor = color
         }
         if let width = message["penWidth"] as? Double {
-            // Keep pathological web values from creating either invisible ink
-            // or a marker-sized stroke that hides small mathematical detail.
             surface.penWidth = min(8, max(1.5, CGFloat(width)))
         }
     }
@@ -185,9 +184,6 @@ final class InkBridge: NSObject, InkSurfaceDelegate {
                width: number(dict["w"]), height: number(dict["h"]))
     }
 
-    /// JavaScript numbers arrive as NSNumber, which bridges to Double, Int or
-    /// CGFloat depending on the value — so every one of them is read the same
-    /// way rather than guessed at per call site.
     private static func number(_ value: Any?) -> CGFloat {
         (value as? NSNumber).map { CGFloat($0.doubleValue) } ?? 0
     }
@@ -202,8 +198,6 @@ final class InkBridge: NSObject, InkSurfaceDelegate {
         emitStrokeSnapshot(surface.strokes)
     }
 
-    /// The common writing path crosses the bridge as ONE stroke, not the whole
-    /// page. Building the JSON dictionaries is also kept off the main thread.
     private func emitStrokeDelta(_ stroke: InkStroke, at index: Int) {
         if let onEmit {
             onEmit(["type": "strokeDelta", "index": index, "stroke": stroke.jsonObject])
@@ -214,9 +208,6 @@ final class InkBridge: NSObject, InkSurfaceDelegate {
         }
     }
 
-    /// Arbitrary edits need a full snapshot, but they are exceptional. Even
-    /// here, spline→JSON conversion has already been cached by InkSurface and
-    /// dictionary construction/serialization happens off the UI thread.
     private func emitStrokeSnapshot(_ strokes: [InkStroke]) {
         if let onEmit {
             onEmit(["type": "strokes", "strokes": strokes.map(\.jsonObject)])
@@ -234,41 +225,45 @@ final class InkBridge: NSObject, InkSurfaceDelegate {
         recognitionToken = nil
     }
 
-    /// Convert a correction the student explicitly made in the existing picker
-    /// into a tiny feature prototype. Approximate OCR ownership is excluded:
-    /// learning from the wrong strokes is worse than learning nothing.
+    /// Explicit corrections are the only events allowed to teach the personal
+    /// recognizer. Exact trace ownership is mandatory, and profile identity is
+    /// mandatory: a sibling's handwriting must never become another student's
+    /// prior on a shared iPad.
     private func learnExplicitCorrections(
+        profile: String?,
         overrides: [String: String],
         reading: Reading?,
         strokes: [InkStroke]
     ) {
-        guard let reading else { return }
+        guard let profile, !profile.isEmpty, let reading else { return }
         let symbols = reading.lines.flatMap(\.symbols)
         for (id, intended) in overrides {
             guard let original = symbols.first(where: { $0.id == id }),
                   original.symbol != intended,
                   !original.approximate,
                   !original.strokeIndexes.isEmpty else { continue }
-            let signature = "\(id)|\(intended)|\(original.strokeIndexes.map(String.init).joined(separator: ","))"
+            let signature = "\(profile)|\(id)|\(intended)|\(original.strokeIndexes.map(String.init).joined(separator: ","))"
             guard !learnedCorrectionKeys.contains(signature) else { continue }
             let members = original.strokeIndexes.compactMap {
                 strokes.indices.contains($0) ? strokes[$0] : nil
             }
             guard !members.isEmpty else { continue }
-            InkPersonalizationStore.shared.learn(symbol: intended, strokes: members)
+            personalization.learn(profile: profile, symbol: intended, strokes: members)
             learnedCorrectionKeys.insert(signature)
         }
     }
 
-    /// Add only conservative personal overrides to a first-pass reading. The
-    /// second recognizer pass receives those as ordinary locked corrections, so
-    /// fractions, powers, function names and maths assembly all run normally;
-    /// personalization never edits the final string behind the decoder's back.
+    /// Personal history is a weak second opinion, not a second ground truth.
+    /// It can act only on low-confidence, exactly-owned glyphs, and only when
+    /// its bounded feature prototype is materially stronger than the global
+    /// reading. User picker corrections remain locked above both engines.
     private func personalOverrides(
+        profile: String?,
         for reading: Reading,
         strokes: [InkStroke],
         userOverrides: [String: String]
     ) -> [String: String] {
+        guard let profile, !profile.isEmpty else { return userOverrides }
         var merged = userOverrides
         for symbol in reading.lines.flatMap(\.symbols) {
             guard merged[symbol.id] == nil,
@@ -279,28 +274,32 @@ final class InkBridge: NSObject, InkSurfaceDelegate {
                 strokes.indices.contains($0) ? strokes[$0] : nil
             }
             guard !members.isEmpty,
-                  let suggestion = InkPersonalizationStore.shared.suggestion(
+                  let suggestion = personalization.suggestion(
+                    profile: profile,
                     for: members,
                     current: symbol.symbol,
                     alternatives: symbol.alternatives.map(\.symbol),
                     globalConfidence: symbol.confidence
                   ),
-                  suggestion.symbol != symbol.symbol else { continue }
+                  suggestion.symbol != symbol.symbol,
+                  suggestion.confidence >= max(0.64, symbol.confidence + 0.04)
+            else { continue }
             merged[symbol.id] = suggestion.symbol
             if ProcessInfo.processInfo.arguments.contains("--ink-selfcheck") {
-                NSLog("PRIINK personal %@→%@ conf=%.2f d=%.3f margin=%.3f",
-                      symbol.symbol as NSString, suggestion.symbol as NSString,
+                NSLog("PRIINK personal %@ %@→%@ conf=%.2f d=%.3f margin=%.3f",
+                      profile as NSString, symbol.symbol as NSString, suggestion.symbol as NSString,
                       suggestion.confidence, suggestion.distance, suggestion.margin)
             }
         }
         return merged
     }
 
-    private func recognize(requestId: Int, overrides: [String: String]) {
+    private func recognize(requestId: Int, overrides: [String: String], profile: String?) {
         // `surface.strokes` is a cached value, not a fresh conversion of the
         // entire PKDrawing. The snapshot is immutable for this request.
         let strokes = surface.strokes
-        learnExplicitCorrections(overrides: overrides, reading: lastReading, strokes: strokes)
+        learnExplicitCorrections(profile: profile, overrides: overrides,
+                                 reading: lastReading, strokes: strokes)
 
         recognitionToken?.cancel()
         let token = InkRecognitionToken()
@@ -315,7 +314,11 @@ final class InkBridge: NSObject, InkSurfaceDelegate {
 
             let first = self.recognizer.read(strokes: strokes, overrides: overrides)
             guard !token.isCancelled else { return }
-            let personalized = self.personalOverrides(for: first, strokes: strokes, userOverrides: overrides)
+            let personalized = self.personalOverrides(
+                profile: profile, for: first, strokes: strokes, userOverrides: overrides
+            )
+            // The line cache means this second pass does not re-run Vision. It
+            // re-decodes the cached trace/symbol hypotheses with personal locks.
             let reading = personalized == overrides
                 ? first
                 : self.recognizer.read(strokes: strokes, overrides: personalized)
@@ -359,8 +362,6 @@ final class InkBridge: NSObject, InkSurfaceDelegate {
                   (payload["type"] as? String ?? "?") as NSString)
             return
         }
-        // U+2028/U+2029 are legal in JSON strings and illegal in a JavaScript
-        // source literal; unescaped they would make the injected call fail.
         json = json.replacingOccurrences(of: "\u{2028}", with: "\\u2028")
                    .replacingOccurrences(of: "\u{2029}", with: "\\u2029")
         DispatchQueue.main.async { [weak self] in
@@ -373,7 +374,6 @@ final class InkBridge: NSObject, InkSurfaceDelegate {
 // MARK: - Colour
 
 extension UIColor {
-    /// Accepts the CSS forms the theme actually emits: #rgb, #rrggbb, #rrggbbaa.
     convenience init?(hex: String) {
         var text = hex.trimmingCharacters(in: .whitespacesAndNewlines)
         guard text.hasPrefix("#") else { return nil }
