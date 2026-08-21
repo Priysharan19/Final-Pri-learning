@@ -44,7 +44,12 @@ let package = Package(
                 "README.md"
             ],
             resources: [
-                .copy("Resources/Web")
+                .copy("Resources/Web"),
+                // When PriInkOnline.mlpackage is produced from real calibrated
+                // writer data, SwiftPM/Xcode processes it as an app resource.
+                // The directory otherwise contains documentation only and the
+                // runtime treats model absence as a normal offline fallback.
+                .process("Resources/Models")
             ]
         )
     ]
