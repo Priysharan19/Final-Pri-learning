@@ -9,11 +9,13 @@
 // This is the layer that reads Vision's answer as maths:
 //
 //   1. alphabet   — one spelling for each mark: ×·∙ → *, −–— → -, π → pi …
-//   2. context    — letter/digit twins settled by their neighbours, an 'x'
+//   2. geometry   — narrowly targeted stroke evidence repairs confusions text
+//                   OCR cannot see, such as a crossed x reported as a 4
+//   3. context    — letter/digit twins settled by their neighbours, an 'x'
 //                   told apart from a times sign by what follows it
-//   3. layout     — a glyph's box against the line's body band decides whether
+//   4. layout     — a glyph's box against the line's body band decides whether
 //                   it is a power; runs of raised glyphs become ^(…)
-//   4. grammar    — each of Vision's candidate readings scored as maths, so
+//   5. grammar    — each of Vision's candidate readings scored as maths, so
 //                   the one that IS a well-formed line wins over the one that
 //                   merely scored highest as English
 //
@@ -93,13 +95,20 @@ enum MathGrammar {
 
         var score = 0.5
 
-        // Brackets that close what they open.
-        var depth = 0, brokeBrackets = false
+        // Brackets that close what they open. Keep () and [] distinct so a
+        // candidate cannot gain credit by closing one kind with the other.
+        var stack: [Character] = []
+        var brokeBrackets = false
         for ch in s {
-            if ch == "(" { depth += 1 }
-            if ch == ")" { depth -= 1; if depth < 0 { brokeBrackets = true } }
+            if ch == "(" || ch == "[" { stack.append(ch) }
+            if ch == ")" || ch == "]" {
+                let expected: Character = ch == ")" ? "(" : "["
+                if stack.last == expected { stack.removeLast() }
+                else { brokeBrackets = true }
+            }
         }
-        if depth != 0 || brokeBrackets { score -= 0.22 }
+        if !stack.isEmpty || brokeBrackets { score -= 0.22 }
+        else if s.contains("(") || s.contains("[") { score += 0.04 }
 
         // A line normally states one thing.
         let equals = s.filter { $0 == "=" }.count
@@ -111,15 +120,23 @@ enum MathGrammar {
         // operator — "x = -3" and "2^(-1)" are ordinary maths.
         let chars = Array(s)
         for (i, ch) in chars.enumerated() {
-            guard "+*/=<>".contains(ch) else { continue }
+            guard "+*/=<>^".contains(ch) else { continue }
             if i == 0 || i == chars.count - 1 { score -= 0.16 }
-            else if "+*/=<>".contains(chars[i - 1]) && !(ch == "=" && chars[i - 1] == "!") { score -= 0.12 }
+            else if "+*/=<>^".contains(chars[i - 1]) && !(ch == "=" && chars[i - 1] == "!") { score -= 0.12 }
         }
         if let last = chars.last, "+-*/=<>^".contains(last) { score -= 0.12 }
 
+        // Decimal points are meaningful inside numbers and suspicious as a run
+        // of punctuation, a common OCR artefact from Pencil taps/noise.
+        for i in chars.indices where chars[i] == "." {
+            let left = i > 0 && chars[i - 1].isNumber
+            let right = i + 1 < chars.count && chars[i + 1].isNumber
+            if left && right { score += 0.025 } else { score -= 0.06 }
+        }
+
         // Characters that have no business on a maths line at all.
         let allowed = CharacterSet(charactersIn:
-            "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ+-*/=^().,<>!'°%±:| ")
+            "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ+-*/=^().,[]<>!'°%±:| ")
         let stray = s.unicodeScalars.filter { !allowed.contains($0) }.count
         score -= min(0.3, Double(stray) * 0.1)
 
@@ -127,7 +144,10 @@ enum MathGrammar {
         // names are the legitimate ones and are not counted against it.
         for run in s.split(whereSeparator: { !$0.isLetter }) {
             let word = String(run).lowercased()
-            if MathAlphabet.functionNames.contains(word) || word == "lhs" || word == "rhs" { continue }
+            if MathAlphabet.functionNames.contains(word) || word == "lhs" || word == "rhs" {
+                score += 0.04
+                continue
+            }
             if run.count >= 3 { score -= 0.09 * Double(run.count - 2) }
         }
 
@@ -187,7 +207,7 @@ enum MathDecoder {
             return MathAlphabet.isDigit(symbols[i]) || symbols[i] == "."
         }
         let numericLine = symbols.enumerated().allSatisfy { index, s in
-            locked.contains(index) || MathAlphabet.isDigit(s) || "+-*/=.,()^:%°".contains(s)
+            locked.contains(index) || MathAlphabet.isDigit(s) || "+-*/=.,()[]^:%°".contains(s)
                 || MathAlphabet.identicalToDigit[s] != nil || MathAlphabet.shapedToDigit[s] != nil
         }
 
@@ -196,14 +216,13 @@ enum MathDecoder {
             let leftDigit = isNumericish(i - 1)
             let rightDigit = isNumericish(i + 1)
 
-            // '*' out of Vision is a times sign — which is also how a great
-            // many people write the variable x. It is only multiplication when
-            // there is a second operand to its right; at the end of a line, or
-            // before an operator or a power, it is the letter.
+            // '*' out of Vision — or out of the diagonal-cross geometry pass —
+            // is an x-shaped mark. It is only multiplication when both sides
+            // make the semantics unambiguous.
             if symbol == "*" {
                 let next = i + 1 < symbols.count ? symbols[i + 1] : ""
                 let rightIsOperand = MathAlphabet.isDigit(next) || MathAlphabet.isLetter(next)
-                    || next == "(" || next == "sqrt"
+                    || next == "(" || next == "[" || next == "sqrt"
                 // A power hanging off the mark settles it on its own: nothing
                 // is ever raised to a power off a times sign, so "2x^3" read
                 // as 2 × 3 with the 3 up in the air is really 2, x, 3.
@@ -246,24 +265,41 @@ enum MathDecoder {
                 glyphs[i].alternatives = mergedAlternatives([symbol], into: glyphs[i].alternatives)
             }
         }
+
+        // Some ambiguities cannot be proved from geometry. Do not silently
+        // rewrite them: lower false confidence and make the useful alternative
+        // available to the existing "check this reading" UI instead.
+        for i in glyphs.indices where !locked.contains(i) {
+            let next = i + 1 < glyphs.count ? glyphs[i + 1].symbol : ""
+            if glyphs[i].symbol == "1", i == 0, next == "=" {
+                glyphs[i].alternatives = mergedAlternatives(["y"], into: glyphs[i].alternatives)
+                glyphs[i].confidence = min(glyphs[i].confidence, 0.78)
+            }
+            if glyphs[i].symbol == "4",
+               (i > 0 || i + 1 < glyphs.count),
+               !numericLine {
+                glyphs[i].alternatives = mergedAlternatives(["x"], into: glyphs[i].alternatives)
+            }
+        }
     }
 
-    /// Brackets, recovered from the ink.
+    /// Brackets, x-shaped marks and theta recovered from the original ink.
     ///
     /// Vision reads a hand-drawn '(' as a '1' or an 'l' very readily — upright,
     /// narrow, one stroke, and on a maths line a lone '1' is perfectly ordinary
     /// so nothing in the text argues against it. The ink does: a bracket BOWS,
     /// consistently, to one side of the line joining its ends, and a '1' does
     /// not. Which side it bows to says which bracket it is.
-    ///
-    /// Only marks Vision already read as one of the upright family are looked
-    /// at, and only when the mark is a single stroke tied to one character —
-    /// so this can correct a bracket, and can never invent one.
     static func repairBrackets(
         _ glyphs: inout [DecodedGlyph],
         strokes: [InkStroke],
         glyphHeight: CGFloat
     ) {
+        // Do the narrow classifiers first. Bracket rollback below only rolls
+        // back bracket guesses, not geometry already proven by two independent
+        // strokes.
+        MathShapeClassifier.repair(&glyphs, strokes: strokes, glyphHeight: glyphHeight)
+
         let upright: Set<String> = ["1", "l", "I", "|", "/", "\\", "t", "i", "j"]
         let original = glyphs.map(\.symbol)
         var changed = false
