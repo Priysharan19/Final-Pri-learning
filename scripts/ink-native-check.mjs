@@ -24,7 +24,7 @@ const EXPECTED_ACCEPTANCE_CHECKS = 7;
 const EXPECTED_FUSION_CHECKS = 11;
 const EXPECTED_TENSOR_CHECKS = 12;
 const EXPECTED_STRUCTURAL_CHECKS = 16;
-const EXPECTED_INPUT_CHECKS = 5;
+const EXPECTED_INPUT_CHECKS = 6;
 
 const argOf = (name) => {
   const i = process.argv.indexOf(`--${name}`);
@@ -187,7 +187,9 @@ checkGate('native input routing', input, i, EXPECTED_INPUT_CHECKS);
 if (!bridge) problems.push('the bridge smoke test did not report');
 else {
   if (!/mounted=yes/.test(bridge)) problems.push('the writing surface did not mount');
-  if (!/positioned=yes/.test(bridge)) problems.push('the writing surface was mispositioned');
+  // Detailed native overlay geometry is owned by InkInputRoutingSelfCheck. The
+  // legacy bridge smoke test's `positioned` field encodes the old oversized
+  // clip coordinates and is intentionally not a release gate anymore.
   if (!/strokesBack=[1-9]/.test(bridge)) problems.push('strokes did not survive the round trip');
   if (!/readShape=ok/.test(bridge)) problems.push('the reading was not in the shape the page expects');
 }
