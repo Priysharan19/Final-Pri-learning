@@ -13,9 +13,9 @@ struct PriLearningApp: App {
     init() {
         // Scores the native reading pipeline against expressions whose answer
         // is known, then runs deterministic alignment, personalization,
-        // geometry, provenance, selective-trust, expert-fusion, online-feature
-        // and structural-tree/count/refinement checks. Off unless explicitly
-        // requested by the simulator validation harness.
+        // geometry, provenance, selective-trust, expert-fusion, online-feature,
+        // structural-tree/count/refinement and native input-routing checks. Off
+        // unless explicitly requested by the simulator validation harness.
         if ProcessInfo.processInfo.arguments.contains("--ink-selfcheck") {
             DispatchQueue.global(qos: .userInitiated).async {
                 InkSelfCheck.run()
@@ -27,6 +27,9 @@ struct PriLearningApp: App {
                 InkExpertFusionSelfCheck.run()
                 InkFeatureTensorSelfCheck.run()
                 InkStructuralIntelligenceSelfCheck.run()
+            }
+            DispatchQueue.main.async {
+                InkInputRoutingSelfCheck.run()
             }
         }
     }
