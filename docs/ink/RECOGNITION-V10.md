@@ -1,53 +1,95 @@
-# PRI Native Ink V10 — recognition architecture
+# PRI Native Ink V11/V12 frontier architecture
 
-This document records the production recognition direction and prevents future work from collapsing back into benchmark-specific OCR substitutions.
+This document records the production direction for the native Apple Pencil recognizer.
 
-## Evidence-backed design
+## Core principle
 
-1. **Keep raw online ink.** Pencil coordinates, time, force and orientation are first-class evidence. Do not rasterize and discard them.
-2. **Use multiple independent hypothesis sources.** Apple Vision is the always-available image hypothesis engine. Pencil geometry supplies deterministic structural evidence. A stroke-native recognizer may supply additional hypotheses when configured.
-3. **Keep maths two-dimensional.** Trace-to-symbol ownership, baseline, superscript/subscript, fraction membership, radical span and spatial relations are resolved before final expression assembly.
-4. **Delay commitment.** Candidate alternatives survive until maths grammar and global structure can score them.
-5. **Calibrate uncertainty.** A disagreement between engines or weak structural ownership lowers confidence; it must not be hidden by a syntactically convenient rewrite.
-6. **Offline first.** Network recognition is optional rescue/ensemble evidence. Loss of network or credentials must never stop writing or local recognition.
-7. **No client secrets.** Mathpix `app_key` is server-only. The app may receive only short-lived `app_token` / `strokes_session_id` credentials.
-8. **Writer-separated evidence.** Development, validation and final holdout are split by writer. Synthetic fixtures are regression tests, not production-accuracy evidence.
+PRI must not collapse handwriting into a bitmap and then treat OCR text as ground truth. The production representation is multimodal and provenance-preserving:
 
-## Current engines
+1. raw Pencil traces (x/y/time/pressure/azimuth/altitude)
+2. rendered appearance
+3. trace-to-symbol ownership
+4. 2-D mathematical relations
+5. multiple expert hypotheses
+6. mathematical grammar/AST
+7. calibrated uncertainty
+8. profile-scoped personalization
 
-### Apple Vision
-Always available on the supported iOS target. It remains useful for candidate generation from normalized rasters, but ordinary OCR is not treated as a mathematical parser or as ground truth.
+The local Vision recognizer is one expert, not the final authority.
 
-### PRI geometry + structural decoder
-Uses the original Pencil traces to recover evidence that raster OCR loses: crossings, closed loops, stroke direction, fractions, superscripts, brackets, equals signs, baseline and trace ownership. The final decoder scores mathematical structure and preserves ambiguity.
+## Implemented now
 
-### Mathpix strokes (optional)
-`OnlineInkRecognizer.swift` implements the raw-stroke client boundary. The endpoint consumes x/y arrays directly and can return text/LaTeX/confidence. Production activation requires a PRI backend route that brokers short-lived Mathpix app tokens. The app key must never be committed or embedded in the binary.
+- incremental PencilKit transport and off-main-thread recognition
+- dynamic-programming trace-to-symbol alignment
+- geometry-aware ambiguity repair
+- profile-scoped bounded personalization
+- optional Mathpix raw-stroke expert boundary with no embedded API secret
+- `InkSequenceEncoder`: a stable 16-feature online sequence representation ready for a future Core ML stroke Transformer
+- `InkStructureGraph`: additive trace-provenance graph containing symbols, exact stroke ownership, right-of, superscript, subscript and bracket relations, plus explicit structural risk flags
+- deterministic frontier self-checks in native CI
 
-### Google ML Kit Digital Ink
-Researched but deliberately not added to the current Swift Playgrounds package. Google's current iOS distribution documentation states ML Kit is CocoaPods-only, while this application is an Apple Swift Package / Swift Playgrounds iOSApplication. Introducing a parallel CocoaPods/Xcode project solely for this engine would break the present package architecture. Re-evaluate if Google ships Swift Package Manager support or PRI moves to an Xcode workspace.
+## Sequence model contract
 
-## Evaluation gates
+Each sampled Pencil point is represented by 16 values:
 
-Report these separately:
+`x, y, dx, dy, dt, speed, cos(direction), sin(direction), curvature, width, force, sin(azimuth), cos(azimuth), altitude, strokeStart, strokeEnd`
 
-- native synthetic character accuracy
-- native synthetic expression exact match
-- writer-separated real-Pencil character/symbol accuracy
-- writer-separated expression exact match
-- fraction/superscript/ambiguous-symbol accuracy
-- false-confidence rate
-- local recognition latency distribution (p50/p95/p99)
-- optional remote rescue latency and incremental accuracy
-- physical Pencil latency/feel (human/device evidence only)
+Coordinates are normalized by page scale. The encoder exposes `dynamicsCoverage` so tests and datasets can distinguish genuine Apple Pencil telemetry from old/synthetic samples with defaults.
 
-A 10/10 synthetic fixture is not evidence of 100% production recognition.
+The future Core ML model must use the exact same encoder contract during training and deployment.
 
-## Primary references reviewed 2026-08-21
+## Structure graph
 
-- Apple Vision `VNRecognizeTextRequest` documentation
-- Mathpix `/v3/strokes` and authentication/app-token documentation
-- Google ML Kit iOS migration/distribution and Digital Ink guidance
-- Seitz, Lengfeld & Timofte, *The Return of Structural Handwritten Mathematical Expression Recognition* (2025)
+Recognition output now has an additive `structure` payload. Nodes preserve:
 
-The common conclusion is architectural: online handwriting recognition benefits from retaining traces and explicit spatial structure rather than flattening handwriting into a bitmap/string too early.
+- symbol id
+- symbol hypothesis
+- confidence and alternatives
+- line id
+- bounding box
+- exact stroke indexes
+- approximate-ownership flag
+
+Edges currently include:
+
+- `rightOf`
+- `superscriptOf`
+- `subscriptOf`
+- `bracketPair`
+- `insideBrackets`
+
+The graph also reports trace coverage, approximate-node fraction, an evidence-quality score and risk flags. The evidence score is diagnostic only and is **not** a calibrated probability.
+
+## Next neural system
+
+The first proprietary PRI model should be an online stroke Transformer trained on writer-separated data. It should predict symbol/structure hypotheses while preserving trace alignment. A second visual model should encode the raster view. Training should include:
+
+- symbol classification
+- sequence/LaTeX decoding
+- symbol-count auxiliary loss
+- tree/spatial-relation auxiliary loss
+- trace-to-symbol alignment loss
+- error-driven contrastive losses for known confusions
+- stroke↔raster contrastive learning
+
+A larger research/VLM teacher may be used for distillation where licensing allows, but the production iPad model should be compact enough for Core ML/Neural Engine deployment.
+
+## Ensemble safety
+
+External experts such as Mathpix, MyScript or ML Kit may supply hypotheses. Their confidence values must never be averaged blindly because provider confidence scales are not calibrated against each other. Until a provider is calibrated on the same writer-separated PRI holdout, external output may corroborate or surface a disagreement but must not silently overwrite trace-aligned local ink.
+
+## Evidence hierarchy
+
+Scores must always remain separate:
+
+- synthetic native benchmark
+- writer-model holdout
+- real writer-separated Apple Pencil validation
+- simulator latency
+- physical iPad latency/feel
+
+Passing the ten-expression simulator suite is a regression gate, not evidence of production accuracy.
+
+## Production dataset requirement
+
+The next accuracy step is data, not more benchmark-specific rules. A PRI-owned, consented corpus should preserve writer ids for splitting and record raw Pencil telemetry, ground-truth expression, symbol↔stroke alignment, corrections, writing-area geometry, device metadata and sample conditions. Train/dev/test/final-holdout must be writer-separated.
