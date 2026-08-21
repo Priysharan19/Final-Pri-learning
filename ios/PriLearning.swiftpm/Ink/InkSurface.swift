@@ -11,16 +11,20 @@
 // The surface is transparent, so the ruled paper, the teacher's ✓ and ✗ marks
 // and the margin notes drawn by the page below all show through under the ink.
 //
-// Fingers still scroll. A touch that is not a Pencil is refused by hitTest and
-// falls through to the web view underneath — the same rule the app has always
-// had (once a Pencil has been seen, fingers scroll and the Pencil writes),
-// only now enforced where the touch actually arrives.
+// Apple Pencil writes. Fingers fall through to the web page and scroll unless
+// the student explicitly enables finger drawing from the toolbar.
 // ─────────────────────────────────────────────────────────────────────────────
 import PencilKit
 import UIKit
 
 protocol InkSurfaceDelegate: AnyObject {
-    func inkSurfaceDidChangeStrokes(_ surface: InkSurfaceView)
+    /// Ordinary pen input appends one final stroke. Keeping this incremental is
+    /// what prevents a long page from being re-sampled and re-serialized every
+    /// time the Pencil comes off the glass.
+    func inkSurface(_ surface: InkSurfaceView, didAppend stroke: InkStroke, at index: Int)
+    /// Erase/undo/redo/restore can change arbitrary indexes, so those operations
+    /// deliberately publish a full snapshot.
+    func inkSurfaceDidReplaceStrokes(_ surface: InkSurfaceView)
 }
 
 final class InkSurfaceView: UIView, PKCanvasViewDelegate {
@@ -29,8 +33,6 @@ final class InkSurfaceView: UIView, PKCanvasViewDelegate {
 
     let canvas = PKCanvasView()
 
-    /// Once a Pencil has written, fingers go back to scrolling the page.
-    private(set) var pencilSeen = false
     /// Explicit "let me draw with a finger too" from the toolbar.
     var fingerDrawingEnabled = false { didSet { applyDrawingPolicy() } }
 
@@ -44,6 +46,7 @@ final class InkSurfaceView: UIView, PKCanvasViewDelegate {
 
     private var undoStack: [PKDrawing] = []
     private var redoStack: [PKDrawing] = []
+    private var cachedStrokes: [InkStroke] = []
     private var suppressChangeEvents = false
     private let historyLimit = 60
 
@@ -82,26 +85,20 @@ final class InkSurfaceView: UIView, PKCanvasViewDelegate {
     override func layoutSubviews() {
         super.layoutSubviews()
         canvas.frame = bounds
-        canvas.contentSize = bounds.size
+        if canvas.contentSize != bounds.size { canvas.contentSize = bounds.size }
     }
 
     // MARK: - Touch routing
 
     override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
         guard let hit = super.hitTest(point, with: event) else { return nil }
+        if fingerDrawingEnabled { return hit }
+        // The overlay must not win a finger touch just because it visually sits
+        // above WKWebView. A Pencil touch stays native; everything else falls
+        // through so the page's scroll view owns it from the first interaction,
+        // not only after a Pencil has previously been seen.
         let touches = event?.allTouches ?? []
-        if touches.contains(where: { $0.type == .pencil }) {
-            if !pencilSeen {
-                pencilSeen = true
-                applyDrawingPolicy()
-            }
-            return hit
-        }
-        // Before any Pencil has been seen the app is being used with a finger
-        // (or a trackpad), so a finger writes. After that it scrolls, unless
-        // the student has asked for both.
-        if fingerDrawingEnabled || !pencilSeen { return hit }
-        return nil
+        return touches.contains(where: { $0.type == .pencil }) ? hit : nil
     }
 
     // MARK: - Tools
@@ -109,6 +106,9 @@ final class InkSurfaceView: UIView, PKCanvasViewDelegate {
     private func applyTool() {
         switch tool {
         case .pen:
+            // PencilKit keeps the device's pressure/azimuth/altitude and system
+            // prediction in the rendered PKStroke. We only choose the nominal
+            // pen width here; no custom smoothing is inserted in front of it.
             canvas.tool = PKInkingTool(.pen, color: inkColor, width: penWidth)
         case .eraser:
             // Whole strokes, matching how the app's eraser has always behaved.
@@ -117,7 +117,7 @@ final class InkSurfaceView: UIView, PKCanvasViewDelegate {
     }
 
     private func applyDrawingPolicy() {
-        canvas.drawingPolicy = (fingerDrawingEnabled || !pencilSeen) ? .anyInput : .pencilOnly
+        canvas.drawingPolicy = fingerDrawingEnabled ? .anyInput : .pencilOnly
     }
 
     // MARK: - History
@@ -128,7 +128,22 @@ final class InkSurfaceView: UIView, PKCanvasViewDelegate {
 
     func canvasViewDidEndUsingTool(_ canvasView: PKCanvasView) {
         guard !suppressChangeEvents else { return }
-        delegate?.inkSurfaceDidChangeStrokes(self)
+
+        // Pen input is append-only in the normal case. Sample just the stroke
+        // that finished, cache it, and send a delta. If PencilKit reports any
+        // other shape of change, fall back to a full resync rather than risk a
+        // cache that no longer describes the drawing on screen.
+        let drawingStrokes = canvasView.drawing.strokes
+        if tool == .pen,
+           drawingStrokes.count == cachedStrokes.count + 1,
+           let last = drawingStrokes.last {
+            let stroke = StrokeCodec.stroke(from: last)
+            cachedStrokes.append(stroke)
+            delegate?.inkSurface(self, didAppend: stroke, at: cachedStrokes.count - 1)
+            return
+        }
+
+        resyncCacheAndNotify()
     }
 
     private func pushHistory() {
@@ -150,26 +165,37 @@ final class InkSurfaceView: UIView, PKCanvasViewDelegate {
     }
 
     func clear() {
-        guard !canvas.drawing.strokes.isEmpty else { return }
+        guard !canvas.drawing.strokes.isEmpty else {
+            cachedStrokes.removeAll(keepingCapacity: true)
+            return
+        }
         pushHistory()
-        replaceDrawing(PKDrawing())
+        replaceDrawing(PKDrawing(), knownStrokes: [])
     }
 
-    private func replaceDrawing(_ drawing: PKDrawing) {
+    private func replaceDrawing(_ drawing: PKDrawing, knownStrokes: [InkStroke]? = nil) {
         suppressChangeEvents = true
         canvas.drawing = drawing
+        cachedStrokes = knownStrokes ?? StrokeCodec.strokes(from: drawing)
         suppressChangeEvents = false
-        delegate?.inkSurfaceDidChangeStrokes(self)
+        delegate?.inkSurfaceDidReplaceStrokes(self)
+    }
+
+    private func resyncCacheAndNotify() {
+        cachedStrokes = StrokeCodec.strokes(from: canvas.drawing)
+        delegate?.inkSurfaceDidReplaceStrokes(self)
     }
 
     // MARK: - Strokes
 
-    var strokes: [InkStroke] { StrokeCodec.strokes(from: canvas.drawing) }
+    /// O(1) with respect to PencilKit conversion: the expensive spline sampling
+    /// is done once when a stroke finishes, not again for every recognition.
+    var strokes: [InkStroke] { cachedStrokes }
 
     func setStrokes(_ strokes: [InkStroke]) {
         pushHistory()
-        replaceDrawing(StrokeCodec.drawing(from: strokes, color: inkColor))
+        replaceDrawing(StrokeCodec.drawing(from: strokes, color: inkColor), knownStrokes: strokes)
     }
 
-    var isEmpty: Bool { canvas.drawing.strokes.isEmpty }
+    var isEmpty: Bool { cachedStrokes.isEmpty }
 }

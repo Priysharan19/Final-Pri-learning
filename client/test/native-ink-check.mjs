@@ -117,10 +117,22 @@ window.__priInkReceive({ type: 'reading', reqId: 99999, text: 'wrong', lines: []
 window.__priInkReceive({ type: 'reading', reqId: posted[1].reqId, text: 'right', lines: [] });
 check('a reply for another request is ignored', (await stray)?.text === 'right');
 
+// ── stroke transport ─────────────────────────────────────────────────────────
 let heard = null;
 const stop = nativeInk.onStrokes(s => { heard = s; });
-window.__priInkReceive({ type: 'strokes', strokes: [{ points: [] }, { points: [] }] });
-check('stroke updates reach the listener', heard?.length === 2);
+const first = { points: [{ x: 1, y: 2, w: 3 }] };
+const second = { points: [{ x: 4, y: 5, w: 2 }] };
+const replacement = { points: [{ x: 9, y: 9, w: 1 }] };
+window.__priInkReceive({ type: 'strokes', strokes: [first] });
+check('full stroke snapshots reach the listener', heard?.length === 1 && heard[0] === first);
+window.__priInkReceive({ type: 'strokeDelta', index: 1, stroke: second });
+check('an append delta reconstructs the full page in JS',
+  heard?.length === 2 && heard[0] === first && heard[1] === second);
+window.__priInkReceive({ type: 'strokeDelta', index: 0, stroke: replacement });
+check('a replacement delta updates one stroke without dropping the rest',
+  heard?.length === 2 && heard[0] === replacement && heard[1] === second);
+window.__priInkReceive({ type: 'strokeDelta', index: 4, stroke: first });
+check('a gapped delta is rejected instead of inventing missing ink', heard?.length === 2);
 stop();
 window.__priInkReceive({ type: 'strokes', strokes: [] });
 check('a removed listener stops hearing', heard?.length === 2);
@@ -141,6 +153,7 @@ const source = readFileSync(join(HERE, '../src/ink/native.js'), 'utf8');
 for (const op of sent) {
   check(`the page sends "${op}"`, source.includes(`op: '${op}'`));
 }
+check('the page understands incremental native stroke transport', source.includes("payload.type === 'strokeDelta'"));
 
 console.log(`\n${failures === 0 ? 'PASS' : `FAIL — ${failures} problem(s)`}`);
 process.exit(failures === 0 ? 0 : 1);

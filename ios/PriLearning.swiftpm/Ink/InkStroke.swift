@@ -68,23 +68,28 @@ enum StrokeCodec {
     /// long that JSON encoding shows up while the pen is still moving.
     private static let sampleStep: CGFloat = 1.5
 
-    static func strokes(from drawing: PKDrawing) -> [InkStroke] {
-        drawing.strokes.map { stroke in
-            var points: [InkPoint] = []
-            let transform = stroke.transform
-            for point in stroke.path.interpolatedPoints(by: .distance(sampleStep)) {
-                let location = point.location.applying(transform)
-                points.append(InkPoint(x: location.x, y: location.y, w: point.size.width))
-            }
-            // A tap leaves a path with a single control point and no
-            // interpolated span — the dot of an 'i' is a real glyph, so it is
-            // kept rather than dropped for being zero length.
-            if points.isEmpty, let only = stroke.path.first {
-                let location = only.location.applying(transform)
-                points.append(InkPoint(x: location.x, y: location.y, w: only.size.width))
-            }
-            return InkStroke(points: points)
+    /// Convert one final PencilKit stroke. The drawing surface uses this on the
+    /// ordinary pen path so finishing one stroke never has to re-sample every
+    /// stroke already on the page.
+    static func stroke(from stroke: PKStroke) -> InkStroke {
+        var points: [InkPoint] = []
+        let transform = stroke.transform
+        for point in stroke.path.interpolatedPoints(by: .distance(sampleStep)) {
+            let location = point.location.applying(transform)
+            points.append(InkPoint(x: location.x, y: location.y, w: point.size.width))
         }
+        // A tap leaves a path with a single control point and no interpolated
+        // span — the dot of an 'i' is a real glyph, so it is kept rather than
+        // dropped for being zero length.
+        if points.isEmpty, let only = stroke.path.first {
+            let location = only.location.applying(transform)
+            points.append(InkPoint(x: location.x, y: location.y, w: only.size.width))
+        }
+        return InkStroke(points: points)
+    }
+
+    static func strokes(from drawing: PKDrawing) -> [InkStroke] {
+        drawing.strokes.map(stroke(from:))
     }
 
     /// Rebuild a drawing from strokes the web layer supplies — restoring a

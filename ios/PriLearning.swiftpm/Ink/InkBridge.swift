@@ -11,8 +11,24 @@
 // from the web view's own scroll offset, so the surface stays welded to the
 // paper at display rate instead of chasing messages across the bridge.
 // ─────────────────────────────────────────────────────────────────────────────
+import Foundation
+import os
 import UIKit
 import WebKit
+
+private final class InkRecognitionToken {
+    private let lock = NSLock()
+    private var cancelled = false
+
+    func cancel() {
+        lock.lock(); cancelled = true; lock.unlock()
+    }
+
+    var isCancelled: Bool {
+        lock.lock(); defer { lock.unlock() }
+        return cancelled
+    }
+}
 
 final class InkBridge: NSObject, InkSurfaceDelegate {
 
@@ -22,9 +38,11 @@ final class InkBridge: NSObject, InkSurfaceDelegate {
     private let surface = InkSurfaceView()
     private let recognizer = MathInkRecognizer()
     private let recognitionQueue = DispatchQueue(label: "com.prilearning.ink.recognize", qos: .userInitiated)
-    private let encodingQueue = DispatchQueue(label: "com.prilearning.ink.encode", qos: .userInitiated)
+    private let encodingQueue = DispatchQueue(label: "com.prilearning.ink.encode", qos: .utility)
+    private let performanceLog = OSLog(subsystem: "com.prilearning.app", category: "InkPerformance")
 
     private weak var webView: WKWebView?
+    private var recognitionToken: InkRecognitionToken?
 
     /// Every payload the page would receive, for the bridge smoke test. Nil in
     /// the app — the page is the only listener there.
@@ -61,6 +79,7 @@ final class InkBridge: NSObject, InkSurfaceDelegate {
 
         switch op {
         case "mount":
+            cancelRecognition()
             applyAppearance(message)
             updateGeometry(message)
             // A mount is a fresh sheet: the page mounts one writing area per
@@ -78,6 +97,7 @@ final class InkBridge: NSObject, InkSurfaceDelegate {
             applyLayout()
 
         case "unmount":
+            cancelRecognition()
             isMounted = false
             clipView.isHidden = true
 
@@ -143,7 +163,9 @@ final class InkBridge: NSObject, InkSurfaceDelegate {
             surface.inkColor = color
         }
         if let width = message["penWidth"] as? Double {
-            surface.penWidth = CGFloat(width)
+            // Keep pathological web values from creating either invisible ink
+            // or a marker-sized stroke that hides small mathematical detail.
+            surface.penWidth = min(8, max(1.5, CGFloat(width)))
         }
     }
 
@@ -161,22 +183,76 @@ final class InkBridge: NSObject, InkSurfaceDelegate {
 
     // MARK: - Strokes out
 
-    func inkSurfaceDidChangeStrokes(_ surface: InkSurfaceView) {
-        let strokes = surface.strokes
-        emit(["type": "strokes", "strokes": strokes.map(\.jsonObject)])
+    func inkSurface(_ surface: InkSurfaceView, didAppend stroke: InkStroke, at index: Int) {
+        emitStrokeDelta(stroke, at: index)
+    }
+
+    func inkSurfaceDidReplaceStrokes(_ surface: InkSurfaceView) {
+        emitStrokeSnapshot(surface.strokes)
+    }
+
+    /// The common writing path crosses the bridge as ONE stroke, not the whole
+    /// page. Building the JSON dictionaries is also kept off the main thread.
+    private func emitStrokeDelta(_ stroke: InkStroke, at index: Int) {
+        if let onEmit {
+            onEmit(["type": "strokeDelta", "index": index, "stroke": stroke.jsonObject])
+        }
+        guard webView != nil else { return }
+        encodingQueue.async { [weak self] in
+            self?.encodeAndDeliver(["type": "strokeDelta", "index": index, "stroke": stroke.jsonObject])
+        }
+    }
+
+    /// Arbitrary edits need a full snapshot, but they are exceptional. Even
+    /// here, spline→JSON conversion has already been cached by InkSurface and
+    /// dictionary construction/serialization happens off the UI thread.
+    private func emitStrokeSnapshot(_ strokes: [InkStroke]) {
+        if let onEmit {
+            onEmit(["type": "strokes", "strokes": strokes.map(\.jsonObject)])
+        }
+        guard webView != nil else { return }
+        encodingQueue.async { [weak self] in
+            self?.encodeAndDeliver(["type": "strokes", "strokes": strokes.map(\.jsonObject)])
+        }
     }
 
     // MARK: - Recognition
 
+    private func cancelRecognition() {
+        recognitionToken?.cancel()
+        recognitionToken = nil
+    }
+
     private func recognize(requestId: Int, overrides: [String: String]) {
+        // `surface.strokes` is a cached value, not a fresh conversion of the
+        // entire PKDrawing. The snapshot is immutable for this request.
         let strokes = surface.strokes
+        recognitionToken?.cancel()
+        let token = InkRecognitionToken()
+        recognitionToken = token
+        let signpostID = OSSignpostID(log: performanceLog)
+
         recognitionQueue.async { [weak self] in
-            guard let self else { return }
+            guard let self, !token.isCancelled else { return }
+            let started = DispatchTime.now().uptimeNanoseconds
+            os_signpost(.begin, log: self.performanceLog, name: "InkRecognition",
+                        signpostID: signpostID, "%{public}d strokes", strokes.count)
             let reading = self.recognizer.read(strokes: strokes, overrides: overrides)
+            os_signpost(.end, log: self.performanceLog, name: "InkRecognition", signpostID: signpostID)
+            guard !token.isCancelled else { return }
+
+            let elapsedMs = Double(DispatchTime.now().uptimeNanoseconds - started) / 1_000_000
             var payload = reading.jsonObject
             payload["type"] = "reading"
             payload["reqId"] = requestId
-            DispatchQueue.main.async { self.emit(payload) }
+            DispatchQueue.main.async { [weak self] in
+                guard let self, !token.isCancelled, self.isMounted else { return }
+                if ProcessInfo.processInfo.arguments.contains("--ink-selfcheck") {
+                    NSLog("PRIINK perf recognition req=%d strokes=%d %.1fms", requestId, strokes.count, elapsedMs)
+                }
+                self.emit(payload)
+                if self.recognitionToken === token { self.recognitionToken = nil }
+            }
         }
     }
 
@@ -185,29 +261,28 @@ final class InkBridge: NSObject, InkSurfaceDelegate {
     private func emit(_ payload: [String: Any]) {
         onEmit?(payload)
         guard webView != nil else { return }
-        // Encoding a page of strokes is not free, and this runs at the end of
-        // every stroke. Doing it on the main thread would put that cost between
-        // the pen and the next mark, which is the one place it must never be.
-        encodingQueue.async { [weak self] in
-            guard JSONSerialization.isValidJSONObject(payload),
-                  let data = try? JSONSerialization.data(withJSONObject: payload, options: []),
-                  var json = String(data: data, encoding: .utf8) else {
-                // Nothing the page can do about this, but it must not pass
-                // unnoticed: an unencodable payload is a stroke or a reading
-                // the student never gets back.
-                NSLog("Pri Learning: ink payload could not be encoded (%@)",
-                      (payload["type"] as? String ?? "?") as NSString)
-                return
-            }
-            // U+2028/U+2029 are legal in JSON strings and illegal in a
-            // JavaScript source literal; unescaped they would make the injected
-            // call a syntax error rather than a reading.
-            json = json.replacingOccurrences(of: "\u{2028}", with: "\\u2028")
-                       .replacingOccurrences(of: "\u{2029}", with: "\\u2029")
-            DispatchQueue.main.async {
-                self?.webView?.evaluateJavaScript(
-                    "window.__priInkReceive && window.__priInkReceive(\(json));")
-            }
+        encodingQueue.async { [weak self] in self?.encodeAndDeliver(payload) }
+    }
+
+    private func encodeAndDeliver(_ payload: [String: Any]) {
+        let signpostID = OSSignpostID(log: performanceLog)
+        os_signpost(.begin, log: performanceLog, name: "InkBridgeEncode", signpostID: signpostID)
+        defer { os_signpost(.end, log: performanceLog, name: "InkBridgeEncode", signpostID: signpostID) }
+
+        guard JSONSerialization.isValidJSONObject(payload),
+              let data = try? JSONSerialization.data(withJSONObject: payload, options: []),
+              var json = String(data: data, encoding: .utf8) else {
+            NSLog("Pri Learning: ink payload could not be encoded (%@)",
+                  (payload["type"] as? String ?? "?") as NSString)
+            return
+        }
+        // U+2028/U+2029 are legal in JSON strings and illegal in a JavaScript
+        // source literal; unescaped they would make the injected call fail.
+        json = json.replacingOccurrences(of: "\u{2028}", with: "\\u2028")
+                   .replacingOccurrences(of: "\u{2029}", with: "\\u2029")
+        DispatchQueue.main.async { [weak self] in
+            self?.webView?.evaluateJavaScript(
+                "window.__priInkReceive && window.__priInkReceive(\(json));")
         }
     }
 }

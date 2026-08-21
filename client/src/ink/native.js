@@ -20,12 +20,31 @@ export const nativeInkAvailable = () => !!handler();
 let nextRequestId = 1;
 const pending = new Map();       // reqId → resolve
 const strokeListeners = new Set();
+let cachedStrokes = [];
+
+function publishStrokes() {
+  // Give listeners a fresh array so React state and callers never observe the
+  // bridge mutating an array they already received.
+  const snapshot = cachedStrokes.slice();
+  for (const listener of strokeListeners) listener(snapshot);
+}
 
 if (typeof window !== 'undefined') {
   window.__priInkReceive = (payload) => {
     if (!payload || typeof payload !== 'object') return;
     if (payload.type === 'strokes') {
-      for (const listener of strokeListeners) listener(payload.strokes || []);
+      cachedStrokes = Array.isArray(payload.strokes) ? payload.strokes.slice() : [];
+      publishStrokes();
+    } else if (payload.type === 'strokeDelta') {
+      const index = Number.isInteger(payload.index) ? payload.index : -1;
+      if (!payload.stroke || index < 0) return;
+      // Native deltas are emitted on one serial encoding queue. Accept the
+      // append-only fast path, but also tolerate a replacement at an existing
+      // index so a future shell can use the same contract safely.
+      if (index === cachedStrokes.length) cachedStrokes.push(payload.stroke);
+      else if (index < cachedStrokes.length) cachedStrokes[index] = payload.stroke;
+      else return; // a gap means a full snapshot is required; never invent ink
+      publishStrokes();
     } else if (payload.type === 'reading') {
       const resolve = pending.get(payload.reqId);
       if (resolve) { pending.delete(payload.reqId); resolve(payload); }
@@ -97,6 +116,7 @@ export const nativeInk = {
 
   mount(element) {
     if (!element) return false;
+    cachedStrokes = [];
     return post({ op: 'mount', ...geometryOf(element), ink: inkColor() });
   },
 
@@ -105,7 +125,10 @@ export const nativeInk = {
     post({ op: 'layout', ...geometryOf(element) });
   },
 
-  unmount() { post({ op: 'unmount' }); },
+  unmount() {
+    cachedStrokes = [];
+    post({ op: 'unmount' });
+  },
 
   setAppearance() { post({ op: 'appearance', ink: inkColor() }); },
 
@@ -117,7 +140,10 @@ export const nativeInk = {
   redo() { post({ op: 'redo' }); },
   clear() { post({ op: 'clear' }); },
 
-  setStrokes(strokes) { post({ op: 'setStrokes', strokes: strokes || [] }); },
+  setStrokes(strokes) {
+    cachedStrokes = Array.isArray(strokes) ? strokes.slice() : [];
+    post({ op: 'setStrokes', strokes: cachedStrokes });
+  },
 
   onStrokes(listener) {
     strokeListeners.add(listener);
