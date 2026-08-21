@@ -1,15 +1,10 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Pri Learning · Ink bridge
 //
-// Joins the native writing surface to the page it sits on. The web app owns
-// the layout, the toolbar and everything downstream of a reading — the marker,
-// Step Check, drafts, replay — and none of that changes. What changes is that
-// the ink and the reading of it are now native.
-//
-// Position tracking is deliberately split. The page tells the shell where the
-// writing area is whenever its LAYOUT changes; scrolling is tracked natively
-// from the web view's own scroll offset, so the surface stays welded to the
-// paper at display rate instead of chasing messages across the bridge.
+// Native PencilKit owns the latency-critical rendering path. Recognition and
+// JSON work are intentionally scheduled behind it: handwriting mutations cancel
+// stale work immediately and Vision is not allowed to start until the Pencil has
+// been quiet for a short window.
 // ─────────────────────────────────────────────────────────────────────────────
 import Foundation
 import os
@@ -36,7 +31,10 @@ final class InkBridge: NSObject, InkSurfaceDelegate {
     private let surface = InkSurfaceView()
     private let recognizer = MathInkRecognizer()
     private let personalization = InkPersonalizationStore.shared
-    private let recognitionQueue = DispatchQueue(label: "com.prilearning.ink.recognize", qos: .userInitiated)
+    // Recognition is interactive but never latency-critical relative to the nib.
+    // Utility QoS prevents a Vision pass from competing with PencilKit's display
+    // path while the student begins the next symbol.
+    private let recognitionQueue = DispatchQueue(label: "com.prilearning.ink.recognize", qos: .utility)
     private let encodingQueue = DispatchQueue(label: "com.prilearning.ink.encode", qos: .utility)
     private let performanceLog = OSLog(subsystem: "com.prilearning.app", category: "InkPerformance")
 
@@ -44,6 +42,12 @@ final class InkBridge: NSObject, InkSurfaceDelegate {
     private var recognitionToken: InkRecognitionToken?
     private var lastReading: Reading?
     private var learnedCorrectionKeys: Set<String> = []
+
+    /// Native quiet-window guard. The web side also debounces, but the native
+    /// boundary is authoritative because other callers/self-checks can request
+    /// recognition directly.
+    private var lastInkMutationNanos: UInt64 = 0
+    private static let recognitionQuietNanos: UInt64 = 380_000_000
 
     var onEmit: (([String: Any]) -> Void)?
 
@@ -79,6 +83,7 @@ final class InkBridge: NSObject, InkSurfaceDelegate {
             applyAppearance(message)
             updateGeometry(message)
             surface.clear()
+            markInkMutation()
             isMounted = true
             clipView.isHidden = false
             applyLayout()
@@ -173,11 +178,20 @@ final class InkBridge: NSObject, InkSurfaceDelegate {
 
     // MARK: - Strokes out
 
+    private func markInkMutation() {
+        lastInkMutationNanos = DispatchTime.now().uptimeNanoseconds
+        // Drop stale recognition as soon as the next real mark lands instead of
+        // waiting for the web debounce to issue a replacement request.
+        recognitionToken?.cancel()
+    }
+
     func inkSurface(_ surface: InkSurfaceView, didAppend stroke: InkStroke, at index: Int) {
+        markInkMutation()
         emitStrokeDelta(stroke, at: index)
     }
 
     func inkSurfaceDidReplaceStrokes(_ surface: InkSurfaceView) {
+        markInkMutation()
         emitStrokeSnapshot(surface.strokes)
     }
 
@@ -279,39 +293,47 @@ final class InkBridge: NSObject, InkSurfaceDelegate {
         recognitionToken = token
         let signpostID = OSSignpostID(log: performanceLog)
 
-        recognitionQueue.async { [weak self] in
+        let now = DispatchTime.now().uptimeNanoseconds
+        let quietDeadline = lastInkMutationNanos &+ Self.recognitionQuietNanos
+        let delayNanos = quietDeadline > now ? quietDeadline - now : 0
+        let deadline = DispatchTime.now() + .nanoseconds(Int(min(delayNanos, UInt64(Int.max))))
+
+        recognitionQueue.asyncAfter(deadline: deadline) { [weak self] in
             guard let self, !token.isCancelled else { return }
-            let started = DispatchTime.now().uptimeNanoseconds
-            os_signpost(.begin, log: self.performanceLog, name: "InkRecognition",
-                        signpostID: signpostID, "%{public}d strokes", strokes.count)
+            autoreleasepool {
+                let started = DispatchTime.now().uptimeNanoseconds
+                os_signpost(.begin, log: self.performanceLog, name: "InkRecognition",
+                            signpostID: signpostID, "%{public}d strokes", strokes.count)
 
-            let first = self.recognizer.read(strokes: strokes, overrides: overrides)
-            guard !token.isCancelled else { return }
-            let personalized = self.personalOverrides(
-                profile: profile, for: first, strokes: strokes, userOverrides: overrides
-            )
-            let reading = personalized == overrides
-                ? first
-                : self.recognizer.read(strokes: strokes, overrides: personalized)
-
-            os_signpost(.end, log: self.performanceLog, name: "InkRecognition", signpostID: signpostID)
-            guard !token.isCancelled else { return }
-
-            let elapsedMs = Double(DispatchTime.now().uptimeNanoseconds - started) / 1_000_000
-            // Use the immutable stroke snapshot here, not a later surface read.
-            // This adds geometry-only symbol count, expression tree and exact
-            // local-refinement regions to the same payload as the recognized text.
-            var payload = reading.jsonObject(strokes: strokes)
-            payload["type"] = "reading"
-            payload["reqId"] = requestId
-            DispatchQueue.main.async { [weak self] in
-                guard let self, !token.isCancelled, self.isMounted else { return }
-                self.lastReading = reading
-                if ProcessInfo.processInfo.arguments.contains("--ink-selfcheck") {
-                    NSLog("PRIINK perf recognition req=%d strokes=%d %.1fms", requestId, strokes.count, elapsedMs)
+                let first = self.recognizer.read(strokes: strokes, overrides: overrides)
+                guard !token.isCancelled else {
+                    os_signpost(.end, log: self.performanceLog, name: "InkRecognition", signpostID: signpostID)
+                    return
                 }
-                self.emit(payload)
-                if self.recognitionToken === token { self.recognitionToken = nil }
+                let personalized = self.personalOverrides(
+                    profile: profile, for: first, strokes: strokes, userOverrides: overrides
+                )
+                let reading = personalized == overrides
+                    ? first
+                    : self.recognizer.read(strokes: strokes, overrides: personalized)
+
+                os_signpost(.end, log: self.performanceLog, name: "InkRecognition", signpostID: signpostID)
+                guard !token.isCancelled else { return }
+
+                let elapsedMs = Double(DispatchTime.now().uptimeNanoseconds - started) / 1_000_000
+                var payload = reading.jsonObject(strokes: strokes)
+                payload["type"] = "reading"
+                payload["reqId"] = requestId
+                payload["recognitionQuietMs"] = Double(Self.recognitionQuietNanos) / 1_000_000
+                DispatchQueue.main.async { [weak self] in
+                    guard let self, !token.isCancelled, self.isMounted else { return }
+                    self.lastReading = reading
+                    if ProcessInfo.processInfo.arguments.contains("--ink-selfcheck") {
+                        NSLog("PRIINK perf recognition req=%d strokes=%d %.1fms", requestId, strokes.count, elapsedMs)
+                    }
+                    self.emit(payload)
+                    if self.recognitionToken === token { self.recognitionToken = nil }
+                }
             }
         }
     }
