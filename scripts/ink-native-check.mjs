@@ -34,6 +34,22 @@ const argOf = (name) => {
 const run = (cmd, args, opts = {}) =>
   execFileSync(cmd, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], ...opts });
 
+function compilerDiagnostics(err) {
+  const stdout = String(err?.stdout || err?.output?.[1] || '');
+  const stderr = String(err?.stderr || err?.output?.[2] || '');
+  const combined = `${stdout}\n${stderr}`.split('\n');
+  const interesting = combined.filter(line =>
+    /(^|\s)(error:|warning:)|SwiftEmitModule|EmitSwiftModule|BUILD FAILED|\.swift:\d+:\d+:/i.test(line)
+  );
+  if (interesting.length) {
+    console.error('\nXcode compiler diagnostics:');
+    for (const line of interesting.slice(-160)) console.error(line);
+  } else {
+    console.error('\nXcode failed without a parseable compiler diagnostic. Last output lines:');
+    for (const line of combined.slice(-100)) console.error(line);
+  }
+}
+
 function pickDevice() {
   const named = argOf('device');
   if (named) return named;
@@ -64,12 +80,17 @@ ensureBooted(device);
 
 const derived = mkdtempSync(join(tmpdir(), 'pri-ink-'));
 console.log('Building…');
-run('xcodebuild', [
-  '-scheme', 'PriLearning',
-  '-destination', `platform=iOS Simulator,name=${device}`,
-  '-derivedDataPath', derived,
-  'build'
-], { cwd: PACKAGE, maxBuffer: 64 * 1024 * 1024 });
+try {
+  run('xcodebuild', [
+    '-scheme', 'PriLearning',
+    '-destination', `platform=iOS Simulator,name=${device}`,
+    '-derivedDataPath', derived,
+    'build'
+  ], { cwd: PACKAGE, maxBuffer: 64 * 1024 * 1024 });
+} catch (err) {
+  compilerDiagnostics(err);
+  process.exit(1);
+}
 
 const app = join(derived, 'Build/Products/Debug-iphonesimulator/Pri Learning.app');
 try { run('xcrun', ['simctl', 'terminate', device, BUNDLE_ID]); } catch { /* not running */ }
