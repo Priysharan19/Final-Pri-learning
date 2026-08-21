@@ -32,8 +32,6 @@ private final class InkRecognitionToken {
 
 final class InkBridge: NSObject, InkSurfaceDelegate {
 
-    /// Clips the surface to the visible content area, so ink can never be
-    /// drawn over the sticky top bar or the sidebar.
     private let clipView = UIView()
     private let surface = InkSurfaceView()
     private let recognizer = MathInkRecognizer()
@@ -44,20 +42,11 @@ final class InkBridge: NSObject, InkSurfaceDelegate {
 
     private weak var webView: WKWebView?
     private var recognitionToken: InkRecognitionToken?
-
-    // The correction UI already sends its current override map back with every
-    // recognition request. Keeping the prior native Reading lets the shell turn
-    // an explicit correction into a bounded personal feature prototype without
-    // adding another raw-ink persistence path.
     private var lastReading: Reading?
     private var learnedCorrectionKeys: Set<String> = []
 
-    /// Every payload the page would receive, for the bridge smoke test. Nil in
-    /// the app — the page is the only listener there.
     var onEmit: (([String: Any]) -> Void)?
 
-    /// Where the writing area sat in the viewport when the page last reported,
-    /// and what the scroll offset was at that moment.
     private var reportedFrame: CGRect = .zero
     private var reportedClip: CGRect = .zero
     private var reportedOffset: CGPoint = .zero
@@ -73,10 +62,7 @@ final class InkBridge: NSObject, InkSurfaceDelegate {
         container.addSubview(clipView)
     }
 
-    /// Called from the web view's scroll delegate — the page moved under the
-    /// surface, so the surface moves with it.
     func webViewDidScroll() { applyLayout() }
-
     func webViewDidResize() { applyLayout() }
 
     // MARK: - Messages from the page
@@ -92,9 +78,6 @@ final class InkBridge: NSObject, InkSurfaceDelegate {
             learnedCorrectionKeys.removeAll()
             applyAppearance(message)
             updateGeometry(message)
-            // A mount is a fresh sheet: the page mounts one writing area per
-            // question, and per switch into ✎ Write mode, exactly as the web
-            // canvas did when it was the one being created and destroyed.
             surface.clear()
             isMounted = true
             clipView.isHidden = false
@@ -225,10 +208,6 @@ final class InkBridge: NSObject, InkSurfaceDelegate {
         recognitionToken = nil
     }
 
-    /// Explicit corrections are the only events allowed to teach the personal
-    /// recognizer. Exact trace ownership is mandatory, and profile identity is
-    /// mandatory: a sibling's handwriting must never become another student's
-    /// prior on a shared iPad.
     private func learnExplicitCorrections(
         profile: String?,
         overrides: [String: String],
@@ -253,10 +232,6 @@ final class InkBridge: NSObject, InkSurfaceDelegate {
         }
     }
 
-    /// Personal history is a weak second opinion, not a second ground truth.
-    /// It can act only on low-confidence, exactly-owned glyphs, and only when
-    /// its bounded feature prototype is materially stronger than the global
-    /// reading. User picker corrections remain locked above both engines.
     private func personalOverrides(
         profile: String?,
         for reading: Reading,
@@ -295,8 +270,6 @@ final class InkBridge: NSObject, InkSurfaceDelegate {
     }
 
     private func recognize(requestId: Int, overrides: [String: String], profile: String?) {
-        // `surface.strokes` is a cached value, not a fresh conversion of the
-        // entire PKDrawing. The snapshot is immutable for this request.
         let strokes = surface.strokes
         learnExplicitCorrections(profile: profile, overrides: overrides,
                                  reading: lastReading, strokes: strokes)
@@ -317,8 +290,6 @@ final class InkBridge: NSObject, InkSurfaceDelegate {
             let personalized = self.personalOverrides(
                 profile: profile, for: first, strokes: strokes, userOverrides: overrides
             )
-            // The line cache means this second pass does not re-run Vision. It
-            // re-decodes the cached trace/symbol hypotheses with personal locks.
             let reading = personalized == overrides
                 ? first
                 : self.recognizer.read(strokes: strokes, overrides: personalized)
@@ -327,7 +298,10 @@ final class InkBridge: NSObject, InkSurfaceDelegate {
             guard !token.isCancelled else { return }
 
             let elapsedMs = Double(DispatchTime.now().uptimeNanoseconds - started) / 1_000_000
-            var payload = reading.jsonObject
+            // Use the immutable stroke snapshot here, not a later surface read.
+            // This adds geometry-only symbol count, expression tree and exact
+            // local-refinement regions to the same payload as the recognized text.
+            var payload = reading.jsonObject(strokes: strokes)
             payload["type"] = "reading"
             payload["reqId"] = requestId
             DispatchQueue.main.async { [weak self] in
