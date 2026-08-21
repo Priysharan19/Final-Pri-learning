@@ -478,12 +478,19 @@ final class MathInkRecognizer {
             readings.append(primary)
             let count = Self.symbols(of: primary.text).count
             let grammar = MathGrammar.score(Self.respell(primary.text))
-            if count == expectedMarks && grammar >= 0.45 {
+
+            // Correct OCR character count is not independent evidence: the
+            // screenshot failure returned plausible-length strings while the
+            // symbols themselves were wrong. Skip rescue views only when the
+            // primary result has strong maths structure AND strong Vision
+            // confidence. Everything borderline goes through multi-raster
+            // fusion before trace/geometry repair gets the final say.
+            if count == expectedMarks && grammar >= 0.74 && primary.confidence >= 0.70 {
                 return primary
             }
             if Self.trace {
-                NSLog("PRIINK   adaptive retry marks=%d primarySymbols=%d grammar=%.2f",
-                      expectedMarks, count, grammar)
+                NSLog("PRIINK   adaptive retry marks=%d primarySymbols=%d grammar=%.2f conf=%.2f",
+                      expectedMarks, count, grammar, primary.confidence)
             }
         }
 
