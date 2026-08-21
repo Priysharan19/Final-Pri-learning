@@ -2,9 +2,10 @@
 // Pri Learning · Reading → page
 //
 // The native reading keeps the legacy web-engine fields stable, then adds a
-// trace-provenance structure graph. Existing consumers continue to read the
-// same text/symbol keys; newer diagnostics and future neural ensembles can use
-// the additive `structure` field without guessing stroke ownership from text.
+// trace-provenance structure graph and a selective trust decision. Existing
+// consumers continue to read the same text/symbol keys; newer consumers can
+// refuse to mark an uncertain reading instead of treating every OCR string as
+// authoritative.
 // ─────────────────────────────────────────────────────────────────────────────
 import CoreGraphics
 import Foundation
@@ -52,12 +53,17 @@ extension ReadingLine {
 extension Reading {
     var jsonObject: [String: Any] {
         let structure = InkStructureGraphBuilder.build(from: self)
+        let decision = InkAcceptancePolicy.evaluate(reading: self, structure: structure)
         var payload: [String: Any] = [
             "lines": lines.map(\.jsonObject),
             "text": text,
             "minConf": minConfidence,
             "margin": margin,
-            "structure": structure.jsonObject
+            "structure": structure.jsonObject,
+            "decision": decision.jsonObject,
+            // Redundant top-level boolean keeps the safety property easy for
+            // legacy web code to consume without understanding policy details.
+            "safeToAutoAccept": decision.autoAccept
         ]
         if let weakest {
             payload["weakest"] = [
