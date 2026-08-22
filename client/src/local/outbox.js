@@ -26,21 +26,21 @@ function safeId(value, fallback = 'self') {
   return ID.test(text) ? text : fallback;
 }
 
-function pathId(path, at) {
-  const parts = String(path || '').split('/').filter(Boolean);
-  return safeId(parts[at], 'unknown');
-}
-
 /**
  * Map a successful local mutation to the entity that a future sync adapter has
- * to re-read. null means intentionally local-only or read-only.
+ * to re-read. null means intentionally local-only or read-only. `body` is used
+ * only for the one case whose id disappears with the successful write: profile
+ * deletion. No other request field is copied or retained.
  */
-export function classifyMutation(method, path, result = null) {
+export function classifyMutation(method, path, result = null, body = null) {
   const key = `${String(method || '').toUpperCase()} ${String(path || '')}`;
 
   if (key === 'POST /profiles') return { kind: 'profile', entityId: safeId(result?.user?.id), operation: 'upsert' };
   if (key === 'PATCH /me') return { kind: 'profile', entityId: safeId(result?.user?.id), operation: 'upsert' };
-  if (key === 'POST /profiles/delete') return null; // deletion id lives in request body; never copied into diagnostics/outbox here
+  if (key === 'POST /profiles/delete') {
+    const id = safeId(body?.id, '');
+    return id ? { kind: 'profile', entityId: id, operation: 'delete' } : null;
+  }
   if (key === 'POST /profiles/password' || key === 'POST /profiles/select' || key === 'POST /auth/logout' || key === 'POST /profiles/demo') return null;
 
   let m = key.match(/^POST \/practice\/([A-Za-z0-9._-]+)\/(submit|reveal)$/);
@@ -112,9 +112,9 @@ function locked(job) {
   return next;
 }
 
-/** Persist one successful mutation. The result body is inspected only for ids. */
-export function recordMutation(method, path, result) {
-  const classified = classifyMutation(method, path, result);
+/** Persist one successful mutation. Only opaque ids are retained from result/body. */
+export function recordMutation(method, path, result, body = null) {
+  const classified = classifyMutation(method, path, result, body);
   if (!classified) return Promise.resolve(null);
   return locked(async () => {
     const row = cleanRow(await get('device', ROW_ID).catch(() => null));
