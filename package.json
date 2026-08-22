@@ -10,6 +10,7 @@
     "build": "npm run build --prefix client",
     "start": "node server/index.js",
     "seed": "node server/seed.js",
+    "completion": "node tools/completion/audit.mjs --run",
     "test": "npm run test:engine && npm run test:gateway && npm run test:outbox && npm run test:backend && npm run test:security && npm run test:ink && npm run test:hard && npm run test:lines && npm run test:holdout && npm run test:holdout2 && npm run test:holdout3 && npm run test:ink:corpus && npm run test:context && npm run test:ink:bridge",
     "test:engine": "node server/test/selfcheck.mjs",
     "test:engine:quick": "node server/test/selfcheck.mjs --quick",
