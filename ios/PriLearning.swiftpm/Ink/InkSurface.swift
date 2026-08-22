@@ -137,6 +137,11 @@ final class InkSurfaceView: UIView, PKCanvasViewDelegate {
         redoStack.removeAll()
     }
 
+    private func clearHistory() {
+        undoStack.removeAll(keepingCapacity: true)
+        redoStack.removeAll(keepingCapacity: true)
+    }
+
     func undo() {
         guard let previous = undoStack.popLast() else { return }
         redoStack.append(canvas.drawing)
@@ -155,19 +160,33 @@ final class InkSurfaceView: UIView, PKCanvasViewDelegate {
         replaceDrawing(PKDrawing())
     }
 
-    private func replaceDrawing(_ drawing: PKDrawing) {
+    /// Begin a genuinely new writing sheet. This is deliberately different
+    /// from the user's Clear action: no prior question is allowed to survive
+    /// in Undo/Redo, and the reset is not emitted as a user stroke change.
+    func resetForNewSheet() {
+        clearHistory()
+        replaceDrawing(PKDrawing(), notify: false)
+    }
+
+    private func replaceDrawing(_ drawing: PKDrawing, notify: Bool = true) {
         suppressChangeEvents = true
         canvas.drawing = drawing
         suppressChangeEvents = false
-        delegate?.inkSurfaceDidChangeStrokes(self)
+        if notify {
+            delegate?.inkSurfaceDidChangeStrokes(self)
+        }
     }
 
     // MARK: - Strokes
 
     var strokes: [InkStroke] { StrokeCodec.strokes(from: canvas.drawing) }
 
+    /// Programmatic restoration establishes the baseline for the current
+    /// question. It must not make the previous sheet reachable through Undo.
+    /// The first subsequent user stroke will push this restored drawing as the
+    /// new question's first undo point.
     func setStrokes(_ strokes: [InkStroke]) {
-        pushHistory()
+        clearHistory()
         replaceDrawing(StrokeCodec.drawing(from: strokes, color: inkColor))
     }
 
