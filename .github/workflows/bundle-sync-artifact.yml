@@ -24,6 +24,8 @@ jobs:
         run: npm run build
       - name: Sync iOS web bundle
         run: npm run sync:ios
+      - name: Show bundle changes
+        run: git status --short -- ios/PriLearning.swiftpm/Resources/Web
       - name: Verify sync is clean
         run: npm run check:ios
       - name: Upload synced iOS web bundle
