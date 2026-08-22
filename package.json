@@ -23,7 +23,7 @@
     "test:lines": "node client/test/inkcheck-lines.mjs 40",
     "test:holdout": "node client/test/inkcheck-holdout.mjs 24",
     "test:holdout2": "node client/test/inkcheck-holdout2.mjs 40",
-    "test:holdout3": "node client/test/inkcheck-holdout3.mjs 40",
+    "test:holdout3": "node client/test/inkcheck-holdout3-gate.mjs 40",
     "test:context": "node client/test/inkcheck-context.mjs",
     "test:real": "node client/test/inkcheck-real.mjs",
     "test:ink:corpus": "node client/test/ink-corpus-audit.mjs",
