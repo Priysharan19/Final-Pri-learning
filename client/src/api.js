@@ -85,7 +85,7 @@ async function call(method, path, body) {
         // tempt the UI to repeat a non-idempotent action), so queue failure is a
         // diagnostic warning rather than a rejected request.
         let syncWarning = null;
-        try { await recordMutation(checked.method, checked.path, result); }
+        try { await recordMutation(checked.method, checked.path, result, checked.body); }
         catch { syncWarning = 'SYNC_QUEUE_FAILED'; }
 
         finishRequest(request, 200, syncWarning);
