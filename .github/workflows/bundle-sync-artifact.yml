@@ -1,0 +1,31 @@
+name: Bundle Sync Artifact
+
+on:
+  push:
+    branches:
+      - handwriting-v11-hardening
+
+jobs:
+  sync-bundle:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+      - name: Install client dependencies
+        run: npm ci --prefix client
+      - name: Build client
+        run: npm run build
+      - name: Sync iOS web bundle
+        run: npm run sync:ios
+      - name: Verify sync is clean
+        run: npm run check:ios
+      - name: Upload synced iOS web bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: synced-ios-web
+          path: ios/PriLearning.swiftpm/Resources/Web
+          if-no-files-found: error
