@@ -9,6 +9,12 @@
 // stale hard-coded bundle id previously let the app build and install and then
 // made the release gate fail at launch with FrontBoard "application unknown".
 //
+// The native benchmark is deterministic synthetic ink. It is not a claim about
+// arbitrary real handwriting, but it IS a regression gate for the full shipped
+// PencilKit → Vision → maths-decoder pipeline. Once that pipeline reaches an
+// exact benchmark result, a later release is not allowed to trade exact
+// structure away while hiding behind a high per-character percentage.
+//
 // Usage: npm run test:ink:native [-- --device "iPad Air 11-inch (M4)"]
 // ─────────────────────────────────────────────────────────────────────────────
 import { execFileSync, execSync } from 'node:child_process';
@@ -20,9 +26,13 @@ import { tmpdir } from 'node:os';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PACKAGE = join(HERE, '../ios/PriLearning.swiftpm');
 
-// The floor, not the target. It is deliberately conservative until the native
-// benchmark itself is expanded; synthetic/browser accuracy is gated elsewhere.
-const ACCURACY_FLOOR = 85;
+// These are release floors, not estimates of real-writer accuracy. The current
+// benchmark reaches 10/10 exact and 100.0% characters on the macOS/iPad runner.
+// Exact-expression accuracy is the stronger gate because a single structural
+// error can change the mathematics while barely moving character accuracy.
+const ACCURACY_FLOOR = 99.5;
+const EXPECTED_CASES = 10;
+const EXACT_FLOOR = 10;
 
 const argOf = (name) => {
   const i = process.argv.indexOf(`--${name}`);
@@ -129,11 +139,24 @@ for (const line of lines) console.log(`  ${line.replace(/^PRIINK\s*/, '')}`);
 const summary = lines.find(l => l.includes('character accuracy'));
 const bridge = lines.find(l => l.startsWith('PRIINK bridge mounted'));
 const accuracy = summary ? Number(/accuracy ([\d.]+)%/.exec(summary)?.[1] ?? 0) : 0;
+const exactMatch = summary ? /(\d+)\/(\d+) exact/.exec(summary) : null;
+const exact = Number(exactMatch?.[1] ?? 0);
+const cases = Number(exactMatch?.[2] ?? 0);
 
 const problems = [];
-if (!summary) problems.push('the self-check did not report a score');
-else if (accuracy < ACCURACY_FLOOR) {
-  problems.push(`character accuracy ${accuracy}% is below the ${ACCURACY_FLOOR}% floor`);
+if (!summary) {
+  problems.push('the self-check did not report a score');
+} else {
+  if (accuracy < ACCURACY_FLOOR) {
+    problems.push(`character accuracy ${accuracy}% is below the ${ACCURACY_FLOOR}% floor`);
+  }
+  if (!exactMatch) {
+    problems.push('the self-check did not report exact-expression coverage');
+  } else if (cases !== EXPECTED_CASES) {
+    problems.push(`native benchmark ran ${cases} cases; expected ${EXPECTED_CASES}`);
+  } else if (exact < EXACT_FLOOR) {
+    problems.push(`exact expressions ${exact}/${cases} is below the ${EXACT_FLOOR}/${EXPECTED_CASES} floor`);
+  }
 }
 if (!bridge) problems.push('the bridge smoke test did not report');
 else {
@@ -148,4 +171,4 @@ if (problems.length) {
   for (const problem of problems) console.log(`FAIL — ${problem}`);
   process.exit(1);
 }
-console.log(`PASS — character accuracy ${accuracy}%, bridge round trip clean`);
+console.log(`PASS — character accuracy ${accuracy}%, exact ${exact}/${cases}, bridge round trip clean`);
