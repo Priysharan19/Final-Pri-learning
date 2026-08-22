@@ -10,6 +10,13 @@
 // Keeping the outbox payload-free has two benefits now: it is safe to persist in
 // the device store, and the app can start accumulating durable offline changes
 // before a cloud transport exists without creating a second plaintext database.
+//
+// Most importantly, this queue is fail-closed. A bounded dirty queue must never
+// 'solve' overflow by dropping its oldest write: that would make a later cloud
+// replica permanently wrong. If the queue fills, or an existing queue row is
+// malformed/version-unknown, it collapses to one `full-rescan:all` marker. The
+// future transport must then reconcile the complete authorised local state. A
+// full rescan is more work; silent data loss is not an option.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { get, put } from './idb.js';
@@ -18,6 +25,8 @@ const ROW_ID = 'pri-sync-outbox-v1';
 const VERSION = 1;
 const MAX_ITEMS = 500;
 const ID = /^[A-Za-z0-9._-]{1,100}$/;
+const OPERATIONS = new Set(['upsert', 'delete', 'bulk-import']);
+const FULL_RESCAN = Object.freeze({ kind: 'full-rescan', entityId: 'all', operation: 'upsert' });
 
 let serial = Promise.resolve();
 
@@ -83,9 +92,32 @@ export function classifyMutation(method, path, result = null, body = null) {
   return null;
 }
 
+function rescanMarker(seq = 1, firstAt = Date.now(), at = Date.now()) {
+  return {
+    seq: Math.max(1, Math.floor(Number(seq) || 1)), ...FULL_RESCAN,
+    firstAt: Math.max(0, Number(firstAt) || at || Date.now()),
+    at: Math.max(0, Number(at) || Date.now())
+  };
+}
+
+function validItem(item) {
+  return !!item && typeof item === 'object' && typeof item.kind === 'string' && item.kind.length <= 40 &&
+    ID.test(String(item.entityId || '')) && OPERATIONS.has(item.operation) &&
+    Number.isFinite(Number(item.seq)) && Number(item.seq) > 0;
+}
+
 export function coalesce(items, next) {
   const list = Array.isArray(items) ? items.filter(Boolean).map(x => ({ ...x })) : [];
-  if (!next) return list.slice(-MAX_ITEMS);
+  if (!next) return list;
+
+  // Once the queue has admitted that it needs a complete reconciliation, finer
+  // dirty markers cannot add correctness. Keep one marker, move its sequence to
+  // the latest mutation and preserve how long this device has been dirty.
+  const existingRescan = list.find(item => item.kind === FULL_RESCAN.kind && item.entityId === FULL_RESCAN.entityId);
+  if (existingRescan) {
+    return [rescanMarker(next.seq, existingRescan.firstAt || existingRescan.at || next.firstAt, next.at)];
+  }
+
   const token = `${next.kind}:${next.entityId}`;
   const prior = list.findIndex(item => `${item.kind}:${item.entityId}` === token);
   if (prior >= 0) {
@@ -94,19 +126,29 @@ export function coalesce(items, next) {
     next = { ...next, firstAt: previous.firstAt || previous.at || next.firstAt };
   }
   list.push({ ...next });
-  return list.slice(-MAX_ITEMS);
+
+  if (list.length > MAX_ITEMS) {
+    const firstAt = Math.min(...list.map(item => Number(item.firstAt) || Number(item.at) || Number(next.at) || Date.now()));
+    return [rescanMarker(next.seq, firstAt, next.at)];
+  }
+  return list;
 }
 
 function cleanRow(raw) {
-  if (!raw || raw.id !== ROW_ID || raw.version !== VERSION || !Array.isArray(raw.items)) {
-    return { id: ROW_ID, version: VERSION, nextSeq: 1, items: [] };
+  if (raw === undefined || raw === null) return { id: ROW_ID, version: VERSION, nextSeq: 1, items: [] };
+
+  // A row exists but cannot be trusted. Emptying it would claim there is
+  // nothing to sync, which is exactly the unsafe answer. Preserve correctness
+  // by requiring a complete reconciliation instead.
+  if (raw.id !== ROW_ID || raw.version !== VERSION || !Array.isArray(raw.items) || raw.items.length > MAX_ITEMS || raw.items.some(item => !validItem(item))) {
+    const seq = Math.max(1, Math.floor(Number(raw?.nextSeq) || 1));
+    const marker = rescanMarker(seq);
+    return { id: ROW_ID, version: VERSION, nextSeq: marker.seq + 1, items: [marker] };
   }
-  const items = raw.items.slice(-MAX_ITEMS).filter(item =>
-    item && typeof item === 'object' && typeof item.kind === 'string' &&
-    ID.test(String(item.entityId || '')) && ['upsert', 'delete', 'bulk-import'].includes(item.operation)
-  ).map(item => ({
-    seq: Math.max(1, Math.floor(Number(item.seq) || 1)),
-    kind: String(item.kind).slice(0, 40), entityId: String(item.entityId), operation: item.operation,
+
+  const items = raw.items.map(item => ({
+    seq: Math.max(1, Math.floor(Number(item.seq))),
+    kind: String(item.kind), entityId: String(item.entityId), operation: item.operation,
     firstAt: Math.max(0, Number(item.firstAt) || Number(item.at) || 0),
     at: Math.max(0, Number(item.at) || 0)
   }));
@@ -125,7 +167,11 @@ export function recordMutation(method, path, result, body = null) {
   const classified = classifyMutation(method, path, result, body);
   if (!classified) return Promise.resolve(null);
   return locked(async () => {
-    const row = cleanRow(await get('device', ROW_ID).catch(() => null));
+    // Storage errors are not converted to an empty queue here. api.js already
+    // turns a queue write failure into SYNC_QUEUE_FAILED without repeating the
+    // successful local domain mutation; swallowing the storage error here would
+    // make that warning impossible.
+    const row = cleanRow(await get('device', ROW_ID));
     const now = Date.now();
     const event = {
       seq: row.nextSeq++, kind: classified.kind, entityId: classified.entityId,
@@ -139,8 +185,8 @@ export function recordMutation(method, path, result, body = null) {
 
 /** Snapshot for a future transport; contains no user content. */
 export async function pendingMutations(limit = 100) {
-  const row = cleanRow(await get('device', ROW_ID).catch(() => null));
-  const n = Math.max(1, Math.min(500, Math.floor(Number(limit) || 100)));
+  const row = cleanRow(await get('device', ROW_ID));
+  const n = Math.max(1, Math.min(MAX_ITEMS, Math.floor(Number(limit) || 100)));
   return row.items.slice(0, n).map(item => ({ ...item }));
 }
 
@@ -149,7 +195,7 @@ export function acknowledgeMutations(sequences) {
   const ack = new Set((Array.isArray(sequences) ? sequences : []).map(Number).filter(Number.isFinite));
   if (!ack.size) return Promise.resolve(0);
   return locked(async () => {
-    const row = cleanRow(await get('device', ROW_ID).catch(() => null));
+    const row = cleanRow(await get('device', ROW_ID));
     const before = row.items.length;
     row.items = row.items.filter(item => !ack.has(item.seq));
     if (row.items.length !== before) await put('device', row);
@@ -158,10 +204,11 @@ export function acknowledgeMutations(sequences) {
 }
 
 export async function outboxStats() {
-  const row = cleanRow(await get('device', ROW_ID).catch(() => null));
+  const row = cleanRow(await get('device', ROW_ID));
   return {
     version: VERSION,
     pending: row.items.length,
+    requiresFullRescan: row.items.some(item => item.kind === FULL_RESCAN.kind && item.entityId === FULL_RESCAN.entityId),
     oldestAt: row.items.length ? Math.min(...row.items.map(x => x.firstAt || x.at || 0)) : null,
     newestAt: row.items.length ? Math.max(...row.items.map(x => x.at || 0)) : null,
     nextSeq: row.nextSeq
