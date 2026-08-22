@@ -63,10 +63,11 @@ final class InkBridge: NSObject, InkSurfaceDelegate {
         case "mount":
             applyAppearance(message)
             updateGeometry(message)
-            // A mount is a fresh sheet: the page mounts one writing area per
-            // question, and per switch into ✎ Write mode, exactly as the web
-            // canvas did when it was the one being created and destroyed.
-            surface.clear()
+            // A mount is a fresh sheet. Reset the drawing AND its undo/redo
+            // baseline so Undo on question B can never resurrect question A.
+            // Restored strokes, if any, arrive immediately afterwards through
+            // setStrokes and become the new question's baseline.
+            surface.resetForNewSheet()
             isMounted = true
             clipView.isHidden = false
             applyLayout()
