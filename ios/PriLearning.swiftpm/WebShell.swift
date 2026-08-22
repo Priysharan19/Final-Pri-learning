@@ -64,9 +64,15 @@ struct WebShell: UIViewRepresentable {
         webView.isOpaque = false
         webView.backgroundColor = UIColor(red: 10 / 255, green: 10 / 255, blue: 9 / 255, alpha: 1)
         webView.scrollView.backgroundColor = webView.backgroundColor
+
+        // Web Inspector is a development capability, not a production feature.
+        // Keep it impossible to enable in App Store / release builds even on
+        // iOS versions that support WKWebView inspectability.
+        #if DEBUG
         if #available(iOS 16.4, *) {
-            webView.isInspectable = true   // Safari Web Inspector while developing
+            webView.isInspectable = true
         }
+        #endif
 
         let container = ShellContainerView()
         container.backgroundColor = webView.backgroundColor
