@@ -3,28 +3,36 @@
 // reports what it scored. Needs Xcode and a Mac; everything else in the test
 // suite runs anywhere.
 //
-// It builds the app, installs it, launches it with --ink-selfcheck, and reads
-// the result back out of the system log. It fails when the character accuracy
-// drops below the floor below, or when the bridge smoke test does not pass —
-// so a change that quietly breaks the writing surface is caught here rather
-// than by a student.
+// It builds the app, discovers the product and bundle identifier from the
+// actual build output, installs it, launches it with --ink-selfcheck, and reads
+// the result back out of the system log. Discovering these values matters: a
+// stale hard-coded bundle id previously let the app build and install and then
+// made the release gate fail at launch with FrontBoard "application unknown".
+//
+// The native benchmark is deterministic synthetic ink. It is not a claim about
+// arbitrary real handwriting, but it IS a regression gate for the full shipped
+// PencilKit → Vision → maths-decoder pipeline. Once that pipeline reaches an
+// exact benchmark result, a later release is not allowed to trade exact
+// structure away while hiding behind a high per-character percentage.
 //
 // Usage: npm run test:ink:native [-- --device "iPad Air 11-inch (M4)"]
 // ─────────────────────────────────────────────────────────────────────────────
 import { execFileSync, execSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { mkdtempSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PACKAGE = join(HERE, '../ios/PriLearning.swiftpm');
-const BUNDLE_ID = 'com.prilearning.app';
 
-// The floor, not the target. It is set below the score the pipeline reaches so
-// that ordinary drift does not fail the build, and far enough above chance
-// that a broken stage cannot slip through.
-const ACCURACY_FLOOR = 85;
+// These are release floors, not estimates of real-writer accuracy. The current
+// benchmark reaches 10/10 exact and 100.0% characters on the macOS/iPad runner.
+// Exact-expression accuracy is the stronger gate because a single structural
+// error can change the mathematics while barely moving character accuracy.
+const ACCURACY_FLOOR = 99.5;
+const EXPECTED_CASES = 10;
+const EXACT_FLOOR = 10;
 
 const argOf = (name) => {
   const i = process.argv.indexOf(`--${name}`);
@@ -50,14 +58,41 @@ function ensureBooted(device) {
   if (new RegExp(`${device.replace(/[()]/g, '\\$&')}.*Booted`).test(list)) return;
   console.log(`Booting ${device}…`);
   try { run('xcrun', ['simctl', 'boot', device]); } catch { /* already booting */ }
-  // simctl bootstatus can hang past the point the device is usable; polling the
-  // device list is the thing that actually settles.
   for (let i = 0; i < 60; i++) {
     if (/Booted/.test(run('xcrun', ['simctl', 'list', 'devices']).split('\n')
       .filter(l => l.includes(device)).join('\n'))) return;
     execSync('sleep 2');
   }
   throw new Error(`${device} did not boot`);
+}
+
+function builtApp(derived) {
+  const products = join(derived, 'Build/Products/Debug-iphonesimulator');
+  if (!existsSync(products)) throw new Error(`Xcode produced no simulator products at ${products}`);
+  const apps = readdirSync(products).filter(name => name.endsWith('.app')).sort();
+  if (apps.length !== 1) {
+    throw new Error(`expected exactly one simulator .app, found ${apps.length}: ${apps.join(', ') || 'none'}`);
+  }
+  return join(products, apps[0]);
+}
+
+function bundleIdentifier(app) {
+  const plist = join(app, 'Info.plist');
+  if (!existsSync(plist)) throw new Error(`built app has no Info.plist: ${plist}`);
+  const id = run('/usr/bin/plutil', ['-extract', 'CFBundleIdentifier', 'raw', '-o', '-', plist]).trim();
+  if (!/^[A-Za-z0-9][A-Za-z0-9.-]+$/.test(id)) throw new Error(`invalid CFBundleIdentifier in built app: ${id}`);
+  return id;
+}
+
+function verifyInstalled(device, bundleId) {
+  for (let attempt = 0; attempt < 10; attempt++) {
+    try {
+      const path = run('xcrun', ['simctl', 'get_app_container', device, bundleId, 'app']).trim();
+      if (path) return path;
+    } catch { /* SpringBoard may need a moment to register the install */ }
+    execSync('sleep 1');
+  }
+  throw new Error(`simulator did not register installed app ${bundleId}`);
 }
 
 const device = pickDevice();
@@ -73,11 +108,15 @@ run('xcodebuild', [
   'build'
 ], { cwd: PACKAGE, maxBuffer: 64 * 1024 * 1024 });
 
-const app = join(derived, 'Build/Products/Debug-iphonesimulator/Pri Learning.app');
-try { run('xcrun', ['simctl', 'terminate', device, BUNDLE_ID]); } catch { /* not running */ }
+const app = builtApp(derived);
+const bundleId = bundleIdentifier(app);
+console.log(`Built ${app.split('/').pop()} (${bundleId})`);
+try { run('xcrun', ['simctl', 'terminate', device, bundleId]); } catch { /* not running */ }
 run('xcrun', ['simctl', 'install', device, app]);
+const installed = verifyInstalled(device, bundleId);
+console.log(`Installed ${bundleId} at ${installed}`);
 console.log('Running…');
-run('xcrun', ['simctl', 'launch', device, BUNDLE_ID, '--ink-selfcheck']);
+run('xcrun', ['simctl', 'launch', device, bundleId, '--ink-selfcheck']);
 
 let lines = [];
 for (let i = 0; i < 40; i++) {
@@ -100,11 +139,24 @@ for (const line of lines) console.log(`  ${line.replace(/^PRIINK\s*/, '')}`);
 const summary = lines.find(l => l.includes('character accuracy'));
 const bridge = lines.find(l => l.startsWith('PRIINK bridge mounted'));
 const accuracy = summary ? Number(/accuracy ([\d.]+)%/.exec(summary)?.[1] ?? 0) : 0;
+const exactMatch = summary ? /(\d+)\/(\d+) exact/.exec(summary) : null;
+const exact = Number(exactMatch?.[1] ?? 0);
+const cases = Number(exactMatch?.[2] ?? 0);
 
 const problems = [];
-if (!summary) problems.push('the self-check did not report a score');
-else if (accuracy < ACCURACY_FLOOR) {
-  problems.push(`character accuracy ${accuracy}% is below the ${ACCURACY_FLOOR}% floor`);
+if (!summary) {
+  problems.push('the self-check did not report a score');
+} else {
+  if (accuracy < ACCURACY_FLOOR) {
+    problems.push(`character accuracy ${accuracy}% is below the ${ACCURACY_FLOOR}% floor`);
+  }
+  if (!exactMatch) {
+    problems.push('the self-check did not report exact-expression coverage');
+  } else if (cases !== EXPECTED_CASES) {
+    problems.push(`native benchmark ran ${cases} cases; expected ${EXPECTED_CASES}`);
+  } else if (exact < EXACT_FLOOR) {
+    problems.push(`exact expressions ${exact}/${cases} is below the ${EXACT_FLOOR}/${EXPECTED_CASES} floor`);
+  }
 }
 if (!bridge) problems.push('the bridge smoke test did not report');
 else {
@@ -119,4 +171,4 @@ if (problems.length) {
   for (const problem of problems) console.log(`FAIL — ${problem}`);
   process.exit(1);
 }
-console.log(`PASS — character accuracy ${accuracy}%, bridge round trip clean`);
+console.log(`PASS — character accuracy ${accuracy}%, exact ${exact}/${cases}, bridge round trip clean`);

@@ -3,9 +3,15 @@
 // A two-minute guided flow: write each symbol once in your own hand and the
 // recogniser stores it as a personal template that outranks the stock shapes.
 // Corrections made while practising keep teaching it forever after.
+//
+// In the native iPad app calibration uses the SAME PencilKit surface as real
+// answers. That matters: a personal template should be learned from the input
+// path it is intended to help, not from a parallel browser-only canvas.
 // ─────────────────────────────────────────────────────────────────────────────
 import React, { useRef, useState } from 'react';
 import InkCanvas from './InkCanvas.jsx';
+import NativeInkCanvas from './NativeInkCanvas.jsx';
+import { nativeInkAvailable } from './native.js';
 import { addPersonal, personalStats, clearPersonal, ensurePersonalLoaded } from './personal.js';
 
 const PROMPTS = [
@@ -17,6 +23,8 @@ const PROMPTS = [
   ['s', 's'], ['i', 'i'], ['n', 'n'], ['c', 'c'], ['o', 'o'],
   ['t', 't'], ['a', 'a'], ['e', 'e'], ['l', 'l'], ['g', 'g'],
 ];
+
+const Surface = nativeInkAvailable() ? NativeInkCanvas : InkCanvas;
 
 export default function Calibrate({ onDone, toast }) {
   const canvasRef = useRef(null);
@@ -71,7 +79,14 @@ export default function Calibrate({ onDone, toast }) {
           {label}<span className="sr-only"> — symbol {idx + 1} of {PROMPTS.length}</span>
         </div>
       </div>
-      <InkCanvas ref={canvasRef} height={190} guides={false} ariaLabel={`Write ${label}`} />
+      <Surface
+        ref={canvasRef}
+        height={190}
+        guides={false}
+        tool="pen"
+        fingerMode="auto"
+        ariaLabel={`Write ${label}`}
+      />
       <div className="row" style={{ padding: '10px 14px', borderTop: '1px solid var(--hairline)' }}>
         <button className="btn btn-quiet btn-sm" onClick={() => canvasRef.current?.clear()}>Clear</button>
         <button className="btn btn-quiet btn-sm" onClick={advance}>Skip</button>
