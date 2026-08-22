@@ -8,8 +8,17 @@
 // can generate: the signed-in profile's scope (learned from the /me and profile
 // responses), the subtopic or year named in the request, and — for the rare task
 // or retry that points outside both — the bank the engine reports missing.
+//
+// It is also the production boundary for the in-process API. Every call is
+// validated and measured by local/gateway.js before backend.js sees it. The
+// diagnostics are deliberately payload-free: timings/statuses are useful for
+// support, while names, answers, emails, passwords and handwriting never belong
+// in an operational log.
 // ─────────────────────────────────────────────────────────────────────────────
 import { dispatch } from './local/backend.js';
+import {
+  beginRequest, finishRequest, normalizeApiError, validateRequest
+} from './local/gateway.js';
 import { scopeForYear } from './engine/curriculum.js';
 import { loadBanks, loadBanksFor, loadAllBanks } from './engine/generators/index.js';
 
@@ -55,21 +64,26 @@ async function preload(method, path, body) {
 // ── Calls ────────────────────────────────────────────────────────────────────
 
 async function call(method, path, body) {
+  const request = beginRequest(method, path);
   try {
-    await preload(method, path, body);
+    const checked = validateRequest(method, path, body);
+    await preload(checked.method, checked.path, checked.body);
+
     for (let faults = 0; ; faults++) {
       try {
-        const result = await dispatch(method, path, body);
-        if (path === '/me' || path.startsWith('/profiles')) noteUser(result);
+        const result = await dispatch(checked.method, checked.path, checked.body);
+        if (checked.path === '/me' || checked.path.startsWith('/profiles')) noteUser(result);
+        finishRequest(request, 200);
         return result;
       } catch (err) {
         if (!err?.bankMissing || faults >= MAX_BANK_FAULTS) throw err;
         await loadBanks([err.bank]);
       }
     }
-  } catch (e) {
-    if (!e.status) e.status = 500;
-    throw e;
+  } catch (error) {
+    const err = normalizeApiError(error, request.id);
+    finishRequest(request, err.status, err.code);
+    throw err;
   }
 }
 
