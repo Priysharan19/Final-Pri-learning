@@ -42,6 +42,11 @@ same('practice result maps by question id', classifyMutation('POST', '/practice/
   { kind: 'practice-progress', entityId: 'q-1', operation: 'upsert' });
 same('reveals also dirty progress', classifyMutation('POST', '/practice/q-2/reveal', {}),
   { kind: 'practice-progress', entityId: 'q-2', operation: 'upsert' });
+same('Rush answer dirties resolved progress by opaque question id',
+  classifyMutation('POST', '/rush/answer', { correct: true }, { id: 'rush-q1', answer: 'SECRET STUDENT ANSWER' }),
+  { kind: 'practice-progress', entityId: 'rush-q1', operation: 'upsert' });
+same('Rush answer without a valid id is not queued',
+  classifyMutation('POST', '/rush/answer', { correct: true }, { id: '../bad', answer: 'x' }), null);
 same('new exam maps by returned id', classifyMutation('POST', '/exams', { exam: { id: 'e1' } }),
   { kind: 'exam', entityId: 'e1', operation: 'upsert' });
 same('exam submit maps by path id', classifyMutation('POST', '/exams/e1/submit', {}),
@@ -85,10 +90,12 @@ same('first dirty timestamp survives coalescing', afterDelete[0].firstAt, task1.
 await recordMutation('POST', '/classes', { class: { id: 'class-1', name: 'SECRET CLASS NAME' } });
 await recordMutation('POST', '/custom-questions', { question: { id: 'custom-1', prompt: 'SECRET PROMPT' } });
 await recordMutation('POST', '/profiles/delete', { ok: true }, { id: 'profile-1', password: 'SECRET PASSWORD', confirmName: 'SECRET NAME' });
-const four = await pendingMutations();
-same('independent dirty entities persist', four.length, 4);
-same('queue order follows sequence', four.map(x => x.seq), [...four.map(x => x.seq)].sort((a, b) => a - b));
-same('profile deletion persists as tombstone', four.find(x => x.kind === 'profile' && x.entityId === 'profile-1')?.operation, 'delete');
+await recordMutation('POST', '/rush/answer', { correct: true, answerText: 'SECRET EXPECTED ANSWER' }, { id: 'rush-q1', answer: 'SECRET STUDENT ANSWER' });
+const five = await pendingMutations();
+same('independent dirty entities persist', five.length, 5);
+same('queue order follows sequence', five.map(x => x.seq), [...five.map(x => x.seq)].sort((a, b) => a - b));
+same('profile deletion persists as tombstone', five.find(x => x.kind === 'profile' && x.entityId === 'profile-1')?.operation, 'delete');
+same('Rush answer persists only its opaque progress id', five.find(x => x.entityId === 'rush-q1')?.kind, 'practice-progress');
 
 const disk = JSON.stringify(rawRows().device || []);
 ok('outbox disk row never copies task title', !disk.includes('PRIVATE TITLE'), disk);
@@ -97,20 +104,22 @@ ok('outbox disk row never copies class name', !disk.includes('SECRET CLASS NAME'
 ok('outbox disk row never copies custom prompt', !disk.includes('SECRET PROMPT'), disk);
 ok('outbox disk row never copies deletion password', !disk.includes('SECRET PASSWORD'), disk);
 ok('outbox disk row never copies deletion confirmation name', !disk.includes('SECRET NAME'), disk);
-ok('outbox disk row contains only opaque ids/metadata', disk.includes('task-1') && disk.includes('class-1') && disk.includes('custom-1') && disk.includes('profile-1'), disk);
+ok('outbox disk row never copies Rush student answer', !disk.includes('SECRET STUDENT ANSWER'), disk);
+ok('outbox disk row never copies Rush expected answer', !disk.includes('SECRET EXPECTED ANSWER'), disk);
+ok('outbox disk row contains only opaque ids/metadata', disk.includes('task-1') && disk.includes('class-1') && disk.includes('custom-1') && disk.includes('profile-1') && disk.includes('rush-q1'), disk);
 
 const beforeAck = await pendingMutations();
 const ackSeq = beforeAck[1].seq;
 same('ack removes exactly one committed sequence', await acknowledgeMutations([ackSeq]), 1);
 const afterAck = await pendingMutations();
-same('ack leaves other mutations', afterAck.length, 3);
+same('ack leaves other mutations', afterAck.length, 4);
 ok('ack removed requested sequence', !afterAck.some(x => x.seq === ackSeq), JSON.stringify(afterAck));
 same('unknown ack is harmless', await acknowledgeMutations([999999]), 0);
 same('empty ack is harmless', await acknowledgeMutations([]), 0);
 
 const stats = await outboxStats();
 same('stats reports version one', stats.version, 1);
-same('stats reports pending count', stats.pending, 3);
+same('stats reports pending count', stats.pending, 4);
 ok('stats exposes oldest timestamp', Number.isFinite(stats.oldestAt) && stats.oldestAt > 0, JSON.stringify(stats));
 ok('stats exposes newest timestamp', Number.isFinite(stats.newestAt) && stats.newestAt >= stats.oldestAt, JSON.stringify(stats));
 ok('stats next sequence is ahead of every item', stats.nextSeq > Math.max(...afterAck.map(x => x.seq)), JSON.stringify(stats));
