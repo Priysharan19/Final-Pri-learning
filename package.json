@@ -30,6 +30,8 @@
     "test:ink:corpus:strict": "node client/test/ink-corpus-audit.mjs --strict",
     "test:ink:bridge": "node client/test/native-ink-check.mjs",
     "test:ink:native": "node scripts/ink-native-check.mjs",
+    "test:ios:device-evidence": "node scripts/ipad-device-evidence-check.mjs",
+    "test:ios:device-evidence:strict": "node scripts/ipad-device-evidence-check.mjs --strict",
     "test:browser": "npm run test:e2e && npm run test:a11y",
     "test:e2e": "node client/test/e2e.mjs",
     "test:a11y": "node client/test/a11y-gate.mjs",
