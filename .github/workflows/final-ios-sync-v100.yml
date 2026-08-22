@@ -1,0 +1,53 @@
+name: One-shot final iOS bundle sync
+
+on:
+  push:
+    branches:
+      - backend-v100-foundation
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    if: contains(github.event.head_commit.message, '[final-ios-sync-request]')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: backend-v100-foundation
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+
+      - name: Install exact client dependencies
+        run: npm ci --prefix client
+
+      - name: Refuse high or critical dependency vulnerabilities
+        run: npm audit --prefix client --audit-level=high
+
+      - name: Build production client
+        run: npm run build
+
+      - name: Refresh native web bundle
+        run: npm run sync:ios
+
+      - name: Prove native bundle now matches
+        run: npm run check:ios
+
+      - name: Commit only generated iOS web assets
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- ios/PriLearning.swiftpm/Resources/Web
+          if git diff --cached --quiet; then
+            echo 'iOS bundle already matched the production build.'
+            exit 0
+          fi
+          git commit -m 'Sync final iOS bundle for backend v100 [final-ios-sync-generated]'
+          git push origin HEAD:backend-v100-foundation
