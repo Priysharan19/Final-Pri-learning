@@ -32,6 +32,9 @@ same('profile create is syncable', classifyMutation('POST', '/profiles', { user:
   { kind: 'profile', entityId: 'p1', operation: 'upsert' });
 same('profile patch is syncable', classifyMutation('PATCH', '/me', { user: { id: 'p1' } }),
   { kind: 'profile', entityId: 'p1', operation: 'upsert' });
+same('profile delete keeps only its opaque id', classifyMutation('POST', '/profiles/delete', { ok: true }, { id: 'p1', password: 'DO NOT COPY' }),
+  { kind: 'profile', entityId: 'p1', operation: 'delete' });
+same('profile delete without a valid id is not queued', classifyMutation('POST', '/profiles/delete', { ok: true }, { id: '../bad' }), null);
 same('password changes never enter sync outbox', classifyMutation('POST', '/profiles/password', { ok: true }), null);
 same('profile selection never enters sync outbox', classifyMutation('POST', '/profiles/select', { ok: true }), null);
 same('logout never enters sync outbox', classifyMutation('POST', '/auth/logout', { ok: true }), null);
@@ -81,29 +84,33 @@ same('first dirty timestamp survives coalescing', afterDelete[0].firstAt, task1.
 
 await recordMutation('POST', '/classes', { class: { id: 'class-1', name: 'SECRET CLASS NAME' } });
 await recordMutation('POST', '/custom-questions', { question: { id: 'custom-1', prompt: 'SECRET PROMPT' } });
-const three = await pendingMutations();
-same('independent dirty entities persist', three.length, 3);
-same('queue order follows sequence', three.map(x => x.seq), [...three.map(x => x.seq)].sort((a, b) => a - b));
+await recordMutation('POST', '/profiles/delete', { ok: true }, { id: 'profile-1', password: 'SECRET PASSWORD', confirmName: 'SECRET NAME' });
+const four = await pendingMutations();
+same('independent dirty entities persist', four.length, 4);
+same('queue order follows sequence', four.map(x => x.seq), [...four.map(x => x.seq)].sort((a, b) => a - b));
+same('profile deletion persists as tombstone', four.find(x => x.kind === 'profile' && x.entityId === 'profile-1')?.operation, 'delete');
 
 const disk = JSON.stringify(rawRows().device || []);
 ok('outbox disk row never copies task title', !disk.includes('PRIVATE TITLE'), disk);
 ok('outbox disk row never copies result secret', !disk.includes('SHOULD NOT BE COPIED'), disk);
 ok('outbox disk row never copies class name', !disk.includes('SECRET CLASS NAME'), disk);
 ok('outbox disk row never copies custom prompt', !disk.includes('SECRET PROMPT'), disk);
-ok('outbox disk row contains only opaque ids/metadata', disk.includes('task-1') && disk.includes('class-1') && disk.includes('custom-1'), disk);
+ok('outbox disk row never copies deletion password', !disk.includes('SECRET PASSWORD'), disk);
+ok('outbox disk row never copies deletion confirmation name', !disk.includes('SECRET NAME'), disk);
+ok('outbox disk row contains only opaque ids/metadata', disk.includes('task-1') && disk.includes('class-1') && disk.includes('custom-1') && disk.includes('profile-1'), disk);
 
 const beforeAck = await pendingMutations();
 const ackSeq = beforeAck[1].seq;
 same('ack removes exactly one committed sequence', await acknowledgeMutations([ackSeq]), 1);
 const afterAck = await pendingMutations();
-same('ack leaves other mutations', afterAck.length, 2);
+same('ack leaves other mutations', afterAck.length, 3);
 ok('ack removed requested sequence', !afterAck.some(x => x.seq === ackSeq), JSON.stringify(afterAck));
 same('unknown ack is harmless', await acknowledgeMutations([999999]), 0);
 same('empty ack is harmless', await acknowledgeMutations([]), 0);
 
 const stats = await outboxStats();
 same('stats reports version one', stats.version, 1);
-same('stats reports pending count', stats.pending, 2);
+same('stats reports pending count', stats.pending, 3);
 ok('stats exposes oldest timestamp', Number.isFinite(stats.oldestAt) && stats.oldestAt > 0, JSON.stringify(stats));
 ok('stats exposes newest timestamp', Number.isFinite(stats.newestAt) && stats.newestAt >= stats.oldestAt, JSON.stringify(stats));
 ok('stats next sequence is ahead of every item', stats.nextSeq > Math.max(...afterAck.map(x => x.seq)), JSON.stringify(stats));
