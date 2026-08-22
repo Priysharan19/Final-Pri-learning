@@ -3,27 +3,25 @@
 // reports what it scored. Needs Xcode and a Mac; everything else in the test
 // suite runs anywhere.
 //
-// It builds the app, installs it, launches it with --ink-selfcheck, and reads
-// the result back out of the system log. It fails when the character accuracy
-// drops below the floor below, or when the bridge smoke test does not pass —
-// so a change that quietly breaks the writing surface is caught here rather
-// than by a student.
+// It builds the app, discovers the product and bundle identifier from the
+// actual build output, installs it, launches it with --ink-selfcheck, and reads
+// the result back out of the system log. Discovering these values matters: a
+// stale hard-coded bundle id previously let the app build and install and then
+// made the release gate fail at launch with FrontBoard "application unknown".
 //
 // Usage: npm run test:ink:native [-- --device "iPad Air 11-inch (M4)"]
 // ─────────────────────────────────────────────────────────────────────────────
 import { execFileSync, execSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { mkdtempSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PACKAGE = join(HERE, '../ios/PriLearning.swiftpm');
-const BUNDLE_ID = 'com.prilearning.app';
 
-// The floor, not the target. It is set below the score the pipeline reaches so
-// that ordinary drift does not fail the build, and far enough above chance
-// that a broken stage cannot slip through.
+// The floor, not the target. It is deliberately conservative until the native
+// benchmark itself is expanded; synthetic/browser accuracy is gated elsewhere.
 const ACCURACY_FLOOR = 85;
 
 const argOf = (name) => {
@@ -50,14 +48,41 @@ function ensureBooted(device) {
   if (new RegExp(`${device.replace(/[()]/g, '\\$&')}.*Booted`).test(list)) return;
   console.log(`Booting ${device}…`);
   try { run('xcrun', ['simctl', 'boot', device]); } catch { /* already booting */ }
-  // simctl bootstatus can hang past the point the device is usable; polling the
-  // device list is the thing that actually settles.
   for (let i = 0; i < 60; i++) {
     if (/Booted/.test(run('xcrun', ['simctl', 'list', 'devices']).split('\n')
       .filter(l => l.includes(device)).join('\n'))) return;
     execSync('sleep 2');
   }
   throw new Error(`${device} did not boot`);
+}
+
+function builtApp(derived) {
+  const products = join(derived, 'Build/Products/Debug-iphonesimulator');
+  if (!existsSync(products)) throw new Error(`Xcode produced no simulator products at ${products}`);
+  const apps = readdirSync(products).filter(name => name.endsWith('.app')).sort();
+  if (apps.length !== 1) {
+    throw new Error(`expected exactly one simulator .app, found ${apps.length}: ${apps.join(', ') || 'none'}`);
+  }
+  return join(products, apps[0]);
+}
+
+function bundleIdentifier(app) {
+  const plist = join(app, 'Info.plist');
+  if (!existsSync(plist)) throw new Error(`built app has no Info.plist: ${plist}`);
+  const id = run('/usr/bin/plutil', ['-extract', 'CFBundleIdentifier', 'raw', '-o', '-', plist]).trim();
+  if (!/^[A-Za-z0-9][A-Za-z0-9.-]+$/.test(id)) throw new Error(`invalid CFBundleIdentifier in built app: ${id}`);
+  return id;
+}
+
+function verifyInstalled(device, bundleId) {
+  for (let attempt = 0; attempt < 10; attempt++) {
+    try {
+      const path = run('xcrun', ['simctl', 'get_app_container', device, bundleId, 'app']).trim();
+      if (path) return path;
+    } catch { /* SpringBoard may need a moment to register the install */ }
+    execSync('sleep 1');
+  }
+  throw new Error(`simulator did not register installed app ${bundleId}`);
 }
 
 const device = pickDevice();
@@ -73,11 +98,15 @@ run('xcodebuild', [
   'build'
 ], { cwd: PACKAGE, maxBuffer: 64 * 1024 * 1024 });
 
-const app = join(derived, 'Build/Products/Debug-iphonesimulator/Pri Learning.app');
-try { run('xcrun', ['simctl', 'terminate', device, BUNDLE_ID]); } catch { /* not running */ }
+const app = builtApp(derived);
+const bundleId = bundleIdentifier(app);
+console.log(`Built ${app.split('/').pop()} (${bundleId})`);
+try { run('xcrun', ['simctl', 'terminate', device, bundleId]); } catch { /* not running */ }
 run('xcrun', ['simctl', 'install', device, app]);
+const installed = verifyInstalled(device, bundleId);
+console.log(`Installed ${bundleId} at ${installed}`);
 console.log('Running…');
-run('xcrun', ['simctl', 'launch', device, BUNDLE_ID, '--ink-selfcheck']);
+run('xcrun', ['simctl', 'launch', device, bundleId, '--ink-selfcheck']);
 
 let lines = [];
 for (let i = 0; i < 40; i++) {
