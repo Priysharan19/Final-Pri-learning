@@ -29,8 +29,9 @@ function safeId(value, fallback = 'self') {
 /**
  * Map a successful local mutation to the entity that a future sync adapter has
  * to re-read. null means intentionally local-only or read-only. `body` is used
- * only for the one case whose id disappears with the successful write: profile
- * deletion. No other request field is copied or retained.
+ * only when the opaque entity id exists solely in the request (profile delete
+ * and Rush/Match answer resolution). No answer/password/other request field is
+ * copied or retained.
  */
 export function classifyMutation(method, path, result = null, body = null) {
   const key = `${String(method || '').toUpperCase()} ${String(path || '')}`;
@@ -50,6 +51,13 @@ export function classifyMutation(method, path, result = null, body = null) {
   m = key.match(/^POST \/exams\/([A-Za-z0-9._-]+)\/submit$/);
   if (m) return { kind: 'exam', entityId: safeId(m[1]), operation: 'upsert' };
 
+  // Rush and Match use the same answer endpoint. `resolve()` updates question,
+  // attempts, rating, review/activity and XP, so the answer is a real progress
+  // mutation even before the mode's summary row is written by /finish.
+  if (key === 'POST /rush/answer') {
+    const id = safeId(body?.id, '');
+    return id ? { kind: 'practice-progress', entityId: id, operation: 'upsert' } : null;
+  }
   if (key === 'POST /rush/finish') return { kind: 'rush-history', entityId: 'self', operation: 'upsert' };
   if (key === 'POST /match/finish') return { kind: 'match-history', entityId: 'self', operation: 'upsert' };
 
