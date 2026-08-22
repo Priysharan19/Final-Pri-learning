@@ -90,7 +90,7 @@ jobs:
       # ║    lines 40      93.3% lines  97.9% chars                           ║
       # ║    held-out  24  95.2% lines  worst writer 86%                      ║
       # ║    held-out2 40  94.5% lines  worst writer 71%                      ║
-      # ║    context       256 wrong-answer readings · 11 misread correct     ║
+      # ║    context       256 wrong-answer + 256 correct-answer probes        ║
       # ║                                                                     ║
       # ║  The suites are seeded and deterministic, so the percentage floors  ║
       # ║  sit ~1 point under the measured figure and the count floors sit    ║
@@ -120,9 +120,11 @@ jobs:
       HOLDOUT2_WORST: "64"
       # The context guard's own verdict is its exit code — it fails if a single
       # wrong reading is pulled toward the expected answer. What CI adds is the
-      # size of the sample it pulled that verdict out of.
+      # invariant number of answer pairs it tested. The denominator of
+      # "misread correct answers" is deliberately NOT a floor: when the base
+      # recognizer improves, fewer correct answers are misread before context,
+      # so that denominator goes down for a good reason.
       CONTEXT_WRONG_READINGS: "256"
-      CONTEXT_MISREAD_CORRECT: "11"
       # Real ink has no floor because client/test/ink-corpus/ ships empty and
       # the suite exits 0 on an empty corpus. It is run for visibility and
       # reported as NOT MEASURED. When a corpus lands, add REALINK_LINES here
@@ -220,8 +222,7 @@ jobs:
           gate "held-out #1 · worst writer" "HELD-OUT SCORE"                 's|.*worst writer \([0-9][0-9.]*\)%.*|\1|p'           "$HOLDOUT1_WORST"
           gate "held-out #2 · lines"       "HELD-OUT-2 SCORE"                's|.*SCORE — \([0-9][0-9.]*\)% lines.*|\1|p'          "$HOLDOUT2_LINES"
           gate "held-out #2 · worst writer" "HELD-OUT-2 SCORE"               's|.*worst writer \([0-9][0-9.]*\)%.*|\1|p'           "$HOLDOUT2_WORST"
-          gate "context · wrong-answer readings"  "wrong-answer readings ctx left alone"  's|.*/\([0-9][0-9]*\).*|\1|p'          "$CONTEXT_WRONG_READINGS"
-          gate "context · misread correct answers" "misread correct answers ctx recovered" 's|.*/\([0-9][0-9]*\).*|\1|p'          "$CONTEXT_MISREAD_CORRECT"
+          gate "context · answer-pair coverage" "wrong-answer readings ctx left alone" 's|.*/\([0-9][0-9]*\).*|\1|p'          "$CONTEXT_WRONG_READINGS"
 
           # ── nothing quietly skipped ─────────────────────────────────────────
           # The suites say so out loud when a check could not be driven, using
