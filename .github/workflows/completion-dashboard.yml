@@ -1,0 +1,121 @@
+name: Verified Completion Dashboard
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: completion-dashboard-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  node-evidence:
+    name: Core, browser and quantitative evidence
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+
+      - name: Install client dependencies
+        run: npm ci --prefix client
+
+      - name: Install Chromium for E2E and accessibility evidence
+        run: npx --prefix client playwright install --with-deps chromium
+
+      - name: Run fresh evidence audit
+        run: node tools/completion/audit.mjs --run-node --evidence-out artifacts/completion-node.json
+
+      - name: Upload node evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: completion-node-evidence
+          path: artifacts/completion-node.json
+          if-no-files-found: error
+          retention-days: 30
+
+  native-evidence:
+    name: Native iPad evidence
+    runs-on: macos-15
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Verify Apple toolchain and iPad simulator
+        run: |
+          set -euo pipefail
+          xcodebuild -version
+          xcrun simctl list devices available | grep -m 1 'iPad' >/dev/null || {
+            echo '::error::No iPad simulator is available on this runner'
+            exit 1
+          }
+
+      - name: Run native evidence audit
+        run: node tools/completion/audit.mjs --run-native --evidence-out artifacts/completion-native.json
+
+      - name: Upload native evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: completion-native-evidence
+          path: artifacts/completion-native.json
+          if-no-files-found: error
+          retention-days: 30
+
+  dashboard:
+    name: Calculate verified completion
+    needs: [node-evidence, native-evidence]
+    if: always()
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download node evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: completion-node-evidence
+          path: artifacts/evidence
+        continue-on-error: true
+
+      - name: Download native evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: completion-native-evidence
+          path: artifacts/evidence
+        continue-on-error: true
+
+      - name: Calculate percentages and render dashboard
+        run: |
+          node tools/completion/audit.mjs --aggregate \
+            artifacts/evidence/completion-node.json \
+            artifacts/evidence/completion-native.json \
+            --out-dir artifacts/completion
+
+      - name: Show calculated summary
+        run: |
+          node -e "const r=require('./artifacts/completion/completion-report.json'); console.log('Overall verified completion:', r.overall.percent.toFixed(2)+'%', '('+r.overall.passed+'/'+r.overall.total+')'); for(const d of r.departments) console.log(d.name+':', d.percent.toFixed(2)+'%', '('+d.passed+'/'+d.total+')')"
+
+      - name: Upload live dashboard snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: completion-dashboard
+          path: artifacts/completion
+          if-no-files-found: error
+          retention-days: 30
