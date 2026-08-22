@@ -28,13 +28,15 @@ struct PriLearningApp: App {
 struct ContentView: View {
     var body: some View {
         ZStack {
-            // The app's page background, extended under the status bar and
-            // home indicator so the shell never shows a white flash.
+            // Keep the shell background dark so there is no white launch/resize
+            // flash while the bundled web app paints. Do not force the entire
+            // UIKit/SwiftUI hierarchy into dark appearance: the product owns
+            // its own theme and native controls should remain compatible with
+            // the user's system accessibility/appearance settings.
             Color(red: 14 / 255, green: 17 / 255, blue: 23 / 255)
                 .ignoresSafeArea()
             WebShell()
         }
-        .preferredColorScheme(.dark)
         .persistentSystemOverlays(.hidden)
     }
 }
