@@ -25,6 +25,8 @@
     "test:holdout2": "node client/test/inkcheck-holdout2.mjs 40",
     "test:context": "node client/test/inkcheck-context.mjs",
     "test:real": "node client/test/inkcheck-real.mjs",
+    "test:ink:corpus": "node client/test/ink-corpus-audit.mjs",
+    "test:ink:corpus:strict": "node client/test/ink-corpus-audit.mjs --strict",
     "test:ink:bridge": "node client/test/native-ink-check.mjs",
     "test:ink:native": "node scripts/ink-native-check.mjs",
     "test:browser": "npm run test:e2e && npm run test:a11y",
