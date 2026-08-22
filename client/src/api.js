@@ -14,11 +14,17 @@
 // diagnostics are deliberately payload-free: timings/statuses are useful for
 // support, while names, answers, emails, passwords and handwriting never belong
 // in an operational log.
+//
+// Successful sync-relevant mutations are marked dirty in local/outbox.js. The
+// outbox stores only entity ids + operation metadata, never the request/response
+// payload. A future authenticated cloud adapter can therefore re-read the
+// encrypted current state without this app creating a second plaintext copy.
 // ─────────────────────────────────────────────────────────────────────────────
 import { dispatch } from './local/backend.js';
 import {
   beginRequest, finishRequest, normalizeApiError, validateRequest
 } from './local/gateway.js';
+import { recordMutation } from './local/outbox.js';
 import { scopeForYear } from './engine/curriculum.js';
 import { loadBanks, loadBanksFor, loadAllBanks } from './engine/generators/index.js';
 
@@ -73,7 +79,16 @@ async function call(method, path, body) {
       try {
         const result = await dispatch(checked.method, checked.path, checked.body);
         if (checked.path === '/me' || checked.path.startsWith('/profiles')) noteUser(result);
-        finishRequest(request, 200);
+
+        // The local write has already committed at this point. A damaged/full
+        // outbox must never turn that successful write into an API error (and
+        // tempt the UI to repeat a non-idempotent action), so queue failure is a
+        // diagnostic warning rather than a rejected request.
+        let syncWarning = null;
+        try { await recordMutation(checked.method, checked.path, result); }
+        catch { syncWarning = 'SYNC_QUEUE_FAILED'; }
+
+        finishRequest(request, 200, syncWarning);
         return result;
       } catch (err) {
         if (!err?.bankMissing || faults >= MAX_BANK_FAULTS) throw err;
