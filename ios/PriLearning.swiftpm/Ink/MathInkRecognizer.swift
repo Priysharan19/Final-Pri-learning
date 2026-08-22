@@ -1,22 +1,10 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Pri Learning · Handwriting recognition (native)
 //
-// Reads a page of Apple Pencil ink as maths, entirely on device, using the
-// same Vision handwriting model that reads a photograph of a page in Notes —
-// then decodes its answer as maths rather than as English.
-//
-//   strokes
-//     → stacked fractions lifted out (bar + what sits above and below it)
-//     → lines found from the ink itself
-//     → each line redrawn at the size Vision reads best, black on white
-//     → Vision, several candidate readings per line
-//     → each candidate scored as MATHS, not as prose; best one taken
-//     → characters tied back to the strokes that made them, so a power is
-//       decided by where the ink actually sits and a correction can be learnt
-//     → ^(…), (…)/(…), sqrt(…) — the grammar the marker already speaks
-//
-// A line Vision returns nothing for is reported as unread rather than
-// silently dropped, and the web engine reads that line instead.
+// Reads a page of Apple Pencil ink as maths, entirely on device. Vision is one
+// source of symbol hypotheses; Pencil geometry and maths structure are other
+// independent sources of evidence. A suspicious OCR segmentation is never
+// accepted merely because it was the first non-empty result.
 // ─────────────────────────────────────────────────────────────────────────────
 import CoreGraphics
 import Foundation
@@ -32,7 +20,6 @@ struct ReadingSymbol {
     var alternatives: [(symbol: String, confidence: Double)]
     var box: CGRect
     var strokeIndexes: [Int]
-    /// The box is a fair guess rather than a fact — see DecodedGlyph.
     var approximate: Bool
 }
 
@@ -41,8 +28,6 @@ struct ReadingLine {
     var box: CGRect
     var symbols: [ReadingSymbol]
     var strokeIndexes: [Int]
-    /// True when Vision produced nothing for this line's ink. The web engine
-    /// takes the line over rather than the student losing a step.
     var unread: Bool
 }
 
@@ -59,26 +44,25 @@ struct Reading {
 
 final class MathInkRecognizer {
 
-    /// Lines already read, keyed by their ink. Recognition runs after every
-    /// stroke, and a page of working is mostly lines that have not changed
-    /// since the last one — re-reading all of them to find out what the last
-    /// mark was is most of the cost of writing a long answer.
     private var lineCache: [String: [DecodedGlyph]] = [:]
     private static let lineCacheLimit = 64
 
-    /// Turns on a per-observation, per-glyph trace in the system log. Used by
-    /// the self-check; off in the app.
+    /// Vision is synchronous at the request-handler call site, but VNRequest
+    /// itself is cancellable. The generation invalidates the complete adaptive
+    /// recognition pass, not only whichever Vision request happens to be active
+    /// when the next Pencil contact arrives.
+    private let visionLock = NSLock()
+    private var activeVisionRequest: VNRequest?
+    private var cancellationGeneration: UInt64 = 0
+
     static var trace = false
-    /// Names the dumps for whichever case is being read.
     static var traceLabel = "line"
 
-    /// Candidate readings pulled from Vision per line. More than a handful
-    /// stops paying: past the top few they are near-duplicates, and each one
-    /// costs a grammar score.
+    /// Candidates per Vision observation. The global beam below combines them
+    /// across observations instead of greedily committing to each fragment.
     private static let candidateCount = 6
+    private static let beamWidth = 12
 
-    /// Alternatives offered in tap-to-correct when Vision's own candidates
-    /// agree — the marks a reader would plausibly confuse this one with.
     private static let lookalikes: [String: [String]] = [
         "0": ["o", "6", "8"], "1": ["l", "7", "/"], "2": ["z", "7"], "3": ["8", "5"],
         "4": ["9", "y"], "5": ["s", "6", "3"], "6": ["b", "0", "5"], "7": ["1", "2"],
@@ -90,9 +74,28 @@ final class MathInkRecognizer {
         "(": ["c", "["], ")": [")", "]"], ".": [",", "-"]
     ]
 
+    func cancelActiveVision() {
+        visionLock.lock()
+        cancellationGeneration &+= 1
+        let request = activeVisionRequest
+        visionLock.unlock()
+        request?.cancel()
+    }
+
+    private func generationSnapshot() -> UInt64 {
+        visionLock.lock(); defer { visionLock.unlock() }
+        return cancellationGeneration
+    }
+
+    private func generationIsCurrent(_ generation: UInt64) -> Bool {
+        visionLock.lock(); defer { visionLock.unlock() }
+        return generation == cancellationGeneration
+    }
+
     // MARK: Entry point
 
     func read(strokes: [InkStroke], overrides: [String: String]) -> Reading {
+        let generation = generationSnapshot()
         let live = strokes.filter { !$0.isEmpty }
         guard !live.isEmpty else {
             return Reading(lines: [], text: "", minConfidence: 1, margin: 1, weakest: nil)
@@ -101,17 +104,11 @@ final class MathInkRecognizer {
         let pageGlyph = InkLineSegmenter.pageGlyphSize(strokes)
         let fractions = FractionFinder.find(in: strokes, pageGlyph: pageGlyph)
         let consumed = Set(fractions.flatMap { $0.allStrokeIndexes })
-
-        // Fraction ink is hidden from line finding so a numerator does not
-        // become a line of its own — but the indexes stay original, so every
-        // symbol still points at the stroke the student drew.
         let masked = strokes.enumerated().map { index, stroke in
             consumed.contains(index) ? InkStroke(points: []) : stroke
         }
         var lines = InkLineSegmenter.segment(masked)
 
-        // A page that is nothing but a fraction has no ordinary line to hang
-        // it on; one is opened at the fraction's own position.
         if lines.isEmpty, let block = fractions.first {
             lines = [InkLine(strokeIndexes: [], strokes: [], bounds: block.bounds,
                              band: block.bounds.minY...block.bounds.maxY,
@@ -120,6 +117,7 @@ final class MathInkRecognizer {
 
         var readLines: [ReadingLine] = []
         for (lineIndex, line) in lines.enumerated() {
+            guard generationIsCurrent(generation) else { break }
             let blocks = fractions.filter { block in
                 let y = block.bar.midY
                 return y >= line.band.lowerBound - line.glyphHeight
@@ -127,9 +125,9 @@ final class MathInkRecognizer {
             }
             readLines.append(readLine(line, lineIndex: lineIndex, fractions: blocks,
                                       strokes: strokes, pageGlyph: pageGlyph,
-                                      overrides: overrides))
+                                      overrides: overrides,
+                                      generation: generation))
         }
-
         return summarise(readLines)
     }
 
@@ -141,28 +139,35 @@ final class MathInkRecognizer {
         fractions: [FractionBlock],
         strokes: [InkStroke],
         pageGlyph: CGFloat,
-        overrides: [String: String]
+        overrides: [String: String],
+        generation: UInt64
     ) -> ReadingLine {
-
         var glyphs: [DecodedGlyph] = []
         var locked: Set<Int> = []
         var unread = false
 
-        if !line.strokes.isEmpty {
+        if !line.strokes.isEmpty, generationIsCurrent(generation) {
             let decoded = decodeGlyphs(
                 strokeIndexes: line.strokeIndexes,
                 strokes: strokes,
-                glyphHeight: line.glyphHeight
+                glyphHeight: line.glyphHeight,
+                generation: generation
             )
             glyphs = decoded
-            unread = decoded.isEmpty
+            if !glyphs.isEmpty {
+                // This is the live production call that was previously missing:
+                // the DP trace aligner and decisive Pencil geometry must actually
+                // participate before grammar turns OCR hypotheses into maths.
+                MathShapeClassifier.repair(&glyphs, strokes: strokes, glyphHeight: line.glyphHeight)
+            }
+            unread = glyphs.isEmpty
         }
 
-        // Fractions arrive already read; they are placed by where their bar
-        // sits among the line's other marks.
-        for block in fractions {
-            let numerator = readNested(block.numerator, strokes: strokes, pageGlyph: pageGlyph)
-            let denominator = readNested(block.denominator, strokes: strokes, pageGlyph: pageGlyph)
+        for block in fractions where generationIsCurrent(generation) {
+            let numerator = readNested(block.numerator, strokes: strokes,
+                                       pageGlyph: pageGlyph, generation: generation)
+            let denominator = readNested(block.denominator, strokes: strokes,
+                                         pageGlyph: pageGlyph, generation: generation)
             let text = "(\(numerator.isEmpty ? "?" : numerator))/(\(denominator.isEmpty ? "?" : denominator))"
             let glyph = DecodedGlyph(
                 symbol: text,
@@ -179,7 +184,11 @@ final class MathInkRecognizer {
             unread = false
         }
 
-        // Student corrections outrank everything, including the grammar pass.
+        guard generationIsCurrent(generation) else {
+            return ReadingLine(text: "", box: line.bounds, symbols: [],
+                               strokeIndexes: line.strokeIndexes, unread: true)
+        }
+
         for i in glyphs.indices {
             let id = "n\(lineIndex)_\(i)"
             if let chosen = overrides[id] {
@@ -193,8 +202,6 @@ final class MathInkRecognizer {
         locked.formUnion(MathDecoder.lockFunctionNames(&glyphs))
         MathDecoder.applyContext(&glyphs, locked: locked)
 
-        // A radical takes everything sitting under its bar; the bar's reach is
-        // the width of the ink the radical itself was drawn with.
         var radicalSpans: [Int: CGFloat] = [:]
         for (i, glyph) in glyphs.enumerated() where glyph.symbol == "sqrt" {
             let ink = glyph.strokeIndexes.compactMap { strokes.indices.contains($0) ? strokes[$0].bounds : nil }
@@ -224,13 +231,20 @@ final class MathInkRecognizer {
                            strokeIndexes: line.strokeIndexes, unread: unread)
     }
 
-    /// Read a numerator, denominator or other nested run as a plain string.
-    private func readNested(_ indexes: [Int], strokes: [InkStroke], pageGlyph: CGFloat) -> String {
+    private func readNested(
+        _ indexes: [Int],
+        strokes: [InkStroke],
+        pageGlyph: CGFloat,
+        generation: UInt64
+    ) -> String {
+        guard generationIsCurrent(generation) else { return "" }
         let members = indexes.compactMap { strokes.indices.contains($0) ? strokes[$0] : nil }
         guard !members.isEmpty else { return "" }
         let glyphHeight = InkLineSegmenter.pageGlyphSize(members)
-        var glyphs = decodeGlyphs(strokeIndexes: indexes, strokes: strokes, glyphHeight: glyphHeight)
-        guard !glyphs.isEmpty else { return "" }
+        var glyphs = decodeGlyphs(strokeIndexes: indexes, strokes: strokes,
+                                  glyphHeight: glyphHeight, generation: generation)
+        guard generationIsCurrent(generation), !glyphs.isEmpty else { return "" }
+        MathShapeClassifier.repair(&glyphs, strokes: strokes, glyphHeight: glyphHeight)
         MathDecoder.repairBrackets(&glyphs, strokes: strokes, glyphHeight: glyphHeight)
         let locked = MathDecoder.lockFunctionNames(&glyphs)
         MathDecoder.applyContext(&glyphs, locked: locked)
@@ -239,18 +253,12 @@ final class MathInkRecognizer {
 
     // MARK: Glyph clusters
 
-    /// One written mark and the strokes that make it. Vision tells us WHAT was
-    /// written; the clusters tell us WHERE each mark sits — which is what
-    /// decides a power, and what ties a correction back to the ink.
     private struct GlyphCluster {
         var strokeIndexes: [Int]
         var bounds: CGRect
         var isRaised = false
     }
 
-    /// Group a line's strokes into marks by horizontal overlap. The two
-    /// strokes of an '=', the three of a '4' and the cross of an 'x' share a
-    /// column and come out as one mark; neighbouring characters do not.
     private func clusters(of strokeIndexes: [Int], strokes: [InkStroke]) -> [GlyphCluster] {
         let ordered = strokeIndexes
             .filter { strokes.indices.contains($0) && !strokes[$0].isEmpty }
@@ -276,9 +284,6 @@ final class MathInkRecognizer {
         return result
     }
 
-    /// Mark the clusters that sit as powers, measured against the band the
-    /// line's full-height marks occupy — the student's own ink, not a text
-    /// model's guess at where a glyph was.
     private func markRaised(_ clusters: inout [GlyphCluster], glyphHeight: CGFloat) {
         let body = clusters.filter { $0.bounds.height >= 0.35 * glyphHeight }
         guard body.count >= 2 else { return }
@@ -289,59 +294,71 @@ final class MathInkRecognizer {
 
         for i in clusters.indices {
             let box = clusters[i].bounds
-            // Centre in the top third of the body, clear of the baseline, and
-            // smaller than a body mark. A '+' sits at mid height and fails the
-            // first test, which is what keeps operators off the exponent.
             guard box.midY < top + 0.35 * bodyHeight,
                   box.maxY < top + 0.72 * bodyHeight,
                   box.height < 0.80 * bodyHeight,
-                  i > 0                                    // nothing to carry it
-            else { continue }
+                  i > 0 else { continue }
             clusters[i].isRaised = true
         }
     }
 
     // MARK: Reading a line
 
-    /// Read one line's ink. The line is read WHOLE — Vision is at its best
-    /// with the most context it can get, and a line read whole came back
-    /// materially better than the same line read a mark at a time — and the
-    /// characters it returns are laid onto the marks underneath them.
     private func decodeGlyphs(
         strokeIndexes: [Int],
         strokes: [InkStroke],
-        glyphHeight: CGFloat
+        glyphHeight: CGFloat,
+        generation: UInt64
     ) -> [DecodedGlyph] {
+        guard generationIsCurrent(generation) else { return [] }
         var marks = clusters(of: strokeIndexes, strokes: strokes)
         guard !marks.isEmpty else { return [] }
         markRaised(&marks, glyphHeight: glyphHeight)
 
         let members = strokeIndexes.compactMap { strokes.indices.contains($0) ? strokes[$0] : nil }
-
         let key = MathInkRecognizer.digest(of: members, glyphHeight: glyphHeight)
         if let cached = lineCache[key] {
-            // The cached glyphs describe the same ink, but the stroke indexes
-            // are the page's and the page may have been renumbered by an
-            // eraser, so those are re-taken from this call's marks.
             return MathInkRecognizer.reindex(cached, onto: marks)
         }
 
-        guard let reading = read(members, glyphHeight: glyphHeight, label: MathInkRecognizer.traceLabel) else { return [] }
+        guard let reading = read(
+            members,
+            glyphHeight: glyphHeight,
+            label: MathInkRecognizer.traceLabel,
+            expectedMarks: marks.count,
+            generation: generation
+        ) else { return [] }
 
+        guard generationIsCurrent(generation) else { return [] }
         let symbols = MathInkRecognizer.symbols(of: reading.text)
         guard !symbols.isEmpty else { return [] }
 
-        // Characters map onto marks one for one when the counts agree, which
-        // is the ordinary case: a mark is a character. When they disagree —
-        // two digits written joined up, a mark Vision merged — they are spread
-        // across the marks in proportion, which keeps boxes and stroke
-        // ownership sensible even though it can no longer be exact.
+        // Count disagreement is exactly when proportional assignment is least
+        // defensible. Align OCR symbols to spatial Pencil marks with DP so an
+        // OCR hallucination can remain ownerless and real unexplained ink can be
+        // recovered structurally instead of shifting every later symbol.
+        let spatialMarks = marks.map {
+            InkSpatialMark(strokeIndexes: $0.strokeIndexes.sorted(), bounds: $0.bounds, isRaised: $0.isRaised)
+        }
+        let alignment = InkSymbolAligner.align(
+            symbols: symbols,
+            agreement: reading.agreement,
+            marks: spatialMarks,
+            strokes: strokes,
+            glyphHeight: glyphHeight
+        )
         let exact = symbols.count == marks.count
+            && alignment.approximateSymbols.isEmpty
+            && alignment.unmatchedMarks.isEmpty
+
         var glyphs: [DecodedGlyph] = []
         for (position, symbol) in symbols.enumerated() {
-            let markIndex = exact
-                ? position
-                : min(marks.count - 1, position * marks.count / max(symbols.count, 1))
+            guard position < alignment.symbolToMark.count,
+                  let markIndex = alignment.symbolToMark[position],
+                  marks.indices.contains(markIndex) else {
+                // Vision produced a character with no defensible Pencil owner.
+                continue
+            }
             let mark = marks[markIndex]
             let agreed = reading.agreement[position] ?? [:]
             let support = agreed[symbol] ?? 1
@@ -349,9 +366,8 @@ final class MathInkRecognizer {
                 .filter { $0.key != symbol }
                 .sorted { $0.value > $1.value }
                 .map { (symbol: $0.key, confidence: $0.value) }
-            // On a proportional mapping an operator is never called a power:
-            // the mark under it is not reliably the one it came from.
-            let raised = mark.isRaised && (exact || !MathAlphabet.binaryOperators.contains(symbol))
+            let approximate = alignment.approximateSymbols.contains(position)
+            let raised = mark.isRaised && !MathAlphabet.binaryOperators.contains(symbol)
             glyphs.append(DecodedGlyph(
                 symbol: symbol,
                 box: mark.bounds,
@@ -359,7 +375,7 @@ final class MathInkRecognizer {
                 alternatives: rivals,
                 isSuperscript: raised,
                 strokeIndexes: mark.strokeIndexes.sorted(),
-                approximate: !exact
+                approximate: approximate
             ))
         }
 
@@ -374,15 +390,28 @@ final class MathInkRecognizer {
         return glyphs
     }
 
-    /// Identifies a line by the shape of its ink: how many marks, where each
-    /// one sits, and how much was drawn. Two lines with the same digest read
-    /// the same, and one more stroke anywhere changes it.
+    /// Shape-aware cache fingerprint. Bounding boxes + point counts are not
+    /// sufficient: two different marks can share both and must never reuse the
+    /// same OCR result. Representative normalized trajectory points make such
+    /// collisions vanishingly unlikely while keeping this key cheap to build.
     private static func digest(of strokes: [InkStroke], glyphHeight: CGFloat) -> String {
-        var parts: [String] = [String(format: "%.1f", glyphHeight)]
+        var parts: [String] = [String(format: "%.2f", glyphHeight)]
         for stroke in strokes {
             let b = stroke.bounds
-            parts.append(String(format: "%.1f,%.1f,%.1f,%.1f,%d",
-                                b.minX, b.minY, b.maxX, b.maxY, stroke.points.count))
+            var component = String(format: "%.2f,%.2f,%.2f,%.2f,%d",
+                                   b.minX, b.minY, b.maxX, b.maxY, stroke.points.count)
+            let count = stroke.points.count
+            if count > 0 {
+                let sampleCount = min(9, count)
+                for sample in 0..<sampleCount {
+                    let index = sampleCount == 1 ? 0 : sample * (count - 1) / (sampleCount - 1)
+                    let point = stroke.points[index]
+                    let nx = b.width > 0 ? (point.x - b.minX) / b.width : 0
+                    let ny = b.height > 0 ? (point.y - b.minY) / b.height : 0
+                    component += String(format: ",%.3f,%.3f", nx, ny)
+                }
+            }
+            parts.append(component)
         }
         return parts.joined(separator: ";")
     }
@@ -391,8 +420,6 @@ final class MathInkRecognizer {
         guard !marks.isEmpty else { return glyphs }
         return glyphs.map { glyph in
             var updated = glyph
-            // Same geometry, so the mark under a glyph is the one whose box
-            // matches the box the glyph was given when it was first read.
             if let mark = marks.first(where: { $0.bounds == glyph.box }) {
                 updated.strokeIndexes = mark.strokeIndexes.sorted()
             }
@@ -400,7 +427,6 @@ final class MathInkRecognizer {
         }
     }
 
-    /// One spelling per mark, as an array of symbols.
     private static func symbols(of text: String) -> [String] {
         var out: [String] = []
         for ch in text where !ch.isWhitespace {
@@ -410,82 +436,253 @@ final class MathInkRecognizer {
         return out
     }
 
-    // MARK: Vision
+    // MARK: Vision + adaptive multi-view fusion
 
     private struct LineReading {
         var text: String
         var confidence: Double
-        /// position → symbol → how much of Vision's other readings back it.
         var agreement: [Int: [String: Double]]
     }
 
-    /// Vision, with a ladder behind it. A line of two or three marks is short
-    /// enough that the detector can decide there is no text in the picture at
-    /// all; drawn larger, or read with the faster model, the same ink comes
-    /// back. A step the student wrote is worth three attempts.
-    private func read(_ strokes: [InkStroke], glyphHeight: CGFloat, label: String) -> LineReading? {
-        let attempts: [(scale: CGFloat, level: VNRequestTextRecognitionLevel)] = [
-            (1.0, .accurate), (1.9, .accurate), (1.0, .fast)
-        ]
-        for attempt in attempts {
-            guard let raster = InkRasterizer.render(
-                strokes: strokes,
-                glyphHeight: glyphHeight / attempt.scale
-            ) else { continue }
-            let observations = recognizeText(in: raster.image, level: attempt.level)
-            if MathInkRecognizer.trace {
-                MathInkRecognizer.dump(raster.image, label: label)
-                NSLog("PRIINK   %@ %dx%d level=%@ x%.1f observations=%d", label as NSString,
-                      raster.pixelWidth, raster.pixelHeight,
-                      attempt.level == .accurate ? "accurate" : "fast",
-                      Double(attempt.scale), observations.count)
-            }
-            guard !observations.isEmpty else { continue }
-            if let reading = assemble(observations) { return reading }
+    private struct Beam {
+        var text: String
+        var confidenceSum: Double
+        var pieces: Int
+        var agreement: [Int: [String: Double]]
+
+        var meanConfidence: Double {
+            pieces == 0 ? 0 : confidenceSum / Double(pieces)
         }
-        return nil
     }
 
-    /// Left to right across however many pieces Vision split the line into.
+    private func read(
+        _ strokes: [InkStroke],
+        glyphHeight: CGFloat,
+        label: String,
+        expectedMarks: Int,
+        generation: UInt64
+    ) -> LineReading? {
+        guard generationIsCurrent(generation) else { return nil }
+        let primaryAttempt: (scale: CGFloat, level: VNRequestTextRecognitionLevel) = (1.0, .accurate)
+        var readings: [LineReading] = []
+
+        if let primary = runVisionAttempt(
+            strokes,
+            glyphHeight: glyphHeight,
+            label: label,
+            scale: primaryAttempt.scale,
+            level: primaryAttempt.level,
+            generation: generation
+        ) {
+            guard generationIsCurrent(generation) else { return nil }
+            readings.append(primary)
+            let count = Self.symbols(of: primary.text).count
+            let grammar = MathGrammar.score(Self.respell(primary.text))
+
+            // Correct OCR character count is not independent evidence: the
+            // screenshot failure returned plausible-length strings while the
+            // symbols themselves were wrong. Skip rescue views only when the
+            // primary result has strong maths structure AND strong Vision
+            // confidence. Everything borderline goes through multi-raster
+            // fusion before trace/geometry repair gets the final say.
+            if count == expectedMarks && grammar >= 0.74 && primary.confidence >= 0.70 {
+                return primary
+            }
+            if Self.trace {
+                NSLog("PRIINK   adaptive retry marks=%d primarySymbols=%d grammar=%.2f conf=%.2f",
+                      expectedMarks, count, grammar, primary.confidence)
+            }
+        }
+
+        let rescueAttempts: [(scale: CGFloat, level: VNRequestTextRecognitionLevel)] = [
+            (1.45, .accurate),
+            (1.90, .accurate),
+            (1.00, .fast)
+        ]
+        for attempt in rescueAttempts {
+            guard generationIsCurrent(generation) else { return nil }
+            if let reading = runVisionAttempt(
+                strokes,
+                glyphHeight: glyphHeight,
+                label: label,
+                scale: attempt.scale,
+                level: attempt.level,
+                generation: generation
+            ) {
+                readings.append(reading)
+            }
+        }
+
+        guard generationIsCurrent(generation), !readings.isEmpty else { return nil }
+        return fuse(readings, expectedMarks: expectedMarks)
+    }
+
+    private func runVisionAttempt(
+        _ strokes: [InkStroke],
+        glyphHeight: CGFloat,
+        label: String,
+        scale: CGFloat,
+        level: VNRequestTextRecognitionLevel,
+        generation: UInt64
+    ) -> LineReading? {
+        guard generationIsCurrent(generation),
+              let raster = InkRasterizer.render(
+                strokes: strokes,
+                glyphHeight: glyphHeight / scale
+              ),
+              generationIsCurrent(generation)
+        else { return nil }
+        let observations = recognizeText(in: raster.image, level: level, generation: generation)
+        guard generationIsCurrent(generation) else { return nil }
+        if MathInkRecognizer.trace {
+            MathInkRecognizer.dump(raster.image, label: label)
+            NSLog("PRIINK   %@ %dx%d level=%@ x%.2f observations=%d", label as NSString,
+                  raster.pixelWidth, raster.pixelHeight,
+                  level == .accurate ? "accurate" : "fast",
+                  Double(scale), observations.count)
+        }
+        guard !observations.isEmpty else { return nil }
+        return assemble(observations)
+    }
+
+    private func fuse(_ readings: [LineReading], expectedMarks: Int) -> LineReading {
+        let grouped = Dictionary(grouping: readings) { Self.respell($0.text) }
+        var winner = readings[0]
+        var best = -Double.infinity
+
+        for (canonical, group) in grouped {
+            guard let representative = group.max(by: {
+                readingScore($0, expectedMarks: expectedMarks) < readingScore($1, expectedMarks: expectedMarks)
+            }) else { continue }
+            let consensus = min(0.12, 0.04 * Double(max(0, group.count - 1)))
+            let score = readingScore(representative, expectedMarks: expectedMarks) + consensus
+            if score > best {
+                best = score
+                winner = representative
+            }
+            if Self.trace {
+                NSLog("PRIINK   fusion \"%@\" views=%d score=%.3f",
+                      canonical as NSString, group.count, score)
+            }
+        }
+
+        let winnerSymbols = Self.symbols(of: winner.text)
+        var tally: [Int: [String: Double]] = [:]
+        for reading in readings where Self.symbols(of: reading.text).count == winnerSymbols.count {
+            let ownSymbols = Self.symbols(of: reading.text)
+            let weight = max(0.15, reading.confidence)
+            for (position, symbol) in ownSymbols.enumerated() {
+                tally[position, default: [:]][symbol, default: 0] += 0.65 * weight
+            }
+            for (position, votes) in reading.agreement {
+                for (symbol, share) in votes {
+                    tally[position, default: [:]][symbol, default: 0] += 0.35 * weight * share
+                }
+            }
+        }
+        winner.agreement = tally.mapValues { votes in
+            let total = votes.values.reduce(0, +)
+            guard total > 0 else { return votes }
+            return votes.mapValues { $0 / total }
+        }
+        return winner
+    }
+
+    private func readingScore(_ reading: LineReading, expectedMarks: Int) -> Double {
+        let canonical = Self.respell(reading.text)
+        let count = Self.symbols(of: canonical).count
+        let denominator = Double(max(expectedMarks, 1))
+        let countFit = max(0, 1 - Double(abs(count - expectedMarks)) / denominator)
+        return 0.42 * reading.confidence
+            + 0.38 * MathGrammar.score(canonical)
+            + 0.20 * countFit
+    }
+
     private func assemble(_ observations: [VNRecognizedTextObservation]) -> LineReading? {
         let ordered = observations.sorted { $0.boundingBox.minX < $1.boundingBox.minX }
-        var text = ""
-        var agreement: [Int: [String: Double]] = [:]
-        var confidence: Double = 0
-        var pieces = 0
+        var beams = [Beam(text: "", confidenceSum: 0, pieces: 0, agreement: [:])]
 
         for observation in ordered {
             let candidates = observation.topCandidates(Self.candidateCount)
-            guard let winner = bestCandidate(candidates) else { continue }
-            let offset = MathInkRecognizer.symbols(of: text).count
-            for (position, votes) in self.agreement(with: winner.candidate, among: candidates) {
-                agreement[offset + position] = votes
+            guard !candidates.isEmpty else { continue }
+            var next: [Beam] = []
+
+            for beam in beams {
+                for candidate in candidates {
+                    let spelled = Self.respell(candidate.string)
+                    guard !spelled.isEmpty else { continue }
+                    var extended = beam
+                    let offset = Self.symbols(of: extended.text).count
+                    extended.text += candidate.string
+                    extended.confidenceSum += Double(candidate.confidence)
+                    extended.pieces += 1
+                    let localAgreement = agreement(with: candidate, among: candidates)
+                    for (position, votes) in localAgreement {
+                        extended.agreement[offset + position] = votes
+                    }
+                    next.append(extended)
+                }
             }
-            text += winner.candidate.string
-            confidence += Double(winner.candidate.confidence)
-            pieces += 1
-            if MathInkRecognizer.trace {
-                NSLog("PRIINK   obs \"%@\" conf=%.2f", winner.candidate.string as NSString,
-                      Double(winner.candidate.confidence))
+
+            next.sort { lhs, rhs in
+                if lhs.meanConfidence != rhs.meanConfidence {
+                    return lhs.meanConfidence > rhs.meanConfidence
+                }
+                return Self.symbols(of: lhs.text).count > Self.symbols(of: rhs.text).count
             }
+            beams = Array(next.prefix(Self.beamWidth))
+            if beams.isEmpty { return nil }
         }
 
-        guard pieces > 0, !MathInkRecognizer.symbols(of: text).isEmpty else { return nil }
-        return LineReading(text: text, confidence: confidence / Double(pieces), agreement: agreement)
+        guard !beams.isEmpty else { return nil }
+        let winner = beams.max { lhs, rhs in
+            finalBeamScore(lhs) < finalBeamScore(rhs)
+        }!
+        guard !Self.symbols(of: winner.text).isEmpty else { return nil }
+
+        if Self.trace {
+            NSLog("PRIINK   beam \"%@\" conf=%.2f grammar=%.2f",
+                  winner.text as NSString, winner.meanConfidence,
+                  MathGrammar.score(Self.respell(winner.text)))
+        }
+        return LineReading(text: winner.text,
+                           confidence: winner.meanConfidence,
+                           agreement: winner.agreement)
+    }
+
+    private func finalBeamScore(_ beam: Beam) -> Double {
+        0.55 * beam.meanConfidence + 0.45 * MathGrammar.score(Self.respell(beam.text))
     }
 
     private func recognizeText(
         in image: CGImage,
-        level: VNRequestTextRecognitionLevel
+        level: VNRequestTextRecognitionLevel,
+        generation: UInt64
     ) -> [VNRecognizedTextObservation] {
+        guard generationIsCurrent(generation) else { return [] }
         let request = VNRecognizeTextRequest()
         request.recognitionLevel = level
-        // Language correction is what turns "2x" into "2a" and "cos" into
-        // "cost". A maths line is not English and must not be spell-checked.
         request.usesLanguageCorrection = false
         request.recognitionLanguages = ["en-US"]
         request.revision = VNRecognizeTextRequestRevision3
         request.minimumTextHeight = 0
+
+        // Keep Vision interactive. `preferBackgroundProcessing` caused the
+        // simulator benchmark to stop producing timely results. PencilKit is
+        // protected instead by the native quiet window, utility-QoS queue and
+        // explicit pen-down cancellation of this entire generation.
+        visionLock.lock()
+        guard generation == cancellationGeneration else {
+            visionLock.unlock()
+            return []
+        }
+        activeVisionRequest = request
+        visionLock.unlock()
+        defer {
+            visionLock.lock()
+            if activeVisionRequest === request { activeVisionRequest = nil }
+            visionLock.unlock()
+        }
 
         let handler = VNImageRequestHandler(cgImage: image, orientation: .up, options: [:])
         do {
@@ -493,27 +690,10 @@ final class MathInkRecognizer {
         } catch {
             return []
         }
+        guard generationIsCurrent(generation) else { return [] }
         return request.results ?? []
     }
 
-    /// Vision ranks candidates by how likely the MARKS are. On a maths line
-    /// that is only half the question, so each candidate is also scored on
-    /// whether it says something a maths line is allowed to say.
-    private func bestCandidate(
-        _ candidates: [VNRecognizedText]
-    ) -> (candidate: VNRecognizedText, score: Double)? {
-        var best: (candidate: VNRecognizedText, score: Double)?
-        for candidate in candidates {
-            let spelled = MathInkRecognizer.respell(candidate.string)
-            guard !spelled.isEmpty else { continue }
-            let score = 0.55 * Double(candidate.confidence) + 0.45 * MathGrammar.score(spelled)
-            if best == nil || score > best!.score { best = (candidate, score) }
-        }
-        return best
-    }
-
-    /// Writes what Vision was actually shown to the app's Documents directory,
-    /// so a bad reading can be told apart from a bad picture.
     private static var dumpCounter = 0
     static func dump(_ image: CGImage, label: String) {
         guard let directory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
@@ -526,16 +706,10 @@ final class MathInkRecognizer {
         CGImageDestinationFinalize(destination)
     }
 
-    /// One spelling per mark, before anything is judged on it.
     static func respell(_ text: String) -> String {
         symbols(of: text).joined()
     }
 
-    /// How much Vision's other readings back each character of the winner.
-    /// Agreement across independent candidates is a far better calibrated
-    /// signal than the model's own score, which for handwriting sits low even
-    /// when it is right — and it is what stops the app stopping to ask about
-    /// a reading it is actually sure of.
     private func agreement(
         with winner: VNRecognizedText,
         among candidates: [VNRecognizedText]
@@ -546,8 +720,6 @@ final class MathInkRecognizer {
 
         for candidate in candidates {
             let spelled = MathInkRecognizer.symbols(of: candidate.string)
-            // Only same-length readings line up mark for mark; a reading that
-            // split a glyph differently votes on nothing.
             guard spelled.count == target.count else { continue }
             let share = max(0.15, Double(candidate.confidence))
             weight += share
