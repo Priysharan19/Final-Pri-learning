@@ -79,16 +79,16 @@ The one that matters is the last:
   held-out suite until the v8 accuracy work read its failures — the misreads
   *are* the diagnosis, so reading them is what spends a holdout. Treat it as a
   regression guard now.
-- `inkcheck-holdout2.mjs` — holdout #2, **the honest number.** Different seed
-  space, different expressions, and a *writer* model (one consistent hand per
-  simulated student, as real handwriting is) rather than per-glyph randomness.
-  No tuning pass has ever executed it.
+- `inkcheck-holdout2.mjs` — holdout #2, now **a spent synthetic regression
+  guard.** Different seed space, different expressions, and a *writer* model
+  (one consistent hand per simulated student, as real handwriting is) rather
+  than per-glyph randomness, but the pass that raised it to 552/560 read its
+  failures and fixed against several of them.
 
-Do not tune against either holdout. A spent holdout does not become a target;
-it becomes a guard. Anything tuned against is eventually tuned *to*, which is
-the whole reason holdout #2 is separate — and when a retrain has to read holdout
-#2's failures to make progress, that spends it too, and a third suite must be
-added before the next one.
+Do not treat either holdout as sealed evidence. A spent holdout does not become
+a release claim; it becomes a guard. Anything tuned against is eventually tuned
+*to*, so a third suite must be added before the next honest release-style
+synthetic claim.
 
 `README.md` (**Measured accuracy**) says the same thing, and carries the current
 figures with the `n` that produced each. If the two ever disagree, the one

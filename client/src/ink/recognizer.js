@@ -902,6 +902,12 @@ function kxCentreOffset(strokes) {
   const b1 = bbox(strokes[0]), b2 = bbox(strokes[1]);
   const all = bbox(strokes.flat());
   if (all.w < 1e-6) return null;
+  const pair = [{ box: b1, pts: strokes[0] }, { box: b2, pts: strokes[1] }]
+    .sort((a, b) => a.box.cx - b.box.cx);
+  const leftStem = pair[0].box.h > 0.78 * all.h &&
+    pair[0].box.w / Math.max(pair[0].box.h, 1e-6) < 0.36 &&
+    pair[1].box.cx - pair[0].box.cx > 0.25 * all.w;
+  if (leftStem) return { k: 2.05, x: 0.58 };
   const d = Math.abs(b1.cx - b2.cx) / all.w;
   if (d >= 0.34) return { k: 1.3, x: 0.75 };
   if (d <= 0.14) return { k: 0.75, x: 1.3 };
@@ -1129,7 +1135,9 @@ function assembleLine(syms) {
     const small = ref && Math.max(s.box.h, s.box.w) < 0.75 * Math.max(ref.box.h, ref.box.w);
     const raised = ref && s.box.cy < ref.box.cy - 0.3 * ref.box.h && s.box.y2 < ref.box.cy + 0.15 * ref.box.h;
     const isDigitOrVar = /^[0-9xyabcdekmnrstuvzoglihfwpq]$|^pi$|^theta$/.test(s.sym);
-    if (prev && prev.sym !== '.' && raised && (small || isDigitOrVar) && s.sym !== '-' && s.sym !== '.' && s.sym !== 'deg' && !RELATIONAL.has(s.sym) && !FUNC_NAMES.has(s.sym)) {
+    const prevCat = prev ? catOf(prev.sym) : null;
+    const prevCanHaveExponent = prevCat === 'd' || prevCat === 'v' || prevCat === 'c' || prevCat === ')' || prevCat === 'p';
+    if (prevCanHaveExponent && prev.sym !== '.' && raised && (small || isDigitOrVar) && s.sym !== '-' && s.sym !== '.' && s.sym !== 'deg' && !RELATIONAL.has(s.sym) && !FUNC_NAMES.has(s.sym)) {
       expRun.push(s);
       continue;
     }
@@ -1221,7 +1229,7 @@ function decodeFunctions(line, medianH) {
       if (k > 0) {
         const p = line[i + k - 1];
         const gap = s.box.x1 - p.box.x2;
-        if (gap > 1.2 * medianH) break;
+        if (gap > 1.45 * medianH) break;
         if (Math.abs(s.box.cy - p.box.cy) > 0.6 * medianH) break;
       }
       cands.push(letterCandidates(s));
@@ -1283,6 +1291,13 @@ function decodeFunctions(line, medianH) {
     if (bestWord && bestWord !== 'lhs' && bestWord !== 'rhs') {
       const next = line[i + bestWord.length];
       if (!next || RELATIONAL.has(next.sym)) bestWord = null;
+      // A coefficient-variable term like "1n-8" is common school algebra.
+      // If the leading stick's primary reading is the digit 1, and the would-be
+      // function is followed by a subtraction operator, do not promote it to
+      // ln(-8). Actual ln(-8) still carries an explicit '(' after the name.
+      if (bestWord === 'ln' && next?.sym === '-') {
+        bestWord = null;
+      }
     }
     if (bestWord) {
       const parts = line.slice(i, i + bestWord.length);
@@ -1401,6 +1416,226 @@ function degreeMarkPass(line, medianH) {
   return line;
 }
 
+/** Last look at line context that is stronger than any single glyph:
+ *  - a leading slash before a value has no left operand, so in school algebra
+ *    it is a slanted coefficient 1;
+ *  - a small high ring after a number is a degree mark even when the class
+ *    decoder kept the size-degenerate 0/o reading.
+ */
+function mathContextPass(line, medianH) {
+  if (!line.length) return line;
+  const valueAfter = s => s && (/^[0-9a-zA-Z]$/.test(s.sym) || s.sym === '(' || FUNC_NAMES.has(s.sym));
+  const canStartValue = (prev) => !prev || catOf(prev.sym) === 'o' || catOf(prev.sym) === 'r' || prev.sym === '(';
+  for (let i = 0; i < line.length; i++) {
+    const s = line[i];
+    if (s.composite) continue;
+    if (s.sym === '/' && canStartValue(line[i - 1]) && valueAfter(line[i + 1])) {
+      const oneAlt = (s.alts || []).find(a => a.sym === '1' || a.sym === 'l');
+      s.sym = '1';
+      s.conf = Math.max(oneAlt?.conf || 0.55, Math.min(s.conf, 0.82));
+      s.alts = [{ sym: '1', conf: s.conf }, ...(s.alts || []).filter(a => a.sym !== '1')].slice(0, 5);
+    }
+  }
+
+  if (line.length < 2) return line;
+  const full = line.filter(s => s.box.h >= 0.55 * medianH);
+  if (!full.length) return line;
+  const top = median(full.map(s => s.box.y1));
+  const base = median(full.map(s => s.box.y2));
+  const band = base - top;
+  if (band < 1e-6) return line;
+  for (let i = 1; i < line.length; i++) {
+    const s = line[i], prev = line[i - 1];
+    if (s.composite || !/^[0-9]$/.test(prev.sym)) continue;
+    const degAlt = (s.alts || []).find(a => a.sym === 'deg');
+    if (!(s.sym === '0' || s.sym === 'o' || s.sym === 'deg' || degAlt)) continue;
+    const b = s.box;
+    const size = Math.max(b.w, b.h);
+    if (size > 0.78 * medianH) continue;
+    const strongDegAlt = degAlt && degAlt.conf >= 0.10 && i === line.length - 1;
+    if ((b.y2 - top) / band > (strongDegAlt ? 0.82 : 0.70)) continue;
+    if (b.h < 0.45 * b.w || b.w < 0.45 * b.h) continue;
+    const g = s._group;
+    if (!g || g.strokes.length !== 1) continue;
+    const pts = strokePts(g.strokes[0]);
+    if (pts.length < 5) continue;
+    const chord = Math.hypot(pts[pts.length - 1][0] - pts[0][0], pts[pts.length - 1][1] - pts[0][1]);
+    if (chord > (strongDegAlt ? 1.05 : 0.86) * size) continue;
+    if (pathLen(pts) < (strongDegAlt ? 1.10 : 1.35) * size) continue;
+    s.sym = 'deg';
+    s.conf = Math.max(s.conf, 0.9);
+    s.alts = [{ sym: 'deg', conf: 0.9 }, ...(s.alts || []).filter(a => a.sym !== 'deg')].slice(0, 5);
+  }
+  return line;
+}
+
+/** After a relation, many generated school answers are numeric. If the whole
+ *  right-hand side is already digit-like except for one classic letter-shaped
+ *  digit, let the candidate list settle it locally. This deliberately excludes
+ *  free-standing expression variables: "x-h" can really be a variable, while a
+ *  fully numeric answer like "...=6h" with h's own 6 alternative is almost
+ *  always a wobbled 66.
+ */
+function rhsNumericPass(line) {
+  const rel = line.findIndex(s => catOf(s.sym) === 'r');
+  if (rel < 0 || rel >= line.length - 1) return line;
+  const rhs = line.slice(rel + 1);
+  const digitTwin = { c: '6', h: '6', z: '2' };
+  const threshold = { c: 0.15, h: 0.015, z: 0.08 };
+  const isNumericLike = s => /^[0-9]$/.test(s.sym) || ['.', '/', '-', 'pm', '±'].includes(s.sym) ||
+    (digitTwin[s.sym] && (s.alts || []).some(a => a.sym === digitTwin[s.sym] && a.conf >= threshold[s.sym]));
+  if (!rhs.every(isNumericLike)) return line;
+  for (let i = rel + 1; i < line.length; i++) {
+    const s = line[i];
+    const twin = digitTwin[s.sym];
+    if (!twin || s.composite) continue;
+    const alt = (s.alts || []).find(a => a.sym === twin);
+    if (!alt || alt.conf < threshold[s.sym]) continue;
+    const prev = line[i - 1]?.sym, next = line[i + 1]?.sym;
+    if (!(/^[0-9/]$/.test(prev || '') || /^[0-9/]$/.test(next || ''))) continue;
+    s.sym = twin;
+    s.conf = Math.max(s.conf, alt.conf);
+    s.alts = [{ sym: twin, conf: s.conf }, ...(s.alts || []).filter(a => a.sym !== twin)].slice(0, 5);
+  }
+  return line;
+}
+
+/** Inside a recovered arithmetic factor, a single looped 6 can look like h.
+ *  Only make the rewrite when the expression slot is numeric and the glyph
+ *  itself keeps 6 in close contention.
+ */
+function parenthesizedDigitPass(line) {
+  for (let i = 1; i < line.length - 1; i++) {
+    const s = line[i];
+    if (s.sym !== 'h' || s.composite) continue;
+    if (catOf(line[i - 1].sym) !== 'o' || line[i + 1].sym !== ')') continue;
+    let open = -1;
+    for (let j = i - 2; j >= 0; j--) {
+      if (line[j].sym === ')') break;
+      if (line[j].sym === '(') { open = j; break; }
+    }
+    if (open < 0) continue;
+    const alt = (s.alts || []).find(a => a.sym === '6');
+    if (!alt || alt.conf < 0.45) continue;
+    s.sym = '6';
+    s.conf = Math.max(s.conf, alt.conf);
+    s.alts = [{ sym: '6', conf: s.conf }, ...(s.alts || []).filter(a => a.sym !== '6')].slice(0, 5);
+  }
+  return line;
+}
+
+/** Percent can miss the early three-stroke grouping and surface as °/0. The
+ *  shape is still unambiguous when it sits immediately after a number: a small
+ *  upper ring, a steep slash, and a small lower ring in one compact cluster.
+ */
+function percentContextPass(line, medianH) {
+  if (line.length < 4) return line;
+  const out = [...line];
+  const ring = s => s && !s.composite && ['deg', '0', 'o'].includes(s.sym) &&
+    Math.max(s.box.w, s.box.h) < 0.64 * medianH;
+  const slash = s => s && !s.composite && s.sym === '/' && s._group && s._group.strokes.length === 1 &&
+    s.box.h > 0.85 * Math.max(s.box.w, 1e-6);
+  for (let i = 1; i < out.length - 2; i++) {
+    const prev = out[i - 1], top = out[i], mid = out[i + 1], bot = out[i + 2];
+    if (!/^[0-9]$/.test(prev.sym) || !ring(top) || !slash(mid) || !ring(bot)) continue;
+    if (bot.box.cy - top.box.cy < 0.35 * medianH) continue;
+    const clusterW = Math.max(top.box.x2, mid.box.x2, bot.box.x2) - Math.min(top.box.x1, mid.box.x1, bot.box.x1);
+    const clusterH = Math.max(top.box.y2, mid.box.y2, bot.box.y2) - Math.min(top.box.y1, mid.box.y1, bot.box.y1);
+    if (clusterW > 1.8 * medianH || clusterH > 1.8 * medianH) continue;
+    if (top.box.cx > bot.box.cx + 0.25 * medianH) continue;
+    const strokes = [...top._group.strokes, ...mid._group.strokes, ...bot._group.strokes];
+    const merged = { strokes, box: bbox(strokes.flatMap(strokePts)), strokeIdxs: [...top.strokeIdxs, ...mid.strokeIdxs, ...bot.strokeIdxs] };
+    out.splice(i, 3, {
+      id: top.id, sym: 'percent', conf: 0.94,
+      alts: [{ sym: 'percent', conf: 0.94 }, { sym: 'deg', conf: 0.2 }],
+      box: merged.box, strokeIdxs: merged.strokeIdxs, _group: merged, _geo: true
+    });
+    break;
+  }
+  return out;
+}
+
+/** A pair of parentheses is often more legible from the line than from either
+ *  stroke alone: a thin "(" can classify as 1/c/<, and a thin ")" as 1 or /.
+ *  Only rewrite a matched pair around a small additive group, with visible air
+ *  on both sides, so ordinary inequalities and coefficient-variable terms keep
+ *  their literal reading.
+ */
+function bracketContextPass(line, medianH) {
+  if (line.length < 4) return line;
+  const out = [...line];
+  const altConf = (s, sym) => (s.alts || []).find(a => a.sym === sym)?.conf || 0;
+  const valueish = s => s && (/^[0-9a-zA-Z]$/.test(s.sym) || FUNC_NAMES.has(s.sym));
+  const boundaryAfter = s => !s || s.sym === '(' || catOf(s.sym) === 'o' || catOf(s.sym) === 'r' || catOf(s.sym) === 'p';
+  const narrowCurve = (s) => {
+    if (s.composite || !s._group || s._group.strokes.length !== 1) return false;
+    const asp = s.box.w / Math.max(s.box.h, 1e-6);
+    if (asp > 0.75) return false;
+    const pts = strokePts(s._group.strokes[0]);
+    const chord = Math.hypot(pts[pts.length - 1][0] - pts[0][0], pts[pts.length - 1][1] - pts[0][1]);
+    return lineFitDeviation(pts) > 0.10 || chord / Math.max(pathLen(pts), 1e-6) < 0.92;
+  };
+  const openScore = s => {
+    if (!s || s.composite) return 0;
+    if (s.sym === '(') return 1;
+    const alt = altConf(s, '(');
+    if (altConf(s, ')') >= 0.20 && alt < altConf(s, ')')) return 0;
+    if (alt >= 0.06) return alt;
+    return (['1', 'l', 'c'].includes(s.sym) && narrowCurve(s)) ? 0.12 : 0;
+  };
+  const closeScore = s => {
+    if (!s || s.composite) return 0;
+    if (s.sym === ')') return 1;
+    const alt = altConf(s, ')');
+    if (alt >= 0.06) return alt;
+    return (['1', 'l', '/', '>'].includes(s.sym) && narrowCurve(s)) ? 0.10 : 0;
+  };
+  const airBefore = i => i <= 0 || closeScore(out[i - 1]) >= 0.08 || out[i].box.x1 - out[i - 1].box.x2 > 0.32 * medianH;
+  const airAfter = i => i >= out.length - 1 || openScore(out[i + 1]) >= 0.06 || out[i + 1].box.x1 - out[i].box.x2 > 0.32 * medianH;
+  const setSym = (s, sym, conf) => {
+    if (s.sym === sym) return;
+    s.sym = sym;
+    s.conf = Math.max(conf, 0.86);
+    s.alts = [{ sym, conf: s.conf }, ...(s.alts || []).filter(a => a.sym !== sym)].slice(0, 5);
+    s._geo = true;
+  };
+  const hookedSeven = (s) => {
+    const alt = altConf(s, '7');
+    if (!alt || alt < 0.45 * (s.conf || 1)) return false;
+    if (!s._group || s._group.strokes.length !== 1) return false;
+    const pts = strokePts(s._group.strokes[0]);
+    return lineFitDeviation(pts) > 0.22 || Math.hypot(pts[pts.length - 1][0] - pts[0][0], pts[pts.length - 1][1] - pts[0][1]) / Math.max(pathLen(pts), 1e-6) < 0.72;
+  };
+
+  let best = null;
+  for (let i = 0; i < out.length - 3; i++) {
+    const os = openScore(out[i]);
+    if (os < 0.06 || !airBefore(i) || !valueish(out[i + 1])) continue;
+    for (let k = i + 3; k < out.length; k++) {
+      const cs = closeScore(out[k]);
+      if (cs < 0.08 || !airAfter(k) || !boundaryAfter(out[k + 1])) continue;
+      if (out[i].sym === '(' && out[k].sym === ')') continue;
+      const inside = out.slice(i + 1, k);
+      if (inside.some(s => catOf(s.sym) === 'r')) continue;
+      if (inside.some(s => s.sym === '(' || s.sym === ')')) continue;
+      const op = inside.findIndex((s, j) => (s.sym === '+' || s.sym === '-') && j > 0 && j < inside.length - 1);
+      if (op < 0 || !valueish(inside[op - 1]) || !valueish(inside[op + 1])) continue;
+      if (os + cs < 0.30) continue;
+      const score = os + cs + (i > 0 && /^[0-9)]$/.test(out[i - 1].sym) ? 0.12 : 0);
+      if (!best || score > best.score) best = { i, k, os, cs, score };
+    }
+  }
+  if (best) {
+    setSym(out[best.i], '(', best.os);
+    setSym(out[best.k], ')', best.cs);
+    if (best.i > 0 && out[best.i - 1].sym === '1' && hookedSeven(out[best.i - 1])) {
+      setSym(out[best.i - 1], '7', altConf(out[best.i - 1], '7'));
+    }
+    return out;
+  }
+  return out;
+}
+
 /** Segmentation self-repair for ':' — the pre-pass in segment() judges the two
  *  dots against the median of PER-STROKE sizes, and on a short ratio line
  *  ("7:6" is five strokes once the 7 is crossed) the two dots plus the
@@ -1427,6 +1662,53 @@ function colonRetry(line, medianH) {
     out.splice(i, 2, {
       id: a.id, sym: ':', conf: 0.93,
       alts: [{ sym: ':', conf: 0.93 }, { sym: '.', conf: 0.3 }],
+      box: merged.box, strokeIdxs: merged.strokeIdxs, _group: merged
+    });
+  }
+  return out;
+}
+
+/** Segmentation self-repair for '='. A fast PencilKit pass can leave the two
+ *  bars as separate, high-confidence '-' glyphs; confidence-based merge repair
+ *  will never touch them because each bar is individually obvious. Geometry is
+ *  decisive here: two flat bars, vertically stacked, sharing the same x-span.
+ */
+function equalsRetry(line, medianH) {
+  if (line.length < 2) return line;
+  const out = [...line];
+  const flatBar = (s) => {
+    if (s.sym !== '-' || s.composite || !s._group || s._group.strokes.length !== 1) return false;
+    const pts = strokePts(s._group.strokes[0]);
+    return flatness(pts) < 0.38 && lineFitDeviation(pts) < 0.14;
+  };
+  const spansFraction = (a, b) => {
+    const bx = {
+      x1: Math.min(a.box.x1, b.box.x1), x2: Math.max(a.box.x2, b.box.x2),
+      cy: (a.box.cy + b.box.cy) / 2
+    };
+    const wide = Math.max(a.box.w, b.box.w) > 1.35 * medianH;
+    if (!wide) return false;
+    const above = out.some(o => o !== a && o !== b && o.box.cy < bx.cy - 0.2 * medianH &&
+      overlap1D(bx.x1, bx.x2, o.box.x1, o.box.x2) > 0.35);
+    const below = out.some(o => o !== a && o !== b && o.box.cy > bx.cy + 0.2 * medianH &&
+      overlap1D(bx.x1, bx.x2, o.box.x1, o.box.x2) > 0.35);
+    return above && below;
+  };
+  for (let i = 0; i < out.length - 1; i++) {
+    const a = out[i], b = out[i + 1];
+    if (!flatBar(a) || !flatBar(b)) continue;
+    const xOverlap = overlap1D(a.box.x1, a.box.x2, b.box.x1, b.box.x2);
+    const dx = Math.abs(a.box.cx - b.box.cx);
+    const dy = Math.abs(a.box.cy - b.box.cy);
+    const similarWidth = Math.min(a.box.w, b.box.w) / Math.max(a.box.w, b.box.w, 1e-6);
+    if (xOverlap < 0.55 || dx > 0.35 * medianH) continue;
+    if (dy < 0.12 * medianH || dy > 0.85 * medianH) continue;
+    if (similarWidth < 0.55 || spansFraction(a, b)) continue;
+    const strokes = [...a._group.strokes, ...b._group.strokes];
+    const merged = { strokes, box: bbox(strokes.flatMap(strokePts)), strokeIdxs: [...a.strokeIdxs, ...b.strokeIdxs] };
+    out.splice(i, 2, {
+      id: a.id, sym: '=', conf: 0.93,
+      alts: [{ sym: '=', conf: 0.93 }, { sym: '-', conf: 0.3 }],
       box: merged.box, strokeIdxs: merged.strokeIdxs, _group: merged
     });
   }
@@ -1489,6 +1771,66 @@ function splitRetry(line, medianH) {
     }
   }
   return out;
+}
+
+/** A tight value followed by a '+' can occasionally segment as one confident
+ *  four-stroke glyph — most visibly y+ as H. Confidence then prevents the
+ *  ordinary split retry from touching it. Only split when the two halves are
+ *  themselves strong, and the merged glyph sits exactly where an operator is
+ *  expected: value [value+] value.
+ */
+function operatorSplitPass(line, medianH) {
+  if (line.length < 3) return line;
+  const out = [...line];
+  const valueish = s => s && (/^[0-9a-zA-Z]$/.test(s.sym) || s.sym === ')' || s.sym === 'deg' || FUNC_NAMES.has(s.sym));
+  for (let i = 1; i < out.length - 1; i++) {
+    const s = out[i];
+    if (s.composite || !s._group || s._group.strokes.length < 3 || s._group.strokes.length > 5) continue;
+    if (!valueish(out[i - 1]) || !valueish(out[i + 1])) continue;
+    if (!['H', 'R', '4', 'percent'].includes(s.sym) && s.conf < 0.88) continue;
+    const ordered = [...s._group.strokes].sort((a, b) => a.box.cx - b.box.cx);
+    let best = null;
+    for (let cut = 0; cut < ordered.length - 1; cut++) {
+      const A = ordered.slice(0, cut + 1), B = ordered.slice(cut + 1);
+      const gA = { strokes: A, box: bbox(A.flatMap(strokePts)), strokeIdxs: A.map(st => st.idx) };
+      const gB = { strokes: B, box: bbox(B.flatMap(strokePts)), strokeIdxs: B.map(st => st.idx) };
+      if (Math.max(gA.box.w, gA.box.h) < 0.25 * medianH || Math.max(gB.box.w, gB.box.h) < 0.25 * medianH) continue;
+      const cA = classifyCached(gA, medianH), cB = classifyCached(gB, medianH);
+      if (cB.sym !== '+' || cB.conf < 0.72) continue;
+      if (!/^[0-9a-zA-Z]$/.test(cA.sym) || cA.conf < 0.72) continue;
+      const score = cA.conf + cB.conf;
+      if (!best || score > best.score) best = { gA, gB, cA, cB, score };
+    }
+    if (!best || best.score < 1.58) continue;
+    out.splice(i, 1,
+      { id: s.id + 'a', sym: best.cA.sym, conf: best.cA.conf, alts: best.cA.alts, box: best.gA.box, strokeIdxs: best.gA.strokeIdxs, _group: best.gA, _geo: true },
+      { id: s.id + 'b', sym: '+', conf: best.cB.conf, alts: best.cB.alts, box: best.gB.box, strokeIdxs: best.gB.strokeIdxs, _group: best.gB, _geo: true });
+    i++;
+  }
+  return out;
+}
+
+/** A handwritten + can be drawn with a tall down-stroke and read as t. When
+ *  that leaves the line as an invalid run like 5nt2t=67, the surrounding
+ *  coefficient-variable terms provide stronger evidence than the isolated
+ *  glyph.
+ */
+function operatorContextPass(line) {
+  if (line.length < 6) return line;
+  const isDigit = s => s && /^[0-9]$/.test(s.sym);
+  const isVar = s => s && /^[a-zA-Z]$/.test(s.sym);
+  for (let i = 2; i < line.length - 3; i++) {
+    const s = line[i];
+    if (s.sym !== 't' || s.composite || !s._group || s._group.strokes.length !== 2) continue;
+    if (!isDigit(line[i - 2]) || !isVar(line[i - 1]) || !isDigit(line[i + 1]) || !isVar(line[i + 2])) continue;
+    if (catOf(line[i + 3].sym) !== 'r') continue;
+    const plusAlt = (s.alts || []).find(a => a.sym === '+');
+    if (!plusAlt || plusAlt.conf < 0.01) continue;
+    s.sym = '+';
+    s.conf = Math.max(0.72, plusAlt.conf);
+    s.alts = [{ sym: '+', conf: s.conf }, ...(s.alts || []).filter(a => a.sym !== '+')].slice(0, 5);
+  }
+  return line;
 }
 
 // ── Grammar beam: maths-syntax prior over per-glyph candidates ───────────────
@@ -2135,10 +2477,18 @@ export function recognize(strokes, overrides = {}, ctx = null) {
 
   // segmentation self-repair (colon, merge, then split), then function-name locking
   linesPre = linesPre.map(ls => colonRetry(ls, medianH));
+  linesPre = linesPre.map(ls => equalsRetry(ls, medianH));
   linesPre = linesPre.map(ls => mergeRetry(ls, medianH));
   linesPre = linesPre.map(ls => splitRetry(ls, medianH));
+  linesPre = linesPre.map(ls => operatorSplitPass(ls, medianH));
+  linesPre = linesPre.map(operatorContextPass);
   linesPre = linesPre.map(ls => decodeFunctions(ls, medianH));
   linesPre = linesPre.map(ls => degreeMarkPass(ls, medianH));
+  linesPre = linesPre.map(ls => mathContextPass(ls, medianH));
+  linesPre = linesPre.map(rhsNumericPass);
+  linesPre = linesPre.map(ls => percentContextPass(ls, medianH));
+  linesPre = linesPre.map(ls => bracketContextPass(ls, medianH));
+  linesPre = linesPre.map(parenthesizedDigitPass);
 
   for (const ls of linesPre) {
     for (let i = 0; i < ls.length; i++) {
@@ -2183,7 +2533,8 @@ export function recognize(strokes, overrides = {}, ctx = null) {
       const chord = Math.hypot(dx, dy);
       const slant = Math.abs(dx) / Math.max(Math.abs(dy), 1e-6);
       const slashAlt = (s.alts || []).find(a => a.sym === '/');
-      const strongAlt = slashAlt && slashAlt.conf >= 0.5 * (s.conf || 1);
+      const slashShare = slashAlt ? slashAlt.conf / Math.max(s.conf || 1, 1e-6) : 0;
+      const strongAlt = slashAlt && slashShare >= 0.35;
       // A wobbling hand bows the stroke (measured 0.82 chord/len at wobble
       // 1.3), but a bowed slash is still a slash — its identity is the
       // chord's slant, which survives the bow. The strict gate stays for
@@ -2191,9 +2542,13 @@ export function recognize(strokes, overrides = {}, ctx = null) {
       // % pre-pass already extends to heavily-warped slashes.
       const ratio = chord / Math.max(len, 1e-6);
       const straight = ratio > 0.93 || (ratio > 0.80 && strongAlt && slant >= 0.2);
-      const okFlip = (slant >= 0.34 && slashAlt && slashAlt.conf >= 0.45 * (s.conf || 1)) ||
-        (slant >= 0.15 && strongAlt);
-      if (straight && okFlip) {
+      const gapL = s.box.x1 - ls[i - 1].box.x2;
+      const gapR = ls[i + 1].box.x1 - s.box.x2;
+      const spacedFraction = slashAlt && slashAlt.conf >= 0.08 && ratio > 0.86 && slant >= 0.10 &&
+        s.box.w < 0.35 * medianH && Math.min(gapL, gapR) > 0.35 * medianH;
+      const okFlip = (slant >= 0.34 && slashAlt && slashShare >= 0.35) ||
+        (slant >= 0.15 && strongAlt) || spacedFraction;
+      if ((straight || spacedFraction) && okFlip) {
         s.sym = '/';
         s.conf = Math.max(s.conf, slashAlt.conf);
       }
@@ -2208,6 +2563,11 @@ export function recognize(strokes, overrides = {}, ctx = null) {
   // slash between digits for the first time — the geometry test above then has
   // the context it needed, so it runs once more on the repaired line
   linesPre.forEach(slashBetweenDigits);
+  linesPre = linesPre.map(ls => mathContextPass(ls, medianH));
+  linesPre = linesPre.map(rhsNumericPass);
+  linesPre = linesPre.map(ls => percentContextPass(ls, medianH));
+  linesPre = linesPre.map(ls => bracketContextPass(ls, medianH));
+  linesPre = linesPre.map(parenthesizedDigitPass);
 
   // user corrections always win — including on symbols created by split/merge
   // repair, whose ids ('s3a'…) don't exist at the initial group mapping

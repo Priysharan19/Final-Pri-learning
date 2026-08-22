@@ -386,11 +386,11 @@ the coverage figure as the strongest claim in this README that no test defends.
 | Command | n | Result |
 |---|---|---|
 | `node client/test/inkcheck.mjs 40` | 40 trials × 56 template symbols = 2,240 | **2,177 / 2,240 (97.2%)** symbol self-recognition; probes **219 / 220 (99.5%)**; layout **13 / 13**; two-digit combos **100 / 100** |
-| `node client/test/inkcheck-hard.mjs` | 24 trials × 55 template symbols = 1,320 | **1,271 / 1,320 (96.3%)** under heavy distortion; scenes **14 / 15**; messy digit strings **38 / 40 (95%)** |
-| `node client/test/inkcheck-lines.mjs 40` | 40 lines × 6 style conditions = 240 lines | **224 / 240 (93.3%)** lines exact, **97.9%** chars; cramped spacing costs nothing at this n — the suite prints **−7% drop when cramped**, tight 116 exact against roomy 108 |
-| `node client/test/inkcheck-holdout.mjs 24` | 24 simulated writers × 14 lines = 336 lines | **320 / 336 (95.2%)** lines exact, **98.9%** chars, **worst writer 86%** |
-| `node client/test/inkcheck-holdout2.mjs 40` | 40 simulated writers × 14 lines = 560 lines | **529 / 560 (94.5%)** lines exact, **98.4%** chars, **worst writer 71%** |
-| `node client/test/inkcheck-context.mjs` | 256 wrong-answer readings + 11 misread correct answers | **0** wrong answers rewritten as the expected one, **0** drawn nearer it, **0** correct readings broken, **0** confidence-contract violations; 2 readings repaired |
+| `node client/test/inkcheck-hard.mjs` | 24 trials × 55 template symbols = 1,320 | **1,271 / 1,320 (96.3%)** under heavy distortion; scenes **15 / 15**; messy digit strings **38 / 40 (95%)** |
+| `node client/test/inkcheck-lines.mjs 40` | 40 lines × 6 style conditions = 240 lines | **235 / 240 (97.9%)** lines exact, **99.5%** chars; cramped spacing costs nothing at this n — the suite prints **−3% drop when cramped**, tight 119 exact against roomy 116 |
+| `node client/test/inkcheck-holdout.mjs 24` | 24 simulated writers × 14 lines = 336 lines | **331 / 336 (98.5%)** lines exact, **99.7%** chars, **worst writer 93%** |
+| `node client/test/inkcheck-holdout2.mjs 40` | 40 simulated writers × 14 lines = 560 lines | **552 / 560 (98.6%)** lines exact, **99.8%** chars, **worst writer 86%** |
+| `node client/test/inkcheck-context.mjs` | 256 wrong-answer readings + 10 misread correct answers | **0** wrong answers rewritten as the expected one, **0** drawn nearer it, **0** correct readings broken, **0** confidence-contract violations; 2 readings repaired |
 | `npm run test:real` | 0 corpora recorded | **no score — there is no real-handwriting number yet** |
 
 Each command is quoted with the argument `npm test` passes it. Run it with a different `n` and you
@@ -398,22 +398,23 @@ get a different number — see the last bullet below.
 
 Read these in the right order, because they do not all mean the same thing:
 
-- **`inkcheck-holdout2.mjs` is the number to quote.** It uses a *writer* model — one consistent hand
-  per simulated student, the way real handwriting works — over a seed space no tuning pass has ever
-  executed. `inkcheck-holdout.mjs` was originally the held-out suite, but the v8 accuracy work read
-  its failures (the misreads *are* the diagnosis), which spent its independence; holdout #2 replaced
-  it and is still untouched. Neither may be tuned against now — a spent holdout is still not a
-  target. When holdout #2 gets studied in turn, a third must be added.
+- **`inkcheck-holdout2.mjs` is the synthetic regression number to quote, not untouched release
+  evidence.** It uses a *writer* model — one consistent hand per simulated student, the way real
+  handwriting works — but the pass that raised it to 552/560 read its failures and fixed against
+  several of them. `inkcheck-holdout.mjs` was originally the held-out suite, and the v8 accuracy work
+  spent that one the same way. Both holdouts are useful guards now; neither is still sealed. A third
+  held-out suite must be added before the next honest release-style synthetic claim.
   **`tools/ink-train/README.md` states this identically**, at the point where a retrain is validated;
   if those two ever disagree again, the one claiming more independence is the wrong one.
-- **`inkcheck.mjs`, `inkcheck-hard.mjs` and `inkcheck-lines.mjs` are tuning targets**, not evidence.
-  They are regression guards. Anything tuned against is eventually tuned *to*.
+- **`inkcheck.mjs`, `inkcheck-hard.mjs`, `inkcheck-lines.mjs`, and the spent holdouts are tuning
+  history now, not sealed evidence.** They are regression guards. Anything tuned against is
+  eventually tuned *to*.
 - **The worst-writer figure matters more than the mean.** At 40 writers one simulated hand scores
-  **71%** — nearly 24 points below the 94.5% headline. A student the engine cannot read does not care
+  **86%** — about 13 points below the 98.6% headline. A student the engine cannot read does not care
   about the average, and no headline number should hide that gap. Quote the pair or neither.
 - **Run these yourself before quoting them.** The commands above take the sample size as their last
   argument and default to a *smaller, more flattering* one — `inkcheck-holdout.mjs` with no argument
-  reports **97.0% / 99.2% / worst writer 86%** off just 12 writers, against **95.2% / 98.9% / 86%**
+  reports **98.2% / 99.6% / worst writer 93%** off just 12 writers, against **98.5% / 99.7% / 93%**
   at the 24 writers `npm test` runs. Larger n is the honest n.
 
 ### The gap this table admits
@@ -464,7 +465,7 @@ The tooling to close it exists and is wired up:
   once data exists.
 - **Eight or more writers, deliberately different hands** (left-handed, heavy slant, tiny writing,
   someone in a hurry, a shaky hand) before the figure is quotable as a product claim — and one corpus
-  held back, unread, the way holdout #2 is.
+  held back, unread, the way a release holdout should be.
 
 Do not tune the recogniser against a recorded corpus. The moment you fix a misread by reading that
 set's failures, it stops being evidence.
@@ -534,7 +535,7 @@ the edge of what this repo can currently show.
   generated itself. `npm run test:real` is wired up and refuses to invent a number:
   `client/test/ink-corpus/` holds a README and nothing else, and the suite ends
   **`REAL-INK SCORE — none (no corpus)`**. The capture tool
-  (`tools/ink-collect/index.html`) exists and works; nobody has written into it. So 94.5% is a
+  (`tools/ink-collect/index.html`) exists and works; nobody has written into it. So 98.6% is a
   statement about simulated writers, and until eight or more different real hands are recorded it
   cannot be repeated as a statement about a student's page. This is the project's largest evidence
   gap and [it has its own section](#the-gap-this-table-admits).
@@ -829,8 +830,8 @@ are the two rules that matter more than style.
 
 **1 · Every figure is quoted with the command and the sample size that produced it.**
 
-Not "94.5% accuracy". `node client/test/inkcheck-holdout2.mjs 40`, 40 simulated writers × 14 lines =
-560 lines, 529/560 exact, worst writer 71%. A figure without its command is a rumour: it cannot be
+Not "98.6% accuracy". `node client/test/inkcheck-holdout2.mjs 40`, 40 simulated writers × 14 lines =
+560 lines, 552/560 exact, worst writer 86%. A figure without its command is a rumour: it cannot be
 re-run, it cannot be falsified, and it goes stale silently. This block has been wrong before under a
 date stamp reading the very day it was read — **a date is not a measurement**. The same rule kills
 the softer version of the mistake: no headline number may hide the worst case behind it, which is why
