@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const CORPUS = join(ROOT, 'client', 'test', 'ink-corpus');
-const OUT = join(ROOT, 'client', 'public', 'ink-bootstrap-profile.json');
+const OUT = join(ROOT, 'client', 'public', 'ink-bootstrap-profile.js');
 
 // Only prompts deliberately written as small, left-to-right calibration runs.
 // We do NOT pseudo-label arbitrary equations: one bad personal template is
@@ -68,8 +68,6 @@ function splitIntoGlyphs(strokes, count) {
   const heights = items.map(x => Math.max(x.box.h, x.box.w * 0.5)).sort((a, b) => a - b);
   const medianH = heights[Math.floor(heights.length / 2)] || 1;
   const weakestBoundary = Math.min(...cuts.map(c => c.gap));
-  // A negative/near-zero chosen boundary means the prompt was not actually
-  // separable into the requested glyph count; reject rather than mislabel it.
   if (weakestBoundary < 0.06 * medianH) return null;
 
   const groups = [];
@@ -102,8 +100,6 @@ if (!docs.length) {
   process.exit(1);
 }
 
-// The bootstrap profile is intentionally ONE writer. Mixing people into a
-// personal profile would make it less personal and risks cross-writer leakage.
 const writer = docs[0].data.writer.id;
 const sessions = docs.filter(x => x.data.writer.id === writer);
 const templates = [];
@@ -143,7 +139,12 @@ const payload = {
   generatedAt: new Date().toISOString(),
   templates
 };
-writeFileSync(OUT, JSON.stringify(payload));
+// A standalone script resource keeps the private profile OUT of Vite's hashed
+// tracked bundles. The iPad loads it from its own local Web resources. No fetch,
+// XHR, beacon or socket API is used, so the offline/no-telemetry guarantee stays
+// mechanically enforceable.
+const source = `globalThis.__PRI_INK_BOOTSTRAP__=${JSON.stringify(payload).replace(/</g, '\\u003c')};\n`;
+writeFileSync(OUT, source);
 console.log(`PRI INK PERSONALIZE — PASS: ${templates.length} real templates from ${writer}`);
 console.log([...counts.entries()].sort().map(([s, n]) => `${s}:${n}`).join('  '));
-console.log('wrote client/public/ink-bootstrap-profile.json (gitignored; local/iPad only)');
+console.log('wrote client/public/ink-bootstrap-profile.js (gitignored; local/iPad only)');
