@@ -51,59 +51,20 @@ def make_same_writer_dev_split(examples, seed: int = 20260824, fraction: float =
     shuffled = list(range(n))
     rng.shuffle(shuffled)
 
-    # Keep at least one real training occurrence of every validation glyph when
-    # the tiny one-writer corpus permits it. A one-off symbol in validation would
-    # otherwise measure an impossible zero-shot class rather than same-writer
-    # generalisation. This rule is DEV-ONLY; strict writer-disjoint evaluation is
-    # unchanged and may of course contain difficult rare classes.
-    total_symbols = Counter()
-    per_example = []
-    for row in train_pool:
-        counts = _symbol_counts(row)
-        per_example.append(counts)
-        total_symbols.update(counts)
-
-    heldout_symbols = Counter()
+    # IMPORTANT: keep this selection protocol frozen. Development comparisons
+    # only mean something if architecture/data changes see the same holdout.
     chosen: list[int] = []
-
-    def safe_to_holdout(i: int) -> bool:
-        candidate = per_example[i]
-        for symbol, count in candidate.items():
-            if total_symbols[symbol] - heldout_symbols[symbol] - count < 1:
-                return False
-        return True
-
-    def choose_first(predicate) -> int | None:
-        for i in shuffled:
-            if i in chosen or not predicate(train_pool[i]) or not safe_to_holdout(i):
-                continue
-            return i
-        return None
-
-    def add(i: int | None):
-        if i is None or i in chosen or len(chosen) >= n_val:
-            return
-        chosen.append(i)
-        heldout_symbols.update(per_example[i])
-
-    add(choose_first(_has_multi_stroke_group))
-    add(choose_first(_has_relation))
-
+    multi = next((i for i in shuffled if _has_multi_stroke_group(train_pool[i])), None)
+    if multi is not None:
+        chosen.append(multi)
+    rel = next((i for i in shuffled if i not in chosen and _has_relation(train_pool[i])), None)
+    if rel is not None and len(chosen) < n_val:
+        chosen.append(rel)
     for i in shuffled:
         if len(chosen) >= n_val:
             break
-        if i not in chosen and safe_to_holdout(i):
-            add(i)
-
-    # Extremely small/pathological corpora may not have enough coverage-safe
-    # rows. Fill deterministically rather than silently changing holdout size,
-    # and record any unsupported validation symbols in the metadata.
-    if len(chosen) < n_val:
-        for i in shuffled:
-            if len(chosen) >= n_val:
-                break
-            if i not in chosen:
-                add(i)
+        if i not in chosen:
+            chosen.append(i)
 
     val_indices = set(chosen)
     out = [
@@ -111,6 +72,9 @@ def make_same_writer_dev_split(examples, seed: int = 20260824, fraction: float =
         for i, x in enumerate(train_pool)
     ]
 
+    # Report support without changing the benchmark. A validation symbol absent
+    # from the 38 real fine-tune rows can still be learned from synthetic
+    # pretraining; this metadata makes that transfer challenge explicit.
     train_symbol_counts = Counter()
     validation_symbol_counts = Counter()
     for row in out:
@@ -129,9 +93,9 @@ def make_same_writer_dev_split(examples, seed: int = 20260824, fraction: float =
         "writer": writers[0],
         "trainSamples": sum(x.split == "train" for x in out),
         "validationSamples": sum(x.split == "validation" for x in out),
-        "coverageAware": True,
+        "splitFrozen": True,
         "validationSymbols": sorted(validation_symbol_counts),
-        "unsupportedValidationSymbols": unsupported,
+        "unsupportedRealTrainSymbols": unsupported,
         "writerDisjoint": False,
         "productionEvidence": False,
     }
