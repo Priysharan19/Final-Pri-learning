@@ -5,8 +5,9 @@ set -euo pipefail
 #
 # Keeps the real corpus local, pretrains on Pri-owned synthetic writer diversity,
 # builds a holdout-safe synthetic replay from the writer's REAL Pencil glyphs,
-# adapts on the real writer, exports a non-production Core ML model, and installs
-# it into both local SwiftPM packages for DEBUG testing.
+# adapts on the real writer with replay-balanced sampling + cross-modal visual
+# personalization, exports a non-production Core ML model, and installs it into
+# both local SwiftPM packages for DEBUG testing.
 #
 # It never reads test/final-holdout evidence and can never promote a release.
 
@@ -38,6 +39,10 @@ BOOTSTRAP_EPOCHS="${PRI_INK_BOOTSTRAP_EPOCHS:-32}"
 D_MODEL="${PRI_INK_D_MODEL:-192}"
 STROKE_LAYERS="${PRI_INK_STROKE_LAYERS:-6}"
 DECODER_LAYERS="${PRI_INK_DECODER_LAYERS:-4}"
+REAL_REPLAY_FRACTION="${PRI_INK_REAL_REPLAY_FRACTION:-0.30}"
+VISUAL_LR_MULTIPLIER="${PRI_INK_VISUAL_LR_MULTIPLIER:-2.0}"
+STROKE_LR_MULTIPLIER="${PRI_INK_STROKE_LR_MULTIPLIER:-0.45}"
+DECODER_LR_MULTIPLIER="${PRI_INK_DECODER_LR_MULTIPLIER:-1.0}"
 BOOTSTRAP_SEED="${PRI_INK_BOOTSTRAP_SEED:-20260823}"
 VALIDATION_FRACTION="${PRI_INK_BOOTSTRAP_VALIDATION_FRACTION:-0.20}"
 
@@ -119,6 +124,10 @@ echo "6/8  Adapting V3 to the real Pencil writer + personal replay"
   --epochs "$BOOTSTRAP_EPOCHS" \
   --batch 8 \
   --lr 4e-5 \
+  --real-replay-fraction "$REAL_REPLAY_FRACTION" \
+  --visual-lr-multiplier "$VISUAL_LR_MULTIPLIER" \
+  --stroke-lr-multiplier "$STROKE_LR_MULTIPLIER" \
+  --decoder-lr-multiplier "$DECODER_LR_MULTIPLIER" \
   --d-model "$D_MODEL" \
   --stroke-layers "$STROKE_LAYERS" \
   --decoder-layers "$DECODER_LAYERS" \
@@ -139,9 +148,12 @@ import sys
 import coremltools as ct
 m = ct.models.MLModel(sys.argv[1])
 meta = m.user_defined_metadata
+assert meta.get('pri.model') == 'ink-foundation-v3', meta
+assert meta.get('pri.architectureVersion') == '3', meta
 assert meta.get('pri.productionReady') == 'false', meta
 assert meta.get('pri.trainingStage') == 'bootstrap', meta
-print('Core ML promotion lock: PASS — bootstrap model is development-only')
+assert 'cross-modal-style' in meta.get('pri.decoder', ''), meta
+print('Core ML V3 promotion lock: PASS — exact bootstrap asset is development-only')
 PY
 
 echo
@@ -159,6 +171,7 @@ printf '============================================================\n'
 printf 'Checkpoint: %s\n' "$BOOTSTRAP"
 printf 'Core ML:    %s\n' "$MODEL"
 printf 'Personal replay: %s synthetic expressions\n' "$PERSONAL_SYNTH_SAMPLES"
+printf 'Expected real-Pencil adaptation share: %s\n' "$REAL_REPLAY_FRACTION"
 printf 'Installed:  ios/PriLearning.swiftpm/Resources/Models/PriInkFoundation.mlpackage\n'
 printf '\nThis model is for DEBUG/iPad testing only.\n'
 printf 'It is NOT evidence of accuracy on other people and cannot be promoted.\n'
