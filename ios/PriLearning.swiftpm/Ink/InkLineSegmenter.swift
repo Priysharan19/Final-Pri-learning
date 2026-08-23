@@ -14,15 +14,16 @@
 //     what tap-to-correct and "learn from this correction" need.
 //
 // Primary grouping is by vertical overlap against a line's core band. Maths then
-// needs two structural repair passes:
-//   1. detached raised marks (powers) attach to a full-height carrier on the left;
-//   2. compact 2D satellites (integral limits / evaluation bounds) attach only
+// needs structural repair passes:
+//   1. sparse upper/lower annotation bands are split at large horizontal gaps;
+//   2. detached raised marks (powers) attach to a full-height carrier on the left;
+//   3. compact 2D satellites (integral limits / evaluation bounds) attach only
 //      when geometry AND original Pencil stroke order agree on the same body line.
 //
-// The second rule matters for calculus: an upper/lower integral limit is not a
-// separate line just because it sits clear of x-height. Stroke order is only a
-// supporting cue — InkPoint.t resets at each PKStroke, so we never pretend it is
-// a page-wide clock.
+// The calculus rules matter because upper limits, lower limits and exponents can
+// all share a y-band and otherwise look like their own tiny "line". Stroke order
+// is only a supporting cue — InkPoint.t resets at each PKStroke, so we never
+// pretend it is a page-wide clock.
 // ─────────────────────────────────────────────────────────────────────────────
 import CoreGraphics
 import Foundation
@@ -98,6 +99,7 @@ enum InkLineSegmenter {
         }
 
         groups = mergeOverlappingGroups(groups, glyphSize: glyphSize)
+        groups = splitSparseSatelliteBands(groups, glyphSize: glyphSize)
         groups = attachRaisedSatellites(groups, glyphSize: glyphSize)
         groups = attachCompactMathSatellites(groups, glyphSize: glyphSize)
         groups = mergeOverlappingGroups(groups, glyphSize: glyphSize)
@@ -136,6 +138,51 @@ enum InkLineSegmenter {
 
     private static func union(of strokes: [InkStroke]) -> CGRect {
         strokes.dropFirst().reduce(strokes.first?.bounds ?? .zero) { $0.union($1.bounds) }
+    }
+
+    /// The first y-band pass can place unrelated upper annotations into one
+    /// group simply because they share height: x² near the middle of a line and
+    /// an evaluation upper bound near the far right are not one glyph or one
+    /// logical line. Split only small, shallow bands and only at a gap larger
+    /// than an ordinary inter-glyph space. Full body lines are left untouched.
+    private static func splitSparseSatelliteBands(
+        _ groups: [[(offset: Int, element: InkStroke)]],
+        glyphSize: CGFloat
+    ) -> [[(offset: Int, element: InkStroke)]] {
+        var output: [[(offset: Int, element: InkStroke)]] = []
+
+        for group in groups {
+            guard group.count > 1 else {
+                output.append(group)
+                continue
+            }
+
+            let members = group.map(\.element)
+            let bounds = union(of: members)
+            let height = lineGlyphHeight(members, pageSize: glyphSize)
+            let satelliteBand = group.count <= 8
+                && height <= 0.95 * glyphSize
+                && bounds.height <= 1.40 * glyphSize
+            guard satelliteBand else {
+                output.append(group)
+                continue
+            }
+
+            let ordered = group.sorted { $0.element.bounds.minX < $1.element.bounds.minX }
+            var chunks: [[(offset: Int, element: InkStroke)]] = [[ordered[0]]]
+            for item in ordered.dropFirst() {
+                guard let previous = chunks[chunks.count - 1].last else { continue }
+                let gap = item.element.bounds.minX - previous.element.bounds.maxX
+                if gap > 1.05 * glyphSize {
+                    chunks.append([item])
+                } else {
+                    chunks[chunks.count - 1].append(item)
+                }
+            }
+            output.append(contentsOf: chunks)
+        }
+
+        return output
     }
 
     private static func attachRaisedSatellites(
@@ -240,7 +287,6 @@ enum InkLineSegmenter {
                     let band = coreBand(of: targetStrokes, glyphSize: glyphSize)
                     let bandHeight = max(1, band.upperBound - band.lowerBound)
                     let targetHeight = max(bandHeight, lineGlyphHeight(targetStrokes, pageSize: glyphSize))
-                    let satelliteExtent = max(satellite.width, satellite.height)
 
                     // A body line should be materially richer than a detached
                     // annotation. This prevents one short answer line such as
@@ -249,7 +295,13 @@ enum InkLineSegmenter {
                         || targetBounds.width >= 2.0 * targetHeight
                         || targetBounds.height >= 1.45 * targetHeight
                     guard substantialTarget else { continue }
-                    guard satelliteExtent <= 1.10 * targetHeight else { continue }
+
+                    // A small annotation band may be horizontally wider than one
+                    // glyph (for example a power near a bracket-bound mark), so
+                    // gate height tightly and width separately rather than using
+                    // max(width,height) as a single size test.
+                    guard satellite.height <= 1.10 * targetHeight,
+                          satellite.width <= 2.40 * targetHeight else { continue }
 
                     let aboveGap = band.lowerBound - satellite.maxY
                     let belowGap = satellite.minY - band.upperBound
