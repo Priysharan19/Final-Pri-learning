@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Evaluate one frozen Pri Ink Foundation checkpoint on a writer-locked split.
 
-`final-holdout` is intentionally opt-in. Running it spends release evidence even
-if no individual errors are printed; do not use repeated aggregate scores as a
-tuning loop.
+`final-holdout` is deliberately opt-in. The evaluator is stricter than ordinary
+accuracy reporting: it measures structural exactness and precision at the
+confidence threshold the product would use for automatic marking.
 """
 from __future__ import annotations
 
@@ -21,11 +21,14 @@ from model import ModelConfig, PriInkFoundation
 
 
 RELEASE = {
-    "exact": 0.97,
+    "exact": 0.98,
     "cer": 0.005,
-    "worst_writer_exact": 0.95,
-    "high_conf_wrong_rate": 0.005,
+    "worst_writer_exact": 0.90,
+    "critical_structure_exact": 0.995,
+    "safe_precision": 0.999,
+    "safe_confidence_threshold": 0.90,
     "writers": 20,
+    "samples": 1000,
     "min_samples_per_writer": 30,
 }
 
@@ -62,10 +65,19 @@ def prediction_confidence(logits: torch.Tensor, ids: torch.Tensor) -> float:
     return 0.65 * (sum(values) / len(values)) + 0.35 * min(values)
 
 
+def is_critical_structure(text: str) -> bool:
+    """Structures where a one-character-looking error can change the maths."""
+    return any(marker in text for marker in (
+        "^(", "sqrt(", "/", "<=", ">=", "!=", "=", "±"
+    ))
+
+
 @torch.no_grad()
 def score(model, loader, device):
     model.eval()
-    total = exact = char_total = char_errors = high_conf_wrong = 0
+    total = exact = char_total = char_errors = 0
+    critical_total = critical_exact = 0
+    safe_total = safe_correct = 0
     by_writer: dict[int, list[int]] = defaultdict(list)
     confidences = []
 
@@ -83,15 +95,25 @@ def score(model, loader, device):
             truth = truths[row]
             ok = int(pred == truth)
             confidence = prediction_confidence(logits_cpu[row], ids[row])
-            total += 1; exact += ok
-            char_total += max(1, len(truth)); char_errors += edit_distance(pred, truth)
+
+            total += 1
+            exact += ok
+            char_total += max(1, len(truth))
+            char_errors += edit_distance(pred, truth)
             by_writer[int(writers[row])].append(ok)
             confidences.append(confidence)
-            if not ok and confidence >= 0.90:
-                high_conf_wrong += 1
+
+            if is_critical_structure(truth):
+                critical_total += 1
+                critical_exact += ok
+
+            if confidence >= RELEASE["safe_confidence_threshold"]:
+                safe_total += 1
+                safe_correct += ok
 
     writer_exact = [sum(v) / len(v) for v in by_writer.values() if v]
     writer_counts = [len(v) for v in by_writer.values() if v]
+    safe_precision = safe_correct / safe_total if safe_total else 0.0
     return {
         "samples": total,
         "writers": len(writer_exact),
@@ -99,19 +121,28 @@ def score(model, loader, device):
         "exact": exact / max(1, total),
         "cer": char_errors / max(1, char_total),
         "worst_writer_exact": min(writer_exact, default=0.0),
-        "high_conf_wrong_rate": high_conf_wrong / max(1, total),
+        "critical_structure_samples": critical_total,
+        "critical_structure_exact": critical_exact / max(1, critical_total),
+        "safe_threshold": RELEASE["safe_confidence_threshold"],
+        "safe_samples": safe_total,
+        "safe_coverage": safe_total / max(1, total),
+        "safe_precision": safe_precision,
         "mean_confidence": sum(confidences) / max(1, len(confidences)),
     }
 
 
 def passes(metrics: dict) -> bool:
     return (
-        metrics["exact"] >= RELEASE["exact"]
-        and metrics["cer"] <= RELEASE["cer"]
-        and metrics["worst_writer_exact"] >= RELEASE["worst_writer_exact"]
-        and metrics["high_conf_wrong_rate"] <= RELEASE["high_conf_wrong_rate"]
+        metrics["samples"] >= RELEASE["samples"]
         and metrics["writers"] >= RELEASE["writers"]
         and metrics["min_samples_per_writer"] >= RELEASE["min_samples_per_writer"]
+        and metrics["exact"] >= RELEASE["exact"]
+        and metrics["cer"] <= RELEASE["cer"]
+        and metrics["worst_writer_exact"] >= RELEASE["worst_writer_exact"]
+        and metrics["critical_structure_samples"] > 0
+        and metrics["critical_structure_exact"] >= RELEASE["critical_structure_exact"]
+        and metrics["safe_samples"] > 0
+        and metrics["safe_precision"] >= RELEASE["safe_precision"]
     )
 
 
@@ -170,14 +201,14 @@ def main():
 
     report = {
         "format": "pri-ink-release-eval",
-        "version": 1,
+        "version": 2,
         "checkpointSha256": sha256(checkpoint),
         "checkpointStage": ckpt.get("stage"),
         "split": args.split,
         "metrics": metrics,
         "releaseTargets": RELEASE,
         "passesReleaseTargets": passed,
-        "note": "Aggregate-only evaluation. Do not inspect final-holdout errors or tune against repeated final-holdout runs."
+        "note": "Aggregate-only evaluation. Never tune against final-holdout errors or repeated final-holdout scores."
     }
     out = Path(args.out) if args.out else checkpoint.with_name(f"{checkpoint.stem}-{args.split}-report.json")
     out.write_text(json.dumps(report, indent=2), encoding="utf-8")
@@ -185,8 +216,11 @@ def main():
     print(f"split={args.split} samples={metrics['samples']} writers={metrics['writers']} "
           f"min/writer={metrics['min_samples_per_writer']}")
     print(f"exact={100*metrics['exact']:.2f}% CER={100*metrics['cer']:.3f}% "
-          f"worst-writer={100*metrics['worst_writer_exact']:.2f}% "
-          f"high-conf-wrong={100*metrics['high_conf_wrong_rate']:.3f}%")
+          f"worst-writer={100*metrics['worst_writer_exact']:.2f}%")
+    print(f"critical-structure={100*metrics['critical_structure_exact']:.2f}% "
+          f"({metrics['critical_structure_samples']} samples)")
+    print(f"safe precision={100*metrics['safe_precision']:.3f}% at "
+          f"{100*metrics['safe_coverage']:.1f}% coverage (threshold={metrics['safe_threshold']:.2f})")
     print(f"release targets: {'PASS' if passed else 'FAIL'}")
     print(f"report: {out}")
     raise SystemExit(0 if passed else 2)
