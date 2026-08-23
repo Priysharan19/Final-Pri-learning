@@ -41,7 +41,11 @@ check('overlapping coalesced batches cannot regress stroke time', html.includes(
 check('duplicate coalesced points are rejected', html.includes("q.t===last.t&&q.x===last.x&&q.y===last.y"));
 check('drawing is frame-throttled', html.includes('requestAnimationFrame'));
 check('stroke redraw is linear, not per-point restroking', /for\(let i=1;i<st\.points\.length;i\+\+\)\{const p=st\.points\[i\];ctx\.lineTo\(p\.x,p\.y\)\}ctx\.stroke\(\)/.test(html));
-check('collector schema is at least v5', /collector:\{name:'pri-ink-collect-v2',version:([5-9]|[1-9][0-9]+)/.test(html));
+check('Safari pointer capture is not used', !html.includes('setPointerCapture') && !html.includes('releasePointerCapture'));
+check('new Pencil-down force-finishes a stale previous stroke', html.includes('if(current)finishStroke()'));
+check('global pointer-up safely ends a stroke outside canvas', html.includes("window.addEventListener('pointerup',endStroke,{capture:true,passive:false})"));
+check('collector advertises immediate stroke restart', html.includes('immediateStrokeRestart:true') && html.includes('pointerCapture:false'));
+check('collector schema is at least v6', /collector:\{name:'pri-ink-collect-v2',version:([6-9]|[1-9][0-9]+)/.test(html));
 
 console.log(`\n${failures ? `FAIL — ${failures} collector contract problem(s)` : `PASS — ${pairs.length} prompts and corpus provenance contract verified`}`);
 process.exit(failures ? 1 : 0);
