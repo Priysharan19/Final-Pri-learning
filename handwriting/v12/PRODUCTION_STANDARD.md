@@ -24,6 +24,7 @@ A high character score cannot compensate for a structural error. `x^3` becoming 
 Required for every relevant release:
 
 - native Swift build succeeds;
+- canonical and legacy SwiftPM packages are source-identical;
 - PencilKit ↔ JavaScript bridge succeeds;
 - deterministic native expression benchmark: **100% exact expressions**;
 - deterministic native character accuracy: **>= 99.5%**;
@@ -72,6 +73,12 @@ On supported iPad hardware:
 - recognition never blocks Pencil input;
 - stable single-line recognition p95 **<= 500 ms** after debounce/pen-up;
 - stale recognition is cancellable and cannot replace newer ink.
+
+## CI enforcement
+
+Changes under `handwriting/v12/` intentionally trigger both the native-iPad gate and the Ink Foundation model-tooling gate. A release-standard change therefore exercises the Swift package/build/bridge/native benchmark and a real one-epoch neural training smoke test on the same PR head. General application CI separately gates the deterministic recogniser suites, browser flows, build and iOS web-bundle synchronization.
+
+No gate may be lowered to obtain a green build. If a model or recogniser regresses, fix the system or collect better evidence.
 
 ## Failure taxonomy
 
