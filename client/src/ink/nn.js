@@ -1,33 +1,20 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Pri Learning · Neural ink classifier — on-device forward pass (v7 ensemble).
-// int8-quantised CNNs vote on every glyph and their softmaxes are averaged,
-// which cancels each net's individual blind spots: model A reads a 28² render,
-// model B a 32² render (deeper, wider), and model C a 32² render with an ASPECT
-// FLOOR — the aspect-preserving frame gives a stroke of aspect 0.06 barely one
-// pixel of width, so C exists to see the tall-thin glyphs (1 l ( ) /) that the
-// other two receive as an identical vertical smear. Trained on ~132,000 style-varied
-// glyph renders + 10,000 real handwritten MNIST digits; runs in plain JS in a
-// few milliseconds per symbol. Same deskewing rasterizer as training.
-// ─────────────────────────────────────────────────────────────────────────────
-import { CLASSES } from './classes.js';
-import { rasterize } from './raster.js';
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Weights
-// ~798 kB of quantised weights, read by this file and nothing else, so they
-// arrive over a dynamic edge. A static `import` would put them in the static
-// graph of everything that reaches the recogniser, which is how they stayed in
-// the initial load even after being split into a chunk of their own: a chunk the
-// entry still statically imports is still a file the browser must have before it
-// can run anything. Over a dynamic edge the fetch happens when something first
-// pulls the recogniser in — the write-to-answer surface, itself behind an
-// import() — instead of on a cold open of the app.
+// Pri Learning · Neural ink classifier — on-device forward pass (v8 ensemble).
 //
-// Awaiting it here rather than inside nnClassify leaves the weights an ordinary
-// module-scope constant, so the whole recogniser stays synchronous and stays
-// fast once loaded, and the ink suites go on importing it in Node and calling it
-// straight away: resolving this module is what waited.
+// Three int8 CNN voters classify every glyph. v8 additionally uses the hidden
+// penultimate representation as a few-shot metric space for the active writer:
+// real correction/calibration examples are embedded by the SAME CNNs and can
+// softly re-rank a new glyph when the personal neighbourhood is decisive.
+//
+// This is deliberately not a nearest-template replacement. Stock CNN evidence
+// remains the base distribution; personal evidence is capped and is ignored
+// unless the nearest writer-specific class is both absolutely close and clearly
+// separated from the runner-up. That makes one strange calibration sample
+// unable to hijack an otherwise confident classifier.
 // ─────────────────────────────────────────────────────────────────────────────
+import { CLASSES, CLASS_INDEX, classOfSymbol } from './classes.js';
+import { rasterize } from './raster.js';
+import { getPersonalBank } from './personal.js';
 
 const MODEL = (await import('./model-data.js')).default;
 
@@ -44,12 +31,11 @@ const b64ToF32 = (b64) => {
   return new Float32Array(u8.buffer);
 };
 
-// Node (tests) lacks atob
 if (typeof atob === 'undefined') {
   globalThis.atob = (b64) => Buffer.from(b64, 'base64').toString('binary');
 }
 
-const SPECS = MODEL.models || [MODEL];   // back-compat with single-model files
+const SPECS = MODEL.models || [MODEL];
 
 let LOADED = null;
 function loadAll() {
@@ -62,9 +48,6 @@ function loadAll() {
   };
   LOADED = SPECS.map(m => ({
     img: m.img,
-    // Each voter carries its own raster convention. A model trained on an
-    // aspect-floored render must be fed one at inference too, or it is shown a
-    // frame it has never seen.
     minAspect: m.minAspect || 0,
     chans: [m.c1w.shape[0], m.c2w.shape[0], m.c3w.shape[0]],
     hidden: m.f1w.shape[0],
@@ -120,7 +103,24 @@ function convReluPool(input, inC, size, w, b, outC) {
   return out;
 }
 
-function forward(m, img) {
+function unit(v) {
+  let ss = 0;
+  for (let i = 0; i < v.length; i++) ss += v[i] * v[i];
+  const inv = 1 / Math.max(Math.sqrt(ss), 1e-8);
+  const out = new Float32Array(v.length);
+  for (let i = 0; i < v.length; i++) out[i] = v[i] * inv;
+  return out;
+}
+
+function dotUnit(a, b) {
+  let s = 0;
+  const n = Math.min(a.length, b.length);
+  for (let i = 0; i < n; i++) s += a[i] * b[i];
+  return s;
+}
+
+/** One voter. Return both class probabilities and its normalized hidden vector. */
+function forwardDetailed(m, img) {
   const [C1, C2, C3] = m.chans;
   let size = m.img;
   let x = convReluPool(img, 1, size, m.c1w, m.c1b, C1); size >>= 1;
@@ -136,36 +136,122 @@ function forward(m, img) {
     for (let i = 0; i < flat; i++) acc += x[i] * w1[base + i];
     f1[o] = acc > 0 ? acc : 0;
   }
+
   const n = CLASSES.length;
-  const logits = new Float32Array(n);
+  const probs = new Float32Array(n);
   const w2 = m.f2w.data;
   let max = -Infinity;
   for (let o = 0; o < n; o++) {
     let acc = m.f2b[o];
     const base = o * H;
     for (let i = 0; i < H; i++) acc += f1[i] * w2[base + i];
-    logits[o] = acc;
+    probs[o] = acc;
     if (acc > max) max = acc;
   }
   let sum = 0;
-  for (let o = 0; o < n; o++) { logits[o] = Math.exp(logits[o] - max); sum += logits[o]; }
-  for (let o = 0; o < n; o++) logits[o] /= sum;
-  return logits;
+  for (let o = 0; o < n; o++) { probs[o] = Math.exp(probs[o] - max); sum += probs[o]; }
+  for (let o = 0; o < n; o++) probs[o] /= sum;
+  return { probs, embedding: unit(f1) };
+}
+
+// ── Few-shot writer metric memory ────────────────────────────────────────────
+// Templates are already local/profile-scoped in personal.js. We cache their
+// CNN embeddings and rebuild only when the bank object or its length changes.
+let personalCache = { bank: null, length: -1, entries: [] };
+
+function personalEntries(models) {
+  const bank = getPersonalBank();
+  if (personalCache.bank === bank && personalCache.length === bank.length) return personalCache.entries;
+
+  const entries = [];
+  for (const t of bank) {
+    const cls = classOfSymbol(t.sym);
+    const classIndex = CLASS_INDEX[cls];
+    if (classIndex === undefined || !Array.isArray(t.strokes) || !t.strokes.length) continue;
+    const features = models.map(m => {
+      const img = rasterize(t.strokes, { size: m.img, minAspect: m.minAspect });
+      return forwardDetailed(m, img).embedding;
+    });
+    entries.push({ classIndex, features });
+  }
+  personalCache = { bank, length: bank.length, entries };
+  return entries;
+}
+
+/**
+ * Produce a conservative class distribution from the active writer's examples.
+ * Similarity alone is not enough: ReLU embeddings can give unrelated glyphs a
+ * moderately high cosine. We therefore require BOTH a strong absolute match
+ * and a clear nearest-class margin before personal evidence gets any weight.
+ */
+function personalDistribution(models, inputEmbeddings) {
+  const entries = personalEntries(models);
+  if (entries.length < 2) return null;
+
+  const best = new Float32Array(CLASSES.length);
+  best.fill(-1);
+  for (const entry of entries) {
+    let sim = 0;
+    for (let m = 0; m < inputEmbeddings.length; m++) {
+      sim += dotUnit(inputEmbeddings[m], entry.features[m]);
+    }
+    sim /= inputEmbeddings.length;
+    if (sim > best[entry.classIndex]) best[entry.classIndex] = sim;
+  }
+
+  let top = -1, second = -1, topIndex = -1;
+  for (let i = 0; i < best.length; i++) {
+    const v = best[i];
+    if (v > top) { second = top; top = v; topIndex = i; }
+    else if (v > second) second = v;
+  }
+  if (topIndex < 0 || top < 0.78 || top - second < 0.035) return null;
+
+  // Temperature-softmax over nearest class exemplars. Missing personal classes
+  // receive zero mass rather than an invented vote.
+  const out = new Float32Array(CLASSES.length);
+  let z = 0;
+  const temperature = 0.055;
+  for (let i = 0; i < best.length; i++) {
+    if (best[i] < 0) continue;
+    const e = Math.exp((best[i] - top) / temperature);
+    out[i] = e; z += e;
+  }
+  if (!(z > 0)) return null;
+  for (let i = 0; i < out.length; i++) out[i] /= z;
+
+  const absolute = Math.max(0, Math.min(1, (top - 0.78) / 0.16));
+  const margin = Math.max(0, Math.min(1, (top - second - 0.035) / 0.10));
+  // 8–42% blend: enough to break x/h/n and 2/z style-specific ties, never
+  // enough to erase overwhelming stock-CNN evidence by itself.
+  const weight = 0.08 + 0.34 * absolute * margin;
+  return { probs: out, weight, top, margin: top - second };
 }
 
 /**
  * strokes: [[ [x,y], … ], …] raw glyph strokes.
- * Returns Float32Array(56) of ensemble class probabilities.
+ * Returns Float32Array(CLASSES.length) of ensemble class probabilities.
  */
 export function nnClassify(strokes) {
   const models = loadAll();
   const n = CLASSES.length;
   const acc = new Float32Array(n);
+  const embeddings = [];
   for (const m of models) {
-    const p = forward(m, rasterize(strokes, { size: m.img, minAspect: m.minAspect }));
-    for (let i = 0; i < n; i++) acc[i] += p[i];
+    const { probs, embedding } = forwardDetailed(
+      m,
+      rasterize(strokes, { size: m.img, minAspect: m.minAspect })
+    );
+    embeddings.push(embedding);
+    for (let i = 0; i < n; i++) acc[i] += probs[i];
   }
   for (let i = 0; i < n; i++) acc[i] /= models.length;
+
+  const personal = personalDistribution(models, embeddings);
+  if (personal) {
+    const w = personal.weight;
+    for (let i = 0; i < n; i++) acc[i] = (1 - w) * acc[i] + w * personal.probs[i];
+  }
   return acc;
 }
 
