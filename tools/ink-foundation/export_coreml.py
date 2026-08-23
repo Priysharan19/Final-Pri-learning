@@ -2,10 +2,9 @@
 """Export a Pri Ink Foundation checkpoint to Core ML.
 
 Development export is allowed for any compatible checkpoint, but it is marked
-`pri.productionReady=false`. A RELEASE export requires an aggregate locked
-final-holdout report produced by evaluate_release.py for the exact checkpoint;
-its SHA-256 and passing release gates must match before the asset can be marked
-production-ready.
+`pri.productionReady=false`. A release export requires the locked final-holdout
+report produced by evaluate_release.py for the exact checkpoint and the report
+must pass the production handwriting standard.
 """
 from __future__ import annotations
 
@@ -41,12 +40,12 @@ def validate_release_report(checkpoint: Path, ckpt: dict, report_path: str | Non
     if not report_path:
         return False, None
     report = json.loads(Path(report_path).read_text(encoding="utf-8"))
-    if report.get("format") != "pri-ink-release-eval" or int(report.get("version", 0)) != 1:
-        raise SystemExit("--release-report is not a Pri Ink release evaluation report")
+    if report.get("format") != "pri-ink-release-eval" or int(report.get("version", 0)) < 2:
+        raise SystemExit("--release-report is not a current Pri Ink release evaluation report")
     if ckpt.get("stage") != "finetune":
         raise SystemExit("production export requires a real-writer fine-tuned checkpoint")
     if report.get("split") != "final-holdout":
-        raise SystemExit("production export requires the locked final-holdout report, not test/validation")
+        raise SystemExit("production export requires the locked final-holdout report")
     actual = sha256(checkpoint)
     if report.get("checkpointSha256") != actual:
         raise SystemExit("release report checkpoint SHA-256 does not match the checkpoint being exported")
@@ -55,9 +54,13 @@ def validate_release_report(checkpoint: Path, ckpt: dict, report_path: str | Non
     if report.get("passesReleaseTargets") is not True:
         raise SystemExit("release report does not pass Pri's production handwriting gates")
     metrics = report.get("metrics") or {}
-    required = ["exact", "cer", "worst_writer_exact", "high_conf_wrong_rate", "writers", "min_samples_per_writer"]
+    required = [
+        "samples", "writers", "min_samples_per_writer", "exact", "cer",
+        "worst_writer_exact", "critical_structure_exact", "safe_precision",
+        "safe_coverage", "safe_threshold"
+    ]
     if any(k not in metrics for k in required):
-        raise SystemExit("release report is missing required reliability metrics")
+        raise SystemExit("release report is missing required production reliability metrics")
     return True, report
 
 
@@ -66,7 +69,7 @@ def main():
     p.add_argument("checkpoint")
     p.add_argument("--out", default="ios/PriLearning.swiftpm/Resources/Models/PriInkFoundation.mlpackage")
     p.add_argument("--release-report", default=None,
-                   help="locked final-holdout report for this exact checkpoint; required to mark production-ready")
+                   help="locked final-holdout report for this exact checkpoint")
     args = p.parse_args()
 
     try:
@@ -122,13 +125,18 @@ def main():
     meta["pri.checkpointSha256"] = sha256(checkpoint)
     meta["pri.trainingStage"] = str(ckpt.get("stage") or "unknown")
     meta["pri.productionReady"] = "true" if production_ready else "false"
+
     if production_ready and report:
         metrics = report["metrics"]
         meta["pri.releaseSplit"] = str(report["split"])
+        meta["pri.releaseSamples"] = str(metrics["samples"])
         meta["pri.releaseExact"] = str(metrics["exact"])
         meta["pri.releaseCER"] = str(metrics["cer"])
         meta["pri.releaseWorstWriter"] = str(metrics["worst_writer_exact"])
-        meta["pri.releaseHighConfidenceWrong"] = str(metrics["high_conf_wrong_rate"])
+        meta["pri.releaseCriticalStructure"] = str(metrics["critical_structure_exact"])
+        meta["pri.releaseSafePrecision"] = str(metrics["safe_precision"])
+        meta["pri.releaseSafeCoverage"] = str(metrics["safe_coverage"])
+        meta["pri.releaseSafeThreshold"] = str(metrics["safe_threshold"])
         meta["pri.releaseWriters"] = str(metrics["writers"])
 
     out = Path(args.out); out.parent.mkdir(parents=True, exist_ok=True)
@@ -137,7 +145,7 @@ def main():
     if production_ready:
         print("PRODUCTION READY — exact checkpoint matched a passing locked final-holdout report.")
     else:
-        print("DEVELOPMENT MODEL ONLY — release builds will refuse this asset until --release-report passes.")
+        print("DEVELOPMENT MODEL ONLY — release builds refuse this asset until final-holdout release evidence passes.")
 
 
 if __name__ == "__main__":
