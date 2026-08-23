@@ -25,6 +25,36 @@ const pending = new Map();       // reqId → {resolve, context, overrides}
 const strokeListeners = new Set();
 let latestStrokes = [];
 
+const BASE_MATH_ALPHABET = [
+  ...'0123456789'.split(''),
+  '+', '-', '*', '/', '=', '(', ')', '[', ']', '<', '>', '<=', '>=', '!=', '±', '.', ',', ':', '%', '°',
+  'pi', 'theta', 'sqrt', 'sin', 'cos', 'tan', 'sec', 'csc', 'cot', 'ln', 'log'
+];
+
+/**
+ * Recover only ANSWER-BLIND notation from the visible question. This is a
+ * fallback for callers that do not yet pass recognitionContext explicitly.
+ * Single-letter variables must occur outside a normal word, so the x in
+ * "differentiate" cannot enter the alphabet. u/v are included because they are
+ * standard scratch variables in product/chain-rule working; no expected answer
+ * or mark-scheme text is ever read here.
+ */
+function inferredNotationContext() {
+  if (typeof document === 'undefined') return null;
+  const prompt = document.querySelector('.q-prompt');
+  const raw = String(prompt?.textContent || '');
+  const vars = new Set(['u', 'v']);
+  const common = new Set('xyzuvnktmabcrfgh'.split(''));
+  const re = /(?:^|[^A-Za-z])([A-Za-z])(?=[^A-Za-z]|$)/g;
+  for (const match of raw.matchAll(re)) {
+    const ch = match[1].toLowerCase();
+    if (common.has(ch)) vars.add(ch);
+  }
+  // TeX/KaTeX accessibility text can duplicate a formula. A set removes all
+  // duplication; only membership matters to the recogniser's tie-break prior.
+  return { alphabet: [...new Set([...BASE_MATH_ALPHABET, ...vars])] };
+}
+
 if (typeof window !== 'undefined') {
   window.__priInkReceive = (payload) => {
     if (!payload || typeof payload !== 'object') return;
@@ -39,7 +69,12 @@ if (typeof window !== 'undefined') {
         if (latestStrokes.length &&
             (payload.engine === 'native-primary-debug' || payload.engine === 'native-rescue')) {
           try {
-            reading = fuseNativeStrokeReading(payload, latestStrokes, entry.overrides || {}, entry.context || null);
+            reading = fuseNativeStrokeReading(
+              payload,
+              latestStrokes,
+              entry.overrides || {},
+              entry.context || inferredNotationContext()
+            );
             reading.engine = `${payload.engine}+line-stroke-fusion`;
           } catch {
             reading = payload;
@@ -78,6 +113,7 @@ function requestReading(message, timeoutMs, context = null) {
   });
 }
 
+/** Where the writing area is, and how much of it the shell may draw in. */
 function geometryOf(element) {
   const rect = element.getBoundingClientRect();
 
