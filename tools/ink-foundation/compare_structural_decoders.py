@@ -3,8 +3,9 @@
 
 The tool refuses apples-to-oranges comparisons: checkpoint hash, split, sample
 count, writer count, stage and (for same-writer development reports) frozen split
-metadata must match. It reports deltas but does not turn same-writer or synthetic
-results into production evidence and does not lower any release threshold.
+metadata must match. It accepts only explicitly named joint decoder variants,
+reports their search regime, and never turns same-writer or synthetic results into
+production evidence or lowers any release threshold.
 """
 from __future__ import annotations
 
@@ -46,7 +47,7 @@ def _same(name: str, baseline: dict, candidate: dict):
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("baseline", help="complete-link evaluation JSON")
-    p.add_argument("candidate", help="joint decoder evaluation JSON")
+    p.add_argument("candidate", help="explicit joint decoder evaluation JSON")
     p.add_argument("--out", default=None)
     args = p.parse_args()
 
@@ -57,8 +58,12 @@ def main():
 
     if baseline.get("decoder", "complete-link") != "complete-link":
         raise SystemExit("baseline report must use decoder=complete-link")
-    if candidate.get("decoder") != "joint":
-        raise SystemExit("candidate report must use decoder=joint")
+    candidate_decoder = str(candidate.get("decoder", ""))
+    if candidate_decoder not in {"joint", "joint-general", "joint-auto"}:
+        raise SystemExit(
+            "candidate report must use an explicit joint decoder: "
+            "joint, joint-general, or joint-auto"
+        )
 
     for key in ("stage", "checkpointSha256", "samples", "writers"):
         _same(key, baseline, candidate)
@@ -91,7 +96,8 @@ def main():
     result = {
         "architectureVersion": 4,
         "productionReady": False,
-        "comparison": "complete-link-vs-joint-contiguous-v1",
+        "comparison": f"complete-link-vs-{candidate_decoder}",
+        "candidateDecoder": candidate_decoder,
         "stage": baseline.get("stage"),
         "checkpointSha256": baseline.get("checkpointSha256"),
         "split": baseline.get("split"),
@@ -105,6 +111,7 @@ def main():
     }
 
     print("\nPri Ink Structural V4 — DECODER COMPARISON\n")
+    print(f"candidate decoder: {candidate_decoder}")
     print(f"stage: {result['stage']} · samples: {result['samples']} · writers: {result['writers']}")
     for key, _, _ in METRICS:
         row = deltas.get(key)
