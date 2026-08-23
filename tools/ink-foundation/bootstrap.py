@@ -1,17 +1,15 @@
 #!/usr/bin/env python3
-"""One-writer development bootstrap for Pri Ink Foundation.
+"""One-writer development bootstrap for Pri Ink Foundation V3.
 
-This exists for the exact situation where Pri has only one consenting real
-Apple-Pencil writer available. It is deliberately NOT release evidence.
+This is the high-accuracy personal-development path when only one consenting
+Apple-Pencil writer is available. It is deliberately NOT release evidence.
 
 Pipeline role:
-  synthetic pretraining -> one-writer bootstrap adaptation -> DEBUG Core ML test
+  V3 synthetic pretraining -> one-writer real-Pencil adaptation -> DEBUG Core ML
 
-The script creates a deterministic expression-level holdout from the one real
-writer only to detect gross overfitting while selecting a development
-checkpoint. Because the same human appears on both sides, the resulting metric
-is NOT writer-generalisation evidence and can never satisfy Pri's production
-release gate.
+The same human appears in train/dev, so no metric from this script is evidence
+of arbitrary-writer generalisation. The checkpoint stage remains `bootstrap` and
+cannot pass Pri's production promotion gate.
 """
 from __future__ import annotations
 
@@ -28,7 +26,7 @@ from torch.utils.data import DataLoader
 
 from data import BOS_ID, EOS_ID, PAD_ID, VOCAB, Example, InkDataset, corpus_files, load_examples
 from model import ModelConfig, PriInkFoundation
-from train import evaluate, load_initial_backbone, seed_everything
+from train import ctc_alignment_loss, evaluate, load_initial_backbone, seed_everything
 
 
 def make_bootstrap_split(examples: list[Example], seed: int, fraction: float):
@@ -66,22 +64,23 @@ def make_bootstrap_split(examples: list[Example], seed: int, fraction: float):
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--corpus", default="client/test/ink-corpus")
-    p.add_argument("--init", required=True, help="compatible synthetic pretraining checkpoint")
+    p.add_argument("--init", required=True, help="compatible V3 synthetic pretraining checkpoint")
     p.add_argument("--out", default="tools/ink-foundation/runs/pri-ink-bootstrap.pt")
-    p.add_argument("--epochs", type=int, default=40)
+    p.add_argument("--epochs", type=int, default=50)
     p.add_argument("--batch", type=int, default=8)
-    p.add_argument("--lr", type=float, default=5e-5)
+    p.add_argument("--lr", type=float, default=4e-5)
     p.add_argument("--weight-decay", type=float, default=0.03)
+    p.add_argument("--ctc-loss", type=float, default=0.16)
     p.add_argument("--seed", type=int, default=20260823)
     p.add_argument("--validation-fraction", type=float, default=0.20)
     p.add_argument("--workers", type=int, default=min(4, os.cpu_count() or 1))
     p.add_argument("--device", default="auto")
-    p.add_argument("--d-model", type=int, default=192)
-    p.add_argument("--stroke-layers", type=int, default=6)
-    p.add_argument("--decoder-layers", type=int, default=4)
+    p.add_argument("--d-model", type=int, default=256)
+    p.add_argument("--stroke-layers", type=int, default=8)
+    p.add_argument("--decoder-layers", type=int, default=6)
     p.add_argument("--max-points", type=int, default=768)
     p.add_argument("--max-tokens", type=int, default=96)
-    p.add_argument("--patience", type=int, default=8)
+    p.add_argument("--patience", type=int, default=10)
     args = p.parse_args()
 
     seed_everything(args.seed)
@@ -109,6 +108,7 @@ def main():
         decoder_layers=args.decoder_layers,
         max_points=args.max_points,
         max_tokens=args.max_tokens,
+        architecture_version=3,
     )
     train_ds = InkDataset(
         examples, "train", cfg.max_points, cfg.max_tokens,
@@ -155,7 +155,7 @@ def main():
     stale = 0
 
     print(
-        f"stage=bootstrap device={device} writer={writer} "
+        f"stage=bootstrap architecture=v3 device={device} writer={writer} "
         f"real-train={train_count} same-writer-dev-val={val_count}"
     )
     print(f"initialized backbone from {args.init}")
@@ -164,45 +164,49 @@ def main():
 
     for epoch in range(1, args.epochs + 1):
         model.train()
-        running = 0.0
+        running = running_token = running_ctc = 0.0
         seen = 0
         for batch in train_loader:
             labels = batch["tokens"].to(device)
+            point_valid = batch["point_valid"].to(device)
+            physical_tokens = batch["ctc_tokens"].to(device)
+            physical_lengths = batch["ctc_length"].to(device)
             opt.zero_grad(set_to_none=True)
             with torch.autocast(
                 device_type=device.type, dtype=torch.float16, enabled=device.type == "cuda"
             ):
-                logits, _ = model(
-                    batch["points"].to(device),
-                    batch["point_valid"].to(device),
+                logits, _, ctc_logits, _ = model.forward_with_aux(
+                    batch["points"].to(device), point_valid,
                     batch["raster"].to(device),
                 )
-                loss = F.cross_entropy(
+                token_loss = F.cross_entropy(
                     logits.reshape(-1, logits.shape[-1]),
-                    labels.reshape(-1),
-                    ignore_index=PAD_ID,
-                    label_smoothing=0.04,
+                    labels.reshape(-1), ignore_index=PAD_ID, label_smoothing=0.035,
                 )
+                ctc_loss = ctc_alignment_loss(
+                    ctc_logits.float(), physical_tokens, physical_lengths, point_valid
+                )
+                loss = token_loss + args.ctc_loss * ctc_loss
             scaler.scale(loss).backward()
             scaler.unscale_(opt)
             torch.nn.utils.clip_grad_norm_(model.parameters(), 0.8)
-            scaler.step(opt)
-            scaler.update()
-            sched.step()
+            scaler.step(opt); scaler.update(); sched.step()
             running += float(loss.detach())
+            running_token += float(token_loss.detach())
+            running_ctc += float(ctc_loss.detach())
             seen += 1
 
         val = evaluate(model, val_loader, device)
         score = val["exact"] - 0.40 * val["cer"]
         print(
             f"epoch {epoch:03d} train={running/max(seen,1):.4f} "
+            f"token={running_token/max(seen,1):.4f} ctc={running_ctc/max(seen,1):.4f} "
             f"same-writer-dev-val={val['loss']:.4f} "
             f"exact={100*val['exact']:.2f}% CER={100*val['cer']:.2f}%"
         )
 
         if score > best_score + 1e-5:
-            best_score = score
-            stale = 0
+            best_score = score; stale = 0
             torch.save({
                 "model": model.state_dict(),
                 "config": cfg.to_dict(),
@@ -215,18 +219,21 @@ def main():
                 "validation": val,
                 "seed": args.seed,
                 "stage": "bootstrap",
+                "architecture_version": 3,
                 "initialized_from": str(args.init),
                 "release_eligible": False,
                 "bootstrap_train_samples": train_count,
                 "bootstrap_validation_samples": val_count,
+                "auxiliary_losses": {"ctc": args.ctc_loss},
             }, out)
             manifest_path.write_text(json.dumps({
                 "format": "pri-ink-foundation",
-                "version": 2,
+                "version": 3,
+                "architectureVersion": 3,
                 "stage": "bootstrap",
                 "evidence": "same-writer development holdout — NOT generalisation evidence",
                 "releaseEligible": False,
-                "decoder": "parallel-output-queries",
+                "decoder": "parallel-output-queries+2d-visual+physical-ctc-aux",
                 "checkpoint": out.name,
                 "config": cfg.to_dict(),
                 "vocab": VOCAB,
@@ -236,6 +243,7 @@ def main():
                 "sameWriterValidationSamples": val_count,
                 "seed": args.seed,
                 "initializedFrom": str(args.init),
+                "auxiliaryLossWeights": {"ctc": args.ctc_loss},
                 "holdoutPolicy": "No test/final-holdout data is read. Production release remains forbidden.",
             }, indent=2), encoding="utf-8")
         else:
