@@ -35,7 +35,10 @@ RELATION_TO_ID = {name: i for i, name in enumerate(RELATIONS)}
 
 @dataclass(frozen=True)
 class StructuralConfig:
-    feature_dim: int = 14
+    # 14 original online channels + four stroke-local shape channels
+    # (local x/y/dx/dy). The local channels make a glyph's trajectory largely
+    # invariant to expression width, absolute position and surrounding layout.
+    feature_dim: int = 18
     geometry_dim: int = 8
     d_model: int = 256
     nhead: int = 8
