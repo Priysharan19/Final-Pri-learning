@@ -5,7 +5,7 @@ not generic OCR:
   * original Pencil point stream -> stroke Transformer;
   * high-resolution raster -> a TRUE 2-D visual token grid (row + column position
     survive; superscripts/fractions are not vertically averaged away);
-  * writer/style representation trained to be stable across expressions;
+  * cross-modal writer/style representation from stroke AND 2-D visual evidence;
   * parallel whole-expression decoder for one-call Core ML inference;
   * training-only CTC alignment head over the online point sequence, so the
     encoder learns monotonic symbol evidence instead of relying only on a
@@ -104,11 +104,12 @@ class PriInkFoundation(nn.Module):
         )
         self.raster_encoder = RasterEncoder(config.d_model)
 
-        # Content-robust style path. Writer-ID supervision plus supervised
-        # contrastive loss (train.py) pressures this vector to be similar for two
-        # different expressions by the same hand and different across writers.
+        # Writer style must not be inferred from the point stream alone. V3
+        # pools both encoded modalities and learns a shared representation. This
+        # gives local CNN adaptation a direct route into writer/style conditioning
+        # while preserving all 2-D visual tokens for the main decoder.
         self.style_encoder = nn.Sequential(
-            nn.Linear(config.d_model, config.style_dim), nn.GELU(),
+            nn.Linear(config.d_model * 2, config.style_dim), nn.GELU(),
             nn.Linear(config.style_dim, config.d_model), nn.LayerNorm(config.d_model),
         )
         self.fusion_norm = nn.LayerNorm(config.d_model)
@@ -143,7 +144,7 @@ class PriInkFoundation(nn.Module):
 
     def encode(self, points: torch.Tensor, point_valid: torch.Tensor,
                raster: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-        """Return fused memory, padding mask, style, and aligned stroke tokens."""
+        """Return fused memory, padding mask, cross-modal style, and stroke tokens."""
         b, n, _ = points.shape
         if n > self.config.max_points:
             raise ValueError(f"point sequence {n} exceeds max_points={self.config.max_points}")
@@ -152,11 +153,16 @@ class PriInkFoundation(nn.Module):
         stroke = self.point_proj(points) + self.point_pos(pos)[None, :, :] + self.stroke_modality
         stroke = self.stroke_encoder(stroke, src_key_padding_mask=~point_valid)
 
-        pooled = self._masked_mean(stroke, point_valid)
-        style = self.style_encoder(pooled)
-        styled_stroke = stroke + style[:, None, :]
+        # Compute unconditioned visual tokens first so the style embedding can
+        # actually learn writer-specific CNN morphology. Style is then fed back
+        # into both modalities before whole-expression decoding.
+        visual_base = self.raster_encoder(raster) + self.raster_modality
+        pooled_stroke = self._masked_mean(stroke, point_valid)
+        pooled_visual = visual_base.mean(dim=1)
+        style = self.style_encoder(torch.cat([pooled_stroke, pooled_visual], dim=-1))
 
-        visual = self.raster_encoder(raster) + self.raster_modality + style[:, None, :]
+        styled_stroke = stroke + style[:, None, :]
+        visual = visual_base + style[:, None, :]
         visual_valid = torch.ones((b, visual.shape[1]), dtype=torch.bool, device=visual.device)
 
         memory = self.fusion_norm(torch.cat([styled_stroke, visual], dim=1))
