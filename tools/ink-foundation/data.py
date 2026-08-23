@@ -24,18 +24,31 @@ SPECIAL = ["<pad>", "<bos>", "<eos>", "<unk>"]
 # handwritten mark. Function names stay character-by-character so the output
 # sequence can still align to the three Pencil glyphs in "sin", "cos", etc.
 WORDS = ["theta", "sqrt", "pi", "<=", ">=", "!="]
-CHARS = list("0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ+-*/=().:^_<>!%,") + ["±", "°"]
+# Prime is first-class. A differentiation engine that cannot emit y' from the
+# model itself is not a production maths recogniser; geometry repair remains a
+# fallback, not the vocabulary definition.
+CHARS = list("0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ+-*/=().:^_<>!%,'") + ["±", "°"]
 VOCAB = SPECIAL + WORDS + [c for c in CHARS if c not in WORDS]
 TOKEN_TO_ID = {t: i for i, t in enumerate(VOCAB)}
 ID_TO_TOKEN = {i: t for t, i in TOKEN_TO_ID.items()}
 PAD_ID = TOKEN_TO_ID["<pad>"]
-BOS_ID = TOKEN_TO_ID["<bos>"]  # reserved for checkpoint compatibility; one-pass model does not emit it
+BOS_ID = TOKEN_TO_ID["<bos>"]
 EOS_ID = TOKEN_TO_ID["<eos>"]
 UNK_ID = TOKEN_TO_ID["<unk>"]
 
 
+def canonical_text(text: str) -> str:
+    return (str(text)
+            .replace("×", "*")
+            .replace("÷", "/")
+            .replace("−", "-")
+            .replace("′", "'")
+            .replace("’", "'")
+            .replace(" ", ""))
+
+
 def tokenize(text: str) -> list[str]:
-    text = str(text).replace("×", "*").replace("÷", "/").replace("−", "-").replace(" ", "")
+    text = canonical_text(text)
     out: list[str] = []
     i = 0
     longest = sorted(WORDS, key=len, reverse=True)
@@ -93,7 +106,7 @@ def load_examples(paths: Iterable[Path]) -> list[Example]:
             raise RuntimeError(f"writer leakage: {writer!r} appears in both {prior!r} and {split!r}")
         writer_split[writer] = split
         for sample in doc.get("samples") or []:
-            target = str(sample.get("target") or "").strip()
+            target = canonical_text(sample.get("target") or "").strip()
             strokes = sample.get("strokes") or []
             if target and strokes:
                 rows.append(Example(writer, split, target, strokes, str(path)))
@@ -131,18 +144,20 @@ def point_features(strokes: list[dict], max_points: int, augment: bool = False) 
     scale = max(max_x - min_x, max_y - min_y, 1.0)
     cx, cy = (min_x + max_x) * 0.5, (min_y + max_y) * 0.5
 
-    # Modest only. Pri's old CNN experiments already showed that excessive
-    # distortion can improve mean accuracy while destroying the worst writer.
+    # Modest spatial augmentation plus capture-domain augmentation. Pressure and
+    # time are useful writer signals but must not become device fingerprints.
     shear = random.uniform(-0.10, 0.10) if augment else 0.0
     global_scale = random.uniform(0.92, 1.08) if augment else 1.0
     pressure_gain = random.uniform(0.90, 1.10) if augment else 1.0
     time_gain = random.uniform(0.85, 1.18) if augment else 1.0
+    x_jitter = random.uniform(-0.015, 0.015) if augment else 0.0
+    y_jitter = random.uniform(-0.015, 0.015) if augment else 0.0
 
     seq = []
     previous = None
     for si, pi, p, stroke_len in raw:
-        x = ((_point_num(p, "x") - cx) / scale) * global_scale
-        y = ((_point_num(p, "y") - cy) / scale) * global_scale
+        x = ((_point_num(p, "x") - cx) / scale) * global_scale + x_jitter
+        y = ((_point_num(p, "y") - cy) / scale) * global_scale + y_jitter
         x = x - shear * y
         t = _point_num(p, "t", default=pi / 120.0) * time_gain
         force = max(0.0, min(2.0, _point_num(p, "p", "force") * pressure_gain))
@@ -222,8 +237,19 @@ def rasterize(strokes: list[dict], height: int, width: int, augment: bool = Fals
         else:
             draw.line(xy, fill=255, width=pen, joint="curve")
     arr = np.asarray(image, dtype=np.float32) / 255.0
-    if augment and random.random() < 0.25:
-        arr = np.clip(arr * random.uniform(0.90, 1.08), 0, 1)
+    if augment:
+        if random.random() < 0.25:
+            arr = np.clip(arr * random.uniform(0.90, 1.08), 0, 1)
+        # Tiny raster translation prevents the visual branch from learning one
+        # collector frame rather than handwriting. Do not rotate maths globally:
+        # superscript/fraction geometry is semantic evidence.
+        if random.random() < 0.35:
+            sx, sy = random.randint(-3, 3), random.randint(-2, 2)
+            arr = np.roll(arr, shift=(sy, sx), axis=(0, 1))
+            if sy > 0: arr[:sy, :] = 0
+            elif sy < 0: arr[sy:, :] = 0
+            if sx > 0: arr[:, :sx] = 0
+            elif sx < 0: arr[:, sx:] = 0
     return arr[None, :, :]
 
 
@@ -256,5 +282,5 @@ class InkDataset(Dataset):
             "raster": torch.from_numpy(raster),
             "tokens": torch.from_numpy(padded),
             "writer": torch.tensor(self.writer_to_id[row.writer], dtype=torch.long),
-            "target_text": row.target,
+            "target_text": canonical_text(row.target),
         }
