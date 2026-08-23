@@ -19,27 +19,29 @@ const NICE = { pi: 'π', theta: 'θ', sqrt: '√', percent: '%' };
 const showSym = s => NICE[s] || s;
 
 // ── Which surface, which engine ──────────────────────────────────────────────
-// In the iPad app the ink is a PencilKit canvas and the reading comes from the
-// on-device Vision handwriting model. Anywhere else — a browser, the dev
-// server — it is the web canvas and the web engine. The decision is made once,
-// at module load, and nothing below this line depends on the answer.
+// In the iPad app the writing surface is still the native PencilKit canvas — it
+// gives us the highest-quality Pencil stroke stream — but recognition is owned
+// by Pri's custom stroke engine on EVERY platform. Apple Vision is deliberately
+// demoted to an emergency fallback for the rare case where the Pri engine
+// throws or produces no readable line at all. This keeps iPad recognition on
+// the same trainable, personalisable maths model as the browser instead of
+// bypassing it with a generic text recogniser.
 const NATIVE_INK = nativeInkAvailable();
 const Surface = NATIVE_INK ? NativeInkCanvas : InkCanvas;
 
 /**
- * Vision reads lines. A line too short to be text — a lone "x", a bare "3" —
- * can come back with nothing at all, and a step the student wrote must never
- * vanish because of it. Those lines, and only those, are read by the web
- * engine instead, on that line's own strokes.
+ * Vision is fallback-only. If it ever has to run and leaves a short line unread
+ * (a lone "x", a bare "3"), heal that line with Pri's own recogniser so a step
+ * the student wrote never disappears.
  */
-function readUnreadLines(reading, strokes, overrides) {
+function readUnreadLines(reading, strokes, overrides, ctx = null) {
   let healed = false;
   const lines = reading.lines.map((line, li) => {
     if (!line.unread || !line.strokeIdxs?.length) return line;
     const own = line.strokeIdxs.map(i => strokes[i]).filter(Boolean);
     if (!own.length) return line;
     let fallback;
-    try { fallback = recognize(own, overrides); } catch { return line; }
+    try { fallback = recognize(own, overrides, ctx); } catch { return line; }
     const first = fallback.lines[0];
     if (!first || !first.text) return line;
     healed = true;
@@ -113,8 +115,11 @@ function readingConfidence(result) {
  * focusSymbol: id of a glyph the caller wants checked. Its picker opens on the
  * student's behalf with the first alternative focused, so a correction is one
  * tap rather than a hunt.
+ * recognitionContext: optional safe question context consumed by recognize().
+ * It must never be strong enough to rewrite confident wrong work; the recogniser
+ * itself enforces the capped/gated context policy.
  */
-export default function InkAnswer({ onRecognized, height = 300, disabled, lineVerdicts = null, focusSymbol = null }) {
+export default function InkAnswer({ onRecognized, height = 300, disabled, lineVerdicts = null, focusSymbol = null, recognitionContext = null }) {
   const canvasRef = useRef(null);
   const [tool, setTool] = useState('pen');
   const [finger, setFinger] = useState(false);
@@ -144,18 +149,39 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
   }, [onRecognized]);
 
   const runRecognition = useCallback((strokes, ovr) => {
-    if (!NATIVE_INK) { publish(recognize(strokes, ovr), strokes); return; }
-    // The shell reads on its own thread, so replies can land out of order —
-    // only the newest request is allowed to reach the panel.
     const seq = ++readSeqRef.current;
+
+    // Pri owns recognition. PencilKit supplies excellent vector strokes, then
+    // our trainable maths recogniser reads those exact vectors. This is the
+    // same engine on iPad, web and desktop, so fixes and personal corrections
+    // improve every platform instead of being skipped by the native app.
+    let local = null;
+    try { local = recognize(strokes, ovr, recognitionContext); } catch { local = null; }
+    if (seq !== readSeqRef.current) return;
+    if (local?.lines?.some(line => line.text)) {
+      publish(local, strokes);
+      return;
+    }
+
+    // A browser has no second local recogniser. Publish a stable empty result
+    // rather than throwing through the answer surface.
+    if (!NATIVE_INK) {
+      publish(local || { lines: [], text: '', symbols: [], minConf: 1, margin: 1, weakest: null }, strokes);
+      return;
+    }
+
+    // Emergency fallback only. Vision remains completely on-device, costs no
+    // API money, and is asked only when Pri returned nothing at all.
     nativeInk.recognize(ovr).then(reading => {
       if (seq !== readSeqRef.current) return;
       publish(
-        reading ? readUnreadLines(reading, strokes, ovr) : recognize(strokes, ovr),
+        reading
+          ? readUnreadLines(reading, strokes, ovr, recognitionContext)
+          : (local || { lines: [], text: '', symbols: [], minConf: 1, margin: 1, weakest: null }),
         strokes
       );
     });
-  }, [publish]);
+  }, [publish, recognitionContext]);
 
   const onStrokesChange = useCallback((strokes) => {
     strokesRef.current = strokes;
