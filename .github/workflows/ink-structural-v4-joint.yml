@@ -7,6 +7,7 @@ on:
       - 'tools/ink-foundation/test_structural_joint_decode.py'
       - 'tools/ink-foundation/structural_joint_general.py'
       - 'tools/ink-foundation/test_structural_joint_general.py'
+      - 'tools/ink-foundation/structural_decoder_registry.py'
       - 'tools/ink-foundation/compare_structural_decoders.py'
       - 'tools/ink-foundation/evaluate_structural.py'
       - 'tools/ink-foundation/evaluate_structural_dev.py'
@@ -17,6 +18,7 @@ on:
       - 'tools/ink-foundation/test_structural_joint_decode.py'
       - 'tools/ink-foundation/structural_joint_general.py'
       - 'tools/ink-foundation/test_structural_joint_general.py'
+      - 'tools/ink-foundation/structural_decoder_registry.py'
       - 'tools/ink-foundation/compare_structural_decoders.py'
       - 'tools/ink-foundation/evaluate_structural.py'
       - 'tools/ink-foundation/evaluate_structural_dev.py'
@@ -50,6 +52,7 @@ jobs:
             tools/ink-foundation/test_structural_joint_decode.py \
             tools/ink-foundation/structural_joint_general.py \
             tools/ink-foundation/test_structural_joint_general.py \
+            tools/ink-foundation/structural_decoder_registry.py \
             tools/ink-foundation/compare_structural_decoders.py \
             tools/ink-foundation/evaluate_structural.py \
             tools/ink-foundation/evaluate_structural_dev.py
@@ -60,13 +63,14 @@ jobs:
       - name: Non-contiguous exact joint decoder deterministic contracts
         run: python tools/ink-foundation/test_structural_joint_general.py
 
-      - name: Evaluator exposes explicit baseline and joint modes
+      - name: Evaluator exposes every inference regime explicitly
         run: |
           python tools/ink-foundation/evaluate_structural.py --help > /tmp/v4-eval-help.txt
-          grep -q -- '--decoder {complete-link,joint}' /tmp/v4-eval-help.txt
+          grep -q -- '--decoder {complete-link,joint,joint-general,joint-auto}' /tmp/v4-eval-help.txt
+          grep -q -- '--general-max-strokes' /tmp/v4-eval-help.txt
           grep -q -- '--grouping-temperature' /tmp/v4-eval-help.txt
           grep -q -- '--partition-margin-threshold' /tmp/v4-eval-help.txt
-          echo 'V4 decoder comparison CLI contract: PASS'
+          echo 'V4 explicit decoder registry CLI contract: PASS'
 
       - name: Decoder comparison refuses evidence mismatch
         run: |
@@ -90,9 +94,10 @@ jobs:
               'evidence': 'research evaluation only; does not promote a V4 model',
           }
           baseline = dict(common, decoder='complete-link')
-          joint = dict(common, decoder='joint', exactExpressionAccuracy=0.70,
+          joint = dict(common, decoder='joint-auto', exactExpressionAccuracy=0.70,
                        characterErrorRate=0.08,
-                       jointPartition={'meanMargin': 0.2, 'minMargin': 0.1})
+                       jointPartition={'meanMargin': 0.2, 'minMargin': 0.1,
+                                       'actualSearchRegimes': {'joint-auto-v1:general': 10}})
           Path('/tmp/v4-baseline.json').write_text(json.dumps(baseline))
           Path('/tmp/v4-joint.json').write_text(json.dumps(joint))
           PY
@@ -103,6 +108,7 @@ jobs:
           from pathlib import Path
           report = json.loads(Path('/tmp/v4-compare.json').read_text())
           assert report['productionReady'] is False
+          assert report['candidateDecoder'] == 'joint-auto'
           assert report['deltas']['exactExpressionAccuracy']['direction'] == 'improved'
           candidate = json.loads(Path('/tmp/v4-joint.json').read_text())
           candidate['checkpointSha256'] = 'different-checkpoint'
