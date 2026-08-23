@@ -19,20 +19,19 @@ const NICE = { pi: 'π', theta: 'θ', sqrt: '√', percent: '%' };
 const showSym = s => NICE[s] || s;
 
 // ── Which surface, which engine ──────────────────────────────────────────────
-// In the iPad app the writing surface is still the native PencilKit canvas — it
-// gives us the highest-quality Pencil stroke stream — but recognition is owned
-// by Pri's custom stroke engine on EVERY platform. Apple Vision is deliberately
-// demoted to an emergency fallback for the rare case where the Pri engine
-// throws or produces no readable line at all. This keeps iPad recognition on
-// the same trainable, personalisable maths model as the browser instead of
-// bypassing it with a generic text recogniser.
+// PencilKit is the native capture surface. Recognition order on iPad is now:
+//   1. Pri's bundled Core ML foundation model, when a validated asset exists;
+//   2. Pri's mature JS stroke/CNN/grammar recogniser;
+//   3. the native Vision/geometry reader as an emergency no-result rescue.
+// Every stage is local. Browsers simply begin at stage 2.
 const NATIVE_INK = nativeInkAvailable();
 const Surface = NATIVE_INK ? NativeInkCanvas : InkCanvas;
+const EMPTY_READING = { lines: [], text: '', symbols: [], minConf: 1, margin: 1, weakest: null };
 
 /**
- * Vision is fallback-only. If it ever has to run and leaves a short line unread
- * (a lone "x", a bare "3"), heal that line with Pri's own recogniser so a step
- * the student wrote never disappears.
+ * Native rescue reads lines. If it leaves a short line unread (a lone "x", a
+ * bare "3"), heal that line with Pri's JS engine so a written step cannot
+ * silently disappear.
  */
 function readUnreadLines(reading, strokes, overrides, ctx = null) {
   let healed = false;
@@ -49,9 +48,6 @@ function readUnreadLines(reading, strokes, overrides, ctx = null) {
       ...line,
       text: first.text,
       box: first.box,
-      // Ids are namespaced so a correction on a web-read line cannot collide
-      // with one on a Vision-read line, and stroke indexes are mapped back to
-      // the page so "learn from this correction" trains on the right ink.
       symbols: first.symbols.map(sym => ({
         ...sym,
         id: `w${li}_${sym.id}`,
@@ -62,24 +58,10 @@ function readUnreadLines(reading, strokes, overrides, ctx = null) {
     };
   });
   if (!healed) return reading;
-  // The engine's own confidence summary described the reading before the swap;
-  // dropping it makes the caller derive a fresh one from the symbols that are
-  // actually being shown.
   return { lines, text: lines.map(l => l.text).join('\n') };
 }
 
 // ── How sure the reading is ──────────────────────────────────────────────────
-// The line a mark is awarded or withheld on travels with the engine's own
-// account of how much of a guess it was — minConf, margin and the glyph
-// responsible — so a caller can stop and ask before a wrong reading is marked.
-// Two things are added on the way through: the id of the glyph the engine
-// named, which is what the tap-to-correct picker opens on, and the runner-up
-// worth showing beside it. A runner-up inside the glyph's own CNN class is the
-// same ink under another name (1/l, 0/o) and is no use as a question, so it is
-// skipped here exactly as the engine skips it when measuring the margin.
-// Older builds returned none of this; the same three are then derived from the
-// per-symbol confidences that have always been there, so a caller sees one
-// shape either way.
 const rivalOf = (s) => {
   const cls = classOfSymbol(s.sym);
   return (s.alts || []).find(a => a.sym !== s.sym && classOfSymbol(a.sym) !== cls) || null;
@@ -112,12 +94,8 @@ function readingConfidence(result) {
  * lineVerdicts: optional array aligned with recognised lines, e.g.
  * [{status:'ok'}, {status:'break', note:'…'}] — drawn as a teacher-style
  * ✓/✗ overlay on the ink itself and as badges in the reading panel.
- * focusSymbol: id of a glyph the caller wants checked. Its picker opens on the
- * student's behalf with the first alternative focused, so a correction is one
- * tap rather than a hunt.
+ * focusSymbol: id of a glyph the caller wants checked.
  * recognitionContext: optional safe question context consumed by recognize().
- * It must never be strong enough to rewrite confident wrong work; the recogniser
- * itself enforces the capped/gated context policy.
  */
 export default function InkAnswer({ onRecognized, height = 300, disabled, lineVerdicts = null, focusSymbol = null, recognitionContext = null }) {
   const canvasRef = useRef(null);
@@ -125,7 +103,7 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
   const [finger, setFinger] = useState(false);
   const [rec, setRec] = useState({ lines: [], text: '' });
   const [overrides, setOverrides] = useState({});
-  const [picker, setPicker] = useState(null); // {id, alts}
+  const [picker, setPicker] = useState(null);
   const [extraHeight, setExtraHeight] = useState(0);
   const timerRef = useRef(null);
   const readSeqRef = useRef(0);
@@ -151,35 +129,46 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
   const runRecognition = useCallback((strokes, ovr) => {
     const seq = ++readSeqRef.current;
 
-    // Pri owns recognition. PencilKit supplies excellent vector strokes, then
-    // our trainable maths recogniser reads those exact vectors. This is the
-    // same engine on iPad, web and desktop, so fixes and personal corrections
-    // improve every platform instead of being skipped by the native app.
-    let local = null;
-    try { local = recognize(strokes, ovr, recognitionContext); } catch { local = null; }
-    if (seq !== readSeqRef.current) return;
-    if (local?.lines?.some(line => line.text)) {
-      publish(local, strokes);
-      return;
-    }
+    const readWithJS = () => {
+      try { return recognize(strokes, ovr, recognitionContext); }
+      catch { return null; }
+    };
 
-    // A browser has no second local recogniser. Publish a stable empty result
-    // rather than throwing through the answer surface.
+    // Browser/dev: Pri JS is the complete local engine.
     if (!NATIVE_INK) {
-      publish(local || { lines: [], text: '', symbols: [], minConf: 1, margin: 1, weakest: null }, strokes);
+      publish(readWithJS() || EMPTY_READING, strokes);
       return;
     }
 
-    // Emergency fallback only. Vision remains completely on-device, costs no
-    // API money, and is asked only when Pri returned nothing at all.
-    nativeInk.recognize(ovr).then(reading => {
+    // iPad: first ask the Pri-owned Core ML foundation model. Development builds
+    // without a promoted model return an empty result immediately and continue.
+    nativeInk.foundationRecognize(ovr).then(foundation => {
       if (seq !== readSeqRef.current) return;
-      publish(
-        reading
-          ? readUnreadLines(reading, strokes, ovr, recognitionContext)
-          : (local || { lines: [], text: '', symbols: [], minConf: 1, margin: 1, weakest: null }),
-        strokes
-      );
+      if (foundation?.lines?.some(line => line.text)) {
+        publish(foundation, strokes);
+        return;
+      }
+
+      // The existing custom engine remains a strong independent local opinion
+      // and protects the product while the real-writer corpus grows.
+      const local = readWithJS();
+      if (seq !== readSeqRef.current) return;
+      if (local?.lines?.some(line => line.text)) {
+        publish(local, strokes);
+        return;
+      }
+
+      // Last resort only. This path is still fully on-device and exists to make
+      // a missing/failed model an accuracy degradation rather than lost work.
+      nativeInk.recognize(ovr).then(reading => {
+        if (seq !== readSeqRef.current) return;
+        publish(
+          reading
+            ? readUnreadLines(reading, strokes, ovr, recognitionContext)
+            : (local || EMPTY_READING),
+          strokes
+        );
+      });
     });
   }, [publish, recognitionContext]);
 
@@ -192,8 +181,6 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
   useEffect(() => { ensurePersonalLoaded(); }, []);
   useEffect(() => () => timerRef.current && clearTimeout(timerRef.current), []);
 
-  // Open on a newly-named glyph only. Re-running on every recognition would
-  // reopen the picker the moment a correction closed it.
   useEffect(() => {
     if (!focusSymbol) { focusedRef.current = null; return; }
     if (focusedRef.current === focusSymbol) return;
@@ -211,10 +198,8 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
     const next = { ...overrides, [id]: sym };
     setOverrides(next);
     setPicker(null);
-    // Learn from the correction: this exact ink now belongs to that symbol.
-    // Unless the reading could not tie the symbol to one mark exactly (`approx`)
-    // — then the strokes under it are a fair guess, and training on a guess
-    // teaches the engine the wrong shape.
+    // Corrections remain local training evidence regardless of which Pri model
+    // produced the original reading. Approximate ownership is never learned.
     const symbol = rec.lines.flatMap(l => l.symbols).find(s => s.id === id);
     if (symbol?.strokeIdxs?.length && !symbol.approx) {
       const strokes = symbol.strokeIdxs.map(i => strokesRef.current[i]).filter(Boolean);
@@ -275,7 +260,6 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
                 const b = line.box;
                 return (
                   <React.Fragment key={li}>
-                    {/* teacher-style box drawn around the whole step */}
                     <span
                       className={`ink-linebox ${good ? 'good' : 'bad'}`}
                       style={{ left: b.x - 9, top: b.y - 7, width: b.w + 18, height: b.h + 14 }}
