@@ -77,7 +77,7 @@ def main():
     if validity is not None:
         if validity.get("baseCheckpointSha256") != candidate.get("checkpointSha256"):
             raise SystemExit("candidate component validity metadata is not tied to candidate base checkpoint")
-        if validity.get("componentValidityVersion") != 1:
+        if validity.get("componentValidityVersion") != 2:
             raise SystemExit("candidate component validity metadata has unsupported version")
 
     deltas = {}
