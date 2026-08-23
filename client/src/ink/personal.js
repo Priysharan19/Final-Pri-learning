@@ -5,13 +5,19 @@
 // stock shapes. The recogniser literally learns YOUR handwriting — and each
 // profile on the iPad keeps its OWN hand: templates are namespaced by profile,
 // so a sibling's loopy 2s never bleed into your model.
+//
+// A local development build may additionally contain
+// `ink-bootstrap-profile.json`, generated from a consenting real-Pencil corpus
+// by `npm run ink:personalize`. That file is gitignored and never persisted back
+// to the database; it exists only to make the iPad test build use the writer's
+// already-collected real shapes instead of pretending those samples do not exist.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const DB_NAME = 'pri-ink-personal';
 const STORE = 'templates';
 const MAX_PER_SYMBOL = 24;
 
-let bank = [];          // [{sym, strokes(0-100 box), src}] for the ACTIVE profile
+let bank = [];
 let loaded = false;
 let loading = null;
 let activePid = null;
@@ -39,7 +45,6 @@ function openDB() {
 
 const tx = (db, mode) => db.transaction(STORE, mode).objectStore(STORE);
 
-/** Normalise raw strokes ([{points:[{x,y}]}] or [[[x,y]…]]) into a 0–100 box. */
 export function normalizeStrokes(strokesRaw) {
   const strokes = strokesRaw.map(s => Array.isArray(s) ? s.map(p => [p[0], p[1]]) : s.points.map(p => [p.x, p.y]));
   let x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity;
@@ -54,7 +59,23 @@ export function normalizeStrokes(strokesRaw) {
   ]));
 }
 
-/** Point the bank at a profile (or null = shared). Reloads if it changed. */
+async function loadBootstrapProfile() {
+  if (typeof document === 'undefined' || typeof fetch !== 'function') return [];
+  try {
+    const url = new URL('ink-bootstrap-profile.json', document.baseURI).toString();
+    const response = await fetch(url, { cache: 'no-store' });
+    if (!response.ok) return [];
+    const data = await response.json();
+    if (data?.format !== 'pri-ink-personal-bootstrap' || Number(data.version) !== 1 || !Array.isArray(data.templates)) return [];
+    return data.templates
+      .filter(t => typeof t?.sym === 'string' && Array.isArray(t.strokes) && t.strokes.length)
+      .slice(0, 320)
+      .map(t => ({ sym: t.sym, strokes: t.strokes, src: t.src || `bootstrap:${data.writer || 'local'}` }));
+  } catch {
+    return [];
+  }
+}
+
 export function setPersonalProfile(pid) {
   const next = pid || null;
   if (next === activePid && (loaded || loading)) return loading || Promise.resolve();
@@ -69,34 +90,45 @@ export function ensurePersonalLoaded() {
   loading = (async () => {
     try {
       const db = await openDB();
-      if (!db) { loaded = true; return; }
-      const rows = await new Promise((resolve, reject) => {
-        const req = tx(db, 'readonly').getAll();
-        req.onsuccess = () => resolve(req.result || []);
-        req.onerror = () => reject(req.error);
-      });
-      // migration: templates saved before profiles existed belong to whoever
-      // is signed in the first time they're seen (the original writer)
-      const orphans = rows.filter(r => r.pid === undefined);
-      if (orphans.length && activePid) {
-        await new Promise((resolve) => {
-          const st = tx(db, 'readwrite');
-          for (const r of orphans) st.put({ ...r, pid: activePid });
-          st.transaction.oncomplete = resolve;
-          st.transaction.onerror = resolve;
+      let rows = [];
+      if (db) {
+        rows = await new Promise((resolve, reject) => {
+          const req = tx(db, 'readonly').getAll();
+          req.onsuccess = () => resolve(req.result || []);
+          req.onerror = () => reject(req.error);
         });
-        for (const r of orphans) r.pid = activePid;
+        const orphans = rows.filter(r => r.pid === undefined);
+        if (orphans.length && activePid) {
+          await new Promise((resolve) => {
+            const st = tx(db, 'readwrite');
+            for (const r of orphans) st.put({ ...r, pid: activePid });
+            st.transaction.oncomplete = resolve;
+            st.transaction.onerror = resolve;
+          });
+          for (const r of orphans) r.pid = activePid;
+        }
       }
       const mine = activePid ? rows.filter(r => r.pid === activePid || r.pid == null) : rows;
       bank = mine.map(r => ({ sym: r.sym, strokes: r.strokes, src: r.src }));
+
+      // Local bootstrap evidence is intentionally MEMORY-ONLY. It is generated
+      // from a corpus that already carries consent/provenance and should not be
+      // copied into a profile database or synced anywhere by this module.
+      const bootstrap = await loadBootstrapProfile();
+      if (bootstrap.length) {
+        const seen = new Set(bank.map(b => `${b.sym}|${JSON.stringify(b.strokes)}`));
+        for (const b of bootstrap) {
+          const key = `${b.sym}|${JSON.stringify(b.strokes)}`;
+          if (!seen.has(key)) { seen.add(key); bank.push(b); }
+        }
+      }
       loaded = true;
-      db.close();
+      db?.close();
     } catch { loaded = true; }
   })();
   return loading;
 }
 
-/** Synchronous view for the recogniser hot path. */
 export function getPersonalBank() { return bank; }
 
 export async function addPersonal(sym, strokesRaw, src = 'correction') {
@@ -113,7 +145,6 @@ export async function addPersonal(sym, strokesRaw, src = 'correction') {
       st.transaction.oncomplete = resolve;
       st.transaction.onerror = () => reject(st.transaction.error);
     });
-    // cap per symbol within this profile: drop oldest beyond the cap
     const db2 = await openDB();
     const rows = await new Promise((resolve) => {
       const req = tx(db2, 'readonly').index('sym').getAll(sym);
@@ -130,14 +161,17 @@ export async function addPersonal(sym, strokesRaw, src = 'correction') {
         st.transaction.onerror = resolve;
       });
       const drop = new Set(excess.map(r => JSON.stringify(r.strokes)));
-      bank = bank.filter(b => !(b.sym === sym && drop.has(JSON.stringify(b.strokes))));
+      bank = bank.filter(b => b.src?.startsWith?.('real-corpus:') || !(b.sym === sym && drop.has(JSON.stringify(b.strokes))));
     }
     db2.close(); db.close();
   } catch { }
 }
 
 export async function clearPersonal() {
-  bank = [];
+  // Local corpus bootstrap templates will return on the next load because they
+  // are build evidence, not profile DB rows. This clears only learned profile
+  // corrections/calibration persisted in IndexedDB.
+  bank = bank.filter(b => b.src?.startsWith?.('real-corpus:'));
   const pid = activePid ?? currentPid();
   try {
     const db = await openDB();
