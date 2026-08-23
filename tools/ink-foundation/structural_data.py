@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import json
 import math
+import random
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
@@ -172,8 +173,60 @@ def _expression_bounds(strokes: list[dict]):
     return x1, y1, x2, y2, scale
 
 
+def augment_structural_strokes(strokes: list[dict]) -> list[dict]:
+    """Small geometry/device perturbations for train-only domain adaptation.
+
+    Stroke order and count are preserved exactly, so structural labels remain
+    valid. The same transformed points feed both online features and the raster,
+    keeping the two modalities aligned.
+    """
+    if not strokes:
+        return strokes
+    x1, y1, x2, y2, span = _expression_bounds(strokes)
+    cx, cy = (x1 + x2) * 0.5, (y1 + y2) * 0.5
+
+    angle = math.radians(random.uniform(-4.0, 4.0))
+    ca, sa = math.cos(angle), math.sin(angle)
+    sx = random.uniform(0.92, 1.08)
+    sy = random.uniform(0.90, 1.10)
+    shear = random.uniform(-0.08, 0.08)
+    tx = random.uniform(-0.025, 0.025) * span
+    ty = random.uniform(-0.025, 0.025) * span
+    jitter = 0.0018 * span
+    time_gain = random.uniform(0.86, 1.16)
+    pressure_gain = random.uniform(0.88, 1.12)
+    width_gain = random.uniform(0.90, 1.10)
+
+    out: list[dict] = []
+    for stroke in strokes:
+        copy_stroke = {k: v for k, v in stroke.items() if k != "points"}
+        new_points = []
+        for p in stroke.get("points") or []:
+            q = dict(p)
+            px = _num(p, "x") - cx
+            py = _num(p, "y") - cy
+            px = sx * (px + shear * py)
+            py = sy * py
+            rx = ca * px - sa * py
+            ry = sa * px + ca * py
+            q["x"] = rx + cx + tx + random.gauss(0.0, jitter)
+            q["y"] = ry + cy + ty + random.gauss(0.0, jitter)
+            if isinstance(p.get("t"), (int, float)):
+                q["t"] = float(p["t"]) * time_gain
+            if isinstance(p.get("p"), (int, float)):
+                q["p"] = max(0.0, min(2.0, float(p["p"]) * pressure_gain))
+            if isinstance(p.get("force"), (int, float)):
+                q["force"] = max(0.0, min(2.0, float(p["force"]) * pressure_gain))
+            if isinstance(p.get("w"), (int, float)):
+                q["w"] = max(0.2, float(p["w"]) * width_gain)
+            new_points.append(q)
+        copy_stroke["points"] = new_points
+        out.append(copy_stroke)
+    return out
+
+
 def hierarchical_stroke_features(strokes: list[dict], cfg: StructuralConfig):
-    """Return per-stroke point tensors plus expression-relative geometry."""
+    """Return per-stroke point tensors with expression + local shape channels."""
     out = np.zeros(
         (cfg.max_strokes, cfg.max_points_per_stroke, cfg.feature_dim), dtype=np.float32
     )
@@ -183,6 +236,11 @@ def hierarchical_stroke_features(strokes: list[dict], cfg: StructuralConfig):
     stroke_valid = np.zeros(cfg.max_strokes, dtype=np.bool_)
     geometry = np.zeros((cfg.max_strokes, cfg.geometry_dim), dtype=np.float32)
 
+    if cfg.feature_dim != 18:
+        raise ValueError(
+            f"Pri Ink V4 local-shape pipeline requires feature_dim=18, got {cfg.feature_dim}. "
+            "Rebuild stale V4 checkpoints after this representation change."
+        )
     if len(strokes) > cfg.max_strokes:
         raise ValueError(
             f"sample has {len(strokes)} physical strokes; max_strokes={cfg.max_strokes}. "
@@ -198,7 +256,6 @@ def hierarchical_stroke_features(strokes: list[dict], cfg: StructuralConfig):
             raise ValueError(f"physical stroke {si} has no points")
         stroke_valid[si] = True
 
-        # Uniformly retain trajectory coverage if a physical stroke is very dense.
         if len(pts) > cfg.max_points_per_stroke:
             idx = np.linspace(0, len(pts) - 1, cfg.max_points_per_stroke).round().astype(int)
             pts = [pts[i] for i in idx]
@@ -207,12 +264,17 @@ def hierarchical_stroke_features(strokes: list[dict], cfg: StructuralConfig):
         ys = np.asarray([_num(p, "y") for p in pts], dtype=np.float32)
         sx1, sx2, sy1, sy2 = float(xs.min()), float(xs.max()), float(ys.min()), float(ys.max())
         width, height = max(sx2 - sx1, 1e-4), max(sy2 - sy1, 1e-4)
+        local_scale = max(width, height, 1e-3)
+        local_cx, local_cy = (sx1 + sx2) * 0.5, (sy1 + sy2) * 0.5
         length = 0.0
         previous = None
 
         for pi, p in enumerate(pts):
-            x = (_num(p, "x") - cx_expr) / scale
-            y = (_num(p, "y") - cy_expr) / scale
+            raw_x, raw_y = _num(p, "x"), _num(p, "y")
+            x = (raw_x - cx_expr) / scale
+            y = (raw_y - cy_expr) / scale
+            lx = (raw_x - local_cx) / local_scale
+            ly = (raw_y - local_cy) / local_scale
             t = _num(p, "t", pi / 120.0)
             pressure = max(0.0, min(2.0, _num(p, "p", _num(p, "force")))) / 2.0
             width_pen = max(0.0, min(16.0, _num(p, "w", 3.0))) / 8.0
@@ -220,16 +282,19 @@ def hierarchical_stroke_features(strokes: list[dict], cfg: StructuralConfig):
             alt = _num(p, "altitude", math.pi / 2)
 
             if previous is None:
-                dx = dy = dt = speed = 0.0
+                dx = dy = ldx = ldy = dt = speed = 0.0
             else:
                 dx, dy = x - previous[0], y - previous[1]
-                dt = max(0.0, min(0.2, t - previous[2]))
+                ldx, ldy = lx - previous[2], ly - previous[3]
+                dt = max(0.0, min(0.2, t - previous[4]))
                 dist = math.hypot(dx, dy)
                 length += dist
                 speed = min(8.0, dist / max(dt, 1e-3)) / 8.0
 
             out[si, pi] = [
-                x, y, dx, dy, min(dt, 0.2) / 0.2, speed,
+                x, y, dx, dy,
+                lx, ly, ldx, ldy,
+                min(dt, 0.2) / 0.2, speed,
                 pressure, width_pen, math.sin(az), math.cos(az),
                 max(0.0, min(1.0, alt / (math.pi / 2))),
                 1.0 if pi == 0 else 0.0,
@@ -237,7 +302,7 @@ def hierarchical_stroke_features(strokes: list[dict], cfg: StructuralConfig):
                 min(si, cfg.max_strokes - 1) / max(1, cfg.max_strokes - 1),
             ]
             point_valid[si, pi] = True
-            previous = (x, y, t)
+            previous = (x, y, lx, ly, t)
 
         geometry[si] = [
             ((sx1 + sx2) * 0.5 - cx_expr) / scale,
@@ -273,9 +338,6 @@ def structural_targets(structure: dict, max_strokes: int):
         for si in strokes:
             symbol[si] = token_id
 
-    # Only distinct physical-stroke pairs teach grouping. A diagonal target says
-    # merely "stroke i is itself", which is always true and can inflate grouping
-    # accuracy without teaching whether two separate traces form one glyph.
     for left_gid, left_strokes, _ in parsed:
         for right_gid, right_strokes, _ in parsed:
             same = left_gid == right_gid
@@ -286,9 +348,6 @@ def structural_targets(structure: dict, max_strokes: int):
                     grouping[i, j] = 1.0 if same else 0.0
 
     group_by_id = {gid: strokes for gid, strokes, _ in parsed}
-    # Annotated group roots are representative physical traces. Self-pairs stay
-    # ignored: "glyph relates to itself as NONE" is a trivial negative and would
-    # inflate relation accuracy just like grouping diagonals.
     roots = {gid: strokes[0] for gid, strokes, _ in parsed}
     labelled_roots = list(roots.values())
     for i in labelled_roots:
@@ -312,6 +371,7 @@ def structural_targets(structure: dict, max_strokes: int):
 class StructuralInkDataset(Dataset):
     def __init__(self, examples: list[StructuralExample], split: str, cfg: StructuralConfig):
         self.rows = [x for x in examples if x.split == split]
+        self.split = split
         self.cfg = cfg
 
     def __len__(self):
@@ -320,12 +380,13 @@ class StructuralInkDataset(Dataset):
     def __getitem__(self, index: int):
         row = self.rows[index]
         validate_structure(row.structure, len(row.strokes), require_complete=True)
+        work_strokes = augment_structural_strokes(row.strokes) if self.split == "train" else row.strokes
         points, point_valid, stroke_valid, geometry = hierarchical_stroke_features(
-            row.strokes, self.cfg
+            work_strokes, self.cfg
         )
         symbol, grouping, relations = structural_targets(row.structure, self.cfg.max_strokes)
         raster = rasterize(
-            row.strokes, self.cfg.raster_height, self.cfg.raster_width, augment=False
+            work_strokes, self.cfg.raster_height, self.cfg.raster_width, augment=False
         )
         return {
             "stroke_points": torch.from_numpy(points),
