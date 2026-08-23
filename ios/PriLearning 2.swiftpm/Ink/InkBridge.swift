@@ -172,35 +172,35 @@ final class InkBridge: NSObject, InkSurfaceDelegate {
         let strokes = surface.strokes
         recognitionQueue.async { [weak self] in
             guard let self else { return }
-            let reading = self.foundationRecognizer.read(strokes: strokes, overrides: overrides)
+            let foundation = self.foundationRecognizer.read(strokes: strokes, overrides: overrides)
                 ?? Reading(lines: [], text: "", minConfidence: 1, margin: 1, weakest: nil)
 
 #if DEBUG
-            // Development checkpoints are shadow models. They still execute so
-            // model crashes and latency remain visible during engineering, but
-            // they cannot outrank the mature fallback just because they emitted
-            // non-empty text. Production builds only accept promoted weights.
-            if !reading.text.isEmpty {
+            // Unpromoted neural checkpoints remain shadow-only, but DEBUG must
+            // still show the best available real handwriting reader. Run the
+            // native Vision/geometry recogniser on the exact same Pencil strokes
+            // and return it through this first bridge hop. If it returns nothing,
+            // the web layer will continue to Pri JS exactly as before.
+            if !foundation.text.isEmpty {
                 NSLog(
                     "PRIINK foundation shadow — lines=%d chars=%d minConf=%.4f margin=%.4f",
-                    reading.lines.count,
-                    reading.text.count,
-                    reading.minConfidence,
-                    reading.margin
+                    foundation.lines.count,
+                    foundation.text.count,
+                    foundation.minConfidence,
+                    foundation.margin
                 )
             }
-            var payload = Reading(
-                lines: [], text: "", minConfidence: 1, margin: 1, weakest: nil
-            ).jsonObject
+            let visible = self.recognizer.read(strokes: strokes, overrides: overrides)
+            var payload = visible.jsonObject
             payload["type"] = "reading"
             payload["reqId"] = requestId
-            payload["engine"] = "pri-foundation-shadow"
-            payload["available"] = self.foundationRecognizer.isAvailable
-            payload["shadowLineCount"] = reading.lines.count
-            payload["shadowCharacterCount"] = reading.text.count
+            payload["engine"] = "native-primary-debug"
+            payload["foundationAvailable"] = self.foundationRecognizer.isAvailable
+            payload["shadowLineCount"] = foundation.lines.count
+            payload["shadowCharacterCount"] = foundation.text.count
             DispatchQueue.main.async { self.emit(payload) }
 #else
-            var payload = reading.jsonObject
+            var payload = foundation.jsonObject
             payload["type"] = "reading"
             payload["reqId"] = requestId
             payload["engine"] = "pri-foundation"
