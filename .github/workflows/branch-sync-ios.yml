@@ -1,0 +1,47 @@
+name: Branch iOS bundle sync
+
+on:
+  push:
+    branches: [pri-local-ink-v2]
+    paths:
+      - '.github/workflows/branch-sync-ios.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: pri-local-ink-v2
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+
+      - name: Install client dependencies
+        run: npm ci --prefix client
+
+      - name: Build and sync native web bundle
+        run: |
+          set -euo pipefail
+          npm run build
+          node scripts/sync-ios.mjs
+
+      - name: Commit generated bundle only
+        run: |
+          set -euo pipefail
+          git config user.name 'Pri Learning Build'
+          git config user.email 'actions@users.noreply.github.com'
+          git add ios/PriLearning.swiftpm/Resources/Web
+          if git diff --cached --quiet; then
+            echo 'Native bundle already current.'
+            exit 0
+          fi
+          git commit -m 'Sync iOS web bundle for local ink v2'
+          git push origin HEAD:pri-local-ink-v2
