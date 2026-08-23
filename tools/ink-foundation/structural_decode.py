@@ -1,13 +1,8 @@
 """Deterministic graph/AST decoding for Pri Ink Structural V4.
 
 The neural model predicts evidence; this module turns that evidence into an
-inspectable hypothesis. It deliberately keeps trace grouping, relation evidence,
-an AST and calibrated decision confidence so Pri Learning can abstain on
-uncertain ink rather than hiding ambiguity behind an authoritative string.
-
-This remains a research decoder. It supports the core secondary-school spatial
-relations needed to benchmark the V4 representation and supports multi-glyph
-fractions, radicals, superscripts and subscripts.
+inspectable hypothesis. It keeps trace grouping, relation evidence, an AST and
+confidence so Pri Learning can abstain on uncertain ink.
 """
 from __future__ import annotations
 
@@ -42,34 +37,25 @@ class RelationHypothesis:
 
 @dataclass(frozen=True)
 class MathNode:
-    """Minimal inspectable AST used by the research structural decoder."""
     kind: str
     value: str | None = None
     children: tuple["MathNode", ...] = ()
 
     def canonical(self) -> str:
-        if self.kind == "symbol":
-            return self.value or ""
-        if self.kind == "sequence":
-            return "".join(child.canonical() for child in self.children)
+        if self.kind == "symbol": return self.value or ""
+        if self.kind == "sequence": return "".join(child.canonical() for child in self.children)
         if self.kind == "fraction":
-            num, den = self.children
-            return f"({num.canonical()})/({den.canonical()})"
-        if self.kind == "sqrt":
-            return f"sqrt({self.children[0].canonical()})"
+            num, den = self.children; return f"({num.canonical()})/({den.canonical()})"
+        if self.kind == "sqrt": return f"sqrt({self.children[0].canonical()})"
         if self.kind == "superscript":
-            base, exponent = self.children
-            return f"{base.canonical()}^({exponent.canonical()})"
+            base, exponent = self.children; return f"{base.canonical()}^({exponent.canonical()})"
         if self.kind == "subscript":
-            base, sub = self.children
-            text = sub.canonical()
-            suffix = f"_{text}" if len(text) == 1 else f"_({text})"
-            return base.canonical() + suffix
+            base, sub = self.children; text = sub.canonical()
+            return base.canonical() + (f"_{text}" if len(text) == 1 else f"_({text})")
         if self.kind == "scripts":
-            base, exponent, sub = self.children
-            sub_text = sub.canonical()
-            sub_suffix = f"_{sub_text}" if len(sub_text) == 1 else f"_({sub_text})"
-            return f"{base.canonical()}^({exponent.canonical()}){sub_suffix}"
+            base, exponent, sub = self.children; text = sub.canonical()
+            suffix = f"_{text}" if len(text) == 1 else f"_({text})"
+            return f"{base.canonical()}^({exponent.canonical()}){suffix}"
         return self.value or ""
 
 
@@ -93,58 +79,39 @@ def _symmetric_group_probability(prob: torch.Tensor, i: int, j: int) -> float:
 
 def _components(group_logits: torch.Tensor, valid: torch.Tensor,
                 threshold: float) -> tuple[list[tuple[int, ...]], float]:
-    """Recover glyph components using complete-link agglomerative grouping.
-
-    Single-link/union-find grouping is unsafe for handwriting: if A-B and B-C are
-    high by mistake, it merges A/B/C even when A-C is strongly negative. V4 only
-    merges two components when *every* cross-stroke pair supports the merge.
-    """
+    """Recover glyph components using conservative complete-link grouping."""
     active = valid.nonzero(as_tuple=False).flatten().tolist()
     prob = group_logits.sigmoid()
     clusters: list[tuple[int, ...]] = [(i,) for i in active]
-
     while True:
-        best_pair = None
-        best_support = threshold
+        best_pair = None; best_support = threshold
         for ai in range(len(clusters)):
             for bi in range(ai + 1, len(clusters)):
                 left, right = clusters[ai], clusters[bi]
-                support = min(
-                    _symmetric_group_probability(prob, i, j)
-                    for i in left for j in right
-                )
+                support = min(_symmetric_group_probability(prob, i, j) for i in left for j in right)
                 if support >= best_support:
                     candidate = (support, -min(left), -min(right), ai, bi)
                     if best_pair is None or candidate > best_pair:
-                        best_pair = candidate
-                        best_support = support
-        if best_pair is None:
-            break
+                        best_pair = candidate; best_support = support
+        if best_pair is None: break
         _, _, _, ai, bi = best_pair
         merged = tuple(sorted(clusters[ai] + clusters[bi]))
         clusters = [c for k, c in enumerate(clusters) if k not in (ai, bi)]
-        clusters.append(merged)
-        clusters.sort(key=min)
+        clusters.append(merged); clusters.sort(key=min)
 
     component_for = {stroke: ci for ci, comp in enumerate(clusters) for stroke in comp}
-    pair_confidences: list[float] = []
+    pair_confidences = []
     for ai, i in enumerate(active):
         for j in active[ai + 1:]:
             score = _symmetric_group_probability(prob, i, j)
             same = component_for[i] == component_for[j]
             pair_confidences.append(score if same else 1.0 - score)
-
-    # An inconsistent bridge (e.g. A-B=.9, B-C=.9, A-C=.1) therefore forms no
-    # catastrophic 3-stroke component and also carries low confidence, causing
-    # the product to abstain rather than silently trust the uncertain boundary.
-    confidence = min(pair_confidences, default=1.0)
-    return clusters, confidence
+    return clusters, min(pair_confidences, default=1.0)
 
 
 def _safe_symbol(logits: torch.Tensor) -> tuple[str, float]:
     probs = F.softmax(logits, dim=-1)
-    order = probs.argsort(descending=True)
-    for idx in order.tolist():
+    for idx in probs.argsort(descending=True).tolist():
         token = ID_TO_TOKEN.get(int(idx), "<unk>")
         if token not in SPECIAL:
             return token, float(probs[idx])
@@ -152,53 +119,39 @@ def _safe_symbol(logits: torch.Tensor) -> tuple[str, float]:
 
 
 def _glyphs(symbol_logits: torch.Tensor, geometry: torch.Tensor,
-            components: list[tuple[int, ...]]) -> list[GlyphHypothesis]:
+            components: list[tuple[int, ...]],
+            component_logits: torch.Tensor | None = None) -> list[GlyphHypothesis]:
     out: list[GlyphHypothesis] = []
-    log_probs = F.log_softmax(symbol_logits, dim=-1)
+    fallback_log_probs = F.log_softmax(symbol_logits, dim=-1)
     for gid, strokes in enumerate(components):
         idx = torch.tensor(strokes, device=symbol_logits.device, dtype=torch.long)
-        # Mean log-probability prevents a many-stroke symbol from being rewarded
-        # merely because it contains more physical traces.
-        pooled = log_probs.index_select(0, idx).mean(dim=0)
-        symbol, conf = _safe_symbol(pooled)
+        if component_logits is None:
+            token_logits = fallback_log_probs.index_select(0, idx).mean(dim=0)
+        else:
+            token_logits = component_logits[gid]
+        symbol, conf = _safe_symbol(token_logits)
         g = geometry.index_select(0, idx)
         weights = g[:, 2].clamp_min(1e-3) * g[:, 3].clamp_min(1e-3)
         weights = weights / weights.sum().clamp_min(1e-6)
-        cx = float((g[:, 0] * weights).sum())
-        cy = float((g[:, 1] * weights).sum())
-        left = float((g[:, 0] - g[:, 2] * 0.5).min())
-        right = float((g[:, 0] + g[:, 2] * 0.5).max())
-        top = float((g[:, 1] - g[:, 3] * 0.5).min())
-        bottom = float((g[:, 1] + g[:, 3] * 0.5).max())
+        cx = float((g[:, 0] * weights).sum()); cy = float((g[:, 1] * weights).sum())
+        left = float((g[:, 0] - g[:, 2] * 0.5).min()); right = float((g[:, 0] + g[:, 2] * 0.5).max())
+        top = float((g[:, 1] - g[:, 3] * 0.5).min()); bottom = float((g[:, 1] + g[:, 3] * 0.5).max())
         out.append(GlyphHypothesis(
-            id=gid,
-            strokes=strokes,
-            symbol=symbol,
-            symbol_confidence=conf,
-            cx=cx,
-            cy=cy,
-            width=max(1e-4, right - left),
-            height=max(1e-4, bottom - top),
+            id=gid, strokes=strokes, symbol=symbol, symbol_confidence=conf,
+            cx=cx, cy=cy, width=max(1e-4, right-left), height=max(1e-4, bottom-top),
         ))
     return out
 
 
 def _relations(relation_logits: torch.Tensor, components: list[tuple[int, ...]],
                min_confidence: float) -> tuple[list[RelationHypothesis], float]:
-    out: list[RelationHypothesis] = []
-    decision_confidences: list[float] = []
+    out = []; decision_confidences = []
     for si, src in enumerate(components):
         for ti, dst in enumerate(components):
-            if si == ti:
-                continue
-            # Training stores relation supervision on group roots. Decode from
-            # the same representative trace until a future group-level head replaces it.
+            if si == ti: continue
             logits = relation_logits[src[0], dst[0]]
-            probs = F.softmax(logits, dim=-1)
-            rid = int(probs.argmax())
-            kind = RELATIONS[rid]
-            conf = float(probs[rid])
-            decision_confidences.append(conf)
+            probs = F.softmax(logits, dim=-1); rid = int(probs.argmax())
+            kind = RELATIONS[rid]; conf = float(probs[rid]); decision_confidences.append(conf)
             if kind != "NONE" and conf >= min_confidence:
                 out.append(RelationHypothesis(si, ti, kind, conf))
     return out, min(decision_confidences, default=1.0)
@@ -214,31 +167,22 @@ def _targets(relations: list[RelationHypothesis], source: int, kind: str) -> lis
 
 def _order_ids(ids: list[int], glyphs: list[GlyphHypothesis],
                relations: list[RelationHypothesis], warnings: list[str]) -> list[int]:
-    """Topologically respect RIGHT edges, with x-position as deterministic tie-break."""
     unique = list(dict.fromkeys(ids))
-    if len(unique) < 2:
-        return unique
-    allowed = set(unique)
-    edges: dict[int, set[int]] = {i: set() for i in unique}
-    incoming = {i: 0 for i in unique}
+    if len(unique) < 2: return unique
+    allowed = set(unique); edges = {i: set() for i in unique}; incoming = {i: 0 for i in unique}
     for rel in relations:
-        if rel.kind != "RIGHT" or rel.source not in allowed or rel.target not in allowed:
-            continue
+        if rel.kind != "RIGHT" or rel.source not in allowed or rel.target not in allowed: continue
         if rel.target not in edges[rel.source]:
-            edges[rel.source].add(rel.target)
-            incoming[rel.target] += 1
-
+            edges[rel.source].add(rel.target); incoming[rel.target] += 1
     by_id = {g.id: g for g in glyphs}
     ready = sorted((i for i in unique if incoming[i] == 0), key=lambda i: (by_id[i].cx, by_id[i].cy))
-    ordered: list[int] = []
+    ordered = []
     while ready:
-        current = ready.pop(0)
-        ordered.append(current)
+        current = ready.pop(0); ordered.append(current)
         for target in sorted(edges[current], key=lambda i: (by_id[i].cx, by_id[i].cy)):
             incoming[target] -= 1
             if incoming[target] == 0:
-                ready.append(target)
-                ready.sort(key=lambda i: (by_id[i].cx, by_id[i].cy))
+                ready.append(target); ready.sort(key=lambda i: (by_id[i].cx, by_id[i].cy))
     if len(ordered) != len(unique):
         warnings.append("RIGHT relation cycle; fell back to geometry")
         return sorted(unique, key=lambda i: (by_id[i].cx, by_id[i].cy))
@@ -246,121 +190,79 @@ def _order_ids(ids: list[int], glyphs: list[GlyphHypothesis],
 
 
 def _build_ast(glyphs: list[GlyphHypothesis], relations: list[RelationHypothesis]):
-    if not glyphs:
-        return MathNode("sequence"), ["no glyphs"]
-
-    warnings: list[str] = []
-    by_id = {g.id: g for g in glyphs}
+    if not glyphs: return MathNode("sequence"), ["no glyphs"]
+    warnings: list[str] = []; by_id = {g.id: g for g in glyphs}
     child_kinds = ("SUPERSCRIPT", "SUBSCRIPT", "INSIDE_ROOT", "NUMERATOR", "DENOMINATOR")
-    children: dict[tuple[int, str], list[int]] = {}
-    parents: dict[int, set[tuple[int, str]]] = {}
+    children: dict[tuple[int, str], list[int]] = {}; parents: dict[int, set[tuple[int, str]]] = {}
     for g in glyphs:
         for kind in child_kinds:
             targets = _targets(relations, g.id, kind)
             if targets:
                 children[(g.id, kind)] = targets
-                for target in targets:
-                    parents.setdefault(target, set()).add((g.id, kind))
-
+                for target in targets: parents.setdefault(target, set()).add((g.id, kind))
     for target, owners in parents.items():
         if len(owners) > 1:
-            warnings.append(
-                f"glyph {target} has multiple structural parents: " +
-                ", ".join(f"{src}:{kind}" for src, kind in sorted(owners))
-            )
-
-    attached = set(parents)
-    visiting: set[int] = set()
+            warnings.append(f"glyph {target} has multiple structural parents: " + ", ".join(f"{src}:{kind}" for src, kind in sorted(owners)))
+    attached = set(parents); visiting: set[int] = set()
 
     def sequence(ids: list[int]) -> MathNode:
-        ordered = _order_ids(ids, glyphs, relations, warnings)
-        return MathNode("sequence", children=tuple(render(i) for i in ordered))
+        return MathNode("sequence", children=tuple(render(i) for i in _order_ids(ids, glyphs, relations, warnings)))
 
     def render(gid: int) -> MathNode:
         if gid in visiting:
-            warnings.append(f"structural cycle at glyph {gid}")
-            return MathNode("symbol", value=by_id[gid].symbol)
-        visiting.add(gid)
-        g = by_id[gid]
-
-        numerators = children.get((gid, "NUMERATOR"), [])
-        denominators = children.get((gid, "DENOMINATOR"), [])
-        inside = children.get((gid, "INSIDE_ROOT"), [])
-        supers = children.get((gid, "SUPERSCRIPT"), [])
+            warnings.append(f"structural cycle at glyph {gid}"); return MathNode("symbol", value=by_id[gid].symbol)
+        visiting.add(gid); g = by_id[gid]
+        numerators = children.get((gid, "NUMERATOR"), []); denominators = children.get((gid, "DENOMINATOR"), [])
+        inside = children.get((gid, "INSIDE_ROOT"), []); supers = children.get((gid, "SUPERSCRIPT"), [])
         subs = children.get((gid, "SUBSCRIPT"), [])
-
         if numerators or denominators:
             if not numerators or not denominators:
-                warnings.append(f"incomplete fraction relation at glyph {gid}")
-                node = MathNode("symbol", value=g.symbol)
-            else:
-                node = MathNode("fraction", children=(sequence(numerators), sequence(denominators)))
-        elif inside:
-            node = MathNode("sqrt", children=(sequence(inside),))
+                warnings.append(f"incomplete fraction relation at glyph {gid}"); node = MathNode("symbol", value=g.symbol)
+            else: node = MathNode("fraction", children=(sequence(numerators), sequence(denominators)))
+        elif inside: node = MathNode("sqrt", children=(sequence(inside),))
         elif g.symbol == "sqrt":
-            warnings.append(f"radical glyph {gid} has no INSIDE_ROOT relation")
-            node = MathNode("symbol", value="sqrt")
-        else:
-            node = MathNode("symbol", value=g.symbol)
-
-        if supers and subs:
-            node = MathNode("scripts", children=(node, sequence(supers), sequence(subs)))
-        elif supers:
-            node = MathNode("superscript", children=(node, sequence(supers)))
-        elif subs:
-            node = MathNode("subscript", children=(node, sequence(subs)))
-        visiting.remove(gid)
-        return node
+            warnings.append(f"radical glyph {gid} has no INSIDE_ROOT relation"); node = MathNode("symbol", value="sqrt")
+        else: node = MathNode("symbol", value=g.symbol)
+        if supers and subs: node = MathNode("scripts", children=(node, sequence(supers), sequence(subs)))
+        elif supers: node = MathNode("superscript", children=(node, sequence(supers)))
+        elif subs: node = MathNode("subscript", children=(node, sequence(subs)))
+        visiting.remove(gid); return node
 
     roots = [g.id for g in glyphs if g.id not in attached]
     if not roots:
-        warnings.append("no structural root; fell back to all glyphs")
-        roots = [g.id for g in glyphs]
-    ast = sequence(roots)
-    return ast, warnings
+        warnings.append("no structural root; fell back to all glyphs"); roots = [g.id for g in glyphs]
+    return sequence(roots), warnings
 
 
 def decode_structural_output(outputs: dict, stroke_geometry: torch.Tensor,
                              stroke_valid: torch.Tensor, group_threshold: float = 0.65,
                              relation_threshold: float = 0.60,
-                             ambiguity_threshold: float = 0.80) -> StructuralHypothesis:
-    """Decode one V4 output dictionary into an inspectable AST hypothesis."""
-    symbol_logits = outputs["symbol_logits"]
-    group_logits = outputs["group_logits"]
+                             ambiguity_threshold: float = 0.80,
+                             model=None) -> StructuralHypothesis:
+    """Decode one V4 output; use the true group classifier when a model is supplied."""
+    symbol_logits = outputs["symbol_logits"]; group_logits = outputs["group_logits"]
     relation_logits = outputs["relation_logits"]
+    glyph_strokes = outputs.get("glyph_stroke_embeddings")
     if symbol_logits.ndim == 3:
-        if symbol_logits.shape[0] != 1:
-            raise ValueError("decode_structural_output expects one example")
-        symbol_logits = symbol_logits[0]
-        group_logits = group_logits[0]
-        relation_logits = relation_logits[0]
-    if stroke_geometry.ndim == 3:
-        stroke_geometry = stroke_geometry[0]
-    if stroke_valid.ndim == 2:
-        stroke_valid = stroke_valid[0]
+        if symbol_logits.shape[0] != 1: raise ValueError("decode_structural_output expects one example")
+        symbol_logits = symbol_logits[0]; group_logits = group_logits[0]; relation_logits = relation_logits[0]
+        if glyph_strokes is not None: glyph_strokes = glyph_strokes[0]
+    if stroke_geometry.ndim == 3: stroke_geometry = stroke_geometry[0]
+    if stroke_valid.ndim == 2: stroke_valid = stroke_valid[0]
 
-    components, grouping_confidence = _components(
-        group_logits, stroke_valid.bool(), group_threshold
-    )
-    glyphs = _glyphs(symbol_logits, stroke_geometry, components)
-    relations, relation_confidence = _relations(
-        relation_logits, components, relation_threshold
-    )
-    ast, warnings = _build_ast(glyphs, relations)
-    canonical = ast.canonical()
-
+    components, grouping_confidence = _components(group_logits, stroke_valid.bool(), group_threshold)
+    component_logits = None
+    if model is not None and glyph_strokes is not None:
+        component_logits = model.classify_glyph_components(glyph_strokes, components)
+    glyphs = _glyphs(symbol_logits, stroke_geometry, components, component_logits)
+    relations, relation_confidence = _relations(relation_logits, components, relation_threshold)
+    ast, warnings = _build_ast(glyphs, relations); canonical = ast.canonical()
     symbol_confidence = min((g.symbol_confidence for g in glyphs), default=0.0)
     confidence = min(symbol_confidence, grouping_confidence, relation_confidence)
     ambiguous = confidence < ambiguity_threshold or bool(warnings)
     return StructuralHypothesis(
-        glyphs=glyphs,
-        relations=relations,
-        ast=ast,
-        canonical=canonical,
-        confidence=confidence,
-        symbol_confidence=symbol_confidence,
-        grouping_confidence=grouping_confidence,
-        relation_confidence=relation_confidence,
-        ambiguous=ambiguous,
-        warnings=warnings,
+        glyphs=glyphs, relations=relations, ast=ast, canonical=canonical,
+        confidence=confidence, symbol_confidence=symbol_confidence,
+        grouping_confidence=grouping_confidence, relation_confidence=relation_confidence,
+        ambiguous=ambiguous, warnings=warnings,
     )
