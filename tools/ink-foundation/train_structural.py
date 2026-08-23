@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Train the Pri Ink V4 structural research model.
 
-This trainer intentionally refuses unannotated corpora.  V4 grouping/relation
-metrics must come from explicit trace-to-glyph supervision rather than guessed
-labels.  It runs beside the V3 release path until real writer-disjoint evidence
-supports promotion.
+This trainer intentionally refuses unannotated or structurally trivial corpora.
+V4 grouping/relation metrics must come from explicit trace-to-glyph supervision,
+not guessed labels. It runs beside the V3 release path until real writer-disjoint
+evidence supports promotion.
 """
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader
 
 from data import TOKEN_TO_ID
-from structural import PriInkStructuralV4, StructuralConfig
+from structural import PriInkStructuralV4, RELATION_TO_ID, StructuralConfig
 from structural_data import (
     IGNORE_INDEX,
     StructuralInkDataset,
@@ -37,6 +37,33 @@ def seed_everything(seed: int):
         torch.cuda.manual_seed_all(seed)
 
 
+def _balanced_binary_loss(logits: torch.Tensor, targets: torch.Tensor, mask: torch.Tensor):
+    pos = mask & targets.gt(0.5)
+    neg = mask & targets.le(0.5)
+    parts = []
+    if bool(pos.any()):
+        parts.append(F.binary_cross_entropy_with_logits(logits[pos], targets[pos]))
+    if bool(neg.any()):
+        parts.append(F.binary_cross_entropy_with_logits(logits[neg], targets[neg]))
+    if not parts:
+        return logits.sum() * 0.0
+    return sum(parts) / len(parts)
+
+
+def _balanced_relation_loss(logits: torch.Tensor, targets: torch.Tensor, mask: torch.Tensor):
+    none_id = RELATION_TO_ID["NONE"]
+    positive = mask & targets.ne(none_id)
+    negative = mask & targets.eq(none_id)
+    parts = []
+    if bool(positive.any()):
+        parts.append(F.cross_entropy(logits[positive], targets[positive]))
+    if bool(negative.any()):
+        parts.append(F.cross_entropy(logits[negative], targets[negative]))
+    if not parts:
+        return logits.sum() * 0.0
+    return sum(parts) / len(parts)
+
+
 def structural_loss(outputs: dict, batch: dict, device: torch.device):
     symbol_targets = batch["symbol_targets"].to(device)
     group_targets = batch["group_targets"].to(device)
@@ -51,20 +78,12 @@ def structural_loss(outputs: dict, batch: dict, device: torch.device):
     )
 
     group_mask = group_targets.ne(float(IGNORE_INDEX)) & pair_valid
-    if bool(group_mask.any()):
-        group_loss = F.binary_cross_entropy_with_logits(
-            outputs["group_logits"][group_mask], group_targets[group_mask]
-        )
-    else:
-        group_loss = outputs["group_logits"].sum() * 0.0
+    group_loss = _balanced_binary_loss(outputs["group_logits"], group_targets, group_mask)
 
     relation_mask = relation_targets.ne(IGNORE_INDEX) & pair_valid
-    if bool(relation_mask.any()):
-        relation_loss = F.cross_entropy(
-            outputs["relation_logits"][relation_mask], relation_targets[relation_mask]
-        )
-    else:
-        relation_loss = outputs["relation_logits"].sum() * 0.0
+    relation_loss = _balanced_relation_loss(
+        outputs["relation_logits"], relation_targets, relation_mask
+    )
 
     total = symbol_loss + 0.45 * group_loss + 0.55 * relation_loss
     return total, {
@@ -74,13 +93,21 @@ def structural_loss(outputs: dict, batch: dict, device: torch.device):
     }
 
 
+def _acc(ok: int, n: int) -> float:
+    return ok / max(1, n)
+
+
 @torch.no_grad()
 def evaluate(model, loader, device):
     model.eval()
     symbol_ok = symbol_n = 0
-    group_ok = group_n = 0
-    relation_ok = relation_n = 0
+    group_pos_ok = group_pos_n = 0
+    group_neg_ok = group_neg_n = 0
+    relation_pos_ok = relation_pos_n = 0
+    relation_none_ok = relation_none_n = 0
     losses = []
+    none_id = RELATION_TO_ID["NONE"]
+
     for batch in loader:
         outputs = model(
             batch["stroke_points"].to(device),
@@ -93,31 +120,49 @@ def evaluate(model, loader, device):
         losses.append(float(loss))
 
         symbols = batch["symbol_targets"].to(device)
-        mask = symbols.ne(IGNORE_INDEX)
-        pred = outputs["symbol_logits"].argmax(-1)
-        symbol_ok += int((pred[mask] == symbols[mask]).sum())
-        symbol_n += int(mask.sum())
+        smask = symbols.ne(IGNORE_INDEX)
+        spred = outputs["symbol_logits"].argmax(-1)
+        symbol_ok += int((spred[smask] == symbols[smask]).sum())
+        symbol_n += int(smask.sum())
 
         groups = batch["group_targets"].to(device)
         gmask = groups.ne(float(IGNORE_INDEX)) & outputs["pair_valid"]
         gpred = outputs["group_logits"].sigmoid().ge(0.5)
-        group_ok += int((gpred[gmask] == groups[gmask].bool()).sum())
-        group_n += int(gmask.sum())
+        gpos = gmask & groups.gt(0.5)
+        gneg = gmask & groups.le(0.5)
+        group_pos_ok += int(gpred[gpos].sum())
+        group_pos_n += int(gpos.sum())
+        group_neg_ok += int((~gpred[gneg]).sum())
+        group_neg_n += int(gneg.sum())
 
         relations = batch["relation_targets"].to(device)
         rmask = relations.ne(IGNORE_INDEX) & outputs["pair_valid"]
         rpred = outputs["relation_logits"].argmax(-1)
-        relation_ok += int((rpred[rmask] == relations[rmask]).sum())
-        relation_n += int(rmask.sum())
+        rpos = rmask & relations.ne(none_id)
+        rnone = rmask & relations.eq(none_id)
+        relation_pos_ok += int((rpred[rpos] == relations[rpos]).sum())
+        relation_pos_n += int(rpos.sum())
+        relation_none_ok += int((rpred[rnone] == relations[rnone]).sum())
+        relation_none_n += int(rnone.sum())
 
+    group_pos = _acc(group_pos_ok, group_pos_n)
+    group_neg = _acc(group_neg_ok, group_neg_n)
+    relation_pos = _acc(relation_pos_ok, relation_pos_n)
+    relation_none = _acc(relation_none_ok, relation_none_n)
     return {
         "loss": sum(losses) / max(1, len(losses)),
-        "symbol_accuracy": symbol_ok / max(1, symbol_n),
-        "group_accuracy": group_ok / max(1, group_n),
-        "relation_accuracy": relation_ok / max(1, relation_n),
+        "symbol_accuracy": _acc(symbol_ok, symbol_n),
+        "group_positive_accuracy": group_pos,
+        "group_negative_accuracy": group_neg,
+        "group_balanced_accuracy": 0.5 * (group_pos + group_neg),
+        "relation_positive_accuracy": relation_pos,
+        "relation_none_accuracy": relation_none,
+        "relation_balanced_accuracy": 0.5 * (relation_pos + relation_none),
         "symbol_labels": symbol_n,
-        "group_labels": group_n,
-        "relation_labels": relation_n,
+        "group_positive_labels": group_pos_n,
+        "group_negative_labels": group_neg_n,
+        "relation_positive_labels": relation_pos_n,
+        "relation_none_labels": relation_none_n,
     }
 
 
@@ -163,6 +208,19 @@ def main():
     if overlap:
         raise SystemExit(f"writer leakage in V4 structural corpus: {sorted(overlap)[:5]}")
 
+    train_examples = [x for x in examples if x.split == "train"]
+    multi_groups = sum(
+        len(g.get("strokes") or []) > 1
+        for x in train_examples for g in (x.structure.get("groups") or [])
+    )
+    positive_relations = sum(
+        len(x.structure.get("relations") or []) for x in train_examples
+    )
+    if multi_groups < 1:
+        raise SystemExit("V4 training corpus has no multi-stroke glyph groups; grouping head would be trivial")
+    if positive_relations < 1:
+        raise SystemExit("V4 training corpus has no positive structural relations")
+
     cfg = StructuralConfig(
         d_model=args.d_model,
         point_layers=args.point_layers,
@@ -200,7 +258,8 @@ def main():
 
     print(
         f"Pri Ink Structural V4 device={device} samples={len(examples)} splits={counts} "
-        f"train_writers={len(train_writers)} val_writers={len(val_writers)}"
+        f"train_writers={len(train_writers)} val_writers={len(val_writers)} "
+        f"multi_stroke_groups={multi_groups} positive_relations={positive_relations}"
     )
     print(f"parameters={sum(p.numel() for p in model.parameters()):,}")
 
@@ -217,24 +276,27 @@ def main():
                 batch["stroke_geometry"].to(device),
                 batch["raster"].to(device),
             )
-            loss, parts = structural_loss(outputs, batch, device)
+            loss, _ = structural_loss(outputs, batch, device)
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
             opt.step(); sched.step()
             running += float(loss.detach()); steps += 1
 
         metrics = evaluate(model, val_loader, device)
-        # Structural relation correctness matters most, but grouping and symbol
-        # identity must both be healthy before a checkpoint is useful.
+        # Flat NONE accuracy can look excellent while the parser learns nothing.
+        # Checkpoint selection therefore weights positive relation recognition and
+        # balanced grouping, not raw all-pairs accuracy.
         score = (
             0.35 * metrics["symbol_accuracy"] +
-            0.30 * metrics["group_accuracy"] +
-            0.35 * metrics["relation_accuracy"]
+            0.30 * metrics["group_balanced_accuracy"] +
+            0.35 * metrics["relation_positive_accuracy"]
         )
         print(
             f"epoch={epoch} train_loss={running/max(1,steps):.4f} "
             f"val_loss={metrics['loss']:.4f} symbol={metrics['symbol_accuracy']:.4f} "
-            f"group={metrics['group_accuracy']:.4f} relation={metrics['relation_accuracy']:.4f}"
+            f"group_bal={metrics['group_balanced_accuracy']:.4f} "
+            f"relation_pos={metrics['relation_positive_accuracy']:.4f} "
+            f"relation_none={metrics['relation_none_accuracy']:.4f}"
         )
 
         if score > best + 1e-5:
@@ -257,6 +319,8 @@ def main():
                 "validation": metrics,
                 "trainWriters": len(train_writers),
                 "validationWriters": len(val_writers),
+                "multiStrokeGroups": multi_groups,
+                "positiveRelations": positive_relations,
                 "evidence": checkpoint["evidence"],
             }, indent=2) + "\n")
         else:
