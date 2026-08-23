@@ -7,6 +7,7 @@ on:
       - 'tools/ink-foundation/structural.py'
       - 'tools/ink-foundation/structural_data.py'
       - 'tools/ink-foundation/train_structural.py'
+      - 'tools/ink-foundation/train_structural_dev.py'
       - 'scripts/ink-structural-pretrain-dev.sh'
       - 'scripts/ink-structural-rebuild-dev.sh'
       - 'package.json'
@@ -17,6 +18,7 @@ on:
       - 'tools/ink-foundation/structural.py'
       - 'tools/ink-foundation/structural_data.py'
       - 'tools/ink-foundation/train_structural.py'
+      - 'tools/ink-foundation/train_structural_dev.py'
       - 'scripts/ink-structural-pretrain-dev.sh'
       - 'scripts/ink-structural-rebuild-dev.sh'
       - 'package.json'
@@ -41,8 +43,12 @@ jobs:
           cache: pip
           cache-dependency-path: tools/ink-foundation/requirements.txt
 
-      - name: Generator syntax
-        run: node --check tools/ink-foundation/generate_structural_synthetic.mjs
+      - name: Generator and trainer syntax
+        run: |
+          node --check tools/ink-foundation/generate_structural_synthetic.mjs
+          python -m py_compile \
+            tools/ink-foundation/train_structural.py \
+            tools/ink-foundation/train_structural_dev.py
 
       - name: Install training dependencies
         run: python -m pip install -r tools/ink-foundation/requirements.txt
@@ -90,14 +96,45 @@ jobs:
             --max-points-per-stroke 96 \
             --patience 1
 
-      - name: Checkpoint remains research-only
+      - name: Generate one-writer dev smoke corpus
+        run: |
+          node tools/ink-foundation/generate_structural_synthetic.mjs \
+            /tmp/pri-ink-v4-dev-smoke 1 0 12
+
+      - name: One-epoch glyph replay fine-tune smoke
+        run: |
+          python tools/ink-foundation/train_structural_dev.py \
+            --corpus /tmp/pri-ink-v4-dev-smoke \
+            --init /tmp/pri-ink-v4-exact-synth.pt \
+            --replay-corpus /tmp/pri-ink-v4-exact-synth \
+            --replay-weight 0.20 \
+            --out /tmp/pri-ink-v4-dev-smoke.pt \
+            --epochs 1 \
+            --batch 4 \
+            --device cpu \
+            --d-model 64 \
+            --point-layers 1 \
+            --stroke-layers 1 \
+            --max-strokes 64 \
+            --max-points-per-stroke 96 \
+            --patience 1
+
+      - name: Checkpoints remain research-only
         run: |
           python - <<'PY'
           import torch
-          p = '/tmp/pri-ink-v4-exact-synth.pt'
-          ckpt = torch.load(p, map_location='cpu', weights_only=False)
-          assert ckpt['architecture_version'] == 4
-          assert ckpt['stage'] == 'structural-research'
-          assert ckpt['production_ready'] is False
-          print('Exact synthetic promotion lock: PASS')
+          for p, stage in [
+              ('/tmp/pri-ink-v4-exact-synth.pt', 'structural-research'),
+              ('/tmp/pri-ink-v4-dev-smoke.pt', 'structural-research-dev'),
+          ]:
+              ckpt = torch.load(p, map_location='cpu', weights_only=False)
+              assert ckpt['architecture_version'] == 4
+              assert ckpt['stage'] == stage
+              assert ckpt['production_ready'] is False
+              assert ckpt.get('symbol_objective') == 'annotated-glyph-group-logprob-v1'
+          dev = torch.load('/tmp/pri-ink-v4-dev-smoke.pt', map_location='cpu', weights_only=False)
+          replay = dev.get('synthetic_replay') or {}
+          assert replay.get('objective') == 'glyph-symbol-only'
+          assert replay.get('evidence') is False
+          print('Exact synthetic + replay promotion locks: PASS')
           PY
