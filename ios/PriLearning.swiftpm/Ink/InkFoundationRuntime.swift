@@ -77,28 +77,27 @@ final class InkFoundationRuntime {
     private static func loadModel() -> MLModel? {
         var bundles: [Bundle] = [Bundle.main]
         if let nested = Bundle.main.urls(forResourcesWithExtension: "bundle", subdirectory: nil) {
-            bundles.append(contentsOf: nested.compactMap(Bundle.init(url:)))
+            bundles.append(contentsOf: nested.compactMap { Bundle(url: $0) })
         }
-        var source: URL?
+        var source: URL? = nil
         for bundle in bundles {
             for subdir in ["Models", "Resources/Models"] {
                 if let compiled = bundle.url(forResource: "PriInkFoundation", withExtension: "mlmodelc", subdirectory: subdir) {
-                    source = compiled; break
+                    source = compiled
+                    break
                 }
                 if let package = bundle.url(forResource: "PriInkFoundation", withExtension: "mlpackage", subdirectory: subdir) {
-                    source = package; break
+                    source = package
+                    break
                 }
             }
             if source != nil { break }
         }
         guard let source else { return nil }
         do {
-            let url: URL
-            if source.pathExtension == "mlmodelc" {
-                url = source
-            } else {
-                url = try MLModel.compileModel(at: source)
-            }
+            let url = source.pathExtension == "mlmodelc"
+                ? source
+                : try MLModel.compileModel(at: source)
             let configuration = MLModelConfiguration()
             configuration.computeUnits = .all
             return try MLModel(contentsOf: url, configuration: configuration)
@@ -116,13 +115,26 @@ final class InkFoundationRuntime {
         let raster: MLMultiArray
     }
 
+    private static func index(_ values: Int...) -> [NSNumber] {
+        values.map { NSNumber(value: $0) }
+    }
+
     private func makeInputs(strokes: [InkStroke]) throws -> Inputs {
-        let points = try MLMultiArray(shape: [1, NSNumber(value: maxPoints), NSNumber(value: featureDim)], dataType: .float32)
-        let valid = try MLMultiArray(shape: [1, NSNumber(value: maxPoints)], dataType: .float32)
-        let raster = try MLMultiArray(shape: [1, 1, NSNumber(value: rasterHeight), NSNumber(value: rasterWidth)], dataType: .float32)
-        for i in 0..<points.count { points[i] = 0 }
-        for i in 0..<valid.count { valid[i] = 0 }
-        for i in 0..<raster.count { raster[i] = 0 }
+        let points = try MLMultiArray(
+            shape: [NSNumber(value: 1), NSNumber(value: maxPoints), NSNumber(value: featureDim)],
+            dataType: .float32
+        )
+        let valid = try MLMultiArray(
+            shape: [NSNumber(value: 1), NSNumber(value: maxPoints)],
+            dataType: .float32
+        )
+        let raster = try MLMultiArray(
+            shape: [NSNumber(value: 1), NSNumber(value: 1), NSNumber(value: rasterHeight), NSNumber(value: rasterWidth)],
+            dataType: .float32
+        )
+        for i in 0..<points.count { points[i] = NSNumber(value: 0.0) }
+        for i in 0..<valid.count { valid[i] = NSNumber(value: 0.0) }
+        for i in 0..<raster.count { raster[i] = NSNumber(value: 0.0) }
 
         let live = strokes.enumerated().filter { !$0.element.points.isEmpty }
         guard !live.isEmpty else { return Inputs(points: points, valid: valid, raster: raster) }
@@ -170,9 +182,9 @@ final class InkFoundationRuntime {
             features = sampled
         }
         for i in 0..<features.count {
-            valid[[0, NSNumber(value: i)]] = 1
+            valid[Self.index(0, i)] = NSNumber(value: 1.0)
             for f in 0..<featureDim {
-                points[[0, NSNumber(value: i), NSNumber(value: f)]] = NSNumber(value: features[i][f])
+                points[Self.index(0, i, f)] = NSNumber(value: features[i][f])
             }
         }
         fillRaster(strokes: strokes, into: raster)
@@ -196,18 +208,24 @@ final class InkFoundationRuntime {
         let colorSpace = CGColorSpaceCreateDeviceGray()
         pixels.withUnsafeMutableBytes { raw in
             guard let base = raw.baseAddress,
-                  let context = CGContext(data: base, width: rasterWidth, height: rasterHeight,
-                                          bitsPerComponent: 8, bytesPerRow: rasterWidth,
-                                          space: colorSpace,
-                                          bitmapInfo: CGImageAlphaInfo.none.rawValue) else { return }
+                  let context = CGContext(
+                    data: base,
+                    width: rasterWidth,
+                    height: rasterHeight,
+                    bitsPerComponent: 8,
+                    bytesPerRow: rasterWidth,
+                    space: colorSpace,
+                    bitmapInfo: CGImageAlphaInfo.none.rawValue
+                  ) else { return }
             context.setFillColor(gray: 0, alpha: 1)
             context.fill(CGRect(x: 0, y: 0, width: rasterWidth, height: rasterHeight))
-            // Match the y-down coordinate convention used by the corpus raster.
             context.translateBy(x: 0, y: CGFloat(rasterHeight))
             context.scaleBy(x: 1, y: -1)
             context.setStrokeColor(gray: 1, alpha: 1)
             context.setFillColor(gray: 1, alpha: 1)
-            context.setLineCap(.round); context.setLineJoin(.round); context.setShouldAntialias(true)
+            context.setLineCap(.round)
+            context.setLineJoin(.round)
+            context.setShouldAntialias(true)
 
             let map: (InkPoint) -> CGPoint = { p in
                 CGPoint(x: p.x * scale + ox, y: p.y * scale + oy)
@@ -221,7 +239,8 @@ final class InkFoundationRuntime {
                     context.fillEllipse(in: CGRect(x: c.x-r, y: c.y-r, width: 2*r, height: 2*r))
                     continue
                 }
-                context.beginPath(); context.move(to: map(first))
+                context.beginPath()
+                context.move(to: map(first))
                 for p in stroke.points.dropFirst() { context.addLine(to: map(p)) }
                 context.strokePath()
             }
@@ -229,7 +248,7 @@ final class InkFoundationRuntime {
         for y in 0..<rasterHeight {
             for x in 0..<rasterWidth {
                 let value = Float(pixels[y * rasterWidth + x]) / 255
-                output[[0, 0, NSNumber(value: y), NSNumber(value: x)]] = NSNumber(value: value)
+                output[Self.index(0, 0, y, x)] = NSNumber(value: value)
             }
         }
     }
@@ -249,22 +268,27 @@ final class InkFoundationRuntime {
             raw.reserveCapacity(classes)
             var maxLogit = -Double.infinity
             for id in 0..<classes {
-                let v = logits[[0, NSNumber(value: slot), NSNumber(value: id)]].doubleValue
-                raw.append((id, v)); maxLogit = max(maxLogit, v)
+                let v = logits[Self.index(0, slot, id)].doubleValue
+                raw.append((id, v))
+                maxLogit = max(maxLogit, v)
             }
             var denom = 0.0
-            let probs = raw.map { item -> (Int, Double) in
-                let p = exp(item.logit - maxLogit); denom += p; return (item.id, p)
+            let unnormalised = raw.map { item -> (Int, Double) in
+                let p = exp(item.logit - maxLogit)
+                denom += p
+                return (item.id, p)
             }
-            let ranked = probs.map { ($0.0, $0.1 / max(denom, 1e-12)) }.sorted { $0.1 > $1.1 }
+            let ranked = unnormalised
+                .map { ($0.0, $0.1 / max(denom, 1e-12)) }
+                .sorted { $0.1 > $1.1 }
             guard let top = ranked.first else { break }
-            if top.0 == eosID { break }
-            if top.0 == padID { break }
+            if top.0 == eosID || top.0 == padID { break }
             if top.0 == bosID { continue }
             guard vocab.indices.contains(top.0) else { continue }
             let token = vocab[top.0]
             if token.hasPrefix("<") { continue }
-            pieces.append(token); confidences.append(top.1)
+            pieces.append(token)
+            confidences.append(top.1)
             var candidates: [String: Double] = [:]
             for (id, p) in ranked.prefix(6) where vocab.indices.contains(id) {
                 let candidate = vocab[id]
