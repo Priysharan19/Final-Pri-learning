@@ -113,14 +113,14 @@ def ctc_alignment_loss(ctc_logits: torch.Tensor, physical_tokens: torch.Tensor,
     """Online points -> physically drawn token sequence, using PAD as blank."""
     input_lengths = point_valid.sum(dim=1).to(torch.long)
     target_lengths = physical_lengths.to(torch.long)
-    if int(target_lengths.max()) == 0:
+    if int(target_lengths.max().item()) == 0:
         return ctc_logits.sum() * 0.0
 
     chunks = []
     for row, n in zip(physical_tokens, target_lengths):
-        chunks.append(row[:int(n)].to(torch.long))
+        chunks.append(row[:int(n.item())].to(torch.long))
     targets = torch.cat(chunks, dim=0)
-    log_probs = F.log_softmax(ctc_logits, dim=-1).transpose(0, 1)  # T,B,C
+    log_probs = F.log_softmax(ctc_logits, dim=-1).transpose(0, 1)
     return F.ctc_loss(
         log_probs, targets, input_lengths, target_lengths,
         blank=PAD_ID, reduction="mean", zero_infinity=True,
@@ -145,9 +145,13 @@ def _expanded_vocab_tensor(current_tensor: torch.Tensor, incoming_tensor: torch.
 def load_initial_backbone(model: PriInkFoundation, path: str):
     """Load compatible pretraining weights with explicit V2 -> V3 migration.
 
-    V3 adds 2-D raster positions, a CTC head and the derivative-prime output
-    token. Old output rows are copied by token NAME so inserting a new token
-    cannot silently shift ±/° or any future vocabulary item.
+    V2 checkpoints legitimately lack V3's 2-D position embeddings and CTC head,
+    so those tensors initialize fresh only when absent. V3 -> V3 transfer must
+    preserve them: throwing away learned spatial/alignment weights before real
+    Pencil adaptation would erase a major part of pretraining.
+
+    Vocabulary-indexed rows are copied by token NAME so adding derivative prime
+    cannot silently shift older tokens such as ± or °.
     """
     ckpt = torch.load(path, map_location="cpu", weights_only=False)
     prior_vocab = ckpt.get("vocab") or []
@@ -159,27 +163,40 @@ def load_initial_backbone(model: PriInkFoundation, path: str):
 
     current = model.state_dict()
     incoming = ckpt.get("model") or {}
-    new_v3 = {
+    optional_v3 = {
         "raster_encoder.row_pos.weight",
         "raster_encoder.col_pos.weight",
         "ctc_output.weight",
         "ctc_output.bias",
     }
-    vocab_rows = {"output.weight", "output.bias"}
+    vocab_rows = {"output.weight", "output.bias", "ctc_output.weight", "ctc_output.bias"}
     usable = {}
     mismatched = []
+    allowed_missing = set()
 
     for key, value_now in current.items():
-        if key.startswith("writer_head.") or key in new_v3:
+        if key.startswith("writer_head."):
+            allowed_missing.add(key)
             continue
         value = incoming.get(key)
+
         if key in vocab_rows and value is not None:
-            # The only allowed shape change is axis-0 vocabulary expansion.
             compatible_tail = value.ndim == value_now.ndim and tuple(value.shape[1:]) == tuple(value_now.shape[1:])
             if not compatible_tail:
                 mismatched.append(key); continue
             usable[key] = _expanded_vocab_tensor(value_now, value, prior_vocab, VOCAB)
             continue
+
+        if key in optional_v3:
+            if value is None:
+                allowed_missing.add(key)
+                continue
+            if tuple(value.shape) != tuple(value_now.shape):
+                mismatched.append(key)
+            else:
+                usable[key] = value
+            continue
+
         if value is None or tuple(value.shape) != tuple(value_now.shape):
             mismatched.append(key)
         else:
@@ -190,11 +207,17 @@ def load_initial_backbone(model: PriInkFoundation, path: str):
         raise SystemExit(f"--init architecture mismatch in {len(mismatched)} backbone tensors: {preview}")
 
     missing, unexpected = model.load_state_dict(usable, strict=False)
-    allowed_missing = new_v3 | {k for k in current if k.startswith("writer_head.")}
     bad_missing = [k for k in missing if k not in allowed_missing]
     bad_unexpected = [k for k in unexpected if not k.startswith("writer_head.")]
     if bad_missing or bad_unexpected:
         raise SystemExit(f"--init did not load cleanly: missing={bad_missing[:5]} unexpected={bad_unexpected[:5]}")
+
+    # A V3 source must transfer every V3 representation tensor. This assertion
+    # makes a future refactor fail loudly instead of silently degrading bootstrap.
+    if int(ckpt.get("architecture_version") or (ckpt.get("config") or {}).get("architecture_version") or 0) >= 3:
+        lost = [k for k in optional_v3 if k in current and k not in usable]
+        if lost:
+            raise SystemExit(f"V3 -> V3 transfer dropped learned V3 tensors: {lost}")
     return ckpt
 
 
