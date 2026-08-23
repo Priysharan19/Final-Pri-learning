@@ -1,8 +1,8 @@
 # Pri Ink Foundation — locally owned handwriting AI
 
-Pri Ink Foundation is Pri Learning's trainable, on-device handwriting model. It is trained by Pri Learning, exported to Core ML and executed locally. No hosted AI inference API is required.
+Pri Ink Foundation is Pri Learning's trainable, on-device handwriting system. It is trained by Pri Learning, exported to Core ML and executed locally. No hosted AI inference API is required.
 
-## Architecture
+## Current production-compatible path: V3
 
 1. **Stroke Transformer** — up to 768 Pencil points with x/y, velocity, timing, force, width, orientation and stroke boundaries.
 2. **Whole-expression visual encoder** — 128×512 raster, preserving 2-D context that isolated-glyph CNNs lose.
@@ -17,6 +17,70 @@ The native runtime uses:
 3. native Vision/geometry recogniser as emergency no-result rescue.
 
 All three are on-device.
+
+## Structural V4 research path
+
+V4 is the next architecture, developed beside V3 rather than replacing a passing runtime prematurely. It changes the recognition abstraction from flat OCR to explicit mathematical structure:
+
+```text
+Pencil points
+    -> physical-stroke encoder
+    -> contextual stroke embeddings + 2-D visual cross-attention
+    -> same-glyph grouping
+    -> symbol evidence
+    -> directed spatial/mathematical relations
+    -> inspectable maths graph
+    -> deterministic structural decoder
+```
+
+The current V4 relation vocabulary is `RIGHT`, `SUPERSCRIPT`, `SUBSCRIPT`, `ABOVE`, `BELOW`, `NUMERATOR`, `DENOMINATOR` and `INSIDE_ROOT`. Grouping and relation heads are trained with balanced losses so the huge number of negative/NONE pairs cannot produce misleadingly high validation accuracy.
+
+V4 is intentionally tagged **research-only**. It does not have permission to replace V3 or enter a release build until it beats V3 on locked writer-disjoint real Pencil evidence.
+
+### Annotate real Pencil traces for V4
+
+Collect normally first:
+
+```bash
+npm run ink:collect
+```
+
+Then run the local structural annotator:
+
+```bash
+npm run ink:annotate
+```
+
+Load a collected `pri-ink-corpus` JSON. For every expression:
+
+1. group the physical stroke numbers that form one visible glyph (for example, the two bars of `=`);
+2. label the group with the canonical model token (`x`, `2`, `=`, `sqrt`, `theta`, `'`, etc.);
+3. add explicit mathematical relations such as `SUPERSCRIPT` or `NUMERATOR`;
+4. validate that every physical stroke belongs to exactly one glyph;
+5. save the structural-V4 JSON locally.
+
+The annotator reads and writes local files only. It does not upload handwriting.
+
+### Train V4
+
+Set up the same Python environment used by V3, then point the V4 trainer at a directory containing structure-annotated train and validation writers:
+
+```bash
+.venv-ink/bin/python tools/ink-foundation/train_structural.py \
+  --corpus client/test/ink-corpus-structural \
+  --out tools/ink-foundation/runs/pri-ink-structural-v4.pt
+```
+
+The trainer refuses:
+
+- writer overlap between train and validation;
+- unsupported glyph labels;
+- incomplete or duplicate stroke grouping;
+- relation edges to nonexistent glyphs;
+- corpora with no real multi-stroke glyph grouping signal;
+- corpora with no positive mathematical relations.
+
+V4 checkpoint selection weights symbol accuracy, balanced grouping accuracy and **positive structural-relation accuracy**. Raw all-pairs/NONE accuracy is not accepted as evidence that the parser learned maths structure.
 
 ## Collect real Apple Pencil data
 
@@ -43,7 +107,7 @@ npm run test:ink:corpus:strict
 
 Strict audit fails on writer/session leakage, incorrect deterministic split assignment, missing consent, non-Pencil samples, or inadequate timing/dynamics coverage.
 
-## Training: synthetic initialization → real-writer fine-tuning
+## V3 training: synthetic initialization → real-writer fine-tuning
 
 Set up once:
 
@@ -122,7 +186,7 @@ Coverage is allowed to fall before safe precision. Uncertain work should be conf
 
 ## Core ML export and promotion lock
 
-A development model can be exported without promotion:
+A V3 development model can be exported without promotion:
 
 ```bash
 .venv-ink/bin/python tools/ink-foundation/export_coreml.py \
@@ -141,6 +205,8 @@ A production export requires the passing locked final-holdout report for the exa
 
 The exporter embeds the checkpoint hash and release metrics. Release builds activate the model only when promotion metadata is valid.
 
+V4 has no production export path yet by design. A structural research checkpoint is not allowed to masquerade as a promoted V3 Core ML asset.
+
 ## Evidence boundary
 
-Synthetic suites, simulator benchmarks and training loss are engineering evidence, not arbitrary-human-handwriting accuracy. Until the real writer corpus reaches the production evidence floor and the frozen checkpoint passes it, Pri Learning must describe the foundation model as unvalidated for production real writers.
+Synthetic suites, simulator benchmarks, annotation-tool correctness and training loss are engineering evidence, not arbitrary-human-handwriting accuracy. Until a frozen model passes the real writer-disjoint release floor, Pri Learning must describe it as unvalidated for production real writers.
