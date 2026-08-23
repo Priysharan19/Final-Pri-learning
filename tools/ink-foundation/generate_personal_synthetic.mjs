@@ -1,9 +1,9 @@
-// Pri Ink Foundation · holdout-safe writer-specific synthetic replay
+// Pri Ink Foundation · holdout-safe writer-specific synthetic replay V3
 //
 // Reads one local capture-v7+ TRAIN writer, mirrors bootstrap.py's deterministic
 // real-expression dev holdout exactly, extracts only confidently separable glyphs
 // from the remaining real training expressions, then recombines those real
-// writer shapes into new HSC-style expressions.
+// writer shapes into a broader HSC-style curriculum.
 //
 // The output is synthetic TRAINING DATA. It is never counted as real evidence.
 // No held-out real expression contributes a glyph to the replay bank.
@@ -170,7 +170,7 @@ function sourceGlyph(sym) {
   return personal?.length ? pick(personal) : genericGlyph(sym);
 }
 
-function primeGlyph() {
+function fallbackPrimeGlyph() {
   return [{ points: [
     { x: 47, y: 23, w: 2.2, t: 0, p: 0.5, azimuth: 0, altitude: Math.PI / 2 },
     { x: 55, y: 0, w: 2.2, t: 0.045, p: 0.5, azimuth: 0, altitude: Math.PI / 2 }
@@ -178,7 +178,11 @@ function primeGlyph() {
 }
 
 function placeGlyph(sym, x, y, scaleFactor = 1, ordinal = 0) {
-  const source = sym === "'" ? primeGlyph() : sourceGlyph(sym);
+  // Prime is a first-class token. If the writer supplied a safely extracted
+  // prime glyph, use it; only fall back to a synthetic mark when unavailable.
+  const source = sym === "'"
+    ? (bank.get("'")?.length ? pick(bank.get("'")) : fallbackPrimeGlyph())
+    : sourceGlyph(sym);
   if (!source?.length) throw new Error(`No personal or stock glyph source for ${sym}`);
   const pts = source.flatMap(s => s.points || []);
   const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
@@ -210,79 +214,157 @@ function writeTokens(tokens, x = 18, y = 64, scale = 1, ordinal = 0) {
     ord = g.ordinal;
     cursor += g.width + 7 * scale * (0.82 + rng() * 0.36);
   }
-  return { strokes, x2: cursor, ordinal: ord };
+  return { strokes, x1: x, x2: cursor, width: Math.max(1, cursor - x), ordinal: ord };
 }
 
-function baseline(tokens, target = tokens.join('')) {
-  return { strokes: writeTokens(tokens).strokes, target };
+function baseline(tokens, target = tokens.join(''), family = 'baseline') {
+  return { strokes: writeTokens(tokens).strokes, target, family };
 }
 
-function onePower(prefix, power, tail, target) {
+function onePower(prefix, power, tail, target, family = 'powers') {
   const base = writeTokens(prefix);
   const exp = writeTokens([power], base.x2 + 1, 26, 0.58, base.ordinal);
   const rest = writeTokens(tail, Math.max(base.x2, exp.x2) + 7, 64, 1, exp.ordinal);
-  return { strokes: [...base.strokes, ...exp.strokes, ...rest.strokes], target };
+  return { strokes: [...base.strokes, ...exp.strokes, ...rest.strokes], target, family };
 }
 
-function twoPowers(prefix1, power1, between, prefix2, power2, tail, target) {
+function twoPowers(prefix1, power1, between, prefix2, power2, tail, target, family = 'polynomial') {
   const a = writeTokens(prefix1);
   const ae = writeTokens([power1], a.x2 + 1, 26, 0.58, a.ordinal);
   const mid = writeTokens(between, Math.max(a.x2, ae.x2) + 7, 64, 1, ae.ordinal);
   const b = writeTokens(prefix2, mid.x2, 64, 1, mid.ordinal);
   const be = writeTokens([power2], b.x2 + 1, 26, 0.58, b.ordinal);
   const rest = writeTokens(tail, Math.max(b.x2, be.x2) + 7, 64, 1, be.ordinal);
-  return { strokes: [...a.strokes, ...ae.strokes, ...mid.strokes, ...b.strokes, ...be.strokes, ...rest.strokes], target };
+  return { strokes: [...a.strokes, ...ae.strokes, ...mid.strokes, ...b.strokes, ...be.strokes, ...rest.strokes], target, family };
+}
+
+function moveStrokes(strokes, dx, dy) {
+  return strokes.map(stroke => ({
+    points: (stroke.points || []).map(p => ({ ...p, x: p.x + dx, y: p.y + dy }))
+  }));
+}
+
+function stretchedFractionBar(x, y, width) {
+  const source = sourceGlyph('-');
+  if (source?.length) {
+    const pts = source.flatMap(s => s.points || []);
+    const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
+    const x1 = Math.min(...xs), x2 = Math.max(...xs), cy = (Math.min(...ys) + Math.max(...ys)) / 2;
+    const span = Math.max(1, x2 - x1);
+    return source.map(stroke => ({
+      points: (stroke.points || []).map((p, i) => ({
+        ...p,
+        x: +(x + ((p.x - x1) / span) * width).toFixed(3),
+        y: +(y + (p.y - cy) * 0.16).toFixed(3),
+        t: +(Number.isFinite(p.t) ? p.t : i / 120).toFixed(6)
+      }))
+    }));
+  }
+  return [{ points: [
+    { x, y, w: 2.5, t: 0, p: 0.5, azimuth: 0, altitude: Math.PI / 2 },
+    { x: x + width, y, w: 2.5, t: 0.08, p: 0.5, azimuth: 0, altitude: Math.PI / 2 }
+  ] }];
+}
+
+function stackedFraction() {
+  const numerator = rng() < 0.45 ? ['x', '+', nz()] : [nz(), ...(rng() < 0.25 ? [digit()] : [])];
+  const denominator = rng() < 0.35 ? ['x', '-', nz()] : [nz(), ...(rng() < 0.20 ? [digit()] : [])];
+  const n = writeTokens(numerator, 24, 18, 0.72);
+  const d = writeTokens(denominator, 24, 92, 0.72, n.ordinal);
+  const width = Math.max(n.width, d.width) + 20;
+  const left = 18;
+  const nShift = left + (width - n.width) / 2 - n.x1;
+  const dShift = left + (width - d.width) / 2 - d.x1;
+  const bar = stretchedFractionBar(left, 76, width);
+  return {
+    strokes: [...moveStrokes(n.strokes, nShift, 0), ...bar, ...moveStrokes(d.strokes, dShift, 0)],
+    target: `(${numerator.join('')})/(${denominator.join('')})`,
+    family: 'stacked-fraction'
+  };
+}
+
+function radicalExpression() {
+  const inside = rng() < 0.45 ? ['x'] : (rng() < 0.6 ? ['4', '9'] : [nz(), digit()]);
+  const root = placeGlyph('sqrt', 18, 38, 1, 0);
+  const body = writeTokens(inside, 18 + root.width + 2, 48, 0.88, root.ordinal);
+  return {
+    strokes: [...root.strokes, ...body.strokes],
+    target: `sqrt(${inside.join('')})`,
+    family: 'radical'
+  };
 }
 
 const digit = () => String(Math.floor(rng() * 10));
 const nz = () => String(1 + Math.floor(rng() * 9));
 
 function makeExpression() {
-  switch (Math.floor(rng() * 14)) {
+  switch (Math.floor(rng() * 20)) {
     case 0: {
       const a = nz(), b = nz(), rhs = String(Number(a) * (2 + Math.floor(rng() * 8)) + Number(b));
-      return baseline([a, 'x', '+', b, '=', ...rhs]);
+      return baseline([a, 'x', '+', b, '=', ...rhs], undefined, 'linear-equation');
     }
     case 1:
-      return onePower(['0', '=', 'x'], '2', ['+', 'x', '-', '3', '0'], '0=x^(2)+x-30');
+      return onePower(['0', '=', 'x'], '2', ['+', 'x', '-', '3', '0'], '0=x^(2)+x-30', 'stationary-quadratic');
     case 2:
-      return baseline(['0', '=', '(', 'x', '-', '5', ')', '(', 'x', '+', '6', ')']);
+      return baseline(['0', '=', '(', 'x', '-', '5', ')', '(', 'x', '+', '6', ')'], undefined, 'factorised-quadratic');
     case 3:
-      return onePower(['y', '=', '(', '4', 'x', '-', '3', ')'], '4', [], 'y=(4x-3)^(4)');
+      return onePower(['y', '=', '(', '4', 'x', '-', '3', ')'], '4', [], 'y=(4x-3)^(4)', 'chain-rule-source');
     case 4:
-      return onePower(['y', "'", '=', '1', '6', '(', '4', 'x', '-', '3', ')'], '3', [], "y'=16(4x-3)^(3)");
+      return onePower(['y', "'", '=', '1', '6', '(', '4', 'x', '-', '3', ')'], '3', [], "y'=16(4x-3)^(3)", 'chain-rule-derivative');
     case 5:
-      return onePower(['y', "'", '=', '6', 'x'], '2', ['+', '6', 'x', '-', '1', '8', '0'], "y'=6x^(2)+6x-180");
+      return onePower(['y', "'", '=', '6', 'x'], '2', ['+', '6', 'x', '-', '1', '8', '0'], "y'=6x^(2)+6x-180", 'polynomial-derivative');
     case 6:
-      return onePower(['0', '=', '6', 'x'], '2', ['+', '6', 'x', '-', '1', '8', '0'], '0=6x^(2)+6x-180');
+      return onePower(['0', '=', '6', 'x'], '2', ['+', '6', 'x', '-', '1', '8', '0'], '0=6x^(2)+6x-180', 'stationary-equation');
     case 7:
-      return onePower(['d', 'y', '/', 'd', 'x', '=', '6', 'x'], '2', ['+', '6', 'x', '-', '1', '8', '0'], 'dy/dx=6x^(2)+6x-180');
+      return onePower(['d', 'y', '/', 'd', 'x', '=', '6', 'x'], '2', ['+', '6', 'x', '-', '1', '8', '0'], 'dy/dx=6x^(2)+6x-180', 'dydx');
     case 8: {
       const a = digit(), b = digit();
-      return baseline(['x', '=', '3', '.', a, b]);
+      return baseline(['x', '=', '3', '.', a, b], undefined, 'decimal');
     }
     case 9: {
       const a = nz(), b = nz();
-      return baseline(['(', 'x', '+', a, ')', '(', 'x', '-', b, ')']);
+      return baseline(['(', 'x', '+', a, ')', '(', 'x', '-', b, ')'], undefined, 'factorised-expression');
     }
     case 10:
-      return baseline(['s', 'i', 'n', '(', 'x', ')', '=', '1', '/', '2']);
+      return baseline(['s', 'i', 'n', '(', 'x', ')', '=', '1', '/', '2'], undefined, 'trig');
     case 11: {
       const p = pick(['2', '3', '4']), c = nz();
-      return onePower(['x'], p, ['+', c], `x^(${p})+${c}`);
+      return onePower(['x'], p, ['+', c], `x^(${p})+${c}`, 'powers');
     }
     case 12:
-      return twoPowers(['y', '=', '2', 'x'], '3', ['+'], ['3', 'x'], '2', ['-', '1', '8', '0', 'x'], 'y=2x^(3)+3x^(2)-180x');
+      return twoPowers(['y', '=', '2', 'x'], '3', ['+'], ['3', 'x'], '2', ['-', '1', '8', '0', 'x'], 'y=2x^(3)+3x^(2)-180x', 'cubic-polynomial');
+    case 13:
+      return stackedFraction();
+    case 14:
+      return radicalExpression();
+    case 15:
+      return baseline(['c', 'o', 's', '(', 'x', ')', '=', '0'], undefined, 'trig');
+    case 16: {
+      const c = nz();
+      return onePower(['f', "'", '(', 'x', ')', '=', c, 'x'], '2', ['-', '4', 'x', '+', '1'], `f'(x)=${c}x^(2)-4x+1`, 'function-derivative');
+    }
+    case 17: {
+      const rel = pick(['<', '>']);
+      return baseline(['x', rel, nz()], undefined, 'inequality');
+    }
+    case 18:
+      return onePower(['y', '=', '3', 'x'], '2', ['-', '5', 'x', '+', '2'], 'y=3x^(2)-5x+2', 'quadratic');
     default:
-      return baseline(['x', '=', '5']);
+      return baseline(['x', '=', '5'], undefined, 'simple-value');
   }
 }
 
 const generated = [];
+const curriculum = {};
 for (let i = 0; i < COUNT; i++) {
   const ex = makeExpression();
   if (!ex?.strokes?.length || !ex.target) throw new Error(`generator produced empty sample at ${i}`);
-  generated.push({ target: canonical(ex.target), shown: canonical(ex.target), pen: false, synthetic: true, personalSynthetic: true, strokes: ex.strokes });
+  curriculum[ex.family || 'unknown'] = (curriculum[ex.family || 'unknown'] || 0) + 1;
+  generated.push({
+    target: canonical(ex.target), shown: canonical(ex.target), pen: false,
+    synthetic: true, personalSynthetic: true, curriculumFamily: ex.family,
+    strokes: ex.strokes
+  });
 }
 
 rmSync(OUT, { recursive: true, force: true });
@@ -292,17 +374,19 @@ const doc = {
   format: 'pri-ink-corpus', version: 2, split: 'train', synthetic: true, personalSynthetic: true,
   holdoutLocked: false, predictedTouchesStored: false,
   collector: {
-    name: 'pri-personal-synthetic-replay-v2', seed: SEED,
+    name: 'pri-personal-synthetic-replay-v3', seed: SEED,
     derivedFromRealTrainingOnly: true, excludedRealDevHoldoutHash: heldoutHash,
-    excludedRealDevSamples: nVal
+    excludedRealDevSamples: nVal,
+    curriculum
   },
   writer: { id: writer, sessionId: `${writer}-PERSONAL-SYNTH-${SEED}`, handedness: 'derived', device: 'local-generator', pen: false },
   samples: generated
 };
 writeFileSync(join(OUT, `pri-personal-synth-${writer}.json`), JSON.stringify(doc));
 
-console.log(`PRI PERSONAL SYNTH — PASS: ${generated.length} derived expressions for ${writer}`);
+console.log(`PRI PERSONAL SYNTH V3 — PASS: ${generated.length} derived expressions for ${writer}`);
 console.log(`real extraction: ${acceptedSamples} accepted training samples, ${rejectedSamples} rejected; ${nVal} real dev-holdout samples untouched`);
 console.log(`personal core: ${personalCore.join(', ')}`);
+console.log(`curriculum: ${Object.entries(curriculum).sort().map(([name, n]) => `${name}:${n}`).join('  ')}`);
 console.log(`glyph bank: ${[...bank.entries()].sort().map(([sym, rows]) => `${sym}:${rows.length}`).join('  ')}`);
 console.log(`wrote ${OUT}`);
