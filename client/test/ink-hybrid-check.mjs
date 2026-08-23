@@ -15,54 +15,29 @@ function addSymbol(target, sym, x, y, scale = 0.48) {
   assert.ok(variant, `template exists for ${sym}`);
   const start = target.length;
   const made = variant.map(stroke => ({
-    points: stroke.map(([px, py]) => ({
-      x: x + scale * px,
-      y: y + scale * py,
-      w: 2.2,
-      t: 0
-    }))
+    points: stroke.map(([px, py]) => ({ x: x + scale * px, y: y + scale * py, w: 2.2, t: 0 }))
   }));
   target.push(...made);
-  return {
-    indexes: Array.from({ length: made.length }, (_, i) => start + i),
-    box: bounds(made)
-  };
+  return { indexes: Array.from({ length: made.length }, (_, i) => start + i), box: bounds(made) };
 }
 
-// ── Regression 1: Vision glyph ownership is WRONG, native LINE ownership is right.
-// This is the real failure class from the iPad screenshots. The hybrid must
-// ignore native per-glyph ownership and recover 3n+2 from the line's raw Pencil
-// strokes alone.
+// 1) Vision per-glyph ownership is deliberately WRONG. Native only knows the
+// real line. Pri must recover 3n+2 from the raw line strokes.
 const strokes = [];
 const owned = [];
 let cursor = 10;
-for (const sym of ['3', 'n', '+', '2']) {
-  owned.push(addSymbol(strokes, sym, cursor, 20));
-  cursor += 62;
-}
-
+for (const sym of ['3', 'n', '+', '2']) { owned.push(addSymbol(strokes, sym, cursor, 20)); cursor += 62; }
 const wrong = ['8', 'h', '=', 'z'];
 const symbols = wrong.map((sym, i) => ({
-  id: `n0_${i}`,
-  sym,
-  conf: 0.52,
-  alts: [],
-  box: owned[(i + 1) % owned.length].box,
-  // Deliberately scrambled ownership: if hybrid still trusts Vision at glyph
-  // level this test MUST fail.
-  strokeIdxs: owned[(i + 1) % owned.length].indexes,
-  approx: true
+  id: `n0_${i}`, sym, conf: 0.52, alts: [], box: owned[(i + 1) % owned.length].box,
+  strokeIdxs: owned[(i + 1) % owned.length].indexes, approx: true
 }));
 const allBox = bounds(strokes);
 const native = {
   engine: 'native-primary-debug',
   lines: [{ text: '8h=z', box: allBox, symbols, strokeIdxs: strokes.map((_, i) => i), unread: false }],
-  text: '8h=z',
-  minConf: 0.52,
-  margin: 0.2,
-  weakest: null
+  text: '8h=z', minConf: 0.52, margin: 0.2, weakest: null
 };
-
 const fused = fuseNativeStrokeReading(native, strokes, {});
 assert.equal(fused.lines.length, 1);
 assert.equal(fused.lines[0].text, '3n+2', `expected 3n+2, got ${fused.lines[0].text}`);
@@ -73,23 +48,15 @@ assert.deepEqual(
   'line-first fusion must preserve every Pencil stroke despite corrupted Vision ownership'
 );
 assert.ok(fused.lines[0].hybridCoverage >= 0.99, 'line-first reader must explain essentially all strokes');
-
-// Explicit student corrections use deterministic stroke-owned hybrid ids and
-// therefore survive the next recognition pass.
 const firstId = fused.lines[0].symbols[0].id;
 const corrected = fuseNativeStrokeReading(native, strokes, { [firstId]: '8' });
 assert.equal(corrected.lines[0].symbols[0].sym, '8', 'student override must remain locked');
 assert.equal(corrected.lines[0].symbols[0].conf, 1, 'student override confidence must remain locked');
 
-// ── Regression 2: the chain-rule failure shown on-device.
-// Native owns ONE real line; the raised 4 is deliberately small/high. Even if
-// Pri's internal page segmenter tries to split it into a tiny second line, the
-// hybrid must flatten the glyphs back into the native real line and restore the
-// power from geometry.
+// 2) Raised power from the real chain-rule failure.
 const powerStrokes = [];
 let x = 12;
-const baseline = ['y', '=', '(', '4', 'x', '-', '3', ')'];
-for (const sym of baseline) {
+for (const sym of ['y', '=', '(', '4', 'x', '-', '3', ')']) {
   addSymbol(powerStrokes, sym, x, 55, 0.42);
   x += sym === '(' || sym === ')' ? 38 : 51;
 }
@@ -97,25 +64,40 @@ addSymbol(powerStrokes, '4', x - 5, 28, 0.26);
 const powerBox = bounds(powerStrokes);
 const powerNative = {
   engine: 'native-primary-debug',
-  lines: [{
-    text: 'h=(42-3)1',
-    box: powerBox,
+  lines: [{ text: 'h=(42-3)1', box: powerBox,
     symbols: [{ id: 'bad', sym: 'h', conf: 0.5, alts: [], box: powerBox, strokeIdxs: [0], approx: true }],
-    strokeIdxs: powerStrokes.map((_, i) => i),
-    unread: false
-  }],
-  text: 'h=(42-3)1',
-  minConf: 0.5,
-  margin: 0.1,
-  weakest: null
+    strokeIdxs: powerStrokes.map((_, i) => i), unread: false }],
+  text: 'h=(42-3)1', minConf: 0.5, margin: 0.1, weakest: null
 };
 const powered = fuseNativeStrokeReading(powerNative, powerStrokes, {});
 assert.equal(powered.lines.length, 1);
-assert.equal(
-  powered.lines[0].text,
-  'y=(4x-3)^(4)',
-  `raised-power line must survive as y=(4x-3)^(4), got ${powered.lines[0].text}`
-);
+assert.equal(powered.lines[0].text, 'y=(4x-3)^(4)',
+  `raised-power line must survive as y=(4x-3)^(4), got ${powered.lines[0].text}`);
 assert.ok(powered.lines[0].hybridCoverage >= 0.99, 'power line must preserve every owned Pencil stroke');
 
-console.log('INK HYBRID — PASS: native real-line ownership + full Pri stroke re-recognition + raised powers');
+// 3) Derivative prime. The base classifier intentionally has no prime class;
+// this short raised Pencil tick therefore has to be recovered from geometry.
+const derivative = [];
+addSymbol(derivative, 'y', 10, 55, 0.42);
+derivative.push({ points: [
+  { x: 48, y: 51, w: 2, t: 0 },
+  { x: 47, y: 55, w: 2, t: 0.02 },
+  { x: 46, y: 59, w: 2, t: 0.04 }
+] });
+addSymbol(derivative, '=', 66, 55, 0.42);
+addSymbol(derivative, '3', 122, 55, 0.42);
+const derivativeBox = bounds(derivative);
+const derivativeNative = {
+  engine: 'native-primary-debug',
+  lines: [{ text: '4l=3', box: derivativeBox,
+    symbols: [{ id: 'bad-prime', sym: '4', conf: 0.5, alts: [], box: derivativeBox, strokeIdxs: [0], approx: true }],
+    strokeIdxs: derivative.map((_, i) => i), unread: false }],
+  text: '4l=3', minConf: 0.5, margin: 0.1, weakest: null
+};
+const derivativeRead = fuseNativeStrokeReading(derivativeNative, derivative, {});
+assert.equal(derivativeRead.lines.length, 1);
+assert.equal(derivativeRead.lines[0].text, "y'=3",
+  `derivative prime must survive as y'=3, got ${derivativeRead.lines[0].text}`);
+assert.ok(derivativeRead.lines[0].symbols.some(s => s.sym === "'"), 'prime must be represented as its own owned glyph');
+
+console.log('INK HYBRID — PASS: line ownership + stroke identity + raised powers + derivative primes');
