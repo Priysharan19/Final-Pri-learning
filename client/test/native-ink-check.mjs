@@ -1,16 +1,9 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Native ink bridge contract.
 //
-// The writing surface in the iPad app is native and the page talks to it by
-// posting messages. Those two halves are written in different languages, live
-// in different directories, and are compiled by different toolchains — so
-// nothing but a test will notice the day one of them is changed and the other
-// is not, and the symptom would be a student's handwriting silently going
-// nowhere.
-//
-// This reads BOTH sides: it drives client/src/ink/native.js against a stub of
-// the shell, and checks every op it sends against the ops InkBridge.swift
-// actually handles.
+// Reads BOTH sides of the JS ↔ Swift boundary. A renamed message, missing op or
+// dropped Pencil feature must fail here rather than turn into silent handwriting
+// loss in the app.
 //
 // Usage: node client/test/native-ink-check.mjs
 // ─────────────────────────────────────────────────────────────────────────────
@@ -20,6 +13,7 @@ import { fileURLToPath } from 'node:url';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const BRIDGE_SWIFT = join(HERE, '../../ios/PriLearning.swiftpm/Ink/InkBridge.swift');
+const STROKE_SWIFT = join(HERE, '../../ios/PriLearning.swiftpm/Ink/InkStroke.swift');
 
 let failures = 0;
 const check = (name, ok, detail = '') => {
@@ -90,21 +84,38 @@ posted.length = 0;
 nativeInk.setTool('eraser', true);
 nativeInk.setEnabled(false);
 nativeInk.undo(); nativeInk.redo(); nativeInk.clear();
-nativeInk.setStrokes([{ points: [{ x: 1, y: 2, w: 3 }] }]);
+nativeInk.setStrokes([{ points: [{ x: 1, y: 2, w: 3, t: 0.01, p: 0.7, azimuth: 1.1, altitude: 0.9 }] }]);
 nativeInk.layout(inkWrap);
 nativeInk.setAppearance();
 nativeInk.unmount();
 check('tool carries both the tool and the finger setting',
   posted[0].op === 'tool' && posted[0].tool === 'eraser' && posted[0].finger === true);
 check('enabled is a boolean', posted[1].op === 'enabled' && posted[1].enabled === false);
-check('strokes are sent as {points:[{x,y,w}]}',
-  posted[5].op === 'setStrokes' && posted[5].strokes[0].points[0].x === 1);
+check('stroke metadata survives the page → native message',
+  posted[5].op === 'setStrokes'
+  && posted[5].strokes[0].points[0].x === 1
+  && posted[5].strokes[0].points[0].p === 0.7
+  && posted[5].strokes[0].points[0].azimuth === 1.1);
 
-// ── recognition round trip ───────────────────────────────────────────────────
+// ── recognition round trips ──────────────────────────────────────────────────
+posted.length = 0;
+const foundationPending = nativeInk.foundationRecognize({ f0_2: 'x' });
+const foundationRequest = posted[0];
+check('foundation recognizer sends a request id and corrections',
+  foundationRequest.op === 'foundationRecognize'
+  && Number.isInteger(foundationRequest.reqId)
+  && foundationRequest.overrides.f0_2 === 'x');
+window.__priInkReceive({
+  type: 'reading', reqId: foundationRequest.reqId, engine: 'pri-foundation',
+  available: true, text: 'x=3', lines: []
+});
+check('foundation reply resolves its matching request',
+  (await foundationPending)?.engine === 'pri-foundation');
+
 posted.length = 0;
 const pending = nativeInk.recognize({ n0_2: 'x' });
 const request = posted[0];
-check('recognize sends a request id and the corrections so far',
+check('rescue recognizer sends a request id and corrections',
   request.op === 'recognize' && Number.isInteger(request.reqId)
   && request.overrides.n0_2 === 'x');
 
@@ -125,18 +136,23 @@ stop();
 window.__priInkReceive({ type: 'strokes', strokes: [] });
 check('a removed listener stops hearing', heard?.length === 2);
 
-// ── both sides of the contract ───────────────────────────────────────────────
+// ── full Pencil signal is part of the native data contract ───────────────────
+const strokeSwift = readFileSync(STROKE_SWIFT, 'utf8');
+for (const field of ['"t"', '"p"', '"azimuth"', '"altitude"']) {
+  check(`native strokes export ${field}`, strokeSwift.includes(`${field}:`));
+}
+
+// ── both sides of the message contract ──────────────────────────────────────
 const swift = readFileSync(BRIDGE_SWIFT, 'utf8');
 const handled = new Set([...swift.matchAll(/case\s+"([a-zA-Z]+)"/g)].map(m => m[1]));
 const sent = new Set([
   'mount', 'layout', 'unmount', 'appearance', 'tool', 'enabled',
-  'undo', 'redo', 'clear', 'setStrokes', 'recognize'
+  'undo', 'redo', 'clear', 'setStrokes', 'foundationRecognize', 'recognize'
 ]);
 for (const op of sent) {
   check(`the shell handles "${op}"`, handled.has(op),
     `InkBridge.swift has no case for it`);
 }
-// And the page must actually send everything this list claims.
 const source = readFileSync(join(HERE, '../src/ink/native.js'), 'utf8');
 for (const op of sent) {
   check(`the page sends "${op}"`, source.includes(`op: '${op}'`));
