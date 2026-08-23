@@ -94,19 +94,19 @@ jobs:
             --max-points-per-stroke 96 \
             --patience 1
 
-      - name: Train synthetic component-validity calibrator
+      - name: Train synthetic component-validity V2 calibrator
         run: |
           python tools/ink-foundation/train_component_validity.py \
             /tmp/pri-ink-v4-validity-base.pt \
             --corpus /tmp/pri-ink-v4-validity-synth \
             --out /tmp/pri-ink-v4-component-validity.pt \
             --mode writer-disjoint \
-            --epochs 2 \
+            --epochs 4 \
             --batch 4 \
             --device cpu \
             --max-group-size 4 \
             --max-negatives 24 \
-            --patience 2
+            --patience 4
 
       - name: Validity checkpoint is hash-bound and research-only
         run: |
@@ -117,14 +117,14 @@ jobs:
           digest = hashlib.sha256(base.read_bytes()).hexdigest()
           ckpt = torch.load('/tmp/pri-ink-v4-component-validity.pt', map_location='cpu', weights_only=False)
           assert ckpt['architecture_version'] == 4
-          assert ckpt['component_validity_version'] == 1
+          assert ckpt['component_validity_version'] == 2
           assert ckpt['production_ready'] is False
-          assert ckpt['objective'] == 'contextual-hard-negative-component-validity-v1'
+          assert ckpt['objective'] == 'contextual-hard-negative-ranking-validity-v2'
           assert ckpt['base_checkpoint_sha256'] == digest
           assert ckpt['training']['syntheticOnly'] is True
           assert ckpt['validation']['positiveComponents'] > 0
           assert ckpt['validation']['hardNegativeComponents'] > 0
-          print('V4 component-validity checkpoint provenance: PASS')
+          print('V4 component-validity V2 checkpoint provenance: PASS')
           PY
 
       - name: A/B exact same joint decoder with and without validity
@@ -163,12 +163,12 @@ jobs:
           assert before['samples'] == after['samples'] == 8
           assert before['writers'] == after['writers'] == 2
           assert before['componentValidity'] is None
-          assert after['componentValidity']['componentValidityVersion'] == 1
+          assert after['componentValidity']['componentValidityVersion'] == 2
           assert after['componentValidity']['baseCheckpointSha256'] == before['checkpointSha256']
           assert before['jointPartition']['actualSearchRegimes'] == after['jointPartition']['actualSearchRegimes']
           assert ab['comparison'] == 'joint-without-vs-with-component-validity'
           assert ab['productionReady'] is False
-          print('Same-base component-validity A/B evidence contract: PASS')
+          print('Same-base component-validity V2 A/B evidence contract: PASS')
           PY
 
       - name: Mismatched validity checkpoint must be rejected
@@ -220,12 +220,12 @@ jobs:
             --mode same-writer-dev \
             --init-validity /tmp/pri-ink-v4-component-validity.pt \
             --allow-base-transfer \
-            --epochs 1 \
+            --epochs 2 \
             --batch 4 \
             --device cpu \
             --max-group-size 4 \
             --max-negatives 24 \
-            --patience 1
+            --patience 2
 
       - name: Frozen dev evaluator accepts only matching fine-tuned validity head
         run: |
@@ -245,8 +245,9 @@ jobs:
           assert validity['production_ready'] is False
           assert validity['initialisation']['baseTransfer'] is True
           assert report['productionReady'] is False
+          assert report['componentValidity']['componentValidityVersion'] == 2
           assert report['componentValidity']['stage'] == 'component-validity-research-dev'
           assert report['validationProtocol'] == report['componentValidity']['validationProtocol']
           assert 'not writer-disjoint' in report['evidence']
-          print('Synthetic pretrain -> frozen dev validity fine-tune protocol: PASS')
+          print('Synthetic pretrain -> frozen dev validity V2 fine-tune protocol: PASS')
           PY
