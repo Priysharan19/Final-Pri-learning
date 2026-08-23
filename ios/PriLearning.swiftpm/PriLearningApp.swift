@@ -14,6 +14,10 @@ struct PriLearningApp: App {
         // Scores the native reading pipeline against expressions whose answer
         // is known, and reports it to the system log. Off unless asked for.
         if ProcessInfo.processInfo.arguments.contains("--ink-selfcheck") {
+            // Structural geometry is checked synchronously before the Vision
+            // benchmark. If an exponent can become its own line, there is no
+            // valid downstream OCR result to benchmark and CI must fail hard.
+            InkSegmentationRegression.assertProductionInvariants()
             DispatchQueue.global(qos: .userInitiated).async { InkSelfCheck.run() }
         }
     }

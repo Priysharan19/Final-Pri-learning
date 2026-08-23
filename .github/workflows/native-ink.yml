@@ -9,16 +9,20 @@ on:
   push:
     paths:
       - 'ios/PriLearning.swiftpm/**'
+      - 'ios/PriLearning 2.swiftpm/**'
       - 'client/src/ink/native.js'
       - 'client/test/native-ink-check.mjs'
       - 'scripts/ink-native-check.mjs'
+      - 'scripts/check-native-package-sync.mjs'
       - '.github/workflows/native-ink.yml'
   pull_request:
     paths:
       - 'ios/PriLearning.swiftpm/**'
+      - 'ios/PriLearning 2.swiftpm/**'
       - 'client/src/ink/native.js'
       - 'client/test/native-ink-check.mjs'
       - 'scripts/ink-native-check.mjs'
+      - 'scripts/check-native-package-sync.mjs'
       - '.github/workflows/native-ink.yml'
 
 concurrency:
@@ -37,6 +41,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
+
+      - name: Canonical native source has no stale duplicate
+        run: node scripts/check-native-package-sync.mjs
 
       - name: Apple toolchain and iPad simulator
         run: |

@@ -14,11 +14,12 @@
 //     what tap-to-correct and "learn from this correction" need.
 //
 // Grouping is by vertical OVERLAP against a line's core band, not by centre
-// distance. A superscript sits high but still inside its line's band, so it
-// joins; the next line down sits clear of the band even when a descender from
-// the line above reaches into its space, because the band is built from the
-// median top and bottom of the line's full-height glyphs rather than from the
-// union of everything in it.
+// distance. A superscript usually overlaps the top of its carrier line, but
+// real Pencil writing often puts a power completely clear of the x-height.
+// Those detached raised marks are attached in a second, geometry-constrained
+// pass. The pass requires a smaller mark, a full-height carrier immediately to
+// its left, and a tight vertical gap, so a genuine next line is not collapsed
+// into the line above or below it.
 // ─────────────────────────────────────────────────────────────────────────────
 import CoreGraphics
 import Foundation
@@ -108,6 +109,12 @@ enum InkLineSegmenter {
         }
 
         groups = mergeOverlappingGroups(groups, glyphSize: glyphSize)
+        // A power written clearly above its base has zero vertical overlap and
+        // therefore correctly opens as its own provisional group above. It is
+        // not a second written line, though. Recover that relationship from the
+        // Pencil geometry before line order is frozen.
+        groups = attachRaisedSatellites(groups, glyphSize: glyphSize)
+        groups = mergeOverlappingGroups(groups, glyphSize: glyphSize)
 
         return groups
             .map { group -> InkLine in
@@ -148,6 +155,92 @@ enum InkLineSegmenter {
 
     private static func union(of strokes: [InkStroke]) -> CGRect {
         strokes.dropFirst().reduce(strokes.first?.bounds ?? .zero) { $0.union($1.bounds) }
+    }
+
+    /// Attach a detached superscript/degree-sized group to the baseline line
+    /// that geometrically carries it. This deliberately does NOT just widen the
+    /// first-pass vertical tolerance: doing that makes nearby written lines
+    /// bleed into each other. A satellite has to satisfy all of these:
+    ///
+    ///  - materially smaller than the target line's ordinary glyphs;
+    ///  - in or above only the upper part of that line's body;
+    ///  - no more than ~0.7 glyph heights clear of the body's top;
+    ///  - immediately to the right of a full-height carrier stroke.
+    ///
+    /// The last condition is the important structural one. In `x³`, the x is
+    /// the carrier. A random small mark on another line does not earn a merge
+    /// merely because its y-position happens to be close.
+    private static func attachRaisedSatellites(
+        _ groups: [[(offset: Int, element: InkStroke)]],
+        glyphSize: CGFloat
+    ) -> [[(offset: Int, element: InkStroke)]] {
+        guard groups.count > 1 else { return groups }
+        var result = groups
+        var changed = true
+
+        while changed {
+            changed = false
+            outer: for satelliteIndex in result.indices {
+                let satelliteStrokes = result[satelliteIndex].map(\.element)
+                guard !satelliteStrokes.isEmpty, satelliteStrokes.count <= 4 else { continue }
+                let satellite = union(of: satelliteStrokes)
+
+                var bestTarget: Int?
+                var bestScore = CGFloat.greatestFiniteMagnitude
+
+                for targetIndex in result.indices where targetIndex != satelliteIndex {
+                    let targetStrokes = result[targetIndex].map(\.element)
+                    guard !targetStrokes.isEmpty else { continue }
+                    let band = coreBand(of: targetStrokes, glyphSize: glyphSize)
+                    let bandHeight = max(1, band.upperBound - band.lowerBound)
+                    let targetHeight = max(bandHeight, lineGlyphHeight(targetStrokes, pageSize: glyphSize))
+                    let satelliteExtent = max(satellite.width, satellite.height)
+
+                    // Genuine next-line text is normally full-size. A power is
+                    // not. Keeping this comfortably below 1 is the primary
+                    // anti-line-collapse gate.
+                    guard satelliteExtent <= 0.88 * targetHeight else { continue }
+
+                    // The mark must sit in the top of the target's coordinate
+                    // band, or completely above it but still close enough to be
+                    // carried by it. This catches the user's high x³ while
+                    // keeping the normal ~1.5–2 em inter-line gap untouched.
+                    let clearAbove = band.lowerBound - satellite.maxY
+                    guard clearAbove <= 0.72 * targetHeight else { continue }
+                    guard satellite.midY < band.lowerBound + 0.34 * targetHeight else { continue }
+                    guard satellite.maxY < band.lowerBound + 0.68 * targetHeight else { continue }
+
+                    // Find a real carrier immediately to the left. Bars/dots do
+                    // not qualify; the carrier needs body height. Negative dx
+                    // allows the natural slight x-overlap of a handwritten
+                    // exponent with its base, but not a mark centred over it.
+                    var carrierGap = CGFloat.greatestFiniteMagnitude
+                    for stroke in targetStrokes {
+                        let box = stroke.bounds
+                        guard box.height >= 0.42 * targetHeight else { continue }
+                        let dx = satellite.minX - box.maxX
+                        guard dx >= -0.22 * targetHeight, dx <= 0.72 * targetHeight else { continue }
+                        guard satellite.midX >= box.midX - 0.05 * targetHeight else { continue }
+                        carrierGap = min(carrierGap, max(0, dx))
+                    }
+                    guard carrierGap.isFinite else { continue }
+
+                    let score = carrierGap + 0.8 * max(0, clearAbove)
+                    if score < bestScore {
+                        bestScore = score
+                        bestTarget = targetIndex
+                    }
+                }
+
+                guard let targetIndex = bestTarget else { continue }
+                result[targetIndex].append(contentsOf: result[satelliteIndex])
+                result.remove(at: satelliteIndex)
+                changed = true
+                break outer
+            }
+        }
+
+        return result
     }
 
     /// Left-to-right grouping can open a second line for ink that belongs to
