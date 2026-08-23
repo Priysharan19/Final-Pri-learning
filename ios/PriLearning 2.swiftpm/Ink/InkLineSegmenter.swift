@@ -17,9 +17,9 @@
 // distance. A superscript usually overlaps the top of its carrier line, but
 // real Pencil writing often puts a power completely clear of the x-height.
 // Those detached raised marks are attached in a second, geometry-constrained
-// pass. The pass requires a smaller mark, a full-height carrier immediately to
-// its left, and a tight vertical gap, so a genuine next line is not collapsed
-// into the line above or below it.
+// pass. The pass requires a compact raised mark, a full-height carrier
+// immediately to its left, and a tight vertical gap, so a genuine next line is
+// not collapsed into the line above or below it.
 // ─────────────────────────────────────────────────────────────────────────────
 import CoreGraphics
 import Foundation
@@ -159,20 +159,26 @@ enum InkLineSegmenter {
                     let bandHeight = max(1, band.upperBound - band.lowerBound)
                     let targetHeight = max(bandHeight, lineGlyphHeight(targetStrokes, pageSize: glyphSize))
                     let satelliteExtent = max(satellite.width, satellite.height)
-                    guard satelliteExtent <= 0.88 * targetHeight else { continue }
+
+                    // Real Pencil powers are often almost body-height (especially
+                    // handwritten 2/3/4). The old 0.88 limit turned them into
+                    // separate lines. Size alone is not our safety gate: the
+                    // strong raised-position + nearby-left-carrier constraints
+                    // below distinguish a superscript from genuine next working.
+                    guard satelliteExtent <= 1.15 * targetHeight else { continue }
 
                     let clearAbove = band.lowerBound - satellite.maxY
-                    guard clearAbove <= 0.72 * targetHeight else { continue }
-                    guard satellite.midY < band.lowerBound + 0.34 * targetHeight else { continue }
-                    guard satellite.maxY < band.lowerBound + 0.68 * targetHeight else { continue }
+                    guard clearAbove <= 0.92 * targetHeight else { continue }
+                    guard satellite.midY < band.lowerBound + 0.43 * targetHeight else { continue }
+                    guard satellite.maxY < band.lowerBound + 0.82 * targetHeight else { continue }
 
                     var carrierGap = CGFloat.greatestFiniteMagnitude
                     for stroke in targetStrokes {
                         let box = stroke.bounds
                         guard box.height >= 0.42 * targetHeight else { continue }
                         let dx = satellite.minX - box.maxX
-                        guard dx >= -0.22 * targetHeight, dx <= 0.72 * targetHeight else { continue }
-                        guard satellite.midX >= box.midX - 0.05 * targetHeight else { continue }
+                        guard dx >= -0.24 * targetHeight, dx <= 0.90 * targetHeight else { continue }
+                        guard satellite.midX >= box.midX - 0.08 * targetHeight else { continue }
                         carrierGap = min(carrierGap, max(0, dx))
                     }
                     guard carrierGap.isFinite else { continue }
