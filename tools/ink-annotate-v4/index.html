@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<title>Pri Ink V4 · Structural Annotator</title>
+<style>
+:root{--bg:#0b0b0a;--card:#151513;--line:#302f2a;--ink:#f2efe6;--dim:#a39f92;--good:#79ae78;--bad:#d98673;--accent:#c9a227}
+*{box-sizing:border-box}html,body{margin:0;min-height:100%;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,sans-serif}button,input,select{font:inherit}.top{display:flex;align-items:center;gap:12px;padding:14px 18px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--bg);z-index:3}.brand{font-family:Georgia,serif}.brand b{color:var(--accent);font-weight:500}.muted{color:var(--dim);font-size:13px}.spacer{flex:1}.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:9px 13px;border-radius:4px;cursor:pointer}.btn.primary{background:var(--ink);color:var(--bg);border-color:var(--ink)}.btn.bad{color:var(--bad)}.btn:disabled{opacity:.4;cursor:not-allowed}.layout{display:grid;grid-template-columns:minmax(0,1fr) 390px;min-height:calc(100vh - 61px)}.stage{padding:20px;display:flex;flex-direction:column;min-width:0}.target{font-family:Georgia,serif;font-size:28px;margin:0 0 12px}.canvasWrap{position:relative;min-height:460px;flex:1;border:1px solid var(--line);background:#11110f}canvas{width:100%;height:100%;position:absolute;inset:0}.side{border-left:1px solid var(--line);padding:18px;background:#10100f;overflow:auto;max-height:calc(100vh - 61px);position:sticky;top:61px}.section{border-bottom:1px solid var(--line);padding-bottom:18px;margin-bottom:18px}.section h2{font:600 12px/1.2 system-ui,sans-serif;letter-spacing:.12em;text-transform:uppercase;color:var(--dim);margin:0 0 10px}.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.strokeGrid{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}.stroke{padding:8px 4px;border:1px solid var(--line);background:#151513;color:var(--ink);border-radius:3px}.stroke.selected{border-color:var(--accent);color:var(--accent)}.stroke.used{opacity:.42}.field{display:flex;flex-direction:column;gap:5px;margin:9px 0}.field label{font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.08em}input,select{background:#0b0b0a;color:var(--ink);border:1px solid var(--line);padding:9px;border-radius:3px;width:100%}.group,.relation{border:1px solid var(--line);padding:9px;margin:7px 0;background:var(--card);font-size:13px}.group strong{font-family:ui-monospace,SFMono-Regular,monospace}.tag{font:11px ui-monospace,SFMono-Regular,monospace;color:var(--accent)}.error{color:var(--bad);font-size:13px;min-height:1.2em}.ok{color:var(--good)}.empty{display:flex;align-items:center;justify-content:center;min-height:70vh;padding:30px;text-align:center}.empty .box{max-width:620px;border:1px solid var(--line);background:var(--card);padding:28px}.empty h1{font-family:Georgia,serif;font-weight:400}.file{margin:14px auto;max-width:420px}.nav{display:flex;gap:8px;align-items:center}.progress{font-variant-numeric:tabular-nums;color:var(--dim);font-size:12px}.legend{margin-top:10px;color:var(--dim);font-size:12px;line-height:1.5}.kbd{font-family:ui-monospace,SFMono-Regular,monospace;color:var(--ink)}
+@media(max-width:900px){.layout{grid-template-columns:1fr}.side{position:static;max-height:none;border-left:0;border-top:1px solid var(--line)}.canvasWrap{min-height:380px}}
+</style>
+</head>
+<body>
+<div id="empty" class="empty"><div class="box">
+  <h1>Pri Ink V4 structural annotator</h1>
+  <p class="muted">Load a locally collected <code>pri-ink-corpus</code> JSON file. Nothing is uploaded. Group physical Pencil strokes into glyphs, label each glyph, then add mathematical spatial relations.</p>
+  <input class="file" id="file" type="file" accept="application/json,.json" />
+  <p class="muted">Use canonical symbols: <span class="kbd">x</span>, <span class="kbd">2</span>, <span class="kbd">=</span>, <span class="kbd">sqrt</span>, <span class="kbd">theta</span>, <span class="kbd">pi</span>, <span class="kbd">'</span>, etc.</p>
+  <div class="error" id="loadError"></div>
+</div></div>
+<div id="app" hidden>
+  <div class="top"><span class="brand">Pri Ink · <b>Structural V4</b></span><span class="progress" id="progress"></span><span class="spacer"></span><button class="btn" id="save">Save annotated JSON</button></div>
+  <div class="layout">
+    <section class="stage"><div class="target" id="target"></div><div class="canvasWrap"><canvas id="canvas"></canvas></div><div class="legend">Each physical stroke is numbered. Select stroke numbers on the right to create one glyph group. A multi-stroke <span class="kbd">=</span>, <span class="kbd">x</span>, <span class="kbd">t</span>, etc. must be one group.</div></section>
+    <aside class="side">
+      <div class="section"><h2>1 · Select physical strokes</h2><div class="strokeGrid" id="strokes"></div></div>
+      <div class="section"><h2>2 · Create glyph</h2><div class="field"><label>Canonical symbol</label><input id="symbol" autocomplete="off" spellcheck="false" placeholder="e.g. x, =, 2, sqrt, '" /></div><div class="row"><button class="btn primary" id="addGroup">Add glyph group</button><button class="btn" id="clearSelection">Clear selection</button></div><div class="error" id="groupError"></div><div id="groups"></div></div>
+      <div class="section"><h2>3 · Add structural relation</h2><div class="field"><label>From glyph</label><select id="relFrom"></select></div><div class="field"><label>Relation</label><select id="relType"><option>RIGHT</option><option>SUPERSCRIPT</option><option>SUBSCRIPT</option><option>ABOVE</option><option>BELOW</option><option>NUMERATOR</option><option>DENOMINATOR</option><option>INSIDE_ROOT</option></select></div><div class="field"><label>To glyph</label><select id="relTo"></select></div><button class="btn" id="addRelation">Add relation</button><div class="error" id="relationError"></div><div id="relations"></div></div>
+      <div class="section"><h2>Sample</h2><div class="error" id="sampleError"></div><div class="nav"><button class="btn" id="prev">Previous</button><button class="btn primary" id="next">Validate & next</button></div><p class="muted" id="coverage"></p></div>
+    </aside>
+  </div>
+</div>
+<script>
+const $=id=>document.getElementById(id);
+const RELATIONS=['RIGHT','SUPERSCRIPT','SUBSCRIPT','ABOVE','BELOW','NUMERATOR','DENOMINATOR','INSIDE_ROOT'];
+let doc=null,fileName='pri-ink-annotated-v4.json',index=0,selected=new Set();
+const canvas=$('canvas'),ctx=canvas.getContext('2d');
+
+function structure(sample){
+  if(!sample.structure||typeof sample.structure!=='object')sample.structure={groups:[],relations:[]};
+  if(!Array.isArray(sample.structure.groups))sample.structure.groups=[];
+  if(!Array.isArray(sample.structure.relations))sample.structure.relations=[];
+  return sample.structure;
+}
+function sample(){return doc.samples[index]}
+function assigned(){const set=new Set();for(const g of structure(sample()).groups)for(const s of g.strokes||[])set.add(Number(s));return set}
+function nextGroupId(){const used=new Set(structure(sample()).groups.map(g=>String(g.id)));let n=0;while(used.has('g'+n))n++;return 'g'+n}
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+
+$('file').addEventListener('change',async e=>{
+  $('loadError').textContent='';const f=e.target.files?.[0];if(!f)return;
+  try{const parsed=JSON.parse(await f.text());if(parsed.format!=='pri-ink-corpus'||!Array.isArray(parsed.samples)||!parsed.samples.length)throw new Error('Not a non-empty pri-ink-corpus file.');doc=parsed;fileName=f.name.replace(/\.json$/i,'')+'-structural-v4.json';index=0;selected.clear();$('empty').style.display='none';$('app').hidden=false;render()}catch(err){$('loadError').textContent=String(err.message||err)}
+});
+
+function fit(){const r=canvas.getBoundingClientRect(),d=devicePixelRatio||1;canvas.width=Math.max(1,Math.round(r.width*d));canvas.height=Math.max(1,Math.round(r.height*d));ctx.setTransform(d,0,0,d,0,0);draw()}
+addEventListener('resize',fit);
+
+function bounds(strokes){let x1=Infinity,y1=Infinity,x2=-Infinity,y2=-Infinity;for(const st of strokes)for(const p of st.points||[]){x1=Math.min(x1,p.x);x2=Math.max(x2,p.x);y1=Math.min(y1,p.y);y2=Math.max(y2,p.y)}if(!isFinite(x1))return{x1:0,y1:0,x2:1,y2:1};return{x1,y1,x2,y2}}
+function draw(){if(!doc)return;const r=canvas.getBoundingClientRect();ctx.clearRect(0,0,r.width,r.height);const strokes=sample().strokes||[],b=bounds(strokes),pad=44,sw=Math.max(1,b.x2-b.x1),sh=Math.max(1,b.y2-b.y1),scale=Math.min((r.width-2*pad)/sw,(r.height-2*pad)/sh),ox=(r.width-sw*scale)/2-b.x1*scale,oy=(r.height-sh*scale)/2-b.y1*scale;ctx.lineCap='round';ctx.lineJoin='round';const used=assigned();strokes.forEach((st,si)=>{const pts=st.points||[];if(!pts.length)return;ctx.strokeStyle=selected.has(si)?'#c9a227':used.has(si)?'#7b786f':'#f2efe6';ctx.fillStyle=ctx.strokeStyle;ctx.lineWidth=selected.has(si)?4:2.4;const xy=pts.map(p=>[p.x*scale+ox,p.y*scale+oy]);if(xy.length===1){ctx.beginPath();ctx.arc(xy[0][0],xy[0][1],2.5,0,Math.PI*2);ctx.fill()}else{ctx.beginPath();ctx.moveTo(...xy[0]);for(const p of xy.slice(1))ctx.lineTo(...p);ctx.stroke()}const mid=xy[Math.floor(xy.length/2)];ctx.font='600 13px ui-monospace,monospace';ctx.fillStyle='#c9a227';ctx.fillText(String(si),mid[0]+6,mid[1]-6)})}
+
+function renderStrokeButtons(){const used=assigned(),strokes=sample().strokes||[];$('strokes').innerHTML=strokes.map((_,i)=>`<button class="stroke ${selected.has(i)?'selected':''} ${used.has(i)&&!selected.has(i)?'used':''}" data-i="${i}" ${used.has(i)&&!selected.has(i)?'disabled':''}>#${i}</button>`).join('');for(const b of $('strokes').querySelectorAll('button'))b.onclick=()=>{const i=Number(b.dataset.i);selected.has(i)?selected.delete(i):selected.add(i);renderStrokeButtons();draw()}}
+function groupLabel(g){return `${g.id} · ${g.symbol} · strokes ${(g.strokes||[]).join(',')}`}
+function renderGroups(){const s=structure(sample());$('groups').innerHTML=s.groups.map((g,i)=>`<div class="group"><span class="tag">${esc(g.id)}</span> <strong>${esc(g.symbol)}</strong><br><span class="muted">strokes ${(g.strokes||[]).join(', ')}</span> <button class="btn bad" data-delg="${i}">Remove</button></div>`).join('');for(const b of $('groups').querySelectorAll('[data-delg]'))b.onclick=()=>{const i=Number(b.dataset.delg),gid=s.groups[i].id;s.groups.splice(i,1);s.relations=s.relations.filter(r=>r.from!==gid&&r.to!==gid);selected.clear();render()};const opts=s.groups.map(g=>`<option value="${esc(g.id)}">${esc(groupLabel(g))}</option>`).join('');$('relFrom').innerHTML=opts;$('relTo').innerHTML=opts}
+function renderRelations(){const s=structure(sample());$('relations').innerHTML=s.relations.map((r,i)=>`<div class="relation"><span class="tag">${esc(r.from)}</span> → <b>${esc(r.type)}</b> → <span class="tag">${esc(r.to)}</span> <button class="btn bad" data-delr="${i}">Remove</button></div>`).join('');for(const b of $('relations').querySelectorAll('[data-delr]'))b.onclick=()=>{s.relations.splice(Number(b.dataset.delr),1);renderRelations()}}
+function render(){const s=sample(),st=structure(s);$('target').textContent=s.display||s.prompt||s.target||'';$('progress').textContent=`sample ${index+1} / ${doc.samples.length}`;$('prev').disabled=index===0;$('next').textContent=index===doc.samples.length-1?'Validate sample':'Validate & next';$('sampleError').textContent='';$('groupError').textContent='';$('relationError').textContent='';renderStrokeButtons();renderGroups();renderRelations();const n=(s.strokes||[]).length,u=assigned().size;$('coverage').innerHTML=`Stroke coverage: <span class="${u===n?'ok':''}">${u}/${n}</span> physical strokes assigned to glyphs.`;requestAnimationFrame(fit)}
+
+$('clearSelection').onclick=()=>{selected.clear();renderStrokeButtons();draw()};
+$('addGroup').onclick=()=>{const err=$('groupError');err.textContent='';const symbol=$('symbol').value.trim();if(!selected.size){err.textContent='Select at least one unused physical stroke.';return}if(!symbol){err.textContent='Enter the canonical symbol for this glyph.';return}const used=assigned();for(const i of selected)if(used.has(i)){err.textContent=`Stroke ${i} is already assigned.`;return}structure(sample()).groups.push({id:nextGroupId(),symbol,strokes:[...selected].sort((a,b)=>a-b)});selected.clear();$('symbol').value='';render()};
+$('addRelation').onclick=()=>{const err=$('relationError');err.textContent='';const from=$('relFrom').value,to=$('relTo').value,type=$('relType').value;if(!from||!to){err.textContent='Create at least two glyph groups first.';return}if(from===to){err.textContent='A structural relation must connect two different glyphs.';return}const rels=structure(sample()).relations;if(rels.some(r=>r.from===from&&r.to===to&&r.type===type)){err.textContent='That relation already exists.';return}rels.push({from,to,type});renderRelations()};
+
+function validateCurrent(){const s=sample(),groups=structure(s).groups,rels=structure(s).relations,n=(s.strokes||[]).length,seen=new Set();for(const g of groups){if(!g.symbol||!Array.isArray(g.strokes)||!g.strokes.length)return 'Every glyph group needs a symbol and at least one stroke.';for(const i of g.strokes){if(!Number.isInteger(i)||i<0||i>=n)return `Glyph ${g.id} references invalid stroke ${i}.`;if(seen.has(i))return `Stroke ${i} belongs to more than one glyph.`;seen.add(i)}}if(seen.size!==n)return `Assign all physical strokes before validating (${seen.size}/${n} assigned).`;const ids=new Set(groups.map(g=>g.id));for(const r of rels){if(!ids.has(r.from)||!ids.has(r.to))return 'A relation references a missing glyph group.';if(!RELATIONS.includes(r.type))return `Unknown relation ${r.type}.`}s.structure.annotator='pri-ink-structural-v4-v1';s.structure.annotatedAt=new Date().toISOString();return ''}
+$('prev').onclick=()=>{if(index>0){index--;selected.clear();render()}};
+$('next').onclick=()=>{const err=validateCurrent();$('sampleError').textContent=err;if(err)return;if(index<doc.samples.length-1){index++;selected.clear();render()}else{$('sampleError').innerHTML='<span class="ok">All strokes in this sample are structurally annotated. Save the JSON when the session is complete.</span>'}};
+$('save').onclick=()=>{const failures=[];doc.samples.forEach((_,i)=>{const prior=index;index=i;const e=validateCurrent();if(e)failures.push(`#${i+1}: ${e}`);index=prior});if(failures.length){$('sampleError').textContent=`Cannot save as complete: ${failures[0]} (${failures.length} sample(s) incomplete).`;render();return}doc.structuralAnnotation={format:'pri-ink-structural-v4',version:1,annotatedAt:new Date().toISOString()};const blob=new Blob([JSON.stringify(doc,null,2)+'\n'],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=fileName;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)};
+</script>
+</body>
+</html>
