@@ -7,6 +7,8 @@ on:
       - 'tools/ink-foundation/structural.py'
       - 'tools/ink-foundation/structural_data.py'
       - 'tools/ink-foundation/structural_decode.py'
+      - 'tools/ink-foundation/structural_joint_decode.py'
+      - 'tools/ink-foundation/compare_structural_decoders.py'
       - 'tools/ink-foundation/train_structural.py'
       - 'tools/ink-foundation/train_structural_dev.py'
       - 'tools/ink-foundation/evaluate_structural.py'
@@ -21,6 +23,8 @@ on:
       - 'tools/ink-foundation/structural.py'
       - 'tools/ink-foundation/structural_data.py'
       - 'tools/ink-foundation/structural_decode.py'
+      - 'tools/ink-foundation/structural_joint_decode.py'
+      - 'tools/ink-foundation/compare_structural_decoders.py'
       - 'tools/ink-foundation/train_structural.py'
       - 'tools/ink-foundation/train_structural_dev.py'
       - 'tools/ink-foundation/evaluate_structural.py'
@@ -55,6 +59,8 @@ jobs:
           python -m py_compile \
             tools/ink-foundation/structural.py \
             tools/ink-foundation/structural_decode.py \
+            tools/ink-foundation/structural_joint_decode.py \
+            tools/ink-foundation/compare_structural_decoders.py \
             tools/ink-foundation/train_structural.py \
             tools/ink-foundation/train_structural_dev.py \
             tools/ink-foundation/evaluate_structural.py \
@@ -105,6 +111,47 @@ jobs:
             --max-strokes 64 \
             --max-points-per-stroke 96 \
             --patience 1
+
+      - name: Run both decoders on identical trained smoke checkpoint
+        run: |
+          python tools/ink-foundation/evaluate_structural.py \
+            /tmp/pri-ink-v4-exact-synth.pt \
+            --corpus /tmp/pri-ink-v4-exact-synth \
+            --split validation \
+            --device cpu \
+            --out /tmp/pri-ink-v4-baseline.json
+          python tools/ink-foundation/evaluate_structural.py \
+            /tmp/pri-ink-v4-exact-synth.pt \
+            --corpus /tmp/pri-ink-v4-exact-synth \
+            --split validation \
+            --device cpu \
+            --decoder joint \
+            --out /tmp/pri-ink-v4-joint.json
+          python tools/ink-foundation/compare_structural_decoders.py \
+            /tmp/pri-ink-v4-baseline.json \
+            /tmp/pri-ink-v4-joint.json \
+            --out /tmp/pri-ink-v4-decoder-comparison.json
+
+      - name: Smoke decoder reports preserve evidence boundary
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          baseline = json.loads(Path('/tmp/pri-ink-v4-baseline.json').read_text())
+          joint = json.loads(Path('/tmp/pri-ink-v4-joint.json').read_text())
+          comparison = json.loads(Path('/tmp/pri-ink-v4-decoder-comparison.json').read_text())
+          assert baseline['decoder'] == 'complete-link'
+          assert joint['decoder'] == 'joint'
+          assert baseline['checkpointSha256'] == joint['checkpointSha256']
+          assert baseline['samples'] == joint['samples'] == 8
+          assert baseline['writers'] == joint['writers'] == 2
+          assert baseline['productionReady'] is False
+          assert joint['productionReady'] is False
+          assert comparison['productionReady'] is False
+          assert comparison['comparison'] == 'complete-link-vs-joint-contiguous-v1'
+          assert joint['jointPartition']['assumption'].startswith('glyph strokes are contiguous')
+          print('Actual-model joint decoder integration: PASS (accuracy remains synthetic smoke evidence only)')
+          PY
 
       - name: Generate one-writer dev smoke corpus
         run: |
