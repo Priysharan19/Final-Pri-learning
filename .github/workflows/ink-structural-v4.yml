@@ -5,12 +5,14 @@ on:
     paths:
       - 'tools/ink-foundation/structural.py'
       - 'tools/ink-foundation/structural_data.py'
+      - 'tools/ink-foundation/structural_decode.py'
       - 'tools/ink-foundation/train_structural.py'
       - '.github/workflows/ink-structural-v4.yml'
   pull_request:
     paths:
       - 'tools/ink-foundation/structural.py'
       - 'tools/ink-foundation/structural_data.py'
+      - 'tools/ink-foundation/structural_decode.py'
       - 'tools/ink-foundation/train_structural.py'
       - '.github/workflows/ink-structural-v4.yml'
 
@@ -36,6 +38,7 @@ jobs:
           python -m py_compile \
             tools/ink-foundation/structural.py \
             tools/ink-foundation/structural_data.py \
+            tools/ink-foundation/structural_decode.py \
             tools/ink-foundation/train_structural.py
 
       - name: Install training dependencies
@@ -92,6 +95,50 @@ jobs:
           )
           assert torch.isfinite(out['symbol_logits']).all()
           print('Pri Ink V4 structural tensor contract: PASS')
+          PY
+
+      - name: Deterministic graph decoder contract
+        run: |
+          python - <<'PY'
+          import sys, torch
+          sys.path.insert(0, 'tools/ink-foundation')
+          from data import TOKEN_TO_ID
+          from structural import RELATION_TO_ID
+          from structural_decode import decode_structural_output
+
+          s = 4; v = len(TOKEN_TO_ID); r = len(RELATION_TO_ID)
+          symbols = torch.full((1, s, v), -8.0)
+          for stroke, token in [(0, 'x'), (1, '2'), (2, '='), (3, '=')]:
+              symbols[0, stroke, TOKEN_TO_ID[token]] = 8.0
+          groups = torch.full((1, s, s), -8.0)
+          for i in range(s): groups[0, i, i] = 8.0
+          groups[0, 2, 3] = groups[0, 3, 2] = 8.0
+          relations = torch.full((1, s, s, r), -8.0)
+          relations[..., RELATION_TO_ID['NONE']] = 8.0
+          relations[0, 0, 1, :] = -8.0
+          relations[0, 0, 1, RELATION_TO_ID['SUPERSCRIPT']] = 8.0
+          relations[0, 0, 2, :] = -8.0
+          relations[0, 0, 2, RELATION_TO_ID['RIGHT']] = 8.0
+          geometry = torch.tensor([[[
+              -0.30, 0.00, 0.20, 0.40, 0, 0, 0, 0
+          ], [
+              -0.12, -0.25, 0.10, 0.16, 0, 0, 0, 0
+          ], [
+               0.18, 0.00, 0.28, 0.04, 0, 0, 0, 0
+          ], [
+               0.18, 0.07, 0.28, 0.04, 0, 0, 0, 0
+          ]]], dtype=torch.float32)
+          valid = torch.ones(1, s, dtype=torch.bool)
+          hyp = decode_structural_output({
+              'symbol_logits': symbols,
+              'group_logits': groups,
+              'relation_logits': relations,
+          }, geometry, valid, group_threshold=0.65, relation_threshold=0.60)
+          assert len(hyp.glyphs) == 3, hyp
+          assert hyp.glyphs[2].strokes == (2, 3), hyp.glyphs
+          assert hyp.canonical == 'x^(2)=', hyp.canonical
+          assert not hyp.ambiguous, hyp
+          print('Pri Ink V4 graph decoder contract: PASS —', hyp.canonical)
           PY
 
       - name: Build tiny writer-disjoint annotated corpus
