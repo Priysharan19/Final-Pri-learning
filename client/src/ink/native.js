@@ -6,7 +6,13 @@
 //   foundationRecognize() → Pri's bundled Core ML model, when validated/present
 //   recognize()           → mature native rescue recogniser
 // Browser/dev builds have neither and use the JS Pri engine directly.
+//
+// DEBUG/native readings are additionally fused with Pri's purpose-built
+// stroke/CNN glyph classifier using the exact native stroke ownership. Native
+// remains responsible for 2-D geometry; the stroke model gets an independent
+// vote on glyph identity.
 // ─────────────────────────────────────────────────────────────────────────────
+import { fuseNativeStrokeReading } from './hybrid.js';
 
 const handler = () =>
   (typeof window !== 'undefined' && window.__PRI_NATIVE_INK__ &&
@@ -17,15 +23,34 @@ export const nativeInkAvailable = () => !!handler();
 let nextRequestId = 1;
 const pending = new Map();       // reqId → resolve
 const strokeListeners = new Set();
+let latestStrokes = [];
 
 if (typeof window !== 'undefined') {
   window.__priInkReceive = (payload) => {
     if (!payload || typeof payload !== 'object') return;
     if (payload.type === 'strokes') {
-      for (const listener of strokeListeners) listener(payload.strokes || []);
+      latestStrokes = Array.isArray(payload.strokes) ? payload.strokes : [];
+      for (const listener of strokeListeners) listener(latestStrokes);
     } else if (payload.type === 'reading') {
       const resolve = pending.get(payload.reqId);
-      if (resolve) { pending.delete(payload.reqId); resolve(payload); }
+      if (resolve) {
+        pending.delete(payload.reqId);
+        let reading = payload;
+        // The promoted foundation model is release-gated separately and must
+        // not be silently rewritten here. The native debug/rescue reader,
+        // however, benefits from Pri's independent stroke classifier because
+        // it already supplies exact per-glyph Pencil ownership.
+        if (latestStrokes.length &&
+            (payload.engine === 'native-primary-debug' || payload.engine === 'native-rescue')) {
+          try {
+            reading = fuseNativeStrokeReading(payload, latestStrokes, payload.overrides || {});
+            reading.engine = `${payload.engine}+stroke-fusion`;
+          } catch {
+            reading = payload;
+          }
+        }
+        resolve(reading);
+      }
     }
   };
 }
@@ -103,6 +128,7 @@ export const nativeInk = {
 
   mount(element) {
     if (!element) return false;
+    latestStrokes = [];
     return post({ op: 'mount', ...geometryOf(element), ink: inkColor() });
   },
 
@@ -111,14 +137,17 @@ export const nativeInk = {
     post({ op: 'layout', ...geometryOf(element) });
   },
 
-  unmount() { post({ op: 'unmount' }); },
+  unmount() { latestStrokes = []; post({ op: 'unmount' }); },
   setAppearance() { post({ op: 'appearance', ink: inkColor() }); },
   setTool(tool, finger) { post({ op: 'tool', tool, finger: !!finger }); },
   setEnabled(enabled) { post({ op: 'enabled', enabled: !!enabled }); },
   undo() { post({ op: 'undo' }); },
   redo() { post({ op: 'redo' }); },
-  clear() { post({ op: 'clear' }); },
-  setStrokes(strokes) { post({ op: 'setStrokes', strokes: strokes || [] }); },
+  clear() { latestStrokes = []; post({ op: 'clear' }); },
+  setStrokes(strokes) {
+    latestStrokes = Array.isArray(strokes) ? strokes : [];
+    post({ op: 'setStrokes', strokes: latestStrokes });
+  },
 
   onStrokes(listener) {
     strokeListeners.add(listener);
