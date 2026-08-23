@@ -15,16 +15,15 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build-model:
-    name: Train, verify and export DEBUG Core ML model
-    runs-on: macos-14
-    timeout-minutes: 75
+  train-model:
+    name: Train verified V3 DEBUG checkpoint
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
     env:
-      OMP_NUM_THREADS: '3'
+      OMP_NUM_THREADS: '4'
       OUT_DIR: /tmp/pri-ink-v3-test
       SYNTH_DIR: /tmp/pri-ink-v3-test/synth
       CHECKPOINT: /tmp/pri-ink-v3-test/PriInkFoundation-test.pt
-      MODEL: /tmp/pri-ink-v3-test/PriInkFoundation.mlpackage
     steps:
       - uses: actions/checkout@v4
 
@@ -38,18 +37,16 @@ jobs:
         with:
           node-version: '24'
 
-      - name: Install pinned V3 training/export environment
+      - name: Install pinned V3 training environment
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r tools/ink-foundation/requirements.txt
           python - <<'PY'
-          import platform, numpy, torch, coremltools
+          import platform, numpy, torch
           print('platform:', platform.platform())
           print('numpy:', numpy.__version__)
           print('torch:', torch.__version__)
-          print('coremltools:', coremltools.__version__)
           assert torch.__version__.startswith('2.7.0'), torch.__version__
-          assert coremltools.__version__.startswith('9.0'), coremltools.__version__
           PY
 
       - name: Generate writer-disjoint Pri-owned synthetic maths curriculum
@@ -57,7 +54,7 @@ jobs:
           mkdir -p "$OUT_DIR"
           node tools/ink-foundation/generate_synthetic.mjs "$SYNTH_DIR" 24 6 24
 
-      - name: Train V3 test checkpoint on deterministic CPU path
+      - name: Train V3 test checkpoint
         run: |
           python tools/ink-foundation/train.py \
             --stage pretrain \
@@ -92,6 +89,53 @@ jobs:
           print('synthetic validation:', ckpt.get('validation'))
           PY
 
+      - name: Upload verified checkpoint for Apple export
+        uses: actions/upload-artifact@v4
+        with:
+          name: PriInkFoundation-V3-DEBUG-Checkpoint
+          path: |
+            /tmp/pri-ink-v3-test/PriInkFoundation-test.pt
+            /tmp/pri-ink-v3-test/PriInkFoundation-test.json
+          if-no-files-found: error
+          retention-days: 1
+
+  export-model:
+    name: Export and verify DEBUG Core ML artifact
+    needs: train-model
+    runs-on: macos-14
+    timeout-minutes: 25
+    env:
+      OUT_DIR: /tmp/pri-ink-v3-test
+      CHECKPOINT: /tmp/pri-ink-v3-test/PriInkFoundation-test.pt
+      MODEL: /tmp/pri-ink-v3-test/PriInkFoundation.mlpackage
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: tools/ink-foundation/requirements.txt
+
+      - name: Download verified training checkpoint
+        uses: actions/download-artifact@v4
+        with:
+          name: PriInkFoundation-V3-DEBUG-Checkpoint
+          path: /tmp/pri-ink-v3-test
+
+      - name: Install pinned Core ML export environment
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r tools/ink-foundation/requirements.txt
+          python - <<'PY'
+          import numpy, torch, coremltools
+          print('numpy:', numpy.__version__)
+          print('torch:', torch.__version__)
+          print('coremltools:', coremltools.__version__)
+          assert torch.__version__.startswith('2.7.0'), torch.__version__
+          assert coremltools.__version__.startswith('9.0'), coremltools.__version__
+          PY
+
       - name: Export Core ML with training graph parity checks
         run: |
           python tools/ink-foundation/export_coreml.py "$CHECKPOINT" --out "$MODEL"
@@ -123,7 +167,7 @@ jobs:
           ckpt = torch.load(p, map_location='cpu', weights_only=False)
           val = ckpt.get('validation') or {}
           cfg = ckpt['config']
-          text = f'''PRI INK FOUNDATION V3 — DEBUG TEST MODEL\n\nArchitecture: V3 multimodal stroke Transformer + 2-D visual tokens + cross-modal style + physical CTC training auxiliary.\nConfig: d_model={cfg['d_model']}, stroke_layers={cfg['stroke_layers']}, decoder_layers={cfg['decoder_layers']}, max_points={cfg['max_points']}, max_tokens={cfg['max_tokens']}\nSynthetic curriculum: 24 train writers + 6 writer-disjoint synthetic validation writers, 24 expressions/writer.\nTraining: up to 8 epochs with early stopping on the deterministic CPU path.\nSynthetic validation exact: {100*float(val.get('exact', 0)):.2f}%\nSynthetic validation CER: {100*float(val.get('cer', 0)):.2f}%\n\nIMPORTANT EVIDENCE BOUNDARY\nThis checkpoint is synthetic-pretrained only. It is useful for DEBUG runtime/iPad testing but is NOT evidence of natural Apple Pencil accuracy and is NOT production-promoted. P0001 private handwriting was not available to GitHub Actions and was not fabricated. Release gates remain unchanged.\n'''
+          text = f'''PRI INK FOUNDATION V3 — DEBUG TEST MODEL\n\nArchitecture: V3 multimodal stroke Transformer + 2-D visual tokens + cross-modal style + physical CTC training auxiliary.\nConfig: d_model={cfg['d_model']}, stroke_layers={cfg['stroke_layers']}, decoder_layers={cfg['decoder_layers']}, max_points={cfg['max_points']}, max_tokens={cfg['max_tokens']}\nSynthetic curriculum: 24 train writers + 6 writer-disjoint synthetic validation writers, 24 expressions/writer.\nTraining: up to 8 epochs with early stopping.\nSynthetic validation exact: {100*float(val.get('exact', 0)):.2f}%\nSynthetic validation CER: {100*float(val.get('cer', 0)):.2f}%\n\nIMPORTANT EVIDENCE BOUNDARY\nThis checkpoint is synthetic-pretrained only. It is useful for DEBUG runtime/iPad testing but is NOT evidence of natural Apple Pencil accuracy and is NOT production-promoted. P0001 private handwriting was not available to GitHub Actions and was not fabricated. Release gates remain unchanged.\n'''
           open(os.path.join(os.environ['OUT_DIR'], 'TEST_MODEL_README.txt'), 'w').write(text)
           print(text)
           with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as f:
