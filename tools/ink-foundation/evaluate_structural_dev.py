@@ -7,7 +7,8 @@ classifier used by live decoding, cleanly separating symbol and grouping errors.
 
 Complete-link remains the historical baseline. Joint search variants run on the
 identical frozen split and record their actual per-sample search regime so a
-comparison cannot silently change its inference semantics.
+comparison cannot silently change its inference semantics. An optional component-
+validity checkpoint must be hash-bound to this exact dev base checkpoint.
 """
 from __future__ import annotations
 
@@ -25,6 +26,10 @@ from data import ID_TO_TOKEN, SPECIAL, TOKEN_TO_ID
 from dev_split import make_same_writer_dev_split
 from evaluate_structural import checkpoint_sha256, edit_distance, is_critical_structure, _joint_search_contract
 from structural import PriInkStructuralV4, StructuralConfig
+from structural_component_validity import (
+    ValidityAugmentedGlyphModel,
+    load_component_validity_checkpoint,
+)
 from structural_data import StructuralInkDataset, corpus_files, load_structural_examples
 from structural_decoder_registry import DECODER_NAMES, decode_structural_selected, is_joint_decoder
 
@@ -76,6 +81,8 @@ def main():
     p.add_argument("--grouping-temperature", type=float, default=1.0)
     p.add_argument("--symbol-weight", type=float, default=1.0)
     p.add_argument("--partition-margin-threshold", type=float, default=0.0)
+    p.add_argument("--component-validity", default=None)
+    p.add_argument("--component-validity-weight", type=float, default=1.0)
     p.add_argument("--out", default=None)
     args = p.parse_args()
 
@@ -89,6 +96,10 @@ def main():
         raise SystemExit("--symbol-weight must be >= 0")
     if args.partition_margin_threshold < 0:
         raise SystemExit("--partition-margin-threshold must be >= 0")
+    if args.component_validity_weight < 0:
+        raise SystemExit("--component-validity-weight must be >= 0")
+    if args.component_validity and not is_joint_decoder(args.decoder):
+        raise SystemExit("component validity is available only for joint decoder evaluation")
 
     checkpoint = Path(args.checkpoint)
     ckpt = torch.load(checkpoint, map_location="cpu", weights_only=False)
@@ -130,6 +141,38 @@ def main():
     model = PriInkStructuralV4(len(TOKEN_TO_ID), cfg)
     model.load_state_dict(ckpt["model"], strict=True); model.to(device).eval()
 
+    validity_scorer = None
+    validity_meta = None
+    if args.component_validity:
+        validity_path = Path(args.component_validity)
+        if not validity_path.exists():
+            raise SystemExit(f"component validity checkpoint not found: {validity_path}")
+        try:
+            validity_scorer, validity_ckpt = load_component_validity_checkpoint(
+                validity_path,
+                base_checkpoint_path=checkpoint,
+                d_model=cfg.d_model,
+                device=device,
+            )
+        except ValueError as exc:
+            raise SystemExit(str(exc)) from exc
+        validity_protocol = validity_ckpt.get("validation_protocol") or {}
+        if validity_ckpt.get("stage") != "component-validity-research-dev":
+            raise SystemExit("same-writer dev evaluation requires a dev component-validity checkpoint")
+        for key in ("writer", "trainSamples", "validationSamples"):
+            if validity_protocol.get(key) != recreated.get(key):
+                raise SystemExit(f"component validity frozen dev split mismatch for {key}")
+        validity_meta = {
+            "componentValidityVersion": validity_ckpt["component_validity_version"],
+            "checkpointSha256": checkpoint_sha256(validity_path),
+            "baseCheckpointSha256": validity_ckpt["base_checkpoint_sha256"],
+            "stage": validity_ckpt.get("stage"),
+            "objective": validity_ckpt.get("objective"),
+            "weight": args.component_validity_weight,
+            "validationProtocol": validity_protocol,
+            "evidence": validity_ckpt.get("evidence"),
+        }
+
     total = exact = char_errors = char_total = accepted = accepted_exact = 0
     critical_total = critical_exact = 0; confidence_sum = 0.0
     oracle_symbol_ok = oracle_symbol_n = 0
@@ -140,16 +183,23 @@ def main():
 
     with torch.inference_mode():
         for sample_number, (batch, row) in enumerate(zip(loader, validation_rows), 1):
+            device_valid = batch["stroke_valid"].to(device)
             outputs = model(
                 batch["stroke_points"].to(device), batch["stroke_point_valid"].to(device),
-                batch["stroke_valid"].to(device), batch["stroke_geometry"].to(device), batch["raster"].to(device),
+                device_valid, batch["stroke_geometry"].to(device), batch["raster"].to(device),
             )
+            decode_model = model
+            if validity_scorer is not None:
+                decode_model = ValidityAugmentedGlyphModel(
+                    model, validity_scorer, outputs["stroke_embeddings"], device_valid,
+                    validity_weight=args.component_validity_weight,
+                )
             hyp = decode_structural_selected(
                 args.decoder,
                 outputs,
                 batch["stroke_geometry"].to(device),
-                batch["stroke_valid"].to(device),
-                model=model,
+                device_valid,
+                model=decode_model,
                 group_threshold=args.group_threshold,
                 relation_threshold=args.relation_threshold,
                 ambiguity_threshold=args.ambiguity_threshold,
@@ -205,6 +255,8 @@ def main():
             "symbolWeight": args.symbol_weight,
             "partitionMargin": args.partition_margin_threshold,
         })
+        if validity_meta is not None:
+            thresholds["componentValidityWeight"] = args.component_validity_weight
     else:
         thresholds["group"] = args.group_threshold
 
@@ -222,6 +274,7 @@ def main():
         "worstWriterExact": min(writer_exact.values(), default=0.0), "writerExact": writer_exact,
         "warningCounts": dict(sorted(warning_counts.items())),
         "thresholds": thresholds,
+        "componentValidity": validity_meta,
         "sampleDiagnostics": sample_diagnostics,
         "evidence": "same-writer development evaluation only; not writer-disjoint and not production evidence",
     }
@@ -236,6 +289,7 @@ def main():
 
     print("\nPri Ink Structural V4 — SAME-WRITER DEV EVALUATION\n")
     print(f"decoder: {args.decoder}")
+    print(f"component validity: {'enabled' if validity_meta else 'disabled'}")
     print(f"writer: {recreated['writer']} · samples: {total}")
     print(f"exact expression: {100*metrics['exactExpressionAccuracy']:.2f}%")
     print(f"CER: {100*metrics['characterErrorRate']:.2f}%")
