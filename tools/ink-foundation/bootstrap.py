@@ -1,23 +1,23 @@
 #!/usr/bin/env python3
 """One-writer development bootstrap for Pri Ink Foundation V3.
 
-This is the high-accuracy personal-development path when only one consenting
-Apple-Pencil writer is available. It is deliberately NOT release evidence.
+Pipeline:
+  V3 generic synthetic pretraining
+    -> optional writer-specific synthetic replay made only from bootstrap-TRAIN
+       glyphs
+    -> real one-writer adaptation
+    -> DEBUG Core ML
 
-Pipeline role:
-  V3 synthetic pretraining -> one-writer real-Pencil adaptation -> DEBUG Core ML
-
-The same human appears in train/dev, so no metric from this script is evidence
-of arbitrary-writer generalisation. The checkpoint stage remains `bootstrap` and
-cannot pass Pri's production promotion gate.
+The same human appears in train/dev, so this is NEVER arbitrary-writer release
+evidence. Personal synthetic replay is also never counted as real evidence.
 """
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import math
 import os
-import random
 from pathlib import Path
 
 import torch
@@ -27,6 +27,24 @@ from torch.utils.data import DataLoader
 from data import BOS_ID, EOS_ID, PAD_ID, VOCAB, Example, InkDataset, corpus_files, load_examples
 from model import ModelConfig, PriInkFoundation
 from train import ctc_alignment_loss, evaluate, load_initial_backbone, seed_everything
+
+
+def bootstrap_validation_indices(examples: list[Example], seed: int, fraction: float) -> set[int]:
+    """Stable cross-language split used by Python training and JS personal synth.
+
+    SHA-256 over seed/index/target makes the holdout reproducible without relying
+    on Python-vs-JS PRNG implementations. The personal synthesizer mirrors this
+    exactly and is forbidden from extracting glyphs from these indices.
+    """
+    fraction = min(0.35, max(0.10, fraction))
+    n_val = max(8, int(round(len(examples) * fraction)))
+    n_val = min(n_val, len(examples) - 8)
+    ranked = []
+    for i, row in enumerate(examples):
+        key = f"{seed}:{i}:{row.target}".encode("utf-8")
+        ranked.append((hashlib.sha256(key).hexdigest(), i))
+    ranked.sort()
+    return {i for _, i in ranked[:n_val]}
 
 
 def make_bootstrap_split(examples: list[Example], seed: int, fraction: float):
@@ -42,13 +60,7 @@ def make_bootstrap_split(examples: list[Example], seed: int, fraction: float):
     if len(examples) < 20:
         raise SystemExit("Need at least 20 real expressions for a useful one-writer bootstrap; 50 is recommended.")
 
-    fraction = min(0.35, max(0.10, fraction))
-    n_val = max(8, int(round(len(examples) * fraction)))
-    n_val = min(n_val, len(examples) - 8)
-    order = list(range(len(examples)))
-    random.Random(seed).shuffle(order)
-    val_indices = set(order[:n_val])
-
+    val_indices = bootstrap_validation_indices(examples, seed, fraction)
     rows: list[Example] = []
     for i, row in enumerate(examples):
         rows.append(Example(
@@ -58,12 +70,28 @@ def make_bootstrap_split(examples: list[Example], seed: int, fraction: float):
             strokes=row.strokes,
             source=row.source,
         ))
-    return rows, writers[0], len(examples) - n_val, n_val
+    return rows, writers[0], len(examples) - len(val_indices), len(val_indices)
+
+
+def load_personal_synthetic(root: str | None, writer: str) -> list[Example]:
+    if not root:
+        return []
+    rows = load_examples(corpus_files(root))
+    if not rows:
+        raise SystemExit(f"--personal-synth contains no usable samples: {root}")
+    if any(x.split != "train" for x in rows):
+        raise SystemExit("personal synthetic replay must be train-only")
+    writers = sorted({x.writer for x in rows})
+    if writers != [writer]:
+        raise SystemExit(f"personal synthetic replay writer mismatch: expected {writer}, found {writers}")
+    return [Example(writer=x.writer, split="train", target=x.target, strokes=x.strokes, source=x.source) for x in rows]
 
 
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--corpus", default="client/test/ink-corpus")
+    p.add_argument("--personal-synth", default=None,
+                   help="optional train-only corpus composed from this writer's bootstrap-training glyphs")
     p.add_argument("--init", required=True, help="compatible V3 synthetic pretraining checkpoint")
     p.add_argument("--out", default="tools/ink-foundation/runs/pri-ink-bootstrap.pt")
     p.add_argument("--epochs", type=int, default=50)
@@ -92,14 +120,15 @@ def main():
     else:
         device = torch.device(args.device)
 
-    files = corpus_files(args.corpus)
-    examples = load_examples(files)
-    if not examples:
+    real_examples = load_examples(corpus_files(args.corpus))
+    if not real_examples:
         raise SystemExit(f"No v2 real-ink samples found under {args.corpus!r}")
 
-    examples, writer, train_count, val_count = make_bootstrap_split(
-        examples, args.seed, args.validation_fraction
+    examples, writer, real_train_count, val_count = make_bootstrap_split(
+        real_examples, args.seed, args.validation_fraction
     )
+    personal_synth = load_personal_synthetic(args.personal_synth, writer)
+    examples.extend(personal_synth)
     writer_to_id = {writer: 0}
 
     cfg = ModelConfig(
@@ -148,24 +177,22 @@ def main():
     sched = torch.optim.lr_scheduler.LambdaLR(opt, lr_factor)
     scaler = torch.amp.GradScaler("cuda", enabled=device.type == "cuda")
 
-    out = Path(args.out)
-    out.parent.mkdir(parents=True, exist_ok=True)
+    out = Path(args.out); out.parent.mkdir(parents=True, exist_ok=True)
     manifest_path = out.with_suffix(".json")
-    best_score = -1e9
-    stale = 0
+    best_score = -1e9; stale = 0
 
     print(
         f"stage=bootstrap architecture=v3 device={device} writer={writer} "
-        f"real-train={train_count} same-writer-dev-val={val_count}"
+        f"real-train={real_train_count} personal-synth={len(personal_synth)} "
+        f"same-writer-real-dev-val={val_count}"
     )
     print(f"initialized backbone from {args.init}")
     print(f"parameters={sum(p.numel() for p in model.parameters()):,}")
-    print("WARNING: same-writer validation is a development signal only, NOT writer-generalisation evidence.")
+    print("WARNING: same-writer validation is development-only; personal synthetic replay is not real evidence.")
 
     for epoch in range(1, args.epochs + 1):
         model.train()
-        running = running_token = running_ctc = 0.0
-        seen = 0
+        running = running_token = running_ctc = 0.0; seen = 0
         for batch in train_loader:
             labels = batch["tokens"].to(device)
             point_valid = batch["point_valid"].to(device)
@@ -180,71 +207,56 @@ def main():
                     batch["raster"].to(device),
                 )
                 token_loss = F.cross_entropy(
-                    logits.reshape(-1, logits.shape[-1]),
-                    labels.reshape(-1), ignore_index=PAD_ID, label_smoothing=0.035,
+                    logits.reshape(-1, logits.shape[-1]), labels.reshape(-1),
+                    ignore_index=PAD_ID, label_smoothing=0.035,
                 )
                 ctc_loss = ctc_alignment_loss(
                     ctc_logits.float(), physical_tokens, physical_lengths, point_valid
                 )
                 loss = token_loss + args.ctc_loss * ctc_loss
-            scaler.scale(loss).backward()
-            scaler.unscale_(opt)
+            scaler.scale(loss).backward(); scaler.unscale_(opt)
             torch.nn.utils.clip_grad_norm_(model.parameters(), 0.8)
             scaler.step(opt); scaler.update(); sched.step()
-            running += float(loss.detach())
-            running_token += float(token_loss.detach())
-            running_ctc += float(ctc_loss.detach())
-            seen += 1
+            running += float(loss.detach()); running_token += float(token_loss.detach())
+            running_ctc += float(ctc_loss.detach()); seen += 1
 
         val = evaluate(model, val_loader, device)
         score = val["exact"] - 0.40 * val["cer"]
         print(
             f"epoch {epoch:03d} train={running/max(seen,1):.4f} "
             f"token={running_token/max(seen,1):.4f} ctc={running_ctc/max(seen,1):.4f} "
-            f"same-writer-dev-val={val['loss']:.4f} "
+            f"same-writer-real-dev-val={val['loss']:.4f} "
             f"exact={100*val['exact']:.2f}% CER={100*val['cer']:.2f}%"
         )
 
         if score > best_score + 1e-5:
             best_score = score; stale = 0
             torch.save({
-                "model": model.state_dict(),
-                "config": cfg.to_dict(),
-                "vocab": VOCAB,
-                "pad_id": PAD_ID,
-                "bos_id": BOS_ID,
-                "eos_id": EOS_ID,
-                "train_writers": [writer],
-                "epoch": epoch,
-                "validation": val,
-                "seed": args.seed,
-                "stage": "bootstrap",
-                "architecture_version": 3,
-                "initialized_from": str(args.init),
+                "model": model.state_dict(), "config": cfg.to_dict(), "vocab": VOCAB,
+                "pad_id": PAD_ID, "bos_id": BOS_ID, "eos_id": EOS_ID,
+                "train_writers": [writer], "epoch": epoch,
+                "validation": val, "seed": args.seed, "stage": "bootstrap",
+                "architecture_version": 3, "initialized_from": str(args.init),
                 "release_eligible": False,
-                "bootstrap_train_samples": train_count,
+                "bootstrap_real_train_samples": real_train_count,
+                "bootstrap_personal_synthetic_samples": len(personal_synth),
                 "bootstrap_validation_samples": val_count,
                 "auxiliary_losses": {"ctc": args.ctc_loss},
             }, out)
             manifest_path.write_text(json.dumps({
-                "format": "pri-ink-foundation",
-                "version": 3,
-                "architectureVersion": 3,
-                "stage": "bootstrap",
-                "evidence": "same-writer development holdout — NOT generalisation evidence",
+                "format": "pri-ink-foundation", "version": 3,
+                "architectureVersion": 3, "stage": "bootstrap",
+                "evidence": "same-writer real development holdout — NOT generalisation evidence; personal synthetic replay excluded from evidence counts",
                 "releaseEligible": False,
                 "decoder": "parallel-output-queries+2d-visual+physical-ctc-aux",
-                "checkpoint": out.name,
-                "config": cfg.to_dict(),
-                "vocab": VOCAB,
-                "validation": val,
-                "realWriterCount": 1,
-                "realTrainSamples": train_count,
-                "sameWriterValidationSamples": val_count,
-                "seed": args.seed,
+                "checkpoint": out.name, "config": cfg.to_dict(), "vocab": VOCAB,
+                "validation": val, "realWriterCount": 1,
+                "realTrainSamples": real_train_count,
+                "personalSyntheticReplaySamples": len(personal_synth),
+                "sameWriterValidationSamples": val_count, "seed": args.seed,
                 "initializedFrom": str(args.init),
                 "auxiliaryLossWeights": {"ctc": args.ctc_loss},
-                "holdoutPolicy": "No test/final-holdout data is read. Production release remains forbidden.",
+                "holdoutPolicy": "Real dev-val samples are excluded from personal glyph extraction/replay. No test/final-holdout data is read. Production release remains forbidden.",
             }, indent=2), encoding="utf-8")
         else:
             stale += 1
