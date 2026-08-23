@@ -26,6 +26,8 @@ def main():
     p = argparse.ArgumentParser()
     p.add_argument("--corpus", required=True)
     p.add_argument("--out", default="tools/ink-foundation/runs/pri-ink-structural-v4-dev.pt")
+    p.add_argument("--init", default=None,
+                   help="optional V4 checkpoint used only to initialise model weights")
     p.add_argument("--epochs", type=int, default=30)
     p.add_argument("--batch", type=int, default=8)
     p.add_argument("--lr", type=float, default=2e-4)
@@ -84,6 +86,28 @@ def main():
     val_loader = DataLoader(val_ds, batch_size=args.batch, shuffle=False, num_workers=args.workers)
 
     model = PriInkStructuralV4(len(TOKEN_TO_ID), cfg).to(device)
+    init_meta = None
+    if args.init:
+        init_path = Path(args.init)
+        if not init_path.exists():
+            raise SystemExit(f"initialisation checkpoint not found: {init_path}")
+        init_ckpt = torch.load(init_path, map_location="cpu", weights_only=False)
+        if int(init_ckpt.get("architecture_version", 0)) != 4:
+            raise SystemExit("initialisation checkpoint is not V4")
+        if init_ckpt.get("production_ready") is not False:
+            raise SystemExit("refusing unsafe initialisation checkpoint claiming production readiness")
+        if (init_ckpt.get("vocab") or []) != list(TOKEN_TO_ID.keys()):
+            raise SystemExit("initialisation checkpoint vocabulary mismatch")
+        init_cfg = StructuralConfig(**init_ckpt["config"])
+        if init_cfg.to_dict() != cfg.to_dict():
+            raise SystemExit("initialisation checkpoint V4 config does not match fine-tune config")
+        model.load_state_dict(init_ckpt["model"], strict=True)
+        init_meta = {
+            "path": str(init_path),
+            "stage": init_ckpt.get("stage"),
+            "evidence": init_ckpt.get("evidence"),
+        }
+
     opt = torch.optim.AdamW(
         model.parameters(), lr=args.lr, weight_decay=args.weight_decay, betas=(0.9, 0.98)
     )
@@ -108,6 +132,8 @@ def main():
         f"device={device} writer={split_meta['writer']} train={len(train_examples)} "
         f"validation={len(val_examples)} holdout={split_meta['fraction']:.2f}"
     )
+    if init_meta:
+        print(f"initialised from: {init_meta['path']} stage={init_meta['stage']}")
     print(f"parameters={sum(p.numel() for p in model.parameters()):,}")
 
     for epoch in range(1, args.epochs + 1):
@@ -131,9 +157,9 @@ def main():
 
         metrics = evaluate(model, val_loader, device)
         score = (
-            0.35 * metrics["symbol_accuracy"] +
-            0.30 * metrics["group_balanced_accuracy"] +
-            0.35 * metrics["relation_positive_accuracy"]
+            0.45 * metrics["symbol_accuracy"] +
+            0.25 * metrics["group_balanced_accuracy"] +
+            0.30 * metrics["relation_positive_accuracy"]
         )
         print(
             f"epoch={epoch} train_loss={running/max(1, steps):.4f} "
@@ -155,6 +181,7 @@ def main():
                 "model": model.state_dict(),
                 "validation": metrics,
                 "dev_split": split_meta,
+                "initialisation": init_meta,
                 "evidence": (
                     "same-writer development holdout only; not writer-disjoint and not valid "
                     "for production promotion"
@@ -167,6 +194,7 @@ def main():
                 "productionReady": False,
                 "validationProtocol": split_meta,
                 "validation": metrics,
+                "initialisation": init_meta,
                 "multiStrokeGroups": multi_groups,
                 "positiveRelations": positive_relations,
                 "evidence": checkpoint["evidence"],
