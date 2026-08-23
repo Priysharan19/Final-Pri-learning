@@ -11,9 +11,12 @@ import SwiftUI
 @main
 struct PriLearningApp: App {
     init() {
-        // Scores the native reading pipeline against expressions whose answer
-        // is known, and reports it to the system log. Off unless asked for.
         if ProcessInfo.processInfo.arguments.contains("--ink-selfcheck") {
+            // Structural geometry must pass before any downstream recogniser is
+            // allowed to produce a score. If an exponent is split into another
+            // line, OCR accuracy is irrelevant because the maths was already
+            // destroyed at segmentation time.
+            InkSegmentationRegression.assertProductionInvariants()
             DispatchQueue.global(qos: .userInitiated).async { InkSelfCheck.run() }
         }
     }
@@ -28,8 +31,6 @@ struct PriLearningApp: App {
 struct ContentView: View {
     var body: some View {
         ZStack {
-            // The app's page background, extended under the status bar and
-            // home indicator so the shell never shows a white flash.
             Color(red: 14 / 255, green: 17 / 255, blue: 23 / 255)
                 .ignoresSafeArea()
             WebShell()
