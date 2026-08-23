@@ -1,8 +1,8 @@
 """Real-ink dataset for Pri's local handwriting foundation model.
 
-Consumes the version-2 corpus emitted by tools/ink-collect-v2. Splits are writer
-locked by the collector; this loader refuses to silently mix a writer across
-splits because that would make accuracy numbers meaningless.
+Consumes `pri-ink-corpus` v2 JSON. Writer split leakage is treated as a hard
+error: a model that has already seen the test writer is not evidence of real
+handwriting generalisation.
 """
 from __future__ import annotations
 
@@ -20,16 +20,16 @@ from torch.utils.data import Dataset
 
 
 SPECIAL = ["<pad>", "<bos>", "<eos>", "<unk>"]
-WORDS = [
-    "cosec", "theta", "sqrt", "percent", "sin", "cos", "tan", "sec", "csc",
-    "cot", "log", "LHS", "RHS", "ln", "pi", "<=", ">=", "!=",
-]
+# Multi-character tokens are restricted to symbols that are physically ONE
+# handwritten mark. Function names stay character-by-character so the output
+# sequence can still align to the three Pencil glyphs in "sin", "cos", etc.
+WORDS = ["theta", "sqrt", "pi", "<=", ">=", "!="]
 CHARS = list("0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ+-*/=().:^_<>!%,") + ["±", "°"]
 VOCAB = SPECIAL + WORDS + [c for c in CHARS if c not in WORDS]
 TOKEN_TO_ID = {t: i for i, t in enumerate(VOCAB)}
 ID_TO_TOKEN = {i: t for t, i in TOKEN_TO_ID.items()}
 PAD_ID = TOKEN_TO_ID["<pad>"]
-BOS_ID = TOKEN_TO_ID["<bos>"]
+BOS_ID = TOKEN_TO_ID["<bos>"]  # reserved for checkpoint compatibility; one-pass model does not emit it
 EOS_ID = TOKEN_TO_ID["<eos>"]
 UNK_ID = TOKEN_TO_ID["<unk>"]
 
@@ -51,7 +51,7 @@ def tokenize(text: str) -> list[str]:
 
 
 def encode(text: str, max_tokens: int) -> list[int]:
-    ids = [BOS_ID] + [TOKEN_TO_ID.get(t, UNK_ID) for t in tokenize(text)] + [EOS_ID]
+    ids = [TOKEN_TO_ID.get(t, UNK_ID) for t in tokenize(text)] + [EOS_ID]
     if len(ids) > max_tokens:
         raise ValueError(f"target has {len(ids)} tokens; max_tokens={max_tokens}: {text}")
     return ids
@@ -131,9 +131,8 @@ def point_features(strokes: list[dict], max_points: int, augment: bool = False) 
     scale = max(max_x - min_x, max_y - min_y, 1.0)
     cx, cy = (min_x + max_x) * 0.5, (min_y + max_y) * 0.5
 
-    # Train-only nuisance transforms. These are intentionally modest: the old
-    # engine already demonstrated that turning augmentation into label noise
-    # improves the average while hurting difficult writers.
+    # Modest only. Pri's old CNN experiments already showed that excessive
+    # distortion can improve mean accuracy while destroying the worst writer.
     shear = random.uniform(-0.10, 0.10) if augment else 0.0
     global_scale = random.uniform(0.92, 1.08) if augment else 1.0
     pressure_gain = random.uniform(0.90, 1.10) if augment else 1.0
@@ -149,9 +148,6 @@ def point_features(strokes: list[dict], max_points: int, augment: bool = False) 
         force = max(0.0, min(2.0, _point_num(p, "p", "force") * pressure_gain))
         width = max(0.0, min(16.0, _point_num(p, "w", default=3.0))) / 8.0
 
-        # Web collector exposes tiltX/tiltY; native PencilKit exposes azimuth
-        # and altitude. Both become orientation features instead of creating two
-        # incompatible dataset dialects.
         az = _point_num(p, "azimuth")
         alt = _point_num(p, "altitude", default=math.pi / 2)
         if "azimuth" not in p and ("tiltX" in p or "tiltY" in p):
@@ -178,7 +174,6 @@ def point_features(strokes: list[dict], max_points: int, augment: bool = False) 
 
     arr = np.asarray(seq, dtype=np.float32)
     if augment and len(arr) > 40:
-        # Drop a few interior samples, never stroke boundaries.
         keep = np.ones(len(arr), dtype=bool)
         candidate = np.where((arr[:, 11] < 0.5) & (arr[:, 12] < 0.5))[0]
         n_drop = int(len(candidate) * random.uniform(0.0, 0.04))
@@ -187,7 +182,7 @@ def point_features(strokes: list[dict], max_points: int, augment: bool = False) 
             arr = arr[keep]
 
     if len(arr) > max_points:
-        # Uniformly preserve the entire gesture instead of chopping off the end.
+        # Preserve the whole gesture rather than truncating the answer.
         idx = np.linspace(0, len(arr) - 1, max_points).round().astype(np.int64)
         arr = arr[idx]
 
