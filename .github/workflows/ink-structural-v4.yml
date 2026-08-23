@@ -7,6 +7,10 @@ on:
       - 'tools/ink-foundation/structural_data.py'
       - 'tools/ink-foundation/structural_decode.py'
       - 'tools/ink-foundation/train_structural.py'
+      - 'tools/ink-annotate-v4/**'
+      - 'client/test/ink-structural-annotator-check.mjs'
+      - 'scripts/serve-lan.mjs'
+      - 'package.json'
       - '.github/workflows/ink-structural-v4.yml'
   pull_request:
     paths:
@@ -14,6 +18,10 @@ on:
       - 'tools/ink-foundation/structural_data.py'
       - 'tools/ink-foundation/structural_decode.py'
       - 'tools/ink-foundation/train_structural.py'
+      - 'tools/ink-annotate-v4/**'
+      - 'client/test/ink-structural-annotator-check.mjs'
+      - 'scripts/serve-lan.mjs'
+      - 'package.json'
       - '.github/workflows/ink-structural-v4.yml'
 
 concurrency:
@@ -32,6 +40,9 @@ jobs:
           python-version: '3.12'
           cache: pip
           cache-dependency-path: tools/ink-foundation/requirements.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
 
       - name: Python syntax
         run: |
@@ -40,6 +51,9 @@ jobs:
             tools/ink-foundation/structural_data.py \
             tools/ink-foundation/structural_decode.py \
             tools/ink-foundation/train_structural.py
+
+      - name: Structural annotator contract
+        run: npm run test:ink:structure
 
       - name: Install training dependencies
         run: python -m pip install -r tools/ink-foundation/requirements.txt
