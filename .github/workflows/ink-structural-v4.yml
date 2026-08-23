@@ -7,6 +7,8 @@ on:
       - 'tools/ink-foundation/structural_data.py'
       - 'tools/ink-foundation/structural_decode.py'
       - 'tools/ink-foundation/train_structural.py'
+      - 'tools/ink-foundation/audit_structural.py'
+      - 'tools/ink-foundation/README.md'
       - 'tools/ink-annotate-v4/**'
       - 'client/test/ink-structural-annotator-check.mjs'
       - 'scripts/serve-lan.mjs'
@@ -18,6 +20,8 @@ on:
       - 'tools/ink-foundation/structural_data.py'
       - 'tools/ink-foundation/structural_decode.py'
       - 'tools/ink-foundation/train_structural.py'
+      - 'tools/ink-foundation/audit_structural.py'
+      - 'tools/ink-foundation/README.md'
       - 'tools/ink-annotate-v4/**'
       - 'client/test/ink-structural-annotator-check.mjs'
       - 'scripts/serve-lan.mjs'
@@ -50,7 +54,8 @@ jobs:
             tools/ink-foundation/structural.py \
             tools/ink-foundation/structural_data.py \
             tools/ink-foundation/structural_decode.py \
-            tools/ink-foundation/train_structural.py
+            tools/ink-foundation/train_structural.py \
+            tools/ink-foundation/audit_structural.py
 
       - name: Structural annotator contract
         run: npm run test:ink:structure
@@ -65,7 +70,7 @@ jobs:
           sys.path.insert(0, 'tools/ink-foundation')
           from data import TOKEN_TO_ID
           from structural import PriInkStructuralV4, StructuralConfig, RELATION_TO_ID
-          from structural_data import hierarchical_stroke_features, structural_targets
+          from structural_data import IGNORE_INDEX, hierarchical_stroke_features, structural_targets
 
           cfg = StructuralConfig(
               d_model=64, nhead=8, point_layers=1, stroke_layers=1,
@@ -90,9 +95,12 @@ jobs:
           }
           p, pv, sv, geom = hierarchical_stroke_features(strokes, cfg)
           sym, group, rel = structural_targets(structure, cfg.max_strokes)
-          assert group[2, 3] == 1 and group[0, 1] == 0
+          assert group[2, 3] == 1 and group[3, 2] == 1
+          assert group[0, 1] == 0
+          assert group[0, 0] == IGNORE_INDEX and group[2, 2] == IGNORE_INDEX
           assert rel[0, 1] == RELATION_TO_ID['SUPERSCRIPT']
           assert rel[0, 2] == RELATION_TO_ID['RIGHT']
+          assert rel[0, 0] == IGNORE_INDEX and rel[2, 2] == IGNORE_INDEX
           assert sym[2] == TOKEN_TO_ID['='] and sym[3] == TOKEN_TO_ID['=']
 
           model = PriInkStructuralV4(len(TOKEN_TO_ID), cfg).eval()
@@ -210,6 +218,9 @@ jobs:
           print(root)
           PY
 
+      - name: Strict structural corpus audit
+        run: python tools/ink-foundation/audit_structural.py /tmp/pri-ink-v4-smoke --require-all
+
       - name: One-epoch CPU structural training smoke
         run: |
           python tools/ink-foundation/train_structural.py \
@@ -241,5 +252,7 @@ jobs:
           assert manifest['architectureVersion'] == 4
           assert manifest['productionReady'] is False
           assert manifest['validationWriters'] == 1
+          assert manifest['multiStrokeGroups'] >= 1
+          assert manifest['positiveRelations'] >= 1
           print('Pri Ink V4 research promotion lock: PASS')
           PY
