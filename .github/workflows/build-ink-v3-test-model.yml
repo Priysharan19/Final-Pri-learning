@@ -2,9 +2,7 @@ name: Build Ink V3 Test Model
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - pri-local-ink-v2
+  pull_request:
     paths:
       - '.github/workflows/build-ink-v3-test-model.yml'
 
@@ -115,7 +113,7 @@ jobs:
       - name: Write model card
         run: |
           python - <<'PY'
-          import json, os, torch
+          import os, torch
           p = os.environ['CHECKPOINT']
           ckpt = torch.load(p, map_location='cpu', weights_only=False)
           val = ckpt.get('validation') or {}
