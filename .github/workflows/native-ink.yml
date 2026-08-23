@@ -12,6 +12,7 @@ on:
       - 'client/test/native-ink-check.mjs'
       - 'scripts/ink-native-check.mjs'
       - 'scripts/check-native-package-sync.mjs'
+      - 'handwriting/v12/**'
       - '.github/workflows/native-ink.yml'
   pull_request:
     paths:
@@ -21,6 +22,7 @@ on:
       - 'client/test/native-ink-check.mjs'
       - 'scripts/ink-native-check.mjs'
       - 'scripts/check-native-package-sync.mjs'
+      - 'handwriting/v12/**'
       - '.github/workflows/native-ink.yml'
 
 concurrency:
