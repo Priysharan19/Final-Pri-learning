@@ -7,6 +7,7 @@ on:
       - 'tools/ink-foundation/structural_data.py'
       - 'tools/ink-foundation/structural_decode.py'
       - 'tools/ink-foundation/train_structural.py'
+      - 'tools/ink-foundation/evaluate_structural.py'
       - 'tools/ink-foundation/audit_structural.py'
       - 'tools/ink-foundation/README.md'
       - 'tools/ink-annotate-v4/**'
@@ -20,6 +21,7 @@ on:
       - 'tools/ink-foundation/structural_data.py'
       - 'tools/ink-foundation/structural_decode.py'
       - 'tools/ink-foundation/train_structural.py'
+      - 'tools/ink-foundation/evaluate_structural.py'
       - 'tools/ink-foundation/audit_structural.py'
       - 'tools/ink-foundation/README.md'
       - 'tools/ink-annotate-v4/**'
@@ -55,6 +57,7 @@ jobs:
             tools/ink-foundation/structural_data.py \
             tools/ink-foundation/structural_decode.py \
             tools/ink-foundation/train_structural.py \
+            tools/ink-foundation/evaluate_structural.py \
             tools/ink-foundation/audit_structural.py
 
       - name: Structural annotator contract
@@ -119,7 +122,7 @@ jobs:
           print('Pri Ink V4 structural tensor contract: PASS')
           PY
 
-      - name: Deterministic graph decoder contract
+      - name: Deterministic graph and multi-glyph AST contract
         run: |
           python - <<'PY'
           import sys, torch
@@ -128,12 +131,12 @@ jobs:
           from structural import RELATION_TO_ID
           from structural_decode import decode_structural_output
 
+          # x^2 = : grouping + superscript
           s = 4; v = len(TOKEN_TO_ID); r = len(RELATION_TO_ID)
           symbols = torch.full((1, s, v), -8.0)
           for stroke, token in [(0, 'x'), (1, '2'), (2, '='), (3, '=')]:
               symbols[0, stroke, TOKEN_TO_ID[token]] = 8.0
           groups = torch.full((1, s, s), -8.0)
-          for i in range(s): groups[0, i, i] = 8.0
           groups[0, 2, 3] = groups[0, 3, 2] = 8.0
           relations = torch.full((1, s, s, r), -8.0)
           relations[..., RELATION_TO_ID['NONE']] = 8.0
@@ -159,8 +162,34 @@ jobs:
           assert len(hyp.glyphs) == 3, hyp
           assert hyp.glyphs[2].strokes == (2, 3), hyp.glyphs
           assert hyp.canonical == 'x^(2)=', hyp.canonical
+          assert hyp.ast.canonical() == hyp.canonical
           assert not hyp.ambiguous, hyp
-          print('Pri Ink V4 graph decoder contract: PASS —', hyp.canonical)
+
+          # (x+1)/(2x) : one fraction bar with multiple numerator/denominator glyphs.
+          tokens = ['/', 'x', '+', '1', '2', 'x']
+          s = len(tokens)
+          symbols = torch.full((1, s, v), -8.0)
+          for i, token in enumerate(tokens): symbols[0, i, TOKEN_TO_ID[token]] = 8.0
+          groups = torch.full((1, s, s), -8.0)
+          relations = torch.full((1, s, s, r), -8.0)
+          relations[..., RELATION_TO_ID['NONE']] = 8.0
+          for target in [1,2,3]:
+              relations[0,0,target,:] = -8.0
+              relations[0,0,target,RELATION_TO_ID['NUMERATOR']] = 8.0
+          for target in [4,5]:
+              relations[0,0,target,:] = -8.0
+              relations[0,0,target,RELATION_TO_ID['DENOMINATOR']] = 8.0
+          for a,b in [(1,2),(2,3),(4,5)]:
+              relations[0,a,b,:] = -8.0
+              relations[0,a,b,RELATION_TO_ID['RIGHT']] = 8.0
+          geometry = torch.zeros(1,s,8)
+          for i,(x,y) in enumerate([(0,0),(-.3,-.2),(0,-.2),(.3,-.2),(-.15,.2),(.15,.2)]):
+              geometry[0,i,0]=x; geometry[0,i,1]=y; geometry[0,i,2]=.12; geometry[0,i,3]=.15
+          hyp = decode_structural_output({
+              'symbol_logits': symbols, 'group_logits': groups, 'relation_logits': relations,
+          }, geometry, torch.ones(1,s,dtype=torch.bool))
+          assert hyp.canonical == '(x+1)/(2x)', hyp.canonical
+          print('Pri Ink V4 graph/AST decoder contract: PASS')
           PY
 
       - name: Build tiny writer-disjoint annotated corpus
@@ -237,7 +266,16 @@ jobs:
             --max-points-per-stroke 16 \
             --patience 1
 
-      - name: Checkpoint is research-only V4 evidence
+      - name: Expression evaluator smoke
+        run: |
+          python tools/ink-foundation/evaluate_structural.py \
+            /tmp/pri-ink-v4-smoke.pt \
+            --corpus /tmp/pri-ink-v4-smoke \
+            --split validation \
+            --device cpu \
+            --out /tmp/pri-ink-v4-eval.json
+
+      - name: Checkpoint and report stay research-only
         run: |
           python - <<'PY'
           import json, pathlib, torch
@@ -246,6 +284,7 @@ jobs:
               raise SystemExit('V4 smoke did not create a substantive checkpoint')
           ckpt = torch.load(p, map_location='cpu', weights_only=False)
           manifest = json.loads(p.with_suffix('.json').read_text())
+          report = json.loads(pathlib.Path('/tmp/pri-ink-v4-eval.json').read_text())
           assert ckpt['architecture_version'] == 4
           assert ckpt['stage'] == 'structural-research'
           assert ckpt['production_ready'] is False
@@ -254,5 +293,9 @@ jobs:
           assert manifest['validationWriters'] == 1
           assert manifest['multiStrokeGroups'] >= 1
           assert manifest['positiveRelations'] >= 1
+          assert report['architectureVersion'] == 4
+          assert report['productionReady'] is False
+          assert report['split'] == 'validation'
+          assert report['samples'] == 2 and report['writers'] == 1
           print('Pri Ink V4 research promotion lock: PASS')
           PY
