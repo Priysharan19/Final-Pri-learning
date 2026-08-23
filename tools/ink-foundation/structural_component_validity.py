@@ -7,10 +7,15 @@ set symbol classifier can therefore be confidently wrong on malformed groups.
 This module adds a separately trained validity calibrator rather than changing the
 base V4 checkpoint. The calibrator sees local glyph-shape pooling, contextual
 structural pooling, and an expression summary. It learns whether a proposed group
-is a *complete glyph in this expression*. At inference its validity probability is
-converted into explicit <unk> probability mass. That preserves the existing exact
-joint-search objective: invalid candidates simply receive lower real-symbol log
-probability, while the underlying symbol class ordering is unchanged.
+is a *complete glyph in this expression*.
+
+V2 fixes a calibration failure exposed by the first end-to-end smoke. V1 multiplied
+every candidate's real-symbol probability by raw validity, so even plausible groups
+were unnecessarily suppressed. V2 is conservative: candidates with non-negative
+validity logits are untouched; only explicit rejects are assigned <unk> mass. The
+training loss also includes a pairwise margin-ranking term so true components must
+outrank mined malformed candidates instead of merely landing on the correct side
+of an independently calibrated binary threshold.
 
 The auxiliary checkpoint is cryptographically tied to one base V4 checkpoint.
 Transfer to a different fine-tuned base must be explicit during training, and an
@@ -22,19 +27,21 @@ from __future__ import annotations
 from dataclasses import dataclass
 from itertools import combinations
 import hashlib
-import math
 from pathlib import Path
 
 import torch
 from torch import nn
 import torch.nn.functional as F
 
-from data import TOKEN_TO_ID, UNK_ID
+from data import UNK_ID
 from structural_data import IGNORE_INDEX
 
 
-COMPONENT_VALIDITY_VERSION = 1
-COMPONENT_VALIDITY_OBJECTIVE = "contextual-hard-negative-component-validity-v1"
+COMPONENT_VALIDITY_VERSION = 2
+COMPONENT_VALIDITY_OBJECTIVE = "contextual-hard-negative-ranking-validity-v2"
+VALIDITY_RANK_MARGIN = 0.75
+VALIDITY_RANK_WEIGHT = 0.35
+VALIDITY_REJECT_THRESHOLD_LOGIT = 0.0
 
 
 def checkpoint_sha256(path: Path) -> str:
@@ -153,8 +160,7 @@ def mine_invalid_components(
             for subset in combinations(comp, size):
                 add(subset, 4.0, _mean_pair_probability(probability, tuple(subset)))
 
-    # 2) Whole-glyph false merges. Neighbouring true groups are especially
-    # common search competitors, but all pairs are considered within the bound.
+    # 2) Whole-glyph false merges.
     for ai, left in enumerate(truth):
         for right in truth[ai + 1 :]:
             merged = tuple(sorted(left + right))
@@ -197,14 +203,15 @@ class ComponentValidityHead(nn.Module):
         # contextual structural mean/max + expression mean = 3D
         input_dim = self.d_model * 5 + 1
         hidden = max(128, self.d_model)
+        tail = max(64, self.d_model // 2)
         self.net = nn.Sequential(
             nn.Linear(input_dim, hidden),
             nn.GELU(),
             nn.LayerNorm(hidden),
             nn.Dropout(0.10),
-            nn.Linear(hidden, max(64, self.d_model // 2)),
+            nn.Linear(hidden, tail),
             nn.GELU(),
-            nn.Linear(max(64, self.d_model // 2), 1),
+            nn.Linear(tail, 1),
         )
 
     def _features(
@@ -236,7 +243,10 @@ class ComponentValidityHead(nn.Module):
             members = [int(i) for i in component]
             if not members:
                 raise ValueError("component validity candidate cannot be empty")
-            if any(i < 0 or i >= glyph_strokes.shape[0] or not bool(stroke_valid[i]) for i in members):
+            if any(
+                i < 0 or i >= glyph_strokes.shape[0] or not bool(stroke_valid[i])
+                for i in members
+            ):
                 raise ValueError(f"component validity candidate references inactive stroke: {members}")
             idx = torch.tensor(members, device=glyph_strokes.device, dtype=torch.long)
             local = glyph_strokes.index_select(0, idx)
@@ -329,6 +339,7 @@ def score_supervised_components(
 
 
 def balanced_validity_loss(batch: ValidityBatch) -> torch.Tensor:
+    """Balanced binary calibration plus a true-vs-hard-negative rank margin."""
     parts = []
     if batch.positive_count:
         parts.append(F.binary_cross_entropy_with_logits(
@@ -340,7 +351,20 @@ def balanced_validity_loss(batch: ValidityBatch) -> torch.Tensor:
         ))
     if not parts:
         return batch.positive_logits.sum() + batch.negative_logits.sum()
-    return sum(parts) / len(parts)
+
+    binary = sum(parts) / len(parts)
+    if not batch.positive_count or not batch.negative_count:
+        return binary
+
+    # Smooth AUC surrogate: every true component should beat every mined hard
+    # negative by a useful logit margin. Batch sizes are intentionally bounded by
+    # max_negatives, so this dense comparison is small while directly optimizing
+    # the ordering that joint partition search consumes.
+    difference = (
+        batch.positive_logits[:, None] - batch.negative_logits[None, :]
+    )
+    ranking = F.softplus(VALIDITY_RANK_MARGIN - difference).mean()
+    return binary + VALIDITY_RANK_WEIGHT * ranking
 
 
 def inject_invalid_probability_mass(
@@ -349,13 +373,14 @@ def inject_invalid_probability_mass(
     *,
     weight: float = 1.0,
 ) -> torch.Tensor:
-    """Move invalid-component probability mass to <unk> without changing symbol rank.
+    """Move only explicitly rejected candidate mass to <unk>.
 
-    For a validity probability v and weight w, every base class probability is
-    multiplied by v**w and the remaining mass is assigned to <unk>. The returned
-    tensor is log-probability shaped like logits, so downstream softmax calls keep
-    exactly this distribution. This makes joint search add w*log(v) to the real-
-    symbol evidence for each candidate while retaining exact DP/set-partitioning.
+    V2 uses a conservative reject-only policy. A candidate with validity logit
+    >= 0 is left exactly unchanged. For a rejected candidate, real-symbol mass is
+    multiplied by exp(weight * logit) (logit is negative), and the removed mass
+    moves to <unk>. Therefore exact joint search receives the additive penalty
+    ``weight * min(0, validity_logit)`` without depressing plausible candidates.
+    Symbol ranking inside the base closed-set classifier is never changed.
     """
     if weight < 0:
         raise ValueError("component validity weight must be >= 0")
@@ -367,9 +392,10 @@ def inject_invalid_probability_mass(
         return symbol_logits
 
     base = F.softmax(symbol_logits, dim=-1)
-    validity = torch.sigmoid(validity_logits).clamp(1e-6, 1.0 - 1e-6).pow(weight)
-    calibrated = base * validity.unsqueeze(-1)
-    calibrated[:, UNK_ID] = calibrated[:, UNK_ID] + (1.0 - validity)
+    rejection = F.relu(VALIDITY_REJECT_THRESHOLD_LOGIT - validity_logits)
+    retained = torch.exp(-weight * rejection).clamp(1e-6, 1.0)
+    calibrated = base * retained.unsqueeze(-1)
+    calibrated[:, UNK_ID] = calibrated[:, UNK_ID] + (1.0 - retained)
     calibrated = calibrated / calibrated.sum(dim=-1, keepdim=True).clamp_min(1e-8)
     return calibrated.clamp_min(1e-8).log()
 
