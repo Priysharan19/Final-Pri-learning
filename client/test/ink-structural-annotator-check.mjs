@@ -18,6 +18,12 @@ const check = (name, ok) => {
 
 console.log('\nPri Ink V4 structural annotator contract\n');
 
+const script = html.match(/<script>([\s\S]*?)<\/script>/)?.[1] || '';
+let parses = false;
+try { new Function(script); parses = script.length > 1000; } catch (error) {
+  console.log(`  JavaScript parse error: ${error.message}`);
+}
+check('embedded annotator JavaScript parses', parses);
 check('loads corpus through a local file picker', html.includes('type="file"') && html.includes('await f.text()'));
 check('does not upload corpus data', !/\bfetch\s*\(/.test(html) && !/XMLHttpRequest|WebSocket/.test(html));
 check('groups reference physical stroke indices', html.includes("symbol,strokes:[...selected]") && html.includes('Stroke ${i} belongs to more than one glyph'));
