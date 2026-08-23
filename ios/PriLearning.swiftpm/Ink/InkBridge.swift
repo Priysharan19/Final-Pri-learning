@@ -179,8 +179,9 @@ final class InkBridge: NSObject, InkSurfaceDelegate {
             // Unpromoted neural checkpoints remain shadow-only, but DEBUG must
             // still show the best available real handwriting reader. Run the
             // native Vision/geometry recogniser on the exact same Pencil strokes
-            // and return it through this first bridge hop. If it returns nothing,
-            // the web layer will continue to Pri JS exactly as before.
+            // and return it through this first bridge hop. Any Pencil cluster
+            // omitted by whole-line OCR is recovered independently before the
+            // reading is exposed, so real student ink cannot silently vanish.
             if !foundation.text.isEmpty {
                 NSLog(
                     "PRIINK foundation shadow — lines=%d chars=%d minConf=%.4f margin=%.4f",
@@ -190,7 +191,7 @@ final class InkBridge: NSObject, InkSurfaceDelegate {
                     foundation.margin
                 )
             }
-            let visible = self.recognizer.read(strokes: strokes, overrides: overrides)
+            let visible = self.recognizer.readWithCompleteness(strokes: strokes, overrides: overrides)
             var payload = visible.jsonObject
             payload["type"] = "reading"
             payload["reqId"] = requestId
@@ -214,7 +215,7 @@ final class InkBridge: NSObject, InkSurfaceDelegate {
         let strokes = surface.strokes
         recognitionQueue.async { [weak self] in
             guard let self else { return }
-            let reading = self.recognizer.read(strokes: strokes, overrides: overrides)
+            let reading = self.recognizer.readWithCompleteness(strokes: strokes, overrides: overrides)
             var payload = reading.jsonObject
             payload["type"] = "reading"
             payload["reqId"] = requestId
