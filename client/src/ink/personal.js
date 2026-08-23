@@ -9,7 +9,8 @@
 // A local development build may additionally contain
 // `ink-bootstrap-profile.js`, generated from a consenting real-Pencil corpus by
 // `npm run ink:personalize`. The file is gitignored and loaded as a local script
-// resource — never through fetch/XHR and never persisted back to IndexedDB.
+// resource on the native iPad only — never through fetch/XHR and never persisted
+// back to IndexedDB.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const DB_NAME = 'pri-ink-personal';
@@ -74,7 +75,10 @@ function bootstrapPayload() {
 
 async function loadBootstrapProfile() {
   const existing = bootstrapPayload();
-  if (existing.length || typeof document === 'undefined') return existing;
+  if (existing.length) return existing;
+  // Browser/web builds deliberately do not request this optional private file.
+  // The native bridge is the proof that we are inside the local iPad package.
+  if (typeof document === 'undefined' || !globalThis.__PRI_NATIVE_INK__) return [];
   if (bootstrapLoading) return bootstrapLoading;
 
   bootstrapLoading = new Promise(resolve => {
@@ -123,9 +127,6 @@ export function ensurePersonalLoaded() {
       const mine = activePid ? rows.filter(r => r.pid === activePid || r.pid == null) : rows;
       bank = mine.map(r => ({ sym: r.sym, strokes: r.strokes, src: r.src }));
 
-      // Local corpus evidence is MEMORY-ONLY. It is generated from data that
-      // already carries consent/provenance, and this module never writes it to
-      // the profile database or any network destination.
       const bootstrap = await loadBootstrapProfile();
       if (bootstrap.length) {
         const seen = new Set(bank.map(b => `${b.sym}|${JSON.stringify(b.strokes)}`));
