@@ -10,9 +10,22 @@
 import UIKit
 import WebKit
 
+/// The clipping region is deliberately larger than the actual Pencil surface so
+/// ink can be clipped against scroll containers. A plain UIView here would eat
+/// every finger tap inside that large transparent rectangle — including toolbar
+/// buttons sitting above/beside the paper. Return nil when the clip view itself
+/// wins hit-testing so those touches continue to the WKWebView underneath. A hit
+/// on the InkSurfaceView/PKCanvasView is still returned normally.
+private final class InkClipView: UIView {
+    override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
+        let hit = super.hitTest(point, with: event)
+        return hit === self ? nil : hit
+    }
+}
+
 final class InkBridge: NSObject, InkSurfaceDelegate {
 
-    private let clipView = UIView()
+    private let clipView = InkClipView()
     private let surface = InkSurfaceView()
     private let foundationRecognizer = InkFoundationPageRecognizer()
     private let recognizer = MathInkRecognizer()
@@ -148,9 +161,6 @@ final class InkBridge: NSObject, InkSurfaceDelegate {
     // MARK: - Strokes out
 
     func inkSurfaceDidChangeStrokes(_ surface: InkSurfaceView) {
-        // A newer Pencil contact invalidates any old Vision rescue pass. Core ML
-        // calls are short and serial; their result is discarded by the web-side
-        // sequence gate if it belongs to an older stroke set.
         recognizer.cancelActiveVision()
         let strokes = surface.strokes
         emit(["type": "strokes", "strokes": strokes.map(\.jsonObject)])
@@ -173,8 +183,6 @@ final class InkBridge: NSObject, InkSurfaceDelegate {
         }
     }
 
-    /// Mature native rescue path. This stays available until a real-writer
-    /// foundation checkpoint proves that removing it is safe.
     private func recognize(requestId: Int, overrides: [String: String]) {
         let strokes = surface.strokes
         recognitionQueue.async { [weak self] in
