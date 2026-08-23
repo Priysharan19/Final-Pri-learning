@@ -2,6 +2,7 @@ node_modules/
 client/dist/
 .venv/
 .venv-ink/
+.venv-ink-export/
 server/data/*.db
 .DS_Store
 *.log
