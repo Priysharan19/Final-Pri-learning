@@ -5,11 +5,18 @@ Pipeline:
   V3 generic synthetic pretraining
     -> optional writer-specific synthetic replay made only from bootstrap-TRAIN
        glyphs
-    -> real one-writer adaptation
+    -> real one-writer adaptation with a personalization-biased optimizer
     -> DEBUG Core ML
 
 The same human appears in train/dev, so this is NEVER arbitrary-writer release
 evidence. Personal synthetic replay is also never counted as real evidence.
+
+The bootstrap optimizer intentionally adapts the visual CNN/style path more
+aggressively than the generic stroke backbone. This is a local personalization
+mechanism, not evidence of cross-writer generalisation: the raster encoder sees
+this writer's morphology and writer-derived replay at a higher learning rate,
+while the pretrained stroke representation moves conservatively to reduce
+catastrophic forgetting from a single human writer.
 """
 from __future__ import annotations
 
@@ -87,6 +94,58 @@ def load_personal_synthetic(root: str | None, writer: str) -> list[Example]:
     return [Example(writer=x.writer, split="train", target=x.target, strokes=x.strokes, source=x.source) for x in rows]
 
 
+def personalization_parameter_groups(
+    model: PriInkFoundation,
+    base_lr: float,
+    visual_multiplier: float,
+    stroke_multiplier: float,
+    decoder_multiplier: float,
+):
+    """Disjoint LR groups tuned for one-writer local adaptation.
+
+    The raster CNN + style MLP get the strongest writer-specific update because
+    they encode morphology. The generic stroke Transformer moves more slowly so
+    40-ish real training expressions cannot erase broad synthetic structure.
+    Decoder/output layers keep the base rate to learn P0001 token/layout priors.
+    """
+    visual_modules = (model.raster_encoder, model.style_encoder)
+    decoder_modules = (model.decoder, model.output, model.output_queries, model.output_pos)
+
+    visual_ids = {id(p) for module in visual_modules for p in module.parameters()}
+    decoder_ids = {id(p) for module in decoder_modules for p in module.parameters()}
+    overlap = visual_ids & decoder_ids
+    if overlap:
+        raise RuntimeError("personalization optimizer parameter groups overlap")
+
+    visual_params = []
+    decoder_params = []
+    stroke_params = []
+    for p in model.parameters():
+        if not p.requires_grad:
+            continue
+        pid = id(p)
+        if pid in visual_ids:
+            visual_params.append(p)
+        elif pid in decoder_ids:
+            decoder_params.append(p)
+        else:
+            stroke_params.append(p)
+
+    total = len(visual_params) + len(decoder_params) + len(stroke_params)
+    trainable = sum(1 for p in model.parameters() if p.requires_grad)
+    if total != trainable or not visual_params or not decoder_params or not stroke_params:
+        raise RuntimeError(
+            f"invalid personalization groups: visual={len(visual_params)} "
+            f"decoder={len(decoder_params)} stroke={len(stroke_params)} trainable={trainable}"
+        )
+
+    return [
+        {"params": visual_params, "lr": base_lr * visual_multiplier, "group_name": "writer-visual-cnn-style"},
+        {"params": decoder_params, "lr": base_lr * decoder_multiplier, "group_name": "math-decoder"},
+        {"params": stroke_params, "lr": base_lr * stroke_multiplier, "group_name": "generic-stroke-backbone"},
+    ]
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--corpus", default="client/test/ink-corpus")
@@ -99,6 +158,12 @@ def main():
     p.add_argument("--lr", type=float, default=4e-5)
     p.add_argument("--weight-decay", type=float, default=0.03)
     p.add_argument("--ctc-loss", type=float, default=0.16)
+    p.add_argument("--visual-lr-multiplier", type=float, default=2.0,
+                   help="writer-specific raster CNN/style adaptation multiplier")
+    p.add_argument("--stroke-lr-multiplier", type=float, default=0.45,
+                   help="conservative multiplier for the generic stroke backbone")
+    p.add_argument("--decoder-lr-multiplier", type=float, default=1.0,
+                   help="math sequence decoder adaptation multiplier")
     p.add_argument("--seed", type=int, default=20260823)
     p.add_argument("--validation-fraction", type=float, default=0.20)
     p.add_argument("--workers", type=int, default=min(4, os.cpu_count() or 1))
@@ -110,6 +175,9 @@ def main():
     p.add_argument("--max-tokens", type=int, default=96)
     p.add_argument("--patience", type=int, default=10)
     args = p.parse_args()
+
+    if min(args.visual_lr_multiplier, args.stroke_lr_multiplier, args.decoder_lr_multiplier) <= 0:
+        raise SystemExit("all personalization LR multipliers must be positive")
 
     seed_everything(args.seed)
     if args.device == "auto":
@@ -162,8 +230,15 @@ def main():
         raise SystemExit("bootstrap initialization must come from a synthetic pretrain checkpoint")
     model = model.to(device)
 
+    parameter_groups = personalization_parameter_groups(
+        model,
+        args.lr,
+        args.visual_lr_multiplier,
+        args.stroke_lr_multiplier,
+        args.decoder_lr_multiplier,
+    )
     opt = torch.optim.AdamW(
-        model.parameters(), lr=args.lr, weight_decay=args.weight_decay, betas=(0.9, 0.98)
+        parameter_groups, weight_decay=args.weight_decay, betas=(0.9, 0.98)
     )
     total_steps = max(1, args.epochs * len(train_loader))
     warmup = max(10, total_steps // 20)
@@ -188,6 +263,12 @@ def main():
     )
     print(f"initialized backbone from {args.init}")
     print(f"parameters={sum(p.numel() for p in model.parameters()):,}")
+    print(
+        "personalization LRs: "
+        f"visual-cnn/style={args.lr * args.visual_lr_multiplier:.3g} "
+        f"decoder={args.lr * args.decoder_lr_multiplier:.3g} "
+        f"stroke-backbone={args.lr * args.stroke_lr_multiplier:.3g}"
+    )
     print("WARNING: same-writer validation is development-only; personal synthetic replay is not real evidence.")
 
     for epoch in range(1, args.epochs + 1):
@@ -242,6 +323,12 @@ def main():
                 "bootstrap_personal_synthetic_samples": len(personal_synth),
                 "bootstrap_validation_samples": val_count,
                 "auxiliary_losses": {"ctc": args.ctc_loss},
+                "personalization": {
+                    "visual_lr_multiplier": args.visual_lr_multiplier,
+                    "stroke_lr_multiplier": args.stroke_lr_multiplier,
+                    "decoder_lr_multiplier": args.decoder_lr_multiplier,
+                    "strategy": "writer-specific CNN/style emphasis with conservative stroke-backbone adaptation",
+                },
             }, out)
             manifest_path.write_text(json.dumps({
                 "format": "pri-ink-foundation", "version": 3,
@@ -256,6 +343,12 @@ def main():
                 "sameWriterValidationSamples": val_count, "seed": args.seed,
                 "initializedFrom": str(args.init),
                 "auxiliaryLossWeights": {"ctc": args.ctc_loss},
+                "personalization": {
+                    "writerSpecificVisualCNNAdaptation": True,
+                    "visualLearningRateMultiplier": args.visual_lr_multiplier,
+                    "strokeBackboneLearningRateMultiplier": args.stroke_lr_multiplier,
+                    "decoderLearningRateMultiplier": args.decoder_lr_multiplier,
+                },
                 "holdoutPolicy": "Real dev-val samples are excluded from personal glyph extraction/replay. No test/final-holdout data is read. Production release remains forbidden.",
             }, indent=2), encoding="utf-8")
         else:
