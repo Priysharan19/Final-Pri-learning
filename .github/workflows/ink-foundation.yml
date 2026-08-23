@@ -83,6 +83,7 @@ jobs:
           export = Path('tools/ink-foundation/export_coreml.py').read_text()
           bootstrap = Path('tools/ink-foundation/bootstrap.py').read_text()
           runtime = Path('ios/PriLearning.swiftpm/Ink/InkFoundationRuntime.swift').read_text()
+          low_bootstrap = bootstrap.lower()
           required = {
               'release evaluator checks final holdout': 'final-holdout' in release and 'passesReleaseTargets' in release,
               'release evaluator checks critical structure': 'critical_structure_exact' in release,
@@ -93,7 +94,7 @@ jobs:
               'runtime enforces promotion metadata': 'pri.productionReady' in runtime,
               'bootstrap labels itself development only': 'releaseEligible' in bootstrap and 'NOT generalisation evidence' in bootstrap,
               'bootstrap checkpoint stage is distinct': '"stage": "bootstrap"' in bootstrap,
-              'personal replay excluded from release evidence': 'personal synthetic replay is not real evidence' in bootstrap.lower() or 'personal synthetic replay excluded from evidence' in bootstrap.lower(),
+              'personal replay exists but is not real evidence': 'personal synthetic replay' in low_bootstrap and 'not real evidence' in low_bootstrap,
           }
           bad = [name for name, ok in required.items() if not ok]
           if bad:
