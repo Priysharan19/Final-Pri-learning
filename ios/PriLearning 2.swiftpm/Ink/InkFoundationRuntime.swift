@@ -2,12 +2,13 @@
 // Pri Learning · Local multimodal foundation-model runtime
 //
 // Loads PriInkFoundation only when a compatible Core ML asset has been bundled.
-// DEBUG builds may exercise a development checkpoint. RELEASE builds additionally
-// require `pri.productionReady=true`, which the exporter writes only after a
-// passing locked final-holdout report matches the exact checkpoint SHA-256.
-// One prediction consumes the original Pencil point stream AND a high-resolution
-// raster. No request leaves the device. If the asset is absent or rejected,
-// this runtime returns nil and the existing Pri recogniser remains available.
+// DEBUG builds may exercise an unpromoted development checkpoint. RELEASE builds
+// require a V3 asset plus `pri.productionReady=true`, which the exporter writes
+// only after a passing locked final-holdout report matches the exact checkpoint
+// SHA-256. One prediction consumes the original Pencil point stream AND a
+// high-resolution raster. No request leaves the device. If the asset is absent
+// or rejected, this runtime returns nil and the existing Pri recogniser remains
+// available.
 // ─────────────────────────────────────────────────────────────────────────────
 import CoreGraphics
 import CoreML
@@ -36,7 +37,6 @@ final class InkFoundationRuntime {
     init() {
         guard let loaded = Self.loadModel(),
               let metadata = loaded.modelDescription.metadata[.creatorDefinedKey] as? [String: String],
-              metadata["pri.model"] == "ink-foundation-v2",
               Self.modelAllowedInThisBuild(metadata),
               let rawVocab = metadata["pri.vocab"] else {
             model = nil; vocab = []; padID = 0; bosID = 1; eosID = 2
@@ -57,12 +57,19 @@ final class InkFoundationRuntime {
     }
 
     private static func modelAllowedInThisBuild(_ metadata: [String: String]) -> Bool {
+        let modelID = metadata["pri.model"] ?? ""
 #if DEBUG
-        // Developers may benchmark an unpromoted model without pretending it is
-        // release evidence. The normal fallback chain still remains available.
-        return true
+        // Keep old unpromoted V2 development assets loadable for comparison,
+        // but the current exporter writes V3. Neither DEBUG path is release
+        // evidence and the normal fallback chain remains available.
+        return modelID == "ink-foundation-v3" || modelID == "ink-foundation-v2"
 #else
-        return metadata["pri.productionReady"] == "true"
+        // Production must not accidentally promote a stale V2 development
+        // package merely because metadata was copied. Only coherent V3 export
+        // plus the locked release flag is accepted.
+        return modelID == "ink-foundation-v3"
+            && metadata["pri.architectureVersion"] == "3"
+            && metadata["pri.productionReady"] == "true"
 #endif
     }
 
