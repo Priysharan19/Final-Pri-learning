@@ -5,6 +5,8 @@ on:
     paths:
       - 'tools/ink-foundation/**'
       - 'handwriting/v12/**'
+      - 'scripts/ink-bootstrap-one-writer.sh'
+      - 'package.json'
       - 'ios/PriLearning.swiftpm/Ink/InkFoundationRuntime.swift'
       - 'ios/PriLearning 2.swiftpm/Ink/InkFoundationRuntime.swift'
       - '.github/workflows/ink-foundation.yml'
@@ -12,6 +14,8 @@ on:
     paths:
       - 'tools/ink-foundation/**'
       - 'handwriting/v12/**'
+      - 'scripts/ink-bootstrap-one-writer.sh'
+      - 'package.json'
       - 'ios/PriLearning.swiftpm/Ink/InkFoundationRuntime.swift'
       - 'ios/PriLearning 2.swiftpm/Ink/InkFoundationRuntime.swift'
       - '.github/workflows/ink-foundation.yml'
@@ -129,6 +133,50 @@ jobs:
               if required not in personal:
                   raise SystemExit(f'personal replay curriculum lost required structure: {required}')
           print('replay balance/curriculum contract: PASS — 30% real mass at 40:1600 plus HSC structures')
+          PY
+
+      - name: Strong bootstrap preset contract
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          scripts = json.loads(Path('package.json').read_text())['scripts']
+          strong = scripts['ink:bootstrap:strong']
+          expected = {
+              'train writers': 'PRI_INK_SYNTH_TRAIN_WRITERS=192',
+              'validation writers': 'PRI_INK_SYNTH_VAL_WRITERS=48',
+              'expressions per writer': 'PRI_INK_SYNTH_SAMPLES_PER_WRITER=40',
+              'personal replay': 'PRI_INK_PERSONAL_SYNTH_SAMPLES=1600',
+              'pretrain epochs': 'PRI_INK_PRETRAIN_EPOCHS=24',
+              'bootstrap epochs': 'PRI_INK_BOOTSTRAP_EPOCHS=50',
+              'd_model': 'PRI_INK_D_MODEL=256',
+              'stroke layers': 'PRI_INK_STROKE_LAYERS=8',
+              'decoder layers': 'PRI_INK_DECODER_LAYERS=6',
+              'real replay fraction': 'PRI_INK_REAL_REPLAY_FRACTION=0.30',
+              'visual LR': 'PRI_INK_VISUAL_LR_MULTIPLIER=2.0',
+              'stroke LR': 'PRI_INK_STROKE_LR_MULTIPLIER=0.45',
+              'decoder LR': 'PRI_INK_DECODER_LR_MULTIPLIER=1.0',
+          }
+          missing = [name for name, literal in expected.items() if literal not in strong]
+          if missing:
+              raise SystemExit('strong V3 preset drifted: ' + ', '.join(missing))
+
+          bootstrap_script = Path('scripts/ink-bootstrap-one-writer.sh').read_text()
+          script_contract = {
+              'passes replay fraction': '--real-replay-fraction "$REAL_REPLAY_FRACTION"' in bootstrap_script,
+              'passes visual LR': '--visual-lr-multiplier "$VISUAL_LR_MULTIPLIER"' in bootstrap_script,
+              'passes stroke LR': '--stroke-lr-multiplier "$STROKE_LR_MULTIPLIER"' in bootstrap_script,
+              'passes decoder LR': '--decoder-lr-multiplier "$DECODER_LR_MULTIPLIER"' in bootstrap_script,
+              'rejects stale model id': "meta.get('pri.model') == 'ink-foundation-v3'" in bootstrap_script,
+              'rejects stale architecture': "meta.get('pri.architectureVersion') == '3'" in bootstrap_script,
+              'requires bootstrap stage': "meta.get('pri.trainingStage') == 'bootstrap'" in bootstrap_script,
+              'requires non-production asset': "meta.get('pri.productionReady') == 'false'" in bootstrap_script,
+          }
+          bad = [name for name, ok in script_contract.items() if not ok]
+          if bad:
+              raise SystemExit('strong bootstrap script contract broken: ' + ', '.join(bad))
+          print('strong V3 bootstrap preset contract: PASS')
           PY
 
       - name: Evidence gates remain wired
