@@ -1,9 +1,12 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Pri Learning · Local multimodal foundation-model runtime
 //
-// Loads PriInkFoundation only when a validated Core ML asset has been bundled.
+// Loads PriInkFoundation only when a compatible Core ML asset has been bundled.
+// DEBUG builds may exercise a development checkpoint. RELEASE builds additionally
+// require `pri.productionReady=true`, which the exporter writes only after a
+// passing locked final-holdout report matches the exact checkpoint SHA-256.
 // One prediction consumes the original Pencil point stream AND a high-resolution
-// raster. No request leaves the device. If the asset is absent or incompatible,
+// raster. No request leaves the device. If the asset is absent or rejected,
 // this runtime returns nil and the existing Pri recogniser remains available.
 // ─────────────────────────────────────────────────────────────────────────────
 import CoreGraphics
@@ -34,6 +37,7 @@ final class InkFoundationRuntime {
         guard let loaded = Self.loadModel(),
               let metadata = loaded.modelDescription.metadata[.creatorDefinedKey] as? [String: String],
               metadata["pri.model"] == "ink-foundation-v2",
+              Self.modelAllowedInThisBuild(metadata),
               let rawVocab = metadata["pri.vocab"] else {
             model = nil; vocab = []; padID = 0; bosID = 1; eosID = 2
             maxPoints = 768; maxTokens = 96; featureDim = 14
@@ -50,6 +54,16 @@ final class InkFoundationRuntime {
         featureDim = Int(metadata["pri.featureDim"] ?? "14") ?? 14
         rasterHeight = Int(metadata["pri.rasterHeight"] ?? "128") ?? 128
         rasterWidth = Int(metadata["pri.rasterWidth"] ?? "512") ?? 512
+    }
+
+    private static func modelAllowedInThisBuild(_ metadata: [String: String]) -> Bool {
+#if DEBUG
+        // Developers may benchmark an unpromoted model without pretending it is
+        // release evidence. The normal fallback chain still remains available.
+        return true
+#else
+        return metadata["pri.productionReady"] == "true"
+#endif
     }
 
     func predict(strokes: [InkStroke]) -> InkFoundationPrediction? {
