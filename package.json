@@ -41,6 +41,7 @@
     "ink:collect": "node scripts/serve-lan.mjs --collector",
     "ink:status": "node client/test/ink-corpus-status.mjs",
     "ink:personalize": "node scripts/ink-personalize.mjs",
+    "ink:next-attempt": "npm run test:ink:corpus:strict && npm run ink:personalize && npm run test:ink:hybrid && npm run test:context && npm run build && npm run sync:ios && npm run check:ios",
     "ink:bootstrap": "bash scripts/ink-bootstrap-one-writer.sh",
     "ink:bootstrap:export": "bash scripts/ink-bootstrap-export.sh"
   }
