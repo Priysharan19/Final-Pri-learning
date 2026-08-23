@@ -176,30 +176,29 @@ final class InkBridge: NSObject, InkSurfaceDelegate {
                 ?? Reading(lines: [], text: "", minConfidence: 1, margin: 1, weakest: nil)
 
 #if DEBUG
-            // Unpromoted neural checkpoints remain shadow-only, but DEBUG must
-            // still show the best available real handwriting reader. Run the
-            // native Vision/geometry recogniser on the exact same Pencil strokes
-            // and return it through this first bridge hop. Any Pencil cluster
-            // omitted by whole-line OCR is recovered independently, then weak
-            // owned glyphs receive a second isolated shape vote before display.
-            if !foundation.text.isEmpty {
-                NSLog(
-                    "PRIINK foundation shadow — lines=%d chars=%d minConf=%.4f margin=%.4f",
-                    foundation.lines.count,
-                    foundation.text.count,
-                    foundation.minConfidence,
-                    foundation.margin
-                )
+            // DEBUG is the deliberate Pri Learning model-test path. When a V3
+            // development model is bundled, its result is what the app shows so
+            // a real iPad session tests the Foundation engine end-to-end inside
+            // Pri Learning. If the model is absent or yields no reading, fall
+            // back to the mature native reader. RELEASE behaviour is unchanged.
+            if self.foundationRecognizer.isAvailable && !foundation.text.isEmpty {
+                var payload = foundation.jsonObject
+                payload["type"] = "reading"
+                payload["reqId"] = requestId
+                payload["engine"] = "pri-foundation-debug"
+                payload["foundationAvailable"] = true
+                payload["debugModelTest"] = true
+                DispatchQueue.main.async { self.emit(payload) }
+            } else {
+                let rescue = self.recognizer.readWithGlyphConsensus(strokes: strokes, overrides: overrides)
+                var payload = rescue.jsonObject
+                payload["type"] = "reading"
+                payload["reqId"] = requestId
+                payload["engine"] = "native-rescue-debug"
+                payload["foundationAvailable"] = self.foundationRecognizer.isAvailable
+                payload["debugModelTest"] = true
+                DispatchQueue.main.async { self.emit(payload) }
             }
-            let visible = self.recognizer.readWithGlyphConsensus(strokes: strokes, overrides: overrides)
-            var payload = visible.jsonObject
-            payload["type"] = "reading"
-            payload["reqId"] = requestId
-            payload["engine"] = "native-primary-debug"
-            payload["foundationAvailable"] = self.foundationRecognizer.isAvailable
-            payload["shadowLineCount"] = foundation.lines.count
-            payload["shadowCharacterCount"] = foundation.text.count
-            DispatchQueue.main.async { self.emit(payload) }
 #else
             var payload = foundation.jsonObject
             payload["type"] = "reading"
