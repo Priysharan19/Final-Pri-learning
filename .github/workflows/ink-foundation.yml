@@ -5,11 +5,15 @@ on:
     paths:
       - 'tools/ink-foundation/**'
       - 'handwriting/v12/**'
+      - 'ios/PriLearning.swiftpm/Ink/InkFoundationRuntime.swift'
+      - 'ios/PriLearning 2.swiftpm/Ink/InkFoundationRuntime.swift'
       - '.github/workflows/ink-foundation.yml'
   pull_request:
     paths:
       - 'tools/ink-foundation/**'
       - 'handwriting/v12/**'
+      - 'ios/PriLearning.swiftpm/Ink/InkFoundationRuntime.swift'
+      - 'ios/PriLearning 2.swiftpm/Ink/InkFoundationRuntime.swift'
       - '.github/workflows/ink-foundation.yml'
 
 concurrency:
@@ -20,7 +24,7 @@ jobs:
   tooling:
     name: Model tooling and training contract
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -47,10 +51,6 @@ jobs:
           node --check tools/ink-foundation/generate_synthetic.mjs
           node --check tools/ink-foundation/generate_personal_synthetic.mjs
 
-      # The representation contract imports numpy + torch through data.py/model.py.
-      # Install the locked training environment before executing any semantic
-      # model contract. A pip cache is only cached wheel bytes; it is not an
-      # installed Python environment.
       - name: Install training dependencies
         run: python -m pip install -r tools/ink-foundation/requirements.txt
 
@@ -69,6 +69,8 @@ jobs:
           cfg = ModelConfig(d_model=64, nhead=8, stroke_layers=1, decoder_layers=1,
                             ff_dim=128, max_points=64, max_tokens=24)
           model = PriInkFoundation(len(TOKEN_TO_ID), TOKEN_TO_ID['<pad>'], cfg)
+          if model.style_encoder[0].in_features != 2 * cfg.d_model:
+              raise SystemExit('writer/style embedding is not genuinely cross-modal')
           image = torch.zeros(1, 1, cfg.raster_height, cfg.raster_width)
           visual = model.raster_encoder(image)
           if visual.shape[1] <= 64:
@@ -79,7 +81,54 @@ jobs:
           assert logits.shape == (1, cfg.max_tokens, len(TOKEN_TO_ID))
           assert ctc.shape == (1, cfg.max_points, len(TOKEN_TO_ID))
           assert style.shape[-1] == cfg.d_model
-          print(f'V3 representation contract: PASS — {visual.shape[1]} spatial visual tokens + physical CTC + prime token')
+          print(f'V3 representation contract: PASS — {visual.shape[1]} spatial visual tokens + cross-modal style + physical CTC + prime token')
+          PY
+
+      - name: Training-to-export graph numerical parity
+        run: |
+          python - <<'PY'
+          import sys, torch
+          sys.path.insert(0, 'tools/ink-foundation')
+          from data import TOKEN_TO_ID
+          from model import ModelConfig, PriInkFoundation
+          from export_coreml import CoreMLFriendlyFoundation, NativeWrapper, make_trace_fixture
+
+          torch.manual_seed(20260823)
+          cfg = ModelConfig(d_model=64, nhead=8, stroke_layers=1, decoder_layers=1,
+                            ff_dim=128, max_points=64, max_tokens=24)
+          native = PriInkFoundation(len(TOKEN_TO_ID), TOKEN_TO_ID['<pad>'], cfg).eval()
+          exported = CoreMLFriendlyFoundation(native).eval()
+          reference = NativeWrapper(native).eval()
+          points, valid, raster = make_trace_fixture(cfg)
+          with torch.inference_mode():
+              a = reference(points, valid, raster)
+              b = exported(points, valid, raster)
+          delta = float((a - b).abs().max())
+          if not bool(torch.isfinite(a).all() and torch.isfinite(b).all()) or delta > 2e-4:
+              raise SystemExit(f'V3 training/export graph parity failed: max_abs={delta}')
+          print(f'V3 training/export graph parity: PASS — max_abs={delta:.7g}')
+          PY
+
+      - name: Replay balance and curriculum contract
+        run: |
+          python - <<'PY'
+          import sys
+          from types import SimpleNamespace
+          sys.path.insert(0, 'tools/ink-foundation')
+          from bootstrap import replay_sampling_weights
+
+          rows = [SimpleNamespace(source='real') for _ in range(40)] + [SimpleNamespace(source='personal') for _ in range(1600)]
+          weights, real_n, synth_n = replay_sampling_weights(rows, {'personal'}, 0.30)
+          real_mass = float(weights[:real_n].sum() / weights.sum())
+          if (real_n, synth_n) != (40, 1600) or abs(real_mass - 0.30) > 1e-9:
+              raise SystemExit(f'replay balance contract failed: real={real_n} synth={synth_n} mass={real_mass}')
+
+          from pathlib import Path
+          personal = Path('tools/ink-foundation/generate_personal_synthetic.mjs').read_text()
+          for required in ('stackedFraction', 'radicalExpression', 'chain-rule-derivative', 'polynomial-derivative', "bank.get(\"'\")"):
+              if required not in personal:
+                  raise SystemExit(f'personal replay curriculum lost required structure: {required}')
+          print('replay balance/curriculum contract: PASS — 30% real mass at 40:1600 plus HSC structures')
           PY
 
       - name: Evidence gates remain wired
@@ -90,6 +139,7 @@ jobs:
           export = Path('tools/ink-foundation/export_coreml.py').read_text()
           bootstrap = Path('tools/ink-foundation/bootstrap.py').read_text()
           runtime = Path('ios/PriLearning.swiftpm/Ink/InkFoundationRuntime.swift').read_text()
+          legacy_runtime = Path('ios/PriLearning 2.swiftpm/Ink/InkFoundationRuntime.swift').read_text()
           low_bootstrap = bootstrap.lower()
           replay_boundary = (
               'personal synthetic replay' in low_bootstrap and
@@ -103,7 +153,9 @@ jobs:
               'export verifies checkpoint hash': 'checkpointSha256' in export and 'sha256(checkpoint)' in export,
               'production export requires finetune stage': 'ckpt.get("stage") != "finetune"' in export,
               'export writes promotion metadata': 'pri.productionReady' in export,
-              'runtime enforces promotion metadata': 'pri.productionReady' in runtime,
+              'export identifies V3': 'ink-foundation-v3' in export and 'pri.architectureVersion' in export,
+              'runtime requires promoted V3 in release': 'ink-foundation-v3' in runtime and 'pri.architectureVersion' in runtime and 'pri.productionReady' in runtime,
+              'canonical and legacy runtime stay identical': runtime == legacy_runtime,
               'bootstrap labels itself development only': 'releaseEligible' in bootstrap and 'NOT generalisation evidence' in bootstrap,
               'bootstrap checkpoint stage is distinct': '"stage": "bootstrap"' in bootstrap,
               'personal replay exists but is excluded from real evidence': replay_boundary,
