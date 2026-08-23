@@ -50,11 +50,12 @@
     "ink:structure:train:dev": "npm run ink:structure:audit && python3 tools/ink-foundation/train_structural_dev.py --corpus client/test/ink-corpus-structural --out tools/ink-foundation/runs/pri-ink-structural-v4-dev.pt",
     "ink:structure:train:dev:pretrained": "npm run ink:structure:audit && python3 tools/ink-foundation/train_structural_dev.py --corpus client/test/ink-corpus-structural --init tools/ink-foundation/runs/pri-ink-structural-v4-synthetic.pt --out tools/ink-foundation/runs/pri-ink-structural-v4-dev.pt",
     "ink:structure:evaluate:dev": "python3 tools/ink-foundation/evaluate_structural_dev.py tools/ink-foundation/runs/pri-ink-structural-v4-dev.pt --corpus client/test/ink-corpus-structural --out tools/ink-foundation/runs/pri-ink-structural-v4-dev-validation.json",
+    "ink:structure:rebuild:dev": "bash scripts/ink-structural-rebuild-dev.sh",
     "ink:status": "node client/test/ink-corpus-status.mjs",
     "ink:personalize": "node scripts/ink-personalize.mjs",
     "ink:next-attempt": "npm run test:ink:corpus:strict && npm run ink:personalize && npm run test:ink:personal && npm run test:ink:hybrid && npm run test:context && npm run build && npm run sync:ios && npm run check:ios",
     "ink:bootstrap": "bash scripts/ink-bootstrap-one-writer.sh",
-    "ink:bootstrap:strong": "PRI_INK_SYNTH_TRAIN_WRITERS=192 PRI_INK_SYNTH_VAL_WRITERS=48 PRI_INK_SYNTH_SAMPLES_PER_WRITER=40 PRI_INK_PERSONAL_SYNTH_SAMPLES=1600 PRI_INK_PRETRAIN_EPOCHS=24 PRI_INK_BOOTSTRAP_EPOCHS=50 PRI_INK_D_MODEL=256 PRI_INK_STROKE_LAYERS=8 PRI_INK_DECODER_LAYERS=6 PRI_INK_REAL_REPLAY_FRACTION=0.30 PRI_INK_VISUAL_LR_MULTIPLIER=2.0 PRI_INK_STROKE_LR_MULTIPLIER=0.45 PRI_INK_DECODER_LR_MULTIPLIER=1.0 bash scripts/ink-bootstrap-one-writer.sh",
+    "ink:bootstrap:strong": "PRI_INK_SYNTH_TRAIN_WRITERS=192 PRI_INK_SYNTH_VAL_WRITERS=48 PRI_INK_SYNTH_SAMPLES_PER_WRITER=40 PRI_INK_PERSONAL_SYNTH_SAMPLES=1600 PRI_INK_PRETRAIN_EPOCHS=24 PRI_INK_BOOTSTRAP_EPOCHS=50 PRI_INK_D_MODEL=256 PRI_INK_STROKE_LAYERS=8 PRI_INK_DECODER_LAYERS=6 PRI_INK_REAL_REPLAY_FRACTION=0.30 PRI_INK_VISUAL_LR_MULTIPLIER=2.0 PRI_INK_STROKE_LR_MULTIPLIER=0.45 PRI_INK_DECODER_LAYERS=6 PRI_INK_REAL_REPLAY_FRACTION=0.30 PRI_INK_VISUAL_LR_MULTIPLIER=2.0 PRI_INK_STROKE_LR_MULTIPLIER=0.45 PRI_INK_DECODER_LR_MULTIPLIER=1.0 bash scripts/ink-bootstrap-one-writer.sh",
     "ink:next-attempt:strong": "npm run ink:bootstrap:strong && npm run ink:personalize && npm run test:ink:personal && npm run test:ink:hybrid && npm run test:context && npm run build && npm run sync:ios && npm run check:ios",
     "ink:bootstrap:export": "bash scripts/ink-bootstrap-export.sh"
   }
