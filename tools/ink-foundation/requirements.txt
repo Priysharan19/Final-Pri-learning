@@ -1,0 +1,5 @@
+numpy>=2.0
+pillow>=10.4
+torch>=2.5
+# macOS export only; training itself does not require it.
+coremltools>=8.0; sys_platform == "darwin"
