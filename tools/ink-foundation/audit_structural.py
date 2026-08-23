@@ -8,6 +8,11 @@ for a corpus directory intended specifically for V4 training.
 Machine preannotation is allowed as a drafting aid, but a draft is not training
 evidence. A machine-drafted sample must have been opened and validated by the
 local V4 annotator, which stamps the structure with annotator + annotatedAt.
+
+Samples that cannot be represented by the current whole-physical-stroke schema
+may be explicitly excluded with sample.structure.excluded = true. This is safer
+than fabricating trace-to-glyph labels when one continuous pen-down stroke spans
+multiple glyphs. Excluded samples are reported and never used for V4 training.
 """
 from __future__ import annotations
 
@@ -33,7 +38,8 @@ def main():
     split_writers: dict[str, set[str]] = defaultdict(set)
     glyphs = Counter()
     relations = Counter()
-    total = annotated = unannotated = 0
+    exclusions = Counter()
+    total = annotated = unannotated = excluded = 0
     machine_drafts = reviewed_machine_drafts = 0
     multi_stroke_groups = 0
     errors: list[str] = []
@@ -58,6 +64,17 @@ def main():
             total += 1
             strokes = sample.get("strokes") or []
             structure = sample.get("structure") or {}
+
+            if structure.get("excluded") is True:
+                excluded += 1
+                reason = str(structure.get("excludeReason") or "unspecified")
+                exclusions[reason] += 1
+                if structure.get("groups"):
+                    errors.append(
+                        f"{path} sample {sample_index}: excluded sample also has glyph groups"
+                    )
+                continue
+
             if not structure.get("groups"):
                 unannotated += 1
                 continue
@@ -94,14 +111,16 @@ def main():
 
     if args.require_all and unannotated:
         errors.append(
-            f"--require-all: {unannotated}/{total} corpus samples have no structural annotation"
+            f"--require-all: {unannotated}/{total} corpus samples have neither structural annotation nor an explicit exclusion"
         )
     if annotated == 0:
         errors.append("no valid structure-annotated samples found")
 
     print("\nPri Ink V4 structural corpus audit\n")
     print(f"files: {len(files)}")
-    print(f"samples: {total} total · {annotated} annotated · {unannotated} unannotated")
+    print(
+        f"samples: {total} total · {annotated} annotated · {excluded} excluded · {unannotated} unannotated"
+    )
     print(
         f"machine drafts: {machine_drafts} total · "
         f"{reviewed_machine_drafts} human-reviewed"
@@ -112,6 +131,8 @@ def main():
     print(f"glyph groups: {sum(glyphs.values())} · multi-stroke groups: {multi_stroke_groups}")
     print("relations: " + (", ".join(f"{k}={v}" for k, v in relations.most_common()) or "none"))
     print("top glyphs: " + (", ".join(f"{k}={v}" for k, v in glyphs.most_common(16)) or "none"))
+    if exclusions:
+        print("exclusions: " + ", ".join(f"{k}={v}" for k, v in exclusions.most_common()))
 
     if errors:
         print(f"\nFAIL — {len(errors)} structural corpus problem(s)")
@@ -121,7 +142,7 @@ def main():
             print(f"  ... {len(errors)-40} more")
         raise SystemExit(1)
 
-    print("\nPASS — structural labels are complete, reviewed, trace-addressable and writer-disjoint")
+    print("\nPASS — structural labels/exclusions are complete, reviewed, trace-addressable and writer-disjoint")
 
 
 if __name__ == "__main__":
