@@ -1,15 +1,18 @@
 """Pri Learning local handwriting foundation model.
 
-Production constraints matter as much as benchmark accuracy. The model is
-multimodal but still executes in ONE neural pass on an iPad:
-  * a Transformer reads the original Pencil point stream;
-  * a CNN reads a high-resolution raster of the same expression;
-  * a learned style vector captures the current writer's hand;
-  * parallel learned output queries decode the full maths sequence at once.
+V3 is deliberately built around the failure modes of handwritten mathematics,
+not generic OCR:
+  * original Pencil point stream -> stroke Transformer;
+  * high-resolution raster -> a TRUE 2-D visual token grid (row + column position
+    survive; superscripts/fractions are not vertically averaged away);
+  * writer/style representation trained to be stable across expressions;
+  * parallel whole-expression decoder for one-call Core ML inference;
+  * training-only CTC alignment head over the online point sequence, so the
+    encoder learns monotonic symbol evidence instead of relying only on a
+    sequence-level loss.
 
-The non-autoregressive output-query decoder avoids 10–100 repeated Core ML
-invocations per expression. Pri's existing grammar/AST layer remains downstream
-for structured mathematical consistency.
+The CTC head and writer/style supervision are training aids. Production still
+uses one Core ML invocation and the parallel decoder, preserving low latency.
 """
 from __future__ import annotations
 
@@ -33,13 +36,20 @@ class ModelConfig:
     raster_height: int = 128
     raster_width: int = 512
     style_dim: int = 128
+    architecture_version: int = 3
 
     def to_dict(self):
         return asdict(self)
 
 
 class RasterEncoder(nn.Module):
-    """Preserve horizontal order while collapsing only the vertical image axis."""
+    """2-D visual encoder that never collapses vertical layout.
+
+    The previous implementation averaged H' after the CNN. That made an x² and
+    an x with a low 2 much more alike than they should be and weakened stacked
+    fractions for the same reason. V3 flattens the H'×W' map into tokens and
+    attaches learned row/column coordinates before fusion.
+    """
 
     def __init__(self, d_model: int):
         super().__init__()
@@ -50,12 +60,22 @@ class RasterEncoder(nn.Module):
             nn.Conv2d(128, 192, 3, stride=(2, 1), padding=1), nn.GELU(),
             nn.Conv2d(192, d_model, 3, stride=(2, 1), padding=1), nn.GELU(),
         )
+        # Current 128×512 input yields 4×64 tokens. These generous limits keep
+        # checkpoints compatible with moderately larger future raster sizes.
+        self.row_pos = nn.Embedding(32, d_model)
+        self.col_pos = nn.Embedding(256, d_model)
         self.norm = nn.LayerNorm(d_model)
 
     def forward(self, image: torch.Tensor) -> torch.Tensor:
-        x = self.net(image)                 # B,D,H',W'
-        x = x.mean(dim=2).transpose(1, 2)  # B,W',D
-        return self.norm(x)
+        x = self.net(image)                         # B,D,H',W'
+        b, d, h, w = x.shape
+        if h > self.row_pos.num_embeddings or w > self.col_pos.num_embeddings:
+            raise ValueError(f"visual grid {h}x{w} exceeds positional capacity")
+        rows = torch.arange(h, device=x.device).repeat_interleave(w)
+        cols = torch.arange(w, device=x.device).repeat(h)
+        tokens = x.permute(0, 2, 3, 1).reshape(b, h * w, d)
+        tokens = tokens + self.row_pos(rows)[None, :, :] + self.col_pos(cols)[None, :, :]
+        return self.norm(tokens)
 
 
 class PriInkFoundation(nn.Module):
@@ -84,15 +104,15 @@ class PriInkFoundation(nn.Module):
         )
         self.raster_encoder = RasterEncoder(config.d_model)
 
+        # Content-robust style path. Writer-ID supervision plus supervised
+        # contrastive loss (train.py) pressures this vector to be similar for two
+        # different expressions by the same hand and different across writers.
         self.style_encoder = nn.Sequential(
             nn.Linear(config.d_model, config.style_dim), nn.GELU(),
             nn.Linear(config.style_dim, config.d_model), nn.LayerNorm(config.d_model),
         )
         self.fusion_norm = nn.LayerNorm(config.d_model)
 
-        # DETR-style learned sequence slots. All positions are decoded together,
-        # so self-attention can enforce line-level consistency without an
-        # autoregressive loop at inference time.
         self.output_queries = nn.Embedding(config.max_tokens, config.d_model)
         self.output_pos = nn.Embedding(config.max_tokens, config.d_model)
         decoder_layer = nn.TransformerDecoderLayer(
@@ -104,8 +124,10 @@ class PriInkFoundation(nn.Module):
         )
         self.output = nn.Linear(config.d_model, vocab_size)
 
-        # Training-only style supervision. It pressures the pooled stroke
-        # representation to describe the writer rather than just the equation.
+        # Training-only auxiliary alignment. PAD is used as the CTC blank; PAD
+        # never occurs in target text, so no extra release vocabulary is needed.
+        self.ctc_output = nn.Linear(config.d_model, vocab_size)
+
         self.writer_head = (
             nn.Linear(config.d_model, writer_classes) if writer_classes > 1 else None
         )
@@ -120,8 +142,8 @@ class PriInkFoundation(nn.Module):
         return (x * w).sum(1) / w.sum(1).clamp_min(1.0)
 
     def encode(self, points: torch.Tensor, point_valid: torch.Tensor,
-               raster: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        """Return fused memory, memory padding mask and current-hand style vector."""
+               raster: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        """Return fused memory, padding mask, style, and aligned stroke tokens."""
         b, n, _ = points.shape
         if n > self.config.max_points:
             raise ValueError(f"point sequence {n} exceeds max_points={self.config.max_points}")
@@ -132,14 +154,14 @@ class PriInkFoundation(nn.Module):
 
         pooled = self._masked_mean(stroke, point_valid)
         style = self.style_encoder(pooled)
-        stroke = stroke + style[:, None, :]
+        styled_stroke = stroke + style[:, None, :]
 
         visual = self.raster_encoder(raster) + self.raster_modality + style[:, None, :]
         visual_valid = torch.ones((b, visual.shape[1]), dtype=torch.bool, device=visual.device)
 
-        memory = self.fusion_norm(torch.cat([stroke, visual], dim=1))
+        memory = self.fusion_norm(torch.cat([styled_stroke, visual], dim=1))
         memory_valid = torch.cat([point_valid, visual_valid], dim=1)
-        return memory, ~memory_valid, style
+        return memory, ~memory_valid, style, stroke
 
     def decode(self, memory: torch.Tensor, memory_pad: torch.Tensor) -> torch.Tensor:
         b = memory.shape[0]
@@ -149,9 +171,17 @@ class PriInkFoundation(nn.Module):
         decoded = self.decoder(q, memory, memory_key_padding_mask=memory_pad)
         return self.output(decoded)
 
+    def forward_with_aux(self, points: torch.Tensor, point_valid: torch.Tensor,
+                         raster: torch.Tensor):
+        memory, memory_pad, style, stroke = self.encode(points, point_valid, raster)
+        logits = self.decode(memory, memory_pad)
+        writer_logits = self.writer_head(style) if self.writer_head is not None else None
+        ctc_logits = self.ctc_output(stroke)
+        return logits, writer_logits, ctc_logits, style
+
     def forward(self, points: torch.Tensor, point_valid: torch.Tensor,
                 raster: torch.Tensor):
-        memory, memory_pad, style = self.encode(points, point_valid, raster)
+        memory, memory_pad, style, _ = self.encode(points, point_valid, raster)
         logits = self.decode(memory, memory_pad)
         writer_logits = self.writer_head(style) if self.writer_head is not None else None
         return logits, writer_logits
