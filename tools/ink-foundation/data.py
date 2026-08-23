@@ -1,14 +1,17 @@
-"""Real-ink dataset for Pri's local handwriting foundation model.
+"""Dataset and feature pipeline for Pri Ink Foundation.
 
-Consumes `pri-ink-corpus` v2 JSON. Writer split leakage is treated as a hard
-error: a model that has already seen the test writer is not evidence of real
-handwriting generalisation.
+The release target is mathematical serialization, while the online auxiliary
+alignment target is the sequence of marks that were physically drawn. Those are
+not the same thing: x^(2) serializes layout using ^( ) even though the Pencil
+contains only x and a raised 2. Keeping both targets explicit prevents CTC from
+being trained to align invisible syntax to real strokes.
 """
 from __future__ import annotations
 
 import json
 import math
 import random
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
@@ -20,13 +23,7 @@ from torch.utils.data import Dataset
 
 
 SPECIAL = ["<pad>", "<bos>", "<eos>", "<unk>"]
-# Multi-character tokens are restricted to symbols that are physically ONE
-# handwritten mark. Function names stay character-by-character so the output
-# sequence can still align to the three Pencil glyphs in "sin", "cos", etc.
 WORDS = ["theta", "sqrt", "pi", "<=", ">=", "!="]
-# Prime is first-class. A differentiation engine that cannot emit y' from the
-# model itself is not a production maths recogniser; geometry repair remains a
-# fallback, not the vocabulary definition.
 CHARS = list("0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ+-*/=().:^_<>!%,'") + ["±", "°"]
 VOCAB = SPECIAL + WORDS + [c for c in CHARS if c not in WORDS]
 TOKEN_TO_ID = {t: i for i, t in enumerate(VOCAB)}
@@ -55,11 +52,9 @@ def tokenize(text: str) -> list[str]:
     while i < len(text):
         hit = next((w for w in longest if text.startswith(w, i)), None)
         if hit is not None:
-            out.append(hit)
-            i += len(hit)
+            out.append(hit); i += len(hit)
         else:
-            out.append(text[i])
-            i += 1
+            out.append(text[i]); i += 1
     return out
 
 
@@ -70,14 +65,52 @@ def encode(text: str, max_tokens: int) -> list[int]:
     return ids
 
 
+def physical_text(text: str) -> str:
+    """Best deterministic physical-glyph sequence for online CTC supervision.
+
+    Serialization-only wrappers are removed while genuinely drawn brackets are
+    retained. The full decoder still sees the original target.
+    """
+    t = canonical_text(text)
+
+    # Powers/subscripts: the raised/lowered glyph is real; ^, _, and the wrapper
+    # parentheses are serialization. Apply repeatedly for multiple powers.
+    old = None
+    while old != t:
+        old = t
+        t = re.sub(r"\^\(([^()]*)\)", r"\1", t)
+    t = re.sub(r"_([A-Za-z0-9])", r"\1", t)
+
+    # sqrt is one physical radical glyph followed by the radicand. Its wrapper
+    # parentheses are not written as ordinary brackets.
+    old = None
+    while old != t:
+        old = t
+        t = re.sub(r"sqrt\(([^()]*)\)", r"sqrt\1", t)
+
+    # Canonical vertical fractions are serialized as (num)/(den). The grouping
+    # parentheses are not Pencil marks; the fraction bar remains one physical
+    # mark represented by '/'. Ordinary algebraic parentheses do not match this
+    # complete fraction form and are preserved.
+    fraction = re.fullmatch(r"\(([^()]*)\)/\(([^()]*)\)", t)
+    if fraction:
+        t = f"{fraction.group(1)}/{fraction.group(2)}"
+    return t
+
+
+def encode_physical(text: str, max_tokens: int) -> list[int]:
+    ids = [TOKEN_TO_ID.get(t, UNK_ID) for t in tokenize(physical_text(text))]
+    if len(ids) > max_tokens:
+        raise ValueError(f"physical target has {len(ids)} tokens; max_tokens={max_tokens}: {text}")
+    return ids
+
+
 def decode(ids: Iterable[int]) -> str:
     out = []
     for i in ids:
         token = ID_TO_TOKEN.get(int(i), "<unk>")
-        if token == "<eos>":
-            break
-        if token in SPECIAL:
-            continue
+        if token == "<eos>": break
+        if token in SPECIAL: continue
         out.append(token)
     return "".join(out)
 
@@ -115,8 +148,7 @@ def load_examples(paths: Iterable[Path]) -> list[Example]:
 
 def corpus_files(root: str | Path) -> list[Path]:
     p = Path(root)
-    if p.is_file():
-        return [p]
+    if p.is_file(): return [p]
     return sorted(p.rglob("*.json"))
 
 
@@ -132,8 +164,7 @@ def point_features(strokes: list[dict], max_points: int, augment: bool = False) 
     raw = []
     for si, stroke in enumerate(strokes):
         pts = stroke.get("points") or []
-        for pi, p in enumerate(pts):
-            raw.append((si, pi, p, len(pts)))
+        for pi, p in enumerate(pts): raw.append((si, pi, p, len(pts)))
     if not raw:
         return np.zeros((max_points, 14), np.float32), np.zeros(max_points, np.bool_)
 
@@ -144,8 +175,6 @@ def point_features(strokes: list[dict], max_points: int, augment: bool = False) 
     scale = max(max_x - min_x, max_y - min_y, 1.0)
     cx, cy = (min_x + max_x) * 0.5, (min_y + max_y) * 0.5
 
-    # Modest spatial augmentation plus capture-domain augmentation. Pressure and
-    # time are useful writer signals but must not become device fingerprints.
     shear = random.uniform(-0.10, 0.10) if augment else 0.0
     global_scale = random.uniform(0.92, 1.08) if augment else 1.0
     pressure_gain = random.uniform(0.90, 1.10) if augment else 1.0
@@ -166,8 +195,7 @@ def point_features(strokes: list[dict], max_points: int, augment: bool = False) 
         az = _point_num(p, "azimuth")
         alt = _point_num(p, "altitude", default=math.pi / 2)
         if "azimuth" not in p and ("tiltX" in p or "tiltY" in p):
-            tx = math.radians(_point_num(p, "tiltX"))
-            ty = math.radians(_point_num(p, "tiltY"))
+            tx = math.radians(_point_num(p, "tiltX")); ty = math.radians(_point_num(p, "tiltY"))
             az = math.atan2(ty, tx) if abs(tx) + abs(ty) > 1e-6 else 0.0
             alt = max(0.0, min(math.pi / 2, math.pi / 2 - math.hypot(tx, ty)))
 
@@ -197,23 +225,19 @@ def point_features(strokes: list[dict], max_points: int, augment: bool = False) 
             arr = arr[keep]
 
     if len(arr) > max_points:
-        # Preserve the whole gesture rather than truncating the answer.
         idx = np.linspace(0, len(arr) - 1, max_points).round().astype(np.int64)
         arr = arr[idx]
 
     out = np.zeros((max_points, 14), dtype=np.float32)
     valid = np.zeros(max_points, dtype=np.bool_)
-    out[:len(arr)] = arr
-    valid[:len(arr)] = True
+    out[:len(arr)] = arr; valid[:len(arr)] = True
     return out, valid
 
 
 def rasterize(strokes: list[dict], height: int, width: int, augment: bool = False) -> np.ndarray:
     pts = [p for s in strokes for p in (s.get("points") or [])]
-    if not pts:
-        return np.zeros((1, height, width), dtype=np.float32)
-    xs = [_point_num(p, "x") for p in pts]
-    ys = [_point_num(p, "y") for p in pts]
+    if not pts: return np.zeros((1, height, width), dtype=np.float32)
+    xs = [_point_num(p, "x") for p in pts]; ys = [_point_num(p, "y") for p in pts]
     x1, x2, y1, y2 = min(xs), max(xs), min(ys), max(ys)
     span_x, span_y = max(x2 - x1, 1.0), max(y2 - y1, 1.0)
     pad = 8
@@ -221,28 +245,20 @@ def rasterize(strokes: list[dict], height: int, width: int, augment: bool = Fals
     ox = (width - span_x * scale) * 0.5 - x1 * scale
     oy = (height - span_y * scale) * 0.5 - y1 * scale
 
-    image = Image.new("L", (width, height), 0)
-    draw = ImageDraw.Draw(image)
+    image = Image.new("L", (width, height), 0); draw = ImageDraw.Draw(image)
     for stroke in strokes:
         points = stroke.get("points") or []
-        if not points:
-            continue
+        if not points: continue
         xy = [(_point_num(p, "x") * scale + ox, _point_num(p, "y") * scale + oy) for p in points]
         avg_w = sum(_point_num(p, "w", default=3.0) for p in points) / len(points)
         pen = max(1, int(round(avg_w * max(scale, 0.5))))
         if len(xy) == 1:
-            x, y = xy[0]
-            r = max(1, pen // 2)
-            draw.ellipse((x-r, y-r, x+r, y+r), fill=255)
+            x, y = xy[0]; r = max(1, pen // 2); draw.ellipse((x-r, y-r, x+r, y+r), fill=255)
         else:
             draw.line(xy, fill=255, width=pen, joint="curve")
     arr = np.asarray(image, dtype=np.float32) / 255.0
     if augment:
-        if random.random() < 0.25:
-            arr = np.clip(arr * random.uniform(0.90, 1.08), 0, 1)
-        # Tiny raster translation prevents the visual branch from learning one
-        # collector frame rather than handwriting. Do not rotate maths globally:
-        # superscript/fraction geometry is semantic evidence.
+        if random.random() < 0.25: arr = np.clip(arr * random.uniform(0.90, 1.08), 0, 1)
         if random.random() < 0.35:
             sx, sy = random.randint(-3, 3), random.randint(-2, 2)
             arr = np.roll(arr, shift=(sy, sx), axis=(0, 1))
@@ -258,29 +274,30 @@ class InkDataset(Dataset):
                  max_tokens: int, raster_height: int, raster_width: int,
                  writer_to_id: dict[str, int]):
         self.rows = [x for x in examples if x.split == split]
-        self.split = split
-        self.max_points = max_points
-        self.max_tokens = max_tokens
-        self.raster_height = raster_height
-        self.raster_width = raster_width
+        self.split = split; self.max_points = max_points; self.max_tokens = max_tokens
+        self.raster_height = raster_height; self.raster_width = raster_width
         self.writer_to_id = writer_to_id
 
-    def __len__(self):
-        return len(self.rows)
+    def __len__(self): return len(self.rows)
 
     def __getitem__(self, index: int):
-        row = self.rows[index]
-        augment = self.split == "train"
+        row = self.rows[index]; augment = self.split == "train"
         points, valid = point_features(row.strokes, self.max_points, augment=augment)
         raster = rasterize(row.strokes, self.raster_height, self.raster_width, augment=augment)
+
         ids = encode(row.target, self.max_tokens)
-        padded = np.full(self.max_tokens, PAD_ID, dtype=np.int64)
-        padded[:len(ids)] = ids
+        padded = np.full(self.max_tokens, PAD_ID, dtype=np.int64); padded[:len(ids)] = ids
+
+        physical = encode_physical(row.target, self.max_tokens)
+        ctc = np.full(self.max_tokens, PAD_ID, dtype=np.int64); ctc[:len(physical)] = physical
         return {
             "points": torch.from_numpy(points),
             "point_valid": torch.from_numpy(valid),
             "raster": torch.from_numpy(raster),
             "tokens": torch.from_numpy(padded),
+            "ctc_tokens": torch.from_numpy(ctc),
+            "ctc_length": torch.tensor(len(physical), dtype=torch.long),
             "writer": torch.tensor(self.writer_to_id[row.writer], dtype=torch.long),
             "target_text": canonical_text(row.target),
+            "physical_text": physical_text(row.target),
         }
