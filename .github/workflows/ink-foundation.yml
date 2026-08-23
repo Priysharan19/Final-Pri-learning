@@ -38,6 +38,7 @@ jobs:
             tools/ink-foundation/model.py \
             tools/ink-foundation/data.py \
             tools/ink-foundation/train.py \
+            tools/ink-foundation/bootstrap.py \
             tools/ink-foundation/evaluate_release.py \
             tools/ink-foundation/export_coreml.py
 
@@ -50,14 +51,18 @@ jobs:
           from pathlib import Path
           release = Path('tools/ink-foundation/evaluate_release.py').read_text()
           export = Path('tools/ink-foundation/export_coreml.py').read_text()
+          bootstrap = Path('tools/ink-foundation/bootstrap.py').read_text()
           runtime = Path('ios/PriLearning.swiftpm/Ink/InkFoundationRuntime.swift').read_text()
           required = {
               'release evaluator checks final holdout': 'final-holdout' in release and 'passesReleaseTargets' in release,
               'release evaluator checks critical structure': 'critical_structure_exact' in release,
               'release evaluator checks safe precision': 'safe_precision' in release,
               'export verifies checkpoint hash': 'checkpointSha256' in export and 'sha256(checkpoint)' in export,
+              'production export requires finetune stage': 'ckpt.get("stage") != "finetune"' in export,
               'export writes promotion metadata': 'pri.productionReady' in export,
               'runtime enforces promotion metadata': 'pri.productionReady' in runtime,
+              'bootstrap labels itself development only': 'releaseEligible' in bootstrap and 'NOT generalisation evidence' in bootstrap,
+              'bootstrap checkpoint stage is distinct': '"stage": "bootstrap"' in bootstrap,
           }
           bad = [name for name, ok in required.items() if not ok]
           if bad:
@@ -71,7 +76,7 @@ jobs:
       - name: Generate tiny whole-expression corpus
         run: node tools/ink-foundation/generate_synthetic.mjs /tmp/pri-ink-smoke 6 2 3
 
-      - name: One-epoch CPU training smoke test
+      - name: One-epoch CPU pretraining smoke test
         run: |
           python tools/ink-foundation/train.py \
             --stage pretrain \
@@ -88,7 +93,7 @@ jobs:
             --max-tokens 32 \
             --patience 1
 
-      - name: Training smoke produced a real checkpoint
+      - name: Pretraining smoke produced a real checkpoint
         run: |
           python - <<'PY'
           import json, pathlib, torch
@@ -101,5 +106,43 @@ jobs:
           manifest = json.loads(p.with_suffix('.json').read_text())
           if manifest.get('stage') != 'pretrain' or manifest.get('evidence') != 'synthetic initialization only':
               raise SystemExit('pretrain manifest blurred synthetic and real evidence')
-          print('foundation training smoke: PASS')
+          print('foundation pretraining smoke: PASS')
+          PY
+
+      - name: Generate one-writer bootstrap smoke corpus
+        run: node tools/ink-foundation/generate_synthetic.mjs /tmp/pri-ink-bootstrap-smoke 1 0 20
+
+      - name: One-epoch bootstrap adaptation smoke test
+        run: |
+          python tools/ink-foundation/bootstrap.py \
+            --init /tmp/pri-ink-smoke.pt \
+            --corpus /tmp/pri-ink-bootstrap-smoke \
+            --out /tmp/pri-ink-bootstrap.pt \
+            --epochs 1 \
+            --batch 4 \
+            --workers 0 \
+            --device cpu \
+            --d-model 64 \
+            --stroke-layers 1 \
+            --decoder-layers 1 \
+            --max-points 128 \
+            --max-tokens 32 \
+            --patience 1
+
+      - name: Bootstrap remains explicitly non-release evidence
+        run: |
+          python - <<'PY'
+          import json, pathlib, torch
+          p = pathlib.Path('/tmp/pri-ink-bootstrap.pt')
+          if not p.exists() or p.stat().st_size < 10_000:
+              raise SystemExit('bootstrap smoke did not produce a substantive checkpoint')
+          ckpt = torch.load(p, map_location='cpu', weights_only=False)
+          manifest = json.loads(p.with_suffix('.json').read_text())
+          if ckpt.get('stage') != 'bootstrap' or ckpt.get('release_eligible') is not False:
+              raise SystemExit('bootstrap checkpoint can be confused with release evidence')
+          if manifest.get('stage') != 'bootstrap' or manifest.get('releaseEligible') is not False:
+              raise SystemExit('bootstrap manifest can be confused with release evidence')
+          if 'NOT generalisation evidence' not in manifest.get('evidence', ''):
+              raise SystemExit('bootstrap manifest does not state its evidence limitation')
+          print('foundation one-writer bootstrap smoke: PASS')
           PY
