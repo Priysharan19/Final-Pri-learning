@@ -4,11 +4,16 @@
 The frozen P0001 holdout is diagnostic only and never production evidence. The
 oracle-group metric supplies true stroke groups to the same group-level glyph
 classifier used by live decoding, cleanly separating symbol and grouping errors.
+
+The complete-link decoder remains the default historical baseline. ``--decoder
+joint`` applies the symbol-aware exact partition search on the identical frozen
+split so improvements cannot be attributed to a changed holdout.
 """
 from __future__ import annotations
 
 import argparse
 import json
+import math
 from collections import defaultdict
 from pathlib import Path
 
@@ -22,6 +27,7 @@ from evaluate_structural import checkpoint_sha256, edit_distance, is_critical_st
 from structural import PriInkStructuralV4, StructuralConfig
 from structural_data import StructuralInkDataset, corpus_files, load_structural_examples
 from structural_decode import decode_structural_output
+from structural_joint_decode import decode_structural_output_joint
 
 
 def _best_real_symbol(logits: torch.Tensor) -> tuple[str, float]:
@@ -62,11 +68,25 @@ def main():
     p.add_argument("checkpoint")
     p.add_argument("--corpus", required=True)
     p.add_argument("--device", default="auto")
+    p.add_argument("--decoder", choices=["complete-link", "joint"], default="complete-link")
     p.add_argument("--group-threshold", type=float, default=0.65)
     p.add_argument("--relation-threshold", type=float, default=0.60)
     p.add_argument("--ambiguity-threshold", type=float, default=0.80)
+    p.add_argument("--max-group-size", type=int, default=4)
+    p.add_argument("--grouping-temperature", type=float, default=1.0)
+    p.add_argument("--symbol-weight", type=float, default=1.0)
+    p.add_argument("--partition-margin-threshold", type=float, default=0.0)
     p.add_argument("--out", default=None)
     args = p.parse_args()
+
+    if args.max_group_size < 1:
+        raise SystemExit("--max-group-size must be >= 1")
+    if args.grouping_temperature <= 0:
+        raise SystemExit("--grouping-temperature must be > 0")
+    if args.symbol_weight < 0:
+        raise SystemExit("--symbol-weight must be >= 0")
+    if args.partition_margin_threshold < 0:
+        raise SystemExit("--partition-margin-threshold must be >= 0")
 
     checkpoint = Path(args.checkpoint)
     ckpt = torch.load(checkpoint, map_location="cpu", weights_only=False)
@@ -113,6 +133,7 @@ def main():
     oracle_symbol_ok = oracle_symbol_n = 0
     by_writer: dict[str, list[int]] = defaultdict(list)
     warning_counts: dict[str, int] = defaultdict(int); sample_diagnostics = []
+    joint_margins: list[float] = []
 
     with torch.inference_mode():
         for sample_number, (batch, row) in enumerate(zip(loader, validation_rows), 1):
@@ -120,11 +141,22 @@ def main():
                 batch["stroke_points"].to(device), batch["stroke_point_valid"].to(device),
                 batch["stroke_valid"].to(device), batch["stroke_geometry"].to(device), batch["raster"].to(device),
             )
-            hyp = decode_structural_output(
-                outputs, batch["stroke_geometry"].to(device), batch["stroke_valid"].to(device),
-                group_threshold=args.group_threshold, relation_threshold=args.relation_threshold,
-                ambiguity_threshold=args.ambiguity_threshold, model=model,
-            )
+            if args.decoder == "joint":
+                hyp = decode_structural_output_joint(
+                    outputs, batch["stroke_geometry"].to(device), batch["stroke_valid"].to(device),
+                    model=model, max_group_size=args.max_group_size,
+                    grouping_temperature=args.grouping_temperature, symbol_weight=args.symbol_weight,
+                    relation_threshold=args.relation_threshold, ambiguity_threshold=args.ambiguity_threshold,
+                    partition_margin_threshold=args.partition_margin_threshold,
+                )
+                if math.isfinite(hyp.partition_margin):
+                    joint_margins.append(hyp.partition_margin)
+            else:
+                hyp = decode_structural_output(
+                    outputs, batch["stroke_geometry"].to(device), batch["stroke_valid"].to(device),
+                    group_threshold=args.group_threshold, relation_threshold=args.relation_threshold,
+                    ambiguity_threshold=args.ambiguity_threshold, model=model,
+                )
             target = str(batch["target_text"][0]); writer = str(batch["writer"][0])
             ok = int(hyp.canonical == target); dist = edit_distance(hyp.canonical, target)
             total += 1; exact += ok; char_errors += dist; char_total += max(1, len(target)); confidence_sum += hyp.confidence
@@ -135,7 +167,7 @@ def main():
 
             oracle_rows, oracle_ok, oracle_n = _oracle_group_symbol_diagnostic(model, outputs, row.structure)
             oracle_symbol_ok += oracle_ok; oracle_symbol_n += oracle_n
-            sample_diagnostics.append({
+            diagnostic = {
                 "sample": sample_number, "target": target, "prediction": hyp.canonical, "exact": bool(ok),
                 "editDistance": dist, "ambiguous": hyp.ambiguous, "confidence": hyp.confidence,
                 "symbolConfidence": hyp.symbol_confidence, "groupingConfidence": hyp.grouping_confidence,
@@ -146,11 +178,31 @@ def main():
                 "predictedGlyphs": [{"id": g.id, "strokes": list(g.strokes), "symbol": g.symbol, "confidence": g.symbol_confidence, "cx": g.cx, "cy": g.cy} for g in hyp.glyphs],
                 "predictedRelations": [{"from": r.source, "to": r.target, "type": r.kind, "confidence": r.confidence} for r in hyp.relations],
                 "warnings": list(hyp.warnings),
-            })
+            }
+            if args.decoder == "joint":
+                diagnostic["jointPartition"] = {
+                    "score": hyp.partition_score,
+                    "margin": hyp.partition_margin if math.isfinite(hyp.partition_margin) else None,
+                    "pairScore": hyp.partition_pair_score,
+                    "symbolScore": hyp.partition_symbol_score,
+                }
+            sample_diagnostics.append(diagnostic)
 
     writer_exact = {w: sum(v) / len(v) for w, v in sorted(by_writer.items())}
+    thresholds = {"relation": args.relation_threshold, "ambiguity": args.ambiguity_threshold}
+    if args.decoder == "joint":
+        thresholds.update({
+            "maxGroupSize": args.max_group_size,
+            "groupingTemperature": args.grouping_temperature,
+            "symbolWeight": args.symbol_weight,
+            "partitionMargin": args.partition_margin_threshold,
+        })
+    else:
+        thresholds["group"] = args.group_threshold
+
     metrics = {
         "architectureVersion": 4, "stage": "structural-research-dev", "productionReady": False,
+        "decoder": args.decoder,
         "validationProtocol": recreated, "checkpointSha256": checkpoint_sha256(checkpoint),
         "samples": total, "writers": len(by_writer), "exactExpressionAccuracy": exact / max(1, total),
         "characterErrorRate": char_errors / max(1, char_total),
@@ -161,12 +213,20 @@ def main():
         "oracleGroupingGlyphSymbolsCorrect": oracle_symbol_ok, "oracleGroupingGlyphSymbolsTotal": oracle_symbol_n,
         "worstWriterExact": min(writer_exact.values(), default=0.0), "writerExact": writer_exact,
         "warningCounts": dict(sorted(warning_counts.items())),
-        "thresholds": {"group": args.group_threshold, "relation": args.relation_threshold, "ambiguity": args.ambiguity_threshold},
+        "thresholds": thresholds,
         "sampleDiagnostics": sample_diagnostics,
         "evidence": "same-writer development evaluation only; not writer-disjoint and not production evidence",
     }
+    if args.decoder == "joint":
+        metrics["jointPartition"] = {
+            "finiteMarginSamples": len(joint_margins),
+            "meanMargin": sum(joint_margins) / max(1, len(joint_margins)),
+            "minMargin": min(joint_margins, default=0.0),
+            "assumption": "glyph strokes are contiguous in physical draw order within maxGroupSize",
+        }
 
     print("\nPri Ink Structural V4 — SAME-WRITER DEV EVALUATION\n")
+    print(f"decoder: {args.decoder}")
     print(f"writer: {recreated['writer']} · samples: {total}")
     print(f"exact expression: {100*metrics['exactExpressionAccuracy']:.2f}%")
     print(f"CER: {100*metrics['characterErrorRate']:.2f}%")
@@ -174,14 +234,20 @@ def main():
     print(f"critical structure exact: {100*metrics['criticalStructureExact']:.2f}% ({critical_total} samples)")
     print(f"abstention coverage: {100*metrics['coverage']:.2f}%")
     print(f"safe precision among accepted: {100*metrics['safePrecision']:.2f}%")
+    if args.decoder == "joint":
+        print(f"joint partition mean finite margin: {metrics['jointPartition']['meanMargin']:.6f}")
     print("\nPer-sample diagnostics:")
     for item in sample_diagnostics:
-        print(
+        text = (
             f"  #{item['sample']} target={item['target']!r} pred={item['prediction']!r} edit={item['editDistance']} "
             f"conf={item['confidence']:.3f} sym={item['symbolConfidence']:.3f} group={item['groupingConfidence']:.3f} "
             f"rel={item['relationConfidence']:.3f} glyphs={item['predictedGlyphCount']}/{item['truthGlyphCount']} "
             f"oracle_sym={item['oracleGroupSymbolCorrect']}/{item['oracleGroupSymbolTotal']}"
         )
+        if args.decoder == "joint":
+            margin = item["jointPartition"]["margin"]
+            text += f" joint_margin={margin if margin is not None else 'inf'}"
+        print(text)
     print("writer-disjoint: false"); print("production ready: false")
     if args.out:
         out = Path(args.out); out.parent.mkdir(parents=True, exist_ok=True)
