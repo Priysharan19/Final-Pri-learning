@@ -6,20 +6,23 @@
 // buys three things Vision cannot give on its own:
 //
 //   · every line is rendered to its own image and scaled to the height Vision
-//     reads best at, so a small line is not penalised for sharing a page with
-//     a big one;
-//   · a line that Vision returns nothing for is identifiable, and can be
-//     handed back to the web engine rather than silently vanishing;
+//     reads best at, so a small line is not penalised for sharing a page with a
+//     big one;
+//   · a line that Vision returns nothing for is identifiable, and can be handed
+//     back to the web engine rather than silently vanishing;
 //   · recognised characters map back to the strokes that made them, which is
 //     what tap-to-correct and "learn from this correction" need.
 //
-// Grouping is by vertical OVERLAP against a line's core band, not by centre
-// distance. A superscript usually overlaps the top of its carrier line, but
-// real Pencil writing often puts a power completely clear of the x-height.
-// Those detached raised marks are attached in a second, geometry-constrained
-// pass. The pass requires a compact raised mark, a full-height carrier
-// immediately to its left, and a tight vertical gap, so a genuine next line is
-// not collapsed into the line above or below it.
+// Primary grouping is by vertical overlap against a line's core band. Maths then
+// needs two structural repair passes:
+//   1. detached raised marks (powers) attach to a full-height carrier on the left;
+//   2. compact 2D satellites (integral limits / evaluation bounds) attach only
+//      when geometry AND original Pencil stroke order agree on the same body line.
+//
+// The second rule matters for calculus: an upper/lower integral limit is not a
+// separate line just because it sits clear of x-height. Stroke order is only a
+// supporting cue — InkPoint.t resets at each PKStroke, so we never pretend it is
+// a page-wide clock.
 // ─────────────────────────────────────────────────────────────────────────────
 import CoreGraphics
 import Foundation
@@ -96,6 +99,7 @@ enum InkLineSegmenter {
 
         groups = mergeOverlappingGroups(groups, glyphSize: glyphSize)
         groups = attachRaisedSatellites(groups, glyphSize: glyphSize)
+        groups = attachCompactMathSatellites(groups, glyphSize: glyphSize)
         groups = mergeOverlappingGroups(groups, glyphSize: glyphSize)
 
         return groups
@@ -161,8 +165,7 @@ enum InkLineSegmenter {
                     let satelliteExtent = max(satellite.width, satellite.height)
 
                     // Real Pencil powers are often almost body-height (especially
-                    // handwritten 2/3/4). The old 0.88 limit turned them into
-                    // separate lines. Size alone is not our safety gate: the
+                    // handwritten 2/3/4). Size alone is not our safety gate: the
                     // strong raised-position + nearby-left-carrier constraints
                     // below distinguish a superscript from genuine next working.
                     guard satelliteExtent <= 1.15 * targetHeight else { continue }
@@ -184,6 +187,107 @@ enum InkLineSegmenter {
                     guard carrierGap.isFinite else { continue }
 
                     let score = carrierGap + 0.8 * max(0, clearAbove)
+                    if score < bestScore {
+                        bestScore = score
+                        bestTarget = targetIndex
+                    }
+                }
+
+                guard let targetIndex = bestTarget else { continue }
+                result[targetIndex].append(contentsOf: result[satelliteIndex])
+                result.remove(at: satelliteIndex)
+                changed = true
+                break outer
+            }
+        }
+
+        return result
+    }
+
+    /// Attach compact marks that are part of a two-dimensional maths construct
+    /// but are not necessarily superscripts: integral limits, evaluation bounds,
+    /// and similar small annotations immediately above/below a body line.
+    ///
+    /// Geometry alone is dangerous because consecutive working lines often start
+    /// at the same x. Therefore a candidate must also be close in original Pencil
+    /// stroke order to a member of the target line. This is deliberately not a
+    /// time threshold: PKStrokePoint.timeOffset restarts for every stroke.
+    private static func attachCompactMathSatellites(
+        _ groups: [[(offset: Int, element: InkStroke)]],
+        glyphSize: CGFloat
+    ) -> [[(offset: Int, element: InkStroke)]] {
+        guard groups.count > 1 else { return groups }
+        var result = groups
+        var changed = true
+
+        while changed {
+            changed = false
+            outer: for satelliteIndex in result.indices {
+                let satelliteGroup = result[satelliteIndex]
+                let satelliteStrokes = satelliteGroup.map(\.element)
+                guard !satelliteStrokes.isEmpty, satelliteStrokes.count <= 5 else { continue }
+                let satellite = union(of: satelliteStrokes)
+
+                var bestTarget: Int?
+                var bestScore = CGFloat.greatestFiniteMagnitude
+
+                for targetIndex in result.indices where targetIndex != satelliteIndex {
+                    let targetGroup = result[targetIndex]
+                    let targetStrokes = targetGroup.map(\.element)
+                    guard !targetStrokes.isEmpty else { continue }
+
+                    let targetBounds = union(of: targetStrokes)
+                    let band = coreBand(of: targetStrokes, glyphSize: glyphSize)
+                    let bandHeight = max(1, band.upperBound - band.lowerBound)
+                    let targetHeight = max(bandHeight, lineGlyphHeight(targetStrokes, pageSize: glyphSize))
+                    let satelliteExtent = max(satellite.width, satellite.height)
+
+                    // A body line should be materially richer than a detached
+                    // annotation. This prevents one short answer line such as
+                    // "2" from being absorbed into its neighbour.
+                    let substantialTarget = targetStrokes.count >= 3
+                        || targetBounds.width >= 2.0 * targetHeight
+                        || targetBounds.height >= 1.45 * targetHeight
+                    guard substantialTarget else { continue }
+                    guard satelliteExtent <= 1.10 * targetHeight else { continue }
+
+                    let aboveGap = band.lowerBound - satellite.maxY
+                    let belowGap = satellite.minY - band.upperBound
+                    let verticalGap = max(0, max(aboveGap, belowGap))
+                    guard verticalGap <= 0.95 * targetHeight else { continue }
+
+                    let horizontalGap = max(0, max(
+                        targetBounds.minX - satellite.maxX,
+                        satellite.minX - targetBounds.maxX
+                    ))
+                    guard horizontalGap <= 0.72 * targetHeight else { continue }
+
+                    // Integral limits and evaluation bounds normally live within
+                    // (or just beside) the x-span of their owning expression.
+                    let inExpandedSpan = satellite.midX >= targetBounds.minX - 0.38 * targetHeight
+                        && satellite.midX <= targetBounds.maxX + 0.38 * targetHeight
+                    guard inExpandedSpan else { continue }
+
+                    // Preserve the temporal ordering signal already present in
+                    // the drawing: array offsets are PKDrawing stroke order.
+                    var orderGap = Int.max
+                    for s in satelliteGroup {
+                        for t in targetGroup {
+                            orderGap = min(orderGap, abs(s.offset - t.offset))
+                        }
+                    }
+                    guard orderGap <= 6 else { continue }
+
+                    // The satellite must actually sit away from the body's centre
+                    // band. If it is a normal baseline-sized fragment, leave the
+                    // ordinary line grouping to decide its ownership.
+                    let displaced = satellite.midY < band.lowerBound + 0.30 * targetHeight
+                        || satellite.midY > band.upperBound - 0.18 * targetHeight
+                    guard displaced else { continue }
+
+                    let score = verticalGap
+                        + 0.35 * horizontalGap
+                        + 0.08 * targetHeight * CGFloat(orderGap)
                     if score < bestScore {
                         bestScore = score
                         bestTarget = targetIndex
