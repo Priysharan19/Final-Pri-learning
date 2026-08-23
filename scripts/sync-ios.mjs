@@ -1,23 +1,22 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Keeps ios/PriLearning.swiftpm/Resources/Web in step with the client build.
+// Keeps every tracked native iPad web bundle in step with the client build.
+// PriLearning.swiftpm is canonical; PriLearning 2.swiftpm is retained only for
+// older Swift Playgrounds installs and must never execute a different client.
 //
-// The iPad app is the deployment target the README leads with, and its bundled
-// copy of the web build went stale three times during one day's work — shipping
-// code no figure in the README measured, including a marketing claim that had
-// already been removed everywhere else. It drifted because refreshing it was a
-// hand-typed rm/cp that nothing checked.
-//
-//   node scripts/sync-ios.mjs           copy client/dist over the bundle
-//   node scripts/sync-ios.mjs --check   exit 1 if they differ (for CI)
+//   node scripts/sync-ios.mjs           copy client/dist over both bundles
+//   node scripts/sync-ios.mjs --check   exit 1 if either bundle differs
 // ─────────────────────────────────────────────────────────────────────────────
-import { readdirSync, readFileSync, rmSync, cpSync, existsSync, statSync } from 'node:fs';
+import { readdirSync, readFileSync, rmSync, cpSync, existsSync, statSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const DIST = join(ROOT, 'client', 'dist');
-const WEB = join(ROOT, 'ios', 'PriLearning.swiftpm', 'Resources', 'Web');
+const BUNDLES = [
+  { label: 'PriLearning.swiftpm', web: join(ROOT, 'ios', 'PriLearning.swiftpm', 'Resources', 'Web') },
+  { label: 'PriLearning 2.swiftpm', web: join(ROOT, 'ios', 'PriLearning 2.swiftpm', 'Resources', 'Web') },
+];
 const CHECK = process.argv.includes('--check');
 
 if (!existsSync(DIST)) {
@@ -25,7 +24,6 @@ if (!existsSync(DIST)) {
   process.exit(2);
 }
 
-/** Every file under `dir`, as path → sha256, so a rename is a difference too. */
 function fingerprint(dir, base = dir, acc = {}) {
   for (const name of readdirSync(dir)) {
     if (name === '.DS_Store') continue;
@@ -35,34 +33,37 @@ function fingerprint(dir, base = dir, acc = {}) {
   }
   return acc;
 }
-
-// icons/ is authored in the iOS bundle and has no counterpart in the build.
-const drop = (m) => Object.fromEntries(Object.entries(m).filter(([k]) => !k.startsWith('icons/')));
-
+const drop = m => Object.fromEntries(Object.entries(m).filter(([k]) => !k.startsWith('icons/')));
 const built = drop(fingerprint(DIST));
-const bundled = existsSync(WEB) ? drop(fingerprint(WEB)) : {};
+let failed = false;
 
-const names = [...new Set([...Object.keys(built), ...Object.keys(bundled)])].sort();
-const differing = names.filter(n => built[n] !== bundled[n]);
+for (const bundle of BUNDLES) {
+  const bundled = existsSync(bundle.web) ? drop(fingerprint(bundle.web)) : {};
+  const names = [...new Set([...Object.keys(built), ...Object.keys(bundled)])].sort();
+  const differing = names.filter(n => built[n] !== bundled[n]);
 
-if (!differing.length) {
-  console.log(`iOS bundle matches client/dist — ${names.length} files.`);
-  process.exit(0);
+  if (!differing.length) {
+    console.log(`${bundle.label} web bundle matches client/dist — ${names.length} files.`);
+    continue;
+  }
+  if (CHECK) {
+    failed = true;
+    console.error(`${bundle.label} web bundle is out of step with client/dist — ${differing.length} of ${names.length} files differ:`);
+    for (const n of differing.slice(0, 12)) console.error(`  ${!built[n] ? 'only in bundle' : !bundled[n] ? 'only in build ' : 'differs       '}  ${n}`);
+    if (differing.length > 12) console.error(`  ... and ${differing.length - 12} more`);
+    continue;
+  }
+
+  mkdirSync(bundle.web, { recursive: true });
+  rmSync(join(bundle.web, 'assets'), { recursive: true, force: true });
+  for (const name of readdirSync(DIST)) {
+    if (name === '.DS_Store') continue;
+    cpSync(join(DIST, name), join(bundle.web, name), { recursive: true });
+  }
+  console.log(`${bundle.label} web bundle refreshed from client/dist — ${differing.length} file(s) updated.`);
 }
 
-if (CHECK) {
-  console.error(`iOS bundle is out of step with client/dist — ${differing.length} of ${names.length} files differ:`);
-  for (const n of differing.slice(0, 12)) {
-    console.error(`  ${!built[n] ? 'only in bundle' : !bundled[n] ? 'only in build ' : 'differs       '}  ${n}`);
-  }
-  if (differing.length > 12) console.error(`  ... and ${differing.length - 12} more`);
-  console.error('\nRun `npm run sync:ios` after `npm run build`.');
+if (failed) {
+  console.error('\nRun `npm run sync:ios` after `npm run build` to refresh both tracked iPad bundles.');
   process.exit(1);
 }
-
-rmSync(join(WEB, 'assets'), { recursive: true, force: true });
-for (const name of readdirSync(DIST)) {
-  if (name === '.DS_Store') continue;
-  cpSync(join(DIST, name), join(WEB, name), { recursive: true });
-}
-console.log(`iOS bundle refreshed from client/dist — ${differing.length} file(s) updated.`);
