@@ -4,6 +4,11 @@
 This command is intentionally separate from the strict trainer. It is useful for
 exercising V4 on one collected writer, but its validation numbers are not
 writer-disjoint and are never production evidence.
+
+When initialising from synthetic structural pretraining, an optional small
+symbol-only replay stream can preserve rare glyph classes while the real writer
+adapts the shared representation. Replay never contributes validation evidence
+and never updates grouping/relation losses directly.
 """
 from __future__ import annotations
 
@@ -19,7 +24,22 @@ from data import TOKEN_TO_ID
 from dev_split import make_same_writer_dev_split
 from structural import PriInkStructuralV4, StructuralConfig
 from structural_data import StructuralInkDataset, corpus_files, load_structural_examples
-from train_structural import evaluate, seed_everything, structural_loss
+from train_structural import (
+    evaluate,
+    glyph_symbol_loss,
+    seed_everything,
+    structural_loss,
+)
+
+
+def _forward(model, batch, device):
+    return model(
+        batch["stroke_points"].to(device),
+        batch["stroke_point_valid"].to(device),
+        batch["stroke_valid"].to(device),
+        batch["stroke_geometry"].to(device),
+        batch["raster"].to(device),
+    )
 
 
 def main():
@@ -28,6 +48,14 @@ def main():
     p.add_argument("--out", default="tools/ink-foundation/runs/pri-ink-structural-v4-dev.pt")
     p.add_argument("--init", default=None,
                    help="optional V4 checkpoint used only to initialise model weights")
+    p.add_argument(
+        "--replay-corpus", default=None,
+        help="optional SYN4 train corpus used for symbol-only rehearsal during real fine-tuning",
+    )
+    p.add_argument(
+        "--replay-weight", type=float, default=0.20,
+        help="weight for synthetic glyph-level symbol rehearsal; grouping/relation are not replayed",
+    )
     p.add_argument("--epochs", type=int, default=30)
     p.add_argument("--batch", type=int, default=8)
     p.add_argument("--lr", type=float, default=2e-4)
@@ -43,6 +71,9 @@ def main():
     p.add_argument("--max-points-per-stroke", type=int, default=96)
     p.add_argument("--patience", type=int, default=8)
     args = p.parse_args()
+
+    if not 0.0 <= args.replay_weight <= 1.0:
+        raise SystemExit("--replay-weight must be between 0 and 1")
 
     seed_everything(args.seed)
     raw_examples = load_structural_examples(corpus_files(args.corpus))
@@ -85,6 +116,34 @@ def main():
     train_loader = DataLoader(train_ds, batch_size=args.batch, shuffle=True, num_workers=args.workers)
     val_loader = DataLoader(val_ds, batch_size=args.batch, shuffle=False, num_workers=args.workers)
 
+    replay_loader = None
+    replay_meta = None
+    if args.replay_corpus:
+        replay_all = load_structural_examples(corpus_files(args.replay_corpus))
+        replay_examples = [
+            x for x in replay_all
+            if x.split == "train" and x.writer.startswith("SYN4_T_")
+        ]
+        if not replay_examples:
+            raise SystemExit(
+                "replay corpus has no SYN4_T_ training examples; refusing an unverified replay source"
+            )
+        replay_ds = StructuralInkDataset(replay_examples, "train", cfg)
+        replay_loader = DataLoader(
+            replay_ds,
+            batch_size=args.batch,
+            shuffle=True,
+            num_workers=args.workers,
+        )
+        replay_meta = {
+            "corpus": str(args.replay_corpus),
+            "samples": len(replay_examples),
+            "writers": len({x.writer for x in replay_examples}),
+            "weight": args.replay_weight,
+            "objective": "glyph-symbol-only",
+            "evidence": False,
+        }
+
     model = PriInkStructuralV4(len(TOKEN_TO_ID), cfg).to(device)
     init_meta = None
     if args.init:
@@ -106,6 +165,7 @@ def main():
             "path": str(init_path),
             "stage": init_ckpt.get("stage"),
             "evidence": init_ckpt.get("evidence"),
+            "symbolObjective": init_ckpt.get("symbol_objective"),
         }
 
     opt = torch.optim.AdamW(
@@ -134,36 +194,57 @@ def main():
     )
     if init_meta:
         print(f"initialised from: {init_meta['path']} stage={init_meta['stage']}")
+    if replay_meta:
+        print(
+            f"synthetic glyph replay: samples={replay_meta['samples']} "
+            f"writers={replay_meta['writers']} weight={replay_meta['weight']:.2f}"
+        )
     print(f"parameters={sum(p.numel() for p in model.parameters()):,}")
 
     for epoch in range(1, args.epochs + 1):
         model.train()
         running = 0.0
+        replay_running = 0.0
         steps = 0
+        replay_iter = iter(replay_loader) if replay_loader is not None else None
+
         for batch in train_loader:
             opt.zero_grad(set_to_none=True)
-            outputs = model(
-                batch["stroke_points"].to(device),
-                batch["stroke_point_valid"].to(device),
-                batch["stroke_valid"].to(device),
-                batch["stroke_geometry"].to(device),
-                batch["raster"].to(device),
-            )
-            loss, _ = structural_loss(outputs, batch, device)
+            outputs = _forward(model, batch, device)
+            real_loss, _ = structural_loss(outputs, batch, device)
+            loss = real_loss
+
+            if replay_iter is not None and args.replay_weight > 0:
+                try:
+                    replay_batch = next(replay_iter)
+                except StopIteration:
+                    replay_iter = iter(replay_loader)
+                    replay_batch = next(replay_iter)
+                replay_outputs = _forward(model, replay_batch, device)
+                replay_symbol, _ = glyph_symbol_loss(replay_outputs, replay_batch, device)
+                loss = loss + args.replay_weight * replay_symbol
+                replay_running += float(replay_symbol.detach())
+
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
             opt.step(); sched.step()
-            running += float(loss.detach()); steps += 1
+            running += float(real_loss.detach())
+            steps += 1
 
         metrics = evaluate(model, val_loader, device)
         score = (
-            0.45 * metrics["symbol_accuracy"] +
+            0.45 * metrics["glyph_symbol_accuracy"] +
             0.25 * metrics["group_balanced_accuracy"] +
             0.30 * metrics["relation_positive_accuracy"]
         )
+        replay_text = (
+            f" replay_symbol={replay_running/max(1, steps):.4f}"
+            if replay_loader is not None else ""
+        )
         print(
-            f"epoch={epoch} train_loss={running/max(1, steps):.4f} "
-            f"val_loss={metrics['loss']:.4f} symbol={metrics['symbol_accuracy']:.4f} "
+            f"epoch={epoch} train_loss={running/max(1, steps):.4f}{replay_text} "
+            f"val_loss={metrics['loss']:.4f} glyph_symbol={metrics['glyph_symbol_accuracy']:.4f} "
+            f"stroke_symbol={metrics['stroke_symbol_accuracy']:.4f} "
             f"group_bal={metrics['group_balanced_accuracy']:.4f} "
             f"relation_pos={metrics['relation_positive_accuracy']:.4f} "
             f"relation_none={metrics['relation_none_accuracy']:.4f}"
@@ -182,6 +263,8 @@ def main():
                 "validation": metrics,
                 "dev_split": split_meta,
                 "initialisation": init_meta,
+                "symbol_objective": "annotated-glyph-group-logprob-v1",
+                "synthetic_replay": replay_meta,
                 "evidence": (
                     "same-writer development holdout only; not writer-disjoint and not valid "
                     "for production promotion"
@@ -195,6 +278,8 @@ def main():
                 "validationProtocol": split_meta,
                 "validation": metrics,
                 "initialisation": init_meta,
+                "symbolObjective": checkpoint["symbol_objective"],
+                "syntheticReplay": replay_meta,
                 "multiStrokeGroups": multi_groups,
                 "positiveRelations": positive_relations,
                 "evidence": checkpoint["evidence"],
