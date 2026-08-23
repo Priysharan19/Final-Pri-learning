@@ -15,9 +15,9 @@ client/test/ink-corpus/*.json
 
 # Local real-writer calibration derived from that corpus. Vite copies the
 # client/public file into the iPad web bundle; every copy stays gitignored.
-client/public/ink-bootstrap-profile.json
-ios/PriLearning.swiftpm/Resources/Web/ink-bootstrap-profile.json
-ios/PriLearning\ 2.swiftpm/Resources/Web/ink-bootstrap-profile.json
+client/public/ink-bootstrap-profile.js
+ios/PriLearning.swiftpm/Resources/Web/ink-bootstrap-profile.js
+ios/PriLearning\ 2.swiftpm/Resources/Web/ink-bootstrap-profile.js
 
 # Local neural-training outputs are large/private development artifacts.
 tools/ink-foundation/runs/
