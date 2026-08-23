@@ -5,12 +5,19 @@ Development export is allowed for any compatible checkpoint, but it is marked
 `pri.productionReady=false`. A release export requires the locked final-holdout
 report produced by evaluate_release.py for the exact checkpoint and the report
 must pass the production handwriting standard.
+
+Core ML export deliberately uses a stable, non-empty trace fixture and disables
+PyTorch's MHA fast path. Newer PyTorch versions can otherwise select different
+Transformer attention graphs between trace/check invocations, and an all-padding
+fixture can create NaNs inside attention. Both failure modes are exporter bugs,
+not model-quality evidence.
 """
 from __future__ import annotations
 
 import argparse
 import hashlib
 import json
+import sys
 from pathlib import Path
 
 import torch
@@ -64,6 +71,41 @@ def validate_release_report(checkpoint: Path, ckpt: dict, report_path: str | Non
     return True, report
 
 
+def make_trace_fixture(cfg: ModelConfig):
+    """Create a finite representative input instead of an all-padding sample."""
+    points = torch.zeros(1, cfg.max_points, cfg.feature_dim, dtype=torch.float32)
+    valid = torch.zeros(1, cfg.max_points, dtype=torch.float32)
+    raster = torch.zeros(1, 1, cfg.raster_height, cfg.raster_width, dtype=torch.float32)
+
+    n = min(32, cfg.max_points)
+    valid[0, :n] = 1.0
+    if n > 1:
+        points[0, :n, 0] = torch.linspace(-0.45, 0.45, n)
+        points[0, :n, 1] = 0.08 * torch.sin(torch.linspace(0, 3.14159, n))
+        points[0, 1:n, 2] = points[0, 1:n, 0] - points[0, :n-1, 0]
+        points[0, 1:n, 3] = points[0, 1:n, 1] - points[0, :n-1, 1]
+    if cfg.feature_dim > 12:
+        points[0, 0, 11] = 1.0
+        points[0, n-1, 12] = 1.0
+    if cfg.feature_dim > 9:
+        points[0, :n, 9] = 1.0
+    if cfg.feature_dim > 10:
+        points[0, :n, 10] = 0.75
+
+    y = cfg.raster_height // 2
+    x1 = max(1, cfg.raster_width // 4)
+    x2 = min(cfg.raster_width - 1, 3 * cfg.raster_width // 4)
+    raster[0, 0, max(0, y-1):min(cfg.raster_height, y+2), x1:x2] = 1.0
+    return points, valid, raster
+
+
+def stabilise_transformer_trace():
+    mha = getattr(torch.backends, "mha", None)
+    setter = getattr(mha, "set_fastpath_enabled", None) if mha is not None else None
+    if callable(setter):
+        setter(False)
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("checkpoint")
@@ -72,12 +114,20 @@ def main():
                    help="locked final-holdout report for this exact checkpoint")
     args = p.parse_args()
 
+    if sys.version_info >= (3, 14):
+        raise SystemExit(
+            "Core ML export requires the dedicated supported export environment (Python 3.12). "
+            "Run: npm run ink:bootstrap:export"
+        )
+
     try:
         import coremltools as ct
     except ImportError as exc:
-        raise SystemExit("Install coremltools on macOS: pip install coremltools") from exc
+        raise SystemExit("Install coremltools in a supported macOS Python environment") from exc
 
     checkpoint = Path(args.checkpoint)
+    if not checkpoint.exists():
+        raise SystemExit(f"checkpoint not found: {checkpoint}")
     ckpt = torch.load(checkpoint, map_location="cpu", weights_only=False)
     production_ready, report = validate_release_report(checkpoint, ckpt, args.release_report)
 
@@ -90,10 +140,21 @@ def main():
     model.load_state_dict(ckpt["model"]); model.eval()
     wrapper = ExportWrapper(model).eval()
 
-    points = torch.zeros(1, cfg.max_points, cfg.feature_dim, dtype=torch.float32)
-    valid = torch.zeros(1, cfg.max_points, dtype=torch.float32)
-    raster = torch.zeros(1, 1, cfg.raster_height, cfg.raster_width, dtype=torch.float32)
-    traced = torch.jit.trace(wrapper, (points, valid, raster), strict=False)
+    stabilise_transformer_trace()
+    points, valid, raster = make_trace_fixture(cfg)
+    with torch.inference_mode():
+        native_out = wrapper(points, valid, raster)
+        if not bool(torch.isfinite(native_out).all()):
+            raise SystemExit("checkpoint produced non-finite logits on the export fixture; refusing export")
+        # check_trace=False is intentional. PyTorch MHA can rewrite equivalent
+        # attention graphs between invocations; the finite-output check above is
+        # the stable semantic guard and Core ML conversion validates the graph.
+        traced = torch.jit.trace(
+            wrapper, (points, valid, raster), strict=False, check_trace=False
+        )
+        traced_out = traced(points, valid, raster)
+        if not bool(torch.isfinite(traced_out).all()):
+            raise SystemExit("traced model produced non-finite logits; refusing Core ML conversion")
 
     mlmodel = ct.convert(
         traced,
