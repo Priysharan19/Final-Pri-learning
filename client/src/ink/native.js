@@ -8,9 +8,9 @@
 // Browser/dev builds have neither and use the JS Pri engine directly.
 //
 // DEBUG/native readings are additionally fused with Pri's purpose-built
-// stroke/CNN glyph classifier using the exact native stroke ownership. Native
-// remains responsible for 2-D geometry; the stroke model gets an independent
-// vote on glyph identity.
+// line/stroke recogniser. Native owns real-line geometry; Pri owns glyph
+// segmentation and identity inside that line. Safe, answer-blind question
+// context is retained on the web request and applied only during that Pri pass.
 // ─────────────────────────────────────────────────────────────────────────────
 import { fuseNativeStrokeReading } from './hybrid.js';
 
@@ -21,7 +21,7 @@ const handler = () =>
 export const nativeInkAvailable = () => !!handler();
 
 let nextRequestId = 1;
-const pending = new Map();       // reqId → resolve
+const pending = new Map();       // reqId → {resolve, context, overrides}
 const strokeListeners = new Set();
 let latestStrokes = [];
 
@@ -32,24 +32,20 @@ if (typeof window !== 'undefined') {
       latestStrokes = Array.isArray(payload.strokes) ? payload.strokes : [];
       for (const listener of strokeListeners) listener(latestStrokes);
     } else if (payload.type === 'reading') {
-      const resolve = pending.get(payload.reqId);
-      if (resolve) {
+      const entry = pending.get(payload.reqId);
+      if (entry) {
         pending.delete(payload.reqId);
         let reading = payload;
-        // The promoted foundation model is release-gated separately and must
-        // not be silently rewritten here. The native debug/rescue reader,
-        // however, benefits from Pri's independent stroke classifier because
-        // it already supplies exact per-glyph Pencil ownership.
         if (latestStrokes.length &&
             (payload.engine === 'native-primary-debug' || payload.engine === 'native-rescue')) {
           try {
-            reading = fuseNativeStrokeReading(payload, latestStrokes, payload.overrides || {});
-            reading.engine = `${payload.engine}+stroke-fusion`;
+            reading = fuseNativeStrokeReading(payload, latestStrokes, entry.overrides || {}, entry.context || null);
+            reading.engine = `${payload.engine}+line-stroke-fusion`;
           } catch {
             reading = payload;
           }
         }
-        resolve(reading);
+        entry.resolve(reading);
       }
     }
   };
@@ -66,22 +62,22 @@ function post(message) {
   }
 }
 
-function requestReading(message, timeoutMs) {
+function requestReading(message, timeoutMs, context = null) {
   return new Promise((resolve) => {
     const reqId = nextRequestId++;
-    pending.set(reqId, resolve);
+    pending.set(reqId, { resolve, context, overrides: message.overrides || {} });
     if (!post({ ...message, reqId })) {
       pending.delete(reqId);
       resolve(null);
       return;
     }
     setTimeout(() => {
-      if (pending.has(reqId)) { pending.delete(reqId); resolve(null); }
+      const entry = pending.get(reqId);
+      if (entry) { pending.delete(reqId); entry.resolve(null); }
     }, timeoutMs);
   });
 }
 
-/** Where the writing area is, and how much of it the shell may draw in. */
 function geometryOf(element) {
   const rect = element.getBoundingClientRect();
 
@@ -156,13 +152,13 @@ export const nativeInk = {
 
   /** Pri-owned learned model. Empty result means no validated asset is bundled
    * or the model declined the page; callers must continue through fallbacks. */
-  foundationRecognize(overrides = {}) {
-    return requestReading({ op: 'foundationRecognize', overrides }, 5000);
+  foundationRecognize(overrides = {}, context = null) {
+    return requestReading({ op: 'foundationRecognize', overrides }, 5000, context);
   },
 
   /** Mature native rescue recogniser. It remains on-device and is intentionally
    * separate from the foundation call so production fallback order is auditable. */
-  recognize(overrides = {}) {
-    return requestReading({ op: 'recognize', overrides }, 6000);
+  recognize(overrides = {}, context = null) {
+    return requestReading({ op: 'recognize', overrides }, 6000, context);
   }
 };
