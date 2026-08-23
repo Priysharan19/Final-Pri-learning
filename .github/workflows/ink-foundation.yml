@@ -47,6 +47,13 @@ jobs:
           node --check tools/ink-foundation/generate_synthetic.mjs
           node --check tools/ink-foundation/generate_personal_synthetic.mjs
 
+      # The representation contract imports numpy + torch through data.py/model.py.
+      # Install the locked training environment before executing any semantic
+      # model contract. A pip cache is only cached wheel bytes; it is not an
+      # installed Python environment.
+      - name: Install training dependencies
+        run: python -m pip install -r tools/ink-foundation/requirements.txt
+
       - name: V3 representation contract
         run: |
           python - <<'PY'
@@ -106,9 +113,6 @@ jobs:
               raise SystemExit('foundation evidence contract broken: ' + ', '.join(bad))
           print('foundation evidence contract: PASS')
           PY
-
-      - name: Install training dependencies
-        run: python -m pip install -r tools/ink-foundation/requirements.txt
 
       - name: Generate tiny whole-expression corpus
         run: node tools/ink-foundation/generate_synthetic.mjs /tmp/pri-ink-smoke 6 2 3
