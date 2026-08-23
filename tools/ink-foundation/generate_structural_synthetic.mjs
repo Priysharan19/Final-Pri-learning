@@ -30,6 +30,40 @@ const TEMPLATE_ALIAS = new Map([
   ['±', 'pm'], ['°', 'deg'], ['%', 'percent'], ['÷', 'div']
 ]);
 
+// Synthetic-only templates for difficult real-corpus classes not present in
+// the legacy JS template library. V4 inference itself does not depend on these
+// templates; they exist only to avoid zero-shot classes during pretraining.
+const line = (x1, y1, x2, y2, n = 12) =>
+  Array.from({ length: n }, (_, i) => [
+    x1 + (x2 - x1) * i / Math.max(1, n - 1),
+    y1 + (y2 - y1) * i / Math.max(1, n - 1)
+  ]);
+const arc = (cx, cy, rx, ry, a0, a1, n = 16) =>
+  Array.from({ length: n }, (_, i) => {
+    const a = (a0 + (a1 - a0) * i / Math.max(1, n - 1)) * Math.PI / 180;
+    return [cx + rx * Math.cos(a), cy + ry * Math.sin(a)];
+  });
+const chain = (...parts) => parts.flat();
+const EXTRA_TEMPLATES = {
+  'B': [
+    [line(30, 10, 30, 90, 12), chain(arc(42, 32, 20, 22, 270, 450, 12), arc(42, 68, 24, 22, 270, 450, 12))],
+    [chain(line(30, 10, 30, 90, 12), arc(43, 31, 21, 21, 270, 450, 12), arc(43, 68, 25, 22, 270, 450, 12))]
+  ],
+  'I': [
+    [line(50, 10, 50, 90, 14)],
+    [line(28, 14, 72, 14, 8), line(50, 14, 50, 86, 12), line(28, 86, 72, 86, 8)]
+  ]
+};
+
+// The first quarter of every writer's corpus is a balanced glyph drill. This
+// prevents frequent digits/operators from drowning rare but real classes.
+const DRILL_SYMBOLS = [
+  '0','1','2','3','4','5','6','7','8','9',
+  'x','y','n','a','b','B','I','l','k','m','r','s','c','o','t','i',
+  '+','-','=','/','(',')','.',':','pi','theta','sqrt','<','>','<=','>=','!=','±','°','%'
+];
+const DRILL_SAMPLES = Math.max(1, Math.min(8, Math.round(SAMPLES * 0.25)));
+
 function makeWriter() {
   return {
     slant: (rng() * 2 - 1) * 0.38,
@@ -86,7 +120,7 @@ function enrichStroke(points, writer, scale, ordinal) {
 
 function renderGlyph(symbol, writer, x, y, scaleFactor, ordinalBase) {
   const key = TEMPLATE_ALIAS.get(symbol) || symbol;
-  const variants = TEMPLATES[key];
+  const variants = TEMPLATES[key] || EXTRA_TEMPLATES[key];
   if (!variants?.length) throw new Error(`no handwriting template for ${symbol} (${key})`);
   const seed = pick(variants).map(st => st.map(p => p.slice()));
   const warped = applyHand(stylize(seed, rng, writer.wobble), writer);
@@ -173,12 +207,21 @@ class Builder {
         relations: this.relations,
         syntheticExact: {
           status: 'generator-ground-truth',
-          generator: 'pri-ink-structural-synthetic-v1',
+          generator: 'pri-ink-structural-synthetic-v2',
           reviewRequired: false
         }
       }
     };
   }
+}
+
+function symbolDrill(writer, writerIndex, sampleIndex) {
+  const b = new Builder(writer);
+  const width = 4;
+  const start = ((writerIndex * DRILL_SAMPLES + sampleIndex) * width) % DRILL_SYMBOLS.length;
+  const tokens = Array.from({ length: width }, (_, i) => DRILL_SYMBOLS[(start + i) % DRILL_SYMBOLS.length]);
+  b.sequence(tokens, 18, 58, 0.92, true);
+  return b.finish(canonical(tokens));
 }
 
 function baseline(writer) {
@@ -223,7 +266,7 @@ function superscript(writer) {
   const tail = b.addGlyph(NZ(), x, 62, 1); roots.push(tail.id);
   b.right(roots);
   const prefix = roots.length === 4 ? b.groups[0].symbol : '';
-  return b.finish(`${prefix}${v}^(${power})+${tail ? b.groups.find(g => g.id === tail.id).symbol : ''}`);
+  return b.finish(`${prefix}${v}^(${power})+${b.groups.find(g => g.id === tail.id).symbol}`);
 }
 
 function fraction(writer) {
@@ -267,11 +310,12 @@ function derivative(writer) {
   return b.finish("y'=6x^(2)+6x-180");
 }
 
-function makeSample(writer) {
+function makeSample(writer, writerIndex, sampleIndex) {
+  if (sampleIndex < DRILL_SAMPLES) return symbolDrill(writer, writerIndex, sampleIndex);
   const r = rng();
-  if (r < 0.50) return baseline(writer);
-  if (r < 0.68) return superscript(writer);
-  if (r < 0.80) return fraction(writer);
+  if (r < 0.45) return baseline(writer);
+  if (r < 0.64) return superscript(writer);
+  if (r < 0.78) return fraction(writer);
   if (r < 0.90) return radical(writer);
   return derivative(writer);
 }
@@ -280,11 +324,11 @@ function emitSplit(split, count, prefix) {
   for (let wi = 0; wi < count; wi++) {
     const writer = makeWriter();
     const id = `${prefix}${String(wi).padStart(5, '0')}`;
-    const samples = Array.from({ length: SAMPLES }, () => makeSample(writer));
+    const samples = Array.from({ length: SAMPLES }, (_, si) => makeSample(writer, wi, si));
     const doc = {
       format: 'pri-ink-corpus', version: 2, split,
       synthetic: true, holdoutLocked: false, predictedTouchesStored: false,
-      collector: { name: 'pri-ink-structural-synthetic-v1', seed: 2026082407 },
+      collector: { name: 'pri-ink-structural-synthetic-v2', seed: 2026082407 },
       writer: { id, sessionId: `${id}-S0`, handedness: 'synthetic', device: 'generator', pen: false },
       samples
     };
@@ -297,4 +341,5 @@ emitSplit('train', TRAIN_WRITERS, 'SYN4_T_');
 emitSplit('validation', VAL_WRITERS, 'SYN4_V_');
 console.log(`\nExact structural synthetic corpus written to ${OUT}`);
 console.log(`${(TRAIN_WRITERS + VAL_WRITERS) * SAMPLES} expressions with generator-ground-truth trace grouping.`);
+console.log(`balanced glyph drills: ${DRILL_SAMPLES} sample(s) per writer across ${DRILL_SYMBOLS.length} symbols`);
 console.log('Synthetic only — never report these metrics as real handwriting accuracy.');
