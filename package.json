@@ -35,6 +35,7 @@
     "test:a11y": "node client/test/a11y-gate.mjs",
     "sync:ios": "node scripts/sync-ios.mjs",
     "check:ios": "node scripts/sync-ios.mjs --check",
-    "serve:lan": "node scripts/serve-lan.mjs"
+    "serve:lan": "node scripts/serve-lan.mjs",
+    "ink:collect": "node scripts/serve-lan.mjs --collector"
   }
 }
