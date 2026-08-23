@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Pri Ink Foundation — one-writer DEVELOPMENT bootstrap.
+# Pri Ink Foundation V3 — one-writer DEVELOPMENT bootstrap.
 #
-# Keeps the real corpus local, pretrains on synthetic writer diversity, adapts
-# on the one available real Pencil writer, exports a non-production Core ML
-# model, and installs it into both local SwiftPM packages for DEBUG testing.
+# Keeps the real corpus local, pretrains on Pri-owned synthetic writer diversity,
+# builds a holdout-safe synthetic replay from the writer's REAL Pencil glyphs,
+# adapts on the real writer, exports a non-production Core ML model, and installs
+# it into both local SwiftPM packages for DEBUG testing.
+#
 # It never reads test/final-holdout evidence and can never promote a release.
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -22,27 +24,28 @@ PY="$VENV/bin/python"
 PIP="$VENV/bin/pip"
 RUN_DIR="tools/ink-foundation/runs/bootstrap-one-writer"
 SYNTH_DIR="${TMPDIR:-/tmp}/pri-ink-bootstrap-synth"
+PERSONAL_SYNTH_DIR="${TMPDIR:-/tmp}/pri-ink-personal-synth"
 PRETRAIN="$RUN_DIR/pri-ink-bootstrap-pretrain.pt"
 BOOTSTRAP="$RUN_DIR/pri-ink-bootstrap.pt"
 MODEL="$RUN_DIR/PriInkFoundation.mlpackage"
 
-# Balanced default for a laptop bootstrap. Increase these with environment
-# variables later without changing code; none of these numbers are release
-# evidence because the only real writer count remains one.
 SYNTH_TRAIN_WRITERS="${PRI_INK_SYNTH_TRAIN_WRITERS:-96}"
 SYNTH_VAL_WRITERS="${PRI_INK_SYNTH_VAL_WRITERS:-24}"
 SYNTH_SAMPLES_PER_WRITER="${PRI_INK_SYNTH_SAMPLES_PER_WRITER:-24}"
+PERSONAL_SYNTH_SAMPLES="${PRI_INK_PERSONAL_SYNTH_SAMPLES:-600}"
 PRETRAIN_EPOCHS="${PRI_INK_PRETRAIN_EPOCHS:-16}"
 BOOTSTRAP_EPOCHS="${PRI_INK_BOOTSTRAP_EPOCHS:-32}"
 D_MODEL="${PRI_INK_D_MODEL:-192}"
 STROKE_LAYERS="${PRI_INK_STROKE_LAYERS:-6}"
 DECODER_LAYERS="${PRI_INK_DECODER_LAYERS:-4}"
+BOOTSTRAP_SEED="${PRI_INK_BOOTSTRAP_SEED:-20260823}"
+VALIDATION_FRACTION="${PRI_INK_BOOTSTRAP_VALIDATION_FRACTION:-0.20}"
 
 printf '\n============================================================\n'
-printf ' Pri Ink · one-writer DEVELOPMENT bootstrap\n'
+printf ' Pri Ink V3 · one-writer DEVELOPMENT bootstrap\n'
 printf '============================================================\n\n'
 
-echo "1/7  Auditing the private real-Pencil corpus"
+echo "1/8  Auditing the private real-Pencil corpus"
 npm run test:ink:corpus:strict
 
 node <<'NODE'
@@ -63,7 +66,7 @@ console.log(`bootstrap source: ${writers[0]} · ${samples} real expressions · c
 NODE
 
 echo
-echo "2/7  Preparing the isolated Python environment"
+echo "2/8  Preparing the isolated Python environment"
 if [[ ! -x "$PY" ]]; then
   "$PYTHON" -m venv "$VENV"
 fi
@@ -71,10 +74,10 @@ fi
 "$PIP" install -r tools/ink-foundation/requirements.txt
 
 mkdir -p "$RUN_DIR"
-rm -rf "$SYNTH_DIR" "$MODEL"
+rm -rf "$SYNTH_DIR" "$PERSONAL_SYNTH_DIR" "$MODEL"
 
 echo
-echo "3/7  Generating synthetic whole-expression writer diversity"
+echo "3/8  Generating generic whole-expression writer diversity"
 node tools/ink-foundation/generate_synthetic.mjs \
   "$SYNTH_DIR" \
   "$SYNTH_TRAIN_WRITERS" \
@@ -82,7 +85,7 @@ node tools/ink-foundation/generate_synthetic.mjs \
   "$SYNTH_SAMPLES_PER_WRITER"
 
 echo
-echo "4/7  Pretraining the multimodal backbone"
+echo "4/8  Pretraining the V3 multimodal backbone"
 "$PY" tools/ink-foundation/train.py \
   --stage pretrain \
   --corpus "$SYNTH_DIR" \
@@ -98,24 +101,35 @@ echo "4/7  Pretraining the multimodal backbone"
   --patience 5
 
 echo
-echo "5/7  Adapting to the one available real Pencil writer"
+echo "5/8  Building holdout-safe replay from this writer's real Pencil glyphs"
+node tools/ink-foundation/generate_personal_synthetic.mjs \
+  client/test/ink-corpus \
+  "$PERSONAL_SYNTH_DIR" \
+  "$PERSONAL_SYNTH_SAMPLES" \
+  "$BOOTSTRAP_SEED" \
+  "$VALIDATION_FRACTION"
+
+echo
+echo "6/8  Adapting V3 to the real Pencil writer + personal replay"
 "$PY" tools/ink-foundation/bootstrap.py \
   --init "$PRETRAIN" \
   --corpus client/test/ink-corpus \
+  --personal-synth "$PERSONAL_SYNTH_DIR" \
   --out "$BOOTSTRAP" \
   --epochs "$BOOTSTRAP_EPOCHS" \
   --batch 8 \
-  --lr 5e-5 \
+  --lr 4e-5 \
   --d-model "$D_MODEL" \
   --stroke-layers "$STROKE_LAYERS" \
   --decoder-layers "$DECODER_LAYERS" \
   --max-points 768 \
   --max-tokens 96 \
-  --validation-fraction 0.20 \
-  --patience 8
+  --seed "$BOOTSTRAP_SEED" \
+  --validation-fraction "$VALIDATION_FRACTION" \
+  --patience 10
 
 echo
-echo "6/7  Exporting a development-only Core ML model"
+echo "7/8  Exporting a development-only Core ML model"
 "$PY" tools/ink-foundation/export_coreml.py \
   "$BOOTSTRAP" \
   --out "$MODEL"
@@ -131,7 +145,7 @@ print('Core ML promotion lock: PASS — bootstrap model is development-only')
 PY
 
 echo
-echo "7/7  Installing the DEBUG model into both local iPad packages"
+echo "8/8  Installing the DEBUG model into both local iPad packages"
 for package in "ios/PriLearning.swiftpm" "ios/PriLearning 2.swiftpm"; do
   dest="$package/Resources/Models/PriInkFoundation.mlpackage"
   mkdir -p "$(dirname "$dest")"
@@ -140,10 +154,11 @@ for package in "ios/PriLearning.swiftpm" "ios/PriLearning 2.swiftpm"; do
 done
 
 printf '\n============================================================\n'
-printf ' BOOTSTRAP COMPLETE\n'
+printf ' V3 BOOTSTRAP COMPLETE\n'
 printf '============================================================\n'
 printf 'Checkpoint: %s\n' "$BOOTSTRAP"
 printf 'Core ML:    %s\n' "$MODEL"
+printf 'Personal replay: %s synthetic expressions\n' "$PERSONAL_SYNTH_SAMPLES"
 printf 'Installed:  ios/PriLearning.swiftpm/Resources/Models/PriInkFoundation.mlpackage\n'
 printf '\nThis model is for DEBUG/iPad testing only.\n'
 printf 'It is NOT evidence of accuracy on other people and cannot be promoted.\n'
