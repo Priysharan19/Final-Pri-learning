@@ -38,6 +38,7 @@
     "check:ios": "node scripts/sync-ios.mjs --check",
     "serve:lan": "node scripts/serve-lan.mjs",
     "ink:collect": "node scripts/serve-lan.mjs --collector",
-    "ink:status": "node client/test/ink-corpus-status.mjs"
+    "ink:status": "node client/test/ink-corpus-status.mjs",
+    "ink:bootstrap": "bash scripts/ink-bootstrap-one-writer.sh"
   }
 }
