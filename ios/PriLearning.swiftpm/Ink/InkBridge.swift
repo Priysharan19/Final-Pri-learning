@@ -174,12 +174,39 @@ final class InkBridge: NSObject, InkSurfaceDelegate {
             guard let self else { return }
             let reading = self.foundationRecognizer.read(strokes: strokes, overrides: overrides)
                 ?? Reading(lines: [], text: "", minConfidence: 1, margin: 1, weakest: nil)
+
+#if DEBUG
+            // Development checkpoints are shadow models. They still execute so
+            // model crashes and latency remain visible during engineering, but
+            // they cannot outrank the mature fallback just because they emitted
+            // non-empty text. Production builds only accept promoted weights.
+            if !reading.text.isEmpty {
+                NSLog(
+                    "PRIINK foundation shadow — lines=%d chars=%d minConf=%.4f margin=%.4f",
+                    reading.lines.count,
+                    reading.text.count,
+                    reading.minConfidence,
+                    reading.margin
+                )
+            }
+            var payload = Reading(
+                lines: [], text: "", minConfidence: 1, margin: 1, weakest: nil
+            ).jsonObject
+            payload["type"] = "reading"
+            payload["reqId"] = requestId
+            payload["engine"] = "pri-foundation-shadow"
+            payload["available"] = self.foundationRecognizer.isAvailable
+            payload["shadowLineCount"] = reading.lines.count
+            payload["shadowCharacterCount"] = reading.text.count
+            DispatchQueue.main.async { self.emit(payload) }
+#else
             var payload = reading.jsonObject
             payload["type"] = "reading"
             payload["reqId"] = requestId
             payload["engine"] = "pri-foundation"
             payload["available"] = self.foundationRecognizer.isAvailable
             DispatchQueue.main.async { self.emit(payload) }
+#endif
         }
     }
 
