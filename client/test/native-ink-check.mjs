@@ -14,6 +14,7 @@ import { fileURLToPath } from 'node:url';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const BRIDGE_SWIFT = join(HERE, '../../ios/PriLearning.swiftpm/Ink/InkBridge.swift');
 const STROKE_SWIFT = join(HERE, '../../ios/PriLearning.swiftpm/Ink/InkStroke.swift');
+const SURFACE_SWIFT = join(HERE, '../../ios/PriLearning.swiftpm/Ink/InkSurface.swift');
 
 let failures = 0;
 const check = (name, ok, detail = '') => {
@@ -141,6 +142,17 @@ const strokeSwift = readFileSync(STROKE_SWIFT, 'utf8');
 for (const field of ['"t"', '"p"', '"azimuth"', '"altitude"']) {
   check(`native strokes export ${field}`, strokeSwift.includes(`${field}:`));
 }
+
+// ── Apple Pencil routing must be stateless and Pencil-first ──────────────────
+const surfaceSwift = readFileSync(SURFACE_SWIFT, 'utf8');
+check('native surface no longer uses a stateful pencilSeen gate',
+  !surfaceSwift.includes('pencilSeen'));
+check('default native drawing policy is Pencil-only',
+  surfaceSwift.includes('canvas.drawingPolicy = fingerDrawingEnabled ? .anyInput : .pencilOnly'));
+check('explicit Pencil touches are always routed to PencilKit',
+  surfaceSwift.includes("$0.type == .pencil") && surfaceSwift.includes('return hit'));
+check('empty hover/hit-test events do not reject the next Pencil contact',
+  surfaceSwift.includes('return hit') && surfaceSwift.includes('allTouches'));
 
 // ── both sides of the message contract ──────────────────────────────────────
 const swift = readFileSync(BRIDGE_SWIFT, 'utf8');
