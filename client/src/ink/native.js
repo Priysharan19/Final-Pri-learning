@@ -41,11 +41,11 @@ function post(message) {
   }
 }
 
-function requestReading(op, overrides, timeoutMs) {
+function requestReading(message, timeoutMs) {
   return new Promise((resolve) => {
     const reqId = nextRequestId++;
     pending.set(reqId, resolve);
-    if (!post({ op, reqId, overrides: overrides || {} })) {
+    if (!post({ ...message, reqId })) {
       pending.delete(reqId);
       resolve(null);
       return;
@@ -128,12 +128,12 @@ export const nativeInk = {
   /** Pri-owned learned model. Empty result means no validated asset is bundled
    * or the model declined the page; callers must continue through fallbacks. */
   foundationRecognize(overrides = {}) {
-    return requestReading('foundationRecognize', overrides, 5000);
+    return requestReading({ op: 'foundationRecognize', overrides }, 5000);
   },
 
   /** Mature native rescue recogniser. It remains on-device and is intentionally
    * separate from the foundation call so production fallback order is auditable. */
   recognize(overrides = {}) {
-    return requestReading('recognize', overrides, 6000);
+    return requestReading({ op: 'recognize', overrides }, 6000);
   }
 };
