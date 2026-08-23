@@ -43,7 +43,11 @@ enum InkGlyphConsensus {
             var changed = false
 
             for i in symbols.indices {
+                // Explicit student correction / locked structural evidence.
                 if symbols[i].confidence >= 0.995 { continue }
+                // Fraction blocks and named structural tokens are already the
+                // output of dedicated 2D readers; single-glyph OCR is not a
+                // meaningful independent vote for them.
                 if symbols[i].symbol.count > 1 && !["pi", "theta"].contains(symbols[i].symbol) {
                     continue
                 }
@@ -52,6 +56,9 @@ enum InkGlyphConsensus {
                 }
                 guard !members.isEmpty else { continue }
 
+                // Most correct high-confidence whole-line glyphs do not need an
+                // extra Vision request. Approximate owners, low confidence, or a
+                // close rival are exactly where a shape-only opinion is useful.
                 let closeRival = symbols[i].alternatives.contains {
                     $0.symbol != symbols[i].symbol && $0.confidence >= symbols[i].confidence - 0.18
                 }
@@ -91,9 +98,14 @@ enum InkGlyphConsensus {
                         current: [(old.symbol, min(0.74, old.confidence))] + old.alternatives,
                         isolated: isolated.alternatives
                     )
+                    // A second OCR view is useful evidence, but it is still OCR;
+                    // corrections must not train personalization from this owner.
                     symbols[i].approximate = true
                     changed = true
                 } else if isolated.confidence >= 0.38 {
+                    // Two readers disagree and neither has enough independent
+                    // evidence to win. Surface that uncertainty instead of
+                    // leaving a confidently wrong contextual character.
                     symbols[i].confidence = min(old.confidence, 0.68)
                     symbols[i].alternatives = mergedAlternatives(
                         primary: old.symbol,
@@ -120,6 +132,8 @@ enum InkGlyphConsensus {
         return summarise(lines)
     }
 
+    // MARK: - Isolated glyph vote
+
     private static func cachedVote(
         members: [InkStroke],
         glyphHeight: CGFloat
@@ -134,6 +148,9 @@ enum InkGlyphConsensus {
 
         let first = visionVote(members: members, targetHeight: 82)
         var final = first
+
+        // If the first shape-only pass is weak, or if it produced a single
+        // fragile observation, a different raster scale is genuinely useful.
         if first == nil || (first?.confidence ?? 0) < 0.64 {
             let second = visionVote(members: members, targetHeight: 108)
             final = fuse(first, second)
@@ -171,6 +188,10 @@ enum InkGlyphConsensus {
                 guard let dominant = counts.max(by: { $0.value < $1.value }) else { continue }
                 let ratio = Double(dominant.value) / Double(symbols.count)
                 guard ratio >= 0.55 else { continue }
+
+                // Repetition is deliberate evidence. Reading 4/5 copies of the
+                // same Pencil glyph as one symbol is stronger than seeing a
+                // single character once in a large empty image.
                 let repetition = min(1.0, 0.35 + 0.16 * Double(dominant.value))
                 let score = Double(candidate.confidence) * (0.48 + 0.52 * ratio) * repetition
                 scores[dominant.key] = max(scores[dominant.key] ?? 0, score)
@@ -205,10 +226,15 @@ enum InkGlyphConsensus {
                 )
             )
         }
+
+        // Different raster scales disagree. Keep only a clearly stronger vote;
+        // otherwise abstain so the contextual reader remains primary but shaky.
         let gap = abs(a.confidence - b.confidence)
         guard gap >= 0.18 else { return nil }
         return a.confidence > b.confidence ? a : b
     }
+
+    // MARK: - Raster
 
     private static func renderRepeatedGlyph(
         _ strokes: [InkStroke],
@@ -281,6 +307,8 @@ enum InkGlyphConsensus {
         }
         return context.makeImage()
     }
+
+    // MARK: - Reassembly
 
     private static func rebuildLine(
         _ original: ReadingLine,
