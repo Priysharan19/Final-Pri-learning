@@ -4,6 +4,10 @@
 This is deliberately independent of model quality. It verifies that structural
 labels are internally coherent and writer splits do not leak. Use --require-all
 for a corpus directory intended specifically for V4 training.
+
+Machine preannotation is allowed as a drafting aid, but a draft is not training
+evidence. A machine-drafted sample must have been opened and validated by the
+local V4 annotator, which stamps the structure with annotator + annotatedAt.
 """
 from __future__ import annotations
 
@@ -30,6 +34,7 @@ def main():
     glyphs = Counter()
     relations = Counter()
     total = annotated = unannotated = 0
+    machine_drafts = reviewed_machine_drafts = 0
     multi_stroke_groups = 0
     errors: list[str] = []
 
@@ -56,6 +61,23 @@ def main():
             if not structure.get("groups"):
                 unannotated += 1
                 continue
+
+            preannotation = structure.get("preannotation") or {}
+            is_machine_draft = preannotation.get("status") == "machine-draft"
+            if is_machine_draft:
+                machine_drafts += 1
+                reviewed = (
+                    structure.get("annotator") == "pri-ink-structural-v4-v1"
+                    and bool(structure.get("annotatedAt"))
+                )
+                if not reviewed:
+                    errors.append(
+                        f"{path} sample {sample_index}: machine preannotation has not been "
+                        "human-reviewed in the V4 annotator"
+                    )
+                    continue
+                reviewed_machine_drafts += 1
+
             try:
                 validate_structure(structure, len(strokes), require_complete=True)
             except ValueError as exc:
@@ -80,6 +102,10 @@ def main():
     print("\nPri Ink V4 structural corpus audit\n")
     print(f"files: {len(files)}")
     print(f"samples: {total} total · {annotated} annotated · {unannotated} unannotated")
+    print(
+        f"machine drafts: {machine_drafts} total · "
+        f"{reviewed_machine_drafts} human-reviewed"
+    )
     print("writers: " + ", ".join(
         f"{split}={len(writers)}" for split, writers in sorted(split_writers.items())
     ))
@@ -95,7 +121,7 @@ def main():
             print(f"  ... {len(errors)-40} more")
         raise SystemExit(1)
 
-    print("\nPASS — structural labels are complete, trace-addressable and writer-disjoint")
+    print("\nPASS — structural labels are complete, reviewed, trace-addressable and writer-disjoint")
 
 
 if __name__ == "__main__":
