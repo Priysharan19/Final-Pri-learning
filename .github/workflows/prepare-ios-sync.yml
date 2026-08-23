@@ -1,0 +1,62 @@
+name: Prepare iOS Bundle Sync
+
+on:
+  push:
+    branches:
+      - pri-local-ink-v2
+    paths:
+      - 'client/**'
+      - 'scripts/sync-ios.mjs'
+      - '.github/workflows/prepare-ios-sync.yml'
+      - 'package.json'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: prepare-ios-sync-pr31
+  cancel-in-progress: true
+
+jobs:
+  prepare:
+    name: Build exact client and prepare synced bundle commit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: pri-local-ink-v2
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+
+      - name: Install client dependencies
+        run: npm ci --prefix client
+
+      - name: Build exact client
+        run: npm run build
+
+      - name: Synchronize both tracked iPad bundles
+        run: npm run sync:ios
+
+      - name: Verify synchronization before publishing
+        run: npm run check:ios
+
+      - name: Publish generated commit to handoff branch
+        run: |
+          set -euo pipefail
+          git config user.name 'pri-learning-ci'
+          git config user.email 'actions@users.noreply.github.com'
+          git add -- 'ios/PriLearning.swiftpm/Resources/Web' 'ios/PriLearning 2.swiftpm/Resources/Web'
+          if git diff --cached --quiet; then
+            echo 'No generated bundle changes were needed.'
+            git push --force origin HEAD:refs/heads/pri-local-ink-v2-sync-generated
+            exit 0
+          fi
+          git commit -m 'Sync tracked iPad web bundles from exact client build'
+          git push --force origin HEAD:refs/heads/pri-local-ink-v2-sync-generated
+          echo "Prepared generated sync commit $(git rev-parse HEAD)"
