@@ -1,0 +1,62 @@
+name: Branch canonical native sync
+
+on:
+  push:
+    branches: [pri-local-ink-v2]
+    paths:
+      - '.github/workflows/branch-sync-native.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: pri-local-ink-v2
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+
+      - name: Install client dependencies
+        run: npm ci --prefix client
+
+      - name: Regenerate duplicate from canonical package
+        run: |
+          set -euo pipefail
+          rm -rf 'ios/PriLearning 2.swiftpm'
+          cp -R 'ios/PriLearning.swiftpm' 'ios/PriLearning 2.swiftpm'
+
+      - name: Build and sync both native web bundles
+        run: |
+          set -euo pipefail
+          npm run build
+          node scripts/sync-ios.mjs
+          node scripts/check-native-package-sync.mjs
+          node scripts/sync-ios.mjs --check
+
+      - name: Refresh portable SwiftPM archive
+        run: |
+          set -euo pipefail
+          cd ios
+          rm -f PriLearning.swiftpm.zip
+          zip -qr PriLearning.swiftpm.zip PriLearning.swiftpm
+
+      - name: Commit generated native artifacts
+        run: |
+          set -euo pipefail
+          git config user.name 'Pri Learning Build'
+          git config user.email 'actions@users.noreply.github.com'
+          git add 'ios/PriLearning.swiftpm/Resources/Web' 'ios/PriLearning 2.swiftpm' ios/PriLearning.swiftpm.zip
+          if git diff --cached --quiet; then
+            echo 'Native artifacts already current.'
+            exit 0
+          fi
+          git commit -m 'Sync duplicate iPad package and portable archive'
+          git push origin HEAD:pri-local-ink-v2
