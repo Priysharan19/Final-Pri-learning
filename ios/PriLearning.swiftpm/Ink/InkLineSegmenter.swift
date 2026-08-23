@@ -14,11 +14,12 @@
 //     what tap-to-correct and "learn from this correction" need.
 //
 // Grouping is by vertical OVERLAP against a line's core band, not by centre
-// distance. A superscript sits high but still inside its line's band, so it
-// joins; the next line down sits clear of the band even when a descender from
-// the line above reaches into its space, because the band is built from the
-// median top and bottom of the line's full-height glyphs rather than from the
-// union of everything in it.
+// distance. A superscript usually overlaps the top of its carrier line, but
+// real Pencil writing often puts a power completely clear of the x-height.
+// Those detached raised marks are attached in a second, geometry-constrained
+// pass. The pass requires a smaller mark, a full-height carrier immediately to
+// its left, and a tight vertical gap, so a genuine next line is not collapsed
+// into the line above or below it.
 // ─────────────────────────────────────────────────────────────────────────────
 import CoreGraphics
 import Foundation
@@ -54,12 +55,7 @@ enum InkLineSegmenter {
         guard !indexed.isEmpty else { return [] }
 
         let glyphSize = pageGlyphSize(strokes)
-
-        // Reading order first. Grouping left to right means a line's band is
-        // built from its own early glyphs, which is the same evidence a reader
-        // uses when they decide the next mark belongs to the line they are on.
         let ordered = indexed.sorted { $0.element.bounds.minX < $1.element.bounds.minX }
-
         var groups: [[(offset: Int, element: InkStroke)]] = []
 
         for item in ordered {
@@ -73,22 +69,13 @@ enum InkLineSegmenter {
                     - max(strokeRange.lowerBound, band.lowerBound)
                 let reference = min(item.element.bounds.height, band.upperBound - band.lowerBound)
                 let centre = item.element.bounds.midY
-
-                // A dot, a decimal point or a minus sign is far shorter than
-                // the band, and the dot of an 'i' does not touch the band at
-                // all — it floats above it. Requiring overlap for those marks
-                // put "sin(x)" on two lines, the dot on one and the rest on
-                // the other. Small marks are judged on how far from the band
-                // they sit; anything full height is judged on overlap.
                 let smallMark = item.element.bounds.height < 0.35 * glyphSize
                 if smallMark {
                     let above = band.lowerBound - centre
                     let below = centre - band.upperBound
-                    // Reaching further up than down: dots and powers live
-                    // above the band, and only commas hang below it.
                     guard above <= 0.95 * glyphSize, below <= 0.45 * glyphSize else { continue }
                     let distance = max(0, max(above, below))
-                    let score = glyphSize - distance      // nearer band wins
+                    let score = glyphSize - distance
                     if score > bestOverlap { bestOverlap = score; bestGroup = index }
                     continue
                 }
@@ -108,6 +95,8 @@ enum InkLineSegmenter {
         }
 
         groups = mergeOverlappingGroups(groups, glyphSize: glyphSize)
+        groups = attachRaisedSatellites(groups, glyphSize: glyphSize)
+        groups = mergeOverlappingGroups(groups, glyphSize: glyphSize)
 
         return groups
             .map { group -> InkLine in
@@ -124,11 +113,6 @@ enum InkLineSegmenter {
             .sorted { $0.band.lowerBound < $1.band.lowerBound }
     }
 
-    // MARK: - Helpers
-
-    /// The vertical band a line's ordinary glyphs occupy. Built from the median
-    /// top and median bottom of full-height members so one descender or one
-    /// superscript cannot stretch the line's claim over its neighbours.
     private static func coreBand(of strokes: [InkStroke], glyphSize: CGFloat) -> ClosedRange<CGFloat> {
         let tall = strokes.filter { $0.bounds.height >= 0.45 * glyphSize }
         let sample = tall.isEmpty ? strokes : tall
@@ -150,10 +134,67 @@ enum InkLineSegmenter {
         strokes.dropFirst().reduce(strokes.first?.bounds ?? .zero) { $0.union($1.bounds) }
     }
 
-    /// Left-to-right grouping can open a second line for ink that belongs to
-    /// one already open — a lone superscript written before the rest of its
-    /// line catches up, say. Bands that substantially share space are the same
-    /// line, so they are folded together once every stroke has been placed.
+    private static func attachRaisedSatellites(
+        _ groups: [[(offset: Int, element: InkStroke)]],
+        glyphSize: CGFloat
+    ) -> [[(offset: Int, element: InkStroke)]] {
+        guard groups.count > 1 else { return groups }
+        var result = groups
+        var changed = true
+
+        while changed {
+            changed = false
+            outer: for satelliteIndex in result.indices {
+                let satelliteStrokes = result[satelliteIndex].map(\.element)
+                guard !satelliteStrokes.isEmpty, satelliteStrokes.count <= 4 else { continue }
+                let satellite = union(of: satelliteStrokes)
+
+                var bestTarget: Int?
+                var bestScore = CGFloat.greatestFiniteMagnitude
+
+                for targetIndex in result.indices where targetIndex != satelliteIndex {
+                    let targetStrokes = result[targetIndex].map(\.element)
+                    guard !targetStrokes.isEmpty else { continue }
+                    let band = coreBand(of: targetStrokes, glyphSize: glyphSize)
+                    let bandHeight = max(1, band.upperBound - band.lowerBound)
+                    let targetHeight = max(bandHeight, lineGlyphHeight(targetStrokes, pageSize: glyphSize))
+                    let satelliteExtent = max(satellite.width, satellite.height)
+                    guard satelliteExtent <= 0.88 * targetHeight else { continue }
+
+                    let clearAbove = band.lowerBound - satellite.maxY
+                    guard clearAbove <= 0.72 * targetHeight else { continue }
+                    guard satellite.midY < band.lowerBound + 0.34 * targetHeight else { continue }
+                    guard satellite.maxY < band.lowerBound + 0.68 * targetHeight else { continue }
+
+                    var carrierGap = CGFloat.greatestFiniteMagnitude
+                    for stroke in targetStrokes {
+                        let box = stroke.bounds
+                        guard box.height >= 0.42 * targetHeight else { continue }
+                        let dx = satellite.minX - box.maxX
+                        guard dx >= -0.22 * targetHeight, dx <= 0.72 * targetHeight else { continue }
+                        guard satellite.midX >= box.midX - 0.05 * targetHeight else { continue }
+                        carrierGap = min(carrierGap, max(0, dx))
+                    }
+                    guard carrierGap.isFinite else { continue }
+
+                    let score = carrierGap + 0.8 * max(0, clearAbove)
+                    if score < bestScore {
+                        bestScore = score
+                        bestTarget = targetIndex
+                    }
+                }
+
+                guard let targetIndex = bestTarget else { continue }
+                result[targetIndex].append(contentsOf: result[satelliteIndex])
+                result.remove(at: satelliteIndex)
+                changed = true
+                break outer
+            }
+        }
+
+        return result
+    }
+
     private static func mergeOverlappingGroups(
         _ groups: [[(offset: Int, element: InkStroke)]],
         glyphSize: CGFloat
