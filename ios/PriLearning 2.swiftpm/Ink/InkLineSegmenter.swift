@@ -164,6 +164,10 @@ enum InkLineSegmenter {
                     let targetHeight = max(bandHeight, lineGlyphHeight(targetStrokes, pageSize: glyphSize))
                     let satelliteExtent = max(satellite.width, satellite.height)
 
+                    // Real Pencil powers are often almost body-height (especially
+                    // handwritten 2/3/4). Size alone is not our safety gate: the
+                    // strong raised-position + nearby-left-carrier constraints
+                    // below distinguish a superscript from genuine next working.
                     guard satelliteExtent <= 1.15 * targetHeight else { continue }
 
                     let clearAbove = band.lowerBound - satellite.maxY
@@ -200,6 +204,14 @@ enum InkLineSegmenter {
         return result
     }
 
+    /// Attach compact marks that are part of a two-dimensional maths construct
+    /// but are not necessarily superscripts: integral limits, evaluation bounds,
+    /// and similar small annotations immediately above/below a body line.
+    ///
+    /// Geometry alone is dangerous because consecutive working lines often start
+    /// at the same x. Therefore a candidate must also be close in original Pencil
+    /// stroke order to a member of the target line. This is deliberately not a
+    /// time threshold: PKStrokePoint.timeOffset restarts for every stroke.
     private static func attachCompactMathSatellites(
         _ groups: [[(offset: Int, element: InkStroke)]],
         glyphSize: CGFloat
@@ -230,6 +242,9 @@ enum InkLineSegmenter {
                     let targetHeight = max(bandHeight, lineGlyphHeight(targetStrokes, pageSize: glyphSize))
                     let satelliteExtent = max(satellite.width, satellite.height)
 
+                    // A body line should be materially richer than a detached
+                    // annotation. This prevents one short answer line such as
+                    // "2" from being absorbed into its neighbour.
                     let substantialTarget = targetStrokes.count >= 3
                         || targetBounds.width >= 2.0 * targetHeight
                         || targetBounds.height >= 1.45 * targetHeight
@@ -247,10 +262,14 @@ enum InkLineSegmenter {
                     ))
                     guard horizontalGap <= 0.72 * targetHeight else { continue }
 
+                    // Integral limits and evaluation bounds normally live within
+                    // (or just beside) the x-span of their owning expression.
                     let inExpandedSpan = satellite.midX >= targetBounds.minX - 0.38 * targetHeight
                         && satellite.midX <= targetBounds.maxX + 0.38 * targetHeight
                     guard inExpandedSpan else { continue }
 
+                    // Preserve the temporal ordering signal already present in
+                    // the drawing: array offsets are PKDrawing stroke order.
                     var orderGap = Int.max
                     for s in satelliteGroup {
                         for t in targetGroup {
@@ -259,6 +278,9 @@ enum InkLineSegmenter {
                     }
                     guard orderGap <= 6 else { continue }
 
+                    // The satellite must actually sit away from the body's centre
+                    // band. If it is a normal baseline-sized fragment, leave the
+                    // ordinary line grouping to decide its ownership.
                     let displaced = satellite.midY < band.lowerBound + 0.30 * targetHeight
                         || satellite.midY > band.upperBound - 0.18 * targetHeight
                     guard displaced else { continue }
