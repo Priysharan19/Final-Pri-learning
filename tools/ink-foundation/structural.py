@@ -1,11 +1,11 @@
 """Pri Ink V4 structural handwriting model (research path).
 
 V4 does not replace the promoted V3 runtime until it wins the locked real-writer
-benchmark.  It changes the recognition abstraction from flat OCR to:
+benchmark. It changes the recognition abstraction from flat OCR to:
 
     points -> physical strokes -> symbol evidence -> spatial relations -> maths graph
 
-The module is intentionally Core-ML-independent for now.  It is trained and
+The module is intentionally Core-ML-independent for now. It is trained and
 benchmarked beside V3; promotion requires separate export/runtime work after the
 writer-disjoint evidence gate passes.
 """
@@ -90,30 +90,40 @@ class PointToStrokeEncoder(nn.Module):
         if f != self.cfg.feature_dim:
             raise ValueError(f"expected feature_dim={self.cfg.feature_dim}, got {f}")
 
-        flat = points.reshape(b * s, p, f)
-        valid = point_valid.reshape(b * s, p).clone()
+        flat_points = points.reshape(b * s, p, f)
+        flat_valid = point_valid.reshape(b * s, p)
         active = stroke_valid.reshape(b * s)
+        active_idx = active.nonzero(as_tuple=False).flatten()
+        out = points.new_zeros((b * s, self.cfg.d_model))
+        if active_idx.numel() == 0:
+            return out.reshape(b, s, self.cfg.d_model)
 
-        # PyTorch attention cannot consume an entirely masked row.  Padded stroke
-        # slots get one harmless zero token, then are zeroed again after pooling.
+        # Encode only real physical strokes. Padding slots can dominate compute
+        # when max_strokes is generous, especially on iPad-sized expressions.
+        selected_points = flat_points.index_select(0, active_idx)
+        valid = flat_valid.index_select(0, active_idx).clone()
         empty = ~valid.any(dim=1)
-        valid[empty, 0] = True
+        if bool(empty.any()):
+            valid[empty, 0] = True
 
         pos = torch.arange(p, device=points.device)
-        x = self.point_proj(flat) + self.point_pos(pos)[None, :, :]
+        x = self.point_proj(selected_points) + self.point_pos(pos)[None, :, :]
         x = self.encoder(x, src_key_padding_mask=~valid)
         weight = valid.to(x.dtype).unsqueeze(-1)
         pooled = (x * weight).sum(dim=1) / weight.sum(dim=1).clamp_min(1.0)
-        pooled = pooled * active.to(pooled.dtype).unsqueeze(-1)
-        return pooled.reshape(b, s, self.cfg.d_model)
+        out.index_copy_(0, active_idx, pooled)
+        return out.reshape(b, s, self.cfg.d_model)
 
 
 class PairwiseStructureHead(nn.Module):
-    """Predict stroke grouping and directed spatial/mathematical relations."""
+    """Predict same-glyph grouping and directed mathematical spatial relations."""
 
     def __init__(self, d_model: int, relation_classes: int):
         super().__init__()
-        pair_dim = d_model * 4
+        pair_embed = max(64, d_model // 2)
+        self.left_proj = nn.Linear(d_model, pair_embed)
+        self.right_proj = nn.Linear(d_model, pair_embed)
+        pair_dim = pair_embed * 4 + 8
         hidden = max(128, d_model)
         self.shared = nn.Sequential(
             nn.Linear(pair_dim, hidden),
@@ -123,13 +133,51 @@ class PairwiseStructureHead(nn.Module):
         self.group = nn.Linear(hidden, 1)
         self.relation = nn.Linear(hidden, relation_classes)
 
-    def forward(self, strokes: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
-        # Pair representation keeps both order and symmetric similarity evidence.
-        left = strokes[:, :, None, :]
-        right = strokes[:, None, :, :]
-        left = left.expand(-1, -1, strokes.shape[1], -1)
-        right = right.expand(-1, strokes.shape[1], -1, -1)
-        pair = torch.cat([left, right, left - right, left * right], dim=-1)
+    @staticmethod
+    def _pair_geometry(geometry: torch.Tensor) -> torch.Tensor:
+        # geometry channels: cx, cy, width, height, aspect, length, density, order
+        left = geometry[:, :, None, :]
+        right = geometry[:, None, :, :]
+        dx = right[..., 0] - left[..., 0]
+        dy = right[..., 1] - left[..., 1]
+        eps = 1e-4
+        log_w_ratio = torch.log((right[..., 2] + eps) / (left[..., 2] + eps))
+        log_h_ratio = torch.log((right[..., 3] + eps) / (left[..., 3] + eps))
+
+        left_x1 = left[..., 0] - left[..., 2] * 0.5
+        left_x2 = left[..., 0] + left[..., 2] * 0.5
+        right_x1 = right[..., 0] - right[..., 2] * 0.5
+        right_x2 = right[..., 0] + right[..., 2] * 0.5
+        overlap_x = torch.minimum(left_x2, right_x2) - torch.maximum(left_x1, right_x1)
+        overlap_x = overlap_x / torch.minimum(left[..., 2], right[..., 2]).clamp_min(eps)
+
+        left_y1 = left[..., 1] - left[..., 3] * 0.5
+        left_y2 = left[..., 1] + left[..., 3] * 0.5
+        right_y1 = right[..., 1] - right[..., 3] * 0.5
+        right_y2 = right[..., 1] + right[..., 3] * 0.5
+        overlap_y = torch.minimum(left_y2, right_y2) - torch.maximum(left_y1, right_y1)
+        overlap_y = overlap_y / torch.minimum(left[..., 3], right[..., 3]).clamp_min(eps)
+
+        order_delta = right[..., 7] - left[..., 7]
+        distance = torch.sqrt(dx.square() + dy.square() + eps)
+        return torch.stack([
+            dx, dy,
+            log_w_ratio.clamp(-4.0, 4.0),
+            log_h_ratio.clamp(-4.0, 4.0),
+            overlap_x.clamp(-2.0, 2.0),
+            overlap_y.clamp(-2.0, 2.0),
+            order_delta,
+            distance.clamp(0.0, 4.0),
+        ], dim=-1)
+
+    def forward(self, strokes: torch.Tensor,
+                geometry: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        l = self.left_proj(strokes)
+        r = self.right_proj(strokes)
+        left = l[:, :, None, :].expand(-1, -1, strokes.shape[1], -1)
+        right = r[:, None, :, :].expand(-1, strokes.shape[1], -1, -1)
+        pair_geo = self._pair_geometry(geometry)
+        pair = torch.cat([left, right, left - right, left * right, pair_geo], dim=-1)
         h = self.shared(pair)
         return self.group(h).squeeze(-1), self.relation(h)
 
@@ -137,7 +185,7 @@ class PairwiseStructureHead(nn.Module):
 class PriInkStructuralV4(nn.Module):
     """Hierarchical multimodal encoder with explicit grouping/relation heads.
 
-    Symbol logits are per physical stroke.  During decoding, high-probability
+    Symbol logits are per physical stroke. During decoding, high-probability
     group edges form glyph components; member-stroke symbol evidence is pooled
     before the structural parser resolves superscripts, fractions, roots, etc.
     This makes trace-to-symbol attribution observable rather than hidden inside a
@@ -169,7 +217,7 @@ class PriInkStructuralV4(nn.Module):
             layer, cfg.stroke_layers, norm=nn.LayerNorm(cfg.d_model)
         )
 
-        # Reuse V3's 2-D-preserving raster encoder.  Cross-attention allows each
+        # Reuse V3's 2-D-preserving raster encoder. Cross-attention allows each
         # physical stroke to query whole-expression visual evidence while the 2-D
         # row/column positions remain intact.
         self.raster_encoder = RasterEncoder(cfg.d_model)
@@ -188,7 +236,7 @@ class PriInkStructuralV4(nn.Module):
     def encode(self, stroke_points: torch.Tensor, stroke_point_valid: torch.Tensor,
                stroke_valid: torch.Tensor, stroke_geometry: torch.Tensor,
                raster: torch.Tensor) -> torch.Tensor:
-        b, s, _, _ = stroke_points.shape
+        _, s, _, _ = stroke_points.shape
         local = self.local_stroke(stroke_points, stroke_point_valid, stroke_valid)
         pos = torch.arange(s, device=stroke_points.device)
         x = local + self.geometry(stroke_geometry) + self.stroke_pos(pos)[None, :, :]
@@ -206,11 +254,9 @@ class PriInkStructuralV4(nn.Module):
             stroke_points, stroke_point_valid, stroke_valid, stroke_geometry, raster
         )
         symbol_logits = self.symbol_head(strokes)
-        group_logits, relation_logits = self.structure_head(strokes)
+        group_logits, relation_logits = self.structure_head(strokes, stroke_geometry)
 
         pair_valid = stroke_valid[:, :, None] & stroke_valid[:, None, :]
-        # Invalid pair slots are strongly suppressed for grouping. Relation loss
-        # uses an explicit ignore mask in the training code.
         group_logits = group_logits.masked_fill(~pair_valid, -30.0)
         return {
             "stroke_embeddings": strokes,
