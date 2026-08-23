@@ -18,8 +18,8 @@
 //
 // Do not derive this policy from "have we seen a Pencil yet". On modern iPadOS
 // Pencil hover / hit-testing can produce UIEvents whose allTouches collection is
-// temporarily empty. A stateful pencilSeen gate can therefore reject the next
-// real Pencil contact even though the UI still looks enabled.
+// temporarily empty. A stateful "Pencil observed" gate can therefore reject the
+// next real Pencil contact even though the UI still looks enabled.
 // ─────────────────────────────────────────────────────────────────────────────
 import PencilKit
 import UIKit
