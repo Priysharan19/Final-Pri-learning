@@ -1,0 +1,60 @@
+name: Ink Foundation
+
+on:
+  push:
+    paths:
+      - 'tools/ink-foundation/**'
+      - '.github/workflows/ink-foundation.yml'
+  pull_request:
+    paths:
+      - 'tools/ink-foundation/**'
+      - '.github/workflows/ink-foundation.yml'
+
+concurrency:
+  group: ink-foundation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tooling:
+    name: Model tooling contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Python syntax
+        run: |
+          python -m py_compile \
+            tools/ink-foundation/model.py \
+            tools/ink-foundation/data.py \
+            tools/ink-foundation/train.py \
+            tools/ink-foundation/evaluate_release.py \
+            tools/ink-foundation/export_coreml.py
+
+      - name: Synthetic generator syntax
+        run: node --check tools/ink-foundation/generate_synthetic.mjs
+
+      - name: Evidence gates remain wired
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          release = Path('tools/ink-foundation/evaluate_release.py').read_text()
+          export = Path('tools/ink-foundation/export_coreml.py').read_text()
+          runtime = Path('ios/PriLearning.swiftpm/Ink/InkFoundationRuntime.swift').read_text()
+          required = {
+              'release evaluator checks final holdout': 'final-holdout' in release and 'passesReleaseTargets' in release,
+              'export verifies checkpoint hash': 'checkpointSha256' in export and 'sha256(checkpoint)' in export,
+              'export writes promotion metadata': 'pri.productionReady' in export,
+              'runtime enforces promotion metadata': 'pri.productionReady' in runtime,
+          }
+          bad = [name for name, ok in required.items() if not ok]
+          if bad:
+              raise SystemExit('foundation evidence contract broken: ' + ', '.join(bad))
+          print('foundation evidence contract: PASS')
+          PY
