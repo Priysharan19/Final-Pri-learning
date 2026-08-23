@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Export a Pri Ink Foundation checkpoint to Core ML.
+"""Export a Pri Ink Foundation V3 checkpoint to Core ML.
 
 Development export is allowed for any compatible checkpoint, but it is marked
 `pri.productionReady=false`. A release export requires the locked final-holdout
@@ -8,12 +8,11 @@ must pass the production handwriting standard.
 
 The normal PyTorch Transformer modules are ideal for training, but their
 MultiheadAttention implementation traces through version-dependent helper code
-(`int`, fast-path dispatch, nested-tensor decisions) that Core ML does not need
-and, on some PyTorch/coremltools combinations, cannot lower reliably. Export
-therefore reconstructs the exact EVAL computation with explicit linear ->
-matmul -> softmax -> matmul attention. The checkpoint weights are copied without
-retraining, and the explicit graph is numerically compared with the training
-model before conversion.
+that Core ML does not need and can fail to lower reliably. Export therefore
+reconstructs the exact EVAL computation with explicit linear -> matmul ->
+softmax -> matmul attention. Checkpoint weights are copied without retraining,
+and the explicit graph is numerically compared with the training model before
+conversion.
 """
 from __future__ import annotations
 
@@ -37,12 +36,7 @@ def _frozen_parameter(t: torch.Tensor) -> nn.Parameter:
 
 
 class ExplicitAttention(nn.Module):
-    """Core ML-friendly equivalent of eval-mode nn.MultiheadAttention.
-
-    Pri Ink uses fixed batch-1 tensors at runtime, so the query/key lengths are
-    known at export time. Keeping those dimensions explicit also removes shape
-    -> Python-int casts from the traced graph.
-    """
+    """Core ML-friendly equivalent of eval-mode nn.MultiheadAttention."""
 
     def __init__(self, source: nn.MultiheadAttention, q_len: int, kv_len: int):
         super().__init__()
@@ -92,7 +86,6 @@ class ExplicitAttention(nn.Module):
 
         scores = torch.matmul(q, k.transpose(-2, -1)) * self.scale
         if key_valid_f32 is not None:
-            # FP16-safe finite masking. 1 = valid, 0 = padding.
             penalty = (1.0 - key_valid_f32).unsqueeze(1).unsqueeze(1) * -10000.0
             scores = scores + penalty
         probs = torch.softmax(scores, dim=-1)
@@ -160,8 +153,6 @@ class CoreMLFriendlyFoundation(nn.Module):
         self.style_encoder = copy.deepcopy(source.style_encoder)
         self.fusion_norm = copy.deepcopy(source.fusion_norm)
 
-        # Determine the visual token count once in Python; it never becomes a
-        # traced shape-cast operation.
         with torch.no_grad():
             probe = torch.zeros(1, 1, cfg.raster_height, cfg.raster_width)
             visual_tokens = int(self.raster_encoder(probe).shape[1])
@@ -175,7 +166,6 @@ class CoreMLFriendlyFoundation(nn.Module):
         ])
         self.encoder_norm = copy.deepcopy(source.stroke_encoder.norm)
 
-        # The original decoder always consumes all learned output slots.
         self.output_query_weight = _frozen_parameter(source.output_queries.weight)
         self.output_pos_weight = _frozen_parameter(source.output_pos.weight)
         self.decoder_layers = nn.ModuleList([
@@ -195,12 +185,16 @@ class CoreMLFriendlyFoundation(nn.Module):
         if self.encoder_norm is not None:
             stroke = self.encoder_norm(stroke)
 
+        # Must mirror model.py exactly: style is cross-modal and is computed from
+        # unconditioned stroke + 2-D visual tokens, then fed back to both paths.
+        visual_base = self.raster_encoder(raster) + self.raster_modality
         weights = valid.unsqueeze(-1)
-        pooled = (stroke * weights).sum(dim=1) / weights.sum(dim=1).clamp_min(1.0)
-        style = self.style_encoder(pooled)
-        stroke = stroke + style.unsqueeze(1)
+        pooled_stroke = (stroke * weights).sum(dim=1) / weights.sum(dim=1).clamp_min(1.0)
+        pooled_visual = visual_base.mean(dim=1)
+        style = self.style_encoder(torch.cat((pooled_stroke, pooled_visual), dim=-1))
 
-        visual = self.raster_encoder(raster) + self.raster_modality + style.unsqueeze(1)
+        stroke = stroke + style.unsqueeze(1)
+        visual = visual_base + style.unsqueeze(1)
         memory = self.fusion_norm(torch.cat((stroke, visual), dim=1))
         memory_valid = torch.cat((valid, self.visual_valid.to(valid.dtype)), dim=1)
 
@@ -214,7 +208,8 @@ class CoreMLFriendlyFoundation(nn.Module):
 
 class NativeWrapper(nn.Module):
     def __init__(self, model: PriInkFoundation):
-        super().__init__(); self.model = model
+        super().__init__()
+        self.model = model
 
     def forward(self, points, point_valid_f32, raster):
         logits, _ = self.model(points, point_valid_f32 > 0.5, raster)
@@ -355,11 +350,12 @@ def main():
         compute_precision=ct.precision.FLOAT16,
     )
     mlmodel.author = "Pri Learning"
-    mlmodel.short_description = "Pri Learning multimodal Apple Pencil maths recogniser"
-    mlmodel.version = "2"
+    mlmodel.short_description = "Pri Learning V3 multimodal Apple Pencil maths recogniser"
+    mlmodel.version = "3"
     meta = mlmodel.user_defined_metadata
-    meta["pri.model"] = "ink-foundation-v2"
-    meta["pri.decoder"] = "parallel-output-queries"
+    meta["pri.model"] = "ink-foundation-v3"
+    meta["pri.architectureVersion"] = str(cfg.architecture_version)
+    meta["pri.decoder"] = "parallel-output-queries+2d-visual+cross-modal-style"
     meta["pri.vocab"] = "|".join(ckpt["vocab"])
     meta["pri.pad"] = str(ckpt["pad_id"])
     meta["pri.bos"] = str(ckpt["bos_id"])
