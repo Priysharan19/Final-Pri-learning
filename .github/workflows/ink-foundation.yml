@@ -4,10 +4,12 @@ on:
   push:
     paths:
       - 'tools/ink-foundation/**'
+      - 'handwriting/v12/**'
       - '.github/workflows/ink-foundation.yml'
   pull_request:
     paths:
       - 'tools/ink-foundation/**'
+      - 'handwriting/v12/**'
       - '.github/workflows/ink-foundation.yml'
 
 concurrency:
