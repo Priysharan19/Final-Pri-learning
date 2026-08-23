@@ -5,6 +5,8 @@ on:
     paths:
       - 'tools/ink-foundation/structural_joint_decode.py'
       - 'tools/ink-foundation/test_structural_joint_decode.py'
+      - 'tools/ink-foundation/structural_joint_general.py'
+      - 'tools/ink-foundation/test_structural_joint_general.py'
       - 'tools/ink-foundation/compare_structural_decoders.py'
       - 'tools/ink-foundation/evaluate_structural.py'
       - 'tools/ink-foundation/evaluate_structural_dev.py'
@@ -13,6 +15,8 @@ on:
     paths:
       - 'tools/ink-foundation/structural_joint_decode.py'
       - 'tools/ink-foundation/test_structural_joint_decode.py'
+      - 'tools/ink-foundation/structural_joint_general.py'
+      - 'tools/ink-foundation/test_structural_joint_general.py'
       - 'tools/ink-foundation/compare_structural_decoders.py'
       - 'tools/ink-foundation/evaluate_structural.py'
       - 'tools/ink-foundation/evaluate_structural_dev.py'
@@ -44,12 +48,17 @@ jobs:
           python -m py_compile \
             tools/ink-foundation/structural_joint_decode.py \
             tools/ink-foundation/test_structural_joint_decode.py \
+            tools/ink-foundation/structural_joint_general.py \
+            tools/ink-foundation/test_structural_joint_general.py \
             tools/ink-foundation/compare_structural_decoders.py \
             tools/ink-foundation/evaluate_structural.py \
             tools/ink-foundation/evaluate_structural_dev.py
 
-      - name: Joint decoder deterministic regression contracts
+      - name: Contiguous joint decoder deterministic contracts
         run: python tools/ink-foundation/test_structural_joint_decode.py
+
+      - name: Non-contiguous exact joint decoder deterministic contracts
+        run: python tools/ink-foundation/test_structural_joint_general.py
 
       - name: Evaluator exposes explicit baseline and joint modes
         run: |
@@ -111,9 +120,11 @@ jobs:
           python - <<'PY'
           from pathlib import Path
           decoder = Path('tools/ink-foundation/structural_joint_decode.py').read_text()
+          general = Path('tools/ink-foundation/structural_joint_general.py').read_text()
           evaluator = Path('tools/ink-foundation/evaluate_structural.py').read_text()
           comparator = Path('tools/ink-foundation/compare_structural_decoders.py').read_text()
           assert 'research path' in decoder.lower()
+          assert 'research infrastructure only' in general.lower()
           assert 'productionReady": False' in evaluator
           assert 'final-holdout is locked' in evaluator
           assert 'does not promote a V4 model' in evaluator
