@@ -7,10 +7,9 @@
 // so a sibling's loopy 2s never bleed into your model.
 //
 // A local development build may additionally contain
-// `ink-bootstrap-profile.json`, generated from a consenting real-Pencil corpus
-// by `npm run ink:personalize`. That file is gitignored and never persisted back
-// to the database; it exists only to make the iPad test build use the writer's
-// already-collected real shapes instead of pretending those samples do not exist.
+// `ink-bootstrap-profile.js`, generated from a consenting real-Pencil corpus by
+// `npm run ink:personalize`. The file is gitignored and loaded as a local script
+// resource — never through fetch/XHR and never persisted back to IndexedDB.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const DB_NAME = 'pri-ink-personal';
@@ -21,6 +20,7 @@ let bank = [];
 let loaded = false;
 let loading = null;
 let activePid = null;
+let bootstrapLoading = null;
 
 const currentPid = () => {
   try { return typeof localStorage !== 'undefined' ? localStorage.getItem('pri-current-profile') : null; }
@@ -59,21 +59,33 @@ export function normalizeStrokes(strokesRaw) {
   ]));
 }
 
-async function loadBootstrapProfile() {
-  if (typeof document === 'undefined' || typeof fetch !== 'function') return [];
+function bootstrapPayload() {
   try {
-    const url = new URL('ink-bootstrap-profile.json', document.baseURI).toString();
-    const response = await fetch(url, { cache: 'no-store' });
-    if (!response.ok) return [];
-    const data = await response.json();
+    const data = globalThis.__PRI_INK_BOOTSTRAP__;
     if (data?.format !== 'pri-ink-personal-bootstrap' || Number(data.version) !== 1 || !Array.isArray(data.templates)) return [];
     return data.templates
       .filter(t => typeof t?.sym === 'string' && Array.isArray(t.strokes) && t.strokes.length)
       .slice(0, 320)
-      .map(t => ({ sym: t.sym, strokes: t.strokes, src: t.src || `bootstrap:${data.writer || 'local'}` }));
+      .map(t => ({ sym: t.sym, strokes: t.strokes, src: t.src || `real-corpus:${data.writer || 'local'}` }));
   } catch {
     return [];
   }
+}
+
+async function loadBootstrapProfile() {
+  const existing = bootstrapPayload();
+  if (existing.length || typeof document === 'undefined') return existing;
+  if (bootstrapLoading) return bootstrapLoading;
+
+  bootstrapLoading = new Promise(resolve => {
+    const script = document.createElement('script');
+    script.async = true;
+    script.src = new URL('ink-bootstrap-profile.js', document.baseURI).toString();
+    script.onload = () => { script.remove(); resolve(bootstrapPayload()); };
+    script.onerror = () => { script.remove(); resolve([]); };
+    (document.head || document.documentElement).appendChild(script);
+  }).finally(() => { bootstrapLoading = null; });
+  return bootstrapLoading;
 }
 
 export function setPersonalProfile(pid) {
@@ -111,9 +123,9 @@ export function ensurePersonalLoaded() {
       const mine = activePid ? rows.filter(r => r.pid === activePid || r.pid == null) : rows;
       bank = mine.map(r => ({ sym: r.sym, strokes: r.strokes, src: r.src }));
 
-      // Local bootstrap evidence is intentionally MEMORY-ONLY. It is generated
-      // from a corpus that already carries consent/provenance and should not be
-      // copied into a profile database or synced anywhere by this module.
+      // Local corpus evidence is MEMORY-ONLY. It is generated from data that
+      // already carries consent/provenance, and this module never writes it to
+      // the profile database or any network destination.
       const bootstrap = await loadBootstrapProfile();
       if (bootstrap.length) {
         const seen = new Set(bank.map(b => `${b.sym}|${JSON.stringify(b.strokes)}`));
@@ -168,9 +180,6 @@ export async function addPersonal(sym, strokesRaw, src = 'correction') {
 }
 
 export async function clearPersonal() {
-  // Local corpus bootstrap templates will return on the next load because they
-  // are build evidence, not profile DB rows. This clears only learned profile
-  // corrections/calibration persisted in IndexedDB.
   bank = bank.filter(b => b.src?.startsWith?.('real-corpus:'));
   const pid = activePid ?? currentPid();
   try {
