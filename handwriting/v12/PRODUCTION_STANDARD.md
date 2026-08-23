@@ -18,6 +18,7 @@ A high character score cannot compensate for a structural error. `x^3` becoming 
 - Question context may break a genuine near-tie but may never pull wrong work toward the expected answer.
 - Ambiguous recognition is not auto-marked; the product asks for confirmation.
 - Training, validation, test and final-holdout writers are disjoint.
+- The real-Pencil collector's displayed prompts and stored targets are contract-tested before collection; a ground-truth typo is a release-blocking data defect.
 
 ## Gate A — deterministic native pipeline
 
@@ -76,7 +77,7 @@ On supported iPad hardware:
 
 ## CI enforcement
 
-Changes under `handwriting/v12/` intentionally trigger both the native-iPad gate and the Ink Foundation model-tooling gate. A release-standard change therefore exercises the Swift package/build/bridge/native benchmark and a real one-epoch neural training smoke test on the same PR head. General application CI separately gates the deterministic recogniser suites, browser flows, build and iOS web-bundle synchronization.
+Changes under `handwriting/v12/` intentionally trigger both the native-iPad gate and the Ink Foundation model-tooling gate. A release-standard change therefore exercises the Swift package/build/bridge/native benchmark and a real one-epoch neural training smoke test on the same PR head. General application CI separately gates the deterministic recogniser suites, collector ground-truth/provenance contract, browser flows, build and iOS web-bundle synchronization.
 
 No gate may be lowered to obtain a green build. If a model or recogniser regresses, fix the system or collect better evidence.
 
