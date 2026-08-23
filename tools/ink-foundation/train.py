@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Train Pri Learning's locally owned multimodal handwriting model."""
+"""Train Pri Learning's locally owned multimodal handwriting model.
+
+Two intended stages:
+  pretrain  — synthetic whole-expression writers; initialization only.
+  finetune  — real, writer-separated Pencil corpus; model-selection evidence.
+"""
 from __future__ import annotations
 
 import argparse
@@ -31,16 +36,6 @@ def edit_distance(a: str, b: str) -> int:
             cur.append(min(cur[-1] + 1, prev[j] + 1, prev[j - 1] + (ca != cb)))
         prev = cur
     return prev[-1]
-
-
-@torch.no_grad()
-def predict_batch(model, batch, device) -> list[str]:
-    logits, _ = model(
-        batch["points"].to(device), batch["point_valid"].to(device),
-        batch["raster"].to(device),
-    )
-    ids = logits.argmax(-1).cpu()
-    return [decode(row.tolist()) for row in ids]
 
 
 @torch.no_grad()
@@ -82,10 +77,46 @@ def evaluate(model, loader, device, decode_limit: int = 512):
     }
 
 
+def load_initial_backbone(model: PriInkFoundation, path: str):
+    """Load a pretraining checkpoint without importing its writer-ID head.
+
+    The real corpus contains different people, so the classifier head is meant
+    to be re-created. Every other tensor must match exactly; silently accepting
+    a mostly incompatible checkpoint would make `--init` ceremonial rather than
+    actual transfer learning.
+    """
+    ckpt = torch.load(path, map_location="cpu", weights_only=False)
+    prior_vocab = ckpt.get("vocab")
+    if prior_vocab != VOCAB:
+        raise SystemExit("--init checkpoint uses a different token vocabulary")
+    current = model.state_dict()
+    incoming = ckpt.get("model") or {}
+    usable = {}
+    required = [k for k in current if not k.startswith("writer_head.")]
+    mismatched = []
+    for key in required:
+        value = incoming.get(key)
+        if value is None or tuple(value.shape) != tuple(current[key].shape):
+            mismatched.append(key)
+        else:
+            usable[key] = value
+    if mismatched:
+        preview = ", ".join(mismatched[:8])
+        raise SystemExit(f"--init architecture mismatch in {len(mismatched)} backbone tensors: {preview}")
+    missing, unexpected = model.load_state_dict(usable, strict=False)
+    bad_missing = [k for k in missing if not k.startswith("writer_head.")]
+    bad_unexpected = [k for k in unexpected if not k.startswith("writer_head.")]
+    if bad_missing or bad_unexpected:
+        raise SystemExit(f"--init did not load cleanly: missing={bad_missing[:5]} unexpected={bad_unexpected[:5]}")
+    return ckpt
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--corpus", default="client/test/ink-corpus")
     p.add_argument("--out", default="tools/ink-foundation/runs/pri-ink-foundation.pt")
+    p.add_argument("--init", default=None, help="compatible pretraining checkpoint to fine-tune")
+    p.add_argument("--stage", choices=["pretrain", "finetune"], default="finetune")
     p.add_argument("--epochs", type=int, default=80)
     p.add_argument("--batch", type=int, default=16)
     p.add_argument("--lr", type=float, default=2e-4)
@@ -102,6 +133,9 @@ def main():
     p.add_argument("--patience", type=int, default=12)
     args = p.parse_args()
 
+    if args.stage == "pretrain" and args.init:
+        raise SystemExit("pretrain starts from scratch; --init belongs to real-writer fine-tuning")
+
     seed_everything(args.seed)
     if args.device == "auto":
         device = torch.device(
@@ -114,14 +148,11 @@ def main():
     files = corpus_files(args.corpus)
     examples = load_examples(files)
     if not examples:
-        raise SystemExit(f"No v2 real-ink samples found under {args.corpus!r}")
+        raise SystemExit(f"No v2 ink samples found under {args.corpus!r}")
     counts = {s: sum(x.split == s for x in examples) for s in {x.split for x in examples}}
     if counts.get("train", 0) < 1 or counts.get("validation", 0) < 1:
         raise SystemExit("Need writer-separated train and validation samples before training.")
 
-    # Train writers are numbered first. The writer classifier therefore has no
-    # dependency on validation/test identities; held-out writer IDs are used only
-    # for grouping reliability metrics.
     train_writers = sorted({x.writer for x in examples if x.split == "train"})
     heldout_writers = sorted({x.writer for x in examples if x.writer not in set(train_writers)})
     writers = train_writers + heldout_writers
@@ -141,7 +172,12 @@ def main():
     val_loader = DataLoader(val_ds, batch_size=args.batch, shuffle=False,
                             num_workers=args.workers, pin_memory=device.type == "cuda")
 
-    model = PriInkFoundation(len(VOCAB), PAD_ID, cfg, writer_classes=len(train_writers)).to(device)
+    model = PriInkFoundation(len(VOCAB), PAD_ID, cfg, writer_classes=len(train_writers))
+    init_meta = None
+    if args.init:
+        init_meta = load_initial_backbone(model, args.init)
+    model = model.to(device)
+
     opt = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay, betas=(0.9, 0.98))
     total_steps = max(1, args.epochs * len(train_loader)); warmup = max(50, total_steps // 20)
     def lr_factor(step: int):
@@ -154,8 +190,10 @@ def main():
     out = Path(args.out); out.parent.mkdir(parents=True, exist_ok=True)
     manifest_path = out.with_suffix(".json")
     best_score = -1e9; stale = 0
-    print(f"device={device} files={len(files)} samples={len(examples)} splits={counts} train-writers={len(train_writers)}")
+    print(f"stage={args.stage} device={device} files={len(files)} samples={len(examples)} splits={counts} train-writers={len(train_writers)}")
     print(f"parameters={sum(p.numel() for p in model.parameters()):,}")
+    if args.init:
+        print(f"initialized backbone from {args.init} (stage={init_meta.get('stage', 'unknown')})")
 
     for epoch in range(1, args.epochs + 1):
         model.train(); running = 0.0; seen = 0
@@ -172,7 +210,6 @@ def main():
                     ignore_index=PAD_ID, label_smoothing=0.03,
                 )
                 if writer_logits is not None:
-                    # Train rows are numbered before all held-out writers.
                     writer_loss = F.cross_entropy(writer_logits, batch["writer"].to(device))
                     loss = token_loss + args.writer_loss * writer_loss
                 else:
@@ -184,7 +221,8 @@ def main():
 
         val = evaluate(model, val_loader, device)
         score = val["exact"] - 0.35 * val["cer"] + 0.20 * val["worst_writer_exact"]
-        print(f"epoch {epoch:03d} train={running/max(seen,1):.4f} val={val['loss']:.4f} "
+        label = "synthetic-val" if args.stage == "pretrain" else "real-val"
+        print(f"epoch {epoch:03d} train={running/max(seen,1):.4f} {label}={val['loss']:.4f} "
               f"exact={100*val['exact']:.2f}% CER={100*val['cer']:.2f}% "
               f"worst-writer={100*val['worst_writer_exact']:.2f}%")
 
@@ -194,13 +232,17 @@ def main():
                 "model": model.state_dict(), "config": cfg.to_dict(), "vocab": VOCAB,
                 "pad_id": PAD_ID, "bos_id": BOS_ID, "eos_id": EOS_ID,
                 "train_writers": train_writers, "epoch": epoch,
-                "validation": val, "seed": args.seed,
+                "validation": val, "seed": args.seed, "stage": args.stage,
+                "initialized_from": str(args.init) if args.init else None,
             }, out)
             manifest_path.write_text(json.dumps({
                 "format": "pri-ink-foundation", "version": 2,
+                "stage": args.stage,
+                "evidence": "synthetic initialization only" if args.stage == "pretrain" else "writer-separated real validation",
                 "decoder": "parallel-output-queries", "checkpoint": out.name,
                 "config": cfg.to_dict(), "vocab": VOCAB, "validation": val,
                 "counts": counts, "trainWriterCount": len(train_writers), "seed": args.seed,
+                "initializedFrom": str(args.init) if args.init else None,
                 "holdoutPolicy": "final-holdout is not evaluated by train.py",
             }, indent=2), encoding="utf-8")
         else:
@@ -210,7 +252,10 @@ def main():
                 break
 
     print(f"best checkpoint: {out}")
-    print("Do NOT inspect final-holdout errors while tuning this run.")
+    if args.stage == "pretrain":
+        print("PRETRAIN ONLY — do not report this checkpoint's score as real handwriting accuracy.")
+    else:
+        print("Real validation selected the checkpoint. Do NOT inspect final-holdout errors while tuning.")
 
 
 if __name__ == "__main__":
