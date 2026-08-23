@@ -36,6 +36,7 @@
     "sync:ios": "node scripts/sync-ios.mjs",
     "check:ios": "node scripts/sync-ios.mjs --check",
     "serve:lan": "node scripts/serve-lan.mjs",
-    "ink:collect": "node scripts/serve-lan.mjs --collector"
+    "ink:collect": "node scripts/serve-lan.mjs --collector",
+    "ink:status": "node client/test/ink-corpus-status.mjs"
   }
 }
