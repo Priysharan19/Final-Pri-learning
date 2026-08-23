@@ -14,8 +14,8 @@ The model deliberately keeps information the old pipeline discarded:
    expression instead of isolated 28px glyphs.
 3. **Writer/style encoder** — a pooled style vector conditions both modalities;
    writer-ID is an auxiliary training target only, so a new student needs no ID.
-4. **Maths decoder** — an autoregressive Transformer emits structured maths
-   tokens (`sqrt`, `theta`, powers, brackets, relations, operators, digits, etc.).
+4. **Parallel maths decoder** — learned output queries emit the complete maths
+   sequence in one neural pass. This avoids a full Core ML call per token on iPad.
 5. **Existing Pri grammar + symbolic checks** remain downstream. A learned model
    proposes what the student wrote; it does not get permission to change wrong
    mathematics into the expected answer.
@@ -72,16 +72,26 @@ On macOS:
   tools/ink-foundation/runs/pri-ink-foundation.pt
 ```
 
-This writes a float16 Core ML package under the SwiftPM Resources directory.
-The exported model accepts a fixed-size point tensor, validity mask, raster and
-decoder prefix. Swift owns the autoregressive/beam loop so decoding policy can
-change independently of the base weights.
+This writes a float16 Core ML package to
+`ios/PriLearning.swiftpm/Resources/Models/PriInkFoundation.mlpackage`.
+One model invocation accepts the fixed-size point tensor, validity mask and
+whole-expression raster and returns logits for every output slot. The native
+runtime decodes those logits, aligns physical tokens back to Pencil strokes and
+keeps inserted structural notation separate from stroke ownership.
+
+A development build with no promoted model asset still works: runtime order is
+
+1. Pri Ink Foundation Core ML model, if bundled and metadata-compatible;
+2. the existing Pri JS stroke/CNN/grammar recogniser;
+3. the native Vision/geometry reader only as an emergency no-result rescue.
+
+All three paths are on-device.
 
 ## Release gates
 
-Do not replace the current production recogniser merely because training loss
-looks good. A foundation checkpoint is eligible to become primary only after it
-passes **real-writer** gates. Initial targets:
+Do not promote a checkpoint merely because training loss looks good. A foundation
+checkpoint is eligible to become primary only after it passes **real-writer**
+gates. Initial targets:
 
 - character error rate ≤ 0.5% on the locked test set;
 - exact expression match ≥ 97%;
