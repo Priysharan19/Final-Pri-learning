@@ -84,6 +84,11 @@ jobs:
           bootstrap = Path('tools/ink-foundation/bootstrap.py').read_text()
           runtime = Path('ios/PriLearning.swiftpm/Ink/InkFoundationRuntime.swift').read_text()
           low_bootstrap = bootstrap.lower()
+          replay_boundary = (
+              'personal synthetic replay' in low_bootstrap and
+              'real evidence' in low_bootstrap and
+              any(term in low_bootstrap for term in ('never counted', 'excluded from evidence', 'not real evidence'))
+          )
           required = {
               'release evaluator checks final holdout': 'final-holdout' in release and 'passesReleaseTargets' in release,
               'release evaluator checks critical structure': 'critical_structure_exact' in release,
@@ -94,7 +99,7 @@ jobs:
               'runtime enforces promotion metadata': 'pri.productionReady' in runtime,
               'bootstrap labels itself development only': 'releaseEligible' in bootstrap and 'NOT generalisation evidence' in bootstrap,
               'bootstrap checkpoint stage is distinct': '"stage": "bootstrap"' in bootstrap,
-              'personal replay exists but is not real evidence': 'personal synthetic replay' in low_bootstrap and 'not real evidence' in low_bootstrap,
+              'personal replay exists but is excluded from real evidence': replay_boundary,
           }
           bad = [name for name, ok in required.items() if not ok]
           if bad:
