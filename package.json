@@ -51,6 +51,7 @@
     "ink:structure:train:dev:pretrained": "npm run ink:structure:audit && python3 tools/ink-foundation/train_structural_dev.py --corpus client/test/ink-corpus-structural --init tools/ink-foundation/runs/pri-ink-structural-v4-synthetic.pt --replay-corpus /tmp/pri-ink-v4-synth-structural --replay-weight 0.20 --out tools/ink-foundation/runs/pri-ink-structural-v4-dev.pt --lr 8e-5 --weight-decay 0.04 --epochs 40 --patience 12",
     "ink:structure:evaluate:dev": "python3 tools/ink-foundation/evaluate_structural_dev.py tools/ink-foundation/runs/pri-ink-structural-v4-dev.pt --corpus client/test/ink-corpus-structural --out tools/ink-foundation/runs/pri-ink-structural-v4-dev-validation.json",
     "ink:structure:diagnose:grouping:dev": "python3 tools/ink-foundation/diagnose_structural_grouping_dev.py",
+    "ink:structure:diagnose:joint-grouping:dev": "python3 tools/ink-foundation/diagnose_structural_joint_grouping_dev.py",
     "ink:structure:rebuild:dev": "bash scripts/ink-structural-rebuild-dev.sh",
     "ink:status": "node client/test/ink-corpus-status.mjs",
     "ink:personalize": "node scripts/ink-personalize.mjs",
