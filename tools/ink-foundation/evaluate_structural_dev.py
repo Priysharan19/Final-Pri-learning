@@ -5,9 +5,9 @@ The frozen P0001 holdout is diagnostic only and never production evidence. The
 oracle-group metric supplies true stroke groups to the same group-level glyph
 classifier used by live decoding, cleanly separating symbol and grouping errors.
 
-The complete-link decoder remains the default historical baseline. ``--decoder
-joint`` applies the symbol-aware exact partition search on the identical frozen
-split so improvements cannot be attributed to a changed holdout.
+Complete-link remains the historical baseline. Joint search variants run on the
+identical frozen split and record their actual per-sample search regime so a
+comparison cannot silently change its inference semantics.
 """
 from __future__ import annotations
 
@@ -23,11 +23,10 @@ from torch.utils.data import DataLoader
 
 from data import ID_TO_TOKEN, SPECIAL, TOKEN_TO_ID
 from dev_split import make_same_writer_dev_split
-from evaluate_structural import checkpoint_sha256, edit_distance, is_critical_structure
+from evaluate_structural import checkpoint_sha256, edit_distance, is_critical_structure, _joint_search_contract
 from structural import PriInkStructuralV4, StructuralConfig
 from structural_data import StructuralInkDataset, corpus_files, load_structural_examples
-from structural_decode import decode_structural_output
-from structural_joint_decode import decode_structural_output_joint
+from structural_decoder_registry import DECODER_NAMES, decode_structural_selected, is_joint_decoder
 
 
 def _best_real_symbol(logits: torch.Tensor) -> tuple[str, float]:
@@ -68,11 +67,12 @@ def main():
     p.add_argument("checkpoint")
     p.add_argument("--corpus", required=True)
     p.add_argument("--device", default="auto")
-    p.add_argument("--decoder", choices=["complete-link", "joint"], default="complete-link")
+    p.add_argument("--decoder", choices=list(DECODER_NAMES), default="complete-link")
     p.add_argument("--group-threshold", type=float, default=0.65)
     p.add_argument("--relation-threshold", type=float, default=0.60)
     p.add_argument("--ambiguity-threshold", type=float, default=0.80)
     p.add_argument("--max-group-size", type=int, default=4)
+    p.add_argument("--general-max-strokes", type=int, default=14)
     p.add_argument("--grouping-temperature", type=float, default=1.0)
     p.add_argument("--symbol-weight", type=float, default=1.0)
     p.add_argument("--partition-margin-threshold", type=float, default=0.0)
@@ -81,6 +81,8 @@ def main():
 
     if args.max_group_size < 1:
         raise SystemExit("--max-group-size must be >= 1")
+    if args.general_max_strokes < 1:
+        raise SystemExit("--general-max-strokes must be >= 1")
     if args.grouping_temperature <= 0:
         raise SystemExit("--grouping-temperature must be > 0")
     if args.symbol_weight < 0:
@@ -134,6 +136,7 @@ def main():
     by_writer: dict[str, list[int]] = defaultdict(list)
     warning_counts: dict[str, int] = defaultdict(int); sample_diagnostics = []
     joint_margins: list[float] = []
+    search_regimes: dict[str, int] = defaultdict(int)
 
     with torch.inference_mode():
         for sample_number, (batch, row) in enumerate(zip(loader, validation_rows), 1):
@@ -141,22 +144,25 @@ def main():
                 batch["stroke_points"].to(device), batch["stroke_point_valid"].to(device),
                 batch["stroke_valid"].to(device), batch["stroke_geometry"].to(device), batch["raster"].to(device),
             )
-            if args.decoder == "joint":
-                hyp = decode_structural_output_joint(
-                    outputs, batch["stroke_geometry"].to(device), batch["stroke_valid"].to(device),
-                    model=model, max_group_size=args.max_group_size,
-                    grouping_temperature=args.grouping_temperature, symbol_weight=args.symbol_weight,
-                    relation_threshold=args.relation_threshold, ambiguity_threshold=args.ambiguity_threshold,
-                    partition_margin_threshold=args.partition_margin_threshold,
-                )
+            hyp = decode_structural_selected(
+                args.decoder,
+                outputs,
+                batch["stroke_geometry"].to(device),
+                batch["stroke_valid"].to(device),
+                model=model,
+                group_threshold=args.group_threshold,
+                relation_threshold=args.relation_threshold,
+                ambiguity_threshold=args.ambiguity_threshold,
+                max_group_size=args.max_group_size,
+                general_max_strokes=args.general_max_strokes,
+                grouping_temperature=args.grouping_temperature,
+                symbol_weight=args.symbol_weight,
+                partition_margin_threshold=args.partition_margin_threshold,
+            )
+            if is_joint_decoder(args.decoder):
+                search_regimes[getattr(hyp, "decoder", args.decoder)] += 1
                 if math.isfinite(hyp.partition_margin):
                     joint_margins.append(hyp.partition_margin)
-            else:
-                hyp = decode_structural_output(
-                    outputs, batch["stroke_geometry"].to(device), batch["stroke_valid"].to(device),
-                    group_threshold=args.group_threshold, relation_threshold=args.relation_threshold,
-                    ambiguity_threshold=args.ambiguity_threshold, model=model,
-                )
             target = str(batch["target_text"][0]); writer = str(batch["writer"][0])
             ok = int(hyp.canonical == target); dist = edit_distance(hyp.canonical, target)
             total += 1; exact += ok; char_errors += dist; char_total += max(1, len(target)); confidence_sum += hyp.confidence
@@ -179,8 +185,9 @@ def main():
                 "predictedRelations": [{"from": r.source, "to": r.target, "type": r.kind, "confidence": r.confidence} for r in hyp.relations],
                 "warnings": list(hyp.warnings),
             }
-            if args.decoder == "joint":
+            if is_joint_decoder(args.decoder):
                 diagnostic["jointPartition"] = {
+                    "searchRegime": getattr(hyp, "decoder", args.decoder),
                     "score": hyp.partition_score,
                     "margin": hyp.partition_margin if math.isfinite(hyp.partition_margin) else None,
                     "pairScore": hyp.partition_pair_score,
@@ -190,9 +197,10 @@ def main():
 
     writer_exact = {w: sum(v) / len(v) for w, v in sorted(by_writer.items())}
     thresholds = {"relation": args.relation_threshold, "ambiguity": args.ambiguity_threshold}
-    if args.decoder == "joint":
+    if is_joint_decoder(args.decoder):
         thresholds.update({
             "maxGroupSize": args.max_group_size,
+            "generalMaxStrokes": args.general_max_strokes,
             "groupingTemperature": args.grouping_temperature,
             "symbolWeight": args.symbol_weight,
             "partitionMargin": args.partition_margin_threshold,
@@ -217,12 +225,13 @@ def main():
         "sampleDiagnostics": sample_diagnostics,
         "evidence": "same-writer development evaluation only; not writer-disjoint and not production evidence",
     }
-    if args.decoder == "joint":
+    if is_joint_decoder(args.decoder):
         metrics["jointPartition"] = {
             "finiteMarginSamples": len(joint_margins),
             "meanMargin": sum(joint_margins) / max(1, len(joint_margins)),
             "minMargin": min(joint_margins, default=0.0),
-            "assumption": "glyph strokes are contiguous in physical draw order within maxGroupSize",
+            "searchContract": _joint_search_contract(args.decoder, args.max_group_size, args.general_max_strokes),
+            "actualSearchRegimes": dict(sorted(search_regimes.items())),
         }
 
     print("\nPri Ink Structural V4 — SAME-WRITER DEV EVALUATION\n")
@@ -234,8 +243,9 @@ def main():
     print(f"critical structure exact: {100*metrics['criticalStructureExact']:.2f}% ({critical_total} samples)")
     print(f"abstention coverage: {100*metrics['coverage']:.2f}%")
     print(f"safe precision among accepted: {100*metrics['safePrecision']:.2f}%")
-    if args.decoder == "joint":
+    if is_joint_decoder(args.decoder):
         print(f"joint partition mean finite margin: {metrics['jointPartition']['meanMargin']:.6f}")
+        print(f"actual joint search regimes: {metrics['jointPartition']['actualSearchRegimes']}")
     print("\nPer-sample diagnostics:")
     for item in sample_diagnostics:
         text = (
@@ -244,9 +254,9 @@ def main():
             f"rel={item['relationConfidence']:.3f} glyphs={item['predictedGlyphCount']}/{item['truthGlyphCount']} "
             f"oracle_sym={item['oracleGroupSymbolCorrect']}/{item['oracleGroupSymbolTotal']}"
         )
-        if args.decoder == "joint":
-            margin = item["jointPartition"]["margin"]
-            text += f" joint_margin={margin if margin is not None else 'inf'}"
+        if is_joint_decoder(args.decoder):
+            part = item["jointPartition"]
+            text += f" search={part['searchRegime']} joint_margin={part['margin'] if part['margin'] is not None else 'inf'}"
         print(text)
     print("writer-disjoint: false"); print("production ready: false")
     if args.out:
