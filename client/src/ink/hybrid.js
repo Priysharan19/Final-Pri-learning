@@ -1,25 +1,34 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Pri Learning · native geometry × Pri stroke/CNN glyph fusion
+// Pri Learning · native line geometry × Pri stroke recogniser
 //
-// Native PencilKit/Vision is currently the strongest owner of 2-D page geometry:
-// which strokes form a line, a superscript, a bracket/fraction block, etc.  The
-// web Pri recogniser has the stronger purpose-built glyph classifier: a 142k
-// sample CNN ensemble + point-cloud templates + the student's local correction
-// bank.  Running them as mutually-exclusive fallbacks wastes both strengths.
+// The iPad experiments established an important boundary:
+//   • native PencilKit geometry is good at deciding which strokes belong to a
+//     REAL WRITING LINE;
+//   • Vision is not reliable enough to decide which strokes belong to each
+//     individual glyph, or what that glyph is;
+//   • Pri's purpose-built stroke/CNN recogniser is much stronger once it is
+//     handed one real line instead of being asked to discover the whole page.
 //
-// This module fuses them at the one place where their evidence is independent:
-// a native ReadingSymbol already owns exact Pencil stroke indexes.  We classify
-// those same strokes with Pri's stroke model, then combine the two votes.
+// Therefore this module deliberately ignores native per-glyph ownership for
+// ordinary maths. Native supplies only line membership (plus strong structural
+// evidence when available). Pri then re-runs its complete segmentation,
+// 142k-sample CNN ensemble, point-cloud templates, personal correction bank and
+// maths decoder over the ORIGINAL Pencil strokes for that line.
 //
 // Safety invariants:
-//   · explicit student overrides are untouchable;
-//   · high-confidence geometry operators are not replaced by OCR/classifier noise;
-//   · disagreement lowers confidence unless one source has materially stronger
-//     independent evidence;
-//   · complex native 2-D tokens (fractions/radicals) remain native-owned;
-//   · no stroke can disappear here: ownership/boxes are never changed.
+//   · a Vision glyph can be totally wrong and own the wrong strokes without
+//     poisoning the Pri line re-read;
+//   · every line-owned Pencil stroke must remain represented before a Pri line
+//     is allowed to replace the native line;
+//   · explicit student corrections are locked by deterministic stroke-owned ids;
+//   · decisive native structural operators may reinforce, but never create, a
+//     Pri glyph at a different location;
+//   · complex native fraction/radical blocks remain native-owned until their
+//     own structure-aware hybrid pass is implemented;
+//   · disagreement lowers confidence; nothing here can produce release-grade
+//     certainty by itself.
 // ─────────────────────────────────────────────────────────────────────────────
-import { classify } from './recognizer.js';
+import { classify, recognize } from './recognizer.js';
 
 const STRUCTURAL = new Set(['+', '-', '=', '*', '/', '(', ')', '[', ']', '<', '>', '<=', '>=', '!=', '±', ':']);
 const NEVER_SUPERSCRIPT = new Set([...STRUCTURAL, "'", '.', ',', '°', '%']);
@@ -89,75 +98,6 @@ function mergeAlternatives(primary, ...lists) {
     .map(([sym, conf]) => ({ sym, conf }));
 }
 
-function fuseSymbol(native, js, override) {
-  if (!js) return native;
-  if (override || native.conf >= 0.995) return native;
-
-  const oldSym = canonical(native.sym);
-  const jsSym = canonical(js.sym);
-  const oldConf = Number(native.conf) || 0;
-  const jsConf = Number(js.conf) || 0;
-  const nativeAlts = native.alts || [];
-  const jsAlts = js.alts || [];
-
-  if (!jsSym || jsSym === '?') return native;
-
-  if (jsSym === oldSym) {
-    return {
-      ...native,
-      sym: oldSym,
-      conf: Math.min(0.98, Math.max(oldConf, jsConf, 0.58 * oldConf + 0.42 * jsConf + 0.08)),
-      alts: mergeAlternatives(oldSym, nativeAlts, jsAlts)
-    };
-  }
-
-  if (STRUCTURAL.has(oldSym) && oldConf >= 0.90 && !native.approx) {
-    return {
-      ...native,
-      sym: oldSym,
-      conf: Math.min(oldConf, jsConf >= 0.55 ? 0.80 : oldConf),
-      alts: mergeAlternatives(oldSym, nativeAlts, [{ sym: jsSym, conf: Math.min(0.55, jsConf) }], jsAlts)
-    };
-  }
-
-  const family = sameFamily(oldSym, jsSym);
-  const nativeApprox = !!native.approx;
-  const nativeAlreadyOffersJS = nativeAlts.some(a => canonical(a.sym) === jsSym);
-
-  const replace =
-    (oldSym === '?' && jsConf >= 0.34) ||
-    (nativeApprox && jsConf >= 0.46) ||
-    (oldConf < 0.55 && jsConf >= 0.50) ||
-    (family && jsConf >= 0.62 && (oldConf < 0.84 || jsConf >= oldConf - 0.10)) ||
-    (nativeAlreadyOffersJS && jsConf >= 0.68 && oldConf < 0.86) ||
-    (jsConf >= 0.82 && jsConf >= oldConf + 0.08);
-
-  if (replace) {
-    return {
-      ...native,
-      sym: jsSym,
-      // Identity changed, but native geometry still owns the same exact Pencil
-      // cluster. Keep that ownership flag intact: a STUDENT correction of this
-      // glyph is therefore safe local training evidence even though the current
-      // automatic identity remains below release-grade certainty.
-      conf: Math.min(0.90, Math.max(jsConf, 0.52 * jsConf + 0.28 * oldConf)),
-      alts: mergeAlternatives(jsSym, [{ sym: oldSym, conf: Math.min(0.74, oldConf) }], nativeAlts, jsAlts),
-      approx: native.approx
-    };
-  }
-
-  if (jsConf >= 0.34) {
-    return {
-      ...native,
-      sym: oldSym,
-      conf: Math.min(oldConf, family ? 0.60 : 0.70),
-      alts: mergeAlternatives(oldSym, nativeAlts, [{ sym: jsSym, conf: Math.min(0.67, jsConf) }], jsAlts),
-      approx: native.approx
-    };
-  }
-  return native;
-}
-
 function complexLine(line) {
   if ((line?.text || '').includes('sqrt(')) return true;
   return (line?.symbols || []).some(s => {
@@ -209,7 +149,11 @@ function summarise(lines, reading) {
   let minConf = 1, margin = 1, weakest = null;
   all.forEach((s, index) => {
     const conf = Number(s.conf) || 0;
-    const rival = (s.alts || [])[0]?.conf || 0;
+    let rival = 0;
+    for (const alt of s.alts || []) {
+      if (canonical(alt.sym) === canonical(s.sym)) continue;
+      rival = Math.max(rival, Number(alt.conf) || 0);
+    }
     minConf = Math.min(minConf, conf);
     margin = Math.min(margin, Math.max(0, Math.min(1, conf - rival)));
     if (!weakest || conf < weakest.conf) {
@@ -226,35 +170,201 @@ function summarise(lines, reading) {
   };
 }
 
+function lineIndexes(line, strokeCount) {
+  const set = new Set();
+  const add = i => {
+    if (Number.isInteger(i) && i >= 0 && i < strokeCount) set.add(i);
+  };
+  for (const i of line?.strokeIdxs || []) add(i);
+  // Fraction/radical ownership may live only on symbols after native masking.
+  for (const s of line?.symbols || []) for (const i of s.strokeIdxs || []) add(i);
+  return [...set].sort((a, b) => a - b);
+}
+
+const strokeKey = indexes => [...new Set(indexes || [])].sort((a, b) => a - b).join('_');
+const stableId = (lineIndex, indexes, fallback) => `h${lineIndex}_${strokeKey(indexes) || fallback}`;
+
+function overlapRatio(a, b) {
+  const A = new Set(a || []), B = new Set(b || []);
+  if (!A.size || !B.size) return 0;
+  let hit = 0;
+  for (const i of A) if (B.has(i)) hit++;
+  return hit / Math.max(A.size, B.size);
+}
+
+function boxIoU(a0, b0) {
+  const a = box4(a0), b = box4(b0);
+  const iw = Math.max(0, Math.min(a.x2, b.x2) - Math.max(a.x1, b.x1));
+  const ih = Math.max(0, Math.min(a.y2, b.y2) - Math.max(a.y1, b.y1));
+  const inter = iw * ih;
+  const union = a.w * a.h + b.w * b.h - inter;
+  return union > 0 ? inter / union : 0;
+}
+
+function strongestNativeStructure(jsSymbol, nativeLine) {
+  let best = null;
+  for (const n of nativeLine?.symbols || []) {
+    const sym = canonical(n.sym || '');
+    if (!STRUCTURAL.has(sym) || Number(n.conf) < 0.90 || n.approx) continue;
+    const ownership = overlapRatio(jsSymbol.strokeIdxs, n.strokeIdxs);
+    const spatial = boxIoU(jsSymbol.box, n.box);
+    const score = Math.max(ownership, spatial);
+    if (score < 0.58) continue;
+    if (!best || score > best.score) best = { native: n, sym, score };
+  }
+  return best;
+}
+
+function remapJsSymbol(symbol, localToGlobal, lineIndex, ordinal, nativeLine, overrides) {
+  const globalIndexes = [...new Set((symbol.strokeIdxs || [])
+    .map(i => localToGlobal[i])
+    .filter(i => Number.isInteger(i)))].sort((a, b) => a - b);
+  const id = stableId(lineIndex, globalIndexes, ordinal);
+  const out = {
+    ...symbol,
+    id,
+    sym: canonical(symbol.sym),
+    conf: Math.min(0.97, Number(symbol.conf) || 0),
+    alts: (symbol.alts || []).map(a => ({ ...a, sym: canonical(a.sym) })),
+    strokeIdxs: globalIndexes,
+    approx: false
+  };
+
+  // Strong Pencil geometry may reinforce a real operator, but only when it
+  // overlaps this Pri-owned glyph. It never supplies ownership by itself.
+  const structural = strongestNativeStructure(out, nativeLine);
+  if (structural && structural.sym !== out.sym) {
+    out.alts = mergeAlternatives(out.sym, out.alts, [{ sym: structural.sym, conf: Math.min(0.82, structural.native.conf) }]);
+    if (out.conf < 0.68 || (STRUCTURAL.has(out.sym) && structural.native.conf >= 0.96)) {
+      const previous = out.sym;
+      out.sym = structural.sym;
+      out.conf = Math.min(0.92, Math.max(out.conf, 0.72 * structural.native.conf));
+      out.alts = mergeAlternatives(out.sym, [{ sym: previous, conf: Math.min(0.72, Number(symbol.conf) || 0) }], out.alts);
+    }
+  }
+
+  if (Object.prototype.hasOwnProperty.call(overrides, id)) {
+    out.sym = overrides[id];
+    out.conf = 1;
+    out.approx = false;
+  }
+  return out;
+}
+
+function readWholeNativeLine(line, lineIndex, strokes, overrides) {
+  const indexes = lineIndexes(line, strokes.length);
+  if (!indexes.length) return null;
+  const members = indexes.map(i => strokes[i]).filter(Boolean);
+  if (!members.length) return null;
+
+  let result;
+  try {
+    // Deliberately no answer context here. This path is proving the ink itself
+    // can identify the line; question context may only be layered on later.
+    result = recognize(members, {}, null);
+  } catch {
+    return null;
+  }
+  if (!result?.lines?.length) return null;
+
+  // `recognize` is still free to split a raised exponent into a tiny second
+  // line. Native has already established that all these strokes are ONE real
+  // working line, so flatten those glyphs back into that line and let the
+  // geometry-aware assembler restore powers.
+  const raw = result.lines.flatMap(l => l.symbols || []);
+  if (!raw.length) return null;
+  const symbols = raw
+    .map((s, i) => remapJsSymbol(s, indexes, lineIndex, i, line, overrides))
+    .filter(s => s.strokeIdxs.length);
+  if (!symbols.length) return null;
+
+  // A line re-read may replace native identity only when it explains almost
+  // all of the Pencil strokes native assigned to that real line. This is the
+  // guard against a recogniser producing a plausible substring and dropping
+  // the marks it could not understand.
+  const covered = new Set(symbols.flatMap(s => s.strokeIdxs));
+  const coverage = indexes.filter(i => covered.has(i)).length / indexes.length;
+  if (coverage < 0.88) return null;
+
+  const text = assembleSimple(symbols);
+  if (!text) return null;
+
+  // Do not present line confidence as stronger than the weakest Pri glyph. The
+  // visible correction UI must remain conservative while real-writer evidence
+  // is still sparse.
+  const weakest = Math.min(...symbols.map(s => Number(s.conf) || 0));
+  return {
+    ...line,
+    text,
+    symbols,
+    strokeIdxs: indexes,
+    unread: false,
+    hybridCoverage: coverage,
+    hybridConfidence: Math.min(0.95, weakest)
+  };
+}
+
+// Previous per-owned-glyph fusion is retained only as a last-resort for a line
+// whose native membership cannot be re-read with sufficient stroke coverage.
+function fallbackOwnedGlyphFusion(line, strokes, overrides, lineIndex) {
+  if (!line?.symbols?.length) return line;
+  const dimensions = line.symbols
+    .map(s => box4(s.box))
+    .map(b => Math.max(b.w, b.h))
+    .filter(v => Number.isFinite(v) && v > 2)
+    .sort((a, b) => a - b);
+  const medianH = Math.max(8, median(dimensions) || 20);
+
+  const symbols = line.symbols.map((native, ordinal) => {
+    const indexes = (native.strokeIdxs || []).filter(i => Number.isInteger(i) && strokes[i]);
+    const members = indexes.map(i => strokes[i]);
+    if (!members.length) return native;
+    const b = strokeBox(members);
+    if (!b) return native;
+    let js = null;
+    try { js = classify({ strokes: members, box: b, strokeIdxs: indexes }, medianH); }
+    catch { return native; }
+    if (!js?.sym) return native;
+
+    const id = stableId(lineIndex, indexes, ordinal);
+    const oldSym = canonical(native.sym);
+    const jsSym = canonical(js.sym);
+    const oldConf = Number(native.conf) || 0;
+    const jsConf = Number(js.conf) || 0;
+    let sym = oldSym;
+    let conf = oldConf;
+    let alts = mergeAlternatives(oldSym, native.alts, js.alts, [{ sym: jsSym, conf: jsConf }]);
+
+    if (jsSym === oldSym) conf = Math.min(0.95, Math.max(oldConf, jsConf));
+    else if (!STRUCTURAL.has(oldSym) && (native.approx || oldConf < 0.58 || (sameFamily(oldSym, jsSym) && jsConf >= 0.65))) {
+      sym = jsSym;
+      conf = Math.min(0.82, Math.max(jsConf, 0.5 * jsConf + 0.25 * oldConf));
+      alts = mergeAlternatives(sym, [{ sym: oldSym, conf: Math.min(0.70, oldConf) }], native.alts, js.alts);
+    } else if (jsConf >= 0.34) {
+      conf = Math.min(oldConf, 0.62);
+    }
+
+    if (Object.prototype.hasOwnProperty.call(overrides, id)) { sym = overrides[id]; conf = 1; }
+    return { ...native, id, sym, conf, alts, strokeIdxs: indexes };
+  });
+  return { ...line, symbols, text: assembleSimple(symbols) || line.text };
+}
+
+/**
+ * Fuse a native reading with Pri's purpose-built line recogniser.
+ *
+ * Native contributes real-line membership. Pri re-segments and classifies the
+ * original strokes inside each line. Native per-glyph OCR ownership is ignored
+ * for ordinary lines because the on-device screenshots proved it is not a
+ * trustworthy boundary.
+ */
 export function fuseNativeStrokeReading(reading, strokes, overrides = {}) {
   if (!reading?.lines?.length || !Array.isArray(strokes) || !strokes.length) return reading;
 
-  const lines = reading.lines.map(line => {
-    if (!line?.symbols?.length || complexLine(line)) return line;
-
-    const dimensions = line.symbols
-      .map(s => box4(s.box))
-      .map(b => Math.max(b.w, b.h))
-      .filter(v => Number.isFinite(v) && v > 2)
-      .sort((a, b) => a - b);
-    const medianH = Math.max(8, median(dimensions) || 20);
-
-    const symbols = line.symbols.map(native => {
-      const indexes = native.strokeIdxs || [];
-      const members = indexes.map(i => strokes[i]).filter(Boolean);
-      if (!members.length) return native;
-      const b = strokeBox(members);
-      if (!b) return native;
-      let js = null;
-      try {
-        js = classify({ strokes: members, box: b, strokeIdxs: indexes }, medianH);
-      } catch {
-        return native;
-      }
-      return fuseSymbol(native, js, overrides[native.id]);
-    });
-
-    return { ...line, symbols, text: assembleSimple(symbols) || line.text };
+  const lines = reading.lines.map((line, lineIndex) => {
+    if (complexLine(line)) return fallbackOwnedGlyphFusion(line, strokes, overrides, lineIndex);
+    return readWholeNativeLine(line, lineIndex, strokes, overrides)
+      || fallbackOwnedGlyphFusion(line, strokes, overrides, lineIndex);
   });
 
   return summarise(lines, reading);
