@@ -1,9 +1,9 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Pri Learning · Production segmentation regression
 //
-// Geometry-only regressions for the real failure where a high handwritten power
-// became a separate line before OCR. Detached raised marks carried by a body
-// glyph must stay on that line while genuine second-line working stays separate.
+// Geometry-only regressions for real Pencil failures. Superscripts, integral
+// limits and evaluation bounds are 2D parts of an expression, not independent
+// lines. Genuine next-line working must still remain separate.
 // ─────────────────────────────────────────────────────────────────────────────
 import CoreGraphics
 import Foundation
@@ -46,9 +46,8 @@ enum InkSegmentationRegression {
             && secondLine != bodyLine
     }
 
-    /// Mirrors the August real-Pencil failure more closely: two genuine working
-    /// lines, each with a handwritten power almost as large as the body glyphs.
-    /// The old 0.88 size cutoff detached both powers into their own lines.
+    /// Two genuine working lines, each with a handwritten power almost as large
+    /// as the body glyphs. A size-only satellite cutoff must not detach them.
     private static func twoLargeSuperscriptsInvariant() -> Bool {
         var strokes: [InkStroke] = [
             stroke(20, 100, 22, 134),
@@ -85,18 +84,114 @@ enum InkSegmentationRegression {
             && secondPowerLine == secondBody
     }
 
+    /// Mirrors natural calculus working: each baseline line is far apart, while
+    /// small upper/lower limits and bracket bounds sit close to their owning line.
+    /// The original stroke order is intentionally line-by-line, as PKDrawing is.
+    private static func calculusLimitsAndBoundsInvariant() -> Bool {
+        var strokes: [InkStroke] = []
+
+        // Line 1: = integral_0^1 (3x^2 - 2x) dx
+        let line1Start = strokes.count
+        strokes.append(stroke(20, 110, 42, 110))
+        strokes.append(stroke(20, 122, 42, 122))
+        strokes.append(stroke(66, 88, 58, 142))
+        let upperLimit = strokes.count
+        strokes.append(stroke(76, 66, 77, 82))
+        let lowerLimit = strokes.count
+        strokes.append(stroke(76, 145, 88, 160))
+        strokes.append(stroke(112, 102, 128, 132))
+        strokes.append(stroke(146, 102, 164, 132))
+        let exponent2 = strokes.count
+        strokes.append(stroke(166, 78, 180, 96))
+        strokes.append(stroke(202, 114, 226, 114))
+        strokes.append(stroke(250, 102, 267, 132))
+        strokes.append(stroke(302, 102, 320, 132))
+        strokes.append(stroke(344, 101, 360, 132))
+        let line1End = strokes.count - 1
+
+        // Line 2: = [x^3 - x^2]_0^1
+        let line2Start = strokes.count
+        strokes.append(stroke(20, 230, 42, 230))
+        strokes.append(stroke(20, 242, 42, 242))
+        strokes.append(stroke(68, 212, 68, 258))
+        strokes.append(stroke(68, 212, 82, 212))
+        strokes.append(stroke(68, 258, 82, 258))
+        strokes.append(stroke(112, 222, 130, 252))
+        let exponent3 = strokes.count
+        strokes.append(stroke(132, 198, 146, 216))
+        strokes.append(stroke(174, 234, 198, 234))
+        strokes.append(stroke(224, 222, 242, 252))
+        let exponent2b = strokes.count
+        strokes.append(stroke(244, 198, 258, 216))
+        strokes.append(stroke(282, 212, 282, 258))
+        strokes.append(stroke(268, 212, 282, 212))
+        strokes.append(stroke(268, 258, 282, 258))
+        let evalUpper = strokes.count
+        strokes.append(stroke(292, 194, 293, 211))
+        let evalLower = strokes.count
+        strokes.append(stroke(292, 260, 304, 276))
+        let line2End = strokes.count - 3
+
+        // Line 3: ordinary body line with a power.
+        let line3Start = strokes.count
+        strokes.append(stroke(20, 350, 42, 350))
+        strokes.append(stroke(20, 362, 42, 362))
+        strokes.append(stroke(78, 342, 96, 372))
+        let line3Power = strokes.count
+        strokes.append(stroke(98, 318, 112, 336))
+        strokes.append(stroke(142, 354, 166, 354))
+        strokes.append(stroke(194, 342, 212, 372))
+        let line3End = strokes.count - 1
+
+        // Line 4: = 0, deliberately short. It must NOT be swallowed by line 3.
+        let line4Start = strokes.count
+        strokes.append(stroke(20, 470, 42, 470))
+        strokes.append(stroke(20, 482, 42, 482))
+        strokes.append(stroke(78, 462, 94, 490))
+        let line4End = strokes.count - 1
+
+        let lines = InkLineSegmenter.segment(strokes)
+        guard lines.count == 4 else { return false }
+
+        func owner(_ index: Int) -> Int? {
+            lines.firstIndex { $0.strokeIndexes.contains(index) }
+        }
+
+        guard let l1 = owner(line1Start), let l2 = owner(line2Start),
+              let l3 = owner(line3Start), let l4 = owner(line4Start) else { return false }
+
+        let distinctBodies = Set([l1, l2, l3, l4]).count == 4
+        let bodyEndsStayPut = owner(line1End) == l1
+            && owner(line2End) == l2
+            && owner(line3End) == l3
+            && owner(line4End) == l4
+        let line1Satellites = owner(upperLimit) == l1
+            && owner(lowerLimit) == l1
+            && owner(exponent2) == l1
+        let line2Satellites = owner(exponent3) == l2
+            && owner(exponent2b) == l2
+            && owner(evalUpper) == l2
+            && owner(evalLower) == l2
+        let line3Satellite = owner(line3Power) == l3
+
+        return distinctBodies && bodyEndsStayPut
+            && line1Satellites && line2Satellites && line3Satellite
+    }
+
     static func assertProductionInvariants() {
         let legacy = legacyDetachedPowerInvariant()
         let twoLine = twoLargeSuperscriptsInvariant()
-        let ok = legacy && twoLine
+        let calculus = calculusLimitsAndBoundsInvariant()
+        let ok = legacy && twoLine && calculus
 
         NSLog(
-            "PRIINK segmentation satellite=%@ legacy=%@ twoLargePowers=%@",
+            "PRIINK segmentation satellite=%@ legacy=%@ twoLargePowers=%@ calculusLimits=%@",
             ok ? "PASS" : "FAIL",
             legacy ? "yes" : "NO",
-            twoLine ? "yes" : "NO"
+            twoLine ? "yes" : "NO",
+            calculus ? "yes" : "NO"
         )
         precondition(ok,
-            "Native handwriting line segmentation violated superscript/line separation invariant")
+            "Native handwriting line segmentation violated 2D maths / line separation invariant")
     }
 }
