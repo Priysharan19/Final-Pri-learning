@@ -94,15 +94,15 @@ enum InkSegmentationRegression {
         let line1Start = strokes.count
         strokes.append(stroke(20, 110, 42, 110))
         strokes.append(stroke(20, 122, 42, 122))
-        strokes.append(stroke(66, 88, 58, 142))
+        strokes.append(stroke(66, 88, 58, 142))                 // integral body
         let upperLimit = strokes.count
-        strokes.append(stroke(76, 66, 77, 82))
+        strokes.append(stroke(76, 66, 77, 82))                  // upper 1
         let lowerLimit = strokes.count
-        strokes.append(stroke(76, 145, 88, 160))
+        strokes.append(stroke(76, 145, 88, 160))                // lower 0
         strokes.append(stroke(112, 102, 128, 132))
-        strokes.append(stroke(146, 102, 164, 132))
+        strokes.append(stroke(146, 102, 164, 132))              // x carrier
         let exponent2 = strokes.count
-        strokes.append(stroke(166, 78, 180, 96))
+        strokes.append(stroke(166, 78, 180, 96))                // ^2
         strokes.append(stroke(202, 114, 226, 114))
         strokes.append(stroke(250, 102, 267, 132))
         strokes.append(stroke(302, 102, 320, 132))
@@ -127,9 +127,9 @@ enum InkSegmentationRegression {
         strokes.append(stroke(268, 212, 282, 212))
         strokes.append(stroke(268, 258, 282, 258))
         let evalUpper = strokes.count
-        strokes.append(stroke(292, 194, 293, 211))
+        strokes.append(stroke(292, 194, 293, 211))              // upper 1
         let evalLower = strokes.count
-        strokes.append(stroke(292, 260, 304, 276))
+        strokes.append(stroke(292, 260, 304, 276))              // lower 0
         let line2End = strokes.count - 3
 
         // Line 3: ordinary body line with a power.
