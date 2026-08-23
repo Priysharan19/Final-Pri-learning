@@ -273,21 +273,28 @@ def structural_targets(structure: dict, max_strokes: int):
         for si in strokes:
             symbol[si] = token_id
 
-    # Every pair of labelled strokes receives an explicit same-glyph target.
+    # Only distinct physical-stroke pairs teach grouping. A diagonal target says
+    # merely "stroke i is itself", which is always true and can inflate grouping
+    # accuracy without teaching whether two separate traces form one glyph.
     for left_gid, left_strokes, _ in parsed:
         for right_gid, right_strokes, _ in parsed:
             same = left_gid == right_gid
             for i in left_strokes:
                 for j in right_strokes:
+                    if i == j:
+                        continue
                     grouping[i, j] = 1.0 if same else 0.0
 
     group_by_id = {gid: strokes for gid, strokes, _ in parsed}
-    # Annotated group roots are representative physical traces. Relation edges
-    # remain sparse and interpretable while grouping recovers the full glyph.
+    # Annotated group roots are representative physical traces. Self-pairs stay
+    # ignored: "glyph relates to itself as NONE" is a trivial negative and would
+    # inflate relation accuracy just like grouping diagonals.
     roots = {gid: strokes[0] for gid, strokes, _ in parsed}
     labelled_roots = list(roots.values())
     for i in labelled_roots:
         for j in labelled_roots:
+            if i == j:
+                continue
             relations[i, j] = RELATION_TO_ID["NONE"]
 
     for rel in structure.get("relations") or []:
