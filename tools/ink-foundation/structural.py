@@ -98,8 +98,6 @@ class PointToStrokeEncoder(nn.Module):
         if active_idx.numel() == 0:
             return out.reshape(b, s, self.cfg.d_model)
 
-        # Encode only real physical strokes. Padding slots can dominate compute
-        # when max_strokes is generous, especially on iPad-sized expressions.
         selected_points = flat_points.index_select(0, active_idx)
         valid = flat_valid.index_select(0, active_idx).clone()
         empty = ~valid.any(dim=1)
@@ -135,7 +133,6 @@ class PairwiseStructureHead(nn.Module):
 
     @staticmethod
     def _pair_geometry(geometry: torch.Tensor) -> torch.Tensor:
-        # geometry channels: cx, cy, width, height, aspect, length, density, order
         left = geometry[:, :, None, :]
         right = geometry[:, None, :, :]
         dx = right[..., 0] - left[..., 0]
@@ -185,11 +182,11 @@ class PairwiseStructureHead(nn.Module):
 class PriInkStructuralV4(nn.Module):
     """Hierarchical multimodal encoder with explicit grouping/relation heads.
 
-    Symbol logits are per physical stroke. During decoding, high-probability
-    group edges form glyph components; member-stroke symbol evidence is pooled
-    before the structural parser resolves superscripts, fractions, roots, etc.
-    This makes trace-to-symbol attribution observable rather than hidden inside a
-    single flat sequence decoder.
+    Symbol recognition is group-aware. A physical trace by itself may be
+    ambiguous (one bar of '=' looks exactly like '-'), so the grouping head is
+    used to construct a soft neighbouring-stroke context before symbol
+    classification. The symbol loss does not back-propagate through this context
+    into grouping; grouping remains independently supervised and inspectable.
     """
 
     def __init__(self, vocab_size: int, cfg: StructuralConfig):
@@ -217,9 +214,6 @@ class PriInkStructuralV4(nn.Module):
             layer, cfg.stroke_layers, norm=nn.LayerNorm(cfg.d_model)
         )
 
-        # Reuse V3's 2-D-preserving raster encoder. Cross-attention allows each
-        # physical stroke to query whole-expression visual evidence while the 2-D
-        # row/column positions remain intact.
         self.raster_encoder = RasterEncoder(cfg.d_model)
         self.visual_cross_attention = nn.MultiheadAttention(
             cfg.d_model, cfg.nhead, dropout=cfg.dropout, batch_first=True
@@ -230,6 +224,14 @@ class PriInkStructuralV4(nn.Module):
             nn.LayerNorm(cfg.d_model),
         )
 
+        # A glyph can span several physical strokes. Classify from the stroke
+        # plus the high-confidence same-glyph context instead of requiring each
+        # member stroke to identify the whole symbol independently.
+        self.symbol_group_fusion = nn.Sequential(
+            nn.Linear(cfg.d_model * 2, cfg.d_model),
+            nn.GELU(),
+            nn.LayerNorm(cfg.d_model),
+        )
         self.symbol_head = nn.Linear(cfg.d_model, vocab_size)
         self.structure_head = PairwiseStructureHead(cfg.d_model, len(RELATIONS))
 
@@ -247,21 +249,43 @@ class PriInkStructuralV4(nn.Module):
         fused = self.fusion(torch.cat([x, attended], dim=-1))
         return fused * stroke_valid.to(fused.dtype).unsqueeze(-1)
 
+    @staticmethod
+    def _group_context(strokes: torch.Tensor, group_logits: torch.Tensor,
+                       stroke_valid: torch.Tensor) -> torch.Tensor:
+        """Pool likely same-glyph strokes without letting symbol loss game grouping."""
+        pair_valid = stroke_valid[:, :, None] & stroke_valid[:, None, :]
+        symmetric = 0.5 * (group_logits + group_logits.transpose(1, 2))
+        probability = symmetric.sigmoid()
+
+        # Random group logits start near 0.5. Convert that undecided region to
+        # zero context so early training does not average the whole expression.
+        affinity = ((probability - 0.5) * 2.0).clamp(0.0, 1.0).detach()
+        affinity = affinity * pair_valid.to(affinity.dtype)
+        b, s, _ = affinity.shape
+        eye = torch.eye(s, device=strokes.device, dtype=affinity.dtype)[None, :, :]
+        eye = eye * stroke_valid.to(affinity.dtype)[:, :, None]
+        weights = torch.maximum(affinity, eye)
+        weights = weights / weights.sum(dim=-1, keepdim=True).clamp_min(1e-6)
+        return torch.bmm(weights, strokes)
+
     def forward(self, stroke_points: torch.Tensor, stroke_point_valid: torch.Tensor,
                 stroke_valid: torch.Tensor, stroke_geometry: torch.Tensor,
                 raster: torch.Tensor):
         strokes = self.encode(
             stroke_points, stroke_point_valid, stroke_valid, stroke_geometry, raster
         )
-        symbol_logits = self.symbol_head(strokes)
         group_logits, relation_logits = self.structure_head(strokes, stroke_geometry)
+        group_context = self._group_context(strokes, group_logits, stroke_valid)
+        symbol_features = self.symbol_group_fusion(torch.cat([strokes, group_context], dim=-1))
+        symbol_logits = self.symbol_head(symbol_features)
 
         pair_valid = stroke_valid[:, :, None] & stroke_valid[:, None, :]
         group_logits = group_logits.masked_fill(~pair_valid, -30.0)
+        relation_logits = relation_logits.masked_fill(~pair_valid.unsqueeze(-1), -30.0)
         return {
-            "stroke_embeddings": strokes,
             "symbol_logits": symbol_logits,
             "group_logits": group_logits,
             "relation_logits": relation_logits,
             "pair_valid": pair_valid,
+            "stroke_embeddings": strokes,
         }
