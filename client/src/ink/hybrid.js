@@ -25,6 +25,7 @@
 //     Pri glyph at a different location;
 //   · complex native fraction/radical blocks remain native-owned until their
 //     own structure-aware hybrid pass is implemented;
+//   · question context is answer-blind and can only bias live ink candidates;
 //   · disagreement lowers confidence; nothing here can produce release-grade
 //     certainty by itself.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -176,7 +177,6 @@ function lineIndexes(line, strokeCount) {
     if (Number.isInteger(i) && i >= 0 && i < strokeCount) set.add(i);
   };
   for (const i of line?.strokeIdxs || []) add(i);
-  // Fraction/radical ownership may live only on symbols after native masking.
   for (const s of line?.symbols || []) for (const i of s.strokeIdxs || []) add(i);
   return [...set].sort((a, b) => a - b);
 }
@@ -230,8 +230,6 @@ function remapJsSymbol(symbol, localToGlobal, lineIndex, ordinal, nativeLine, ov
     approx: false
   };
 
-  // Strong Pencil geometry may reinforce a real operator, but only when it
-  // overlaps this Pri-owned glyph. It never supplies ownership by itself.
   const structural = strongestNativeStructure(out, nativeLine);
   if (structural && structural.sym !== out.sym) {
     out.alts = mergeAlternatives(out.sym, out.alts, [{ sym: structural.sym, conf: Math.min(0.82, structural.native.conf) }]);
@@ -251,7 +249,7 @@ function remapJsSymbol(symbol, localToGlobal, lineIndex, ordinal, nativeLine, ov
   return out;
 }
 
-function readWholeNativeLine(line, lineIndex, strokes, overrides) {
+function readWholeNativeLine(line, lineIndex, strokes, overrides, ctx) {
   const indexes = lineIndexes(line, strokes.length);
   if (!indexes.length) return null;
   const members = indexes.map(i => strokes[i]).filter(Boolean);
@@ -259,18 +257,14 @@ function readWholeNativeLine(line, lineIndex, strokes, overrides) {
 
   let result;
   try {
-    // Deliberately no answer context here. This path is proving the ink itself
-    // can identify the line; question context may only be layered on later.
-    result = recognize(members, {}, null);
+    // Context here is deliberately answer-blind: notation visible in the
+    // question can break x/h/n-style near-ties, but it cannot supply an answer.
+    result = recognize(members, {}, ctx || null);
   } catch {
     return null;
   }
   if (!result?.lines?.length) return null;
 
-  // `recognize` is still free to split a raised exponent into a tiny second
-  // line. Native has already established that all these strokes are ONE real
-  // working line, so flatten those glyphs back into that line and let the
-  // geometry-aware assembler restore powers.
   const raw = result.lines.flatMap(l => l.symbols || []);
   if (!raw.length) return null;
   const symbols = raw
@@ -278,10 +272,6 @@ function readWholeNativeLine(line, lineIndex, strokes, overrides) {
     .filter(s => s.strokeIdxs.length);
   if (!symbols.length) return null;
 
-  // A line re-read may replace native identity only when it explains almost
-  // all of the Pencil strokes native assigned to that real line. This is the
-  // guard against a recogniser producing a plausible substring and dropping
-  // the marks it could not understand.
   const covered = new Set(symbols.flatMap(s => s.strokeIdxs));
   const coverage = indexes.filter(i => covered.has(i)).length / indexes.length;
   if (coverage < 0.88) return null;
@@ -289,9 +279,6 @@ function readWholeNativeLine(line, lineIndex, strokes, overrides) {
   const text = assembleSimple(symbols);
   if (!text) return null;
 
-  // Do not present line confidence as stronger than the weakest Pri glyph. The
-  // visible correction UI must remain conservative while real-writer evidence
-  // is still sparse.
   const weakest = Math.min(...symbols.map(s => Number(s.conf) || 0));
   return {
     ...line,
@@ -304,8 +291,6 @@ function readWholeNativeLine(line, lineIndex, strokes, overrides) {
   };
 }
 
-// Previous per-owned-glyph fusion is retained only as a last-resort for a line
-// whose native membership cannot be re-read with sufficient stroke coverage.
 function fallbackOwnedGlyphFusion(line, strokes, overrides, lineIndex) {
   if (!line?.symbols?.length) return line;
   const dimensions = line.symbols
@@ -352,18 +337,16 @@ function fallbackOwnedGlyphFusion(line, strokes, overrides, lineIndex) {
 
 /**
  * Fuse a native reading with Pri's purpose-built line recogniser.
- *
- * Native contributes real-line membership. Pri re-segments and classifies the
- * original strokes inside each line. Native per-glyph OCR ownership is ignored
- * for ordinary lines because the on-device screenshots proved it is not a
- * trustworthy boundary.
+ * Native contributes real-line membership; Pri re-segments/classifies the
+ * original line strokes. Per-glyph Vision ownership is ignored for ordinary
+ * maths because the iPad evidence proved it is not a trustworthy boundary.
  */
-export function fuseNativeStrokeReading(reading, strokes, overrides = {}) {
+export function fuseNativeStrokeReading(reading, strokes, overrides = {}, ctx = null) {
   if (!reading?.lines?.length || !Array.isArray(strokes) || !strokes.length) return reading;
 
   const lines = reading.lines.map((line, lineIndex) => {
     if (complexLine(line)) return fallbackOwnedGlyphFusion(line, strokes, overrides, lineIndex);
-    return readWholeNativeLine(line, lineIndex, strokes, overrides)
+    return readWholeNativeLine(line, lineIndex, strokes, overrides, ctx)
       || fallbackOwnedGlyphFusion(line, strokes, overrides, lineIndex);
   });
 
