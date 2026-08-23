@@ -5,6 +5,7 @@ on:
     paths:
       - 'tools/ink-foundation/structural_joint_decode.py'
       - 'tools/ink-foundation/test_structural_joint_decode.py'
+      - 'tools/ink-foundation/compare_structural_decoders.py'
       - 'tools/ink-foundation/evaluate_structural.py'
       - 'tools/ink-foundation/evaluate_structural_dev.py'
       - '.github/workflows/ink-structural-v4-joint.yml'
@@ -12,6 +13,7 @@ on:
     paths:
       - 'tools/ink-foundation/structural_joint_decode.py'
       - 'tools/ink-foundation/test_structural_joint_decode.py'
+      - 'tools/ink-foundation/compare_structural_decoders.py'
       - 'tools/ink-foundation/evaluate_structural.py'
       - 'tools/ink-foundation/evaluate_structural_dev.py'
       - '.github/workflows/ink-structural-v4-joint.yml'
@@ -42,7 +44,9 @@ jobs:
           python -m py_compile \
             tools/ink-foundation/structural_joint_decode.py \
             tools/ink-foundation/test_structural_joint_decode.py \
-            tools/ink-foundation/evaluate_structural.py
+            tools/ink-foundation/compare_structural_decoders.py \
+            tools/ink-foundation/evaluate_structural.py \
+            tools/ink-foundation/evaluate_structural_dev.py
 
       - name: Joint decoder deterministic regression contracts
         run: python tools/ink-foundation/test_structural_joint_decode.py
@@ -55,15 +59,64 @@ jobs:
           grep -q -- '--partition-margin-threshold' /tmp/v4-eval-help.txt
           echo 'V4 decoder comparison CLI contract: PASS'
 
+      - name: Decoder comparison refuses evidence mismatch
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          common = {
+              'architectureVersion': 4,
+              'stage': 'structural-research',
+              'productionReady': False,
+              'checkpointSha256': 'abc123',
+              'split': 'validation',
+              'samples': 10,
+              'writers': 2,
+              'exactExpressionAccuracy': 0.60,
+              'characterErrorRate': 0.12,
+              'criticalStructureExact': 0.50,
+              'coverage': 0.70,
+              'safePrecision': 0.90,
+              'worstWriterExact': 0.50,
+              'evidence': 'research evaluation only; does not promote a V4 model',
+          }
+          baseline = dict(common, decoder='complete-link')
+          joint = dict(common, decoder='joint', exactExpressionAccuracy=0.70,
+                       characterErrorRate=0.08,
+                       jointPartition={'meanMargin': 0.2, 'minMargin': 0.1})
+          Path('/tmp/v4-baseline.json').write_text(json.dumps(baseline))
+          Path('/tmp/v4-joint.json').write_text(json.dumps(joint))
+          PY
+          python tools/ink-foundation/compare_structural_decoders.py \
+            /tmp/v4-baseline.json /tmp/v4-joint.json --out /tmp/v4-compare.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          report = json.loads(Path('/tmp/v4-compare.json').read_text())
+          assert report['productionReady'] is False
+          assert report['deltas']['exactExpressionAccuracy']['direction'] == 'improved'
+          candidate = json.loads(Path('/tmp/v4-joint.json').read_text())
+          candidate['checkpointSha256'] = 'different-checkpoint'
+          Path('/tmp/v4-joint-mismatch.json').write_text(json.dumps(candidate))
+          PY
+          if python tools/ink-foundation/compare_structural_decoders.py \
+              /tmp/v4-baseline.json /tmp/v4-joint-mismatch.json; then
+            echo 'comparison accepted mismatched checkpoint evidence' >&2
+            exit 1
+          fi
+          echo 'V4 decoder comparison evidence-integrity contract: PASS'
+
       - name: Research evidence boundary remains explicit
         run: |
           python - <<'PY'
           from pathlib import Path
           decoder = Path('tools/ink-foundation/structural_joint_decode.py').read_text()
           evaluator = Path('tools/ink-foundation/evaluate_structural.py').read_text()
+          comparator = Path('tools/ink-foundation/compare_structural_decoders.py').read_text()
           assert 'research path' in decoder.lower()
           assert 'productionReady": False' in evaluator
           assert 'final-holdout is locked' in evaluator
           assert 'does not promote a V4 model' in evaluator
+          assert 'release promotion remains governed by writer-disjoint production gates' in comparator
           print('Pri Ink V4 joint decoder evidence boundary: PASS')
           PY
