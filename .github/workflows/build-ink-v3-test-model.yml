@@ -5,6 +5,7 @@ on:
   pull_request:
     paths:
       - '.github/workflows/build-ink-v3-test-model.yml'
+      - 'tools/ink-foundation/requirements.txt'
 
 permissions:
   contents: read
@@ -19,7 +20,7 @@ jobs:
     runs-on: macos-14
     timeout-minutes: 75
     env:
-      PYTORCH_ENABLE_MPS_FALLBACK: '1'
+      OMP_NUM_THREADS: '3'
       OUT_DIR: /tmp/pri-ink-v3-test
       SYNTH_DIR: /tmp/pri-ink-v3-test/synth
       CHECKPOINT: /tmp/pri-ink-v3-test/PriInkFoundation-test.pt
@@ -37,38 +38,42 @@ jobs:
         with:
           node-version: '24'
 
-      - name: Install V3 training/export environment
+      - name: Install pinned V3 training/export environment
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r tools/ink-foundation/requirements.txt
           python - <<'PY'
-          import platform, torch
+          import platform, numpy, torch, coremltools
           print('platform:', platform.platform())
+          print('numpy:', numpy.__version__)
           print('torch:', torch.__version__)
-          print('MPS available:', torch.backends.mps.is_available())
+          print('coremltools:', coremltools.__version__)
+          assert torch.__version__.startswith('2.7.0'), torch.__version__
+          assert coremltools.__version__.startswith('9.0'), coremltools.__version__
           PY
 
       - name: Generate writer-disjoint Pri-owned synthetic maths curriculum
         run: |
           mkdir -p "$OUT_DIR"
-          node tools/ink-foundation/generate_synthetic.mjs "$SYNTH_DIR" 48 12 32
+          node tools/ink-foundation/generate_synthetic.mjs "$SYNTH_DIR" 24 6 24
 
-      - name: Train V3 test checkpoint
+      - name: Train V3 test checkpoint on deterministic CPU path
         run: |
           python tools/ink-foundation/train.py \
             --stage pretrain \
             --corpus "$SYNTH_DIR" \
             --out "$CHECKPOINT" \
-            --epochs 12 \
-            --batch 12 \
+            --epochs 8 \
+            --batch 8 \
             --lr 2e-4 \
-            --d-model 192 \
-            --stroke-layers 6 \
-            --decoder-layers 4 \
-            --max-points 512 \
+            --device cpu \
+            --d-model 160 \
+            --stroke-layers 4 \
+            --decoder-layers 3 \
+            --max-points 384 \
             --max-tokens 72 \
-            --workers 2 \
-            --patience 5
+            --workers 0 \
+            --patience 4
 
       - name: Verify checkpoint is V3 development evidence only
         run: |
@@ -82,7 +87,7 @@ jobs:
           assert manifest.get('architectureVersion') == 3, manifest
           assert manifest.get('evidence') == 'synthetic initialization only', manifest
           cfg = ckpt['config']
-          assert cfg['d_model'] == 192 and cfg['stroke_layers'] == 6 and cfg['decoder_layers'] == 4, cfg
+          assert cfg['d_model'] == 160 and cfg['stroke_layers'] == 4 and cfg['decoder_layers'] == 3, cfg
           print('checkpoint contract: PASS')
           print('synthetic validation:', ckpt.get('validation'))
           PY
@@ -118,7 +123,7 @@ jobs:
           ckpt = torch.load(p, map_location='cpu', weights_only=False)
           val = ckpt.get('validation') or {}
           cfg = ckpt['config']
-          text = f'''PRI INK FOUNDATION V3 — DEBUG TEST MODEL\n\nArchitecture: V3 multimodal stroke Transformer + 2-D visual tokens + cross-modal style + physical CTC training auxiliary.\nConfig: d_model={cfg['d_model']}, stroke_layers={cfg['stroke_layers']}, decoder_layers={cfg['decoder_layers']}, max_points={cfg['max_points']}, max_tokens={cfg['max_tokens']}\nSynthetic curriculum: 48 train writers + 12 writer-disjoint synthetic validation writers, 32 expressions/writer.\nTraining: up to 12 epochs with early stopping.\nSynthetic validation exact: {100*float(val.get('exact', 0)):.2f}%\nSynthetic validation CER: {100*float(val.get('cer', 0)):.2f}%\n\nIMPORTANT EVIDENCE BOUNDARY\nThis checkpoint is synthetic-pretrained only. It is useful for DEBUG runtime/iPad testing but is NOT evidence of natural Apple Pencil accuracy and is NOT production-promoted. P0001 private handwriting was not available to GitHub Actions and was not fabricated. Release gates remain unchanged.\n'''
+          text = f'''PRI INK FOUNDATION V3 — DEBUG TEST MODEL\n\nArchitecture: V3 multimodal stroke Transformer + 2-D visual tokens + cross-modal style + physical CTC training auxiliary.\nConfig: d_model={cfg['d_model']}, stroke_layers={cfg['stroke_layers']}, decoder_layers={cfg['decoder_layers']}, max_points={cfg['max_points']}, max_tokens={cfg['max_tokens']}\nSynthetic curriculum: 24 train writers + 6 writer-disjoint synthetic validation writers, 24 expressions/writer.\nTraining: up to 8 epochs with early stopping on the deterministic CPU path.\nSynthetic validation exact: {100*float(val.get('exact', 0)):.2f}%\nSynthetic validation CER: {100*float(val.get('cer', 0)):.2f}%\n\nIMPORTANT EVIDENCE BOUNDARY\nThis checkpoint is synthetic-pretrained only. It is useful for DEBUG runtime/iPad testing but is NOT evidence of natural Apple Pencil accuracy and is NOT production-promoted. P0001 private handwriting was not available to GitHub Actions and was not fabricated. Release gates remain unchanged.\n'''
           open(os.path.join(os.environ['OUT_DIR'], 'TEST_MODEL_README.txt'), 'w').write(text)
           print(text)
           with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as f:
