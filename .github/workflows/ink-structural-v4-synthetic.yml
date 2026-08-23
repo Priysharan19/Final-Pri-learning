@@ -148,8 +148,8 @@ jobs:
           assert baseline['productionReady'] is False
           assert joint['productionReady'] is False
           assert comparison['productionReady'] is False
-          assert comparison['comparison'] == 'complete-link-vs-joint-contiguous-v1'
-          assert joint['jointPartition']['assumption'].startswith('glyph strokes are contiguous')
+          assert comparison['comparison'] == 'complete-link-vs-joint'
+          assert joint['jointPartition']['actualSearchRegimes'] == {'joint-contiguous-v1': 8}
           print('Actual-model joint decoder integration: PASS (accuracy remains synthetic smoke evidence only)')
           PY
 
