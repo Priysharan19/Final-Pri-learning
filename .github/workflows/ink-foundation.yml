@@ -16,14 +16,16 @@ concurrency:
 
 jobs:
   tooling:
-    name: Model tooling contract
+    name: Model tooling and training contract
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+          cache: pip
+          cache-dependency-path: tools/ink-foundation/requirements.txt
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -49,6 +51,8 @@ jobs:
           runtime = Path('ios/PriLearning.swiftpm/Ink/InkFoundationRuntime.swift').read_text()
           required = {
               'release evaluator checks final holdout': 'final-holdout' in release and 'passesReleaseTargets' in release,
+              'release evaluator checks critical structure': 'critical_structure_exact' in release,
+              'release evaluator checks safe precision': 'safe_precision' in release,
               'export verifies checkpoint hash': 'checkpointSha256' in export and 'sha256(checkpoint)' in export,
               'export writes promotion metadata': 'pri.productionReady' in export,
               'runtime enforces promotion metadata': 'pri.productionReady' in runtime,
@@ -57,4 +61,43 @@ jobs:
           if bad:
               raise SystemExit('foundation evidence contract broken: ' + ', '.join(bad))
           print('foundation evidence contract: PASS')
+          PY
+
+      - name: Install training dependencies
+        run: python -m pip install -r tools/ink-foundation/requirements.txt
+
+      - name: Generate tiny whole-expression corpus
+        run: node tools/ink-foundation/generate_synthetic.mjs /tmp/pri-ink-smoke 6 2 3
+
+      - name: One-epoch CPU training smoke test
+        run: |
+          python tools/ink-foundation/train.py \
+            --stage pretrain \
+            --corpus /tmp/pri-ink-smoke \
+            --out /tmp/pri-ink-smoke.pt \
+            --epochs 1 \
+            --batch 4 \
+            --workers 0 \
+            --device cpu \
+            --d-model 64 \
+            --stroke-layers 1 \
+            --decoder-layers 1 \
+            --max-points 128 \
+            --max-tokens 32 \
+            --patience 1
+
+      - name: Training smoke produced a real checkpoint
+        run: |
+          python - <<'PY'
+          import json, pathlib, torch
+          p = pathlib.Path('/tmp/pri-ink-smoke.pt')
+          if not p.exists() or p.stat().st_size < 10_000:
+              raise SystemExit('training smoke did not produce a substantive checkpoint')
+          ckpt = torch.load(p, map_location='cpu', weights_only=False)
+          if ckpt.get('stage') != 'pretrain' or not ckpt.get('model'):
+              raise SystemExit('training checkpoint metadata/state is incomplete')
+          manifest = json.loads(p.with_suffix('.json').read_text())
+          if manifest.get('stage') != 'pretrain' or manifest.get('evidence') != 'synthetic initialization only':
+              raise SystemExit('pretrain manifest blurred synthetic and real evidence')
+          print('foundation training smoke: PASS')
           PY
