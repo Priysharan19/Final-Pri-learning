@@ -4,8 +4,9 @@
 The tool refuses apples-to-oranges comparisons: checkpoint hash, split, sample
 count, writer count, stage and (for same-writer development reports) frozen split
 metadata must match. It accepts only explicitly named joint decoder variants,
-reports their search regime, and never turns same-writer or synthetic results into
-production evidence or lowers any release threshold.
+reports their search regime and optional component-validity calibrator, and never
+turns same-writer or synthetic results into production evidence or lowers any
+release threshold.
 """
 from __future__ import annotations
 
@@ -72,6 +73,13 @@ def main():
     if "validationProtocol" in baseline or "validationProtocol" in candidate:
         _same("validationProtocol", baseline, candidate)
 
+    validity = candidate.get("componentValidity")
+    if validity is not None:
+        if validity.get("baseCheckpointSha256") != candidate.get("checkpointSha256"):
+            raise SystemExit("candidate component validity metadata is not tied to candidate base checkpoint")
+        if validity.get("componentValidityVersion") != 1:
+            raise SystemExit("candidate component validity metadata has unsupported version")
+
     deltas = {}
     regressions = []
     for key, label, higher_is_better in METRICS:
@@ -106,12 +114,14 @@ def main():
         "deltas": deltas,
         "regressions": regressions,
         "candidateJointPartition": candidate.get("jointPartition"),
+        "candidateComponentValidity": validity,
         "evidence": baseline.get("evidence"),
         "interpretation": "comparison only; release promotion remains governed by writer-disjoint production gates",
     }
 
     print("\nPri Ink Structural V4 — DECODER COMPARISON\n")
     print(f"candidate decoder: {candidate_decoder}")
+    print(f"component validity: {'enabled' if validity else 'disabled'}")
     print(f"stage: {result['stage']} · samples: {result['samples']} · writers: {result['writers']}")
     for key, _, _ in METRICS:
         row = deltas.get(key)
