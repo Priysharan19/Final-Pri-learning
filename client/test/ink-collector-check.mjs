@@ -37,7 +37,11 @@ check('finger input is rejected', html.includes("e.pointerType!=='pen'"));
 check('stored samples are Pencil-labelled', html.includes("pen:true,strokes:"));
 check('predicted touches are excluded', html.includes('predictedTouchesStored:false') && html.includes('predictedEvents:false'));
 check('coalesced real events are captured', html.includes('getCoalescedEvents'));
-check('collector schema is at least v4', /collector:\{name:'pri-ink-collect-v2',version:([4-9]|[1-9][0-9]+)/.test(html));
+check('overlapping coalesced batches cannot regress stroke time', html.includes('if(last&&q.t<last.t)return false'));
+check('duplicate coalesced points are rejected', html.includes("q.t===last.t&&q.x===last.x&&q.y===last.y"));
+check('drawing is frame-throttled', html.includes('requestAnimationFrame'));
+check('stroke redraw is linear, not per-point restroking', /for\(let i=1;i<st\.points\.length;i\+\+\)\{const p=st\.points\[i\];ctx\.lineTo\(p\.x,p\.y\)\}ctx\.stroke\(\)/.test(html));
+check('collector schema is at least v5', /collector:\{name:'pri-ink-collect-v2',version:([5-9]|[1-9][0-9]+)/.test(html));
 
 console.log(`\n${failures ? `FAIL — ${failures} collector contract problem(s)` : `PASS — ${pairs.length} prompts and corpus provenance contract verified`}`);
 process.exit(failures ? 1 : 0);
