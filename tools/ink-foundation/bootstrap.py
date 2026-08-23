@@ -5,18 +5,18 @@ Pipeline:
   V3 generic synthetic pretraining
     -> optional writer-specific synthetic replay made only from bootstrap-TRAIN
        glyphs
-    -> real one-writer adaptation with a personalization-biased optimizer
+    -> replay-balanced real one-writer adaptation with a personalization-biased
+       optimizer
     -> DEBUG Core ML
 
 The same human appears in train/dev, so this is NEVER arbitrary-writer release
 evidence. Personal synthetic replay is also never counted as real evidence.
 
-The bootstrap optimizer intentionally adapts the visual CNN/style path more
-aggressively than the generic stroke backbone. This is a local personalization
-mechanism, not evidence of cross-writer generalisation: the raster encoder sees
-this writer's morphology and writer-derived replay at a higher learning rate,
-while the pretrained stroke representation moves conservatively to reduce
-catastrophic forgetting from a single human writer.
+Two safeguards matter for a 50-expression writer:
+  * writer-derived replay may be large, but it must not drown out the scarce
+    real Pencil samples; weighted sampling keeps a controlled real-data share;
+  * the visual CNN/style path adapts more aggressively than the generic stroke
+    backbone, which moves conservatively to reduce catastrophic forgetting.
 """
 from __future__ import annotations
 
@@ -29,7 +29,7 @@ from pathlib import Path
 
 import torch
 import torch.nn.functional as F
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, WeightedRandomSampler
 
 from data import BOS_ID, EOS_ID, PAD_ID, VOCAB, Example, InkDataset, corpus_files, load_examples
 from model import ModelConfig, PriInkFoundation
@@ -37,12 +37,7 @@ from train import ctc_alignment_loss, evaluate, load_initial_backbone, seed_ever
 
 
 def bootstrap_validation_indices(examples: list[Example], seed: int, fraction: float) -> set[int]:
-    """Stable cross-language split used by Python training and JS personal synth.
-
-    SHA-256 over seed/index/target makes the holdout reproducible without relying
-    on Python-vs-JS PRNG implementations. The personal synthesizer mirrors this
-    exactly and is forbidden from extracting glyphs from these indices.
-    """
+    """Stable cross-language split used by Python training and JS personal synth."""
     fraction = min(0.35, max(0.10, fraction))
     n_val = max(8, int(round(len(examples) * fraction)))
     n_val = min(n_val, len(examples) - 8)
@@ -94,6 +89,35 @@ def load_personal_synthetic(root: str | None, writer: str) -> list[Example]:
     return [Example(writer=x.writer, split="train", target=x.target, strokes=x.strokes, source=x.source) for x in rows]
 
 
+def replay_sampling_weights(
+    rows: list[Example], personal_sources: set[str], real_fraction: float
+) -> tuple[torch.Tensor, int, int]:
+    """Return per-row weights whose probability mass preserves real Pencil data.
+
+    With 40 real bootstrap-train expressions and 1,600 personal replay rows,
+    uniform sampling would make real data only ~2.4% of updates. The replay is a
+    regularizer/curriculum, not a replacement for the real writer. We therefore
+    assign a fixed probability mass to real rows and spread the remainder across
+    writer-derived synthetic rows. Counts stay metadata-only and are never
+    confused with release evidence.
+    """
+    real_fraction = min(0.75, max(0.10, float(real_fraction)))
+    is_synth = [row.source in personal_sources for row in rows]
+    real_count = sum(not x for x in is_synth)
+    synth_count = sum(is_synth)
+    if real_count < 1 or synth_count < 1:
+        raise RuntimeError(
+            f"replay-balanced sampling needs real and personal rows; real={real_count} synthetic={synth_count}"
+        )
+    real_weight = real_fraction / real_count
+    synth_weight = (1.0 - real_fraction) / synth_count
+    weights = torch.tensor(
+        [synth_weight if synth else real_weight for synth in is_synth],
+        dtype=torch.double,
+    )
+    return weights, real_count, synth_count
+
+
 def personalization_parameter_groups(
     model: PriInkFoundation,
     base_lr: float,
@@ -101,13 +125,7 @@ def personalization_parameter_groups(
     stroke_multiplier: float,
     decoder_multiplier: float,
 ):
-    """Disjoint LR groups tuned for one-writer local adaptation.
-
-    The raster CNN + style MLP get the strongest writer-specific update because
-    they encode morphology. The generic stroke Transformer moves more slowly so
-    40-ish real training expressions cannot erase broad synthetic structure.
-    Decoder/output layers keep the base rate to learn P0001 token/layout priors.
-    """
+    """Disjoint LR groups tuned for one-writer local adaptation."""
     visual_modules = (model.raster_encoder, model.style_encoder)
     decoder_modules = (model.decoder, model.output, model.output_queries, model.output_pos)
 
@@ -158,6 +176,8 @@ def main():
     p.add_argument("--lr", type=float, default=4e-5)
     p.add_argument("--weight-decay", type=float, default=0.03)
     p.add_argument("--ctc-loss", type=float, default=0.16)
+    p.add_argument("--real-replay-fraction", type=float, default=0.30,
+                   help="expected share of adaptation draws coming from real Pencil rows when personal replay is used")
     p.add_argument("--visual-lr-multiplier", type=float, default=2.0,
                    help="writer-specific raster CNN/style adaptation multiplier")
     p.add_argument("--stroke-lr-multiplier", type=float, default=0.45,
@@ -178,6 +198,8 @@ def main():
 
     if min(args.visual_lr_multiplier, args.stroke_lr_multiplier, args.decoder_lr_multiplier) <= 0:
         raise SystemExit("all personalization LR multipliers must be positive")
+    if not 0.10 <= args.real_replay_fraction <= 0.75:
+        raise SystemExit("--real-replay-fraction must be between 0.10 and 0.75")
 
     seed_everything(args.seed)
     if args.device == "auto":
@@ -215,8 +237,33 @@ def main():
         examples, "validation", cfg.max_points, cfg.max_tokens,
         cfg.raster_height, cfg.raster_width, writer_to_id,
     )
+
+    train_sampler = None
+    effective_real_fraction = None
+    if personal_synth:
+        personal_sources = {row.source for row in personal_synth}
+        weights, sampled_real_count, sampled_synth_count = replay_sampling_weights(
+            train_ds.rows, personal_sources, args.real_replay_fraction
+        )
+        if sampled_real_count != real_train_count or sampled_synth_count != len(personal_synth):
+            raise RuntimeError(
+                "replay sampler provenance mismatch: "
+                f"real {sampled_real_count}/{real_train_count}, "
+                f"synthetic {sampled_synth_count}/{len(personal_synth)}"
+            )
+        generator = torch.Generator()
+        generator.manual_seed(args.seed ^ 0x51A7E11)
+        train_sampler = WeightedRandomSampler(
+            weights,
+            num_samples=len(train_ds),
+            replacement=True,
+            generator=generator,
+        )
+        effective_real_fraction = args.real_replay_fraction
+
     train_loader = DataLoader(
-        train_ds, batch_size=args.batch, shuffle=True,
+        train_ds, batch_size=args.batch,
+        shuffle=train_sampler is None, sampler=train_sampler,
         num_workers=args.workers, pin_memory=device.type == "cuda",
     )
     val_loader = DataLoader(
@@ -263,6 +310,11 @@ def main():
     )
     print(f"initialized backbone from {args.init}")
     print(f"parameters={sum(p.numel() for p in model.parameters()):,}")
+    if effective_real_fraction is not None:
+        print(
+            f"replay-balanced sampling: expected real Pencil share={100 * effective_real_fraction:.1f}% "
+            f"(uniform would be {100 * real_train_count / max(real_train_count + len(personal_synth), 1):.1f}%)"
+        )
     print(
         "personalization LRs: "
         f"visual-cnn/style={args.lr * args.visual_lr_multiplier:.3g} "
@@ -327,7 +379,8 @@ def main():
                     "visual_lr_multiplier": args.visual_lr_multiplier,
                     "stroke_lr_multiplier": args.stroke_lr_multiplier,
                     "decoder_lr_multiplier": args.decoder_lr_multiplier,
-                    "strategy": "writer-specific CNN/style emphasis with conservative stroke-backbone adaptation",
+                    "real_replay_fraction": effective_real_fraction,
+                    "strategy": "cross-modal writer CNN/style emphasis + replay-balanced real Pencil sampling + conservative stroke-backbone adaptation",
                 },
             }, out)
             manifest_path.write_text(json.dumps({
@@ -335,7 +388,7 @@ def main():
                 "architectureVersion": 3, "stage": "bootstrap",
                 "evidence": "same-writer real development holdout — NOT generalisation evidence; personal synthetic replay excluded from evidence counts",
                 "releaseEligible": False,
-                "decoder": "parallel-output-queries+2d-visual+physical-ctc-aux",
+                "decoder": "parallel-output-queries+2d-visual+cross-modal-style+physical-ctc-aux",
                 "checkpoint": out.name, "config": cfg.to_dict(), "vocab": VOCAB,
                 "validation": val, "realWriterCount": 1,
                 "realTrainSamples": real_train_count,
@@ -345,9 +398,11 @@ def main():
                 "auxiliaryLossWeights": {"ctc": args.ctc_loss},
                 "personalization": {
                     "writerSpecificVisualCNNAdaptation": True,
+                    "crossModalStyleEmbedding": True,
                     "visualLearningRateMultiplier": args.visual_lr_multiplier,
                     "strokeBackboneLearningRateMultiplier": args.stroke_lr_multiplier,
                     "decoderLearningRateMultiplier": args.decoder_lr_multiplier,
+                    "expectedRealReplayFraction": effective_real_fraction,
                 },
                 "holdoutPolicy": "Real dev-val samples are excluded from personal glyph extraction/replay. No test/final-holdout data is read. Production release remains forbidden.",
             }, indent=2), encoding="utf-8")
