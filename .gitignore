@@ -1,6 +1,7 @@
 node_modules/
 client/dist/
 .venv/
+.venv-ink/
 server/data/*.db
 .DS_Store
 *.log
@@ -10,3 +11,10 @@ scripts/.lan-cert/
 # Real Apple Pencil corpus is local/private training data.
 # Keep the corpus README tracked, but never commit participant JSON sessions.
 client/test/ink-corpus/*.json
+
+# Local neural-training outputs are large/private development artifacts.
+tools/ink-foundation/runs/
+
+# Development bootstrap models are installed locally for DEBUG testing only.
+ios/PriLearning.swiftpm/Resources/Models/PriInkFoundation.mlpackage/
+ios/PriLearning\ 2.swiftpm/Resources/Models/PriInkFoundation.mlpackage/
