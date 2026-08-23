@@ -1,13 +1,12 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Serves Pri Learning or the real-Pencil corpus collector to an iPad over LAN.
-// HTTPS is the default so the page runs in a secure context. `--collector`
-// serves tools/ink-collect-v2 directly, which makes writer collection a one-
-// command operation without rebuilding the application.
+// Serves Pri Learning, the real-Pencil corpus collector, or the V4 structural
+// annotator to an iPad/desktop over LAN. HTTPS is the default so the collection
+// path runs in a secure context.
 //
 //   npm run serve:lan                 built app, HTTPS on 4188
 //   npm run serve:lan -- --http       built app, plain HTTP
 //   npm run ink:collect               corpus collector, HTTPS on 4192
-//   npm run ink:collect -- --http     corpus collector, plain HTTP
+//   npm run ink:annotate              V4 structural annotator, HTTPS on 4194
 // ─────────────────────────────────────────────────────────────────────────────
 import { createServer as createHttp } from 'node:http';
 import { createServer as createHttps } from 'node:https';
@@ -19,19 +18,27 @@ import { execFileSync } from 'node:child_process';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const COLLECTOR = process.argv.includes('--collector');
-const ROOT = COLLECTOR
-  ? fileURLToPath(new URL('../tools/ink-collect-v2', import.meta.url))
-  : fileURLToPath(new URL('../client/dist', import.meta.url));
+const ANNOTATOR = process.argv.includes('--annotator');
+if (COLLECTOR && ANNOTATOR) {
+  console.error('choose either --collector or --annotator, not both');
+  process.exit(2);
+}
+const ROOT = ANNOTATOR
+  ? fileURLToPath(new URL('../tools/ink-annotate-v4', import.meta.url))
+  : COLLECTOR
+    ? fileURLToPath(new URL('../tools/ink-collect-v2', import.meta.url))
+    : fileURLToPath(new URL('../client/dist', import.meta.url));
 const CERT_DIR = join(HERE, '.lan-cert');
 const PLAIN = process.argv.includes('--http');
 const numeric = process.argv.find(a => /^\d+$/.test(a));
-const PORT = Number(numeric || (COLLECTOR ? 4192 : 4188));
+const DEFAULT_PORT = ANNOTATOR ? 4194 : (COLLECTOR ? 4192 : 4188);
+const PORT = Number(numeric || DEFAULT_PORT);
 
 const lan = Object.values(networkInterfaces()).flat()
   .find(n => n && n.family === 'IPv4' && !n.internal);
 
 if (!existsSync(ROOT)) {
-  console.error(`${ROOT} does not exist${COLLECTOR ? '' : ' — run `npm run build` first'}.`);
+  console.error(`${ROOT} does not exist${COLLECTOR || ANNOTATOR ? '' : ' — run `npm run build` first'}.`);
   process.exit(2);
 }
 
@@ -88,7 +95,7 @@ const handler = (req, res) => {
   let f = safeFile(p);
   if (!f) { res.writeHead(403); return res.end('forbidden'); }
   if (!existsSync(f) || statSync(f).isDirectory()) {
-    if (COLLECTOR || !extname(p)) f = join(ROOT, 'index.html');
+    if (COLLECTOR || ANNOTATOR || !extname(p)) f = join(ROOT, 'index.html');
   }
   if (!existsSync(f)) { res.writeHead(404); return res.end('not found'); }
   res.writeHead(200, {
@@ -100,23 +107,28 @@ const handler = (req, res) => {
 };
 
 const where = (scheme, port) => lan ? `${scheme}://${lan.address}:${port}` : `${scheme}://localhost:${port}`;
-const label = COLLECTOR ? 'real-Pencil corpus collector' : 'Pri Learning build';
+const label = ANNOTATOR
+  ? 'Pri Ink V4 structural annotator'
+  : COLLECTOR ? 'real-Pencil corpus collector' : 'Pri Learning build';
 
 if (PLAIN) {
   createHttp(handler).listen(PORT, '0.0.0.0', () => {
     console.log(`serving ${label} from ${ROOT}\n`);
-    console.log(`  on the iPad   ${where('http', PORT)}\n`);
-    if (!COLLECTOR) console.log('Plain HTTP has reduced app capability; HTTPS is the production-like route.');
+    console.log(`  open          ${where('http', PORT)}\n`);
+    if (!COLLECTOR && !ANNOTATOR) console.log('Plain HTTP has reduced app capability; HTTPS is the production-like route.');
   });
 } else {
   const creds = certificate();
   createHttps(creds, handler).listen(PORT, '0.0.0.0', () => {
     console.log(`serving ${label} from ${ROOT}\n`);
-    console.log(`  on the iPad   ${where('https', PORT)}`);
+    console.log(`  open          ${where('https', PORT)}`);
     console.log(`  certificate   ${where('http', PORT + 1)}/cert   (first time only)\n`);
     if (COLLECTOR) {
       console.log('Use anonymous writer codes. Keep each writer permanently in one split.');
       console.log('After each session, save the JSON into client/test/ink-corpus/.');
+    } else if (ANNOTATOR) {
+      console.log('Load a corpus JSON locally; no handwriting data is uploaded by this tool.');
+      console.log('Save the structural-v4 JSON beside the source corpus when annotation is complete.');
     } else {
       console.log('Trust the certificate once on the iPad for the full secure-context app.');
     }
