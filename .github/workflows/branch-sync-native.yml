@@ -60,3 +60,5 @@ jobs:
           fi
           git commit -m 'Sync duplicate iPad package and portable archive'
           git push origin HEAD:pri-local-ink-v2
+
+# Trigger revision 2: canonical source drift gate is now mandatory.
