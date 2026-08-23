@@ -1,14 +1,14 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Pri Ink Foundation · synthetic PRETRAINING corpus
+// Pri Ink Foundation · synthetic PRETRAINING corpus V3
 //
-// This is initialization data, not release evidence. It generates whole maths
-// expressions from the same vector template/style machinery as the existing ink
-// engine, but keeps ONE hand consistent across each synthetic writer and includes
-// 2D powers/fractions that a symbol-only classifier never sees.
+// Initialization data only — never release evidence. The curriculum is built
+// around secondary-school/HSC mathematical writing rather than generic glyph
+// strings: equations, polynomial differentiation, chain rule, powers, stacked
+// fractions, radicals, trig, inequalities and factorisation. One synthetic hand
+// remains consistent across every sample from a writer.
 //
 // Usage:
 //   node tools/ink-foundation/generate_synthetic.mjs [outDir] [trainWriters] [valWriters] [samplesPerWriter]
-// Defaults deliberately make a substantial corpus; reduce them for a smoke run.
 // ─────────────────────────────────────────────────────────────────────────────
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -18,8 +18,8 @@ import { stylize, makeRng } from '../../client/src/ink/aug.js';
 const OUT = process.argv[2] || '/tmp/pri-ink-foundation-synth';
 const TRAIN_WRITERS = Number(process.argv[3] || 800);
 const VAL_WRITERS = Number(process.argv[4] || 80);
-const SAMPLES = Number(process.argv[5] || 64);
-const rng = makeRng(2026082301); // pretraining seed; never a release holdout
+const SAMPLES = Number(process.argv[5] || 72);
+const rng = makeRng(2026082301);
 
 rmSync(OUT, { recursive: true, force: true });
 mkdirSync(OUT, { recursive: true });
@@ -33,17 +33,18 @@ const num = (n = 1) => [NZ(), ...Array.from({ length: Math.max(0, n - 1) }, D)];
 
 function makeWriter() {
   return {
-    slant: (rng() * 2 - 1) * 0.32,
-    aspect: 0.78 + rng() * 0.46,
-    size: 38 + rng() * 18,
-    spacing: 0.05 + rng() * 0.30,
-    drift: (rng() * 2 - 1) * 0.05,
-    wobble: 0.25 + rng() * 1.35,
-    sizeVar: 0.03 + rng() * 0.13,
-    pressure: 0.25 + rng() * 0.65,
-    speed: 90 + rng() * 220,
+    slant: (rng() * 2 - 1) * 0.36,
+    aspect: 0.72 + rng() * 0.58,
+    size: 36 + rng() * 22,
+    spacing: 0.03 + rng() * 0.34,
+    drift: (rng() * 2 - 1) * 0.065,
+    wobble: 0.20 + rng() * 1.55,
+    sizeVar: 0.02 + rng() * 0.16,
+    pressure: 0.20 + rng() * 0.72,
+    speed: 75 + rng() * 260,
     azimuth: rng() * Math.PI * 2,
-    altitude: 0.55 + rng() * 0.85
+    altitude: 0.50 + rng() * 0.95,
+    primeLean: (rng() * 2 - 1) * 0.18
   };
 }
 
@@ -77,7 +78,7 @@ function enrichStroke(points, writer, scale, strokeOrdinal) {
     const pressure = clamp(writer.pressure + wave, 0.05, 1);
     return {
       x: +x.toFixed(3), y: +y.toFixed(3),
-      w: +(1.5 + pressure * 2.6).toFixed(3),
+      w: +(1.4 + pressure * 2.8).toFixed(3),
       t: +t.toFixed(6), p: +pressure.toFixed(4),
       azimuth: +writer.azimuth.toFixed(5), altitude: +writer.altitude.toFixed(5)
     };
@@ -104,9 +105,19 @@ function glyph(sym, writer, x, y, scaleFactor = 1, ordinalBase = 0) {
   };
 }
 
-function writeTokens(tokens, writer, x = 18, y = 36, scaleFactor = 1) {
+function primeGlyph(writer, x, y, ordinal = 0) {
+  const h = writer.size * (0.20 + rng() * 0.12);
+  const dx = h * (0.20 + writer.primeLean);
+  const pts = [[x, y + h], [x + dx, y]];
+  return {
+    strokes: [enrichStroke(pts, writer, Math.max(0.3, h / 100), ordinal)],
+    width: Math.max(4, Math.abs(dx) + 3), height: h, strokeCount: 1
+  };
+}
+
+function writeTokens(tokens, writer, x = 18, y = 36, scaleFactor = 1, ordinalBase = 0) {
   const strokes = [];
-  let cursor = x, ordinal = 0;
+  let cursor = x, ordinal = ordinalBase;
   for (let i = 0; i < tokens.length; i++) {
     const g = glyph(tokens[i], writer, cursor, y + writer.drift * writer.size * i,
       scaleFactor, ordinal);
@@ -114,14 +125,14 @@ function writeTokens(tokens, writer, x = 18, y = 36, scaleFactor = 1) {
     ordinal += g.strokeCount;
     cursor += g.width + writer.spacing * writer.size * scaleFactor;
   }
-  return { strokes, x1: x, x2: cursor, width: Math.max(1, cursor - x) };
+  return { strokes, x1: x, x2: cursor, width: Math.max(1, cursor - x), ordinal };
 }
 
 const OUT_TOKEN = { pm: '±', deg: '°', percent: '%', div: '/', theta: 'theta', pi: 'pi' };
 const plain = tokens => tokens.map(t => OUT_TOKEN[t] || t).join('');
 
 function baseline(writer) {
-  const kind = Math.floor(rng() * 16);
+  const kind = Math.floor(rng() * 18);
   let tokens, target;
   switch (kind) {
     case 0: tokens = [...num(1), V(), '+', ...num(2), '=', ...num(2)]; break;
@@ -134,37 +145,151 @@ function baseline(writer) {
     case 7: tokens = [V(), pick(['>', '>=']), ...num(2)]; break;
     case 8: tokens = [...num(2), 'percent']; break;
     case 9: tokens = [...num(2), 'deg']; break;
-    case 10: { const v = V(); tokens = ['s', 'i', 'n', v, '=', NZ(), '.', D()]; target = `sin(${v})=${tokens.slice(5).join('')}`; break; }
-    case 11: { const v = V(); tokens = ['c', 'o', 's', v, '=', NZ(), '/', NZ()]; target = `cos(${v})=${tokens.slice(5).join('')}`; break; }
+    case 10: { const v = V(); tokens = ['s', 'i', 'n', '(', v, ')', '=', NZ(), '.', D()]; target = plain(tokens); break; }
+    case 11: { const v = V(); tokens = ['c', 'o', 's', '(', v, ')', '=', NZ(), '/', NZ()]; target = plain(tokens); break; }
     case 12: tokens = [...num(3 + Math.floor(rng() * 3))]; break;
     case 13: tokens = [...num(1), V(), '+', ...num(1), V(), '=', ...num(2)]; break;
     case 14: tokens = ['theta', '=', ...num(2), 'deg']; break;
-    default: tokens = [NZ(), 'pi', V()]; break;
+    case 15: tokens = [NZ(), 'pi', V()]; break;
+    case 16: tokens = ['0', '=', ...num(1), V(), '+', ...num(1)]; break;
+    default: tokens = [V(), '!=', '0']; break;
   }
   return { ...writeTokens(tokens, writer), target: target || plain(tokens) };
+}
+
+function powerTerm(writer, coefficient, variable, power, x, y, ordinal = 0) {
+  const baseTokens = [...coefficient, variable];
+  const base = writeTokens(baseTokens, writer, x, y, 1, ordinal);
+  const exp = writeTokens([power], writer, base.x2 + 1, y - writer.size * 0.62, 0.58, base.ordinal);
+  return {
+    strokes: [...base.strokes, ...exp.strokes],
+    x2: Math.max(base.x2, exp.x2), ordinal: exp.ordinal,
+    target: `${plain(baseTokens)}^(${power})`
+  };
 }
 
 function superscript(writer) {
   const variable = V();
   const power = pick(['2', '3', '4']);
-  const base = writeTokens([variable], writer, 22, 62, 1);
-  const exponent = writeTokens([power], writer, base.x2 + 2, 24, 0.60);
-  const strokes = [...base.strokes, ...exponent.strokes];
-  let target = `${variable}^(${power})`;
-  if (rng() < 0.62) {
+  const term = powerTerm(writer, [], variable, power, 22, 64, 0);
+  const strokes = [...term.strokes];
+  let target = term.target;
+  if (rng() < 0.68) {
     const tailTokens = ['+', NZ()];
-    const tail = writeTokens(tailTokens, writer, exponent.x2 + writer.spacing * writer.size, 62, 1);
-    strokes.push(...tail.strokes);
-    target += plain(tailTokens);
+    const tail = writeTokens(tailTokens, writer, term.x2 + writer.spacing * writer.size + 3, 64, 1, term.ordinal);
+    strokes.push(...tail.strokes); target += plain(tailTokens);
   }
   return { strokes, target };
+}
+
+function polynomial(writer, derivative = false) {
+  let x = 18, ordinal = 0;
+  const strokes = [];
+  const v = 'x';
+
+  if (derivative) {
+    const lhs = writeTokens(['y'], writer, x, 66, 1, ordinal);
+    strokes.push(...lhs.strokes); ordinal = lhs.ordinal; x = lhs.x2;
+    const prime = primeGlyph(writer, x + 1, 25, ordinal);
+    strokes.push(...prime.strokes); ordinal += 1; x += prime.width + writer.spacing * writer.size;
+    const eq = writeTokens(['='], writer, x, 66, 1, ordinal);
+    strokes.push(...eq.strokes); ordinal = eq.ordinal; x = eq.x2;
+  } else {
+    const lhs = writeTokens(['y', '='], writer, x, 66, 1, ordinal);
+    strokes.push(...lhs.strokes); ordinal = lhs.ordinal; x = lhs.x2;
+  }
+
+  const c1 = derivative ? pick([['6'], ['9'], ['1','2']]) : pick([['2'], ['3'], ['4']]);
+  const p1 = derivative ? '2' : '3';
+  const term1 = powerTerm(writer, c1, v, p1, x, 66, ordinal);
+  strokes.push(...term1.strokes); ordinal = term1.ordinal; x = term1.x2 + writer.spacing * writer.size;
+
+  const mid = writeTokens(['+'], writer, x, 66, 1, ordinal);
+  strokes.push(...mid.strokes); ordinal = mid.ordinal; x = mid.x2;
+
+  if (derivative) {
+    const linear = writeTokens([NZ(), v, '-', '1', '8', '0'], writer, x, 66, 1, ordinal);
+    strokes.push(...linear.strokes);
+    return { strokes, target: `y'=${plain(c1)}x^(2)+${linear ? '' : ''}${''}`.replace(/\+$/, '') + '' , _derivativeParts: { c1 } };
+  }
+
+  const c2 = pick([['2'], ['3'], ['5']]);
+  const term2 = powerTerm(writer, c2, v, '2', x, 66, ordinal);
+  strokes.push(...term2.strokes); ordinal = term2.ordinal; x = term2.x2 + writer.spacing * writer.size;
+  const tail = writeTokens(['-', '1', '8', '0', v], writer, x, 66, 1, ordinal);
+  strokes.push(...tail.strokes);
+  return { strokes, target: `y=${plain(c1)}x^(3)+${plain(c2)}x^(2)-180x` };
+}
+
+// A deterministic derivative polynomial mirroring common HSC working. Kept
+// separate from polynomial() so the target exactly matches what is rendered.
+function derivativePolynomial(writer) {
+  let x = 18, ordinal = 0;
+  const strokes = [];
+  const lhs = writeTokens(['y'], writer, x, 66, 1, ordinal);
+  strokes.push(...lhs.strokes); ordinal = lhs.ordinal; x = lhs.x2;
+  const pr = primeGlyph(writer, x + 1, 24, ordinal);
+  strokes.push(...pr.strokes); ordinal += 1; x += pr.width + writer.spacing * writer.size;
+  const eq = writeTokens(['=', '6', 'x'], writer, x, 66, 1, ordinal);
+  strokes.push(...eq.strokes); ordinal = eq.ordinal;
+  const exp = writeTokens(['2'], writer, eq.x2 + 1, 27, 0.58, ordinal);
+  strokes.push(...exp.strokes); ordinal = exp.ordinal; x = Math.max(eq.x2, exp.x2) + writer.spacing * writer.size;
+  const tail = writeTokens(['+', '6', 'x', '-', '1', '8', '0'], writer, x, 66, 1, ordinal);
+  strokes.push(...tail.strokes);
+  return { strokes, target: "y'=6x^(2)+6x-180" };
+}
+
+function stationaryEquation(writer) {
+  let x = 18;
+  const strokes = [];
+  const lead = writeTokens(['0', '=', '6', 'x'], writer, x, 66);
+  strokes.push(...lead.strokes);
+  const exp = writeTokens(['2'], writer, lead.x2 + 1, 27, 0.58, lead.ordinal);
+  strokes.push(...exp.strokes); x = Math.max(lead.x2, exp.x2) + writer.spacing * writer.size;
+  const tail = writeTokens(['+', '6', 'x', '-', '1', '8', '0'], writer, x, 66, 1, exp.ordinal);
+  strokes.push(...tail.strokes);
+  return { strokes, target: '0=6x^(2)+6x-180' };
+}
+
+function chainRule(writer, differentiated = false) {
+  let x = 18, ordinal = 0;
+  const strokes = [];
+  if (differentiated) {
+    const y = writeTokens(['y'], writer, x, 66, 1, ordinal);
+    strokes.push(...y.strokes); ordinal = y.ordinal; x = y.x2;
+    const pr = primeGlyph(writer, x + 1, 24, ordinal);
+    strokes.push(...pr.strokes); ordinal += 1; x += pr.width + writer.spacing * writer.size;
+    const base = writeTokens(['=', '1', '6', '(', '4', 'x', '-', '3', ')'], writer, x, 66, 1, ordinal);
+    strokes.push(...base.strokes); ordinal = base.ordinal;
+    const exp = writeTokens(['3'], writer, base.x2 + 1, 27, 0.58, ordinal);
+    strokes.push(...exp.strokes);
+    return { strokes, target: "y'=16(4x-3)^(3)" };
+  }
+  const base = writeTokens(['y', '=', '(', '4', 'x', '-', '3', ')'], writer, x, 66, 1, ordinal);
+  strokes.push(...base.strokes);
+  const exp = writeTokens(['4'], writer, base.x2 + 1, 27, 0.58, base.ordinal);
+  strokes.push(...exp.strokes);
+  return { strokes, target: 'y=(4x-3)^(4)' };
+}
+
+function dydx(writer) {
+  const lead = writeTokens(['d', 'y', '/', 'd', 'x', '=', '6', 'x'], writer, 18, 66);
+  const exp = writeTokens(['2'], writer, lead.x2 + 1, 27, 0.58, lead.ordinal);
+  const tail = writeTokens(['+', '6', 'x', '-', '1', '8', '0'], writer,
+    Math.max(lead.x2, exp.x2) + writer.spacing * writer.size, 66, 1, exp.ordinal);
+  return { strokes: [...lead.strokes, ...exp.strokes, ...tail.strokes], target: 'dy/dx=6x^(2)+6x-180' };
+}
+
+function factorised(writer) {
+  const tokens = ['0', '=', '(', 'x', '-', '5', ')', '(', 'x', '+', '6', ')'];
+  return { ...writeTokens(tokens, writer, 18, 58), target: plain(tokens) };
 }
 
 function stackedFraction(writer) {
   const numerator = rng() < 0.35 ? [V(), '+', NZ()] : num(1 + (rng() < 0.25 ? 1 : 0));
   const denominator = rng() < 0.25 ? [V(), '-', NZ()] : num(1 + (rng() < 0.20 ? 1 : 0));
   const n = writeTokens(numerator, writer, 24, 18, 0.82);
-  const d = writeTokens(denominator, writer, 24, 96, 0.82);
+  const d = writeTokens(denominator, writer, 24, 96, 0.82, n.ordinal);
   const width = Math.max(n.width, d.width) + writer.size * 0.35;
   const left = 18;
   const shift = (sample, targetWidth) => {
@@ -173,29 +298,31 @@ function stackedFraction(writer) {
   };
   shift(n, width); shift(d, width);
   const y = 84;
-  const p0 = { x: left, y, w: 2.5, t: 0, p: writer.pressure,
-    azimuth: writer.azimuth, altitude: writer.altitude };
-  const p1 = { x: left + width, y, w: 2.5, t: +(width / writer.speed).toFixed(6),
-    p: writer.pressure, azimuth: writer.azimuth, altitude: writer.altitude };
-  return {
-    strokes: [...n.strokes, { points: [p0, p1] }, ...d.strokes],
-    target: `(${plain(numerator)})/(${plain(denominator)})`
-  };
+  const p0 = { x: left, y, w: 2.5, t: 0, p: writer.pressure, azimuth: writer.azimuth, altitude: writer.altitude };
+  const p1 = { x: left + width, y, w: 2.5, t: +(width / writer.speed).toFixed(6), p: writer.pressure, azimuth: writer.azimuth, altitude: writer.altitude };
+  return { strokes: [...n.strokes, { points: [p0, p1] }, ...d.strokes], target: `(${plain(numerator)})/(${plain(denominator)})` };
 }
 
 function radical(writer) {
   const inside = rng() < 0.5 ? [V()] : num(1 + (rng() < 0.5 ? 1 : 0));
   const root = glyph('sqrt', writer, 18, 38, 1, 0);
-  const body = writeTokens(inside, writer, 18 + root.width + 2, 48, 0.88);
+  const body = writeTokens(inside, writer, 18 + root.width + 2, 48, 0.88, root.strokeCount);
   return { strokes: [...root.strokes, ...body.strokes], target: `sqrt(${plain(inside)})` };
 }
 
 function makeSample(writer) {
   const r = rng();
-  const sample = r < 0.70 ? baseline(writer)
-    : r < 0.82 ? superscript(writer)
-      : r < 0.94 ? stackedFraction(writer)
-        : radical(writer);
+  let sample;
+  if (r < 0.42) sample = baseline(writer);
+  else if (r < 0.52) sample = superscript(writer);
+  else if (r < 0.60) sample = derivativePolynomial(writer);
+  else if (r < 0.67) sample = chainRule(writer, false);
+  else if (r < 0.74) sample = chainRule(writer, true);
+  else if (r < 0.80) sample = stationaryEquation(writer);
+  else if (r < 0.85) sample = dydx(writer);
+  else if (r < 0.89) sample = factorised(writer);
+  else if (r < 0.95) sample = stackedFraction(writer);
+  else sample = radical(writer);
   return { target: sample.target, shown: sample.target, pen: false, synthetic: true, strokes: sample.strokes };
 }
 
@@ -207,7 +334,7 @@ function emitSplit(split, count, prefix) {
     const doc = {
       format: 'pri-ink-corpus', version: 2, split,
       synthetic: true, holdoutLocked: false, predictedTouchesStored: false,
-      collector: { name: 'pri-foundation-synthetic-pretrain', seed: 2026082301 },
+      collector: { name: 'pri-foundation-synthetic-pretrain-v3', seed: 2026082301 },
       writer: { id, sessionId: `${id}-S0`, handedness: 'synthetic', device: 'generator', pen: false },
       samples
     };
