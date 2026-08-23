@@ -1,113 +1,146 @@
 # Pri Ink Foundation — locally owned handwriting AI
 
-This directory is the replacement path for the tiny glyph-only CNN ensemble.
-The model is **trained by Pri Learning, shipped by Pri Learning and run locally**.
-There is no OpenAI, Gemini, Mathpix, Claude or other inference API in this path.
+Pri Ink Foundation is Pri Learning's trainable, on-device handwriting model. It is trained by Pri Learning, exported to Core ML and executed locally. No hosted AI inference API is required.
 
 ## Architecture
 
-The model deliberately keeps information the old pipeline discarded:
+1. **Stroke Transformer** — up to 768 Pencil points with x/y, velocity, timing, force, width, orientation and stroke boundaries.
+2. **Whole-expression visual encoder** — 128×512 raster, preserving 2-D context that isolated-glyph CNNs lose.
+3. **Writer/style encoder** — conditions both modalities on the current hand; no known writer ID is required at inference.
+4. **Parallel maths decoder** — emits the complete token sequence in one neural pass for practical iPad latency.
+5. **Pri structural/grammar checks** — learned hypotheses do not get permission to rewrite mathematically wrong work into an expected answer.
 
-1. **Stroke Transformer** — reads up to 768 sampled Pencil points with x/y,
-   velocity, timing, force, stroke width, orientation and pen-boundary features.
-2. **High-resolution visual encoder** — reads a 128×512 raster of the whole
-   expression instead of isolated 28px glyphs.
-3. **Writer/style encoder** — a pooled style vector conditions both modalities;
-   writer-ID is an auxiliary training target only, so a new student needs no ID.
-4. **Parallel maths decoder** — learned output queries emit the complete maths
-   sequence in one neural pass. This avoids a full Core ML call per token on iPad.
-5. **Existing Pri grammar + symbolic checks** remain downstream. A learned model
-   proposes what the student wrote; it does not get permission to change wrong
-   mathematics into the expected answer.
+The native runtime uses:
 
-## Data contract
+1. promoted Pri Ink Foundation Core ML model;
+2. existing Pri JS stroke/CNN/grammar recogniser;
+3. native Vision/geometry recogniser as emergency no-result rescue.
 
-Training consumes `pri-ink-corpus` version 2 JSON from `tools/ink-collect-v2/`.
-The collector locks each anonymous writer to exactly one split. `data.py` checks
-that invariant again and aborts if a writer appears in multiple splits.
+All three are on-device.
 
-The split policy is:
+## Collect real Apple Pencil data
 
-- `train` — gradients and augmentation.
-- `validation` — model selection / early stopping.
-- `test` — periodic unbiased evaluation after a candidate is frozen.
-- `final-holdout` — release evidence. **Never inspect its errors while tuning.**
-
-The old synthetic suites remain useful regression guards but are not evidence
-that the foundation model works on real students.
-
-## Capture quality
-
-The iPad bridge now exports PencilKit timing, force, width, azimuth and altitude
-alongside x/y. Legacy saved strokes without those fields still load with neutral
-values. The browser collector's `tiltX` / `tiltY` fields are normalised into the
-same orientation representation by the dataset loader.
-
-## Train on a Mac
-
-Apple Silicon is supported through PyTorch MPS. A discrete CUDA GPU is also
-supported if the corpus is trained elsewhere.
+From the repo root:
 
 ```bash
-cd Final-Pri-learning
-python3 -m venv .venv-ink
-.venv-ink/bin/pip install -r tools/ink-foundation/requirements.txt
-
-.venv-ink/bin/python tools/ink-foundation/train.py \
-  --corpus client/test/ink-corpus \
-  --out tools/ink-foundation/runs/pri-ink-foundation.pt
+npm run ink:collect
 ```
 
-The default network is intentionally much larger than the existing 798 kB CNN
-ensemble. Storage is not used as an optimisation target; real accuracy and
-worst-writer reliability are. Increase `--d-model`, `--stroke-layers` or
-`--decoder-layers` only when real validation data says it helps.
+Open the printed HTTPS address on the iPad. The collector:
 
-## Export to the iPad app
+- accepts Apple Pencil input only;
+- records anonymous participant codes, not names/emails/account IDs;
+- records a versioned consent acknowledgement;
+- deterministically maps every participant code to one split using `fnv1a32-v1:70/10/10/10`;
+- stores coalesced real samples but never predicted touches;
+- records timing, pressure and Pencil orientation where available.
 
-On macOS:
+Save every session JSON under `client/test/ink-corpus/`, then run:
+
+```bash
+npm run test:ink:corpus:strict
+```
+
+Strict audit fails on writer/session leakage, incorrect deterministic split assignment, missing consent, non-Pencil samples, or inadequate timing/dynamics coverage.
+
+## Training: synthetic initialization → real-writer fine-tuning
+
+Set up once:
+
+```bash
+python3 -m venv .venv-ink
+.venv-ink/bin/pip install -r tools/ink-foundation/requirements.txt
+```
+
+### 1. Synthetic whole-expression pretraining
+
+Synthetic data is initialization only, never release evidence:
+
+```bash
+node tools/ink-foundation/generate_synthetic.mjs /tmp/pri-ink-pretrain
+
+.venv-ink/bin/python tools/ink-foundation/train.py \
+  --stage pretrain \
+  --corpus /tmp/pri-ink-pretrain \
+  --out tools/ink-foundation/runs/pri-ink-pretrain.pt
+```
+
+### 2. Fine-tune on writer-separated real Pencil data
+
+```bash
+npm run test:ink:corpus:strict
+
+.venv-ink/bin/python tools/ink-foundation/train.py \
+  --stage finetune \
+  --init tools/ink-foundation/runs/pri-ink-pretrain.pt \
+  --corpus client/test/ink-corpus \
+  --out tools/ink-foundation/runs/pri-ink-finetuned.pt
+```
+
+`train.py` uses train writers for gradients and validation writers for checkpoint selection. It does not read final-holdout evidence.
+
+## Frozen evaluation
+
+Use `test` while deciding whether a checkpoint is a credible release candidate:
+
+```bash
+.venv-ink/bin/python tools/ink-foundation/evaluate_release.py \
+  tools/ink-foundation/runs/pri-ink-finetuned.pt \
+  --corpus client/test/ink-corpus \
+  --split test
+```
+
+Only for a frozen release candidate, spend the final holdout once:
+
+```bash
+.venv-ink/bin/python tools/ink-foundation/evaluate_release.py \
+  tools/ink-foundation/runs/pri-ink-finetuned.pt \
+  --corpus client/test/ink-corpus \
+  --split final-holdout \
+  --unlock-final-holdout \
+  --out tools/ink-foundation/runs/final-release-report.json
+```
+
+Do not inspect individual final-holdout failures or repeatedly tune against its aggregate score.
+
+## Production gates
+
+The current release standard requires at minimum:
+
+- >= 20 writer-disjoint evaluation writers;
+- >= 1,000 real-Pencil evaluation expressions;
+- exact expression accuracy >= **98.0%**;
+- character accuracy >= **99.5%** (CER <= 0.5%);
+- worst-writer exact accuracy >= **90%**;
+- critical-structure exactness for powers/fractions/radicals/relations >= **99.5%**;
+- precision among readings the product declares safe to auto-mark >= **99.9%**;
+- deterministic native benchmark remains 100% exact and >=99.5% characters;
+- detached superscripts stay attached while real second lines stay separate;
+- supported-iPad stable single-line recognition target p95 <= 500 ms after debounce/pen-up.
+
+Coverage is allowed to fall before safe precision. Uncertain work should be confirmed by the student, not silently marked from a guess.
+
+## Core ML export and promotion lock
+
+A development model can be exported without promotion:
 
 ```bash
 .venv-ink/bin/python tools/ink-foundation/export_coreml.py \
-  tools/ink-foundation/runs/pri-ink-foundation.pt
+  tools/ink-foundation/runs/pri-ink-finetuned.pt
 ```
 
-This writes a float16 Core ML package to
-`ios/PriLearning.swiftpm/Resources/Models/PriInkFoundation.mlpackage`.
-One model invocation accepts the fixed-size point tensor, validity mask and
-whole-expression raster and returns logits for every output slot. The native
-runtime decodes those logits, aligns physical tokens back to Pencil strokes and
-keeps inserted structural notation separate from stroke ownership.
+It is tagged `pri.productionReady=false`; release builds refuse it.
 
-A development build with no promoted model asset still works: runtime order is
+A production export requires the passing locked final-holdout report for the exact checkpoint SHA-256:
 
-1. Pri Ink Foundation Core ML model, if bundled and metadata-compatible;
-2. the existing Pri JS stroke/CNN/grammar recogniser;
-3. the native Vision/geometry reader only as an emergency no-result rescue.
+```bash
+.venv-ink/bin/python tools/ink-foundation/export_coreml.py \
+  tools/ink-foundation/runs/pri-ink-finetuned.pt \
+  --release-report tools/ink-foundation/runs/final-release-report.json
+```
 
-All three paths are on-device.
+The exporter embeds the checkpoint hash and release metrics. Release builds activate the model only when promotion metadata is valid.
 
-## Release gates
+## Evidence boundary
 
-Do not promote a checkpoint merely because training loss looks good. A foundation
-checkpoint is eligible to become primary only after it passes **real-writer**
-gates. Initial targets:
-
-- character error rate ≤ 0.5% on the locked test set;
-- exact expression match ≥ 97%;
-- worst-writer exact match ≥ 95% with enough expressions per writer;
-- no regression in fraction/power/root structure suites;
-- high-confidence false reads measured separately and driven as close to zero
-  as practical because they are more dangerous than an explicit “check this”.
-
-Those numbers are targets, not claims. Until a sufficiently large real corpus
-exists, Pri Learning should report the current model as unvalidated on real
-writers rather than extrapolating from synthetic ink.
-
-## Why not just widen the old CNN?
-
-The repository already measured that experiment: wider glyph CNNs slightly
-improved the mean while substantially hurting the worst writer. The remaining
-problem is not parameter count in an isolated raster classifier. It is missing
-stroke dynamics, writer style, 2D context and real training ink. This model is
-built around those failure modes directly.
+Synthetic suites, simulator benchmarks and training loss are engineering evidence, not arbitrary-human-handwriting accuracy. Until the real writer corpus reaches the production evidence floor and the frozen checkpoint passes it, Pri Learning must describe the foundation model as unvalidated for production real writers.
