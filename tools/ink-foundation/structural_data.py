@@ -12,9 +12,11 @@ Structural samples use the existing pri-ink-corpus envelope and may add:
     ]
   }
 
-Unannotated corpus rows remain usable by V3 and are simply skipped by V4
-structural training.  This keeps the production data contract backwards
-compatible while allowing trace-to-glyph labels to be collected incrementally.
+Unannotated corpus rows remain usable by V3 and are skipped by V4 structural
+training. Annotated rows are strict: every physical stroke must belong to exactly
+one glyph, every glyph symbol must be a real model token, and every relation must
+reference existing groups. Bad supervision fails loudly instead of poisoning the
+model silently.
 """
 from __future__ import annotations
 
@@ -28,7 +30,7 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset
 
-from data import TOKEN_TO_ID, UNK_ID, canonical_text, rasterize
+from data import SPECIAL, TOKEN_TO_ID, canonical_text, rasterize
 from structural import RELATION_TO_ID, StructuralConfig
 
 IGNORE_INDEX = -100
@@ -51,6 +53,76 @@ def corpus_files(root: str | Path) -> list[Path]:
     return sorted(p.rglob("*.json"))
 
 
+def validate_structure(structure: dict, stroke_count: int, require_complete: bool = True):
+    """Validate trace-to-glyph supervision before any tensor is created."""
+    if not isinstance(structure, dict):
+        raise ValueError("structure must be an object")
+    groups = structure.get("groups") or []
+    relations = structure.get("relations") or []
+    if not isinstance(groups, list) or not groups:
+        raise ValueError("structure.groups must be a non-empty list")
+    if not isinstance(relations, list):
+        raise ValueError("structure.relations must be a list")
+
+    ids: set[str] = set()
+    seen_strokes: set[int] = set()
+    for gi, group in enumerate(groups):
+        if not isinstance(group, dict):
+            raise ValueError(f"group {gi} is not an object")
+        gid = str(group.get("id", "")).strip()
+        if not gid:
+            raise ValueError(f"group {gi} has no id")
+        if gid in ids:
+            raise ValueError(f"duplicate structural group id {gid!r}")
+        ids.add(gid)
+
+        token = str(group.get("symbol", ""))
+        if token not in TOKEN_TO_ID or token in SPECIAL:
+            raise ValueError(f"group {gid!r} has unsupported canonical symbol {token!r}")
+
+        indices = group.get("strokes")
+        if not isinstance(indices, list) or not indices:
+            raise ValueError(f"group {gid!r} has no physical strokes")
+        local_seen: set[int] = set()
+        for raw in indices:
+            if not isinstance(raw, int):
+                raise ValueError(f"group {gid!r} contains non-integer stroke index {raw!r}")
+            i = int(raw)
+            if i < 0 or i >= stroke_count:
+                raise ValueError(
+                    f"group {gid!r} references stroke {i}, but sample has {stroke_count} strokes"
+                )
+            if i in local_seen:
+                raise ValueError(f"group {gid!r} repeats stroke {i}")
+            if i in seen_strokes:
+                raise ValueError(f"physical stroke {i} belongs to multiple glyph groups")
+            local_seen.add(i); seen_strokes.add(i)
+
+    if require_complete and len(seen_strokes) != stroke_count:
+        missing = sorted(set(range(stroke_count)) - seen_strokes)
+        raise ValueError(
+            f"structural annotation covers {len(seen_strokes)}/{stroke_count} strokes; "
+            f"missing={missing[:12]}"
+        )
+
+    relation_keys: set[tuple[str, str, str]] = set()
+    for ri, rel in enumerate(relations):
+        if not isinstance(rel, dict):
+            raise ValueError(f"relation {ri} is not an object")
+        src = str(rel.get("from", "")); dst = str(rel.get("to", ""))
+        kind = str(rel.get("type", "")).upper()
+        if src not in ids or dst not in ids:
+            raise ValueError(f"relation {ri} references unknown group {src!r}->{dst!r}")
+        if src == dst:
+            raise ValueError(f"relation {ri} is a self-edge on {src!r}")
+        if kind not in RELATION_TO_ID or kind == "NONE":
+            raise ValueError(f"relation {ri} has unsupported explicit type {kind!r}")
+        key = (src, dst, kind)
+        if key in relation_keys:
+            raise ValueError(f"duplicate structural relation {src}->{dst}:{kind}")
+        relation_keys.add(key)
+
+
 def load_structural_examples(paths: Iterable[Path]) -> list[StructuralExample]:
     rows: list[StructuralExample] = []
     writer_split: dict[str, str] = {}
@@ -67,11 +139,15 @@ def load_structural_examples(paths: Iterable[Path]) -> list[StructuralExample]:
                 f"writer leakage: {writer!r} appears in both {prior!r} and {split!r}"
             )
         writer_split[writer] = split
-        for sample in doc.get("samples") or []:
+        for sample_index, sample in enumerate(doc.get("samples") or []):
             target = canonical_text(sample.get("target") or "").strip()
             strokes = sample.get("strokes") or []
             structure = sample.get("structure") or {}
             if target and strokes and structure.get("groups"):
+                try:
+                    validate_structure(structure, len(strokes), require_complete=True)
+                except ValueError as exc:
+                    raise ValueError(f"{path} sample {sample_index}: {exc}") from exc
                 rows.append(
                     StructuralExample(writer, split, target, strokes, structure, str(path))
                 )
@@ -107,13 +183,19 @@ def hierarchical_stroke_features(strokes: list[dict], cfg: StructuralConfig):
     stroke_valid = np.zeros(cfg.max_strokes, dtype=np.bool_)
     geometry = np.zeros((cfg.max_strokes, cfg.geometry_dim), dtype=np.float32)
 
+    if len(strokes) > cfg.max_strokes:
+        raise ValueError(
+            f"sample has {len(strokes)} physical strokes; max_strokes={cfg.max_strokes}. "
+            "Do not silently truncate structure supervision."
+        )
+
     x1, y1, x2, y2, scale = _expression_bounds(strokes)
     cx_expr, cy_expr = (x1 + x2) * 0.5, (y1 + y2) * 0.5
 
-    for si, stroke in enumerate(strokes[:cfg.max_strokes]):
+    for si, stroke in enumerate(strokes):
         pts = stroke.get("points") or []
         if not pts:
-            continue
+            raise ValueError(f"physical stroke {si} has no points")
         stroke_valid[si] = True
 
         # Uniformly retain trajectory coverage if a physical stroke is very dense.
@@ -178,35 +260,30 @@ def structural_targets(structure: dict, max_strokes: int):
 
     groups = structure.get("groups") or []
     parsed: list[tuple[str, list[int], int]] = []
-    seen_strokes: set[int] = set()
     for gi, group in enumerate(groups):
         gid = str(group.get("id", f"g{gi}"))
-        strokes = sorted({
-            int(i) for i in (group.get("strokes") or [])
-            if isinstance(i, int) and 0 <= int(i) < max_strokes
-        })
+        strokes = sorted(int(i) for i in (group.get("strokes") or []) if 0 <= int(i) < max_strokes)
         if not strokes:
             continue
-        overlap = seen_strokes.intersection(strokes)
-        if overlap:
-            raise ValueError(f"structural annotation assigns strokes twice: {sorted(overlap)}")
-        seen_strokes.update(strokes)
-        token_id = TOKEN_TO_ID.get(str(group.get("symbol", "")), UNK_ID)
+        token = str(group.get("symbol", ""))
+        if token not in TOKEN_TO_ID or token in SPECIAL:
+            raise ValueError(f"group {gid!r} has unsupported canonical symbol {token!r}")
+        token_id = TOKEN_TO_ID[token]
         parsed.append((gid, strokes, token_id))
         for si in strokes:
             symbol[si] = token_id
 
     # Every pair of labelled strokes receives an explicit same-glyph target.
-    for _, left_strokes, _ in parsed:
-        for _, right_strokes, _ in parsed:
-            same = left_strokes is right_strokes
+    for left_gid, left_strokes, _ in parsed:
+        for right_gid, right_strokes, _ in parsed:
+            same = left_gid == right_gid
             for i in left_strokes:
                 for j in right_strokes:
                     grouping[i, j] = 1.0 if same else 0.0
 
     group_by_id = {gid: strokes for gid, strokes, _ in parsed}
-    # Annotated group roots are representative physical traces.  Relation edges
-    # therefore remain sparse and interpretable while grouping recovers the full glyph.
+    # Annotated group roots are representative physical traces. Relation edges
+    # remain sparse and interpretable while grouping recovers the full glyph.
     roots = {gid: strokes[0] for gid, strokes, _ in parsed}
     labelled_roots = list(roots.values())
     for i in labelled_roots:
@@ -218,7 +295,7 @@ def structural_targets(structure: dict, max_strokes: int):
         kind = str(rel.get("type", "NONE")).upper()
         if src not in group_by_id or dst not in group_by_id:
             raise ValueError(f"relation references unknown group: {src!r}->{dst!r}")
-        if kind not in RELATION_TO_ID:
+        if kind not in RELATION_TO_ID or kind == "NONE":
             raise ValueError(f"unknown structural relation {kind!r}")
         relations[roots[src], roots[dst]] = RELATION_TO_ID[kind]
 
@@ -235,6 +312,7 @@ class StructuralInkDataset(Dataset):
 
     def __getitem__(self, index: int):
         row = self.rows[index]
+        validate_structure(row.structure, len(row.strokes), require_complete=True)
         points, point_valid, stroke_valid, geometry = hierarchical_stroke_features(
             row.strokes, self.cfg
         )
