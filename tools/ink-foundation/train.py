@@ -6,13 +6,13 @@ Stages:
   finetune  — consented, writer-separated real Pencil corpus; release evidence.
 
 V3 optimizes four signals together:
-  1. whole-expression token transcription;
-  2. point-stream CTC alignment (training only);
+  1. whole-expression mathematical serialization;
+  2. point-stream CTC alignment to PHYSICAL glyphs only (training only);
   3. writer-ID style supervision;
   4. supervised contrastive style consistency across different expressions from
      the same writer.
 
-Only (1) is required at inference. The auxiliary heads teach a much stronger
+Only (1) is required at inference. The auxiliary heads teach a stronger
 representation without adding another Core ML call on iPad.
 """
 from __future__ import annotations
@@ -89,11 +89,6 @@ def evaluate(model, loader, device, decode_limit: int = 512):
 
 def supervised_contrastive_style_loss(style: torch.Tensor, writer: torch.Tensor,
                                       temperature: float = 0.12) -> torch.Tensor:
-    """Pull different equations by the same writer together in style space.
-
-    Batches that contain no repeated writer contribute zero rather than making a
-    fake negative-only objective. Writer classification still supervises those.
-    """
     if style.shape[0] < 2:
         return style.sum() * 0.0
     z = F.normalize(style, dim=-1)
@@ -112,15 +107,19 @@ def supervised_contrastive_style_loss(style: torch.Tensor, writer: torch.Tensor,
     return per_anchor[anchors].mean()
 
 
-def ctc_alignment_loss(ctc_logits: torch.Tensor, labels: torch.Tensor,
+def ctc_alignment_loss(ctc_logits: torch.Tensor, physical_tokens: torch.Tensor,
+                       physical_lengths: torch.Tensor,
                        point_valid: torch.Tensor) -> torch.Tensor:
-    """Online point sequence -> token alignment, using PAD as the blank class."""
-    target_mask = labels.ne(PAD_ID) & labels.ne(EOS_ID)
-    target_lengths = target_mask.sum(dim=1).to(torch.long)
+    """Online points -> physically drawn token sequence, using PAD as blank."""
     input_lengths = point_valid.sum(dim=1).to(torch.long)
+    target_lengths = physical_lengths.to(torch.long)
     if int(target_lengths.max()) == 0:
         return ctc_logits.sum() * 0.0
-    targets = labels[target_mask].to(torch.long)
+
+    chunks = []
+    for row, n in zip(physical_tokens, target_lengths):
+        chunks.append(row[:int(n)].to(torch.long))
+    targets = torch.cat(chunks, dim=0)
     log_probs = F.log_softmax(ctc_logits, dim=-1).transpose(0, 1)  # T,B,C
     return F.ctc_loss(
         log_probs, targets, input_lengths, target_lengths,
@@ -128,42 +127,70 @@ def ctc_alignment_loss(ctc_logits: torch.Tensor, labels: torch.Tensor,
     )
 
 
-def load_initial_backbone(model: PriInkFoundation, path: str):
-    """Load compatible pretraining weights while allowing explicit V2 -> V3 migration.
+def _expanded_vocab_tensor(current_tensor: torch.Tensor, incoming_tensor: torch.Tensor,
+                           prior_vocab: list[str], current_vocab: list[str]) -> torch.Tensor:
+    """Copy vocabulary-indexed rows by token name, leaving new tokens initialized."""
+    out = current_tensor.detach().clone()
+    prior_index = {token: i for i, token in enumerate(prior_vocab)}
+    for new_i, token in enumerate(current_vocab):
+        old_i = prior_index.get(token)
+        if old_i is None: continue
+        if incoming_tensor.ndim == 1:
+            out[new_i] = incoming_tensor[old_i]
+        else:
+            out[new_i].copy_(incoming_tensor[old_i])
+    return out
 
-    V3 adds 2-D raster position embeddings and a training-only CTC head. Those
-    parameters do not exist in V2 and are intentionally initialized fresh. Every
-    older tensor that should transfer still has to match exactly.
+
+def load_initial_backbone(model: PriInkFoundation, path: str):
+    """Load compatible pretraining weights with explicit V2 -> V3 migration.
+
+    V3 adds 2-D raster positions, a CTC head and the derivative-prime output
+    token. Old output rows are copied by token NAME so inserting a new token
+    cannot silently shift ±/° or any future vocabulary item.
     """
     ckpt = torch.load(path, map_location="cpu", weights_only=False)
-    prior_vocab = ckpt.get("vocab")
-    if prior_vocab != VOCAB:
-        raise SystemExit("--init checkpoint uses a different token vocabulary")
+    prior_vocab = ckpt.get("vocab") or []
+    if not prior_vocab:
+        raise SystemExit("--init checkpoint has no vocabulary metadata")
+    unknown_old = [t for t in prior_vocab if t not in VOCAB]
+    if unknown_old:
+        raise SystemExit(f"--init checkpoint contains unsupported old tokens: {unknown_old[:8]}")
 
     current = model.state_dict()
     incoming = ckpt.get("model") or {}
-    new_v3 = (
+    new_v3 = {
         "raster_encoder.row_pos.weight",
         "raster_encoder.col_pos.weight",
         "ctc_output.weight",
         "ctc_output.bias",
-    )
+    }
+    vocab_rows = {"output.weight", "output.bias"}
     usable = {}
     mismatched = []
+
     for key, value_now in current.items():
         if key.startswith("writer_head.") or key in new_v3:
             continue
         value = incoming.get(key)
+        if key in vocab_rows and value is not None:
+            # The only allowed shape change is axis-0 vocabulary expansion.
+            compatible_tail = value.ndim == value_now.ndim and tuple(value.shape[1:]) == tuple(value_now.shape[1:])
+            if not compatible_tail:
+                mismatched.append(key); continue
+            usable[key] = _expanded_vocab_tensor(value_now, value, prior_vocab, VOCAB)
+            continue
         if value is None or tuple(value.shape) != tuple(value_now.shape):
             mismatched.append(key)
         else:
             usable[key] = value
+
     if mismatched:
         preview = ", ".join(mismatched[:8])
         raise SystemExit(f"--init architecture mismatch in {len(mismatched)} backbone tensors: {preview}")
 
     missing, unexpected = model.load_state_dict(usable, strict=False)
-    allowed_missing = set(new_v3) | {k for k in current if k.startswith("writer_head.")}
+    allowed_missing = new_v3 | {k for k in current if k.startswith("writer_head.")}
     bad_missing = [k for k in missing if k not in allowed_missing]
     bad_unexpected = [k for k in unexpected if not k.startswith("writer_head.")]
     if bad_missing or bad_unexpected:
@@ -255,7 +282,8 @@ def main():
     print(f"stage={args.stage} architecture=v{cfg.architecture_version} device={device} files={len(files)} samples={len(examples)} splits={counts} train-writers={len(train_writers)}")
     print(f"parameters={sum(p.numel() for p in model.parameters()):,}")
     if args.init:
-        print(f"initialized transferable backbone from {args.init} (stage={init_meta.get('stage', 'unknown')})")
+        added = [t for t in VOCAB if t not in (init_meta.get('vocab') or [])]
+        print(f"initialized transferable backbone from {args.init} (stage={init_meta.get('stage', 'unknown')}; new tokens={added})")
 
     for epoch in range(1, args.epochs + 1):
         model.train(); running = 0.0; seen = 0
@@ -264,6 +292,8 @@ def main():
             labels = batch["tokens"].to(device)
             point_valid = batch["point_valid"].to(device)
             writers_batch = batch["writer"].to(device)
+            physical_tokens = batch["ctc_tokens"].to(device)
+            physical_lengths = batch["ctc_length"].to(device)
             opt.zero_grad(set_to_none=True)
             with torch.autocast(device_type=device.type, dtype=torch.float16, enabled=device.type == "cuda"):
                 logits, writer_logits, ctc_logits, style = model.forward_with_aux(
@@ -274,7 +304,9 @@ def main():
                     logits.reshape(-1, logits.shape[-1]), labels.reshape(-1),
                     ignore_index=PAD_ID, label_smoothing=0.03,
                 )
-                ctc_loss = ctc_alignment_loss(ctc_logits.float(), labels, point_valid)
+                ctc_loss = ctc_alignment_loss(
+                    ctc_logits.float(), physical_tokens, physical_lengths, point_valid
+                )
                 style_loss = supervised_contrastive_style_loss(style.float(), writers_batch)
                 loss = token_loss + args.ctc_loss * ctc_loss + args.style_contrast * style_loss
                 if writer_logits is not None:
@@ -283,10 +315,8 @@ def main():
             scaler.scale(loss).backward(); scaler.unscale_(opt)
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
             scaler.step(opt); scaler.update(); sched.step()
-            running += float(loss.detach());
-            running_token += float(token_loss.detach());
-            running_ctc += float(ctc_loss.detach());
-            running_style += float(style_loss.detach());
+            running += float(loss.detach()); running_token += float(token_loss.detach())
+            running_ctc += float(ctc_loss.detach()); running_style += float(style_loss.detach())
             seen += 1
 
         val = evaluate(model, val_loader, device)
@@ -316,7 +346,7 @@ def main():
                 "architectureVersion": cfg.architecture_version,
                 "stage": args.stage,
                 "evidence": "synthetic initialization only" if args.stage == "pretrain" else "writer-separated real validation",
-                "decoder": "parallel-output-queries+2d-visual+ctc-aux", "checkpoint": out.name,
+                "decoder": "parallel-output-queries+2d-visual+physical-ctc-aux", "checkpoint": out.name,
                 "config": cfg.to_dict(), "vocab": VOCAB, "validation": val,
                 "counts": counts, "trainWriterCount": len(train_writers), "seed": args.seed,
                 "initializedFrom": str(args.init) if args.init else None,
