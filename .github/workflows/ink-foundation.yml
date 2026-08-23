@@ -43,7 +43,37 @@ jobs:
             tools/ink-foundation/export_coreml.py
 
       - name: Synthetic generator syntax
-        run: node --check tools/ink-foundation/generate_synthetic.mjs
+        run: |
+          node --check tools/ink-foundation/generate_synthetic.mjs
+          node --check tools/ink-foundation/generate_personal_synthetic.mjs
+
+      - name: V3 representation contract
+        run: |
+          python - <<'PY'
+          import sys
+          sys.path.insert(0, 'tools/ink-foundation')
+          from data import TOKEN_TO_ID, physical_text
+          from model import ModelConfig, PriInkFoundation
+          import torch
+
+          assert "'" in TOKEN_TO_ID, 'derivative prime is not a first-class model token'
+          assert physical_text('x^(2)') == 'x2'
+          assert physical_text("y'=6x^(2)+6x") == "y'=6x2+6x"
+          cfg = ModelConfig(d_model=64, nhead=8, stroke_layers=1, decoder_layers=1,
+                            ff_dim=128, max_points=64, max_tokens=24)
+          model = PriInkFoundation(len(TOKEN_TO_ID), TOKEN_TO_ID['<pad>'], cfg)
+          image = torch.zeros(1, 1, cfg.raster_height, cfg.raster_width)
+          visual = model.raster_encoder(image)
+          if visual.shape[1] <= 64:
+              raise SystemExit(f'V3 visual encoder collapsed 2-D layout: only {visual.shape[1]} tokens')
+          points = torch.zeros(1, cfg.max_points, cfg.feature_dim)
+          valid = torch.zeros(1, cfg.max_points, dtype=torch.bool); valid[:, :16] = True
+          logits, _, ctc, style = model.forward_with_aux(points, valid, image)
+          assert logits.shape == (1, cfg.max_tokens, len(TOKEN_TO_ID))
+          assert ctc.shape == (1, cfg.max_points, len(TOKEN_TO_ID))
+          assert style.shape[-1] == cfg.d_model
+          print(f'V3 representation contract: PASS — {visual.shape[1]} spatial visual tokens + physical CTC + prime token')
+          PY
 
       - name: Evidence gates remain wired
         run: |
@@ -63,6 +93,7 @@ jobs:
               'runtime enforces promotion metadata': 'pri.productionReady' in runtime,
               'bootstrap labels itself development only': 'releaseEligible' in bootstrap and 'NOT generalisation evidence' in bootstrap,
               'bootstrap checkpoint stage is distinct': '"stage": "bootstrap"' in bootstrap,
+              'personal replay excluded from release evidence': 'personal synthetic replay is not real evidence' in bootstrap.lower() or 'personal synthetic replay excluded from evidence' in bootstrap.lower(),
           }
           bad = [name for name, ok in required.items() if not ok]
           if bad:
@@ -76,7 +107,7 @@ jobs:
       - name: Generate tiny whole-expression corpus
         run: node tools/ink-foundation/generate_synthetic.mjs /tmp/pri-ink-smoke 6 2 3
 
-      - name: One-epoch CPU pretraining smoke test
+      - name: One-epoch CPU V3 pretraining smoke test
         run: |
           python tools/ink-foundation/train.py \
             --stage pretrain \
@@ -93,7 +124,7 @@ jobs:
             --max-tokens 32 \
             --patience 1
 
-      - name: Pretraining smoke produced a real checkpoint
+      - name: Pretraining smoke produced a real V3 checkpoint
         run: |
           python - <<'PY'
           import json, pathlib, torch
@@ -103,10 +134,14 @@ jobs:
           ckpt = torch.load(p, map_location='cpu', weights_only=False)
           if ckpt.get('stage') != 'pretrain' or not ckpt.get('model'):
               raise SystemExit('training checkpoint metadata/state is incomplete')
+          if ckpt.get('architecture_version') != 3:
+              raise SystemExit('training smoke did not produce V3')
           manifest = json.loads(p.with_suffix('.json').read_text())
           if manifest.get('stage') != 'pretrain' or manifest.get('evidence') != 'synthetic initialization only':
               raise SystemExit('pretrain manifest blurred synthetic and real evidence')
-          print('foundation pretraining smoke: PASS')
+          if manifest.get('architectureVersion') != 3:
+              raise SystemExit('pretrain manifest does not identify V3')
+          print('foundation V3 pretraining smoke: PASS')
           PY
 
       - name: Generate one-writer bootstrap smoke corpus
@@ -140,9 +175,11 @@ jobs:
           manifest = json.loads(p.with_suffix('.json').read_text())
           if ckpt.get('stage') != 'bootstrap' or ckpt.get('release_eligible') is not False:
               raise SystemExit('bootstrap checkpoint can be confused with release evidence')
+          if ckpt.get('architecture_version') != 3:
+              raise SystemExit('bootstrap checkpoint is not V3')
           if manifest.get('stage') != 'bootstrap' or manifest.get('releaseEligible') is not False:
               raise SystemExit('bootstrap manifest can be confused with release evidence')
           if 'NOT generalisation evidence' not in manifest.get('evidence', ''):
               raise SystemExit('bootstrap manifest does not state its evidence limitation')
-          print('foundation one-writer bootstrap smoke: PASS')
+          print('foundation V3 one-writer bootstrap smoke: PASS')
           PY
