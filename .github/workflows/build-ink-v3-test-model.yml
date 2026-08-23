@@ -1,0 +1,144 @@
+name: Build Ink V3 Test Model
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - pri-local-ink-v2
+    paths:
+      - '.github/workflows/build-ink-v3-test-model.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ink-v3-test-model
+  cancel-in-progress: true
+
+jobs:
+  build-model:
+    name: Train, verify and export DEBUG Core ML model
+    runs-on: macos-14
+    timeout-minutes: 75
+    env:
+      PYTORCH_ENABLE_MPS_FALLBACK: '1'
+      OUT_DIR: /tmp/pri-ink-v3-test
+      SYNTH_DIR: /tmp/pri-ink-v3-test/synth
+      CHECKPOINT: /tmp/pri-ink-v3-test/PriInkFoundation-test.pt
+      MODEL: /tmp/pri-ink-v3-test/PriInkFoundation.mlpackage
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: tools/ink-foundation/requirements.txt
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install V3 training/export environment
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r tools/ink-foundation/requirements.txt
+          python - <<'PY'
+          import platform, torch
+          print('platform:', platform.platform())
+          print('torch:', torch.__version__)
+          print('MPS available:', torch.backends.mps.is_available())
+          PY
+
+      - name: Generate writer-disjoint Pri-owned synthetic maths curriculum
+        run: |
+          mkdir -p "$OUT_DIR"
+          node tools/ink-foundation/generate_synthetic.mjs "$SYNTH_DIR" 48 12 32
+
+      - name: Train V3 test checkpoint
+        run: |
+          python tools/ink-foundation/train.py \
+            --stage pretrain \
+            --corpus "$SYNTH_DIR" \
+            --out "$CHECKPOINT" \
+            --epochs 12 \
+            --batch 12 \
+            --lr 2e-4 \
+            --d-model 192 \
+            --stroke-layers 6 \
+            --decoder-layers 4 \
+            --max-points 512 \
+            --max-tokens 72 \
+            --workers 2 \
+            --patience 5
+
+      - name: Verify checkpoint is V3 development evidence only
+        run: |
+          python - <<'PY'
+          import json, os, torch
+          p = os.environ['CHECKPOINT']
+          ckpt = torch.load(p, map_location='cpu', weights_only=False)
+          manifest = json.load(open(p.replace('.pt', '.json')))
+          assert ckpt.get('stage') == 'pretrain', ckpt.get('stage')
+          assert ckpt.get('architecture_version') == 3, ckpt.get('architecture_version')
+          assert manifest.get('architectureVersion') == 3, manifest
+          assert manifest.get('evidence') == 'synthetic initialization only', manifest
+          cfg = ckpt['config']
+          assert cfg['d_model'] == 192 and cfg['stroke_layers'] == 6 and cfg['decoder_layers'] == 4, cfg
+          print('checkpoint contract: PASS')
+          print('synthetic validation:', ckpt.get('validation'))
+          PY
+
+      - name: Export Core ML with training graph parity checks
+        run: |
+          python tools/ink-foundation/export_coreml.py "$CHECKPOINT" --out "$MODEL"
+
+      - name: Verify DEBUG-only V3 Core ML metadata
+        run: |
+          python - <<'PY'
+          import os, coremltools as ct
+          model = ct.models.MLModel(os.environ['MODEL'])
+          meta = model.user_defined_metadata
+          required = {
+            'pri.model': 'ink-foundation-v3',
+            'pri.architectureVersion': '3',
+            'pri.trainingStage': 'pretrain',
+            'pri.productionReady': 'false',
+          }
+          for key, expected in required.items():
+              actual = meta.get(key)
+              if actual != expected:
+                  raise SystemExit(f'{key}: expected {expected!r}, got {actual!r}')
+          print('Core ML DEBUG promotion lock: PASS')
+          PY
+
+      - name: Write model card
+        run: |
+          python - <<'PY'
+          import json, os, torch
+          p = os.environ['CHECKPOINT']
+          ckpt = torch.load(p, map_location='cpu', weights_only=False)
+          val = ckpt.get('validation') or {}
+          cfg = ckpt['config']
+          text = f'''PRI INK FOUNDATION V3 — DEBUG TEST MODEL\n\nArchitecture: V3 multimodal stroke Transformer + 2-D visual tokens + cross-modal style + physical CTC training auxiliary.\nConfig: d_model={cfg['d_model']}, stroke_layers={cfg['stroke_layers']}, decoder_layers={cfg['decoder_layers']}, max_points={cfg['max_points']}, max_tokens={cfg['max_tokens']}\nSynthetic curriculum: 48 train writers + 12 writer-disjoint synthetic validation writers, 32 expressions/writer.\nTraining: up to 12 epochs with early stopping.\nSynthetic validation exact: {100*float(val.get('exact', 0)):.2f}%\nSynthetic validation CER: {100*float(val.get('cer', 0)):.2f}%\n\nIMPORTANT EVIDENCE BOUNDARY\nThis checkpoint is synthetic-pretrained only. It is useful for DEBUG runtime/iPad testing but is NOT evidence of natural Apple Pencil accuracy and is NOT production-promoted. P0001 private handwriting was not available to GitHub Actions and was not fabricated. Release gates remain unchanged.\n'''
+          open(os.path.join(os.environ['OUT_DIR'], 'TEST_MODEL_README.txt'), 'w').write(text)
+          print(text)
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as f:
+              f.write('## Pri Ink V3 DEBUG test model\n\n')
+              f.write(f"- Synthetic validation exact: **{100*float(val.get('exact', 0)):.2f}%**\n")
+              f.write(f"- Synthetic validation CER: **{100*float(val.get('cer', 0)):.2f}%**\n")
+              f.write('- Production ready: **false**\n')
+              f.write('- Real-writer evidence: **none in this artifact**\n')
+          PY
+
+      - name: Upload downloadable test model
+        uses: actions/upload-artifact@v4
+        with:
+          name: PriInkFoundation-V3-DEBUG-Test
+          path: |
+            /tmp/pri-ink-v3-test/PriInkFoundation.mlpackage
+            /tmp/pri-ink-v3-test/PriInkFoundation-test.pt
+            /tmp/pri-ink-v3-test/PriInkFoundation-test.json
+            /tmp/pri-ink-v3-test/TEST_MODEL_README.txt
+          if-no-files-found: error
+          retention-days: 7
