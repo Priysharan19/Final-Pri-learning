@@ -5,6 +5,11 @@ This trainer intentionally refuses unannotated or structurally trivial corpora.
 V4 grouping/relation metrics must come from explicit trace-to-glyph supervision,
 not guessed labels. It runs beside the V3 release path until real writer-disjoint
 evidence supports promotion.
+
+Symbol supervision is glyph-level: a mathematical glyph may contain several
+physical Pencil strokes, so the symbol objective pools the member-stroke evidence
+exactly as the decoder does. We never require one bar of '=' or one trace of 'pi'
+to identify the complete glyph by itself.
 """
 from __future__ import annotations
 
@@ -64,18 +69,96 @@ def _balanced_relation_loss(logits: torch.Tensor, targets: torch.Tensor, mask: t
     return sum(parts) / len(parts)
 
 
-def structural_loss(outputs: dict, batch: dict, device: torch.device):
+def _glyph_components(symbol_targets: torch.Tensor, group_targets: torch.Tensor):
+    """Recover ground-truth glyph components from explicit same-glyph labels.
+
+    The structural target tensor intentionally ignores diagonal pairs. Positive
+    off-diagonal edges connect traces belonging to one glyph; traces without a
+    positive neighbour are singleton glyphs. Different glyphs remain separate
+    even when their symbol token is identical (for example the two 1s in 11).
+    """
+    active = [int(i) for i in symbol_targets.ne(IGNORE_INDEX).nonzero(as_tuple=False).flatten()]
+    remaining = set(active)
+    components: list[tuple[list[int], int]] = []
+
+    while remaining:
+        seed = min(remaining)
+        remaining.remove(seed)
+        members = {seed}
+        frontier = [seed]
+        while frontier:
+            left = frontier.pop()
+            neighbours = []
+            for right in list(remaining):
+                same = bool(group_targets[left, right].gt(0.5)) or bool(
+                    group_targets[right, left].gt(0.5)
+                )
+                if same:
+                    neighbours.append(right)
+            for right in neighbours:
+                remaining.remove(right)
+                members.add(right)
+                frontier.append(right)
+
+        ordered = sorted(members)
+        target = int(symbol_targets[ordered[0]])
+        if any(int(symbol_targets[i]) != target for i in ordered):
+            raise RuntimeError(
+                f"inconsistent symbol targets inside annotated glyph group {ordered}"
+            )
+        components.append((ordered, target))
+    return components
+
+
+def glyph_symbol_loss(outputs: dict, batch: dict, device: torch.device):
+    """Cross-entropy on whole annotated glyph groups, aligned with decoding.
+
+    We average per-stroke log probabilities inside each true glyph, matching
+    structural_decode._glyphs and the oracle-group evaluator. This removes the
+    impossible supervision that previously asked every physical trace of a
+    multi-stroke glyph to classify the entire symbol independently.
+    """
     symbol_targets = batch["symbol_targets"].to(device)
+    group_targets = batch["group_targets"].to(device)
+    log_probs = F.log_softmax(outputs["symbol_logits"], dim=-1)
+    losses = []
+    glyphs = 0
+
+    for bi in range(symbol_targets.shape[0]):
+        for members, target in _glyph_components(symbol_targets[bi], group_targets[bi]):
+            idx = torch.tensor(members, device=device, dtype=torch.long)
+            pooled = log_probs[bi].index_select(0, idx).mean(dim=0)
+            nll = -pooled[target]
+            smooth = -pooled.mean()
+            losses.append(0.98 * nll + 0.02 * smooth)
+            glyphs += 1
+
+    if not losses:
+        return outputs["symbol_logits"].sum() * 0.0, 0
+    return torch.stack(losses).mean(), glyphs
+
+
+def _glyph_symbol_stats(outputs: dict, batch: dict, device: torch.device):
+    symbol_targets = batch["symbol_targets"].to(device)
+    group_targets = batch["group_targets"].to(device)
+    log_probs = F.log_softmax(outputs["symbol_logits"], dim=-1)
+    ok = total = 0
+
+    for bi in range(symbol_targets.shape[0]):
+        for members, target in _glyph_components(symbol_targets[bi], group_targets[bi]):
+            idx = torch.tensor(members, device=device, dtype=torch.long)
+            pooled = log_probs[bi].index_select(0, idx).mean(dim=0)
+            ok += int(int(pooled.argmax()) == target)
+            total += 1
+    return ok, total
+
+
+def structural_loss(outputs: dict, batch: dict, device: torch.device):
     group_targets = batch["group_targets"].to(device)
     relation_targets = batch["relation_targets"].to(device)
     pair_valid = outputs["pair_valid"]
 
-    symbol_loss = F.cross_entropy(
-        outputs["symbol_logits"].reshape(-1, outputs["symbol_logits"].shape[-1]),
-        symbol_targets.reshape(-1),
-        ignore_index=IGNORE_INDEX,
-        label_smoothing=0.02,
-    )
+    symbol_loss, glyph_count = glyph_symbol_loss(outputs, batch, device)
 
     group_mask = group_targets.ne(float(IGNORE_INDEX)) & pair_valid
     group_loss = _balanced_binary_loss(outputs["group_logits"], group_targets, group_mask)
@@ -88,6 +171,7 @@ def structural_loss(outputs: dict, batch: dict, device: torch.device):
     total = symbol_loss + 0.45 * group_loss + 0.55 * relation_loss
     return total, {
         "symbol": symbol_loss.detach(),
+        "glyphs": glyph_count,
         "group": group_loss.detach(),
         "relation": relation_loss.detach(),
     }
@@ -101,6 +185,7 @@ def _acc(ok: int, n: int) -> float:
 def evaluate(model, loader, device):
     model.eval()
     symbol_ok = symbol_n = 0
+    stroke_symbol_ok = stroke_symbol_n = 0
     group_pos_ok = group_pos_n = 0
     group_neg_ok = group_neg_n = 0
     relation_pos_ok = relation_pos_n = 0
@@ -119,11 +204,17 @@ def evaluate(model, loader, device):
         loss, _ = structural_loss(outputs, batch, device)
         losses.append(float(loss))
 
+        gok, gn = _glyph_symbol_stats(outputs, batch, device)
+        symbol_ok += gok
+        symbol_n += gn
+
+        # Retain the old per-trace number only as a diagnostic. It is not the
+        # symbol objective and is not used for checkpoint selection.
         symbols = batch["symbol_targets"].to(device)
         smask = symbols.ne(IGNORE_INDEX)
         spred = outputs["symbol_logits"].argmax(-1)
-        symbol_ok += int((spred[smask] == symbols[smask]).sum())
-        symbol_n += int(smask.sum())
+        stroke_symbol_ok += int((spred[smask] == symbols[smask]).sum())
+        stroke_symbol_n += int(smask.sum())
 
         groups = batch["group_targets"].to(device)
         gmask = groups.ne(float(IGNORE_INDEX)) & outputs["pair_valid"]
@@ -149,9 +240,12 @@ def evaluate(model, loader, device):
     group_neg = _acc(group_neg_ok, group_neg_n)
     relation_pos = _acc(relation_pos_ok, relation_pos_n)
     relation_none = _acc(relation_none_ok, relation_none_n)
+    glyph_accuracy = _acc(symbol_ok, symbol_n)
     return {
         "loss": sum(losses) / max(1, len(losses)),
-        "symbol_accuracy": _acc(symbol_ok, symbol_n),
+        "symbol_accuracy": glyph_accuracy,
+        "glyph_symbol_accuracy": glyph_accuracy,
+        "stroke_symbol_accuracy": _acc(stroke_symbol_ok, stroke_symbol_n),
         "group_positive_accuracy": group_pos,
         "group_negative_accuracy": group_neg,
         "group_balanced_accuracy": 0.5 * (group_pos + group_neg),
@@ -159,6 +253,7 @@ def evaluate(model, loader, device):
         "relation_none_accuracy": relation_none,
         "relation_balanced_accuracy": 0.5 * (relation_pos + relation_none),
         "symbol_labels": symbol_n,
+        "stroke_symbol_labels": stroke_symbol_n,
         "group_positive_labels": group_pos_n,
         "group_negative_labels": group_neg_n,
         "relation_positive_labels": relation_pos_n,
@@ -285,15 +380,16 @@ def main():
         metrics = evaluate(model, val_loader, device)
         # Flat NONE accuracy can look excellent while the parser learns nothing.
         # Checkpoint selection therefore weights positive relation recognition and
-        # balanced grouping, not raw all-pairs accuracy.
+        # balanced grouping, plus glyph-level (not per-trace) symbol recognition.
         score = (
-            0.35 * metrics["symbol_accuracy"] +
+            0.35 * metrics["glyph_symbol_accuracy"] +
             0.30 * metrics["group_balanced_accuracy"] +
             0.35 * metrics["relation_positive_accuracy"]
         )
         print(
             f"epoch={epoch} train_loss={running/max(1,steps):.4f} "
-            f"val_loss={metrics['loss']:.4f} symbol={metrics['symbol_accuracy']:.4f} "
+            f"val_loss={metrics['loss']:.4f} glyph_symbol={metrics['glyph_symbol_accuracy']:.4f} "
+            f"stroke_symbol={metrics['stroke_symbol_accuracy']:.4f} "
             f"group_bal={metrics['group_balanced_accuracy']:.4f} "
             f"relation_pos={metrics['relation_positive_accuracy']:.4f} "
             f"relation_none={metrics['relation_none_accuracy']:.4f}"
@@ -309,6 +405,7 @@ def main():
                 "vocab": list(TOKEN_TO_ID.keys()),
                 "model": model.state_dict(),
                 "validation": metrics,
+                "symbol_objective": "annotated-glyph-group-logprob-v1",
                 "evidence": "research only; requires writer-disjoint real-Pencil promotion evidence",
             }
             torch.save(checkpoint, out)
@@ -317,6 +414,7 @@ def main():
                 "stage": "structural-research",
                 "productionReady": False,
                 "validation": metrics,
+                "symbolObjective": checkpoint["symbol_objective"],
                 "trainWriters": len(train_writers),
                 "validationWriters": len(val_writers),
                 "multiStrokeGroups": multi_groups,
