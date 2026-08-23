@@ -111,9 +111,6 @@ function fuseSymbol(native, js, override) {
     };
   }
 
-  // Geometry detectors are genuinely independent evidence. Once they are
-  // decisive, a raster/stroke classifier may add an alternative but cannot
-  // turn a + into t or an = into two unrelated characters.
   if (STRUCTURAL.has(oldSym) && oldConf >= 0.90 && !native.approx) {
     return {
       ...native,
@@ -139,25 +136,23 @@ function fuseSymbol(native, js, override) {
     return {
       ...native,
       sym: jsSym,
-      // A disagreement resolved by the stroke classifier is useful, but it is
-      // not yet release-grade certainty. Keep it below the safe-auto-mark gate
-      // and mark ownership approximate so it cannot silently train a bad local
-      // template from its own prediction.
+      // Identity changed, but native geometry still owns the same exact Pencil
+      // cluster. Keep that ownership flag intact: a STUDENT correction of this
+      // glyph is therefore safe local training evidence even though the current
+      // automatic identity remains below release-grade certainty.
       conf: Math.min(0.90, Math.max(jsConf, 0.52 * jsConf + 0.28 * oldConf)),
       alts: mergeAlternatives(jsSym, [{ sym: oldSym, conf: Math.min(0.74, oldConf) }], nativeAlts, jsAlts),
-      approx: true
+      approx: native.approx
     };
   }
 
-  // Neither source earns the right to replace the other. Preserve the native
-  // reading but make the conflict visible to the correction UI.
   if (jsConf >= 0.34) {
     return {
       ...native,
       sym: oldSym,
       conf: Math.min(oldConf, family ? 0.60 : 0.70),
       alts: mergeAlternatives(oldSym, nativeAlts, [{ sym: jsSym, conf: Math.min(0.67, jsConf) }], jsAlts),
-      approx: true
+      approx: native.approx
     };
   }
   return native;
@@ -231,11 +226,6 @@ function summarise(lines, reading) {
   };
 }
 
-/**
- * Fuse a native reading with Pri's purpose-built stroke classifier while
- * preserving the native geometry and ownership. Safe to call repeatedly; the
- * underlying classifier already caches stable glyphs.
- */
 export function fuseNativeStrokeReading(reading, strokes, overrides = {}) {
   if (!reading?.lines?.length || !Array.isArray(strokes) || !strokes.length) return reading;
 
