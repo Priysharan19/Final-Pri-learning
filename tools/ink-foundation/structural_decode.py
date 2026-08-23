@@ -87,49 +87,58 @@ class StructuralHypothesis:
     warnings: list[str] = field(default_factory=list)
 
 
-class _UnionFind:
-    def __init__(self, n: int):
-        self.parent = list(range(n))
-
-    def find(self, x: int) -> int:
-        while self.parent[x] != x:
-            self.parent[x] = self.parent[self.parent[x]]
-            x = self.parent[x]
-        return x
-
-    def union(self, a: int, b: int):
-        ra, rb = self.find(a), self.find(b)
-        if ra != rb:
-            self.parent[rb] = ra
+def _symmetric_group_probability(prob: torch.Tensor, i: int, j: int) -> float:
+    return 0.5 * (float(prob[i, j]) + float(prob[j, i]))
 
 
 def _components(group_logits: torch.Tensor, valid: torch.Tensor,
                 threshold: float) -> tuple[list[tuple[int, ...]], float]:
-    """Recover glyph components and confidence in all pairwise group decisions."""
+    """Recover glyph components using complete-link agglomerative grouping.
+
+    Single-link/union-find grouping is unsafe for handwriting: if A-B and B-C are
+    high by mistake, it merges A/B/C even when A-C is strongly negative. V4 only
+    merges two components when *every* cross-stroke pair supports the merge.
+    """
     active = valid.nonzero(as_tuple=False).flatten().tolist()
-    uf = _UnionFind(group_logits.shape[0])
     prob = group_logits.sigmoid()
-    decisions: list[tuple[int, int, float]] = []
+    clusters: list[tuple[int, ...]] = [(i,) for i in active]
+
+    while True:
+        best_pair = None
+        best_support = threshold
+        for ai in range(len(clusters)):
+            for bi in range(ai + 1, len(clusters)):
+                left, right = clusters[ai], clusters[bi]
+                support = min(
+                    _symmetric_group_probability(prob, i, j)
+                    for i in left for j in right
+                )
+                if support >= best_support:
+                    candidate = (support, -min(left), -min(right), ai, bi)
+                    if best_pair is None or candidate > best_pair:
+                        best_pair = candidate
+                        best_support = support
+        if best_pair is None:
+            break
+        _, _, _, ai, bi = best_pair
+        merged = tuple(sorted(clusters[ai] + clusters[bi]))
+        clusters = [c for k, c in enumerate(clusters) if k not in (ai, bi)]
+        clusters.append(merged)
+        clusters.sort(key=min)
+
+    component_for = {stroke: ci for ci, comp in enumerate(clusters) for stroke in comp}
+    pair_confidences: list[float] = []
     for ai, i in enumerate(active):
         for j in active[ai + 1:]:
-            # Group membership is symmetric even though the pair head is ordered.
-            score = 0.5 * (float(prob[i, j]) + float(prob[j, i]))
-            decisions.append((i, j, score))
-            if score >= threshold:
-                uf.union(i, j)
-    buckets: dict[int, list[int]] = {}
-    for i in active:
-        buckets.setdefault(uf.find(i), []).append(i)
-    components = [tuple(v) for _, v in sorted(buckets.items(), key=lambda kv: min(kv[1]))]
+            score = _symmetric_group_probability(prob, i, j)
+            same = component_for[i] == component_for[j]
+            pair_confidences.append(score if same else 1.0 - score)
 
-    # A 0.51/0.49 pair decision should not become "high confidence" simply
-    # because the threshold happened to fall on one side of it.
-    pair_conf = []
-    for i, j, score in decisions:
-        same = uf.find(i) == uf.find(j)
-        pair_conf.append(score if same else 1.0 - score)
-    confidence = min(pair_conf, default=1.0)
-    return components, confidence
+    # An inconsistent bridge (e.g. A-B=.9, B-C=.9, A-C=.1) therefore forms no
+    # catastrophic 3-stroke component and also carries low confidence, causing
+    # the product to abstain rather than silently trust the uncertain boundary.
+    confidence = min(pair_confidences, default=1.0)
+    return clusters, confidence
 
 
 def _safe_symbol(logits: torch.Tensor) -> tuple[str, float]:
