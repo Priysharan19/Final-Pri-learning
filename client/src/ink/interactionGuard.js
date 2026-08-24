@@ -14,6 +14,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 const ACTIVE_CLASS = 'pri-ink-pointer-active';
+const SESSION_CLASS = 'pri-ink-session';
 const RELEASE_GRACE_MS = 220;
 let activePointer = null;
 let releaseTimer = null;
@@ -25,6 +26,19 @@ const inkSessionOpen = () => Boolean(document.querySelector?.('.ink-answer'));
 
 function clearSelection() {
   try { window.getSelection?.()?.removeAllRanges?.(); } catch { /* best effort */ }
+}
+
+function syncSessionClass() {
+  const open = inkSessionOpen();
+  const r = root();
+  if (!r) return open;
+  if (open) {
+    r.classList.add(SESSION_CLASS);
+    clearSelection();
+  } else {
+    r.classList.remove(SESSION_CLASS);
+  }
+  return open;
 }
 
 function addActiveClass() {
@@ -67,13 +81,13 @@ function suppressPointerGesture(event) {
 }
 
 function suppressSelectionGesture(event) {
-  if (activePointer === null && !inkSessionOpen()) return;
+  if (activePointer === null && !syncSessionClass()) return;
   if (event.cancelable) event.preventDefault();
   clearSelection();
 }
 
 function clearSelectionDuringInkSession() {
-  if (activePointer !== null || inkSessionOpen()) clearSelection();
+  if (activePointer !== null || syncSessionClass()) clearSelection();
 }
 
 function releaseInkPointer(event) {
@@ -91,35 +105,47 @@ function hardRelease() {
   clearSelection();
 }
 
-// The :has(.ink-answer) rule is intentional. It removes the race entirely: the
-// page is non-selectable for the whole handwriting session, even if Safari does
-// not deliver the PointerEvent shape we expected. Inputs/contenteditable are
-// explicitly exempt so accessibility text entry still behaves normally.
+// Do not make the full-session invariant depend on :has() or on PointerEvent
+// identity. A MutationObserver maintains SESSION_CLASS whenever React mounts or
+// unmounts InkAnswer. The CSS therefore reduces to a plain class selector that
+// WebKit has supported for its entire lifetime.
 const style = document.createElement('style');
 style.id = 'pri-ink-pointer-guard';
 style.textContent = `
 html.${ACTIVE_CLASS}, html.${ACTIVE_CLASS} *,
-html:has(.ink-answer), html:has(.ink-answer) #root,
-html:has(.ink-answer) #root * {
+html.${SESSION_CLASS}, html.${SESSION_CLASS} #root,
+html.${SESSION_CLASS} #root * {
   -webkit-user-select: none !important;
   user-select: none !important;
   -webkit-touch-callout: none !important;
   -webkit-user-drag: none !important;
 }
-html:has(.ink-answer) input,
-html:has(.ink-answer) textarea,
-html:has(.ink-answer) [contenteditable="true"] {
+html.${SESSION_CLASS} input,
+html.${SESSION_CLASS} textarea,
+html.${SESSION_CLASS} [contenteditable="true"] {
   -webkit-user-select: text !important;
   user-select: text !important;
   -webkit-touch-callout: default !important;
 }
-.ink-wrap, .ink-stage, .ink-answer {
+.ink-wrap, .ink-stage, .ink-answer, .ink-toolbar, .ink-toolbar *, .ink-preview, .ink-preview * {
   -webkit-touch-callout: none !important;
   -webkit-user-select: none !important;
   user-select: none !important;
 }
+.ink-hint {
+  pointer-events: none !important;
+}
 `;
 if (!document.getElementById(style.id)) document.head.appendChild(style);
+
+// React mounts after this module executes. Observe the existing document root so
+// the session class turns on immediately when .ink-answer appears and turns off
+// when the user leaves handwriting mode.
+syncSessionClass();
+if (typeof MutationObserver !== 'undefined') {
+  const sessionObserver = new MutationObserver(syncSessionClass);
+  sessionObserver.observe(document.documentElement, { childList: true, subtree: true });
+}
 
 document.addEventListener('pointerdown', armInkPointer, { capture: true, passive: false });
 document.addEventListener('pointermove', suppressPointerGesture, { capture: true, passive: false });
@@ -134,6 +160,8 @@ window.addEventListener('pagehide', hardRelease);
 
 export const __interactionGuardContract = Object.freeze({
   activeClass: ACTIVE_CLASS,
+  sessionClass: SESSION_CLASS,
   releaseGraceMs: RELEASE_GRACE_MS,
-  inkSessionOpen
+  inkSessionOpen,
+  syncSessionClass
 });
