@@ -3,6 +3,7 @@ name: Ink Structural V4 Live LAN
 on:
   pull_request:
     paths:
+      - 'client/src/main.jsx'
       - 'client/src/ink/InkAnswer.jsx'
       - 'client/src/ink/devStructural.js'
       - 'client/src/ink/interactionGuard.js'
@@ -42,6 +43,16 @@ jobs:
 
       - name: Full-session Pencil selection contract
         run: npm run test:ink:interaction
+
+      - name: LAN test origin cannot use offline cache
+        run: |
+          grep -q 'serve-lan.mjs --v4-dev 4196' package.json
+          grep -q "window.location.port === '4196'" client/src/main.jsx
+          grep -q 'window.__PRI_LAN_DEV__' client/src/main.jsx
+          grep -q 'getRegistrations' client/src/main.jsx
+          grep -q "name.startsWith('pri-')" client/src/main.jsx
+          grep -q '!window.__PRI_LAN_DEV__' client/src/main.jsx
+          echo 'fresh-origin/no-service-worker LAN contract: PASS'
 
       - name: Install V4 dependencies
         run: python -m pip install -r tools/ink-foundation/requirements.txt
