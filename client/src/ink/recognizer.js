@@ -12,7 +12,9 @@
 //   → 2D layout (lines, fractions, roots, exponents) → maths string
 // The output feeds the same parser, marker and Step Check as typed answers.
 // ─────────────────────────────────────────────────────────────────────────────
-import { TEMPLATES } from './templates.js';
+// The $P matcher (and the slant bias derived from it) match against the full
+// runtime library — hand-authored variants plus learned real-writer allographs.
+import { RUNTIME_TEMPLATES as TEMPLATES } from './templates.js';
 import { nnClassify, NN_CLASSES } from './nn.js';
 import { geomRerank } from './rerank.js';
 import { classOfSymbol, defaultSymbol, symbolsOfClass, CLASS_INDEX } from './classes.js';
