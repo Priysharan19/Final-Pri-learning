@@ -6,3 +6,4 @@ server/data/*.db
 *.log
 Pri-learning-final-production/
 scripts/.lan-cert/
+.venv-ink-export/
