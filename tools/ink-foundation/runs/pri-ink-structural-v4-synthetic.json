@@ -1,0 +1,30 @@
+{
+  "architectureVersion": 4,
+  "stage": "structural-synthetic-pretrain",
+  "productionReady": false,
+  "validation": {
+    "loss": 0.3458849284797907,
+    "symbol_accuracy": 0.9621435594886922,
+    "glyph_symbol_accuracy": 0.9621435594886922,
+    "stroke_symbol_accuracy": 0.01602454824411865,
+    "group_positive_accuracy": 0.9975417895771878,
+    "group_negative_accuracy": 0.9975331745491663,
+    "group_balanced_accuracy": 0.997537482063177,
+    "relation_positive_accuracy": 0.9954102122776821,
+    "relation_none_accuracy": 0.9984349016922626,
+    "relation_balanced_accuracy": 0.9969225569849723,
+    "symbol_labels": 2034,
+    "stroke_symbol_labels": 2933,
+    "group_positive_labels": 2034,
+    "group_negative_labels": 23512,
+    "relation_positive_labels": 1743,
+    "relation_none_labels": 10223
+  },
+  "symbolObjective": "explicit-group-embedding-classifier-v2",
+  "trainWriters": 64,
+  "validationWriters": 16,
+  "multiStrokeGroups": 2946,
+  "positiveRelations": 6744,
+  "evidence": "synthetic structural pretraining only; never real-handwriting, writer-disjoint, or production evidence",
+  "syntheticPretraining": true
+}
