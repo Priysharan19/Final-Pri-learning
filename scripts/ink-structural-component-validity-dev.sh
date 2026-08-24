@@ -62,7 +62,8 @@ synth_path, dev_path = sys.argv[1:3]
 synth = torch.load(synth_path, map_location='cpu', weights_only=False)
 dev = torch.load(dev_path, map_location='cpu', weights_only=False)
 assert synth.get('architecture_version') == 4
-assert synth.get('stage') == 'structural-research'
+assert synth.get('stage') == 'structural-synthetic-pretrain'
+assert synth.get('synthetic_pretraining') is True
 assert synth.get('production_ready') is False
 assert dev.get('architecture_version') == 4
 assert dev.get('stage') == 'structural-research-dev'
@@ -76,6 +77,7 @@ print(
     f"writer={split.get('writer')} train={split.get('trainSamples')} "
     f"validation={split.get('validationSamples')}"
 )
+print('synthetic base provenance: structural-synthetic-pretrain')
 print('writer-disjoint: false · production evidence: false')
 PY
 
