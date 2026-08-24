@@ -9,6 +9,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import InkCanvas from './InkCanvas.jsx';
 import NativeInkCanvas from './NativeInkCanvas.jsx';
 import { nativeInk, nativeInkAvailable } from './native.js';
+import { recognizeWithStructuralDev } from './devStructural.js';
 import { recognize, exprToLatex } from './recognizer.js';
 import { ALPHABET } from './templates.js';
 import { classOfSymbol } from './classes.js';
@@ -23,7 +24,10 @@ const showSym = s => NICE[s] || s;
 //   1. Pri's bundled Core ML foundation model, when a validated asset exists;
 //   2. Pri's mature JS stroke/CNN/grammar recogniser;
 //   3. the native Vision/geometry reader as an emergency no-result rescue.
-// Every stage is local. Browsers simply begin at stage 2.
+// Browser/LAN builds normally begin at stage 2. `serve:lan:v4` adds a strictly
+// development-only first opinion from the local Structural V4 PyTorch worker on
+// the developer Mac, so physical iPad testing can exercise the actual research
+// model without pretending it is a production/offline asset.
 const NATIVE_INK = nativeInkAvailable();
 const Surface = NATIVE_INK ? NativeInkCanvas : InkCanvas;
 const EMPTY_READING = { lines: [], text: '', symbols: [], minConf: 1, margin: 1, weakest: null };
@@ -58,7 +62,7 @@ function readUnreadLines(reading, strokes, overrides, ctx = null) {
     };
   });
   if (!healed) return reading;
-  return { lines, text: lines.map(l => l.text).join('\n') };
+  return { ...reading, lines, text: lines.map(l => l.text).join('\n') };
 }
 
 // ── How sure the reading is ──────────────────────────────────────────────────
@@ -122,6 +126,9 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
       minConf: sure.minConf,
       margin: sure.margin,
       weakest: sure.weakest,
+      engine: r.engine || null,
+      researchOnly: r.researchOnly === true,
+      productionReady: r.productionReady === true,
       strokes
     });
   }, [onRecognized]);
@@ -134,38 +141,50 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
       catch { return null; }
     };
 
-    // Browser/dev: Pri JS is the complete local engine.
+    // Browser/dev: prefer the explicit Structural V4 LAN research bridge when
+    // the server exposes it. A normal build answers 404 once, the client caches
+    // that absence, and the mature JS recogniser remains the local fallback.
     if (!NATIVE_INK) {
-      publish(readWithJS() || EMPTY_READING, strokes);
+      recognizeWithStructuralDev(strokes).then(v4 => {
+        if (seq !== readSeqRef.current) return;
+        if (v4?.lines?.some(line => line.text)) {
+          publish(v4, strokes);
+          return;
+        }
+        const local = readWithJS();
+        if (seq !== readSeqRef.current) return;
+        publish(local ? { ...local, engine: 'pri-js-v3' } : EMPTY_READING, strokes);
+      });
       return;
     }
 
-    // iPad: first ask the Pri-owned Core ML foundation model. Development builds
-    // without a promoted model return an empty result immediately and continue.
-    nativeInk.foundationRecognize(ovr).then(foundation => {
+    // iPad native wrapper: first ask the Pri-owned Core ML foundation model.
+    // Development builds without a promoted model return an empty result and
+    // continue. Safe recognition context is forwarded across the bridge too.
+    nativeInk.foundationRecognize(ovr, recognitionContext).then(foundation => {
       if (seq !== readSeqRef.current) return;
       if (foundation?.lines?.some(line => line.text)) {
         publish(foundation, strokes);
         return;
       }
 
-      // The existing custom engine remains a strong independent local opinion
-      // and protects the product while the real-writer corpus grows.
+      // The existing custom engine remains an independent local opinion and
+      // protects the product while the real-writer corpus grows.
       const local = readWithJS();
       if (seq !== readSeqRef.current) return;
       if (local?.lines?.some(line => line.text)) {
-        publish(local, strokes);
+        publish({ ...local, engine: 'pri-js-v3' }, strokes);
         return;
       }
 
       // Last resort only. This path is still fully on-device and exists to make
       // a missing/failed model an accuracy degradation rather than lost work.
-      nativeInk.recognize(ovr).then(reading => {
+      nativeInk.recognize(ovr, recognitionContext).then(reading => {
         if (seq !== readSeqRef.current) return;
         publish(
           reading
             ? readUnreadLines(reading, strokes, ovr, recognitionContext)
-            : (local || EMPTY_READING),
+            : (local ? { ...local, engine: 'pri-js-v3' } : EMPTY_READING),
           strokes
         );
       });
@@ -184,7 +203,7 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
   useEffect(() => {
     if (!focusSymbol) { focusedRef.current = null; return; }
     if (focusedRef.current === focusSymbol) return;
-    const sym = rec.lines.flatMap(l => l.symbols).find(s => s.id === focusSymbol);
+    const sym = rec.lines.flatMap(l => l.symbols || []).find(s => s.id === focusSymbol);
     if (!sym) return;
     focusedRef.current = focusSymbol;
     setPicker({ id: sym.id, alts: sym.alts || [] });
@@ -200,7 +219,7 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
     setPicker(null);
     // Corrections remain local training evidence regardless of which Pri model
     // produced the original reading. Approximate ownership is never learned.
-    const symbol = rec.lines.flatMap(l => l.symbols).find(s => s.id === id);
+    const symbol = rec.lines.flatMap(l => l.symbols || []).find(s => s.id === id);
     if (symbol?.strokeIdxs?.length && !symbol.approx) {
       const strokes = symbol.strokeIdxs.map(i => strokesRef.current[i]).filter(Boolean);
       if (strokes.length) addPersonal(sym, strokes, 'correction');
@@ -213,6 +232,12 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
     setPicker(null);
     canvasRef.current?.[fn]();
   };
+
+  const engineNote = rec.engine === 'pri-structural-v4-dev-lan'
+    ? 'Structural V4 research · Mac LAN · not production'
+    : rec.engine === 'pri-js-v3'
+      ? 'JS V3 fallback'
+      : null;
 
   return (
     <div className={`ink-answer ${disabled ? 'ink-disabled' : ''}`}>
@@ -287,7 +312,9 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
 
       {rec.lines.length > 0 && (
         <div className="ink-preview">
-          <div className="ink-preview-title" id="ink-reading">I'm reading:</div>
+          <div className="ink-preview-title" id="ink-reading">
+            I'm reading:{engineNote && <span className="muted" style={{ marginLeft: 10, textTransform: 'none', letterSpacing: 0 }}>{engineNote}</span>}
+          </div>
           {rec.lines.map((line, li) => (
             <div className="ink-line" key={li}>
               <span className="ink-line-n" aria-hidden="true">{li + 1}</span>
@@ -302,7 +329,7 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
                 <span className="sc-note" style={{ fontSize: 12.5 }}>— {lineVerdicts[li].note}</span>
               )}
               <span className="ink-syms">
-                {line.symbols.map(s => (
+                {(line.symbols || []).map(s => (
                   <button
                     type="button"
                     key={s.id}
@@ -313,7 +340,7 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
                     title={s.id === focusSymbol ? 'Check this one' : 'Tap to correct'}
                     aria-label={`Line ${li + 1}, symbol read as “${showSym(s.sym)}”${s.conf < 0.45 ? ', a shaky reading' : ''} — change it`}
                     aria-expanded={picker?.id === s.id}
-                    onClick={() => setPicker(picker?.id === s.id ? null : { id: s.id, alts: s.alts })}
+                    onClick={() => setPicker(picker?.id === s.id ? null : { id: s.id, alts: s.alts || [] })}
                   >{showSym(s.sym)}</button>
                 ))}
               </span>
@@ -322,7 +349,7 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
           {picker && (
             <div className="ink-picker" ref={pickerRef} role="group" aria-label="Change this symbol">
               <div className="ink-picker-row">
-                {picker.alts.map(a => (
+                {(picker.alts || []).map(a => (
                   <button type="button" key={a.sym} className="ink-pick"
                     aria-label={`Change it to “${showSym(a.sym)}” — ${Math.round(a.conf * 100)}% sure`}
                     onClick={() => applyOverride(picker.id, a.sym)}>
