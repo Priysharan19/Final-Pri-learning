@@ -76,10 +76,17 @@ def _load_base(path: Path, device: torch.device):
 
 def _prepare_examples(raw, base_ckpt: dict, mode: str):
     if mode == "writer-disjoint":
-        if base_ckpt.get("stage") != "structural-research":
+        stage = base_ckpt.get("stage")
+        if stage == "structural-synthetic-pretrain":
+            if base_ckpt.get("synthetic_pretraining") is not True:
+                raise SystemExit(
+                    "synthetic-pretrain base is missing synthetic_pretraining=true provenance"
+                )
+        elif stage != "structural-research":
             raise SystemExit(
-                f"writer-disjoint validity training requires stage='structural-research', "
-                f"got {base_ckpt.get('stage')!r}"
+                "writer-disjoint validity training requires stage='structural-research' "
+                "or a provenance-tagged 'structural-synthetic-pretrain' base, "
+                f"got {stage!r}"
             )
         train_writers = {x.writer for x in raw if x.split == "train"}
         val_writers = {x.writer for x in raw if x.split == "validation"}
