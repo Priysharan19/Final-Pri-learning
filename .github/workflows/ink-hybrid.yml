@@ -1,0 +1,25 @@
+name: Ink Hybrid
+
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: ink-hybrid-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  hybrid:
+    name: Native line ownership, personal adaptation and stroke identity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Personal CNN metric adaptation regression
+        run: npm run test:ink:personal
+      - name: Native-line ownership, glyph identity, derivative-prime and raised-power regression
+        run: npm run test:ink:hybrid
+      - name: Answer-context safety regression
+        run: npm run test:context

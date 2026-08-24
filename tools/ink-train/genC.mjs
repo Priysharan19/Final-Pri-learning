@@ -9,7 +9,7 @@
 // Output: /tmp/inktrain/{train,val}{28,32}.img + {train,val}.lbl + manifest
 // ─────────────────────────────────────────────────────────────────────────────
 import { mkdirSync, writeFileSync, readFileSync, createWriteStream, rmSync } from 'node:fs';
-import { TEMPLATES } from '../../client/src/ink/templates.js';
+import { TEMPLATES, REAL_ALLOGRAPHS, REAL_TRAIN_SHARE } from '../../client/src/ink/templates.js';
 import { rasterize, renormalizeRaster } from '../../client/src/ink/raster.js';
 import { stylize, makeRng } from '../../client/src/ink/aug.js';
 import { CLASSES, classOfSymbol, CLASS_INDEX } from '../../client/src/ink/classes.js';
@@ -40,6 +40,19 @@ for (const [sym, variants] of Object.entries(TEMPLATES)) {
 }
 for (const cls of CLASSES) {
   if (!seedsFor[cls]?.length) throw new Error(`class ${cls} has no template seeds`);
+}
+
+// Same capped real-allograph slice as gen.mjs — see the note there.
+const REAL_SHARE = Number(process.env.PRI_REAL_SHARE || 0.25);
+const realSeedsFor = {};
+for (const [sym, variants] of Object.entries(REAL_ALLOGRAPHS)) {
+  (realSeedsFor[classOfSymbol(sym)] ||= []).push(...variants);
+}
+function pickSeed(cls, rng) {
+  const real = realSeedsFor[cls];
+  if (real?.length && rng() < (REAL_TRAIN_SHARE[cls] ?? REAL_SHARE)) return real[Math.floor(rng() * real.length)];
+  const seeds = seedsFor[cls];
+  return seeds[Math.floor(rng() * seeds.length)];
 }
 
 const toU8 = (img) => {
@@ -76,8 +89,7 @@ const emit = (set, imgs, label) => {
 const LOW_BOW = new Set(['(', ')']);
 
 function synthStrokes(cls, rng) {
-  const seeds = seedsFor[cls];
-  const variant = seeds[Math.floor(rng() * seeds.length)];
+  const variant = pickSeed(cls, rng);
   const strokes = variant.map(st => st.map(p => p.slice()));
   // Style strength is a THREE-part mixture, not a uniform band.
   //

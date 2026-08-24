@@ -1,15 +1,18 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Pri Learning · Native ink bridge (web side)
 //
-// Inside the iPad app the writing surface is a real PencilKit canvas sitting
-// over this page, and the reading comes from Vision. This module is the whole
-// of the web app's side of that: where the writing area is, what the toolbar
-// just did, and "please read what is written".
+// PencilKit owns the low-latency writing surface. Recognition sources are
+// explicit rather than hidden behind one generic call:
+//   foundationRecognize() → Pri's bundled Core ML model, when validated/present
+//   recognize()           → mature native rescue recogniser
+// Browser/dev builds have neither and use the JS Pri engine directly.
 //
-// Everywhere else — a browser, a desktop, the dev server — `available()` is
-// false and the app keeps its own canvas and its own engine. Nothing else in
-// the app needs to know which one it got.
+// DEBUG/native readings are additionally fused with Pri's purpose-built
+// line/stroke recogniser. Native owns real-line geometry; Pri owns glyph
+// segmentation and identity inside that line. Safe, answer-blind question
+// context is retained on the web request and applied only during that Pri pass.
 // ─────────────────────────────────────────────────────────────────────────────
+import { fuseNativeStrokeReading } from './hybrid.js';
 
 const handler = () =>
   (typeof window !== 'undefined' && window.__PRI_NATIVE_INK__ &&
@@ -18,17 +21,67 @@ const handler = () =>
 export const nativeInkAvailable = () => !!handler();
 
 let nextRequestId = 1;
-const pending = new Map();       // reqId → resolve
+const pending = new Map();       // reqId → {resolve, context, overrides}
 const strokeListeners = new Set();
+let latestStrokes = [];
+
+const BASE_MATH_ALPHABET = [
+  ...'0123456789'.split(''),
+  '+', '-', '*', '/', '=', '(', ')', '[', ']', '<', '>', '<=', '>=', '!=', '±', '.', ',', ':', '%', '°',
+  'pi', 'theta', 'sqrt', 'sin', 'cos', 'tan', 'sec', 'csc', 'cot', 'ln', 'log'
+];
+
+/**
+ * Recover only ANSWER-BLIND notation from the visible question. This is a
+ * fallback for callers that do not yet pass recognitionContext explicitly.
+ * Single-letter variables must occur outside a normal word, so the x in
+ * "differentiate" cannot enter the alphabet. u/v are included because they are
+ * standard scratch variables in product/chain-rule working; no expected answer
+ * or mark-scheme text is ever read here.
+ */
+function inferredNotationContext() {
+  if (typeof document === 'undefined') return null;
+  const prompt = document.querySelector('.q-prompt');
+  const raw = String(prompt?.textContent || '');
+  const vars = new Set(['u', 'v']);
+  const common = new Set('xyzuvnktmabcrfgh'.split(''));
+  const re = /(?:^|[^A-Za-z])([A-Za-z])(?=[^A-Za-z]|$)/g;
+  for (const match of raw.matchAll(re)) {
+    const ch = match[1].toLowerCase();
+    if (common.has(ch)) vars.add(ch);
+  }
+  // TeX/KaTeX accessibility text can duplicate a formula. A set removes all
+  // duplication; only membership matters to the recogniser's tie-break prior.
+  return { alphabet: [...new Set([...BASE_MATH_ALPHABET, ...vars])] };
+}
 
 if (typeof window !== 'undefined') {
   window.__priInkReceive = (payload) => {
     if (!payload || typeof payload !== 'object') return;
     if (payload.type === 'strokes') {
-      for (const listener of strokeListeners) listener(payload.strokes || []);
+      latestStrokes = Array.isArray(payload.strokes) ? payload.strokes : [];
+      for (const listener of strokeListeners) listener(latestStrokes);
     } else if (payload.type === 'reading') {
-      const resolve = pending.get(payload.reqId);
-      if (resolve) { pending.delete(payload.reqId); resolve(payload); }
+      const entry = pending.get(payload.reqId);
+      if (entry) {
+        pending.delete(payload.reqId);
+        let reading = payload;
+        if (latestStrokes.length &&
+            (payload.engine === 'native-primary-debug' || payload.engine === 'native-rescue')) {
+          try {
+            reading = fuseNativeStrokeReading(
+              payload,
+              latestStrokes,
+              entry.overrides || {},
+              entry.context || inferredNotationContext()
+            );
+            reading.engine = `${payload.engine}+line-stroke-fusion`;
+          } catch {
+            reading = payload;
+          }
+        }
+        entry.resolve(reading);
+      }
     }
   };
 }
@@ -40,10 +93,24 @@ function post(message) {
     target.postMessage(message);
     return true;
   } catch {
-    // A postMessage that throws means the shell went away mid-navigation.
-    // The caller's fallback path is the web engine, which is always there.
     return false;
   }
+}
+
+function requestReading(message, timeoutMs, context = null) {
+  return new Promise((resolve) => {
+    const reqId = nextRequestId++;
+    pending.set(reqId, { resolve, context, overrides: message.overrides || {} });
+    if (!post({ ...message, reqId })) {
+      pending.delete(reqId);
+      resolve(null);
+      return;
+    }
+    setTimeout(() => {
+      const entry = pending.get(reqId);
+      if (entry) { pending.delete(reqId); entry.resolve(null); }
+    }, timeoutMs);
+  });
 }
 
 /** Where the writing area is, and how much of it the shell may draw in. */
@@ -53,7 +120,6 @@ function geometryOf(element) {
   let left = 0, top = 0;
   let right = window.innerWidth, bottom = window.innerHeight;
 
-  // Any ancestor that clips its content also clips the ink.
   let node = element.parentElement;
   while (node && node !== document.body && node !== document.documentElement) {
     const style = getComputedStyle(node);
@@ -65,8 +131,6 @@ function geometryOf(element) {
     node = node.parentElement;
   }
 
-  // The sticky top bar and the sidebar float above the page. A native view
-  // knows nothing about z-index, so the area it may paint in stops at them.
   const bar = document.querySelector('.topbar');
   if (bar) {
     const b = bar.getBoundingClientRect();
@@ -86,7 +150,6 @@ function geometryOf(element) {
   };
 }
 
-/** The pen colour the theme is currently using, as the shell wants it. */
 function inkColor() {
   const value = getComputedStyle(document.documentElement).getPropertyValue('--ink').trim();
   return /^#([0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(value) ? value : '#efece1';
@@ -97,6 +160,7 @@ export const nativeInk = {
 
   mount(element) {
     if (!element) return false;
+    latestStrokes = [];
     return post({ op: 'mount', ...geometryOf(element), ink: inkColor() });
   },
 
@@ -105,45 +169,32 @@ export const nativeInk = {
     post({ op: 'layout', ...geometryOf(element) });
   },
 
-  unmount() { post({ op: 'unmount' }); },
-
+  unmount() { latestStrokes = []; post({ op: 'unmount' }); },
   setAppearance() { post({ op: 'appearance', ink: inkColor() }); },
-
   setTool(tool, finger) { post({ op: 'tool', tool, finger: !!finger }); },
-
   setEnabled(enabled) { post({ op: 'enabled', enabled: !!enabled }); },
-
   undo() { post({ op: 'undo' }); },
   redo() { post({ op: 'redo' }); },
-  clear() { post({ op: 'clear' }); },
-
-  setStrokes(strokes) { post({ op: 'setStrokes', strokes: strokes || [] }); },
+  clear() { latestStrokes = []; post({ op: 'clear' }); },
+  setStrokes(strokes) {
+    latestStrokes = Array.isArray(strokes) ? strokes : [];
+    post({ op: 'setStrokes', strokes: latestStrokes });
+  },
 
   onStrokes(listener) {
     strokeListeners.add(listener);
     return () => strokeListeners.delete(listener);
   },
 
-  /**
-   * Ask the shell to read what is written. Resolves with the same shape the
-   * web engine returns, plus `unread` on any line Vision produced nothing for
-   * — the caller reads those with the web engine instead, so a step is never
-   * lost just because one line was too short to read as text.
-   */
-  recognize(overrides = {}) {
-    return new Promise((resolve) => {
-      const reqId = nextRequestId++;
-      pending.set(reqId, resolve);
-      if (!post({ op: 'recognize', reqId, overrides })) {
-        pending.delete(reqId);
-        resolve(null);
-        return;
-      }
-      // A reply that never comes must not leave the reading panel waiting on
-      // it for the rest of the session.
-      setTimeout(() => {
-        if (pending.has(reqId)) { pending.delete(reqId); resolve(null); }
-      }, 6000);
-    });
+  /** Pri-owned learned model. Empty result means no validated asset is bundled
+   * or the model declined the page; callers must continue through fallbacks. */
+  foundationRecognize(overrides = {}, context = null) {
+    return requestReading({ op: 'foundationRecognize', overrides }, 5000, context);
+  },
+
+  /** Mature native rescue recogniser. It remains on-device and is intentionally
+   * separate from the foundation call so production fallback order is auditable. */
+  recognize(overrides = {}, context = null) {
+    return requestReading({ op: 'recognize', overrides }, 6000, context);
   }
 };

@@ -1,0 +1,198 @@
+name: Ink Structural V4 Synthetic
+
+on:
+  push:
+    paths:
+      - 'tools/ink-foundation/generate_structural_synthetic.mjs'
+      - 'tools/ink-foundation/structural.py'
+      - 'tools/ink-foundation/structural_data.py'
+      - 'tools/ink-foundation/structural_decode.py'
+      - 'tools/ink-foundation/structural_joint_decode.py'
+      - 'tools/ink-foundation/compare_structural_decoders.py'
+      - 'tools/ink-foundation/train_structural.py'
+      - 'tools/ink-foundation/train_structural_dev.py'
+      - 'tools/ink-foundation/evaluate_structural.py'
+      - 'tools/ink-foundation/evaluate_structural_dev.py'
+      - 'scripts/ink-structural-pretrain-dev.sh'
+      - 'scripts/ink-structural-rebuild-dev.sh'
+      - 'package.json'
+      - '.github/workflows/ink-structural-v4-synthetic.yml'
+  pull_request:
+    paths:
+      - 'tools/ink-foundation/generate_structural_synthetic.mjs'
+      - 'tools/ink-foundation/structural.py'
+      - 'tools/ink-foundation/structural_data.py'
+      - 'tools/ink-foundation/structural_decode.py'
+      - 'tools/ink-foundation/structural_joint_decode.py'
+      - 'tools/ink-foundation/compare_structural_decoders.py'
+      - 'tools/ink-foundation/train_structural.py'
+      - 'tools/ink-foundation/train_structural_dev.py'
+      - 'tools/ink-foundation/evaluate_structural.py'
+      - 'tools/ink-foundation/evaluate_structural_dev.py'
+      - 'scripts/ink-structural-pretrain-dev.sh'
+      - 'scripts/ink-structural-rebuild-dev.sh'
+      - 'package.json'
+      - '.github/workflows/ink-structural-v4-synthetic.yml'
+
+concurrency:
+  group: ink-structural-v4-synthetic-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  exact-synthetic-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: tools/ink-foundation/requirements.txt
+
+      - name: Generator and trainer syntax
+        run: |
+          node --check tools/ink-foundation/generate_structural_synthetic.mjs
+          python -m py_compile \
+            tools/ink-foundation/structural.py \
+            tools/ink-foundation/structural_decode.py \
+            tools/ink-foundation/structural_joint_decode.py \
+            tools/ink-foundation/compare_structural_decoders.py \
+            tools/ink-foundation/train_structural.py \
+            tools/ink-foundation/train_structural_dev.py \
+            tools/ink-foundation/evaluate_structural.py \
+            tools/ink-foundation/evaluate_structural_dev.py
+
+      - name: Install training dependencies
+        run: python -m pip install -r tools/ink-foundation/requirements.txt
+
+      - name: Generate tiny exact structural corpus
+        run: |
+          node tools/ink-foundation/generate_structural_synthetic.mjs \
+            /tmp/pri-ink-v4-exact-synth 3 2 4
+
+      - name: Exact structural provenance contract
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          files = sorted(Path('/tmp/pri-ink-v4-exact-synth').glob('*.json'))
+          assert len(files) == 5, len(files)
+          docs = [json.loads(p.read_text()) for p in files]
+          samples = [s for d in docs for s in d['samples']]
+          assert len(samples) == 20
+          assert all(s.get('structure', {}).get('syntheticExact', {}).get('status') == 'generator-ground-truth' for s in samples)
+          assert all(s['structure']['groups'] for s in samples)
+          for s in samples:
+              covered = sorted(i for g in s['structure']['groups'] for i in g['strokes'])
+              assert covered == list(range(len(s['strokes']))), (s['target'], covered, len(s['strokes']))
+              keys = [(r['from'], r['to'], r['type']) for r in s['structure']['relations']]
+              assert len(keys) == len(set(keys)), s['target']
+          print('Exact synthetic trace supervision: PASS')
+          PY
+
+      - name: Strict structural audit
+        run: python tools/ink-foundation/audit_structural.py /tmp/pri-ink-v4-exact-synth --require-all
+
+      - name: One-epoch exact synthetic training smoke
+        run: |
+          python tools/ink-foundation/train_structural.py \
+            --corpus /tmp/pri-ink-v4-exact-synth \
+            --out /tmp/pri-ink-v4-exact-synth.pt \
+            --epochs 1 \
+            --batch 4 \
+            --device cpu \
+            --d-model 64 \
+            --point-layers 1 \
+            --stroke-layers 1 \
+            --max-strokes 64 \
+            --max-points-per-stroke 96 \
+            --patience 1
+
+      - name: Run both decoders on identical trained smoke checkpoint
+        run: |
+          python tools/ink-foundation/evaluate_structural.py \
+            /tmp/pri-ink-v4-exact-synth.pt \
+            --corpus /tmp/pri-ink-v4-exact-synth \
+            --split validation \
+            --device cpu \
+            --out /tmp/pri-ink-v4-baseline.json
+          python tools/ink-foundation/evaluate_structural.py \
+            /tmp/pri-ink-v4-exact-synth.pt \
+            --corpus /tmp/pri-ink-v4-exact-synth \
+            --split validation \
+            --device cpu \
+            --decoder joint \
+            --out /tmp/pri-ink-v4-joint.json
+          python tools/ink-foundation/compare_structural_decoders.py \
+            /tmp/pri-ink-v4-baseline.json \
+            /tmp/pri-ink-v4-joint.json \
+            --out /tmp/pri-ink-v4-decoder-comparison.json
+
+      - name: Smoke decoder reports preserve evidence boundary
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          baseline = json.loads(Path('/tmp/pri-ink-v4-baseline.json').read_text())
+          joint = json.loads(Path('/tmp/pri-ink-v4-joint.json').read_text())
+          comparison = json.loads(Path('/tmp/pri-ink-v4-decoder-comparison.json').read_text())
+          assert baseline['decoder'] == 'complete-link'
+          assert joint['decoder'] == 'joint'
+          assert baseline['checkpointSha256'] == joint['checkpointSha256']
+          assert baseline['samples'] == joint['samples'] == 8
+          assert baseline['writers'] == joint['writers'] == 2
+          assert baseline['productionReady'] is False
+          assert joint['productionReady'] is False
+          assert comparison['productionReady'] is False
+          assert comparison['comparison'] == 'complete-link-vs-joint'
+          assert joint['jointPartition']['actualSearchRegimes'] == {'joint-contiguous-v1': 8}
+          print('Actual-model joint decoder integration: PASS (accuracy remains synthetic smoke evidence only)')
+          PY
+
+      - name: Generate one-writer dev smoke corpus
+        run: |
+          node tools/ink-foundation/generate_structural_synthetic.mjs \
+            /tmp/pri-ink-v4-dev-smoke 1 0 12
+
+      - name: One-epoch glyph replay fine-tune smoke
+        run: |
+          python tools/ink-foundation/train_structural_dev.py \
+            --corpus /tmp/pri-ink-v4-dev-smoke \
+            --init /tmp/pri-ink-v4-exact-synth.pt \
+            --replay-corpus /tmp/pri-ink-v4-exact-synth \
+            --replay-weight 0.20 \
+            --out /tmp/pri-ink-v4-dev-smoke.pt \
+            --epochs 1 \
+            --batch 4 \
+            --device cpu \
+            --d-model 64 \
+            --point-layers 1 \
+            --stroke-layers 1 \
+            --max-strokes 64 \
+            --max-points-per-stroke 96 \
+            --patience 1
+
+      - name: Checkpoints remain research-only
+        run: |
+          python - <<'PY'
+          import torch
+          for p, stage in [
+              ('/tmp/pri-ink-v4-exact-synth.pt', 'structural-research'),
+              ('/tmp/pri-ink-v4-dev-smoke.pt', 'structural-research-dev'),
+          ]:
+              ckpt = torch.load(p, map_location='cpu', weights_only=False)
+              assert ckpt['architecture_version'] == 4
+              assert ckpt['stage'] == stage
+              assert ckpt['production_ready'] is False
+              assert ckpt.get('symbol_objective') == 'explicit-group-embedding-classifier-v2'
+              assert int((ckpt.get('config') or {}).get('glyph_representation_version', 0)) == 2
+          dev = torch.load('/tmp/pri-ink-v4-dev-smoke.pt', map_location='cpu', weights_only=False)
+          replay = dev.get('synthetic_replay') or {}
+          assert replay.get('objective') == 'explicit-group-embedding-symbol-only'
+          assert replay.get('evidence') is False
+          print('Exact synthetic + group-glyph replay promotion locks: PASS')
+          PY

@@ -2,29 +2,54 @@
 // Pri Learning · Ink stroke model
 //
 // One representation of a stroke shared by everything native: the PencilKit
-// canvas, the rasteriser that feeds Vision, the line segmenter, and the JSON
-// the web layer receives so its own engine, drafts and replay keep working.
+// canvas, native/local recognisers, the line segmenter, and the JSON the web
+// layer receives. V2 deliberately preserves the signal a learned stroke model
+// needs instead of reducing Pencil input to x/y alone.
 //
-// Coordinates are the ink surface's own CSS-pixel space — (0, 0) at the top
-// left of the writing area — which is exactly the space the web canvas used,
-// so every downstream consumer of a stroke list is unchanged.
+// Coordinates are the ink surface's CSS-pixel space — (0, 0) at the top left
+// of the writing area — exactly the space the web canvas uses.
 // ─────────────────────────────────────────────────────────────────────────────
 import CoreGraphics
 import Foundation
 import PencilKit
 
-/// A single sampled point along a stroke. `w` is the ink width at that point,
-/// carried so the web side can redraw a stroke exactly as it was written.
+/// A sampled point along a stroke.
+///
+/// `t` is seconds from the start of this stroke; `force`, `azimuth` and
+/// `altitude` come directly from PencilKit. Old saved strokes that only contain
+/// x/y/w remain valid because every V2 field has a safe default.
 struct InkPoint {
     var x: CGFloat
     var y: CGFloat
     var w: CGFloat
+    var t: TimeInterval
+    var force: CGFloat
+    var azimuth: CGFloat
+    var altitude: CGFloat
+
+    init(
+        x: CGFloat,
+        y: CGFloat,
+        w: CGFloat = 3,
+        t: TimeInterval = 0,
+        force: CGFloat = 0,
+        azimuth: CGFloat = 0,
+        altitude: CGFloat = .pi / 2
+    ) {
+        self.x = x
+        self.y = y
+        self.w = w
+        self.t = t
+        self.force = force
+        self.azimuth = azimuth
+        self.altitude = altitude
+    }
 }
 
 struct InkStroke {
     var points: [InkPoint]
 
-    var isEmpty: Bool { points.count < 1 }
+    var isEmpty: Bool { points.isEmpty }
 
     /// Tight bounds of the stroke's centreline. Zero-area strokes (a dot, a
     /// perfectly horizontal minus sign) are given a hairline extent so callers
@@ -50,22 +75,20 @@ struct InkStroke {
         return total
     }
 
-    /// Mean ink width, used to scale the pen when re-drawing for recognition.
     var meanWidth: CGFloat {
         guard !points.isEmpty else { return 0 }
         return points.reduce(0) { $0 + $1.w } / CGFloat(points.count)
     }
+
+    var duration: TimeInterval { points.last?.t ?? 0 }
 }
 
 // MARK: - PencilKit bridge
 
 enum StrokeCodec {
 
-    /// Sampling step along a PencilKit path, in points. PencilKit stores a
-    /// spline rather than the raw samples, so the step — not the input rate —
-    /// decides how much shape survives. 1.5pt keeps the corners a recogniser
-    /// needs (the join of a '4', the cusp of a 'v') without producing lists so
-    /// long that JSON encoding shows up while the pen is still moving.
+    /// 1.5 pt preserves corners without exploding the JSON payload. PencilKit
+    /// interpolation also gives us force/orientation/time at every sampled point.
     private static let sampleStep: CGFloat = 1.5
 
     static func strokes(from drawing: PKDrawing) -> [InkStroke] {
@@ -74,45 +97,58 @@ enum StrokeCodec {
             let transform = stroke.transform
             for point in stroke.path.interpolatedPoints(by: .distance(sampleStep)) {
                 let location = point.location.applying(transform)
-                points.append(InkPoint(x: location.x, y: location.y, w: point.size.width))
+                points.append(InkPoint(
+                    x: location.x,
+                    y: location.y,
+                    w: point.size.width,
+                    t: point.timeOffset,
+                    force: point.force,
+                    azimuth: point.azimuth,
+                    altitude: point.altitude
+                ))
             }
-            // A tap leaves a path with a single control point and no
-            // interpolated span — the dot of an 'i' is a real glyph, so it is
-            // kept rather than dropped for being zero length.
+            // A tap has no interpolated span, but its pressure/orientation are
+            // still useful and the dot must survive as a real mark.
             if points.isEmpty, let only = stroke.path.first {
                 let location = only.location.applying(transform)
-                points.append(InkPoint(x: location.x, y: location.y, w: only.size.width))
+                points.append(InkPoint(
+                    x: location.x,
+                    y: location.y,
+                    w: only.size.width,
+                    t: only.timeOffset,
+                    force: only.force,
+                    azimuth: only.azimuth,
+                    altitude: only.altitude
+                ))
             }
             return InkStroke(points: points)
         }
     }
 
-    /// Rebuild a drawing from strokes the web layer supplies — restoring a
-    /// saved draft, or replaying an attempt.
+    /// Rebuild a drawing from strokes supplied by the web layer. V2 metadata is
+    /// retained when present; legacy strokes fall back to neutral Pencil values.
     static func drawing(from strokes: [InkStroke], color: UIColor) -> PKDrawing {
         let ink = PKInk(.pen, color: color)
         let built: [PKStroke] = strokes.compactMap { stroke in
             guard !stroke.points.isEmpty else { return nil }
-            var time: TimeInterval = 0
-            let controlPoints: [PKStrokePoint] = stroke.points.map { p in
-                defer { time += 1.0 / 120.0 }
+            let controlPoints: [PKStrokePoint] = stroke.points.enumerated().map { index, p in
+                let fallbackTime = Double(index) / 120.0
+                let time = p.t > 0 || index == 0 ? p.t : fallbackTime
                 let width = max(1, p.w)
                 return PKStrokePoint(
                     location: CGPoint(x: p.x, y: p.y),
                     timeOffset: time,
                     size: CGSize(width: width, height: width),
                     opacity: 1,
-                    force: 1,
-                    azimuth: 0,
-                    altitude: .pi / 2
+                    force: max(0, p.force),
+                    azimuth: p.azimuth,
+                    altitude: p.altitude > 0 ? p.altitude : .pi / 2
                 )
             }
-            // PKStrokePath needs at least two control points to describe a
-            // span; a single-point tap is given a second coincident point so
-            // it renders as the dot it was.
-            let path = controlPoints.count >= 2
-                ? PKStrokePath(controlPoints: controlPoints, creationDate: Date())
-                : PKStrokePath(controlPoints: controlPoints + controlPoints, creationDate: Date())
+            let safePoints = controlPoints.count >= 2
+                ? controlPoints
+                : controlPoints + controlPoints
+            let path = PKStrokePath(controlPoints: safePoints, creationDate: Date())
             return PKStroke(ink: ink, path: path)
         }
         return PKDrawing(strokes: built)
@@ -122,31 +158,53 @@ enum StrokeCodec {
 // MARK: - JSON
 
 extension InkStroke {
-    /// CGFloat is not a JSON type — JSONSerialization refuses an object graph
-    /// containing one and hands back nil, which would mean the page silently
-    /// never hearing about a single stroke. Every number crossing the bridge
-    /// is a Double.
+    /// Field names intentionally match the browser collector where possible:
+    /// p=force, t=time, plus Pencil-specific azimuth/altitude. Existing web code
+    /// ignores unknown fields, so this is backwards compatible immediately.
     var jsonObject: [String: Any] {
-        ["points": points.map { ["x": Double($0.x), "y": Double($0.y), "w": Double($0.w)] }]
+        ["points": points.map {
+            [
+                "x": Double($0.x),
+                "y": Double($0.y),
+                "w": Double($0.w),
+                "t": $0.t,
+                "p": Double($0.force),
+                "azimuth": Double($0.azimuth),
+                "altitude": Double($0.altitude)
+            ] as [String: Any]
+        }]
     }
 
     init?(json: Any) {
         guard let dict = json as? [String: Any],
               let raw = dict["points"] as? [[String: Any]] else { return nil }
         let parsed: [InkPoint] = raw.compactMap { p in
-            guard let x = InkStroke.number(p["x"]), let y = InkStroke.number(p["y"]) else { return nil }
-            return InkPoint(x: x, y: y, w: InkStroke.number(p["w"]) ?? 3)
+            guard let x = InkStroke.number(p["x"]),
+                  let y = InkStroke.number(p["y"]) else { return nil }
+            return InkPoint(
+                x: x,
+                y: y,
+                w: InkStroke.number(p["w"]) ?? 3,
+                t: InkStroke.double(p["t"]) ?? 0,
+                force: InkStroke.number(p["p"]) ?? InkStroke.number(p["force"]) ?? 0,
+                azimuth: InkStroke.number(p["azimuth"]) ?? 0,
+                altitude: InkStroke.number(p["altitude"]) ?? .pi / 2
+            )
         }
         guard !parsed.isEmpty else { return nil }
         self.points = parsed
     }
 
-    /// A JavaScript number arrives as NSNumber; the same value built natively
-    /// arrives as CGFloat or Double. All three are read the same way.
     private static func number(_ value: Any?) -> CGFloat? {
         if let n = value as? NSNumber { return CGFloat(n.doubleValue) }
         if let d = value as? Double { return CGFloat(d) }
         if let f = value as? CGFloat { return f }
+        return nil
+    }
+
+    private static func double(_ value: Any?) -> Double? {
+        if let n = value as? NSNumber { return n.doubleValue }
+        if let d = value as? Double { return d }
         return nil
     }
 }

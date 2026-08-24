@@ -1,0 +1,178 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Pri Ink Foundation V3 — one-writer DEVELOPMENT bootstrap.
+#
+# Keeps the real corpus local, pretrains on Pri-owned synthetic writer diversity,
+# builds a holdout-safe synthetic replay from the writer's REAL Pencil glyphs,
+# adapts on the real writer with replay-balanced sampling + cross-modal visual
+# personalization, exports a non-production Core ML model, and installs it into
+# both local SwiftPM packages for DEBUG testing.
+#
+# It never reads test/final-holdout evidence and can never promote a release.
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$ROOT"
+
+if [[ "$(uname -s)" != "Darwin" ]]; then
+  echo "ERROR: Core ML bootstrap export must run on macOS."
+  exit 2
+fi
+
+PYTHON="${PYTHON:-python3}"
+VENV=".venv-ink"
+PY="$VENV/bin/python"
+PIP="$VENV/bin/pip"
+RUN_DIR="tools/ink-foundation/runs/bootstrap-one-writer"
+SYNTH_DIR="${TMPDIR:-/tmp}/pri-ink-bootstrap-synth"
+PERSONAL_SYNTH_DIR="${TMPDIR:-/tmp}/pri-ink-personal-synth"
+PRETRAIN="$RUN_DIR/pri-ink-bootstrap-pretrain.pt"
+BOOTSTRAP="$RUN_DIR/pri-ink-bootstrap.pt"
+MODEL="$RUN_DIR/PriInkFoundation.mlpackage"
+
+SYNTH_TRAIN_WRITERS="${PRI_INK_SYNTH_TRAIN_WRITERS:-96}"
+SYNTH_VAL_WRITERS="${PRI_INK_SYNTH_VAL_WRITERS:-24}"
+SYNTH_SAMPLES_PER_WRITER="${PRI_INK_SYNTH_SAMPLES_PER_WRITER:-24}"
+PERSONAL_SYNTH_SAMPLES="${PRI_INK_PERSONAL_SYNTH_SAMPLES:-600}"
+PRETRAIN_EPOCHS="${PRI_INK_PRETRAIN_EPOCHS:-16}"
+BOOTSTRAP_EPOCHS="${PRI_INK_BOOTSTRAP_EPOCHS:-32}"
+D_MODEL="${PRI_INK_D_MODEL:-192}"
+STROKE_LAYERS="${PRI_INK_STROKE_LAYERS:-6}"
+DECODER_LAYERS="${PRI_INK_DECODER_LAYERS:-4}"
+REAL_REPLAY_FRACTION="${PRI_INK_REAL_REPLAY_FRACTION:-0.30}"
+VISUAL_LR_MULTIPLIER="${PRI_INK_VISUAL_LR_MULTIPLIER:-2.0}"
+STROKE_LR_MULTIPLIER="${PRI_INK_STROKE_LR_MULTIPLIER:-0.45}"
+DECODER_LR_MULTIPLIER="${PRI_INK_DECODER_LR_MULTIPLIER:-1.0}"
+BOOTSTRAP_SEED="${PRI_INK_BOOTSTRAP_SEED:-20260823}"
+VALIDATION_FRACTION="${PRI_INK_BOOTSTRAP_VALIDATION_FRACTION:-0.20}"
+
+printf '\n============================================================\n'
+printf ' Pri Ink V3 · one-writer DEVELOPMENT bootstrap\n'
+printf '============================================================\n\n'
+
+echo "1/8  Auditing the private real-Pencil corpus"
+npm run test:ink:corpus:strict
+
+node <<'NODE'
+const fs = require('fs');
+const path = require('path');
+const dir = path.join(process.cwd(), 'client/test/ink-corpus');
+const files = fs.readdirSync(dir).filter(f => f.endsWith('.json'));
+const docs = files.map(f => JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8')));
+const writers = [...new Set(docs.map(d => d.writer?.id).filter(Boolean))];
+const samples = docs.reduce((n, d) => n + (d.samples?.length || 0), 0);
+const badCollector = docs.filter(d => Number(d.collector?.version || 0) < 7);
+const nonTrain = docs.filter(d => d.split !== 'train');
+if (writers.length !== 1) throw new Error(`bootstrap requires exactly one real writer; found ${writers.length}: ${writers.join(', ')}`);
+if (samples < 20) throw new Error(`bootstrap needs at least 20 real expressions; found ${samples}`);
+if (badCollector.length) throw new Error('bootstrap requires capture v7+ real data');
+if (nonTrain.length) throw new Error('bootstrap must not consume validation/test/final-holdout files');
+console.log(`bootstrap source: ${writers[0]} · ${samples} real expressions · capture v7+`);
+NODE
+
+echo
+echo "2/8  Preparing the isolated Python environment"
+if [[ ! -x "$PY" ]]; then
+  "$PYTHON" -m venv "$VENV"
+fi
+"$PY" -m pip install --upgrade pip
+"$PIP" install -r tools/ink-foundation/requirements.txt
+
+mkdir -p "$RUN_DIR"
+rm -rf "$SYNTH_DIR" "$PERSONAL_SYNTH_DIR" "$MODEL"
+
+echo
+echo "3/8  Generating generic whole-expression writer diversity"
+node tools/ink-foundation/generate_synthetic.mjs \
+  "$SYNTH_DIR" \
+  "$SYNTH_TRAIN_WRITERS" \
+  "$SYNTH_VAL_WRITERS" \
+  "$SYNTH_SAMPLES_PER_WRITER"
+
+echo
+echo "4/8  Pretraining the V3 multimodal backbone"
+"$PY" tools/ink-foundation/train.py \
+  --stage pretrain \
+  --corpus "$SYNTH_DIR" \
+  --out "$PRETRAIN" \
+  --epochs "$PRETRAIN_EPOCHS" \
+  --batch 16 \
+  --lr 2e-4 \
+  --d-model "$D_MODEL" \
+  --stroke-layers "$STROKE_LAYERS" \
+  --decoder-layers "$DECODER_LAYERS" \
+  --max-points 768 \
+  --max-tokens 96 \
+  --patience 5
+
+echo
+echo "5/8  Building holdout-safe replay from this writer's real Pencil glyphs"
+node tools/ink-foundation/generate_personal_synthetic.mjs \
+  client/test/ink-corpus \
+  "$PERSONAL_SYNTH_DIR" \
+  "$PERSONAL_SYNTH_SAMPLES" \
+  "$BOOTSTRAP_SEED" \
+  "$VALIDATION_FRACTION"
+
+echo
+echo "6/8  Adapting V3 to the real Pencil writer + personal replay"
+"$PY" tools/ink-foundation/bootstrap.py \
+  --init "$PRETRAIN" \
+  --corpus client/test/ink-corpus \
+  --personal-synth "$PERSONAL_SYNTH_DIR" \
+  --out "$BOOTSTRAP" \
+  --epochs "$BOOTSTRAP_EPOCHS" \
+  --batch 8 \
+  --lr 4e-5 \
+  --real-replay-fraction "$REAL_REPLAY_FRACTION" \
+  --visual-lr-multiplier "$VISUAL_LR_MULTIPLIER" \
+  --stroke-lr-multiplier "$STROKE_LR_MULTIPLIER" \
+  --decoder-lr-multiplier "$DECODER_LR_MULTIPLIER" \
+  --d-model "$D_MODEL" \
+  --stroke-layers "$STROKE_LAYERS" \
+  --decoder-layers "$DECODER_LAYERS" \
+  --max-points 768 \
+  --max-tokens 96 \
+  --seed "$BOOTSTRAP_SEED" \
+  --validation-fraction "$VALIDATION_FRACTION" \
+  --patience 10
+
+echo
+echo "7/8  Exporting a development-only Core ML model"
+"$PY" tools/ink-foundation/export_coreml.py \
+  "$BOOTSTRAP" \
+  --out "$MODEL"
+
+"$PY" - "$MODEL" <<'PY'
+import sys
+import coremltools as ct
+m = ct.models.MLModel(sys.argv[1])
+meta = m.user_defined_metadata
+assert meta.get('pri.model') == 'ink-foundation-v3', meta
+assert meta.get('pri.architectureVersion') == '3', meta
+assert meta.get('pri.productionReady') == 'false', meta
+assert meta.get('pri.trainingStage') == 'bootstrap', meta
+assert 'cross-modal-style' in meta.get('pri.decoder', ''), meta
+print('Core ML V3 promotion lock: PASS — exact bootstrap asset is development-only')
+PY
+
+echo
+echo "8/8  Installing the DEBUG model into both local iPad packages"
+for package in "ios/PriLearning.swiftpm" "ios/PriLearning 2.swiftpm"; do
+  dest="$package/Resources/Models/PriInkFoundation.mlpackage"
+  mkdir -p "$(dirname "$dest")"
+  rm -rf "$dest"
+  cp -R "$MODEL" "$dest"
+done
+
+printf '\n============================================================\n'
+printf ' V3 BOOTSTRAP COMPLETE\n'
+printf '============================================================\n'
+printf 'Checkpoint: %s\n' "$BOOTSTRAP"
+printf 'Core ML:    %s\n' "$MODEL"
+printf 'Personal replay: %s synthetic expressions\n' "$PERSONAL_SYNTH_SAMPLES"
+printf 'Expected real-Pencil adaptation share: %s\n' "$REAL_REPLAY_FRACTION"
+printf 'Installed:  ios/PriLearning.swiftpm/Resources/Models/PriInkFoundation.mlpackage\n'
+printf '\nThis model is for DEBUG/iPad testing only.\n'
+printf 'It is NOT evidence of accuracy on other people and cannot be promoted.\n'
+printf 'Pri production promotion still requires writer-disjoint real test/final-holdout gates.\n\n'

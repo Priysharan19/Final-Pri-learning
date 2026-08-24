@@ -9,7 +9,10 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import InkCanvas from './InkCanvas.jsx';
 import NativeInkCanvas from './NativeInkCanvas.jsx';
 import { nativeInk, nativeInkAvailable } from './native.js';
+import { recognizeWithStructuralDev } from '../../dev/devStructural.js';
 import { recognize, exprToLatex } from './recognizer.js';
+import { recognizeWithoutDetachedSideWork } from './runtimeSpatial.js';
+import { feedbackGeometry } from './feedbackGeometry.js';
 import { ALPHABET } from './templates.js';
 import { classOfSymbol } from './classes.js';
 import { ensurePersonalLoaded, addPersonal } from './personal.js';
@@ -19,27 +22,32 @@ const NICE = { pi: 'π', theta: 'θ', sqrt: '√', percent: '%' };
 const showSym = s => NICE[s] || s;
 
 // ── Which surface, which engine ──────────────────────────────────────────────
-// In the iPad app the ink is a PencilKit canvas and the reading comes from the
-// on-device Vision handwriting model. Anywhere else — a browser, the dev
-// server — it is the web canvas and the web engine. The decision is made once,
-// at module load, and nothing below this line depends on the answer.
+// PencilKit is the native capture surface. Recognition order on iPad is now:
+//   1. Pri's bundled Core ML foundation model, when a validated asset exists;
+//   2. Pri's mature JS stroke/CNN/grammar recogniser;
+//   3. the native Vision/geometry reader as an emergency no-result rescue.
+// Browser/LAN builds normally begin at stage 2. `serve:lan:v4` adds a strictly
+// development-only first opinion from the local Structural V4 PyTorch worker on
+// the developer Mac, so physical iPad testing can exercise the actual research
+// model without pretending it is a production/offline asset.
 const NATIVE_INK = nativeInkAvailable();
 const Surface = NATIVE_INK ? NativeInkCanvas : InkCanvas;
+const EMPTY_READING = { lines: [], text: '', symbols: [], minConf: 1, margin: 1, weakest: null };
+const structuralLanExpected = () => !NATIVE_INK && typeof window !== 'undefined' && window.__PRI_LAN_DEV__ === true;
 
 /**
- * Vision reads lines. A line too short to be text — a lone "x", a bare "3" —
- * can come back with nothing at all, and a step the student wrote must never
- * vanish because of it. Those lines, and only those, are read by the web
- * engine instead, on that line's own strokes.
+ * Native rescue reads lines. If it leaves a short line unread (a lone "x", a
+ * bare "3"), heal that line with Pri's JS engine so a written step cannot
+ * silently disappear.
  */
-function readUnreadLines(reading, strokes, overrides) {
+function readUnreadLines(reading, strokes, overrides, ctx = null) {
   let healed = false;
   const lines = reading.lines.map((line, li) => {
     if (!line.unread || !line.strokeIdxs?.length) return line;
     const own = line.strokeIdxs.map(i => strokes[i]).filter(Boolean);
     if (!own.length) return line;
     let fallback;
-    try { fallback = recognize(own, overrides); } catch { return line; }
+    try { fallback = recognize(own, overrides, ctx); } catch { return line; }
     const first = fallback.lines[0];
     if (!first || !first.text) return line;
     healed = true;
@@ -47,9 +55,6 @@ function readUnreadLines(reading, strokes, overrides) {
       ...line,
       text: first.text,
       box: first.box,
-      // Ids are namespaced so a correction on a web-read line cannot collide
-      // with one on a Vision-read line, and stroke indexes are mapped back to
-      // the page so "learn from this correction" trains on the right ink.
       symbols: first.symbols.map(sym => ({
         ...sym,
         id: `w${li}_${sym.id}`,
@@ -60,24 +65,10 @@ function readUnreadLines(reading, strokes, overrides) {
     };
   });
   if (!healed) return reading;
-  // The engine's own confidence summary described the reading before the swap;
-  // dropping it makes the caller derive a fresh one from the symbols that are
-  // actually being shown.
-  return { lines, text: lines.map(l => l.text).join('\n') };
+  return { ...reading, lines, text: lines.map(l => l.text).join('\n') };
 }
 
 // ── How sure the reading is ──────────────────────────────────────────────────
-// The line a mark is awarded or withheld on travels with the engine's own
-// account of how much of a guess it was — minConf, margin and the glyph
-// responsible — so a caller can stop and ask before a wrong reading is marked.
-// Two things are added on the way through: the id of the glyph the engine
-// named, which is what the tap-to-correct picker opens on, and the runner-up
-// worth showing beside it. A runner-up inside the glyph's own CNN class is the
-// same ink under another name (1/l, 0/o) and is no use as a question, so it is
-// skipped here exactly as the engine skips it when measuring the margin.
-// Older builds returned none of this; the same three are then derived from the
-// per-symbol confidences that have always been there, so a caller sees one
-// shape either way.
 const rivalOf = (s) => {
   const cls = classOfSymbol(s.sym);
   return (s.alts || []).find(a => a.sym !== s.sym && classOfSymbol(a.sym) !== cls) || null;
@@ -110,17 +101,16 @@ function readingConfidence(result) {
  * lineVerdicts: optional array aligned with recognised lines, e.g.
  * [{status:'ok'}, {status:'break', note:'…'}] — drawn as a teacher-style
  * ✓/✗ overlay on the ink itself and as badges in the reading panel.
- * focusSymbol: id of a glyph the caller wants checked. Its picker opens on the
- * student's behalf with the first alternative focused, so a correction is one
- * tap rather than a hunt.
+ * focusSymbol: id of a glyph the caller wants checked.
+ * recognitionContext: optional safe question context consumed by recognize().
  */
-export default function InkAnswer({ onRecognized, height = 300, disabled, lineVerdicts = null, focusSymbol = null }) {
+export default function InkAnswer({ onRecognized, height = 300, disabled, lineVerdicts = null, focusSymbol = null, recognitionContext = null }) {
   const canvasRef = useRef(null);
   const [tool, setTool] = useState('pen');
   const [finger, setFinger] = useState(false);
   const [rec, setRec] = useState({ lines: [], text: '' });
   const [overrides, setOverrides] = useState({});
-  const [picker, setPicker] = useState(null); // {id, alts}
+  const [picker, setPicker] = useState(null);
   const [extraHeight, setExtraHeight] = useState(0);
   const timerRef = useRef(null);
   const readSeqRef = useRef(0);
@@ -139,23 +129,75 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
       minConf: sure.minConf,
       margin: sure.margin,
       weakest: sure.weakest,
+      engine: r.engine || null,
+      researchOnly: r.researchOnly === true,
+      productionReady: r.productionReady === true,
       strokes
     });
   }, [onRecognized]);
 
   const runRecognition = useCallback((strokes, ovr) => {
-    if (!NATIVE_INK) { publish(recognize(strokes, ovr), strokes); return; }
-    // The shell reads on its own thread, so replies can land out of order —
-    // only the newest request is allowed to reach the panel.
     const seq = ++readSeqRef.current;
-    nativeInk.recognize(ovr).then(reading => {
+
+    const readWithJS = () => {
+      try { return recognizeWithoutDetachedSideWork(strokes, ovr, recognitionContext, recognize); }
+      catch { return null; }
+    };
+
+    // Browser/dev: prefer the explicit Structural V4 LAN research bridge when
+    // the server exposes it. A normal build answers 404 once, the client caches
+    // that absence, and the mature JS recogniser remains the local fallback.
+    // On the dedicated V4 LAN origin, however, a V4 miss is now named in the
+    // engine label instead of looking like an ordinary V3 result. That prevents
+    // a physical-iPad research session from accidentally judging V4 by legacy
+    // fallback output.
+    if (!NATIVE_INK) {
+      recognizeWithStructuralDev(strokes).then(v4 => {
+        if (seq !== readSeqRef.current) return;
+        if (v4?.lines?.some(line => line.text)) {
+          publish(v4, strokes);
+          return;
+        }
+        const local = readWithJS();
+        if (seq !== readSeqRef.current) return;
+        const engine = structuralLanExpected() ? 'pri-js-v3-v4-unavailable' : 'pri-js-v3';
+        publish(local ? { ...local, engine } : { ...EMPTY_READING, engine }, strokes);
+      });
+      return;
+    }
+
+    // iPad native wrapper: first ask the Pri-owned Core ML foundation model.
+    // Development builds without a promoted model return an empty result and
+    // continue. Safe recognition context is forwarded across the bridge too.
+    nativeInk.foundationRecognize(ovr, recognitionContext).then(foundation => {
       if (seq !== readSeqRef.current) return;
-      publish(
-        reading ? readUnreadLines(reading, strokes, ovr) : recognize(strokes, ovr),
-        strokes
-      );
+      if (foundation?.lines?.some(line => line.text)) {
+        publish(foundation, strokes);
+        return;
+      }
+
+      // The existing custom engine remains an independent local opinion and
+      // protects the product while the real-writer corpus grows.
+      const local = readWithJS();
+      if (seq !== readSeqRef.current) return;
+      if (local?.lines?.some(line => line.text)) {
+        publish({ ...local, engine: 'pri-js-v3' }, strokes);
+        return;
+      }
+
+      // Last resort only. This path is still fully on-device and exists to make
+      // a missing/failed model an accuracy degradation rather than lost work.
+      nativeInk.recognize(ovr, recognitionContext).then(reading => {
+        if (seq !== readSeqRef.current) return;
+        publish(
+          reading
+            ? readUnreadLines(reading, strokes, ovr, recognitionContext)
+            : (local ? { ...local, engine: 'pri-js-v3' } : EMPTY_READING),
+          strokes
+        );
+      });
     });
-  }, [publish]);
+  }, [publish, recognitionContext]);
 
   const onStrokesChange = useCallback((strokes) => {
     strokesRef.current = strokes;
@@ -166,12 +208,10 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
   useEffect(() => { ensurePersonalLoaded(); }, []);
   useEffect(() => () => timerRef.current && clearTimeout(timerRef.current), []);
 
-  // Open on a newly-named glyph only. Re-running on every recognition would
-  // reopen the picker the moment a correction closed it.
   useEffect(() => {
     if (!focusSymbol) { focusedRef.current = null; return; }
     if (focusedRef.current === focusSymbol) return;
-    const sym = rec.lines.flatMap(l => l.symbols).find(s => s.id === focusSymbol);
+    const sym = rec.lines.flatMap(l => l.symbols || []).find(s => s.id === focusSymbol);
     if (!sym) return;
     focusedRef.current = focusSymbol;
     setPicker({ id: sym.id, alts: sym.alts || [] });
@@ -185,11 +225,9 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
     const next = { ...overrides, [id]: sym };
     setOverrides(next);
     setPicker(null);
-    // Learn from the correction: this exact ink now belongs to that symbol.
-    // Unless the reading could not tie the symbol to one mark exactly (`approx`)
-    // — then the strokes under it are a fair guess, and training on a guess
-    // teaches the engine the wrong shape.
-    const symbol = rec.lines.flatMap(l => l.symbols).find(s => s.id === id);
+    // Corrections remain local training evidence regardless of which Pri model
+    // produced the original reading. Approximate ownership is never learned.
+    const symbol = rec.lines.flatMap(l => l.symbols || []).find(s => s.id === id);
     if (symbol?.strokeIdxs?.length && !symbol.approx) {
       const strokes = symbol.strokeIdxs.map(i => strokesRef.current[i]).filter(Boolean);
       if (strokes.length) addPersonal(sym, strokes, 'correction');
@@ -202,6 +240,14 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
     setPicker(null);
     canvasRef.current?.[fn]();
   };
+
+  const engineNote = rec.engine === 'pri-structural-v4-dev-lan'
+    ? 'Structural V4 research · Mac LAN · not production'
+    : rec.engine === 'pri-js-v3-v4-unavailable'
+      ? 'Structural V4 returned no reading · showing JS V3 fallback'
+      : rec.engine === 'pri-js-v3'
+        ? 'JS V3 fallback'
+        : null;
 
   return (
     <div className={`ink-answer ${disabled ? 'ink-disabled' : ''}`}>
@@ -246,22 +292,30 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
                 if (!good && !bad) return null;
                 const showNote = bad && !noted;
                 if (showNote) noted = true;
-                const b = line.box;
+                const geometry = feedbackGeometry(line);
+                const b = geometry.anchor || line.box;
+                const boxes = geometry.boxes.length ? geometry.boxes : [b];
                 return (
                   <React.Fragment key={li}>
-                    {/* teacher-style box drawn around the whole step */}
-                    <span
-                      className={`ink-linebox ${good ? 'good' : 'bad'}`}
-                      style={{ left: b.x - 9, top: b.y - 7, width: b.w + 18, height: b.h + 14 }}
-                    />
+                    {boxes.map((gb, gi) => (
+                      <span
+                        key={`box-${gi}`}
+                        className={`ink-linebox ${good ? 'good' : 'bad'}`}
+                        style={{ left: gb.x - 5, top: gb.y - 5, width: gb.w + 10, height: gb.h + 10 }}
+                      />
+                    ))}
                     <span
                       className={`ink-verdict ${good ? 'good' : 'bad'}`}
                       style={{ top: b.y + b.h / 2 - 14, left: b.x + b.w + 16 }}
                       title={v.note || (good ? 'This line checks out' : 'The maths breaks on this line')}
                     >{good ? '✓' : '✗'}</span>
-                    {bad && (
-                      <span className="ink-underline" style={{ left: b.x - 5, top: b.y + b.h + 5, width: b.w + 14 }} />
-                    )}
+                    {bad && boxes.map((gb, gi) => (
+                      <span
+                        key={`underline-${gi}`}
+                        className="ink-underline"
+                        style={{ left: gb.x - 3, top: gb.y + gb.h + 4, width: gb.w + 6 }}
+                      />
+                    ))}
                     {showNote && (
                       <span className="ink-note" style={{ left: Math.max(4, b.x - 2), top: b.y + b.h + 16 }}>
                         <b>✗ the mistake is here</b>{v.note ? <> — {v.note}</> : null}
@@ -277,7 +331,9 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
 
       {rec.lines.length > 0 && (
         <div className="ink-preview">
-          <div className="ink-preview-title" id="ink-reading">I'm reading:</div>
+          <div className="ink-preview-title" id="ink-reading">
+            I'm reading:{engineNote && <span className="muted" style={{ marginLeft: 10, textTransform: 'none', letterSpacing: 0 }}>{engineNote}</span>}
+          </div>
           {rec.lines.map((line, li) => (
             <div className="ink-line" key={li}>
               <span className="ink-line-n" aria-hidden="true">{li + 1}</span>
@@ -292,7 +348,7 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
                 <span className="sc-note" style={{ fontSize: 12.5 }}>— {lineVerdicts[li].note}</span>
               )}
               <span className="ink-syms">
-                {line.symbols.map(s => (
+                {(line.symbols || []).map(s => (
                   <button
                     type="button"
                     key={s.id}
@@ -303,7 +359,7 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
                     title={s.id === focusSymbol ? 'Check this one' : 'Tap to correct'}
                     aria-label={`Line ${li + 1}, symbol read as “${showSym(s.sym)}”${s.conf < 0.45 ? ', a shaky reading' : ''} — change it`}
                     aria-expanded={picker?.id === s.id}
-                    onClick={() => setPicker(picker?.id === s.id ? null : { id: s.id, alts: s.alts })}
+                    onClick={() => setPicker(picker?.id === s.id ? null : { id: s.id, alts: s.alts || [] })}
                   >{showSym(s.sym)}</button>
                 ))}
               </span>
@@ -312,7 +368,7 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
           {picker && (
             <div className="ink-picker" ref={pickerRef} role="group" aria-label="Change this symbol">
               <div className="ink-picker-row">
-                {picker.alts.map(a => (
+                {(picker.alts || []).map(a => (
                   <button type="button" key={a.sym} className="ink-pick"
                     aria-label={`Change it to “${showSym(a.sym)}” — ${Math.round(a.conf * 100)}% sure`}
                     onClick={() => applyOverride(picker.id, a.sym)}>

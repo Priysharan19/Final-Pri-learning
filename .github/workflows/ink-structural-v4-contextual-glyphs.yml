@@ -1,0 +1,77 @@
+name: Ink Structural V4 Contextual Glyphs
+on:
+  pull_request:
+    paths:
+      - 'tools/ink-foundation/**'
+      - 'scripts/ink-structural-contextual-glyphs-dev.sh'
+      - '.github/workflows/ink-structural-v4-contextual-glyphs.yml'
+  workflow_dispatch:
+jobs:
+  glyph-fusion:
+    name: Local vs visual-context group symbols
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '24'}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12', cache: pip, cache-dependency-path: tools/ink-foundation/requirements.txt}
+      - name: Syntax and evidence boundary
+        run: |
+          python -m py_compile tools/ink-foundation/structural_contextual_glyphs.py tools/ink-foundation/train_contextual_glyphs.py tools/ink-foundation/evaluate_contextual_glyphs.py tools/ink-foundation/test_structural_contextual_glyphs.py
+          bash -n scripts/ink-structural-contextual-glyphs-dev.sh
+          grep -q 'same-writer development only' scripts/ink-structural-contextual-glyphs-dev.sh
+          grep -q 'production ready: false' scripts/ink-structural-contextual-glyphs-dev.sh
+          if grep -q -- '--unlock-final-holdout' scripts/ink-structural-contextual-glyphs-dev.sh;then echo 'contextual glyph dev runner must never unlock final holdout' >&2;exit 1;fi
+      - name: Install pinned V4 dependencies
+        run: python -m pip install -r tools/ink-foundation/requirements.txt
+      - name: Deterministic contextual glyph contracts
+        run: python tools/ink-foundation/test_structural_contextual_glyphs.py
+      - name: Generate exact writer-disjoint structural corpus
+        run: |
+          node tools/ink-foundation/generate_structural_synthetic.mjs /tmp/pri-ink-v4-glyph-synth 3 2 4
+          python tools/ink-foundation/audit_structural.py /tmp/pri-ink-v4-glyph-synth --require-all
+      - name: Train one frozen base for both ablations
+        run: |
+          python tools/ink-foundation/train_structural.py --corpus /tmp/pri-ink-v4-glyph-synth --out /tmp/pri-ink-v4-glyph-base.pt --epochs 1 --batch 4 --device cpu --d-model 64 --point-layers 1 --stroke-layers 1 --max-strokes 64 --max-points-per-stroke 96 --patience 1
+      - name: Train identical-capacity local-only control
+        run: |
+          python tools/ink-foundation/train_contextual_glyphs.py /tmp/pri-ink-v4-glyph-base.pt --corpus /tmp/pri-ink-v4-glyph-synth --out /tmp/pri-ink-v4-glyph-local.pt --mode writer-disjoint --feature-mode local-control --epochs 8 --batch 4 --device cpu --patience 8
+      - name: Train local plus visual-context candidate
+        run: |
+          python tools/ink-foundation/train_contextual_glyphs.py /tmp/pri-ink-v4-glyph-base.pt --corpus /tmp/pri-ink-v4-glyph-synth --out /tmp/pri-ink-v4-glyph-context.pt --mode writer-disjoint --feature-mode local-plus-visual --epochs 8 --batch 4 --device cpu --patience 8
+      - name: Three-way same-base glyph ablation
+        run: |
+          python tools/ink-foundation/evaluate_contextual_glyphs.py /tmp/pri-ink-v4-glyph-base.pt /tmp/pri-ink-v4-glyph-local.pt /tmp/pri-ink-v4-glyph-context.pt --corpus /tmp/pri-ink-v4-glyph-synth --mode writer-disjoint --decoder joint --device cpu --out /tmp/pri-ink-v4-glyph-ablation.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path('/tmp/pri-ink-v4-glyph-ablation.json').read_text())
+          assert d['productionReady'] is False
+          assert d['comparison']=='base-vs-local-control-vs-local-plus-visual-group-symbols'
+          assert d['contextualGlyphVersion']==1
+          assert d['validationProtocol']['writerDisjoint'] is True
+          assert d['oracleGrouping']['base']['groups']==d['oracleGrouping']['localControl']['groups']==d['oracleGrouping']['localPlusVisual']['groups']
+          print('Same-base contextual glyph ablation contract: PASS')
+          PY
+      - name: Build one-writer dev base for transfer smoke
+        run: |
+          node tools/ink-foundation/generate_structural_synthetic.mjs /tmp/pri-ink-v4-glyph-dev 1 0 12
+          python tools/ink-foundation/train_structural_dev.py --corpus /tmp/pri-ink-v4-glyph-dev --init /tmp/pri-ink-v4-glyph-base.pt --replay-corpus /tmp/pri-ink-v4-glyph-synth --replay-weight 0.20 --out /tmp/pri-ink-v4-glyph-dev-base.pt --epochs 1 --batch 4 --device cpu --d-model 64 --point-layers 1 --stroke-layers 1 --max-strokes 64 --max-points-per-stroke 96 --patience 1
+      - name: Transfer both heads to frozen dev train split
+        run: |
+          python tools/ink-foundation/train_contextual_glyphs.py /tmp/pri-ink-v4-glyph-dev-base.pt --corpus /tmp/pri-ink-v4-glyph-dev --out /tmp/pri-ink-v4-glyph-local-dev.pt --mode same-writer-dev --feature-mode local-control --init /tmp/pri-ink-v4-glyph-local.pt --allow-base-transfer --epochs 4 --batch 4 --device cpu --patience 4
+          python tools/ink-foundation/train_contextual_glyphs.py /tmp/pri-ink-v4-glyph-dev-base.pt --corpus /tmp/pri-ink-v4-glyph-dev --out /tmp/pri-ink-v4-glyph-context-dev.pt --mode same-writer-dev --feature-mode local-plus-visual --init /tmp/pri-ink-v4-glyph-context.pt --allow-base-transfer --epochs 4 --batch 4 --device cpu --patience 4
+      - name: Frozen dev contextual glyph ablation preserves evidence boundary
+        run: |
+          python tools/ink-foundation/evaluate_contextual_glyphs.py /tmp/pri-ink-v4-glyph-dev-base.pt /tmp/pri-ink-v4-glyph-local-dev.pt /tmp/pri-ink-v4-glyph-context-dev.pt --corpus /tmp/pri-ink-v4-glyph-dev --mode same-writer-dev --decoder joint --device cpu --out /tmp/pri-ink-v4-glyph-dev-ablation.json
+          python - <<'PY'
+          import json,torch
+          from pathlib import Path
+          d=json.loads(Path('/tmp/pri-ink-v4-glyph-dev-ablation.json').read_text())
+          local=torch.load('/tmp/pri-ink-v4-glyph-local-dev.pt',map_location='cpu',weights_only=False);context=torch.load('/tmp/pri-ink-v4-glyph-context-dev.pt',map_location='cpu',weights_only=False)
+          assert local['initialisation']['baseTransfer'] is True and context['initialisation']['baseTransfer'] is True
+          assert d['productionReady'] is False and d['validationProtocol']['writerDisjoint'] is False and d['validationProtocol']['productionEvidence'] is False
+          print('Synthetic pretrain -> frozen dev contextual glyph protocol: PASS')
+          PY

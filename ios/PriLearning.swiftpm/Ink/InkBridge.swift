@@ -2,36 +2,40 @@
 // Pri Learning · Ink bridge
 //
 // Joins the native writing surface to the page it sits on. The web app owns
-// the layout, the toolbar and everything downstream of a reading — the marker,
-// Step Check, drafts, replay — and none of that changes. What changes is that
-// the ink and the reading of it are now native.
-//
-// Position tracking is deliberately split. The page tells the shell where the
-// writing area is whenever its LAYOUT changes; scrolling is tracked natively
-// from the web view's own scroll offset, so the surface stays welded to the
-// paper at display rate instead of chasing messages across the bridge.
+// layout, toolbar and downstream marking. Native exposes TWO recognisers:
+//   foundationRecognize — Pri's bundled Core ML foundation model, when present;
+//   recognize           — the mature native Vision/geometry emergency reader.
+// The web layer decides fallback order explicitly.
 // ─────────────────────────────────────────────────────────────────────────────
 import UIKit
 import WebKit
 
+/// The clipping region is deliberately larger than the actual Pencil surface so
+/// ink can be clipped against scroll containers. A plain UIView here would eat
+/// every finger tap inside that large transparent rectangle — including toolbar
+/// buttons sitting above/beside the paper. Return nil when the clip view itself
+/// wins hit-testing so those touches continue to the WKWebView underneath. A hit
+/// on the InkSurfaceView/PKCanvasView is still returned normally.
+private final class InkClipView: UIView {
+    override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
+        let hit = super.hitTest(point, with: event)
+        return hit === self ? nil : hit
+    }
+}
+
 final class InkBridge: NSObject, InkSurfaceDelegate {
 
-    /// Clips the surface to the visible content area, so ink can never be
-    /// drawn over the sticky top bar or the sidebar.
-    private let clipView = UIView()
+    private let clipView = InkClipView()
     private let surface = InkSurfaceView()
+    private let foundationRecognizer = InkFoundationPageRecognizer()
     private let recognizer = MathInkRecognizer()
     private let recognitionQueue = DispatchQueue(label: "com.prilearning.ink.recognize", qos: .userInitiated)
     private let encodingQueue = DispatchQueue(label: "com.prilearning.ink.encode", qos: .userInitiated)
 
     private weak var webView: WKWebView?
 
-    /// Every payload the page would receive, for the bridge smoke test. Nil in
-    /// the app — the page is the only listener there.
     var onEmit: (([String: Any]) -> Void)?
 
-    /// Where the writing area sat in the viewport when the page last reported,
-    /// and what the scroll offset was at that moment.
     private var reportedFrame: CGRect = .zero
     private var reportedClip: CGRect = .zero
     private var reportedOffset: CGPoint = .zero
@@ -47,10 +51,7 @@ final class InkBridge: NSObject, InkSurfaceDelegate {
         container.addSubview(clipView)
     }
 
-    /// Called from the web view's scroll delegate — the page moved under the
-    /// surface, so the surface moves with it.
     func webViewDidScroll() { applyLayout() }
-
     func webViewDidResize() { applyLayout() }
 
     // MARK: - Messages from the page
@@ -63,14 +64,11 @@ final class InkBridge: NSObject, InkSurfaceDelegate {
         case "mount":
             applyAppearance(message)
             updateGeometry(message)
-            // A mount is a fresh sheet: the page mounts one writing area per
-            // question, and per switch into ✎ Write mode, exactly as the web
-            // canvas did when it was the one being created and destroyed.
             surface.clear()
             isMounted = true
             clipView.isHidden = false
             applyLayout()
-            emit(["type": "mounted"])
+            emit(["type": "mounted", "foundationAvailable": foundationRecognizer.isAvailable])
 
         case "layout":
             guard isMounted else { return }
@@ -103,6 +101,11 @@ final class InkBridge: NSObject, InkSurfaceDelegate {
             let raw = message["strokes"] as? [Any] ?? []
             surface.setStrokes(raw.compactMap(InkStroke.init(json:)))
 
+        case "foundationRecognize":
+            let requestId = message["reqId"] as? Int ?? 0
+            let overrides = message["overrides"] as? [String: String] ?? [:]
+            foundationRecognize(requestId: requestId, overrides: overrides)
+
         case "recognize":
             let requestId = message["reqId"] as? Int ?? 0
             let overrides = message["overrides"] as? [String: String] ?? [:]
@@ -123,7 +126,6 @@ final class InkBridge: NSObject, InkSurfaceDelegate {
 
     private func applyLayout() {
         guard isMounted, let webView else { return }
-        // How far the page has scrolled since it last told us where it was.
         let delta = CGPoint(
             x: webView.scrollView.contentOffset.x - reportedOffset.x,
             y: webView.scrollView.contentOffset.y - reportedOffset.y
@@ -152,9 +154,6 @@ final class InkBridge: NSObject, InkSurfaceDelegate {
                width: number(dict["w"]), height: number(dict["h"]))
     }
 
-    /// JavaScript numbers arrive as NSNumber, which bridges to Double, Int or
-    /// CGFloat depending on the value — so every one of them is read the same
-    /// way rather than guessed at per call site.
     private static func number(_ value: Any?) -> CGFloat {
         (value as? NSNumber).map { CGFloat($0.doubleValue) } ?? 0
     }
@@ -162,20 +161,64 @@ final class InkBridge: NSObject, InkSurfaceDelegate {
     // MARK: - Strokes out
 
     func inkSurfaceDidChangeStrokes(_ surface: InkSurfaceView) {
+        recognizer.cancelActiveVision()
         let strokes = surface.strokes
         emit(["type": "strokes", "strokes": strokes.map(\.jsonObject)])
     }
 
     // MARK: - Recognition
 
+    private func foundationRecognize(requestId: Int, overrides: [String: String]) {
+        let strokes = surface.strokes
+        recognitionQueue.async { [weak self] in
+            guard let self else { return }
+            let foundation = self.foundationRecognizer.read(strokes: strokes, overrides: overrides)
+                ?? Reading(lines: [], text: "", minConfidence: 1, margin: 1, weakest: nil)
+
+#if DEBUG
+            // DEBUG is the deliberate Pri Learning model-test path. When a V3
+            // development model is bundled, its result is what the app shows so
+            // a real iPad session tests the Foundation engine end-to-end inside
+            // Pri Learning. If the model is absent or yields no reading, fall
+            // back to the mature native reader. RELEASE behaviour is unchanged.
+            if self.foundationRecognizer.isAvailable && !foundation.text.isEmpty {
+                var payload = foundation.jsonObject
+                payload["type"] = "reading"
+                payload["reqId"] = requestId
+                payload["engine"] = "pri-foundation-debug"
+                payload["foundationAvailable"] = true
+                payload["debugModelTest"] = true
+                DispatchQueue.main.async { self.emit(payload) }
+            } else {
+                let rescue = self.recognizer.readWithGlyphConsensus(strokes: strokes, overrides: overrides)
+                var payload = rescue.jsonObject
+                payload["type"] = "reading"
+                payload["reqId"] = requestId
+                payload["engine"] = "native-rescue-debug"
+                payload["foundationAvailable"] = self.foundationRecognizer.isAvailable
+                payload["debugModelTest"] = true
+                DispatchQueue.main.async { self.emit(payload) }
+            }
+#else
+            var payload = foundation.jsonObject
+            payload["type"] = "reading"
+            payload["reqId"] = requestId
+            payload["engine"] = "pri-foundation"
+            payload["available"] = self.foundationRecognizer.isAvailable
+            DispatchQueue.main.async { self.emit(payload) }
+#endif
+        }
+    }
+
     private func recognize(requestId: Int, overrides: [String: String]) {
         let strokes = surface.strokes
         recognitionQueue.async { [weak self] in
             guard let self else { return }
-            let reading = self.recognizer.read(strokes: strokes, overrides: overrides)
+            let reading = self.recognizer.readWithGlyphConsensus(strokes: strokes, overrides: overrides)
             var payload = reading.jsonObject
             payload["type"] = "reading"
             payload["reqId"] = requestId
+            payload["engine"] = "native-rescue"
             DispatchQueue.main.async { self.emit(payload) }
         }
     }
@@ -185,23 +228,14 @@ final class InkBridge: NSObject, InkSurfaceDelegate {
     private func emit(_ payload: [String: Any]) {
         onEmit?(payload)
         guard webView != nil else { return }
-        // Encoding a page of strokes is not free, and this runs at the end of
-        // every stroke. Doing it on the main thread would put that cost between
-        // the pen and the next mark, which is the one place it must never be.
         encodingQueue.async { [weak self] in
             guard JSONSerialization.isValidJSONObject(payload),
                   let data = try? JSONSerialization.data(withJSONObject: payload, options: []),
                   var json = String(data: data, encoding: .utf8) else {
-                // Nothing the page can do about this, but it must not pass
-                // unnoticed: an unencodable payload is a stroke or a reading
-                // the student never gets back.
                 NSLog("Pri Learning: ink payload could not be encoded (%@)",
                       (payload["type"] as? String ?? "?") as NSString)
                 return
             }
-            // U+2028/U+2029 are legal in JSON strings and illegal in a
-            // JavaScript source literal; unescaped they would make the injected
-            // call a syntax error rather than a reading.
             json = json.replacingOccurrences(of: "\u{2028}", with: "\\u2028")
                        .replacingOccurrences(of: "\u{2029}", with: "\\u2029")
             DispatchQueue.main.async {
@@ -215,15 +249,13 @@ final class InkBridge: NSObject, InkSurfaceDelegate {
 // MARK: - Colour
 
 extension UIColor {
-    /// Accepts the CSS forms the theme actually emits: #rgb, #rrggbb, #rrggbbaa.
     convenience init?(hex: String) {
         var text = hex.trimmingCharacters(in: .whitespacesAndNewlines)
         guard text.hasPrefix("#") else { return nil }
         text.removeFirst()
-        if text.count == 3 {
-            text = text.map { "\($0)\($0)" }.joined()
-        }
-        guard text.count == 6 || text.count == 8, let value = UInt64(text, radix: 16) else { return nil }
+        if text.count == 3 { text = text.map { "\($0)\($0)" }.joined() }
+        guard text.count == 6 || text.count == 8,
+              let value = UInt64(text, radix: 16) else { return nil }
         let hasAlpha = text.count == 8
         let r = CGFloat((value >> (hasAlpha ? 24 : 16)) & 0xFF) / 255
         let g = CGFloat((value >> (hasAlpha ? 16 : 8)) & 0xFF) / 255

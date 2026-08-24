@@ -11,10 +11,15 @@
 // The surface is transparent, so the ruled paper, the teacher's ✓ and ✗ marks
 // and the margin notes drawn by the page below all show through under the ink.
 //
-// Fingers still scroll. A touch that is not a Pencil is refused by hitTest and
-// falls through to the web view underneath — the same rule the app has always
-// had (once a Pencil has been seen, fingers scroll and the Pencil writes),
-// only now enforced where the touch actually arrives.
+// Input policy is intentionally simple and stateless:
+//   • Apple Pencil always reaches PencilKit and writes.
+//   • Fingers fall through to the WKWebView and scroll by default.
+//   • The explicit Finger toolbar toggle lets fingers draw too.
+//
+// Do not derive this policy from "have we seen a Pencil yet". On modern iPadOS
+// Pencil hover / hit-testing can produce UIEvents whose allTouches collection is
+// temporarily empty. A stateful "Pencil observed" gate can therefore reject the
+// next real Pencil contact even though the UI still looks enabled.
 // ─────────────────────────────────────────────────────────────────────────────
 import PencilKit
 import UIKit
@@ -29,8 +34,6 @@ final class InkSurfaceView: UIView, PKCanvasViewDelegate {
 
     let canvas = PKCanvasView()
 
-    /// Once a Pencil has written, fingers go back to scrolling the page.
-    private(set) var pencilSeen = false
     /// Explicit "let me draw with a finger too" from the toolbar.
     var fingerDrawingEnabled = false { didSet { applyDrawingPolicy() } }
 
@@ -56,8 +59,8 @@ final class InkSurfaceView: UIView, PKCanvasViewDelegate {
         canvas.delegate = self
         canvas.backgroundColor = .clear
         canvas.isOpaque = false
-        // The canvas is a scroll view; here it is a fixed sheet of paper. The
-        // page underneath does the scrolling.
+        // The canvas is a fixed sheet of paper. The web page underneath owns
+        // scrolling; fingers are routed through to it unless Finger mode is on.
         canvas.isScrollEnabled = false
         canvas.bounces = false
         canvas.bouncesZoom = false
@@ -70,8 +73,6 @@ final class InkSurfaceView: UIView, PKCanvasViewDelegate {
         // authored on white paper and darkens light strokes so they stay
         // readable. Here the paper is already near-black and the pen colour is
         // the one the theme wants shown, so that adaptation only washes it out.
-        // Pinning the canvas to the light style turns it off; the canvas itself
-        // is transparent, so nothing else about it changes.
         canvas.overrideUserInterfaceStyle = .light
         applyTool()
         applyDrawingPolicy()
@@ -89,19 +90,21 @@ final class InkSurfaceView: UIView, PKCanvasViewDelegate {
 
     override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
         guard let hit = super.hitTest(point, with: event) else { return nil }
-        let touches = event?.allTouches ?? []
-        if touches.contains(where: { $0.type == .pencil }) {
-            if !pencilSeen {
-                pencilSeen = true
-                applyDrawingPolicy()
-            }
-            return hit
+
+        // When UIKit gives us concrete touches, route by the actual input type.
+        // Pencil always belongs to PencilKit. Finger/direct input belongs to the
+        // page unless the student explicitly enabled Finger drawing.
+        if let touches = event?.allTouches, !touches.isEmpty {
+            if touches.contains(where: { $0.type == .pencil }) { return hit }
+            if fingerDrawingEnabled { return hit }
+            return nil
         }
-        // Before any Pencil has been seen the app is being used with a finger
-        // (or a trackpad), so a finger writes. After that it scrolls, unless
-        // the student has asked for both.
-        if fingerDrawingEnabled || !pencilSeen { return hit }
-        return nil
+
+        // A nil/empty touch set is legal during modern Pencil hover/hit-testing.
+        // Defaulting to the native surface is the safe choice: rejecting here can
+        // make the following real Pencil contact disappear completely. Normal
+        // finger events arrive with .direct touches and still fall through above.
+        return hit
     }
 
     // MARK: - Tools
@@ -111,13 +114,14 @@ final class InkSurfaceView: UIView, PKCanvasViewDelegate {
         case .pen:
             canvas.tool = PKInkingTool(.pen, color: inkColor, width: penWidth)
         case .eraser:
-            // Whole strokes, matching how the app's eraser has always behaved.
             canvas.tool = PKEraserTool(.vector)
         }
     }
 
     private func applyDrawingPolicy() {
-        canvas.drawingPolicy = (fingerDrawingEnabled || !pencilSeen) ? .anyInput : .pencilOnly
+        // Pencil is always accepted. Finger drawing is opt-in; otherwise direct
+        // touches are passed through by hitTest so the WKWebView can scroll.
+        canvas.drawingPolicy = fingerDrawingEnabled ? .anyInput : .pencilOnly
     }
 
     // MARK: - History

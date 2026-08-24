@@ -1,9 +1,27 @@
 node_modules/
 client/dist/
 .venv/
+.venv-ink/
+.venv-ink-export/
 server/data/*.db
 .DS_Store
 *.log
 Pri-learning-final-production/
 scripts/.lan-cert/
-.venv-ink-export/
+
+# Real Apple Pencil corpus is local/private training data.
+# Keep the corpus README tracked, but never commit participant JSON sessions.
+client/test/ink-corpus/*.json
+
+# Local real-writer calibration derived from that corpus. Vite copies the
+# client/public file into the iPad web bundle; every copy stays gitignored.
+client/public/ink-bootstrap-profile.js
+ios/PriLearning.swiftpm/Resources/Web/ink-bootstrap-profile.js
+ios/PriLearning\ 2.swiftpm/Resources/Web/ink-bootstrap-profile.js
+
+# Local neural-training outputs are large/private development artifacts.
+tools/ink-foundation/runs/
+
+# Development bootstrap models are installed locally for DEBUG testing only.
+ios/PriLearning.swiftpm/Resources/Models/PriInkFoundation.mlpackage/
+ios/PriLearning\ 2.swiftpm/Resources/Models/PriInkFoundation.mlpackage/

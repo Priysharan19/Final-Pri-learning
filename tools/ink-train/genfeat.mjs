@@ -8,7 +8,7 @@
 // trained on as well as fresh ones — hence a distinct seed.
 // ─────────────────────────────────────────────────────────────────────────────
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { TEMPLATES } from '../../client/src/ink/templates.js';
+import { TEMPLATES, REAL_ALLOGRAPHS, REAL_TRAIN_SHARE } from '../../client/src/ink/templates.js';
 import { stylize, makeRng } from '../../client/src/ink/aug.js';
 import { CLASSES, classOfSymbol, CLASS_INDEX } from '../../client/src/ink/classes.js';
 import { nnClassify } from '../../client/src/ink/nn.js';
@@ -27,6 +27,20 @@ for (const [sym, variants] of Object.entries(TEMPLATES)) {
   (seedsFor[classOfSymbol(sym)] ||= []).push(...variants);
 }
 
+// Same capped real-allograph slice as gen.mjs — the re-ranker must see the
+// same glyph population the CNN was trained on.
+const REAL_SHARE = Number(process.env.PRI_REAL_SHARE || 0.25);
+const realSeedsFor = {};
+for (const [sym, variants] of Object.entries(REAL_ALLOGRAPHS)) {
+  (realSeedsFor[classOfSymbol(sym)] ||= []).push(...variants);
+}
+const pickSeed = (cls, rng) => {
+  const real = realSeedsFor[cls];
+  if (real?.length && rng() < (REAL_TRAIN_SHARE[cls] ?? REAL_SHARE)) return real[Math.floor(rng() * real.length)];
+  const seeds = seedsFor[cls];
+  return seeds[Math.floor(rng() * seeds.length)];
+};
+
 const rng = makeRng(555123);          // distinct from CNN training (20260819)
 const nC = CLASSES.length;
 
@@ -40,7 +54,7 @@ for (const cls of CLASSES) {
   if (!seeds?.length) throw new Error(`class ${cls} has no seeds`);
   const li = CLASS_INDEX[cls];
   for (let i = 0; i < PER_CLASS; i++) {
-    const variant = seeds[Math.floor(rng() * seeds.length)];
+    const variant = pickSeed(cls, rng);
     const strength = rng() < 0.1 ? 0.15 : 0.45 + rng() * 1.25;
     const strokes = stylize(
       variant.map(st => st.map(p => p.slice())),

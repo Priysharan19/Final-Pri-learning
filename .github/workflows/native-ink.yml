@@ -1,24 +1,28 @@
 # Native iPad handwriting validation.
-#
-# Linux CI proves the offline/browser recognizer. This job proves that the
-# production iPad PencilKit/Vision path still compiles, installs, launches and
-# returns a reading through the JS↔Swift bridge on an Apple simulator.
+# Canonical Swift source, duplicate-package drift, JS↔Swift transport and the
+# installed simulator app are all gated independently.
 name: Native Ink
 
 on:
   push:
     paths:
       - 'ios/PriLearning.swiftpm/**'
+      - 'ios/PriLearning 2.swiftpm/**'
       - 'client/src/ink/native.js'
       - 'client/test/native-ink-check.mjs'
       - 'scripts/ink-native-check.mjs'
+      - 'scripts/check-native-package-sync.mjs'
+      - 'handwriting/v12/**'
       - '.github/workflows/native-ink.yml'
   pull_request:
     paths:
       - 'ios/PriLearning.swiftpm/**'
+      - 'ios/PriLearning 2.swiftpm/**'
       - 'client/src/ink/native.js'
       - 'client/test/native-ink-check.mjs'
       - 'scripts/ink-native-check.mjs'
+      - 'scripts/check-native-package-sync.mjs'
+      - 'handwriting/v12/**'
       - '.github/workflows/native-ink.yml'
 
 concurrency:
@@ -37,6 +41,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
+
+      - name: Canonical native source has no stale duplicate
+        run: node scripts/check-native-package-sync.mjs
 
       - name: Apple toolchain and iPad simulator
         run: |

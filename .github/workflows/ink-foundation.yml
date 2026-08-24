@@ -1,0 +1,295 @@
+name: Ink Foundation
+
+on:
+  push:
+    paths:
+      - 'tools/ink-foundation/**'
+      - 'handwriting/v12/**'
+      - 'scripts/ink-bootstrap-one-writer.sh'
+      - 'package.json'
+      - 'ios/PriLearning.swiftpm/Ink/InkFoundationRuntime.swift'
+      - 'ios/PriLearning 2.swiftpm/Ink/InkFoundationRuntime.swift'
+      - '.github/workflows/ink-foundation.yml'
+  pull_request:
+    paths:
+      - 'tools/ink-foundation/**'
+      - 'handwriting/v12/**'
+      - 'scripts/ink-bootstrap-one-writer.sh'
+      - 'package.json'
+      - 'ios/PriLearning.swiftpm/Ink/InkFoundationRuntime.swift'
+      - 'ios/PriLearning 2.swiftpm/Ink/InkFoundationRuntime.swift'
+      - '.github/workflows/ink-foundation.yml'
+
+concurrency:
+  group: ink-foundation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tooling:
+    name: Model tooling and training contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: tools/ink-foundation/requirements.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Python syntax
+        run: |
+          python -m py_compile \
+            tools/ink-foundation/model.py \
+            tools/ink-foundation/data.py \
+            tools/ink-foundation/train.py \
+            tools/ink-foundation/bootstrap.py \
+            tools/ink-foundation/evaluate_release.py \
+            tools/ink-foundation/export_coreml.py
+
+      - name: Synthetic generator syntax
+        run: |
+          node --check tools/ink-foundation/generate_synthetic.mjs
+          node --check tools/ink-foundation/generate_personal_synthetic.mjs
+
+      - name: Install training dependencies
+        run: python -m pip install -r tools/ink-foundation/requirements.txt
+
+      - name: V3 representation contract
+        run: |
+          python - <<'PY'
+          import sys
+          sys.path.insert(0, 'tools/ink-foundation')
+          from data import TOKEN_TO_ID, physical_text
+          from model import ModelConfig, PriInkFoundation
+          import torch
+
+          assert "'" in TOKEN_TO_ID, 'derivative prime is not a first-class model token'
+          assert physical_text('x^(2)') == 'x2'
+          assert physical_text("y'=6x^(2)+6x") == "y'=6x2+6x"
+          cfg = ModelConfig(d_model=64, nhead=8, stroke_layers=1, decoder_layers=1,
+                            ff_dim=128, max_points=64, max_tokens=24)
+          model = PriInkFoundation(len(TOKEN_TO_ID), TOKEN_TO_ID['<pad>'], cfg)
+          if model.style_encoder[0].in_features != 2 * cfg.d_model:
+              raise SystemExit('writer/style embedding is not genuinely cross-modal')
+          image = torch.zeros(1, 1, cfg.raster_height, cfg.raster_width)
+          visual = model.raster_encoder(image)
+          if visual.shape[1] <= 64:
+              raise SystemExit(f'V3 visual encoder collapsed 2-D layout: only {visual.shape[1]} tokens')
+          points = torch.zeros(1, cfg.max_points, cfg.feature_dim)
+          valid = torch.zeros(1, cfg.max_points, dtype=torch.bool); valid[:, :16] = True
+          logits, _, ctc, style = model.forward_with_aux(points, valid, image)
+          assert logits.shape == (1, cfg.max_tokens, len(TOKEN_TO_ID))
+          assert ctc.shape == (1, cfg.max_points, len(TOKEN_TO_ID))
+          assert style.shape[-1] == cfg.d_model
+          print(f'V3 representation contract: PASS — {visual.shape[1]} spatial visual tokens + cross-modal style + physical CTC + prime token')
+          PY
+
+      - name: Training-to-export graph numerical parity
+        run: |
+          python - <<'PY'
+          import sys, torch
+          sys.path.insert(0, 'tools/ink-foundation')
+          from data import TOKEN_TO_ID
+          from model import ModelConfig, PriInkFoundation
+          from export_coreml import CoreMLFriendlyFoundation, NativeWrapper, make_trace_fixture
+
+          torch.manual_seed(20260823)
+          cfg = ModelConfig(d_model=64, nhead=8, stroke_layers=1, decoder_layers=1,
+                            ff_dim=128, max_points=64, max_tokens=24)
+          native = PriInkFoundation(len(TOKEN_TO_ID), TOKEN_TO_ID['<pad>'], cfg).eval()
+          exported = CoreMLFriendlyFoundation(native).eval()
+          reference = NativeWrapper(native).eval()
+          points, valid, raster = make_trace_fixture(cfg)
+          with torch.inference_mode():
+              a = reference(points, valid, raster)
+              b = exported(points, valid, raster)
+          delta = float((a - b).abs().max())
+          if not bool(torch.isfinite(a).all() and torch.isfinite(b).all()) or delta > 2e-4:
+              raise SystemExit(f'V3 training/export graph parity failed: max_abs={delta}')
+          print(f'V3 training/export graph parity: PASS — max_abs={delta:.7g}')
+          PY
+
+      - name: Replay balance and curriculum contract
+        run: |
+          python - <<'PY'
+          import sys
+          from types import SimpleNamespace
+          sys.path.insert(0, 'tools/ink-foundation')
+          from bootstrap import replay_sampling_weights
+
+          rows = [SimpleNamespace(source='real') for _ in range(40)] + [SimpleNamespace(source='personal') for _ in range(1600)]
+          weights, real_n, synth_n = replay_sampling_weights(rows, {'personal'}, 0.30)
+          real_mass = float(weights[:real_n].sum() / weights.sum())
+          if (real_n, synth_n) != (40, 1600) or abs(real_mass - 0.30) > 1e-9:
+              raise SystemExit(f'replay balance contract failed: real={real_n} synth={synth_n} mass={real_mass}')
+
+          from pathlib import Path
+          personal = Path('tools/ink-foundation/generate_personal_synthetic.mjs').read_text()
+          for required in ('stackedFraction', 'radicalExpression', 'chain-rule-derivative', 'polynomial-derivative', "bank.get(\"'\")"):
+              if required not in personal:
+                  raise SystemExit(f'personal replay curriculum lost required structure: {required}')
+          print('replay balance/curriculum contract: PASS — 30% real mass at 40:1600 plus HSC structures')
+          PY
+
+      - name: Strong bootstrap preset contract
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          scripts = json.loads(Path('package.json').read_text())['scripts']
+          strong = scripts['ink:bootstrap:strong']
+          expected = {
+              'train writers': 'PRI_INK_SYNTH_TRAIN_WRITERS=192',
+              'validation writers': 'PRI_INK_SYNTH_VAL_WRITERS=48',
+              'expressions per writer': 'PRI_INK_SYNTH_SAMPLES_PER_WRITER=40',
+              'personal replay': 'PRI_INK_PERSONAL_SYNTH_SAMPLES=1600',
+              'pretrain epochs': 'PRI_INK_PRETRAIN_EPOCHS=24',
+              'bootstrap epochs': 'PRI_INK_BOOTSTRAP_EPOCHS=50',
+              'd_model': 'PRI_INK_D_MODEL=256',
+              'stroke layers': 'PRI_INK_STROKE_LAYERS=8',
+              'decoder layers': 'PRI_INK_DECODER_LAYERS=6',
+              'real replay fraction': 'PRI_INK_REAL_REPLAY_FRACTION=0.30',
+              'visual LR': 'PRI_INK_VISUAL_LR_MULTIPLIER=2.0',
+              'stroke LR': 'PRI_INK_STROKE_LR_MULTIPLIER=0.45',
+              'decoder LR': 'PRI_INK_DECODER_LR_MULTIPLIER=1.0',
+          }
+          missing = [name for name, literal in expected.items() if literal not in strong]
+          if missing:
+              raise SystemExit('strong V3 preset drifted: ' + ', '.join(missing))
+
+          bootstrap_script = Path('scripts/ink-bootstrap-one-writer.sh').read_text()
+          script_contract = {
+              'passes replay fraction': '--real-replay-fraction "$REAL_REPLAY_FRACTION"' in bootstrap_script,
+              'passes visual LR': '--visual-lr-multiplier "$VISUAL_LR_MULTIPLIER"' in bootstrap_script,
+              'passes stroke LR': '--stroke-lr-multiplier "$STROKE_LR_MULTIPLIER"' in bootstrap_script,
+              'passes decoder LR': '--decoder-lr-multiplier "$DECODER_LR_MULTIPLIER"' in bootstrap_script,
+              'rejects stale model id': "meta.get('pri.model') == 'ink-foundation-v3'" in bootstrap_script,
+              'rejects stale architecture': "meta.get('pri.architectureVersion') == '3'" in bootstrap_script,
+              'requires bootstrap stage': "meta.get('pri.trainingStage') == 'bootstrap'" in bootstrap_script,
+              'requires non-production asset': "meta.get('pri.productionReady') == 'false'" in bootstrap_script,
+          }
+          bad = [name for name, ok in script_contract.items() if not ok]
+          if bad:
+              raise SystemExit('strong bootstrap script contract broken: ' + ', '.join(bad))
+          print('strong V3 bootstrap preset contract: PASS')
+          PY
+
+      - name: Evidence gates remain wired
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          release = Path('tools/ink-foundation/evaluate_release.py').read_text()
+          export = Path('tools/ink-foundation/export_coreml.py').read_text()
+          bootstrap = Path('tools/ink-foundation/bootstrap.py').read_text()
+          runtime = Path('ios/PriLearning.swiftpm/Ink/InkFoundationRuntime.swift').read_text()
+          legacy_runtime = Path('ios/PriLearning 2.swiftpm/Ink/InkFoundationRuntime.swift').read_text()
+          low_bootstrap = bootstrap.lower()
+          replay_boundary = (
+              'personal synthetic replay' in low_bootstrap and
+              'real evidence' in low_bootstrap and
+              any(term in low_bootstrap for term in ('never counted', 'excluded from evidence', 'not real evidence'))
+          )
+          required = {
+              'release evaluator checks final holdout': 'final-holdout' in release and 'passesReleaseTargets' in release,
+              'release evaluator checks critical structure': 'critical_structure_exact' in release,
+              'release evaluator checks safe precision': 'safe_precision' in release,
+              'export verifies checkpoint hash': 'checkpointSha256' in export and 'sha256(checkpoint)' in export,
+              'production export requires finetune stage': 'ckpt.get("stage") != "finetune"' in export,
+              'export writes promotion metadata': 'pri.productionReady' in export,
+              'export identifies V3': 'ink-foundation-v3' in export and 'pri.architectureVersion' in export,
+              'runtime requires promoted V3 in release': 'ink-foundation-v3' in runtime and 'pri.architectureVersion' in runtime and 'pri.productionReady' in runtime,
+              'canonical and legacy runtime stay identical': runtime == legacy_runtime,
+              'bootstrap labels itself development only': 'releaseEligible' in bootstrap and 'NOT generalisation evidence' in bootstrap,
+              'bootstrap checkpoint stage is distinct': '"stage": "bootstrap"' in bootstrap,
+              'personal replay exists but is excluded from real evidence': replay_boundary,
+          }
+          bad = [name for name, ok in required.items() if not ok]
+          if bad:
+              raise SystemExit('foundation evidence contract broken: ' + ', '.join(bad))
+          print('foundation evidence contract: PASS')
+          PY
+
+      - name: Generate tiny whole-expression corpus
+        run: node tools/ink-foundation/generate_synthetic.mjs /tmp/pri-ink-smoke 6 2 3
+
+      - name: One-epoch CPU V3 pretraining smoke test
+        run: |
+          python tools/ink-foundation/train.py \
+            --stage pretrain \
+            --corpus /tmp/pri-ink-smoke \
+            --out /tmp/pri-ink-smoke.pt \
+            --epochs 1 \
+            --batch 4 \
+            --workers 0 \
+            --device cpu \
+            --d-model 64 \
+            --stroke-layers 1 \
+            --decoder-layers 1 \
+            --max-points 128 \
+            --max-tokens 32 \
+            --patience 1
+
+      - name: Pretraining smoke produced a real V3 checkpoint
+        run: |
+          python - <<'PY'
+          import json, pathlib, torch
+          p = pathlib.Path('/tmp/pri-ink-smoke.pt')
+          if not p.exists() or p.stat().st_size < 10_000:
+              raise SystemExit('training smoke did not produce a substantive checkpoint')
+          ckpt = torch.load(p, map_location='cpu', weights_only=False)
+          if ckpt.get('stage') != 'pretrain' or not ckpt.get('model'):
+              raise SystemExit('training checkpoint metadata/state is incomplete')
+          if ckpt.get('architecture_version') != 3:
+              raise SystemExit('training smoke did not produce V3')
+          manifest = json.loads(p.with_suffix('.json').read_text())
+          if manifest.get('stage') != 'pretrain' or manifest.get('evidence') != 'synthetic initialization only':
+              raise SystemExit('pretrain manifest blurred synthetic and real evidence')
+          if manifest.get('architectureVersion') != 3:
+              raise SystemExit('pretrain manifest does not identify V3')
+          print('foundation V3 pretraining smoke: PASS')
+          PY
+
+      - name: Generate one-writer bootstrap smoke corpus
+        run: node tools/ink-foundation/generate_synthetic.mjs /tmp/pri-ink-bootstrap-smoke 1 0 20
+
+      - name: One-epoch bootstrap adaptation smoke test
+        run: |
+          python tools/ink-foundation/bootstrap.py \
+            --init /tmp/pri-ink-smoke.pt \
+            --corpus /tmp/pri-ink-bootstrap-smoke \
+            --out /tmp/pri-ink-bootstrap.pt \
+            --epochs 1 \
+            --batch 4 \
+            --workers 0 \
+            --device cpu \
+            --d-model 64 \
+            --stroke-layers 1 \
+            --decoder-layers 1 \
+            --max-points 128 \
+            --max-tokens 32 \
+            --patience 1
+
+      - name: Bootstrap remains explicitly non-release evidence
+        run: |
+          python - <<'PY'
+          import json, pathlib, torch
+          p = pathlib.Path('/tmp/pri-ink-bootstrap.pt')
+          if not p.exists() or p.stat().st_size < 10_000:
+              raise SystemExit('bootstrap smoke did not produce a substantive checkpoint')
+          ckpt = torch.load(p, map_location='cpu', weights_only=False)
+          manifest = json.loads(p.with_suffix('.json').read_text())
+          if ckpt.get('stage') != 'bootstrap' or ckpt.get('release_eligible') is not False:
+              raise SystemExit('bootstrap checkpoint can be confused with release evidence')
+          if ckpt.get('architecture_version') != 3:
+              raise SystemExit('bootstrap checkpoint is not V3')
+          if manifest.get('stage') != 'bootstrap' or manifest.get('releaseEligible') is not False:
+              raise SystemExit('bootstrap manifest can be confused with release evidence')
+          if 'NOT generalisation evidence' not in manifest.get('evidence', ''):
+              raise SystemExit('bootstrap manifest does not state its evidence limitation')
+          print('foundation V3 one-writer bootstrap smoke: PASS')
+          PY

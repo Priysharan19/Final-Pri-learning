@@ -11,10 +11,16 @@ import SwiftUI
 @main
 struct PriLearningApp: App {
     init() {
-        // Scores the native reading pipeline against expressions whose answer
-        // is known, and reports it to the system log. Off unless asked for.
         if ProcessInfo.processInfo.arguments.contains("--ink-selfcheck") {
-            DispatchQueue.global(qos: .userInitiated).async { InkSelfCheck.run() }
+            // Structural geometry must pass before any downstream recogniser is
+            // allowed to produce a score. If an exponent/limit becomes another
+            // line, or if real Pencil ink disappears from the visible reading,
+            // OCR accuracy is irrelevant because the maths was already damaged.
+            InkSegmentationRegression.assertProductionInvariants()
+            DispatchQueue.global(qos: .userInitiated).async {
+                InkCompletenessRecovery.assertNoDisappearedInkInvariant()
+                InkSelfCheck.run()
+            }
         }
     }
 
@@ -28,8 +34,6 @@ struct PriLearningApp: App {
 struct ContentView: View {
     var body: some View {
         ZStack {
-            // The app's page background, extended under the status bar and
-            // home indicator so the shell never shows a white flash.
             Color(red: 14 / 255, green: 17 / 255, blue: 23 / 255)
                 .ignoresSafeArea()
             WebShell()

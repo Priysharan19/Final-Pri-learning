@@ -1,0 +1,7 @@
+numpy>=2.0,<2.4
+pillow>=10.4
+torch==2.7.0
+# Core ML export is macOS-only. Keep the exporter on the toolchain version
+# coremltools 9.0 documents/tests with PyTorch 2.7, and avoid NumPy 2.4+ scalar
+# casting regressions in the Torch -> MIL frontend.
+coremltools==9.0; sys_platform == "darwin"
