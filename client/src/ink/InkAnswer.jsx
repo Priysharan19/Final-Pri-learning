@@ -11,6 +11,7 @@ import NativeInkCanvas from './NativeInkCanvas.jsx';
 import { nativeInk, nativeInkAvailable } from './native.js';
 import { recognizeWithStructuralDev } from './devStructural.js';
 import { recognize, exprToLatex } from './recognizer.js';
+import { recognizeWithoutDetachedSideWork } from './runtimeSpatial.js';
 import { feedbackGeometry } from './feedbackGeometry.js';
 import { ALPHABET } from './templates.js';
 import { classOfSymbol } from './classes.js';
@@ -139,7 +140,7 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
     const seq = ++readSeqRef.current;
 
     const readWithJS = () => {
-      try { return recognize(strokes, ovr, recognitionContext); }
+      try { return recognizeWithoutDetachedSideWork(strokes, ovr, recognitionContext, recognize); }
       catch { return null; }
     };
 
