@@ -19,7 +19,8 @@
 //   · pressure + velocity shaped ink, EMA-smoothed width, midpoint quadratics.
 //   · palm rejection: once a Pencil is seen, fingers never draw (they scroll);
 //     an explicit finger mode brings touch drawing back.
-//   · stroke eraser, undo/redo, clear; serialisable strokes {x, y, w}.
+//   · stroke eraser, undo/redo, clear; serialisable strokes preserve
+//     {x,y,w,t,p,azimuth,altitude} when the browser exposes Pencil dynamics.
 // ─────────────────────────────────────────────────────────────────────────────
 import React, { useEffect, useImperativeHandle, useRef, useState, forwardRef, useCallback } from 'react';
 import { makePenFilter } from './smooth.js';
@@ -239,6 +240,18 @@ const InkCanvas = forwardRef(function InkCanvas({
       return cur && cur._w ? cur._w * 0.55 + target * 0.45 : target;   // EMA — no width flicker
     };
 
+    /** Preserve the Pencil signals V4 was designed to consume. Safari exposes
+     * altitudeAngle/azimuthAngle on modern iPadOS; absent values are omitted so
+     * the model's data pipeline can apply the same explicit defaults it uses for
+     * older captures. timeStamp is milliseconds, while V4 stores seconds. */
+    const pointFromEvent = (e, pt, w) => {
+      const out = { x: pt.x, y: pt.y, w, t: Math.max(0, Number(e.timeStamp || 0)) / 1000 };
+      if (Number.isFinite(e.pressure)) out.p = Math.max(0, Math.min(1, Number(e.pressure)));
+      if (Number.isFinite(e.azimuthAngle)) out.azimuth = Number(e.azimuthAngle);
+      if (Number.isFinite(e.altitudeAngle)) out.altitude = Number(e.altitudeAngle);
+      return out;
+    };
+
     const mayDraw = (e) => {
       if (e.pointerType === 'pen') { penSeenRef.current = true; return true; }
       if (e.pointerType === 'touch') return fingerRef.current === 'finger' || !penSeenRef.current;
@@ -257,7 +270,9 @@ const InkCanvas = forwardRef(function InkCanvas({
       if (strokesRef.current.length !== before) { notify(); redrawBase(); }
     };
 
-    /** Refresh the OS's guess of where the pen is heading. */
+    /** Refresh the OS's guess of where the pen is heading. Predicted points are
+     * display-only and never enter the model/corpus, so they intentionally carry
+     * no synthetic timing or pressure metadata. */
     const takePrediction = (e, cur) => {
       predictedRef.current = (e.getPredictedEvents ? e.getPredictedEvents() : [])
         .slice(0, 4)
@@ -273,12 +288,13 @@ const InkCanvas = forwardRef(function InkCanvas({
       const raw = local(e);
       const filter = makePenFilter();
       const pt = filter(raw.x, raw.y, e.timeStamp || 0);
+      const w = widthFor(e, null);
       currentRef.current = {
-        points: [{ x: pt.x, y: pt.y, w: widthFor(e, null) }],
+        points: [pointFromEvent(e, pt, w)],
         drawnTo: 0,
         filter,
         sawRaw: false,
-        _cx: e.clientX, _cy: e.clientY, _t: e.timeStamp || 0, _w: 0
+        _cx: e.clientX, _cy: e.clientY, _t: e.timeStamp || 0, _w: w
       };
       redoRef.current = [];
       predictedRef.current = [];
@@ -305,7 +321,7 @@ const InkCanvas = forwardRef(function InkCanvas({
         const last = cur.points[cur.points.length - 1];
         if (last && Math.hypot(pt.x - last.x, pt.y - last.y) < 0.9) continue;
         const w = widthFor(ev, cur);
-        cur.points.push({ x: pt.x, y: pt.y, w });
+        cur.points.push(pointFromEvent(ev, pt, w));
         cur._cx = ev.clientX; cur._cy = ev.clientY; cur._t = ev.timeStamp || 0; cur._w = w;
       }
       if (withPrediction) takePrediction(e, cur);
