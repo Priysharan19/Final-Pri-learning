@@ -9,7 +9,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import InkCanvas from './InkCanvas.jsx';
 import NativeInkCanvas from './NativeInkCanvas.jsx';
 import { nativeInk, nativeInkAvailable } from './native.js';
-import { recognizeWithStructuralDev } from './devStructural.js';
+import { recognizeWithStructuralDev } from '../../dev/devStructural.js';
 import { recognize, exprToLatex } from './recognizer.js';
 import { recognizeWithoutDetachedSideWork } from './runtimeSpatial.js';
 import { feedbackGeometry } from './feedbackGeometry.js';
@@ -161,7 +161,7 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
         const local = readWithJS();
         if (seq !== readSeqRef.current) return;
         const engine = structuralLanExpected() ? 'pri-js-v3-v4-unavailable' : 'pri-js-v3';
-        publish(local ? { ...local, engine } : { ...EMPTY_READING, engine });
+        publish(local ? { ...local, engine } : { ...EMPTY_READING, engine }, strokes);
       });
       return;
     }

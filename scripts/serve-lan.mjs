@@ -223,11 +223,42 @@ function handleV4Request(req, res) {
 
 if (V4_DEV) startV4Worker();
 
+// The production client contains no network code at all (README, "No
+// telemetry"), so V4 dev mode injects this classic script ahead of the module
+// bundle. It installs the one hook client/dev/devStructural.js looks for; the
+// hook and the fetch below exist only on this LAN origin, never in the built
+// app.
+const LAN_BRIDGE_JS = `// Pri Ink Structural V4 LAN bridge — injected by serve-lan.mjs, never shipped.
+window.__PRI_INK_V4_LAN__ = async strokes => {
+  const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const timer = setTimeout(() => controller && controller.abort(), 14500);
+  try {
+    const response = await fetch('/__pri/ink/v4', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ strokes }),
+      cache: 'no-store',
+      signal: controller ? controller.signal : undefined
+    });
+    if (response.status === 404 || response.status === 405) return { gone: true };
+    if (!response.ok) return null;
+    return await response.json();
+  } finally {
+    clearTimeout(timer);
+  }
+};
+`;
+
 const handler = (req, res) => {
   let p = new URL(req.url, 'http://x').pathname;
   if (p === '/__pri/ink/v4') {
     if (handleV4Request(req, res)) return;
     res.writeHead(404); return res.end('V4 dev bridge disabled');
+  }
+  if (p === '/__pri/lan-bridge.js') {
+    if (!V4_DEV) { res.writeHead(404); return res.end('LAN bridge disabled'); }
+    res.writeHead(200, { 'content-type': 'text/javascript', 'cache-control': 'no-store' });
+    return res.end(LAN_BRIDGE_JS);
   }
   if (p === '/cert' || p === '/cert.pem') {
     const certPath = join(CERT_DIR, 'cert.pem');
@@ -251,7 +282,12 @@ const handler = (req, res) => {
     'cache-control': 'no-store',
     'x-content-type-options': 'nosniff'
   });
-  res.end(readFileSync(f));
+  let body = readFileSync(f);
+  if (V4_DEV && f === join(ROOT, 'index.html')) {
+    body = Buffer.from(body.toString('utf8')
+      .replace('</head>', '  <script src="/__pri/lan-bridge.js"></script>\n  </head>'));
+  }
+  res.end(body);
 };
 
 const where = (scheme, port) => lan ? `${scheme}://${lan.address}:${port}` : `${scheme}://localhost:${port}`;

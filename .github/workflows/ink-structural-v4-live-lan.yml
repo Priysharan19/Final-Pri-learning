@@ -5,7 +5,7 @@ on:
     paths:
       - 'client/src/main.jsx'
       - 'client/src/ink/InkAnswer.jsx'
-      - 'client/src/ink/devStructural.js'
+      - 'client/dev/devStructural.js'
       - 'client/src/ink/interactionGuard.js'
       - 'client/test/ink-interaction-guard-check.mjs'
       - 'tools/ink-foundation/live_structural_infer.py'
@@ -37,7 +37,7 @@ jobs:
       - name: JavaScript and Python syntax
         run: |
           node --check scripts/serve-lan.mjs
-          node --check client/src/ink/devStructural.js
+          node --check client/dev/devStructural.js
           node --check client/src/ink/interactionGuard.js
           python -m py_compile tools/ink-foundation/live_structural_infer.py
 
@@ -107,7 +107,7 @@ jobs:
       - name: Browser bridge remains explicit and research-only
         run: |
           grep -q "'/__pri/ink/v4'" scripts/serve-lan.mjs
-          grep -q "pri-structural-v4-dev-lan" client/src/ink/devStructural.js
+          grep -q "pri-structural-v4-dev-lan" client/dev/devStructural.js
           grep -q "Structural V4 research · Mac LAN · not production" client/src/ink/InkAnswer.jsx
           grep -q '"serve:lan:v4"' package.json
           grep -q 'productionReady=false' scripts/serve-lan.mjs

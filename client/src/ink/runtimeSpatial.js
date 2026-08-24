@@ -143,7 +143,11 @@ function chooseMainLane(rows, strokes, scale) {
   const ranked = [...lanes.values()].map(lane => {
     const box = unionBox(lane.map(r => r.box));
     const strokeCount = lane.reduce((sum, r) => sum + r.indices.length, 0);
-    const score = lane.length * 1000 + strokeCount * 25 + Math.min(20, box.w / Math.max(scale, 1));
+    // A staggered scratch column fragments into many single-stroke rows, so raw
+    // row count would let it outvote the real working. Only multi-stroke rows
+    // count as written steps; ink mass breaks ties between step-less lanes.
+    const stepRows = lane.filter(r => r.indices.length >= 2).length;
+    const score = stepRows * 1000 + strokeCount * 25 + Math.min(20, box.w / Math.max(scale, 1));
     return { lane, box, strokeCount, score };
   }).sort((a, b) => b.score - a.score || a.box.x1 - b.box.x1);
 
