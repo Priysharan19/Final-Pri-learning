@@ -1,0 +1,1272 @@
+{
+  "architectureVersion": 4,
+  "stage": "structural-research-dev",
+  "productionReady": false,
+  "decoder": "complete-link",
+  "validationProtocol": {
+    "protocol": "same-writer-dev-holdout",
+    "seed": 20260824,
+    "fraction": 0.2,
+    "writer": "P0001",
+    "trainSamples": 38,
+    "validationSamples": 9,
+    "splitFrozen": true,
+    "validationSymbols": [
+      "+",
+      ".",
+      "/",
+      "0",
+      "1",
+      "2",
+      "3",
+      "4",
+      "5",
+      "6",
+      "7",
+      "8",
+      "9",
+      "=",
+      "B",
+      "b",
+      "k",
+      "pi",
+      "sqrt",
+      "x"
+    ],
+    "unsupportedRealTrainSymbols": [
+      "B"
+    ],
+    "writerDisjoint": false,
+    "productionEvidence": false
+  },
+  "checkpointSha256": "2d2193fdb682b75276aed83867b48082bc0f4cd2aedc850282c3d6ccf7e39ba3",
+  "samples": 9,
+  "writers": 1,
+  "exactExpressionAccuracy": 0.4444444444444444,
+  "characterErrorRate": 0.3333333333333333,
+  "criticalStructureExact": 0.5,
+  "criticalStructureSamples": 2,
+  "coverage": 0.0,
+  "safePrecision": 0.0,
+  "acceptedSamples": 0,
+  "meanDecisionConfidence": 0.3555110875103209,
+  "oracleGroupingGlyphSymbolAccuracy": 0.9230769230769231,
+  "oracleGroupingGlyphSymbolsCorrect": 36,
+  "oracleGroupingGlyphSymbolsTotal": 39,
+  "worstWriterExact": 0.4444444444444444,
+  "writerExact": {
+    "P0001": 0.4444444444444444
+  },
+  "warningCounts": {
+    "incomplete fraction relation at glyph 1": 1
+  },
+  "thresholds": {
+    "relation": 0.6,
+    "ambiguity": 0.8,
+    "group": 0.65
+  },
+  "componentValidity": null,
+  "sampleDiagnostics": [
+    {
+      "sample": 1,
+      "target": "2x+5=17",
+      "prediction": "2x+5=17",
+      "exact": true,
+      "editDistance": 0,
+      "ambiguous": true,
+      "confidence": 0.4343675971031189,
+      "symbolConfidence": 0.4343675971031189,
+      "groupingConfidence": 0.8716077134013176,
+      "relationConfidence": 0.9885439276695251,
+      "truthGlyphCount": 7,
+      "predictedGlyphCount": 7,
+      "oracleGroupSymbolCorrect": 7,
+      "oracleGroupSymbolTotal": 7,
+      "oracleGroupSymbolAccuracy": 1.0,
+      "oracleGroupSymbols": [
+        {
+          "id": "g0",
+          "strokes": [
+            0
+          ],
+          "target": "2",
+          "prediction": "2",
+          "correct": true,
+          "confidence": 0.9680989980697632
+        },
+        {
+          "id": "g1",
+          "strokes": [
+            1
+          ],
+          "target": "x",
+          "prediction": "x",
+          "correct": true,
+          "confidence": 0.9478147625923157
+        },
+        {
+          "id": "g2",
+          "strokes": [
+            2,
+            3
+          ],
+          "target": "+",
+          "prediction": "+",
+          "correct": true,
+          "confidence": 0.8733962774276733
+        },
+        {
+          "id": "g3",
+          "strokes": [
+            4
+          ],
+          "target": "5",
+          "prediction": "5",
+          "correct": true,
+          "confidence": 0.9276617765426636
+        },
+        {
+          "id": "g4",
+          "strokes": [
+            5,
+            6
+          ],
+          "target": "=",
+          "prediction": "=",
+          "correct": true,
+          "confidence": 0.8596044182777405
+        },
+        {
+          "id": "g5",
+          "strokes": [
+            7
+          ],
+          "target": "1",
+          "prediction": "1",
+          "correct": true,
+          "confidence": 0.4343675971031189
+        },
+        {
+          "id": "g6",
+          "strokes": [
+            8,
+            9
+          ],
+          "target": "7",
+          "prediction": "7",
+          "correct": true,
+          "confidence": 0.8542535901069641
+        }
+      ],
+      "predictedGlyphs": [
+        {
+          "id": 0,
+          "strokes": [
+            0
+          ],
+          "symbol": "2",
+          "confidence": 0.9680989980697632,
+          "cx": -0.45108696818351746,
+          "cy": 0.010869565419852734
+        },
+        {
+          "id": 1,
+          "strokes": [
+            1
+          ],
+          "symbol": "x",
+          "confidence": 0.9478147625923157,
+          "cx": -0.31086957454681396,
+          "cy": 0.02391304261982441
+        },
+        {
+          "id": 2,
+          "strokes": [
+            2,
+            3
+          ],
+          "symbol": "+",
+          "confidence": 0.8733962774276733,
+          "cx": -0.15605589747428894,
+          "cy": -0.008529664017260075
+        },
+        {
+          "id": 3,
+          "strokes": [
+            4
+          ],
+          "symbol": "5",
+          "confidence": 0.9276617765426636,
+          "cx": -0.03913043439388275,
+          "cy": -0.005434782709926367
+        },
+        {
+          "id": 4,
+          "strokes": [
+            5,
+            6
+          ],
+          "symbol": "=",
+          "confidence": 0.8596044182777405,
+          "cx": 0.14623607695102692,
+          "cy": 0.028835788369178772
+        },
+        {
+          "id": 5,
+          "strokes": [
+            7
+          ],
+          "symbol": "1",
+          "confidence": 0.4343675971031189,
+          "cx": 0.27282607555389404,
+          "cy": 0.0032608695328235626
+        },
+        {
+          "id": 6,
+          "strokes": [
+            8,
+            9
+          ],
+          "symbol": "7",
+          "confidence": 0.8542535901069641,
+          "cx": 0.39685988426208496,
+          "cy": -0.006812579929828644
+        }
+      ],
+      "predictedRelations": [
+        {
+          "from": 0,
+          "to": 1,
+          "type": "RIGHT",
+          "confidence": 0.9999769926071167
+        },
+        {
+          "from": 1,
+          "to": 2,
+          "type": "RIGHT",
+          "confidence": 0.9992921352386475
+        },
+        {
+          "from": 2,
+          "to": 3,
+          "type": "RIGHT",
+          "confidence": 0.999971866607666
+        },
+        {
+          "from": 3,
+          "to": 4,
+          "type": "RIGHT",
+          "confidence": 0.9997956156730652
+        },
+        {
+          "from": 4,
+          "to": 5,
+          "type": "RIGHT",
+          "confidence": 0.9996838569641113
+        },
+        {
+          "from": 5,
+          "to": 6,
+          "type": "RIGHT",
+          "confidence": 0.9998905658721924
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "sample": 2,
+      "target": "k=106",
+      "prediction": "2=106",
+      "exact": false,
+      "editDistance": 1,
+      "ambiguous": true,
+      "confidence": 0.3567536771297455,
+      "symbolConfidence": 0.3567536771297455,
+      "groupingConfidence": 0.6259837448596954,
+      "relationConfidence": 0.7884888052940369,
+      "truthGlyphCount": 5,
+      "predictedGlyphCount": 5,
+      "oracleGroupSymbolCorrect": 4,
+      "oracleGroupSymbolTotal": 5,
+      "oracleGroupSymbolAccuracy": 0.8,
+      "oracleGroupSymbols": [
+        {
+          "id": "g0",
+          "strokes": [
+            0
+          ],
+          "target": "k",
+          "prediction": "2",
+          "correct": false,
+          "confidence": 0.3567536771297455
+        },
+        {
+          "id": "g1",
+          "strokes": [
+            1,
+            2
+          ],
+          "target": "=",
+          "prediction": "=",
+          "correct": true,
+          "confidence": 0.8916186094284058
+        },
+        {
+          "id": "g2",
+          "strokes": [
+            3
+          ],
+          "target": "1",
+          "prediction": "1",
+          "correct": true,
+          "confidence": 0.6962385177612305
+        },
+        {
+          "id": "g3",
+          "strokes": [
+            4
+          ],
+          "target": "0",
+          "prediction": "0",
+          "correct": true,
+          "confidence": 0.8718774914741516
+        },
+        {
+          "id": "g4",
+          "strokes": [
+            5
+          ],
+          "target": "6",
+          "prediction": "6",
+          "correct": true,
+          "confidence": 0.7443708181381226
+        }
+      ],
+      "predictedGlyphs": [
+        {
+          "id": 0,
+          "strokes": [
+            0
+          ],
+          "symbol": "2",
+          "confidence": 0.3567536771297455,
+          "cx": -0.4107744097709656,
+          "cy": 0.02693602629005909
+        },
+        {
+          "id": 1,
+          "strokes": [
+            1,
+            2
+          ],
+          "symbol": "=",
+          "confidence": 0.8916186094284058,
+          "cx": -0.13949795067310333,
+          "cy": 0.012852097861468792
+        },
+        {
+          "id": 2,
+          "strokes": [
+            3
+          ],
+          "symbol": "1",
+          "confidence": 0.6962385177612305,
+          "cx": 0.08585858345031738,
+          "cy": -0.013468013145029545
+        },
+        {
+          "id": 3,
+          "strokes": [
+            4
+          ],
+          "symbol": "0",
+          "confidence": 0.8718774914741516,
+          "cx": 0.24242424964904785,
+          "cy": -0.04040404036641121
+        },
+        {
+          "id": 4,
+          "strokes": [
+            5
+          ],
+          "symbol": "6",
+          "confidence": 0.7443708181381226,
+          "cx": 0.43265992403030396,
+          "cy": -0.035353533923625946
+        }
+      ],
+      "predictedRelations": [
+        {
+          "from": 0,
+          "to": 1,
+          "type": "RIGHT",
+          "confidence": 0.9999648332595825
+        },
+        {
+          "from": 1,
+          "to": 2,
+          "type": "RIGHT",
+          "confidence": 0.7884888052940369
+        },
+        {
+          "from": 2,
+          "to": 3,
+          "type": "RIGHT",
+          "confidence": 0.9999572038650513
+        },
+        {
+          "from": 3,
+          "to": 4,
+          "type": "RIGHT",
+          "confidence": 0.9889037013053894
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "sample": 3,
+      "target": "6b",
+      "prediction": "6b",
+      "exact": true,
+      "editDistance": 0,
+      "ambiguous": true,
+      "confidence": 0.17957177758216858,
+      "symbolConfidence": 0.17957177758216858,
+      "groupingConfidence": 0.9998871913376206,
+      "relationConfidence": 0.9961677193641663,
+      "truthGlyphCount": 2,
+      "predictedGlyphCount": 2,
+      "oracleGroupSymbolCorrect": 2,
+      "oracleGroupSymbolTotal": 2,
+      "oracleGroupSymbolAccuracy": 1.0,
+      "oracleGroupSymbols": [
+        {
+          "id": "g0",
+          "strokes": [
+            0
+          ],
+          "target": "6",
+          "prediction": "6",
+          "correct": true,
+          "confidence": 0.9352821111679077
+        },
+        {
+          "id": "g1",
+          "strokes": [
+            1
+          ],
+          "target": "b",
+          "prediction": "b",
+          "correct": true,
+          "confidence": 0.17957177758216858
+        }
+      ],
+      "predictedGlyphs": [
+        {
+          "id": 0,
+          "strokes": [
+            0
+          ],
+          "symbol": "6",
+          "confidence": 0.9352821111679077,
+          "cx": -0.29901960492134094,
+          "cy": 0.019607843831181526
+        },
+        {
+          "id": 1,
+          "strokes": [
+            1
+          ],
+          "symbol": "b",
+          "confidence": 0.17957177758216858,
+          "cx": 0.3284313678741455,
+          "cy": 0.0
+        }
+      ],
+      "predictedRelations": [
+        {
+          "from": 0,
+          "to": 1,
+          "type": "RIGHT",
+          "confidence": 0.9961677193641663
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "sample": 4,
+      "target": "8B3",
+      "prediction": "833",
+      "exact": false,
+      "editDistance": 1,
+      "ambiguous": true,
+      "confidence": 0.4066757559776306,
+      "symbolConfidence": 0.4066757559776306,
+      "groupingConfidence": 0.9986695602710824,
+      "relationConfidence": 0.9994763731956482,
+      "truthGlyphCount": 3,
+      "predictedGlyphCount": 3,
+      "oracleGroupSymbolCorrect": 2,
+      "oracleGroupSymbolTotal": 3,
+      "oracleGroupSymbolAccuracy": 0.6666666666666666,
+      "oracleGroupSymbols": [
+        {
+          "id": "g0",
+          "strokes": [
+            0
+          ],
+          "target": "8",
+          "prediction": "8",
+          "correct": true,
+          "confidence": 0.4066757559776306
+        },
+        {
+          "id": "g1",
+          "strokes": [
+            1
+          ],
+          "target": "B",
+          "prediction": "3",
+          "correct": false,
+          "confidence": 0.6473299264907837
+        },
+        {
+          "id": "g2",
+          "strokes": [
+            2
+          ],
+          "target": "3",
+          "prediction": "3",
+          "correct": true,
+          "confidence": 0.9556217193603516
+        }
+      ],
+      "predictedGlyphs": [
+        {
+          "id": 0,
+          "strokes": [
+            0
+          ],
+          "symbol": "8",
+          "confidence": 0.4066757559776306,
+          "cx": -0.3950892984867096,
+          "cy": -0.02901785634458065
+        },
+        {
+          "id": 1,
+          "strokes": [
+            1
+          ],
+          "symbol": "3",
+          "confidence": 0.6473299264907837,
+          "cx": -0.02678571455180645,
+          "cy": -0.01116071455180645
+        },
+        {
+          "id": 2,
+          "strokes": [
+            2
+          ],
+          "symbol": "3",
+          "confidence": 0.9556217193603516,
+          "cx": 0.3883928656578064,
+          "cy": 0.008928571827709675
+        }
+      ],
+      "predictedRelations": [
+        {
+          "from": 0,
+          "to": 1,
+          "type": "RIGHT",
+          "confidence": 0.9999469518661499
+        },
+        {
+          "from": 1,
+          "to": 2,
+          "type": "RIGHT",
+          "confidence": 0.9999768733978271
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "sample": 5,
+      "target": "x=3.75",
+      "prediction": "x=3.75",
+      "exact": true,
+      "editDistance": 0,
+      "ambiguous": true,
+      "confidence": 0.22345073521137238,
+      "symbolConfidence": 0.22345073521137238,
+      "groupingConfidence": 0.23094850778579712,
+      "relationConfidence": 0.93193519115448,
+      "truthGlyphCount": 6,
+      "predictedGlyphCount": 6,
+      "oracleGroupSymbolCorrect": 6,
+      "oracleGroupSymbolTotal": 6,
+      "oracleGroupSymbolAccuracy": 1.0,
+      "oracleGroupSymbols": [
+        {
+          "id": "g0",
+          "strokes": [
+            0
+          ],
+          "target": "x",
+          "prediction": "x",
+          "correct": true,
+          "confidence": 0.9685701727867126
+        },
+        {
+          "id": "g1",
+          "strokes": [
+            1,
+            2
+          ],
+          "target": "=",
+          "prediction": "=",
+          "correct": true,
+          "confidence": 0.969578742980957
+        },
+        {
+          "id": "g2",
+          "strokes": [
+            3
+          ],
+          "target": "3",
+          "prediction": "3",
+          "correct": true,
+          "confidence": 0.9888269901275635
+        },
+        {
+          "id": "g3",
+          "strokes": [
+            4
+          ],
+          "target": ".",
+          "prediction": ".",
+          "correct": true,
+          "confidence": 0.22345073521137238
+        },
+        {
+          "id": "g4",
+          "strokes": [
+            5,
+            6
+          ],
+          "target": "7",
+          "prediction": "7",
+          "correct": true,
+          "confidence": 0.8419297933578491
+        },
+        {
+          "id": "g5",
+          "strokes": [
+            7
+          ],
+          "target": "5",
+          "prediction": "5",
+          "correct": true,
+          "confidence": 0.9737086296081543
+        }
+      ],
+      "predictedGlyphs": [
+        {
+          "id": 0,
+          "strokes": [
+            0,
+            1
+          ],
+          "symbol": "x",
+          "confidence": 0.7857064008712769,
+          "cx": -0.3973366618156433,
+          "cy": -0.030926715582609177
+        },
+        {
+          "id": 1,
+          "strokes": [
+            2
+          ],
+          "symbol": "=",
+          "confidence": 0.8104864954948425,
+          "cx": -0.18965516984462738,
+          "cy": 0.0
+        },
+        {
+          "id": 2,
+          "strokes": [
+            3
+          ],
+          "symbol": "3",
+          "confidence": 0.9888269901275635,
+          "cx": -0.0013262599240988493,
+          "cy": -0.011936339549720287
+        },
+        {
+          "id": 3,
+          "strokes": [
+            4
+          ],
+          "symbol": ".",
+          "confidence": 0.22345073521137238,
+          "cx": 0.1326259970664978,
+          "cy": -0.017241379246115685
+        },
+        {
+          "id": 4,
+          "strokes": [
+            5,
+            6
+          ],
+          "symbol": "7",
+          "confidence": 0.8419297933578491,
+          "cx": 0.24722369015216827,
+          "cy": 0.007541067898273468
+        },
+        {
+          "id": 5,
+          "strokes": [
+            7
+          ],
+          "symbol": "5",
+          "confidence": 0.9737086296081543,
+          "cx": 0.456233412027359,
+          "cy": 0.017241379246115685
+        }
+      ],
+      "predictedRelations": [
+        {
+          "from": 0,
+          "to": 1,
+          "type": "RIGHT",
+          "confidence": 0.9999927282333374
+        },
+        {
+          "from": 1,
+          "to": 2,
+          "type": "RIGHT",
+          "confidence": 0.9999616146087646
+        },
+        {
+          "from": 2,
+          "to": 3,
+          "type": "RIGHT",
+          "confidence": 0.999908447265625
+        },
+        {
+          "from": 3,
+          "to": 4,
+          "type": "RIGHT",
+          "confidence": 0.9992967844009399
+        },
+        {
+          "from": 4,
+          "to": 5,
+          "type": "RIGHT",
+          "confidence": 0.9715975522994995
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "sample": 6,
+      "target": "7/8",
+      "prediction": "(7)/(0)",
+      "exact": false,
+      "editDistance": 5,
+      "ambiguous": true,
+      "confidence": 0.40460097789764404,
+      "symbolConfidence": 0.40460097789764404,
+      "groupingConfidence": 0.47721314430236816,
+      "relationConfidence": 0.9237337112426758,
+      "truthGlyphCount": 3,
+      "predictedGlyphCount": 3,
+      "oracleGroupSymbolCorrect": 2,
+      "oracleGroupSymbolTotal": 3,
+      "oracleGroupSymbolAccuracy": 0.6666666666666666,
+      "oracleGroupSymbols": [
+        {
+          "id": "g0",
+          "strokes": [
+            0,
+            1
+          ],
+          "target": "7",
+          "prediction": "7",
+          "correct": true,
+          "confidence": 0.7208922505378723
+        },
+        {
+          "id": "g1",
+          "strokes": [
+            2
+          ],
+          "target": "/",
+          "prediction": "/",
+          "correct": true,
+          "confidence": 0.7081278562545776
+        },
+        {
+          "id": "g2",
+          "strokes": [
+            3
+          ],
+          "target": "8",
+          "prediction": "0",
+          "correct": false,
+          "confidence": 0.40460097789764404
+        }
+      ],
+      "predictedGlyphs": [
+        {
+          "id": 0,
+          "strokes": [
+            0,
+            1
+          ],
+          "symbol": "7",
+          "confidence": 0.7208922505378723,
+          "cx": -0.1263987123966217,
+          "cy": -0.33067047595977783
+        },
+        {
+          "id": 1,
+          "strokes": [
+            2
+          ],
+          "symbol": "/",
+          "confidence": 0.7081278562545776,
+          "cx": 0.0,
+          "cy": -0.08544303476810455
+        },
+        {
+          "id": 2,
+          "strokes": [
+            3
+          ],
+          "symbol": "0",
+          "confidence": 0.40460097789764404,
+          "cx": 0.10443037748336792,
+          "cy": 0.275316447019577
+        }
+      ],
+      "predictedRelations": [
+        {
+          "from": 1,
+          "to": 0,
+          "type": "NUMERATOR",
+          "confidence": 0.9990485310554504
+        },
+        {
+          "from": 1,
+          "to": 2,
+          "type": "DENOMINATOR",
+          "confidence": 0.9237337112426758
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "sample": 7,
+      "target": "x^(2)+6x+9",
+      "prediction": "x^(2)+6x+9",
+      "exact": true,
+      "editDistance": 0,
+      "ambiguous": true,
+      "confidence": 0.7569042444229126,
+      "symbolConfidence": 0.7746961116790771,
+      "groupingConfidence": 0.7817724496126175,
+      "relationConfidence": 0.7569042444229126,
+      "truthGlyphCount": 7,
+      "predictedGlyphCount": 7,
+      "oracleGroupSymbolCorrect": 7,
+      "oracleGroupSymbolTotal": 7,
+      "oracleGroupSymbolAccuracy": 1.0,
+      "oracleGroupSymbols": [
+        {
+          "id": "g0",
+          "strokes": [
+            0
+          ],
+          "target": "x",
+          "prediction": "x",
+          "correct": true,
+          "confidence": 0.9731556177139282
+        },
+        {
+          "id": "g1",
+          "strokes": [
+            1
+          ],
+          "target": "2",
+          "prediction": "2",
+          "correct": true,
+          "confidence": 0.8510544300079346
+        },
+        {
+          "id": "g2",
+          "strokes": [
+            2,
+            3
+          ],
+          "target": "+",
+          "prediction": "+",
+          "correct": true,
+          "confidence": 0.9712948203086853
+        },
+        {
+          "id": "g3",
+          "strokes": [
+            4
+          ],
+          "target": "6",
+          "prediction": "6",
+          "correct": true,
+          "confidence": 0.9613902568817139
+        },
+        {
+          "id": "g4",
+          "strokes": [
+            5
+          ],
+          "target": "x",
+          "prediction": "x",
+          "correct": true,
+          "confidence": 0.9421349167823792
+        },
+        {
+          "id": "g5",
+          "strokes": [
+            6,
+            7
+          ],
+          "target": "+",
+          "prediction": "+",
+          "correct": true,
+          "confidence": 0.9624521732330322
+        },
+        {
+          "id": "g6",
+          "strokes": [
+            8
+          ],
+          "target": "9",
+          "prediction": "9",
+          "correct": true,
+          "confidence": 0.7746961116790771
+        }
+      ],
+      "predictedGlyphs": [
+        {
+          "id": 0,
+          "strokes": [
+            0
+          ],
+          "symbol": "x",
+          "confidence": 0.9731556177139282,
+          "cx": -0.4276169240474701,
+          "cy": 0.043429844081401825
+        },
+        {
+          "id": 1,
+          "strokes": [
+            1
+          ],
+          "symbol": "2",
+          "confidence": 0.8510544300079346,
+          "cx": -0.29398664832115173,
+          "cy": -0.04899777099490166
+        },
+        {
+          "id": 2,
+          "strokes": [
+            2,
+            3
+          ],
+          "symbol": "+",
+          "confidence": 0.9712948203086853,
+          "cx": -0.17544803023338318,
+          "cy": 0.017406724393367767
+        },
+        {
+          "id": 3,
+          "strokes": [
+            4
+          ],
+          "symbol": "6",
+          "confidence": 0.9613902568817139,
+          "cx": -0.03563474491238594,
+          "cy": 0.0
+        },
+        {
+          "id": 4,
+          "strokes": [
+            5
+          ],
+          "symbol": "x",
+          "confidence": 0.9421349167823792,
+          "cx": 0.12806236743927002,
+          "cy": 0.010022271424531937
+        },
+        {
+          "id": 5,
+          "strokes": [
+            6,
+            7
+          ],
+          "symbol": "+",
+          "confidence": 0.9624521732330322,
+          "cx": 0.3293468654155731,
+          "cy": -0.01947316713631153
+        },
+        {
+          "id": 6,
+          "strokes": [
+            8
+          ],
+          "symbol": "9",
+          "confidence": 0.7746961116790771,
+          "cx": 0.4587973356246948,
+          "cy": -0.0022271715570241213
+        }
+      ],
+      "predictedRelations": [
+        {
+          "from": 0,
+          "to": 1,
+          "type": "SUPERSCRIPT",
+          "confidence": 0.9739586114883423
+        },
+        {
+          "from": 0,
+          "to": 2,
+          "type": "RIGHT",
+          "confidence": 0.997954249382019
+        },
+        {
+          "from": 2,
+          "to": 3,
+          "type": "RIGHT",
+          "confidence": 0.9995424747467041
+        },
+        {
+          "from": 3,
+          "to": 4,
+          "type": "RIGHT",
+          "confidence": 0.99982750415802
+        },
+        {
+          "from": 4,
+          "to": 5,
+          "type": "RIGHT",
+          "confidence": 0.953529953956604
+        },
+        {
+          "from": 5,
+          "to": 6,
+          "type": "RIGHT",
+          "confidence": 0.9769389033317566
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "sample": 8,
+      "target": "sqrt(16)=4",
+      "prediction": "x6=4",
+      "exact": false,
+      "editDistance": 7,
+      "ambiguous": true,
+      "confidence": 0.2444530576467514,
+      "symbolConfidence": 0.2444530576467514,
+      "groupingConfidence": 0.8808873891830444,
+      "relationConfidence": 0.7482461929321289,
+      "truthGlyphCount": 5,
+      "predictedGlyphCount": 4,
+      "oracleGroupSymbolCorrect": 5,
+      "oracleGroupSymbolTotal": 5,
+      "oracleGroupSymbolAccuracy": 1.0,
+      "oracleGroupSymbols": [
+        {
+          "id": "g0",
+          "strokes": [
+            0
+          ],
+          "target": "sqrt",
+          "prediction": "sqrt",
+          "correct": true,
+          "confidence": 0.7437492609024048
+        },
+        {
+          "id": "g1",
+          "strokes": [
+            1
+          ],
+          "target": "1",
+          "prediction": "1",
+          "correct": true,
+          "confidence": 0.7807811498641968
+        },
+        {
+          "id": "g2",
+          "strokes": [
+            2
+          ],
+          "target": "6",
+          "prediction": "6",
+          "correct": true,
+          "confidence": 0.9463191032409668
+        },
+        {
+          "id": "g3",
+          "strokes": [
+            3,
+            4
+          ],
+          "target": "=",
+          "prediction": "=",
+          "correct": true,
+          "confidence": 0.946478009223938
+        },
+        {
+          "id": "g4",
+          "strokes": [
+            5
+          ],
+          "target": "4",
+          "prediction": "4",
+          "correct": true,
+          "confidence": 0.9056738018989563
+        }
+      ],
+      "predictedGlyphs": [
+        {
+          "id": 0,
+          "strokes": [
+            0,
+            1
+          ],
+          "symbol": "x",
+          "confidence": 0.2444530576467514,
+          "cx": -0.32240110635757446,
+          "cy": -0.07064884155988693
+        },
+        {
+          "id": 1,
+          "strokes": [
+            2
+          ],
+          "symbol": "6",
+          "confidence": 0.9463191032409668,
+          "cx": -0.18230563402175903,
+          "cy": -0.012064343318343163
+        },
+        {
+          "id": 2,
+          "strokes": [
+            3,
+            4
+          ],
+          "symbol": "=",
+          "confidence": 0.946478009223938,
+          "cx": 0.06979754567146301,
+          "cy": 0.025330500677227974
+        },
+        {
+          "id": 3,
+          "strokes": [
+            5
+          ],
+          "symbol": "4",
+          "confidence": 0.9056738018989563,
+          "cx": 0.39946380257606506,
+          "cy": 0.07372654229402542
+        }
+      ],
+      "predictedRelations": [
+        {
+          "from": 0,
+          "to": 1,
+          "type": "RIGHT",
+          "confidence": 0.8984388709068298
+        },
+        {
+          "from": 1,
+          "to": 2,
+          "type": "RIGHT",
+          "confidence": 0.9999911785125732
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "sample": 9,
+      "target": "pi",
+      "prediction": "x",
+      "exact": false,
+      "editDistance": 2,
+      "ambiguous": true,
+      "confidence": 0.19282196462154388,
+      "symbolConfidence": 0.19282196462154388,
+      "groupingConfidence": 0.9782356740906835,
+      "relationConfidence": 0.9668651223182678,
+      "truthGlyphCount": 1,
+      "predictedGlyphCount": 2,
+      "oracleGroupSymbolCorrect": 1,
+      "oracleGroupSymbolTotal": 1,
+      "oracleGroupSymbolAccuracy": 1.0,
+      "oracleGroupSymbols": [
+        {
+          "id": "g0",
+          "strokes": [
+            0,
+            1
+          ],
+          "target": "pi",
+          "prediction": "pi",
+          "correct": true,
+          "confidence": 0.26792803406715393
+        }
+      ],
+      "predictedGlyphs": [
+        {
+          "id": 0,
+          "strokes": [
+            0
+          ],
+          "symbol": "s",
+          "confidence": 0.19282196462154388,
+          "cx": -0.4556961953639984,
+          "cy": -0.03164556995034218
+        },
+        {
+          "id": 1,
+          "strokes": [
+            1
+          ],
+          "symbol": "x",
+          "confidence": 0.6498069167137146,
+          "cx": 0.03164556995034218,
+          "cy": 0.04430379718542099
+        }
+      ],
+      "predictedRelations": [
+        {
+          "from": 0,
+          "to": 1,
+          "type": "RIGHT",
+          "confidence": 0.997331976890564
+        },
+        {
+          "from": 1,
+          "to": 0,
+          "type": "NUMERATOR",
+          "confidence": 0.9668651223182678
+        }
+      ],
+      "warnings": [
+        "incomplete fraction relation at glyph 1"
+      ]
+    }
+  ],
+  "evidence": "same-writer development evaluation only; not writer-disjoint and not production evidence"
+}
