@@ -88,6 +88,10 @@ const emit = (set, imgs, label) => {
 // and undo the very thing this fixes.
 const LOW_BOW = new Set(['(', ')']);
 
+// Same conservative cap as gen.mjs: the rare capital classes must not train on
+// the heavy tail, or their basins invade the 1/±/8 neighbourhoods.
+const STRENGTH_CAP = { B: 1.25, I: 1.15 };
+
 function synthStrokes(cls, rng) {
   const variant = pickSeed(cls, rng);
   const strokes = variant.map(st => st.map(p => p.slice()));
@@ -102,9 +106,10 @@ function synthStrokes(cls, rng) {
   // The clean slice stays, because a net trained only on distortion drifts off
   // the neat hands that are most of the population.
   const r = rng();
-  const strength = r < CLEAN_SHARE ? 0.15
+  let strength = r < CLEAN_SHARE ? 0.15
     : r < 1 - TAIL_SHARE ? 0.45 + rng() * 1.25
       : TAIL_FROM + rng() * (TAIL_TO - TAIL_FROM);
+  if (STRENGTH_CAP[cls]) strength = Math.min(strength, STRENGTH_CAP[cls]);
   return stylize(strokes, rng, strength, { bowScale: LOW_BOW.has(cls) ? 0.3 : 1 });
 }
 

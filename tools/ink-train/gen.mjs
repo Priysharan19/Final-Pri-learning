@@ -91,6 +91,15 @@ const emit = (set, imgs, label) => {
 // and undo the very thing this fixes.
 const LOW_BOW = new Set(['(', ')']);
 
+// The rare capital classes are recognised conservatively. Their heavy-tail
+// renders invade established neighbourhoods that matter far more than they do
+// — a wildly-warped serifed I is a barred 1 or a ±, a warped one-stroke B is a
+// looping 8 — and the collisions were measured, not imagined (a real writer's
+// 8s read as B at 0.9+ when B trained with the full tail). Capping the style
+// strength keeps each new basin tight around its genuine forms while leaving
+// every established class's training untouched.
+const STRENGTH_CAP = { B: 1.25, I: 1.15 };
+
 function synthStrokes(cls, rng) {
   const variant = pickSeed(cls, rng);
   const strokes = variant.map(st => st.map(p => p.slice()));
@@ -105,9 +114,10 @@ function synthStrokes(cls, rng) {
   // The clean slice stays, because a net trained only on distortion drifts off
   // the neat hands that are most of the population.
   const r = rng();
-  const strength = r < CLEAN_SHARE ? 0.15
+  let strength = r < CLEAN_SHARE ? 0.15
     : r < 1 - TAIL_SHARE ? 0.45 + rng() * 1.25
       : TAIL_FROM + rng() * (TAIL_TO - TAIL_FROM);
+  if (STRENGTH_CAP[cls]) strength = Math.min(strength, STRENGTH_CAP[cls]);
   return stylize(strokes, rng, strength, { bowScale: LOW_BOW.has(cls) ? 0.3 : 1 });
 }
 

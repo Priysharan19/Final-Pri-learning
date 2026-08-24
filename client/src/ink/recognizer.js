@@ -2593,7 +2593,16 @@ const BIGRAM = {
  *  maths essentially never uses either as a variable, so the digit reading is
  *  the default and the letter has to be earned from context (a function name,
  *  which the decoder locks before the beam ever runs). */
-const UNIGRAM = { l: -1.15, o: -1.15, ':': -0.45, '!=': -0.55, div: -0.30 };
+const UNIGRAM = {
+  l: -1.15, o: -1.15, ':': -0.45, '!=': -0.55, div: -0.30,
+  // The times sign is the x class's twin: it must be earned from a genuinely
+  // multiplicative slot, not offered as a free operator bridge whenever a
+  // neighbouring glyph wobbles toward a letter ("2x+35" must not decode as
+  // "2*t35" because the + read t). B and I are real classes with their own
+  // ink evidence, but a capital inside written maths is rare enough that a
+  // marginal one beside digits should stay a digit.
+  '*': -0.55, B: -0.35, I: -0.35
+};
 
 /** Unary sign: after a relation, an operator, an open bracket or line start a
  *  '-' (or '+') is a sign, not a dangling operator. */

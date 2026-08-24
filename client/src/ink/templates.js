@@ -224,6 +224,18 @@ export const TEMPLATES = {
   ],
   'R': [
     [L(32, 12, 32, 88, 10), join(A(48, 30, 17, 18, 270, 450, 10), L(44, 48, 28, 48, 4)), L(40, 46, 72, 88, 8)],
+  ],
+  'B': [
+    // stem, then both bowls drawn top-to-bottom in one stroke
+    [L(32, 10, 32, 88, 12), join(L(32, 12, 38, 12, 3), A(40, 30, 20, 18, 270, 450, 11), A(40, 68, 25, 20, 270, 450, 12), L(40, 88, 33, 88, 3))],
+    // one continuous stroke: down the stem, then the bowls climb back up
+    [join(L(36, 10, 33, 90, 11), A(39, 68, 25, 22, 90, -90, 12), A(38, 28, 21, 18, 90, -90, 11))]
+  ],
+  'I': [
+    // serifed capital: top bar, stem, bottom bar
+    [L(30, 12, 70, 12, 6), L(50, 12, 50, 88, 10), L(30, 88, 70, 88, 6)],
+    // the two-stroke form: top bar hooking down the stem, then the base
+    [join(L(28, 12, 70, 12, 7), L(52, 14, 49, 86, 9)), L(28, 88, 72, 88, 6)]
   ]
 };
 
@@ -234,8 +246,8 @@ export const CONTEXTUAL = new Set(['x', '-', '.']);
 export const ALPHABET = [
   '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
   'x', 'y', 't', 'n', 'a', 'b', 'c', 'd', 'e', 'k', 'm', 'r', 's', 'u', 'v', 'z',
-  'i', 'o', 'g', 'l', 'h', 'f', 'w', 'p', 'q', 'L', 'H', 'R',
-  'pi', 'theta', '+', '-', '=', '/', '(', ')', '.', 'sqrt', '<', '>', '<=', '>=', '!=',
+  'i', 'o', 'g', 'l', 'h', 'f', 'w', 'p', 'q', 'L', 'H', 'R', 'B', 'I', 'O',
+  'pi', 'theta', '+', '-', '*', '=', '/', '(', ')', '.', 'sqrt', '<', '>', '<=', '>=', '!=',
   'div', 'pm', 'deg', 'percent', ':', '∫'
 ];
 
@@ -332,6 +344,14 @@ export const REAL_ALLOGRAPHS = {
   'y': [
     [[[34.2,19.9],[37.2,8.6],[34.5,18.6],[34.3,30.2],[44.3,33.2],[53,25.5],[58.9,15.5],[55.6,24.5],[53.3,36.2],[52.1,47.9],[50.1,59.6],[47.7,71.3],[43.5,82.4],[36.9,92],[32.7,82.6],[33.7,70.8],[36.7,59.4],[44.5,50.6],[55.7,46.8],[67.5,46.7]]]
   ],
+  'B': [
+    // one continuous stroke, sample "8B3": down the stem, both bowls back up
+    [[[32.7,40],[26,25.2],[28.3,44.2],[30,63.4],[27.6,67.2],[26,48],[28.8,29],[39.6,13.1],[55.3,10.9],[52.5,29.5],[38.8,42.3],[43.6,49],[62.2,53.9],[77.6,64.6],[72.1,80.6],[55.1,89.4],[36,92],[20.7,84.5],[30.3,70.7],[47.3,61.3]]]
+  ],
+  'I': [
+    // two strokes, sample "1lIy": top bar hooking down the stem, then the base
+    [[[17.3,17.3],[12.7,11.7],[8.7,8],[17.8,8],[26.9,8],[36,8],[45.2,8],[54.3,8],[63.4,8],[72.5,8],[70.1,11.2],[61.8,14],[54,17.3],[45.7,19.2],[45.9,27.8],[47.2,36.6],[49.1,45.3],[50.6,54.1],[50.9,63.1],[49.1,67.7]], [[32.3,90.1],[28.5,90.5],[31.1,92],[35.2,92],[38.5,89.9],[42.4,88.6],[46.4,88.3],[50.2,86.8],[54,85.4],[57.8,83.9],[61.5,82],[65.2,80.4],[69.1,79.1],[73.2,78.9],[76.5,76.6],[80.3,75.4],[84.2,74.1],[88.1,72.8],[92,71.5]]]
+  ],
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -392,4 +412,9 @@ export const RUNTIME_TEMPLATES = Object.fromEntries(
 // overlap the hand-authored forms of OTHER classes — train with a smaller
 // slice, because the tuning suites showed the boundary itself moving (1↔7,
 // (↔1, 4↔9). Runtime $P matching always uses every variant regardless.
-export const REAL_TRAIN_SHARE = { '1l': 0.10, '(': 0.10, ')': 0.10, '7': 0.15, '9': 0.15 };
+export const REAL_TRAIN_SHARE = {
+  '1l': 0.10, '(': 0.10, ')': 0.10, '7': 0.15, '9': 0.15,
+  // The real one-stroke B and two-stroke I sit close to this writer's own 8s
+  // and barred 1s; a large slice would teach the net the collision itself.
+  'B': 0.10, 'I': 0.10
+};

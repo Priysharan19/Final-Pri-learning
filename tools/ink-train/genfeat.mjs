@@ -55,7 +55,10 @@ for (const cls of CLASSES) {
   const li = CLASS_INDEX[cls];
   for (let i = 0; i < PER_CLASS; i++) {
     const variant = pickSeed(cls, rng);
-    const strength = rng() < 0.1 ? 0.15 : 0.45 + rng() * 1.25;
+    let strength = rng() < 0.1 ? 0.15 : 0.45 + rng() * 1.25;
+    // same conservative cap as gen.mjs for the rare capital classes
+    if (cls === 'B') strength = Math.min(strength, 1.25);
+    else if (cls === 'I') strength = Math.min(strength, 1.15);
     const strokes = stylize(
       variant.map(st => st.map(p => p.slice())),
       rng, strength,
