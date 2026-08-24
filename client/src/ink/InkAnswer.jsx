@@ -161,7 +161,7 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
         const local = readWithJS();
         if (seq !== readSeqRef.current) return;
         const engine = structuralLanExpected() ? 'pri-js-v3-v4-unavailable' : 'pri-js-v3';
-        publish(local ? { ...local, engine } : { ...EMPTY_READING, engine });
+        publish(local ? { ...local, engine } : { ...EMPTY_READING, engine }, strokes);
       });
       return;
     }
