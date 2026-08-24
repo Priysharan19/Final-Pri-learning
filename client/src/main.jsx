@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import '@fontsource-variable/inter';
 import './theme.css';
+import './ink/interactionGuard.js';
 import App from './App.jsx';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 
