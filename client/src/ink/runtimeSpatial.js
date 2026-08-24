@@ -159,7 +159,10 @@ function chooseMainLane(rows, strokes, scale) {
     else selected.push(...candidate.lane);
   }
 
-  selected.sort((a, b) => median(a.map(i => strokeBox(strokes[i]).cy), 0) - median(b.map(i => strokeBox(strokes[i]).cy), 0));
+  selected.sort((a, b) =>
+    median(a.indices.map(i => strokeBox(strokes[i]).cy), 0) -
+    median(b.indices.map(i => strokeBox(strokes[i]).cy), 0)
+  );
   return { selected: selected.map(r => r.indices), ignored: ignored.map(r => r.indices) };
 }
 
