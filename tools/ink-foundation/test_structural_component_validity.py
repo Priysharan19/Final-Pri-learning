@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 import sys
+from types import SimpleNamespace
 
 import torch
 
@@ -17,7 +18,7 @@ from structural_component_validity import (
     mine_invalid_components,
 )
 from structural_joint_decode import joint_partition
-from train_component_validity import _binary_auc
+from train_component_validity import _binary_auc, _prepare_examples
 
 
 class StubGlyphModel:
@@ -91,6 +92,36 @@ def test_rank_auc_matches_pairwise_probability_exactly():
         assert "finite" in str(exc)
     else:
         raise AssertionError("rank AUC accepted a non-finite score")
+
+
+def test_tagged_synthetic_base_requires_explicit_provenance():
+    rows = [
+        SimpleNamespace(writer="SYN4_T_00000", split="train"),
+        SimpleNamespace(writer="SYN4_V_00000", split="validation"),
+    ]
+    selected, protocol = _prepare_examples(
+        rows,
+        {
+            "stage": "structural-synthetic-pretrain",
+            "synthetic_pretraining": True,
+            "production_ready": False,
+        },
+        "writer-disjoint",
+    )
+    assert selected is rows
+    assert protocol["writerDisjoint"] is True
+    assert protocol["productionEvidence"] is False
+
+    try:
+        _prepare_examples(
+            rows,
+            {"stage": "structural-synthetic-pretrain", "production_ready": False},
+            "writer-disjoint",
+        )
+    except SystemExit as exc:
+        assert "synthetic_pretraining=true" in str(exc)
+    else:
+        raise AssertionError("tagged synthetic stage was accepted without provenance marker")
 
 
 def test_invalid_mass_preserves_symbol_identity_but_reduces_confidence():
@@ -175,11 +206,12 @@ def test_validity_rejection_repairs_false_merge_without_changing_base_model():
 
 def main():
     test_rank_auc_matches_pairwise_probability_exactly()
+    test_tagged_synthetic_base_requires_explicit_provenance()
     test_invalid_mass_preserves_symbol_identity_but_reduces_confidence()
     test_hard_negative_mining_targets_splits_and_false_merges()
     test_contextual_head_is_trainable_and_finite()
     test_validity_rejection_repairs_false_merge_without_changing_base_model()
-    print("Pri Ink V4 component validity: 5/5 deterministic contracts PASS")
+    print("Pri Ink V4 component validity: 6/6 deterministic contracts PASS")
 
 
 if __name__ == "__main__":
