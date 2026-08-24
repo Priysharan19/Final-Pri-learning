@@ -125,18 +125,37 @@ def _prepare_examples(raw, base_ckpt: dict, mode: str):
 
 
 def _binary_auc(positive: list[float], negative: list[float]) -> float:
+    """Exact tie-aware binary AUC in O((P+N) log(P+N)) time.
+
+    This is the Mann-Whitney rank formulation of the same probability measured
+    by the old pairwise implementation: P(positive > negative) plus half credit
+    for ties. Validation can therefore scale to large candidate corpora without
+    changing the metric's semantics.
+    """
     if not positive or not negative:
         return 0.0
-    # Probability that a random true component outranks a random invalid one.
-    wins = ties = total = 0
-    for p in positive:
-        for n in negative:
-            total += 1
-            if p > n:
-                wins += 1
-            elif p == n:
-                ties += 1
-    return (wins + 0.5 * ties) / max(1, total)
+
+    ranked = [(float(score), 1) for score in positive]
+    ranked.extend((float(score), 0) for score in negative)
+    if any(not math.isfinite(score) for score, _ in ranked):
+        raise ValueError("binary AUC requires finite component-validity scores")
+    ranked.sort(key=lambda item: item[0])
+
+    positive_rank_sum = 0.0
+    i = 0
+    while i < len(ranked):
+        j = i + 1
+        while j < len(ranked) and ranked[j][0] == ranked[i][0]:
+            j += 1
+        # Sorted positions i..j-1 correspond to 1-indexed ranks i+1..j.
+        average_rank = ((i + 1) + j) / 2.0
+        positive_rank_sum += average_rank * sum(label for _, label in ranked[i:j])
+        i = j
+
+    n_pos = len(positive)
+    n_neg = len(negative)
+    mann_whitney_u = positive_rank_sum - n_pos * (n_pos + 1) / 2.0
+    return mann_whitney_u / (n_pos * n_neg)
 
 
 @torch.no_grad()
