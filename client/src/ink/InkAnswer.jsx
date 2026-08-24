@@ -11,6 +11,7 @@ import NativeInkCanvas from './NativeInkCanvas.jsx';
 import { nativeInk, nativeInkAvailable } from './native.js';
 import { recognizeWithStructuralDev } from './devStructural.js';
 import { recognize, exprToLatex } from './recognizer.js';
+import { feedbackGeometry } from './feedbackGeometry.js';
 import { ALPHABET } from './templates.js';
 import { classOfSymbol } from './classes.js';
 import { ensurePersonalLoaded, addPersonal } from './personal.js';
@@ -31,6 +32,7 @@ const showSym = s => NICE[s] || s;
 const NATIVE_INK = nativeInkAvailable();
 const Surface = NATIVE_INK ? NativeInkCanvas : InkCanvas;
 const EMPTY_READING = { lines: [], text: '', symbols: [], minConf: 1, margin: 1, weakest: null };
+const structuralLanExpected = () => !NATIVE_INK && typeof window !== 'undefined' && window.__PRI_LAN_DEV__ === true;
 
 /**
  * Native rescue reads lines. If it leaves a short line unread (a lone "x", a
@@ -144,6 +146,10 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
     // Browser/dev: prefer the explicit Structural V4 LAN research bridge when
     // the server exposes it. A normal build answers 404 once, the client caches
     // that absence, and the mature JS recogniser remains the local fallback.
+    // On the dedicated V4 LAN origin, however, a V4 miss is now named in the
+    // engine label instead of looking like an ordinary V3 result. That prevents
+    // a physical-iPad research session from accidentally judging V4 by legacy
+    // fallback output.
     if (!NATIVE_INK) {
       recognizeWithStructuralDev(strokes).then(v4 => {
         if (seq !== readSeqRef.current) return;
@@ -153,7 +159,8 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
         }
         const local = readWithJS();
         if (seq !== readSeqRef.current) return;
-        publish(local ? { ...local, engine: 'pri-js-v3' } : EMPTY_READING, strokes);
+        const engine = structuralLanExpected() ? 'pri-js-v3-v4-unavailable' : 'pri-js-v3';
+        publish(local ? { ...local, engine } : { ...EMPTY_READING, engine });
       });
       return;
     }
@@ -235,9 +242,11 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
 
   const engineNote = rec.engine === 'pri-structural-v4-dev-lan'
     ? 'Structural V4 research · Mac LAN · not production'
-    : rec.engine === 'pri-js-v3'
-      ? 'JS V3 fallback'
-      : null;
+    : rec.engine === 'pri-js-v3-v4-unavailable'
+      ? 'Structural V4 returned no reading · showing JS V3 fallback'
+      : rec.engine === 'pri-js-v3'
+        ? 'JS V3 fallback'
+        : null;
 
   return (
     <div className={`ink-answer ${disabled ? 'ink-disabled' : ''}`}>
@@ -282,21 +291,30 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
                 if (!good && !bad) return null;
                 const showNote = bad && !noted;
                 if (showNote) noted = true;
-                const b = line.box;
+                const geometry = feedbackGeometry(line);
+                const b = geometry.anchor || line.box;
+                const boxes = geometry.boxes.length ? geometry.boxes : [b];
                 return (
                   <React.Fragment key={li}>
-                    <span
-                      className={`ink-linebox ${good ? 'good' : 'bad'}`}
-                      style={{ left: b.x - 9, top: b.y - 7, width: b.w + 18, height: b.h + 14 }}
-                    />
+                    {boxes.map((gb, gi) => (
+                      <span
+                        key={`box-${gi}`}
+                        className={`ink-linebox ${good ? 'good' : 'bad'}`}
+                        style={{ left: gb.x - 5, top: gb.y - 5, width: gb.w + 10, height: gb.h + 10 }}
+                      />
+                    ))}
                     <span
                       className={`ink-verdict ${good ? 'good' : 'bad'}`}
                       style={{ top: b.y + b.h / 2 - 14, left: b.x + b.w + 16 }}
                       title={v.note || (good ? 'This line checks out' : 'The maths breaks on this line')}
                     >{good ? '✓' : '✗'}</span>
-                    {bad && (
-                      <span className="ink-underline" style={{ left: b.x - 5, top: b.y + b.h + 5, width: b.w + 14 }} />
-                    )}
+                    {bad && boxes.map((gb, gi) => (
+                      <span
+                        key={`underline-${gi}`}
+                        className="ink-underline"
+                        style={{ left: gb.x - 3, top: gb.y + gb.h + 4, width: gb.w + 6 }}
+                      />
+                    ))}
                     {showNote && (
                       <span className="ink-note" style={{ left: Math.max(4, b.x - 2), top: b.y + b.h + 16 }}>
                         <b>✗ the mistake is here</b>{v.note ? <> — {v.note}</> : null}
