@@ -5,16 +5,23 @@ import '@fontsource-variable/inter';
 import './theme.css';
 import App from './App.jsx';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
+import CampaignLanding from './marketing/CampaignLanding.jsx';
+
+const campaignPath = window.location.pathname === '/launch' || window.location.pathname === '/commercial';
 
 // The root boundary sits outside the router so that everything is covered —
 // the boot screen, the whole Login and cold-start path, the topbar, the account
-// menu, the sidebar, the toasts and the mobile nav, not only the routes.
+// menu, the sidebar, the toasts, the mobile nav and the public campaign page.
 createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <ErrorBoundary scope="app">
-      <BrowserRouter>
-        <App />
-      </BrowserRouter>
+      {campaignPath ? (
+        <CampaignLanding />
+      ) : (
+        <BrowserRouter>
+          <App />
+        </BrowserRouter>
+      )}
     </ErrorBoundary>
   </React.StrictMode>
 );
