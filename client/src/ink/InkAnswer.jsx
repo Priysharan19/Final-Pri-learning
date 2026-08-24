@@ -9,7 +9,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import InkCanvas from './InkCanvas.jsx';
 import NativeInkCanvas from './NativeInkCanvas.jsx';
 import { nativeInk, nativeInkAvailable } from './native.js';
-import { recognizeWithStructuralDev } from './devStructural.js';
+import { recognizeWithStructuralDev } from '../../dev/devStructural.js';
 import { recognize, exprToLatex } from './recognizer.js';
 import { recognizeWithoutDetachedSideWork } from './runtimeSpatial.js';
 import { feedbackGeometry } from './feedbackGeometry.js';
