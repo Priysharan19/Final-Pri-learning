@@ -17,6 +17,7 @@ from structural_component_validity import (
     mine_invalid_components,
 )
 from structural_joint_decode import joint_partition
+from train_component_validity import _binary_auc
 
 
 class StubGlyphModel:
@@ -54,6 +55,42 @@ def _best_real(logits):
         if token not in SPECIAL:
             return token, float(probs[idx])
     raise AssertionError("no real symbol")
+
+
+def _brute_auc(positive, negative):
+    if not positive or not negative:
+        return 0.0
+    wins = ties = 0
+    for p in positive:
+        for n in negative:
+            if p > n:
+                wins += 1
+            elif p == n:
+                ties += 1
+    return (wins + 0.5 * ties) / (len(positive) * len(negative))
+
+
+def test_rank_auc_matches_pairwise_probability_exactly():
+    cases = [
+        ([0.9, 0.8], [0.2, 0.1]),
+        ([0.1, 0.2], [0.8, 0.9]),
+        ([0.5, 0.5, 0.7], [0.5, 0.6, 0.7]),
+        ([0.0, 1.0, 0.5, 0.5], [0.0, 1.0, 0.25, 0.5]),
+        ([0.3], [0.3]),
+        ([], [0.2]),
+        ([0.8], []),
+    ]
+    for positive, negative in cases:
+        expected = _brute_auc(positive, negative)
+        actual = _binary_auc(positive, negative)
+        assert abs(actual - expected) < 1e-12, (positive, negative, expected, actual)
+
+    try:
+        _binary_auc([float("nan")], [0.5])
+    except ValueError as exc:
+        assert "finite" in str(exc)
+    else:
+        raise AssertionError("rank AUC accepted a non-finite score")
 
 
 def test_invalid_mass_preserves_symbol_identity_but_reduces_confidence():
@@ -137,11 +174,12 @@ def test_validity_rejection_repairs_false_merge_without_changing_base_model():
 
 
 def main():
+    test_rank_auc_matches_pairwise_probability_exactly()
     test_invalid_mass_preserves_symbol_identity_but_reduces_confidence()
     test_hard_negative_mining_targets_splits_and_false_merges()
     test_contextual_head_is_trainable_and_finite()
     test_validity_rejection_repairs_false_merge_without_changing_base_model()
-    print("Pri Ink V4 component validity: 4/4 deterministic contracts PASS")
+    print("Pri Ink V4 component validity: 5/5 deterministic contracts PASS")
 
 
 if __name__ == "__main__":
