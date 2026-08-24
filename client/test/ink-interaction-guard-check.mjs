@@ -48,8 +48,8 @@ global.window = {
 };
 
 const moduleUrl = pathToFileURL(join(HERE, '../src/ink/interactionGuard.js')).href;
-const mod = await import(`${moduleUrl}?contract=2`);
-const activeClass = mod.__interactionGuardContract.activeClass;
+const mod = await import(`${moduleUrl}?contract=3`);
+const { activeClass, sessionClass, syncSessionClass } = mod.__interactionGuardContract;
 
 const event = (type, { inInk = true, pointerType = 'pen', pointerId = 7 } = {}) => {
   let prevented = 0;
@@ -62,14 +62,19 @@ const event = (type, { inInk = true, pointerType = 'pen', pointerId = 7 } = {}) 
 };
 
 console.log('Ink interaction guard contract\n');
-check('guard injects session-wide no-selection style',
-  injectedStyle?.textContent.includes('html:has(.ink-answer)')
+check('guard injects explicit session-wide no-selection style',
+  injectedStyle?.textContent.includes(`html.${sessionClass}`)
+  && !injectedStyle.textContent.includes(':has(.ink-answer)')
   && injectedStyle.textContent.includes('-webkit-user-select: none !important')
   && injectedStyle.textContent.includes('-webkit-touch-callout: none !important')
   && injectedStyle.textContent.includes('-webkit-user-drag: none !important'));
 check('real text-entry controls are explicitly exempted',
-  injectedStyle?.textContent.includes('html:has(.ink-answer) input')
+  injectedStyle?.textContent.includes(`html.${sessionClass} input`)
   && injectedStyle.textContent.includes('[contenteditable="true"]'));
+check('non-interactive handwriting hint cannot become a Pencil hit target',
+  injectedStyle?.textContent.includes('.ink-hint')
+  && injectedStyle.textContent.includes('pointer-events: none !important'));
+check('handwriting editor present adds explicit session class', html.classList.contains(sessionClass));
 for (const name of ['pointerdown', 'pointermove', 'pointerup', 'pointercancel', 'selectstart', 'dragstart', 'contextmenu', 'selectionchange']) {
   check(`capture handler registered for ${name}`, typeof documentHandlers.get(name) === 'function');
 }
@@ -110,6 +115,8 @@ documentHandlers.get('pointerdown')(finger);
 check('finger pointer itself is not captured, preserving scroll policy', finger.prevented === 0 && !html.classList.contains(activeClass));
 
 inkSession = false;
+syncSessionClass();
+check('session class is removed when handwriting editor closes', !html.classList.contains(sessionClass));
 const afterSession = event('selectstart', { inInk: false, pointerType: 'touch', pointerId: 8 });
 documentHandlers.get('selectstart')(afterSession);
 check('ordinary page selection returns after handwriting editor closes', afterSession.prevented === 0);
