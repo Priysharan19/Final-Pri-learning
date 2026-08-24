@@ -44,7 +44,12 @@ let package = Package(
                 "README.md"
             ],
             resources: [
-                .copy("Resources/Web")
+                .copy("Resources/Web"),
+                // A validated PriInkFoundation.mlpackage is exported here. The
+                // directory exists even in development builds where no learned
+                // asset has been promoted yet, so handwriting can fall back to
+                // the current local engine without changing the package graph.
+                .copy("Resources/Models")
             ]
         )
     ]
