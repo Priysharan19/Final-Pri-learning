@@ -921,8 +921,11 @@ function kxCentreOffset(strokes) {
   return null;
 }
 
-export function classify(group, medianH) {
-  const s = structural(group, medianH);
+/** The raw blended per-symbol candidate list — the full ranking BEFORE the
+ *  calibrated, truncated alts are built. The ligature splitter needs this:
+ *  "how much does this fragment look like an n" is a question the top-5
+ *  calibrated alts cannot answer once a stronger reading has eaten the mass. */
+function glyphCandidates(group, medianH) {
   const strokes = group.strokes.map(strokePts);
   const relSize = Math.max(group.box.w, group.box.h) / Math.max(medianH, 1e-6);
   const kx = kxCentreOffset(strokes);
@@ -948,22 +951,24 @@ export function classify(group, medianH) {
   for (const t of getPersonalClouds()) consider(t, 0.75);   // your handwriting outranks stock
 
   // ③ blend into per-symbol scores
-  const blend = (P) => {
-    const out = [];
-    for (const [sym, { d, personal }] of bestBySym) {
-      const cls = classOfSymbol(sym);
-      const ci = CLASS_INDEX[cls];
-      const cnnP = ci !== undefined ? P[ci] : 0.001;
-      const tmpl = 1 / (1 + 8 * d);
-      let score = Math.pow(cnnP + 0.015, 0.62) * Math.pow(tmpl + 0.02, 0.38) * sizePrior(sym, relSize);
-      if (kx && (sym === 'k' || sym === 'x')) score *= kx[sym];
-      if (personal && d < 0.3) score *= 1.6;               // strong learned match
-      out.push({ sym, score, cnnP, tmpl, d });
-    }
-    out.sort((a, b) => b.score - a.score);
-    return out;
-  };
-  const cand = blend(probs);
+  const out = [];
+  for (const [sym, { d, personal }] of bestBySym) {
+    const cls = classOfSymbol(sym);
+    const ci = CLASS_INDEX[cls];
+    const cnnP = ci !== undefined ? probs[ci] : 0.001;
+    const tmpl = 1 / (1 + 8 * d);
+    let score = Math.pow(cnnP + 0.015, 0.62) * Math.pow(tmpl + 0.02, 0.38) * sizePrior(sym, relSize);
+    if (kx && (sym === 'k' || sym === 'x')) score *= kx[sym];
+    if (personal && d < 0.3) score *= 1.6;               // strong learned match
+    out.push({ sym, score, cnnP, tmpl, d });
+  }
+  out.sort((a, b) => b.score - a.score);
+  return out;
+}
+
+export function classify(group, medianH) {
+  const s = structural(group, medianH);
+  const cand = glyphCandidates(group, medianH);
 
   // ④ NO test-time augmentation — measured, not assumed, and measured twice.
   // A rotation vote used to run for glyphs scoring under 0.35. Two things were
@@ -1220,6 +1225,296 @@ function letterCandidates(sym) {
     for (const m of symbolsOfClass(classOfSymbol(a.sym))) add(m, a.conf * 0.92);
   }
   return set;
+}
+
+// ── Ligature split: several letters in one pen motion ────────────────────────
+// Function names are the one place students routinely write several letters
+// without lifting the pen — a joined 'cos', 'tan' or 'ln'. Whole-stroke
+// segmentation can never separate those, and a free sub-stroke splitter is
+// worse than useless: fragments classify as confident nonsense (a joined
+// 'cos' really does decompose into a strong 'a' plus a strong '%' under
+// best-cut search). So the splitter is hypothesis-driven. Only whole function
+// words are candidate readings; each word fixes the piece count; and every
+// piece is scored against ITS letter — what the fragment would rather be is
+// irrelevant. Cuts are only allowed where the pen slowed to a near-stop or
+// turned hard, which is where letter joins live, not at free arc positions.
+
+const LIGATURE_WORDS = ['cos', 'sin', 'tan', 'sec', 'csc', 'cot', 'log', 'ln'];
+
+/** Candidate cut points of one stroke: pen-speed minima (the corpus records t
+ *  at 240Hz; synthetic strokes without timing fall back to point spacing,
+ *  which their even resampling makes flat — harmless) and curvature cusps.
+ *  Ends are excluded; nearby candidates are suppressed to the strongest. */
+function ligatureCutCandidates(stroke) {
+  const pts = stroke.points;
+  const n = pts.length;
+  if (n < 16) return [];
+  const arc = new Float64Array(n);
+  for (let i = 1; i < n; i++) {
+    arc[i] = arc[i - 1] + Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
+  }
+  const total = arc[n - 1];
+  if (total < 1e-6) return [];
+
+  let timed = true;
+  for (const p of pts) if (!Number.isFinite(p.t)) { timed = false; break; }
+  timed = timed && pts[n - 1].t > pts[0].t;
+
+  const raw = new Float64Array(n);
+  for (let i = 1; i < n - 1; i++) {
+    const ds = arc[i + 1] - arc[i - 1];
+    raw[i] = timed ? ds / Math.max(pts[i + 1].t - pts[i - 1].t, 1e-4) : ds;
+  }
+  raw[0] = raw[1]; raw[n - 1] = raw[n - 2];
+  const speed = new Float64Array(n);
+  for (let i = 0; i < n; i++) {
+    let sum = 0, c = 0;
+    for (let j = Math.max(0, i - 2); j <= Math.min(n - 1, i + 2); j++) { sum += raw[j]; c++; }
+    speed[i] = sum / c;
+  }
+  const medianV = [...speed].sort((a, b) => a - b)[n >> 1] || 1e-6;
+
+  const dirWin = Math.max(2.5, 0.03 * total);
+  const turnAt = (i) => {
+    let a = i; while (a > 0 && arc[i] - arc[a] < dirWin) a--;
+    let b = i; while (b < n - 1 && arc[b] - arc[i] < dirWin) b++;
+    const v1x = pts[i].x - pts[a].x, v1y = pts[i].y - pts[a].y;
+    const v2x = pts[b].x - pts[i].x, v2y = pts[b].y - pts[i].y;
+    const n1 = Math.hypot(v1x, v1y), n2 = Math.hypot(v2x, v2y);
+    if (n1 < 1e-6 || n2 < 1e-6) return 0;
+    return Math.acos(Math.max(-1, Math.min(1, (v1x * v2x + v1y * v2y) / (n1 * n2))));
+  };
+
+  const cands = [];
+  for (let i = 2; i < n - 2; i++) {
+    if (arc[i] < 0.06 * total || arc[i] > 0.94 * total) continue;
+    let strength = 0;
+    const isMin = speed[i] <= speed[i - 1] && speed[i] <= speed[i + 1] &&
+      speed[i] <= speed[Math.max(0, i - 2)] && speed[i] <= speed[Math.min(n - 1, i + 2)];
+    if (isMin && speed[i] < 0.75 * medianV) strength = 1 - speed[i] / medianV;
+    const turn = turnAt(i);
+    if (turn > 0.75) strength = Math.max(strength, 0.3 + 0.7 * Math.min(1, (turn - 0.75) / 2));
+    if (strength > 0) cands.push({ idx: i, arc: arc[i], strength, total });
+  }
+  cands.sort((a, b) => b.strength - a.strength);
+  const kept = [];
+  for (const c of cands) {
+    if (kept.length >= 8) break;
+    if (kept.every(k => Math.abs(k.arc - c.arc) > 0.055 * total)) kept.push(c);
+  }
+  kept.sort((a, b) => a.idx - b.idx);
+  return kept;
+}
+
+function ligatureSplitPass(line, medianH) {
+  const out = [...line];
+  for (let i = 0; i < out.length; i++) {
+    const s = out[i];
+    if (s.composite || !s._group || s._group.strokes.length > 4) continue;
+    if (s.conf >= 0.99) continue;   // user-overridden or certain — never re-split
+    if (FUNC_NAMES.has(s.sym) || s.sym === 'sqrt' || s.sym === 'theta' || s.sym === 'pi') continue;
+    const w = s.box.w;
+    // Which merged glyphs are worth challenging: barely-confident wide ones,
+    // or anything wider than two glyph heights — no single symbol is that
+    // wide, however confidently the ensemble reads it ('tan' joined into one
+    // group reads k at 0.91).
+    const unsure = s.conf < 0.45 && w >= 1.05 * medianH;
+    const shaky = s.conf < 0.70 && w >= 1.5 * medianH;
+    const veryWide = w >= 2.0 * medianH;
+    if (!unsure && !shaky && !veryWide) continue;
+
+    // A function name needs an argument after it; without one the split
+    // could strand loose letters the line never meant (decodeFunctions
+    // applies the very same licence before locking a word).
+    const next = out[i + 1];
+    if (!next || RELATIONAL.has(next.sym)) continue;
+    // Function-argument context loosens the anchor rule below: a wide glyph
+    // in front of a theta / bracket / variable earns trust a bare wide
+    // squiggle between digits does not.
+    const argContext = next.sym === '(' || next.sym === 'theta' || /^[a-zA-Z]$/.test(next.sym);
+
+    const ordered = [...s._group.strokes].sort((a, b) => a.box.cx - b.box.cx);
+    const m = ordered.length;
+    const cutsPer = ordered.map(st => ligatureCutCandidates(st));
+
+    // Shards: every stroke split at every candidate. One letter is typically
+    // SEVERAL shards — a cursive join is smooth, so the pen marks reversals
+    // inside letters far more reliably than the letter boundary itself. A
+    // piece is a consecutive run of shards, so an unused cut is simply
+    // re-merged and costs nothing.
+    const units = [];
+    for (let p = 0; p < m; p++) {
+      const last = ordered[p].points.length - 1;
+      let prev = 0;
+      for (const c of cutsPer[p]) {
+        if (c.idx - prev >= 3 && last - c.idx >= 3) { units.push({ p, a: prev, b: c.idx }); prev = c.idx + 1; }
+      }
+      units.push({ p, a: prev, b: last });
+    }
+    if (units.length < 2) continue;
+
+    // Pieces are classified once each, however many partitions share them.
+    // Adjacent shards of the same stroke are re-joined into one contiguous
+    // point run first: the ink IS one pen motion, and classifying it as
+    // several strokes would both tear the render and pay the template
+    // stroke-count penalty for a lift that never happened.
+    const pieceCache = new Map();
+    const coalesce = (parts) => {
+      const runs = [];
+      for (const u of parts) {
+        const last = runs[runs.length - 1];
+        if (last && last.p === u.p && u.a <= last.b + 1) last.b = u.b;
+        else runs.push({ p: u.p, a: u.a, b: u.b });
+      }
+      return runs;
+    };
+    const pieceOf = (parts) => {
+      const runs = coalesce(parts);
+      const key = runs.map(u => `${u.p}:${u.a}:${u.b}`).join('|');
+      let pc = pieceCache.get(key);
+      if (pc) return pc;
+      const strokes = runs.map(u => {
+        const run = ordered[u.p].points.slice(u.a, u.b + 1);
+        return { points: run, idx: ordered[u.p].idx, box: bbox(run.map(pt => [pt.x, pt.y])) };
+      });
+      const box = bbox(strokes.flatMap(strokePts));
+      const group = { strokes, box, strokeIdxs: [...new Set(strokes.map(st => st.idx))] };
+      pc = { group, cand: null, top: null };
+      if (Math.max(box.w, box.h) >= 0.14 * medianH && box.w <= 1.6 * medianH) {
+        const raw = glyphCandidates(group, medianH);
+        // Fragment re-blend: the CNN was trained on whole glyphs and is far
+        // out of distribution on letter fragments — it confidently reads the
+        // envelope, not the letterform (a joined c scores cnnP 0.007 as 'c'
+        // with template distance 0.01). Within this pass only, the same
+        // components are re-blended template-heavy; the symbol priors folded
+        // into the stored score (size, k/x offset, personal) are kept by
+        // dividing the original blend back out.
+        const cand = raw.map(c => {
+          const orig = Math.pow(c.cnnP + 0.015, 0.62) * Math.pow(c.tmpl + 0.02, 0.38);
+          const prior = orig > 1e-12 ? c.score / orig : 0;
+          return { sym: c.sym, score: Math.pow(c.cnnP + 0.015, 0.25) * Math.pow(c.tmpl + 0.02, 0.75) * prior };
+        }).sort((a, b) => b.score - a.score);
+        if (cand.length && cand[0].score > 1e-9) { pc.cand = cand; pc.top = cand[0]; }
+      }
+      pieceCache.set(key, pc);
+      return pc;
+    };
+
+    // How much a piece looks like one specific letter: the letter's raw
+    // blended score (its class twins count, slightly discounted) relative to
+    // the piece's best reading. This is deliberately NOT the calibrated alt
+    // confidence — a fragment always has a confident favourite, and the
+    // question here is never "what is this?", only "could it be this letter?".
+    const letterScore = (pc, letter, allowBracketL) => {
+      if (!pc.top) return 0;
+      const members = new Set(symbolsOfClass(classOfSymbol(letter)));
+      if (letter === 'o') members.add('deg');
+      if (letter === 'l' && allowBracketL) { members.add('('); members.add(')'); }
+      let bestS = 0;
+      for (const c of pc.cand) {
+        if (c.sym !== letter && !members.has(c.sym)) continue;
+        const sc = c.sym === letter ? c.score : (c.sym === '(' || c.sym === ')' ? 0.85 : 0.95) * c.score;
+        if (sc > bestS) bestS = sc;
+      }
+      return bestS / pc.top.score;
+    };
+
+    // Cursive connectors: a piece may carry the join into or out of its
+    // letter (the baseline travel between letters, the exit flick after the
+    // last one). Score the piece with its first/last shard trimmed as well
+    // and keep the best — the emitted glyph still owns the full ink.
+    const pieceScore = (parts, letter) => {
+      const full = pieceOf(parts);
+      // A full-height NARROW piece reading as a bracket may be an ell:
+      // sticks and shallow bows are pixel-degenerate, and a fragment carved
+      // out of a merged group cannot be a real bracket — real brackets get
+      // their own group. Height is measured against the line (an ell is an
+      // ascender); the width test keeps letter-bodied fragments like a 'c'
+      // from borrowing the licence, and it is judged on the WHOLE piece so a
+      // trimmed sliver of a round letter cannot sneak in as a stick.
+      const fb = full.group.box;
+      const allowBracketL = fb.h >= 0.72 * medianH && fb.w <= 0.62 * fb.h;
+      let bestPc = full, bestConf = letterScore(full, letter, allowBracketL);
+      const variants = [];
+      if (parts.length >= 2) { variants.push(parts.slice(1)); variants.push(parts.slice(0, -1)); }
+      if (parts.length >= 3) variants.push(parts.slice(1, -1));
+      for (const v of variants) {
+        const pc = pieceOf(v);
+        const conf = letterScore(pc, letter, allowBracketL);
+        if (conf > bestConf) { bestConf = conf; bestPc = pc; }
+      }
+      return { pc: full, scoredPc: bestPc, conf: bestConf };
+    };
+
+    let best = null;
+    for (const word of LIGATURE_WORDS) {
+      const k = word.length;
+      if (k > units.length) continue;
+      const score = (parts) => {
+        let sum = 0, anchors = 0, prevCx = -Infinity, loose = 0;
+        const pieces = [];
+        for (let j = 0; j < k; j++) {
+          const { pc, scoredPc, conf } = pieceScore(parts[j], word[j]);
+          if (!scoredPc.top) return;
+          if (pc.group.box.cx <= prevCx) return;
+          prevCx = pc.group.box.cx;
+          // One stand-in slot per word, decodeFunctions-style: a single
+          // position may carry weak evidence when the rest of the word is
+          // anchored by real letter readings (checked below) — a shallow 'n'
+          // after a strong 't' and 'a' is still tan.
+          if (conf < 0.3) {
+            if (loose || conf < 0.1) return;
+            loose = 1;
+          }
+          // an anchor is a piece whose own best reading IS the letter —
+          // the class default ('1' for l, '0' for o) never anchors, so a
+          // merged digit run cannot conjure 'log' out of 109.
+          if (scoredPc.top.sym === word[j]) anchors++;
+          sum += conf;
+          pieces.push({ pc, conf });
+        }
+        if (!anchors && !argContext) return;
+        if (loose && anchors < 2) return;
+        const mean = sum / k;
+        if (!best || mean > best.mean) best = { word, mean, anchors, pieces };
+      };
+      const walk = (start, pieceIdx, acc) => {
+        if (pieceIdx === k - 1) { acc.push(units.slice(start)); score(acc); acc.pop(); return; }
+        for (let end = start + 1; end <= units.length - (k - 1 - pieceIdx); end++) {
+          acc.push(units.slice(start, end));
+          walk(end, pieceIdx + 1, acc);
+          acc.pop();
+        }
+      };
+      walk(0, 0, []);
+    }
+
+    if (!best) continue;
+    // The word must clearly beat the merged reading — a confident merged
+    // glyph is only overruled when it is too wide to be one symbol anyway.
+    const beats = best.mean >= 0.58 &&
+      (s.conf < 0.45 || veryWide || best.mean >= s.conf + 0.05);
+    if (!beats) continue;
+
+    const glyphs = best.pieces.map(({ pc, conf }, j) => {
+      const cl = classifyCached(pc.group, medianH);
+      const letter = best.word[j];
+      const shown = Math.round(100 * Math.min(0.9, Math.max(0.45, conf))) / 100;
+      return {
+        id: s.id + String.fromCharCode(97 + j),
+        sym: letter,
+        conf: shown,
+        alts: [{ sym: letter, conf: shown }, ...(cl.alts || []).filter(a => a.sym !== letter)].slice(0, 5),
+        box: pc.group.box,
+        strokeIdxs: pc.group.strokeIdxs,
+        _group: pc.group,
+        _lig: true
+      };
+    });
+    out.splice(i, 1, ...glyphs);
+    i += glyphs.length - 1;
+  }
+  return out;
 }
 
 /** Lock function names / LHS / RHS across a line of symbols. */
@@ -2489,6 +2784,7 @@ export function recognize(strokes, overrides = {}, ctx = null) {
   linesPre = linesPre.map(ls => splitRetry(ls, medianH));
   linesPre = linesPre.map(ls => operatorSplitPass(ls, medianH));
   linesPre = linesPre.map(operatorContextPass);
+  linesPre = linesPre.map(ls => ligatureSplitPass(ls, medianH));
   linesPre = linesPre.map(ls => decodeFunctions(ls, medianH));
   linesPre = linesPre.map(ls => degreeMarkPass(ls, medianH));
   linesPre = linesPre.map(ls => mathContextPass(ls, medianH));
