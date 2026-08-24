@@ -14,11 +14,14 @@ from torch.utils.data import DataLoader
 
 from data import TOKEN_TO_ID
 from dev_split import make_same_writer_dev_split
-from structural import PriInkStructuralV4, StructuralConfig
+from structural import PriInkStructuralV4, StructuralConfig, RELATIONS
 from structural_component_validity import checkpoint_sha256
 from structural_data import StructuralInkDataset, corpus_files, load_structural_examples
 from structural_group_relations import (
+    GROUP_RELATION_MARGIN,
+    GROUP_RELATION_MARGIN_WEIGHT,
     GROUP_RELATION_OBJECTIVE,
+    GROUP_RELATION_TYPE_WEIGHT,
     GROUP_RELATION_VERSION,
     GroupRelationHead,
     balanced_group_relation_loss,
@@ -270,7 +273,7 @@ def main():
         stage = "group-relation-research"
         evidence = "writer-disjoint glyph-relation research only; full real-Pencil promotion gates still apply"
 
-    print("\nPri Ink Structural V4 — POOLED GROUP RELATION TRAINING\n")
+    print("\nPri Ink Structural V4 — POOLED GROUP RELATION TRAINING V2\n")
     print(f"mode={args.mode} device={device} train={len(train_rows)} validation={len(val_rows)}")
     print(f"base={base_path} sha256={base_hash[:16]}…")
     if init_meta:
@@ -288,30 +291,38 @@ def main():
                     batch["stroke_geometry"].to(device),
                     batch["raster"].to(device),
                 )
-            opt.zero_grad(set_to_none=True)
             scored = score_supervised_group_relations(head, outputs, batch, device=device)
-            if scored.pairs < 1 or scored.positive_pairs < 1 or scored.none_pairs < 1:
-                raise SystemExit(
-                    "group-relation batch lacks positive/NONE supervision; use a relation-diverse batch/corpus"
-                )
+            if scored.pairs < 1:
+                continue
+            opt.zero_grad(set_to_none=True)
             loss = balanced_group_relation_loss(scored)
+            if not torch.isfinite(loss):
+                raise SystemExit("non-finite group-relation loss")
             loss.backward()
             torch.nn.utils.clip_grad_norm_(head.parameters(), 1.0)
             opt.step(); sched.step()
             running += float(loss.detach()); steps += 1
             pairs += scored.pairs; positive += scored.positive_pairs; none += scored.none_pairs
 
+        if steps < 1 or positive < 1 or none < 1:
+            raise SystemExit(
+                "group-relation epoch lacks positive and NONE supervision; corpus is not relation-diverse enough"
+            )
         metrics = evaluate_head(base_model, head, val_loader, device)
+        if metrics["positivePairs"] < 1 or metrics["nonePairs"] < 1:
+            raise SystemExit("group-relation validation lacks positive/NONE supervision")
         score = (
-            0.45 * metrics["macroPositiveRecall"] +
-            0.35 * metrics["positiveAccuracy"] +
-            0.20 * metrics["noneAccuracy"]
+            0.35 * metrics["macroPositiveRecall"]
+            + 0.25 * metrics["macroPositiveTypeRecall"]
+            + 0.25 * metrics["existenceBalancedAccuracy"]
+            + 0.15 * metrics["noneAccuracy"]
         )
         print(
             f"epoch={epoch} train_loss={running/max(1,steps):.4f} train_pairs={pairs} "
             f"train_pos={positive} train_none={none} val_loss={metrics['loss']:.4f} "
-            f"pos={metrics['positiveAccuracy']:.4f} none={metrics['noneAccuracy']:.4f} "
-            f"macro_pos={metrics['macroPositiveRecall']:.4f} worst_pos={metrics['worstPositiveClassRecall']:.4f}"
+            f"pos={metrics['positiveAccuracy']:.4f} type={metrics['positiveTypeAccuracy']:.4f} "
+            f"exist_bal={metrics['existenceBalancedAccuracy']:.4f} none={metrics['noneAccuracy']:.4f} "
+            f"macro_pos={metrics['macroPositiveRecall']:.4f} macro_type={metrics['macroPositiveTypeRecall']:.4f}"
         )
         if score > best + 1e-6:
             best = score; stale = 0
@@ -322,7 +333,7 @@ def main():
                 "production_ready": False,
                 "objective": GROUP_RELATION_OBJECTIVE,
                 "d_model": cfg.d_model,
-                "relation_classes": len(metrics.get("perClass", {})),
+                "relation_classes": len(RELATIONS),
                 "base_checkpoint_sha256": base_hash,
                 "base_checkpoint_stage": base_ckpt.get("stage"),
                 "base_config": cfg.to_dict(),
@@ -330,7 +341,17 @@ def main():
                 "validation": metrics,
                 "validation_protocol": protocol,
                 "initialisation": init_meta,
-                "training": {"seed": args.seed, "syntheticOnly": synthetic_only},
+                "training": {
+                    "seed": args.seed,
+                    "syntheticOnly": synthetic_only,
+                    "loss": {
+                        "existence": "balanced-any-positive-vs-none-bce",
+                        "positiveType": "macro-balanced-positive-only-ce",
+                        "positiveVsNoneMargin": GROUP_RELATION_MARGIN,
+                        "typeWeight": GROUP_RELATION_TYPE_WEIGHT,
+                        "marginWeight": GROUP_RELATION_MARGIN_WEIGHT,
+                    },
+                },
                 "evidence": evidence,
             }
             torch.save(checkpoint, out)

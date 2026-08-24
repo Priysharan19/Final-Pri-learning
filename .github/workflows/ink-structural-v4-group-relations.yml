@@ -53,13 +53,13 @@ jobs:
             --epochs 1 --batch 4 --device cpu --d-model 64 \
             --point-layers 1 --stroke-layers 1 --max-strokes 64 \
             --max-points-per-stroke 96 --patience 1
-      - name: Train pooled group-relation head
+      - name: Train pooled group-relation V2 head
         run: |
           python tools/ink-foundation/train_group_relations.py \
             /tmp/pri-ink-v4-rel-base.pt \
             --corpus /tmp/pri-ink-v4-rel-synth \
             --out /tmp/pri-ink-v4-group-rel.pt \
-            --mode writer-disjoint --epochs 4 --batch 4 --device cpu --patience 4
+            --mode writer-disjoint --epochs 8 --batch 4 --device cpu --patience 8
       - name: Checkpoint is hash-bound and research-only
         run: |
           python - <<'PY'
@@ -69,11 +69,13 @@ jobs:
           digest = hashlib.sha256(base.read_bytes()).hexdigest()
           ckpt = torch.load('/tmp/pri-ink-v4-group-rel.pt', map_location='cpu', weights_only=False)
           assert ckpt['architecture_version'] == 4
-          assert ckpt['group_relation_version'] == 1
+          assert ckpt['group_relation_version'] == 2
           assert ckpt['production_ready'] is False
-          assert ckpt['objective'] == 'pooled-glyph-directed-relations-v1'
+          assert ckpt['objective'] == 'pooled-glyph-directed-relations-decomposed-v2'
           assert ckpt['base_checkpoint_sha256'] == digest
-          print('Pooled group-relation checkpoint provenance: PASS')
+          assert ckpt['relation_classes'] == 9
+          assert ckpt['training']['loss']['existence'] == 'balanced-any-positive-vs-none-bce'
+          print('Pooled group-relation V2 checkpoint provenance: PASS')
           PY
       - name: Same-base relation A/B diagnostic
         run: |
@@ -87,10 +89,12 @@ jobs:
           d = json.loads(Path('/tmp/pri-ink-v4-group-rel-ab.json').read_text())
           assert d['productionReady'] is False
           assert d['comparison'] == 'root-stroke-relations-vs-pooled-group-relations'
-          assert d['groupRelationVersion'] == 1
+          assert d['groupRelationVersion'] == 2
           assert d['validationProtocol']['writerDisjoint'] is True
           assert d['oracleRelation']['pooledGroup']['positivePairs'] > 0
-          print('Same-base pooled relation A/B contract: PASS')
+          assert 'existenceBalancedAccuracy' in d['oracleRelation']['pooledGroup']
+          assert 'macroPositiveTypeRecall' in d['oracleRelation']['pooledGroup']
+          print('Same-base pooled relation V2 A/B contract: PASS')
           PY
       - name: Mismatched relation checkpoint must be rejected
         run: |
@@ -106,7 +110,7 @@ jobs:
             echo 'evaluator accepted group relations trained for another base checkpoint' >&2
             exit 1
           fi
-          echo 'Group-relation base-hash rejection: PASS'
+          echo 'Group-relation V2 base-hash rejection: PASS'
       - name: Build one-writer dev base for transfer smoke
         run: |
           node tools/ink-foundation/generate_structural_synthetic.mjs /tmp/pri-ink-v4-rel-dev 1 0 12
@@ -118,7 +122,7 @@ jobs:
             --epochs 1 --batch 4 --device cpu --d-model 64 \
             --point-layers 1 --stroke-layers 1 --max-strokes 64 \
             --max-points-per-stroke 96 --patience 1
-      - name: Transfer synthetic relation head then fine-tune on frozen dev train split
+      - name: Transfer synthetic relation V2 head then fine-tune on frozen dev train split
         run: |
           python tools/ink-foundation/train_group_relations.py \
             /tmp/pri-ink-v4-rel-dev-base.pt \
@@ -126,7 +130,7 @@ jobs:
             --out /tmp/pri-ink-v4-group-rel-dev.pt \
             --mode same-writer-dev \
             --init-group-relations /tmp/pri-ink-v4-group-rel.pt --allow-base-transfer \
-            --epochs 2 --batch 4 --device cpu --patience 2
+            --epochs 4 --batch 4 --device cpu --patience 4
       - name: Frozen dev relation evaluator preserves evidence boundary
         run: |
           python tools/ink-foundation/evaluate_group_relations.py \
@@ -139,10 +143,11 @@ jobs:
           ckpt = torch.load('/tmp/pri-ink-v4-group-rel-dev.pt', map_location='cpu', weights_only=False)
           report = json.loads(Path('/tmp/pri-ink-v4-group-rel-dev-ab.json').read_text())
           assert ckpt['stage'] == 'group-relation-research-dev'
+          assert ckpt['group_relation_version'] == 2
           assert ckpt['production_ready'] is False
           assert ckpt['initialisation']['baseTransfer'] is True
           assert report['productionReady'] is False
           assert report['validationProtocol']['writerDisjoint'] is False
           assert report['validationProtocol']['productionEvidence'] is False
-          print('Synthetic pretrain -> frozen dev pooled relation protocol: PASS')
+          print('Synthetic pretrain -> frozen dev pooled relation V2 protocol: PASS')
           PY

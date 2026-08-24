@@ -12,11 +12,12 @@ from structural import RELATION_TO_ID, RELATIONS
 from structural_decode import GlyphHypothesis, MathNode, StructuralHypothesis
 from structural_group_relations import (
     GroupRelationHead,
+    GroupRelationBatch,
     apply_group_relation_head,
     balanced_group_relation_loss,
     component_union_geometry,
+    group_relation_metrics,
     group_relation_targets,
-    GroupRelationBatch,
 )
 
 
@@ -69,13 +70,31 @@ def test_group_relation_head_is_trainable():
         RELATION_TO_ID["RIGHT"],
     ])
     selected = torch.stack([logits[0, 1], logits[0, 2], logits[1, 0], logits[1, 2]])
-    batch = GroupRelationBatch(
-        selected, target, 4, 3, 1
-    )
+    batch = GroupRelationBatch(selected, target, 4, 3, 1)
     loss = balanced_group_relation_loss(batch)
     loss.backward()
     assert torch.isfinite(loss)
     assert any(p.grad is not None and torch.isfinite(p.grad).all() for p in head.parameters())
+
+
+def test_decomposed_loss_pushes_positive_away_from_none():
+    none = RELATION_TO_ID["NONE"]
+    superscript = RELATION_TO_ID["SUPERSCRIPT"]
+    logits = torch.full((2, len(RELATIONS)), -2.0, requires_grad=True)
+    with torch.no_grad():
+        logits[0, none] = 3.0
+        logits[0, superscript] = 0.0
+        logits[1, none] = 3.0
+    targets = torch.tensor([superscript, none])
+    batch = GroupRelationBatch(logits, targets, 2, 1, 1)
+    loss = balanced_group_relation_loss(batch)
+    loss.backward()
+    assert float(logits.grad[0, superscript]) < 0.0, logits.grad[0]
+    assert float(logits.grad[0, none]) > 0.0, logits.grad[0]
+    metrics = group_relation_metrics(logits.detach(), targets)
+    assert metrics["positiveTypeAccuracy"] == 1.0
+    assert metrics["positiveAccuracy"] == 0.0
+    assert metrics["existencePositiveRecall"] == 0.0
 
 
 def test_pooled_relation_override_repairs_multistroke_superscript():
@@ -114,15 +133,16 @@ def test_pooled_relation_override_repairs_multistroke_superscript():
     assert hyp.canonical == "x^(2)", hyp.canonical
     assert len(hyp.relations) == 1
     assert hyp.relations[0].kind == "SUPERSCRIPT"
-    assert getattr(hyp, "relation_decoder") == "pooled-group-relations-v1"
+    assert getattr(hyp, "relation_decoder") == "pooled-group-relations-v2"
 
 
 def main():
     test_relation_targets_lift_true_noncontiguous_groups()
     test_union_geometry_uses_all_member_strokes()
     test_group_relation_head_is_trainable()
+    test_decomposed_loss_pushes_positive_away_from_none()
     test_pooled_relation_override_repairs_multistroke_superscript()
-    print("Pri Ink V4 pooled group relations: 4/4 deterministic contracts PASS")
+    print("Pri Ink V4 pooled group relations: 5/5 deterministic contracts PASS")
 
 
 if __name__ == "__main__":

@@ -12,6 +12,15 @@ and predicts directed mathematical relations between pooled glyph nodes. The bas
 V4 checkpoint is frozen and unchanged so root-stroke vs pooled-group relations can
 be A/B tested on exactly the same grouping/symbol model.
 
+V2 fixes the NONE-collapse observed in the first smoke run. Instead of asking one
+multiclass cross-entropy to learn relation existence and relation type at once, it
+uses three explicit signals:
+  1. balanced binary relation-existence evidence (any positive relation vs NONE),
+  2. macro-balanced relation-type CE over positive classes only,
+  3. a margin requiring the annotated positive relation logit to beat NONE.
+This directly optimises the decision that failed without changing inference
+thresholds or using validation labels for tuning.
+
 Research only. Synthetic and same-writer results are never production evidence.
 """
 from __future__ import annotations
@@ -29,9 +38,12 @@ from structural_data import IGNORE_INDEX
 from structural_decode import RelationHypothesis, _build_ast
 
 
-GROUP_RELATION_VERSION = 1
-GROUP_RELATION_OBJECTIVE = "pooled-glyph-directed-relations-v1"
-GROUP_RELATION_DECODER = "pooled-group-relations-v1"
+GROUP_RELATION_VERSION = 2
+GROUP_RELATION_OBJECTIVE = "pooled-glyph-directed-relations-decomposed-v2"
+GROUP_RELATION_DECODER = "pooled-group-relations-v2"
+GROUP_RELATION_MARGIN = 0.75
+GROUP_RELATION_TYPE_WEIGHT = 0.75
+GROUP_RELATION_MARGIN_WEIGHT = 0.35
 
 
 def component_union_geometry(
@@ -227,6 +239,7 @@ def score_supervised_group_relations(
     *,
     device: torch.device,
 ) -> GroupRelationBatch:
+    """Score true complete-glyph relation pairs using frozen V4 embeddings."""
     symbols = batch["symbol_targets"].to(device)
     groups = batch["group_targets"].to(device)
     relations = batch["relation_targets"].to(device)
@@ -256,48 +269,109 @@ def score_supervised_group_relations(
     return GroupRelationBatch(logits, targets, int(targets.numel()), positive, none)
 
 
+def relation_existence_logits(logits: torch.Tensor) -> torch.Tensor:
+    """Log-odds-like score for ANY positive relation versus NONE."""
+    if logits.ndim != 2 or logits.shape[-1] != len(RELATIONS):
+        raise ValueError("relation_existence_logits expects NxR logits")
+    if logits.shape[0] == 0:
+        return logits.new_zeros((0,))
+    none_id = RELATION_TO_ID["NONE"]
+    positive_logits = torch.cat([logits[:, :none_id], logits[:, none_id + 1 :]], dim=-1)
+    return torch.logsumexp(positive_logits, dim=-1) - logits[:, none_id]
+
+
 def balanced_group_relation_loss(batch: GroupRelationBatch) -> torch.Tensor:
-    """Macro-balance positive relation classes, then balance them against NONE."""
+    """Decomposed V2 loss that prevents trivial NONE collapse.
+
+    Existence is balanced between positive/NONE pairs. Positive relation type is
+    macro-balanced across the positive classes present in the batch. Finally, an
+    explicit margin requires the annotated positive logit to beat NONE.
+    """
     if batch.pairs == 0:
         return batch.logits.sum() * 0.0
-    positive_losses = []
-    for rid in range(1, len(RELATIONS)):
-        mask = batch.targets.eq(rid)
-        if bool(mask.any()):
-            positive_losses.append(F.cross_entropy(batch.logits[mask], batch.targets[mask]))
-    parts = []
-    if positive_losses:
-        parts.append(sum(positive_losses) / len(positive_losses))
-    none_mask = batch.targets.eq(RELATION_TO_ID["NONE"])
+    none_id = RELATION_TO_ID["NONE"]
+    positive_mask = batch.targets.ne(none_id)
+    none_mask = batch.targets.eq(none_id)
+    existence_logits = relation_existence_logits(batch.logits)
+    existence_parts = []
+    if bool(positive_mask.any()):
+        existence_parts.append(F.binary_cross_entropy_with_logits(
+            existence_logits[positive_mask],
+            torch.ones_like(existence_logits[positive_mask]),
+        ))
     if bool(none_mask.any()):
-        parts.append(F.cross_entropy(batch.logits[none_mask], batch.targets[none_mask]))
-    if not parts:
-        return batch.logits.sum() * 0.0
-    return sum(parts) / len(parts)
+        existence_parts.append(F.binary_cross_entropy_with_logits(
+            existence_logits[none_mask],
+            torch.zeros_like(existence_logits[none_mask]),
+        ))
+    existence = sum(existence_parts) / max(1, len(existence_parts))
+
+    if not bool(positive_mask.any()):
+        return existence
+
+    type_losses = []
+    for rid in range(1, len(RELATIONS)):
+        class_mask = batch.targets.eq(rid)
+        if bool(class_mask.any()):
+            type_losses.append(F.cross_entropy(
+                batch.logits[class_mask, 1:],
+                batch.targets[class_mask] - 1,
+            ))
+    type_loss = sum(type_losses) / max(1, len(type_losses))
+
+    positive_logits = batch.logits[positive_mask]
+    positive_targets = batch.targets[positive_mask]
+    target_logits = positive_logits.gather(1, positive_targets[:, None]).squeeze(1)
+    none_logits = positive_logits[:, none_id]
+    ranking = F.softplus(
+        GROUP_RELATION_MARGIN - (target_logits - none_logits)
+    ).mean()
+    return (
+        existence
+        + GROUP_RELATION_TYPE_WEIGHT * type_loss
+        + GROUP_RELATION_MARGIN_WEIGHT * ranking
+    )
 
 
 def group_relation_metrics(logits: torch.Tensor, targets: torch.Tensor) -> dict:
     if targets.numel() == 0:
         return {
             "positiveAccuracy": 0.0,
+            "positiveTypeAccuracy": 0.0,
             "noneAccuracy": 0.0,
             "balancedAccuracy": 0.0,
+            "existencePositiveRecall": 0.0,
+            "existenceNoneRecall": 0.0,
+            "existenceBalancedAccuracy": 0.0,
             "macroPositiveRecall": 0.0,
+            "macroPositiveTypeRecall": 0.0,
             "worstPositiveClassRecall": 0.0,
+            "worstPositiveTypeRecall": 0.0,
             "positivePairs": 0,
             "nonePairs": 0,
             "perClass": {},
         }
     pred = logits.argmax(dim=-1)
+    type_pred = logits[:, 1:].argmax(dim=-1) + 1
     none_id = RELATION_TO_ID["NONE"]
     pos_mask = targets.ne(none_id)
     none_mask = targets.eq(none_id)
     pos_ok = int((pred[pos_mask] == targets[pos_mask]).sum()) if bool(pos_mask.any()) else 0
+    type_ok = int((type_pred[pos_mask] == targets[pos_mask]).sum()) if bool(pos_mask.any()) else 0
     none_ok = int((pred[none_mask] == targets[none_mask]).sum()) if bool(none_mask.any()) else 0
     pos_n = int(pos_mask.sum())
     none_n = int(none_mask.sum())
+
+    existence = relation_existence_logits(logits)
+    exists_pred = existence.ge(0.0)
+    existence_pos_ok = int(exists_pred[pos_mask].sum()) if bool(pos_mask.any()) else 0
+    existence_none_ok = int((~exists_pred[none_mask]).sum()) if bool(none_mask.any()) else 0
+    existence_pos = existence_pos_ok / max(1, pos_n)
+    existence_none = existence_none_ok / max(1, none_n)
+
     per_class = {}
     positive_recalls = []
+    positive_type_recalls = []
     for rid, name in enumerate(RELATIONS):
         mask = targets.eq(rid)
         support = int(mask.sum())
@@ -305,19 +379,35 @@ def group_relation_metrics(logits: torch.Tensor, targets: torch.Tensor) -> dict:
             continue
         correct = int((pred[mask] == targets[mask]).sum())
         recall = correct / support
-        per_class[name] = {"support": support, "correct": correct, "recall": recall}
+        row = {"support": support, "correct": correct, "recall": recall}
         if rid != none_id:
+            type_correct = int((type_pred[mask] == targets[mask]).sum())
+            type_recall = type_correct / support
+            row["typeCorrect"] = type_correct
+            row["typeRecall"] = type_recall
             positive_recalls.append(recall)
+            positive_type_recalls.append(type_recall)
+        per_class[name] = row
+
     positive_accuracy = pos_ok / max(1, pos_n)
+    positive_type_accuracy = type_ok / max(1, pos_n)
     none_accuracy = none_ok / max(1, none_n)
     macro = sum(positive_recalls) / max(1, len(positive_recalls))
+    macro_type = sum(positive_type_recalls) / max(1, len(positive_type_recalls))
     worst = min(positive_recalls, default=0.0)
+    worst_type = min(positive_type_recalls, default=0.0)
     return {
         "positiveAccuracy": positive_accuracy,
+        "positiveTypeAccuracy": positive_type_accuracy,
         "noneAccuracy": none_accuracy,
         "balancedAccuracy": 0.5 * (positive_accuracy + none_accuracy),
+        "existencePositiveRecall": existence_pos,
+        "existenceNoneRecall": existence_none,
+        "existenceBalancedAccuracy": 0.5 * (existence_pos + existence_none),
         "macroPositiveRecall": macro,
+        "macroPositiveTypeRecall": macro_type,
         "worstPositiveClassRecall": worst,
+        "worstPositiveTypeRecall": worst_type,
         "positivePairs": pos_n,
         "nonePairs": none_n,
         "positiveClasses": len(positive_recalls),
