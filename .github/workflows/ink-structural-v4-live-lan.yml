@@ -1,0 +1,107 @@
+name: Ink Structural V4 Live LAN
+
+on:
+  pull_request:
+    paths:
+      - 'client/src/ink/InkAnswer.jsx'
+      - 'client/src/ink/devStructural.js'
+      - 'client/src/ink/interactionGuard.js'
+      - 'client/test/ink-interaction-guard-check.mjs'
+      - 'tools/ink-foundation/live_structural_infer.py'
+      - 'scripts/serve-lan.mjs'
+      - 'package.json'
+      - '.github/workflows/ink-structural-v4-live-lan.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ink-structural-v4-live-lan-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  live-lan-contract:
+    name: Physical iPad V4 research bridge
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: tools/ink-foundation/requirements.txt
+
+      - name: JavaScript and Python syntax
+        run: |
+          node --check scripts/serve-lan.mjs
+          node --check client/src/ink/devStructural.js
+          node --check client/src/ink/interactionGuard.js
+          python -m py_compile tools/ink-foundation/live_structural_infer.py
+
+      - name: Full-session Pencil selection contract
+        run: npm run test:ink:interaction
+
+      - name: Install V4 dependencies
+        run: python -m pip install -r tools/ink-foundation/requirements.txt
+
+      - name: Build research-only smoke checkpoint
+        run: |
+          python - <<'PY'
+          import sys, torch
+          sys.path.insert(0, 'tools/ink-foundation')
+          from data import TOKEN_TO_ID
+          from structural import PriInkStructuralV4, StructuralConfig
+
+          cfg = StructuralConfig(
+              d_model=64, nhead=8, point_layers=1, stroke_layers=1,
+              ff_dim=128, max_strokes=8, max_points_per_stroke=32,
+          )
+          model = PriInkStructuralV4(len(TOKEN_TO_ID), cfg)
+          torch.save({
+              'architecture_version': 4,
+              'stage': 'structural-research-dev',
+              'production_ready': False,
+              'vocab': list(TOKEN_TO_ID.keys()),
+              'config': cfg.__dict__,
+              'model': model.state_dict(),
+          }, '/tmp/pri-v4-live-smoke.pt')
+          print('research-only smoke checkpoint: PASS')
+          PY
+
+      - name: One-request persistent worker smoke
+        run: |
+          printf '%s\n' '{"id":7,"strokes":[{"points":[{"x":10,"y":20,"t":0},{"x":14,"y":42,"t":0.08}]}]}' \
+            | python tools/ink-foundation/live_structural_infer.py \
+                --checkpoint /tmp/pri-v4-live-smoke.pt \
+                --device cpu --decoder joint-auto \
+                --general-max-strokes 8 --max-group-size 4 \
+            > /tmp/pri-v4-live-response.jsonl
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          rows=[json.loads(x) for x in Path('/tmp/pri-v4-live-response.jsonl').read_text().splitlines() if x.strip()]
+          assert len(rows) == 1, rows
+          r=rows[0]
+          assert r['id'] == 7
+          assert r['engine'] == 'pri-structural-v4-dev-lan'
+          assert r['available'] is True
+          assert r['researchOnly'] is True
+          assert r['productionReady'] is False
+          assert isinstance(r['lines'], list)
+          print('persistent V4 LAN worker: PASS')
+          PY
+
+      - name: Browser bridge remains explicit and research-only
+        run: |
+          grep -q "'/__pri/ink/v4'" scripts/serve-lan.mjs
+          grep -q "pri-structural-v4-dev-lan" client/src/ink/devStructural.js
+          grep -q "Structural V4 research · Mac LAN · not production" client/src/ink/InkAnswer.jsx
+          grep -q '"serve:lan:v4"' package.json
+          grep -q 'productionReady=false' scripts/serve-lan.mjs
+
+      - name: Client production build still compiles
+        run: |
+          npm install --prefix client
+          npm run build
