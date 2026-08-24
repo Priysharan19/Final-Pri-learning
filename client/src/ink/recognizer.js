@@ -14,7 +14,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // The $P matcher (and the slant bias derived from it) match against the full
 // runtime library — hand-authored variants plus learned real-writer allographs.
-import { RUNTIME_TEMPLATES as TEMPLATES } from './templates.js';
+import { RUNTIME_TEMPLATES as TEMPLATES, TEMPLATES as HAND_TEMPLATES } from './templates.js';
 import { nnClassify, NN_CLASSES } from './nn.js';
 import { geomRerank } from './rerank.js';
 import { classOfSymbol, defaultSymbol, symbolsOfClass, CLASS_INDEX } from './classes.js';
@@ -107,15 +107,20 @@ function cloudDistance(a, b) {
   return best / n;
 }
 
-// Precompute template clouds (with aspect for a cheap gate)
+// Precompute template clouds (with aspect for a cheap gate). Variants past the
+// hand-authored count are learned real-writer allographs: they matter for hands
+// like the one they came from, but several (the two-stroke pi, the one-stroke
+// theta) sit close to OTHER writers' n/m/t/0, so they carry a small distance
+// penalty and must beat a hand-authored form clearly before claiming a glyph.
 const TEMPLATE_CLOUDS = [];
 for (const [sym, variants] of Object.entries(TEMPLATES)) {
-  for (const strokes of variants) {
+  const handCount = HAND_TEMPLATES[sym]?.length ?? variants.length;
+  variants.forEach((strokes, vi) => {
     const flat = strokes.map(st => st.map(p => p.slice()));
     const allPts = flat.flat();
     const b = bbox(allPts);
-    TEMPLATE_CLOUDS.push({ sym, cloud: cloudOf(flat), aspect: b.w / b.h, nStrokes: strokes.length });
-  }
+    TEMPLATE_CLOUDS.push({ sym, cloud: cloudOf(flat), aspect: b.w / b.h, nStrokes: strokes.length, real: vi >= handCount });
+  });
 }
 
 // ── Hand-slant normalisation ─────────────────────────────────────────────────
@@ -939,7 +944,7 @@ export function classify(group, medianH) {
     const cur = bestBySym.get(t.sym);
     if (cur === undefined || d < cur.d) bestBySym.set(t.sym, { d, personal: discount < 1 });
   };
-  for (const t of TEMPLATE_CLOUDS) consider(t, 1);
+  for (const t of TEMPLATE_CLOUDS) consider(t, t.real ? 1.12 : 1);
   for (const t of getPersonalClouds()) consider(t, 0.75);   // your handwriting outranks stock
 
   // ③ blend into per-symbol scores
@@ -2509,7 +2514,13 @@ export function recognize(strokes, overrides = {}, ctx = null) {
       const identicalTwin = ['o', 'l'].includes(sym.sym);
       if ((leftOk && rightOk) || ((leftOk || rightOk) && (identicalTwin || (restNumeric && ls.length > 1)))) {
         const alt = sym.alts?.find(a => a.sym === digitTwin);
-        if ((alt && alt.conf > 0.25 * (sym.conf || 1)) || ['o', 'l', 'g', 'q'].includes(sym.sym)) {
+        // Inside a digit run (digits on BOTH sides) a letter reading is almost
+        // certainly a misread digit, so a weak digit alternative suffices. With
+        // context on one side only, "digit letter" is ordinary coefficient
+        // algebra (2z, 5s, 6b) — the flip must be earned by real shape
+        // evidence, not imposed by the neighbourhood.
+        const need = (leftOk && rightOk) ? 0.25 : 0.55;
+        if ((alt && alt.conf > need * (sym.conf || 1)) || ['o', 'l', 'g', 'q'].includes(sym.sym)) {
           sym.sym = digitTwin;
           sym.conf = Math.max(sym.conf, alt?.conf || sym.conf);
         }
@@ -2557,6 +2568,43 @@ export function recognize(strokes, overrides = {}, ctx = null) {
     }
   };
   linesPre.forEach(slashBetweenDigits);
+
+  // Two geometric certainties the grammar beam must not re-litigate:
+  // - a wide, flat, confidently-structural '-' is a bar whatever the CNN's
+  //   alt list says (the ensemble offers '7' on flat bars, and "7/8" became
+  //   "7^(7)8" when the beam took it);
+  // - a '/' the classifier already read, flanked by digits stepping DOWN the
+  //   page, is a written-diagonally fraction — the y-descent is layout
+  //   evidence the beam's bigrams cannot see, and without the lock it
+  //   preferred the digit string ("3/4" -> "314").
+  for (const ls of linesPre) {
+    for (let i = 0; i < ls.length; i++) {
+      const s = ls[i];
+      if (s.composite || overrides[s.id]) continue;
+      if (s.sym === '-' && s.conf >= 0.85 && s.box.h < 0.22 * s.box.w && s.box.w >= 1.2 * medianH) {
+        s._geo = true;
+        continue;
+      }
+      if (i > 0 && i < ls.length - 1 &&
+        /^[0-9]$/.test(ls[i - 1].sym) && /^[0-9]$/.test(ls[i + 1].sym) &&
+        ls[i + 1].box.cy - ls[i - 1].box.cy > 0.4 * medianH) {
+        if (s.sym === '/') { s._geo = true; continue; }
+        // The same descent also rescues a slash the pipeline renamed to a
+        // stick. The page de-shear straightens a slanted hand's fraction
+        // slash toward vertical, so by here its '/' reading may not even
+        // survive in the alts — but the layout does: digits stepping
+        // monotonically DOWN the page with the stick's centre between them is
+        // a diagonal fraction. Nobody writes "314" like that on a baseline.
+        if ((s.sym === '1' || s.sym === 'l') && s._group?.strokes.length === 1 &&
+          ls[i - 1].box.cy < s.box.cy && s.box.cy < ls[i + 1].box.cy &&
+          ls[i + 1].box.cy - ls[i - 1].box.cy > 0.45 * medianH) {
+          s.sym = '/';
+          s.conf = Math.max(0.55, s.conf * 0.9);
+          s._geo = true;
+        }
+      }
+    }
+  }
 
   // grammar beam: uncertain lines re-decoded against the maths-syntax prior
   linesPre = linesPre.map(ls => beamRepair(ls, overrides, medianH, ctx));
