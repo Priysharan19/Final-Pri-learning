@@ -37,7 +37,8 @@ check('annotator provenance is versioned', html.includes("pri-ink-structural-v4-
 check('document-level structural annotation metadata is written', html.includes("format:'pri-ink-structural-v4',version:1"));
 check('annotated output is downloaded locally', html.includes('new Blob') && html.includes("a.download=fileName"));
 check('annotator has a dedicated LAN server mode', server.includes("process.argv.includes('--annotator')") && server.includes("../tools/ink-annotate-v4"));
-check('collector and annotator modes cannot collide', server.includes('COLLECTOR && ANNOTATOR'));
+check('collector, annotator and V4 inference modes cannot collide',
+  server.includes('[COLLECTOR, ANNOTATOR, V4_DEV].filter(Boolean).length > 1'));
 
 console.log(`\n${failures ? `FAIL — ${failures} V4 annotation contract problem(s)` : 'PASS — explicit local trace-to-glyph annotation contract verified'}`);
 process.exit(failures ? 1 : 0);
