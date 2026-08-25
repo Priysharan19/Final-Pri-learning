@@ -9,6 +9,7 @@ on:
       - 'tools/ink-foundation/evaluate_writer_generalization.py'
       - 'tools/ink-foundation/audit_writer_diversity.py'
       - 'tools/ink-foundation/test_writer_generalization.py'
+      - 'tools/ink-foundation/export_coreml_v4.py'
       - 'handwriting/v16/**'
       - '.github/workflows/ink-writer-generalization.yml'
   push:
@@ -20,6 +21,7 @@ on:
       - 'tools/ink-foundation/evaluate_writer_generalization.py'
       - 'tools/ink-foundation/audit_writer_diversity.py'
       - 'tools/ink-foundation/test_writer_generalization.py'
+      - 'tools/ink-foundation/export_coreml_v4.py'
       - 'handwriting/v16/**'
       - '.github/workflows/ink-writer-generalization.yml'
 
@@ -36,6 +38,7 @@ jobs:
         with:
           python-version: '3.11'
           cache: pip
+          cache-dependency-path: tools/ink-foundation/requirements.txt
       - name: Install minimal ML dependencies
         run: |
           python -m pip install --upgrade pip
@@ -48,7 +51,8 @@ jobs:
             tools/ink-foundation/style_augmentation.py \
             tools/ink-foundation/evaluate_writer_generalization.py \
             tools/ink-foundation/audit_writer_diversity.py \
-            tools/ink-foundation/test_writer_generalization.py
+            tools/ink-foundation/test_writer_generalization.py \
+            tools/ink-foundation/export_coreml_v4.py
       - name: Test writer-generalization architecture
         working-directory: tools/ink-foundation
         run: python test_writer_generalization.py
