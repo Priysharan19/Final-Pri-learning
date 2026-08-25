@@ -18,6 +18,7 @@ V16 introduces a V4 foundation-model track without replacing the current V3 prod
 6. **Physical-stroke CTC remains first-class.** The model still learns the marks actually drawn, separately from serialization-only syntax such as power wrappers.
 7. **Generalisation stress evaluation.** Frozen checkpoints are evaluated on real unseen writers and repeated plausible style shifts. A prediction is only 'robust' when the original and every perturbation remain correct.
 8. **Corpus diversity audit.** Synthetic transforms never count as new writers. The audit measures real writer counts, split integrity, samples, vocabulary coverage and capture-style variation.
+9. **Dual-gated Core ML promotion.** V4 can be exported for development at any time, but it cannot be marked production-ready unless the exact checkpoint passes both the locked final-holdout release report and the real unseen-writer generalisation report.
 
 ## Production data policy
 
@@ -77,6 +78,24 @@ python tools/ink-foundation/evaluate_writer_generalization.py \
   --corpus client/test/ink-corpus \
   --split test \
   --perturbations 8
+```
+
+Export a development-only V4 Core ML candidate:
+
+```bash
+python tools/ink-foundation/export_coreml_v4.py \
+  tools/ink-foundation/runs/pri-ink-foundation-v4.pt \
+  --out ios/PriLearning.swiftpm/Resources/Models/PriInkFoundation.mlpackage
+```
+
+Only after the exact checkpoint passes both evidence tracks may it be exported as production-ready:
+
+```bash
+python tools/ink-foundation/export_coreml_v4.py \
+  tools/ink-foundation/runs/pri-ink-foundation-v4.pt \
+  --release-report tools/ink-foundation/runs/pri-ink-foundation-v4-final-holdout.json \
+  --generalization-report tools/ink-foundation/runs/pri-ink-foundation-v4-test-writer-generalization.json \
+  --out ios/PriLearning.swiftpm/Resources/Models/PriInkFoundation.mlpackage
 ```
 
 Use `--enforce` only when the corpus is large enough for the production evidence gates. Do not unlock final-holdout merely to improve a score.
