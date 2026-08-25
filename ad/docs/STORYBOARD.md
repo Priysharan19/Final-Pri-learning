@@ -17,8 +17,8 @@
 ### S1 — HOOK · 0.00–1.50 (frames 0–90)
 Black. At 0.10 s a sub-thump; the line **"Stop memorising maths."** sets itself in three
 hard beats — "Stop" (0.10), "memorising" (0.35), "maths." (0.60) — huge display type,
-tight leading, one word in accent. Micro push-in (1.5 % scale over the shot) so the
-frame is alive. Grain and vignette already present: the film look starts at frame 0.
+tight leading — and on the third beat a gold line sweeps in under the words: the
+tangent, promised before it is explained. Push-in ~4 % so the frame is alive. Grain and vignette already present: the film look starts at frame 0.
 *Frame 0 is the cover: the full line already set, before the type re-slams for motion
 viewers — cover exports from the composed end-state of this shot.*
 
@@ -32,10 +32,10 @@ cards are real, correct formulas set in real maths type — among them, dead cen
 **d/dx x² = 2x** (this exact card returns in Act II). Behind, faint rank-list rows
 tick over: BATCH 7A · BATCH 7B · identical row after identical row.
 
-- 1.50–4.50: stamp, stamp, stamp. Overline: **"Memorise. Repeat."** (beats 3–9).
+- 1.50–4.50: stamp, stamp, stamp. Overline: **"Memorise. Repeat."** (from 2.0).
 - 4.50–6.50: the grid multiplies — rows of the *same* card now, sameness at scale.
-  Line: **"One formula for everything."** struck through by the next beat →
-  **"Four hundred formulas. No ideas."**
+  Two-line beat: **"Four hundred formulas."** / **"No ideas."** (the planned
+  strikethrough beat was cut in pass 1 — the two-line set carries it better).
 - 6.50–8.00: **THE SEIZE.** A question card slides up that matches no pattern:
   *"Prove that eˣ ≥ 1 + x for every real x."* The stamping halts mid-motion, one card
   frozen at a wrong angle. Music cuts to near-silence — room tone only. Caption, small:
