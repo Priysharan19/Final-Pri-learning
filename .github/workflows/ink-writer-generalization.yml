@@ -7,6 +7,7 @@ on:
       - 'tools/ink-foundation/train_v4.py'
       - 'tools/ink-foundation/style_augmentation.py'
       - 'tools/ink-foundation/evaluate_writer_generalization.py'
+      - 'tools/ink-foundation/evaluate_release_v4.py'
       - 'tools/ink-foundation/audit_writer_diversity.py'
       - 'tools/ink-foundation/test_writer_generalization.py'
       - 'tools/ink-foundation/export_coreml_v4.py'
@@ -19,6 +20,7 @@ on:
       - 'tools/ink-foundation/train_v4.py'
       - 'tools/ink-foundation/style_augmentation.py'
       - 'tools/ink-foundation/evaluate_writer_generalization.py'
+      - 'tools/ink-foundation/evaluate_release_v4.py'
       - 'tools/ink-foundation/audit_writer_diversity.py'
       - 'tools/ink-foundation/test_writer_generalization.py'
       - 'tools/ink-foundation/export_coreml_v4.py'
@@ -50,6 +52,7 @@ jobs:
             tools/ink-foundation/train_v4.py \
             tools/ink-foundation/style_augmentation.py \
             tools/ink-foundation/evaluate_writer_generalization.py \
+            tools/ink-foundation/evaluate_release_v4.py \
             tools/ink-foundation/audit_writer_diversity.py \
             tools/ink-foundation/test_writer_generalization.py \
             tools/ink-foundation/export_coreml_v4.py
