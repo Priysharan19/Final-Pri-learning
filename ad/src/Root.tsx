@@ -3,7 +3,7 @@ import { Composition } from 'remotion';
 import './lib/fonts';
 import { Reel, type ReelProps } from './compositions/Reel';
 import { Cut15 } from './compositions/Cut15';
-import { DUR15, DUR30, FPS, sec } from './data/timeline';
+import { DUR15, DUR_MAIN, FPS, sec } from './data/timeline';
 
 const defaults: ReelProps = { aspect: '916', debugSafe: false, muted: false };
 
@@ -18,7 +18,7 @@ export const Root: React.FC = () => {
       <Composition
         id="Reel916"
         component={ReelC}
-        durationInFrames={sec(DUR30)}
+        durationInFrames={sec(DUR_MAIN)}
         fps={FPS}
         width={1080}
         height={1920}
@@ -27,7 +27,7 @@ export const Root: React.FC = () => {
       <Composition
         id="Story916"
         component={ReelC}
-        durationInFrames={sec(DUR30)}
+        durationInFrames={sec(DUR_MAIN)}
         fps={FPS}
         width={1080}
         height={1920}
@@ -36,7 +36,7 @@ export const Root: React.FC = () => {
       <Composition
         id="Feed45"
         component={ReelC}
-        durationInFrames={sec(DUR30)}
+        durationInFrames={sec(DUR_MAIN)}
         fps={FPS}
         width={1080}
         height={1350}
@@ -45,7 +45,7 @@ export const Root: React.FC = () => {
       <Composition
         id="Square11"
         component={ReelC}
-        durationInFrames={sec(DUR30)}
+        durationInFrames={sec(DUR_MAIN)}
         fps={FPS}
         width={1080}
         height={1080}

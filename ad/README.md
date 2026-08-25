@@ -1,18 +1,18 @@
 # Pri Learning — Instagram ad ("The Tangent")
 
-A 30 s launch-film-grade Instagram ad, built as code (Remotion 4 + React +
+A 36 s launch-film-grade Instagram ad, built as code (Remotion 4 + React +
 TypeScript), plus a real 15 s edit, in the product's own **Dark LaTeX** design
-language. One idea carries all thirty seconds: the tangent line — memorised in
-the factory, understood at the lock, scaled Class 7 → Olympiad, offered as an
-invitation. Creative rationale: [docs/INTERPRETATION.md](docs/INTERPRETATION.md);
+language. One idea carries the whole film: the tangent line — memorised in the factory,
+understood at the lock, backed by the feature run ("The Instrument"), scaled
+Class 7 → Olympiad, offered as an invitation. Creative rationale: [docs/INTERPRETATION.md](docs/INTERPRETATION.md);
 frame-accurate board: [docs/STORYBOARD.md](docs/STORYBOARD.md).
 
 ## Deliverables (in `out/`, gitignored build artifacts)
 
 | File | What |
 |---|---|
-| `pri-reel-30-916.mp4` | **Hero** — 1080×1920, 30 s, 60 fps, H.264 yuv420p, AAC 128k 48 kHz, faststart |
-| `pri-reel-30-45.mp4` / `pri-reel-30-11.mp4` | 4:5 and 1:1 recompositions (re-framed, not cropped) |
+| `pri-reel-36-916.mp4` | **Hero** — 1080×1920, 36 s, 60 fps, H.264 yuv420p, AAC 128k 48 kHz, faststart |
+| `pri-reel-36-45.mp4` / `pri-reel-36-11.mp4` | 4:5 and 1:1 recompositions (re-framed, not cropped) |
 | `pri-reel-15-916.mp4` | 15 s cut — its own edit on its own audio mix |
 | `cover.png` | Frame 0 — works as the IG cover |
 | `captions.srt` / `captions-15.srt` | VO captions (burned captions are in-film) |

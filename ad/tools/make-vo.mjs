@@ -111,8 +111,10 @@ const LINES30 = [
   { at: 9.0, until: 11.7, text: 'Watch the secant become the tangent.' },
   { at: 13.2, until: 14.9, text: 'That is the derivative — not a rule, a reason.' },
   { at: 15.4, until: 19.6, text: 'Understand one idea, and you can solve what you have never seen. Marked like an examiner.' },
-  { at: 20.8, until: 26.4, text: 'Class seven to Olympiad. The same mathematics, at different pressures.' },
-  { at: 27.3, until: 29.3, text: 'Pri Learning. Join the change.' },
+  { at: 20.3, until: 23.3, text: 'Over three lakh questions, generated on your iPad. Your misconceptions, traced.' },
+  { at: 23.4, until: 26.3, text: 'Percentile predicted. Rivals raced. Mocks marked. All of it offline.' },
+  { at: 27.3, until: 32.6, text: 'Class seven to Olympiad. The same mathematics, at different pressures.' },
+  { at: 33.3, until: 35.2, text: 'Pri Learning. Join the change.' },
 ];
 const LINES15 = [
   { at: 0.2, until: 1.15, text: 'Stop memorising maths.', reuse: 0 },
@@ -120,7 +122,7 @@ const LINES15 = [
   { at: 3.9, until: 6.5, text: 'Watch the secant become the tangent.' },
   { at: 8.7, until: 10.4, text: 'Your working, marked like an examiner.' },
   { at: 10.7, until: 12.3, text: 'Class seven to Olympiad.' },
-  { at: 12.8, until: 14.5, text: 'Pri Learning. Join the change.', reuse: 6 },
+  { at: 12.8, until: 14.5, text: 'Pri Learning. Join the change.', reuse: 9 },
 ];
 
 function parseWav(buf) {

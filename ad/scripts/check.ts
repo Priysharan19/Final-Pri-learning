@@ -20,7 +20,7 @@ import { fileURLToPath } from 'node:url';
 import { decodePng } from './png.mjs';
 import katex from 'katex';
 import { ALL_TEX, VERIFICATIONS } from '../src/math/expressions';
-import { FPS, SCENES30, SCENES15, TEXT30, TEXT15, VO30, VO15, DUR30, DUR15 } from '../src/data/timeline';
+import { FPS, SCENES_MAIN, SCENES15, TEXT_MAIN, TEXT15, VO_MAIN, VO15, DUR_MAIN, DUR15 } from '../src/data/timeline';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = join(ROOT, 'out');
@@ -65,7 +65,7 @@ console.log('\n[1] Mathematics');
 console.log('\n[2] Timeline');
 {
   for (const [label, beats] of [
-    ['30s', TEXT30],
+    ['30s', TEXT_MAIN],
     ['15s', TEXT15],
   ] as const) {
     let ok = true;
@@ -79,7 +79,7 @@ console.log('\n[2] Timeline');
     }
     if (ok) pass(`${label} text beats: every >4-word line holds ≥1.2s`);
   }
-  const cuts30 = Object.values(SCENES30).map((s) => s.at);
+  const cuts30 = Object.values(SCENES_MAIN).map((s) => s.at);
   const cuts15 = Object.values(SCENES15).map((s) => s.at);
   const offGrid = [...cuts30, ...cuts15].filter((s) => {
     const r = s % 0.5;
@@ -89,7 +89,7 @@ console.log('\n[2] Timeline');
   else fail(`cuts off the beat grid: ${offGrid.join(', ')}`);
 
   for (const [label, vo, dur] of [
-    ['30s', VO30, DUR30],
+    ['30s', VO_MAIN, DUR_MAIN],
     ['15s', VO15, DUR15],
   ] as const) {
     let ok = true;
@@ -116,9 +116,9 @@ interface Target {
   dur: number;
 }
 const targets: Target[] = [
-  { file: 'pri-reel-30-916.mp4', w: 1080, h: 1920, dur: 30 },
-  { file: 'pri-reel-30-45.mp4', w: 1080, h: 1350, dur: 30 },
-  { file: 'pri-reel-30-11.mp4', w: 1080, h: 1080, dur: 30 },
+  { file: 'pri-reel-36-916.mp4', w: 1080, h: 1920, dur: 36 },
+  { file: 'pri-reel-36-45.mp4', w: 1080, h: 1350, dur: 36 },
+  { file: 'pri-reel-36-11.mp4', w: 1080, h: 1080, dur: 36 },
   { file: 'pri-reel-15-916.mp4', w: 1080, h: 1920, dur: 15 },
 ];
 for (const t of targets) {
@@ -182,7 +182,7 @@ if (!skipStills) {
     label: string;
   }
   const probes: Probe[] = [];
-  for (const b of TEXT30) probes.push({ comp: 'Reel916', frame: Math.round(((b.at + b.until) / 2) * FPS), label: `30s "${b.text.slice(0, 32)}"` });
+  for (const b of TEXT_MAIN) probes.push({ comp: 'Reel916', frame: Math.round(((b.at + b.until) / 2) * FPS), label: `36s "${b.text.slice(0, 32)}"` });
   for (const b of TEXT15) probes.push({ comp: 'Cut15', frame: Math.round(((b.at + b.until) / 2) * FPS), label: `15s "${b.text.slice(0, 32)}"` });
 
   const W = 1080;

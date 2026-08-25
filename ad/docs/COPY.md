@@ -12,7 +12,7 @@ breaks on this line.") sets the temperature.
 | B — mathematical | One idea beats four hundred formulas. | States the film's thesis as arithmetic; slower but smarter. |
 | C — emotional | You are not a rank. | The anti-factory line; strongest for parents, softer for students. |
 
-## On-screen line set (every word that appears in frame, 30 s master)
+## On-screen line set (every word that appears in frame, 36 s master)
 
 | # | Time (s) | Line | Words |
 |---|---|---|---|
@@ -24,8 +24,16 @@ breaks on this line.") sets the temperature.
 | 6 | 12.90–14.90 | The derivative isn't a rule. / It's what you're watching. | 9 |
 | 7 | 15.30–17.40 | Understand one idea. / Solve what you've never seen. | 8 |
 | 8 | 18.60–20.00 | Marked like an examiner. | 4 |
-| 9 | 20.60–26.80 | Class 7 to Olympiad. / The same mathematics, at different pressures. | 10 |
-| 10 | 27.00–29.60 | ℙri Learning · **Join the change.** · Follow @pri.learning · coming soon | — |
+| 9 | 20.40–23.20 | Three lakh questions, on your iPad. / Your misconceptions, traced. | 10 |
+| 10 | 23.50–26.20 | Percentile predicted. Rivals raced. / Mocks marked. | 6 |
+| 11 | 25.60–26.45 | All of it offline. | 4 |
+| 12 | 27.10–32.80 | Class 7 to Olympiad. / The same mathematics, at different pressures. | 10 |
+| 13 | 33.20–35.60 | ℙri Learning · **Join the change.** · Follow @pri.learning · coming soon | — |
+
+Feature-panel labels (small caps, in-panel): QUESTION BANK · GENERATED ON-DEVICE /
+KNOWLEDGE MAP · EVERY TOPIC, ONE WEB / PRIORITIES · WHY THIS NEXT / PREDICTED
+PERCENTILE · FROM YOUR PRACTICE / MATCH MODE · RACE LIVE RIVALS / FULL MOCKS ·
+CRITERIA MARKING — with in-frame disclaimers on percentile and rivals.
 
 Plus scene kickers in small caps (not spoken, structural): THE FACTORY · THE IDEA ·
 CLASS 7 · CLASS 10 · CLASS 12 · JEE · OLYMPIAD · QUESTION 1 · UNSEEN / SOLVED.
@@ -47,8 +55,10 @@ The gap at 11.7–13.2 s is authored: the music owns the tangent lock.
 | 9.00–11.70 | Watch the secant become the tangent. |
 | 13.20–14.90 | That's the derivative — not a rule, a reason. |
 | 15.40–19.60 | Understand one idea, and you can solve what you've never seen. Marked like an examiner. |
-| 20.80–26.40 | Class seven to Olympiad. The same mathematics, at different pressures. |
-| 27.30–29.30 | Pri Learning. Join the change. |
+| 20.30–23.30 | Over three lakh questions, generated on your iPad. Your misconceptions, traced. |
+| 23.40–26.30 | Percentile predicted. Rivals raced. Mocks marked. All of it offline. |
+| 27.30–32.60 | Class seven to Olympiad. The same mathematics, at different pressures. |
+| 33.30–35.20 | Pri Learning. Join the change. |
 
 ## 15 s cut — on-screen lines
 
