@@ -25,3 +25,4 @@ tools/ink-foundation/runs/
 # Development bootstrap models are installed locally for DEBUG testing only.
 ios/PriLearning.swiftpm/Resources/Models/PriInkFoundation.mlpackage/
 ios/PriLearning\ 2.swiftpm/Resources/Models/PriInkFoundation.mlpackage/
+marketing/reel/export/

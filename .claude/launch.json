@@ -15,6 +15,12 @@
       "runtimeExecutable": "python3",
       "runtimeArgs": ["-m", "http.server", "4173", "-d", "marketing/reel"],
       "port": 4173
+    },
+    {
+      "name": "reel-export",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["marketing/reel/tools/serve.mjs"],
+      "port": 4174
     }
   ]
 }
