@@ -1,0 +1,58 @@
+import React from 'react';
+import { AbsoluteFill, Audio, Sequence, staticFile } from 'remotion';
+import { C, type Aspect } from '../design/tokens';
+import { Film } from '../lib/Film';
+import { AspectProvider, Captions } from '../lib/Type';
+import { sec, SCENES30, TEXT30 } from '../data/timeline';
+import { Hook } from '../scenes/Hook';
+import { Factory } from '../scenes/Factory';
+import { TurnCurve } from '../scenes/TurnCurve';
+import { TurnHinge } from '../scenes/TurnHinge';
+import { TurnProduct } from '../scenes/TurnProduct';
+import { Ladder } from '../scenes/Ladder';
+import { Close } from '../scenes/Close';
+
+export interface ReelProps {
+  aspect: Aspect;
+  debugSafe: boolean;
+  muted: boolean;
+}
+
+const S = SCENES30;
+
+export const Reel: React.FC<ReelProps> = ({ aspect, debugSafe, muted }) => {
+  return (
+    <AspectProvider aspect={aspect} debugSafe={debugSafe}>
+      <Film>
+        <AbsoluteFill style={{ background: C.page }}>
+          <Sequence from={sec(S.hook.at)} durationInFrames={sec(S.hook.dur)} name="Hook">
+            <Hook t0={S.hook.at} />
+          </Sequence>
+          <Sequence from={sec(S.factory.at)} durationInFrames={sec(S.factory.dur)} name="Factory">
+            <Factory t0={S.factory.at} />
+          </Sequence>
+          <Sequence from={sec(S.turnCurve.at)} durationInFrames={sec(S.turnCurve.dur)} name="Turn · curve">
+            <TurnCurve t0={S.turnCurve.at} />
+          </Sequence>
+          <Sequence from={sec(S.turnHinge.at)} durationInFrames={sec(S.turnHinge.dur)} name="Turn · hinge">
+            <TurnHinge t0={S.turnHinge.at} />
+          </Sequence>
+          {/* product + marked are one continuously developing shot */}
+          <Sequence from={sec(S.turnProduct.at)} durationInFrames={sec(S.turnProduct.dur + S.turnMarked.dur)} name="Turn · product/marked">
+            <TurnProduct t0={S.turnProduct.at} />
+          </Sequence>
+          <Sequence from={sec(S.ladder.at)} durationInFrames={sec(S.ladder.dur)} name="Ladder">
+            <Ladder t0={S.ladder.at} />
+          </Sequence>
+          <Sequence from={sec(S.close.at)} durationInFrames={sec(S.close.dur)} name="Close">
+            <Close t0={S.close.at} />
+          </Sequence>
+
+          {/* burned captions — part of the design system, span the whole film */}
+          <Captions beats={TEXT30} roles={['caption']} />
+        </AbsoluteFill>
+      </Film>
+      {muted ? null : <Audio src={staticFile('audio/soundtrack-30.wav')} />}
+    </AspectProvider>
+  );
+};
