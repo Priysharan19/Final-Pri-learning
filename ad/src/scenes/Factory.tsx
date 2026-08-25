@@ -20,14 +20,16 @@ const CARD_H = 150;
 const GAP = 20;
 const SEIZE = 6.5; // absolute
 
-const Card: React.FC<{ tex: string; hero?: boolean; style?: React.CSSProperties }> = ({ tex, hero, style }) => (
+const Card: React.FC<{ tex: string; hero?: boolean; shadow?: number; style?: React.CSSProperties }> = ({ tex, hero, shadow = 1, style }) => (
   <div
     style={{
       width: CARD_W,
       height: CARD_H,
-      background: C.surface2,
-      border: `1px solid ${hero ? C.hairlineStrong : C.hairlineStrong}`,
+      // a raking key from the upper left so the faces read as surfaces
+      background: `linear-gradient(115deg, rgba(240,236,224,0.07) 0%, rgba(240,236,224,0.015) 45%, rgba(0,0,0,0.10) 100%), ${C.surface2}`,
+      border: `1px solid ${C.hairlineStrong}`,
       borderRadius: RADIUS.card,
+      boxShadow: `0 ${6 * shadow}px ${16 * shadow}px rgba(0,0,0,${0.4 * shadow}), inset 0 1px 0 rgba(240,236,224,0.08)`,
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
@@ -70,10 +72,12 @@ export const FactoryGrid: React.FC<{ t: number; start: number; seizeAt: number; 
   const lastEvent =
     tt < multAt ? start + (stampCount - 1) * beat : multAt + shiftRows * (beat * 0.75);
   const sinceEvent = tt - lastEvent;
-  const jolt = sinceEvent >= 0 && sinceEvent < 0.1 ? (1 - sinceEvent / 0.1) * 3 : 0;
+  let jolt = sinceEvent >= 0 && sinceEvent < 0.1 ? (1 - sinceEvent / 0.1) * 3 : 0;
+  // the halt itself is violent: a hard 9px drop when the machine seizes
+  if (t >= seizeAt) jolt += (1 - ramp(t, [seizeAt, seizeAt + 0.14], [0, 1])) * 9;
 
   const frozen = t >= seizeAt;
-  const dim = frozen ? ramp(t, [seizeAt, seizeAt + 0.35], [1, 0.35]) : 1;
+  const dim = frozen ? ramp(t, [seizeAt, seizeAt + 0.22], [1, 0.35]) : 1;
 
   const totalRows = rows + 2;
   const cells: React.ReactNode[] = [];
@@ -103,12 +107,13 @@ export const FactoryGrid: React.FC<{ t: number; start: number; seizeAt: number; 
             left: c * (CARD_W + GAP),
             top: r * (CARD_H + GAP) - shiftFrac * (CARD_H + GAP),
             transform: stuck
-              ? `scale(1.06) rotate(2.1deg)`
+              ? `scale(1.12) rotate(3.4deg)`
               : `scale(${1.22 - 0.22 * p})`,
             opacity: p,
+            zIndex: stuck ? 2 : 1,
           }}
         >
-          <Card tex={FACTORY_CARDS[texIdx]} hero={texIdx === 0 && isConveyorRow} />
+          <Card tex={FACTORY_CARDS[texIdx]} hero={texIdx === 0 && isConveyorRow} shadow={stuck ? 1.8 : p} />
         </div>,
       );
     }
@@ -150,7 +155,7 @@ export const SeizeCard: React.FC<{ t: number; at: number }> = ({ t, at }) => {
         top: spec.aspect === '916' ? 900 : spec.aspect === '45' ? 620 : 480,
         transform: `translate(-50%, ${rise + tremble}px)`,
         opacity: p,
-        width: Math.min(720, spec.w - spec.safeSide * 2),
+        width: Math.min(800, spec.w - spec.safeSide * 2),
         background: C.surface3,
         border: `1px solid ${C.goldBorder}`,
         borderRadius: RADIUS.card,
@@ -166,7 +171,7 @@ export const SeizeCard: React.FC<{ t: number; at: number }> = ({ t, at }) => {
         Question 1 · unseen
       </Kicker>
       <TextBox>
-        <Tex tex={SEIZE_QUESTION} size={31} color={C.ink} />
+        <Tex tex={SEIZE_QUESTION} size={28} color={C.ink} />
       </TextBox>
     </div>
   );
@@ -183,7 +188,14 @@ export const Factory: React.FC<{ t0?: number }> = ({ t0 = 1.5 }) => {
   return (
     <AbsoluteFill style={{ background: C.page }}>
       {/* the rank-list wall — sameness as wallpaper */}
-      <AbsoluteFill style={{ opacity: 0.09, overflow: 'hidden' }}>
+      <AbsoluteFill
+        style={{
+          opacity: 0.09,
+          overflow: 'hidden',
+          maskImage: 'linear-gradient(180deg, transparent 0%, transparent 24%, black 34%, black 72%, transparent 82%)',
+          WebkitMaskImage: 'linear-gradient(180deg, transparent 0%, transparent 24%, black 34%, black 72%, transparent 82%)',
+        }}
+      >
         {Array.from({ length: 26 }, (_, i) => (
           <div
             key={i}
@@ -222,23 +234,32 @@ export const Factory: React.FC<{ t0?: number }> = ({ t0 = 1.5 }) => {
               justifyContent: 'center',
             }}
           >
-            {t >= 2.5 && t < 4.55 ? (
-              <Display words={w('Memorise. Repeat.')} size={TYPE.s4} wordAt={[2.5, 3.0].map((s) => s - t0)} landDur={0.2} mode="slam" exitAt={4.3 - t0} />
+            {t >= 2.0 && t < 4.55 ? (
+              <Display words={w('Memorise. Repeat.')} size={TYPE.s4} wordAt={[2.0, 2.55].map((s) => s - t0)} landDur={0.2} mode="slam" exitAt={4.3 - t0} />
             ) : null}
             {t >= 4.6 && t <= 6.45 ? (
-              <Display
-                words={w('Four hundred formulas. *No* *ideas.*')}
-                size={70}
-                wordAt={[4.6, 4.6, 4.6, 5.1, 5.1].map((s) => s - t0)}
-                landDur={0.22}
-                mode="rise"
-                exitAt={6.25 - t0}
-                style={{ maxWidth: spec.w - spec.safeSide * 2 }}
-              />
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
+                <Display
+                  words={w('Four hundred formulas.')}
+                  size={64}
+                  wordAt={[4.6, 4.6, 4.6].map((s) => s - t0)}
+                  landDur={0.22}
+                  mode="rise"
+                  exitAt={6.25 - t0}
+                />
+                <Display
+                  words={w('*No* *ideas.*')}
+                  size={78}
+                  wordAt={[5.1, 5.1].map((s) => s - t0)}
+                  landDur={0.22}
+                  mode="rise"
+                  exitAt={6.25 - t0}
+                />
+              </div>
             ) : null}
           </div>
 
-          <FactoryGrid t={t} start={1.5} seizeAt={SEIZE} />
+          <FactoryGrid t={t} start={1.5} seizeAt={SEIZE} rows={spec.aspect === '916' ? 4 : 3} />
           <SeizeCard t={t} at={SEIZE} />
         </Plane>
       </Stage>

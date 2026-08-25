@@ -15,8 +15,9 @@ import { easeDrift, ramp } from '../lib/ease';
  */
 export const CloseCard: React.FC<{ tRel: number; atRel?: number; compact?: boolean }> = ({ tRel, atRel = 0, compact }) => {
   const spec = useFrameSpec();
-  const markP = ramp(tRel, [atRel + 0.1, atRel + 0.65], [0, 1], easeDrift);
-  const ctaP = ramp(tRel, [atRel + 0.8, atRel + 1.15], [0, 1]);
+  const markP = ramp(tRel, [atRel, atRel + 0.5], [0, 1], easeDrift);
+  const ctaP = ramp(tRel, [atRel + 0.7, atRel + 1.05], [0, 1]);
+  const breath = 1 + 0.18 * Math.exp(-((tRel - atRel - 1.9) ** 2) / 0.18); // one slow luminous breath
   const markSize = (compact ? 84 : 104) * spec.typeScale;
 
   return (
@@ -35,7 +36,7 @@ export const CloseCard: React.FC<{ tRel: number; atRel?: number; compact?: boole
         <Display
           words={w('Join the *change.*')}
           size={compact ? TYPE.s3 : TYPE.s4}
-          wordAt={[atRel + 0.24, atRel + 0.4, atRel + 0.56]}
+          wordAt={[atRel + 0.18, atRel + 0.32, atRel + 0.46]}
           landDur={0.3}
           mode="rise"
         />
@@ -51,7 +52,7 @@ export const CloseCard: React.FC<{ tRel: number; atRel?: number; compact?: boole
               fontSize: 30 * spec.typeScale,
               padding: '16px 40px',
               borderRadius: 999,
-              boxShadow: '0 0 26px rgba(244,241,224,0.18)',
+              boxShadow: `0 0 ${Math.round(16 * breath)}px rgba(244,241,224,${(0.16 * breath).toFixed(3)})`,
             }}
           >
             Follow @pri.learning
@@ -82,7 +83,7 @@ export const Close: React.FC<{ t0?: number; fadeAt?: number; fadeDur?: number }>
   const t = tRel + t0;
 
   // stillness: drift decays to zero — confidence reads as expensive
-  const drift = ramp(t, [t0, t0 + 1.4], [0.4, 0]);
+  const drift = ramp(t, [t0, t0 + 1.6], [0.4, 0.12]);
   const fade = ramp(t, [fadeAt, fadeAt + fadeDur], [0, 1], easeDrift);
 
   return (

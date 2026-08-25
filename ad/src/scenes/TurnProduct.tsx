@@ -61,6 +61,18 @@ export const ProductPanel: React.FC<{ t: number; enterAt: number; inkAt: number;
         opacity: enter,
       }}
     >
+      <div
+        style={{
+          perspective: 1200,
+        }}
+      >
+      <div
+        style={{
+          transform: `rotateX(${(1 - enter) * 7 + 1.6}deg) rotateY(${-((1 - enter) * 5 + 1.2)}deg)`,
+          transformStyle: 'preserve-3d',
+          position: 'relative',
+        }}
+      >
       <LitPanel width={panelW} radius={RADIUS.card} background={C.surface2}>
         {/* header — the product frame */}
         <div
@@ -73,7 +85,7 @@ export const ProductPanel: React.FC<{ t: number; enterAt: number; inkAt: number;
           }}
         >
           <Kicker size={19} color={C.ink3}>
-            ✒ Pri Ink Engine · on-device
+            ✒ Pri Ink Engine · your proof, marked live
           </Kicker>
           <TextBox>
             <span style={{ fontFamily: FONT.ams, fontSize: 30, color: C.ink }}>
@@ -95,7 +107,7 @@ export const ProductPanel: React.FC<{ t: number; enterAt: number; inkAt: number;
             <path d={`M${m.x(-2.1)},${m.y(0)}L${m.x(1.7)},${m.y(0)}`} stroke={C.hairlineStrong} strokeWidth={1.4} fill="none" />
             <path d={`M${m.x(0)},${m.y(-0.9)}L${m.x(0)},${m.y(3.4)}`} stroke={C.hairlineStrong} strokeWidth={1.4} fill="none" />
             <LitPath d={fnPath(m, (x) => Math.exp(x), -2.05, 1.18)} progress={curveP} color={C.gold} width={4} glow={0.6} />
-            <LitPath d={linePath(m, 0, 1, 1, -1.9, 1.55)} progress={tanP} color={C.ink2} width={3} glow={0.2} />
+            <LitPath d={linePath(m, 0, 1, 1, -1.9, 1.55)} progress={tanP} color={C.goldBright} width={3.2} glow={0.35} />
             <circle cx={m.x(0)} cy={m.y(1)} r={6} fill={C.goldBright} opacity={tanP} />
           </svg>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -111,17 +123,47 @@ export const ProductPanel: React.FC<{ t: number; enterAt: number; inkAt: number;
         {/* the student's ink + the marks that land on it */}
         <div style={{ borderTop: `1px solid ${C.hairline}`, padding: '20px 30px 24px', position: 'relative' }}>
           <TextBox>
-            <div
-              style={{
-                fontFamily: FONT.hand,
-                fontSize: 44,
-                color: '#f5f0df',
-                transform: 'rotate(-0.8deg)',
-                clipPath: `inset(0 ${(1 - inkP) * 100}% -8% 0)`,
-                whiteSpace: 'nowrap',
-              }}
-            >
-              {PRODUCT.handwritten}
+            <div style={{ position: 'relative' }}>
+              <div
+                style={{
+                  fontFamily: FONT.hand,
+                  fontSize: 44,
+                  color: '#f5f0df',
+                  transform: 'rotate(-0.8deg)',
+                  clipPath: `inset(-14% ${(1 - inkP) * 100}% -10% 0)`,
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {/* real hands wobble: deterministic per-character drift + weight */}
+                {PRODUCT.handwritten.split('').map((ch, i) => (
+                  <span
+                    key={i}
+                    style={{
+                      display: 'inline-block',
+                      whiteSpace: 'pre',
+                      transform: `translateY(${Math.sin(i * 2.7) * 1.8}px) rotate(${Math.sin(i * 1.9) * 2.2}deg)`,
+                      opacity: 0.88 + 0.12 * Math.abs(Math.sin(i * 3.3)),
+                    }}
+                  >
+                    {ch}
+                  </span>
+                ))}
+              </div>
+              {/* the pen: a warm point riding the reveal edge while writing */}
+              {inkP > 0.01 && inkP < 0.99 ? (
+                <div
+                  style={{
+                    position: 'absolute',
+                    left: `${inkP * 100}%`,
+                    top: 8,
+                    width: 7,
+                    height: 7,
+                    borderRadius: 999,
+                    background: C.goldBright,
+                    boxShadow: '0 0 12px rgba(227,200,126,0.8)',
+                  }}
+                />
+              ) : null}
             </div>
           </TextBox>
 
@@ -168,12 +210,26 @@ export const ProductPanel: React.FC<{ t: number; enterAt: number; inkAt: number;
           ) : null}
         </div>
       </LitPanel>
+      {/* one pass of key light across the object as it arrives */}
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          borderRadius: RADIUS.card,
+          background: 'linear-gradient(115deg, transparent 30%, rgba(244,241,224,0.09) 46%, rgba(244,241,224,0.02) 52%, transparent 64%)',
+          transform: `translateX(${(ramp(t, [enterAt + 0.15, enterAt + 1.3], [-0.65, 0.9]) * panelW).toFixed(1)}px)`,
+          opacity: ramp(t, [enterAt + 1.15, enterAt + 1.45], [1, 0]),
+          pointerEvents: 'none',
+        }}
+      />
+      </div>
+      </div>
     </div>
   );
 };
 
 const TurnStage: React.FC<{ t: number; t0: number }> = ({ t, t0 }) => {
-  const dolly = ramp(t, [15.0, 20.0], [-30, 26], easeDrift);
+  const dolly = ramp(t, [15.0, 20.0], [-45, 40], easeDrift);
   return (
     <AbsoluteFill style={{ background: C.page }}>
       <Stage cam={{ dolly, drift: 0.5, focus: 0, dof: 2.0 }} tOffset={t0}>
@@ -181,7 +237,7 @@ const TurnStage: React.FC<{ t: number; t0: number }> = ({ t, t0 }) => {
           <MathField opacity={0.35} seed={33} count={36} />
         </Plane>
         <Plane z={0} blurScale={0}>
-          <ProductPanel t={t} enterAt={15.05} inkAt={16.3} />
+          <ProductPanel t={t} enterAt={15.05} inkAt={15.9} />
         </Plane>
       </Stage>
     </AbsoluteFill>

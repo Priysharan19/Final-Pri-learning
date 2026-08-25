@@ -46,7 +46,7 @@ export const HingeCore: React.FC<{ t: number; t0: number; lockAt?: number; speed
 
   // camera: slow push through the shot; a felt push + settle on the lock
   const dolly =
-    ramp(t, [lockAt - 2.6 * speed, lockAt + 2.4], [0, 24], easeDrift) +
+    ramp(t, [lockAt - 2.6 * speed, lockAt + 2.4], [0, 40], easeDrift) +
     26 * ramp(t, [lockAt, lockAt + 0.15], [0, 1], easeOutSignature) * ramp(t, [lockAt + 0.15, lockAt + 1.2], [1, 0.45], easeDrift);
   // rack focus: the equation plane sharpens as the curve softens, once the tangent locks
   const focus = ramp(t, [lockAt + 0.25, lockAt + 1.0], [0, 36], easeDrift);
@@ -57,11 +57,14 @@ export const HingeCore: React.FC<{ t: number; t0: number; lockAt?: number; speed
     HINGE.slopeAt(1, '3'),
     HINGE.slopeAt(0.5, '2.5'),
     HINGE.slopeAt(0.1, '2.1'),
-    HINGE.resolved,
+    HINGE.slopeAt(0.1, '2.1'),
   ];
+  // the chip narrates the approach, then dies AT the lock so the resolved
+  // equation is the single payoff anchor (no spoiler, no duplicate)
+  const chipDie = ramp(t, [lockAt - 0.06, lockAt + 0.06], [1, 0]);
 
   // equation strip (upper-left): quotient → limit → resolved
-  const eqPhase = t < lockAt - 0.55 * speed ? 0 : t < lockAt ? 1 : 2;
+  const eqPhase = t < lockAt - 0.55 * speed ? 0 : t < lockAt - 0.001 ? 1 : 2;
 
   return (
     <Stage cam={{ dolly, drift: 0.55, focus, dof: 2.2 }} tOffset={t0}>
@@ -102,7 +105,7 @@ export const HingeCore: React.FC<{ t: number; t0: number; lockAt?: number; speed
               position: 'absolute',
               left: m.x(1.8),
               top: m.y(2 * 1.8 - 1) - 56,
-              opacity: fadeIO(t, lockAt + 0.55, lockAt + 900, 0.35, 1),
+              opacity: fadeIO(t, lockAt + 1.1, lockAt + 900, 0.45, 1),
               transform: 'rotate(-31deg)',
             }}
           >
@@ -130,15 +133,15 @@ export const HingeCore: React.FC<{ t: number; t0: number; lockAt?: number; speed
             right: spec.safeSide + 44,
             top: spec.safeTop + 132,
             background: C.surface2,
-            border: `1px solid ${stageIdx === 3 ? C.goldBorder : C.hairline}`,
+            border: `1px solid ${C.hairline}`,
             borderRadius: RADIUS.card,
             padding: '16px 24px',
             boxShadow: '0 14px 40px rgba(0,0,0,0.4)',
-            opacity: chipO,
+            opacity: chipO * chipDie,
           }}
         >
           <TextBox>
-            <Tex tex={chips[stageIdx]} size={27} color={stageIdx === 3 ? C.goldBright : C.ink2} />
+            <Tex tex={chips[Math.min(stageIdx, 2)]} size={34} color={C.ink2} />
           </TextBox>
         </div>
 
@@ -153,7 +156,7 @@ export const HingeCore: React.FC<{ t: number; t0: number; lockAt?: number; speed
               <Tex tex={HINGE.limit} size={34} color={C.ink} />
             </TextBox>
           ) : (
-            <TextBox style={{ opacity: ramp(t, [lockAt + 0.08, lockAt + 0.4], [0, 1]) }}>
+            <TextBox style={{ opacity: ramp(t, [lockAt, lockAt + 0.22], [0, 1]) }}>
               <div style={{ transform: `scale(${1 + pulse * 0.05})`, transformOrigin: 'left center' }}>
                 <Tex tex={HINGE.resolved} size={56} color={C.goldBright} />
               </div>

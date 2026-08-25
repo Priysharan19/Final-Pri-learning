@@ -207,9 +207,10 @@ function buildScore({ dur, cues }) {
     hook, factoryStart, seize, bloom, lock, ticks, ladderStart, ladderMoves, close, end,
   } = cues;
 
-  // — Hook: sub hit + dark drone
+  // — Hook: sub hit + dark drone + a soft beat under each word slam
   mix.add(hook + 0.08, sub(40, 1.4), 0.8);
   mix.add(hook, pad(D('D', 2), seize - hook, { attack: 0.4, bright: 0.25 }), 0.24);
+  for (const wt of [0.1, 0.35, 0.6]) mix.add(hook + wt, thunk(rng, 0.16), 0.34);
 
   // — Factory: metronomic 16ths + staccato minor pulse + stamps
   for (let t = factoryStart; t < seize - 0.02; t += 0.125) {
@@ -252,9 +253,7 @@ function buildScore({ dur, cues }) {
     if ((Math.round((t - pulseStart) / 0.5) % 2) === 1) mix.add(t + 0.25, felt(D('A', 3), 0.4), 0.1);
   }
   mix.add(pulseStart - 1.2, pad(D('Bb', 2), ladderStart - pulseStart + 1.4, { attack: 1.2, bright: 0.35 }), 0.2);
-  // pencil ticks for the examiner marks + a small "nailed it" chime
-  for (const tt of ticks) mix.add(tt, pencil(rng), 0.5);
-  if (ticks.length) mix.add(ticks[ticks.length - 1] + 0.3, felt(D('D', 5), 1.2), 0.2);
+  // (pencil ticks + chime are added post-duck as foreground foley — see below)
 
   // — Ladder: one chord step per station, building
   const ladderChords = [
@@ -269,12 +268,12 @@ function buildScore({ dur, cues }) {
     const nd = (i < stations.length - 1 ? stations[i + 1] : close) - st + 0.9;
     const ch = ladderChords[Math.min(i, ladderChords.length - 1)];
     for (let k = 0; k < ch.length; k += 2) {
-      mix.add(st, pad(D(ch[k], ch[k + 1]), nd, { attack: 0.25, bright: 0.42 + i * 0.05 }), 0.2);
+      mix.add(st, pad(D(ch[k], ch[k + 1]), nd, { attack: 0.25, bright: 0.4 + i * 0.07 }), 0.13 + i * 0.045);
     }
-    mix.add(st, felt(D(ch[0], ch[1] + 1), 1.4), 0.24 + i * 0.02);
+    mix.add(st, felt(D(ch[0], ch[1] + 1), 1.4), 0.2 + i * 0.05);
     // rising eighth figure gains energy up the ladder
     for (let t = st + 0.25; t < (i < stations.length - 1 ? stations[i + 1] : close) - 0.05; t += 0.25) {
-      mix.add(t, felt(D(ch[(Math.round(t * 4) % 2) * 2], ch[1] + 1), 0.3), 0.07 + i * 0.02);
+      mix.add(t, felt(D(ch[(Math.round(t * 4) % 2) * 2], ch[1] + 1), 0.3), 0.045 + i * 0.03);
     }
   });
   mix.add(close - 1.0, riser(1.0, rng), 0.26);
@@ -291,7 +290,12 @@ function buildScore({ dur, cues }) {
 
 // ── ducking, master, write ─────────────────────────────────────────────────
 
-function duck(mix, windows, depth = 0.5, att = 0.12, rel = 0.6) {
+function addForeground(mix, cues, rng) {
+  for (const tt of cues.ticks) mix.add(tt, pencil(rng), 0.62);
+  if (cues.ticks.length) mix.add(cues.ticks[cues.ticks.length - 1] + 0.3, felt(NOTE('D', 5), 1.2), 0.24);
+}
+
+function duck(mix, windows, depth = 0.82, att = 0.12, rel = 0.6) {
   const env = new Float32Array(mix.N).fill(1);
   for (const [a, b] of windows) {
     const s0 = Math.max(0, Math.round((a - att) * SR));
@@ -367,7 +371,7 @@ function writeWav(path, mix) {
 // ── cue maps (must mirror src/data/timeline.ts) ────────────────────────────
 
 const VO30 = [
-  [0.15, 1.45], [2.6, 6.3], [6.55, 7.75], [9.0, 11.7], [13.2, 14.9], [15.4, 19.6], [20.8, 26.4], [27.3, 29.3],
+  [0.15, 1.45], [2.6, 6.05], [6.1, 7.35], [9.0, 11.7], [13.2, 14.9], [15.4, 19.6], [20.8, 26.4], [27.3, 29.3],
 ];
 const VO15 = [
   [0.2, 1.15], [2.55, 3.7], [3.9, 6.5], [8.7, 10.4], [10.7, 12.3], [12.8, 14.5],
@@ -377,9 +381,7 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const AUD = join(ROOT, 'public', 'audio');
 mkdirSync(AUD, { recursive: true });
 
-const m30 = buildScore({
-  dur: 30,
-  cues: {
+const CUES30 = {
     hook: 0,
     factoryStart: 1.5,
     seize: 6.5,
@@ -387,18 +389,17 @@ const m30 = buildScore({
     lock: 12.6,
     ticks: [18.0, 18.5, 19.0],
     ladderStart: 20.0,
-    ladderMoves: [21.0, 22.5, 24.0, 25.5],
+    ladderMoves: [21.2, 22.3, 23.4, 24.6],
     close: 27.0,
     end: 30.0,
-  },
-});
+};
+const m30 = buildScore({ dur: 30, cues: CUES30 });
 duck(m30, VO30);
+addForeground(m30, CUES30, mulberry32(77));
 master(m30);
 writeWav(join(AUD, 'music-30.wav'), m30);
 
-const m15 = buildScore({
-  dur: 15,
-  cues: {
+const CUES15 = {
     hook: 0,
     factoryStart: 1.0,
     seize: 2.5,
@@ -409,9 +410,10 @@ const m15 = buildScore({
     ladderMoves: [11.0, 11.5, 12.0],
     close: 12.5,
     end: 15.0,
-  },
-});
+};
+const m15 = buildScore({ dur: 15, cues: CUES15 });
 duck(m15, VO15);
+addForeground(m15, CUES15, mulberry32(78));
 master(m15);
 writeWav(join(AUD, 'music-15.wav'), m15);
 

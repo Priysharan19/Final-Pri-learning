@@ -190,11 +190,15 @@ export const Captions: React.FC<{ beats: TextBeat[]; roles?: TextBeat['role'][] 
                 lineHeight: 1.3,
                 color: C.ink,
                 textAlign: 'center',
+                whiteSpace: 'pre-line', // authored line breaks — no widows
                 maxWidth: spec.w - spec.safeSide * 2,
                 opacity: o,
                 transform: `translateY(${rise}px)`,
                 textShadow: '0 2px 24px rgba(0,0,0,0.85), 0 0 60px rgba(0,0,0,0.55)',
-                padding: '10px 26px',
+                padding: '12px 30px',
+                // a soft scrim so bright plot strokes never run through the words
+                background: 'radial-gradient(60% 90% at 50% 50%, rgba(5,5,4,0.52), rgba(5,5,4,0.0) 78%)',
+                borderRadius: 14,
               }}
             >
               {b.text}

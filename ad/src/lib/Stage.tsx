@@ -32,10 +32,11 @@ export const Stage: React.FC<{ cam?: Cam; tOffset?: number; children: React.Reac
   const t = frame / fps + tOffset;
   const { dolly = 0, x = 0, y = 0, roll = 0, focus = 0, drift = 0.5, dof = 2.2 } = cam;
 
-  const dx = drift * 4.5 * noise1(t * 0.55, 3.1);
-  const dy = drift * 3.5 * noise1(t * 0.45, 7.7);
-  const dr = drift * 0.22 * noise1(t * 0.3, 11.3);
-  const dz = drift * 6 * noise1(t * 0.35, 17.9);
+  // amplitudes sized to stay perceptible after Instagram's downscale
+  const dx = drift * 9 * noise1(t * 0.55, 3.1);
+  const dy = drift * 7 * noise1(t * 0.45, 7.7);
+  const dr = drift * 0.38 * noise1(t * 0.3, 11.3);
+  const dz = drift * 13 * noise1(t * 0.35, 17.9);
 
   return (
     <StageCtx.Provider value={{ focus, dof }}>

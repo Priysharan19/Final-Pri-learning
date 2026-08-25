@@ -65,11 +65,11 @@ export const PRODUCT = {
 
 /** Act III — the ladder: the same motif at five pressures. */
 export const LADDER = [
-  { label: 'Class 7', kicker: 'SLOPE', tex: String.raw`y=2x`, note: 'rise over run' },
+  { label: 'Class 7', kicker: 'PROPORTION', tex: String.raw`y=2x`, note: 'y is always double of x' },
   { label: 'Class 10', kicker: 'CIRCLES', tex: String.raw`OP\perp\ell`, note: 'radius ⊥ tangent at the point of contact' },
   { label: 'Class 12', kicker: 'DERIVATIVES', tex: String.raw`f'(x)=2x`, note: 'the card, finally understood' },
   { label: 'JEE', kicker: 'CONICS', tex: String.raw`x-y+1=0`, note: 'tangent to y² = 4x at (1, 2)' },
-  { label: 'Olympiad', kicker: 'INEQUALITIES', tex: String.raw`e^{x}\ge 1+x`, note: 'the tangent-line trick' },
+  { label: 'Olympiad', kicker: 'INEQUALITIES', tex: String.raw`e^{x}\ge 1+x`, note: 'the unseen question — two lines now' },
 ];
 
 /** Everything above, checkable. */

@@ -16,7 +16,7 @@ import { LADDER } from '../math/expressions';
  */
 
 // station transitions (absolute seconds, on beats)
-const MOVES = [21.0, 22.5, 24.0, 25.5];
+const MOVES = [21.2, 22.3, 23.4, 24.6];
 
 const Motif: React.FC<{ index: number; p: number; size: number }> = ({ index, p, size }) => {
   const W = size;
@@ -55,7 +55,8 @@ const Motif: React.FC<{ index: number; p: number; size: number }> = ({ index, p,
     const py = cy + r * Math.sin(a);
     const tx = -Math.sin(a);
     const ty = Math.cos(a);
-    const L = W * 0.52;
+    const L1 = W * 0.52; // toward the lower left
+    const L2 = W * 0.34; // toward the header — kept clear of the type
     const circ = 2 * Math.PI * r;
     return (
       <svg width={W} height={H} style={{ overflow: 'visible' }}>
@@ -72,7 +73,7 @@ const Motif: React.FC<{ index: number; p: number; size: number }> = ({ index, p,
         />
         <path d={`M${cx},${cy}L${px},${py}`} stroke={C.ink2} strokeWidth={3} opacity={ramp(p, [0.55, 0.9], [0, 1])} />
         <path
-          d={`M${px - tx * L},${py - ty * L}L${px + tx * L},${py + ty * L}`}
+          d={`M${px - tx * L2},${py - ty * L2}L${px + tx * L1},${py + ty * L1}`}
           stroke={C.goldBright}
           strokeWidth={4}
           opacity={ramp(p, [0.65, 1], [0, 1])}
@@ -165,6 +166,22 @@ export const LadderStation: React.FC<{ index: number; p: number; motifSize: numb
   const st = LADDER[index];
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 26 }}>
+      {index === 4 ? (
+        <div
+          style={{
+            opacity: ramp(p, [0.3, 0.6], [0, 1]),
+            border: `1px solid ${C.goldBorder}`,
+            background: 'rgba(201,173,99,0.10)',
+            borderRadius: 6,
+            padding: '8px 18px',
+            marginBottom: 2,
+          }}
+        >
+          <Kicker size={17} color={C.goldBright}>
+            Question 1 · solved
+          </Kicker>
+        </div>
+      ) : null}
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 22, opacity: ramp(p, [0.05, 0.4], [0, 1]) }}>
         <Kicker size={30} color={C.ink}>
           {st.label}
@@ -194,8 +211,12 @@ export const Ladder: React.FC<{ t0?: number }> = ({ t0 = 20 }) => {
   const motifSize = spec.aspect === '916' ? 560 : 450;
 
   // continuous pedestal move: one station per beat-pair, gliding with mass
-  const climbed = MOVES.reduce((acc, mv) => acc + ramp(t, [mv - 0.25, mv + 0.35], [0, 1], easeMassive), 0);
-  const worldY = climbed * gap;
+  const climbed = MOVES.reduce(
+    (acc, mv, i) => acc + ramp(t, [mv - 0.25, mv + 0.35], [0, 1], i % 2 === 0 ? easeMassive : easeDrift),
+    0,
+  );
+  // ...plus a slow constant creep so no hold is ever a dead frame
+  const worldY = climbed * gap + ramp(t, [20.0, 27.0], [0, 120], easeDrift);
 
   const enterO = ramp(t, [20.0, 20.4], [0, 1]);
   const stationTop = spec.aspect === '916' ? 520 : spec.aspect === '45' ? 330 : 240;

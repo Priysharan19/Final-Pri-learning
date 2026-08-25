@@ -106,7 +106,7 @@ const EL_MODEL = args.model || 'eleven_multilingual_v2';
 // ── the lines (must mirror src/data/timeline.ts VO30/VO15) ─────────────────
 const LINES30 = [
   { at: 0.15, until: 1.45, text: 'Stop memorising maths.' },
-  { at: 2.6, until: 6.3, text: 'Four hundred formulas. The same drill, the same batch, every day.' },
+  { at: 2.6, until: 6.05, text: 'Four hundred formulas. The same drill, the same batch, every day.' },
   { at: 6.75, until: 7.95, text: 'Until the question is new.' },
   { at: 9.0, until: 11.7, text: 'Watch the secant become the tangent.' },
   { at: 13.2, until: 14.9, text: 'That is the derivative — not a rule, a reason.' },
@@ -252,7 +252,7 @@ function mixInto(bedPath, outPath, lines, takes) {
     const g = Math.min(0.22 / Math.max(rms0, 1e-6), 0.97 / Math.max(pk, 1e-6));
     const start = Math.round(ln.at * SR);
     // deepen the bed under the line beyond the baked duck
-    const dip = 0.5, aN = Math.round(0.1 * SR), rN = Math.round(0.45 * SR);
+    const dip = 0.62, aN = Math.round(0.1 * SR), rN = Math.round(0.45 * SR);
     const d0 = Math.max(0, start - Math.round(0.05 * SR)), d1 = Math.min(N, start + s.length + Math.round(0.1 * SR));
     for (let i = d0; i < Math.min(N, d1 + rN); i++) {
       let e = 1;

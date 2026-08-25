@@ -51,7 +51,7 @@ const CurveOpen: React.FC = () => {
           </div>
           <AbsoluteFill style={{ justifyContent: 'center', alignItems: 'center' }}>
             <Display
-              words={w('Stop *memorising* maths.')}
+              words={w('Stop memorising maths.')}
               size={spec.aspect === '916' ? TYPE.s5 : TYPE.s4}
               wordAt={isCover ? undefined : [0.15, 0.35, 0.55]}
               landDur={0.22}
