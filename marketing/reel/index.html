@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pri Learning — Reel</title>
+<meta name="description" content="Pri Learning launch reel — handwriting that marks itself. 4K 9:16, 36.4s.">
+<meta name="theme-color" content="#050504">
+<meta property="og:title" content="Pri Learning — Reel">
+<meta property="og:description" content="What if your handwriting marked itself? IIT JEE · Olympiad Maths · iPad + Pencil.">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&amp;display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<style>
+  html, body { margin: 0; height: 100%; background: #050504; }
+  a { color: #c9ad63; text-decoration: none; }
+  a:hover { color: #e3c87e; }
+</style>
+<script>window.OM_SCENES = '[{"name":"Hook","dur":2.4,"desc":"Dark opening over drifting math symbols — the hook question rises word by word"},{"name":"Write","dur":5.2,"desc":"A real JEE Advanced integral is handwritten on the iPad in four steps and typeset live"},{"name":"Marked","dur":3.8,"desc":"Step marks land line by line — M1, M1, A1 — and the evaluation card scores 4 out of 4"},{"name":"Bank","dur":2.6,"desc":"The question counter rolls to 3,44,798 with NCERT → Olympiad tags"},{"name":"Map","dur":2.4,"desc":"The syllabus constellation draws itself and one idea is highlighted"},{"name":"Band","dur":2.2,"desc":"The predicted JEE percentile counts up to 99.4"},{"name":"Match","dur":2.8,"desc":"Match Mode — four lanes race and You overtake rival Ishaan"},{"name":"Exam","dur":2.6,"desc":"A print-ready JEE-pattern mock paper slides in with marking criteria and a 12/15 stamp"},{"name":"Kit","dur":5.4,"desc":"Rapid-fire toolkit montage — Smart Practice, hints, photo answers, Rush, History replay, scribble pad, teacher task packs, encrypted backup"},{"name":"Price","dur":3.8,"desc":"Coaching at 2,00,000 a year is struck through — Pri Learning lands at 999 a month"},{"name":"Close","dur":3.2,"desc":"Logo lockup and the Coming soon badge, then fade to black"}]';</script>
+<script>window.OM_PLAYBACK = '{"mode":"loop"}';</script>
+</helmet>
+<div style="min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; background: #050504; padding: 18px 0;">
+  <div style="height: calc(100vh - 110px); aspect-ratio: 9 / 16; max-width: 94vw; position: relative; border-radius: 10px; overflow: hidden; box-shadow: 0 30px 90px rgba(0,0,0,0.7); border: 1px solid rgba(240,236,224,0.1);">
+    <x-import component-from-global-scope="PriReel" from="./animations-v3.jsx ./reel.jsx" hint-size="100%,100%" voice-over="{{ vo }}" music="{{ music }}" captions="{{ caps }}"></x-import>
+  </div>
+  <div style="display: flex; align-items: center; gap: 18px; font-family: Georgia, 'Times New Roman', serif;">
+    <span style="font-size: 12px; letter-spacing: 0.28em; text-transform: uppercase; color: #7c796d;">Pri Learning · Reel · 4K · 2160 × 3840 · {{ durLabel }} s</span>
+    <button onClick="{{ unlock }}" aria-label="Enable sound for the reel" style="background: none; border: 1px solid rgba(240,236,224,0.24); border-radius: 3px; color: #efece1; font-family: inherit; font-size: 13px; letter-spacing: 0.06em; padding: 7px 16px; cursor: pointer;" style-hover="border-color: #7c796d; background: #161615;">{{ soundBtn }}</button>
+    <span style="font-size: 12.5px; color: #c9ad63;">{{ soundMsg }}</span>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;voiceOver&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Audio&quot;},&quot;music&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Audio&quot;},&quot;captions&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Overlay&quot;},&quot;motionEditor&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Editor&quot;}}">
+class Component extends DCLogic {
+  state = { armed: false };
+  renderVals() {
+    let durLabel = '36.4';
+    try {
+      const total = JSON.parse(window.OM_SCENES).reduce((a, s) => a + s.dur, 0);
+      durLabel = (Math.round(total * 10) / 10).toFixed(1).replace(/\.0$/, '');
+    } catch (e) {}
+    return {
+      vo: this.props.voiceOver ?? true,
+      music: this.props.music ?? true,
+      caps: this.props.captions ?? true,
+      durLabel,
+      soundBtn: this.state.armed ? '♪ Sound armed' : 'Enable sound',
+      soundMsg: this.state.armed ? 'press play — music + voice-over will follow the timeline' : '',
+      unlock: () => {
+        window.dispatchEvent(new Event('pri-audio-unlock'));
+        this.setState({ armed: true });
+      }
+    };
+  }
+}
+</script>
+</body>
+</html>
