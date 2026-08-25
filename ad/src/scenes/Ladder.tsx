@@ -190,8 +190,8 @@ export const Ladder: React.FC<{ t0?: number }> = ({ t0 = 20 }) => {
   const spec = useFrameSpec();
   const t = frame / fps + t0;
 
-  const gap = spec.aspect === '916' ? 1240 : spec.aspect === '45' ? 950 : 800;
-  const motifSize = spec.aspect === '916' ? 520 : 430;
+  const gap = spec.aspect === '916' ? 1060 : spec.aspect === '45' ? 860 : 760;
+  const motifSize = spec.aspect === '916' ? 560 : 450;
 
   // continuous pedestal move: one station per beat-pair, gliding with mass
   const climbed = MOVES.reduce((acc, mv) => acc + ramp(t, [mv - 0.25, mv + 0.35], [0, 1], easeMassive), 0);
@@ -222,9 +222,15 @@ export const Ladder: React.FC<{ t0?: number }> = ({ t0 = 20 }) => {
             />
             {LADDER.map((_, i) => {
               const arrive = i === 0 ? 20.0 : MOVES[i - 1];
-              const p = ramp(t, [arrive - 0.15, arrive + 0.75], [0, 1]);
+              const p = ramp(t, [arrive - 0.45, arrive + 0.55], [0, 1]);
+              // the focus window: stations exist only near the camera — they
+              // emerge from the dark below and recede above (and never leak
+              // text into the IG zones from off-screen)
+              const delta = i * gap - worldY;
+              const windowO = ramp(Math.abs(delta), [gap * 0.22, gap * 0.5], [1, 0]);
+              if (windowO <= 0.001) return null;
               return (
-                <div key={i} style={{ position: 'absolute', top: stationTop + i * gap, left: 0, right: 0, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                <div key={i} style={{ position: 'absolute', top: stationTop + i * gap, left: 0, right: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', opacity: windowO }}>
                   {/* rail node */}
                   <div
                     style={{

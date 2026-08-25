@@ -63,7 +63,7 @@ export const SAFE = {
 
 // Grade parameters — one grade across the whole film (docs/BRAND.md).
 export const GRADE = {
-  filter: 'contrast(1.04) brightness(1.01) saturate(1.05)',
+  filter: 'contrast(1.04) brightness(1.035) saturate(1.05)',
   vignette: 0.42,
   grainOpacity: 0.045,
   liftFloor: '#0d0d0b',

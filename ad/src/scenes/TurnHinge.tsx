@@ -49,7 +49,7 @@ export const HingeCore: React.FC<{ t: number; t0: number; lockAt?: number; speed
     ramp(t, [lockAt - 2.6 * speed, lockAt + 2.4], [0, 24], easeDrift) +
     26 * ramp(t, [lockAt, lockAt + 0.15], [0, 1], easeOutSignature) * ramp(t, [lockAt + 0.15, lockAt + 1.2], [1, 0.45], easeDrift);
   // rack focus: the equation plane sharpens as the curve softens, once the tangent locks
-  const focus = ramp(t, [lockAt + 0.25, lockAt + 1.0], [0, 80], easeDrift);
+  const focus = ramp(t, [lockAt + 0.25, lockAt + 1.0], [0, 36], easeDrift);
 
   // slope readout stages (top-right chip)
   const stageIdx = h > 0.72 ? 0 : h > 0.28 ? 1 : h > 0.045 ? 2 : 3;
@@ -95,12 +95,13 @@ export const HingeCore: React.FC<{ t: number; t0: number; lockAt?: number; speed
               opacity={secantIn * ramp(h, [0.004, 0.02], [0, 1])}
             />
           </svg>
-          {/* tangent label rides the line after the lock */}
+          {/* tangent label rides the line after the lock (inboard: its rotated
+              corner must clear the side margin even under the dolly's zoom) */}
           <div
             style={{
               position: 'absolute',
-              left: m.x(2.02),
-              top: m.y(2 * 2.02 - 1) - 56,
+              left: m.x(1.8),
+              top: m.y(2 * 1.8 - 1) - 56,
               opacity: fadeIO(t, lockAt + 0.55, lockAt + 900, 0.35, 1),
               transform: 'rotate(-31deg)',
             }}
@@ -112,9 +113,11 @@ export const HingeCore: React.FC<{ t: number; t0: number; lockAt?: number; speed
         </div>
       </Plane>
 
-      {/* the information plane — slightly forward; focus racks to it on the lock */}
-      <Plane z={80} blurScale={0.8}>
-        <div style={{ position: 'absolute', top: spec.safeTop + 26, width: '100%', display: 'flex', justifyContent: 'center' }}>
+      {/* the information plane — slightly forward; focus racks to it on the lock.
+          Text here sits deeper inside the margins: this plane magnifies ~5% at
+          full dolly, and the safe-zone gate measures the projected pixels. */}
+      <Plane z={36} blurScale={0.8}>
+        <div style={{ position: 'absolute', top: spec.safeTop + 62, width: '100%', display: 'flex', justifyContent: 'center' }}>
           <Kicker color={C.gold} tracking="0.32em">
             The idea
           </Kicker>
@@ -124,8 +127,8 @@ export const HingeCore: React.FC<{ t: number; t0: number; lockAt?: number; speed
         <div
           style={{
             position: 'absolute',
-            right: spec.safeSide,
-            top: spec.safeTop + 96,
+            right: spec.safeSide + 44,
+            top: spec.safeTop + 132,
             background: C.surface2,
             border: `1px solid ${stageIdx === 3 ? C.goldBorder : C.hairline}`,
             borderRadius: RADIUS.card,
@@ -140,7 +143,7 @@ export const HingeCore: React.FC<{ t: number; t0: number; lockAt?: number; speed
         </div>
 
         {/* the derivation, upper-left in the curve's negative space */}
-        <div style={{ position: 'absolute', left: spec.safeSide + 8, top: spec.aspect === '916' ? 560 : 400, width: 460 }}>
+        <div style={{ position: 'absolute', left: spec.safeSide + 44, top: spec.aspect === '916' ? 560 : 400, width: 460 }}>
           {eqPhase === 0 ? (
             <TextBox style={{ opacity: fadeIO(t, t0 + 0.2, lockAt - 0.55 * speed, 0.3, 0.25) }}>
               <Tex tex={HINGE.quotient} size={38} color={C.ink} />

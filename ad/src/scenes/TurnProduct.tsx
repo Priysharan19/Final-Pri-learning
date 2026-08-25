@@ -30,11 +30,12 @@ export const ProductPanel: React.FC<{ t: number; enterAt: number; inkAt: number;
 }) => {
   const spec = useFrameSpec();
   const enter = ramp(t, [enterAt, enterAt + 0.55 * speed], [0, 1], easeDrift);
-  const panelW = Math.min(880, spec.w - spec.safeSide * 2 + 20);
+  // 40px of zoom headroom for the dolly-in
+  const panelW = Math.min(850, spec.w - spec.safeSide * 2 - 20);
 
   // the small e^x picture: curve then its tangent at 0
-  const PW = 330;
-  const PH = 240;
+  const PW = 356;
+  const PH = 256;
   const m = makeMap(-2.1, 1.7, -0.9, 3.4, PW, PH);
   const curveP = ramp(t, [enterAt + 0.35 * speed, enterAt + 1.1 * speed], [0, 1], easeDrift);
   const tanP = ramp(t, [enterAt + 0.8 * speed, enterAt + 1.5 * speed], [0, 1], easeDrift);
@@ -55,12 +56,12 @@ export const ProductPanel: React.FC<{ t: number; enterAt: number; inkAt: number;
       style={{
         position: 'absolute',
         left: '50%',
-        top: spec.aspect === '916' ? 400 : spec.aspect === '45' ? 250 : 180,
+        top: spec.aspect === '916' ? 380 : spec.aspect === '45' ? 240 : 180,
         transform: `translateX(-50%) translateY(${(1 - enter) * 70}px)`,
         opacity: enter,
       }}
     >
-      <LitPanel width={panelW} radius={RADIUS.card} background={C.surface}>
+      <LitPanel width={panelW} radius={RADIUS.card} background={C.surface2}>
         {/* header — the product frame */}
         <div
           style={{
@@ -84,7 +85,7 @@ export const ProductPanel: React.FC<{ t: number; enterAt: number; inkAt: number;
         {/* the question that seized the factory */}
         <div style={{ padding: '26px 30px 20px' }}>
           <TextBox>
-            <Tex tex={PRODUCT.question} size={26} color={C.ink} />
+            <Tex tex={PRODUCT.question} size={29} color={C.ink} />
           </TextBox>
         </div>
 
@@ -113,7 +114,7 @@ export const ProductPanel: React.FC<{ t: number; enterAt: number; inkAt: number;
             <div
               style={{
                 fontFamily: FONT.hand,
-                fontSize: 41,
+                fontSize: 44,
                 color: '#f5f0df',
                 transform: 'rotate(-0.8deg)',
                 clipPath: `inset(0 ${(1 - inkP) * 100}% -8% 0)`,

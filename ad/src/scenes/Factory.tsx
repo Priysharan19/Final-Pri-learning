@@ -25,8 +25,8 @@ const Card: React.FC<{ tex: string; hero?: boolean; style?: React.CSSProperties 
     style={{
       width: CARD_W,
       height: CARD_H,
-      background: C.surface,
-      border: `1px solid ${hero ? C.hairlineStrong : C.hairline}`,
+      background: C.surface2,
+      border: `1px solid ${hero ? C.hairlineStrong : C.hairlineStrong}`,
       borderRadius: RADIUS.card,
       display: 'flex',
       alignItems: 'center',
@@ -36,7 +36,7 @@ const Card: React.FC<{ tex: string; hero?: boolean; style?: React.CSSProperties 
     }}
   >
     <TextBox>
-      <Tex tex={tex} size={26} color={hero ? C.ink : C.ink2} />
+      <Tex tex={tex} size={26} color={hero ? C.ink : '#c9c5b8'} />
     </TextBox>
   </div>
 );
@@ -151,7 +151,7 @@ export const SeizeCard: React.FC<{ t: number; at: number }> = ({ t, at }) => {
         transform: `translate(-50%, ${rise + tremble}px)`,
         opacity: p,
         width: Math.min(720, spec.w - spec.safeSide * 2),
-        background: C.surface2,
+        background: C.surface3,
         border: `1px solid ${C.goldBorder}`,
         borderRadius: RADIUS.card,
         padding: '38px 44px',
@@ -183,7 +183,7 @@ export const Factory: React.FC<{ t0?: number }> = ({ t0 = 1.5 }) => {
   return (
     <AbsoluteFill style={{ background: C.page }}>
       {/* the rank-list wall — sameness as wallpaper */}
-      <AbsoluteFill style={{ opacity: 0.07, overflow: 'hidden' }}>
+      <AbsoluteFill style={{ opacity: 0.09, overflow: 'hidden' }}>
         {Array.from({ length: 26 }, (_, i) => (
           <div
             key={i}

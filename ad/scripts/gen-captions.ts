@@ -1,7 +1,8 @@
 // Generates out/captions.srt (30 s master) and out/captions-15.srt from the
 // timeline's VO lines — the same data the burned captions render from.
 import { writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { VO30, VO15 } from '../src/data/timeline';
 
 const stamp = (s: number): string => {
@@ -17,6 +18,6 @@ const stamp = (s: number): string => {
 const srt = (lines: { at: number; until: number; text: string }[]): string =>
   lines.map((l, i) => `${i + 1}\n${stamp(l.at)} --> ${stamp(l.until)}\n${l.text}\n`).join('\n');
 
-writeFileSync(join(__dirname, '..', 'out', 'captions.srt'), srt(VO30));
-writeFileSync(join(__dirname, '..', 'out', 'captions-15.srt'), srt(VO15));
+writeFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'out', 'captions.srt'), srt(VO30));
+writeFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'out', 'captions-15.srt'), srt(VO15));
 console.log('wrote out/captions.srt and out/captions-15.srt');

@@ -36,12 +36,15 @@ x − y + 1 = 0 tangent to y² = 4x at (1,2).
 
 ## VO lines (ElevenLabs studio voice; each is also a burned caption)
 
+The gap at 11.7–13.2 s is authored: the music owns the tangent lock.
+
 | at–until (s) | Line |
 |---|---|
 | 0.15–1.45 | Stop memorising maths. |
 | 2.60–6.30 | Four hundred formulas. The same drill, the same batch, every day. |
-| 6.75–7.95 | Until the question is new. |
-| 9.00–14.60 | Watch the secant become the tangent. That's the derivative — not a rule, a reason. |
+| 6.55–7.75 | Until the question is new. |
+| 9.00–11.70 | Watch the secant become the tangent. |
+| 13.20–14.90 | That's the derivative — not a rule, a reason. |
 | 15.40–19.60 | Understand one idea, and you can solve what you've never seen. Marked like an examiner. |
 | 20.80–26.40 | Class seven to Olympiad. The same mathematics, at different pressures. |
 | 27.30–29.30 | Pri Learning. Join the change. |

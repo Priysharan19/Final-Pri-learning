@@ -36,7 +36,7 @@ const targets = [
 ];
 
 for (const [comp, file] of targets) {
-  run(`npx remotion render ${comp} out/${file} --codec=h264 --video-bitrate=14M --audio-bitrate=128k --concurrency=8 2>&1 | tail -3`);
+  run(`npx remotion render ${comp} out/${file} --codec=h264 --video-bitrate=14M --audio-bitrate=128k --color-space=bt709 --concurrency=8 2>&1 | tail -3`);
   faststart(join(OUT, file));
 }
 

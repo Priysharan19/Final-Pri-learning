@@ -15,12 +15,14 @@
 
 import { execSync } from 'node:child_process';
 import { existsSync, readFileSync, mkdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { decodePng } from './png.mjs';
 import katex from 'katex';
 import { ALL_TEX, VERIFICATIONS } from '../src/math/expressions';
 import { FPS, SCENES30, SCENES15, TEXT30, TEXT15, VO30, VO15, DUR30, DUR15 } from '../src/data/timeline';
 
-const ROOT = join(__dirname, '..');
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = join(ROOT, 'out');
 const PROBE = join(OUT, 'probe');
 mkdirSync(PROBE, { recursive: true });
@@ -164,10 +166,10 @@ const lum = (r: number, g: number, b: number): number => {
   return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
 };
 
-const rgbOf = (png: string, w: number, h: number): Buffer => {
-  const buf = shBuf(`npx remotion ffmpeg -v quiet -i "${png}" -f rawvideo -pix_fmt rgb24 - `);
-  if (buf.length !== w * h * 3) throw new Error(`raw size mismatch for ${png}: ${buf.length}`);
-  return buf;
+const rgbOf = (png: string, w: number, h: number): Uint8Array => {
+  const { w: pw, h: ph, rgb } = decodePng(readFileSync(png));
+  if (pw !== w || ph !== h) throw new Error(`size mismatch for ${png}: ${pw}x${ph}`);
+  return rgb;
 };
 
 if (!skipStills) {

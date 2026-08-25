@@ -39,7 +39,8 @@ export const Hook: React.FC<{ t0?: number }> = ({ t0 = 0 }) => {
                 landDur={0.24}
                 mode="slam"
                 lineHeight={1.04}
-                style={{ maxWidth: spec.w - spec.safeSide * 2, textAlign: 'center' }}
+                // 50px of zoom headroom: the push-in scales this plane ~2% and drift adds ±5px
+                style={{ maxWidth: spec.w - spec.safeSide * 2 - 50, textAlign: 'center' }}
               />
             </div>
           </AbsoluteFill>
