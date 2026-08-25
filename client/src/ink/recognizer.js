@@ -1757,6 +1757,12 @@ function ligatureSplitPass(line, medianH) {
     let best = null;
     for (const word of LIGATURE_WORDS) {
       if (standaloneOnly && !STANDALONE_LIG.has(word)) continue;
+      // A differential never precedes a variable: working reads "2x dx", a
+      // declaration reads "let u" — so against a following letter the du/dx
+      // hypotheses are not readings, they are "let" wearing a costume (the
+      // cursive let body carves into a plausible d + x, and the two means
+      // sit within a few points of each other).
+      if ((word === 'du' || word === 'dx') && next && /^[a-zA-Z]$/.test(next.sym)) continue;
       const k = word.length;
       if (k > units.length) continue;
       const score = (parts) => {
