@@ -74,10 +74,12 @@ This is the hero object. Apple revolves aluminium; we revolve an idea.
   pulse enters at 15.0; two pencil-tick foley hits per ✓.
 
 ### S4 — THE LADDER · 20.00–27.00 (frames 1200–1620)
-One continuous upward camera move — not four products, one ladder. Four stations rise
-past, each the *same motif* (a line touching a curve) at a different pressure:
+One continuous upward camera move — not four products, one ladder. Five stations rise
+past, each the *same motif* (a line touching a curve) at a different pressure
+(station rhythm escalates: Class 7 and Olympiad breathe, the middle compresses;
+moves at 21.2 · 22.3 · 23.4 · 24.6):
 
-1. **Class 7** — slope: y = 2x, rise over run.
+1. **Class 7** — proportion: y = 2x, y always double of x.
 2. **Class 10** — a tangent to a circle, radius ⊥ tangent at the point of contact.
 3. **Class 12** — the derivative: f′(x) = 2x (the card, finally understood).
 4. **JEE** — tangent to y² = 4x at (1, 2): x − y + 1 = 0.
@@ -104,15 +106,16 @@ The 15 has no room for the factory to breathe, so it inverts the order of revela
 it opens *on the curve already drawing* (beauty first — the scroll-stopper), states the
 problem in one line, and lets the tangent lock carry everything.
 
-- 0.00–1.20 · Curve drawing in the dark, already gorgeous. Type: **"Stop memorising maths."**
-- 1.20–3.60 · Three stamps of the factory grid — the d/dx card among them — then the
-  seize card, one beat of stillness.
-- 3.60–10.80 · Secant → tangent, lock at **7.20 s**; handwritten line marked ✓✓.
-- 10.80–15.00 · Ladder compressed to a single rising wipe (Class 7 → Olympiad as one
-  line of type), then wordmark · "Join the change." · fade to black. Loop-safe.
+- 0.00–1.00 · Curve drawing in the dark, already gorgeous. Type: **"Stop memorising maths."**
+- 1.00–3.50 · Compressed factory stamps — the d/dx card among them — then the
+  seize card at 2.5, one beat of stillness.
+- 3.50–8.50 · Secant → tangent, lock at **7.00 s**.
+- 8.50–10.50 · The product marks the handwritten close.
+- 10.50–12.50 · Ladder as one lateral move through the five stations.
+- 12.50–15.00 · Wordmark · "Join the change." · fade to black. Loop-safe.
 
-Own audio mix (same palette, re-cued): tick intro is shorter, the silence-before-reveal
-sits at 3.2–3.6, lock hits at 7.2.
+Own audio mix (same palette, re-cued to the 0.5 s grid): seize silence after 2.5,
+lock hits at 7.0.
 
 ---
 
