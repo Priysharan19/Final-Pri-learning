@@ -13,11 +13,13 @@ Canonical design source: the "Pri Learning Instagram Reel" project on claude.ai/
 | File | Role |
 |---|---|
 | `index.html` | Production shell — scene list (`OM_SCENES`), playback mode, frame chrome, sound-arm button |
-| `reel.jsx` | The whole reel: 11 sections, captions, audio rig (music sync + speech-synthesis VO) |
+| `reel.jsx` | The whole reel: 11 sections, captions, audio rig (timeline-synced soundtrack, speech-synth fallback) |
 | `animations-v3.jsx` | Composition engine (timeline, cues, easing, export protocol) — generated scaffold, don't hand-edit |
 | `support.js` | dc-runtime — boots React 18 + Babel from CDN and mounts the `<x-dc>` document — generated, don't edit |
-| `assets/music.wav` | Soundtrack, 36.4 s, VO ducking baked in |
+| `assets/music.wav` | Music bed, 36.4 s, VO ducking baked in |
+| `assets/vo-mix.wav` | Full commercial soundtrack — music bed + recorded voice-over; the preview and export prefer it |
 | `tools/make-music.mjs` | Deterministic zero-dependency synth that renders `assets/music.wav` to the cue map |
+| `tools/make-vo-mix.mjs` | Records the 11 VO lines with macOS neural TTS (Tara Premium, en-IN), levels them, and mixes `assets/vo-mix.wav` |
 | `tools/serve.mjs` | Static server (port 4174) that also accepts the export harness's MP4 upload |
 | `tools/frame.html` | Bare stage page (native 2160×3840, no chrome) for frame capture |
 | `tools/render-frames.mjs` | Zero-dependency headless-Chrome CDP driver — seeks the timeline frame by frame and captures 4K JPEGs |
@@ -35,10 +37,9 @@ Then open http://localhost:4173. Space toggles play/pause, ←/→ scrub, 0 retu
 start. Click "Enable sound" once — browsers require a gesture before audio — and the
 music and voice-over follow the timeline from then on.
 
-Sound in the browser preview is two layers: `assets/music.wav` (timeline-synced) and
-live speech-synthesis voice-over (an en-IN voice when the OS has one). The exported
-video muxes the music track; record studio VO separately for the final master if the
-platform needs burned-in voice.
+Sound in the preview is `assets/vo-mix.wav` — the full commercial soundtrack
+(music + recorded voice-over), timeline-synced. If the mix file is absent, the
+reel falls back to `assets/music.wav` plus live speech-synthesis VO.
 
 ## Export
 
@@ -62,8 +63,23 @@ node marketing/reel/tools/render-frames.mjs --fps 30
 ```
 
 Then open http://localhost:4174/tools/export.html — it encodes the frames plus
-`assets/music.wav` (H.264 + AAC) and writes `export/pri-reel-2160x3840-30fps.mp4`.
+the soundtrack (`assets/vo-mix.wav`, falling back to `assets/music.wav`;
+override with `?audio=<file>`) as H.264 + AAC and writes the MP4 to `export/`.
 Frames and MP4s under `export/` are build artifacts and gitignored.
+
+## Regenerating the voice-over
+
+```bash
+node marketing/reel/tools/make-vo-mix.mjs --voice Tara
+```
+
+Renders each of the 11 lines (auto-fitting any that overrun their scene window),
+runs each through a VO channel strip (90 Hz high-pass, presence EQ, air shelf,
+3:1 compression), levels them consistently, dips the bed under speech, and
+masters the mix to −14 LUFS with a −1 dBFS limiter ceiling. Per-line takes land
+in `export/vo-lines/` for auditioning. Timing lives in the `LINES` table at the
+top of the script; to re-voice the reel, pass `--voice <name>` or swap in your
+own takes per line.
 
 ## Editing rules
 

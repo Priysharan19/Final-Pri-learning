@@ -11,7 +11,7 @@ YouTube Shorts / Facebook Reels).
 | Aspect / size | 9:16 — export at 2160 × 3840, Instagram serves 1080 × 1920 |
 | Length | 36.4 s |
 | Frame rate | 30 or 60 fps (either is fine; the piece is deterministic per frame) |
-| Audio | Music track muxed from `assets/music.wav` (VO ducking baked in) |
+| Audio | Full soundtrack muxed from `assets/vo-mix.wav` — music bed + recorded VO, mastered to −14 LUFS, −1 dBFS peak, AAC 256 kbps |
 | Cover frame | **34.5 s** — logo lockup + "Coming soon" badge, before the fade |
 
 Safe areas are already authored in: captions and CTAs sit above the bottom ~22%
@@ -46,10 +46,12 @@ first/last frames are black so the loop is seamless.
 
 ## Voice-over
 
-The browser preview speaks the VO with the OS speech engine (en-IN voice when
-available) — that layer is **not** in the exported file. For the commercial master,
-record the 11 lines in `reel.jsx` (`AudioRig` → `VO`) with a studio/AI voice and lay
-them over the export at each line's cue; the music already ducks under every line.
+The voice-over is recorded and baked into the exported file: the 11 lines are
+rendered with macOS's neural Tara voice (en-IN, Premium), run through a VO channel
+strip (high-pass, presence EQ, compression), levelled, and mixed over the ducked
+bed by `tools/make-vo-mix.mjs`. To re-voice the reel (human or studio-AI takes),
+regenerate with `--voice <name>` or replace the per-line takes and re-run the mix,
+then re-export.
 
 ## Claims checklist (already in the video)
 
