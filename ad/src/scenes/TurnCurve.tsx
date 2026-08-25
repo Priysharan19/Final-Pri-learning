@@ -40,7 +40,7 @@ export const TurnCurve: React.FC<{ t0?: number }> = ({ t0 = 8 }) => {
 
   return (
     <AbsoluteFill style={{ background: C.page, opacity: ramp(t, [8.0, 8.35], [0, 1]) }}>
-      <Stage cam={{ dolly, drift: 0.55, focus: 0, dof: 2.2 }} tOffset={t0}>
+      <Stage cam={{ dolly, drift: 0.55, focus: 0, dof: 2.2, roll: ramp(t, [8.0, 10.0], [-0.8, -0.55], easeDrift) }} tOffset={t0}>
         <Plane z={-260}>
           <MathField opacity={0.4 * bloom} seed={21} count={40} />
         </Plane>

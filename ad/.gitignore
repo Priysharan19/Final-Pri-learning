@@ -3,3 +3,6 @@ out/*.mp4
 out/frames/
 out/probe/
 .remotion/
+out/vo-lines/
+out/render-log.txt
+out/cs-*/

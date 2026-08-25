@@ -16,18 +16,19 @@ breaks on this line.") sets the temperature.
 
 | # | Time (s) | Line | Words |
 |---|---|---|---|
-| 1 | 0.10–1.50 | Stop memorising maths. | 3 |
-| 2 | 2.50–4.50 | Memorise. Repeat. | 2 |
-| 3 | 4.60–6.40 | Four hundred formulas. No ideas. | 5 |
-| 4 | 6.70–8.00 | Until the question is new. | 5 |
-| 5 | 12.90–14.90 | The derivative isn't a rule. It's what you're watching. | 9 |
-| 6 | 15.30–17.40 | Understand one idea. Solve what you've never seen. | 8 |
-| 7 | 18.60–20.00 | Marked like an examiner. | 4 |
-| 8 | 20.60–26.80 | Class 7 to Olympiad. The same mathematics, at different pressures. | 10 |
-| 9 | 27.20–29.60 | ℙri Learning · **Join the change.** · @pri.learning — coming soon | — |
+| 1 | 0.10–1.50 | Stop memorising maths. *(all-ivory; the gold is the tangent line sweeping under the words)* | 3 |
+| 2 | 2.00–4.50 | Memorise. Repeat. | 2 |
+| 3 | 4.60–6.40 | Four hundred formulas. / No ideas. *(two lines, "No ideas." gold)* | 5 |
+| 4 | 6.20–7.60 | Until the question is new. | 5 |
+| 5 | 9.20–11.60 | Watch the secant become the tangent. | 6 |
+| 6 | 12.90–14.90 | The derivative isn't a rule. / It's what you're watching. | 9 |
+| 7 | 15.30–17.40 | Understand one idea. / Solve what you've never seen. | 8 |
+| 8 | 18.60–20.00 | Marked like an examiner. | 4 |
+| 9 | 20.60–26.80 | Class 7 to Olympiad. / The same mathematics, at different pressures. | 10 |
+| 10 | 27.00–29.60 | ℙri Learning · **Join the change.** · Follow @pri.learning · coming soon | — |
 
-Plus scene kickers in small caps (not spoken, ≤3 words, structural): THE FACTORY ·
-THE IDEA · CLASS 7 · CLASS 10 · CLASS 12 · JEE · OLYMPIAD.
+Plus scene kickers in small caps (not spoken, structural): THE FACTORY · THE IDEA ·
+CLASS 7 · CLASS 10 · CLASS 12 · JEE · OLYMPIAD · QUESTION 1 · UNSEEN / SOLVED.
 
 Maths set in frame (all KaTeX, all verified in `src/math`): d/dx x² = 2x · the factory's
 formula cards · "Prove that eˣ ≥ 1 + x for every real x." · secant slope table (h = 1 → 3,
@@ -41,8 +42,8 @@ The gap at 11.7–13.2 s is authored: the music owns the tangent lock.
 | at–until (s) | Line |
 |---|---|
 | 0.15–1.45 | Stop memorising maths. |
-| 2.60–6.30 | Four hundred formulas. The same drill, the same batch, every day. |
-| 6.55–7.75 | Until the question is new. |
+| 2.60–6.05 | Four hundred formulas. The same drill, the same batch, every day. |
+| 6.10–7.35 | Until the question is new. |
 | 9.00–11.70 | Watch the secant become the tangent. |
 | 13.20–14.90 | That's the derivative — not a rule, a reason. |
 | 15.40–19.60 | Understand one idea, and you can solve what you've never seen. Marked like an examiner. |

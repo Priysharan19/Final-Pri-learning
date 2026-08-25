@@ -73,10 +73,55 @@ would survive in the Titanium reel.
   built; the two-line "Four hundred formulas. / No ideas." carries the beat
   better. Storyboard updated instead of the film.
 
-## Pass 2
+## Pass 2 — verification of the rebuild (fresh renders, all gates green)
 
-(pending)
+Every pass-1 rebuild verified on the new contact sheet and probe stills: the
+factory reads at feed brightness and jolts at the seize; the sound-off caption
+chain is complete; the lock detonates with a single text anchor; the panel is
+lit, tilted and *writing* (pen dot on the ink edge); the ladder escalates and
+closes the wound with "QUESTION 1 · SOLVED"; captions carry no widows; the mix
+verifies (lock −7.0 dB loudest, tail → −47 dB null at 8.0 s, silence by 29.5).
+`scripts/check.ts`: **ALL GATES PASS** — including yuv420p after the bt709 flag.
 
-## Pass 3 / head-to-head
+Remaining below 8 after pass 2: motion/cinematography 7.5 (no true 3-D object
+rotation; act transitions fade through dark where Apple would cut), emotional
+truth 7 (an object film by design — the one human trace is the ink being
+written). Pass 3 adds the cheap-but-real cinema: a slow camera roll arc through
+the Turn act (the "revolve"), and per-station scale escalation up the ladder.
 
-(pending)
+**Self-grades after pass 2:**
+hook 8 · typographic craft 8 · motion 7.5→8 (with pass-3 roll) · cinematography
+7.5→8 · sound 8 · reveal craft 8.5 · mathematical honesty 9 · message clarity 8 ·
+restraint 8 · emotional truth 7.
+
+## Pass 3 / head-to-head — Apple "Titanium" as the measuring stick
+
+Shot-by-shot, against the discipline (nothing copied):
+- **Hook** — survives. Type-first cold opens are a legitimate Apple gesture;
+  the gold line under the words is our own promise device. ✓
+- **Factory** — survives as *characterisation*: it is deliberately the only
+  flat-lit, locked-off act, and the raking key + stamp shadows keep it physical.
+  In a straight lighting contest it still loses to aluminium; as an argument it
+  doesn't need to win. ✓ (with that caveat recorded)
+- **Curve/Hinge/Lock** — the film's case. Lit object, meaningful focus, camera
+  arc, earned silence, detonation on the beat. Would not read as the amateur
+  shot in the reel. ✓
+- **Product/Marked** — much closer after the light sweep, perspective and live
+  ink; interior UI type is still smaller than Apple would ever set. Partial.
+- **Ladder** — the continuous creep + escalation carries it; individual
+  stations held ~1.1 s are information-dense where Apple would give each 3 s
+  of air. The film only has 30. Partial — a length problem, not a craft one.
+- **Close** — chord lands on the brand, the pill breathes, stillness is now
+  alive-still, loop seam authored. ✓
+- **Honest verdict**: cut into a Titanium reel, the Turn act belongs; the
+  factory and ladder would read as a different (denser, more argumentative)
+  school of filmmaking rather than amateur work. That is the film we meant
+  to make. Where it still loses: interior-UI type scale, and the absence of
+  a physically-simulated ink stroke (Caveat + jitter approximates it).
+
+Final grades: hook 8 · typographic craft 8 · motion 8 · cinematography 8 ·
+sound 8 · reveal craft 8.5 · mathematical honesty 9 · message clarity 8 ·
+restraint 8 · **emotional truth 7 — the one accepted sub-8**: the brief's own
+premise (the mathematics is the hero object) trades human faces for the idea;
+within that premise the ink-being-marked is as human as the film gets. Logged
+as the weakest thing in HANDOFF.md rather than patched cosmetically.

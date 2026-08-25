@@ -266,7 +266,7 @@ export const Ladder: React.FC<{ t0?: number }> = ({ t0 = 20 }) => {
                       transition: 'none',
                     }}
                   />
-                  <LadderStation index={i} p={p} motifSize={motifSize} />
+                  <LadderStation index={i} p={p} motifSize={Math.round(motifSize * (1 + i * 0.045))} />
                 </div>
               );
             })}

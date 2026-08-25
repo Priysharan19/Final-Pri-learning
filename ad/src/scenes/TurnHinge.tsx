@@ -66,8 +66,11 @@ export const HingeCore: React.FC<{ t: number; t0: number; lockAt?: number; speed
   // equation strip (upper-left): quotient → limit → resolved
   const eqPhase = t < lockAt - 0.55 * speed ? 0 : t < lockAt - 0.001 ? 1 : 2;
 
+  // a slow arc: the camera rolls gently through the approach and settles level after the lock
+  const roll = ramp(t, [k(10.0), lockAt + 1.6], [-0.55, 0.35], easeDrift);
+
   return (
-    <Stage cam={{ dolly, drift: 0.55, focus, dof: 2.2 }} tOffset={t0}>
+    <Stage cam={{ dolly, drift: 0.55, focus, dof: 2.2, roll }} tOffset={t0}>
       <Plane z={-260}>
         <MathField opacity={0.4} seed={21} count={40} />
       </Plane>

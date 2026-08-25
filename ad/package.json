@@ -2,6 +2,7 @@
   "name": "pri-learning-ad",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
   "description": "Pri Learning — Instagram ad, Remotion production",
   "scripts": {
     "render": "node scripts/render-all.mjs",
