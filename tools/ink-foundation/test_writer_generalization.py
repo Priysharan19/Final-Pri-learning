@@ -6,7 +6,8 @@ import math
 
 import torch
 
-from data import PAD_ID, VOCAB
+from data import VOCAB as V3_VOCAB
+from data_v4 import PAD_ID, VOCAB, decode, encode
 from model import ModelConfig
 from model_v4 import PriInkFoundationV4, gradient_reverse
 from style_augmentation import augmented_strokes
@@ -14,16 +15,28 @@ from style_augmentation import augmented_strokes
 
 def fixture_strokes():
     return [
-        {"points": [
-            {"x": 10.0, "y": 30.0, "t": 0.00, "p": 0.4, "w": 2.5},
-            {"x": 20.0, "y": 15.0, "t": 0.04, "p": 0.5, "w": 2.8},
-            {"x": 30.0, "y": 30.0, "t": 0.08, "p": 0.6, "w": 3.0},
-        ]},
-        {"points": [
-            {"x": 36.0, "y": 18.0, "t": 0.10, "p": 0.5, "w": 2.7},
-            {"x": 48.0, "y": 18.0, "t": 0.14, "p": 0.5, "w": 2.7},
-        ]},
+        {
+            "points": [
+                {"x": 10.0, "y": 30.0, "t": 0.00, "p": 0.4, "w": 2.5},
+                {"x": 20.0, "y": 15.0, "t": 0.04, "p": 0.5, "w": 2.8},
+                {"x": 30.0, "y": 30.0, "t": 0.08, "p": 0.6, "w": 3.0},
+            ]
+        },
+        {
+            "points": [
+                {"x": 36.0, "y": 18.0, "t": 0.10, "p": 0.5, "w": 2.7},
+                {"x": 48.0, "y": 18.0, "t": 0.14, "p": 0.5, "w": 2.7},
+            ]
+        },
     ]
+
+
+def test_v4_vocabulary():
+    assert VOCAB[: len(V3_VOCAB)] == V3_VOCAB, "V4 vocabulary must be append-only"
+    assert "∫" not in V3_VOCAB, "test no longer demonstrates the real V3 calculus gap"
+    assert "∫" in VOCAB, "V4 must represent the collector's integral sign explicitly"
+    ids = encode("∫u^(2)du", 32)
+    assert decode(ids) == "∫u^(2)du", "V4 integral target must round-trip losslessly"
 
 
 def test_augmentation():
@@ -34,11 +47,17 @@ def test_augmentation():
     assert a == b, "same seed must produce identical writer transform"
     assert a != c, "different seeds should explore different handwriting styles"
     assert len(a) == len(original), "augmentation must never reorder/drop whole strokes"
-    assert [len(s["points"]) for s in a] == [3, 2], "tiny fixture endpoints must survive"
-    assert original[0]["points"][0]["x"] == 10.0, "augmentation must not mutate source corpus"
+    assert [len(stroke["points"]) for stroke in a] == [3, 2], (
+        "tiny fixture endpoints must survive"
+    )
+    assert original[0]["points"][0]["x"] == 10.0, (
+        "augmentation must not mutate source corpus"
+    )
     for stroke in a:
         for point in stroke["points"]:
-            assert math.isfinite(float(point["x"])) and math.isfinite(float(point["y"]))
+            assert math.isfinite(float(point["x"])) and math.isfinite(
+                float(point["y"])
+            )
             assert float(point.get("w", 1.0)) > 0
 
 
@@ -51,9 +70,17 @@ def test_gradient_reversal():
 
 def test_model_shapes():
     cfg = ModelConfig(
-        d_model=32, nhead=4, stroke_layers=1, decoder_layers=1, ff_dim=64,
-        max_points=16, max_tokens=8, raster_height=32, raster_width=64,
-        style_dim=16, architecture_version=4,
+        d_model=32,
+        nhead=4,
+        stroke_layers=1,
+        decoder_layers=1,
+        ff_dim=64,
+        max_points=16,
+        max_tokens=8,
+        raster_height=32,
+        raster_width=64,
+        style_dim=16,
+        architecture_version=4,
     )
     model = PriInkFoundationV4(
         len(VOCAB), PAD_ID, cfg, writer_classes=3, style_dropout=0.0
@@ -78,10 +105,11 @@ def test_model_shapes():
 
 
 def main():
+    test_v4_vocabulary()
     test_augmentation()
     test_gradient_reversal()
     test_model_shapes()
-    print("PASS: Pri Ink V4 writer-generalization checks")
+    print("PASS: Pri Ink V4 writer-generalization + calculus vocabulary checks")
 
 
 if __name__ == "__main__":
