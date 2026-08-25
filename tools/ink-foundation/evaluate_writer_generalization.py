@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Stress-test a frozen Pri Ink V4 checkpoint across handwriting styles.
 
-This evaluator never changes labels and never tunes the model.  It measures how
+This evaluator never changes labels and never tunes the model. It measures how
 often a correct expression survives plausible changes in slant, aspect, speed,
-pressure, width, point density and page angle.  Real writer-disjoint evidence is
+pressure, width, point density and page angle. Real writer-disjoint evidence is
 still mandatory: synthetic style perturbations are a robustness probe, not a
 substitute for people.
 """
@@ -17,7 +17,16 @@ from pathlib import Path
 
 import torch
 
-from data import EOS_ID, PAD_ID, VOCAB, corpus_files, decode, load_examples, point_features, rasterize
+from data_v4 import (
+    EOS_ID,
+    PAD_ID,
+    VOCAB,
+    corpus_files,
+    decode,
+    load_examples,
+    point_features,
+    rasterize,
+)
 from evaluate_release import edit_distance, is_critical_structure, prediction_confidence
 from model import ModelConfig
 from model_v4 import PriInkFoundationV4
@@ -49,15 +58,20 @@ def _device(name: str) -> torch.device:
     if name != "auto":
         return torch.device(name)
     return torch.device(
-        "cuda" if torch.cuda.is_available() else
-        "mps" if torch.backends.mps.is_available() else "cpu"
+        "cuda"
+        if torch.cuda.is_available()
+        else "mps"
+        if torch.backends.mps.is_available()
+        else "cpu"
     )
 
 
 @torch.no_grad()
 def infer(model, strokes, config: ModelConfig, device: torch.device):
     points, valid = point_features(strokes, config.max_points, augment=False)
-    raster = rasterize(strokes, config.raster_height, config.raster_width, augment=False)
+    raster = rasterize(
+        strokes, config.raster_height, config.raster_width, augment=False
+    )
     points_t = torch.from_numpy(points).unsqueeze(0).to(device)
     valid_t = torch.from_numpy(valid).unsqueeze(0).to(device)
     raster_t = torch.from_numpy(raster).unsqueeze(0).to(device)
@@ -67,8 +81,14 @@ def infer(model, strokes, config: ModelConfig, device: torch.device):
     return decode(ids.tolist()), prediction_confidence(logits, ids)
 
 
-def evaluate(model, examples, config: ModelConfig, device: torch.device,
-             perturbations: int, seed: int):
+def evaluate(
+    model,
+    examples,
+    config: ModelConfig,
+    device: torch.device,
+    perturbations: int,
+    seed: int,
+):
     model.eval()
     base_correct = 0
     base_char_errors = 0
@@ -80,7 +100,9 @@ def evaluate(model, examples, config: ModelConfig, device: torch.device,
     critical_total = 0
     critical_robust = 0
     confidence_drop = []
-    by_writer = defaultdict(lambda: {"n": 0, "base": 0, "robust": 0, "flips": 0, "variants": 0})
+    by_writer = defaultdict(
+        lambda: {"n": 0, "base": 0, "robust": 0, "flips": 0, "variants": 0}
+    )
 
     for index, example in enumerate(examples):
         truth = example.target
@@ -112,7 +134,9 @@ def evaluate(model, examples, config: ModelConfig, device: torch.device,
         robust = base_ok and all_variants_ok
         robust_correct += int(robust)
         writer_row["robust"] += int(robust)
-        if is_critical_structure(truth):
+        # The V3 release helper predates integral support. In V4 an integral sign
+        # is itself critical structure: dropping it changes the mathematical task.
+        if is_critical_structure(truth) or "∫" in truth:
             critical_total += 1
             critical_robust += int(robust)
 
@@ -125,7 +149,7 @@ def evaluate(model, examples, config: ModelConfig, device: torch.device,
             "flipRate": row["flips"] / max(1, row["variants"]),
         }
 
-    metrics = {
+    return {
         "samples": len(examples),
         "writers": len(writer_metrics),
         "perturbationsPerSample": perturbations,
@@ -134,14 +158,18 @@ def evaluate(model, examples, config: ModelConfig, device: torch.device,
         "perturbedExact": variant_correct / max(1, variant_total),
         "robustExact": robust_correct / max(1, len(examples)),
         "predictionFlipRate": flips / max(1, variant_total),
-        "worstWriterBaseExact": min((m["baseExact"] for m in writer_metrics.values()), default=0.0),
-        "worstWriterRobustExact": min((m["robustExact"] for m in writer_metrics.values()), default=0.0),
+        "worstWriterBaseExact": min(
+            (metric["baseExact"] for metric in writer_metrics.values()), default=0.0
+        ),
+        "worstWriterRobustExact": min(
+            (metric["robustExact"] for metric in writer_metrics.values()), default=0.0
+        ),
         "criticalSamples": critical_total,
         "criticalRobustExact": critical_robust / max(1, critical_total),
-        "meanConfidenceDropUnderStyleShift": sum(confidence_drop) / max(1, len(confidence_drop)),
+        "meanConfidenceDropUnderStyleShift": sum(confidence_drop)
+        / max(1, len(confidence_drop)),
         "byWriter": writer_metrics,
     }
-    return metrics
 
 
 def passes(metrics: dict) -> bool:
@@ -152,7 +180,8 @@ def passes(metrics: dict) -> bool:
         and metrics["perturbedExact"] >= TARGETS["perturbed_exact"]
         and metrics["robustExact"] >= TARGETS["robust_exact"]
         and metrics["worstWriterBaseExact"] >= TARGETS["worst_writer_base_exact"]
-        and metrics["worstWriterRobustExact"] >= TARGETS["worst_writer_robust_exact"]
+        and metrics["worstWriterRobustExact"]
+        >= TARGETS["worst_writer_robust_exact"]
         and metrics["predictionFlipRate"] <= TARGETS["prediction_flip_rate"]
         and metrics["criticalSamples"] > 0
         and metrics["criticalRobustExact"] >= TARGETS["critical_robust_exact"]
@@ -163,31 +192,44 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("checkpoint")
     parser.add_argument("--corpus", default="client/test/ink-corpus")
-    parser.add_argument("--split", choices=["validation", "test", "final-holdout"], default="test")
+    parser.add_argument(
+        "--split",
+        choices=["validation", "test", "final-holdout"],
+        default="test",
+    )
     parser.add_argument("--unlock-final-holdout", action="store_true")
     parser.add_argument("--perturbations", type=int, default=8)
     parser.add_argument("--seed", type=int, default=20260825)
     parser.add_argument("--device", default="auto")
     parser.add_argument("--out", default=None)
-    parser.add_argument("--enforce", action="store_true", help="exit 2 when V16 targets are not met")
+    parser.add_argument(
+        "--enforce", action="store_true", help="exit 2 when V16 targets are not met"
+    )
     args = parser.parse_args()
 
     if args.perturbations < 1:
         raise SystemExit("--perturbations must be >= 1")
     if args.split == "final-holdout" and not args.unlock_final_holdout:
-        raise SystemExit("Refusing to inspect final-holdout without --unlock-final-holdout")
+        raise SystemExit(
+            "Refusing to inspect final-holdout without --unlock-final-holdout"
+        )
 
     checkpoint_path = Path(args.checkpoint)
     checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
     if int(checkpoint.get("architecture_version") or 0) != 4:
-        raise SystemExit("writer-generalization evaluation requires an architecture_version=4 checkpoint")
+        raise SystemExit(
+            "writer-generalization evaluation requires an architecture_version=4 checkpoint"
+        )
     if checkpoint.get("vocab") != VOCAB:
-        raise SystemExit("checkpoint vocabulary does not match evaluator vocabulary")
+        raise SystemExit("checkpoint vocabulary does not match V4 evaluator vocabulary")
 
     config = ModelConfig(**checkpoint["config"])
     train_writers = checkpoint.get("train_writers") or []
     model = PriInkFoundationV4(
-        len(VOCAB), PAD_ID, config, writer_classes=len(train_writers),
+        len(VOCAB),
+        PAD_ID,
+        config,
+        writer_classes=len(train_writers),
         style_dropout=float(checkpoint.get("style_dropout", 0.20)),
     )
     model.load_state_dict(checkpoint["model"])
@@ -199,11 +241,17 @@ def main():
     if not selected:
         raise SystemExit(f"no {args.split!r} samples found under {args.corpus!r}")
     train_writer_set = set(train_writers)
-    leaked = sorted({example.writer for example in selected} & train_writer_set)
+    leaked = sorted(
+        {example.writer for example in selected} & train_writer_set
+    )
     if leaked:
-        raise SystemExit(f"writer-disjoint evaluation violated; trained writers in {args.split}: {leaked[:8]}")
+        raise SystemExit(
+            f"writer-disjoint evaluation violated; trained writers in {args.split}: {leaked[:8]}"
+        )
 
-    metrics = evaluate(model, selected, config, device, args.perturbations, args.seed)
+    metrics = evaluate(
+        model, selected, config, device, args.perturbations, args.seed
+    )
     passed = passes(metrics)
     report = {
         "format": "pri-ink-writer-generalization",
@@ -218,14 +266,19 @@ def main():
             "the real writer-disjoint sample/writer minimums and untouched final-holdout policy."
         ),
     }
-    output = Path(args.out) if args.out else checkpoint_path.with_name(
-        f"{checkpoint_path.stem}-{args.split}-writer-generalization.json"
+    output = (
+        Path(args.out)
+        if args.out
+        else checkpoint_path.with_name(
+            f"{checkpoint_path.stem}-{args.split}-writer-generalization.json"
+        )
     )
     output.write_text(json.dumps(report, indent=2), encoding="utf-8")
 
     print(
         f"writers={metrics['writers']} samples={metrics['samples']} "
-        f"base={100*metrics['baseExact']:.2f}% perturbed={100*metrics['perturbedExact']:.2f}% "
+        f"base={100*metrics['baseExact']:.2f}% "
+        f"perturbed={100*metrics['perturbedExact']:.2f}% "
         f"robust={100*metrics['robustExact']:.2f}%"
     )
     print(
