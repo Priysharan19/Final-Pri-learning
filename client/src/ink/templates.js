@@ -236,7 +236,7 @@ export const ALPHABET = [
   'x', 'y', 't', 'n', 'a', 'b', 'c', 'd', 'e', 'k', 'm', 'r', 's', 'u', 'v', 'z',
   'i', 'o', 'g', 'l', 'h', 'f', 'w', 'p', 'q', 'L', 'H', 'R',
   'pi', 'theta', '+', '-', '=', '/', '(', ')', '.', 'sqrt', '<', '>', '<=', '>=', '!=',
-  'div', 'pm', 'deg', 'percent', ':'
+  'div', 'pm', 'deg', 'percent', ':', '∫'
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -334,12 +334,55 @@ export const REAL_ALLOGRAPHS = {
   ],
 };
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Hand-authored cursive allographs — letterforms every school hand produces
+// that the print-shaped library above cannot match: the script u whose entry
+// hook and exit tail make it read as an open 4, the one-motion looped e and
+// bowl-into-stem d of joined writing. They are runtime-matching material only:
+// NOT in TEMPLATES (the synthetic suites' locked writer population) and NOT in
+// REAL_ALLOGRAPHS (which holds consented corpus observations, and these are
+// not observations — they are authored). gen.mjs does not import this export,
+// so retraining is unaffected until someone deliberately opts it in.
+// ─────────────────────────────────────────────────────────────────────────────
+export const HAND_ALLOGRAPHS = {
+  'u': [
+    // script u: rising entry hook, two minims, short exit tail
+    [[[12, 36], [18, 29], [23, 26], [22, 36], [20, 47], [19, 58], [21, 70], [26, 80], [34, 85], [42, 81], [47, 72], [50, 61], [52, 49], [53, 36], [53, 30], [54, 44], [56, 58], [60, 72], [67, 82], [76, 87], [86, 84]]],
+    // rounder bowls, no entry hook
+    [[[16, 30], [14, 42], [13, 55], [15, 68], [20, 79], [29, 85], [38, 82], [45, 73], [49, 62], [52, 50], [54, 37], [55, 30], [55, 43], [57, 57], [61, 70], [68, 81], [78, 86], [88, 80]]],
+    // minims-only fragment — the form a ligature carve-out actually produces
+    // (the entry travel belongs to the previous letter's exit); this is what
+    // the du/dx splitter scores its u piece against
+    [[[14, 32], [13, 46], [14, 60], [18, 73], [26, 80], [34, 76], [41, 65], [45, 52], [47, 38], [48, 30], [48, 45], [50, 60], [54, 72], [61, 80], [70, 83], [80, 79]]],
+    // …and the same fragment when the carve keeps the join: the pen climbs
+    // from the previous letter's baseline exit straight into the first minim
+    [[[8, 86], [12, 70], [15, 52], [17, 38], [18, 30], [17, 44], [16, 58], [18, 72], [24, 80], [32, 84], [40, 78], [45, 64], [48, 50], [50, 38], [51, 30], [51, 44], [52, 58], [55, 72], [61, 82], [68, 86], [76, 84], [84, 78]]]
+  ],
+  'd': [
+    // one-motion cursive d: bowl, tall stem retraced, exit tail
+    [[[56, 42], [47, 35], [37, 34], [28, 41], [23, 52], [22, 64], [26, 76], [34, 84], [44, 84], [52, 76], [57, 64], [60, 50], [62, 35], [63, 20], [64, 8], [63, 22], [62, 38], [62, 54], [63, 68], [66, 80], [72, 88], [80, 90]]]
+  ],
+  'e': [
+    // one-motion looped e
+    [[[22, 62], [32, 54], [41, 45], [46, 35], [44, 26], [36, 22], [28, 27], [22, 38], [19, 51], [20, 64], [25, 76], [34, 85], [46, 90], [60, 90], [72, 85]]]
+  ]
+};
+
 /** The library the app matches against at runtime: every hand-authored
- *  variant plus every learned real-writer allograph. */
+ *  variant plus every learned real-writer allograph. HAND_ALLOGRAPHS is
+ *  deliberately NOT merged here: folding the cursive letterforms into
+ *  general candidate scoring measurably moved the held-out synthetic
+ *  boundaries (u/d/e candidates strengthened everywhere, -0.3 lines on the
+ *  holdout3 gate), so the recogniser consults them only through the
+ *  authored-cursive rescue, which fires on a near-exact match with a clear
+ *  margin and nowhere else. */
 export const RUNTIME_TEMPLATES = Object.fromEntries(
   Object.entries(TEMPLATES).map(([sym, vars]) => [
     sym,
-    REAL_ALLOGRAPHS[sym] ? [...vars, ...REAL_ALLOGRAPHS[sym]] : vars
+    [
+      ...vars,
+      ...(REAL_ALLOGRAPHS[sym] || [])
+    ]
   ])
 );
 

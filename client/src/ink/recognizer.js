@@ -14,7 +14,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // The $P matcher (and the slant bias derived from it) match against the full
 // runtime library — hand-authored variants plus learned real-writer allographs.
-import { RUNTIME_TEMPLATES as TEMPLATES, TEMPLATES as HAND_TEMPLATES } from './templates.js';
+import { RUNTIME_TEMPLATES as TEMPLATES, TEMPLATES as HAND_TEMPLATES, REAL_ALLOGRAPHS, HAND_ALLOGRAPHS } from './templates.js';
 import { nnClassify, NN_CLASSES } from './nn.js';
 import { geomRerank } from './rerank.js';
 import { classOfSymbol, defaultSymbol, symbolsOfClass, CLASS_INDEX } from './classes.js';
@@ -121,6 +121,17 @@ for (const [sym, variants] of Object.entries(TEMPLATES)) {
     const b = bbox(allPts);
     TEMPLATE_CLOUDS.push({ sym, cloud: cloudOf(flat), aspect: b.w / b.h, nStrokes: strokes.length, real: vi >= handCount });
   });
+}
+
+// The authored cursive letterforms live in their own bank, matched ONLY by
+// the rescue below — see the RUNTIME_TEMPLATES note in templates.js.
+const AUTHORED_CLOUDS = [];
+for (const [sym, variants] of Object.entries(HAND_ALLOGRAPHS)) {
+  for (const strokes of variants) {
+    const flat = strokes.map(st => st.map(p => p.slice()));
+    const b = bbox(flat.flat());
+    AUTHORED_CLOUDS.push({ sym, cloud: cloudOf(flat), aspect: b.w / b.h, nStrokes: strokes.length });
+  }
 }
 
 // ── Hand-slant normalisation ─────────────────────────────────────────────────
@@ -342,8 +353,52 @@ function structural(group, medianH) {
     if (Math.max(b.w, b.h) > 0.9 * medianH && isRadicalStroke(strokes[0])) {
       return { sym: 'sqrt', conf: 0.9 };
     }
+    // ∫ : one very tall, narrow S-curve — a hook opening RIGHT at the top, a
+    // near-vertical trunk, a hook opening LEFT at the bottom. Nothing else in
+    // the inventory is this tall and double-hooked: straight strokes returned
+    // above, a parenthesis hooks one way only, a cursive ell exits rightward,
+    // and a bowed fraction slash is monotone (its topmost point IS its
+    // rightmost, so the curl tests reject it). The integral sign has no CNN
+    // class — growing the class set costs the retrain gate (measured on
+    // B/I) — so it is read here, from the one geometry a raster throws away.
+    const fine = resample(strokes[0], 32);
+    const relY = p => (p[1] - pb.y1) / Math.max(pb.h, 1e-6);
+    const cxOf = a => a.reduce((t, p) => t + p[0], 0) / Math.max(a.length, 1);
+    if (pb.h >= 1.5 * medianH && pb.w <= 0.62 * pb.h && pb.w >= 0.08 * pb.h) {
+      const top = fine.filter(p => relY(p) < 0.30);
+      const mid = fine.filter(p => { const r = relY(p); return r >= 0.35 && r < 0.65; });
+      const bot = fine.filter(p => relY(p) >= 0.70);
+      if (top.length >= 2 && mid.length >= 2 && bot.length >= 2) {
+        const c = cxOf(mid);
+        const spread = Math.max(...mid.map(p => p[0])) - Math.min(...mid.map(p => p[0]));
+        // reach, not centroid: the trunk's points share the top band with the
+        // hook and would dilute a centroid; how far the hook STICKS OUT past
+        // the trunk is the signature. The curl tests keep monotone diagonals
+        // out — a bowed slash's topmost point IS its rightmost.
+        const need = Math.max(0.28 * pb.w, 4);
+        const apexT = fine.reduce((a, p) => (p[1] < a[1] ? p : a));
+        const apexB = fine.reduce((a, p) => (p[1] > a[1] ? p : a));
+        const topReach = Math.max(...top.map(p => p[0])) - c;
+        const botReach = c - Math.min(...bot.map(p => p[0]));
+        const topCurl = Math.max(...top.map(p => p[0])) - apexT[0] >= 0.08 * pb.w;
+        const botCurl = apexB[0] - Math.min(...bot.map(p => p[0])) >= 0.08 * pb.w;
+        // …and the hooks must actually TURN: across each end fifth of the
+        // path the pen's bearing reverses by ≥80°. A very tall warped
+        // parenthesis can S-ify enough to pass the reach tests, but its whole
+        // arc only sweeps ~90°, so an end fifth of it never carries a real
+        // hook's rotation.
+        const seg = Math.max(2, Math.floor(fine.length / 5));
+        const bearingOf = (p, q) => Math.atan2(q[1] - p[1], q[0] - p[0]);
+        const wrap = (a) => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; };
+        const headTurn = Math.abs(wrap(bearingOf(fine[seg - 1], fine[seg]) - bearingOf(fine[0], fine[1])));
+        const tailTurn = Math.abs(wrap(bearingOf(fine[fine.length - 2], fine[fine.length - 1]) - bearingOf(fine[fine.length - 1 - seg], fine[fine.length - seg])));
+        const hooksTurn = headTurn >= Math.PI * (80 / 180) && tailTurn >= Math.PI * (80 / 180);
+        if (spread <= 0.5 * pb.w && topReach > need && botReach > need && topCurl && botCurl && hooksTurn) {
+          return { sym: '∫', conf: 0.92 };
+        }
+      }
+    }
   }
-
   if (strokes.length === 2) {
     const p1 = resample(strokes[0], 20), p2 = resample(strokes[1], 20);
     const f1 = flatness(p1) < 0.35 && lineFitDeviation(p1) < 0.12;
@@ -960,7 +1015,7 @@ function kxCentreOffset(strokes) {
  *  calibrated, truncated alts are built. The ligature splitter needs this:
  *  "how much does this fragment look like an n" is a question the top-5
  *  calibrated alts cannot answer once a stronger reading has eaten the mass. */
-function glyphCandidates(group, medianH) {
+export function glyphCandidates(group, medianH, withAuthored = false) {
   const strokes = group.strokes.map(strokePts);
   const relSize = Math.max(group.box.w, group.box.h) / Math.max(medianH, 1e-6);
   const kx = kxCentreOffset(strokes);
@@ -974,15 +1029,23 @@ function glyphCandidates(group, medianH) {
   const cloud = cloudOf(strokes);
   const aspect = group.box.w / group.box.h;
   const bestBySym = new Map();
-  const consider = (t, discount) => {
+  const distOf = (t, discount) => {
     let d = cloudDistance(cloud, t.cloud) * discount;
     const aspLog = Math.abs(Math.log((aspect + 0.05) / (t.aspect + 0.05)));
     d += 0.06 * Math.min(2.2, aspLog);
     if (t.nStrokes !== strokes.length) d += 0.035;
+    return d;
+  };
+  const consider = (t, discount) => {
+    const d = distOf(t, discount);
     const cur = bestBySym.get(t.sym);
     if (cur === undefined || d < cur.d) bestBySym.set(t.sym, { d, personal: discount < 1 });
   };
   for (const t of TEMPLATE_CLOUDS) consider(t, t.real ? 1.12 : 1);
+  // the authored cursive bank joins general matching ONLY for ligature piece
+  // scoring — a carved fragment of joined writing IS the population these
+  // forms describe, while whole print-shaped glyphs must never feel them
+  if (withAuthored) for (const t of AUTHORED_CLOUDS) consider(t, 1.12);
   for (const t of getPersonalClouds()) consider(t, 0.75);   // your handwriting outranks stock
 
   // ③ blend into per-symbol scores
@@ -998,6 +1061,40 @@ function glyphCandidates(group, medianH) {
     out.push({ sym, score, cnnP, tmpl, d });
   }
   out.sort((a, b) => b.score - a.score);
+
+  // Authored-cursive rescue, the personal-template principle extended: the
+  // CNN trained on print-shaped renders and is far out of distribution on a
+  // joined-hand letterform, so when the ink lies essentially ON an authored
+  // cursive form (near-exact $P match) and every other symbol's shape is
+  // nearly twice as far, the match IS the evidence — a blend the net
+  // dominates would bury it (a script u matched at d=0.027 scored 6th while
+  // the net read '4'). The authored bank is consulted ONLY here: its forms
+  // never join general scoring, so print-shaped populations cannot feel
+  // them, and the relative-margin gate keeps a genuinely ambiguous glyph
+  // (which never has a 1.9x shape margin) out of the rescue.
+  if (out.length) {
+    let bestA = null;
+    for (const t of AUTHORED_CLOUDS) {
+      const d = distOf(t, 1.12);
+      if (!bestA || d < bestA.d) bestA = { sym: t.sym, d };
+    }
+    if (bestA && bestA.d <= 0.16) {
+      const rescCls = classOfSymbol(bestA.sym);
+      const others = out.filter(c => classOfSymbol(c.sym) !== rescCls).map(c => c.d);
+      if (others.length && Math.min(...others) >= 1.9 * bestA.d) {
+        const have = out.find(c => c.sym === bestA.sym);
+        const boosted = out[0].score * 1.25;
+        if (have) {
+          have.score = Math.max(have.score, boosted);
+          if (bestA.d < have.d) { have.d = bestA.d; have.tmpl = 1 / (1 + 8 * bestA.d); }
+        } else {
+          const ci = CLASS_INDEX[classOfSymbol(bestA.sym)];
+          out.push({ sym: bestA.sym, score: boosted, cnnP: ci !== undefined ? probs[ci] : 0.001, tmpl: 1 / (1 + 8 * bestA.d), d: bestA.d });
+        }
+        out.sort((a, b) => b.score - a.score);
+      }
+    }
+  }
   return out;
 }
 
@@ -1252,7 +1349,13 @@ function assembleLine(syms) {
 // ── Math-language decode ─────────────────────────────────────────────────────
 
 // Words the decoder can lock (longest first). Lowercase; caps resolved after.
-const FUNC_WORDS = ['cosec', 'sec', 'csc', 'sin', 'cos', 'tan', 'cot', 'log', 'lhs', 'rhs', 'ln'];
+const FUNC_WORDS = ['cosec', 'sec', 'csc', 'sin', 'cos', 'tan', 'cot', 'log', 'lhs', 'rhs', 'ln', 'let', 'du', 'dx'];
+
+/** Words that are complete terms rather than function names: no argument is
+ *  required after them, and locking them keeps the beam from re-litigating
+ *  the letter pair (the bigram table taxes letter-letter adjacency, which is
+ *  exactly what a differential is). */
+const STANDALONE_WORDS = new Set(['lhs', 'rhs', 'let', 'du', 'dx']);
 
 /** The only digits that may stand in for a letter of a function name — they are
  *  the genuine pixel-identical class twins. */
@@ -1306,7 +1409,13 @@ function letterCandidates(sym) {
 // irrelevant. Cuts are only allowed where the pen slowed to a near-stop or
 // turned hard, which is where letter joins live, not at free arc positions.
 
-const LIGATURE_WORDS = ['cos', 'sin', 'tan', 'sec', 'csc', 'cot', 'log', 'ln'];
+const LIGATURE_WORDS = ['cos', 'sin', 'tan', 'sec', 'csc', 'cot', 'log', 'ln', 'let', 'du', 'dx'];
+
+/** Complete terms, not function names: they need no argument after them, so
+ *  the argument-context guards must not veto them. "du = 2x dx" carries its
+ *  'du' hard against the '=', exactly where the function-word guard says a
+ *  word can never be. */
+const STANDALONE_LIG = new Set(['let', 'du', 'dx']);
 
 /** Candidate cut points of one stroke: pen-speed minima (the corpus records t
  *  at 240Hz; synthetic strokes without timing fall back to point spacing,
@@ -1392,13 +1501,15 @@ function ligatureSplitPass(line, medianH) {
 
     // A function name needs an argument after it; without one the split
     // could strand loose letters the line never meant (decodeFunctions
-    // applies the very same licence before locking a word).
+    // applies the very same licence before locking a word). Standalone terms
+    // (let / du / dx) are complete without an argument, so at end-of-line or
+    // against a relation they stay hypotheses while function names drop out.
     const next = out[i + 1];
-    if (!next || RELATIONAL.has(next.sym)) continue;
+    const standaloneOnly = !next || RELATIONAL.has(next.sym);
     // Function-argument context loosens the anchor rule below: a wide glyph
     // in front of a theta / bracket / variable earns trust a bare wide
     // squiggle between digits does not.
-    const argContext = next.sym === '(' || next.sym === 'theta' || /^[a-zA-Z]$/.test(next.sym);
+    const argContext = !!next && (next.sym === '(' || next.sym === 'theta' || /^[a-zA-Z]$/.test(next.sym));
 
     const ordered = [...s._group.strokes].sort((a, b) => a.box.cx - b.box.cx);
     const m = ordered.length;
@@ -1448,7 +1559,7 @@ function ligatureSplitPass(line, medianH) {
       const group = { strokes, box, strokeIdxs: [...new Set(strokes.map(st => st.idx))] };
       pc = { group, cand: null, top: null };
       if (Math.max(box.w, box.h) >= 0.14 * medianH && box.w <= 1.6 * medianH) {
-        const raw = glyphCandidates(group, medianH);
+        const raw = glyphCandidates(group, medianH, true);
         // Fragment re-blend: the CNN was trained on whole glyphs and is far
         // out of distribution on letter fragments — it confidently reads the
         // envelope, not the letterform (a joined c scores cnnP 0.007 as 'c'
@@ -1515,6 +1626,7 @@ function ligatureSplitPass(line, medianH) {
 
     let best = null;
     for (const word of LIGATURE_WORDS) {
+      if (standaloneOnly && !STANDALONE_LIG.has(word)) continue;
       const k = word.length;
       if (k > units.length) continue;
       const score = (parts) => {
@@ -1657,7 +1769,7 @@ function decodeFunctions(line, medianH) {
     // A function needs something it can actually take as an argument. If the
     // next glyph is a relation or operator this was never a function name —
     // "1n=…" locking as "ln" then wrapping "=" gave "ln(=)1±1".
-    if (bestWord && bestWord !== 'lhs' && bestWord !== 'rhs') {
+    if (bestWord && !STANDALONE_WORDS.has(bestWord)) {
       const next = line[i + bestWord.length];
       if (!next || RELATIONAL.has(next.sym)) bestWord = null;
       // A coefficient-variable term like "1n-8" is common school algebra.
@@ -2271,7 +2383,12 @@ function mathGrammarScore(symsList) {
 const CAT = new Map();
 for (let i = 0; i <= 9; i++) CAT.set(String(i), 'd');
 for (const ch of 'abcdefghijklmnopqrstuvwxyz') { CAT.set(ch, 'v'); CAT.set(ch.toUpperCase(), 'v'); }
-for (const s of ['pi', 'theta', 'LHS', 'RHS']) CAT.set(s, 'c');
+for (const s of ['pi', 'theta', 'LHS', 'RHS', 'let']) CAT.set(s, 'c');
+CAT.set('∫', 'f');   // prefix operator: takes what follows, like a function name
+// differentials close an integrand the way a postfix unit closes a value —
+// "u du" is the canonical form, and 'p' is the category that welcomes a
+// preceding value and a following end-of-line
+for (const s of ['du', 'dx']) CAT.set(s, 'p');
 CAT.set('.', '.');
 CAT.set('(', '(');
 CAT.set(')', ')');
@@ -2624,6 +2741,17 @@ function beamRepair(line, overrides, medianH, ctx = null) {
     }
     return list;
   });
+  // The corrected raised-glyph semantics below (bigrams silenced in both
+  // directions, prevCat carried across, whole-line form judged on baseline
+  // text) are the right physics for exponents everywhere — but the beam's
+  // weights were TUNED against the old flat approximation, and re-deriving
+  // them is retrain-scale work. Until then the corrected semantics engage
+  // only where the old tuning never reached: lines carrying the calculus
+  // notation (∫, du, dx, let) that did not exist when the tables were tuned.
+  // Elsewhere the beam behaves bit-identically to the tuned baseline.
+  const calcNotation = line.some(s2 => s2.sym === '∫' || s2.sym === 'du' || s2.sym === 'dx' || s2.sym === 'let') ||
+    candLists.some(l => l.some(c => c.sym === '∫'));
+
   // Merge arcs: the beam may also read two adjacent glyphs as ONE symbol,
   // scored by re-classifying their joined ink. mergeRetry above only fires on
   // low confidence, but this engine is confidently wrong more often than it is
@@ -2696,7 +2824,10 @@ function beamRepair(line, overrides, medianH, ctx = null) {
     // an exponent, though: no maths raises a dot or an operator, and exempting
     // them here let a colon's upper dot dodge the '.'→'.' penalty as a
     // "superscript" and priced the ':' merge out of the beam.
-    if (raised[i] && g < 0 && (cat === 'd' || cat === 'v' || cat === 'c' || cat === '(' || cat === ')')) g = 0;
+    // …in BOTH directions: a digit exponent must not collect the d→d bond
+    // with its baseline neighbour either, or "u²" flattens to "42" — the
+    // exponent's identity comes from its own ink, not a cross-band bigram.
+    if (raised[i] && (calcNotation || g < 0) && (cat === 'd' || cat === 'v' || cat === 'c' || cat === '(' || cat === ')')) g = 0;
     // …but the symbol prior survives the exemption: being raised excuses a
     // reading from its NEIGHBOURS, not from what it is — nobody writes an
     // exponent letter-l, and zeroing the unigram tax let a fraction's
@@ -2704,7 +2835,11 @@ function beamRepair(line, overrides, medianH, ctx = null) {
     // with 'l' and lose to sort noise.
     g += UNIGRAM[sym] || 0;
     if (unitSlot[i]) g += cat === 'p' ? 0.55 : (cat === 'd' || cat === 'v') ? -0.30 : 0;
-    return { cat, delta: Math.log(conf) + GRAMMAR_WEIGHT * g };
+    // A raised glyph is grammatically DISCONNECTED from the baseline: the
+    // symbol after "u²" follows the u, not the 2 — so the exponent's own
+    // category must not become prevCat, or "du" pays d→v as if the ² were
+    // inline text between them.
+    return { cat: (raised[i] && calcNotation) ? b.prevCat : cat, delta: Math.log(conf) + GRAMMAR_WEIGHT * g };
   };
   const qctx = ctxScorer(ctx, candLists);
   let beamsAt = Array.from({ length: line.length + 1 }, () => []);
@@ -2746,7 +2881,16 @@ function beamRepair(line, overrides, medianH, ctx = null) {
 
   let best = null, bestTotal = -Infinity;
   for (const b of beamsAt[line.length]) {
-    const total = b.score + GRAMMAR_WEIGHT * (bigramScore(b.prevCat, '$', '$') + lineFormScore(b.syms)) +
+    // Whole-line form terms judge the BASELINE text: an exponent digit is not
+    // inline — "∫u²du" must not lose the parse bonus to "∫42dx", which is
+    // literally what a flat parse of the same ink rewards (the raised 2 reads
+    // as the second digit of 42 and the line becomes a well-formed product).
+    // Raised glyphs are dropped by their POSITION, which is path-independent,
+    // so every hypothesis is judged on the same footing.
+    const baseSyms = calcNotation
+      ? b.syms.filter((_, j) => !(b.arcs[j] && raised[b.arcs[j].i]))
+      : b.syms;
+    const total = b.score + GRAMMAR_WEIGHT * (bigramScore(b.prevCat, '$', '$') + lineFormScore(baseSyms)) +
       (qctx ? qctx.score(b.syms) : 0);
     if (total > bestTotal) { bestTotal = total; best = b; }
   }
@@ -2894,17 +3038,24 @@ export function recognize(strokes, overrides = {}, ctx = null) {
 
   // Context re-rank: letter/digit lookalikes settle by their neighbours.
   const LOOKALIKE = { s: '5', z: '2', b: '6', u: '4', d: 'a', g: '9', q: '9', o: '0', l: '1' };
+  const trace = (label, lns) => { if (process.env.INK_TRACE) console.error('TRACE', label, lns.map(ls => ls.map(s => s.sym + (s.conf < 0.99 ? '@' + s.conf : '')).join(' ')).join(' | ')); };
   let linesPre = splitLines(symbols);
+  trace('split', linesPre);
 
   // segmentation self-repair (colon, merge, then split), then function-name locking
   linesPre = linesPre.map(ls => colonRetry(ls, medianH));
+  trace('colon-retry', linesPre);
   linesPre = linesPre.map(ls => equalsRetry(ls, medianH));
   linesPre = linesPre.map(ls => mergeRetry(ls, medianH));
+  trace('merge-retry', linesPre);
   linesPre = linesPre.map(ls => splitRetry(ls, medianH));
+  trace('split-retry', linesPre);
   linesPre = linesPre.map(ls => operatorSplitPass(ls, medianH));
   linesPre = linesPre.map(operatorContextPass);
   linesPre = linesPre.map(ls => ligatureSplitPass(ls, medianH));
+  trace('ligature', linesPre);
   linesPre = linesPre.map(ls => decodeFunctions(ls, medianH));
+  trace('decode-words', linesPre);
   linesPre = linesPre.map(ls => degreeMarkPass(ls, medianH));
   linesPre = linesPre.map(ls => mathContextPass(ls, medianH));
   linesPre = linesPre.map(rhsNumericPass);
@@ -3022,7 +3173,9 @@ export function recognize(strokes, overrides = {}, ctx = null) {
   }
 
   // grammar beam: uncertain lines re-decoded against the maths-syntax prior
+  trace('pre-beam', linesPre);
   linesPre = linesPre.map(ls => beamRepair(ls, overrides, medianH, ctx));
+  trace('post-beam', linesPre);
 
   // the beam can turn a misread bracket back into the digit it was, putting a
   // slash between digits for the first time — the geometry test above then has
@@ -3103,6 +3256,8 @@ export function exprToLatex(s) {
   t = t.replace(/\^\(([^()]*)\)/g, '^{$1}');
   t = t.replace(/\b(sin|cos|tan|sec|csc|cot|ln|log)\b/g, '\\$1 ');
   t = t.replace(/\bLHS\b/g, '\\mathrm{LHS}').replace(/\bRHS\b/g, '\\mathrm{RHS}');
+  t = t.replace(/\blet\b/g, '\\mathrm{let}\\;');
+  t = t.replace(/∫/g, '\\int ');
   t = t.replace(/theta/g, '\\theta ').replace(/pi/g, '\\pi ');
   t = t.replace(/<=/g, ' \\le ').replace(/>=/g, ' \\ge ').replace(/!=/g, ' \\ne ');
   t = t.replace(/±/g, ' \\pm ').replace(/°/g, '^{\\circ}');
