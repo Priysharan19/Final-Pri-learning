@@ -19,7 +19,7 @@ Canonical design source: the "Pri Learning Instagram Reel" project on claude.ai/
 | `assets/music.wav` | Music bed, 36.4 s, VO ducking baked in |
 | `assets/vo-mix.wav` | Full commercial soundtrack — music bed + recorded voice-over; the preview and export prefer it |
 | `tools/make-music.mjs` | Deterministic zero-dependency synth that renders `assets/music.wav` to the cue map |
-| `tools/make-vo-mix.mjs` | Records the 11 VO lines with macOS neural TTS (Tara Premium, en-IN), levels them, and mixes `assets/vo-mix.wav` |
+| `tools/make-vo-mix.mjs` | Records the 11 VO lines (ElevenLabs studio voice by default, macOS TTS fallback), levels them, and mixes `assets/vo-mix.wav` |
 | `tools/serve.mjs` | Static server (port 4174) that also accepts the export harness's MP4 upload |
 | `tools/frame.html` | Bare stage page (native 2160×3840, no chrome) for frame capture |
 | `tools/render-frames.mjs` | Zero-dependency headless-Chrome CDP driver — seeks the timeline frame by frame and captures 4K JPEGs |
@@ -70,8 +70,14 @@ Frames and MP4s under `export/` are build artifacts and gitignored.
 ## Regenerating the voice-over
 
 ```bash
-node marketing/reel/tools/make-vo-mix.mjs --voice Tara
+node marketing/reel/tools/make-vo-mix.mjs
 ```
+
+With an ElevenLabs key present (`ELEVENLABS_API_KEY` or `~/.elevenlabs_key`) it
+uses the ElevenLabs studio engine — auto-picking an Indian-English voice from the
+account when one exists, else a narration voice; `--voice <name-or-id>` overrides,
+`--model` picks the model. Without a key it falls back to macOS TTS
+(`--engine say --voice Tara`).
 
 Renders each of the 11 lines (auto-fitting any that overrun their scene window),
 runs each through a VO channel strip (90 Hz high-pass, presence EQ, air shelf,

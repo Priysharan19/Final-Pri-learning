@@ -1,16 +1,24 @@
 #!/usr/bin/env node
-// Records the reel's 11 voice-over lines with macOS TTS (say), lays them at
-// their cue times over assets/music.wav (which already ducks under each line),
-// and writes the full commercial soundtrack to assets/vo-mix.wav.
+// Records the reel's 11 voice-over lines, lays them at their cue times over
+// assets/music.wav (which already ducks under each line), and writes the full
+// commercial soundtrack to assets/vo-mix.wav.
 //
-//   node marketing/reel/tools/make-vo-mix.mjs [--voice Tara]
+//   node marketing/reel/tools/make-vo-mix.mjs [--engine elevenlabs|say] [--voice <name>]
 //
-// Lines that overrun their scene window are automatically re-rendered at a
-// higher speaking rate until they fit. Deterministic for a given macOS voice.
+// Engines:
+//   elevenlabs — studio-grade neural TTS (default when a key is present).
+//     Key: ELEVENLABS_API_KEY env var or ~/.elevenlabs_key. Picks an
+//     Indian-English voice from the account's voice list unless --voice
+//     names one (by name or voice id). --model overrides the model id
+//     (default eleven_multilingual_v2). Lines that overrun their scene
+//     window are re-rendered slightly faster via the API's speed setting.
+//   say — macOS TTS fallback (--voice defaults to Tara). Overruns are
+//     re-rendered at a higher wpm rate.
 
 import { execFileSync } from 'node:child_process';
-import { readFileSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, rmSync, existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
+import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 
 function segRms(buf, start, len) {
@@ -89,7 +97,15 @@ function limit(Lc, Rc, ceiling, sr) {
 
 const args = Object.fromEntries(process.argv.slice(2).map((a, i, all) =>
   a.startsWith('--') ? [a.slice(2), all[i + 1] && !all[i + 1].startsWith('--') ? all[i + 1] : '1'] : []).filter(p => p.length));
-const VOICE = args.voice || 'Tara';
+const KEY = process.env.ELEVENLABS_API_KEY
+  || (existsSync(join(homedir(), '.elevenlabs_key')) ? readFileSync(join(homedir(), '.elevenlabs_key'), 'utf8').trim() : '');
+const ENGINE = args.engine || (KEY ? 'elevenlabs' : 'say');
+if (ENGINE === 'elevenlabs' && !KEY) {
+  console.error('no ElevenLabs key — set ELEVENLABS_API_KEY or write it to ~/.elevenlabs_key');
+  process.exit(1);
+}
+const VOICE = args.voice || (ENGINE === 'say' ? 'Tara' : '');
+const EL_MODEL = args.model || 'eleven_multilingual_v2';
 const SR = 44100;
 
 // Cue map (OM_SCENES running starts) + the AudioRig offsets from reel.jsx.
@@ -129,16 +145,11 @@ rmSync(LINE_DIR, { recursive: true, force: true });
 mkdirSync(LINE_DIR, { recursive: true });
 const RATE_CAP = 215; // above this, TTS pacing stops sounding like an ad read
 
-function renderLine(idx, text, rate) {
-  const out = join(LINE_DIR, `line${String(idx).padStart(2, '0')}${rate ? '-r' + rate : ''}.wav`);
-  const a = ['-v', VOICE, '--data-format=LEI16@44100', '-o', out];
-  if (rate) a.push('-r', String(rate));
-  a.push(text);
-  execFileSync('say', a);
-  const w = parseWav(readFileSync(out));
-  if (w.sampleRate !== SR) throw new Error('say returned ' + w.sampleRate + ' Hz');
+function wavToMonoTrimmed(path, idx, words) {
+  const w = parseWav(readFileSync(path));
+  if (w.sampleRate !== SR) throw new Error('expected 44100 Hz, got ' + w.sampleRate);
   // mono float
-  const n = w.data.length / 2 / w.channels;
+  const n = Math.floor(w.data.length / 2 / w.channels);
   const s = new Float32Array(n);
   for (let i = 0; i < n; i++) s[i] = w.data.readInt16LE(i * 2 * w.channels) / 32768;
   // trim leading/trailing silence below -50 dB
@@ -147,11 +158,52 @@ function renderLine(idx, text, rate) {
   while (a0 < n && Math.abs(s[a0]) < thr) a0++;
   while (a1 > a0 && Math.abs(s[a1]) < thr) a1--;
   const trimmed = s.subarray(Math.max(0, a0 - Math.round(0.02 * SR)), Math.min(n, a1 + Math.round(0.06 * SR)));
-  // sanity floor: a render shorter than ~0.12s per word means say truncated
-  const words = text.split(/\s+/).length;
+  // sanity floor: a render shorter than ~0.12s per word means the engine truncated
   if (trimmed.length / SR < words * 0.12)
-    throw new Error(`line ${idx} rendered suspiciously short (${(trimmed.length / SR).toFixed(2)}s for ${words} words) — inspect ${out}`);
+    throw new Error(`line ${idx} rendered suspiciously short (${(trimmed.length / SR).toFixed(2)}s for ${words} words) — inspect ${path}`);
   return trimmed;
+}
+
+function renderLineSay(idx, text, rate) {
+  const out = join(LINE_DIR, `line${String(idx).padStart(2, '0')}${rate ? '-r' + rate : ''}.wav`);
+  const a = ['-v', VOICE, '--data-format=LEI16@44100', '-o', out];
+  if (rate) a.push('-r', String(rate));
+  a.push(text);
+  execFileSync('say', a);
+  return wavToMonoTrimmed(out, idx, text.split(/\s+/).length);
+}
+
+let EL_VOICE = null; // {id, name}, resolved once per run
+async function resolveElevenVoice() {
+  const r = await fetch('https://api.elevenlabs.io/v1/voices', { headers: { 'xi-api-key': KEY } });
+  if (!r.ok) throw new Error('ElevenLabs /voices failed: HTTP ' + r.status + ' ' + (await r.text()).slice(0, 200));
+  const { voices = [] } = await r.json();
+  if (VOICE) {
+    const hit = voices.find((v) => v.voice_id === VOICE || v.name.toLowerCase() === VOICE.toLowerCase());
+    return hit ? { id: hit.voice_id, name: hit.name } : { id: VOICE, name: VOICE }; // raw voice id passthrough
+  }
+  const lbl = (v) => (v.name + ' ' + Object.values(v.labels || {}).join(' ')).toLowerCase();
+  const pick = voices.find((v) => /india/.test(lbl(v)))
+    || voices.find((v) => /(narrat|news|informative)/.test(lbl(v)) && /female/.test(lbl(v)))
+    || voices.find((v) => /female/.test(lbl(v)))
+    || voices[0];
+  if (!pick) throw new Error('no voices available on this ElevenLabs account');
+  return { id: pick.voice_id, name: pick.name };
+}
+
+async function renderLineEleven(idx, text, speed) {
+  const base = join(LINE_DIR, `line${String(idx).padStart(2, '0')}${speed !== 1 ? '-s' + speed.toFixed(2) : ''}`);
+  const vs = { stability: 0.5, similarity_boost: 0.75, style: 0.3, use_speaker_boost: true };
+  if (speed !== 1) vs.speed = speed;
+  const r = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${EL_VOICE.id}?output_format=mp3_44100_128`, {
+    method: 'POST',
+    headers: { 'xi-api-key': KEY, 'content-type': 'application/json' },
+    body: JSON.stringify({ text, model_id: EL_MODEL, voice_settings: vs }),
+  });
+  if (!r.ok) throw new Error('ElevenLabs TTS failed on line ' + idx + ': HTTP ' + r.status + ' ' + (await r.text()).slice(0, 300));
+  writeFileSync(base + '.mp3', Buffer.from(await r.arrayBuffer()));
+  execFileSync('afconvert', ['-f', 'WAVE', '-d', 'LEI16@44100', base + '.mp3', base + '.wav']);
+  return wavToMonoTrimmed(base + '.wav', idx, text.split(/\s+/).length);
 }
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -162,19 +214,36 @@ const L = new Float32Array(N), R = new Float32Array(N);
 for (let i = 0; i < N; i++) { L[i] = music.data.readInt16LE(i * 4) / 32768; R[i] = music.data.readInt16LE(i * 4 + 2) / 32768; }
 
 const VO_GAIN = 0.95, FADE = Math.round(0.008 * SR);
-console.log(`voice: ${VOICE}`);
-LINES.forEach((ln, li) => {
+if (ENGINE === 'elevenlabs') {
+  EL_VOICE = await resolveElevenVoice();
+  console.log(`engine: elevenlabs — voice ${EL_VOICE.name} (${EL_VOICE.id}), model ${EL_MODEL}`);
+} else {
+  console.log(`engine: say — voice ${VOICE}`);
+}
+for (const [li, ln] of LINES.entries()) {
   const window = ln.until - ln.at - 0.12;
-  let rate = 0, s = renderLine(li, ln.text, 0), dur = s.length / SR;
-  while (dur > window * 1.03 && rate < RATE_CAP) {
-    // aim for 95% of the window; if -r has no effect on this voice, stop escalating
-    const next = Math.min(RATE_CAP, Math.ceil((rate || 178) * dur / (window * 0.95)));
-    if (next === rate) break;
-    rate = next;
-    const s2 = renderLine(li, ln.text, rate);
-    const d2 = s2.length / SR;
-    if (d2 > dur * 0.95 && d2 < dur * 1.05 && rate > 190) { console.warn(`  ⚠ voice ignores -r on line ${li}`); s = s2; dur = d2; break; }
-    s = s2; dur = d2;
+  let s, dur, fitNote = '';
+  if (ENGINE === 'elevenlabs') {
+    s = await renderLineEleven(li, ln.text, 1); dur = s.length / SR;
+    if (dur > window * 1.03) {
+      const speed = Math.round(Math.min(1.2, Math.max(1.05, dur / (window * 0.95))) * 100) / 100;
+      s = await renderLineEleven(li, ln.text, speed); dur = s.length / SR;
+      fitNote = `  (speed ${speed.toFixed(2)})`;
+    }
+  } else {
+    let rate = 0;
+    s = renderLineSay(li, ln.text, 0); dur = s.length / SR;
+    while (dur > window * 1.03 && rate < RATE_CAP) {
+      // aim for 95% of the window; if -r has no effect on this voice, stop escalating
+      const next = Math.min(RATE_CAP, Math.ceil((rate || 178) * dur / (window * 0.95)));
+      if (next === rate) break;
+      rate = next;
+      const s2 = renderLineSay(li, ln.text, rate);
+      const d2 = s2.length / SR;
+      if (d2 > dur * 0.95 && d2 < dur * 1.05 && rate > 190) { console.warn(`  ⚠ voice ignores -r on line ${li}`); s = s2; dur = d2; break; }
+      s = s2; dur = d2;
+    }
+    if (rate) fitNote = `  (rate ${rate})`;
   }
   if (dur > window + 0.3) console.warn(`  ⚠ line ${li} spills ${(dur - window).toFixed(2)}s past its window`);
   // VO channel strip: rumble high-pass, presence lift, a little air, then
@@ -211,8 +280,8 @@ LINES.forEach((ln, li) => {
   const mixRms = segRms(L, start, s.length);
   const lift = 20 * Math.log10(mixRms / Math.max(musicRms, 1e-6));
   if (lift < 5) console.warn(`  ⚠ line ${li} barely audible over the bed (+${lift.toFixed(1)} dB)`);
-  console.log(`  ${ln.at.toFixed(2).padStart(5)}s  ${dur.toFixed(2)}s / ${window.toFixed(2)}s window${rate ? '  (rate ' + rate + ')' : ''}  +${lift.toFixed(1)} dB over bed  "${ln.text.slice(0, 44)}${ln.text.length > 44 ? '…' : ''}"`);
-});
+  console.log(`  ${ln.at.toFixed(2).padStart(5)}s  ${dur.toFixed(2)}s / ${window.toFixed(2)}s window${fitNote}  +${lift.toFixed(1)} dB over bed  "${ln.text.slice(0, 44)}${ln.text.length > 44 ? '…' : ''}"`);
+}
 
 // Master bus: measure integrated loudness (approx BS.1770), master to the
 // -14 LUFS streaming standard, and limit with a -1 dBFS ceiling.

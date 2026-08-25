@@ -47,9 +47,9 @@ first/last frames are black so the loop is seamless.
 ## Voice-over
 
 The voice-over is recorded and baked into the exported file: the 11 lines are
-rendered with macOS's neural Tara voice (en-IN, Premium), run through a VO channel
-strip (high-pass, presence EQ, compression), levelled, and mixed over the ducked
-bed by `tools/make-vo-mix.mjs`. To re-voice the reel (human or studio-AI takes),
+rendered with an ElevenLabs studio voice (Alice — clear educator read), run through
+a VO channel strip (high-pass, presence EQ, compression), levelled, and mixed over
+the ducked bed by `tools/make-vo-mix.mjs`. To re-voice the reel (human or studio-AI takes),
 regenerate with `--voice <name>` or replace the per-line takes and re-run the mix,
 then re-export.
 
