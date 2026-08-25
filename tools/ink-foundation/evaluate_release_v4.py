@@ -1,23 +1,103 @@
 #!/usr/bin/env python3
-"""Run the existing Pri Ink production reliability gates on a frozen V4 model.
+"""Run Pri Ink production reliability gates on a frozen Foundation V4 model.
 
-This intentionally reuses the V3 release metrics/thresholds rather than creating
-a friendlier V4 scorecard. The only difference is model construction. The final
-holdout remains explicit opt-in and must never be used for tuning.
+The thresholds are intentionally unchanged from V3. The scoring path is V4-
+aware so append-only symbols such as the integral sign are decoded and counted
+correctly rather than being silently treated as <unk>. The final holdout remains
+explicit opt-in and must never be used for tuning.
 """
 from __future__ import annotations
 
 import argparse
 import json
+from collections import defaultdict
 from pathlib import Path
 
 import torch
 from torch.utils.data import DataLoader
 
-from data import PAD_ID, VOCAB, InkDataset, corpus_files, load_examples
-from evaluate_release import RELEASE, passes, score, sha256
+from data_v4 import (
+    PAD_ID,
+    VOCAB,
+    InkDatasetV4,
+    corpus_files,
+    decode,
+    load_examples,
+)
+from evaluate_release import (
+    RELEASE,
+    edit_distance,
+    is_critical_structure,
+    passes,
+    prediction_confidence,
+    sha256,
+)
 from model import ModelConfig
 from model_v4 import PriInkFoundationV4
+
+
+def _critical_v4(text: str) -> bool:
+    return is_critical_structure(text) or "∫" in text
+
+
+@torch.no_grad()
+def score_v4(model, loader, device):
+    model.eval()
+    total = exact = char_total = char_errors = 0
+    critical_total = critical_exact = 0
+    safe_total = safe_correct = 0
+    by_writer: dict[int, list[int]] = defaultdict(list)
+    confidences = []
+
+    for batch in loader:
+        logits, _ = model(
+            batch["points"].to(device),
+            batch["point_valid"].to(device),
+            batch["raster"].to(device),
+        )
+        ids = logits.argmax(-1).cpu()
+        logits_cpu = logits.float().cpu()
+        truths = list(batch["target_text"])
+        writers = batch["writer"].tolist()
+        for row in range(ids.shape[0]):
+            pred = decode(ids[row].tolist())
+            truth = truths[row]
+            ok = int(pred == truth)
+            confidence = prediction_confidence(logits_cpu[row], ids[row])
+
+            total += 1
+            exact += ok
+            char_total += max(1, len(truth))
+            char_errors += edit_distance(pred, truth)
+            by_writer[int(writers[row])].append(ok)
+            confidences.append(confidence)
+
+            if _critical_v4(truth):
+                critical_total += 1
+                critical_exact += ok
+
+            if confidence >= RELEASE["safe_confidence_threshold"]:
+                safe_total += 1
+                safe_correct += ok
+
+    writer_exact = [sum(v) / len(v) for v in by_writer.values() if v]
+    writer_counts = [len(v) for v in by_writer.values() if v]
+    safe_precision = safe_correct / safe_total if safe_total else 0.0
+    return {
+        "samples": total,
+        "writers": len(writer_exact),
+        "min_samples_per_writer": min(writer_counts, default=0),
+        "exact": exact / max(1, total),
+        "cer": char_errors / max(1, char_total),
+        "worst_writer_exact": min(writer_exact, default=0.0),
+        "critical_structure_samples": critical_total,
+        "critical_structure_exact": critical_exact / max(1, critical_total),
+        "safe_threshold": RELEASE["safe_confidence_threshold"],
+        "safe_samples": safe_total,
+        "safe_coverage": safe_total / max(1, total),
+        "safe_precision": safe_precision,
+        "mean_confidence": sum(confidences) / max(1, len(confidences)),
+    }
 
 
 def main():
@@ -44,13 +124,15 @@ def main():
     checkpoint = Path(args.checkpoint)
     ckpt = torch.load(checkpoint, map_location="cpu", weights_only=False)
     if int(ckpt.get("architecture_version") or 0) != 4:
-        raise SystemExit("evaluate_release_v4.py requires an architecture_version=4 checkpoint")
+        raise SystemExit(
+            "evaluate_release_v4.py requires an architecture_version=4 checkpoint"
+        )
     if ckpt.get("stage") != "finetune":
         raise SystemExit(
             "release evaluation requires a real-writer fine-tuned checkpoint, not synthetic pretraining"
         )
     if ckpt.get("vocab") != VOCAB:
-        raise SystemExit("checkpoint vocabulary does not match this evaluator")
+        raise SystemExit("checkpoint vocabulary does not match the V4 evaluator")
 
     cfg = ModelConfig(**ckpt["config"])
     train_writers = ckpt.get("train_writers") or []
@@ -65,8 +147,11 @@ def main():
 
     if args.device == "auto":
         device = torch.device(
-            "cuda" if torch.cuda.is_available() else
-            "mps" if torch.backends.mps.is_available() else "cpu"
+            "cuda"
+            if torch.cuda.is_available()
+            else "mps"
+            if torch.backends.mps.is_available()
+            else "cpu"
         )
     else:
         device = torch.device(args.device)
@@ -77,10 +162,6 @@ def main():
     if not selected:
         raise SystemExit(f"no {args.split!r} samples found under {args.corpus!r}")
 
-    # Release evidence must also be writer-disjoint from training. This check is
-    # explicit here even though corpus loading already prevents one writer from
-    # occupying two declared splits: a checkpoint may have been trained on an
-    # older corpus snapshot.
     trained = set(train_writers)
     leaked = sorted({example.writer for example in selected} & trained)
     if leaked:
@@ -90,7 +171,7 @@ def main():
 
     writers = sorted({example.writer for example in selected})
     writer_to_id = {writer: index for index, writer in enumerate(writers)}
-    dataset = InkDataset(
+    dataset = InkDatasetV4(
         selected,
         args.split,
         cfg.max_points,
@@ -102,7 +183,7 @@ def main():
     loader = DataLoader(
         dataset, batch_size=args.batch, shuffle=False, num_workers=0
     )
-    metrics = score(model, loader, device)
+    metrics = score_v4(model, loader, device)
     passed = passes(metrics)
 
     report = {
