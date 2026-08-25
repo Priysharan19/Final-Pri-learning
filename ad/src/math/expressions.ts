@@ -59,8 +59,8 @@ export const PRODUCT = {
   proofLine2: String.raw`g'<0 \text{ on } x<0,\;\; g'>0 \text{ on } x>0\;\Rightarrow\; \min g=g(0)=0`,
   conclusion: String.raw`\therefore\; e^{x}\ge 1+x\quad\blacksquare`,
   /** Handwritten (Caveat) final line the marks land on. */
-  handwritten: 'so eˣ − (1 + x) ≥ g(0) = 0  ∴  eˣ ≥ 1 + x  ∎',
-  ticks: ['tangent at 0', 'minimum at 0', 'conclusion'],
+  handwritten: 'so eˣ ≥ 1 + x, equality only at x = 0  ∎',
+  ticks: ['tangent at 0', 'above the tangent', 'conclusion'],
 };
 
 /** Act III — the ladder: the same motif at five pressures. */

@@ -214,10 +214,10 @@ function buildScore({ dur, cues }) {
   // — Factory: metronomic 16ths + staccato minor pulse + stamps
   for (let t = factoryStart; t < seize - 0.02; t += 0.125) {
     const strong = Math.round((t - factoryStart) / 0.125) % 4 === 0;
-    mix.add(t, tick(rng, strong ? 1.25 : 0.8), strong ? 0.4 : 0.16, strong ? 0.12 : -0.12);
+    mix.add(t, tick(rng, strong ? 1.25 : 0.8), strong ? 0.34 : 0.13, strong ? 0.12 : -0.12);
   }
   for (let t = factoryStart; t < seize - 0.02; t += 0.5) {
-    mix.add(t, thunk(rng), 0.62);
+    mix.add(t, thunk(rng), 0.56);
     mix.add(t, felt(D('D', 3), 0.28), 0.2); // dead staccato — no melody, machine
   }
   // dread layer under the sameness
@@ -238,11 +238,11 @@ function buildScore({ dur, cues }) {
   mix.add(lock - 1.1, riser(1.1, rng), 0.32);
 
   // — LOCK: the loudest, warmest moment
-  mix.add(lock, sub(48, 1.6), 0.9);
-  for (const [n, o, g] of [['F', 2, 0.4], ['F', 3, 0.34], ['A', 3, 0.3], ['C', 4, 0.26], ['G', 4, 0.14]]) {
+  mix.add(lock, sub(48, 1.6), 1.15);
+  for (const [n, o, g] of [['F', 2, 0.54], ['F', 3, 0.46], ['A', 3, 0.4], ['C', 4, 0.35], ['G', 4, 0.19]]) {
     mix.add(lock, pad(D(n, o), 4.6, { attack: 0.012, release: 2.4, bright: 0.6 }), g);
   }
-  mix.add(lock, shimmer(), 0.34);
+  mix.add(lock, shimmer(), 0.42);
   mix.add(lock + 0.5, felt(D('F', 5)), 0.2);
 
   // — After the lock: gentle organic pulse under the product
@@ -280,8 +280,8 @@ function buildScore({ dur, cues }) {
   mix.add(close - 1.0, riser(1.0, rng), 0.26);
 
   // — Close: D major resolve, long decay, silence by end − 0.2
-  mix.add(close, sub(36, 1.8), 0.7);
-  for (const [n, o, g] of [['D', 2, 0.34], ['D', 3, 0.3], ['A', 3, 0.26], ['Gb', 4, 0.2], ['D', 4, 0.18]]) {
+  mix.add(close, sub(36, 1.8), 0.55);
+  for (const [n, o, g] of [['D', 2, 0.24], ['D', 3, 0.22], ['A', 3, 0.19], ['Gb', 4, 0.14], ['D', 4, 0.13]]) {
     mix.add(close, pad(D(n, o), end - close - 1.3, { attack: 0.02, release: 1.1, bright: 0.5 }), g);
   }
   mix.add(close + 0.15, felt(D('D', 5), 2.4), 0.2);
@@ -367,10 +367,10 @@ function writeWav(path, mix) {
 // ── cue maps (must mirror src/data/timeline.ts) ────────────────────────────
 
 const VO30 = [
-  [0.15, 1.45], [2.6, 6.3], [6.75, 7.95], [9.0, 14.6], [15.4, 19.6], [20.8, 26.4], [27.3, 29.3],
+  [0.15, 1.45], [2.6, 6.3], [6.55, 7.75], [9.0, 11.7], [13.2, 14.9], [15.4, 19.6], [20.8, 26.4], [27.3, 29.3],
 ];
 const VO15 = [
-  [0.2, 1.15], [2.55, 3.7], [3.8, 8.1], [8.7, 10.4], [10.7, 12.3], [12.8, 14.5],
+  [0.2, 1.15], [2.55, 3.7], [3.9, 6.5], [8.7, 10.4], [10.7, 12.3], [12.8, 14.5],
 ];
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');

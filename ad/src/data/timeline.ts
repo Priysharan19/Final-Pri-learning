@@ -78,12 +78,14 @@ export interface VoLine {
   caption?: string;
 }
 
-/** VO for the 30 s master. Also the source of out/captions.srt. */
+/** VO for the 30 s master. Also the source of out/captions.srt.
+ * The gap at 11.7–13.2 is authored: the music owns the tangent lock (12.6). */
 export const VO30: VoLine[] = [
   { at: 0.15, until: 1.45, text: 'Stop memorising maths.' },
   { at: 2.6, until: 6.3, text: 'Four hundred formulas. The same drill, the same batch, every day.' },
-  { at: 6.75, until: 7.95, text: 'Until the question is new.' },
-  { at: 9.0, until: 14.6, text: 'Watch the secant become the tangent. That’s the derivative — not a rule, a reason.' },
+  { at: 6.55, until: 7.75, text: 'Until the question is new.' },
+  { at: 9.0, until: 11.7, text: 'Watch the secant become the tangent.' },
+  { at: 13.2, until: 14.9, text: 'That’s the derivative — not a rule, a reason.' },
   { at: 15.4, until: 19.6, text: 'Understand one idea, and you can solve what you’ve never seen. Marked like an examiner.' },
   { at: 20.8, until: 26.4, text: 'Class seven to Olympiad. The same mathematics, at different pressures.' },
   { at: 27.3, until: 29.3, text: 'Pri Learning. Join the change.' },
@@ -92,7 +94,7 @@ export const VO30: VoLine[] = [
 export const VO15: VoLine[] = [
   { at: 0.2, until: 1.15, text: 'Stop memorising maths.' },
   { at: 2.55, until: 3.7, text: 'Until the question is new.' },
-  { at: 3.8, until: 8.1, text: 'Watch the secant become the tangent. That’s the derivative — a reason, not a rule.' },
+  { at: 3.9, until: 6.5, text: 'Watch the secant become the tangent.' },
   { at: 8.7, until: 10.4, text: 'Your working, marked like an examiner.' },
   { at: 10.7, until: 12.3, text: 'Class seven to Olympiad.' },
   { at: 12.8, until: 14.5, text: 'Pri Learning. Join the change.' },
