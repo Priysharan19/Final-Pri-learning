@@ -1,6 +1,6 @@
 /* Pri Learning — Instagram reel v3 (2160×3840 4K, 36.4s) — animations-v3 engine */
 const {CompositionStage, useComposition, Shot, Easing, interpolate, animate, clamp} = window;
-const {useRef, useEffect, useMemo} = React;
+const {useRef, useEffect, useMemo, useState} = React;
 
 const C = {page:'#0a0a09',surface:'#101010',s2:'#161615',s3:'#1d1d1b',
   hair:'rgba(240,236,224,0.13)',hairS:'rgba(240,236,224,0.24)',hairF:'rgba(240,236,224,0.07)',
@@ -445,10 +445,15 @@ function Supers({T,CU,on}){
   return <div style={{position:'absolute',left:80,right:80,top:1408,textAlign:'center',...e}}><div style={{width:38,height:3,background:C.gold,margin:'0 auto 14px',borderRadius:2,opacity:0.85}}></div><div style={{fontFamily:SERIF,fontSize:46,color:C.ink,textShadow:'0 2px 24px rgba(0,0,0,0.8)'}}>{a.t}</div></div>;
 }
 
-/* studio VO: natural-voice pick, warm rate/pitch; music track has VO ducking baked in */
+/* Soundtrack: assets/vo-mix.wav is the full commercial mix (music + recorded
+   VO, ducking baked in) — preferred when present, and speech synthesis stays
+   silent so the voice isn't doubled. Falls back to music.wav + live
+   speech-synthesis VO when the mix hasn't been generated. */
 function AudioRig({musicOn,voOn,CU}){
   const {T,time,playing,duration}=useComposition();
   const vref=useRef(null);
+  const [audioSrc,setAudioSrc]=useState('./assets/vo-mix.wav');
+  const baked=audioSrc.indexOf('vo-mix')>=0;
   const VO=useMemo(()=>[
     {at:CU.Hook+0.05,text:'What if your handwriting, marked itself?'},
     {at:CU.Write+0.15,text:'A real J E E Advanced integral. Watch it read every symbol, live.'},
@@ -477,7 +482,7 @@ function AudioRig({musicOn,voOn,CU}){
       if(v.paused)v.play().catch(()=>{});}
     else if(!v.paused){v.pause();try{v.currentTime=Math.max(0,time);}catch(e){}}
   },[playing,musicOn,sync]);
-  useEffect(()=>{if(!('speechSynthesis'in window))return;
+  useEffect(()=>{if(!('speechSynthesis'in window)||baked)return;
     speechSynthesis.cancel();
     if(!playing||!voOn||ai<0)return;
     const ln=VO[ai];if(T-ln.at>1.8)return;
@@ -495,9 +500,10 @@ function AudioRig({musicOn,voOn,CU}){
     u.rate=0.99;u.pitch=0.96;u.volume=1;
     speechSynthesis.speak(u);
     return()=>{try{speechSynthesis.cancel();}catch(e){}};
-  },[ai,playing,voOn]);
-  return <video ref={vref} src="./assets/music.wav" preload="auto" playsInline
-    onError={()=>console.warn('reel: music track missing or failed to load — continuing silent')}
+  },[ai,playing,voOn,baked]);
+  return <video ref={vref} src={audioSrc} preload="auto" playsInline
+    onError={()=>{if(baked)setAudioSrc('./assets/music.wav');
+      else console.warn('reel: music track missing or failed to load — continuing silent');}}
     data-om-exportable-video-play-start="0" data-om-exportable-video-play-end={duration}
     style={{position:'absolute',left:0,top:0,width:2,height:2,opacity:0,pointerEvents:'none'}}></video>;
 }

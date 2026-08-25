@@ -45,7 +45,7 @@ async function main() {
   if (!vcfg) throw new Error('no supported video codec at this resolution (tried H.264, VP9)');
   log('video codec: ' + vcfg.codec + ' @ ' + (bitrate / 1e6) + ' Mbps');
 
-  const aTry = { codec: 'mp4a.40.2', sampleRate: 44100, numberOfChannels: 2, bitrate: 192000 };
+  const aTry = { codec: 'mp4a.40.2', sampleRate: 44100, numberOfChannels: 2, bitrate: 256000 };
   const aSup = ('AudioEncoder' in window)
     ? await AudioEncoder.isConfigSupported(aTry).catch(() => ({ supported: false }))
     : { supported: false };
@@ -60,7 +60,14 @@ async function main() {
   });
 
   if (audioCfg) {
-    const buf = await (await fetch('/assets/music.wav')).arrayBuffer();
+    // Prefer the full commercial soundtrack (music + voice-over) when present.
+    const wanted = q.get('audio') || 'vo-mix.wav';
+    let src = '/assets/' + wanted;
+    let resp = await fetch(src);
+    if (!resp.ok && wanted === 'vo-mix.wav') { src = '/assets/music.wav'; resp = await fetch(src); }
+    if (!resp.ok) throw new Error('no audio track at ' + src);
+    log('audio source: ' + src);
+    const buf = await resp.arrayBuffer();
     const octx = new OfflineAudioContext(2, 44100, 44100);
     const ab = await octx.decodeAudioData(buf);
     const n = Math.min(ab.length, Math.round(dur * ab.sampleRate));
@@ -80,7 +87,7 @@ async function main() {
       if (aerr) throw aerr;
     }
     await aenc.flush(); aenc.close();
-    log('audio encoded (AAC 192kbps)');
+    log('audio encoded (AAC 256kbps)');
   }
 
   let verr = null;
