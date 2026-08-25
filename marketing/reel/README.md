@@ -18,6 +18,10 @@ Canonical design source: the "Pri Learning Instagram Reel" project on claude.ai/
 | `support.js` | dc-runtime — boots React 18 + Babel from CDN and mounts the `<x-dc>` document — generated, don't edit |
 | `assets/music.wav` | Soundtrack, 36.4 s, VO ducking baked in |
 | `tools/make-music.mjs` | Deterministic zero-dependency synth that renders `assets/music.wav` to the cue map |
+| `tools/serve.mjs` | Static server (port 4174) that also accepts the export harness's MP4 upload |
+| `tools/frame.html` | Bare stage page (native 2160×3840, no chrome) for frame capture |
+| `tools/render-frames.mjs` | Zero-dependency headless-Chrome CDP driver — seeks the timeline frame by frame and captures 4K JPEGs |
+| `tools/export.html` | WebCodecs encoder — H.264 + AAC muxed to MP4, written to `export/` |
 
 ## Preview
 
@@ -38,10 +42,28 @@ platform needs burned-in voice.
 
 ## Export
 
-Export the MP4 from the Claude Design canvas (the stage advertises the export
-protocol — duration, seek, font inlining — so the host dialog renders it frame by
-frame at the resolution you pick). Everything on screen is a pure function of the
-timeline: no wall-clock CSS transitions, so preview and export are pixel-identical.
+Two ways to get the MP4; both are frame-exact because everything on screen is a
+pure function of the timeline (no wall-clock CSS transitions).
+
+**Claude Design canvas** — the stage advertises the export protocol (duration,
+seek, font inlining), so the host dialog renders it frame by frame at the
+resolution you pick.
+
+**Local, no canvas needed** — a two-pass pipeline (Chromium taints canvases for
+any foreignObject SVG, so frames are captured from headless Chrome's compositor,
+then encoded with WebCodecs):
+
+```bash
+node marketing/reel/tools/serve.mjs
+```
+
+```bash
+node marketing/reel/tools/render-frames.mjs --fps 30
+```
+
+Then open http://localhost:4174/tools/export.html — it encodes the frames plus
+`assets/music.wav` (H.264 + AAC) and writes `export/pri-reel-2160x3840-30fps.mp4`.
+Frames and MP4s under `export/` are build artifacts and gitignored.
 
 ## Editing rules
 

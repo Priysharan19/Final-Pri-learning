@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reel frame stage</title>
+<script src="/support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&amp;display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<style>html, body { margin: 0; background: #0a0a09; }</style>
+<script>window.OM_SCENES = '[{"name":"Hook","dur":2.4,"desc":"Dark opening over drifting math symbols — the hook question rises word by word"},{"name":"Write","dur":5.2,"desc":"A real JEE Advanced integral is handwritten on the iPad in four steps and typeset live"},{"name":"Marked","dur":3.8,"desc":"Step marks land line by line — M1, M1, A1 — and the evaluation card scores 4 out of 4"},{"name":"Bank","dur":2.6,"desc":"The question counter rolls to 3,44,798 with NCERT → Olympiad tags"},{"name":"Map","dur":2.4,"desc":"The syllabus constellation draws itself and one idea is highlighted"},{"name":"Band","dur":2.2,"desc":"The predicted JEE percentile counts up to 99.4"},{"name":"Match","dur":2.8,"desc":"Match Mode — four lanes race and You overtake rival Ishaan"},{"name":"Exam","dur":2.6,"desc":"A print-ready JEE-pattern mock paper slides in with marking criteria and a 12/15 stamp"},{"name":"Kit","dur":5.4,"desc":"Rapid-fire toolkit montage — Smart Practice, hints, photo answers, Rush, History replay, scribble pad, teacher task packs, encrypted backup"},{"name":"Price","dur":3.8,"desc":"Coaching at 2,00,000 a year is struck through — Pri Learning lands at 999 a month"},{"name":"Close","dur":3.2,"desc":"Logo lockup and the Coming soon badge, then fade to black"}]';</script>
+<script>window.OM_PLAYBACK = '{"mode":"loop"}';</script>
+</helmet>
+<!-- Bare stage for frame capture: tall enough that the engine's fit-to-box
+     scale resolves to exactly 1 (box height ≥ 3840 + 44px playback bar),
+     so the svg renders at its native 2160×3840 CSS pixels. -->
+<div style="position: fixed; left: 0; top: 0; width: 2160px; height: 3930px;">
+  <x-import component-from-global-scope="PriReel" from="/animations-v3.jsx /reel.jsx" hint-size="100%,100%" music="false" voice-over="false"></x-import>
+</div>
+</x-dc>
+</body>
+</html>
