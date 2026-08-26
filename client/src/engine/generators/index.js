@@ -24,7 +24,9 @@ const BANKS = {
   // Indian curriculum chapters the NSW banks never had a topic for.
   'india-algebra': () => import('./india-algebra.js').then(m => m.indiaAlgebra),
   'india-coordinate': () => import('./india-coordinate.js').then(m => m.indiaCoordinate),
-  'india-calculus': () => import('./india-calculus.js').then(m => m.indiaCalculus)
+  'india-calculus': () => import('./india-calculus.js').then(m => m.indiaCalculus),
+  'india-olympiad': () => import('./india-olympiad.js').then(m => m.indiaOlympiad),
+  'india-foundation': () => import('./india-foundation.js').then(m => m.indiaFoundation)
 };
 
 // Subtopic ids are namespaced by the bank that authors them: y9-surds lives in
@@ -50,7 +52,26 @@ const INDIA_BANK_OF = {
   'c12-3d-geometry': 'india-coordinate',
   'c12-linear-programming': 'india-coordinate',
   'c12-differential-equations': 'india-calculus',
-  'c12-applications-integrals': 'india-calculus'
+  'c12-applications-integrals': 'india-calculus',
+  'olymp-number-theory': 'india-olympiad',
+  'olymp-combinatorics': 'india-olympiad',
+  'olymp-inequalities': 'india-olympiad',
+  'olymp-functional-equations': 'india-olympiad',
+  'olymp-geometry': 'india-olympiad',
+  'olymp-polynomials': 'india-olympiad',
+  'olymp-proof': 'india-olympiad',
+  'c7-symmetry': 'india-foundation',
+  'c7-solid-shapes': 'india-foundation',
+  'c8-quadrilaterals': 'india-foundation',
+  'c8-squares-roots': 'india-foundation',
+  'c8-cubes-roots': 'india-foundation',
+  'c9-euclid-geometry': 'india-foundation',
+  'c9-triangles': 'india-foundation',
+  'c9-quadrilaterals': 'india-foundation',
+  'c9-circles': 'india-foundation',
+  'c9-herons-formula': 'india-foundation',
+  'c10-real-numbers': 'india-foundation',
+  'c10-circles': 'india-foundation'
 };
 
 /** Holds the generators of every bank loaded so far, keyed by subtopic id. */

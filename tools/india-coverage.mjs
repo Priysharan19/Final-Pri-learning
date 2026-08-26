@@ -43,8 +43,16 @@ for (const g of IN_CURRICULUM) {
 console.log(`  Olympiad  ${String(OLYMPIAD_TOPICS.length).padStart(2)} topics   — 0 full, 0 partial, ${OLYMPIAD_TOPICS.length} none`);
 
 console.log('\nChapters with no generator — this is the authoring plan');
-for (const ch of c.none) {
-  console.log(`  ${(ch.grade ? `Class ${ch.grade}` : 'Olympiad').padEnd(9)} ${ch.name}`);
+if (!c.none.length) {
+  console.log('  none — every chapter has a generator behind it.');
+  console.log('  That is NOT the same as every chapter being fully covered: the 25 listed');
+  console.log('  below are reached by a generator that authors only part of them, and the');
+  console.log('  dot points named there still have nothing. Read this section and the next');
+  console.log('  one together or the first will read as more than it is.');
+} else {
+  for (const ch of c.none) {
+    console.log(`  ${(ch.grade ? `Class ${ch.grade}` : 'Olympiad').padEnd(9)} ${ch.name}`);
+  }
 }
 
 console.log('\nChapters covered only in part — what is missing, chapter by chapter');
@@ -61,3 +69,4 @@ if (bad.length) {
 }
 const reach = c.full.length + c.partial.length;
 console.log(`\n✔ every mapping resolves — ${reach}/${c.total} chapters (${(reach / c.total * 100).toFixed(1)}%) can be practised today, ${c.none.length} cannot`);
+console.log(`   of those, ${c.full.length} are covered whole and ${c.partial.length} only in part — the second number is the remaining work, and it is not zero.`);

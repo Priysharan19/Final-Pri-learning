@@ -127,7 +127,8 @@ for (const g of IN_CURRICULUM) {
 }
 ok('JEE reaches both senior years', IN_TRACKS['jee-main'].scopeFor().length === IN_CURRICULUM.find(g => g.grade === 11).chapters.length + IN_CURRICULUM.find(g => g.grade === 12).chapters.length);
 ok('the olympiad scope is the olympiad topics, not school chapters', IN_TRACKS.olympiad.scopeFor().every(id => OLYMPIAD_TOPICS.some(t => t.id === id)));
-ok('no olympiad topic claims a school generator', OLYMPIAD_TOPICS.every(t => !t.maps));
+ok('no olympiad topic reuses a school generator', OLYMPIAD_TOPICS.every(t => !t.maps));
+ok('every olympiad topic is authored for this curriculum', OLYMPIAD_TOPICS.every(t => t.native));
 
 // ── Coverage arithmetic ─────────────────────────────────────────────────────
 console.log('\nCOVERAGE');
@@ -138,6 +139,7 @@ ok('nothing is counted as both full and partial', c.full.every(x => !c.partial.i
 const reach = c.full.length + c.partial.length;
 console.log(`  ${c.total} chapters — ${c.full.length} full, ${c.partial.length} partial, ${c.none.length} none`);
 console.log(`  ${reach}/${c.total} (${(reach / c.total * 100).toFixed(1)}%) can be practised today; ${c.none.length} cannot and are listed by tools/india-coverage.mjs`);
+console.log(`  Read that with the line above it: ${c.full.length} chapters are covered whole and ${c.partial.length} only in part, so "can be practised" means the chapter sets questions, not that every dot point in it does.`);
 console.log('  This is a count of chapters with a generator behind them, not a claim that the questions are pitched at NCERT level — no Indian teacher has read one.');
 
 if (failures.length) {

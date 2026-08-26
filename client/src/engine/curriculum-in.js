@@ -128,12 +128,12 @@ export const IN_CURRICULUM = [
         'Identify lines of symmetry in plane figures',
         'Recognise rotational symmetry and its order',
         'Complete a figure given its line of symmetry'
-      ]),
+      ], { native: true }),
       C('c7-solid-shapes', 'Visualising Solid Shapes', 'Geometry', 5, [
         'Name faces, edges and vertices of common solids',
         'Match a solid with its net',
         'Read a solid from its front, side and top views'
-      ])
+      ], { native: true })
     ]
   },
   {
@@ -155,7 +155,7 @@ export const IN_CURRICULUM = [
         'Angle sum of a polygon and of a quadrilateral',
         'Properties of parallelograms, rhombuses, rectangles and squares',
         'Find unknown angles and sides in a named quadrilateral'
-      ]),
+      ], { native: true }),
       C('c8-data-handling', 'Data Handling', 'Statistics & Probability', 9, [
         'Group data into class intervals and read a histogram',
         'Read and construct a pie chart',
@@ -165,12 +165,12 @@ export const IN_CURRICULUM = [
         'Recognise properties and patterns of square numbers',
         'Find square roots by prime factorisation and by long division',
         'Estimate the square root of a non-perfect square'
-      ]),
+      ], { native: true }),
       C('c8-cubes-roots', 'Cubes and Cube Roots', 'Number & Arithmetic', 8, [
         'Recognise cube numbers and their properties',
         'Find a cube root by prime factorisation',
         'Solve problems involving cubes and cube roots'
-      ]),
+      ], { native: true }),
       C('c8-comparing-quantities', 'Comparing Quantities', 'Number & Arithmetic', 12, [
         'Find discount, profit, loss and GST as percentages',
         'Calculate simple interest',
@@ -237,7 +237,7 @@ export const IN_CURRICULUM = [
         "State Euclid's definitions, axioms and postulates",
         'Distinguish an axiom from a theorem',
         'Give a short deductive argument from stated axioms'
-      ]),
+      ], { native: true }),
       C('c9-lines-angles', 'Lines and Angles', 'Geometry', 10, [
         'Angles on a line, at a point and vertically opposite',
         'Angles made by a transversal on parallel lines',
@@ -247,22 +247,22 @@ export const IN_CURRICULUM = [
         'Prove congruence by SSS, SAS, ASA, AAS and RHS',
         'Use properties of isosceles triangles',
         'Apply inequalities relating sides and angles of a triangle'
-      ]),
+      ], { native: true }),
       C('c9-quadrilaterals', 'Quadrilaterals', 'Geometry', 10, [
         'Prove and use properties of a parallelogram',
         'Apply the midpoint theorem',
         'Establish the conditions for a quadrilateral to be a parallelogram'
-      ]),
+      ], { native: true }),
       C('c9-circles', 'Circles', 'Geometry', 10, [
         'Relate equal chords to their distances from the centre',
         'Use the angle subtended by an arc at the centre and on the circle',
         'Apply cyclic-quadrilateral properties'
-      ]),
+      ], { native: true }),
       C('c9-herons-formula', "Heron's Formula", 'Mensuration', 7, [
         "Find the area of a triangle by Heron's formula",
         'Find the area of a quadrilateral by splitting it into triangles',
         'Solve practical area problems given three sides'
-      ]),
+      ], { native: true }),
       C('c9-surface-volume', 'Surface Areas and Volumes', 'Mensuration', 11, [
         'Surface area of a cuboid, cylinder, cone and sphere',
         'Volume of a cuboid, cylinder, cone and sphere',
@@ -289,7 +289,7 @@ export const IN_CURRICULUM = [
         "Apply Euclid's division lemma and the fundamental theorem of arithmetic",
         'Find HCF and LCM by prime factorisation and use HCF × LCM = product',
         'Prove that a given surd is irrational'
-      ]),
+      ], { native: true }),
       C('c10-polynomials', 'Polynomials', 'Algebra', 11, [
         'Relate the zeroes of a quadratic to its coefficients',
         'Find a polynomial from its zeroes',
@@ -334,7 +334,7 @@ export const IN_CURRICULUM = [
         'Use the tangent-radius perpendicularity property',
         'Apply the equal-tangents-from-an-external-point property',
         'Solve problems combining tangents and chords'
-      ]),
+      ], { native: true }),
       C('c10-areas-circles', 'Areas Related to Circles', 'Mensuration', 9, [
         'Find the area and perimeter of a sector',
         'Find the area of a segment of a circle',
@@ -550,45 +550,46 @@ export const IN_TRACKS = {
 };
 
 // The olympiad ladder is deliberately kept out of IN_CURRICULUM: it is not a
-// class and does not sit above one. Nothing in the existing bank maps onto any
-// of it, and pretending otherwise would be the exact failure this file's header
-// warns about.
+// class and does not sit above one. Nothing in the NSW bank maps onto any of
+// it either — olympiad mathematics is not harder school mathematics — so every
+// one of these is authored from scratch in generators/india-olympiad.js, and
+// none carries a `maps`.
 export const OLYMPIAD_TOPICS = [
   C('olymp-number-theory', 'Number Theory', 'Number Theory', 14, [
     'Divisibility, gcd, the Euclidean algorithm and Bézout',
     'Modular arithmetic, Fermat and Euler, and orders',
     'Linear and quadratic Diophantine equations'
-  ]),
+  ], { native: true }),
   C('olymp-combinatorics', 'Combinatorics', 'Combinatorics', 14, [
     'Bijections, double counting and inclusion–exclusion',
     'The pigeonhole principle and extremal arguments',
     'Recursions, generating arguments and invariants'
-  ]),
+  ], { native: true }),
   C('olymp-inequalities', 'Inequalities', 'Algebra', 12, [
     'AM–GM, Cauchy–Schwarz and power mean',
     'Rearrangement, Chebyshev and Jensen',
     'Normalisation, substitution and SOS technique'
-  ]),
+  ], { native: true }),
   C('olymp-functional-equations', 'Functional Equations', 'Algebra', 11, [
     'Substitution and finding f(0), f(1) and symmetry',
     'Injectivity, surjectivity and fixed points',
     'Cauchy-type equations and regularity conditions'
-  ]),
+  ], { native: true }),
   C('olymp-geometry', 'Euclidean Geometry', 'Geometry', 14, [
     'Angle chasing, cyclic quadrilaterals and the power of a point',
     'Similar triangles, homothety and the radical axis',
     'Ceva, Menelaus and the standard triangle centres'
-  ]),
+  ], { native: true }),
   C('olymp-polynomials', 'Polynomials', 'Algebra', 11, [
     "Vieta's relations and symmetric functions of the roots",
     'Integer and rational root theorems and irreducibility',
     'Roots of unity and polynomial identities'
-  ]),
+  ], { native: true }),
   C('olymp-proof', 'Proof Technique', 'Reasoning & Proof', 10, [
     'Induction, strong induction and infinite descent',
     'Contradiction, contrapositive and the well-ordering principle',
     'Constructions and existence arguments'
-  ])
+  ], { native: true })
 ];
 
 // ── Lookups ─────────────────────────────────────────────────────────────────

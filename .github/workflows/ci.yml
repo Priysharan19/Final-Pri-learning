@@ -122,9 +122,9 @@ jobs:
       # actually generated and marked: a mapping can resolve to a real generator
       # and still hand back nothing, and a suite that generated zero questions
       # would otherwise report a clean pass.
-      INDIA_CHECKS: "661"
-      INDIA_QUESTIONS: "3264"
-      INDIA_CHAPTERS: "68"
+      INDIA_CHECKS: "700"
+      INDIA_QUESTIONS: "4176"
+      INDIA_CHAPTERS: "87"
       INK_SELF: "96.0"
       INK_PROBES: "99.0"
       HARD_SYMBOLS: "95.0"
