@@ -111,6 +111,7 @@ to. Nothing in this project compares the two products head to head.
 | Progress at “idea level” | Per-subtopic ratings, mastery bands, strand analytics, activity calendar, printable progress report |
 | Account data in the cloud | **Data safety, locally**: persistent-storage protection, storage usage meter, **encryption at rest** on password-protected profiles (13 stores sealed row by row under a per-profile AES-GCM-256 key, two more sealed to a whole class roll, and the profile record itself sealed field by field on top — [counted below](#architecture)), and **one-file full backup/restore** that moves your entire history between devices. What that does **not** cover — row counts, and a profile with no password — is in [What is not done](#what-is-not-done) |
 | Free tier limits (5/day), Pro $9.99/mo | **No daily cap, no tiers, nothing to pay** — it's your device doing the work. "Unlimited" is bounded, and the [census below](#measured-accuracy) says where: questions are built from a seed rather than drawn from a pool, so the space is large (**344,798** distinct observed) but finite, and the thinnest (subtopic × difficulty) cell holds **54** |
+| — | **The mistake by name, not just the line it is on.** Where Step Check finds working that stops being true, a diagnosis engine works out *which* move the student made — a term that crossed the equals sign without changing sign, a bracket expanded onto its first term only, (a+b)² squared term by term, two fractions added straight across, a root thrown away by dividing through by x, one side of an equation divided and the other left alone — and says the rule that move breaks. **20 named mistakes**, found by applying each one to the last true line and testing which reproduces what the student wrote, so it holds however they wrote it down; where nothing fits it gives a counterexample rather than a guess. A named misstep then feeds the same misconception model a designed wrong answer does, so the scheduler works against it. All on-device, deterministic, no model. [Measured below](#step-diagnosis) |
 | — | Plus: streaks & XP levels, 22 achievements, 90-second Rush, spaced-review scheduler, dark/light themes, offline PWA, multi-profile |
 
 ## The handwriting engine
@@ -381,6 +382,40 @@ structure and a human-checked meaning, and a retag that quietly lied would still
 the coverage figure as the strongest claim in this README that no test defends.
 
 
+### Step diagnosis
+
+Finding the line where working breaks is the half every marker does. Naming the move that broke it is
+the half this measures.
+
+| Command | n | Result |
+|---|---|---|
+| `npm run test:diagnose` | 35 authored missteps, at least one per catalogue entry | **35 / 35** named with the expected code |
+| `npm run test:diagnose` | 20 mistakes × 40 seeded draws, each buried in random context — an extra term on both sides, the variable renamed, the equation written the other way round | **795 / 795** named (100.0%) |
+| `npm run test:diagnose` | 22 authored + 794 generated correct steps | **0 / 816** false positives |
+
+The three rows are not worth the same, and the middle one is worth the least.
+
+**That 100% is close to tautological.** The sweep builds each wrong line by applying the very rewrite
+the catalogue was written to recognise, so once a rule is right it is right at every coefficient —
+scoring 100% against your own rules is the expected result, not a finding. It earns its place as a
+regression gate and nothing more, and it does have teeth: commenting out one branch of the
+term-transfer rule drops it and reds the suite.
+
+**The false-positive row is the one that carries information.** A marker that invents a mistake in
+correct working is worse than one that stays quiet, because the student goes and "fixes" a line that
+was right — so one false positive fails the suite. Those 794 generated cases are true identities and
+valid steps (expansions, common denominators, difference of two squares, index laws, dividing both
+sides, collecting like terms) put through the same context wrapper as the missteps. Removing one
+branch of the equivalence test produces 60 of them immediately, which is how it is known the row can
+fail rather than merely being green.
+
+**What no row here says is how often a real student's slip is one of the 20 the catalogue knows.**
+That needs student working, and this repo has none — the same evidence gap as
+[the handwriting corpus](#the-gap-this-table-admits), and it is stated again in
+[What is not done](#what-is-not-done). Where nothing in the catalogue fits, the engine falls back to
+a counterexample — *"put x = 6 into this line and it reads 29 = 30"* — rather than guessing, and a
+counterexample is never recorded as a misconception.
+
 ### Handwriting
 
 | Command | n | Result |
@@ -632,6 +667,24 @@ the edge of what this repo can currently show.
   on the device that could draw the second line. `client/src/local/idb.js` says the same at *"A
   profile with no password"* and at *"What an attacker can still infer"*. The only fix is a password,
   and only for the profile that takes one.
+
+- **The mistake catalogue has never met a real mistake.** The step diagnoser knows 20 named missteps
+  and is measured at 35/35 authored cases, 795/795 seeded ones and 0 false positives in 816 correct
+  steps ([above](#step-diagnosis)) — every one of which this repo generated. No student's working has
+  been through it. So the measured half is *"when the mistake is one of these 20, it is named"*, and
+  the unmeasured half is the one that decides whether the feature is any good: **what fraction of the
+  slips a real Year 9 makes are in the catalogue at all**. Nothing here can answer that, and the
+  design takes the safe side of it — a line the catalogue cannot explain gets a counterexample rather
+  than an invented reason, and only a confidently named misstep is written into the misconception
+  model:
+
+  ```bash
+  node --input-type=module -e "
+  import {diagnoseStep} from './client/src/engine/diagnose.js';
+  const d = diagnoseStep({prevText: '3x + 2', brokenText: '7x - 5'});
+  console.log(d.code + ' — ' + d.message);"
+  # counterexample — At x = 2 the line above is 8 and this line is 9.
+  ```
 
 - **No teacher has reviewed any of this, and nothing has been checked against NESA.** The 84
   subtopics, 252 dot points, exam weights and topic codes in `client/src/engine/curriculum.js` were

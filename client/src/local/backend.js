@@ -17,6 +17,7 @@ import {
 } from '../engine/curriculum.js';
 import { generateQuestion } from '../engine/generators/index.js';
 import { checkAnswer, stepCheck } from '../engine/checker.js';
+import { stepTrapKey } from '../engine/diagnose.js';
 import {
   START_RATING, updateRating, masteryOf, masteryBand, pickDifficulty, pickNext,
   predictMark, priorities, xpFor, levelFromXp, bandFor,
@@ -240,6 +241,35 @@ async function recordTrap(pid, row, q, feedback) {
   traps[key] = {
     n: Math.min(9, (prev.n || 0) + 1), credit: 0, firstAt: prev.firstAt || now, lastAt: now,
     label: safeLabel(misconceptionLabel(hit.why), 140),
+    dotpoint: q.dotpoint || prev.dotpoint || null
+  };
+  await putRating(pid, q.subtopic, { ...st, traps: trimTraps(traps) });
+  row.trapKey = key;
+  return key;
+}
+
+/**
+ * A misstep Step Check could name is the same kind of evidence a designed
+ * distractor is, and often better: the student showed their working, so the
+ * mistake was watched happening rather than inferred from a final answer. Only
+ * confidently named missteps are counted — a bare counterexample says the line
+ * is false without saying what was done, which is not a pattern to schedule
+ * against. The code carries no numbers, so the same slip in two questions lands
+ * on one key.
+ */
+async function recordStepTrap(pid, row, q, diagnosis) {
+  if (!diagnosis || row.trapKey || q.custom || !q.subtopic) return null;
+  if (row.mode === 'rush' || row.mode === 'match') return null;
+  if (diagnosis.confidence !== 'high' || diagnosis.code === 'counterexample') return null;
+  const key = stepTrapKey(q.subtopic, diagnosis.code);
+  if (!key) return null;
+  const now = Date.now();
+  const st = (await getRating(pid, q.subtopic)) || { rating: START_RATING, attempts: 0, correct: 0, last_at: null };
+  const traps = { ...(st.traps || {}) };
+  const prev = traps[key] || { n: 0, credit: 0, firstAt: now };
+  traps[key] = {
+    n: Math.min(9, (prev.n || 0) + 1), credit: 0, firstAt: prev.firstAt || now, lastAt: now,
+    label: safeLabel(diagnosis.title, 140),
     dotpoint: q.dotpoint || prev.dotpoint || null
   };
   await putRating(pid, q.subtopic, { ...st, traps: trimTraps(traps) });
@@ -1549,11 +1579,6 @@ const routes = {
     if (!result.correct && q.answerType === 'mcq' && q.answer.optionTraps) {
       feedback = q.answer.optionTraps[Number(answer)] || feedback;
     }
-    // A wrong answer that landed on a designed distractor is not a random miss:
-    // the trap names the misconception behind it. Counted here, before the
-    // two-try branch below, because the first attempt is the honest evidence.
-    let trapHit = null;
-    if (!result.correct && !result.invalid) trapHit = await recordTrap(p.id, row, q, feedback);
     let stepReport = null;
     const meta0 = stepMetaFor(q);
     if (steps && meta0) {
@@ -1561,6 +1586,16 @@ const routes = {
     }
     // Working-type questions mark every submitted line — surface that report
     if (!stepReport && result.stepReport) stepReport = result.stepReport;
+    // A wrong answer that landed on a designed distractor is not a random miss:
+    // the trap names the misconception behind it. Counted here, before the
+    // two-try branch below, because the first attempt is the honest evidence.
+    // Where the working itself names the misstep, that is counted instead — the
+    // distractor infers the mistake, the working shows it.
+    let trapHit = null;
+    if (!result.correct && !result.invalid) {
+      trapHit = await recordTrap(p.id, row, q, feedback);
+      if (!trapHit) trapHit = await recordStepTrap(p.id, row, q, stepReport?.diagnosis);
+    }
     // The student's own work is stored before any early return below. A first
     // wrong answer sends them back for another try, and losing the ink at that
     // point would mean their handwriting could never be replayed in History and
@@ -1580,7 +1615,7 @@ const routes = {
     if (!result.correct && !result.invalid && !isFast && (row.tries || 0) < 1) {
       row.tries = (row.tries || 0) + 1;
       await put('questions', row);
-      return { correct: false, resolved: false, triesLeft: 1, feedback: feedback || 'Not quite — check your working and try once more.', stepReport, misconception: await namedTrap(p.id, q.subtopic, trapHit) };
+      return { correct: false, resolved: false, triesLeft: 1, feedback: feedback || 'Not quite — check your working and try once more.', stepReport, diagnosis: stepReport?.diagnosis || null, misconception: await namedTrap(p.id, q.subtopic, trapHit) };
     }
     if (result.invalid && !isFast) {
       return { correct: false, resolved: false, triesLeft: Math.max(0, 1 - (row.tries || 0)), invalid: true, feedback, stepReport };
@@ -1588,6 +1623,7 @@ const routes = {
     const meta = await resolve(p, row, q, result.correct, answer, ms, row.mode, !!viaInk);
     return {
       correct: result.correct, resolved: true, feedback, stepReport,
+      diagnosis: stepReport?.diagnosis || null,
       misconception: await namedTrap(p.id, q.subtopic, trapHit),
       solution: { steps: q.steps, answerText: displayAnswer(q), criteria: criteriaFor(q), solutionText: q.solutionText },
       ...meta

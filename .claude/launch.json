@@ -2,6 +2,14 @@
   "version": "0.0.1",
   "configurations": [
     {
+      "name": "app",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "server/index.js"
+      ],
+      "port": 4000
+    },
+    {
       "name": "dev",
       "runtimeExecutable": "npm",
       "runtimeArgs": [
@@ -13,13 +21,21 @@
     {
       "name": "reel",
       "runtimeExecutable": "python3",
-      "runtimeArgs": ["-m", "http.server", "4173", "-d", "marketing/reel"],
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "4173",
+        "-d",
+        "marketing/reel"
+      ],
       "port": 4173
     },
     {
       "name": "reel-export",
       "runtimeExecutable": "node",
-      "runtimeArgs": ["marketing/reel/tools/serve.mjs"],
+      "runtimeArgs": [
+        "marketing/reel/tools/serve.mjs"
+      ],
       "port": 4174
     }
   ]
