@@ -12,12 +12,12 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import {
   IN_CHAPTERS, IN_CURRICULUM, IN_STRANDS, IN_TRACKS, OLYMPIAD_TOPICS,
-  IN_CHAPTER_BY_ID, coverage, mappedGenerators
+  IN_CHAPTER_BY_ID, coverage, mappedGenerators, allGenerators, generatorFor
 } from '../src/engine/curriculum-in.js';
 import { SUBTOPIC_BY_ID } from '../src/engine/curriculum.js';
 import { GENERATORS, loadAllBanks, generateQuestion } from '../src/engine/generators/index.js';
 import { checkAnswer } from '../src/engine/checker.js';
-import { answerForms } from '../../server/test/selfcheck.mjs';
+import { answerForms, inspect } from '../../server/test/selfcheck.mjs';
 
 await loadAllBanks();
 
@@ -44,29 +44,43 @@ console.log(`  ${IN_CHAPTERS.length} chapters across ${IN_CURRICULUM.length} cla
 
 // ── Mappings: the half that can silently lie ────────────────────────────────
 console.log('\nMAPPINGS');
-const mapped = IN_CHAPTERS.filter(c => c.maps);
+const mapped = IN_CHAPTERS.filter(c => generatorFor(c));
 for (const ch of mapped) {
-  ok(`${ch.id} maps to a real subtopic (${ch.maps})`, !!SUBTOPIC_BY_ID[ch.maps]);
-  ok(`${ch.id} maps to a subtopic that has generators (${ch.maps})`, !!GENERATORS[ch.maps]);
+  const gid = generatorFor(ch);
+  if (ch.native) {
+    same(`${ch.id} is native, so it does not also claim an NSW subtopic`, ch.maps, null);
+    ok(`${ch.id} has a generator of its own`, !!GENERATORS[gid]);
+  } else {
+    ok(`${ch.id} maps to a real subtopic (${gid})`, !!SUBTOPIC_BY_ID[gid]);
+    ok(`${ch.id} maps to a subtopic that has generators (${gid})`, !!GENERATORS[gid]);
+  }
 }
 for (const ch of IN_CHAPTERS) {
-  if (ch.partial) ok(`${ch.id} says which part is covered`, !!ch.maps && ch.partial.trim().length > 20);
-  if (!ch.maps) same(`${ch.id} claims no partial cover when it has no generator`, ch.partial, null);
+  if (ch.partial) ok(`${ch.id} says which part is covered`, !!generatorFor(ch) && ch.partial.trim().length > 20);
+  if (!generatorFor(ch)) same(`${ch.id} claims no partial cover when it has no generator`, ch.partial, null);
 }
-console.log(`  ${mapped.length} chapters map onto ${mappedGenerators().length} distinct generators`);
+console.log(`  ${mapped.length} chapters reach ${allGenerators().length} generators — ${mappedGenerators().length} reused from the NSW banks, ${coverage().native.length} written for this curriculum`);
 
 // ── The mapping has to actually produce a markable question ────────────────
 console.log('\nQUESTIONS — every mapped chapter, every difficulty, marked by its own marker');
 const DRAWS = 12;
-let made = 0, marked = 0, broken = [];
+let made = 0, marked = 0, wellFormed = 0, broken = [];
 for (const ch of mapped) {
+  const gid = generatorFor(ch);
   for (let d = 1; d <= 4; d++) {
     for (let i = 0; i < DRAWS; i++) {
       let q;
-      try { q = generateQuestion(ch.maps, d, `in-${ch.id}-${d}-${i}`); }
-      catch (e) { broken.push(`${ch.id} → ${ch.maps} d${d}: threw ${e.message}`); continue; }
-      if (!q || !q.prompt) { broken.push(`${ch.id} → ${ch.maps} d${d}: produced no question`); continue; }
+      try { q = generateQuestion(gid, d, `in-${ch.id}-${d}-${i}`); }
+      catch (e) { broken.push(`${ch.id} → ${gid} d${d}: threw ${e.message}`); continue; }
+      if (!q || !q.prompt) { broken.push(`${ch.id} → ${gid} d${d}: produced no question`); continue; }
       made++;
+      // The same well-formedness inspection selfcheck.mjs runs over the NSW
+      // bank: no NaN or undefined leaking into prose, no floating-point
+      // artefact in a keyed value, an integer where the question asks for a
+      // count, hints and steps present.
+      const problems = inspect(q);
+      if (!problems.length) wellFormed++;
+      else if (broken.length < 12) broken.push(`${ch.id} → ${gid} d${d}: ${problems[0]}`);
       if (q.multipart) { marked++; continue; }
       // The keyed answer is read exactly as selfcheck.mjs reads it. A question
       // that demands a simplest fraction or a surd is right to reject the
@@ -80,7 +94,7 @@ for (const ch of mapped) {
         catch (e) { res = { correct: false, feedback: `threw ${e.message}` }; }
         if (!res.correct) {
           allOk = false;
-          if (broken.length < 12) broken.push(`${ch.id} → ${ch.maps} d${d}: keyed ${form.label} "${form.input}" is marked wrong by its own marker`);
+          if (broken.length < 12) broken.push(`${ch.id} → ${gid} d${d}: keyed ${form.label} "${form.input}" is marked wrong by its own marker`);
         }
       }
       if (allOk) marked++;
@@ -89,7 +103,8 @@ for (const ch of mapped) {
 }
 ok(`every mapped chapter produced questions — ${broken.length} problem(s)`, broken.length === 0);
 same('every generated question passed its own marker', marked, made);
-console.log(`  ${made} questions generated across ${mapped.length} chapters × 4 difficulties × ${DRAWS} draws — ${marked} marked correct by their own marker`);
+same('every generated question is well formed', wellFormed, made);
+console.log(`  ${made} questions generated across ${mapped.length} chapters × 4 difficulties × ${DRAWS} draws — ${marked} marked correct by their own marker, ${wellFormed} well formed`);
 if (broken.length) for (const b of broken) console.log(`    ✗ ${b}`);
 
 // ── Tracks ──────────────────────────────────────────────────────────────────

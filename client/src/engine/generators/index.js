@@ -20,7 +20,9 @@ const BANKS = {
   year11: () => import('./year11.js').then(m => m.year11),
   year12: () => import('./year12.js').then(m => m.year12),
   'streams-standard': () => import('./streams-standard.js').then(m => m.streamsStandard),
-  'streams-ext': () => import('./streams-ext.js').then(m => m.streamsExt)
+  'streams-ext': () => import('./streams-ext.js').then(m => m.streamsExt),
+  // Indian curriculum chapters the NSW banks never had a topic for.
+  'india-algebra': () => import('./india-algebra.js').then(m => m.indiaAlgebra)
 };
 
 // Subtopic ids are namespaced by the bank that authors them: y9-surds lives in
@@ -28,7 +30,8 @@ const BANKS = {
 const BANK_OF = {
   y7: 'year7', y8: 'year8', y9: 'year9', y10: 'year10', y11: 'year11', y12: 'year12',
   ms11: 'streams-standard', ms12: 'streams-standard',
-  me11: 'streams-ext', me12: 'streams-ext', mex: 'streams-ext'
+  me11: 'streams-ext', me12: 'streams-ext', mex: 'streams-ext',
+  c11: 'india-algebra', c12: 'india-algebra'
 };
 
 /** Holds the generators of every bank loaded so far, keyed by subtopic id. */

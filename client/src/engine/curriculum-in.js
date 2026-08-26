@@ -40,15 +40,28 @@ export const IN_STRANDS = [
 
 /**
  * C(id, name, strand, weight, dotpoints, link)
- *   link.maps    — the existing generator subtopic id that authors this chapter
+ *   link.native  — a generator is authored against this chapter's own id, because
+                  the topic exists in this curriculum and in no NSW one
+   link.maps    — the existing generator subtopic id that authors this chapter
  *   link.partial — a note naming the part of the chapter that generator covers,
  *                  set only when the cover is genuinely incomplete
  */
 const C = (id, name, strand, weight, dotpoints, link = {}) => ({
   id, name, strand, weight, dotpoints,
   maps: link.maps || null,
+  native: !!link.native,
   partial: link.partial || null
 });
+
+/**
+ * The generator that authors a chapter: a reused NSW one, or — where the topic
+ * exists only in this curriculum — one written against the chapter's own id.
+ */
+export function generatorFor(chapter) {
+  if (!chapter) return null;
+  if (chapter.native) return chapter.id;
+  return chapter.maps || null;
+}
 
 export const IN_CURRICULUM = [
   {
@@ -353,7 +366,7 @@ export const IN_CURRICULUM = [
         'Use set notation, subsets, power sets and the universal set',
         'Take unions, intersections, differences and complements',
         'Apply the inclusion–exclusion formula for two and three sets'
-      ]),
+      ], { native: true }),
       C('c11-relations-functions', 'Relations and Functions', 'Algebra', 10, [
         'Find the Cartesian product and represent a relation',
         'Determine the domain and range of a function',
@@ -373,7 +386,7 @@ export const IN_CURRICULUM = [
         'Solve a linear inequality in one variable and graph the solution',
         'Solve a system of linear inequalities in one variable',
         'Graph the solution region of linear inequalities in two variables'
-      ]),
+      ], { native: true }),
       C('c11-permutations-combinations', 'Permutations and Combinations', 'Combinatorics', 12, [
         'Apply the fundamental principle of counting',
         'Count arrangements with and without repetition and with restrictions',
@@ -383,7 +396,7 @@ export const IN_CURRICULUM = [
         'Expand a binomial using the binomial theorem',
         'Find a general term and a specified term of an expansion',
         'Find the middle term and the term independent of x'
-      ]),
+      ], { native: true }),
       C('c11-sequences-series', 'Sequences and Series', 'Algebra', 11, [
         'Find the nth term and sum of an arithmetic progression',
         'Find the nth term and sum of a geometric progression, finite and infinite',
@@ -440,12 +453,12 @@ export const IN_CURRICULUM = [
         'Add, subtract and multiply matrices and use the transpose',
         'Recognise symmetric and skew-symmetric matrices',
         'Find an inverse by elementary row operations'
-      ]),
+      ], { native: true }),
       C('c12-determinants', 'Determinants', 'Algebra', 11, [
         'Evaluate a determinant and use its properties',
         'Find minors, cofactors and the adjugate, and the area of a triangle',
         'Solve a system of linear equations by the matrix method'
-      ]),
+      ], { native: true }),
       C('c12-continuity-differentiability', 'Continuity and Differentiability', 'Calculus', 13, [
         'Test continuity and differentiability at a point',
         'Differentiate composite, implicit, inverse-trigonometric and logarithmic functions',
@@ -592,6 +605,11 @@ export function mappedGenerators() {
   return [...new Set(IN_CHAPTERS.map(c => c.maps).filter(Boolean))];
 }
 
+/** Every generator id this curriculum reaches, reused or its own. */
+export function allGenerators() {
+  return [...new Set(IN_CHAPTERS.map(generatorFor).filter(Boolean))];
+}
+
 /**
  * Coverage, three ways — and the three are reported separately on purpose.
  *   full    a generator authors the chapter and no dot point is called out as
@@ -600,8 +618,9 @@ export function mappedGenerators() {
  *   none    nothing in the bank sets a question on this chapter
  */
 export function coverage() {
-  const full = IN_CHAPTERS.filter(c => c.maps && !c.partial);
-  const partial = IN_CHAPTERS.filter(c => c.maps && c.partial);
-  const none = IN_CHAPTERS.filter(c => !c.maps);
-  return { total: IN_CHAPTERS.length, full, partial, none };
+  const full = IN_CHAPTERS.filter(c => generatorFor(c) && !c.partial);
+  const partial = IN_CHAPTERS.filter(c => generatorFor(c) && c.partial);
+  const none = IN_CHAPTERS.filter(c => !generatorFor(c));
+  const native = IN_CHAPTERS.filter(c => c.native);
+  return { total: IN_CHAPTERS.length, full, partial, none, native };
 }
