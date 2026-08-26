@@ -264,6 +264,27 @@ function structural(group, medianH) {
     }
   }
 
+  // ! : a tall stem with a dot UNDER it. The entire discriminator against 'i'
+  // is which side of the stem the dot sits on, and that is unambiguous — an
+  // i's dot rides above its x-height body, a factorial's sits on the baseline
+  // below the stem. Factorials are everywhere in JEE combinatorics (nCr, n!,
+  // the binomial general term) and had no reading at all. Like ∫, this gets no
+  // CNN class: growing the class set costs the retrain gate.
+  if (strokes.length === 2) {
+    const bA = bbox(strokes[0]), bB = bbox(strokes[1]);
+    const tinyMark = s2 => Math.max(s2.w, s2.h) < 0.3 * medianH;
+    const isStem = s2 => s2.h > 0.55 * medianH && s2.h > 2.2 * Math.max(s2.w, 1e-6);
+    for (const [stem, dot] of [[bA, bB], [bB, bA]]) {
+      // the dot must sit BELOW the stem and directly under it — a decimal
+      // point after a '1' is a glyph advance away horizontally, which this
+      // rejects, and an i's dot is above the stem, which reverses the test
+      if (isStem(stem) && tinyMark(dot) && dot.cy > stem.y2 - 0.05 * medianH
+        && Math.abs(dot.cx - stem.cx) < 0.3 * medianH) {
+        return { sym: '!', conf: 0.92 };
+      }
+    }
+  }
+
   // degree mark: a single small closed loop (bigger than a dot, smaller than a digit)
   if (strokes.length === 1) {
     const pts0 = resample(strokes[0], 20);
@@ -307,6 +328,26 @@ function structural(group, medianH) {
         const crosses = fA.box.cy > v.box.y1 && fA.box.cy < v.box.y2;
         const under = fB.box.cy > v.box.y2 - 0.15 * medianH;
         if (crosses && under) return { sym: 'pm', conf: 0.94 };
+      }
+
+      // ≡ : three parallel bars, evenly stacked. The difference from '=' is one
+      // more bar and nothing else, so the guards are all about regularity —
+      // equal gaps, comparable widths, a shared centre line. Congruence is the
+      // working notation of olympiad number theory ("a ≡ b (mod n)") and had no
+      // reading; three unrelated bars that happen to land in one group are kept
+      // out by requiring the stack to be even.
+      if (flat.length === 3) {
+        const bars = flat.slice().sort((a2, b2) => a2.box.cy - b2.box.cy);
+        const gapA = bars[1].box.cy - bars[0].box.cy;
+        const gapB = bars[2].box.cy - bars[1].box.cy;
+        const ws = bars.map(x => x.box.w);
+        const wMax = Math.max(...ws), wMin = Math.min(...ws);
+        const centred = bars.every(x => Math.abs(x.box.cx - bars[1].box.cx) < 0.3 * wMax);
+        if (gapA > 0.1 * medianH && gapB > 0.1 * medianH
+          && Math.abs(gapA - gapB) < 0.5 * Math.max(gapA, gapB)
+          && wMin > 0.6 * wMax && centred) {
+          return { sym: '≡', conf: 0.93 };
+        }
       }
 
       // ≠ : two stacked bars crossed by a steep diagonal
@@ -397,6 +438,66 @@ function structural(group, medianH) {
           return { sym: '∫', conf: 0.92 };
         }
       }
+    }
+
+    // Σ : NOT read here, and the reason is worth keeping.
+    //
+    // A summation sign is a top bar, two long diagonals meeting at a vertex and
+    // a bottom bar, in one motion. It has a clean geometric signature — three
+    // horizontal reversals of real amplitude, a waist far narrower than either
+    // end — and a detector built on it read an authored Σ 32 times out of 40.
+    // It also read a warped '3' as Σ, because a '3' reverses three times too
+    // and its waist is narrow as well.
+    //
+    // Three guard iterations did not close the gap: corners between straight
+    // runs (an arc turns continuously and never bends 55° in one step) plus
+    // flat top and bottom bars took the collision from 12 draws in 18 to 1, a
+    // minimum bar length took nothing more, and a 1.35× median-height gate — the
+    // same principle that lets ∫ be read at all — took nothing more again. At
+    // every step held-out #3 read 543/560 instead of 544/560. One line in five
+    // hundred and sixty, and the floor has no margin, so the detector is out.
+    //
+    // The square-bracket detector was removed for exactly this reason in V15,
+    // and the precedent is the right one: the floors are the release contract.
+    // inkcheck-jee.mjs keeps an authored Σ scene as an xfail so the target does
+    // not disappear with the code. What promotes it is a discriminator tuned on
+    // REAL Σ strokes from the collector, not another guard tuned on synthetic
+    // ink — and reading held-out #3's failures to find the casualty would spend
+    // the holdout, which is why nobody looked.
+
+    // ∞ : two lobes crossing at the waist, one motion. The only wide glyphs in
+    // the inventory are '-' and '=', and both are straight — the straightness
+    // branch above has already claimed those — so a glyph half again as wide as
+    // it is tall, that curves, and whose pen finishes where it began, is not
+    // anything else here. The crossing count is what separates it from a wide
+    // 'o': a lozenge closes too, but never cuts its own centre line three times.
+    if (pb.w >= 1.5 * pb.h && pb.w >= 0.7 * medianH && dev > 0.12) {
+      const f = resample(strokes[0], 40);
+      const closes = Math.hypot(f[0][0] - f[f.length - 1][0], f[0][1] - f[f.length - 1][1]) < 0.25 * pb.w;
+      // Self-intersection is the actual signature, and counting centre-line
+      // crossings was not it: a figure-eight drawn from the waist outwards —
+      // which is how it is drawn — crosses that line once, not three times.
+      // What no other wide glyph here does is cross ITSELF. The start/end pair
+      // is skipped: a closed path touching its own tail is closure, not a knot.
+      const side = (a2, b2, c2) => (b2[0] - a2[0]) * (c2[1] - a2[1]) - (b2[1] - a2[1]) * (c2[0] - a2[0]);
+      const straddles = (p, q, r, t2) =>
+        ((side(p, q, r) > 0) !== (side(p, q, t2) > 0)) && ((side(r, t2, p) > 0) !== (side(r, t2, q) > 0));
+      // Proximity as well as strict crossing: a figure-eight drawn exactly —
+      // which authored ink is and a hand never is — passes through its waist
+      // twice at the SAME point, and a straddle test built on strict sides
+      // reads a shared point as no crossing at all. Two distant parts of one
+      // path coming within a twentieth of the glyph's width is a knot however
+      // the arithmetic lands on the boundary.
+      const near = 0.05 * pb.w;
+      let knots = false;
+      for (let i = 0; i < f.length - 1 && !knots; i++) {
+        for (let j = i + 2; j < f.length - 1; j++) {
+          if (i < 2 && j > f.length - 4) continue;   // the closure, not a knot
+          if (straddles(f[i], f[i + 1], f[j], f[j + 1])
+            || Math.hypot(f[i][0] - f[j][0], f[i][1] - f[j][1]) < near) { knots = true; break; }
+        }
+      }
+      if (closes && knots) return { sym: '∞', conf: 0.9 };
     }
   }
   if (strokes.length === 2) {
@@ -2157,6 +2258,76 @@ function colonRetry(line, medianH) {
   return out;
 }
 
+/** Segmentation self-repair for '≡'. The same story as equalsRetry one bar
+ *  further on: three bars that the segmenter split leave an '=' with a loose
+ *  '-' beside it, and "a ≡ b" reads "a=-b". The join only fires when the third
+ *  bar continues the stack — same column, comparable width, and a gap that
+ *  matches the one already inside the '='. A minus sign in front of a term is a
+ *  glyph advance away horizontally and fails the column test.
+ */
+function congruenceRetry(line, medianH) {
+  if (line.length < 2) return line;
+  const out = [...line];
+  const barLike = s => !s.composite && s._group && s._group.strokes.length === 1
+    && s.sym === '-' && s.box.w > 0.3 * medianH;
+  for (let i = 0; i < out.length - 1; i++) {
+    for (const [eq, bar] of [[out[i], out[i + 1]], [out[i + 1], out[i]]]) {
+      if (eq.sym !== '=' || !eq._group || eq._group.strokes.length !== 2) continue;
+      if (!barLike(bar)) continue;
+      if (Math.abs(bar.box.cx - eq.box.cx) > 0.3 * medianH) continue;
+      if (bar.box.w < 0.6 * eq.box.w || bar.box.w > 1.6 * eq.box.w) continue;
+      const inner = Math.abs(bbox(strokePts(eq._group.strokes[0])).cy - bbox(strokePts(eq._group.strokes[1])).cy);
+      const reach = Math.abs(bar.box.cy - eq.box.cy);
+      // the third bar continues the stack: one gap out from the pair's centre
+      if (inner < 1e-6 || reach < 0.6 * inner || reach > 1.8 * inner) continue;
+      const strokes = [...eq._group.strokes, ...bar._group.strokes];
+      const merged = { strokes, box: bbox(strokes.flatMap(strokePts)), strokeIdxs: [...eq.strokeIdxs, ...bar.strokeIdxs] };
+      out.splice(i, 2, {
+        id: out[i].id, sym: '≡', conf: 0.9,
+        alts: [{ sym: '≡', conf: 0.9 }, { sym: '=', conf: 0.3 }],
+        box: merged.box, strokeIdxs: merged.strokeIdxs, _group: merged
+      });
+      break;
+    }
+  }
+  return out;
+}
+
+/** Segmentation self-repair for '!'. The segmenter keeps a small mark below a
+ *  tall stroke apart, and it has to — otherwise every decimal point would be
+ *  swallowed by the digit in front of it — so a factorial arrives as a '1' and
+ *  a '.' side by side and the line reads "n.1". The join is geometric and
+ *  narrow: the mark has to sit UNDER the stem and in the stem's own column,
+ *  which is exactly what a decimal point does not do. A decimal sits a glyph
+ *  advance to the right, on the baseline of the digit that follows it, and the
+ *  column test is what tells the two apart.
+ */
+function factorialRetry(line, medianH) {
+  if (line.length < 2) return line;
+  const out = [...line];
+  const stemLike = s => !s.composite && s._group && s._group.strokes.length === 1
+    && (s.sym === '1' || s.sym === 'l')
+    && s.box.h > 0.55 * medianH && s.box.h > 2.0 * Math.max(s.box.w, 1e-6);
+  const dotLike = s => !s.composite && s._group && s.sym === '.'
+    && Math.max(s.box.w, s.box.h) < 0.3 * medianH;
+  for (let i = 0; i < out.length - 1; i++) {
+    for (const [stem, dot] of [[out[i], out[i + 1]], [out[i + 1], out[i]]]) {
+      if (!stemLike(stem) || !dotLike(dot)) continue;
+      if (Math.abs(dot.box.cx - stem.box.cx) > 0.3 * medianH) continue;
+      if (dot.box.cy < stem.box.y2 - 0.05 * medianH) continue;
+      const strokes = [...stem._group.strokes, ...dot._group.strokes];
+      const merged = { strokes, box: bbox(strokes.flatMap(strokePts)), strokeIdxs: [...stem.strokeIdxs, ...dot.strokeIdxs] };
+      out.splice(i, 2, {
+        id: out[i].id, sym: '!', conf: 0.9,
+        alts: [{ sym: '!', conf: 0.9 }, { sym: stem.sym, conf: 0.3 }],
+        box: merged.box, strokeIdxs: merged.strokeIdxs, _group: merged
+      });
+      break;
+    }
+  }
+  return out;
+}
+
 /** Segmentation self-repair for '='. A fast PencilKit pass can leave the two
  *  bars as separate, high-confidence '-' glyphs; confidence-based merge repair
  *  will never touch them because each bar is individually obvious. Geometry is
@@ -2385,6 +2556,9 @@ for (let i = 0; i <= 9; i++) CAT.set(String(i), 'd');
 for (const ch of 'abcdefghijklmnopqrstuvwxyz') { CAT.set(ch, 'v'); CAT.set(ch.toUpperCase(), 'v'); }
 for (const s of ['pi', 'theta', 'LHS', 'RHS', 'let']) CAT.set(s, 'c');
 CAT.set('∫', 'f');   // prefix operator: takes what follows, like a function name
+CAT.set('Σ', 'f');   // the same shape of thing: a big operator over what follows
+CAT.set('∞', 'c');   // reads as a value — "x → ∞", "the limit is ∞"
+CAT.set('!', 'p');   // postfix: closes a value, like a unit or a differential
 // differentials close an integrand the way a postfix unit closes a value —
 // "u du" is the canonical form, and 'p' is the category that welcomes a
 // preceding value and a following end-of-line
@@ -2392,7 +2566,7 @@ for (const s of ['du', 'dx']) CAT.set(s, 'p');
 CAT.set('.', '.');
 CAT.set('(', '(');
 CAT.set(')', ')');
-for (const s of ['=', '<', '>', '<=', '>=', '!=']) CAT.set(s, 'r');
+for (const s of ['=', '<', '>', '<=', '>=', '!=', '≡']) CAT.set(s, 'r');
 for (const s of ['+', '-', '*', '/', ':', '±', 'pm', 'div']) CAT.set(s, 'o');
 for (const s of ['%', 'percent', 'deg', '°']) CAT.set(s, 'p');
 for (const s of ['sqrt', 'sin', 'cos', 'tan', 'sec', 'csc', 'cosec', 'cot', 'ln', 'log']) CAT.set(s, 'f');
@@ -3045,7 +3219,9 @@ export function recognize(strokes, overrides = {}, ctx = null) {
   // segmentation self-repair (colon, merge, then split), then function-name locking
   linesPre = linesPre.map(ls => colonRetry(ls, medianH));
   trace('colon-retry', linesPre);
+  linesPre = linesPre.map(ls => factorialRetry(ls, medianH));
   linesPre = linesPre.map(ls => equalsRetry(ls, medianH));
+  linesPre = linesPre.map(ls => congruenceRetry(ls, medianH));
   linesPre = linesPre.map(ls => mergeRetry(ls, medianH));
   trace('merge-retry', linesPre);
   linesPre = linesPre.map(ls => splitRetry(ls, medianH));
@@ -3062,6 +3238,17 @@ export function recognize(strokes, overrides = {}, ctx = null) {
   linesPre = linesPre.map(ls => percentContextPass(ls, medianH));
   linesPre = linesPre.map(ls => bracketContextPass(ls, medianH));
   linesPre = linesPre.map(parenthesizedDigitPass);
+  // A geometric reading of the new JEE/olympiad notation is locked, the way
+  // every other geometric repair here is locked. These three symbols have no
+  // support at all in the tuned bigram tables — they did not exist when those
+  // were derived — so the beam reliably trades a correct '≡' for a common '='
+  // on grammar alone, and reads '∞' back as the '0' its neighbours expect.
+  // Re-deriving the tables is retrain-scale work; locking is not, and it is
+  // scoped to the three symbols, so a line carrying none of them is scored
+  // bit-identically to before.
+  for (const ls of linesPre) for (const s2 of ls) {
+    if (s2.sym === '!' || s2.sym === '≡' || s2.sym === '∞') s2._geo = true;
+  }
 
   for (const ls of linesPre) {
     for (let i = 0; i < ls.length; i++) {
@@ -3258,6 +3445,7 @@ export function exprToLatex(s) {
   t = t.replace(/\bLHS\b/g, '\\mathrm{LHS}').replace(/\bRHS\b/g, '\\mathrm{RHS}');
   t = t.replace(/\blet\b/g, '\\mathrm{let}\\;');
   t = t.replace(/∫/g, '\\int ');
+  t = t.replace(/Σ/g, '\\sum ').replace(/∞/g, '\\infty ').replace(/≡/g, ' \\equiv ');
   t = t.replace(/theta/g, '\\theta ').replace(/pi/g, '\\pi ');
   t = t.replace(/<=/g, ' \\le ').replace(/>=/g, ' \\ge ').replace(/!=/g, ' \\ne ');
   t = t.replace(/±/g, ' \\pm ').replace(/°/g, '^{\\circ}');

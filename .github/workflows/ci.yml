@@ -138,6 +138,10 @@ jobs:
       HARD_SYMBOLS: "95.0"
       HARD_SCENES: "14"
       CALC_CHECKS: "24"
+      # The JEE/olympiad notation suite. Like CALC_CHECKS this holds the number
+      # of scenes that ran, not a score: the suite's own exit code is the
+      # verdict, and what CI adds is that the scenes were not quietly dropped.
+      JEE_CHECKS: "30"
       HARD_DIGITS: "92"
       LINES_EXACT: "92.0"
       LINES_CHARS: "97.0"
@@ -250,6 +254,7 @@ jobs:
           gate "hard · scenes"             "HARD SUITE"                      's|.*scenes \([0-9][0-9]*\)/.*|\1|p'                  "$HARD_SCENES"
           gate "hard · digit strings"      "HARD SUITE"                      's|.*digit strings \([0-9][0-9.]*\)%.*|\1|p'          "$HARD_DIGITS"
           gate "calculus · notation"       "Calculus notation:"              's|.*: \([0-9][0-9]*\)/.*|\1|p'                     "$CALC_CHECKS"
+          gate "jee · notation"            "JEE notation:"                   's|.*: \([0-9][0-9]*\)/.*|\1|p'                     "$JEE_CHECKS"
           gate "lines · exact"             "LINE SUITE"                      's|.*— \([0-9][0-9.]*\)% lines exact.*|\1|p'          "$LINES_EXACT"
           gate "lines · chars"             "LINE SUITE"                      's|.*exact, \([0-9][0-9.]*\)% chars.*|\1|p'           "$LINES_CHARS"
           gate "held-out #1 · lines"       "HELD-OUT SCORE"                  's|.*SCORE — \([0-9][0-9.]*\)% lines.*|\1|p'          "$HOLDOUT1_LINES"
