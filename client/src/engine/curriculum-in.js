@@ -411,12 +411,12 @@ export const IN_CURRICULUM = [
         'Find the centre, radius and equation of a circle',
         'Find the focus, directrix and latus rectum of a parabola',
         'Find the foci, axes and eccentricity of an ellipse and a hyperbola'
-      ]),
+      ], { native: true }),
       C('c11-3d-introduction', 'Introduction to Three Dimensional Geometry', 'Vectors & 3D', 7, [
         'Locate a point by its coordinates in three dimensions',
         'Find the distance between two points in space',
         'Apply the section formula in three dimensions'
-      ]),
+      ], { native: true }),
       C('c11-limits-derivatives', 'Limits and Derivatives', 'Calculus', 13, [
         'Evaluate limits algebraically and use the standard trigonometric limits',
         'Find a derivative from first principles',
@@ -478,12 +478,12 @@ export const IN_CURRICULUM = [
         'Find the area under a curve between two ordinates',
         'Find the area between two curves',
         'Find areas bounded by a line and a conic'
-      ]),
+      ], { native: true }),
       C('c12-differential-equations', 'Differential Equations', 'Calculus', 11, [
         'State the order and degree and verify a solution',
         'Solve by separating the variables and by homogeneous substitution',
         'Solve a linear differential equation by an integrating factor'
-      ]),
+      ], { native: true }),
       C('c12-vector-algebra', 'Vector Algebra', 'Vectors & 3D', 10, [
         'Add vectors and find magnitude, direction cosines and unit vectors',
         'Find and use the scalar (dot) product and the angle between vectors',
@@ -493,12 +493,12 @@ export const IN_CURRICULUM = [
         'Find the equation of a line in vector and Cartesian form',
         'Find the angle and shortest distance between two lines',
         'Find the equation of a plane and the angle and distance from a point'
-      ]),
+      ], { native: true }),
       C('c12-linear-programming', 'Linear Programming', 'Algebra', 7, [
         'Formulate a linear programming problem from a context',
         'Graph the feasible region of a set of constraints',
         'Find the optimal value at a corner point'
-      ]),
+      ], { native: true }),
       C('c12-probability', 'Probability', 'Statistics & Probability', 11, [
         'Find conditional probability and use the multiplication rule',
         "Apply the theorem of total probability and Bayes' theorem",

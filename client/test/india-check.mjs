@@ -15,7 +15,7 @@ import {
   IN_CHAPTER_BY_ID, coverage, mappedGenerators, allGenerators, generatorFor
 } from '../src/engine/curriculum-in.js';
 import { SUBTOPIC_BY_ID } from '../src/engine/curriculum.js';
-import { GENERATORS, loadAllBanks, generateQuestion } from '../src/engine/generators/index.js';
+import { GENERATORS, loadAllBanks, generateQuestion, bankOf } from '../src/engine/generators/index.js';
 import { checkAnswer } from '../src/engine/checker.js';
 import { answerForms, inspect } from '../../server/test/selfcheck.mjs';
 
@@ -50,6 +50,11 @@ for (const ch of mapped) {
   if (ch.native) {
     same(`${ch.id} is native, so it does not also claim an NSW subtopic`, ch.maps, null);
     ok(`${ch.id} has a generator of its own`, !!GENERATORS[gid]);
+    // Every India bank authors ids beginning c11-/c12-, so the prefix table
+    // cannot choose between them and each chapter is named individually. A
+    // chapter added to a bank but not to that table resolves to no bank, and
+    // then loads nothing on a device that has not already loaded everything.
+    ok(`${ch.id} resolves to a bank that can be lazily loaded`, !!bankOf(gid));
   } else {
     ok(`${ch.id} maps to a real subtopic (${gid})`, !!SUBTOPIC_BY_ID[gid]);
     ok(`${ch.id} maps to a subtopic that has generators (${gid})`, !!GENERATORS[gid]);

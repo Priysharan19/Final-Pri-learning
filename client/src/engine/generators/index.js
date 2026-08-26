@@ -22,7 +22,9 @@ const BANKS = {
   'streams-standard': () => import('./streams-standard.js').then(m => m.streamsStandard),
   'streams-ext': () => import('./streams-ext.js').then(m => m.streamsExt),
   // Indian curriculum chapters the NSW banks never had a topic for.
-  'india-algebra': () => import('./india-algebra.js').then(m => m.indiaAlgebra)
+  'india-algebra': () => import('./india-algebra.js').then(m => m.indiaAlgebra),
+  'india-coordinate': () => import('./india-coordinate.js').then(m => m.indiaCoordinate),
+  'india-calculus': () => import('./india-calculus.js').then(m => m.indiaCalculus)
 };
 
 // Subtopic ids are namespaced by the bank that authors them: y9-surds lives in
@@ -30,8 +32,25 @@ const BANKS = {
 const BANK_OF = {
   y7: 'year7', y8: 'year8', y9: 'year9', y10: 'year10', y11: 'year11', y12: 'year12',
   ms11: 'streams-standard', ms12: 'streams-standard',
-  me11: 'streams-ext', me12: 'streams-ext', mex: 'streams-ext',
-  c11: 'india-algebra', c12: 'india-algebra'
+  me11: 'streams-ext', me12: 'streams-ext', mex: 'streams-ext'
+};
+
+// The Indian banks all author chapters whose ids begin c11-/c12-, so the prefix
+// table above cannot tell them apart. These are named one by one instead —
+// a chapter added to a bank has to be added here too, and india-check.mjs fails
+// if it is not, because the chapter then resolves to no bank at all.
+const INDIA_BANK_OF = {
+  'c11-sets': 'india-algebra',
+  'c11-linear-inequalities': 'india-algebra',
+  'c11-binomial-theorem': 'india-algebra',
+  'c12-matrices': 'india-algebra',
+  'c12-determinants': 'india-algebra',
+  'c11-conic-sections': 'india-coordinate',
+  'c11-3d-introduction': 'india-coordinate',
+  'c12-3d-geometry': 'india-coordinate',
+  'c12-linear-programming': 'india-coordinate',
+  'c12-differential-equations': 'india-calculus',
+  'c12-applications-integrals': 'india-calculus'
 };
 
 /** Holds the generators of every bank loaded so far, keyed by subtopic id. */
@@ -42,7 +61,8 @@ const inflight = new Map();
 
 /** The bank a subtopic id belongs to, or null if the id names no bank. */
 export function bankOf(subtopicId) {
-  return BANK_OF[String(subtopicId ?? '').split('-')[0]] || null;
+  const id = String(subtopicId ?? '');
+  return INDIA_BANK_OF[id] || BANK_OF[id.split('-')[0]] || null;
 }
 
 function loadBank(name) {
