@@ -15,8 +15,8 @@ import { LADDER } from '../math/expressions';
  * Not four products; one ladder. The Olympiad station answers the seize.
  */
 
-// station transitions (absolute seconds, on beats)
-const MOVES = [21.2, 22.3, 23.4, 24.6];
+// station transitions relative to the act start (on beats)
+const MOVES_REL = [1.2, 2.3, 3.4, 4.6];
 
 const Motif: React.FC<{ index: number; p: number; size: number }> = ({ index, p, size }) => {
   const W = size;
@@ -201,7 +201,7 @@ export const LadderStation: React.FC<{ index: number; p: number; motifSize: numb
   );
 };
 
-export const Ladder: React.FC<{ t0?: number }> = ({ t0 = 20 }) => {
+export const Ladder: React.FC<{ t0?: number }> = ({ t0 = 26.5 }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const spec = useFrameSpec();
@@ -211,14 +211,15 @@ export const Ladder: React.FC<{ t0?: number }> = ({ t0 = 20 }) => {
   const motifSize = spec.aspect === '916' ? 560 : 450;
 
   // continuous pedestal move: one station per beat-pair, gliding with mass
-  const climbed = MOVES.reduce(
+  const moves = MOVES_REL.map((x) => t0 + x);
+  const climbed = moves.reduce(
     (acc, mv, i) => acc + ramp(t, [mv - 0.25, mv + 0.35], [0, 1], i % 2 === 0 ? easeMassive : easeDrift),
     0,
   );
   // ...plus a slow constant creep so no hold is ever a dead frame
-  const worldY = climbed * gap + ramp(t, [20.0, 27.0], [0, 120], easeDrift);
+  const worldY = climbed * gap + ramp(t, [t0, t0 + 6.5], [0, 120], easeDrift);
 
-  const enterO = ramp(t, [20.0, 20.4], [0, 1]);
+  const enterO = ramp(t, [t0, t0 + 0.4], [0, 1]);
   const stationTop = spec.aspect === '916' ? 520 : spec.aspect === '45' ? 330 : 240;
 
   return (
@@ -242,7 +243,7 @@ export const Ladder: React.FC<{ t0?: number }> = ({ t0 = 20 }) => {
               }}
             />
             {LADDER.map((_, i) => {
-              const arrive = i === 0 ? 20.0 : MOVES[i - 1];
+              const arrive = i === 0 ? t0 : moves[i - 1];
               const p = ramp(t, [arrive - 0.45, arrive + 0.55], [0, 1]);
               // the focus window: stations exist only near the camera — they
               // emerge from the dark below and recede above (and never leak

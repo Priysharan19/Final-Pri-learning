@@ -1,10 +1,10 @@
-# Storyboard — "The Tangent" (30 s master, 1080×1920, 60 fps)
+# Storyboard — "The Tangent" (36 s master, 1080×1920, 60 fps)
 
 **Creative platform:** A student who understands can solve a problem they have never seen; a student who memorised cannot.
 
 **The one idea:** The whole film is a single mathematical object — the tangent line — seen four ways: as a formula memorised without meaning (Act I), as an idea genuinely understood (Act II), as the same mathematics at four pressures from Class 7 to Olympiad (Act III), and as an invitation (Close). Every shot either serves that idea or was cut.
 
-**Grid:** 120 BPM. One beat = 0.5 s = 30 frames. Every cut lands on a beat. 30.00 s = 1800 frames.
+**Grid:** 120 BPM. One beat = 0.5 s = 30 frames. Every cut lands on a beat. 36.00 s = 2160 frames.
 
 **Camera:** everything lives in a virtual 3D stage; no frame is perfectly static. Act I is locked-off and mechanical (the factory doesn't drift — rigidity is the point; the only motion is the machine's). Act II onward the camera breathes: slow drift, parallax between layers, shallow depth of field with meaningful focus pulls.
 
@@ -73,11 +73,30 @@ This is the hero object. Apple revolves aluminium; we revolve an idea.
   the tangent lock lands on a full warm chord (the dynamic-range moment); soft organic
   pulse enters at 15.0; two pencil-tick foley hits per ✓.
 
-### S4 — THE LADDER · 20.00–27.00 (frames 1200–1620)
+### S4 — THE INSTRUMENT · 20.00–26.50 (frames 1200–1590) — the feature run
+The flex, inside the argument. Six lit panels of real product surface fly
+through a depth corridor, each crossing the focal plane on a beat
+(20.5 · 21.5 · 22.5 · 23.5 · 24.5 · 25.5), sharpening as they cross, dying
+before they crowd the frame:
+
+1. **Question bank** — the counter rolls to 3,44,798 (en-IN; the measured figure the shipped marketing quotes).
+2. **Knowledge map** — the constellation draws itself: every topic, one web.
+3. **Priorities** — the anti-factory feature, in the app's own voice: "Not quite. You keep flipping the sign when terms move." → misconception traced.
+4. **Predicted percentile** — 96.4 (illustrative) with the launch reel's disclaimer: "estimate from your practice data — not a guarantee of results."
+5. **Match Mode** — three race lanes, You in cream with the ♛ (rivals illustrative).
+6. **Full mocks** — a criteria fragment ✓2 ✓2 ✗1 → "4 / 5 · method marks kept."
+
+Then the run's punchline, set alone as the corridor empties: **"All of it offline."**
+
+- Audio: the film's forward gear — eighth-note bass groove with off-beat hats,
+  a whoosh + soft hit on every crossing, full strip-back under the offline line,
+  riser into the ladder.
+
+### S5 — THE LADDER · 26.50–33.00 (frames 1590–1980)
 One continuous upward camera move — not four products, one ladder. Five stations rise
 past, each the *same motif* (a line touching a curve) at a different pressure
 (station rhythm escalates: Class 7 and Olympiad breathe, the middle compresses;
-moves at 21.2 · 22.3 · 23.4 · 24.6):
+moves at 27.7 · 28.8 · 29.9 · 31.1):
 
 1. **Class 7** — proportion: y = 2x, y always double of x.
 2. **Class 10** — a tangent to a circle, radius ⊥ tangent at the point of contact.
@@ -91,13 +110,13 @@ different pressures."**
 
 - Audio: rising figure, one step per station, building but understated; a riser into the close.
 
-### S5 — CLOSE · 27.00–30.00 (frames 1620–1800)
+### S6 — CLOSE · 33.00–36.00 (frames 1980–2160)
 The wordmark sets. Below it: **"Join the change."** Then, small: **@pri.learning ·
 Coming soon.** Everything nearly still — the second stillness beat; the camera's drift
-decays to zero. Fade to pure black by 29.70 so the last frame hands off cleanly to
+decays to zero. Fade to pure black by 35.70 so the last frame hands off cleanly to
 frame 0. (Loop-safe: both ends black.)
 
-- Audio: resolve chord, long decay, silence by 29.8.
+- Audio: resolve chord, long decay, silence by 35.5.
 
 ---
 
@@ -138,8 +157,9 @@ lock hits at 7.0.
 | Turn: hinge (lock 12.60) | 10.00 | 15.00 | 600–900 | 20–30 |
 | Turn: ideal product | 15.00 | 17.50 | 900–1050 | 30–35 |
 | Turn: marked | 17.50 | 20.00 | 1050–1200 | 35–40 |
-| Ladder | 20.00 | 27.00 | 1200–1620 | 40–54 |
-| Close | 27.00 | 30.00 | 1620–1800 | 54–60 |
+| Instrument | 20.00 | 26.50 | 1200–1590 | 40–53 |
+| Ladder | 26.50 | 33.00 | 1590–1980 | 53–66 |
+| Close | 33.00 | 36.00 | 1980–2160 | 66–72 |
 
 ## Mathematics on screen (all verified numerically in `src/math`, gated in `scripts/check.ts`)
 - ((1+h)² − 1)/h = 2 + h → secant slopes 3, 2.5, 2.1 for h = 1, 0.5, 0.1; limit 2. ✓

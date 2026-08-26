@@ -29,9 +29,9 @@ const faststart = (file) => {
 };
 
 const targets = [
-  ['Reel916', 'pri-reel-30-916.mp4'],
-  ['Feed45', 'pri-reel-30-45.mp4'],
-  ['Square11', 'pri-reel-30-11.mp4'],
+  ['Reel916', 'pri-reel-36-916.mp4'],
+  ['Feed45', 'pri-reel-36-45.mp4'],
+  ['Square11', 'pri-reel-36-11.mp4'],
   ['Cut15', 'pri-reel-15-916.mp4'],
 ];
 

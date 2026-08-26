@@ -3,12 +3,13 @@ import { AbsoluteFill, Audio, Sequence, staticFile } from 'remotion';
 import { C, type Aspect } from '../design/tokens';
 import { Film } from '../lib/Film';
 import { AspectProvider, Captions } from '../lib/Type';
-import { sec, SCENES30, TEXT30 } from '../data/timeline';
+import { sec, SCENES_MAIN, TEXT_MAIN } from '../data/timeline';
 import { Hook } from '../scenes/Hook';
 import { Factory } from '../scenes/Factory';
 import { TurnCurve } from '../scenes/TurnCurve';
 import { TurnHinge } from '../scenes/TurnHinge';
 import { TurnProduct } from '../scenes/TurnProduct';
+import { Instrument } from '../scenes/Instrument';
 import { Ladder } from '../scenes/Ladder';
 import { Close } from '../scenes/Close';
 
@@ -18,7 +19,7 @@ export interface ReelProps {
   muted: boolean;
 }
 
-const S = SCENES30;
+const S = SCENES_MAIN;
 
 export const Reel: React.FC<ReelProps> = ({ aspect, debugSafe, muted }) => {
   return (
@@ -41,15 +42,18 @@ export const Reel: React.FC<ReelProps> = ({ aspect, debugSafe, muted }) => {
           <Sequence from={sec(S.turnProduct.at)} durationInFrames={sec(S.turnProduct.dur + S.turnMarked.dur)} name="Turn · product/marked">
             <TurnProduct t0={S.turnProduct.at} />
           </Sequence>
+          <Sequence from={sec(S.instrument.at)} durationInFrames={sec(S.instrument.dur)} name="Instrument">
+            <Instrument t0={S.instrument.at} />
+          </Sequence>
           <Sequence from={sec(S.ladder.at)} durationInFrames={sec(S.ladder.dur)} name="Ladder">
             <Ladder t0={S.ladder.at} />
           </Sequence>
           <Sequence from={sec(S.close.at)} durationInFrames={sec(S.close.dur)} name="Close">
-            <Close t0={S.close.at} />
+            <Close t0={S.close.at} fadeAt={S.close.at + 2.2} />
           </Sequence>
 
           {/* burned captions — part of the design system, span the whole film */}
-          <Captions beats={TEXT30} roles={['caption']} />
+          <Captions beats={TEXT_MAIN} roles={['caption']} />
         </AbsoluteFill>
       </Film>
       {muted ? null : <Audio src={staticFile('audio/soundtrack-30.wav')} />}

@@ -206,6 +206,7 @@ function buildScore({ dur, cues }) {
   const {
     hook, factoryStart, seize, bloom, lock, ticks, ladderStart, ladderMoves, close, end,
   } = cues;
+  const instrument = cues.instrument;
 
   // — Hook: sub hit + dark drone + a soft beat under each word slam
   mix.add(hook + 0.08, sub(40, 1.4), 0.8);
@@ -248,11 +249,32 @@ function buildScore({ dur, cues }) {
 
   // — After the lock: gentle organic pulse under the product
   const pulseStart = lock + 2.4;
-  for (let t = pulseStart; t < ladderStart - 0.05; t += 0.5) {
+  const pulseEnd = instrument ?? ladderStart;
+  for (let t = pulseStart; t < pulseEnd - 0.05; t += 0.5) {
     mix.add(t, felt(D('D', 3), 0.5), 0.16);
     if ((Math.round((t - pulseStart) / 0.5) % 2) === 1) mix.add(t + 0.25, felt(D('A', 3), 0.4), 0.1);
   }
-  mix.add(pulseStart - 1.2, pad(D('Bb', 2), ladderStart - pulseStart + 1.4, { attack: 1.2, bright: 0.35 }), 0.2);
+  mix.add(pulseStart - 1.2, pad(D('Bb', 2), (instrument ?? ladderStart) - pulseStart + 1.4, { attack: 1.2, bright: 0.35 }), 0.2);
+
+  // — The Instrument: the feature run gets the film's forward gear — an eighth
+  // groove with off-beat hats, one whoosh+hit per panel crossing, then a full
+  // strip-back for the offline line before the ladder resumes the build.
+  if (instrument) {
+    const grooveEnd = cues.panels[cues.panels.length - 1];
+    for (let t = instrument + 0.25; t < grooveEnd - 0.02; t += 0.25) {
+      const k = Math.round((t - instrument) / 0.25);
+      mix.add(t, felt(D(k % 4 === 2 ? 'A' : 'D', 2), 0.28), 0.2);
+      if (k % 2 === 1) mix.add(t, tick(rng, 1.6, 0.03), 0.13, 0.15);
+    }
+    mix.add(instrument, pad(D('D', 3), grooveEnd - instrument + 0.8, { attack: 0.4, bright: 0.55 }), 0.19);
+    mix.add(instrument, pad(D('F', 3), grooveEnd - instrument + 0.8, { attack: 0.6, bright: 0.5 }), 0.15);
+    for (const pc of cues.panels) {
+      mix.add(pc - 0.3, riser(0.3, rng), 0.17);
+      mix.add(pc, thunk(rng, 0.14), 0.4);
+    }
+    mix.add(grooveEnd + 0.1, sub(38, 1.1), 0.5); // the breath under "All of it offline."
+    mix.add(ladderStart - 0.9, riser(0.9, rng), 0.22);
+  }
   // (pencil ticks + chime are added post-duck as foreground foley — see below)
 
   // — Ladder: one chord step per station, building
@@ -371,7 +393,8 @@ function writeWav(path, mix) {
 // ── cue maps (must mirror src/data/timeline.ts) ────────────────────────────
 
 const VO30 = [
-  [0.15, 1.45], [2.6, 6.05], [6.1, 7.35], [9.0, 11.7], [13.2, 14.9], [15.4, 19.6], [20.8, 26.4], [27.3, 29.3],
+  [0.15, 1.45], [2.6, 6.05], [6.1, 7.35], [9.0, 11.7], [13.2, 14.9], [15.4, 19.6],
+  [20.3, 23.3], [23.4, 26.3], [27.3, 32.6], [33.3, 35.2],
 ];
 const VO15 = [
   [0.2, 1.15], [2.55, 3.7], [3.9, 6.5], [8.7, 10.4], [10.7, 12.3], [12.8, 14.5],
@@ -388,12 +411,14 @@ const CUES30 = {
     bloom: 8.0,
     lock: 12.6,
     ticks: [18.0, 18.5, 19.0],
-    ladderStart: 20.0,
-    ladderMoves: [21.2, 22.3, 23.4, 24.6],
-    close: 27.0,
-    end: 30.0,
+    instrument: 20.0,
+    panels: [20.5, 21.5, 22.5, 23.5, 24.5, 25.5],
+    ladderStart: 26.5,
+    ladderMoves: [27.7, 28.8, 29.9, 31.1],
+    close: 33.0,
+    end: 36.0,
 };
-const m30 = buildScore({ dur: 30, cues: CUES30 });
+const m30 = buildScore({ dur: 36, cues: CUES30 });
 duck(m30, VO30);
 addForeground(m30, CUES30, mulberry32(77));
 master(m30);

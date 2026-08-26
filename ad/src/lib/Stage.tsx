@@ -66,7 +66,7 @@ export const Plane: React.FC<{
   blurScale?: number;
 }> = ({ z = 0, style, children, blurScale = 1 }) => {
   const { focus, dof } = useContext(StageCtx);
-  const blur = (Math.abs(z - focus) / 100) * dof * blurScale;
+  const blur = Math.min(14, (Math.abs(z - focus) / 100) * dof * blurScale);
   return (
     <AbsoluteFill
       style={{
