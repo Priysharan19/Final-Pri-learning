@@ -26,3 +26,11 @@ tools/ink-foundation/runs/
 ios/PriLearning.swiftpm/Resources/Models/PriInkFoundation.mlpackage/
 ios/PriLearning\ 2.swiftpm/Resources/Models/PriInkFoundation.mlpackage/
 marketing/reel/export/
+
+# macOS duplicates a file as "name 2.ext" when it is copied over itself. Eight
+# of these were committed by mistake in acf58d3 — byte-identical copies of files
+# already tracked beside them. Ignored so it cannot happen again.
+*[ ]2.py
+*[ ]2.mjs
+*[ ]2.sh
+*[ ]2.js
