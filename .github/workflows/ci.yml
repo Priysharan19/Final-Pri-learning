@@ -102,7 +102,13 @@ jobs:
       # ║  lower one to make a build pass: a score under its floor is the     ║
       # ║  regression the floor exists to catch.                              ║
       # ╚═════════════════════════════════════════════════════════════════════╝
-      ENGINE_SELFCHECKS: "672000"
+      # selfcheck.mjs walks every generator the banks register, not only the NSW
+      # subtopics, so the India banks came under this gate the moment they were
+      # written: 134 subtopics × 4 difficulties × 2,000 draws. It earned that on
+      # its first run, finding an empty filtered draw in c8-proportions-dir-inv
+      # that fired on 22.6% of one cell's seeds and that a 25-draw smoke test had
+      # walked straight past.
+      ENGINE_SELFCHECKS: "1072000"
       ENGINE_MULTIPART: "21000"
       BACKEND_CHECKS: "329"
       BACKEND_ROUTES: "51"
@@ -117,14 +123,16 @@ jobs:
       DIAGNOSE_CHECKS: "104"
       DIAGNOSE_SWEEP: "795"
       DIAGNOSE_SOUND: "816"
-      # The Indian curriculum's claim is "these chapters can be practised". The
-      # floor that carries it is not the check count but the number of QUESTIONS
-      # actually generated and marked: a mapping can resolve to a real generator
-      # and still hand back nothing, and a suite that generated zero questions
-      # would otherwise report a clean pass.
-      INDIA_CHECKS: "700"
-      INDIA_QUESTIONS: "4176"
-      INDIA_CHAPTERS: "87"
+      # The Indian curriculum's claim is per DOT POINT, not per chapter: a
+      # chapter counts as reachable the moment one of its three dot points has a
+      # generator, so the chapter count was nearly meaningless and is no longer
+      # gated. INDIA_DOTPOINTS is the real coverage figure, and INDIA_QUESTIONS
+      # is what stops it being a claim on paper — a cover entry can resolve to a
+      # real generator and still hand back nothing, and a suite that generated
+      # zero questions would otherwise report a clean pass.
+      INDIA_CHECKS: "1358"
+      INDIA_QUESTIONS: "4644"
+      INDIA_DOTPOINTS: "261"
       INK_SELF: "96.0"
       INK_PROBES: "99.0"
       HARD_SYMBOLS: "95.0"
@@ -232,8 +240,8 @@ jobs:
           gate "diagnosis · missteps swept" "Sweep "                         's|.*Sweep \([0-9][0-9]*\)/.*|\1|p'                    "$DIAGNOSE_SWEEP"
           gate "diagnosis · correct steps tested" "False positives "         's|.*False positives [0-9][0-9]*/\([0-9][0-9]*\) .*|\1|p' "$DIAGNOSE_SOUND"
           gate "india · checks"            "INDIA SUITE"                     's|.*— \([0-9][0-9]*\)/.*|\1|p'                       "$INDIA_CHECKS"
-          gate "india · questions marked"  "questions generated across"      's|.*— \([0-9][0-9]*\) marked correct.*|\1|p'         "$INDIA_QUESTIONS"
-          gate "india · chapters reachable" "can be practised today"         's|.*  \([0-9][0-9]*\)/[0-9][0-9]* (.*|\1|p'          "$INDIA_CHAPTERS"
+          gate "india · questions marked"  "declared (generator, difficulty) pairs" 's|.*— \([0-9][0-9]*\) marked correct.*|\1|p'  "$INDIA_QUESTIONS"
+          gate "india · dot points covered" "dot points have a generator behind them" 's|.*  \([0-9][0-9]*\)/[0-9][0-9]* dot points.*|\1|p' "$INDIA_DOTPOINTS"
 
           # ── how well it scored ──────────────────────────────────────────────
           gate "inkcheck · self"           "RECOGNIZER SUITE"                's|.*self \([0-9][0-9.]*\)%.*|\1|p'                   "$INK_SELF"

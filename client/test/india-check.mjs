@@ -12,9 +12,10 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import {
   IN_CHAPTERS, IN_CURRICULUM, IN_STRANDS, IN_TRACKS, OLYMPIAD_TOPICS,
-  IN_CHAPTER_BY_ID, coverage, mappedGenerators, allGenerators, generatorFor
+  IN_CHAPTER_BY_ID, coverage, mappedGenerators, allGenerators, nativeGenerators,
+  generatorFor, generatorsFor, coversForDotpoint, uncoveredDotpoints, DIFFICULTIES, OWN_GENERATOR
 } from '../src/engine/curriculum-in.js';
-import { SUBTOPIC_BY_ID } from '../src/engine/curriculum.js';
+import { SUBTOPIC_BY_ID, DOTPOINTS, difficultiesForDotpoint } from '../src/engine/curriculum.js';
 import { GENERATORS, loadAllBanks, generateQuestion, bankOf } from '../src/engine/generators/index.js';
 import { checkAnswer } from '../src/engine/checker.js';
 import { answerForms, inspect } from '../../server/test/selfcheck.mjs';
@@ -44,72 +45,70 @@ console.log(`  ${IN_CHAPTERS.length} chapters across ${IN_CURRICULUM.length} cla
 
 // ── Mappings: the half that can silently lie ────────────────────────────────
 console.log('\nMAPPINGS');
-const mapped = IN_CHAPTERS.filter(c => generatorFor(c));
-for (const ch of mapped) {
-  const gid = generatorFor(ch);
-  if (ch.native) {
-    same(`${ch.id} is native, so it does not also claim an NSW subtopic`, ch.maps, null);
-    ok(`${ch.id} has a generator of its own`, !!GENERATORS[gid]);
-    // Every India bank authors ids beginning c11-/c12-, so the prefix table
-    // cannot choose between them and each chapter is named individually. A
-    // chapter added to a bank but not to that table resolves to no bank, and
-    // then loads nothing on a device that has not already loaded everything.
-    ok(`${ch.id} resolves to a bank that can be lazily loaded`, !!bankOf(gid));
-  } else {
-    ok(`${ch.id} maps to a real subtopic (${gid})`, !!SUBTOPIC_BY_ID[gid]);
-    ok(`${ch.id} maps to a subtopic that has generators (${gid})`, !!GENERATORS[gid]);
-  }
-}
+let entries = 0;
 for (const ch of IN_CHAPTERS) {
-  if (ch.partial) ok(`${ch.id} says which part is covered`, !!generatorFor(ch) && ch.partial.trim().length > 20);
-  if (!generatorFor(ch)) same(`${ch.id} claims no partial cover when it has no generator`, ch.partial, null);
-}
-console.log(`  ${mapped.length} chapters reach ${allGenerators().length} generators — ${mappedGenerators().length} reused from the NSW banks, ${coverage().native.length} written for this curriculum`);
-
-// ── The mapping has to actually produce a markable question ────────────────
-console.log('\nQUESTIONS — every mapped chapter, every difficulty, marked by its own marker');
-const DRAWS = 12;
-let made = 0, marked = 0, wellFormed = 0, broken = [];
-for (const ch of mapped) {
-  const gid = generatorFor(ch);
-  for (let d = 1; d <= 4; d++) {
-    for (let i = 0; i < DRAWS; i++) {
-      let q;
-      try { q = generateQuestion(gid, d, `in-${ch.id}-${d}-${i}`); }
-      catch (e) { broken.push(`${ch.id} → ${gid} d${d}: threw ${e.message}`); continue; }
-      if (!q || !q.prompt) { broken.push(`${ch.id} → ${gid} d${d}: produced no question`); continue; }
-      made++;
-      // The same well-formedness inspection selfcheck.mjs runs over the NSW
-      // bank: no NaN or undefined leaking into prose, no floating-point
-      // artefact in a keyed value, an integer where the question asks for a
-      // count, hints and steps present.
-      const problems = inspect(q);
-      if (!problems.length) wellFormed++;
-      else if (broken.length < 12) broken.push(`${ch.id} → ${gid} d${d}: ${problems[0]}`);
-      if (q.multipart) { marked++; continue; }
-      // The keyed answer is read exactly as selfcheck.mjs reads it. A question
-      // that demands a simplest fraction or a surd is right to reject the
-      // decimal, so feeding it one would test the opposite of what it asks.
-      const forms = answerForms(q);
-      if (!forms.length) { marked++; continue; }
-      let allOk = true;
-      for (const form of forms) {
-        let res;
-        try { res = checkAnswer(q, form.input); }
-        catch (e) { res = { correct: false, feedback: `threw ${e.message}` }; }
-        if (!res.correct) {
-          allOk = false;
-          if (broken.length < 12) broken.push(`${ch.id} → ${gid} d${d}: keyed ${form.label} "${form.input}" is marked wrong by its own marker`);
-        }
-      }
-      if (allOk) marked++;
-    }
+  for (const c of ch.covers) {
+    entries++;
+    ok(`${ch.id} → ${c.gen} exists`, !!GENERATORS[c.gen]);
+    ok(`${ch.id} → ${c.gen} resolves to a lazily-loadable bank`, !!bankOf(c.gen));
+    ok(`${ch.id} → ${c.gen} names real dot points`, c.dp.every(i => i >= 0 && i < ch.dotpoints.length));
+    ok(`${ch.id} → ${c.gen} names real difficulties`, c.diff.length > 0 && c.diff.every(d => DIFFICULTIES.includes(d)));
+    // A generator borrowed from the NSW banks must be a real subtopic there; one
+    // written for this curriculum is named by the convention OWN_GENERATOR sets.
+    const own = OWN_GENERATOR.test(c.gen);
+    ok(`${ch.id} → ${c.gen} is either an NSW subtopic or written for this curriculum`, own || !!SUBTOPIC_BY_ID[c.gen]);
+    if (own) ok(`${ch.id} → ${c.gen} lives in an India bank`, String(bankOf(c.gen)).startsWith('india-'));
   }
 }
-ok(`every mapped chapter produced questions — ${broken.length} problem(s)`, broken.length === 0);
+const mapped = IN_CHAPTERS.filter(c => generatorFor(c));
+console.log(`  ${entries} cover entries across ${mapped.length} chapters, reaching ${allGenerators().length} generators — ${mappedGenerators().length} reused from the NSW banks, ${nativeGenerators().length} written for this curriculum`);
+
+// ── Every claim has to produce a markable question ─────────────────────────
+// The claim is not "this chapter has a generator" but "this generator, at these
+// difficulties, asks about this dot point". The first half of that is machine
+// checkable and is checked here: every (generator, difficulty) pair a chapter
+// names is made to produce real questions, which are then marked by the real
+// marker and inspected for well-formedness. The second half — that the question
+// is *about* the dot point claimed — is a human judgement, made once per entry
+// against sampled output, and is not something this suite can verify.
+console.log('\nQUESTIONS — every declared (generator, difficulty), marked and inspected');
+const DRAWS = 12;
+let made = 0, marked = 0, wellFormed = 0;
+const broken = [];
+const pairs = new Set();
+for (const ch of IN_CHAPTERS) for (const c of ch.covers) for (const d of c.diff) pairs.add(`${c.gen}|${d}`);
+for (const pair of pairs) {
+  const [gid, ds] = pair.split('|');
+  const d = Number(ds);
+  for (let i = 0; i < DRAWS; i++) {
+    let q;
+    try { q = generateQuestion(gid, d, `in-${gid}-${d}-${i}`); }
+    catch (e) { broken.push(`${gid} d${d}: threw ${e.message}`); continue; }
+    if (!q || !q.prompt) { broken.push(`${gid} d${d}: produced no question`); continue; }
+    made++;
+    const problems = inspect(q);
+    if (!problems.length) wellFormed++;
+    else if (broken.length < 12) broken.push(`${gid} d${d}: ${problems[0]}`);
+    if (q.multipart) { marked++; continue; }
+    const forms = answerForms(q);
+    if (!forms.length) { marked++; continue; }
+    let allOk = true;
+    for (const form of forms) {
+      let res;
+      try { res = checkAnswer(q, form.input); }
+      catch (e) { res = { correct: false, feedback: `threw ${e.message}` }; }
+      if (!res.correct) {
+        allOk = false;
+        if (broken.length < 12) broken.push(`${gid} d${d}: keyed ${form.label} "${form.input}" is marked wrong by its own marker`);
+      }
+    }
+    if (allOk) marked++;
+  }
+}
+ok(`every declared pair produced questions — ${broken.length} problem(s)`, broken.length === 0);
 same('every generated question passed its own marker', marked, made);
 same('every generated question is well formed', wellFormed, made);
-console.log(`  ${made} questions generated across ${mapped.length} chapters × 4 difficulties × ${DRAWS} draws — ${marked} marked correct by their own marker, ${wellFormed} well formed`);
+console.log(`  ${made} questions from ${pairs.size} declared (generator, difficulty) pairs × ${DRAWS} draws — ${marked} marked correct by their own marker, ${wellFormed} well formed`);
 if (broken.length) for (const b of broken) console.log(`    ✗ ${b}`);
 
 // ── Tracks ──────────────────────────────────────────────────────────────────
@@ -135,12 +134,32 @@ console.log('\nCOVERAGE');
 const c = coverage();
 same('the three buckets account for every chapter', c.full.length + c.partial.length + c.none.length, c.total);
 same('total matches the chapter list', c.total, IN_CHAPTERS.length);
+same('the dot-point count is three per chapter', c.dotpoints, IN_CHAPTERS.length * 3);
+same('covered plus uncovered is every dot point', c.coveredDotpoints + c.uncovered.length, c.dotpoints);
 ok('nothing is counted as both full and partial', c.full.every(x => !c.partial.includes(x)));
-const reach = c.full.length + c.partial.length;
+for (const ch of c.full) same(`${ch.id} is full, so nothing is uncovered`, uncoveredDotpoints(ch).length, 0);
+for (const ch of c.partial) ok(`${ch.id} is partial, so something is uncovered`, uncoveredDotpoints(ch).length > 0);
+
+// A dot point reachable at only one of the four difficulties is covered but
+// thin: asking for it forces that difficulty, because the picker snaps a
+// request to the nearest difficulty that can deliver. Reported rather than
+// gated — it is a quality number, and hiding it would let the headline read as
+// more than it is. It is reported *beside the NSW figure*, because a number
+// with nothing to compare it against says very little, and this architecture
+// has always had thin dot points.
+const thin = [];
+for (const ch of IN_CHAPTERS) {
+  ch.dotpoints.forEach((text, i) => {
+    const diffs = new Set(coversForDotpoint(ch, i).flatMap(x => x.diff));
+    if (diffs.size === 1) thin.push(`${ch.id} dp${i} — only D${[...diffs][0]}`);
+  });
+}
 console.log(`  ${c.total} chapters — ${c.full.length} full, ${c.partial.length} partial, ${c.none.length} none`);
-console.log(`  ${reach}/${c.total} (${(reach / c.total * 100).toFixed(1)}%) can be practised today; ${c.none.length} cannot and are listed by tools/india-coverage.mjs`);
-console.log(`  Read that with the line above it: ${c.full.length} chapters are covered whole and ${c.partial.length} only in part, so "can be practised" means the chapter sets questions, not that every dot point in it does.`);
-console.log('  This is a count of chapters with a generator behind them, not a claim that the questions are pitched at NCERT level — no Indian teacher has read one.');
+console.log(`  ${c.coveredDotpoints}/${c.dotpoints} dot points have a generator behind them; ${c.uncovered.length} do not`);
+const nswThin = DOTPOINTS.filter(dp => difficultiesForDotpoint(dp.id).length === 1).length;
+console.log(`  ${thin.length}/${c.dotpoints} (${(thin.length / c.dotpoints * 100).toFixed(1)}%) are reachable at only one of the four difficulties — against ${nswThin}/${DOTPOINTS.length} (${(nswThin / DOTPOINTS.length * 100).toFixed(1)}%) in the NSW curriculum this app already ships:`);
+for (const t of thin) console.log(`    · ${t}`);
+console.log('  None of this is a claim that the questions are pitched at NCERT level, or that a generator asks what its dot point says — no Indian teacher has read one.');
 
 if (failures.length) {
   console.log('\nfailures:');

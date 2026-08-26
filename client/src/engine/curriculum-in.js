@@ -7,20 +7,41 @@
 // different subject: number theory, combinatorics, inequalities, functional
 // equations and synthetic geometry.
 //
-// ── What `maps` means, and why every chapter carries one ────────────────────
+// ── How coverage is declared, and why it is per dot point ───────────────────
 // This repo already holds 84 parameterised generators written against the NSW
 // syllabus. A large part of school mathematics is the same mathematics wherever
 // it is taught: Class 8 "Linear Equations in One Variable" and NSW Year 8
 // "Equations with Brackets" are one topic with two names, and re-authoring the
 // generator would produce the same questions with more bugs.
 //
-// So each chapter names the generator behind it, or `null` where there is none.
-// `null` is the honest half and the load-bearing half: it is a chapter this app
-// cannot yet set a question on, and `node tools/india-coverage.mjs` counts them.
-// A chapter must never be given a `maps` that merely sounds close — a student
-// asking for Determinants and getting Quadratic Equations is worse than being
-// told the chapter is not ready. Where the overlap is real but partial, `partial`
-// says which part is covered, and coverage counts it separately from a clean map.
+// The first version of this file recorded that with one `maps` per chapter and a
+// prose `partial` note saying what the reuse missed. That was a sentence nobody
+// could check, and the count it implied — "25 chapters partly covered" — was an
+// assertion rather than a measurement.
+//
+// Coverage is now declared **per dot point, and per difficulty**:
+//
+//   covers: [
+//     { gen: 'y7-angles', dp: [0], diff: [1, 2, 4] },
+//     { gen: 'y7-angles', dp: [1], diff: [3] }
+//   ]
+//
+// `dp` is the ordinal of the dot point within the chapter, `diff` the
+// difficulties of that generator which actually ask about it (all four when
+// omitted). A dot point named by no entry is uncovered, and the count of those
+// is computed rather than written down.
+//
+// The standard a `covers` entry has to meet: **every difficulty it names must
+// ask about the dot point it claims**. That is what stops a chapter borrowing a
+// generator whose ladder wanders somewhere else — `y12-series` runs arithmetic
+// series at D1–D2 and geometric at D3–D4, so a Class 10 chapter that only wants
+// arithmetic progressions may claim the first two and not the last two. A
+// chapter is never given a generator that merely sounds close: a student asking
+// for Determinants and getting Quadratic Equations is worse than being told the
+// dot point is not ready.
+//
+// `maps: X` is sugar for "X covers every dot point at every difficulty", and
+// `native: true` the same with the chapter's own id.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const IN_STRANDS = [
@@ -38,29 +59,59 @@ export const IN_STRANDS = [
   'Reasoning & Proof'
 ];
 
-/**
- * C(id, name, strand, weight, dotpoints, link)
- *   link.native  — a generator is authored against this chapter's own id, because
-                  the topic exists in this curriculum and in no NSW one
-   link.maps    — the existing generator subtopic id that authors this chapter
- *   link.partial — a note naming the part of the chapter that generator covers,
- *                  set only when the cover is genuinely incomplete
- */
-const C = (id, name, strand, weight, dotpoints, link = {}) => ({
-  id, name, strand, weight, dotpoints,
-  maps: link.maps || null,
-  native: !!link.native,
-  partial: link.partial || null
-});
+export const DIFFICULTIES = [1, 2, 3, 4];
 
 /**
- * The generator that authors a chapter: a reused NSW one, or — where the topic
- * exists only in this curriculum — one written against the chapter's own id.
+ * Generators written for this curriculum are named after the chapter or the dot
+ * point they serve — c10-areas-circles, c12-probability-bayes, olymp-geometry.
+ * Anything else is a subtopic id borrowed from the NSW banks.
  */
+export const OWN_GENERATOR = /^(c(?:7|8|9|10|11|12)|olymp)-/;
+
+/**
+ * C(id, name, strand, weight, dotpoints, link)
+ *   link.native — a generator authored against this chapter's own id, covering
+ *                 every dot point (the topic exists here and in no NSW syllabus)
+ *   link.maps   — one existing generator covering every dot point
+ *   link.covers — the precise form: [{ gen, dp: [ordinals], diff: [1..4] }]
+ */
+const C = (id, name, strand, weight, dotpoints, link = {}) => {
+  const all = dotpoints.map((_, i) => i);
+  let covers = [];
+  if (link.covers) covers = link.covers;
+  else if (link.native) covers = [{ gen: id, dp: all }];
+  else if (link.maps) covers = [{ gen: link.maps, dp: all }];
+  const resolved = covers.map(c => ({ gen: c.gen, dp: [...c.dp], diff: c.diff ? [...c.diff] : [...DIFFICULTIES] }));
+  return {
+    id, name, strand, weight, dotpoints,
+    // Native means at least one generator was written for this curriculum
+    // rather than borrowed from the NSW banks.
+    native: resolved.some(c => OWN_GENERATOR.test(c.gen)),
+    covers: resolved
+  };
+};
+
+/** Every generator a chapter draws on, in declaration order. */
+export function generatorsFor(chapter) {
+  return [...new Set((chapter?.covers || []).map(c => c.gen))];
+}
+
+/** The first generator behind a chapter, or null when nothing covers it. */
 export function generatorFor(chapter) {
-  if (!chapter) return null;
-  if (chapter.native) return chapter.id;
-  return chapter.maps || null;
+  return generatorsFor(chapter)[0] || null;
+}
+
+/** The generators that author one dot point, with the difficulties that do it. */
+export function coversForDotpoint(chapter, ordinal) {
+  return (chapter?.covers || []).filter(c => c.dp.includes(ordinal));
+}
+
+/** The ordinals of this chapter's dot points that nothing authors. */
+export function uncoveredDotpoints(chapter) {
+  if (!chapter) return [];
+  return chapter.dotpoints
+    .map((_, i) => i)
+    .filter(i => !coversForDotpoint(chapter, i).some(c => c.diff.length));
 }
 
 export const IN_CURRICULUM = [
@@ -98,12 +149,12 @@ export const IN_CURRICULUM = [
         'Angle sum and exterior angle property of a triangle',
         'Medians, altitudes and the triangle inequality',
         'Apply Pythagoras’ theorem to a right triangle'
-      ], { maps: 'y9-pythagoras', partial: 'Pythagoras only — the angle-sum, exterior-angle and triangle-inequality dot points have no generator' }),
+      ], { covers: [{ gen: 'c7-triangle-angles', dp: [0], diff: [1, 2] }, { gen: 'c7-triangle-angles', dp: [1], diff: [3, 4] }, { gen: 'y9-pythagoras', dp: [2] }] }),
       C('c7-comparing-quantities', 'Comparing Quantities', 'Number & Arithmetic', 11, [
         'Simplify ratios and divide a quantity in a given ratio',
         'Convert between fractions, decimals and percentages',
         'Find percentage increase, decrease and simple interest'
-      ], { maps: 'y7-ratio', partial: 'ratio and rates only — percentage change and simple interest sit in y8-percentages and y9-simint' }),
+      ], { covers: [{ gen: 'y7-ratio', dp: [0], diff: [1, 2, 3] }, { gen: 'y7-decimals-perc', dp: [1], diff: [1, 3] }, { gen: 'y8-percentages', dp: [2] }, { gen: 'y9-simint', dp: [2] }] }),
       C('c7-rational-numbers', 'Rational Numbers', 'Number & Arithmetic', 9, [
         'Represent rational numbers on the number line and in standard form',
         'Add and subtract rational numbers with unlike denominators',
@@ -145,7 +196,7 @@ export const IN_CURRICULUM = [
         'Use closure, commutativity, associativity and distributivity',
         'Find the additive and multiplicative inverse of a rational number',
         'Represent rational numbers on the number line and find numbers between two of them'
-      ], { maps: 'y7-fractions', partial: 'arithmetic only — the property and density dot points have no generator' }),
+      ], { covers: [{ gen: 'c8-rational-numbers', dp: [0], diff: [1] }, { gen: 'c8-rational-numbers', dp: [1], diff: [2] }, { gen: 'c8-rational-numbers', dp: [2], diff: [3, 4] }] }),
       C('c8-linear-equations', 'Linear Equations in One Variable', 'Algebra', 12, [
         'Solve equations with the variable on both sides',
         'Solve equations involving brackets and fractional coefficients',
@@ -160,7 +211,7 @@ export const IN_CURRICULUM = [
         'Group data into class intervals and read a histogram',
         'Read and construct a pie chart',
         'Find the probability of a simple event'
-      ], { maps: 'y8-probability', partial: 'probability only — grouped frequency, histograms and pie charts have no generator' }),
+      ], { covers: [{ gen: 'c8-data-charts', dp: [0], diff: [1, 4] }, { gen: 'c8-data-charts', dp: [1], diff: [2, 3] }, { gen: 'y8-probability', dp: [2] }] }),
       C('c8-squares-roots', 'Squares and Square Roots', 'Number & Arithmetic', 10, [
         'Recognise properties and patterns of square numbers',
         'Find square roots by prime factorisation and by long division',
@@ -175,7 +226,7 @@ export const IN_CURRICULUM = [
         'Find discount, profit, loss and GST as percentages',
         'Calculate simple interest',
         'Calculate compound interest annually, half-yearly and quarterly'
-      ], { maps: 'y8-percentages', partial: 'percentage change, discount, profit and loss — the compound-interest dot point is authored in y10-compound and simple interest in y9-simint' }),
+      ], { covers: [{ gen: 'y8-percentages', dp: [0], diff: [2, 3, 4] }, { gen: 'y9-simint', dp: [1] }, { gen: 'y10-compound', dp: [2] }] }),
       C('c8-algebraic-identities', 'Algebraic Expressions and Identities', 'Algebra', 12, [
         'Multiply monomials, binomials and polynomials',
         'Apply (a ± b)² and (a + b)(a − b)',
@@ -195,7 +246,7 @@ export const IN_CURRICULUM = [
         'Recognise and use direct proportion',
         'Recognise and use inverse proportion',
         'Solve time, work and speed problems by proportion'
-      ], { maps: 'y8-rates', partial: 'rates, speed and time — the direct and inverse proportion dot points have no generator' }),
+      ], { covers: [{ gen: 'c8-proportions-dir-inv', dp: [0], diff: [1, 4] }, { gen: 'c8-proportions-dir-inv', dp: [1], diff: [2, 3, 4] }, { gen: 'y8-rates', dp: [2] }] }),
       C('c8-factorisation', 'Factorisation', 'Algebra', 11, [
         'Factorise by taking out a common factor and by grouping',
         'Factorise using the standard identities',
@@ -222,12 +273,12 @@ export const IN_CURRICULUM = [
         'Identify the degree, zeroes and type of a polynomial',
         'Apply the remainder and factor theorems',
         'Factorise polynomials using standard identities'
-      ], { maps: 'y11-polynomials', partial: 'remainder and factor theorems — the identity-factorisation dot point is authored in y9-algebra' }),
+      ], { covers: [{ gen: 'c9-polynomial-basics', dp: [0] }, { gen: 'y11-polynomials', dp: [1], diff: [2, 3] }, { gen: 'y9-algebra', dp: [2] }] }),
       C('c9-coordinate-geometry', 'Coordinate Geometry', 'Coordinate Geometry', 8, [
         'Plot points and name quadrants in the Cartesian plane',
         'Read coordinates from a graph',
         'Plot a linear relationship from a table of values'
-      ], { maps: 'y9-linear', partial: 'distance, midpoint and gradient — the quadrant-naming dot point has no generator' }),
+      ], { covers: [{ gen: 'c9-coordinate-geometry', dp: [0], diff: [1, 2] }, { gen: 'c9-coordinate-geometry', dp: [1], diff: [4] }, { gen: 'c9-coordinate-geometry', dp: [2], diff: [3] }] }),
       C('c9-linear-equations-2var', 'Linear Equations in Two Variables', 'Algebra', 10, [
         'Write a linear equation in two variables and find its solutions',
         'Draw the graph of a linear equation in two variables',
@@ -242,7 +293,7 @@ export const IN_CURRICULUM = [
         'Angles on a line, at a point and vertically opposite',
         'Angles made by a transversal on parallel lines',
         'Angle sum and exterior angle of a triangle'
-      ], { maps: 'y7-angles', partial: 'the two angle-relationship dot points — the triangle angle-sum dot point has no generator' }),
+      ], { covers: [{ gen: 'y7-angles', dp: [0], diff: [1, 2, 4] }, { gen: 'y7-angles', dp: [1], diff: [3] }, { gen: 'c7-triangle-angles', dp: [2], diff: [1, 2] }] }),
       C('c9-triangles', 'Triangles', 'Geometry', 12, [
         'Prove congruence by SSS, SAS, ASA, AAS and RHS',
         'Use properties of isosceles triangles',
@@ -272,7 +323,7 @@ export const IN_CURRICULUM = [
         'Present data in a grouped frequency table',
         'Draw and read bar graphs, histograms and frequency polygons',
         'Find the mean, median and mode of ungrouped data'
-      ], { maps: 'y7-data', partial: 'measures of centre — the grouped-table and histogram dot points have no generator' }),
+      ], { covers: [{ gen: 'c9-statistics-grouped', dp: [0], diff: [1, 2] }, { gen: 'c9-statistics-grouped', dp: [1], diff: [3, 4] }, { gen: 'y7-data', dp: [2], diff: [1, 3, 4] }] }),
       C('c9-probability', 'Probability', 'Statistics & Probability', 8, [
         'Find experimental probability from recorded outcomes',
         'Use the probability of an event and its complement',
@@ -294,7 +345,7 @@ export const IN_CURRICULUM = [
         'Relate the zeroes of a quadratic to its coefficients',
         'Find a polynomial from its zeroes',
         'Divide polynomials and apply the division algorithm'
-      ], { maps: 'y11-polynomials', partial: 'division and the factor theorem — the zeroes-and-coefficients dot point has no generator' }),
+      ], { covers: [{ gen: 'c10-polynomial-zeroes', dp: [0], diff: [1, 2] }, { gen: 'c10-polynomial-zeroes', dp: [1], diff: [3, 4] }, { gen: 'y11-polynomials', dp: [2], diff: [2, 3] }] }),
       C('c10-pair-linear-equations', 'Pair of Linear Equations in Two Variables', 'Algebra', 12, [
         'Solve a pair of linear equations by substitution and elimination',
         'Decide consistency from the ratios of the coefficients',
@@ -309,7 +360,7 @@ export const IN_CURRICULUM = [
         'Find the nth term of an arithmetic progression',
         'Find the sum of the first n terms',
         'Solve word problems set as an arithmetic progression'
-      ], { maps: 'y12-series', partial: 'arithmetic progressions — that generator also covers geometric series, which Class 10 does not' }),
+      ], { covers: [{ gen: 'c10-arithmetic-progressions', dp: [0], diff: [1, 3] }, { gen: 'y12-series', dp: [0], diff: [1] }, { gen: 'c10-arithmetic-progressions', dp: [1], diff: [2] }, { gen: 'y12-series', dp: [1], diff: [2] }, { gen: 'c10-arithmetic-progressions', dp: [2], diff: [4] }] }),
       C('c10-triangles', 'Triangles', 'Geometry', 12, [
         'Apply the basic proportionality (Thales) theorem',
         'Prove and use the criteria for similar triangles',
@@ -319,12 +370,12 @@ export const IN_CURRICULUM = [
         'Find the distance between two points',
         'Find a point dividing a segment in a given ratio',
         'Find the area of a triangle from its vertices'
-      ], { maps: 'y9-linear', partial: 'distance, midpoint and gradient — the section-formula and area-from-vertices dot points have no generator' }),
+      ], { covers: [{ gen: 'c10-coordinate-geometry', dp: [0], diff: [1] }, { gen: 'c10-coordinate-geometry', dp: [1], diff: [2] }, { gen: 'c10-coordinate-geometry', dp: [2], diff: [3, 4] }] }),
       C('c10-trigonometry', 'Introduction to Trigonometry', 'Trigonometry', 12, [
         'Define the trigonometric ratios of an acute angle',
         'Use the exact ratios of 0°, 30°, 45°, 60° and 90°',
         'Prove and apply trigonometric identities'
-      ], { maps: 'y9-trig', partial: 'the ratios and exact values — the identity-proof dot point is authored in y11-trigfunc' }),
+      ], { covers: [{ gen: 'y9-trig', dp: [0], diff: [1, 2, 3] }, { gen: 'y11-trigfunc', dp: [1], diff: [1, 2] }, { gen: 'y11-trigfunc', dp: [2], diff: [4] }] }),
       C('c10-trig-applications', 'Some Applications of Trigonometry', 'Trigonometry', 10, [
         'Solve heights and distances using angles of elevation',
         'Solve problems using angles of depression',
@@ -339,17 +390,17 @@ export const IN_CURRICULUM = [
         'Find the area and perimeter of a sector',
         'Find the area of a segment of a circle',
         'Find areas of combinations of plane figures'
-      ], { maps: 'y8-circles', partial: 'circumference and area of a whole circle — the sector and segment dot points have no generator' }),
+      ], { covers: [{ gen: 'c10-areas-circles', dp: [0], diff: [1, 2] }, { gen: 'c10-areas-circles', dp: [1], diff: [3] }, { gen: 'c10-areas-circles', dp: [2], diff: [4] }] }),
       C('c10-surface-volume', 'Surface Areas and Volumes', 'Mensuration', 10, [
         'Surface area of a combination of solids',
         'Volume of a combination of solids',
         'Solve problems where one solid is recast as another'
-      ], { maps: 'y9-surface-area', partial: 'single solids — the combination and recasting dot points have no generator' }),
+      ], { covers: [{ gen: 'y9-surface-area', dp: [0], diff: [3] }, { gen: 'c10-surface-volume-combo', dp: [1], diff: [1, 2] }, { gen: 'c10-surface-volume-combo', dp: [2], diff: [3, 4] }] }),
       C('c10-statistics', 'Statistics', 'Statistics & Probability', 10, [
         'Find the mean of grouped data by the direct and assumed-mean methods',
         'Find the mode and median of grouped data',
         'Read a cumulative frequency (ogive) curve'
-      ], { maps: 'y10-stats', partial: 'summary statistics and bivariate data — the grouped-data formulae and the ogive have no generator' }),
+      ], { covers: [{ gen: 'c10-statistics', dp: [0], diff: [1] }, { gen: 'y10-stats', dp: [0], diff: [1] }, { gen: 'c10-statistics', dp: [1], diff: [2, 3] }, { gen: 'c10-statistics', dp: [2], diff: [4] }] }),
       C('c10-probability', 'Probability', 'Statistics & Probability', 9, [
         'Find the theoretical probability of a single event',
         'Use the complement of an event',
@@ -376,7 +427,7 @@ export const IN_CURRICULUM = [
         'Convert between degrees and radians and use the unit circle',
         'Apply compound-angle, double-angle and product-to-sum identities',
         'Find the general solution of a trigonometric equation'
-      ], { maps: 'me11-trigid', partial: 'compound-angle identities — radian measure is covered by y11-trigfunc and general solutions by me12-trigeq' }),
+      ], { covers: [{ gen: 'y11-trigfunc', dp: [0], diff: [2] }, { gen: 'me11-trigid', dp: [1] }, { gen: 'me12-trigeq', dp: [2] }] }),
       C('c11-complex-numbers', 'Complex Numbers and Quadratic Equations', 'Algebra', 11, [
         'Operate on complex numbers and find modulus and conjugate',
         'Write a complex number in polar form and use the argument',
@@ -401,7 +452,7 @@ export const IN_CURRICULUM = [
         'Find the nth term and sum of an arithmetic progression',
         'Find the nth term and sum of a geometric progression, finite and infinite',
         'Use arithmetic, geometric and harmonic means and standard sums'
-      ], { maps: 'y12-series', partial: 'arithmetic and geometric series — the harmonic-mean and standard-sums dot point has no generator' }),
+      ], { covers: [{ gen: 'y12-series', dp: [0], diff: [1, 2] }, { gen: 'y12-series', dp: [1], diff: [3, 4] }, { gen: 'c11-sequence-means', dp: [2] }] }),
       C('c11-straight-lines', 'Straight Lines', 'Coordinate Geometry', 11, [
         'Find the slope and the equation of a line in every standard form',
         'Find the angle between two lines and conditions for parallel and perpendicular',
@@ -426,7 +477,7 @@ export const IN_CURRICULUM = [
         'Find the mean deviation about the mean and median',
         'Find the variance and standard deviation of grouped and ungrouped data',
         'Compare two data sets by the coefficient of variation'
-      ], { maps: 'y10-stats', partial: 'summary statistics — the mean-deviation and coefficient-of-variation dot points have no generator' }),
+      ], { covers: [{ gen: 'c11-statistics', dp: [0], diff: [1] }, { gen: 'c11-statistics', dp: [1], diff: [2, 3] }, { gen: 'y10-stats', dp: [1], diff: [2] }, { gen: 'c11-statistics', dp: [2], diff: [4] }] }),
       C('c11-probability', 'Probability', 'Statistics & Probability', 10, [
         'Describe a sample space and events for a random experiment',
         'Use the addition rule and mutually exclusive events',
@@ -443,7 +494,7 @@ export const IN_CURRICULUM = [
         'Classify relations as reflexive, symmetric and transitive',
         'Determine whether a function is one-one, onto or a bijection',
         'Compose functions and find an inverse function'
-      ], { maps: 'me11-functions', partial: 'inverse functions — the equivalence-relation and composition dot points have no generator' }),
+      ], { covers: [{ gen: 'c12-relations-equivalence', dp: [0] }, { gen: 'me11-functions', dp: [1], diff: [2] }, { gen: 'me11-functions', dp: [2], diff: [1, 3, 4] }] }),
       C('c12-inverse-trigonometric', 'Inverse Trigonometric Functions', 'Trigonometry', 9, [
         'State the domain, range and principal value branch of each inverse ratio',
         'Evaluate expressions involving inverse trigonometric functions',
@@ -463,7 +514,7 @@ export const IN_CURRICULUM = [
         'Test continuity and differentiability at a point',
         'Differentiate composite, implicit, inverse-trigonometric and logarithmic functions',
         "Apply Rolle's theorem and the mean value theorem"
-      ], { maps: 'y12-diff', partial: 'the differentiation rules — the continuity tests and the mean value theorems have no generator' }),
+      ], { covers: [{ gen: 'c12-continuity-mvt', dp: [0], diff: [1, 2] }, { gen: 'y12-diff', dp: [1] }, { gen: 'c12-continuity-mvt', dp: [2], diff: [3, 4] }] }),
       C('c12-applications-derivatives', 'Application of Derivatives', 'Calculus', 12, [
         'Find rates of change and approximations',
         'Find intervals of increase and decrease, and tangents and normals',
@@ -473,7 +524,7 @@ export const IN_CURRICULUM = [
         'Integrate by substitution, by parts and by partial fractions',
         'Evaluate a definite integral and use the fundamental theorem',
         'Apply the properties of definite integrals'
-      ], { maps: 'y12-integration', partial: 'substitution and basic definite integrals — parts, partial fractions and the definite-integral properties are only partly reached by mex-integration' }),
+      ], { covers: [{ gen: 'mex-integration', dp: [0], diff: [1, 3, 4] }, { gen: 'y12-integration', dp: [0], diff: [1] }, { gen: 'y12-integration', dp: [1], diff: [2] }, { gen: 'mex-integration', dp: [1], diff: [2] }, { gen: 'c12-integral-properties', dp: [2] }] }),
       C('c12-applications-integrals', 'Application of Integrals', 'Calculus', 9, [
         'Find the area under a curve between two ordinates',
         'Find the area between two curves',
@@ -488,7 +539,7 @@ export const IN_CURRICULUM = [
         'Add vectors and find magnitude, direction cosines and unit vectors',
         'Find and use the scalar (dot) product and the angle between vectors',
         'Find and use the vector (cross) product and its geometric meaning'
-      ], { maps: 'mex-vectors', partial: 'three-dimensional vectors and the dot product — the cross product has no generator' }),
+      ], { covers: [{ gen: 'c12-vector-algebra', dp: [0], diff: [1, 2] }, { gen: 'mex-vectors', dp: [0], diff: [1] }, { gen: 'mex-vectors', dp: [1], diff: [2, 3, 4] }, { gen: 'c12-vector-algebra', dp: [2], diff: [3, 4] }] }),
       C('c12-3d-geometry', 'Three Dimensional Geometry', 'Vectors & 3D', 11, [
         'Find the equation of a line in vector and Cartesian form',
         'Find the angle and shortest distance between two lines',
@@ -503,7 +554,7 @@ export const IN_CURRICULUM = [
         'Find conditional probability and use the multiplication rule',
         "Apply the theorem of total probability and Bayes' theorem",
         'Work with a random variable, its mean and the binomial distribution'
-      ], { maps: 'me12-binomial', partial: "the binomial distribution — conditional probability is covered by y10-probability and Bayes' theorem has no generator" })
+      ], { covers: [{ gen: 'y10-probability', dp: [0], diff: [3, 4] }, { gen: 'c12-probability-bayes', dp: [1] }, { gen: 'me12-binomial', dp: [2] }] })
     ]
   }
 ];
@@ -603,12 +654,17 @@ export const IN_CHAPTER_BY_ID = Object.fromEntries(IN_CHAPTERS.map(c => [c.id, c
 
 /** The generator subtopic ids this curriculum reaches, deduplicated. */
 export function mappedGenerators() {
-  return [...new Set(IN_CHAPTERS.map(c => c.maps).filter(Boolean))];
+  return allGenerators().filter(g => !OWN_GENERATOR.test(g));
 }
 
 /** Every generator id this curriculum reaches, reused or its own. */
 export function allGenerators() {
-  return [...new Set(IN_CHAPTERS.map(generatorFor).filter(Boolean))];
+  return [...new Set(IN_CHAPTERS.flatMap(generatorsFor))];
+}
+
+/** Every generator written for this curriculum rather than reused. */
+export function nativeGenerators() {
+  return allGenerators().filter(g => OWN_GENERATOR.test(g));
 }
 
 /**
@@ -619,9 +675,14 @@ export function allGenerators() {
  *   none    nothing in the bank sets a question on this chapter
  */
 export function coverage() {
-  const full = IN_CHAPTERS.filter(c => generatorFor(c) && !c.partial);
-  const partial = IN_CHAPTERS.filter(c => generatorFor(c) && c.partial);
-  const none = IN_CHAPTERS.filter(c => !generatorFor(c));
+  const full = IN_CHAPTERS.filter(c => c.covers.length && !uncoveredDotpoints(c).length);
+  const partial = IN_CHAPTERS.filter(c => c.covers.length && uncoveredDotpoints(c).length);
+  const none = IN_CHAPTERS.filter(c => !c.covers.length);
   const native = IN_CHAPTERS.filter(c => c.native);
-  return { total: IN_CHAPTERS.length, full, partial, none, native };
+  const dotpoints = IN_CHAPTERS.reduce((n, c) => n + c.dotpoints.length, 0);
+  const uncovered = IN_CHAPTERS.flatMap(c => uncoveredDotpoints(c).map(i => ({ chapter: c, ordinal: i, text: c.dotpoints[i] })));
+  return {
+    total: IN_CHAPTERS.length, full, partial, none, native,
+    dotpoints, uncovered, coveredDotpoints: dotpoints - uncovered.length
+  };
 }
