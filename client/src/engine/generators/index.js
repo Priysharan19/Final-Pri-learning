@@ -26,7 +26,10 @@ const BANKS = {
   'india-coordinate': () => import('./india-coordinate.js').then(m => m.indiaCoordinate),
   'india-calculus': () => import('./india-calculus.js').then(m => m.indiaCalculus),
   'india-olympiad': () => import('./india-olympiad.js').then(m => m.indiaOlympiad),
-  'india-foundation': () => import('./india-foundation.js').then(m => m.indiaFoundation)
+  'india-foundation': () => import('./india-foundation.js').then(m => m.indiaFoundation),
+  'india-junior': () => import('./india-junior.js').then(m => m.indiaJunior),
+  'india-class10': () => import('./india-class10.js').then(m => m.indiaClass10),
+  'india-senior': () => import('./india-senior.js').then(m => m.indiaSenior)
 };
 
 // Subtopic ids are namespaced by the bank that authors them: y9-surds lives in
@@ -71,7 +74,27 @@ const INDIA_BANK_OF = {
   'c9-circles': 'india-foundation',
   'c9-herons-formula': 'india-foundation',
   'c10-real-numbers': 'india-foundation',
-  'c10-circles': 'india-foundation'
+  'c10-circles': 'india-foundation',
+  'c7-triangle-angles': 'india-junior',
+  'c8-rational-numbers': 'india-junior',
+  'c8-data-charts': 'india-junior',
+  'c8-proportions-dir-inv': 'india-junior',
+  'c9-polynomial-basics': 'india-junior',
+  'c9-coordinate-geometry': 'india-junior',
+  'c9-statistics-grouped': 'india-junior',
+  'c10-polynomial-zeroes': 'india-class10',
+  'c10-arithmetic-progressions': 'india-class10',
+  'c10-coordinate-geometry': 'india-class10',
+  'c10-areas-circles': 'india-class10',
+  'c10-surface-volume-combo': 'india-class10',
+  'c10-statistics': 'india-class10',
+  'c11-sequence-means': 'india-senior',
+  'c11-statistics': 'india-senior',
+  'c12-relations-equivalence': 'india-senior',
+  'c12-continuity-mvt': 'india-senior',
+  'c12-integral-properties': 'india-senior',
+  'c12-vector-algebra': 'india-senior',
+  'c12-probability-bayes': 'india-senior'
 };
 
 /** Holds the generators of every bank loaded so far, keyed by subtopic id. */

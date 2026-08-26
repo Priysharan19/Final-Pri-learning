@@ -1,72 +1,86 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Pri Learning · Indian curriculum coverage
 //
-// Which NCERT chapters this app can actually set a question on today, and which
-// it cannot. Run it: `node tools/india-coverage.mjs`
+// Which NCERT dot points this app can set a question on, and which it cannot.
+// Run it: `node tools/india-coverage.mjs`
 //
-// The number that matters is the last one. A chapter with no generator is a
-// chapter a student can select and get nothing from, so the list of those is
-// the authoring plan and is printed in full rather than summarised.
+// The unit is the dot point, not the chapter. "87 chapters reachable" was the
+// first version of this report and it was nearly meaningless — a chapter counts
+// as reachable the moment one of its three dot points has a generator. The
+// number below counts all 261.
 // ─────────────────────────────────────────────────────────────────────────────
-import { IN_CHAPTERS, IN_CURRICULUM, OLYMPIAD_TOPICS, coverage, mappedGenerators, allGenerators, generatorFor } from '../client/src/engine/curriculum-in.js';
-import { SUBTOPIC_BY_ID, SUBTOPICS } from '../client/src/engine/curriculum.js';
-import { GENERATORS, loadAllBanks } from '../client/src/engine/generators/index.js';
+import {
+  IN_CHAPTERS, IN_CURRICULUM, OLYMPIAD_TOPICS, coverage,
+  mappedGenerators, allGenerators, nativeGenerators,
+  generatorsFor, coversForDotpoint, uncoveredDotpoints, OWN_GENERATOR
+} from '../client/src/engine/curriculum-in.js';
+import { SUBTOPIC_BY_ID, SUBTOPICS, DOTPOINTS, difficultiesForDotpoint } from '../client/src/engine/curriculum.js';
+import { GENERATORS, loadAllBanks, bankOf } from '../client/src/engine/generators/index.js';
 
 await loadAllBanks();
 
 const c = coverage();
 const bad = [];
 for (const ch of IN_CHAPTERS) {
-  const gid = generatorFor(ch);
-  if (!gid) continue;
-  if (!GENERATORS[gid]) bad.push(`${ch.id} resolves to ${gid}, which has no generator`);
-  else if (!ch.native && !SUBTOPIC_BY_ID[gid]) bad.push(`${ch.id} maps to ${gid}, which is not a subtopic`);
-}
-
-const line = (label, n) => `${String(n).padStart(3)}  ${label}`;
-console.log('NCERT / CBSE Classes 7–12 plus the olympiad ladder\n');
-console.log(line('chapters in the curriculum', c.total));
-console.log(line('with a generator behind the whole chapter', c.full.length));
-console.log(line('with a generator behind part of it', c.partial.length));
-console.log(line('with no generator at all', c.none.length));
-console.log(line('existing NSW generators reused', mappedGenerators().length) + ` of ${SUBTOPICS.length}`);
-console.log(line('generators written for this curriculum', c.native.length));
-console.log(line('generators reached in all', allGenerators().length));
-
-console.log('\nBy class');
-for (const g of IN_CURRICULUM) {
-  const full = g.chapters.filter(x => generatorFor(x) && !x.partial).length;
-  const part = g.chapters.filter(x => generatorFor(x) && x.partial).length;
-  const none = g.chapters.filter(x => !generatorFor(x)).length;
-  console.log(`  Class ${String(g.grade).padEnd(3)} ${String(g.chapters.length).padStart(2)} chapters — ${full} full, ${part} partial, ${none} none`);
-}
-console.log(`  Olympiad  ${String(OLYMPIAD_TOPICS.length).padStart(2)} topics   — 0 full, 0 partial, ${OLYMPIAD_TOPICS.length} none`);
-
-console.log('\nChapters with no generator — this is the authoring plan');
-if (!c.none.length) {
-  console.log('  none — every chapter has a generator behind it.');
-  console.log('  That is NOT the same as every chapter being fully covered: the 25 listed');
-  console.log('  below are reached by a generator that authors only part of them, and the');
-  console.log('  dot points named there still have nothing. Read this section and the next');
-  console.log('  one together or the first will read as more than it is.');
-} else {
-  for (const ch of c.none) {
-    console.log(`  ${(ch.grade ? `Class ${ch.grade}` : 'Olympiad').padEnd(9)} ${ch.name}`);
+  for (const entry of ch.covers) {
+    if (!GENERATORS[entry.gen]) bad.push(`${ch.id} names ${entry.gen}, which has no generator`);
+    else if (!bankOf(entry.gen)) bad.push(`${ch.id} names ${entry.gen}, which resolves to no bank`);
+    else if (!OWN_GENERATOR.test(entry.gen) && !SUBTOPIC_BY_ID[entry.gen]) bad.push(`${ch.id} borrows ${entry.gen}, which is not an NSW subtopic`);
   }
 }
 
-console.log('\nChapters covered only in part — what is missing, chapter by chapter');
-for (const ch of c.partial) {
-  console.log(`  ${(ch.grade ? `Class ${ch.grade}` : 'Olympiad').padEnd(9)} ${ch.name}`);
-  console.log(`            via ${ch.maps} — ${ch.partial}`);
+const line = (label, n) => `${String(n).padStart(4)}  ${label}`;
+console.log('NCERT / CBSE Classes 7–12 plus the olympiad ladder\n');
+console.log(line('chapters in the curriculum', c.total));
+console.log(line('dot points in the curriculum', c.dotpoints));
+console.log(line('dot points with a generator behind them', c.coveredDotpoints));
+console.log(line('dot points with nothing behind them', c.uncovered.length));
+console.log('');
+console.log(line('generators reached in all', allGenerators().length));
+console.log(line('reused from the NSW banks', mappedGenerators().length) + ` of ${SUBTOPICS.length}`);
+console.log(line('written for this curriculum', nativeGenerators().length));
+console.log(line('cover entries — one per (generator, dot point)', IN_CHAPTERS.reduce((n, ch) => n + ch.covers.length, 0)));
+
+console.log('\nBy class — dot points covered');
+for (const g of IN_CURRICULUM) {
+  const total = g.chapters.length * 3;
+  const missing = g.chapters.reduce((n, ch) => n + uncoveredDotpoints(ch).length, 0);
+  console.log(`  Class ${String(g.grade).padEnd(3)} ${String(total - missing).padStart(3)}/${total}`);
+}
+const olyMissing = OLYMPIAD_TOPICS.reduce((n, ch) => n + uncoveredDotpoints(IN_CHAPTERS.find(x => x.id === ch.id)).length, 0);
+console.log(`  Olympiad ${String(OLYMPIAD_TOPICS.length * 3 - olyMissing).padStart(3)}/${OLYMPIAD_TOPICS.length * 3}`);
+
+if (c.uncovered.length) {
+  console.log('\nDot points with no generator — this is the authoring plan');
+  for (const u of c.uncovered) {
+    console.log(`  ${(u.chapter.grade ? `Class ${u.chapter.grade}` : 'Olympiad').padEnd(9)} ${u.chapter.name} — dot point ${u.ordinal + 1}`);
+    console.log(`            ${u.text}`);
+  }
+} else {
+  console.log('\nDot points with no generator: none.');
 }
 
+// Covered is not the same as richly covered. A dot point reachable at one
+// difficulty is reachable only at that difficulty, because the picker snaps a
+// request to the nearest difficulty that can deliver it.
+const thin = [];
+for (const ch of IN_CHAPTERS) {
+  ch.dotpoints.forEach((text, i) => {
+    const diffs = new Set(coversForDotpoint(ch, i).flatMap(x => x.diff));
+    if (diffs.size === 1) thin.push({ ch, i, text, d: [...diffs][0] });
+  });
+}
+const nswThin = DOTPOINTS.filter(dp => difficultiesForDotpoint(dp.id).length === 1).length;
+console.log(`\nReachable at only one of the four difficulties — ${thin.length}/${c.dotpoints} (${(thin.length / c.dotpoints * 100).toFixed(1)}%)`);
+console.log(`  For scale, the NSW curriculum this app already ships: ${nswThin}/${DOTPOINTS.length} (${(nswThin / DOTPOINTS.length * 100).toFixed(1)}%).`);
+console.log('  Thin is not broken — the dot point is still reachable — but a request for it forces that difficulty.');
+for (const t of thin) console.log(`  · ${t.ch.id} dot point ${t.i + 1} — only D${t.d}`);
+
 if (bad.length) {
-  console.log('\nBROKEN MAPPINGS');
+  console.log('\nBROKEN COVER ENTRIES');
   for (const b of bad) console.log(`  ${b}`);
-  console.log(`\n✖ INDIA COVERAGE FAILED — ${bad.length} mapping(s) name something that does not exist`);
+  console.log(`\n✖ INDIA COVERAGE FAILED — ${bad.length} entry(ies) name something that does not exist`);
   process.exit(1);
 }
-const reach = c.full.length + c.partial.length;
-console.log(`\n✔ every mapping resolves — ${reach}/${c.total} chapters (${(reach / c.total * 100).toFixed(1)}%) can be practised today, ${c.none.length} cannot`);
-console.log(`   of those, ${c.full.length} are covered whole and ${c.partial.length} only in part — the second number is the remaining work, and it is not zero.`);
+console.log(`\n✔ every cover entry resolves — ${c.coveredDotpoints}/${c.dotpoints} dot points (${(c.coveredDotpoints / c.dotpoints * 100).toFixed(1)}%) have a generator behind them`);
+console.log('  What that does NOT say: whether the generator asks what its dot point says, or whether the question is pitched at NCERT level. No Indian teacher has read one.');
