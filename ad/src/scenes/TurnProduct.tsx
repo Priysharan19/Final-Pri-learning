@@ -30,6 +30,8 @@ export const ProductPanel: React.FC<{ t: number; enterAt: number; inkAt: number;
 }) => {
   const spec = useFrameSpec();
   const enter = ramp(t, [enterAt, enterAt + 0.55 * speed], [0, 1], easeDrift);
+  // as the act ends the panel falls back into depth — the corridor inherits it
+  const recede = ramp(t, [19.5, 20.0], [0, 1], easeDrift);
   // 40px of zoom headroom for the dolly-in
   const panelW = Math.min(850, spec.w - spec.safeSide * 2 - 20);
 
@@ -57,8 +59,9 @@ export const ProductPanel: React.FC<{ t: number; enterAt: number; inkAt: number;
         position: 'absolute',
         left: '50%',
         top: spec.aspect === '916' ? 380 : spec.aspect === '45' ? 240 : 180,
-        transform: `translateX(-50%) translateY(${(1 - enter) * 70}px)`,
-        opacity: enter,
+        transform: `translateX(-50%) translateY(${(1 - enter) * 70}px) scale(${1 - recede * 0.16})`,
+        opacity: enter * (1 - recede),
+        filter: recede > 0.01 ? `blur(${(recede * 3.5).toFixed(2)}px)` : undefined,
       }}
     >
       <div

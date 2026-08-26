@@ -164,8 +164,9 @@ const Motif: React.FC<{ index: number; p: number; size: number }> = ({ index, p,
 
 export const LadderStation: React.FC<{ index: number; p: number; motifSize: number }> = ({ index, p, motifSize }) => {
   const st = LADDER[index];
+  const rise = (1 - ramp(p, [0, 0.65], [0, 1], easeMassive)) * 46;
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 26 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 26, transform: `translateY(${rise}px)` }}>
       {index === 4 ? (
         <div
           style={{

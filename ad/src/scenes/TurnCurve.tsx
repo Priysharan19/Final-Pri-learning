@@ -54,6 +54,14 @@ export const TurnCurve: React.FC<{ t0?: number }> = ({ t0 = 8 }) => {
             <svg width={W} height={H} style={{ overflow: 'visible' }}>
               <Axes m={m} {...PLOT} progress={axesP} opacity={0.9} />
               <LitPath d={fnPath(m, (x) => x * x, -0.62, 2.24)} progress={curveP} color={C.gold} width={5.5} glow={0.8 * bloom} />
+              {/* the ember from the seize card lands here and becomes the curve */}
+              <Dot
+                cx={m.x(-0.62)}
+                cy={m.y(0.3844)}
+                r={7}
+                color={C.goldBright}
+                opacity={ramp(t, [8.0, 8.12], [1, 1]) * ramp(t, [8.25, 8.65], [1, 0])}
+              />
               <Dot cx={m.x(1)} cy={m.y(1)} opacity={dotO} />
             </svg>
           </div>

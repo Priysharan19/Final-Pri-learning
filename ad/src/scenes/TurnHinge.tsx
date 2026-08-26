@@ -91,6 +91,26 @@ export const HingeCore: React.FC<{ t: number; t0: number; lockAt?: number; speed
               glow={0.35 + pulse * 2.2}
               progress={secantIn}
             />
+            {/* twin light pulses travel outward along the tangent from the
+                contact point at the instant of the lock */}
+            {locked && t < lockAt + 0.6
+              ? [1, -1].map((dir) => {
+                  const tp = ramp(t, [lockAt + 0.02, lockAt + 0.55], [0, 1], easeDrift);
+                  const wx = 1 + dir * tp * 1.35;
+                  const wy = 1 + 2 * (wx - 1);
+                  return (
+                    <circle
+                      key={dir}
+                      cx={m.x(wx)}
+                      cy={m.y(wy)}
+                      r={5.5}
+                      fill={C.goldBright}
+                      opacity={0.9 * (1 - tp)}
+                      style={{ filter: 'blur(1px)' }}
+                    />
+                  );
+                })
+              : null}
             <Dot cx={m.x(1)} cy={m.y(1)} r={9} />
             <Dot
               cx={m.x(1 + h)}

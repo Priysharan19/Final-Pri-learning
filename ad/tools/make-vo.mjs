@@ -109,16 +109,16 @@ const LINES30 = [
   { at: 2.6, until: 6.05, text: 'Four hundred formulas. The same drill, the same batch, every day.' },
   { at: 6.75, until: 7.95, text: 'Until the question is new.' },
   { at: 9.0, until: 11.7, text: 'Watch the secant become the tangent.' },
-  { at: 13.2, until: 14.9, text: 'That is the derivative — not a rule, a reason.' },
+  { at: 13.0, until: 15.3, text: 'Not a rule. A reason.' },
   { at: 15.4, until: 19.6, text: 'Understand one idea, and you can solve what you have never seen. Marked like an examiner.' },
-  { at: 20.3, until: 23.3, text: 'Over three lakh questions, generated on your iPad. Your misconceptions, traced.' },
-  { at: 23.4, until: 26.3, text: 'Percentile predicted. Rivals raced. Mocks marked. All of it offline.' },
+  { at: 20.3, until: 23.2, text: 'Three lakh questions. Your misconceptions, traced.' },
+  { at: 23.5, until: 26.1, text: 'Percentile predicted. Rivals raced. Mocks marked.' },
   { at: 27.3, until: 32.6, text: 'Class seven to Olympiad. The same mathematics, at different pressures.' },
   { at: 33.3, until: 35.2, text: 'Pri Learning. Join the change.' },
 ];
 const LINES15 = [
   { at: 0.2, until: 1.15, text: 'Stop memorising maths.', reuse: 0 },
-  { at: 2.55, until: 3.7, text: 'Until the question is new.', reuse: 2 },
+  { at: 2.2, until: 3.35, text: 'Until the question is new.', reuse: 2 },
   { at: 3.9, until: 6.5, text: 'Watch the secant become the tangent.' },
   { at: 8.7, until: 10.4, text: 'Your working, marked like an examiner.' },
   { at: 10.7, until: 12.3, text: 'Class seven to Olympiad.' },
@@ -308,19 +308,53 @@ if (ENGINE === 'elevenlabs') {
   console.log(`engine: say — voice ${VOICE}`);
 }
 
-console.log('30 s lines:');
+// A line may NEVER overlap the next line's start: the fit window is the
+// tighter of the scene window and the gap to the next cue (minus 60 ms).
+const fitWindow = (lines, i) => {
+  const ln = lines[i];
+  const sceneWin = ln.until - ln.at - 0.1;
+  const gapWin = i < lines.length - 1 ? lines[i + 1].at - ln.at - 0.06 : Infinity;
+  return Math.min(sceneWin, gapWin);
+};
+// Last resort if the API's speed cap still spills: truncate with an 80 ms fade.
+const guard = (s, li, hardLimit) => {
+  const maxN = Math.floor(hardLimit * SR);
+  if (s.length <= maxN) return { s, truncated: false };
+  console.warn(`  ⚠ line ${li} still spills after speed-up — fade-truncated to ${hardLimit.toFixed(2)}s`);
+  const out = Float32Array.from(s.subarray(0, maxN));
+  const fadeN = Math.min(out.length, Math.round(0.08 * SR));
+  for (let i = 0; i < fadeN; i++) out[out.length - 1 - i] *= i / fadeN;
+  return { s: out, truncated: true };
+};
+
+const report = { main: [], cut15: [] };
+console.log('36 s lines:');
 const takes30 = [];
-for (const [li, ln] of LINES30.entries()) takes30.push(await renderLine(li, ln.text, ln.until - ln.at - 0.1));
+for (const [li, ln] of LINES30.entries()) {
+  const win = fitWindow(LINES30, li);
+  let s = await renderLine(li, ln.text, win);
+  const hard = li < LINES30.length - 1 ? LINES30[li + 1].at - ln.at - 0.05 : 99;
+  const g = guard(s, li, hard);
+  takes30.push(g.s);
+  report.main.push({ i: li, at: ln.at, end: ln.at + g.s.length / SR, nextAt: li < LINES30.length - 1 ? LINES30[li + 1].at : null, truncated: g.truncated });
+}
 console.log('15 s lines:');
 const takes15 = [];
 for (const [li, ln] of LINES15.entries()) {
+  let s;
   if (ln.reuse !== undefined) {
-    takes15.push(takes30[ln.reuse]);
-    console.log(`  line ${li}: reused 30s take ${ln.reuse}`);
+    s = takes30[ln.reuse];
+    console.log(`  line ${li}: reused 36s take ${ln.reuse}`);
   } else {
-    takes15.push(await renderLine(`15-${li}`, ln.text, ln.until - ln.at - 0.1));
+    s = await renderLine(`15-${li}`, ln.text, fitWindow(LINES15, li));
   }
+  const hard = li < LINES15.length - 1 ? LINES15[li + 1].at - ln.at - 0.05 : 99;
+  const g = guard(s, li, hard);
+  takes15.push(g.s);
+  report.cut15.push({ i: li, at: ln.at, end: ln.at + g.s.length / SR, nextAt: li < LINES15.length - 1 ? LINES15[li + 1].at : null, truncated: g.truncated });
 }
+writeFileSync(join(ROOT, 'out', 'vo-report.json'), JSON.stringify(report, null, 1));
+console.log('wrote out/vo-report.json (placement proof)');
 
 mixInto(join(AUD, 'music-30.wav'), join(AUD, 'soundtrack-30.wav'), LINES30, takes30);
 mixInto(join(AUD, 'music-15.wav'), join(AUD, 'soundtrack-15.wav'), LINES15, takes15);

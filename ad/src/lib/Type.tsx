@@ -1,7 +1,7 @@
 import React, { createContext, useContext } from 'react';
 import { useCurrentFrame, useVideoConfig } from 'remotion';
 import { C, FONT, KICKER_TRACKING, LABEL_TRACKING, TYPE, trackingFor, frameFor, type Frame_, type Aspect } from '../design/tokens';
-import { easeMassive, easeOutSignature, fadeIO, ramp } from './ease';
+import { easeExit, easeMassive, easeOutSignature, fadeIO, ramp } from './ease';
 import type { TextBeat } from '../data/timeline';
 
 // ── Aspect + debug plumbing ────────────────────────────────────────────────
@@ -113,8 +113,9 @@ export const Display: React.FC<{
           const at = wordAt?.[i];
           let opacity = 1;
           let transform: string | undefined;
+          let p = 1;
           if (at !== undefined) {
-            const p = ramp(t, [at, at + landDur], [0, 1], mode === 'slam' ? easeMassive : easeOutSignature);
+            p = ramp(t, [at, at + landDur], [0, 1], mode === 'slam' ? easeMassive : easeOutSignature);
             opacity = p;
             transform =
               mode === 'slam'
@@ -125,6 +126,7 @@ export const Display: React.FC<{
             <span
               key={i}
               style={{
+                position: 'relative',
                 display: 'inline-block',
                 whiteSpace: 'pre',
                 color: w.accent ? C.gold : undefined,
@@ -134,6 +136,23 @@ export const Display: React.FC<{
             >
               {w.text}
               {i < words.length - 1 ? ' ' : ''}
+              {/* impact energy: a gold ghost that collapses into the landed word */}
+              {mode === 'slam' && at !== undefined && p < 1 && p > 0 ? (
+                <span
+                  aria-hidden
+                  style={{
+                    position: 'absolute',
+                    left: 0,
+                    top: 0,
+                    color: C.gold,
+                    opacity: (1 - p) * 0.35,
+                    transform: `translateY(${(1 - p) * 12}px)`,
+                    whiteSpace: 'pre',
+                  }}
+                >
+                  {w.text}
+                </span>
+              ) : null}
             </span>
           );
         })}
@@ -180,7 +199,9 @@ export const Captions: React.FC<{ beats: TextBeat[]; roles?: TextBeat['role'][] 
     >
       {active.map((b, i) => {
         const o = fadeIO(t, b.at, b.until, 0.28, 0.22);
-        const rise = ramp(t, [b.at, b.at + 0.35], [16, 0], easeOutSignature);
+        const rise =
+          ramp(t, [b.at, b.at + 0.35], [16, 0], easeOutSignature) -
+          12 * ramp(t, [b.until - 0.22, b.until], [0, 1], easeExit);
         return (
           <TextBox key={i} style={{ position: 'absolute', bottom: 0 }}>
             <div
