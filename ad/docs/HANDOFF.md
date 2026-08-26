@@ -33,11 +33,16 @@ identical tangent motif at five pressures, Class 7 → Olympiad, ending on
 "QUESTION 1 · SOLVED". Close: wordmark, "Join the change.", cream CTA. The ad
 practises what it preaches — and now also shows the machine that delivers it.
 
-## Final self-grades (four passes + five adversarial judge agents; full log in [CRITIQUE.md](CRITIQUE.md))
+## Final self-grades (five passes + five adversarial judge agents; full log in [CRITIQUE.md](CRITIQUE.md))
 
-hook **8** · typographic craft **8** · motion **8** · cinematography **8** ·
-sound design & dynamic range **8** · reveal craft **8.5** · mathematical honesty
+hook **8** · typographic craft **8** · motion **8.5** · cinematography **8.5** ·
+sound design & dynamic range **8.5** · reveal craft **9** · mathematical honesty
 **9** · message clarity **8** · restraint **8** · emotional truth **7**.
+Pass 5 added the launch-film cut-craft: match cuts hand objects across every
+act boundary (the ember from the seize card ignites the curve), impact physics
+throughout, twin light pulses on the lock, and the reported VO overlap fixed at
+the root with a placement gate ([8]) that proves every take ends clear of the
+next — from the actual rendered audio, not the cue sheet.
 
 ## The single weakest thing I could not fix
 
