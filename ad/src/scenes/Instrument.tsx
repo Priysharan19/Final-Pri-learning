@@ -274,15 +274,44 @@ export const Instrument: React.FC<{ t0?: number }> = ({ t0 = 20 }) => {
           const cross = PANEL_CROSSINGS[i];
           const p = ramp(t, [cross - 0.85, cross + 0.15], [0, 1]);
           const side = i % 2 === 0 ? -1 : 1;
+          // the panel straightens toward the camera as it crosses — objects
+          // acknowledge the lens
+          const rotY = side * (-4.5 + 3 * ramp(rel, [-260, 60], [0, 1], easeDrift));
+          const glint = ramp(t, [cross - 0.1, cross + 0.24], [0, 1]);
           return (
             <Plane key={i} z={z} blurScale={0.85}>
               <AbsoluteFill style={{ justifyContent: 'center', alignItems: 'center', opacity: o }}>
                 <div
                   style={{
-                    transform: `translateX(${side * 78}px) translateY(${spec.aspect === '916' ? -150 : spec.aspect === '45' ? -60 : -20}px) rotateY(${side * -4.5}deg)`,
+                    position: 'relative',
+                    transform: `translateX(${side * 78}px) translateY(${spec.aspect === '916' ? -150 : spec.aspect === '45' ? -60 : -20}px) rotateY(${rotY}deg)`,
                   }}
                 >
                   <Face p={p} />
+                  {/* the key light catches the face exactly at its crossing */}
+                  {glint > 0 && glint < 1 ? (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        inset: 0,
+                        borderRadius: 10,
+                        overflow: 'hidden',
+                        pointerEvents: 'none',
+                      }}
+                    >
+                      <div
+                        style={{
+                          position: 'absolute',
+                          top: '-20%',
+                          bottom: '-20%',
+                          width: '34%',
+                          left: `${-40 + glint * 150}%`,
+                          background: 'linear-gradient(105deg, transparent, rgba(244,241,224,0.10), transparent)',
+                          transform: 'skewX(-12deg)',
+                        }}
+                      />
+                    </div>
+                  ) : null}
                 </div>
               </AbsoluteFill>
             </Plane>

@@ -4,7 +4,7 @@ import { C, FONT, TYPE } from '../design/tokens';
 import { MathField } from '../lib/Film';
 import { Stage, Plane } from '../lib/Stage';
 import { Display, TextBox, useFrameSpec, w } from '../lib/Type';
-import { easeDrift, ramp } from '../lib/ease';
+import { easeDrift, easeOvershoot, ramp } from '../lib/ease';
 
 /**
  * S5 — CLOSE (27.00–30.00). Wordmark · "Join the change." · CTA. The second
@@ -25,11 +25,28 @@ export const CloseCard: React.FC<{ tRel: number; atRel?: number; compact?: boole
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: compact ? 30 : 44, marginTop: -40 }}>
         {/* wordmark — blackboard-bold ℙ + serif, exactly the app's lockup */}
         <TextBox style={{ opacity: markP }}>
-          <div style={{ transform: `translateY(${(1 - markP) * 26}px)` }}>
+          <div style={{ transform: `translateY(${(1 - markP) * 26}px)`, position: 'relative', overflow: 'hidden', padding: '6px 14px' }}>
             <span style={{ fontFamily: FONT.ams, fontSize: markSize, color: C.ink }}>
               P
               <span style={{ fontFamily: FONT.serif, fontSize: markSize * 0.82 }}>ri Learning.</span>
             </span>
+            {(() => {
+              const sp = ramp(tRel, [atRel + 0.75, atRel + 1.45], [0, 1], easeDrift);
+              if (sp <= 0 || sp >= 1) return null;
+              return (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    bottom: 0,
+                    width: '26%',
+                    left: `${-30 + sp * 150}%`,
+                    background: 'linear-gradient(105deg, transparent, rgba(244,241,224,0.20), transparent)',
+                    transform: 'skewX(-14deg)',
+                  }}
+                />
+              );
+            })()}
           </div>
         </TextBox>
 
@@ -45,7 +62,7 @@ export const CloseCard: React.FC<{ tRel: number; atRel?: number; compact?: boole
         <TextBox style={{ opacity: ctaP }}>
           <div
             style={{
-              transform: `translateY(${(1 - ctaP) * 18}px)`,
+              transform: `translateY(${(1 - ctaP) * 18}px) scale(${0.9 + 0.1 * ramp(tRel, [atRel + 0.7, atRel + 1.08], [0, 1], easeOvershoot)})`,
               background: C.cream,
               color: C.creamInk,
               fontFamily: FONT.serif,

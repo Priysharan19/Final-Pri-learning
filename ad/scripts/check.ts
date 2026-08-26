@@ -258,5 +258,29 @@ console.log('\n[7] Render log');
   }
 }
 
+// ── 8. VO placement — takes must never overlap the next line ───────────────
+console.log('\n[8] VO placement (actual rendered takes)');
+{
+  const rp = join(OUT, 'vo-report.json');
+  if (!existsSync(rp)) fail('out/vo-report.json missing (run tools/make-vo.mjs)');
+  else {
+    const rep = JSON.parse(readFileSync(rp, 'utf8'));
+    for (const [label, rows] of [['main', rep.main], ['15s', rep.cut15]] as const) {
+      let ok = true;
+      for (const r of rows) {
+        if (r.nextAt !== null && r.end > r.nextAt - 0.03) {
+          ok = false;
+          fail(`${label} VO line ${r.i} ends ${r.end.toFixed(2)} — overlaps next line at ${r.nextAt}`);
+        }
+        if (r.truncated) {
+          ok = false;
+          fail(`${label} VO line ${r.i} was fade-truncated — shorten the line text instead`);
+        }
+      }
+      if (ok) pass(`${label}: every take ends clear of the next line`);
+    }
+  }
+}
+
 console.log(failures === 0 ? '\nALL GATES PASS' : `\n${failures} GATE FAILURE(S)`);
 process.exit(failures === 0 ? 0 : 1);

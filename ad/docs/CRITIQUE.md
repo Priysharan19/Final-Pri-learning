@@ -150,3 +150,48 @@ Feature-act self-grades: integration with the argument 8 (the diagnosis panel
 keeps the act honest), craft 8 (the corridor is genuinely cinematic; the map
 panel is the weakest face), pacing 7.5 (six panels in six beats is dense —
 deliberate, but a 45 s cut could let each breathe).
+
+
+## Pass 5 — the cut-craft pass ("more better than apple.com trailer events")
+
+The remaining distance to a true launch-event film was in the CUTS: acts faded
+through dark where a launch film hands objects across the edit. Built this pass:
+
+**Match-cut connective tissue**
+- Hook → Factory: the gold underline exits as a streak of light through the
+  first stamps.
+- Seize → Curve: an **ember** of gold detaches from the frozen question during
+  the silence, travels the darkness, and lands on the exact pixel where the
+  curve is born at 8.0 — the film's object handed across its biggest cut.
+- Marked → Instrument: the product panel recedes into depth (scale + blur) and
+  the corridor inherits it.
+- Instrument → Ladder: "All of it offline." exits upward as the first station
+  rises — z-momentum converted to y.
+
+**Impact physics**
+- Press-head shadows form before every factory stamp (anticipation).
+- Hook word-slams throw a collapsing gold ghost (impact energy).
+- Ladder stations rise with mass, not just fade.
+- Captions exit on a different curve than they enter.
+
+**The detonation, finished**
+- Twin light pulses travel outward along the tangent from the contact point at
+  the lock instant; the seize card's border takes one slow breath in the
+  silence before it.
+
+**Ad craft**
+- A whispered ℙ monogram from 8.0 s (turn onward — the factory stays
+  unbranded; the close carries the full lockup): recall for a pre-launch brand.
+- Panel arrival glints (the key light catches each feature face at its beat);
+  panels straighten toward the lens as they cross.
+- The CTA lands with overshoot; one shine pass crosses the wordmark.
+
+**The narrator fix (user-reported: "voice overlaps sometimes")**
+Root-caused: the two feature-act lines exceeded their windows even at the
+API's 1.2× speed cap, and one 15 s cue had silently drifted out of sync
+between tables. Fixed by writing tighter lines ("Not a rule. A reason." now
+answers the lock), force-syncing every table, adding a hard anti-overlap guard
+to `make-vo.mjs` (fit-to-next-cue, fade-truncate as last resort with a loud
+warning), and a **new gate [8]** that reads `out/vo-report.json` — the actual
+rendered take placements — and fails on any overlap or truncation.
+Result: VO PLACEMENT CLEAN.

@@ -94,10 +94,10 @@ export const VO_MAIN: VoLine[] = [
   { at: 2.6, until: 6.05, text: 'Four hundred formulas. The same drill, the same batch, every day.' },
   { at: 6.1, until: 7.35, text: 'Until the question is new.' },
   { at: 9.0, until: 11.7, text: 'Watch the secant become the tangent.' },
-  { at: 13.2, until: 14.9, text: 'That’s the derivative — not a rule, a reason.' },
+  { at: 13.0, until: 15.3, text: 'Not a rule. A reason.' },
   { at: 15.4, until: 19.6, text: 'Understand one idea, and you can solve what you’ve never seen. Marked like an examiner.' },
-  { at: 20.3, until: 23.3, text: 'Over three lakh questions, generated on your iPad. Your misconceptions, traced.' },
-  { at: 23.4, until: 26.3, text: 'Percentile predicted. Rivals raced. Mocks marked. All of it offline.' },
+  { at: 20.3, until: 23.2, text: 'Three lakh questions. Your misconceptions, traced.' },
+  { at: 23.5, until: 26.1, text: 'Percentile predicted. Rivals raced. Mocks marked.' },
   { at: 27.3, until: 32.6, text: 'Class seven to Olympiad. The same mathematics, at different pressures.' },
   { at: 33.3, until: 35.2, text: 'Pri Learning. Join the change.' },
 ];

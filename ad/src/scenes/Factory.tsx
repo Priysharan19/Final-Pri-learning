@@ -4,7 +4,9 @@ import { C, FONT, RADIUS, TYPE } from '../design/tokens';
 import { Stage, Plane } from '../lib/Stage';
 import { Display, Kicker, TextBox, useFrameSpec, w } from '../lib/Type';
 import { Tex } from '../lib/Tex';
-import { easeSnap, ramp } from '../lib/ease';
+import { easeDrift, easeExit, easeSnap, ramp } from '../lib/ease';
+import { makeMap } from '../lib/plots';
+import { PLOT, plotSize } from './TurnCurve';
 import { FACTORY_CARDS, SEIZE_QUESTION } from '../math/expressions';
 
 /**
@@ -85,15 +87,35 @@ export const FactoryGrid: React.FC<{ t: number; start: number; seizeAt: number; 
     for (let c = 0; c < cols; c++) {
       const absRow = r + shiftRows;
       const idx = absRow * cols + c;
-      // before the conveyor starts, only stamped cards exist
-      const stampedIn = idx < stampCount || absRow >= Math.ceil((multAt - start) / beat / cols) + 1;
+      // before the conveyor starts, only stamped cards exist; at multAt the
+      // sameness floods the whole grid on the beat
+      const stampedIn = idx < stampCount || tt >= multAt;
       const isConveyorRow = absRow * cols >= 6;
       const texIdx = isConveyorRow ? 0 : idx % FACTORY_CARDS.length; // sameness: the d/dx card, again and again
-      if (!stampedIn && !isConveyorRow) continue;
+      if (!stampedIn) continue;
 
       // stamp scale-in with a mechanical snap (no settle)
       const stampT = start + idx * beat;
       const p = isConveyorRow ? 1 : ramp(tt, [stampT, stampT + 0.16], [0, 1], easeSnap);
+      // anticipation: the press head's shadow forms just before the stamp lands
+      const antic = !isConveyorRow && p <= 0 ? ramp(tt, [stampT - 0.14, stampT - 0.01], [0, 1]) : 0;
+      if (antic > 0) {
+        cells.push(
+          <div
+            key={`a-${absRow}-${c}`}
+            style={{
+              position: 'absolute',
+              left: c * (CARD_W + GAP) + CARD_W * 0.12,
+              top: r * (CARD_H + GAP) + CARD_H * 0.2 - shiftFrac * (CARD_H + GAP),
+              width: CARD_W * 0.76,
+              height: CARD_H * 0.6,
+              borderRadius: 24,
+              background: `radial-gradient(50% 50% at 50% 50%, rgba(0,0,0,${0.5 * antic}), transparent 70%)`,
+              filter: 'blur(6px)',
+            }}
+          />,
+        );
+      }
       if (p <= 0) continue;
 
       // the card stuck mid-stamp when the machine seizes
@@ -173,6 +195,18 @@ export const SeizeCard: React.FC<{ t: number; at: number }> = ({ t, at }) => {
       <TextBox>
         <Tex tex={SEIZE_QUESTION} size={28} color={C.ink} />
       </TextBox>
+      {/* one slow breath of the border in the silence — the question is alive */}
+      <div
+        style={{
+          position: 'absolute',
+          inset: -1,
+          borderRadius: RADIUS.card,
+          border: `1px solid ${C.goldBright}`,
+          boxShadow: '0 0 24px rgba(227,200,126,0.35)',
+          opacity: 0.65 * ramp(t, [at + 0.8, at + 1.15], [0, 1]) * ramp(t, [at + 1.15, at + 1.5], [1, 0]),
+          pointerEvents: 'none',
+        }}
+      />
     </div>
   );
 };
@@ -263,6 +297,58 @@ export const Factory: React.FC<{ t0?: number }> = ({ t0 = 1.5 }) => {
           <SeizeCard t={t} at={SEIZE} />
         </Plane>
       </Stage>
+
+      {/* the hook's underline exits through this shot as a streak of light */}
+      {(() => {
+        const sp = ramp(t, [1.5, 1.82], [0, 1], easeExit);
+        if (sp <= 0 || sp >= 1) return null;
+        return (
+          <div
+            style={{
+              position: 'absolute',
+              top: spec.h * 0.622,
+              left: `${-30 + sp * 165}%`,
+              width: '30%',
+              height: 4,
+              borderRadius: 999,
+              background: `linear-gradient(90deg, transparent, ${C.gold}, transparent)`,
+              boxShadow: '0 0 18px rgba(201,173,99,0.7)',
+              opacity: 0.9 * (1 - sp * 0.6),
+            }}
+          />
+        );
+      })()}
+
+      {/* the ember: a point of gold leaves the frozen question and travels to
+          the exact spot where the curve is born at 8.0 — the film's match cut */}
+      {(() => {
+        const ep = ramp(t, [7.3, 8.0], [0, 1], easeDrift);
+        if (ep <= 0) return null;
+        const { W, H, top } = plotSize(spec.aspect);
+        const m = makeMap(PLOT.xmin, PLOT.xmax, PLOT.ymin, PLOT.ymax, W, H);
+        const x1 = (spec.w - W) / 2 + m.x(-0.62);
+        const y1 = top + m.y(0.3844);
+        const x0 = spec.w / 2;
+        const y0 = (spec.aspect === '916' ? 900 : spec.aspect === '45' ? 620 : 480) + 14;
+        const x = x0 + (x1 - x0) * ep;
+        const y = y0 + (y1 - y0) * ep - Math.sin(ep * Math.PI) * 150;
+        const r = 4 + ep * 3;
+        return (
+          <div
+            style={{
+              position: 'absolute',
+              left: x - r,
+              top: y - r,
+              width: r * 2,
+              height: r * 2,
+              borderRadius: 999,
+              background: C.goldBright,
+              boxShadow: `0 0 ${10 + ep * 16}px rgba(227,200,126,0.85)`,
+              opacity: ramp(t, [7.3, 7.5], [0, 1]),
+            }}
+          />
+        );
+      })()}
     </AbsoluteFill>
   );
 };
