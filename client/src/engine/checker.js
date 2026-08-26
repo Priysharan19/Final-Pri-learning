@@ -7,6 +7,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { normalize, parse, evaluate, evalNumeric, exprEquivalent, numsClose, variablesOf } from './expr.js';
+import { diagnoseStep } from './diagnose.js';
 
 const UNIT_TAIL = /(cm³|m³|mm³|cm²|m²|mm²|km²|km\/h|m\/s|cm|mm|km|kg|ml|l\b|m\b|s\b|h\b|hours?|mins?|minutes?|seconds?|degrees?|deg|°|units?²?|sq units)\s*$/i;
 
@@ -263,7 +264,10 @@ export function checkWorking(q, workingText) {
     return { correct: false, feedback: `Show at least ${minLines} lines of mathematical working — I could only read ${parsed.length}.`, stepReport: report, validLines: okLines.length };
   }
   if (report.firstBreak !== -1) {
-    return { correct: false, feedback: 'There’s a slip in your working — Step Check has marked the line where it breaks.', stepReport: report, validLines: okLines.length };
+    const named = report.diagnosis && report.diagnosis.code !== 'counterexample'
+      ? `${report.diagnosis.title} — line ${report.firstBreak + 1} is marked below.`
+      : 'There’s a slip in your working — Step Check has marked the line where it breaks.';
+    return { correct: false, feedback: named, stepReport: report, validLines: okLines.length };
   }
   // The final readable line must state the result
   const lastLine = [...report.lines].reverse().find(l => l.status === 'ok');
@@ -372,10 +376,24 @@ export function stepCheck(meta, workingText) {
   });
 
   // Everything after the first break is unreliable — soften to notes
-  if (firstBreak !== -1) {
-    for (let i = firstBreak + 1; i < out.length; i++) {
-      if (out[i].status === 'break') { out[i].status = 'note'; out[i].note = 'Follows from the earlier slip.'; }
-    }
+  if (firstBreak === -1) return { lines: out, firstBreak, diagnosis: null };
+  for (let i = firstBreak + 1; i < out.length; i++) {
+    if (out[i].status === 'break') { out[i].status = 'note'; out[i].note = 'Follows from the earlier slip.'; }
   }
-  return { lines: out, firstBreak };
+
+  // Knowing *where* it broke is the cheap half. Against the last line that was
+  // still true, work out which move the student actually made and say so — a
+  // named mistake is something a student can fix; "there is a slip here" is not.
+  let prevText = null;
+  for (let i = firstBreak - 1; i >= 0; i--) {
+    if (out[i].status === 'ok') { prevText = out[i].text; break; }
+  }
+  let diagnosis = null;
+  try { diagnosis = diagnoseStep({ prevText, brokenText: out[firstBreak].text, meta }); }
+  catch { diagnosis = null; }
+  if (diagnosis) {
+    out[firstBreak].diagnosis = diagnosis;
+    out[firstBreak].note = diagnosis.message;
+  }
+  return { lines: out, firstBreak, diagnosis };
 }

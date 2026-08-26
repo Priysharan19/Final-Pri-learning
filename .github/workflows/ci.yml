@@ -107,6 +107,16 @@ jobs:
       BACKEND_CHECKS: "329"
       BACKEND_ROUTES: "51"
       SECURITY_CHECKS: "129"
+      # The diagnosis suite's own verdict is its exit code — it fails on a
+      # single invented mistake. What CI adds is that the work was actually
+      # done: how many checks ran, how many missteps the sweep put through, and
+      # above all how many CORRECT steps were tested. That last floor is the one
+      # that matters. Zero false positives out of zero correct steps tested is
+      # the shape of a green build that measured nothing, and it is exactly the
+      # mistake this file exists to catch.
+      DIAGNOSE_CHECKS: "104"
+      DIAGNOSE_SWEEP: "795"
+      DIAGNOSE_SOUND: "816"
       INK_SELF: "96.0"
       INK_PROBES: "99.0"
       HARD_SYMBOLS: "95.0"
@@ -210,6 +220,9 @@ jobs:
           gate "backend · checks"          "BACKEND SUITE"                   's|.*— \([0-9][0-9]*\)/.*|\1|p'                       "$BACKEND_CHECKS"
           gate "backend · routes covered"  "route coverage:"                 's|.*route coverage: \([0-9][0-9]*\)/.*|\1|p'         "$BACKEND_ROUTES"
           gate "security · checks"         "SECURITY SUITE"                  's|.*— \([0-9][0-9]*\)/.*|\1|p'                       "$SECURITY_CHECKS"
+          gate "diagnosis · checks"        "DIAGNOSIS SUITE"                 's|.*— \([0-9][0-9]*\)/.*|\1|p'                       "$DIAGNOSE_CHECKS"
+          gate "diagnosis · missteps swept" "Sweep "                         's|.*Sweep \([0-9][0-9]*\)/.*|\1|p'                    "$DIAGNOSE_SWEEP"
+          gate "diagnosis · correct steps tested" "False positives "         's|.*False positives [0-9][0-9]*/\([0-9][0-9]*\) .*|\1|p' "$DIAGNOSE_SOUND"
 
           # ── how well it scored ──────────────────────────────────────────────
           gate "inkcheck · self"           "RECOGNIZER SUITE"                's|.*self \([0-9][0-9.]*\)%.*|\1|p'                   "$INK_SELF"

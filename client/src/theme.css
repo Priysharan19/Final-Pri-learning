@@ -531,6 +531,21 @@ select.input {
 .sc-break { background: var(--bad-soft); color: var(--bad); font-weight: 700; }
 .sc-note { color: var(--ink-3); }
 
+.diagnosis-card {
+  margin: 6px 0 10px; padding: 12px 14px; border: 1px solid var(--gold-border);
+  border-left-width: 3px; border-radius: 4px; background: var(--gold-soft);
+}
+.diagnosis-label {
+  font-family: var(--font); font-size: 10.5px; letter-spacing: 0.16em; text-transform: uppercase;
+  color: var(--gold); margin-bottom: 5px;
+}
+.diagnosis-title { font-size: 15px; color: var(--ink); margin-bottom: 4px; }
+.diagnosis-body { font-family: var(--font); font-size: 13.5px; line-height: 1.55; color: var(--ink-2); }
+.diagnosis-fix {
+  font-family: var(--font); font-size: 12.5px; line-height: 1.5; color: var(--ink-3);
+  margin-top: 7px; padding-top: 7px; border-top: 1px solid var(--hairline);
+}
+
 .redo-chip {
   display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--hairline-strong); border-radius: 4px;
   background: var(--surface); color: var(--ink-2); font-size: 13.5px; padding: 6px 14px; cursor: pointer; font-family: inherit;

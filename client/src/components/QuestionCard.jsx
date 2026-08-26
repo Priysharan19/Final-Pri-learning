@@ -930,13 +930,33 @@ function StepReport({ report }) {
     <div style={{ marginTop: 10, display: 'grid', gap: 3 }}>
       <div className="muted" style={{ fontSize: 12, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Step check on your working</div>
       {report.lines.map((l, i) => (
-        <div key={i} className={`stepcheck-line sc-${l.status}`}>
-          <span>{l.status === 'ok' ? '✓' : l.status === 'break' ? '✗' : '·'}</span>
-          <span>{l.text}</span>
-          {l.status === 'break' && <b style={{ fontFamily: 'var(--font)', fontSize: 12.5, whiteSpace: 'nowrap' }}>← the mistake is here</b>}
-          {l.note && <span style={{ fontFamily: 'var(--font)', fontWeight: 400, fontSize: 12.5 }}> — {l.note}</span>}
-        </div>
+        <React.Fragment key={i}>
+          <div className={`stepcheck-line sc-${l.status}`}>
+            <span>{l.status === 'ok' ? '✓' : l.status === 'break' ? '✗' : '·'}</span>
+            <span>{l.text}</span>
+            {l.status === 'break' && <b style={{ fontFamily: 'var(--font)', fontSize: 12.5, whiteSpace: 'nowrap' }}>← the mistake is here</b>}
+            {l.note && !l.diagnosis && <span style={{ fontFamily: 'var(--font)', fontWeight: 400, fontSize: 12.5 }}> — {l.note}</span>}
+          </div>
+          {l.diagnosis && <Diagnosis d={l.diagnosis} />}
+        </React.Fragment>
       ))}
+    </div>
+  );
+}
+
+/**
+ * The mistake by name. Marking the line is where every other marker stops;
+ * this card says which move was made, and the rule that move breaks — so the
+ * student leaves with something to change rather than something to re-read.
+ */
+function Diagnosis({ d }) {
+  if (!d) return null;
+  return (
+    <div className="diagnosis-card">
+      <div className="diagnosis-label">{d.code === 'counterexample' ? 'Why it fails' : 'What went wrong'}</div>
+      <div className="diagnosis-title">{d.title}</div>
+      <div className="diagnosis-body">{d.message}</div>
+      {d.fix && <div className="diagnosis-fix">{d.fix}</div>}
     </div>
   );
 }
