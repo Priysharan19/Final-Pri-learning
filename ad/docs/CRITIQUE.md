@@ -125,3 +125,28 @@ restraint 8 · **emotional truth 7 — the one accepted sub-8**: the brief's own
 premise (the mathematics is the hero object) trades human faces for the idea;
 within that premise the ink-being-marked is as human as the film gets. Logged
 as the weakest thing in HANDOFF.md rather than patched cosmetically.
+
+
+## Pass 4 — the feature act ("flex all the features", by request)
+
+The 30 s argument film gained what it deliberately withheld: the product's
+breadth. Rather than a card montage, THE INSTRUMENT is a depth corridor —
+six lit panels fly through the focal plane, one crossing per beat, each a
+plausible Dark-LaTeX surface: question bank (the measured 3,44,798), knowledge
+map, misconception diagnosis (the anti-factory feature, given the emphasis),
+predicted percentile (disclaimed in-frame), Match Mode (rivals labelled
+illustrative), criteria-marked mocks — capped by "All of it offline." set
+alone as the corridor empties. Master extended 30 → 36 s (house precedent:
+the shipped reel is 36.4 s); the 15 s cut stays the tight argument edit.
+
+Verified on the final renders: ALL GATES PASS on the 36 s grid (three new
+text beats pixel-linted and contrast-checked); the mix keeps its architecture
+(lock still loudest at −7.3 dB; groove under the run; strip-back for the
+offline line; silence by 35.5 s). One rebuild inside the pass: the knowledge
+map's constellation was too faint at feed scale — nodes/edges brightened to
+full gold.
+
+Feature-act self-grades: integration with the argument 8 (the diagnosis panel
+keeps the act honest), craft 8 (the corridor is genuinely cinematic; the map
+panel is the weakest face), pacing 7.5 (six panels in six beats is dense —
+deliberate, but a 45 s cut could let each breathe).

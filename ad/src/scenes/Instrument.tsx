@@ -64,7 +64,7 @@ const MapCard: React.FC<{ p: number }> = ({ p }) => {
       h = (h * 1664525 + 1013904223) >>> 0;
       return h / 4294967296;
     };
-    return { x: 30 + rnd() * 500, y: 16 + rnd() * 210, r: 3 + rnd() * 5, m: rnd() };
+    return { x: 30 + rnd() * 500, y: 16 + rnd() * 210, r: 4 + rnd() * 6, m: rnd() };
   });
   const edges: [number, number][] = [];
   nodes.forEach((n, i) => {
@@ -91,9 +91,9 @@ const MapCard: React.FC<{ p: number }> = ({ p }) => {
             y1={nodes[a].y}
             x2={nodes[b].x}
             y2={nodes[b].y}
-            stroke={C.goldBorder}
-            strokeWidth={1.2}
-            opacity={0.5 * ramp(dp, [k / edges.length, Math.min(1, k / edges.length + 0.25)], [0, 1])}
+            stroke={C.gold}
+            strokeWidth={1.5}
+            opacity={0.65 * ramp(dp, [k / edges.length, Math.min(1, k / edges.length + 0.25)], [0, 1])}
           />
         ))}
         {nodes.map((n, k) => (
@@ -102,9 +102,9 @@ const MapCard: React.FC<{ p: number }> = ({ p }) => {
             cx={n.x}
             cy={n.y}
             r={n.r}
-            fill={n.m > 0.55 ? C.gold : C.surface3}
-            stroke={C.goldBorder}
-            strokeWidth={1}
+            fill={n.m > 0.55 ? C.goldBright : C.surface3}
+            stroke={C.gold}
+            strokeWidth={1.4}
             opacity={ramp(dp, [k / nodes.length, Math.min(1, k / nodes.length + 0.2)], [0, 1])}
           />
         ))}
