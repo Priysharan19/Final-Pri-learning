@@ -117,6 +117,14 @@ jobs:
       DIAGNOSE_CHECKS: "104"
       DIAGNOSE_SWEEP: "795"
       DIAGNOSE_SOUND: "816"
+      # The Indian curriculum's claim is "these chapters can be practised". The
+      # floor that carries it is not the check count but the number of QUESTIONS
+      # actually generated and marked: a mapping can resolve to a real generator
+      # and still hand back nothing, and a suite that generated zero questions
+      # would otherwise report a clean pass.
+      INDIA_CHECKS: "638"
+      INDIA_QUESTIONS: "2736"
+      INDIA_CHAPTERS: "57"
       INK_SELF: "96.0"
       INK_PROBES: "99.0"
       HARD_SYMBOLS: "95.0"
@@ -223,6 +231,9 @@ jobs:
           gate "diagnosis · checks"        "DIAGNOSIS SUITE"                 's|.*— \([0-9][0-9]*\)/.*|\1|p'                       "$DIAGNOSE_CHECKS"
           gate "diagnosis · missteps swept" "Sweep "                         's|.*Sweep \([0-9][0-9]*\)/.*|\1|p'                    "$DIAGNOSE_SWEEP"
           gate "diagnosis · correct steps tested" "False positives "         's|.*False positives [0-9][0-9]*/\([0-9][0-9]*\) .*|\1|p' "$DIAGNOSE_SOUND"
+          gate "india · checks"            "INDIA SUITE"                     's|.*— \([0-9][0-9]*\)/.*|\1|p'                       "$INDIA_CHECKS"
+          gate "india · questions marked"  "questions generated across"      's|.*— \([0-9][0-9]*\) marked correct.*|\1|p'         "$INDIA_QUESTIONS"
+          gate "india · chapters reachable" "can be practised today"         's|.*  \([0-9][0-9]*\)/[0-9][0-9]* (.*|\1|p'          "$INDIA_CHAPTERS"
 
           # ── how well it scored ──────────────────────────────────────────────
           gate "inkcheck · self"           "RECOGNIZER SUITE"                's|.*self \([0-9][0-9.]*\)%.*|\1|p'                   "$INK_SELF"
