@@ -107,6 +107,8 @@ async function handler(req, res) {
   if (url.pathname === '/health' && req.method === 'GET') {
     return send(req, res, 200, {
       ok: true,
+      // This means a key is present in the process. The first real recognition
+      // request is what validates permissions, billing/quota and model access.
       openaiConfigured: Boolean(process.env.OPENAI_API_KEY),
       tls: TLS_READY,
       requestId
@@ -123,17 +125,22 @@ async function handler(req, res) {
     return send(req, res, 503, { error: 'OPENAI_API_KEY is not configured', code: 'OPENAI_NOT_CONFIGURED', requestId });
   }
 
+  const started = Date.now();
+  // Safe diagnostics only: request id + outcome. Never log image data or the
+  // student's transcription payload.
+  console.log(`[cloud-ink ${requestId}] recognition start`);
   try {
     const body = await readJson(req);
     const image = body?.image || body?.imageDataUrl;
     const result = await transcribeMathHandwriting(image);
+    console.log(`[cloud-ink ${requestId}] recognition ok · ${result.engine} · ${Date.now() - started}ms`);
     return send(req, res, 200, { ...result, requestId });
   } catch (error) {
     const status = Number(error?.status) >= 400 && Number(error?.status) < 600 ? Number(error.status) : 500;
     const safeMessage = status >= 500 && !['OPENAI_NOT_CONFIGURED'].includes(error?.code)
       ? 'Cloud handwriting recognition failed'
       : String(error?.message || 'Cloud handwriting recognition failed');
-    if (status >= 500) console.error(`[cloud-ink ${requestId}]`, error);
+    console.error(`[cloud-ink ${requestId}] recognition failed · HTTP ${status} · ${error?.code || 'CLOUD_INK_FAILED'} · ${String(error?.message || 'unknown error')} · ${Date.now() - started}ms`);
     return send(req, res, status, { error: safeMessage, code: error?.code || 'CLOUD_INK_FAILED', requestId });
   }
 }
