@@ -2,9 +2,12 @@ import { storyboardPromptContract } from './storyboard.js';
 import { selectTeachingStoryboard } from './teachingDirector.js';
 
 const TIMEOUT_MS = 12000;
+const MAX_WRONG_CACHE = 32;
 let nextRequestId = 1;
 const pending = new Map();
+const firstWrongByQuestion = new Map();
 let receiverInstalled = false;
+let providerInstalled = false;
 
 function installReceiver() {
   if (receiverInstalled || typeof window === 'undefined') return;
@@ -67,6 +70,16 @@ function providerPayload(solution, context) {
   };
 }
 
+function rememberFirstWrong(detail) {
+  if (!detail?.questionId || detail.correct !== false || !detail.submission) return;
+  const key = String(detail.questionId);
+  if (firstWrongByQuestion.has(key)) return;
+  firstWrongByQuestion.set(key, detail);
+  if (firstWrongByQuestion.size > MAX_WRONG_CACHE) {
+    firstWrongByQuestion.delete(firstWrongByQuestion.keys().next().value);
+  }
+}
+
 export function canUseNativeTeachingModel() {
   return Boolean(nativeHandler());
 }
@@ -115,5 +128,62 @@ export async function requestNativeTeachingStoryboard(solution, context = {}) {
     storyboard: selected.storyboard,
     engine: response.engine || 'apple-foundation-models',
     reason: '',
+  };
+}
+
+/**
+ * Install the optional native model as a non-blocking second pass over the same
+ * browser-local teaching evidence Pri Explain already uses. The normal local
+ * V4 director renders immediately. On supported iPads, a verified model plan is
+ * then re-published through the existing worked-solution event; unsupported
+ * devices do nothing and therefore keep the local director unchanged.
+ */
+export function installNativeTeachingProvider() {
+  if (providerInstalled || typeof window === 'undefined') return () => {};
+  providerInstalled = true;
+  installReceiver();
+
+  const onAttempt = event => rememberFirstWrong(event?.detail);
+  const onSolution = async event => {
+    const detail = event?.detail;
+    if (!detail?.solution || detail?.nativeTeachingResolved) return;
+    if (!nativeHandler()) return;
+
+    const key = String(detail.questionId || '');
+    const prior = firstWrongByQuestion.get(key) || null;
+    const context = {
+      ...detail,
+      questionPrompt: detail.questionPrompt || '',
+      wrongAttempt: prior?.submission || (detail.correct === false ? detail.submission : null),
+      feedback: prior?.feedback || detail.feedback || '',
+      diagnosis: prior?.diagnosis || detail.diagnosis || null,
+      misconception: prior?.misconception || detail.misconception || null,
+      hadWrongAttempt: Boolean(prior),
+    };
+
+    const result = await requestNativeTeachingStoryboard(detail.solution, context);
+    firstWrongByQuestion.delete(key);
+    if (!result.storyboard) return;
+
+    window.dispatchEvent(new CustomEvent('pri:worked-solution', {
+      detail: {
+        ...detail,
+        nativeTeachingResolved: true,
+        teachingEngine: result.engine,
+        explanationStoryboard: result.storyboard,
+        solution: {
+          ...detail.solution,
+          explanationStoryboard: result.storyboard,
+        },
+      },
+    }));
+  };
+
+  window.addEventListener('pri:attempt-feedback', onAttempt);
+  window.addEventListener('pri:worked-solution', onSolution);
+  return () => {
+    window.removeEventListener('pri:attempt-feedback', onAttempt);
+    window.removeEventListener('pri:worked-solution', onSolution);
+    providerInstalled = false;
   };
 }
