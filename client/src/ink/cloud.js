@@ -15,11 +15,27 @@ let hardUnavailable = false;
 let retryAfter = 0;
 let activeRequest = null;
 
+function isLocalHost(hostname) {
+  return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1' ||
+    hostname.endsWith('.local') || /^10\./.test(hostname) || /^192\.168\./.test(hostname) ||
+    /^172\.(1[6-9]|2\d|3[01])\./.test(hostname);
+}
+
 function endpoint() {
   if (typeof window === 'undefined') return '';
   const runtime = String(window.__PRI_CLOUD_INK_ENDPOINT__ || '').trim();
   if (runtime) return runtime;
-  return String(import.meta.env.VITE_PRI_CLOUD_INK_ENDPOINT || '').trim();
+  const built = String(import.meta.env.VITE_PRI_CLOUD_INK_ENDPOINT || '').trim();
+  if (built) return built;
+
+  // LAN browser testing should require no custom build flag. The companion
+  // gateway runs on :4190 and reuses serve-lan's certificate. Public hosts are
+  // NEVER auto-routed; a production deployment must provide an explicit URL.
+  const { protocol, hostname } = window.location;
+  if ((protocol === 'http:' || protocol === 'https:') && isLocalHost(hostname)) {
+    return `${protocol}//${hostname}:4190/v1/handwriting/recognize`;
+  }
+  return '';
 }
 
 function clientToken() {
@@ -148,7 +164,9 @@ function normalizeReading(payload) {
     margin: Number.isFinite(Number(payload?.margin)) ? Number(payload.margin) : 0,
     weakest: null,
     cloud: true,
-    productionReady: true
+    // The transport exists, but production readiness belongs to the real-writer
+    // evaluation gate, not to the fact that an API call succeeded.
+    productionReady: false
   };
 }
 
