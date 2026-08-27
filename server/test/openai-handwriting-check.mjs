@@ -113,10 +113,20 @@ assert.equal(extractResponseText({
   assert.equal(result.candidateReadings.length, 2);
 }
 
-// No secret means no accidental direct API use from a checkout or CI worker.
-await assert.rejects(
-  () => transcribeMathHandwriting(image, { apiKey: '', fetchImpl: async () => { throw new Error('must not run'); } }),
-  /OPENAI_API_KEY/
-);
+// No secret means no accidental direct API use from a checkout or CI worker,
+// even if the developer happens to have OPENAI_API_KEY exported in their shell.
+{
+  const saved = process.env.OPENAI_API_KEY;
+  delete process.env.OPENAI_API_KEY;
+  try {
+    await assert.rejects(
+      () => transcribeMathHandwriting(image, { fetchImpl: async () => { throw new Error('must not run'); } }),
+      /OPENAI_API_KEY/
+    );
+  } finally {
+    if (saved === undefined) delete process.env.OPENAI_API_KEY;
+    else process.env.OPENAI_API_KEY = saved;
+  }
+}
 
 console.log('OpenAI handwriting contract: PASS');
