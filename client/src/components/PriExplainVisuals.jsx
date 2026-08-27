@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { MathText } from '../lib/latex.jsx';
 import { sanitizeFigure } from '../lib/sanitize.js';
+import './PriExplainVisuals.css';
 
 function operationLabel(before, after, authored = '') {
   if (authored) return authored;
