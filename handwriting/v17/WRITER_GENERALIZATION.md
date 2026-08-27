@@ -1,14 +1,22 @@
-# Pri Ink V16 — Writer Generalisation Standard
+# Pri Ink V17 — Writer Generalisation Standard
 
 ## Objective
 
 Pri Learning should recognise mathematical handwriting from people it has never seen before, not merely memorise one writer or a catalogue of hand-authored allographs.
 
-No finite system can truthfully guarantee recognition of **all possible handwriting**. V16 therefore defines the production target as high-accuracy, calibrated recognition across a deliberately broad, writer-disjoint population, with safe abstention when the ink is genuinely ambiguous.
+No finite system can truthfully guarantee recognition of **all possible handwriting**. V17 therefore defines the production target as high-accuracy, calibrated recognition across a deliberately broad, writer-disjoint population, with safe abstention when the ink is genuinely ambiguous.
+
+## Integration status
+
+V17 is rebuilt from the current production `main` rather than merged from the diverged V16 branch. This preserves the newer JEE notation, structural decoding, curriculum, diagnosis and iPad work while carrying forward the tested V4 writer-generalisation foundation. PR #45 is therefore a source lane, not the release branch.
+
+**V4 remains the ML architecture/checkpoint version. V17 is the Pri Ink product/release lane.** Renaming the model files to V17 would falsely imply a new checkpoint format and would break append-only compatibility guarantees.
+
+The current repository has one substantial real Apple Pencil writer corpus. That writer is useful for plumbing and train-split diagnostics, but it is not evidence of unseen-writer generalisation. V17 deliberately keeps production promotion locked until writer-disjoint evidence reaches the minimum scale below.
 
 ## What changed
 
-V16 introduces a V4 foundation-model track without replacing the current V3 production path:
+V17 introduces the V4 foundation-model track without replacing the current production recogniser:
 
 1. **Coherent raw-stroke style augmentation.** Slant, aspect ratio, page rotation, baseline curvature, point density, pressure, width and writing speed are perturbed once at the raw-ink level. Stroke and raster encoders always see the same transformed handwriting.
 2. **Writer-adaptive style path.** A style embedding is retained so the model can exploit stable characteristics of a writer when useful.
@@ -16,9 +24,10 @@ V16 introduces a V4 foundation-model track without replacing the current V3 prod
 4. **Style dropout.** The decoder is regularly denied the style vector, preventing dependence on a known writer.
 5. **Two-view consistency.** Two independently transformed versions of the same expression must agree at both the token distribution and content-embedding level.
 6. **Physical-stroke CTC remains first-class.** The model still learns the marks actually drawn, separately from serialization-only syntax such as power wrappers.
-7. **Generalisation stress evaluation.** Frozen checkpoints are evaluated on real unseen writers and repeated plausible style shifts. A prediction is only 'robust' when the original and every perturbation remain correct.
+7. **Generalisation stress evaluation.** Frozen checkpoints are evaluated on real unseen writers and repeated plausible style shifts. A prediction is only `robust` when the original and every perturbation remain correct.
 8. **Corpus diversity audit.** Synthetic transforms never count as new writers. The audit measures real writer counts, split integrity, samples, vocabulary coverage and capture-style variation.
 9. **Dual-gated Core ML promotion.** V4 can be exported for development at any time, but it cannot be marked production-ready unless the exact checkpoint passes both the locked final-holdout release report and the real unseen-writer generalisation report.
+10. **Executable CI smoke.** CI compiles every V4 module, runs architecture/vocabulary checks, generates a writer-disjoint mini-corpus, performs an actual one-epoch CPU training run, verifies the resulting checkpoint identity and audits the current real corpus.
 
 ## Production data policy
 
@@ -45,7 +54,7 @@ A V4 checkpoint is not a production model merely because training loss is low. P
 - critical-structure robust exact accuracy >= 98%;
 - existing safe-precision/abstention and final-holdout rules continue to pass.
 
-The untouched final holdout remains locked during tuning. Style perturbation is a stress test, never a substitute for real people.
+The untouched final holdout remains locked during tuning. Style perturbation is a stress test, never a substitute for real people. **Do not lower an existing handwriting floor to promote V4.** A candidate that cannot meet the current release contract stays a candidate.
 
 ## Commands
 
@@ -102,4 +111,6 @@ Use `--enforce` only when the corpus is large enough for the production evidence
 
 ## Next data milestone
 
-The present repository contains one substantial real Pencil writer corpus. V16 makes that data much more useful and gives the model the correct inductive bias, but **new independent real writers are now the highest-leverage input**. Until those writers are collected, universal-handwriting claims would be unsupported regardless of how sophisticated the network becomes.
+The present repository contains one substantial real Pencil writer corpus. V17 makes that data much more useful and gives the model the correct inductive bias, but **new independent real writers are now the highest-leverage input**. Until those writers are collected, universal-handwriting claims would be unsupported regardless of how sophisticated the network becomes.
+
+The next evidence milestone is therefore operational rather than architectural: collect independent writers under the existing consent/anonymisation protocol, keep evaluation writers untouched, then train and evaluate V4 writer-disjoint. Failure clusters should be fixed from training/validation evidence; the locked final holdout is only for promotion decisions.
