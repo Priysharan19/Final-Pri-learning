@@ -7,8 +7,9 @@ model needs enough independent people, writer-disjoint splits, broad token
 coverage and non-trivial variation in capture dynamics.
 
 V17 deliberately evaluates data readiness on the repeatable engineering `test`
-split only. The locked `final-holdout` must never be used to make an otherwise
-under-sized test set look production-ready.
+split only. The locked `final-holdout` is treated as opaque here: writer/session
+metadata is enough to detect split leakage, but its targets and stroke/style
+statistics are not read by routine readiness tooling.
 """
 from __future__ import annotations
 
@@ -153,6 +154,13 @@ def load_corpus(root):
         row["files"] += 1
         hand = str((doc.get("writer") or {}).get("handedness") or "unknown")
         row["handedness"][hand] += 1
+
+        # Final-holdout contents stay opaque to routine readiness analysis.
+        # Writer id / split / session metadata above are sufficient to detect
+        # leakage and duplicate sessions without learning targets or hand style.
+        if split == "final-holdout":
+            continue
+
         for sample in doc.get("samples") or []:
             target = canonical_text(sample.get("target") or "").strip()
             strokes = sample.get("strokes") or []
@@ -204,9 +212,10 @@ def _coverage_row(token_counts: Counter, writer_counts: Counter,
 def build_report(root) -> dict:
     """Build the machine-checkable V17 corpus-readiness report.
 
-    Kept as a pure-ish helper so the frozen writer-generalisation evaluator can
-    embed the exact same readiness decision into its checkpoint evidence. This
-    prevents Core ML promotion from bypassing the standalone audit.
+    Kept as a helper so the frozen writer-generalisation evaluator can embed the
+    exact same readiness decision into its checkpoint evidence. Final-holdout
+    contents remain unread here; only an explicitly unlocked release evaluator
+    may score them.
     """
     (
         writers,
@@ -219,6 +228,13 @@ def build_report(root) -> dict:
     writer_rows = {}
     for writer, row in sorted(writers.items()):
         by_split[row["split"]].append(writer)
+        if row["split"] == "final-holdout":
+            writer_rows[writer] = {
+                "split": "final-holdout",
+                "files": row["files"],
+                "detailsRead": False,
+            }
+            continue
         writer_rows[writer] = {
             "split": row["split"],
             "samples": row["samples"],
@@ -233,10 +249,11 @@ def build_report(root) -> dict:
     required_tokens = [token for token in VOCAB if not token.startswith("<")]
     writer_token_by_split = {
         split: _writer_token_counts(writers, split, required_tokens)
-        for split in set(by_split) | {"train", "validation", "test", "final-holdout"}
+        for split in set(by_split) | {"train", "validation", "test"}
+        if split != "final-holdout"
     }
     coverage = {}
-    for split in sorted(set(samples_by_split) | set(by_split)):
+    for split in sorted((set(samples_by_split) | set(by_split)) - {"final-holdout"}):
         coverage[split] = _coverage_row(
             token_by_split[split], writer_token_by_split[split], required_tokens
         )
@@ -244,8 +261,8 @@ def build_report(root) -> dict:
     train_counts = [
         writers[writer]["samples"] for writer in by_split.get("train", [])
     ]
-    train_writer_token_counts = writer_token_by_split["train"]
-    test_writer_token_counts = writer_token_by_split["test"]
+    train_writer_token_counts = writer_token_by_split.get("train", Counter())
+    test_writer_token_counts = writer_token_by_split.get("test", Counter())
     test_token_counts = token_by_split["test"]
 
     thin_train_tokens = [
@@ -288,6 +305,7 @@ def build_report(root) -> dict:
             "minTestOccurrencesPerToken": MIN_TEST_OCCURRENCES_PER_TOKEN,
             "syntheticAugmentationsCountAsWriters": False,
             "finalHoldoutCountsTowardReadiness": False,
+            "finalHoldoutContentInspectedByAudit": False,
         },
         "writers": len(writers),
         "writersBySplit": {
@@ -299,6 +317,10 @@ def build_report(root) -> dict:
             "trainTokensBelowWriterMinimum": thin_train_tokens,
             "testTokensBelowWriterMinimum": thin_test_writer_tokens,
             "testTokensBelowOccurrenceMinimum": thin_test_occurrence_tokens,
+        },
+        "finalHoldout": {
+            "writersRegistered": len(by_split.get("final-holdout", [])),
+            "contentInspected": False,
         },
         "unknownTargets": unknown_targets[:100],
         "duplicateSessionIds": duplicates,
@@ -323,7 +345,7 @@ def main():
     print(
         "\nDATA READINESS: "
         + ("PASS" if report["passesDataReadiness"] else "NOT YET")
-        + " — augmented copies never count as independent writers; final-holdout never fills test gaps."
+        + " — augmented copies never count as independent writers; final-holdout stays opaque."
     )
     if args.enforce and not report["passesDataReadiness"]:
         raise SystemExit(2)
