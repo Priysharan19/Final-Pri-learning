@@ -1,15 +1,9 @@
 #!/usr/bin/env python3
-"""Audit whether the Pri Ink corpus represents genuinely different writers.
+"""Audit Pri Ink V17.1 real-writer corpus readiness without spending holdout evidence.
 
-This tool intentionally measures the *data*, not model accuracy. Synthetic
-augmentation is not counted as a writer. Promotion to a broadly generalising
-model needs enough independent people, writer-disjoint splits, broad token
-coverage and non-trivial variation in capture dynamics.
-
-V17 deliberately evaluates data readiness on the repeatable engineering `test`
-split only. The locked `final-holdout` is treated as opaque here: writer/session
-metadata is enough to detect split leakage, but its targets and stroke/style
-statistics are not read by routine readiness tooling.
+Routine readiness is intentionally data-only. Synthetic augmentation never counts
+as a writer, train/test writers must remain disjoint, and final-holdout targets
+and strokes are never inspected here.
 """
 from __future__ import annotations
 
@@ -23,13 +17,32 @@ from pathlib import Path
 from data_v4 import VOCAB, canonical_text, corpus_files, tokenize
 
 
-EVAL_MIN_WRITERS = 20
-EVAL_MIN_SAMPLES = 1000
-TRAIN_TARGET_WRITERS = 100
-MIN_SAMPLES_PER_TRAIN_WRITER = 40
-MIN_TRAIN_WRITERS_PER_TOKEN = 5
-MIN_TEST_WRITERS_PER_TOKEN = 3
-MIN_TEST_OCCURRENCES_PER_TOKEN = 5
+POLICY_PATH = Path(__file__).with_name("corpus_policy.json")
+
+
+def _load_policy() -> dict:
+    policy = json.loads(POLICY_PATH.read_text(encoding="utf-8"))
+    if policy.get("format") != "pri-ink-corpus-policy":
+        raise RuntimeError(f"invalid corpus policy format in {POLICY_PATH}")
+    if policy.get("vocabularyVersion") != 4:
+        raise RuntimeError("corpus policy vocabularyVersion must remain 4 for this audit")
+    evidence = policy.get("evidence") or {}
+    if evidence.get("routineToolsMayInspectFinalHoldoutTargets") is not False:
+        raise RuntimeError("routine corpus policy must keep final-holdout targets opaque")
+    if evidence.get("routineToolsMayInspectFinalHoldoutStrokes") is not False:
+        raise RuntimeError("routine corpus policy must keep final-holdout strokes opaque")
+    return policy
+
+
+POLICY = _load_policy()
+READINESS = POLICY["readiness"]
+EVAL_MIN_WRITERS = int(READINESS["evaluationMinWriters"])
+EVAL_MIN_SAMPLES = int(READINESS["evaluationMinSamples"])
+TRAIN_TARGET_WRITERS = int(READINESS["trainWriterTarget"])
+MIN_SAMPLES_PER_TRAIN_WRITER = int(READINESS["minSamplesPerTrainWriter"])
+MIN_TRAIN_WRITERS_PER_TOKEN = int(READINESS["minTrainWritersPerToken"])
+MIN_TEST_WRITERS_PER_TOKEN = int(READINESS["minTestWritersPerToken"])
+MIN_TEST_OCCURRENCES_PER_TOKEN = int(READINESS["minTestOccurrencesPerToken"])
 
 
 def finite(value, default=0.0):
@@ -43,13 +56,7 @@ def finite(value, default=0.0):
 def quantiles(values):
     values = sorted(float(x) for x in values if math.isfinite(float(x)))
     if not values:
-        return {
-            "min": 0.0,
-            "p10": 0.0,
-            "median": 0.0,
-            "p90": 0.0,
-            "max": 0.0,
-        }
+        return {"min": 0.0, "p10": 0.0, "median": 0.0, "p90": 0.0, "max": 0.0}
 
     def pick(q):
         pos = q * (len(values) - 1)
@@ -76,9 +83,7 @@ def sample_signature(strokes):
     ys = [finite(point.get("y")) for point in points]
     span_x = max(max(xs) - min(xs), 1.0)
     span_y = max(max(ys) - min(ys), 1.0)
-    pressures = [
-        finite(point.get("p", point.get("force", 0.0))) for point in points
-    ]
+    pressures = [finite(point.get("p", point.get("force", 0.0))) for point in points]
     widths = [finite(point.get("w", 3.0), 3.0) for point in points]
     speeds = []
     gaps = []
@@ -114,6 +119,19 @@ def sample_signature(strokes):
     }
 
 
+def _session_id(doc: dict) -> str:
+    writer = doc.get("writer") or {}
+    session = doc.get("session")
+    if isinstance(session, dict):
+        session = session.get("id")
+    return str(
+        writer.get("sessionId")
+        or doc.get("sessionId")
+        or session
+        or ""
+    ).strip()
+
+
 def load_corpus(root):
     writers = {}
     writer_splits = {}
@@ -129,17 +147,21 @@ def load_corpus(root):
             continue
         if doc.get("format") != "pri-ink-corpus" or int(doc.get("version", 0)) < 2:
             continue
-        writer = str((doc.get("writer") or {}).get("id") or "unknown")
-        split = str(doc.get("split") or "train")
+
+        writer_doc = doc.get("writer") or {}
+        writer = str(writer_doc.get("id") or "unknown")
+        split = str(doc.get("split") or writer_doc.get("split") or "train")
         prior = writer_splits.get(writer)
         if prior is not None and prior != split:
             raise SystemExit(
                 f"FAIL: writer leakage: {writer!r} occurs in {prior!r} and {split!r}"
             )
         writer_splits[writer] = split
-        session = str(doc.get("sessionId") or doc.get("session") or "")
+
+        session = _session_id(doc)
         if session:
             duplicate_session_ids[session] += 1
+
         row = writers.setdefault(
             writer,
             {
@@ -152,15 +174,14 @@ def load_corpus(root):
             },
         )
         row["files"] += 1
-        hand = str((doc.get("writer") or {}).get("handedness") or "unknown")
-        row["handedness"][hand] += 1
 
-        # Final-holdout contents stay opaque to routine readiness analysis.
-        # Writer id / split / session metadata above are sufficient to detect
-        # leakage and duplicate sessions without learning targets or hand style.
+        # Final-holdout is metadata-only in routine tooling. Never inspect
+        # handedness, targets, strokes, token coverage, or style statistics.
         if split == "final-holdout":
             continue
 
+        hand = str(writer_doc.get("handedness") or "unknown")
+        row["handedness"][hand] += 1
         for sample in doc.get("samples") or []:
             target = canonical_text(sample.get("target") or "").strip()
             strokes = sample.get("strokes") or []
@@ -210,13 +231,7 @@ def _coverage_row(token_counts: Counter, writer_counts: Counter,
 
 
 def build_report(root) -> dict:
-    """Build the machine-checkable V17 corpus-readiness report.
-
-    Kept as a helper so the frozen writer-generalisation evaluator can embed the
-    exact same readiness decision into its checkpoint evidence. Final-holdout
-    contents remain unread here; only an explicitly unlocked release evaluator
-    may score them.
-    """
+    """Build the machine-checkable V17.1 corpus-readiness report."""
     (
         writers,
         samples_by_split,
@@ -224,6 +239,7 @@ def build_report(root) -> dict:
         unknown_targets,
         duplicates,
     ) = load_corpus(root)
+
     by_split = defaultdict(list)
     writer_rows = {}
     for writer, row in sorted(writers.items()):
@@ -290,13 +306,16 @@ def build_report(root) -> dict:
         "noUnknownTargetTokens": not unknown_targets,
         "noDuplicateSessionIds": not duplicates,
     }
+
     return {
         "format": "pri-ink-writer-diversity-audit",
-        "version": 2,
-        "vocabularyVersion": 4,
+        "version": 3,
+        "releaseLane": POLICY.get("releaseLane", "V17.1"),
+        "vocabularyVersion": POLICY["vocabularyVersion"],
+        "policySource": str(POLICY_PATH),
         "policy": {
             "trainWriterTarget": TRAIN_TARGET_WRITERS,
-            "evaluationSplit": "test",
+            "evaluationSplit": READINESS["evaluationSplit"],
             "evaluationMinWriters": EVAL_MIN_WRITERS,
             "evaluationMinSamples": EVAL_MIN_SAMPLES,
             "minSamplesPerTrainWriter": MIN_SAMPLES_PER_TRAIN_WRITER,
