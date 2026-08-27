@@ -11,8 +11,17 @@ import { useApp } from '../App.jsx';
 import InkCanvas from '../ink/InkCanvas.jsx';
 import { sanitizeFigure } from '../lib/sanitize.js';
 import { clearDraft, queueDraft, readDraft } from './drafts.js';
+import { nativePhotoAvailable, recognizePhoto } from '../native/photo.js';
 
 const DIFF_CLASS = { 1: 'tag-d1', 2: 'tag-d2', 3: 'tag-d3', 4: 'tag-d4' };
+// Public question metadata may constrain what a single answer glyph can be,
+// but it must never disclose or encode the expected answer. Numeric questions
+// therefore expose only the ten digit symbols to the one-glyph tie-breaker.
+// Multi-glyph grammar/context scoring deliberately ignores this separate field.
+const NUMERIC_SINGLE_GLYPH_ALPHABET = Array.from({ length: 10 }, (_, i) => String(i));
+const recognitionContextForQuestion = question => question?.answerType === 'numeric'
+  ? { answerType: 'numeric', singleGlyphAlphabet: NUMERIC_SINGLE_GLYPH_ALPHABET }
+  : null;
 // Each key carries the name of the thing it inserts, because "≥" and "√(" are
 // read out as punctuation — or not at all — by a screen reader.
 const SYMBOLS = [
@@ -170,6 +179,19 @@ function doubtOf(ink) {
   return null;
 }
 
+// The local gateway counts object keys to reject pathological nested payloads.
+// Pencil points used to be sent as {x,y}, so a normal full working page could
+// exceed that security budget despite being a legitimate answer. Transport each
+// point as [x,y]; backend safeStrokes expands it back to the canonical stored
+// object shape, so History/replay remains unchanged.
+function compactInkStrokes(strokes) {
+  return (Array.isArray(strokes) ? strokes : []).map(st => ({
+    points: (Array.isArray(st?.points) ? st.points : []).map(p => [
+      Math.round(Number(p?.x) || 0), Math.round(Number(p?.y) || 0)
+    ])
+  }));
+}
+
 export default function QuestionCard({ question, why, reason, onResolved, onNext, onRedo, compact = false }) {
   const { celebrate, refreshUser, refreshDue, refreshRecent, toast } = useApp();
   const [answer, setAnswer] = useState('');
@@ -189,6 +211,7 @@ export default function QuestionCard({ question, why, reason, onResolved, onNext
   const [selfMarks, setSelfMarks] = useState({});
   const [selfSaved, setSelfSaved] = useState(false);
   const [photo, setPhoto] = useState(null);
+  const [photoOCR, setPhotoOCR] = useState({ phase: 'idle', text: '', confidence: 0, error: '', engine: null });
   const [elapsed, setElapsed] = useState(0);
   const [inkPhase, setInkPhase] = useState(() => (inkModule ? 'ready' : 'idle'));   // idle | loading | ready | failed
   const [inkTry, setInkTry] = useState(0);
@@ -206,6 +229,7 @@ export default function QuestionCard({ question, why, reason, onResolved, onNext
     setWorking(draft?.working || ''); setShowWorking(!!draft?.working);
     setState({ phase: 'answering' }); setBusy(false);
     setSelfMarks({}); setSelfSaved(false); setPhoto(null); setBookmarked(false); setElapsed(0);
+    setPhotoOCR({ phase: 'idle', text: '', confidence: 0, error: '', engine: null });
     setChecking(false); setVouched(null);
     startRef.current = Date.now();
     if (mode === 'type') setTimeout(() => inputRef.current?.focus(), 60);
@@ -226,6 +250,39 @@ export default function QuestionCard({ question, why, reason, onResolved, onNext
   const hintsUsed = hints.length;
   const credit = Math.max(0.55, 1 - 0.15 * hintsUsed);
   const writeMode = mode === 'write';
+  const recognitionContext = useMemo(
+    () => recognitionContextForQuestion(question),
+    [question.answerType]
+  );
+
+
+  const decodePhoto = useCallback(async (dataURL) => {
+    if (!dataURL) return;
+    if (!nativePhotoAvailable()) {
+      setPhotoOCR({ phase: 'unavailable', text: '', confidence: 0, error: 'Native photo OCR is unavailable in this build.', engine: null });
+      return;
+    }
+    setPhotoOCR({ phase: 'reading', text: '', confidence: 0, error: '', engine: null });
+    try {
+      const result = await recognizePhoto(dataURL);
+      const text = String(result?.text || '').trim();
+      const finalCandidate = String(result?.answer || '').trim();
+      const fallbackFinal = text.split(/\n+/).map(s => s.trim()).filter(Boolean).at(-1) || '';
+      const markable = finalCandidate || fallbackFinal;
+      if (!text && !markable) throw new Error('No handwriting was detected in that photo.');
+      if (isWorking && text) {
+        setWorking(text);
+        setShowWorking(true);
+      }
+      if (markable) setAnswer(markable);
+      setPhotoOCR({
+        phase: 'done', text, confidence: Number(result?.confidence || 0), error: '',
+        engine: result?.engine || 'apple-vision-photo-v1'
+      });
+    } catch (err) {
+      setPhotoOCR({ phase: 'failed', text: '', confidence: 0, error: err?.message || 'Photo handwriting could not be read.', engine: null });
+    }
+  }, [isWorking]);
 
   useEffect(() => {
     if (!writeMode) return;
@@ -349,7 +406,7 @@ export default function QuestionCard({ question, why, reason, onResolved, onNext
         if (!inkResult?.lines?.length) return;
         given = inkResult.lines.join('\n');
         viaInk = true;
-        ink = { strokes: inkResult.strokes.map(s => ({ points: s.points.map(p => ({ x: Math.round(p.x), y: Math.round(p.y) })) })), recognized: inkResult.text };
+        ink = { strokes: compactInkStrokes(inkResult.strokes), recognized: inkResult.text };
       } else {
         given = working;
         if (!given.trim()) return;
@@ -359,7 +416,7 @@ export default function QuestionCard({ question, why, reason, onResolved, onNext
       given = inkResult.answerLine;
       steps = inkResult.lines.length > 1 ? inkResult.lines.join('\n') : undefined;
       viaInk = true;
-      ink = { strokes: inkResult.strokes.map(s => ({ points: s.points.map(p => ({ x: Math.round(p.x), y: Math.round(p.y) })) })), recognized: inkResult.text };
+      ink = { strokes: compactInkStrokes(inkResult.strokes), recognized: inkResult.text };
     } else {
       given = answer;
       if (String(given).trim() === '') return;
@@ -368,7 +425,7 @@ export default function QuestionCard({ question, why, reason, onResolved, onNext
     setBusy(true);
     try {
       const scribbleStrokes = scribbleRef.current && !scribbleRef.current.isEmpty()
-        ? scribbleRef.current.getStrokes().map(st => ({ points: st.points.map(pt => ({ x: Math.round(pt.x), y: Math.round(pt.y) })) }))
+        ? compactInkStrokes(scribbleRef.current.getStrokes())
         : undefined;
       const r = await api.post(`/practice/${question.id}/submit`, {
         answer: String(given), ms: Date.now() - startRef.current, steps, viaInk, ink, photo, scribble: scribbleStrokes
@@ -592,13 +649,24 @@ export default function QuestionCard({ question, why, reason, onResolved, onNext
                 {mode === 'photo' && (
                   <div style={{ marginBottom: 14 }}>
                     <input ref={photoInputRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }}
-                      onChange={e => attachPhoto(e, setPhoto)} />
+                      onChange={e => attachPhoto(e, setPhoto, decodePhoto)} />
                     {!photo
                       ? <button className="btn btn-ghost" onClick={() => photoInputRef.current?.click()}>▣ Attach a photo of your working</button>
                       : (
                         <div className="photo-attach">
-                          <div className="photo-thumb"><img src={photo} alt="Paper working" /><button aria-label="Remove photo" onClick={() => setPhoto(null)}>✕</button></div>
-                          <span className="muted">Saved with this attempt. Type your final answer below so it can be marked.</span>
+                          <div className="photo-thumb"><img src={photo} alt="Paper working" /><button aria-label="Remove photo" onClick={() => { setPhoto(null); setPhotoOCR({ phase: 'idle', text: '', confidence: 0, error: '', engine: null }); }}>✕</button></div>
+                          <div style={{ flex: 1 }}>
+                            {photoOCR.phase === 'reading' && <span className="muted">Reading your handwriting on-device with Apple Vision…</span>}
+                            {photoOCR.phase === 'done' && (
+                              <>
+                                <div style={{ fontSize: 12.5, marginBottom: 6 }}><b>Decoded on-device</b>{photoOCR.confidence ? ` · ${Math.round(photoOCR.confidence * 100)}% OCR confidence` : ''}</div>
+                                <pre style={{ whiteSpace: 'pre-wrap', margin: 0, font: 'inherit', color: 'var(--ink)' }}>{photoOCR.text}</pre>
+                                <div className="muted" style={{ marginTop: 6 }}>Pri filled the answer box from the final recognised line. Check or edit it before marking.</div>
+                              </>
+                            )}
+                            {(photoOCR.phase === 'failed' || photoOCR.phase === 'unavailable') && <span style={{ color: 'var(--warn)' }}>{photoOCR.error}</span>}
+                            {photoOCR.phase === 'idle' && <span className="muted">Photo attached. Native Pri will decode it into editable maths before marking.</span>}
+                          </div>
                         </div>
                       )}
                   </div>
@@ -665,7 +733,7 @@ export default function QuestionCard({ question, why, reason, onResolved, onNext
               <div className="editor-shell" style={{ flex: 1, minWidth: 0 }}>
                 {InkAnswer && (
                   <InkAnswer onRecognized={setInkResult} height={380} lineVerdicts={lineVerdicts}
-                    disabled={resolved} focusSymbol={checkFocus} />
+                    disabled={resolved} focusSymbol={checkFocus} recognitionContext={recognitionContext} />
                 )}
                 {inkPhase === 'failed' && (
                   <div className="editor-body">
@@ -961,19 +1029,22 @@ function Diagnosis({ d }) {
   );
 }
 
-function attachPhoto(e, setPhoto) {
+function attachPhoto(e, setPhoto, onReady) {
   const f = e.target.files?.[0];
   if (!f) return;
   const img = new Image();
   const url = URL.createObjectURL(f);
   img.onload = () => {
-    const scale = Math.min(1, 1280 / Math.max(img.width, img.height));
+    const scale = Math.min(1, 1600 / Math.max(img.width, img.height));
     const cv = document.createElement('canvas');
     cv.width = Math.round(img.width * scale); cv.height = Math.round(img.height * scale);
     cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
-    setPhoto(cv.toDataURL('image/jpeg', 0.82));
+    const dataURL = cv.toDataURL('image/jpeg', 0.88);
+    setPhoto(dataURL);
+    onReady?.(dataURL);
     URL.revokeObjectURL(url);
   };
+  img.onerror = () => URL.revokeObjectURL(url);
   img.src = url;
   e.target.value = '';
 }

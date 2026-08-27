@@ -4,9 +4,11 @@
 // not trusted for ordinary per-glyph ownership/identity. Pri re-runs its full
 // stroke recogniser on the original Pencil trajectories inside each native line.
 // ─────────────────────────────────────────────────────────────────────────────
-import { classify, recognize } from './recognizer.js';
+import { recognize, classify } from './recognizer.js';
+import { isSetContext } from './setNotation.js';
 
 const STRUCTURAL = new Set(['+', '-', '=', '*', '/', '(', ')', '[', ']', '<', '>', '<=', '>=', '!=', '±', ':']);
+const SET_STRUCTURAL = new Set(['{', '}', ',', '∪', '∩']);
 const NEVER_SUPERSCRIPT = new Set([...STRUCTURAL, "'", '.', ',', '°', '%']);
 const SIMPLE_MULTI = new Set(['pi', 'theta', '<=', '>=', '!=']);
 const PRIME_LOOKALIKES = new Set(['1', 'l', 'I', '|', '/', '.', ',', '-', 't', '?']);
@@ -149,16 +151,16 @@ function overlapRatio(a, b) { const A = new Set(a || []), B = new Set(b || []); 
   let hit = 0; for (const i of A) if (B.has(i)) hit++; return hit / Math.max(A.size, B.size); }
 function boxIoU(a0, b0) { const a = box4(a0), b = box4(b0); const iw = Math.max(0, Math.min(a.x2, b.x2) - Math.max(a.x1, b.x1));
   const ih = Math.max(0, Math.min(a.y2, b.y2) - Math.max(a.y1, b.y1)); const inter = iw * ih, union = a.w * a.h + b.w * b.h - inter; return union > 0 ? inter / union : 0; }
-function strongestNativeStructure(jsSymbol, nativeLine) { let best = null;
-  for (const n of nativeLine?.symbols || []) { const sym = canonical(n.sym || ''); if (!STRUCTURAL.has(sym) || Number(n.conf) < 0.90 || n.approx) continue;
+function strongestNativeStructure(jsSymbol, nativeLine, ctx) { let best = null;
+  for (const n of nativeLine?.symbols || []) { const sym = canonical(n.sym || ''); const protectedSyntax = STRUCTURAL.has(sym) || (isSetContext(ctx) && SET_STRUCTURAL.has(sym)); if (!protectedSyntax || Number(n.conf) < 0.90 || n.approx) continue;
     const score = Math.max(overlapRatio(jsSymbol.strokeIdxs, n.strokeIdxs), boxIoU(jsSymbol.box, n.box)); if (score >= 0.58 && (!best || score > best.score)) best = { native: n, sym, score }; }
   return best; }
-function remapJsSymbol(symbol, localToGlobal, lineIndex, ordinal, nativeLine, overrides) {
+function remapJsSymbol(symbol, localToGlobal, lineIndex, ordinal, nativeLine, overrides, ctx) {
   const globalIndexes = [...new Set((symbol.strokeIdxs || []).map(i => localToGlobal[i]).filter(Number.isInteger))].sort((a, b) => a - b);
   const id = stableId(lineIndex, globalIndexes, ordinal);
   const out = { ...symbol, id, sym: canonical(symbol.sym), conf: Math.min(0.97, Number(symbol.conf) || 0),
     alts: (symbol.alts || []).map(a => ({ ...a, sym: canonical(a.sym) })), strokeIdxs: globalIndexes, approx: false };
-  const structural = strongestNativeStructure(out, nativeLine);
+  const structural = strongestNativeStructure(out, nativeLine, ctx);
   if (structural && structural.sym !== out.sym) { out.alts = mergeAlternatives(out.sym, out.alts, [{ sym: structural.sym, conf: Math.min(0.82, structural.native.conf) }]);
     if (out.conf < 0.68 || (STRUCTURAL.has(out.sym) && structural.native.conf >= 0.96)) { const previous = out.sym; out.sym = structural.sym;
       out.conf = Math.min(0.92, Math.max(out.conf, 0.72 * structural.native.conf)); out.alts = mergeAlternatives(out.sym, [{ sym: previous, conf: Math.min(0.72, Number(symbol.conf) || 0) }], out.alts); } }
@@ -169,13 +171,13 @@ function readWholeNativeLine(line, lineIndex, strokes, overrides, ctx) {
   const members = indexes.map(i => strokes[i]).filter(Boolean); if (!members.length) return null;
   let result; try { result = recognize(members, {}, ctx || null); } catch { return null; } if (!result?.lines?.length) return null;
   const raw = result.lines.flatMap(l => l.symbols || []); if (!raw.length) return null;
-  const symbols = raw.map((s, i) => remapJsSymbol(s, indexes, lineIndex, i, line, overrides)).filter(s => s.strokeIdxs.length); if (!symbols.length) return null;
+  const symbols = raw.map((s, i) => remapJsSymbol(s, indexes, lineIndex, i, line, overrides, ctx)).filter(s => s.strokeIdxs.length); if (!symbols.length) return null;
   recoverMergedPrimeStrokes(symbols, indexes, strokes, lineIndex, overrides); repairDerivativePrimes(symbols);
   const covered = new Set(symbols.flatMap(s => s.strokeIdxs)), coverage = indexes.filter(i => covered.has(i)).length / indexes.length; if (coverage < 0.88) return null;
   const text = assembleSimple(symbols); if (!text) return null; const weakest = Math.min(...symbols.map(s => Number(s.conf) || 0));
   return { ...line, text, symbols, strokeIdxs: indexes, unread: false, hybridCoverage: coverage, hybridConfidence: Math.min(0.95, weakest) };
 }
-function fallbackOwnedGlyphFusion(line, strokes, overrides, lineIndex) {
+function fallbackOwnedGlyphFusion(line, strokes, overrides, lineIndex, ctx) {
   if (!line?.symbols?.length) return line;
   const dimensions = line.symbols.map(s => box4(s.box)).map(b => Math.max(b.w, b.h)).filter(v => Number.isFinite(v) && v > 2).sort((a, b) => a - b);
   const medianH = Math.max(8, median(dimensions) || 20);
@@ -185,14 +187,14 @@ function fallbackOwnedGlyphFusion(line, strokes, overrides, lineIndex) {
     const id = stableId(lineIndex, indexes, ordinal), oldSym = canonical(native.sym), jsSym = canonical(js.sym), oldConf = Number(native.conf) || 0, jsConf = Number(js.conf) || 0;
     let sym = oldSym, conf = oldConf, alts = mergeAlternatives(oldSym, native.alts, js.alts, [{ sym: jsSym, conf: jsConf }]);
     if (jsSym === oldSym) conf = Math.min(0.95, Math.max(oldConf, jsConf));
-    else if (!STRUCTURAL.has(oldSym) && (native.approx || oldConf < 0.58 || (sameFamily(oldSym, jsSym) && jsConf >= 0.65))) { sym = jsSym; conf = Math.min(0.82, Math.max(jsConf, 0.5 * jsConf + 0.25 * oldConf)); alts = mergeAlternatives(sym, [{ sym: oldSym, conf: Math.min(0.70, oldConf) }], native.alts, js.alts); }
+    else if (!(STRUCTURAL.has(oldSym) || (isSetContext(ctx) && SET_STRUCTURAL.has(oldSym))) && (native.approx || oldConf < 0.58 || (sameFamily(oldSym, jsSym) && jsConf >= 0.65))) { sym = jsSym; conf = Math.min(0.82, Math.max(jsConf, 0.5 * jsConf + 0.25 * oldConf)); alts = mergeAlternatives(sym, [{ sym: oldSym, conf: Math.min(0.70, oldConf) }], native.alts, js.alts); }
     else if (jsConf >= 0.34) conf = Math.min(oldConf, 0.62); if (Object.prototype.hasOwnProperty.call(overrides, id)) { sym = overrides[id]; conf = 1; }
     return { ...native, id, sym, conf, alts, strokeIdxs: indexes }; });
   repairDerivativePrimes(symbols); return { ...line, symbols, text: assembleSimple(symbols) || line.text };
 }
 export function fuseNativeStrokeReading(reading, strokes, overrides = {}, ctx = null) {
   if (!reading?.lines?.length || !Array.isArray(strokes) || !strokes.length) return reading;
-  const lines = reading.lines.map((line, lineIndex) => complexLine(line) ? fallbackOwnedGlyphFusion(line, strokes, overrides, lineIndex)
-    : (readWholeNativeLine(line, lineIndex, strokes, overrides, ctx) || fallbackOwnedGlyphFusion(line, strokes, overrides, lineIndex)));
+  const lines = reading.lines.map((line, lineIndex) => complexLine(line) ? fallbackOwnedGlyphFusion(line, strokes, overrides, lineIndex, ctx)
+    : (readWholeNativeLine(line, lineIndex, strokes, overrides, ctx) || fallbackOwnedGlyphFusion(line, strokes, overrides, lineIndex, ctx)));
   return summarise(lines, reading);
 }

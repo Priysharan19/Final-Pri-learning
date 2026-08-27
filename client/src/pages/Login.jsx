@@ -10,6 +10,7 @@ import { api } from '../api.js';
 import { useApp, Logo } from '../App.jsx';
 
 const AVATARS = ['🚀', '🦊', '🐨', '🦉', '🌟', '🐯', '🍀', '🎧', '🦄', '⚡', '🌊', '🧠'];
+const INDIA_TRACKS = [['cbse', 'CBSE / NCERT'], ['jee-main', 'JEE Main'], ['jee-advanced', 'JEE Advanced'], ['olympiad', 'Olympiad']];
 const GLYPHS = ['∑', '∫', '∬', 'π', 'θ', 'Ω', 'Δ', 'Γ', 'Φ', 'λ', 'ε', 'δ', 'η', 'ρ', 'ξ', 'ζ', 'χ', 'ψ', '√', '∞', '≈', '≠', '≤', '≥', '±', '÷', '∈', '∉', '∀', '∃', '⊂', '∪', '∩', 'ℵ', 'ℝ', 'ℤ', 'ℚ', 'ℂ', 'ℕ', '∂', '∇', '↦', '⇌', '∘', 'ϕ', '⊕', '≡', '⟨', '⟩', '4', '2', 'e', 'i', 'x', 'dx'];
 
 function hash01(str) {
@@ -156,7 +157,7 @@ export default function Login() {
   const [profiles, setProfiles] = useState(null);
   const [stage, setStage] = useState('hero');   // hero | pick | method | create
   const [withEmail, setWithEmail] = useState(true);
-  const [form, setForm] = useState({ name: '', email: '', password: '', password2: '', year: 12, avatar: '🚀', role: 'student', course: 'nsw', pathway: 'advanced', protect: false });
+  const [form, setForm] = useState({ name: '', email: '', password: '', password2: '', year: 12, avatar: '🚀', role: 'student', course: 'nsw', pathway: 'advanced', indiaTrack: 'cbse', protect: false });
   const [unlockId, setUnlockId] = useState(null);   // profile awaiting its password
   const [unlockPw, setUnlockPw] = useState('');
   const [lock, setLock] = useState(null);           // { id, until } while a profile is shut out
@@ -224,7 +225,7 @@ export default function Login() {
     }
     go('/profiles', {
       name: form.name, year: form.year, avatar: form.avatar, role: form.role,
-      course: form.course, pathway: form.pathway,
+      course: form.course, pathway: form.course === 'nsw' ? form.pathway : undefined, indiaTrack: form.course === 'in' ? form.indiaTrack : undefined,
       email: withEmail && form.email ? form.email : undefined,
       password: form.protect ? form.password : undefined
     });
@@ -237,7 +238,7 @@ export default function Login() {
         <MathField />
         <div className="auth-col fade-in">
           <Logo large />
-          <div className="hero-kicker">NSW · HSC · VCE · QCE · WACE · SACE · IB</div>
+          <div className="hero-kicker">NSW · HSC · CBSE · JEE · OLYMPIAD · VCE · QCE · WACE · SACE · IB</div>
           <h1 className="hero-title">Write it by hand.<br />Get it marked like the <span className="gold">HSC</span>.</h1>
           <p className="hero-sub">344,798 measured distinct questions across all 252 syllabus dot points · your working
             marked line by line, with method marks · entirely on this iPad, offline.</p>
@@ -405,9 +406,9 @@ export default function Login() {
               {form.role === 'student' && (
                 <div className="grid cols-2" style={{ gap: 12 }}>
                   <div className="field">
-                    <label className="label" htmlFor="signup-year">School year</label>
+                    <label className="label" htmlFor="signup-year">{form.course === 'in' ? 'School class' : 'School year'}</label>
                     <select className="input" id="signup-year" value={form.year} onChange={e => setForm(f => ({ ...f, year: Number(e.target.value) }))}>
-                      {[7, 8, 9, 10, 11, 12].map(y => <option key={y} value={y}>Year {y}</option>)}
+                      {[7, 8, 9, 10, 11, 12].map(y => <option key={y} value={y}>{form.course === 'in' ? 'Class' : 'Year'} {y}</option>)}
                     </select>
                   </div>
                   <div className="field">
@@ -419,11 +420,12 @@ export default function Login() {
                       <option value="wa">WA · WACE</option>
                       <option value="sa">SA · SACE</option>
                       <option value="ib">IB</option>
+                      <option value="in">India · CBSE / JEE / Olympiad</option>
                     </select>
                   </div>
                 </div>
               )}
-              {form.role === 'student' && form.year >= 11 && (
+              {form.role === 'student' && form.course === 'nsw' && form.year >= 11 && (
                 <div className="field">
                   <div className="label" id="signup-pathway">HSC pathway</div>
                   <div className="pathway-row" role="group" aria-labelledby="signup-pathway">
@@ -435,6 +437,17 @@ export default function Login() {
                           <b>{name}</b>
                         </button>
                       ))}
+                  </div>
+                </div>
+              )}
+              {form.role === 'student' && form.course === 'in' && (
+                <div className="field">
+                  <div className="label" id="signup-india-track">India maths track</div>
+                  <div className="pathway-row" role="group" aria-labelledby="signup-india-track">
+                    {INDIA_TRACKS.filter(([k]) => form.year >= 11 || !k.startsWith('jee-')).map(([k, name]) => (
+                      <button key={k} type="button" className={`pathway-pick ${form.indiaTrack === k ? 'on' : ''}`}
+                        onClick={() => setForm(f => ({ ...f, indiaTrack: k }))}><b>{name}</b></button>
+                    ))}
                   </div>
                 </div>
               )}

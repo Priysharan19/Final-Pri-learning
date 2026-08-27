@@ -12,6 +12,7 @@ export default function Practice() {
   const subtopic = params.get('subtopic');
   const dotpoint = params.get('dotpoint');
   const difficulty = params.get('difficulty');
+  const track = params.get('track');
   const taskId = params.get('task');
   const [serve, setServe] = useState(null);
   const handedRef = useRef(location.state?.serve || null);   // a retry handed over from History
@@ -31,13 +32,13 @@ export default function Practice() {
     setError('');
     try {
       const body = taskId ? { taskId }
-        : subtopic ? { mode: 'topic', subtopic, dotpoint: dotpoint != null ? Number(dotpoint) : undefined, difficulty: difficulty != null ? Number(difficulty) : undefined }
-          : { mode: 'smart', difficulty: difficulty != null ? Number(difficulty) : undefined };
+        : subtopic ? { mode: 'topic', subtopic, track: track || undefined, dotpoint: dotpoint != null ? Number(dotpoint) : undefined, difficulty: difficulty != null ? Number(difficulty) : undefined }
+          : { mode: 'smart', track: track || undefined, difficulty: difficulty != null ? Number(difficulty) : undefined };
       const r = await api.post('/practice/next', body);
       setServe(r);
     } catch (e) { setError(e.message); }
     finally { loading.current = false; }
-  }, [subtopic, dotpoint, difficulty, taskId]);
+  }, [subtopic, dotpoint, difficulty, taskId, track]);
 
   useEffect(() => { setServe(null); setSession({ answered: 0, correct: 0, xp: 0 }); load(); }, [load]);
 
@@ -58,8 +59,8 @@ export default function Practice() {
     } catch { load(); setServe(null); }
   };
 
-  const course = (user.courseLabel || 'Mathematics').replace(/^Year \d+\s*·\s*/, '');
-  const metaLine = `Year ${serve?.question?.year ?? user.year} · ${course}`;
+  const course = (user.courseLabel || 'Mathematics').replace(/^(?:Year|Class) \d+\s*·\s*/, '');
+  const metaLine = `${user.course === 'in' ? 'Class' : 'Year'} ${serve?.question?.year ?? user.year} · ${serve?.question?.indiaTrack ? (user.indiaTrackName || course) : course}`;
   const heading = serve?.question?.subtopicName
     || (taskId ? 'Task practice' : subtopic ? 'Topic practice' : 'Smart practice');
 

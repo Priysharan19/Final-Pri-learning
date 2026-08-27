@@ -8,7 +8,8 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import InkCanvas from './InkCanvas.jsx';
 import NativeInkCanvas from './NativeInkCanvas.jsx';
-import { nativeInk, nativeInkAvailable } from './native.js';
+import { nativeInk, nativeInkAvailable, inferredNotationContext } from './native.js';
+import { chooseNativeConsensus, hasReading, normalizedReadingText } from './nativeConsensus.js';
 import { recognizeWithStructuralDev } from '../../dev/devStructural.js';
 import { recognize, exprToLatex } from './recognizer.js';
 import { recognizeWithoutDetachedSideWork } from './runtimeSpatial.js';
@@ -22,10 +23,11 @@ const NICE = { pi: 'π', theta: 'θ', sqrt: '√', percent: '%' };
 const showSym = s => NICE[s] || s;
 
 // ── Which surface, which engine ──────────────────────────────────────────────
-// PencilKit is the native capture surface. Recognition order on iPad is now:
-//   1. Pri's bundled Core ML foundation model, when a validated asset exists;
-//   2. Pri's mature JS stroke/CNN/grammar recogniser;
-//   3. the native Vision/geometry reader as an emergency no-result rescue.
+// PencilKit is the native capture surface. Recognition on iPad is an evidence
+// problem, not a fallback ladder: Foundation and JS form two independent
+// opinions, and any disagreement MUST ask the native Vision/geometry reader
+// for a third vote. A legacy JS reading can never become authoritative merely
+// because its synthetic confidence is high on real Apple Pencil handwriting.
 // Browser/LAN builds normally begin at stage 2. `serve:lan:v4` adds a strictly
 // development-only first opinion from the local Structural V4 PyTorch worker on
 // the developer Mac, so physical iPad testing can exercise the actual research
@@ -138,9 +140,10 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
 
   const runRecognition = useCallback((strokes, ovr) => {
     const seq = ++readSeqRef.current;
+    const effectiveContext = inferredNotationContext(recognitionContext);
 
     const readWithJS = () => {
-      try { return recognizeWithoutDetachedSideWork(strokes, ovr, recognitionContext, recognize); }
+      try { return recognizeWithoutDetachedSideWork(strokes, ovr, effectiveContext, recognize); }
       catch { return null; }
     };
 
@@ -166,35 +169,31 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
       return;
     }
 
-    // iPad native wrapper: first ask the Pri-owned Core ML foundation model.
-    // Development builds without a promoted model return an empty result and
-    // continue. Safe recognition context is forwarded across the bridge too.
-    nativeInk.foundationRecognize(ovr, recognitionContext).then(foundation => {
+    // Native iPad: Foundation and JS are opinions, not fallbacks. The previous
+    // implementation allowed a lone JS V3 reading to short-circuit this path
+    // when JS reported high confidence. Real Pencil evidence showed that those
+    // confidences are not calibrated outside the synthetic/template domain.
+    // Therefore only exact two-engine agreement may finish early. Every other
+    // case asks the native Vision/geometry reader for a third answer-blind vote.
+    nativeInk.foundationRecognize(ovr, effectiveContext).then(foundation => {
       if (seq !== readSeqRef.current) return;
-      if (foundation?.lines?.some(line => line.text)) {
-        publish(foundation, strokes);
+      const localRaw = readWithJS();
+      const local = localRaw ? { ...localRaw, engine: 'pri-js-v3' } : null;
+
+      if (hasReading(foundation) && hasReading(local)
+          && normalizedReadingText(foundation) === normalizedReadingText(local)) {
+        const agreed = chooseNativeConsensus([foundation, local], effectiveContext);
+        publish(agreed || { ...EMPTY_READING, engine: 'pri-native-no-reading' }, strokes);
         return;
       }
 
-      // The existing custom engine remains an independent local opinion and
-      // protects the product while the real-writer corpus grows.
-      const local = readWithJS();
-      if (seq !== readSeqRef.current) return;
-      if (local?.lines?.some(line => line.text)) {
-        publish({ ...local, engine: 'pri-js-v3' }, strokes);
-        return;
-      }
-
-      // Last resort only. This path is still fully on-device and exists to make
-      // a missing/failed model an accuracy degradation rather than lost work.
-      nativeInk.recognize(ovr, recognitionContext).then(reading => {
+      nativeInk.recognize(ovr, effectiveContext).then(nativeRaw => {
         if (seq !== readSeqRef.current) return;
-        publish(
-          reading
-            ? readUnreadLines(reading, strokes, ovr, recognitionContext)
-            : (local ? { ...local, engine: 'pri-js-v3' } : EMPTY_READING),
-          strokes
-        );
+        const nativeReading = nativeRaw
+          ? readUnreadLines(nativeRaw, strokes, ovr, effectiveContext)
+          : null;
+        const chosen = chooseNativeConsensus([foundation, local, nativeReading], effectiveContext);
+        publish(chosen || { ...EMPTY_READING, engine: 'pri-native-no-reading' }, strokes);
       });
     });
   }, [publish, recognitionContext]);
@@ -202,11 +201,19 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
   const onStrokesChange = useCallback((strokes) => {
     strokesRef.current = strokes;
     if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => runRecognition(strokes, overrides), 240);
+    // Native whole-page recognition is intentionally a quiet-window operation.
+    // A 240 ms debounce caused a recognition job after normal pauses between
+    // symbols/lines; those jobs then queued behind Core ML/Vision and the newest
+    // page timed out. Browser JS remains cheap enough for the old live cadence.
+    const quietMs = NATIVE_INK ? (strokes.length > 24 ? 1600 : 1000) : 240;
+    timerRef.current = setTimeout(() => runRecognition(strokes, overrides), quietMs);
   }, [overrides, runRecognition]);
 
   useEffect(() => { ensurePersonalLoaded(); }, []);
-  useEffect(() => () => timerRef.current && clearTimeout(timerRef.current), []);
+  useEffect(() => () => {
+    readSeqRef.current += 1;
+    if (timerRef.current) clearTimeout(timerRef.current);
+  }, []);
 
   useEffect(() => {
     if (!focusSymbol) { focusedRef.current = null; return; }
@@ -246,11 +253,20 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
     : rec.engine === 'pri-js-v3-v4-unavailable'
       ? 'Structural V4 returned no reading · showing JS V3 fallback'
       : rec.engine === 'pri-js-v3'
-        ? 'JS V3 fallback'
-        : null;
+        ? 'Legacy JS V3 fallback · not native PencilKit/Core ML'
+        : rec.disagreement
+          ? `Native engines disagree · confirmation required · ${rec.engine}`
+          : NATIVE_INK && rec.engine
+            ? `Native recognition path · ${rec.engine}`
+            : null;
 
   return (
     <div className={`ink-answer ${disabled ? 'ink-disabled' : ''}`}>
+      {!NATIVE_INK && (
+        <div role="note" style={{ padding: '9px 12px', marginBottom: 8, border: '1px solid var(--warn)', borderRadius: 10, fontSize: 12.5 }}>
+          Browser handwriting = legacy JS fallback. For handwriting quality testing, run the native iPad package with PencilKit; this web fallback is not the production acceptance path.
+        </div>
+      )}
       <div className="ink-toolbar">
         <button type="button" className={`ink-tool ${tool === 'pen' ? 'on' : ''}`} aria-pressed={tool === 'pen'} onClick={() => setTool('pen')} title="Pen">✒️ Pen</button>
         <button type="button" className={`ink-tool ${tool === 'eraser' ? 'on' : ''}`} aria-pressed={tool === 'eraser'} onClick={() => setTool('eraser')} title="Eraser">◻️ Eraser</button>
@@ -334,6 +350,16 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
           <div className="ink-preview-title" id="ink-reading">
             I'm reading:{engineNote && <span className="muted" style={{ marginLeft: 10, textTransform: 'none', letterSpacing: 0 }}>{engineNote}</span>}
           </div>
+          {rec.disagreement && Array.isArray(rec.candidateReadings) && rec.candidateReadings.length > 1 && (
+            <details style={{ margin: '8px 14px 2px', fontSize: 11.5 }} className="muted">
+              <summary style={{ cursor: 'pointer' }}>Recognition evidence</summary>
+              {rec.candidateReadings.map((candidate, index) => (
+                <div key={`${candidate.engine}-${index}`} style={{ marginTop: 5, overflowWrap: 'anywhere' }}>
+                  <b>{candidate.engine}</b> → {candidate.text || candidate.failure || 'no reading'}
+                </div>
+              ))}
+            </details>
+          )}
           {rec.lines.map((line, li) => (
             <div className="ink-line" key={li}>
               <span className="ink-line-n" aria-hidden="true">{li + 1}</span>
