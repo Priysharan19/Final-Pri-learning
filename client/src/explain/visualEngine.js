@@ -1,6 +1,9 @@
-// Pri Explain V2 · deterministic visual reasoning planner.
-// This module is deliberately pure: marking owns correctness; this layer only
-// decides how an already-verified solution should be visualised.
+// Pri Explain V3 · deterministic visual renderer + verified storyboard compiler.
+// Marking owns correctness. This layer accepts presentation instructions only
+// after storyboard.js proves every mathematical reference came from the
+// verified solution payload.
+
+import { STORYBOARD_VERSION, validateStoryboard } from './storyboard.js';
 
 const MATH = /\$([^$]+)\$/g;
 const TOKEN = /\\[a-zA-Z]+|\d+(?:\.\d+)?|[A-Za-z]+|<=|>=|!=|[=+\-*/^(),{}]|\S/g;
@@ -61,7 +64,8 @@ function classify(text, hasFigure) {
 }
 
 function duration(scene) {
-  const chars = `${scene.heading} ${(scene.lines || []).join(' ')}`.length;
+  const narration = String(scene.narration || '').trim();
+  const chars = narration.length || `${scene.heading} ${(scene.lines || []).join(' ')}`.length;
   const visualBonus = (scene.visuals || []).some(v => v.kind === 'ink') ? 1800 : (scene.visuals || []).length ? 900 : 0;
   return Math.max(3500, Math.min(10500, 2600 + chars * 23 + visualBonus));
 }
@@ -80,22 +84,26 @@ function cleanAttempt(attempt) {
   return { strokes, scribble, working, answer, viaInk: Boolean(attempt.viaInk) };
 }
 
-export function buildVisualTimeline(solution, context = {}) {
+function narrationFor(heading, lines) {
+  return [heading, ...(lines || [])].filter(Boolean).join('. ');
+}
+
+export function buildDeterministicStoryboard(solution, context = {}) {
   const scenes = [];
   const prompt = String(context.questionPrompt || '');
   const figure = String(context.questionFigure || '');
   const wrongAttempt = cleanAttempt(context.wrongAttempt || context.submission);
 
   if (!context.revealed && (context.correct === false || context.hadWrongAttempt || wrongAttempt) && (context.feedback || wrongAttempt)) {
-    const visuals = [];
-    if (wrongAttempt?.strokes?.length || wrongAttempt?.scribble?.length) visuals.push({ kind: 'ink', attempt: wrongAttempt });
-    else if (wrongAttempt?.working || wrongAttempt?.answer) visuals.push({ kind: 'attempt', attempt: wrongAttempt });
+    const heading = context?.diagnosis?.message || context?.diagnosis?.note || 'Find the exact point the working changes direction';
+    const lines = splitLines(context.feedback || 'Compare your working with the verified path before changing the next line.');
     scenes.push({
-      kind: 'diagnosis',
-      heading: context?.diagnosis?.message || context?.diagnosis?.note || 'Find the exact point the working changes direction',
-      lines: splitLines(context.feedback || 'Compare your working with the verified path before changing the next line.'),
-      visuals,
+      id: 'diagnosis',
+      heading,
+      lines,
+      narration: narrationFor(heading, lines),
       concept: 'diagnosis',
+      actions: wrongAttempt ? [{ kind: 'replay_attempt' }] : [],
     });
   }
 
@@ -103,38 +111,115 @@ export function buildVisualTimeline(solution, context = {}) {
   for (const [stepIndex, step] of (solution?.steps || []).entries()) {
     const heading = String(step?.h || `Step ${stepIndex + 1}`);
     const detail = String(step?.d || '');
+    const lines = splitLines(detail);
     const maths = extractMath(detail);
     const after = maths.length ? maths[maths.length - 1] : null;
     const before = previous && after && previous !== after ? previous : (maths.length > 1 ? maths[0] : null);
     const concept = classify(`${prompt} ${heading} ${detail}`, !!figure);
-    const visuals = [];
+    const actions = [];
 
     if (before && after && before !== after) {
-      visuals.push({ kind: 'transform', before, after, diff: diffMath(before, after) });
+      actions.push({ kind: 'transform_equation', before, after });
+    } else if (after) {
+      actions.push({ kind: 'focus_math', expression: after, tokens: [] });
     }
     if (figure && ['graph', 'geometry', 'calculus', 'statistics', 'figure'].includes(concept)) {
-      visuals.push({ kind: 'figure', mode: concept, figure });
+      actions.push({ kind: 'show_figure', mode: concept });
     }
 
-    const scene = {
-      kind: 'solution', heading, lines: splitLines(detail), visuals, concept,
-      id: `solution-${stepIndex}`, number: scenes.length + 1,
-    };
-    scene.duration = duration(scene);
-    scenes.push(scene);
+    scenes.push({
+      id: `solution-${stepIndex}`,
+      heading,
+      lines,
+      narration: narrationFor(heading, lines),
+      concept,
+      actions,
+    });
     if (after) previous = after;
   }
 
   if (!scenes.length && solution?.answerText) {
-    scenes.push({ kind: 'solution', heading: 'Work to the result', lines: [], visuals: [], concept: classify(prompt, !!figure) });
+    scenes.push({
+      id: 'result',
+      heading: 'Work to the result',
+      lines: [],
+      narration: 'Work through the verified reasoning to the final result.',
+      concept: classify(prompt, !!figure),
+      actions: [],
+    });
   }
 
-  return scenes.map((scene, index) => ({
-    ...scene,
-    id: scene.id || `${scene.kind}-${index}`,
-    number: index + 1,
-    duration: scene.duration || duration(scene),
-  }));
+  return { version: STORYBOARD_VERSION, source: 'deterministic', scenes };
+}
+
+function visualFromAction(action, context) {
+  if (!action) return null;
+  if (action.kind === 'replay_attempt') {
+    const attempt = cleanAttempt(context.wrongAttempt || context.submission);
+    if (!attempt) return null;
+    return attempt.strokes.length || attempt.scribble.length
+      ? { kind: 'ink', attempt }
+      : { kind: 'attempt', attempt };
+  }
+  if (action.kind === 'transform_equation') {
+    return {
+      kind: 'transform',
+      before: action.before,
+      after: action.after,
+      diff: diffMath(action.before, action.after),
+    };
+  }
+  if (action.kind === 'focus_math') {
+    return {
+      kind: 'focus',
+      expression: action.expression,
+      tokens: action.tokens || [],
+      label: action.label || '',
+    };
+  }
+  if (action.kind === 'show_figure' && context.questionFigure) {
+    return { kind: 'figure', mode: action.mode || 'figure', figure: String(context.questionFigure) };
+  }
+  if (action.kind === 'checkpoint') {
+    return { kind: 'checkpoint', prompt: action.prompt };
+  }
+  return null;
+}
+
+export function compileStoryboard(storyboard, solution, context = {}, options = {}) {
+  const checked = validateStoryboard(storyboard, solution, context, options);
+  if (!checked.ok) return { ok: false, reason: checked.reason, timeline: [] };
+
+  const timeline = checked.storyboard.scenes.map((scene, index) => {
+    const visuals = (scene.actions || []).map(action => visualFromAction(action, context)).filter(Boolean);
+    const compiled = {
+      kind: scene.concept === 'diagnosis' ? 'diagnosis' : 'solution',
+      heading: scene.heading,
+      lines: scene.lines || [],
+      narration: scene.narration || narrationFor(scene.heading, scene.lines),
+      visuals,
+      concept: scene.concept || 'generic',
+      id: scene.id || `story-${index}`,
+      number: index + 1,
+      storyboardSource: checked.storyboard.source || 'authored',
+    };
+    compiled.duration = duration(compiled);
+    return compiled;
+  });
+
+  return { ok: true, reason: '', timeline };
+}
+
+export function buildVisualTimeline(solution, context = {}) {
+  const authored = context.explanationStoryboard || solution?.explanationStoryboard || solution?.storyboard || null;
+  if (authored) {
+    const compiled = compileStoryboard(authored, solution, context);
+    if (compiled.ok && compiled.timeline.length) return compiled.timeline;
+  }
+
+  const fallback = buildDeterministicStoryboard(solution, context);
+  const compiled = compileStoryboard(fallback, solution, context, { trustedText: true });
+  return compiled.ok ? compiled.timeline : [];
 }
 
 export function visualSummary(timeline) {
