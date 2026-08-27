@@ -5,6 +5,10 @@ This tool intentionally measures the *data*, not model accuracy. Synthetic
 augmentation is not counted as a writer. Promotion to a broadly generalising
 model needs enough independent people, writer-disjoint splits, broad token
 coverage and non-trivial variation in capture dynamics.
+
+V17 deliberately evaluates data readiness on the public-to-engineering `test`
+split only. The locked `final-holdout` must never be used to make an otherwise
+under-sized test set look production-ready.
 """
 from __future__ import annotations
 
@@ -21,7 +25,10 @@ from data_v4 import VOCAB, canonical_text, corpus_files, tokenize
 EVAL_MIN_WRITERS = 20
 EVAL_MIN_SAMPLES = 1000
 TRAIN_TARGET_WRITERS = 100
-MIN_SAMPLES_PER_WRITER = 40
+MIN_SAMPLES_PER_TRAIN_WRITER = 40
+MIN_TRAIN_WRITERS_PER_TOKEN = 5
+MIN_TEST_WRITERS_PER_TOKEN = 3
+MIN_TEST_OCCURRENCES_PER_TOKEN = 5
 
 
 def finite(value, default=0.0):
@@ -173,6 +180,29 @@ def load_corpus(root):
     return writers, samples_by_split, token_by_split, unknown_targets, duplicates
 
 
+def _writer_token_counts(writers, split: str, required_tokens: list[str]) -> Counter:
+    counts = Counter()
+    for row in writers.values():
+        if row["split"] != split:
+            continue
+        for token in required_tokens:
+            if row["tokens"][token] > 0:
+                counts[token] += 1
+    return counts
+
+
+def _coverage_row(token_counts: Counter, writer_counts: Counter,
+                  required_tokens: list[str]) -> dict:
+    missing = [token for token in required_tokens if token_counts[token] == 0]
+    return {
+        "uniqueTokens": len(required_tokens) - len(missing),
+        "totalVocabularyTokens": len(required_tokens),
+        "missingTokens": missing,
+        "occurrences": {token: token_counts[token] for token in required_tokens},
+        "writersPerToken": {token: writer_counts[token] for token in required_tokens},
+    }
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--corpus", default="client/test/ink-corpus")
@@ -202,45 +232,70 @@ def main():
             "uniqueTokens": len(row["tokens"]),
         }
 
-    non_special = [token for token in VOCAB if not token.startswith("<")]
+    required_tokens = [token for token in VOCAB if not token.startswith("<")]
+    writer_token_by_split = {
+        split: _writer_token_counts(writers, split, required_tokens)
+        for split in set(by_split) | {"train", "validation", "test", "final-holdout"}
+    }
     coverage = {}
     for split in sorted(set(samples_by_split) | set(by_split)):
-        seen = token_by_split[split]
-        missing = [token for token in non_special if seen[token] == 0]
-        coverage[split] = {
-            "uniqueTokens": sum(seen[token] > 0 for token in non_special),
-            "totalVocabularyTokens": len(non_special),
-            "missingTokens": missing,
-        }
+        coverage[split] = _coverage_row(
+            token_by_split[split], writer_token_by_split[split], required_tokens
+        )
 
-    test_like_writers = len(by_split.get("test", [])) + len(
-        by_split.get("final-holdout", [])
-    )
-    test_like_samples = (
-        samples_by_split["test"] + samples_by_split["final-holdout"]
-    )
     train_counts = [
         writers[writer]["samples"] for writer in by_split.get("train", [])
     ]
+    train_writer_token_counts = writer_token_by_split["train"]
+    test_writer_token_counts = writer_token_by_split["test"]
+    test_token_counts = token_by_split["test"]
+
+    thin_train_tokens = [
+        token
+        for token in required_tokens
+        if train_writer_token_counts[token] < MIN_TRAIN_WRITERS_PER_TOKEN
+    ]
+    thin_test_writer_tokens = [
+        token
+        for token in required_tokens
+        if test_writer_token_counts[token] < MIN_TEST_WRITERS_PER_TOKEN
+    ]
+    thin_test_occurrence_tokens = [
+        token
+        for token in required_tokens
+        if test_token_counts[token] < MIN_TEST_OCCURRENCES_PER_TOKEN
+    ]
+
+    # Final-holdout is deliberately not allowed to satisfy these gates. The
+    # test split is the repeatable engineering evaluation set; final-holdout is
+    # consumed only by a frozen release candidate.
     gates = {
         "trainWriterTarget": len(by_split.get("train", [])) >= TRAIN_TARGET_WRITERS,
-        "evaluationWriterMinimum": test_like_writers >= EVAL_MIN_WRITERS,
-        "evaluationSampleMinimum": test_like_samples >= EVAL_MIN_SAMPLES,
+        "evaluationWriterMinimum": len(by_split.get("test", [])) >= EVAL_MIN_WRITERS,
+        "evaluationSampleMinimum": samples_by_split["test"] >= EVAL_MIN_SAMPLES,
         "minimumSamplesPerTrainWriter": bool(train_counts)
-        and min(train_counts) >= MIN_SAMPLES_PER_WRITER,
+        and min(train_counts) >= MIN_SAMPLES_PER_TRAIN_WRITER,
+        "trainTokenWriterCoverage": not thin_train_tokens,
+        "testTokenWriterCoverage": not thin_test_writer_tokens,
+        "testTokenOccurrenceCoverage": not thin_test_occurrence_tokens,
         "noUnknownTargetTokens": not unknown_targets,
         "noDuplicateSessionIds": not duplicates,
     }
     report = {
         "format": "pri-ink-writer-diversity-audit",
-        "version": 1,
+        "version": 2,
         "vocabularyVersion": 4,
         "policy": {
             "trainWriterTarget": TRAIN_TARGET_WRITERS,
+            "evaluationSplit": "test",
             "evaluationMinWriters": EVAL_MIN_WRITERS,
             "evaluationMinSamples": EVAL_MIN_SAMPLES,
-            "minSamplesPerTrainWriter": MIN_SAMPLES_PER_WRITER,
+            "minSamplesPerTrainWriter": MIN_SAMPLES_PER_TRAIN_WRITER,
+            "minTrainWritersPerToken": MIN_TRAIN_WRITERS_PER_TOKEN,
+            "minTestWritersPerToken": MIN_TEST_WRITERS_PER_TOKEN,
+            "minTestOccurrencesPerToken": MIN_TEST_OCCURRENCES_PER_TOKEN,
             "syntheticAugmentationsCountAsWriters": False,
+            "finalHoldoutCountsTowardReadiness": False,
         },
         "writers": len(writers),
         "writersBySplit": {
@@ -248,6 +303,11 @@ def main():
         },
         "samplesBySplit": dict(samples_by_split),
         "vocabularyCoverage": coverage,
+        "thinCoverage": {
+            "trainTokensBelowWriterMinimum": thin_train_tokens,
+            "testTokensBelowWriterMinimum": thin_test_writer_tokens,
+            "testTokensBelowOccurrenceMinimum": thin_test_occurrence_tokens,
+        },
         "unknownTargets": unknown_targets[:100],
         "duplicateSessionIds": duplicates,
         "gates": gates,
@@ -262,7 +322,7 @@ def main():
     print(
         "\nDATA READINESS: "
         + ("PASS" if report["passesDataReadiness"] else "NOT YET")
-        + " — augmented copies never count as independent writers."
+        + " — augmented copies never count as independent writers; final-holdout never fills test gaps."
     )
     if args.enforce and not report["passesDataReadiness"]:
         raise SystemExit(2)
