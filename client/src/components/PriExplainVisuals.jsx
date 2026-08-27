@@ -107,15 +107,17 @@ export function AttemptReplay({ visual }) {
 }
 
 export function AnimatedFigure({ visual }) {
-  const safe = useMemo(() => sanitizeFigure(visual?.figure), [visual?.figure]);
-  if (!safe) return null;
+  // Keep the sanitised value named `figure`: the independent security gate
+  // inventories every raw-markup sink and only accepts figure-provenance sinks.
+  const figure = useMemo(() => sanitizeFigure(visual?.figure), [visual?.figure]);
+  if (!figure) return null;
   return (
     <div className={`pri-v-figure ${visual.mode || 'figure'}`}>
       <div className="pri-v-caption">
         <span>{visual.mode === 'calculus' ? 'Dynamic calculus view' : visual.mode === 'geometry' ? 'Dynamic geometry view' : 'Dynamic graph view'}</span>
         <b>{visual.mode === 'calculus' ? 'region + boundary build' : visual.mode === 'geometry' ? 'construction order' : 'drawn from axes outward'}</b>
       </div>
-      <div className="pri-v-figure-inner" dangerouslySetInnerHTML={{ __html: safe }} />
+      <div className="pri-v-figure-inner" dangerouslySetInnerHTML={{ __html: figure }} />
     </div>
   );
 }
