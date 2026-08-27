@@ -22,6 +22,9 @@ let r = stepCheck({ kind: 'equation', variable: 'x', solutions: [5] }, '3x + 5 =
 same('sound linear working has no break', r.firstBreak, -1);
 ok('sound linear lines are verified', r.lines.every(l => l.status === 'ok'));
 
+// Constant division is part of ordinary reversible algebra too.
+ok('division by a non-zero scalar is proved exactly', sameEquationClaim(parse('x/2 = 3'), parse('x = 6')));
+
 // 2. The old false-positive class: the correct answer survives, but a new root
 // is introduced. This must be a hard break, not an OK line.
 r = stepCheck({ kind: 'equation', variable: 'x', solutions: [5] }, '3x = 15\n(x - 5)(x - 100) = 0\nx = 5');
@@ -39,6 +42,11 @@ same('squaring extra root gets the same stable misconception', r.diagnosis?.code
 r = stepCheck({ kind: 'equation', variable: 'x', solutions: [5] }, '3x = 15\n0 = 0\nx = 5');
 same('tautology breaks where constraint is dropped', r.firstBreak, 1);
 same('tautology has a stable diagnosis', r.diagnosis?.code, 'constraint-dropped');
+
+// Polynomial identities are detected algebraically rather than by sample points.
+r = stepCheck({ kind: 'equation', variable: 'x', solutions: [5] }, 'x = 5\n(x + 1)^2 = x^2 + 2x + 1');
+same('expanded identity is recognised as a dropped constraint', r.firstBreak, 1);
+same('expanded identity keeps the stable diagnosis', r.diagnosis?.code, 'constraint-dropped');
 
 // 5. Losing one branch of a multi-solution equation is a first-class error even
 // when the student writes only the bare value rather than x = value.
@@ -103,6 +111,23 @@ const suspicious = assessEquationLine({
 });
 same('reason API rejects solution-preserving extra root', suspicious.status, 'break');
 same('reason API exposes persistent misconception code', suspicious.diagnosis?.code, 'extraneous-solution');
+
+// 13. Adversarial regression: the previous implementation used these exact ten
+// probe values to decide whether residuals were proportional. A polynomial can
+// be constructed to equal the source residual at every probe while differing
+// everywhere else. Such a line must never be certified by finite sampling.
+const oldProbes = [0.73, 1.31, -0.64, 2.17, -1.72, 0.37, 3.08, -2.29, 4.61, -4.13];
+const vanishesAtOldProbes = oldProbes.map(v => `(x-(${v}))`).join('*');
+const adversarialText = `(x-5)*(1+${vanishesAtOldProbes}) = 0`;
+const adversarialAst = parse(adversarialText);
+ok('fixed-probe collision is not accepted as the same equation', !sameEquationClaim(parse('x = 5'), adversarialAst));
+const adversarial = assessEquationLine({
+  ast: adversarialAst,
+  previousAst: parse('x = 5'),
+  previousTrusted: true,
+  meta: { kind: 'equation', variable: 'x', solutions: [5] }
+});
+same('unsupported high-degree collision abstains instead of passing', adversarial.status, 'note');
 
 console.log(`\n${pass} passed, ${fail} failed`);
 if (failures.length) {
