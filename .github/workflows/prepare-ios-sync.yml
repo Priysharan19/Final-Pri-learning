@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - pri-local-ink-v2
-      - feature/pri-explain-v1
     paths:
       - 'client/**'
       - 'tools/ink-foundation/**'
@@ -20,7 +19,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: prepare-ios-sync-${{ github.ref_name }}
+  group: prepare-ios-sync-pr31
   cancel-in-progress: true
 
 jobs:
@@ -63,9 +62,9 @@ jobs:
           git add -- 'ios/PriLearning.swiftpm/Resources/Web' 'ios/PriLearning 2.swiftpm/Resources/Web'
           if git diff --cached --quiet; then
             echo 'No generated bundle changes were needed.'
-            git push --force origin HEAD:refs/heads/${GITHUB_REF_NAME}-sync-generated
+            git push --force origin HEAD:refs/heads/pri-local-ink-v2-sync-generated
             exit 0
           fi
           git commit -m 'Sync tracked iPad web bundles from exact client build'
-          git push --force origin HEAD:refs/heads/${GITHUB_REF_NAME}-sync-generated
+          git push --force origin HEAD:refs/heads/pri-local-ink-v2-sync-generated
           echo "Prepared generated sync commit $(git rev-parse HEAD) from trigger $GITHUB_SHA"
