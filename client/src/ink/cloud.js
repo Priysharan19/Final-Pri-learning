@@ -8,12 +8,18 @@
 const MAX_SIDE = 2048;
 const MAX_PIXELS = 3_200_000;
 const PADDING = 28;
-const REQUEST_TIMEOUT_MS = 17000;
-const RETRY_BACKOFF_MS = 30000;
+// Terra may legitimately escalate to Sol. The server gives each model up to
+// 15 s, so the browser timeout must cover both calls plus LAN/network overhead.
+const REQUEST_TIMEOUT_MS = 40000;
+// InkAnswer's browser recogniser wakes quickly for the local preview. Delay the
+// expensive cloud raster/network path so ordinary pauses between Pencil strokes
+// do not trigger OCR work while the student is still writing.
+const CLOUD_SETTLE_MS = 900;
+const RETRY_BACKOFF_MS = 5000;
 
-let hardUnavailable = false;
 let retryAfter = 0;
 let activeRequest = null;
+let requestGeneration = 0;
 
 function isLocalHost(hostname) {
   return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1' ||
@@ -44,7 +50,12 @@ function clientToken() {
 }
 
 export function cloudInkConfigured() {
-  return Boolean(endpoint()) && !hardUnavailable;
+  // A temporary gateway failure must never permanently turn cloud recognition
+  // off for the lifetime of the SPA. Earlier code latched `hardUnavailable`
+  // after a 404/405; if the gateway was started afterwards, Safari kept using
+  // Pri Ink until a full page process reset. Keep configuration and temporary
+  // reachability as separate concepts instead.
+  return Boolean(endpoint());
 }
 
 function allPoints(strokes) {
@@ -154,6 +165,8 @@ function normalizeReading(payload) {
     }))
     .filter(line => line.text);
   if (!lines.length) return null;
+
+  const requiresConfirmation = Boolean(payload?.needsConfirmation);
   return {
     ...payload,
     lines,
@@ -164,15 +177,33 @@ function normalizeReading(payload) {
     margin: Number.isFinite(Number(payload?.margin)) ? Number(payload.margin) : 0,
     weakest: null,
     cloud: true,
+    // InkAnswer historically used `needsConfirmation` as "discard the cloud
+    // reading". That hid exactly the result the student needed to confirm and
+    // left the weaker local OCR on screen. Preserve uncertainty in minConf /
+    // margin (so QuestionCard still requires confirmation), but allow the cloud
+    // transcription itself to become the visible reading.
+    requiresConfirmation,
+    needsConfirmation: false,
     // The transport exists, but production readiness belongs to the real-writer
     // evaluation gate, not to the fact that an API call succeeded.
     productionReady: false
   };
 }
 
+function wait(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 export async function recognizeWithCloud(strokes) {
+  const generation = ++requestGeneration;
   const url = endpoint();
-  if (!url || hardUnavailable || Date.now() < retryAfter) return null;
+  if (!url || Date.now() < retryAfter) return null;
+
+  // Let the Pencil settle before rasterisation/network work. A later recognition
+  // call invalidates this one before it spends money or competes with drawing.
+  await wait(CLOUD_SETTLE_MS);
+  if (generation !== requestGeneration) return null;
+
   const raster = rasterizeInkForCloud(strokes);
   if (!raster?.image) return null;
 
@@ -198,16 +229,12 @@ export async function recognizeWithCloud(strokes) {
 
     const contentType = String(response.headers.get('content-type') || '');
     if (!contentType.includes('application/json')) {
-      if ([200, 404, 405].includes(response.status)) hardUnavailable = true;
+      retryAfter = Date.now() + RETRY_BACKOFF_MS;
       return null;
     }
 
     const payload = await response.json();
     if (!response.ok) {
-      if (response.status === 404 || response.status === 405 || payload?.code === 'OPENAI_NOT_CONFIGURED') {
-        hardUnavailable = true;
-        return null;
-      }
       retryAfter = Date.now() + RETRY_BACKOFF_MS;
       return null;
     }
