@@ -1,0 +1,84 @@
+name: India product routing stage
+
+on:
+  push:
+    branches: [product/india-native-ink-truth]
+
+permissions:
+  contents: write
+
+jobs:
+  patch-test-sync:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: product/india-native-ink-truth
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+      - name: Repair temporary patch script delimiters
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('tools/apply-india-native-product-patch.py')
+          s = p.read_text()
+          for name in ['l', 's', 'i', 'pkg']:
+              s = s.replace(f"─{name} = '", f"─\n{name} = '")
+          p.write_text(s)
+          compile(s, str(p), 'exec')
+          PY
+      - name: Apply product patch
+        run: python3 tools/apply-india-native-product-patch.py
+      - name: Install client dependencies
+        run: npm ci --prefix client
+      - name: India curriculum engine and product helper checks
+        run: |
+          node client/test/india-check.mjs
+          node --input-type=module - <<'JS'
+          import assert from 'node:assert/strict';
+          import { indiaProductSections, indiaChapter, resolveIndiaTarget, indiaGeneratorsForScope, cleanIndiaTrack } from './client/src/engine/indiaProduct.js';
+          const product = indiaProductSections();
+          assert.equal(product.years.length, 6);
+          assert.ok(product.streams.some(s => s.track === 'jee-main'));
+          assert.ok(product.streams.some(s => s.track === 'jee-advanced'));
+          assert.ok(product.streams.some(s => s.track === 'olympiad'));
+          const det = indiaChapter('c12-determinants');
+          assert.ok(det);
+          const target = resolveIndiaTarget(det, { dotpoint: 0, difficulty: 4, track: 'jee-advanced', grade: 12, random: () => 0 });
+          assert.ok(target?.generator);
+          assert.ok(indiaGeneratorsForScope('jee-main', 12).length > 20);
+          assert.equal(cleanIndiaTrack('jee-main', 9), 'cbse');
+          console.log('INDIA PRODUCT HELPER — PASS');
+          JS
+      - name: Local API and gateway regression suites
+        run: |
+          node client/test/gateway-check.mjs
+          node client/test/backend-check.mjs
+      - name: Build product
+        run: npm run build
+      - name: Sync both iPad bundles
+        run: |
+          npm run sync:ios
+          npm run check:ios
+      - name: Swift package compile sanity
+        run: swift build --package-path ios/PriLearning.swiftpm
+      - name: Final diff audit
+        run: |
+          git diff --check
+          test -f scripts/test-ipad-native.mjs
+          grep -q "India · CBSE / JEE / Olympiad" client/src/pages/Login.jsx
+          grep -q "Browser handwriting = legacy JS fallback" client/src/ink/InkAnswer.jsx
+          grep -q "p.course === 'in'" client/src/local/backend.js
+      - name: Commit tested product patch
+        run: |
+          rm -f tools/apply-india-native-product-patch.py
+          rm -f .github/workflows/india-native-product-stage.yml
+          git add -A
+          git config user.name pri-learning-ci
+          git config user.email actions@users.noreply.github.com
+          git commit -m "Wire India curriculum and expose native handwriting test path"
+          git push origin HEAD:product/india-native-ink-truth
