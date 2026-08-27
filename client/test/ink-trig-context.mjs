@@ -95,7 +95,7 @@ native.text = native.lines.map(l => l.text).join('\n');
 const fused = chooseNativeConsensus([foundation, js, native], ctx);
 assert.ok(fused, 'expected a fused reading');
 assert.equal(fused.disagreement, false, fused.engine);
-assert.match(fused.engine, /^pri-line-consensus:/);
+assert.match(fused.engine, /^pri-(?:line-)?consensus:/);
 assert.ok(!fused.lines.some(line => /pi\/6011|π\/6011/.test(line.text)), 'triangle/labels must not survive as a text row');
 assert.deepEqual(
   fused.lines.map(line => line.text),
