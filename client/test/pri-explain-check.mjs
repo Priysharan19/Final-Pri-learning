@@ -54,6 +54,7 @@ check('exposes a bounded teaching-director contract', () => {
   assert.equal(contract.version, STORYBOARD_VERSION);
   assert.deepEqual(contract.allowedActions, ACTION_KINDS);
   assert.ok(contract.rules.some(rule => /Never invent/i.test(rule)));
+  assert.ok(contract.rules.some(rule => /checkpoint.*never supply its answer/i.test(rule)));
 });
 
 check('accepts an authored storyboard using only verified equations', () => {
@@ -177,13 +178,17 @@ check('animates an authored graph instead of synthesising a new one', () => {
   assert.equal(timeline[0].visuals.find(v => v.kind === 'figure')?.mode, 'graph');
 });
 
-check('supports a safe understanding checkpoint without changing marking', () => {
+check('keeps understanding checkpoints prediction-only', () => {
   const plan = {
     version: 3,
-    scenes: [{ heading: 'Predict the next move', actions: [{ kind: 'checkpoint', prompt: 'What should we undo first?', answer: 'Subtract 2' }] }],
+    scenes: [{ heading: 'Predict the next move', actions: [{ kind: 'checkpoint', prompt: 'What should we undo first?', answer: 'Invented answer must not render' }] }],
   };
+  const checked = validateStoryboard(plan, algebraSolution, {});
+  assert.equal(checked.ok, true);
+  assert.equal(checked.storyboard.scenes[0].actions[0].answer, undefined);
   const compiled = compileStoryboard(plan, algebraSolution, {});
   assert.equal(compiled.timeline[0].visuals[0].kind, 'checkpoint');
+  assert.equal(compiled.timeline[0].visuals[0].answer, '');
 });
 
 check('the deterministic storyboard itself passes the same verifier', () => {
