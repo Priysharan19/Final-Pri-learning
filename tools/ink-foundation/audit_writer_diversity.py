@@ -6,7 +6,7 @@ augmentation is not counted as a writer. Promotion to a broadly generalising
 model needs enough independent people, writer-disjoint splits, broad token
 coverage and non-trivial variation in capture dynamics.
 
-V17 deliberately evaluates data readiness on the public-to-engineering `test`
+V17 deliberately evaluates data readiness on the repeatable engineering `test`
 split only. The locked `final-holdout` must never be used to make an otherwise
 under-sized test set look production-ready.
 """
@@ -94,8 +94,6 @@ def sample_signature(strokes):
             if abs(dx) + abs(dy) > 1e-6:
                 direction_angles.append(math.atan2(dy, dx))
 
-    # Circular concentration is a stable descriptor of how directional the
-    # writing is without pretending it is a literal typographic slant angle.
     if direction_angles:
         sx = statistics.fmean(math.cos(angle) for angle in direction_angles)
         sy = statistics.fmean(math.sin(angle) for angle in direction_angles)
@@ -203,20 +201,20 @@ def _coverage_row(token_counts: Counter, writer_counts: Counter,
     }
 
 
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--corpus", default="client/test/ink-corpus")
-    parser.add_argument("--out", default=None)
-    parser.add_argument("--enforce", action="store_true")
-    args = parser.parse_args()
+def build_report(root) -> dict:
+    """Build the machine-checkable V17 corpus-readiness report.
 
+    Kept as a pure-ish helper so the frozen writer-generalisation evaluator can
+    embed the exact same readiness decision into its checkpoint evidence. This
+    prevents Core ML promotion from bypassing the standalone audit.
+    """
     (
         writers,
         samples_by_split,
         token_by_split,
         unknown_targets,
         duplicates,
-    ) = load_corpus(args.corpus)
+    ) = load_corpus(root)
     by_split = defaultdict(list)
     writer_rows = {}
     for writer, row in sorted(writers.items()):
@@ -251,24 +249,18 @@ def main():
     test_token_counts = token_by_split["test"]
 
     thin_train_tokens = [
-        token
-        for token in required_tokens
+        token for token in required_tokens
         if train_writer_token_counts[token] < MIN_TRAIN_WRITERS_PER_TOKEN
     ]
     thin_test_writer_tokens = [
-        token
-        for token in required_tokens
+        token for token in required_tokens
         if test_writer_token_counts[token] < MIN_TEST_WRITERS_PER_TOKEN
     ]
     thin_test_occurrence_tokens = [
-        token
-        for token in required_tokens
+        token for token in required_tokens
         if test_token_counts[token] < MIN_TEST_OCCURRENCES_PER_TOKEN
     ]
 
-    # Final-holdout is deliberately not allowed to satisfy these gates. The
-    # test split is the repeatable engineering evaluation set; final-holdout is
-    # consumed only by a frozen release candidate.
     gates = {
         "trainWriterTarget": len(by_split.get("train", [])) >= TRAIN_TARGET_WRITERS,
         "evaluationWriterMinimum": len(by_split.get("test", [])) >= EVAL_MIN_WRITERS,
@@ -281,7 +273,7 @@ def main():
         "noUnknownTargetTokens": not unknown_targets,
         "noDuplicateSessionIds": not duplicates,
     }
-    report = {
+    return {
         "format": "pri-ink-writer-diversity-audit",
         "version": 2,
         "vocabularyVersion": 4,
@@ -315,6 +307,15 @@ def main():
         "byWriter": writer_rows,
     }
 
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--corpus", default="client/test/ink-corpus")
+    parser.add_argument("--out", default=None)
+    parser.add_argument("--enforce", action="store_true")
+    args = parser.parse_args()
+
+    report = build_report(args.corpus)
     text = json.dumps(report, indent=2)
     if args.out:
         Path(args.out).write_text(text, encoding="utf-8")
