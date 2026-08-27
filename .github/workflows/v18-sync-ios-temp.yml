@@ -1,0 +1,49 @@
+name: V18 temporary iOS bundle sync
+
+on:
+  push:
+    branches:
+      - pri-ink-v18-real-page-trig
+
+permissions:
+  contents: write
+
+concurrency:
+  group: v18-sync-ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: pri-ink-v18-real-page-trig
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --prefix client
+
+      - name: Build client
+        run: npm run build
+
+      - name: Sync both tracked iPad web bundles
+        run: npm run sync:ios
+
+      - name: Commit generated iPad bundle only when changed
+        run: |
+          if git diff --quiet -- "ios/PriLearning.swiftpm/Resources/Web" "ios/PriLearning 2.swiftpm/Resources/Web"; then
+            echo "iPad bundles already match client/dist."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- "ios/PriLearning.swiftpm/Resources/Web" "ios/PriLearning 2.swiftpm/Resources/Web"
+          git commit -m "Sync iPad web bundles for Pri Ink V18"
+          git push origin HEAD:pri-ink-v18-real-page-trig
