@@ -186,8 +186,8 @@ function visualFromAction(action, context) {
   return null;
 }
 
-export function compileStoryboard(storyboard, solution, context = {}) {
-  const checked = validateStoryboard(storyboard, solution, context);
+export function compileStoryboard(storyboard, solution, context = {}, options = {}) {
+  const checked = validateStoryboard(storyboard, solution, context, options);
   if (!checked.ok) return { ok: false, reason: checked.reason, timeline: [] };
 
   const timeline = checked.storyboard.scenes.map((scene, index) => {
@@ -218,7 +218,7 @@ export function buildVisualTimeline(solution, context = {}) {
   }
 
   const fallback = buildDeterministicStoryboard(solution, context);
-  const compiled = compileStoryboard(fallback, solution, context);
+  const compiled = compileStoryboard(fallback, solution, context, { trustedText: true });
   return compiled.ok ? compiled.timeline : [];
 }
 
