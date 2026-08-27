@@ -166,7 +166,7 @@ function cleanScene(raw, index, evidence, context, trustedText) {
   };
 }
 
-export function validateStoryboard(raw, solution, context = {}) {
+export function validateStoryboard(raw, solution, context = {}, options = {}) {
   if (!raw || typeof raw !== 'object') {
     return { ok: false, reason: 'missing storyboard', storyboard: null };
   }
@@ -179,7 +179,10 @@ export function validateStoryboard(raw, solution, context = {}) {
 
   const evidence = verifiedMath(solution);
   const source = text(raw.source, 40) || 'authored';
-  const trustedText = source === 'deterministic';
+  // Trust is conferred only by the caller that built the deterministic plan.
+  // Never infer trust from a data field such as `source`, because an AI plan can
+  // author that field too.
+  const trustedText = options?.trustedText === true;
   const scenes = [];
 
   for (let index = 0; index < raw.scenes.length; index++) {
