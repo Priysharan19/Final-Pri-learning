@@ -5,8 +5,9 @@ Development export is always allowed for a compatible V4 checkpoint and is
 marked `pri.productionReady=false`. A production export requires BOTH:
 
 1. the existing locked final-holdout release report for the exact checkpoint;
-2. a passing unseen-writer generalisation report from the real writer-disjoint
-   test split for that same exact checkpoint.
+2. a passing V17 unseen-writer generalisation report from the real writer-
+   disjoint test split for that same exact checkpoint, including the embedded
+   corpus-readiness gates.
 
 The V4 inference graph intentionally matches V3 at the module interface: the
 writer-adversarial/content heads are training-only. We therefore reuse the
@@ -43,6 +44,17 @@ GENERALISATION_MINIMUMS = {
     "criticalRobustExact": 0.98,
 }
 GENERALISATION_MAXIMUMS = {"predictionFlipRate": 0.02}
+REQUIRED_DATA_GATES = {
+    "trainWriterTarget",
+    "evaluationWriterMinimum",
+    "evaluationSampleMinimum",
+    "minimumSamplesPerTrainWriter",
+    "trainTokenWriterCoverage",
+    "testTokenWriterCoverage",
+    "testTokenOccurrenceCoverage",
+    "noUnknownTargetTokens",
+    "noDuplicateSessionIds",
+}
 
 
 def validate_generalisation_report(
@@ -55,8 +67,8 @@ def validate_generalisation_report(
         raise SystemExit(
             "--generalization-report is not a Pri Ink writer-generalisation report"
         )
-    if int(report.get("version", 0)) < 1:
-        raise SystemExit("writer-generalisation report version is unsupported")
+    if int(report.get("version", 0)) < 2:
+        raise SystemExit("production V4 export requires a V17 generalisation report (v2+)")
     if report.get("split") != "test":
         raise SystemExit(
             "production V4 export requires writer-generalisation evidence from the real test split"
@@ -65,8 +77,26 @@ def validate_generalisation_report(
         raise SystemExit(
             "writer-generalisation report SHA-256 does not match the checkpoint being exported"
         )
+    if report.get("passesMetricTargets") is not True:
+        raise SystemExit("writer-generalisation report does not pass V17 metric targets")
+    if report.get("passesDataReadiness") is not True:
+        raise SystemExit("writer-generalisation report does not pass V17 corpus-readiness gates")
     if report.get("passesTargets") is not True:
-        raise SystemExit("writer-generalisation report does not pass V16 targets")
+        raise SystemExit("writer-generalisation report does not pass the complete V17 target set")
+
+    evidence = report.get("dataReadiness") or {}
+    if int(evidence.get("auditVersion") or 0) < 2:
+        raise SystemExit("writer-generalisation report lacks the V17 corpus audit schema")
+    policy = evidence.get("policy") or {}
+    if policy.get("evaluationSplit") != "test":
+        raise SystemExit("V17 corpus readiness must be measured on the test split")
+    if policy.get("finalHoldoutCountsTowardReadiness") is not False:
+        raise SystemExit("final-holdout cannot count toward V17 corpus readiness")
+    gates = evidence.get("gates") or {}
+    if set(gates) != REQUIRED_DATA_GATES or not all(gates.values()):
+        raise SystemExit("writer-generalisation report has incomplete/failing V17 data gates")
+    if evidence.get("passesDataReadiness") is not True:
+        raise SystemExit("embedded V17 corpus evidence is not production-ready")
 
     metrics = report.get("metrics") or {}
     for key, threshold in GENERALISATION_MINIMUMS.items():
@@ -101,7 +131,7 @@ def main():
     parser.add_argument(
         "--generalization-report",
         default=None,
-        help="passing writer-disjoint V16 test report for this exact checkpoint",
+        help="passing writer-disjoint V17 test report for this exact checkpoint",
     )
     args = parser.parse_args()
 
@@ -198,6 +228,7 @@ def main():
     meta = mlmodel.user_defined_metadata
     meta["pri.model"] = "ink-foundation-v4"
     meta["pri.architectureVersion"] = "4"
+    meta["pri.releaseLane"] = "V17"
     meta["pri.decoder"] = (
         "parallel-output-queries+2d-visual+cross-modal-style+writer-invariant-content"
     )
@@ -214,6 +245,7 @@ def main():
     meta["pri.trainingStage"] = str(ckpt.get("stage") or "unknown")
     meta["pri.productionReady"] = "true" if production_ready else "false"
     meta["pri.writerGeneralizationRequired"] = "true"
+    meta["pri.corpusReadinessRequired"] = "true"
 
     if production_ready and release_report and generalisation_report:
         release_metrics = release_report["metrics"]
@@ -242,6 +274,9 @@ def main():
         meta["pri.generalizationFlipRate"] = str(
             generalisation_metrics["predictionFlipRate"]
         )
+        meta["pri.corpusAuditVersion"] = str(
+            generalisation_report["dataReadiness"]["auditVersion"]
+        )
 
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -249,11 +284,11 @@ def main():
     print(f"wrote {out}")
     if production_ready:
         print(
-            "PRODUCTION READY — exact V4 checkpoint passed final-holdout and unseen-writer gates."
+            "PRODUCTION READY — exact V4 checkpoint passed final-holdout, V17 corpus-readiness and unseen-writer gates."
         )
     else:
         print(
-            "DEVELOPMENT MODEL ONLY — V4 release requires both final-holdout and writer-generalisation evidence."
+            "DEVELOPMENT MODEL ONLY — V4 release requires final-holdout, V17 corpus-readiness and writer-generalisation evidence."
         )
 
 
