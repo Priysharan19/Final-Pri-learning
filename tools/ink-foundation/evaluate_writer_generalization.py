@@ -6,6 +6,10 @@ often a correct expression survives plausible changes in slant, aspect, speed,
 pressure, width, point density and page angle. Real writer-disjoint evidence is
 still mandatory: synthetic style perturbations are a robustness probe, not a
 substitute for people.
+
+V17 also embeds the corpus-readiness decision into the checkpoint report. A
+model cannot therefore satisfy the production evidence chain merely by scoring
+well on a large but notation-thin or final-holdout-padded test set.
 """
 from __future__ import annotations
 
@@ -17,6 +21,7 @@ from pathlib import Path
 
 import torch
 
+from audit_writer_diversity import build_report as build_data_readiness_report
 from data_v4 import (
     EOS_ID,
     PAD_ID,
@@ -134,8 +139,6 @@ def evaluate(
         robust = base_ok and all_variants_ok
         robust_correct += int(robust)
         writer_row["robust"] += int(robust)
-        # The V3 release helper predates integral support. In V4 an integral sign
-        # is itself critical structure: dropping it changes the mathematical task.
         if is_critical_structure(truth) or "∫" in truth:
             critical_total += 1
             critical_robust += int(robust)
@@ -188,6 +191,20 @@ def passes(metrics: dict) -> bool:
     )
 
 
+def _data_evidence_snapshot(report: dict) -> dict:
+    """Keep promotion-critical audit evidence without copying per-writer telemetry."""
+    return {
+        "auditVersion": report.get("version"),
+        "vocabularyVersion": report.get("vocabularyVersion"),
+        "policy": report.get("policy") or {},
+        "writersBySplit": report.get("writersBySplit") or {},
+        "samplesBySplit": report.get("samplesBySplit") or {},
+        "gates": report.get("gates") or {},
+        "thinCoverage": report.get("thinCoverage") or {},
+        "passesDataReadiness": report.get("passesDataReadiness") is True,
+    }
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("checkpoint")
@@ -203,7 +220,7 @@ def main():
     parser.add_argument("--device", default="auto")
     parser.add_argument("--out", default=None)
     parser.add_argument(
-        "--enforce", action="store_true", help="exit 2 when V16 targets are not met"
+        "--enforce", action="store_true", help="exit 2 when V17 targets are not met"
     )
     args = parser.parse_args()
 
@@ -252,18 +269,29 @@ def main():
     metrics = evaluate(
         model, selected, config, device, args.perturbations, args.seed
     )
-    passed = passes(metrics)
+    metric_passed = passes(metrics)
+    data_report = build_data_readiness_report(args.corpus)
+    data_passed = data_report.get("passesDataReadiness") is True
+    # Production generalisation is defined on the repeatable test split. A
+    # validation/final-holdout diagnostic may be useful, but it cannot produce a
+    # passing production report by construction.
+    production_split = args.split == "test"
+    passed = metric_passed and data_passed and production_split
     report = {
         "format": "pri-ink-writer-generalization",
-        "version": 1,
+        "version": 2,
         "checkpointSha256": sha256(checkpoint_path),
         "split": args.split,
         "targets": TARGETS,
         "metrics": metrics,
+        "passesMetricTargets": metric_passed,
+        "passesDataReadiness": data_passed,
+        "dataReadiness": _data_evidence_snapshot(data_report),
         "passesTargets": passed,
         "note": (
-            "Style perturbations are a stress test only. Production readiness still requires "
-            "the real writer-disjoint sample/writer minimums and untouched final-holdout policy."
+            "Style perturbations are a stress test only. Production readiness requires "
+            "the real writer-disjoint V17 data-readiness gates, the repeatable test split, "
+            "and the untouched final-holdout release policy."
         ),
     }
     output = (
@@ -286,7 +314,11 @@ def main():
         f"robust={100*metrics['worstWriterRobustExact']:.2f}% "
         f"flip-rate={100*metrics['predictionFlipRate']:.2f}%"
     )
-    print(f"V16 writer-generalization targets: {'PASS' if passed else 'NOT YET'}")
+    print(
+        f"data-readiness={'PASS' if data_passed else 'NOT YET'} "
+        f"metric-targets={'PASS' if metric_passed else 'NOT YET'}"
+    )
+    print(f"V17 writer-generalization targets: {'PASS' if passed else 'NOT YET'}")
     print(f"report: {output}")
     if args.enforce and not passed:
         raise SystemExit(2)
