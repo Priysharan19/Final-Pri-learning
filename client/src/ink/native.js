@@ -14,6 +14,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { fuseNativeStrokeReading } from './hybrid.js';
 import { inferSetContextFromPrompt, mergeRecognitionContext } from './setNotation.js';
+import { inferTrigContextFromPrompt } from './trigNotation.js';
 
 const handler = () =>
   (typeof window !== 'undefined' && window.__PRI_NATIVE_INK__ &&
@@ -60,8 +61,16 @@ export function inferredNotationContext(explicit = null) {
     if (common.has(ch)) vars.add(ch);
   }
   const generic = { alphabet: [...new Set([...BASE_MATH_ALPHABET, ...vars])] };
-  const setContext = inferSetContextFromPrompt(raw, generic.alphabet);
-  return mergeRecognitionContext(setContext || generic, explicit);
+
+  // Topic context is public question language, never the hidden answer. Build
+  // it compositionally so a future topic can add a safe grammar without
+  // discarding the generic maths alphabet or a caller's explicit answer type.
+  let inferred = generic;
+  const trigContext = inferTrigContextFromPrompt(raw, inferred.alphabet);
+  if (trigContext) inferred = mergeRecognitionContext(inferred, trigContext);
+  const setContext = inferSetContextFromPrompt(raw, inferred.alphabet);
+  if (setContext) inferred = mergeRecognitionContext(inferred, setContext);
+  return mergeRecognitionContext(inferred, explicit);
 }
 
 function invalidatePending(reason) {
