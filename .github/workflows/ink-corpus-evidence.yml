@@ -1,0 +1,92 @@
+name: Pri Ink Corpus Evidence
+
+on:
+  push:
+    paths:
+      - 'tools/ink-foundation/corpus_policy.json'
+      - 'tools/ink-foundation/audit_writer_diversity.py'
+      - 'tools/ink-foundation/plan_collection_campaign.py'
+      - 'tools/ink-foundation/test_corpus_campaign.py'
+      - 'client/test/ink-corpus-status.mjs'
+      - 'client/test/ink-corpus-status-check.mjs'
+      - 'client/test/ink-corpus/**'
+      - '.github/workflows/ink-corpus-evidence.yml'
+  pull_request:
+    paths:
+      - 'tools/ink-foundation/corpus_policy.json'
+      - 'tools/ink-foundation/audit_writer_diversity.py'
+      - 'tools/ink-foundation/plan_collection_campaign.py'
+      - 'tools/ink-foundation/test_corpus_campaign.py'
+      - 'client/test/ink-corpus-status.mjs'
+      - 'client/test/ink-corpus-status-check.mjs'
+      - 'client/test/ink-corpus/**'
+      - '.github/workflows/ink-corpus-evidence.yml'
+
+concurrency:
+  group: ink-corpus-evidence-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  evidence:
+    name: V17.1 writer-disjoint corpus evidence firewall
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: tools/ink-foundation/requirements.txt
+
+      - name: Status tooling syntax and holdout firewall
+        run: |
+          node --check client/test/ink-corpus-status.mjs
+          node --check client/test/ink-corpus-status-check.mjs
+          node client/test/ink-corpus-status-check.mjs
+
+      - name: Install corpus-audit dependencies
+        run: python -m pip install -r tools/ink-foundation/requirements.txt
+
+      - name: Corpus evidence tooling syntax
+        run: |
+          python -m py_compile \
+            tools/ink-foundation/audit_writer_diversity.py \
+            tools/ink-foundation/plan_collection_campaign.py \
+            tools/ink-foundation/test_corpus_campaign.py
+
+      - name: Duplicate-session and holdout-opacity regression
+        run: python tools/ink-foundation/test_corpus_campaign.py
+
+      - name: Current corpus routine readiness report
+        run: |
+          python tools/ink-foundation/audit_writer_diversity.py \
+            --corpus client/test/ink-corpus \
+            --out /tmp/pri-ink-v17-1-readiness.json
+
+      - name: Current collection campaign plan
+        run: |
+          python tools/ink-foundation/plan_collection_campaign.py \
+            --corpus client/test/ink-corpus \
+            --json \
+            --out /tmp/pri-ink-v17-1-campaign.json
+
+      - name: Evidence firewall remains machine-verifiable
+        run: |
+          python - <<'PY'
+          import json
+          readiness = json.load(open('/tmp/pri-ink-v17-1-readiness.json'))
+          campaign = json.load(open('/tmp/pri-ink-v17-1-campaign.json'))
+          assert readiness['finalHoldout']['contentInspected'] is False
+          assert readiness['policy']['finalHoldoutCountsTowardReadiness'] is False
+          assert 'final-holdout' not in readiness.get('samplesBySplit', {})
+          assert campaign['samples']['current']['final-holdout'] is None
+          assert campaign['samples']['targets']['finalHoldout'] is None
+          assert campaign['samples']['deficits']['finalHoldout'] is None
+          assert campaign['evidenceFirewall']['finalHoldoutContentInspected'] is False
+          assert campaign['evidenceFirewall']['finalHoldoutSamplesReported'] is False
+          print('V17.1 corpus evidence firewall: PASS')
+          PY
