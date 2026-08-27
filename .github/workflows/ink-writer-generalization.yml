@@ -1,4 +1,4 @@
-name: Ink writer generalization
+name: Pri Ink V17 writer generalization
 
 on:
   pull_request:
@@ -12,7 +12,7 @@ on:
       - 'tools/ink-foundation/audit_writer_diversity.py'
       - 'tools/ink-foundation/test_writer_generalization.py'
       - 'tools/ink-foundation/export_coreml_v4.py'
-      - 'handwriting/v16/**'
+      - 'handwriting/v17/**'
       - '.github/workflows/ink-writer-generalization.yml'
   push:
     branches: [main]
@@ -26,7 +26,7 @@ on:
       - 'tools/ink-foundation/audit_writer_diversity.py'
       - 'tools/ink-foundation/test_writer_generalization.py'
       - 'tools/ink-foundation/export_coreml_v4.py'
-      - 'handwriting/v16/**'
+      - 'handwriting/v17/**'
       - '.github/workflows/ink-writer-generalization.yml'
 
 permissions:
@@ -111,4 +111,8 @@ jobs:
           print('writers by split:', p['writersBySplit'])
           print('samples by split:', p['samplesBySplit'])
           print('production data ready:', p['passesDataReadiness'])
+          # V17 must remain honest while the real corpus is still below promotion scale.
+          # The audit itself is required to execute, but CI must not manufacture readiness.
+          if p['passesDataReadiness'] and p['writers'] < 20:
+              raise SystemExit('writer diversity audit reported readiness below the minimum writer floor')
           PY
