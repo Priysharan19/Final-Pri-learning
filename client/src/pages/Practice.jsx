@@ -3,6 +3,7 @@ import { useLocation, useSearchParams } from 'react-router-dom';
 import { api } from '../api.js';
 import { useApp } from '../App.jsx';
 import QuestionCard, { SR_ONLY } from '../components/QuestionCard.jsx';
+import PriExplain from '../components/PriExplain.jsx';
 
 export default function Practice() {
   const { user } = useApp();
@@ -84,15 +85,22 @@ export default function Practice() {
       )}
 
       {serve && (
-        <QuestionCard
-          key={serve.question.id}
-          question={serve.question}
-          reason={serve.reason}
-          why={serve.why}
-          onResolved={onResolved}
-          onNext={load}
-          onRedo={redo}
-        />
+        <>
+          <QuestionCard
+            key={serve.question.id}
+            question={serve.question}
+            reason={serve.reason}
+            why={serve.why}
+            onResolved={onResolved}
+            onNext={load}
+            onRedo={redo}
+          />
+          <PriExplain
+            key={`explain-${serve.question.id}`}
+            questionId={serve.question.id}
+            questionPrompt={serve.question.prompt}
+          />
+        </>
       )}
 
       {/* bottom context pill */}
