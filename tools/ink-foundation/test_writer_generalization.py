@@ -10,6 +10,7 @@ from pathlib import Path
 
 import torch
 
+from audit_writer_diversity import build_report as build_data_readiness_report
 from data import VOCAB as V3_VOCAB
 from data_v4 import PAD_ID, VOCAB, decode, encode
 from export_coreml_v4 import REQUIRED_DATA_GATES, validate_generalisation_report
@@ -140,6 +141,7 @@ def _passing_generalisation_report(checkpoint: Path) -> dict:
             "policy": {
                 "evaluationSplit": "test",
                 "finalHoldoutCountsTowardReadiness": False,
+                "finalHoldoutContentInspectedByAudit": False,
             },
             "gates": gates,
             "passesDataReadiness": True,
@@ -167,22 +169,61 @@ def test_production_evidence_cannot_bypass_data_gates():
         ready, loaded = validate_generalisation_report(checkpoint, str(report_path))
         assert ready and loaded is not None
 
-        # A headline-success report may not hide one failed corpus gate.
         report["dataReadiness"]["gates"]["testTokenWriterCoverage"] = False
         report_path.write_text(json.dumps(report), encoding="utf-8")
         _expect_rejected(checkpoint, report_path)
 
-        # Nor may final-holdout silently fill ordinary test-readiness gaps.
         report = _passing_generalisation_report(checkpoint)
         report["dataReadiness"]["policy"]["finalHoldoutCountsTowardReadiness"] = True
         report_path.write_text(json.dumps(report), encoding="utf-8")
         _expect_rejected(checkpoint, report_path)
 
-        # Old V16 reports did not carry the V17 data contract and cannot promote.
+        report = _passing_generalisation_report(checkpoint)
+        report["dataReadiness"]["policy"]["finalHoldoutContentInspectedByAudit"] = True
+        report_path.write_text(json.dumps(report), encoding="utf-8")
+        _expect_rejected(checkpoint, report_path)
+
         report = _passing_generalisation_report(checkpoint)
         report["version"] = 1
         report_path.write_text(json.dumps(report), encoding="utf-8")
         _expect_rejected(checkpoint, report_path)
+
+
+def _corpus_doc(writer: str, split: str, target: str, session: str) -> dict:
+    return {
+        "format": "pri-ink-corpus",
+        "version": 2,
+        "writer": {"id": writer},
+        "split": split,
+        "sessionId": session,
+        "samples": [{"target": target, "strokes": fixture_strokes()}],
+    }
+
+
+def test_final_holdout_is_opaque_to_readiness_audit():
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        (root / "train.json").write_text(
+            json.dumps(_corpus_doc("PTRAIN", "train", "x+1", "S-TRAIN")),
+            encoding="utf-8",
+        )
+        # Deliberately unsupported target. If routine readiness ever reads the
+        # holdout contents, this would leak into unknownTargets immediately.
+        (root / "holdout.json").write_text(
+            json.dumps(_corpus_doc("PHOLD", "final-holdout", "☠", "S-HOLD")),
+            encoding="utf-8",
+        )
+        report = build_data_readiness_report(root)
+        assert report["unknownTargets"] == [], "routine audit inspected holdout target"
+        assert "final-holdout" not in report["vocabularyCoverage"], (
+            "routine audit exposed holdout vocabulary distribution"
+        )
+        assert report["finalHoldout"] == {
+            "writersRegistered": 1,
+            "contentInspected": False,
+        }
+        assert report["byWriter"]["PHOLD"]["detailsRead"] is False
+        assert report["policy"]["finalHoldoutContentInspectedByAudit"] is False
 
 
 def main():
@@ -191,6 +232,7 @@ def main():
     test_gradient_reversal()
     test_model_shapes()
     test_production_evidence_cannot_bypass_data_gates()
+    test_final_holdout_is_opaque_to_readiness_audit()
     print("PASS: Pri Ink V4 architecture + V17 writer-generalization evidence checks")
 
 
