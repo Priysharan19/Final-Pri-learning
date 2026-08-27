@@ -109,44 +109,90 @@ final class NativeCloudInkClient: NSObject, URLSessionDelegate {
     private static func imageDataURL(strokes: [InkStroke]) throws -> String {
         guard !strokes.isEmpty else { throw ClientError.noInk }
 
-        // Rebuild the exact PencilKit centrelines in black, then ask PencilKit
-        // itself to render them. This is both smoother and more faithful than
-        // asking JavaScript to redraw thousands of sampled points.
-        let drawing = StrokeCodec.drawing(from: strokes, color: .black)
-        guard !drawing.strokes.isEmpty else { throw ClientError.noInk }
-
-        var bounds = drawing.bounds
+        // IMPORTANT: do not use PKDrawing.image(from:scale:) here. PencilKit
+        // adapts PKInk colours for the current appearance. Pri Learning runs in
+        // dark mode, so a nominal .black PKInk can be appearance-adapted when
+        // rendered off-screen; flattening that onto white can produce a nearly
+        // blank OCR image. Draw the captured centrelines ourselves instead so
+        // OpenAI always receives literal black ink on literal white paper.
+        var bounds = strokes[0].bounds
+        for stroke in strokes.dropFirst() { bounds = bounds.union(stroke.bounds) }
         guard bounds.width.isFinite, bounds.height.isFinite,
               bounds.width > 0, bounds.height > 0 else {
             throw ClientError.rasterFailed
         }
 
         let pad: CGFloat = 28
-        bounds = bounds.insetBy(dx: -pad, dy: -pad)
+        let paddedWidth = max(1, bounds.width + pad * 2)
+        let paddedHeight = max(1, bounds.height + pad * 2)
 
-        // Keep useful OCR resolution while bounding upload cost/memory.
         let maxSide: CGFloat = 2048
         let maxPixels: CGFloat = 3_200_000
         var scale: CGFloat = 2
-        scale = min(scale, maxSide / max(bounds.width, bounds.height))
-        scale = min(scale, sqrt(maxPixels / max(1, bounds.width * bounds.height)))
+        scale = min(scale, maxSide / max(paddedWidth, paddedHeight))
+        scale = min(scale, sqrt(maxPixels / max(1, paddedWidth * paddedHeight)))
         scale = max(0.5, scale)
 
-        let transparent = drawing.image(from: bounds, scale: scale)
-        let size = transparent.size
-        guard size.width > 0, size.height > 0 else { throw ClientError.rasterFailed }
+        let pixelWidth = max(64, Int(ceil(paddedWidth * scale)))
+        let pixelHeight = max(64, Int(ceil(paddedHeight * scale)))
 
         let format = UIGraphicsImageRendererFormat()
         format.opaque = true
-        format.scale = max(1, transparent.scale)
-        let renderer = UIGraphicsImageRenderer(size: size, format: format)
-        let flattened = renderer.image { context in
-            context.cgContext.setFillColor(UIColor.white.cgColor)
-            context.cgContext.fill(CGRect(origin: .zero, size: size))
-            transparent.draw(in: CGRect(origin: .zero, size: size))
+        format.scale = 1
+        let renderer = UIGraphicsImageRenderer(
+            size: CGSize(width: pixelWidth, height: pixelHeight),
+            format: format
+        )
+
+        let image = renderer.image { rendererContext in
+            let cg = rendererContext.cgContext
+            cg.setFillColor(UIColor.white.cgColor)
+            cg.fill(CGRect(x: 0, y: 0, width: pixelWidth, height: pixelHeight))
+            cg.setStrokeColor(UIColor.black.cgColor)
+            cg.setFillColor(UIColor.black.cgColor)
+            cg.setLineCap(.round)
+            cg.setLineJoin(.round)
+            cg.setShouldAntialias(true)
+
+            func map(_ p: InkPoint) -> CGPoint {
+                CGPoint(
+                    x: (p.x - bounds.minX + pad) * scale,
+                    y: (p.y - bounds.minY + pad) * scale
+                )
+            }
+
+            for stroke in strokes {
+                let points = stroke.points
+                guard let first = points.first else { continue }
+
+                if points.count == 1 {
+                    let centre = map(first)
+                    let diameter = max(4, min(14, first.w * scale))
+                    cg.fillEllipse(in: CGRect(
+                        x: centre.x - diameter / 2,
+                        y: centre.y - diameter / 2,
+                        width: diameter,
+                        height: diameter
+                    ))
+                    continue
+                }
+
+                for i in 1..<points.count {
+                    let a = points[i - 1]
+                    let b = points[i]
+                    let wa = a.w.isFinite ? a.w : 3
+                    let wb = b.w.isFinite ? b.w : wa
+                    let nativeWidth = max(2.2, min(7.0, (wa + wb) * 0.5))
+                    cg.setLineWidth(nativeWidth * scale)
+                    cg.beginPath()
+                    cg.move(to: map(a))
+                    cg.addLine(to: map(b))
+                    cg.strokePath()
+                }
+            }
         }
 
-        guard let png = flattened.pngData(), !png.isEmpty else {
+        guard let png = image.pngData(), !png.isEmpty else {
             throw ClientError.rasterFailed
         }
         return "data:image/png;base64,\(png.base64EncodedString())"
