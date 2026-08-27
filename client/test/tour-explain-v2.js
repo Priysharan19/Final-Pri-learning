@@ -1,4 +1,4 @@
-// Pri Explain V2 · browser-level proof of the visual teaching path.
+// Pri Explain V4 · browser-level proof of the personalised teaching path.
 // This deliberately resolves a real generated question through the normal UI;
 // no test fixture injects a solution or fake handwriting payload.
 import { pathToFileURL } from 'node:url';
@@ -9,8 +9,8 @@ const SECOND_WRONG = '-987655';
 const SUBMIT = { name: 'Submit Answer' };
 
 export const flow = {
-  id: 'explain-v2',
-  name: 'Pri Explain V2 · visual reasoning playback',
+  id: 'explain-v4',
+  name: 'Pri Explain V4 · teaching director playback',
 
   async run({ page, base, check, goto, createProfile, settle }) {
     await goto('/');
@@ -43,12 +43,12 @@ export const flow = {
     await launch.click();
     await page.waitForSelector('.pri-explain-dialog', { timeout: 10000 });
 
-    await check('the V2 visual player opens',
-      /Visual Engine V2/i.test(await page.locator('.pri-explain-kicker').innerText()),
+    await check('the V4 teaching director player opens',
+      /Teaching Director V4/i.test(await page.locator('.pri-explain-kicker').innerText()),
       `kicker reads ${JSON.stringify(await page.locator('.pri-explain-kicker').innerText())}`);
 
     const attempt = page.locator('.pri-v-attempt');
-    await check('the player starts by replaying the first wrong attempt', await attempt.count() === 1,
+    await check('the director starts by replaying the first wrong attempt', await attempt.count() === 1,
       'the diagnosis scene did not render the submitted working');
     if (await attempt.count()) {
       await check('the replay is the first miss, not the later retry',
@@ -58,21 +58,53 @@ export const flow = {
 
     const rail = page.locator('.pri-explain-rail button');
     const scenes = await rail.count();
-    await check('the explanation has a multi-scene timeline', scenes >= 2, `${scenes} scene(s)`);
+    await check('the director creates a multi-scene teaching timeline', scenes >= 3, `${scenes} scene(s)`);
 
-    let sawTransform = false;
+    let checkpointIndex = -1;
+    let transformIndex = -1;
     for (let i = 0; i < scenes; i++) {
       await rail.nth(i).click();
       await settle();
-      if (await page.locator('.pri-v-transform').count()) { sawTransform = true; break; }
+      if (checkpointIndex < 0 && await page.locator('.pri-v-checkpoint').count()) checkpointIndex = i;
+      if (transformIndex < 0 && await page.locator('.pri-v-transform').count()) transformIndex = i;
     }
-    await check('a verified algebra step becomes an equation-motion scene', sawTransform,
+
+    await check('the director inserts a prediction checkpoint before a verified move', checkpointIndex >= 0,
+      'no timeline scene rendered a prediction checkpoint');
+    if (checkpointIndex >= 0) {
+      await rail.nth(checkpointIndex).click();
+      await settle();
+      const reveal = page.getByRole('button', { name: 'Reveal next verified step' });
+      await check('checkpoint autoplay is replaced by an explicit reveal', await reveal.count() === 1,
+        'prediction scene did not expose the reveal control');
+      if (await reveal.count()) {
+        await reveal.click();
+        await settle();
+        await check('revealing a checkpoint advances to checked mathematics',
+          await page.locator('.pri-v-checkpoint').count() === 0);
+      }
+    }
+
+    await check('a verified algebra step becomes an equation-motion scene', transformIndex >= 0,
       'no timeline scene rendered an equation transition');
+    if (transformIndex >= 0) {
+      await rail.nth(transformIndex).click();
+      await settle();
+      const slower = page.getByRole('button', { name: 'Show it slower' });
+      await check('a verified transform offers personalised branch controls', await slower.count() === 1);
+      if (await slower.count()) {
+        await slower.click();
+        await page.waitForSelector('.pri-explain-branch', { timeout: 5000 });
+        await check('the slower branch is rendered inside the same verified player',
+          await page.locator('.pri-explain-branch-scenes article').count() >= 2);
+        await page.getByRole('button', { name: 'Close extra explanation' }).click();
+      }
+    }
 
     if (scenes) {
       await rail.nth(scenes - 1).click();
       await settle();
-      await check('the visual timeline ends on the verified final answer',
+      await check('the teaching timeline ends on the verified final answer',
         await page.locator('.pri-explain-final').count() === 1);
     }
 
@@ -85,16 +117,9 @@ export const flow = {
 if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {
   const { runOne } = await import('./e2e.mjs');
 
-  // `npm run test:e2e` first runs the canonical browser suite, then this focused
-  // V2 flow against the exact dist that suite built. The CI coverage gate reads
-  // the LAST "E2E SUITE" verdict in browser.log. Without aggregation, this
-  // focused 11-check verdict shadows the canonical 129-check verdict and makes
-  // the gate report 11 < 129 even though both suites passed.
-  //
-  // CI already supplies the canonical floors as E2E_CHECKS/E2E_FLOWS. When
-  // those are present, make this final verdict an aggregate of the canonical
-  // run plus this flow. Outside CI the variables are absent, so a developer
-  // running this file directly still gets its honest standalone 11-check report.
+  // The canonical browser suite runs first; this focused flow runs against the
+  // same built dist. CI reads the last E2E verdict, so when the canonical floors
+  // are supplied we report their combined coverage rather than shadowing it.
   const baseChecks = Number(process.env.E2E_CHECKS || 0);
   const baseFlows = Number(process.env.E2E_FLOWS || 0);
   const originalLog = console.log;
@@ -103,8 +128,6 @@ if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) 
     console.log = (...args) => {
       const mapped = args.map(arg => {
         if (typeof arg !== 'string') return arg;
-        // report() prefixes its verdict with a newline, so match the verdict
-        // wherever it occurs in the logged string and preserve that prefix.
         const match = arg.match(/([✔✖]) E2E SUITE (PASSED|FAILED) — (\d+)\/(\d+) checks across (\d+) flows$/);
         if (!match) return arg;
         const passed = baseChecks + Number(match[3]);
