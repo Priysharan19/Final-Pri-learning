@@ -67,28 +67,12 @@ jobs:
               exit 1
             fi
 
-            # Web bundles are generated artifacts. Rebuild them from the merged source tree.
             rm -rf "ios/PriLearning.swiftpm/Resources/Web" "ios/PriLearning 2.swiftpm/Resources/Web"
             git add -A "ios/PriLearning.swiftpm/Resources/Web" "ios/PriLearning 2.swiftpm/Resources/Web"
 
-            # package.json conflict is a mechanical union: keep all product-lane
-            # handwriting/photo/iPad scripts and add Pri Explain V2's test/e2e gates.
             if printf '%s\n' "${conflicts[@]}" | grep -qx 'package.json'; then
               git checkout --ours package.json
-              node <<'NODE'
-              const fs = require('fs');
-              const path = 'package.json';
-              const pkg = JSON.parse(fs.readFileSync(path, 'utf8'));
-              const s = pkg.scripts || (pkg.scripts = {});
-              s['test:explain'] = 'node client/test/pri-explain-check.mjs';
-              if (!String(s.test || '').includes('npm run test:explain')) {
-                const needle = 'npm run test:india && ';
-                if (!String(s.test || '').includes(needle)) throw new Error('Expected test:india anchor missing');
-                s.test = s.test.replace(needle, `${needle}npm run test:explain && `);
-              }
-              s['test:e2e'] = 'node client/test/e2e.mjs && node client/test/tour-explain-v2.js --no-build';
-              fs.writeFileSync(path, JSON.stringify(pkg, null, 2) + '\n');
-              NODE
+              node --input-type=commonjs -e 'const fs=require("fs"); const p="package.json"; const pkg=JSON.parse(fs.readFileSync(p,"utf8")); const s=pkg.scripts||(pkg.scripts={}); s["test:explain"]="node client/test/pri-explain-check.mjs"; if(!String(s.test||"").includes("npm run test:explain")){ const needle="npm run test:india && "; if(!String(s.test||"").includes(needle)) throw new Error("Expected test:india anchor missing"); s.test=s.test.replace(needle,needle+"npm run test:explain && "); } s["test:e2e"]="node client/test/e2e.mjs && node client/test/tour-explain-v2.js --no-build"; fs.writeFileSync(p,JSON.stringify(pkg,null,2)+"\n");'
               git add package.json
             fi
           fi
