@@ -132,7 +132,11 @@ export default function PriExplain({ questionId, questionPrompt }) {
 
   useEffect(() => {
     clearTimeout(timerRef.current);
-    if (!open || !playing || !current || atEnd) return undefined;
+    if (!open || !playing || !current) return undefined;
+    if (atEnd) {
+      setPlaying(false);
+      return undefined;
+    }
     timerRef.current = setTimeout(() => go(index + 1), current.duration / speed);
     return () => clearTimeout(timerRef.current);
   }, [open, playing, current, atEnd, index, speed]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -220,7 +224,7 @@ export default function PriExplain({ questionId, questionPrompt }) {
             </div>
 
             <div className="pri-explain-layout">
-              <main className="pri-explain-stage">
+              <div className="pri-explain-stage">
                 {timeline.map((scene, sceneIndex) => {
                   if (sceneIndex > index) return null;
                   const active = sceneIndex === index;
@@ -245,7 +249,7 @@ export default function PriExplain({ questionId, questionPrompt }) {
                     <strong><MathText text={payload.solution.answerText} /></strong>
                   </div>
                 )}
-              </main>
+              </div>
 
               <aside className="pri-explain-rail" aria-label="Solution steps">
                 <div className="pri-explain-rail-title">Timeline</div>
@@ -267,7 +271,10 @@ export default function PriExplain({ questionId, questionPrompt }) {
               <div>
                 <button className="btn btn-ghost btn-sm" type="button" onClick={() => { go(0); setPlaying(true); }}>↺ Restart</button>
                 <button className="btn btn-ghost btn-sm" type="button" onClick={() => go(index - 1)} disabled={index === 0}>‹ Back</button>
-                <button className="btn btn-primary btn-sm" type="button" onClick={() => setPlaying(v => !v)}>
+                <button className="btn btn-primary btn-sm" type="button" onClick={() => {
+                  if (atEnd) { go(0); setPlaying(true); }
+                  else setPlaying(v => !v);
+                }}>
                   {playing ? 'Pause' : atEnd ? 'Replay' : 'Play'}
                 </button>
                 <button className="btn btn-ghost btn-sm" type="button" onClick={() => go(index + 1)} disabled={atEnd}>Next ›</button>
