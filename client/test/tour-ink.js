@@ -139,6 +139,36 @@ export const flow = {
     await page.locator('.ink-tool[title="Clear"]').click();
     await settle();
 
+    // This exact glyph is the production regression that escaped because the
+    // old flow only exercised whatever random short answer happened to be
+    // served. Keep it permanent and deterministic: every browser run must now
+    // prove the QuestionCard → InkAnswer numeric context settles the 5/s tie.
+    await handwrite(page, box, '5');
+    const fiveLines = await reading(page);
+    const fiveSymbol = page.locator('.ink-line .ink-sym').first();
+    let fiveCandidates = [];
+    if (await fiveSymbol.count()) {
+      await fiveSymbol.click();
+      fiveCandidates = await page.locator('.ink-picker-row .ink-pick').evaluateAll(nodes =>
+        nodes.map(node => node.getAttribute('aria-label') || node.textContent?.trim() || '').filter(Boolean));
+      await fiveSymbol.click();
+    }
+    await check('a single handwritten 5 survives the real numeric question context',
+      fiveLines.length === 1 && fiveLines[0] === '5',
+      `read ${JSON.stringify(fiveLines)}; candidates ${JSON.stringify(fiveCandidates)}`);
+    await page.locator('.ink-tool[title="Clear"]').click();
+    await settle();
+
+    // And the guardrail is tested through the same mounted product path: the
+    // context is not permission to manufacture the expected digit from clear
+    // letter-shaped ink. We only require that an authored s is not coerced to 5.
+    await handwrite(page, box, 's');
+    const sLines = await reading(page);
+    await check('numeric context does not coerce a genuine handwritten s into 5',
+      sLines.length === 1 && sLines[0] !== '5', `read ${JSON.stringify(sLines)}`);
+    await page.locator('.ink-tool[title="Clear"]').click();
+    await settle();
+
     // ── 4 · the answer, written by hand, is read back ────────────────────────
     await handwrite(page, box, answer);
     const lines = await reading(page);
