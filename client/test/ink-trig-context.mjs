@@ -96,7 +96,7 @@ const fused = chooseNativeConsensus([foundation, js, native], ctx);
 assert.ok(fused, 'expected a fused reading');
 assert.equal(fused.disagreement, false, fused.engine);
 assert.match(fused.engine, /^pri-line-consensus:/);
-assert.ok((fused.diagramLinesIgnored || 0) >= 1, 'triangle/labels should be excluded from text rows');
+assert.ok(!fused.lines.some(line => /pi\/6011|π\/6011/.test(line.text)), 'triangle/labels must not survive as a text row');
 assert.deepEqual(
   fused.lines.map(line => line.text),
   [
