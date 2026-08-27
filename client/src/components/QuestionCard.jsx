@@ -13,6 +13,14 @@ import { sanitizeFigure } from '../lib/sanitize.js';
 import { clearDraft, queueDraft, readDraft } from './drafts.js';
 
 const DIFF_CLASS = { 1: 'tag-d1', 2: 'tag-d2', 3: 'tag-d3', 4: 'tag-d4' };
+// Public question metadata may constrain what a single answer glyph can be,
+// but it must never disclose or encode the expected answer. Numeric questions
+// therefore expose only the ten digit symbols to the one-glyph tie-breaker.
+// Multi-glyph grammar/context scoring deliberately ignores this separate field.
+const NUMERIC_SINGLE_GLYPH_ALPHABET = Array.from({ length: 10 }, (_, i) => String(i));
+const recognitionContextForQuestion = question => question?.answerType === 'numeric'
+  ? { answerType: 'numeric', singleGlyphAlphabet: NUMERIC_SINGLE_GLYPH_ALPHABET }
+  : null;
 // Each key carries the name of the thing it inserts, because "≥" and "√(" are
 // read out as punctuation — or not at all — by a screen reader.
 const SYMBOLS = [
@@ -226,6 +234,10 @@ export default function QuestionCard({ question, why, reason, onResolved, onNext
   const hintsUsed = hints.length;
   const credit = Math.max(0.55, 1 - 0.15 * hintsUsed);
   const writeMode = mode === 'write';
+  const recognitionContext = useMemo(
+    () => recognitionContextForQuestion(question),
+    [question.answerType]
+  );
 
   useEffect(() => {
     if (!writeMode) return;
@@ -665,7 +677,7 @@ export default function QuestionCard({ question, why, reason, onResolved, onNext
               <div className="editor-shell" style={{ flex: 1, minWidth: 0 }}>
                 {InkAnswer && (
                   <InkAnswer onRecognized={setInkResult} height={380} lineVerdicts={lineVerdicts}
-                    disabled={resolved} focusSymbol={checkFocus} />
+                    disabled={resolved} focusSymbol={checkFocus} recognitionContext={recognitionContext} />
                 )}
                 {inkPhase === 'failed' && (
                   <div className="editor-body">

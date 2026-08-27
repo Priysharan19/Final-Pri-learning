@@ -193,16 +193,23 @@ function remapResult(result, localToGlobal) {
 // A one-symbol answer has no neighbouring glyphs, so the legacy recogniser's
 // local s/5, z/2, b/6… context pass cannot fire and its grammar beam deliberately
 // exits early. On a question that explicitly asks for an INTEGER we still know
-// one answer-blind fact: a lone letter is outside the legal answer alphabet.
-// Use that fact only to break a genuine classifier near-tie. This never consults
-// ctx.expected, never turns one digit into another, and never invents a digit
-// that the glyph classifier itself did not already propose.
+// one answer-blind fact: a lone letter is outside a numeric answer's legal
+// single-glyph alphabet. Use that fact only to break a genuine classifier
+// near-tie. This never consults ctx.expected, never turns one digit into another,
+// and never invents a digit that the glyph classifier itself did not propose.
 const SINGLE_GLYPH_DIGIT_TWIN = { s: '5', z: '2', b: '6', u: '4', g: '9', q: '9' };
 const SINGLE_GLYPH_NEAR_TIE_SHARE = 0.90;
 
 export function repairSingleGlyphQuestionContext(result, ctx) {
-  if (!result || String(ctx?.answerType || '').toLowerCase() !== 'integer') return result;
-  const alphabet = Array.isArray(ctx?.alphabet) ? new Set(ctx.alphabet.map(String)) : null;
+  const answerType = String(ctx?.answerType || '').toLowerCase();
+  if (!result || (answerType !== 'numeric' && answerType !== 'integer')) return result;
+  // Production numeric questions use a dedicated one-glyph alphabet so this
+  // repair cannot leak into the general grammar beam. `alphabet` remains a
+  // compatibility path for the older explicit `integer` research context.
+  const rawAlphabet = Array.isArray(ctx?.singleGlyphAlphabet)
+    ? ctx.singleGlyphAlphabet
+    : (answerType === 'integer' && Array.isArray(ctx?.alphabet) ? ctx.alphabet : null);
+  const alphabet = rawAlphabet ? new Set(rawAlphabet.map(String)) : null;
   if (!alphabet || !alphabet.size) return result;
   const lines = result.lines || [];
   if (lines.length !== 1) return result;
@@ -244,7 +251,7 @@ export function repairSingleGlyphQuestionContext(result, ctx) {
     minConf: altConf,
     margin: Math.max(0, Math.min(1, altConf - number(rival?.conf, 0))),
     weakest: { index: 0, sym: digit, conf: altConf, alts: repaired.alts },
-    singleGlyphContextRepair: 'answer-blind-integer-near-tie-v1'
+    singleGlyphContextRepair: 'answer-blind-numeric-near-tie-v2'
   };
 }
 

@@ -124,18 +124,18 @@ const singleResult = (sym, conf, altSym, altConf) => {
     weakest: { index: 0, sym, conf, alts: symbol.alts }
   };
 };
-const integerCtx = { answerType: 'integer', alphabet: digitAlphabet, expected: '7' };
-const nearTie = repairSingleGlyphQuestionContext(singleResult('s', 0.52, '5', 0.50), integerCtx);
-assert.equal(nearTie.text, '5', 'answer-blind integer context should settle a genuine s/5 near-tie as the legal digit');
-assert.equal(nearTie.singleGlyphContextRepair, 'answer-blind-integer-near-tie-v1');
+const numericCtx = { answerType: 'numeric', singleGlyphAlphabet: digitAlphabet, expected: '7' };
+const nearTie = repairSingleGlyphQuestionContext(singleResult('s', 0.52, '5', 0.50), numericCtx);
+assert.equal(nearTie.text, '5', 'answer-blind numeric context should settle a genuine s/5 near-tie as the legal digit');
+assert.equal(nearTie.singleGlyphContextRepair, 'answer-blind-numeric-near-tie-v2');
 const strongLetter = repairSingleGlyphQuestionContext(singleResult('s', 0.90, '5', 0.30),
-  { answerType: 'integer', alphabet: digitAlphabet, expected: '5' });
+  { answerType: 'numeric', singleGlyphAlphabet: digitAlphabet, expected: '5' });
 assert.equal(strongLetter.text, 's', 'question context must not rewrite a confident student letter into the expected digit');
 const expressionNearTie = repairSingleGlyphQuestionContext(singleResult('s', 0.52, '5', 0.50),
   { answerType: 'expression', alphabet: ['s', '5'], expected: '5' });
 assert.equal(expressionNearTie.text, 's', 'single-glyph repair is integer-only');
 const legalLetterNearTie = repairSingleGlyphQuestionContext(singleResult('s', 0.52, '5', 0.50),
-  { answerType: 'integer', alphabet: [...digitAlphabet, 's'], expected: '5' });
+  { answerType: 'numeric', singleGlyphAlphabet: [...digitAlphabet, 's'], expected: '5' });
 assert.equal(legalLetterNearTie.text, 's', 'a symbol that is legal in the declared alphabet must never be coerced');
 
 // End-to-end through the real JS fallback. A real authored s must not become 5
@@ -144,9 +144,9 @@ const fiveInk = [];
 addSymbol(fiveInk, '5', 10, 20, 0.48);
 const sInk = [];
 addSymbol(sInk, 's', 10, 20, 0.48);
-const ctxFive = { answerType: 'integer', alphabet: digitAlphabet, expected: '5' };
+const ctxFive = { answerType: 'numeric', singleGlyphAlphabet: digitAlphabet, expected: '5' };
 const fiveRead = recognizeWithoutDetachedSideWork(fiveInk, {}, ctxFive, recognize);
-assert.equal(fiveRead.text, '5', `authored 5 must read as 5 in integer context, got ${fiveRead.text}`);
+assert.equal(fiveRead.text, '5', `authored 5 must read as 5 in numeric context, got ${fiveRead.text}`);
 const sRead = recognizeWithoutDetachedSideWork(sInk, {}, ctxFive, recognize);
 assert.notEqual(sRead.text, '5', 'an authored student s must not be manufactured into the expected answer 5');
 
