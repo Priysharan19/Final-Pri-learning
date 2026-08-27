@@ -86,7 +86,7 @@ export function buildVisualTimeline(solution, context = {}) {
   const figure = String(context.questionFigure || '');
   const wrongAttempt = cleanAttempt(context.wrongAttempt || context.submission);
 
-  if (context.correct === false && !context.revealed && (context.feedback || wrongAttempt)) {
+  if (!context.revealed && (context.correct === false || context.hadWrongAttempt || wrongAttempt) && (context.feedback || wrongAttempt)) {
     const visuals = [];
     if (wrongAttempt?.strokes?.length || wrongAttempt?.scribble?.length) visuals.push({ kind: 'ink', attempt: wrongAttempt });
     else if (wrongAttempt?.working || wrongAttempt?.answer) visuals.push({ kind: 'attempt', attempt: wrongAttempt });
