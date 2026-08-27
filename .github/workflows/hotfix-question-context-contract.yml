@@ -1,0 +1,112 @@
+name: Hotfix question-context contract
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/hotfix-question-context-contract.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+      - name: Patch the real QuestionCard → InkAnswer contract
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path, old, new):
+              p = Path(path)
+              text = p.read_text(encoding='utf-8')
+              if text.count(old) != 1:
+                  raise SystemExit(f'{path}: expected exactly one patch anchor, found {text.count(old)}')
+              p.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          q = 'client/src/components/QuestionCard.jsx'
+          replace_once(q,
+              "const DIFF_CLASS = { 1: 'tag-d1', 2: 'tag-d2', 3: 'tag-d3', 4: 'tag-d4' };\n",
+              "const DIFF_CLASS = { 1: 'tag-d1', 2: 'tag-d2', 3: 'tag-d3', 4: 'tag-d4' };\n"
+              "// Public question metadata may constrain what a single answer glyph can be,\n"
+              "// but it must never disclose or encode the expected answer. Numeric questions\n"
+              "// therefore expose only the ten digit symbols to the one-glyph tie-breaker.\n"
+              "// Multi-glyph grammar/context scoring deliberately ignores this separate field.\n"
+              "const NUMERIC_SINGLE_GLYPH_ALPHABET = Array.from({ length: 10 }, (_, i) => String(i));\n"
+              "const recognitionContextForQuestion = question => question?.answerType === 'numeric'\n"
+              "  ? { answerType: 'numeric', singleGlyphAlphabet: NUMERIC_SINGLE_GLYPH_ALPHABET }\n"
+              "  : null;\n")
+          replace_once(q,
+              "  const writeMode = mode === 'write';\n",
+              "  const writeMode = mode === 'write';\n"
+              "  const recognitionContext = useMemo(\n"
+              "    () => recognitionContextForQuestion(question),\n"
+              "    [question.answerType]\n"
+              "  );\n")
+          replace_once(q,
+              "                  <InkAnswer onRecognized={setInkResult} height={380} lineVerdicts={lineVerdicts}\n                    disabled={resolved} focusSymbol={checkFocus} />\n",
+              "                  <InkAnswer onRecognized={setInkResult} height={380} lineVerdicts={lineVerdicts}\n                    disabled={resolved} focusSymbol={checkFocus} recognitionContext={recognitionContext} />\n")
+
+          r = 'client/src/ink/runtimeSpatial.js'
+          replace_once(r,
+              "// one answer-blind fact: a lone letter is outside the legal answer alphabet.\n// Use that fact only to break a genuine classifier near-tie. This never consults\n// ctx.expected, never turns one digit into another, and never invents a digit\n// that the glyph classifier itself did not already propose.\n",
+              "// one answer-blind fact: a lone letter is outside a numeric answer's legal\n// single-glyph alphabet. Use that fact only to break a genuine classifier\n// near-tie. This never consults ctx.expected, never turns one digit into another,\n// and never invents a digit that the glyph classifier itself did not propose.\n")
+          replace_once(r,
+              "export function repairSingleGlyphQuestionContext(result, ctx) {\n  if (!result || String(ctx?.answerType || '').toLowerCase() !== 'integer') return result;\n  const alphabet = Array.isArray(ctx?.alphabet) ? new Set(ctx.alphabet.map(String)) : null;\n",
+              "export function repairSingleGlyphQuestionContext(result, ctx) {\n  const answerType = String(ctx?.answerType || '').toLowerCase();\n  if (!result || (answerType !== 'numeric' && answerType !== 'integer')) return result;\n  // Production numeric questions use a dedicated one-glyph alphabet so this\n  // repair cannot leak into the general grammar beam. `alphabet` remains a\n  // compatibility path for the older explicit `integer` research context.\n  const rawAlphabet = Array.isArray(ctx?.singleGlyphAlphabet)\n    ? ctx.singleGlyphAlphabet\n    : (answerType === 'integer' && Array.isArray(ctx?.alphabet) ? ctx.alphabet : null);\n  const alphabet = rawAlphabet ? new Set(rawAlphabet.map(String)) : null;\n")
+          replace_once(r,
+              "    singleGlyphContextRepair: 'answer-blind-integer-near-tie-v1'\n",
+              "    singleGlyphContextRepair: 'answer-blind-numeric-near-tie-v2'\n")
+
+          t = 'client/test/ink-hybrid-check.mjs'
+          replace_once(t,
+              "const integerCtx = { answerType: 'integer', alphabet: digitAlphabet, expected: '7' };\nconst nearTie = repairSingleGlyphQuestionContext(singleResult('s', 0.52, '5', 0.50), integerCtx);\nassert.equal(nearTie.text, '5', 'answer-blind integer context should settle a genuine s/5 near-tie as the legal digit');\nassert.equal(nearTie.singleGlyphContextRepair, 'answer-blind-integer-near-tie-v1');\nconst strongLetter = repairSingleGlyphQuestionContext(singleResult('s', 0.90, '5', 0.30),\n  { answerType: 'integer', alphabet: digitAlphabet, expected: '5' });\n",
+              "const numericCtx = { answerType: 'numeric', singleGlyphAlphabet: digitAlphabet, expected: '7' };\nconst nearTie = repairSingleGlyphQuestionContext(singleResult('s', 0.52, '5', 0.50), numericCtx);\nassert.equal(nearTie.text, '5', 'answer-blind numeric context should settle a genuine s/5 near-tie as the legal digit');\nassert.equal(nearTie.singleGlyphContextRepair, 'answer-blind-numeric-near-tie-v2');\nconst strongLetter = repairSingleGlyphQuestionContext(singleResult('s', 0.90, '5', 0.30),\n  { answerType: 'numeric', singleGlyphAlphabet: digitAlphabet, expected: '5' });\n")
+          replace_once(t,
+              "const legalLetterNearTie = repairSingleGlyphQuestionContext(singleResult('s', 0.52, '5', 0.50),\n  { answerType: 'integer', alphabet: [...digitAlphabet, 's'], expected: '5' });\n",
+              "const legalLetterNearTie = repairSingleGlyphQuestionContext(singleResult('s', 0.52, '5', 0.50),\n  { answerType: 'numeric', singleGlyphAlphabet: [...digitAlphabet, 's'], expected: '5' });\n")
+          replace_once(t,
+              "const ctxFive = { answerType: 'integer', alphabet: digitAlphabet, expected: '5' };\nconst fiveRead = recognizeWithoutDetachedSideWork(fiveInk, {}, ctxFive, recognize);\nassert.equal(fiveRead.text, '5', `authored 5 must read as 5 in integer context, got ${fiveRead.text}`);\n",
+              "const ctxFive = { answerType: 'numeric', singleGlyphAlphabet: digitAlphabet, expected: '5' };\nconst fiveRead = recognizeWithoutDetachedSideWork(fiveInk, {}, ctxFive, recognize);\nassert.equal(fiveRead.text, '5', `authored 5 must read as 5 in numeric context, got ${fiveRead.text}`);\n")
+
+          e = 'client/test/tour-ink.js'
+          replace_once(e,
+              "    await page.locator('.ink-tool[title=\"Clear\"]').click();\n    await settle();\n\n    // ── 4 · the answer, written by hand, is read back ────────────────────────\n",
+              "    await page.locator('.ink-tool[title=\"Clear\"]').click();\n    await settle();\n\n    // This exact glyph is the production regression that escaped because the\n    // old flow only exercised whatever random short answer happened to be\n    // served. Keep it permanent and deterministic: every browser run must now\n    // prove the QuestionCard → InkAnswer numeric context settles the 5/s tie.\n    await handwrite(page, box, '5');\n    const fiveLines = await reading(page);\n    await check('a single handwritten 5 survives the real numeric question context',\n      fiveLines.length === 1 && fiveLines[0] === '5', `read ${JSON.stringify(fiveLines)}`);\n    await page.locator('.ink-tool[title=\"Clear\"]').click();\n    await settle();\n\n    // And the guardrail is tested through the same mounted product path: the\n    // context is not permission to manufacture the expected digit from clear\n    // letter-shaped ink. We only require that an authored s is not coerced to 5.\n    await handwrite(page, box, 's');\n    const sLines = await reading(page);\n    await check('numeric context does not coerce a genuine handwritten s into 5',\n      sLines.length === 1 && sLines[0] !== '5', `read ${JSON.stringify(sLines)}`);\n    await page.locator('.ink-tool[title=\"Clear\"]').click();\n    await settle();\n\n    // ── 4 · the answer, written by hand, is read back ────────────────────────\n")
+          PY
+      - name: Install client dependencies
+        run: npm ci --prefix client
+      - name: Run targeted handwriting safety regressions
+        run: |
+          node client/test/ink-hybrid-check.mjs
+          node client/test/inkcheck-context.mjs
+      - name: Build and sync exact iPad bundles
+        run: |
+          npm run build
+          node scripts/sync-ios.mjs
+          node scripts/sync-ios.mjs --check
+      - name: Commit final hotfix and remove this temporary workflow
+        run: |
+          git config user.name "pri-learning-ci"
+          git config user.email "actions@users.noreply.github.com"
+          rm -f .github/workflows/hotfix-question-context-contract.yml
+          git add -- \
+            client/src/components/QuestionCard.jsx \
+            client/src/ink/runtimeSpatial.js \
+            client/test/ink-hybrid-check.mjs \
+            client/test/tour-ink.js \
+            'ios/PriLearning.swiftpm/Resources/Web' \
+            'ios/PriLearning 2.swiftpm/Resources/Web' \
+            .github/workflows/hotfix-question-context-contract.yml
+          git diff --cached --check
+          git commit -m "Fix real numeric handwriting context contract"
+          git push origin "HEAD:${{ github.head_ref }}"
