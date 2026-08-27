@@ -26,6 +26,27 @@ jobs:
         with:
           node-version: 22
 
+      - name: Align staged patch with current hybrid source
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('scripts/apply-set-ink-hotfix.py')
+          s = p.read_text()
+          s = s.replace(
+              '"import { recognize, classify } from \'./recognizer.js\';\\n",',
+              '"import { classify, recognize } from \'./recognizer.js\';\\n",'
+          )
+          s = s.replace(
+              '"const STRUCTURAL = new Set([\'=\', \'+\', \'-\', \'/\', \'sqrt\', \'<\', \'>\', \'<=\', \'>=\', \'!=\', \'div\', \'pm\', \'deg\', \'percent\', \':\', \'∫\']);\\n",',
+              '"const STRUCTURAL = new Set([\'+\', \'-\', \'=\', \'*\', \'/\', \'(\', \')\', \'[\', \']\', \'<\', \'>\', \'<=\', \'>=\', \'!=\', \'±\', \':\']);\\n",'
+          )
+          s = s.replace(
+              '"const STRUCTURAL = new Set([\'=\', \'+\', \'-\', \'/\', \'sqrt\', \'<\', \'>\', \'<=\', \'>=\', \'!=\', \'div\', \'pm\', \'deg\', \'percent\', \':\', \'∫\']);\\nconst SET_STRUCTURAL',
+              '"const STRUCTURAL = new Set([\'+\', \'-\', \'=\', \'*\', \'/\', \'(\', \')\', \'[\', \']\', \'<\', \'>\', \'<=\', \'>=\', \'!=\', \'±\', \':\']);\\nconst SET_STRUCTURAL'
+          )
+          p.write_text(s)
+          PY
+
       - name: Apply Pri Ink patch
         run: python3 scripts/apply-set-ink-hotfix.py
 
