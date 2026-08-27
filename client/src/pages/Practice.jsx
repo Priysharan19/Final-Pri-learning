@@ -3,7 +3,7 @@ import { useLocation, useSearchParams } from 'react-router-dom';
 import { api } from '../api.js';
 import { useApp } from '../App.jsx';
 import QuestionCard, { SR_ONLY } from '../components/QuestionCard.jsx';
-import PriExplain from '../components/PriExplain.jsx';
+import PriExplainV4 from '../components/PriExplainV4.jsx';
 
 export default function Practice() {
   const { user } = useApp();
@@ -95,7 +95,7 @@ export default function Practice() {
             onNext={load}
             onRedo={redo}
           />
-          <PriExplain
+          <PriExplainV4
             key={`explain-${serve.question.id}`}
             questionId={serve.question.id}
             questionPrompt={serve.question.prompt}
