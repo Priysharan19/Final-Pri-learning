@@ -62,26 +62,60 @@ function noteUser(result) {
   warmScope(u.year, pathway, course, indiaTrackId);
 }
 
+function teachingSubmission(body) {
+  if (!body) return null;
+  return {
+    answer: body.answer == null ? '' : String(body.answer),
+    steps: body.steps == null ? '' : String(body.steps),
+    viaInk: Boolean(body.viaInk),
+    ink: body.ink ? {
+      recognized: body.ink.recognized || body.ink.text || '',
+      strokes: Array.isArray(body.ink.strokes) ? body.ink.strokes : [],
+    } : null,
+    scribble: Array.isArray(body.scribble) ? body.scribble : [],
+  };
+}
+
 /**
- * Pri Explain stays downstream of marking: it never changes an answer, a mark,
- * or the verified solution. It only receives the already-resolved solution and
- * turns that immutable result into a teaching timeline in the practice UI.
- *
- * Browser-only by design. Node self-checks import this API too, so publishing is
- * a no-op when there is no window/CustomEvent implementation.
+ * Pri Explain stays downstream of marking. The first event carries the student's
+ * own attempt so V2 can replay the exact line/strokes that led to a mistake.
+ * The second is only emitted once the verified solution exists. Neither event
+ * mutates a result, rating, answer or stored ink; both are browser-local only.
  */
-function publishWorkedSolution(path, result) {
-  if (typeof window === 'undefined' || typeof CustomEvent === 'undefined' || !result?.solution) return;
+function publishTeachingEvidence(path, result, body) {
+  if (typeof window === 'undefined' || typeof CustomEvent === 'undefined') return;
   const match = SOLUTION_PATH.exec(path);
   if (!match) return;
+  const questionId = match[1];
+  const submission = match[2] === 'submit' ? teachingSubmission(body) : null;
+
+  if (submission) {
+    window.dispatchEvent(new CustomEvent('pri:attempt-feedback', {
+      detail: {
+        questionId,
+        submission,
+        correct: result?.correct,
+        resolved: Boolean(result?.resolved),
+        feedback: result?.feedback || '',
+        stepReport: result?.stepReport || null,
+        diagnosis: result?.diagnosis || result?.stepReport?.diagnosis || null,
+        misconception: result?.misconception || null,
+      }
+    }));
+  }
+
+  if (!result?.solution) return;
   window.dispatchEvent(new CustomEvent('pri:worked-solution', {
     detail: {
-      questionId: match[1],
+      questionId,
       solution: result.solution,
       correct: result.correct,
       feedback: result.feedback || '',
       revealed: Boolean(result.revealed),
       stepReport: result.stepReport || null,
+      diagnosis: result.diagnosis || result.stepReport?.diagnosis || null,
+      misconception: result.misconception || null,
+      submission,
     }
   }));
 }
@@ -114,7 +148,7 @@ async function call(method, path, body) {
       try {
         const result = await dispatch(checked.method, checked.path, checked.body);
         if (checked.path === '/me' || checked.path.startsWith('/profiles')) noteUser(result);
-        publishWorkedSolution(checked.path, result);
+        publishTeachingEvidence(checked.path, result, checked.body);
 
         // The local write has already committed at this point. A damaged/full
         // outbox must never turn that successful write into an API error (and

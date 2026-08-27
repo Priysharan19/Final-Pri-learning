@@ -99,6 +99,7 @@ export default function Practice() {
             key={`explain-${serve.question.id}`}
             questionId={serve.question.id}
             questionPrompt={serve.question.prompt}
+            questionFigure={serve.question.figure}
           />
         </>
       )}
