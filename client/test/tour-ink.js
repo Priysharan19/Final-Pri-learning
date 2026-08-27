@@ -145,8 +145,17 @@ export const flow = {
     // prove the QuestionCard → InkAnswer numeric context settles the 5/s tie.
     await handwrite(page, box, '5');
     const fiveLines = await reading(page);
+    const fiveSymbol = page.locator('.ink-line .ink-sym').first();
+    let fiveCandidates = [];
+    if (await fiveSymbol.count()) {
+      await fiveSymbol.click();
+      fiveCandidates = await page.locator('.ink-picker-row .ink-pick').evaluateAll(nodes =>
+        nodes.map(node => node.getAttribute('aria-label') || node.textContent?.trim() || '').filter(Boolean));
+      await fiveSymbol.click();
+    }
     await check('a single handwritten 5 survives the real numeric question context',
-      fiveLines.length === 1 && fiveLines[0] === '5', `read ${JSON.stringify(fiveLines)}`);
+      fiveLines.length === 1 && fiveLines[0] === '5',
+      `read ${JSON.stringify(fiveLines)}; candidates ${JSON.stringify(fiveCandidates)}`);
     await page.locator('.ink-tool[title="Clear"]').click();
     await settle();
 
