@@ -82,7 +82,19 @@ const workingQ = {
 const incomplete = checkWorking(workingQ, 'x^2 = 9\nx = 3');
 ok('working question rejects a final line with one of two roots', !incomplete.correct);
 
-// 11. Direct reason API: canonical solution survival alone is no longer enough.
+// 11. Natural complete solution lists are verified. Students should not have to
+// use ± just to satisfy the machine.
+r = stepCheck({ kind: 'equation', variable: 'x', solutions: [-3, 3] }, 'x^2 = 9\nx = 3 or x = -3');
+same('natural two-root list has no break', r.firstBreak, -1);
+same('natural two-root list is verified', r.lines[1].status, 'ok');
+const complete = checkWorking(workingQ, 'x^2 = 9\nx = 3 or x = -3');
+ok('working question accepts the complete natural solution list', complete.correct);
+
+r = stepCheck({ kind: 'equation', variable: 'x', solutions: [-3, 3] }, 'x^2 = 9\nx = 3, -3, 4');
+same('solution list with an extra value breaks', r.firstBreak, 1);
+same('listed extra value is diagnosed', r.diagnosis?.code, 'extraneous-solution');
+
+// 12. Direct reason API: canonical solution survival alone is no longer enough.
 const suspicious = assessEquationLine({
   ast: parse('(x - 5)(x - 100) = 0'),
   previousAst: parse('x = 5'),
