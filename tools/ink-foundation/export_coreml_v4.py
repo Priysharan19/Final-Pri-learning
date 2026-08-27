@@ -92,6 +92,8 @@ def validate_generalisation_report(
         raise SystemExit("V17 corpus readiness must be measured on the test split")
     if policy.get("finalHoldoutCountsTowardReadiness") is not False:
         raise SystemExit("final-holdout cannot count toward V17 corpus readiness")
+    if policy.get("finalHoldoutContentInspectedByAudit") is not False:
+        raise SystemExit("routine V17 corpus readiness must not inspect final-holdout contents")
     gates = evidence.get("gates") or {}
     if set(gates) != REQUIRED_DATA_GATES or not all(gates.values()):
         raise SystemExit("writer-generalisation report has incomplete/failing V17 data gates")
