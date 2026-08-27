@@ -1,0 +1,71 @@
+name: Native handwriting arbitration V2 stage
+
+on:
+  push:
+    branches:
+      - product/india-native-ink-truth
+
+permissions:
+  contents: write
+
+concurrency:
+  group: native-arbitration-v2-stage
+  cancel-in-progress: true
+
+jobs:
+  patch-test-native:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: product/india-native-ink-truth
+          fetch-depth: 1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+      - name: Apply native arbitration repair
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: python3 tools/apply-native-arbitration-v2.py
+      - name: Install client dependencies
+        run: npm ci --prefix client
+      - name: Native arbitration regression
+        run: |
+          npm run test:ink:arbitration
+          npm run test:ink:bridge
+          npm run test:ink:hybrid
+          npm run test:context
+      - name: Product regressions
+        run: |
+          npm run test:india
+          npm run test:gateway
+          npm run test:backend
+      - name: Production build
+        run: npm run build
+      - name: Sync native packages
+        run: |
+          npm run sync:ios
+          npm run check:ios
+          node scripts/check-native-package-sync.mjs
+      - name: Canonical native PencilKit gate
+        run: npm run test:ink:native
+      - name: Audit staged repair
+        run: |
+          git diff --check
+          grep -q "chooseNativeConsensus" client/src/ink/nativeConsensus.js
+          grep -q "Every other" client/src/ink/InkAnswer.jsx
+          grep -q "Native engines disagree" client/src/ink/InkAnswer.jsx
+          grep -q "test:ink:arbitration" package.json
+      - name: Commit validated repair
+        run: |
+          rm -f tools/apply-native-arbitration-v2.py
+          rm -f .github/workflows/native-arbitration-v2-stage.yml
+          rm -rf tools/__pycache__
+          git add -A
+          git config user.name pri-learning-ci
+          git config user.email actions@users.noreply.github.com
+          git commit -m "Require native consensus for real Apple Pencil handwriting"
+          git push origin HEAD:product/india-native-ink-truth
