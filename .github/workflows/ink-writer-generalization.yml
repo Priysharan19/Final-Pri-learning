@@ -111,8 +111,30 @@ jobs:
           print('writers by split:', p['writersBySplit'])
           print('samples by split:', p['samplesBySplit'])
           print('production data ready:', p['passesDataReadiness'])
-          # V17 must remain honest while the real corpus is still below promotion scale.
-          # The audit itself is required to execute, but CI must not manufacture readiness.
-          if p['passesDataReadiness'] and p['writers'] < 20:
-              raise SystemExit('writer diversity audit reported readiness below the minimum writer floor')
+
+          required_gates = {
+              'trainWriterTarget',
+              'evaluationWriterMinimum',
+              'evaluationSampleMinimum',
+              'minimumSamplesPerTrainWriter',
+              'trainTokenWriterCoverage',
+              'testTokenWriterCoverage',
+              'testTokenOccurrenceCoverage',
+              'noUnknownTargetTokens',
+              'noDuplicateSessionIds',
+          }
+          if int(p.get('version', 0)) < 2:
+              raise SystemExit('V17 requires writer-diversity audit schema v2+')
+          if set(p.get('gates', {})) != required_gates:
+              raise SystemExit('writer-diversity audit gates drifted from V17 release contract')
+          policy = p.get('policy', {})
+          if policy.get('evaluationSplit') != 'test' or policy.get('finalHoldoutCountsTowardReadiness') is not False:
+              raise SystemExit('final-holdout must never fill ordinary test-readiness gaps')
+          if p['passesDataReadiness']:
+              if p.get('writersBySplit', {}).get('test', 0) < policy['evaluationMinWriters']:
+                  raise SystemExit('readiness passed below the test-writer minimum')
+              if p.get('samplesBySplit', {}).get('test', 0) < policy['evaluationMinSamples']:
+                  raise SystemExit('readiness passed below the test-sample minimum')
+              if not all(p['gates'].values()):
+                  raise SystemExit('readiness passed while a constituent data gate failed')
           PY
