@@ -1,0 +1,39 @@
+{
+  "format": "pri-ink-corpus-policy",
+  "version": 1,
+  "releaseLane": "V17.1",
+  "vocabularyVersion": 4,
+  "splitAlgorithm": "fnv1a32-v1:70/10/10/10",
+  "splitPercentages": {
+    "train": 70,
+    "validation": 10,
+    "test": 10,
+    "final-holdout": 10
+  },
+  "readiness": {
+    "trainWriterTarget": 100,
+    "minSamplesPerTrainWriter": 40,
+    "validationWriterTarget": 10,
+    "preferredSamplesPerValidationWriter": 50,
+    "evaluationSplit": "test",
+    "evaluationMinWriters": 20,
+    "evaluationMinSamples": 1000,
+    "finalHoldoutWriterTarget": 20,
+    "preferredSamplesPerFinalHoldoutWriter": 50,
+    "minTrainWritersPerToken": 5,
+    "minTestWritersPerToken": 3,
+    "minTestOccurrencesPerToken": 5
+  },
+  "evidence": {
+    "syntheticAugmentationsCountAsWriters": false,
+    "finalHoldoutCountsTowardRoutineReadiness": false,
+    "routineToolsMayInspectFinalHoldoutTargets": false,
+    "routineToolsMayInspectFinalHoldoutStrokes": false
+  },
+  "campaign": {
+    "preferredSamplesPerWriter": 50,
+    "candidateCodePrefix": "P",
+    "candidateCodeWidth": 4,
+    "candidatePreviewPerSplit": 12
+  }
+}
