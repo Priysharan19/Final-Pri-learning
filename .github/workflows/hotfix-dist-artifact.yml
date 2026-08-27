@@ -22,9 +22,44 @@ jobs:
           cache-dependency-path: client/package-lock.json
       - run: npm ci --prefix client
       - run: npm run build
+      - name: Sync both tracked iPad bundles
+        run: node scripts/sync-ios.mjs
+      - name: Build exact sync payload
+        run: |
+          python - <<'PY'
+          import base64, json, pathlib, subprocess
+          root = pathlib.Path('.')
+          raw = subprocess.check_output(['git', 'status', '--porcelain=v1', '-z'])
+          records = []
+          for item in raw.decode('utf-8').split('\0'):
+              if not item:
+                  continue
+              status = item[:2]
+              path = item[3:]
+              # The workflow file is a temporary transport helper, not part of
+              # the iOS bundle payload.
+              if path == '.github/workflows/hotfix-dist-artifact.yml':
+                  continue
+              p = root / path
+              row = {'status': status, 'path': path}
+              if p.is_file():
+                  data = p.read_bytes()
+                  try:
+                      row['encoding'] = 'utf-8'
+                      row['content'] = data.decode('utf-8')
+                  except UnicodeDecodeError:
+                      row['encoding'] = 'base64'
+                      row['content'] = base64.b64encode(data).decode('ascii')
+              records.append(row)
+          pathlib.Path('/tmp/ios-sync-payload.json').write_text(
+              json.dumps({'changes': records}, ensure_ascii=False), encoding='utf-8')
+          print('sync payload changes:', len(records))
+          for row in records:
+              print(row['status'], row['path'])
+          PY
       - uses: actions/upload-artifact@v4
         with:
-          name: hotfix-client-dist
-          path: client/dist
+          name: hotfix-ios-sync-payload
+          path: /tmp/ios-sync-payload.json
           if-no-files-found: error
           retention-days: 1
