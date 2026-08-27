@@ -9,6 +9,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import InkCanvas from './InkCanvas.jsx';
 import NativeInkCanvas from './NativeInkCanvas.jsx';
 import { nativeInk, nativeInkAvailable } from './native.js';
+import { chooseNativeConsensus, hasReading, normalizedReadingText } from './nativeConsensus.js';
 import { recognizeWithStructuralDev } from '../../dev/devStructural.js';
 import { recognize, exprToLatex } from './recognizer.js';
 import { recognizeWithoutDetachedSideWork } from './runtimeSpatial.js';
@@ -22,10 +23,11 @@ const NICE = { pi: 'π', theta: 'θ', sqrt: '√', percent: '%' };
 const showSym = s => NICE[s] || s;
 
 // ── Which surface, which engine ──────────────────────────────────────────────
-// PencilKit is the native capture surface. Recognition order on iPad is now:
-//   1. Pri's bundled Core ML foundation model, when a validated asset exists;
-//   2. Pri's mature JS stroke/CNN/grammar recogniser;
-//   3. the native Vision/geometry reader as an emergency no-result rescue.
+// PencilKit is the native capture surface. Recognition on iPad is an evidence
+// problem, not a fallback ladder: Foundation and JS form two independent
+// opinions, and any disagreement MUST ask the native Vision/geometry reader
+// for a third vote. A legacy JS reading can never become authoritative merely
+// because its synthetic confidence is high on real Apple Pencil handwriting.
 // Browser/LAN builds normally begin at stage 2. `serve:lan:v4` adds a strictly
 // development-only first opinion from the local Structural V4 PyTorch worker on
 // the developer Mac, so physical iPad testing can exercise the actual research
@@ -97,52 +99,6 @@ function readingConfidence(result) {
   };
 }
 
-const normalizedReadingText = r => String(r?.text || '').replace(/\s+/g, '').toLowerCase();
-const hasReading = r => !!r?.lines?.some(line => String(line?.text || '').trim());
-
-function plausibleInkText(r) {
-  const t = normalizedReadingText(r);
-  if (!t || t.includes('?')) return false;
-  let depth = 0;
-  for (const ch of t) {
-    if (ch === '(') depth++;
-    else if (ch === ')') { depth--; if (depth < 0) return false; }
-  }
-  return depth === 0 && !/[+*/=<>^]$/.test(t);
-}
-
-function qualityOfReading(r) {
-  if (!hasReading(r)) return -1;
-  const sure = readingConfidence(r);
-  const conf = Number.isFinite(sure.minConf) ? sure.minConf : 0.45;
-  const margin = Number.isFinite(sure.margin) ? sure.margin : 0.10;
-  return 0.74 * conf + 0.26 * Math.min(1, margin * 2.5) + (plausibleInkText(r) ? 0.08 : -0.20);
-}
-
-function strongReading(r) {
-  if (!hasReading(r) || !plausibleInkText(r)) return false;
-  const sure = readingConfidence(r);
-  return sure.minConf >= 0.68 && sure.margin >= 0.10;
-}
-
-function chooseNativeConsensus(candidates) {
-  const live = candidates.filter(hasReading);
-  if (!live.length) return null;
-  const groups = new Map();
-  for (const r of live) {
-    const key = normalizedReadingText(r);
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key).push(r);
-  }
-  const consensus = [...groups.values()].sort((a, b) => b.length - a.length || Math.max(...b.map(qualityOfReading)) - Math.max(...a.map(qualityOfReading)))[0];
-  if (consensus.length >= 2) {
-    const chosen = [...consensus].sort((a, b) => qualityOfReading(b) - qualityOfReading(a))[0];
-    const engines = consensus.map(r => r.engine || 'unknown').join('+');
-    return { ...chosen, engine: `pri-consensus:${engines}` };
-  }
-  return [...live].sort((a, b) => qualityOfReading(b) - qualityOfReading(a))[0];
-}
-
 /**
  * lineVerdicts: optional array aligned with recognised lines, e.g.
  * [{status:'ok'}, {status:'break', note:'…'}] — drawn as a teacher-style
@@ -212,27 +168,21 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
       return;
     }
 
-    // Native iPad: Foundation is one opinion, not an oracle. The current
-    // learned checkpoint is still data-limited, so a non-empty reading is not
-    // enough to trust it. Compare it with Pri's independent JS stroke engine;
-    // disagreement or weak confidence asks the native rescue reader for a third
-    // answer-blind vote. Two matching engines win; otherwise the best calibrated
-    // reading is shown and the existing confirmation gate still protects marks.
+    // Native iPad: Foundation and JS are opinions, not fallbacks. The previous
+    // implementation allowed a lone JS V3 reading to short-circuit this path
+    // when JS reported high confidence. Real Pencil evidence showed that those
+    // confidences are not calibrated outside the synthetic/template domain.
+    // Therefore only exact two-engine agreement may finish early. Every other
+    // case asks the native Vision/geometry reader for a third answer-blind vote.
     nativeInk.foundationRecognize(ovr, recognitionContext).then(foundation => {
       if (seq !== readSeqRef.current) return;
       const localRaw = readWithJS();
       const local = localRaw ? { ...localRaw, engine: 'pri-js-v3' } : null;
 
-      if (hasReading(foundation) && hasReading(local) && normalizedReadingText(foundation) === normalizedReadingText(local)) {
-        publish({ ...foundation, engine: `pri-consensus:${foundation.engine || 'foundation'}+pri-js-v3` }, strokes);
-        return;
-      }
-      if (hasReading(foundation) && strongReading(foundation) && !hasReading(local)) {
-        publish(foundation, strokes);
-        return;
-      }
-      if (!hasReading(foundation) && hasReading(local) && strongReading(local)) {
-        publish(local, strokes);
+      if (hasReading(foundation) && hasReading(local)
+          && normalizedReadingText(foundation) === normalizedReadingText(local)) {
+        const agreed = chooseNativeConsensus([foundation, local]);
+        publish(agreed || { ...EMPTY_READING, engine: 'pri-native-no-reading' }, strokes);
         return;
       }
 
@@ -295,9 +245,11 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
       ? 'Structural V4 returned no reading · showing JS V3 fallback'
       : rec.engine === 'pri-js-v3'
         ? 'Legacy JS V3 fallback · not native PencilKit/Core ML'
-        : NATIVE_INK && rec.engine
-          ? `Native recognition path · ${rec.engine}`
-          : null;
+        : rec.disagreement
+          ? `Native engines disagree · confirmation required · ${rec.engine}`
+          : NATIVE_INK && rec.engine
+            ? `Native recognition path · ${rec.engine}`
+            : null;
 
   return (
     <div className={`ink-answer ${disabled ? 'ink-disabled' : ''}`}>
@@ -389,6 +341,16 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
           <div className="ink-preview-title" id="ink-reading">
             I'm reading:{engineNote && <span className="muted" style={{ marginLeft: 10, textTransform: 'none', letterSpacing: 0 }}>{engineNote}</span>}
           </div>
+          {rec.disagreement && Array.isArray(rec.candidateReadings) && rec.candidateReadings.length > 1 && (
+            <details style={{ margin: '8px 14px 2px', fontSize: 11.5 }} className="muted">
+              <summary style={{ cursor: 'pointer' }}>Recognition evidence</summary>
+              {rec.candidateReadings.map((candidate, index) => (
+                <div key={`${candidate.engine}-${index}`} style={{ marginTop: 5, overflowWrap: 'anywhere' }}>
+                  <b>{candidate.engine}</b> → {candidate.text || 'no reading'}
+                </div>
+              ))}
+            </details>
+          )}
           {rec.lines.map((line, li) => (
             <div className="ink-line" key={li}>
               <span className="ink-line-n" aria-hidden="true">{li + 1}</span>

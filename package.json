@@ -10,7 +10,7 @@
     "build": "npm run build --prefix client",
     "start": "node server/index.js",
     "seed": "node server/seed.js",
-    "test": "npm run test:engine && npm run test:gateway && npm run test:outbox && npm run test:backend && npm run test:security && npm run test:diagnose && npm run test:india && npm run test:ink && npm run test:calculus && npm run test:jee && npm run test:hard && npm run test:lines && npm run test:holdout && npm run test:holdout2 && npm run test:holdout3 && npm run test:ink:collector && npm run test:ink:feedback && npm run test:ink:structure && npm run test:ink:corpus && npm run test:context && npm run test:ink:bridge && npm run test:photo:bridge && npm run test:ink:interaction && npm run test:ink:personal && npm run test:ink:hybrid",
+    "test": "npm run test:engine && npm run test:gateway && npm run test:outbox && npm run test:backend && npm run test:security && npm run test:diagnose && npm run test:india && npm run test:ink && npm run test:calculus && npm run test:jee && npm run test:hard && npm run test:lines && npm run test:holdout && npm run test:holdout2 && npm run test:holdout3 && npm run test:ink:collector && npm run test:ink:feedback && npm run test:ink:structure && npm run test:ink:corpus && npm run test:context && npm run test:ink:bridge && npm run test:photo:bridge && npm run test:ink:interaction && npm run test:ink:personal && npm run test:ink:hybrid && npm run test:ink:arbitration",
     "test:engine": "node server/test/selfcheck.mjs",
     "test:engine:quick": "node server/test/selfcheck.mjs --quick",
     "test:engine:thorough": "node server/test/selfcheck.mjs --thorough",
@@ -74,6 +74,7 @@
     "ink:bootstrap": "bash scripts/ink-bootstrap-one-writer.sh",
     "ink:bootstrap:strong": "PRI_INK_SYNTH_TRAIN_WRITERS=192 PRI_INK_SYNTH_VAL_WRITERS=48 PRI_INK_SYNTH_SAMPLES_PER_WRITER=40 PRI_INK_PERSONAL_SYNTH_SAMPLES=1600 PRI_INK_PRETRAIN_EPOCHS=24 PRI_INK_BOOTSTRAP_EPOCHS=50 PRI_INK_D_MODEL=256 PRI_INK_STROKE_LAYERS=8 PRI_INK_DECODER_LAYERS=6 PRI_INK_REAL_REPLAY_FRACTION=0.30 PRI_INK_VISUAL_LR_MULTIPLIER=2.0 PRI_INK_STROKE_LR_MULTIPLIER=0.45 PRI_INK_DECODER_LR_MULTIPLIER=1.0 bash scripts/ink-bootstrap-one-writer.sh",
     "ink:next-attempt:strong": "npm run ink:bootstrap:strong && npm run ink:personalize && npm run test:ink:personal && npm run test:ink:hybrid && npm run test:context && npm run build && npm run sync:ios && npm run check:ios",
-    "ink:bootstrap:export": "bash scripts/ink-bootstrap-export.sh"
+    "ink:bootstrap:export": "bash scripts/ink-bootstrap-export.sh",
+    "test:ink:arbitration": "node client/test/native-ink-arbitration-check.mjs"
   }
 }
