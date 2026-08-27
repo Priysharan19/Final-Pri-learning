@@ -29,6 +29,7 @@ V17 introduces the V4 foundation-model track without replacing the current produ
 9. **Dual-gated Core ML promotion.** V4 can be exported for development at any time, but it cannot be marked production-ready unless the exact checkpoint passes both the locked final-holdout release report and the real unseen-writer generalisation report.
 10. **Executable CI smoke.** CI compiles every V4 module, runs architecture/vocabulary checks, generates a writer-disjoint mini-corpus, performs an actual one-epoch CPU training run, verifies the resulting checkpoint identity and audits the current real corpus.
 11. **Coverage cannot hide behind sample count.** Production data readiness requires real multi-writer exposure for every supported V4 token; a large corpus that omits hard notation is still not ready.
+12. **Final holdout stays opaque.** Routine readiness tooling may read only enough holdout metadata to detect writer/session leakage. It does not inspect final-holdout targets, symbols, strokes or style statistics. Only an explicitly unlocked frozen-release evaluator may consume that evidence.
 
 ## Production data policy
 
