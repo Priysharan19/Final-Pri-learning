@@ -1,9 +1,10 @@
-// Pri Explain V3 · deterministic visual renderer + verified storyboard compiler.
+// Pri Explain V4 · deterministic visual renderer + verified teaching director.
 // Marking owns correctness. This layer accepts presentation instructions only
 // after storyboard.js proves every mathematical reference came from the
 // verified solution payload.
 
 import { STORYBOARD_VERSION, validateStoryboard } from './storyboard.js';
+import { buildDirectedStoryboard } from './teachingDirector.js';
 
 const MATH = /\$([^$]+)\$/g;
 const TOKEN = /\\[a-zA-Z]+|\d+(?:\.\d+)?|[A-Za-z]+|<=|>=|!=|[=+\-*/^(),{}]|\S/g;
@@ -217,6 +218,19 @@ export function buildVisualTimeline(solution, context = {}) {
     if (compiled.ok && compiled.timeline.length) return compiled.timeline;
   }
 
+  // V4: the local teaching director is the normal production path. It uses
+  // marking evidence to choose emphasis/checkpoints, then comes back through the
+  // exact same V3 verifier as an authored or future model storyboard.
+  if (context.disableTeachingDirector !== true) {
+    const directed = buildDirectedStoryboard(solution, context);
+    if (directed) {
+      const compiled = compileStoryboard(directed, solution, context);
+      if (compiled.ok && compiled.timeline.length) return compiled.timeline;
+    }
+  }
+
+  // Last-resort renderer: deliberately retained so a future director bug can
+  // never remove worked solutions from the product.
   const fallback = buildDeterministicStoryboard(solution, context);
   const compiled = compileStoryboard(fallback, solution, context, { trustedText: true });
   return compiled.ok ? compiled.timeline : [];
