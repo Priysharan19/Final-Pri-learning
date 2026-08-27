@@ -1,0 +1,146 @@
+name: Pri Ink V17 writer generalization
+
+on:
+  pull_request:
+    paths:
+      - 'tools/ink-foundation/data_v4.py'
+      - 'tools/ink-foundation/model_v4.py'
+      - 'tools/ink-foundation/train_v4.py'
+      - 'tools/ink-foundation/style_augmentation.py'
+      - 'tools/ink-foundation/evaluate_writer_generalization.py'
+      - 'tools/ink-foundation/evaluate_release_v4.py'
+      - 'tools/ink-foundation/audit_writer_diversity.py'
+      - 'tools/ink-foundation/test_writer_generalization.py'
+      - 'tools/ink-foundation/export_coreml_v4.py'
+      - 'handwriting/v17/**'
+      - '.github/workflows/ink-writer-generalization.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'tools/ink-foundation/data_v4.py'
+      - 'tools/ink-foundation/model_v4.py'
+      - 'tools/ink-foundation/train_v4.py'
+      - 'tools/ink-foundation/style_augmentation.py'
+      - 'tools/ink-foundation/evaluate_writer_generalization.py'
+      - 'tools/ink-foundation/evaluate_release_v4.py'
+      - 'tools/ink-foundation/audit_writer_diversity.py'
+      - 'tools/ink-foundation/test_writer_generalization.py'
+      - 'tools/ink-foundation/export_coreml_v4.py'
+      - 'handwriting/v17/**'
+      - '.github/workflows/ink-writer-generalization.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  writer-generalization-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: tools/ink-foundation/requirements.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install minimal ML dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install 'torch>=2.3,<3' 'numpy>=1.26,<3' 'Pillow>=10,<12'
+      - name: Compile V4 modules
+        run: |
+          python -m py_compile \
+            tools/ink-foundation/data_v4.py \
+            tools/ink-foundation/model_v4.py \
+            tools/ink-foundation/train_v4.py \
+            tools/ink-foundation/style_augmentation.py \
+            tools/ink-foundation/evaluate_writer_generalization.py \
+            tools/ink-foundation/evaluate_release_v4.py \
+            tools/ink-foundation/audit_writer_diversity.py \
+            tools/ink-foundation/test_writer_generalization.py \
+            tools/ink-foundation/export_coreml_v4.py
+      - name: Test writer-generalization architecture and V4 vocabulary
+        working-directory: tools/ink-foundation
+        run: python test_writer_generalization.py
+      - name: Generate tiny writer-disjoint corpus
+        run: node tools/ink-foundation/generate_synthetic.mjs /tmp/pri-ink-v4-smoke 4 2 4
+      - name: One-epoch CPU V4 training smoke
+        run: |
+          python tools/ink-foundation/train_v4.py \
+            --stage pretrain \
+            --corpus /tmp/pri-ink-v4-smoke \
+            --out /tmp/pri-ink-v4-smoke.pt \
+            --epochs 1 \
+            --batch 4 \
+            --workers 0 \
+            --device cpu \
+            --d-model 32 \
+            --stroke-layers 1 \
+            --decoder-layers 1 \
+            --max-points 128 \
+            --max-tokens 32 \
+            --patience 1
+      - name: Verify substantive V4 checkpoint
+        run: |
+          python - <<'PY'
+          import pathlib, sys, torch
+          sys.path.insert(0, 'tools/ink-foundation')
+          from data_v4 import VOCAB
+          p = pathlib.Path('/tmp/pri-ink-v4-smoke.pt')
+          if not p.exists() or p.stat().st_size < 10_000:
+              raise SystemExit('V4 training smoke did not produce a substantive checkpoint')
+          ckpt = torch.load(p, map_location='cpu', weights_only=False)
+          if ckpt.get('architecture_version') != 4 or ckpt.get('stage') != 'pretrain':
+              raise SystemExit('V4 checkpoint identity/stage is wrong')
+          if ckpt.get('vocab') != VOCAB or '∫' not in ckpt.get('vocab', []):
+              raise SystemExit('V4 checkpoint lost append-only calculus vocabulary')
+          print('V4 training smoke: PASS')
+          PY
+      - name: Audit current real-writer evidence
+        run: |
+          python tools/ink-foundation/audit_writer_diversity.py \
+            --corpus client/test/ink-corpus \
+            --out /tmp/pri-ink-writer-diversity.json
+          python - <<'PY'
+          import json
+          p = json.load(open('/tmp/pri-ink-writer-diversity.json'))
+          print('writers:', p['writers'])
+          print('writers by split:', p['writersBySplit'])
+          print('samples by split:', p['samplesBySplit'])
+          print('production data ready:', p['passesDataReadiness'])
+
+          required_gates = {
+              'trainWriterTarget',
+              'evaluationWriterMinimum',
+              'evaluationSampleMinimum',
+              'minimumSamplesPerTrainWriter',
+              'trainTokenWriterCoverage',
+              'testTokenWriterCoverage',
+              'testTokenOccurrenceCoverage',
+              'noUnknownTargetTokens',
+              'noDuplicateSessionIds',
+          }
+          if int(p.get('version', 0)) < 2:
+              raise SystemExit('V17 requires writer-diversity audit schema v2+')
+          if set(p.get('gates', {})) != required_gates:
+              raise SystemExit('writer-diversity audit gates drifted from V17 release contract')
+          policy = p.get('policy', {})
+          if policy.get('evaluationSplit') != 'test':
+              raise SystemExit('V17 readiness must be measured on the repeatable test split')
+          if policy.get('finalHoldoutCountsTowardReadiness') is not False:
+              raise SystemExit('final-holdout must never fill ordinary test-readiness gaps')
+          if policy.get('finalHoldoutContentInspectedByAudit') is not False:
+              raise SystemExit('routine readiness audit must not inspect final-holdout contents')
+          if (p.get('finalHoldout') or {}).get('contentInspected') is not False:
+              raise SystemExit('final-holdout opacity invariant is missing from audit report')
+          if p['passesDataReadiness']:
+              if p.get('writersBySplit', {}).get('test', 0) < policy['evaluationMinWriters']:
+                  raise SystemExit('readiness passed below the test-writer minimum')
+              if p.get('samplesBySplit', {}).get('test', 0) < policy['evaluationMinSamples']:
+                  raise SystemExit('readiness passed below the test-sample minimum')
+              if not all(p['gates'].values()):
+                  raise SystemExit('readiness passed while a constituent data gate failed')
+          PY
