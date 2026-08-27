@@ -82,7 +82,10 @@ function cleanAction(raw, evidence, context) {
   if (kind === 'checkpoint') {
     const prompt = text(raw.prompt, 220);
     if (!prompt) return null;
-    return { kind, prompt, answer: text(raw.answer, 220) };
+    // Checkpoints are intentionally prediction-only. An AI director may ask the
+    // learner what should happen next, but the answer is supplied only by the
+    // following verified scene — never by free-form storyboard text.
+    return { kind, prompt };
   }
 
   return null;
@@ -157,6 +160,7 @@ export function storyboardPromptContract(solution, context = {}) {
       'Prefer one conceptual change per scene.',
       'Use replay_attempt first when a wrong attempt exists.',
       'Use transform_equation only for equations listed in verifiedMath.',
+      'Use checkpoint only to ask for a prediction; never supply its answer.',
       'Keep narration concise and suitable for spoken Australian English.',
     ],
     allowedActions: ACTION_KINDS,
