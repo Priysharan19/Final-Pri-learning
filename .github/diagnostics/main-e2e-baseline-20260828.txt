@@ -1,0 +1,1 @@
+Baseline trigger only. This commit intentionally changes no client, handwriting, engine, iOS bundle, or test source. It exists solely to rerun the current main application through CI for comparison with Pri Reason PR #65, then the diagnostic branch can be discarded.
