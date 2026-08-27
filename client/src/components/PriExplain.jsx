@@ -90,7 +90,9 @@ export default function PriExplain({ questionId, questionPrompt, questionFigure 
     const receiveAttempt = event => {
       const detail = event?.detail;
       if (String(detail?.questionId) !== String(questionId)) return;
-      if (detail.correct === false && detail.submission) {
+      // The first miss is the pedagogically useful evidence. Later retries can
+      // be consequences of that misconception, so never overwrite the original.
+      if (detail.correct === false && detail.submission && !wrongRef.current) {
         wrongRef.current = detail;
       }
     };
