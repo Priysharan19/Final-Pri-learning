@@ -64,8 +64,17 @@ jobs:
         run: |
           npm run sync:ios
           npm run check:ios
-      - name: Swift package compile sanity
-        run: swift build --package-path ios/PriLearning.swiftpm
+      - name: Canonical native iPad handwriting gate
+        run: |
+          set -euo pipefail
+          node scripts/check-native-package-sync.mjs
+          xcodebuild -version
+          xcrun simctl list devices available | grep -m 1 'iPad' >/dev/null || {
+            echo '::error::No iPad simulator is available on this runner'
+            exit 1
+          }
+          npm run test:ink:bridge
+          npm run test:ink:native
       - name: Final diff audit
         run: |
           git diff --check
