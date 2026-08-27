@@ -13,13 +13,16 @@ const DEFAULT_MIN_CONFIDENCE = 0.92;
 const DEFAULT_TIMEOUT_MS = 15000;
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
+// Keep the strict schema deliberately conservative. Length/range limits are
+// enforced after parsing so this stays compatible with the Structured Outputs
+// JSON-Schema subset across model revisions.
 const MATH_LINE_SCHEMA = {
   type: 'object',
   additionalProperties: false,
   properties: {
-    text: { type: 'string', maxLength: 500 },
-    latex: { type: 'string', maxLength: 1000 },
-    confidence: { type: 'number', minimum: 0, maximum: 1 },
+    text: { type: 'string' },
+    latex: { type: 'string' },
+    confidence: { type: 'number' },
     kind: { type: 'string', enum: ['math', 'diagram', 'annotation', 'unreadable'] }
   },
   required: ['text', 'latex', 'confidence', 'kind']
@@ -31,10 +34,9 @@ const RESPONSE_SCHEMA = {
   properties: {
     lines: {
       type: 'array',
-      maxItems: 30,
       items: MATH_LINE_SCHEMA
     },
-    overall_confidence: { type: 'number', minimum: 0, maximum: 1 },
+    overall_confidence: { type: 'number' },
     needs_confirmation: { type: 'boolean' }
   },
   required: ['lines', 'overall_confidence', 'needs_confirmation']
@@ -80,7 +82,7 @@ export function normalizePriText(value) {
     .replace(/\\%/g, '%')
     .replace(/\s+/g, ' ')
     .trim();
-  return text;
+  return text.slice(0, 500);
 }
 
 export function extractResponseText(response) {
@@ -243,9 +245,9 @@ export async function transcribeMathHandwriting(imageDataUrl, options = {}) {
     model: primaryModel, imageDataUrl, apiKey, fetchImpl, timeoutMs, detail
   });
   let chosen = primaryCall.result;
-  let usage = [{ model: primaryModel, usage: primaryCall.usage }];
+  const usage = [{ model: primaryModel, usage: primaryCall.usage }];
   let disagreement = false;
-  let candidates = [publicCandidate(primaryCall.result)];
+  const candidates = [publicCandidate(primaryCall.result)];
 
   const shouldEscalate = chosen.needsConfirmation || chosen.overallConfidence < minConfidence;
   if (shouldEscalate && fallbackModel && fallbackModel !== primaryModel) {
