@@ -5,6 +5,7 @@
 // Native integrations:
 //   • a real PencilKit writing surface over the page's ink area, and Vision
 //     handwriting recognition behind it (Ink/) — see InkBridge
+//   • Apple Foundation Models teaching-director bridge for Pri Explain V4
 //   • priShare message handler → iOS share sheet for backups / task packs /
 //     progress files (AirDrop, Files, Mail…)
 //   • WKDownload for any blob downloads → share sheet
@@ -42,7 +43,7 @@ struct WebShell: UIViewRepresentable {
 
         // Tell the web app it is running inside the native shell.
         let nativeFlag = WKUserScript(
-            source: "window.__PRI_NATIVE__ = true; window.__PRI_NATIVE_INK__ = true; window.__PRI_NATIVE_PHOTO__ = true;",
+            source: "window.__PRI_NATIVE__ = true; window.__PRI_NATIVE_INK__ = true; window.__PRI_NATIVE_PHOTO__ = true; window.__PRI_NATIVE_EXPLAIN__ = true;",
             injectionTime: .atDocumentStart,
             forMainFrameOnly: false
         )
@@ -50,6 +51,7 @@ struct WebShell: UIViewRepresentable {
         config.userContentController.add(context.coordinator, name: "priShare")
         config.userContentController.add(context.coordinator, name: "priInk")
         config.userContentController.add(context.coordinator, name: "priPhoto")
+        config.userContentController.add(ExplainModelMessageHandler(), name: "priExplain")
 
         let webView = WKWebView(frame: .zero, configuration: config)
         webView.navigationDelegate = context.coordinator
