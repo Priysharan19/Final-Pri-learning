@@ -97,6 +97,52 @@ function readingConfidence(result) {
   };
 }
 
+const normalizedReadingText = r => String(r?.text || '').replace(/\s+/g, '').toLowerCase();
+const hasReading = r => !!r?.lines?.some(line => String(line?.text || '').trim());
+
+function plausibleInkText(r) {
+  const t = normalizedReadingText(r);
+  if (!t || t.includes('?')) return false;
+  let depth = 0;
+  for (const ch of t) {
+    if (ch === '(') depth++;
+    else if (ch === ')') { depth--; if (depth < 0) return false; }
+  }
+  return depth === 0 && !/[+*/=<>^]$/.test(t);
+}
+
+function qualityOfReading(r) {
+  if (!hasReading(r)) return -1;
+  const sure = readingConfidence(r);
+  const conf = Number.isFinite(sure.minConf) ? sure.minConf : 0.45;
+  const margin = Number.isFinite(sure.margin) ? sure.margin : 0.10;
+  return 0.74 * conf + 0.26 * Math.min(1, margin * 2.5) + (plausibleInkText(r) ? 0.08 : -0.20);
+}
+
+function strongReading(r) {
+  if (!hasReading(r) || !plausibleInkText(r)) return false;
+  const sure = readingConfidence(r);
+  return sure.minConf >= 0.68 && sure.margin >= 0.10;
+}
+
+function chooseNativeConsensus(candidates) {
+  const live = candidates.filter(hasReading);
+  if (!live.length) return null;
+  const groups = new Map();
+  for (const r of live) {
+    const key = normalizedReadingText(r);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(r);
+  }
+  const consensus = [...groups.values()].sort((a, b) => b.length - a.length || Math.max(...b.map(qualityOfReading)) - Math.max(...a.map(qualityOfReading)))[0];
+  if (consensus.length >= 2) {
+    const chosen = [...consensus].sort((a, b) => qualityOfReading(b) - qualityOfReading(a))[0];
+    const engines = consensus.map(r => r.engine || 'unknown').join('+');
+    return { ...chosen, engine: `pri-consensus:${engines}` };
+  }
+  return [...live].sort((a, b) => qualityOfReading(b) - qualityOfReading(a))[0];
+}
+
 /**
  * lineVerdicts: optional array aligned with recognised lines, e.g.
  * [{status:'ok'}, {status:'break', note:'…'}] — drawn as a teacher-style
@@ -166,35 +212,37 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
       return;
     }
 
-    // iPad native wrapper: first ask the Pri-owned Core ML foundation model.
-    // Development builds without a promoted model return an empty result and
-    // continue. Safe recognition context is forwarded across the bridge too.
+    // Native iPad: Foundation is one opinion, not an oracle. The current
+    // learned checkpoint is still data-limited, so a non-empty reading is not
+    // enough to trust it. Compare it with Pri's independent JS stroke engine;
+    // disagreement or weak confidence asks the native rescue reader for a third
+    // answer-blind vote. Two matching engines win; otherwise the best calibrated
+    // reading is shown and the existing confirmation gate still protects marks.
     nativeInk.foundationRecognize(ovr, recognitionContext).then(foundation => {
       if (seq !== readSeqRef.current) return;
-      if (foundation?.lines?.some(line => line.text)) {
+      const localRaw = readWithJS();
+      const local = localRaw ? { ...localRaw, engine: 'pri-js-v3' } : null;
+
+      if (hasReading(foundation) && hasReading(local) && normalizedReadingText(foundation) === normalizedReadingText(local)) {
+        publish({ ...foundation, engine: `pri-consensus:${foundation.engine || 'foundation'}+pri-js-v3` }, strokes);
+        return;
+      }
+      if (hasReading(foundation) && strongReading(foundation) && !hasReading(local)) {
         publish(foundation, strokes);
         return;
       }
-
-      // The existing custom engine remains an independent local opinion and
-      // protects the product while the real-writer corpus grows.
-      const local = readWithJS();
-      if (seq !== readSeqRef.current) return;
-      if (local?.lines?.some(line => line.text)) {
-        publish({ ...local, engine: 'pri-js-v3' }, strokes);
+      if (!hasReading(foundation) && hasReading(local) && strongReading(local)) {
+        publish(local, strokes);
         return;
       }
 
-      // Last resort only. This path is still fully on-device and exists to make
-      // a missing/failed model an accuracy degradation rather than lost work.
-      nativeInk.recognize(ovr, recognitionContext).then(reading => {
+      nativeInk.recognize(ovr, recognitionContext).then(nativeRaw => {
         if (seq !== readSeqRef.current) return;
-        publish(
-          reading
-            ? readUnreadLines(reading, strokes, ovr, recognitionContext)
-            : (local ? { ...local, engine: 'pri-js-v3' } : EMPTY_READING),
-          strokes
-        );
+        const nativeReading = nativeRaw
+          ? readUnreadLines(nativeRaw, strokes, ovr, recognitionContext)
+          : null;
+        const chosen = chooseNativeConsensus([foundation, local, nativeReading]);
+        publish(chosen || { ...EMPTY_READING, engine: 'pri-native-no-reading' }, strokes);
       });
     });
   }, [publish, recognitionContext]);
@@ -247,7 +295,9 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
       ? 'Structural V4 returned no reading · showing JS V3 fallback'
       : rec.engine === 'pri-js-v3'
         ? 'Legacy JS V3 fallback · not native PencilKit/Core ML'
-        : null;
+        : NATIVE_INK && rec.engine
+          ? `Native recognition path · ${rec.engine}`
+          : null;
 
   return (
     <div className={`ink-answer ${disabled ? 'ink-disabled' : ''}`}>

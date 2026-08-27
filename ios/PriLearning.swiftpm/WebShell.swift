@@ -42,13 +42,14 @@ struct WebShell: UIViewRepresentable {
 
         // Tell the web app it is running inside the native shell.
         let nativeFlag = WKUserScript(
-            source: "window.__PRI_NATIVE__ = true; window.__PRI_NATIVE_INK__ = true;",
+            source: "window.__PRI_NATIVE__ = true; window.__PRI_NATIVE_INK__ = true; window.__PRI_NATIVE_PHOTO__ = true;",
             injectionTime: .atDocumentStart,
             forMainFrameOnly: false
         )
         config.userContentController.addUserScript(nativeFlag)
         config.userContentController.add(context.coordinator, name: "priShare")
         config.userContentController.add(context.coordinator, name: "priInk")
+        config.userContentController.add(context.coordinator, name: "priPhoto")
 
         let webView = WKWebView(frame: .zero, configuration: config)
         webView.navigationDelegate = context.coordinator
@@ -97,6 +98,8 @@ struct WebShell: UIViewRepresentable {
 
     final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandler, WKDownloadDelegate {
         private var downloadDestination: URL?
+        private weak var shellWebView: WKWebView?
+        private let photoOCR = PhotoOCRBridge()
 
         // ── Native ink ──
         let ink = InkBridge()
@@ -104,6 +107,7 @@ struct WebShell: UIViewRepresentable {
         private var demoDriver: InkDemoDriver?
 
         func attachInk(to webView: WKWebView, in container: UIView) {
+            shellWebView = webView
             ink.attach(to: webView, in: container)
             // Scrolling is followed from the web view's own offset rather than
             // from messages: the page tells us where the writing area IS, and
@@ -126,12 +130,17 @@ struct WebShell: UIViewRepresentable {
         func detachInk() {
             scrollObservation?.invalidate()
             scrollObservation = nil
+            shellWebView = nil
         }
 
         // ── Bridges from the page ──
         func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
             if message.name == "priInk" {
                 ink.handle(message.body)
+                return
+            }
+            if message.name == "priPhoto" {
+                photoOCR.handle(message.body, webView: shellWebView)
                 return
             }
             guard message.name == "priShare",

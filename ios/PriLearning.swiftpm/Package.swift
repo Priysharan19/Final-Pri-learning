@@ -31,7 +31,7 @@ let package = Package(
                 .portraitUpsideDown(.when(deviceFamilies: [.pad]))
             ],
             capabilities: [
-                .camera(purposeString: "Attach a photo of your paper working to a saved attempt.")
+                .camera(purposeString: "Photograph handwritten maths so Pri can read it on-device and attach it to your attempt.")
             ],
             appCategory: .education
         )
