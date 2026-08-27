@@ -48,6 +48,19 @@ const r = (engine, text, minConf, margin) => ({ engine, text, lines: line(text),
   assert.match(out.engine, /^pri-consensus:/);
 }
 
+// Two out-of-domain calculus readers must not outvote one set-capable reader.
+{
+  const setCtx = { answerType: 'set', setNotation: true, setElementKind: 'integer', setIdentifiers: ['A', 'B'] };
+  const foundationLeak = r('pri-foundation-debug', "y'=6x=6x+6x-6x-180", 0.91, 0.25);
+  const nativeLeak = r('native-rescue+line-stroke-fusion', "y'=dx=6x^6-6x-180", 0.84, 0.18);
+  const setVote = r('pri-js-v3', 'A∪B={1,2,3,4,5,6,7,8,12}', 0.64, 0.10);
+  const out = chooseNativeConsensus([foundationLeak, nativeLeak, setVote], setCtx);
+  assert.equal(out.text, setVote.text);
+  assert.equal(out.disagreement, true);
+  assert.ok(out.minConf <= 0.54);
+  assert.ok(out.candidateReadings.some(x => x.contextReason === 'set-context-calculus-leak'));
+}
+
 // Arbitration must remain answer-blind.
 {
   const source = await import('node:fs').then(fs => fs.readFileSync(new URL('../src/ink/nativeConsensus.js', import.meta.url), 'utf8'));

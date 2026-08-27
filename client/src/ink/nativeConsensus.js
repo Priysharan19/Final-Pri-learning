@@ -1,3 +1,4 @@
+import { isSetContext, setReadingCompatibility } from './setNotation.js';
 // Pri Learning · native handwriting arbitration
 // Pure, answer-blind evidence fusion. This module intentionally knows nothing
 // about the expected answer or mark scheme, so it can be regression-tested in
@@ -44,24 +45,29 @@ function engineAdjustment(r) {
   return 0;
 }
 
-function choiceScore(r) {
-  return intrinsicQuality(r) + engineAdjustment(r);
+function choiceScore(r, ctx = null) {
+  return intrinsicQuality(r) + engineAdjustment(r) + setReadingCompatibility(r, ctx).bonus;
 }
 
-function evidenceOf(r) {
+function evidenceOf(r, ctx = null) {
+  const compatibility = setReadingCompatibility(r, ctx);
   return {
     engine: r?.engine || 'unknown',
     text: String(r?.text || ''),
     minConf: finiteOr(r?.minConf, null),
     margin: finiteOr(r?.margin, null),
-    failure: r?.failure || (!hasReading(r) ? 'no-reading' : null)
+    failure: r?.failure || (!hasReading(r) ? 'no-reading' : null),
+    contextCompatible: compatibility.eligible,
+    contextReason: compatibility.reason
   };
 }
 
-export function chooseNativeConsensus(candidates) {
+export function chooseNativeConsensus(candidates, ctx = null) {
   const attempted = (candidates || []).filter(Boolean);
-  const live = attempted.filter(hasReading);
-  if (!live.length) return null;
+  const allLive = attempted.filter(hasReading);
+  if (!allLive.length) return null;
+  const compatible = allLive.filter(r => setReadingCompatibility(r, ctx).eligible);
+  const live = isSetContext(ctx) && compatible.length ? compatible : allLive;
 
   const groups = new Map();
   for (const reading of live) {
@@ -72,17 +78,17 @@ export function chooseNativeConsensus(candidates) {
 
   const orderedGroups = [...groups.values()].sort((a, b) => {
     if (b.length !== a.length) return b.length - a.length;
-    return Math.max(...b.map(choiceScore)) - Math.max(...a.map(choiceScore));
+    return Math.max(...b.map(r => choiceScore(r, ctx))) - Math.max(...a.map(r => choiceScore(r, ctx)));
   });
   const consensus = orderedGroups[0];
 
   if (consensus.length >= 2) {
-    const chosen = [...consensus].sort((a, b) => choiceScore(b) - choiceScore(a))[0];
+    const chosen = [...consensus].sort((a, b) => choiceScore(b, ctx) - choiceScore(a, ctx))[0];
     const engines = consensus.map(r => r.engine || 'unknown').join('+');
     return {
       ...chosen,
       disagreement: false,
-      candidateReadings: attempted.map(evidenceOf),
+      candidateReadings: attempted.map(r => evidenceOf(r, ctx)),
       engine: `pri-consensus:${engines}`
     };
   }
@@ -90,14 +96,14 @@ export function chooseNativeConsensus(candidates) {
   // No two independent readers agree. We may still display the best evidence,
   // but we deliberately destroy auto-mark certainty. QuestionCard's existing
   // doubt gate will require the student to confirm/correct the reading first.
-  const chosen = [...live].sort((a, b) => choiceScore(b) - choiceScore(a))[0];
+  const chosen = [...live].sort((a, b) => choiceScore(b, ctx) - choiceScore(a, ctx))[0];
   const engines = attempted.map(r => r.engine || 'unknown').join('|');
   return {
     ...chosen,
     minConf: Math.min(finiteOr(chosen.minConf, 0.54), 0.54),
     margin: Math.min(finiteOr(chosen.margin, 0.08), 0.08),
     disagreement: true,
-    candidateReadings: attempted.map(evidenceOf),
+    candidateReadings: attempted.map(r => evidenceOf(r, ctx)),
     engine: `pri-disagreement:${engines}->${chosen.engine || 'unknown'}`
   };
 }

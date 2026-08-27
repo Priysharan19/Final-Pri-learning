@@ -1,4 +1,5 @@
 // Pri Learning · runtime spatial guard for the legacy JS fallback
+import { repairSetNotationResult } from './setNotation.js';
 //
 // The v3 recogniser was designed around one main column of written steps. Its
 // internal line splitter links any glyphs that share a y-band, even if they are
@@ -361,7 +362,7 @@ export function repairSingleGlyphQuestionContext(result, ctx) {
  */
 export function recognizeWithoutDetachedSideWork(strokes, overrides, ctx, recognize) {
   if (typeof recognize !== 'function') throw new TypeError('recognize function required');
-  const finish = result => repairSingleGlyphQuestionContext(result, ctx);
+  const finish = result => repairSingleGlyphQuestionContext(repairSetNotationResult(result, ctx), ctx);
   if (!Array.isArray(strokes) || strokes.length < 4) return finish(recognize(strokes || [], overrides || {}, ctx));
 
   const { rows, scale } = spatialRows(strokes);

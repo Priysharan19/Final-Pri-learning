@@ -13,6 +13,7 @@
 // context is retained on the web request and applied only during that Pri pass.
 // ─────────────────────────────────────────────────────────────────────────────
 import { fuseNativeStrokeReading } from './hybrid.js';
+import { inferSetContextFromPrompt, mergeRecognitionContext } from './setNotation.js';
 
 const handler = () =>
   (typeof window !== 'undefined' && window.__PRI_NATIVE_INK__ &&
@@ -21,13 +22,21 @@ const handler = () =>
 export const nativeInkAvailable = () => !!handler();
 
 let nextRequestId = 1;
-const pending = new Map();       // reqId → {resolve, context, overrides}
+const pending = new Map();       // reqId → {resolve, context, overrides, strokes, surfaceEpoch}
 const strokeListeners = new Set();
 let latestStrokes = [];
+let surfaceEpoch = 0;
+
+export function snapshotInkStrokes(strokes) {
+  return (Array.isArray(strokes) ? strokes : []).map(stroke => ({
+    ...stroke,
+    points: (Array.isArray(stroke?.points) ? stroke.points : []).map(point => ({ ...point }))
+  }));
+}
 
 const BASE_MATH_ALPHABET = [
   ...'0123456789'.split(''),
-  '+', '-', '*', '/', '=', '(', ')', '[', ']', '<', '>', '<=', '>=', '!=', '±', '.', ',', ':', '%', '°',
+  '+', '-', '*', '/', '=', '(', ')', '[', ']', '{', '}', '<', '>', '<=', '>=', '!=', '±', '.', ',', ':', '%', '°', '∪', '∩',
   'pi', 'theta', 'sqrt', 'sin', 'cos', 'tan', 'sec', 'csc', 'cot', 'ln', 'log'
 ];
 
@@ -39,8 +48,8 @@ const BASE_MATH_ALPHABET = [
  * standard scratch variables in product/chain-rule working; no expected answer
  * or mark-scheme text is ever read here.
  */
-function inferredNotationContext() {
-  if (typeof document === 'undefined') return null;
+export function inferredNotationContext(explicit = null) {
+  if (typeof document === 'undefined') return explicit || null;
   const prompt = document.querySelector('.q-prompt');
   const raw = String(prompt?.textContent || '');
   const vars = new Set(['u', 'v']);
@@ -50,9 +59,17 @@ function inferredNotationContext() {
     const ch = match[1].toLowerCase();
     if (common.has(ch)) vars.add(ch);
   }
-  // TeX/KaTeX accessibility text can duplicate a formula. A set removes all
-  // duplication; only membership matters to the recogniser's tie-break prior.
-  return { alphabet: [...new Set([...BASE_MATH_ALPHABET, ...vars])] };
+  const generic = { alphabet: [...new Set([...BASE_MATH_ALPHABET, ...vars])] };
+  const setContext = inferSetContextFromPrompt(raw, generic.alphabet);
+  return mergeRecognitionContext(setContext || generic, explicit);
+}
+
+function invalidatePending(reason) {
+  surfaceEpoch += 1;
+  for (const [reqId, entry] of pending) {
+    pending.delete(reqId);
+    entry.resolve(failedReading(entry.op, reason));
+  }
 }
 
 if (typeof window !== 'undefined') {
@@ -65,13 +82,17 @@ if (typeof window !== 'undefined') {
       const entry = pending.get(payload.reqId);
       if (entry) {
         pending.delete(payload.reqId);
+        if (entry.surfaceEpoch !== surfaceEpoch) {
+          entry.resolve(failedReading(entry.op, 'surface-stale'));
+          return;
+        }
         let reading = payload;
-        if (latestStrokes.length &&
+        if (entry.strokes.length &&
             (payload.engine === 'native-primary-debug' || payload.engine === 'native-rescue')) {
           try {
             reading = fuseNativeStrokeReading(
               payload,
-              latestStrokes,
+              entry.strokes,
               entry.overrides || {},
               entry.context || inferredNotationContext()
             );
@@ -108,7 +129,10 @@ function failedReading(op, failure) {
 function requestReading(message, timeoutMs, context = null) {
   return new Promise((resolve) => {
     const reqId = nextRequestId++;
-    pending.set(reqId, { resolve, context, overrides: message.overrides || {}, op: message.op });
+    pending.set(reqId, {
+      resolve, context, overrides: message.overrides || {}, op: message.op,
+      strokes: snapshotInkStrokes(latestStrokes), surfaceEpoch
+    });
     if (!post({ ...message, reqId })) {
       pending.delete(reqId);
       resolve(failedReading(message.op, 'bridge-unavailable'));
@@ -171,6 +195,7 @@ export const nativeInk = {
 
   mount(element) {
     if (!element) return false;
+    invalidatePending('surface-remounted');
     latestStrokes = [];
     return post({ op: 'mount', ...geometryOf(element), ink: inkColor() });
   },
@@ -180,13 +205,13 @@ export const nativeInk = {
     post({ op: 'layout', ...geometryOf(element) });
   },
 
-  unmount() { latestStrokes = []; post({ op: 'unmount' }); },
+  unmount() { invalidatePending('surface-unmounted'); latestStrokes = []; post({ op: 'unmount' }); },
   setAppearance() { post({ op: 'appearance', ink: inkColor() }); },
   setTool(tool, finger) { post({ op: 'tool', tool, finger: !!finger }); },
   setEnabled(enabled) { post({ op: 'enabled', enabled: !!enabled }); },
   undo() { post({ op: 'undo' }); },
   redo() { post({ op: 'redo' }); },
-  clear() { latestStrokes = []; post({ op: 'clear' }); },
+  clear() { invalidatePending('surface-cleared'); latestStrokes = []; post({ op: 'clear' }); },
   setStrokes(strokes) {
     latestStrokes = Array.isArray(strokes) ? strokes : [];
     post({ op: 'setStrokes', strokes: latestStrokes });

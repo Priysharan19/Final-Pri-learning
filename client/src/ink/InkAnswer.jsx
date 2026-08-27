@@ -8,7 +8,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import InkCanvas from './InkCanvas.jsx';
 import NativeInkCanvas from './NativeInkCanvas.jsx';
-import { nativeInk, nativeInkAvailable } from './native.js';
+import { nativeInk, nativeInkAvailable, inferredNotationContext } from './native.js';
 import { chooseNativeConsensus, hasReading, normalizedReadingText } from './nativeConsensus.js';
 import { recognizeWithStructuralDev } from '../../dev/devStructural.js';
 import { recognize, exprToLatex } from './recognizer.js';
@@ -140,9 +140,10 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
 
   const runRecognition = useCallback((strokes, ovr) => {
     const seq = ++readSeqRef.current;
+    const effectiveContext = inferredNotationContext(recognitionContext);
 
     const readWithJS = () => {
-      try { return recognizeWithoutDetachedSideWork(strokes, ovr, recognitionContext, recognize); }
+      try { return recognizeWithoutDetachedSideWork(strokes, ovr, effectiveContext, recognize); }
       catch { return null; }
     };
 
@@ -174,24 +175,24 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
     // confidences are not calibrated outside the synthetic/template domain.
     // Therefore only exact two-engine agreement may finish early. Every other
     // case asks the native Vision/geometry reader for a third answer-blind vote.
-    nativeInk.foundationRecognize(ovr, recognitionContext).then(foundation => {
+    nativeInk.foundationRecognize(ovr, effectiveContext).then(foundation => {
       if (seq !== readSeqRef.current) return;
       const localRaw = readWithJS();
       const local = localRaw ? { ...localRaw, engine: 'pri-js-v3' } : null;
 
       if (hasReading(foundation) && hasReading(local)
           && normalizedReadingText(foundation) === normalizedReadingText(local)) {
-        const agreed = chooseNativeConsensus([foundation, local]);
+        const agreed = chooseNativeConsensus([foundation, local], effectiveContext);
         publish(agreed || { ...EMPTY_READING, engine: 'pri-native-no-reading' }, strokes);
         return;
       }
 
-      nativeInk.recognize(ovr, recognitionContext).then(nativeRaw => {
+      nativeInk.recognize(ovr, effectiveContext).then(nativeRaw => {
         if (seq !== readSeqRef.current) return;
         const nativeReading = nativeRaw
-          ? readUnreadLines(nativeRaw, strokes, ovr, recognitionContext)
+          ? readUnreadLines(nativeRaw, strokes, ovr, effectiveContext)
           : null;
-        const chosen = chooseNativeConsensus([foundation, local, nativeReading]);
+        const chosen = chooseNativeConsensus([foundation, local, nativeReading], effectiveContext);
         publish(chosen || { ...EMPTY_READING, engine: 'pri-native-no-reading' }, strokes);
       });
     });
@@ -209,7 +210,10 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
   }, [overrides, runRecognition]);
 
   useEffect(() => { ensurePersonalLoaded(); }, []);
-  useEffect(() => () => timerRef.current && clearTimeout(timerRef.current), []);
+  useEffect(() => () => {
+    readSeqRef.current += 1;
+    if (timerRef.current) clearTimeout(timerRef.current);
+  }, []);
 
   useEffect(() => {
     if (!focusSymbol) { focusedRef.current = null; return; }
