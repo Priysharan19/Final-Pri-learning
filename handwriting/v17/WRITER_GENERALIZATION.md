@@ -28,12 +28,15 @@ V17 introduces the V4 foundation-model track without replacing the current produ
 8. **Corpus diversity audit.** Synthetic transforms never count as new writers. The audit measures real writer counts, split integrity, samples, vocabulary coverage and capture-style variation.
 9. **Dual-gated Core ML promotion.** V4 can be exported for development at any time, but it cannot be marked production-ready unless the exact checkpoint passes both the locked final-holdout release report and the real unseen-writer generalisation report.
 10. **Executable CI smoke.** CI compiles every V4 module, runs architecture/vocabulary checks, generates a writer-disjoint mini-corpus, performs an actual one-epoch CPU training run, verifies the resulting checkpoint identity and audits the current real corpus.
+11. **Coverage cannot hide behind sample count.** Production data readiness requires real multi-writer exposure for every supported V4 token; a large corpus that omits hard notation is still not ready.
 
 ## Production data policy
 
-Writer identity is an anonymous corpus code only. The existing deterministic split assignment is retained permanently so the same person cannot leak from training into validation/test/final-holdout.
+Writer identity is an anonymous corpus code only. The existing split assignment is retained permanently so the same person cannot leak from training into validation/test/final-holdout.
 
-The collection target is **100+ independent training writers**, with at least **20 independent evaluation writers and 1,000 real evaluation expressions** before claiming broad writer generalisation. These are minimum evidence gates, not a stopping point.
+The collection target is **100+ independent training writers**. The repeatable engineering **test split itself** must contain at least **20 independent unseen writers and 1,000 real expressions** before broad writer-generalisation claims. Final-holdout writers/samples never fill a missing test quota: final-holdout is reserved for a frozen release candidate, not routine readiness accounting.
+
+Sample count alone is insufficient. For every non-special token in the V4 vocabulary, the real corpus must contain that token from at least **5 independent training writers**; the test split must contain it from at least **3 independent writers** and at least **5 total occurrences**. These are minimum diversity floors, not evidence that five examples are enough to estimate per-symbol accuracy precisely.
 
 Recruit for variation in the handwriting itself rather than demographic profiling: printed/cursive/mixed construction, upright/slanted writing, small/large glyphs, narrow/wide aspect, slow/fast writing, light/heavy pressure, connected/disconnected strokes, unusual but legitimate stroke order, left/right handed capture when volunteered, and common mathematical allographs.
 
@@ -44,8 +47,11 @@ The corpus should deliberately include hard confusable families: `1/l/I`, `0/O/t
 A V4 checkpoint is not a production model merely because training loss is low. Promotion requires all of the following evidence:
 
 - no writer leakage across splits;
-- release evaluation on real writer-disjoint data;
-- at least 20 evaluation writers and 1,000 evaluation expressions;
+- at least 100 real training writers with at least 40 valid expressions each;
+- test evaluation on real writer-disjoint data;
+- at least 20 **test** writers and 1,000 **test** expressions, excluding final-holdout;
+- every supported non-special token represented by at least 5 training writers;
+- every supported non-special token represented by at least 3 test writers and 5 test occurrences;
 - base exact accuracy >= 98%;
 - style-perturbed exact accuracy >= 97%;
 - robust exact accuracy >= 95%;
@@ -79,7 +85,7 @@ python tools/ink-foundation/train_v4.py \
   --out tools/ink-foundation/runs/pri-ink-foundation-v4.pt
 ```
 
-Stress-test an unseen-writer test split:
+Stress-test the unseen-writer test split:
 
 ```bash
 python tools/ink-foundation/evaluate_writer_generalization.py \
@@ -109,8 +115,10 @@ python tools/ink-foundation/export_coreml_v4.py \
 
 Use `--enforce` only when the corpus is large enough for the production evidence gates. Do not unlock final-holdout merely to improve a score.
 
-## Next data milestone
+## Current evidence and next data milestone
 
-The present repository contains one substantial real Pencil writer corpus. V17 makes that data much more useful and gives the model the correct inductive bias, but **new independent real writers are now the highest-leverage input**. Until those writers are collected, universal-handwriting claims would be unsupported regardless of how sophisticated the network becomes.
+The live V17 audit currently finds **1 real writer / 50 train expressions / 0 test writers**, and **49 of 86 non-special V4 tokens** appear in that writer's real corpus. That is enough to exercise the pipeline and nowhere near enough to claim generalisation.
 
-The next evidence milestone is therefore operational rather than architectural: collect independent writers under the existing consent/anonymisation protocol, keep evaluation writers untouched, then train and evaluate V4 writer-disjoint. Failure clusters should be fixed from training/validation evidence; the locked final holdout is only for promotion decisions.
+V17 makes the existing data more useful and gives the model the correct inductive bias, but **new independent real writers are now the highest-leverage input**. Until those writers are collected, universal-handwriting claims would be unsupported regardless of how sophisticated the network becomes.
+
+The next evidence milestone is therefore operational rather than architectural: collect independent writers under the existing consent/anonymisation protocol, keep test/final-holdout writers untouched, then train and evaluate V4 writer-disjoint. Failure clusters should be fixed from training/validation evidence; the locked final holdout is only for promotion decisions.
