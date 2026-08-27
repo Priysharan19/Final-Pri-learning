@@ -16,6 +16,7 @@ function any(text, markers) {
   return markers.some(marker => s.includes(marker));
 }
 const critical = text => any(text, ['^(', 'sqrt(', '/', '<=', '>=', '!=', '=', '±']);
+const canonicalWriter = value => String(value || '').trim().toUpperCase();
 
 function sessionId(doc) {
   const legacy = doc?.session;
@@ -65,7 +66,9 @@ export function buildCorpusStatus(corpusDir = DEFAULT_DIR) {
       continue;
     }
 
-    const writer = String(doc.writer?.id || '').trim();
+    // The collector canonicalises participant codes to uppercase. Mirror that
+    // here so P0042 and p0042 cannot inflate the independent-writer count.
+    const writer = canonicalWriter(doc.writer?.id);
     const session = sessionId(doc);
     if (writer) row.writers.add(writer);
     if (session) row.sessions.add(session);
