@@ -58,7 +58,9 @@ def test_duplicate_writer_session_and_holdout_firewall():
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)
         write_doc(root, "train-a.json", corpus("P1000", "train", "SAME", [sample("x")]))
-        write_doc(root, "train-b.json", corpus("P1000", "train", "SAME", [sample("2")]))
+        # Case changes must not manufacture another independent writer. The real
+        # collector canonicalises anonymous participant codes to uppercase.
+        write_doc(root, "train-b.json", corpus("p1000", "train", "SAME", [sample("2")]))
         # Deliberately toxic holdout contents: if routine readiness inspected this,
         # it would create an unknown target and style/sample statistics.
         write_doc(
@@ -75,6 +77,9 @@ def test_duplicate_writer_session_and_holdout_firewall():
         report = build_report(root)
         assert report["duplicateSessionIds"] == ["SAME"], report["duplicateSessionIds"]
         assert report["gates"]["noDuplicateSessionIds"] is False
+        assert report["writersBySplit"]["train"] == 1
+        assert "p1000" not in report["byWriter"]
+        assert report["byWriter"]["P1000"]["files"] == 2
         assert report["unknownTargets"] == [], report["unknownTargets"]
         assert "final-holdout" not in report["samplesBySplit"]
         assert report["finalHoldout"]["writersRegistered"] == 1
