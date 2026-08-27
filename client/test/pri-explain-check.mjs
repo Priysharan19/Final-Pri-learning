@@ -15,6 +15,11 @@ import {
   validateStoryboard,
   verifiedMath,
 } from '../src/explain/storyboard.js';
+import {
+  buildDirectedStoryboard,
+  buildDirectorBranch,
+  selectTeachingStoryboard,
+} from '../src/explain/teachingDirector.js';
 
 let checks = 0;
 const check = (name, fn) => {
@@ -183,14 +188,83 @@ check('rejects unsupported storyboard actions instead of silently executing arou
   assert.equal(result.reason, 'unsupported action');
 });
 
-check('builds an equation-motion scene from verified consecutive steps', () => {
+check('V4 inserts a prediction checkpoint before a verified equation motion', () => {
   const timeline = buildVisualTimeline(algebraSolution, { questionPrompt: 'Solve the equation.' });
-  assert.equal(timeline[1].visuals[0].kind, 'transform');
-  assert.equal(timeline[1].visuals[0].after, 'x=3');
-  assert.equal(timeline[1].storyboardSource, 'deterministic');
+  assert.equal(timeline.length, 3);
+  assert.equal(timeline[0].storyboardSource, 'director-local-v4');
+  assert.equal(timeline[1].visuals[0].kind, 'checkpoint');
+  assert.equal(timeline[2].visuals[0].kind, 'transform');
+  assert.equal(timeline[2].visuals[0].after, 'x=3');
 });
 
-check('uses a valid solution storyboard in preference to deterministic inference', () => {
+check('the local director storyboard itself passes the V3 verifier', () => {
+  const plan = buildDirectedStoryboard(algebraSolution, { questionPrompt: 'Solve the equation.' });
+  assert.equal(plan.source, 'director-local-v4');
+  assert.equal(validateStoryboard(plan, algebraSolution, {}).ok, true);
+});
+
+check('V4 prioritises the first wrong attempt before the repaired solution', () => {
+  const plan = buildDirectedStoryboard(algebraSolution, {
+    correct: true,
+    hadWrongAttempt: true,
+    feedback: 'The sign changed too early.',
+    misconception: 'sign error',
+    wrongAttempt: { steps: 'x+2=5\nx=-3', answer: '-3' },
+  });
+  assert.equal(plan.scenes[0].concept, 'diagnosis');
+  assert.equal(plan.scenes[0].actions[0].kind, 'replay_attempt');
+  assert.match(plan.scenes[0].lines.join(' '), /sign/i);
+  assert.ok(plan.scenes.some(scene => scene.actions.some(action => action.kind === 'checkpoint')));
+});
+
+check('provider output is accepted only when it stays inside verified maths', () => {
+  const selected = selectTeachingStoryboard({
+    version: 3,
+    source: 'model-test',
+    scenes: [{
+      heading: 'Model emphasis',
+      narration: 'Keep equality balanced.',
+      actions: [{ kind: 'transform_equation', before: 'x+2=5', after: 'x=3' }],
+    }],
+  }, algebraSolution, {});
+  assert.equal(selected.providerAccepted, true);
+  assert.equal(selected.storyboard.source, 'model-test');
+});
+
+check('invented provider maths fails closed to the local V4 director', () => {
+  const selected = selectTeachingStoryboard({
+    version: 3,
+    source: 'model-test',
+    scenes: [{ heading: 'Invented', actions: [{ kind: 'focus_math', expression: 'x=99' }] }],
+  }, algebraSolution, {});
+  assert.equal(selected.providerAccepted, false);
+  assert.equal(selected.fallbackReason, 'invented focus expression');
+  assert.equal(selected.storyboard.source, 'director-local-v4');
+});
+
+check('V4 slower branch decomposes one verified transform into three verified scenes', () => {
+  const timeline = buildVisualTimeline(algebraSolution, {});
+  const transformScene = timeline.find(scene => scene.visuals.some(v => v.kind === 'transform'));
+  const branch = buildDirectorBranch(transformScene, 'slower', algebraSolution, {});
+  assert.ok(branch);
+  assert.equal(branch.scenes.length, 3);
+  const compiled = compileStoryboard(branch, algebraSolution, {});
+  assert.equal(compiled.ok, true);
+  assert.deepEqual(compiled.timeline.map(scene => scene.visuals[0].kind), ['focus', 'transform', 'focus']);
+});
+
+check('V4 notice branch highlights only tokens inside the verified result expression', () => {
+  const timeline = buildVisualTimeline(algebraSolution, {});
+  const transformScene = timeline.find(scene => scene.visuals.some(v => v.kind === 'transform'));
+  const branch = buildDirectorBranch(transformScene, 'notice', algebraSolution, {});
+  const action = branch.scenes[0].actions[0];
+  assert.equal(action.kind, 'focus_math');
+  assert.equal(action.expression, 'x=3');
+  assert.ok(action.tokens.every(token => action.expression.includes(token)));
+  assert.equal(validateStoryboard(branch, algebraSolution, {}).ok, true);
+});
+
+check('uses a valid solution storyboard in preference to the V4 director', () => {
   const solution = {
     ...algebraSolution,
     explanationStoryboard: {
@@ -215,7 +289,7 @@ check('uses a valid solution storyboard in preference to deterministic inference
   assert.equal(timeline[0].visuals[0].kind, 'focus');
 });
 
-check('falls back safely when an authored storyboard invents maths', () => {
+check('falls back safely from invented authored maths to the V4 local director', () => {
   const solution = {
     ...algebraSolution,
     explanationStoryboard: {
@@ -226,7 +300,7 @@ check('falls back safely when an authored storyboard invents maths', () => {
   };
   const timeline = buildVisualTimeline(solution, {});
   assert.ok(timeline.length >= 2);
-  assert.ok(timeline.every(scene => scene.storyboardSource === 'deterministic'));
+  assert.ok(timeline.every(scene => scene.storyboardSource === 'director-local-v4'));
 });
 
 check('replays the first wrong Pencil attempt after a successful retry', () => {
@@ -238,13 +312,15 @@ check('replays the first wrong Pencil attempt after a successful retry', () => {
   });
   assert.equal(timeline[0].kind, 'diagnosis');
   assert.equal(timeline[0].visuals[0].kind, 'ink');
+  assert.equal(timeline[0].storyboardSource, 'director-local-v4');
 });
 
-check('trusted deterministic diagnosis may quote the marked wrong working', () => {
+check('deterministic fallback may quote marked wrong working when explicitly requested', () => {
   const timeline = buildVisualTimeline({ steps: [{ h: 'Correct it', d: '$x=3$' }] }, {
     correct: false,
     feedback: 'Your line $x=99$ is where the working diverges.',
     wrongAttempt: { steps: '$x=99$' },
+    disableTeachingDirector: true,
   });
   assert.equal(timeline[0].kind, 'diagnosis');
   assert.equal(timeline[0].storyboardSource, 'deterministic');
@@ -268,7 +344,7 @@ check('animates an authored graph instead of synthesising a new one', () => {
   assert.equal(timeline[0].visuals.find(v => v.kind === 'figure')?.mode, 'graph');
 });
 
-check('the deterministic storyboard itself passes the same verifier for verified solution text', () => {
+check('the deterministic storyboard still passes the same verifier for verified solution text', () => {
   const plan = buildDeterministicStoryboard(algebraSolution, { questionPrompt: 'Solve the equation.' });
   assert.equal(validateStoryboard(plan, algebraSolution, {}).ok, true);
 });
@@ -276,6 +352,7 @@ check('the deterministic storyboard itself passes the same verifier for verified
 check('reports the visual modes exposed to the player', () => {
   const timeline = buildVisualTimeline(algebraSolution, {});
   assert.ok(visualSummary(timeline).includes('transform'));
+  assert.ok(visualSummary(timeline).includes('checkpoint'));
 });
 
 if (!process.exitCode) console.log(`PRI EXPLAIN SUITE PASSED — ${checks}/${checks} checks`);
