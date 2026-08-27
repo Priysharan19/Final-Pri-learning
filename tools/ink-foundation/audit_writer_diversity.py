@@ -45,6 +45,11 @@ MIN_TEST_WRITERS_PER_TOKEN = int(READINESS["minTestWritersPerToken"])
 MIN_TEST_OCCURRENCES_PER_TOKEN = int(READINESS["minTestOccurrencesPerToken"])
 
 
+def canonical_writer(value) -> str:
+    """Mirror the collector/strict-audit anonymous participant-code contract."""
+    return str(value or "").strip().upper()
+
+
 def finite(value, default=0.0):
     try:
         value = float(value)
@@ -149,7 +154,9 @@ def load_corpus(root):
             continue
 
         writer_doc = doc.get("writer") or {}
-        writer = str(writer_doc.get("id") or "unknown")
+        # The real collector canonicalises anonymous codes to uppercase. Mirror
+        # that here so P0042/p0042 can never masquerade as independent writers.
+        writer = canonical_writer(writer_doc.get("id") or "unknown")
         split = str(doc.get("split") or writer_doc.get("split") or "train")
         prior = writer_splits.get(writer)
         if prior is not None and prior != split:
