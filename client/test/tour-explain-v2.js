@@ -103,12 +103,15 @@ if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) 
     console.log = (...args) => {
       const mapped = args.map(arg => {
         if (typeof arg !== 'string') return arg;
-        const match = arg.match(/^([✔✖]) E2E SUITE (PASSED|FAILED) — (\d+)\/(\d+) checks across (\d+) flows$/);
+        // report() prefixes its verdict with a newline, so match the verdict
+        // wherever it occurs in the logged string and preserve that prefix.
+        const match = arg.match(/([✔✖]) E2E SUITE (PASSED|FAILED) — (\d+)\/(\d+) checks across (\d+) flows$/);
         if (!match) return arg;
         const passed = baseChecks + Number(match[3]);
         const total = baseChecks + Number(match[4]);
         const flows = baseFlows + Number(match[5]);
-        return `${match[1]} E2E SUITE ${match[2]} — ${passed}/${total} checks across ${flows} flows`;
+        const combined = `${match[1]} E2E SUITE ${match[2]} — ${passed}/${total} checks across ${flows} flows`;
+        return arg.replace(match[0], combined);
       });
       originalLog(...mapped);
     };
