@@ -4,8 +4,15 @@ import { BrowserRouter } from 'react-router-dom';
 import '@fontsource-variable/inter';
 import './theme.css';
 import './ink/interactionGuard.js';
+import { installNativeTeachingProvider } from './explain/nativeTeachingProvider.js';
 import App from './App.jsx';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
+
+// The optional Pri Explain AI provider is a WKWebView bridge to Apple's
+// on-device Foundation Models framework. Browsers and unsupported iPads simply
+// have no handler, so installation is a no-op and the local V4 director remains
+// the production fallback. No network request is introduced here.
+installNativeTeachingProvider();
 
 // Physical iPad LAN testing must never be controlled by an older offline shell.
 // A production Vite build normally registers the service worker below, which is
