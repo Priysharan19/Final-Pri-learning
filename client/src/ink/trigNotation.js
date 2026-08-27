@@ -27,6 +27,62 @@ export function inferTrigContextFromPrompt(rawPrompt, baseAlphabet = []) {
 const readingText = reading => String(reading?.text || '').replace(/\s+/g, '');
 const canonical = sym => ({ theta: 'theta', 'θ': 'theta', percent: '%', deg: '°', div: '/' }[sym] || String(sym || ''));
 
+const finite = value => Number.isFinite(Number(value)) ? Number(value) : null;
+const median = values => {
+  const clean = (values || []).map(finite).filter(v => v !== null).sort((a, b) => a - b);
+  return clean.length ? clean[Math.floor(clean.length / 2)] : 0;
+};
+
+function lineBox(line) {
+  const b = line?.box;
+  if (!b || typeof b !== 'object') return null;
+  const x = finite(b.x1 ?? b.x), y = finite(b.y1 ?? b.y);
+  const w = finite(b.w ?? (finite(b.x2) !== null && x !== null ? Number(b.x2) - x : null));
+  const h = finite(b.h ?? (finite(b.y2) !== null && y !== null ? Number(b.y2) - y : null));
+  if ([x, y, w, h].some(v => v === null) || w < 0 || h <= 0) return null;
+  return { x, y, w, h };
+}
+
+/**
+ * A handwritten triangle is not an equation, but Vision often serialises its
+ * side labels and one diagonal edge as something fraction-like (`π/60 11`,
+ * which may compact to `π/6011`). Rejecting every standalone fraction would be
+ * dangerous, so this filter needs three independent signals at once:
+ *   1. this is a trig question with several physical rows;
+ *   2. the candidate region is much taller than ordinary writing on the page;
+ *   3. it contains label-like numbers/punctuation but no relation or trig word.
+ *
+ * The geometry gate is what protects legitimate lines such as `60/11`.
+ */
+function rejectDiagramLabelLines(lines) {
+  if (!Array.isArray(lines) || lines.length < 3) return { lines: lines || [], dropped: 0 };
+  const boxes = lines.map(lineBox);
+  const peerHeights = boxes.filter(Boolean).map(b => b.h);
+  const typical = median(peerHeights);
+  if (!(typical > 0)) return { lines, dropped: 0 };
+
+  let dropped = 0;
+  const kept = lines.filter((line, index) => {
+    const box = boxes[index];
+    if (!box || box.h < 1.65 * typical) return true;
+    const raw = String(line?.text || '').toLowerCase();
+    const compact = raw.replace(/\s+/g, '');
+    const groups = raw.match(/\d+/g) || [];
+    const digitCount = (compact.match(/\d/g) || []).length;
+    const multiLabelEvidence = groups.length >= 2 || (compact.includes('/') && digitCount >= 4);
+    const hasRelation = /(?:=|<=|>=|!=)/.test(compact);
+    const hasTrigFunction = /(?:sin|cos|tan|sec|csc|cot)/.test(compact);
+    const labelOnly = compact
+      .replace(/(?:theta|θ|π|pi)/g, '')
+      .replace(/[0-9./,°\-]/g, '')
+      .length === 0;
+    const diagram = multiLabelEvidence && !hasRelation && !hasTrigFunction && labelOnly;
+    if (diagram) dropped++;
+    return !diagram;
+  });
+  return { lines: kept, dropped };
+}
+
 // Only families with strong visual overlap are licensed here. The repair is
 // further gated by a trig-function slot followed by a real argument, so this
 // cannot globally turn arbitrary digits into letters.
@@ -102,10 +158,11 @@ function repairSymbolWords(symbols, ctx) {
       const s = source[i + offset];
       if (canonical(s.sym).toLowerCase() === wanted) return;
       const previous = s.sym;
-      const capped = Math.min(Number(s.conf) || 0.72, 0.82);
+      const previousConf = Number(s.conf) || 0.72;
+      const capped = Math.min(previousConf, 0.82);
       s.sym = wanted;
       s.conf = capped;
-      s.alts = copyAlt(s.alts, previous, Math.min(0.62, Number(s.conf) || 0.5));
+      s.alts = copyAlt(s.alts, previous, Math.min(0.62, previousConf));
       s._trigContextRepair = `function:${best.word}`;
       changed = true;
     });
@@ -154,8 +211,9 @@ function recomputeConfidence(result, lines) {
 
 export function repairTrigNotationResult(result, ctx) {
   if (!result || !isTrigContext(ctx) || !Array.isArray(result.lines)) return result;
-  let changed = false;
-  const lines = result.lines.map(line => {
+  const filtered = rejectDiagramLabelLines(result.lines);
+  let changed = filtered.dropped > 0;
+  const lines = filtered.lines.map(line => {
     const repaired = repairSymbolWords(line.symbols || [], ctx);
     const repairedText = repairTextWords(line.text, ctx);
     const textChanged = repairedText !== String(line.text || '');
@@ -171,7 +229,8 @@ export function repairTrigNotationResult(result, ctx) {
     lines,
     symbols: lines.flatMap(line => line.symbols || []),
     text: lines.map(line => line.text).join('\n'),
-    trigContextRepair: 'answer-blind-trig-notation-v1'
+    trigContextRepair: 'answer-blind-trig-notation-v1',
+    trigDiagramLinesIgnored: (Number(result.trigDiagramLinesIgnored) || 0) + filtered.dropped
   };
 }
 
