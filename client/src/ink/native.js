@@ -97,18 +97,29 @@ function post(message) {
   }
 }
 
+function failedReading(op, failure) {
+  const base = op === 'foundationRecognize' ? 'pri-foundation' : 'native-rescue';
+  return {
+    type: 'reading', lines: [], text: '', symbols: [], minConf: 0, margin: 0,
+    weakest: null, engine: `${base}-${failure}`, failure
+  };
+}
+
 function requestReading(message, timeoutMs, context = null) {
   return new Promise((resolve) => {
     const reqId = nextRequestId++;
-    pending.set(reqId, { resolve, context, overrides: message.overrides || {} });
+    pending.set(reqId, { resolve, context, overrides: message.overrides || {}, op: message.op });
     if (!post({ ...message, reqId })) {
       pending.delete(reqId);
-      resolve(null);
+      resolve(failedReading(message.op, 'bridge-unavailable'));
       return;
     }
     setTimeout(() => {
       const entry = pending.get(reqId);
-      if (entry) { pending.delete(reqId); entry.resolve(null); }
+      if (entry) {
+        pending.delete(reqId);
+        entry.resolve(failedReading(entry.op, 'timeout'));
+      }
     }, timeoutMs);
   });
 }
@@ -189,12 +200,12 @@ export const nativeInk = {
   /** Pri-owned learned model. Empty result means no validated asset is bundled
    * or the model declined the page; callers must continue through fallbacks. */
   foundationRecognize(overrides = {}, context = null) {
-    return requestReading({ op: 'foundationRecognize', overrides }, 5000, context);
+    return requestReading({ op: 'foundationRecognize', overrides }, 8000, context);
   },
 
   /** Mature native rescue recogniser. It remains on-device and is intentionally
    * separate from the foundation call so production fallback order is auditable. */
   recognize(overrides = {}, context = null) {
-    return requestReading({ op: 'recognize', overrides }, 6000, context);
+    return requestReading({ op: 'recognize', overrides }, 14000, context);
   }
 };

@@ -31,6 +31,8 @@ final class InkBridge: NSObject, InkSurfaceDelegate {
     private let recognizer = MathInkRecognizer()
     private let recognitionQueue = DispatchQueue(label: "com.prilearning.ink.recognize", qos: .userInitiated)
     private let encodingQueue = DispatchQueue(label: "com.prilearning.ink.encode", qos: .userInitiated)
+    private let revisionLock = NSLock()
+    private var strokeRevision: UInt64 = 0
 
     private weak var webView: WKWebView?
 
@@ -161,44 +163,70 @@ final class InkBridge: NSObject, InkSurfaceDelegate {
     // MARK: - Strokes out
 
     func inkSurfaceDidChangeStrokes(_ surface: InkSurfaceView) {
+        revisionLock.lock()
+        strokeRevision &+= 1
+        revisionLock.unlock()
         recognizer.cancelActiveVision()
         let strokes = surface.strokes
         emit(["type": "strokes", "strokes": strokes.map(\.jsonObject)])
+    }
+
+    private func revisionSnapshot() -> UInt64 {
+        revisionLock.lock(); defer { revisionLock.unlock() }
+        return strokeRevision
+    }
+
+    private func revisionIsCurrent(_ revision: UInt64) -> Bool {
+        revisionLock.lock(); defer { revisionLock.unlock() }
+        return revision == strokeRevision
+    }
+
+    private func emptyReadingPayload(requestId: Int, engine: String) -> [String: Any] {
+        var payload = Reading(lines: [], text: "", minConfidence: 0, margin: 0, weakest: nil).jsonObject
+        payload["type"] = "reading"
+        payload["reqId"] = requestId
+        payload["engine"] = engine
+        return payload
     }
 
     // MARK: - Recognition
 
     private func foundationRecognize(requestId: Int, overrides: [String: String]) {
         let strokes = surface.strokes
+        let revision = revisionSnapshot()
         recognitionQueue.async { [weak self] in
             guard let self else { return }
+            guard self.revisionIsCurrent(revision) else {
+                let payload = self.emptyReadingPayload(requestId: requestId, engine: "pri-foundation-stale")
+                DispatchQueue.main.async { self.emit(payload) }
+                return
+            }
             let foundation = self.foundationRecognizer.read(strokes: strokes, overrides: overrides)
-                ?? Reading(lines: [], text: "", minConfidence: 1, margin: 1, weakest: nil)
+                ?? Reading(lines: [], text: "", minConfidence: 0, margin: 0, weakest: nil)
+            guard self.revisionIsCurrent(revision) else {
+                let payload = self.emptyReadingPayload(requestId: requestId, engine: "pri-foundation-stale")
+                DispatchQueue.main.async { self.emit(payload) }
+                return
+            }
 
 #if DEBUG
-            // DEBUG is the deliberate Pri Learning model-test path. When a V3
-            // development model is bundled, its result is what the app shows so
-            // a real iPad session tests the Foundation engine end-to-end inside
-            // Pri Learning. If the model is absent or yields no reading, fall
-            // back to the mature native reader. RELEASE behaviour is unchanged.
+            // Foundation is one opinion. Do not secretly run the expensive native
+            // rescue here as well: the web arbiter requests that reader exactly
+            // once when independent opinions disagree. This avoids duplicate
+            // whole-page Vision work on physical iPad.
+            var payload = foundation.jsonObject
+            payload["type"] = "reading"
+            payload["reqId"] = requestId
+            payload["foundationAvailable"] = self.foundationRecognizer.isAvailable
+            payload["debugModelTest"] = true
             if self.foundationRecognizer.isAvailable && !foundation.text.isEmpty {
-                var payload = foundation.jsonObject
-                payload["type"] = "reading"
-                payload["reqId"] = requestId
                 payload["engine"] = "pri-foundation-debug"
-                payload["foundationAvailable"] = true
-                payload["debugModelTest"] = true
-                DispatchQueue.main.async { self.emit(payload) }
             } else {
-                let rescue = self.recognizer.readWithGlyphConsensus(strokes: strokes, overrides: overrides)
-                var payload = rescue.jsonObject
-                payload["type"] = "reading"
-                payload["reqId"] = requestId
-                payload["engine"] = "native-rescue-debug"
-                payload["foundationAvailable"] = self.foundationRecognizer.isAvailable
-                payload["debugModelTest"] = true
-                DispatchQueue.main.async { self.emit(payload) }
+                payload["engine"] = self.foundationRecognizer.isAvailable
+                    ? "pri-foundation-no-reading-debug"
+                    : "pri-foundation-unavailable-debug"
             }
+            DispatchQueue.main.async { self.emit(payload) }
 #else
             var payload = foundation.jsonObject
             payload["type"] = "reading"
@@ -212,9 +240,20 @@ final class InkBridge: NSObject, InkSurfaceDelegate {
 
     private func recognize(requestId: Int, overrides: [String: String]) {
         let strokes = surface.strokes
+        let revision = revisionSnapshot()
         recognitionQueue.async { [weak self] in
             guard let self else { return }
+            guard self.revisionIsCurrent(revision) else {
+                let payload = self.emptyReadingPayload(requestId: requestId, engine: "native-rescue-stale")
+                DispatchQueue.main.async { self.emit(payload) }
+                return
+            }
             let reading = self.recognizer.readWithGlyphConsensus(strokes: strokes, overrides: overrides)
+            guard self.revisionIsCurrent(revision) else {
+                let payload = self.emptyReadingPayload(requestId: requestId, engine: "native-rescue-stale")
+                DispatchQueue.main.async { self.emit(payload) }
+                return
+            }
             var payload = reading.jsonObject
             payload["type"] = "reading"
             payload["reqId"] = requestId

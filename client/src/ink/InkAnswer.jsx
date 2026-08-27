@@ -200,7 +200,12 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
   const onStrokesChange = useCallback((strokes) => {
     strokesRef.current = strokes;
     if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => runRecognition(strokes, overrides), 240);
+    // Native whole-page recognition is intentionally a quiet-window operation.
+    // A 240 ms debounce caused a recognition job after normal pauses between
+    // symbols/lines; those jobs then queued behind Core ML/Vision and the newest
+    // page timed out. Browser JS remains cheap enough for the old live cadence.
+    const quietMs = NATIVE_INK ? (strokes.length > 24 ? 1600 : 1000) : 240;
+    timerRef.current = setTimeout(() => runRecognition(strokes, overrides), quietMs);
   }, [overrides, runRecognition]);
 
   useEffect(() => { ensurePersonalLoaded(); }, []);
@@ -346,7 +351,7 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
               <summary style={{ cursor: 'pointer' }}>Recognition evidence</summary>
               {rec.candidateReadings.map((candidate, index) => (
                 <div key={`${candidate.engine}-${index}`} style={{ marginTop: 5, overflowWrap: 'anywhere' }}>
-                  <b>{candidate.engine}</b> → {candidate.text || 'no reading'}
+                  <b>{candidate.engine}</b> → {candidate.text || candidate.failure || 'no reading'}
                 </div>
               ))}
             </details>

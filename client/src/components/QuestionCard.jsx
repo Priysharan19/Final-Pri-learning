@@ -179,6 +179,19 @@ function doubtOf(ink) {
   return null;
 }
 
+// The local gateway counts object keys to reject pathological nested payloads.
+// Pencil points used to be sent as {x,y}, so a normal full working page could
+// exceed that security budget despite being a legitimate answer. Transport each
+// point as [x,y]; backend safeStrokes expands it back to the canonical stored
+// object shape, so History/replay remains unchanged.
+function compactInkStrokes(strokes) {
+  return (Array.isArray(strokes) ? strokes : []).map(st => ({
+    points: (Array.isArray(st?.points) ? st.points : []).map(p => [
+      Math.round(Number(p?.x) || 0), Math.round(Number(p?.y) || 0)
+    ])
+  }));
+}
+
 export default function QuestionCard({ question, why, reason, onResolved, onNext, onRedo, compact = false }) {
   const { celebrate, refreshUser, refreshDue, refreshRecent, toast } = useApp();
   const [answer, setAnswer] = useState('');
@@ -393,7 +406,7 @@ export default function QuestionCard({ question, why, reason, onResolved, onNext
         if (!inkResult?.lines?.length) return;
         given = inkResult.lines.join('\n');
         viaInk = true;
-        ink = { strokes: inkResult.strokes.map(s => ({ points: s.points.map(p => ({ x: Math.round(p.x), y: Math.round(p.y) })) })), recognized: inkResult.text };
+        ink = { strokes: compactInkStrokes(inkResult.strokes), recognized: inkResult.text };
       } else {
         given = working;
         if (!given.trim()) return;
@@ -403,7 +416,7 @@ export default function QuestionCard({ question, why, reason, onResolved, onNext
       given = inkResult.answerLine;
       steps = inkResult.lines.length > 1 ? inkResult.lines.join('\n') : undefined;
       viaInk = true;
-      ink = { strokes: inkResult.strokes.map(s => ({ points: s.points.map(p => ({ x: Math.round(p.x), y: Math.round(p.y) })) })), recognized: inkResult.text };
+      ink = { strokes: compactInkStrokes(inkResult.strokes), recognized: inkResult.text };
     } else {
       given = answer;
       if (String(given).trim() === '') return;
@@ -412,7 +425,7 @@ export default function QuestionCard({ question, why, reason, onResolved, onNext
     setBusy(true);
     try {
       const scribbleStrokes = scribbleRef.current && !scribbleRef.current.isEmpty()
-        ? scribbleRef.current.getStrokes().map(st => ({ points: st.points.map(pt => ({ x: Math.round(pt.x), y: Math.round(pt.y) })) }))
+        ? compactInkStrokes(scribbleRef.current.getStrokes())
         : undefined;
       const r = await api.post(`/practice/${question.id}/submit`, {
         answer: String(given), ms: Date.now() - startRef.current, steps, viaInk, ink, photo, scribble: scribbleStrokes

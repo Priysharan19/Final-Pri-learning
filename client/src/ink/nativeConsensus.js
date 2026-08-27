@@ -53,12 +53,14 @@ function evidenceOf(r) {
     engine: r?.engine || 'unknown',
     text: String(r?.text || ''),
     minConf: finiteOr(r?.minConf, null),
-    margin: finiteOr(r?.margin, null)
+    margin: finiteOr(r?.margin, null),
+    failure: r?.failure || (!hasReading(r) ? 'no-reading' : null)
   };
 }
 
 export function chooseNativeConsensus(candidates) {
-  const live = (candidates || []).filter(hasReading);
+  const attempted = (candidates || []).filter(Boolean);
+  const live = attempted.filter(hasReading);
   if (!live.length) return null;
 
   const groups = new Map();
@@ -80,7 +82,7 @@ export function chooseNativeConsensus(candidates) {
     return {
       ...chosen,
       disagreement: false,
-      candidateReadings: live.map(evidenceOf),
+      candidateReadings: attempted.map(evidenceOf),
       engine: `pri-consensus:${engines}`
     };
   }
@@ -89,13 +91,13 @@ export function chooseNativeConsensus(candidates) {
   // but we deliberately destroy auto-mark certainty. QuestionCard's existing
   // doubt gate will require the student to confirm/correct the reading first.
   const chosen = [...live].sort((a, b) => choiceScore(b) - choiceScore(a))[0];
-  const engines = live.map(r => r.engine || 'unknown').join('|');
+  const engines = attempted.map(r => r.engine || 'unknown').join('|');
   return {
     ...chosen,
     minConf: Math.min(finiteOr(chosen.minConf, 0.54), 0.54),
     margin: Math.min(finiteOr(chosen.margin, 0.08), 0.08),
     disagreement: true,
-    candidateReadings: live.map(evidenceOf),
+    candidateReadings: attempted.map(evidenceOf),
     engine: `pri-disagreement:${engines}->${chosen.engine || 'unknown'}`
   };
 }

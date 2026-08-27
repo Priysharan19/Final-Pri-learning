@@ -378,7 +378,10 @@ const safeSteps = (v) => (Array.isArray(v) ? v : []).slice(0, 40)
   .map(s => ({ h: sanitizeText(s?.h, 200), d: sanitizeText(s?.d, 2000) }));
 const safeOptions = (v) => (Array.isArray(v) ? v : []).slice(0, 6).map(o => sanitizeText(o, 200));
 const safeStrokes = (v, max) => (Array.isArray(v) ? v : []).slice(0, max)
-  .map(st => ({ points: (Array.isArray(st?.points) ? st.points : []).slice(0, 4000).map(pt => ({ x: safeNum(pt?.x), y: safeNum(pt?.y) })) }));
+  .map(st => ({ points: (Array.isArray(st?.points) ? st.points : []).slice(0, 4000).map(pt => ({
+    x: safeNum(Array.isArray(pt) ? pt[0] : pt?.x),
+    y: safeNum(Array.isArray(pt) ? pt[1] : pt?.y)
+  })) }));
 
 /** A photo is only ever a base64 raster: no svg, no scheme games, no markup. */
 const safePhoto = (v) => {
