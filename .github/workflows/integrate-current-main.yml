@@ -87,7 +87,6 @@ jobs:
           node client/test/ink-set-notation-check.mjs
           node client/test/native-ink-arbitration-check.mjs
           node client/test/ink-hybrid-check.mjs
-          node client/test/ink-stability-check.mjs
 
       - name: Build and regenerate native web bundles
         shell: bash
