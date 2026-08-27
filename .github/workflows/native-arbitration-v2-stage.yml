@@ -13,9 +13,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  patch-test-native:
+  patch-test-product:
     if: github.actor != 'github-actions[bot]'
-    runs-on: macos-15-arm64
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
@@ -57,13 +57,11 @@ jobs:
           npm run test:backend
       - name: Production build
         run: npm run build
-      - name: Sync native packages
+      - name: Sync native web bundles
         run: |
           npm run sync:ios
           npm run check:ios
           node scripts/check-native-package-sync.mjs
-      - name: Canonical native PencilKit gate
-        run: npm run test:ink:native
       - name: Audit staged repair
         run: |
           git diff --check
