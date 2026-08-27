@@ -1,0 +1,112 @@
+name: Integrate current main into product lane
+
+on:
+  push:
+    branches:
+      - product/india-native-ink-truth
+    paths:
+      - .github/workflows/integrate-current-main.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: integrate-current-main-product-lane
+  cancel-in-progress: false
+
+jobs:
+  integrate-and-validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout product lane
+        uses: actions/checkout@v4
+        with:
+          ref: product/india-native-ink-truth
+          fetch-depth: 0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            client/package-lock.json
+            server/package-lock.json
+
+      - name: Merge current main safely
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "pri-learning-ci"
+          git config user.email "actions@users.noreply.github.com"
+          git fetch origin main
+
+          set +e
+          git merge --no-ff --no-commit origin/main
+          merge_rc=$?
+          set -e
+
+          if [ "$merge_rc" -ne 0 ]; then
+            echo "Merge reported conflicts. Resolving generated iOS web bundles only."
+            mapfile -t conflicts < <(git diff --name-only --diff-filter=U)
+            printf 'Conflicts:\n%s\n' "${conflicts[*]:-none}"
+
+            bad=0
+            for path in "${conflicts[@]}"; do
+              case "$path" in
+                ios/PriLearning.swiftpm/Resources/Web/*|ios/PriLearning\ 2.swiftpm/Resources/Web/*)
+                  ;;
+                *)
+                  echo "Refusing automatic resolution for source conflict: $path"
+                  bad=1
+                  ;;
+              esac
+            done
+            if [ "$bad" -ne 0 ]; then
+              exit 1
+            fi
+
+            rm -rf "ios/PriLearning.swiftpm/Resources/Web" "ios/PriLearning 2.swiftpm/Resources/Web"
+            git add -A "ios/PriLearning.swiftpm/Resources/Web" "ios/PriLearning 2.swiftpm/Resources/Web"
+          fi
+
+          if git diff --name-only --diff-filter=U | grep -q .; then
+            echo "Unresolved conflicts remain:"
+            git diff --name-only --diff-filter=U
+            exit 1
+          fi
+
+      - name: Install dependencies
+        run: npm run setup
+
+      - name: Validate handwriting integration
+        shell: bash
+        run: |
+          set -euo pipefail
+          node client/test/ink-set-notation-check.mjs
+          node client/test/native-ink-arbitration-check.mjs
+          node client/test/ink-hybrid-check.mjs
+          node client/test/ink-stability-check.mjs
+
+      - name: Build and regenerate native web bundles
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run build
+          npm run sync:ios
+          npm run check:ios
+
+      - name: Remove integration runner from product tree
+        shell: bash
+        run: |
+          rm -f .github/workflows/integrate-current-main.yml
+          git add -A
+
+      - name: Commit integrated product tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          git status --short
+          git commit -m "Integrate current main with native handwriting product lane"
+          git push origin HEAD:product/india-native-ink-truth
