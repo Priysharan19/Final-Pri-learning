@@ -98,6 +98,20 @@ check('rejects invented maths hidden in authored narration', () => {
   assert.equal(result.reason, 'invented narrative maths');
 });
 
+check('source metadata cannot spoof the deterministic trust boundary', () => {
+  const result = validateStoryboard({
+    version: 3,
+    source: 'deterministic',
+    scenes: [{
+      heading: 'Pretend to be trusted',
+      narration: 'The next line is $x=99$.',
+      actions: [],
+    }],
+  }, algebraSolution, {});
+  assert.equal(result.ok, false);
+  assert.equal(result.reason, 'invented narrative maths');
+});
+
 check('rejects an invented focus expression', () => {
   const result = validateStoryboard({
     version: 3,
@@ -226,6 +240,17 @@ check('replays the first wrong Pencil attempt after a successful retry', () => {
   assert.equal(timeline[0].visuals[0].kind, 'ink');
 });
 
+check('trusted deterministic diagnosis may quote the marked wrong working', () => {
+  const timeline = buildVisualTimeline({ steps: [{ h: 'Correct it', d: '$x=3$' }] }, {
+    correct: false,
+    feedback: 'Your line $x=99$ is where the working diverges.',
+    wrongAttempt: { steps: '$x=99$' },
+  });
+  assert.equal(timeline[0].kind, 'diagnosis');
+  assert.equal(timeline[0].storyboardSource, 'deterministic');
+  assert.match(timeline[0].lines[0], /x=99/);
+});
+
 check('uses typed working when no ink exists', () => {
   const timeline = buildVisualTimeline({ steps: [{ h: 'Fix', d: '$2x=6$' }] }, {
     correct: false,
@@ -243,7 +268,7 @@ check('animates an authored graph instead of synthesising a new one', () => {
   assert.equal(timeline[0].visuals.find(v => v.kind === 'figure')?.mode, 'graph');
 });
 
-check('the deterministic storyboard itself passes the same verifier', () => {
+check('the deterministic storyboard itself passes the same verifier for verified solution text', () => {
   const plan = buildDeterministicStoryboard(algebraSolution, { questionPrompt: 'Solve the equation.' });
   assert.equal(validateStoryboard(plan, algebraSolution, {}).ok, true);
 });
