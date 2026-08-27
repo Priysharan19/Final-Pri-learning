@@ -44,7 +44,7 @@
     "test:ink:hybrid": "node client/test/ink-hybrid-check.mjs",
     "test:ink:native": "node scripts/ink-native-check.mjs",
     "test:browser": "npm run test:e2e && npm run test:a11y",
-    "test:e2e": "node client/test/e2e.mjs",
+    "test:e2e": "node client/test/e2e.mjs && node client/test/tour-explain-v2.js --no-build",
     "test:a11y": "node client/test/a11y-gate.mjs",
     "sync:ios": "node scripts/sync-ios.mjs",
     "check:ios": "node scripts/sync-ios.mjs --check",
