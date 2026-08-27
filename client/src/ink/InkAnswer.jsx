@@ -1,9 +1,9 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Pri Learning · Write-to-answer surface
-// Ink canvas + toolbar + live on-device recognition with per-symbol
-// tap-to-correct. The recognised lines feed Step Check; the final line is
-// submitted as the answer, together with how sure the engine is that it read
-// that line right — see "How sure the reading is" below.
+// Ink canvas + toolbar + live recognition with per-symbol correction on local
+// readings. When the optional cloud handwriting gateway is configured, a clean
+// raster of the ink is read in parallel and a confident cloud result becomes
+// authoritative. Local/native Pri Ink remains the offline fallback.
 // ─────────────────────────────────────────────────────────────────────────────
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import InkCanvas from './InkCanvas.jsx';
@@ -13,6 +13,7 @@ import { chooseNativeConsensus, hasReading, normalizedReadingText } from './nati
 import { recognizeWithStructuralDev } from '../../dev/devStructural.js';
 import { recognize, exprToLatex } from './recognizer.js';
 import { recognizeWithoutDetachedSideWork } from './runtimeSpatial.js';
+import { recognizeWithCloud, cloudInkConfigured } from './cloud.js';
 import { feedbackGeometry } from './feedbackGeometry.js';
 import { ALPHABET } from './templates.js';
 import { classOfSymbol } from './classes.js';
@@ -23,15 +24,10 @@ const NICE = { pi: 'π', theta: 'θ', sqrt: '√', percent: '%' };
 const showSym = s => NICE[s] || s;
 
 // ── Which surface, which engine ──────────────────────────────────────────────
-// PencilKit is the native capture surface. Recognition on iPad is an evidence
-// problem, not a fallback ladder: Foundation and JS form two independent
-// opinions, and any disagreement MUST ask the native Vision/geometry reader
-// for a third vote. A legacy JS reading can never become authoritative merely
-// because its synthetic confidence is high on real Apple Pencil handwriting.
-// Browser/LAN builds normally begin at stage 2. `serve:lan:v4` adds a strictly
-// development-only first opinion from the local Structural V4 PyTorch worker on
-// the developer Mac, so physical iPad testing can exercise the actual research
-// model without pretending it is a production/offline asset.
+// PencilKit remains the native capture surface. Cloud OCR is deliberately an
+// optional recognition authority, never a capture surface and never a place for
+// the OpenAI API key: client/src/ink/cloud.js can only call a Pri gateway URL.
+// If that gateway is absent, offline Pri Ink behaves exactly as before.
 const NATIVE_INK = nativeInkAvailable();
 const Surface = NATIVE_INK ? NativeInkCanvas : InkCanvas;
 const EMPTY_READING = { lines: [], text: '', symbols: [], minConf: 1, margin: 1, weakest: null };
@@ -134,6 +130,7 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
       engine: r.engine || null,
       researchOnly: r.researchOnly === true,
       productionReady: r.productionReady === true,
+      cloud: r.cloud === true,
       strokes
     });
   }, [onRecognized]);
@@ -141,6 +138,27 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
   const runRecognition = useCallback((strokes, ovr) => {
     const seq = ++readSeqRef.current;
     const effectiveContext = inferredNotationContext(recognitionContext);
+    let cloudAccepted = false;
+
+    const publishLocal = (reading) => {
+      if (seq !== readSeqRef.current || cloudAccepted) return;
+      publish(reading, strokes);
+    };
+
+    // Cloud OCR is answer-blind and receives only a raster made from `strokes`.
+    // It runs beside Pri Ink, not after it, so the local result can appear with
+    // no network latency. Only a server-approved confident result is allowed to
+    // supersede local recognition. If Terra/Sol remain uncertain, the existing
+    // local correction/confirmation path stays visible instead.
+    const manualCorrectionActive = Object.keys(ovr || {}).length > 0;
+    if (!manualCorrectionActive && cloudInkConfigured()) {
+      recognizeWithCloud(strokes).then(cloud => {
+        if (seq !== readSeqRef.current || !cloud?.lines?.some(line => line.text)) return;
+        if (cloud.needsConfirmation) return;
+        cloudAccepted = true;
+        publish(cloud, strokes);
+      });
+    }
 
     const readWithJS = () => {
       try { return recognizeWithoutDetachedSideWork(strokes, ovr, effectiveContext, recognize); }
@@ -148,52 +166,46 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
     };
 
     // Browser/dev: prefer the explicit Structural V4 LAN research bridge when
-    // the server exposes it. A normal build answers 404 once, the client caches
-    // that absence, and the mature JS recogniser remains the local fallback.
-    // On the dedicated V4 LAN origin, however, a V4 miss is now named in the
-    // engine label instead of looking like an ordinary V3 result. That prevents
-    // a physical-iPad research session from accidentally judging V4 by legacy
-    // fallback output.
+    // the server exposes it. Cloud OCR, when configured, may later supersede
+    // this local preview; otherwise behaviour is unchanged.
     if (!NATIVE_INK) {
       recognizeWithStructuralDev(strokes).then(v4 => {
-        if (seq !== readSeqRef.current) return;
+        if (seq !== readSeqRef.current || cloudAccepted) return;
         if (v4?.lines?.some(line => line.text)) {
-          publish(v4, strokes);
+          publishLocal(v4);
           return;
         }
         const local = readWithJS();
-        if (seq !== readSeqRef.current) return;
+        if (seq !== readSeqRef.current || cloudAccepted) return;
         const engine = structuralLanExpected() ? 'pri-js-v3-v4-unavailable' : 'pri-js-v3';
-        publish(local ? { ...local, engine } : { ...EMPTY_READING, engine }, strokes);
+        publishLocal(local ? { ...local, engine } : { ...EMPTY_READING, engine });
       });
       return;
     }
 
-    // Native iPad: Foundation and JS are opinions, not fallbacks. The previous
-    // implementation allowed a lone JS V3 reading to short-circuit this path
-    // when JS reported high confidence. Real Pencil evidence showed that those
-    // confidences are not calibrated outside the synthetic/template domain.
-    // Therefore only exact two-engine agreement may finish early. Every other
-    // case asks the native Vision/geometry reader for a third answer-blind vote.
+    // Native iPad: Foundation and JS remain independent local opinions. Cloud
+    // OCR does not get inserted as a fake extra vote in this consensus system;
+    // it has its own explicit authority gate above. That preserves the evidence
+    // semantics of Pri Ink whenever cloud is unavailable or uncertain.
     nativeInk.foundationRecognize(ovr, effectiveContext).then(foundation => {
-      if (seq !== readSeqRef.current) return;
+      if (seq !== readSeqRef.current || cloudAccepted) return;
       const localRaw = readWithJS();
       const local = localRaw ? { ...localRaw, engine: 'pri-js-v3' } : null;
 
       if (hasReading(foundation) && hasReading(local)
           && normalizedReadingText(foundation) === normalizedReadingText(local)) {
         const agreed = chooseNativeConsensus([foundation, local], effectiveContext);
-        publish(agreed || { ...EMPTY_READING, engine: 'pri-native-no-reading' }, strokes);
+        publishLocal(agreed || { ...EMPTY_READING, engine: 'pri-native-no-reading' });
         return;
       }
 
       nativeInk.recognize(ovr, effectiveContext).then(nativeRaw => {
-        if (seq !== readSeqRef.current) return;
+        if (seq !== readSeqRef.current || cloudAccepted) return;
         const nativeReading = nativeRaw
           ? readUnreadLines(nativeRaw, strokes, ovr, effectiveContext)
           : null;
         const chosen = chooseNativeConsensus([foundation, local, nativeReading], effectiveContext);
-        publish(chosen || { ...EMPTY_READING, engine: 'pri-native-no-reading' }, strokes);
+        publishLocal(chosen || { ...EMPTY_READING, engine: 'pri-native-no-reading' });
       });
     });
   }, [publish, recognitionContext]);
@@ -201,10 +213,8 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
   const onStrokesChange = useCallback((strokes) => {
     strokesRef.current = strokes;
     if (timerRef.current) clearTimeout(timerRef.current);
-    // Native whole-page recognition is intentionally a quiet-window operation.
-    // A 240 ms debounce caused a recognition job after normal pauses between
-    // symbols/lines; those jobs then queued behind Core ML/Vision and the newest
-    // page timed out. Browser JS remains cheap enough for the old live cadence.
+    // One cloud request is made only after the same quiet window used by native
+    // whole-page recognition — never on every Pencil stroke.
     const quietMs = NATIVE_INK ? (strokes.length > 24 ? 1600 : 1000) : 240;
     timerRef.current = setTimeout(() => runRecognition(strokes, overrides), quietMs);
   }, [overrides, runRecognition]);
@@ -248,23 +258,26 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
     canvasRef.current?.[fn]();
   };
 
-  const engineNote = rec.engine === 'pri-structural-v4-dev-lan'
-    ? 'Structural V4 research · Mac LAN · not production'
-    : rec.engine === 'pri-js-v3-v4-unavailable'
-      ? 'Structural V4 returned no reading · showing JS V3 fallback'
-      : rec.engine === 'pri-js-v3'
-        ? 'Legacy JS V3 fallback · not native PencilKit/Core ML'
-        : rec.disagreement
-          ? `Native engines disagree · confirmation required · ${rec.engine}`
-          : NATIVE_INK && rec.engine
-            ? `Native recognition path · ${rec.engine}`
-            : null;
+  const cloudModel = String(rec.engine || '').replace(/^openai-gpt-5\.6-/, 'GPT-5.6 ');
+  const engineNote = String(rec.engine || '').startsWith('openai-gpt-5.6-')
+    ? `Cloud handwriting · OpenAI ${cloudModel.replace(/^GPT-5\.6 ([a-z])/, (_, c) => `GPT-5.6 ${c.toUpperCase()}`)}`
+    : rec.engine === 'pri-structural-v4-dev-lan'
+      ? 'Structural V4 research · Mac LAN · not production'
+      : rec.engine === 'pri-js-v3-v4-unavailable'
+        ? 'Structural V4 returned no reading · showing JS V3 fallback'
+        : rec.engine === 'pri-js-v3'
+          ? 'Legacy JS V3 fallback · not native PencilKit/Core ML'
+          : rec.disagreement
+            ? `Native engines disagree · confirmation required · ${rec.engine}`
+            : NATIVE_INK && rec.engine
+              ? `Native recognition path · ${rec.engine}`
+              : null;
 
   return (
     <div className={`ink-answer ${disabled ? 'ink-disabled' : ''}`}>
-      {!NATIVE_INK && (
+      {!NATIVE_INK && !cloudInkConfigured() && (
         <div role="note" style={{ padding: '9px 12px', marginBottom: 8, border: '1px solid var(--warn)', borderRadius: 10, fontSize: 12.5 }}>
-          Browser handwriting = legacy JS fallback. For handwriting quality testing, run the native iPad package with PencilKit; this web fallback is not the production acceptance path.
+          Browser handwriting = legacy JS fallback. Configure the optional cloud handwriting gateway or use the native iPad package for production-quality testing.
         </div>
       )}
       <div className="ink-toolbar">
