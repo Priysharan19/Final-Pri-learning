@@ -190,6 +190,64 @@ function remapResult(result, localToGlobal) {
   };
 }
 
+// A one-symbol answer has no neighbouring glyphs, so the legacy recogniser's
+// local s/5, z/2, b/6… context pass cannot fire and its grammar beam deliberately
+// exits early. On a question that explicitly asks for an INTEGER we still know
+// one answer-blind fact: a lone letter is outside the legal answer alphabet.
+// Use that fact only to break a genuine classifier near-tie. This never consults
+// ctx.expected, never turns one digit into another, and never invents a digit
+// that the glyph classifier itself did not already propose.
+const SINGLE_GLYPH_DIGIT_TWIN = { s: '5', z: '2', b: '6', u: '4', g: '9', q: '9' };
+const SINGLE_GLYPH_NEAR_TIE_SHARE = 0.90;
+
+export function repairSingleGlyphQuestionContext(result, ctx) {
+  if (!result || String(ctx?.answerType || '').toLowerCase() !== 'integer') return result;
+  const alphabet = Array.isArray(ctx?.alphabet) ? new Set(ctx.alphabet.map(String)) : null;
+  if (!alphabet || !alphabet.size) return result;
+  const lines = result.lines || [];
+  if (lines.length !== 1) return result;
+  const line = lines[0];
+  const symbols = line.symbols || [];
+  if (symbols.length !== 1) return result;
+  const symbol = symbols[0];
+  if (!symbol || symbol.composite || /^[0-9]$/.test(symbol.sym)) return result;
+  const digit = SINGLE_GLYPH_DIGIT_TWIN[symbol.sym];
+  if (!digit || !alphabet.has(digit) || alphabet.has(symbol.sym)) return result;
+
+  const candidates = [{ sym: symbol.sym, conf: number(symbol.conf, 0) }, ...(symbol.alts || [])];
+  let top = 0;
+  for (const candidate of candidates) top = Math.max(top, number(candidate.conf, 0));
+  const alt = candidates
+    .filter(candidate => candidate.sym === digit)
+    .sort((a, b) => number(b.conf, 0) - number(a.conf, 0))[0];
+  const altConf = number(alt?.conf, 0);
+  if (!alt || top <= 0 || altConf < SINGLE_GLYPH_NEAR_TIE_SHARE * top) return result;
+
+  const repaired = {
+    ...symbol,
+    sym: digit,
+    conf: altConf,
+    alts: [
+      { sym: digit, conf: altConf },
+      ...(symbol.alts || []).filter(candidate => candidate.sym !== digit)
+    ].slice(0, 6),
+    _singleGlyphContextRepair: true
+  };
+  const repairedLine = { ...line, text: digit, symbols: [repaired] };
+  const topSymbols = (result.symbols || []).map(item => item.id === symbol.id ? repaired : item);
+  const rival = (repaired.alts || []).find(candidate => candidate.sym !== repaired.sym);
+  return {
+    ...result,
+    lines: [repairedLine],
+    symbols: topSymbols,
+    text: digit,
+    minConf: altConf,
+    margin: Math.max(0, Math.min(1, altConf - number(rival?.conf, 0))),
+    weakest: { index: 0, sym: digit, conf: altConf, alts: repaired.alts },
+    singleGlyphContextRepair: 'answer-blind-integer-near-tie-v1'
+  };
+}
+
 /**
  * Run the legacy recogniser unchanged unless a clearly detached side lane was
  * found. In the guarded case only the dominant written-step lane is recognised.
@@ -198,11 +256,12 @@ function remapResult(result, localToGlobal) {
  */
 export function recognizeWithoutDetachedSideWork(strokes, overrides, ctx, recognize) {
   if (typeof recognize !== 'function') throw new TypeError('recognize function required');
-  if (!Array.isArray(strokes) || strokes.length < 4) return recognize(strokes || [], overrides || {}, ctx);
+  const finish = result => repairSingleGlyphQuestionContext(result, ctx);
+  if (!Array.isArray(strokes) || strokes.length < 4) return finish(recognize(strokes || [], overrides || {}, ctx));
 
   const { rows, scale } = spatialRows(strokes);
   const { selected, ignored } = chooseMainLane(rows, strokes, scale);
-  if (!ignored.length) return recognize(strokes, overrides || {}, ctx);
+  if (!ignored.length) return finish(recognize(strokes, overrides || {}, ctx));
 
   const localToGlobal = [...new Set(selected.flat())].sort((a, b) => a - b);
   const filtered = localToGlobal.map(i => strokes[i]).filter(Boolean);
@@ -220,9 +279,9 @@ export function recognizeWithoutDetachedSideWork(strokes, overrides, ctx, recogn
     if (Object.keys(localOverrides).length) first = recognize(filtered, localOverrides, ctx);
   }
 
-  return {
+  return finish({
     ...remapResult(first, localToGlobal),
     ignoredAuxiliaryStrokeCount: [...new Set(ignored.flat())].length,
     spatialGuard: 'detached-side-work-v1'
-  };
+  });
 }
