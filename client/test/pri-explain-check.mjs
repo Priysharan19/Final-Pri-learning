@@ -1,10 +1,33 @@
 import assert from 'node:assert/strict';
-import { buildVisualTimeline, diffMath, extractMath, mathTokens, visualSummary } from '../src/explain/visualEngine.js';
+import {
+  buildDeterministicStoryboard,
+  buildVisualTimeline,
+  compileStoryboard,
+  diffMath,
+  extractMath,
+  mathTokens,
+  visualSummary,
+} from '../src/explain/visualEngine.js';
+import {
+  ACTION_KINDS,
+  STORYBOARD_VERSION,
+  storyboardPromptContract,
+  validateStoryboard,
+  verifiedMath,
+} from '../src/explain/storyboard.js';
 
 let checks = 0;
 const check = (name, fn) => {
   try { fn(); checks++; }
   catch (err) { console.error(`FAIL ${name}: ${err.message}`); process.exitCode = 1; }
+};
+
+const algebraSolution = {
+  steps: [
+    { h: 'Start', d: '$x+2=5$' },
+    { h: 'Subtract 2', d: '$x=3$' },
+  ],
+  answerText: '$x=3$',
 };
 
 check('extracts authored maths without inventing expressions', () => {
@@ -22,13 +45,108 @@ check('marks only changed terms across an equation transition', () => {
   assert.equal(diff.after.find(t => t.text === 'x')?.changed, false);
 });
 
+check('indexes only mathematics contained in the verified solution', () => {
+  assert.deepEqual([...verifiedMath(algebraSolution)].sort(), ['x+2=5', 'x=3']);
+});
+
+check('exposes a bounded teaching-director contract', () => {
+  const contract = storyboardPromptContract(algebraSolution, {});
+  assert.equal(contract.version, STORYBOARD_VERSION);
+  assert.deepEqual(contract.allowedActions, ACTION_KINDS);
+  assert.ok(contract.rules.some(rule => /Never invent/i.test(rule)));
+});
+
+check('accepts an authored storyboard using only verified equations', () => {
+  const plan = {
+    version: 3,
+    source: 'ai',
+    scenes: [{
+      heading: 'Undo the addition',
+      narration: 'Subtract two from both sides.',
+      concept: 'algebra',
+      actions: [{ kind: 'transform_equation', before: 'x+2=5', after: 'x=3', operation: 'subtract 2 from both sides' }],
+    }],
+  };
+  const result = validateStoryboard(plan, algebraSolution, {});
+  assert.equal(result.ok, true);
+  assert.equal(result.storyboard.source, 'ai');
+});
+
+check('rejects a plausible but invented AI equation', () => {
+  const plan = {
+    version: 3,
+    scenes: [{
+      heading: 'Invented intermediate',
+      actions: [{ kind: 'transform_equation', before: 'x+2=5', after: 'x+1=4' }],
+    }],
+  };
+  const result = validateStoryboard(plan, algebraSolution, {});
+  assert.equal(result.ok, false);
+  assert.equal(result.reason, 'invented equation');
+});
+
+check('rejects an invented focus expression too', () => {
+  const result = validateStoryboard({
+    version: 3,
+    scenes: [{ heading: 'Focus', actions: [{ kind: 'focus_math', expression: '2x=6' }] }],
+  }, algebraSolution, {});
+  assert.equal(result.ok, false);
+  assert.equal(result.reason, 'invented focus expression');
+});
+
+check('compiles an authored verified transform with its authored operation', () => {
+  const plan = {
+    version: 3,
+    scenes: [{
+      heading: 'Subtract on both sides',
+      actions: [{ kind: 'transform_equation', before: 'x+2=5', after: 'x=3', operation: 'subtract 2 from both sides' }],
+    }],
+  };
+  const compiled = compileStoryboard(plan, algebraSolution, {});
+  assert.equal(compiled.ok, true);
+  assert.equal(compiled.timeline[0].visuals[0].kind, 'transform');
+  assert.equal(compiled.timeline[0].visuals[0].operation, 'subtract 2 from both sides');
+});
+
 check('builds an equation-motion scene from verified consecutive steps', () => {
-  const timeline = buildVisualTimeline({ steps: [
-    { h: 'Start', d: '$x+2=5$' },
-    { h: 'Subtract 2', d: '$x=3$' },
-  ] }, { questionPrompt: 'Solve the equation.' });
+  const timeline = buildVisualTimeline(algebraSolution, { questionPrompt: 'Solve the equation.' });
   assert.equal(timeline[1].visuals[0].kind, 'transform');
   assert.equal(timeline[1].visuals[0].after, 'x=3');
+  assert.equal(timeline[1].storyboardSource, 'deterministic');
+});
+
+check('uses a valid solution storyboard in preference to regex inference', () => {
+  const solution = {
+    ...algebraSolution,
+    explanationStoryboard: {
+      version: 3,
+      source: 'teacher',
+      scenes: [{
+        heading: 'Teacher emphasis',
+        narration: 'Keep equality balanced.',
+        actions: [{ kind: 'focus_math', expression: 'x+2=5', tokens: ['2', '5'], label: 'Both sides matter' }],
+      }],
+    },
+  };
+  const timeline = buildVisualTimeline(solution, {});
+  assert.equal(timeline.length, 1);
+  assert.equal(timeline[0].heading, 'Teacher emphasis');
+  assert.equal(timeline[0].storyboardSource, 'teacher');
+  assert.equal(timeline[0].visuals[0].kind, 'focus');
+});
+
+check('falls back safely when an authored storyboard invents maths', () => {
+  const solution = {
+    ...algebraSolution,
+    explanationStoryboard: {
+      version: 3,
+      source: 'ai',
+      scenes: [{ heading: 'Bad plan', actions: [{ kind: 'focus_math', expression: 'x=99' }] }],
+    },
+  };
+  const timeline = buildVisualTimeline(solution, {});
+  assert.ok(timeline.length >= 2);
+  assert.ok(timeline.every(scene => scene.storyboardSource === 'deterministic'));
 });
 
 check('replays the first wrong Pencil attempt after a successful retry', () => {
@@ -59,10 +177,22 @@ check('animates an authored graph instead of synthesising a new one', () => {
   assert.equal(timeline[0].visuals.find(v => v.kind === 'figure')?.mode, 'graph');
 });
 
+check('supports a safe understanding checkpoint without changing marking', () => {
+  const plan = {
+    version: 3,
+    scenes: [{ heading: 'Predict the next move', actions: [{ kind: 'checkpoint', prompt: 'What should we undo first?', answer: 'Subtract 2' }] }],
+  };
+  const compiled = compileStoryboard(plan, algebraSolution, {});
+  assert.equal(compiled.timeline[0].visuals[0].kind, 'checkpoint');
+});
+
+check('the deterministic storyboard itself passes the same verifier', () => {
+  const plan = buildDeterministicStoryboard(algebraSolution, { questionPrompt: 'Solve the equation.' });
+  assert.equal(validateStoryboard(plan, algebraSolution, {}).ok, true);
+});
+
 check('reports the visual modes exposed to the player', () => {
-  const timeline = buildVisualTimeline({ steps: [
-    { h: 'Start', d: '$x+1=4$' }, { h: 'Solve', d: '$x=3$' }
-  ] }, {});
+  const timeline = buildVisualTimeline(algebraSolution, {});
   assert.ok(visualSummary(timeline).includes('transform'));
 });
 
