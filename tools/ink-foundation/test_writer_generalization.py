@@ -1,13 +1,18 @@
 #!/usr/bin/env python3
-"""Fast CPU checks for Pri Ink V4 writer-generalization machinery."""
+"""Fast CPU checks for Pri Ink V4 / V17 writer-generalization machinery."""
 from __future__ import annotations
 
+import hashlib
+import json
 import math
+import tempfile
+from pathlib import Path
 
 import torch
 
 from data import VOCAB as V3_VOCAB
 from data_v4 import PAD_ID, VOCAB, decode, encode
+from export_coreml_v4 import REQUIRED_DATA_GATES, validate_generalisation_report
 from model import ModelConfig
 from model_v4 import PriInkFoundationV4, gradient_reverse
 from style_augmentation import augmented_strokes
@@ -104,12 +109,89 @@ def test_model_shapes():
     assert inference.shape == logits.shape
 
 
+def _checkpoint_hash(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _passing_generalisation_report(checkpoint: Path) -> dict:
+    gates = {name: True for name in REQUIRED_DATA_GATES}
+    return {
+        "format": "pri-ink-writer-generalization",
+        "version": 2,
+        "checkpointSha256": _checkpoint_hash(checkpoint),
+        "split": "test",
+        "passesMetricTargets": True,
+        "passesDataReadiness": True,
+        "passesTargets": True,
+        "metrics": {
+            "writers": 20,
+            "samples": 1000,
+            "baseExact": 0.98,
+            "perturbedExact": 0.97,
+            "robustExact": 0.95,
+            "worstWriterBaseExact": 0.90,
+            "worstWriterRobustExact": 0.90,
+            "predictionFlipRate": 0.02,
+            "criticalSamples": 1,
+            "criticalRobustExact": 0.98,
+        },
+        "dataReadiness": {
+            "auditVersion": 2,
+            "policy": {
+                "evaluationSplit": "test",
+                "finalHoldoutCountsTowardReadiness": False,
+            },
+            "gates": gates,
+            "passesDataReadiness": True,
+        },
+    }
+
+
+def _expect_rejected(checkpoint: Path, report_path: Path):
+    try:
+        validate_generalisation_report(checkpoint, str(report_path))
+    except SystemExit:
+        return
+    raise AssertionError("production exporter accepted invalid V17 evidence")
+
+
+def test_production_evidence_cannot_bypass_data_gates():
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        checkpoint = root / "candidate.pt"
+        checkpoint.write_bytes(b"frozen-v4-checkpoint-fixture")
+        report_path = root / "generalisation.json"
+
+        report = _passing_generalisation_report(checkpoint)
+        report_path.write_text(json.dumps(report), encoding="utf-8")
+        ready, loaded = validate_generalisation_report(checkpoint, str(report_path))
+        assert ready and loaded is not None
+
+        # A headline-success report may not hide one failed corpus gate.
+        report["dataReadiness"]["gates"]["testTokenWriterCoverage"] = False
+        report_path.write_text(json.dumps(report), encoding="utf-8")
+        _expect_rejected(checkpoint, report_path)
+
+        # Nor may final-holdout silently fill ordinary test-readiness gaps.
+        report = _passing_generalisation_report(checkpoint)
+        report["dataReadiness"]["policy"]["finalHoldoutCountsTowardReadiness"] = True
+        report_path.write_text(json.dumps(report), encoding="utf-8")
+        _expect_rejected(checkpoint, report_path)
+
+        # Old V16 reports did not carry the V17 data contract and cannot promote.
+        report = _passing_generalisation_report(checkpoint)
+        report["version"] = 1
+        report_path.write_text(json.dumps(report), encoding="utf-8")
+        _expect_rejected(checkpoint, report_path)
+
+
 def main():
     test_v4_vocabulary()
     test_augmentation()
     test_gradient_reversal()
     test_model_shapes()
-    print("PASS: Pri Ink V4 writer-generalization + calculus vocabulary checks")
+    test_production_evidence_cannot_bypass_data_gates()
+    print("PASS: Pri Ink V4 architecture + V17 writer-generalization evidence checks")
 
 
 if __name__ == "__main__":
