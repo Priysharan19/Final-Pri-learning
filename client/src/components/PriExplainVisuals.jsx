@@ -2,7 +2,8 @@ import React, { useMemo } from 'react';
 import { MathText } from '../lib/latex.jsx';
 import { sanitizeFigure } from '../lib/sanitize.js';
 
-function operationLabel(before, after) {
+function operationLabel(before, after, authored = '') {
+  if (authored) return authored;
   const a = String(before || '').toLowerCase(), b = String(after || '').toLowerCase();
   if (/\\frac|\//.test(b) && !/\\frac|\//.test(a)) return 'divide through';
   if (/\([^)]*\)\([^)]*\)/.test(b) && !/\([^)]*\)\([^)]*\)/.test(a)) return 'factorise';
@@ -31,11 +32,36 @@ export function EquationTransform({ visual }) {
       <TokenStrip tokens={visual.diff?.before} label="Terms before the transformation" />
       <div className="pri-v-transform-arrow" aria-hidden="true">
         <i />
-        <span>{operationLabel(visual.before, visual.after)}</span>
+        <span>{operationLabel(visual.before, visual.after, visual.operation)}</span>
         <b>↓</b>
       </div>
       <TokenStrip tokens={visual.diff?.after} label="Terms after the transformation" />
       <div className="pri-v-transform-math after"><MathText text={`$${visual.after}$`} /></div>
+    </div>
+  );
+}
+
+export function MathFocus({ visual }) {
+  if (!visual?.expression) return null;
+  const tokens = Array.isArray(visual.tokens) ? visual.tokens : [];
+  return (
+    <div className="pri-v-focus" aria-label={`Focus on ${visual.expression}`}>
+      <div className="pri-v-caption"><span>{visual.label || 'Focus on the structure'}</span><b>verified expression</b></div>
+      <div className="pri-v-focus-math"><MathText text={`$${visual.expression}$`} /></div>
+      {!!tokens.length && <div className="pri-v-focus-chips" aria-label="Important terms">
+        {tokens.map((token, index) => <span key={`${token}-${index}`}><MathText text={`$${token}$`} /></span>)}
+      </div>}
+    </div>
+  );
+}
+
+export function Checkpoint({ visual }) {
+  if (!visual?.prompt) return null;
+  return (
+    <div className="pri-v-checkpoint" aria-label="Understanding checkpoint">
+      <span>Pause and predict</span>
+      <strong>{visual.prompt}</strong>
+      {visual.answer && <small>Check: <MathText text={visual.answer} /></small>}
     </div>
   );
 }
@@ -125,6 +151,8 @@ export function AnimatedFigure({ visual }) {
 export function VisualBlock({ visual }) {
   if (!visual) return null;
   if (visual.kind === 'transform') return <EquationTransform visual={visual} />;
+  if (visual.kind === 'focus') return <MathFocus visual={visual} />;
+  if (visual.kind === 'checkpoint') return <Checkpoint visual={visual} />;
   if (visual.kind === 'ink') return <InkReplay visual={visual} />;
   if (visual.kind === 'attempt') return <AttemptReplay visual={visual} />;
   if (visual.kind === 'figure') return <AnimatedFigure visual={visual} />;
