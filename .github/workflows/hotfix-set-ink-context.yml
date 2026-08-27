@@ -1,0 +1,488 @@
+name: Pri Ink set-notation lifecycle hotfix
+
+on:
+  push:
+    branches:
+      - product/india-native-ink-truth
+    paths:
+      - .github/workflows/hotfix-set-ink-context.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: product/india-native-ink-truth
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            client/package-lock.json
+            server/package-lock.json
+      - name: Apply answer-blind set notation + request lifecycle fix
+        shell: bash
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+
+          def replace_once(path, old, new):
+              p = Path(path)
+              s = p.read_text()
+              if old not in s:
+                  raise SystemExit(f'expected patch anchor missing in {path}: {old[:120]!r}')
+              p.write_text(s.replace(old, new, 1))
+
+          set_module = r'''// Pri Learning · answer-blind set-notation context
+//
+// Set questions use glyphs that the legacy algebra/calculus recognisers did not
+// originally model as first-class syntax: braces, commas and union/intersection.
+// This module is intentionally pure and expected-answer blind. It may use only
+// public question notation plus the recognisers' own candidates/geometry.
+
+export const isSetContext = ctx =>
+  String(ctx?.answerType || '').toLowerCase() === 'set' || ctx?.setNotation === true;
+
+const uniq = values => [...new Set((values || []).filter(Boolean).map(String))];
+const SET_PUNCTUATION = ['{', '}', ',', '∪', '∩', '='];
+
+/** Infer safe notation from the visible prompt. No answer or mark-scheme data
+ * is accepted by this function. */
+export function inferSetContextFromPrompt(rawPrompt, baseAlphabet = []) {
+  const raw = String(rawPrompt || '');
+  const hasSetSignal = /[{}∪∩]|\\(?:cup|cap)\b|\bsets?\b|\bunion\b|\bintersection\b/i.test(raw);
+  if (!hasSetSignal) return null;
+
+  const ids = [];
+  for (const m of raw.matchAll(/(?:^|[^A-Za-z])([A-Z])(?=[^A-Za-z]|$)/g)) ids.push(m[1]);
+  const setIdentifiers = uniq(ids);
+
+  // NCERT/JEE list-form set questions in the current generator use integer
+  // elements. This is inferred from the visible source-set notation itself,
+  // never from the hidden target set.
+  const braceBodies = [...raw.matchAll(/\{([^}]*)\}/g)].map(m => m[1]);
+  const integerLists = braceBodies.length > 0 && braceBodies.every(body =>
+    /^\s*-?\d+(?:\s*,\s*-?\d+)*\s*$/.test(body)
+  );
+
+  return {
+    answerType: 'set',
+    setNotation: true,
+    setElementKind: integerLists ? 'integer' : 'mixed',
+    setIdentifiers,
+    alphabet: uniq([...baseAlphabet, ...setIdentifiers, ...setIdentifiers.map(x => x.toLowerCase()), ...SET_PUNCTUATION])
+  };
+}
+
+export function mergeRecognitionContext(inferred, explicit) {
+  if (!inferred) return explicit || null;
+  if (!explicit) return inferred;
+  return {
+    ...inferred,
+    ...explicit,
+    setIdentifiers: uniq([...(inferred.setIdentifiers || []), ...(explicit.setIdentifiers || [])]),
+    alphabet: uniq([...(inferred.alphabet || []), ...(explicit.alphabet || [])])
+  };
+}
+
+const readingText = r => String(r?.text || '').replace(/\s+/g, '');
+
+/**
+ * A context-capability check, not an answer scorer. On a set question, a reader
+ * that emits a derivative/calculus sentence with zero set/list evidence is out
+ * of domain and cannot become authoritative merely because another equally
+ * incapable reader agrees with it.
+ */
+export function setReadingCompatibility(reading, ctx) {
+  if (!isSetContext(ctx)) return { eligible: true, bonus: 0, reason: null };
+  const text = readingText(reading);
+  if (!text) return { eligible: false, bonus: -1, reason: 'empty' };
+
+  const setSyntax = /[{}∪∩,]/.test(text);
+  const listEvidence = /-?\d+,-?\d+/.test(text);
+  const setEvidence = setSyntax || listEvidence;
+  const calculusLeak = /(?:[∫′']|\b(?:sin|cos|tan|sec|csc|cot|ln|log|sqrt|dx|dy)\b|\^[({]?\d)/i.test(text);
+
+  if (calculusLeak && !setEvidence) {
+    return { eligible: false, bonus: -0.55, reason: 'set-context-calculus-leak' };
+  }
+
+  let bonus = 0;
+  if (/[{}]/.test(text)) bonus += 0.10;
+  if (/[∪∩]/.test(text)) bonus += 0.10;
+  if (listEvidence) bonus += 0.08;
+  return { eligible: true, bonus, reason: null };
+}
+
+const copyAlt = (alts, sym, conf) => [
+  { sym, conf },
+  ...(alts || []).filter(a => a.sym !== sym)
+].slice(0, 6);
+
+const isIdentifier = (sym, ctx) => {
+  const u = String(sym || '').toUpperCase();
+  return (ctx?.setIdentifiers || []).includes(u);
+};
+
+/**
+ * Repair only syntax that is determined by the public set-question language.
+ * It never changes one number into another. The generic recogniser remains the
+ * source of digit identity; this pass recovers notation it historically lacked.
+ */
+export function repairSetNotationResult(result, ctx) {
+  if (!result || !isSetContext(ctx) || !Array.isArray(result.lines)) return result;
+  let changed = false;
+
+  const lines = result.lines.map(line => {
+    const source = (line.symbols || []).map(s => ({ ...s, alts: [...(s.alts || [])] }));
+    if (!source.length) return line;
+
+    // First recover label/operator syntax. A/B/C/S are promoted only when that
+    // exact identifier is visible in the question. u/n become ∪/∩ only when
+    // physically placed between two such identifiers.
+    for (let i = 0; i < source.length; i++) {
+      const s = source[i];
+      const upper = String(s.sym || '').toUpperCase();
+      const prev = source[i - 1], next = source[i + 1];
+      if (isIdentifier(s.sym, ctx) && s.sym !== upper) {
+        const labelSlot = i === 0 || next?.sym === '=' || next?.sym === 'u' || next?.sym === 'n' || next?.sym === '∪' || next?.sym === '∩';
+        const relationSlot = prev?.sym === 'u' || prev?.sym === 'n' || prev?.sym === '∪' || prev?.sym === '∩';
+        if (labelSlot || relationSlot) {
+          s.sym = upper;
+          s.conf = Math.min(Number(s.conf) || 0.72, 0.78);
+          s.alts = copyAlt(s.alts, upper, s.conf);
+          s._setContextRepair = 'identifier-case';
+          changed = true;
+        }
+      }
+    }
+
+    for (let i = 1; i < source.length - 1; i++) {
+      const s = source[i], prev = source[i - 1], next = source[i + 1];
+      if (s.sym === 'u' && isIdentifier(prev?.sym, ctx) && isIdentifier(next?.sym, ctx)) {
+        s.sym = '∪'; s.conf = Math.min(Number(s.conf) || 0.72, 0.78);
+        s.alts = copyAlt(s.alts, '∪', s.conf); s._setContextRepair = 'union'; changed = true;
+      } else if (s.sym === 'n' && isIdentifier(prev?.sym, ctx) && isIdentifier(next?.sym, ctx)) {
+        s.sym = '∩'; s.conf = Math.min(Number(s.conf) || 0.72, 0.78);
+        s.alts = copyAlt(s.alts, '∩', s.conf); s._setContextRepair = 'intersection'; changed = true;
+      }
+    }
+
+    // In integer-list set context, tiny baseline dots between digits are commas,
+    // not decimal points. This is deliberately disabled for mixed/decimal sets.
+    if (ctx?.setElementKind === 'integer') {
+      for (let i = 1; i < source.length - 1; i++) {
+        const s = source[i], prev = source[i - 1], next = source[i + 1];
+        if (s.sym === '.' && /^[0-9]$/.test(prev?.sym || '') && /^[0-9]$/.test(next?.sym || '')) {
+          s.sym = ','; s.conf = Math.min(Number(s.conf) || 0.68, 0.72);
+          s.alts = copyAlt(s.alts, ',', s.conf); s._setContextRepair = 'integer-list-comma'; changed = true;
+        }
+      }
+    }
+
+    const digitCount = source.filter(s => /^[0-9]$/.test(s.sym)).length;
+    const commaCount = source.filter(s => s.sym === ',').length;
+    if (digitCount >= 2 && commaCount >= 1) {
+      const firstDigit = source.findIndex(s => /^[0-9]$/.test(s.sym));
+      let lastDigit = -1;
+      for (let i = source.length - 1; i >= 0; i--) if (/^[0-9]$/.test(source[i].sym)) { lastDigit = i; break; }
+      const before = firstDigit > 0 ? source[firstDigit - 1] : null;
+      const after = lastDigit >= 0 && lastDigit + 1 < source.length ? source[lastDigit + 1] : null;
+      if (before && (before.sym === '(' || before.sym === '[')) {
+        before.sym = '{'; before.conf = Math.min(Number(before.conf) || 0.68, 0.74);
+        before.alts = copyAlt(before.alts, '{', before.conf); before._setContextRepair = 'open-brace'; changed = true;
+      }
+      if (after && (after.sym === ')' || after.sym === ']')) {
+        after.sym = '}'; after.conf = Math.min(Number(after.conf) || 0.68, 0.74);
+        after.alts = copyAlt(after.alts, '}', after.conf); after._setContextRepair = 'close-brace'; changed = true;
+      }
+    }
+
+    if (!changed) return line;
+    return { ...line, symbols: source, text: source.map(s => s.sym).join('') };
+  });
+
+  if (!changed) return result;
+  const byId = new Map(lines.flatMap(l => l.symbols || []).map(s => [s.id, s]));
+  const symbols = (result.symbols || []).map(s => byId.get(s.id) || s);
+  const all = lines.flatMap(l => l.symbols || []);
+  let minConf = all.length ? 1 : Number(result.minConf) || 1;
+  let margin = all.length ? 1 : Number(result.margin) || 1;
+  let weakest = null;
+  all.forEach((s, index) => {
+    const conf = Number(s.conf) || 0;
+    const rival = Math.max(0, ...(s.alts || []).filter(a => a.sym !== s.sym).map(a => Number(a.conf) || 0));
+    minConf = Math.min(minConf, conf);
+    margin = Math.min(margin, Math.max(0, conf - rival));
+    if (!weakest || conf < weakest.conf) weakest = { id: s.id, index, sym: s.sym, conf, alts: s.alts || [] };
+  });
+  return {
+    ...result,
+    lines,
+    symbols,
+    text: lines.map(l => l.text).join('\n'),
+    minConf,
+    margin,
+    weakest,
+    setContextRepair: 'answer-blind-set-notation-v1'
+  };
+}
+'''
+          Path('client/src/ink/setNotation.js').write_text(set_module)
+
+          # native.js — request snapshots + surface generations + prompt context.
+          replace_once('client/src/ink/native.js',
+            "import { fuseNativeStrokeReading } from './hybrid.js';\n",
+            "import { fuseNativeStrokeReading } from './hybrid.js';\nimport { inferSetContextFromPrompt, mergeRecognitionContext } from './setNotation.js';\n")
+          replace_once('client/src/ink/native.js',
+            "const pending = new Map();       // reqId → {resolve, context, overrides}\nconst strokeListeners = new Set();\nlet latestStrokes = [];\n",
+            "const pending = new Map();       // reqId → {resolve, context, overrides, strokes, surfaceEpoch}\nconst strokeListeners = new Set();\nlet latestStrokes = [];\nlet surfaceEpoch = 0;\n\nexport function snapshotInkStrokes(strokes) {\n  return (Array.isArray(strokes) ? strokes : []).map(stroke => ({\n    ...stroke,\n    points: (Array.isArray(stroke?.points) ? stroke.points : []).map(point => ({ ...point }))\n  }));\n}\n")
+          replace_once('client/src/ink/native.js',
+            "  '+', '-', '*', '/', '=', '(', ')', '[', ']', '<', '>', '<=', '>=', '!=', '±', '.', ',', ':', '%', '°',\n",
+            "  '+', '-', '*', '/', '=', '(', ')', '[', ']', '{', '}', '<', '>', '<=', '>=', '!=', '±', '.', ',', ':', '%', '°', '∪', '∩',\n")
+
+          old_infer = '''function inferredNotationContext() {\n  if (typeof document === 'undefined') return null;\n  const prompt = document.querySelector('.q-prompt');\n  const raw = String(prompt?.textContent || '');\n  const vars = new Set(['u', 'v']);\n  const common = new Set('xyzuvnktmabcrfgh'.split(''));\n  const re = /(?:^|[^A-Za-z])([A-Za-z])(?=[^A-Za-z]|$)/g;\n  for (const match of raw.matchAll(re)) {\n    const ch = match[1].toLowerCase();\n    if (common.has(ch)) vars.add(ch);\n  }\n  // TeX/KaTeX accessibility text can duplicate a formula. A set removes all\n  // duplication; only membership matters to the recogniser's tie-break prior.\n  return { alphabet: [...new Set([...BASE_MATH_ALPHABET, ...vars])] };\n}\n'''
+          new_infer = '''export function inferredNotationContext(explicit = null) {\n  if (typeof document === 'undefined') return explicit || null;\n  const prompt = document.querySelector('.q-prompt');\n  const raw = String(prompt?.textContent || '');\n  const vars = new Set(['u', 'v']);\n  const common = new Set('xyzuvnktmabcrfgh'.split(''));\n  const re = /(?:^|[^A-Za-z])([A-Za-z])(?=[^A-Za-z]|$)/g;\n  for (const match of raw.matchAll(re)) {\n    const ch = match[1].toLowerCase();\n    if (common.has(ch)) vars.add(ch);\n  }\n  const generic = { alphabet: [...new Set([...BASE_MATH_ALPHABET, ...vars])] };\n  const setContext = inferSetContextFromPrompt(raw, generic.alphabet);\n  return mergeRecognitionContext(setContext || generic, explicit);\n}\n\nfunction invalidatePending(reason) {\n  surfaceEpoch += 1;\n  for (const [reqId, entry] of pending) {\n    pending.delete(reqId);\n    entry.resolve(failedReading(entry.op, reason));\n  }\n}\n'''
+          replace_once('client/src/ink/native.js', old_infer, new_infer)
+
+          old_receive = '''        let reading = payload;\n        if (latestStrokes.length &&\n            (payload.engine === 'native-primary-debug' || payload.engine === 'native-rescue')) {\n          try {\n            reading = fuseNativeStrokeReading(\n              payload,\n              latestStrokes,\n              entry.overrides || {},\n              entry.context || inferredNotationContext()\n            );\n            reading.engine = `${payload.engine}+line-stroke-fusion`;\n          } catch {\n            reading = payload;\n          }\n        }\n        entry.resolve(reading);\n'''
+          new_receive = '''        if (entry.surfaceEpoch !== surfaceEpoch) {\n          entry.resolve(failedReading(entry.op, 'surface-stale'));\n          return;\n        }\n        let reading = payload;\n        if (entry.strokes.length &&\n            (payload.engine === 'native-primary-debug' || payload.engine === 'native-rescue')) {\n          try {\n            reading = fuseNativeStrokeReading(\n              payload,\n              entry.strokes,\n              entry.overrides || {},\n              entry.context || inferredNotationContext()\n            );\n            reading.engine = `${payload.engine}+line-stroke-fusion`;\n          } catch {\n            reading = payload;\n          }\n        }\n        entry.resolve(reading);\n'''
+          replace_once('client/src/ink/native.js', old_receive, new_receive)
+
+          replace_once('client/src/ink/native.js',
+            "    pending.set(reqId, { resolve, context, overrides: message.overrides || {}, op: message.op });\n",
+            "    pending.set(reqId, {\n      resolve, context, overrides: message.overrides || {}, op: message.op,\n      strokes: snapshotInkStrokes(latestStrokes), surfaceEpoch\n    });\n")
+          replace_once('client/src/ink/native.js',
+            "  mount(element) {\n    if (!element) return false;\n    latestStrokes = [];\n",
+            "  mount(element) {\n    if (!element) return false;\n    invalidatePending('surface-remounted');\n    latestStrokes = [];\n")
+          replace_once('client/src/ink/native.js',
+            "  unmount() { latestStrokes = []; post({ op: 'unmount' }); },\n",
+            "  unmount() { invalidatePending('surface-unmounted'); latestStrokes = []; post({ op: 'unmount' }); },\n")
+          replace_once('client/src/ink/native.js',
+            "  clear() { latestStrokes = []; post({ op: 'clear' }); },\n",
+            "  clear() { invalidatePending('surface-cleared'); latestStrokes = []; post({ op: 'clear' }); },\n")
+
+          # InkAnswer — one merged safe context throughout each request, and make
+          # late callbacks inert on unmount.
+          replace_once('client/src/ink/InkAnswer.jsx',
+            "import { nativeInk, nativeInkAvailable } from './native.js';\n",
+            "import { nativeInk, nativeInkAvailable, inferredNotationContext } from './native.js';\n")
+          replace_once('client/src/ink/InkAnswer.jsx',
+            "  const runRecognition = useCallback((strokes, ovr) => {\n    const seq = ++readSeqRef.current;\n\n    const readWithJS = () => {\n      try { return recognizeWithoutDetachedSideWork(strokes, ovr, recognitionContext, recognize); }\n",
+            "  const runRecognition = useCallback((strokes, ovr) => {\n    const seq = ++readSeqRef.current;\n    const effectiveContext = inferredNotationContext(recognitionContext);\n\n    const readWithJS = () => {\n      try { return recognizeWithoutDetachedSideWork(strokes, ovr, effectiveContext, recognize); }\n")
+          replace_once('client/src/ink/InkAnswer.jsx',
+            "    nativeInk.foundationRecognize(ovr, recognitionContext).then(foundation => {\n",
+            "    nativeInk.foundationRecognize(ovr, effectiveContext).then(foundation => {\n")
+          replace_once('client/src/ink/InkAnswer.jsx',
+            "        const agreed = chooseNativeConsensus([foundation, local]);\n",
+            "        const agreed = chooseNativeConsensus([foundation, local], effectiveContext);\n")
+          replace_once('client/src/ink/InkAnswer.jsx',
+            "      nativeInk.recognize(ovr, recognitionContext).then(nativeRaw => {\n",
+            "      nativeInk.recognize(ovr, effectiveContext).then(nativeRaw => {\n")
+          replace_once('client/src/ink/InkAnswer.jsx',
+            "          ? readUnreadLines(nativeRaw, strokes, ovr, recognitionContext)\n",
+            "          ? readUnreadLines(nativeRaw, strokes, ovr, effectiveContext)\n")
+          replace_once('client/src/ink/InkAnswer.jsx',
+            "        const chosen = chooseNativeConsensus([foundation, local, nativeReading]);\n",
+            "        const chosen = chooseNativeConsensus([foundation, local, nativeReading], effectiveContext);\n")
+          replace_once('client/src/ink/InkAnswer.jsx',
+            "  useEffect(() => () => timerRef.current && clearTimeout(timerRef.current), []);\n",
+            "  useEffect(() => () => {\n    readSeqRef.current += 1;\n    if (timerRef.current) clearTimeout(timerRef.current);\n  }, []);\n")
+
+          # Runtime post-processing: set syntax is repaired only in set context.
+          replace_once('client/src/ink/runtimeSpatial.js',
+            "// Pri Learning · runtime spatial guard for the legacy JS fallback\n",
+            "// Pri Learning · runtime spatial guard for the legacy JS fallback\nimport { repairSetNotationResult } from './setNotation.js';\n")
+          replace_once('client/src/ink/runtimeSpatial.js',
+            "  const finish = result => repairSingleGlyphQuestionContext(result, ctx);\n",
+            "  const finish = result => repairSingleGlyphQuestionContext(repairSetNotationResult(result, ctx), ctx);\n")
+
+          # Native/JS line fusion: in set context, preserve strong native set
+          # punctuation instead of forcing it through an algebra-only classifier.
+          replace_once('client/src/ink/hybrid.js',
+            "import { recognize, classify } from './recognizer.js';\n",
+            "import { recognize, classify } from './recognizer.js';\nimport { isSetContext } from './setNotation.js';\n")
+          replace_once('client/src/ink/hybrid.js',
+            "const STRUCTURAL = new Set(['=', '+', '-', '/', 'sqrt', '<', '>', '<=', '>=', '!=', 'div', 'pm', 'deg', 'percent', ':', '∫']);\n",
+            "const STRUCTURAL = new Set(['=', '+', '-', '/', 'sqrt', '<', '>', '<=', '>=', '!=', 'div', 'pm', 'deg', 'percent', ':', '∫']);\nconst SET_STRUCTURAL = new Set(['{', '}', ',', '∪', '∩']);\n")
+          replace_once('client/src/ink/hybrid.js',
+            "function strongestNativeStructure(jsSymbol, nativeLine) { let best = null;\n  for (const n of nativeLine?.symbols || []) { const sym = canonical(n.sym || ''); if (!STRUCTURAL.has(sym) || Number(n.conf) < 0.90 || n.approx) continue;\n",
+            "function strongestNativeStructure(jsSymbol, nativeLine, ctx) { let best = null;\n  for (const n of nativeLine?.symbols || []) { const sym = canonical(n.sym || ''); const protectedSyntax = STRUCTURAL.has(sym) || (isSetContext(ctx) && SET_STRUCTURAL.has(sym)); if (!protectedSyntax || Number(n.conf) < 0.90 || n.approx) continue;\n")
+          replace_once('client/src/ink/hybrid.js',
+            "function remapJsSymbol(symbol, localToGlobal, lineIndex, ordinal, nativeLine, overrides) {\n",
+            "function remapJsSymbol(symbol, localToGlobal, lineIndex, ordinal, nativeLine, overrides, ctx) {\n")
+          replace_once('client/src/ink/hybrid.js',
+            "  const structural = strongestNativeStructure(out, nativeLine);\n",
+            "  const structural = strongestNativeStructure(out, nativeLine, ctx);\n")
+          replace_once('client/src/ink/hybrid.js',
+            "  const symbols = raw.map((s, i) => remapJsSymbol(s, indexes, lineIndex, i, line, overrides)).filter(s => s.strokeIdxs.length); if (!symbols.length) return null;\n",
+            "  const symbols = raw.map((s, i) => remapJsSymbol(s, indexes, lineIndex, i, line, overrides, ctx)).filter(s => s.strokeIdxs.length); if (!symbols.length) return null;\n")
+          replace_once('client/src/ink/hybrid.js',
+            "function fallbackOwnedGlyphFusion(line, strokes, overrides, lineIndex) {\n",
+            "function fallbackOwnedGlyphFusion(line, strokes, overrides, lineIndex, ctx) {\n")
+          replace_once('client/src/ink/hybrid.js',
+            "    else if (!STRUCTURAL.has(oldSym) && (native.approx || oldConf < 0.58 || (sameFamily(oldSym, jsSym) && jsConf >= 0.65))) { sym = jsSym; conf = Math.min(0.82, Math.max(jsConf, 0.5 * jsConf + 0.25 * oldConf)); alts = mergeAlternatives(sym, [{ sym: oldSym, conf: Math.min(0.70, oldConf) }], native.alts, js.alts); }\n",
+            "    else if (!(STRUCTURAL.has(oldSym) || (isSetContext(ctx) && SET_STRUCTURAL.has(oldSym))) && (native.approx || oldConf < 0.58 || (sameFamily(oldSym, jsSym) && jsConf >= 0.65))) { sym = jsSym; conf = Math.min(0.82, Math.max(jsConf, 0.5 * jsConf + 0.25 * oldConf)); alts = mergeAlternatives(sym, [{ sym: oldSym, conf: Math.min(0.70, oldConf) }], native.alts, js.alts); }\n")
+          replace_once('client/src/ink/hybrid.js',
+            "  const lines = reading.lines.map((line, lineIndex) => complexLine(line) ? fallbackOwnedGlyphFusion(line, strokes, overrides, lineIndex)\n    : (readWholeNativeLine(line, lineIndex, strokes, overrides, ctx) || fallbackOwnedGlyphFusion(line, strokes, overrides, lineIndex)));\n",
+            "  const lines = reading.lines.map((line, lineIndex) => complexLine(line) ? fallbackOwnedGlyphFusion(line, strokes, overrides, lineIndex, ctx)\n    : (readWholeNativeLine(line, lineIndex, strokes, overrides, ctx) || fallbackOwnedGlyphFusion(line, strokes, overrides, lineIndex, ctx)));\n")
+
+          # Correction picker can now explicitly select set tokens.
+          replace_once('client/src/ink/templates.js',
+            "  'div', 'pm', 'deg', 'percent', ':', '∫'\n];\n",
+            "  'div', 'pm', 'deg', 'percent', ':', '∫', '{', '}', ',', '∪', '∩', 'A', 'B', 'C', 'S'\n];\n")
+
+          # Native consensus capability guard.
+          consensus = Path('client/src/ink/nativeConsensus.js')
+          s = consensus.read_text()
+          s = "import { isSetContext, setReadingCompatibility } from './setNotation.js';\n" + s
+          s = s.replace('function choiceScore(r) {\n  return intrinsicQuality(r) + engineAdjustment(r);\n}',
+                        'function choiceScore(r, ctx = null) {\n  return intrinsicQuality(r) + engineAdjustment(r) + setReadingCompatibility(r, ctx).bonus;\n}')
+          s = s.replace('function evidenceOf(r) {\n  return {',
+                        'function evidenceOf(r, ctx = null) {\n  const compatibility = setReadingCompatibility(r, ctx);\n  return {')
+          s = s.replace("    failure: r?.failure || (!hasReading(r) ? 'no-reading' : null)\n  };",
+                        "    failure: r?.failure || (!hasReading(r) ? 'no-reading' : null),\n    contextCompatible: compatibility.eligible,\n    contextReason: compatibility.reason\n  };")
+          s = s.replace('export function chooseNativeConsensus(candidates) {\n  const attempted = (candidates || []).filter(Boolean);\n  const live = attempted.filter(hasReading);\n  if (!live.length) return null;\n',
+                        "export function chooseNativeConsensus(candidates, ctx = null) {\n  const attempted = (candidates || []).filter(Boolean);\n  const allLive = attempted.filter(hasReading);\n  if (!allLive.length) return null;\n\n  // On a set question, exclude only readers that are demonstrably outside the\n  // question language (for example a derivative with no set/list syntax). If\n  // every reader is incompatible we still surface the best evidence, but never\n  // manufacture a blank page.\n  const compatible = allLive.filter(r => setReadingCompatibility(r, ctx).eligible);\n  const contextFiltered = isSetContext(ctx) && compatible.length > 0 && compatible.length < allLive.length;\n  const live = compatible.length ? compatible : allLive;\n")
+          s = s.replace('    return Math.max(...b.map(choiceScore)) - Math.max(...a.map(choiceScore));',
+                        '    return Math.max(...b.map(r => choiceScore(r, ctx))) - Math.max(...a.map(r => choiceScore(r, ctx)));')
+          s = s.replace('    const chosen = [...consensus].sort((a, b) => choiceScore(b) - choiceScore(a))[0];',
+                        '    const chosen = [...consensus].sort((a, b) => choiceScore(b, ctx) - choiceScore(a, ctx))[0];')
+          s = s.replace('      candidateReadings: attempted.map(evidenceOf),',
+                        '      candidateReadings: attempted.map(r => evidenceOf(r, ctx)),', 1)
+          s = s.replace('  const chosen = [...live].sort((a, b) => choiceScore(b) - choiceScore(a))[0];',
+                        '  const chosen = [...live].sort((a, b) => choiceScore(b, ctx) - choiceScore(a, ctx))[0];')
+          s = s.replace('    candidateReadings: attempted.map(evidenceOf),',
+                        '    candidateReadings: attempted.map(r => evidenceOf(r, ctx)),')
+          consensus.write_text(s)
+
+          # Permanent regression tests.
+          set_test = r'''import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import {
+  inferSetContextFromPrompt,
+  repairSetNotationResult,
+  setReadingCompatibility
+} from '../src/ink/setNotation.js';
+
+const ctx = inferSetContextFromPrompt(
+  'Let A = {1, 2, 3, 4, 5, 8} and B = {2, 5, 6, 7, 12}. Write down A ∪ B.',
+  ['0','1','2','3','4','5','6','7','8','9','=']
+);
+assert.equal(ctx.answerType, 'set');
+assert.equal(ctx.setNotation, true);
+assert.equal(ctx.setElementKind, 'integer');
+assert.deepEqual(ctx.setIdentifiers, ['A', 'B']);
+for (const token of ['{', '}', ',', '∪', '∩', 'A', 'B']) assert.ok(ctx.alphabet.includes(token));
+assert.ok(!Object.hasOwn(ctx, 'expected'));
+
+const symbol = (id, sym, conf = 0.82) => ({ id, sym, conf, alts: [{ sym, conf }], strokeIdxs: [] });
+const rawSymbols = [
+  symbol('0','a'), symbol('1','u'), symbol('2','b'), symbol('3','='),
+  symbol('4','('), symbol('5','1'), symbol('6','.'), symbol('7','2'),
+  symbol('8','.'), symbol('9','3'), symbol('10',')')
+];
+const repaired = repairSetNotationResult({
+  lines: [{ text: 'aub=(1.2.3)', symbols: rawSymbols }],
+  symbols: rawSymbols,
+  text: 'aub=(1.2.3)', minConf: 0.82, margin: 0.2
+}, ctx);
+assert.equal(repaired.text, 'A∪B={1,2,3}');
+assert.equal(repaired.setContextRepair, 'answer-blind-set-notation-v1');
+assert.ok(repaired.minConf <= 0.78, 'context repair must not manufacture high certainty');
+
+const calculus = { text: "y'=dx=6x^6-180", lines: [{ text: "y'=dx=6x^6-180" }] };
+const setReading = { text: 'A∪B={1,2,3}', lines: [{ text: 'A∪B={1,2,3}' }] };
+assert.equal(setReadingCompatibility(calculus, ctx).eligible, false);
+assert.equal(setReadingCompatibility(setReading, ctx).eligible, true);
+
+// Regression for the screenshot-class bug: a delayed native response must be
+// fused against its request snapshot, never whichever page happens to be live
+// when the response arrives.
+const nativeSource = fs.readFileSync(new URL('../src/ink/native.js', import.meta.url), 'utf8');
+assert.match(nativeSource, /strokes:\s*snapshotInkStrokes\(latestStrokes\)/);
+assert.match(nativeSource, /fuseNativeStrokeReading\(\s*payload,\s*entry\.strokes,/s);
+assert.match(nativeSource, /invalidatePending\('surface-remounted'\)/);
+assert.match(nativeSource, /entry\.surfaceEpoch !== surfaceEpoch/);
+assert.ok(!/ctx\.expected|expectedAnswer|answerText|markScheme/.test(fs.readFileSync(new URL('../src/ink/setNotation.js', import.meta.url), 'utf8')));
+
+console.log('SET NOTATION + REQUEST LIFECYCLE — PASS');
+'''
+          Path('client/test/ink-set-notation-check.mjs').write_text(set_test)
+
+          # Extend native arbitration with the exact failure class: two
+          # out-of-domain calculus opinions may not outvote one set-capable one.
+          arb = Path('client/test/native-ink-arbitration-check.mjs')
+          a = arb.read_text()
+          anchor = "// Arbitration must remain answer-blind.\n"
+          extra = r'''// Set-context capability guard: agreement between two readers that cannot
+// represent the question language must not beat a compatible set reading.
+{
+  const setCtx = { answerType: 'set', setNotation: true, setElementKind: 'integer', setIdentifiers: ['A', 'B'] };
+  const foundationLeak = r('pri-foundation-debug', "y'=6x=6x+6x-6x-180", 0.91, 0.25);
+  const nativeLeak = r('native-rescue+line-stroke-fusion', "y'=dx=6x^6-6x-180", 0.84, 0.18);
+  const setVote = r('pri-js-v3', 'A∪B={1,2,3,4,5,6,7,8,12}', 0.64, 0.10);
+  const out = chooseNativeConsensus([foundationLeak, nativeLeak, setVote], setCtx);
+  assert.equal(out.text, setVote.text);
+  assert.equal(out.disagreement, true, 'one compatible reader is evidence, not automatic truth');
+  assert.ok(out.minConf <= 0.54);
+  assert.ok(out.candidateReadings.some(x => x.contextReason === 'set-context-calculus-leak'));
+}
+
+'''
+          if anchor not in a: raise SystemExit('arbitration test anchor missing')
+          arb.write_text(a.replace(anchor, extra + anchor, 1))
+
+          # Register the new focused gate without reformatting package.json.
+          replace_once('package.json',
+            '&& npm run test:ink:arbitration && npm run test:ink:stability",',
+            '&& npm run test:ink:arbitration && npm run test:ink:sets && npm run test:ink:stability",')
+          replace_once('package.json',
+            '    "test:ink:arbitration": "node client/test/native-ink-arbitration-check.mjs",\n    "test:ink:stability":',
+            '    "test:ink:arbitration": "node client/test/native-ink-arbitration-check.mjs",\n    "test:ink:sets": "node client/test/ink-set-notation-check.mjs",\n    "test:ink:stability":')
+          PY
+
+      - name: Install dependencies
+        run: npm run setup
+
+      - name: Focused handwriting gates
+        run: |
+          npm run test:ink:sets
+          npm run test:ink:arbitration
+          npm run test:ink:hybrid
+          npm run test:ink:stability
+
+      - name: Build and sync native bundles
+        run: |
+          npm run build
+          npm run sync:ios
+          npm run check:ios
+
+      - name: Commit validated patch and remove temporary workflow
+        shell: bash
+        run: |
+          rm .github/workflows/hotfix-set-ink-context.yml
+          git config user.name "pri-learning-ci"
+          git config user.email "actions@users.noreply.github.com"
+          git add \
+            client/src/ink/native.js \
+            client/src/ink/InkAnswer.jsx \
+            client/src/ink/nativeConsensus.js \
+            client/src/ink/runtimeSpatial.js \
+            client/src/ink/hybrid.js \
+            client/src/ink/templates.js \
+            client/src/ink/setNotation.js \
+            client/test/native-ink-arbitration-check.mjs \
+            client/test/ink-set-notation-check.mjs \
+            package.json \
+            ios/PriLearning.swiftpm/Resources/Web \
+            'ios/PriLearning 2.swiftpm/Resources/Web' \
+            .github/workflows/hotfix-set-ink-context.yml
+          git commit -m "Fix stale native ink and add set notation context"
+          git push origin HEAD:product/india-native-ink-truth
