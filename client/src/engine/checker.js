@@ -8,7 +8,7 @@
 
 import { normalize, parse, evaluate, exprEquivalent, numsClose } from './expr.js';
 import { diagnoseStep } from './diagnose.js';
-import { assessEquationLine } from './reason.js';
+import { assessEquationLine, sameEquationClaim } from './reason.js';
 import { cleanInput, parseNumericInput, checkAnswer as coreCheckAnswer } from './checker-core.js';
 
 export { cleanInput, parseNumericInput };
@@ -38,6 +38,45 @@ function lostRootDiagnosis(variable, kept, total) {
   };
 }
 
+function extraListedRootDiagnosis(variable, value) {
+  return {
+    code: 'extraneous-solution',
+    title: 'An extra solution was introduced',
+    message: `${variable} = ${value} is listed here, but it does not solve the original equation.`,
+    fix: 'Check every proposed solution in the original equation before keeping it.',
+    confidence: 'high'
+  };
+}
+
+/**
+ * Read a natural final solution list before normalize() removes commas.
+ * Accepted forms include:
+ *   x = 3 or x = -3
+ *   x = 3, -3
+ *   x = 3; x = -3
+ * A single equation is deliberately not handled here.
+ */
+function readSolutionList(raw, meta) {
+  if (meta?.kind !== 'equation' || !meta.variable || !Array.isArray(meta.solutions)) return null;
+  let src = String(raw || '').trim()
+    .replace(/[−–—]/g, '-')
+    .replace(/^∴\s*/, '')
+    .replace(/^(so|hence|then|therefore)\s+/i, '');
+  if (!/(\bor\b|,|;)/i.test(src)) return null;
+  const variable = String(meta.variable).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const lead = new RegExp(`^${variable}\\s*=\\s*`, 'i');
+  const parts = src.split(/\bor\b|,|;/i).map(s => s.trim()).filter(Boolean);
+  if (parts.length < 2) return null;
+  const values = [];
+  for (let part of parts) {
+    part = part.replace(lead, '').trim();
+    if (!part || part.includes('=')) return { values: [], invalid: true };
+    try { values.push(parseNumericInput(part).value); }
+    catch { return { values: [], invalid: true }; }
+  }
+  return { values: uniqueNumeric(values), invalid: false };
+}
+
 export function checkWorking(q, workingText) {
   const ans = q.answer;
   const meta = ans.stepMeta;
@@ -63,22 +102,28 @@ export function checkWorking(q, workingText) {
 
   let reached = false;
   try {
-    const cleaned = normalize(lastLine.text).replace(/^∴\s*/, '');
-    if (ans.final?.kind === 'expr') {
-      const cand = cleaned.includes('=') ? cleaned.split('=').pop() : cleaned;
-      reached = exprEquivalent(cand, ans.final.expr, { positiveOnly: ans.final.positiveOnly });
-    } else if (meta.kind === 'equation') {
-      const re = new RegExp(`${meta.variable}\\s*=`);
-      if (re.test(cleaned)) {
-        const rhs = cleaned.split('=').pop();
-        const parts = rhs.split(/,|\bor\b/).map(p => p.trim()).filter(Boolean);
-        const vals = uniqueNumeric(parts.map(p => { try { return parseNumericInput(p).value; } catch { return NaN; } }));
-        const wanted = uniqueNumeric(meta.solutions);
-        reached = vals.length === wanted.length && vals.every(v => wanted.some(s => numsClose(v, s)));
-      }
+    const naturalList = readSolutionList(lastLine.text, meta);
+    if (naturalList && !naturalList.invalid) {
+      const wanted = uniqueNumeric(meta.solutions);
+      reached = naturalList.values.length === wanted.length
+        && naturalList.values.every(v => wanted.some(s => numsClose(v, s)));
     } else {
-      const cand = cleaned.includes('=') ? cleaned.split('=').pop() : cleaned;
-      reached = exprEquivalent(cand, meta.canonical, {});
+      const cleaned = normalize(lastLine.text).replace(/^∴\s*/, '');
+      if (ans.final?.kind === 'expr') {
+        const cand = cleaned.includes('=') ? cleaned.split('=').pop() : cleaned;
+        reached = exprEquivalent(cand, ans.final.expr, { positiveOnly: ans.final.positiveOnly });
+      } else if (meta.kind === 'equation') {
+        const re = new RegExp(`${meta.variable}\\s*=`);
+        if (re.test(cleaned)) {
+          const rhs = cleaned.split('=').pop();
+          const vals = uniqueNumeric([parseNumericInput(rhs).value]);
+          const wanted = uniqueNumeric(meta.solutions);
+          reached = vals.length === wanted.length && vals.every(v => wanted.some(s => numsClose(v, s)));
+        }
+      } else {
+        const cand = cleaned.includes('=') ? cleaned.split('=').pop() : cleaned;
+        reached = exprEquivalent(cand, meta.canonical, {});
+      }
     }
   } catch { reached = false; }
 
@@ -100,6 +145,32 @@ export function stepCheck(meta, workingText) {
     let note;
     let lineDiagnosis = null;
     try {
+      const listed = readSolutionList(line, meta);
+      if (listed) {
+        const wanted = uniqueNumeric(meta.solutions);
+        if (listed.invalid || !listed.values.length) {
+          status = 'note';
+          note = 'Skipped — I couldn’t read the solution list safely.';
+        } else {
+          const extra = listed.values.find(v => !wanted.some(sol => numsClose(v, sol)));
+          const missing = wanted.filter(sol => !listed.values.some(v => numsClose(v, sol)));
+          if (extra !== undefined) {
+            status = 'break';
+            lineDiagnosis = extraListedRootDiagnosis(meta.variable, extra);
+            note = lineDiagnosis.message;
+          } else if (missing.length || listed.values.length !== wanted.length) {
+            status = 'break';
+            lineDiagnosis = lostRootDiagnosis(meta.variable, listed.values.join(' or '), wanted.length);
+            note = lineDiagnosis.message;
+          } else {
+            status = 'ok';
+          }
+        }
+        if (status === 'break' && firstBreak === -1) firstBreak = i;
+        out.push({ text: line, status, note, ...(lineDiagnosis ? { diagnosis: lineDiagnosis } : {}) });
+        return;
+      }
+
       const cleaned = normalize(line).replace(/^∴\s*/, '').replace(/^(so|hence|then|therefore)\s+/i, '');
 
       if (cleaned.includes('±') && meta.kind === 'equation' && cleaned.includes('=')) {
@@ -134,13 +205,22 @@ export function stepCheck(meta, workingText) {
         if (cleaned.includes('=')) {
           const ast = parse(cleaned);
           if (ast.t === 'equation') {
-            const assessed = assessEquationLine({ ast, previousAst: previousEquation, previousTrusted: previousEquationTrusted, meta });
-            status = assessed.status;
-            note = assessed.note;
-            lineDiagnosis = assessed.diagnosis || null;
-            if (status !== 'break') {
+            // The common case is a reversible rearrangement of a line already
+            // proved correct. Verify that cheaply before invoking Pri Reason's
+            // extra-root search. Non-equivalent moves still take the full path.
+            if (previousEquationTrusted && previousEquation && sameEquationClaim(previousEquation, ast)) {
+              status = 'ok';
               previousEquation = ast;
-              previousEquationTrusted = !!assessed.trusted;
+              previousEquationTrusted = true;
+            } else {
+              const assessed = assessEquationLine({ ast, previousAst: previousEquation, previousTrusted: previousEquationTrusted, meta });
+              status = assessed.status;
+              note = assessed.note;
+              lineDiagnosis = assessed.diagnosis || null;
+              if (status !== 'break') {
+                previousEquation = ast;
+                previousEquationTrusted = !!assessed.trusted;
+              }
             }
           }
         } else {
