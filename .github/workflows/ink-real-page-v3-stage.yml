@@ -28,6 +28,10 @@ jobs:
           cache-dependency-path: |
             client/package-lock.json
             server/package-lock.json
+      - name: Repair staged installer
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: python3 tools/fix-ink-real-page-v3-installer.py
       - name: Apply real-page repair
         env:
           PYTHONDONTWRITEBYTECODE: '1'
@@ -67,7 +71,9 @@ jobs:
       - name: Commit validated repair
         run: |
           rm -f tools/apply-ink-real-page-v3.py
+          rm -f tools/fix-ink-real-page-v3-installer.py
           rm -f .github/workflows/ink-real-page-v3-stage.yml
+          rm -f .github/workflows/ink-real-page-v3-linux.yml
           rm -rf tools/__pycache__
           git add -A
           git config user.name pri-learning-ci
