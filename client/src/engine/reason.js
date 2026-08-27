@@ -1,25 +1,22 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Pri Learning · Pri Reason — conservative equation-transformation verifier
 //
-// Step Check already knows the canonical solution(s) to many generated
-// questions. That is useful evidence, but it is not enough to prove that an
-// intermediate equation is a valid transformation: an equation can keep every
-// correct solution while adding new ones. For example, if x = 5 is correct,
-// `(x - 5)(x - 100) = 0` is still true at x = 5 but is not equivalent.
+// Step Check knows the canonical solution(s) to many generated questions, but
+// solution survival alone does not prove a transformation is reversible. Pri
+// Reason therefore has three outcomes:
+//   ok    — positively verified;
+//   break — positively disproved;
+//   note  — insufficient evidence, so Pri abstains.
 //
-// Pri Reason therefore separates three outcomes:
-//   ok    — the transformation is positively verified;
-//   break — it is positively disproved (lost/added solutions, etc.);
-//   note  — the known answer survives but reversibility cannot be proved.
-//
-// The design is intentionally precision-first. An uncertain line is never
-// promoted to "correct" just to make the UI look confident.
+// The central rule is precision first: no finite set of numerical probe points
+// is allowed to certify an equation transformation as correct.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { parse, evaluate, exprEquivalent, variablesOf, numsClose } from './expr.js';
+import { parse, evaluate, numsClose } from './expr.js';
 
 const SAMPLE = [0.73, 1.31, -0.64, 2.17, -1.72, 0.37, 3.08, -2.29, 4.61, -4.13];
 const EPS = 1e-7;
+const MAX_PROOF_DEGREE = 12;
 
 const residual = eq => ({ t: 'bin', op: '-', l: eq.l, r: eq.r });
 
@@ -33,78 +30,181 @@ function equationHoldsAt(eq, variable, value) {
   } catch { return false; }
 }
 
+// ── Deterministic polynomial proof ───────────────────────────────────────────
+// Equation residuals are reduced to coefficient vectors in one variable. This
+// proves ordinary school-algebra rearrangements without trusting sampled values.
+// Unsupported/non-polynomial forms simply return null and therefore abstain.
+
+function constantNumber(node) {
+  try {
+    const v = evaluate(node, {});
+    return Number.isFinite(v) ? v : null;
+  } catch { return null; }
+}
+
+function trimPoly(poly) {
+  if (!poly) return null;
+  const out = poly.slice();
+  while (out.length > 1 && Math.abs(out[out.length - 1]) <= EPS) out.pop();
+  for (let i = 0; i < out.length; i++) if (Math.abs(out[i]) <= EPS) out[i] = 0;
+  return out;
+}
+
+function addPoly(a, b, sign = 1) {
+  if (!a || !b) return null;
+  const n = Math.max(a.length, b.length);
+  if (n > MAX_PROOF_DEGREE + 1) return null;
+  const out = new Array(n).fill(0);
+  for (let i = 0; i < n; i++) out[i] = (a[i] || 0) + sign * (b[i] || 0);
+  return trimPoly(out);
+}
+
+function scalePoly(a, scalar) {
+  if (!a || !Number.isFinite(scalar)) return null;
+  return trimPoly(a.map(v => v * scalar));
+}
+
+function mulPoly(a, b) {
+  if (!a || !b || a.length + b.length - 2 > MAX_PROOF_DEGREE) return null;
+  const out = new Array(a.length + b.length - 1).fill(0);
+  for (let i = 0; i < a.length; i++) {
+    for (let j = 0; j < b.length; j++) out[i + j] += a[i] * b[j];
+  }
+  return trimPoly(out);
+}
+
+function powPoly(base, exponent) {
+  if (!base || !Number.isInteger(exponent) || exponent < 0 || exponent > MAX_PROOF_DEGREE) return null;
+  let out = [1];
+  let factor = base;
+  let n = exponent;
+  while (n > 0) {
+    if (n & 1) {
+      out = mulPoly(out, factor);
+      if (!out) return null;
+    }
+    n >>= 1;
+    if (n) {
+      factor = mulPoly(factor, factor);
+      if (!factor) return null;
+    }
+  }
+  return trimPoly(out);
+}
+
+function polynomialCoefficients(node, variable) {
+  if (!node || typeof node !== 'object') return null;
+
+  if (node.t === 'num') return [node.v];
+  if (node.t === 'group') return polynomialCoefficients(node.v, variable);
+  if (node.t === 'neg') return scalePoly(polynomialCoefficients(node.v, variable), -1);
+
+  if (node.t === 'var' || node.t === 'const') {
+    if (node.v === variable) return [0, 1];
+    const c = constantNumber(node);
+    return c === null ? null : [c];
+  }
+
+  // Calls such as sqrt(2) are allowed as scalar coefficients only when they are
+  // genuinely variable-free. Calls involving the equation variable abstain.
+  if (node.t === 'call') {
+    const c = constantNumber(node);
+    return c === null ? null : [c];
+  }
+
+  if (node.t !== 'bin') return null;
+  if (node.op === '+' || node.op === '-') {
+    return addPoly(
+      polynomialCoefficients(node.l, variable),
+      polynomialCoefficients(node.r, variable),
+      node.op === '+' ? 1 : -1
+    );
+  }
+  if (node.op === '*') {
+    return mulPoly(
+      polynomialCoefficients(node.l, variable),
+      polynomialCoefficients(node.r, variable)
+    );
+  }
+  if (node.op === '/') {
+    const num = polynomialCoefficients(node.l, variable);
+    const den = polynomialCoefficients(node.r, variable);
+    if (!num || !den || den.length !== 1 || Math.abs(den[0]) <= EPS) return null;
+    return scalePoly(num, 1 / den[0]);
+  }
+  if (node.op === '^') {
+    const exponent = constantNumber(node.r);
+    if (!Number.isInteger(exponent)) return null;
+    return powPoly(polynomialCoefficients(node.l, variable), exponent);
+  }
+  return null;
+}
+
+function unknownNames(node, out = new Set()) {
+  if (!node || typeof node !== 'object') return out;
+  if (node.t === 'var' || node.t === 'const') {
+    if (constantNumber(node) === null) out.add(node.v);
+    return out;
+  }
+  for (const key of ['l', 'r', 'v', 'arg']) unknownNames(node[key], out);
+  return out;
+}
+
+function proportionalPolynomials(a, b) {
+  a = trimPoly(a);
+  b = trimPoly(b);
+  if (!a || !b || a.length !== b.length) return false;
+
+  let pivot = -1;
+  for (let i = 0; i < a.length; i++) {
+    if (Math.abs(a[i]) > EPS || Math.abs(b[i]) > EPS) { pivot = i; break; }
+  }
+  // 0 = 0 is an identity, not an equation claim worth trusting.
+  if (pivot < 0 || Math.abs(a[pivot]) <= EPS || Math.abs(b[pivot]) <= EPS) return false;
+
+  const ratio = a[pivot] / b[pivot];
+  if (!Number.isFinite(ratio) || Math.abs(ratio) <= EPS) return false;
+  for (let i = 0; i < a.length; i++) {
+    const want = ratio * b[i];
+    if (Math.abs(a[i] - want) > 1e-8 * Math.max(1, Math.abs(a[i]), Math.abs(want))) return false;
+  }
+  return true;
+}
+
 /**
- * Strong algebraic proof for ordinary rearrangements: two equation residuals
- * are equivalent up to one non-zero constant factor.
+ * Deterministically prove that two one-variable polynomial equations express
+ * the same claim up to multiplication by one non-zero scalar.
+ *
+ * This intentionally has no numerical-sampling fallback. If the expressions
+ * are outside the proof vocabulary, the caller receives false and abstains.
  */
-export function sameEquationClaim(a, b) {
+export function sameEquationClaim(a, b, variable = null) {
   if (!a || !b || a.t !== 'equation' || b.t !== 'equation') return false;
   const da = residual(a);
   const db = residual(b);
-  if (exprEquivalent(da, db)) return true;
-
-  const names = [...new Set([...variablesOf(da), ...variablesOf(db)])];
-  let ratio = null;
-  let seen = 0;
-  for (let s = 0; s < SAMPLE.length; s++) {
-    const env = {};
-    names.forEach((name, i) => { env[name] = SAMPLE[(s + i * 3) % SAMPLE.length]; });
-    const va = evaluate(da, env);
-    const vb = evaluate(db, env);
-    if (!Number.isFinite(va) || !Number.isFinite(vb)) continue;
-    if (Math.abs(vb) < 1e-9) {
-      if (Math.abs(va) > EPS) return false;
-      continue;
-    }
-    const r = va / vb;
-    if (!Number.isFinite(r) || Math.abs(r) < 1e-10) return false;
-    if (ratio === null) ratio = r;
-    else if (Math.abs(r - ratio) > 1e-6 * Math.max(1, Math.abs(ratio))) return false;
-    seen++;
-  }
-  return seen >= 3 && ratio !== null;
+  const names = [...new Set([...unknownNames(da), ...unknownNames(db)])];
+  const chosen = variable || (names.length === 1 ? names[0] : null);
+  if (!chosen || names.some(name => name !== chosen)) return false;
+  return proportionalPolynomials(
+    polynomialCoefficients(da, chosen),
+    polynomialCoefficients(db, chosen)
+  );
 }
 
 // ── Polynomial certification ─────────────────────────────────────────────────
 // A non-zero polynomial of degree d has at most d distinct real roots. If a
 // candidate degree-d equation is satisfied by d distinct canonical solutions,
-// the solution set is therefore complete; no sampling assumption is needed.
+// the solution set is complete; no sampling assumption is needed.
 
 function polynomialDegree(node, variable) {
-  if (!node || typeof node !== 'object') return null;
-  switch (node.t) {
-    case 'num': return 0;
-    case 'group': return polynomialDegree(node.v, variable);
-    case 'neg': return polynomialDegree(node.v, variable);
-    case 'var': return node.v === variable ? 1 : null;
-    case 'const': return node.v === variable ? 1 : null;
-    case 'call': return null;
-    case 'bin': {
-      const dl = polynomialDegree(node.l, variable);
-      const dr = polynomialDegree(node.r, variable);
-      if (node.op === '+' || node.op === '-') return dl === null || dr === null ? null : Math.max(dl, dr);
-      if (node.op === '*') return dl === null || dr === null ? null : dl + dr;
-      if (node.op === '/') return dl === null || dr !== 0 ? null : dl;
-      if (node.op === '^') {
-        if (dl === null || node.r?.t !== 'num' || !Number.isInteger(node.r.v) || node.r.v < 0 || node.r.v > 8) return null;
-        return dl * node.r.v;
-      }
-      return null;
-    }
-    default: return null;
-  }
+  const poly = polynomialCoefficients(node, variable);
+  return poly ? trimPoly(poly).length - 1 : null;
 }
 
 function residualLooksIdenticallyZero(eq, variable) {
-  const d = residual(eq);
-  let seen = 0;
-  for (const x of SAMPLE) {
-    const v = evaluate(d, { [variable]: x });
-    if (!Number.isFinite(v)) continue;
-    seen++;
-    if (Math.abs(v) > EPS * Math.max(1, Math.abs(x))) return false;
-  }
-  return seen >= 4;
+  const poly = polynomialCoefficients(residual(eq), variable);
+  if (!poly) return false;
+  return trimPoly(poly).every(v => Math.abs(v) <= EPS);
 }
 
 function distinctNumbers(values) {
@@ -129,9 +229,8 @@ function certifiedByFinitePolynomial(eq, meta) {
 }
 
 // ── Positive counterevidence: definite extra roots ───────────────────────────
-// We never use this numerical scan to *prove* a line correct. It is only a way
-// to find a concrete extra root and prove a line wrong. The scan is restricted
-// to polynomial equations, avoiding discontinuity-as-root mistakes.
+// Numerical scanning is used only to find a concrete counterexample. It can
+// prove a candidate wrong, never prove it right.
 
 function polynomialEquationDegree(eq, variable) {
   if (!eq || eq.t !== 'equation') return null;
@@ -222,10 +321,7 @@ function droppedConstraintDiagnosis() {
   };
 }
 
-/**
- * Assess one parsed equation line. `previousAst` is the previous readable
- * equation, while `previousTrusted` says whether Pri positively verified it.
- */
+/** Assess one parsed equation line. */
 export function assessEquationLine({ ast, previousAst = null, previousTrusted = false, meta = null } = {}) {
   if (!ast || ast.t !== 'equation') return { status: 'note', trusted: false, note: 'Skipped — this is not an equation.' };
   const variable = meta?.variable;
@@ -253,16 +349,14 @@ export function assessEquationLine({ ast, previousAst = null, previousTrusted = 
     }
   }
 
-  // An authored source is the strongest possible local reference.
   if (meta?.source) {
     try {
       const source = parse(meta.source);
-      if (source.t === 'equation' && sameEquationClaim(source, ast)) return { status: 'ok', trusted: true };
-    } catch { /* fall through to other proofs */ }
+      if (source.t === 'equation' && sameEquationClaim(source, ast, variable)) return { status: 'ok', trusted: true };
+    } catch { /* fall through */ }
   }
 
-  // Ordinary school rearrangements reduce to the same residual up to scale.
-  if (previousAst && sameEquationClaim(previousAst, ast)) {
+  if (previousAst && sameEquationClaim(previousAst, ast, variable)) {
     return previousTrusted
       ? { status: 'ok', trusted: true }
       : (certifiedByFinitePolynomial(ast, meta)
@@ -270,12 +364,8 @@ export function assessEquationLine({ ast, previousAst = null, previousTrusted = 
         : { status: 'note', trusted: false, note: 'This follows from the line above, but the starting equation was not independently verifiable.' });
   }
 
-  // A finite polynomial can sometimes be proved directly from the canonical
-  // solution set without trusting the previous line.
   if (certifiedByFinitePolynomial(ast, meta)) return { status: 'ok', trusted: true };
 
-  // No proof and no counterexample: abstain. This is a deliberate product
-  // state, not a parser failure.
   return {
     status: 'note', trusted: false,
     note: 'The known answer still satisfies this line, but Pri cannot prove that this transformation preserves exactly the same solutions, so it is not marked correct.'
