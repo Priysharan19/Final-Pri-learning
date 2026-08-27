@@ -48,14 +48,14 @@ jobs:
           set -e
 
           if [ "$merge_rc" -ne 0 ]; then
-            echo "Merge reported conflicts. Resolving generated iOS web bundles only."
+            echo "Merge reported conflicts. Only generated iOS bundles and the audited package-script union may be resolved automatically."
             mapfile -t conflicts < <(git diff --name-only --diff-filter=U)
             printf 'Conflicts:\n%s\n' "${conflicts[*]:-none}"
 
             bad=0
             for path in "${conflicts[@]}"; do
               case "$path" in
-                ios/PriLearning.swiftpm/Resources/Web/*|ios/PriLearning\ 2.swiftpm/Resources/Web/*)
+                ios/PriLearning.swiftpm/Resources/Web/*|ios/PriLearning\ 2.swiftpm/Resources/Web/*|package.json)
                   ;;
                 *)
                   echo "Refusing automatic resolution for source conflict: $path"
@@ -67,8 +67,30 @@ jobs:
               exit 1
             fi
 
+            # Web bundles are generated artifacts. Rebuild them from the merged source tree.
             rm -rf "ios/PriLearning.swiftpm/Resources/Web" "ios/PriLearning 2.swiftpm/Resources/Web"
             git add -A "ios/PriLearning.swiftpm/Resources/Web" "ios/PriLearning 2.swiftpm/Resources/Web"
+
+            # package.json conflict is a mechanical union: keep all product-lane
+            # handwriting/photo/iPad scripts and add Pri Explain V2's test/e2e gates.
+            if printf '%s\n' "${conflicts[@]}" | grep -qx 'package.json'; then
+              git checkout --ours package.json
+              node <<'NODE'
+              const fs = require('fs');
+              const path = 'package.json';
+              const pkg = JSON.parse(fs.readFileSync(path, 'utf8'));
+              const s = pkg.scripts || (pkg.scripts = {});
+              s['test:explain'] = 'node client/test/pri-explain-check.mjs';
+              if (!String(s.test || '').includes('npm run test:explain')) {
+                const needle = 'npm run test:india && ';
+                if (!String(s.test || '').includes(needle)) throw new Error('Expected test:india anchor missing');
+                s.test = s.test.replace(needle, `${needle}npm run test:explain && `);
+              }
+              s['test:e2e'] = 'node client/test/e2e.mjs && node client/test/tour-explain-v2.js --no-build';
+              fs.writeFileSync(path, JSON.stringify(pkg, null, 2) + '\n');
+              NODE
+              git add package.json
+            fi
           fi
 
           if git diff --name-only --diff-filter=U | grep -q .; then
@@ -80,7 +102,7 @@ jobs:
       - name: Install dependencies
         run: npm run setup
 
-      - name: Validate handwriting integration
+      - name: Validate merged source integration
         shell: bash
         run: |
           set -euo pipefail
@@ -88,6 +110,7 @@ jobs:
           node client/test/native-ink-arbitration-check.mjs
           node client/test/ink-hybrid-check.mjs
           node client/test/ink-real-page-stability-check.mjs
+          node client/test/pri-explain-check.mjs
 
       - name: Build and regenerate native web bundles
         shell: bash
@@ -108,5 +131,5 @@ jobs:
         run: |
           set -euo pipefail
           git status --short
-          git commit -m "Integrate latest main with native handwriting product lane"
+          git commit -m "Integrate Pri Explain V2 with native handwriting product lane"
           git push origin HEAD:product/india-native-ink-truth
