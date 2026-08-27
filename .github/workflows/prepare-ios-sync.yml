@@ -3,7 +3,7 @@ name: Prepare iOS Bundle Sync
 on:
   push:
     branches:
-      - feature/pri-explain-v3-storyboard
+      - pri-local-ink-v2
     paths:
       - 'client/**'
       - 'tools/ink-foundation/**'
@@ -19,7 +19,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: prepare-ios-sync-pri-explain-v3
+  group: prepare-ios-sync-pr31
   cancel-in-progress: true
 
 jobs:
@@ -30,21 +30,30 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          # Build the immutable commit that triggered this run. Checking out the
+          # moving branch here can race a later model commit and produce a web
+          # bundle whose parent is not the SHA we actually verified.
           ref: ${{ github.sha }}
           fetch-depth: 0
+
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
           cache: npm
           cache-dependency-path: client/package-lock.json
+
       - name: Install client dependencies
         run: npm ci --prefix client
+
       - name: Build exact client
         run: npm run build
+
       - name: Synchronize both tracked iPad bundles
         run: npm run sync:ios
+
       - name: Verify synchronization before publishing
         run: npm run check:ios
+
       - name: Publish generated commit to handoff branch
         run: |
           set -euo pipefail
@@ -52,8 +61,10 @@ jobs:
           git config user.email 'actions@users.noreply.github.com'
           git add -- 'ios/PriLearning.swiftpm/Resources/Web' 'ios/PriLearning 2.swiftpm/Resources/Web'
           if git diff --cached --quiet; then
-            git push --force origin HEAD:refs/heads/feature/pri-explain-v3-storyboard-sync-generated
+            echo 'No generated bundle changes were needed.'
+            git push --force origin HEAD:refs/heads/pri-local-ink-v2-sync-generated
             exit 0
           fi
-          git commit -m 'Sync tracked iPad web bundles from exact Pri Explain V3 build'
-          git push --force origin HEAD:refs/heads/feature/pri-explain-v3-storyboard-sync-generated
+          git commit -m 'Sync tracked iPad web bundles from exact client build'
+          git push --force origin HEAD:refs/heads/pri-local-ink-v2-sync-generated
+          echo "Prepared generated sync commit $(git rev-parse HEAD) from trigger $GITHUB_SHA"
