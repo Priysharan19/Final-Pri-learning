@@ -138,11 +138,11 @@ final class NativeCloudInkClient: NSObject, URLSessionDelegate {
 
         let format = UIGraphicsImageRendererFormat()
         format.opaque = true
-        format.scale = 1
+        format.scale = max(1, transparent.scale)
         let renderer = UIGraphicsImageRenderer(size: size, format: format)
         let flattened = renderer.image { context in
-            UIColor.white.setFill()
-            context.fill(CGRect(origin: .zero, size: size))
+            context.cgContext.setFillColor(UIColor.white.cgColor)
+            context.cgContext.fill(CGRect(origin: .zero, size: size))
             transparent.draw(in: CGRect(origin: .zero, size: size))
         }
 
