@@ -128,8 +128,14 @@ jobs:
           if set(p.get('gates', {})) != required_gates:
               raise SystemExit('writer-diversity audit gates drifted from V17 release contract')
           policy = p.get('policy', {})
-          if policy.get('evaluationSplit') != 'test' or policy.get('finalHoldoutCountsTowardReadiness') is not False:
+          if policy.get('evaluationSplit') != 'test':
+              raise SystemExit('V17 readiness must be measured on the repeatable test split')
+          if policy.get('finalHoldoutCountsTowardReadiness') is not False:
               raise SystemExit('final-holdout must never fill ordinary test-readiness gaps')
+          if policy.get('finalHoldoutContentInspectedByAudit') is not False:
+              raise SystemExit('routine readiness audit must not inspect final-holdout contents')
+          if (p.get('finalHoldout') or {}).get('contentInspected') is not False:
+              raise SystemExit('final-holdout opacity invariant is missing from audit report')
           if p['passesDataReadiness']:
               if p.get('writersBySplit', {}).get('test', 0) < policy['evaluationMinWriters']:
                   raise SystemExit('readiness passed below the test-writer minimum')
