@@ -15,6 +15,10 @@ import {
   CURRICULUM, STREAM_CURRICULUM, PATHWAYS, streamSubtopics, SUBTOPIC_BY_ID, subtopicsForYear,
   scopeForYear, DIFF_LABELS, dotpointsFor, dotpointById, dotpointAt
 } from '../engine/curriculum.js';
+import {
+  cleanIndiaTrack, indiaTrack, indiaCourseLabel, indiaScope, indiaChapter,
+  indiaChapterGrade, resolveIndiaTarget, indiaProductSections
+} from '../engine/indiaProduct.js';
 import { generateQuestion } from '../engine/generators/index.js';
 import { checkAnswer, stepCheck } from '../engine/checker.js';
 import { stepTrapKey } from '../engine/diagnose.js';
@@ -38,9 +42,11 @@ export const COURSES = {
   qld: { name: 'QLD · QCE', junior: y => `Year ${y} · Australian Curriculum`, senior: y => `Year ${y} · QCE Mathematical Methods` },
   wa: { name: 'WA · WACE', junior: y => `Year ${y} · WA Curriculum`, senior: y => `Year ${y} · WACE Mathematics Methods` },
   sa: { name: 'SA · SACE', junior: y => `Year ${y} · Australian Curriculum`, senior: y => `Year ${y} · SACE Mathematical Methods` },
-  ib: { name: 'IB', junior: y => `MYP Year ${y - 6}`, senior: () => 'IB DP · Mathematics AA' }
+  ib: { name: 'IB', junior: y => `MYP Year ${y - 6}`, senior: () => 'IB DP · Mathematics AA' },
+  in: { name: 'India · CBSE / JEE', junior: y => `Class ${y} · CBSE / NCERT`, senior: y => `Class ${y} · CBSE / NCERT` }
 };
-export const courseLabel = (course, year, pathway) => {
+export const courseLabel = (course, year, pathway, indiaTrackId = 'cbse') => {
+  if (course === 'in') return indiaCourseLabel(year, indiaTrackId);
   const c = COURSES[course] || COURSES.nsw;
   if (year >= 11 && (course || 'nsw') === 'nsw' && pathway && PATHWAYS[pathway]) {
     return `Year ${year} · ${PATHWAYS[pathway].name}${year === 12 ? ' (HSC)' : ''}`;
@@ -647,8 +653,12 @@ async function publicUser(p, nowMs = Date.now()) {
   const today = (await get('activity', `${p.id}:${sydneyDate(nowMs)}`)) || { questions: 0, correct: 0, xp: 0 };
   return {
     id: p.id, name: p.name, year: p.year, theme: p.theme || 'dark',
-    course: p.course || 'nsw', courseLabel: courseLabel(p.course || 'nsw', p.year, pathwayOf(p)),
-    pathway: p.year >= 11 ? pathwayOf(p) : null, pathwayName: p.year >= 11 ? PATHWAYS[pathwayOf(p)].name : null,
+    course: p.course || 'nsw',
+    courseLabel: courseLabel(p.course || 'nsw', p.year, pathwayOf(p), cleanIndiaTrack(p.indiaTrack, p.year)),
+    pathway: p.course === 'nsw' && p.year >= 11 ? pathwayOf(p) : null,
+    pathwayName: p.course === 'nsw' && p.year >= 11 ? PATHWAYS[pathwayOf(p)].name : null,
+    indiaTrack: p.course === 'in' ? cleanIndiaTrack(p.indiaTrack, p.year) : null,
+    indiaTrackName: p.course === 'in' ? indiaTrack(p.indiaTrack, p.year).name : null,
     role: p.role || 'student', avatar: p.avatar || '🙂',
     email: await profileEmail(p), provider: p.provider || null, hasPassword: !!p.auth,
     dailyGoal: p.dailyGoal || 10, xp: p.xp || 0, level, levelProgress: progress, levelNeeded: needed,
@@ -673,6 +683,31 @@ function loadMultipart() {
       .catch(err => { multipartBank = null; throw err; });
   }
   return multipartBank;
+}
+
+const indiaGeneratorIds = chapter => [...new Set((chapter?.covers || []).map(c => c.gen))];
+
+function indiaState(chapter, ratings, now = Date.now()) {
+  const rows = indiaGeneratorIds(chapter).map(id => ratings[id]).filter(Boolean);
+  if (!rows.length) return { attempts: 0, correct: 0, rating: START_RATING, mastery: 0 };
+  const attempts = rows.reduce((n, st) => n + (st.attempts || 0), 0);
+  const correct = rows.reduce((n, st) => n + (st.correct || 0), 0);
+  const weights = rows.reduce((n, st) => n + Math.max(1, st.attempts || 0), 0);
+  const rating = rows.reduce((n, st) => n + (st.rating || START_RATING) * Math.max(1, st.attempts || 0), 0) / Math.max(1, weights);
+  const mastery = rows.reduce((n, st) => n + masteryOf(st.rating, st.attempts, st.last_at, now) * Math.max(1, st.attempts || 0), 0) / Math.max(1, weights);
+  return { attempts, correct, rating, mastery };
+}
+
+async function createIndiaQuestion(pid, chapter, target, mode, trackId, examId = null, taskId = null) {
+  if (!chapter || !target) throw Object.assign(new Error('That India syllabus target has no authored question form yet.'), { status: 409, code: 'INDIA_TARGET_UNCOVERED' });
+  const q = generateQuestion(target.generator, target.difficulty);
+  const row = {
+    id: uuid(), pid, subtopic: q.subtopic, difficulty: q.difficulty || target.difficulty, payload: q,
+    india: { chapterId: chapter.id, track: trackId, dotpointIndex: target.dotpointIndex },
+    mode, examId, taskId, answered: 0, tries: 0, hintsUsed: 0, createdAt: Date.now()
+  };
+  await put('questions', row);
+  return { row, payload: q };
 }
 
 function criteriaFor(q) {
@@ -724,10 +759,16 @@ function sanitize(q, row) {
   }
   const s = SUBTOPIC_BY_ID[q.subtopic];
   const dp = s ? dotpointOf(q.subtopic, q.dotpoint) : null;
+  const inChapter = row.india ? indiaChapter(row.india.chapterId) : null;
+  const inDp = inChapter && Number.isInteger(row.india?.dotpointIndex) ? row.india.dotpointIndex : null;
   return {
-    id: row.id, subtopic: q.subtopic, subtopicName: q.custom ? q.customName || 'Custom question' : (s?.name || q.subtopic),
-    year: s?.year, strand: s?.strand,
-    dotpoint: dp ? dp.id : null, dotpointText: dp ? dp.text : null, dotpointIndex: dp ? dp.ordinal : null,
+    id: row.id, subtopic: inChapter?.id || q.subtopic,
+    subtopicName: inChapter?.name || (q.custom ? q.customName || 'Custom question' : (s?.name || q.subtopic)),
+    year: inChapter ? indiaChapterGrade(inChapter) : s?.year, strand: inChapter?.strand || s?.strand,
+    indiaTrack: row.india?.track || null,
+    dotpoint: inChapter ? inDp : (dp ? dp.id : null),
+    dotpointText: inChapter && inDp != null ? inChapter.dotpoints[inDp] : (dp ? dp.text : null),
+    dotpointIndex: inChapter ? inDp : (dp ? dp.ordinal : null),
     difficulty: q.difficulty, diffLabel: DIFF_LABELS[q.difficulty] || 'Custom',
     prompt: q.prompt, answerType: q.answerType, mcqOptions: q.mcqOptions,
     figure: safeFigure(q.figure), code: s?.code || null,
@@ -961,7 +1002,7 @@ function packQuestion(cq) {
  * address, no lockout state. A restored profile comes back unprotected.
  */
 const exportProfile = p => ({
-  name: p.name, year: p.year, course: p.course || 'nsw', role: p.role || 'student',
+  name: p.name, year: p.year, course: p.course || 'nsw', indiaTrack: p.indiaTrack || null, role: p.role || 'student',
   avatar: p.avatar || '🙂', theme: p.theme || 'dark', dailyGoal: p.dailyGoal || 10,
   xp: p.xp || 0, pathway: p.pathway ?? null, provider: p.provider || null,
   handwriting: p.handwriting !== false, isDemo: false,
@@ -973,12 +1014,13 @@ function importProfile(src, id) {
   return {
     id, name: safeLabel(src.name, 40) || 'Student', year,
     course: COURSES[src.course] ? src.course : 'nsw',
+    indiaTrack: (COURSES[src.course] ? src.course : 'nsw') === 'in' ? cleanIndiaTrack(src.indiaTrack, year) : null,
     role: src.role === 'teacher' ? 'teacher' : 'student',
     avatar: safeLabel(src.avatar, 4) || '🙂',
     theme: src.theme === 'light' ? 'light' : 'dark',
     dailyGoal: safeInt(src.dailyGoal, 3, 60, 10),
     xp: safeInt(src.xp, 0, 1e9, 0),
-    pathway: cleanPathway(src.pathway, year) || (year >= 11 ? 'advanced' : null),
+    pathway: (COURSES[src.course] ? src.course : 'nsw') === 'nsw' ? (cleanPathway(src.pathway, year) || (year >= 11 ? 'advanced' : null)) : null,
     provider: ['apple', 'google', 'email'].includes(src.provider) ? src.provider : null,
     handwriting: src.handwriting !== false,
     isDemo: false,
@@ -1262,7 +1304,8 @@ const routes = {
       p.vault = made.vault;
       setDataKey(p.id, made.key);
     }
-    p.pathway = cleanPathway(body.pathway, p.year) || (p.year >= 11 ? 'advanced' : null);
+    p.pathway = p.course === 'nsw' ? (cleanPathway(body.pathway, p.year) || (p.year >= 11 ? 'advanced' : null)) : null;
+    p.indiaTrack = p.course === 'in' ? cleanIndiaTrack(body.indiaTrack, p.year) : null;
     await setProfileEmail(p, email);
     await put('profiles', p);
     setCurrentPid(p.id);
@@ -1367,11 +1410,19 @@ const routes = {
     const p = await requireProfile();
     if (body.name !== undefined) p.name = String(body.name).trim().slice(0, 40) || p.name;
     if (body.year !== undefined) p.year = Math.min(12, Math.max(7, Number(body.year) || p.year));
-    if (body.pathway !== undefined) p.pathway = cleanPathway(body.pathway, p.year) || (p.year >= 11 ? 'advanced' : null);
-    if (body.year !== undefined && body.pathway === undefined) p.pathway = cleanPathway(p.pathway, p.year) || (p.year >= 11 ? 'advanced' : null);
+    if (body.pathway !== undefined && p.course === 'nsw') p.pathway = cleanPathway(body.pathway, p.year) || (p.year >= 11 ? 'advanced' : null);
+    if (body.year !== undefined && body.pathway === undefined && p.course === 'nsw') p.pathway = cleanPathway(p.pathway, p.year) || (p.year >= 11 ? 'advanced' : null);
     if (body.theme !== undefined && ['dark', 'light'].includes(body.theme)) p.theme = body.theme;
     if (body.dailyGoal !== undefined) p.dailyGoal = Math.min(60, Math.max(3, Number(body.dailyGoal) || p.dailyGoal));
     if (body.course !== undefined && COURSES[body.course]) p.course = body.course;
+    if (p.course === 'in') {
+      p.pathway = null;
+      p.indiaTrack = cleanIndiaTrack(body.indiaTrack !== undefined ? body.indiaTrack : p.indiaTrack, p.year);
+    } else {
+      p.indiaTrack = null;
+      if (p.course === 'nsw') p.pathway = cleanPathway(p.pathway, p.year) || (p.year >= 11 ? 'advanced' : null);
+      else p.pathway = null;
+    }
     if (body.avatar !== undefined) p.avatar = String(body.avatar).slice(0, 4);
     if (body.handwriting !== undefined) p.handwriting = !!body.handwriting;
     if (body.email !== undefined) {
@@ -1393,6 +1444,37 @@ const routes = {
     const reviews = await byIndex('reviews', 'pid', p.id);
     const due = new Set(reviews.filter(r => r.dueAt <= Date.now()).map(r => r.subtopic));
     const now = Date.now();
+    if (p.course === 'in') {
+      const product = indiaProductSections();
+      const decorate = chapter => {
+        const state = indiaState(chapter, ratings, now);
+        const dotpoints = chapter.dotpoints.map((text, ordinal) => {
+          const covers = (chapter.covers || []).filter(c => c.dp.includes(ordinal));
+          const forms = [...new Set(covers.flatMap(c => c.diff || []))].sort((a, b) => a - b);
+          const ids = [...new Set(covers.map(c => c.gen))];
+          const dRows = ids.map(id => ratings[id]).filter(Boolean);
+          const attempts = dRows.reduce((n, st) => n + (st.attempts || 0), 0);
+          const correct = dRows.reduce((n, st) => n + (st.correct || 0), 0);
+          const weights = dRows.reduce((n, st) => n + Math.max(1, st.attempts || 0), 0);
+          const m = dRows.length ? dRows.reduce((n, st) => n + masteryOf(st.rating, st.attempts, st.last_at, now) * Math.max(1, st.attempts || 0), 0) / Math.max(1, weights) : 0;
+          return { id: `${chapter.id}#${ordinal}`, key: String(ordinal), text, difficulties: forms, mastery: Math.round(m * 100), band: attempts ? masteryBand(m) : 'unseen', attempts, correct, generated: forms.length > 0 };
+        });
+        return {
+          id: chapter.id, name: chapter.name, strand: chapter.strand, weight: chapter.weight, code: null, dotpoints,
+          mastery: Math.round(state.mastery * 100), band: state.attempts ? masteryBand(state.mastery) : 'unseen',
+          attempts: state.attempts, correct: state.correct, due: indiaGeneratorIds(chapter).some(id => due.has(id)), rating: state.attempts ? state.rating : null
+        };
+      };
+      const years = product.years.map(section => ({
+        year: section.year, key: section.key, track: section.track, title: section.title, caption: section.caption,
+        courseLabel: section.label, difficultyCeiling: section.difficultyCeiling, subtopics: section.chapters.map(decorate)
+      }));
+      const streams = product.streams.map(section => ({
+        year: section.year, allYears: !!section.allYears, key: section.key, track: section.track, title: section.title, caption: section.caption,
+        courseLabel: section.label, difficultyCeiling: section.difficultyCeiling, subtopics: section.chapters.map(decorate)
+      }));
+      return { country: 'in', years, streams, userYear: p.year, pathway: null, course: 'in', indiaTrack: cleanIndiaTrack(p.indiaTrack, p.year) };
+    }
     /** Dot points with their own mastery, and an honest `generated` flag. */
     const dotpointRows = (s, st) => dotpointsFor(s.id).map(dp => {
       const d = dpStateOf(st, dp.id);
@@ -1451,7 +1533,7 @@ const routes = {
   // ---- practice ----
   'POST /practice/next': async (body) => {
     const p = await requireProfile();
-    const { mode = 'smart', subtopic, difficulty, dotpoint, taskId } = body || {};
+    const { mode = 'smart', subtopic, difficulty, dotpoint, taskId, track } = body || {};
     // Task-driven question
     if (taskId) {
       const task = await get('tasks', taskId);
@@ -1473,6 +1555,32 @@ const routes = {
       return { question: sanitize(payload, row), reason: 'task', why: `Task: ${task.title} — question ${done + 1} of ${task.count}.` };
     }
     const now = Date.now();
+    if (p.course === 'in' && !taskId) {
+      const trackId = cleanIndiaTrack(track || p.indiaTrack, p.year);
+      const ratings = await ratingsFor(p.id);
+      let chapter = subtopic ? indiaChapter(subtopic) : null;
+      if (subtopic && !chapter) throw Object.assign(new Error('That topic is not part of the India syllabus.'), { status: 404, code: 'INDIA_TOPIC_NOT_FOUND' });
+      if (!chapter) {
+        const scope = indiaScope(trackId, p.year).filter(c => (c.covers || []).some(x => (x.diff || []).length));
+        if (!scope.length) throw Object.assign(new Error('No generated questions are available for this India track yet.'), { status: 409, code: 'INDIA_TRACK_UNCOVERED' });
+        const ranked = scope.map(c => ({ chapter: c, ...indiaState(c, ratings, now) }))
+          .sort((a, b) => a.attempts - b.attempts || a.mastery - b.mastery);
+        chapter = ranked[Math.floor(Math.random() * Math.min(4, ranked.length))].chapter;
+      }
+      const state = indiaState(chapter, ratings, now);
+      const want = difficulty != null ? Number(difficulty) : pickDifficulty(state.rating, state.attempts, { state, nowMs: now });
+      const target = resolveIndiaTarget(chapter, { dotpoint, difficulty: want, track: trackId, grade: indiaChapterGrade(chapter) || p.year });
+      if (!target) {
+        const suffix = dotpoint != null ? 'dot point' : 'chapter';
+        throw Object.assign(new Error(`That India ${suffix} has no authored question form at this track yet.`), { status: 409, code: 'INDIA_TARGET_UNCOVERED' });
+      }
+      const { row, payload } = await createIndiaQuestion(p.id, chapter, target, 'practice', trackId);
+      return {
+        question: sanitize(payload, row), reason: subtopic ? 'topic' : 'smart',
+        why: subtopic ? `${indiaTrack(trackId, p.year).name} · focused practice on ${chapter.name}.` : `${indiaTrack(trackId, p.year).name} · adapting across ${chapter.name}.`,
+        dotpoint: target.dotpointIndex, target: state.mastery, misconception: null
+      };
+    }
     let choice;
     if (mode === 'topic' && subtopic && SUBTOPIC_BY_ID[subtopic]) {
       const sub = SUBTOPIC_BY_ID[subtopic];

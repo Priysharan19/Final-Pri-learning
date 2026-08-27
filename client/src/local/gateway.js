@@ -109,7 +109,7 @@ const BODY_RULES = [
     optionalString(body, 'course', 30); optionalString(body, 'role', 30);
     optionalString(body, 'avatar', 32); optionalString(body, 'email', 180);
     optionalString(body, 'provider', 30); optionalString(body, 'password', 1024);
-    optionalString(body, 'pathway', 30);
+    optionalString(body, 'pathway', 30); optionalString(body, 'indiaTrack', 30);
   }],
   [/^POST \/profiles\/select$/, body => {
     requireObject(body, 'POST /profiles/select'); requiredId(body); optionalString(body, 'password', 1024);
@@ -123,11 +123,13 @@ const BODY_RULES = [
   [/^PATCH \/me$/, body => {
     requireObject(body, 'PATCH /me'); optionalString(body, 'name', 80); optionalNumber(body, 'year');
     optionalString(body, 'pathway', 30); optionalString(body, 'theme', 20); optionalNumber(body, 'dailyGoal');
-    optionalString(body, 'course', 30); optionalString(body, 'avatar', 32); optionalBoolean(body, 'handwriting'); optionalString(body, 'email', 180);
+    optionalString(body, 'course', 30); optionalString(body, 'indiaTrack', 30); optionalString(body, 'avatar', 32); optionalBoolean(body, 'handwriting'); optionalString(body, 'email', 180);
   }],
   [/^POST \/practice\/next$/, body => {
-    requireObject(body, 'POST /practice/next'); optionalString(body, 'mode', 30); optionalId(body, 'subtopic');
-    optionalNumber(body, 'difficulty'); optionalId(body, 'dotpoint'); optionalId(body, 'taskId');
+    requireObject(body, 'POST /practice/next'); optionalString(body, 'mode', 30); optionalId(body, 'subtopic'); optionalString(body, 'track', 30);
+    optionalNumber(body, 'difficulty');
+    if (typeof body.dotpoint === 'number') optionalNumber(body, 'dotpoint'); else optionalId(body, 'dotpoint');
+    optionalId(body, 'taskId');
   }],
   [/^POST \/practice\/[A-Za-z0-9._-]+\/(?:hint|reveal)$/, body => {
     requireObject(body, 'practice action'); optionalNumber(body, 'ms');

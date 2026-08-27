@@ -7,7 +7,8 @@ import { personalStats, clearPersonal, ensurePersonalLoaded } from '../ink/perso
 import { MIN_PASSWORD, PasswordMeter, passwordVerdict } from './Login.jsx';
 
 const AVATARS = ['🚀', '🦊', '🐨', '🦉', '🌟', '🐯', '🍀', '🎧', '🦄', '⚡', '🌊', '🧠'];
-const COURSES = [['nsw', 'NSW · HSC'], ['vic', 'VIC · VCE'], ['qld', 'QLD · QCE'], ['wa', 'WA · WACE'], ['sa', 'SA · SACE'], ['ib', 'IB']];
+const COURSES = [['nsw', 'NSW · HSC'], ['vic', 'VIC · VCE'], ['qld', 'QLD · QCE'], ['wa', 'WA · WACE'], ['sa', 'SA · SACE'], ['ib', 'IB'], ['in', 'India · CBSE / JEE / Olympiad']];
+const INDIA_TRACKS = [['cbse', 'CBSE / NCERT', 'Classes 7–12 school syllabus'], ['jee-main', 'JEE Main', 'Classes 11–12 objective depth'], ['jee-advanced', 'JEE Advanced', 'Classes 11–12 multi-concept depth'], ['olympiad', 'Olympiad', 'PRMO → RMO → INMO']];
 export const PATHWAY_OPTS = [
   ['standard', 'Standard', 'Everyday maths — finance, measurement, networks'],
   ['advanced', 'Advanced', 'Functions, calculus and statistics — the classic HSC course'],
@@ -30,10 +31,9 @@ function HandwritingSection({ toast }) {
     <div className="card">
       <h2 style={{ marginBottom: 8 }}>✒ Handwriting</h2>
       <p className="sub" style={{ marginBottom: 12 }}>
-        The recogniser reads your ink with a two-model neural ensemble trained on ~142,000 handwriting
-        samples, cross-checked by geometric matching, a maths-aware decoder and a grammar search — and it
-        <b> learns your hand</b>: every correction becomes a personal template that outranks the built-in
-        shapes, kept separately for each profile on this iPad.
+        {window.__PRI_NATIVE__
+          ? <>The native iPad app captures Apple Pencil ink with PencilKit. Pri uses the bundled foundation model only when that build permits the model metadata; otherwise it falls back to the local recogniser. <b>Corrections still learn your hand</b> and stay on this iPad.</>
+          : <>This browser build uses Pri’s legacy JavaScript handwriting fallback. It is useful for testing the web UI, <b>not</b> for judging the native PencilKit/Core ML handwriting experience. Corrections still stay local to this device.</>}
       </p>
       <div className="set-row">
         <span className="set-k">Personal templates learned</span>
@@ -173,7 +173,7 @@ export default function Settings() {
   const importRef = useRef(null);
   const secRefs = useRef({});
   useEffect(() => { api.get('/data/storage').then(setStorageInfo).catch(() => { }); }, []);
-  const [form, setForm] = useState({ name: user.name, year: user.year, dailyGoal: user.dailyGoal, course: user.course, avatar: user.avatar, pathway: user.pathway || 'advanced' });
+  const [form, setForm] = useState({ name: user.name, year: user.year, dailyGoal: user.dailyGoal, course: user.course, avatar: user.avatar, pathway: user.pathway || 'advanced', indiaTrack: user.indiaTrack || 'cbse' });
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [del, setDel] = useState(null);   // { name, password, error, busy } while the wipe is being confirmed
@@ -321,7 +321,7 @@ export default function Settings() {
               <div style={{ marginTop: 8 }}>
                 <div className="set-row"><span className="set-k">Full name</span><span className="set-v">{user.name}</span></div>
                 <div className="set-row"><span className="set-k">Avatar</span><span className="set-v" style={{ fontSize: 20 }}>{user.avatar}</span></div>
-                {user.role !== 'teacher' && <div className="set-row"><span className="set-k">Year level</span><span className="set-v">Year {user.year}</span></div>}
+                {user.role !== 'teacher' && <div className="set-row"><span className="set-k">{user.course === 'in' ? 'Class level' : 'Year level'}</span><span className="set-v">{user.course === 'in' ? 'Class' : 'Year'} {user.year}</span></div>}
                 <div className="set-row"><span className="set-k">Course</span><span className="set-v">{user.courseLabel}</span></div>
                 <div className="set-row"><span className="set-k">Daily goal</span><span className="set-v">{user.dailyGoal} questions</span></div>
               </div>
@@ -344,9 +344,9 @@ export default function Settings() {
                 {user.role !== 'teacher' && (
                   <div className="grid cols-2" style={{ gap: 12 }}>
                     <div className="field">
-                      <label className="label" htmlFor="set-year">School year</label>
+                      <label className="label" htmlFor="set-year">{form.course === 'in' ? 'School class' : 'School year'}</label>
                       <select className="input" id="set-year" value={form.year} onChange={e => setForm(f => ({ ...f, year: Number(e.target.value) }))}>
-                        {[7, 8, 9, 10, 11, 12].map(y => <option key={y} value={y}>Year {y}</option>)}
+                        {[7, 8, 9, 10, 11, 12].map(y => <option key={y} value={y}>{form.course === 'in' ? 'Class' : 'Year'} {y}</option>)}
                       </select>
                     </div>
                     <div className="field">
@@ -357,7 +357,7 @@ export default function Settings() {
                     </div>
                   </div>
                 )}
-                {user.role !== 'teacher' && form.year >= 11 && (
+                {user.role !== 'teacher' && form.course === 'nsw' && form.year >= 11 && (
                   <div className="field">
                     <div className="label" id="set-pathway">HSC pathway</div>
                     <div className="pathway-row" role="group" aria-labelledby="set-pathway">
@@ -367,6 +367,17 @@ export default function Settings() {
                           <b>{name}</b>
                           <span>{desc}</span>
                         </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {user.role !== 'teacher' && form.course === 'in' && (
+                  <div className="field">
+                    <div className="label" id="set-india-track">India maths track</div>
+                    <div className="pathway-row" role="group" aria-labelledby="set-india-track">
+                      {INDIA_TRACKS.filter(([k]) => form.year >= 11 || !k.startsWith('jee-')).map(([k, name, desc]) => (
+                        <button key={k} type="button" className={`pathway-pick ${form.indiaTrack === k ? 'on' : ''}`}
+                          onClick={() => setForm(f => ({ ...f, indiaTrack: k }))}><b>{name}</b><span>{desc}</span></button>
                       ))}
                     </div>
                   </div>

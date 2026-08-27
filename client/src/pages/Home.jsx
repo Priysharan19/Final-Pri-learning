@@ -49,9 +49,9 @@ export default function Home() {
     if (!curriculum) return [];
     const out = [];
     const core = curriculum.years.find(y => y.year === year);
-    if (core) out.push({ key: `y${year}`, label: year >= 11 ? 'Advanced' : 'Core', ...core });
+    if (core) out.push({ key: core.key || `y${year}`, label: curriculum.country === 'in' ? 'CBSE / NCERT' : (year >= 11 ? 'Advanced' : 'Core'), ...core });
     for (const g of curriculum.streams || []) {
-      if (g.year === year) out.push({ key: g.key, label: g.title.replace(/^Mathematics\s*/, ''), ...g });
+      if (g.year === year || g.allYears) out.push({ key: g.key, label: curriculum.country === 'in' ? (g.courseLabel || g.title) : g.title.replace(/^Mathematics\s*/, ''), ...g });
     }
     return out;
   }, [curriculum, year]);
@@ -81,7 +81,7 @@ export default function Home() {
   }, [subtopic, curriculum]);
 
   const chips = [];
-  if (year != null) chips.push({ k: 'year', label: `Year ${year}`, clear: () => { setYear(user.year); setSectionKey(null); setSubtopic(null); setDotpoint(null); } });
+  if (year != null) chips.push({ k: 'year', label: `${curriculum?.country === 'in' ? 'Class' : 'Year'} ${year}`, clear: () => { setYear(user.year); setSectionKey(null); setSubtopic(null); setDotpoint(null); } });
   if (section) chips.push({ k: 'course', label: section.label, clear: () => { setSectionKey(null); setSubtopic(null); setDotpoint(null); } });
   if (selSub) chips.push({ k: 'topic', label: selSub.name, clear: () => { setSubtopic(null); setDotpoint(null); } });
   if (dotpoint != null && selSub) chips.push({ k: 'dp', label: `Dot point ${dotpoint + 1}`, clear: () => setDotpoint(null) });
@@ -92,6 +92,7 @@ export default function Home() {
     if (subtopic) p.set('subtopic', subtopic);
     if (subtopic && dotpoint != null) p.set('dotpoint', String(dotpoint));
     if (difficulty != null) p.set('difficulty', String(difficulty));
+    if (section?.track) p.set('track', section.track);
     nav(`/practice${p.toString() ? `?${p}` : ''}`);
   };
 
@@ -132,7 +133,7 @@ export default function Home() {
           <div className="gen-panel" id="gen-panel">
             <div className="gen-cats">
               {[
-                ['year', 'Year'], ['course', 'Course'], ['topics', 'Topics'],
+                ['year', curriculum?.country === 'in' ? 'Class' : 'Year'], ['course', curriculum?.country === 'in' ? 'Track' : 'Course'], ['topics', 'Topics'],
                 ['dots', 'Dot Points'], ['difficulty', 'Difficulty'],
               ].map(([k, label]) => (
                 <button
@@ -150,12 +151,12 @@ export default function Home() {
             <div className="gen-pane">
               {cat === 'year' && (
                 <>
-                  <div className="gen-pane-title">Select the year level to target</div>
+                  <div className="gen-pane-title">Select the {curriculum?.country === 'in' ? 'class' : 'year level'} to target</div>
                   <div className="gen-opts">
                     {[7, 8, 9, 10, 11, 12].map(y => (
                       <button key={y} className={`gen-opt ${year === y ? 'on' : ''}`}
                         onClick={() => { setYear(y); setSectionKey(null); setSubtopic(null); setDotpoint(null); setCat('course'); }}>
-                        Year {y}{y === user.year ? <small> · yours</small> : null}
+                        {curriculum?.country === 'in' ? 'Class' : 'Year'} {y}{y === user.year ? <small> · yours</small> : null}
                       </button>
                     ))}
                   </div>
@@ -164,7 +165,7 @@ export default function Home() {
 
               {cat === 'course' && (
                 <>
-                  <div className="gen-pane-title">Now select the maths course</div>
+                  <div className="gen-pane-title">Now select the {curriculum?.country === 'in' ? 'India maths track' : 'maths course'}</div>
                   <div className="gen-opts">
                     {sections.map(s => (
                       <button key={s.key} className={`gen-opt ${sectionKey === s.key ? 'on' : ''}`}
@@ -220,7 +221,7 @@ export default function Home() {
                   <div className="gen-pane-note">(optional)</div>
                   <div className="gen-pane-title">Fix the difficulty — or leave it to the adaptive engine</div>
                   <div className="gen-opts">
-                    {[1, 2, 3, 4].map(d => (
+                    {[1, 2, 3, 4].filter(d => !section?.difficultyCeiling || d <= section.difficultyCeiling).map(d => (
                       <button key={d} className={`gen-opt ${difficulty === d ? 'on' : ''}`}
                         onClick={() => setDifficulty(difficulty === d ? null : d)}>
                         D{d} · {DIFF_LABELS[d]}

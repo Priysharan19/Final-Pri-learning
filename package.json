@@ -48,6 +48,7 @@
     "sync:ios": "node scripts/sync-ios.mjs",
     "check:ios": "node scripts/sync-ios.mjs --check",
     "serve:lan": "node scripts/serve-lan.mjs",
+    "test:ipad:native": "node scripts/test-ipad-native.mjs",
     "serve:lan:v4": "node scripts/serve-lan.mjs --v4-dev 4196",
     "ink:collect": "node scripts/serve-lan.mjs --collector",
     "ink:annotate": "node scripts/serve-lan.mjs --annotator",

@@ -26,6 +26,7 @@ import {
 } from './local/gateway.js';
 import { recordMutation } from './local/outbox.js';
 import { scopeForYear } from './engine/curriculum.js';
+import { indiaGeneratorsForScope, indiaChapter, cleanIndiaTrack } from './engine/indiaProduct.js';
 import { loadBanks, loadBanksFor, loadAllBanks } from './engine/generators/index.js';
 
 // ── Bank preloading ──────────────────────────────────────────────────────────
@@ -36,13 +37,17 @@ const MAX_BANK_FAULTS = 4;
 
 let scopeReady = Promise.resolve();
 let pathway = 'advanced';
+let course = 'nsw';
+let indiaTrackId = 'cbse';
 
-/** Pull in what a profile practises from: their year and stream, plus the year below. */
-function warmScope(year, pw) {
+/** Pull in what a profile practises from. India and Australia have separate scopes. */
+function warmScope(year, pw, selectedCourse = course, selectedIndiaTrack = indiaTrackId) {
   const y = Number(year);
   if (!y) return;
-  const { own, revision } = scopeForYear(y, y >= 11 ? (pw || 'advanced') : 'advanced');
-  const job = loadBanksFor([...own, ...revision].map(s => s.id));
+  const ids = selectedCourse === 'in'
+    ? indiaGeneratorsForScope(cleanIndiaTrack(selectedIndiaTrack, y), y)
+    : (() => { const { own, revision } = scopeForYear(y, y >= 11 ? (pw || 'advanced') : 'advanced'); return [...own, ...revision].map(s => s.id); })();
+  const job = loadBanksFor(ids);
   scopeReady = Promise.all([scopeReady, job]).then(() => { }, () => { });
 }
 
@@ -51,7 +56,9 @@ function noteUser(result) {
   const u = result?.user;
   if (!u?.year) return;
   pathway = u.pathway || 'advanced';
-  warmScope(u.year, pathway);
+  course = u.course || 'nsw';
+  indiaTrackId = u.indiaTrack || 'cbse';
+  warmScope(u.year, pathway, course, indiaTrackId);
 }
 
 function generates(method, path) {
@@ -62,8 +69,11 @@ async function preload(method, path, body) {
   if (!generates(method, path)) return;
   // The demo seeds a whole fictional history at a fixed year of its own choosing.
   if (path === '/profiles/demo') return loadAllBanks();
-  if (body?.subtopic) await loadBanksFor([body.subtopic]);
-  if (path === '/exams' && body?.year) warmScope(body.year, pathway);
+  if (body?.subtopic) {
+    const chapter = indiaChapter(body.subtopic);
+    await loadBanksFor(chapter ? [...new Set((chapter.covers || []).map(c => c.gen))] : [body.subtopic]);
+  }
+  if (path === '/exams' && body?.year) warmScope(body.year, pathway, course, indiaTrackId);
   await scopeReady;
 }
 

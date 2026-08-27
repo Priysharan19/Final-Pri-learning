@@ -246,11 +246,16 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
     : rec.engine === 'pri-js-v3-v4-unavailable'
       ? 'Structural V4 returned no reading · showing JS V3 fallback'
       : rec.engine === 'pri-js-v3'
-        ? 'JS V3 fallback'
+        ? 'Legacy JS V3 fallback · not native PencilKit/Core ML'
         : null;
 
   return (
     <div className={`ink-answer ${disabled ? 'ink-disabled' : ''}`}>
+      {!NATIVE_INK && (
+        <div role="note" style={{ padding: '9px 12px', marginBottom: 8, border: '1px solid var(--warn)', borderRadius: 10, fontSize: 12.5 }}>
+          Browser handwriting = legacy JS fallback. For handwriting quality testing, run the native iPad package with PencilKit; this web fallback is not the production acceptance path.
+        </div>
+      )}
       <div className="ink-toolbar">
         <button type="button" className={`ink-tool ${tool === 'pen' ? 'on' : ''}`} aria-pressed={tool === 'pen'} onClick={() => setTool('pen')} title="Pen">✒️ Pen</button>
         <button type="button" className={`ink-tool ${tool === 'eraser' ? 'on' : ''}`} aria-pressed={tool === 'eraser'} onClick={() => setTool('eraser')} title="Eraser">◻️ Eraser</button>
