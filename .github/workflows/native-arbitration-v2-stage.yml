@@ -30,6 +30,18 @@ jobs:
         env:
           PYTHONDONTWRITEBYTECODE: '1'
         run: python3 tools/apply-native-arbitration-v2.py
+      - name: Tighten answer-blind safety assertion
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('client/test/native-ink-arbitration-check.mjs')
+          s = p.read_text()
+          old = "assert.ok(!/expected|answerText|markScheme/.test(source), 'native arbitration must not inspect expected-answer data');"
+          new = "assert.ok(!/ctx\\.expected|expectedAnswer|answerText|markScheme/.test(source), 'native arbitration must not inspect expected-answer data');"
+          if old not in s:
+              raise SystemExit('answer-blind assertion anchor missing')
+          p.write_text(s.replace(old, new, 1))
+          PY
       - name: Install client dependencies
         run: npm ci --prefix client
       - name: Native arbitration regression
