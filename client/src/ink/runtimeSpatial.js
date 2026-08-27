@@ -199,6 +199,98 @@ function remapResult(result, localToGlobal) {
 // and never invents a digit that the glyph classifier itself did not propose.
 const SINGLE_GLYPH_DIGIT_TWIN = { s: '5', z: '2', b: '6', u: '4', g: '9', q: '9' };
 const SINGLE_GLYPH_NEAR_TIE_SHARE = 0.90;
+// A canonical 5 can be visually s-like after pointer filtering. We do NOT
+// lower the generic context threshold for that case. Instead, a much weaker
+// 5 alternative may be promoted only when the physical trajectory has the
+// defining 5 structure: a long top sweep, an early leftmost turn, then a
+// lower bowl that exits back to the right. Pri's s templates continue to
+// their leftmost endpoint, so they fail this shape test.
+const STRUCTURAL_FIVE_ALT_SHARE = 0.35;
+const pointXY = p => ({ x: number(p?.x ?? p?.[0]), y: number(p?.y ?? p?.[1]) });
+const strokePoints = stroke => (stroke?.points || []).map(pointXY).filter(p => Number.isFinite(p.x) && Number.isFinite(p.y));
+
+function pathMeasurements(points) {
+  if (points.length < 4) return null;
+  const lengths = [0];
+  for (let i = 1; i < points.length; i++) {
+    lengths.push(lengths[i - 1] + Math.hypot(points[i].x - points[i - 1].x, points[i].y - points[i - 1].y));
+  }
+  const total = lengths[lengths.length - 1];
+  if (!(total > 0)) return null;
+  return { lengths, total };
+}
+
+function prefixAtFraction(points, measurements, fraction) {
+  const target = measurements.total * fraction;
+  const out = [points[0]];
+  for (let i = 1; i < points.length; i++) {
+    if (measurements.lengths[i] <= target) { out.push(points[i]); continue; }
+    const before = measurements.lengths[i - 1];
+    const seg = measurements.lengths[i] - before;
+    const t = seg > 0 ? Math.max(0, Math.min(1, (target - before) / seg)) : 0;
+    out.push({
+      x: points[i - 1].x + t * (points[i].x - points[i - 1].x),
+      y: points[i - 1].y + t * (points[i].y - points[i - 1].y)
+    });
+    break;
+  }
+  return out;
+}
+
+function oneStrokeFiveStructure(points, box) {
+  const m = pathMeasurements(points);
+  if (!m || box.w <= 1e-6 || box.h <= 1e-6) return false;
+  let minIndex = 0;
+  for (let i = 1; i < points.length; i++) if (points[i].x < points[minIndex].x) minIndex = i;
+  const start = points[0], end = points[points.length - 1];
+  const startX = (start.x - box.x1) / box.w;
+  const startY = (start.y - box.y1) / box.h;
+  const endX = (end.x - box.x1) / box.w;
+  const endY = (end.y - box.y1) / box.h;
+  const minProgress = m.lengths[minIndex] / m.total;
+  const rebound = (end.x - points[minIndex].x) / box.w;
+  const prefix = prefixAtFraction(points, m, 0.18);
+  const prefixYs = prefix.map(p => p.y);
+  const prefixXs = prefix.map(p => p.x);
+  const topSpan = (Math.max(...prefixYs) - Math.min(...prefixYs)) / box.h;
+  const topSweep = (start.x - Math.min(...prefixXs)) / box.w;
+  return startX >= 0.65 && startY <= 0.25 &&
+    endX >= 0.30 && endY >= 0.65 &&
+    minProgress >= 0.22 && minProgress <= 0.72 && rebound >= 0.26 &&
+    topSweep >= 0.30 && topSpan <= 0.085;
+}
+
+export function hasStructuralFiveEvidence(symbol) {
+  const strokes = (symbol?._group?.strokes || []).filter(stroke => (stroke?.points || []).length >= 2);
+  if (!strokes.length || strokes.length > 2) return false;
+  const boxes = strokes.map(strokeBox);
+  const box = unionBox(boxes);
+  if (!box || box.w <= 1e-6 || box.h <= 1e-6) return false;
+  if (strokes.length === 1) return oneStrokeFiveStructure(strokePoints(strokes[0]), box);
+
+  // The second stock 5 allograph lifts the Pencil after the top bar.
+  // Accept that form only when one stroke is a wide, very flat top bar and
+  // the other is a lower stem/bowl ending well right of its left edge.
+  let topBar = -1;
+  for (let i = 0; i < 2; i++) {
+    const b = boxes[i];
+    const cy = (b.cy - box.y1) / box.h;
+    if (b.w >= 0.45 * box.w && b.h <= 0.12 * box.h && cy <= 0.24) topBar = i;
+  }
+  if (topBar < 0) return false;
+  const body = strokePoints(strokes[1 - topBar]);
+  const m = pathMeasurements(body);
+  if (!m || body.length < 4) return false;
+  const bodyBox = strokeBox(strokes[1 - topBar]);
+  const end = body[body.length - 1];
+  const endX = (end.x - box.x1) / box.w;
+  const endY = (end.y - box.y1) / box.h;
+  let minIndex = 0;
+  for (let i = 1; i < body.length; i++) if (body[i].x < body[minIndex].x) minIndex = i;
+  const minProgress = m.lengths[minIndex] / m.total;
+  const rebound = (end.x - body[minIndex].x) / box.w;
+  return bodyBox.h >= 0.55 * box.h && endX >= 0.30 && endY >= 0.65 && minProgress <= 0.35 && rebound >= 0.24;
+}
 
 export function repairSingleGlyphQuestionContext(result, ctx) {
   const answerType = String(ctx?.answerType || '').toLowerCase();
@@ -228,7 +320,11 @@ export function repairSingleGlyphQuestionContext(result, ctx) {
     .filter(candidate => candidate.sym === digit)
     .sort((a, b) => number(b.conf, 0) - number(a.conf, 0))[0];
   const altConf = number(alt?.conf, 0);
-  if (!alt || top <= 0 || altConf < SINGLE_GLYPH_NEAR_TIE_SHARE * top) return result;
+  if (!alt || top <= 0) return result;
+  const ordinaryNearTie = altConf >= SINGLE_GLYPH_NEAR_TIE_SHARE * top;
+  const structuralFive = symbol.sym === 's' && digit === '5' &&
+    altConf >= STRUCTURAL_FIVE_ALT_SHARE * top && hasStructuralFiveEvidence(symbol);
+  if (!ordinaryNearTie && !structuralFive) return result;
 
   const repaired = {
     ...symbol,
@@ -251,7 +347,9 @@ export function repairSingleGlyphQuestionContext(result, ctx) {
     minConf: altConf,
     margin: Math.max(0, Math.min(1, altConf - number(rival?.conf, 0))),
     weakest: { index: 0, sym: digit, conf: altConf, alts: repaired.alts },
-    singleGlyphContextRepair: 'answer-blind-numeric-near-tie-v2'
+    singleGlyphContextRepair: structuralFive
+      ? 'answer-blind-numeric-5-structure-v3'
+      : 'answer-blind-numeric-near-tie-v2'
   };
 }
 

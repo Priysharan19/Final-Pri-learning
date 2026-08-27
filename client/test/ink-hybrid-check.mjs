@@ -4,7 +4,8 @@ import { fuseNativeStrokeReading } from '../src/ink/hybrid.js';
 import { recognize } from '../src/ink/recognizer.js';
 import {
   recognizeWithoutDetachedSideWork,
-  repairSingleGlyphQuestionContext
+  repairSingleGlyphQuestionContext,
+  hasStructuralFiveEvidence
 } from '../src/ink/runtimeSpatial.js';
 
 function bounds(strokes) {
@@ -125,6 +126,47 @@ const singleResult = (sym, conf, altSym, altConf) => {
   };
 };
 const numericCtx = { answerType: 'numeric', singleGlyphAlphabet: digitAlphabet, expected: '7' };
+
+const groupFromTemplate = (sym, variant = 0, { shear = 0, scaleX = 1, scaleY = 1, dx = 0, dy = 0 } = {}) => ({
+  strokes: TEMPLATES[sym][variant].map(stroke => ({
+    points: stroke.map(([x, y]) => ({ x: dx + scaleX * x + shear * y, y: dy + scaleY * y, w: 2, t: 0 }))
+  }))
+});
+const structuralResult = (group, sym = 's', conf = 0.58, altSym = '5', altConf = 0.23) => {
+  const base = singleResult(sym, conf, altSym, altConf);
+  base.lines[0].symbols[0]._group = group;
+  base.symbols[0]._group = group;
+  return base;
+};
+
+// Physical 5/s evidence: the mounted browser gives canonical 5 a weak
+// 23% 5 alternative behind a 58% s. Only the five-shaped trajectory may
+// use that weaker evidence; a real s with identical classifier scores
+// must remain s. Affine shear/scale checks keep this structural rather
+// than tied to one screenshot or canvas size.
+for (const [label, group] of [
+  ['stock one-stroke 5', groupFromTemplate('5', 0)],
+  ['sheared one-stroke 5', groupFromTemplate('5', 0, { shear: 0.18, scaleX: 1.15, scaleY: 0.82, dx: 40, dy: 20 })],
+  ['lifted-top-bar 5', groupFromTemplate('5', 1)]
+]) {
+  assert.equal(hasStructuralFiveEvidence({ _group: group }), true, `${label} must expose five structure`);
+  const repaired = repairSingleGlyphQuestionContext(structuralResult(group), numericCtx);
+  assert.equal(repaired.text, '5', `${label} must rescue measured 58/23 s-vs-5 evidence`);
+  assert.equal(repaired.singleGlyphContextRepair, 'answer-blind-numeric-5-structure-v3');
+}
+for (const [label, group] of [
+  ['stock s', groupFromTemplate('s', 0)],
+  ['alternate s', groupFromTemplate('s', 1)],
+  ['sheared s', groupFromTemplate('s', 0, { shear: 0.18, scaleX: 1.15, scaleY: 0.82, dx: 40, dy: 20 })]
+]) {
+  assert.equal(hasStructuralFiveEvidence({ _group: group }), false, `${label} must not masquerade as five structure`);
+  const untouched = repairSingleGlyphQuestionContext(structuralResult(group),
+    { answerType: 'numeric', singleGlyphAlphabet: digitAlphabet, expected: '5' });
+  assert.equal(untouched.text, 's', `${label} must stay s even when expected is 5`);
+}
+const unrelatedWeakTwin = repairSingleGlyphQuestionContext(structuralResult(groupFromTemplate('5', 0), 'z', 0.58, '2', 0.23), numericCtx);
+assert.equal(unrelatedWeakTwin.text, 'z', 'structural exception must not lower the generic z/2 threshold');
+
 const nearTie = repairSingleGlyphQuestionContext(singleResult('s', 0.52, '5', 0.50), numericCtx);
 assert.equal(nearTie.text, '5', 'answer-blind numeric context should settle a genuine s/5 near-tie as the legal digit');
 assert.equal(nearTie.singleGlyphContextRepair, 'answer-blind-numeric-near-tie-v2');
