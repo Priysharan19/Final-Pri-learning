@@ -2,7 +2,13 @@ import http from 'node:http';
 import { URL } from 'node:url';
 import { loadConfig } from './config.mjs';
 import { campaignPage, staffPage } from './html.mjs';
-import { fetchInstagramProfile, extractInstagramMessages, extractInstagramReferrals, sendInstagramText } from './instagram.mjs';
+import {
+  ensureInstagramWebhookSubscription,
+  fetchInstagramProfile,
+  extractInstagramMessages,
+  extractInstagramReferrals,
+  sendInstagramText,
+} from './instagram.mjs';
 import { PromotionsStore } from './store.mjs';
 import { anonymizeId, createClaimCode, hashClaimCode, safeEqualText, verifyMetaSignature } from './security.mjs';
 
@@ -17,6 +23,14 @@ store.seedCampaign({
 
 const redemptionAttempts = new Map();
 const MAX_BODY = 256 * 1024;
+const runtimeStatus = {
+  instagramWebhookSubscription: config.isProduction ? 'pending' : 'development',
+  lastWebhookAt: null,
+  lastReferralAt: null,
+  lastMessageAt: null,
+  lastProcessingErrorAt: null,
+};
+let subscriptionTimer = null;
 
 function setSecurityHeaders(res, contentType = 'text/plain; charset=utf-8') {
   res.setHeader('Content-Type', contentType);
@@ -71,6 +85,31 @@ function matchesCampaignKeyword(messageText, campaignKeyword) {
   return String(messageText ?? '').trim().toLowerCase() === String(campaignKeyword ?? '').trim().toLowerCase();
 }
 
+async function refreshInstagramWebhookSubscription() {
+  if (!config.isProduction) return;
+  try {
+    await ensureInstagramWebhookSubscription({
+      accountId: config.instagramAccountId,
+      accessToken: config.instagramAccessToken,
+      apiVersion: config.metaApiVersion,
+      fields: ['messages', 'messaging_referral'],
+    });
+    runtimeStatus.instagramWebhookSubscription = 'subscribed';
+    console.log(JSON.stringify({
+      level: 'info',
+      event: 'instagram_webhooks_subscribed',
+      fields: ['messages', 'messaging_referral'],
+    }));
+  } catch (error) {
+    runtimeStatus.instagramWebhookSubscription = 'error';
+    console.error(JSON.stringify({
+      level: 'error',
+      event: 'instagram_webhook_subscription_failed',
+      message: error.message,
+    }));
+  }
+}
+
 async function issueForInstagramIdentity({ campaign, senderId, profile }) {
   store.upsertParticipant({
     instagramScopedId: senderId,
@@ -90,7 +129,9 @@ async function issueForInstagramIdentity({ campaign, senderId, profile }) {
 }
 
 async function processInstagramPayload(payload) {
-  for (const referral of extractInstagramReferrals(payload)) {
+  const referrals = extractInstagramReferrals(payload);
+  if (referrals.length) runtimeStatus.lastReferralAt = new Date().toISOString();
+  for (const referral of referrals) {
     const campaign = store.getCampaignByRef(referral.ref);
     if (!campaign) continue;
     store.recordAttribution({
@@ -102,7 +143,9 @@ async function processInstagramPayload(payload) {
     });
   }
 
-  for (const message of extractInstagramMessages(payload)) {
+  const messages = extractInstagramMessages(payload);
+  if (messages.length) runtimeStatus.lastMessageAt = new Date().toISOString();
+  for (const message of messages) {
     const attributedCampaign = store.getAttributedCampaign(message.senderId);
     if (!attributedCampaign) {
       const keywordCampaign = store.getCampaignByKeyword(message.text);
@@ -182,7 +225,16 @@ const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url, config.publicBaseUrl);
     if (req.method === 'GET' && url.pathname === '/health') {
-      return json(res, 200, { ok: true, service: 'pri-promotions', campaign: config.campaignId });
+      return json(res, 200, {
+        ok: true,
+        service: 'pri-promotions',
+        campaign: config.campaignId,
+        instagramWebhookSubscription: runtimeStatus.instagramWebhookSubscription,
+        lastWebhookAt: runtimeStatus.lastWebhookAt,
+        lastReferralAt: runtimeStatus.lastReferralAt,
+        lastMessageAt: runtimeStatus.lastMessageAt,
+        lastProcessingErrorAt: runtimeStatus.lastProcessingErrorAt,
+      });
     }
     if (req.method === 'GET' && url.pathname === '/') {
       res.statusCode = 302;
@@ -214,8 +266,10 @@ const server = http.createServer(async (req, res) => {
         return text(res, 401, 'Invalid webhook signature.');
       }
       const payload = parseJsonBody(raw);
+      runtimeStatus.lastWebhookAt = new Date().toISOString();
       text(res, 200, 'EVENT_RECEIVED');
       void processInstagramPayload(payload).catch((error) => {
+        runtimeStatus.lastProcessingErrorAt = new Date().toISOString();
         console.error(JSON.stringify({ level: 'error', event: 'instagram_webhook_processing_failed', message: error.message }));
       });
       return;
@@ -266,10 +320,17 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(config.port, () => {
   console.log(`Pri Promotions listening on ${config.publicBaseUrl} (port ${config.port})`);
-  if (!config.isProduction) console.log(`Development simulator enabled: POST ${config.publicBaseUrl}/dev/simulate`);
+  if (!config.isProduction) {
+    console.log(`Development simulator enabled: POST ${config.publicBaseUrl}/dev/simulate`);
+  } else {
+    void refreshInstagramWebhookSubscription();
+    subscriptionTimer = setInterval(() => void refreshInstagramWebhookSubscription(), 15 * 60 * 1000);
+    subscriptionTimer.unref();
+  }
 });
 
 function shutdown() {
+  if (subscriptionTimer) clearInterval(subscriptionTimer);
   server.close(() => {
     store.close();
     process.exit(0);
