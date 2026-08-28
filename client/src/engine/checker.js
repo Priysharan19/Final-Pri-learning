@@ -2,13 +2,15 @@
 // Pri Learning · Answer checker + Pri Reason safety layer
 //
 // The mature answer-format checker remains in checker-core.js. This facade keeps
-// that API stable while replacing equation Step Check with Pri Reason's
-// precision-first transformation verifier.
+// that API stable while routing mathematical working through Pri Reason.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { normalize, parse, evaluate, exprEquivalent, numsClose } from './expr.js';
 import { diagnoseStep } from './diagnose.js';
-import { assessEquationLine, sameEquationClaim } from './reason.js';
+import {
+  assessEquationLine, sameEquationClaim,
+  assessRelationLine, assessDerivativeLine
+} from './reason-v2-safe.js';
 import { cleanInput, parseNumericInput, checkAnswer as coreCheckAnswer } from './checker-core.js';
 
 export { cleanInput, parseNumericInput };
@@ -139,6 +141,8 @@ export function stepCheck(meta, workingText) {
   let firstBreak = -1;
   let previousEquation = null;
   let previousEquationTrusted = false;
+  let previousRelation = null;
+  let previousRelationTrusted = false;
 
   rawLines.forEach((line, i) => {
     let status = 'note';
@@ -171,7 +175,44 @@ export function stepCheck(meta, workingText) {
         return;
       }
 
-      const cleaned = normalize(line).replace(/^∴\s*/, '').replace(/^(so|hence|then|therefore)\s+/i, '');
+      const proseClean = String(line).trim()
+        .replace(/^∴\s*/, '')
+        .replace(/^(so|hence|then|therefore)\s+/i, '');
+
+      // V2 inequalities are parsed before normalize(), because <, >, ≤ and ≥
+      // are relations rather than arithmetic tokens in the expression engine.
+      if (meta?.kind === 'inequality') {
+        const assessed = assessRelationLine({
+          text: proseClean,
+          previous: previousRelation,
+          previousTrusted: previousRelationTrusted,
+          meta
+        });
+        status = assessed.status;
+        note = assessed.note;
+        lineDiagnosis = assessed.diagnosis || null;
+        if (status !== 'break' && assessed.relation) {
+          previousRelation = assessed.relation;
+          previousRelationTrusted = !!assessed.trusted;
+        }
+        if (status === 'break' && firstBreak === -1) firstBreak = i;
+        out.push({ text: line, status, note, ...(lineDiagnosis ? { diagnosis: lineDiagnosis } : {}) });
+        return;
+      }
+
+      // Authored derivative metadata lets Pri verify the mathematical operation,
+      // not merely whether the student's final expression happens to match.
+      if (meta?.kind === 'derivative') {
+        const assessed = assessDerivativeLine({ text: proseClean, meta });
+        status = assessed.status;
+        note = assessed.note;
+        lineDiagnosis = assessed.diagnosis || null;
+        if (status === 'break' && firstBreak === -1) firstBreak = i;
+        out.push({ text: line, status, note, ...(lineDiagnosis ? { diagnosis: lineDiagnosis } : {}) });
+        return;
+      }
+
+      const cleaned = normalize(proseClean);
 
       if (cleaned.includes('±') && meta.kind === 'equation' && cleaned.includes('=')) {
         const branchSols = (variant) => {
@@ -206,9 +247,8 @@ export function stepCheck(meta, workingText) {
           const ast = parse(cleaned);
           if (ast.t === 'equation') {
             // The common case is a reversible rearrangement of a line already
-            // proved correct. Verify that cheaply before invoking Pri Reason's
-            // extra-root search. Non-equivalent moves still take the full path.
-            if (previousEquationTrusted && previousEquation && sameEquationClaim(previousEquation, ast)) {
+            // proved correct. Verify that cheaply before invoking counterevidence.
+            if (previousEquationTrusted && previousEquation && sameEquationClaim(previousEquation, ast, meta.variable)) {
               status = 'ok';
               previousEquation = ast;
               previousEquationTrusted = true;
