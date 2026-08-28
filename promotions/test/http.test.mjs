@@ -21,7 +21,7 @@ async function waitForHealth(baseUrl, child) {
   throw new Error('server did not become healthy');
 }
 
-test('HTTP flow requires follow verification, redeems once, and permanently blocks refollow reclaim', async (t) => {
+test('HTTP flow requires follow verification, exposes compliance pages, redeems once, and permanently blocks refollow reclaim', async (t) => {
   const dir = mkdtempSync(join(tmpdir(), 'pri-promotions-'));
   const port = randomInt(18000, 28000);
   const baseUrl = `http://127.0.0.1:${port}`;
@@ -53,6 +53,29 @@ test('HTTP flow requires follow verification, redeems once, and permanently bloc
   const landingHtml = await landing.text();
   assert.match(landingHtml, /https:\/\/ig\.me\/m\/pri\.learning\?ref=pri-a2z-qr-2026/);
   assert.match(landingHtml, /Follow @pri\.learning/);
+  assert.match(landingHtml, /href="\/privacy"/);
+  assert.match(landingHtml, /href="\/data-deletion"/);
+
+  const privacy = await fetch(`${baseUrl}/privacy`);
+  assert.equal(privacy.status, 200);
+  const privacyHtml = await privacy.text();
+  assert.match(privacyHtml, /Promotion privacy/);
+  assert.match(privacyHtml, /Instagram-scoped identifier/);
+  assert.match(privacyHtml, /We do not ask for your Instagram password/);
+
+  const deletion = await fetch(`${baseUrl}/data-deletion`);
+  assert.equal(deletion.status, 200);
+  const deletionHtml = await deletion.text();
+  assert.match(deletionHtml, /A2Z data deletion request/);
+  assert.match(deletionHtml, /We will not ask for your Instagram password/);
+
+  const terms = await fetch(`${baseUrl}/terms`);
+  assert.equal(terms.status, 200);
+  assert.match(await terms.text(), /one successfully redeemed reward per eligible Instagram identity/i);
+
+  const robots = await fetch(`${baseUrl}/robots.txt`);
+  assert.equal(robots.status, 200);
+  assert.match(await robots.text(), /Allow: \/$/m);
 
   const blockedBeforeFollowResponse = await fetch(`${baseUrl}/dev/simulate`, {
     method: 'POST',
