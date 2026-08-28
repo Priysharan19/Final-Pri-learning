@@ -1,7 +1,7 @@
 import http from 'node:http';
 import { URL } from 'node:url';
 import { loadConfig } from './config.mjs';
-import { campaignPage, staffPage } from './html.mjs';
+import { campaignPage, dataDeletionPage, privacyPage, staffPage, termsPage } from './html.mjs';
 import {
   ensureInstagramWebhookSubscription,
   fetchInstagramProfile,
@@ -236,6 +236,12 @@ const server = http.createServer(async (req, res) => {
         lastProcessingErrorAt: runtimeStatus.lastProcessingErrorAt,
       });
     }
+    if (req.method === 'GET' && url.pathname === '/robots.txt') {
+      return text(res, 200, 'User-agent: *\nAllow: /\n');
+    }
+    if (req.method === 'GET' && url.pathname === '/privacy') return html(res, 200, privacyPage());
+    if (req.method === 'GET' && url.pathname === '/data-deletion') return html(res, 200, dataDeletionPage());
+    if (req.method === 'GET' && url.pathname === '/terms') return html(res, 200, termsPage());
     if (req.method === 'GET' && url.pathname === '/') {
       res.statusCode = 302;
       res.setHeader('Location', `/c/${encodeURIComponent(config.campaignId)}`);
