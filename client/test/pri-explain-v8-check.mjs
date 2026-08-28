@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {
   TEACHING_MODES,
+  adaptiveCheckpointPrompt,
   buildTeachingProfile,
   importantTeachingScene,
   teachingTimingScale,
@@ -28,6 +29,7 @@ check('strong clean session becomes a quick review', () => {
   assert.equal(profile.mode, TEACHING_MODES.RAPID);
   assert.ok(profile.timingScale < 1);
   assert.equal(profile.focus, null);
+  assert.equal(profile.pauseAtKeyStep, false);
 });
 
 check('first wrong attempt always becomes targeted recovery', () => {
@@ -39,6 +41,7 @@ check('first wrong attempt always becomes targeted recovery', () => {
   assert.equal(profile.mode, TEACHING_MODES.RECOVERY);
   assert.equal(profile.focus.kind, 'attempt');
   assert.ok(profile.shouldOfferFollowUp);
+  assert.ok(profile.pauseAtKeyStep);
 });
 
 check('marker diagnosis is reused verbatim as teaching focus', () => {
@@ -68,6 +71,7 @@ check('hard junior work receives extra scaffolding without a fake misconception'
   assert.equal(profile.mode, TEACHING_MODES.SCAFFOLDED);
   assert.equal(profile.focus, null);
   assert.ok(profile.timingScale > 1);
+  assert.ok(profile.pauseAtKeyStep);
 });
 
 check('most structurally useful verified scene becomes the key teaching step', () => {
@@ -86,6 +90,29 @@ check('recovery prefers the actual diagnosis scene', () => {
   const profile = buildTeachingProfile({ payload: { hadWrongAttempt: true }, timeline: recoveryTimeline });
   assert.equal(profile.importantSceneIndex, 0);
   assert.match(whyThisStep(recoveryTimeline[0], profile, 0), /your attempt/);
+  assert.match(adaptiveCheckpointPrompt(recoveryTimeline[0], profile, 0), /original attempt/);
+});
+
+check('scaffolded transform checkpoint asks for retrieval without inventing maths', () => {
+  const profile = buildTeachingProfile({
+    payload: { correct: true },
+    studentContext: { year: 8, difficulty: 4 },
+    timeline,
+  });
+  const prompt = adaptiveCheckpointPrompt(timeline[1], profile, 1);
+  assert.match(prompt, /describe what changed/);
+  assert.ok(!/[=+*/^]/.test(prompt));
+});
+
+check('rapid and non-key scenes do not create adaptive checkpoints', () => {
+  const rapid = buildTeachingProfile({
+    payload: { correct: true },
+    studentContext: { year: 11, difficulty: 1, session: { answered: 5, correct: 5 } },
+    timeline,
+  });
+  assert.equal(adaptiveCheckpointPrompt(timeline[rapid.importantSceneIndex], rapid, rapid.importantSceneIndex), '');
+  const scaffolded = buildTeachingProfile({ payload: { correct: true }, studentContext: { year: 8, difficulty: 4 }, timeline });
+  assert.equal(adaptiveCheckpointPrompt(timeline[0], scaffolded, 0), '');
 });
 
 check('key step receives extra time but timing remains bounded', () => {
