@@ -205,35 +205,58 @@ p.body b{color:${T.ink};font-weight:400}
 .glyphs .row span:nth-child(n+15){color:${T.ink2}}
 
 /* ── the all-in-one slide ─────────────────────────────────────────────── */
-.rows{margin-top:28px;display:flex;flex-direction:column}
-.r{
-  display:flex;align-items:flex-start;gap:20px;padding:17px 0;
+/* The hero is the marked ink, not a feature list: what sells this product is
+   watching a tick land on your own handwriting. Everything else is one line. */
+.lede{font-size:33px;line-height:1.44;color:${T.ink2};margin-top:26px;max-width:880px}
+.lede b{color:${T.ink};font-weight:400}
+
+.hero{
+  border:1px solid ${T.hairStrong};border-radius:6px;background:${T.surface};
+  padding:32px 36px 30px;margin-top:34px;
+  box-shadow:0 30px 70px rgba(0,0,0,0.55);
+}
+.hero .cap{
+  font-size:19px;text-transform:uppercase;letter-spacing:0.18em;color:${T.ink3};
+  display:flex;justify-content:space-between;margin-bottom:22px;
+}
+.hero .cap .live{color:${T.gold}}
+.hero .l{
+  display:flex;align-items:center;gap:22px;padding:14px 0;
   border-bottom:1px solid ${T.hairFaint};
 }
-.r:last-child{border-bottom:none}
-.r .no{
-  font-size:21px;letter-spacing:0.14em;color:${T.gold};width:42px;
-  padding-top:6px;flex:none;
+.hero .l.wrong{
+  background:linear-gradient(90deg, rgba(207,95,86,0.10), transparent 78%);
+  margin:0 -36px;padding-left:36px;padding-right:36px;
 }
-.r .txt{flex:1}
-.r .name{
-  font-size:20px;text-transform:uppercase;letter-spacing:0.18em;color:${T.ink3};
+.hero .l:last-of-type{border-bottom:none}
+.hero .w{
+  font-family:${HAND};font-size:58px;line-height:1;color:${T.ink};
+  flex:1;letter-spacing:0.5px;
 }
-.r .say{font-size:28px;line-height:1.32;color:${T.ink};margin-top:9px}
-.r .say b{color:${T.goldBright};font-weight:400}
-.r .fig{
-  width:212px;flex:none;text-align:right;padding-top:4px;
-  font-size:29px;line-height:1.24;color:${T.goldBright};
+.hero .m{
+  font-size:21px;letter-spacing:0.14em;text-transform:uppercase;color:${T.ink3};
+  width:96px;text-align:right;
 }
-.r .fig small{
-  display:block;font-size:17px;letter-spacing:0.13em;text-transform:uppercase;
-  color:${T.ink3};margin-top:7px;
+.hero .v{font-size:44px;width:50px;text-align:center;color:${T.good}}
+.hero .v.no{color:${T.bad}}
+.hero .said{
+  margin-top:24px;padding-left:22px;border-left:2px solid ${T.bad};
+  font-size:29px;line-height:1.38;color:${T.ink2};
 }
+.hero .said b{color:${T.ink};font-weight:400}
+
+.chips{
+  margin-top:34px;font-size:29px;line-height:1.62;color:${T.ink2};
+  max-width:900px;
+}
+.chips b{color:${T.ink};font-weight:400}
+.chips i{font-style:normal;color:${T.gold};margin:0 14px}
+
 .signoff{
-  margin-top:34px;padding-top:24px;border-top:1px solid ${T.hairFaint};
+  margin-top:32px;padding-top:26px;border-top:1px solid ${T.hairFaint};
   width:100%;display:flex;align-items:baseline;justify-content:space-between;
 }
-.signoff .mark{font-size:32px;color:${T.ink}}
+.signoff .mark{font-size:34px;color:${T.ink}}
 .signoff .mark .P{font-family:'KaTeX_AMS',${SERIF}}
 .signoff .mark em{font-style:normal;color:${T.gold};margin-left:22px}
 .signoff .handle{font-size:24px;color:${T.ink3};letter-spacing:0.02em}
@@ -285,49 +308,23 @@ const SLIDES = [
   // that backs it. Same numbers, same commands as the carousel; POST.md's
   // claims table covers both.
   ['00-all-in-one', 'Everything', `<div class="slide">
-    ${head('What Pri does')}
-    <h1 style="font-size:70px;margin-top:26px">Write the maths.<br>It marks the maths.</h1>
-    <div class="rows">
-      <div class="r">
-        <div class="no">01</div>
-        <div class="txt"><div class="name">Recognition</div>
-          <div class="say">Reads your <b>handwriting</b> on the iPad itself — no network,
-            no account.</div></div>
-        <div class="fig">98.4%<small>characters read</small></div>
-      </div>
-      <div class="r">
-        <div class="no">02</div>
-        <div class="txt"><div class="name">Instant feedback</div>
-          <div class="say"><b>✓ and ✗ on your own ink</b>, line by line, with the
-            misconception named.</div></div>
-        <div class="fig">795 / 795<small>mistakes named</small></div>
-      </div>
-      <div class="r">
-        <div class="no">03</div>
-        <div class="txt"><div class="name">Every level</div>
-          <div class="say">Boards to <b>JEE Advanced</b> — CBSE, JEE Main, JEE Advanced,
-            Olympiad.</div></div>
-        <div class="fig">4 tracks<small>one syllabus</small></div>
-      </div>
-      <div class="r">
-        <div class="no">04</div>
-        <div class="txt"><div class="name">Every class</div>
-          <div class="say"><b>Class 7 to Class 12</b>, every NCERT chapter mapped to its
-            syllabus lines.</div></div>
-        <div class="fig">252 / 252<small>dot points covered</small></div>
-      </div>
-      <div class="r">
-        <div class="no">05</div>
-        <div class="txt"><div class="name">Unlimited</div>
-          <div class="say">Questions built from a <b>seed</b>, not drawn from a pool.
-            Premium: no cap.</div></div>
-        <div class="fig">3,44,798<small>distinct questions</small></div>
-      </div>
+    ${head('Pri Learning')}
+    <h1 style="font-size:88px;margin-top:28px;letter-spacing:-1.3px">Marked like<br>an <em>examiner</em>.</h1>
+    <div class="lede">You write with the Pencil, as you would on paper. Pri reads every
+      line, awards the method marks, and <b>names the mistake</b>.</div>
+    <div class="hero">
+      <div class="cap"><span>Class 10 · Quadratic equations</span><span class="live">Marked on device</span></div>
+      <div class="l"><span class="w">x<sup>2</sup> + 6x + 5 = 0</span><span class="m">M1</span><span class="v">✓</span></div>
+      <div class="l"><span class="w">(x + 3)<sup>2</sup> − 9 + 5 = 0</span><span class="m">M1</span><span class="v">✓</span></div>
+      <div class="l wrong"><span class="w">x = −1  or  x = 5</span><span class="m">A1</span><span class="v no">✗</span></div>
+      <div class="said">Line 3 — <b>you keep flipping the sign</b> taking the root across.
+        2 of 3 marks.</div>
+    </div>
+    <div class="chips">
+      <b>Reads your handwriting</b><i>·</i><b>Marks every line</b><i>·</i><b>Never runs out</b><br>
+      <b>Class 7 to Class 12</b><i>·</i><b>Boards to JEE Advanced</b><i>·</i><b>Olympiad</b>
     </div>
     <div class="spacer"></div>
-    <div class="foot">Measured, not asserted — 98.4% is characters on held-out simulated
-      writers (n = 560 lines, worst hand 71%); 3,44,798 distinct questions observed at 3,000
-      draws per cell, thinnest cell 54.</div>
     <div class="signoff">
       <span class="mark"><span class="P">P</span>ri Learning <em>Join the change.</em></span>
       <span class="handle">@pri.learning — coming soon</span>
