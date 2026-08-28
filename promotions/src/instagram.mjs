@@ -29,6 +29,28 @@ export function extractInstagramReferrals(payload) {
   return result;
 }
 
+export async function ensureInstagramWebhookSubscription({
+  accountId,
+  accessToken,
+  apiVersion = 'v24.0',
+  fields = ['messages', 'messaging_referral'],
+  fetchImpl = fetch,
+}) {
+  const url = new URL(`https://graph.instagram.com/${apiVersion}/${encodeURIComponent(accountId)}/subscribed_apps`);
+  url.searchParams.set('subscribed_fields', fields.join(','));
+  const response = await fetchImpl(url, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${accessToken}` },
+    signal: AbortSignal.timeout(8000),
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok || body?.success !== true) {
+    const message = body?.error?.message || `Instagram webhook subscription failed with ${response.status}`;
+    throw new Error(message);
+  }
+  return { success: true, fields: [...fields] };
+}
+
 export async function fetchInstagramProfile({ scopedId, accessToken, apiVersion = 'v24.0', fetchImpl = fetch }) {
   const url = new URL(`https://graph.instagram.com/${apiVersion}/${encodeURIComponent(scopedId)}`);
   url.searchParams.set('fields', 'id,name,username,is_user_follow_business,is_business_follow_user');
