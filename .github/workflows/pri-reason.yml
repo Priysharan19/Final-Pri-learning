@@ -1,5 +1,6 @@
 name: Pri Reason
 
+# Permanent precision gate for Pri Reason V1-V3 and authored curriculum rollout.
 on:
   pull_request:
     paths:
