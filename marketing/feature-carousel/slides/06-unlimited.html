@@ -143,6 +143,40 @@ p.body b{color:#efece1;font-weight:400}
 }
 .glyphs .row span:nth-child(n+15){color:#b3afa2}
 
+/* ── the all-in-one slide ─────────────────────────────────────────────── */
+.rows{margin-top:28px;display:flex;flex-direction:column}
+.r{
+  display:flex;align-items:flex-start;gap:20px;padding:17px 0;
+  border-bottom:1px solid rgba(240,236,224,0.07);
+}
+.r:last-child{border-bottom:none}
+.r .no{
+  font-size:21px;letter-spacing:0.14em;color:#c9ad63;width:42px;
+  padding-top:6px;flex:none;
+}
+.r .txt{flex:1}
+.r .name{
+  font-size:20px;text-transform:uppercase;letter-spacing:0.18em;color:#7c796d;
+}
+.r .say{font-size:28px;line-height:1.32;color:#efece1;margin-top:9px}
+.r .say b{color:#e3c87e;font-weight:400}
+.r .fig{
+  width:212px;flex:none;text-align:right;padding-top:4px;
+  font-size:29px;line-height:1.24;color:#e3c87e;
+}
+.r .fig small{
+  display:block;font-size:17px;letter-spacing:0.13em;text-transform:uppercase;
+  color:#7c796d;margin-top:7px;
+}
+.signoff{
+  margin-top:34px;padding-top:24px;border-top:1px solid rgba(240,236,224,0.07);
+  width:100%;display:flex;align-items:baseline;justify-content:space-between;
+}
+.signoff .mark{font-size:32px;color:#efece1}
+.signoff .mark .P{font-family:'KaTeX_AMS','KaTeX_Main','Latin Modern Roman','Computer Modern',Georgia,'Times New Roman',serif}
+.signoff .mark em{font-style:normal;color:#c9ad63;margin-left:22px}
+.signoff .handle{font-size:24px;color:#7c796d;letter-spacing:0.02em}
+
 /* ── cover / CTA ──────────────────────────────────────────────────────── */
 .cover{justify-content:center;align-items:flex-start;padding:96px 88px 76px}
 .cover h1{font-size:92px;margin-top:0;letter-spacing:-1.2px}

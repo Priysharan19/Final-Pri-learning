@@ -1,8 +1,11 @@
-# Posting kit — "Five things Pri does" carousel
+# Posting kit — "Five things Pri does"
 
-Seven-slide Instagram carousel covering the five headline features: AI handwriting
+Two cuts of the same post, covering the five headline features: AI handwriting
 recognition, examiner-style instant marking, every level from boards to JEE Advanced,
 all of Class 7–12, and an unlimited question bank.
+
+- **`out/00-all-in-one.png`** — everything on one slide. This is the post.
+- **`out/01`–`07`** — the seven-slide carousel, same content with room to breathe.
 
 Register follows `ad/docs/COPY.md`: Indian English, dry and confident, no exclamation
 marks, no shame hooks. Design system is `client/src/theme.css` v4 "Dark LaTeX", same as
@@ -17,6 +20,21 @@ node marketing/feature-carousel/build.mjs && node marketing/feature-carousel/ren
 `build.mjs` emits `slides/*.html` + `preview.html`; `render.mjs` shoots `out/*.png` at
 2160×2700 (2×) using the Chromium already installed for the client's Playwright.
 **Edit `build.mjs`, never the generated HTML.**
+
+## The single slide
+
+`out/00-all-in-one.png` is the whole post on one artboard — all five features, each with
+the figure that backs it, plus the sign-off. Use it when you want one image in the feed
+instead of a swipe; the carousel below is the same content given room to breathe.
+
+| Field | Value |
+|---|---|
+| Format | one PNG |
+| Aspect / size | 4:5 — exported 2160×2700, Instagram serves 1080×1350 |
+| Caption | the same one below (the long variant reads best under a single image) |
+
+Everything on it is legible at feed size: the smallest type is the disclaimer line, which
+is there to be read on tap rather than in the scroll.
 
 ## Upload spec
 
@@ -34,6 +52,7 @@ the bottom ~6%, so nothing collides with Instagram's caption gradient.
 
 | # | File | Says |
 |---|---|---|
+| — | `00-all-in-one` | **The single-image version — everything on one slide** |
 | 1 | `01-cover` | Write the maths. It marks the maths. |
 | 2 | `02-recognition` | **AI recognition** — on-device CNN, 56 symbols, 98.4% chars |
 | 3 | `03-marking` | **Instant feedback** — ✓/✗ on your own ink, method marks, misconception named |
@@ -83,6 +102,17 @@ Lead with the first three. Swap `#Class12` → `#Class10` if you post this in bo
 
 ## Alt text
 
+**Single slide:**
+
+> A dark slide set in Computer Modern, headed "Write the maths. It marks the maths." Five
+> numbered rows: recognition, reading handwriting on the iPad itself, 98.4% of characters;
+> instant feedback, ticks and crosses on your own ink, 795 of 795 mistakes named; every
+> level, boards to JEE Advanced across four tracks; every class, 7 to 12, 252 of 252 dot
+> points covered; unlimited, questions built from a seed, 3,44,798 distinct. Signed off
+> Pri Learning, Join the change, @pri.learning — coming soon.
+
+**Carousel:**
+
 > A seven-slide carousel on near-black paper set in Computer Modern. Slide 1: "Write the
 > maths. It marks the maths." Slide 2: on-device handwriting recognition, a strip of the
 > 56 symbols it reads, 98.4% character accuracy. Slide 3: handwritten quadratic working
@@ -97,6 +127,8 @@ Lead with the first three. Swap `#Class12` → `#Class10` if you post this in bo
 Every number on a slide, with the command that produced it. Re-run before reposting —
 these move whenever a generator or the model changes, and a date has never once caught a
 stale figure (README, "Measured accuracy").
+
+The single slide carries the same five figures as slides 2–6, so this table covers both.
 
 | Slide | Claim | Source |
 |---|---|---|

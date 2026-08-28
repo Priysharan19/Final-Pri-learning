@@ -204,6 +204,40 @@ p.body b{color:${T.ink};font-weight:400}
 }
 .glyphs .row span:nth-child(n+15){color:${T.ink2}}
 
+/* ── the all-in-one slide ─────────────────────────────────────────────── */
+.rows{margin-top:28px;display:flex;flex-direction:column}
+.r{
+  display:flex;align-items:flex-start;gap:20px;padding:17px 0;
+  border-bottom:1px solid ${T.hairFaint};
+}
+.r:last-child{border-bottom:none}
+.r .no{
+  font-size:21px;letter-spacing:0.14em;color:${T.gold};width:42px;
+  padding-top:6px;flex:none;
+}
+.r .txt{flex:1}
+.r .name{
+  font-size:20px;text-transform:uppercase;letter-spacing:0.18em;color:${T.ink3};
+}
+.r .say{font-size:28px;line-height:1.32;color:${T.ink};margin-top:9px}
+.r .say b{color:${T.goldBright};font-weight:400}
+.r .fig{
+  width:212px;flex:none;text-align:right;padding-top:4px;
+  font-size:29px;line-height:1.24;color:${T.goldBright};
+}
+.r .fig small{
+  display:block;font-size:17px;letter-spacing:0.13em;text-transform:uppercase;
+  color:${T.ink3};margin-top:7px;
+}
+.signoff{
+  margin-top:34px;padding-top:24px;border-top:1px solid ${T.hairFaint};
+  width:100%;display:flex;align-items:baseline;justify-content:space-between;
+}
+.signoff .mark{font-size:32px;color:${T.ink}}
+.signoff .mark .P{font-family:'KaTeX_AMS',${SERIF}}
+.signoff .mark em{font-style:normal;color:${T.gold};margin-left:22px}
+.signoff .handle{font-size:24px;color:${T.ink3};letter-spacing:0.02em}
+
 /* ── cover / CTA ──────────────────────────────────────────────────────── */
 .cover{justify-content:center;align-items:flex-start;padding:96px 88px 76px}
 .cover h1{font-size:92px;margin-top:0;letter-spacing:-1.2px}
@@ -247,6 +281,59 @@ const stat = (label, value, note) => `<div class="stat">
 
 // ─── the seven slides ─────────────────────────────────────────────────────
 const SLIDES = [
+  // The whole post on one artboard — the five features, each with the figure
+  // that backs it. Same numbers, same commands as the carousel; POST.md's
+  // claims table covers both.
+  ['00-all-in-one', 'Everything', `<div class="slide">
+    ${head('What Pri does')}
+    <h1 style="font-size:70px;margin-top:26px">Write the maths.<br>It marks the maths.</h1>
+    <div class="rows">
+      <div class="r">
+        <div class="no">01</div>
+        <div class="txt"><div class="name">Recognition</div>
+          <div class="say">Reads your <b>handwriting</b> on the iPad itself — no network,
+            no account.</div></div>
+        <div class="fig">98.4%<small>characters read</small></div>
+      </div>
+      <div class="r">
+        <div class="no">02</div>
+        <div class="txt"><div class="name">Instant feedback</div>
+          <div class="say"><b>✓ and ✗ on your own ink</b>, line by line, with the
+            misconception named.</div></div>
+        <div class="fig">795 / 795<small>mistakes named</small></div>
+      </div>
+      <div class="r">
+        <div class="no">03</div>
+        <div class="txt"><div class="name">Every level</div>
+          <div class="say">Boards to <b>JEE Advanced</b> — CBSE, JEE Main, JEE Advanced,
+            Olympiad.</div></div>
+        <div class="fig">4 tracks<small>one syllabus</small></div>
+      </div>
+      <div class="r">
+        <div class="no">04</div>
+        <div class="txt"><div class="name">Every class</div>
+          <div class="say"><b>Class 7 to Class 12</b>, every NCERT chapter mapped to its
+            syllabus lines.</div></div>
+        <div class="fig">252 / 252<small>dot points covered</small></div>
+      </div>
+      <div class="r">
+        <div class="no">05</div>
+        <div class="txt"><div class="name">Unlimited</div>
+          <div class="say">Questions built from a <b>seed</b>, not drawn from a pool.
+            Premium: no cap.</div></div>
+        <div class="fig">3,44,798<small>distinct questions</small></div>
+      </div>
+    </div>
+    <div class="spacer"></div>
+    <div class="foot">Measured, not asserted — 98.4% is characters on held-out simulated
+      writers (n = 560 lines, worst hand 71%); 3,44,798 distinct questions observed at 3,000
+      draws per cell, thinnest cell 54.</div>
+    <div class="signoff">
+      <span class="mark"><span class="P">P</span>ri Learning <em>Join the change.</em></span>
+      <span class="handle">@pri.learning — coming soon</span>
+    </div>
+  </div>`],
+
   ['01-cover', 'Cover', `<div class="slide cover">
     ${head('What Pri does')}
     <div class="lead"></div>
