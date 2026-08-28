@@ -59,6 +59,28 @@ export default function Practice() {
     } catch { load(); setServe(null); }
   };
 
+  const loadSimilar = useCallback(async () => {
+    const q = serve?.question;
+    if (!q?.subtopic) {
+      setServe(null);
+      load();
+      return;
+    }
+    if (loading.current) return;
+    loading.current = true;
+    setError('');
+    try {
+      const r = await api.post('/practice/next', {
+        mode: 'topic',
+        subtopic: q.subtopic,
+        track: q.indiaTrack || track || undefined,
+        difficulty: q.difficulty,
+      });
+      setServe(r);
+    } catch (e) { setError(e.message); }
+    finally { loading.current = false; }
+  }, [serve, track, load]);
+
   const course = (user.courseLabel || 'Mathematics').replace(/^(?:Year|Class) \d+\s*·\s*/, '');
   const metaLine = `${user.course === 'in' ? 'Class' : 'Year'} ${serve?.question?.year ?? user.year} · ${serve?.question?.indiaTrack ? (user.indiaTrackName || course) : course}`;
   const heading = serve?.question?.subtopicName
@@ -100,6 +122,18 @@ export default function Practice() {
             questionId={serve.question.id}
             questionPrompt={serve.question.prompt}
             questionFigure={serve.question.figure}
+            studentContext={{
+              year: serve.question.year ?? user.year,
+              course: user.course,
+              pathway: user.pathway,
+              indiaTrack: serve.question.indiaTrack || user.indiaTrack,
+              difficulty: serve.question.difficulty,
+              subtopic: serve.question.subtopicName,
+              dotpoint: serve.question.dotpointText,
+              reason: serve.reason,
+              session,
+            }}
+            onTrySimilar={loadSimilar}
           />
         </>
       )}
