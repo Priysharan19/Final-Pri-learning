@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { MathText } from '../lib/latex.jsx';
 import { buildVisualTimeline, visualSummary } from '../explain/visualEngine.js';
 import { visualCuePlan, visualCueState, visualProgressForCue } from '../explain/choreography.js';
-import { buildTeachingProfile, teachingTimingScale, whyThisStep } from '../explain/adaptiveTeaching.js';
+import { adaptiveCheckpointPrompt, buildTeachingProfile, teachingTimingScale, whyThisStep } from '../explain/adaptiveTeaching.js';
 import { VisualBlock } from './PriExplainVisuals.jsx';
 import './PriExplainV5.css';
 import './PriExplainV7.css';
@@ -123,8 +123,10 @@ export default function PriExplainV5({ questionId, questionPrompt, questionFigur
   const revealedLines = reduceMotion ? lineCount : Math.min(beat, lineCount);
   const sceneComplete = reduceMotion || beat >= lineCount;
   const visualCues = useMemo(() => visualCuePlan(current?.visuals || [], lineCount), [current, lineCount]);
-  const hasCheckpoint = Boolean(current?.visuals?.some(visual => visual.kind === 'checkpoint'));
-  const checkpointPending = sceneComplete && hasCheckpoint && !checkpointPassed;
+  const hasAuthoredCheckpoint = Boolean(current?.visuals?.some(visual => visual.kind === 'checkpoint'));
+  const adaptivePrompt = adaptiveCheckpointPrompt(current, teaching, index);
+  const hasAdaptiveCheckpoint = Boolean(adaptivePrompt) && !hasAuthoredCheckpoint;
+  const checkpointPending = sceneComplete && (hasAuthoredCheckpoint || hasAdaptiveCheckpoint) && !checkpointPassed;
   const atEnd = timeline.length > 0 && index === timeline.length - 1;
   const atFinished = atEnd && sceneComplete && !checkpointPending;
   const visualKinds = useMemo(() => visualSummary(timeline), [timeline]);
@@ -337,7 +339,7 @@ export default function PriExplainV5({ questionId, questionPrompt, questionFigur
   const sceneFraction = lineCount ? Math.min(1, revealedLines / lineCount) : 1;
   const progress = Math.min(100, ((index + sceneFraction) / timeline.length) * 100);
   const status = checkpointPending
-    ? 'Your turn · predict before continuing'
+    ? 'Your turn · explain before continuing'
     : atFinished
       ? 'Complete'
       : playing
@@ -455,6 +457,14 @@ export default function PriExplainV5({ questionId, questionPrompt, questionFigur
                       )}
                     </div>
                   </div>
+
+                  {checkpointPending && hasAdaptiveCheckpoint && (
+                    <div className="pri-v-checkpoint pri-explain-adaptive-retrieval" aria-label="Adaptive understanding checkpoint">
+                      <span>Retrieval checkpoint</span>
+                      <strong>{adaptivePrompt}</strong>
+                      <small>Say it out loud or write it briefly, then continue.</small>
+                    </div>
+                  )}
                 </article>
 
                 {atFinished && payload.solution?.answerText && (
