@@ -21,7 +21,7 @@ async function waitForHealth(baseUrl, child) {
   throw new Error('server did not become healthy');
 }
 
-test('customer controls redemption, green-tick counter increments once, and same identity stays blocked', async (t) => {
+test('green tick requires follow, increments once, and same identity stays blocked after refollow', async (t) => {
   const dir = mkdtempSync(join(tmpdir(), 'pri-promotions-'));
   const port = randomInt(18000, 28000);
   const baseUrl = `http://127.0.0.1:${port}`;
@@ -52,44 +52,71 @@ test('customer controls redemption, green-tick counter increments once, and same
   assert.equal(landing.status, 200);
   const landingHtml = await landing.text();
   assert.match(landingHtml, /A2Z-[2-9A-HJ-NP-Z]{4}-[2-9A-HJ-NP-Z]{4}/);
-  assert.match(landingHtml, /Following @pri\.learning is optional/);
+  assert.match(landingHtml, /green tick requires/i);
   assert.match(landingHtml, /href="\/privacy"/);
 
-  const claimResponse = await fetch(`${baseUrl}/dev/simulate`, {
+  // First create a valid A2Z identity that is NOT following.
+  const notFollowingResponse = await fetch(`${baseUrl}/dev/simulate`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ pin: '2468', instagramScopedId: 'ig-http-001', username: 'student', followsBusiness: false }),
   });
-  assert.equal(claimResponse.status, 200);
-  const claim = await claimResponse.json();
-  assert.equal(claim.status, 'issued');
-  assert.match(claim.code, /^PRI-/);
+  assert.equal(notFollowingResponse.status, 200);
+  const notFollowingClaim = await notFollowingResponse.json();
+  assert.equal(notFollowingClaim.status, 'issued');
+  assert.match(notFollowingClaim.code, /^PRI-/);
 
-  const claimPage = await fetch(`${baseUrl}/claim/${encodeURIComponent(claim.code)}`);
+  const claimPage = await fetch(`${baseUrl}/claim/${encodeURIComponent(notFollowingClaim.code)}`);
   assert.equal(claimPage.status, 200);
   const claimPageHtml = await claimPage.text();
-  assert.match(claimPageHtml, /Show live green tick/);
-  assert.match(claimPageHtml, /TOTAL GREEN TICKS/);
-  assert.match(claimPageHtml, /unfollows and follows again/);
+  assert.match(claimPageHtml, /Verify follow & show green tick/);
+  assert.match(claimPageHtml, /only if Instagram confirms/i);
+  assert.match(claimPageHtml, /unfollowing and following again/i);
 
-  const ready = await fetch(`${baseUrl}/api/customer/status?code=${encodeURIComponent(claim.code)}`);
+  const ready = await fetch(`${baseUrl}/api/customer/status?code=${encodeURIComponent(notFollowingClaim.code)}`);
   assert.equal(ready.status, 200);
   assert.equal((await ready.json()).status, 'ready');
+
+  // No follow => no redemption, no counter increment, no green tick.
+  const blocked = await fetch(`${baseUrl}/api/customer/redeem`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ code: notFollowingClaim.code }),
+  });
+  assert.equal(blocked.status, 403);
+  const blockedBody = await blocked.json();
+  assert.equal(blockedBody.status, 'follow_required');
+  assert.equal(blockedBody.currentFollowState, false);
+  assert.equal(blockedBody.redemptionCount, 0);
+
+  const stillReady = await fetch(`${baseUrl}/api/customer/status?code=${encodeURIComponent(notFollowingClaim.code)}`);
+  assert.equal((await stillReady.json()).status, 'ready');
+
+  // Same Instagram identity follows. In dev simulation this rotates the
+  // outstanding code but does not create a second claim.
+  const followingResponse = await fetch(`${baseUrl}/dev/simulate`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ pin: '2468', instagramScopedId: 'ig-http-001', username: 'student', followsBusiness: true }),
+  });
+  const followingClaim = await followingResponse.json();
+  assert.equal(followingClaim.status, 'rotated');
+  assert.match(followingClaim.code, /^PRI-/);
 
   const redeemed = await fetch(`${baseUrl}/api/customer/redeem`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ code: claim.code }),
+    body: JSON.stringify({ code: followingClaim.code }),
   });
   assert.equal(redeemed.status, 200);
   const redeemedBody = await redeemed.json();
   assert.equal(redeemedBody.status, 'redeemed');
+  assert.equal(redeemedBody.currentFollowState, true);
   assert.equal(redeemedBody.redemptionCount, 1);
-  assert.equal(redeemedBody.currentFollowState, false);
   assert.match(redeemedBody.redeemedAt, /^\d{4}-\d{2}-\d{2}T/);
   assert.match(redeemedBody.serverTime, /^\d{4}-\d{2}-\d{2}T/);
 
-  const after = await fetch(`${baseUrl}/api/customer/status?code=${encodeURIComponent(claim.code)}`);
+  const after = await fetch(`${baseUrl}/api/customer/status?code=${encodeURIComponent(followingClaim.code)}`);
   const afterBody = await after.json();
   assert.equal(afterBody.status, 'already_redeemed');
   assert.equal(afterBody.redemptionCount, 1);
@@ -97,13 +124,14 @@ test('customer controls redemption, green-tick counter increments once, and same
   const repeat = await fetch(`${baseUrl}/api/customer/redeem`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ code: claim.code }),
+    body: JSON.stringify({ code: followingClaim.code }),
   });
   assert.equal(repeat.status, 409);
   const repeatBody = await repeat.json();
   assert.equal(repeatBody.status, 'already_redeemed');
   assert.equal(repeatBody.redemptionCount, 1);
 
+  // Unfollow/refollow after redemption still cannot create another reward.
   const reclaimResponse = await fetch(`${baseUrl}/dev/simulate`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -126,13 +154,16 @@ test('customer controls redemption, green-tick counter increments once, and same
   });
   const secondRedeemBody = await secondRedeem.json();
   assert.equal(secondRedeemBody.status, 'redeemed');
+  assert.equal(secondRedeemBody.currentFollowState, true);
   assert.equal(secondRedeemBody.redemptionCount, 2);
 
   const privacy = await fetch(`${baseUrl}/privacy`);
   assert.equal(privacy.status, 200);
+  assert.match(await privacy.text(), /live green tick is issued only when the follow relationship is positively confirmed/i);
   const deletion = await fetch(`${baseUrl}/data-deletion`);
   assert.equal(deletion.status, 200);
   const terms = await fetch(`${baseUrl}/terms`);
   assert.equal(terms.status, 200);
+  assert.match(await terms.text(), /currently following @pri\.learning/i);
   assert.equal(stderr.includes('internal_error'), false);
 });
