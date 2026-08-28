@@ -72,7 +72,7 @@ test('HTTP flow is referral-gated, follow-independent, one-time, and exposes com
   const terms = await fetch(`${baseUrl}/terms`);
   assert.equal(terms.status, 200);
   const termsHtml = await terms.text();
-  assert.match(termsHtml, /Following `@pri\.learning` is optional/);
+  assert.match(termsHtml, /Following @pri\.learning is optional/);
   assert.match(termsHtml, /in no way sponsored, endorsed or administered by, or associated with, Instagram/);
 
   const robots = await fetch(`${baseUrl}/robots.txt`);
