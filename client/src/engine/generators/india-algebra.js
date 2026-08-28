@@ -228,6 +228,13 @@ export const indiaAlgebra = {
       return {
         prompt: `How many integers $x$ satisfy $${L} \\le ${a}x ${b >= 0 ? '+' : '-'} ${Math.abs(b)} \\le ${H}$?`,
         answerType: 'numeric', answer: { value: count },
+        stepcheck: {
+          kind: 'plan',
+          stages: [
+            { kind: 'chained-inequality', source: `${L} <= ${a}x ${b >= 0 ? '+' : '-'} ${Math.abs(b)} <= ${H}`, canonical: `${lo} <= x <= ${hi}`, requireProgress: true },
+            { kind: 'evaluation', source: `${hi} - (${lo}) + 1`, substitutions: {}, expected: count, labels: ['count', 'n'] }
+          ]
+        },
         traps: [{ value: hi - lo, why: `Both endpoints are included, so the count is $${hi} - (${lo}) + 1$, not $${hi} - (${lo})$.` }],
         hints: [
           'Solve the double inequality for x, keeping both ends.',
@@ -243,14 +250,23 @@ export const indiaAlgebra = {
     }
     // D4 — a modulus inequality
     const c = ri(rng, 2, 6), d = nz(rng, -9, 9), r = ri(rng, 3, 12);
+    const expression = `${c}x ${d >= 0 ? '+' : '-'} ${Math.abs(d)}`;
     const loTex = fracTex(-r - d, c), hiTex = fracTex(r - d, c);
     const lo = (-r - d) / c, hi = (r - d) / c;
-    const loI = Math.ceil(lo), hiI = Math.floor(hi);
+    const loI = Math.floor(lo) + 1, hiI = Math.ceil(hi) - 1;
     const count = Math.max(0, hiI - loI + 1);
     if (count < 2) return indiaAlgebra['c11-linear-inequalities'](rng, 3);
     return {
       prompt: `How many integers $x$ satisfy $|${c}x ${d >= 0 ? '+' : '-'} ${Math.abs(d)}| < ${r}$?`,
       answerType: 'numeric', answer: { value: count },
+      stepcheck: {
+        kind: 'plan',
+        stages: [
+          { kind: 'modulus-inequality', expression, radius: r, op: '<' },
+          { kind: 'chained-inequality', source: `${-r} < ${expression} < ${r}`, canonical: `${lo} < x < ${hi}`, requireProgress: true },
+          { kind: 'evaluation', source: `${hiI} - (${loI}) + 1`, substitutions: {}, expected: count, labels: ['count', 'n'] }
+        ]
+      },
       traps: [{ value: count + 2, why: `The inequality is strict, so the endpoints of $-${r} < ${c}x ${d >= 0 ? '+' : '-'} ${Math.abs(d)} < ${r}$ are not included.` }],
       hints: [
         '$|u| < r$ is the same as $-r < u < r$.',

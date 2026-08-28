@@ -80,9 +80,34 @@ for (const difficulty of [1, 2]) {
   }
 }
 
-for (const difficulty of [3, 4]) {
-  const q = indiaAlgebra['c11-linear-inequalities'](makeRng(0x110000 + difficulty), difficulty);
-  ok(`Class 11 inequality D${difficulty} stays outside single-relation metadata`, !q.stepcheck);
+{
+  const q = indiaAlgebra['c11-linear-inequalities'](makeRng(0x110003), 3);
+  same('Class 11 inequality D3 uses proof plan', q.stepcheck?.kind, 'plan');
+  same('Class 11 inequality D3 has chain + count stages', q.stepcheck?.stages?.length, 2);
+  const [chain, count] = q.stepcheck.stages;
+  same('Class 11 inequality D3 chain stage kind', chain.kind, 'chained-inequality');
+  let r = stepCheck(q.stepcheck, `${chain.canonical}\ncount = ${count.expected}`);
+  same('Class 11 inequality D3 canonical plan has no break', r.firstBreak, -1);
+  same('Class 11 inequality D3 completes both stages', r.completedStages, 2);
+  const wrongBoundary = chain.canonical.replace('<=', '<');
+  r = stepCheck(q.stepcheck, `${wrongBoundary}\ncount = ${count.expected}`);
+  same('Class 11 inequality D3 catches changed endpoint inclusion', r.firstBreak, 0);
+  same('Class 11 inequality D3 names boundary error', r.diagnosis?.code, 'inequality-boundary-changed');
+}
+
+{
+  const q = indiaAlgebra['c11-linear-inequalities'](makeRng(0x110004), 4);
+  same('Class 11 inequality D4 uses proof plan', q.stepcheck?.kind, 'plan');
+  same('Class 11 inequality D4 has modulus + chain + count stages', q.stepcheck?.stages?.length, 3);
+  const [modulus, chain, count] = q.stepcheck.stages;
+  const unfolded = `${-modulus.radius} < ${modulus.expression} < ${modulus.radius}`;
+  let r = stepCheck(q.stepcheck, `${unfolded}\n${chain.canonical}\ncount = ${count.expected}`);
+  same('Class 11 inequality D4 canonical plan has no break', r.firstBreak, -1);
+  same('Class 11 inequality D4 completes all stages', r.completedStages, 3);
+  const wrongUnfold = `${-modulus.radius} <= ${modulus.expression} <= ${modulus.radius}`;
+  r = stepCheck(q.stepcheck, `${wrongUnfold}\n${chain.canonical}`);
+  same('Class 11 inequality D4 catches strictness loss', r.firstBreak, 0);
+  same('Class 11 inequality D4 names strictness error', r.diagnosis?.code, 'inequality-boundary-changed');
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);
