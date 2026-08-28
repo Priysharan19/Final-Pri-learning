@@ -1,13 +1,10 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Pri Learning · Pri Reason V2 safety facade
+// Pri Learning · Pri Reason V2/V4 safety facade
 //
-// The V2 rational normaliser certifies many low-degree rational equations by
-// carrying numerator/denominator polynomials. A quotient whose *divisor itself*
-// contains a variable-dependent denominator has an additional domain exclusion
-// that moves into the numerator when inverted (for example 1/(1/x)). Until V3
-// represents domain constraints as first-class proof objects, this facade blocks
-// that proof class completely. Precision beats coverage: dangerous nested
-// quotients abstain and fall back to V1 rather than receiving a false OK.
+// V2 certifies symbolic/rational transformations. V4 handles only the domain
+// classes V2 deliberately left unsupported: nested rational quotients and simple
+// log/root equalities whose complete low-degree real solution sets can be proved.
+// Ordinary algebra keeps the established V1/V2 policy and stable diagnoses.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { parse } from './expr.js';
@@ -26,6 +23,11 @@ import {
   sameEquationClaim as sameEquationClaimV1,
   assessEquationLine as assessEquationLineV1
 } from './reason.js';
+import {
+  compareDomainAwareEquationClaims,
+  domainFunctionEquationSignature,
+  domainSolutionDiagnosis
+} from './reason-v4.js';
 
 function unwrap(node) {
   let out = node;
@@ -54,9 +56,8 @@ function containsVariableDenominator(node, variable = null) {
 /**
  * Quotient-of-rational-denominator hazard:
  *   A / (B / C(x))
- * The C(x) != 0 restriction belongs to the original expression but becomes a
- * numerator factor after inversion. The current finite-rational normaliser does
- * not yet retain that independent exclusion set, so this proof must abstain.
+ * V4 can certify this class when every relevant numerator, denominator and
+ * exclusion is low-degree. Higher/unsupported forms still fall back to V1.
  */
 export function hasNestedDomainHazard(node, variable = null) {
   node = unwrap(node);
@@ -69,9 +70,31 @@ function equationHazard(a, b, variable = null) {
   return hasNestedDomainHazard(a, variable) || hasNestedDomainHazard(b, variable);
 }
 
+function domainFunctionClass(a, b, variable = null) {
+  return !!domainFunctionEquationSignature(a, variable)
+    || !!domainFunctionEquationSignature(b, variable);
+}
+
+function shouldUseV4(a, b, variable = null) {
+  return equationHazard(a, b, variable) || domainFunctionClass(a, b, variable);
+}
+
 export function sameEquationClaim(a, b, variable = null) {
-  if (equationHazard(a, b, variable)) return sameEquationClaimV1(a, b, variable);
+  if (shouldUseV4(a, b, variable)) {
+    const v4 = compareDomainAwareEquationClaims(a, b, variable);
+    if (v4.decidable) return v4.same;
+    if (equationHazard(a, b, variable)) return sameEquationClaimV1(a, b, variable);
+  }
   return sameEquationClaimV2(a, b, variable);
+}
+
+function exactDomainComparison(a, b, variable = null) {
+  if (!shouldUseV4(a, b, variable)) return null;
+  const comparison = compareDomainAwareEquationClaims(a, b, variable);
+  if (!comparison.decidable) return null;
+  if (comparison.same) return { status: 'ok', trusted: true };
+  const diagnosis = domainSolutionDiagnosis(comparison);
+  return { status: 'break', trusted: false, note: diagnosis.message, diagnosis };
 }
 
 export function assessEquationLine({ ast, previousAst = null, previousTrusted = false, meta = null } = {}) {
@@ -80,6 +103,16 @@ export function assessEquationLine({ ast, previousAst = null, previousTrusted = 
   if (meta?.source) {
     try { source = parse(meta.source); } catch { source = null; }
   }
+
+  if (source?.t === 'equation' && ast?.t === 'equation') {
+    const assessed = exactDomainComparison(source, ast, variable);
+    if (assessed) return assessed;
+  }
+  if (previousTrusted && previousAst?.t === 'equation' && ast?.t === 'equation') {
+    const assessed = exactDomainComparison(previousAst, ast, variable);
+    if (assessed) return assessed;
+  }
+
   if (hasNestedDomainHazard(ast, variable)
       || hasNestedDomainHazard(previousAst, variable)
       || hasNestedDomainHazard(source, variable)) {

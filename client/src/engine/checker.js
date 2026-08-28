@@ -12,6 +12,7 @@ import {
   assessRelationLine, assessDerivativeLine
 } from './reason-v2-safe.js';
 import { assessEvaluationLine, assessPointLine } from './reason-v3.js';
+import { assessRelationChainLine, assessModulusInequalityLine } from './reason-v4.js';
 import { cleanInput, parseNumericInput, checkAnswer as coreCheckAnswer } from './checker-core.js';
 
 export { cleanInput, parseNumericInput };
@@ -201,6 +202,26 @@ function stepCheckSingle(meta, workingText) {
         return;
       }
 
+      if (meta?.kind === 'chained-inequality') {
+        const assessed = assessRelationChainLine({ text: proseClean, meta });
+        status = assessed.status;
+        note = assessed.note;
+        lineDiagnosis = assessed.diagnosis || null;
+        if (status === 'break' && firstBreak === -1) firstBreak = i;
+        out.push({ text: line, status, note, ...(lineDiagnosis ? { diagnosis: lineDiagnosis } : {}) });
+        return;
+      }
+
+      if (meta?.kind === 'modulus-inequality') {
+        const assessed = assessModulusInequalityLine({ text: proseClean, meta });
+        status = assessed.status;
+        note = assessed.note;
+        lineDiagnosis = assessed.diagnosis || null;
+        if (status === 'break' && firstBreak === -1) firstBreak = i;
+        out.push({ text: line, status, note, ...(lineDiagnosis ? { diagnosis: lineDiagnosis } : {}) });
+        return;
+      }
+
       // Authored derivative metadata lets Pri verify the mathematical operation,
       // not merely whether the student's final expression happens to match.
       if (meta?.kind === 'derivative') {
@@ -354,6 +375,8 @@ function assessPlanStage(stage, line) {
   }
   if (stage.kind === 'evaluation') return assessEvaluationLine({ text: line, meta: stage });
   if (stage.kind === 'point') return assessPointLine({ text: line, meta: stage });
+  if (stage.kind === 'chained-inequality') return assessRelationChainLine({ text: line, meta: stage });
+  if (stage.kind === 'modulus-inequality') return assessModulusInequalityLine({ text: line, meta: stage });
   if (derivativeSourceLine(stage, line)) {
     return { status: 'note', trusted: false, note: 'Starting function recognised — differentiate it on the next line.' };
   }
