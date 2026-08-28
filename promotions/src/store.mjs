@@ -54,6 +54,15 @@ export class PromotionsStore {
         PRIMARY KEY(instagram_scoped_id, campaign_id)
       );
 
+      CREATE TABLE IF NOT EXISTS campaign_passes (
+        pass_hash TEXT PRIMARY KEY,
+        campaign_id TEXT NOT NULL REFERENCES campaigns(id),
+        issued_at TEXT NOT NULL,
+        expires_at TEXT NOT NULL,
+        consumed_at TEXT,
+        instagram_scoped_id TEXT
+      );
+
       CREATE TABLE IF NOT EXISTS audit_events (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         event_type TEXT NOT NULL,
@@ -66,6 +75,7 @@ export class PromotionsStore {
 
       CREATE INDEX IF NOT EXISTS idx_claims_code_hash ON claims(code_hash);
       CREATE INDEX IF NOT EXISTS idx_attribution_subject ON campaign_attributions(instagram_scoped_id, attributed_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_campaign_pass_expiry ON campaign_passes(expires_at);
       CREATE INDEX IF NOT EXISTS idx_audit_created_at ON audit_events(created_at);
     `);
 
@@ -97,6 +107,70 @@ export class PromotionsStore {
 
   getCampaignByRef(refCode) {
     return this.db.prepare('SELECT * FROM campaigns WHERE ref_code = ? AND active = 1').get(String(refCode).trim()) ?? null;
+  }
+
+  issueCampaignPass({ campaignId, passHash, ttlMs = 15 * 60 * 1000 }) {
+    const issuedAt = nowIso();
+    const expiresAt = new Date(Date.now() + ttlMs).toISOString();
+    this.db.prepare(`
+      INSERT INTO campaign_passes (pass_hash, campaign_id, issued_at, expires_at)
+      VALUES (?, ?, ?, ?)
+    `).run(passHash, campaignId, issuedAt, expiresAt);
+    this.#audit('campaign_pass_issued', campaignId, null, null, { expiresAt });
+    return { campaignId, issuedAt, expiresAt };
+  }
+
+  consumeCampaignPass({ passHash, instagramScopedId, subjectRef = null }) {
+    this.db.exec('BEGIN IMMEDIATE');
+    try {
+      const pass = this.db.prepare(`
+        SELECT p.*, c.active
+        FROM campaign_passes p
+        JOIN campaigns c ON c.id = p.campaign_id
+        WHERE p.pass_hash = ?
+      `).get(passHash);
+
+      if (!pass || pass.active !== 1) {
+        this.#audit('campaign_pass_invalid', null, null, subjectRef, {});
+        this.db.exec('COMMIT');
+        return { status: 'invalid' };
+      }
+
+      if (Date.parse(pass.expires_at) <= Date.now()) {
+        this.#audit('campaign_pass_expired', pass.campaign_id, null, subjectRef, {});
+        this.db.exec('COMMIT');
+        return { status: 'expired', campaignId: pass.campaign_id };
+      }
+
+      if (pass.consumed_at) {
+        const sameIdentity = pass.instagram_scoped_id === instagramScopedId;
+        this.#audit('campaign_pass_reused', pass.campaign_id, null, subjectRef, { sameIdentity });
+        this.db.exec('COMMIT');
+        return {
+          status: sameIdentity ? 'already_consumed_by_identity' : 'used',
+          campaignId: pass.campaign_id,
+        };
+      }
+
+      const consumedAt = nowIso();
+      const result = this.db.prepare(`
+        UPDATE campaign_passes
+        SET consumed_at = ?, instagram_scoped_id = ?
+        WHERE pass_hash = ? AND consumed_at IS NULL
+      `).run(consumedAt, instagramScopedId, passHash);
+
+      if (result.changes !== 1) {
+        this.db.exec('ROLLBACK');
+        return { status: 'conflict' };
+      }
+
+      this.#audit('campaign_pass_consumed', pass.campaign_id, null, subjectRef, {});
+      this.db.exec('COMMIT');
+      return { status: 'consumed', campaignId: pass.campaign_id, consumedAt };
+    } catch (error) {
+      this.db.exec('ROLLBACK');
+      throw error;
+    }
   }
 
   recordAttribution({ instagramScopedId, campaignId, refCode, source = null, subjectRef = null }) {
