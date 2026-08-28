@@ -21,7 +21,7 @@ async function waitForHealth(baseUrl, child) {
   throw new Error('server did not become healthy');
 }
 
-test('HTTP flow exposes tracked A2Z DM, redeems once, and permanently blocks reclaim', async (t) => {
+test('HTTP flow requires follow verification, redeems once, and permanently blocks refollow reclaim', async (t) => {
   const dir = mkdtempSync(join(tmpdir(), 'pri-promotions-'));
   const port = randomInt(18000, 28000);
   const baseUrl = `http://127.0.0.1:${port}`;
@@ -52,6 +52,17 @@ test('HTTP flow exposes tracked A2Z DM, redeems once, and permanently blocks rec
   assert.equal(landing.status, 200);
   const landingHtml = await landing.text();
   assert.match(landingHtml, /https:\/\/ig\.me\/m\/pri\.learning\?ref=pri-a2z-qr-2026/);
+  assert.match(landingHtml, /Follow @pri\.learning/);
+
+  const blockedBeforeFollowResponse = await fetch(`${baseUrl}/dev/simulate`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ pin: '2468', instagramScopedId: 'ig-http-001', username: 'student', followsBusiness: false }),
+  });
+  assert.equal(blockedBeforeFollowResponse.status, 200);
+  const blockedBeforeFollow = await blockedBeforeFollowResponse.json();
+  assert.equal(blockedBeforeFollow.status, 'not_following');
+  assert.equal('code' in blockedBeforeFollow, false);
 
   const claimResponse = await fetch(`${baseUrl}/dev/simulate`, {
     method: 'POST',
@@ -77,13 +88,22 @@ test('HTTP flow exposes tracked A2Z DM, redeems once, and permanently blocks rec
   assert.equal(second.status, 409);
   assert.equal((await second.json()).status, 'already_redeemed');
 
-  const reclaimResponse = await fetch(`${baseUrl}/dev/simulate`, {
+  const unfollowResponse = await fetch(`${baseUrl}/dev/simulate`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ pin: '2468', instagramScopedId: 'ig-http-001', username: 'student', followsBusiness: false }),
   });
-  const reclaim = await reclaimResponse.json();
-  assert.equal(reclaim.status, 'already_redeemed');
-  assert.equal('code' in reclaim, false);
+  const unfollow = await unfollowResponse.json();
+  assert.equal(unfollow.status, 'not_following');
+  assert.equal('code' in unfollow, false);
+
+  const refollowResponse = await fetch(`${baseUrl}/dev/simulate`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ pin: '2468', instagramScopedId: 'ig-http-001', username: 'student', followsBusiness: true }),
+  });
+  const refollow = await refollowResponse.json();
+  assert.equal(refollow.status, 'already_redeemed');
+  assert.equal('code' in refollow, false);
   assert.equal(stderr.includes('internal_error'), false);
 });
