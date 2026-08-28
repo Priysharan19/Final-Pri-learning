@@ -1,6 +1,6 @@
-// Pri Explain V4 · browser-level proof of the visual teaching path.
+// Pri Explain V8 · browser-level proof of the adaptive visual teaching path.
 // This deliberately resolves a real generated question through the normal UI;
-// no test fixture injects a solution or fake handwriting payload.
+// no test fixture injects a solution, diagnosis or fake handwriting payload.
 import { pathToFileURL } from 'node:url';
 
 const TOPIC = 'y7-equations';
@@ -10,7 +10,7 @@ const SUBMIT = { name: 'Submit Answer' };
 
 export const flow = {
   id: 'explain-v2',
-  name: 'Pri Explain V4 · board-style reasoning playback',
+  name: 'Pri Explain V8 · adaptive board-style reasoning playback',
 
   async run({ page, base, check, goto, createProfile, settle }) {
     await goto('/');
@@ -43,9 +43,14 @@ export const flow = {
     await launch.click();
     await page.waitForSelector('.pri-explain-dialog', { timeout: 10000 });
 
-    await check('the V4 board player opens',
-      /Board Mode V4/i.test(await page.locator('.pri-explain-kicker').innerText()),
+    await check('the V8 adaptive board player opens',
+      /V8 adaptive teacher/i.test(await page.locator('.pri-explain-kicker').innerText()),
       `kicker reads ${JSON.stringify(await page.locator('.pri-explain-kicker').innerText())}`);
+
+    const adaptive = page.locator('.pri-explain-adaptive');
+    await check('a real wrong attempt switches the teaching plan to Targeted recovery',
+      await adaptive.count() === 1 && /Targeted recovery/i.test(await adaptive.innerText()),
+      await adaptive.count() ? `adaptive plan reads ${JSON.stringify(await adaptive.innerText())}` : 'adaptive teaching plan missing');
 
     const attempt = page.locator('.pri-v-attempt');
     await check('the player starts by replaying the first wrong attempt', await attempt.count() === 1,
@@ -55,6 +60,13 @@ export const flow = {
         (await attempt.innerText()).includes(FIRST_WRONG) && !(await attempt.innerText()).includes(SECOND_WRONG),
         `attempt replay reads ${JSON.stringify(await attempt.innerText())}`);
     }
+
+    await check('recovery marks the attempt/diagnosis scene as the key teaching step',
+      await page.locator('.pri-explain-key-badge').count() === 1,
+      'the recovery scene was not prioritised');
+    await check('the key teaching step explains its presentation purpose',
+      /your attempt/i.test(await page.locator('.pri-explain-why-step').innerText()),
+      await page.locator('.pri-explain-why-step').count() ? JSON.stringify(await page.locator('.pri-explain-why-step').innerText()) : 'why-this-step cue missing');
 
     const rail = page.locator('.pri-explain-rail button');
     const scenes = await rail.count();
@@ -74,11 +86,21 @@ export const flow = {
       await settle();
       await check('the visual timeline ends on the verified final answer',
         await page.locator('.pri-explain-final').count() === 1);
+      await check('targeted recovery offers a same-concept follow-up question',
+        await page.getByRole('button', { name: 'Try one yourself' }).count() === 1);
     }
 
-    await page.getByRole('button', { name: 'Close visual solution' }).click();
-    await check('closing the player returns to the resolved question',
-      await page.locator('.pri-explain-dialog').count() === 0 && await page.locator('.eval-card').count() === 1);
+    const followUp = page.getByRole('button', { name: 'Try one yourself' });
+    if (await followUp.count()) {
+      await followUp.click();
+      await page.waitForSelector('.q-prompt', { timeout: 20000 });
+      await check('the follow-up returns to a fresh unresolved practice question',
+        await page.locator('.pri-explain-dialog').count() === 0 && await page.locator('.eval-card').count() === 0);
+    } else {
+      await page.getByRole('button', { name: 'Close visual solution' }).click();
+      await check('closing the player returns to the resolved question',
+        await page.locator('.pri-explain-dialog').count() === 0 && await page.locator('.eval-card').count() === 1);
+    }
   }
 };
 
@@ -88,13 +110,8 @@ if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) 
   // `npm run test:e2e` first runs the canonical browser suite, then this focused
   // flow against the exact dist that suite built. The CI coverage gate reads
   // the LAST "E2E SUITE" verdict in browser.log. Without aggregation, this
-  // focused 11-check verdict shadows the canonical 129-check verdict and makes
-  // the gate report 11 < 129 even though both suites passed.
-  //
-  // CI already supplies the canonical floors as E2E_CHECKS/E2E_FLOWS. When
-  // those are present, make this final verdict an aggregate of the canonical
-  // run plus this flow. Outside CI the variables are absent, so a developer
-  // running this file directly still gets its honest standalone 11-check report.
+  // focused verdict shadows the canonical verdict and makes the gate report a
+  // false coverage regression even though both suites passed.
   const baseChecks = Number(process.env.E2E_CHECKS || 0);
   const baseFlows = Number(process.env.E2E_FLOWS || 0);
   const originalLog = console.log;
