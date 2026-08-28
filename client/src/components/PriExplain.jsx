@@ -71,6 +71,7 @@ export default function PriExplain({ questionId, questionPrompt, questionFigure 
   const [open, setOpen] = useState(false);
   const [index, setIndex] = useState(0);
   const [beat, setBeat] = useState(0);
+  const [checkpointPassed, setCheckpointPassed] = useState(false);
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState(1);
   const [voice, setVoice] = useState(false);
@@ -90,8 +91,10 @@ export default function PriExplain({ questionId, questionPrompt, questionFigure 
   const lineCount = current?.lines?.length || 0;
   const revealedLines = reduceMotion ? lineCount : Math.min(beat, lineCount);
   const sceneComplete = reduceMotion || beat >= lineCount;
+  const hasCheckpoint = Boolean(current?.visuals?.some(visual => visual.kind === 'checkpoint'));
+  const checkpointPending = sceneComplete && hasCheckpoint && !checkpointPassed;
   const atEnd = timeline.length > 0 && index === timeline.length - 1;
-  const atFinished = atEnd && sceneComplete;
+  const atFinished = atEnd && sceneComplete && !checkpointPending;
   const visualKinds = useMemo(() => visualSummary(timeline), [timeline]);
 
   const goScene = (nextIndex, revealAll = false) => {
@@ -99,6 +102,7 @@ export default function PriExplain({ questionId, questionPrompt, questionFigure 
     const bounded = Math.max(0, Math.min(nextIndex, timeline.length - 1));
     setIndex(bounded);
     setBeat(revealAll ? (timeline[bounded]?.lines?.length || 0) : 0);
+    setCheckpointPassed(false);
   };
 
   const stepForward = () => {
@@ -107,11 +111,20 @@ export default function PriExplain({ questionId, questionPrompt, questionFigure 
       setBeat(value => Math.min(value + 1, lineCount));
       return;
     }
+    if (checkpointPending) {
+      if (atEnd) setCheckpointPassed(true);
+      else goScene(index + 1, false);
+      return;
+    }
     if (!atEnd) goScene(index + 1, false);
   };
 
   const stepBack = () => {
     if (!current) return;
+    if (checkpointPassed) {
+      setCheckpointPassed(false);
+      return;
+    }
     if (beat > 0 && !reduceMotion) {
       setBeat(value => Math.max(0, value - 1));
       return;
@@ -141,6 +154,7 @@ export default function PriExplain({ questionId, questionPrompt, questionFigure 
     setOpen(false);
     setIndex(0);
     setBeat(0);
+    setCheckpointPassed(false);
     setPlaying(false);
     setVoice(false);
     cancelSpeech();
@@ -166,6 +180,7 @@ export default function PriExplain({ questionId, questionPrompt, questionFigure 
       });
       setIndex(0);
       setBeat(0);
+      setCheckpointPassed(false);
       setPlaying(false);
     };
     window.addEventListener(ATTEMPT_EVENT, receiveAttempt);
@@ -189,6 +204,11 @@ export default function PriExplain({ questionId, questionPrompt, questionFigure 
       return () => clearTimeout(timerRef.current);
     }
 
+    if (checkpointPending) {
+      setPlaying(false);
+      return undefined;
+    }
+
     if (atEnd) {
       setPlaying(false);
       return undefined;
@@ -196,7 +216,7 @@ export default function PriExplain({ questionId, questionPrompt, questionFigure 
 
     timerRef.current = setTimeout(() => goScene(index + 1, false), holdDelay(current) / speed);
     return () => clearTimeout(timerRef.current);
-  }, [open, playing, current, atEnd, index, beat, lineCount, speed, reduceMotion]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [open, playing, current, atEnd, checkpointPending, index, beat, lineCount, speed, reduceMotion]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!open || !voice || !current) return undefined;
@@ -216,13 +236,15 @@ export default function PriExplain({ questionId, questionPrompt, questionFigure 
         setPlaying(false); stepBack();
       } else if (event.key === ' ' && !['BUTTON', 'SELECT', 'INPUT'].includes(event.target?.tagName)) {
         event.preventDefault();
-        if (atFinished) restart(); else setPlaying(value => !value);
+        if (checkpointPending) stepForward();
+        else if (atFinished) restart();
+        else setPlaying(value => !value);
       }
     };
     window.addEventListener('keydown', onKey);
     setTimeout(() => dialogRef.current?.focus(), 0);
     return () => window.removeEventListener('keydown', onKey);
-  }, [open, index, beat, lineCount, atFinished, reduceMotion]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [open, index, beat, lineCount, checkpointPending, checkpointPassed, atFinished, reduceMotion]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => () => cancelSpeech(), []);
 
@@ -230,7 +252,13 @@ export default function PriExplain({ questionId, questionPrompt, questionFigure 
 
   const sceneFraction = lineCount ? Math.min(1, revealedLines / lineCount) : 1;
   const progress = Math.min(100, ((index + sceneFraction) / timeline.length) * 100);
-  const status = atFinished ? 'Complete' : playing ? (beat < lineCount ? 'Writing the next line' : 'Moving to the next step') : 'Paused';
+  const status = checkpointPending
+    ? 'Your turn · predict before continuing'
+    : atFinished
+      ? 'Complete'
+      : playing
+        ? (beat < lineCount ? 'Writing the next line' : 'Moving to the next step')
+        : 'Paused';
   const close = () => {
     setOpen(false); setPlaying(false); cancelSpeech();
     setTimeout(() => launchRef.current?.focus(), 0);
@@ -240,7 +268,7 @@ export default function PriExplain({ questionId, questionPrompt, questionFigure 
     <>
       <style>{STYLES}</style>
       <button ref={launchRef} className="pri-explain-launch no-print" type="button"
-        onClick={() => { setOpen(true); setBeat(0); setPlaying(!reduceMotion); }} aria-haspopup="dialog">
+        onClick={() => { setOpen(true); setBeat(0); setCheckpointPassed(false); setPlaying(!reduceMotion); }} aria-haspopup="dialog">
         <span className="pri-explain-play" aria-hidden="true">▶</span>
         <span><b>Watch explanation</b><small>{visualKinds.length ? 'Animated teacher-style working' : 'Animated worked solution'}</small></span>
       </button>
@@ -321,11 +349,11 @@ export default function PriExplain({ questionId, questionPrompt, questionFigure 
             <footer className="pri-explain-controls">
               <div>
                 <button className="btn btn-ghost btn-sm" type="button" onClick={restart}>↺ Restart</button>
-                <button className="btn btn-ghost btn-sm" type="button" onClick={() => { setPlaying(false); stepBack(); }} disabled={index === 0 && beat === 0}>‹ Back</button>
+                <button className="btn btn-ghost btn-sm" type="button" onClick={() => { setPlaying(false); stepBack(); }} disabled={index === 0 && beat === 0 && !checkpointPassed}>‹ Back</button>
                 <button className="btn btn-primary btn-sm" type="button" onClick={() => {
                   if (atFinished) restart(); else setPlaying(value => !value);
-                }} disabled={reduceMotion}>{reduceMotion ? 'Motion reduced' : playing ? 'Pause' : atFinished ? 'Replay' : 'Play'}</button>
-                <button className="btn btn-ghost btn-sm" type="button" onClick={() => { setPlaying(false); stepForward(); }} disabled={atFinished}>Next ›</button>
+                }} disabled={reduceMotion || checkpointPending}>{checkpointPending ? 'Your turn' : reduceMotion ? 'Motion reduced' : playing ? 'Pause' : atFinished ? 'Replay' : 'Play'}</button>
+                <button className="btn btn-ghost btn-sm" type="button" onClick={() => { setPlaying(false); stepForward(); }} disabled={atFinished}>{checkpointPending ? 'Continue ›' : 'Next ›'}</button>
               </div>
               <div className="pri-explain-settings">
                 <label>Speed<select value={speed} onChange={event => setSpeed(Number(event.target.value))} aria-label="Explanation speed" disabled={reduceMotion}>
