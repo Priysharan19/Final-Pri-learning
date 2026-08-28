@@ -37,6 +37,18 @@
         "marketing/reel/tools/serve.mjs"
       ],
       "port": 4174
+    },
+    {
+      "name": "claim",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "4175",
+        "-d",
+        "marketing/a2z-claim-page"
+      ],
+      "port": 4175
     }
   ]
 }

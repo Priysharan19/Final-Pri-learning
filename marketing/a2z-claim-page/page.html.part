@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0a0a09">
+<meta name="robots" content="noindex">
+<title>Pri Learning · Claim your chocolate</title>
+<meta property="og:title" content="Free chocolate · A2Z × Pri Learning">
+<meta property="og:description" content="One scan, one follow, one chocolate at the A2Z counter.">
+<meta property="og:type" content="website">
+<style>
+/* ───────────────────────────────────────────────────────────────────────────
+   A2Z × Pri Learning · claim page
+   Design system v4 "Dark LaTeX" — every value below is lifted verbatim from
+   client/src/theme.css so this page and the app are the same object. Computer
+   Modern is the real KaTeX face the app ships, inlined because this page is
+   served standalone. To slim the payload, drop the three @font-face blocks and
+   serve the woff2 files instead:
+     @font-face{font-family:'KaTeX_Main';src:url(/fonts/KaTeX_Main-Regular.woff2) format('woff2');font-weight:400;font-display:swap}
+   ─────────────────────────────────────────────────────────────────────────── */
+__FONTS__
+:root{
+  --page:#0a0a09; --surface:#101010; --surface-2:#161615;
+  --hairline:rgba(240,236,224,0.13); --hairline-strong:rgba(240,236,224,0.24); --hairline-faint:rgba(240,236,224,0.07);
+  --ink:#efece1; --ink-2:#b3afa2; --ink-3:#7c796d;
+  --cream:#f4f1e0; --cream-hover:#fffdf2; --cream-ink:#131310;
+  --gold:#c9ad63; --gold-bright:#e3c87e; --gold-soft:rgba(201,173,99,0.12); --gold-border:rgba(201,173,99,0.55);
+  --good:#5aa86c; --good-soft:rgba(90,168,108,0.13);
+  --bad:#cf5f56;
+  --radius:6px; --radius-sm:3px;
+  --font:'KaTeX_Main','Latin Modern Roman','Computer Modern',Georgia,'Times New Roman',serif;
+  --font-mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+  --ease:cubic-bezier(0.22,1,0.36,1);
+  color-scheme:dark;
+}
+*,*::before,*::after{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0; background:var(--page); color:var(--ink);
+  font-family:var(--font); font-size:16px; line-height:1.55;
+  -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
+  padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+main{width:min(430px,100%); margin:0 auto; padding:22px 22px 34px; display:flex; flex-direction:column; min-height:100%}
+a{color:inherit; text-decoration:none}
+::selection{background:rgba(201,173,99,0.32)}
+
+/* header — theme.css .logo / .logo-bb / .logo-name */
+.head{display:flex; align-items:baseline; justify-content:space-between; gap:14px}
+.logo{display:flex; align-items:baseline; gap:1px; user-select:none}
+.logo-bb{font-family:'KaTeX_AMS',var(--font); font-size:21px; line-height:1; font-weight:400}
+.logo-name{font-size:17px; letter-spacing:0.01em; font-weight:500}
+.sc{font-size:10.5px; font-weight:500; text-transform:uppercase; letter-spacing:0.18em; color:var(--ink-3)}
+.rule{height:1px; background:var(--hairline); margin:14px 0 0}
+
+/* the offer — one dominant element, no reading required */
+.kicker{font-size:11px; letter-spacing:0.32em; text-transform:uppercase; color:var(--gold); margin:28px 0 12px}
+h1{margin:0; font-size:54px; line-height:0.98; letter-spacing:-1px; font-weight:700; color:var(--ink)}
+h1 .l2{display:block}
+
+/* the code card — theme.css card: surface + 1px hairline, no resting shadow */
+.card{
+  margin-top:26px; background:var(--surface); border:1px solid var(--hairline);
+  border-radius:var(--radius); padding:18px;
+}
+.label{margin:0 0 10px; font-size:10.5px; font-weight:500; text-transform:uppercase; letter-spacing:0.18em; color:var(--ink-3)}
+.code{
+  margin:0; font-family:var(--font-mono); font-size:21px; font-weight:700; letter-spacing:0.04em;
+  color:var(--ink); word-break:break-word; line-height:1.35;
+  background:var(--surface-2); border:1px solid var(--hairline-faint); border-radius:var(--radius-sm);
+  padding:12px 13px; -webkit-user-select:all; user-select:all;
+}
+.expiry{margin:10px 0 0; font-size:12.5px; color:var(--ink-2); display:flex; align-items:center; gap:7px}
+.expiry.warn{color:var(--gold-bright)}
+.expiry.dead{color:var(--bad)}
+.expiry svg{flex:0 0 auto}
+
+/* actions — one primary, theme.css .btn / .btn-primary / .btn-ghost */
+.btn{
+  display:flex; align-items:center; justify-content:center; gap:9px; width:100%;
+  min-height:52px; padding:14px 20px; border-radius:var(--radius-sm);
+  font-family:inherit; font-size:17px; font-weight:500; letter-spacing:0.01em;
+  border:1px solid transparent; cursor:pointer; text-align:center;
+  transition:background 0.13s var(--ease), border 0.13s var(--ease), color 0.13s var(--ease), transform 0.13s var(--ease);
+}
+.btn:active{transform:scale(0.97)}
+.btn-primary{background:var(--cream); color:var(--cream-ink); border-color:var(--cream); margin-top:16px}
+.btn-ghost{background:none; color:var(--ink); border-color:var(--hairline-strong); margin-top:10px}
+.status{margin:11px 0 0; font-size:13px; line-height:1.45; color:var(--ink-2); min-height:0}
+.status.ok{color:var(--good)}
+.status.err{color:var(--bad)}
+.status:empty{display:none}
+
+/* the flow — four words, not four paragraphs */
+.steps{list-style:none; display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:9px; margin:26px 0 0; padding:0}
+.steps li{border-top:1px solid var(--hairline); padding-top:9px; display:flex; flex-direction:column; gap:3px}
+.steps .n{font-size:11px; color:var(--gold); line-height:1; display:flex; align-items:center; gap:4px; min-height:12px}
+.steps .t{font-size:14px; color:var(--ink-2)}
+.steps li.done{border-top-color:var(--gold-border)}
+.steps li.done .t{color:var(--ink)}
+.steps li.now{border-top-color:var(--ink)}
+.steps li.now .t{color:var(--ink)}
+.hint{margin:14px 0 0; font-size:13.5px; color:var(--ink-2)}
+
+/* everything people don't want to read, folded away */
+details{margin-top:26px; border-top:1px solid var(--hairline); padding-top:14px}
+summary{
+  font-size:13.5px; color:var(--ink-2); cursor:pointer; list-style:none;
+  display:flex; align-items:center; gap:8px; min-height:24px;
+}
+summary::-webkit-details-marker{display:none}
+summary .chev{transition:transform 0.16s var(--ease); color:var(--ink-3)}
+details[open] summary .chev{transform:rotate(90deg)}
+details p{margin:10px 0 0; font-size:13.5px; line-height:1.6; color:var(--ink-2)}
+
+footer{margin-top:auto; padding-top:26px; display:flex; gap:16px; flex-wrap:wrap}
+footer a{font-size:12px; color:var(--ink-2); border-bottom:1px solid var(--hairline); padding-bottom:1px}
+
+@media (max-width:360px){ h1{font-size:46px} .code{font-size:19px} }
+@media (prefers-reduced-motion:reduce){ *{transition:none !important} }
+</style>
+</head>
+<body>
+<main>
+
+  <div class="head">
+    <span class="logo"><span class="logo-bb">P</span><span class="logo-name">ri Learning.</span></span>
+    <span class="sc">A2Z</span>
+  </div>
+  <div class="rule"></div>
+
+  <p class="kicker">No purchase necessary</p>
+  <h1>Free<span class="l2">chocolate.</span></h1>
+
+  <section class="card">
+    <p class="label">Send this code</p>
+    <!-- SERVER: inject the verification message as this element's text, exactly as before.
+         Optionally set data-expires-at to an ISO-8601 timestamp and the countdown
+         below becomes exact; without it the page counts 15 minutes from first view. -->
+    <p id="verification-message" class="code" data-expires-at="">A2Z A2Z-XXXX-XXXX</p>
+    <p class="expiry" id="expiry">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/><path d="M12 7.5V12l3 2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      <span id="expiry-text">Valid for about 15 minutes</span>
+    </p>
+    <button id="copy-open" class="btn btn-primary" type="button">
+      <span id="copy-open-text">Copy code, open Instagram</span>
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 12h13M13 6.5 18.5 12 13 17.5" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <p class="status" id="copy-status" role="status" aria-live="polite"></p>
+  </section>
+
+  <ol class="steps" id="steps">
+    <li><span class="n" data-n="1">1</span><span class="t">Send</span></li>
+    <li><span class="n" data-n="2">2</span><span class="t">Follow</span></li>
+    <li><span class="n" data-n="3">3</span><span class="t">Return</span></li>
+    <li><span class="n" data-n="4">4</span><span class="t">Tick</span></li>
+  </ol>
+  <p class="hint" id="hint">Show the green tick at the counter.</p>
+
+  <a class="btn btn-ghost" id="follow" href="https://www.instagram.com/pri.learning/" rel="noopener noreferrer">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5" stroke="currentColor" stroke-width="1.7"/><circle cx="12" cy="12" r="4.1" stroke="currentColor" stroke-width="1.7"/><circle cx="17.2" cy="6.8" r="1.15" fill="currentColor"/></svg>
+    <span id="follow-text">Follow @pri.learning</span>
+  </a>
+
+  <details>
+    <summary>
+      <svg class="chev" width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 5l7 7-7 7" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Why Instagram?
+    </summary>
+    <p>One chocolate per person. The code ties this scan to your account, so nobody can claim twice. Following is all we ask in return — and the counter tick only appears while you are still following.</p>
+  </details>
+
+  <footer>
+    <a href="/privacy">Privacy</a>
+    <a href="/data-deletion">Data deletion</a>
+    <a href="/terms">Promotion terms</a>
+  </footer>
+
+</main>
+<script>
+(function () {
+  var DM = "https://ig.me/m/pri.learning?ref=pri-a2z-qr-2026";
+  var TTL = 15 * 60 * 1000;
+  var codeEl = document.getElementById('verification-message');
+  var status = document.getElementById('copy-status');
+  var btn = document.getElementById('copy-open');
+  var btnText = document.getElementById('copy-open-text');
+  var expiryText = document.getElementById('expiry-text');
+  var expiryEl = document.getElementById('expiry');
+  var steps = document.getElementById('steps').children;
+  var hint = document.getElementById('hint');
+  var followBtn = document.getElementById('follow');
+  var code = (codeEl.textContent || '').trim();
+  var expired = false;
+
+  // Progress is per-code and local: the page cannot see whether the DM landed,
+  // so it remembers only that this device took the step.
+  var KEY = 'pri-a2z:' + code;
+  function store(k, v) { try { localStorage.setItem(KEY + ':' + k, v); } catch (e) {} }
+  function load(k) { try { return localStorage.getItem(KEY + ':' + k); } catch (e) { return null; } }
+
+  // ── expiry ────────────────────────────────────────────────────────────────
+  var explicit = Date.parse(codeEl.getAttribute('data-expires-at') || '');
+  var deadline;
+  if (!isNaN(explicit)) {
+    deadline = explicit;
+  } else {
+    var first = parseInt(load('seen'), 10);
+    if (!first) { first = Date.now(); store('seen', String(first)); }
+    deadline = first + TTL;
+  }
+  function pad(n) { return n < 10 ? '0' + n : String(n); }
+  function tickClock() {
+    var left = deadline - Date.now();
+    if (left <= 0) {
+      // A dead code makes every other action pointless: the only useful button
+      // left is the one that fetches a fresh one.
+      expired = true;
+      expiryEl.className = 'expiry dead';
+      expiryText.textContent = 'This code has expired';
+      btnText.textContent = 'Get a new code';
+      status.className = 'status';
+      status.textContent = '';
+      return;
+    }
+    var m = Math.floor(left / 60000), s = Math.floor((left % 60000) / 1000);
+    expiryEl.className = 'expiry' + (left < 3 * 60000 ? ' warn' : '');
+    expiryText.textContent = 'Expires in ' + m + ':' + pad(s);
+    setTimeout(tickClock, 1000);
+  }
+  tickClock();
+
+  // ── progress ──────────────────────────────────────────────────────────────
+  var CHECK = '<svg width="11" height="11" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 10.6 8 14.4 16 5.6" stroke="#5aa86c" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  function paint() {
+    var sent = load('sent') === '1';
+    for (var i = 0; i < steps.length; i++) steps[i].className = '';
+    if (sent) {
+      steps[0].className = 'done';
+      steps[0].querySelector('.n').innerHTML = CHECK;
+      steps[1].className = 'now';
+      if (!expired) { btnText.textContent = 'Follow @pri.learning'; }
+      hint.textContent = 'Sent the code? Now follow, then open the claim link in your DM.';
+      document.getElementById('follow-text').textContent = 'Reopen the Instagram DM';
+      followBtn.setAttribute('href', DM);
+    } else {
+      steps[0].className = 'now';
+    }
+  }
+
+  // Primary action. On the first pass it copies and hands off to Instagram; once
+  // the code has been sent it becomes the follow step, which is what is left.
+  btn.addEventListener('click', function () {
+    if (expired) { window.location.reload(); return; }
+    if (load('sent') === '1') { window.location.href = 'https://www.instagram.com/pri.learning/'; return; }
+    var copied = false;
+    function go() {
+      if (copied) {
+        store('sent', '1');
+        status.className = 'status ok';
+        status.textContent = 'Copied. Paste it into the chat and send.';
+        setTimeout(function () { window.location.href = DM; }, 400);
+      } else {
+        // Do not hand off with an empty clipboard — that lands them in Instagram
+        // with nothing to paste.
+        status.className = 'status err';
+        status.textContent = 'Could not copy. Press and hold the code above to copy it, then tap Follow to open Instagram.';
+        try {
+          var r = document.createRange(); r.selectNodeContents(codeEl);
+          var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+        } catch (e) {}
+      }
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(code).then(function () { copied = true; go(); }, function () { legacy(); });
+    } else { legacy(); }
+    function legacy() {
+      var ta = document.createElement('textarea');
+      ta.value = code; ta.setAttribute('readonly', '');
+      ta.style.position = 'fixed'; ta.style.top = '0'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.focus(); ta.select();
+      try { copied = document.execCommand('copy'); } catch (e) {}
+      ta.remove(); go();
+    }
+  });
+
+  paint();
+})();
+</script>
+</body>
+</html>
