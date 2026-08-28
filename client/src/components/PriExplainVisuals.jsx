@@ -5,48 +5,122 @@ import './PriExplainVisuals.css';
 
 const clamp01 = value => Math.max(0, Math.min(1, Number(value) || 0));
 
-function operationLabel(before, after) {
-  const a = String(before || '').toLowerCase(), b = String(after || '').toLowerCase();
-  if (/\\frac|\//.test(b) && !/\\frac|\//.test(a)) return 'divide through';
-  if (/\([^)]*\)\([^)]*\)/.test(b) && !/\([^)]*\)\([^)]*\)/.test(a)) return 'factorise';
-  if (/\\sqrt/.test(b) && !/\\sqrt/.test(a)) return 'take the square root';
-  if ((b.match(/=/g) || []).length && a !== b) return 'preserve equality';
-  if (b.length < a.length) return 'simplify';
-  return 'transform';
+function tokenMotionPlan(diff) {
+  const before = (diff?.before || []).map((token, index) => ({ ...token, index, state: token.changed ? 'leaving' : 'stable' }));
+  const after = (diff?.after || []).map((token, index) => ({ ...token, index, state: token.changed ? 'entering' : 'stable' }));
+  const waitingAfter = new Map();
+  const pairs = [];
+
+  for (const token of after) {
+    if (!token.changed) continue;
+    const bucket = waitingAfter.get(token.text) || [];
+    bucket.push(token.index);
+    waitingAfter.set(token.text, bucket);
+  }
+
+  for (const token of before) {
+    if (!token.changed) continue;
+    const bucket = waitingAfter.get(token.text);
+    if (!bucket?.length) continue;
+    const afterIndex = bucket.shift();
+    token.state = 'moving';
+    after[afterIndex].state = 'moving';
+    const key = `${token.text}-${token.index}-${afterIndex}`;
+    token.motionKey = key;
+    after[afterIndex].motionKey = key;
+    pairs.push({ key, text: token.text, beforeIndex: token.index, afterIndex });
+  }
+
+  return { before, after, pairs };
 }
 
-function TokenStrip({ tokens, label }) {
+function TokenStrip({ tokens, label, phase = 'rest' }) {
   if (!tokens?.length) return null;
   return (
-    <div className="pri-v-tokenstrip" aria-label={label}>
+    <div className={`pri-v-tokenstrip phase-${phase}`} aria-label={label}>
       {tokens.map((token, index) => (
-        <span key={`${index}-${token.text}`} className={token.changed ? 'changed' : 'same'}>{token.text}</span>
+        <span
+          key={`${index}-${token.text}`}
+          className={`state-${token.state || (token.changed ? 'changed' : 'stable')}`}
+          data-motion-key={token.motionKey || undefined}
+        >
+          {token.text}
+        </span>
       ))}
     </div>
   );
 }
 
+function MotionLane({ pairs, active }) {
+  if (!pairs?.length || !active) return null;
+  return (
+    <div className="pri-v-motion-lane" aria-label="Verified terms carried into the next line">
+      <span className="pri-v-motion-label">track the same term</span>
+      <div>
+        {pairs.map((pair, index) => (
+          <b key={pair.key} style={{ '--motion-order': index }}>{pair.text}</b>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function EquationTransform({ visual, progress = 1 }) {
+  const plan = useMemo(() => tokenMotionPlan(visual?.diff), [visual?.diff]);
   if (!visual?.before || !visual?.after) return null;
   const p = clamp01(progress);
-  const showBeforeTokens = p >= 0.16;
-  const showOperation = p >= 0.34;
-  const showAfterTokens = p >= 0.58;
-  const showAfter = p >= 0.72;
+  const showBeforeTokens = p >= 0.12;
+  const activateDeparture = p >= 0.30;
+  const showCue = p >= 0.38;
+  const showMotionLane = p >= 0.40 && p < 0.82;
+  const showAfterTokens = p >= 0.56;
+  const showAfter = p >= 0.74;
+  const completed = p >= 0.92;
   return (
-    <div className="pri-v-transform pri-v-choreographed" data-progress={Math.round(p * 100)} aria-label={`Equation transformation from ${visual.before}${showAfter ? ` to ${visual.after}` : ''}`}>
-      <div className="pri-v-transform-math before"><MathText text={`$${visual.before}$`} /></div>
-      {showBeforeTokens && <TokenStrip tokens={visual.diff?.before} label="Terms before the transformation" />}
-      {showOperation && (
+    <div
+      className={`pri-v-transform pri-v-choreographed ${completed ? 'is-complete' : ''}`}
+      data-progress={Math.round(p * 100)}
+      aria-label={`Equation transformation from ${visual.before}${showAfter ? ` to ${visual.after}` : ''}`}
+    >
+      <div className="pri-v-transform-state">
+        <span className="pri-v-state-label">verified line</span>
+        <div className="pri-v-transform-math before"><MathText text={`$${visual.before}$`} /></div>
+      </div>
+
+      {showBeforeTokens && (
+        <TokenStrip
+          tokens={plan.before}
+          phase={activateDeparture ? 'depart' : 'inspect'}
+          label="Terms in the verified line before the transformation"
+        />
+      )}
+
+      {showCue && (
         <div className="pri-v-transform-arrow" aria-hidden="true">
           <i />
-          <span>{operationLabel(visual.before, visual.after)}</span>
+          <span>track what changes</span>
           <b>↓</b>
         </div>
       )}
-      {showAfterTokens && <TokenStrip tokens={visual.diff?.after} label="Terms after the transformation" />}
-      {showAfter && <div className="pri-v-transform-math after"><MathText text={`$${visual.after}$`} /></div>}
-      {!showAfter && <div className="pri-v-awaiting" aria-hidden="true">next mathematical state</div>}
+
+      <MotionLane pairs={plan.pairs} active={showMotionLane} />
+
+      {showAfterTokens && (
+        <TokenStrip
+          tokens={plan.after}
+          phase={showAfter ? 'arrive' : 'prepare'}
+          label="Terms in the next verified line"
+        />
+      )}
+
+      {showAfter
+        ? (
+          <div className="pri-v-transform-state after-state">
+            <span className="pri-v-state-label">next verified line</span>
+            <div className="pri-v-transform-math after"><MathText text={`$${visual.after}$`} /></div>
+          </div>
+        )
+        : <div className="pri-v-awaiting" aria-hidden="true">building the next verified state</div>}
     </div>
   );
 }
