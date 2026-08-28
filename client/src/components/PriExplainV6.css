@@ -1,0 +1,28 @@
+/* Pri Explain V6 · true position-aware mathematical choreography. */
+
+.pri-v-transform-v6{isolation:isolate}
+.pri-v-flight-layer{position:absolute;inset:0;pointer-events:none;z-index:6;overflow:visible}
+.pri-v-flight-token{position:absolute;display:inline-grid;place-items:center;min-width:24px;min-height:25px;padding:2px 6px;border-radius:6px;border:1px solid var(--gold-border);background:var(--gold-faint);color:var(--ink);font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:.83rem;font-weight:760;box-shadow:0 8px 24px color-mix(in srgb,var(--gold) 16%,transparent);opacity:0;will-change:transform,opacity;animation:priV6TokenFlight .78s var(--flight-delay,460ms) cubic-bezier(.22,.72,.18,1) both}
+.pri-v-transform-v6.has-started .phase-depart>span.state-moving{animation:priV6SourceYield .25s .28s ease forwards}
+.pri-v-transform-v6.has-started .phase-arrive>span.state-moving{opacity:0;animation:priV6DestinationLand .24s var(--landing-delay,1.18s) ease forwards}
+.pri-v-transform-v6 .pri-v-motion-lane{display:none!important}
+.pri-v-position-note{display:flex;align-items:center;justify-content:center;gap:8px;min-height:24px;color:var(--ink-3);font-size:8px;font-weight:800;letter-spacing:.13em;text-transform:uppercase;opacity:0}
+.pri-v-transform-v6.has-started .pri-v-position-note{animation:priExplainVisualIn .22s .48s ease both}
+.pri-v-position-note:before,.pri-v-position-note:after{content:"";height:1px;flex:1;max-width:72px;background:linear-gradient(90deg,transparent,var(--hairline-strong))}
+.pri-v-position-note:after{background:linear-gradient(90deg,var(--hairline-strong),transparent)}
+
+.pri-v-figure-v6 .pri-v-figure-inner{position:relative}
+.pri-v-figure-v6 .pri-v-figure-inner svg [data-pri-choreo]{transition:opacity .08s linear,filter .12s linear;transform-box:fill-box;transform-origin:center;will-change:opacity,stroke-dashoffset,transform}
+.pri-v-figure-v6 .pri-v-figure-inner svg text[data-pri-choreo]{transition:opacity .14s ease}
+.pri-v-figure-v6 .pri-v-figure-inner svg circle[data-pri-choreo],.pri-v-figure-v6 .pri-v-figure-inner svg ellipse[data-pri-choreo],.pri-v-figure-v6 .pri-v-figure-inner svg rect[data-pri-choreo]{transition:opacity .1s linear,transform .16s ease}
+.pri-v-figure-sequence{display:flex;justify-content:center;gap:6px;flex-wrap:wrap;margin-top:8px}
+.pri-v-figure-sequence span{padding:4px 7px;border:1px solid var(--hairline);border-radius:999px;color:var(--ink-3);font-size:8px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;background:color-mix(in srgb,var(--surface-3) 70%,transparent)}
+.pri-v-figure-sequence span.active{border-color:var(--gold-border);color:var(--gold-bright);background:var(--gold-faint)}
+
+@keyframes priV6TokenFlight{0%{opacity:0;transform:translate3d(0,0,0) scale(.9)}12%{opacity:1}58%{opacity:1;transform:translate3d(var(--flight-mid-x),var(--flight-mid-y),0) scale(1.08)}100%{opacity:0;transform:translate3d(var(--flight-dx),var(--flight-dy),0) scale(1)}}
+@keyframes priV6SourceYield{from{opacity:1;transform:none}to{opacity:.12;transform:scale(.9)}}
+@keyframes priV6DestinationLand{from{opacity:0;transform:scale(.84);filter:blur(.3px)}to{opacity:1;transform:none;filter:none}}
+
+@media(max-width:720px){.pri-v-flight-token{font-size:.76rem;min-width:21px;padding:2px 5px}.pri-v-position-note:before,.pri-v-position-note:after{max-width:38px}.pri-v-figure-sequence{gap:4px}.pri-v-figure-sequence span{font-size:7px;padding:3px 5px}}
+
+@media(prefers-reduced-motion:reduce){.pri-v-flight-layer{display:none!important}.pri-v-transform-v6.has-started .phase-depart>span.state-moving,.pri-v-transform-v6.has-started .phase-arrive>span.state-moving{animation:none!important;opacity:1!important;transform:none!important;filter:none!important}.pri-v-position-note{opacity:1!important;animation:none!important}.pri-v-figure-v6 .pri-v-figure-inner svg [data-pri-choreo]{opacity:1!important;stroke-dashoffset:0!important;transform:none!important;transition:none!important}}

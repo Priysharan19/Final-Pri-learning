@@ -1,4 +1,4 @@
-// Pri Explain V3 · deterministic visual renderer + verified storyboard compiler.
+// Pri Explain V4 · deterministic visual renderer + verified storyboard compiler.
 // Marking owns correctness. This layer accepts presentation instructions only
 // after storyboard.js proves every mathematical reference came from the
 // verified solution payload.
@@ -70,8 +70,43 @@ function duration(scene) {
   return Math.max(3500, Math.min(10500, 2600 + chars * 23 + visualBonus));
 }
 
-function splitLines(value) {
-  return String(value || '').split(/\n+/).map(v => v.trim()).filter(Boolean);
+// Turn teacher-authored prose into animation beats without rewriting it. We only
+// split at explicit newlines or sentence boundaries OUTSIDE $...$ maths, so a
+// decimal, LaTeX expression or verified equation can never be fragmented into
+// a different mathematical statement by the presentation layer.
+export function teachingBeats(value) {
+  const text = String(value || '').trim();
+  if (!text) return [];
+
+  const beats = [];
+  let current = '';
+  let inMath = false;
+
+  const flush = () => {
+    const beat = current.trim();
+    if (beat) beats.push(beat);
+    current = '';
+  };
+
+  for (let index = 0; index < text.length; index++) {
+    const ch = text[index];
+    const escaped = index > 0 && text[index - 1] === '\\';
+    if (ch === '$' && !escaped) inMath = !inMath;
+
+    if (!inMath && ch === '\n') {
+      flush();
+      continue;
+    }
+
+    current += ch;
+    if (inMath || !/[.!?]/.test(ch)) continue;
+
+    const next = text[index + 1] || '';
+    if (!next || /\s/.test(next)) flush();
+  }
+
+  flush();
+  return beats;
 }
 
 function cleanAttempt(attempt) {
@@ -96,7 +131,7 @@ export function buildDeterministicStoryboard(solution, context = {}) {
 
   if (!context.revealed && (context.correct === false || context.hadWrongAttempt || wrongAttempt) && (context.feedback || wrongAttempt)) {
     const heading = context?.diagnosis?.message || context?.diagnosis?.note || 'Find the exact point the working changes direction';
-    const lines = splitLines(context.feedback || 'Compare your working with the verified path before changing the next line.');
+    const lines = teachingBeats(context.feedback || 'Compare your working with the verified path before changing the next line.');
     scenes.push({
       id: 'diagnosis',
       heading,
@@ -111,7 +146,7 @@ export function buildDeterministicStoryboard(solution, context = {}) {
   for (const [stepIndex, step] of (solution?.steps || []).entries()) {
     const heading = String(step?.h || `Step ${stepIndex + 1}`);
     const detail = String(step?.d || '');
-    const lines = splitLines(detail);
+    const lines = teachingBeats(detail);
     const maths = extractMath(detail);
     const after = maths.length ? maths[maths.length - 1] : null;
     const before = previous && after && previous !== after ? previous : (maths.length > 1 ? maths[0] : null);
