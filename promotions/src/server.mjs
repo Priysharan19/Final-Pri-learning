@@ -264,12 +264,19 @@ async function processInstagramPayload(payload) {
     const claim = await issueForInstagramIdentity({ campaign, senderId: message.senderId, profile });
     const reply = claim.status === 'already_redeemed'
       ? `This ${campaign.reward_label} has already been redeemed for this A2Z campaign. Re-scanning, unfollowing, or following again cannot create another reward for the same Instagram identity.`
-      : `A2Z verified. When you are physically at the counter, open ${config.publicBaseUrl}/claim/${encodeURIComponent(claim.code)} and tap “Show live green tick”. The shopkeeper only needs to see the live green screen. Your one-time backup code is ${claim.code}.`;
+      : `A2Z verified. Follow @${config.instagramUsername}, then when you are physically at the counter open ${config.publicBaseUrl}/claim/${encodeURIComponent(claim.code)} and tap “Verify follow & show green tick”. The green tick appears only if Instagram confirms this account is currently following @${config.instagramUsername}. Your one-time backup code is ${claim.code}.`;
     await sendToInstagram(message.senderId, reply);
   }
 }
 
 async function currentFollowStateForClaim(claim) {
+  // Tests/development use the simulated stored relationship state. Production
+  // deliberately does NOT fall back to cached data: a green tick requires a
+  // fresh Meta confirmation at the moment of redemption.
+  if (!config.isProduction) {
+    return claim.follows_business == null ? null : claim.follows_business === 1;
+  }
+
   try {
     const profile = await fetchInstagramProfile({
       scopedId: claim.instagram_scoped_id,
@@ -286,11 +293,11 @@ async function currentFollowStateForClaim(claim) {
   } catch (error) {
     console.error(JSON.stringify({
       level: 'warn',
-      event: 'customer_redeem_profile_lookup_failed_nonblocking',
+      event: 'customer_redeem_profile_lookup_failed_closed',
       subject: subjectRef(claim.instagram_scoped_id),
       message: error.message,
     }));
-    return claim.follows_business == null ? null : claim.follows_business === 1;
+    return null;
   }
 }
 
@@ -359,16 +366,30 @@ const server = http.createServer(async (req, res) => {
       }
 
       const currentFollowState = await currentFollowStateForClaim(claim);
+      const serverTime = new Date().toISOString();
+
+      // Fail closed. The claim remains unredeemed and the counter does not move
+      // unless a fresh/current follow state is positively verified.
+      if (currentFollowState !== true) {
+        const status = currentFollowState === false ? 'follow_required' : 'follow_check_unavailable';
+        const httpStatus = currentFollowState === false ? 403 : 503;
+        return json(res, httpStatus, {
+          status,
+          currentFollowState,
+          redemptionCount: campaignRedemptionCount(claim.campaign_id),
+          serverTime,
+        });
+      }
+
       const result = store.redeemByCodeHash({
         codeHash: hashClaimCode(config.claimSecret, code),
         subjectRef: `customer:${subjectRef(claim.instagram_scoped_id)}`,
       });
       const redemptionCount = campaignRedemptionCount(claim.campaign_id);
-      const serverTime = new Date().toISOString();
       if (result.status === 'redeemed') {
         return json(res, 200, {
           ...result,
-          currentFollowState,
+          currentFollowState: true,
           redemptionCount,
           serverTime,
         });
@@ -376,7 +397,7 @@ const server = http.createServer(async (req, res) => {
       if (result.status === 'already_redeemed') {
         return json(res, 409, {
           ...result,
-          currentFollowState,
+          currentFollowState: true,
           redemptionCount,
           serverTime,
         });
@@ -451,7 +472,12 @@ const server = http.createServer(async (req, res) => {
       if (!safeEqualText(body.pin, config.staffPin)) return json(res, 403, { error: 'invalid_staff_pin' });
       const senderId = String(body.instagramScopedId || `dev-${Date.now()}`);
       const campaign = store.getCampaign(config.campaignId);
-      const profile = { id: senderId, username: body.username ?? 'demo_user', name: body.name ?? 'Demo User', followsBusiness: typeof body.followsBusiness === 'boolean' ? body.followsBusiness : null };
+      const profile = {
+        id: senderId,
+        username: body.username ?? 'demo_user',
+        name: body.name ?? 'Demo User',
+        followsBusiness: typeof body.followsBusiness === 'boolean' ? body.followsBusiness : null,
+      };
       const claim = await issueForInstagramIdentity({ campaign, senderId, profile });
       return json(res, 200, claim);
     }
