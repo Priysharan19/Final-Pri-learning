@@ -1,5 +1,6 @@
 name: Pri Reason
 
+# Permanent precision gate for Pri Reason V1-V3 and authored curriculum rollout.
 on:
   pull_request:
     paths:
@@ -8,10 +9,12 @@ on:
       - 'client/src/engine/reason.js'
       - 'client/src/engine/reason-v2.js'
       - 'client/src/engine/reason-v2-safe.js'
+      - 'client/src/engine/reason-v3.js'
       - 'client/src/engine/diagnose.js'
       - 'client/src/engine/expr.js'
       - 'client/test/pri-reason-check.mjs'
       - 'client/test/pri-reason-v2-check.mjs'
+      - 'client/test/pri-reason-v3-check.mjs'
       - 'client/test/pri-reason-curriculum-check.mjs'
       - 'client/src/engine/generators/year11.js'
       - 'client/src/engine/generators/india-algebra.js'
@@ -26,10 +29,12 @@ on:
       - 'client/src/engine/reason.js'
       - 'client/src/engine/reason-v2.js'
       - 'client/src/engine/reason-v2-safe.js'
+      - 'client/src/engine/reason-v3.js'
       - 'client/src/engine/diagnose.js'
       - 'client/src/engine/expr.js'
       - 'client/test/pri-reason-check.mjs'
       - 'client/test/pri-reason-v2-check.mjs'
+      - 'client/test/pri-reason-v3-check.mjs'
       - 'client/test/pri-reason-curriculum-check.mjs'
       - 'client/src/engine/generators/year11.js'
       - 'client/src/engine/generators/india-algebra.js'
@@ -54,7 +59,9 @@ jobs:
         run: node client/test/pri-reason-check.mjs
       - name: Pri Reason V2 safety gate
         run: node client/test/pri-reason-v2-check.mjs
-      - name: Pri Reason V2 curriculum integration gate
+      - name: Pri Reason V3 proof-plan and domain gate
+        run: node client/test/pri-reason-v3-check.mjs
+      - name: Pri Reason authored curriculum integration gate
         run: node client/test/pri-reason-curriculum-check.mjs
       - name: Existing diagnosis regression gate
         run: node client/test/diagnose-check.mjs

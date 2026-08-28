@@ -31,9 +31,35 @@ for (const difficulty of [1, 2]) {
   same(`Year 11 differentiation D${difficulty} diagnosis`, r.diagnosis?.code, 'derivative-error');
 }
 
-for (const difficulty of [3, 4]) {
-  const q = year11['y11-diff'](makeRng(0x521100 + difficulty), difficulty);
-  ok(`Year 11 differentiation D${difficulty} stays outside single-operation metadata`, !q.stepcheck);
+{
+  const q = year11['y11-diff'](makeRng(0x521103), 3);
+  same('Year 11 differentiation D3 uses proof plan', q.stepcheck?.kind, 'plan');
+  same('Year 11 differentiation D3 has two authored stages', q.stepcheck?.stages?.length, 2);
+  const [derivative, evaluation] = q.stepcheck.stages;
+  same('Year 11 differentiation D3 stage 1 derivative', derivative.kind, 'derivative');
+  same('Year 11 differentiation D3 stage 2 evaluation', evaluation.kind, 'evaluation');
+  let r = stepCheck(q.stepcheck, `dy/dx = ${derivative.canonical}\nm = ${evaluation.expected}`);
+  same('Year 11 differentiation D3 full plan has no break', r.firstBreak, -1);
+  same('Year 11 differentiation D3 completes both stages', r.completedStages, 2);
+  r = stepCheck(q.stepcheck, `dy/dx = ${derivative.canonical}\nm = ${evaluation.expected + 1}`);
+  same('Year 11 differentiation D3 wrong substitution breaks', r.firstBreak, 1);
+  same('Year 11 differentiation D3 wrong substitution diagnosis', r.diagnosis?.code, 'substitution-error');
+}
+
+{
+  const q = year11['y11-diff'](makeRng(0x521104), 4);
+  same('Year 11 differentiation D4 uses proof plan', q.stepcheck?.kind, 'plan');
+  same('Year 11 differentiation D4 has four authored stages', q.stepcheck?.stages?.length, 4);
+  const [derivative, equation, evaluation, point] = q.stepcheck.stages;
+  const x = equation.solutions[0];
+  const working = `dy/dx = ${derivative.canonical}\n${equation.source}\nx = ${x}\ny = ${evaluation.expected}\n(${point.x}, ${point.y})`;
+  let r = stepCheck(q.stepcheck, working);
+  same('Year 11 differentiation D4 full plan has no break', r.firstBreak, -1);
+  same('Year 11 differentiation D4 completes all stages', r.completedStages, 4);
+  ok('Year 11 differentiation D4 full plan lines verify', r.lines.every(line => line.status === 'ok'));
+  r = stepCheck(q.stepcheck, `dy/dx = ${derivative.canonical}\n${equation.source}\nx = ${x}\ny = ${evaluation.expected + 1}`);
+  same('Year 11 differentiation D4 wrong y breaks', r.firstBreak, 3);
+  same('Year 11 differentiation D4 wrong y diagnosis', r.diagnosis?.code, 'substitution-error');
 }
 
 for (const difficulty of [1, 2]) {
