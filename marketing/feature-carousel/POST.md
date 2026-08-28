@@ -4,8 +4,8 @@ Two cuts of the same post, covering the five headline features: AI handwriting
 recognition, examiner-style instant marking, every level from boards to JEE Advanced,
 all of Class 7–12, and an unlimited question bank.
 
-- **`out/00-all-in-one.png`** — the post: the marked-ink demonstration, with the five
-  capabilities beneath it in one line.
+- **`out/00-all-in-one.png`** — the post: the marked-ink demonstration over a six-tile
+  grid carrying the rest of the product.
 - **`out/01`–`07`** — the seven-slide carousel, one feature per slide with its figure.
 
 Register follows `ad/docs/COPY.md`: Indian English, dry and confident, no exclamation
@@ -24,11 +24,14 @@ node marketing/feature-carousel/build.mjs && node marketing/feature-carousel/ren
 
 ## The single slide — this is the post
 
-`out/00-all-in-one.png`. It leads with the thing that sells Pri: a student's own
-handwriting with the ticks landing on it, the wrong line flagged, and the mistake named
-in the margin. A feature list cannot do that — it explains where the demonstration
-persuades — so the five capabilities sit under the hero as one quiet line and the
-measured figures move to the caption, where a reader who wants them will look.
+`out/00-all-in-one.png`. It leads with the thing that sells Pri — a student's own
+handwriting with the ticks landing on it, the wrong line flagged, the mistake named in the
+margin — and then carries the whole product underneath it in a six-tile grid. The hero
+persuades; the grid answers "what else does it do?" before the reader has to ask. The
+measured figures move to the caption, where anyone who wants a number will look.
+
+The six tiles: **AI recognition · Instant marking · Every level · Every class ·
+Unlimited (premium) · Exam ready**.
 
 | Field | Value |
 |---|---|
@@ -50,23 +53,29 @@ on a pricing slide of its own.
 > sign."
 >
 > Class 7 to Class 12. Boards, JEE Main, JEE Advanced, Olympiad. Questions built from a
-> seed rather than drawn from a pool, so the practice does not run out.
+> seed rather than drawn from a pool, so the practice does not run out. Timed mock papers
+> with criteria marking, and a percentile predicted from your own practice.
+>
+> Unlimited on premium: every track, every class, no daily cap.
 >
 > Join the change. Follow @pri.learning — coming soon. 🔔
 >
 > —
 > Recognition measured at 98.4% of characters on held-out writer tests (simulated writers,
 > 560 lines, worst single hand 71%). 3,44,798 distinct questions counted at 3,000 draws per
-> chapter-difficulty cell.
+> chapter-difficulty cell. Predicted percentile is an estimate from your practice data, not
+> a guarantee of results.
 
 ### Single-slide alt text
 
-> A dark slide headed "Marked like an examiner." Below it, a card showing three lines of
-> handwritten quadratic working: the first two carry green ticks and method marks, the
-> third — x = −1 or x = 5 — is tinted red with a cross, and a margin note reads "Line 3 —
-> you keep flipping the sign taking the root across. 2 of 3 marks." Under the card: reads
-> your handwriting, marks every line, never runs out; Class 7 to Class 12, boards to JEE
-> Advanced, Olympiad. Signed Pri Learning, Join the change, @pri.learning — coming soon.
+> A dark slide headed "Your handwriting, marked. Your syllabus, mapped. Your practice,
+> endless." Below it, a card showing three lines of handwritten quadratic working: the
+> first two carry green ticks and method marks, the third — x = −1 or x = 5 — is tinted
+> red with a cross, and a margin note reads "Line 3 — you keep flipping the sign. 2 of 3
+> marks." Under the card, six tiles: AI recognition, reads your Pencil on device; instant
+> marking, graded like a teacher; every level, boards to JEE Advanced; every class, 7 to
+> 12; unlimited on premium; exam ready, mocks and predicted percentile. Signed Pri
+> Learning, Join the change, @pri.learning — coming soon.
 
 ## Upload spec
 
@@ -84,7 +93,7 @@ the bottom ~6%, so nothing collides with Instagram's caption gradient.
 
 | # | File | Says |
 |---|---|---|
-| — | `00-all-in-one` | **The single-image post — marked-ink hero, capabilities under it** |
+| — | `00-all-in-one` | **The single-image post — marked-ink hero over a six-tile feature grid** |
 | 1 | `01-cover` | Write the maths. It marks the maths. |
 | 2 | `02-recognition` | **AI recognition** — on-device CNN, 56 symbols, 98.4% chars |
 | 3 | `03-marking` | **Instant feedback** — ✓/✗ on your own ink, method marks, misconception named |
@@ -160,10 +169,17 @@ Every number on a slide, with the command that produced it. Re-run before repost
 these move whenever a generator or the model changes, and a date has never once caught a
 stale figure (README, "Measured accuracy").
 
-The **single slide carries no numbers at all** — its claims are qualitative and each is
-true on its face ("reads your handwriting", "marks every line", "never runs out"). The
-figures live in its caption instead, with their n attached; the table below is what backs
-them either way.
+The **single slide carries no numbers at all** — every tile is qualitative and true on its
+face. Two wordings on it were chosen deliberately and should not drift:
+
+- **"It never runs out"**, not *never repeats*. The thinnest (subtopic × difficulty) cell
+  holds 54 distinct questions, so a hard-working student does eventually see one twice.
+  "Never runs out" is the claim the census supports; "never repeats" is not.
+- **"predicted percentile"**, not *predicted rank* — the app predicts a percentile with a
+  confidence band, and the caption carries the estimate-not-a-guarantee line the reel uses.
+
+The figures live in the caption instead, with their n attached; the table below backs them
+either way.
 
 | Slide | Claim | Source |
 |---|---|---|

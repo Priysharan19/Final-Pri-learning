@@ -205,61 +205,63 @@ p.body b{color:${T.ink};font-weight:400}
 .glyphs .row span:nth-child(n+15){color:${T.ink2}}
 
 /* ── the all-in-one slide ─────────────────────────────────────────────── */
-/* The hero is the marked ink, not a feature list: what sells this product is
-   watching a tick land on your own handwriting. Everything else is one line. */
-.lede{font-size:33px;line-height:1.44;color:${T.ink2};margin-top:26px;max-width:880px}
-.lede b{color:${T.ink};font-weight:400}
-
+/* The hero is the marked ink — the one thing no formula sheet can do — and the
+   grid under it carries the rest of the product without turning into a list. */
 .hero{
   border:1px solid ${T.hairStrong};border-radius:6px;background:${T.surface};
-  padding:32px 36px 30px;margin-top:34px;
-  box-shadow:0 30px 70px rgba(0,0,0,0.55);
+  padding:26px 32px 24px;margin-top:30px;
+  box-shadow:0 26px 60px rgba(0,0,0,0.55);
 }
 .hero .cap{
-  font-size:19px;text-transform:uppercase;letter-spacing:0.18em;color:${T.ink3};
-  display:flex;justify-content:space-between;margin-bottom:22px;
+  font-size:18px;text-transform:uppercase;letter-spacing:0.17em;color:${T.ink3};
+  display:flex;justify-content:space-between;margin-bottom:16px;
 }
 .hero .cap .live{color:${T.gold}}
 .hero .l{
-  display:flex;align-items:center;gap:22px;padding:14px 0;
+  display:flex;align-items:center;gap:20px;padding:11px 0;
   border-bottom:1px solid ${T.hairFaint};
 }
 .hero .l.wrong{
   background:linear-gradient(90deg, rgba(207,95,86,0.10), transparent 78%);
-  margin:0 -36px;padding-left:36px;padding-right:36px;
+  margin:0 -32px;padding-left:32px;padding-right:32px;
 }
 .hero .l:last-of-type{border-bottom:none}
 .hero .w{
-  font-family:${HAND};font-size:58px;line-height:1;color:${T.ink};
+  font-family:${HAND};font-size:50px;line-height:1;color:${T.ink};
   flex:1;letter-spacing:0.5px;
 }
 .hero .m{
-  font-size:21px;letter-spacing:0.14em;text-transform:uppercase;color:${T.ink3};
-  width:96px;text-align:right;
+  font-size:19px;letter-spacing:0.14em;text-transform:uppercase;color:${T.ink3};
+  width:84px;text-align:right;
 }
-.hero .v{font-size:44px;width:50px;text-align:center;color:${T.good}}
+.hero .v{font-size:38px;width:46px;text-align:center;color:${T.good}}
 .hero .v.no{color:${T.bad}}
 .hero .said{
-  margin-top:24px;padding-left:22px;border-left:2px solid ${T.bad};
-  font-size:29px;line-height:1.38;color:${T.ink2};
+  margin-top:17px;padding-left:20px;border-left:2px solid ${T.bad};
+  font-size:26px;line-height:1.36;color:${T.ink2};
 }
 .hero .said b{color:${T.ink};font-weight:400}
 
-.chips{
-  margin-top:34px;font-size:29px;line-height:1.62;color:${T.ink2};
-  max-width:900px;
+.tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:13px;margin-top:26px}
+.tile{
+  border:1px solid ${T.hair};border-radius:6px;background:${T.surface};
+  padding:19px 19px 20px;
 }
-.chips b{color:${T.ink};font-weight:400}
-.chips i{font-style:normal;color:${T.gold};margin:0 14px}
+.tile .k{
+  font-size:17px;text-transform:uppercase;letter-spacing:0.15em;color:${T.gold};
+  display:block;
+}
+.tile .d{font-size:22px;line-height:1.31;letter-spacing:-0.2px;color:${T.ink};margin-top:10px}
+.tile .d small{display:block;font-size:19px;color:${T.ink3};margin-top:6px;line-height:1.28}
 
 .signoff{
-  margin-top:32px;padding-top:26px;border-top:1px solid ${T.hairFaint};
+  margin-top:28px;padding-top:24px;border-top:1px solid ${T.hairFaint};
   width:100%;display:flex;align-items:baseline;justify-content:space-between;
 }
-.signoff .mark{font-size:34px;color:${T.ink}}
+.signoff .mark{font-size:33px;color:${T.ink}}
 .signoff .mark .P{font-family:'KaTeX_AMS',${SERIF}}
-.signoff .mark em{font-style:normal;color:${T.gold};margin-left:22px}
-.signoff .handle{font-size:24px;color:${T.ink3};letter-spacing:0.02em}
+.signoff .mark em{font-style:normal;color:${T.gold};margin-left:20px}
+.signoff .handle{font-size:23px;color:${T.ink3};letter-spacing:0.02em}
 
 /* ── cover / CTA ──────────────────────────────────────────────────────── */
 .cover{justify-content:center;align-items:flex-start;padding:96px 88px 76px}
@@ -309,20 +311,27 @@ const SLIDES = [
   // claims table covers both.
   ['00-all-in-one', 'Everything', `<div class="slide">
     ${head('Pri Learning')}
-    <h1 style="font-size:88px;margin-top:28px;letter-spacing:-1.3px">Marked like<br>an <em>examiner</em>.</h1>
-    <div class="lede">You write with the Pencil, as you would on paper. Pri reads every
-      line, awards the method marks, and <b>names the mistake</b>.</div>
+    <h1 style="font-size:62px;margin-top:24px;letter-spacing:-0.9px;line-height:1.08">Your handwriting, <em>marked</em>.<br>Your syllabus, <em>mapped</em>.<br>Your practice, <em>endless</em>.</h1>
     <div class="hero">
       <div class="cap"><span>Class 10 · Quadratic equations</span><span class="live">Marked on device</span></div>
       <div class="l"><span class="w">x<sup>2</sup> + 6x + 5 = 0</span><span class="m">M1</span><span class="v">✓</span></div>
       <div class="l"><span class="w">(x + 3)<sup>2</sup> − 9 + 5 = 0</span><span class="m">M1</span><span class="v">✓</span></div>
       <div class="l wrong"><span class="w">x = −1  or  x = 5</span><span class="m">A1</span><span class="v no">✗</span></div>
-      <div class="said">Line 3 — <b>you keep flipping the sign</b> taking the root across.
-        2 of 3 marks.</div>
+      <div class="said">Line 3 — <b>you keep flipping the sign</b>. 2 of 3 marks.</div>
     </div>
-    <div class="chips">
-      <b>Reads your handwriting</b><i>·</i><b>Marks every line</b><i>·</i><b>Never runs out</b><br>
-      <b>Class 7 to Class 12</b><i>·</i><b>Boards to JEE Advanced</b><i>·</i><b>Olympiad</b>
+    <div class="tiles">
+      <div class="tile"><span class="k">AI recognition</span>
+        <div class="d">Reads your Pencil<small>Every symbol, on device. No upload, no account.</small></div></div>
+      <div class="tile"><span class="k">Instant marking</span>
+        <div class="d">Graded like a teacher<small>Line by line, method marks, the mistake named.</small></div></div>
+      <div class="tile"><span class="k">Every level</span>
+        <div class="d">Boards → JEE Advanced<small>CBSE, JEE Main, Advanced, Olympiad. Four tiers.</small></div></div>
+      <div class="tile"><span class="k">Every class</span>
+        <div class="d">Class 7 to Class 12<small>Every NCERT chapter, mapped line by line.</small></div></div>
+      <div class="tile"><span class="k">Unlimited · premium</span>
+        <div class="d">It never runs out<small>Built from a seed, not drawn from a pool.</small></div></div>
+      <div class="tile"><span class="k">Exam ready</span>
+        <div class="d">Mocks &amp; percentile<small>Timed papers, criteria marking, predicted percentile.</small></div></div>
     </div>
     <div class="spacer"></div>
     <div class="signoff">
