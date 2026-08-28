@@ -97,4 +97,6 @@ check('V7 visual progress is bounded, monotonic and reduced-motion complete', ()
   assert.equal(visualCueState(cue, 0, true), 'done');
 });
 
+await import('./pri-explain-v8-check.mjs');
+
 if (!process.exitCode) console.log(`PRI EXPLAIN V6/V7 CHOREOGRAPHY PASSED — ${checks}/${checks} checks`);
