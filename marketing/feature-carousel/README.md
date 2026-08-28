@@ -1,13 +1,14 @@
 # Five-feature carousel — Instagram
 
-Seven 4:5 slides covering what the app does: on-device handwriting recognition,
+One all-in-one 4:5 slide, plus a seven-slide carousel, covering what the app does: on-device handwriting recognition,
 examiner-style marking, boards → JEE Advanced, Class 7–12, and the unlimited bank.
 
 | File | What it is |
 |---|---|
 | `build.mjs` | Builds the slides. **Edit this, never the generated HTML.** |
 | `render.mjs` | Shoots `out/*.png` at 2160×2700 with the client's Playwright Chromium. |
-| `slides/*.html` | Generated — one file per slide, 1080×1350. |
+| `slides/00-all-in-one.html` | Generated — **the single-image version**: all five features on one slide. |
+| `slides/*.html` | Generated — one file per carousel slide, 1080×1350. |
 | `preview.html` | Generated — all seven at 40% to check the set as a set. |
 | `POST.md` | Caption, hashtags, alt text, upload spec and the claims checklist. |
 | `out/` | Rendered PNGs (git-ignored — rebuild them). |
