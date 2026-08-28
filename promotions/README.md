@@ -5,23 +5,26 @@ This is a deliberately isolated online service for physical-store promotions. It
 ## Customer flow
 
 1. The printed QR opens `GET /c/a2z`.
-2. The customer follows `@pri.learning`.
-3. The page opens a tracked Instagram DM link for `@pri.learning` with `ref=pri-a2z-qr-2026`.
-4. Meta can deliver that campaign value through the `messaging_referral` webhook; the service stores the Instagram-scoped identity → A2Z attribution.
-5. The customer sends `A2Z` to complete the messaging interaction.
-6. The service fetches the Instagram user profile and requires `is_user_follow_business === true` before a claim can be issued.
-7. A claim code is issued only when the same Instagram-scoped identity has both the verified A2Z referral and a verified follow. Knowing or sharing the keyword alone is not enough.
-8. A2Z staff redeems the code once at `GET /staff`.
-9. After redemption, the same Instagram-scoped identity can never receive another reward for the A2Z campaign, even if it later unfollows and follows again.
+2. The page opens a tracked Instagram DM link for `@pri.learning` with `ref=pri-a2z-qr-2026`.
+3. Meta can deliver that campaign value through the `messaging_referral` webhook; the service stores the Instagram-scoped identity → A2Z attribution.
+4. The customer sends `A2Z` to complete the messaging interaction.
+5. A claim code is issued only if that same Instagram-scoped identity has the verified A2Z referral and has not already redeemed the campaign. Knowing or sharing the keyword alone is not enough.
+6. A2Z staff redeems the code once at `GET /staff`.
+7. After redemption, the same Instagram-scoped identity can never receive another reward for the A2Z campaign.
+8. The customer may choose to follow `@pri.learning`, but following is optional and does not affect reward eligibility.
 
-The QR referral proves that the Instagram conversation entered through the A2Z campaign. The follow check proves that the same Instagram identity currently follows `@pri.learning` when the claim is created. Instagram does not provide a reliable way to prove that the act of following itself was caused by the QR code, so the system combines campaign attribution + current follow verification.
+The QR referral proves that the Instagram conversation entered through the A2Z campaign. The Instagram-scoped sender identity is the durable campaign identity used for one-time redemption. The service may observe the follow-relationship signal Meta exposes for a messaging participant, but that signal is optional engagement information only and is not used as the condition for the reward.
+
+## Why the reward is not follow-gated
+
+The production flow intentionally does **not** exchange a toffee or other item of value for a follow. Meta's spam/engagement policies restrict exchanging things of monetary value for engagement such as follows. Keeping the reward tied to the tracked A2Z campaign interaction rather than to the follow makes the promotion materially safer for public Instagram use and App Review. The landing page can still invite customers to visit and follow `@pri.learning` voluntarily.
 
 ## Integrity and security
 
 - Unique `(campaign_id, instagram_scoped_id)` database constraint.
 - Tracked `ig.me` campaign referral is required for production eligibility; the public keyword alone cannot mint a claim.
-- Follow state must be positively verified before claim issuance. If profile lookup fails or follow state is unavailable/false, the service fails closed and issues no code.
-- Only the configured campaign keyword triggers claim verification after attribution.
+- Only the configured campaign keyword triggers claim issuance after attribution.
+- Optional profile/follow lookup is non-blocking; a Meta profile lookup outage cannot create a duplicate reward or prevent an otherwise valid A2Z claim.
 - Atomic SQLite `BEGIN IMMEDIATE` redemption transaction.
 - HMAC-SHA256 hashed claim codes; raw codes are not stored.
 - Meta `X-Hub-Signature-256` verification.
@@ -39,7 +42,7 @@ npm test
 STAFF_PIN=2468 CLAIM_SECRET=dev-secret node src/server.mjs
 ```
 
-Verify that a non-follower cannot receive a code:
+Create a simulated claim without Meta credentials:
 
 ```bash
 curl -s http://localhost:8787/dev/simulate \
@@ -47,15 +50,15 @@ curl -s http://localhost:8787/dev/simulate \
   -d '{"pin":"2468","instagramScopedId":"demo-001","username":"demo_student","followsBusiness":false}'
 ```
 
-That returns `{"status":"not_following"}` with no code. Then simulate the same identity after following:
+A code is issued even when `followsBusiness` is false because the follow is not the reward gate. Re-running the simulator for the same identity before redemption rotates the outstanding code rather than creating a second reward. After redemption, the same identity always returns `already_redeemed` with no new code.
 
-```bash
-curl -s http://localhost:8787/dev/simulate \
-  -H 'content-type: application/json' \
-  -d '{"pin":"2468","instagramScopedId":"demo-001","username":"demo_student","followsBusiness":true}'
-```
+## Public compliance pages
 
-The simulator intentionally bypasses Meta attribution so the eligibility and redemption path can be exercised locally. Open `http://localhost:8787/staff`, redeem the returned code, and verify that a second redemption is rejected. Simulating the same identity as a follower again after redemption must return `already_redeemed` and no new code.
+- Privacy Policy: `/privacy`
+- User Data Deletion Instructions: `/data-deletion`
+- Promotion Terms: `/terms`
+- Crawler policy: `/robots.txt`
+- Meta launch/App Review pack: `META_APP_REVIEW.md`
 
 ## Meta / Instagram setup for @pri.learning
 
@@ -67,8 +70,10 @@ The simulator intentionally bypasses Meta attribution so the eligibility and red
 6. Subscribe the Instagram account to `messages` and `messaging_referral`.
 7. Set `META_APP_SECRET` so POST callbacks are verified using `X-Hub-Signature-256`.
 8. Deploy with the variables in `.env.example`.
-9. Print a QR for `https://<your-host>/c/a2z`.
-10. Give A2Z staff only the `/staff` URL and staff PIN.
+9. Fill Meta app metadata with the public Privacy Policy and User Data Deletion URLs.
+10. Move the Meta app from Development to Live for public customers, using the least-privilege access level Meta permits for the Pri Learning-owned professional account.
+11. Print a QR for `https://<your-host>/c/a2z` only after an unrelated public Instagram account passes the live acceptance test.
+12. Give A2Z staff only the `/staff` URL and staff PIN.
 
 ## Production notes
 
