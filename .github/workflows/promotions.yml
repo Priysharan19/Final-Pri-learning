@@ -19,5 +19,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
+      - name: Install promotions dependencies
+        run: npm install --prefix promotions --ignore-scripts --no-audit --no-fund
       - name: Run promotions unit and HTTP integration tests
         run: npm test --prefix promotions
