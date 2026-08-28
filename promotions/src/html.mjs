@@ -43,14 +43,14 @@ export function campaignPage({ instagramUsername, keyword, refCode, rewardLabel,
         <div id="copy-status" class="copy-status">Valid for about 15 minutes. If it expires, rescan/reopen this page for a fresh message.</div>
       </div>
       <div class="steps">
-        <div class="step"><span class="num">1</span><div><b>Copy the message above</b><span>It contains a one-time, short-lived A2Z QR pass. This avoids depending on Instagram’s referral webhook.</span></div></div>
-        <div class="step"><span class="num">2</span><div><b>Open the Pri Learning DM</b><span>Paste and send the full message exactly as shown — not just <span class="code">${escapeHtml(keyword)}</span>.</span></div></div>
-        <div class="step"><span class="num">3</span><div><b>Receive your one-time reward code</b><span>Pri Learning verifies the QR pass, binds it to your Instagram identity, and checks that the account has not already redeemed this campaign.</span></div></div>
-        <div class="step"><span class="num">4</span><div><b>Show the code to A2Z staff</b><span>Staff redeems it once. After redemption, the same Instagram identity cannot claim again.</span></div></div>
+        <div class="step"><span class="num">1</span><div><b>Send the verification message</b><span>This binds the A2Z QR visit to your Instagram identity.</span></div></div>
+        <div class="step"><span class="num">2</span><div><b>Follow @${escapeHtml(instagramUsername)}</b><span>The live green tick will not appear unless Instagram confirms that this same account is currently following at the counter.</span></div></div>
+        <div class="step"><span class="num">3</span><div><b>Open your private claim link</b><span>Pri Learning checks that this Instagram identity has not already redeemed this A2Z campaign.</span></div></div>
+        <div class="step"><span class="num">4</span><div><b>Show the live green tick</b><span>At the counter, tap the verification button yourself. A valid follow + unused identity produces a 60-second live green tick for the shopkeeper.</span></div></div>
       </div>
       <a class="button secondary" href="${dmUrl}" rel="noopener noreferrer">Open A2Z verification DM</a>
-      <a class="button secondary" href="${profileUrl}" rel="noopener noreferrer">Visit @${escapeHtml(instagramUsername)} on Instagram</a>
-      <p class="note">Following @${escapeHtml(instagramUsername)} is optional and does not change reward eligibility. One redeemed reward is available per Instagram identity for this A2Z campaign.</p>
+      <a class="button secondary" href="${profileUrl}" rel="noopener noreferrer">Follow @${escapeHtml(instagramUsername)} on Instagram</a>
+      <p class="note">A green tick requires a current Instagram follow confirmation. Once this Instagram identity redeems the campaign, unfollowing and following again cannot create another reward.</p>
       ${legalFooter}
     </section>
     <script>
@@ -74,7 +74,7 @@ export function staffPage() {
     <section class="card">
       <span class="eyebrow">Redemption console</span>
       <h1>Verify a claim.</h1>
-      <p>Enter the customer’s one-time Pri code. Valid codes were issued only after A2Z campaign attribution. A successful redemption is atomic: the same reward cannot be accepted twice.</p>
+      <p>This is an operational fallback. The normal customer-controlled flow shows a live green tick only after current follow verification and one-time redemption.</p>
       <form id="redeem" class="form">
         <label>Claim code<input name="code" autocomplete="off" autocapitalize="characters" placeholder="PRI-ABCD-2345" required></label>
         <label>Staff PIN<input name="pin" type="password" inputmode="numeric" autocomplete="current-password" required></label>
@@ -82,7 +82,7 @@ export function staffPage() {
       </form>
       <div id="result" class="result" role="status" aria-live="polite"></div>
       <div class="divider"></div>
-      <p class="tiny">Do not redeem from screenshots you cannot inspect clearly. The server is the source of truth; green means accepted, red means do not issue another reward.</p>
+      <p class="tiny">The customer live-green-tick flow is the preferred verification method.</p>
       ${legalFooter}
     </section>
     <script>
@@ -98,24 +98,24 @@ export function privacyPage() {
     <section class="card legal">
       <span class="eyebrow">Privacy notice</span>
       <h1>Promotion privacy.</h1>
-      <p class="updated">Last updated 28 August 2026</p>
+      <p class="updated">Last updated 29 August 2026</p>
       <p>This notice applies to the Pri Learning × A2Z Instagram reward service. It is separate from the main Pri Learning educational app.</p>
       <h2>What data we receive</h2>
       <ul>
         <li>an Instagram-scoped identifier supplied by Meta after you interact with the Pri Learning professional account;</li>
-        <li>profile fields Meta makes available for the messaging interaction, which may include your Instagram username, display name and an optional follow-relationship signal;</li>
+        <li>profile fields Meta makes available for the messaging interaction, which may include your Instagram username, display name and current follow-relationship signal;</li>
         <li>the short-lived A2Z QR verification pass or Meta referral used to attribute the campaign interaction;</li>
         <li>claim issuance and redemption status, timestamps and security/audit events;</li>
-        <li>limited technical information required for service security and staff redemption rate limiting. Hosting providers may also process ordinary request metadata.</li>
+        <li>limited technical information required for service security and redemption rate limiting. Hosting providers may also process ordinary request metadata.</li>
       </ul>
       <h2>Why we use it</h2>
-      <p>We use this information to attribute the A2Z promotion, issue and redeem a one-time reward, prevent duplicate claims, operate the service securely, investigate abuse and maintain an audit trail. Any follow-relationship signal is optional engagement information and is not used to decide whether you receive the reward. We do not ask for your Instagram password and do not scrape Instagram.</p>
+      <p>We use this information to attribute the A2Z promotion, verify the current Instagram follow relationship at redemption, prevent duplicate claims, operate the service securely, investigate abuse and maintain an audit trail. The live green tick is issued only when the follow relationship is positively confirmed and the Instagram identity has not already redeemed this campaign. We do not ask for your Instagram password and do not scrape Instagram.</p>
       <h2>Sharing</h2>
-      <p>The service relies on Meta/Instagram for messaging and identity signals and on infrastructure providers used to host the promotion service and database. A2Z staff receive only the information needed to validate a reward. We do not sell promotion participant data.</p>
+      <p>The service relies on Meta/Instagram for messaging and identity/follow signals and on infrastructure providers used to host the promotion service and database. A2Z staff only need to see the live validation result. We do not sell promotion participant data.</p>
       <h2>Retention</h2>
       <p>Promotion records are retained only for as long as reasonably needed to operate the campaign, resolve disputes, prevent duplicate redemptions and meet security or legal obligations. Short-lived unused QR passes expire automatically.</p>
       <h2>Your choices</h2>
-      <p>You can stop messaging or unfollow the Instagram account at any time without affecting a reward already issued or redeemed. To request access, correction or deletion of promotion data, use the <a href="/data-deletion">data deletion instructions</a>.</p>
+      <p>You can unfollow at any time, but an account that is not currently following will not receive a green tick. Once a reward has been redeemed, following again does not create another entitlement. To request access, correction or deletion of promotion data, use the <a href="/data-deletion">data deletion instructions</a>.</p>
       <h2>Contact</h2>
       <p>For privacy questions about this promotion, contact Pri Learning through the official Instagram account <a href="https://www.instagram.com/pri.learning/" rel="noopener noreferrer">@pri.learning</a>.</p>
       ${legalFooter}
@@ -129,7 +129,7 @@ export function dataDeletionPage() {
     <section class="card legal">
       <span class="eyebrow">User data deletion</span>
       <h1>Request deletion.</h1>
-      <p class="updated">Last updated 28 August 2026</p>
+      <p class="updated">Last updated 29 August 2026</p>
       <p>You can ask Pri Learning to delete or anonymize personal data held by the A2Z promotion service.</p>
       <h2>How to request deletion</h2>
       <ol>
@@ -153,14 +153,14 @@ export function termsPage() {
     <section class="card legal">
       <span class="eyebrow">Promotion terms</span>
       <h1>A2Z reward terms.</h1>
-      <p class="updated">Last updated 28 August 2026</p>
+      <p class="updated">Last updated 29 August 2026</p>
       <ul>
         <li>The offer is limited to one successfully redeemed reward per eligible Instagram identity for the A2Z campaign.</li>
         <li>Eligibility requires a valid A2Z campaign attribution, normally established by the short-lived verification message generated from the A2Z QR page.</li>
-        <li>Following @pri.learning is optional and does not affect reward eligibility.</li>
-        <li>A code must be valid and successfully redeemed by A2Z staff before the reward is provided.</li>
-        <li>Once redeemed, repeated scans or messages from the same Instagram identity do not create a new entitlement.</li>
-        <li>Attempts to manipulate verification passes, referrals, codes, accounts or redemption systems may be rejected.</li>
+        <li>The live green tick requires Meta/Instagram to confirm that the same Instagram identity is currently following @pri.learning at the moment of redemption.</li>
+        <li>If the current follow cannot be positively verified, no green tick is issued and the claim remains unredeemed so the customer can retry.</li>
+        <li>Once redeemed, repeated scans, unfollowing, following again or repeated messages from the same Instagram identity do not create a new entitlement.</li>
+        <li>Attempts to manipulate verification passes, follow checks, codes, accounts or redemption systems may be rejected.</li>
         <li>The promotion may be suspended or ended if the technical service, Meta platform access, stock or store operations make fulfilment unavailable.</li>
       </ul>
       <p>This promotion is in no way sponsored, endorsed or administered by, or associated with, Instagram.</p>
