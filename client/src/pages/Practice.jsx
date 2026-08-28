@@ -61,11 +61,7 @@ export default function Practice() {
 
   const loadSimilar = useCallback(async () => {
     const q = serve?.question;
-    if (!q?.subtopic) {
-      setServe(null);
-      load();
-      return;
-    }
+    if (!q?.subtopic || q.subtopic === 'custom') return;
     if (loading.current) return;
     loading.current = true;
     setError('');
@@ -79,7 +75,7 @@ export default function Practice() {
       setServe(r);
     } catch (e) { setError(e.message); }
     finally { loading.current = false; }
-  }, [serve, track, load]);
+  }, [serve, track]);
 
   const course = (user.courseLabel || 'Mathematics').replace(/^(?:Year|Class) \d+\s*·\s*/, '');
   const metaLine = `${user.course === 'in' ? 'Class' : 'Year'} ${serve?.question?.year ?? user.year} · ${serve?.question?.indiaTrack ? (user.indiaTrackName || course) : course}`;
@@ -133,7 +129,7 @@ export default function Practice() {
               reason: serve.reason,
               session,
             }}
-            onTrySimilar={loadSimilar}
+            onTrySimilar={serve.question.subtopic && serve.question.subtopic !== 'custom' ? loadSimilar : undefined}
           />
         </>
       )}
