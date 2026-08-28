@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createHmac } from 'node:crypto';
 import { PromotionsStore } from '../src/store.mjs';
 import { createClaimCode, hashClaimCode, normalizeClaimCode, verifyMetaSignature } from '../src/security.mjs';
-import { extractInstagramMessages, extractInstagramReferrals } from '../src/instagram.mjs';
+import { ensureInstagramWebhookSubscription, extractInstagramMessages, extractInstagramReferrals } from '../src/instagram.mjs';
 
 test('claim codes are normalized and hash deterministically', () => {
   const code = createClaimCode();
@@ -107,4 +107,32 @@ test('Instagram webhook parser extracts messages and tracked referrals', () => {
   assert.deepEqual(extractInstagramReferrals(payload), [{
     senderId: '123', ref: 'pri-a2z-qr-2026', source: 'IGME', type: 'OPEN_THREAD',
   }]);
+});
+
+test('Instagram webhook subscription requests messages and messaging_referral', async () => {
+  let capturedUrl = null;
+  let capturedOptions = null;
+  const fetchImpl = async (url, options) => {
+    capturedUrl = new URL(url);
+    capturedOptions = options;
+    return {
+      ok: true,
+      status: 200,
+      async json() { return { success: true }; },
+    };
+  };
+
+  const result = await ensureInstagramWebhookSubscription({
+    accountId: '17841400000000000',
+    accessToken: 'test-token',
+    apiVersion: 'v24.0',
+    fetchImpl,
+  });
+
+  assert.equal(result.success, true);
+  assert.equal(capturedUrl.hostname, 'graph.instagram.com');
+  assert.equal(capturedUrl.pathname, '/v24.0/17841400000000000/subscribed_apps');
+  assert.equal(capturedUrl.searchParams.get('subscribed_fields'), 'messages,messaging_referral');
+  assert.equal(capturedOptions.method, 'POST');
+  assert.equal(capturedOptions.headers.Authorization, 'Bearer test-token');
 });
