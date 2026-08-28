@@ -21,7 +21,7 @@ export function loadConfig() {
     instagramAccessToken: env('INSTAGRAM_ACCESS_TOKEN'),
     metaAppSecret: env('META_APP_SECRET'),
     metaVerifyToken: env('META_VERIFY_TOKEN'),
-    metaApiVersion: env('META_API_VERSION', 'v23.0'),
+    metaApiVersion: env('META_API_VERSION', 'v24.0'),
     campaignId: env('CAMPAIGN_ID', 'a2z'),
     campaignKeyword: env('CAMPAIGN_KEYWORD', 'A2Z'),
     rewardLabel: env('CAMPAIGN_REWARD_LABEL', 'Pri Learning reward'),
