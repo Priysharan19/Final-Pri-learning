@@ -147,7 +147,7 @@ export function termsPage() {
       <ul>
         <li>The offer is limited to one successfully redeemed reward per eligible Instagram identity for the A2Z campaign.</li>
         <li>Eligibility requires entering through the tracked A2Z Instagram referral and sending the configured campaign keyword.</li>
-        <li>Following `@pri.learning` is optional and does not affect reward eligibility.</li>
+        <li>Following @pri.learning is optional and does not affect reward eligibility.</li>
         <li>A code must be valid and successfully redeemed by A2Z staff before the reward is provided.</li>
         <li>Once redeemed, repeated scans or messages from the same Instagram identity do not create a new entitlement.</li>
         <li>Attempts to manipulate referrals, codes, accounts or redemption systems may be rejected.</li>
