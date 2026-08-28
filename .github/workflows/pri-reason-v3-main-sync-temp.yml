@@ -1,0 +1,68 @@
+name: Pri Reason V3 main sync temp
+
+on:
+  push:
+    branches:
+      - feature/pri-reason-v3-proof-plans
+    paths:
+      - '.github/workflows/pri-reason-v3-main-sync-temp.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  sync-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout feature branch
+        uses: actions/checkout@v4
+        with:
+          ref: feature/pri-reason-v3-proof-plans
+          fetch-depth: 0
+      - name: Use Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Merge latest main conservatively
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          git merge --no-edit -X theirs origin/main
+      - name: Install client dependencies
+        run: npm ci --prefix client
+      - name: Pri Reason V1
+        run: node client/test/pri-reason-check.mjs
+      - name: Pri Reason V2
+        run: node client/test/pri-reason-v2-check.mjs
+      - name: Pri Reason V3
+        run: node client/test/pri-reason-v3-check.mjs
+      - name: Authored curriculum integration
+        run: node client/test/pri-reason-curriculum-check.mjs
+      - name: Diagnosis regression
+        run: node client/test/diagnose-check.mjs
+      - name: Hybrid handwriting safety
+        run: npm run test:ink:hybrid
+      - name: Answer-context anti-leak
+        run: npm run test:context
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Combined browser E2E
+        run: npm run test:e2e
+      - name: Production build
+        run: npm run build
+      - name: Refresh combined iPad bundles
+        run: npm run sync:ios
+      - name: Verify combined iPad parity
+        run: npm run check:ios
+      - name: Diff safety
+        run: git diff --check
+      - name: Commit regenerated combined bundles and push tested merge
+        run: |
+          git add ios/PriLearning.swiftpm/Resources/Web \
+                  'ios/PriLearning 2.swiftpm/Resources/Web'
+          if ! git diff --cached --quiet; then
+            git commit -m "Refresh iPad bundles after latest main sync"
+          fi
+          git push origin HEAD:feature/pri-reason-v3-proof-plans
