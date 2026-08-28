@@ -1,0 +1,19 @@
+/* Pri Explain V7 · narration-gated teacher conductor. */
+
+.pri-explain-visual-beat{position:relative;transition:opacity .22s ease,transform .22s ease,filter .22s ease}
+.pri-explain-visual-beat.pending{opacity:.48;transform:scale(.985);filter:saturate(.72)}
+.pri-explain-visual-beat.active{opacity:1;transform:none;filter:none;z-index:2}
+.pri-explain-visual-beat.done{opacity:.9;transform:none;filter:none}
+.pri-explain-visual-beat.active:before{content:"";position:absolute;inset:-7px;border-radius:14px;border:1px solid color-mix(in srgb,var(--gold) 34%,transparent);box-shadow:0 0 0 1px color-mix(in srgb,var(--gold) 7%,transparent),0 12px 34px color-mix(in srgb,var(--gold) 8%,transparent);pointer-events:none;animation:priV7FocusIn .28s ease both}
+.pri-explain-now{position:absolute;right:7px;top:7px;z-index:5;padding:3px 7px;border-radius:999px;background:var(--gold-faint);border:1px solid var(--gold-border);color:var(--gold-bright);font-size:7px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;box-shadow:0 4px 16px color-mix(in srgb,var(--gold) 12%,transparent)}
+.pri-explain-teacher-cue.narrating i{animation:priV7NarrationPulse 1.05s ease-in-out infinite}
+.pri-explain-teacher-cue.narrating span{font-weight:800}
+.pri-explain-voice{gap:6px}
+.pri-explain-voice:has(input:checked){color:var(--gold-bright)}
+
+@keyframes priV7FocusIn{from{opacity:0;transform:scale(.99)}to{opacity:1;transform:none}}
+@keyframes priV7NarrationPulse{0%,100%{transform:scale(.82);opacity:.55}50%{transform:scale(1.15);opacity:1}}
+
+@media(max-width:720px){.pri-explain-visual-beat.active:before{inset:-4px;border-radius:11px}.pri-explain-now{right:5px;top:5px;font-size:6px;padding:2px 5px}}
+
+@media(prefers-reduced-motion:reduce){.pri-explain-visual-beat,.pri-explain-visual-beat.pending,.pri-explain-visual-beat.active,.pri-explain-visual-beat.done{opacity:1!important;transform:none!important;filter:none!important;transition:none!important}.pri-explain-visual-beat.active:before,.pri-explain-teacher-cue.narrating i{animation:none!important}.pri-explain-now{display:none}}
