@@ -1,0 +1,44 @@
+name: Pri Reason
+
+on:
+  pull_request:
+    paths:
+      - 'client/src/engine/checker.js'
+      - 'client/src/engine/checker-core.js'
+      - 'client/src/engine/reason.js'
+      - 'client/src/engine/diagnose.js'
+      - 'client/src/engine/expr.js'
+      - 'client/test/pri-reason-check.mjs'
+      - 'client/test/diagnose-check.mjs'
+      - '.github/workflows/pri-reason.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'client/src/engine/checker.js'
+      - 'client/src/engine/checker-core.js'
+      - 'client/src/engine/reason.js'
+      - 'client/src/engine/diagnose.js'
+      - 'client/src/engine/expr.js'
+      - 'client/test/pri-reason-check.mjs'
+      - 'client/test/diagnose-check.mjs'
+
+permissions:
+  contents: read
+
+jobs:
+  reason-safety:
+    name: Mathematical reasoning safety
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact commit
+        uses: actions/checkout@v4
+      - name: Use Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Pri Reason precision gate
+        run: node client/test/pri-reason-check.mjs
+      - name: Existing diagnosis regression gate
+        run: node client/test/diagnose-check.mjs
