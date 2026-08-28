@@ -10,7 +10,15 @@ import {
   sendInstagramText,
 } from './instagram.mjs';
 import { PromotionsStore } from './store.mjs';
-import { anonymizeId, createClaimCode, hashClaimCode, safeEqualText, verifyMetaSignature } from './security.mjs';
+import {
+  anonymizeId,
+  createCampaignPassCode,
+  createClaimCode,
+  hashCampaignPassCode,
+  hashClaimCode,
+  safeEqualText,
+  verifyMetaSignature,
+} from './security.mjs';
 
 const config = loadConfig();
 const store = new PromotionsStore(config.dbPath);
@@ -23,10 +31,12 @@ store.seedCampaign({
 
 const redemptionAttempts = new Map();
 const MAX_BODY = 256 * 1024;
+const CAMPAIGN_PASS_TTL_MS = 15 * 60 * 1000;
 const runtimeStatus = {
   instagramWebhookSubscription: config.isProduction ? 'pending' : 'development',
   lastWebhookAt: null,
   lastReferralAt: null,
+  lastQrPassAt: null,
   lastMessageAt: null,
   lastProcessingErrorAt: null,
 };
@@ -84,6 +94,11 @@ function subjectRef(scopedId) { return `ig:${anonymizeId(scopedId, config.claimS
 function matchesCampaignKeyword(messageText, campaignKeyword) {
   return String(messageText ?? '').trim().toLowerCase() === String(campaignKeyword ?? '').trim().toLowerCase();
 }
+function parseCampaignPassMessage(messageText) {
+  const match = String(messageText ?? '').trim().match(/^([^\s]+)\s+(A2Z-[2-9A-HJ-NP-Z]{4}-[2-9A-HJ-NP-Z]{4})$/i);
+  if (!match) return null;
+  return { keyword: match[1], passCode: match[2].toUpperCase() };
+}
 
 async function refreshInstagramWebhookSubscription() {
   if (!config.isProduction) return;
@@ -128,6 +143,16 @@ async function issueForInstagramIdentity({ campaign, senderId, profile }) {
   return result.status === 'already_redeemed' ? result : { ...result, code };
 }
 
+async function sendToInstagram(senderId, message) {
+  return sendInstagramText({
+    accountId: config.instagramAccountId,
+    recipientScopedId: senderId,
+    text: message,
+    accessToken: config.instagramAccessToken,
+    apiVersion: config.metaApiVersion,
+  });
+}
+
 async function processInstagramPayload(payload) {
   const referrals = extractInstagramReferrals(payload);
   if (referrals.length) runtimeStatus.lastReferralAt = new Date().toISOString();
@@ -146,23 +171,50 @@ async function processInstagramPayload(payload) {
   const messages = extractInstagramMessages(payload);
   if (messages.length) runtimeStatus.lastMessageAt = new Date().toISOString();
   for (const message of messages) {
-    const attributedCampaign = store.getAttributedCampaign(message.senderId);
+    let attributedCampaign = store.getAttributedCampaign(message.senderId);
+    const passMessage = parseCampaignPassMessage(message.text);
+
+    if (!attributedCampaign && passMessage) {
+      const campaign = store.getCampaignByKeyword(passMessage.keyword);
+      if (campaign) {
+        const passHash = hashCampaignPassCode(config.claimSecret, passMessage.passCode);
+        const passResult = store.consumeCampaignPass({
+          passHash,
+          instagramScopedId: message.senderId,
+          subjectRef: subjectRef(message.senderId),
+        });
+
+        if (passResult.status === 'consumed' && passResult.campaignId === campaign.id) {
+          runtimeStatus.lastQrPassAt = new Date().toISOString();
+          store.recordAttribution({
+            instagramScopedId: message.senderId,
+            campaignId: campaign.id,
+            refCode: `qr-pass:${passHash.slice(0, 12)}`,
+            source: 'QR_PASS',
+            subjectRef: subjectRef(message.senderId),
+          });
+          attributedCampaign = campaign;
+        } else if (passResult.status === 'already_consumed_by_identity' && passResult.campaignId === campaign.id) {
+          attributedCampaign = store.getAttributedCampaign(message.senderId);
+        } else {
+          await sendToInstagram(message.senderId,
+            `That A2Z verification code is ${passResult.status === 'expired' ? 'expired' : 'not valid anymore'}. Re-open the official A2Z QR page to get a fresh verification message, then send the full message shown there.`);
+          continue;
+        }
+      }
+    }
+
     if (!attributedCampaign) {
       const keywordCampaign = store.getCampaignByKeyword(message.text);
       if (keywordCampaign) {
-        await sendInstagramText({
-          accountId: config.instagramAccountId,
-          recipientScopedId: message.senderId,
-          text: `This reward is reserved for the tracked A2Z QR campaign. Please open the official A2Z QR link, then send ${keywordCampaign.keyword} again.`,
-          accessToken: config.instagramAccessToken,
-          apiVersion: config.metaApiVersion,
-        });
+        await sendToInstagram(message.senderId,
+          `This reward is reserved for the A2Z QR campaign. Re-open the official A2Z QR page and send the full verification message shown there (it starts with ${keywordCampaign.keyword}).`);
       }
       continue;
     }
 
     const campaign = attributedCampaign;
-    if (!matchesCampaignKeyword(message.text, campaign.keyword)) continue;
+    if (!matchesCampaignKeyword(message.text, campaign.keyword) && !passMessage) continue;
 
     let profile = null;
     try {
@@ -185,13 +237,7 @@ async function processInstagramPayload(payload) {
       ? `This ${campaign.reward_label} has already been redeemed for this campaign. The same Instagram identity cannot receive another reward.`
       : `A2Z QR verified. Your one-time code is ${claim.code}. Show it to A2Z staff. Once redeemed, this Instagram identity cannot claim again.${profile?.followsBusiness === true ? ` Thanks for following @${config.instagramUsername}.` : ` Following @${config.instagramUsername} is optional and does not affect this reward.`}`;
 
-    await sendInstagramText({
-      accountId: config.instagramAccountId,
-      recipientScopedId: message.senderId,
-      text: reply,
-      accessToken: config.instagramAccessToken,
-      apiVersion: config.metaApiVersion,
-    });
+    await sendToInstagram(message.senderId, reply);
   }
 }
 
@@ -206,6 +252,7 @@ const server = http.createServer(async (req, res) => {
         instagramWebhookSubscription: runtimeStatus.instagramWebhookSubscription,
         lastWebhookAt: runtimeStatus.lastWebhookAt,
         lastReferralAt: runtimeStatus.lastReferralAt,
+        lastQrPassAt: runtimeStatus.lastQrPassAt,
         lastMessageAt: runtimeStatus.lastMessageAt,
         lastProcessingErrorAt: runtimeStatus.lastProcessingErrorAt,
       });
@@ -225,11 +272,18 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'GET' && url.pathname.startsWith('/c/')) {
       const campaign = store.getCampaign(decodeURIComponent(url.pathname.slice(3)));
       if (!campaign) return text(res, 404, 'Campaign not found.');
+      const campaignPassCode = createCampaignPassCode();
+      store.issueCampaignPass({
+        campaignId: campaign.id,
+        passHash: hashCampaignPassCode(config.claimSecret, campaignPassCode),
+        ttlMs: CAMPAIGN_PASS_TTL_MS,
+      });
       return html(res, 200, campaignPage({
         instagramUsername: config.instagramUsername,
         keyword: campaign.keyword,
         refCode: campaign.ref_code,
         rewardLabel: campaign.reward_label,
+        campaignPassCode,
       }));
     }
     if (req.method === 'GET' && url.pathname === '/staff') return html(res, 200, staffPage());
