@@ -1,37 +1,56 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { MathText } from '../lib/latex.jsx';
 import { sanitizeFigure } from '../lib/sanitize.js';
+import {
+  canMorphFigureSvg,
+  clamp01,
+  equationTravelPlan,
+  instrumentFigureSvg,
+  morphFigureSvg,
+} from '../explain/choreography.js';
 import './PriExplainVisuals.css';
+import './PriExplainVisualsV6.css';
 
-const clamp01 = value => Math.max(0, Math.min(1, Number(value) || 0));
+function initialReduceMotion() {
+  return typeof window !== 'undefined' && Boolean(window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches);
+}
 
-function tokenMotionPlan(diff) {
-  const before = (diff?.before || []).map((token, index) => ({ ...token, index, state: token.changed ? 'leaving' : 'stable' }));
-  const after = (diff?.after || []).map((token, index) => ({ ...token, index, state: token.changed ? 'entering' : 'stable' }));
-  const waitingAfter = new Map();
-  const pairs = [];
+function useChoreographyProgress(target) {
+  const reduced = initialReduceMotion();
+  const currentRef = useRef(reduced ? clamp01(target) : 0);
+  const frameRef = useRef(0);
+  const [value, setValue] = useState(currentRef.current);
 
-  for (const token of after) {
-    if (!token.changed) continue;
-    const bucket = waitingAfter.get(token.text) || [];
-    bucket.push(token.index);
-    waitingAfter.set(token.text, bucket);
-  }
+  useEffect(() => {
+    const next = clamp01(target);
+    cancelAnimationFrame(frameRef.current);
+    if (reduced || next <= currentRef.current) {
+      currentRef.current = next;
+      setValue(next);
+      return undefined;
+    }
 
-  for (const token of before) {
-    if (!token.changed) continue;
-    const bucket = waitingAfter.get(token.text);
-    if (!bucket?.length) continue;
-    const afterIndex = bucket.shift();
-    token.state = 'moving';
-    after[afterIndex].state = 'moving';
-    const key = `${token.text}-${token.index}-${afterIndex}`;
-    token.motionKey = key;
-    after[afterIndex].motionKey = key;
-    pairs.push({ key, text: token.text, beforeIndex: token.index, afterIndex });
-  }
+    const from = currentRef.current;
+    const delta = next - from;
+    const duration = delta > 0.7 ? 1450 : 480;
+    let startedAt = 0;
 
-  return { before, after, pairs };
+    const tick = time => {
+      if (!startedAt) startedAt = time;
+      const t = Math.min(1, (time - startedAt) / duration);
+      const eased = 1 - Math.pow(1 - t, 3);
+      const progress = from + delta * eased;
+      currentRef.current = progress;
+      setValue(progress);
+      if (t < 1) frameRef.current = requestAnimationFrame(tick);
+    };
+
+    frameRef.current = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frameRef.current);
+  }, [target, reduced]);
+
+  useEffect(() => () => cancelAnimationFrame(frameRef.current), []);
+  return value;
 }
 
 function TokenStrip({ tokens, label, phase = 'rest' }) {
@@ -51,22 +70,25 @@ function TokenStrip({ tokens, label, phase = 'rest' }) {
   );
 }
 
-function MotionLane({ pairs }) {
-  if (!pairs?.length) return null;
+function DirectTravelLayer({ travels }) {
+  if (!travels?.length) return null;
   return (
-    <div className="pri-v-motion-lane" aria-label="Verified terms carried into the next line">
-      <span className="pri-v-motion-label">track the same term</span>
-      <div>
-        {pairs.map((pair, index) => (
-          <b key={pair.key} style={{ '--motion-order': index }}>{pair.text}</b>
-        ))}
-      </div>
+    <div className="pri-v-direct-travel" aria-label="Verified terms moving directly to their next positions">
+      <span>same verified term · new position</span>
+      {travels.map(travel => (
+        <b
+          key={travel.key}
+          style={{ '--from-x': `${travel.from}%`, '--to-x': `${travel.to}%` }}
+        >
+          {travel.text}
+        </b>
+      ))}
     </div>
   );
 }
 
 export function EquationTransform({ visual, progress = 1 }) {
-  const plan = useMemo(() => tokenMotionPlan(visual?.diff), [visual?.diff]);
+  const plan = useMemo(() => equationTravelPlan(visual?.diff), [visual?.diff]);
   if (!visual?.before || !visual?.after) return null;
   const p = clamp01(progress);
   const started = p > 0;
@@ -94,7 +116,7 @@ export function EquationTransform({ visual, progress = 1 }) {
         <b>↓</b>
       </div>
 
-      <MotionLane pairs={plan.pairs} />
+      <DirectTravelLayer travels={plan.travels} />
 
       <TokenStrip
         tokens={plan.after}
@@ -213,20 +235,52 @@ export function AttemptReplay({ visual }) {
   );
 }
 
+function uniqueSanitizedFigures(visual) {
+  const raw = [visual?.figure, ...(Array.isArray(visual?.sequence) ? visual.sequence : [])]
+    .map(value => String(value || '').trim())
+    .filter(Boolean);
+  const unique = [...new Set(raw)];
+  return unique.map(sanitizeFigure).filter(Boolean);
+}
+
+function figureAtProgress(figures, progress) {
+  if (!figures.length) return { svg: '', morphing: false };
+  if (figures.length === 1) return { svg: figures[0], morphing: false };
+  const scaled = clamp01(progress) * (figures.length - 1);
+  const index = Math.min(figures.length - 2, Math.floor(scaled));
+  const local = scaled - index;
+  const from = figures[index];
+  const to = figures[index + 1];
+  const morphing = canMorphFigureSvg(from, to);
+  return { svg: morphFigureSvg(from, to, local), morphing };
+}
+
 export function AnimatedFigure({ visual, progress = 1 }) {
-  const figure = useMemo(() => sanitizeFigure(visual?.figure), [visual?.figure]);
-  if (!figure) return null;
-  const p = clamp01(progress);
-  const ready = p >= 0.24;
-  const phase = p < 0.5 ? 'constructing' : p < 0.85 ? 'developing' : 'complete';
+  const figures = useMemo(() => uniqueSanitizedFigures(visual), [visual?.figure, visual?.sequence]);
+  const p = useChoreographyProgress(progress);
+  if (!figures.length) return null;
+  const ready = p >= 0.08;
+  const phase = p < 0.34 ? 'constructing' : p < 0.78 ? 'developing' : 'complete';
+  const rendered = figureAtProgress(figures, p);
+  const figure = useMemo(
+    () => instrumentFigureSvg(rendered.svg, visual?.mode || 'figure'),
+    [rendered.svg, visual?.mode],
+  );
+  const sequenceLabel = figures.length > 1
+    ? (rendered.morphing ? 'morphing verified authored states' : 'transitioning verified authored states')
+    : null;
   return (
-    <div className={`pri-v-figure ${visual.mode || 'figure'} pri-v-choreographed`} data-phase={phase}>
+    <div
+      className={`pri-v-figure ${visual.mode || 'figure'} pri-v-choreographed ${rendered.morphing ? 'is-morphing' : ''}`}
+      data-phase={phase}
+      data-progress={Math.round(p * 100)}
+    >
       <div className="pri-v-caption">
         <span>{visual.mode === 'calculus' ? 'Dynamic calculus view' : visual.mode === 'geometry' ? 'Dynamic geometry view' : 'Dynamic graph view'}</span>
-        <b>{phase === 'constructing' ? 'building the setup' : phase === 'developing' ? 'adding the important structure' : 'construction complete'}</b>
+        <b>{sequenceLabel || (phase === 'constructing' ? 'building the verified setup' : phase === 'developing' ? 'tracing the verified structure' : 'construction complete')}</b>
       </div>
       {ready
-        ? <div className="pri-v-figure-inner" key={`${visual.mode}-${phase}`} dangerouslySetInnerHTML={{ __html: figure }} />
+        ? <div className="pri-v-figure-inner" dangerouslySetInnerHTML={{ __html: figure }} />
         : <div className="pri-v-figure-placeholder" aria-hidden="true"><i /><i /><i /></div>}
     </div>
   );
