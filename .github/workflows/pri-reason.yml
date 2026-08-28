@@ -6,9 +6,12 @@ on:
       - 'client/src/engine/checker.js'
       - 'client/src/engine/checker-core.js'
       - 'client/src/engine/reason.js'
+      - 'client/src/engine/reason-v2.js'
+      - 'client/src/engine/reason-v2-safe.js'
       - 'client/src/engine/diagnose.js'
       - 'client/src/engine/expr.js'
       - 'client/test/pri-reason-check.mjs'
+      - 'client/test/pri-reason-v2-check.mjs'
       - 'client/test/diagnose-check.mjs'
       - '.github/workflows/pri-reason.yml'
   push:
@@ -18,9 +21,12 @@ on:
       - 'client/src/engine/checker.js'
       - 'client/src/engine/checker-core.js'
       - 'client/src/engine/reason.js'
+      - 'client/src/engine/reason-v2.js'
+      - 'client/src/engine/reason-v2-safe.js'
       - 'client/src/engine/diagnose.js'
       - 'client/src/engine/expr.js'
       - 'client/test/pri-reason-check.mjs'
+      - 'client/test/pri-reason-v2-check.mjs'
       - 'client/test/diagnose-check.mjs'
 
 permissions:
@@ -38,7 +44,9 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Pri Reason precision gate
+      - name: Pri Reason V1 regression gate
         run: node client/test/pri-reason-check.mjs
+      - name: Pri Reason V2 safety gate
+        run: node client/test/pri-reason-v2-check.mjs
       - name: Existing diagnosis regression gate
         run: node client/test/diagnose-check.mjs
