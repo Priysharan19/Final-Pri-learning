@@ -1,4 +1,5 @@
 import http from 'node:http';
+import { readFile } from 'node:fs/promises';
 import { URL } from 'node:url';
 import { loadConfig } from './config.mjs';
 import { campaignPage, dataDeletionPage, privacyPage, termsPage } from './html.mjs';
@@ -32,6 +33,15 @@ store.seedCampaign({
   refCode: config.campaignRef,
   rewardLabel: config.rewardLabel,
 });
+
+const FONT_DIR = new URL('../public/fonts/', import.meta.url);
+const FONT_FILES = new Set(['KaTeX_Main-Regular.woff2', 'KaTeX_Main-Bold.woff2', 'KaTeX_AMS-Regular.woff2']);
+const fontCache = new Map();
+
+async function readFont(name) {
+  if (!fontCache.has(name)) fontCache.set(name, await readFile(new URL(name, FONT_DIR)));
+  return fontCache.get(name);
+}
 
 const redemptionAttempts = new Map();
 const MAX_BODY = 256 * 1024;
@@ -309,6 +319,17 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, { ok: true, service: 'pri-promotions', campaign: config.campaignId, instagramWebhookSubscription: runtimeStatus.instagramWebhookSubscription, lastWebhookAt: runtimeStatus.lastWebhookAt, lastReferralAt: runtimeStatus.lastReferralAt, lastQrPassAt: runtimeStatus.lastQrPassAt, lastMessageAt: runtimeStatus.lastMessageAt, lastProcessingErrorAt: runtimeStatus.lastProcessingErrorAt });
     }
     if (req.method === 'GET' && url.pathname === '/robots.txt') return text(res, 200, 'User-agent: *\nAllow: /\n');
+    if (req.method === 'GET' && url.pathname.startsWith('/fonts/')) {
+      const name = url.pathname.slice('/fonts/'.length);
+      if (!FONT_FILES.has(name)) {
+        res.statusCode = 404;
+        return res.end();
+      }
+      res.statusCode = 200;
+      res.setHeader('content-type', 'font/woff2');
+      res.setHeader('cache-control', 'public, max-age=31536000, immutable');
+      return res.end(await readFont(name));
+    }
     if (req.method === 'GET' && url.pathname === '/privacy') return html(res, 200, privacyPage());
     if (req.method === 'GET' && url.pathname === '/data-deletion') return html(res, 200, dataDeletionPage());
     if (req.method === 'GET' && url.pathname === '/terms') return html(res, 200, termsPage());
@@ -325,7 +346,8 @@ const server = http.createServer(async (req, res) => {
       if (!campaign) return text(res, 404, 'Campaign not found.');
       const campaignPassCode = createCampaignPassCode();
       store.issueCampaignPass({ campaignId: campaign.id, passHash: hashCampaignPassCode(config.claimSecret, campaignPassCode), ttlMs: CAMPAIGN_PASS_TTL_MS });
-      return html(res, 200, campaignPage({ instagramUsername: config.instagramUsername, keyword: campaign.keyword, refCode: campaign.ref_code, rewardLabel: campaign.reward_label, campaignPassCode }));
+      const passExpiresAt = new Date(Date.now() + CAMPAIGN_PASS_TTL_MS).toISOString();
+      return html(res, 200, campaignPage({ instagramUsername: config.instagramUsername, keyword: campaign.keyword, refCode: campaign.ref_code, rewardLabel: campaign.reward_label, campaignPassCode, passExpiresAt }));
     }
 
     if (req.method === 'GET' && url.pathname.startsWith('/claim/')) {
