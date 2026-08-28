@@ -1,9 +1,9 @@
 import http from 'node:http';
 import { URL } from 'node:url';
-import QRCode from 'qrcode';
 import { loadConfig } from './config.mjs';
 import { campaignPage, dataDeletionPage, privacyPage, termsPage } from './html.mjs';
-import { customerClaimPage, staffHomePage, staffLoginPage, staffScanPage } from './staff-ui.mjs';
+import { customerRedeemPage } from './customer-ui.mjs';
+import { staffHomePage, staffLoginPage, staffScanPage } from './staff-ui.mjs';
 import {
   ensureInstagramWebhookSubscription,
   fetchInstagramProfile,
@@ -107,6 +107,26 @@ function parseCampaignPassMessage(messageText) {
 }
 function isClaimCode(code) {
   return /^PRI-[2-9A-HJ-NP-Z]{4}-[2-9A-HJ-NP-Z]{4}$/i.test(String(code ?? '').trim());
+}
+function claimByCode(code) {
+  if (!isClaimCode(code)) return null;
+  return store.db.prepare(`
+    SELECT
+      c.id,
+      c.campaign_id,
+      c.instagram_scoped_id,
+      c.redeemed_at,
+      ca.reward_label,
+      p.username,
+      p.follows_business
+    FROM claims c
+    JOIN campaigns ca ON ca.id = c.campaign_id
+    JOIN participants p ON p.instagram_scoped_id = c.instagram_scoped_id
+    WHERE c.code_hash = ?
+  `).get(hashClaimCode(config.claimSecret, code)) ?? null;
+}
+function campaignRedemptionCount(campaignId) {
+  return Number(store.getStats(campaignId)?.redeemed ?? 0);
 }
 function parseCookies(req) {
   const out = {};
@@ -243,9 +263,34 @@ async function processInstagramPayload(payload) {
 
     const claim = await issueForInstagramIdentity({ campaign, senderId: message.senderId, profile });
     const reply = claim.status === 'already_redeemed'
-      ? `This ${campaign.reward_label} has already been redeemed for this campaign. The same Instagram identity cannot receive another reward.`
-      : `A2Z QR verified. Your reward is ready. Open ${config.publicBaseUrl}/claim/${encodeURIComponent(claim.code)} and show the QR to A2Z staff. Your backup code is ${claim.code}. Once staff scans/redeems it, this Instagram identity cannot claim again.${profile?.followsBusiness === true ? ` Thanks for following @${config.instagramUsername}.` : ` Following @${config.instagramUsername} is optional and does not affect this reward.`}`;
+      ? `This ${campaign.reward_label} has already been redeemed for this A2Z campaign. Re-scanning, unfollowing, or following again cannot create another reward for the same Instagram identity.`
+      : `A2Z verified. When you are physically at the counter, open ${config.publicBaseUrl}/claim/${encodeURIComponent(claim.code)} and tap “Show live green tick”. The shopkeeper only needs to see the live green screen. Your one-time backup code is ${claim.code}.`;
     await sendToInstagram(message.senderId, reply);
+  }
+}
+
+async function currentFollowStateForClaim(claim) {
+  try {
+    const profile = await fetchInstagramProfile({
+      scopedId: claim.instagram_scoped_id,
+      accessToken: config.instagramAccessToken,
+      apiVersion: config.metaApiVersion,
+    });
+    store.upsertParticipant({
+      instagramScopedId: claim.instagram_scoped_id,
+      username: profile?.username ?? claim.username ?? null,
+      displayName: profile?.name ?? null,
+      followsBusiness: profile?.followsBusiness ?? null,
+    });
+    return profile?.followsBusiness ?? null;
+  } catch (error) {
+    console.error(JSON.stringify({
+      level: 'warn',
+      event: 'customer_redeem_profile_lookup_failed_nonblocking',
+      subject: subjectRef(claim.instagram_scoped_id),
+      message: error.message,
+    }));
+    return claim.follows_business == null ? null : claim.follows_business === 1;
   }
 }
 
@@ -278,10 +323,65 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === 'GET' && url.pathname.startsWith('/claim/')) {
       const code = decodeURIComponent(url.pathname.slice('/claim/'.length)).trim().toUpperCase();
-      if (!isClaimCode(code)) return text(res, 404, 'Claim not found.');
-      const staffScanUrl = `${config.publicBaseUrl}/staff/scan?code=${encodeURIComponent(code)}`;
-      const qrSvg = await QRCode.toString(staffScanUrl, { type: 'svg', width: 360, margin: 2, errorCorrectionLevel: 'M' });
-      return html(res, 200, customerClaimPage({ code, qrSvg, instagramUsername: config.instagramUsername }));
+      const claim = claimByCode(code);
+      if (!claim) return text(res, 404, 'Claim not found.');
+      return html(res, 200, customerRedeemPage({ code, rewardLabel: claim.reward_label, instagramUsername: config.instagramUsername }));
+    }
+
+    if (req.method === 'GET' && url.pathname === '/api/customer/status') {
+      const code = String(url.searchParams.get('code') ?? '').trim().toUpperCase();
+      const claim = claimByCode(code);
+      if (!claim) return json(res, 404, { status: 'invalid', serverTime: new Date().toISOString() });
+      if (claim.redeemed_at) {
+        return json(res, 200, {
+          status: 'already_redeemed',
+          redeemedAt: claim.redeemed_at,
+          redemptionCount: campaignRedemptionCount(claim.campaign_id),
+          serverTime: new Date().toISOString(),
+        });
+      }
+      return json(res, 200, { status: 'ready', serverTime: new Date().toISOString() });
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/customer/redeem') {
+      if (redemptionRateLimited(req)) return json(res, 429, { error: 'too_many_attempts' });
+      const body = parseJsonBody(await readRawBody(req));
+      const code = String(body.code ?? '').trim().toUpperCase();
+      const claim = claimByCode(code);
+      if (!claim) return json(res, 404, { status: 'invalid', serverTime: new Date().toISOString() });
+      if (claim.redeemed_at) {
+        return json(res, 409, {
+          status: 'already_redeemed',
+          redeemedAt: claim.redeemed_at,
+          redemptionCount: campaignRedemptionCount(claim.campaign_id),
+          serverTime: new Date().toISOString(),
+        });
+      }
+
+      const currentFollowState = await currentFollowStateForClaim(claim);
+      const result = store.redeemByCodeHash({
+        codeHash: hashClaimCode(config.claimSecret, code),
+        subjectRef: `customer:${subjectRef(claim.instagram_scoped_id)}`,
+      });
+      const redemptionCount = campaignRedemptionCount(claim.campaign_id);
+      const serverTime = new Date().toISOString();
+      if (result.status === 'redeemed') {
+        return json(res, 200, {
+          ...result,
+          currentFollowState,
+          redemptionCount,
+          serverTime,
+        });
+      }
+      if (result.status === 'already_redeemed') {
+        return json(res, 409, {
+          ...result,
+          currentFollowState,
+          redemptionCount,
+          serverTime,
+        });
+      }
+      return json(res, 404, { status: 'invalid', serverTime });
     }
 
     if (req.method === 'GET' && url.pathname === '/staff') {
