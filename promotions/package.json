@@ -1,0 +1,14 @@
+{
+  "name": "pri-learning-promotions",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Isolated one-time campaign reward service for Pri Learning.",
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "scripts": {
+    "start": "node src/server.mjs",
+    "test": "node --test test/*.test.mjs"
+  }
+}
