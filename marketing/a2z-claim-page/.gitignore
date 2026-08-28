@@ -1,0 +1,3 @@
+# Generated: body-only variant, published as an Artifact for phone previews.
+# Rebuild with `node build.mjs`.
+claim-preview.html
