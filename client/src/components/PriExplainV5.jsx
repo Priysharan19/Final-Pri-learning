@@ -1,8 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { MathText } from '../lib/latex.jsx';
 import { buildVisualTimeline, visualSummary } from '../explain/visualEngine.js';
+import { visualCuePlan, visualCueState, visualProgressForCue } from '../explain/choreography.js';
 import { VisualBlock } from './PriExplainVisuals.jsx';
 import './PriExplainV5.css';
+import './PriExplainV7.css';
 
 const SOLUTION_EVENT = 'pri:worked-solution';
 const ATTEMPT_EVENT = 'pri:attempt-feedback';
@@ -28,29 +30,49 @@ function speechText(value) {
 }
 
 function canSpeak() {
-  return typeof window !== 'undefined' && 'speechSynthesis' in window;
+  return typeof window !== 'undefined'
+    && 'speechSynthesis' in window
+    && typeof SpeechSynthesisUtterance !== 'undefined';
 }
 
 function cancelSpeech() {
   if (canSpeak()) window.speechSynthesis.cancel();
 }
 
-function speakBeat(value, speed) {
-  if (!canSpeak()) return;
+function speakBeat(value, speed, onDone) {
   const text = speechText(value);
-  if (!text) return;
+  if (!text || !canSpeak()) {
+    onDone?.();
+    return () => {};
+  }
+
   cancelSpeech();
   const utterance = new SpeechSynthesisUtterance(text);
   utterance.lang = 'en-AU';
   utterance.rate = Math.max(0.75, Math.min(1.4, 0.96 * speed));
   utterance.pitch = 1;
+  let active = true;
+  const finish = () => {
+    if (!active) return;
+    active = false;
+    onDone?.();
+  };
+  utterance.onend = finish;
+  utterance.onerror = finish;
   window.speechSynthesis.speak(utterance);
+
+  return () => {
+    if (!active) return;
+    active = false;
+    utterance.onend = null;
+    utterance.onerror = null;
+    cancelSpeech();
+  };
 }
 
-function beatDelay(line, first, hasVisuals, voice) {
+function beatDelay(line, first, hasVisuals) {
   const chars = speechText(line).length;
-  const voiceFloor = voice ? 1250 : 0;
-  return Math.max(900, voiceFloor, Math.min(3400, 680 + chars * 27 + (first && hasVisuals ? 500 : 0)));
+  return Math.max(900, Math.min(3400, 680 + chars * 27 + (first && hasVisuals ? 500 : 0)));
 }
 
 function holdDelay(scene) {
@@ -78,12 +100,13 @@ export default function PriExplainV5({ questionId, questionPrompt, questionFigur
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState(1);
   const [voice, setVoice] = useState(false);
+  const [narrating, setNarrating] = useState(false);
   const [reduceMotion, setReduceMotion] = useState(initialReduceMotion);
   const timerRef = useRef(null);
+  const speechCancelRef = useRef(null);
   const dialogRef = useRef(null);
   const launchRef = useRef(null);
   const wrongRef = useRef(null);
-  const spokenRef = useRef('');
 
   const timeline = useMemo(() => buildVisualTimeline(payload?.solution, {
     ...payload,
@@ -96,20 +119,31 @@ export default function PriExplainV5({ questionId, questionPrompt, questionFigur
   const lineCount = current?.lines?.length || 0;
   const revealedLines = reduceMotion ? lineCount : Math.min(beat, lineCount);
   const sceneComplete = reduceMotion || beat >= lineCount;
-  const visualProgress = reduceMotion ? 1 : lineCount ? Math.min(1, revealedLines / lineCount) : 1;
+  const visualCues = useMemo(() => visualCuePlan(current?.visuals || [], lineCount), [current, lineCount]);
   const hasCheckpoint = Boolean(current?.visuals?.some(visual => visual.kind === 'checkpoint'));
   const checkpointPending = sceneComplete && hasCheckpoint && !checkpointPassed;
   const atEnd = timeline.length > 0 && index === timeline.length - 1;
   const atFinished = atEnd && sceneComplete && !checkpointPending;
   const visualKinds = useMemo(() => visualSummary(timeline), [timeline]);
 
+  const stopNarration = () => {
+    speechCancelRef.current?.();
+    speechCancelRef.current = null;
+    setNarrating(false);
+  };
+
   const goScene = (nextIndex, revealAll = false) => {
     if (!timeline.length) return;
     const bounded = Math.max(0, Math.min(nextIndex, timeline.length - 1));
+    stopNarration();
     setIndex(bounded);
     setBeat(revealAll ? (timeline[bounded]?.lines?.length || 0) : 0);
     setCheckpointPassed(false);
-    spokenRef.current = '';
+  };
+
+  const pausePlayback = () => {
+    setPlaying(false);
+    stopNarration();
   };
 
   const stepForward = () => {
@@ -134,7 +168,6 @@ export default function PriExplainV5({ questionId, questionPrompt, questionFigur
     }
     if (beat > 0 && !reduceMotion) {
       setBeat(value => Math.max(0, value - 1));
-      spokenRef.current = '';
       return;
     }
     if (index > 0) goScene(index - 1, true);
@@ -150,11 +183,11 @@ export default function PriExplainV5({ questionId, questionPrompt, questionFigur
     if (!query) return undefined;
     const onChange = event => {
       setReduceMotion(Boolean(event.matches));
-      if (event.matches) setPlaying(false);
+      if (event.matches) pausePlayback();
     };
     query.addEventListener?.('change', onChange);
     return () => query.removeEventListener?.('change', onChange);
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     wrongRef.current = null;
@@ -165,9 +198,9 @@ export default function PriExplainV5({ questionId, questionPrompt, questionFigur
     setCheckpointPassed(false);
     setPlaying(false);
     setVoice(false);
-    spokenRef.current = '';
+    stopNarration();
     cancelSpeech();
-  }, [questionId]);
+  }, [questionId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const receiveAttempt = event => {
@@ -191,7 +224,7 @@ export default function PriExplainV5({ questionId, questionPrompt, questionFigur
       setBeat(0);
       setCheckpointPassed(false);
       setPlaying(false);
-      spokenRef.current = '';
+      stopNarration();
     };
     window.addEventListener(ATTEMPT_EVENT, receiveAttempt);
     window.addEventListener(SOLUTION_EVENT, receiveSolution);
@@ -199,17 +232,54 @@ export default function PriExplainV5({ questionId, questionPrompt, questionFigur
       window.removeEventListener(ATTEMPT_EVENT, receiveAttempt);
       window.removeEventListener(SOLUTION_EVENT, receiveSolution);
     };
-  }, [questionId]);
+  }, [questionId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     clearTimeout(timerRef.current);
-    if (!open || !playing || !current || reduceMotion) return undefined;
+    speechCancelRef.current?.();
+    speechCancelRef.current = null;
 
+    if (!open || !playing || !current || reduceMotion) {
+      setNarrating(false);
+      return undefined;
+    }
+
+    const advanceAfterNarration = () => {
+      speechCancelRef.current = null;
+      setNarrating(false);
+      if (beat < lineCount) {
+        setBeat(value => Math.min(value + 1, lineCount));
+        return;
+      }
+      if (checkpointPending) {
+        setPlaying(false);
+        return;
+      }
+      if (atEnd) {
+        setPlaying(false);
+        return;
+      }
+      timerRef.current = setTimeout(() => goScene(index + 1, false), holdDelay(current) / speed);
+    };
+
+    if (voice && canSpeak()) {
+      const source = beat === 0
+        ? current.heading
+        : current.lines?.[Math.min(beat - 1, Math.max(0, lineCount - 1))] || current.heading;
+      setNarrating(true);
+      speechCancelRef.current = speakBeat(source, speed, advanceAfterNarration);
+      return () => {
+        speechCancelRef.current?.();
+        speechCancelRef.current = null;
+      };
+    }
+
+    setNarrating(false);
     if (beat < lineCount) {
       const line = current.lines[beat] || '';
       timerRef.current = setTimeout(
         () => setBeat(value => Math.min(value + 1, lineCount)),
-        beatDelay(line, beat === 0, Boolean(current.visuals?.length), voice) / speed,
+        beatDelay(line, beat === 0, Boolean(current.visuals?.length)) / speed,
       );
       return () => clearTimeout(timerRef.current);
     }
@@ -229,43 +299,32 @@ export default function PriExplainV5({ questionId, questionPrompt, questionFigur
   }, [open, playing, current, atEnd, checkpointPending, index, beat, lineCount, speed, reduceMotion, voice]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (!open || !voice || !current) {
-      if (!voice) cancelSpeech();
-      return undefined;
-    }
-    const source = beat === 0
-      ? current.heading
-      : current.lines?.[Math.min(beat - 1, lineCount - 1)] || current.heading;
-    const key = `${current.id}:${beat}:${source}`;
-    if (!source || spokenRef.current === key) return undefined;
-    spokenRef.current = key;
-    speakBeat(source, speed);
-    return undefined;
-  }, [open, voice, current, beat, lineCount, speed]);
-
-  useEffect(() => {
     if (!open) return undefined;
     const onKey = event => {
       if (event.key === 'Escape') {
-        setOpen(false); setPlaying(false); cancelSpeech();
+        setOpen(false); pausePlayback(); cancelSpeech();
         setTimeout(() => launchRef.current?.focus(), 0);
       } else if (event.key === 'ArrowRight') {
-        setPlaying(false); stepForward();
+        pausePlayback(); stepForward();
       } else if (event.key === 'ArrowLeft') {
-        setPlaying(false); stepBack();
+        pausePlayback(); stepBack();
       } else if (event.key === ' ' && !['BUTTON', 'SELECT', 'INPUT'].includes(event.target?.tagName)) {
         event.preventDefault();
         if (checkpointPending) stepForward();
         else if (atFinished) restart();
-        else setPlaying(value => !value);
+        else if (playing) pausePlayback();
+        else setPlaying(true);
       }
     };
     window.addEventListener('keydown', onKey);
     setTimeout(() => dialogRef.current?.focus(), 0);
     return () => window.removeEventListener('keydown', onKey);
-  }, [open, index, beat, lineCount, checkpointPending, checkpointPassed, atFinished, reduceMotion]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [open, index, beat, lineCount, checkpointPending, checkpointPassed, atFinished, reduceMotion, playing]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => () => cancelSpeech(), []);
+  useEffect(() => () => {
+    speechCancelRef.current?.();
+    cancelSpeech();
+  }, []);
 
   if (!payload || !timeline.length) return null;
 
@@ -276,21 +335,25 @@ export default function PriExplainV5({ questionId, questionPrompt, questionFigur
     : atFinished
       ? 'Complete'
       : playing
-        ? (beat < lineCount ? 'Teaching the next move' : 'Moving to the next step')
+        ? narrating
+          ? 'Narrating this move'
+          : beat < lineCount ? 'Teaching the next move' : 'Moving to the next step'
         : 'Paused';
   const activeLine = revealedLines > 0 ? revealedLines - 1 : -1;
 
   const close = () => {
-    setOpen(false); setPlaying(false); cancelSpeech();
+    setOpen(false);
+    pausePlayback();
+    cancelSpeech();
     setTimeout(() => launchRef.current?.focus(), 0);
   };
 
   return (
     <>
       <button ref={launchRef} className="pri-explain-launch no-print" type="button"
-        onClick={() => { setOpen(true); setBeat(0); setCheckpointPassed(false); spokenRef.current = ''; setPlaying(!reduceMotion); }} aria-haspopup="dialog">
+        onClick={() => { setOpen(true); setBeat(0); setCheckpointPassed(false); setPlaying(!reduceMotion); }} aria-haspopup="dialog">
         <span className="pri-explain-play" aria-hidden="true">▶</span>
-        <span><b>Watch explanation</b><small>{visualKinds.length ? 'Beat-synchronised visual working' : 'Animated worked solution'}</small></span>
+        <span><b>Watch explanation</b><small>{visualKinds.length ? 'Teacher-synchronised visual working' : 'Animated worked solution'}</small></span>
       </button>
 
       {open && (
@@ -298,8 +361,8 @@ export default function PriExplainV5({ questionId, questionPrompt, questionFigur
           <section className="pri-explain-dialog" role="dialog" aria-modal="true" aria-label="Animated worked solution" tabIndex={-1} ref={dialogRef}>
             <header className="pri-explain-head">
               <div>
-                <div className="pri-explain-kicker">Pri Explain · Board Mode V4 · V5 choreography</div>
-                <h2>Watch each mathematical move appear when the teacher explains it</h2>
+                <div className="pri-explain-kicker">Pri Explain · Board Mode V4 · V7 teacher conductor</div>
+                <h2>Watch the teacher explain, write and build each mathematical move in sync</h2>
                 {!!visualKinds.length && <div className="pri-explain-capabilities" aria-label="Visual explanation capabilities">
                   {visualKinds.map(kind => <span key={kind}>{VISUAL_NAMES[kind] || kind}</span>)}
                 </div>}
@@ -329,19 +392,30 @@ export default function PriExplainV5({ questionId, questionPrompt, questionFigur
                   <div className="pri-explain-board">
                     {!!current.visuals?.length && (
                       <div className="pri-explain-visuals">
-                        {current.visuals.map((visual, visualIndex) => (
-                          <VisualBlock
-                            key={`${current.id}-${visual.kind}-${visualIndex}`}
-                            visual={visual}
-                            progress={visualProgress}
-                            complete={sceneComplete}
-                          />
-                        ))}
+                        {current.visuals.map((visual, visualIndex) => {
+                          const cue = visualCues[visualIndex];
+                          const cueState = visualCueState(cue, revealedLines, reduceMotion);
+                          const cueProgress = visualProgressForCue(cue, revealedLines, reduceMotion);
+                          return (
+                            <div
+                              key={`${current.id}-${visual.kind}-${visualIndex}`}
+                              className={`pri-explain-visual-beat ${cueState}`}
+                              data-visual-kind={visual.kind === 'figure' ? visual.mode : visual.kind}
+                            >
+                              {cueState === 'active' && visual.kind !== 'checkpoint' && <span className="pri-explain-now" aria-hidden="true">now</span>}
+                              <VisualBlock visual={visual} progress={cueProgress} complete={sceneComplete} />
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
 
                     <div className="pri-explain-lines">
-                      {playing && !checkpointPending && <div className="pri-explain-teacher-cue" aria-hidden="true"><i /><span>teacher is working</span></div>}
+                      {playing && !checkpointPending && (
+                        <div className={`pri-explain-teacher-cue ${narrating ? 'narrating' : ''}`} aria-hidden="true">
+                          <i /><span>{narrating ? 'teacher is explaining' : 'teacher is working'}</span>
+                        </div>
+                      )}
                       {(current.lines || []).slice(0, revealedLines).map((line, lineIndex) => (
                         <div key={`${current.id}-${lineIndex}`} className={`pri-explain-line ${lineIndex === activeLine ? 'current' : ''}`}>
                           <span className="pri-explain-line-number" aria-hidden="true">{lineIndex + 1}</span>
@@ -349,7 +423,7 @@ export default function PriExplainV5({ questionId, questionPrompt, questionFigur
                         </div>
                       ))}
                       {!reduceMotion && revealedLines < lineCount && (
-                        <div className="pri-explain-writing" aria-hidden="true"><i /><span>preparing the next move…</span></div>
+                        <div className="pri-explain-writing" aria-hidden="true"><i /><span>{voice && playing ? 'listening, then writing the next move…' : 'preparing the next move…'}</span></div>
                       )}
                     </div>
                   </div>
@@ -380,17 +454,19 @@ export default function PriExplainV5({ questionId, questionPrompt, questionFigur
             <footer className="pri-explain-controls">
               <div>
                 <button className="btn btn-ghost btn-sm" type="button" onClick={restart}>↺ Restart</button>
-                <button className="btn btn-ghost btn-sm" type="button" onClick={() => { setPlaying(false); stepBack(); }} disabled={index === 0 && beat === 0 && !checkpointPassed}>‹ Back</button>
+                <button className="btn btn-ghost btn-sm" type="button" onClick={() => { pausePlayback(); stepBack(); }} disabled={index === 0 && beat === 0 && !checkpointPassed}>‹ Back</button>
                 <button className="btn btn-primary btn-sm" type="button" onClick={() => {
-                  if (atFinished) restart(); else setPlaying(value => !value);
+                  if (atFinished) restart();
+                  else if (playing) pausePlayback();
+                  else setPlaying(true);
                 }} disabled={reduceMotion || checkpointPending}>{checkpointPending ? 'Your turn' : reduceMotion ? 'Motion reduced' : playing ? 'Pause' : atFinished ? 'Replay' : 'Play'}</button>
-                <button className="btn btn-ghost btn-sm" type="button" onClick={() => { setPlaying(false); stepForward(); }} disabled={atFinished}>{checkpointPending ? 'Continue ›' : 'Next ›'}</button>
+                <button className="btn btn-ghost btn-sm" type="button" onClick={() => { pausePlayback(); stepForward(); }} disabled={atFinished}>{checkpointPending ? 'Continue ›' : 'Next ›'}</button>
               </div>
               <div className="pri-explain-settings">
-                <label>Speed<select value={speed} onChange={event => { setSpeed(Number(event.target.value)); spokenRef.current = ''; }} aria-label="Explanation speed" disabled={reduceMotion}>
+                <label>Speed<select value={speed} onChange={event => setSpeed(Number(event.target.value))} aria-label="Explanation speed" disabled={reduceMotion}>
                   {SPEEDS.map(value => <option key={value} value={value}>{value}×</option>)}
                 </select></label>
-                <label className="pri-explain-voice"><input type="checkbox" checked={voice} disabled={!canSpeak()} onChange={event => { spokenRef.current = ''; setVoice(event.target.checked); }} />Voice</label>
+                <label className="pri-explain-voice"><input type="checkbox" checked={voice} disabled={!canSpeak()} onChange={event => setVoice(event.target.checked)} />Voice sync</label>
               </div>
             </footer>
           </section>
