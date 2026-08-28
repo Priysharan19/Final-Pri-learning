@@ -1,0 +1,46 @@
+name: Temporary PR66 iOS bundle sync
+
+on:
+  push:
+    branches:
+      - pri-explain-board-v4
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: pri-explain-board-v4
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+
+      - name: Install client dependencies
+        run: npm ci --prefix client
+
+      - name: Build client
+        run: npm run build
+
+      - name: Refresh tracked iPad bundles
+        run: node scripts/sync-ios.mjs
+
+      - name: Commit generated iPad bundle
+        run: |
+          if git diff --quiet -- ios; then
+            echo 'iPad bundles already match.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add ios
+          git commit -m 'chore(ios): sync teaching-beat Board Mode V4 bundle'
+          git push origin HEAD:pri-explain-board-v4
