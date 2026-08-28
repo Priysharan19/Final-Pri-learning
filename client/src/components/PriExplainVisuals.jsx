@@ -5,7 +5,7 @@ import './PriExplainVisuals.css';
 
 const clamp01 = value => Math.max(0, Math.min(1, Number(value) || 0));
 
-function tokenMotionPlan(diff) {
+export function tokenMotionPlan(diff) {
   const before = (diff?.before || []).map((token, index) => ({ ...token, index, state: token.changed ? 'leaving' : 'stable' }));
   const after = (diff?.after || []).map((token, index) => ({ ...token, index, state: token.changed ? 'entering' : 'stable' }));
   const waitingAfter = new Map();
