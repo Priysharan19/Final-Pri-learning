@@ -140,16 +140,14 @@ export function InkReplay({ visual, progress = 1 }) {
   );
 }
 
-export function AttemptReplay({ visual, progress = 1 }) {
+export function AttemptReplay({ visual }) {
   const attempt = visual?.attempt;
   if (!attempt) return null;
-  const p = clamp01(progress);
   return (
     <div className="pri-v-attempt pri-v-choreographed">
       <span>Your submitted working</span>
-      {p >= 0.3 && attempt.working && <MathText text={attempt.working} />}
-      {p >= 0.3 && !attempt.working && attempt.answer && <MathText text={attempt.answer} />}
-      {p < 0.3 && <div className="pri-v-attempt-placeholder" aria-hidden="true" />}
+      {attempt.working && <MathText text={attempt.working} />}
+      {!attempt.working && attempt.answer && <MathText text={attempt.answer} />}
     </div>
   );
 }
@@ -179,7 +177,7 @@ export function VisualBlock({ visual, progress = 1, complete = true }) {
   if (visual.kind === 'focus') return <MathFocus visual={visual} progress={progress} />;
   if (visual.kind === 'checkpoint') return <Checkpoint visual={visual} complete={complete} />;
   if (visual.kind === 'ink') return <InkReplay visual={visual} progress={progress} />;
-  if (visual.kind === 'attempt') return <AttemptReplay visual={visual} progress={progress} />;
+  if (visual.kind === 'attempt') return <AttemptReplay visual={visual} />;
   if (visual.kind === 'figure') return <AnimatedFigure visual={visual} progress={progress} />;
   return null;
 }
