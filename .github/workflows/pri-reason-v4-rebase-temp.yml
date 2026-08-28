@@ -1,0 +1,62 @@
+name: Pri Reason V4 rebase temp
+
+on:
+  push:
+    branches:
+      - feature/pri-reason-v4-domain-regions
+    paths:
+      - '.github/workflows/pri-reason-v4-rebase-temp.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  rebuild-combined-ipad:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout rebased V4 branch
+        uses: actions/checkout@v4
+        with:
+          ref: feature/pri-reason-v4-domain-regions
+          fetch-depth: 0
+      - name: Use Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install client dependencies
+        run: npm ci --prefix client
+      - name: Pri Reason V1
+        run: node client/test/pri-reason-check.mjs
+      - name: Pri Reason V2
+        run: node client/test/pri-reason-v2-check.mjs
+      - name: Pri Reason V3
+        run: node client/test/pri-reason-v3-check.mjs
+      - name: Pri Reason V4
+        run: node client/test/pri-reason-v4-check.mjs
+      - name: Authored curriculum integration
+        run: node client/test/pri-reason-curriculum-check.mjs
+      - name: Diagnosis regression
+        run: node client/test/diagnose-check.mjs
+      - name: Pri Explain V8 integration regression
+        run: node client/test/pri-explain-v8-check.mjs
+      - name: Production build
+        run: npm run build
+      - name: Refresh tracked iPad bundles
+        run: npm run sync:ios
+      - name: Verify iPad parity
+        run: npm run check:ios
+      - name: Diff safety
+        run: git diff --check
+      - name: Commit combined iPad bundles
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add ios/PriLearning.swiftpm/Resources/Web \
+                  'ios/PriLearning 2.swiftpm/Resources/Web'
+          if git diff --cached --quiet; then
+            echo 'Combined bundles already match.'
+          else
+            git commit -m "Regenerate iPad bundles after V4 rebase"
+            git push origin HEAD:feature/pri-reason-v4-domain-regions
+          fi
