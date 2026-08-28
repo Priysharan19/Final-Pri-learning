@@ -65,6 +65,11 @@ export default function Practice() {
     if (loading.current) return;
     loading.current = true;
     setError('');
+    // Clear the resolved question before generation starts. Otherwise closing
+    // Pri Explain briefly exposes the stale evaluation card while the fresh
+    // transfer question is being created, which makes the hand-off feel like
+    // nothing happened and can invite a duplicate tap.
+    setServe(null);
     try {
       const r = await api.post('/practice/next', {
         mode: 'topic',
