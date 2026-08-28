@@ -7,9 +7,9 @@ This is a deliberately isolated online service for physical-store promotions. It
 1. The printed QR opens `GET /c/a2z`.
 2. The page opens a tracked Instagram DM link for `@pri.learning` with `ref=pri-a2z-qr-2026`.
 3. Meta can deliver that campaign value through the `messaging_referral` webhook; the service stores the Instagram-scoped identity → A2Z attribution.
-4. The customer sends `A2Z` (also retained as a fallback campaign signal).
-5. The service issues one claim code for that Instagram-scoped identity and campaign.
-6. A2Z staff redeems the code once at `GET /staff`.
+4. The customer sends `A2Z` to complete the messaging interaction.
+5. The service issues one claim code **only if that Instagram-scoped identity already has the verified A2Z referral**. Knowing or sharing the keyword alone is not enough.
+6. A2Z staff redeems the code once at `GET /staff` and sees whether the A2Z QR source was verified plus the observed follow state.
 7. After redemption, the same Instagram-scoped identity can never receive another reward for the A2Z campaign, even if it later unfollows and refollows.
 
 The reward is intentionally **not conditional on following**. `is_user_follow_business` is recorded only as an optional engagement signal.
@@ -17,7 +17,7 @@ The reward is intentionally **not conditional on following**. `is_user_follow_bu
 ## Integrity and security
 
 - Unique `(campaign_id, instagram_scoped_id)` database constraint.
-- Tracked `ig.me` campaign referral plus keyword fallback.
+- Tracked `ig.me` campaign referral is required for production eligibility; the public keyword alone cannot mint a claim.
 - Atomic SQLite `BEGIN IMMEDIATE` redemption transaction.
 - HMAC-SHA256 hashed claim codes; raw codes are not stored.
 - Meta `X-Hub-Signature-256` verification.
@@ -43,7 +43,7 @@ curl -s http://localhost:8787/dev/simulate \
   -d '{"pin":"2468","instagramScopedId":"demo-001","username":"demo_student","followsBusiness":true}'
 ```
 
-Then open `http://localhost:8787/staff`, redeem the returned code, and verify that a second redemption is rejected.
+The simulator intentionally bypasses Meta attribution so the redemption path can be exercised locally. Then open `http://localhost:8787/staff`, redeem the returned code, and verify that a second redemption is rejected.
 
 ## Meta / Instagram setup for @pri.learning
 
