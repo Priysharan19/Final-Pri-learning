@@ -26,16 +26,17 @@ export function campaignPage({ instagramUsername, keyword, refCode, rewardLabel 
     <div class="brand"><span class="mark">P</span> PRI LEARNING</div>
     <section class="card">
       <span class="eyebrow">A2Z × Pri Learning</span>
-      <h1>One scan.<br>One reward.</h1>
-      <p>This QR carries the A2Z campaign ID. Message Pri Learning once, receive a one-time claim code, and show it to staff for your ${escapeHtml(rewardLabel)}.</p>
+      <h1>Follow. Verify.<br>Get your reward.</h1>
+      <p>This QR identifies the A2Z campaign. To receive your ${escapeHtml(rewardLabel)}, follow @${escapeHtml(instagramUsername)}, enter the tracked A2Z Instagram conversation, and let Pri Learning verify your follow before issuing a one-time code.</p>
       <div class="steps">
-        <div class="step"><span class="num">1</span><div><b>Open the tracked Instagram DM</b><span>The button carries this A2Z QR campaign’s referral ID into Instagram.</span></div></div>
-        <div class="step"><span class="num">2</span><div><b>Send <span class="code">${escapeHtml(keyword)}</span></b><span>Send the keyword so Pri Learning can issue your claim. If Instagram delivers the QR referral, the backend also records that this conversation came from A2Z.</span></div></div>
-        <div class="step"><span class="num">3</span><div><b>Show your one-time code</b><span>Staff enters your code once. After redemption, this Instagram identity cannot claim again for this campaign.</span></div></div>
+        <div class="step"><span class="num">1</span><div><b>Follow @${escapeHtml(instagramUsername)}</b><span>Open the Instagram profile and follow the account. The reward is only issued after Instagram confirms the follow.</span></div></div>
+        <div class="step"><span class="num">2</span><div><b>Open the tracked A2Z DM</b><span>The tracked button carries this QR campaign’s referral ID into Instagram so the system can attribute the claim to A2Z.</span></div></div>
+        <div class="step"><span class="num">3</span><div><b>Send <span class="code">${escapeHtml(keyword)}</span></b><span>Pri Learning checks the A2Z referral and your Instagram follow state. If both are verified and you have not already redeemed, a claim code is sent back.</span></div></div>
+        <div class="step"><span class="num">4</span><div><b>Show your one-time code</b><span>A2Z staff redeems it once. After redemption, this Instagram identity cannot claim again even if it later unfollows and follows again.</span></div></div>
       </div>
-      <a class="button" href="${dmUrl}" rel="noopener noreferrer">Message @${escapeHtml(instagramUsername)} on Instagram</a>
-      <a class="button secondary" href="${profileUrl}" rel="noopener noreferrer">Open Instagram profile instead</a>
-      <p class="note">Following @${escapeHtml(instagramUsername)} is optional and does not change reward eligibility. One reward is available per Instagram identity for this campaign. The tracked DM link works best on a phone with Instagram installed.</p>
+      <a class="button" href="${profileUrl}" rel="noopener noreferrer">1. Follow @${escapeHtml(instagramUsername)}</a>
+      <a class="button secondary" href="${dmUrl}" rel="noopener noreferrer">2. Continue to A2Z verification DM</a>
+      <p class="note">A valid reward requires both the tracked A2Z Instagram referral and a verified follow of @${escapeHtml(instagramUsername)}. One redeemed reward is permanently allowed per Instagram identity for this campaign.</p>
     </section>
   `);
 }
@@ -46,7 +47,7 @@ export function staffPage() {
     <section class="card">
       <span class="eyebrow">Redemption console</span>
       <h1>Verify a claim.</h1>
-      <p>Enter the customer’s one-time Pri code. A successful redemption is atomic: the same code cannot be accepted twice.</p>
+      <p>Enter the customer’s one-time Pri code. Valid codes were issued only after A2Z campaign attribution and Instagram follow verification. A successful redemption is atomic: the same reward cannot be accepted twice.</p>
       <form id="redeem" class="form">
         <label>Claim code<input name="code" autocomplete="off" autocapitalize="characters" placeholder="PRI-ABCD-2345" required></label>
         <label>Staff PIN<input name="pin" type="password" inputmode="numeric" autocomplete="current-password" required></label>
@@ -58,7 +59,7 @@ export function staffPage() {
     </section>
     <script>
     const form=document.getElementById('redeem');const result=document.getElementById('result');
-    form.addEventListener('submit',async(e)=>{e.preventDefault();result.className='result';result.textContent='Checking…';const fd=new FormData(form);try{const r=await fetch('/api/redeem',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({code:fd.get('code'),pin:fd.get('pin')})});const j=await r.json();if(j.status==='redeemed'){const follow=j.followsBusiness===true?'follow detected':j.followsBusiness===false?'not following':'follow state unavailable';const source=j.sourceVerified?'A2Z QR verified':'source not verified';result.className='result good';result.textContent='✓ VALID — '+source+' · '+follow+'. Give 1 '+j.rewardLabel+'. This claim is now permanently redeemed.';form.elements.code.value='';}else if(j.status==='already_redeemed'){result.className='result bad';result.textContent='✕ ALREADY REDEEMED — do not issue another reward.';}else if(j.error==='invalid_staff_pin'){result.className='result bad';result.textContent='✕ Staff PIN incorrect.';}else{result.className='result bad';result.textContent='✕ INVALID CODE — do not issue a reward.';}}catch{result.className='result bad';result.textContent='Could not reach the verification server. Do not redeem until online.';}});
+    form.addEventListener('submit',async(e)=>{e.preventDefault();result.className='result';result.textContent='Checking…';const fd=new FormData(form);try{const r=await fetch('/api/redeem',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({code:fd.get('code'),pin:fd.get('pin')})});const j=await r.json();if(j.status==='redeemed'){const follow=j.followsBusiness===true?'follow verified at claim':j.followsBusiness===false?'follow not verified':'follow state unavailable';const source=j.sourceVerified?'A2Z QR verified':'source not verified';result.className='result good';result.textContent='✓ VALID — '+source+' · '+follow+'. Give 1 '+j.rewardLabel+'. This claim is now permanently redeemed.';form.elements.code.value='';}else if(j.status==='already_redeemed'){result.className='result bad';result.textContent='✕ ALREADY REDEEMED — do not issue another reward.';}else if(j.error==='invalid_staff_pin'){result.className='result bad';result.textContent='✕ Staff PIN incorrect.';}else{result.className='result bad';result.textContent='✕ INVALID CODE — do not issue a reward.';}}catch{result.className='result bad';result.textContent='Could not reach the verification server. Do not redeem until online.';}});
     </script>
   `);
 }
