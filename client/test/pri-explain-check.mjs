@@ -6,6 +6,7 @@ import {
   diffMath,
   extractMath,
   mathTokens,
+  teachingBeats,
   visualSummary,
 } from '../src/explain/visualEngine.js';
 import {
@@ -43,6 +44,14 @@ check('marks only changed terms across an equation transition', () => {
   assert.ok(diff.changedBefore.includes('+'));
   assert.ok(diff.changedAfter.includes('3'));
   assert.equal(diff.after.find(t => t.text === 'x')?.changed, false);
+});
+
+check('splits prose into teacher-paced beats without splitting maths', () => {
+  assert.deepEqual(teachingBeats('Subtract $2.5$ from both sides. Keep the equation balanced.\nThen simplify to $x=3$.'), [
+    'Subtract $2.5$ from both sides.',
+    'Keep the equation balanced.',
+    'Then simplify to $x=3$.',
+  ]);
 });
 
 check('indexes only mathematics contained in the verified solution', () => {
@@ -188,6 +197,15 @@ check('builds an equation-motion scene from verified consecutive steps', () => {
   assert.equal(timeline[1].visuals[0].kind, 'transform');
   assert.equal(timeline[1].visuals[0].after, 'x=3');
   assert.equal(timeline[1].storyboardSource, 'deterministic');
+});
+
+check('deterministic scenes preserve sentence-level teaching beats', () => {
+  const timeline = buildVisualTimeline({
+    steps: [{ h: 'Balance it', d: 'Subtract $2$ from both sides. This keeps equality balanced. Then simplify to $x=3$.' }],
+    answerText: '$x=3$',
+  }, { questionPrompt: 'Solve the equation.' });
+  assert.equal(timeline[0].lines.length, 3);
+  assert.equal(timeline[0].lines[2], 'Then simplify to $x=3$.');
 });
 
 check('uses a valid solution storyboard in preference to deterministic inference', () => {
