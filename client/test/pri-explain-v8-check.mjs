@@ -62,6 +62,14 @@ check('confirmed misconception ledger drives recovery without inventing a label'
   assert.match(profile.focus.message, /3/);
 });
 
+check('reveal-only recovery never fabricates a student attempt', () => {
+  const profile = buildTeachingProfile({ payload: { correct: false, revealed: true }, timeline });
+  assert.equal(profile.mode, TEACHING_MODES.RECOVERY);
+  assert.equal(profile.focus, null);
+  assert.match(profile.reason, /chose to reveal/i);
+  assert.doesNotMatch(profile.reason, /your actual attempt/i);
+});
+
 check('hard junior work receives extra scaffolding without a fake misconception', () => {
   const profile = buildTeachingProfile({
     payload: { correct: true },
