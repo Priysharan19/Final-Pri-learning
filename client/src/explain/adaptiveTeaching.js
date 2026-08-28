@@ -70,7 +70,7 @@ function evidenceFocus(payload = {}) {
       confidence: 'marker-ledger',
     };
   }
-  if (payload?.hadWrongAttempt || payload?.correct === false) {
+  if (payload?.hadWrongAttempt || payload?.wrongAttempt) {
     return {
       kind: 'attempt',
       label: 'Compare your first attempt with the verified path',
@@ -122,7 +122,7 @@ export function buildTeachingProfile({ payload = {}, studentContext = {}, timeli
   const answered = bounded(studentContext?.session?.answered, 0, 10000, 0);
 
   let mode = TEACHING_MODES.GUIDED;
-  if (payload?.hadWrongAttempt || payload?.correct === false || payload?.revealed || focus?.kind === 'diagnosis' || focus?.kind === 'misconception') {
+  if (payload?.hadWrongAttempt || payload?.wrongAttempt || payload?.correct === false || payload?.revealed || focus?.kind === 'diagnosis' || focus?.kind === 'misconception') {
     mode = TEACHING_MODES.RECOVERY;
   } else if ((year <= 8 && difficulty >= 3) || difficulty >= 4 || (accuracy != null && answered >= 3 && accuracy < 0.55)) {
     mode = TEACHING_MODES.SCAFFOLDED;
@@ -138,7 +138,9 @@ export function buildTeachingProfile({ payload = {}, studentContext = {}, timeli
       ? 'Pri is giving extra attention to a misconception already confirmed by your learning history.'
       : focus?.kind === 'attempt'
         ? 'Pri is comparing your first attempt with the verified solution path.'
-        : meta.reason;
+        : payload?.revealed
+          ? 'Pri is slowing the walkthrough because you chose to reveal the verified solution.'
+          : meta.reason;
 
   return {
     mode,
