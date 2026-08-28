@@ -10,12 +10,42 @@ page are recognisably the same object.
 |---|---|
 | `page.html.part` | The source. Edit this. `__FONTS__` is the font-injection slot. |
 | `build.mjs` | Inlines the KaTeX faces and writes the two outputs below. |
-| `claim.html` | **The deliverable** — a complete document to serve at `GET /c/a2z`. |
+| `claim.html` | The whole page as one static document (generated). |
+| `claim-template.mjs` | **The deliverable** — `renderClaimPage()`, ESM (generated). |
+| `claim-template.cjs` | Same function for a non-ESM server (generated). |
 | `claim-preview.html` | Body-only variant, for publishing as an Artifact (generated). |
+| `template.test.mjs` | Contract tests for the render function. `node template.test.mjs`. |
+
+The generated files are committed on purpose: `build.mjs` reads the KaTeX faces
+from `client/node_modules/katex`, which a fresh clone does not have, so without
+them the page would be unobtainable without an `npm install` first.
+
+## Wiring it in
+
+Two lines, whatever serves the route:
+
+```js
+import { renderClaimPage } from './claim-template.mjs';
+
+app.get('/c/:campaign', (req, res) => {
+  const { message, expiresAt } = issueVerificationMessage(req);   // your existing logic
+  res.type('html').send(renderClaimPage({ verificationMessage: message, expiresAt }));
+});
+```
+
+`verificationMessage` is required and is the exact text the visitor must send.
+`expiresAt` is optional. Both are escaped for the context they land in, so a
+message containing `</script>` cannot break out — see `template.test.mjs`.
+`dmUrl` and `profileUrl` override the Instagram targets and default to the ones
+the current page uses.
+
+If you would rather not import anything, `claim.html` is the same page as a flat
+document: paste it into your template string and keep whatever line injects the
+message into `#verification-message`.
 
 ## Server contract
 
-Unchanged from the page it replaces, so this is a template swap and nothing else:
+Unchanged from the page it replaces, so this is a swap and nothing else:
 
 - Inject the verification message as the **text** of `#verification-message`.
 - The ids the old page used are all still here: `#verification-message`,
