@@ -843,6 +843,7 @@ export const year11 = {
         answerType: 'expression', answer: { expr: `${a * n}x^${n - 1}` },
         inputHint: `e.g. ${a * n}x^${n - 1}`,
         answerPrefix: 'dy/dx =',
+        stepcheck: { kind: 'derivative', variable: 'x', source: `${a}x^${n}`, canonical: `${a * n}x^${n - 1}` },
         traps: [
           { expr: `${a * n}x^${n}`, why: 'Multiply by the old power *and* reduce the power by 1.' },
           { expr: `${a}x^${n - 1}`, why: 'The old power multiplies out the front: bring the ' + n + ' down.' }
@@ -861,6 +862,7 @@ export const year11 = {
         answerType: 'expression', answer: { expr: `${3 * a}x^2 + ${2 * b}x + ${c}` },
         inputHint: 'e.g. 6x^2 - 4x + 3',
         answerPrefix: "f '(x) =",
+        stepcheck: { kind: 'derivative', variable: 'x', source: poly([a, b, c, d]), canonical: `${3 * a}x^2 + ${2 * b}x + ${c}` },
         traps: [{ expr: `${3 * a}x^2 + ${2 * b}x + ${c === 0 ? 1 : c}x`, why: `The derivative of $${c}x$ is just $${c}$ — and the constant ${d} vanishes.` }],
         hints: ['Differentiate term by term with the power rule.', `$x^3 → 3x^2$, $x^2 → 2x$, $x → 1$, constant → 0.`, `$${a}x^3 → ${3 * a}x^2$, $\\ ${b}x^2 → ${2 * b}x$, $\\ ${c}x → ${c}$, $\\ ${d} → 0$.`],
         steps: [
