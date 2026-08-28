@@ -21,7 +21,7 @@ async function waitForHealth(baseUrl, child) {
   throw new Error('server did not become healthy');
 }
 
-test('HTTP flow issues once, redeems once, and permanently blocks reclaim', async (t) => {
+test('HTTP flow exposes tracked A2Z DM, redeems once, and permanently blocks reclaim', async (t) => {
   const dir = mkdtempSync(join(tmpdir(), 'pri-promotions-'));
   const port = randomInt(18000, 28000);
   const baseUrl = `http://127.0.0.1:${port}`;
@@ -35,6 +35,7 @@ test('HTTP flow issues once, redeems once, and permanently blocks reclaim', asyn
       PROMOTIONS_DB_PATH: join(dir, 'test.sqlite'),
       CLAIM_SECRET: 'test-claim-secret-which-is-long-enough-123456789',
       STAFF_PIN: '2468',
+      CAMPAIGN_REF: 'pri-a2z-qr-2026',
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
@@ -46,6 +47,11 @@ test('HTTP flow issues once, redeems once, and permanently blocks reclaim', asyn
   });
 
   await waitForHealth(baseUrl, child);
+
+  const landing = await fetch(`${baseUrl}/c/a2z`);
+  assert.equal(landing.status, 200);
+  const landingHtml = await landing.text();
+  assert.match(landingHtml, /https:\/\/ig\.me\/m\/pri\.learning\?ref=pri-a2z-qr-2026/);
 
   const claimResponse = await fetch(`${baseUrl}/dev/simulate`, {
     method: 'POST',

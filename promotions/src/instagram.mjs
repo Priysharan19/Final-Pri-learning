@@ -11,7 +11,25 @@ export function extractInstagramMessages(payload) {
   return result;
 }
 
-export async function fetchInstagramProfile({ scopedId, accessToken, apiVersion = 'v23.0', fetchImpl = fetch }) {
+export function extractInstagramReferrals(payload) {
+  const result = [];
+  for (const entry of payload?.entry ?? []) {
+    for (const event of entry?.messaging ?? []) {
+      const senderId = event?.sender?.id;
+      const referral = event?.referral;
+      if (!senderId || !referral || typeof referral.ref !== 'string') continue;
+      result.push({
+        senderId: String(senderId),
+        ref: referral.ref,
+        source: referral.source ?? null,
+        type: referral.type ?? null,
+      });
+    }
+  }
+  return result;
+}
+
+export async function fetchInstagramProfile({ scopedId, accessToken, apiVersion = 'v24.0', fetchImpl = fetch }) {
   const url = new URL(`https://graph.instagram.com/${apiVersion}/${encodeURIComponent(scopedId)}`);
   url.searchParams.set('fields', 'id,name,username,is_user_follow_business,is_business_follow_user');
   const response = await fetchImpl(url, {
@@ -32,7 +50,7 @@ export async function fetchInstagramProfile({ scopedId, accessToken, apiVersion 
   };
 }
 
-export async function sendInstagramText({ accountId, recipientScopedId, text, accessToken, apiVersion = 'v23.0', fetchImpl = fetch }) {
+export async function sendInstagramText({ accountId, recipientScopedId, text, accessToken, apiVersion = 'v24.0', fetchImpl = fetch }) {
   const url = `https://graph.instagram.com/${apiVersion}/${encodeURIComponent(accountId)}/messages`;
   const response = await fetchImpl(url, {
     method: 'POST',

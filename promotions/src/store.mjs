@@ -20,6 +20,7 @@ export class PromotionsStore {
       CREATE TABLE IF NOT EXISTS campaigns (
         id TEXT PRIMARY KEY,
         keyword TEXT NOT NULL UNIQUE COLLATE NOCASE,
+        ref_code TEXT,
         reward_label TEXT NOT NULL,
         active INTEGER NOT NULL DEFAULT 1 CHECK(active IN (0, 1)),
         created_at TEXT NOT NULL
@@ -44,6 +45,15 @@ export class PromotionsStore {
         UNIQUE(campaign_id, instagram_scoped_id)
       );
 
+      CREATE TABLE IF NOT EXISTS campaign_attributions (
+        instagram_scoped_id TEXT NOT NULL,
+        campaign_id TEXT NOT NULL REFERENCES campaigns(id),
+        ref_code TEXT NOT NULL,
+        source TEXT,
+        attributed_at TEXT NOT NULL,
+        PRIMARY KEY(instagram_scoped_id, campaign_id)
+      );
+
       CREATE TABLE IF NOT EXISTS audit_events (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         event_type TEXT NOT NULL,
@@ -55,16 +65,26 @@ export class PromotionsStore {
       );
 
       CREATE INDEX IF NOT EXISTS idx_claims_code_hash ON claims(code_hash);
+      CREATE INDEX IF NOT EXISTS idx_attribution_subject ON campaign_attributions(instagram_scoped_id, attributed_at DESC);
       CREATE INDEX IF NOT EXISTS idx_audit_created_at ON audit_events(created_at);
     `);
+
+    const campaignColumns = this.db.prepare('PRAGMA table_info(campaigns)').all().map((column) => column.name);
+    if (!campaignColumns.includes('ref_code')) {
+      this.db.exec('ALTER TABLE campaigns ADD COLUMN ref_code TEXT;');
+    }
+    this.db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_campaign_ref_code ON campaigns(ref_code) WHERE ref_code IS NOT NULL;');
   }
 
-  seedCampaign({ id, keyword, rewardLabel }) {
+  seedCampaign({ id, keyword, refCode, rewardLabel }) {
     this.db.prepare(`
-      INSERT INTO campaigns (id, keyword, reward_label, active, created_at)
-      VALUES (?, ?, ?, 1, ?)
-      ON CONFLICT(id) DO UPDATE SET keyword = excluded.keyword, reward_label = excluded.reward_label
-    `).run(id, keyword, rewardLabel, nowIso());
+      INSERT INTO campaigns (id, keyword, ref_code, reward_label, active, created_at)
+      VALUES (?, ?, ?, ?, 1, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        keyword = excluded.keyword,
+        ref_code = excluded.ref_code,
+        reward_label = excluded.reward_label
+    `).run(id, keyword, refCode, rewardLabel, nowIso());
   }
 
   getCampaign(id) {
@@ -73,6 +93,35 @@ export class PromotionsStore {
 
   getCampaignByKeyword(keyword) {
     return this.db.prepare('SELECT * FROM campaigns WHERE keyword = ? AND active = 1').get(String(keyword).trim()) ?? null;
+  }
+
+  getCampaignByRef(refCode) {
+    return this.db.prepare('SELECT * FROM campaigns WHERE ref_code = ? AND active = 1').get(String(refCode).trim()) ?? null;
+  }
+
+  recordAttribution({ instagramScopedId, campaignId, refCode, source = null, subjectRef = null }) {
+    const attributedAt = nowIso();
+    this.db.prepare(`
+      INSERT INTO campaign_attributions (instagram_scoped_id, campaign_id, ref_code, source, attributed_at)
+      VALUES (?, ?, ?, ?, ?)
+      ON CONFLICT(instagram_scoped_id, campaign_id) DO UPDATE SET
+        ref_code = excluded.ref_code,
+        source = excluded.source,
+        attributed_at = excluded.attributed_at
+    `).run(instagramScopedId, campaignId, refCode, source, attributedAt);
+    this.#audit('campaign_attributed', campaignId, null, subjectRef, { refCode, source });
+    return { campaignId, attributedAt };
+  }
+
+  getAttributedCampaign(instagramScopedId) {
+    return this.db.prepare(`
+      SELECT c.*
+      FROM campaign_attributions a
+      JOIN campaigns c ON c.id = a.campaign_id
+      WHERE a.instagram_scoped_id = ? AND c.active = 1
+      ORDER BY a.attributed_at DESC
+      LIMIT 1
+    `).get(instagramScopedId) ?? null;
   }
 
   upsertParticipant({ instagramScopedId, username = null, displayName = null, followsBusiness = null }) {

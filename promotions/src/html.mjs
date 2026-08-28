@@ -19,21 +19,23 @@ const shell = (title, body) => `<!doctype html>
 </style>
 </head><body><main class="wrap">${body}</main></body></html>`;
 
-export function campaignPage({ instagramUsername, keyword, rewardLabel }) {
+export function campaignPage({ instagramUsername, keyword, refCode, rewardLabel }) {
+  const dmUrl = `https://ig.me/m/${encodeURIComponent(instagramUsername)}?ref=${encodeURIComponent(refCode)}`;
   const profileUrl = `https://www.instagram.com/${encodeURIComponent(instagramUsername)}/`;
   return shell('Pri Learning · Claim', `
     <div class="brand"><span class="mark">P</span> PRI LEARNING</div>
     <section class="card">
       <span class="eyebrow">A2Z × Pri Learning</span>
       <h1>One scan.<br>One reward.</h1>
-      <p>Connect your Instagram identity once, receive a one-time claim code, and show it to staff for your ${escapeHtml(rewardLabel)}.</p>
+      <p>This QR carries the A2Z campaign ID. Message Pri Learning once, receive a one-time claim code, and show it to staff for your ${escapeHtml(rewardLabel)}.</p>
       <div class="steps">
-        <div class="step"><span class="num">1</span><div><b>Open @${escapeHtml(instagramUsername)}</b><span>Tap the button below to open Pri Learning on Instagram.</span></div></div>
-        <div class="step"><span class="num">2</span><div><b>DM <span class="code">${escapeHtml(keyword)}</span></b><span>Send exactly this keyword. The system uses your Instagram-scoped identity to stop repeat claims.</span></div></div>
-        <div class="step"><span class="num">3</span><div><b>Show your one-time code</b><span>Staff enters your code once. After redemption it can never be used again.</span></div></div>
+        <div class="step"><span class="num">1</span><div><b>Open the tracked Instagram DM</b><span>The button carries this A2Z QR campaign’s referral ID into Instagram.</span></div></div>
+        <div class="step"><span class="num">2</span><div><b>Send <span class="code">${escapeHtml(keyword)}</span></b><span>Send the keyword so Pri Learning can issue your claim. If Instagram delivers the QR referral, the backend also records that this conversation came from A2Z.</span></div></div>
+        <div class="step"><span class="num">3</span><div><b>Show your one-time code</b><span>Staff enters your code once. After redemption, this Instagram identity cannot claim again for this campaign.</span></div></div>
       </div>
-      <a class="button" href="${profileUrl}" rel="noopener noreferrer">Open @${escapeHtml(instagramUsername)} on Instagram</a>
-      <p class="note">Following @${escapeHtml(instagramUsername)} is optional and does not change reward eligibility. One reward is available per Instagram identity for this campaign.</p>
+      <a class="button" href="${dmUrl}" rel="noopener noreferrer">Message @${escapeHtml(instagramUsername)} on Instagram</a>
+      <a class="button secondary" href="${profileUrl}" rel="noopener noreferrer">Open Instagram profile instead</a>
+      <p class="note">Following @${escapeHtml(instagramUsername)} is optional and does not change reward eligibility. One reward is available per Instagram identity for this campaign. The tracked DM link works best on a phone with Instagram installed.</p>
     </section>
   `);
 }
