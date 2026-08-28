@@ -36,6 +36,7 @@ export async function ensureInstagramWebhookSubscription({
   fields = ['messages', 'messaging_referral'],
   fetchImpl = fetch,
 }) {
+  if (!accessToken) throw new Error('Instagram access token unavailable');
   const url = new URL(`https://graph.instagram.com/${apiVersion}/${encodeURIComponent(accountId)}/subscribed_apps`);
   url.searchParams.set('subscribed_fields', fields.join(','));
   const response = await fetchImpl(url, {
@@ -52,6 +53,7 @@ export async function ensureInstagramWebhookSubscription({
 }
 
 export async function fetchInstagramProfile({ scopedId, accessToken, apiVersion = 'v24.0', fetchImpl = fetch }) {
+  if (!accessToken) throw new Error('Instagram access token unavailable');
   const url = new URL(`https://graph.instagram.com/${apiVersion}/${encodeURIComponent(scopedId)}`);
   url.searchParams.set('fields', 'id,name,username,is_user_follow_business,is_business_follow_user');
   const response = await fetchImpl(url, {
@@ -73,6 +75,7 @@ export async function fetchInstagramProfile({ scopedId, accessToken, apiVersion 
 }
 
 export async function sendInstagramText({ accountId, recipientScopedId, text, accessToken, apiVersion = 'v24.0', fetchImpl = fetch }) {
+  if (!accessToken) throw new Error('Instagram access token unavailable');
   const url = `https://graph.instagram.com/${apiVersion}/${encodeURIComponent(accountId)}/messages`;
   const response = await fetchImpl(url, {
     method: 'POST',
