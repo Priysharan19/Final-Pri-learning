@@ -51,8 +51,8 @@ function TokenStrip({ tokens, label, phase = 'rest' }) {
   );
 }
 
-function MotionLane({ pairs, active }) {
-  if (!pairs?.length || !active) return null;
+function MotionLane({ pairs }) {
+  if (!pairs?.length) return null;
   return (
     <div className="pri-v-motion-lane" aria-label="Verified terms carried into the next line">
       <span className="pri-v-motion-label">track the same term</span>
@@ -69,58 +69,45 @@ export function EquationTransform({ visual, progress = 1 }) {
   const plan = useMemo(() => tokenMotionPlan(visual?.diff), [visual?.diff]);
   if (!visual?.before || !visual?.after) return null;
   const p = clamp01(progress);
-  const showBeforeTokens = p >= 0.12;
-  const activateDeparture = p >= 0.30;
-  const showCue = p >= 0.38;
-  const showMotionLane = p >= 0.40 && p < 0.82;
-  const showAfterTokens = p >= 0.56;
-  const showAfter = p >= 0.74;
+  const started = p > 0;
   const completed = p >= 0.92;
   return (
     <div
-      className={`pri-v-transform pri-v-choreographed ${completed ? 'is-complete' : ''}`}
+      className={`pri-v-transform pri-v-choreographed ${started ? 'has-started' : ''} ${completed ? 'is-complete' : ''}`}
       data-progress={Math.round(p * 100)}
-      aria-label={`Equation transformation from ${visual.before}${showAfter ? ` to ${visual.after}` : ''}`}
+      aria-label={`Equation transformation from ${visual.before}${started ? ` to ${visual.after}` : ''}`}
     >
       <div className="pri-v-transform-state">
         <span className="pri-v-state-label">verified line</span>
         <div className="pri-v-transform-math before"><MathText text={`$${visual.before}$`} /></div>
       </div>
 
-      {showBeforeTokens && (
-        <TokenStrip
-          tokens={plan.before}
-          phase={activateDeparture ? 'depart' : 'inspect'}
-          label="Terms in the verified line before the transformation"
-        />
-      )}
+      <TokenStrip
+        tokens={plan.before}
+        phase={started ? 'depart' : 'inspect'}
+        label="Terms in the verified line before the transformation"
+      />
 
-      {showCue && (
-        <div className="pri-v-transform-arrow" aria-hidden="true">
-          <i />
-          <span>track what changes</span>
-          <b>↓</b>
-        </div>
-      )}
+      <div className="pri-v-transform-arrow" aria-hidden="true">
+        <i />
+        <span>track what changes</span>
+        <b>↓</b>
+      </div>
 
-      <MotionLane pairs={plan.pairs} active={showMotionLane} />
+      <MotionLane pairs={plan.pairs} />
 
-      {showAfterTokens && (
-        <TokenStrip
-          tokens={plan.after}
-          phase={showAfter ? 'arrive' : 'prepare'}
-          label="Terms in the next verified line"
-        />
-      )}
+      <TokenStrip
+        tokens={plan.after}
+        phase={started ? 'arrive' : 'prepare'}
+        label="Terms in the next verified line"
+      />
 
-      {showAfter
-        ? (
-          <div className="pri-v-transform-state after-state">
-            <span className="pri-v-state-label">next verified line</span>
-            <div className="pri-v-transform-math after"><MathText text={`$${visual.after}$`} /></div>
-          </div>
-        )
-        : <div className="pri-v-awaiting" aria-hidden="true">building the next verified state</div>}
+      <div className="pri-v-transform-state after-state">
+        <span className="pri-v-state-label">next verified line</span>
+        <div className="pri-v-transform-math after"><MathText text={`$${visual.after}$`} /></div>
+      </div>
+
+      {!started && <div className="pri-v-awaiting" aria-hidden="true">building the next verified state</div>}
     </div>
   );
 }
