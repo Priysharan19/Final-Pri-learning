@@ -72,6 +72,16 @@ export const flow = {
     const scenes = await rail.count();
     await check('the explanation has a multi-scene timeline', scenes >= 2, `${scenes} scene(s)`);
 
+    if (scenes) {
+      await rail.nth(0).click();
+      await settle();
+      const retrieval = page.locator('.pri-explain-adaptive-retrieval');
+      await check('targeted recovery pauses at the key step for retrieval',
+        await retrieval.count() === 1 && /original attempt/i.test(await retrieval.innerText()),
+        await retrieval.count() ? JSON.stringify(await retrieval.innerText()) : 'adaptive retrieval checkpoint missing');
+      if (await retrieval.count()) await page.getByRole('button', { name: 'Continue' }).click();
+    }
+
     let sawTransform = false;
     for (let i = 0; i < scenes; i++) {
       await rail.nth(i).click();
