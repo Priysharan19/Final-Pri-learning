@@ -877,6 +877,13 @@ export const year11 = {
       return {
         prompt: `Find the gradient of the tangent to $y = ${poly([a, b, c])}$ at the point where $x = ${x0}$.`,
         answerType: 'numeric', answer: { value: grad },
+        stepcheck: {
+          kind: 'plan',
+          stages: [
+            { kind: 'derivative', variable: 'x', source: poly([a, b, c]), canonical: poly([2 * a, b]) },
+            { kind: 'evaluation', source: poly([2 * a, b]), substitutions: { x: x0 }, expected: grad, labels: ['m', 'gradient', 'dy/dx'] }
+          ]
+        },
         traps: [
           { value: a * x0 * x0 + b * x0 + c, why: 'That’s the *y-value* at the point — the gradient comes from substituting into the *derivative*.' }
         ].filter(t => t.value !== grad),
@@ -895,6 +902,15 @@ export const year11 = {
     return {
       prompt: `Find the point on the curve $y = ${poly([1, b, c])}$ where the gradient equals $${targetGrad}$.`,
       answerType: 'point', answer: { x: x0v, y: y0 },
+      stepcheck: {
+        kind: 'plan',
+        stages: [
+          { kind: 'derivative', variable: 'x', source: poly([1, b, c]), canonical: poly([2, b]) },
+          { kind: 'equation', variable: 'x', source: `${poly([2, b])} = ${targetGrad}`, solutions: [x0v] },
+          { kind: 'evaluation', source: poly([1, b, c]), substitutions: { x: x0v }, expected: y0, labels: ['y'] },
+          { kind: 'point', x: x0v, y: y0 }
+        ]
+      },
       inputHint: 'e.g. (2, -3)',
       traps: [{ why: 'Set the *derivative* equal to the target gradient, solve for x, then find y from the original curve.' }],
       hints: ['Differentiate and set the result equal to the given gradient.', `$2x ${sgn(b)} = ${targetGrad}$.`, `$x = ${x0v}$; substitute into the original equation for y.`],

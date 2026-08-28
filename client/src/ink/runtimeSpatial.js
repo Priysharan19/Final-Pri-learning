@@ -205,8 +205,10 @@ const SINGLE_GLYPH_NEAR_TIE_SHARE = 0.90;
 // 5 alternative may be promoted only when the physical trajectory has the
 // defining 5 structure: a long top sweep, an early leftmost turn, then a
 // lower bowl that exits back to the right. Pri's s templates continue to
-// their leftmost endpoint, so they fail this shape test.
-const STRUCTURAL_FIVE_ALT_SHARE = 0.35;
+// their leftmost endpoint, so they fail this shape test. The browser release
+// fixture measures the real pointer-filtered 5 at about 0.32 of the leading s
+// score, so 0.30 leaves measured margin without weakening any other digit twin.
+const STRUCTURAL_FIVE_ALT_SHARE = 0.30;
 const pointXY = p => ({ x: number(p?.x ?? p?.[0]), y: number(p?.y ?? p?.[1]) });
 const strokePoints = stroke => (stroke?.points || []).map(pointXY).filter(p => Number.isFinite(p.x) && Number.isFinite(p.y));
 

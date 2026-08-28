@@ -132,18 +132,18 @@ const groupFromTemplate = (sym, variant = 0, { shear = 0, scaleX = 1, scaleY = 1
     points: stroke.map(([x, y]) => ({ x: dx + scaleX * x + shear * y, y: dy + scaleY * y, w: 2, t: 0 }))
   }))
 });
-const structuralResult = (group, sym = 's', conf = 0.58, altSym = '5', altConf = 0.23) => {
+const structuralResult = (group, sym = 's', conf = 0.58, altSym = '5', altConf = 0.19) => {
   const base = singleResult(sym, conf, altSym, altConf);
   base.lines[0].symbols[0]._group = group;
   base.symbols[0]._group = group;
   return base;
 };
 
-// Physical 5/s evidence: the mounted browser gives canonical 5 a weak
-// 23% 5 alternative behind a 58% s. Only the five-shaped trajectory may
-// use that weaker evidence; a real s with identical classifier scores
-// must remain s. Affine shear/scale checks keep this structural rather
-// than tied to one screenshot or canvas size.
+// Physical 5/s evidence: the exact PR browser rerun gave canonical 5 a
+// 19% 5 alternative behind a 58% s (the first run was 21% behind 66%). Only
+// the five-shaped trajectory may use that weaker evidence; a real s with the
+// identical classifier scores must remain s. Affine shear/scale checks keep
+// this structural rather than tied to one screenshot or canvas size.
 for (const [label, group] of [
   ['stock one-stroke 5', groupFromTemplate('5', 0)],
   ['sheared one-stroke 5', groupFromTemplate('5', 0, { shear: 0.18, scaleX: 1.15, scaleY: 0.82, dx: 40, dy: 20 })],
@@ -151,7 +151,7 @@ for (const [label, group] of [
 ]) {
   assert.equal(hasStructuralFiveEvidence({ _group: group }), true, `${label} must expose five structure`);
   const repaired = repairSingleGlyphQuestionContext(structuralResult(group), numericCtx);
-  assert.equal(repaired.text, '5', `${label} must rescue measured 58/23 s-vs-5 evidence`);
+  assert.equal(repaired.text, '5', `${label} must rescue measured 58/19 s-vs-5 evidence`);
   assert.equal(repaired.singleGlyphContextRepair, 'answer-blind-numeric-5-structure-v3');
 }
 for (const [label, group] of [

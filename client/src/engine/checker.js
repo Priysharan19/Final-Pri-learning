@@ -8,9 +8,10 @@
 import { normalize, parse, evaluate, exprEquivalent, numsClose } from './expr.js';
 import { diagnoseStep } from './diagnose.js';
 import {
-  assessEquationLine, sameEquationClaim,
+  assessEquationLine, sameEquationClaim, sameExpressionClaim,
   assessRelationLine, assessDerivativeLine
 } from './reason-v2-safe.js';
+import { assessEvaluationLine, assessPointLine } from './reason-v3.js';
 import { cleanInput, parseNumericInput, checkAnswer as coreCheckAnswer } from './checker-core.js';
 
 export { cleanInput, parseNumericInput };
@@ -135,7 +136,7 @@ export function checkWorking(q, workingText) {
   return { correct: true, stepReport: report, validLines: okLines.length };
 }
 
-export function stepCheck(meta, workingText) {
+function stepCheckSingle(meta, workingText) {
   const rawLines = String(workingText || '').split('\n').map(l => l.trim()).filter(Boolean);
   const out = [];
   let firstBreak = -1;
@@ -317,4 +318,199 @@ export function stepCheck(meta, workingText) {
     out[firstBreak].note = diagnosis.message;
   }
   return { lines: out, firstBreak, diagnosis };
+}
+
+
+// ── Pri Reason V3: authored multi-operation proof plans ─────────────────────
+// A plan is an ordered list of already-safe verifiers. It cannot skip a stage:
+// a later-stage truth shown before its prerequisite is recognised only as a
+// note. This preserves the V1/V2 prove/disprove/abstain contract while allowing
+// a real solution to move from differentiation into solving and substitution.
+
+function planClause(line) {
+  return String(line || '').split(/(?:=>|⇒|→)/).pop().trim();
+}
+
+function derivativeSourceLine(stage, line) {
+  if (stage?.kind !== 'derivative' || !stage.source) return false;
+  const raw = String(line || '').trim().replace(/[−–—]/g, '-').replace(/^∴\s*/, '');
+  let candidate = raw;
+  const eq = raw.indexOf('=');
+  if (eq >= 0) {
+    const lhs = raw.slice(0, eq).trim();
+    if (!/^(?:y|f\s*\(\s*x\s*\))$/i.test(lhs)) return false;
+    candidate = raw.slice(eq + 1).trim();
+  }
+  try {
+    const a = parse(normalize(candidate));
+    const b = parse(normalize(stage.source));
+    return a.t !== 'equation' && b.t !== 'equation' && sameExpressionClaim(a, b);
+  } catch { return false; }
+}
+
+function assessPlanStage(stage, line) {
+  if (!stage || typeof stage !== 'object') {
+    return { status: 'note', note: 'This proof stage is not configured safely.', trusted: false };
+  }
+  if (stage.kind === 'evaluation') return assessEvaluationLine({ text: line, meta: stage });
+  if (stage.kind === 'point') return assessPointLine({ text: line, meta: stage });
+  if (derivativeSourceLine(stage, line)) {
+    return { status: 'note', trusted: false, note: 'Starting function recognised — differentiate it on the next line.' };
+  }
+
+  // For an explicit equation inside a proof plan, prefer the direct exact
+  // equation proof before the legacy single-line facade. The facade may replace
+  // a mathematically certified lost-solution diagnosis with a lower-confidence
+  // pedagogical heuristic; the plan must retain the proof-grade diagnosis.
+  if (stage.kind === 'equation') {
+    const clause = planClause(line)
+      .replace(/^∴\s*/, '')
+      .replace(/^(so|hence|then|therefore)\s+/i, '');
+    try {
+      const ast = parse(normalize(clause));
+      if (ast.t === 'equation') {
+        const exact = assessEquationLine({ ast, meta: stage });
+        if (exact.status === 'ok' || exact.status === 'break') return exact;
+      }
+    } catch { /* fall back to the stable facade */ }
+  }
+
+  const checked = stepCheckSingle(stage, stage.kind === 'equation' ? planClause(line) : line);
+  const item = checked.lines?.[0];
+  if (!item) return { status: 'note', trusted: false, note: 'Pri could not verify this proof stage safely.' };
+  return {
+    status: item.status,
+    note: item.note,
+    diagnosis: item.diagnosis || checked.diagnosis || null,
+    trusted: item.status === 'ok'
+  };
+}
+
+function stepCheckPlan(meta, workingText) {
+  const rawLines = String(workingText || '').split('\n').map(line => line.trim()).filter(Boolean);
+  const stages = Array.isArray(meta?.stages) ? meta.stages.filter(Boolean) : [];
+  if (!stages.length) {
+    return {
+      lines: rawLines.map(text => ({ text, status: 'note', note: 'This proof plan has no authored stages.' })),
+      firstBreak: -1, diagnosis: null, completedStages: 0, totalStages: 0
+    };
+  }
+
+  const out = [];
+  const completed = new Set();
+  let active = 0;
+  let activeSatisfied = false;
+  let firstBreak = -1;
+  let diagnosis = null;
+
+  for (let i = 0; i < rawLines.length; i++) {
+    const line = rawLines[i];
+    if (firstBreak !== -1) {
+      out.push({ text: line, status: 'note', note: 'Follows from the earlier slip.', stage: active });
+      continue;
+    }
+
+    const currentStage = stages[active];
+
+    if (!activeSatisfied) {
+      const current = assessPlanStage(currentStage, line);
+      if (current.status === 'ok') {
+        activeSatisfied = true;
+        completed.add(active);
+        out.push({ text: line, status: 'ok', stage: active });
+        continue;
+      }
+
+      // Do not falsely call a correct later-stage result a derivative/algebra
+      // error merely because the prerequisite working was omitted. It still
+      // cannot advance the plan, so it receives a note rather than credit.
+      let laterTruth = false;
+      for (let s = active + 1; s < stages.length; s++) {
+        const later = assessPlanStage(stages[s], line);
+        if (later.status === 'ok') { laterTruth = true; break; }
+      }
+      if (laterTruth) {
+        out.push({
+          text: line, status: 'note', stage: active,
+          note: 'This matches a later result, but Pri has not yet verified the prerequisite stage, so it cannot receive step credit.'
+        });
+        continue;
+      }
+
+      if (current.status === 'break') {
+        firstBreak = i;
+        diagnosis = current.diagnosis || null;
+        out.push({ text: line, status: 'break', stage: active, note: current.note, ...(diagnosis ? { diagnosis } : {}) });
+      } else {
+        out.push({ text: line, status: 'note', stage: active, note: current.note });
+      }
+      continue;
+    }
+
+    const hasNext = active + 1 < stages.length;
+    if (hasNext) {
+      const nextIndex = active + 1;
+      const next = assessPlanStage(stages[nextIndex], line);
+      if (next.status === 'ok') {
+        active = nextIndex;
+        activeSatisfied = true;
+        completed.add(active);
+        out.push({ text: line, status: 'ok', stage: active });
+        continue;
+      }
+      if (next.status === 'break') {
+        active = nextIndex;
+        firstBreak = i;
+        diagnosis = next.diagnosis || null;
+        out.push({ text: line, status: 'break', stage: active, note: next.note, ...(diagnosis ? { diagnosis } : {}) });
+        continue;
+      }
+
+      // The line may be another equivalent form within the already-completed
+      // stage (for example source equation then x = 2). Keep that stage active.
+      const current = assessPlanStage(currentStage, line);
+      if (current.status === 'ok') {
+        out.push({ text: line, status: 'ok', stage: active });
+        continue;
+      }
+      // Equation solvers have strong exact solution-set diagnostics. Preserve
+      // those rather than hiding a wrong solved root as an unsupported next op.
+      if (current.status === 'break' && currentStage.kind === 'equation') {
+        firstBreak = i;
+        diagnosis = current.diagnosis || null;
+        out.push({ text: line, status: 'break', stage: active, note: current.note, ...(diagnosis ? { diagnosis } : {}) });
+        continue;
+      }
+
+      out.push({
+        text: line, status: 'note', stage: active,
+        note: next.note || current.note || 'Pri could not prove which authored operation this line belongs to.'
+      });
+      continue;
+    }
+
+    // Final stage: a positively disproved final claim is a real break.
+    const current = assessPlanStage(currentStage, line);
+    if (current.status === 'break') {
+      firstBreak = i;
+      diagnosis = current.diagnosis || null;
+      out.push({ text: line, status: 'break', stage: active, note: current.note, ...(diagnosis ? { diagnosis } : {}) });
+    } else {
+      if (current.status === 'ok') completed.add(active);
+      out.push({ text: line, status: current.status, stage: active, ...(current.note ? { note: current.note } : {}) });
+    }
+  }
+
+  return {
+    lines: out,
+    firstBreak,
+    diagnosis,
+    completedStages: completed.size,
+    totalStages: stages.length
+  };
+}
+
+export function stepCheck(meta, workingText) {
+  if (meta?.kind === 'plan') return stepCheckPlan(meta, workingText);
+  return stepCheckSingle(meta, workingText);
 }
