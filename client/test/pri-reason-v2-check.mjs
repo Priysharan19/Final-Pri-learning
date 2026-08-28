@@ -5,8 +5,8 @@ import { parse } from '../src/engine/expr.js';
 import {
   sameEquationClaim, sameInverseFunctionClaim,
   parseRelation, sameRelationClaim,
-  assessDerivativeLine
-} from '../src/engine/reason-v2.js';
+  assessDerivativeLine, hasNestedDomainHazard
+} from '../src/engine/reason-v2-safe.js';
 import { stepCheck } from '../src/engine/checker.js';
 
 let pass = 0;
@@ -77,6 +77,18 @@ r = stepCheck(
 );
 same('rational identity drops the constraint', r.firstBreak, 1);
 same('rational identity uses stable diagnosis', r.diagnosis?.code, 'constraint-dropped');
+
+// A quotient that inverts another variable-denominator expression has a hidden
+// domain exclusion. Until exclusions are first-class proof objects, it must
+// abstain instead of proving 1/(1/x)=0 equivalent to x=0.
+const nestedDomain = parse('1/(1/x) = 0');
+ok('nested rational denominator hazard is detected', hasNestedDomainHazard(nestedDomain, 'x'));
+ok('nested rational denominator cannot certify an excluded root', !sameEquationClaim(nestedDomain, parse('x = 0'), 'x'));
+r = stepCheck(
+  { kind: 'equation', variable: 'x', solutions: [], source: '1/(1/x) = 0' },
+  '1/(1/x) = 0\nx = 0'
+);
+ok('nested-domain working never receives a false OK', r.lines[1]?.status !== 'ok');
 
 // 5. Inequalities: multiplying/dividing by a negative value must reverse the
 // comparator. Strict/non-strict boundaries are also part of the claim.
