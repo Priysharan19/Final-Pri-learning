@@ -2,9 +2,11 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { MathText } from '../lib/latex.jsx';
 import { buildVisualTimeline, visualSummary } from '../explain/visualEngine.js';
 import { visualCuePlan, visualCueState, visualProgressForCue } from '../explain/choreography.js';
+import { buildTeachingProfile, teachingTimingScale, whyThisStep } from '../explain/adaptiveTeaching.js';
 import { VisualBlock } from './PriExplainVisuals.jsx';
 import './PriExplainV5.css';
 import './PriExplainV7.css';
+import './PriExplainV8.css';
 
 const SOLUTION_EVENT = 'pri:worked-solution';
 const ATTEMPT_EVENT = 'pri:attempt-feedback';
@@ -91,7 +93,7 @@ const VISUAL_NAMES = {
   checkpoint: 'Pause + predict', focus: 'Math focus',
 };
 
-export default function PriExplainV5({ questionId, questionPrompt, questionFigure }) {
+export default function PriExplainV5({ questionId, questionPrompt, questionFigure, studentContext = {}, onTrySimilar }) {
   const [payload, setPayload] = useState(null);
   const [open, setOpen] = useState(false);
   const [index, setIndex] = useState(0);
@@ -115,6 +117,7 @@ export default function PriExplainV5({ questionId, questionPrompt, questionFigur
     wrongAttempt: payload?.wrongAttempt || wrongRef.current?.submission || null,
   }), [payload, questionPrompt, questionFigure]);
 
+  const teaching = useMemo(() => buildTeachingProfile({ payload, studentContext, timeline }), [payload, studentContext, timeline]);
   const current = timeline[index] || null;
   const lineCount = current?.lines?.length || 0;
   const revealedLines = reduceMotion ? lineCount : Math.min(beat, lineCount);
@@ -125,6 +128,9 @@ export default function PriExplainV5({ questionId, questionPrompt, questionFigur
   const atEnd = timeline.length > 0 && index === timeline.length - 1;
   const atFinished = atEnd && sceneComplete && !checkpointPending;
   const visualKinds = useMemo(() => visualSummary(timeline), [timeline]);
+  const timingScale = teachingTimingScale(teaching, index);
+  const keyTeachingStep = index === teaching.importantSceneIndex;
+  const whyStep = whyThisStep(current, teaching, index);
 
   const stopNarration = () => {
     speechCancelRef.current?.();
@@ -259,7 +265,7 @@ export default function PriExplainV5({ questionId, questionPrompt, questionFigur
         setPlaying(false);
         return;
       }
-      timerRef.current = setTimeout(() => goScene(index + 1, false), holdDelay(current) / speed);
+      timerRef.current = setTimeout(() => goScene(index + 1, false), holdDelay(current) * timingScale / speed);
     };
 
     if (voice && canSpeak()) {
@@ -267,7 +273,7 @@ export default function PriExplainV5({ questionId, questionPrompt, questionFigur
         ? current.heading
         : current.lines?.[Math.min(beat - 1, Math.max(0, lineCount - 1))] || current.heading;
       setNarrating(true);
-      speechCancelRef.current = speakBeat(source, speed, advanceAfterNarration);
+      speechCancelRef.current = speakBeat(source, speed * teaching.voiceRate, advanceAfterNarration);
       return () => {
         speechCancelRef.current?.();
         speechCancelRef.current = null;
@@ -279,7 +285,7 @@ export default function PriExplainV5({ questionId, questionPrompt, questionFigur
       const line = current.lines[beat] || '';
       timerRef.current = setTimeout(
         () => setBeat(value => Math.min(value + 1, lineCount)),
-        beatDelay(line, beat === 0, Boolean(current.visuals?.length)) / speed,
+        beatDelay(line, beat === 0, Boolean(current.visuals?.length)) * timingScale / speed,
       );
       return () => clearTimeout(timerRef.current);
     }
@@ -294,9 +300,9 @@ export default function PriExplainV5({ questionId, questionPrompt, questionFigur
       return undefined;
     }
 
-    timerRef.current = setTimeout(() => goScene(index + 1, false), holdDelay(current) / speed);
+    timerRef.current = setTimeout(() => goScene(index + 1, false), holdDelay(current) * timingScale / speed);
     return () => clearTimeout(timerRef.current);
-  }, [open, playing, current, atEnd, checkpointPending, index, beat, lineCount, speed, reduceMotion, voice]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [open, playing, current, atEnd, checkpointPending, index, beat, lineCount, speed, reduceMotion, voice, timingScale, teaching.voiceRate]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!open) return undefined;
@@ -348,12 +354,17 @@ export default function PriExplainV5({ questionId, questionPrompt, questionFigur
     setTimeout(() => launchRef.current?.focus(), 0);
   };
 
+  const trySimilar = () => {
+    close();
+    onTrySimilar?.();
+  };
+
   return (
     <>
       <button ref={launchRef} className="pri-explain-launch no-print" type="button"
         onClick={() => { setOpen(true); setBeat(0); setCheckpointPassed(false); setPlaying(!reduceMotion); }} aria-haspopup="dialog">
         <span className="pri-explain-play" aria-hidden="true">▶</span>
-        <span><b>Watch explanation</b><small>{visualKinds.length ? 'Teacher-synchronised visual working' : 'Animated worked solution'}</small></span>
+        <span><b>Watch explanation</b><small>{teaching.label} · {visualKinds.length ? 'teacher-synchronised visual working' : 'animated worked solution'}</small></span>
       </button>
 
       {open && (
@@ -361,7 +372,7 @@ export default function PriExplainV5({ questionId, questionPrompt, questionFigur
           <section className="pri-explain-dialog" role="dialog" aria-modal="true" aria-label="Animated worked solution" tabIndex={-1} ref={dialogRef}>
             <header className="pri-explain-head">
               <div>
-                <div className="pri-explain-kicker">Pri Explain · Board Mode V4 · V7 teacher conductor</div>
+                <div className="pri-explain-kicker">Pri Explain · Board Mode · V8 adaptive teacher</div>
                 <h2>Watch the teacher explain, write and build each mathematical move in sync</h2>
                 {!!visualKinds.length && <div className="pri-explain-capabilities" aria-label="Visual explanation capabilities">
                   {visualKinds.map(kind => <span key={kind}>{VISUAL_NAMES[kind] || kind}</span>)}
@@ -375,6 +386,21 @@ export default function PriExplainV5({ questionId, questionPrompt, questionFigur
               <MathText text={questionPrompt || 'Worked solution'} />
             </div>
 
+            <div className="pri-explain-adaptive" data-mode={teaching.mode} aria-label={`Adaptive teaching plan: ${teaching.label}`}>
+              <span>{teaching.label}</span>
+              <div>
+                <b>{teaching.reason}</b>
+                <small>Only presentation changes. The verified solution and marking remain unchanged.</small>
+              </div>
+              {teaching.focus && (
+                <div className="pri-explain-adaptive-focus">
+                  <strong>{teaching.focus.kind === 'misconception' ? 'Pattern to watch' : teaching.focus.kind === 'diagnosis' ? 'Marker-confirmed focus' : 'Focus from your attempt'} · <MathText text={teaching.focus.label} /></strong>
+                  {teaching.focus.message && <p><MathText text={teaching.focus.message} /></p>}
+                  {teaching.focus.fix && <em><MathText text={teaching.focus.fix} /></em>}
+                </div>
+              )}
+            </div>
+
             <div className="pri-explain-progress" aria-label={`Step ${index + 1} of ${timeline.length}`}>
               <div><span>Step {index + 1} of {timeline.length}{lineCount ? ` · beat ${Math.min(revealedLines + 1, lineCount)} of ${lineCount}` : ''}</span><span>{status}</span></div>
               <i><b style={{ width: `${progress}%` }} /></i>
@@ -382,12 +408,14 @@ export default function PriExplainV5({ questionId, questionPrompt, questionFigur
 
             <div className="pri-explain-layout">
               <div className="pri-explain-stage" aria-live="polite">
-                <article key={`${current.id}-${index}`} className={`pri-explain-scene active ${current.kind}`}>
+                <article key={`${current.id}-${index}`} className={`pri-explain-scene active ${current.kind} ${keyTeachingStep ? 'key-teaching-step' : ''}`}>
                   <div className="pri-explain-step-label">
                     {current.kind === 'diagnosis' ? 'Replay + diagnosis' : `Step ${current.number}`}
                     {current.concept && current.concept !== 'generic' && <em>{current.concept}</em>}
+                    {keyTeachingStep && <span className="pri-explain-key-badge">key teaching step</span>}
                   </div>
                   <h3><MathText text={current.heading} /></h3>
+                  {whyStep && <div className="pri-explain-why-step"><b>Why this step matters · </b>{whyStep}</div>}
 
                   <div className="pri-explain-board">
                     {!!current.visuals?.length && (
@@ -433,6 +461,12 @@ export default function PriExplainV5({ questionId, questionPrompt, questionFigur
                   <div className="pri-explain-final">
                     <span>Verified final answer</span>
                     <strong><MathText text={payload.solution.answerText} /></strong>
+                    {teaching.shouldOfferFollowUp && onTrySimilar && (
+                      <div className="pri-explain-followup">
+                        <span>Lock it in with a fresh question on the same concept.</span>
+                        <button className="btn btn-primary btn-sm" type="button" onClick={trySimilar}>Try one yourself →</button>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -445,7 +479,7 @@ export default function PriExplainV5({ questionId, questionPrompt, questionFigur
                     aria-current={sceneIndex === index ? 'step' : undefined}
                     onClick={() => { goScene(sceneIndex, true); setPlaying(false); }}>
                     <span>{sceneIndex < index ? '✓' : sceneIndex + 1}</span>
-                    <div><b>{scene.kind === 'diagnosis' ? 'Your attempt' : scene.heading}</b><small>{scene.visuals?.map(visual => VISUAL_NAMES[visual.kind === 'figure' ? visual.mode : visual.kind] || visual.kind).join(' · ') || 'Reasoning'}</small></div>
+                    <div><b>{scene.kind === 'diagnosis' ? 'Your attempt' : scene.heading}{sceneIndex === teaching.importantSceneIndex ? ' · key' : ''}</b><small>{scene.visuals?.map(visual => VISUAL_NAMES[visual.kind === 'figure' ? visual.mode : visual.kind] || visual.kind).join(' · ') || 'Reasoning'}</small></div>
                   </button>
                 ))}
               </aside>
