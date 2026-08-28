@@ -213,7 +213,17 @@ function visualFromAction(action, context) {
     };
   }
   if (action.kind === 'show_figure' && context.questionFigure) {
-    return { kind: 'figure', mode: action.mode || 'figure', figure: String(context.questionFigure) };
+    const rawSequence = [
+      String(context.questionFigure || ''),
+      ...(Array.isArray(context.questionFigureSequence) ? context.questionFigureSequence.map(value => String(value || '')) : []),
+    ].map(value => value.trim()).filter(Boolean);
+    const sequence = [...new Set(rawSequence)].slice(0, 6);
+    return {
+      kind: 'figure',
+      mode: action.mode || 'figure',
+      figure: sequence[0] || String(context.questionFigure),
+      sequence,
+    };
   }
   if (action.kind === 'checkpoint') {
     return { kind: 'checkpoint', prompt: action.prompt };
