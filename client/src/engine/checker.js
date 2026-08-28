@@ -10,7 +10,7 @@ import { diagnoseStep } from './diagnose.js';
 import {
   assessEquationLine, sameEquationClaim,
   assessRelationLine, assessDerivativeLine
-} from './reason-v2.js';
+} from './reason-v2-safe.js';
 import { cleanInput, parseNumericInput, checkAnswer as coreCheckAnswer } from './checker-core.js';
 
 export { cleanInput, parseNumericInput };
