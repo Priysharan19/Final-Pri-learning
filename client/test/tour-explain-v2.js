@@ -1,4 +1,4 @@
-// Pri Explain V2 · browser-level proof of the visual teaching path.
+// Pri Explain V4 · browser-level proof of the visual teaching path.
 // This deliberately resolves a real generated question through the normal UI;
 // no test fixture injects a solution or fake handwriting payload.
 import { pathToFileURL } from 'node:url';
@@ -10,7 +10,7 @@ const SUBMIT = { name: 'Submit Answer' };
 
 export const flow = {
   id: 'explain-v2',
-  name: 'Pri Explain V2 · visual reasoning playback',
+  name: 'Pri Explain V4 · board-style reasoning playback',
 
   async run({ page, base, check, goto, createProfile, settle }) {
     await goto('/');
@@ -43,8 +43,8 @@ export const flow = {
     await launch.click();
     await page.waitForSelector('.pri-explain-dialog', { timeout: 10000 });
 
-    await check('the V2 visual player opens',
-      /Visual Engine V2/i.test(await page.locator('.pri-explain-kicker').innerText()),
+    await check('the V4 board player opens',
+      /Board Mode V4/i.test(await page.locator('.pri-explain-kicker').innerText()),
       `kicker reads ${JSON.stringify(await page.locator('.pri-explain-kicker').innerText())}`);
 
     const attempt = page.locator('.pri-v-attempt');
@@ -86,7 +86,7 @@ if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) 
   const { runOne } = await import('./e2e.mjs');
 
   // `npm run test:e2e` first runs the canonical browser suite, then this focused
-  // V2 flow against the exact dist that suite built. The CI coverage gate reads
+  // flow against the exact dist that suite built. The CI coverage gate reads
   // the LAST "E2E SUITE" verdict in browser.log. Without aggregation, this
   // focused 11-check verdict shadows the canonical 129-check verdict and makes
   // the gate report 11 < 129 even though both suites passed.
@@ -103,8 +103,6 @@ if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) 
     console.log = (...args) => {
       const mapped = args.map(arg => {
         if (typeof arg !== 'string') return arg;
-        // report() prefixes its verdict with a newline, so match the verdict
-        // wherever it occurs in the logged string and preserve that prefix.
         const match = arg.match(/([✔✖]) E2E SUITE (PASSED|FAILED) — (\d+)\/(\d+) checks across (\d+) flows$/);
         if (!match) return arg;
         const passed = baseChecks + Number(match[3]);
