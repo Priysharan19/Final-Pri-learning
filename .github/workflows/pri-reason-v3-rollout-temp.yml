@@ -25,7 +25,9 @@ jobs:
         with:
           node-version: 22
       - name: Apply exact V3 source patch
-        run: python3 tools/pri-reason-v3-proof-plans-temp.py
+        run: |
+          python3 tools/pri-reason-v3-proof-plans-temp.py
+          python3 tools/pri-reason-v3-exact-equation-temp.py
       - name: Pri Reason V1 regression
         run: node client/test/pri-reason-check.mjs
       - name: Pri Reason V2 regression
