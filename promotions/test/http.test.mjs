@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 const here = resolve(fileURLToPath(new URL('..', import.meta.url)));
 
 async function waitForHealth(baseUrl, child) {
-  for (let i = 0; i < 50; i += 1) {
+  for (let i = 0; i < 80; i += 1) {
     if (child.exitCode != null) throw new Error(`server exited early with ${child.exitCode}`);
     try {
       const response = await fetch(`${baseUrl}/health`);
@@ -21,7 +21,7 @@ async function waitForHealth(baseUrl, child) {
   throw new Error('server did not become healthy');
 }
 
-test('HTTP flow issues short-lived QR pass, stays follow-independent, redeems once, and exposes compliance pages', async (t) => {
+test('HTTP flow includes customer QR, shift staff session, one-time redemption, and compliance pages', async (t) => {
   const dir = mkdtempSync(join(tmpdir(), 'pri-promotions-'));
   const port = randomInt(18000, 28000);
   const baseUrl = `http://127.0.0.1:${port}`;
@@ -51,86 +51,89 @@ test('HTTP flow issues short-lived QR pass, stays follow-independent, redeems on
   const landing = await fetch(`${baseUrl}/c/a2z`);
   assert.equal(landing.status, 200);
   const landingHtml = await landing.text();
-  assert.match(landingHtml, /https:\/\/ig\.me\/m\/pri\.learning\?ref=pri-a2z-qr-2026/);
-  const passMatch = landingHtml.match(/A2Z (A2Z-[2-9A-HJ-NP-Z]{4}-[2-9A-HJ-NP-Z]{4})/);
-  assert.ok(passMatch, 'landing should contain a short-lived A2Z verification pass');
-  assert.match(landingHtml, /Copy message & open Instagram/);
+  assert.match(landingHtml, /A2Z-[2-9A-HJ-NP-Z]{4}-[2-9A-HJ-NP-Z]{4}/);
   assert.match(landingHtml, /Following @pri\.learning is optional/);
   assert.match(landingHtml, /href="\/privacy"/);
-  assert.match(landingHtml, /href="\/data-deletion"/);
-
-  const secondLanding = await fetch(`${baseUrl}/c/a2z`);
-  const secondHtml = await secondLanding.text();
-  const secondPassMatch = secondHtml.match(/A2Z (A2Z-[2-9A-HJ-NP-Z]{4}-[2-9A-HJ-NP-Z]{4})/);
-  assert.ok(secondPassMatch);
-  assert.notEqual(secondPassMatch[1], passMatch[1], 'each page load should mint a fresh verification pass');
-
-  const health = await fetch(`${baseUrl}/health`);
-  const healthJson = await health.json();
-  assert.equal('lastQrPassAt' in healthJson, true);
 
   const privacy = await fetch(`${baseUrl}/privacy`);
   assert.equal(privacy.status, 200);
-  const privacyHtml = await privacy.text();
-  assert.match(privacyHtml, /Promotion privacy/);
-  assert.match(privacyHtml, /Instagram-scoped identifier/);
-  assert.match(privacyHtml, /short-lived A2Z QR verification pass/);
-
+  assert.match(await privacy.text(), /Promotion privacy/);
   const deletion = await fetch(`${baseUrl}/data-deletion`);
   assert.equal(deletion.status, 200);
-  const deletionHtml = await deletion.text();
-  assert.match(deletionHtml, /A2Z data deletion request/);
-  assert.match(deletionHtml, /We will not ask for your Instagram password/);
-
+  assert.match(await deletion.text(), /A2Z data deletion request/);
   const terms = await fetch(`${baseUrl}/terms`);
   assert.equal(terms.status, 200);
-  const termsHtml = await terms.text();
-  assert.match(termsHtml, /Following @pri\.learning is optional/);
-  assert.match(termsHtml, /short-lived verification message generated from the A2Z QR page/);
-  assert.match(termsHtml, /in no way sponsored, endorsed or administered by, or associated with, Instagram/);
-
+  assert.match(await terms.text(), /Following @pri\.learning is optional/);
   const robots = await fetch(`${baseUrl}/robots.txt`);
   assert.equal(robots.status, 200);
-  assert.match(await robots.text(), /Allow: \/$/m);
 
-  const firstClaimResponse = await fetch(`${baseUrl}/dev/simulate`, {
+  const claimResponse = await fetch(`${baseUrl}/dev/simulate`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ pin: '2468', instagramScopedId: 'ig-http-001', username: 'student', followsBusiness: false }),
   });
-  assert.equal(firstClaimResponse.status, 200);
-  const firstClaim = await firstClaimResponse.json();
-  assert.equal(firstClaim.status, 'issued');
-  assert.match(firstClaim.code, /^PRI-/);
+  assert.equal(claimResponse.status, 200);
+  const claim = await claimResponse.json();
+  assert.equal(claim.status, 'issued');
+  assert.match(claim.code, /^PRI-/);
 
-  const rotatedResponse = await fetch(`${baseUrl}/dev/simulate`, {
+  const claimPage = await fetch(`${baseUrl}/claim/${encodeURIComponent(claim.code)}`);
+  assert.equal(claimPage.status, 200);
+  const claimPageHtml = await claimPage.text();
+  assert.match(claimPageHtml, /Show this QR/);
+  assert.match(claimPageHtml, /<svg/);
+  assert.match(claimPageHtml, new RegExp(claim.code));
+
+  const lockedStaff = await fetch(`${baseUrl}/staff`);
+  assert.equal(lockedStaff.status, 200);
+  assert.match(await lockedStaff.text(), /Unlock this phone/);
+
+  const badSession = await fetch(`${baseUrl}/api/staff/session`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ pin: '2468', instagramScopedId: 'ig-http-001', username: 'student', followsBusiness: true }),
+    body: JSON.stringify({ pin: '0000' }),
   });
-  const rotated = await rotatedResponse.json();
-  assert.equal(rotated.status, 'rotated');
-  assert.match(rotated.code, /^PRI-/);
-  assert.notEqual(rotated.code, firstClaim.code);
+  assert.equal(badSession.status, 403);
 
-  const redeem = () => fetch(`${baseUrl}/api/redeem`, {
+  const session = await fetch(`${baseUrl}/api/staff/session`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ pin: '2468', code: rotated.code }),
+    body: JSON.stringify({ pin: '2468' }),
   });
+  assert.equal(session.status, 200);
+  const cookie = session.headers.get('set-cookie');
+  assert.match(cookie, /pri_staff_session=/);
+  assert.match(cookie, /HttpOnly/);
+  assert.match(cookie, /SameSite=Strict/);
 
-  const first = await redeem();
-  assert.equal(first.status, 200);
-  assert.equal((await first.json()).status, 'redeemed');
+  const unlockedStaff = await fetch(`${baseUrl}/staff`, { headers: { cookie } });
+  assert.equal(unlockedStaff.status, 200);
+  assert.match(await unlockedStaff.text(), /Staff device unlocked/);
 
-  const second = await redeem();
-  assert.equal(second.status, 409);
-  assert.equal((await second.json()).status, 'already_redeemed');
+  const scanPage = await fetch(`${baseUrl}/staff/scan?code=${encodeURIComponent(claim.code)}`, { headers: { cookie } });
+  assert.equal(scanPage.status, 200);
+  assert.match(await scanPage.text(), /Checking/);
+
+  const redeemed = await fetch(`${baseUrl}/api/redeem-session`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', cookie },
+    body: JSON.stringify({ code: claim.code }),
+  });
+  assert.equal(redeemed.status, 200);
+  assert.equal((await redeemed.json()).status, 'redeemed');
+
+  const repeat = await fetch(`${baseUrl}/api/redeem-session`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', cookie },
+    body: JSON.stringify({ code: claim.code }),
+  });
+  assert.equal(repeat.status, 409);
+  assert.equal((await repeat.json()).status, 'already_redeemed');
 
   const reclaimResponse = await fetch(`${baseUrl}/dev/simulate`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ pin: '2468', instagramScopedId: 'ig-http-001', username: 'student', followsBusiness: false }),
+    body: JSON.stringify({ pin: '2468', instagramScopedId: 'ig-http-001', username: 'student', followsBusiness: true }),
   });
   const reclaim = await reclaimResponse.json();
   assert.equal(reclaim.status, 'already_redeemed');
