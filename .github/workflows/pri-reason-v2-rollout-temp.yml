@@ -37,10 +37,10 @@ jobs:
           npm run build
           npm run sync:ios
           npm run check:ios
-      - name: Commit rollout
+      - name: Commit tested product changes
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add client/src/engine/generators/year11.js client/src/engine/generators/india-algebra.js client/test/pri-reason-curriculum-check.mjs .github/workflows/pri-reason.yml ios/PriLearning.swiftpm/Resources/Web 'ios/PriLearning 2.swiftpm/Resources/Web'
+          git add client/src/engine/generators/year11.js client/src/engine/generators/india-algebra.js client/test/pri-reason-curriculum-check.mjs ios/PriLearning.swiftpm/Resources/Web 'ios/PriLearning 2.swiftpm/Resources/Web'
           git commit -m 'Activate Pri Reason V2 in authored calculus and inequalities'
           git push origin HEAD:feature/pri-reason-v2-curriculum-rollout
