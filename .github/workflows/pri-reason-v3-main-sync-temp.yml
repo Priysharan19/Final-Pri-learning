@@ -24,12 +24,34 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 24
-      - name: Merge latest main conservatively
+      - name: Merge latest main and discard only stale generated conflicts
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git fetch origin main
+          set +e
           git merge --no-edit -X theirs origin/main
+          merge_rc=$?
+          set -e
+          if [ "$merge_rc" -ne 0 ]; then
+            conflicts="$(git diff --name-only --diff-filter=U)"
+            printf 'Unmerged paths:\n%s\n' "$conflicts"
+            allowed_a='ios/PriLearning.swiftpm/Resources/Web/assets/index-CY1c7v6N.js'
+            allowed_b='ios/PriLearning 2.swiftpm/Resources/Web/assets/index-CY1c7v6N.js'
+            unexpected="$(printf '%s\n' "$conflicts" | grep -v -F -x "$allowed_a" | grep -v -F -x "$allowed_b" || true)"
+            if [ -n "$unexpected" ]; then
+              echo "Unexpected source conflict(s); refusing automatic resolution:"
+              printf '%s\n' "$unexpected"
+              exit 1
+            fi
+            git rm -f -- "$allowed_a" "$allowed_b"
+            if git diff --name-only --diff-filter=U | grep -q .; then
+              echo 'Unresolved merge conflicts remain.'
+              git diff --name-only --diff-filter=U
+              exit 1
+            fi
+            git commit --no-edit
+          fi
       - name: Install client dependencies
         run: npm ci --prefix client
       - name: Pri Reason V1
