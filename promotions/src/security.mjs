@@ -50,3 +50,32 @@ export function verifyMetaSignature(appSecret, rawBody, signatureHeader) {
 export function anonymizeId(value, secret) {
   return createHmac('sha256', secret).update(String(value)).digest('hex').slice(0, 12);
 }
+
+function staffPinFingerprint(secret, staffPin) {
+  return createHmac('sha256', secret).update(`staff-pin:${String(staffPin)}`).digest('hex').slice(0, 20);
+}
+
+export function createStaffSession({ secret, staffPin, ttlMs = 12 * 60 * 60 * 1000, now = Date.now() }) {
+  const expiresAt = now + ttlMs;
+  const nonce = randomBytes(12).toString('base64url');
+  const payload = `${expiresAt}.${staffPinFingerprint(secret, staffPin)}.${nonce}`;
+  const signature = createHmac('sha256', secret).update(`staff-session:${payload}`).digest('base64url');
+  return `${Buffer.from(payload).toString('base64url')}.${signature}`;
+}
+
+export function verifyStaffSession({ secret, staffPin, token, now = Date.now() }) {
+  if (!token || typeof token !== 'string') return false;
+  const dot = token.lastIndexOf('.');
+  if (dot <= 0) return false;
+  const encodedPayload = token.slice(0, dot);
+  const suppliedSignature = token.slice(dot + 1);
+  let payload;
+  try { payload = Buffer.from(encodedPayload, 'base64url').toString('utf8'); }
+  catch { return false; }
+  const expectedSignature = createHmac('sha256', secret).update(`staff-session:${payload}`).digest('base64url');
+  if (!safeEqualText(suppliedSignature, expectedSignature)) return false;
+  const [expiresText, fingerprint, nonce] = payload.split('.');
+  const expiresAt = Number(expiresText);
+  if (!Number.isFinite(expiresAt) || expiresAt <= now || !nonce) return false;
+  return safeEqualText(fingerprint, staffPinFingerprint(secret, staffPin));
+}
