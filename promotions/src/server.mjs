@@ -153,7 +153,7 @@ async function processInstagramPayload(payload) {
         await sendInstagramText({
           accountId: config.instagramAccountId,
           recipientScopedId: message.senderId,
-          text: `This reward is reserved for the tracked A2Z QR campaign. Please open the official A2Z QR link, follow @${config.instagramUsername}, then send ${keywordCampaign.keyword} again.`,
+          text: `This reward is reserved for the tracked A2Z QR campaign. Please open the official A2Z QR link, then send ${keywordCampaign.keyword} again.`,
           accessToken: config.instagramAccessToken,
           apiVersion: config.metaApiVersion,
         });
@@ -173,43 +173,17 @@ async function processInstagramPayload(payload) {
       });
     } catch (error) {
       console.error(JSON.stringify({
-        level: 'error',
-        event: 'instagram_profile_lookup_failed',
+        level: 'warn',
+        event: 'instagram_profile_lookup_failed_nonblocking',
         subject: subjectRef(message.senderId),
         message: error.message,
       }));
-      await sendInstagramText({
-        accountId: config.instagramAccountId,
-        recipientScopedId: message.senderId,
-        text: `I could not verify your Instagram follow right now, so no reward code was created. Please try again shortly by sending ${campaign.keyword}.`,
-        accessToken: config.instagramAccessToken,
-        apiVersion: config.metaApiVersion,
-      });
-      continue;
-    }
-
-    store.upsertParticipant({
-      instagramScopedId: message.senderId,
-      username: profile?.username ?? null,
-      displayName: profile?.name ?? null,
-      followsBusiness: profile?.followsBusiness ?? null,
-    });
-
-    if (profile?.followsBusiness !== true) {
-      await sendInstagramText({
-        accountId: config.instagramAccountId,
-        recipientScopedId: message.senderId,
-        text: `Follow @${config.instagramUsername} first to qualify for the A2Z ${campaign.reward_label}. Once you have followed, send ${campaign.keyword} again and I will verify it.`,
-        accessToken: config.instagramAccessToken,
-        apiVersion: config.metaApiVersion,
-      });
-      continue;
     }
 
     const claim = await issueForInstagramIdentity({ campaign, senderId: message.senderId, profile });
     const reply = claim.status === 'already_redeemed'
-      ? `This ${campaign.reward_label} has already been redeemed for this campaign. Unfollowing and following again does not create another reward.`
-      : `Follow verified for @${config.instagramUsername}. Your one-time A2Z code is ${claim.code}. Show it to A2Z staff. Once redeemed, this Instagram identity cannot claim again.`;
+      ? `This ${campaign.reward_label} has already been redeemed for this campaign. The same Instagram identity cannot receive another reward.`
+      : `A2Z QR verified. Your one-time code is ${claim.code}. Show it to A2Z staff. Once redeemed, this Instagram identity cannot claim again.${profile?.followsBusiness === true ? ` Thanks for following @${config.instagramUsername}.` : ` Following @${config.instagramUsername} is optional and does not affect this reward.`}`;
 
     await sendInstagramText({
       accountId: config.instagramAccountId,
@@ -303,15 +277,8 @@ const server = http.createServer(async (req, res) => {
         id: senderId,
         username: body.username ?? 'demo_user',
         name: body.name ?? 'Demo User',
-        followsBusiness: body.followsBusiness === true,
+        followsBusiness: typeof body.followsBusiness === 'boolean' ? body.followsBusiness : null,
       };
-      store.upsertParticipant({
-        instagramScopedId: senderId,
-        username: profile.username,
-        displayName: profile.name,
-        followsBusiness: profile.followsBusiness,
-      });
-      if (profile.followsBusiness !== true) return json(res, 200, { status: 'not_following' });
       const claim = await issueForInstagramIdentity({ campaign, senderId, profile });
       return json(res, 200, claim);
     }
