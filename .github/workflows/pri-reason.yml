@@ -12,6 +12,9 @@ on:
       - 'client/src/engine/expr.js'
       - 'client/test/pri-reason-check.mjs'
       - 'client/test/pri-reason-v2-check.mjs'
+      - 'client/test/pri-reason-curriculum-check.mjs'
+      - 'client/src/engine/generators/year11.js'
+      - 'client/src/engine/generators/india-algebra.js'
       - 'client/test/diagnose-check.mjs'
       - '.github/workflows/pri-reason.yml'
   push:
@@ -27,6 +30,9 @@ on:
       - 'client/src/engine/expr.js'
       - 'client/test/pri-reason-check.mjs'
       - 'client/test/pri-reason-v2-check.mjs'
+      - 'client/test/pri-reason-curriculum-check.mjs'
+      - 'client/src/engine/generators/year11.js'
+      - 'client/src/engine/generators/india-algebra.js'
       - 'client/test/diagnose-check.mjs'
 
 permissions:
@@ -48,5 +54,7 @@ jobs:
         run: node client/test/pri-reason-check.mjs
       - name: Pri Reason V2 safety gate
         run: node client/test/pri-reason-v2-check.mjs
+      - name: Pri Reason V2 curriculum integration gate
+        run: node client/test/pri-reason-curriculum-check.mjs
       - name: Existing diagnosis regression gate
         run: node client/test/diagnose-check.mjs
