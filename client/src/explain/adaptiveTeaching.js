@@ -180,7 +180,7 @@ export function whyThisStep(scene, profile, sceneIndex) {
 
 export function adaptiveCheckpointPrompt(scene, profile, sceneIndex) {
   if (!profile?.pauseAtKeyStep || sceneIndex !== profile?.importantSceneIndex || !scene) return '';
-  if (profile.focus?.kind === 'diagnosis') {
+  if (profile.focus?.kind === 'diagnosis' || scene.kind === 'diagnosis' || scene.concept === 'diagnosis') {
     return 'Before continuing, say what you would change in your original attempt.';
   }
   if (profile.focus?.kind === 'misconception') {
