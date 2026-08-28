@@ -4,6 +4,7 @@
 name: Native Ink
 
 on:
+  workflow_dispatch:
   push:
     paths:
       - 'ios/PriLearning.swiftpm/**'
