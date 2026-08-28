@@ -13,8 +13,23 @@ export function createClaimCode() {
   return `PRI-${chars.slice(0, 4)}-${chars.slice(4, 8)}`;
 }
 
+export function normalizeCampaignPassCode(value) {
+  return String(value ?? '').trim().toUpperCase().replace(/\s+/g, '').replace(/–/g, '-');
+}
+
+export function createCampaignPassCode() {
+  const bytes = randomBytes(8);
+  let chars = '';
+  for (const byte of bytes) chars += CODE_ALPHABET[byte % CODE_ALPHABET.length];
+  return `A2Z-${chars.slice(0, 4)}-${chars.slice(4, 8)}`;
+}
+
 export function hashClaimCode(secret, code) {
   return createHmac('sha256', secret).update(normalizeClaimCode(code)).digest('hex');
+}
+
+export function hashCampaignPassCode(secret, code) {
+  return createHmac('sha256', secret).update(`campaign-pass:${normalizeCampaignPassCode(code)}`).digest('hex');
 }
 
 export function safeEqualText(a, b) {
