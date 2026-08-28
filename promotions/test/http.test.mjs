@@ -21,7 +21,7 @@ async function waitForHealth(baseUrl, child) {
   throw new Error('server did not become healthy');
 }
 
-test('HTTP flow requires follow verification, exposes compliance pages, redeems once, and permanently blocks refollow reclaim', async (t) => {
+test('HTTP flow is referral-gated, follow-independent, one-time, and exposes compliance pages', async (t) => {
   const dir = mkdtempSync(join(tmpdir(), 'pri-promotions-'));
   const port = randomInt(18000, 28000);
   const baseUrl = `http://127.0.0.1:${port}`;
@@ -52,7 +52,7 @@ test('HTTP flow requires follow verification, exposes compliance pages, redeems 
   assert.equal(landing.status, 200);
   const landingHtml = await landing.text();
   assert.match(landingHtml, /https:\/\/ig\.me\/m\/pri\.learning\?ref=pri-a2z-qr-2026/);
-  assert.match(landingHtml, /Follow @pri\.learning/);
+  assert.match(landingHtml, /Following @pri\.learning is optional/);
   assert.match(landingHtml, /href="\/privacy"/);
   assert.match(landingHtml, /href="\/data-deletion"/);
 
@@ -61,7 +61,7 @@ test('HTTP flow requires follow verification, exposes compliance pages, redeems 
   const privacyHtml = await privacy.text();
   assert.match(privacyHtml, /Promotion privacy/);
   assert.match(privacyHtml, /Instagram-scoped identifier/);
-  assert.match(privacyHtml, /We do not ask for your Instagram password/);
+  assert.match(privacyHtml, /not used to decide whether you receive the reward/);
 
   const deletion = await fetch(`${baseUrl}/data-deletion`);
   assert.equal(deletion.status, 200);
@@ -71,36 +71,38 @@ test('HTTP flow requires follow verification, exposes compliance pages, redeems 
 
   const terms = await fetch(`${baseUrl}/terms`);
   assert.equal(terms.status, 200);
-  assert.match(await terms.text(), /one successfully redeemed reward per eligible Instagram identity/i);
+  const termsHtml = await terms.text();
+  assert.match(termsHtml, /Following `@pri\.learning` is optional/);
+  assert.match(termsHtml, /in no way sponsored, endorsed or administered by, or associated with, Instagram/);
 
   const robots = await fetch(`${baseUrl}/robots.txt`);
   assert.equal(robots.status, 200);
   assert.match(await robots.text(), /Allow: \/$/m);
 
-  const blockedBeforeFollowResponse = await fetch(`${baseUrl}/dev/simulate`, {
+  const firstClaimResponse = await fetch(`${baseUrl}/dev/simulate`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ pin: '2468', instagramScopedId: 'ig-http-001', username: 'student', followsBusiness: false }),
   });
-  assert.equal(blockedBeforeFollowResponse.status, 200);
-  const blockedBeforeFollow = await blockedBeforeFollowResponse.json();
-  assert.equal(blockedBeforeFollow.status, 'not_following');
-  assert.equal('code' in blockedBeforeFollow, false);
+  assert.equal(firstClaimResponse.status, 200);
+  const firstClaim = await firstClaimResponse.json();
+  assert.equal(firstClaim.status, 'issued');
+  assert.match(firstClaim.code, /^PRI-/);
 
-  const claimResponse = await fetch(`${baseUrl}/dev/simulate`, {
+  const rotatedResponse = await fetch(`${baseUrl}/dev/simulate`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ pin: '2468', instagramScopedId: 'ig-http-001', username: 'student', followsBusiness: true }),
   });
-  assert.equal(claimResponse.status, 200);
-  const claim = await claimResponse.json();
-  assert.equal(claim.status, 'issued');
-  assert.match(claim.code, /^PRI-/);
+  const rotated = await rotatedResponse.json();
+  assert.equal(rotated.status, 'rotated');
+  assert.match(rotated.code, /^PRI-/);
+  assert.notEqual(rotated.code, firstClaim.code);
 
   const redeem = () => fetch(`${baseUrl}/api/redeem`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ pin: '2468', code: claim.code }),
+    body: JSON.stringify({ pin: '2468', code: rotated.code }),
   });
 
   const first = await redeem();
@@ -111,22 +113,13 @@ test('HTTP flow requires follow verification, exposes compliance pages, redeems 
   assert.equal(second.status, 409);
   assert.equal((await second.json()).status, 'already_redeemed');
 
-  const unfollowResponse = await fetch(`${baseUrl}/dev/simulate`, {
+  const reclaimResponse = await fetch(`${baseUrl}/dev/simulate`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ pin: '2468', instagramScopedId: 'ig-http-001', username: 'student', followsBusiness: false }),
   });
-  const unfollow = await unfollowResponse.json();
-  assert.equal(unfollow.status, 'not_following');
-  assert.equal('code' in unfollow, false);
-
-  const refollowResponse = await fetch(`${baseUrl}/dev/simulate`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ pin: '2468', instagramScopedId: 'ig-http-001', username: 'student', followsBusiness: true }),
-  });
-  const refollow = await refollowResponse.json();
-  assert.equal(refollow.status, 'already_redeemed');
-  assert.equal('code' in refollow, false);
+  const reclaim = await reclaimResponse.json();
+  assert.equal(reclaim.status, 'already_redeemed');
+  assert.equal('code' in reclaim, false);
   assert.equal(stderr.includes('internal_error'), false);
 });
