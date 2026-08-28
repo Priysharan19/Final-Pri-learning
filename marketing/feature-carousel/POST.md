@@ -66,6 +66,19 @@ on a pricing slide of its own.
 > chapter-difficulty cell. Predicted percentile is an estimate from your practice data, not
 > a guarantee of results.
 
+**Short — the one to use unless you want the detail.** No figures in it, so it carries no
+footnote: every line is true on its face, the way the artboard's tiles are.
+
+> You wrote it. It marked it.
+>
+> Pri reads your handwriting on the iPad itself, marks every line like an examiner, and
+> names the exact mistake. Class 7 to JEE Advanced. Practice that does not run out.
+>
+> Join the change. Follow @pri.learning — coming soon. 🔔
+
+Adding a number back means adding its n back with it. That is the whole reason the short
+version is short.
+
 ### Single-slide alt text
 
 > A dark slide headed "Your handwriting, marked. Your syllabus, mapped. Your practice,
