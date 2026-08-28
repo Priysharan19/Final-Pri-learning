@@ -100,8 +100,21 @@ async function processInstagramPayload(payload) {
   }
 
   for (const message of extractInstagramMessages(payload)) {
-    const campaign = store.getCampaignByKeyword(message.text) ?? store.getAttributedCampaign(message.senderId);
-    if (!campaign) continue;
+    const attributedCampaign = store.getAttributedCampaign(message.senderId);
+    if (!attributedCampaign) {
+      const keywordCampaign = store.getCampaignByKeyword(message.text);
+      if (keywordCampaign) {
+        await sendInstagramText({
+          accountId: config.instagramAccountId,
+          recipientScopedId: message.senderId,
+          text: `This reward is reserved for the tracked A2Z QR campaign. Please open the official A2Z QR link, then send ${keywordCampaign.keyword} again.`,
+          accessToken: config.instagramAccessToken,
+          apiVersion: config.metaApiVersion,
+        });
+      }
+      continue;
+    }
+    const campaign = attributedCampaign;
 
     let profile = null;
     try {

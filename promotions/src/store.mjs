@@ -180,8 +180,21 @@ export class PromotionsStore {
     this.db.exec('BEGIN IMMEDIATE');
     try {
       const claim = this.db.prepare(`
-        SELECT c.id, c.campaign_id, c.redeemed_at, ca.reward_label
-        FROM claims c JOIN campaigns ca ON ca.id = c.campaign_id
+        SELECT
+          c.id,
+          c.campaign_id,
+          c.instagram_scoped_id,
+          c.redeemed_at,
+          ca.reward_label,
+          p.follows_business,
+          EXISTS(
+            SELECT 1 FROM campaign_attributions a
+            WHERE a.campaign_id = c.campaign_id
+              AND a.instagram_scoped_id = c.instagram_scoped_id
+          ) AS source_verified
+        FROM claims c
+        JOIN campaigns ca ON ca.id = c.campaign_id
+        JOIN participants p ON p.instagram_scoped_id = c.instagram_scoped_id
         WHERE c.code_hash = ?
       `).get(codeHash);
 
@@ -194,7 +207,14 @@ export class PromotionsStore {
       if (claim.redeemed_at) {
         this.#audit('redeem_repeat', claim.campaign_id, claim.id, subjectRef, {});
         this.db.exec('COMMIT');
-        return { status: 'already_redeemed', claimId: claim.id, redeemedAt: claim.redeemed_at, rewardLabel: claim.reward_label };
+        return {
+          status: 'already_redeemed',
+          claimId: claim.id,
+          redeemedAt: claim.redeemed_at,
+          rewardLabel: claim.reward_label,
+          sourceVerified: claim.source_verified === 1,
+          followsBusiness: claim.follows_business == null ? null : claim.follows_business === 1,
+        };
       }
 
       const redeemedAt = nowIso();
@@ -209,7 +229,14 @@ export class PromotionsStore {
 
       this.#audit('redeem_success', claim.campaign_id, claim.id, subjectRef, {});
       this.db.exec('COMMIT');
-      return { status: 'redeemed', claimId: claim.id, redeemedAt, rewardLabel: claim.reward_label };
+      return {
+        status: 'redeemed',
+        claimId: claim.id,
+        redeemedAt,
+        rewardLabel: claim.reward_label,
+        sourceVerified: claim.source_verified === 1,
+        followsBusiness: claim.follows_business == null ? null : claim.follows_business === 1,
+      };
     } catch (error) {
       this.db.exec('ROLLBACK');
       throw error;

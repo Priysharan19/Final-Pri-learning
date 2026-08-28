@@ -16,6 +16,12 @@ test('one Instagram identity gets one claim per campaign and cannot redeem twice
   const store = new PromotionsStore(':memory:');
   store.seedCampaign({ id: 'a2z', keyword: 'A2Z', refCode: 'pri-a2z-qr-2026', rewardLabel: 'toffee' });
   store.upsertParticipant({ instagramScopedId: 'ig-1', username: 'student', followsBusiness: false });
+  store.recordAttribution({
+    instagramScopedId: 'ig-1',
+    campaignId: 'a2z',
+    refCode: 'pri-a2z-qr-2026',
+    source: 'IGME',
+  });
 
   const firstCode = 'PRI-ABCD-2345';
   const first = store.issueOrRotateClaim({
@@ -31,7 +37,10 @@ test('one Instagram identity gets one claim per campaign and cannot redeem twice
   assert.equal(second.claimId, first.claimId);
 
   assert.equal(store.redeemByCodeHash({ codeHash: hashClaimCode('s', firstCode) }).status, 'invalid');
-  assert.equal(store.redeemByCodeHash({ codeHash: hashClaimCode('s', secondCode) }).status, 'redeemed');
+  const redemption = store.redeemByCodeHash({ codeHash: hashClaimCode('s', secondCode) });
+  assert.equal(redemption.status, 'redeemed');
+  assert.equal(redemption.sourceVerified, true);
+  assert.equal(redemption.followsBusiness, false);
   assert.equal(store.redeemByCodeHash({ codeHash: hashClaimCode('s', secondCode) }).status, 'already_redeemed');
 
   const after = store.issueOrRotateClaim({
