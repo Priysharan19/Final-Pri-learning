@@ -149,6 +149,7 @@ export function buildTeachingProfile({ payload = {}, studentContext = {}, timeli
     focus,
     importantSceneIndex,
     sessionAccuracy: accuracy,
+    pauseAtKeyStep: mode === TEACHING_MODES.RECOVERY || mode === TEACHING_MODES.SCAFFOLDED,
     shouldOfferFollowUp: mode === TEACHING_MODES.RECOVERY || mode === TEACHING_MODES.SCAFFOLDED,
   };
 }
@@ -175,4 +176,24 @@ export function whyThisStep(scene, profile, sceneIndex) {
     return 'Keep your submitted working visible while Pri connects it to the verified reasoning.';
   }
   return 'Connect this reasoning line to the verified step immediately before it.';
+}
+
+export function adaptiveCheckpointPrompt(scene, profile, sceneIndex) {
+  if (!profile?.pauseAtKeyStep || sceneIndex !== profile?.importantSceneIndex || !scene) return '';
+  if (profile.focus?.kind === 'diagnosis') {
+    return 'Before continuing, say what you would change in your original attempt.';
+  }
+  if (profile.focus?.kind === 'misconception') {
+    return 'Before continuing, name the pattern you want to avoid when you try this again.';
+  }
+  if ((scene.visuals || []).some(visual => visual.kind === 'transform')) {
+    return 'Before continuing, describe what changed between the two verified lines.';
+  }
+  if ((scene.visuals || []).some(visual => visual.kind === 'figure')) {
+    return 'Before continuing, explain which part of the verified construction matters to this step.';
+  }
+  if (profile.focus?.kind === 'attempt') {
+    return 'Before continuing, compare this verified step with what you tried first.';
+  }
+  return 'Before continuing, explain this verified move in your own words.';
 }
