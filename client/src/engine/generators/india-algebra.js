@@ -181,6 +181,7 @@ export const indiaAlgebra = {
       return {
         prompt: `Solve $${a}x ${b >= 0 ? '+' : '-'} ${Math.abs(b)} ${dir} ${k}$.`,
         answerType: 'mcq', answer: { correctIndex: m.correctIndex, optionTraps: m.optionTraps }, mcqOptions: m.options,
+        stepcheck: { kind: 'inequality', source: `${a}x ${b >= 0 ? '+' : '-'} ${Math.abs(b)} ${dir} ${k}`, canonical: `x ${dir} ${bound}` },
         hints: [
           'Treat it exactly like an equation, one step at a time.',
           `Move the $${Math.abs(b)}$ across first, then divide by $${a}$.`,
@@ -206,6 +207,7 @@ export const indiaAlgebra = {
       return {
         prompt: `Solve $${a}x ${b >= 0 ? '+' : '-'} ${Math.abs(b)} ${dir} ${k}$.`,
         answerType: 'mcq', answer: { correctIndex: m.correctIndex, optionTraps: m.optionTraps }, mcqOptions: m.options,
+        stepcheck: { kind: 'inequality', source: `${a}x ${b >= 0 ? '+' : '-'} ${Math.abs(b)} ${dir} ${k}`, canonical: `x ${flipped} ${bound}` },
         hints: [
           'Move the constant across first.',
           `Now divide both sides by $${a}$ — and look at its sign before you write the answer.`,
