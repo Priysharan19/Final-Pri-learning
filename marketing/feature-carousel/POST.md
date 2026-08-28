@@ -4,8 +4,9 @@ Two cuts of the same post, covering the five headline features: AI handwriting
 recognition, examiner-style instant marking, every level from boards to JEE Advanced,
 all of Class 7–12, and an unlimited question bank.
 
-- **`out/00-all-in-one.png`** — everything on one slide. This is the post.
-- **`out/01`–`07`** — the seven-slide carousel, same content with room to breathe.
+- **`out/00-all-in-one.png`** — the post: the marked-ink demonstration, with the five
+  capabilities beneath it in one line.
+- **`out/01`–`07`** — the seven-slide carousel, one feature per slide with its figure.
 
 Register follows `ad/docs/COPY.md`: Indian English, dry and confident, no exclamation
 marks, no shame hooks. Design system is `client/src/theme.css` v4 "Dark LaTeX", same as
@@ -21,20 +22,51 @@ node marketing/feature-carousel/build.mjs && node marketing/feature-carousel/ren
 2160×2700 (2×) using the Chromium already installed for the client's Playwright.
 **Edit `build.mjs`, never the generated HTML.**
 
-## The single slide
+## The single slide — this is the post
 
-`out/00-all-in-one.png` is the whole post on one artboard — all five features, each with
-the figure that backs it, plus the sign-off. Use it when you want one image in the feed
-instead of a swipe; the carousel below is the same content given room to breathe.
+`out/00-all-in-one.png`. It leads with the thing that sells Pri: a student's own
+handwriting with the ticks landing on it, the wrong line flagged, and the mistake named
+in the margin. A feature list cannot do that — it explains where the demonstration
+persuades — so the five capabilities sit under the hero as one quiet line and the
+measured figures move to the caption, where a reader who wants them will look.
 
 | Field | Value |
 |---|---|
 | Format | one PNG |
 | Aspect / size | 4:5 — exported 2160×2700, Instagram serves 1080×1350 |
-| Caption | the same one below (the long variant reads best under a single image) |
+| Caption | the single-slide caption below |
 
-Everything on it is legible at feed size: the smallest type is the disclaimer line, which
-is there to be read on tap rather than in the scroll.
+**No pricing on the artboard.** Tier language ("premium", "no cap") reads as a sales sheet
+under a hero image and undercuts the demonstration above it. It belongs in the caption, or
+on a pricing slide of its own.
+
+### Single-slide caption
+
+> You wrote it. It marked it.
+>
+> Write your working with the Pencil, the way you would on paper. Pri reads every line on
+> the iPad itself — no upload, no account — awards the method marks where your reasoning
+> holds, and names the exact line where the maths broke. Not "62%". "You keep flipping the
+> sign."
+>
+> Class 7 to Class 12. Boards, JEE Main, JEE Advanced, Olympiad. Questions built from a
+> seed rather than drawn from a pool, so the practice does not run out.
+>
+> Join the change. Follow @pri.learning — coming soon. 🔔
+>
+> —
+> Recognition measured at 98.4% of characters on held-out writer tests (simulated writers,
+> 560 lines, worst single hand 71%). 3,44,798 distinct questions counted at 3,000 draws per
+> chapter-difficulty cell.
+
+### Single-slide alt text
+
+> A dark slide headed "Marked like an examiner." Below it, a card showing three lines of
+> handwritten quadratic working: the first two carry green ticks and method marks, the
+> third — x = −1 or x = 5 — is tinted red with a cross, and a margin note reads "Line 3 —
+> you keep flipping the sign taking the root across. 2 of 3 marks." Under the card: reads
+> your handwriting, marks every line, never runs out; Class 7 to Class 12, boards to JEE
+> Advanced, Olympiad. Signed Pri Learning, Join the change, @pri.learning — coming soon.
 
 ## Upload spec
 
@@ -52,7 +84,7 @@ the bottom ~6%, so nothing collides with Instagram's caption gradient.
 
 | # | File | Says |
 |---|---|---|
-| — | `00-all-in-one` | **The single-image version — everything on one slide** |
+| — | `00-all-in-one` | **The single-image post — marked-ink hero, capabilities under it** |
 | 1 | `01-cover` | Write the maths. It marks the maths. |
 | 2 | `02-recognition` | **AI recognition** — on-device CNN, 56 symbols, 98.4% chars |
 | 3 | `03-marking` | **Instant feedback** — ✓/✗ on your own ink, method marks, misconception named |
@@ -128,7 +160,10 @@ Every number on a slide, with the command that produced it. Re-run before repost
 these move whenever a generator or the model changes, and a date has never once caught a
 stale figure (README, "Measured accuracy").
 
-The single slide carries the same five figures as slides 2–6, so this table covers both.
+The **single slide carries no numbers at all** — its claims are qualitative and each is
+true on its face ("reads your handwriting", "marks every line", "never runs out"). The
+figures live in its caption instead, with their n attached; the table below is what backs
+them either way.
 
 | Slide | Claim | Source |
 |---|---|---|

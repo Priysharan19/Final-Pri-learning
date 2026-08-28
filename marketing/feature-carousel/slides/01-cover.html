@@ -144,35 +144,58 @@ p.body b{color:#efece1;font-weight:400}
 .glyphs .row span:nth-child(n+15){color:#b3afa2}
 
 /* ── the all-in-one slide ─────────────────────────────────────────────── */
-.rows{margin-top:28px;display:flex;flex-direction:column}
-.r{
-  display:flex;align-items:flex-start;gap:20px;padding:17px 0;
+/* The hero is the marked ink, not a feature list: what sells this product is
+   watching a tick land on your own handwriting. Everything else is one line. */
+.lede{font-size:33px;line-height:1.44;color:#b3afa2;margin-top:26px;max-width:880px}
+.lede b{color:#efece1;font-weight:400}
+
+.hero{
+  border:1px solid rgba(240,236,224,0.24);border-radius:6px;background:#101010;
+  padding:32px 36px 30px;margin-top:34px;
+  box-shadow:0 30px 70px rgba(0,0,0,0.55);
+}
+.hero .cap{
+  font-size:19px;text-transform:uppercase;letter-spacing:0.18em;color:#7c796d;
+  display:flex;justify-content:space-between;margin-bottom:22px;
+}
+.hero .cap .live{color:#c9ad63}
+.hero .l{
+  display:flex;align-items:center;gap:22px;padding:14px 0;
   border-bottom:1px solid rgba(240,236,224,0.07);
 }
-.r:last-child{border-bottom:none}
-.r .no{
-  font-size:21px;letter-spacing:0.14em;color:#c9ad63;width:42px;
-  padding-top:6px;flex:none;
+.hero .l.wrong{
+  background:linear-gradient(90deg, rgba(207,95,86,0.10), transparent 78%);
+  margin:0 -36px;padding-left:36px;padding-right:36px;
 }
-.r .txt{flex:1}
-.r .name{
-  font-size:20px;text-transform:uppercase;letter-spacing:0.18em;color:#7c796d;
+.hero .l:last-of-type{border-bottom:none}
+.hero .w{
+  font-family:'Caveat','Bradley Hand','Segoe Script','Chalkboard SE',cursive;font-size:58px;line-height:1;color:#efece1;
+  flex:1;letter-spacing:0.5px;
 }
-.r .say{font-size:28px;line-height:1.32;color:#efece1;margin-top:9px}
-.r .say b{color:#e3c87e;font-weight:400}
-.r .fig{
-  width:212px;flex:none;text-align:right;padding-top:4px;
-  font-size:29px;line-height:1.24;color:#e3c87e;
+.hero .m{
+  font-size:21px;letter-spacing:0.14em;text-transform:uppercase;color:#7c796d;
+  width:96px;text-align:right;
 }
-.r .fig small{
-  display:block;font-size:17px;letter-spacing:0.13em;text-transform:uppercase;
-  color:#7c796d;margin-top:7px;
+.hero .v{font-size:44px;width:50px;text-align:center;color:#5aa86c}
+.hero .v.no{color:#cf5f56}
+.hero .said{
+  margin-top:24px;padding-left:22px;border-left:2px solid #cf5f56;
+  font-size:29px;line-height:1.38;color:#b3afa2;
 }
+.hero .said b{color:#efece1;font-weight:400}
+
+.chips{
+  margin-top:34px;font-size:29px;line-height:1.62;color:#b3afa2;
+  max-width:900px;
+}
+.chips b{color:#efece1;font-weight:400}
+.chips i{font-style:normal;color:#c9ad63;margin:0 14px}
+
 .signoff{
-  margin-top:34px;padding-top:24px;border-top:1px solid rgba(240,236,224,0.07);
+  margin-top:32px;padding-top:26px;border-top:1px solid rgba(240,236,224,0.07);
   width:100%;display:flex;align-items:baseline;justify-content:space-between;
 }
-.signoff .mark{font-size:32px;color:#efece1}
+.signoff .mark{font-size:34px;color:#efece1}
 .signoff .mark .P{font-family:'KaTeX_AMS','KaTeX_Main','Latin Modern Roman','Computer Modern',Georgia,'Times New Roman',serif}
 .signoff .mark em{font-style:normal;color:#c9ad63;margin-left:22px}
 .signoff .handle{font-size:24px;color:#7c796d;letter-spacing:0.02em}
