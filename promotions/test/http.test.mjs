@@ -21,7 +21,7 @@ async function waitForHealth(baseUrl, child) {
   throw new Error('server did not become healthy');
 }
 
-test('HTTP flow includes customer QR, shift staff session, one-time redemption, and compliance pages', async (t) => {
+test('customer controls redemption, green-tick counter increments once, and same identity stays blocked', async (t) => {
   const dir = mkdtempSync(join(tmpdir(), 'pri-promotions-'));
   const port = randomInt(18000, 28000);
   const baseUrl = `http://127.0.0.1:${port}`;
@@ -55,18 +55,6 @@ test('HTTP flow includes customer QR, shift staff session, one-time redemption, 
   assert.match(landingHtml, /Following @pri\.learning is optional/);
   assert.match(landingHtml, /href="\/privacy"/);
 
-  const privacy = await fetch(`${baseUrl}/privacy`);
-  assert.equal(privacy.status, 200);
-  assert.match(await privacy.text(), /Promotion privacy/);
-  const deletion = await fetch(`${baseUrl}/data-deletion`);
-  assert.equal(deletion.status, 200);
-  assert.match(await deletion.text(), /A2Z data deletion request/);
-  const terms = await fetch(`${baseUrl}/terms`);
-  assert.equal(terms.status, 200);
-  assert.match(await terms.text(), /Following @pri\.learning is optional/);
-  const robots = await fetch(`${baseUrl}/robots.txt`);
-  assert.equal(robots.status, 200);
-
   const claimResponse = await fetch(`${baseUrl}/dev/simulate`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -80,55 +68,41 @@ test('HTTP flow includes customer QR, shift staff session, one-time redemption, 
   const claimPage = await fetch(`${baseUrl}/claim/${encodeURIComponent(claim.code)}`);
   assert.equal(claimPage.status, 200);
   const claimPageHtml = await claimPage.text();
-  assert.match(claimPageHtml, /Show this QR/);
-  assert.match(claimPageHtml, /<svg/);
-  assert.match(claimPageHtml, new RegExp(claim.code));
+  assert.match(claimPageHtml, /Show live green tick/);
+  assert.match(claimPageHtml, /TOTAL GREEN TICKS/);
+  assert.match(claimPageHtml, /unfollows and follows again/);
 
-  const lockedStaff = await fetch(`${baseUrl}/staff`);
-  assert.equal(lockedStaff.status, 200);
-  assert.match(await lockedStaff.text(), /Unlock this phone/);
+  const ready = await fetch(`${baseUrl}/api/customer/status?code=${encodeURIComponent(claim.code)}`);
+  assert.equal(ready.status, 200);
+  assert.equal((await ready.json()).status, 'ready');
 
-  const badSession = await fetch(`${baseUrl}/api/staff/session`, {
+  const redeemed = await fetch(`${baseUrl}/api/customer/redeem`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ pin: '0000' }),
-  });
-  assert.equal(badSession.status, 403);
-
-  const session = await fetch(`${baseUrl}/api/staff/session`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ pin: '2468' }),
-  });
-  assert.equal(session.status, 200);
-  const cookie = session.headers.get('set-cookie');
-  assert.match(cookie, /pri_staff_session=/);
-  assert.match(cookie, /HttpOnly/);
-  assert.match(cookie, /SameSite=Strict/);
-
-  const unlockedStaff = await fetch(`${baseUrl}/staff`, { headers: { cookie } });
-  assert.equal(unlockedStaff.status, 200);
-  assert.match(await unlockedStaff.text(), /Staff device unlocked/);
-
-  const scanPage = await fetch(`${baseUrl}/staff/scan?code=${encodeURIComponent(claim.code)}`, { headers: { cookie } });
-  assert.equal(scanPage.status, 200);
-  assert.match(await scanPage.text(), /Checking/);
-
-  const redeemed = await fetch(`${baseUrl}/api/redeem-session`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', cookie },
     body: JSON.stringify({ code: claim.code }),
   });
   assert.equal(redeemed.status, 200);
-  assert.equal((await redeemed.json()).status, 'redeemed');
+  const redeemedBody = await redeemed.json();
+  assert.equal(redeemedBody.status, 'redeemed');
+  assert.equal(redeemedBody.redemptionCount, 1);
+  assert.equal(redeemedBody.currentFollowState, false);
+  assert.match(redeemedBody.redeemedAt, /^\d{4}-\d{2}-\d{2}T/);
+  assert.match(redeemedBody.serverTime, /^\d{4}-\d{2}-\d{2}T/);
 
-  const repeat = await fetch(`${baseUrl}/api/redeem-session`, {
+  const after = await fetch(`${baseUrl}/api/customer/status?code=${encodeURIComponent(claim.code)}`);
+  const afterBody = await after.json();
+  assert.equal(afterBody.status, 'already_redeemed');
+  assert.equal(afterBody.redemptionCount, 1);
+
+  const repeat = await fetch(`${baseUrl}/api/customer/redeem`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json', cookie },
+    headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ code: claim.code }),
   });
   assert.equal(repeat.status, 409);
-  assert.equal((await repeat.json()).status, 'already_redeemed');
+  const repeatBody = await repeat.json();
+  assert.equal(repeatBody.status, 'already_redeemed');
+  assert.equal(repeatBody.redemptionCount, 1);
 
   const reclaimResponse = await fetch(`${baseUrl}/dev/simulate`, {
     method: 'POST',
@@ -138,5 +112,27 @@ test('HTTP flow includes customer QR, shift staff session, one-time redemption, 
   const reclaim = await reclaimResponse.json();
   assert.equal(reclaim.status, 'already_redeemed');
   assert.equal('code' in reclaim, false);
+
+  const secondClaimResponse = await fetch(`${baseUrl}/dev/simulate`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ pin: '2468', instagramScopedId: 'ig-http-002', username: 'student2', followsBusiness: true }),
+  });
+  const secondClaim = await secondClaimResponse.json();
+  const secondRedeem = await fetch(`${baseUrl}/api/customer/redeem`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ code: secondClaim.code }),
+  });
+  const secondRedeemBody = await secondRedeem.json();
+  assert.equal(secondRedeemBody.status, 'redeemed');
+  assert.equal(secondRedeemBody.redemptionCount, 2);
+
+  const privacy = await fetch(`${baseUrl}/privacy`);
+  assert.equal(privacy.status, 200);
+  const deletion = await fetch(`${baseUrl}/data-deletion`);
+  assert.equal(deletion.status, 200);
+  const terms = await fetch(`${baseUrl}/terms`);
+  assert.equal(terms.status, 200);
   assert.equal(stderr.includes('internal_error'), false);
 });
