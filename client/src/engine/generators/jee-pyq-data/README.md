@@ -6,7 +6,7 @@ The committed `catalog.js` is intentionally empty until reviewed source records 
 
 When approved records are packed, this directory receives gzip/base64 `.b64` shards plus a generated `catalog.js` containing only:
 
-- static shard URLs for offline/Vite caching;
+- lazy local `?raw` shard importers that Vite bundles and the offline cache can own without adding a network API;
 - generator-id → shard-part coverage;
 - aggregate record/checksum metadata.
 

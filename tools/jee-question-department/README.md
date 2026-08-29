@@ -11,7 +11,7 @@ There are four stages, and only the last one creates app assets:
 1. **Extract** — `extract.py` finds likely printed question markers and creates `work/review-queue.jsonl`. Every row is `status: "draft"`; extraction can never publish.
 2. **Review** — a reviewer checks the source crop/PDF page, repairs maths text, chooses the exact Pri chapter when the source chapter is ambiguous, confirms JEE Main vs Advanced/historical IIT-JEE, sets D1–D4, enters the answer, and writes the worked steps. The reviewer then sets `status: "approved"`, `review.reviewedBy`, and `review.reviewedAt`.
 3. **Audit** — `audit.py --publish` rejects duplicate ids, out-of-range source pages, ambiguous routing, missing reviewer evidence, invalid answer contracts, missing worked steps, and placeholder solutions.
-4. **Pack** — `pack.py` runs the same strict publish audit again, gzip/base64 packs only approved rows, and generates `client/src/engine/generators/jee-pyq-data/catalog.js`. The student runtime reads only that generated catalog.
+4. **Pack** — `pack.py` runs the same strict publish audit again, gzip/base64 packs only approved rows, and generates `client/src/engine/generators/jee-pyq-data/catalog.js`. The generated catalog uses lazy local Vite `?raw` imports, so archive shards stay demand-loaded without introducing `fetch`, XHR, telemetry, or another network path. The student runtime reads only that generated catalog.
 
 That boundary is deliberate: an OCR/PDF extraction error must become a review item, never a wrong maths question shown to a student.
 
@@ -64,6 +64,7 @@ python3 tools/jee-question-department/pack.py approved.jsonl
 node client/test/jee-question-department-check.mjs
 python3 tools/jee-question-department/test_pipeline.py
 npm run build
+node scripts/sync-ios.mjs --check
 ```
 
 The packer is fail-closed. If even one publish record violates the gate, no archive shards are written.
@@ -71,6 +72,8 @@ The packer is fail-closed. If even one publish record violates the gate, no arch
 ## Student-runtime rules
 
 `jee-pyq-runtime.js` is intentionally separate from the synthetic/parameterised JEE generators. Reviewed PYQs carry source metadata and the existing `steps` contract so Pri Explain can animate the reviewed worked solution. Multiple-correct questions reuse Pri's exact unordered set checker. Descriptive/proof/source formats are `custom: true` self-check questions so tapping “finished” cannot fabricate Elo/mastery evidence.
+
+Reviewed JEE assets are loaded through local build chunks rather than a network request. Chapter-level JEE Main/Advanced practice prefers a reviewed PYQ only when the generated catalog says that track/chapter has approved records; exact dot-point practice remains on authored generators because source chapter metadata is not proof of dot-point precision.
 
 The committed `catalog.js` may be empty. Empty means exactly what it says: **zero reviewed PYQs are published**. It is safer than the previous unfinished branch state, which declared a large archive while the referenced data shards and reproducible extraction pipeline were not actually committed.
 
