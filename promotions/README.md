@@ -5,10 +5,10 @@ This isolated service powers the A2Z × Pri Learning in-store campaign without c
 ## Production customer flow
 
 1. The printed table QR opens `GET /c/a2z`.
-2. The page generates a short-lived one-time A2Z verification message.
-3. The customer copies that message into the `@pri.learning` Instagram DM.
+2. The page generates a one-time A2Z verification code, valid for 24 hours and usable once.
+3. The customer copies that code into the `@pri.learning` Instagram DM. Case, spaces and dashes are ignored on the way back in, so a code typed by hand still verifies.
 4. The Instagram webhook supplies the Instagram-scoped sender identity.
-5. The backend binds the short-lived A2Z pass to that identity and creates at most one campaign claim for that identity.
+5. The backend binds the A2Z pass to that identity and creates at most one campaign claim for that identity.
 6. Instagram replies with a private `/claim/PRI-...` link.
 7. The customer follows `@pri.learning`.
 8. At the counter, the customer opens the private claim link and taps **Verify follow & show green tick**.

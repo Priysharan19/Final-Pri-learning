@@ -51,9 +51,23 @@ test('green tick requires follow, increments once, and same identity stays block
   const landing = await fetch(`${baseUrl}/c/a2z`);
   assert.equal(landing.status, 200);
   const landingHtml = await landing.text();
-  assert.match(landingHtml, /A2Z-[2-9A-HJ-NP-Z]{4}-[2-9A-HJ-NP-Z]{4}/);
   assert.match(landingHtml, /green tick requires/i);
   assert.match(landingHtml, /href="\/privacy"/);
+
+  // The message to send is the code and nothing else — it used to be printed as
+  // "A2Z A2Z-....-....", which made the customer copy the keyword twice.
+  const printedMessage = landingHtml.match(/<p id="verification-message"[^>]*>([^<]+)<\/p>/)?.[1];
+  assert.match(printedMessage ?? '', /^A2Z-[2-9A-HJ-NP-Z]{4}-[2-9A-HJ-NP-Z]{4}$/);
+
+  // The pass is good for a day, and the page says so in both places.
+  assert.match(landingHtml, /Valid for 24 hours/);
+  const printedExpiry = landingHtml.match(/data-expires-at="([^"]*)"/)?.[1];
+  const passLifetimeMs = Date.parse(printedExpiry ?? '') - Date.now();
+  const DAY = 24 * 60 * 60 * 1000;
+  assert.ok(
+    passLifetimeMs > DAY - 60_000 && passLifetimeMs <= DAY,
+    `pass should expire in about 24h, got ${passLifetimeMs}ms`,
+  );
 
   // First create a valid A2Z identity that is NOT following.
   const notFollowingResponse = await fetch(`${baseUrl}/dev/simulate`, {
@@ -115,6 +129,22 @@ test('green tick requires follow, increments once, and same identity stays block
   assert.equal(redeemedBody.redemptionCount, 1);
   assert.match(redeemedBody.redeemedAt, /^\d{4}-\d{2}-\d{2}T/);
   assert.match(redeemedBody.serverTime, /^\d{4}-\d{2}-\d{2}T/);
+
+  // The same claim, spelled the way someone would type it off a phone screen:
+  // lower case, no dashes, a stray space. It has to resolve to the same claim
+  // rather than a second one, so the answer here is already_redeemed.
+  const sloppy = ` ${followingClaim.code.replace(/-/g, '').toLowerCase()} `;
+  const sloppyStatus = await fetch(`${baseUrl}/api/customer/status?code=${encodeURIComponent(sloppy)}`);
+  assert.equal(sloppyStatus.status, 200);
+  assert.equal((await sloppyStatus.json()).status, 'already_redeemed');
+
+  const sloppyRedeem = await fetch(`${baseUrl}/api/customer/redeem`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ code: followingClaim.code.toLowerCase().replace(/-/g, ' ') }),
+  });
+  assert.equal(sloppyRedeem.status, 409);
+  assert.equal((await sloppyRedeem.json()).redemptionCount, 1);
 
   const after = await fetch(`${baseUrl}/api/customer/status?code=${encodeURIComponent(followingClaim.code)}`);
   const afterBody = await after.json();

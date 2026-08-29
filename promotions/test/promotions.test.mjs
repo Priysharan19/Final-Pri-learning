@@ -7,8 +7,11 @@ import {
   createClaimCode,
   hashCampaignPassCode,
   hashClaimCode,
+  isCampaignPassCode,
+  isClaimCode,
   normalizeCampaignPassCode,
   normalizeClaimCode,
+  parseCampaignPassMessage,
   verifyMetaSignature,
 } from '../src/security.mjs';
 import { ensureInstagramWebhookSubscription, extractInstagramMessages, extractInstagramReferrals } from '../src/instagram.mjs';
@@ -16,16 +19,68 @@ import { ensureInstagramWebhookSubscription, extractInstagramMessages, extractIn
 test('claim and campaign pass codes normalize and hash deterministically', () => {
   const code = createClaimCode();
   assert.match(code, /^PRI-[2-9A-HJ-NP-Z]{4}-[2-9A-HJ-NP-Z]{4}$/);
-  assert.equal(normalizeClaimCode(`  ${code.toLowerCase()}  `), code);
-  assert.equal(hashClaimCode('secret', code), hashClaimCode('secret', code.toLowerCase()));
+  // The canonical form is the code without its dashes: that is what gets hashed,
+  // so every sloppy spelling of one code lands on one row.
+  assert.equal(normalizeClaimCode(`  ${code.toLowerCase()}  `), code.replace(/-/g, ''));
 
   const pass = createCampaignPassCode();
   assert.match(pass, /^A2Z-[2-9A-HJ-NP-Z]{4}-[2-9A-HJ-NP-Z]{4}$/);
-  assert.equal(normalizeCampaignPassCode(` ${pass.toLowerCase()} `), pass);
-  assert.equal(hashCampaignPassCode('secret', pass), hashCampaignPassCode('secret', pass.toLowerCase()));
+  assert.equal(normalizeCampaignPassCode(` ${pass.toLowerCase()} `), pass.replace(/-/g, ''));
 });
 
-test('short-lived QR pass can be consumed once and binds one Instagram identity', () => {
+test('a code typed by hand verifies however it is spaced, cased or dashed', () => {
+  const code = createClaimCode();                        // PRI-4K7M-92QX
+  const body = code.replace(/-/g, '');                   // PRI4K7M92QX
+  const spellings = [
+    code,
+    code.toLowerCase(),
+    body,
+    body.toLowerCase(),
+    `  ${code}  `,
+    code.replace(/-/g, ' '),                             // PRI 4K7M 92QX
+    code.replace(/-/g, '\u2013'),                        // en-dashes from autocorrect
+    `${body.slice(0, 3)} ${body.slice(3, 7)}-${body.slice(7)}`,
+  ];
+  const expected = hashClaimCode('secret', code);
+  for (const spelling of spellings) {
+    assert.equal(hashClaimCode('secret', spelling), expected, `hash differs for ${JSON.stringify(spelling)}`);
+    assert.ok(isClaimCode(spelling), `shape rejected ${JSON.stringify(spelling)}`);
+  }
+
+  const pass = createCampaignPassCode();
+  assert.equal(
+    hashCampaignPassCode('secret', pass),
+    hashCampaignPassCode('secret', pass.replace(/-/g, ' ').toLowerCase()),
+  );
+
+  // Forgiving about noise, not about content.
+  for (const rubbish of ['', 'PRI', 'PRI-4K7M', 'PRI-4K7M-92QXX', 'XYZ-4K7M-92QX', 'PRI-4K7M-92Q0']) {
+    assert.equal(isClaimCode(rubbish), false, `should have been rejected: ${JSON.stringify(rubbish)}`);
+  }
+});
+
+test('the DM parser takes the code alone and still takes the old keyword form', () => {
+  const pass = createCampaignPassCode();
+  const body = pass.replace(/-/g, '');
+
+  // What the page prints now.
+  assert.deepEqual(parseCampaignPassMessage(pass, 'A2Z'), { passCode: body });
+  assert.deepEqual(parseCampaignPassMessage(pass.toLowerCase(), 'A2Z'), { passCode: body });
+  assert.deepEqual(parseCampaignPassMessage(` ${body.toLowerCase()} `, 'A2Z'), { passCode: body });
+
+  // What a page opened before the change still prints, for the day its pass lives.
+  assert.deepEqual(parseCampaignPassMessage(`A2Z ${pass}`, 'A2Z'), { passCode: body });
+  assert.deepEqual(parseCampaignPassMessage(`a2z ${pass.toLowerCase()}`, 'A2Z'), { passCode: body });
+
+  // The bare keyword is not a pass, and neither is a near miss.
+  assert.equal(parseCampaignPassMessage('A2Z', 'A2Z'), null);
+  assert.equal(parseCampaignPassMessage('', 'A2Z'), null);
+  assert.equal(parseCampaignPassMessage(`A2Z ${pass}X`, 'A2Z'), null);
+  assert.equal(parseCampaignPassMessage('hello there', 'A2Z'), null);
+  assert.ok(isCampaignPassCode(pass));
+});
+
+test('a QR pass can be consumed once and binds one Instagram identity', () => {
   const store = new PromotionsStore(':memory:');
   store.seedCampaign({ id: 'a2z', keyword: 'A2Z', refCode: 'pri-a2z-qr-2026', rewardLabel: 'toffee' });
   const passHash = hashCampaignPassCode('secret', 'A2Z-ABCD-2345');
@@ -40,6 +95,17 @@ test('short-lived QR pass can be consumed once and binds one Instagram identity'
 
   const other = store.consumeCampaignPass({ passHash, instagramScopedId: 'ig-2' });
   assert.equal(other.status, 'used');
+  store.close();
+});
+
+test('a QR pass issued with no explicit TTL lasts 24 hours', () => {
+  const store = new PromotionsStore(':memory:');
+  store.seedCampaign({ id: 'a2z', keyword: 'A2Z', refCode: 'pri-a2z-qr-2026', rewardLabel: 'toffee' });
+  const before = Date.now();
+  const { expiresAt } = store.issueCampaignPass({ campaignId: 'a2z', passHash: hashCampaignPassCode('secret', 'A2Z-ABCD-2345') });
+  const lifetimeMs = Date.parse(expiresAt) - before;
+  const DAY = 24 * 60 * 60 * 1000;
+  assert.ok(lifetimeMs > DAY - 5_000 && lifetimeMs <= DAY, `expected ~24h, got ${lifetimeMs}ms`);
   store.close();
 });
 

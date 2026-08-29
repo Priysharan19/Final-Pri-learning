@@ -109,7 +109,7 @@ export class PromotionsStore {
     return this.db.prepare('SELECT * FROM campaigns WHERE ref_code = ? AND active = 1').get(String(refCode).trim()) ?? null;
   }
 
-  issueCampaignPass({ campaignId, passHash, ttlMs = 15 * 60 * 1000 }) {
+  issueCampaignPass({ campaignId, passHash, ttlMs = 24 * 60 * 60 * 1000 }) {
     const issuedAt = nowIso();
     const expiresAt = new Date(Date.now() + ttlMs).toISOString();
     this.db.prepare(`

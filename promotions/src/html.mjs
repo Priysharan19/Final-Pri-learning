@@ -118,7 +118,10 @@ export function campaignPage({
 }) {
   const dmUrl = `https://ig.me/m/${encodeURIComponent(instagramUsername)}?ref=${encodeURIComponent(refCode)}`;
   const profileUrl = `https://www.instagram.com/${encodeURIComponent(instagramUsername)}/`;
-  const verificationMessage = `${keyword} ${campaignPassCode}`;
+  // The code already begins with the campaign keyword, so printing the keyword
+  // in front of it made the customer copy "A2Z" twice. The server still accepts
+  // the old two-part message from pages opened before this change.
+  const verificationMessage = campaignPassCode;
   const handle = `@${escapeHtml(instagramUsername)}`;
   const reward = escapeHtml(rewardLabel);
   return `<!doctype html>
@@ -152,7 +155,7 @@ export function campaignPage({
     <p id="verification-message" class="code" data-expires-at="${escapeHtml(passExpiresAt)}">${escapeHtml(verificationMessage)}</p>
     <p class="expiry" id="expiry">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/><path d="M12 7.5V12l3 2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-      <span id="expiry-text">Valid for about 15 minutes</span>
+      <span id="expiry-text">Valid for 24 hours</span>
     </p>
     <button id="copy-open" class="btn btn-primary" type="button">
       <span id="copy-open-text">Copy code, open Instagram</span>
@@ -193,7 +196,7 @@ export function campaignPage({
 (function () {
   var DM = ${JSON.stringify(dmUrl)};
   var PROFILE = ${JSON.stringify(profileUrl)};
-  var TTL = 15 * 60 * 1000;
+  var TTL = 24 * 60 * 60 * 1000;
   var codeEl = document.getElementById('verification-message');
   var status = document.getElementById('copy-status');
   var btn = document.getElementById('copy-open');
@@ -235,10 +238,18 @@ export function campaignPage({
       status.textContent = '';
       return;
     }
-    var m = Math.floor(left / 60000), s = Math.floor((left % 60000) / 1000);
-    expiryEl.className = 'expiry' + (left < 3 * 60000 ? ' warn' : '');
-    expiryText.textContent = 'Expires in ' + m + ':' + pad(s);
-    setTimeout(tickClock, 1000);
+    // 1439:59 is not a duration anyone reads. Hours and minutes while the
+    // window is wide; the ticking clock only in the last hour, where the
+    // seconds are the part that matters.
+    var h = Math.floor(left / 3600000);
+    var m = Math.floor((left % 3600000) / 60000), s = Math.floor((left % 60000) / 1000);
+    expiryEl.className = 'expiry' + (left < 10 * 60000 ? ' warn' : '');
+    expiryText.textContent = h > 0
+      ? 'Expires in ' + h + 'h' + (m ? ' ' + m + 'm' : '')
+      : 'Expires in ' + m + ':' + pad(s);
+    // Above an hour the string changes once a minute; do not wake every second
+    // to repaint it.
+    setTimeout(tickClock, h > 0 ? 30000 : 1000);
   }
   tickClock();
 
@@ -388,7 +399,7 @@ export function termsPage() {
       <p class="updated">Last updated 29 August 2026</p>
       <ul>
         <li>The offer is limited to one successfully redeemed reward per eligible Instagram identity for the A2Z campaign.</li>
-        <li>Eligibility requires a valid A2Z campaign attribution, normally established by the short-lived verification message generated from the A2Z QR page.</li>
+        <li>Eligibility requires a valid A2Z campaign attribution, normally established by the one-time verification code generated from the A2Z QR page, which is valid for 24 hours and can be used once.</li>
         <li>The live green tick requires Meta/Instagram to confirm that the same Instagram identity is currently following @pri.learning at the moment of redemption.</li>
         <li>If the current follow cannot be positively verified, no green tick is issued and the claim remains unredeemed so the customer can retry.</li>
         <li>Once redeemed, repeated scans, unfollowing, following again or repeated messages from the same Instagram identity do not create a new entitlement.</li>
