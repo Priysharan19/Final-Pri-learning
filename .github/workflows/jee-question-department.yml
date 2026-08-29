@@ -63,3 +63,8 @@ jobs:
           name: jee-ios-sync-patch
           path: /tmp/jee-ios-sync.patch
           retention-days: 1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: jee-client-dist
+          path: client/dist
+          retention-days: 1
