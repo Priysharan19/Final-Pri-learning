@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "title": "41 Years IIT JEE Mathematics",
+    "edition": "2019-1979",
+    "publisher": "Arihant",
+    "pdfPages": 625,
+    "bookPageOffset": 9,
+    "notes": "Book page 1 is PDF page 10. The chapter archive occupies book pages 1-598; the final solved JEE Advanced 2019 paper occupies PDF pages 608-625."
+  },
+  "reviewPolicy": {
+    "publishStatuses": ["approved"],
+    "requiredEvidence": ["sourcePdfPage", "sourceChapter", "sourceQuestionNumber", "reviewedBy", "reviewedAt"],
+    "requireWorkedSteps": true,
+    "rejectPlaceholderSolutions": true,
+    "ambiguousTargetRequiresReview": true
+  },
+  "chapters": [
+    {"number":1,"title":"Complex Numbers","bookPageStart":1,"bookPageEnd":26,"answerPage":8,"part":"algebra","targets":["c11-complex-numbers"]},
+    {"number":2,"title":"Theory of Equations","bookPageStart":27,"bookPageEnd":47,"answerPage":32,"part":"algebra","targets":["c11-complex-numbers"],"targetNote":"Pri Learning's Class 11 Complex Numbers and Quadratic Equations chapter owns quadratic-equation coverage."},
+    {"number":3,"title":"Sequences and Series","bookPageStart":48,"bookPageEnd":71,"answerPage":54,"part":"algebra","targets":["c11-sequences-series"]},
+    {"number":4,"title":"Permutations and Combinations","bookPageStart":72,"bookPageEnd":83,"answerPage":76,"part":"algebra","targets":["c11-permutations-combinations"]},
+    {"number":5,"title":"Binomial Theorem","bookPageStart":84,"bookPageEnd":96,"answerPage":87,"part":"algebra","targets":["c11-binomial-theorem"]},
+    {"number":6,"title":"Probability","bookPageStart":97,"bookPageEnd":126,"answerPage":106,"part":"probability-matrix","targets":["c11-probability","c12-probability"],"ambiguousTarget":true},
+    {"number":7,"title":"Matrices and Determinants","bookPageStart":127,"bookPageEnd":159,"answerPage":135,"part":"probability-matrix","targets":["c12-matrices","c12-determinants"],"ambiguousTarget":true},
+    {"number":8,"title":"Functions","bookPageStart":160,"bookPageEnd":175,"answerPage":165,"part":"algebra","targets":["c11-relations-functions","c12-relations-functions"],"ambiguousTarget":true},
+    {"number":9,"title":"Limit, Continuity and Differentiability","bookPageStart":176,"bookPageEnd":224,"answerPage":188,"part":"calculus-a","targets":["c11-limits-derivatives","c12-continuity-differentiability"],"ambiguousTarget":true},
+    {"number":10,"title":"Application of Derivatives","bookPageStart":225,"bookPageEnd":262,"answerPage":232,"part":"calculus-a","targets":["c12-applications-derivatives"]},
+    {"number":11,"title":"Indefinite Integration","bookPageStart":263,"bookPageEnd":277,"answerPage":266,"part":"calculus-b","targets":["c12-integrals"]},
+    {"number":12,"title":"Definite Integration","bookPageStart":278,"bookPageEnd":310,"answerPage":285,"part":"calculus-b","targets":["c12-integrals"]},
+    {"number":13,"title":"Area","bookPageStart":311,"bookPageEnd":334,"answerPage":315,"part":"calculus-b","targets":["c12-applications-integrals"]},
+    {"number":14,"title":"Differential Equations","bookPageStart":335,"bookPageEnd":357,"answerPage":340,"part":"calculus-b","targets":["c12-differential-equations"]},
+    {"number":15,"title":"Straight Line and Pair of Straight Lines","bookPageStart":358,"bookPageEnd":382,"answerPage":364,"part":"coordinate","targets":["c11-straight-lines"]},
+    {"number":16,"title":"Circle","bookPageStart":383,"bookPageEnd":416,"answerPage":390,"part":"coordinate","targets":["c11-conic-sections"]},
+    {"number":17,"title":"Parabola","bookPageStart":417,"bookPageEnd":434,"answerPage":421,"part":"coordinate","targets":["c11-conic-sections"]},
+    {"number":18,"title":"Ellipse","bookPageStart":435,"bookPageEnd":449,"answerPage":438,"part":"coordinate","targets":["c11-conic-sections"]},
+    {"number":19,"title":"Hyperbola","bookPageStart":450,"bookPageEnd":460,"answerPage":453,"part":"coordinate","targets":["c11-conic-sections"]},
+    {"number":20,"title":"Trigonometrical Ratios and Identities","bookPageStart":461,"bookPageEnd":473,"answerPage":464,"part":"trig-vector","targets":["c11-trig-functions"]},
+    {"number":21,"title":"Trigonometrical Equations","bookPageStart":474,"bookPageEnd":487,"answerPage":477,"part":"trig-vector","targets":["c11-trig-functions"]},
+    {"number":22,"title":"Inverse Circular Functions","bookPageStart":488,"bookPageEnd":497,"answerPage":490,"part":"trig-vector","targets":["c12-inverse-trigonometric"]},
+    {"number":23,"title":"Properties of Triangles","bookPageStart":498,"bookPageEnd":518,"answerPage":502,"part":"trig-vector","targets":["c11-trig-functions"]},
+    {"number":24,"title":"Vectors","bookPageStart":519,"bookPageEnd":548,"answerPage":527,"part":"trig-vector","targets":["c12-vector-algebra"]},
+    {"number":25,"title":"3D Geometry","bookPageStart":549,"bookPageEnd":572,"answerPage":554,"part":"trig-vector","targets":["c11-3d-introduction","c12-3d-geometry"],"ambiguousTarget":true},
+    {"number":26,"title":"Miscellaneous","bookPageStart":573,"bookPageEnd":598,"answerPage":581,"part":"mixed","targets":["c11-complex-numbers","c11-sequences-series","c11-permutations-combinations","c11-binomial-theorem","c11-relations-functions","c11-probability","c11-straight-lines","c11-conic-sections","c11-trig-functions","c11-limits-derivatives","c12-probability","c12-matrices","c12-determinants","c12-relations-functions","c12-continuity-differentiability","c12-applications-derivatives","c12-integrals","c12-applications-integrals","c12-differential-equations","c12-inverse-trigonometric","c12-vector-algebra","c12-3d-geometry"],"ambiguousTarget":true}
+  ],
+  "appendices": [
+    {"id":"jee-advanced-2019-solved-paper","title":"JEE Advanced Solved Paper 2019","pdfPageStart":608,"pdfPageEnd":625,"part":"mixed","ambiguousTarget":true}
+  ]
+}

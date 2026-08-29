@@ -1,0 +1,100 @@
+name: Main Integrity
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+  actions: read
+
+jobs:
+  verify-main-arrived-through-green-pr:
+    name: Main arrived through a green PR
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify merged PR provenance and exact-head gates
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+          API: ${{ github.api_url }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          auth=(
+            -H "Authorization: Bearer ${GH_TOKEN}"
+            -H "Accept: application/vnd.github+json"
+            -H "X-GitHub-Api-Version: 2022-11-28"
+          )
+
+          echo "Auditing main commit ${SHA}"
+
+          prs="$(curl --fail --silent --show-error "${auth[@]}" \
+            "${API}/repos/${REPO}/commits/${SHA}/pulls")"
+
+          pr="$(printf '%s' "$prs" | jq -c --arg sha "$SHA" '
+            [ .[]
+              | select(.base.ref == "main")
+              | select(.merged_at != null)
+              | select(.merge_commit_sha == $sha)
+            ]
+            | sort_by(.merged_at)
+            | last // empty
+          ')"
+
+          if [[ -z "$pr" ]]; then
+            echo "::error::main commit ${SHA} is not the recorded merge result of a merged pull request targeting main. Direct pushes and out-of-band ref updates are not an approved release path."
+            exit 1
+          fi
+
+          pr_number="$(printf '%s' "$pr" | jq -r '.number')"
+          head_sha="$(printf '%s' "$pr" | jq -r '.head.sha')"
+          pr_url="$(printf '%s' "$pr" | jq -r '.html_url')"
+
+          echo "Found merged PR #${pr_number}: ${pr_url}"
+          echo "Exact PR head: ${head_sha}"
+
+          runs="$(curl --fail --silent --show-error "${auth[@]}" \
+            "${API}/repos/${REPO}/actions/runs?head_sha=${head_sha}&event=pull_request&per_page=100")"
+
+          latest="$(printf '%s' "$runs" | jq -c '
+            [ .workflow_runs[] ]
+            | sort_by(.workflow_id, .updated_at)
+            | group_by(.workflow_id)
+            | map(max_by(.updated_at))
+          ')"
+
+          total="$(printf '%s' "$latest" | jq 'length')"
+          ci_green="$(printf '%s' "$latest" | jq '[.[] | select(.name == "CI" and .status == "completed" and .conclusion == "success")] | length')"
+          pending="$(printf '%s' "$latest" | jq '[.[] | select(.status != "completed")] | length')"
+          bad="$(printf '%s' "$latest" | jq '[.[] | select(.status == "completed" and (.conclusion != "success" and .conclusion != "skipped" and .conclusion != "neutral"))] | length')"
+
+          echo "Latest PR workflows measured: ${total}"
+          printf '%s' "$latest" | jq -r '.[] | "  - \(.name): \(.status) / \(.conclusion // "pending")"'
+
+          if [[ "$total" -lt 1 ]]; then
+            echo "::error::no pull-request workflow evidence exists for exact head ${head_sha}."
+            exit 1
+          fi
+
+          if [[ "$ci_green" -lt 1 ]]; then
+            echo "::error::the exact PR head ${head_sha} has no successful completed CI workflow."
+            exit 1
+          fi
+
+          if [[ "$pending" -gt 0 ]]; then
+            echo "::error::the PR was merged while ${pending} latest workflow(s) were still pending."
+            exit 1
+          fi
+
+          if [[ "$bad" -gt 0 ]]; then
+            echo "::error::the PR was merged with ${bad} latest workflow(s) in a failing/cancelled/timed-out state."
+            exit 1
+          fi
+
+          echo "Main integrity verified: PR provenance is exact and every latest PR workflow is terminal green/neutral, with CI successful."

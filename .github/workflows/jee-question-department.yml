@@ -1,0 +1,58 @@
+name: JEE Question Department
+
+on:
+  pull_request:
+    paths:
+      - 'tools/jee-question-department/**'
+      - 'client/src/engine/indiaProduct.js'
+      - 'client/src/engine/generators/index.js'
+      - 'client/src/engine/generators/jee-pyq-runtime.js'
+      - 'client/src/engine/generators/jee-pyq-data/**'
+      - 'client/test/jee-question-department-check.mjs'
+      - '.github/workflows/jee-question-department.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'tools/jee-question-department/**'
+      - 'client/src/engine/indiaProduct.js'
+      - 'client/src/engine/generators/index.js'
+      - 'client/src/engine/generators/jee-pyq-runtime.js'
+      - 'client/src/engine/generators/jee-pyq-data/**'
+      - 'client/test/jee-question-department-check.mjs'
+      - '.github/workflows/jee-question-department.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Runtime + product routing contract
+        run: node client/test/jee-question-department-check.mjs
+      - name: India generator regression
+        run: node client/test/india-check.mjs
+      - name: Audit and pack regression
+        run: python tools/jee-question-department/test_pipeline.py
+      - name: Python syntax gate
+        run: >-
+          python -m py_compile
+          tools/jee-question-department/extract.py
+          tools/jee-question-department/audit.py
+          tools/jee-question-department/pack.py
+          tools/jee-question-department/test_pipeline.py
+      - name: Build + iOS sync guarantee
+        run: |
+          npm ci --prefix client
+          npm run build
+          node scripts/sync-ios.mjs --check
