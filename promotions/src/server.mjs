@@ -18,8 +18,13 @@ import {
   createCampaignPassCode,
   createClaimCode,
   createStaffSession,
+  campaignPassCodeHashes,
+  claimCodeHashes,
   hashCampaignPassCode,
   hashClaimCode,
+  isClaimCode,
+  parseCampaignPassMessage,
+  normalizeClaimCode,
   safeEqualText,
   verifyMetaSignature,
   verifyStaffSession,
@@ -45,7 +50,7 @@ async function readFont(name) {
 
 const redemptionAttempts = new Map();
 const MAX_BODY = 256 * 1024;
-const CAMPAIGN_PASS_TTL_MS = 15 * 60 * 1000;
+const CAMPAIGN_PASS_TTL_MS = 24 * 60 * 60 * 1000;
 const STAFF_SESSION_TTL_MS = 12 * 60 * 60 * 1000;
 const STAFF_COOKIE = 'pri_staff_session';
 const runtimeStatus = {
@@ -110,16 +115,9 @@ function subjectRef(scopedId) { return `ig:${anonymizeId(scopedId, config.claimS
 function matchesCampaignKeyword(messageText, campaignKeyword) {
   return String(messageText ?? '').trim().toLowerCase() === String(campaignKeyword ?? '').trim().toLowerCase();
 }
-function parseCampaignPassMessage(messageText) {
-  const match = String(messageText ?? '').trim().match(/^([^\s]+)\s+(A2Z-[2-9A-HJ-NP-Z]{4}-[2-9A-HJ-NP-Z]{4})$/i);
-  if (!match) return null;
-  return { keyword: match[1], passCode: match[2].toUpperCase() };
-}
-function isClaimCode(code) {
-  return /^PRI-[2-9A-HJ-NP-Z]{4}-[2-9A-HJ-NP-Z]{4}$/i.test(String(code ?? '').trim());
-}
 function claimByCode(code) {
   if (!isClaimCode(code)) return null;
+  const candidates = claimCodeHashes(config.claimSecret, code);
   return store.db.prepare(`
     SELECT
       c.id,
@@ -132,8 +130,8 @@ function claimByCode(code) {
     FROM claims c
     JOIN campaigns ca ON ca.id = c.campaign_id
     JOIN participants p ON p.instagram_scoped_id = c.instagram_scoped_id
-    WHERE c.code_hash = ?
-  `).get(hashClaimCode(config.claimSecret, code)) ?? null;
+    WHERE c.code_hash IN (${candidates.map(() => '?').join(', ')})
+  `).get(...candidates) ?? null;
 }
 function campaignRedemptionCount(campaignId) {
   return Number(store.getStats(campaignId)?.redeemed ?? 0);
@@ -169,7 +167,7 @@ function safeStaffNext(value) {
 function redeemCode(code, req) {
   if (!isClaimCode(code)) return { httpStatus: 400, body: { status: 'invalid' } };
   const result = store.redeemByCodeHash({
-    codeHash: hashClaimCode(config.claimSecret, code),
+    codeHash: claimCodeHashes(config.claimSecret, code),
     subjectRef: `staff:${remoteKey(req)}`,
   });
   if (result.status === 'redeemed') return { httpStatus: 200, body: result };
@@ -235,29 +233,30 @@ async function processInstagramPayload(payload) {
   if (messages.length) runtimeStatus.lastMessageAt = new Date().toISOString();
   for (const message of messages) {
     let attributedCampaign = store.getAttributedCampaign(message.senderId);
-    const passMessage = parseCampaignPassMessage(message.text);
+    const passMessage = parseCampaignPassMessage(message.text, config.campaignKeyword);
 
     if (!attributedCampaign && passMessage) {
-      const campaign = store.getCampaignByKeyword(passMessage.keyword);
-      if (campaign) {
-        const passHash = hashCampaignPassCode(config.claimSecret, passMessage.passCode);
-        const passResult = store.consumeCampaignPass({ passHash, instagramScopedId: message.senderId, subjectRef: subjectRef(message.senderId) });
-        if (passResult.status === 'consumed' && passResult.campaignId === campaign.id) {
-          runtimeStatus.lastQrPassAt = new Date().toISOString();
-          store.recordAttribution({ instagramScopedId: message.senderId, campaignId: campaign.id, refCode: `qr-pass:${passHash.slice(0, 12)}`, source: 'QR_PASS', subjectRef: subjectRef(message.senderId) });
-          attributedCampaign = campaign;
-        } else if (passResult.status === 'already_consumed_by_identity' && passResult.campaignId === campaign.id) {
-          attributedCampaign = store.getAttributedCampaign(message.senderId);
-        } else {
-          await sendToInstagram(message.senderId, `That A2Z verification code is ${passResult.status === 'expired' ? 'expired' : 'not valid anymore'}. Re-open the official A2Z QR page to get a fresh verification message, then send the full message shown there.`);
-          continue;
-        }
+      // The pass row names its own campaign and consumeCampaignPass already
+      // refuses one whose campaign is inactive, so the hash is the authority
+      // here. Nothing has to be inferred from a keyword the sender typed.
+      const passHashes = campaignPassCodeHashes(config.claimSecret, passMessage.passCode);
+      const passResult = store.consumeCampaignPass({ passHash: passHashes, instagramScopedId: message.senderId, subjectRef: subjectRef(message.senderId) });
+      const passCampaign = passResult.campaignId ? store.getCampaign(passResult.campaignId) : null;
+      if (passResult.status === 'consumed' && passCampaign) {
+        runtimeStatus.lastQrPassAt = new Date().toISOString();
+        store.recordAttribution({ instagramScopedId: message.senderId, campaignId: passCampaign.id, refCode: `qr-pass:${passHashes[0].slice(0, 12)}`, source: 'QR_PASS', subjectRef: subjectRef(message.senderId) });
+        attributedCampaign = passCampaign;
+      } else if (passResult.status === 'already_consumed_by_identity' && passCampaign) {
+        attributedCampaign = store.getAttributedCampaign(message.senderId);
+      } else {
+        await sendToInstagram(message.senderId, `That A2Z code is ${passResult.status === 'expired' ? 'expired' : 'not valid anymore'}. Re-open the official A2Z QR page for a fresh code, then send the code shown there.`);
+        continue;
       }
     }
 
     if (!attributedCampaign) {
       const keywordCampaign = store.getCampaignByKeyword(message.text);
-      if (keywordCampaign) await sendToInstagram(message.senderId, `This reward is reserved for the A2Z QR campaign. Re-open the official A2Z QR page and send the full verification message shown there (it starts with ${keywordCampaign.keyword}).`);
+      if (keywordCampaign) await sendToInstagram(message.senderId, `This reward is reserved for the A2Z QR campaign. Re-open the official A2Z QR page and send the code shown there (it starts with ${keywordCampaign.keyword}-).`);
       continue;
     }
 
@@ -351,14 +350,14 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (req.method === 'GET' && url.pathname.startsWith('/claim/')) {
-      const code = decodeURIComponent(url.pathname.slice('/claim/'.length)).trim().toUpperCase();
+      const code = normalizeClaimCode(decodeURIComponent(url.pathname.slice('/claim/'.length)));
       const claim = claimByCode(code);
       if (!claim) return text(res, 404, 'Claim not found.');
       return html(res, 200, customerRedeemPage({ code, rewardLabel: claim.reward_label, instagramUsername: config.instagramUsername }));
     }
 
     if (req.method === 'GET' && url.pathname === '/api/customer/status') {
-      const code = String(url.searchParams.get('code') ?? '').trim().toUpperCase();
+      const code = normalizeClaimCode(url.searchParams.get('code'));
       const claim = claimByCode(code);
       if (!claim) return json(res, 404, { status: 'invalid', serverTime: new Date().toISOString() });
       if (claim.redeemed_at) {
@@ -375,7 +374,7 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'POST' && url.pathname === '/api/customer/redeem') {
       if (redemptionRateLimited(req)) return json(res, 429, { error: 'too_many_attempts' });
       const body = parseJsonBody(await readRawBody(req));
-      const code = String(body.code ?? '').trim().toUpperCase();
+      const code = normalizeClaimCode(body.code);
       const claim = claimByCode(code);
       if (!claim) return json(res, 404, { status: 'invalid', serverTime: new Date().toISOString() });
       if (claim.redeemed_at) {
@@ -404,7 +403,7 @@ const server = http.createServer(async (req, res) => {
       }
 
       const result = store.redeemByCodeHash({
-        codeHash: hashClaimCode(config.claimSecret, code),
+        codeHash: claimCodeHashes(config.claimSecret, code),
         subjectRef: `customer:${subjectRef(claim.instagram_scoped_id)}`,
       });
       const redemptionCount = campaignRedemptionCount(claim.campaign_id);
@@ -433,7 +432,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (req.method === 'GET' && url.pathname === '/staff/scan') {
-      const code = String(url.searchParams.get('code') ?? '').trim().toUpperCase();
+      const code = normalizeClaimCode(url.searchParams.get('code'));
       const next = `/staff/scan?code=${encodeURIComponent(code)}`;
       if (!staffUnlocked(req)) return html(res, 200, staffLoginPage({ next }));
       return html(res, 200, staffScanPage({ code }));

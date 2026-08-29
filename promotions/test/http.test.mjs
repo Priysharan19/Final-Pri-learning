@@ -3,11 +3,13 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { randomInt } from 'node:crypto';
+import { createHmac, randomInt } from 'node:crypto';
+import { PromotionsStore } from '../src/store.mjs';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const here = resolve(fileURLToPath(new URL('..', import.meta.url)));
+const CLAIM_SECRET = 'test-claim-secret-which-is-long-enough-123456789';
 
 async function waitForHealth(baseUrl, child) {
   for (let i = 0; i < 80; i += 1) {
@@ -33,7 +35,7 @@ test('green tick requires follow, increments once, and same identity stays block
       PORT: String(port),
       PUBLIC_BASE_URL: baseUrl,
       PROMOTIONS_DB_PATH: join(dir, 'test.sqlite'),
-      CLAIM_SECRET: 'test-claim-secret-which-is-long-enough-123456789',
+      CLAIM_SECRET,
       STAFF_PIN: '2468',
       CAMPAIGN_REF: 'pri-a2z-qr-2026',
     },
@@ -51,9 +53,23 @@ test('green tick requires follow, increments once, and same identity stays block
   const landing = await fetch(`${baseUrl}/c/a2z`);
   assert.equal(landing.status, 200);
   const landingHtml = await landing.text();
-  assert.match(landingHtml, /A2Z-[2-9A-HJ-NP-Z]{4}-[2-9A-HJ-NP-Z]{4}/);
   assert.match(landingHtml, /green tick requires/i);
   assert.match(landingHtml, /href="\/privacy"/);
+
+  // The message to send is the code and nothing else — it used to be printed as
+  // "A2Z A2Z-....-....", which made the customer copy the keyword twice.
+  const printedMessage = landingHtml.match(/<p id="verification-message"[^>]*>([^<]+)<\/p>/)?.[1];
+  assert.match(printedMessage ?? '', /^A2Z-[2-9A-HJ-NP-Z]{4}-[2-9A-HJ-NP-Z]{4}$/);
+
+  // The pass is good for a day, and the page says so in both places.
+  assert.match(landingHtml, /Valid for 24 hours/);
+  const printedExpiry = landingHtml.match(/data-expires-at="([^"]*)"/)?.[1];
+  const passLifetimeMs = Date.parse(printedExpiry ?? '') - Date.now();
+  const DAY = 24 * 60 * 60 * 1000;
+  assert.ok(
+    passLifetimeMs > DAY - 60_000 && passLifetimeMs <= DAY,
+    `pass should expire in about 24h, got ${passLifetimeMs}ms`,
+  );
 
   // First create a valid A2Z identity that is NOT following.
   const notFollowingResponse = await fetch(`${baseUrl}/dev/simulate`, {
@@ -116,6 +132,22 @@ test('green tick requires follow, increments once, and same identity stays block
   assert.match(redeemedBody.redeemedAt, /^\d{4}-\d{2}-\d{2}T/);
   assert.match(redeemedBody.serverTime, /^\d{4}-\d{2}-\d{2}T/);
 
+  // The same claim, spelled the way someone would type it off a phone screen:
+  // lower case, no dashes, a stray space. It has to resolve to the same claim
+  // rather than a second one, so the answer here is already_redeemed.
+  const sloppy = ` ${followingClaim.code.replace(/-/g, '').toLowerCase()} `;
+  const sloppyStatus = await fetch(`${baseUrl}/api/customer/status?code=${encodeURIComponent(sloppy)}`);
+  assert.equal(sloppyStatus.status, 200);
+  assert.equal((await sloppyStatus.json()).status, 'already_redeemed');
+
+  const sloppyRedeem = await fetch(`${baseUrl}/api/customer/redeem`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ code: followingClaim.code.toLowerCase().replace(/-/g, ' ') }),
+  });
+  assert.equal(sloppyRedeem.status, 409);
+  assert.equal((await sloppyRedeem.json()).redemptionCount, 1);
+
   const after = await fetch(`${baseUrl}/api/customer/status?code=${encodeURIComponent(followingClaim.code)}`);
   const afterBody = await after.json();
   assert.equal(afterBody.status, 'already_redeemed');
@@ -156,6 +188,41 @@ test('green tick requires follow, increments once, and same identity stays block
   assert.equal(secondRedeemBody.status, 'redeemed');
   assert.equal(secondRedeemBody.currentFollowState, true);
   assert.equal(secondRedeemBody.redemptionCount, 2);
+
+  // ── a claim issued before the normalisation changed ────────────────────
+  // Written straight into the running server's database exactly as the old
+  // scheme wrote it: hashed over the dashed spelling, and containing an L,
+  // which was in the alphabet until this change. A link like this is already in
+  // a customer's Instagram thread, so it has to keep working after deploy.
+  const LEGACY_CODE = 'PRI-ABCL-2345';
+  const legacyStore = new PromotionsStore(join(dir, 'test.sqlite'));
+  legacyStore.upsertParticipant({ instagramScopedId: 'ig-http-legacy', username: 'legacy', followsBusiness: true });
+  legacyStore.issueOrRotateClaim({
+    campaignId: 'a2z',
+    instagramScopedId: 'ig-http-legacy',
+    codeHash: createHmac('sha256', CLAIM_SECRET).update(LEGACY_CODE).digest('hex'),
+    followsBusiness: true,
+  });
+  legacyStore.close();
+
+  const legacyPage = await fetch(`${baseUrl}/claim/${encodeURIComponent(LEGACY_CODE)}`);
+  assert.equal(legacyPage.status, 200, 'an old claim link must still open');
+  assert.match(await legacyPage.text(), /Verify follow & show green tick/);
+
+  // ...and it resolves when typed the new forgiving way, too.
+  const legacyStatus = await fetch(`${baseUrl}/api/customer/status?code=${encodeURIComponent(' priabcl2345 ')}`);
+  assert.equal(legacyStatus.status, 200);
+  assert.equal((await legacyStatus.json()).status, 'ready');
+
+  const legacyRedeem = await fetch(`${baseUrl}/api/customer/redeem`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ code: LEGACY_CODE.toLowerCase() }),
+  });
+  assert.equal(legacyRedeem.status, 200, 'an old claim must still redeem');
+  const legacyRedeemBody = await legacyRedeem.json();
+  assert.equal(legacyRedeemBody.status, 'redeemed');
+  assert.equal(legacyRedeemBody.redemptionCount, 3);
 
   const privacy = await fetch(`${baseUrl}/privacy`);
   assert.equal(privacy.status, 200);
