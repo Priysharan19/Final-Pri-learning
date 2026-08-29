@@ -27,12 +27,14 @@ permissions:
 jobs:
   gate:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: client/package-lock.json
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -49,3 +51,15 @@ jobs:
           tools/jee-question-department/audit.py
           tools/jee-question-department/pack.py
           tools/jee-question-department/test_pipeline.py
+      - name: Build synced iOS patch
+        run: |
+          npm ci --prefix client
+          npm run build
+          npm run sync:ios
+          git diff --binary -- ios/PriLearning.swiftpm/Resources/Web "ios/PriLearning 2.swiftpm/Resources/Web" > /tmp/jee-ios-sync.patch
+          test -s /tmp/jee-ios-sync.patch
+      - uses: actions/upload-artifact@v4
+        with:
+          name: jee-ios-sync-patch
+          path: /tmp/jee-ios-sync.patch
+          retention-days: 1
