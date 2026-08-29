@@ -175,16 +175,18 @@ function base64Bytes(text) {
 }
 
 async function decodePart(part) {
-  const urls = JEE_PYQ_PARTS[part];
-  if (!urls?.length) throw Object.assign(new Error(`No reviewed JEE PYQ part named ${part}.`), { code: 'JEE_PYQ_PART_UNPUBLISHED' });
+  const loaders = JEE_PYQ_PARTS[part];
+  if (!loaders?.length) throw Object.assign(new Error(`No reviewed JEE PYQ part named ${part}.`), { code: 'JEE_PYQ_PART_UNPUBLISHED' });
   if (typeof DecompressionStream !== 'function') {
     throw Object.assign(new Error('This browser cannot open Pri Learning’s compressed JEE archive. Update Safari/iPadOS and try again.'), { code: 'JEE_PYQ_GZIP_UNSUPPORTED' });
   }
-  const responses = await Promise.all(urls.map(url => fetch(url)));
-  for (const response of responses) {
-    if (!response.ok) throw Object.assign(new Error(`Could not load reviewed JEE archive (${response.status || 'offline'}).`), { code: 'JEE_PYQ_LOAD_FAILED' });
-  }
-  const encoded = (await Promise.all(responses.map(response => response.text()))).join('');
+  const pieces = await Promise.all(loaders.map(async load => {
+    if (typeof load !== 'function') throw new Error(`Reviewed JEE part ${part} has an invalid local asset loader.`);
+    const text = await load();
+    if (typeof text !== 'string') throw new Error(`Reviewed JEE part ${part} did not decode to local text.`);
+    return text;
+  }));
+  const encoded = pieces.join('');
   const stream = new Blob([base64Bytes(encoded)]).stream().pipeThrough(new DecompressionStream('gzip'));
   const records = JSON.parse(await new Response(stream).text());
   if (!Array.isArray(records)) throw new Error(`Reviewed JEE part ${part} is not an array.`);
