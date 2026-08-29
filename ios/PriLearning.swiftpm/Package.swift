@@ -33,7 +33,8 @@ let package = Package(
             capabilities: [
                 .camera(purposeString: "Photograph handwritten maths so Pri can read it on-device and attach it to your attempt.")
             ],
-            appCategory: .education
+            appCategory: .education,
+            additionalInfoPlistContentFilePath: "AppInfo.plist"
         )
     ],
     targets: [
