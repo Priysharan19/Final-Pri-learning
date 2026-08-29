@@ -22,7 +22,7 @@ on:
       - '.github/workflows/jee-question-department.yml'
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   gate:
@@ -30,8 +30,6 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -53,22 +51,8 @@ jobs:
           tools/jee-question-department/audit.py
           tools/jee-question-department/pack.py
           tools/jee-question-department/test_pipeline.py
-      - name: Build and sync tracked iOS bundle
+      - name: Build + iOS sync guarantee
         run: |
           npm ci --prefix client
           npm run build
-          npm run sync:ios
-      - name: Commit iOS bundle sync
-        if: github.event_name == 'pull_request'
-        run: |
-          if git diff --quiet -- ios/PriLearning.swiftpm/Resources/Web "ios/PriLearning 2.swiftpm/Resources/Web" && [ -z "$(git status --porcelain --untracked-files=all -- ios/PriLearning.swiftpm/Resources/Web "ios/PriLearning 2.swiftpm/Resources/Web")" ]; then
-            echo "iOS bundle already synchronized"
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -- ios/PriLearning.swiftpm/Resources/Web "ios/PriLearning 2.swiftpm/Resources/Web"
-          git commit -m "Sync iOS web bundle for JEE integration"
-          git push origin "HEAD:${GITHUB_HEAD_REF}"
-      - name: Verify iOS bundle
-        run: node scripts/sync-ios.mjs --check
+          node scripts/sync-ios.mjs --check
