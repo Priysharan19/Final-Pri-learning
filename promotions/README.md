@@ -91,6 +91,13 @@ STAFF_PIN=2468 CLAIM_SECRET=dev-secret node src/server.mjs
 - Keep one writer instance while SQLite is used; move the same schema to Postgres before horizontal scaling.
 - Back up the promotion database.
 - Never rotate `CLAIM_SECRET` while outstanding claims matter; rotation invalidates their codes.
+- **Code normalisation is backward compatible.** Codes are now hashed over a canonical form with
+  case, whitespace and dashes stripped. Rows written under the previous normalisation — which kept
+  the dashes, and came from an alphabet that still contained `L` — are found by a legacy hash tried
+  after the canonical one. Claim links and unexpired passes issued before that change keep working,
+  and nothing in the database needs rewriting. New codes are only ever written canonically, so the
+  legacy branch is dead weight that can be deleted once every pass and claim predating it has
+  expired or been redeemed.
 - Never commit Instagram access tokens, Meta app secrets, claim secrets, or real staff PINs.
 - A completely different Instagram account is a different identity. If multi-account abuse becomes material, add a second uniqueness factor such as a verified phone number.
 - A follow-gated reward may carry Instagram/Meta policy and App Review risk. Do not misrepresent the follow gate in App Review materials; validate the promotion structure against current Meta promotion/engagement rules before commercial launch.

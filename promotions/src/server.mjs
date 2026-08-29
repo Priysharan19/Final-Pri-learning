@@ -18,6 +18,8 @@ import {
   createCampaignPassCode,
   createClaimCode,
   createStaffSession,
+  campaignPassCodeHashes,
+  claimCodeHashes,
   hashCampaignPassCode,
   hashClaimCode,
   isClaimCode,
@@ -115,7 +117,7 @@ function matchesCampaignKeyword(messageText, campaignKeyword) {
 }
 function claimByCode(code) {
   if (!isClaimCode(code)) return null;
-  const canonical = normalizeClaimCode(code);
+  const candidates = claimCodeHashes(config.claimSecret, code);
   return store.db.prepare(`
     SELECT
       c.id,
@@ -128,8 +130,8 @@ function claimByCode(code) {
     FROM claims c
     JOIN campaigns ca ON ca.id = c.campaign_id
     JOIN participants p ON p.instagram_scoped_id = c.instagram_scoped_id
-    WHERE c.code_hash = ?
-  `).get(hashClaimCode(config.claimSecret, canonical)) ?? null;
+    WHERE c.code_hash IN (${candidates.map(() => '?').join(', ')})
+  `).get(...candidates) ?? null;
 }
 function campaignRedemptionCount(campaignId) {
   return Number(store.getStats(campaignId)?.redeemed ?? 0);
@@ -165,7 +167,7 @@ function safeStaffNext(value) {
 function redeemCode(code, req) {
   if (!isClaimCode(code)) return { httpStatus: 400, body: { status: 'invalid' } };
   const result = store.redeemByCodeHash({
-    codeHash: hashClaimCode(config.claimSecret, code),
+    codeHash: claimCodeHashes(config.claimSecret, code),
     subjectRef: `staff:${remoteKey(req)}`,
   });
   if (result.status === 'redeemed') return { httpStatus: 200, body: result };
@@ -237,12 +239,12 @@ async function processInstagramPayload(payload) {
       // The pass row names its own campaign and consumeCampaignPass already
       // refuses one whose campaign is inactive, so the hash is the authority
       // here. Nothing has to be inferred from a keyword the sender typed.
-      const passHash = hashCampaignPassCode(config.claimSecret, passMessage.passCode);
-      const passResult = store.consumeCampaignPass({ passHash, instagramScopedId: message.senderId, subjectRef: subjectRef(message.senderId) });
+      const passHashes = campaignPassCodeHashes(config.claimSecret, passMessage.passCode);
+      const passResult = store.consumeCampaignPass({ passHash: passHashes, instagramScopedId: message.senderId, subjectRef: subjectRef(message.senderId) });
       const passCampaign = passResult.campaignId ? store.getCampaign(passResult.campaignId) : null;
       if (passResult.status === 'consumed' && passCampaign) {
         runtimeStatus.lastQrPassAt = new Date().toISOString();
-        store.recordAttribution({ instagramScopedId: message.senderId, campaignId: passCampaign.id, refCode: `qr-pass:${passHash.slice(0, 12)}`, source: 'QR_PASS', subjectRef: subjectRef(message.senderId) });
+        store.recordAttribution({ instagramScopedId: message.senderId, campaignId: passCampaign.id, refCode: `qr-pass:${passHashes[0].slice(0, 12)}`, source: 'QR_PASS', subjectRef: subjectRef(message.senderId) });
         attributedCampaign = passCampaign;
       } else if (passResult.status === 'already_consumed_by_identity' && passCampaign) {
         attributedCampaign = store.getAttributedCampaign(message.senderId);
@@ -401,7 +403,7 @@ const server = http.createServer(async (req, res) => {
       }
 
       const result = store.redeemByCodeHash({
-        codeHash: hashClaimCode(config.claimSecret, code),
+        codeHash: claimCodeHashes(config.claimSecret, code),
         subjectRef: `customer:${subjectRef(claim.instagram_scoped_id)}`,
       });
       const redemptionCount = campaignRedemptionCount(claim.campaign_id);

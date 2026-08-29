@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { createHmac } from 'node:crypto';
 import { PromotionsStore } from '../src/store.mjs';
 import {
+  campaignPassCodeHashes,
+  claimCodeHashes,
   createCampaignPassCode,
   createClaimCode,
   hashCampaignPassCode,
@@ -78,6 +80,78 @@ test('the DM parser takes the code alone and still takes the old keyword form', 
   assert.equal(parseCampaignPassMessage(`A2Z ${pass}X`, 'A2Z'), null);
   assert.equal(parseCampaignPassMessage('hello there', 'A2Z'), null);
   assert.ok(isCampaignPassCode(pass));
+});
+
+test('generated codes avoid every character that has two readings', () => {
+  const seen = new Set();
+  for (let i = 0; i < 2000; i += 1) {
+    const code = createClaimCode();
+    assert.match(code, /^PRI-[2-9A-HJKMNP-Z]{4}-[2-9A-HJKMNP-Z]{4}$/);
+    for (const character of code.replace(/^PRI-/, '').replace('-', '')) seen.add(character);
+  }
+  for (const confusable of ['0', 'O', '1', 'I', 'L']) {
+    assert.equal(seen.has(confusable), false, `${confusable} should never be generated`);
+  }
+  // Rejection sampling must not quietly drop the tail of the alphabet: over
+  // 16,000 characters every one of the 31 should have turned up.
+  assert.equal(seen.size, 31, `expected all 31 characters, saw ${seen.size}`);
+});
+
+test('a pass hashed under the old normalisation is still consumable', () => {
+  const store = new PromotionsStore(':memory:');
+  store.seedCampaign({ id: 'a2z', keyword: 'A2Z', refCode: 'pri-a2z-qr-2026', rewardLabel: 'toffee' });
+
+  // Exactly what the previous scheme wrote: the dashes survived normalisation,
+  // and L was still in the alphabet, so a live row can contain one.
+  const legacyPassHash = createHmac('sha256', 'secret').update('campaign-pass:A2Z-ABCL-2345').digest('hex');
+  store.issueCampaignPass({ campaignId: 'a2z', passHash: legacyPassHash });
+
+  // The customer sends it the new, forgiving way — lower case, no dashes.
+  const consumed = store.consumeCampaignPass({
+    passHash: campaignPassCodeHashes('secret', 'a2z abcl 2345'),
+    instagramScopedId: 'ig-legacy',
+  });
+  assert.equal(consumed.status, 'consumed');
+  assert.equal(consumed.campaignId, 'a2z');
+
+  // And it is still a one-shot pass afterwards.
+  assert.equal(
+    store.consumeCampaignPass({ passHash: campaignPassCodeHashes('secret', 'A2Z-ABCL-2345'), instagramScopedId: 'ig-other' }).status,
+    'used',
+  );
+  store.close();
+});
+
+test('a claim hashed under the old normalisation is still redeemable', () => {
+  const store = new PromotionsStore(':memory:');
+  store.seedCampaign({ id: 'a2z', keyword: 'A2Z', refCode: 'pri-a2z-qr-2026', rewardLabel: 'toffee' });
+  store.upsertParticipant({ instagramScopedId: 'ig-legacy', followsBusiness: true });
+  const legacyCodeHash = createHmac('sha256', 'secret').update('PRI-ABCL-2345').digest('hex');
+  store.issueOrRotateClaim({ campaignId: 'a2z', instagramScopedId: 'ig-legacy', codeHash: legacyCodeHash, followsBusiness: true });
+
+  const redeemed = store.redeemByCodeHash({ codeHash: claimCodeHashes('secret', 'pri abcl 2345') });
+  assert.equal(redeemed.status, 'redeemed');
+  assert.equal(redeemed.rewardLabel, 'toffee');
+
+  // Still exactly one redemption, whichever spelling asks a second time.
+  assert.equal(store.redeemByCodeHash({ codeHash: claimCodeHashes('secret', 'PRI-ABCL-2345') }).status, 'already_redeemed');
+  store.close();
+});
+
+test('new codes resolve on the canonical hash and never need the legacy one', () => {
+  const store = new PromotionsStore(':memory:');
+  store.seedCampaign({ id: 'a2z', keyword: 'A2Z', refCode: 'pri-a2z-qr-2026', rewardLabel: 'toffee' });
+  store.upsertParticipant({ instagramScopedId: 'ig-new', followsBusiness: true });
+
+  const code = createClaimCode();
+  const candidates = claimCodeHashes('secret', code);
+  // Canonical first — the legacy hashes are a fallback, never the primary key.
+  assert.equal(candidates[0], hashClaimCode('secret', code));
+  store.issueOrRotateClaim({ campaignId: 'a2z', instagramScopedId: 'ig-new', codeHash: candidates[0], followsBusiness: true });
+
+  // Redeeming with the canonical hash alone is enough for a code issued today.
+  assert.equal(store.redeemByCodeHash({ codeHash: hashClaimCode('secret', code) }).status, 'redeemed');
+  store.close();
 });
 
 test('a QR pass can be consumed once and binds one Instagram identity', () => {

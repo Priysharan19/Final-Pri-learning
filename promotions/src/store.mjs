@@ -6,6 +6,20 @@ function nowIso() {
   return new Date().toISOString();
 }
 
+// Lookups accept either a single hash or the ordered candidate list that
+// security.mjs builds for a code — canonical first, then the hashes a row
+// written under the older normalisation would be holding. Rows are only ever
+// *written* with the canonical hash; this is what stops a normalisation change
+// from orphaning codes that are already in customers' hands.
+function hashList(value) {
+  const list = (Array.isArray(value) ? value : [value]).filter(Boolean).map(String);
+  if (!list.length) throw new Error('At least one code hash is required.');
+  return list;
+}
+function placeholders(list) {
+  return list.map(() => '?').join(', ');
+}
+
 export class PromotionsStore {
   constructor(path = ':memory:') {
     if (path !== ':memory:') mkdirSync(dirname(path), { recursive: true });
@@ -121,14 +135,15 @@ export class PromotionsStore {
   }
 
   consumeCampaignPass({ passHash, instagramScopedId, subjectRef = null }) {
+    const candidates = hashList(passHash);
     this.db.exec('BEGIN IMMEDIATE');
     try {
       const pass = this.db.prepare(`
         SELECT p.*, c.active
         FROM campaign_passes p
         JOIN campaigns c ON c.id = p.campaign_id
-        WHERE p.pass_hash = ?
-      `).get(passHash);
+        WHERE p.pass_hash IN (${placeholders(candidates)})
+      `).get(...candidates);
 
       if (!pass || pass.active !== 1) {
         this.#audit('campaign_pass_invalid', null, null, subjectRef, {});
@@ -157,7 +172,7 @@ export class PromotionsStore {
         UPDATE campaign_passes
         SET consumed_at = ?, instagram_scoped_id = ?
         WHERE pass_hash = ? AND consumed_at IS NULL
-      `).run(consumedAt, instagramScopedId, passHash);
+      `).run(consumedAt, instagramScopedId, pass.pass_hash);
 
       if (result.changes !== 1) {
         this.db.exec('ROLLBACK');
@@ -251,6 +266,7 @@ export class PromotionsStore {
   }
 
   redeemByCodeHash({ codeHash, subjectRef = 'staff' }) {
+    const candidates = hashList(codeHash);
     this.db.exec('BEGIN IMMEDIATE');
     try {
       const claim = this.db.prepare(`
@@ -269,8 +285,8 @@ export class PromotionsStore {
         FROM claims c
         JOIN campaigns ca ON ca.id = c.campaign_id
         JOIN participants p ON p.instagram_scoped_id = c.instagram_scoped_id
-        WHERE c.code_hash = ?
-      `).get(codeHash);
+        WHERE c.code_hash IN (${placeholders(candidates)})
+      `).get(...candidates);
 
       if (!claim) {
         this.#audit('redeem_invalid_code', null, null, subjectRef, {});

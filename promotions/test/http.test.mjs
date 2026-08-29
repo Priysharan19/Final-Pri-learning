@@ -3,11 +3,13 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { randomInt } from 'node:crypto';
+import { createHmac, randomInt } from 'node:crypto';
+import { PromotionsStore } from '../src/store.mjs';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const here = resolve(fileURLToPath(new URL('..', import.meta.url)));
+const CLAIM_SECRET = 'test-claim-secret-which-is-long-enough-123456789';
 
 async function waitForHealth(baseUrl, child) {
   for (let i = 0; i < 80; i += 1) {
@@ -33,7 +35,7 @@ test('green tick requires follow, increments once, and same identity stays block
       PORT: String(port),
       PUBLIC_BASE_URL: baseUrl,
       PROMOTIONS_DB_PATH: join(dir, 'test.sqlite'),
-      CLAIM_SECRET: 'test-claim-secret-which-is-long-enough-123456789',
+      CLAIM_SECRET,
       STAFF_PIN: '2468',
       CAMPAIGN_REF: 'pri-a2z-qr-2026',
     },
@@ -186,6 +188,41 @@ test('green tick requires follow, increments once, and same identity stays block
   assert.equal(secondRedeemBody.status, 'redeemed');
   assert.equal(secondRedeemBody.currentFollowState, true);
   assert.equal(secondRedeemBody.redemptionCount, 2);
+
+  // ── a claim issued before the normalisation changed ────────────────────
+  // Written straight into the running server's database exactly as the old
+  // scheme wrote it: hashed over the dashed spelling, and containing an L,
+  // which was in the alphabet until this change. A link like this is already in
+  // a customer's Instagram thread, so it has to keep working after deploy.
+  const LEGACY_CODE = 'PRI-ABCL-2345';
+  const legacyStore = new PromotionsStore(join(dir, 'test.sqlite'));
+  legacyStore.upsertParticipant({ instagramScopedId: 'ig-http-legacy', username: 'legacy', followsBusiness: true });
+  legacyStore.issueOrRotateClaim({
+    campaignId: 'a2z',
+    instagramScopedId: 'ig-http-legacy',
+    codeHash: createHmac('sha256', CLAIM_SECRET).update(LEGACY_CODE).digest('hex'),
+    followsBusiness: true,
+  });
+  legacyStore.close();
+
+  const legacyPage = await fetch(`${baseUrl}/claim/${encodeURIComponent(LEGACY_CODE)}`);
+  assert.equal(legacyPage.status, 200, 'an old claim link must still open');
+  assert.match(await legacyPage.text(), /Verify follow & show green tick/);
+
+  // ...and it resolves when typed the new forgiving way, too.
+  const legacyStatus = await fetch(`${baseUrl}/api/customer/status?code=${encodeURIComponent(' priabcl2345 ')}`);
+  assert.equal(legacyStatus.status, 200);
+  assert.equal((await legacyStatus.json()).status, 'ready');
+
+  const legacyRedeem = await fetch(`${baseUrl}/api/customer/redeem`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ code: LEGACY_CODE.toLowerCase() }),
+  });
+  assert.equal(legacyRedeem.status, 200, 'an old claim must still redeem');
+  const legacyRedeemBody = await legacyRedeem.json();
+  assert.equal(legacyRedeemBody.status, 'redeemed');
+  assert.equal(legacyRedeemBody.redemptionCount, 3);
 
   const privacy = await fetch(`${baseUrl}/privacy`);
   assert.equal(privacy.status, 200);
