@@ -12,6 +12,7 @@ import {
   generatorsFor,
   coversForDotpoint
 } from './curriculum-in.js';
+import { hasJeePyqGenerator } from './generators/jee-pyq-runtime.js';
 
 export const INDIA_COURSE = 'in';
 export const INDIA_TRACK_IDS = Object.freeze(Object.keys(IN_TRACKS));
@@ -62,9 +63,12 @@ export function indiaDotpointIndex(chapter, ref) {
 }
 
 /**
- * Resolve an India chapter request to a generator/difficulty that is explicitly
- * declared to cover it. The requested difficulty is snapped to the closest real
- * authored form, capped by the selected track. No NSW topic fallback occurs.
+ * Resolve an India chapter request to a real generator/difficulty. Reviewed JEE
+ * PYQs are preferred only for chapter-level JEE practice: the archive has source
+ * chapter provenance but does not claim syllabus-dot-point precision. A request
+ * for a specific dot point therefore stays on the authored generator that can
+ * prove it covers that dot point. If no reviewed PYQ has been published for the
+ * chapter yet, JEE practice falls back to the existing authored form.
  */
 export function resolveIndiaTarget(chapter, {
   dotpoint = null,
@@ -76,16 +80,24 @@ export function resolveIndiaTarget(chapter, {
   if (!chapter) return null;
   const track = indiaTrack(rawTrack, grade);
   const ordinal = indiaDotpointIndex(chapter, dotpoint);
-  let covers = ordinal == null ? (chapter.covers || []) : coversForDotpoint(chapter, ordinal);
   const ceiling = track.difficultyCeiling || 4;
+  const want = difficulty == null ? Math.min(2, ceiling) : Math.max(1, Math.min(ceiling, Number(difficulty) || 2));
+
+  if (ordinal == null && (track.id === 'jee-main' || track.id === 'jee-advanced')) {
+    const pyqGenerator = `${track.id}-${chapter.id}`;
+    if (hasJeePyqGenerator(pyqGenerator)) {
+      return { generator: pyqGenerator, difficulty: want, dotpointIndex: null, pyq: true };
+    }
+  }
+
+  const covers = ordinal == null ? (chapter.covers || []) : coversForDotpoint(chapter, ordinal);
   const choices = [];
   for (const cover of covers) {
     for (const d of cover.diff || []) {
-      if (d >= 1 && d <= ceiling) choices.push({ generator: cover.gen, difficulty: d, dotpointIndex: ordinal });
+      if (d >= 1 && d <= ceiling) choices.push({ generator: cover.gen, difficulty: d, dotpointIndex: ordinal, pyq: false });
     }
   }
   if (!choices.length) return null;
-  const want = difficulty == null ? Math.min(2, ceiling) : Math.max(1, Math.min(ceiling, Number(difficulty) || 2));
   const gap = Math.min(...choices.map(c => Math.abs(c.difficulty - want)));
   const nearest = choices.filter(c => Math.abs(c.difficulty - want) === gap);
   return nearest[Math.min(nearest.length - 1, Math.floor(Math.max(0, Math.min(0.999999, Number(random()) || 0)) * nearest.length))];

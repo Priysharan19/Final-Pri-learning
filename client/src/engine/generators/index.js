@@ -9,6 +9,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { makeRng } from '../qhelpers.js';
 import { dotpointById, dotpointAt, formDotpoints } from '../curriculum.js';
+import { hasJeePyqGenerator, loadJeePyqGenerator } from './jee-pyq-runtime.js';
 
 // ── Banks ────────────────────────────────────────────────────────────────────
 
@@ -102,18 +103,31 @@ export const GENERATORS = {};
 
 const loaded = new Set();
 const inflight = new Map();
+const JEE_BANK_PREFIX = 'jee-pyq:';
 
 /** The bank a subtopic id belongs to, or null if the id names no bank. */
 export function bankOf(subtopicId) {
   const id = String(subtopicId ?? '');
+  if (hasJeePyqGenerator(id)) return `${JEE_BANK_PREFIX}${id}`;
   return INDIA_BANK_OF[id] || BANK_OF[id.split('-')[0]] || null;
 }
 
+function bankLoader(name) {
+  if (BANKS[name]) return BANKS[name];
+  if (!String(name || '').startsWith(JEE_BANK_PREFIX)) return null;
+  const generatorId = String(name).slice(JEE_BANK_PREFIX.length);
+  return async () => {
+    const generator = await loadJeePyqGenerator(generatorId);
+    return generator ? { [generatorId]: generator } : {};
+  };
+}
+
 function loadBank(name) {
-  if (loaded.has(name)) return Promise.resolve();
+  const loader = bankLoader(name);
+  if (!loader || loaded.has(name)) return Promise.resolve();
   let job = inflight.get(name);
   if (!job) {
-    job = BANKS[name]().then(bank => {
+    job = loader().then(bank => {
       Object.assign(GENERATORS, bank);
       loaded.add(name);
       inflight.delete(name);
@@ -128,7 +142,7 @@ function loadBank(name) {
 
 /** Load the named banks; unknown names are ignored. Resolves once all are in. */
 export function loadBanks(names) {
-  return Promise.all([...new Set(names)].filter(n => BANKS[n]).map(loadBank)).then(() => { });
+  return Promise.all([...new Set(names)].filter(Boolean).map(loadBank)).then(() => { });
 }
 
 /** Load whichever banks author the given subtopic ids. */
@@ -136,7 +150,7 @@ export function loadBanksFor(subtopicIds) {
   return loadBanks(subtopicIds.map(bankOf).filter(Boolean));
 }
 
-/** Load every bank — for callers that can reach any year, such as the demo seed. */
+/** Load every authored bank — reviewed JEE PYQs stay demand-loaded by chapter. */
 export function loadAllBanks() {
   return loadBanks(Object.keys(BANKS));
 }

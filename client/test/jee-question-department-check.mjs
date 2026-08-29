@@ -8,6 +8,8 @@ import {
   hasJeePyqGenerator,
   jeePyqCatalogSnapshot
 } from '../src/engine/generators/jee-pyq-runtime.js';
+import { bankOf } from '../src/engine/generators/index.js';
+import { indiaChapter, resolveIndiaTarget } from '../src/engine/indiaProduct.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const manifestPath = path.resolve(here, '../../tools/jee-question-department/source-manifest.json');
@@ -86,12 +88,45 @@ assert.equal(typeof bank['jee-advanced-c12-integrals'], 'function');
 assert.equal(bank['jee-main-c11-complex-numbers'](() => 0, 3).pyqId, 'fixture-mcq');
 assert.equal(bank['jee-advanced-c12-integrals'](() => 0.999, 4).pyq, true);
 
-// The committed catalog is intentionally empty until approved source records are
-// packed. Empty must be safe: no unreviewed extraction can be selected by the app.
+// Catalog invariants must survive the transition from an empty reviewed catalog
+// to a populated one. The test therefore checks the generated contract rather
+// than freezing today's record count at zero.
 const catalog = jeePyqCatalogSnapshot();
 assert.equal(catalog.meta.schemaVersion, 1);
-assert.equal(catalog.meta.records, 0);
-assert.deepEqual(catalog.coverage, {});
-assert.equal(hasJeePyqGenerator('jee-main-c11-complex-numbers'), false);
+assert.ok(Number.isInteger(catalog.meta.records) && catalog.meta.records >= 0);
+assert.ok(Number.isInteger(catalog.meta.parts) && catalog.meta.parts >= 0);
+assert.equal(catalog.meta.parts, catalog.parts.length);
+for (const [generatorId, parts] of Object.entries(catalog.coverage)) {
+  assert.match(generatorId, /^jee-(main|advanced)-c(?:11|12)-/);
+  assert.ok(Array.isArray(parts) && parts.length > 0);
+  assert.ok(parts.every(part => catalog.parts.includes(part)));
+  assert.equal(hasJeePyqGenerator(generatorId), true);
+  assert.equal(bankOf(generatorId), `jee-pyq:${generatorId}`);
+}
+if (catalog.meta.records === 0) {
+  assert.deepEqual(catalog.coverage, {});
+  assert.equal(catalog.meta.parts, 0);
+}
+
+// Product wiring: reviewed PYQs win only at chapter level. Dot-point practice
+// remains on authored generators because the archive does not claim dot-point
+// precision. With an empty catalog the same chapter transparently falls back.
+const chapter = indiaChapter('c11-complex-numbers');
+assert.ok(chapter);
+const gid = 'jee-main-c11-complex-numbers';
+const chapterTarget = resolveIndiaTarget(chapter, { track: 'jee-main', difficulty: 3, random: () => 0 });
+assert.ok(chapterTarget);
+if (hasJeePyqGenerator(gid)) {
+  assert.equal(chapterTarget.generator, gid);
+  assert.equal(chapterTarget.pyq, true);
+} else {
+  assert.notEqual(chapterTarget.generator, gid);
+  assert.equal(chapterTarget.pyq, false);
+  assert.equal(bankOf(gid), null);
+}
+const dotpointTarget = resolveIndiaTarget(chapter, { track: 'jee-main', dotpoint: 0, difficulty: 3, random: () => 0 });
+assert.ok(dotpointTarget);
+assert.notEqual(dotpointTarget.generator, gid);
+assert.equal(dotpointTarget.pyq, false);
 
 console.log('JEE question department gate: PASS');

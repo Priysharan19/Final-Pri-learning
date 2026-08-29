@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - 'tools/jee-question-department/**'
+      - 'client/src/engine/indiaProduct.js'
+      - 'client/src/engine/generators/index.js'
       - 'client/src/engine/generators/jee-pyq-runtime.js'
       - 'client/src/engine/generators/jee-pyq-data/**'
       - 'client/test/jee-question-department-check.mjs'
@@ -12,6 +14,8 @@ on:
     branches: [main]
     paths:
       - 'tools/jee-question-department/**'
+      - 'client/src/engine/indiaProduct.js'
+      - 'client/src/engine/generators/index.js'
       - 'client/src/engine/generators/jee-pyq-runtime.js'
       - 'client/src/engine/generators/jee-pyq-data/**'
       - 'client/test/jee-question-department-check.mjs'
@@ -23,7 +27,7 @@ permissions:
 jobs:
   gate:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -32,8 +36,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Runtime contract
+      - name: Runtime + product routing contract
         run: node client/test/jee-question-department-check.mjs
+      - name: India generator regression
+        run: node client/test/india-check.mjs
       - name: Audit and pack regression
         run: python tools/jee-question-department/test_pipeline.py
       - name: Python syntax gate
