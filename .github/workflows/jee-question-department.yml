@@ -1,0 +1,45 @@
+name: JEE Question Department
+
+on:
+  pull_request:
+    paths:
+      - 'tools/jee-question-department/**'
+      - 'client/src/engine/generators/jee-pyq-runtime.js'
+      - 'client/src/engine/generators/jee-pyq-data/**'
+      - 'client/test/jee-question-department-check.mjs'
+      - '.github/workflows/jee-question-department.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'tools/jee-question-department/**'
+      - 'client/src/engine/generators/jee-pyq-runtime.js'
+      - 'client/src/engine/generators/jee-pyq-data/**'
+      - 'client/test/jee-question-department-check.mjs'
+      - '.github/workflows/jee-question-department.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Runtime contract
+        run: node client/test/jee-question-department-check.mjs
+      - name: Audit and pack regression
+        run: python tools/jee-question-department/test_pipeline.py
+      - name: Python syntax gate
+        run: >-
+          python -m py_compile
+          tools/jee-question-department/extract.py
+          tools/jee-question-department/audit.py
+          tools/jee-question-department/pack.py
+          tools/jee-question-department/test_pipeline.py
