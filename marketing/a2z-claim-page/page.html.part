@@ -137,11 +137,11 @@ footer a{font-size:12px; color:var(--ink-2); border-bottom:1px solid var(--hairl
     <p class="label">Send this code</p>
     <!-- SERVER: inject the verification message as this element's text, exactly as before.
          Optionally set data-expires-at to an ISO-8601 timestamp and the countdown
-         below becomes exact; without it the page counts 15 minutes from first view. -->
+         below becomes exact; without it the page counts 24 hours from first view. -->
     <p id="verification-message" class="code" data-expires-at="">A2Z A2Z-XXXX-XXXX</p>
     <p class="expiry" id="expiry">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/><path d="M12 7.5V12l3 2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-      <span id="expiry-text">Valid for about 15 minutes</span>
+      <span id="expiry-text">Valid for 24 hours</span>
     </p>
     <button id="copy-open" class="btn btn-primary" type="button">
       <span id="copy-open-text">Copy code, open Instagram</span>
@@ -181,7 +181,7 @@ footer a{font-size:12px; color:var(--ink-2); border-bottom:1px solid var(--hairl
 <script>
 (function () {
   var DM = "https://ig.me/m/pri.learning?ref=pri-a2z-qr-2026";
-  var TTL = 15 * 60 * 1000;
+  var TTL = 24 * 60 * 60 * 1000;
   var codeEl = document.getElementById('verification-message');
   var status = document.getElementById('copy-status');
   var btn = document.getElementById('copy-open');
@@ -224,10 +224,15 @@ footer a{font-size:12px; color:var(--ink-2); border-bottom:1px solid var(--hairl
       status.textContent = '';
       return;
     }
-    var m = Math.floor(left / 60000), s = Math.floor((left % 60000) / 1000);
-    expiryEl.className = 'expiry' + (left < 3 * 60000 ? ' warn' : '');
-    expiryText.textContent = 'Expires in ' + m + ':' + pad(s);
-    setTimeout(tickClock, 1000);
+    var h = Math.floor(left / 3600000);
+    var m = Math.floor((left % 3600000) / 60000), s = Math.floor((left % 60000) / 1000);
+    expiryEl.className = 'expiry' + (left < 10 * 60000 ? ' warn' : '');
+    expiryText.textContent = h > 0
+      ? 'Expires in ' + h + 'h' + (m ? ' ' + m + 'm' : '')
+      : 'Expires in ' + m + ':' + pad(s);
+    // Above an hour nothing visible changes for a minute, so do not wake once a
+    // second to redraw the same string.
+    setTimeout(tickClock, h > 0 ? 30000 : 1000);
   }
   tickClock();
 

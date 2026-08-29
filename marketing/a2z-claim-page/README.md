@@ -55,7 +55,7 @@ Unchanged from the page it replaces, so this is a swap and nothing else:
 
 **Optional, and worth doing:** set `data-expires-at` on `#verification-message`
 to an ISO-8601 timestamp and the countdown becomes exact. Without it the page
-counts 15 minutes from the first time that code was seen on the device, which is
+counts 24 hours from the first time that code was seen on the device, which is
 only right if the server issues a fresh code per page load.
 
 ## What changed, and why
@@ -75,7 +75,7 @@ only right if the server issues a fresh code per page load.
   in `localStorage`, so coming back from Instagram shows step 1 ticked and
   promotes "Follow" to the primary action. All reads/writes are wrapped — the
   page renders correctly when storage throws or is disabled.
-- **Live expiry.** "Valid for about 15 minutes" is now a countdown that, at zero,
+- **Live expiry.** "Valid for 24 hours" is a live countdown that, at zero,
   turns the CTA into "Get a new code".
 - **Contrast.** Body-level text moved from `--ink-3` (4.5:1 on `--page`, right at
   the AA line) to `--ink-2` (9.0:1). `--ink-3` is kept for the letterspaced
