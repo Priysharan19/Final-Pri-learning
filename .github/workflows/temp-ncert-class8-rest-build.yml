@@ -63,11 +63,8 @@ jobs:
             if (line.includes('const a=pick(rng,[2.5,3.2,4.5])')) {
               return '    const a=pick(rng,[2.5,3.2,4.5]), b=pick(rng,[1.2,2.4,5.1]), e=ri(rng,4,7), prod=Number((a*b).toFixed(2)), value=Math.round(prod*10**(2*e));';
             }
-            if (line.includes("['Coefficients',`$${a}\\\\times${b}=${a*b}$`]")) {
-              return line.replace('${a*b}', '${prod}');
-            }
-            if (line.includes("['Value',`${a*b}\\\\times10^${2*e}=${value}`]")) {
-              return line.replace('${a*b}', '${prod}');
+            if (line.includes("['Coefficients',`$${a}\\\\times${b}=${a*b}$`]") && line.includes("['Value',`${a*b}")) {
+              return line.replaceAll('${a*b}', '${prod}');
             }
             if (line.includes('const speed1=pick(rng,[40,50,60])')) {
               return '      const speed1=pick(rng,[40,50,60]), time1=pick(rng,[4,5,6]), factor=pick(rng,[2,4]), speed2=speed1*factor, time2=Number((time1/factor).toFixed(2));';
