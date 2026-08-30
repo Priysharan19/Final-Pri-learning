@@ -72,7 +72,7 @@ const generators = {
       return qMcq(rng, `A bar graph has category values A=$${a}$, B=$${b}$ and C=$${c}$. Which category has the greatest value?`, labels[idx],
         labels.filter((_,i)=>i!==idx).map(t=>[t,'Its bar is not the tallest.']).concat([['All equal','The three values are not all equal.']]),
         ['Compare the numerical heights represented by the bars.', 'The tallest bar represents the greatest value.', `The maximum of ${a}, ${b}, ${c} is ${max}.`],
-        [['Read values',`A=${a}, B=${b}, C=${c}`],['Compare',`Maximum=${max}`],['Answer',labels[idx]]); 
+        [['Read values',`A=${a}, B=${b}, C=${c}`],['Compare',`Maximum=${max}`],['Answer',labels[idx]]]);
     }
     if (diff === 2) {
       const total=pick(rng,[40,60,72,80,90,120]), part=pick(rng,[total/2,total/3,total/4,total/5].filter(Number.isInteger));
@@ -87,7 +87,7 @@ const generators = {
       const g=(a,b)=>{while(b){[a,b]=[b,a%b]}return a}; const d=g(fav,6);
       return qFrac(`A fair die is rolled once. Find the probability of getting a ${event[0]} number.`, fav/d, 6/d,
         ['Write the six equally likely die outcomes.',`Favourable outcomes: ${event[1].join(', ')}.`, 'Probability = favourable outcomes ÷ total outcomes.'],
-        [['Sample space','${1,2,3,4,5,6}$'],['Count',`${fav} favourable out of 6`],['Simplify',`$${fav}/6=${fav/d}/${6/d}$`]]);
+        [['Sample space','$\\{1,2,3,4,5,6\\}$'],['Count',`${fav} favourable out of 6`],['Simplify',`$${fav}/6=${fav/d}/${6/d}$`]]);
     }
     const red=ri(rng,1,4), blue=ri(rng,1,4), green=ri(rng,1,4), total=red+blue+green;
     const nonBlue=red+green; const g=(a,b)=>{while(b){[a,b]=[b,a%b]}return a}; const d=g(nonBlue,total);
@@ -162,7 +162,7 @@ const generators = {
         [['GST',`₹${price}\\times${tax}/100=₹${price*tax/100}`],['Bill',`₹${price}+₹${price*tax/100}=₹${amt}`],['Answer',`₹${amt}`]], {answerPrefix:'₹'});
     }
     if (diff === 3) {
-      const p=pick(rng,[2000,4000,5000,8000,10000]), r=pick(rng,[5,10,20]), years=2, amount=p*(1+r/100)**years, ci=amount-p;
+      const p=pick(rng,[2000,4000,5000,8000,10000]), r=pick(rng,[5,10,20]), years=2, amount=Number((p*(1+r/100)**years).toFixed(2)), ci=Number((amount-p).toFixed(2));
       return q(`₹${p} is invested at $${r}\\%$ p.a., compounded annually for 2 years. Find the compound interest.`,ci,
         ['Use repeated growth for two years.',`Amount = $P(1+r/100)^2$.`,'Compound interest = amount − principal.'],
         [['Amount',`₹${p}(1+${r}/100)^2=₹${amount}`],['Interest',`₹${amount}-₹${p}=₹${ci}`],['Answer',`₹${ci}`]], {answerPrefix:'₹'});
@@ -222,7 +222,7 @@ const generators = {
         [['Formula','$TSA=2(lb+bh+hl)$'],['Substitute',`$2(${l*b}+${b*h}+${h*l})$`],['Answer',`$${tsa}\\text{ cm}^2$`]], {answerSuffix:' cm²'});
     }
     if (diff === 3) {
-      const r=pick(rng,[3,7,14]), h=ri(rng,5,20), pi=r%7===0?22/7:3.14, v=pi*r*r*h;
+      const r=pick(rng,[3,7,14]), h=ri(rng,5,20), pi=r%7===0?22/7:3.14, v=Number((pi*r*r*h).toFixed(2));
       return q(`A right circular cylinder has radius $${r}$ cm and height $${h}$ cm. Using $\\pi=${pi===22/7?'22/7':'3.14'}$, find its volume.`,v,
         ['Cylinder volume = base area × height.','The circular base area is $\\pi r^2$.','Substitute radius, not diameter.'],
         [['Formula','$V=\\pi r^2h$'],['Substitute',`$${pi===22/7?'22/7':'3.14'}\\times${r}^2\\times${h}$`],['Answer',`$V=${v}\\text{ cm}^3$`]], {answerSuffix:' cm³'});
@@ -250,18 +250,18 @@ const generators = {
       [['Law','$a^ma^n=a^{m+n}$'],['Exponent',`$${m}+(${n})=${exp}$`],['Answer',`$${a}^{${exp}}$`]]);
     }
     if (diff === 3) {
-      const coeff=pick(rng,[3.02,8.5,9.42,6.02]), exp=pick(rng,[-12,-9,10,15]);
+      const coeff=pick(rng,[3.02,8.5,9.42,6.02]), exp=pick(rng,[-12,-9,10,15]), shifted=Number((coeff*10).toFixed(2));
       return qMcq(rng, `Which is the standard form of the quantity represented by coefficient $${coeff}$ and power $10^{${exp}}$?`, `$${coeff}\\times10^{${exp}}$`, [
-        [`$${coeff*10}\\times10^{${exp-1}}$`,'This equals the same value but is not normalised because the coefficient is not between 1 and 10.'],
+        [`$${shifted}\\times10^{${exp-1}}$`,'This equals the same value but is not normalised because the coefficient is not between 1 and 10.'],
         [`$${coeff}\\times10^{${-exp}}$`,'Changing the exponent sign changes the magnitude.'],
         [`$${coeff/10}\\times10^{${exp}}$`,'The coefficient has been changed without compensating in the exponent.']
       ], ['Standard form is $a\\times10^n$ with $1\\le a<10$.',`The coefficient ${coeff} is already normalised.`,`Keep the stated exponent ${exp}.`],
       [['Coefficient',`${coeff} is between 1 and 10`],['Power',`$10^{${exp}}$`],['Answer',`$${coeff}\\times10^{${exp}}$`]]);
     }
-    const a=pick(rng,[2.5,3.2,4.5]), b=pick(rng,[1.2,2.4,5.1]), e=ri(rng,4,8), value=(a*b)*10**(2*e);
+    const a=pick(rng,[2.5,3.2,4.5]), b=pick(rng,[1.2,2.4,5.1]), e=ri(rng,4,7), prod=Number((a*b).toFixed(2)), value=Math.round(prod*10**(2*e));
     return q(`Compute $(${a}\\times10^{${e}})(${b}\\times10^{${e}})$ and give the numerical value.`,value,
       ['Multiply coefficients and powers of ten separately.','For powers of ten with the same base, add exponents.','If needed, renormalise the coefficient before evaluating.'],
-      [['Coefficients',`$${a}\\times${b}=${a*b}$`],['Powers',`$10^{${e}}\\times10^{${e}}=10^{${2*e}}$`],['Value',`${a*b}\\times10^${2*e}=${value}`]]);
+      [['Coefficients',`$${a}\\times${b}=${prod}$`],['Powers',`$10^{${e}}\\times10^{${e}}=10^{${2*e}}$`],['Value',`${prod}\\times10^${2*e}=${value}`]]);
   },
 
   'c8-proportions-ncert-mastery': (rng, diff) => {
@@ -278,7 +278,7 @@ const generators = {
         [['Constant work',`$${workers}\\times${days}=${w2}\\times d$`],['Solve',`$d=${workers*days}/${w2}$`],['Answer',`$d=${d2}$ days`]], {answerSuffix:' days'});
     }
     if (diff === 3) {
-      const speed1=pick(rng,[40,50,60]), time1=pick(rng,[4,5,6]), speed2=pick(rng,[80,100,120]), time2=speed1*time1/speed2;
+      const speed1=pick(rng,[40,50,60]), time1=pick(rng,[4,5,6]), factor=pick(rng,[2,4]), speed2=speed1*factor, time2=Number((time1/factor).toFixed(2));
       return q(`A journey takes $${time1}$ hours at $${speed1}$ km/h. At $${speed2}$ km/h, how long would the same distance take?`,time2,
         ['The distance is fixed.','For fixed distance, speed and time are inversely proportional.','Use speed × time = constant distance.'],
         [['Distance',`$${speed1}\\times${time1}=${speed1*time1}$ km`],['New time',`$${speed1*time1}/${speed2}$`],['Answer',`$${time2}$ h`]], {answerSuffix:' h'});

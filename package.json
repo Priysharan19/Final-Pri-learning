@@ -10,7 +10,7 @@
     "build": "npm run build --prefix client",
     "start": "node server/index.js",
     "seed": "node server/seed.js",
-    "test": "npm run test:engine && npm run test:gateway && npm run test:outbox && npm run test:backend && npm run test:security && npm run test:diagnose && npm run test:india && npm run test:ncert:rational && npm run test:ncert:linear && npm run test:explain && npm run test:ink && npm run test:calculus && npm run test:jee && npm run test:hard && npm run test:lines && npm run test:holdout && npm run test:holdout2 && npm run test:holdout3 && npm run test:ink:collector && npm run test:ink:feedback && npm run test:ink:structure && npm run test:ink:corpus && npm run test:context && npm run test:ink:bridge && npm run test:photo:bridge && npm run test:ink:interaction && npm run test:ink:personal && npm run test:ink:hybrid && npm run test:ink:arbitration && npm run test:ink:sets && npm run test:ink:stability",
+    "test": "npm run test:engine && npm run test:gateway && npm run test:outbox && npm run test:backend && npm run test:security && npm run test:diagnose && npm run test:india && npm run test:ncert:rational && npm run test:ncert:linear && npm run test:ncert:class8:rest && npm run test:explain && npm run test:ink && npm run test:calculus && npm run test:jee && npm run test:hard && npm run test:lines && npm run test:holdout && npm run test:holdout2 && npm run test:holdout3 && npm run test:ink:collector && npm run test:ink:feedback && npm run test:ink:structure && npm run test:ink:corpus && npm run test:context && npm run test:ink:bridge && npm run test:photo:bridge && npm run test:ink:interaction && npm run test:ink:personal && npm run test:ink:hybrid && npm run test:ink:arbitration && npm run test:ink:sets && npm run test:ink:stability",
     "test:engine": "node server/test/selfcheck.mjs",
     "test:engine:quick": "node server/test/selfcheck.mjs --quick",
     "test:engine:thorough": "node server/test/selfcheck.mjs --thorough",
@@ -80,6 +80,7 @@
     "test:ink:arbitration": "node client/test/native-ink-arbitration-check.mjs",
     "test:ink:sets": "node client/test/ink-set-notation-check.mjs",
     "test:ink:stability": "node client/test/ink-real-page-stability-check.mjs",
-    "test:explain": "node client/test/pri-explain-check.mjs"
+    "test:explain": "node client/test/pri-explain-check.mjs",
+    "test:ncert:class8:rest": "node client/test/ncert-class8-ch3-13-check.mjs"
   }
 }
