@@ -2593,7 +2593,12 @@ const BIGRAM = {
  *  maths essentially never uses either as a variable, so the digit reading is
  *  the default and the letter has to be earned from context (a function name,
  *  which the decoder locks before the beam ever runs). */
-const UNIGRAM = { l: -1.15, o: -1.15, ':': -0.45, '!=': -0.55, div: -0.30 };
+const UNIGRAM = {
+  l: -1.15, o: -1.15, ':': -0.45, '!=': -0.55, div: -0.30,
+  // '*' shares the x visual class and must be earned from a genuinely
+  // multiplicative slot rather than becoming a free grammar bridge.
+  '*': -0.55
+};
 
 /** Unary sign: after a relation, an operator, an open bracket or line start a
  *  '-' (or '+') is a sign, not a dangling operator. */
@@ -2889,12 +2894,28 @@ function beamRepair(line, overrides, medianH, ctx = null) {
     return f * top;
   };
 
-  const candLists = line.map(s => {
+  // '*' is an x-class decoder twin, but it is only admitted in a real
+  // multiplicative slot: depth zero, a value on the left and a digit on the
+  // right. This prevents the operator reading from bridging unrelated noisy
+  // glyphs while preserving arithmetic such as 7*8 and x*4k.
+  let starDepth = 0;
+  const starAllowed = line.map((s, i) => {
+    const ok = starDepth === 0 &&
+      i > 0 && i < line.length - 1 &&
+      /^[0-9]$/.test(line[i + 1].sym) &&
+      (/^[0-9a-zA-Z)]$/.test(line[i - 1].sym) || line[i - 1].sym === 'pi' || line[i - 1].sym === 'theta');
+    if (s.sym === '(') starDepth++;
+    else if (s.sym === ')') starDepth = Math.max(0, starDepth - 1);
+    return ok;
+  });
+
+  const candLists = line.map((s, i) => {
     if (overrides[s.id] || s.composite || s._geo) return [{ sym: s.sym, conf: Math.max(s.conf, 0.9) }];
     const seen = new Set([s.sym]);
     const list = [{ sym: s.sym, conf: Math.max(0.02, s.conf) }];
     for (const a of s.alts || []) {
       if (seen.has(a.sym) || a.conf < 0.06) continue;
+      if (a.sym === '*' && !starAllowed[i]) continue;
       seen.add(a.sym);
       list.push({ sym: a.sym, conf: a.conf });
       if (list.length >= MAX_CANDS) break;
@@ -3355,6 +3376,33 @@ export function recognize(strokes, overrides = {}, ctx = null) {
           s.conf = Math.max(0.55, s.conf * 0.9);
           s._geo = true;
         }
+      }
+    }
+  }
+
+  // Capital O is also a decoder twin of the 0/o ring. When two baseline
+  // rings share a line and one is at least 1.5x the other's height, geometry
+  // provides evidence the raster class cannot: the tall ring is a capital O.
+  // Degree-sized or raised rings are excluded so ordinary 0/deg ambiguity is
+  // never promoted into a capital.
+  for (const ls of linesPre) {
+    const full = ls.filter(s => s.box.h >= 0.55 * medianH);
+    if (!full.length) continue;
+    const base = median(full.map(s => s.box.y2));
+    const band = Math.max(base - median(full.map(s => s.box.y1)), 1e-6);
+    const rings = ls.filter(s => !s.composite && !overrides[s.id] &&
+      (s.sym === '0' || s.sym === 'o') &&
+      (s.alts || []).some(a => a.sym === 'O') &&
+      base - s.box.y2 <= 0.30 * band);
+    if (rings.length < 2) continue;
+    const minH = Math.min(...rings.map(s => s.box.h));
+    if (minH < 0.50 * medianH) continue;
+    for (const s of rings) {
+      const asp = s.box.w / Math.max(s.box.h, 1e-6);
+      if (s.box.h >= 1.5 * minH && s.box.h >= 0.75 * medianH && asp >= 0.6 && asp <= 1.45) {
+        s.sym = 'O';
+        s.conf = Math.max(s.conf, 0.9);
+        s._geo = true;
       }
     }
   }
