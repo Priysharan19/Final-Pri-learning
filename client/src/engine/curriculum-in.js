@@ -1,11 +1,13 @@
 // Production NCERT overlay.
-// The original curriculum remains byte-for-byte in curriculum-in-base.js; this
-// thin layer upgrades Class 8 Chapter 1 to the full source-audited learning map.
+// The original curriculum remains byte-for-byte in curriculum-in-base.js. This
+// layer upgrades Class 8 Chapter 1 from its thin legacy coverage to the complete
+// source-audited NCERT bank while preserving Pri Learning's three-dot-point India
+// product contract.
 import { IN_CURRICULUM, IN_CHAPTERS, IN_CHAPTER_BY_ID } from './curriculum-in-base.js';
 import {
   NCERT_CLASS8_RATIONAL_DOTPOINTS,
   NCERT_CLASS8_RATIONAL_COVERS
-} from './ncert/class8-rational-numbers.js';
+} from './ncert/class8-rational-production.js';
 
 const chapterId = 'c8-rational-numbers';
 const curriculumChapter = IN_CURRICULUM
@@ -21,6 +23,7 @@ for (const chapter of new Set([curriculumChapter, lookupChapter, flatChapter].fi
     dp: [...c.dp],
     diff: [...c.diff]
   }));
+  chapter.native = true;
 }
 
 export * from './curriculum-in-base.js';
