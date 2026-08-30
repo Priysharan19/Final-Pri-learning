@@ -55,7 +55,7 @@ function VerificationStrip() {
         ))}
       </div>
       <div className="muted" style={{ marginTop: 10 }}>
-        In particular, Exercise 2.2 Q3 is read from the PDF as <Text>$x+7-\\frac{8x}{3}=\\frac{17}{6}-\\frac{5x}{2}$</Text>, which gives <Text>$x=-5$</Text> and matches the supplied answer image.
+        In particular, Exercise 2.2 Q3 is read from the PDF as <Text>{'$x+7-\\frac{8x}{3}=\\frac{17}{6}-\\frac{5x}{2}$'}</Text>, which gives <Text>{'$x=-5$'}</Text> and matches the supplied answer image.
       </div>
     </div>
   );
