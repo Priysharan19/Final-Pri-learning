@@ -33,11 +33,28 @@ jobs:
           cache: npm
           cache-dependency-path: client/package-lock.json
 
-      - name: Register all remaining Class 8 NCERT generators and permanent release test
+      - name: Repair release source and register all remaining Class 8 NCERT generators
         if: steps.guard.outputs.skip != 'true'
         run: |
           node --input-type=module <<'NODE'
           import fs from 'node:fs';
+
+          const sourcePath = 'client/src/engine/ncert/class8-chapters-3-13-production.js';
+          let source = fs.readFileSync(sourcePath, 'utf8');
+          const bad = "        [['Read values',`A=${a}, B=${b}, C=${c}`],['Compare',`Maximum=${max}`],['Answer',labels[idx]]);";
+          const good = "        [['Read values',`A=${a}, B=${b}, C=${c}`],['Compare',`Maximum=${max}`],['Answer',labels[idx]]);";
+          // The source defect is one extra closing parenthesis after the steps array.
+          source = source.replace(
+            "        [['Read values',`A=${a}, B=${b}, C=${c}`],['Compare',`Maximum=${max}`],['Answer',labels[idx]]); ",
+            "        [['Read values',`A=${a}, B=${b}, C=${c}`],['Compare',`Maximum=${max}`],['Answer',labels[idx]]);"
+          );
+          // Normalize the exact qMcq call terminator if whitespace differs.
+          source = source.replace(
+            /\[\['Read values',`A=\$\{a\}, B=\$\{b\}, C=\$\{c\}`\],\['Compare',`Maximum=\$\{max\}`\],\['Answer',labels\[idx\]\]\]\);\s*/,
+            "[['Read values',`A=${a}, B=${b}, C=${c}`],['Compare',`Maximum=${max}`],['Answer',labels[idx]]);\n"
+          );
+          fs.writeFileSync(sourcePath, source);
+
           const indexPath = 'client/src/engine/generators/index.js';
           let index = fs.readFileSync(indexPath, 'utf8');
           const anchor = "  'c8-linear-equations-source-mastery': 'india-junior',\n";
@@ -110,7 +127,7 @@ jobs:
         run: |
           git config user.name 'Pri Learning Release Bot'
           git config user.email 'actions@users.noreply.github.com'
-          git add client/src/engine/generators/index.js package.json ios
+          git add client/src/engine/ncert/class8-chapters-3-13-production.js client/src/engine/generators/index.js package.json ios
           if git diff --cached --quiet; then
             echo 'No generated release changes to commit.'
             exit 1
