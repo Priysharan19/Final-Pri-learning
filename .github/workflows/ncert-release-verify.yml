@@ -1,0 +1,37 @@
+name: Temporary NCERT release verification
+
+on:
+  push:
+    branches:
+      - feature/ncert-class8-rational-complete
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/ncert-class8-rational-complete
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+      - name: Install client dependencies
+        run: npm ci --prefix client
+      - name: NCERT chapter contract and seeded bank audit
+        run: node client/test/ncert-rational-numbers-check.mjs
+      - name: India curriculum integration suite
+        run: npm run test:india
+      - name: Full deterministic maths engine self-check
+        run: npm run test:engine
+      - name: Handwriting bridge contract
+        run: npm run test:ink:bridge
+      - name: Handwriting interaction guard
+        run: npm run test:ink:interaction
+      - name: Pri Explain integration
+        run: npm run test:explain
+      - name: Production client build
+        run: npm run build
+      - name: Exact tracked iPad bundle check
+        run: npm run check:ios
