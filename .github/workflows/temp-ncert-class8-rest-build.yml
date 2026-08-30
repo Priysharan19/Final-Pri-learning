@@ -53,6 +53,25 @@ jobs:
             'pi=r%7===0?22/7:3.14, v=pi*r*r*h;',
             'pi=r%7===0?22/7:3.14, v=Number((pi*r*r*h).toFixed(2));'
           );
+          source = source.replace(
+            'const p=pick(rng,[2000,4000,5000,8000,10000]), r=pick(rng,[5,10,20]), years=2, amount=p*(1+r/100)**years, ci=amount-p;',
+            'const p=pick(rng,[2000,4000,5000,8000,10000]), r=pick(rng,[5,10,20]), years=2, amount=Number((p*(1+r/100)**years).toFixed(2)), ci=Number((amount-p).toFixed(2));'
+          );
+          source = source.replace(
+            "const coeff=pick(rng,[3.02,8.5,9.42,6.02]), exp=pick(rng,[-12,-9,10,15]);",
+            "const coeff=pick(rng,[3.02,8.5,9.42,6.02]), exp=pick(rng,[-12,-9,10,15]), shifted=Number((coeff*10).toFixed(2));"
+          ).replace(
+            "[`$${coeff*10}\\\\times10^{${exp-1}}$`,'This equals the same value but is not normalised because the coefficient is not between 1 and 10.'],",
+            "[`$${shifted}\\\\times10^{${exp-1}}$`,'This equals the same value but is not normalised because the coefficient is not between 1 and 10.'],"
+          );
+          source = source.replace(
+            'const a=pick(rng,[2.5,3.2,4.5]), b=pick(rng,[1.2,2.4,5.1]), e=ri(rng,4,8), value=(a*b)*10**(2*e);',
+            'const a=pick(rng,[2.5,3.2,4.5]), b=pick(rng,[1.2,2.4,5.1]), e=ri(rng,4,7), prod=Number((a*b).toFixed(2)), value=Math.round(prod*10**(2*e));'
+          ).replaceAll('${a*b}', '${prod}');
+          source = source.replace(
+            "const speed1=pick(rng,[40,50,60]), time1=pick(rng,[4,5,6]), speed2=pick(rng,[80,100,120]), time2=speed1*time1/speed2;",
+            "const speed1=pick(rng,[40,50,60]), time1=pick(rng,[4,5,6]), factor=pick(rng,[2,4]), speed2=speed1*factor, time2=Number((time1/factor).toFixed(2));"
+          );
           fs.writeFileSync(sourcePath, source);
 
           const indexPath = 'client/src/engine/generators/index.js';
