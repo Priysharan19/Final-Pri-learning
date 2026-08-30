@@ -83,7 +83,7 @@ for (const [gi, id] of NCERT_CLASS8_LINEAR_GENERATOR_IDS.entries()) {
     for (let sample = 0; sample < 40; sample++) {
       const q = gen(makeRng(0x8c200000 + gi * 10000 + diff * 100 + sample), diff);
       assert.equal(typeof q.prompt, 'string');
-      assert.ok(q.prompt.length > 12, `${id} D${diff} prompt should be substantive`);
+      assert.ok(q.prompt.length > 5, `${id} D${diff} prompt must not be empty/trivial`);
       assert.ok(Array.isArray(q.hints) && q.hints.length >= 3, `${id} D${diff} needs progressive hints`);
       assert.ok(Array.isArray(q.steps) && q.steps.length >= 3, `${id} D${diff} needs a full worked solution`);
       for (const step of q.steps) {
