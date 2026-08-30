@@ -1,0 +1,119 @@
+name: Temporary NCERT Class 8 Chapters 3-13 release assembly
+
+on:
+  push:
+    branches:
+      - feature/ncert-class8-ch3-13-complete
+
+jobs:
+  assemble-and-verify:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/ncert-class8-ch3-13-complete
+          fetch-depth: 0
+
+      - name: Guard generated commit
+        id: guard
+        shell: bash
+        run: |
+          if git log -1 --pretty=%B | grep -Fq '[class8-rest-generated]'; then
+            echo 'skip=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'skip=false' >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-node@v4
+        if: steps.guard.outputs.skip != 'true'
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+
+      - name: Register all remaining Class 8 NCERT generators and permanent release test
+        if: steps.guard.outputs.skip != 'true'
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const indexPath = 'client/src/engine/generators/index.js';
+          let index = fs.readFileSync(indexPath, 'utf8');
+          const anchor = "  'c8-linear-equations-source-mastery': 'india-junior',\n";
+          const mappings = [
+            'c8-quadrilaterals-ncert-mastery',
+            'c8-data-handling-ncert-mastery',
+            'c8-squares-roots-ncert-mastery',
+            'c8-cubes-roots-ncert-mastery',
+            'c8-comparing-quantities-ncert-mastery',
+            'c8-algebraic-identities-ncert-mastery',
+            'c8-mensuration-ncert-mastery',
+            'c8-exponents-ncert-mastery',
+            'c8-proportions-ncert-mastery',
+            'c8-factorisation-ncert-mastery',
+            'c8-graphs-ncert-mastery'
+          ];
+          if (!index.includes(anchor)) throw new Error('Generator registry anchor moved');
+          if (!index.includes("'c8-quadrilaterals-ncert-mastery'")) {
+            const block = mappings.map(id => `  '${id}': 'india-junior',`).join('\n') + '\n';
+            index = index.replace(anchor, anchor + block);
+            fs.writeFileSync(indexPath, index);
+          }
+
+          const packagePath = 'package.json';
+          const pkg = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
+          pkg.scripts['test:ncert:class8:rest'] = 'node client/test/ncert-class8-ch3-13-check.mjs';
+          if (!pkg.scripts.test.includes('test:ncert:class8:rest')) {
+            pkg.scripts.test = pkg.scripts.test.replace(
+              'npm run test:ncert:linear',
+              'npm run test:ncert:linear && npm run test:ncert:class8:rest'
+            );
+          }
+          fs.writeFileSync(packagePath, JSON.stringify(pkg, null, 2) + '\n');
+          NODE
+
+      - name: Install client dependencies
+        if: steps.guard.outputs.skip != 'true'
+        run: npm ci --prefix client
+
+      - name: Verify complete NCERT Chapters 3-13 source contract
+        if: steps.guard.outputs.skip != 'true'
+        run: node client/test/ncert-class8-ch3-13-check.mjs
+
+      - name: Verify India curriculum and Chapters 1-2 regressions
+        if: steps.guard.outputs.skip != 'true'
+        run: |
+          npm run test:india
+          npm run test:ncert:rational
+          npm run test:ncert:linear
+
+      - name: Verify maths engine and answer experience
+        if: steps.guard.outputs.skip != 'true'
+        run: |
+          npm run test:engine
+          npm run test:explain
+          npm run test:ink:bridge
+          npm run test:photo:bridge
+          npm run test:ink:interaction
+
+      - name: Build and synchronize both iPad bundles
+        if: steps.guard.outputs.skip != 'true'
+        run: |
+          npm run build
+          npm run sync:ios
+          npm run check:ios
+
+      - name: Commit production candidate
+        if: steps.guard.outputs.skip != 'true'
+        shell: bash
+        run: |
+          git config user.name 'Pri Learning Release Bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add client/src/engine/generators/index.js package.json ios
+          if git diff --cached --quiet; then
+            echo 'No generated release changes to commit.'
+            exit 1
+          fi
+          git commit -m 'NCERT Class 8: register Chapters 3-13 and sync iPad bundles [class8-rest-generated]'
+          git push origin HEAD:feature/ncert-class8-ch3-13-complete
