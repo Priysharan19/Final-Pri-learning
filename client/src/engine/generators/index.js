@@ -28,7 +28,9 @@ const BANKS = {
   'india-calculus': () => import('./india-calculus.js').then(m => m.indiaCalculus),
   'india-olympiad': () => import('./india-olympiad.js').then(m => m.indiaOlympiad),
   'india-foundation': () => import('./india-foundation.js').then(m => m.indiaFoundation),
-  'india-junior': () => import('./india-junior.js').then(m => m.indiaJunior),
+  // The overlay leaves the established junior bank unchanged and adds the
+  // eight source-audited NCERT Class 8 Rational Numbers skill generators.
+  'india-junior': () => import('./india-junior-overlay.js').then(m => m.indiaJunior),
   'india-class10': () => import('./india-class10.js').then(m => m.indiaClass10),
   'india-senior': () => import('./india-senior.js').then(m => m.indiaSenior)
 };
@@ -78,6 +80,14 @@ const INDIA_BANK_OF = {
   'c10-circles': 'india-foundation',
   'c7-triangle-angles': 'india-junior',
   'c8-rational-numbers': 'india-junior',
+  'c8-rational-numbers-foundations': 'india-junior',
+  'c8-rational-numbers-closure': 'india-junior',
+  'c8-rational-numbers-commutativity': 'india-junior',
+  'c8-rational-numbers-associativity': 'india-junior',
+  'c8-rational-numbers-identities': 'india-junior',
+  'c8-rational-numbers-distributivity': 'india-junior',
+  'c8-rational-numbers-strategy': 'india-junior',
+  'c8-rational-numbers-between': 'india-junior',
   'c8-data-charts': 'india-junior',
   'c8-proportions-dir-inv': 'india-junior',
   'c9-polynomial-basics': 'india-junior',
