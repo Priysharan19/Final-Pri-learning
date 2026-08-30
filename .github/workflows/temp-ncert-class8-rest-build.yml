@@ -41,17 +41,9 @@ jobs:
 
           const sourcePath = 'client/src/engine/ncert/class8-chapters-3-13-production.js';
           let source = fs.readFileSync(sourcePath, 'utf8');
-          const bad = "        [['Read values',`A=${a}, B=${b}, C=${c}`],['Compare',`Maximum=${max}`],['Answer',labels[idx]]);";
-          const good = "        [['Read values',`A=${a}, B=${b}, C=${c}`],['Compare',`Maximum=${max}`],['Answer',labels[idx]]);";
-          // The source defect is one extra closing parenthesis after the steps array.
           source = source.replace(
-            "        [['Read values',`A=${a}, B=${b}, C=${c}`],['Compare',`Maximum=${max}`],['Answer',labels[idx]]); ",
-            "        [['Read values',`A=${a}, B=${b}, C=${c}`],['Compare',`Maximum=${max}`],['Answer',labels[idx]]);"
-          );
-          // Normalize the exact qMcq call terminator if whitespace differs.
-          source = source.replace(
-            /\[\['Read values',`A=\$\{a\}, B=\$\{b\}, C=\$\{c\}`\],\['Compare',`Maximum=\$\{max\}`\],\['Answer',labels\[idx\]\]\]\);\s*/,
-            "[['Read values',`A=${a}, B=${b}, C=${c}`],['Compare',`Maximum=${max}`],['Answer',labels[idx]]);\n"
+            "[['Read values',`A=${a}, B=${b}, C=${c}`],['Compare',`Maximum=${max}`],['Answer',labels[idx]]);",
+            "[['Read values',`A=${a}, B=${b}, C=${c}`],['Compare',`Maximum=${max}`],['Answer',labels[idx]]]);"
           );
           fs.writeFileSync(sourcePath, source);
 
