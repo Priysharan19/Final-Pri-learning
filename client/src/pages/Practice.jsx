@@ -3,11 +3,11 @@ import { useSearchParams } from 'react-router-dom';
 import PracticeBase from './PracticeBase.jsx';
 import RationalNumbersTopperSectionProduction from '../components/RationalNumbersTopperSectionProduction.jsx';
 import LinearEquationsTopperSectionProduction from '../components/LinearEquationsTopperSectionProduction.jsx';
+import NcertClass8ChapterSection from '../components/NcertClass8ChapterSection.jsx';
 
 // Chapter-specific learning layers sit above the unchanged practice experience.
-// This keeps question serving, handwriting, marking and Pri Explain on the same
-// production path while giving NCERT chapters room for source-backed notes and
-// source-vs-answer-key verification evidence.
+// Question serving, AI handwriting, marking, retries and Pri Explain stay on the
+// same production path; Chapters 3–13 share one source-audited NCERT shell.
 export default function Practice() {
   const [params] = useSearchParams();
   const chapter = params.get('subtopic');
@@ -16,6 +16,7 @@ export default function Practice() {
     <>
       {chapter === 'c8-rational-numbers' && <RationalNumbersTopperSectionProduction />}
       {chapter === 'c8-linear-equations' && <LinearEquationsTopperSectionProduction />}
+      <NcertClass8ChapterSection chapterId={chapter} />
       <PracticeBase />
     </>
   );

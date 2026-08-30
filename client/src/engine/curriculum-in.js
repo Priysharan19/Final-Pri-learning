@@ -11,6 +11,11 @@ import {
   NCERT_CLASS8_LINEAR_DOTPOINTS,
   NCERT_CLASS8_LINEAR_COVERS
 } from './ncert/class8-linear-production.js';
+import {
+  NCERT_CLASS8_3_13_IDS,
+  NCERT_CLASS8_3_13_DOTPOINTS_BY_ID,
+  NCERT_CLASS8_3_13_COVERS_BY_ID
+} from './ncert/class8-chapters-3-13-production.js';
 
 function applyChapterOverlay(chapterId, dotpoints, covers) {
   const curriculumChapter = IN_CURRICULUM
@@ -32,5 +37,13 @@ function applyChapterOverlay(chapterId, dotpoints, covers) {
 
 applyChapterOverlay('c8-rational-numbers', NCERT_CLASS8_RATIONAL_DOTPOINTS, NCERT_CLASS8_RATIONAL_COVERS);
 applyChapterOverlay('c8-linear-equations', NCERT_CLASS8_LINEAR_DOTPOINTS, NCERT_CLASS8_LINEAR_COVERS);
+
+for (const chapterId of NCERT_CLASS8_3_13_IDS) {
+  applyChapterOverlay(
+    chapterId,
+    NCERT_CLASS8_3_13_DOTPOINTS_BY_ID[chapterId],
+    NCERT_CLASS8_3_13_COVERS_BY_ID[chapterId]
+  );
+}
 
 export * from './curriculum-in-base.js';
