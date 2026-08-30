@@ -75,7 +75,10 @@ function precache() {
       outDir = resolve(config.root, config.build.outDir);
       swSource = resolve(config.publicDir, 'sw.js');
     },
-    closeBundle() {
+    // `writeBundle` is the correct lifecycle point: output has definitely been
+    // written, while `closeBundle` can also run during a failed build before
+    // `dist/` exists and mask the real error with an ENOENT from this plugin.
+    writeBundle() {
       const files = filesIn(outDir).filter(f => !PRECACHE_SKIP.test(f)).sort();
       const digest = createHash('sha256');
       for (const f of files) {
