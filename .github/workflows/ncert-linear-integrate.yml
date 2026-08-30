@@ -1,0 +1,116 @@
+name: Temporary NCERT Chapter 2 integration
+
+on:
+  push:
+    branches:
+      - feature/ncert-class8-linear-complete
+
+permissions:
+  contents: write
+
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/ncert-class8-linear-complete
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+
+      - name: Wire production registry and permanent chapter tests
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p = Path('client/src/engine/generators/index.js')
+          s = p.read_text()
+          anchor = "  'c8-rational-numbers-between': 'india-junior',\n"
+          insertion = anchor + "  'c8-linear-equations': 'india-junior',\n  'c8-linear-equations-foundations': 'india-junior',\n  'c8-linear-equations-both-sides': 'india-junior',\n  'c8-linear-equations-fractions': 'india-junior',\n  'c8-linear-equations-brackets': 'india-junior',\n  'c8-linear-equations-decimals': 'india-junior',\n  'c8-linear-equations-verification': 'india-junior',\n  'c8-linear-equations-source-mastery': 'india-junior',\n"
+          if "'c8-linear-equations-source-mastery': 'india-junior'" not in s:
+              if anchor not in s:
+                  raise SystemExit('generator registry anchor missing')
+              s = s.replace(anchor, insertion)
+          s = s.replace(
+              '// eight source-audited NCERT Class 8 Rational Numbers skill generators.',
+              '// source-audited NCERT Class 8 Chapter 1 and Chapter 2 skill generators.'
+          )
+          p.write_text(s)
+
+          p = Path('package.json')
+          s = p.read_text()
+          if '"test:ncert:linear"' not in s:
+              s = s.replace(
+                  '"test:india": "node client/test/india-check.mjs",',
+                  '"test:india": "node client/test/india-check.mjs",\n    "test:ncert:rational": "node client/test/ncert-rational-numbers-check.mjs",\n    "test:ncert:linear": "node client/test/ncert-linear-equations-check.mjs",'
+              )
+              s = s.replace(
+                  'npm run test:india && npm run test:explain',
+                  'npm run test:india && npm run test:ncert:rational && npm run test:ncert:linear && npm run test:explain'
+              )
+          p.write_text(s)
+
+          # Tighten two generated-solution formatting details before the release audit.
+          p = Path('client/src/engine/ncert/class8-linear-equations.js')
+          s = p.read_text()
+          s = s.replace(
+              "const answerLatex = a => frac(a).latex();\n",
+              "const answerLatex = a => frac(a).latex();\nconst signedLatex = f => f.n < 0 ? `-${new Frac(-f.n, f.d).latex()}` : `+${f.latex()}`;\n"
+          )
+          s = s.replace(
+              "const dFrac = new Frac((a * den - c) * sol + b, den);\n  const prompt = `$${a}${v}+\\\\frac{${b}}{${den}}=\\\\frac{${c}${v}}{${den}}+${dFrac.latex()}$`;",
+              "const dNum = (a * den - c) * sol + b;\n  const dFrac = new Frac(dNum, den);\n  const prompt = `$${a}${v}+\\\\frac{${b}}{${den}}=\\\\frac{${c}${v}}{${den}}${signedLatex(dFrac)}$`;"
+          )
+          s = s.replace(
+              "{ h: 'Clear denominators', d: `$${a*den}${v}${b >= 0 ? '+' : ''}${b}=${c}${v}+${dFrac.n}$` },",
+              "{ h: 'Clear denominators', d: `$${a*den}${v}${b >= 0 ? '+' : ''}${b}=${c}${v}${dNum >= 0 ? '+' : ''}${dNum}$` },"
+          )
+          s = s.replace(
+              "{ h: 'Collect variable terms', d: `$${a-c}${variable}+${b}=${d}$` },",
+              "{ h: 'Collect variable terms', d: `$${fmtLin(a-c, b, variable)}=${d}$` },"
+          )
+          p.write_text(s)
+          PY
+
+      - name: Install client dependencies
+        run: npm ci --prefix client
+
+      - name: Chapter 1 regression remains green
+        run: npm run test:ncert:rational
+
+      - name: Chapter 2 source, answer-key and seeded-bank audit
+        run: npm run test:ncert:linear
+
+      - name: India curriculum integration
+        run: npm run test:india
+
+      - name: Deterministic maths engine
+        run: npm run test:engine
+
+      - name: Handwriting bridge and interaction contracts
+        run: |
+          npm run test:ink:bridge
+          npm run test:ink:interaction
+
+      - name: Pri Explain contract
+        run: npm run test:explain
+
+      - name: Build and synchronize both iPad bundles
+        run: |
+          npm run build
+          npm run sync:ios
+          npm run check:ios
+
+      - name: Commit generated production wiring and iPad bundles
+        run: |
+          git config user.name "Pri Learning CI"
+          git config user.email "actions@users.noreply.github.com"
+          git add package.json client/src/engine/generators/index.js client/src/engine/ncert/class8-linear-equations.js ios/
+          if ! git diff --cached --quiet; then
+            git commit -m "Wire and sync complete NCERT Chapter 2 production integration"
+            git push origin HEAD:feature/ncert-class8-linear-complete
+          fi
