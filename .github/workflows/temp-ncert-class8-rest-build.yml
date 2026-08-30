@@ -45,10 +45,10 @@ jobs:
             "[['Read values',`A=${a}, B=${b}, C=${c}`],['Compare',`Maximum=${max}`],['Answer',labels[idx]]);",
             "[['Read values',`A=${a}, B=${b}, C=${c}`],['Compare',`Maximum=${max}`],['Answer',labels[idx]]]);"
           );
-          source = source.replace(
-            "['Sample space','${1,2,3,4,5,6}$']",
-            "['Sample space','$\\\\{1,2,3,4,5,6\\\\}$']"
-          );
+          source = source.split('\n').map(line => line.includes("['Sample space'")
+            ? "        [['Sample space','$\\\\{1,2,3,4,5,6\\\\}$'],['Count',`${fav} favourable out of 6`],['Simplify',`$${fav}/6=${fav/d}/${6/d}$`]]);"
+            : line
+          ).join('\n');
           fs.writeFileSync(sourcePath, source);
 
           const indexPath = 'client/src/engine/generators/index.js';
