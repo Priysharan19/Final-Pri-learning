@@ -1112,6 +1112,33 @@ function kxCentreOffset(strokes) {
   return null;
 }
 
+/** Soft prior over the {t, +} pair alone — the same treatment kxCentreOffset
+ *  gives {k, x}. Both are a bar crossing a stem, and a slanted hand tilts a
+ *  '+' into exactly the picture the render makes of a 't'. What the render
+ *  keeps poorly but the raw ink states plainly is WHERE the bar crosses: a t
+ *  is barred in the top third of its stem, a plus at the middle with roughly
+ *  balanced arms. The bands are deliberately wide apart and the middle left
+ *  to the ink, and glyphs that are not one straight bar over one straight
+ *  stem (open 4s, =, x) never reach the test. */
+function plusTeeCross(strokes) {
+  if (strokes.length !== 2) return null;
+  const s0 = strokes[0], s1 = strokes[1];
+  if (!nearStraight(s0) || !nearStraight(s1)) return null;
+  const b0 = bbox(s0), b1 = bbox(s1);
+  const slope = (b) => b.h / Math.max(b.w, 1e-6);
+  let bar = null, stem = null, barBox = null, stemBox = null;
+  if (slope(b0) < 0.45 && slope(b1) > 1.8) { bar = s0; barBox = b0; stem = s1; stemBox = b1; }
+  else if (slope(b1) < 0.45 && slope(b0) > 1.8) { bar = s1; barBox = b1; stem = s0; stemBox = b0; }
+  else return null;
+  if (stemBox.h < 1e-6) return null;
+  // the bar must actually cross the stem, not underline or top it
+  if (barBox.x1 > stemBox.cx || barBox.x2 < stemBox.cx) return null;
+  const r = (barBox.cy - stemBox.y1) / stemBox.h;
+  if (r >= 0.36 && r <= 0.62) return { '+': 1.7, t: 0.6 };
+  if (r >= 0.12 && r <= 0.30) return { '+': 0.55, t: 1.7 };
+  return null;
+}
+
 /** The raw blended per-symbol candidate list — the full ranking BEFORE the
  *  calibrated, truncated alts are built. The ligature splitter needs this:
  *  "how much does this fragment look like an n" is a question the top-5
@@ -1120,6 +1147,7 @@ export function glyphCandidates(group, medianH, withAuthored = false) {
   const strokes = group.strokes.map(strokePts);
   const relSize = Math.max(group.box.w, group.box.h) / Math.max(medianH, 1e-6);
   const kx = kxCentreOffset(strokes);
+  const pt = plusTeeCross(strokes);
 
   // ① neural ensemble on the rendered glyph (28² + 32² votes, deskewed), then
   // corrected by the geometry that render throws away — bow direction and depth
@@ -1158,6 +1186,7 @@ export function glyphCandidates(group, medianH, withAuthored = false) {
     const tmpl = 1 / (1 + 8 * d);
     let score = Math.pow(cnnP + 0.015, 0.62) * Math.pow(tmpl + 0.02, 0.38) * sizePrior(sym, relSize);
     if (kx && (sym === 'k' || sym === 'x')) score *= kx[sym];
+    if (pt && (sym === '+' || sym === 't')) score *= pt[sym];
     if (personal && d < 0.3) score *= 1.6;               // strong learned match
     out.push({ sym, score, cnnP, tmpl, d });
   }
@@ -1728,6 +1757,12 @@ function ligatureSplitPass(line, medianH) {
     let best = null;
     for (const word of LIGATURE_WORDS) {
       if (standaloneOnly && !STANDALONE_LIG.has(word)) continue;
+      // A differential never precedes a variable: working reads "2x dx", a
+      // declaration reads "let u" — so against a following letter the du/dx
+      // hypotheses are not readings, they are "let" wearing a costume (the
+      // cursive let body carves into a plausible d + x, and the two means
+      // sit within a few points of each other).
+      if ((word === 'du' || word === 'dx') && next && /^[a-zA-Z]$/.test(next.sym)) continue;
       const k = word.length;
       if (k > units.length) continue;
       const score = (parts) => {
@@ -2593,7 +2628,16 @@ const BIGRAM = {
  *  maths essentially never uses either as a variable, so the digit reading is
  *  the default and the letter has to be earned from context (a function name,
  *  which the decoder locks before the beam ever runs). */
-const UNIGRAM = { l: -1.15, o: -1.15, ':': -0.45, '!=': -0.55, div: -0.30 };
+const UNIGRAM = {
+  l: -1.15, o: -1.15, ':': -0.45, '!=': -0.55, div: -0.30,
+  // The times sign is the x class's twin: it must be earned from a genuinely
+  // multiplicative slot, not offered as a free operator bridge whenever a
+  // neighbouring glyph wobbles toward a letter ("2x+35" must not decode as
+  // "2*t35" because the + read t). B and I are real classes with their own
+  // ink evidence, but a capital inside written maths is rare enough that a
+  // marginal one beside digits should stay a digit.
+  '*': -0.55, B: -0.35, I: -0.35
+};
 
 /** Unary sign: after a relation, an operator, an open bracket or line start a
  *  '-' (or '+') is a sign, not a dangling operator. */
@@ -2889,12 +2933,35 @@ function beamRepair(line, overrides, medianH, ctx = null) {
     return f * top;
   };
 
-  const candLists = line.map(s => {
+  // The times sign is the x class's twin, so every x-shaped glyph offers '*'
+  // — but the operator reading is only real when the thing being multiplied
+  // is actually there: the glyph to its RIGHT must itself read as a digit,
+  // and something value-like must stand on its left. Anywhere else the
+  // operator is a free grammar bridge for a wobbled neighbour ("2x+35"
+  // decoded "2*t35" because o→v is cheap and the + had drifted toward t; a
+  // unigram tax alone cannot stop a + that misreads at 30×).
+  // …and never inside an open bracket: a bracketed group in this population
+  // is algebra ("(4x-3)"), where a digit-×-digit picture is a coefficient and
+  // a variable whose separator wobbled — not a times sign. ("7*8=56" and
+  // "x*4k" sit at depth 0 and keep the reading.)
+  let starDepth = 0;
+  const starAllowed = line.map((s, i) => {
+    const ok = starDepth === 0 &&
+      i > 0 && i < line.length - 1 &&
+      /^[0-9]$/.test(line[i + 1].sym) &&
+      (/^[0-9a-zA-Z)]$/.test(line[i - 1].sym) || line[i - 1].sym === 'pi' || line[i - 1].sym === 'theta');
+    if (s.sym === '(') starDepth++;
+    else if (s.sym === ')') starDepth = Math.max(0, starDepth - 1);
+    return ok;
+  });
+
+  const candLists = line.map((s, i) => {
     if (overrides[s.id] || s.composite || s._geo) return [{ sym: s.sym, conf: Math.max(s.conf, 0.9) }];
     const seen = new Set([s.sym]);
     const list = [{ sym: s.sym, conf: Math.max(0.02, s.conf) }];
     for (const a of s.alts || []) {
       if (seen.has(a.sym) || a.conf < 0.06) continue;
+      if (a.sym === '*' && !starAllowed[i]) continue;
       seen.add(a.sym);
       list.push({ sym: a.sym, conf: a.conf });
       if (list.length >= MAX_CANDS) break;
@@ -3355,6 +3422,37 @@ export function recognize(strokes, overrides = {}, ctx = null) {
           s.conf = Math.max(0.55, s.conf * 0.9);
           s._geo = true;
         }
+      }
+    }
+  }
+
+  // A writer's capitals are their own evidence: when two ring glyphs (the 0o
+  // class) share a line, both sit on the baseline, and one stands half again
+  // the other's height at full line height, the tall one is a capital O — not
+  // a zero that happened to grow. Absolute size never survives the raster,
+  // and the bigrams actively prefer "00" over "0O", so without a lock the
+  // beam erases the reading. Guards: the small ring must be well above
+  // degree-mark size AND on the baseline (the deg↔0o confusion is the
+  // ensemble's most common, and a misread ° floating after "90" must never
+  // promote the true zero beside it).
+  for (const ls of linesPre) {
+    const full = ls.filter(s => s.box.h >= 0.55 * medianH);
+    if (!full.length) continue;
+    const base = median(full.map(s => s.box.y2));
+    const band = Math.max(base - median(full.map(s => s.box.y1)), 1e-6);
+    const rings = ls.filter(s => !s.composite && !overrides[s.id] &&
+      (s.sym === '0' || s.sym === 'o') &&
+      (s.alts || []).some(a => a.sym === 'O') &&
+      base - s.box.y2 <= 0.30 * band);
+    if (rings.length < 2) continue;
+    const minH = Math.min(...rings.map(s => s.box.h));
+    if (minH < 0.50 * medianH) continue;
+    for (const s of rings) {
+      const asp = s.box.w / Math.max(s.box.h, 1e-6);
+      if (s.box.h >= 1.5 * minH && s.box.h >= 0.75 * medianH && asp >= 0.6 && asp <= 1.45) {
+        s.sym = 'O';
+        s.conf = Math.max(s.conf, 0.9);
+        s._geo = true;
       }
     }
   }

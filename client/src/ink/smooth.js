@@ -56,8 +56,14 @@ export function makePenFilter({ minCutoff = 20, beta = 0.10, dCutoff = 1.0 } = {
   let tPrev = null;
   return (x, y, t) => {
     // Coalesced samples can share a timestamp; clamp dt so the filter is
-    // stable rather than dividing by ~0.
-    const dt = tPrev === null ? 1 / 120 : Math.min(0.1, Math.max(1 / 1000, (t - tPrev) / 1000));
+    // stable rather than dividing by ~0. The floor is the Pencil's own top
+    // rate, not 1 ms: no real digitizer samples a hand faster than 240 Hz,
+    // so events packed tighter than that are bursts inside one physical
+    // sample (coalesced batches, synthetic pointer streams) and must be
+    // filtered as if they arrived at 240 Hz. Flooring at 1 ms treated every
+    // burst point as a full sample and stacked the low-pass hard enough to
+    // lag a written 5's bowl into an s.
+    const dt = tPrev === null ? 1 / 120 : Math.min(0.1, Math.max(1 / 240, (t - tPrev) / 1000));
     tPrev = t;
     return { x: fx(x, dt), y: fy(y, dt) };
   };

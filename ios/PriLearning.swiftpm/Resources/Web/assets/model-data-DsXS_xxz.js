@@ -1,0 +1,1 @@
+import{t as e}from"./ink-model-D3cN_hBH.js";export{e as default};

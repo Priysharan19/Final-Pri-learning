@@ -224,6 +224,18 @@ export const TEMPLATES = {
   ],
   'R': [
     [L(32, 12, 32, 88, 10), join(A(48, 30, 17, 18, 270, 450, 10), L(44, 48, 28, 48, 4)), L(40, 46, 72, 88, 8)],
+  ],
+  'B': [
+    // stem, then both bowls drawn top-to-bottom in one stroke
+    [L(32, 10, 32, 88, 12), join(L(32, 12, 38, 12, 3), A(40, 30, 20, 18, 270, 450, 11), A(40, 68, 25, 20, 270, 450, 12), L(40, 88, 33, 88, 3))],
+    // one continuous stroke: down the stem, then the bowls climb back up
+    [join(L(36, 10, 33, 90, 11), A(39, 68, 25, 22, 90, -90, 12), A(38, 28, 21, 18, 90, -90, 11))]
+  ],
+  'I': [
+    // serifed capital: top bar, stem, bottom bar
+    [L(30, 12, 70, 12, 6), L(50, 12, 50, 88, 10), L(30, 88, 70, 88, 6)],
+    // the two-stroke form: top bar hooking down the stem, then the base
+    [join(L(28, 12, 70, 12, 7), L(52, 14, 49, 86, 9)), L(28, 88, 72, 88, 6)]
   ]
 };
 
@@ -234,9 +246,9 @@ export const CONTEXTUAL = new Set(['x', '-', '.']);
 export const ALPHABET = [
   '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
   'x', 'y', 't', 'n', 'a', 'b', 'c', 'd', 'e', 'k', 'm', 'r', 's', 'u', 'v', 'z',
-  'i', 'o', 'g', 'l', 'h', 'f', 'w', 'p', 'q', 'L', 'H', 'R',
-  'pi', 'theta', '+', '-', '=', '/', '(', ')', '.', 'sqrt', '<', '>', '<=', '>=', '!=',
-  'div', 'pm', 'deg', 'percent', ':', '∫', '{', '}', ',', '∪', '∩', 'A', 'B', 'C', 'S'
+  'i', 'o', 'g', 'l', 'h', 'f', 'w', 'p', 'q', 'L', 'H', 'R', 'B', 'I', 'O',
+  'pi', 'theta', '+', '-', '*', '=', '/', '(', ')', '.', 'sqrt', '<', '>', '<=', '>=', '!=',
+  'div', 'pm', 'deg', 'percent', ':', '∫', '{', '}', ',', '∪', '∩', 'A', 'C', 'S'
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -259,7 +271,9 @@ export const REAL_ALLOGRAPHS = {
   // a loop-ell, a shallow n with its exit tail, a joined c — are letterforms
   // the hand-authored library has no equivalent for.
   'l': [
-    [[[35.2,66.8],[40.4,71.3],[43.7,63.2],[46,54],[49.8,45.1],[51.5,35.7],[53,26.3],[53,16.6],[50.4,8],[42.9,11.4],[38.7,19.9],[36.9,29.2],[35.2,38.7],[35.2,48.3],[35.2,58],[37.8,67.3],[42.9,75.4],[48.6,83.2],[55.7,89.7],[64.8,92]]]
+    [[[35.2,66.8],[40.4,71.3],[43.7,63.2],[46,54],[49.8,45.1],[51.5,35.7],[53,26.3],[53,16.6],[50.4,8],[42.9,11.4],[38.7,19.9],[36.9,29.2],[35.2,38.7],[35.2,48.3],[35.2,58],[37.8,67.3],[42.9,75.4],[48.6,83.2],[55.7,89.7],[64.8,92]]],
+    // small loop-ell with an exit sweep, written mid-line in "1lIy"
+    [[[23.3,52.3],[25.7,48.3],[33.1,40.9],[39,32],[42.9,22.5],[44.7,12.4],[37.7,8.9],[29.7,15.9],[24.1,25.1],[20.8,35.3],[20.2,46],[20.9,56.7],[23.9,67],[29.9,76],[37.7,83.3],[47,88.6],[57.3,92],[68.1,92],[76.4,88.5],[79.8,78.3]]]
   ],
   'n': [
     [[[11.8,22.5],[9.9,20.2],[8,30.5],[8,41.6],[9.9,52.3],[11.8,62.6],[15.6,72.1],[21.6,64.3],[28.3,55.6],[35.1,47],[41.8,38.3],[49.7,31.3],[59.1,26.8],[66.2,32],[70.3,42.1],[73.6,52.4],[79.2,61.8],[84.4,71.4],[90.4,79.8],[92,70.2]]],
@@ -276,6 +290,22 @@ export const REAL_ALLOGRAPHS = {
   '2': [
     [[[11.9,32.9],[13.6,20.8],[20,12.4],[32,11.9],[43.7,14.1],[52,22.6],[53.6,34.3],[48.6,45.2],[40.8,54.3],[32.5,63.2],[24.3,72.1],[15.2,80.1],[9,88.1],[20.7,85.9],[32.6,84.3],[44.4,81.7],[56.3,79.2],[68.3,78.1],[80.2,75.5],[92,72.8]]],
     [[[11.8,52.8],[13.6,39.6],[17.9,27.7],[28,18.9],[38.7,12],[51.5,10.6],[62.6,10.8],[63.8,21.4],[59.3,33.2],[50.3,42.9],[42.1,53.2],[33.2,63],[24.9,73.2],[18.6,84],[22.8,92],[36.1,92],[49.2,91.2],[61.7,89.2],[75,87.9],[88.2,86.4]]]
+  ],
+  // This writer's 8 is two OPEN loops that never cross — the very topology the
+  // B class owns — and their 6 closes with a flat, wide bottom loop. Training
+  // 8 and 6 on their own forms is what keeps the new B basin from claiming
+  // them ("8B3" read "BB3", "56" read "5B" before these existed).
+  '8': [
+    [[[30.8,56.4],[18,49.3],[16.5,33.4],[25.8,20.1],[39.7,11.7],[55.3,8],[63.5,18.2],[55.1,32.1],[44.1,44.5],[35.8,58.4],[32.2,74.3],[40.6,87.6],[56.1,92],[72.6,92],[83.5,82.1],[77.6,67.7],[63.6,59.3],[47.7,54.5],[32.6,55.6],[43.6,66.4]]],
+    [[[16.8,37.8],[15.8,24.7],[26.3,15.5],[38.7,9.8],[51.8,8.6],[52.7,21.8],[48.6,35],[42.4,47.6],[39.5,61],[37.8,74.7],[41.7,87.6],[53.7,92],[67.5,90.3],[78.9,82.4],[85,70.2],[83.2,56.8],[72.1,49.2],[58.7,45.9],[45.3,46],[57,51.8]]]
+  ],
+  '6': [
+    [[[47.8,34.1],[50.2,22.2],[53.6,10.8],[42.9,8],[32,13.7],[24.7,23.7],[21.8,36],[21.8,48.7],[22.3,61.2],[28.6,72.3],[36.4,82.1],[47,88.8],[59.2,92],[71.6,91.4],[78.2,80.9],[74.1,69.6],[62.3,65],[49.6,64.5],[39.2,67.8],[40.6,80.4]]]
+  ],
+  // Their 0 enters with a curl that ends INSIDE the ring — close enough to a
+  // one-stroke theta that the theta allograph above claimed it outright.
+  '0': [
+    [[[20.3,38.7],[16.2,24.6],[10.5,37.9],[8,53.1],[8.5,68.8],[17.4,80.9],[31.6,85.9],[47.1,87.8],[61.6,81.5],[73.7,71.4],[84.8,60.2],[92,46.4],[92,30.6],[81.4,20.1],[67.3,14.1],[51.8,12.1],[36.8,16.2],[28.3,29],[34.3,41.3],[44.9,53.1]]]
   ],
   '4': [
     [[[29,24.5],[31.2,12.5],[28.9,13.7],[24.1,24.6],[21.6,36.5],[18.2,48],[17.7,60],[22.4,70.6],[33.4,70.1],[43.7,63.7],[51.8,54.7],[60.5,46.3],[68,36.8],[71,35.4],[67.8,46.9],[66.4,58.9],[67.4,70.7],[70.6,82.4],[75.9,92],[82.9,82.1]]],
@@ -332,6 +362,14 @@ export const REAL_ALLOGRAPHS = {
   'y': [
     [[[34.2,19.9],[37.2,8.6],[34.5,18.6],[34.3,30.2],[44.3,33.2],[53,25.5],[58.9,15.5],[55.6,24.5],[53.3,36.2],[52.1,47.9],[50.1,59.6],[47.7,71.3],[43.5,82.4],[36.9,92],[32.7,82.6],[33.7,70.8],[36.7,59.4],[44.5,50.6],[55.7,46.8],[67.5,46.7]]]
   ],
+  'B': [
+    // one continuous stroke, sample "8B3": down the stem, both bowls back up
+    [[[32.7,40],[26,25.2],[28.3,44.2],[30,63.4],[27.6,67.2],[26,48],[28.8,29],[39.6,13.1],[55.3,10.9],[52.5,29.5],[38.8,42.3],[43.6,49],[62.2,53.9],[77.6,64.6],[72.1,80.6],[55.1,89.4],[36,92],[20.7,84.5],[30.3,70.7],[47.3,61.3]]]
+  ],
+  'I': [
+    // two strokes, sample "1lIy": top bar hooking down the stem, then the base
+    [[[17.3,17.3],[12.7,11.7],[8.7,8],[17.8,8],[26.9,8],[36,8],[45.2,8],[54.3,8],[63.4,8],[72.5,8],[70.1,11.2],[61.8,14],[54,17.3],[45.7,19.2],[45.9,27.8],[47.2,36.6],[49.1,45.3],[50.6,54.1],[50.9,63.1],[49.1,67.7]], [[32.3,90.1],[28.5,90.5],[31.1,92],[35.2,92],[38.5,89.9],[42.4,88.6],[46.4,88.3],[50.2,86.8],[54,85.4],[57.8,83.9],[61.5,82],[65.2,80.4],[69.1,79.1],[73.2,78.9],[76.5,76.6],[80.3,75.4],[84.2,74.1],[88.1,72.8],[92,71.5]]]
+  ],
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -368,6 +406,27 @@ export const HAND_ALLOGRAPHS = {
   ]
 };
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Hand-authored allographs that DO train and DO match at runtime — the
+// opposite contract from HAND_ALLOGRAPHS above, which is rescue-only
+// material. These are forms we know exist in the wild (the hard suite's
+// barred 1 is one) that the net must keep assigned to their true class now
+// that lookalike classes exist beside them: a barred 1 is a serifed I minus
+// its top bar, and without these seeds the I class claimed it at 23× and one
+// personal correction could no longer flip it back. They are NOT corpus
+// evidence (REAL_ALLOGRAPHS) and NOT in TEMPLATES, so the seeded synthetic
+// suites keep their locked populations; the generators fold them into the
+// capped real-allograph slice.
+// ─────────────────────────────────────────────────────────────────────────────
+export const TRAIN_ALLOGRAPHS = {
+  '1': [
+    // barred: stem, full base bar, flag — three strokes
+    [L(50, 10, 50, 88, 11), L(28, 88, 72, 88, 6), L(32, 26, 50, 10, 4)],
+    // barred: flag joined into the stem, then the base bar
+    [join(L(30, 24, 50, 8, 5), L(50, 8, 49, 88, 11)), L(30, 88, 71, 87, 6)]
+  ]
+};
+
 /** The library the app matches against at runtime: every hand-authored
  *  variant plus every learned real-writer allograph. HAND_ALLOGRAPHS is
  *  deliberately NOT merged here: folding the cursive letterforms into
@@ -381,7 +440,8 @@ export const RUNTIME_TEMPLATES = Object.fromEntries(
     sym,
     [
       ...vars,
-      ...(REAL_ALLOGRAPHS[sym] || [])
+      ...(REAL_ALLOGRAPHS[sym] || []),
+      ...(TRAIN_ALLOGRAPHS[sym] || [])
     ]
   ])
 );
@@ -392,4 +452,13 @@ export const RUNTIME_TEMPLATES = Object.fromEntries(
 // overlap the hand-authored forms of OTHER classes — train with a smaller
 // slice, because the tuning suites showed the boundary itself moving (1↔7,
 // (↔1, 4↔9). Runtime $P matching always uses every variant regardless.
-export const REAL_TRAIN_SHARE = { '1l': 0.10, '(': 0.10, ')': 0.10, '7': 0.15, '9': 0.15 };
+export const REAL_TRAIN_SHARE = {
+  '1l': 0.10, '(': 0.10, ')': 0.10, '7': 0.15, '9': 0.15,
+  // The real one-stroke B and two-stroke I sit close to this writer's own 8s
+  // and barred 1s; a large slice would teach the net the collision itself.
+  'B': 0.10, 'I': 0.10,
+  // The open-loop 8s and flat-loop 6 exist to fence the B basin, and the
+  // curled 0 to fence theta — small slices are enough to mark the territory,
+  // and larger ones would erode the canonical forms the suites simulate.
+  '8': 0.15, '6': 0.15, '0o': 0.10
+};

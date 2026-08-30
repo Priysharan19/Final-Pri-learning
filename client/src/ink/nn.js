@@ -186,7 +186,7 @@ function personalEntries(models) {
  */
 function personalDistribution(models, inputEmbeddings) {
   const entries = personalEntries(models);
-  if (entries.length < 2) return null;
+  if (!entries.length) return null;
 
   const best = new Float32Array(CLASSES.length);
   best.fill(-1);
@@ -205,7 +205,20 @@ function personalDistribution(models, inputEmbeddings) {
     if (v > top) { second = top; top = v; topIndex = i; }
     else if (v > second) second = v;
   }
-  if (topIndex < 0 || top < 0.78 || top - second < 0.035) return null;
+  // A bank whose entries are all ONE class cannot prove a margin against a
+  // rival it has never seen, so the margin gate below would pass vacuously —
+  // which is why this path used to demand two entries and the very FIRST
+  // correction a student made did nothing at all. The product promise is the
+  // opposite ("a misread glyph becomes right after one sample"), so a
+  // single-class bank is accepted, but only as a near-identical repeat: the
+  // glyph must land far closer to the corrected example than unrelated ink
+  // ever does (ReLU cosines between different glyphs sit well under 0.9),
+  // and even then it gets a reduced weight rather than the full blend.
+  const singleClass = second < 0;
+  if (topIndex < 0) return null;
+  if (singleClass) {
+    if (top < 0.90) return null;
+  } else if (top < 0.78 || top - second < 0.035) return null;
 
   // Temperature-softmax over nearest class exemplars. Missing personal classes
   // receive zero mass rather than an invented vote.
@@ -220,6 +233,13 @@ function personalDistribution(models, inputEmbeddings) {
   if (!(z > 0)) return null;
   for (let i = 0; i < out.length; i++) out[i] /= z;
 
+  if (singleClass) {
+    // Near-identity repeats only: weight scales with how exactly the glyph
+    // matches the corrected example, capped below the multi-class blend.
+    const absolute = Math.max(0, Math.min(1, (top - 0.90) / 0.08));
+    const weight = 0.10 + 0.24 * absolute;
+    return { probs: out, weight, top, margin: 0 };
+  }
   const absolute = Math.max(0, Math.min(1, (top - 0.78) / 0.16));
   const margin = Math.max(0, Math.min(1, (top - second - 0.035) / 0.10));
   // 8–42% blend: enough to break x/h/n and 2/z style-specific ties, never

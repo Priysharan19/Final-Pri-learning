@@ -9,7 +9,7 @@
 // Output: /tmp/inktrain/{train,val}{28,32}.img + {train,val}.lbl + manifest
 // ─────────────────────────────────────────────────────────────────────────────
 import { mkdirSync, writeFileSync, readFileSync, createWriteStream, rmSync } from 'node:fs';
-import { TEMPLATES, REAL_ALLOGRAPHS, REAL_TRAIN_SHARE } from '../../client/src/ink/templates.js';
+import { TEMPLATES, REAL_ALLOGRAPHS, TRAIN_ALLOGRAPHS, REAL_TRAIN_SHARE } from '../../client/src/ink/templates.js';
 import { rasterize, renormalizeRaster } from '../../client/src/ink/raster.js';
 import { stylize, makeRng } from '../../client/src/ink/aug.js';
 import { CLASSES, classOfSymbol, CLASS_INDEX } from '../../client/src/ink/classes.js';
@@ -48,7 +48,7 @@ for (const cls of CLASSES) {
 // population. A fixed slice keeps the standard forms dominant.
 const REAL_SHARE = Number(process.env.PRI_REAL_SHARE || 0.25);
 const realSeedsFor = {};
-for (const [sym, variants] of Object.entries(REAL_ALLOGRAPHS)) {
+for (const [sym, variants] of [...Object.entries(REAL_ALLOGRAPHS), ...Object.entries(TRAIN_ALLOGRAPHS)]) {
   (realSeedsFor[classOfSymbol(sym)] ||= []).push(...variants);
 }
 function pickSeed(cls, rng) {
@@ -91,6 +91,22 @@ const emit = (set, imgs, label) => {
 // and undo the very thing this fixes.
 const LOW_BOW = new Set(['(', ')']);
 
+// The rare capital classes are recognised conservatively. Their heavy-tail
+// renders invade established neighbourhoods that matter far more than they do
+// — a wildly-warped serifed I is a barred 1 or a ±, a warped one-stroke B is a
+// looping 8 — and the collisions were measured, not imagined (a real writer's
+// 8s read as B at 0.9+ when B trained with the full tail). Capping the style
+// strength keeps each new basin tight around its genuine forms while leaving
+// every established class's training untouched.
+const STRENGTH_CAP = { B: 1.25, I: 1.15 };
+
+// …and at half the sample count of an established class. A capital's job is
+// to be recognisable when clearly written, not to compete for softmax mass
+// against every messy digit: at full count their presence measurably thinned
+// the digit margins on the deg/z boundaries (hard-suite digit strings 95% →
+// 88%) while the clean real-corpus B/I read at 0.99 with room to spare.
+const COUNT_SCALE = { B: 0.5, I: 0.5 };
+
 function synthStrokes(cls, rng) {
   const variant = pickSeed(cls, rng);
   const strokes = variant.map(st => st.map(p => p.slice()));
@@ -105,9 +121,10 @@ function synthStrokes(cls, rng) {
   // The clean slice stays, because a net trained only on distortion drifts off
   // the neat hands that are most of the population.
   const r = rng();
-  const strength = r < CLEAN_SHARE ? 0.15
+  let strength = r < CLEAN_SHARE ? 0.15
     : r < 1 - TAIL_SHARE ? 0.45 + rng() * 1.25
       : TAIL_FROM + rng() * (TAIL_TO - TAIL_FROM);
+  if (STRENGTH_CAP[cls]) strength = Math.min(strength, STRENGTH_CAP[cls]);
   return stylize(strokes, rng, strength, { bowScale: LOW_BOW.has(cls) ? 0.3 : 1 });
 }
 
@@ -115,12 +132,14 @@ const rng = makeRng(20260819);
 let done = 0;
 for (const cls of CLASSES) {
   const li = CLASS_INDEX[cls];
-  for (let i = 0; i < N_SYNTH_TRAIN + N_SYNTH_VAL; i++) {
+  const scale = COUNT_SCALE[cls] ?? 1;
+  const nTrain = Math.round(N_SYNTH_TRAIN * scale), nVal = Math.round(N_SYNTH_VAL * scale);
+  for (let i = 0; i < nTrain + nVal; i++) {
     const strokes = synthStrokes(cls, rng);
     const brush = 0.85 + rng() * 0.7;                          // pen weight varies
     const imgs = {};
     for (const s of SIZES) imgs[s] = toU8(rasterize(strokes, { size: s, brush }));
-    emit(i < N_SYNTH_TRAIN ? 'train' : 'val', imgs, li);
+    emit(i < nTrain ? 'train' : 'val', imgs, li);
   }
   done++;
   if (done % 8 === 0) console.log(`synth ${done}/${CLASSES.length} classes`);

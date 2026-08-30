@@ -8,7 +8,7 @@
 // trained on as well as fresh ones — hence a distinct seed.
 // ─────────────────────────────────────────────────────────────────────────────
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { TEMPLATES, REAL_ALLOGRAPHS, REAL_TRAIN_SHARE } from '../../client/src/ink/templates.js';
+import { TEMPLATES, REAL_ALLOGRAPHS, TRAIN_ALLOGRAPHS, REAL_TRAIN_SHARE } from '../../client/src/ink/templates.js';
 import { stylize, makeRng } from '../../client/src/ink/aug.js';
 import { CLASSES, classOfSymbol, CLASS_INDEX } from '../../client/src/ink/classes.js';
 import { nnClassify } from '../../client/src/ink/nn.js';
@@ -31,7 +31,7 @@ for (const [sym, variants] of Object.entries(TEMPLATES)) {
 // same glyph population the CNN was trained on.
 const REAL_SHARE = Number(process.env.PRI_REAL_SHARE || 0.25);
 const realSeedsFor = {};
-for (const [sym, variants] of Object.entries(REAL_ALLOGRAPHS)) {
+for (const [sym, variants] of [...Object.entries(REAL_ALLOGRAPHS), ...Object.entries(TRAIN_ALLOGRAPHS)]) {
   (realSeedsFor[classOfSymbol(sym)] ||= []).push(...variants);
 }
 const pickSeed = (cls, rng) => {
@@ -53,9 +53,14 @@ for (const cls of CLASSES) {
   const seeds = seedsFor[cls];
   if (!seeds?.length) throw new Error(`class ${cls} has no seeds`);
   const li = CLASS_INDEX[cls];
-  for (let i = 0; i < PER_CLASS; i++) {
+  // half weight for the rare capitals — same reasoning as gen.mjs
+  const perClass = (cls === 'B' || cls === 'I') ? Math.round(PER_CLASS / 2) : PER_CLASS;
+  for (let i = 0; i < perClass; i++) {
     const variant = pickSeed(cls, rng);
-    const strength = rng() < 0.1 ? 0.15 : 0.45 + rng() * 1.25;
+    let strength = rng() < 0.1 ? 0.15 : 0.45 + rng() * 1.25;
+    // same conservative cap as gen.mjs for the rare capital classes
+    if (cls === 'B') strength = Math.min(strength, 1.25);
+    else if (cls === 'I') strength = Math.min(strength, 1.15);
     const strokes = stylize(
       variant.map(st => st.map(p => p.slice())),
       rng, strength,

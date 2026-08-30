@@ -9,15 +9,17 @@ export const CLASSES = [
   'x', 'y', 't', 'n', 'a', 'b', 'e', 'c', 'd', 'k', 'm', 'r', 's', 'u', 'v', 'z',
   'i', 'g', 'h', 'f', 'w', 'p', 'q', 'L', 'H', 'R',
   'pi', 'theta', '(', ')', 'sqrt', 'percent', '<', '>',
-  '+', '-', '=', '/', '.', ':', 'div', 'pm', '<=', '>=', '!=', 'deg'
+  '+', '-', '=', '/', '.', ':', 'div', 'pm', '<=', '>=', '!=', 'deg',
+  'B', 'I'
 ];
 
 export const CLASS_INDEX = Object.fromEntries(CLASSES.map((c, i) => [c, i]));
 
 /** Which CNN class a template symbol belongs to. */
 export function classOfSymbol(sym) {
-  if (sym === '0' || sym === 'o') return '0o';
+  if (sym === '0' || sym === 'o' || sym === 'O') return '0o';
   if (sym === '1' || sym === 'l') return '1l';
+  if (sym === '*') return 'x';
   return sym;
 }
 
@@ -28,9 +30,13 @@ export function defaultSymbol(cls) {
   return cls;
 }
 
-/** All symbols a CNN class may stand for — the decoder chooses among these. */
+/** All symbols a CNN class may stand for — the decoder chooses among these.
+ *  Capital O and the times sign carry no shape of their own at raster
+ *  resolution (O is a 0/o ring, * is a small ×), so they live inside the
+ *  existing classes and the maths-language decode earns them from context. */
 export function symbolsOfClass(cls) {
-  if (cls === '0o') return ['0', 'o'];
+  if (cls === '0o') return ['0', 'o', 'O'];
   if (cls === '1l') return ['1', 'l'];
+  if (cls === 'x') return ['x', '*'];
   return [cls];
 }

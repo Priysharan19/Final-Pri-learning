@@ -114,22 +114,29 @@ for (let t = 0; t < 40; t++) {
 console.log(`Messy digit strings: ${dPass}/${dTot} (${(100 * dPass / dTot).toFixed(0)}%)`);
 
 // ── 4. Personal learning: a MISREAD glyph becomes right after ONE sample ─────
-// This check has to prove two things, and until now it proved neither. It used a
-// European crossed 7, which the stock templates already read as "7" — so the
+// This check has to prove two things, and originally it proved neither. It used
+// a European crossed 7, which the stock templates already read as "7" — so the
 // assertion `after.sym === '7'` held with addPersonal deleted entirely. A check
 // that passes with the feature removed is not a check.
-// The barred one below is genuinely misread: the stock recogniser calls it "2".
-// So the glyph is asserted WRONG first and RIGHT after a single correction, and
-// deleting addPersonal now fails the suite.
+// Its second fixture, a barred 1, stopped working the day the V14 hand
+// allographs taught the stock net that a barred 1 IS a 1 — right by stock, so
+// again proving nothing. The fixture must move whenever the engine absorbs it;
+// what is permanent is the CONTRACT: a glyph stock reads WRONG becomes RIGHT
+// after a single correction.
+// The looped g below is that glyph today: a closed-return loop g that stock
+// confidently calls "theta", against real CNN conviction — so the flip has to
+// come from the personal machinery (the single-example embedding path), and
+// deleting addPersonal fails the suite.
 const { addPersonal } = await import('../src/ink/personal.js');
 const L = (x1, y1, x2, y2, n = 10) => Array.from({ length: n }, (_, i) => [x1 + (x2 - x1) * i / (n - 1), y1 + (y2 - y1) * i / (n - 1)]);
-const barred1 = [L(50, 12, 50, 88), L(30, 88, 70, 88), L(34, 26, 50, 12)];
+const AA = (cx, cy, rx, ry, a0, a1, n = 16) => Array.from({ length: n }, (_, i) => { const a = (a0 + (a1 - a0) * i / (n - 1)) * Math.PI / 180; return [cx + rx * Math.cos(a), cy + ry * Math.sin(a)]; });
+const loopg = [[...AA(45, 50, 20, 20, 320, 640, 12), ...L(64, 34, 66, 80, 6), ...AA(52, 84, 16, 16, 10, 160, 8), ...L(38, 90, 30, 72, 4)]];
 const mk = (v, x, y, s) => v.map(st => ({ points: st.map(([px, py]) => ({ x: x + px / 100 * s, y: y + py / 100 * s })) }));
-const before = classifyOne(mk(barred1, 10, 10, 60));
-await addPersonal('1', mk(barred1, 0, 0, 100), 'test');
-const after = classifyOne(mk(barred1, 40, 25, 52));
-const misreadFirst = before.sym !== '1';
-const learned = misreadFirst && after.sym === '1';
+const before = classifyOne(mk(loopg, 10, 10, 60));
+await addPersonal('g', mk(loopg, 0, 0, 100), 'test');
+const after = classifyOne(mk(loopg, 40, 25, 52));
+const misreadFirst = before.sym !== 'g';
+const learned = misreadFirst && after.sym === 'g';
 console.log(`Personal learning: before="${before.sym}"${misreadFirst ? '' : ' (NOT A MISREAD — this check proves nothing)'} → after one correction="${after.sym}" ${learned ? 'PASS' : 'FAIL'}`);
 
 const okAll = pass / tot >= 0.87 && sPass / sTot >= 0.86 && dPass / dTot >= 0.85 && learned;

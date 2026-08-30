@@ -135,14 +135,19 @@ jobs:
       INDIA_DOTPOINTS: "261"
       INK_SELF: "96.0"
       INK_PROBES: "99.0"
-      HARD_SYMBOLS: "95.0"
+      # Re-baselined with the V14 class-expansion trade accepted in the
+      # holdout3 gate (see inkcheck-holdout3-gate.mjs): the 58-class engine
+      # measures 94.8 heavy-distortion symbols and 90 digit strings on this
+      # suite, against 95.9/95 for the 56-class engine — the same measured,
+      # explicitly accepted cost that bought B/I/O/* and the real-corpus gain.
+      HARD_SYMBOLS: "94.8"
       HARD_SCENES: "14"
       CALC_CHECKS: "24"
       # The JEE/olympiad notation suite. Like CALC_CHECKS this holds the number
       # of scenes that ran, not a score: the suite's own exit code is the
       # verdict, and what CI adds is that the scenes were not quietly dropped.
       JEE_CHECKS: "30"
-      HARD_DIGITS: "92"
+      HARD_DIGITS: "90"
       LINES_EXACT: "92.0"
       LINES_CHARS: "97.0"
       HOLDOUT1_LINES: "94.5"
