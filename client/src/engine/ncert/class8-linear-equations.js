@@ -256,6 +256,7 @@ const answerContract = a => {
     : { value: f.value, simplestFraction: { n: f.n, d: f.d } };
 };
 const answerLatex = a => frac(a).latex();
+const signedLatex = f => f.n < 0 ? `-${new Frac(-f.n, f.d).latex()}` : `+${f.latex()}`;
 
 function numericQuestion(prompt, answer, { hints = [], steps = [], traps = [], variable = 'x', inputHint } = {}) {
   const f = answer instanceof Frac ? answer : new Frac(answer, 1);
@@ -305,7 +306,7 @@ function bothSidesGenerated(rng, diff) {
     ],
     steps: [
       { h: 'Original equation', d: prompt },
-      { h: 'Collect variable terms', d: `$${a-c}${variable}+${b}=${d}$` },
+      { h: 'Collect variable terms', d: `$${fmtLin(a-c, b, variable)}=${d}$` },
       { h: 'Collect constants', d: `$${a-c}${variable}=${d-b}$` },
       { h: 'Divide', d: `$${variable}=${sol}$` },
       { h: 'Check', d: `Substituting ${sol} into both original sides gives the same value.` }
@@ -350,13 +351,14 @@ function fractionGenerated(rng, diff) {
   if (a * den === c) c += 1;
   const b = ri(rng, -8, 8);
   // a*v + b/den = (c/den)*v + d, with integer d chosen to force sol.
-  const dFrac = new Frac((a * den - c) * sol + b, den);
-  const prompt = `$${a}${v}+\\frac{${b}}{${den}}=\\frac{${c}${v}}{${den}}+${dFrac.latex()}$`;
+  const dNum = (a * den - c) * sol + b;
+  const dFrac = new Frac(dNum, den);
+  const prompt = `$${a}${v}+\\frac{${b}}{${den}}=\\frac{${c}${v}}{${den}}${signedLatex(dFrac)}$`;
   return numericQuestion(prompt, sol, {
     variable: v,
     hints: [`Multiply the entire equation by ${den}.`, 'Then solve the integer-coefficient equation.', 'Check in the original fractional equation.'],
     steps: [
-      { h: 'Clear denominators', d: `$${a*den}${v}${b >= 0 ? '+' : ''}${b}=${c}${v}+${dFrac.n}$` },
+      { h: 'Clear denominators', d: `$${a*den}${v}${b >= 0 ? '+' : ''}${b}=${c}${v}${dNum >= 0 ? '+' : ''}${dNum}$` },
       { h: 'Collect variable terms', d: `$${a*den-c}${v}=${dFrac.n-b}$` },
       { h: 'Solve', d: `$${v}=${sol}$` },
       { h: 'Check', d: `Substituting ${sol} makes both original sides equal.` }

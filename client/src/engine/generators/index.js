@@ -29,7 +29,7 @@ const BANKS = {
   'india-olympiad': () => import('./india-olympiad.js').then(m => m.indiaOlympiad),
   'india-foundation': () => import('./india-foundation.js').then(m => m.indiaFoundation),
   // The overlay leaves the established junior bank unchanged and adds the
-  // eight source-audited NCERT Class 8 Rational Numbers skill generators.
+  // source-audited NCERT Class 8 Chapter 1 and Chapter 2 skill generators.
   'india-junior': () => import('./india-junior-overlay.js').then(m => m.indiaJunior),
   'india-class10': () => import('./india-class10.js').then(m => m.indiaClass10),
   'india-senior': () => import('./india-senior.js').then(m => m.indiaSenior)
@@ -88,6 +88,14 @@ const INDIA_BANK_OF = {
   'c8-rational-numbers-distributivity': 'india-junior',
   'c8-rational-numbers-strategy': 'india-junior',
   'c8-rational-numbers-between': 'india-junior',
+  'c8-linear-equations': 'india-junior',
+  'c8-linear-equations-foundations': 'india-junior',
+  'c8-linear-equations-both-sides': 'india-junior',
+  'c8-linear-equations-fractions': 'india-junior',
+  'c8-linear-equations-brackets': 'india-junior',
+  'c8-linear-equations-decimals': 'india-junior',
+  'c8-linear-equations-verification': 'india-junior',
+  'c8-linear-equations-source-mastery': 'india-junior',
   'c8-data-charts': 'india-junior',
   'c8-proportions-dir-inv': 'india-junior',
   'c9-polynomial-basics': 'india-junior',
