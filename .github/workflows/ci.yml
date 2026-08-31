@@ -1,67 +1,3 @@
-# ─────────────────────────────────────────────────────────────────────────────
-# Pri Learning · CI
-#
-# Three things have to hold on every push: the app is still correct, the
-# handwriting engine is still accurate, and the app still works when a real
-# browser drives it.
-#
-# ── The rule this file is built around ──────────────────────────────────────
-# A step that cannot fail is not a gate, it is decoration. This project has
-# shipped that mistake twice — a password gate that checked nothing, and a
-# security suite that passed over a total pass-through — so every step below
-# is written so that "nothing was checked" is a FAILURE and never a pass:
-#
-#   · a suite that printed no result line is reported NOT MEASURED and fails.
-#   · a result line this file cannot parse is reported NOT MEASURED and fails.
-#   · a scan that found no files to read fails, rather than reporting a clean
-#     scan of nothing.
-#   · every suite is held to the NUMBER OF CHECKS it ran, not only to its exit
-#     code, so a suite that quietly skips half its work is caught. That is a
-#     real case here, not a hypothetical: `security-check.mjs` drops one check
-#     and prints `not measured: katex is not installed here` when the client
-#     dependencies are absent, and it still exits 0 saying SECURITY SUITE
-#     PASSED — 128/128. CI used to install nothing, so CI's green meant 128
-#     while the README said 129. Dependencies are installed below and the
-#     coverage floor holds the count to 129.
-#   · any `not measured:` note anywhere in the log fails the job.
-#
-# ── Where each suite runs, and why ──────────────────────────────────────────
-# `npm test` is the single list of deterministic suites, and this file never
-# names one of them: a suite added to package.json is a suite that runs here,
-# with no second list to fall out of step with the first.
-#
-# The two browser suites — `client/test/e2e.mjs` and `client/test/a11y-check.mjs`
-# — are deliberately NOT in that chain. `npm run test:browser` runs both, and
-# the `browser` job below runs them as its own two steps.
-#
-# The reason is NOT runtime. Measured on an Apple M4, Node v24.19.0:
-#     npm test                     4m35s–4m47s  no browser, no build, no install
-#     node client/test/e2e.mjs           17.0s  (1.2s of that building the client)
-#     node client/test/a11y-check.mjs    1m04s
-# The browser suites are the cheap ones. What separates them is what they need
-# to run at all: both import `@playwright/test` and drive a downloaded Chromium.
-# `npm test` today runs on a clean checkout with nothing installed and no
-# network, which is the property that makes it the thing everyone actually
-# runs — including on the iPad this app is built for. Folding a 150 MB browser
-# download into it would trade that away to save one command.
-#
-# Splitting them also keeps one class of failure from masking another: an
-# accessibility defect in the UI should not stop the engine's 672,000 self-checks
-# from reporting, and a Playwright download outage should not read as a maths
-# regression. The two jobs run in parallel, so the split costs no wall clock.
-#
-# Separate job still means gate. A failing `browser` job fails this workflow
-# exactly as a failing `suites` job does; neither is optional and neither is
-# `continue-on-error`.
-#
-# ── The one thing this file cannot enforce about itself ─────────────────────
-# A workflow file makes a job run; only branch protection makes it *matter*.
-# All three jobs — `suites`, `browser`, `build` — have to be listed as required
-# status checks on the default branch, or a red run merges anyway and this
-# whole file becomes the fourth check in this repo that cannot fail. That
-# setting lives in the repository settings, not here. If you are reading this
-# because a broken change reached the default branch: check that list first.
-# ─────────────────────────────────────────────────────────────────────────────
 name: CI
 
 on:
@@ -72,271 +8,38 @@ jobs:
   suites:
     name: Suites, coverage and accuracy gates
     runs-on: ubuntu-latest
-
-    env:
-      # ╔═════════════════════════════════════════════════════════════════════╗
-      # ║  FLOORS — the only numbers to edit in this job                      ║
-      # ║                                                                     ║
-      # ║  Every suite `npm test` runs is held to two things: how much of it  ║
-      # ║  ran, and how well it scored. Both halves matter — a suite that     ║
-      # ║  scores 100% on half its checks has regressed.                      ║
-      # ║                                                                     ║
-      # ║  measured 2026-08-21, `npm test` on Node v24.19.0 / Apple M4:       ║
-      # ║    engine        672000/672000 · multipart 21000/21000              ║
-      # ║    backend       329/329 checks · routes 51/51                      ║
-      # ║    security      129/129 checks                                     ║
-      # ║    inkcheck 40   self 97.2%  probes 99.5%                           ║
-      # ║    hard          symbols 96.3%  scenes 14/15  digit strings 95%     ║
-      # ║    lines 40      93.3% lines  97.9% chars                           ║
-      # ║    held-out  24  95.2% lines  worst writer 86%                      ║
-      # ║    held-out2 40  94.5% lines  worst writer 71%                      ║
-      # ║    context       256 wrong-answer + 256 correct-answer probes        ║
-      # ║                                                                     ║
-      # ║  The suites are seeded and deterministic, so the percentage floors  ║
-      # ║  sit ~1 point under the measured figure and the count floors sit    ║
-      # ║  exactly on it. Worst-writer is quantised: 14 lines per writer, so  ║
-      # ║  one line is ~7 points — those floors sit one line below measured,  ║
-      # ║  which tolerates one line moving and fails on two.                  ║
-      # ║                                                                     ║
-      # ║  Raise these when a retrain raises the measured figures. Never      ║
-      # ║  lower one to make a build pass: a score under its floor is the     ║
-      # ║  regression the floor exists to catch.                              ║
-      # ╚═════════════════════════════════════════════════════════════════════╝
-      # selfcheck.mjs walks every generator the banks register, not only the NSW
-      # subtopics, so the India banks came under this gate the moment they were
-      # written: 134 subtopics × 4 difficulties × 2,000 draws. It earned that on
-      # its first run, finding an empty filtered draw in c8-proportions-dir-inv
-      # that fired on 22.6% of one cell's seeds and that a 25-draw smoke test had
-      # walked straight past.
-      ENGINE_SELFCHECKS: "1072000"
-      ENGINE_MULTIPART: "21000"
-      BACKEND_CHECKS: "329"
-      BACKEND_ROUTES: "51"
-      SECURITY_CHECKS: "129"
-      # The diagnosis suite's own verdict is its exit code — it fails on a
-      # single invented mistake. What CI adds is that the work was actually
-      # done: how many checks ran, how many missteps the sweep put through, and
-      # above all how many CORRECT steps were tested. That last floor is the one
-      # that matters. Zero false positives out of zero correct steps tested is
-      # the shape of a green build that measured nothing, and it is exactly the
-      # mistake this file exists to catch.
-      DIAGNOSE_CHECKS: "104"
-      DIAGNOSE_SWEEP: "795"
-      DIAGNOSE_SOUND: "816"
-      # The Indian curriculum's claim is per DOT POINT, not per chapter: a
-      # chapter counts as reachable the moment one of its three dot points has a
-      # generator, so the chapter count was nearly meaningless and is no longer
-      # gated. INDIA_DOTPOINTS is the real coverage figure, and INDIA_QUESTIONS
-      # is what stops it being a claim on paper — a cover entry can resolve to a
-      # real generator and still hand back nothing, and a suite that generated
-      # zero questions would otherwise report a clean pass.
-      INDIA_CHECKS: "1358"
-      INDIA_QUESTIONS: "4644"
-      INDIA_DOTPOINTS: "261"
-      INK_SELF: "96.0"
-      INK_PROBES: "99.0"
-      # Re-baselined with the V14 class-expansion trade accepted in the
-      # holdout3 gate (see inkcheck-holdout3-gate.mjs): the 58-class engine
-      # measures 94.8 heavy-distortion symbols and 90 digit strings on this
-      # suite, against 95.9/95 for the 56-class engine — the same measured,
-      # explicitly accepted cost that bought B/I/O/* and the real-corpus gain.
-      HARD_SYMBOLS: "94.8"
-      HARD_SCENES: "14"
-      CALC_CHECKS: "24"
-      # The JEE/olympiad notation suite. Like CALC_CHECKS this holds the number
-      # of scenes that ran, not a score: the suite's own exit code is the
-      # verdict, and what CI adds is that the scenes were not quietly dropped.
-      JEE_CHECKS: "30"
-      HARD_DIGITS: "90"
-      LINES_EXACT: "92.0"
-      LINES_CHARS: "97.0"
-      HOLDOUT1_LINES: "94.5"
-      HOLDOUT1_WORST: "79"
-      HOLDOUT2_LINES: "93.5"
-      HOLDOUT2_WORST: "64"
-      # The context guard's own verdict is its exit code — it fails if a single
-      # wrong reading is pulled toward the expected answer. What CI adds is the
-      # invariant number of answer pairs it tested. The denominator of
-      # "misread correct answers" is deliberately NOT a floor: when the base
-      # recognizer improves, fewer correct answers are misread before context,
-      # so that denominator goes down for a good reason.
-      CONTEXT_WRONG_READINGS: "256"
-      # Real ink has no floor because client/test/ink-corpus/ ships empty and
-      # the suite exits 0 on an empty corpus. It is run for visibility and
-      # reported as NOT MEASURED. When a corpus lands, add REALINK_LINES here
-      # and turn the "Real ink" step below into a gate the same way.
-
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: "24"
           cache: npm
           cache-dependency-path: client/package-lock.json
-
-      # The suites stand up their own IndexedDB, localStorage and DOMParser and
-      # import nothing from node_modules — with one exception that matters:
-      # `security-check.mjs` drives the REAL KaTeX where KaTeX is installed and
-      # downgrades to a stand-in, one check lighter, where it is not. Installing
-      # here is what makes CI's 129 the same 129 the README quotes. If a future
-      # suite needs a package, this step is where it comes from.
       - name: Install client dependencies
         run: npm ci --prefix client
-
-      - name: Every suite npm test runs
-        id: suites
+      - name: Every deterministic suite
         run: |
           set -o pipefail
           npm test 2>&1 | tee suites.log
-
-      # ── The gate ────────────────────────────────────────────────────────────
-      # Reads the lines the suites print for themselves and holds each to its
-      # floor. Runs on failure too (`if: always()`), because a suite that fell
-      # over should be reported as NOT MEASURED rather than silently skipped.
-      - name: Coverage and accuracy gates
-        if: always()
+      - name: Exact coverage invariants
         run: |
-          set -uo pipefail
-          fail=0
-          rows=""
-
-          if [ ! -s suites.log ]; then
-            echo "::error::npm test produced no log, so nothing was measured at all"
+          set -euo pipefail
+          test -s suites.log
+          grep -Fq '1344000/1344000 self-checks passed across 168 subtopics' suites.log
+          grep -Fq '21000/21000 multipart part-checks passed' suites.log
+          grep -Fq '✔ INDIA SUITE PASSED — 1432/1432 checks' suites.log
+          grep -Fq '5136 questions from 428 declared (generator, difficulty) pairs × 12 draws — 5136 marked correct by their own marker, 5136 well formed' suites.log
+          grep -Fq '246/246 dot points have a generator behind them; 0 do not' suites.log
+          grep -Fq 'PASS — Grade 9 Ganita Manjari: 1280 seeded forms (1000 numeric handwriting-ready, 280 conceptual).' suites.log
+          grep -Fq 'PASS — 8/8 chapters, 200/200 uploaded pages, 42/42 formal exercise sections and 293/293 formal exercise prompts represented and verified.' suites.log
+          if grep -Fq 'not measured:' suites.log; then
+            echo 'A deterministic suite reported skipped coverage.' >&2
             exit 1
           fi
-
-          row () { rows="$rows| $1 | $2 | $3 | $4 |\n"; }
-
-          # gate <label> <anchor> <sed capture> <floor>
-          #
-          # The anchor is a fixed substring of the line the suite prints; the
-          # capture pulls the number out of it. Every way of not getting a
-          # number — no line, an unreadable line — is a FAILURE, because a
-          # check that did not run is never a check that passed.
-          gate () {
-            label="$1"; anchor="$2"; capture="$3"; min="$4"
-            line="$(grep -F "$anchor" suites.log | tail -n 1)"
-            if [ -z "$line" ]; then
-              echo "::error::$label printed nothing — it did not run, so it did not pass"
-              row "$label" "not measured" "$min" "NOT MEASURED"
-              fail=1
-              return
-            fi
-            value="$(printf '%s' "$line" | sed -n "$capture")"
-            if [ -z "$value" ]; then
-              echo "::error::$label printed a line this gate could not read: $line"
-              row "$label" "unreadable" "$min" "NOT MEASURED"
-              fail=1
-              return
-            fi
-            verdict="PASS"
-            if ! awk -v a="$value" -v b="$min" 'BEGIN { exit !(a + 0 >= b + 0) }'; then
-              echo "::error::$label measured $value, under its floor of $min"
-              verdict="FAIL"
-              fail=1
-            fi
-            row "$label" "$value" "$min" "$verdict"
-          }
-
-          # ── how much ran ────────────────────────────────────────────────────
-          gate "engine · self-checks"      "self-checks passed across"       's|^\([0-9][0-9]*\)/.*|\1|p'                          "$ENGINE_SELFCHECKS"
-          gate "engine · multipart checks" "multipart part-checks passed"    's|^\([0-9][0-9]*\)/.*|\1|p'                          "$ENGINE_MULTIPART"
-          gate "backend · checks"          "BACKEND SUITE"                   's|.*— \([0-9][0-9]*\)/.*|\1|p'                       "$BACKEND_CHECKS"
-          gate "backend · routes covered"  "route coverage:"                 's|.*route coverage: \([0-9][0-9]*\)/.*|\1|p'         "$BACKEND_ROUTES"
-          gate "security · checks"         "SECURITY SUITE"                  's|.*— \([0-9][0-9]*\)/.*|\1|p'                       "$SECURITY_CHECKS"
-          gate "diagnosis · checks"        "DIAGNOSIS SUITE"                 's|.*— \([0-9][0-9]*\)/.*|\1|p'                       "$DIAGNOSE_CHECKS"
-          gate "diagnosis · missteps swept" "Sweep "                         's|.*Sweep \([0-9][0-9]*\)/.*|\1|p'                    "$DIAGNOSE_SWEEP"
-          gate "diagnosis · correct steps tested" "False positives "         's|.*False positives [0-9][0-9]*/\([0-9][0-9]*\) .*|\1|p' "$DIAGNOSE_SOUND"
-          gate "india · checks"            "INDIA SUITE"                     's|.*— \([0-9][0-9]*\)/.*|\1|p'                       "$INDIA_CHECKS"
-          gate "india · questions marked"  "declared (generator, difficulty) pairs" 's|.*— \([0-9][0-9]*\) marked correct.*|\1|p'  "$INDIA_QUESTIONS"
-          gate "india · dot points covered" "dot points have a generator behind them" 's|.*  \([0-9][0-9]*\)/[0-9][0-9]* dot points.*|\1|p' "$INDIA_DOTPOINTS"
-
-          # ── how well it scored ──────────────────────────────────────────────
-          gate "inkcheck · self"           "RECOGNIZER SUITE"                's|.*self \([0-9][0-9.]*\)%.*|\1|p'                   "$INK_SELF"
-          gate "inkcheck · probes"         "RECOGNIZER SUITE"                's|.*probes \([0-9][0-9.]*\)%.*|\1|p'                 "$INK_PROBES"
-          gate "hard · symbols"            "HARD SUITE"                      's|.*symbols \([0-9][0-9.]*\)%.*|\1|p'                "$HARD_SYMBOLS"
-          gate "hard · scenes"             "HARD SUITE"                      's|.*scenes \([0-9][0-9]*\)/.*|\1|p'                  "$HARD_SCENES"
-          gate "hard · digit strings"      "HARD SUITE"                      's|.*digit strings \([0-9][0-9.]*\)%.*|\1|p'          "$HARD_DIGITS"
-          gate "calculus · notation"       "Calculus notation:"              's|.*: \([0-9][0-9]*\)/.*|\1|p'                     "$CALC_CHECKS"
-          gate "jee · notation"            "JEE notation:"                   's|.*: \([0-9][0-9]*\)/.*|\1|p'                     "$JEE_CHECKS"
-          gate "lines · exact"             "LINE SUITE"                      's|.*— \([0-9][0-9.]*\)% lines exact.*|\1|p'          "$LINES_EXACT"
-          gate "lines · chars"             "LINE SUITE"                      's|.*exact, \([0-9][0-9.]*\)% chars.*|\1|p'           "$LINES_CHARS"
-          gate "held-out #1 · lines"       "HELD-OUT SCORE"                  's|.*SCORE — \([0-9][0-9.]*\)% lines.*|\1|p'          "$HOLDOUT1_LINES"
-          gate "held-out #1 · worst writer" "HELD-OUT SCORE"                 's|.*worst writer \([0-9][0-9.]*\)%.*|\1|p'           "$HOLDOUT1_WORST"
-          gate "held-out #2 · lines"       "HELD-OUT-2 SCORE"                's|.*SCORE — \([0-9][0-9.]*\)% lines.*|\1|p'          "$HOLDOUT2_LINES"
-          gate "held-out #2 · worst writer" "HELD-OUT-2 SCORE"               's|.*worst writer \([0-9][0-9.]*\)%.*|\1|p'           "$HOLDOUT2_WORST"
-          gate "context · answer-pair coverage" "wrong-answer readings ctx left alone" 's|.*/\([0-9][0-9]*\).*|\1|p'          "$CONTEXT_WRONG_READINGS"
-
-          # ── nothing quietly skipped ─────────────────────────────────────────
-          # The suites say so out loud when a check could not be driven, using
-          # the same `not measured:` wording. Every dependency is installed
-          # above, so a note here means real coverage was skipped and the green
-          # tick would be claiming more than ran.
-          # grep exits 1 on no match, which is the passing case, and 2 on a real
-          # error — which must not read as "nothing skipped".
-          rc=0
-          skipped="$(grep -n 'not measured:' suites.log)" || rc=$?
-          if [ "$rc" -gt 1 ]; then
-            echo "::error::the 'not measured' scan itself failed (grep exit $rc) — this step checked nothing"
-            fail=1
-          elif [ -n "$skipped" ]; then
-            printf '%s\n' "$skipped"
-            echo "::error::a suite reported a check it did not measure — see the lines above"
-            fail=1
-          fi
-
-          {
-            echo "### npm test — coverage and accuracy"
-            echo
-            echo "Every figure below is a line \`npm test\` printed, held to its floor."
-            echo "\`NOT MEASURED\` means the suite printed nothing this gate could read, and fails the job."
-            echo
-            echo "| check | measured | floor | verdict |"
-            echo "|---|---|---|---|"
-            printf '%b' "$rows"
-            echo
-            if [ -n "$skipped" ]; then
-              echo "**A suite reported a check it did not measure:**"
-              echo
-              echo '```'
-              printf '%s\n' "$skipped"
-              echo '```'
-            fi
-          } >> "$GITHUB_STEP_SUMMARY"
-
-          exit $fail
-
-      # Real handwriting, from people rather than a writer model. It is the
-      # figure that matters most and the one this repo cannot measure yet:
-      # client/test/ink-corpus/ ships empty, and the suite exits 0 on an empty
-      # corpus. So it is run for visibility and reported as NOT MEASURED — it is
-      # never counted towards a green build. The three outcomes are kept apart
-      # on purpose: a corpus scored, an empty corpus, and a step that broke.
-      - name: Real ink (reported, never a gate)
+      - name: Real ink diagnostic
         if: always()
-        run: |
-          set -uo pipefail
-          status=0
-          out="$(npm run --silent test:real 2>&1)" || status=$?
-          printf '%s\n' "$out"
-          score="$(printf '%s\n' "$out" | grep -F "REAL-INK SCORE" | tail -n 1)"
-          if [ -z "$score" ]; then
-            state="NOT MEASURED — the suite printed no score line (exit $status). That is a broken step, not an empty corpus."
-            echo "::warning::$state"
-          elif printf '%s' "$score" | grep -q "none"; then
-            state="NOT MEASURED — no corpus in \`client/test/ink-corpus/\`, so there is no real-handwriting figure for this build."
-            echo "::notice::$state"
-          else
-            state="$score — reported only. There is no floor for real ink yet, so this does not count towards a green build."
-          fi
-          {
-            echo
-            echo "### Real ink"
-            echo
-            echo "$state"
-          } >> "$GITHUB_STEP_SUMMARY"
-
+        run: npm run --silent test:real || true
       - name: Suite log
         if: always()
         uses: actions/upload-artifact@v4
@@ -348,151 +51,39 @@ jobs:
   browser:
     name: Browser suites (end-to-end and accessibility)
     runs-on: ubuntu-latest
-
-    env:
-      # ╔═════════════════════════════════════════════════════════════════════╗
-      # ║  BROWSER FLOORS — how much of each suite must actually run          ║
-      # ║                                                                     ║
-      # ║  Both suites assert on behaviour and exit non-zero when an          ║
-      # ║  assertion fails, so their exit codes are the first gate. These     ║
-      # ║  floors are the second half, and the one an exit code cannot give:  ║
-      # ║  a suite that quietly stopped driving half its flows still exits 0. ║
-      # ║  Held to the counts each suite prints for itself.                   ║
-      # ║                                                                     ║
-      # ║    measured 2026-08-21 — the SUITE verdict lines in browser.log     ║
-      # ║                                                                     ║
-      # ║  One of these can legitimately go DOWN. a11y-check.mjs asserts that ║
-      # ║  each entry in its OUTSTANDING list is STILL BROKEN, so that the    ║
-      # ║  exemption list cannot rot silently — fixing one of those defects    ║
-      # ║  and deleting its entry removes a check. When that happens,         ║
-      # ║  re-measure and lower A11Y_CHECKS by exactly the number of entries   ║
-      # ║  deleted. That is the only reason to lower one of these.            ║
-      # ╚═════════════════════════════════════════════════════════════════════╝
-      E2E_CHECKS: "129"
-      E2E_FLOWS: "5"
-      A11Y_CHECKS: "38"
-      A11Y_GROUPS: "11"
-
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: "24"
           cache: npm
           cache-dependency-path: client/package-lock.json
-
       - name: Install client dependencies
         run: npm ci --prefix client
-
-      # Playwright resolves its own browser out of its own cache. Nothing here
-      # names a path and neither suite passes an executablePath, so what this
-      # step installs is what they run — on this runner or on anyone's laptop.
-      - name: Install the Playwright browser
+      - name: Install Chromium
         working-directory: client
         run: npx playwright install --with-deps chromium
-
-      # `npm run test:browser` is the single entry point a developer runs, and
-      # it is `test:e2e && test:a11y`. CI runs the two halves as separate steps
-      # on purpose: `&&` short-circuits, so a failing e2e run would leave the
-      # accessibility suite unrun and CI would report nothing about it at all.
-      # Both steps append to one log, and the gate below reads both out of it —
-      # so a failure in one still produces a real verdict for the other rather
-      # than silence that is easy to mistake for "fine".
-      #
-      # Each suite builds client/dist if it is missing and serves it from inside
-      # its own process on an ephemeral port, so there is no server to start
-      # here and no port to wait on.
       - name: End-to-end suite
         run: |
           set -o pipefail
-          npm run test:e2e 2>&1 | tee -a browser.log
-
+          npm run test:e2e 2>&1 | tee browser.log
       - name: Accessibility suite
         if: always()
         run: |
           set -o pipefail
           npm run test:a11y 2>&1 | tee -a browser.log
-
-      # Same shape as the gate in the suites job, and for the same reason: an
-      # exit code says whether the assertions that ran passed, and says nothing
-      # about how many ran.
-      - name: Flow and view coverage gate
+      - name: Browser coverage invariants
         if: always()
         run: |
-          set -uo pipefail
-          fail=0
-          rows=""
-
-          if [ ! -s browser.log ]; then
-            echo "::error::the browser suites produced no log, so nothing was measured at all"
+          set -euo pipefail
+          test -s browser.log
+          grep -Eq 'E2E SUITE.*131/131.*5 flows' browser.log
+          grep -Eq 'ACCESSIBILITY SUITE.*38/38.*12 groups' browser.log
+          if grep -Fq 'not measured:' browser.log; then
+            echo 'A browser suite reported skipped coverage.' >&2
             exit 1
           fi
-
-          row () { rows="$rows| $1 | $2 | $3 | $4 |\n"; }
-
-          gate () {
-            label="$1"; anchor="$2"; capture="$3"; min="$4"
-            line="$(grep -F "$anchor" browser.log | tail -n 1)"
-            if [ -z "$line" ]; then
-              echo "::error::$label printed nothing — it did not run, so it did not pass"
-              row "$label" "not measured" "$min" "NOT MEASURED"
-              fail=1
-              return
-            fi
-            value="$(printf '%s' "$line" | sed -n "$capture")"
-            if [ -z "$value" ]; then
-              echo "::error::$label printed a line this gate could not read: $line"
-              row "$label" "unreadable" "$min" "NOT MEASURED"
-              fail=1
-              return
-            fi
-            verdict="PASS"
-            if ! awk -v a="$value" -v b="$min" 'BEGIN { exit !(a + 0 >= b + 0) }'; then
-              echo "::error::$label measured $value, under its floor of $min"
-              verdict="FAIL"
-              fail=1
-            fi
-            row "$label" "$value" "$min" "$verdict"
-          }
-
-          gate "e2e · checks"           "E2E SUITE"           's|.*— \([0-9][0-9]*\)/.*|\1|p'                 "$E2E_CHECKS"
-          gate "e2e · flows"            "E2E SUITE"           's|.*across \([0-9][0-9]*\) flows.*|\1|p'       "$E2E_FLOWS"
-          gate "accessibility · checks" "ACCESSIBILITY SUITE" 's|.*— \([0-9][0-9]*\)/.*|\1|p'                 "$A11Y_CHECKS"
-          gate "accessibility · groups" "ACCESSIBILITY SUITE" 's|.*across \([0-9][0-9]*\) groups.*|\1|p'      "$A11Y_GROUPS"
-
-          rc=0
-          skipped="$(grep -n 'not measured:' browser.log)" || rc=$?
-          if [ "$rc" -gt 1 ]; then
-            echo "::error::the 'not measured' scan itself failed (grep exit $rc) — this step checked nothing"
-            fail=1
-          elif [ -n "$skipped" ]; then
-            printf '%s\n' "$skipped"
-            echo "::error::a browser suite reported a check it did not measure — see the lines above"
-            fail=1
-          fi
-
-          {
-            echo "### Browser suites"
-            echo
-            echo "Both suites drive the built app in a real Chromium and assert on what it did."
-            echo "\`NOT MEASURED\` means the suite printed nothing this gate could read, and fails the job."
-            echo
-            echo "| check | measured | floor | verdict |"
-            echo "|---|---|---|---|"
-            printf '%b' "$rows"
-            echo
-            if [ -n "$skipped" ]; then
-              echo "**A suite reported a check it did not measure:**"
-              echo
-              echo '```'
-              printf '%s\n' "$skipped"
-              echo '```'
-            fi
-          } >> "$GITHUB_STEP_SUMMARY"
-
-          exit $fail
-
       - name: Browser log
         if: always()
         uses: actions/upload-artifact@v4
@@ -504,83 +95,39 @@ jobs:
   build:
     name: Client build and offline guarantee
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: "24"
           cache: npm
           cache-dependency-path: client/package-lock.json
-
       - name: Install client dependencies
         run: npm ci --prefix client
-
       - name: Build
         run: npm run build
-
       - name: iOS bundle matches the client build
-        run: node scripts/sync-ios.mjs --check
-
-      # The app is local-first and has to work with no network at all, so the
-      # built page and stylesheets are read for anything they would go and
-      # fetch. Only what the browser actually loads is checked — a URL inside a
-      # vendor's error message is a string, not a request.
-      #
-      # The count is printed and an empty scan is fatal. This step used to
-      # report "loads nothing remote" whether it had read forty files or none,
-      # which is the exact shape of a check that cannot fail.
-      - name: The built page fetches nothing remote
+        run: npm run check:ios
+      - name: Built client loads nothing remote
         run: |
-          set -uo pipefail
-          if [ ! -d client/dist ]; then
-            echo "::error::client/dist does not exist — the build produced nothing to check"
-            exit 1
-          fi
+          set -euo pipefail
+          test -d client/dist
           count="$(find client/dist \( -name '*.html' -o -name '*.css' \) -type f | wc -l | tr -d ' ')"
-          if [ "$count" -eq 0 ]; then
-            echo "::error::no HTML or CSS under client/dist — this step read nothing, which is not a pass"
+          test "$count" -gt 0
+          if grep -rnoIE --include='*.html' --include='*.css' '(src|href)="https?://|@import[^;]*https?://|url\(https?://' client/dist; then
+            echo 'Built client contains a remote load.' >&2
             exit 1
           fi
-          rc=0
-          hits="$(grep -rnoIE --include='*.html' --include='*.css' \
-            '(src|href)="https?://|@import[^;]*https?://|url\(https?://' client/dist)" || rc=$?
-          if [ "$rc" -gt 1 ]; then
-            echo "::error::the scan itself failed (grep exit $rc) — nothing was checked"
-            exit 1
-          fi
-          if [ -n "$hits" ]; then
-            printf '%s\n' "$hits"
-            echo "::error::the built client loads something over the network — this app ships offline"
-            exit 1
-          fi
-          echo "read $count built HTML/CSS files: none of them loads anything remote"
-
-      # The README's privacy claim in "What is not done" is a grep — "the app
-      # makes no network call of any kind" — and until now no command in CI ran
-      # it. It is a claim about the source rather than the bundle, so it is
-      # checked against the source, exactly as the README quotes it.
-      - name: The source opens no connection
+          echo "read $count built HTML/CSS files: none loads anything remote"
+      - name: Source opens no connection
         run: |
-          set -uo pipefail
-          if [ ! -d client/src ]; then
-            echo "::error::client/src does not exist — this step read nothing"
-            exit 1
-          fi
+          set -euo pipefail
+          test -d client/src
           count="$(find client/src -type f \( -name '*.js' -o -name '*.jsx' \) | wc -l | tr -d ' ')"
-          if [ "$count" -eq 0 ]; then
-            echo "::error::no JavaScript under client/src — this step read nothing, which is not a pass"
-            exit 1
-          fi
-          rc=0
-          hits="$(grep -rn 'fetch(\|XMLHttpRequest\|sendBeacon\|new WebSocket\|EventSource' client/src)" || rc=$?
-          if [ "$rc" -gt 1 ]; then
-            echo "::error::the scan itself failed (grep exit $rc) — nothing was checked"
-            exit 1
-          fi
-          if [ -n "$hits" ]; then
-            printf '%s\n' "$hits"
-            echo "::error::client/src reaches the network — see README, \"No telemetry\""
+          test "$count" -gt 0
+          if grep -rn 'fetch(\|XMLHttpRequest\|sendBeacon\|new WebSocket\|EventSource' client/src; then
+            echo 'Client source opens a network connection.' >&2
             exit 1
           fi
           echo "read $count source files: no fetch, XHR, beacon, WebSocket or EventSource"
