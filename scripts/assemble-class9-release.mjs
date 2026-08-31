@@ -1,0 +1,57 @@
+import fs from 'node:fs';
+import { execFileSync } from 'node:child_process';
+
+const run = (cmd,args=[]) => {
+  console.log(`\n$ ${cmd} ${args.join(' ')}`);
+  execFileSync(cmd,args,{stdio:'inherit'});
+};
+
+const indexPath='client/src/engine/generators/index.js';
+let index=fs.readFileSync(indexPath,'utf8');
+const anchor="  'c9-statistics-grouped': 'india-junior',\n";
+const bankLines=[
+  "  'c9-coordinate-geometry-ncert-mastery': 'india-junior',",
+  "  'c9-linear-polynomials-ncert-mastery': 'india-junior',",
+  "  'c9-number-systems-ncert-mastery': 'india-junior',",
+  "  'c9-algebraic-identities-ncert-mastery': 'india-junior',",
+  "  'c9-circles-ncert-mastery': 'india-junior',",
+  "  'c9-perimeter-area-ncert-mastery': 'india-junior',",
+  "  'c9-probability-ncert-mastery': 'india-junior',",
+  "  'c9-sequences-progressions-ncert-mastery': 'india-junior',"
+].join('\n')+'\n';
+if(!index.includes(bankLines)){
+  if(!index.includes(anchor)) throw new Error('Class 9 bank-routing anchor missing');
+  index=index.replace(anchor,anchor+bankLines);
+  fs.writeFileSync(indexPath,index);
+}
+
+const pkgPath='package.json';
+const pkg=JSON.parse(fs.readFileSync(pkgPath,'utf8'));
+pkg.scripts['test:ncert:class9']='node client/test/ncert-class9-check.mjs';
+if(!pkg.scripts.test.includes('npm run test:ncert:class9')) pkg.scripts.test=pkg.scripts.test.replace('npm run test:ncert:class8:rest && npm run test:explain','npm run test:ncert:class8:rest && npm run test:ncert:class9 && npm run test:explain');
+fs.writeFileSync(pkgPath,JSON.stringify(pkg,null,2)+'\n');
+
+for(const f of ['client/src/engine/ncert/class9-generators.js','client/src/engine/ncert/class9-content.js','client/src/engine/ncert/class9-chapters-production.js','client/test/ncert-class9-check.mjs']) run('node',['--check',f]);
+run('npm',['run','test:ncert:class9']);
+run('npm',['run','test:india']);
+run('npm',['run','test:ncert:rational']);
+run('npm',['run','test:ncert:linear']);
+run('npm',['run','test:ncert:class8:rest']);
+run('npm',['run','test:engine']);
+run('npm',['run','test:explain']);
+run('npm',['run','test:ink:bridge']);
+run('npm',['run','test:photo:bridge']);
+run('npm',['run','test:ink:interaction']);
+run('npm',['run','build']);
+run('npm',['run','sync:ios']);
+run('npm',['run','check:ios']);
+
+run('git',['config','user.name','github-actions[bot]']);
+run('git',['config','user.email','41898282+github-actions[bot]@users.noreply.github.com']);
+run('git',['add',indexPath,pkgPath,'ios']);
+let dirty=true;
+try { execFileSync('git',['diff','--cached','--quiet']); dirty=false; } catch {}
+if(dirty){
+  run('git',['commit','-m','Assemble Grade 9 release and sync iPad bundles [class9-assembled]']);
+  run('git',['push','origin','HEAD:feature/ncert-class9-complete']);
+} else console.log('No assembled changes to commit.');
