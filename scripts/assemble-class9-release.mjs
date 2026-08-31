@@ -27,13 +27,23 @@ if(!index.includes(bankLines)){
 
 const generatorPath='client/src/engine/ncert/class9-generators.js';
 let generators=fs.readFileSync(generatorPath,'utf8');
-const oldCircle="const r=pick(rng,[5,10,13,17]),d=pick(rng,[3,4,5,8,12,15].filter(x=>x<r)),half=Math.sqrt(r*r-d*d),chord=2*half;";
-const exactCircle="const [r,d,half]=pick(rng,[[5,3,4],[10,6,8],[13,5,12],[17,8,15]]),chord=2*half;";
-if(generators.includes(oldCircle)){
-  generators=generators.replace(oldCircle,exactCircle);
-  fs.writeFileSync(generatorPath,generators);
-}
-if(!generators.includes(exactCircle)) throw new Error('Exact circle chord generator patch was not applied');
+const patches=[
+  [
+    "const r=pick(rng,[5,10,13,17]),d=pick(rng,[3,4,5,8,12,15].filter(x=>x<r)),half=Math.sqrt(r*r-d*d),chord=2*half;",
+    "const [r,d,half]=pick(rng,[[5,3,4],[10,6,8],[13,5,12],[17,8,15]]),chord=2*half;"
+  ],
+  [
+    "const r=pick(rng,[7,14,21]),theta=pick(rng,[60,90,120,180,270]),L=2*22/7*r*theta/360;",
+    "const r=pick(rng,[7,14,21]),theta=pick(rng,[90,180,270]),L=2*22/7*r*theta/360;"
+  ],
+  [
+    "const r=pick(rng,[7,14]),theta=pick(rng,[60,90,120]),sector=22/7*r*r*theta/360;",
+    "const r=pick(rng,[7,14]),theta=pick(rng,[90,180]),sector=22/7*r*r*theta/360;"
+  ]
+];
+for(const [from,to] of patches){ if(generators.includes(from)) generators=generators.replace(from,to); }
+for(const [,to] of patches){ if(!generators.includes(to)) throw new Error(`Generator safety patch missing: ${to}`); }
+fs.writeFileSync(generatorPath,generators);
 
 const pkgPath='package.json';
 const pkg=JSON.parse(fs.readFileSync(pkgPath,'utf8'));
