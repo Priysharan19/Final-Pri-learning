@@ -69,18 +69,6 @@ pkg.scripts['test:ncert:class9']='node client/test/ncert-class9-check.mjs';
 if(!pkg.scripts.test.includes('npm run test:ncert:class9')) pkg.scripts.test=pkg.scripts.test.replace('npm run test:ncert:class8:rest && npm run test:explain','npm run test:ncert:class8:rest && npm run test:ncert:class9 && npm run test:explain');
 fs.writeFileSync(pkgPath,JSON.stringify(pkg,null,2)+'\n');
 
-const ciPath='.github/workflows/ci.yml';
-let ci=fs.readFileSync(ciPath,'utf8');
-const floors={
-  'ENGINE_SELFCHECKS: "1072000"':'ENGINE_SELFCHECKS: "1344000"',
-  'INDIA_CHECKS: "1358"':'INDIA_CHECKS: "1432"',
-  'INDIA_QUESTIONS: "4644"':'INDIA_QUESTIONS: "5136"',
-  'INDIA_DOTPOINTS: "261"':'INDIA_DOTPOINTS: "246"'
-};
-for(const [from,to] of Object.entries(floors)) if(ci.includes(from)) ci=ci.replaceAll(from,to);
-for(const to of Object.values(floors)) if(!ci.includes(to)) throw new Error(`CI floor update missing: ${to}`);
-fs.writeFileSync(ciPath,ci);
-
 for(const f of [generatorPath,'client/src/engine/ncert/class9-content.js','client/src/engine/ncert/class9-chapters-production.js','client/test/ncert-class9-check.mjs']) run('node',['--check',f]);
 run('npm',['run','test:ncert:class9']);
 run('npm',['run','test:india']);
@@ -98,7 +86,7 @@ run('npm',['run','check:ios']);
 
 run('git',['config','user.name','github-actions[bot]']);
 run('git',['config','user.email','41898282+github-actions[bot]@users.noreply.github.com']);
-run('git',['add',indexPath,generatorPath,pkgPath,ciPath,'ios']);
+run('git',['add',indexPath,generatorPath,pkgPath,'ios']);
 let dirty=true;
 try { execFileSync('git',['diff','--cached','--quiet']); dirty=false; } catch {}
 if(dirty){
