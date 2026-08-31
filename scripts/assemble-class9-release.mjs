@@ -25,13 +25,23 @@ if(!index.includes(bankLines)){
   fs.writeFileSync(indexPath,index);
 }
 
+const generatorPath='client/src/engine/ncert/class9-generators.js';
+let generators=fs.readFileSync(generatorPath,'utf8');
+const oldCircle="const r=pick(rng,[5,10,13,17]),d=pick(rng,[3,4,5,8,12,15].filter(x=>x<r)),half=Math.sqrt(r*r-d*d),chord=2*half;";
+const exactCircle="const [r,d,half]=pick(rng,[[5,3,4],[10,6,8],[13,5,12],[17,8,15]]),chord=2*half;";
+if(generators.includes(oldCircle)){
+  generators=generators.replace(oldCircle,exactCircle);
+  fs.writeFileSync(generatorPath,generators);
+}
+if(!generators.includes(exactCircle)) throw new Error('Exact circle chord generator patch was not applied');
+
 const pkgPath='package.json';
 const pkg=JSON.parse(fs.readFileSync(pkgPath,'utf8'));
 pkg.scripts['test:ncert:class9']='node client/test/ncert-class9-check.mjs';
 if(!pkg.scripts.test.includes('npm run test:ncert:class9')) pkg.scripts.test=pkg.scripts.test.replace('npm run test:ncert:class8:rest && npm run test:explain','npm run test:ncert:class8:rest && npm run test:ncert:class9 && npm run test:explain');
 fs.writeFileSync(pkgPath,JSON.stringify(pkg,null,2)+'\n');
 
-for(const f of ['client/src/engine/ncert/class9-generators.js','client/src/engine/ncert/class9-content.js','client/src/engine/ncert/class9-chapters-production.js','client/test/ncert-class9-check.mjs']) run('node',['--check',f]);
+for(const f of [generatorPath,'client/src/engine/ncert/class9-content.js','client/src/engine/ncert/class9-chapters-production.js','client/test/ncert-class9-check.mjs']) run('node',['--check',f]);
 run('npm',['run','test:ncert:class9']);
 run('npm',['run','test:india']);
 run('npm',['run','test:ncert:rational']);
@@ -48,7 +58,7 @@ run('npm',['run','check:ios']);
 
 run('git',['config','user.name','github-actions[bot]']);
 run('git',['config','user.email','41898282+github-actions[bot]@users.noreply.github.com']);
-run('git',['add',indexPath,pkgPath,'ios']);
+run('git',['add',indexPath,generatorPath,pkgPath,'ios']);
 let dirty=true;
 try { execFileSync('git',['diff','--cached','--quiet']); dirty=false; } catch {}
 if(dirty){
