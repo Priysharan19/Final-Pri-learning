@@ -39,6 +39,10 @@ const patches=[
   [
     "const r=pick(rng,[7,14]),theta=pick(rng,[60,90,120]),sector=22/7*r*r*theta/360;",
     "const r=pick(rng,[7,14]),theta=pick(rng,[90,180]),sector=22/7*r*r*theta/360;"
+  ],
+  [
+    "['Sample space','$\\\\{1,2,3,4,5,6\\\\}$']",
+    "['Sample space','Outcomes: 1, 2, 3, 4, 5, 6']"
   ]
 ];
 for(const [from,to] of patches){ if(generators.includes(from)) generators=generators.replace(from,to); }
