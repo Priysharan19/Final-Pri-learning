@@ -2,14 +2,14 @@ name: Temporary Class 9 release assembly
 
 on:
   push:
-    branches: [feature/ncert-class9-complete]
+    branches:
+      - feature/ncert-class9-complete
 
 permissions:
   contents: write
 
 jobs:
   assemble-and-verify:
-    if: ${{ !contains(github.event.head_commit.message, '[class9-assembled]') }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -23,6 +23,7 @@ jobs:
           cache: npm
           cache-dependency-path: client/package-lock.json
       - name: Register Class 9 bank routing and permanent test
+        shell: bash
         run: |
           python3 - <<'PY'
           from pathlib import Path
@@ -40,9 +41,7 @@ jobs:
 """
           if block not in s:
               if anchor not in s: raise SystemExit('generator routing anchor missing')
-              s=s.replace(anchor,anchor+block)
-              p.write_text(s)
-
+              p.write_text(s.replace(anchor,anchor+block))
           p=Path('package.json')
           s=p.read_text()
           if '"test:ncert:class9"' not in s:
@@ -58,7 +57,7 @@ jobs:
           node --check client/src/engine/ncert/class9-content.js
           node --check client/src/engine/ncert/class9-chapters-production.js
           node --check client/test/ncert-class9-check.mjs
-      - name: Grade 9 source, answer, bank and solution audit
+      - name: Grade 9 source answer bank and solution audit
         run: npm run test:ncert:class9
       - name: India curriculum integration
         run: npm run test:india
