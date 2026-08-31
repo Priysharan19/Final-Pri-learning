@@ -78,8 +78,8 @@ jobs:
         run: |
           set -euo pipefail
           test -s browser.log
-          grep -Eq 'E2E SUITE.*129/129.*5 flows' browser.log
-          grep -Eq 'ACCESSIBILITY SUITE.*38/38.*11 groups' browser.log
+          grep -Eq 'E2E SUITE.*131/131.*5 flows' browser.log
+          grep -Eq 'ACCESSIBILITY SUITE.*38/38.*12 groups' browser.log
           if grep -Fq 'not measured:' browser.log; then
             echo 'A browser suite reported skipped coverage.' >&2
             exit 1
