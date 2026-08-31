@@ -72,10 +72,10 @@ fs.writeFileSync(pkgPath,JSON.stringify(pkg,null,2)+'\n');
 const ciPath='.github/workflows/ci.yml';
 let ci=fs.readFileSync(ciPath,'utf8');
 const floors={
-  'ENGINE_SELFCHECKS: 1072000':'ENGINE_SELFCHECKS: 1344000',
-  'INDIA_CHECKS: 1358':'INDIA_CHECKS: 1432',
-  'INDIA_QUESTIONS: 4644':'INDIA_QUESTIONS: 5136',
-  'INDIA_DOTPOINTS: 261':'INDIA_DOTPOINTS: 246'
+  'ENGINE_SELFCHECKS: "1072000"':'ENGINE_SELFCHECKS: "1344000"',
+  'INDIA_CHECKS: "1358"':'INDIA_CHECKS: "1432"',
+  'INDIA_QUESTIONS: "4644"':'INDIA_QUESTIONS: "5136"',
+  'INDIA_DOTPOINTS: "261"':'INDIA_DOTPOINTS: "246"'
 };
 for(const [from,to] of Object.entries(floors)) if(ci.includes(from)) ci=ci.replaceAll(from,to);
 for(const to of Object.values(floors)) if(!ci.includes(to)) throw new Error(`CI floor update missing: ${to}`);
