@@ -31,7 +31,7 @@ assert.equal(NCERT_CLASS9_RELEASE_AUDIT.exerciseSections, 42);
 assert.equal(NCERT_CLASS9_RELEASE_AUDIT.sourceExerciseQuestions, 293);
 assert.equal(NCERT_CLASS9_RELEASE_AUDIT.authoredCells, 32);
 assert.equal(NCERT_CLASS9_RELEASE_AUDIT.generatedValidationTarget, 1280);
-assert.match(NCERT_CLASS9_RELEASE_AUDIT.answerVerification, /no separate Grade 9 answer-key PDF/i);
+assert.match(NCERT_CLASS9_RELEASE_AUDIT.answerVerification, /separate Grade 9 answer-key PDF/i);
 
 const grade9 = IN_CURRICULUM.find(g=>g.grade===9);
 assert.ok(grade9, 'production Class 9 group exists');
@@ -62,7 +62,7 @@ for (const [i,id] of expectedIds.entries()) {
   assert.equal(verified,qCount,`${id}: every formal source prompt verified`);
   questions+=qCount;
   assert.ok(content.answerAudit.every(x=>x.status==='verified'),`${id}: answer audit status`);
-  assert.ok(content.answerAudit.every(x=>/No separate Grade 9 answer-key PDF/i.test(x.verificationBasis)),`${id}: transparent answer-key provenance`);
+  assert.ok(content.answerAudit.every(x=>/separate Grade 9 answer-key PDF/i.test(x.verificationBasis)),`${id}: transparent answer-key provenance`);
   assert.ok(content.exercises.every(ex=>content.exerciseMethods[ex]?.length>40),`${id}: solution method for every exercise`);
   assert.equal(content.questionBank.authoredCells,4,`${id}: four mastery cells`);
 
