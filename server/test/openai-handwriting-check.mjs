@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
 import {
   extractResponseText,
   normalizePriText,
@@ -29,7 +31,7 @@ function openAIResponse(payload, id = 'resp_test') {
 function makeFetch(payloads, calls) {
   let index = 0;
   return async (url, init) => {
-    calls.push({ url, body: JSON.parse(init.body), headers: init.headers });
+    calls.push({ url, body: JSON.parse(init.body), headers: init.headers, signal: init.signal });
     const payload = payloads[index++];
     if (!payload) throw new Error('unexpected extra OpenAI call');
     return openAIResponse(payload, `resp_${index}`);
@@ -59,6 +61,8 @@ assert.equal(extractResponseText({
 
 // A confident Terra read is one request, answer-blind, store:false, image-only
 // apart from the stable transcription instruction. It must not "fix" wrong math.
+// OCR uses no reasoning and high-detail image input: the latency-oriented GPT-5.6
+// configuration deliberately avoids paying reasoning time for visual extraction.
 {
   const calls = [];
   const result = await transcribeMathHandwriting(image, {
@@ -68,12 +72,16 @@ assert.equal(extractResponseText({
   assert.equal(calls.length, 1);
   assert.equal(calls[0].body.model, 'gpt-5.6-terra');
   assert.equal(calls[0].body.store, false);
+  assert.equal(calls[0].body.reasoning.effort, 'none');
+  assert.equal(calls[0].body.max_output_tokens, 900);
   assert.equal(calls[0].body.input[0].content[1].type, 'input_image');
-  assert.equal(calls[0].body.input[0].content[1].detail, 'original');
+  assert.equal(calls[0].body.input[0].content[1].detail, 'high');
   assert.equal(calls[0].body.text.format.type, 'json_schema');
   assert.equal(result.text, '2+2=5');
   assert.equal(result.needsConfirmation, false);
   assert.equal(result.engine, 'openai-gpt-5.6-terra');
+  assert.equal(result.usage.length, 1);
+  assert.equal(typeof result.usage[0].latencyMs, 'number');
 }
 
 // A doubtful Terra read escalates to Sol. Agreement plus a strong fallback is
@@ -89,6 +97,7 @@ assert.equal(extractResponseText({
   });
   assert.equal(calls.length, 2);
   assert.equal(calls[1].body.model, 'gpt-5.6-sol');
+  assert.equal(calls[1].body.reasoning.effort, 'none');
   assert.equal(result.text, 'theta=(3pi)/(4)');
   assert.equal(result.needsConfirmation, false);
   assert.equal(result.engine, 'openai-gpt-5.6-sol');
@@ -111,6 +120,46 @@ assert.equal(extractResponseText({
   assert.equal(result.needsConfirmation, true);
   assert.equal(result.minConf, 0);
   assert.equal(result.candidateReadings.length, 2);
+}
+
+// A cancelled browser/gateway request must actually abort the OpenAI request,
+// not merely ignore the eventual result after paying its full latency/cost.
+{
+  const controller = new AbortController();
+  let upstreamSignal = null;
+  const pending = transcribeMathHandwriting(image, {
+    apiKey: 'test-key',
+    signal: controller.signal,
+    fetchImpl: async (_url, init) => {
+      upstreamSignal = init.signal;
+      return new Promise((_resolve, reject) => {
+        init.signal.addEventListener('abort', () => {
+          const error = new Error('aborted');
+          error.name = 'AbortError';
+          reject(error);
+        }, { once: true });
+      });
+    }
+  });
+  await new Promise(resolve => setTimeout(resolve, 0));
+  controller.abort();
+  await assert.rejects(pending, /aborted/i);
+  assert.equal(upstreamSignal?.aborted, true);
+}
+
+// Lock the client-side smoothness contract without needing a browser DOM in CI:
+// no second human-scale debounce, stale requests are explicitly cancellable,
+// and uncertain cloud readings cannot overwrite the local answer.
+{
+  const cloudClientUrl = new URL('../../client/src/ink/cloud.js', import.meta.url);
+  const cloudClient = await readFile(fileURLToPath(cloudClientUrl), 'utf8');
+  const settle = /const CLOUD_SETTLE_MS = (\d+);/.exec(cloudClient);
+  assert.ok(settle, 'cloud settle constant must remain explicit');
+  assert.ok(Number(settle[1]) <= 200, 'cloud client must not reintroduce a long second debounce');
+  assert.match(cloudClient, /export function cancelCloudRecognition\(\)/);
+  assert.match(cloudClient, /needsConfirmation:\s*requiresConfirmation/);
+  assert.match(cloudClient, /requestGeneration\s*\+=\s*1/);
+  assert.match(cloudClient, /target\.closest\('\.ink-wrap'\)/);
 }
 
 // No secret means no accidental direct API use from a checkout or CI worker,
