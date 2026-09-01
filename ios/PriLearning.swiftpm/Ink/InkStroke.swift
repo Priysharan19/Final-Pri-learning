@@ -91,38 +91,43 @@ enum StrokeCodec {
     /// interpolation also gives us force/orientation/time at every sampled point.
     private static let sampleStep: CGFloat = 1.5
 
-    static func strokes(from drawing: PKDrawing) -> [InkStroke] {
-        drawing.strokes.map { stroke in
-            var points: [InkPoint] = []
-            let transform = stroke.transform
-            for point in stroke.path.interpolatedPoints(by: .distance(sampleStep)) {
-                let location = point.location.applying(transform)
-                points.append(InkPoint(
-                    x: location.x,
-                    y: location.y,
-                    w: point.size.width,
-                    t: point.timeOffset,
-                    force: point.force,
-                    azimuth: point.azimuth,
-                    altitude: point.altitude
-                ))
-            }
-            // A tap has no interpolated span, but its pressure/orientation are
-            // still useful and the dot must survive as a real mark.
-            if points.isEmpty, let only = stroke.path.first {
-                let location = only.location.applying(transform)
-                points.append(InkPoint(
-                    x: location.x,
-                    y: location.y,
-                    w: only.size.width,
-                    t: only.timeOffset,
-                    force: only.force,
-                    azimuth: only.azimuth,
-                    altitude: only.altitude
-                ))
-            }
-            return InkStroke(points: points)
+    /// Convert one PencilKit stroke. Keeping this operation separate is important
+    /// for the live bridge: a normal pen-up can encode just the newly completed
+    /// stroke instead of resampling the student's entire page on every mark.
+    static func stroke(from stroke: PKStroke) -> InkStroke {
+        var points: [InkPoint] = []
+        let transform = stroke.transform
+        for point in stroke.path.interpolatedPoints(by: .distance(sampleStep)) {
+            let location = point.location.applying(transform)
+            points.append(InkPoint(
+                x: location.x,
+                y: location.y,
+                w: point.size.width,
+                t: point.timeOffset,
+                force: point.force,
+                azimuth: point.azimuth,
+                altitude: point.altitude
+            ))
         }
+        // A tap has no interpolated span, but its pressure/orientation are still
+        // useful and the dot must survive as a real mark.
+        if points.isEmpty, let only = stroke.path.first {
+            let location = only.location.applying(transform)
+            points.append(InkPoint(
+                x: location.x,
+                y: location.y,
+                w: only.size.width,
+                t: only.timeOffset,
+                force: only.force,
+                azimuth: only.azimuth,
+                altitude: only.altitude
+            ))
+        }
+        return InkStroke(points: points)
+    }
+
+    static func strokes(from drawing: PKDrawing) -> [InkStroke] {
+        drawing.strokes.map(stroke(from:))
     }
 
     /// Rebuild a drawing from strokes supplied by the web layer. V2 metadata is
