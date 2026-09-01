@@ -51,9 +51,6 @@ struct InkStroke {
 
     var isEmpty: Bool { points.isEmpty }
 
-    /// Tight bounds of the stroke's centreline. Zero-area strokes (a dot, a
-    /// perfectly horizontal minus sign) are given a hairline extent so callers
-    /// can divide by width or height without special-casing them.
     var bounds: CGRect {
         guard let first = points.first else { return .zero }
         var minX = first.x, maxX = first.x, minY = first.y, maxY = first.y
@@ -86,14 +83,10 @@ struct InkStroke {
 // MARK: - PencilKit bridge
 
 enum StrokeCodec {
-
-    /// 1.5 pt preserves corners without exploding the JSON payload. PencilKit
-    /// interpolation also gives us force/orientation/time at every sampled point.
     private static let sampleStep: CGFloat = 1.5
 
-    /// Convert one PencilKit stroke. Keeping this operation separate is important
-    /// for the live bridge: a normal pen-up can encode just the newly completed
-    /// stroke instead of resampling the student's entire page on every mark.
+    /// Convert one PencilKit stroke. Keeping this operation separate lets the
+    /// live bridge encode only the newly completed mark on a normal pen-up.
     static func stroke(from stroke: PKStroke) -> InkStroke {
         var points: [InkPoint] = []
         let transform = stroke.transform
@@ -109,8 +102,6 @@ enum StrokeCodec {
                 altitude: point.altitude
             ))
         }
-        // A tap has no interpolated span, but its pressure/orientation are still
-        // useful and the dot must survive as a real mark.
         if points.isEmpty, let only = stroke.path.first {
             let location = only.location.applying(transform)
             points.append(InkPoint(
@@ -127,11 +118,9 @@ enum StrokeCodec {
     }
 
     static func strokes(from drawing: PKDrawing) -> [InkStroke] {
-        drawing.strokes.map(stroke(from:))
+        drawing.strokes.map { StrokeCodec.stroke(from: $0) }
     }
 
-    /// Rebuild a drawing from strokes supplied by the web layer. V2 metadata is
-    /// retained when present; legacy strokes fall back to neutral Pencil values.
     static func drawing(from strokes: [InkStroke], color: UIColor) -> PKDrawing {
         let ink = PKInk(.pen, color: color)
         let built: [PKStroke] = strokes.compactMap { stroke in
@@ -150,9 +139,7 @@ enum StrokeCodec {
                     altitude: p.altitude > 0 ? p.altitude : .pi / 2
                 )
             }
-            let safePoints = controlPoints.count >= 2
-                ? controlPoints
-                : controlPoints + controlPoints
+            let safePoints = controlPoints.count >= 2 ? controlPoints : controlPoints + controlPoints
             let path = PKStrokePath(controlPoints: safePoints, creationDate: Date())
             return PKStroke(ink: ink, path: path)
         }
@@ -163,9 +150,6 @@ enum StrokeCodec {
 // MARK: - JSON
 
 extension InkStroke {
-    /// Field names intentionally match the browser collector where possible:
-    /// p=force, t=time, plus Pencil-specific azimuth/altitude. Existing web code
-    /// ignores unknown fields, so this is backwards compatible immediately.
     var jsonObject: [String: Any] {
         ["points": points.map {
             [
