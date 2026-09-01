@@ -18,8 +18,9 @@ jobs:
         with:
           ref: perf/cloud-handwriting-smoothness-sep1
       - name: Make optional handwriting gateway an explicit audited exception
-        shell: python
+        shell: bash
         run: |
+          python3 <<'PY'
           from pathlib import Path
           path = Path('.github/workflows/ci.yml')
           text = path.read_text()
@@ -72,6 +73,7 @@ jobs:
           if old not in text:
               raise SystemExit('CI network gate block did not match; refusing blind patch')
           path.write_text(text.replace(old, new, 1))
+          PY
       - name: Commit CI boundary gate
         shell: bash
         run: |
