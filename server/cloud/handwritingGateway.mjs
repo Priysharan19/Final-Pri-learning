@@ -55,6 +55,7 @@ function headers(req, extra = {}) {
 }
 
 function send(req, res, status, payload) {
+  if (res.destroyed || res.writableEnded) return;
   const body = Buffer.from(JSON.stringify(payload));
   res.writeHead(status, headers(req, { 'content-length': String(body.length) }));
   res.end(body);
@@ -126,18 +127,33 @@ async function handler(req, res) {
   }
 
   const started = Date.now();
+  const requestAbort = new AbortController();
+  // Browser-side cancellation (new Pencil input, navigation, timeout) should
+  // stop the upstream model call too. Otherwise a stale result is discarded by
+  // the client but still consumes latency, quota and a gateway execution slot.
+  res.once('close', () => {
+    if (!res.writableEnded) requestAbort.abort();
+  });
+
   // Safe diagnostics only: request id + outcome. Never log image data or the
   // student's transcription payload.
   console.log(`[cloud-ink ${requestId}] recognition start`);
   try {
     const body = await readJson(req);
+    if (requestAbort.signal.aborted) return;
     const image = body?.image || body?.imageDataUrl;
-    const result = await transcribeMathHandwriting(image);
-    console.log(`[cloud-ink ${requestId}] recognition ok · ${result.engine} · ${Date.now() - started}ms`);
-    return send(req, res, 200, { ...result, requestId });
+    const result = await transcribeMathHandwriting(image, { signal: requestAbort.signal });
+    if (requestAbort.signal.aborted || res.destroyed) return;
+    const latencyMs = Date.now() - started;
+    console.log(`[cloud-ink ${requestId}] recognition ok · ${result.engine} · ${latencyMs}ms`);
+    return send(req, res, 200, { ...result, latencyMs, requestId });
   } catch (error) {
+    if (requestAbort.signal.aborted || res.destroyed) {
+      console.log(`[cloud-ink ${requestId}] recognition cancelled · ${Date.now() - started}ms`);
+      return;
+    }
     const status = Number(error?.status) >= 400 && Number(error?.status) < 600 ? Number(error.status) : 500;
-    const safeMessage = status >= 500 && !['OPENAI_NOT_CONFIGURED'].includes(error?.code)
+    const safeMessage = status >= 500 && !['OPENAI_NOT_CONFIGURED', 'OPENAI_TIMEOUT'].includes(error?.code)
       ? 'Cloud handwriting recognition failed'
       : String(error?.message || 'Cloud handwriting recognition failed');
     console.error(`[cloud-ink ${requestId}] recognition failed · HTTP ${status} · ${error?.code || 'CLOUD_INK_FAILED'} · ${String(error?.message || 'unknown error')} · ${Date.now() - started}ms`);

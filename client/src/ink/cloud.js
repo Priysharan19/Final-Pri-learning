@@ -6,15 +6,19 @@
 // answers, profile data and the surrounding UI are deliberately excluded.
 
 const MAX_SIDE = 2048;
-const MAX_PIXELS = 3_200_000;
+// Keep the raster inside the high-detail vision budget. Handwriting benefits
+// from sharp edges, but shipping extra blank pixels only increases upload/model
+// latency without adding signal.
+const MAX_PIXELS = 2_400_000;
 const PADDING = 28;
-// Terra may legitimately escalate to Sol. The server gives each model up to
-// 15 s, so the browser timeout must cover both calls plus LAN/network overhead.
-const REQUEST_TIMEOUT_MS = 40000;
-// InkAnswer's browser recogniser wakes quickly for the local preview. Delay the
-// expensive cloud raster/network path so ordinary pauses between Pencil strokes
-// do not trigger OCR work while the student is still writing.
-const CLOUD_SETTLE_MS = 900;
+// Cloud OCR is an opportunistic authority layered over instant local Pri Ink.
+// A request that takes tens of seconds is no longer useful to the active answer,
+// so fail back to local recognition rather than leaving a zombie request alive.
+const REQUEST_TIMEOUT_MS = 18000;
+// InkAnswer already waits for a handwriting quiet window before invoking cloud
+// recognition. Keep only a tiny settle here to collapse rapid duplicate calls;
+// the previous 900 ms created an avoidable second debounce.
+const CLOUD_SETTLE_MS = 120;
 const RETRY_BACKOFF_MS = 5000;
 
 let retryAfter = 0;
@@ -56,6 +60,31 @@ export function cloudInkConfigured() {
   // Pri Ink until a full page process reset. Keep configuration and temporary
   // reachability as separate concepts instead.
   return Boolean(endpoint());
+}
+
+/**
+ * Immediately invalidate every pending cloud result and abort the active HTTP
+ * request. This is deliberately safe to call on every new Pencil gesture.
+ */
+export function cancelCloudRecognition() {
+  requestGeneration += 1;
+  if (activeRequest) {
+    activeRequest.abort();
+    activeRequest = null;
+  }
+}
+
+// If the student resumes writing while cloud OCR is in flight, cancel it at
+// pointer-down rather than waiting for the next recognition debounce. This
+// prevents stale network work from consuming bandwidth/model time and, more
+// importantly, prevents an old answer from replacing the UI mid-stroke.
+if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+  document.addEventListener('pointerdown', event => {
+    const target = event?.target;
+    if (target && typeof target.closest === 'function' && target.closest('.ink-wrap')) {
+      cancelCloudRecognition();
+    }
+  }, { capture: true, passive: true });
 }
 
 function allPoints(strokes) {
@@ -177,15 +206,12 @@ function normalizeReading(payload) {
     margin: Number.isFinite(Number(payload?.margin)) ? Number(payload.margin) : 0,
     weakest: null,
     cloud: true,
-    // InkAnswer historically used `needsConfirmation` as "discard the cloud
-    // reading". That hid exactly the result the student needed to confirm and
-    // left the weaker local OCR on screen. Preserve uncertainty in minConf /
-    // margin (so QuestionCard still requires confirmation), but allow the cloud
-    // transcription itself to become the visible reading.
+    // Uncertain cloud OCR must never silently displace a stable local reading.
+    // Keep it as uncertainty evidence and let the existing local confirmation /
+    // correction path remain authoritative until cloud confidence clears the
+    // server-side gate.
     requiresConfirmation,
-    needsConfirmation: false,
-    // The transport exists, but production readiness belongs to the real-writer
-    // evaluation gate, not to the fact that an API call succeeded.
+    needsConfirmation: requiresConfirmation,
     productionReady: false
   };
 }
@@ -199,19 +225,25 @@ export async function recognizeWithCloud(strokes) {
   const url = endpoint();
   if (!url || Date.now() < retryAfter) return null;
 
-  // Let the Pencil settle before rasterisation/network work. A later recognition
-  // call invalidates this one before it spends money or competes with drawing.
+  // A newer scheduled read owns the network slot immediately.
+  if (activeRequest) {
+    activeRequest.abort();
+    activeRequest = null;
+  }
+
+  // Collapse only near-simultaneous duplicate invocations. The answer surface
+  // already owns the human-scale handwriting quiet window.
   await wait(CLOUD_SETTLE_MS);
   if (generation !== requestGeneration) return null;
 
   const raster = rasterizeInkForCloud(strokes);
   if (!raster?.image) return null;
 
-  if (activeRequest) activeRequest.abort();
   const controller = new AbortController();
   activeRequest = controller;
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   const token = clientToken();
+  const startedAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
 
   try {
     const response = await fetch(url, {
@@ -227,6 +259,7 @@ export async function recognizeWithCloud(strokes) {
       body: JSON.stringify({ image: raster.image })
     });
 
+    if (generation !== requestGeneration) return null;
     const contentType = String(response.headers.get('content-type') || '');
     if (!contentType.includes('application/json')) {
       retryAfter = Date.now() + RETRY_BACKOFF_MS;
@@ -234,12 +267,16 @@ export async function recognizeWithCloud(strokes) {
     }
 
     const payload = await response.json();
+    if (generation !== requestGeneration) return null;
     if (!response.ok) {
       retryAfter = Date.now() + RETRY_BACKOFF_MS;
       return null;
     }
     retryAfter = 0;
-    return normalizeReading(payload);
+    const reading = normalizeReading(payload);
+    if (!reading) return null;
+    const endedAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    return { ...reading, clientLatencyMs: Math.max(0, endedAt - startedAt) };
   } catch (error) {
     if (error?.name !== 'AbortError') retryAfter = Date.now() + RETRY_BACKOFF_MS;
     return null;
