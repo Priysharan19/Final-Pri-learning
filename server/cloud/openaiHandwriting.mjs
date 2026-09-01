@@ -10,7 +10,10 @@ const OPENAI_RESPONSES_URL = 'https://api.openai.com/v1/responses';
 const DEFAULT_PRIMARY_MODEL = 'gpt-5.6-terra';
 const DEFAULT_FALLBACK_MODEL = 'gpt-5.6-sol';
 const DEFAULT_MIN_CONFIDENCE = 0.92;
-const DEFAULT_TIMEOUT_MS = 15000;
+// Cloud recognition is a rescue/authority layer over local Pri Ink. A single
+// model call that exceeds this budget is no longer useful to the current pause.
+const DEFAULT_TIMEOUT_MS = 8000;
+const DEFAULT_IMAGE_DETAIL = 'high';
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
 // Keep the strict schema deliberately conservative. Length/range limits are
@@ -151,9 +154,25 @@ function publicCandidate(result) {
   };
 }
 
-async function requestModel({ model, imageDataUrl, apiKey, fetchImpl, timeoutMs, detail }) {
+function timeoutError() {
+  const error = new Error('OpenAI handwriting recognition timed out');
+  error.code = 'OPENAI_TIMEOUT';
+  error.status = 504;
+  return error;
+}
+
+async function requestModel({ model, imageDataUrl, apiKey, fetchImpl, timeoutMs, detail, signal }) {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  let timedOut = false;
+  const abortFromCaller = () => controller.abort(signal?.reason);
+  if (signal?.aborted) abortFromCaller();
+  else signal?.addEventListener?.('abort', abortFromCaller, { once: true });
+  const timer = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, timeoutMs);
+  const started = Date.now();
+
   try {
     const response = await fetchImpl(OPENAI_RESPONSES_URL, {
       method: 'POST',
@@ -165,8 +184,11 @@ async function requestModel({ model, imageDataUrl, apiKey, fetchImpl, timeoutMs,
       body: JSON.stringify({
         model,
         store: false,
-        reasoning: { effort: 'low' },
-        max_output_tokens: 1200,
+        // OCR/transcription is a visual extraction task, not a reasoning task.
+        // `none` removes avoidable reasoning latency while the strict schema and
+        // confidence gate preserve the safety/quality contract.
+        reasoning: { effort: 'none' },
+        max_output_tokens: 900,
         instructions: SYSTEM_INSTRUCTIONS,
         input: [{
           role: 'user',
@@ -210,10 +232,15 @@ async function requestModel({ model, imageDataUrl, apiKey, fetchImpl, timeoutMs,
     return {
       result: normalizeModelResult(parsed, model),
       usage: body?.usage || null,
-      responseId: body?.id || null
+      responseId: body?.id || null,
+      latencyMs: Date.now() - started
     };
+  } catch (error) {
+    if (timedOut && !signal?.aborted) throw timeoutError();
+    throw error;
   } finally {
     clearTimeout(timer);
+    signal?.removeEventListener?.('abort', abortFromCaller);
   }
 }
 
@@ -237,15 +264,21 @@ export async function transcribeMathHandwriting(imageDataUrl, options = {}) {
   const timeoutMs = Math.max(1000, Math.min(60000,
     Number(options.timeoutMs ?? envNumber('OPENAI_HANDWRITING_TIMEOUT_MS', DEFAULT_TIMEOUT_MS)) || DEFAULT_TIMEOUT_MS
   ));
-  const detail = options.detail || process.env.OPENAI_HANDWRITING_DETAIL || 'original';
+  const detail = options.detail || process.env.OPENAI_HANDWRITING_DETAIL || DEFAULT_IMAGE_DETAIL;
   const fetchImpl = options.fetchImpl || globalThis.fetch;
+  const signal = options.signal;
   if (typeof fetchImpl !== 'function') throw new Error('fetch is unavailable in this Node runtime');
+  if (signal?.aborted) {
+    const error = new Error('Handwriting recognition cancelled');
+    error.name = 'AbortError';
+    throw error;
+  }
 
   const primaryCall = await requestModel({
-    model: primaryModel, imageDataUrl, apiKey, fetchImpl, timeoutMs, detail
+    model: primaryModel, imageDataUrl, apiKey, fetchImpl, timeoutMs, detail, signal
   });
   let chosen = primaryCall.result;
-  const usage = [{ model: primaryModel, usage: primaryCall.usage }];
+  const usage = [{ model: primaryModel, usage: primaryCall.usage, latencyMs: primaryCall.latencyMs }];
   let disagreement = false;
   const candidates = [publicCandidate(primaryCall.result)];
 
@@ -253,9 +286,9 @@ export async function transcribeMathHandwriting(imageDataUrl, options = {}) {
   if (shouldEscalate && fallbackModel && fallbackModel !== primaryModel) {
     try {
       const fallbackCall = await requestModel({
-        model: fallbackModel, imageDataUrl, apiKey, fetchImpl, timeoutMs, detail
+        model: fallbackModel, imageDataUrl, apiKey, fetchImpl, timeoutMs, detail, signal
       });
-      usage.push({ model: fallbackModel, usage: fallbackCall.usage });
+      usage.push({ model: fallbackModel, usage: fallbackCall.usage, latencyMs: fallbackCall.latencyMs });
       candidates.push(publicCandidate(fallbackCall.result));
       const agrees = canonical(primaryCall.result) && canonical(primaryCall.result) === canonical(fallbackCall.result);
       if (agrees) {
@@ -271,8 +304,11 @@ export async function transcribeMathHandwriting(imageDataUrl, options = {}) {
         chosen = { ...chosen, needsConfirmation: true };
       }
     } catch (error) {
-      // The fallback is a reliability enhancement, not a reason to throw away a
-      // usable primary reading. Force student confirmation instead.
+      // A disconnected client has no consumer for a fallback result. Propagate
+      // cancellation all the way to the gateway instead of burning model time.
+      if (signal?.aborted) throw error;
+      // The fallback is otherwise a reliability enhancement, not a reason to
+      // throw away a usable primary reading. Force student confirmation instead.
       chosen = { ...chosen, needsConfirmation: true };
       candidates.push({ engine: `openai-${fallbackModel}`, text: '', failure: error.message });
     }
