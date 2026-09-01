@@ -4,15 +4,19 @@ on:
   push:
     branches:
       - perf/cloud-handwriting-smoothness-sep1
+    paths:
+      - .github/workflows/handwriting-sync-helper.yml
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  build-client:
+  sync-ios:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: perf/cloud-handwriting-smoothness-sep1
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -20,9 +24,16 @@ jobs:
           cache-dependency-path: client/package-lock.json
       - run: npm ci --prefix client
       - run: npm run build
-      - uses: actions/upload-artifact@v4
-        with:
-          name: handwriting-client-dist
-          path: client/dist
-          if-no-files-found: error
-          retention-days: 1
+      - run: npm run sync:ios
+      - name: Commit exact generated iPad bundles
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "ios/PriLearning.swiftpm/Resources/Web" "ios/PriLearning 2.swiftpm/Resources/Web"
+          if git diff --cached --quiet; then
+            echo "iOS bundles already match client/dist"
+            exit 0
+          fi
+          git commit -m "chore(ink): sync iOS web bundles"
+          git push origin HEAD:perf/cloud-handwriting-smoothness-sep1
