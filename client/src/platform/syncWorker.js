@@ -15,9 +15,9 @@ import { cloudAccountLink, cloudDeviceId, markCloudSynced, verifyCloudSession } 
 import {
   MAX_PUSH_ITEMS, createPushEnvelope, syncPolicyFor, SYNC_POLICY, validatePullEnvelope
 } from './syncContract.js';
+import { historicalSupplementalEvents } from './syncHistorical.js';
+import { remoteEventPrefix, syncStateId } from './syncReplicaState.js';
 
-const STATE_PREFIX = 'pri-cloud-sync-state-v1:';
-const REMOTE_EVENT_PREFIX = 'pri-cloud-remote-event-v1:';
 const MAX_REMOTE_EVENT_CACHE = 2000;
 const HISTORIC_OLD_ATTEMPT_BASE = 4_000_000_000_000_000;
 const HISTORIC_NEW_ATTEMPT_BASE = 5_000_000_000_000_000;
@@ -28,8 +28,7 @@ const HISTORIC_FALLBACK_BASE = 6_000_000_000_000_000;
 // local task records through a student's generic replica would be a privacy bug.
 const CLIENT_ENTITY_KINDS = new Set(['profile', 'bookmark', 'favorite']);
 
-const stateId = pid => `${STATE_PREFIX}${pid}`;
-const eventCacheId = (pid, id) => `${REMOTE_EVENT_PREFIX}${pid}:${id}`;
+const eventCacheId = (pid, id) => `${remoteEventPrefix(pid)}${id}`;
 
 function plain(value) {
   return !!value && typeof value === 'object' && !Array.isArray(value) &&
@@ -72,9 +71,9 @@ function attemptPayload(attempt, fallbackAt = Date.now()) {
 }
 
 async function loadState(pid) {
-  const row = await get('device', stateId(pid)).catch(() => null);
+  const row = await get('device', syncStateId(pid)).catch(() => null);
   return {
-    id: stateId(pid),
+    id: syncStateId(pid),
     cursor: safeInt(row?.cursor),
     entityVersions: plain(row?.entityVersions) ? { ...row.entityVersions } : {},
     accountId: row?.accountId || null,
@@ -85,7 +84,7 @@ async function loadState(pid) {
 
 async function saveState(pid, state) {
   await put('device', {
-    id: stateId(pid), cursor: safeInt(state.cursor),
+    id: syncStateId(pid), cursor: safeInt(state.cursor),
     entityVersions: { ...(state.entityVersions || {}) }, accountId: state.accountId || null,
     lastSyncAt: state.lastSyncAt || null,
     lastError: state.lastError ? String(state.lastError).slice(0, 300) : null
@@ -258,7 +257,7 @@ async function cacheRemoteEvent(pid, event) {
 }
 
 async function trimRemoteEventCache(pid) {
-  const prefix = `${REMOTE_EVENT_PREFIX}${pid}:`;
+  const prefix = remoteEventPrefix(pid);
   const rows = (await all('device')).filter(row => String(row?.id || '').startsWith(prefix));
   if (rows.length <= MAX_REMOTE_EVENT_CACHE) return;
   rows.sort((a, b) => Number(b.serverCursor || 0) - Number(a.serverCursor || 0));
@@ -322,7 +321,10 @@ function rescanKey(prefix, deviceId, index, chunk) {
 
 async function pushFullRescan(pid, deviceId, marker, state) {
   const entities = await fullRescanEntities(pid, state);
-  const historical = await historicalAttemptEvents(pid, deviceId);
+  const historical = [
+    ...(await historicalAttemptEvents(pid, deviceId)),
+    ...(await historicalSupplementalEvents(pid, deviceId))
+  ].sort((a, b) => a.deviceSeq - b.deviceSeq);
   let pushedEntities = 0;
   let pushedEvents = 0;
 
@@ -432,7 +434,7 @@ export async function cloudSyncStatus(pid) {
 
 export async function remoteLearningSummary(pid) {
   const deviceId = await cloudDeviceId();
-  const prefix = `${REMOTE_EVENT_PREFIX}${pid}:`;
+  const prefix = remoteEventPrefix(pid);
   const rows = (await all('device')).filter(row => String(row?.id || '').startsWith(prefix) && row.deviceId !== deviceId);
   let attempts = 0;
   let correct = 0;
