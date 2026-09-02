@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
 import { useApp } from '../App.jsx';
+import Class10NCERTLibrary from '../components/Class10NCERTLibrary.jsx';
 import { readJSONFile } from '../lib/files.js';
 
 export default function Classes() {
@@ -37,8 +38,10 @@ export default function Classes() {
         <h1>Classes</h1>
         <button className="btn btn-primary" onClick={() => fileRef.current?.click()}>＋ Join Class</button>
       </div>
-      <p className="muted" style={{ marginBottom: 20 }}>your enrolled classes</p>
+      <p className="muted" style={{ marginBottom: 20 }}>your enrolled classes and curriculum libraries</p>
       <input ref={fileRef} type="file" accept="application/json,.json" style={{ display: 'none' }} onChange={importPack} />
+
+      {Number(user.year) === 10 && <Class10NCERTLibrary />}
 
       {joined.length === 0 ? (
         <div className="locked-wrap">
