@@ -5,6 +5,7 @@ const canonical = new URL('../../ios/PriLearning.swiftpm/', import.meta.url);
 const runnableCopy = new URL('../../ios/PriLearning 2.swiftpm/', import.meta.url);
 const critical = [
   'Package.swift',
+  'Info.plist',
   'PriLearningApp.swift',
   'LocalSchemeHandler.swift',
   'PhotoOCR.swift',
