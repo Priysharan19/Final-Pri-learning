@@ -33,7 +33,11 @@ let package = Package(
             capabilities: [
                 .camera(purposeString: "Photograph handwritten maths so Pri can read it on-device and attach it to your attempt.")
             ],
-            appCategory: .education
+            appCategory: .education,
+            // Xcode/App Store builds supply PRI_CLOUD_ORIGIN as a user-defined
+            // build setting. The signed Info.plist is the native transport's
+            // only production origin source; an absent/invalid value fails closed.
+            additionalInfoPlistContentFilePath: "Info.plist"
         )
     ],
     targets: [
