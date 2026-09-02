@@ -82,6 +82,11 @@ export function purchaseNativeProduct(productId, appAccountToken) {
   }, 5 * 60_000);
 }
 
+export async function unfinishedNativeTransactions(productIds) {
+  const result = await request('unfinished', { productIds: ids(productIds) }, 60_000);
+  return Array.isArray(result.transactions) ? result.transactions : [];
+}
+
 export async function restoreNativePurchases(productIds) {
   const result = await request('restore', { productIds: ids(productIds) }, 2 * 60_000);
   return Array.isArray(result.transactions) ? result.transactions : [];
