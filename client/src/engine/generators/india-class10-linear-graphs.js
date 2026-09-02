@@ -44,10 +44,9 @@ function figPair({ first, second, mark = null }) {
   };
   inner += draw(first, '#3987e5');
   inner += draw(second, '#f59e0b', first[0] === second[0] && first[1] === second[1] ? '7 4' : '');
-  if (mark) {
-    inner += `<circle cx="${n(X(mark[0]))}" cy="${n(Y(mark[1]))}" r="4.5" fill="currentColor" stroke="none"/>`;
-    inner += `<text x="${n(X(mark[0])+28)}" y="${n(Y(mark[1])-8)}" fill="currentColor" stroke="none" text-anchor="middle" font-size="11">(${mark[0]}, ${mark[1]})</text>`;
-  }
+  // Mark the intersection visually but never print its coordinates: the student
+  // must read those from the axes rather than receive the answer in the SVG.
+  if (mark) inner += `<circle cx="${n(X(mark[0]))}" cy="${n(Y(mark[1]))}" r="4.5" fill="currentColor" stroke="none"/>`;
   inner += `<text x="${W-12}" y="${n(Y(0)+16)}" fill="currentColor" stroke="none" font-size="12">x</text>`;
   inner += `<text x="${n(X(0)+10)}" y="16" fill="currentColor" stroke="none" font-size="12">y</text>`;
   inner += `<text x="218" y="22" fill="#3987e5" stroke="none" font-size="11">${lineLabel(first)}</text>`;
@@ -60,8 +59,9 @@ export function currentLinearPairGraphs(rng, diff) {
     const s = rc(rng, SYSTEMS);
     const [x,y] = s.point;
     const correct = `(${x}, ${y})`;
+    const swapped = x === y ? `(${x - 1}, ${y + 1})` : `(${y}, ${x})`;
     const m = mcq(rng, correct, [
-      { text: `(${y}, ${x})`, why: 'Read coordinates in the order (x, y), not (y, x).' },
+      { text: swapped, why: x === y ? 'The solution is the exact intersection, not a nearby lattice point.' : 'Read coordinates in the order (x, y), not (y, x).' },
       { text: `(${x+1}, ${y})`, why: 'The solution is the exact point where both lines meet.' },
       { text: `(${x}, ${y+1})`, why: 'The solution must lie on both lines simultaneously.' }
     ]);
