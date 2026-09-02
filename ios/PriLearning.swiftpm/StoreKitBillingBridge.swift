@@ -8,9 +8,10 @@
 // web app ask this bridge to finish the transaction.
 //
 // Leaving an accepted purchase unfinished while the network/server is down is
-// deliberate. StoreKit will redeliver unfinished transactions through
-// Transaction.updates, giving Pri Learning a durable recovery path instead of a
-// paid customer losing access because one HTTP request failed.
+// deliberate. StoreKit keeps unfinished transactions until finish() is called;
+// Transaction.updates plus the explicit Transaction.unfinished sweep below give
+// Pri Learning a durable recovery path even if the web UI was not listening yet
+// when an update arrived during launch.
 // ─────────────────────────────────────────────────────────────────────────────
 import Foundation
 import StoreKit
@@ -74,13 +75,7 @@ final class StoreKitBillingBridge {
                         switch verification {
                         case .verified(let transaction):
                             self.pendingTransactions[transaction.id] = transaction
-                            self.respond(requestId, ok: true, result: [
-                                "status": "verified",
-                                "transactionId": String(transaction.id),
-                                "originalTransactionId": String(transaction.originalID),
-                                "productId": transaction.productID,
-                                "signedTransaction": verification.jwsRepresentation
-                            ])
+                            self.respond(requestId, ok: true, result: self.transactionResult(transaction, verification: verification, status: "verified"))
                         case .unverified(_, let error):
                             throw BillingBridgeError.unverified(error.localizedDescription)
                         }
@@ -92,6 +87,17 @@ final class StoreKitBillingBridge {
                         throw BillingBridgeError.unknownPurchaseResult
                     }
 
+                case "unfinished":
+                    let allowed = Set(self.productIds(body["productIds"]))
+                    var rows: [[String: Any]] = []
+                    for await verification in Transaction.unfinished {
+                        guard case .verified(let transaction) = verification,
+                              allowed.contains(transaction.productID) else { continue }
+                        self.pendingTransactions[transaction.id] = transaction
+                        rows.append(self.transactionResult(transaction, verification: verification))
+                    }
+                    self.respond(requestId, ok: true, result: ["transactions": rows])
+
                 case "restore":
                     let allowed = Set(self.productIds(body["productIds"]))
                     try await AppStore.sync()
@@ -101,12 +107,7 @@ final class StoreKitBillingBridge {
                               allowed.contains(transaction.productID),
                               transaction.revocationDate == nil else { continue }
                         self.pendingTransactions[transaction.id] = transaction
-                        rows.append([
-                            "transactionId": String(transaction.id),
-                            "originalTransactionId": String(transaction.originalID),
-                            "productId": transaction.productID,
-                            "signedTransaction": verification.jwsRepresentation
-                        ])
+                        rows.append(self.transactionResult(transaction, verification: verification))
                     }
                     self.respond(requestId, ok: true, result: ["transactions": rows])
 
@@ -143,6 +144,19 @@ final class StoreKitBillingBridge {
         return out
     }
 
+    private func transactionResult(_ transaction: Transaction,
+                                   verification: VerificationResult<Transaction>,
+                                   status: String? = nil) -> [String: Any] {
+        var result: [String: Any] = [
+            "transactionId": String(transaction.id),
+            "originalTransactionId": String(transaction.originalID),
+            "productId": transaction.productID,
+            "signedTransaction": verification.jwsRepresentation
+        ]
+        if let status { result["status"] = status }
+        return result
+    }
+
     private func startTransactionListener() {
         updatesTask?.cancel()
         updatesTask = Task { @MainActor [weak self] in
@@ -150,13 +164,7 @@ final class StoreKitBillingBridge {
                 guard !Task.isCancelled, let self else { return }
                 guard case .verified(let transaction) = verification else { continue }
                 self.pendingTransactions[transaction.id] = transaction
-                self.emit("pri:native-billing-update", detail: [
-                    "status": "verified",
-                    "transactionId": String(transaction.id),
-                    "originalTransactionId": String(transaction.originalID),
-                    "productId": transaction.productID,
-                    "signedTransaction": verification.jwsRepresentation
-                ])
+                self.emit("pri:native-billing-update", detail: self.transactionResult(transaction, verification: verification, status: "verified"))
             }
         }
     }
