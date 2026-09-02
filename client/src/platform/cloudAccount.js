@@ -8,6 +8,7 @@
 
 import { get, put, del, uuid } from '../local/idb.js';
 import { cloud, cloudAvailable } from './cloudTransport.js';
+import { announceCloudSessionChange } from './cloudSession.js';
 import { normalizeEntitlementSnapshot } from './entitlements.js';
 import { resetProfileOutboxForRelink } from './profileOutbox.js';
 import { clearCloudReplicaState } from './syncReplicaState.js';
@@ -18,6 +19,15 @@ const LINK_PREFIX = 'pri-cloud-account-link-v1:';
 function linkRowId(pid) {
   if (!pid) throw new Error('A local profile id is required');
   return `${LINK_PREFIX}${pid}`;
+}
+
+function announceLink(pid, link, connected) {
+  announceCloudSessionChange({
+    localProfileId: String(pid || ''),
+    connected: !!connected,
+    accountId: connected ? String(link?.accountId || '') : null,
+    role: connected ? String(link?.role || 'student') : null
+  });
 }
 
 export async function cloudDeviceId() {
@@ -74,8 +84,10 @@ export async function registerCloudAccount(pid, { name, email, password }) {
   if (!cloudAvailable()) throw Object.assign(new Error('Cloud accounts are not configured on this build.'), { code: 'CLOUD_DISABLED' });
   const deviceId = await cloudDeviceId();
   const result = await cloud.register({ name, email, password, deviceId });
-  const link = await saveAccount(pid, result.account);
+  await saveAccount(pid, result.account);
   await refreshCloudEntitlement(pid).catch(() => {});
+  const link = await cloudAccountLink(pid);
+  announceLink(pid, link, true);
   return link;
 }
 
@@ -83,8 +95,10 @@ export async function loginCloudAccount(pid, { email, password }) {
   if (!cloudAvailable()) throw Object.assign(new Error('Cloud accounts are not configured on this build.'), { code: 'CLOUD_DISABLED' });
   const deviceId = await cloudDeviceId();
   const result = await cloud.login({ email, password, deviceId });
-  const link = await saveAccount(pid, result.account);
+  await saveAccount(pid, result.account);
   await refreshCloudEntitlement(pid).catch(() => {});
+  const link = await cloudAccountLink(pid);
+  announceLink(pid, link, true);
   return link;
 }
 
@@ -130,5 +144,6 @@ export async function disconnectCloudAccount(pid) {
     resetProfileOutboxForRelink(pid)
   ]);
   await del('device', linkRowId(pid));
+  announceLink(pid, null, false);
   return { connected: false };
 }

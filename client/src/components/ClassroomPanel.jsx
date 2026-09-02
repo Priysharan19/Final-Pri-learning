@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { cloud, cloudAvailable } from '../platform/cloudTransport.js';
+import { onCloudSessionChange } from '../platform/cloudSession.js';
 
 function niceDate(value) {
   if (!value) return 'No due date';
@@ -58,13 +59,29 @@ export default function ClassroomPanel() {
   useEffect(() => {
     let live = true;
     if (!enabled) return () => { live = false; };
-    loadClasses({ keepSelection: false }).catch(err => {
-      if (!live) return;
-      // A missing cloud session is normal: Account & cross-device sync above is
-      // the authority for sign-in. Do not make the offline Settings page noisy.
-      if (err?.status !== 401) setError(err.message || 'Classrooms could not be loaded.');
-    });
-    return () => { live = false; };
+
+    const refresh = async () => {
+      try {
+        await loadClasses({ keepSelection: false });
+        if (live) setError('');
+      } catch (err) {
+        if (!live) return;
+        if (err?.status === 401) {
+          setAccount(null);
+          setClasses([]);
+          setSelectedId('');
+          setDetail(null);
+          setStudents([]);
+          setError('');
+          return;
+        }
+        setError(err.message || 'Classrooms could not be loaded.');
+      }
+    };
+
+    refresh();
+    const stop = onCloudSessionChange(() => { refresh(); });
+    return () => { live = false; stop(); };
   }, [enabled]);
 
   useEffect(() => {

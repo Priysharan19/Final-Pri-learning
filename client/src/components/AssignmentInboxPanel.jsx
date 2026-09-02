@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { cloud, cloudAvailable } from '../platform/cloudTransport.js';
+import { onCloudSessionChange } from '../platform/cloudSession.js';
 
 function dueText(value) {
   if (!value) return 'No due date';
@@ -24,17 +25,29 @@ export default function AssignmentInboxPanel() {
   useEffect(() => {
     let live = true;
     if (!enabled) return () => { live = false; };
-    Promise.all([cloud.me(), cloud.assignments()])
-      .then(([me, result]) => {
+
+    const load = async () => {
+      try {
+        const [me, result] = await Promise.all([cloud.me(), cloud.assignments()]);
         if (!live) return;
         setRole(me?.account?.role || null);
         setAssignments(Array.isArray(result?.assignments) ? result.assignments : []);
-      })
-      .catch(err => {
-        if (!live || err?.status === 401) return;
+        setError('');
+      } catch (err) {
+        if (!live) return;
+        if (err?.status === 401) {
+          setRole(null);
+          setAssignments([]);
+          setError('');
+          return;
+        }
         setError(err.message || 'Assignments could not be loaded.');
-      });
-    return () => { live = false; };
+      }
+    };
+
+    load();
+    const stop = onCloudSessionChange(() => { load(); });
+    return () => { live = false; stop(); };
   }, [enabled]);
 
   if (!enabled || role !== 'student') return null;
