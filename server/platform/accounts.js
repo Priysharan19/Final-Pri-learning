@@ -57,6 +57,12 @@ function queueAccountToken(db, accountId, destination, purpose, now = Date.now()
   return tokenId;
 }
 
+function invalidatePendingTokens(db, accountId, purpose, now = Date.now()) {
+  db.prepare('DELETE FROM auth_delivery_outbox WHERE account_id = ? AND kind = ? AND delivered_at IS NULL').run(accountId, purpose);
+  db.prepare(`UPDATE account_tokens SET consumed_at = ?
+    WHERE account_id = ? AND purpose = ? AND consumed_at IS NULL`).run(now, accountId, purpose);
+}
+
 function revokeSession(db, req, now = Date.now()) {
   const session = sessionFromRequest(db, req, now);
   if (session) db.prepare('UPDATE account_sessions SET revoked_at = ? WHERE id = ?').run(now, session.id);
@@ -160,6 +166,18 @@ export function createAccountRouter(db) {
     res.json({ ok: true });
   });
 
+  router.post('/email/verification-request', requireSession(db), rateLimit(db, 'verify-email-request', { limit: 5, windowMs: 60 * 60 * 1000 }), (req, res) => {
+    const account = db.prepare('SELECT id,email,email_verified_at FROM accounts WHERE id = ? AND deleted_at IS NULL').get(req.platformSession.account_id);
+    if (!account) return res.status(404).json({ error: { code: 'ACCOUNT_NOT_FOUND', message: 'Account not found.' } });
+    if (account.email_verified_at) return res.json({ ok: true, alreadyVerified: true });
+    const now = Date.now();
+    db.transaction(() => {
+      invalidatePendingTokens(db, account.id, 'verify-email', now);
+      queueAccountToken(db, account.id, account.email, 'verify-email', now);
+    })();
+    res.json({ ok: true, alreadyVerified: false });
+  });
+
   router.post('/email/verify', rateLimit(db, 'verify-email', { limit: 20, windowMs: 60 * 60 * 1000 }), (req, res) => {
     const raw = String(req.body?.token || '');
     const now = Date.now();
@@ -180,7 +198,7 @@ export function createAccountRouter(db) {
     if (row) {
       const now = Date.now();
       db.transaction(() => {
-        db.prepare(`UPDATE account_tokens SET consumed_at = ? WHERE account_id = ? AND purpose = 'reset-password' AND consumed_at IS NULL`).run(now, row.id);
+        invalidatePendingTokens(db, row.id, 'reset-password', now);
         queueAccountToken(db, row.id, row.email, 'reset-password', now);
       })();
     }
@@ -206,17 +224,51 @@ export function createAccountRouter(db) {
     res.json({ ok: true, signInRequired: true });
   });
 
+  router.patch('/password', requireSession(db), rateLimit(db, 'password-change', { limit: 5, windowMs: 60 * 60 * 1000 }), (req, res) => {
+    const currentPassword = String(req.body?.currentPassword || '');
+    const newPassword = String(req.body?.newPassword || '');
+    if (!strongPassword(newPassword)) return res.status(400).json({ error: { code: 'WEAK_PASSWORD', message: 'New password must be at least 10 characters.' } });
+    const account = db.prepare('SELECT * FROM accounts WHERE id = ? AND deleted_at IS NULL').get(req.platformSession.account_id);
+    if (!account?.password_hash) return res.status(409).json({ error: { code: 'PASSWORD_NOT_CONFIGURED', message: 'This account uses a linked identity provider and has no password to change.' } });
+    if (!bcrypt.compareSync(currentPassword, account.password_hash)) {
+      return res.status(401).json({ error: { code: 'REAUTH_REQUIRED', message: 'Current password is incorrect.' } });
+    }
+    if (bcrypt.compareSync(newPassword, account.password_hash)) {
+      return res.status(400).json({ error: { code: 'PASSWORD_UNCHANGED', message: 'Choose a different new password.' } });
+    }
+
+    const now = Date.now();
+    const deviceId = req.platformSession.device_id;
+    db.transaction(() => {
+      db.prepare('UPDATE accounts SET password_hash = ?, updated_at = ? WHERE id = ?').run(bcrypt.hashSync(newPassword, 12), now, account.id);
+      db.prepare('UPDATE account_sessions SET revoked_at = ? WHERE account_id = ? AND revoked_at IS NULL').run(now, account.id);
+    })();
+    // Rotate the current session after a credential change rather than leaving a
+    // pre-change bearer token alive. Other devices stay revoked until they sign in.
+    createSession(db, res, account.id, deviceId, req.get('user-agent') || '', now);
+    res.json({ ok: true, account: publicAccount(account), sessionsRotated: true });
+  });
+
   router.get('/devices', requireSession(db), (req, res) => {
     const rows = db.prepare(`SELECT id,device_id,created_at,last_seen_at,expires_at FROM account_sessions
       WHERE account_id = ? AND revoked_at IS NULL AND expires_at > ? ORDER BY last_seen_at DESC`).all(req.platformSession.account_id, Date.now());
-    res.json({ devices: rows.map(row => ({ id: row.id, deviceId: row.device_id, createdAt: row.created_at, lastSeenAt: row.last_seen_at, expiresAt: row.expires_at })) });
+    res.json({ devices: rows.map(row => ({
+      id: row.id,
+      deviceId: row.device_id,
+      createdAt: row.created_at,
+      lastSeenAt: row.last_seen_at,
+      expiresAt: row.expires_at,
+      current: row.id === req.platformSession.id
+    })) });
   });
 
   router.delete('/devices/:sessionId', requireSession(db), (req, res) => {
     const sessionId = String(req.params.sessionId || '');
+    const current = sessionId === req.platformSession.id;
     const info = db.prepare('UPDATE account_sessions SET revoked_at = ? WHERE id = ? AND account_id = ? AND revoked_at IS NULL')
       .run(Date.now(), sessionId, req.platformSession.account_id);
-    res.json({ revoked: info.changes === 1 });
+    if (current && info.changes === 1) clearSessionCookies(res);
+    res.json({ revoked: info.changes === 1, current });
   });
 
   router.get('/export', requireSession(db), (req, res) => {
