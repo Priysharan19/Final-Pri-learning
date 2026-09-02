@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
 import { useApp } from '../App.jsx';
+import { dotpointAvailable, practiceTargetAvailable, topicAvailability } from '../engine/curriculumAvailability.js';
 
 const TAGLINES = [
   'The rest is algebra.',
@@ -18,9 +19,6 @@ const DIFF_LABELS = { 1: 'Foundation', 2: 'Intermediate', 3: 'Advanced', 4: 'Ext
 function loadSaved() {
   try { return JSON.parse(localStorage.getItem('pri-gen-filters')) || {}; } catch { return {}; }
 }
-
-const topicAvailable = topic => (topic?.dotpoints || []).some(dp => dp?.generated !== false);
-const dotpointAvailable = dotpoint => !!dotpoint && dotpoint.generated !== false;
 
 export default function Home() {
   const { user, dueCount } = useApp();
@@ -84,17 +82,14 @@ export default function Home() {
   }, [subtopic, curriculum]);
 
   const selectedDotpoint = dotpoint != null ? selSub?.dotpoints?.[dotpoint] || null : null;
-  const impossibleTarget = Boolean(
-    (selSub && !topicAvailable(selSub)) ||
-    (selectedDotpoint && !dotpointAvailable(selectedDotpoint))
-  );
+  const impossibleTarget = Boolean(selSub && !practiceTargetAvailable(selSub, dotpoint));
 
   // A saved filter can outlive a curriculum rationalisation. Do not keep a
   // stale target selected after a source update has made that exact outcome
   // unavailable in production.
   useEffect(() => {
     if (!selSub) return;
-    if (!topicAvailable(selSub)) {
+    if (!topicAvailability(selSub).selectable) {
       setSubtopic(null);
       setDotpoint(null);
       return;
@@ -210,7 +205,7 @@ export default function Home() {
                       <div className="gen-sub-head">{strand}</div>
                       <div className="gen-opts">
                         {subs.map(s => {
-                          const available = topicAvailable(s);
+                          const available = topicAvailability(s).selectable;
                           return (
                             <button key={s.id} className={`gen-opt ${subtopic === s.id ? 'on' : ''}`} style={{ textAlign: 'left' }}
                               disabled={!available}
@@ -233,7 +228,7 @@ export default function Home() {
                   <div className="gen-opts narrow">
                     {selSub.dotpoints.map((dp, i) => {
                       const text = typeof dp === 'string' ? dp : dp.text;
-                      const available = typeof dp === 'string' ? true : dotpointAvailable(dp);
+                      const available = dotpointAvailable(dp);
                       return (
                         <button key={i} className={`gen-opt ${dotpoint === i ? 'on' : ''}`} style={{ textAlign: 'left' }}
                           disabled={!available}
