@@ -48,8 +48,9 @@ export const CBSE_CLASS10_2026_27_CHAPTERS = Object.freeze([
     'Solve a pair of linear equations by substitution and elimination',
     'Model and solve simple situational problems using a pair of linear equations'
   ], [
-    // The legacy simultaneous-equations bank is useful practice but has not been
-    // promoted here because its form-by-form graphical/current-CBSE audit is open.
+    cover('y10-simeq', [1], [1, 2, 3]),
+    cover('y10-simeq', [2], [4])
+    // The current graphical solution/consistency outcome remains uncovered.
   ]),
 
   chapter('c10-quadratic-equations', [
