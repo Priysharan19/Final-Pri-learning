@@ -139,6 +139,9 @@ export const cloud = Object.freeze({
   syncPush: (body, idempotencyKey) => cloudRequest('/v1/sync/push', { method: 'POST', body, idempotencyKey }),
   syncPull: cursor => cloudRequest(`/v1/sync/pull/${Math.max(0, Number(cursor) || 0)}`),
   entitlements: () => cloudRequest('/v1/entitlements'),
+  billingConfig: () => cloudRequest('/v1/billing/config'),
+  billingStatus: () => cloudRequest('/v1/billing/status'),
+  restoreBilling: (provider, body = {}) => cloudRequest(`/v1/billing/restore/${pathId(provider, 'provider')}`, { method: 'POST', body }),
   classes: () => cloudRequest('/v1/classes'),
   reportIssue: (body, idempotencyKey) => cloudRequest('/v1/reports', { method: 'POST', body, idempotencyKey }),
   telemetry: events => cloudRequest('/v1/telemetry', { method: 'POST', body: { events } })
