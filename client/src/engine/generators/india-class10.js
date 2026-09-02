@@ -3,6 +3,7 @@
 // Only source-reviewed current-syllabus gaps are replaced here.
 import { indiaClass10 as baseIndiaClass10 } from './india-class10-base.js';
 import { currentPolynomialZeroes, currentTriangles } from './india-class10-current-forms.js';
+import { currentIrrationalityProof } from './india-class10-irrationality.js';
 
 const basePolynomialZeroes = baseIndiaClass10['c10-polynomial-zeroes'];
 
@@ -15,5 +16,6 @@ function polynomialZeroes(rng, diff) {
 export const indiaClass10 = Object.freeze({
   ...baseIndiaClass10,
   'c10-polynomial-zeroes': polynomialZeroes,
-  'c10-triangles-current': currentTriangles
+  'c10-triangles-current': currentTriangles,
+  'c10-irrationality-proofs': currentIrrationalityProof
 });
