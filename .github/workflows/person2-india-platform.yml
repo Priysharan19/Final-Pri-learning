@@ -16,6 +16,8 @@ on:
       - 'client/src/pages/Progress*.jsx'
       - 'client/src/pages/Settings.jsx'
       - 'client/src/pages/PracticeBase.jsx'
+      - 'client/src/pages/AccountAction.jsx'
+      - 'client/src/main.jsx'
       - 'client/src/platform/**'
       - 'client/src/components/CloudAccountPanel.jsx'
       - 'client/src/components/ClassroomPanel.jsx'
@@ -25,6 +27,7 @@ on:
       - 'client/test/india-**'
       - 'client/test/cloud-**'
       - 'client/test/profile-cloud-**'
+      - 'client/test/account-action-**'
       - 'client/test/classroom-product-check.mjs'
       - 'client/test/assignment-staff-product-check.mjs'
       - 'client/test/tour-cloud-platform.js'
@@ -38,6 +41,7 @@ on:
       - 'server/platform/**'
       - 'server/test/platform-**'
       - 'server/test/account-**'
+      - 'server/test/auth-delivery-**'
       - 'server/test/billing-**'
       - 'server/test/razorpay-**'
       - 'server/test/apple-**'
@@ -97,6 +101,8 @@ jobs:
         run: node client/test/cloud-account-boundary-check.mjs
       - name: Cloud session live refresh
         run: node client/test/cloud-session-refresh-check.mjs
+      - name: Fragment-only verification/reset link boundary
+        run: node client/test/account-action-boundary-check.mjs
       - name: Classroom client transport boundary
         run: node client/test/classroom-product-check.mjs
       - name: Assignment execution and staff UI boundary
@@ -141,6 +147,10 @@ jobs:
         run: node server/test/account-deletion-reauth-check.mjs
       - name: Full account lifecycle and session rotation
         run: node server/test/account-lifecycle-contract-check.mjs
+      - name: Encrypted auth email delivery worker
+        run: node server/test/auth-delivery-worker-check.mjs
+      - name: Production auth email configuration
+        run: node server/test/auth-delivery-config-check.mjs
       - name: Deployment-configured billing display
         run: node server/test/billing-config-check.mjs
       - name: Verified Razorpay checkout, webhook and restore lifecycle
