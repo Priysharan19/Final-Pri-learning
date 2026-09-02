@@ -21,17 +21,21 @@ on:
       - 'client/src/local/india**'
       - 'client/src/pages/India**'
       - 'client/src/pages/Home.jsx'
+      - 'client/src/pages/Classes.jsx'
       - 'client/src/pages/Exams.jsx'
       - 'client/src/pages/Progress*.jsx'
       - 'client/src/pages/Settings.jsx'
       - 'client/src/pages/PracticeBase.jsx'
       - 'client/src/platform/**'
+      - 'client/src/components/Class10NCERTLibrary.jsx'
       - 'client/src/components/CloudAccountPanel.jsx'
       - 'client/src/components/ClassroomPanel.jsx'
       - 'client/src/components/AssignmentInboxPanel.jsx'
       - 'client/src/components/StaffOperationsPanel.jsx'
       - 'client/src/api.js'
       - 'client/test/india-**'
+      - 'client/test/ncert-class10-**'
+      - 'client/test/class10-ncert-**'
       - 'client/test/cloud-**'
       - 'client/test/profile-cloud-**'
       - 'client/test/classroom-product-check.mjs'
@@ -80,6 +84,10 @@ jobs:
         run: node client/test/india-production-meta-check.mjs
       - name: Current Class 10 source truth
         run: node client/test/india-class10-current-source-check.mjs
+      - name: Full NCERT Class 10 book, answers, topper notes and source coverage
+        run: node client/test/ncert-class10-full-book-check.mjs
+      - name: NCERT Class 10 offline iPad and handwriting product integration
+        run: node client/test/class10-ncert-product-check.mjs
       - name: Current Class 10 polynomial zero-finding forms
         run: node client/test/india-class10-polynomial-current-check.mjs
       - name: Current Class 10 Triangle theorem forms
@@ -129,7 +137,7 @@ jobs:
       - name: Audited network boundary
         run: node tools/check-client-network-boundary.mjs
       - name: Client build
-        run: npm run build
+        run: npm run build --prefix client
 
   platform:
     name: Account, sync, billing, classroom and CMS contracts
