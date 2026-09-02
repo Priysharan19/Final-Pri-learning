@@ -1,18 +1,39 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useApp } from '../App.jsx';
-import { cloudAvailable } from '../platform/cloudTransport.js';
+import { cloud, cloudAvailable } from '../platform/cloudTransport.js';
 import {
   cloudAccountLink, disconnectCloudAccount, loginCloudAccount,
   refreshCloudEntitlement, registerCloudAccount, verifyCloudSession
 } from '../platform/cloudAccount.js';
 import { cloudSyncStatus, syncNow } from '../platform/syncWorker.js';
-import { DEFAULT_PUBLIC_PRICING } from '../platform/entitlements.js';
-
-const money = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 });
+import { normalizeCommercialDisplay } from '../platform/entitlements.js';
 
 function when(value) {
   if (!value) return 'Never';
   try { return new Date(value).toLocaleString(); } catch { return 'Unknown'; }
+}
+
+function price(value, currency) {
+  if (!value || !currency) return null;
+  try {
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency', currency, maximumFractionDigits: 0
+    }).format(value);
+  } catch {
+    return `${currency} ${value}`;
+  }
+}
+
+function pricingText(config) {
+  if (!config) return 'Storefront pricing is not available while the cloud service is offline.';
+  const monthly = price(config.monthly, config.currency);
+  const annual = price(config.annual, config.currency);
+  const pieces = [];
+  if (monthly) pieces.push(`${monthly}/month`);
+  if (annual) pieces.push(`${annual}/year`);
+  if (!pieces.length) return 'Public pricing has not been configured for this deployment yet. Store/provider pricing remains authoritative.';
+  const trial = config.trialDays ? ` with a ${config.trialDays}-day trial` : '';
+  return `${pieces.join(' or ')}${trial}. Display pricing is advisory; checkout/storefront pricing and server entitlements remain authoritative.`;
 }
 
 export default function CloudAccountPanel() {
@@ -21,6 +42,7 @@ export default function CloudAccountPanel() {
   const [link, setLink] = useState(null);
   const [status, setStatus] = useState(null);
   const [session, setSession] = useState(null);
+  const [pricing, setPricing] = useState(null);
   const [mode, setMode] = useState('login');
   const [form, setForm] = useState({ name: user?.name || '', email: '', password: '' });
   const [busy, setBusy] = useState('');
@@ -45,11 +67,20 @@ export default function CloudAccountPanel() {
   }
 
   useEffect(() => { reload().catch(() => {}); }, [user?.id, enabled]);
+  useEffect(() => {
+    let live = true;
+    if (!enabled) { setPricing(null); return () => { live = false; }; }
+    cloud.billingConfig()
+      .then(result => { if (live) setPricing(normalizeCommercialDisplay(result?.display)); })
+      .catch(() => { if (live) setPricing(null); });
+    return () => { live = false; };
+  }, [enabled]);
 
   const entitlement = link?.entitlement;
   const premium = !!entitlement?.active;
   const pending = status?.pending || 0;
   const canSync = enabled && !!link?.accountId && !!session?.connected;
+  const liveAccount = session?.connected ? session.account : null;
 
   async function submit(e) {
     e.preventDefault();
@@ -144,11 +175,11 @@ export default function CloudAccountPanel() {
       {link?.accountId && <div className="grid cols-2" style={{ gap: 14, marginTop: 16 }}>
         <div className="card" style={{ boxShadow: 'none' }}>
           <div className="sc-label">Cloud identity</div>
-          <div style={{ fontWeight: 680, marginTop: 4 }}>{link.name || user.name}</div>
-          <div className="muted" style={{ fontSize: 13 }}>{link.email || 'Email unavailable'}</div>
+          <div style={{ fontWeight: 680, marginTop: 4 }}>{liveAccount?.name || user.name}</div>
+          <div className="muted" style={{ fontSize: 13 }}>{liveAccount?.email || 'Account details available after sign-in'}</div>
           <div className="row" style={{ gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
-            <span className="tag">{link.role}</span>
-            <span className="tag">{link.emailVerified ? 'Email verified' : 'Email verification pending'}</span>
+            <span className="tag">{liveAccount?.role || link.role}</span>
+            <span className="tag">{(liveAccount?.emailVerified ?? link.emailVerified) ? 'Email verified' : 'Email verification pending'}</span>
           </div>
         </div>
         <div className="card" style={{ boxShadow: 'none' }}>
@@ -178,7 +209,7 @@ export default function CloudAccountPanel() {
       </div>}
 
       <div className="muted" style={{ marginTop: 14, fontSize: 12.5 }}>
-        Planned public pricing is currently {money.format(DEFAULT_PUBLIC_PRICING.monthlyDisplay)}/month or {money.format(DEFAULT_PUBLIC_PRICING.annualDisplay)}/year with about a {DEFAULT_PUBLIC_PRICING.trialDaysDisplay}-day trial. These are advisory display defaults only; the store/provider price and entitlement authority remain server/store controlled.
+        {pricingText(pricing)}
       </div>
 
       {message && <div role="status" style={{ marginTop: 12, color: 'var(--good)' }}>{message}</div>}
