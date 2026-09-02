@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { cloud, cloudAvailable } from '../platform/cloudTransport.js';
+import { onCloudSessionChange } from '../platform/cloudSession.js';
 
 function parseJson(text, label) {
   let value;
@@ -40,7 +41,13 @@ export default function StaffOperationsPanel() {
     const me = await cloud.me();
     const nextAccount = me?.account || null;
     setAccount(nextAccount);
-    if (!['support', 'admin'].includes(nextAccount?.role)) return;
+    if (!['support', 'admin'].includes(nextAccount?.role)) {
+      setRevisions([]);
+      setHealth(null);
+      setUsers([]);
+      setAudit([]);
+      return;
+    }
     const rev = await cloud.contentRevisions();
     setRevisions(Array.isArray(rev?.revisions) ? rev.revisions : []);
     if (nextAccount.role === 'admin') {
@@ -48,17 +55,39 @@ export default function StaffOperationsPanel() {
       setHealth(h || null);
       setUsers(Array.isArray(u?.users) ? u.users : []);
       setAudit(Array.isArray(a?.entries) ? a.entries : []);
+    } else {
+      setHealth(null);
+      setUsers([]);
+      setAudit([]);
     }
   }
 
   useEffect(() => {
     let live = true;
     if (!enabled) return () => { live = false; };
-    reloadStaff().catch(err => {
-      if (!live || err?.status === 401 || err?.status === 403) return;
-      setError(err.message || 'Staff operations could not be loaded.');
-    });
-    return () => { live = false; };
+
+    const refresh = async () => {
+      try {
+        await reloadStaff();
+        if (live) setError('');
+      } catch (err) {
+        if (!live) return;
+        if (err?.status === 401 || err?.status === 403) {
+          setAccount(null);
+          setRevisions([]);
+          setHealth(null);
+          setUsers([]);
+          setAudit([]);
+          setError('');
+          return;
+        }
+        setError(err.message || 'Staff operations could not be loaded.');
+      }
+    };
+
+    refresh();
+    const stop = onCloudSessionChange(() => { refresh(); });
+    return () => { live = false; stop(); };
   }, [enabled]);
 
   async function createDraft(e) {
