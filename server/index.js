@@ -14,6 +14,8 @@ import { fileURLToPath } from 'node:url';
 import { authRouter } from './auth.js';
 import { api } from './routes/api.js';
 import { platformDb } from './platform/db.js';
+import { ensureBillingSchema } from './platform/billingSchema.js';
+import { createRazorpayBilling } from './platform/razorpay.js';
 import { createPlatformRouter } from './platform/router.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -24,14 +26,19 @@ app.use(compression());
 app.use(express.json({
   limit: '1mb',
   verify(req, res, buffer) {
-    // Provider-specific billing webhook verifiers may require exact bytes. This
+    // Provider-specific billing webhook verifiers require the exact bytes. This
     // copy lives only for the request lifetime and is never logged/persisted.
     req.rawBody = Buffer.from(buffer);
   }
 }));
 app.use(cookieParser());
 
-app.use('/v1', createPlatformRouter(platformDb));
+ensureBillingSchema(platformDb);
+const billing = createRazorpayBilling(platformDb);
+app.use('/v1', createPlatformRouter(platformDb, {
+  billingVerifiers: billing.verifiers,
+  billingCheckout: billing.checkout
+}));
 
 // Legacy routes: kept until old tooling no longer needs the historical server.
 app.use('/api/auth', authRouter);
