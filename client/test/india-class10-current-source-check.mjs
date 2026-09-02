@@ -45,7 +45,8 @@ assert.deepEqual(reviewed, [
   'c10-coordinate-geometry',
   'c10-polynomials',
   'c10-probability',
-  'c10-statistics'
+  'c10-statistics',
+  'c10-triangles'
 ]);
 
 for (const id of reviewed) {
@@ -64,6 +65,14 @@ for (const id of reviewed) {
 assert.deepEqual(sourceById['c10-polynomials'].covers, [
   { gen: 'c10-polynomial-zeroes', dp: [0], diff: [1, 2] },
   { gen: 'c10-polynomial-zeroes', dp: [1], diff: [3, 4] }
+]);
+
+// The old y10-similarity bank includes area scaling and map scale, so it cannot
+// stand in for the current Class X theorem chapter. Dedicated forms split the
+// exact source claims: BPT/converse at D1–D2 and triangle similarity at D3–D4.
+assert.deepEqual(sourceById['c10-triangles'].covers, [
+  { gen: 'c10-triangles-current', dp: [0], diff: [1, 2] },
+  { gen: 'c10-triangles-current', dp: [1], diff: [3, 4] }
 ]);
 
 // Probability is deliberately narrow: the shared y8 bank also contains
@@ -92,6 +101,7 @@ for (const id of ['c10-real-numbers', 'c10-pair-linear-equations', 'c10-quadrati
 
 assert.deepEqual(uncoveredDotpoints(byId['c10-real-numbers']), [1], 'irrationality-proof practice remains the explicit Real Numbers blocker');
 assert.deepEqual(uncoveredDotpoints(byId['c10-polynomials']), [], 'graphical and algebraic polynomial zero-finding must both be covered');
+assert.deepEqual(uncoveredDotpoints(byId['c10-triangles']), [], 'BPT/converse and prescribed triangle similarity criteria must both be covered');
 assert.deepEqual(uncoveredDotpoints(byId['c10-pair-linear-equations']), [0], 'graphical solution/consistency remains the explicit simultaneous-equations blocker');
 assert.deepEqual(uncoveredDotpoints(byId['c10-surface-volume']), [0], 'combination surface-area practice remains the explicit mensuration blocker');
 
