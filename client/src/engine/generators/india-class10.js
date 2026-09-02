@@ -2,7 +2,7 @@
 // The established bank is preserved byte-for-byte in india-class10-base.js.
 // Only source-reviewed current-syllabus gaps are replaced here.
 import { indiaClass10 as baseIndiaClass10 } from './india-class10-base.js';
-import { currentPolynomialZeroes } from './india-class10-current-forms.js';
+import { currentPolynomialZeroes, currentTriangles } from './india-class10-current-forms.js';
 
 const basePolynomialZeroes = baseIndiaClass10['c10-polynomial-zeroes'];
 
@@ -14,5 +14,6 @@ function polynomialZeroes(rng, diff) {
 
 export const indiaClass10 = Object.freeze({
   ...baseIndiaClass10,
-  'c10-polynomial-zeroes': polynomialZeroes
+  'c10-polynomial-zeroes': polynomialZeroes,
+  'c10-triangles-current': currentTriangles
 });
