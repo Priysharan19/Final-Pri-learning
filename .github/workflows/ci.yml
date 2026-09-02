@@ -107,6 +107,7 @@ jobs:
           set -o pipefail
           npm run test:e2e 2>&1 | tee browser.log
           node client/test/tour-cloud-platform.js --no-build 2>&1 | tee -a browser.log
+          node client/test/tour-admin-cms-platform.js --no-build 2>&1 | tee -a browser.log
       - name: Accessibility suite
         if: always()
         run: |
@@ -120,6 +121,8 @@ jobs:
           grep -Eq 'E2E SUITE.*131/131.*5 flows' browser.log
           grep -Fq 'Cloud · account, live Settings refresh, assignment hand-off' browser.log
           grep -Eq 'E2E SUITE.*14/14.*1 flows' browser.log
+          grep -Fq 'Cloud admin · CMS lifecycle and role management' browser.log
+          grep -Eq 'E2E SUITE.*17/17.*1 flows' browser.log
           grep -Eq 'ACCESSIBILITY SUITE.*38/38.*12 groups' browser.log
           if grep -Fq 'not measured:' browser.log; then
             echo 'A browser suite reported skipped coverage.' >&2
