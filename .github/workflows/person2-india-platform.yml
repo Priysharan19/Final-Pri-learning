@@ -1,18 +1,9 @@
 name: Person 2 India + Platform
 
 on:
+  workflow_dispatch:
   push:
-    branches:
-      - main
-      - 'india/**'
-      - 'ios/**'
-      - 'auth/**'
-      - 'sync/**'
-      - 'billing/**'
-      - 'teacher/**'
-      - 'admin/**'
-      - 'cms/**'
-      - 'release/**'
+    branches: [main]
   pull_request:
     paths:
       - 'client/src/engine/india**'
@@ -61,6 +52,14 @@ on:
 
 permissions:
   contents: read
+
+# Person 2 branches are expected to evolve rapidly. PR validation is the
+# feature-branch authority; main is validated again after merge. Retaining every
+# historical synchronize run creates no extra evidence because only the latest
+# head can be merged.
+concurrency:
+  group: person2-india-platform-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   contracts:
