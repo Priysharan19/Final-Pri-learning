@@ -26,7 +26,12 @@ for (let seed = 1; seed <= 64; seed++) {
     assert.match(all, /quadratic|x\^2/i, `D${diff} seed ${seed} must actually formulate a quadratic`);
     assert.match(all, /let|model|represent|speed|width|integer/i, `D${diff} seed ${seed} must begin from the situation rather than a bare equation`);
     assert.ok(!/completing the square/i.test(all), 'current source mapping must not smuggle completing-square solving back into Class X');
-    assert.ok(!/negative.*answer|keep both/i.test(all), 'physical contexts must interpret and reject non-physical roots');
+    // The previous negative.*answer regex accidentally matched correct prose such
+    // as “reject the negative length … Answer”. Reject only the unsafe teaching
+    // claims themselves, while requiring explicit physical-root interpretation.
+    assert.ok(!/negative answer|keep both roots/i.test(all), 'physical contexts must not tell students to keep an inadmissible root');
+    assert.match(all, /reject the negative|positive (?:length|integer|speed|context)|positive speed/i,
+      `D${diff} seed ${seed} must explicitly interpret the physical root`);
 
     seenKinds.add(q.modelKind);
     if (q.modelKind === 'speed-time') speedForms += 1;
