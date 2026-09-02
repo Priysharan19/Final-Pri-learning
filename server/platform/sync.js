@@ -48,6 +48,35 @@ function conflictPayload(row) {
   } : null;
 }
 
+export function syncPullPage(db, accountId, cursor = 0, limit = MAX_PULL) {
+  const startCursor = Math.max(0, Math.floor(Number(cursor) || 0));
+  const pageLimit = Math.max(1, Math.min(MAX_PULL, Math.floor(Number(limit) || MAX_PULL)));
+  const eventRows = db.prepare(`SELECT server_cursor,id,device_id,device_seq,kind,entity_id,occurred_at,payload_json,created_at
+    FROM learning_events WHERE account_id=? AND server_cursor>? ORDER BY server_cursor LIMIT ?`).all(accountId, startCursor, pageLimit);
+  const entityRows = db.prepare(`SELECT server_cursor,kind,entity_id,version,body_json,tombstone,updated_at
+    FROM sync_entities WHERE account_id=? AND server_cursor>? ORDER BY server_cursor LIMIT ?`).all(accountId, startCursor, pageLimit);
+  const merged = [
+    ...eventRows.map(row => ({ type: 'event', cursor: row.server_cursor, row })),
+    ...entityRows.map(row => ({ type: 'entity', cursor: row.server_cursor, row }))
+  ].sort((a, b) => a.cursor - b.cursor).slice(0, pageLimit);
+  const cutoff = merged.length ? merged[merged.length - 1].cursor : startCursor;
+  const events = merged.filter(x => x.type === 'event').map(({ row }) => ({
+    serverCursor: row.server_cursor, id: row.id, deviceId: row.device_id, deviceSeq: row.device_seq, kind: row.kind,
+    entityId: row.entity_id, occurredAt: row.occurred_at, payload: parseJson(row.payload_json, {}), createdAt: row.created_at
+  }));
+  const entities = merged.filter(x => x.type === 'entity').map(({ row }) => ({
+    serverCursor: row.server_cursor, kind: row.kind, entityId: row.entity_id, version: row.version,
+    tombstone: !!row.tombstone, body: row.tombstone ? null : parseJson(row.body_json, {}), updatedAt: row.updated_at
+  }));
+
+  // The global cursor is only an allocation mechanism. Pagination is an account-
+  // scoped contract: another student's newer rows must never keep this account in
+  // a permanent hasMore loop or reveal anything about another tenant's activity.
+  const hasMoreEvent = db.prepare('SELECT 1 FROM learning_events WHERE account_id=? AND server_cursor>? LIMIT 1').get(accountId, cutoff);
+  const hasMoreEntity = db.prepare('SELECT 1 FROM sync_entities WHERE account_id=? AND server_cursor>? LIMIT 1').get(accountId, cutoff);
+  return { schemaVersion: SCHEMA, cursor: cutoff, hasMore: !!(hasMoreEvent || hasMoreEntity), events, entities };
+}
+
 export function createSyncRouter(db) {
   const router = Router();
   router.use(requireSession(db));
@@ -117,28 +146,10 @@ export function createSyncRouter(db) {
   });
 
   router.get('/pull/:cursor', rateLimit(db, 'sync-pull', { limit: 180, windowMs: 60 * 1000 }), (req, res) => {
-    const cursor = Math.max(0, Math.floor(Number(req.params.cursor) || 0));
     const accountId = req.platformSession.account_id;
-    const eventRows = db.prepare(`SELECT server_cursor,id,device_id,device_seq,kind,entity_id,occurred_at,payload_json,created_at
-      FROM learning_events WHERE account_id=? AND server_cursor>? ORDER BY server_cursor LIMIT ?`).all(accountId, cursor, MAX_PULL);
-    const entityRows = db.prepare(`SELECT server_cursor,kind,entity_id,version,body_json,tombstone,updated_at
-      FROM sync_entities WHERE account_id=? AND server_cursor>? ORDER BY server_cursor LIMIT ?`).all(accountId, cursor, MAX_PULL);
-    const merged = [
-      ...eventRows.map(row => ({ type: 'event', cursor: row.server_cursor, row })),
-      ...entityRows.map(row => ({ type: 'entity', cursor: row.server_cursor, row }))
-    ].sort((a, b) => a.cursor - b.cursor).slice(0, MAX_PULL);
-    const cutoff = merged.length ? merged[merged.length - 1].cursor : cursor;
-    const events = merged.filter(x => x.type === 'event').map(({ row }) => ({
-      serverCursor: row.server_cursor, id: row.id, deviceId: row.device_id, deviceSeq: row.device_seq, kind: row.kind,
-      entityId: row.entity_id, occurredAt: row.occurred_at, payload: parseJson(row.payload_json, {}), createdAt: row.created_at
-    }));
-    const entities = merged.filter(x => x.type === 'entity').map(({ row }) => ({
-      serverCursor: row.server_cursor, kind: row.kind, entityId: row.entity_id, version: row.version,
-      tombstone: !!row.tombstone, body: row.tombstone ? null : parseJson(row.body_json, {}), updatedAt: row.updated_at
-    }));
-    const latest = db.prepare('SELECT value FROM sync_cursors WHERE id=1').get()?.value || 0;
+    const page = syncPullPage(db, accountId, req.params.cursor, MAX_PULL);
     res.set('Cache-Control', 'no-store');
-    res.json({ schemaVersion: SCHEMA, cursor: cutoff, hasMore: cutoff < latest, events, entities });
+    res.json(page);
   });
 
   return router;
