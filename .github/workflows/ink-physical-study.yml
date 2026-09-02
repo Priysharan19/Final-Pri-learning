@@ -1,0 +1,39 @@
+name: Ink Physical Study Operations
+
+on:
+  pull_request:
+    paths:
+      - 'client/src/ink/productionEvidence.js'
+      - 'client/test/ink-physical-study-plan-check.mjs'
+      - 'scripts/ink-physical-study-status.mjs'
+      - 'handwriting/v12/PHYSICAL_STUDY_PLAN.json'
+      - 'handwriting/v12/PHYSICAL_STUDY_RUNBOOK.md'
+      - 'handwriting/v12/evidence/physical/**'
+      - '.github/workflows/ink-physical-study.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'client/src/ink/productionEvidence.js'
+      - 'client/test/ink-physical-study-plan-check.mjs'
+      - 'scripts/ink-physical-study-status.mjs'
+      - 'handwriting/v12/PHYSICAL_STUDY_PLAN.json'
+      - 'handwriting/v12/PHYSICAL_STUDY_RUNBOOK.md'
+      - 'handwriting/v12/evidence/physical/**'
+      - '.github/workflows/ink-physical-study.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate deterministic writer allocation and study capacity
+        run: node client/test/ink-physical-study-plan-check.mjs
+      - name: Report current test-set collection status
+        run: node scripts/ink-physical-study-status.mjs --split test
