@@ -92,6 +92,8 @@ jobs:
         run: node client/test/india-class10-quadratic-context-current-check.mjs
       - name: Current Class 10 exposed surface-area combinations
         run: node client/test/india-class10-surface-combo-current-check.mjs
+      - name: Current Class 10 dedicated trigonometry
+        run: node client/test/india-class10-trigonometry-current-check.mjs
       - name: Student practice target availability
         run: node client/test/india-practice-availability-check.mjs
       - name: India exam source/claim contract
