@@ -27,8 +27,15 @@ export function commercialConfig() {
       appleAnnual: process.env.PRI_APPLE_ANNUAL_PRODUCT_ID || null,
       googleMonthly: process.env.PRI_GOOGLE_MONTHLY_PRODUCT_ID || null,
       googleAnnual: process.env.PRI_GOOGLE_ANNUAL_PRODUCT_ID || null,
-      webMonthly: process.env.PRI_WEB_MONTHLY_PRICE_ID || null,
-      webAnnual: process.env.PRI_WEB_ANNUAL_PRICE_ID || null
+      webMonthly: process.env.PRI_RAZORPAY_MONTHLY_PLAN_ID || process.env.PRI_WEB_MONTHLY_PRICE_ID || null,
+      webAnnual: process.env.PRI_RAZORPAY_ANNUAL_PLAN_ID || process.env.PRI_WEB_ANNUAL_PRICE_ID || null
+    }),
+    webCheckout: Object.freeze({
+      provider: 'razorpay',
+      configured: !!(
+        process.env.PRI_RAZORPAY_KEY_ID && process.env.PRI_RAZORPAY_KEY_SECRET && process.env.PRI_RAZORPAY_WEBHOOK_SECRET &&
+        (process.env.PRI_RAZORPAY_MONTHLY_PLAN_ID || process.env.PRI_WEB_MONTHLY_PRICE_ID || process.env.PRI_RAZORPAY_ANNUAL_PLAN_ID || process.env.PRI_WEB_ANNUAL_PRICE_ID)
+      )
     }),
     platformRule: 'Native iOS/Android purchases must use the platform billing mechanism required for that storefront. The server consumes verified provider events and never trusts client premium flags.'
   });
@@ -46,7 +53,7 @@ function validateVerifiedResult(result, provider) {
   return result;
 }
 
-export function createBillingRouter(db, { verifiers = {} } = {}) {
+export function createBillingRouter(db, { verifiers = {}, checkout = {} } = {}) {
   const router = Router();
 
   router.get('/config', (req, res) => res.json(commercialConfig()));
@@ -59,6 +66,22 @@ export function createBillingRouter(db, { verifiers = {} } = {}) {
       currentPeriodEnd: row.current_period_end, graceUntil: row.grace_until,
       sourceVersion: row.source_version, updatedAt: row.updated_at
     } : { plan: 'free', status: 'free', provider: 'none' } });
+  });
+
+  // Web checkout is created server-side so API secrets and account binding never
+  // enter the browser. The returned URL is a provider-hosted authorization page;
+  // Premium still unlocks only after a verified webhook/restore updates the
+  // server entitlement snapshot.
+  router.post('/checkout/web', requireSession(db), rateLimit(db, 'billing-checkout-web', { limit: 8, windowMs: 60 * 60 * 1000 }), async (req, res, next) => {
+    const create = checkout.web?.create;
+    if (typeof create !== 'function') return res.status(503).json({ error: { code: 'BILLING_PROVIDER_NOT_CONFIGURED', message: 'Web subscription checkout is not configured on this deployment.' } });
+    try {
+      const result = await create({
+        accountId: req.platformSession.account_id,
+        cadence: String(req.body?.cadence || '')
+      });
+      res.status(201).json({ checkout: result });
+    } catch (err) { next(err); }
   });
 
   router.post('/restore/:provider', requireSession(db), rateLimit(db, 'billing-restore', { limit: 12, windowMs: 60 * 60 * 1000 }), async (req, res, next) => {
@@ -90,7 +113,7 @@ export function createBillingRouter(db, { verifiers = {} } = {}) {
         const result = validateVerifiedResult(candidate, provider);
         results.push(applyVerifiedEntitlement(db, result));
       }
-      res.json({ ok: true, applied: results.length });
+      res.json({ ok: true, applied: results.length, stale: results.filter(result => result?.stale).length });
     } catch (err) { next(err); }
   });
 
