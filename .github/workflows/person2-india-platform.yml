@@ -1,0 +1,84 @@
+name: Person 2 India + Platform
+
+on:
+  push:
+    branches:
+      - main
+      - 'india/**'
+      - 'auth/**'
+      - 'sync/**'
+      - 'billing/**'
+      - 'teacher/**'
+      - 'admin/**'
+      - 'cms/**'
+      - 'release/**'
+  pull_request:
+    paths:
+      - 'client/src/engine/india**'
+      - 'client/src/local/india**'
+      - 'client/src/pages/India**'
+      - 'client/src/pages/Exams.jsx'
+      - 'client/src/pages/Progress*.jsx'
+      - 'client/src/platform/**'
+      - 'client/src/api.js'
+      - 'client/test/india-**'
+      - 'client/test/entitlement-check.mjs'
+      - 'client/test/sync-contract-check.mjs'
+      - 'server/platform/**'
+      - 'server/test/platform-**'
+      - 'tools/india-**'
+      - 'tools/check-client-network-boundary.mjs'
+      - '.github/workflows/person2-india-platform.yml'
+      - '.github/workflows/ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    name: India product and offline/cloud contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+      - name: Install client dependencies
+        run: npm ci --prefix client
+      - name: India curriculum provenance
+        run: node client/test/india-production-meta-check.mjs
+      - name: India exam source/claim contract
+        run: node client/test/india-exam-blueprint-check.mjs
+      - name: India progress presentation contract
+        run: node client/test/india-progress-product-check.mjs
+      - name: India product routing
+        run: node client/test/india-product-routing-check.mjs
+      - name: Premium entitlement authority
+        run: node client/test/entitlement-check.mjs
+      - name: Sync conflict/idempotency contract
+        run: node client/test/sync-contract-check.mjs
+      - name: Coverage census
+        run: node tools/india-production-census.mjs
+      - name: Audited network boundary
+        run: node tools/check-client-network-boundary.mjs
+      - name: Client build
+        run: npm run build
+
+  platform:
+    name: Account, sync, billing, classroom and CMS schema
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+      - name: Install server dependencies
+        run: npm ci --prefix server
+      - name: Platform schema contract
+        run: node server/test/platform-schema-check.mjs
