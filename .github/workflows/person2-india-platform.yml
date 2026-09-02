@@ -36,6 +36,7 @@ on:
       - 'client/test/profile-cloud-**'
       - 'client/test/classroom-product-check.mjs'
       - 'client/test/assignment-staff-product-check.mjs'
+      - 'client/test/tour-cloud-platform.js'
       - 'client/test/entitlement-check.mjs'
       - 'client/test/sync-contract-check.mjs'
       - 'client/test/native-storekit-boundary-check.mjs'
@@ -95,6 +96,8 @@ jobs:
         run: node client/test/profile-cloud-outbox-check.mjs
       - name: Cloud account link boundary
         run: node client/test/cloud-account-boundary-check.mjs
+      - name: Cloud session live refresh
+        run: node client/test/cloud-session-refresh-check.mjs
       - name: Classroom client transport boundary
         run: node client/test/classroom-product-check.mjs
       - name: Assignment execution and staff UI boundary
