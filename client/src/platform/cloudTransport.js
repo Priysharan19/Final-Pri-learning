@@ -263,6 +263,13 @@ export const cloud = Object.freeze({
   }),
   restoreBilling: (provider, body = {}) => cloudRequest(`/v1/billing/restore/${pathId(provider, 'provider')}`, { method: 'POST', body }),
   classes: () => cloudRequest('/v1/classes'),
+  classDetails: classId => cloudRequest(`/v1/classes/${pathId(classId, 'class id')}`),
+  classStudents: classId => cloudRequest(`/v1/classes/${pathId(classId, 'class id')}/students`),
+  createClass: name => cloudRequest('/v1/classes', { method: 'POST', body: { name } }),
+  joinClass: code => cloudRequest('/v1/classes/join', { method: 'POST', body: { code } }),
+  createAssignment: (classId, body) => cloudRequest(`/v1/classes/${pathId(classId, 'class id')}/assignments`, { method: 'POST', body }),
+  updateSubmission: (classId, assignmentId, body) => cloudRequest(`/v1/classes/${pathId(classId, 'class id')}/assignments/${pathId(assignmentId, 'assignment id')}/submission`, { method: 'PATCH', body }),
+  returnSubmission: (classId, assignmentId, studentId, feedback = {}) => cloudRequest(`/v1/classes/${pathId(classId, 'class id')}/assignments/${pathId(assignmentId, 'assignment id')}/submissions/${pathId(studentId, 'student id')}/return`, { method: 'POST', body: { feedback } }),
   reportIssue: (body, idempotencyKey) => cloudRequest('/v1/reports', { method: 'POST', body, idempotencyKey }),
   telemetry: events => cloudRequest('/v1/telemetry', { method: 'POST', body: { events } })
 });
