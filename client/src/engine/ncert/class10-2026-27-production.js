@@ -12,7 +12,20 @@ export const CBSE_CLASS10_2026_27_SOURCE = Object.freeze({
   cbseMathematicsPdf: 'https://cbseacademic.nic.in/web_material/CurriculumMain27/SecPart1/Maths_SecP1X_2026-27.pdf',
   ncertTextbook: 'https://www.ncert.nic.in/textbook/pdf/jemh1ps.pdf',
   ncertEdition: 'Mathematics Textbook for Class X, Reprint 2026–27',
-  reviewedAt: '2026-09-02',
+  reviewedAt: '2026-09-03',
+  constraints: Object.freeze({
+    heightsAndDistancesAnglesDeg: Object.freeze([30, 45, 60]),
+    heightsAndDistancesMaxRightTriangles: 2,
+    circleSegmentCentralAnglesDeg: Object.freeze([60, 90, 120])
+  }),
+  legacyExcludedOutcomes: Object.freeze([
+    "Euclid's division lemma or division algorithm as a current Class X outcome",
+    'polynomial division algorithm',
+    'coordinate-geometry area of a triangle',
+    'areas of similar triangles as a current Class X theorem outcome',
+    'recasting or melting solids',
+    'ogive or cumulative-frequency graph work'
+  ]),
   reviewRule: 'Only exact current-syllabus outcomes with audited generator forms can be promoted to reviewed production coverage.'
 });
 
@@ -31,7 +44,10 @@ export const CBSE_CLASS10_2026_27_CHAPTERS = Object.freeze([
     'Apply the Fundamental Theorem of Arithmetic and prime factorisation to integer problems',
     'Prove irrationality results such as √2, √3 and √5 by contradiction'
   ], [
-    cover('c10-real-numbers', [0], [1, 2, 3, 4])
+    // D1 and D4 in the legacy bank explicitly teach Euclid/remainder forms.
+    // D2–D3 stay within prime-factor/HCF-LCM applications and are the only
+    // current-safe forms retained until a dedicated Class X bank replaces them.
+    cover('c10-real-numbers', [0], [2, 3])
     // Irrationality proof reasoning is intentionally uncovered.
   ]),
 
@@ -45,22 +61,24 @@ export const CBSE_CLASS10_2026_27_CHAPTERS = Object.freeze([
 
   chapter('c10-pair-linear-equations', [
     'Solve a pair of linear equations graphically and decide consistency or inconsistency',
+    'Use algebraic conditions to determine the number of solutions of a pair of linear equations',
     'Solve a pair of linear equations by substitution and elimination',
     'Model and solve simple situational problems using a pair of linear equations'
   ], [
-    cover('y10-simeq', [1], [1, 2, 3]),
-    cover('y10-simeq', [2], [4])
-    // The current graphical solution/consistency outcome remains uncovered.
+    cover('y10-simeq', [2], [1, 2, 3]),
+    cover('y10-simeq', [3], [4])
+    // The graphical and algebraic solution-count outcomes remain uncovered.
   ]),
 
   chapter('c10-quadratic-equations', [
     'Solve real-root quadratic equations by factorisation',
-    'Use the quadratic formula and discriminant to solve and classify real roots',
+    'Solve real-root quadratic equations using the quadratic formula',
+    'Use the discriminant to classify the nature of the roots',
     'Formulate and solve situational problems leading to a quadratic equation'
   ], [
     cover('y10-quadratics', [0], [1, 3]),
     cover('y10-quadratics', [1], [4])
-    // Contextual quadratic modelling remains uncovered in the reviewed mapping.
+    // Discriminant classification and contextual modelling remain uncovered.
   ]),
 
   chapter('c10-arithmetic-progressions', [
@@ -77,7 +95,9 @@ export const CBSE_CLASS10_2026_27_CHAPTERS = Object.freeze([
     'Prove and apply the Basic Proportionality Theorem and its converse',
     'Establish and apply the prescribed similarity criteria for triangles'
   ], [
-    cover('y10-similarity', [0, 1], [1, 2, 3, 4])
+    // The shared y10-similarity bank asks generic scale, area-scale and map-scale
+    // questions. Those are useful elsewhere but are not evidence for these two
+    // current theorem outcomes, so Class X fails closed until exact forms exist.
   ]),
 
   chapter('c10-coordinate-geometry', [
@@ -90,18 +110,23 @@ export const CBSE_CLASS10_2026_27_CHAPTERS = Object.freeze([
 
   chapter('c10-trigonometry', [
     'Use trigonometric ratios of an acute angle in a right triangle',
-    'Evaluate trigonometric ratios at 0°, 30°, 45°, 60° and 90° and relate the ratios',
+    'Use the exact trigonometric values at 30°, 45° and 60°',
+    'Motivate the trigonometric ratios defined at 0° and 90° and relate the trigonometric ratios',
     'Prove and apply simple identities based on sin²A + cos²A = 1'
   ], [
     cover('y9-trig', [0], [1, 2, 3]),
-    cover('y11-trigfunc', [1], [1, 2]),
-    cover('y11-trigfunc', [2], [4])
+    // D1 is restricted to the 30°/45°/60° exact-value table. D2 in the same
+    // bank intentionally moves to angles such as 180°/270° and is therefore
+    // not credited to Class X. The mixed D4 identity cell is also withheld
+    // until a per-question Class X declaration is authored.
+    cover('y11-trigfunc', [1], [1])
   ]),
 
   chapter('c10-trig-applications', [
     'Solve heights-and-distances problems using 30°, 45° and 60° angles of elevation or depression with no more than two right triangles'
   ], [
-    cover('y10-trig', [0], [1, 2, 3, 4])
+    // y10-trig generates arbitrary angles and bearings. It is intentionally not
+    // routed into current CBSE Class X; a dedicated prescribed-angle bank is due.
   ]),
 
   chapter('c10-circles', [
@@ -125,7 +150,7 @@ export const CBSE_CLASS10_2026_27_CHAPTERS = Object.freeze([
     'Find volumes of combinations of two prescribed solids'
   ], [
     cover('c10-surface-volume-combo', [1], [1, 2])
-    // Recasting is not promoted as current syllabus coverage, and an exact
+    // D3–D4 are recasting/melting forms and are intentionally excluded. An exact
     // reviewed combination-surface-area form is still missing.
   ]),
 
@@ -137,6 +162,7 @@ export const CBSE_CLASS10_2026_27_CHAPTERS = Object.freeze([
     cover('c10-statistics', [0], [1]),
     cover('c10-statistics', [1], [2]),
     cover('c10-statistics', [2], [3])
+    // D4 is an ogive/cumulative-frequency form and is not current Class X.
   ], true),
 
   chapter('c10-probability', [
