@@ -39,9 +39,12 @@ export const CBSE_CLASS10_2026_27_CHAPTERS = Object.freeze([
     'Find zeroes of a polynomial graphically and algebraically',
     'Relate the zeroes of a quadratic polynomial to its coefficients'
   ], [
-    cover('c10-polynomial-zeroes', [1], [1, 2, 3, 4])
-    // Current graphical/algebraic zero-finding is not yet authored exactly.
-  ]),
+    // D1 reads the x-intercepts of an actual plotted parabola; D2 finds the
+    // zeroes algebraically by factorisation. D3–D4 retain the audited
+    // zeroes↔coefficients forms from the established Class 10 bank.
+    cover('c10-polynomial-zeroes', [0], [1, 2]),
+    cover('c10-polynomial-zeroes', [1], [3, 4])
+  ], true),
 
   chapter('c10-pair-linear-equations', [
     'Solve a pair of linear equations graphically and decide consistency or inconsistency',
