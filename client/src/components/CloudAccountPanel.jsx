@@ -33,17 +33,19 @@ function pricingText(config) {
   if (monthly) pieces.push(`${monthly}/month`);
   if (annual) pieces.push(`${annual}/year`);
   if (!pieces.length) return 'Public pricing has not been configured for this deployment yet. Store/provider pricing remains authoritative.';
-  const trial = config.trialDays ? ` with a ${config.trialDays}-day trial` : '';
+  const trial = config.trialDays ? ` with a ${config.trialDays}-day trial when eligible` : '';
   return `${pieces.join(' or ')}${trial}. Display pricing is advisory; checkout/storefront pricing and server entitlements remain authoritative.`;
 }
 
 export default function CloudAccountPanel() {
   const { user } = useApp();
   const enabled = cloudAvailable();
+  const nativeShell = typeof window !== 'undefined' && !!window.__PRI_NATIVE__;
   const [link, setLink] = useState(null);
   const [status, setStatus] = useState(null);
   const [session, setSession] = useState(null);
   const [pricing, setPricing] = useState(null);
+  const [webCheckout, setWebCheckout] = useState(false);
   const [mode, setMode] = useState('login');
   const [form, setForm] = useState({ name: user?.name || '', email: '', password: '' });
   const [busy, setBusy] = useState('');
@@ -70,10 +72,22 @@ export default function CloudAccountPanel() {
   useEffect(() => { reload().catch(() => {}); }, [user?.id, enabled]);
   useEffect(() => {
     let live = true;
-    if (!enabled) { setPricing(null); return () => { live = false; }; }
+    if (!enabled) {
+      setPricing(null);
+      setWebCheckout(false);
+      return () => { live = false; };
+    }
     cloud.billingConfig()
-      .then(result => { if (live) setPricing(normalizeCommercialDisplay(result?.display)); })
-      .catch(() => { if (live) setPricing(null); });
+      .then(result => {
+        if (!live) return;
+        setPricing(normalizeCommercialDisplay(result?.display));
+        setWebCheckout(result?.webCheckout?.configured === true);
+      })
+      .catch(() => {
+        if (!live) return;
+        setPricing(null);
+        setWebCheckout(false);
+      });
     return () => { live = false; };
   }, [enabled]);
 
@@ -81,6 +95,7 @@ export default function CloudAccountPanel() {
   const premium = !!entitlement?.active;
   const pending = status?.pending || 0;
   const canSync = enabled && !!link?.accountId && !!session?.connected;
+  const canUseWebBilling = canSync && webCheckout && !nativeShell;
   const liveAccount = session?.connected ? session.account : null;
 
   async function submit(e) {
@@ -130,6 +145,45 @@ export default function CloudAccountPanel() {
       setMessage(`Sync complete: ${result.pushedEvents || 0} learning event(s), ${result.pushedEntities || 0} record(s) pushed; ${result.pulledEvents || 0} event(s), ${result.pulledEntities || 0} record(s) received.`);
       await reload({ verify: false });
     } catch (err) { setError(err.message || 'Sync could not complete. Your local work is still safe on this device.'); }
+    finally { setBusy(''); }
+  }
+
+  async function startWebCheckout(cadence) {
+    if (!canUseWebBilling) return;
+    setBusy(`checkout-${cadence}`);
+    setError('');
+    setMessage('');
+    try {
+      const result = await cloud.createWebBillingCheckout(cadence);
+      const checkout = result?.checkout;
+      let destination;
+      try {
+        destination = new URL(String(checkout?.checkoutUrl || ''));
+        if (destination.protocol !== 'https:' || destination.hostname !== 'rzp.io') throw new Error('invalid hosted checkout');
+      } catch {
+        throw new Error('The payment provider returned an invalid checkout address.');
+      }
+      // The hosted provider page performs payment authorisation. Returning from
+      // it does not itself unlock Premium; the verified server webhook/restore is
+      // the only entitlement authority.
+      window.location.assign(destination.toString());
+    } catch (err) {
+      setError(err.message || 'Could not start subscription checkout.');
+      setBusy('');
+    }
+  }
+
+  async function restoreWebBilling() {
+    if (!canUseWebBilling) return;
+    setBusy('restore-web');
+    setError('');
+    setMessage('');
+    try {
+      await cloud.restoreBilling('web', {});
+      await refreshCloudEntitlement(user.id);
+      await reload({ verify: false });
+      setMessage('Subscription status restored from the payment provider.');
+    } catch (err) { setError(err.message || 'Could not restore the web subscription.'); }
     finally { setBusy(''); }
   }
 
@@ -222,6 +276,20 @@ export default function CloudAccountPanel() {
             {premium ? `${entitlement.status} · ${entitlement.provider}` : entitlement?.stale ? 'Paid cache expired; reconnect to refresh.' : 'No active paid entitlement.'}
           </div>
           {entitlement?.offlineUntil && <div className="muted" style={{ fontSize: 12, marginTop: 6 }}>Offline entitlement valid until {when(entitlement.offlineUntil)}</div>}
+          {canUseWebBilling && <div className="row" style={{ gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
+            {!premium && pricing?.monthly && <button className="btn btn-sm btn-primary" type="button" disabled={!!busy} onClick={() => startWebCheckout('monthly')}>
+              {busy === 'checkout-monthly' ? 'Opening…' : `Monthly ${price(pricing.monthly, pricing.currency)}`}
+            </button>}
+            {!premium && pricing?.annual && <button className="btn btn-sm btn-ghost" type="button" disabled={!!busy} onClick={() => startWebCheckout('annual')}>
+              {busy === 'checkout-annual' ? 'Opening…' : `Annual ${price(pricing.annual, pricing.currency)}`}
+            </button>}
+            <button className="btn btn-sm btn-quiet" type="button" disabled={!!busy} onClick={restoreWebBilling}>
+              {busy === 'restore-web' ? 'Restoring…' : 'Restore web subscription'}
+            </button>
+          </div>}
+          {nativeShell && <div className="muted" style={{ fontSize: 12, marginTop: 8 }}>
+            Native purchases are handled by the device storefront rather than web checkout.
+          </div>}
         </div>
       </div>}
 
