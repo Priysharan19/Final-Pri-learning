@@ -95,13 +95,16 @@ assert.deepEqual(sourceById['c10-pair-linear-equations'].covers, [
   { gen: 'y10-simeq', dp: [3], diff: [4] }
 ]);
 
-// Trigonometry keeps the acute-triangle forms and only the D1 special-angle
-// table. The shared D2 cell intentionally reaches 180°/270°/coterminal angles,
-// while D4 mixes broader identities, so neither is credited to current Class X.
+// Trigonometry keeps acute right-triangle work, the D1 30°/45°/60° exact table,
+// and the D4 simple-identity cell. D2 intentionally reaches 180°/270° and
+// coterminal angles, so it cannot be credited to current Class X.
 assert.deepEqual(sourceById['c10-trigonometry'].covers, [
   { gen: 'y9-trig', dp: [0], diff: [1, 2, 3] },
-  { gen: 'y11-trigfunc', dp: [1], diff: [1] }
+  { gen: 'y11-trigfunc', dp: [1], diff: [1] },
+  { gen: 'y11-trigfunc', dp: [3], diff: [4] }
 ]);
+assert.equal(sourceById['c10-trigonometry'].covers.some(cover => cover.gen === 'y11-trigfunc' && cover.diff.includes(2)), false,
+  'angles-of-any-magnitude D2 forms cannot count as current Class X trigonometry');
 
 // These broad shared generators contain out-of-syllabus branches for the
 // current outcomes and therefore must not be reachable through Class X.
@@ -131,7 +134,7 @@ assert.deepEqual(uncoveredDotpoints(byId['c10-polynomials']), [0], 'current zero
 assert.deepEqual(uncoveredDotpoints(byId['c10-pair-linear-equations']), [0, 1], 'graphical and algebraic solution-count forms remain explicit system blockers');
 assert.deepEqual(uncoveredDotpoints(byId['c10-quadratic-equations']), [2, 3], 'discriminant classification and contextual modelling remain explicit quadratic blockers');
 assert.deepEqual(uncoveredDotpoints(byId['c10-triangles']), [0, 1], 'BPT and similarity-criteria theorem forms remain explicit triangle blockers');
-assert.deepEqual(uncoveredDotpoints(byId['c10-trigonometry']), [2, 3], '0°/90° relationships and current-bounded identities remain explicit trig blockers');
+assert.deepEqual(uncoveredDotpoints(byId['c10-trigonometry']), [2], '0°/90° ratio relationships remain the explicit trigonometry blocker');
 assert.deepEqual(uncoveredDotpoints(byId['c10-trig-applications']), [0], 'prescribed-angle heights-and-distances remains explicitly unavailable');
 assert.deepEqual(uncoveredDotpoints(byId['c10-surface-volume']), [0], 'combination surface-area practice remains the explicit mensuration blocker');
 
