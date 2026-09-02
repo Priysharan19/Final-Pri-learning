@@ -91,5 +91,7 @@ jobs:
         run: npm ci --prefix server
       - name: Platform schema contract
         run: node server/test/platform-schema-check.mjs
+      - name: Platform migration contract
+        run: node server/test/platform-migration-check.mjs
       - name: Cross-account sync pagination regression
         run: node server/test/platform-sync-pagination-check.mjs
