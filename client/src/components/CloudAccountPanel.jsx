@@ -7,6 +7,7 @@ import {
 } from '../platform/cloudAccount.js';
 import { cloudSyncStatus, syncNow } from '../platform/syncWorker.js';
 import { normalizeCommercialDisplay } from '../platform/entitlements.js';
+import CloudAccountSecurity from './CloudAccountSecurity.jsx';
 
 function when(value) {
   if (!value) return 'Never';
@@ -102,6 +103,24 @@ export default function CloudAccountPanel() {
     finally { setBusy(''); }
   }
 
+  async function requestReset() {
+    if (!enabled) return;
+    if (!form.email.trim()) {
+      setError('Enter your email first.');
+      return;
+    }
+    setBusy('reset');
+    setError('');
+    setMessage('');
+    try {
+      await cloud.requestPasswordReset({ email: form.email });
+      // The server deliberately gives the same response whether or not an account
+      // exists, so the UI must preserve that enumeration-safe contract.
+      setMessage('If a Pri Learning account exists for that email, a password-reset email has been queued.');
+    } catch (err) { setError(err.message || 'Could not request password recovery.'); }
+    finally { setBusy(''); }
+  }
+
   async function doSync() {
     setBusy('sync');
     setError('');
@@ -123,6 +142,15 @@ export default function CloudAccountPanel() {
       setMessage('Cloud account disconnected from this local profile. Local learning data was not deleted.');
     } catch (err) { setError(err.message || 'Could not disconnect.'); }
     finally { setBusy(''); }
+  }
+
+  async function securityDisconnected({ cloudDeleted = false } = {}) {
+    setLink(null);
+    setStatus(null);
+    setSession(null);
+    setMessage(cloudDeleted
+      ? 'Cloud account deleted. This device’s separate offline profile remains available.'
+      : 'Cloud session ended. This device’s separate offline profile remains available.');
   }
 
   const stateLabel = useMemo(() => {
@@ -167,9 +195,14 @@ export default function CloudAccountPanel() {
             <input className="input" id="cloud-password" type="password" autoComplete={mode === 'register' ? 'new-password' : 'current-password'} minLength={10} maxLength={200} value={form.password} onChange={e => setForm(v => ({ ...v, password: e.target.value }))} required />
           </div>
         </div>
-        <button className="btn btn-primary" type="submit" disabled={!!busy} style={{ marginTop: 8 }}>
-          {busy ? 'Connecting…' : mode === 'register' ? 'Create and connect account' : 'Connect account'}
-        </button>
+        <div className="row" style={{ gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
+          <button className="btn btn-primary" type="submit" disabled={!!busy}>
+            {busy === mode ? 'Connecting…' : mode === 'register' ? 'Create and connect account' : 'Connect account'}
+          </button>
+          {mode === 'login' && <button className="btn btn-quiet" type="button" onClick={requestReset} disabled={!!busy}>
+            {busy === 'reset' ? 'Requesting…' : 'Forgot password?'}
+          </button>}
+        </div>
       </form>}
 
       {link?.accountId && <div className="grid cols-2" style={{ gap: 14, marginTop: 16 }}>
@@ -201,12 +234,19 @@ export default function CloudAccountPanel() {
             {status?.lastError && <div style={{ color: 'var(--bad)', fontSize: 12 }}>Last error: {status.lastError}</div>}
           </div>
           <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
-            <button className="btn btn-primary" onClick={doSync} disabled={!canSync || !!busy}>{busy === 'sync' ? 'Syncing…' : 'Sync now'}</button>
-            <button className="btn btn-ghost" onClick={() => refreshCloudEntitlement(user.id).then(() => reload({ verify: false })).catch(err => setError(err.message))} disabled={!canSync || !!busy}>Refresh Premium</button>
-            <button className="btn btn-quiet" onClick={disconnect} disabled={!!busy}>Disconnect</button>
+            <button className="btn btn-primary" type="button" onClick={doSync} disabled={!canSync || !!busy}>{busy === 'sync' ? 'Syncing…' : 'Sync now'}</button>
+            <button className="btn btn-ghost" type="button" onClick={() => refreshCloudEntitlement(user.id).then(() => reload({ verify: false })).catch(err => setError(err.message))} disabled={!canSync || !!busy}>Refresh Premium</button>
+            <button className="btn btn-quiet" type="button" onClick={disconnect} disabled={!!busy}>Disconnect</button>
           </div>
         </div>
       </div>}
+
+      {session?.connected && liveAccount && <CloudAccountSecurity
+        pid={user.id}
+        account={liveAccount}
+        onChanged={() => reload()}
+        onDeleted={securityDisconnected}
+      />}
 
       <div className="muted" style={{ marginTop: 14, fontSize: 12.5 }}>
         {pricingText(pricing)}
