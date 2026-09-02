@@ -1,0 +1,51 @@
+name: Admin CMS Browser
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'client/test/tour-admin-cms-platform.js'
+      - 'client/src/components/StaffOperationsPanel.jsx'
+      - 'client/src/components/CloudAccountPanel.jsx'
+      - 'client/src/platform/cloudTransport.js'
+      - 'client/src/platform/cloudAccount.js'
+      - 'client/src/platform/cloudSession.js'
+      - '.github/workflows/admin-cms-browser.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: admin-cms-browser-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  browser:
+    name: Authenticated admin/CMS product journey
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+      - name: Install client dependencies
+        run: npm ci --prefix client
+      - name: Install Chromium
+        working-directory: client
+        run: npx playwright install --with-deps chromium
+      - name: Run admin/CMS journey
+        run: |
+          set -euo pipefail
+          node client/test/tour-admin-cms-platform.js 2>&1 | tee admin-cms-browser.log
+          grep -Fq 'Admin CMS · independent review, publish, roles and audit' admin-cms-browser.log
+          grep -Eq 'E2E SUITE.*13/13.*1 flows' admin-cms-browser.log
+      - name: Upload browser log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: admin-cms-browser-log
+          path: admin-cms-browser.log
+          if-no-files-found: error
