@@ -12,7 +12,7 @@
 // The API is InkCanvas's, method for method, so InkAnswer neither knows nor
 // cares which surface it is holding.
 // ─────────────────────────────────────────────────────────────────────────────
-import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
+import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useRef } from 'react';
 import { nativeInk } from './native.js';
 
 const NativeInkCanvas = forwardRef(function NativeInkCanvas({
@@ -21,13 +21,23 @@ const NativeInkCanvas = forwardRef(function NativeInkCanvas({
 }, ref) {
   const wrapRef = useRef(null);
   const strokesRef = useRef([]);
-  const [, force] = useState(0);
+  const onStrokesChangeRef = useRef(onStrokesChange);
+
+  // Keep the bridge subscription and PencilKit mount stable even when the parent
+  // recreates its callback (for example after a symbol override). Remounting the
+  // native bridge clears the PencilKit surface, so callback identity must never
+  // control the lifetime of the writing surface.
+  useEffect(() => {
+    onStrokesChangeRef.current = onStrokesChange;
+  }, [onStrokesChange]);
 
   const notify = useCallback((strokes) => {
     strokesRef.current = strokes;
-    onStrokesChange?.(strokes);
-    force(x => x + 1);
-  }, [onStrokesChange]);
+    onStrokesChangeRef.current?.(strokes);
+    // No React state update is needed here. PencilKit already rendered the ink,
+    // and this component's DOM does not depend on stroke count/content. Avoiding
+    // a redundant render after every pen-up keeps long solutions responsive.
+  }, []);
 
   useEffect(() => {
     const element = wrapRef.current;

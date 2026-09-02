@@ -85,6 +85,10 @@ if (typeof window !== 'undefined') {
   window.__priInkReceive = (payload) => {
     if (!payload || typeof payload !== 'object') return;
     if (payload.type === 'strokes') {
+      // JSON messages are immutable snapshots from the native bridge. Replace
+      // the top-level array on every pen-up instead of mutating it in place, so
+      // recognition requests can safely retain this exact snapshot by reference.
+      // This avoids another O(total stroke points) deep clone on every request.
       latestStrokes = Array.isArray(payload.strokes) ? payload.strokes : [];
       for (const listener of strokeListeners) listener(latestStrokes);
     } else if (payload.type === 'reading') {
@@ -140,7 +144,10 @@ function requestReading(message, timeoutMs, context = null) {
     const reqId = nextRequestId++;
     pending.set(reqId, {
       resolve, context, overrides: message.overrides || {}, op: message.op,
-      strokes: snapshotInkStrokes(latestStrokes), surfaceEpoch
+      // `latestStrokes` is replaced, never mutated, when native emits a new
+      // drawing snapshot. Holding the reference preserves the exact page that
+      // belongs to this request without cloning every point a second time.
+      strokes: latestStrokes, surfaceEpoch
     });
     if (!post({ ...message, reqId })) {
       pending.delete(reqId);
@@ -222,7 +229,9 @@ export const nativeInk = {
   redo() { post({ op: 'redo' }); },
   clear() { invalidatePending('surface-cleared'); latestStrokes = []; post({ op: 'clear' }); },
   setStrokes(strokes) {
-    latestStrokes = Array.isArray(strokes) ? strokes : [];
+    // External callers may retain/mutate their array. Snapshot once at the API
+    // boundary; recognition can then reuse this bridge-owned immutable snapshot.
+    latestStrokes = snapshotInkStrokes(strokes);
     post({ op: 'setStrokes', strokes: latestStrokes });
   },
 
