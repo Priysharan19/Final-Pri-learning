@@ -145,6 +145,10 @@ export const cloud = Object.freeze({
   billingConfig: () => cloudRequest('/v1/billing/config'),
   billingStatus: () => cloudRequest('/v1/billing/status'),
   createWebBillingCheckout: cadence => cloudRequest('/v1/billing/checkout/web', { method: 'POST', body: { cadence } }),
+  appleBillingBootstrap: () => cloudRequest('/v1/billing/apple/bootstrap'),
+  submitAppleTransaction: signedTransaction => cloudRequest('/v1/billing/apple/transaction', {
+    method: 'POST', body: { signedTransaction: String(signedTransaction || '') }
+  }),
   restoreBilling: (provider, body = {}) => cloudRequest(`/v1/billing/restore/${pathId(provider, 'provider')}`, { method: 'POST', body }),
   classes: () => cloudRequest('/v1/classes'),
   reportIssue: (body, idempotencyKey) => cloudRequest('/v1/reports', { method: 'POST', body, idempotencyKey }),
