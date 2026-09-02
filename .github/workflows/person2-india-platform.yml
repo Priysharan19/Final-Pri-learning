@@ -101,6 +101,8 @@ jobs:
         run: node server/test/platform-sync-pagination-check.mjs
       - name: Destructive account reauthentication
         run: node server/test/account-deletion-reauth-check.mjs
+      - name: Full account lifecycle and session rotation
+        run: node server/test/account-lifecycle-contract-check.mjs
       - name: Deployment-configured billing display
         run: node server/test/billing-config-check.mjs
       - name: Independent CMS review
