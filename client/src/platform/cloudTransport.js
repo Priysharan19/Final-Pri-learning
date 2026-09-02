@@ -8,6 +8,7 @@
 const DEFAULT_TIMEOUT_MS = 12_000;
 const MAX_RESPONSE_BYTES = 2 * 1024 * 1024;
 const PATH = /^\/v1\/[A-Za-z0-9/_-]{1,180}$/;
+const SAFE_ID = /^[A-Za-z0-9._:-]{1,160}$/;
 
 function envOrigin() {
   const vite = import.meta?.env?.VITE_PRI_CLOUD_ORIGIN;
@@ -44,6 +45,12 @@ function requestId() {
 
 function byteLength(text) {
   try { return new TextEncoder().encode(text).byteLength; } catch { return text.length * 2; }
+}
+
+function pathId(value, label = 'id') {
+  const id = String(value || '');
+  if (!SAFE_ID.test(id)) throw new Error(`${label} is invalid`);
+  return id;
 }
 
 export async function cloudRequest(path, {
@@ -123,9 +130,16 @@ export const cloud = Object.freeze({
   requestPasswordReset: body => cloudRequest('/v1/account/password/reset-request', { method: 'POST', body }),
   resetPassword: body => cloudRequest('/v1/account/password/reset', { method: 'POST', body }),
   verifyEmail: body => cloudRequest('/v1/account/email/verify', { method: 'POST', body }),
+  devices: () => cloudRequest('/v1/account/devices'),
+  revokeDevice: sessionId => cloudRequest(`/v1/account/devices/${pathId(sessionId, 'session id')}`, { method: 'DELETE' }),
+  exportAccount: () => cloudRequest('/v1/account/export'),
+  deleteAccount: body => cloudRequest('/v1/account', { method: 'DELETE', body }),
+  socialSignIn: (provider, body) => cloudRequest(`/v1/account/identity/${pathId(provider, 'provider')}/sign-in`, { method: 'POST', body }),
+  linkIdentity: (provider, body) => cloudRequest(`/v1/account/identity/${pathId(provider, 'provider')}/link`, { method: 'POST', body }),
   syncPush: (body, idempotencyKey) => cloudRequest('/v1/sync/push', { method: 'POST', body, idempotencyKey }),
   syncPull: cursor => cloudRequest(`/v1/sync/pull/${Math.max(0, Number(cursor) || 0)}`),
   entitlements: () => cloudRequest('/v1/entitlements'),
   classes: () => cloudRequest('/v1/classes'),
-  reportIssue: (body, idempotencyKey) => cloudRequest('/v1/reports', { method: 'POST', body, idempotencyKey })
+  reportIssue: (body, idempotencyKey) => cloudRequest('/v1/reports', { method: 'POST', body, idempotencyKey }),
+  telemetry: events => cloudRequest('/v1/telemetry', { method: 'POST', body: { events } })
 });
