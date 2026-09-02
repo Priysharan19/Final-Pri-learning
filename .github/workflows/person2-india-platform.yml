@@ -88,6 +88,8 @@ jobs:
         run: node client/test/india-class10-irrationality-current-check.mjs
       - name: Current Class 10 graphical linear-pair forms
         run: node client/test/india-class10-linear-graphs-current-check.mjs
+      - name: Current Class 10 contextual quadratic models
+        run: node client/test/india-class10-quadratic-context-current-check.mjs
       - name: Student practice target availability
         run: node client/test/india-practice-availability-check.mjs
       - name: India exam source/claim contract
