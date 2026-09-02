@@ -4,6 +4,7 @@ import {
   clearSessionCookies, createSession, id, opaqueToken, rateLimit, requireSession,
   sessionFromRequest, setSessionCookies, sha256
 } from './security.js';
+import { encryptDeliveryToken } from './deliveryCrypto.js';
 
 const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const TOKEN_MS = 1000 * 60 * 60;
@@ -43,14 +44,15 @@ function ensureDeliveryTable(db) {
 }
 
 function queueAccountToken(db, accountId, destination, purpose, now = Date.now()) {
-  // This queue is intentionally server-side. A deployment worker/provider must
-  // deliver and then erase the opaque token; it never enters logs or client state.
+  // Only a one-way token hash is used for verification. The delivery worker gets
+  // an AES-GCM envelope bound to this token id; raw tokens are never persisted.
   const raw = opaqueToken(32);
   const tokenId = id('tok');
+  const ciphertext = encryptDeliveryToken(raw, `${accountId}:${purpose}:${tokenId}`);
   db.prepare(`INSERT INTO account_tokens(id, account_id, purpose, token_hash, created_at, expires_at)
     VALUES (?, ?, ?, ?, ?, ?)`).run(tokenId, accountId, purpose, sha256(raw), now, now + TOKEN_MS);
   db.prepare(`INSERT INTO auth_delivery_outbox(id, account_id, kind, destination, token_id, token_ciphertext, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?)`).run(id('mail'), accountId, purpose, destination, tokenId, raw, now);
+    VALUES (?, ?, ?, ?, ?, ?, ?)`).run(id('mail'), accountId, purpose, destination, tokenId, ciphertext, now);
   return tokenId;
 }
 
