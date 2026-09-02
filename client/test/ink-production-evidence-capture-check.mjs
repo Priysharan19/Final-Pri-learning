@@ -15,7 +15,9 @@ const practice = fs.readFileSync(new URL('../src/pages/Practice.jsx', import.met
 const page = fs.readFileSync(new URL('../src/components/InkPhysicalEvidenceSession.jsx', import.meta.url), 'utf8');
 const questionCard = fs.readFileSync(new URL('../src/components/QuestionCard.jsx', import.meta.url), 'utf8');
 
-const collectorPairs = [...collector.matchAll(/\['([^']*)','([^']*)'\]/g)]
+const promptBlock = collector.match(/const PROMPTS=\[(.*?)\]\.map\(\(\[text,want\]\)=>\(\{text,want\}\)\);/s)?.[1];
+assert.ok(promptBlock, 'could not locate the audited collector PROMPTS array');
+const collectorPairs = [...promptBlock.matchAll(/\['([^']*)','([^']*)'\]/g)]
   .map(([, shown, target]) => ({ shown, target }));
 const protocolPairs = REAL_PENCIL_PROMPTS.map(({ shown, target }) => ({ shown, target }));
 
