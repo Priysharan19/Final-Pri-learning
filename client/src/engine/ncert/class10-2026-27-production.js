@@ -142,8 +142,11 @@ export const CBSE_CLASS10_2026_27_CHAPTERS = Object.freeze([
     'Use the classical definition of probability',
     'Find the probability of a simple event in a real-life context'
   ], [
-    cover('y8-probability', [0, 1], [1, 2, 3, 4])
-  ])
+    // Only D1 is credited. D2–D4 in the shared Year 8 bank exercise complement,
+    // expected-frequency and experimental-probability ideas; useful practice,
+    // but they are not promoted as evidence for the current Class X claim.
+    cover('y8-probability', [0, 1], [1])
+  ], true)
 ]);
 
 export const CBSE_CLASS10_2026_27_BY_ID = Object.freeze(Object.fromEntries(
