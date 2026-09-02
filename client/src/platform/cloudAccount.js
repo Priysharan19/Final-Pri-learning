@@ -6,15 +6,14 @@
 // provider credentials, account email and cloud display name are never copied
 // into IndexedDB by this module.
 
-import { all, get, put, del, uuid } from '../local/idb.js';
+import { get, put, del, uuid } from '../local/idb.js';
 import { cloud, cloudAvailable } from './cloudTransport.js';
 import { normalizeEntitlementSnapshot } from './entitlements.js';
+import { resetProfileOutboxForRelink } from './profileOutbox.js';
+import { clearCloudReplicaState } from './syncReplicaState.js';
 
 const DEVICE_ID_ROW = 'pri-cloud-device-v1';
 const LINK_PREFIX = 'pri-cloud-account-link-v1:';
-const SYNC_STATE_PREFIX = 'pri-cloud-sync-state-v1:';
-const SYNC_OUTBOX_PREFIX = 'pri-cloud-outbox-v1:';
-const REMOTE_EVENT_PREFIX = 'pri-cloud-remote-event-v1:';
 
 function linkRowId(pid) {
   if (!pid) throw new Error('A local profile id is required');
@@ -118,21 +117,18 @@ export async function markCloudSynced(pid, at = Date.now()) {
   await put('device', { ...prior, lastSyncAt: at });
 }
 
-async function clearReplicaMetadata(pid) {
-  const exact = new Set([
-    `${SYNC_STATE_PREFIX}${pid}`,
-    `${SYNC_OUTBOX_PREFIX}${pid}`
-  ]);
-  const remotePrefix = `${REMOTE_EVENT_PREFIX}${pid}:`;
-  const rows = await all('device').catch(() => []);
-  await Promise.all(rows
-    .filter(row => exact.has(String(row?.id || '')) || String(row?.id || '').startsWith(remotePrefix))
-    .map(row => del('device', row.id).catch(() => {})));
-}
-
 export async function disconnectCloudAccount(pid) {
-  try { if (cloudAvailable()) await cloud.logout(); } catch { /* local unlink still succeeds */ }
-  await del('device', linkRowId(pid)).catch(() => {});
-  await clearReplicaMetadata(pid);
+  try { if (cloudAvailable()) await cloud.logout(); } catch { /* local unlink must remain possible during a cloud outage */ }
+
+  // Fail closed locally: first remove account-specific replica metadata and put
+  // the profile outbox back into its mandatory full-rescan state. Only after
+  // both steps succeed do we remove the link itself. If IndexedDB is under
+  // storage pressure, the profile therefore remains visibly linked rather than
+  // appearing disconnected while stale account state is still present.
+  await Promise.all([
+    clearCloudReplicaState(pid),
+    resetProfileOutboxForRelink(pid)
+  ]);
+  await del('device', linkRowId(pid));
   return { connected: false };
 }
