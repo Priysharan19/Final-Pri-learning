@@ -1,8 +1,18 @@
 name: CI
 
 on:
+  workflow_dispatch:
   push:
+    branches: [main]
   pull_request:
+
+# Feature branches are validated by their PR merge ref; main is validated again
+# after merge. A newer head makes every older queued head non-authoritative, so
+# keep only the latest run for each PR/branch instead of building an unbounded
+# backlog during active development.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   suites:
