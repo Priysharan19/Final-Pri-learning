@@ -84,6 +84,8 @@ jobs:
         run: node client/test/india-class10-polynomial-current-check.mjs
       - name: Current Class 10 Triangle theorem forms
         run: node client/test/india-class10-triangles-current-check.mjs
+      - name: Current Class 10 irrationality proof reasoning
+        run: node client/test/india-class10-irrationality-current-check.mjs
       - name: Student practice target availability
         run: node client/test/india-practice-availability-check.mjs
       - name: India exam source/claim contract
