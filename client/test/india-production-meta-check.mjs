@@ -45,9 +45,6 @@ for (const chapter of chapters) {
     continue;
   }
 
-  // Generator completeness is useful, but it is not evidence of a current
-  // NCERT/CBSE source review. Do not let future refactors promote an unreviewed
-  // Class 7/10/11/12 chapter merely because a generator exists.
   if (status.generatorComplete) {
     assert.equal(status.quality, INDIA_CONTENT_QUALITY.WEAK_MAPPING, `${chapter.id} must remain C until review evidence is recorded`);
     assert.equal(status.releaseState, INDIA_RELEASE_STATE.UNREVIEWED);
@@ -58,14 +55,8 @@ for (const chapter of chapters) {
 const product = indiaProductSections();
 for (const section of product.years) {
   assert.equal(section.chapters.length, section.production.totalChapters);
-  assert.equal(
-    section.production.reviewedChapters,
-    section.chapters.filter(ch => ch.production?.sourceReviewed).length,
-    `${section.key} review count must be derived from chapter metadata`
-  );
-  for (const chapter of section.chapters) {
-    assert.ok(chapter.production, `${chapter.id} must expose production metadata to product surfaces`);
-  }
+  assert.equal(section.production.reviewedChapters, section.chapters.filter(ch => ch.production?.sourceReviewed).length, `${section.key} review count must be derived from chapter metadata`);
+  for (const chapter of section.chapters) assert.ok(chapter.production, `${chapter.id} must expose production metadata to product surfaces`);
 }
 
 const grade7 = product.years.find(section => section.year === 7);
@@ -82,11 +73,12 @@ assert.equal(grade9.production.reviewState, 'source-reviewed');
 assert.match(grade8.label, /source-reviewed/);
 assert.match(grade9.label, /source-reviewed/);
 
-assert.equal(grade10.production.reviewedChapters, CBSE_CLASS10_2026_27_REVIEWED_IDS.size);
-assert.equal(grade10.production.reviewedChapters, 6, 'Class 10 review promotion must stay narrow until more form audits land');
-assert.equal(grade10.production.reviewState, 'mixed-review');
-assert.match(grade10.label, /source review in progress/,
-  'partially reviewed Class 10 must disclose review-in-progress status in the track picker');
+assert.equal(CBSE_CLASS10_2026_27_REVIEWED_IDS.size, 14, 'Class 10 promotion requires every chapter to be reviewed');
+assert.equal(grade10.production.reviewedChapters, grade10.production.totalChapters);
+assert.equal(grade10.production.reviewedChapters, 14);
+assert.equal(grade10.production.reviewState, 'source-reviewed');
+assert.match(grade10.label, /source-reviewed/,
+  'fully reviewed Class 10 should present reviewed provenance in the track picker');
 
 for (const section of [grade7, grade11, grade12]) {
   assert.equal(section.production.reviewedChapters, 0, `${section.key} must not claim source review before evidence is committed`);
@@ -96,5 +88,5 @@ for (const section of [grade7, grade11, grade12]) {
 }
 
 console.log(`PASS — India production provenance census: ${summary.total} chapters; A=${summary.byQuality.A}, B=${summary.byQuality.B}, C=${summary.byQuality.C}, D=${summary.byQuality.D}.`);
-console.log(`PASS — Class 8/9 remain source-authored; ${grade10.production.reviewedChapters}/${grade10.production.totalChapters} Class 10 chapters are narrowly source-reviewed mappings.`);
+console.log(`PASS — Class 8/9 remain source-authored; ${grade10.production.reviewedChapters}/${grade10.production.totalChapters} Class 10 chapters are source-reviewed mappings.`);
 console.log('PASS — CBSE track labels disclose whether source review is complete or still in progress.');
