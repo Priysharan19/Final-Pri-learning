@@ -1,8 +1,24 @@
 name: Ink Hybrid
 
 on:
+  workflow_dispatch:
   push:
+    branches: [main]
+    paths:
+      - 'client/src/ink/**'
+      - 'client/test/ink-personal-metric-check.mjs'
+      - 'client/test/ink-hybrid-check.mjs'
+      - 'client/test/ink-trig-context.mjs'
+      - 'client/test/inkcheck-context.mjs'
+      - '.github/workflows/ink-hybrid.yml'
   pull_request:
+    paths:
+      - 'client/src/ink/**'
+      - 'client/test/ink-personal-metric-check.mjs'
+      - 'client/test/ink-hybrid-check.mjs'
+      - 'client/test/ink-trig-context.mjs'
+      - 'client/test/inkcheck-context.mjs'
+      - '.github/workflows/ink-hybrid.yml'
 
 concurrency:
   group: ink-hybrid-${{ github.ref }}
@@ -18,10 +34,10 @@ jobs:
         with:
           node-version: "24"
       - name: Personal CNN metric adaptation regression
-        run: npm run test:ink:personal
+        run: node client/test/ink-personal-metric-check.mjs
       - name: Native-line ownership, glyph identity, derivative-prime and raised-power regression
-        run: npm run test:ink:hybrid
+        run: node client/test/ink-hybrid-check.mjs
       - name: Real-page trig grammar, line consensus and diagram rejection regression
         run: node client/test/ink-trig-context.mjs
       - name: Answer-context safety regression
-        run: npm run test:context
+        run: node client/test/inkcheck-context.mjs

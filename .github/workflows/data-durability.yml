@@ -20,6 +20,13 @@ on:
 permissions:
   contents: read
 
+# A PR can accumulate many commits while the restore surface remains in its
+# overall diff. Only the newest exact head is release evidence; older queued
+# heads waste runners and can never become the merge authority.
+concurrency:
+  group: data-durability-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   restore:
     name: Backup restore rollback and local backend regression
