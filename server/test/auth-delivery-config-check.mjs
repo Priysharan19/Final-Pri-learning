@@ -51,10 +51,15 @@ try {
   assert.equal(unsupported.authEmailProviderConfigured, false);
 
   const server = readFileSync(new URL('../index.js', import.meta.url), 'utf8');
+  const router = readFileSync(new URL('../platform/router.js', import.meta.url), 'utf8');
   assert.ok(server.includes("import { startAuthDeliveryWorker } from './platform/authDelivery.js'"));
   assert.ok(server.includes('startAuthDeliveryWorker(platformDb);'), 'production server must actually start the auth delivery worker');
+  assert.ok(router.includes('authDelivery: { email: config.authEmailProviderConfigured }'),
+    'health must expose only the auth-mail readiness boolean, never provider credentials');
+  assert.ok(!router.includes('PRI_RESEND_API_KEY') && !router.includes('PRI_AUTH_EMAIL_FROM'),
+    'health/router source must not expose auth-email secrets or sender configuration');
 
-  console.log('PASS — router contracts stay isolated, while full production startup fails closed unless auth-email delivery is configured.');
+  console.log('PASS — router contracts stay isolated, full production startup fails closed without auth-mail, and health exposes only delivery readiness.');
 } finally {
   for (const name of names) {
     if (prior[name] === undefined) delete process.env[name];
