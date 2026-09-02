@@ -7,6 +7,10 @@
 // into "NCERT source-reviewed" by accident.
 
 import { IN_CURRICULUM, uncoveredDotpoints } from './curriculum-in.js';
+import {
+  CBSE_CLASS10_2026_27_REVIEWED_IDS,
+  CBSE_CLASS10_2026_27_SOURCE
+} from './ncert/class10-2026-27-production.js';
 
 export const INDIA_CONTENT_QUALITY = Object.freeze({
   SOURCE_AUTHORED: 'A',
@@ -47,22 +51,37 @@ const CLASS9_SOURCE_IDS = Object.freeze(new Set(
 
 const SOURCES = Object.freeze({
   class8: Object.freeze({
+    quality: INDIA_CONTENT_QUALITY.SOURCE_AUTHORED,
     kind: 'ncert-textbook-and-answer-key',
     edition: 'NCERT Mathematics Class 8 Reprint 2024–25',
     evidence: 'Source-authored modules preserve exercise/source audit metadata and dedicated mastery generators.',
     reviewState: 'source-audited-in-repository'
   }),
   class9: Object.freeze({
+    quality: INDIA_CONTENT_QUALITY.SOURCE_AUTHORED,
     kind: 'ncert-textbook',
     edition: 'Ganita Manjari Grade 9 Part I, 2026–27',
     evidence: 'The Grade 9 curriculum is replaced atomically by the dedicated source-oriented eight-chapter implementation.',
     reviewState: 'source-audited-in-repository'
+  }),
+  class10: Object.freeze({
+    quality: INDIA_CONTENT_QUALITY.REVIEWED_MAPPING,
+    kind: 'cbse-syllabus-plus-ncert-textbook',
+    edition: CBSE_CLASS10_2026_27_SOURCE.curriculumVersion,
+    subject: CBSE_CLASS10_2026_27_SOURCE.subject,
+    cbseCurriculumIndex: CBSE_CLASS10_2026_27_SOURCE.cbseCurriculumIndex,
+    cbseMathematicsPdf: CBSE_CLASS10_2026_27_SOURCE.cbseMathematicsPdf,
+    ncertTextbook: CBSE_CLASS10_2026_27_SOURCE.ncertTextbook,
+    ncertEdition: CBSE_CLASS10_2026_27_SOURCE.ncertEdition,
+    evidence: 'Current Class X outcomes were overlaid from the 2026–27 CBSE syllabus and NCERT textbook; only form-by-form audited chapter mappings are promoted.',
+    reviewState: 'current-source-reviewed-mapping'
   })
 });
 
 function sourceRecord(chapter) {
   if (CLASS8_SOURCE_IDS.has(chapter.id)) return SOURCES.class8;
   if (CLASS9_SOURCE_IDS.has(chapter.id)) return SOURCES.class9;
+  if (CBSE_CLASS10_2026_27_REVIEWED_IDS.has(chapter.id)) return SOURCES.class10;
   return null;
 }
 
@@ -84,13 +103,15 @@ export function indiaProductionStatus(chapter, grade = chapter?.grade ?? null) {
 
   if (source && generatorComplete) {
     return Object.freeze({
-      quality: INDIA_CONTENT_QUALITY.SOURCE_AUTHORED,
+      quality: source.quality || INDIA_CONTENT_QUALITY.SOURCE_AUTHORED,
       releaseState: INDIA_RELEASE_STATE.REVIEWED,
       selectable: true,
       sourceReviewed: true,
       generatorComplete: true,
       source,
-      reason: 'Dedicated source-oriented production implementation is present for every product dot point.'
+      reason: source.quality === INDIA_CONTENT_QUALITY.REVIEWED_MAPPING
+        ? 'Current curriculum outcomes and the mapped production forms were reviewed against the recorded source set.'
+        : 'Dedicated source-oriented production implementation is present for every product dot point.'
     });
   }
 
@@ -107,7 +128,8 @@ export function indiaProductionStatus(chapter, grade = chapter?.grade ?? null) {
   }
 
   // A complete generator mapping is not automatically a current-curriculum
-  // review. Classes 7/10/11/12 remain C until a source review promotes them.
+  // review. Classes 7/10/11/12 remain C until an explicit source review promotes
+  // the specific chapter; Class 10 deliberately uses a narrow reviewed allowlist.
   return Object.freeze({
     quality: INDIA_CONTENT_QUALITY.WEAK_MAPPING,
     releaseState: INDIA_RELEASE_STATE.UNREVIEWED,
@@ -116,7 +138,7 @@ export function indiaProductionStatus(chapter, grade = chapter?.grade ?? null) {
     generatorComplete: true,
     source: null,
     grade,
-    reason: 'Generator-complete mapping exists, but current source review/provenance has not yet been recorded.'
+    reason: 'Generator-complete mapping exists, but current source review/provenance has not yet been recorded for this chapter.'
   });
 }
 
