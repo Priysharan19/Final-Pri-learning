@@ -10,6 +10,10 @@ function webAnnualConfigured() {
   return nonEmpty('PRI_RAZORPAY_ANNUAL_PLAN_ID') || nonEmpty('PRI_WEB_ANNUAL_PRICE_ID');
 }
 
+function appleTrustConfigured() {
+  return nonEmpty('PRI_APPLE_ROOT_CA_PEM') || nonEmpty('PRI_APPLE_ROOT_CA_FILE');
+}
+
 export function platformConfigStatus() {
   const production = process.env.NODE_ENV === 'production';
   const missing = [];
@@ -28,18 +32,28 @@ export function platformConfigStatus() {
     if (webAnnual && !nonEmpty('PRI_RAZORPAY_ANNUAL_TOTAL_COUNT')) missing.push('PRI_RAZORPAY_ANNUAL_TOTAL_COUNT');
   }
 
+  const appleProducts = nonEmpty('PRI_APPLE_MONTHLY_PRODUCT_ID') || nonEmpty('PRI_APPLE_ANNUAL_PRODUCT_ID');
+  if (production && appleProducts) {
+    if (!appleTrustConfigured()) missing.push('PRI_APPLE_ROOT_CA_PEM or PRI_APPLE_ROOT_CA_FILE');
+    if (!nonEmpty('PRI_APPLE_APP_ID')) missing.push('PRI_APPLE_APP_ID');
+  }
+
   const webBillingProviderConfigured = webProducts &&
     nonEmpty('PRI_RAZORPAY_KEY_ID') && nonEmpty('PRI_RAZORPAY_KEY_SECRET') && nonEmpty('PRI_RAZORPAY_WEBHOOK_SECRET') &&
     (!webMonthly || nonEmpty('PRI_RAZORPAY_MONTHLY_TOTAL_COUNT')) &&
     (!webAnnual || nonEmpty('PRI_RAZORPAY_ANNUAL_TOTAL_COUNT'));
+  const appleBillingProviderConfigured = appleProducts && appleTrustConfigured() &&
+    (!production || nonEmpty('PRI_APPLE_APP_ID'));
 
+  const uniqueMissing = [...new Set(missing)];
   return Object.freeze({
     production,
-    missing: Object.freeze([...new Set(missing)]),
-    ok: missing.length === 0,
+    missing: Object.freeze(uniqueMissing),
+    ok: uniqueMissing.length === 0,
     googleConfigured: nonEmpty('PRI_GOOGLE_CLIENT_IDS'),
     appleConfigured: nonEmpty('PRI_APPLE_CLIENT_IDS'),
-    appleBillingProductsConfigured: nonEmpty('PRI_APPLE_MONTHLY_PRODUCT_ID') || nonEmpty('PRI_APPLE_ANNUAL_PRODUCT_ID'),
+    appleBillingProductsConfigured: appleProducts,
+    appleBillingProviderConfigured,
     googleBillingProductsConfigured: nonEmpty('PRI_GOOGLE_MONTHLY_PRODUCT_ID') || nonEmpty('PRI_GOOGLE_ANNUAL_PRODUCT_ID'),
     webBillingProductsConfigured: webProducts,
     webBillingProviderConfigured
