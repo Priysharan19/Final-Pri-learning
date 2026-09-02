@@ -22,12 +22,15 @@ on:
       - 'client/src/pages/Home.jsx'
       - 'client/src/pages/Exams.jsx'
       - 'client/src/pages/Progress*.jsx'
+      - 'client/src/pages/Settings.jsx'
       - 'client/src/platform/**'
       - 'client/src/components/CloudAccountPanel.jsx'
+      - 'client/src/components/ClassroomPanel.jsx'
       - 'client/src/api.js'
       - 'client/test/india-**'
       - 'client/test/cloud-**'
       - 'client/test/profile-cloud-**'
+      - 'client/test/classroom-product-check.mjs'
       - 'client/test/entitlement-check.mjs'
       - 'client/test/sync-contract-check.mjs'
       - 'client/test/native-storekit-boundary-check.mjs'
@@ -82,6 +85,8 @@ jobs:
         run: node client/test/profile-cloud-outbox-check.mjs
       - name: Cloud account link boundary
         run: node client/test/cloud-account-boundary-check.mjs
+      - name: Classroom client transport boundary
+        run: node client/test/classroom-product-check.mjs
       - name: Cloud sync migration and profile isolation
         run: node client/test/cloud-sync-worker-check.mjs
       - name: Native StoreKit bridge authority boundary
