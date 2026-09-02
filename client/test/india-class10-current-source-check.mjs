@@ -64,8 +64,16 @@ assert.deepEqual(sourceById['c10-probability'].covers, [
   { gen: 'y8-probability', dp: [0, 1], diff: [1] }
 ]);
 
+// The simultaneous-equations bank genuinely covers substitution/elimination
+// and a situational two-equation model, but it has no audited graphical form.
+// Keep the useful forms live while making the missing graphical outcome explicit.
+assert.deepEqual(sourceById['c10-pair-linear-equations'].covers, [
+  { gen: 'y10-simeq', dp: [1], diff: [1, 2, 3] },
+  { gen: 'y10-simeq', dp: [2], diff: [4] }
+]);
+
 // These are visible product gaps, not false review claims.
-for (const id of ['c10-real-numbers', 'c10-polynomials', 'c10-quadratic-equations', 'c10-surface-volume']) {
+for (const id of ['c10-real-numbers', 'c10-polynomials', 'c10-pair-linear-equations', 'c10-quadratic-equations', 'c10-surface-volume']) {
   const status = indiaProductionStatus(byId[id], 10);
   assert.equal(status.sourceReviewed, false, `${id} must not be promoted while a current outcome is uncovered`);
   assert.equal(status.quality, INDIA_CONTENT_QUALITY.MISSING, `${id} should expose its missing current outcome(s)`);
@@ -74,6 +82,7 @@ for (const id of ['c10-real-numbers', 'c10-polynomials', 'c10-quadratic-equation
 
 assert.deepEqual(uncoveredDotpoints(byId['c10-real-numbers']), [1], 'irrationality-proof practice remains the explicit Real Numbers blocker');
 assert.deepEqual(uncoveredDotpoints(byId['c10-polynomials']), [0], 'current zero-finding practice remains the explicit Polynomials blocker');
+assert.deepEqual(uncoveredDotpoints(byId['c10-pair-linear-equations']), [0], 'graphical solution/consistency remains the explicit simultaneous-equations blocker');
 assert.deepEqual(uncoveredDotpoints(byId['c10-surface-volume']), [0], 'combination surface-area practice remains the explicit mensuration blocker');
 
 console.log(`PASS — Class 10 2026–27 source truth: ${reviewed.length}/14 chapters reviewed; rationalised-out outcomes cannot count as current coverage.`);
