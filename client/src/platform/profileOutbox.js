@@ -176,6 +176,24 @@ export function acknowledgeProfileMutations(pid, sequences) {
   });
 }
 
+/**
+ * Forget only cloud-delivery bookkeeping for this local profile.
+ *
+ * This is used when a profile is deliberately unlinked from one cloud account
+ * before it can be linked to another. Local learning rows are the source of
+ * truth and are not deleted. Resetting to a fresh outbox forces the next account
+ * to reconcile from local state instead of inheriting another account's acked
+ * queue position. The operation uses the same serial lock as mutation recording
+ * so a concurrent local write cannot resurrect stale queue metadata.
+ */
+export function resetProfileOutboxForRelink(pid) {
+  const id = requirePid(pid);
+  return locked(async () => {
+    await save(fresh(id));
+    return { reset: true, requiresFullRescan: true };
+  });
+}
+
 export async function profileOutboxStats(pid) {
   const row = await load(pid);
   return {
