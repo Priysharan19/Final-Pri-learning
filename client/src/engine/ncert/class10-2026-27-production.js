@@ -92,16 +92,17 @@ export const CBSE_CLASS10_2026_27_CHAPTERS = Object.freeze([
     'Evaluate trigonometric ratios at 0°, 30°, 45°, 60° and 90° and relate the ratios',
     'Prove and apply simple identities based on sin²A + cos²A = 1'
   ], [
-    cover('y9-trig', [0], [1, 2, 3]),
-    cover('y11-trigfunc', [1], [1, 2]),
-    cover('y11-trigfunc', [2], [4])
-  ]),
+    // Dedicated Class X forms avoid importing broader senior-trigonometry claims.
+    cover('c10-trigonometry-current', [0], [1]),
+    cover('c10-trigonometry-current', [1], [2]),
+    cover('c10-trigonometry-current', [2], [3, 4])
+  ], true),
 
   chapter('c10-trig-applications', [
     'Solve heights-and-distances problems using 30°, 45° and 60° angles of elevation or depression with no more than two right triangles'
   ], [
-    cover('y10-trig', [0], [1, 2, 3, 4])
-  ]),
+    cover('c10-trig-applications-current', [0], [1, 2, 3, 4])
+  ], true),
 
   chapter('c10-circles', [
     'Prove and apply that a tangent is perpendicular to the radius at the point of contact',
@@ -123,8 +124,6 @@ export const CBSE_CLASS10_2026_27_CHAPTERS = Object.freeze([
     'Find surface areas of combinations of two prescribed solids',
     'Find volumes of combinations of two prescribed solids'
   ], [
-    // Surface forms explicitly remove joined/internal faces before adding the
-    // exposed curved surfaces. The established bank continues to own volume.
     cover('c10-surface-area-combo', [0], [1, 2, 3, 4]),
     cover('c10-surface-volume-combo', [1], [1, 2])
   ], true),
