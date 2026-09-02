@@ -1,0 +1,55 @@
+name: Sync PR104 iOS bundle
+
+on:
+  push:
+    branches:
+      - person1/ink-production-evidence-capture-current
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-pr104-ios
+  cancel-in-progress: true
+
+jobs:
+  sync:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+
+      - name: Install client dependencies
+        run: npm ci --prefix client
+
+      - name: Build exact client
+        run: npm run build
+
+      - name: Synchronize both tracked iPad bundles
+        run: npm run sync:ios
+
+      - name: Verify exact synchronization
+        run: npm run check:ios
+
+      - name: Commit generated bundle back to this branch
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- 'ios/PriLearning.swiftpm/Resources/Web' 'ios/PriLearning 2.swiftpm/Resources/Web'
+          if git diff --cached --quiet; then
+            echo 'No generated bundle changes were needed.'
+            exit 0
+          fi
+          git commit -m 'build(ios): sync production evidence capture bundle'
+          git push origin HEAD:${GITHUB_REF_NAME}
