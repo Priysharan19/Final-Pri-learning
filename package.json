@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Pri Learning — Years 7–12 maths practice with HSC-style marking and on-device handwriting recognition. Runs entirely offline; nothing leaves the iPad.",
+  "description": "Pri Learning — Classes/Years 7–12 maths practice with offline-first local learning, on-device handwriting recognition, and optional authenticated cloud sync.",
   "scripts": {
     "setup": "npm install --prefix server && npm install --prefix client",
     "dev": "node scripts/dev.js",
@@ -66,7 +66,7 @@
     "ink:structure:train:dev:pretrained": "npm run ink:structure:audit && python3 tools/ink-foundation/train_structural_dev.py --corpus client/test/ink-corpus-structural --init tools/ink-foundation/runs/pri-ink-structural-v4-synthetic.pt --replay-corpus /tmp/pri-ink-v4-synth-structural --replay-weight 0.20 --out tools/ink-foundation/runs/pri-ink-structural-v4-dev.pt --lr 8e-5 --weight-decay 0.04 --epochs 40 --patience 12",
     "ink:structure:evaluate:dev": "python3 tools/ink-foundation/evaluate_structural_dev.py tools/ink-foundation/runs/pri-ink-structural-v4-dev.pt --corpus client/test/ink-corpus-structural --out tools/ink-foundation/runs/pri-ink-structural-v4-dev-validation.json",
     "ink:structure:evaluate:dev:joint": "python3 tools/ink-foundation/evaluate_structural_dev.py tools/ink-foundation/runs/pri-ink-structural-v4-dev.pt --corpus client/test/ink-corpus-structural --decoder joint --out tools/ink-foundation/runs/pri-ink-structural-v4-dev-validation-joint.json",
-    "ink:structure:compare:dev": "python3 tools/ink-foundation/compare_structural_decoders.py tools/ink-foundation/runs/pri-ink-structural-v4-dev-validation.json tools/ink-foundation/runs/pri-ink-structural-v4-dev-validation-joint.json --out tools/ink-foundation/runs/pri-ink-structural-v4-dev-decoder-comparison.json",
+    "ink:structure:compare:dev": "python3 tools/ink-foundation/compare_structural_decoders.py tools/ink-foundation/runs/pri-ink-structural-v4-dev-validation.json tools/ink-foundation/runs/pri-ink-structural-v4-dev-validation-joint.json --out tools/ink-foundation/runs/pri-ink-structural-v4-decoder-comparison.json",
     "ink:structure:diagnose:grouping:dev": "python3 tools/ink-foundation/diagnose_structural_grouping_dev.py",
     "ink:structure:diagnose:joint-grouping:dev": "python3 tools/ink-foundation/diagnose_structural_joint_grouping_dev.py",
     "ink:structure:rebuild:dev": "bash scripts/ink-structural-rebuild-dev.sh",
