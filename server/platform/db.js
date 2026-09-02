@@ -167,6 +167,16 @@ export function createPlatformDb(path = DEFAULT_PATH) {
       PRIMARY KEY(assignment_id, student_account_id)
     );
 
+    CREATE TABLE IF NOT EXISTS assignment_feedback (
+      assignment_id TEXT NOT NULL REFERENCES assignments(id) ON DELETE CASCADE,
+      student_account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+      teacher_account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+      feedback_json TEXT NOT NULL DEFAULT '{}',
+      returned_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      PRIMARY KEY(assignment_id, student_account_id)
+    );
+
     CREATE TABLE IF NOT EXISTS content_revisions (
       id TEXT PRIMARY KEY,
       content_key TEXT NOT NULL,
@@ -226,7 +236,7 @@ export function createPlatformDb(path = DEFAULT_PATH) {
     );
   `);
 
-  db.prepare("INSERT OR REPLACE INTO platform_meta(key,value) VALUES ('schema_version','1')").run();
+  db.prepare("INSERT OR REPLACE INTO platform_meta(key,value) VALUES ('schema_version','2')").run();
   return db;
 }
 
