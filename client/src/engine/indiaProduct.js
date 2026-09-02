@@ -106,22 +106,43 @@ export function resolveIndiaTarget(chapter, {
   return nearest[Math.min(nearest.length - 1, Math.floor(Math.max(0, Math.min(0.999999, Number(random()) || 0)) * nearest.length))];
 }
 
+function productionSummary(chapters, grade) {
+  const reviewedChapters = chapters.filter(ch => indiaProductionStatus(ch, grade).sourceReviewed).length;
+  const totalChapters = chapters.length;
+  return Object.freeze({
+    reviewedChapters,
+    totalChapters,
+    reviewState: totalChapters > 0 && reviewedChapters === totalChapters
+      ? 'source-reviewed'
+      : reviewedChapters > 0 ? 'mixed-review' : 'source-review-pending'
+  });
+}
+
+function cbseProductLabel(production) {
+  return production.reviewState === 'source-reviewed'
+    ? 'CBSE / NCERT · source-reviewed'
+    : 'CBSE / NCERT · source review in progress';
+}
+
 /** Product sections with explicit provenance/review state on every chapter. */
 export function indiaProductSections() {
-  const years = IN_CURRICULUM.map(group => ({
-    year: group.grade,
-    key: `in-cbse-${group.grade}`,
-    track: 'cbse',
-    title: group.title,
-    label: 'CBSE / NCERT',
-    caption: group.caption,
-    difficultyCeiling: IN_TRACKS.cbse.difficultyCeiling,
-    chapters: group.chapters.map(ch => attachIndiaProductionStatus(ch, group.grade)),
-    production: Object.freeze({
-      reviewedChapters: group.chapters.filter(ch => indiaProductionStatus(ch, group.grade).sourceReviewed).length,
-      totalChapters: group.chapters.length
-    })
-  }));
+  const years = IN_CURRICULUM.map(group => {
+    const production = productionSummary(group.chapters, group.grade);
+    return {
+      year: group.grade,
+      key: `in-cbse-${group.grade}`,
+      track: 'cbse',
+      title: group.title,
+      // A class with C/D mappings must not look identical to an audited A/B class
+      // in the track picker. The chapter bank remains usable, but the product
+      // surface discloses that source review is still underway.
+      label: cbseProductLabel(production),
+      caption: group.caption,
+      difficultyCeiling: IN_TRACKS.cbse.difficultyCeiling,
+      chapters: group.chapters.map(ch => attachIndiaProductionStatus(ch, group.grade)),
+      production
+    };
+  });
   const streams = [];
   for (const year of [11, 12]) {
     for (const id of ['jee-main', 'jee-advanced']) {

@@ -68,17 +68,33 @@ for (const section of product.years) {
   }
 }
 
+const grade7 = product.years.find(section => section.year === 7);
 const grade8 = product.years.find(section => section.year === 8);
 const grade9 = product.years.find(section => section.year === 9);
 const grade10 = product.years.find(section => section.year === 10);
+const grade11 = product.years.find(section => section.year === 11);
+const grade12 = product.years.find(section => section.year === 12);
+
 assert.equal(grade8.production.reviewedChapters, grade8.production.totalChapters);
 assert.equal(grade9.production.reviewedChapters, grade9.production.totalChapters);
-assert.equal(grade10.production.reviewedChapters, CBSE_CLASS10_2026_27_REVIEWED_IDS.size);
-assert.equal(grade10.production.reviewedChapters, 5, 'Class 10 review promotion must stay narrow until more form audits land');
+assert.equal(grade8.production.reviewState, 'source-reviewed');
+assert.equal(grade9.production.reviewState, 'source-reviewed');
+assert.match(grade8.label, /source-reviewed/);
+assert.match(grade9.label, /source-reviewed/);
 
-for (const section of product.years.filter(section => [7, 11, 12].includes(section.year))) {
+assert.equal(grade10.production.reviewedChapters, CBSE_CLASS10_2026_27_REVIEWED_IDS.size);
+assert.equal(grade10.production.reviewedChapters, 6, 'Class 10 review promotion must stay narrow until more form audits land');
+assert.equal(grade10.production.reviewState, 'mixed-review');
+assert.match(grade10.label, /source review in progress/,
+  'partially reviewed Class 10 must disclose review-in-progress status in the track picker');
+
+for (const section of [grade7, grade11, grade12]) {
   assert.equal(section.production.reviewedChapters, 0, `${section.key} must not claim source review before evidence is committed`);
+  assert.equal(section.production.reviewState, 'source-review-pending');
+  assert.match(section.label, /source review in progress/,
+    `${section.key} must not present weak mappings as indistinguishable from reviewed CBSE/NCERT coverage`);
 }
 
 console.log(`PASS — India production provenance census: ${summary.total} chapters; A=${summary.byQuality.A}, B=${summary.byQuality.B}, C=${summary.byQuality.C}, D=${summary.byQuality.D}.`);
 console.log(`PASS — Class 8/9 remain source-authored; ${grade10.production.reviewedChapters}/${grade10.production.totalChapters} Class 10 chapters are narrowly source-reviewed mappings.`);
+console.log('PASS — CBSE track labels disclose whether source review is complete or still in progress.');
