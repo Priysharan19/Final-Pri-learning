@@ -70,8 +70,22 @@ function ids(values) {
     .filter(value => value && value.length <= 200))].slice(0, 12);
 }
 
+function replayUnfinished(productIds) {
+  request('unfinished', { productIds }, 60_000).then(result => {
+    if (typeof window === 'undefined') return;
+    for (const transaction of Array.isArray(result.transactions) ? result.transactions : []) {
+      window.dispatchEvent(new CustomEvent(UPDATE_EVENT, { detail: { status: 'verified', ...transaction } }));
+    }
+  }).catch(() => {});
+}
+
 export async function getNativeProducts(productIds) {
-  const result = await request('products', { productIds: ids(productIds) }, 30_000);
+  const wanted = ids(productIds);
+  const result = await request('products', { productIds: wanted }, 30_000);
+  // The native Transaction.updates observer starts before React. Sweep Apple's
+  // unfinished queue after bootstrap so an update emitted during page startup
+  // is replayed through the normal server-verification handler rather than lost.
+  replayUnfinished(wanted);
   return Array.isArray(result.products) ? result.products : [];
 }
 
