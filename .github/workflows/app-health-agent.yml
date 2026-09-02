@@ -147,7 +147,9 @@ jobs:
         shell: bash
         env:
           WEB_BLOCKING: ${{ needs.app.outputs.blocking }}
+          WEB_VERDICT: ${{ needs.app.outputs.verdict }}
           NATIVE_BLOCKING: ${{ needs.native.outputs.blocking }}
+          NATIVE_VERDICT: ${{ needs.native.outputs.verdict }}
           NATIVE_RESULT: ${{ needs.native.result }}
           WEB_RESULT: ${{ needs.app.result }}
         run: |
@@ -159,7 +161,12 @@ jobs:
           const nb = Number(process.env.NATIVE_BLOCKING || 0);
           const nativeSkipped = process.env.NATIVE_RESULT === 'skipped';
           const total = wb + nb + (process.env.WEB_RESULT === 'failure' ? 1 : 0) + (process.env.NATIVE_RESULT === 'failure' ? 1 : 0);
-          const verdict = total > 0 ? 'FIX REQUIRED' : nativeSkipped ? 'HEALTHY ON WEB/PRODUCT CHECKS; NATIVE COVERED BY PATH-GATED NATIVE INK CI' : 'HEALTHY';
+          const hasEvidenceGap = /EVIDENCE GAPS/i.test(process.env.WEB_VERDICT || '') || /EVIDENCE GAPS/i.test(process.env.NATIVE_VERDICT || '');
+          const verdict = total > 0
+            ? 'FIX REQUIRED'
+            : (hasEvidenceGap || nativeSkipped)
+              ? 'HEALTHY WITH EVIDENCE GAPS'
+              : 'HEALTHY';
           let body = `# Pri Learning consolidated app-health report\n\n**Verdict:** ${verdict}\n\n`;
           body += '## Web, product and mounted student flows\n\n' + web + '\n';
           if (native) body += '\n## Native iPad simulator path\n\n' + native + '\n';
