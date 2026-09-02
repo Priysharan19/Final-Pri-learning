@@ -1,0 +1,42 @@
+name: Data Durability
+
+on:
+  push:
+    branches:
+      - main
+      - 'fix/**'
+      - 'data/**'
+      - 'release/**'
+  pull_request:
+    paths:
+      - 'client/src/api.js'
+      - 'client/src/local/backend.js'
+      - 'client/src/local/idb.js'
+      - 'client/src/local/restoreGuard.js'
+      - 'client/test/restore-durability-check.mjs'
+      - 'client/test/backend-check.mjs'
+      - '.github/workflows/data-durability.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  restore:
+    name: Backup restore rollback and local backend regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+      - name: Install client dependencies
+        run: npm ci --prefix client
+      - name: Mid-restore failure injection
+        run: node client/test/restore-durability-check.mjs
+      - name: Local backend regression
+        run: node client/test/backend-check.mjs
+      - name: Production client build
+        run: npm run build

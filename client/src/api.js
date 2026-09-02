@@ -25,6 +25,7 @@ import {
   beginRequest, finishRequest, normalizeApiError, validateRequest
 } from './local/gateway.js';
 import { recordMutation } from './local/outbox.js';
+import { restoreBackupSafely } from './local/restoreGuard.js';
 import { recordProfileMutation } from './platform/profileOutbox.js';
 import { dispatchIndiaExam, indiaExamRoute } from './local/indiaExamBackend.js';
 import { scopeForYear } from './engine/curriculum.js';
@@ -161,7 +162,9 @@ async function call(method, path, body) {
 
     for (let faults = 0; ; faults++) {
       try {
-        const result = await localDispatch(checked.method, checked.path, checked.body);
+        const result = checked.method === 'POST' && checked.path === '/data/import'
+          ? await restoreBackupSafely(localDispatch, checked.body)
+          : await localDispatch(checked.method, checked.path, checked.body);
         if (checked.path === '/me' || checked.path.startsWith('/profiles')) noteUser(result);
         if (checked.path === '/auth/logout') activeUser = null;
         publishTeachingEvidence(checked.path, result, checked.body);
