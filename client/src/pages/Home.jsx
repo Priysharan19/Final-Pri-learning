@@ -82,12 +82,21 @@ export default function Home() {
   }, [subtopic, curriculum]);
 
   const selectedDotpoint = dotpoint != null ? selSub?.dotpoints?.[dotpoint] || null : null;
-  const impossibleTarget = Boolean(selSub && !practiceTargetAvailable(selSub, dotpoint));
+  const impossibleTarget = Boolean(
+    (subtopic && curriculum && !selSub) ||
+    (selSub && !practiceTargetAvailable(selSub, dotpoint))
+  );
 
   // A saved filter can outlive a curriculum rationalisation. Do not keep a
-  // stale target selected after a source update has made that exact outcome
-  // unavailable in production.
+  // stale target selected after a source update has removed that chapter or made
+  // that exact outcome unavailable in production.
   useEffect(() => {
+    if (!curriculum) return;
+    if (subtopic && !selSub) {
+      setSubtopic(null);
+      setDotpoint(null);
+      return;
+    }
     if (!selSub) return;
     if (!topicAvailability(selSub).selectable) {
       setSubtopic(null);
@@ -95,7 +104,7 @@ export default function Home() {
       return;
     }
     if (selectedDotpoint && !dotpointAvailable(selectedDotpoint)) setDotpoint(null);
-  }, [selSub, selectedDotpoint]);
+  }, [curriculum, subtopic, selSub, selectedDotpoint]);
 
   const chips = [];
   if (year != null) chips.push({ k: 'year', label: `${curriculum?.country === 'in' ? 'Class' : 'Year'} ${year}`, clear: () => { setYear(user.year); setSectionKey(null); setSubtopic(null); setDotpoint(null); } });
