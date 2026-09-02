@@ -46,8 +46,6 @@ export const CBSE_CLASS10_2026_27_CHAPTERS = Object.freeze([
     'Solve a pair of linear equations by substitution and elimination',
     'Model and solve simple situational problems using a pair of linear equations'
   ], [
-    // D1 reads an actual graph intersection; D2–D4 classify intersecting,
-    // parallel and coincident line pairs. Algebraic/context forms stay on y10-simeq.
     cover('c10-linear-graphs', [0], [1, 2, 3, 4]),
     cover('y10-simeq', [1], [1, 2, 3]),
     cover('y10-simeq', [2], [4])
@@ -60,8 +58,6 @@ export const CBSE_CLASS10_2026_27_CHAPTERS = Object.freeze([
   ], [
     cover('y10-quadratics', [0], [1, 3]),
     cover('y10-quadratics', [1], [4]),
-    // Dedicated contextual forms require the student to model the situation
-    // before solving, rather than relabelling a bare algebra exercise as applied.
     cover('c10-quadratic-context', [2], [1, 2, 3, 4])
   ], true),
 
@@ -127,8 +123,11 @@ export const CBSE_CLASS10_2026_27_CHAPTERS = Object.freeze([
     'Find surface areas of combinations of two prescribed solids',
     'Find volumes of combinations of two prescribed solids'
   ], [
+    // Surface forms explicitly remove joined/internal faces before adding the
+    // exposed curved surfaces. The established bank continues to own volume.
+    cover('c10-surface-area-combo', [0], [1, 2, 3, 4]),
     cover('c10-surface-volume-combo', [1], [1, 2])
-  ]),
+  ], true),
 
   chapter('c10-statistics', [
     'Find the mean of grouped data using direct, assumed-mean and step-deviation methods',
