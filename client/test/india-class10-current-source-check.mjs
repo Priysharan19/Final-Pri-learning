@@ -21,6 +21,7 @@ assert.match(CBSE_CLASS10_2026_27_SOURCE.cbseMathematicsPdf, /^https:\/\/cbseaca
 assert.match(CBSE_CLASS10_2026_27_SOURCE.ncertTextbook, /^https:\/\/(www\.)?ncert\.nic\.in\//);
 
 const byId = Object.fromEntries(group.chapters.map(ch => [ch.id, ch]));
+const sourceById = Object.fromEntries(CBSE_CLASS10_2026_27_CHAPTERS.map(ch => [ch.id, ch]));
 const text = id => byId[id].dotpoints.join(' | ').toLowerCase();
 
 // Rationalised-out / non-current outcomes must never re-enter the live Class X
@@ -42,6 +43,7 @@ assert.deepEqual(reviewed, [
   'c10-arithmetic-progressions',
   'c10-circles',
   'c10-coordinate-geometry',
+  'c10-probability',
   'c10-statistics'
 ]);
 
@@ -53,6 +55,14 @@ for (const id of reviewed) {
   assert.equal(status.sourceReviewed, true);
   assert.equal(status.source?.reviewState, 'current-source-reviewed-mapping');
 }
+
+// Probability is deliberately narrow: the shared y8 bank also contains
+// complement, expected-frequency and experimental-probability forms. Those stay
+// usable elsewhere, but only the classical simple-event D1 form is evidence for
+// current Class X coverage.
+assert.deepEqual(sourceById['c10-probability'].covers, [
+  { gen: 'y8-probability', dp: [0, 1], diff: [1] }
+]);
 
 // These are visible product gaps, not false review claims.
 for (const id of ['c10-real-numbers', 'c10-polynomials', 'c10-quadratic-equations', 'c10-surface-volume']) {
