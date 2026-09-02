@@ -10,7 +10,7 @@
 // marker is guessed to belong to a child, and no historical local work is silently
 // skipped just because the new queue starts empty.
 
-import { get, put } from '../local/idb.js';
+import { byIndex, get, put } from '../local/idb.js';
 import { classifyMutation, coalesce } from '../local/outbox.js';
 
 const VERSION = 1;
@@ -20,6 +20,7 @@ const CLOUD_KINDS = new Set([
   'profile', 'practice-progress', 'exam', 'rush-history', 'match-history',
   'task', 'bookmark', 'favorite', 'custom-question'
 ]);
+const APPEND_KINDS = new Set(['practice-progress', 'exam', 'rush-history', 'match-history']);
 const RESCAN = Object.freeze({ seq: 0, kind: 'full-rescan', entityId: 'all', operation: 'upsert', initial: true });
 
 let serial = Promise.resolve();
@@ -44,8 +45,9 @@ function clean(raw, pid) {
   const items = raw.items.filter(item => item && Number.isSafeInteger(Number(item.seq)) && Number(item.seq) > 0)
     .map(item => ({
       seq: Number(item.seq), kind: String(item.kind || ''), entityId: String(item.entityId || ''),
-      operation: String(item.operation || 'upsert'), firstAt: Math.max(0, Number(item.firstAt) || 0),
-      at: Math.max(0, Number(item.at) || 0)
+      operation: String(item.operation || 'upsert'),
+      sourceId: typeof item.sourceId === 'string' || typeof item.sourceId === 'number' ? item.sourceId : null,
+      firstAt: Math.max(0, Number(item.firstAt) || 0), at: Math.max(0, Number(item.at) || 0)
     }));
   const maxSeq = items.reduce((n, item) => Math.max(n, item.seq), 0);
   return {
@@ -69,6 +71,27 @@ async function load(pid) {
 
 async function save(row) {
   await put('device', row);
+}
+
+async function newestSourceId(pid, classified) {
+  let store = null;
+  let rows = [];
+  if (classified.kind === 'practice-progress') {
+    store = 'attempts';
+    rows = (await byIndex(store, 'pid', pid).catch(() => []))
+      .filter(row => row?.questionId === classified.entityId);
+  } else if (classified.kind === 'rush-history') {
+    rows = await byIndex('rushRuns', 'pid', pid).catch(() => []);
+  } else if (classified.kind === 'match-history') {
+    rows = await byIndex('matchRuns', 'pid', pid).catch(() => []);
+  }
+  if (!rows.length) return null;
+  rows.sort((a, b) => {
+    const time = Number(b.createdAt || b.finishedAt || 0) - Number(a.createdAt || a.finishedAt || 0);
+    if (time) return time;
+    return String(b.id || '').localeCompare(String(a.id || ''));
+  });
+  return rows[0]?.id ?? null;
 }
 
 /**
@@ -101,10 +124,19 @@ export function recordProfileMutation(pid, method, path, result, body = null) {
 
     const event = {
       seq: row.nextSeq++, kind: classified.kind, entityId: classified.entityId,
-      operation: classified.operation, firstAt: now, at: now
+      operation: classified.operation,
+      sourceId: APPEND_KINDS.has(classified.kind) ? await newestSourceId(id, classified) : null,
+      firstAt: now, at: now
     };
-    const next = coalesce(row.items, event);
-    if (next.some(item => item.kind === 'full-rescan')) {
+
+    // Learning facts are append-only. Never coalesce two attempts at the same
+    // question into one marker; doing so would erase a real learning event before
+    // the cloud had a chance to see it. Mutable records still coalesce safely.
+    const next = APPEND_KINDS.has(classified.kind)
+      ? [...row.items, event]
+      : coalesce(row.items, event);
+
+    if (next.length > MAX_ITEMS || next.some(item => item.kind === 'full-rescan')) {
       row.initialComplete = false;
       row.items = [];
     } else {
