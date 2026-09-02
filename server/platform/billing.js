@@ -4,9 +4,22 @@ import { rateLimit, requireSession, sha256 } from './security.js';
 
 const PROVIDERS = new Set(['apple', 'google', 'web']);
 
+function positiveInt(name, fallback) {
+  const raw = String(process.env[name] || '').trim();
+  if (!raw) return fallback;
+  const value = Number(raw);
+  return Number.isSafeInteger(value) && value > 0 ? value : fallback;
+}
+
 export function commercialConfig() {
   return Object.freeze({
-    display: Object.freeze({ currency: 'INR', monthly: 1000, annual: 10000, trialDays: 7 }),
+    display: Object.freeze({
+      currency: String(process.env.PRI_DISPLAY_CURRENCY || 'INR').trim().toUpperCase().slice(0, 8) || 'INR',
+      monthly: positiveInt('PRI_DISPLAY_MONTHLY_PRICE', null),
+      annual: positiveInt('PRI_DISPLAY_ANNUAL_PRICE', null),
+      trialDays: positiveInt('PRI_DISPLAY_TRIAL_DAYS', null),
+      advisoryOnly: true
+    }),
     // Storefront identifiers are deployment configuration because Apple/Google/
     // web products can differ by legal entity, region and launch configuration.
     products: Object.freeze({
