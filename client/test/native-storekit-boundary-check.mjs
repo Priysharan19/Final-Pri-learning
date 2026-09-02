@@ -18,26 +18,29 @@ assert.match(swift, /verification\.jwsRepresentation/,
   'verified StoreKit result must preserve Apple signed JWS for server verification');
 assert.match(swift, /Transaction\.currentEntitlements/,
   'restore must enumerate StoreKit current entitlements');
+assert.match(swift, /Transaction\.unfinished/,
+  'launch recovery must explicitly enumerate unfinished StoreKit transactions');
 assert.match(swift, /AppStore\.sync\(\)/,
   'restore must ask App Store to synchronize purchases');
 assert.match(swift, /Transaction\.updates/,
-  'unfinished transactions must be listened for across retry/relaunch flows');
+  'new and externally updated transactions must be listened for');
 
 const purchaseStart = swift.indexOf('case "purchase":');
+const unfinishedStart = swift.indexOf('case "unfinished":');
 const restoreStart = swift.indexOf('case "restore":');
 const finishStart = swift.indexOf('case "finish":');
-assert.ok(purchaseStart >= 0 && restoreStart > purchaseStart && finishStart > restoreStart, 'StoreKit actions must have explicit purchase/restore/finish branches');
-assert.ok(!swift.slice(purchaseStart, restoreStart).includes('.finish()'),
-  'purchase success must not finish a transaction before cloud acceptance');
-assert.ok(!swift.slice(restoreStart, finishStart).includes('.finish()'),
-  'restore must not finish a transaction before cloud acceptance');
+assert.ok(purchaseStart >= 0 && unfinishedStart > purchaseStart && restoreStart > unfinishedStart && finishStart > restoreStart,
+  'StoreKit actions must have explicit purchase/unfinished/restore/finish branches');
+assert.ok(!swift.slice(purchaseStart, finishStart).includes('.finish()'),
+  'purchase, recovery and restore must not finish a transaction before cloud acceptance');
 assert.match(swift.slice(finishStart), /await transaction\.finish\(\)/,
   'only the explicit finish action may acknowledge a StoreKit transaction');
 
 assert.equal(native.includes('fetch('), false, 'native bridge client must not create a second network boundary');
 assert.equal(native.includes('cloudRequest('), false, 'native bridge client must not call cloud directly');
 assert.match(native, /messageHandlers\?\.priBilling/, 'browser/native boundary must target only priBilling');
-assert.match(native, /pri:native-billing-update/, 'client must receive unfinished transaction retries');
+assert.match(native, /request\('unfinished'/, 'client bootstrap must sweep StoreKit unfinished transactions');
+assert.match(native, /pri:native-billing-update/, 'client must replay unfinished transactions through the normal update path');
 
 assert.match(transport, /\/v1\/billing\/apple\/bootstrap/, 'cloud transport must expose Apple account-token bootstrap');
 assert.match(transport, /\/v1\/billing\/apple\/transaction/, 'cloud transport must expose server JWS verification');
@@ -55,4 +58,4 @@ assert.match(panel, /nativeShell && !nativeStoreKit/,
 assert.equal(/set(?:Premium|Entitlement)\s*\(/.test(native), false,
   'native bridge must never contain a client-side Premium mutation');
 
-console.log('PASS — StoreKit purchase/restore keeps Apple JWS intact, binds appAccountToken, retries unfinished transactions, and finishes only after Pri server acceptance.');
+console.log('PASS — StoreKit purchase/restore keeps Apple JWS intact, recovers unfinished transactions, binds appAccountToken, and finishes only after Pri server acceptance.');
