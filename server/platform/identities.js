@@ -13,6 +13,14 @@ function providerOk(value) {
 export function createIdentityRouter(db) {
   const router = Router();
 
+  router.get('/', requireSession(db), (req, res) => {
+    const rows = db.prepare(`SELECT provider,linked_at FROM account_identities
+      WHERE account_id=? ORDER BY provider`).all(req.platformSession.account_id);
+    // Provider subjects and historical provider emails stay server-side; the UI
+    // needs only the provider name and when it was linked.
+    res.json({ providers: rows.map(row => ({ provider: row.provider, linkedAt: row.linked_at })) });
+  });
+
   router.post('/:provider/sign-in', rateLimit(db, 'oidc-signin', { limit: 20, windowMs: 15 * 60 * 1000 }), async (req, res, next) => {
     try {
       const provider = String(req.params.provider || '');
