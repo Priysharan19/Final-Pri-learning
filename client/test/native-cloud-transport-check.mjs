@@ -16,9 +16,13 @@ assert.match(shell, /#if DEBUG[\s\S]*webView\.isInspectable\s*=\s*true[\s\S]*#en
 assert.match(swift, /URLSessionConfiguration\.default/, 'native cloud must use URLSession rather than WKWebView fetch');
 assert.match(swift, /HTTPCookieStorage/, 'native cloud must keep its HTTPS session in the native cookie jar');
 assert.match(swift, /Bundle\.main\.object\(forInfoDictionaryKey:\s*"PRICloudOrigin"\)/,
-  'release cloud origin must be deployment-configurable through app metadata');
-assert.match(swift, /ProcessInfo\.processInfo\.environment\["PRI_CLOUD_ORIGIN"\]/,
-  'development/test builds must support an injected cloud origin');
+  'release cloud origin must be deployment-configurable through signed app metadata');
+const originConfig = swift.slice(
+  swift.indexOf('private static var configuredOrigin'),
+  swift.indexOf('private static func validateOrigin')
+);
+assert.match(originConfig, /#if DEBUG[\s\S]*ProcessInfo\.processInfo\.environment\["PRI_CLOUD_ORIGIN"\][\s\S]*#else[\s\S]*let candidates:\s*\[String\?\]\s*=\s*\[plist\][\s\S]*#endif/,
+  'runtime environment origin overrides must be DEBUG-only and release must use signed app metadata');
 assert.match(swift, /guard scheme == "https"/, 'release native cloud origin must require HTTPS');
 assert.match(swift, /path\.hasPrefix\("\/v1\/"\)/, 'native bridge must be restricted to the Pri platform API');
 assert.match(swift, /!path\.contains\("\.\."\)/, 'native bridge must reject traversal paths');
@@ -46,4 +50,4 @@ assert.ok(nativeBranch >= 0 && webOrigin > nativeBranch && webFetch > webOrigin,
 assert.match(transport, /globalThis\.__PRI_NATIVE_CLOUD_CONFIGURED__\s*===\s*true/,
   'native cloud availability must fail closed when the release origin is absent');
 
-console.log('PASS — iOS cloud traffic is bounded to NativeCloudBridge, keeps cookies/CSRF native, rejects JS-selected origins, and preserves the web transport fallback.');
+console.log('PASS — iOS cloud traffic is bounded to NativeCloudBridge, keeps cookies/CSRF native, pins release origin to signed metadata, rejects JS-selected origins, and preserves the web transport fallback.');
