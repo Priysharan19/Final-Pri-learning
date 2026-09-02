@@ -1,6 +1,7 @@
 // Pri Learning · local profile ↔ cloud account boundary checks
 // Ensures an unrelated authenticated cloud cookie cannot silently retarget a
-// local child's profile, and that account PII is not persisted in device rows.
+// local child's profile, account PII is not persisted in device rows, and an
+// explicit unlink cannot carry cloud replica state into another account.
 
 import { installBrowserEnv, resetStorage, rawRows } from './backend-check.mjs';
 
@@ -8,10 +9,11 @@ installBrowserEnv();
 resetStorage();
 globalThis.__PRI_CLOUD_ORIGIN__ = 'https://pri.example.test';
 
-const { put } = await import('../src/local/idb.js');
+const { get, put } = await import('../src/local/idb.js');
 const {
   cloudAccountLink, disconnectCloudAccount, loginCloudAccount, verifyCloudSession
 } = await import('../src/platform/cloudAccount.js');
+const { pendingProfileMutations, profileOutboxStats } = await import('../src/platform/profileOutbox.js');
 
 let account = { id: 'acct-A', email: 'student@example.test', name: 'Student A', role: 'student', emailVerified: true };
 
@@ -39,6 +41,7 @@ const ok = (name, condition, detail = '') => {
 };
 const same = (name, actual, expected) => ok(name, JSON.stringify(actual) === JSON.stringify(expected), `expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`);
 
+await put('profiles', { id: 'p1', name: 'Offline Student', year: 9, course: 'in' });
 const link = await loginCloudAccount('p1', { email: account.email, password: 'not-stored-password' });
 same('login links expected account', link.accountId, 'acct-A');
 same('link exposes no persisted email', link.email, undefined);
@@ -56,18 +59,29 @@ try { await verifyCloudSession('p1'); } catch (error) { mismatch = error; }
 same('different session is rejected before relinking', mismatch?.code, 'CLOUD_LINK_CONFLICT');
 same('saved local link remains account A', (await cloudAccountLink('p1'))?.accountId, 'acct-A');
 
-// Disconnect removes only cloud replica metadata, not the local profile stores.
-await put('device', { id: 'pri-cloud-sync-state-v1:p1', cursor: 7, accountId: 'acct-A' });
+// Simulate account-A replica state after a completed initial sync. Disconnect
+// must remove account-scoped cursor/cache state and reset the profile outbox to
+// a mandatory full reconciliation for whichever account is linked next.
+await put('device', { id: 'pri-cloud-sync-state-v1:p1', cursor: 7, accountId: 'acct-A', entityVersions: { 'profile:self': 3 } });
 await put('device', { id: 'pri-cloud-outbox-v1:p1', version: 1, nextSeq: 2, initialComplete: true, items: [] });
-await put('device', { id: 'pri-cloud-remote-event-v1:p1:event-1', eventId: 'event-1' });
+await put('device', { id: 'pri-cloud-remote-event-v1:p1:event-1', eventId: 'event-1', payload: { privateToAccountA: true } });
 await put('device', { id: 'unrelated-device-row', keep: true });
 await disconnectCloudAccount('p1');
+
 same('disconnect removes account link', await cloudAccountLink('p1'), null);
 const after = JSON.stringify(rawRows().device || []);
 ok('disconnect removes profile sync state', !after.includes('pri-cloud-sync-state-v1:p1'), after);
-ok('disconnect removes profile cloud outbox', !after.includes('pri-cloud-outbox-v1:p1'), after);
 ok('disconnect removes profile remote-event cache', !after.includes('pri-cloud-remote-event-v1:p1:event-1'), after);
+ok('disconnect does not retain prior-account replica payload', !after.includes('privateToAccountA'), after);
 ok('disconnect preserves unrelated device metadata', after.includes('unrelated-device-row'), after);
+same('disconnect preserves the offline local profile', (await get('profiles', 'p1'))?.name, 'Offline Student');
+
+const outbox = await profileOutboxStats('p1');
+same('disconnect resets initial sync completion', outbox.initialComplete, false);
+same('disconnect requires a full rescan for the next account', outbox.requiresFullRescan, true);
+same('next account receives only the full-rescan marker first', await pendingProfileMutations('p1'), [
+  { seq: 0, kind: 'full-rescan', entityId: 'all', operation: 'upsert', initial: true }
+]);
 
 console.log(`\nCloud account boundary — ${pass}/${pass + fail} checks`);
 if (failures.length) {
