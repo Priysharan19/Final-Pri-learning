@@ -12,7 +12,7 @@ import { createTelemetryRouter } from './telemetry.js';
 import { assertPlatformConfig, platformConfigStatus } from './config.js';
 import { csrfGuard, originGuard } from './security.js';
 
-export function createPlatformRouter(db, { billingVerifiers = {} } = {}) {
+export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckout = {} } = {}) {
   assertPlatformConfig();
   const router = Router();
 
@@ -30,7 +30,13 @@ export function createPlatformRouter(db, { billingVerifiers = {} } = {}) {
       ok: true,
       service: 'pri-learning-platform',
       schemaVersion: db.prepare("SELECT value FROM platform_meta WHERE key='schema_version'").get()?.value || null,
+      billingSchemaVersion: db.prepare("SELECT value FROM platform_meta WHERE key='billing_schema_version'").get()?.value || null,
       identityProviders: { google: config.googleConfigured, apple: config.appleConfigured },
+      billingProviders: {
+        web: config.webBillingProviderConfigured,
+        apple: config.appleBillingProductsConfigured,
+        google: config.googleBillingProductsConfigured
+      },
       checkedAt: Date.now()
     });
   });
@@ -44,7 +50,7 @@ export function createPlatformRouter(db, { billingVerifiers = {} } = {}) {
   router.use('/account/identity', createIdentityRouter(db));
   router.use('/sync', createSyncRouter(db));
   router.use('/entitlements', createEntitlementRouter(db));
-  router.use('/billing', createBillingRouter(db, { verifiers: billingVerifiers }));
+  router.use('/billing', createBillingRouter(db, { verifiers: billingVerifiers, checkout: billingCheckout }));
   router.use('/classes', createClassRouter(db));
   router.use('/content', createContentRouter(db));
   router.use('/reports', createReportRouter(db));
