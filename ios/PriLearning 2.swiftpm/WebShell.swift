@@ -5,6 +5,7 @@
 // Native integrations:
 //   • a real PencilKit writing surface over the page's ink area, and Vision
 //     handwriting recognition behind it (Ink/) — see InkBridge
+//   • StoreKit 2 purchase/restore bridge; Premium remains server-authoritative
 //   • priShare message handler → iOS share sheet for backups / task packs /
 //     progress files (AirDrop, Files, Mail…)
 //   • WKDownload for any blob downloads → share sheet
@@ -40,9 +41,11 @@ struct WebShell: UIViewRepresentable {
         config.allowsInlineMediaPlayback = true
         config.defaultWebpagePreferences.allowsContentJavaScript = true
 
-        // Tell the web app it is running inside the native shell.
+        // Tell the web app it is running inside the native shell. Billing gets
+        // its own flag so the React layer can hide web checkout and offer only
+        // StoreKit purchase/restore controls in an App Store build.
         let nativeFlag = WKUserScript(
-            source: "window.__PRI_NATIVE__ = true; window.__PRI_NATIVE_INK__ = true; window.__PRI_NATIVE_PHOTO__ = true;",
+            source: "window.__PRI_NATIVE__ = true; window.__PRI_NATIVE_INK__ = true; window.__PRI_NATIVE_PHOTO__ = true; window.__PRI_NATIVE_BILLING__ = true;",
             injectionTime: .atDocumentStart,
             forMainFrameOnly: false
         )
@@ -50,6 +53,7 @@ struct WebShell: UIViewRepresentable {
         config.userContentController.add(context.coordinator, name: "priShare")
         config.userContentController.add(context.coordinator, name: "priInk")
         config.userContentController.add(context.coordinator, name: "priPhoto")
+        config.userContentController.add(context.coordinator, name: "priBilling")
 
         let webView = WKWebView(frame: .zero, configuration: config)
         webView.navigationDelegate = context.coordinator
@@ -73,6 +77,7 @@ struct WebShell: UIViewRepresentable {
         container.backgroundColor = webView.backgroundColor
         container.addSubview(webView)
         context.coordinator.attachInk(to: webView, in: container)
+        context.coordinator.attachBilling(to: webView)
         container.onLayout = { [weak coordinator = context.coordinator] in
             coordinator?.ink.webViewDidResize()
         }
@@ -92,6 +97,7 @@ struct WebShell: UIViewRepresentable {
 
     static func dismantleUIView(_ view: UIView, coordinator: Coordinator) {
         coordinator.detachInk()
+        coordinator.detachBilling()
     }
 
     // MARK: - Coordinator
@@ -100,6 +106,7 @@ struct WebShell: UIViewRepresentable {
         private var downloadDestination: URL?
         private weak var shellWebView: WKWebView?
         private let photoOCR = PhotoOCRBridge()
+        private let billing = StoreKitBillingBridge()
 
         // ── Native ink ──
         let ink = InkBridge()
@@ -133,6 +140,14 @@ struct WebShell: UIViewRepresentable {
             shellWebView = nil
         }
 
+        func attachBilling(to webView: WKWebView) {
+            billing.attach(to: webView)
+        }
+
+        func detachBilling() {
+            billing.detach()
+        }
+
         // ── Bridges from the page ──
         func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
             if message.name == "priInk" {
@@ -141,6 +156,10 @@ struct WebShell: UIViewRepresentable {
             }
             if message.name == "priPhoto" {
                 photoOCR.handle(message.body, webView: shellWebView)
+                return
+            }
+            if message.name == "priBilling" {
+                billing.handle(message.body)
                 return
             }
             guard message.name == "priShare",
