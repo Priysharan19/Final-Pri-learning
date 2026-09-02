@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { createAccountRouter } from './accounts.js';
 import { createAdminRouter } from './admin.js';
+import { createAssignmentExecutionRouter } from './assignments.js';
 import { createBillingRouter } from './billing.js';
 import { createClassRouter } from './classes.js';
 import { createContentRouter } from './content.js';
@@ -62,6 +63,7 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
     native: billingNative
   }));
   router.use('/classes', createClassRouter(db));
+  router.use('/assignments', createAssignmentExecutionRouter(db));
   router.use('/content', createContentRouter(db));
   router.use('/reports', createReportRouter(db));
   router.use('/telemetry', createTelemetryRouter(db));
