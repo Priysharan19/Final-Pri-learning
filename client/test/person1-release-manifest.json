@@ -1,0 +1,23 @@
+{
+  "contract": "person1-intelligence-v1",
+  "deterministic": {
+    "recognitionConsensus": "client/test/person1-intelligence-loop-check.mjs",
+    "mathematicalEquivalence": "client/src/engine/checker-core.js",
+    "symbolicReasoning": "client/src/engine/reason-v2-safe.js",
+    "stepMarking": "client/src/engine/checker-core.js",
+    "diagnosis": "client/src/engine/diagnose.js",
+    "adaptiveLearning": "client/src/engine/adaptive.js",
+    "priExplain": "client/src/explain/adaptiveTeaching.js"
+  },
+  "empiricalRequired": {
+    "realPencilTestWriters": 20,
+    "realPencilTestExpressions": 1000,
+    "exactExpressionAccuracy": 0.98,
+    "characterAccuracy": 0.995,
+    "worstWriterExactAccuracy": 0.90,
+    "criticalStructureExactness": 0.995,
+    "safeAutoMarkPrecision": 0.999,
+    "recognitionP95Ms": 500
+  },
+  "claimPolicy": "Empirical thresholds are blocking and must never be inferred from deterministic/synthetic tests."
+}
