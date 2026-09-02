@@ -170,8 +170,11 @@ export async function drainAuthDeliveryOutbox(db, {
   ensureAuthDeliverySchema(db);
   if (typeof send !== 'function') return { enabled: false, sent: 0, failed: 0, purged: 0 };
 
+  // Once a token is consumed or expired there is no reason to retain even a
+  // delivered metadata row. This keeps destinations/provider ids bounded to the
+  // lifetime of the one-hour account action.
   const purged = db.prepare(`DELETE FROM auth_delivery_outbox
-    WHERE delivered_at IS NULL AND token_id IN (
+    WHERE token_id IN (
       SELECT id FROM account_tokens WHERE consumed_at IS NOT NULL OR expires_at <= ?
     )`).run(now).changes;
 
@@ -235,7 +238,12 @@ export function startAuthDeliveryWorker(db, {
   publicOrigin = process.env.PRI_PUBLIC_ORIGIN
 } = {}) {
   ensureAuthDeliverySchema(db);
-  if (typeof send !== 'function') return { enabled: false, stop() {} };
+  if (typeof send !== 'function') {
+    if (process.env.NODE_ENV === 'production') {
+      throw Object.assign(new Error('Production auth email delivery is not configured'), { code: 'AUTH_EMAIL_NOT_CONFIGURED' });
+    }
+    return { enabled: false, stop() {} };
+  }
 
   let stopped = false;
   let running = false;
