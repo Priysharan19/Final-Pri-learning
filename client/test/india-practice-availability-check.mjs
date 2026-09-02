@@ -48,12 +48,12 @@ assert.deepEqual(topicAvailability(triangles), {
 assert.equal(practiceTargetAvailable(triangles), false);
 
 assert.deepEqual(topicAvailability(trig), {
-  total: 4, available: 2, missing: 2, selectable: true, complete: false
-}, 'acute-ratio and special-angle practice can remain live while broad upper-year trig forms are withheld');
+  total: 4, available: 3, missing: 1, selectable: true, complete: false
+}, 'acute-ratio, special-angle and bounded identity practice can remain live while the broad upper-year angle cell is withheld');
 assert.equal(practiceTargetAvailable(trig, 0), true);
 assert.equal(practiceTargetAvailable(trig, 1), true);
 assert.equal(practiceTargetAvailable(trig, 2), false, '0°/90° and ratio-relationship outcome needs a bounded Class X form');
-assert.equal(practiceTargetAvailable(trig, 3), false, 'identity practice needs a bounded Class X declaration');
+assert.equal(practiceTargetAvailable(trig, 3), true, 'simple Pythagorean/tan identities have a bounded audited difficulty');
 
 assert.deepEqual(topicAvailability(heights), {
   total: 1, available: 0, missing: 1, selectable: false, complete: false
