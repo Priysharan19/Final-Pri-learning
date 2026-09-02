@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { createAccountRouter } from './accounts.js';
 import { createAdminRouter } from './admin.js';
 import { createAssignmentExecutionRouter } from './assignments.js';
+import { assignmentSubmissionPrivacyGuard } from './assignmentProgress.js';
 import { createBillingRouter } from './billing.js';
 import { createClassRouter } from './classes.js';
 import { createContentRouter } from './content.js';
@@ -52,6 +53,11 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
     return originGuard(req, res, next);
   });
   router.use(csrfGuard);
+
+  // Defence in depth for child/privacy architecture: even a modified client can
+  // persist only aggregate assignment completion metrics. Answers and ink are
+  // removed before the classroom router reaches storage.
+  router.use(assignmentSubmissionPrivacyGuard);
 
   router.use('/account', createAccountRouter(db));
   router.use('/account/identity', createIdentityRouter(db));

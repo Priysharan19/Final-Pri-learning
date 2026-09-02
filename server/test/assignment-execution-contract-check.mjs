@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
 import { createPlatformDb } from '../platform/db.js';
-import { assignmentForAccount, listAssignmentsForAccount } from '../platform/assignments.js';
+import {
+  assignmentForAccount, assignmentSubmissionsForStaff, listAssignmentsForAccount
+} from '../platform/assignments.js';
+import { assignmentSubmissionPrivacyGuard, sanitizeAssignmentSummary } from '../platform/assignmentProgress.js';
 
 const db = createPlatformDb(':memory:');
 const now = 1_900_000_000_000;
@@ -35,8 +38,17 @@ db.prepare(`INSERT INTO assignments(id,class_id,teacher_account_id,title,specifi
   now
 );
 
+// Simulate a legacy/malicious row. Read paths must redact unknown/sensitive keys
+// even if old data reached storage before the write-side privacy guard existed.
 db.prepare(`INSERT INTO assignment_submissions(assignment_id,student_account_id,state,summary_json,started_at,updated_at)
-  VALUES ('assignment-1','student-1','started',?, ?, ?)`).run(JSON.stringify({ questionsAnswered: 3, correct: 2 }), now + 10, now + 20);
+  VALUES ('assignment-1','student-1','started',?, ?, ?)`).run(JSON.stringify({
+  questionsAnswered: 3,
+  correct: 2,
+  xp: 25,
+  rawInk: [{ x: 1, y: 2 }],
+  answers: ['private working'],
+  solution: 'must never surface'
+}), now + 10, now + 20);
 
 const studentList = listAssignmentsForAccount(db, 'student-1', 'student');
 assert.equal(studentList.length, 1);
@@ -44,7 +56,9 @@ assert.equal(studentList[0].id, 'assignment-1');
 assert.equal(studentList[0].className, 'Class 10 A');
 assert.equal(studentList[0].specification.questionCount, 8);
 assert.equal(studentList[0].submission.state, 'started');
-assert.deepEqual(studentList[0].submission.summary, { questionsAnswered: 3, correct: 2 });
+assert.deepEqual(studentList[0].submission.summary, {
+  kind: 'practice', questionsAnswered: 3, correct: 2, xp: 25
+});
 
 assert.equal(assignmentForAccount(db, 'student-1', 'student', 'class-2', 'assignment-2'), null,
   'a student must not read an assignment from a class they did not join');
@@ -58,5 +72,44 @@ assert.deepEqual(teacherList.map(x => x.id), ['assignment-1']);
 const adminList = listAssignmentsForAccount(db, 'admin-1', 'admin');
 assert.deepEqual(new Set(adminList.map(x => x.id)), new Set(['assignment-1', 'assignment-2']));
 
+const review = assignmentSubmissionsForStaff(db, 'teacher-1', 'teacher', 'class-1', 'assignment-1');
+assert.equal(review.assignment.id, 'assignment-1');
+assert.equal(review.submissions.length, 1);
+assert.equal(review.submissions[0].student.id, 'student-1');
+assert.deepEqual(review.submissions[0].summary, {
+  kind: 'practice', questionsAnswered: 3, correct: 2, xp: 25
+});
+assert.equal(assignmentSubmissionsForStaff(db, 'teacher-2', 'teacher', 'class-1', 'assignment-1'), null,
+  'another teacher must not review a class submission');
+assert.equal(assignmentSubmissionsForStaff(db, 'student-1', 'student', 'class-1', 'assignment-1'), null,
+  'students must not enumerate classmate submission summaries');
+
+assert.deepEqual(sanitizeAssignmentSummary({
+  kind: 'practice', questionsAnswered: 80, correct: 90, xp: 9_999_999,
+  targetQuestions: 200, strokes: ['secret'], answer: 'secret', arbitrary: { nested: true }
+}), {
+  kind: 'practice', questionsAnswered: 50, correct: 50, xp: 1_000_000, targetQuestions: 50
+});
+
+const guarded = {
+  method: 'PATCH',
+  path: '/classes/class-1/assignments/assignment-1/submission',
+  body: {
+    state: 'started',
+    summary: { questionsAnswered: 4, correct: 3, xp: 40, targetQuestions: 8, rawInk: 'secret', answers: ['secret'] }
+  }
+};
+let nextCalled = false;
+assignmentSubmissionPrivacyGuard(guarded, {}, () => { nextCalled = true; });
+assert.equal(nextCalled, true);
+assert.deepEqual(guarded.body.summary, {
+  kind: 'practice', questionsAnswered: 4, correct: 3, xp: 40, targetQuestions: 8
+});
+
+// Non-assignment routes are untouched by the privacy middleware.
+const unrelated = { method: 'PATCH', path: '/account/profile', body: { summary: { answer: 'keep' } } };
+assignmentSubmissionPrivacyGuard(unrelated, {}, () => {});
+assert.deepEqual(unrelated.body.summary, { answer: 'keep' });
+
 db.close();
-console.log('PASS — assignment execution metadata is visible only to authorised class members/staff and exposes bounded practice specifications without learning-answer payloads.');
+console.log('PASS — assignment execution is authorised, staff review is class-scoped, and classroom progress exposes only bounded aggregate metrics.');

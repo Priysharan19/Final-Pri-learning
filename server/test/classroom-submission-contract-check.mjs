@@ -29,12 +29,12 @@ assert.equal(studentSubmissionTransitionAllowed('returned', 'submitted'), true);
 
 const started = writeStudentSubmission(db, {
   assignmentId: 'assignment-1', studentId: 'student-1', state: 'started',
-  summary: { attempted: 2 }, now: now + 10
+  summary: { kind: 'practice', questionsAnswered: 2, correct: 1, xp: 10, targetQuestions: 10 }, now: now + 10
 });
 assert.equal(started.state, 'started');
 const submitted = writeStudentSubmission(db, {
   assignmentId: 'assignment-1', studentId: 'student-1', state: 'submitted',
-  summary: { attempted: 10, score: 8 }, now: now + 20
+  summary: { kind: 'practice', questionsAnswered: 10, correct: 8, xp: 80, targetQuestions: 10 }, now: now + 20
 });
 assert.equal(submitted.state, 'submitted');
 
@@ -57,12 +57,12 @@ assert.equal(feedback.returned_at, now + 40);
 
 const revised = writeStudentSubmission(db, {
   assignmentId: 'assignment-1', studentId: 'student-1', state: 'started',
-  summary: { attempted: 10, revised: true }, now: now + 50
+  summary: { kind: 'practice', questionsAnswered: 0, correct: 0, xp: 0, targetQuestions: 10 }, now: now + 50
 });
 assert.equal(revised.state, 'started');
 const resubmitted = writeStudentSubmission(db, {
   assignmentId: 'assignment-1', studentId: 'student-1', state: 'submitted',
-  summary: { attempted: 10, revised: true }, now: now + 60
+  summary: { kind: 'practice', questionsAnswered: 10, correct: 9, xp: 90, targetQuestions: 10 }, now: now + 60
 });
 assert.equal(resubmitted.submittedAt, now + 60);
 
