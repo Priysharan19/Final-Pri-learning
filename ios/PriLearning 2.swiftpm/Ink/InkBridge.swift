@@ -162,11 +162,22 @@ final class InkBridge: NSObject, InkSurfaceDelegate {
 
     // MARK: - Strokes out
 
-    func inkSurfaceDidChangeStrokes(_ surface: InkSurfaceView) {
+    private func invalidateRecognitionForInkMutation() {
         revisionLock.lock()
         strokeRevision &+= 1
         revisionLock.unlock()
         recognizer.cancelActiveVision()
+    }
+
+    func inkSurfaceDidBeginStroke(_ surface: InkSurfaceView) {
+        // Invalidate immediately at Pencil-down. Foundation work is suppressed
+        // by the revision checks and active Vision work is cancelled outright.
+        // Waiting until pen-up lets obsolete whole-page reads compete with ink.
+        invalidateRecognitionForInkMutation()
+    }
+
+    func inkSurfaceDidChangeStrokes(_ surface: InkSurfaceView) {
+        invalidateRecognitionForInkMutation()
         let strokes = surface.strokes
         emit(["type": "strokes", "strokes": strokes.map(\.jsonObject)])
     }
