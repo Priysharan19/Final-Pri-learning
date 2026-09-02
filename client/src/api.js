@@ -1,6 +1,5 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Pri Learning · Local-first API — every call is served on-device from IndexedDB.
-// Same interface as a network client, zero network. Your data never leaves the iPad.
+// Pri Learning · Local-first API — learning calls are served on-device first.
 //
 // The Years 7–12 question bank ships as one lazy chunk per year and stream, and
 // this layer is the only place that sees a request before the backend runs it,
@@ -17,14 +16,15 @@
 //
 // Successful sync-relevant mutations are marked dirty in local/outbox.js. The
 // outbox stores only entity ids + operation metadata, never the request/response
-// payload. A future authenticated cloud adapter can therefore re-read the
-// encrypted current state without this app creating a second plaintext copy.
+// payload. The optional authenticated cloud adapter lives behind the separately
+// audited client/src/platform/cloudTransport.js boundary.
 // ─────────────────────────────────────────────────────────────────────────────
 import { dispatch } from './local/backend.js';
 import {
   beginRequest, finishRequest, normalizeApiError, validateRequest
 } from './local/gateway.js';
 import { recordMutation } from './local/outbox.js';
+import { dispatchIndiaExam, indiaExamRoute } from './local/indiaExamBackend.js';
 import { scopeForYear } from './engine/curriculum.js';
 import { indiaGeneratorsForScope, indiaChapter, cleanIndiaTrack } from './engine/indiaProduct.js';
 import { loadBanks, loadBanksFor, loadAllBanks } from './engine/generators/index.js';
@@ -40,6 +40,7 @@ let scopeReady = Promise.resolve();
 let pathway = 'advanced';
 let course = 'nsw';
 let indiaTrackId = 'cbse';
+let activeUser = null;
 
 /** Pull in what a profile practises from. India and Australia have separate scopes. */
 function warmScope(year, pw, selectedCourse = course, selectedIndiaTrack = indiaTrackId) {
@@ -56,6 +57,7 @@ function warmScope(year, pw, selectedCourse = course, selectedIndiaTrack = india
 function noteUser(result) {
   const u = result?.user;
   if (!u?.year) return;
+  activeUser = { ...u };
   pathway = u.pathway || 'advanced';
   course = u.course || 'nsw';
   indiaTrackId = u.indiaTrack || 'cbse';
@@ -113,8 +115,8 @@ function publishTeachingEvidence(path, result, body) {
       feedback: result.feedback || '',
       revealed: Boolean(result.revealed),
       stepReport: result.stepReport || null,
-      diagnosis: result.diagnosis || result.stepReport?.diagnosis || null,
-      misconception: result.misconception || null,
+      diagnosis: result.diagnosis || result?.stepReport?.diagnosis || null,
+      misconception: result?.misconception || null,
       submission,
     }
   }));
@@ -136,6 +138,17 @@ async function preload(method, path, body) {
   await scopeReady;
 }
 
+async function localDispatch(method, path, body) {
+  // Never let an India profile fall through to local/backend.js's legacy paper
+  // builder: that path appends an HSC-style multipart Section II. The India exam
+  // module owns the full /exams namespace for Indian profiles and fails closed
+  // when an authentic format/content bank has not been released yet.
+  if (activeUser?.course === 'in' && indiaExamRoute(method, path)) {
+    return dispatchIndiaExam(activeUser, method, path, body);
+  }
+  return dispatch(method, path, body);
+}
+
 // ── Calls ────────────────────────────────────────────────────────────────────
 
 async function call(method, path, body) {
@@ -146,8 +159,9 @@ async function call(method, path, body) {
 
     for (let faults = 0; ; faults++) {
       try {
-        const result = await dispatch(checked.method, checked.path, checked.body);
+        const result = await localDispatch(checked.method, checked.path, checked.body);
         if (checked.path === '/me' || checked.path.startsWith('/profiles')) noteUser(result);
+        if (checked.path === '/auth/logout') activeUser = null;
         publishTeachingEvidence(checked.path, result, checked.body);
 
         // The local write has already committed at this point. A damaged/full
