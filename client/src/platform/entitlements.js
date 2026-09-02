@@ -23,15 +23,23 @@ export const BILLING_STATUS = Object.freeze(new Set([
   'free', 'trialing', 'active', 'grace', 'paused', 'past_due', 'expired', 'revoked'
 ]));
 
-export const DEFAULT_PUBLIC_PRICING = Object.freeze({
-  currency: 'INR',
-  monthlyDisplay: 1000,
-  annualDisplay: 10000,
-  trialDaysDisplay: 7,
-  // Store/provider product identifiers and authoritative prices are deliberately
-  // absent. They come from server configuration/storefront APIs, not this client.
-  advisoryOnly: true
-});
+export function normalizeCommercialDisplay(raw) {
+  const source = raw && typeof raw === 'object' ? raw : {};
+  const currency = /^[A-Z]{3,8}$/.test(String(source.currency || '').toUpperCase())
+    ? String(source.currency).toUpperCase()
+    : null;
+  const positive = value => {
+    const n = Number(value);
+    return Number.isSafeInteger(n) && n > 0 ? n : null;
+  };
+  return Object.freeze({
+    currency,
+    monthly: positive(source.monthly),
+    annual: positive(source.annual),
+    trialDays: positive(source.trialDays),
+    advisoryOnly: source.advisoryOnly !== false
+  });
+}
 
 function finiteMs(value) {
   const n = Number(value);
