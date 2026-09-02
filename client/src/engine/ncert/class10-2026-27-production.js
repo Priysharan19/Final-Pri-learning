@@ -24,16 +24,12 @@ const chapter = (id, dotpoints, covers, reviewed = false) => Object.freeze({
   reviewed
 });
 
-// Current Class X source shape. A missing `covers` entry is intentional evidence
-// of a product gap, not an invitation to route to the nearest generic generator.
 export const CBSE_CLASS10_2026_27_CHAPTERS = Object.freeze([
   chapter('c10-real-numbers', [
     'Apply the Fundamental Theorem of Arithmetic and prime factorisation to integer problems',
     'Prove irrationality results such as √2, √3 and √5 by contradiction'
   ], [
     cover('c10-real-numbers', [0], [1, 2, 3, 4]),
-    // Dedicated proof-reasoning forms assess the contradiction structure without
-    // pretending arbitrary prose proofs can be safely auto-marked.
     cover('c10-irrationality-proofs', [1], [1, 2, 3, 4])
   ], true),
 
@@ -41,9 +37,6 @@ export const CBSE_CLASS10_2026_27_CHAPTERS = Object.freeze([
     'Find zeroes of a polynomial graphically and algebraically',
     'Relate the zeroes of a quadratic polynomial to its coefficients'
   ], [
-    // D1 reads the x-intercepts of an actual plotted parabola; D2 finds the
-    // zeroes algebraically by factorisation. D3–D4 retain the audited
-    // zeroes↔coefficients forms from the established Class 10 bank.
     cover('c10-polynomial-zeroes', [0], [1, 2]),
     cover('c10-polynomial-zeroes', [1], [3, 4])
   ], true),
@@ -53,10 +46,12 @@ export const CBSE_CLASS10_2026_27_CHAPTERS = Object.freeze([
     'Solve a pair of linear equations by substitution and elimination',
     'Model and solve simple situational problems using a pair of linear equations'
   ], [
+    // D1 reads an actual graph intersection; D2–D4 classify intersecting,
+    // parallel and coincident line pairs. Algebraic/context forms stay on y10-simeq.
+    cover('c10-linear-graphs', [0], [1, 2, 3, 4]),
     cover('y10-simeq', [1], [1, 2, 3]),
     cover('y10-simeq', [2], [4])
-    // The current graphical solution/consistency outcome remains uncovered.
-  ]),
+  ], true),
 
   chapter('c10-quadratic-equations', [
     'Solve real-root quadratic equations by factorisation',
@@ -65,7 +60,6 @@ export const CBSE_CLASS10_2026_27_CHAPTERS = Object.freeze([
   ], [
     cover('y10-quadratics', [0], [1, 3]),
     cover('y10-quadratics', [1], [4])
-    // Contextual quadratic modelling remains uncovered in the reviewed mapping.
   ]),
 
   chapter('c10-arithmetic-progressions', [
@@ -82,9 +76,6 @@ export const CBSE_CLASS10_2026_27_CHAPTERS = Object.freeze([
     'Prove and apply the Basic Proportionality Theorem and its converse',
     'Establish and apply the prescribed similarity criteria for triangles'
   ], [
-    // Dedicated current-source forms replace the old scale/map forms: D1 applies
-    // BPT, D2 applies its converse, D3 distinguishes AAA/SSS/SAS, and D4 applies
-    // SAS similarity to a corresponding-side calculation.
     cover('c10-triangles-current', [0], [1, 2]),
     cover('c10-triangles-current', [1], [3, 4])
   ], true),
@@ -134,8 +125,6 @@ export const CBSE_CLASS10_2026_27_CHAPTERS = Object.freeze([
     'Find volumes of combinations of two prescribed solids'
   ], [
     cover('c10-surface-volume-combo', [1], [1, 2])
-    // Recasting is not promoted as current syllabus coverage, and an exact
-    // reviewed combination-surface-area form is still missing.
   ]),
 
   chapter('c10-statistics', [
@@ -152,9 +141,6 @@ export const CBSE_CLASS10_2026_27_CHAPTERS = Object.freeze([
     'Use the classical definition of probability',
     'Find the probability of a simple event in a real-life context'
   ], [
-    // Only D1 is credited. D2–D4 in the shared Year 8 bank exercise complement,
-    // expected-frequency and experimental-probability ideas; useful practice,
-    // but they are not promoted as evidence for the current Class X claim.
     cover('y8-probability', [0, 1], [1])
   ], true)
 ]);
