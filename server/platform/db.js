@@ -1,0 +1,242 @@
+import Database from 'better-sqlite3';
+import { mkdirSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const here = dirname(fileURLToPath(import.meta.url));
+const DEFAULT_PATH = join(here, '..', 'data', 'pri-learning-platform.db');
+
+export function createPlatformDb(path = DEFAULT_PATH) {
+  if (path !== ':memory:') mkdirSync(dirname(path), { recursive: true });
+  const db = new Database(path);
+  db.pragma('journal_mode = WAL');
+  db.pragma('foreign_keys = ON');
+  db.pragma('busy_timeout = 5000');
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS platform_meta (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS accounts (
+      id TEXT PRIMARY KEY,
+      email TEXT NOT NULL UNIQUE COLLATE NOCASE,
+      name TEXT NOT NULL,
+      password_hash TEXT,
+      email_verified_at INTEGER,
+      role TEXT NOT NULL DEFAULT 'student' CHECK(role IN ('student','teacher','support','admin')),
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      deleted_at INTEGER
+    );
+
+    CREATE TABLE IF NOT EXISTS account_identities (
+      provider TEXT NOT NULL CHECK(provider IN ('password','google','apple')),
+      provider_subject TEXT NOT NULL,
+      account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+      email_at_link TEXT,
+      linked_at INTEGER NOT NULL,
+      PRIMARY KEY(provider, provider_subject),
+      UNIQUE(account_id, provider)
+    );
+
+    CREATE TABLE IF NOT EXISTS account_sessions (
+      id TEXT PRIMARY KEY,
+      account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+      token_hash TEXT NOT NULL UNIQUE,
+      device_id TEXT NOT NULL,
+      user_agent_hash TEXT,
+      created_at INTEGER NOT NULL,
+      last_seen_at INTEGER NOT NULL,
+      expires_at INTEGER NOT NULL,
+      revoked_at INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS idx_sessions_account ON account_sessions(account_id, expires_at);
+
+    CREATE TABLE IF NOT EXISTS account_tokens (
+      id TEXT PRIMARY KEY,
+      account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+      purpose TEXT NOT NULL CHECK(purpose IN ('verify-email','reset-password')),
+      token_hash TEXT NOT NULL UNIQUE,
+      created_at INTEGER NOT NULL,
+      expires_at INTEGER NOT NULL,
+      consumed_at INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS idx_account_tokens_account ON account_tokens(account_id, purpose, expires_at);
+
+    -- Append-only learning events. Client clocks are evidence only; server_cursor
+    -- is the canonical ordering and (account,device,device_seq) makes retries idempotent.
+    CREATE TABLE IF NOT EXISTS learning_events (
+      server_cursor INTEGER PRIMARY KEY AUTOINCREMENT,
+      id TEXT NOT NULL UNIQUE,
+      account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+      device_id TEXT NOT NULL,
+      device_seq INTEGER NOT NULL,
+      kind TEXT NOT NULL,
+      entity_id TEXT,
+      occurred_at INTEGER,
+      payload_json TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      UNIQUE(account_id, device_id, device_seq)
+    );
+    CREATE INDEX IF NOT EXISTS idx_learning_events_pull ON learning_events(account_id, server_cursor);
+
+    -- Mutable replicated entities use optimistic versions rather than blind LWW.
+    -- The service applies kind-specific conflict rules before updating this table.
+    CREATE TABLE IF NOT EXISTS sync_entities (
+      account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+      kind TEXT NOT NULL,
+      entity_id TEXT NOT NULL,
+      version INTEGER NOT NULL DEFAULT 1,
+      server_cursor INTEGER NOT NULL,
+      body_json TEXT,
+      tombstone INTEGER NOT NULL DEFAULT 0,
+      updated_at INTEGER NOT NULL,
+      PRIMARY KEY(account_id, kind, entity_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_sync_entities_pull ON sync_entities(account_id, server_cursor);
+
+    CREATE TABLE IF NOT EXISTS sync_cursors (
+      id INTEGER PRIMARY KEY CHECK(id = 1),
+      value INTEGER NOT NULL
+    );
+    INSERT OR IGNORE INTO sync_cursors(id, value) VALUES (1, 0);
+
+    CREATE TABLE IF NOT EXISTS entitlement_snapshots (
+      account_id TEXT PRIMARY KEY REFERENCES accounts(id) ON DELETE CASCADE,
+      plan TEXT NOT NULL DEFAULT 'free',
+      status TEXT NOT NULL DEFAULT 'free',
+      provider TEXT,
+      product_id TEXT,
+      current_period_end INTEGER,
+      grace_until INTEGER,
+      offline_until INTEGER,
+      source_version INTEGER NOT NULL DEFAULT 0,
+      updated_at INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS billing_events (
+      provider TEXT NOT NULL,
+      event_id TEXT NOT NULL,
+      account_id TEXT REFERENCES accounts(id) ON DELETE SET NULL,
+      event_type TEXT NOT NULL,
+      verified INTEGER NOT NULL DEFAULT 0,
+      payload_digest TEXT NOT NULL,
+      received_at INTEGER NOT NULL,
+      applied_at INTEGER,
+      PRIMARY KEY(provider, event_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS classes (
+      id TEXT PRIMARY KEY,
+      teacher_account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      join_code_hash TEXT NOT NULL UNIQUE,
+      created_at INTEGER NOT NULL,
+      archived_at INTEGER
+    );
+
+    CREATE TABLE IF NOT EXISTS class_members (
+      class_id TEXT NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
+      student_account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+      joined_at INTEGER NOT NULL,
+      removed_at INTEGER,
+      PRIMARY KEY(class_id, student_account_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS assignments (
+      id TEXT PRIMARY KEY,
+      class_id TEXT NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
+      teacher_account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+      title TEXT NOT NULL,
+      specification_json TEXT NOT NULL,
+      due_at INTEGER,
+      created_at INTEGER NOT NULL,
+      archived_at INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS idx_assignments_class ON assignments(class_id, created_at);
+
+    CREATE TABLE IF NOT EXISTS assignment_submissions (
+      assignment_id TEXT NOT NULL REFERENCES assignments(id) ON DELETE CASCADE,
+      student_account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+      state TEXT NOT NULL CHECK(state IN ('started','submitted','returned')),
+      summary_json TEXT NOT NULL DEFAULT '{}',
+      started_at INTEGER NOT NULL,
+      submitted_at INTEGER,
+      updated_at INTEGER NOT NULL,
+      PRIMARY KEY(assignment_id, student_account_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS content_revisions (
+      id TEXT PRIMARY KEY,
+      content_key TEXT NOT NULL,
+      curriculum_version TEXT NOT NULL,
+      status TEXT NOT NULL CHECK(status IN ('draft','review','approved','published','retired')),
+      author_account_id TEXT REFERENCES accounts(id) ON DELETE SET NULL,
+      reviewer_account_id TEXT REFERENCES accounts(id) ON DELETE SET NULL,
+      source_json TEXT NOT NULL,
+      body_json TEXT NOT NULL,
+      revision INTEGER NOT NULL,
+      created_at INTEGER NOT NULL,
+      published_at INTEGER,
+      UNIQUE(content_key, revision)
+    );
+    CREATE INDEX IF NOT EXISTS idx_content_release ON content_revisions(content_key, status, revision);
+
+    CREATE TABLE IF NOT EXISTS issue_reports (
+      id TEXT PRIMARY KEY,
+      account_id TEXT REFERENCES accounts(id) ON DELETE SET NULL,
+      category TEXT NOT NULL CHECK(category IN ('wrong-answer','bad-solution','ambiguous-wording','incorrect-diagram','curriculum-mismatch','impossible-question','recognition-problem','other')),
+      content_id TEXT,
+      question_id TEXT,
+      app_version TEXT,
+      curriculum_version TEXT,
+      context_json TEXT NOT NULL DEFAULT '{}',
+      note TEXT,
+      status TEXT NOT NULL DEFAULT 'open' CHECK(status IN ('open','triaged','resolved','dismissed')),
+      created_at INTEGER NOT NULL,
+      resolved_at INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS idx_issue_reports_status ON issue_reports(status, created_at);
+
+    CREATE TABLE IF NOT EXISTS audit_log (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      actor_account_id TEXT REFERENCES accounts(id) ON DELETE SET NULL,
+      action TEXT NOT NULL,
+      target_kind TEXT NOT NULL,
+      target_id TEXT,
+      metadata_json TEXT NOT NULL DEFAULT '{}',
+      created_at INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS idempotency_keys (
+      account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+      scope TEXT NOT NULL,
+      key TEXT NOT NULL,
+      response_json TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      expires_at INTEGER NOT NULL,
+      PRIMARY KEY(account_id, scope, key)
+    );
+
+    CREATE TABLE IF NOT EXISTS rate_limits (
+      bucket TEXT PRIMARY KEY,
+      window_start INTEGER NOT NULL,
+      count INTEGER NOT NULL
+    );
+  `);
+
+  db.prepare("INSERT OR REPLACE INTO platform_meta(key,value) VALUES ('schema_version','1')").run();
+  return db;
+}
+
+export function nextSyncCursor(db) {
+  return db.transaction(() => {
+    const row = db.prepare('SELECT value FROM sync_cursors WHERE id = 1').get();
+    const next = Number(row?.value || 0) + 1;
+    db.prepare('UPDATE sync_cursors SET value = ? WHERE id = 1').run(next);
+    return next;
+  })();
+}
+
+export const platformDb = createPlatformDb(process.env.PRI_PLATFORM_DB || DEFAULT_PATH);
