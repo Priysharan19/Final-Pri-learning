@@ -41,6 +41,7 @@ assert.deepEqual(reviewed, [
   'c10-arithmetic-progressions',
   'c10-circles',
   'c10-coordinate-geometry',
+  'c10-pair-linear-equations',
   'c10-polynomials',
   'c10-probability',
   'c10-real-numbers',
@@ -72,16 +73,17 @@ assert.deepEqual(sourceById['c10-triangles'].covers, [
   { gen: 'c10-triangles-current', dp: [1], diff: [3, 4] }
 ]);
 
-assert.deepEqual(sourceById['c10-probability'].covers, [
-  { gen: 'y8-probability', dp: [0, 1], diff: [1] }
-]);
-
 assert.deepEqual(sourceById['c10-pair-linear-equations'].covers, [
+  { gen: 'c10-linear-graphs', dp: [0], diff: [1, 2, 3, 4] },
   { gen: 'y10-simeq', dp: [1], diff: [1, 2, 3] },
   { gen: 'y10-simeq', dp: [2], diff: [4] }
 ]);
 
-for (const id of ['c10-pair-linear-equations', 'c10-quadratic-equations', 'c10-surface-volume']) {
+assert.deepEqual(sourceById['c10-probability'].covers, [
+  { gen: 'y8-probability', dp: [0, 1], diff: [1] }
+]);
+
+for (const id of ['c10-quadratic-equations', 'c10-surface-volume']) {
   const status = indiaProductionStatus(byId[id], 10);
   assert.equal(status.sourceReviewed, false, `${id} must not be promoted while a current outcome is uncovered`);
   assert.equal(status.quality, INDIA_CONTENT_QUALITY.MISSING, `${id} should expose its missing current outcome(s)`);
@@ -91,7 +93,7 @@ for (const id of ['c10-pair-linear-equations', 'c10-quadratic-equations', 'c10-s
 assert.deepEqual(uncoveredDotpoints(byId['c10-real-numbers']), [], 'FTA practice and irrationality-proof reasoning must both be covered');
 assert.deepEqual(uncoveredDotpoints(byId['c10-polynomials']), [], 'graphical and algebraic polynomial zero-finding must both be covered');
 assert.deepEqual(uncoveredDotpoints(byId['c10-triangles']), [], 'BPT/converse and prescribed triangle similarity criteria must both be covered');
-assert.deepEqual(uncoveredDotpoints(byId['c10-pair-linear-equations']), [0], 'graphical solution/consistency remains the explicit simultaneous-equations blocker');
+assert.deepEqual(uncoveredDotpoints(byId['c10-pair-linear-equations']), [], 'graphical solution/consistency and algebraic/contextual forms must all be covered');
 assert.deepEqual(uncoveredDotpoints(byId['c10-surface-volume']), [0], 'combination surface-area practice remains the explicit mensuration blocker');
 
 console.log(`PASS — Class 10 2026–27 source truth: ${reviewed.length}/14 chapters reviewed; rationalised-out outcomes cannot count as current coverage.`);
