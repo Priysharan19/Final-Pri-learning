@@ -16,8 +16,10 @@ on:
     paths:
       - 'client/src/engine/india**'
       - 'client/src/engine/ncert/**'
+      - 'client/src/engine/curriculumAvailability.js'
       - 'client/src/local/india**'
       - 'client/src/pages/India**'
+      - 'client/src/pages/Home.jsx'
       - 'client/src/pages/Exams.jsx'
       - 'client/src/pages/Progress*.jsx'
       - 'client/src/platform/**'
@@ -61,6 +63,8 @@ jobs:
         run: node client/test/india-production-meta-check.mjs
       - name: Current Class 10 source truth
         run: node client/test/india-class10-current-source-check.mjs
+      - name: Student practice target availability
+        run: node client/test/india-practice-availability-check.mjs
       - name: India exam source/claim contract
         run: node client/test/india-exam-blueprint-check.mjs
       - name: India progress presentation contract
