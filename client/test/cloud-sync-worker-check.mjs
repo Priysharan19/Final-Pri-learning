@@ -60,6 +60,13 @@ const same = (name, actual, expected) => ok(name, JSON.stringify(actual) === JSO
 await put('profiles', { id: 'p1', name: 'Local A', avatar: 'A', year: 10, role: 'student', course: 'in', indiaTrack: 'cbse', theme: 'dark', dailyGoal: 10, handwriting: true });
 await add('attempts', { pid: 'p1', questionId: 'q-old-1', subtopic: 'linear', difficulty: 2, correct: 0, ms: 1400, hintsUsed: 1, mode: 'practice', viaInk: true, ratingBefore: 1000, ratingAfter: 990, createdAt: 1000 });
 await add('attempts', { pid: 'p1', questionId: 'q-old-2', subtopic: 'quadratic', difficulty: 3, correct: 1, ms: 900, hintsUsed: 0, mode: 'practice', viaInk: false, ratingBefore: 990, ratingAfter: 1015, createdAt: 2000 });
+await put('exams', {
+  id: 'exam-old-1', pid: 'p1', title: 'Class 10 mathematics mock', year: 10,
+  questionIds: [], createdAt: 2100, finishedAt: 2600, score: 17, total: 25,
+  indiaExam: { family: 'cbse-school', sourceReviewed: true }
+});
+await add('rushRuns', { pid: 'p1', score: 80, correct: 8, total: 10, bestCombo: 5, createdAt: 2700 });
+await add('matchRuns', { pid: 'p1', won: true, playerScore: 7, rivalScore: 4, rival: 'Robo-Rookie', ms: 45000, createdAt: 2800 });
 
 await loginCloudAccount('p1', { email: 'a@example.test', password: 'test-password-only' });
 same('first profile sync requires reconciliation', (await cloudSyncStatus('p1')).requiresFullRescan, true);
@@ -69,9 +76,15 @@ same('initial reconciliation clears full-rescan requirement', first.requiresFull
 const initialEnvelopes = pushes.slice();
 const initialEvents = initialEnvelopes.flatMap(x => x.body.events || []);
 const initialEntities = initialEnvelopes.flatMap(x => x.body.entities || []);
-same('initial reconciliation migrates both historical attempts', initialEvents.length, 2);
-ok('historical attempts use reserved high device sequence namespace', initialEvents.every(event => event.deviceSeq >= 4_000_000_000_000_000), JSON.stringify(initialEvents.map(x => x.deviceSeq)));
-same('historical attempt payloads preserve two separate subtopics', initialEvents.map(x => x.payload.subtopic).sort(), ['linear', 'quadratic']);
+const historicalAttempts = initialEvents.filter(event => event.kind === 'practice-progress');
+same('initial reconciliation migrates both historical attempts', historicalAttempts.length, 2);
+ok('historical attempts use reserved high device sequence namespace', historicalAttempts.every(event => event.deviceSeq >= 4_000_000_000_000_000), JSON.stringify(historicalAttempts.map(x => x.deviceSeq)));
+same('historical attempt payloads preserve two separate subtopics', historicalAttempts.map(x => x.payload.subtopic).sort(), ['linear', 'quadratic']);
+same('initial reconciliation includes completed exam history', initialEvents.filter(event => event.kind === 'exam-attempt').length, 1);
+same('initial reconciliation includes Rush history', initialEvents.filter(event => event.kind === 'rush-history').length, 1);
+same('initial reconciliation includes Match history', initialEvents.filter(event => event.kind === 'match-history').length, 1);
+same('initial reconciliation migrates every supported historical learning fact', initialEvents.length, 5);
+ok('historical supplemental events use their reserved sequence namespace', initialEvents.filter(event => event.kind !== 'practice-progress').every(event => event.deviceSeq >= 6_500_000_000_000_000), JSON.stringify(initialEvents.map(x => [x.kind, x.deviceSeq])));
 ok('initial reconciliation includes local profile state', initialEntities.some(x => x.kind === 'profile' && x.entityId === 'self'), JSON.stringify(initialEntities));
 ok('every sync push carries an idempotency key', initialEnvelopes.every(x => x.headers['Idempotency-Key']), JSON.stringify(initialEnvelopes.map(x => x.headers)));
 
