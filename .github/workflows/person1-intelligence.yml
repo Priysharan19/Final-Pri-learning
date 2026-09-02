@@ -1,0 +1,40 @@
+name: Person 1 Intelligence Contract
+
+on:
+  pull_request:
+    paths:
+      - 'client/src/engine/**'
+      - 'client/src/explain/**'
+      - 'client/src/ink/nativeConsensus.js'
+      - 'client/test/person1-intelligence-loop-check.mjs'
+      - 'docs/PERSON1_INTELLIGENCE_RELEASE_CONTRACT.md'
+      - '.github/workflows/person1-intelligence.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'client/src/engine/**'
+      - 'client/src/explain/**'
+      - 'client/src/ink/nativeConsensus.js'
+      - 'client/test/person1-intelligence-loop-check.mjs'
+      - 'docs/PERSON1_INTELLIGENCE_RELEASE_CONTRACT.md'
+      - '.github/workflows/person1-intelligence.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  intelligence-contract:
+    name: Handwriting → marking → diagnosis → adaptation → explanation
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+
+      - name: Use Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Run Person 1 deterministic release contract
+        run: node client/test/person1-intelligence-loop-check.mjs
