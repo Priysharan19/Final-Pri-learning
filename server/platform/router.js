@@ -14,7 +14,7 @@ import { csrfGuard, originGuard } from './security.js';
 
 const SERVER_WEBHOOK = /^\/billing\/webhook\/(?:apple|google|web)$/;
 
-export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckout = {} } = {}) {
+export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckout = {}, billingNative = {} } = {}) {
   assertPlatformConfig();
   const router = Router();
 
@@ -36,7 +36,7 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
       identityProviders: { google: config.googleConfigured, apple: config.appleConfigured },
       billingProviders: {
         web: config.webBillingProviderConfigured,
-        apple: false,
+        apple: config.appleBillingProviderConfigured,
         google: false
       },
       checkedAt: Date.now()
@@ -56,7 +56,11 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
   router.use('/account/identity', createIdentityRouter(db));
   router.use('/sync', createSyncRouter(db));
   router.use('/entitlements', createEntitlementRouter(db));
-  router.use('/billing', createBillingRouter(db, { verifiers: billingVerifiers, checkout: billingCheckout }));
+  router.use('/billing', createBillingRouter(db, {
+    verifiers: billingVerifiers,
+    checkout: billingCheckout,
+    native: billingNative
+  }));
   router.use('/classes', createClassRouter(db));
   router.use('/content', createContentRouter(db));
   router.use('/reports', createReportRouter(db));
