@@ -1,0 +1,219 @@
+name: Pri App Health Agent
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Health depth
+        required: true
+        default: deep
+        type: choice
+        options: [fast, deep]
+  schedule:
+    # Early morning in Australia/Sydney for most of the year; exact local hour
+    # shifts with daylight saving, but the audit remains once per day.
+    - cron: '15 18 * * *'
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: pri-app-health-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  HEALTH_MODE: ${{ github.event_name == 'schedule' && 'deep' || (github.event_name == 'workflow_dispatch' && inputs.mode || 'fast') }}
+  PRI_APP_URL: ${{ vars.PRI_APP_URL }}
+
+jobs:
+  app:
+    name: Mounted app, product contracts and repair report
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    outputs:
+      blocking: ${{ steps.health.outputs.blocking }}
+      verdict: ${{ steps.health.outputs.verdict }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+
+      - name: Install client dependencies
+        run: npm ci --prefix client
+
+      - name: Install Chromium for real mounted flows
+        working-directory: client
+        run: npx playwright install --with-deps chromium
+
+      - name: Agent source is syntactically valid
+        run: node --check scripts/pri-app-health-agent.mjs
+
+      - name: Audit actual app and classify repairs
+        id: health
+        shell: bash
+        run: |
+          set +e
+          node scripts/pri-app-health-agent.mjs --mode="$HEALTH_MODE" --out=artifacts/app-health-web
+          agent_code=$?
+          set -e
+          test -s artifacts/app-health-web/report.json
+          test -s artifacts/app-health-web/report.md
+          blocking="$(node -e "const r=require('./artifacts/app-health-web/report.json'); process.stdout.write(String(r.summary.blockingFailures||0))")"
+          verdict="$(node -e "const r=require('./artifacts/app-health-web/report.json'); process.stdout.write(r.summary.verdict)")"
+          echo "blocking=$blocking" >> "$GITHUB_OUTPUT"
+          echo "verdict=$verdict" >> "$GITHUB_OUTPUT"
+          echo "agent_exit=$agent_code" >> "$GITHUB_OUTPUT"
+          cat artifacts/app-health-web/report.md >> "$GITHUB_STEP_SUMMARY"
+          # The final reporter decides the workflow result after native evidence is joined.
+          exit 0
+
+      - name: Upload web/product health evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-health-web
+          path: artifacts/app-health-web
+          if-no-files-found: error
+          retention-days: 14
+
+  native:
+    name: Native iPad shell health
+    if: github.event_name != 'pull_request'
+    runs-on: macos-15
+    timeout-minutes: 35
+    outputs:
+      blocking: ${{ steps.health.outputs.blocking }}
+      verdict: ${{ steps.health.outputs.verdict }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Audit installed iPad simulator app
+        id: health
+        shell: bash
+        run: |
+          set +e
+          node scripts/pri-app-health-agent.mjs --mode=native --out=artifacts/app-health-native
+          agent_code=$?
+          set -e
+          test -s artifacts/app-health-native/report.json
+          test -s artifacts/app-health-native/report.md
+          blocking="$(node -e "const r=require('./artifacts/app-health-native/report.json'); process.stdout.write(String(r.summary.blockingFailures||0))")"
+          verdict="$(node -e "const r=require('./artifacts/app-health-native/report.json'); process.stdout.write(r.summary.verdict)")"
+          echo "blocking=$blocking" >> "$GITHUB_OUTPUT"
+          echo "verdict=$verdict" >> "$GITHUB_OUTPUT"
+          echo "agent_exit=$agent_code" >> "$GITHUB_OUTPUT"
+          cat artifacts/app-health-native/report.md >> "$GITHUB_STEP_SUMMARY"
+          exit 0
+
+      - name: Upload native health evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-health-native
+          path: artifacts/app-health-native
+          if-no-files-found: error
+          retention-days: 14
+
+  report:
+    name: Consolidated app-health report
+    if: always()
+    needs: [app, native]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download web/product report
+        uses: actions/download-artifact@v4
+        with:
+          name: app-health-web
+          path: health/web
+
+      - name: Download native report when available
+        if: needs.native.result != 'skipped'
+        uses: actions/download-artifact@v4
+        with:
+          name: app-health-native
+          path: health/native
+
+      - name: Build one operator report
+        shell: bash
+        env:
+          WEB_BLOCKING: ${{ needs.app.outputs.blocking }}
+          NATIVE_BLOCKING: ${{ needs.native.outputs.blocking }}
+          NATIVE_RESULT: ${{ needs.native.result }}
+          WEB_RESULT: ${{ needs.app.result }}
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const web = fs.existsSync('health/web/report.md') ? fs.readFileSync('health/web/report.md', 'utf8') : '# Web/product agent report missing\n';
+          const native = fs.existsSync('health/native/report.md') ? fs.readFileSync('health/native/report.md', 'utf8') : '';
+          const wb = Number(process.env.WEB_BLOCKING || 0);
+          const nb = Number(process.env.NATIVE_BLOCKING || 0);
+          const nativeSkipped = process.env.NATIVE_RESULT === 'skipped';
+          const total = wb + nb + (process.env.WEB_RESULT === 'failure' ? 1 : 0) + (process.env.NATIVE_RESULT === 'failure' ? 1 : 0);
+          const verdict = total > 0 ? 'FIX REQUIRED' : nativeSkipped ? 'HEALTHY ON WEB/PRODUCT CHECKS; NATIVE COVERED BY PATH-GATED NATIVE INK CI' : 'HEALTHY';
+          let body = `# Pri Learning consolidated app-health report\n\n**Verdict:** ${verdict}\n\n`;
+          body += '## Web, product and mounted student flows\n\n' + web + '\n';
+          if (native) body += '\n## Native iPad simulator path\n\n' + native + '\n';
+          else body += '\n## Native iPad simulator path\n\nNot run in this event. Native Ink remains independently path-gated in `.github/workflows/native-ink.yml`.\n';
+          if (body.length > 60000) body = body.slice(0, 59000) + '\n\n_Report truncated; download workflow artifacts for complete evidence._\n';
+          fs.mkdirSync('health/combined', { recursive: true });
+          fs.writeFileSync('health/combined/report.md', body);
+          fs.writeFileSync('health/combined/status.json', JSON.stringify({ verdict, blocking: total }, null, 2));
+          NODE
+          cat health/combined/report.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Open, update or close the repair issue
+        if: github.event_name != 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const title = 'Pri App Health Agent: fixes required';
+            const status = JSON.parse(fs.readFileSync('health/combined/status.json', 'utf8'));
+            const report = fs.readFileSync('health/combined/report.md', 'utf8');
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              per_page: 100
+            });
+            const existing = issues.find(issue => !issue.pull_request && issue.title === title);
+            const runLink = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const body = `${report}\n\n---\nAutomated run: ${runLink}\nCommit: \`${context.sha}\``;
+            if (status.blocking > 0) {
+              if (existing) {
+                await github.rest.issues.update({ owner: context.repo.owner, repo: context.repo.repo, issue_number: existing.number, body });
+                await github.rest.issues.createComment({ owner: context.repo.owner, repo: context.repo.repo, issue_number: existing.number, body: `Health agent still requires fixes on \`${context.sha.slice(0, 12)}\`. ${runLink}` });
+              } else {
+                await github.rest.issues.create({ owner: context.repo.owner, repo: context.repo.repo, title, body });
+              }
+            } else if (existing) {
+              await github.rest.issues.createComment({ owner: context.repo.owner, repo: context.repo.repo, issue_number: existing.number, body: `All blocking automated app-health checks are green on \`${context.sha.slice(0, 12)}\`. Closing this repair issue. ${runLink}` });
+              await github.rest.issues.update({ owner: context.repo.owner, repo: context.repo.repo, issue_number: existing.number, state: 'closed' });
+            }
+
+      - name: Upload consolidated report
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-health-report
+          path: health/combined
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Fail when the app needs repair
+        shell: bash
+        run: |
+          blocking="$(node -e "const r=require('./health/combined/status.json'); process.stdout.write(String(r.blocking||0))")"
+          if [ "$blocking" -gt 0 ]; then
+            echo "Pri App Health Agent found $blocking blocking problem(s)." >&2
+            exit 1
+          fi
