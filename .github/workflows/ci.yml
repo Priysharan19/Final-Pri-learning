@@ -43,6 +43,7 @@ jobs:
           node client/test/india-production-meta-check.mjs
           node client/test/entitlement-check.mjs
           node client/test/sync-contract-check.mjs
+          node client/test/cloud-session-refresh-check.mjs
           node client/test/india-exam-blueprint-check.mjs
           node client/test/india-progress-product-check.mjs
           node tools/india-production-census.mjs
@@ -93,6 +94,7 @@ jobs:
         run: |
           set -o pipefail
           npm run test:e2e 2>&1 | tee browser.log
+          node client/test/tour-cloud-platform.js --no-build 2>&1 | tee -a browser.log
       - name: Accessibility suite
         if: always()
         run: |
@@ -104,6 +106,8 @@ jobs:
           set -euo pipefail
           test -s browser.log
           grep -Eq 'E2E SUITE.*131/131.*5 flows' browser.log
+          grep -Fq 'Cloud · account, live Settings refresh, assignment hand-off' browser.log
+          grep -Eq 'E2E SUITE.*14/14.*1 flows' browser.log
           grep -Eq 'ACCESSIBILITY SUITE.*38/38.*12 groups' browser.log
           if grep -Fq 'not measured:' browser.log; then
             echo 'A browser suite reported skipped coverage.' >&2
