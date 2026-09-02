@@ -6,6 +6,7 @@
 //   • a real PencilKit writing surface over the page's ink area, and Vision
 //     handwriting recognition behind it (Ink/) — see InkBridge
 //   • StoreKit 2 purchase/restore bridge; Premium remains server-authoritative
+//   • native HTTPS cloud bridge that owns account cookies/CSRF outside WebKit
 //   • priShare message handler → iOS share sheet for backups / task packs /
 //     progress files (AirDrop, Files, Mail…)
 //   • WKDownload for any blob downloads → share sheet
@@ -41,11 +42,12 @@ struct WebShell: UIViewRepresentable {
         config.allowsInlineMediaPlayback = true
         config.defaultWebpagePreferences.allowsContentJavaScript = true
 
-        // Tell the web app it is running inside the native shell. Billing gets
-        // its own flag so the React layer can hide web checkout and offer only
-        // StoreKit purchase/restore controls in an App Store build.
+        // Tell the web app it is running inside the native shell. Billing and
+        // cloud transport have independent capability flags so each can fail
+        // closed when its native/deployment prerequisite is missing.
+        let cloudConfigured = NativeCloudBridge.isConfigured ? "true" : "false"
         let nativeFlag = WKUserScript(
-            source: "window.__PRI_NATIVE__ = true; window.__PRI_NATIVE_INK__ = true; window.__PRI_NATIVE_PHOTO__ = true; window.__PRI_NATIVE_BILLING__ = true;",
+            source: "window.__PRI_NATIVE__ = true; window.__PRI_NATIVE_INK__ = true; window.__PRI_NATIVE_PHOTO__ = true; window.__PRI_NATIVE_BILLING__ = true; window.__PRI_NATIVE_CLOUD__ = true; window.__PRI_NATIVE_CLOUD_CONFIGURED__ = \(cloudConfigured);",
             injectionTime: .atDocumentStart,
             forMainFrameOnly: false
         )
@@ -54,6 +56,7 @@ struct WebShell: UIViewRepresentable {
         config.userContentController.add(context.coordinator, name: "priInk")
         config.userContentController.add(context.coordinator, name: "priPhoto")
         config.userContentController.add(context.coordinator, name: "priBilling")
+        config.userContentController.add(context.coordinator, name: "priCloud")
 
         let webView = WKWebView(frame: .zero, configuration: config)
         webView.navigationDelegate = context.coordinator
@@ -69,15 +72,18 @@ struct WebShell: UIViewRepresentable {
         webView.isOpaque = false
         webView.backgroundColor = UIColor(red: 10 / 255, green: 10 / 255, blue: 9 / 255, alpha: 1)
         webView.scrollView.backgroundColor = webView.backgroundColor
+        #if DEBUG
         if #available(iOS 16.4, *) {
-            webView.isInspectable = true   // Safari Web Inspector while developing
+            webView.isInspectable = true
         }
+        #endif
 
         let container = ShellContainerView()
         container.backgroundColor = webView.backgroundColor
         container.addSubview(webView)
         context.coordinator.attachInk(to: webView, in: container)
         context.coordinator.attachBilling(to: webView)
+        context.coordinator.attachCloud(to: webView)
         container.onLayout = { [weak coordinator = context.coordinator] in
             coordinator?.ink.webViewDidResize()
         }
@@ -98,6 +104,7 @@ struct WebShell: UIViewRepresentable {
     static func dismantleUIView(_ view: UIView, coordinator: Coordinator) {
         coordinator.detachInk()
         coordinator.detachBilling()
+        coordinator.detachCloud()
     }
 
     // MARK: - Coordinator
@@ -107,6 +114,7 @@ struct WebShell: UIViewRepresentable {
         private weak var shellWebView: WKWebView?
         private let photoOCR = PhotoOCRBridge()
         private let billing = StoreKitBillingBridge()
+        private let cloud = NativeCloudBridge()
 
         // ── Native ink ──
         let ink = InkBridge()
@@ -148,6 +156,14 @@ struct WebShell: UIViewRepresentable {
             billing.detach()
         }
 
+        func attachCloud(to webView: WKWebView) {
+            cloud.attach(to: webView)
+        }
+
+        func detachCloud() {
+            cloud.detach()
+        }
+
         // ── Bridges from the page ──
         func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
             if message.name == "priInk" {
@@ -160,6 +176,10 @@ struct WebShell: UIViewRepresentable {
             }
             if message.name == "priBilling" {
                 billing.handle(message.body)
+                return
+            }
+            if message.name == "priCloud" {
+                cloud.handle(message.body)
                 return
             }
             guard message.name == "priShare",

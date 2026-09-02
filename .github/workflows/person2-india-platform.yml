@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - 'india/**'
+      - 'ios/**'
       - 'auth/**'
       - 'sync/**'
       - 'billing/**'
@@ -38,13 +39,17 @@ on:
       - 'client/test/entitlement-check.mjs'
       - 'client/test/sync-contract-check.mjs'
       - 'client/test/native-storekit-boundary-check.mjs'
+      - 'client/test/native-cloud-transport-check.mjs'
+      - 'client/test/ios-package-source-drift-check.mjs'
       - 'ios/PriLearning.swiftpm/**'
+      - 'ios/PriLearning 2.swiftpm/**'
       - 'server/platform/**'
       - 'server/test/platform-**'
       - 'server/test/account-**'
       - 'server/test/billing-**'
       - 'server/test/razorpay-**'
       - 'server/test/apple-**'
+      - 'server/test/native-origin-**'
       - 'server/test/classroom-**'
       - 'server/test/assignment-**'
       - 'server/test/content-**'
@@ -98,6 +103,10 @@ jobs:
         run: node client/test/cloud-sync-worker-check.mjs
       - name: Native StoreKit bridge authority boundary
         run: node client/test/native-storekit-boundary-check.mjs
+      - name: Native cloud transport boundary
+        run: node client/test/native-cloud-transport-check.mjs
+      - name: Runnable iOS package source drift
+        run: node client/test/ios-package-source-drift-check.mjs
       - name: Coverage census
         run: node tools/india-production-census.mjs
       - name: Audited network boundary
@@ -124,6 +133,8 @@ jobs:
         run: node server/test/platform-migration-check.mjs
       - name: Cross-account sync pagination regression
         run: node server/test/platform-sync-pagination-check.mjs
+      - name: Native URLSession origin and CSRF boundary
+        run: node server/test/native-origin-csrf-check.mjs
       - name: Destructive account reauthentication
         run: node server/test/account-deletion-reauth-check.mjs
       - name: Full account lifecycle and session rotation
