@@ -29,6 +29,10 @@ on:
       - 'client/test/sync-contract-check.mjs'
       - 'server/platform/**'
       - 'server/test/platform-**'
+      - 'server/test/account-**'
+      - 'server/test/billing-**'
+      - 'server/test/classroom-**'
+      - 'server/test/content-**'
       - 'tools/india-**'
       - 'tools/check-client-network-boundary.mjs'
       - '.github/workflows/person2-india-platform.yml'
@@ -77,7 +81,7 @@ jobs:
         run: npm run build
 
   platform:
-    name: Account, sync, billing, classroom and CMS schema
+    name: Account, sync, billing, classroom and CMS contracts
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
@@ -95,3 +99,11 @@ jobs:
         run: node server/test/platform-migration-check.mjs
       - name: Cross-account sync pagination regression
         run: node server/test/platform-sync-pagination-check.mjs
+      - name: Destructive account reauthentication
+        run: node server/test/account-deletion-reauth-check.mjs
+      - name: Deployment-configured billing display
+        run: node server/test/billing-config-check.mjs
+      - name: Independent CMS review
+        run: node server/test/content-review-contract-check.mjs
+      - name: Classroom submit-return-resubmit lifecycle
+        run: node server/test/classroom-submission-contract-check.mjs
