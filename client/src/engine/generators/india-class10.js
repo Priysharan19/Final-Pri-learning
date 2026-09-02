@@ -6,6 +6,7 @@ import { currentPolynomialZeroes, currentTriangles } from './india-class10-curre
 import { currentIrrationalityProof } from './india-class10-irrationality.js';
 import { currentLinearPairGraphs } from './india-class10-linear-graphs.js';
 import { currentQuadraticContext } from './india-class10-quadratic-context.js';
+import { currentSurfaceAreaCombination } from './india-class10-surface-combo.js';
 
 const basePolynomialZeroes = baseIndiaClass10['c10-polynomial-zeroes'];
 
@@ -21,5 +22,6 @@ export const indiaClass10 = Object.freeze({
   'c10-triangles-current': currentTriangles,
   'c10-irrationality-proofs': currentIrrationalityProof,
   'c10-linear-graphs': currentLinearPairGraphs,
-  'c10-quadratic-context': currentQuadraticContext
+  'c10-quadratic-context': currentQuadraticContext,
+  'c10-surface-area-combo': currentSurfaceAreaCombination
 });
