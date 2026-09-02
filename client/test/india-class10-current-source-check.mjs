@@ -43,6 +43,7 @@ assert.deepEqual(reviewed, [
   'c10-arithmetic-progressions',
   'c10-circles',
   'c10-coordinate-geometry',
+  'c10-polynomials',
   'c10-probability',
   'c10-statistics'
 ]);
@@ -55,6 +56,15 @@ for (const id of reviewed) {
   assert.equal(status.sourceReviewed, true);
   assert.equal(status.source?.reviewState, 'current-source-reviewed-mapping');
 }
+
+// Polynomials now has two deliberately different current-source cells: D1 reads
+// zeroes from the graph, D2 finds them algebraically, while D3–D4 retain the
+// zeroes↔coefficients relation. That is the source claim; no polynomial-division
+// legacy form receives current credit.
+assert.deepEqual(sourceById['c10-polynomials'].covers, [
+  { gen: 'c10-polynomial-zeroes', dp: [0], diff: [1, 2] },
+  { gen: 'c10-polynomial-zeroes', dp: [1], diff: [3, 4] }
+]);
 
 // Probability is deliberately narrow: the shared y8 bank also contains
 // complement, expected-frequency and experimental-probability forms. Those stay
@@ -72,8 +82,8 @@ assert.deepEqual(sourceById['c10-pair-linear-equations'].covers, [
   { gen: 'y10-simeq', dp: [2], diff: [4] }
 ]);
 
-// These are visible product gaps, not false review claims.
-for (const id of ['c10-real-numbers', 'c10-polynomials', 'c10-pair-linear-equations', 'c10-quadratic-equations', 'c10-surface-volume']) {
+// These remain visible product gaps, not false review claims.
+for (const id of ['c10-real-numbers', 'c10-pair-linear-equations', 'c10-quadratic-equations', 'c10-surface-volume']) {
   const status = indiaProductionStatus(byId[id], 10);
   assert.equal(status.sourceReviewed, false, `${id} must not be promoted while a current outcome is uncovered`);
   assert.equal(status.quality, INDIA_CONTENT_QUALITY.MISSING, `${id} should expose its missing current outcome(s)`);
@@ -81,7 +91,7 @@ for (const id of ['c10-real-numbers', 'c10-polynomials', 'c10-pair-linear-equati
 }
 
 assert.deepEqual(uncoveredDotpoints(byId['c10-real-numbers']), [1], 'irrationality-proof practice remains the explicit Real Numbers blocker');
-assert.deepEqual(uncoveredDotpoints(byId['c10-polynomials']), [0], 'current zero-finding practice remains the explicit Polynomials blocker');
+assert.deepEqual(uncoveredDotpoints(byId['c10-polynomials']), [], 'graphical and algebraic polynomial zero-finding must both be covered');
 assert.deepEqual(uncoveredDotpoints(byId['c10-pair-linear-equations']), [0], 'graphical solution/consistency remains the explicit simultaneous-equations blocker');
 assert.deepEqual(uncoveredDotpoints(byId['c10-surface-volume']), [0], 'combination surface-area practice remains the explicit mensuration blocker');
 
