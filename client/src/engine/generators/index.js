@@ -124,6 +124,7 @@ const INDIA_BANK_OF = {
   'c10-triangles-current': 'india-class10',
   'c10-irrationality-proofs': 'india-class10',
   'c10-linear-graphs': 'india-class10',
+  'c10-quadratic-context': 'india-class10',
   'c10-arithmetic-progressions': 'india-class10',
   'c10-coordinate-geometry': 'india-class10',
   'c10-areas-circles': 'india-class10',
