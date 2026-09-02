@@ -30,11 +30,14 @@ on:
       - 'client/test/profile-cloud-**'
       - 'client/test/entitlement-check.mjs'
       - 'client/test/sync-contract-check.mjs'
+      - 'client/test/native-storekit-boundary-check.mjs'
+      - 'ios/PriLearning.swiftpm/**'
       - 'server/platform/**'
       - 'server/test/platform-**'
       - 'server/test/account-**'
       - 'server/test/billing-**'
       - 'server/test/razorpay-**'
+      - 'server/test/apple-**'
       - 'server/test/classroom-**'
       - 'server/test/content-**'
       - 'tools/india-**'
@@ -81,6 +84,8 @@ jobs:
         run: node client/test/cloud-account-boundary-check.mjs
       - name: Cloud sync migration and profile isolation
         run: node client/test/cloud-sync-worker-check.mjs
+      - name: Native StoreKit bridge authority boundary
+        run: node client/test/native-storekit-boundary-check.mjs
       - name: Coverage census
         run: node tools/india-production-census.mjs
       - name: Audited network boundary
@@ -115,6 +120,8 @@ jobs:
         run: node server/test/billing-config-check.mjs
       - name: Verified Razorpay checkout, webhook and restore lifecycle
         run: node server/test/razorpay-billing-check.mjs
+      - name: Verified Apple transaction and server-notification lifecycle
+        run: node server/test/apple-billing-check.mjs
       - name: Independent CMS review
         run: node server/test/content-review-contract-check.mjs
       - name: Classroom submit-return-resubmit lifecycle
