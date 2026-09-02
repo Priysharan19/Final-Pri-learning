@@ -91,8 +91,22 @@ export function csrfGuard(req, res, next) {
   next();
 }
 
+function nativeNonBrowserRequest(req) {
+  // URLSession does not have a browser Origin or Fetch Metadata context. A web
+  // page cannot suppress Origin on a cross-origin mutation, and the custom
+  // X-Pri-Client header itself causes a CORS preflight. The server intentionally
+  // sends no permissive CORS policy, so this exception cannot be used as a web
+  // CSRF bypass. Authenticated native mutations still pass csrfGuard below using
+  // the server-issued cookie pair held by the native cookie jar.
+  return req.get('x-pri-client') === 'ios-native-v1' &&
+    !req.get('origin') &&
+    !req.get('sec-fetch-site') &&
+    !req.get('sec-fetch-mode');
+}
+
 export function originGuard(req, res, next) {
   if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return next();
+  if (nativeNonBrowserRequest(req)) return next();
   const origin = req.get('origin');
   const configured = String(process.env.PRI_PUBLIC_ORIGIN || '').trim();
   if (!configured && process.env.NODE_ENV !== 'production') return next();
