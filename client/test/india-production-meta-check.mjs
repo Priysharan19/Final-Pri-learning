@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { IN_CURRICULUM } from '../src/engine/curriculum-in.js';
 import { indiaProductSections } from '../src/engine/indiaProduct.js';
+import { CBSE_CLASS10_2026_27_REVIEWED_IDS } from '../src/engine/ncert/class10-2026-27-production.js';
 import {
   INDIA_CONTENT_QUALITY,
   INDIA_RELEASE_STATE,
@@ -32,15 +33,25 @@ for (const chapter of chapters) {
     assert.equal(status.releaseState, INDIA_RELEASE_STATE.REVIEWED, `${chapter.id} must retain reviewed release state`);
     assert.equal(status.sourceReviewed, true, `${chapter.id} must expose source review evidence`);
     assert.ok(status.source?.edition, `${chapter.id} must name its source edition`);
-  } else {
-    // Generator completeness is useful, but it is not evidence of a current
-    // NCERT/CBSE source review. Do not let future refactors promote these by
-    // accident merely because a generator id begins with c10/c11/c12.
-    if (status.generatorComplete) {
-      assert.equal(status.quality, INDIA_CONTENT_QUALITY.WEAK_MAPPING, `${chapter.id} must remain C until review evidence is recorded`);
-      assert.equal(status.releaseState, INDIA_RELEASE_STATE.UNREVIEWED);
-      assert.equal(status.sourceReviewed, false);
-    }
+    continue;
+  }
+
+  if (chapter.grade === 10 && CBSE_CLASS10_2026_27_REVIEWED_IDS.has(chapter.id)) {
+    assert.equal(status.quality, INDIA_CONTENT_QUALITY.REVIEWED_MAPPING, `${chapter.id} should be a reviewed mapping, not source-authored content`);
+    assert.equal(status.releaseState, INDIA_RELEASE_STATE.REVIEWED);
+    assert.equal(status.sourceReviewed, true);
+    assert.equal(status.source?.edition, 'CBSE-2026-27');
+    assert.ok(status.source?.cbseMathematicsPdf?.includes('Maths_SecP1X_2026-27.pdf'));
+    continue;
+  }
+
+  // Generator completeness is useful, but it is not evidence of a current
+  // NCERT/CBSE source review. Do not let future refactors promote an unreviewed
+  // Class 7/10/11/12 chapter merely because a generator exists.
+  if (status.generatorComplete) {
+    assert.equal(status.quality, INDIA_CONTENT_QUALITY.WEAK_MAPPING, `${chapter.id} must remain C until review evidence is recorded`);
+    assert.equal(status.releaseState, INDIA_RELEASE_STATE.UNREVIEWED);
+    assert.equal(status.sourceReviewed, false);
   }
 }
 
@@ -59,13 +70,15 @@ for (const section of product.years) {
 
 const grade8 = product.years.find(section => section.year === 8);
 const grade9 = product.years.find(section => section.year === 9);
+const grade10 = product.years.find(section => section.year === 10);
 assert.equal(grade8.production.reviewedChapters, grade8.production.totalChapters);
 assert.equal(grade9.production.reviewedChapters, grade9.production.totalChapters);
+assert.equal(grade10.production.reviewedChapters, CBSE_CLASS10_2026_27_REVIEWED_IDS.size);
+assert.equal(grade10.production.reviewedChapters, 5, 'Class 10 review promotion must stay narrow until more form audits land');
 
-const unreviewedGrades = product.years.filter(section => [7, 10, 11, 12].includes(section.year));
-for (const section of unreviewedGrades) {
+for (const section of product.years.filter(section => [7, 11, 12].includes(section.year))) {
   assert.equal(section.production.reviewedChapters, 0, `${section.key} must not claim source review before evidence is committed`);
 }
 
 console.log(`PASS — India production provenance census: ${summary.total} chapters; A=${summary.byQuality.A}, B=${summary.byQuality.B}, C=${summary.byQuality.C}, D=${summary.byQuality.D}.`);
-console.log('PASS — Class 8 and Class 9 are source-reviewed; Classes 7/10/11/12 remain explicitly unreviewed until source evidence is committed.');
+console.log(`PASS — Class 8/9 remain source-authored; ${grade10.production.reviewedChapters}/${grade10.production.totalChapters} Class 10 chapters are narrowly source-reviewed mappings.`);
