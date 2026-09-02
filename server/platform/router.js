@@ -8,6 +8,7 @@ import { createEntitlementRouter } from './entitlements.js';
 import { createIdentityRouter } from './identities.js';
 import { createReportRouter } from './reports.js';
 import { createSyncRouter } from './sync.js';
+import { createTelemetryRouter } from './telemetry.js';
 import { assertPlatformConfig, platformConfigStatus } from './config.js';
 import { csrfGuard, originGuard } from './security.js';
 
@@ -47,6 +48,7 @@ export function createPlatformRouter(db, { billingVerifiers = {} } = {}) {
   router.use('/classes', createClassRouter(db));
   router.use('/content', createContentRouter(db));
   router.use('/reports', createReportRouter(db));
+  router.use('/telemetry', createTelemetryRouter(db));
   router.use('/admin', createAdminRouter(db));
 
   router.use((req, res) => res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Platform endpoint not found.' } }));
