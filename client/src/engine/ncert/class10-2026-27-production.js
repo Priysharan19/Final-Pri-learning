@@ -59,8 +59,11 @@ export const CBSE_CLASS10_2026_27_CHAPTERS = Object.freeze([
     'Formulate and solve situational problems leading to a quadratic equation'
   ], [
     cover('y10-quadratics', [0], [1, 3]),
-    cover('y10-quadratics', [1], [4])
-  ]),
+    cover('y10-quadratics', [1], [4]),
+    // Dedicated contextual forms require the student to model the situation
+    // before solving, rather than relabelling a bare algebra exercise as applied.
+    cover('c10-quadratic-context', [2], [1, 2, 3, 4])
+  ], true),
 
   chapter('c10-arithmetic-progressions', [
     'Find and use the nth term of an arithmetic progression',
