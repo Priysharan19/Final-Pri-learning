@@ -25,9 +25,6 @@ export function platformConfigStatus() {
   if (production && !nonEmpty('PRI_PUBLIC_ORIGIN')) missing.push('PRI_PUBLIC_ORIGIN');
   if (production && !nonEmpty('PRI_CSRF_SECRET')) missing.push('PRI_CSRF_SECRET');
   if (production && !nonEmpty('PRI_AUTH_DELIVERY_KEY')) missing.push('PRI_AUTH_DELIVERY_KEY');
-  if (production && String(process.env.PRI_AUTH_EMAIL_PROVIDER || '').trim().toLowerCase() !== 'resend') missing.push('PRI_AUTH_EMAIL_PROVIDER=resend');
-  if (production && !nonEmpty('PRI_RESEND_API_KEY')) missing.push('PRI_RESEND_API_KEY');
-  if (production && !nonEmpty('PRI_AUTH_EMAIL_FROM')) missing.push('PRI_AUTH_EMAIL_FROM');
 
   const webMonthly = webMonthlyConfigured();
   const webAnnual = webAnnualConfigured();
