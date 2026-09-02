@@ -4,6 +4,7 @@ import {
   NCERT_CLASS10_IDS,
   NCERT_CLASS10_RELEASE_AUDIT
 } from '../src/engine/ncert/class10-content.js';
+import { NCERT_CLASS10_EXERCISE_AUDIT } from '../src/engine/ncert/class10-exercise-audit.js';
 import {
   CBSE_CLASS10_2026_27_CHAPTERS,
   CBSE_CLASS10_2026_27_REVIEWED_IDS
@@ -72,6 +73,18 @@ assert.equal(ex12?.appendix,'absent');
 assert.match(ex12?.note||'',/No EXERCISE 1\.2 block|no dedicated/i);
 assert.match(ex12?.note||'',/theorem|contradiction/i);
 
+// One row per top-level source question prevents an aggregate chapter count from
+// hiding a dropped exercise item. Rows describe verification authority without
+// duplicating the copyrighted source wording.
+assert.equal(NCERT_CLASS10_EXERCISE_AUDIT.length,265,'every top-level textbook exercise question has an audit identity');
+assert.equal(new Set(NCERT_CLASS10_EXERCISE_AUDIT.map(row=>row.id)).size,265,'exercise audit identities must be unique');
+assert.ok(NCERT_CLASS10_EXERCISE_AUDIT.every(row=>row.status==='verified'));
+assert.ok(NCERT_CLASS10_EXERCISE_AUDIT.every(row=>row.solutionContract.progressiveHints&&row.solutionContract.workedSolution&&row.solutionContract.finalAnswer&&row.solutionContract.handwriting&&row.solutionContract.priReason&&row.solutionContract.offline));
+const ex12Rows=NCERT_CLASS10_EXERCISE_AUDIT.filter(row=>row.exercise==='1.2');
+assert.equal(ex12Rows.length,3);
+assert.ok(ex12Rows.every(row=>row.answerBlockPresent===false&&row.verificationBasis==='source-theorem-proof-method'));
+assert.equal(NCERT_CLASS10_EXERCISE_AUDIT.filter(row=>row.answerBlockPresent).length,262,'all questions outside Exercise 1.2 belong to exercise blocks represented in the supplied appendix');
+
 // Current-exam truth remains a separate, fail-closed contract. Full-book-only
 // material may be taught but must not silently become an examinable outcome.
 const grade10=IN_CURRICULUM.find(g=>g.grade===10);
@@ -85,12 +98,10 @@ assert.ok(!currentText.includes('ogive'),'book-only ogive material is not promot
 assert.ok(!currentText.includes('recast'),'book-only recasting material is not promoted');
 assert.ok(NCERT_CLASS10_CONTENT.some(ch=>ch.sourceMap.some(s=>s.currentExam===false)),'book-only source material is retained explicitly');
 
-// Every current coverage generator must load through the real production registry,
-// which is the same path used by offline Practice and therefore by Write/Photo.
 const currentGenerators=[...new Set(CBSE_CLASS10_2026_27_CHAPTERS.flatMap(ch=>ch.covers.map(c=>c.gen)))];
 await loadBanksFor(currentGenerators);
 for(const id of currentGenerators) assert.equal(typeof GENERATORS[id],'function',`${id}: production generator loads`);
 
 console.log(`PASS — NCERT Class X full book: ${NCERT_CLASS10_CONTENT.length}/14 chapters, ${pages}/217 pages, ${exerciseBlocks}/32 exercise blocks, ${questions}/265 top-level source questions.`);
-console.log(`PASS — ${notes} topper notes, ${examples} worked examples, D1-D4 + offline/iPad/Pencil/Pri Reason contracts on all 14 chapters.`);
+console.log(`PASS — ${NCERT_CLASS10_EXERCISE_AUDIT.length}/265 exercise audit identities, ${notes} topper notes, ${examples} worked examples, D1-D4 + offline/iPad/Pencil/Pri Reason contracts.`);
 console.log('PASS — supplied Answers/Hints coverage is represented honestly: 31/32 exercise blocks; Exercise 1.2 is theorem-derived because the appendix has no dedicated block.');
