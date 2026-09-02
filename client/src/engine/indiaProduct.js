@@ -1,9 +1,8 @@
 // Pri Learning · production-facing India curriculum helpers
 //
-// curriculum-in.js owns the authored syllabus/coverage declarations. This file
-// is the thin product contract used by profiles, the local API and the UI. It
-// deliberately does not manufacture coverage: an India chapter/dot point is
-// selectable only when curriculum-in.js names a real generator behind it.
+// curriculum-in.js owns syllabus/generator declarations. indiaProductionMeta.js
+// owns provenance/review truth. Product surfaces consume both so "selectable"
+// never silently becomes "source reviewed".
 import {
   IN_CURRICULUM,
   IN_TRACKS,
@@ -12,6 +11,7 @@ import {
   generatorsFor,
   coversForDotpoint
 } from './curriculum-in.js';
+import { attachIndiaProductionStatus, indiaProductionStatus } from './indiaProductionMeta.js';
 import { hasJeePyqGenerator } from './generators/jee-pyq-runtime.js';
 
 export const INDIA_COURSE = 'in';
@@ -43,17 +43,20 @@ export function indiaChapterGrade(chapter) {
   return null;
 }
 
-export function indiaScope(rawTrack, grade) {
+export function indiaScope(rawTrack, grade, { productionMeta = false } = {}) {
   const track = indiaTrack(rawTrack, grade);
-  return track.scopeFor(grade).map(id => IN_CHAPTER_BY_ID[id]).filter(Boolean);
+  const chapters = track.scopeFor(grade).map(id => IN_CHAPTER_BY_ID[id]).filter(Boolean);
+  return productionMeta ? chapters.map(ch => attachIndiaProductionStatus(ch, grade)) : chapters;
 }
 
 export function indiaGeneratorsForScope(rawTrack, grade) {
   return [...new Set(indiaScope(rawTrack, grade).flatMap(generatorsFor))];
 }
 
-export function indiaChapter(id) {
-  return IN_CHAPTER_BY_ID[String(id || '')] || null;
+export function indiaChapter(id, { productionMeta = false } = {}) {
+  const chapter = IN_CHAPTER_BY_ID[String(id || '')] || null;
+  if (!productionMeta || !chapter) return chapter;
+  return attachIndiaProductionStatus(chapter, indiaChapterGrade(chapter));
 }
 
 export function indiaDotpointIndex(chapter, ref) {
@@ -103,7 +106,7 @@ export function resolveIndiaTarget(chapter, {
   return nearest[Math.min(nearest.length - 1, Math.floor(Math.max(0, Math.min(0.999999, Number(random()) || 0)) * nearest.length))];
 }
 
-/** Sections the Home generator can render without knowing India internals. */
+/** Product sections with explicit provenance/review state on every chapter. */
 export function indiaProductSections() {
   const years = IN_CURRICULUM.map(group => ({
     year: group.grade,
@@ -113,12 +116,17 @@ export function indiaProductSections() {
     label: 'CBSE / NCERT',
     caption: group.caption,
     difficultyCeiling: IN_TRACKS.cbse.difficultyCeiling,
-    chapters: group.chapters
+    chapters: group.chapters.map(ch => attachIndiaProductionStatus(ch, group.grade)),
+    production: Object.freeze({
+      reviewedChapters: group.chapters.filter(ch => indiaProductionStatus(ch, group.grade).sourceReviewed).length,
+      totalChapters: group.chapters.length
+    })
   }));
   const streams = [];
   for (const year of [11, 12]) {
     for (const id of ['jee-main', 'jee-advanced']) {
       const t = IN_TRACKS[id];
+      const chapters = t.scopeFor(year).map(chapterId => IN_CHAPTER_BY_ID[chapterId]).filter(Boolean);
       streams.push({
         year,
         key: `in-${id}-${year}`,
@@ -127,7 +135,11 @@ export function indiaProductSections() {
         label: t.name,
         caption: t.caption,
         difficultyCeiling: t.difficultyCeiling,
-        chapters: t.scopeFor(year).map(chapterId => IN_CHAPTER_BY_ID[chapterId]).filter(Boolean)
+        chapters: chapters.map(ch => attachIndiaProductionStatus(ch, year)),
+        production: Object.freeze({
+          reviewedChapters: chapters.filter(ch => indiaProductionStatus(ch, year).sourceReviewed).length,
+          totalChapters: chapters.length
+        })
       });
     }
   }
@@ -139,7 +151,7 @@ export function indiaProductSections() {
     label: 'Olympiad',
     caption: IN_TRACKS.olympiad.caption,
     difficultyCeiling: IN_TRACKS.olympiad.difficultyCeiling,
-    chapters: OLYMPIAD_TOPICS
+    chapters: OLYMPIAD_TOPICS.map(ch => attachIndiaProductionStatus(ch, null))
   });
   return { years, streams };
 }
