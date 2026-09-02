@@ -1,19 +1,10 @@
-// ─────────────────────────────────────────────────────────────────────────────
-// Pri Learning · Server entry — UNUSED LEGACY
+// Pri Learning server entry.
 //
-// The shipped app never calls this server. The real backend is
-// client/src/local/backend.js: 51 routes served from IndexedDB inside the
-// browser, offline, with no network call of any kind. This file and what it
-// imports (routes/api.js, auth.js, db.js, badges.js, seed.js) are the
-// pre-local-first Express implementation, kept for reference.
-//
-// Note that it is not merely a static host: the two routers below mount 22 live
-// API routes ahead of the static fallback. They answer if something calls them;
-// nothing in the client does.
-//
-// Deleting server/ is not a no-op — server/engine/ and server/test/ live under
-// it and ARE used. Read server/README.md first.
-// ─────────────────────────────────────────────────────────────────────────────
+// The shipped learning experience remains local-first and can run without this
+// process. `/v1` is the production cloud control plane for optional identity,
+// sync, entitlements, classrooms, content publishing and support. The older
+// `/api` routes are retained temporarily for compatibility/reference and are not
+// the specification for the production platform.
 import express from 'express';
 import cookieParser from 'cookie-parser';
 import compression from 'compression';
@@ -22,27 +13,41 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { authRouter } from './auth.js';
 import { api } from './routes/api.js';
+import { platformDb } from './platform/db.js';
+import { createPlatformRouter } from './platform/router.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const app = express();
+if (process.env.NODE_ENV === 'production') app.set('trust proxy', 1);
+app.disable('x-powered-by');
 app.use(compression());
-app.use(express.json({ limit: '256kb' }));
+app.use(express.json({
+  limit: '1mb',
+  verify(req, res, buffer) {
+    // Provider-specific billing webhook verifiers may require exact bytes. This
+    // copy lives only for the request lifetime and is never logged/persisted.
+    req.rawBody = Buffer.from(buffer);
+  }
+}));
 app.use(cookieParser());
 
+app.use('/v1', createPlatformRouter(platformDb));
+
+// Legacy routes: kept until old tooling no longer needs the historical server.
 app.use('/api/auth', authRouter);
 app.use('/api', api);
 
 app.use((err, req, res, next) => {
-  console.error(err);
-  res.status(500).json({ error: 'Something went wrong on the server.' });
+  console.error('server_error', { method: req.method, path: req.path, status: err?.status || 500, code: err?.code || 'INTERNAL' });
+  if (res.headersSent) return next(err);
+  res.status(err?.status || 500).json({ error: 'Something went wrong on the server.' });
 });
 
-// Serve the built client in production
 const dist = join(here, '..', 'client', 'dist');
 if (existsSync(dist)) {
   app.use(express.static(dist));
-  app.get(/^(?!\/api).*/, (req, res) => res.sendFile(join(dist, 'index.html')));
+  app.get(/^(?!\/(?:api|v1)).*/, (req, res) => res.sendFile(join(dist, 'index.html')));
 }
 
 const PORT = process.env.PORT || 4000;
-app.listen(PORT, () => console.log(`Pri Learning server running on http://localhost:${PORT}`));
+app.listen(PORT, () => console.log(`Pri Learning server running on port ${PORT}`));
