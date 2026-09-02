@@ -35,23 +35,57 @@ export function publicEntitlement(row, now = Date.now()) {
   };
 }
 
+function subscriptionState(db, provider, providerSubscriptionId) {
+  if (!providerSubscriptionId) return null;
+  return db.prepare(`SELECT account_id,last_effective_at,last_event_rank,last_event_id
+    FROM billing_subscriptions WHERE provider=? AND provider_subscription_id=?`)
+    .get(provider, providerSubscriptionId);
+}
+
+function staleSubscriptionEvent(prior, effectiveAt, eventRank) {
+  if (!prior) return false;
+  const previousAt = Math.max(0, Number(prior.last_effective_at) || 0);
+  const previousRank = Math.max(0, Number(prior.last_event_rank) || 0);
+  if (effectiveAt < previousAt) return true;
+  return effectiveAt === previousAt && eventRank < previousRank;
+}
+
 export function applyVerifiedEntitlement(db, {
   verified, provider, eventId, accountId, eventType, productId = null,
   plan = 'free', status = 'free', currentPeriodEnd = null, graceUntil = null,
-  offlineUntil = null, payloadDigest = '', now = Date.now()
+  offlineUntil = null, payloadDigest = '', now = Date.now(),
+  providerSubscriptionId = null, effectiveAt = now, eventRank = 0
 }) {
   if (verified !== true) throw new Error('Unverified billing events cannot change entitlements');
   if (!PROVIDER.has(provider) || provider === 'none' || !eventId || !eventType || !accountId) throw new Error('Billing event metadata is incomplete');
   if (!STATUS.has(status) || !['free', 'premium'].includes(plan)) throw new Error('Billing lifecycle is invalid');
   if (!db.prepare('SELECT id FROM accounts WHERE id=? AND deleted_at IS NULL').get(accountId)) throw new Error('Billing event account does not exist');
+  const eventTime = Math.max(0, Number(effectiveAt) || 0);
+  const rank = Math.max(0, Math.floor(Number(eventRank) || 0));
 
   return db.transaction(() => {
     const existing = db.prepare('SELECT applied_at FROM billing_events WHERE provider=? AND event_id=?').get(provider, eventId);
-    if (existing?.applied_at) return { replayed: true, snapshot: publicEntitlement(db.prepare('SELECT * FROM entitlement_snapshots WHERE account_id=?').get(accountId), now) };
+    if (existing?.applied_at) return {
+      replayed: true,
+      stale: false,
+      snapshot: publicEntitlement(db.prepare('SELECT * FROM entitlement_snapshots WHERE account_id=?').get(accountId), now)
+    };
     if (!existing) {
       db.prepare(`INSERT INTO billing_events(provider,event_id,account_id,event_type,verified,payload_digest,received_at)
         VALUES (?,?,?,?,1,?,?)`).run(provider, eventId, accountId, eventType, payloadDigest || sha256(`${provider}:${eventId}`), now);
     }
+
+    const subscription = subscriptionState(db, provider, providerSubscriptionId);
+    if (subscription && subscription.account_id !== accountId) throw new Error('Billing subscription is bound to another account');
+    if (subscription && staleSubscriptionEvent(subscription, eventTime, rank)) {
+      db.prepare('UPDATE billing_events SET applied_at=? WHERE provider=? AND event_id=?').run(now, provider, eventId);
+      return {
+        replayed: false,
+        stale: true,
+        snapshot: publicEntitlement(db.prepare('SELECT * FROM entitlement_snapshots WHERE account_id=?').get(accountId), now)
+      };
+    }
+
     const prior = db.prepare('SELECT source_version FROM entitlement_snapshots WHERE account_id=?').get(accountId);
     const version = Math.max(0, Number(prior?.source_version) || 0) + 1;
     const lifecycleEnd = status === 'grace' ? Number(graceUntil) || null : Number(currentPeriodEnd) || null;
@@ -65,8 +99,18 @@ export function applyVerifiedEntitlement(db, {
         product_id=excluded.product_id,current_period_end=excluded.current_period_end,grace_until=excluded.grace_until,
         offline_until=excluded.offline_until,source_version=excluded.source_version,updated_at=excluded.updated_at`)
       .run(accountId, plan, status, provider, productId, currentPeriodEnd, graceUntil, safeOffline, version, now);
+
+    if (subscription && providerSubscriptionId) {
+      db.prepare(`UPDATE billing_subscriptions SET product_id=COALESCE(?,product_id),updated_at=?,last_effective_at=?,last_event_rank=?,last_event_id=?
+        WHERE provider=? AND provider_subscription_id=?`)
+        .run(productId || null, now, eventTime, rank, eventId, provider, providerSubscriptionId);
+    }
     db.prepare('UPDATE billing_events SET applied_at=? WHERE provider=? AND event_id=?').run(now, provider, eventId);
-    return { replayed: false, snapshot: publicEntitlement(db.prepare('SELECT * FROM entitlement_snapshots WHERE account_id=?').get(accountId), now) };
+    return {
+      replayed: false,
+      stale: false,
+      snapshot: publicEntitlement(db.prepare('SELECT * FROM entitlement_snapshots WHERE account_id=?').get(accountId), now)
+    };
   })();
 }
 
