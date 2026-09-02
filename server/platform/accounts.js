@@ -5,6 +5,7 @@ import {
   sessionFromRequest, setSessionCookies, sha256
 } from './security.js';
 import { encryptDeliveryToken } from './deliveryCrypto.js';
+import { verifyIdentityToken } from './oidc.js';
 
 const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const TOKEN_MS = 1000 * 60 * 60;
@@ -59,6 +60,48 @@ function queueAccountToken(db, accountId, destination, purpose, now = Date.now()
 function revokeSession(db, req, now = Date.now()) {
   const session = sessionFromRequest(db, req, now);
   if (session) db.prepare('UPDATE account_sessions SET revoked_at = ? WHERE id = ?').run(now, session.id);
+}
+
+function reauthError(code, message, status = 401) {
+  return Object.assign(new Error(message), { code, status });
+}
+
+/**
+ * Destructive account deletion always requires fresh proof of the account's
+ * authentication method. A long-lived session cookie is not enough on its own.
+ */
+export async function authorizeAccountDeletion(db, accountId, body = {}, identityVerifier = verifyIdentityToken) {
+  const row = db.prepare('SELECT password_hash FROM accounts WHERE id = ? AND deleted_at IS NULL').get(accountId);
+  if (!row) throw reauthError('ACCOUNT_NOT_FOUND', 'Account not found.', 404);
+
+  if (row.password_hash) {
+    const password = String(body?.password || '');
+    if (!password || !bcrypt.compareSync(password, row.password_hash)) {
+      throw reauthError('REAUTH_REQUIRED', 'Confirm your password before deleting the account.');
+    }
+    return { method: 'password' };
+  }
+
+  const provider = String(body?.provider || '');
+  if (!['google', 'apple'].includes(provider)) {
+    throw reauthError('SOCIAL_REAUTH_REQUIRED', 'Confirm your Apple or Google identity again before deleting the account.');
+  }
+  const idToken = String(body?.idToken || '');
+  if (!idToken) throw reauthError('SOCIAL_REAUTH_REQUIRED', 'A fresh identity token is required before deleting the account.');
+
+  let identity;
+  try {
+    identity = await identityVerifier(provider, idToken, {
+      nonce: body?.nonce == null ? null : String(body.nonce)
+    });
+  } catch (error) {
+    if (error?.code === 'OIDC_PROVIDER_NOT_CONFIGURED') throw reauthError(error.code, error.message, 503);
+    throw reauthError(error?.code || 'SOCIAL_REAUTH_FAILED', error?.message || 'Identity confirmation failed.');
+  }
+  const linked = db.prepare(`SELECT 1 FROM account_identities
+    WHERE provider=? AND provider_subject=? AND account_id=?`).get(provider, identity.subject, accountId);
+  if (!linked) throw reauthError('SOCIAL_IDENTITY_MISMATCH', 'The confirmed identity is not linked to this Pri Learning account.');
+  return { method: provider, subject: identity.subject };
 }
 
 export function createAccountRouter(db) {
@@ -187,16 +230,17 @@ export function createAccountRouter(db) {
     res.json({ format: 'pri-account-export-v1', exportedAt: Date.now(), account, learningEvents: events, entities, classes });
   });
 
-  router.delete('/', requireSession(db), rateLimit(db, 'account-delete', { limit: 3, windowMs: 24 * 60 * 60 * 1000 }), (req, res) => {
-    const row = db.prepare('SELECT password_hash FROM accounts WHERE id = ?').get(req.platformSession.account_id);
-    const password = String(req.body?.password || '');
-    if (row?.password_hash && !bcrypt.compareSync(password, row.password_hash)) {
-      return res.status(401).json({ error: { code: 'REAUTH_REQUIRED', message: 'Confirm your password before deleting the account.' } });
+  router.delete('/', requireSession(db), rateLimit(db, 'account-delete', { limit: 3, windowMs: 24 * 60 * 60 * 1000 }), async (req, res, next) => {
+    try {
+      await authorizeAccountDeletion(db, req.platformSession.account_id, req.body || {});
+      const accountId = req.platformSession.account_id;
+      db.prepare('DELETE FROM accounts WHERE id = ?').run(accountId); // foreign keys cascade cloud student data
+      clearSessionCookies(res);
+      res.json({ deleted: true });
+    } catch (error) {
+      if (error?.status) return res.status(error.status).json({ error: { code: error.code || 'REAUTH_REQUIRED', message: error.message } });
+      next(error);
     }
-    const accountId = req.platformSession.account_id;
-    db.prepare('DELETE FROM accounts WHERE id = ?').run(accountId); // foreign keys cascade cloud student data
-    clearSessionCookies(res);
-    res.json({ deleted: true });
   });
 
   return router;
