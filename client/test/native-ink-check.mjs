@@ -15,6 +15,7 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const BRIDGE_SWIFT = join(HERE, '../../ios/PriLearning.swiftpm/Ink/InkBridge.swift');
 const STROKE_SWIFT = join(HERE, '../../ios/PriLearning.swiftpm/Ink/InkStroke.swift');
 const SURFACE_SWIFT = join(HERE, '../../ios/PriLearning.swiftpm/Ink/InkSurface.swift');
+const NATIVE_CANVAS = join(HERE, '../src/ink/NativeInkCanvas.jsx');
 
 let failures = 0;
 const check = (name, ok, detail = '') => {
@@ -137,6 +138,18 @@ stop();
 window.__priInkReceive({ type: 'strokes', strokes: [] });
 check('a removed listener stops hearing', heard?.length === 2);
 
+// ── Native React lifecycle must never control PencilKit by callback identity ─
+const nativeCanvasSource = readFileSync(NATIVE_CANVAS, 'utf8');
+check('native canvas keeps the latest parent stroke callback behind a ref',
+  nativeCanvasSource.includes('onStrokesChangeRef.current = onStrokesChange')
+  && nativeCanvasSource.includes('onStrokesChangeRef.current?.(strokes)'));
+check('stroke notifications do not force a redundant React render',
+  !nativeCanvasSource.includes('force(x => x + 1)')
+  && !nativeCanvasSource.includes('useState(0)'));
+check('native mount listener has stable callback identity',
+  nativeCanvasSource.includes('const notify = useCallback((strokes) =>')
+  && nativeCanvasSource.includes('}, []);'));
+
 // ── full Pencil signal is part of the native data contract ───────────────────
 const strokeSwift = readFileSync(STROKE_SWIFT, 'utf8');
 for (const field of ['"t"', '"p"', '"azimuth"', '"altitude"']) {
@@ -169,6 +182,10 @@ const source = readFileSync(join(HERE, '../src/ink/native.js'), 'utf8');
 for (const op of sent) {
   check(`the page sends "${op}"`, source.includes(`op: '${op}'`));
 }
+check('recognition retains the current immutable native stroke snapshot by reference',
+  source.includes('strokes: latestStrokes, surfaceEpoch'));
+check('external setStrokes input is copied once at the bridge boundary',
+  source.includes('latestStrokes = snapshotInkStrokes(strokes);'));
 
 console.log(`\n${failures === 0 ? 'PASS' : `FAIL — ${failures} problem(s)`}`);
 process.exit(failures === 0 ? 0 : 1);

@@ -26,7 +26,12 @@ assert.equal(setReadingCompatibility(calculus, ctx).eligible, false);
 assert.equal(setReadingCompatibility(setReading, ctx).eligible, true);
 
 const nativeSource = fs.readFileSync(new URL('../src/ink/native.js', import.meta.url), 'utf8');
-assert.match(nativeSource, /strokes:\s*snapshotInkStrokes\(latestStrokes\)/);
+// Native stroke messages are immutable replacement snapshots. Recognition must
+// retain that exact snapshot by reference instead of deep-cloning every point
+// on every request; caller-owned setStrokes input is still copied at the API
+// boundary before it becomes bridge-owned state.
+assert.match(nativeSource, /strokes:\s*latestStrokes/);
+assert.match(nativeSource, /latestStrokes\s*=\s*snapshotInkStrokes\(strokes\)/);
 assert.match(nativeSource, /fuseNativeStrokeReading\(\s*payload,\s*entry\.strokes,/s);
 assert.match(nativeSource, /invalidatePending\('surface-remounted'\)/);
 assert.match(nativeSource, /entry\.surfaceEpoch !== surfaceEpoch/);
