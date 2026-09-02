@@ -25,6 +25,7 @@ import PencilKit
 import UIKit
 
 protocol InkSurfaceDelegate: AnyObject {
+    func inkSurfaceDidBeginStroke(_ surface: InkSurfaceView)
     func inkSurfaceDidChangeStrokes(_ surface: InkSurfaceView)
 }
 
@@ -127,6 +128,10 @@ final class InkSurfaceView: UIView, PKCanvasViewDelegate {
     // MARK: - History
 
     func canvasViewDidBeginUsingTool(_ canvasView: PKCanvasView) {
+        // A new mark makes any whole-page read immediately stale. Invalidate at
+        // Pencil-down rather than waiting for pen-up so Vision/Foundation work
+        // cannot continue burning CPU while the student is actively writing.
+        delegate?.inkSurfaceDidBeginStroke(self)
         pushHistory()
     }
 
