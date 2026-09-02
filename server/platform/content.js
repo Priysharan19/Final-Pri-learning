@@ -41,6 +41,10 @@ function audit(db, actor, action, targetId, metadata = {}, now = Date.now()) {
     .run(actor, action, 'content-revision', targetId, JSON.stringify(metadata), now);
 }
 
+export function independentReviewAllowed(row, reviewerAccountId) {
+  return !!row?.author_account_id && !!reviewerAccountId && row.author_account_id !== reviewerAccountId;
+}
+
 export function createContentRouter(db) {
   const router = Router();
 
@@ -83,13 +87,18 @@ export function createContentRouter(db) {
     } catch (err) {
       return res.status(err.status || 400).json({ error: { code: err.code || 'CONTENT_INVALID', message: err.message } });
     }
-    const prior = db.prepare('SELECT MAX(revision) AS n FROM content_revisions WHERE content_key=?').get(contentKey)?.n || 0;
-    const revision = Number(prior) + 1;
     const revisionId = id('content');
     const now = Date.now();
-    db.prepare(`INSERT INTO content_revisions(id,content_key,curriculum_version,status,author_account_id,source_json,body_json,revision,created_at)
-      VALUES (?,?,?,'draft',?,?,?,?,?)`).run(revisionId, contentKey, curriculumVersion, req.platformSession.account_id, sourceJson, bodyJson, revision, now);
-    audit(db, req.platformSession.account_id, 'content.draft.create', revisionId, { contentKey, revision }, now);
+    let revision;
+    // Serialize revision allocation with the insert. SQLite's transaction keeps
+    // two simultaneous authors from both publishing "revision N+1".
+    db.transaction(() => {
+      const prior = db.prepare('SELECT MAX(revision) AS n FROM content_revisions WHERE content_key=?').get(contentKey)?.n || 0;
+      revision = Number(prior) + 1;
+      db.prepare(`INSERT INTO content_revisions(id,content_key,curriculum_version,status,author_account_id,source_json,body_json,revision,created_at)
+        VALUES (?,?,?,'draft',?,?,?,?,?)`).run(revisionId, contentKey, curriculumVersion, req.platformSession.account_id, sourceJson, bodyJson, revision, now);
+      audit(db, req.platformSession.account_id, 'content.draft.create', revisionId, { contentKey, revision }, now);
+    })();
     res.status(201).json({ revision: revisionPublic(rowFor(db, revisionId)) });
   });
 
@@ -122,7 +131,9 @@ export function createContentRouter(db) {
   router.post('/:revisionId/approve', (req, res) => {
     const row = rowFor(db, req.params.revisionId);
     if (!row || row.status !== 'review') return res.status(409).json({ error: { code: 'CONTENT_TRANSITION_INVALID', message: 'Only content in review can be approved.' } });
-    if (row.author_account_id === req.platformSession.account_id && req.platformSession.role !== 'admin') return res.status(409).json({ error: { code: 'INDEPENDENT_REVIEW_REQUIRED', message: 'A non-admin author cannot approve their own revision.' } });
+    if (!independentReviewAllowed(row, req.platformSession.account_id)) {
+      return res.status(409).json({ error: { code: 'INDEPENDENT_REVIEW_REQUIRED', message: 'The author cannot approve their own revision. A different authorised reviewer is required.' } });
+    }
     db.prepare("UPDATE content_revisions SET status='approved',reviewer_account_id=? WHERE id=?").run(req.platformSession.account_id, row.id);
     audit(db, req.platformSession.account_id, 'content.approve', row.id);
     res.json({ revision: revisionPublic(rowFor(db, row.id)) });
@@ -130,7 +141,9 @@ export function createContentRouter(db) {
 
   router.post('/:revisionId/publish', requireRole('admin'), (req, res) => {
     const row = rowFor(db, req.params.revisionId);
-    if (!row || row.status !== 'approved' || !row.reviewer_account_id) return res.status(409).json({ error: { code: 'CONTENT_NOT_APPROVED', message: 'Only reviewed and approved content can be published.' } });
+    if (!row || row.status !== 'approved' || !row.reviewer_account_id || !independentReviewAllowed(row, row.reviewer_account_id)) {
+      return res.status(409).json({ error: { code: 'CONTENT_NOT_APPROVED', message: 'Only independently reviewed and approved content can be published.' } });
+    }
     const now = Date.now();
     db.transaction(() => {
       db.prepare("UPDATE content_revisions SET status='retired' WHERE content_key=? AND status='published'").run(row.content_key);
@@ -144,13 +157,17 @@ export function createContentRouter(db) {
     const source = rowFor(db, req.params.revisionId);
     if (!source || !['published', 'retired'].includes(source.status)) return res.status(409).json({ error: { code: 'ROLLBACK_SOURCE_INVALID', message: 'Rollback source must be a previously published revision.' } });
     const now = Date.now();
-    const revision = Number(db.prepare('SELECT MAX(revision) AS n FROM content_revisions WHERE content_key=?').get(source.content_key)?.n || 0) + 1;
     const revisionId = id('content');
+    let revision;
     db.transaction(() => {
+      revision = Number(db.prepare('SELECT MAX(revision) AS n FROM content_revisions WHERE content_key=?').get(source.content_key)?.n || 0) + 1;
       db.prepare("UPDATE content_revisions SET status='retired' WHERE content_key=? AND status='published'").run(source.content_key);
+      // A rollback restores bytes that already passed independent review. It is an
+      // explicit admin recovery action, not a new self-reviewed content approval;
+      // audit metadata points back to the reviewed source revision.
       db.prepare(`INSERT INTO content_revisions(id,content_key,curriculum_version,status,author_account_id,reviewer_account_id,source_json,body_json,revision,created_at,published_at)
         VALUES (?,?,?,'published',?,?,?,?,?,?,?)`)
-        .run(revisionId, source.content_key, source.curriculum_version, req.platformSession.account_id, req.platformSession.account_id, source.source_json, source.body_json, revision, now, now);
+        .run(revisionId, source.content_key, source.curriculum_version, source.author_account_id, source.reviewer_account_id, source.source_json, source.body_json, revision, now, now);
       audit(db, req.platformSession.account_id, 'content.rollback', revisionId, { fromRevisionId: source.id, fromRevision: source.revision, revision }, now);
     })();
     res.json({ revision: revisionPublic(rowFor(db, revisionId)), rolledBackFrom: source.id });
