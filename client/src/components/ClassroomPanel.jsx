@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { cloud, cloudAvailable } from '../platform/cloudTransport.js';
+import { assignmentSubmissions } from '../platform/assignmentReview.js';
 import { onCloudSessionChange } from '../platform/cloudSession.js';
 
 function niceDate(value) {
@@ -13,6 +14,13 @@ function roleLabel(role) {
   return 'Student';
 }
 
+function stateLabel(state) {
+  if (state === 'submitted') return 'Submitted';
+  if (state === 'returned') return 'Returned';
+  if (state === 'started') return 'In progress';
+  return 'Not started';
+}
+
 export default function ClassroomPanel() {
   const enabled = cloudAvailable();
   const [account, setAccount] = useState(null);
@@ -23,6 +31,8 @@ export default function ClassroomPanel() {
   const [className, setClassName] = useState('');
   const [joinCode, setJoinCode] = useState('');
   const [assignment, setAssignment] = useState({ title: '', instructions: '', questions: 10, due: '' });
+  const [review, setReview] = useState(null);
+  const [feedbackDraft, setFeedbackDraft] = useState({});
   const [busy, setBusy] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
@@ -56,6 +66,24 @@ export default function ClassroomPanel() {
     } else setStudents([]);
   }
 
+  async function loadReview(assignmentId) {
+    if (!selectedId || !assignmentId) return;
+    setBusy(`review:${assignmentId}`); setError(''); setMessage('');
+    try {
+      const result = await assignmentSubmissions(selectedId, assignmentId);
+      setReview(result || null);
+      const drafts = {};
+      for (const row of result?.submissions || []) {
+        const note = row.feedback?.note;
+        if (note) drafts[row.student.id] = String(note);
+      }
+      setFeedbackDraft(drafts);
+    } catch (err) {
+      setError(err.message || 'Could not load assignment submissions.');
+      setReview(null);
+    } finally { setBusy(''); }
+  }
+
   useEffect(() => {
     let live = true;
     if (!enabled) return () => { live = false; };
@@ -72,6 +100,7 @@ export default function ClassroomPanel() {
           setSelectedId('');
           setDetail(null);
           setStudents([]);
+          setReview(null);
           setError('');
           return;
         }
@@ -85,6 +114,8 @@ export default function ClassroomPanel() {
   }, [enabled]);
 
   useEffect(() => {
+    setReview(null);
+    setFeedbackDraft({});
     if (!selectedId || !account) {
       setDetail(null);
       setStudents([]);
@@ -149,6 +180,26 @@ export default function ClassroomPanel() {
     finally { setBusy(''); }
   }
 
+  async function returnForRevision(row) {
+    const note = String(feedbackDraft[row.student.id] || '').trim();
+    if (!note) {
+      setError('Add a short feedback note before returning an assignment for revision.');
+      return;
+    }
+    if (note.length > 4000) {
+      setError('Teacher feedback must be 4000 characters or fewer.');
+      return;
+    }
+    setBusy(`return:${row.student.id}`); setError(''); setMessage('');
+    try {
+      await cloud.returnSubmission(selectedId, review.assignment.id, row.student.id, { note });
+      await loadReview(review.assignment.id);
+      await loadDetail(selectedId, account?.role);
+      setMessage(`${row.student.name || 'Student'} can now revise and resubmit this assignment.`);
+    } catch (err) { setError(err.message || 'Could not return this submission.'); }
+    finally { setBusy(''); }
+  }
+
   if (!enabled) return null;
   if (!account) return null;
 
@@ -158,7 +209,7 @@ export default function ClassroomPanel() {
         <div>
           <div className="card-title" id="classroom-title" style={{ marginBottom: 4 }}>Classes & assignments</div>
           <p className="sub" style={{ margin: 0, maxWidth: 760 }}>
-            Cloud classrooms are optional. Practice remains local-first; class membership, assignment metadata and teacher feedback use the authenticated Pri Learning account.
+            Cloud classrooms are optional. Practice remains local-first; class membership, assignment metadata, aggregate completion and teacher feedback use the authenticated Pri Learning account. Student answers and handwriting stay out of classroom progress sync.
           </p>
         </div>
         <span className="tag tag-brand">{roleLabel(account.role)}</span>
@@ -230,10 +281,55 @@ export default function ClassroomPanel() {
                     <div className="spread"><strong>{row.title}</strong>{row.submission?.state && <span className="tag">{row.submission.state}</span>}</div>
                     <div className="muted" style={{ marginTop: 4 }}>{niceDate(row.dueAt)}</div>
                     {row.submission?.feedback && <div className="notice" style={{ marginTop: 8 }}>Teacher feedback is available for this submission.</div>}
+                    {staff && <div style={{ marginTop: 10 }}>
+                      <button type="button" className="btn btn-ghost btn-sm" disabled={busy === `review:${row.id}`} onClick={() => loadReview(row.id)}>
+                        {busy === `review:${row.id}` ? 'Loading…' : 'Review submissions'}
+                      </button>
+                    </div>}
                   </div>
                 ))}
               </div>
             </div>
+
+            {staff && review?.assignment && <div className="card" style={{ padding: 14, marginTop: 14 }}>
+              <div className="spread" style={{ gap: 10 }}>
+                <div>
+                  <strong>Submission review · {review.assignment.title}</strong>
+                  <div className="muted">Only aggregate completion metrics are available here. Student answers and handwriting are not uploaded to this view.</div>
+                </div>
+                <button type="button" className="btn btn-quiet btn-sm" onClick={() => setReview(null)}>Close</button>
+              </div>
+
+              {!review.submissions?.length && <p className="muted" style={{ marginTop: 12 }}>No enrolled students.</p>}
+              <div style={{ display: 'grid', gap: 10, marginTop: 12 }}>
+                {(review.submissions || []).map(row => {
+                  const target = row.summary?.targetQuestions || review.assignment.specification?.questionCount || 10;
+                  const answered = row.summary?.questionsAnswered || 0;
+                  const correct = row.summary?.correct || 0;
+                  return (
+                    <div key={row.student.id} className="card" style={{ padding: 12 }}>
+                      <div className="spread" style={{ gap: 10 }}>
+                        <div><strong>{row.student.name || 'Student'}</strong><div className="muted">{answered}/{target} completed · {correct} correct</div></div>
+                        <span className={`tag ${row.state === 'submitted' ? 'tag-brand' : ''}`}>{stateLabel(row.state)}</span>
+                      </div>
+                      {row.submittedAt && <div className="muted" style={{ marginTop: 5 }}>Submitted {niceDate(row.submittedAt)}</div>}
+                      {row.feedback?.note && <div className="notice" style={{ marginTop: 8 }}><strong>Latest feedback:</strong> {row.feedback.note}</div>}
+                      {row.state === 'submitted' && <div style={{ marginTop: 10 }}>
+                        <label className="field">
+                          <span>Feedback for revision</span>
+                          <textarea rows={2} maxLength={4000} value={feedbackDraft[row.student.id] || ''}
+                            onChange={e => setFeedbackDraft(current => ({ ...current, [row.student.id]: e.target.value }))}
+                            placeholder="Explain exactly what the student should revisit before resubmitting." />
+                        </label>
+                        <button type="button" className="btn btn-primary btn-sm" disabled={busy === `return:${row.student.id}`} onClick={() => returnForRevision(row)}>
+                          {busy === `return:${row.student.id}` ? 'Returning…' : 'Return for revision'}
+                        </button>
+                      </div>}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>}
           </>}
         </div>
       </div>
