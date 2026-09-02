@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useApp } from '../App.jsx';
 import { cloud, cloudAvailable } from '../platform/cloudTransport.js';
 import {
@@ -7,6 +7,10 @@ import {
 } from '../platform/cloudAccount.js';
 import { cloudSyncStatus, syncNow } from '../platform/syncWorker.js';
 import { normalizeCommercialDisplay } from '../platform/entitlements.js';
+import {
+  finishNativeTransaction, getNativeProducts, nativeBillingAvailable,
+  onNativeBillingUpdate, purchaseNativeProduct, restoreNativePurchases
+} from '../platform/nativeBilling.js';
 import CloudAccountSecurity from './CloudAccountSecurity.jsx';
 
 function when(value) {
@@ -41,16 +45,31 @@ export default function CloudAccountPanel() {
   const { user } = useApp();
   const enabled = cloudAvailable();
   const nativeShell = typeof window !== 'undefined' && !!window.__PRI_NATIVE__;
+  const nativeStoreKit = nativeBillingAvailable();
   const [link, setLink] = useState(null);
   const [status, setStatus] = useState(null);
   const [session, setSession] = useState(null);
   const [pricing, setPricing] = useState(null);
   const [webCheckout, setWebCheckout] = useState(false);
+  const [appleBootstrap, setAppleBootstrap] = useState(null);
+  const [appleProducts, setAppleProducts] = useState([]);
+  const [appleStoreError, setAppleStoreError] = useState('');
   const [mode, setMode] = useState('login');
   const [form, setForm] = useState({ name: user?.name || '', email: '', password: '' });
   const [busy, setBusy] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const appleInFlight = useRef(new Set());
+
+  const entitlement = link?.entitlement;
+  const premium = !!entitlement?.active;
+  const pending = status?.pending || 0;
+  const canSync = enabled && !!link?.accountId && !!session?.connected;
+  const canUseWebBilling = canSync && webCheckout && !nativeShell;
+  const canUseAppleBilling = canSync && nativeStoreKit && !!appleBootstrap?.appAccountToken;
+  const liveAccount = session?.connected ? session.account : null;
+  const appleMonthly = appleProducts.find(product => product.id === appleBootstrap?.products?.monthly) || null;
+  const appleAnnual = appleProducts.find(product => product.id === appleBootstrap?.products?.annual) || null;
 
   async function reload({ verify = true } = {}) {
     if (!user?.id) return;
@@ -63,13 +82,14 @@ export default function CloudAccountPanel() {
       const verified = await verifyCloudSession(user.id).catch(err => ({ connected: false, reason: err.code || 'unavailable' }));
       setSession(verified);
       if (verified.connected) {
-        const entitlement = await refreshCloudEntitlement(user.id).catch(() => null);
-        if (entitlement) setLink(await cloudAccountLink(user.id));
+        const nextEntitlement = await refreshCloudEntitlement(user.id).catch(() => null);
+        if (nextEntitlement) setLink(await cloudAccountLink(user.id));
       }
     } else setSession(saved?.accountId ? { connected: false, reason: enabled ? 'not-verified' : 'cloud-disabled' } : null);
   }
 
   useEffect(() => { reload().catch(() => {}); }, [user?.id, enabled]);
+
   useEffect(() => {
     let live = true;
     if (!enabled) {
@@ -91,12 +111,69 @@ export default function CloudAccountPanel() {
     return () => { live = false; };
   }, [enabled]);
 
-  const entitlement = link?.entitlement;
-  const premium = !!entitlement?.active;
-  const pending = status?.pending || 0;
-  const canSync = enabled && !!link?.accountId && !!session?.connected;
-  const canUseWebBilling = canSync && webCheckout && !nativeShell;
-  const liveAccount = session?.connected ? session.account : null;
+  // The server mints the opaque appAccountToken and decides which product ids
+  // this deployment sells. StoreKit then supplies localized storefront names and
+  // prices; no client constant is allowed to impersonate App Store pricing.
+  useEffect(() => {
+    let live = true;
+    if (!canSync || !nativeStoreKit) {
+      setAppleBootstrap(null);
+      setAppleProducts([]);
+      setAppleStoreError('');
+      return () => { live = false; };
+    }
+    (async () => {
+      const result = await cloud.appleBillingBootstrap();
+      const bootstrap = result?.apple;
+      const productIds = [bootstrap?.products?.monthly, bootstrap?.products?.annual].filter(Boolean);
+      if (!bootstrap?.appAccountToken || !productIds.length) throw new Error('App Store subscriptions are not configured for this account.');
+      const products = await getNativeProducts(productIds);
+      if (!live) return;
+      setAppleBootstrap(bootstrap);
+      setAppleProducts(products);
+      setAppleStoreError(products.length ? '' : 'The configured Pri Learning subscription is not available in this App Store storefront.');
+    })().catch(err => {
+      if (!live) return;
+      setAppleBootstrap(null);
+      setAppleProducts([]);
+      setAppleStoreError(err.message || 'App Store subscriptions are unavailable.');
+    });
+    return () => { live = false; };
+  }, [canSync, nativeStoreKit, link?.accountId]);
+
+  async function acceptAppleTransaction(transaction, { quiet = false } = {}) {
+    const transactionId = String(transaction?.transactionId || '');
+    const signedTransaction = String(transaction?.signedTransaction || '');
+    if (!transactionId || !signedTransaction || appleInFlight.current.has(transactionId)) return false;
+    appleInFlight.current.add(transactionId);
+    try {
+      // This call is the Premium authority. StoreKit's local .verified result is
+      // not enough: the server independently verifies Apple's JWS and account
+      // binding before it changes the entitlement snapshot.
+      await cloud.submitAppleTransaction(signedTransaction);
+      // Finish only after server acceptance. If this step itself fails, StoreKit
+      // redelivers the unfinished transaction and the server call is idempotent.
+      await finishNativeTransaction(transactionId);
+      await refreshCloudEntitlement(user.id);
+      await reload({ verify: false });
+      if (!quiet) setMessage('App Store purchase verified. Premium status has been refreshed from the server.');
+      return true;
+    } finally {
+      appleInFlight.current.delete(transactionId);
+    }
+  }
+
+  // StoreKit redelivers any unfinished transaction here, including one from an
+  // earlier launch whose server request failed. That turns the native queue into
+  // recovery rather than a second source of entitlement truth.
+  useEffect(() => {
+    if (!canSync || !nativeStoreKit) return undefined;
+    return onNativeBillingUpdate(detail => {
+      acceptAppleTransaction(detail, { quiet: true }).catch(err => {
+        setError(err.message || 'An App Store purchase is waiting for server verification.');
+      });
+    });
+  }, [canSync, nativeStoreKit, user?.id]);
 
   async function submit(e) {
     e.preventDefault();
@@ -187,12 +264,56 @@ export default function CloudAccountPanel() {
     finally { setBusy(''); }
   }
 
+  async function startApplePurchase(product) {
+    if (!canUseAppleBilling || !product?.id) return;
+    setBusy(`apple-${product.id}`);
+    setError('');
+    setMessage('');
+    try {
+      const result = await purchaseNativeProduct(product.id, appleBootstrap.appAccountToken);
+      if (result?.status === 'cancelled') {
+        setMessage('App Store purchase cancelled. No subscription change was made.');
+        return;
+      }
+      if (result?.status === 'pending') {
+        setMessage('The App Store purchase is pending approval. Premium will activate only after Apple verifies the transaction and the server accepts it.');
+        return;
+      }
+      if (result?.status !== 'verified') throw new Error('The App Store did not return a verified transaction.');
+      await acceptAppleTransaction(result);
+    } catch (err) { setError(err.message || 'Could not complete the App Store purchase.'); }
+    finally { setBusy(''); }
+  }
+
+  async function restoreAppleBilling() {
+    if (!canUseAppleBilling) return;
+    setBusy('restore-apple');
+    setError('');
+    setMessage('');
+    try {
+      const productIds = [appleBootstrap?.products?.monthly, appleBootstrap?.products?.annual].filter(Boolean);
+      const transactions = await restoreNativePurchases(productIds);
+      if (!transactions.length) {
+        setMessage('No current Pri Learning subscription was found for this App Store account.');
+        return;
+      }
+      let accepted = 0;
+      for (const transaction of transactions) {
+        if (await acceptAppleTransaction(transaction, { quiet: true })) accepted++;
+      }
+      if (!accepted) throw new Error('No App Store transaction could be verified for this Pri Learning account.');
+      setMessage(`Restored ${accepted} verified App Store subscription transaction${accepted === 1 ? '' : 's'} and refreshed Premium.`);
+    } catch (err) { setError(err.message || 'Could not restore App Store purchases.'); }
+    finally { setBusy(''); }
+  }
+
   async function disconnect() {
     setBusy('disconnect');
     setError('');
     try {
       await disconnectCloudAccount(user.id);
       setLink(null); setStatus(null); setSession(null);
+      setAppleBootstrap(null); setAppleProducts([]);
       setMessage('Cloud account disconnected from this local profile. Local learning data was not deleted.');
     } catch (err) { setError(err.message || 'Could not disconnect.'); }
     finally { setBusy(''); }
@@ -202,6 +323,8 @@ export default function CloudAccountPanel() {
     setLink(null);
     setStatus(null);
     setSession(null);
+    setAppleBootstrap(null);
+    setAppleProducts([]);
     setMessage(cloudDeleted
       ? 'Cloud account deleted. This device’s separate offline profile remains available.'
       : 'Cloud session ended. This device’s separate offline profile remains available.');
@@ -276,6 +399,7 @@ export default function CloudAccountPanel() {
             {premium ? `${entitlement.status} · ${entitlement.provider}` : entitlement?.stale ? 'Paid cache expired; reconnect to refresh.' : 'No active paid entitlement.'}
           </div>
           {entitlement?.offlineUntil && <div className="muted" style={{ fontSize: 12, marginTop: 6 }}>Offline entitlement valid until {when(entitlement.offlineUntil)}</div>}
+
           {canUseWebBilling && <div className="row" style={{ gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
             {!premium && pricing?.monthly && <button className="btn btn-sm btn-primary" type="button" disabled={!!busy} onClick={() => startWebCheckout('monthly')}>
               {busy === 'checkout-monthly' ? 'Opening…' : `Monthly ${price(pricing.monthly, pricing.currency)}`}
@@ -287,8 +411,27 @@ export default function CloudAccountPanel() {
               {busy === 'restore-web' ? 'Restoring…' : 'Restore web subscription'}
             </button>
           </div>}
-          {nativeShell && <div className="muted" style={{ fontSize: 12, marginTop: 8 }}>
-            Native purchases are handled by the device storefront rather than web checkout.
+
+          {nativeShell && nativeStoreKit && <div style={{ marginTop: 12 }}>
+            <div className="muted" style={{ fontSize: 12, marginBottom: 8 }}>
+              App Store pricing below is loaded directly from StoreKit. Pri Learning unlocks Premium only after the server verifies Apple’s signed transaction.
+            </div>
+            <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+              {!premium && appleMonthly && <button className="btn btn-sm btn-primary" type="button" disabled={!canUseAppleBilling || !!busy} onClick={() => startApplePurchase(appleMonthly)}>
+                {busy === `apple-${appleMonthly.id}` ? 'Purchasing…' : `Monthly ${appleMonthly.displayPrice}`}
+              </button>}
+              {!premium && appleAnnual && <button className="btn btn-sm btn-ghost" type="button" disabled={!canUseAppleBilling || !!busy} onClick={() => startApplePurchase(appleAnnual)}>
+                {busy === `apple-${appleAnnual.id}` ? 'Purchasing…' : `Annual ${appleAnnual.displayPrice}`}
+              </button>}
+              <button className="btn btn-sm btn-quiet" type="button" disabled={!canUseAppleBilling || !!busy} onClick={restoreAppleBilling}>
+                {busy === 'restore-apple' ? 'Restoring…' : 'Restore App Store purchases'}
+              </button>
+            </div>
+            {appleStoreError && <div style={{ color: 'var(--bad)', fontSize: 12, marginTop: 7 }}>{appleStoreError}</div>}
+          </div>}
+
+          {nativeShell && !nativeStoreKit && <div className="muted" style={{ fontSize: 12, marginTop: 8 }}>
+            This native build does not include the StoreKit billing bridge. Web checkout is intentionally unavailable inside the iOS app.
           </div>}
         </div>
       </div>}
@@ -317,7 +460,9 @@ export default function CloudAccountPanel() {
       />}
 
       <div className="muted" style={{ marginTop: 14, fontSize: 12.5 }}>
-        {pricingText(pricing)}
+        {nativeStoreKit && appleProducts.length
+          ? 'App Store prices are storefront-authoritative. Subscription state is server-authoritative and is also maintained by verified App Store Server Notifications.'
+          : pricingText(pricing)}
       </div>
 
       {message && <div role="status" style={{ marginTop: 12, color: 'var(--good)' }}>{message}</div>}
