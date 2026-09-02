@@ -15,6 +15,7 @@ import { authRouter } from './auth.js';
 import { api } from './routes/api.js';
 import { platformDb } from './platform/db.js';
 import { ensureBillingSchema } from './platform/billingSchema.js';
+import { createAppleBilling } from './platform/appleBilling.js';
 import { createRazorpayBilling } from './platform/razorpay.js';
 import { createPlatformRouter } from './platform/router.js';
 
@@ -34,10 +35,12 @@ app.use(express.json({
 app.use(cookieParser());
 
 ensureBillingSchema(platformDb);
-const billing = createRazorpayBilling(platformDb);
+const webBilling = createRazorpayBilling(platformDb);
+const appleBilling = createAppleBilling(platformDb);
 app.use('/v1', createPlatformRouter(platformDb, {
-  billingVerifiers: billing.verifiers,
-  billingCheckout: billing.checkout
+  billingVerifiers: { ...webBilling.verifiers, ...appleBilling.verifiers },
+  billingCheckout: webBilling.checkout,
+  billingNative: appleBilling.native
 }));
 
 // Legacy routes: kept until old tooling no longer needs the historical server.
