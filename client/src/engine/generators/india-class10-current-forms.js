@@ -22,7 +22,10 @@ function polynomial(a, b, c) {
 export function currentPolynomialZeroes(rng, diff) {
   if (diff === 1) {
     const h = ri(rng, -2, 2);
-    const d = ri(rng, 1, 3);
+    // figParabola's fixed classroom-sized viewport shows y down to about -5.
+    // d<=2 keeps the vertex k=-d² fully visible instead of plotting roots whose
+    // turning point sits below the card and makes the graph needlessly ambiguous.
+    const d = ri(rng, 1, 2);
     const r1 = h - d, r2 = h + d;
     return {
       prompt: 'The graph of $y=p(x)$ is shown. Read the zeroes of $p(x)$ from the graph.',
