@@ -31,9 +31,11 @@ export const CBSE_CLASS10_2026_27_CHAPTERS = Object.freeze([
     'Apply the Fundamental Theorem of Arithmetic and prime factorisation to integer problems',
     'Prove irrationality results such as √2, √3 and √5 by contradiction'
   ], [
-    cover('c10-real-numbers', [0], [1, 2, 3, 4])
-    // Irrationality proof reasoning is intentionally uncovered.
-  ]),
+    cover('c10-real-numbers', [0], [1, 2, 3, 4]),
+    // Dedicated proof-reasoning forms assess the contradiction structure without
+    // pretending arbitrary prose proofs can be safely auto-marked.
+    cover('c10-irrationality-proofs', [1], [1, 2, 3, 4])
+  ], true),
 
   chapter('c10-polynomials', [
     'Find zeroes of a polynomial graphically and algebraically',
