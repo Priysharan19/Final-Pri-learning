@@ -14,12 +14,20 @@ function appleTrustConfigured() {
   return nonEmpty('PRI_APPLE_ROOT_CA_PEM') || nonEmpty('PRI_APPLE_ROOT_CA_FILE');
 }
 
+function authEmailConfigured() {
+  return String(process.env.PRI_AUTH_EMAIL_PROVIDER || '').trim().toLowerCase() === 'resend' &&
+    nonEmpty('PRI_RESEND_API_KEY') && nonEmpty('PRI_AUTH_EMAIL_FROM');
+}
+
 export function platformConfigStatus() {
   const production = process.env.NODE_ENV === 'production';
   const missing = [];
   if (production && !nonEmpty('PRI_PUBLIC_ORIGIN')) missing.push('PRI_PUBLIC_ORIGIN');
   if (production && !nonEmpty('PRI_CSRF_SECRET')) missing.push('PRI_CSRF_SECRET');
   if (production && !nonEmpty('PRI_AUTH_DELIVERY_KEY')) missing.push('PRI_AUTH_DELIVERY_KEY');
+  if (production && String(process.env.PRI_AUTH_EMAIL_PROVIDER || '').trim().toLowerCase() !== 'resend') missing.push('PRI_AUTH_EMAIL_PROVIDER=resend');
+  if (production && !nonEmpty('PRI_RESEND_API_KEY')) missing.push('PRI_RESEND_API_KEY');
+  if (production && !nonEmpty('PRI_AUTH_EMAIL_FROM')) missing.push('PRI_AUTH_EMAIL_FROM');
 
   const webMonthly = webMonthlyConfigured();
   const webAnnual = webAnnualConfigured();
@@ -52,6 +60,7 @@ export function platformConfigStatus() {
     ok: uniqueMissing.length === 0,
     googleConfigured: nonEmpty('PRI_GOOGLE_CLIENT_IDS'),
     appleConfigured: nonEmpty('PRI_APPLE_CLIENT_IDS'),
+    authEmailProviderConfigured: authEmailConfigured(),
     appleBillingProductsConfigured: appleProducts,
     appleBillingProviderConfigured,
     googleBillingProductsConfigured: nonEmpty('PRI_GOOGLE_MONTHLY_PRODUCT_ID') || nonEmpty('PRI_GOOGLE_ANNUAL_PRODUCT_ID'),
