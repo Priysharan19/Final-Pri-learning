@@ -1,13 +1,15 @@
 // Pri Learning · offline-first cloud sync worker
 //
-// Local learning commits first. This worker reads the existing payload-free
-// outbox afterwards, re-reads only the authorised local state it needs, sends a
-// bounded idempotent batch, and acknowledges outbox sequence numbers only after
-// the server confirms the commit. A cloud outage therefore never blocks local
-// practice and a retry never repeats a non-idempotent learning event.
+// Local learning commits first. This worker consumes ONLY the profile-scoped
+// cloud outbox, re-reads authorised local state, sends bounded idempotent batches,
+// and acknowledges sequence numbers only after the server confirms the commit.
+// A cloud outage therefore never blocks local practice and retries never repeat
+// non-idempotent learning facts.
 
 import { all, byIndex, del, get, put } from '../local/idb.js';
-import { acknowledgeMutations, outboxStats, pendingMutations } from '../local/outbox.js';
+import {
+  acknowledgeProfileMutations, pendingProfileMutations, profileOutboxStats
+} from './profileOutbox.js';
 import { cloud } from './cloudTransport.js';
 import { cloudAccountLink, cloudDeviceId, markCloudSynced, verifyCloudSession } from './cloudAccount.js';
 import {
@@ -17,13 +19,21 @@ import {
 const STATE_PREFIX = 'pri-cloud-sync-state-v1:';
 const REMOTE_EVENT_PREFIX = 'pri-cloud-remote-event-v1:';
 const MAX_REMOTE_EVENT_CACHE = 2000;
-const CLIENT_ENTITY_KINDS = new Set(['profile', 'settings', 'bookmark', 'favorite', 'task', 'custom-question']);
+const HISTORIC_OLD_ATTEMPT_BASE = 4_000_000_000_000_000;
+const HISTORIC_NEW_ATTEMPT_BASE = 5_000_000_000_000_000;
+const HISTORIC_FALLBACK_BASE = 6_000_000_000_000_000;
+
+// Generic user sync deliberately stays small. Networked classes/assignments and
+// teacher-authored content use their own server-authorised APIs; copying shared
+// local task records through a student's generic replica would be a privacy bug.
+const CLIENT_ENTITY_KINDS = new Set(['profile', 'bookmark', 'favorite']);
 
 const stateId = pid => `${STATE_PREFIX}${pid}`;
 const eventCacheId = (pid, id) => `${REMOTE_EVENT_PREFIX}${pid}:${id}`;
 
 function plain(value) {
-  return !!value && typeof value === 'object' && !Array.isArray(value) && (Object.getPrototypeOf(value) === Object.prototype || Object.getPrototypeOf(value) === null);
+  return !!value && typeof value === 'object' && !Array.isArray(value) &&
+    (Object.getPrototypeOf(value) === Object.prototype || Object.getPrototypeOf(value) === null);
 }
 
 function safeInt(value, fallback = 0) {
@@ -46,29 +56,18 @@ function safeProfile(row) {
   };
 }
 
-function safeTask(row) {
-  if (!row) return null;
+function attemptPayload(attempt, fallbackAt = Date.now()) {
   return {
-    title: String(row.title || '').slice(0, 160),
-    classId: row.classId ? String(row.classId).slice(0, 100) : null,
-    subtopics: Array.isArray(row.subtopics) ? row.subtopics.map(String).slice(0, 100) : [],
-    customIds: Array.isArray(row.customIds) ? row.customIds.map(String).slice(0, 100) : [],
-    count: Math.min(100, Math.max(1, Number(row.count) || 1)),
-    dueAt: Number.isFinite(Number(row.dueAt)) ? Number(row.dueAt) : null,
-    createdAt: Number.isFinite(Number(row.createdAt)) ? Number(row.createdAt) : null
-  };
-}
-
-function safeCustomQuestion(row) {
-  if (!row) return null;
-  return {
-    name: String(row.name || '').slice(0, 120),
-    prompt: String(row.prompt || '').slice(0, 8000),
-    answerType: String(row.answerType || 'numeric').slice(0, 40),
-    answer: plain(row.answer) ? { ...row.answer } : {},
-    difficulty: Math.min(4, Math.max(1, Number(row.difficulty) || 2)),
-    solutionText: String(row.solutionText || '').slice(0, 8000),
-    hint: String(row.hint || '').slice(0, 1200)
+    subtopic: attempt?.subtopic || null,
+    difficulty: Number(attempt?.difficulty) || 2,
+    correct: !!attempt?.correct,
+    ms: Math.max(0, Number(attempt?.ms) || 0),
+    hintsUsed: Math.max(0, Number(attempt?.hintsUsed) || 0),
+    mode: String(attempt?.mode || 'practice').slice(0, 30),
+    viaInk: !!attempt?.viaInk,
+    ratingBefore: Number.isFinite(Number(attempt?.ratingBefore)) ? Number(attempt.ratingBefore) : null,
+    ratingAfter: Number.isFinite(Number(attempt?.ratingAfter)) ? Number(attempt.ratingAfter) : null,
+    createdAt: Number(attempt?.createdAt) || fallbackAt
   };
 }
 
@@ -95,18 +94,18 @@ async function saveState(pid, state) {
 
 const versionKey = (kind, entityId) => `${kind}:${entityId}`;
 
-async function attemptIndex(pid) {
-  const rows = await byIndex('attempts', 'pid', pid).catch(() => []);
-  const map = new Map();
-  for (const row of rows) {
-    if (!row?.questionId) continue;
-    const prior = map.get(row.questionId);
-    if (!prior || Number(row.createdAt || 0) >= Number(prior.createdAt || 0)) map.set(row.questionId, row);
+async function exactAttempt(pid, item) {
+  if (item.sourceId !== null && item.sourceId !== undefined) {
+    const row = await get('attempts', item.sourceId).catch(() => null);
+    if (row?.pid === pid && row?.questionId === item.entityId) return row;
   }
-  return map;
+  const rows = (await byIndex('attempts', 'pid', pid).catch(() => []))
+    .filter(row => row?.questionId === item.entityId)
+    .sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
+  return rows[0] || null;
 }
 
-async function eventForOutbox(item, pid, deviceId, attempts) {
+async function eventForOutbox(item, pid, deviceId) {
   const common = {
     id: `evt-${deviceId}-${item.seq}`,
     deviceId,
@@ -116,29 +115,14 @@ async function eventForOutbox(item, pid, deviceId, attempts) {
   };
 
   if (item.kind === 'practice-progress') {
-    const attempt = attempts.get(item.entityId);
+    const attempt = await exactAttempt(pid, item);
     if (!attempt) return null;
-    return {
-      ...common,
-      kind: 'practice-progress',
-      payload: {
-        subtopic: attempt.subtopic || null,
-        difficulty: Number(attempt.difficulty) || 2,
-        correct: !!attempt.correct,
-        ms: Math.max(0, Number(attempt.ms) || 0),
-        hintsUsed: Math.max(0, Number(attempt.hintsUsed) || 0),
-        mode: String(attempt.mode || 'practice').slice(0, 30),
-        viaInk: !!attempt.viaInk,
-        ratingBefore: Number.isFinite(Number(attempt.ratingBefore)) ? Number(attempt.ratingBefore) : null,
-        ratingAfter: Number.isFinite(Number(attempt.ratingAfter)) ? Number(attempt.ratingAfter) : null,
-        createdAt: Number(attempt.createdAt) || common.occurredAt
-      }
-    };
+    return { ...common, kind: 'practice-progress', payload: attemptPayload(attempt, common.occurredAt) };
   }
 
   if (item.kind === 'exam') {
     const exam = await get('exams', item.entityId).catch(() => null);
-    if (!exam) return null;
+    if (!exam || exam.pid !== pid) return null;
     return {
       ...common,
       kind: 'exam-attempt',
@@ -157,14 +141,17 @@ async function eventForOutbox(item, pid, deviceId, attempts) {
 
   if (item.kind === 'rush-history' || item.kind === 'match-history') {
     const store = item.kind === 'rush-history' ? 'rushRuns' : 'matchRuns';
-    const runs = await byIndex(store, 'pid', pid).catch(() => []);
-    const latest = [...runs].sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0))[0];
-    if (!latest) return null;
+    let run = item.sourceId != null ? await get(store, item.sourceId).catch(() => null) : null;
+    if (!run || run.pid !== pid) {
+      const runs = await byIndex(store, 'pid', pid).catch(() => []);
+      run = [...runs].sort((a, b) => Number(b.createdAt || b.finishedAt || 0) - Number(a.createdAt || a.finishedAt || 0))[0];
+    }
+    if (!run) return null;
     const allowed = item.kind === 'rush-history'
       ? ['score', 'correct', 'total', 'bestCombo', 'createdAt']
       : ['won', 'playerScore', 'rivalScore', 'rival', 'ms', 'createdAt'];
     const payload = {};
-    for (const key of allowed) if (latest[key] !== undefined) payload[key] = latest[key];
+    for (const key of allowed) if (run[key] !== undefined) payload[key] = run[key];
     return { ...common, kind: item.kind, payload };
   }
 
@@ -179,16 +166,13 @@ async function entityForOutbox(item, pid, state) {
   if (item.operation === 'delete') return { kind, entityId, operation: 'delete', baseVersion };
 
   let body = null;
-  if (kind === 'profile' || kind === 'settings') body = safeProfile(await get('profiles', pid));
+  if (kind === 'profile') body = safeProfile(await get('profiles', pid));
   else if (kind === 'bookmark' || kind === 'favorite') body = { present: true, questionId: String(item.entityId) };
-  else if (kind === 'task') body = safeTask(await get('tasks', item.entityId));
-  else if (kind === 'custom-question') body = safeCustomQuestion(await get('customQs', item.entityId));
   if (!body) return null;
   return { kind, entityId, operation: 'upsert', baseVersion, body };
 }
 
 async function buildNormalBatch(items, pid, deviceId, state) {
-  const attempts = await attemptIndex(pid);
   const events = [];
   const entities = [];
   const represented = [];
@@ -199,7 +183,7 @@ async function buildNormalBatch(items, pid, deviceId, state) {
     const policy = syncPolicyFor(item.kind === 'exam' ? 'exam-attempt' : item.kind);
     try {
       if (policy === SYNC_POLICY.APPEND_ONLY || item.kind === 'exam') {
-        const event = await eventForOutbox(item, pid, deviceId, attempts);
+        const event = await eventForOutbox(item, pid, deviceId);
         if (event) { events.push(event); represented.push(item.seq); }
         else blocked.push({ seq: item.seq, kind: item.kind, reason: 'local-source-missing' });
       } else if (CLIENT_ENTITY_KINDS.has(item.kind)) {
@@ -213,10 +197,10 @@ async function buildNormalBatch(items, pid, deviceId, state) {
       blocked.push({ seq: item.seq, kind: item.kind, reason: error?.code || error?.message || 'build-failed' });
     }
   }
-  return { events, entities, represented, blocked, fullRescan: false };
+  return { events, entities, represented, blocked };
 }
 
-async function allFullRescanEntities(pid, state) {
+async function fullRescanEntities(pid, state) {
   const entities = [];
   const profile = safeProfile(await get('profiles', pid));
   if (profile) entities.push({
@@ -233,25 +217,43 @@ async function allFullRescanEntities(pid, state) {
       body: { present: true, questionId }
     });
   }
-  for (const row of await all('tasks').catch(() => [])) {
-    if (!row?.id) continue;
-    const body = safeTask(row);
-    if (body) entities.push({ kind: 'task', entityId: row.id, operation: 'upsert', baseVersion: safeInt(state.entityVersions[`task:${row.id}`]), body });
-  }
-  for (const row of await byIndex('customQs', 'ownerPid', pid).catch(() => [])) {
-    if (!row?.id) continue;
-    const body = safeCustomQuestion(row);
-    if (body) entities.push({ kind: 'custom-question', entityId: row.id, operation: 'upsert', baseVersion: safeInt(state.entityVersions[`custom-question:${row.id}`]), body });
-  }
+  entities.sort((a, b) => `${a.kind}:${a.entityId}`.localeCompare(`${b.kind}:${b.entityId}`));
   return entities;
 }
 
+function historicAttemptSeq(attempt, fallbackIndex) {
+  if (Number.isSafeInteger(attempt?.id) && attempt.id > 0) return HISTORIC_OLD_ATTEMPT_BASE + attempt.id;
+  const match = String(attempt?.id || '').match(/:(\d{1,12})$/);
+  if (match) return HISTORIC_NEW_ATTEMPT_BASE + Number(match[1]);
+  return HISTORIC_FALLBACK_BASE + fallbackIndex + 1;
+}
+
+async function historicalAttemptEvents(pid, deviceId) {
+  const rows = await byIndex('attempts', 'pid', pid).catch(() => []);
+  rows.sort((a, b) => {
+    const ta = Number(a.createdAt || 0), tb = Number(b.createdAt || 0);
+    if (ta !== tb) return ta - tb;
+    return String(a.id || '').localeCompare(String(b.id || ''));
+  });
+  return rows.map((attempt, index) => {
+    const source = String(attempt.id ?? index + 1).replace(/[^A-Za-z0-9._:-]/g, '_').slice(0, 80);
+    return {
+      id: `hist:${deviceId}:${source}`.slice(0, 160),
+      deviceId,
+      deviceSeq: historicAttemptSeq(attempt, index),
+      kind: 'practice-progress',
+      entityId: attempt.questionId || null,
+      occurredAt: Number(attempt.createdAt) || null,
+      payload: attemptPayload(attempt)
+    };
+  });
+}
+
 async function cacheRemoteEvent(pid, event) {
-  const id = eventCacheId(pid, event.id);
   await put('device', {
-    id, eventId: event.id, serverCursor: event.serverCursor, deviceId: event.deviceId,
-    kind: event.kind, entityId: event.entityId || null, occurredAt: event.occurredAt || null,
-    payload: plain(event.payload) ? event.payload : {}, cachedAt: Date.now()
+    id: eventCacheId(pid, event.id), eventId: event.id, serverCursor: event.serverCursor,
+    deviceId: event.deviceId, kind: event.kind, entityId: event.entityId || null,
+    occurredAt: event.occurredAt || null, payload: plain(event.payload) ? event.payload : {}, cachedAt: Date.now()
   });
 }
 
@@ -293,8 +295,6 @@ async function pullAll(pid, deviceId, state) {
     const raw = await cloud.syncPull(cursor);
     validatePullEnvelope(raw);
     for (const event of raw.events) {
-      // Our own events are already reflected in the local database. Caching only
-      // other devices prevents double-counting in cross-device product summaries.
       if (event.deviceId !== deviceId) {
         await cacheRemoteEvent(pid, event);
         pulledEvents++;
@@ -313,21 +313,38 @@ async function pullAll(pid, deviceId, state) {
   return { pulledEvents, pulledEntities };
 }
 
+function rescanKey(prefix, deviceId, index, chunk) {
+  const first = chunk[0]?.entityId || chunk[0]?.id || 'none';
+  const last = chunk[chunk.length - 1]?.entityId || chunk[chunk.length - 1]?.id || 'none';
+  const clean = value => String(value).replace(/[^A-Za-z0-9._:-]/g, '_').slice(0, 36);
+  return `${prefix}-${clean(deviceId)}-${index}-${chunk.length}-${clean(first)}-${clean(last)}`.slice(0, 160);
+}
+
 async function pushFullRescan(pid, deviceId, marker, state) {
-  const entities = await allFullRescanEntities(pid, state);
-  let accepted = 0;
+  const entities = await fullRescanEntities(pid, state);
+  const historical = await historicalAttemptEvents(pid, deviceId);
+  let pushedEntities = 0;
+  let pushedEvents = 0;
+
   for (let offset = 0; offset < entities.length; offset += MAX_PUSH_ITEMS) {
     const chunk = entities.slice(offset, offset + MAX_PUSH_ITEMS);
     const envelope = createPushEnvelope({ deviceId, baseCursor: state.cursor, entities: chunk, fullRescan: true });
-    const key = `rescan-${deviceId}-${marker.seq}-${Math.floor(offset / MAX_PUSH_ITEMS)}`;
-    const result = await cloud.syncPush(envelope, key);
+    const result = await cloud.syncPush(envelope, rescanKey('rescan-ent', deviceId, offset / MAX_PUSH_ITEMS, chunk));
     for (const row of result.acceptedEntities || []) {
       state.entityVersions[versionKey(row.kind, row.entityId)] = row.version;
-      accepted++;
+      pushedEntities++;
     }
   }
-  await acknowledgeMutations([marker.seq]);
-  return { pushedEvents: 0, pushedEntities: accepted, acknowledged: 1, blocked: [] };
+
+  for (let offset = 0; offset < historical.length; offset += MAX_PUSH_ITEMS) {
+    const chunk = historical.slice(offset, offset + MAX_PUSH_ITEMS);
+    const envelope = createPushEnvelope({ deviceId, baseCursor: state.cursor, events: chunk, fullRescan: true });
+    const result = await cloud.syncPush(envelope, rescanKey('rescan-hist', deviceId, offset / MAX_PUSH_ITEMS, chunk));
+    pushedEvents += (result.acceptedEvents || []).length;
+  }
+
+  await acknowledgeProfileMutations(pid, [marker.seq]);
+  return { pushedEvents, pushedEntities, acknowledged: 1, blocked: [] };
 }
 
 export async function syncNow(pid) {
@@ -345,22 +362,26 @@ export async function syncNow(pid) {
   state.accountId = link.accountId;
 
   try {
-    const pending = await pendingMutations(MAX_PUSH_ITEMS);
+    const pending = await pendingProfileMutations(pid, MAX_PUSH_ITEMS);
     let push = { pushedEvents: 0, pushedEntities: 0, acknowledged: 0, blocked: [] };
+    let prePull = { pulledEvents: 0, pulledEntities: 0 };
     const rescan = pending.find(item => item.kind === 'full-rescan');
+
+    // On first link to an existing cloud account, learn authoritative entity
+    // versions before trying to publish local state. This turns the initial
+    // reconciliation into a merge/union rather than a blind version-0 overwrite.
     if (rescan) {
+      prePull = await pullAll(pid, deviceId, state);
       push = await pushFullRescan(pid, deviceId, rescan, state);
     } else if (pending.length) {
       const batch = await buildNormalBatch(pending, pid, deviceId, state);
       if (batch.events.length || batch.entities.length) {
-        const envelope = createPushEnvelope({
-          deviceId, baseCursor: state.cursor, events: batch.events, entities: batch.entities, fullRescan: false
-        });
+        const envelope = createPushEnvelope({ deviceId, baseCursor: state.cursor, events: batch.events, entities: batch.entities });
         const first = Math.min(...batch.represented);
         const last = Math.max(...batch.represented);
         const result = await cloud.syncPush(envelope, `sync-${deviceId}-${first}-${last}`);
         for (const row of result.acceptedEntities || []) state.entityVersions[versionKey(row.kind, row.entityId)] = row.version;
-        await acknowledgeMutations(batch.represented);
+        await acknowledgeProfileMutations(pid, batch.represented);
         push = {
           pushedEvents: (result.acceptedEvents || []).length,
           pushedEntities: (result.acceptedEntities || []).length,
@@ -370,16 +391,23 @@ export async function syncNow(pid) {
       } else push.blocked = batch.blocked;
     }
 
-    // Pull from the PREVIOUS canonical cursor rather than skipping directly to
-    // the push response cursor. That catches mutations another device committed
-    // between our last pull and this push.
-    const pull = await pullAll(pid, deviceId, state);
+    // Pull from the previous canonical cursor after the push as well. That catches
+    // mutations another device committed between the pre-pull and this commit.
+    const postPull = await pullAll(pid, deviceId, state);
     state.lastSyncAt = Date.now();
     state.lastError = null;
     await saveState(pid, state);
     await markCloudSynced(pid, state.lastSyncAt);
-    const after = await outboxStats();
-    return { ...push, ...pull, cursor: state.cursor, pending: after.pending, requiresFullRescan: after.requiresFullRescan, lastSyncAt: state.lastSyncAt };
+    const after = await profileOutboxStats(pid);
+    return {
+      ...push,
+      pulledEvents: prePull.pulledEvents + postPull.pulledEvents,
+      pulledEntities: prePull.pulledEntities + postPull.pulledEntities,
+      cursor: state.cursor,
+      pending: after.pending,
+      requiresFullRescan: after.requiresFullRescan,
+      lastSyncAt: state.lastSyncAt
+    };
   } catch (error) {
     state.lastError = error?.code || error?.message || 'sync-failed';
     await saveState(pid, state).catch(() => {});
@@ -389,7 +417,7 @@ export async function syncNow(pid) {
 
 export async function cloudSyncStatus(pid) {
   const [link, state, outbox] = await Promise.all([
-    cloudAccountLink(pid), loadState(pid), outboxStats()
+    cloudAccountLink(pid), loadState(pid), profileOutboxStats(pid)
   ]);
   return {
     linked: !!link?.accountId,
