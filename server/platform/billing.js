@@ -53,7 +53,7 @@ function validateVerifiedResult(result, provider) {
   return result;
 }
 
-export function createBillingRouter(db, { verifiers = {}, checkout = {} } = {}) {
+export function createBillingRouter(db, { verifiers = {}, checkout = {}, native = {} } = {}) {
   const router = Router();
 
   router.get('/config', (req, res) => res.json(commercialConfig()));
@@ -66,6 +66,33 @@ export function createBillingRouter(db, { verifiers = {}, checkout = {} } = {}) 
       currentPeriodEnd: row.current_period_end, graceUntil: row.grace_until,
       sourceVersion: row.source_version, updatedAt: row.updated_at
     } : { plan: 'free', status: 'free', provider: 'none' } });
+  });
+
+  // The App Store account token is generated server-side and is deliberately a
+  // random UUID rather than a Pri account id/email. StoreKit echoes it inside
+  // the Apple-signed transaction so the server can bind purchases to accounts
+  // without trusting anything the web view says after checkout.
+  router.get('/apple/bootstrap', requireSession(db), rateLimit(db, 'billing-apple-bootstrap', { limit: 60, windowMs: 60 * 60 * 1000 }), (req, res, next) => {
+    const bootstrap = native.apple?.bootstrap;
+    if (typeof bootstrap !== 'function') return res.status(503).json({ error: { code: 'BILLING_PROVIDER_NOT_CONFIGURED', message: 'App Store billing is not configured on this deployment.' } });
+    try {
+      res.json({ apple: bootstrap({ accountId: req.platformSession.account_id, request: req }) });
+    } catch (err) { next(err); }
+  });
+
+  // StoreKit's local verification is useful UX evidence, but it is not the
+  // entitlement authority. The native shell sends the JWS representation here;
+  // only after the server re-verifies Apple's certificate chain, app identity,
+  // product id and appAccountToken does Premium change.
+  router.post('/apple/transaction', requireSession(db), rateLimit(db, 'billing-apple-transaction', { limit: 30, windowMs: 60 * 60 * 1000 }), (req, res, next) => {
+    const verify = native.apple?.transaction;
+    if (typeof verify !== 'function') return res.status(503).json({ error: { code: 'BILLING_PROVIDER_NOT_CONFIGURED', message: 'App Store transaction verification is not configured on this deployment.' } });
+    try {
+      const result = validateVerifiedResult(verify({ accountId: req.platformSession.account_id, body: req.body || {}, request: req }), 'apple');
+      if (result.accountId !== req.platformSession.account_id) throw new Error('Apple transaction account binding mismatch');
+      const applied = applyVerifiedEntitlement(db, result);
+      res.json({ accepted: true, ...applied });
+    } catch (err) { next(err); }
   });
 
   // Web checkout is created server-side so API secrets and account binding never
