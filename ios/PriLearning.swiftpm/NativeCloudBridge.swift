@@ -232,14 +232,17 @@ final class NativeCloudBridge {
     }
 
     private static var configuredOrigin: URL? {
-        let environment = ProcessInfo.processInfo.environment["PRI_CLOUD_ORIGIN"]
         let plist = Bundle.main.object(forInfoDictionaryKey: "PRICloudOrigin") as? String
         #if DEBUG
-        let development = UserDefaults.standard.string(forKey: "PRICloudOrigin")
+        let candidates: [String?] = [
+            ProcessInfo.processInfo.environment["PRI_CLOUD_ORIGIN"],
+            plist,
+            UserDefaults.standard.string(forKey: "PRICloudOrigin")
+        ]
         #else
-        let development: String? = nil
+        let candidates: [String?] = [plist]
         #endif
-        for value in [environment, plist, development] {
+        for value in candidates {
             if let origin = validateOrigin(value) { return origin }
         }
         return nil
