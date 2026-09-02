@@ -19,8 +19,11 @@ function loadSaved() {
   try { return JSON.parse(localStorage.getItem('pri-gen-filters')) || {}; } catch { return {}; }
 }
 
+const topicAvailable = topic => (topic?.dotpoints || []).some(dp => dp?.generated !== false);
+const dotpointAvailable = dotpoint => !!dotpoint && dotpoint.generated !== false;
+
 export default function Home() {
-  const { user, dueCount, toast } = useApp();
+  const { user, dueCount } = useApp();
   const nav = useNavigate();
   const [stats, setStats] = useState(null);
   const [curriculum, setCurriculum] = useState(null);
@@ -80,6 +83,25 @@ export default function Home() {
     return null;
   }, [subtopic, curriculum]);
 
+  const selectedDotpoint = dotpoint != null ? selSub?.dotpoints?.[dotpoint] || null : null;
+  const impossibleTarget = Boolean(
+    (selSub && !topicAvailable(selSub)) ||
+    (selectedDotpoint && !dotpointAvailable(selectedDotpoint))
+  );
+
+  // A saved filter can outlive a curriculum rationalisation. Do not keep a
+  // stale target selected after a source update has made that exact outcome
+  // unavailable in production.
+  useEffect(() => {
+    if (!selSub) return;
+    if (!topicAvailable(selSub)) {
+      setSubtopic(null);
+      setDotpoint(null);
+      return;
+    }
+    if (selectedDotpoint && !dotpointAvailable(selectedDotpoint)) setDotpoint(null);
+  }, [selSub, selectedDotpoint]);
+
   const chips = [];
   if (year != null) chips.push({ k: 'year', label: `${curriculum?.country === 'in' ? 'Class' : 'Year'} ${year}`, clear: () => { setYear(user.year); setSectionKey(null); setSubtopic(null); setDotpoint(null); } });
   if (section) chips.push({ k: 'course', label: section.label, clear: () => { setSectionKey(null); setSubtopic(null); setDotpoint(null); } });
@@ -88,6 +110,7 @@ export default function Home() {
   if (difficulty != null) chips.push({ k: 'diff', label: `D${difficulty} ${DIFF_LABELS[difficulty]}`, clear: () => setDifficulty(null) });
 
   const generate = () => {
+    if (impossibleTarget) return;
     const p = new URLSearchParams();
     if (subtopic) p.set('subtopic', subtopic);
     if (subtopic && dotpoint != null) p.set('dotpoint', String(dotpoint));
@@ -126,7 +149,7 @@ export default function Home() {
           {chips.length > 0 && (
             <button className="editor-tool" title="Clear all filters" aria-label="Clear all filters" onClick={resetAll}>↺</button>
           )}
-          <button className="btn btn-primary" style={{ padding: '7px 18px' }} onClick={generate}>Generate</button>
+          <button className="btn btn-primary" style={{ padding: '7px 18px' }} onClick={generate} disabled={impossibleTarget}>Generate</button>
         </div>
 
         {open && (
@@ -186,12 +209,17 @@ export default function Home() {
                     <div key={strand} style={{ marginBottom: 14 }}>
                       <div className="gen-sub-head">{strand}</div>
                       <div className="gen-opts">
-                        {subs.map(s => (
-                          <button key={s.id} className={`gen-opt ${subtopic === s.id ? 'on' : ''}`} style={{ textAlign: 'left' }}
-                            onClick={() => { setSubtopic(subtopic === s.id ? null : s.id); setDotpoint(null); }}>
-                            {s.name}
-                          </button>
-                        ))}
+                        {subs.map(s => {
+                          const available = topicAvailable(s);
+                          return (
+                            <button key={s.id} className={`gen-opt ${subtopic === s.id ? 'on' : ''}`} style={{ textAlign: 'left' }}
+                              disabled={!available}
+                              aria-label={available ? s.name : `${s.name}, coming soon`}
+                              onClick={() => { if (!available) return; setSubtopic(subtopic === s.id ? null : s.id); setDotpoint(null); }}>
+                              {s.name}{!available ? <small> · Coming soon</small> : null}
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
                   ))}
@@ -205,10 +233,13 @@ export default function Home() {
                   <div className="gen-opts narrow">
                     {selSub.dotpoints.map((dp, i) => {
                       const text = typeof dp === 'string' ? dp : dp.text;
+                      const available = typeof dp === 'string' ? true : dotpointAvailable(dp);
                       return (
                         <button key={i} className={`gen-opt ${dotpoint === i ? 'on' : ''}`} style={{ textAlign: 'left' }}
-                          onClick={() => setDotpoint(dotpoint === i ? null : i)}>
-                          {text}
+                          disabled={!available}
+                          aria-label={available ? text : `${text}, question forms coming soon`}
+                          onClick={() => { if (available) setDotpoint(dotpoint === i ? null : i); }}>
+                          {text}{!available ? <small> · Question forms coming soon</small> : null}
                         </button>
                       );
                     })}
