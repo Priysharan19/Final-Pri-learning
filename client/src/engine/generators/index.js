@@ -121,6 +121,7 @@ const INDIA_BANK_OF = {
   'c9-probability-ncert-mastery': 'india-junior',
   'c9-sequences-progressions-ncert-mastery': 'india-junior',
   'c10-polynomial-zeroes': 'india-class10',
+  'c10-triangles-current': 'india-class10',
   'c10-arithmetic-progressions': 'india-class10',
   'c10-coordinate-geometry': 'india-class10',
   'c10-areas-circles': 'india-class10',
