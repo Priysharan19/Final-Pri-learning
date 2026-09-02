@@ -15,6 +15,7 @@ on:
   pull_request:
     paths:
       - 'client/src/engine/india**'
+      - 'client/src/engine/ncert/**'
       - 'client/src/local/india**'
       - 'client/src/pages/India**'
       - 'client/src/pages/Exams.jsx'
@@ -57,6 +58,8 @@ jobs:
         run: npm ci --prefix client
       - name: India curriculum provenance
         run: node client/test/india-production-meta-check.mjs
+      - name: Current Class 10 source truth
+        run: node client/test/india-class10-current-source-check.mjs
       - name: India exam source/claim contract
         run: node client/test/india-exam-blueprint-check.mjs
       - name: India progress presentation contract
