@@ -14,9 +14,10 @@
 // support, while names, answers, emails, passwords and handwriting never belong
 // in an operational log.
 //
-// Successful sync-relevant mutations are marked dirty in local/outbox.js. The
-// outbox stores only entity ids + operation metadata, never the request/response
-// payload. The optional authenticated cloud adapter lives behind the separately
+// Successful sync-relevant mutations are marked dirty in the legacy install-wide
+// journal and, when a profile is active, in the profile-scoped cloud outbox. Both
+// queues store only entity ids + operation metadata, never request/response
+// payloads. The optional authenticated cloud adapter lives behind the separately
 // audited client/src/platform/cloudTransport.js boundary.
 // ─────────────────────────────────────────────────────────────────────────────
 import { dispatch } from './local/backend.js';
@@ -24,6 +25,7 @@ import {
   beginRequest, finishRequest, normalizeApiError, validateRequest
 } from './local/gateway.js';
 import { recordMutation } from './local/outbox.js';
+import { recordProfileMutation } from './platform/profileOutbox.js';
 import { dispatchIndiaExam, indiaExamRoute } from './local/indiaExamBackend.js';
 import { scopeForYear } from './engine/curriculum.js';
 import { indiaGeneratorsForScope, indiaChapter, cleanIndiaTrack } from './engine/indiaProduct.js';
@@ -164,13 +166,24 @@ async function call(method, path, body) {
         if (checked.path === '/auth/logout') activeUser = null;
         publishTeachingEvidence(checked.path, result, checked.body);
 
-        // The local write has already committed at this point. A damaged/full
-        // outbox must never turn that successful write into an API error (and
-        // tempt the UI to repeat a non-idempotent action), so queue failure is a
-        // diagnostic warning rather than a rejected request.
+        // The local write has already committed at this point. Queue damage/full
+        // storage must never turn that successful domain mutation into an API
+        // error and tempt the UI to repeat a non-idempotent answer submission.
         let syncWarning = null;
         try { await recordMutation(checked.method, checked.path, result, checked.body); }
         catch { syncWarning = 'SYNC_QUEUE_FAILED'; }
+
+        // The cloud queue is profile-scoped. Never infer a profile from an
+        // arbitrary request body's `id` (Rush uses it for question ids). Profile
+        // deletion is the only route whose target id can stand in for the active
+        // profile, and the scoped outbox deliberately treats local deletion as
+        // local-only rather than cloud-account deletion.
+        const scopedPid = result?.user?.id || activeUser?.id ||
+          (checked.path === '/profiles/delete' ? checked.body?.id : null);
+        if (scopedPid) {
+          try { await recordProfileMutation(scopedPid, checked.method, checked.path, result, checked.body); }
+          catch { syncWarning = syncWarning || 'CLOUD_SYNC_QUEUE_FAILED'; }
+        }
 
         finishRequest(request, 200, syncWarning);
         return result;
