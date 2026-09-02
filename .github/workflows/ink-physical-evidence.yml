@@ -1,0 +1,35 @@
+name: Ink Physical Evidence
+
+on:
+  pull_request:
+    paths:
+      - 'client/test/ink-physical-release-evidence.mjs'
+      - 'client/test/ink-physical-release-evidence-check.mjs'
+      - 'handwriting/v12/REAL_PENCIL_RELEASE_EVIDENCE.md'
+      - 'handwriting/v12/evidence/physical/**'
+      - '.github/workflows/ink-physical-evidence.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'client/test/ink-physical-release-evidence.mjs'
+      - 'client/test/ink-physical-release-evidence-check.mjs'
+      - 'handwriting/v12/REAL_PENCIL_RELEASE_EVIDENCE.md'
+      - 'handwriting/v12/evidence/physical/**'
+      - '.github/workflows/ink-physical-evidence.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  validator:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Regression-test evidence validator
+        run: node client/test/ink-physical-release-evidence-check.mjs
+      - name: Validate any committed physical evidence without manufacturing a pass
+        run: node client/test/ink-physical-release-evidence.mjs
