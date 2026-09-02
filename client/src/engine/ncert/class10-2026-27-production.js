@@ -115,11 +115,12 @@ export const CBSE_CLASS10_2026_27_CHAPTERS = Object.freeze([
     'Prove and apply simple identities based on sin²A + cos²A = 1'
   ], [
     cover('y9-trig', [0], [1, 2, 3]),
-    // D1 is restricted to the 30°/45°/60° exact-value table. D2 in the same
-    // bank intentionally moves to angles such as 180°/270° and is therefore
-    // not credited to Class X. The mixed D4 identity cell is also withheld
-    // until a per-question Class X declaration is authored.
-    cover('y11-trigfunc', [1], [1])
+    // D1 is restricted to the 30°/45°/60° exact-value table. D2 intentionally
+    // moves to 180°/270°/coterminal angles and is not credited to Class X.
+    cover('y11-trigfunc', [1], [1]),
+    // D4 consists only of simple identities assembled from sin²A + cos²A = 1
+    // and tan A = sin A / cos A, so it is safe for the current identity outcome.
+    cover('y11-trigfunc', [3], [4])
   ]),
 
   chapter('c10-trig-applications', [
