@@ -37,6 +37,15 @@ jobs:
             echo 'A deterministic suite reported skipped coverage.' >&2
             exit 1
           fi
+      - name: Person 2 India + commercial contracts
+        run: |
+          set -euo pipefail
+          node client/test/india-production-meta-check.mjs
+          node client/test/entitlement-check.mjs
+          node client/test/sync-contract-check.mjs
+          node client/test/india-exam-blueprint-check.mjs
+          node client/test/india-progress-product-check.mjs
+          node tools/india-production-census.mjs
       - name: Real ink diagnostic
         if: always()
         run: npm run --silent test:real || true
@@ -47,6 +56,22 @@ jobs:
           name: suites-log
           path: suites.log
           if-no-files-found: error
+
+  platform:
+    name: Production account, sync and commercial schema
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+      - name: Install server dependencies
+        run: npm ci --prefix server
+      - name: Commercial platform schema contract
+        run: node server/test/platform-schema-check.mjs
 
   browser:
     name: Browser suites (end-to-end and accessibility)
@@ -93,7 +118,7 @@ jobs:
           if-no-files-found: error
 
   build:
-    name: Client build and offline guarantee
+    name: Client build and offline-first boundary
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -109,25 +134,16 @@ jobs:
         run: npm run build
       - name: iOS bundle matches the client build
         run: npm run check:ios
-      - name: Built client loads nothing remote
+      - name: Built client loads no remote presentation assets
         run: |
           set -euo pipefail
           test -d client/dist
           count="$(find client/dist \( -name '*.html' -o -name '*.css' \) -type f | wc -l | tr -d ' ')"
           test "$count" -gt 0
           if grep -rnoIE --include='*.html' --include='*.css' '(src|href)="https?://|@import[^;]*https?://|url\(https?://' client/dist; then
-            echo 'Built client contains a remote load.' >&2
+            echo 'Built client contains a remote presentation load.' >&2
             exit 1
           fi
-          echo "read $count built HTML/CSS files: none loads anything remote"
-      - name: Source opens no connection
-        run: |
-          set -euo pipefail
-          test -d client/src
-          count="$(find client/src -type f \( -name '*.js' -o -name '*.jsx' \) | wc -l | tr -d ' ')"
-          test "$count" -gt 0
-          if grep -rn 'fetch(\|XMLHttpRequest\|sendBeacon\|new WebSocket\|EventSource' client/src; then
-            echo 'Client source opens a network connection.' >&2
-            exit 1
-          fi
-          echo "read $count source files: no fetch, XHR, beacon, WebSocket or EventSource"
+          echo "read $count built HTML/CSS files: none loads remote presentation assets"
+      - name: Client network calls stay behind audited transport
+        run: node tools/check-client-network-boundary.mjs
