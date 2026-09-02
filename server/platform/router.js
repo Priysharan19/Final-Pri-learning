@@ -12,6 +12,8 @@ import { createTelemetryRouter } from './telemetry.js';
 import { assertPlatformConfig, platformConfigStatus } from './config.js';
 import { csrfGuard, originGuard } from './security.js';
 
+const SERVER_WEBHOOK = /^\/billing\/webhook\/(?:apple|google|web)$/;
+
 export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckout = {} } = {}) {
   assertPlatformConfig();
   const router = Router();
@@ -34,16 +36,20 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
       identityProviders: { google: config.googleConfigured, apple: config.appleConfigured },
       billingProviders: {
         web: config.webBillingProviderConfigured,
-        apple: config.appleBillingProductsConfigured,
-        google: config.googleBillingProductsConfigured
+        apple: false,
+        google: false
       },
       checkedAt: Date.now()
     });
   });
 
-  // Mutating browser requests must come from the configured product origin, and
-  // signed-in cookie sessions additionally require the per-session CSRF token.
-  router.use(originGuard);
+  // Browser mutations must come from the configured product origin. Provider
+  // webhooks are the one narrow exception: they are server-to-server requests
+  // and authenticate with provider signatures instead of a browser Origin.
+  router.use((req, res, next) => {
+    if (req.method === 'POST' && SERVER_WEBHOOK.test(req.path)) return next();
+    return originGuard(req, res, next);
+  });
   router.use(csrfGuard);
 
   router.use('/account', createAccountRouter(db));
