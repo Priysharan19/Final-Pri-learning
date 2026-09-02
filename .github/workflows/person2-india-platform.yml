@@ -79,6 +79,8 @@ jobs:
         run: node client/test/india-production-meta-check.mjs
       - name: Current Class 10 source truth
         run: node client/test/india-class10-current-source-check.mjs
+      - name: Current Class 10 polynomial zero-finding forms
+        run: node client/test/india-class10-polynomial-current-check.mjs
       - name: Student practice target availability
         run: node client/test/india-practice-availability-check.mjs
       - name: India exam source/claim contract
