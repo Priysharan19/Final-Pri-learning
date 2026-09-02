@@ -16,9 +16,12 @@ import { classifyMutation, coalesce } from '../local/outbox.js';
 const VERSION = 1;
 const MAX_ITEMS = 500;
 const PROFILE_ID = /^[A-Za-z0-9._-]{1,100}$/;
+// Shared class/task/custom-question records deliberately do not enter the generic
+// profile replica. They belong to the server-authorised classroom/CMS APIs, where
+// teacher/student permissions can be enforced explicitly.
 const CLOUD_KINDS = new Set([
   'profile', 'practice-progress', 'exam', 'rush-history', 'match-history',
-  'task', 'bookmark', 'favorite', 'custom-question'
+  'bookmark', 'favorite'
 ]);
 const APPEND_KINDS = new Set(['practice-progress', 'exam', 'rush-history', 'match-history']);
 const RESCAN = Object.freeze({ seq: 0, kind: 'full-rescan', entityId: 'all', operation: 'upsert', initial: true });
@@ -74,11 +77,9 @@ async function save(row) {
 }
 
 async function newestSourceId(pid, classified) {
-  let store = null;
   let rows = [];
   if (classified.kind === 'practice-progress') {
-    store = 'attempts';
-    rows = (await byIndex(store, 'pid', pid).catch(() => []))
+    rows = (await byIndex('attempts', 'pid', pid).catch(() => []))
       .filter(row => row?.questionId === classified.entityId);
   } else if (classified.kind === 'rush-history') {
     rows = await byIndex('rushRuns', 'pid', pid).catch(() => []);
