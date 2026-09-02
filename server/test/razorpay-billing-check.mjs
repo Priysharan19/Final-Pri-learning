@@ -172,18 +172,16 @@ try {
   );
 
   // Restore performs an authenticated provider fetch and may re-establish the
-  // current entitlement without accepting a client-provided Premium flag.
-  getSubscription = subscriptionEntity({ status: 'active' });
-  const restored = await provider.verifiers.web.restore({ accountId: 'acct-billing', body: {} });
-  assert.equal(restored.verified, true);
-  assert.equal(restored.eventType, 'subscription.restore');
-  assert.equal(restored.providerSubscriptionId, 'sub_Second1234567', 'empty restore uses the account’s most recently created subscription');
-  // The latest binding is annual, so make the provider response agree with it.
+  // current entitlement without accepting a client-provided Premium flag. Empty
+  // restore uses the account's most recently created (annual) binding.
   getSubscription = subscriptionEntity({
     id: 'sub_Second1234567', plan: process.env.PRI_RAZORPAY_ANNUAL_PLAN_ID, status: 'active'
   });
-  const restoredAnnual = await provider.verifiers.web.restore({ accountId: 'acct-billing', body: {} });
-  const restoreApplied = applyVerifiedEntitlement(db, restoredAnnual);
+  const restored = await provider.verifiers.web.restore({ accountId: 'acct-billing', body: {} });
+  assert.equal(restored.verified, true);
+  assert.equal(restored.eventType, 'subscription.restore');
+  assert.equal(restored.providerSubscriptionId, 'sub_Second1234567');
+  const restoreApplied = applyVerifiedEntitlement(db, restored);
   assert.equal(restoreApplied.stale, false);
   assert.equal(restoreApplied.snapshot.plan, 'premium');
   assert.equal(restoreApplied.snapshot.provider, 'web');
