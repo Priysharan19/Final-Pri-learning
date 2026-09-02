@@ -12,7 +12,7 @@ export const CBSE_CLASS10_2026_27_SOURCE = Object.freeze({
   cbseMathematicsPdf: 'https://cbseacademic.nic.in/web_material/CurriculumMain27/SecPart1/Maths_SecP1X_2026-27.pdf',
   ncertTextbook: 'https://www.ncert.nic.in/textbook/pdf/jemh1ps.pdf',
   ncertEdition: 'Mathematics Textbook for Class X, Reprint 2026–27',
-  reviewedAt: '2026-09-02',
+  reviewedAt: '2026-09-03',
   reviewRule: 'Only exact current-syllabus outcomes with audited generator forms can be promoted to reviewed production coverage.'
 });
 
@@ -80,8 +80,12 @@ export const CBSE_CLASS10_2026_27_CHAPTERS = Object.freeze([
     'Prove and apply the Basic Proportionality Theorem and its converse',
     'Establish and apply the prescribed similarity criteria for triangles'
   ], [
-    cover('y10-similarity', [0, 1], [1, 2, 3, 4])
-  ]),
+    // Dedicated current-source forms replace the old scale/map forms: D1 applies
+    // BPT, D2 applies its converse, D3 distinguishes AAA/SSS/SAS, and D4 applies
+    // SAS similarity to a corresponding-side calculation.
+    cover('c10-triangles-current', [0], [1, 2]),
+    cover('c10-triangles-current', [1], [3, 4])
+  ], true),
 
   chapter('c10-coordinate-geometry', [
     'Solve problems using the distance formula',
