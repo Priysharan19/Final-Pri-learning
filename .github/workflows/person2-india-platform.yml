@@ -24,14 +24,18 @@ on:
       - 'client/src/pages/Exams.jsx'
       - 'client/src/pages/Progress*.jsx'
       - 'client/src/pages/Settings.jsx'
+      - 'client/src/pages/PracticeBase.jsx'
       - 'client/src/platform/**'
       - 'client/src/components/CloudAccountPanel.jsx'
       - 'client/src/components/ClassroomPanel.jsx'
+      - 'client/src/components/AssignmentInboxPanel.jsx'
+      - 'client/src/components/StaffOperationsPanel.jsx'
       - 'client/src/api.js'
       - 'client/test/india-**'
       - 'client/test/cloud-**'
       - 'client/test/profile-cloud-**'
       - 'client/test/classroom-product-check.mjs'
+      - 'client/test/assignment-staff-product-check.mjs'
       - 'client/test/entitlement-check.mjs'
       - 'client/test/sync-contract-check.mjs'
       - 'client/test/native-storekit-boundary-check.mjs'
@@ -47,6 +51,7 @@ on:
       - 'server/test/apple-**'
       - 'server/test/native-origin-**'
       - 'server/test/classroom-**'
+      - 'server/test/assignment-**'
       - 'server/test/content-**'
       - 'tools/india-**'
       - 'tools/check-client-network-boundary.mjs'
@@ -92,6 +97,8 @@ jobs:
         run: node client/test/cloud-account-boundary-check.mjs
       - name: Classroom client transport boundary
         run: node client/test/classroom-product-check.mjs
+      - name: Assignment execution and staff UI boundary
+        run: node client/test/assignment-staff-product-check.mjs
       - name: Cloud sync migration and profile isolation
         run: node client/test/cloud-sync-worker-check.mjs
       - name: Native StoreKit bridge authority boundary
@@ -142,3 +149,5 @@ jobs:
         run: node server/test/content-review-contract-check.mjs
       - name: Classroom submit-return-resubmit lifecycle
         run: node server/test/classroom-submission-contract-check.mjs
+      - name: Assignment visibility and execution authorization
+        run: node server/test/assignment-execution-contract-check.mjs
