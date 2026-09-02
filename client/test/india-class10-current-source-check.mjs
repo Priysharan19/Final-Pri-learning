@@ -48,8 +48,11 @@ assert.deepEqual(reviewed, [
   'c10-real-numbers',
   'c10-statistics',
   'c10-surface-volume',
-  'c10-triangles'
+  'c10-triangles',
+  'c10-trig-applications',
+  'c10-trigonometry'
 ]);
+assert.equal(reviewed.length, 14, 'every current Class X chapter must be explicitly source-reviewed');
 
 for (const id of reviewed) {
   const status = indiaProductionStatus(byId[id], 10);
@@ -57,6 +60,7 @@ for (const id of reviewed) {
   assert.equal(status.quality, INDIA_CONTENT_QUALITY.REVIEWED_MAPPING, `${id} must be B rather than A/C/D`);
   assert.equal(status.releaseState, INDIA_RELEASE_STATE.REVIEWED);
   assert.equal(status.sourceReviewed, true);
+  assert.equal(status.generatorComplete, true);
   assert.equal(status.source?.reviewState, 'current-source-reviewed-mapping');
 }
 
@@ -87,6 +91,15 @@ assert.deepEqual(sourceById['c10-quadratic-equations'].covers, [
   { gen: 'c10-quadratic-context', dp: [2], diff: [1, 2, 3, 4] }
 ]);
 
+assert.deepEqual(sourceById['c10-trigonometry'].covers, [
+  { gen: 'c10-trigonometry-current', dp: [0], diff: [1] },
+  { gen: 'c10-trigonometry-current', dp: [1], diff: [2] },
+  { gen: 'c10-trigonometry-current', dp: [2], diff: [3, 4] }
+]);
+assert.deepEqual(sourceById['c10-trig-applications'].covers, [
+  { gen: 'c10-trig-applications-current', dp: [0], diff: [1, 2, 3, 4] }
+]);
+
 assert.deepEqual(sourceById['c10-surface-volume'].covers, [
   { gen: 'c10-surface-area-combo', dp: [0], diff: [1, 2, 3, 4] },
   { gen: 'c10-surface-volume-combo', dp: [1], diff: [1, 2] }
@@ -96,22 +109,8 @@ assert.deepEqual(sourceById['c10-probability'].covers, [
   { gen: 'y8-probability', dp: [0, 1], diff: [1] }
 ]);
 
-// These two chapters have generator-complete mappings, but they stay C until
-// their reused Year 9/10/11 forms are audited form-by-form against current Class X.
-for (const id of ['c10-trigonometry', 'c10-trig-applications']) {
-  const status = indiaProductionStatus(byId[id], 10);
-  assert.equal(uncoveredDotpoints(byId[id]).length, 0, `${id} is generator-complete and needs review, not new content`);
-  assert.equal(status.generatorComplete, true);
-  assert.equal(status.sourceReviewed, false);
-  assert.equal(status.quality, INDIA_CONTENT_QUALITY.WEAK_MAPPING);
-  assert.equal(status.releaseState, INDIA_RELEASE_STATE.UNREVIEWED);
+for (const chapter of group.chapters) {
+  assert.deepEqual(uncoveredDotpoints(chapter), [], `${chapter.id} must have no current-source generator gaps`);
 }
 
-assert.deepEqual(uncoveredDotpoints(byId['c10-real-numbers']), []);
-assert.deepEqual(uncoveredDotpoints(byId['c10-polynomials']), []);
-assert.deepEqual(uncoveredDotpoints(byId['c10-triangles']), []);
-assert.deepEqual(uncoveredDotpoints(byId['c10-pair-linear-equations']), []);
-assert.deepEqual(uncoveredDotpoints(byId['c10-quadratic-equations']), []);
-assert.deepEqual(uncoveredDotpoints(byId['c10-surface-volume']), [], 'surface-area and volume combinations must both be covered');
-
-console.log(`PASS — Class 10 2026–27 source truth: ${reviewed.length}/14 chapters reviewed; the remaining two are explicit form-audit gaps, not missing generators.`);
+console.log('PASS — Class 10 2026–27 source truth: 14/14 chapters are explicitly reviewed B mappings with zero uncovered current outcomes.');
