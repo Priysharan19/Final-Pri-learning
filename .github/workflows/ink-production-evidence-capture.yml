@@ -1,0 +1,35 @@
+name: Ink Production Evidence Capture
+
+on:
+  pull_request:
+    paths:
+      - 'client/src/ink/productionEvidence.js'
+      - 'client/src/components/InkPhysicalEvidenceSession.jsx'
+      - 'client/src/pages/Practice.jsx'
+      - 'client/test/ink-production-evidence-capture-check.mjs'
+      - 'tools/ink-collect-v2/index.html'
+      - '.github/workflows/ink-production-evidence-capture.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'client/src/ink/productionEvidence.js'
+      - 'client/src/components/InkPhysicalEvidenceSession.jsx'
+      - 'client/src/pages/Practice.jsx'
+      - 'client/test/ink-production-evidence-capture-check.mjs'
+      - 'tools/ink-collect-v2/index.html'
+      - '.github/workflows/ink-production-evidence-capture.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  capture-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify production evidence capture contract
+        run: node client/test/ink-production-evidence-capture-check.mjs

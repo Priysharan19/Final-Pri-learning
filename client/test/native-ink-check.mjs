@@ -166,6 +166,9 @@ check('explicit Pencil touches are always routed to PencilKit',
   surfaceSwift.includes("$0.type == .pencil") && surfaceSwift.includes('return hit'));
 check('empty hover/hit-test events do not reject the next Pencil contact',
   surfaceSwift.includes('return hit') && surfaceSwift.includes('allTouches'));
+check('Pencil-down invalidates any whole-page read immediately',
+  surfaceSwift.includes('func canvasViewDidBeginUsingTool')
+  && surfaceSwift.includes('delegate?.inkSurfaceDidBeginStroke(self)'));
 
 // ── both sides of the message contract ──────────────────────────────────────
 const swift = readFileSync(BRIDGE_SWIFT, 'utf8');
@@ -186,6 +189,14 @@ check('recognition retains the current immutable native stroke snapshot by refer
   source.includes('strokes: latestStrokes, surfaceEpoch'));
 check('external setStrokes input is copied once at the bridge boundary',
   source.includes('latestStrokes = snapshotInkStrokes(strokes);'));
+check('native bridge bumps revision and cancels Vision at stroke begin',
+  swift.includes('func inkSurfaceDidBeginStroke(_ surface: InkSurfaceView)')
+  && swift.includes('invalidateRecognitionForInkMutation()')
+  && swift.includes('recognizer.cancelActiveVision()'));
+check('Foundation and rescue readers both reject stale revisions',
+  swift.includes('pri-foundation-stale')
+  && swift.includes('native-rescue-stale')
+  && (swift.match(/revisionIsCurrent\(revision\)/g)?.length || 0) >= 4);
 
 console.log(`\n${failures === 0 ? 'PASS' : `FAIL — ${failures} problem(s)`}`);
 process.exit(failures === 0 ? 0 : 1);
