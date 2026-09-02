@@ -144,6 +144,7 @@ export const cloud = Object.freeze({
   entitlements: () => cloudRequest('/v1/entitlements'),
   billingConfig: () => cloudRequest('/v1/billing/config'),
   billingStatus: () => cloudRequest('/v1/billing/status'),
+  createWebBillingCheckout: cadence => cloudRequest('/v1/billing/checkout/web', { method: 'POST', body: { cadence } }),
   restoreBilling: (provider, body = {}) => cloudRequest(`/v1/billing/restore/${pathId(provider, 'provider')}`, { method: 'POST', body }),
   classes: () => cloudRequest('/v1/classes'),
   reportIssue: (body, idempotencyKey) => cloudRequest('/v1/reports', { method: 'POST', body, idempotencyKey }),
