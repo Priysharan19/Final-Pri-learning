@@ -126,6 +126,8 @@ const INDIA_BANK_OF = {
   'c10-linear-graphs': 'india-class10',
   'c10-quadratic-context': 'india-class10',
   'c10-surface-area-combo': 'india-class10',
+  'c10-trigonometry-current': 'india-class10',
+  'c10-trig-applications-current': 'india-class10',
   'c10-arithmetic-progressions': 'india-class10',
   'c10-coordinate-geometry': 'india-class10',
   'c10-areas-circles': 'india-class10',
