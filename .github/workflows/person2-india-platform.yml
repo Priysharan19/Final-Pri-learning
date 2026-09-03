@@ -8,6 +8,7 @@ on:
     paths:
       - 'client/src/engine/india**'
       - 'client/src/engine/ncert/**'
+      - 'client/src/engine/generators/india-class10**'
       - 'client/src/engine/curriculumAvailability.js'
       - 'client/src/local/india**'
       - 'client/src/pages/India**'
@@ -16,15 +17,21 @@ on:
       - 'client/src/pages/Progress*.jsx'
       - 'client/src/pages/Settings.jsx'
       - 'client/src/pages/PracticeBase.jsx'
+      - 'client/src/pages/AccountAction.jsx'
+      - 'client/src/main.jsx'
       - 'client/src/platform/**'
       - 'client/src/components/CloudAccountPanel.jsx'
       - 'client/src/components/ClassroomPanel.jsx'
       - 'client/src/components/AssignmentInboxPanel.jsx'
       - 'client/src/components/StaffOperationsPanel.jsx'
+      - 'client/src/components/Class10NCERTLibrary.jsx'
       - 'client/src/api.js'
       - 'client/test/india-**'
+      - 'client/test/class10-ncert-**'
+      - 'client/test/ncert-class10-**'
       - 'client/test/cloud-**'
       - 'client/test/profile-cloud-**'
+      - 'client/test/account-action-**'
       - 'client/test/classroom-product-check.mjs'
       - 'client/test/assignment-staff-product-check.mjs'
       - 'client/test/tour-cloud-platform.js'
@@ -38,6 +45,8 @@ on:
       - 'server/platform/**'
       - 'server/test/platform-**'
       - 'server/test/account-**'
+      - 'server/test/auth-delivery-**'
+      - 'server/test/production-storage-**'
       - 'server/test/billing-**'
       - 'server/test/razorpay-**'
       - 'server/test/apple-**'
@@ -53,10 +62,6 @@ on:
 permissions:
   contents: read
 
-# Person 2 branches are expected to evolve rapidly. PR validation is the
-# feature-branch authority; main is validated again after merge. Retaining every
-# historical synchronize run creates no extra evidence because only the latest
-# head can be merged.
 concurrency:
   group: person2-india-platform-${{ github.ref }}
   cancel-in-progress: true
@@ -65,7 +70,7 @@ jobs:
   contracts:
     name: India product and offline/cloud contracts
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 18
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -79,6 +84,26 @@ jobs:
         run: node client/test/india-production-meta-check.mjs
       - name: Current Class 10 source truth
         run: node client/test/india-class10-current-source-check.mjs
+      - name: Separated Class 10 source outcomes
+        run: node client/test/india-class10-production-gap-check.mjs
+      - name: Current Class 10 polynomial forms
+        run: node client/test/india-class10-polynomial-current-check.mjs
+      - name: Current Class 10 triangle forms
+        run: node client/test/india-class10-triangles-current-check.mjs
+      - name: Current Class 10 irrationality proofs
+        run: node client/test/india-class10-irrationality-current-check.mjs
+      - name: Current Class 10 linear graph forms
+        run: node client/test/india-class10-linear-graphs-current-check.mjs
+      - name: Current Class 10 contextual quadratics
+        run: node client/test/india-class10-quadratic-context-current-check.mjs
+      - name: Current Class 10 combined surface-area forms
+        run: node client/test/india-class10-surface-combo-current-check.mjs
+      - name: Current Class 10 trigonometry
+        run: node client/test/india-class10-trigonometry-current-check.mjs
+      - name: NCERT Class 10 full-book source contract
+        run: node client/test/ncert-class10-full-book-check.mjs
+      - name: Class 10 NCERT student product contract
+        run: node client/test/class10-ncert-product-check.mjs
       - name: Student practice target availability
         run: node client/test/india-practice-availability-check.mjs
       - name: India exam source/claim contract
@@ -97,6 +122,8 @@ jobs:
         run: node client/test/cloud-account-boundary-check.mjs
       - name: Cloud session live refresh
         run: node client/test/cloud-session-refresh-check.mjs
+      - name: Fragment-only verification/reset action boundary
+        run: node client/test/account-action-boundary-check.mjs
       - name: Classroom client transport boundary
         run: node client/test/classroom-product-check.mjs
       - name: Assignment execution and staff UI boundary
@@ -119,7 +146,7 @@ jobs:
   platform:
     name: Account, sync, billing, classroom and CMS contracts
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 18
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -135,12 +162,18 @@ jobs:
         run: node server/test/platform-migration-check.mjs
       - name: Cross-account sync pagination regression
         run: node server/test/platform-sync-pagination-check.mjs
+      - name: Production persistent-storage contract
+        run: node server/test/production-storage-config-check.mjs
       - name: Native URLSession origin and CSRF boundary
         run: node server/test/native-origin-csrf-check.mjs
       - name: Destructive account reauthentication
         run: node server/test/account-deletion-reauth-check.mjs
       - name: Full account lifecycle and session rotation
         run: node server/test/account-lifecycle-contract-check.mjs
+      - name: Encrypted auth email delivery worker
+        run: node server/test/auth-delivery-worker-check.mjs
+      - name: Production auth email configuration
+        run: node server/test/auth-delivery-config-check.mjs
       - name: Deployment-configured billing display
         run: node server/test/billing-config-check.mjs
       - name: Verified Razorpay checkout, webhook and restore lifecycle
