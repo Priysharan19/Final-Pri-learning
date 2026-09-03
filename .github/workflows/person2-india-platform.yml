@@ -47,6 +47,7 @@ on:
       - 'server/test/account-**'
       - 'server/test/auth-delivery-**'
       - 'server/test/production-storage-**'
+      - 'server/test/production-db-**'
       - 'server/test/billing-**'
       - 'server/test/razorpay-**'
       - 'server/test/apple-**'
@@ -164,6 +165,8 @@ jobs:
         run: node server/test/platform-sync-pagination-check.mjs
       - name: Production persistent-storage contract
         run: node server/test/production-storage-config-check.mjs
+      - name: Production DB bootstrap order contract
+        run: node server/test/production-db-bootstrap-check.mjs
       - name: Native URLSession origin and CSRF boundary
         run: node server/test/native-origin-csrf-check.mjs
       - name: Destructive account reauthentication
