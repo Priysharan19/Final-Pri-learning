@@ -61,6 +61,7 @@ jobs:
           ENV NODE_ENV=production PORT=4000
           WORKDIR /app
           COPY server ./server
+          COPY client/src/engine ./client/src/engine
           COPY --from=server-deps /app/server/node_modules ./server/node_modules
           COPY --from=client-build /app/client/dist ./client/dist
           EXPOSE 4000
