@@ -1,0 +1,13 @@
+.git
+.github
+.claude
+**/node_modules
+**/dist
+server/data
+ios
+handwriting
+marketing
+ad
+promotions
+*.log
+.DS_Store
