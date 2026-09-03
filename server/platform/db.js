@@ -2,6 +2,7 @@ import Database from 'better-sqlite3';
 import { mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { platformDatabasePath } from './config.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_PATH = join(here, '..', 'data', 'pri-learning-platform.db');
@@ -302,4 +303,5 @@ export function nextSyncCursor(db) {
   })();
 }
 
-export const platformDb = createPlatformDb(process.env.PRI_PLATFORM_DB || DEFAULT_PATH);
+const configuredPlatformPath = platformDatabasePath();
+export const platformDb = createPlatformDb(configuredPlatformPath || DEFAULT_PATH);
