@@ -35,6 +35,7 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
       service: 'pri-learning-platform',
       schemaVersion: db.prepare("SELECT value FROM platform_meta WHERE key='schema_version'").get()?.value || null,
       billingSchemaVersion: db.prepare("SELECT value FROM platform_meta WHERE key='billing_schema_version'").get()?.value || null,
+      storage: { persistentDatabase: config.persistentDatabaseConfigured },
       identityProviders: { google: config.googleConfigured, apple: config.appleConfigured },
       authDelivery: { email: config.authEmailProviderConfigured },
       billingProviders: {
