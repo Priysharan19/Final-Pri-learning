@@ -1,0 +1,89 @@
+name: Production Candidate Integration
+
+on:
+  push:
+    branches:
+      - release/production-candidate-2026-09-03
+
+permissions:
+  contents: write
+
+concurrency:
+  group: production-candidate-integration
+  cancel-in-progress: true
+
+jobs:
+  integrate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: release/production-candidate-2026-09-03
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Merge validated product slices without blind conflict resolution
+        run: |
+          git config user.name "Pri Learning Release Automation"
+          git config user.email "actions@users.noreply.github.com"
+          git fetch origin india/class10-ncert-full-integration feature/auth-email-delivery-links
+          merge_one() {
+            ref="$1"
+            if ! git merge --no-edit "origin/$ref"; then
+              echo "::error::Merge conflict while integrating $ref"
+              echo "Unmerged paths:"
+              git diff --name-only --diff-filter=U
+              git status --short
+              exit 1
+            fi
+          }
+          merge_one india/class10-ncert-full-integration
+          merge_one feature/auth-email-delivery-links
+      - name: Install dependencies
+        run: |
+          npm ci --prefix client
+          npm ci --prefix server
+      - name: Validate Class 10 source mastery
+        run: |
+          node client/test/india-class10-current-source-check.mjs
+          node client/test/india-class10-polynomial-current-check.mjs
+          node client/test/india-class10-triangles-current-check.mjs
+          node client/test/india-class10-irrationality-current-check.mjs
+          node client/test/india-class10-linear-graphs-current-check.mjs
+          node client/test/india-class10-quadratic-context-current-check.mjs
+          node client/test/india-class10-surface-combo-current-check.mjs
+          node client/test/india-class10-trigonometry-current-check.mjs
+          node client/test/ncert-class10-full-book-check.mjs
+          node client/test/class10-ncert-product-check.mjs
+          node client/test/india-practice-availability-check.mjs
+          node client/test/india-production-meta-check.mjs
+          node client/test/india-check.mjs
+      - name: Validate account verification and reset delivery
+        run: |
+          node server/test/auth-delivery-worker-check.mjs
+          node server/test/auth-delivery-config-check.mjs
+          node client/test/account-action-boundary-check.mjs
+      - name: Validate platform boundaries on Node 24
+        run: |
+          node client/test/classroom-product-check.mjs
+          node client/test/assignment-staff-product-check.mjs
+          node client/test/cloud-session-refresh-check.mjs
+          node server/test/platform-sync-pagination-check.mjs
+          node server/test/platform-schema-check.mjs
+          node server/test/platform-migration-check.mjs
+          node server/test/account-lifecycle-contract-check.mjs
+          node server/test/razorpay-billing-check.mjs
+          node server/test/apple-billing-check.mjs
+      - name: Build and synchronize both iPad bundles
+        run: |
+          npm run build
+          npm run sync:ios
+          npm run check:ios
+      - name: Remove integration workflow and publish candidate
+        run: |
+          rm .github/workflows/production-candidate-integrate.yml
+          git add -A
+          git commit -m "chore(release): integrate Class 10 mastery and auth delivery" || true
+          git push origin HEAD:release/production-candidate-2026-09-03
