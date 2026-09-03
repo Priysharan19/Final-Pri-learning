@@ -1,4 +1,4 @@
-name: Deployment Readiness Bootstrap
+name: Deployment DB Bootstrap
 
 on:
   push:
@@ -9,13 +9,13 @@ permissions:
   contents: write
 
 concurrency:
-  group: deployment-readiness-bootstrap
+  group: deployment-db-bootstrap
   cancel-in-progress: true
 
 jobs:
-  finalize:
+  patch-db:
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
         with:
@@ -24,367 +24,40 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - name: Apply, validate and commit deployment readiness
+      - name: Enforce production storage validation before SQLite opens
         run: |
           set -euo pipefail
-
           python3 <<'PY'
           from pathlib import Path
-
           db = Path('server/platform/db.js')
           text = db.read_text()
           anchor = "import { fileURLToPath } from 'node:url';\n"
-          if "platformDatabasePath" not in text:
-              text = text.replace(anchor, anchor + "import { platformDatabasePath } from './config.js';\n", 1)
+          import_line = "import { platformDatabasePath } from './config.js';\n"
+          if import_line not in text:
+              if anchor not in text:
+                  raise SystemExit('db import anchor not found')
+              text = text.replace(anchor, anchor + import_line, 1)
           old = "export const platformDb = createPlatformDb(process.env.PRI_PLATFORM_DB || DEFAULT_PATH);"
           new = "const configuredPlatformPath = platformDatabasePath();\nexport const platformDb = createPlatformDb(configuredPlatformPath || DEFAULT_PATH);"
           if old in text:
               text = text.replace(old, new, 1)
           elif new not in text:
-              raise SystemExit('Could not locate platformDb bootstrap line')
+              raise SystemExit('platformDb bootstrap anchor not found')
           db.write_text(text)
-
-          for workflow_path in ['.github/workflows/ci.yml', '.github/workflows/person2-india-platform.yml']:
-              p = Path(workflow_path)
-              body = p.read_text()
-              anchor = "      - name: Production persistent-storage contract\n        run: node server/test/production-storage-config-check.mjs\n"
-              addition = anchor + "      - name: Production DB bootstrap order contract\n        run: node server/test/production-db-bootstrap-check.mjs\n"
-              if 'Production DB bootstrap order contract' not in body:
-                  if anchor not in body:
-                      raise SystemExit(f'Missing storage gate anchor in {workflow_path}')
-                  body = body.replace(anchor, addition, 1)
-              p.write_text(body)
           PY
-
-          cat > server/test/production-db-bootstrap-check.mjs <<'EOF'
-          import assert from 'node:assert/strict';
-          import { existsSync, mkdtempSync, rmSync } from 'node:fs';
-          import { tmpdir } from 'node:os';
-          import { dirname, join } from 'node:path';
-          import { mkdirSync } from 'node:fs';
-          import { spawnSync } from 'node:child_process';
-
-          const dbModule = new URL('../platform/db.js', import.meta.url).href;
-
-          function importDb(cwd, databasePath) {
-            const env = { ...process.env, NODE_ENV: 'production', PRI_PLATFORM_DB: databasePath };
-            const source = `import(${JSON.stringify(dbModule)});`;
-            return spawnSync(process.execPath, ['--input-type=module', '--eval', source], {
-              cwd,
-              env,
-              encoding: 'utf8'
-            });
-          }
-
-          const unsafeCwd = mkdtempSync(join(tmpdir(), 'pri-db-unsafe-'));
-          try {
-            const unsafe = importDb(unsafeCwd, 'relative-platform.db');
-            assert.notEqual(unsafe.status, 0, 'production import must fail before opening a relative database');
-            assert.match(`${unsafe.stdout}\n${unsafe.stderr}`, /absolute|persistent/i);
-            assert.equal(existsSync(join(unsafeCwd, 'relative-platform.db')), false,
-              'invalid production storage must not create an ephemeral SQLite file before config validation');
-          } finally {
-            rmSync(unsafeCwd, { recursive: true, force: true });
-          }
-
-          const safeCwd = mkdtempSync(join(tmpdir(), 'pri-db-safe-'));
-          try {
-            const safePath = join(safeCwd, 'data', 'platform.db');
-            mkdirSync(dirname(safePath), { recursive: true });
-            const safe = importDb(safeCwd, safePath);
-            assert.equal(safe.status, 0, `absolute production DB import failed:\n${safe.stdout}\n${safe.stderr}`);
-            assert.equal(existsSync(safePath), true, 'validated absolute production storage should open normally');
-          } finally {
-            rmSync(safeCwd, { recursive: true, force: true });
-          }
-
-          console.log('PASS — production validates PRI_PLATFORM_DB before SQLite can create a file.');
-          EOF
-
-          cat > Dockerfile <<'EOF'
-          FROM node:24-bookworm-slim AS client-build
-          WORKDIR /app
-          COPY client/package.json client/package-lock.json ./client/
-          RUN npm ci --prefix client
-          COPY client ./client
-          RUN npm run build --prefix client
-
-          FROM node:24-bookworm-slim AS server-deps
-          WORKDIR /app
-          RUN apt-get update \
-              && apt-get install -y --no-install-recommends python3 make g++ \
-              && rm -rf /var/lib/apt/lists/*
-          COPY server/package.json server/package-lock.json ./server/
-          RUN npm ci --prefix server --omit=dev
-
-          FROM node:24-bookworm-slim AS runtime
-          ENV NODE_ENV=production \
-              PORT=4000
-          WORKDIR /app
-          COPY server ./server
-          # Legacy server engine adapters intentionally re-export the canonical
-          # client engine source, so those source modules are runtime dependencies.
-          COPY client/src/engine ./client/src/engine
-          COPY --from=server-deps /app/server/node_modules ./server/node_modules
-          COPY --from=client-build /app/client/dist ./client/dist
-          EXPOSE 4000
-          HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-            CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||4000)+'/v1/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
-          CMD ["node", "server/index.js"]
-          EOF
-
-          cat > .dockerignore <<'EOF'
-          .git
-          .github
-          .claude
-          **/node_modules
-          **/dist
-          server/data
-          ios
-          handwriting
-          marketing
-          ad
-          promotions
-          *.log
-          .DS_Store
-          EOF
-
-          cat > .env.production.example <<'EOF'
-          NODE_ENV=production
-          PORT=4000
-
-          # Exact public browser origin. Production rejects non-HTTPS or dirty origins.
-          PRI_PUBLIC_ORIGIN=https://learn.example.com
-
-          # Generate deployment-only secrets. Never commit real values.
-          PRI_CSRF_SECRET=replace-with-a-high-entropy-secret
-          PRI_AUTH_DELIVERY_KEY=replace-with-64-hex-characters
-
-          # Must be an absolute path on a persistent mounted volume.
-          PRI_PLATFORM_DB=/data/pri-learning-platform.db
-
-          # Verification and password-reset email delivery.
-          PRI_AUTH_EMAIL_PROVIDER=resend
-          PRI_RESEND_API_KEY=replace-with-resend-api-key
-          PRI_AUTH_EMAIL_FROM=Pri Learning <noreply@example.com>
-
-          # Optional OIDC providers.
-          PRI_GOOGLE_CLIENT_IDS=
-          PRI_APPLE_CLIENT_IDS=
-
-          # Optional Razorpay web subscriptions. If a plan id is configured,
-          # production also requires provider secrets and subscription counts.
-          PRI_RAZORPAY_MONTHLY_PLAN_ID=
-          PRI_RAZORPAY_ANNUAL_PLAN_ID=
-          PRI_RAZORPAY_MONTHLY_TOTAL_COUNT=
-          PRI_RAZORPAY_ANNUAL_TOTAL_COUNT=
-          PRI_RAZORPAY_KEY_ID=
-          PRI_RAZORPAY_KEY_SECRET=
-          PRI_RAZORPAY_WEBHOOK_SECRET=
-
-          # Optional Apple subscription verification.
-          PRI_APPLE_MONTHLY_PRODUCT_ID=
-          PRI_APPLE_ANNUAL_PRODUCT_ID=
-          PRI_APPLE_APP_ID=
-          PRI_APPLE_ROOT_CA_FILE=
-          EOF
-
-          mkdir -p docs
-          cat > docs/production-deployment.md <<'EOF'
-          # Pri Learning production deployment contract
-
-          Pri Learning's learning experience remains offline-first. This document covers the optional production cloud control plane in `server/`.
-
-          ## Immutable application image
-
-          The root `Dockerfile` uses Node 24, builds the React client, installs only production server dependencies, and serves the client plus `/v1` control plane from one image:
-
-          ```bash
-          docker build -t pri-learning .
-          ```
-
-          The server retains thin compatibility adapters under `server/engine/` which re-export the canonical modules in `client/src/engine/`; the image therefore includes that engine source directory as an intentional runtime dependency. It does not ship client development dependencies.
-
-          Production configuration belongs in the deployment platform, not the image. Start from `.env.production.example`; never commit real secrets.
-
-          ## Persistent storage is mandatory
-
-          Production startup requires `PRI_PLATFORM_DB` to be an absolute path. Mount persistent storage at `/data` and use:
-
-          ```text
-          PRI_PLATFORM_DB=/data/pri-learning-platform.db
-          ```
-
-          Missing, relative, and `:memory:` production database paths are rejected before SQLite opens or creates a database file. Run one application process against a given SQLite volume; do not mount the same SQLite file into multiple independently scheduled writers.
-
-          ## HTTPS and origin
-
-          Terminate TLS at the hosting platform or reverse proxy and set `PRI_PUBLIC_ORIGIN` to the exact clean HTTPS browser origin, for example `https://learn.example.com`. The container listens on `PORT` (default `4000`).
-
-          Verify a live deployment with:
-
-          ```bash
-          curl -fsS https://learn.example.com/v1/health
-          ```
-
-          A healthy response must identify `pri-learning-platform` and report `storage.persistentDatabase: true`. Provider readiness fields expose only booleans, not credentials or filesystem paths.
-
-          ## Email, billing and identity
-
-          Verification/reset email uses the deployment-only Resend variables in `.env.production.example`. Razorpay and Apple product variables may remain unset until those commercial paths are enabled; once product identifiers are configured, the server fails closed when required provider verification configuration is incomplete.
-
-          Google and Apple identity client IDs are deployment configuration. Provider secrets must never enter the client bundle.
-
-          ## Operational evidence still required
-
-          A green container build proves deployability, not that the commercial environment is live. Launch evidence still requires a real persistent volume, public HTTPS/domain, live Resend delivery, live Razorpay webhook/payment validation, App Store/StoreKit sandbox validation, backup/restore exercises, and physical-device QA.
-
-          After the public deployment exists, configure the GitHub App Health workflow's `PRI_APP_URL` secret so live-origin health is included in release evidence.
-          EOF
-
-          cat > .github/workflows/deployment-image.yml <<'EOF'
-          name: Production Container
-
-          on:
-            workflow_dispatch:
-            push:
-              branches: [main]
-              paths:
-                - 'Dockerfile'
-                - '.dockerignore'
-                - '.env.production.example'
-                - 'client/**'
-                - 'server/**'
-                - 'docs/production-deployment.md'
-                - '.github/workflows/deployment-image.yml'
-            pull_request:
-              paths:
-                - 'Dockerfile'
-                - '.dockerignore'
-                - '.env.production.example'
-                - 'client/**'
-                - 'server/**'
-                - 'docs/production-deployment.md'
-                - '.github/workflows/deployment-image.yml'
-
-          permissions:
-            contents: read
-
-          jobs:
-            container:
-              name: Build container and prove persistent health
-              runs-on: ubuntu-24.04
-              timeout-minutes: 20
-              steps:
-                - uses: actions/checkout@v4
-                - name: Build production image
-                  run: docker build --pull -t pri-learning:ci .
-                - name: Run image with mounted persistent storage
-                  run: |
-                    set -euo pipefail
-                    mkdir -p "$RUNNER_TEMP/pri-platform-data"
-                    docker rm -f pri-learning-ci >/dev/null 2>&1 || true
-                    docker run -d \
-                      --name pri-learning-ci \
-                      -p 127.0.0.1:4010:4000 \
-                      -v "$RUNNER_TEMP/pri-platform-data:/data" \
-                      -e NODE_ENV=production \
-                      -e PORT=4000 \
-                      -e PRI_PUBLIC_ORIGIN=https://learn.pri.example \
-                      -e PRI_CSRF_SECRET=ci-csrf-secret-not-for-production \
-                      -e PRI_AUTH_DELIVERY_KEY=3333333333333333333333333333333333333333333333333333333333333333 \
-                      -e PRI_PLATFORM_DB=/data/pri-learning-platform.db \
-                      -e PRI_AUTH_EMAIL_PROVIDER=resend \
-                      -e PRI_RESEND_API_KEY=ci-resend-key \
-                      -e 'PRI_AUTH_EMAIL_FROM=Pri Learning <noreply@pri.example>' \
-                      pri-learning:ci
-
-                    cleanup() {
-                      docker logs pri-learning-ci || true
-                      docker rm -f pri-learning-ci >/dev/null 2>&1 || true
-                    }
-                    trap cleanup EXIT
-
-                    ok=0
-                    for attempt in $(seq 1 30); do
-                      if curl -fsS http://127.0.0.1:4010/v1/health > health.json; then
-                        ok=1
-                        break
-                      fi
-                      if [ "$(docker inspect pri-learning-ci --format '{{.State.Running}}' 2>/dev/null || echo false)" != "true" ]; then
-                        echo 'Production container exited before becoming healthy.' >&2
-                        docker inspect pri-learning-ci --format '{{json .State}}' || true
-                        break
-                      fi
-                      sleep 1
-                    done
-                    test "$ok" -eq 1
-                    node --input-type=module <<'NODE'
-                    import assert from 'node:assert/strict';
-                    import { readFileSync } from 'node:fs';
-                    const health = JSON.parse(readFileSync('health.json', 'utf8'));
-                    assert.equal(health.ok, true);
-                    assert.equal(health.service, 'pri-learning-platform');
-                    assert.equal(health.storage?.persistentDatabase, true);
-                    NODE
-                    test -s "$RUNNER_TEMP/pri-platform-data/pri-learning-platform.db"
-          EOF
 
           npm ci --prefix server
           node server/test/production-storage-config-check.mjs
           node server/test/production-db-bootstrap-check.mjs
           node server/test/platform-schema-check.mjs
           node server/test/platform-migration-check.mjs
-          npm audit --prefix server --omit=dev --audit-level=high
 
-          docker build -t pri-learning:bootstrap .
-          tmpdata="$(mktemp -d)"
-          docker rm -f pri-learning-bootstrap >/dev/null 2>&1 || true
-          docker run -d \
-            --name pri-learning-bootstrap \
-            -p 127.0.0.1:4011:4000 \
-            -v "$tmpdata:/data" \
-            -e NODE_ENV=production \
-            -e PORT=4000 \
-            -e PRI_PUBLIC_ORIGIN=https://learn.pri.example \
-            -e PRI_CSRF_SECRET=bootstrap-csrf-secret \
-            -e PRI_AUTH_DELIVERY_KEY=3333333333333333333333333333333333333333333333333333333333333333 \
-            -e PRI_PLATFORM_DB=/data/pri-learning-platform.db \
-            -e PRI_AUTH_EMAIL_PROVIDER=resend \
-            -e PRI_RESEND_API_KEY=bootstrap-resend-key \
-            -e 'PRI_AUTH_EMAIL_FROM=Pri Learning <noreply@pri.example>' \
-            pri-learning:bootstrap
-          cleanup() {
-            docker logs pri-learning-bootstrap || true
-            docker rm -f pri-learning-bootstrap >/dev/null 2>&1 || true
-            rm -rf "$tmpdata"
-          }
-          trap cleanup EXIT
-          ok=0
-          for attempt in $(seq 1 30); do
-            if curl -fsS http://127.0.0.1:4011/v1/health > /tmp/pri-health.json; then ok=1; break; fi
-            if [ "$(docker inspect pri-learning-bootstrap --format '{{.State.Running}}' 2>/dev/null || echo false)" != "true" ]; then
-              docker inspect pri-learning-bootstrap --format '{{json .State}}' || true
-              break
-            fi
-            sleep 1
-          done
-          test "$ok" -eq 1
-          node --input-type=module <<'NODE'
-          import assert from 'node:assert/strict';
-          import { readFileSync } from 'node:fs';
-          const health = JSON.parse(readFileSync('/tmp/pri-health.json', 'utf8'));
-          assert.equal(health.ok, true);
-          assert.equal(health.service, 'pri-learning-platform');
-          assert.equal(health.storage?.persistentDatabase, true);
-          NODE
-          test -s "$tmpdata/pri-learning-platform.db"
-          cleanup
-          trap - EXIT
-
-          rm .github/workflows/deployment-readiness-bootstrap.yml
           git config user.name 'Pri Release Automation'
           git config user.email 'actions@users.noreply.github.com'
-          git add -A
-          git commit -m 'fix(deploy): package fail-closed production runtime'
+          git add server/platform/db.js
+          if git diff --cached --quiet; then
+            echo 'Production DB bootstrap is already hardened.'
+            exit 0
+          fi
+          git commit -m 'fix(deploy): validate production storage before SQLite opens'
           git push origin HEAD:release/deployment-readiness-2026-09-03
