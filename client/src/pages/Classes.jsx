@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
 import { useApp } from '../App.jsx';
 import AssignmentInboxPanel from '../components/AssignmentInboxPanel.jsx';
+import Class10NCERTLibrary from '../components/Class10NCERTLibrary.jsx';
 import { readJSONFile } from '../lib/files.js';
 
 export default function Classes() {
@@ -42,6 +43,8 @@ export default function Classes() {
       <input ref={fileRef} type="file" accept="application/json,.json" style={{ display: 'none' }} onChange={importPack} />
 
       <AssignmentInboxPanel />
+
+      {Number(user.year) === 10 && <Class10NCERTLibrary />}
 
       <section style={{ marginTop: 20 }} aria-labelledby="offline-class-packs-title">
         <div className="spread" style={{ marginBottom: 10 }}>
