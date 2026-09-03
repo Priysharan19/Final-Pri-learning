@@ -771,7 +771,7 @@ async function run() {
 
     await step('exam room · sitting a paper', '/exams/:id', async () => {
       await goTo(page, BASE, '/exams');
-      await click(page, 'button.btn-primary', { text: 'Start exam' });
+      await click(page, 'button.btn-primary', { text: 'Start practice paper' });
       await page.waitForSelector('.exam-nav', { timeout: 60000 });
       await wait(page, 900);
       const wk = page.getByRole('button', { name: /Show working for partial credit/ });

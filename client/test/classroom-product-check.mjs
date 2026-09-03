@@ -3,7 +3,12 @@ import assert from 'node:assert/strict';
 globalThis.__PRI_CLOUD_ORIGIN__ = 'https://cloud.pri.example';
 globalThis.document = { cookie: 'pri_csrf=test-csrf' };
 globalThis.location = { origin: 'https://app.pri.example' };
-globalThis.crypto = { randomUUID: () => 'req-test' };
+if (!globalThis.crypto?.randomUUID) {
+  Object.defineProperty(globalThis, 'crypto', {
+    value: { randomUUID: () => 'req-test' },
+    configurable: true
+  });
+}
 
 const calls = [];
 globalThis.fetch = async (url, options = {}) => {
