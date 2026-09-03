@@ -1,0 +1,57 @@
+name: Patch Production Candidate Registry
+
+on:
+  push:
+    branches:
+      - release/production-candidate-2026-09-03
+
+permissions:
+  contents: write
+
+concurrency:
+  group: patch-production-candidate-registry
+  cancel-in-progress: true
+
+jobs:
+  patch:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: release/production-candidate-2026-09-03
+          fetch-depth: 0
+      - name: Patch authoritative Class 10 lazy-bank registry integration
+        run: |
+          set -euo pipefail
+          git config user.name "Pri Learning Release Automation"
+          git config user.email "actions@users.noreply.github.com"
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('.github/workflows/production-candidate-integrate.yml')
+          s = p.read_text()
+          marker = "          p = Path('client/src/engine/generators/india-class10-quadratic-context.js')\n"
+          assert marker in s, 'candidate integrator shape changed unexpectedly'
+          if "c10-linear-solution-conditions': 'india-class10'" not in s:
+              block = '''          p = Path('client/src/engine/generators/index.js')
+          s = p.read_text()
+          needle = "  'c10-linear-graphs': 'india-class10',\\n"
+          assert needle in s
+          additions = (
+              "  'c10-linear-solution-conditions': 'india-class10',\\n"
+              "  'c10-quadratic-discriminant': 'india-class10',\\n"
+              "  'c10-trig-boundary-relations': 'india-class10',\\n"
+          )
+          for line in additions.splitlines(True):
+              if line not in s:
+                  s = s.replace(needle, needle + line)
+                  needle = line
+          p.write_text(s)
+
+'''
+              s = s.replace(marker, block + marker, 1)
+          p.write_text(s)
+          PY
+          rm .github/workflows/patch-production-candidate-registry.yml
+          git add -A
+          git commit -m "fix(release): register separated Class 10 production generators"
+          git push origin HEAD:release/production-candidate-2026-09-03
