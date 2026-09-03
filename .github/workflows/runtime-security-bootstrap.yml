@@ -1,0 +1,63 @@
+name: Runtime Security Bootstrap
+
+on:
+  push:
+    branches:
+      - fix/runtime-qs-6.16.0-2026-09-03
+
+permissions:
+  contents: write
+
+concurrency:
+  group: runtime-security-bootstrap
+  cancel-in-progress: true
+
+jobs:
+  patch-and-prove:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/runtime-qs-6.16.0-2026-09-03
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Pin patched qs and regenerate lockfile
+        run: |
+          set -euo pipefail
+          npm --prefix server pkg set overrides.qs=6.16.0
+          npm install --prefix server --package-lock-only
+          npm ci --prefix server
+          npm ls --prefix server qs
+          node -e "const p=require('./server/node_modules/qs/package.json'); if(p.version!=='6.16.0') throw new Error('expected qs 6.16.0, got '+p.version); console.log('qs runtime:', p.version)"
+      - name: Require a clean production dependency audit
+        run: npm audit --prefix server --omit=dev --audit-level=low
+      - name: Re-run production platform contracts
+        run: |
+          set -euo pipefail
+          node server/test/platform-schema-check.mjs
+          node server/test/platform-migration-check.mjs
+          node server/test/platform-sync-pagination-check.mjs
+          node server/test/production-storage-config-check.mjs
+          node server/test/production-db-bootstrap-check.mjs
+          node server/test/account-lifecycle-contract-check.mjs
+          node server/test/auth-delivery-worker-check.mjs
+          node server/test/auth-delivery-config-check.mjs
+          node server/test/razorpay-billing-check.mjs
+          node server/test/apple-billing-check.mjs
+      - name: Rebuild production image
+        run: docker build -t pri-learning:security .
+      - name: Commit validated dependency tree
+        run: |
+          set -euo pipefail
+          git config user.name 'Pri Security Automation'
+          git config user.email 'actions@users.noreply.github.com'
+          git add server/package.json server/package-lock.json
+          if git diff --cached --quiet; then
+            echo 'Dependency tree already patched.'
+            exit 0
+          fi
+          git commit -m 'fix(security): pin qs 6.16.0 runtime patch'
+          git push origin HEAD:fix/runtime-qs-6.16.0-2026-09-03
