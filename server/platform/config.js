@@ -1,5 +1,42 @@
+import { isAbsolute } from 'node:path';
+
 function nonEmpty(name) {
   return !!String(process.env[name] || '').trim();
+}
+
+function configuredDbPath() {
+  const value = String(process.env.PRI_PLATFORM_DB || '').trim();
+  return value || null;
+}
+
+function productionDbPathValid() {
+  const path = configuredDbPath();
+  return !!path && path !== ':memory:' && isAbsolute(path);
+}
+
+/**
+ * Resolve the platform database path at process startup.
+ *
+ * Development and focused contracts may use the repository-local default or an
+ * in-memory database. Production must make persistence an explicit deployment
+ * decision: silently writing accounts, billing and sync state to an ephemeral
+ * application filesystem is a data-loss failure mode, so it is rejected before
+ * the database is opened.
+ */
+export function platformDatabasePath() {
+  const path = configuredDbPath();
+  if (process.env.NODE_ENV !== 'production') return path;
+  if (!path) {
+    throw Object.assign(new Error('PRI_PLATFORM_DB is required in production and must point to persistent storage.'), {
+      code: 'PLATFORM_DB_NOT_CONFIGURED'
+    });
+  }
+  if (path === ':memory:' || !isAbsolute(path)) {
+    throw Object.assign(new Error('PRI_PLATFORM_DB must be an absolute, persistent database path in production.'), {
+      code: 'PLATFORM_DB_NOT_PERSISTENT'
+    });
+  }
+  return path;
 }
 
 function webMonthlyConfigured() {
@@ -14,12 +51,18 @@ function appleTrustConfigured() {
   return nonEmpty('PRI_APPLE_ROOT_CA_PEM') || nonEmpty('PRI_APPLE_ROOT_CA_FILE');
 }
 
+function authEmailConfigured() {
+  return String(process.env.PRI_AUTH_EMAIL_PROVIDER || '').trim().toLowerCase() === 'resend' &&
+    nonEmpty('PRI_RESEND_API_KEY') && nonEmpty('PRI_AUTH_EMAIL_FROM');
+}
+
 export function platformConfigStatus() {
   const production = process.env.NODE_ENV === 'production';
   const missing = [];
   if (production && !nonEmpty('PRI_PUBLIC_ORIGIN')) missing.push('PRI_PUBLIC_ORIGIN');
   if (production && !nonEmpty('PRI_CSRF_SECRET')) missing.push('PRI_CSRF_SECRET');
   if (production && !nonEmpty('PRI_AUTH_DELIVERY_KEY')) missing.push('PRI_AUTH_DELIVERY_KEY');
+  if (production && !configuredDbPath()) missing.push('PRI_PLATFORM_DB');
 
   const webMonthly = webMonthlyConfigured();
   const webAnnual = webAnnualConfigured();
@@ -49,9 +92,11 @@ export function platformConfigStatus() {
   return Object.freeze({
     production,
     missing: Object.freeze(uniqueMissing),
-    ok: uniqueMissing.length === 0,
+    ok: uniqueMissing.length === 0 && (!production || productionDbPathValid()),
+    persistentDatabaseConfigured: production ? productionDbPathValid() : !!configuredDbPath(),
     googleConfigured: nonEmpty('PRI_GOOGLE_CLIENT_IDS'),
     appleConfigured: nonEmpty('PRI_APPLE_CLIENT_IDS'),
+    authEmailProviderConfigured: authEmailConfigured(),
     appleBillingProductsConfigured: appleProducts,
     appleBillingProviderConfigured,
     googleBillingProductsConfigured: nonEmpty('PRI_GOOGLE_MONTHLY_PRODUCT_ID') || nonEmpty('PRI_GOOGLE_ANNUAL_PRODUCT_ID'),
@@ -62,8 +107,16 @@ export function platformConfigStatus() {
 
 export function assertPlatformConfig() {
   const status = platformConfigStatus();
-  if (!status.ok) throw new Error(`Pri Learning production platform configuration is incomplete: ${status.missing.join(', ')}`);
+  if (!status.ok) {
+    if (status.production && configuredDbPath() && !productionDbPathValid()) {
+      throw new Error('Pri Learning production platform configuration is incomplete: PRI_PLATFORM_DB must be an absolute persistent path');
+    }
+    throw new Error(`Pri Learning production platform configuration is incomplete: ${status.missing.join(', ')}`);
+  }
   if (status.production) {
+    // Re-run the storage resolver here so router-only startup and direct server
+    // startup share one fail-closed contract.
+    platformDatabasePath();
     let origin;
     try { origin = new URL(process.env.PRI_PUBLIC_ORIGIN); } catch { throw new Error('PRI_PUBLIC_ORIGIN is invalid'); }
     if (origin.protocol !== 'https:' || origin.username || origin.password || origin.search || origin.hash) throw new Error('PRI_PUBLIC_ORIGIN must be a clean HTTPS origin in production');
