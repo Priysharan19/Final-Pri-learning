@@ -29,9 +29,6 @@ assert.equal(backup.stores.ratings.length, 1);
 assert.equal(backup.stores.activity.length, 1);
 const sourceSnapshot = JSON.stringify(rawRows());
 
-// Inject one real IndexedDB write failure only after an earlier restored store
-// has already committed. backend.js historically swallowed this exact failure
-// and returned success with a partial profile.
 const database = await idb.openDB();
 const realTransaction = database.transaction.bind(database);
 let injected = false;
@@ -65,18 +62,12 @@ for (const store of ['ratings', 'attempts', 'questions', 'reviews', 'exams', 'ba
   assert.equal(foreign.length, 0, `${store} retained rows from the rolled-back profile`);
 }
 
-// Existing work is byte-for-byte unchanged by the failed restore. The device
-// store can legitimately initialise install crypto keys during the attempt, so
-// compare only the student's profile-owned data.
 const afterFailure = rawRows();
 const beforeFailure = JSON.parse(sourceSnapshot);
 for (const store of ['profiles', 'ratings', 'attempts', 'questions', 'reviews', 'exams', 'badges', 'activity', 'rushRuns', 'matchRuns', 'inks', 'taskProgress', 'bookmarks']) {
   assert.deepEqual(afterFailure[store] || [], beforeFailure[store] || [], `${store} source data changed during failed restore`);
 }
 
-// Two crafted rows that sanitise to one primary key used to overwrite silently.
-// The verified restore boundary treats that as an incomplete restore and rolls
-// the staged profile back instead of claiming both rows survived.
 const duplicate = structuredClone(backup);
 duplicate.stores.activity.push({ ...duplicate.stores.activity[0], questions: 999 });
 let duplicateFailure = null;
@@ -86,7 +77,6 @@ assert.equal(duplicateFailure?.code, 'RESTORE_INCOMPLETE');
 assert.equal(currentPid(), source.id);
 assert.equal((await dispatch('GET', '/profiles')).profiles.length, 1);
 
-// Unsupported future versions and malformed rows are rejected before mutation.
 for (const invalid of [
   { ...structuredClone(backup), version: 99 },
   (() => { const copy = structuredClone(backup); copy.stores.ratings.push(null); return copy; })()
@@ -99,8 +89,6 @@ for (const invalid of [
   assert.equal(currentPid(), source.id);
 }
 
-// With the injected fault gone, the same backup restores exactly once and is
-// independently re-readable from every declared store.
 const restored = await api.post('/data/import', structuredClone(backup));
 assert.equal(restored.restoreVerified, true);
 assert.equal(restored.backupVersion, 2);

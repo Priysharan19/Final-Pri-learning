@@ -1,8 +1,14 @@
 name: CI
 
 on:
+  workflow_dispatch:
   push:
+    branches: [main]
   pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   suites:
@@ -16,8 +22,12 @@ jobs:
           node-version: "24"
           cache: npm
           cache-dependency-path: client/package-lock.json
+      - name: Runner budget policy
+        run: node tools/ci-runner-policy-check.mjs
       - name: Install client dependencies
         run: npm ci --prefix client
+      - name: Runtime dependency security floor
+        run: npm audit --prefix client --omit=dev --audit-level=high
       - name: Every deterministic suite
         run: |
           set -o pipefail
@@ -26,17 +36,33 @@ jobs:
         run: |
           set -euo pipefail
           test -s suites.log
-          grep -Fq '1344000/1344000 self-checks passed across 168 subtopics' suites.log
+          grep -Fq '1424000/1424000 self-checks passed across 178 subtopics' suites.log
           grep -Fq '21000/21000 multipart part-checks passed' suites.log
-          grep -Fq '✔ INDIA SUITE PASSED — 1432/1432 checks' suites.log
-          grep -Fq '5136 questions from 428 declared (generator, difficulty) pairs × 12 draws — 5136 marked correct by their own marker, 5136 well formed' suites.log
-          grep -Fq '246/246 dot points have a generator behind them; 0 do not' suites.log
+          grep -Fq '✔ INDIA SUITE PASSED — 1458/1458 checks' suites.log
+          grep -Fq '5268 questions from 439 declared (generator, difficulty) pairs × 12 draws — 5268 marked correct by their own marker, 5268 well formed' suites.log
+          grep -Fq '239/239 dot points have a generator behind them; 0 do not' suites.log
           grep -Fq 'PASS — Grade 9 Ganita Manjari: 1280 seeded forms (1000 numeric handwriting-ready, 280 conceptual).' suites.log
           grep -Fq 'PASS — 8/8 chapters, 200/200 uploaded pages, 42/42 formal exercise sections and 293/293 formal exercise prompts represented and verified.' suites.log
           if grep -Fq 'not measured:' suites.log; then
             echo 'A deterministic suite reported skipped coverage.' >&2
             exit 1
           fi
+      - name: Person 2 India + commercial contracts
+        run: |
+          set -euo pipefail
+          node client/test/india-production-meta-check.mjs
+          node client/test/india-class10-current-source-check.mjs
+          node client/test/india-class10-production-gap-check.mjs
+          node client/test/ncert-class10-full-book-check.mjs
+          node client/test/class10-ncert-product-check.mjs
+          node client/test/india-practice-availability-check.mjs
+          node client/test/entitlement-check.mjs
+          node client/test/sync-contract-check.mjs
+          node client/test/cloud-session-refresh-check.mjs
+          node client/test/account-action-boundary-check.mjs
+          node client/test/india-exam-blueprint-check.mjs
+          node client/test/india-progress-product-check.mjs
+          node tools/india-production-census.mjs
       - name: Real ink diagnostic
         if: always()
         run: npm run --silent test:real || true
@@ -47,6 +73,40 @@ jobs:
           name: suites-log
           path: suites.log
           if-no-files-found: error
+
+  platform:
+    name: Production account, sync and commercial schema
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+      - name: Install server dependencies
+        run: npm ci --prefix server
+      - name: Runtime dependency security floor
+        run: npm audit --prefix server --omit=dev --audit-level=high
+      - name: Commercial platform schema contract
+        run: node server/test/platform-schema-check.mjs
+      - name: Platform migration contract
+        run: node server/test/platform-migration-check.mjs
+      - name: Cross-account sync pagination regression
+        run: node server/test/platform-sync-pagination-check.mjs
+      - name: Production persistent-storage contract
+        run: node server/test/production-storage-config-check.mjs
+      - name: Account lifecycle and session rotation
+        run: node server/test/account-lifecycle-contract-check.mjs
+      - name: Encrypted verification/reset email worker
+        run: node server/test/auth-delivery-worker-check.mjs
+      - name: Production email delivery configuration
+        run: node server/test/auth-delivery-config-check.mjs
+      - name: Razorpay billing lifecycle
+        run: node server/test/razorpay-billing-check.mjs
+      - name: Apple billing lifecycle
+        run: node server/test/apple-billing-check.mjs
 
   browser:
     name: Browser suites (end-to-end and accessibility)
@@ -68,6 +128,9 @@ jobs:
         run: |
           set -o pipefail
           npm run test:e2e 2>&1 | tee browser.log
+          node client/test/tour-cloud-platform.js --no-build 2>&1 | tee -a browser.log
+          node client/test/tour-admin-cms-platform.js --no-build 2>&1 | tee -a browser.log
+          node client/test/tour-admin-independent-review.js --no-build 2>&1 | tee -a browser.log
       - name: Accessibility suite
         if: always()
         run: |
@@ -79,6 +142,12 @@ jobs:
           set -euo pipefail
           test -s browser.log
           grep -Eq 'E2E SUITE.*131/131.*5 flows' browser.log
+          grep -Fq 'Cloud · account, live Settings refresh, assignment hand-off' browser.log
+          grep -Eq 'E2E SUITE.*14/14.*1 flows' browser.log
+          grep -Fq 'Cloud admin · CMS lifecycle and role management' browser.log
+          grep -Eq 'E2E SUITE.*17/17.*1 flows' browser.log
+          grep -Fq 'Cloud admin · independent-review rejection' browser.log
+          grep -Eq 'E2E SUITE.*8/8.*1 flows' browser.log
           grep -Eq 'ACCESSIBILITY SUITE.*38/38.*12 groups' browser.log
           if grep -Fq 'not measured:' browser.log; then
             echo 'A browser suite reported skipped coverage.' >&2
@@ -93,7 +162,7 @@ jobs:
           if-no-files-found: error
 
   build:
-    name: Client build and offline guarantee
+    name: Client build and offline-first boundary
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -109,25 +178,16 @@ jobs:
         run: npm run build
       - name: iOS bundle matches the client build
         run: npm run check:ios
-      - name: Built client loads nothing remote
+      - name: Built client loads no remote presentation assets
         run: |
           set -euo pipefail
           test -d client/dist
           count="$(find client/dist \( -name '*.html' -o -name '*.css' \) -type f | wc -l | tr -d ' ')"
           test "$count" -gt 0
           if grep -rnoIE --include='*.html' --include='*.css' '(src|href)="https?://|@import[^;]*https?://|url\(https?://' client/dist; then
-            echo 'Built client contains a remote load.' >&2
+            echo 'Built client contains a remote presentation load.' >&2
             exit 1
           fi
-          echo "read $count built HTML/CSS files: none loads anything remote"
-      - name: Source opens no connection
-        run: |
-          set -euo pipefail
-          test -d client/src
-          count="$(find client/src -type f \( -name '*.js' -o -name '*.jsx' \) | wc -l | tr -d ' ')"
-          test "$count" -gt 0
-          if grep -rn 'fetch(\|XMLHttpRequest\|sendBeacon\|new WebSocket\|EventSource' client/src; then
-            echo 'Client source opens a network connection.' >&2
-            exit 1
-          fi
-          echo "read $count source files: no fetch, XHR, beacon, WebSocket or EventSource"
+          echo "read $count built HTML/CSS files: none loads remote presentation assets"
+      - name: Client network calls stay behind audited transport
+        run: node tools/check-client-network-boundary.mjs

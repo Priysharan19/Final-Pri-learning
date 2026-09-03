@@ -34,7 +34,7 @@ same('every chapter id is unique', new Set(ids).size, ids.length);
 ok('no chapter id collides with an NSW subtopic id', ids.every(id => !SUBTOPIC_BY_ID[id]));
 for (const ch of IN_CHAPTERS) {
   ok(`${ch.id} names a strand this curriculum declares`, IN_STRANDS.includes(ch.strand));
-  ok(`${ch.id} has exactly three dot points`, Array.isArray(ch.dotpoints) && ch.dotpoints.length === 3);
+  ok(`${ch.id} has at least one declared dot point`, Array.isArray(ch.dotpoints) && ch.dotpoints.length > 0);
   ok(`${ch.id} dot points are non-empty prose`, (ch.dotpoints || []).every(d => typeof d === 'string' && d.trim().length > 12));
   ok(`${ch.id} carries a usable exam weight`, Number.isFinite(ch.weight) && ch.weight > 0 && ch.weight <= 20);
   ok(`${ch.id} has a name`, typeof ch.name === 'string' && ch.name.trim().length > 2);
@@ -134,7 +134,8 @@ console.log('\nCOVERAGE');
 const c = coverage();
 same('the three buckets account for every chapter', c.full.length + c.partial.length + c.none.length, c.total);
 same('total matches the chapter list', c.total, IN_CHAPTERS.length);
-same('the dot-point count is three per chapter', c.dotpoints, IN_CHAPTERS.length * 3);
+const declaredDotpoints = IN_CHAPTERS.reduce((total, ch) => total + ch.dotpoints.length, 0);
+same('coverage dot-point count matches the curriculum declarations', c.dotpoints, declaredDotpoints);
 same('covered plus uncovered is every dot point', c.coveredDotpoints + c.uncovered.length, c.dotpoints);
 ok('nothing is counted as both full and partial', c.full.every(x => !c.partial.includes(x)));
 for (const ch of c.full) same(`${ch.id} is full, so nothing is uncovered`, uncoveredDotpoints(ch).length, 0);

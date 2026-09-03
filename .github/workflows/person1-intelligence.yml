@@ -22,6 +22,12 @@ on:
 permissions:
   contents: read
 
+# For a PR, only the newest head can be merged. Cancel stale intelligence
+# contracts instead of allowing every synchronize event to consume a runner.
+concurrency:
+  group: person1-intelligence-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   intelligence-contract:
     name: Handwriting → marking → diagnosis → adaptation → explanation

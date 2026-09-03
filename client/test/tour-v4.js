@@ -114,9 +114,9 @@ export const flow = {
 
     // ── 2 · a paper is generated ─────────────────────────────────────────────
     await page.goto(`${base}/exams`, { waitUntil: 'domcontentloaded' });
-    await page.waitForSelector('button:has-text("Start exam")', { timeout: 30000 });
+    await page.waitForSelector('button:has-text("Start practice paper")', { timeout: 30000 });
     await page.locator('.card').first().locator('select').nth(1).selectOption(String(LENGTH));
-    await page.getByRole('button', { name: 'Start exam' }).click();
+    await page.getByRole('button', { name: 'Start practice paper' }).click();
     await page.waitForSelector('.exam-timer', { timeout: 60000 });
     const examId = new URL(page.url()).pathname.split('/').pop();
 

@@ -1,0 +1,188 @@
+name: Person 2 India + Platform
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - 'client/src/engine/india**'
+      - 'client/src/engine/ncert/**'
+      - 'client/src/engine/generators/india-class10**'
+      - 'client/src/engine/curriculumAvailability.js'
+      - 'client/src/local/india**'
+      - 'client/src/pages/India**'
+      - 'client/src/pages/Home.jsx'
+      - 'client/src/pages/Exams.jsx'
+      - 'client/src/pages/Progress*.jsx'
+      - 'client/src/pages/Settings.jsx'
+      - 'client/src/pages/PracticeBase.jsx'
+      - 'client/src/pages/AccountAction.jsx'
+      - 'client/src/main.jsx'
+      - 'client/src/platform/**'
+      - 'client/src/components/CloudAccountPanel.jsx'
+      - 'client/src/components/ClassroomPanel.jsx'
+      - 'client/src/components/AssignmentInboxPanel.jsx'
+      - 'client/src/components/StaffOperationsPanel.jsx'
+      - 'client/src/components/Class10NCERTLibrary.jsx'
+      - 'client/src/api.js'
+      - 'client/test/india-**'
+      - 'client/test/class10-ncert-**'
+      - 'client/test/ncert-class10-**'
+      - 'client/test/cloud-**'
+      - 'client/test/profile-cloud-**'
+      - 'client/test/account-action-**'
+      - 'client/test/classroom-product-check.mjs'
+      - 'client/test/assignment-staff-product-check.mjs'
+      - 'client/test/tour-cloud-platform.js'
+      - 'client/test/entitlement-check.mjs'
+      - 'client/test/sync-contract-check.mjs'
+      - 'client/test/native-storekit-boundary-check.mjs'
+      - 'client/test/native-cloud-transport-check.mjs'
+      - 'client/test/ios-package-source-drift-check.mjs'
+      - 'ios/PriLearning.swiftpm/**'
+      - 'ios/PriLearning 2.swiftpm/**'
+      - 'server/platform/**'
+      - 'server/test/platform-**'
+      - 'server/test/account-**'
+      - 'server/test/auth-delivery-**'
+      - 'server/test/production-storage-**'
+      - 'server/test/billing-**'
+      - 'server/test/razorpay-**'
+      - 'server/test/apple-**'
+      - 'server/test/native-origin-**'
+      - 'server/test/classroom-**'
+      - 'server/test/assignment-**'
+      - 'server/test/content-**'
+      - 'tools/india-**'
+      - 'tools/check-client-network-boundary.mjs'
+      - '.github/workflows/person2-india-platform.yml'
+      - '.github/workflows/ci.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: person2-india-platform-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contracts:
+    name: India product and offline/cloud contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+      - name: Install client dependencies
+        run: npm ci --prefix client
+      - name: India curriculum provenance
+        run: node client/test/india-production-meta-check.mjs
+      - name: Current Class 10 source truth
+        run: node client/test/india-class10-current-source-check.mjs
+      - name: Separated Class 10 source outcomes
+        run: node client/test/india-class10-production-gap-check.mjs
+      - name: Current Class 10 polynomial forms
+        run: node client/test/india-class10-polynomial-current-check.mjs
+      - name: Current Class 10 triangle forms
+        run: node client/test/india-class10-triangles-current-check.mjs
+      - name: Current Class 10 irrationality proofs
+        run: node client/test/india-class10-irrationality-current-check.mjs
+      - name: Current Class 10 linear graph forms
+        run: node client/test/india-class10-linear-graphs-current-check.mjs
+      - name: Current Class 10 contextual quadratics
+        run: node client/test/india-class10-quadratic-context-current-check.mjs
+      - name: Current Class 10 combined surface-area forms
+        run: node client/test/india-class10-surface-combo-current-check.mjs
+      - name: Current Class 10 trigonometry
+        run: node client/test/india-class10-trigonometry-current-check.mjs
+      - name: NCERT Class 10 full-book source contract
+        run: node client/test/ncert-class10-full-book-check.mjs
+      - name: Class 10 NCERT student product contract
+        run: node client/test/class10-ncert-product-check.mjs
+      - name: Student practice target availability
+        run: node client/test/india-practice-availability-check.mjs
+      - name: India exam source/claim contract
+        run: node client/test/india-exam-blueprint-check.mjs
+      - name: India progress presentation contract
+        run: node client/test/india-progress-product-check.mjs
+      - name: India product routing
+        run: node client/test/india-product-routing-check.mjs
+      - name: Premium entitlement authority
+        run: node client/test/entitlement-check.mjs
+      - name: Sync conflict/idempotency contract
+        run: node client/test/sync-contract-check.mjs
+      - name: Profile-scoped cloud outbox isolation
+        run: node client/test/profile-cloud-outbox-check.mjs
+      - name: Cloud account link boundary
+        run: node client/test/cloud-account-boundary-check.mjs
+      - name: Cloud session live refresh
+        run: node client/test/cloud-session-refresh-check.mjs
+      - name: Fragment-only verification/reset action boundary
+        run: node client/test/account-action-boundary-check.mjs
+      - name: Classroom client transport boundary
+        run: node client/test/classroom-product-check.mjs
+      - name: Assignment execution and staff UI boundary
+        run: node client/test/assignment-staff-product-check.mjs
+      - name: Cloud sync migration and profile isolation
+        run: node client/test/cloud-sync-worker-check.mjs
+      - name: Native StoreKit bridge authority boundary
+        run: node client/test/native-storekit-boundary-check.mjs
+      - name: Native cloud transport boundary
+        run: node client/test/native-cloud-transport-check.mjs
+      - name: Runnable iOS package source drift
+        run: node client/test/ios-package-source-drift-check.mjs
+      - name: Coverage census
+        run: node tools/india-production-census.mjs
+      - name: Audited network boundary
+        run: node tools/check-client-network-boundary.mjs
+      - name: Client build
+        run: npm run build
+
+  platform:
+    name: Account, sync, billing, classroom and CMS contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+      - name: Install server dependencies
+        run: npm ci --prefix server
+      - name: Platform schema contract
+        run: node server/test/platform-schema-check.mjs
+      - name: Platform migration contract
+        run: node server/test/platform-migration-check.mjs
+      - name: Cross-account sync pagination regression
+        run: node server/test/platform-sync-pagination-check.mjs
+      - name: Production persistent-storage contract
+        run: node server/test/production-storage-config-check.mjs
+      - name: Native URLSession origin and CSRF boundary
+        run: node server/test/native-origin-csrf-check.mjs
+      - name: Destructive account reauthentication
+        run: node server/test/account-deletion-reauth-check.mjs
+      - name: Full account lifecycle and session rotation
+        run: node server/test/account-lifecycle-contract-check.mjs
+      - name: Encrypted auth email delivery worker
+        run: node server/test/auth-delivery-worker-check.mjs
+      - name: Production auth email configuration
+        run: node server/test/auth-delivery-config-check.mjs
+      - name: Deployment-configured billing display
+        run: node server/test/billing-config-check.mjs
+      - name: Verified Razorpay checkout, webhook and restore lifecycle
+        run: node server/test/razorpay-billing-check.mjs
+      - name: Verified Apple transaction and server-notification lifecycle
+        run: node server/test/apple-billing-check.mjs
+      - name: Independent CMS review
+        run: node server/test/content-review-contract-check.mjs
+      - name: Classroom submit-return-resubmit lifecycle
+        run: node server/test/classroom-submission-contract-check.mjs
+      - name: Assignment visibility and execution authorization
+        run: node server/test/assignment-execution-contract-check.mjs
