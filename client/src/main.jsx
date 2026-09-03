@@ -5,7 +5,21 @@ import '@fontsource-variable/inter';
 import './theme.css';
 import './ink/interactionGuard.js';
 import App from './App.jsx';
+import AccountAction from './pages/AccountAction.jsx';
+import { accountActionCleanUrl, parseAccountActionFragment } from './platform/accountAction.js';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
+
+// Account verification/password-reset links carry their secret only in the URL
+// fragment. Strip it before React, analytics-like browser extensions or later
+// navigation code can observe it. The link itself is minted by PRI_PUBLIC_ORIGIN,
+// so its cloud authority is the same origin that served this page.
+const ACCOUNT_ACTION_MODE = window.location.pathname === '/account-action';
+let accountActionData = null;
+if (ACCOUNT_ACTION_MODE) {
+  accountActionData = parseAccountActionFragment(window.location.hash);
+  window.history.replaceState(null, '', accountActionCleanUrl(window.location));
+  if (!window.__PRI_CLOUD_ORIGIN__) window.__PRI_CLOUD_ORIGIN__ = window.location.origin;
+}
 
 // Physical iPad LAN testing must never be controlled by an older offline shell.
 // A production Vite build normally registers the service worker below, which is
@@ -36,18 +50,29 @@ if (LAN_DEV) {
   })();
 }
 
-// The root boundary sits outside the router so that everything is covered —
-// the boot screen, the whole Login and cold-start path, the topbar, the account
-// menu, the sidebar, the toasts and the mobile nav, not only the routes.
-createRoot(document.getElementById('root')).render(
-  <React.StrictMode>
-    <ErrorBoundary scope="app">
-      <BrowserRouter>
-        <App />
-      </BrowserRouter>
+const root = createRoot(document.getElementById('root'));
+if (ACCOUNT_ACTION_MODE) {
+  // Deliberately outside StrictMode: verification is a one-time token-consuming
+  // mutation and development StrictMode replays mount effects.
+  root.render(
+    <ErrorBoundary scope="account action">
+      <AccountAction actionData={accountActionData} />
     </ErrorBoundary>
-  </React.StrictMode>
-);
+  );
+} else {
+  // The root boundary sits outside the router so that everything is covered —
+  // the boot screen, the whole Login and cold-start path, the topbar, the account
+  // menu, the sidebar, the toasts and the mobile nav, not only the routes.
+  root.render(
+    <React.StrictMode>
+      <ErrorBoundary scope="app">
+        <BrowserRouter>
+          <App />
+        </BrowserRouter>
+      </ErrorBoundary>
+    </React.StrictMode>
+  );
+}
 
 // Offline support — registration is intentionally started as soon as the
 // production module has evaluated, rather than waiting for `load`. A service

@@ -18,6 +18,7 @@ import { ensureBillingSchema } from './platform/billingSchema.js';
 import { createAppleBilling } from './platform/appleBilling.js';
 import { createRazorpayBilling } from './platform/razorpay.js';
 import { createPlatformRouter } from './platform/router.js';
+import { startAuthDeliveryWorker } from './platform/authDelivery.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -42,6 +43,11 @@ app.use('/v1', createPlatformRouter(platformDb, {
   billingCheckout: webBilling.checkout,
   billingNative: appleBilling.native
 }));
+
+// Verification/reset tokens are persisted only as one-way hashes plus an
+// AES-GCM delivery envelope. The worker decrypts a token only at the send
+// boundary, uses provider idempotency, and never logs destinations or tokens.
+startAuthDeliveryWorker(platformDb);
 
 // Legacy routes: kept until old tooling no longer needs the historical server.
 app.use('/api/auth', authRouter);

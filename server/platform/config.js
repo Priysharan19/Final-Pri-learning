@@ -14,6 +14,11 @@ function appleTrustConfigured() {
   return nonEmpty('PRI_APPLE_ROOT_CA_PEM') || nonEmpty('PRI_APPLE_ROOT_CA_FILE');
 }
 
+function authEmailConfigured() {
+  return String(process.env.PRI_AUTH_EMAIL_PROVIDER || '').trim().toLowerCase() === 'resend' &&
+    nonEmpty('PRI_RESEND_API_KEY') && nonEmpty('PRI_AUTH_EMAIL_FROM');
+}
+
 export function platformConfigStatus() {
   const production = process.env.NODE_ENV === 'production';
   const missing = [];
@@ -52,6 +57,7 @@ export function platformConfigStatus() {
     ok: uniqueMissing.length === 0,
     googleConfigured: nonEmpty('PRI_GOOGLE_CLIENT_IDS'),
     appleConfigured: nonEmpty('PRI_APPLE_CLIENT_IDS'),
+    authEmailProviderConfigured: authEmailConfigured(),
     appleBillingProductsConfigured: appleProducts,
     appleBillingProviderConfigured,
     googleBillingProductsConfigured: nonEmpty('PRI_GOOGLE_MONTHLY_PRODUCT_ID') || nonEmpty('PRI_GOOGLE_ANNUAL_PRODUCT_ID'),
