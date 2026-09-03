@@ -1,0 +1,89 @@
+name: Production Container
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'Dockerfile'
+      - '.dockerignore'
+      - '.env.production.example'
+      - 'client/**'
+      - 'server/**'
+      - 'docs/production-deployment.md'
+      - '.github/workflows/deployment-image.yml'
+  pull_request:
+    paths:
+      - 'Dockerfile'
+      - '.dockerignore'
+      - '.env.production.example'
+      - 'client/**'
+      - 'server/**'
+      - 'docs/production-deployment.md'
+      - '.github/workflows/deployment-image.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-container-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  container:
+    name: Build container and prove persistent health
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build production image
+        run: docker build --pull -t pri-learning:ci .
+      - name: Run image with mounted persistent storage
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/pri-platform-data"
+          docker rm -f pri-learning-ci >/dev/null 2>&1 || true
+          docker run -d \
+            --name pri-learning-ci \
+            -p 127.0.0.1:4010:4000 \
+            -v "$RUNNER_TEMP/pri-platform-data:/data" \
+            -e NODE_ENV=production \
+            -e PORT=4000 \
+            -e PRI_PUBLIC_ORIGIN=https://learn.pri.example \
+            -e PRI_CSRF_SECRET=ci-csrf-secret-not-for-production \
+            -e PRI_AUTH_DELIVERY_KEY=3333333333333333333333333333333333333333333333333333333333333333 \
+            -e PRI_PLATFORM_DB=/data/pri-learning-platform.db \
+            -e PRI_AUTH_EMAIL_PROVIDER=resend \
+            -e PRI_RESEND_API_KEY=ci-resend-key \
+            -e 'PRI_AUTH_EMAIL_FROM=Pri Learning <noreply@pri.example>' \
+            pri-learning:ci
+
+          cleanup() {
+            docker logs pri-learning-ci || true
+            docker rm -f pri-learning-ci >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+
+          ok=0
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:4010/v1/health > health.json; then
+              ok=1
+              break
+            fi
+            if [ "$(docker inspect pri-learning-ci --format '{{.State.Running}}' 2>/dev/null || echo false)" != "true" ]; then
+              echo 'Production container exited before becoming healthy.' >&2
+              docker inspect pri-learning-ci --format '{{json .State}}' || true
+              break
+            fi
+            sleep 1
+          done
+          test "$ok" -eq 1
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import { readFileSync } from 'node:fs';
+          const health = JSON.parse(readFileSync('health.json', 'utf8'));
+          assert.equal(health.ok, true);
+          assert.equal(health.service, 'pri-learning-platform');
+          assert.equal(health.storage?.persistentDatabase, true);
+          NODE
+          test -s "$RUNNER_TEMP/pri-platform-data/pri-learning-platform.db"

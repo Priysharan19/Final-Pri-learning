@@ -97,6 +97,8 @@ jobs:
         run: node server/test/platform-sync-pagination-check.mjs
       - name: Production persistent-storage contract
         run: node server/test/production-storage-config-check.mjs
+      - name: Production DB bootstrap order contract
+        run: node server/test/production-db-bootstrap-check.mjs
       - name: Account lifecycle and session rotation
         run: node server/test/account-lifecycle-contract-check.mjs
       - name: Encrypted verification/reset email worker
