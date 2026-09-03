@@ -32,23 +32,24 @@ jobs:
           marker = "          p = Path('client/src/engine/generators/india-class10-quadratic-context.js')\n"
           assert marker in s, 'candidate integrator shape changed unexpectedly'
           if "c10-linear-solution-conditions': 'india-class10'" not in s:
-              block = '''          p = Path('client/src/engine/generators/index.js')
-          s = p.read_text()
-          needle = "  'c10-linear-graphs': 'india-class10',\\n"
-          assert needle in s
-          additions = (
-              "  'c10-linear-solution-conditions': 'india-class10',\\n"
-              "  'c10-quadratic-discriminant': 'india-class10',\\n"
-              "  'c10-trig-boundary-relations': 'india-class10',\\n"
-          )
-          for line in additions.splitlines(True):
-              if line not in s:
-                  s = s.replace(needle, needle + line)
-                  needle = line
-          p.write_text(s)
-
-'''
-              s = s.replace(marker, block + marker, 1)
+              lines = [
+                  "          p = Path('client/src/engine/generators/index.js')",
+                  "          s = p.read_text()",
+                  "          needle = \"  'c10-linear-graphs': 'india-class10',\\\\n\"",
+                  "          assert needle in s",
+                  "          additions = [",
+                  "              \"  'c10-linear-solution-conditions': 'india-class10',\\\\n\" ,",
+                  "              \"  'c10-quadratic-discriminant': 'india-class10',\\\\n\" ,",
+                  "              \"  'c10-trig-boundary-relations': 'india-class10',\\\\n\" ,",
+                  "          ]",
+                  "          for line in additions:",
+                  "              if line not in s:",
+                  "                  s = s.replace(needle, needle + line)",
+                  "                  needle = line",
+                  "          p.write_text(s)",
+                  "",
+              ]
+              s = s.replace(marker, '\n'.join(lines) + '\n' + marker, 1)
           p.write_text(s)
           PY
           rm .github/workflows/patch-production-candidate-registry.yml
