@@ -6,10 +6,6 @@ on:
     branches: [main]
   pull_request:
 
-# Feature branches are validated by their PR merge ref; main is validated again
-# after merge. A newer head makes every older queued head non-authoritative, so
-# keep only the latest run for each PR/branch instead of building an unbounded
-# backlog during active development.
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -30,6 +26,8 @@ jobs:
         run: node tools/ci-runner-policy-check.mjs
       - name: Install client dependencies
         run: npm ci --prefix client
+      - name: Runtime dependency security floor
+        run: npm audit --prefix client --omit=dev --audit-level=high
       - name: Every deterministic suite
         run: |
           set -o pipefail
@@ -38,11 +36,11 @@ jobs:
         run: |
           set -euo pipefail
           test -s suites.log
-          grep -Fq '1344000/1344000 self-checks passed across 168 subtopics' suites.log
+          grep -Fq '1424000/1424000 self-checks passed across 178 subtopics' suites.log
           grep -Fq '21000/21000 multipart part-checks passed' suites.log
-          grep -Fq '✔ INDIA SUITE PASSED — 1432/1432 checks' suites.log
-          grep -Fq '5136 questions from 428 declared (generator, difficulty) pairs × 12 draws — 5136 marked correct by their own marker, 5136 well formed' suites.log
-          grep -Fq '246/246 dot points have a generator behind them; 0 do not' suites.log
+          grep -Fq '✔ INDIA SUITE PASSED — 1458/1458 checks' suites.log
+          grep -Fq '5268 questions from 439 declared (generator, difficulty) pairs × 12 draws — 5268 marked correct by their own marker, 5268 well formed' suites.log
+          grep -Fq '239/239 dot points have a generator behind them; 0 do not' suites.log
           grep -Fq 'PASS — Grade 9 Ganita Manjari: 1280 seeded forms (1000 numeric handwriting-ready, 280 conceptual).' suites.log
           grep -Fq 'PASS — 8/8 chapters, 200/200 uploaded pages, 42/42 formal exercise sections and 293/293 formal exercise prompts represented and verified.' suites.log
           if grep -Fq 'not measured:' suites.log; then
@@ -53,9 +51,15 @@ jobs:
         run: |
           set -euo pipefail
           node client/test/india-production-meta-check.mjs
+          node client/test/india-class10-current-source-check.mjs
+          node client/test/india-class10-production-gap-check.mjs
+          node client/test/ncert-class10-full-book-check.mjs
+          node client/test/class10-ncert-product-check.mjs
+          node client/test/india-practice-availability-check.mjs
           node client/test/entitlement-check.mjs
           node client/test/sync-contract-check.mjs
           node client/test/cloud-session-refresh-check.mjs
+          node client/test/account-action-boundary-check.mjs
           node client/test/india-exam-blueprint-check.mjs
           node client/test/india-progress-product-check.mjs
           node tools/india-production-census.mjs
@@ -73,7 +77,7 @@ jobs:
   platform:
     name: Production account, sync and commercial schema
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -83,8 +87,26 @@ jobs:
           cache-dependency-path: server/package-lock.json
       - name: Install server dependencies
         run: npm ci --prefix server
+      - name: Runtime dependency security floor
+        run: npm audit --prefix server --omit=dev --audit-level=high
       - name: Commercial platform schema contract
         run: node server/test/platform-schema-check.mjs
+      - name: Platform migration contract
+        run: node server/test/platform-migration-check.mjs
+      - name: Cross-account sync pagination regression
+        run: node server/test/platform-sync-pagination-check.mjs
+      - name: Production persistent-storage contract
+        run: node server/test/production-storage-config-check.mjs
+      - name: Account lifecycle and session rotation
+        run: node server/test/account-lifecycle-contract-check.mjs
+      - name: Encrypted verification/reset email worker
+        run: node server/test/auth-delivery-worker-check.mjs
+      - name: Production email delivery configuration
+        run: node server/test/auth-delivery-config-check.mjs
+      - name: Razorpay billing lifecycle
+        run: node server/test/razorpay-billing-check.mjs
+      - name: Apple billing lifecycle
+        run: node server/test/apple-billing-check.mjs
 
   browser:
     name: Browser suites (end-to-end and accessibility)
@@ -125,7 +147,7 @@ jobs:
           grep -Fq 'Cloud admin · CMS lifecycle and role management' browser.log
           grep -Eq 'E2E SUITE.*17/17.*1 flows' browser.log
           grep -Fq 'Cloud admin · independent-review rejection' browser.log
-          grep -Eq 'E2E SUITE.*7/7.*1 flows' browser.log
+          grep -Eq 'E2E SUITE.*8/8.*1 flows' browser.log
           grep -Eq 'ACCESSIBILITY SUITE.*38/38.*12 groups' browser.log
           if grep -Fq 'not measured:' browser.log; then
             echo 'A browser suite reported skipped coverage.' >&2
