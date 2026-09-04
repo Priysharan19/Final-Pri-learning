@@ -8,20 +8,20 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: runtime-audit-floor-bootstrap
+  cancel-in-progress: true
+
 jobs:
   audit:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - name: Install client dependencies
-        run: npm ci --prefix client
       - name: Client runtime audit at low severity
         run: npm audit --prefix client --omit=dev --audit-level=low
-      - name: Install server dependencies
-        run: npm ci --prefix server
       - name: Server runtime audit at low severity
         run: npm audit --prefix server --omit=dev --audit-level=low
