@@ -347,7 +347,7 @@ const numberPlay = (rng, diff) => {
     });
   }
   if (diff === 3) {
-    let a = ri(rng, 2, 15), b = ri(rng, a + 1, 25);
+    const [a, b] = rc(rng, [[1,2],[2,3],[3,5],[5,8],[8,13],[13,21],[21,34],[34,55]]);
     const next = a + b;
     return numeric(`Consecutive terms in a Virahanka-Fibonacci sequence are $${a}$ and $${b}$. What is the next term?`, next, 2, {
       hints: ['Each new term is the sum of the two preceding terms.'],
@@ -435,7 +435,7 @@ const fractions = (rng, diff) => {
       steps: [{ h: 'Reciprocal', d: `Reciprocal of $${b.latex()}$ is $${new Frac(b.d, b.n).latex()}$` }, { h: 'Multiply', d: `$${answer.latex()}$` }]
     });
   }
-  const whole = rc(rng, [24, 30, 36, 48, 60]);
+  const whole = rc(rng, [60, 120, 180]);
   const part = rc(rng, [new Frac(1, 2), new Frac(2, 3), new Frac(3, 4)]);
   const share = rc(rng, [new Frac(1, 2), new Frac(1, 3), new Frac(2, 5)]);
   const answer = new Frac(whole, 1).mul(part).mul(share);
