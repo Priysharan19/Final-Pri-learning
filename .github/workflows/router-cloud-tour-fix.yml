@@ -2,16 +2,14 @@ name: Router cloud handoff fix
 
 on:
   push:
-    branches:
-      - security/runtime-audit-floor-2026-09-04
+    branches: ["security/runtime-audit-floor-2026-09-04"]
 
 permissions:
   contents: write
 
 jobs:
-  verify-and-commit:
-    if: github.actor != 'github-actions[bot]'
-    runs-on: ubuntu-24.04
+  verify:
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
@@ -19,42 +17,27 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-          cache: npm
-          cache-dependency-path: client/package-lock.json
-      - name: Harden cloud assignment assertion
+      - name: Patch cloud tour assertion
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          path = Path('client/test/tour-cloud-platform.js')
-          text = path.read_text()
-          old = """    const assignmentTitle = page.getByText(ASSIGNMENT.title, { exact: true }).first();
-    const assignmentProgress = page.getByText('0/3 questions completed', { exact: true }).first();
-    await assignmentTitle.waitFor({ state: 'visible', timeout: 15000 });
-    await assignmentProgress.waitFor({ state: 'visible', timeout: 15000 });
-    await check('Practice renders the verified assignment context before serving local maths',
-      await assignmentTitle.isVisible() && await assignmentProgress.isVisible(),
-      `assignment card=${JSON.stringify((await assignmentTitle.locator('xpath=ancestor::div[contains(@class,\"card\")][1]').innerText().catch(() => '')).slice(0, 240))}`);
-"""
-          new = """    const assignmentCard = page.locator('.card', { has: page.getByText(ASSIGNMENT.title, { exact: true }) }).first();
+          p = Path('client/test/tour-cloud-platform.js')
+          s = p.read_text()
+          start = s.index('    const assignmentTitle = page.getByText(ASSIGNMENT.title')
+          end = s.index('\n\n    await page.waitForTimeout(300);', start)
+          replacement = '''    const assignmentCard = page.locator('.card', { has: page.getByText(ASSIGNMENT.title, { exact: true }) }).first();
     await assignmentCard.waitFor({ state: 'visible', timeout: 15000 });
     const assignmentCardText = await assignmentCard.innerText();
     await check('Practice renders the verified assignment context before serving local maths',
       assignmentCardText.includes(ASSIGNMENT.title) && assignmentCardText.includes('0/3 questions completed'),
-      `assignment card reads ${JSON.stringify(assignmentCardText.slice(0, 320))}`);
-"""
-          if old not in text:
-              raise SystemExit('expected assertion block not found')
-          path.write_text(text.replace(old, new, 1))
+      `assignment card reads ${JSON.stringify(assignmentCardText.slice(0, 320))}`);'''
+          p.write_text(s[:start] + replacement + s[end:])
           PY
-      - name: Install client
-        run: npm ci --prefix client
-      - name: Install Chromium
-        run: npx playwright install --with-deps chromium
-      - name: Build client
-        run: npm run build --prefix client
-      - name: Verify cloud assignment handoff
-        run: node client/test/tour-cloud-platform.js --no-build
-      - name: Remove bootstrap and commit
+      - run: npm ci --prefix client
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build --prefix client
+      - run: node client/test/tour-cloud-platform.js --no-build
+      - name: Commit verified patch
         run: |
           rm .github/workflows/router-cloud-tour-fix.yml
           git config user.name "Pri Release Automation"
