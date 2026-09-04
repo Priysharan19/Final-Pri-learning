@@ -1,0 +1,164 @@
+name: Class 7 Current Source Bootstrap
+
+on:
+  push:
+    branches:
+      - india/class7-ganita-prakash-2026-27
+
+permissions:
+  contents: write
+
+concurrency:
+  group: class7-current-source-bootstrap
+  cancel-in-progress: true
+
+jobs:
+  integrate-and-prove:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: india/class7-ganita-prakash-2026-27
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Wire current Class 7 source into live product
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          from pathlib import Path
+
+          # 1. Atomically replace the legacy Class 7 spine in curriculum-in.js.
+          p = Path('client/src/engine/curriculum-in.js')
+          s = p.read_text()
+          import_anchor = "import { IN_CURRICULUM, IN_CHAPTERS, IN_CHAPTER_BY_ID } from './curriculum-in-base.js';\n"
+          import_line = "import { NCERT_CLASS7_2026_27_CHAPTERS } from './ncert/class7-2026-27-production.js';\n"
+          if import_line not in s:
+              s = s.replace(import_anchor, import_anchor + import_line, 1)
+          marker = "function applyChapterOverlay(chapterId, dotpoints, covers, { native = true } = {}) {\n"
+          block = r'''function replaceClass7() {
+            const group = IN_CURRICULUM.find(g => g.grade === 7);
+            if (!group) throw new Error('Class 7 curriculum group is missing');
+            const oldIds = group.chapters.map(ch => ch.id);
+            const chapters = NCERT_CLASS7_2026_27_CHAPTERS.map(src => ({
+              id: src.id,
+              name: src.title,
+              strand: src.strand,
+              weight: src.weight,
+              dotpoints: [...src.dotpoints],
+              native: true,
+              covers: src.covers.map(c => ({ gen:c.gen, dp:[...c.dp], diff:[...c.diff] }))
+            }));
+
+            const first = IN_CHAPTERS.findIndex(ch => ch.grade === 7);
+            const count = IN_CHAPTERS.filter(ch => ch.grade === 7).length;
+            if (first < 0 || !count) throw new Error('Class 7 flat curriculum is missing');
+
+            for (const id of oldIds) delete IN_CHAPTER_BY_ID[id];
+            group.caption = 'NCERT Ganita Prakash Grade 7 Part I — current 2026–27 source-authored production coverage';
+            group.chapters = chapters;
+
+            const flat = chapters.map(ch => ({ ...ch, dotpoints:[...ch.dotpoints], covers:ch.covers.map(c=>({gen:c.gen,dp:[...c.dp],diff:[...c.diff]})), grade:7 }));
+            IN_CHAPTERS.splice(first, count, ...flat);
+            for (const ch of flat) IN_CHAPTER_BY_ID[ch.id] = ch;
+          }
+
+          replaceClass7();
+
+          '''
+          if 'function replaceClass7()' not in s:
+              s = s.replace(marker, block + marker, 1)
+          p.write_text(s)
+
+          # 2. Add current Class 7 generators to the junior production bank.
+          p = Path('client/src/engine/generators/india-junior-overlay.js')
+          s = p.read_text()
+          imp = "import { NCERT_CLASS7_2026_27_GENERATORS } from '../ncert/class7-2026-27-production.js';\n"
+          if imp not in s:
+              s = imp + s
+          spread = "  ...NCERT_CLASS7_2026_27_GENERATORS,\n"
+          anchor = "export const indiaJunior = Object.freeze({\n"
+          if spread not in s:
+              s = s.replace(anchor, anchor + spread, 1)
+          p.write_text(s)
+
+          # 3. Route the eight new native generator ids to the junior bank.
+          p = Path('client/src/engine/generators/index.js')
+          s = p.read_text()
+          anchor = "  'c7-triangle-angles': 'india-junior',\n"
+          entries = """  'c7-large-numbers-current': 'india-junior',
+            'c7-arithmetic-expressions-current': 'india-junior',
+            'c7-decimals-current': 'india-junior',
+            'c7-letter-numbers-current': 'india-junior',
+            'c7-parallel-intersecting-lines-current': 'india-junior',
+            'c7-number-play-current': 'india-junior',
+            'c7-triangles-current': 'india-junior',
+            'c7-fractions-current': 'india-junior',
+          """
+          if "'c7-large-numbers-current': 'india-junior'" not in s:
+              s = s.replace(anchor, anchor + entries, 1)
+          p.write_text(s)
+
+          # 4. Promote only the new source-authored Class 7 ids in the truth layer.
+          p = Path('client/src/engine/indiaProductionMeta.js')
+          s = p.read_text()
+          import_anchor = "import { IN_CURRICULUM, uncoveredDotpoints } from './curriculum-in.js';\n"
+          imp = "import { NCERT_CLASS7_2026_27_IDS, NCERT_CLASS7_2026_27_SOURCE } from './ncert/class7-2026-27-production.js';\n"
+          if imp not in s:
+              s = s.replace(import_anchor, import_anchor + imp, 1)
+          set_anchor = "const CLASS8_SOURCE_IDS = Object.freeze(new Set([\n"
+          set_line = "const CLASS7_SOURCE_IDS = Object.freeze(new Set(NCERT_CLASS7_2026_27_IDS));\n\n"
+          if 'const CLASS7_SOURCE_IDS' not in s:
+              s = s.replace(set_anchor, set_line + set_anchor, 1)
+          sources_anchor = "const SOURCES = Object.freeze({\n"
+          class7 = """  class7: Object.freeze({
+            quality: INDIA_CONTENT_QUALITY.SOURCE_AUTHORED,
+            kind: 'ncert-textbook',
+            edition: NCERT_CLASS7_2026_27_SOURCE.curriculumVersion,
+            isbn: NCERT_CLASS7_2026_27_SOURCE.isbn,
+            ncertTextbook: NCERT_CLASS7_2026_27_SOURCE.prelims,
+            evidence: NCERT_CLASS7_2026_27_SOURCE.evidence,
+            reviewState: 'current-source-authored-in-repository'
+          }),
+          """
+          if 'class7: Object.freeze({' not in s:
+              s = s.replace(sources_anchor, sources_anchor + class7, 1)
+          record_anchor = "function sourceRecord(chapter) {\n"
+          record_line = "  if (CLASS7_SOURCE_IDS.has(chapter.id)) return SOURCES.class7;\n"
+          if record_line not in s:
+              s = s.replace(record_anchor, record_anchor + record_line, 1)
+          p.write_text(s)
+          PY
+      - name: Install client dependencies
+        run: npm ci --prefix client
+      - name: Current Class 7 source contract
+        run: node client/test/india-class7-current-source-check.mjs
+      - name: India product regressions
+        run: |
+          set -euo pipefail
+          node client/test/india-check.mjs
+          node client/test/india-production-meta-check.mjs
+          node client/test/india-practice-availability-check.mjs
+          node client/test/india-product-routing-check.mjs
+      - name: Full deterministic regression suite
+        run: npm test
+      - name: Build and synchronize iPad bundles
+        run: |
+          set -euo pipefail
+          npm run build
+          npm run sync:ios
+          npm run check:ios
+      - name: Persist validated Class 7 integration
+        run: |
+          set -euo pipefail
+          git config user.name 'Pri Curriculum Automation'
+          git config user.email 'actions@users.noreply.github.com'
+          git add client/src/engine/curriculum-in.js client/src/engine/generators/index.js client/src/engine/generators/india-junior-overlay.js client/src/engine/indiaProductionMeta.js ios/PriLearning.swiftpm/Resources/Web ios/'PriLearning 2.swiftpm'/Resources/Web
+          if git diff --cached --quiet; then
+            echo 'validated Class 7 integration already persisted'
+            exit 0
+          fi
+          git commit -m 'feat(class7): replace legacy spine with current Ganita Prakash'
+          git push origin HEAD:india/class7-ganita-prakash-2026-27
