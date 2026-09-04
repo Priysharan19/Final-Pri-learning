@@ -7,6 +7,8 @@
 // into "NCERT source-reviewed" by accident.
 
 import { IN_CURRICULUM, uncoveredDotpoints } from './curriculum-in.js';
+import { NCERT_CLASS7_2026_27_IDS, NCERT_CLASS7_2026_27_SOURCE } from './ncert/class7-2026-27-production.js';
+import { NCERT_CLASS7_PART2_2026_27_IDS, NCERT_CLASS7_PART2_2026_27_SOURCE } from './ncert/class7-part2-2026-27-production.js';
 import {
   CBSE_CLASS10_2026_27_REVIEWED_IDS,
   CBSE_CLASS10_2026_27_SOURCE
@@ -25,6 +27,9 @@ export const INDIA_RELEASE_STATE = Object.freeze({
   PARTIAL: 'published-partial',
   MISSING: 'missing'
 });
+
+const CLASS7_PART1_SOURCE_IDS = Object.freeze(new Set(NCERT_CLASS7_2026_27_IDS));
+const CLASS7_PART2_SOURCE_IDS = Object.freeze(new Set(NCERT_CLASS7_PART2_2026_27_IDS));
 
 const CLASS8_SOURCE_IDS = Object.freeze(new Set([
   'c8-rational-numbers',
@@ -50,6 +55,24 @@ const CLASS9_SOURCE_IDS = Object.freeze(new Set(
 ));
 
 const SOURCES = Object.freeze({
+  class7Part1: Object.freeze({
+  quality: INDIA_CONTENT_QUALITY.SOURCE_AUTHORED,
+  kind: 'ncert-textbook',
+  edition: NCERT_CLASS7_2026_27_SOURCE.curriculumVersion,
+  isbn: NCERT_CLASS7_2026_27_SOURCE.isbn,
+  ncertTextbook: NCERT_CLASS7_2026_27_SOURCE.prelims,
+  evidence: NCERT_CLASS7_2026_27_SOURCE.evidence,
+  reviewState: 'current-source-authored-in-repository'
+}),
+class7Part2: Object.freeze({
+  quality: INDIA_CONTENT_QUALITY.SOURCE_AUTHORED,
+  kind: 'ncert-textbook',
+  edition: NCERT_CLASS7_PART2_2026_27_SOURCE.curriculumVersion,
+  isbn: NCERT_CLASS7_PART2_2026_27_SOURCE.isbn,
+  ncertTextbook: NCERT_CLASS7_PART2_2026_27_SOURCE.prelims,
+  evidence: NCERT_CLASS7_PART2_2026_27_SOURCE.evidence,
+  reviewState: 'current-source-authored-in-repository'
+}),
   class8: Object.freeze({
     quality: INDIA_CONTENT_QUALITY.SOURCE_AUTHORED,
     kind: 'ncert-textbook-and-answer-key',
@@ -79,6 +102,8 @@ const SOURCES = Object.freeze({
 });
 
 function sourceRecord(chapter) {
+  if (CLASS7_PART1_SOURCE_IDS.has(chapter.id)) return SOURCES.class7Part1;
+  if (CLASS7_PART2_SOURCE_IDS.has(chapter.id)) return SOURCES.class7Part2;
   if (CLASS8_SOURCE_IDS.has(chapter.id)) return SOURCES.class8;
   if (CLASS9_SOURCE_IDS.has(chapter.id)) return SOURCES.class9;
   if (CBSE_CLASS10_2026_27_REVIEWED_IDS.has(chapter.id)) return SOURCES.class10;
@@ -128,7 +153,7 @@ export function indiaProductionStatus(chapter, grade = chapter?.grade ?? null) {
   }
 
   // A complete generator mapping is not automatically a current-curriculum
-  // review. Classes 7/10/11/12 remain C until an explicit source review promotes
+  // review. Classes 11/12 remain C until an explicit source review promotes
   // the specific chapter; Class 10 deliberately uses a narrow reviewed allowlist.
   return Object.freeze({
     quality: INDIA_CONTENT_QUALITY.WEAK_MAPPING,
