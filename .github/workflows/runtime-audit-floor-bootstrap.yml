@@ -27,11 +27,11 @@ jobs:
       - name: Apply patched React Router runtime
         run: |
           set -euo pipefail
-          if [ "$(node -p "require('./client/package.json').dependencies['react-router-dom']")" != "7.18.0" ]; then
-            npm install --prefix client --save-exact react-router-dom@7.18.0
+          if [ "$(node -p "require('./client/package.json').dependencies['react-router-dom']")" != "7.18.3" ]; then
+            npm install --prefix client --save-exact react-router-dom@7.18.3
           fi
           npm ci --prefix client
-          test "$(node -p "require('./client/node_modules/react-router-dom/package.json').version")" = "7.18.0"
+          test "$(node -p "require('./client/node_modules/react-router-dom/package.json').version")" = "7.18.3"
       - name: Require clean runtime dependency audits
         run: |
           set -euo pipefail
@@ -63,5 +63,5 @@ jobs:
             echo 'validated migration already persisted'
             exit 0
           fi
-          git commit -m 'fix(security): upgrade React Router to 7.18.0'
+          git commit -m 'fix(security): upgrade React Router to 7.18.3'
           git push origin HEAD:security/runtime-audit-floor-2026-09-04
