@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { IN_CURRICULUM } from '../src/engine/curriculum-in.js';
 import { indiaProductSections } from '../src/engine/indiaProduct.js';
 import { NCERT_CLASS7_2026_27_IDS, NCERT_CLASS7_2026_27_SOURCE } from '../src/engine/ncert/class7-2026-27-production.js';
+import { NCERT_CLASS7_PART2_2026_27_IDS, NCERT_CLASS7_PART2_2026_27_SOURCE } from '../src/engine/ncert/class7-part2-2026-27-production.js';
 import { CBSE_CLASS10_2026_27_REVIEWED_IDS } from '../src/engine/ncert/class10-2026-27-production.js';
 import {
   INDIA_CONTENT_QUALITY,
@@ -14,6 +15,8 @@ import {
 const chapters = IN_CURRICULUM.flatMap(group => group.chapters.map(ch => ({ ...ch, grade: group.grade })));
 const census = indiaProductionCensus();
 const summary = indiaProductionSummary();
+const class7Part1 = new Set(NCERT_CLASS7_2026_27_IDS);
+const class7Part2 = new Set(NCERT_CLASS7_PART2_2026_27_IDS);
 
 assert.equal(census.length, chapters.length, 'census must include every live Class 7–12 chapter exactly once');
 assert.equal(summary.total, chapters.length);
@@ -30,13 +33,16 @@ for (const row of census) {
 for (const chapter of chapters) {
   const status = indiaProductionStatus(chapter, chapter.grade);
   if (chapter.grade === 7) {
-    assert.ok(NCERT_CLASS7_2026_27_IDS.includes(chapter.id), `${chapter.id} must belong to the current Ganita Prakash spine`);
+    const part1 = class7Part1.has(chapter.id);
+    const part2 = class7Part2.has(chapter.id);
+    assert.ok(part1 || part2, `${chapter.id} must belong to one current Ganita Prakash part`);
+    const source = part2 ? NCERT_CLASS7_PART2_2026_27_SOURCE : NCERT_CLASS7_2026_27_SOURCE;
     assert.equal(status.quality, INDIA_CONTENT_QUALITY.SOURCE_AUTHORED, `${chapter.id} must be source-authored`);
     assert.equal(status.releaseState, INDIA_RELEASE_STATE.REVIEWED, `${chapter.id} must expose reviewed source evidence`);
     assert.equal(status.sourceReviewed, true, `${chapter.id} must expose source review evidence`);
-    assert.equal(status.source?.edition, NCERT_CLASS7_2026_27_SOURCE.curriculumVersion);
-    assert.equal(status.source?.isbn, NCERT_CLASS7_2026_27_SOURCE.isbn);
-    assert.equal(status.source?.ncertTextbook, NCERT_CLASS7_2026_27_SOURCE.prelims);
+    assert.equal(status.source?.edition, source.curriculumVersion);
+    assert.equal(status.source?.isbn, source.isbn);
+    assert.equal(status.source?.ncertTextbook, source.prelims);
     continue;
   }
 
@@ -83,7 +89,7 @@ for (const section of [grade7, grade8, grade9]) {
   assert.equal(section.production.reviewState, 'source-reviewed');
   assert.match(section.label, /source-reviewed/);
 }
-assert.equal(grade7.production.totalChapters, 8, 'current Grade 7 Ganita Prakash Part I has eight live chapters');
+assert.equal(grade7.production.totalChapters, 15, 'current Grade 7 Ganita Prakash Parts I–II have fifteen live chapters');
 
 assert.equal(CBSE_CLASS10_2026_27_REVIEWED_IDS.size, 14, 'Class 10 promotion requires every chapter to be reviewed');
 assert.equal(grade10.production.reviewedChapters, grade10.production.totalChapters);
@@ -100,5 +106,5 @@ for (const section of [grade11, grade12]) {
 }
 
 console.log(`PASS — India production provenance census: ${summary.total} chapters; A=${summary.byQuality.A}, B=${summary.byQuality.B}, C=${summary.byQuality.C}, D=${summary.byQuality.D}.`);
-console.log(`PASS — Classes 7–9 remain source-authored; ${grade10.production.reviewedChapters}/${grade10.production.totalChapters} Class 10 chapters are source-reviewed mappings.`);
+console.log(`PASS — Classes 7–9 are source-authored; Class 7 includes both Ganita Prakash parts; ${grade10.production.reviewedChapters}/${grade10.production.totalChapters} Class 10 chapters are source-reviewed mappings.`);
 console.log('PASS — CBSE track labels disclose whether source review is complete or still in progress.');
