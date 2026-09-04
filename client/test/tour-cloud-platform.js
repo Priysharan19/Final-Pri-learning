@@ -185,10 +185,16 @@ export const flow = {
     await check('starting an assignment hands off to the normal Practice route with scoped ids',
       new URL(page.url()).searchParams.get('assignment') === ASSIGNMENT.id);
 
-    await page.getByText(ASSIGNMENT.title, { exact: true }).first().waitFor({ timeout: 15000 });
+    // React Router 7 can commit history before the route tree finishes its
+    // concurrent render. Prove Settings has actually left the tree before
+    // looking for the same assignment title on Practice.
+    await page.locator('#assignment-inbox-title').waitFor({ state: 'detached', timeout: 15000 });
+    const assignmentCard = page.locator('.card', { has: page.getByText(ASSIGNMENT.title, { exact: true }) }).first();
+    await assignmentCard.waitFor({ state: 'visible', timeout: 15000 });
+    const assignmentCardText = await assignmentCard.innerText();
     await check('Practice renders the verified assignment context before serving local maths',
-      await page.getByText(ASSIGNMENT.title, { exact: true }).first().isVisible() &&
-        (await page.locator('body').innerText()).includes('0/3 questions completed'));
+      assignmentCardText.includes(ASSIGNMENT.title) && assignmentCardText.includes('0/3 questions completed'),
+      `assignment card reads ${JSON.stringify(assignmentCardText.slice(0, 320))}`);
 
     await page.waitForTimeout(300);
     const startedCall = requests.find(row => row.path.endsWith(`/assignments/${ASSIGNMENT.id}/submission`) && row.method === 'PATCH');
