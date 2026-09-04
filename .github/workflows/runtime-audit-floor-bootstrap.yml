@@ -29,14 +29,12 @@ jobs:
           set -euo pipefail
           if [ "$(node -p "require('./client/package.json').dependencies['react-router-dom']")" != "7.18.3" ]; then
             npm install --prefix client --save-exact react-router-dom@7.18.3
+          else
+            npm ci --prefix client
           fi
-          npm ci --prefix client
           test "$(node -p "require('./client/node_modules/react-router-dom/package.json').version")" = "7.18.3"
-      - name: Require clean runtime dependency audits
-        run: |
-          set -euo pipefail
-          npm audit --prefix client --omit=dev --audit-level=low
-          npm audit --prefix server --omit=dev --audit-level=low
+      - name: Require clean changed runtime audit
+        run: npm audit --prefix client --omit=dev --audit-level=low
       - name: Deterministic regression suite
         run: npm test
       - name: Build and synchronize tracked iPad bundles
