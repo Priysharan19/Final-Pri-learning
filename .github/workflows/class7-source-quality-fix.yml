@@ -1,0 +1,52 @@
+name: Class 7 Source Quality Fix
+
+on:
+  push:
+    branches:
+      - india/class7-ganita-prakash-2026-27
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: india/class7-ganita-prakash-2026-09-27
+          fetch-depth: 0
+        continue-on-error: true
+      - name: Checkout actual release branch
+        if: steps.checkout.outcome == 'failure'
+        uses: actions/checkout@v4
+        with:
+          ref: india/class7-ganita-prakash-2026-27
+          fetch-depth: 0
+      - name: Patch source-valid contexts
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          from pathlib import Path
+          p = Path('client/src/engine/ncert/class7-2026-27-production.js')
+          s = p.read_text()
+          old = "    let a = ri(rng, 2, 15), b = ri(rng, a + 1, 25);\n    const next = a + b;\n"
+          new = "    const [a, b] = rc(rng, [[1,2],[2,3],[3,5],[5,8],[8,13],[13,21],[21,34],[34,55]]);\n    const next = a + b;\n"
+          if old in s:
+              s = s.replace(old, new, 1)
+          old = "  const whole = rc(rng, [24, 30, 36, 48, 60]);\n"
+          new = "  const whole = rc(rng, [60, 120, 180]);\n"
+          if old in s:
+              s = s.replace(old, new, 1)
+          p.write_text(s)
+          PY
+          git config user.name 'Pri Curriculum Automation'
+          git config user.email 'actions@users.noreply.github.com'
+          git add client/src/engine/ncert/class7-2026-27-production.js
+          if git diff --cached --quiet; then
+            echo 'source-quality patch already applied'
+            exit 0
+          fi
+          git commit -m 'fix(class7): keep generated contexts mathematically valid'
+          git push origin HEAD:india/class7-ganita-prakash-2026-27
