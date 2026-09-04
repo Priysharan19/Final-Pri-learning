@@ -185,6 +185,10 @@ export const flow = {
     await check('starting an assignment hands off to the normal Practice route with scoped ids',
       new URL(page.url()).searchParams.get('assignment') === ASSIGNMENT.id);
 
+    // React Router 7 can commit history before the route tree finishes its
+    // concurrent render. Prove Settings has actually left the tree before
+    // looking for the same assignment title on Practice.
+    await page.locator('#assignment-inbox-title').waitFor({ state: 'detached', timeout: 15000 });
     const assignmentCard = page.locator('.card', { has: page.getByText(ASSIGNMENT.title, { exact: true }) }).first();
     await assignmentCard.waitFor({ state: 'visible', timeout: 15000 });
     const assignmentCardText = await assignmentCard.innerText();
