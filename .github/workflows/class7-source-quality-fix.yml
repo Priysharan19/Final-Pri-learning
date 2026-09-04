@@ -15,13 +15,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: india/class7-ganita-prakash-2026-09-27
-          fetch-depth: 0
-        continue-on-error: true
-      - name: Checkout actual release branch
-        if: steps.checkout.outcome == 'failure'
-        uses: actions/checkout@v4
-        with:
           ref: india/class7-ganita-prakash-2026-27
           fetch-depth: 0
       - name: Patch source-valid contexts
