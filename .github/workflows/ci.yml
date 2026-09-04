@@ -27,7 +27,7 @@ jobs:
       - name: Install client dependencies
         run: npm ci --prefix client
       - name: Runtime dependency security floor
-        run: npm audit --prefix client --omit=dev --audit-level=high
+        run: npm audit --prefix client --omit=dev --audit-level=low
       - name: Every deterministic suite
         run: |
           set -o pipefail
@@ -88,7 +88,7 @@ jobs:
       - name: Install server dependencies
         run: npm ci --prefix server
       - name: Runtime dependency security floor
-        run: npm audit --prefix server --omit=dev --audit-level=high
+        run: npm audit --prefix server --omit=dev --audit-level=low
       - name: Commercial platform schema contract
         run: node server/test/platform-schema-check.mjs
       - name: Platform migration contract
