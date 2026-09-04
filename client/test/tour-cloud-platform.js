@@ -185,13 +185,12 @@ export const flow = {
     await check('starting an assignment hands off to the normal Practice route with scoped ids',
       new URL(page.url()).searchParams.get('assignment') === ASSIGNMENT.id);
 
-    const assignmentTitle = page.getByText(ASSIGNMENT.title, { exact: true }).first();
-    const assignmentProgress = page.getByText('0/3 questions completed', { exact: true }).first();
-    await assignmentTitle.waitFor({ state: 'visible', timeout: 15000 });
-    await assignmentProgress.waitFor({ state: 'visible', timeout: 15000 });
+    const assignmentCard = page.locator('.card', { has: page.getByText(ASSIGNMENT.title, { exact: true }) }).first();
+    await assignmentCard.waitFor({ state: 'visible', timeout: 15000 });
+    const assignmentCardText = await assignmentCard.innerText();
     await check('Practice renders the verified assignment context before serving local maths',
-      await assignmentTitle.isVisible() && await assignmentProgress.isVisible(),
-      `assignment card=${JSON.stringify((await assignmentTitle.locator('xpath=ancestor::div[contains(@class,"card")][1]').innerText().catch(() => '')).slice(0, 240))}`);
+      assignmentCardText.includes(ASSIGNMENT.title) && assignmentCardText.includes('0/3 questions completed'),
+      `assignment card reads ${JSON.stringify(assignmentCardText.slice(0, 320))}`);
 
     await page.waitForTimeout(300);
     const startedCall = requests.find(row => row.path.endsWith(`/assignments/${ASSIGNMENT.id}/submission`) && row.method === 'PATCH');
