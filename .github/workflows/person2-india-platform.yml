@@ -83,6 +83,8 @@ jobs:
         run: npm ci --prefix client
       - name: India curriculum provenance
         run: node client/test/india-production-meta-check.mjs
+      - name: Current Class 7 Parts I-II source truth
+        run: node client/test/india-class7-current-source-check.mjs
       - name: Current Class 10 source truth
         run: node client/test/india-class10-current-source-check.mjs
       - name: Separated Class 10 source outcomes
