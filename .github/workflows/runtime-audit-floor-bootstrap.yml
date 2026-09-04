@@ -1,0 +1,27 @@
+name: Runtime Audit Floor Bootstrap
+
+on:
+  push:
+    branches:
+      - security/runtime-audit-floor-2026-09-04
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install client dependencies
+        run: npm ci --prefix client
+      - name: Client runtime audit at low severity
+        run: npm audit --prefix client --omit=dev --audit-level=low
+      - name: Install server dependencies
+        run: npm ci --prefix server
+      - name: Server runtime audit at low severity
+        run: npm audit --prefix server --omit=dev --audit-level=low
