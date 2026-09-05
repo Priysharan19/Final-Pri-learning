@@ -1,0 +1,84 @@
+{
+  "version": 1,
+  "ledger": {
+    "backend": "github_issues",
+    "title_prefix": "[PRI-MISSION]",
+    "active_status": "ACTIVE",
+    "record_markers": {
+      "id": "Pri-Mission-ID",
+      "status": "Pri-Mission-Status",
+      "agent": "Pri-Agent",
+      "branch": "Pri-Branch",
+      "risk": "Pri-Risk",
+      "base_sha": "Pri-Base-SHA",
+      "attempt": "Pri-Attempt",
+      "failure_fingerprint": "Pri-Failure-Fingerprint"
+    }
+  },
+  "lease": {
+    "ttl_hours": 12,
+    "single_active_writer": true,
+    "renew_on_progress": true,
+    "stale_action": "release_and_retriage"
+  },
+  "retry_policy": {
+    "max_identical_failure_attempts": 3,
+    "on_limit": "BLOCKED_AUTOMATION",
+    "rerun_infrastructure_failures_once": true
+  },
+  "states": [
+    "DISCOVERED",
+    "TRIAGED",
+    "ACTIVE",
+    "IMPLEMENTING",
+    "TESTING",
+    "REVIEW",
+    "CI",
+    "REPAIR",
+    "MERGE_READY",
+    "BLOCKED_EXTERNAL",
+    "BLOCKED_AUTOMATION",
+    "DONE",
+    "ABANDONED"
+  ],
+  "transitions": {
+    "DISCOVERED": ["TRIAGED", "ABANDONED"],
+    "TRIAGED": ["ACTIVE", "BLOCKED_EXTERNAL", "ABANDONED"],
+    "ACTIVE": ["IMPLEMENTING", "BLOCKED_EXTERNAL", "BLOCKED_AUTOMATION"],
+    "IMPLEMENTING": ["TESTING", "REPAIR", "BLOCKED_EXTERNAL", "BLOCKED_AUTOMATION"],
+    "TESTING": ["REVIEW", "REPAIR", "BLOCKED_AUTOMATION"],
+    "REVIEW": ["CI", "REPAIR", "BLOCKED_AUTOMATION"],
+    "CI": ["MERGE_READY", "REPAIR", "BLOCKED_EXTERNAL", "BLOCKED_AUTOMATION"],
+    "REPAIR": ["IMPLEMENTING", "TESTING", "BLOCKED_AUTOMATION", "ABANDONED"],
+    "MERGE_READY": ["DONE", "REPAIR"],
+    "BLOCKED_EXTERNAL": ["TRIAGED", "ABANDONED"],
+    "BLOCKED_AUTOMATION": ["TRIAGED", "ABANDONED"],
+    "DONE": [],
+    "ABANDONED": []
+  },
+  "priority": {
+    "preemption_order": [
+      "security",
+      "data_loss",
+      "wrong_marking",
+      "broken_build",
+      "auth",
+      "unsafe_handwriting_authority",
+      "normal"
+    ],
+    "weights": {
+      "severity": 5,
+      "student_impact": 4,
+      "unblock_value": 3,
+      "recurrence": 2,
+      "strategic_value": 2,
+      "diagnosis_confidence": 2,
+      "effort": -2,
+      "regression_risk": -3
+    },
+    "ranges": {
+      "min": 0,
+      "max": 5
+    }
+  }
+}
