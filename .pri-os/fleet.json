@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "name": "Pri Learning Autonomous Engineering Fleet",
   "principles": {
     "single_writer": true,
@@ -8,127 +8,125 @@
     "no_fabricated_human_or_hardware_evidence": true,
     "offline_first": true,
     "answer_blind_handwriting": true,
-    "pr_before_main": true
+    "pr_before_main": true,
+    "independent_review": true,
+    "persistent_mission_ledger": true
   },
-  "agents": [
-    {
-      "id": "director",
-      "role": "CTO / Director",
-      "mission": "Continuously inspect product evidence, CI, open work and repository state; choose the single highest-leverage software mission that materially improves production readiness.",
-      "paths": ["*"],
-      "gates": ["fleet config valid", "no conflicting active mission", "mission has explicit acceptance tests"]
+  "risk_classes": {
+    "R1": {
+      "name": "Low",
+      "description": "Docs/copy or isolated non-behavioural change.",
+      "review": "specialist",
+      "merge": "eligible_when_green"
     },
-    {
-      "id": "handwriting",
-      "role": "Handwriting Intelligence",
-      "mission": "Improve PencilKit capture, OCR/recognition, structure parsing, arbitration, confidence, correction, long-page stability and real-writer evidence infrastructure without using expected answers.",
-      "paths": ["client/src/ink/**", "client/test/ink-**", "handwriting/**", "tools/ink-foundation/**", "scripts/ink-**", "ios/PriLearning.swiftpm/Ink/**", "ios/PriLearning 2.swiftpm/Ink/**"],
-      "gates": ["npm run test:ink:bridge", "npm run test:ink:hybrid", "npm run test:ink:arbitration", "npm run test:ink:stability"]
+    "R2": {
+      "name": "Moderate",
+      "description": "UI/product behaviour with bounded blast radius.",
+      "review": "qa-release",
+      "merge": "eligible_when_green"
     },
-    {
-      "id": "math-reasoning",
-      "role": "Mathematical Reasoning & Marking",
-      "mission": "Improve equivalence, step validation, partial credit safety, misconception logic, alternative valid methods and mathematical correctness.",
-      "paths": ["server/**", "client/src/engine/**", "client/test/diagnose-**", "client/test/*engine*", "client/test/*marker*"],
-      "gates": ["npm run test:engine:quick", "npm run test:diagnose"]
+    "R3": {
+      "name": "High",
+      "description": "Learning logic, offline state, sync, native lifecycle, curriculum executable behaviour.",
+      "review": "qa-release+domain",
+      "merge": "current-head full applicable CI"
     },
-    {
-      "id": "adaptive-learning",
-      "role": "Adaptive Learning & Pri Explain",
-      "mission": "Improve mastery modelling, next-question selection, misconception-aware adaptation, tutoring explanations and longitudinal learning decisions.",
-      "paths": ["client/src/explain/**", "client/src/engine/**", "client/src/local/**", "client/test/pri-explain-**", "client/test/person1-**"],
-      "gates": ["npm run test:explain", "node client/test/person1-intelligence-loop-check.mjs"]
-    },
-    {
-      "id": "india-curriculum",
-      "role": "India Curriculum / NCERT / CBSE / JEE",
-      "mission": "Build source-backed Classes 7-12 and JEE coverage, executable generators, worked solutions, exam blueprints and provenance-safe curriculum mapping.",
-      "paths": ["client/src/engine/india**", "client/src/engine/ncert/**", "client/src/engine/generators/india-**", "client/src/pages/India**", "client/test/india-**", "client/test/ncert-**", "tools/india-**", "docs/**"],
-      "gates": ["npm run test:india", "npm run test:ncert:rational", "npm run test:ncert:linear", "npm run test:ncert:class8:rest", "npm run test:ncert:class9"]
-    },
-    {
-      "id": "hsc-curriculum",
-      "role": "NSW / HSC Curriculum & Exam Intelligence",
-      "mission": "Maintain version-aware NESA alignment, HSC-style assessment, marking validity and evidence-based readiness predictions.",
-      "paths": ["client/src/engine/**", "server/**", "client/test/**", "docs/**"],
-      "gates": ["npm run test:engine:quick", "npm run test:diagnose"]
-    },
-    {
-      "id": "student-experience",
-      "role": "Student Product / UX / Accessibility",
-      "mission": "Make onboarding, home, practice, exams, progress, settings and core learning flows clear, fast, accessible and iPad-first.",
-      "paths": ["client/src/pages/**", "client/src/components/**", "client/src/styles/**", "client/test/a11y-**", "client/test/tour-**", "client/test/e2e.mjs"],
-      "gates": ["npm run build", "npm run test:a11y"]
-    },
-    {
-      "id": "ios-native",
-      "role": "iOS / iPad / Pencil Platform",
-      "mission": "Harden Swift shell, PencilKit lifecycle, native bridges, orientation/multitasking, App Store release behaviour and package parity.",
-      "paths": ["ios/**", "scripts/sync-ios.mjs", "scripts/check-native-package-sync.mjs", "scripts/ink-native-check.mjs", "client/src/ink/native.js", "client/test/native-**", "client/test/ios-**"],
-      "gates": ["npm run check:ios", "npm run test:ink:bridge"]
-    },
-    {
-      "id": "platform",
-      "role": "Backend / Auth / Sync / Data",
-      "mission": "Build reliable identity, sessions, sync, storage, migrations, account lifecycle, privacy boundaries and cloud continuity while preserving offline-first operation.",
-      "paths": ["server/platform/**", "server/test/**", "client/src/platform/**", "client/src/api.js", "client/src/local/**", "client/test/cloud-**", "client/test/profile-cloud-**", "client/test/sync-**"],
-      "gates": ["npm run test:backend", "npm run test:gateway", "npm run test:outbox", "npm run test:security"]
-    },
-    {
-      "id": "commercial",
-      "role": "Billing / Entitlements / Commercial Platform",
-      "mission": "Harden subscriptions, entitlements, Razorpay, StoreKit, trials, restore flows and commercial configuration without compromising student access or privacy.",
-      "paths": ["server/platform/**", "server/test/*billing*", "server/test/*razorpay*", "server/test/*apple*", "client/src/platform/**", "client/src/components/CloudAccountPanel.jsx", "client/test/entitlement-**", "client/test/native-storekit-**"],
-      "gates": ["npm run test:security", "npm run build"]
-    },
-    {
-      "id": "teacher",
-      "role": "Teacher / Classroom Platform",
-      "mission": "Build assignments, class insights, intervention workflows, teacher dashboards and privacy-safe student progress surfaces.",
-      "paths": ["client/src/components/ClassroomPanel.jsx", "client/src/components/AssignmentInboxPanel.jsx", "client/src/components/StaffOperationsPanel.jsx", "client/src/pages/**", "server/platform/**", "server/test/classroom-**", "server/test/assignment-**", "client/test/classroom-**", "client/test/assignment-**"],
-      "gates": ["npm run build", "npm run test:security"]
-    },
-    {
-      "id": "security",
-      "role": "Security / Privacy",
-      "mission": "Continuously remove auth, injection, data isolation, secret handling, dependency and abuse-control risks; security tests are release-blocking.",
-      "paths": ["server/**", "client/src/**", "client/test/security-**", "tools/**", ".github/workflows/**", ".env.production.example"],
-      "gates": ["npm run test:security", "npm audit --prefix client --omit=dev --audit-level=low"]
-    },
-    {
-      "id": "reliability",
-      "role": "Performance / Reliability / Offline / SRE",
-      "mission": "Improve startup, long-session stability, offline recovery, idempotency, observability, latency and failure containment.",
-      "paths": ["client/src/**", "server/**", "scripts/**", "client/test/**", "server/test/**", ".github/workflows/**"],
-      "gates": ["npm run build", "npm run test:backend", "npm run test:outbox"]
-    },
-    {
-      "id": "qa-release",
-      "role": "QA / Integration / Release Governor",
-      "mission": "Act adversarially across all changes; require deterministic tests, current-head CI and explicit residual risk, and keep hardware/human claims unmeasured until evidence exists.",
-      "paths": ["client/test/**", "server/test/**", "scripts/**", "tools/**", ".github/workflows/**", "docs/**"],
-      "gates": ["npm test", "npm run build"]
-    },
-    {
-      "id": "benchmark",
-      "role": "Benchmark Science / ML Evidence",
-      "mission": "Create reproducible product and model benchmarks for handwriting, marking, latency, learning outcomes and competitor comparisons; never infer superiority from synthetic-only evidence.",
-      "paths": ["handwriting/**", "tools/**", "client/test/**", "docs/**"],
-      "gates": ["npm run test:real"]
-    },
-    {
-      "id": "android",
-      "role": "Android / Cross-platform Future",
-      "mission": "Prepare an evidence-led Android path that reuses shared product logic without weakening the iPad experience or creating divergent learning engines.",
-      "paths": ["client/**", "docs/**", "scripts/**"],
-      "gates": ["npm run build"]
-    },
-    {
-      "id": "growth",
-      "role": "Growth / Marketing Product",
-      "mission": "Improve privacy-safe acquisition, activation, referral and conversion surfaces while keeping educational and performance claims evidence-backed.",
-      "paths": ["client/src/**", "marketing/**", "promotions/**", "ad/**", "docs/**"],
-      "gates": ["npm run build", "npm run test:a11y"]
+    "R4": {
+      "name": "Critical",
+      "description": "Auth, billing, migrations, security policy, mathematical marking authority, handwriting authority or destructive data path.",
+      "review": "qa-release+security+domain",
+      "merge": "no autonomous merge unless exact critical gates are green and change is reversible"
     }
+  },
+  "gates": {
+    "build": {"command":"npm run build","platform":"linux","severity":"P0","timeout_minutes":15,"evidence_class":"deterministic"},
+    "backend": {"command":"npm run test:backend","platform":"linux","severity":"P0","timeout_minutes":5,"evidence_class":"deterministic"},
+    "gateway": {"command":"npm run test:gateway","platform":"linux","severity":"P1","timeout_minutes":5,"evidence_class":"deterministic"},
+    "outbox": {"command":"npm run test:outbox","platform":"linux","severity":"P1","timeout_minutes":5,"evidence_class":"deterministic"},
+    "security": {"command":"npm run test:security","platform":"linux","severity":"P0","timeout_minutes":5,"evidence_class":"deterministic"},
+    "runtime-audit": {"command":"npm audit --prefix client --omit=dev --audit-level=low","platform":"linux","severity":"P0","timeout_minutes":5,"evidence_class":"deterministic"},
+    "engine-quick": {"command":"npm run test:engine:quick","platform":"linux","severity":"P0","timeout_minutes":15,"evidence_class":"deterministic"},
+    "diagnose": {"command":"npm run test:diagnose","platform":"linux","severity":"P1","timeout_minutes":5,"evidence_class":"deterministic"},
+    "explain": {"command":"npm run test:explain","platform":"linux","severity":"P1","timeout_minutes":5,"evidence_class":"deterministic"},
+    "person1": {"command":"node client/test/person1-intelligence-loop-check.mjs","platform":"linux","severity":"P0","timeout_minutes":5,"evidence_class":"deterministic"},
+    "india": {"command":"npm run test:india","platform":"linux","severity":"P1","timeout_minutes":10,"evidence_class":"deterministic"},
+    "ncert-rational": {"command":"npm run test:ncert:rational","platform":"linux","severity":"P1","timeout_minutes":5,"evidence_class":"deterministic"},
+    "ncert-linear": {"command":"npm run test:ncert:linear","platform":"linux","severity":"P1","timeout_minutes":5,"evidence_class":"deterministic"},
+    "ncert-class8-rest": {"command":"npm run test:ncert:class8:rest","platform":"linux","severity":"P1","timeout_minutes":10,"evidence_class":"deterministic"},
+    "ncert-class9": {"command":"npm run test:ncert:class9","platform":"linux","severity":"P1","timeout_minutes":10,"evidence_class":"deterministic"},
+    "a11y": {"command":"npm run test:a11y","platform":"linux","severity":"P1","timeout_minutes":10,"evidence_class":"deterministic"},
+    "ink-bridge": {"command":"npm run test:ink:bridge","platform":"linux","severity":"P0","timeout_minutes":5,"evidence_class":"deterministic"},
+    "ink-hybrid": {"command":"npm run test:ink:hybrid","platform":"linux","severity":"P0","timeout_minutes":5,"evidence_class":"deterministic"},
+    "ink-arbitration": {"command":"npm run test:ink:arbitration","platform":"linux","severity":"P0","timeout_minutes":5,"evidence_class":"deterministic"},
+    "ink-stability": {"command":"npm run test:ink:stability","platform":"linux","severity":"P0","timeout_minutes":10,"evidence_class":"deterministic"},
+    "ios-sync": {"command":"npm run check:ios","platform":"linux","severity":"P0","timeout_minutes":5,"evidence_class":"deterministic"},
+    "real-ink": {"command":"npm run test:real","platform":"linux","severity":"P2","timeout_minutes":10,"evidence_class":"real-human-status"},
+    "fleet-validate": {"command":"node scripts/pri-fleet.mjs validate","platform":"linux","severity":"P0","timeout_minutes":2,"evidence_class":"deterministic"}
+  },
+  "ownership_rules": [
+    {"pattern":".pri-os/**","primary":"qa-release","reviewers":["security"],"risk":"R3"},
+    {"pattern":"AGENTS.md","primary":"qa-release","reviewers":["security"],"risk":"R2"},
+    {"pattern":"scripts/pri-*.mjs","primary":"qa-release","reviewers":["security","reliability"],"risk":"R3"},
+    {"pattern":".github/workflows/pri-agent-*.yml","primary":"qa-release","reviewers":["security","reliability"],"risk":"R4"},
+    {"pattern":"client/src/ink/**","primary":"handwriting","reviewers":["ios-native","security","reliability","qa-release"],"risk":"R4"},
+    {"pattern":"handwriting/**","primary":"handwriting","reviewers":["benchmark","qa-release"],"risk":"R3"},
+    {"pattern":"tools/ink-foundation/**","primary":"handwriting","reviewers":["benchmark","qa-release"],"risk":"R3"},
+    {"pattern":"scripts/ink-**","primary":"handwriting","reviewers":["ios-native","benchmark","qa-release"],"risk":"R3"},
+    {"pattern":"ios/**","primary":"ios-native","reviewers":["handwriting","security","reliability","qa-release"],"risk":"R3"},
+    {"pattern":"client/src/explain/**","primary":"adaptive-learning","reviewers":["math-reasoning","qa-release"],"risk":"R3"},
+    {"pattern":"client/src/engine/ncert/**","primary":"india-curriculum","reviewers":["math-reasoning","qa-release"],"risk":"R3"},
+    {"pattern":"client/src/engine/india**","primary":"india-curriculum","reviewers":["math-reasoning","qa-release"],"risk":"R3"},
+    {"pattern":"client/src/engine/generators/india-**","primary":"india-curriculum","reviewers":["math-reasoning","qa-release"],"risk":"R3"},
+    {"pattern":"client/src/pages/India**","primary":"india-curriculum","reviewers":["student-experience","qa-release"],"risk":"R2"},
+    {"pattern":"client/src/engine/**","primary":"math-reasoning","reviewers":["adaptive-learning","security","qa-release"],"risk":"R4"},
+    {"pattern":"server/platform/**","primary":"platform","reviewers":["security","reliability","qa-release"],"risk":"R4"},
+    {"pattern":"server/**","primary":"math-reasoning","reviewers":["platform","security","reliability","qa-release"],"risk":"R4"},
+    {"pattern":"client/src/platform/**","primary":"platform","reviewers":["commercial","security","reliability","qa-release"],"risk":"R4"},
+    {"pattern":"client/src/local/**","primary":"platform","reviewers":["adaptive-learning","security","reliability","qa-release"],"risk":"R3"},
+    {"pattern":"client/src/api.js","primary":"platform","reviewers":["security","reliability","qa-release"],"risk":"R4"},
+    {"pattern":"client/src/components/ClassroomPanel.jsx","primary":"teacher","reviewers":["student-experience","security","qa-release"],"risk":"R3"},
+    {"pattern":"client/src/components/AssignmentInboxPanel.jsx","primary":"teacher","reviewers":["student-experience","security","qa-release"],"risk":"R3"},
+    {"pattern":"client/src/components/StaffOperationsPanel.jsx","primary":"teacher","reviewers":["security","qa-release"],"risk":"R4"},
+    {"pattern":"client/src/components/CloudAccountPanel.jsx","primary":"commercial","reviewers":["platform","security","qa-release"],"risk":"R4"},
+    {"pattern":"client/src/pages/**","primary":"student-experience","reviewers":["security","qa-release"],"risk":"R2"},
+    {"pattern":"client/src/components/**","primary":"student-experience","reviewers":["security","qa-release"],"risk":"R2"},
+    {"pattern":"client/src/styles/**","primary":"student-experience","reviewers":["qa-release"],"risk":"R1"},
+    {"pattern":"client/test/ink-**","primary":"handwriting","reviewers":["qa-release"],"risk":"R3"},
+    {"pattern":"client/test/native-**","primary":"ios-native","reviewers":["qa-release"],"risk":"R3"},
+    {"pattern":"client/test/ios-**","primary":"ios-native","reviewers":["qa-release"],"risk":"R3"},
+    {"pattern":"client/test/india-**","primary":"india-curriculum","reviewers":["qa-release"],"risk":"R3"},
+    {"pattern":"client/test/ncert-**","primary":"india-curriculum","reviewers":["qa-release"],"risk":"R3"},
+    {"pattern":"client/test/classroom-**","primary":"teacher","reviewers":["qa-release"],"risk":"R3"},
+    {"pattern":"client/test/assignment-**","primary":"teacher","reviewers":["qa-release"],"risk":"R3"},
+    {"pattern":"client/test/security-**","primary":"security","reviewers":["qa-release"],"risk":"R4"},
+    {"pattern":"client/test/**","primary":"qa-release","reviewers":[],"risk":"R2"},
+    {"pattern":"server/test/**","primary":"qa-release","reviewers":["security"],"risk":"R3"},
+    {"pattern":"tools/**","primary":"reliability","reviewers":["security","qa-release"],"risk":"R3"},
+    {"pattern":"scripts/**","primary":"reliability","reviewers":["security","qa-release"],"risk":"R3"},
+    {"pattern":".github/workflows/**","primary":"reliability","reviewers":["security","qa-release"],"risk":"R4"},
+    {"pattern":"marketing/**","primary":"growth","reviewers":["security","qa-release"],"risk":"R2"},
+    {"pattern":"promotions/**","primary":"growth","reviewers":["commercial","security","qa-release"],"risk":"R3"},
+    {"pattern":"ad/**","primary":"growth","reviewers":["qa-release"],"risk":"R1"},
+    {"pattern":"docs/**","primary":"qa-release","reviewers":[],"risk":"R1"},
+    {"pattern":"package.json","primary":"reliability","reviewers":["security","qa-release"],"risk":"R3"}
+  ],
+  "agents": [
+    {"id":"director","role":"CTO / Director","mission":"Continuously inspect current repository evidence and rank candidate missions. Director is read-only and may not own a code-changing branch.","gate_ids":["fleet-validate"]},
+    {"id":"handwriting","role":"Handwriting Intelligence","mission":"Improve PencilKit capture, recognition, structure parsing, arbitration, confidence, correction and long-page stability without expected-answer leakage.","gate_ids":["ink-bridge","ink-hybrid","ink-arbitration","ink-stability"]},
+    {"id":"math-reasoning","role":"Mathematical Reasoning & Marking","mission":"Improve mathematical equivalence, step validation, marking authority, misconception logic and alternative valid methods.","gate_ids":["engine-quick","diagnose"]},
+    {"id":"adaptive-learning","role":"Adaptive Learning & Pri Explain","mission":"Improve mastery modelling, next-question decisions and Pri Explain while preserving deterministic and answer-blind learning contracts.","gate_ids":["explain","person1"]},
+    {"id":"india-curriculum","role":"India Curriculum / NCERT / CBSE / JEE","mission":"Build source-backed Classes 7-12 and JEE curriculum, generators, solutions, exams and provenance-safe mappings.","gate_ids":["india","ncert-rational","ncert-linear","ncert-class8-rest","ncert-class9"]},
+    {"id":"hsc-curriculum","role":"NSW / HSC Curriculum & Exam Intelligence","mission":"Maintain version-aware NESA alignment and evidence-based HSC assessment intelligence. Primarily a reviewer on shared executable maths paths unless a dedicated HSC path exists.","gate_ids":["engine-quick","diagnose"]},
+    {"id":"student-experience","role":"Student Product / UX / Accessibility","mission":"Improve onboarding, home, practice, exams, progress, settings and accessible iPad-first student flows.","gate_ids":["build","a11y"]},
+    {"id":"ios-native","role":"iOS / iPad / Pencil Platform","mission":"Harden Swift shell, PencilKit lifecycle, native bridges, orientation, multitasking and release behaviour.","gate_ids":["ios-sync","ink-bridge"]},
+    {"id":"platform","role":"Backend / Auth / Sync / Data","mission":"Build reliable identity, sessions, sync, storage, migrations and account lifecycle while preserving offline-first operation.","gate_ids":["backend","gateway","outbox","security"]},
+    {"id":"commercial","role":"Billing / Entitlements / Commercial Platform","mission":"Harden billing, entitlements, trials, restore and commercial account surfaces.","gate_ids":["security","build"]},
+    {"id":"teacher","role":"Teacher / Classroom Platform","mission":"Build assignments, class intelligence, staff operations and privacy-safe teacher workflows.","gate_ids":["build","security"]},
+    {"id":"security","role":"Security / Privacy","mission":"Review and own dedicated security controls; remove auth, injection, isolation, dependency and abuse-control risks.","gate_ids":["security","runtime-audit"]},
+    {"id":"reliability","role":"Performance / Reliability / Offline / SRE","mission":"Own reliability tooling, workflows, performance, recovery and observability infrastructure.","gate_ids":["build","backend","outbox"]},
+    {"id":"qa-release","role":"QA / Integration / Release Governor","mission":"Act independently of the writer, validate ownership/risk/gates, inspect complete diffs and reject unsupported completion claims.","gate_ids":["build"]},
+    {"id":"benchmark","role":"Benchmark Science / ML Evidence","mission":"Build reproducible benchmarks and preserve separation between synthetic/simulator and real-human evidence.","gate_ids":["real-ink"]},
+    {"id":"android","role":"Android / Cross-platform Future","mission":"Prepare shared product logic for Android without weakening iPad quality or splitting learning engines.","gate_ids":["build"]},
+    {"id":"growth","role":"Growth / Marketing Product","mission":"Improve privacy-safe acquisition, activation and conversion surfaces with evidence-backed claims.","gate_ids":["build","a11y"]}
   ]
 }
