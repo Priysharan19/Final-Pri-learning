@@ -18,7 +18,7 @@ let package = Package(
             bundleIdentifier: "com.prilearning.app",
             displayVersion: "4.0",
             bundleVersion: "2",
-            appIcon: .placeholder(icon: .calculator),
+            appIcon: .asset("AppIcon"),
             accentColor: .presetColor(.orange),
             supportedDeviceFamilies: [
                 .pad,
@@ -48,6 +48,7 @@ let package = Package(
                 "README.md"
             ],
             resources: [
+                .process("Assets.xcassets"),
                 .copy("Resources/Web"),
                 // A validated PriInkFoundation.mlpackage is exported here. The
                 // directory exists even in development builds where no learned
