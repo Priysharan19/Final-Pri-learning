@@ -53,6 +53,7 @@ jobs:
           set -euo pipefail
           node scripts/pri-fleet.mjs route client/src/ink/native.js | grep -q '"primary":"handwriting"'
           node scripts/pri-fleet.mjs route server/platform/index.js | grep -q '"primary":"platform"'
+          node scripts/pri-fleet.mjs route server/test/platform-schema-check.mjs | grep -q '"primary":"qa-release"'
           node scripts/pri-fleet.mjs route client/src/pages/Home.jsx | grep -q '"primary":"student-experience"'
 
       - name: Mission ranker preempts critical categories
@@ -103,15 +104,18 @@ jobs:
           echo "mission=$mission" >> "$GITHUB_OUTPUT"
           echo "risk=$declared_risk" >> "$GITHUB_OUTPUT"
 
-      - name: Verify exactly one active GitHub-Issue writer lease
+      - name: Verify exactly one fresh GitHub-Issue writer lease
         if: github.event_name == 'pull_request' && steps.meta.outputs.autonomous == 'true'
         uses: actions/github-script@v7
         env:
           EXPECTED_AGENT: ${{ steps.meta.outputs.agent }}
           EXPECTED_MISSION: ${{ steps.meta.outputs.mission }}
           EXPECTED_BRANCH: ${{ github.head_ref }}
+          EXPECTED_RISK: ${{ steps.meta.outputs.risk }}
         with:
           script: |
+            const fs = require('fs');
+            const control = JSON.parse(fs.readFileSync('.pri-os/mission-control.json', 'utf8'));
             const issues = await github.paginate(github.rest.issues.listForRepo, {
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -130,15 +134,31 @@ jobs:
               return;
             }
             const lease = active[0];
+            const leaseAgeMs = Date.now() - Date.parse(lease.updated_at);
+            const ttlMs = Number(control.lease.ttl_hours) * 60 * 60 * 1000;
+            if (!Number.isFinite(leaseAgeMs) || leaseAgeMs < 0 || leaseAgeMs > ttlMs) {
+              core.setFailed(`Writer lease issue #${lease.number} is stale or has invalid updated_at (${lease.updated_at}).`);
+              return;
+            }
             const expected = {
               mission: process.env.EXPECTED_MISSION,
               agent: process.env.EXPECTED_AGENT,
-              branch: process.env.EXPECTED_BRANCH
+              branch: process.env.EXPECTED_BRANCH,
+              risk: process.env.EXPECTED_RISK
             };
+            const attempt = marker(lease.body, 'Pri-Attempt');
+            const baseSha = marker(lease.body, 'Pri-Base-SHA');
+            const failureFingerprint = marker(lease.body, 'Pri-Failure-Fingerprint');
             if (marker(lease.body, 'Pri-Mission-ID') !== expected.mission ||
                 marker(lease.body, 'Pri-Agent') !== expected.agent ||
-                marker(lease.body, 'Pri-Branch') !== expected.branch) {
+                marker(lease.body, 'Pri-Branch') !== expected.branch ||
+                marker(lease.body, 'Pri-Risk') !== expected.risk) {
               core.setFailed(`Active lease issue #${lease.number} does not match this autonomous PR.`);
-            } else {
-              core.info(`Verified writer lease in issue #${lease.number}.`);
+              return;
             }
+            if (!/^\d+$/.test(attempt) || !/^[0-9a-f]{7,40}$/i.test(baseSha) ||
+                (failureFingerprint && failureFingerprint !== 'none' && !/^[0-9a-f]{64}$/i.test(failureFingerprint))) {
+              core.setFailed(`Active lease issue #${lease.number} has invalid attempt/base/failure markers.`);
+              return;
+            }
+            core.info(`Verified fresh writer lease in issue #${lease.number}; age ${Math.round(leaseAgeMs / 60000)} minute(s).`);
