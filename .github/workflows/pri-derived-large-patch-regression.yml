@@ -1,0 +1,92 @@
+name: Pri Derived Large Patch Regression
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/pri-derived-artifact-sync.mjs'
+      - '.github/workflows/pri-derived-large-patch-regression.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/pri-derived-artifact-sync.mjs'
+      - '.github/workflows/pri-derived-large-patch-regression.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  large-derived-patch:
+    name: Package >1 MiB derived patch safely
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Build deterministic large-patch fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          fixture="$(mktemp -d)"
+          repo="$fixture/repo"
+          out="$fixture/out"
+          git init -q "$repo"
+          git -C "$repo" config user.name 'Pri Fleet Test'
+          git -C "$repo" config user.email 'pri-fleet-test@invalid.example'
+          mkdir -p \
+            "$repo/ios/PriLearning.swiftpm/Resources/Web/assets" \
+            "$repo/ios/PriLearning 2.swiftpm/Resources/Web/assets"
+          printf 'seed\n' > "$repo/ios/PriLearning.swiftpm/Resources/Web/index.html"
+          printf 'seed\n' > "$repo/ios/PriLearning 2.swiftpm/Resources/Web/index.html"
+          git -C "$repo" add .
+          git -C "$repo" commit -qm seed
+
+          node - "$repo" <<'NODE'
+          const fs = require('node:fs');
+          const path = require('node:path');
+          const repo = process.argv[2];
+          // Two long deterministic text assets force the git patch above 1 MiB
+          // without adding a large fixture to Pri Learning itself.
+          const payloadA = `export const largeA = "${'A'.repeat(700_000)}";\n`;
+          const payloadB = `export const largeB = "${'B'.repeat(700_000)}";\n`;
+          fs.writeFileSync(path.join(repo, 'ios/PriLearning.swiftpm/Resources/Web/assets/index-large-a.js'), payloadA);
+          fs.writeFileSync(path.join(repo, 'ios/PriLearning 2.swiftpm/Resources/Web/assets/index-large-b.js'), payloadB);
+          fs.writeFileSync(path.join(repo, 'ios/PriLearning.swiftpm/Package.swift'), 'native-trap\n');
+          fs.writeFileSync(path.join(repo, 'outside.txt'), 'outside-trap\n');
+          NODE
+
+          node scripts/pri-derived-artifact-sync.mjs package \
+            "$repo" "$out" \
+            agent/mission/reliability/large-patch-smoke \
+            aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa \
+            bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+
+          node scripts/pri-derived-artifact-sync.mjs validate-paths "$out/paths.json"
+          node - "$out" <<'NODE'
+          const fs = require('node:fs');
+          const path = require('node:path');
+          const out = process.argv[2];
+          const patch = fs.readFileSync(path.join(out, 'mirrors.patch'));
+          if (patch.length <= 1024 * 1024) {
+            throw new Error(`fixture did not exceed 1 MiB: ${patch.length} bytes`);
+          }
+          const paths = JSON.parse(fs.readFileSync(path.join(out, 'paths.json'), 'utf8'));
+          const expected = [
+            'ios/PriLearning.swiftpm/Resources/Web/assets/index-large-a.js',
+            'ios/PriLearning 2.swiftpm/Resources/Web/assets/index-large-b.js'
+          ];
+          for (const file of expected) {
+            if (!paths.includes(file)) throw new Error(`large patch omitted ${file}`);
+          }
+          if (paths.some(file => file.includes('Package.swift') || file === 'outside.txt')) {
+            throw new Error(`large patch escaped declared roots: ${JSON.stringify(paths)}`);
+          }
+          console.log(`PASS: packaged ${patch.length} byte derived patch inside declared mirror roots.`);
+          NODE
+
+          if git -C "$repo" diff --cached --name-only | grep -Eq 'Package\.swift|^outside\.txt$'; then
+            echo 'large-patch packager staged an out-of-root trap' >&2
+            exit 1
+          fi
+          rm -rf "$fixture"
