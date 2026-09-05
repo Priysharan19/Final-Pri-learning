@@ -29,6 +29,12 @@ const OPERATIONS = new Set(['upsert', 'delete', 'bulk-import']);
 const FULL_RESCAN = Object.freeze({ kind: 'full-rescan', entityId: 'all', operation: 'upsert' });
 
 let serial = Promise.resolve();
+// A successful local domain mutation can commit before this queue is written.
+// If that write fails, retrying the domain mutation would be unsafe, but simply
+// forgetting the gap would let a later replica miss real student work. Keep an
+// in-memory fail-closed latch: the next syncable mutation must durably replace
+// the fine-grained queue with a full-rescan marker before the latch can clear.
+let needsFullRescanAfterWriteFailure = false;
 
 function safeId(value, fallback = 'self') {
   const text = String(value ?? '');
@@ -162,6 +168,11 @@ function locked(job) {
   return next;
 }
 
+function oldestDirtyAt(row, fallback) {
+  if (!row.items.length) return fallback;
+  return Math.min(...row.items.map(item => Number(item.firstAt) || Number(item.at) || fallback));
+}
+
 /** Persist one successful mutation. Only opaque ids are retained from result/body. */
 export function recordMutation(method, path, result, body = null) {
   const classified = classifyMutation(method, path, result, body);
@@ -170,16 +181,32 @@ export function recordMutation(method, path, result, body = null) {
     // Storage errors are not converted to an empty queue here. api.js already
     // turns a queue write failure into SYNC_QUEUE_FAILED without repeating the
     // successful local domain mutation; swallowing the storage error here would
-    // make that warning impossible.
-    const row = cleanRow(await get('device', ROW_ID));
-    const now = Date.now();
-    const event = {
-      seq: row.nextSeq++, kind: classified.kind, entityId: classified.entityId,
-      operation: classified.operation, firstAt: now, at: now
-    };
-    row.items = coalesce(row.items, event);
-    await put('device', row);
-    return { ...event };
+    // make that warning impossible. A failed read/write also latches a full
+    // reconciliation requirement so a later successful mutation cannot hide
+    // the earlier gap.
+    try {
+      const row = cleanRow(await get('device', ROW_ID));
+      const now = Date.now();
+
+      if (needsFullRescanAfterWriteFailure) {
+        const marker = rescanMarker(row.nextSeq++, oldestDirtyAt(row, now), now);
+        row.items = [marker];
+        await put('device', row);
+        needsFullRescanAfterWriteFailure = false;
+        return { ...marker };
+      }
+
+      const event = {
+        seq: row.nextSeq++, kind: classified.kind, entityId: classified.entityId,
+        operation: classified.operation, firstAt: now, at: now
+      };
+      row.items = coalesce(row.items, event);
+      await put('device', row);
+      return { ...event };
+    } catch (err) {
+      needsFullRescanAfterWriteFailure = true;
+      throw err;
+    }
   });
 }
 
