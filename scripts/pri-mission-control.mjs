@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const CONTROL_FILE = path.join(ROOT, '.pri-os', 'mission-control.json');
 const FLEET_FILE = path.join(ROOT, '.pri-os', 'fleet.json');
+const ACTIVE_STATES = new Set(['ACTIVE','IMPLEMENTING','TESTING','REVIEW','CI','REPAIR','MERGE_READY']);
 
 function readJson(file) {
   return JSON.parse(readFileSync(file, 'utf8'));
@@ -23,6 +24,7 @@ function validateControl() {
   const errors = [];
   if (control.version !== 1) errors.push('mission-control.version must be 1');
   if (control.ledger?.backend !== 'github_issues') errors.push('ledger.backend must be github_issues');
+  if (!control.ledger?.title_prefix) errors.push('ledger.title_prefix is required');
   if (!control.lease?.single_active_writer) errors.push('single_active_writer must remain true');
   if (!Number.isInteger(control.lease?.ttl_hours) || control.lease.ttl_hours <= 0) errors.push('lease.ttl_hours must be positive');
   if (!Number.isInteger(control.retry_policy?.max_identical_failure_attempts) || control.retry_policy.max_identical_failure_attempts < 1) errors.push('max_identical_failure_attempts must be positive');
@@ -109,7 +111,7 @@ function normalizedFingerprint(text) {
 function leaseStatus(record, now = Date.now()) {
   const errors = validateRecord(record);
   if (errors.length) return { valid: false, reason: `invalid record: ${errors.join('; ')}` };
-  if (!['ACTIVE','IMPLEMENTING','TESTING','REVIEW','CI','REPAIR','MERGE_READY'].includes(record.status)) {
+  if (!ACTIVE_STATES.has(record.status)) {
     return { valid: false, reason: `state ${record.status} does not hold the writer lease` };
   }
   const ageMs = now - Date.parse(record.updated_at);
@@ -119,6 +121,57 @@ function leaseStatus(record, now = Date.now()) {
     age_minutes: Math.max(0, Math.round(ageMs / 60000)),
     ttl_minutes: control.lease.ttl_hours * 60,
     reason: ageMs > ttlMs ? 'lease expired' : 'lease active'
+  };
+}
+
+function marker(body, key) {
+  const match = String(body || '').match(new RegExp(`^${key}:\\s*(.+)$`, 'mi'));
+  return match ? match[1].trim() : '';
+}
+
+function validateLedger(issues, expected, now = Date.now()) {
+  const errors = [];
+  if (!Array.isArray(issues)) return { valid: false, errors: ['ledger snapshot must be an array'] };
+  const managed = issues.filter(issue =>
+    !issue.pull_request &&
+    String(issue.title || '').startsWith(control.ledger.title_prefix) &&
+    marker(issue.body, 'Pri-Mission-ID')
+  );
+  const active = managed.filter(issue => ACTIVE_STATES.has(marker(issue.body, 'Pri-Mission-Status')));
+  if (active.length !== 1) {
+    return { valid: false, errors: [`expected exactly one active writer lease, found ${active.length}`], managed_count: managed.length, active_count: active.length };
+  }
+
+  const lease = active[0];
+  const leaseUpdated = Date.parse(lease.updated_at);
+  const leaseAgeMs = now - leaseUpdated;
+  const ttlMs = Number(control.lease.ttl_hours) * 60 * 60 * 1000;
+  if (!Number.isFinite(leaseUpdated) || !Number.isFinite(leaseAgeMs) || leaseAgeMs < 0 || leaseAgeMs > ttlMs) {
+    errors.push(`writer lease issue #${lease.number ?? '?'} is stale or has invalid updated_at (${lease.updated_at})`);
+  }
+
+  if (marker(lease.body, 'Pri-Mission-ID') !== expected.mission) errors.push('mission marker does not match PR');
+  if (marker(lease.body, 'Pri-Agent') !== expected.agent) errors.push('agent marker does not match PR');
+  if (marker(lease.body, 'Pri-Branch') !== expected.branch) errors.push('branch marker does not match PR');
+  if (marker(lease.body, 'Pri-Risk') !== expected.risk) errors.push('risk marker does not match PR');
+
+  const attempt = marker(lease.body, 'Pri-Attempt');
+  const baseSha = marker(lease.body, 'Pri-Base-SHA');
+  const failureFingerprint = marker(lease.body, 'Pri-Failure-Fingerprint');
+  if (!/^\d+$/.test(attempt)) errors.push('Pri-Attempt must be a non-negative integer');
+  if (!/^[0-9a-f]{7,40}$/i.test(baseSha)) errors.push('Pri-Base-SHA must be a git SHA');
+  if (failureFingerprint && failureFingerprint !== 'none' && !/^[0-9a-f]{64}$/i.test(failureFingerprint)) {
+    errors.push('Pri-Failure-Fingerprint must be none/empty or sha256');
+  }
+
+  return {
+    valid: errors.length === 0,
+    errors,
+    issue_number: lease.number ?? null,
+    age_minutes: Number.isFinite(leaseAgeMs) ? Math.max(0, Math.round(leaseAgeMs / 60000)) : null,
+    ttl_minutes: control.lease.ttl_hours * 60,
+    managed_count: managed.length,
+    active_count: active.length
   };
 }
 
@@ -146,7 +199,7 @@ function template(id, agent, risk, baseSha) {
 }
 
 function usage() {
-  console.log(`Pri Learning Mission Control\n\nCommands:\n  validate\n  rank <candidates.json>\n  validate-record <mission.json>\n  transition <mission.json> <next-state> [--write]\n  fingerprint <text-file>\n  lease-status <mission.json>\n  template <id> <agent> <risk> <base-sha>`);
+  console.log(`Pri Learning Mission Control\n\nCommands:\n  validate\n  rank <candidates.json>\n  validate-record <mission.json>\n  validate-ledger <issues.json> <agent> <mission> <branch> <risk>\n  transition <mission.json> <next-state> [--write]\n  fingerprint <text-file>\n  lease-status <mission.json>\n  template <id> <agent> <risk> <base-sha>`);
 }
 
 const [command = 'validate', ...args] = process.argv.slice(2);
@@ -172,6 +225,17 @@ if (command === 'validate') {
     process.exit(1);
   }
   console.log(`PASS: mission ${record.id} (${record.status}, ${record.agent}, ${record.risk})`);
+} else if (command === 'validate-ledger') {
+  const file = args[0];
+  if (!file || !args[1] || !args[2] || !args[3] || !args[4]) throw new Error('validate-ledger requires issues.json agent mission branch risk');
+  const result = validateLedger(readJson(path.resolve(file)), {
+    agent: args[1],
+    mission: args[2],
+    branch: args[3],
+    risk: args[4]
+  });
+  console.log(JSON.stringify(result, null, 2));
+  if (!result.valid) process.exitCode = 1;
 } else if (command === 'transition') {
   const file = path.resolve(args[0]);
   const next = args[1];
