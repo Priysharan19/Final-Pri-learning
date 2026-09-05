@@ -38,7 +38,6 @@ struct ContentView: View {
                 .ignoresSafeArea()
             WebShell()
         }
-        .preferredColorScheme(.dark)
         .persistentSystemOverlays(.hidden)
     }
 }
