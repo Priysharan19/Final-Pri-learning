@@ -38,6 +38,7 @@ jobs:
         run: |
           node --check scripts/pri-fleet.mjs
           node --check scripts/pri-mission-control.mjs
+          node -e "JSON.parse(require('fs').readFileSync('.pri-os/derived-artifacts.json', 'utf8'))"
 
       - name: Validate fleet and mission invariants
         run: |
@@ -55,6 +56,43 @@ jobs:
           node scripts/pri-fleet.mjs route server/platform/index.js | grep -q '"primary":"platform"'
           node scripts/pri-fleet.mjs route server/test/platform-schema-check.mjs | grep -q '"primary":"qa-release"'
           node scripts/pri-fleet.mjs route client/src/pages/Home.jsx | grep -q '"primary":"student-experience"'
+          node scripts/pri-fleet.mjs route 'ios/PriLearning.swiftpm/Resources/Web/index.html' | grep -q '"derived":"ios-web-mirrors"'
+
+      - name: Derived iPad artifact collaboration policy
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # A domain specialist may carry the generated web mirrors only when
+          # the same diff includes a canonical client/src source change it owns.
+          node scripts/pri-fleet.mjs simulate-guard math-reasoning \
+            client/src/engine/checker.js \
+            'ios/PriLearning.swiftpm/Resources/Web/index.html' \
+            'ios/PriLearning 2.swiftpm/Resources/Web/sw.js'
+          node scripts/pri-fleet.mjs simulate-guard student-experience \
+            client/src/pages/Home.jsx \
+            'ios/PriLearning.swiftpm/Resources/Web/assets/index-example.js'
+
+          # A generated mirror by itself is still iOS-owned.
+          if node scripts/pri-fleet.mjs simulate-guard math-reasoning \
+            'ios/PriLearning.swiftpm/Resources/Web/index.html'; then
+            echo 'derived artifact was accepted without a primary-owned source change' >&2
+            exit 1
+          fi
+
+          # The exception must never cover native package or Swift/Pencil code.
+          if node scripts/pri-fleet.mjs simulate-guard math-reasoning \
+            client/src/engine/checker.js \
+            'ios/PriLearning.swiftpm/Package.swift'; then
+            echo 'derived artifact exception escaped into Package.swift' >&2
+            exit 1
+          fi
+          if node scripts/pri-fleet.mjs simulate-guard math-reasoning \
+            client/src/engine/checker.js \
+            'ios/PriLearning.swiftpm/Sources/PriLearningApp.swift'; then
+            echo 'derived artifact exception escaped into native Swift source' >&2
+            exit 1
+          fi
 
       - name: Mission ranker preempts critical categories
         shell: bash
