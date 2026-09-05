@@ -78,17 +78,17 @@ The lease expires after 12 hours without progress. Future autonomous mission PRs
 
 `agent/mission/<agent>/<mission-id>`
 
-The governance workflow verifies there is exactly one open managed GitHub Issue holding the active lease and that it matches the PR branch and specialist.
+The governance workflow verifies there is exactly one open managed GitHub Issue holding the active lease, that its mission/agent/branch/risk match the PR, that required markers are well-formed, and that the issue itself was updated within the configured lease TTL.
 
 ## 4. Primary ownership + reviewer overlays
 
-V1 had overlapping broad ownership. V2 replaces that with ordered ownership rules. The first matching rule is authoritative and contains:
+V1 had overlapping broad ownership. V2 resolves ownership using the most-specific matching rule. A rule contains:
 
 - one `primary` writer
 - zero or more mandatory `reviewers`
 - a risk class
 
-This makes security, reliability and QA cross-cutting reviewers without allowing them to compete with the domain specialist for the same implementation by default.
+If equally specific matching rules disagree on the primary owner, routing fails instead of silently choosing one. This makes security, reliability and QA cross-cutting reviewers without allowing them to compete with the domain specialist for the same implementation by default.
 
 Inspect routing with:
 
@@ -143,7 +143,7 @@ The QA / Release Governor is logically separate from the specialist writer. The 
 
 ## 9. Governance workflow
 
-`.github/workflows/pri-agent-governance.yml` now runs on every PR. All PRs validate the control plane and receive diff risk classification. Strict writer ownership, metadata and GitHub-Issue lease enforcement apply automatically to `agent/mission/**` branches.
+`.github/workflows/pri-agent-governance.yml` now runs on every PR. All PRs validate the control plane and receive diff risk classification. Strict writer ownership, metadata and fresh GitHub-Issue lease enforcement apply automatically to `agent/mission/**` branches.
 
 ## 10. Relationship to existing Pri automation
 
