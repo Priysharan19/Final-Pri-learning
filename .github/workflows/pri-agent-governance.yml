@@ -8,7 +8,7 @@ on:
       - 'AGENTS.md'
       - '.pri-os/**'
       - 'scripts/pri-*.mjs'
-      - '.github/workflows/pri-agent-governance.yml'
+      - '.github/workflows/pri-agent-*.yml'
   workflow_dispatch:
 
 permissions:
@@ -38,6 +38,7 @@ jobs:
         run: |
           node --check scripts/pri-fleet.mjs
           node --check scripts/pri-mission-control.mjs
+          node --check scripts/pri-derived-artifact-sync.mjs
           node -e "JSON.parse(require('fs').readFileSync('.pri-os/derived-artifacts.json', 'utf8'))"
 
       - name: Validate fleet and mission invariants
@@ -91,6 +92,66 @@ jobs:
             client/src/engine/checker.js \
             'ios/PriLearning.swiftpm/Sources/PriLearningApp.swift'; then
             echo 'derived artifact exception escaped into native Swift source' >&2
+            exit 1
+          fi
+
+      - name: Derived sync validator and trust-boundary self-test
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          cat > /tmp/pri-derived-good.json <<'JSON'
+          [
+            "ios/PriLearning.swiftpm/Resources/Web/index.html",
+            "ios/PriLearning 2.swiftpm/Resources/Web/assets/index-example.js"
+          ]
+          JSON
+          node scripts/pri-derived-artifact-sync.mjs validate-paths /tmp/pri-derived-good.json
+          node scripts/pri-derived-artifact-sync.mjs branch agent/mission/math-reasoning/ratio-extra-component-authority | grep -q '"agent":"math-reasoning"'
+
+          cat > /tmp/pri-derived-bad-native.json <<'JSON'
+          ["ios/PriLearning.swiftpm/Package.swift"]
+          JSON
+          if node scripts/pri-derived-artifact-sync.mjs validate-paths /tmp/pri-derived-bad-native.json; then
+            echo 'derived sync accepted native Package.swift' >&2
+            exit 1
+          fi
+
+          cat > /tmp/pri-derived-bad-traversal.json <<'JSON'
+          ["ios/PriLearning.swiftpm/Resources/Web/../../Package.swift"]
+          JSON
+          if node scripts/pri-derived-artifact-sync.mjs validate-paths /tmp/pri-derived-bad-traversal.json; then
+            echo 'derived sync accepted path traversal' >&2
+            exit 1
+          fi
+
+          if node scripts/pri-derived-artifact-sync.mjs branch feature/not-an-agent-mission; then
+            echo 'derived sync accepted a non-mission branch' >&2
+            exit 1
+          fi
+
+          cat > /tmp/pri-derived-meta.json <<'JSON'
+          {
+            "rule_id":"ios-web-mirrors",
+            "required_gate_id":"ios-sync",
+            "head_ref":"agent/mission/math-reasoning/smoke",
+            "head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "base_sha":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          }
+          JSON
+          node scripts/pri-derived-artifact-sync.mjs validate-metadata \
+            /tmp/pri-derived-meta.json \
+            aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa \
+            bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb \
+            agent/mission/math-reasoning/smoke
+
+          test -s .github/workflows/pri-agent-derived-sync.yml
+          grep -Fq 'pull_request_target:' .github/workflows/pri-agent-derived-sync.yml
+          apply_job="$(awk '/^  apply-derived:/{flag=1} flag{print}' .github/workflows/pri-agent-derived-sync.yml)"
+          printf '%s\n' "$apply_job" | grep -Fq 'contents: write'
+          printf '%s\n' "$apply_job" | grep -Fq 'Apply validated mirrors without executing candidate code'
+          if printf '%s\n' "$apply_job" | grep -Eq 'npm (ci|run)|working-directory:[[:space:]]*candidate'; then
+            echo 'write-authority job must never execute candidate npm code' >&2
             exit 1
           fi
 
