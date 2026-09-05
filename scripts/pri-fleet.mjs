@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const FLEET_FILE = path.join(ROOT, '.pri-os', 'fleet.json');
+const DERIVED_ARTIFACT_FILE = path.join(ROOT, '.pri-os', 'derived-artifacts.json');
 const MISSION_CONTROL_FILE = path.join(ROOT, '.pri-os', 'mission-control.json');
 const PACKAGE_FILE = path.join(ROOT, 'package.json');
 const RISK_ORDER = ['R1', 'R2', 'R3', 'R4'];
@@ -17,6 +18,10 @@ function readJson(file) {
 
 function loadFleet() {
   return readJson(FLEET_FILE);
+}
+
+function loadDerivedArtifacts() {
+  return readJson(DERIVED_ARTIFACT_FILE);
 }
 
 function globRegex(glob) {
@@ -72,6 +77,14 @@ function ownerFor(fleet, file) {
   return { ...best, specificity: bestSpecificity };
 }
 
+function derivedRuleFor(policy, file) {
+  const found = (policy.artifacts || []).filter(rule => (rule.patterns || []).some(pattern => matches(file, pattern)));
+  if (found.length > 1) {
+    throw new Error(`ambiguous derived artifact policy for ${file}: ${found.map(rule => rule.id).join(', ')}`);
+  }
+  return found[0] || null;
+}
+
 function changedFiles(base = 'origin/main') {
   const text = execFileSync('git', ['diff', '--name-only', `${base}...HEAD`], {
     cwd: ROOT,
@@ -83,6 +96,39 @@ function changedFiles(base = 'origin/main') {
 function isCollaborativeTest(file, owner, agentId) {
   if (!owner || owner.primary !== 'qa-release' || agentId === 'director') return false;
   return file.startsWith('client/test/') || file.startsWith('server/test/');
+}
+
+function hasPrimaryOwnedDerivedSource(fleet, policy, rule, agentId, files) {
+  return files.some(file => {
+    if (derivedRuleFor(policy, file)) return false;
+    if (!(rule.source_patterns || []).some(pattern => matches(file, pattern))) return false;
+    return ownerFor(fleet, file)?.primary === agentId;
+  });
+}
+
+function isCollaborativeDerivedArtifact(file, owner, agentId, files, fleet, policy) {
+  if (!owner || agentId === 'director') return false;
+  const rule = derivedRuleFor(policy, file);
+  if (!rule) return false;
+  if (owner.primary !== rule.canonical_owner) return false;
+  if (rule.requires_primary_owned_source !== true) return false;
+  return hasPrimaryOwnedDerivedSource(fleet, policy, rule, agentId, files);
+}
+
+function guardViolations(fleet, policy, agentId, files) {
+  const violations = [];
+  for (const file of files) {
+    const owner = ownerFor(fleet, file);
+    if (!owner) {
+      violations.push(`${file}: unowned`);
+      continue;
+    }
+    if (owner.primary === agentId) continue;
+    if (isCollaborativeTest(file, owner, agentId)) continue;
+    if (isCollaborativeDerivedArtifact(file, owner, agentId, files, fleet, policy)) continue;
+    violations.push(`${file}: primary=${owner.primary}, selected=${agentId}`);
+  }
+  return violations;
 }
 
 function maxRisk(fleet, files) {
@@ -97,7 +143,47 @@ function maxRisk(fleet, files) {
   return { risk: result, details };
 }
 
-function validate(fleet) {
+function validateDerivedPolicy(fleet, policy, ids) {
+  const errors = [];
+  if (policy.version !== 1) errors.push('derived-artifacts.version must be 1');
+  if (!Array.isArray(policy.artifacts) || policy.artifacts.length === 0) {
+    errors.push('derived-artifacts must define at least one artifact');
+    return errors;
+  }
+
+  const artifactIds = new Set();
+  const patterns = new Set();
+  for (const rule of policy.artifacts) {
+    if (!rule.id || !/^[a-z0-9-]+$/.test(rule.id)) errors.push(`invalid derived artifact id: ${rule.id}`);
+    if (artifactIds.has(rule.id)) errors.push(`duplicate derived artifact id: ${rule.id}`);
+    artifactIds.add(rule.id);
+
+    if (!ids.has(rule.canonical_owner)) errors.push(`${rule.id}: unknown canonical owner '${rule.canonical_owner}'`);
+    if (!Array.isArray(rule.patterns) || rule.patterns.length === 0) errors.push(`${rule.id}: patterns are required`);
+    if (!Array.isArray(rule.source_patterns) || rule.source_patterns.length === 0) errors.push(`${rule.id}: source_patterns are required`);
+    if (!rule.producer) errors.push(`${rule.id}: producer is required`);
+    if (!rule.required_gate_id || !fleet.gates?.[rule.required_gate_id]) {
+      errors.push(`${rule.id}: required_gate_id must reference a typed fleet gate`);
+    }
+    if (rule.requires_primary_owned_source !== true) {
+      errors.push(`${rule.id}: requires_primary_owned_source must remain true`);
+    }
+
+    for (const pattern of rule.patterns || []) {
+      if (patterns.has(pattern)) errors.push(`duplicate derived artifact pattern: ${pattern}`);
+      patterns.add(pattern);
+      const sample = pattern.replace(/\*\*/g, '__sample__').replace(/\*/g, 'x');
+      const owner = ownerFor(fleet, sample);
+      if (!owner) errors.push(`${rule.id}: derived pattern is not canonically owned: ${pattern}`);
+      else if (owner.primary !== rule.canonical_owner) {
+        errors.push(`${rule.id}: ${pattern} canonical owner is ${owner.primary}, expected ${rule.canonical_owner}`);
+      }
+    }
+  }
+  return errors;
+}
+
+function validate(fleet, policy) {
   const errors = [];
   if (fleet.version !== 2) errors.push('fleet.version must be 2');
   if (!Array.isArray(fleet.agents) || fleet.agents.length < 8) errors.push('fleet must define at least 8 agents');
@@ -179,6 +265,7 @@ function validate(fleet) {
     errors.push(`mission-control config invalid: ${error.message}`);
   }
 
+  errors.push(...validateDerivedPolicy(fleet, policy, ids));
   return errors;
 }
 
@@ -196,27 +283,29 @@ function printAgentPrompt(fleet, id) {
 }
 
 function printUsage() {
-  console.log(`Pri Learning agent fleet V2\n\nCommands:\n  validate                    Validate fleet + mission-control invariants\n  list                        List agents\n  route <repo-path>           Show canonical primary owner, reviewers and risk\n  prompt <agent-id>           Print specialist ownership/review/gates\n  guard <agent-id> [base]     Fail on unowned or cross-domain branch changes\n  risk [base]                 Compute maximum risk class for changed files\n  compare-risk <declared> [base]  Fail if declared PR risk understates diff risk\n  status                      Emit machine-readable fleet status`);
+  console.log(`Pri Learning agent fleet V2\n\nCommands:\n  validate                         Validate fleet + mission-control + derived-artifact invariants\n  list                             List agents\n  route <repo-path>                Show canonical primary owner, reviewers and risk\n  prompt <agent-id>                Print specialist ownership/review/gates\n  guard <agent-id> [base]          Fail on unowned or cross-domain branch changes\n  simulate-guard <agent> <paths…>  Evaluate guard policy against explicit paths\n  risk [base]                      Compute maximum risk class for changed files\n  compare-risk <declared> [base]   Fail if declared PR risk understates diff risk\n  status                           Emit machine-readable fleet status`);
 }
 
 const fleet = loadFleet();
+const derivedPolicy = loadDerivedArtifacts();
 const [command = 'validate', ...args] = process.argv.slice(2);
 
 if (command === 'validate') {
-  const errors = validate(fleet);
+  const errors = validate(fleet, derivedPolicy);
   if (errors.length) {
     for (const error of errors) console.error(`ERROR: ${error}`);
     process.exit(1);
   }
-  console.log(`PASS: ${fleet.agents.length} agents, ${Object.keys(fleet.gates).length} typed gates and ${fleet.ownership_rules.length} primary-ownership rules.`);
+  console.log(`PASS: ${fleet.agents.length} agents, ${Object.keys(fleet.gates).length} typed gates, ${fleet.ownership_rules.length} primary-ownership rules and ${derivedPolicy.artifacts.length} derived-artifact rule(s).`);
 } else if (command === 'list') {
   for (const agent of fleet.agents) console.log(`${agent.id}\t${agent.role}`);
 } else if (command === 'route') {
   const target = args[0];
   if (!target) throw new Error('route requires a repository path');
   const owner = ownerFor(fleet, target);
+  const derived = derivedRuleFor(derivedPolicy, target);
   if (!owner) {
-    console.log(JSON.stringify({ path: target, owned: false, risk: 'R4' }));
+    console.log(JSON.stringify({ path: target, owned: false, risk: 'R4', derived: derived?.id || null }));
     process.exitCode = 2;
   } else {
     console.log(JSON.stringify({
@@ -226,7 +315,9 @@ if (command === 'validate') {
       reviewers: owner.reviewers || [],
       risk: owner.risk,
       rule: owner.pattern,
-      specificity: owner.specificity
+      specificity: owner.specificity,
+      derived: derived?.id || null,
+      derived_gate: derived?.required_gate_id || null
     }));
   }
 } else if (command === 'prompt') {
@@ -236,23 +327,25 @@ if (command === 'validate') {
   if (agent.id === 'director') throw new Error('director is read-only and cannot own a code-changing branch');
   const base = args[1] || 'origin/main';
   const files = changedFiles(base);
-  const violations = [];
-  for (const file of files) {
-    const owner = ownerFor(fleet, file);
-    if (!owner) {
-      violations.push(`${file}: unowned`);
-      continue;
-    }
-    if (owner.primary !== agent.id && !isCollaborativeTest(file, owner, agent.id)) {
-      violations.push(`${file}: primary=${owner.primary}, selected=${agent.id}`);
-    }
-  }
+  const violations = guardViolations(fleet, derivedPolicy, agent.id, files);
   if (violations.length) {
     console.error(`ERROR: ${agent.id} violates primary ownership:`);
     for (const item of violations) console.error(`- ${item}`);
     process.exit(1);
   }
   console.log(`PASS: ${agent.id} owns/collaborates on all ${files.length} changed file(s).`);
+} else if (command === 'simulate-guard') {
+  const agent = getAgent(fleet, args[0]);
+  if (agent.id === 'director') throw new Error('director is read-only and cannot own a code-changing branch');
+  const files = args.slice(1);
+  if (!files.length) throw new Error('simulate-guard requires at least one repository path');
+  const violations = guardViolations(fleet, derivedPolicy, agent.id, files);
+  if (violations.length) {
+    console.error(`ERROR: ${agent.id} violates primary ownership:`);
+    for (const item of violations) console.error(`- ${item}`);
+    process.exit(1);
+  }
+  console.log(`PASS: ${agent.id} owns/collaborates on all ${files.length} simulated file(s).`);
 } else if (command === 'risk') {
   const base = args[0] || 'origin/main';
   const files = changedFiles(base);
@@ -268,7 +361,7 @@ if (command === 'validate') {
   }
   console.log(`PASS: declared ${declared} covers actual ${actual}.`);
 } else if (command === 'status') {
-  const errors = validate(fleet);
+  const errors = validate(fleet, derivedPolicy);
   console.log(JSON.stringify({
     name: fleet.name,
     version: fleet.version,
@@ -277,6 +370,7 @@ if (command === 'validate') {
     agentCount: fleet.agents.length,
     gateCount: Object.keys(fleet.gates || {}).length,
     ownershipRuleCount: fleet.ownership_rules?.length || 0,
+    derivedArtifactRuleCount: derivedPolicy.artifacts?.length || 0,
     principles: fleet.principles,
     riskClasses: fleet.risk_classes
   }, null, 2));
