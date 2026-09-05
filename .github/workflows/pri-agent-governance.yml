@@ -1,0 +1,148 @@
+name: Pri Agent Fleet Governance
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+    paths:
+      - 'AGENTS.md'
+      - '.pri-os/**'
+      - 'scripts/pri-*.mjs'
+      - '.github/workflows/pri-agent-governance.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+
+concurrency:
+  group: pri-agent-governance-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fleet-contract:
+    name: Autonomous fleet V2 contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Control-plane syntax
+        run: |
+          node --check scripts/pri-fleet.mjs
+          node --check scripts/pri-mission-control.mjs
+
+      - name: Validate fleet and mission invariants
+        run: |
+          node scripts/pri-fleet.mjs validate
+          node scripts/pri-mission-control.mjs validate
+
+      - name: Machine-readable fleet status
+        run: node scripts/pri-fleet.mjs status >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Smoke-test canonical primary ownership
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/pri-fleet.mjs route client/src/ink/native.js | grep -q '"primary":"handwriting"'
+          node scripts/pri-fleet.mjs route server/platform/index.js | grep -q '"primary":"platform"'
+          node scripts/pri-fleet.mjs route server/test/platform-schema-check.mjs | grep -q '"primary":"qa-release"'
+          node scripts/pri-fleet.mjs route client/src/pages/Home.jsx | grep -q '"primary":"student-experience"'
+
+      - name: Mission ranker preempts critical categories
+        shell: bash
+        run: |
+          cat > /tmp/pri-candidates.json <<'JSON'
+          [
+            {"id":"normal-high","category":"normal","severity":5,"student_impact":5,"unblock_value":5,"recurrence":5,"strategic_value":5,"diagnosis_confidence":5,"effort":0,"regression_risk":0},
+            {"id":"security-first","category":"security","severity":1,"student_impact":1,"unblock_value":1,"recurrence":1,"strategic_value":1,"diagnosis_confidence":1,"effort":5,"regression_risk":5}
+          ]
+          JSON
+          first="$(node scripts/pri-mission-control.mjs rank /tmp/pri-candidates.json | node -e "let s='';process.stdin.on('data',d=>s+=d);process.stdin.on('end',()=>process.stdout.write(JSON.parse(s)[0].id))")"
+          test "$first" = "security-first"
+
+      - name: Mission ledger validator self-test
+        shell: bash
+        run: |
+          set -euo pipefail
+          now="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          cat > /tmp/pri-ledger-smoke.json <<JSON
+          [
+            {
+              "number": 1,
+              "title": "[PRI-MISSION] smoke",
+              "updated_at": "$now",
+              "body": "Pri-Mission-ID: smoke\nPri-Mission-Status: ACTIVE\nPri-Agent: qa-release\nPri-Branch: agent/mission/qa-release/smoke\nPri-Risk: R2\nPri-Base-SHA: 8458a735fda3637656a8e9e23329f235b5277fb6\nPri-Attempt: 0\nPri-Failure-Fingerprint: none"
+            }
+          ]
+          JSON
+          node scripts/pri-mission-control.mjs validate-ledger /tmp/pri-ledger-smoke.json qa-release smoke agent/mission/qa-release/smoke R2
+
+      - name: Classify PR diff and parse autonomous metadata
+        if: github.event_name == 'pull_request'
+        id: meta
+        shell: bash
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+          BASE_REF: ${{ github.base_ref }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin "$BASE_REF"
+          node scripts/pri-fleet.mjs risk "origin/$BASE_REF" | tee /tmp/pri-risk.json >> "$GITHUB_STEP_SUMMARY"
+          if [[ "$HEAD_REF" != agent/mission/* ]]; then
+            echo "autonomous=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          remainder="${HEAD_REF#agent/mission/}"
+          agent="${remainder%%/*}"
+          mission="${remainder#*/}"
+          if [[ -z "$agent" || -z "$mission" || "$mission" == "$remainder" ]]; then
+            echo "Invalid autonomous branch; expected agent/mission/<agent>/<mission-id>" >&2
+            exit 1
+          fi
+          declared_agent="$(printf '%s\n' "$PR_BODY" | sed -n 's/^Pri-Agent:[[:space:]]*//p' | head -1)"
+          declared_mission="$(printf '%s\n' "$PR_BODY" | sed -n 's/^Pri-Mission-ID:[[:space:]]*//p' | head -1)"
+          declared_risk="$(printf '%s\n' "$PR_BODY" | sed -n 's/^Pri-Risk:[[:space:]]*//p' | head -1)"
+          test "$declared_agent" = "$agent"
+          test "$declared_mission" = "$mission"
+          [[ "$declared_risk" =~ ^R[1-4]$ ]]
+          node scripts/pri-fleet.mjs guard "$agent" "origin/$BASE_REF"
+          node scripts/pri-fleet.mjs compare-risk "$declared_risk" "origin/$BASE_REF"
+          echo "autonomous=true" >> "$GITHUB_OUTPUT"
+          echo "agent=$agent" >> "$GITHUB_OUTPUT"
+          echo "mission=$mission" >> "$GITHUB_OUTPUT"
+          echo "risk=$declared_risk" >> "$GITHUB_OUTPUT"
+
+      - name: Snapshot GitHub-Issue mission ledger
+        if: github.event_name == 'pull_request' && steps.meta.outputs.autonomous == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const issues = await github.paginate(github.rest.issues.listForRepo, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              per_page: 100
+            });
+            fs.writeFileSync('/tmp/pri-issues.json', JSON.stringify(issues.filter(issue => !issue.pull_request), null, 2));
+
+      - name: Verify active writer lease
+        if: github.event_name == 'pull_request' && steps.meta.outputs.autonomous == 'true'
+        shell: bash
+        env:
+          EXPECTED_AGENT: ${{ steps.meta.outputs.agent }}
+          EXPECTED_MISSION: ${{ steps.meta.outputs.mission }}
+          EXPECTED_BRANCH: ${{ github.head_ref }}
+          EXPECTED_RISK: ${{ steps.meta.outputs.risk }}
+        run: |
+          set -euo pipefail
+          node scripts/pri-mission-control.mjs validate-ledger /tmp/pri-issues.json "$EXPECTED_AGENT" "$EXPECTED_MISSION" "$EXPECTED_BRANCH" "$EXPECTED_RISK"
