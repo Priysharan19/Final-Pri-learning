@@ -99,6 +99,33 @@ function boundedMap(body, key, max = 200) {
   if (Object.keys(body[key]).length > max) throw apiError(`${key} has too many entries.`, 413, 'FIELD_TOO_LARGE');
 }
 
+/** India task targets: a short list of {chapterId, dotpoint?, track?, difficulty?} objects. */
+function optionalTargetList(body, key, max = 40) {
+  if (body[key] === undefined || body[key] === null) return;
+  if (!Array.isArray(body[key]) || body[key].length > max) throw apiError(`${key} must be an array of at most ${max} targets.`, 400, 'INVALID_FIELD');
+  for (const target of body[key]) {
+    if (!plainObject(target)) throw apiError(`${key} entries must be objects.`, 400, 'INVALID_FIELD');
+    optionalId(target, 'chapterId'); optionalString(target, 'track', 30); optionalNumber(target, 'difficulty');
+    if (target.dotpoint !== undefined && target.dotpoint !== null && typeof target.dotpoint !== 'number' && typeof target.dotpoint !== 'string') {
+      throw apiError(`${key} dotpoint must be a number.`, 400, 'INVALID_FIELD');
+    }
+    if (typeof target.dotpoint === 'number') optionalNumber(target, 'dotpoint');
+    else if (typeof target.dotpoint === 'string' && target.dotpoint !== '' && !/^\d{1,3}$/.test(target.dotpoint)) throw apiError(`${key} dotpoint must be a number.`, 400, 'INVALID_FIELD');
+  }
+}
+
+/** Roster rows: pasted names or {name, class/year, course, track} objects from a CSV. */
+function optionalRosterRows(body, key, max = 200) {
+  if (body[key] === undefined || body[key] === null) return;
+  if (!Array.isArray(body[key]) || body[key].length > max) throw apiError(`${key} must be an array of at most ${max} rows.`, 400, 'INVALID_FIELD');
+  for (const row of body[key]) {
+    if (typeof row === 'string') { if (row.length > 120) throw apiError(`${key} names are too long.`, 413, 'FIELD_TOO_LARGE'); continue; }
+    if (!plainObject(row)) throw apiError(`${key} entries must be names or objects.`, 400, 'INVALID_FIELD');
+    optionalString(row, 'name', 120); optionalNumber(row, 'year'); optionalNumber(row, 'class');
+    optionalString(row, 'course', 30); optionalString(row, 'track', 30); optionalString(row, 'indiaTrack', 30); optionalString(row, 'avatar', 32);
+  }
+}
+
 // Only routes where the body is security- or storage-significant need an
 // explicit contract here. Routes not listed still receive the universal deep
 // validation below, and backend.js remains responsible for their domain rules.
@@ -166,6 +193,10 @@ const BODY_RULES = [
   [/^POST \/tasks$/, body => {
     requireObject(body, 'POST /tasks'); optionalId(body, 'classId'); optionalString(body, 'title', 160);
     optionalIdArray(body, 'subtopics', 100); optionalIdArray(body, 'customIds', 100); optionalNumber(body, 'count'); optionalNumber(body, 'dueAt');
+    optionalTargetList(body, 'targets', 40); optionalString(body, 'track', 30); optionalNumber(body, 'difficulty');
+  }],
+  [/^POST \/classes\/[A-Za-z0-9._-]+\/roster$/, body => {
+    requireObject(body, 'class roster'); optionalRosterRows(body, 'rows', 200);
   }],
   [/^POST \/history\/list$/, body => {
     requireObject(body, 'POST /history/list'); optionalString(body, 'filter', 30); optionalNumber(body, 'page'); optionalNumber(body, 'pageSize');
