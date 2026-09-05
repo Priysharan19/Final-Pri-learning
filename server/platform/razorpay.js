@@ -432,10 +432,16 @@ export function createRazorpayBilling(db, { fetchImpl = globalThis.fetch } = {})
     const effectiveAt = milliseconds(payload?.created_at) || now;
     const subscription = payload?.payload?.subscription?.entity;
     const payment = payload?.payload?.payment?.entity;
+    const authoritative = !!subscription || family === 'subscription';
+
+    // Non-subscription families are acknowledged exactly once: a redelivery of
+    // an already-recorded event id must not re-run ledger or audit writes.
+    // (subscription.* replays are handled by applyVerifiedEntitlement.)
+    if (!authoritative && db.prepare(`SELECT applied_at FROM billing_events WHERE provider='web' AND event_id=?`).get(eventId)?.applied_at) return [];
 
     // subscription.* is the entitlement authority. An unbound subscription is a
     // genuine mismatch (409) so the provider keeps retrying and support notices.
-    if (subscription || family === 'subscription') {
+    if (authoritative) {
       const subscriptionId = String(subscription?.id || '');
       const binding = RAZORPAY_SUBSCRIPTION.test(subscriptionId) ? boundSubscription(db, subscriptionId) : null;
       if (!binding) throw billingError('BILLING_SUBSCRIPTION_UNKNOWN', 'Razorpay subscription is not bound to a Pri Learning account.', 409);
@@ -500,6 +506,29 @@ export function createRazorpayBilling(db, { fetchImpl = globalThis.fetch } = {})
     })();
   }
 
+  // A definitive provider rejection (4xx) is never taken as proof that the
+  // mandate stopped: a 401 from rotated credentials or a malformed request must
+  // not let an account be deleted while it can still be charged. Ask Razorpay
+  // for the subscription itself and only treat it as finished when the provider
+  // reports a terminal status.
+  async function providerTerminalState(subscriptionId) {
+    let subscription = null;
+    try { subscription = await providerRequest(cfg, `${API_PATH}/${subscriptionId}`, { fetchImpl }); }
+    catch { return null; }
+    return subscription && TERMINAL_STATUS.has(String(subscription.status || '')) ? subscription : null;
+  }
+
+  // Fold a provider-reported terminal state into the entitlement so a missed
+  // webhook cannot leave Premium on after the mandate is gone.
+  function applyTerminalState(subscription, accountId, now, eventType) {
+    try {
+      return applyVerifiedEntitlement(db, normalizeSubscription(cfg, subscription, {
+        accountId, eventId: `${eventType}:${subscription.id}:${now}`, eventType,
+        payloadDigest: digest(JSON.stringify({ id: subscription.id, status: subscription.status, at: now })), effectiveAt: now
+      }));
+    } catch { return null; }
+  }
+
   /**
    * Cancel the account's Razorpay subscription.
    *  - atCycleEnd (student choice): cancel_at_cycle_end=1. Premium stays active
@@ -537,8 +566,16 @@ export function createRazorpayBilling(db, { fetchImpl = globalThis.fetch } = {})
       try {
         subscription = await providerCancel(target.provider_subscription_id, true);
       } catch (error) {
-        if (error?.definitiveFailure) throw billingError('BILLING_SUBSCRIPTION_NOT_CANCELLABLE', error.message || 'Razorpay declined the cancellation.', 409);
-        throw error;
+        if (!error?.definitiveFailure) throw error;
+        // Razorpay refuses to cancel a subscription that already ended. If that
+        // is what happened, reconcile the snapshot (the webhook was missed) and
+        // report that there is nothing left to cancel.
+        const terminal = await providerTerminalState(target.provider_subscription_id);
+        if (!terminal) throw billingError('BILLING_SUBSCRIPTION_NOT_CANCELLABLE', error.message || 'Razorpay declined the cancellation.', 409);
+        applyTerminalState(terminal, accountId, now, 'subscription.reconcile');
+        audit(db, accountId, 'billing.cancel.reconciled', 'subscription', target.provider_subscription_id,
+          { provider: 'web', providerStatus: String(terminal.status || '') }, now);
+        return { provider: 'web', status: 'none', subscriptionId: target.provider_subscription_id, currentPeriodEnd: null, reconciled: true };
       }
       const currentPeriodEnd = milliseconds(subscription?.current_end) || periodEnd;
       markCancelled(db, {
@@ -557,20 +594,17 @@ export function createRazorpayBilling(db, { fetchImpl = globalThis.fetch } = {})
         subscription = await providerCancel(binding.provider_subscription_id, false);
       } catch (error) {
         if (!error?.definitiveFailure) throw error;
+        subscription = await providerTerminalState(binding.provider_subscription_id);
+        // Still chargeable at the provider and it refused to cancel: abort the
+        // deletion rather than orphan a live mandate.
+        if (!subscription) throw billingError('BILLING_SUBSCRIPTION_NOT_CANCELLABLE', error.message || 'Razorpay declined the cancellation.', 409);
       }
       markCancelled(db, {
         subscriptionId: binding.provider_subscription_id, accountId, mode: 'immediate', reason: safeReason,
         currentPeriodEnd: milliseconds(subscription?.current_end) || null,
-        providerStatus: String(subscription?.status || 'provider-rejected'), now
+        providerStatus: String(subscription?.status || ''), now
       });
-      if (subscription && TERMINAL_STATUS.has(String(subscription.status || ''))) {
-        try {
-          applyVerifiedEntitlement(db, normalizeSubscription(cfg, subscription, {
-            accountId, eventId: `cancel:${binding.provider_subscription_id}:${now}`, eventType: 'subscription.cancel-request',
-            payloadDigest: digest(JSON.stringify({ id: subscription.id, status: subscription.status, at: now })), effectiveAt: now
-          }));
-        } catch { /* the account is being deleted; the provider-side cancel already succeeded */ }
-      }
+      if (TERMINAL_STATUS.has(String(subscription?.status || ''))) applyTerminalState(subscription, accountId, now, 'subscription.cancel-request');
       cancelled.push(binding.provider_subscription_id);
     }
     return { provider: 'web', status: 'cancelled', subscriptionId: cancelled[0] || null, currentPeriodEnd: null, cancelled };

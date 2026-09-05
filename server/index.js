@@ -8,7 +8,7 @@
 import express from 'express';
 import cookieParser from 'cookie-parser';
 import compression from 'compression';
-import { existsSync } from 'node:fs';
+import { existsSync, writeSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { authRouter } from './auth.js';
@@ -86,12 +86,14 @@ function shutdown(signal) {
     if (finished) return;
     finished = true;
     let exitCode = 0;
+    // Written synchronously: process.exit() may drop buffered async stdout/stderr
+    // writes on pipes, and this line is the operator's evidence of a clean stop.
     try {
       const result = closePlatformDb(platformDb);
-      console.log('platform_db_closed', { reason, closed: result.closed, checkpoint: result.checkpoint });
+      writeSync(1, `platform_db_closed ${JSON.stringify({ reason, closed: result.closed, checkpoint: result.checkpoint })}\n`);
     } catch (error) {
       exitCode = 1;
-      console.error('platform_db_close_failed', { reason, code: error?.code || 'CLOSE_FAILED' });
+      writeSync(2, `platform_db_close_failed ${JSON.stringify({ reason, code: error?.code || 'CLOSE_FAILED' })}\n`);
     }
     try { if (legacyDb.open) legacyDb.close(); } catch { /* legacy store is best-effort */ }
     process.exit(exitCode);
