@@ -34,7 +34,8 @@ let serial = Promise.resolve();
 // forgetting the gap would let a later replica miss real student work. Keep an
 // in-memory fail-closed latch: the next syncable mutation must durably replace
 // the fine-grained queue with a full-rescan marker before the latch can clear.
-let needsFullRescanAfterWriteFailure = false;
+// The timestamp records the earliest missing mutation this page still knows of.
+let fullRescanRequiredSince = null;
 
 function safeId(value, fallback = 'self') {
   const text = String(value ?? '');
@@ -184,15 +185,17 @@ export function recordMutation(method, path, result, body = null) {
     // make that warning impossible. A failed read/write also latches a full
     // reconciliation requirement so a later successful mutation cannot hide
     // the earlier gap.
+    const attemptAt = Date.now();
     try {
       const row = cleanRow(await get('device', ROW_ID));
       const now = Date.now();
 
-      if (needsFullRescanAfterWriteFailure) {
-        const marker = rescanMarker(row.nextSeq++, oldestDirtyAt(row, now), now);
+      if (fullRescanRequiredSince !== null) {
+        const firstAt = Math.min(oldestDirtyAt(row, now), fullRescanRequiredSince);
+        const marker = rescanMarker(row.nextSeq++, firstAt, now);
         row.items = [marker];
         await put('device', row);
-        needsFullRescanAfterWriteFailure = false;
+        fullRescanRequiredSince = null;
         return { ...marker };
       }
 
@@ -204,7 +207,7 @@ export function recordMutation(method, path, result, body = null) {
       await put('device', row);
       return { ...event };
     } catch (err) {
-      needsFullRescanAfterWriteFailure = true;
+      if (fullRescanRequiredSince === null) fullRescanRequiredSince = attemptAt;
       throw err;
     }
   });
