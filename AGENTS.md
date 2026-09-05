@@ -10,7 +10,7 @@ Every cycle uses:
 
 The canonical definitions are:
 
-- `.pri-os/fleet.json` — agents, ordered primary ownership, reviewer overlays, typed gates and risk classes.
+- `.pri-os/fleet.json` — agents, specificity-resolved primary ownership, reviewer overlays, typed gates and risk classes.
 - `.pri-os/mission-control.json` — persistent GitHub-Issue mission ledger, state machine, writer lease, retry ceiling and deterministic priority policy.
 - `scripts/pri-fleet.mjs` — routing, ownership guard, risk classification and fleet validation.
 - `scripts/pri-mission-control.mjs` — mission ranking, mission-record validation, transitions, failure fingerprints and lease status.
@@ -45,7 +45,7 @@ The PR body must include:
 
 `Pri-Risk: R1|R2|R3|R4`
 
-The ordered ownership table gives every governed path one canonical primary owner. Security, reliability, QA and other cross-cutting roles are reviewer overlays unless an ownership rule explicitly makes them primary.
+The most-specific matching ownership rule gives every governed path one canonical primary owner. Equal-specificity rules with different primary owners are rejected as ambiguous. Security, reliability, QA and other cross-cutting roles are reviewer overlays unless an ownership rule explicitly makes them primary.
 
 ### Independent QA / Release Governor
 
@@ -63,7 +63,7 @@ Writer-holding states are:
 
 `ACTIVE`, `IMPLEMENTING`, `TESTING`, `REVIEW`, `CI`, `REPAIR`, `MERGE_READY`.
 
-Future autonomous PR governance verifies that exactly one active managed issue exists and that its mission, agent and branch match the PR.
+Future autonomous PR governance verifies that exactly one active managed issue exists, that its mission/agent/branch/risk match the PR, that its required markers are well-formed, and that the issue has been updated inside the configured lease TTL.
 
 ## Failure handling
 
