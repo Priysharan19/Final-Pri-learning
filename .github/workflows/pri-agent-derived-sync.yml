@@ -97,6 +97,7 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           set -euo pipefail
+          rm -rf derived-out
           mkdir -p derived-out
           git -C candidate diff --binary -- \
             'ios/PriLearning.swiftpm/Resources/Web' \
@@ -195,7 +196,7 @@ jobs:
           mapfile -t derived_files < <(node -e "for (const p of require('./derived-out/paths.json')) console.log(p)")
           node trusted/scripts/pri-fleet.mjs simulate-guard "$agent" "${source_files[@]}" "${derived_files[@]}"
 
-      - name: Apply patch and prove the staged diff remains mirror-only
+      - name: Apply patch and prove the staged diff remains mirror-only regular files
         shell: bash
         run: |
           set -euo pipefail
@@ -215,6 +216,19 @@ jobs:
           }
           NODE
           node trusted/scripts/pri-derived-artifact-sync.mjs validate-paths /tmp/pri-applied-paths.json
+
+          while IFS= read -r file; do
+            entry="$(git -C candidate ls-files -s -- "$file")"
+            if [[ -z "$entry" ]]; then
+              # A deletion has no index entry and is valid for old hashed assets.
+              continue
+            fi
+            mode="${entry%% *}"
+            if [[ "$mode" != '100644' ]]; then
+              echo "derived artifact must remain a regular non-executable file: $file has mode $mode" >&2
+              exit 1
+            fi
+          done < <(node -e "for (const p of require('/tmp/pri-applied-paths.json')) console.log(p)")
 
       - name: Re-check head lease and push one deterministic derived commit
         shell: bash
