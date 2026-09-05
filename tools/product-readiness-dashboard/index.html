@@ -1,0 +1,23 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Pri Learning Product Readiness</title>
+<style>
+body{font-family:Inter,system-ui;background:#0b0f14;color:#f5f7fa;padding:32px;max-width:1100px;margin:auto}.card{background:#151b23;border:1px solid #303946;border-radius:16px;padding:18px;margin:12px 0}.bar{height:10px;background:#27303b;border-radius:99px}.fill{height:100%;background:#69d3a0;border-radius:99px}.score{font-size:34px;font-weight:800}small{color:#aab3bd}
+</style>
+</head>
+<body>
+<h1>PRI Learning Product Readiness</h1>
+<p>This dashboard separates engineering health from actual product maturity.</p>
+<div id="app"></div>
+<script>
+fetch('readiness-data.json').then(r=>r.json()).then(data=>{
+ const root=document.getElementById('app');
+ data.dimensions.forEach(d=>{
+  root.innerHTML += `<div class="card"><h2>${d.name}</h2><div class="score">${d.score}%</div><div class="bar"><div class="fill" style="width:${d.score}%"></div></div><small>Measurement type: ${d.type}</small></div>`;
+ });
+});
+</script>
+</body>
+</html>

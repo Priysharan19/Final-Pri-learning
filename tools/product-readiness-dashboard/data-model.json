@@ -1,0 +1,34 @@
+{
+  "engineering_reliability": {
+    "score": null,
+    "status": "pending_evidence"
+  },
+  "product_capability": {
+    "score": null,
+    "status": "pending_feature_audit"
+  },
+  "handwriting_reality": {
+    "score": null,
+    "status": "requires_real_writer_validation"
+  },
+  "ai_intelligence": {
+    "score": null,
+    "status": "requires_learning_outcome_validation"
+  },
+  "content_coverage": {
+    "score": null,
+    "status": "requires_curriculum_audit"
+  },
+  "teacher_ecosystem": {
+    "score": null,
+    "status": "requires_teacher_testing"
+  },
+  "student_validation": {
+    "score": null,
+    "status": "requires_student_testing"
+  },
+  "competitive_position": {
+    "score": null,
+    "status": "requires_market_benchmark"
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "dimensions": {
+    "engineering_reliability": {
+      "evidence": [],
+      "score_formula": "passed_evidence / required_evidence * 100"
+    },
+    "handwriting_reality": {
+      "requirements": [
+        "synthetic benchmarks",
+        "real writer validation",
+        "teacher agreement"
+      ]
+    },
+    "student_validation": {
+      "requirements": [
+        "student trials",
+        "retention data",
+        "learning outcome evidence"
+      ]
+    }
+  }
+}

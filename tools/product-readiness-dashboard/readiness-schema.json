@@ -1,0 +1,46 @@
+{
+  "version": "1.0.0",
+  "principle": "No score without evidence",
+  "dimensions": [
+    {
+      "id": "engineering_reliability",
+      "name": "Engineering Reliability",
+      "evidence_required": true
+    },
+    {
+      "id": "product_capability",
+      "name": "Core Product Capability",
+      "evidence_required": true
+    },
+    {
+      "id": "handwriting_reality",
+      "name": "Handwriting Reality",
+      "evidence_required": true
+    },
+    {
+      "id": "ai_intelligence",
+      "name": "AI Intelligence Maturity",
+      "evidence_required": true
+    },
+    {
+      "id": "content_coverage",
+      "name": "Content Coverage",
+      "evidence_required": true
+    },
+    {
+      "id": "teacher_ecosystem",
+      "name": "Teacher Ecosystem",
+      "evidence_required": true
+    },
+    {
+      "id": "student_validation",
+      "name": "Student Validation",
+      "evidence_required": true
+    },
+    {
+      "id": "competitive_position",
+      "name": "Competitive Position",
+      "evidence_required": true
+    }
+  ]
+}

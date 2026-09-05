@@ -1,0 +1,22 @@
+{
+  "engineering_reliability": {
+    "evidence": {
+      "ci_pipeline": {"value":1,"max":1,"weight":1},
+      "security": {"value":1,"max":1,"weight":1},
+      "tests": {"value":1,"max":1,"weight":1}
+    }
+  },
+  "handwriting_reality": {
+    "evidence": {
+      "synthetic_accuracy": {"value":1,"max":1,"weight":1},
+      "real_writer_validation": {"value":0,"max":1,"weight":2},
+      "teacher_agreement": {"value":0,"max":1,"weight":2}
+    }
+  },
+  "student_validation": {
+    "evidence": {
+      "student_trials": {"value":0,"max":1,"weight":2},
+      "learning_outcomes": {"value":0,"max":1,"weight":2}
+    }
+  }
+}

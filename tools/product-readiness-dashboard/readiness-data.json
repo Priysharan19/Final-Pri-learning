@@ -1,0 +1,13 @@
+{
+  "definition": "Product maturity is calculated from evidence-backed dimensions, not code completion alone.",
+  "dimensions": [
+    {"name":"Engineering Reliability","score":97,"type":"automated"},
+    {"name":"Core Product Capability","score":45,"type":"audit"},
+    {"name":"AI Intelligence Maturity","score":50,"type":"audit"},
+    {"name":"Handwriting Reality","score":55,"type":"audit"},
+    {"name":"Content Coverage","score":25,"type":"audit"},
+    {"name":"Teacher Ecosystem","score":30,"type":"audit"},
+    {"name":"Student Validation","score":10,"type":"evidence"},
+    {"name":"Competitive Position","score":40,"type":"benchmark"}
+  ]
+}
