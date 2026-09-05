@@ -16,7 +16,7 @@ import { csrfGuard, originGuard } from './security.js';
 
 const SERVER_WEBHOOK = /^\/billing\/webhook\/(?:apple|google|web)$/;
 
-export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckout = {}, billingNative = {} } = {}) {
+export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckout = {}, billingNative = {}, billingLifecycle = {} } = {}) {
   assertPlatformConfig();
   const router = Router();
 
@@ -61,14 +61,23 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
   // removed before the classroom router reaches storage.
   router.use(assignmentSubmissionPrivacyGuard);
 
-  router.use('/account', createAccountRouter(db));
+  // Account deletion cancels any charging web subscription at the provider
+  // before the rows disappear (immediate cancel: the account cannot use the
+  // remainder of a paid period once it is gone).
+  const cancelWebSubscription = billingLifecycle.web?.cancel;
+  router.use('/account', createAccountRouter(db, {
+    beforeDelete: typeof cancelWebSubscription === 'function'
+      ? ({ accountId }) => cancelWebSubscription({ accountId, atCycleEnd: false, reason: 'account-deletion' })
+      : null
+  }));
   router.use('/account/identity', createIdentityRouter(db));
   router.use('/sync', createSyncRouter(db));
   router.use('/entitlements', createEntitlementRouter(db));
   router.use('/billing', createBillingRouter(db, {
     verifiers: billingVerifiers,
     checkout: billingCheckout,
-    native: billingNative
+    native: billingNative,
+    lifecycle: billingLifecycle
   }));
   router.use('/classes', createClassRouter(db));
   router.use('/assignments', createAssignmentExecutionRouter(db));

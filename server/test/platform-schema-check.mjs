@@ -9,7 +9,7 @@ try {
     'entitlement_snapshots','billing_events','classes','class_members','assignments','assignment_submissions','assignment_feedback',
     'content_revisions','issue_reports','audit_log','idempotency_keys','rate_limits'
   ]) assert.ok(tables.has(required), `missing platform table ${required}`);
-  assert.equal(db.prepare("SELECT value FROM platform_meta WHERE key='schema_version'").get()?.value, '3');
+  assert.equal(db.prepare("SELECT value FROM platform_meta WHERE key='schema_version'").get()?.value, '4');
 
   const now = Date.now();
   db.prepare(`INSERT INTO accounts(id,email,name,password_hash,role,created_at,updated_at)

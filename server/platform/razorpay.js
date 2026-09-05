@@ -1,11 +1,20 @@
 import { createHash, createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
+import { applyVerifiedEntitlement } from './entitlements.js';
 
 const API_ORIGIN = 'https://api.razorpay.com';
 const API_PATH = '/v1/subscriptions';
 const SAFE_ID = /^[A-Za-z0-9._:-]{1,160}$/;
 const RAZORPAY_SUBSCRIPTION = /^sub_[A-Za-z0-9]{8,80}$/;
 const RAZORPAY_PLAN = /^plan_[A-Za-z0-9]{8,80}$/;
+const RAZORPAY_PAYMENT = /^pay_[A-Za-z0-9]{8,80}$/;
+const RAZORPAY_REFUND = /^rfnd_[A-Za-z0-9]{8,80}$/;
 const SIGNATURE = /^[a-f0-9]{64}$/i;
+const TERMINAL_STATUS = new Set(['cancelled', 'completed', 'expired']);
+// Snapshot states in which the Razorpay mandate can still charge.
+const CANCELLABLE_SNAPSHOT = new Set(['trialing', 'active', 'grace', 'past_due', 'paused']);
+// billing_subscriptions.last_event_rank at or above this value is terminal.
+const TERMINAL_RANK = 90;
+const REFUND_STATUS = new Set(['pending', 'processed', 'failed']);
 
 function configError(message) {
   return Object.assign(new Error(message), { code: 'BILLING_PROVIDER_NOT_CONFIGURED', status: 503 });
@@ -245,6 +254,103 @@ function attachTrialSubscription(db, accountId, reservationId, subscriptionId) {
     WHERE account_id=? AND provider='web' AND provider_subscription_id=?`).run(subscriptionId, accountId, reservationId);
 }
 
+function audit(db, actor, action, targetKind, targetId, metadata = {}, now = Date.now()) {
+  db.prepare(`INSERT INTO audit_log(actor_account_id,action,target_kind,target_id,metadata_json,created_at) VALUES (?,?,?,?,?,?)`)
+    .run(actor, action, targetKind, targetId, JSON.stringify(metadata), now);
+}
+
+function minorUnits(value) {
+  const amount = Number(value);
+  return Number.isSafeInteger(amount) && amount >= 0 ? amount : 0;
+}
+
+// A verified event that carries no entitlement change is still recorded so the
+// provider sees 200 (no retry storm) and support can trace what arrived.
+function acknowledgeEvent(db, { eventId, eventType, accountId = null, payloadDigest, now = Date.now() }) {
+  db.prepare(`INSERT OR IGNORE INTO billing_events(provider,event_id,account_id,event_type,verified,payload_digest,received_at,applied_at)
+    VALUES ('web',?,?,?,1,?,?,?)`).run(eventId, accountId, eventType, payloadDigest, now, now);
+  return [];
+}
+
+function recordPayment(db, { paymentId, subscriptionId, accountId, amount, currency, status, capturedAt, now = Date.now() }) {
+  if (!RAZORPAY_PAYMENT.test(String(paymentId || '')) || !RAZORPAY_SUBSCRIPTION.test(String(subscriptionId || ''))) return false;
+  db.prepare(`INSERT INTO billing_payments(provider,payment_id,provider_subscription_id,account_id,amount,currency,status,captured_at,created_at,updated_at)
+    VALUES ('web',?,?,?,?,?,?,?,?,?)
+    ON CONFLICT(provider,payment_id) DO UPDATE SET amount=MAX(billing_payments.amount,excluded.amount),
+      status=excluded.status,currency=COALESCE(excluded.currency,billing_payments.currency),updated_at=excluded.updated_at`)
+    .run(String(paymentId), String(subscriptionId), accountId, minorUnits(amount), currency ? String(currency).slice(0, 8) : null,
+      status ? String(status).slice(0, 40) : null, capturedAt || now, now, now);
+  return true;
+}
+
+function paymentFromSubscriptionPayload(db, { payment, subscriptionId, accountId, now }) {
+  if (!payment || typeof payment !== 'object') return false;
+  return recordPayment(db, {
+    paymentId: payment.id, subscriptionId, accountId, amount: payment.amount, currency: payment.currency,
+    status: payment.status, capturedAt: milliseconds(payment.created_at) || now, now
+  });
+}
+
+/**
+ * Map a refund webhook to an entitlement decision. Rules:
+ *  - a refund is only actionable when its payment was observed on a bound
+ *    subscription (subscription.charged / invoice.paid record payments);
+ *  - a FULL refund of the payment that covers the CURRENT period revokes
+ *    Premium immediately (rank 100, no grace: the money has gone back);
+ *  - a partial refund, or a refund of an older period's payment, is recorded
+ *    and acknowledged without touching the entitlement;
+ *  - refund.failed marks the ledger row failed and never re-grants access;
+ *    support restores through the audited admin grant if that is right.
+ */
+function refundEvent(db, { refund, eventId, eventType, payloadDigest, effectiveAt, now }) {
+  const refundId = String(refund?.id || '');
+  const paymentId = String(refund?.payment_id || '');
+  if (!RAZORPAY_REFUND.test(refundId) || !RAZORPAY_PAYMENT.test(paymentId)) {
+    return acknowledgeEvent(db, { eventId, eventType, payloadDigest, now });
+  }
+  const payment = db.prepare(`SELECT * FROM billing_payments WHERE provider='web' AND payment_id=?`).get(paymentId);
+  if (!payment) return acknowledgeEvent(db, { eventId, eventType, payloadDigest, now });
+
+  const status = REFUND_STATUS.has(refund.status) ? refund.status
+    : eventType === 'refund.failed' ? 'failed' : eventType === 'refund.processed' ? 'processed' : 'pending';
+  db.prepare(`INSERT INTO billing_refunds(provider,refund_id,payment_id,amount,status,created_at,updated_at)
+    VALUES ('web',?,?,?,?,?,?)
+    ON CONFLICT(provider,refund_id) DO UPDATE SET amount=excluded.amount,status=excluded.status,updated_at=excluded.updated_at`)
+    .run(refundId, paymentId, minorUnits(refund.amount), status, milliseconds(refund.created_at) || now, now);
+
+  const refunded = Number(db.prepare(`SELECT COALESCE(SUM(amount),0) AS n FROM billing_refunds
+    WHERE provider='web' AND payment_id=? AND status<>'failed'`).get(paymentId)?.n || 0);
+  const latest = db.prepare(`SELECT payment_id FROM billing_payments WHERE provider='web' AND provider_subscription_id=?
+    ORDER BY captured_at DESC, created_at DESC LIMIT 1`).get(payment.provider_subscription_id);
+  const binding = boundSubscription(db, payment.provider_subscription_id);
+  const full = payment.amount > 0 && refunded >= payment.amount;
+  const current = latest?.payment_id === paymentId;
+  const accountId = binding?.account_id || payment.account_id || null;
+  audit(db, null, 'billing.refund', 'subscription', payment.provider_subscription_id,
+    { refundId, paymentId, amount: minorUnits(refund.amount), refundedTotal: refunded, status, full, currentPeriod: current, eventType }, now);
+  if (!binding || !full || !current || status === 'failed') {
+    return acknowledgeEvent(db, { eventId, eventType, accountId, payloadDigest, now });
+  }
+  return {
+    verified: true,
+    provider: 'web',
+    eventId,
+    accountId: binding.account_id,
+    eventType,
+    providerSubscriptionId: payment.provider_subscription_id,
+    productId: binding.product_id,
+    billingCadence: binding.cadence,
+    plan: 'free',
+    status: 'revoked',
+    currentPeriodEnd: effectiveAt,
+    graceUntil: null,
+    payloadDigest,
+    effectiveAt,
+    eventRank: 100,
+    refund: { id: refundId, paymentId, amount: minorUnits(refund.amount), refundedTotal: refunded }
+  };
+}
+
 export function createRazorpayBilling(db, { fetchImpl = globalThis.fetch } = {}) {
   const cfg = readConfig();
 
@@ -319,21 +425,155 @@ export function createRazorpayBilling(db, { fetchImpl = globalThis.fetch } = {})
     let payload;
     try { payload = JSON.parse(raw.toString('utf8')); }
     catch { throw billingError('BILLING_WEBHOOK_BODY_INVALID', 'Razorpay webhook body is invalid JSON.'); }
+    const now = Date.now();
+    const eventType = String(payload?.event || 'subscription.updated').slice(0, 160);
+    const family = eventType.split('.')[0];
+    const payloadDigest = digest(raw);
+    const effectiveAt = milliseconds(payload?.created_at) || now;
     const subscription = payload?.payload?.subscription?.entity;
-    const subscriptionId = String(subscription?.id || '');
-    const binding = RAZORPAY_SUBSCRIPTION.test(subscriptionId) ? boundSubscription(db, subscriptionId) : null;
-    if (!binding) throw billingError('BILLING_SUBSCRIPTION_UNKNOWN', 'Razorpay subscription is not bound to a Pri Learning account.', 409);
-    const noteAccount = accountBindingFromNotes(subscription);
-    if (noteAccount && noteAccount !== binding.account_id) throw billingError('BILLING_ACCOUNT_MISMATCH', 'Razorpay subscription account binding does not match.', 409);
-    if (String(subscription.plan_id || '') !== binding.product_id) throw billingError('BILLING_PRODUCT_MISMATCH', 'Razorpay subscription plan does not match its Pri Learning binding.', 409);
+    const payment = payload?.payload?.payment?.entity;
 
-    return normalizeSubscription(cfg, subscription, {
-      accountId: binding.account_id,
-      eventId,
-      eventType: String(payload?.event || 'subscription.updated').slice(0, 160),
-      payloadDigest: digest(raw),
-      effectiveAt: milliseconds(payload?.created_at) || Date.now()
+    // subscription.* is the entitlement authority. An unbound subscription is a
+    // genuine mismatch (409) so the provider keeps retrying and support notices.
+    if (subscription || family === 'subscription') {
+      const subscriptionId = String(subscription?.id || '');
+      const binding = RAZORPAY_SUBSCRIPTION.test(subscriptionId) ? boundSubscription(db, subscriptionId) : null;
+      if (!binding) throw billingError('BILLING_SUBSCRIPTION_UNKNOWN', 'Razorpay subscription is not bound to a Pri Learning account.', 409);
+      const noteAccount = accountBindingFromNotes(subscription);
+      if (noteAccount && noteAccount !== binding.account_id) throw billingError('BILLING_ACCOUNT_MISMATCH', 'Razorpay subscription account binding does not match.', 409);
+      if (String(subscription.plan_id || '') !== binding.product_id) throw billingError('BILLING_PRODUCT_MISMATCH', 'Razorpay subscription plan does not match its Pri Learning binding.', 409);
+      // subscription.charged carries the payment that paid for this period; it
+      // is the join key a later refund webhook needs.
+      paymentFromSubscriptionPayload(db, { payment, subscriptionId, accountId: binding.account_id, now });
+      return normalizeSubscription(cfg, subscription, {
+        accountId: binding.account_id, eventId, eventType, payloadDigest, effectiveAt
+      });
+    }
+
+    if (family === 'refund') {
+      return refundEvent(db, { refund: payload?.payload?.refund?.entity, eventId, eventType, payloadDigest, effectiveAt, now });
+    }
+
+    // invoice.paid names both the subscription and the payment: record the
+    // payment for refund mapping. Entitlement itself changes only through the
+    // matching subscription.charged event.
+    if (family === 'invoice') {
+      const invoice = payload?.payload?.invoice?.entity;
+      const subscriptionId = String(invoice?.subscription_id || '');
+      const binding = RAZORPAY_SUBSCRIPTION.test(subscriptionId) ? boundSubscription(db, subscriptionId) : null;
+      if (binding && invoice?.payment_id) {
+        recordPayment(db, {
+          paymentId: invoice.payment_id, subscriptionId, accountId: binding.account_id,
+          amount: invoice.amount_paid ?? invoice.amount, currency: invoice.currency, status: invoice.status,
+          capturedAt: milliseconds(invoice.paid_at) || effectiveAt, now
+        });
+      }
+      return acknowledgeEvent(db, { eventId, eventType, accountId: binding?.account_id || null, payloadDigest, now });
+    }
+
+    // Standalone payment.* events (authorized/captured/failed) do not change a
+    // subscription's lifecycle; Razorpay reports that through subscription.*.
+    if (family === 'payment' && payment) {
+      const subscriptionId = String(payment.subscription_id || '');
+      const binding = RAZORPAY_SUBSCRIPTION.test(subscriptionId) ? boundSubscription(db, subscriptionId) : null;
+      if (binding) paymentFromSubscriptionPayload(db, { payment, subscriptionId, accountId: binding.account_id, now });
+      return acknowledgeEvent(db, { eventId, eventType, accountId: binding?.account_id || null, payloadDigest, now });
+    }
+
+    // Anything else (orders, payment links, settlements, …) is verified but
+    // unrelated to subscriptions: acknowledge so the provider stops retrying.
+    return acknowledgeEvent(db, { eventId, eventType, payloadDigest, now });
+  }
+
+  async function providerCancel(subscriptionId, atCycleEnd) {
+    return providerRequest(cfg, `${API_PATH}/${subscriptionId}/cancel`, {
+      method: 'POST', body: { cancel_at_cycle_end: atCycleEnd ? 1 : 0 }, fetchImpl
     });
+  }
+
+  function markCancelled(db, { subscriptionId, accountId, mode, reason, currentPeriodEnd, providerStatus, now }) {
+    db.transaction(() => {
+      db.prepare(`UPDATE billing_subscriptions SET cancel_requested_at=?,cancel_mode=?,cancel_reason=?,updated_at=?
+        WHERE provider='web' AND provider_subscription_id=?`).run(now, mode, reason, now, subscriptionId);
+      audit(db, accountId, 'billing.cancel', 'subscription', subscriptionId,
+        { provider: 'web', mode, reason, currentPeriodEnd, providerStatus }, now);
+    })();
+  }
+
+  /**
+   * Cancel the account's Razorpay subscription.
+   *  - atCycleEnd (student choice): cancel_at_cycle_end=1. Premium stays active
+   *    until currentPeriodEnd; the verified subscription.cancelled/completed
+   *    webhook at the cycle boundary is what expires the entitlement. Repeating
+   *    the request while the cancellation is pending replays the same answer.
+   *  - immediate (account deletion): every non-terminal binding is cancelled
+   *    now. A provider outage aborts with a retryable error so the account is
+   *    never deleted while a mandate can still charge; a definitive provider
+   *    rejection (already cancelled/completed) is treated as terminal.
+   */
+  async function cancel({ accountId, atCycleEnd = true, reason = 'user' }) {
+    if (!SAFE_ID.test(String(accountId || ''))) throw billingError('BILLING_ACCOUNT_INVALID', 'Billing account binding is invalid.');
+    const now = Date.now();
+    const snapshot = db.prepare('SELECT status,provider,current_period_end,grace_until FROM entitlement_snapshots WHERE account_id=?').get(accountId);
+    const bindings = db.prepare(`SELECT * FROM billing_subscriptions
+      WHERE provider='web' AND account_id=? AND cancel_requested_at IS NULL AND last_event_rank < ?
+      ORDER BY last_effective_at DESC, created_at DESC`).all(accountId, TERMINAL_RANK);
+    const safeReason = String(reason || 'user').slice(0, 40);
+
+    if (atCycleEnd) {
+      const live = snapshot?.provider === 'web' && CANCELLABLE_SNAPSHOT.has(snapshot.status);
+      const periodEnd = (snapshot?.status === 'grace' ? snapshot.grace_until : snapshot?.current_period_end) || null;
+      if (!live) return { provider: 'web', status: 'none', subscriptionId: null, currentPeriodEnd: null };
+      const pending = db.prepare(`SELECT provider_subscription_id,cancel_requested_at FROM billing_subscriptions
+        WHERE provider='web' AND account_id=? AND cancel_requested_at IS NOT NULL AND cancel_mode='cycle-end'
+        ORDER BY cancel_requested_at DESC LIMIT 1`).get(accountId);
+      if (!bindings.length && pending) {
+        return { provider: 'web', status: 'cancelling', subscriptionId: pending.provider_subscription_id, currentPeriodEnd: periodEnd, requestedAt: pending.cancel_requested_at, replayed: true };
+      }
+      if (!bindings.length) return { provider: 'web', status: 'none', subscriptionId: null, currentPeriodEnd: null };
+      requireConfigured(cfg);
+      const target = bindings[0];
+      let subscription;
+      try {
+        subscription = await providerCancel(target.provider_subscription_id, true);
+      } catch (error) {
+        if (error?.definitiveFailure) throw billingError('BILLING_SUBSCRIPTION_NOT_CANCELLABLE', error.message || 'Razorpay declined the cancellation.', 409);
+        throw error;
+      }
+      const currentPeriodEnd = milliseconds(subscription?.current_end) || periodEnd;
+      markCancelled(db, {
+        subscriptionId: target.provider_subscription_id, accountId, mode: 'cycle-end', reason: safeReason,
+        currentPeriodEnd, providerStatus: String(subscription?.status || ''), now
+      });
+      return { provider: 'web', status: 'cancelling', subscriptionId: target.provider_subscription_id, currentPeriodEnd, requestedAt: now, replayed: false };
+    }
+
+    if (!bindings.length) return { provider: 'web', status: 'none', subscriptionId: null, currentPeriodEnd: null, cancelled: [] };
+    requireConfigured(cfg);
+    const cancelled = [];
+    for (const binding of bindings) {
+      let subscription = null;
+      try {
+        subscription = await providerCancel(binding.provider_subscription_id, false);
+      } catch (error) {
+        if (!error?.definitiveFailure) throw error;
+      }
+      markCancelled(db, {
+        subscriptionId: binding.provider_subscription_id, accountId, mode: 'immediate', reason: safeReason,
+        currentPeriodEnd: milliseconds(subscription?.current_end) || null,
+        providerStatus: String(subscription?.status || 'provider-rejected'), now
+      });
+      if (subscription && TERMINAL_STATUS.has(String(subscription.status || ''))) {
+        try {
+          applyVerifiedEntitlement(db, normalizeSubscription(cfg, subscription, {
+            accountId, eventId: `cancel:${binding.provider_subscription_id}:${now}`, eventType: 'subscription.cancel-request',
+            payloadDigest: digest(JSON.stringify({ id: subscription.id, status: subscription.status, at: now })), effectiveAt: now
+          }));
+        } catch { /* the account is being deleted; the provider-side cancel already succeeded */ }
+      }
+      cancelled.push(binding.provider_subscription_id);
+    }
+    return { provider: 'web', status: 'cancelled', subscriptionId: cancelled[0] || null, currentPeriodEnd: null, cancelled };
   }
 
   async function restore({ accountId, body }) {
@@ -373,6 +613,7 @@ export function createRazorpayBilling(db, { fetchImpl = globalThis.fetch } = {})
   return Object.freeze({
     configured: razorpayConfigStatus().configured,
     verifiers: Object.freeze({ web: Object.freeze({ webhook, restore }) }),
-    checkout: Object.freeze({ web: Object.freeze({ create: createCheckout }) })
+    checkout: Object.freeze({ web: Object.freeze({ create: createCheckout }) }),
+    lifecycle: Object.freeze({ web: Object.freeze({ cancel }) })
   });
 }

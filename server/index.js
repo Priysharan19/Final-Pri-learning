@@ -13,7 +13,8 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { authRouter } from './auth.js';
 import { api } from './routes/api.js';
-import { platformDb } from './platform/db.js';
+import { db as legacyDb } from './db.js';
+import { closePlatformDb, platformDb } from './platform/db.js';
 import { ensureBillingSchema } from './platform/billingSchema.js';
 import { createAppleBilling } from './platform/appleBilling.js';
 import { createRazorpayBilling } from './platform/razorpay.js';
@@ -41,13 +42,14 @@ const appleBilling = createAppleBilling(platformDb);
 app.use('/v1', createPlatformRouter(platformDb, {
   billingVerifiers: { ...webBilling.verifiers, ...appleBilling.verifiers },
   billingCheckout: webBilling.checkout,
-  billingNative: appleBilling.native
+  billingNative: appleBilling.native,
+  billingLifecycle: webBilling.lifecycle
 }));
 
 // Verification/reset tokens are persisted only as one-way hashes plus an
 // AES-GCM delivery envelope. The worker decrypts a token only at the send
 // boundary, uses provider idempotency, and never logs destinations or tokens.
-startAuthDeliveryWorker(platformDb);
+const deliveryWorker = startAuthDeliveryWorker(platformDb);
 
 // Legacy routes: kept until old tooling no longer needs the historical server.
 app.use('/api/auth', authRouter);
@@ -66,4 +68,38 @@ if (existsSync(dist)) {
 }
 
 const PORT = process.env.PORT || 4000;
-app.listen(PORT, () => console.log(`Pri Learning server running on port ${PORT}`));
+const server = app.listen(PORT, () => console.log(`Pri Learning server running on port ${server.address().port}`));
+
+// Graceful shutdown for the single-writer SQLite volume: stop taking requests,
+// let in-flight responses finish, checkpoint the WAL into the main file and
+// close the handle so backups see one complete database file. Container
+// orchestrators send SIGTERM before SIGKILL; a hard deadline guarantees exit.
+const SHUTDOWN_DEADLINE_MS = Number(process.env.PRI_SHUTDOWN_DEADLINE_MS) || 10_000;
+let shuttingDown = false;
+function shutdown(signal) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log('platform_shutdown', { signal, deadlineMs: SHUTDOWN_DEADLINE_MS });
+  deliveryWorker.stop();
+  let finished = false;
+  const finish = reason => {
+    if (finished) return;
+    finished = true;
+    let exitCode = 0;
+    try {
+      const result = closePlatformDb(platformDb);
+      console.log('platform_db_closed', { reason, closed: result.closed, checkpoint: result.checkpoint });
+    } catch (error) {
+      exitCode = 1;
+      console.error('platform_db_close_failed', { reason, code: error?.code || 'CLOSE_FAILED' });
+    }
+    try { if (legacyDb.open) legacyDb.close(); } catch { /* legacy store is best-effort */ }
+    process.exit(exitCode);
+  };
+  const deadline = setTimeout(() => finish('deadline'), SHUTDOWN_DEADLINE_MS);
+  deadline.unref();
+  server.closeIdleConnections?.();
+  server.close(() => finish('drained'));
+}
+process.once('SIGTERM', () => shutdown('SIGTERM'));
+process.once('SIGINT', () => shutdown('SIGINT'));
