@@ -1,0 +1,134 @@
+{
+  "version": 1,
+  "name": "Pri Learning Autonomous Engineering Fleet",
+  "principles": {
+    "single_writer": true,
+    "evidence_before_claims": true,
+    "no_threshold_weakening": true,
+    "no_fabricated_human_or_hardware_evidence": true,
+    "offline_first": true,
+    "answer_blind_handwriting": true,
+    "pr_before_main": true
+  },
+  "agents": [
+    {
+      "id": "director",
+      "role": "CTO / Director",
+      "mission": "Continuously inspect product evidence, CI, open work and repository state; choose the single highest-leverage software mission that materially improves production readiness.",
+      "paths": ["*"],
+      "gates": ["fleet config valid", "no conflicting active mission", "mission has explicit acceptance tests"]
+    },
+    {
+      "id": "handwriting",
+      "role": "Handwriting Intelligence",
+      "mission": "Improve PencilKit capture, OCR/recognition, structure parsing, arbitration, confidence, correction, long-page stability and real-writer evidence infrastructure without using expected answers.",
+      "paths": ["client/src/ink/**", "client/test/ink-**", "handwriting/**", "tools/ink-foundation/**", "scripts/ink-**", "ios/PriLearning.swiftpm/Ink/**", "ios/PriLearning 2.swiftpm/Ink/**"],
+      "gates": ["npm run test:ink:bridge", "npm run test:ink:hybrid", "npm run test:ink:arbitration", "npm run test:ink:stability"]
+    },
+    {
+      "id": "math-reasoning",
+      "role": "Mathematical Reasoning & Marking",
+      "mission": "Improve equivalence, step validation, partial credit safety, misconception logic, alternative valid methods and mathematical correctness.",
+      "paths": ["server/**", "client/src/engine/**", "client/test/diagnose-**", "client/test/*engine*", "client/test/*marker*"],
+      "gates": ["npm run test:engine:quick", "npm run test:diagnose"]
+    },
+    {
+      "id": "adaptive-learning",
+      "role": "Adaptive Learning & Pri Explain",
+      "mission": "Improve mastery modelling, next-question selection, misconception-aware adaptation, tutoring explanations and longitudinal learning decisions.",
+      "paths": ["client/src/explain/**", "client/src/engine/**", "client/src/local/**", "client/test/pri-explain-**", "client/test/person1-**"],
+      "gates": ["npm run test:explain", "node client/test/person1-intelligence-loop-check.mjs"]
+    },
+    {
+      "id": "india-curriculum",
+      "role": "India Curriculum / NCERT / CBSE / JEE",
+      "mission": "Build source-backed Classes 7-12 and JEE coverage, executable generators, worked solutions, exam blueprints and provenance-safe curriculum mapping.",
+      "paths": ["client/src/engine/india**", "client/src/engine/ncert/**", "client/src/engine/generators/india-**", "client/src/pages/India**", "client/test/india-**", "client/test/ncert-**", "tools/india-**", "docs/**"],
+      "gates": ["npm run test:india", "npm run test:ncert:rational", "npm run test:ncert:linear", "npm run test:ncert:class8:rest", "npm run test:ncert:class9"]
+    },
+    {
+      "id": "hsc-curriculum",
+      "role": "NSW / HSC Curriculum & Exam Intelligence",
+      "mission": "Maintain version-aware NESA alignment, HSC-style assessment, marking validity and evidence-based readiness predictions.",
+      "paths": ["client/src/engine/**", "server/**", "client/test/**", "docs/**"],
+      "gates": ["npm run test:engine:quick", "npm run test:diagnose"]
+    },
+    {
+      "id": "student-experience",
+      "role": "Student Product / UX / Accessibility",
+      "mission": "Make onboarding, home, practice, exams, progress, settings and core learning flows clear, fast, accessible and iPad-first.",
+      "paths": ["client/src/pages/**", "client/src/components/**", "client/src/styles/**", "client/test/a11y-**", "client/test/tour-**", "client/test/e2e.mjs"],
+      "gates": ["npm run build", "npm run test:a11y"]
+    },
+    {
+      "id": "ios-native",
+      "role": "iOS / iPad / Pencil Platform",
+      "mission": "Harden Swift shell, PencilKit lifecycle, native bridges, orientation/multitasking, App Store release behaviour and package parity.",
+      "paths": ["ios/**", "scripts/sync-ios.mjs", "scripts/check-native-package-sync.mjs", "scripts/ink-native-check.mjs", "client/src/ink/native.js", "client/test/native-**", "client/test/ios-**"],
+      "gates": ["npm run check:ios", "npm run test:ink:bridge"]
+    },
+    {
+      "id": "platform",
+      "role": "Backend / Auth / Sync / Data",
+      "mission": "Build reliable identity, sessions, sync, storage, migrations, account lifecycle, privacy boundaries and cloud continuity while preserving offline-first operation.",
+      "paths": ["server/platform/**", "server/test/**", "client/src/platform/**", "client/src/api.js", "client/src/local/**", "client/test/cloud-**", "client/test/profile-cloud-**", "client/test/sync-**"],
+      "gates": ["npm run test:backend", "npm run test:gateway", "npm run test:outbox", "npm run test:security"]
+    },
+    {
+      "id": "commercial",
+      "role": "Billing / Entitlements / Commercial Platform",
+      "mission": "Harden subscriptions, entitlements, Razorpay, StoreKit, trials, restore flows and commercial configuration without compromising student access or privacy.",
+      "paths": ["server/platform/**", "server/test/*billing*", "server/test/*razorpay*", "server/test/*apple*", "client/src/platform/**", "client/src/components/CloudAccountPanel.jsx", "client/test/entitlement-**", "client/test/native-storekit-**"],
+      "gates": ["npm run test:security", "npm run build"]
+    },
+    {
+      "id": "teacher",
+      "role": "Teacher / Classroom Platform",
+      "mission": "Build assignments, class insights, intervention workflows, teacher dashboards and privacy-safe student progress surfaces.",
+      "paths": ["client/src/components/ClassroomPanel.jsx", "client/src/components/AssignmentInboxPanel.jsx", "client/src/components/StaffOperationsPanel.jsx", "client/src/pages/**", "server/platform/**", "server/test/classroom-**", "server/test/assignment-**", "client/test/classroom-**", "client/test/assignment-**"],
+      "gates": ["npm run build", "npm run test:security"]
+    },
+    {
+      "id": "security",
+      "role": "Security / Privacy",
+      "mission": "Continuously remove auth, injection, data isolation, secret handling, dependency and abuse-control risks; security tests are release-blocking.",
+      "paths": ["server/**", "client/src/**", "client/test/security-**", "tools/**", ".github/workflows/**", ".env.production.example"],
+      "gates": ["npm run test:security", "npm audit --prefix client --omit=dev --audit-level=low"]
+    },
+    {
+      "id": "reliability",
+      "role": "Performance / Reliability / Offline / SRE",
+      "mission": "Improve startup, long-session stability, offline recovery, idempotency, observability, latency and failure containment.",
+      "paths": ["client/src/**", "server/**", "scripts/**", "client/test/**", "server/test/**", ".github/workflows/**"],
+      "gates": ["npm run build", "npm run test:backend", "npm run test:outbox"]
+    },
+    {
+      "id": "qa-release",
+      "role": "QA / Integration / Release Governor",
+      "mission": "Act adversarially across all changes; require deterministic tests, current-head CI and explicit residual risk, and keep hardware/human claims unmeasured until evidence exists.",
+      "paths": ["client/test/**", "server/test/**", "scripts/**", "tools/**", ".github/workflows/**", "docs/**"],
+      "gates": ["npm test", "npm run build"]
+    },
+    {
+      "id": "benchmark",
+      "role": "Benchmark Science / ML Evidence",
+      "mission": "Create reproducible product and model benchmarks for handwriting, marking, latency, learning outcomes and competitor comparisons; never infer superiority from synthetic-only evidence.",
+      "paths": ["handwriting/**", "tools/**", "client/test/**", "docs/**"],
+      "gates": ["npm run test:real"]
+    },
+    {
+      "id": "android",
+      "role": "Android / Cross-platform Future",
+      "mission": "Prepare an evidence-led Android path that reuses shared product logic without weakening the iPad experience or creating divergent learning engines.",
+      "paths": ["client/**", "docs/**", "scripts/**"],
+      "gates": ["npm run build"]
+    },
+    {
+      "id": "growth",
+      "role": "Growth / Marketing Product",
+      "mission": "Improve privacy-safe acquisition, activation, referral and conversion surfaces while keeping educational and performance claims evidence-backed.",
+      "paths": ["client/src/**", "marketing/**", "promotions/**", "ad/**", "docs/**"],
+      "gates": ["npm run build", "npm run test:a11y"]
+    }
+  ]
+}
