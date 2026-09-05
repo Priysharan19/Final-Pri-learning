@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { rateLimit, requireRole, requireSession } from './security.js';
+import { INVITE_MAX_TTL_DAYS, inviteTtlDays, listTeacherInvites, mintTeacherInvite } from './teacherInvites.js';
 
 function ensureAdminTables(db) {
   db.exec(`
@@ -70,6 +71,22 @@ export function createAdminRouter(db) {
     if (!info.changes) return res.status(404).json({ error: { code: 'ACCOUNT_NOT_FOUND', message: 'Account not found.' } });
     audit(db, req.platformSession.account_id, 'account.role', 'account', accountId, { role }, now);
     res.json({ accountId, role, updatedAt: now });
+  });
+
+  // Teacher onboarding: an admin mints a single-use, expiring invite code and
+  // hands it to the teacher out of band; registration with the code creates the
+  // account with role 'teacher'. Only the hash and a display prefix are kept.
+  router.post('/teacher-invites', (req, res) => {
+    const ttlDays = inviteTtlDays(req.body?.ttlDays);
+    if (ttlDays === null) return res.status(400).json({ error: { code: 'INVITE_TTL_INVALID', message: `ttlDays must be a whole number from 1 to ${INVITE_MAX_TTL_DAYS}.` } });
+    const now = Date.now();
+    const invite = mintTeacherInvite(db, { createdBy: req.platformSession.account_id, ttlDays, now });
+    audit(db, req.platformSession.account_id, 'teacher-invite.mint', 'teacher-invite', invite.id, { ttlDays, codePrefix: invite.code.slice(0, 8) }, now);
+    res.status(201).json({ code: invite.code, expiresAt: invite.expiresAt });
+  });
+
+  router.get('/teacher-invites', (req, res) => {
+    res.json({ invites: listTeacherInvites(db) });
   });
 
   router.get('/feature-flags', (req, res) => {

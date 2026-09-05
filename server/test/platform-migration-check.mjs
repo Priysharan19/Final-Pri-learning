@@ -50,7 +50,7 @@ try {
 
   const db = createPlatformDb(path);
   try {
-    assert.equal(db.prepare("SELECT value FROM platform_meta WHERE key='schema_version'").get()?.value, '3');
+    assert.equal(db.prepare("SELECT value FROM platform_meta WHERE key='schema_version'").get()?.value, '4');
     const preserved = db.prepare("SELECT server_cursor,id,account_id,device_id,device_seq,payload_json FROM learning_events WHERE account_id='acct_a'").get();
     assert.deepEqual(preserved, {
       server_cursor: 41,

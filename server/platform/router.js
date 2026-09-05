@@ -13,6 +13,7 @@ import { createSyncRouter } from './sync.js';
 import { createTelemetryRouter } from './telemetry.js';
 import { assertPlatformConfig, platformConfigStatus } from './config.js';
 import { csrfGuard, originGuard } from './security.js';
+import { housekeepingStatus } from './housekeeping.js';
 
 const SERVER_WEBHOOK = /^\/billing\/webhook\/(?:apple|google|web)$/;
 
@@ -43,6 +44,7 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
         apple: config.appleBillingProviderConfigured,
         google: false
       },
+      housekeeping: housekeepingStatus(db),
       checkedAt: Date.now()
     });
   });

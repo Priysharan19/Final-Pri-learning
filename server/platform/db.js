@@ -6,7 +6,7 @@ import { platformDatabasePath } from './config.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_PATH = join(here, '..', 'data', 'pri-learning-platform.db');
-const SCHEMA_VERSION = 3;
+const SCHEMA_VERSION = 4;
 
 function uniqueIndexColumns(db, table) {
   const safeTable = String(table).replaceAll("'", "''");
@@ -290,6 +290,39 @@ export function createPlatformDb(path = DEFAULT_PATH) {
   `);
 
   migrateLearningEventIdentity(db);
+
+  // WP server-security: teacher invite codes, per-account login lockout and
+  // server-issued OIDC nonces (schema v4). Only one-way hashes are stored; raw
+  // invite codes and nonces never touch the database.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS teacher_invites (
+      id TEXT PRIMARY KEY,
+      code_hash TEXT NOT NULL UNIQUE,
+      code_prefix TEXT NOT NULL,
+      created_by TEXT REFERENCES accounts(id) ON DELETE SET NULL,
+      created_at INTEGER NOT NULL,
+      expires_at INTEGER NOT NULL,
+      used_by TEXT REFERENCES accounts(id) ON DELETE SET NULL,
+      used_at INTEGER
+    );
+
+    CREATE TABLE IF NOT EXISTS login_attempts (
+      email_hash TEXT PRIMARY KEY,
+      failures INTEGER NOT NULL,
+      window_start INTEGER NOT NULL,
+      last_failed_at INTEGER NOT NULL,
+      locked_until INTEGER
+    );
+
+    CREATE TABLE IF NOT EXISTS oidc_nonces (
+      nonce_hash TEXT PRIMARY KEY,
+      created_at INTEGER NOT NULL,
+      expires_at INTEGER NOT NULL,
+      consumed_at INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS idx_oidc_nonces_expiry ON oidc_nonces(expires_at);
+  `);
+
   db.prepare("INSERT OR REPLACE INTO platform_meta(key,value) VALUES ('schema_version',?)").run(String(SCHEMA_VERSION));
   return db;
 }
