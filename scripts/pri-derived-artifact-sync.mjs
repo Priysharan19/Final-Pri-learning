@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-import { readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
@@ -24,8 +25,7 @@ function safePath(file) {
   return roots.some(root => file.startsWith(root) && file.length > root.length);
 }
 
-function validatePaths(file, allowEmpty = false) {
-  const parsed = JSON.parse(readFileSync(file, 'utf8'));
+function validatePathList(parsed, allowEmpty = false) {
   if (!Array.isArray(parsed)) throw new Error('paths file must contain a JSON array');
   if (!allowEmpty && parsed.length === 0) throw new Error('derived artifact path list is empty');
   const seen = new Set();
@@ -35,6 +35,10 @@ function validatePaths(file, allowEmpty = false) {
     seen.add(item);
   }
   return parsed;
+}
+
+function validatePaths(file, allowEmpty = false) {
+  return validatePathList(JSON.parse(readFileSync(file, 'utf8')), allowEmpty);
 }
 
 function parseMissionBranch(branch) {
@@ -63,6 +67,63 @@ function validateMetadata(file, expectedHead, expectedBase, expectedBranch) {
   return metadata;
 }
 
+function gitNameOnly(repoDir, args) {
+  const raw = execFileSync('git', ['-C', repoDir, ...args, '-z'], { encoding: 'buffer' });
+  return raw.toString('utf8').split('\0').filter(Boolean);
+}
+
+function packageDerived(repoDir, outDir, headRef, headSha, baseSha) {
+  if (!repoDir || !outDir || !headRef || !headSha || !baseSha) {
+    throw new Error('package requires repo dir, output dir, head ref, head SHA and base SHA');
+  }
+  parseMissionBranch(headRef);
+
+  const repo = path.resolve(repoDir);
+  const out = path.resolve(outDir);
+  rmSync(out, { recursive: true, force: true });
+  mkdirSync(out, { recursive: true });
+
+  // sync:ios can create a brand-new content-hashed asset. Plain `git diff`
+  // ignores untracked files, so stage only the declared derived roots first.
+  // This index is local to the read-only build workspace; no repository write
+  // credential is available in that job.
+  execFileSync('git', ['-C', repo, 'add', '-A', '--', ...roots], { stdio: 'pipe' });
+
+  const allStaged = gitNameOnly(repo, ['diff', '--cached', '--name-only']);
+  const unsafeStaged = allStaged.filter(file => !safePath(file));
+  if (unsafeStaged.length) {
+    throw new Error(`derived packaging staged path(s) outside policy: ${unsafeStaged.join(', ')}`);
+  }
+
+  const paths = gitNameOnly(repo, ['diff', '--cached', '--name-only', '--', ...roots]);
+  validatePathList(paths, true);
+
+  const patch = execFileSync(
+    'git',
+    ['-C', repo, 'diff', '--cached', '--binary', '--', ...roots],
+    { encoding: 'buffer' }
+  );
+
+  writeFileSync(path.join(out, 'mirrors.patch'), patch);
+  writeFileSync(path.join(out, 'paths.json'), JSON.stringify(paths, null, 2));
+  writeFileSync(path.join(out, 'metadata.json'), JSON.stringify({
+    rule_id: IOS_RULE.id,
+    required_gate_id: IOS_RULE.required_gate_id,
+    head_ref: headRef,
+    head_sha: headSha,
+    base_sha: baseSha
+  }, null, 2));
+
+  if (paths.length > 0 && patch.length === 0) {
+    throw new Error('derived path list is non-empty but patch is empty');
+  }
+  if (paths.length === 0 && patch.length !== 0) {
+    throw new Error('derived patch is non-empty but path list is empty');
+  }
+
+  return paths;
+}
+
 const [command, ...args] = process.argv.slice(2);
 
 if (command === 'validate-paths') {
@@ -78,7 +139,11 @@ if (command === 'validate-paths') {
   if (!file || !head || !base || !branch) throw new Error('validate-metadata requires file, head SHA, base SHA and branch');
   const metadata = validateMetadata(file, head, base, branch);
   console.log(`PASS: derived artifact metadata matches ${metadata.head_ref}@${metadata.head_sha}.`);
+} else if (command === 'package') {
+  const [repoDir, outDir, headRef, headSha, baseSha] = args;
+  const paths = packageDerived(repoDir, outDir, headRef, headSha, baseSha);
+  console.log(JSON.stringify({ packaged: paths.length, paths }));
 } else {
-  console.log('Usage:\n  node scripts/pri-derived-artifact-sync.mjs validate-paths <paths.json> [--allow-empty]\n  node scripts/pri-derived-artifact-sync.mjs branch <agent/mission/agent/mission-id>\n  node scripts/pri-derived-artifact-sync.mjs validate-metadata <metadata.json> <head-sha> <base-sha> <branch>');
+  console.log('Usage:\n  node scripts/pri-derived-artifact-sync.mjs validate-paths <paths.json> [--allow-empty]\n  node scripts/pri-derived-artifact-sync.mjs branch <agent/mission/agent/mission-id>\n  node scripts/pri-derived-artifact-sync.mjs validate-metadata <metadata.json> <head-sha> <base-sha> <branch>\n  node scripts/pri-derived-artifact-sync.mjs package <repo-dir> <out-dir> <head-ref> <head-sha> <base-sha>');
   process.exitCode = 2;
 }
