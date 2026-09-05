@@ -145,8 +145,77 @@ jobs:
             bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb \
             agent/mission/math-reasoning/smoke
 
+          # Behavioral regression for the live failure that originally escaped:
+          # sync:ios creates a new content-hashed file that is untracked. The
+          # packager must capture it, plus tracked modifications/deletions, while
+          # leaving every path outside the two declared mirror roots unstaged.
+          fixture="$(mktemp -d)"
+          repo="$fixture/repo"
+          out="$fixture/out"
+          git init -q "$repo"
+          git -C "$repo" config user.name 'Pri Fleet Test'
+          git -C "$repo" config user.email 'pri-fleet-test@invalid.example'
+          mkdir -p \
+            "$repo/ios/PriLearning.swiftpm/Resources/Web/assets" \
+            "$repo/ios/PriLearning 2.swiftpm/Resources/Web/assets"
+          printf 'old-index\n' > "$repo/ios/PriLearning.swiftpm/Resources/Web/index.html"
+          printf 'old-index\n' > "$repo/ios/PriLearning 2.swiftpm/Resources/Web/index.html"
+          printf 'old-payload\n' > "$repo/ios/PriLearning.swiftpm/Resources/Web/assets/index-old.js"
+          printf 'old-payload\n' > "$repo/ios/PriLearning 2.swiftpm/Resources/Web/assets/index-old.js"
+          git -C "$repo" add .
+          git -C "$repo" commit -qm seed
+
+          printf 'new-index\n' > "$repo/ios/PriLearning.swiftpm/Resources/Web/index.html"
+          printf 'new-index\n' > "$repo/ios/PriLearning 2.swiftpm/Resources/Web/index.html"
+          rm "$repo/ios/PriLearning.swiftpm/Resources/Web/assets/index-old.js"
+          rm "$repo/ios/PriLearning 2.swiftpm/Resources/Web/assets/index-old.js"
+          printf 'new-generated-payload\n' > "$repo/ios/PriLearning.swiftpm/Resources/Web/assets/index-newhash.js"
+          printf 'new-generated-payload\n' > "$repo/ios/PriLearning 2.swiftpm/Resources/Web/assets/index-newhash.js"
+          printf 'native-trap\n' > "$repo/ios/PriLearning.swiftpm/Package.swift"
+          printf 'outside-trap\n' > "$repo/outside.txt"
+
+          node scripts/pri-derived-artifact-sync.mjs package \
+            "$repo" "$out" \
+            agent/mission/math-reasoning/smoke \
+            aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa \
+            bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+          node scripts/pri-derived-artifact-sync.mjs validate-paths "$out/paths.json"
+
+          node - "$out/paths.json" <<'NODE'
+          const fs = require('fs');
+          const paths = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+          const required = [
+            'ios/PriLearning.swiftpm/Resources/Web/assets/index-newhash.js',
+            'ios/PriLearning 2.swiftpm/Resources/Web/assets/index-newhash.js',
+            'ios/PriLearning.swiftpm/Resources/Web/assets/index-old.js',
+            'ios/PriLearning 2.swiftpm/Resources/Web/assets/index-old.js',
+            'ios/PriLearning.swiftpm/Resources/Web/index.html',
+            'ios/PriLearning 2.swiftpm/Resources/Web/index.html'
+          ];
+          for (const file of required) {
+            if (!paths.includes(file)) throw new Error(`packager omitted ${file}`);
+          }
+          if (paths.some(file => file.includes('Package.swift') || file === 'outside.txt')) {
+            throw new Error(`packager escaped derived roots: ${JSON.stringify(paths)}`);
+          }
+          NODE
+
+          git -C "$repo" diff --cached --diff-filter=A --name-only | grep -Fxq \
+            'ios/PriLearning.swiftpm/Resources/Web/assets/index-newhash.js'
+          git -C "$repo" diff --cached --diff-filter=A --name-only | grep -Fxq \
+            'ios/PriLearning 2.swiftpm/Resources/Web/assets/index-newhash.js'
+          git -C "$repo" diff --cached --diff-filter=D --name-only | grep -Fxq \
+            'ios/PriLearning.swiftpm/Resources/Web/assets/index-old.js'
+          if git -C "$repo" diff --cached --name-only | grep -Eq 'Package\.swift|^outside\.txt$'; then
+            echo 'derived packager staged an out-of-root trap' >&2
+            exit 1
+          fi
+          grep -Fq 'new-generated-payload' "$out/mirrors.patch"
+          rm -rf "$fixture"
+
           test -s .github/workflows/pri-agent-derived-sync.yml
           grep -Fq 'pull_request_target:' .github/workflows/pri-agent-derived-sync.yml
+          grep -Fq 'pri-derived-artifact-sync.mjs package' .github/workflows/pri-agent-derived-sync.yml
           apply_job="$(awk '/^  apply-derived:/{flag=1} flag{print}' .github/workflows/pri-agent-derived-sync.yml)"
           printf '%s\n' "$apply_job" | grep -Fq 'contents: write'
           printf '%s\n' "$apply_job" | grep -Fq 'Apply validated mirrors without executing candidate code'
