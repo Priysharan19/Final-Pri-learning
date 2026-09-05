@@ -39,3 +39,10 @@ jobs:
         run: node client/test/pilot-evidence-export-check.mjs
       - name: Client build
         run: npm run build
+      - name: Retain pull-request build for packaged iPad sync
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: pilot-evidence-client-dist
+          path: client/dist
+          retention-days: 1
