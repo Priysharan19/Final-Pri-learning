@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import process from 'node:process';
@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const FLEET_FILE = path.join(ROOT, '.pri-os', 'fleet.json');
 const MISSION_CONTROL_FILE = path.join(ROOT, '.pri-os', 'mission-control.json');
+const PACKAGE_FILE = path.join(ROOT, 'package.json');
 const RISK_ORDER = ['R1', 'R2', 'R3', 'R4'];
 
 function readJson(file) {
@@ -116,10 +117,21 @@ function validate(fleet) {
     if (!ids.has(required)) errors.push(`required agent missing: ${required}`);
   }
 
+  let packageScripts = {};
+  try {
+    packageScripts = readJson(PACKAGE_FILE).scripts || {};
+  } catch (error) {
+    errors.push(`package.json invalid: ${error.message}`);
+  }
+
   for (const [gateId, gate] of Object.entries(fleet.gates || {})) {
     if (!/^[a-z0-9-]+$/.test(gateId)) errors.push(`invalid gate id: ${gateId}`);
     if (!gate.command || !gate.platform || !gate.severity || !gate.evidence_class) errors.push(`${gateId}: incomplete typed gate`);
     if (!Number.isInteger(gate.timeout_minutes) || gate.timeout_minutes <= 0) errors.push(`${gateId}: timeout_minutes must be positive integer`);
+    const npmRun = String(gate.command || '').match(/^npm run ([^\s]+)/);
+    if (npmRun && !packageScripts[npmRun[1]]) errors.push(`${gateId}: npm script '${npmRun[1]}' does not exist in root package.json`);
+    const nodeFile = String(gate.command || '').match(/^node ([^\s]+)/);
+    if (nodeFile && !existsSync(path.join(ROOT, nodeFile[1]))) errors.push(`${gateId}: node target '${nodeFile[1]}' does not exist`);
   }
 
   for (const agent of fleet.agents || []) {
