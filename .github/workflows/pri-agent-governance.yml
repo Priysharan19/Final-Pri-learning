@@ -1,0 +1,53 @@
+name: Pri Agent Fleet Governance
+
+on:
+  pull_request:
+    paths:
+      - 'AGENTS.md'
+      - '.pri-os/**'
+      - 'scripts/pri-fleet.mjs'
+      - '.github/workflows/pri-agent-governance.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'AGENTS.md'
+      - '.pri-os/**'
+      - 'scripts/pri-fleet.mjs'
+      - '.github/workflows/pri-agent-governance.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pri-agent-governance-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fleet-contract:
+    name: Autonomous fleet contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Fleet script syntax
+        run: node --check scripts/pri-fleet.mjs
+
+      - name: Validate fleet invariants
+        run: node scripts/pri-fleet.mjs validate
+
+      - name: Machine-readable fleet status
+        run: node scripts/pri-fleet.mjs status >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Smoke-test ownership routing
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/pri-fleet.mjs route client/src/ink/native.js | grep -q '^handwriting'
+          node scripts/pri-fleet.mjs route server/platform/index.js | grep -q '^platform'
+          node scripts/pri-fleet.mjs route client/src/pages/Home.jsx | grep -q '^student-experience'
