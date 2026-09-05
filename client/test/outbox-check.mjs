@@ -7,6 +7,54 @@ import { installBrowserEnv, resetStorage, rawRows } from './backend-check.mjs';
 installBrowserEnv();
 resetStorage();
 
+// Wrap the backend suite's real fake-IDB transaction surface before idb.js is
+// imported. This fails an actual device-store put request, rather than mocking
+// recordMutation itself, so the regression exercises the same get/put promise
+// path the browser uses when IndexedDB transiently refuses a write.
+const originalOpen = globalThis.indexedDB.open.bind(globalThis.indexedDB);
+let failNextDevicePut = false;
+globalThis.indexedDB.open = (...args) => {
+  const req = originalOpen(...args);
+  let successHandler = null;
+  Object.defineProperty(req, 'onsuccess', {
+    configurable: true,
+    get: () => successHandler,
+    set(fn) {
+      successHandler = () => {
+        const db = req.result;
+        if (!db.__priOutboxFailureWrapped) {
+          const originalTransaction = db.transaction.bind(db);
+          db.transaction = (name, mode = 'readonly') => {
+            const transaction = originalTransaction(name, mode);
+            if (name === 'device' && mode === 'readwrite') {
+              const originalObjectStore = transaction.objectStore.bind(transaction);
+              transaction.objectStore = (...storeArgs) => {
+                const handle = originalObjectStore(...storeArgs);
+                const originalPut = handle.put.bind(handle);
+                handle.put = value => {
+                  if (!failNextDevicePut) return originalPut(value);
+                  failNextDevicePut = false;
+                  const failed = { result: undefined, error: null, onsuccess: null, onerror: null };
+                  queueMicrotask(() => {
+                    failed.error = new Error('injected device-store put failure');
+                    failed.onerror?.();
+                  });
+                  return failed;
+                };
+                return handle;
+              };
+            }
+            return transaction;
+          };
+          Object.defineProperty(db, '__priOutboxFailureWrapped', { value: true });
+        }
+        fn?.();
+      };
+    }
+  });
+  return req;
+};
+
 const {
   acknowledgeMutations, classifyMutation, coalesce,
   outboxStats, pendingMutations, recordMutation
@@ -128,6 +176,40 @@ ok('stats next sequence is ahead of every item', stats.nextSeq > Math.max(...aft
 const countBeforePassword = (await pendingMutations()).length;
 same('password record returns null', await recordMutation('POST', '/profiles/password', { password: 'never' }), null);
 same('password operation did not touch outbox', (await pendingMutations()).length, countBeforePassword);
+
+// ── recovery after transient IndexedDB write failure ─────────────────────────
+// The local domain mutation already succeeded by the time recordMutation runs.
+// A rejected device-store write must therefore surface to api.js without being
+// retried, and the NEXT syncable mutation must durably admit that the exact
+// missing entity is unknowable by collapsing to a full reconciliation marker.
+const beforeFailure = await pendingMutations();
+failNextDevicePut = true;
+let firstWriteError = null;
+try {
+  await recordMutation('POST', '/tasks', { task: { id: 'gap-task', title: 'MUST NOT ENTER QUEUE' } });
+} catch (err) { firstWriteError = err; }
+ok('device-store write failure is surfaced', /injected device-store put failure/.test(String(firstWriteError?.message)), String(firstWriteError));
+same('failed outbox persistence does not pretend the missing marker was durable', (await pendingMutations()).length, beforeFailure.length);
+
+// A second persistence failure while trying to recover must keep the latch set;
+// otherwise the third mutation could fall back to a fine-grained marker again.
+failNextDevicePut = true;
+let secondWriteError = null;
+try {
+  await recordMutation('POST', '/classes', { class: { id: 'recovery-class', name: 'PRIVATE' } });
+} catch (err) { secondWriteError = err; }
+ok('recovery write failure is surfaced too', /injected device-store put failure/.test(String(secondWriteError?.message)), String(secondWriteError));
+
+const recovered = await recordMutation('POST', '/custom-questions', { question: { id: 'recovery-question', prompt: 'PRIVATE' } });
+same('next successful syncable mutation returns full-rescan authority', recovered?.kind, 'full-rescan');
+same('full-rescan marker is deliberately opaque', { entityId: recovered?.entityId, operation: recovered?.operation }, { entityId: 'all', operation: 'upsert' });
+const afterRecovery = await pendingMutations();
+same('recovery collapses the queue to exactly one marker', afterRecovery.length, 1);
+same('the one durable marker requires a complete reconciliation', afterRecovery[0]?.kind, 'full-rescan');
+ok('recovery preserves the oldest known dirty timestamp', afterRecovery[0]?.firstAt <= Math.min(...beforeFailure.map(x => x.firstAt || x.at)), JSON.stringify(afterRecovery[0]));
+same('stats report the durable full-rescan requirement', (await outboxStats()).requiresFullRescan, true);
+const recoveryDisk = JSON.stringify(rawRows().device || []);
+ok('failed mutation payload never leaked during recovery', !recoveryDisk.includes('MUST NOT ENTER QUEUE') && !recoveryDisk.includes('PRIVATE'), recoveryDisk);
 
 console.log(`\nDurable sync outbox — ${pass}/${pass + fail} checks`);
 if (failures.length) {
