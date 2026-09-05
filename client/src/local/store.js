@@ -2,12 +2,24 @@
 // Pri Learning · Local data helpers (streaks, activity, ratings) over IndexedDB
 // ─────────────────────────────────────────────────────────────────────────────
 import { get, put, byIndex, dropDataKeys } from './idb.js';
+import { dayKey, hourIn, timezoneOf, AUSTRALIA_TIMEZONE } from '../lib/locale.js';
 
-export function sydneyDate(ms = Date.now()) {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Australia/Sydney', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(ms));
-}
-export function sydneyHour(ms = Date.now()) {
-  return Number(new Intl.DateTimeFormat('en-AU', { timeZone: 'Australia/Sydney', hour: 'numeric', hour12: false }).format(new Date(ms)));
+// ── Day boundaries ───────────────────────────────────────────────────────────
+// A day ends when the student's day ends: Asia/Kolkata for an Indian profile,
+// Australia/Sydney for the legacy NSW profiles, or whatever timezone the
+// profile carries. Every helper below takes the timezone explicitly; a caller
+// that only has the profile id asks the profile for it.
+
+export { dayKey as localDate, hourIn as localHour };
+
+/** @deprecated legacy NSW helpers — kept for the Australian profiles; India profiles must pass their timezone. */
+export function sydneyDate(ms = Date.now()) { return dayKey(ms, AUSTRALIA_TIMEZONE); }
+export function sydneyHour(ms = Date.now()) { return hourIn(ms, AUSTRALIA_TIMEZONE); }
+
+/** The timezone a stored profile lives in — its own, or its course's default. */
+export async function profileTimezone(pid) {
+  const p = pid ? await get('profiles', pid).catch(() => null) : null;
+  return timezoneOf(p || 'nsw');
 }
 
 export async function activityFor(pid) {
@@ -15,22 +27,23 @@ export async function activityFor(pid) {
   return rows.sort((a, b) => a.date < b.date ? -1 : 1);
 }
 
-export async function streakFor(pid, nowMs = Date.now()) {
+export async function streakFor(pid, nowMs = Date.now(), tz = null) {
+  const zone = tz || await profileTimezone(pid);
   const rows = await byIndex('activity', 'pid', pid);
   const dates = new Set(rows.filter(r => r.questions > 0).map(r => r.date));
   if (!dates.size) return 0;
   let streak = 0;
   let cursor = nowMs;
-  if (!dates.has(sydneyDate(nowMs))) cursor -= 86400000;
+  if (!dates.has(dayKey(nowMs, zone))) cursor -= 86400000;
   for (; ;) {
-    const d = sydneyDate(cursor);
+    const d = dayKey(cursor, zone);
     if (dates.has(d)) { streak++; cursor -= 86400000; } else break;
   }
   return streak;
 }
 
-export async function bumpActivity(pid, { correct, xp, ms }, nowMs = Date.now()) {
-  const date = sydneyDate(nowMs);
+export async function bumpActivity(pid, { correct, xp, ms }, nowMs = Date.now(), tz = null) {
+  const date = dayKey(nowMs, tz || await profileTimezone(pid));
   const key = `${pid}:${date}`;
   const row = (await get('activity', key)) || { key, pid, date, questions: 0, correct: 0, xp: 0, ms: 0, predicted: null };
   row.questions += 1;
@@ -40,8 +53,8 @@ export async function bumpActivity(pid, { correct, xp, ms }, nowMs = Date.now())
   await put('activity', row);
 }
 
-export async function setPredictedToday(pid, predicted, nowMs = Date.now()) {
-  const date = sydneyDate(nowMs);
+export async function setPredictedToday(pid, predicted, nowMs = Date.now(), tz = null) {
+  const date = dayKey(nowMs, tz || await profileTimezone(pid));
   const key = `${pid}:${date}`;
   const row = (await get('activity', key)) || { key, pid, date, questions: 0, correct: 0, xp: 0, ms: 0, predicted: null };
   row.predicted = predicted;
