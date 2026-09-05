@@ -122,32 +122,8 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           set -euo pipefail
-          rm -rf derived-out
-          mkdir -p derived-out
-          git -C candidate diff --binary -- \
-            'ios/PriLearning.swiftpm/Resources/Web' \
-            'ios/PriLearning 2.swiftpm/Resources/Web' \
-            > derived-out/mirrors.patch
-
-          node <<'NODE'
-          const { execFileSync } = require('node:child_process');
-          const fs = require('node:fs');
-          const raw = execFileSync('git', [
-            '-C', 'candidate', 'diff', '--name-only', '-z', '--',
-            'ios/PriLearning.swiftpm/Resources/Web',
-            'ios/PriLearning 2.swiftpm/Resources/Web'
-          ]);
-          const paths = raw.toString('utf8').split('\0').filter(Boolean);
-          fs.writeFileSync('derived-out/paths.json', JSON.stringify(paths, null, 2));
-          fs.writeFileSync('derived-out/metadata.json', JSON.stringify({
-            rule_id: 'ios-web-mirrors',
-            required_gate_id: 'ios-sync',
-            head_ref: process.env.HEAD_REF,
-            head_sha: process.env.HEAD_SHA,
-            base_sha: process.env.BASE_SHA
-          }, null, 2));
-          process.stdout.write(String(paths.length));
-          NODE
+          node trusted/scripts/pri-derived-artifact-sync.mjs package \
+            candidate derived-out "$HEAD_REF" "$HEAD_SHA" "$BASE_SHA"
 
           count="$(node -e "process.stdout.write(String(require('./derived-out/paths.json').length))")"
           if [[ "$count" -gt 0 ]]; then
@@ -155,6 +131,7 @@ jobs:
             test -s derived-out/mirrors.patch
             echo 'has_patch=true' >> "$GITHUB_OUTPUT"
           else
+            test ! -s derived-out/mirrors.patch
             echo 'has_patch=false' >> "$GITHUB_OUTPUT"
           fi
 
