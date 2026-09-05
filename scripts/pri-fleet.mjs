@@ -53,9 +53,22 @@ function getAgent(fleet, id) {
   return agent;
 }
 
+function ruleSpecificity(rule) {
+  return rule.pattern.replace(/\*/g, '').length;
+}
+
 function ownerFor(fleet, file) {
-  const rule = fleet.ownership_rules.find(item => matches(file, item.pattern));
-  return rule ? { ...rule } : null;
+  const matched = fleet.ownership_rules.filter(item => matches(file, item.pattern));
+  if (!matched.length) return null;
+  matched.sort((a, b) => ruleSpecificity(b) - ruleSpecificity(a) || b.pattern.length - a.pattern.length);
+  const best = matched[0];
+  const bestSpecificity = ruleSpecificity(best);
+  const tied = matched.filter(rule => ruleSpecificity(rule) === bestSpecificity && rule.pattern.length === best.pattern.length);
+  const primaries = new Set(tied.map(rule => rule.primary));
+  if (primaries.size > 1) {
+    throw new Error(`ambiguous primary ownership for ${file}: ${tied.map(rule => `${rule.pattern}=>${rule.primary}`).join(', ')}`);
+  }
+  return { ...best, specificity: bestSpecificity };
 }
 
 function changedFiles(base = 'origin/main') {
@@ -183,7 +196,7 @@ if (command === 'validate') {
     for (const error of errors) console.error(`ERROR: ${error}`);
     process.exit(1);
   }
-  console.log(`PASS: ${fleet.agents.length} agents, ${Object.keys(fleet.gates).length} typed gates and ${fleet.ownership_rules.length} ordered ownership rules.`);
+  console.log(`PASS: ${fleet.agents.length} agents, ${Object.keys(fleet.gates).length} typed gates and ${fleet.ownership_rules.length} primary-ownership rules.`);
 } else if (command === 'list') {
   for (const agent of fleet.agents) console.log(`${agent.id}\t${agent.role}`);
 } else if (command === 'route') {
@@ -200,7 +213,8 @@ if (command === 'validate') {
       primary: owner.primary,
       reviewers: owner.reviewers || [],
       risk: owner.risk,
-      rule: owner.pattern
+      rule: owner.pattern,
+      specificity: owner.specificity
     }));
   }
 } else if (command === 'prompt') {
