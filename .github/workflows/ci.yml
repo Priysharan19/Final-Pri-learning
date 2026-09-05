@@ -36,11 +36,11 @@ jobs:
         run: |
           set -euo pipefail
           test -s suites.log
-          grep -Fq '1424000/1424000 self-checks passed across 178 subtopics' suites.log
+          grep -Fq '1544000/1544000 self-checks passed across 193 subtopics' suites.log
           grep -Fq '21000/21000 multipart part-checks passed' suites.log
-          grep -Fq '✔ INDIA SUITE PASSED — 1458/1458 checks' suites.log
-          grep -Fq '5268 questions from 439 declared (generator, difficulty) pairs × 12 draws — 5268 marked correct by their own marker, 5268 well formed' suites.log
-          grep -Fq '239/239 dot points have a generator behind them; 0 do not' suites.log
+          grep -Fq '✔ INDIA SUITE PASSED — 1724/1724 checks' suites.log
+          grep -Fq '5256 questions from 438 declared (generator, difficulty) pairs × 12 draws — 5256 marked correct by their own marker, 5256 well formed' suites.log
+          grep -Fq '258/258 dot points have a generator behind them; 0 do not' suites.log
           grep -Fq 'PASS — Grade 9 Ganita Manjari: 1280 seeded forms (1000 numeric handwriting-ready, 280 conceptual).' suites.log
           grep -Fq 'PASS — 8/8 chapters, 200/200 uploaded pages, 42/42 formal exercise sections and 293/293 formal exercise prompts represented and verified.' suites.log
           if grep -Fq 'not measured:' suites.log; then
@@ -51,6 +51,7 @@ jobs:
         run: |
           set -euo pipefail
           node client/test/india-production-meta-check.mjs
+          node client/test/india-class7-current-source-check.mjs
           node client/test/india-class10-current-source-check.mjs
           node client/test/india-class10-production-gap-check.mjs
           node client/test/ncert-class10-full-book-check.mjs
