@@ -2,22 +2,143 @@
 // Pri Learning · Maths expression engine
 // Tokeniser + precedence-climbing parser + evaluator for student maths input.
 // Understands implicit multiplication (2x, 3(x+1), 2π), unicode maths symbols,
-// functions (sin, cos, tan, sqrt, ln, log, …) and constants (π, e).
+// functions (sin, cos, tan, sec, cosec, cot, sqrt, ln, log, …), factorials (n!),
+// counting (nCr / C(n,r) / ⁿCᵣ / nPr), bounded sums (Σ_{k=1}^{n} k²) and the
+// constants π and e.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const FUNCTIONS = {
   sin: Math.sin, cos: Math.cos, tan: Math.tan,
   asin: Math.asin, acos: Math.acos, atan: Math.atan,
   arcsin: Math.asin, arccos: Math.acos, arctan: Math.atan,
+  // NCERT names the reciprocal ratios in Class 10–11; cosec is the Indian
+  // spelling, csc the one an American calculator prints.
+  sec: x => 1 / Math.cos(x), cosec: x => 1 / Math.sin(x), csc: x => 1 / Math.sin(x), cot: x => 1 / Math.tan(x),
   sqrt: Math.sqrt, cbrt: Math.cbrt, abs: Math.abs,
   ln: Math.log, log: Math.log10, log10: Math.log10, log2: Math.log2,
   exp: Math.exp, floor: Math.floor, ceil: Math.ceil
 };
 
+// ── Factorials and counting ──────────────────────────────────────────────────
+// n! is Γ(n + 1). Using the gamma function rather than an integer product keeps
+// n!/(n−2)! and n(n−1) comparable by the same sampling that decides every other
+// equivalence: the samples are not integers, and a product that only exists at
+// integers would leave nothing to compare. Poles at the negative integers come
+// back NaN and are skipped like any other invalid sample.
+const LANCZOS = [
+  676.5203681218851, -1259.1392167224028, 771.32342877765313, -176.61502916214059,
+  12.507343278686905, -0.13857109526572012, 9.9843695780195716e-6, 1.5056327351493116e-7
+];
+function gamma(z) {
+  if (!Number.isFinite(z)) return NaN;
+  if (z < 0.5) {
+    const s = Math.sin(Math.PI * z);
+    if (Math.abs(s) < 1e-300) return NaN;            // a pole
+    return Math.PI / (s * gamma(1 - z));
+  }
+  z -= 1;
+  let x = 0.99999999999980993;
+  for (let i = 0; i < LANCZOS.length; i++) x += LANCZOS[i] / (z + i + 1);
+  const t = z + LANCZOS.length - 0.5;
+  return Math.sqrt(2 * Math.PI) * Math.pow(t, z + 0.5) * Math.exp(-t) * x;
+}
+export function factorial(n) {
+  if (!Number.isFinite(n)) return NaN;
+  if (Number.isInteger(n)) {
+    if (n < 0) return NaN;
+    if (n > 170) return Infinity;
+    let out = 1;
+    for (let k = 2; k <= n; k++) out *= k;
+    return out;
+  }
+  return gamma(n + 1);
+}
+const MULTI_FUNCTIONS = {
+  ncr: (n, r) => {
+    if (Number.isInteger(n) && Number.isInteger(r)) {
+      if (r < 0 || r > n || n < 0) return 0;
+      let out = 1;
+      for (let k = 1; k <= Math.min(r, n - r); k++) out = out * (n - k + 1) / k;
+      return Math.round(out);
+    }
+    return factorial(n) / (factorial(r) * factorial(n - r));
+  },
+  npr: (n, r) => {
+    if (Number.isInteger(n) && Number.isInteger(r)) {
+      if (r < 0 || r > n || n < 0) return 0;
+      let out = 1;
+      for (let k = 0; k < r; k++) out *= (n - k);
+      return out;
+    }
+    return factorial(n) / factorial(n - r);
+  }
+};
+const MULTI_NAMES = ['ncr', 'npr', 'sum'];
+const SUM_LIMIT = 10000;
+
 const CONSTANTS = { pi: Math.PI, e: Math.E };
 
-const FUNC_NAMES = Object.keys(FUNCTIONS).sort((a, b) => b.length - a.length);
+const FUNC_NAMES = [...Object.keys(FUNCTIONS), ...MULTI_NAMES].sort((a, b) => b.length - a.length);
 const CONST_NAMES = ['pi', 'theta', 'alpha', 'beta'];
+
+const SUPER = { '⁰': '0', '¹': '1', '²': '2', '³': '3', '⁴': '4', '⁵': '5', '⁶': '6', '⁷': '7', '⁸': '8', '⁹': '9' };
+const SUB = { '₀': '0', '₁': '1', '₂': '2', '₃': '3', '₄': '4', '₅': '5', '₆': '6', '₇': '7', '₈': '8', '₉': '9' };
+
+/**
+ * Commas separate the arguments of nCr(n, r), nPr(n, r) and sum(term, k, a, b),
+ * and nothing else — everywhere else a comma is a thousands separator that
+ * normalize() removes. Inside those calls it becomes ';' first, so the two
+ * meanings never meet.
+ */
+function protectArguments(s) {
+  const re = /\b(ncr|npr|sum)\s*\(/gi;
+  let out = '';
+  let cursor = 0;
+  let m;
+  while ((m = re.exec(s))) {
+    const open = m.index + m[0].length - 1;
+    let depth = 0;
+    let close = -1;
+    for (let i = open; i < s.length; i++) {
+      if (s[i] === '(') depth++;
+      else if (s[i] === ')') { depth--; if (depth === 0) { close = i; break; } }
+    }
+    if (close === -1) break;
+    let inner = '';
+    depth = 0;
+    for (let i = open + 1; i < close; i++) {
+      const c = s[i];
+      if (c === '(') depth++;
+      else if (c === ')') depth--;
+      inner += (c === ',' && depth === 0) ? ';' : c;
+    }
+    out += s.slice(cursor, open + 1) + inner + ')';
+    cursor = close + 1;
+    re.lastIndex = cursor;
+  }
+  return out + s.slice(cursor);
+}
+
+/** The counting and summation notations NCERT students actually write. */
+function rewriteCounting(s) {
+  // ⁿCᵣ / ⁵C₂ with unicode super/subscripts
+  s = s.replace(/([⁰¹²³⁴⁵⁶⁷⁸⁹]+)\s*([CP])\s*([₀₁₂₃₄₅₆₇₈₉]+)/g, (_, n, f, r) =>
+    `${f === 'C' ? 'ncr' : 'npr'}(${[...n].map(ch => SUPER[ch]).join('')};${[...r].map(ch => SUB[ch]).join('')})`);
+  // \binom{n}{r}
+  s = s.replace(/\\binom\s*\{([^{}]*)\}\s*\{([^{}]*)\}/g, 'ncr($1;$2)');
+  // nCr(n, r) / C(n, r) / nPr(n, r) / P(n, r) as function calls. The bare
+  // capital letters are only counting when they take exactly two arguments —
+  // P(x) stays a product of P and x, as it always was.
+  s = s.replace(/\bnCr\s*\(/g, 'ncr(').replace(/\bnPr\s*\(/g, 'npr(');
+  s = s.replace(/(^|[^a-zA-Z])C\s*\(\s*([^(),]+?)\s*,\s*([^(),]+?)\s*\)/g, '$1ncr($2;$3)');
+  s = s.replace(/(^|[^a-zA-Z])P\s*\(\s*([^(),]+?)\s*,\s*([^(),]+?)\s*\)/g, '$1npr($2;$3)');
+  // 5C2 / 5P2 / 10C3 written inline with capital letters
+  s = s.replace(/(^|[^a-zA-Z0-9.])(\d+)\s*C\s*(\d+)(?![a-zA-Z0-9.])/g, '$1ncr($2;$3)');
+  s = s.replace(/(^|[^a-zA-Z0-9.])(\d+)\s*P\s*(\d+)(?![a-zA-Z0-9.])/g, '$1npr($2;$3)');
+  // Σ_{k=1}^{n} term  →  sum(term; k; 1; n)
+  s = s.replace(/[Σ∑]\s*_?\s*[{(]?\s*([a-zA-Z])\s*=\s*([^{}()^]+?)\s*[})]?\s*\^\s*[{(]?\s*([^{}()]+?)\s*[})]?\s*(.+)$/, 'sum($4;$1;$2;$3)');
+  return protectArguments(s);
+}
 
 /** Normalise unicode / friendly maths notation into parseable ASCII. */
 export function normalize(raw) {
@@ -29,8 +150,9 @@ export function normalize(raw) {
     .replace(/[［【\[]/g, '(').replace(/[］】\]]/g, ')')
     .replace(/π/g, 'pi')
     .replace(/θ/g, 'theta')
-    .replace(/√/g, 'sqrt')
-    .replace(/²/g, '^2').replace(/³/g, '^3')
+    .replace(/√/g, 'sqrt');
+  s = rewriteCounting(s);
+  s = s.replace(/²/g, '^2').replace(/³/g, '^3')
     .replace(/⁻¹/g, '^(-1)')
     .replace(/,/g, '')                             // thousands separators (points use parse pair first)
     .replace(/\$/g, '')
@@ -95,7 +217,8 @@ function tokenize(input) {
       continue;
     }
     if (c === '%') { tokens.push({ t: 'pct' }); i++; continue; }
-    if (c === '!') { throw new Error('Factorials not supported here'); }
+    if (c === '!') { tokens.push({ t: 'fact' }); i++; continue; }
+    if (c === ';') { tokens.push({ t: 'sep' }); i++; continue; }
     throw new Error(`Unexpected character "${c}"`);
   }
   return insertImplicitMult(tokens);
@@ -107,7 +230,7 @@ function insertImplicitMult(tokens) {
     const cur = tokens[k];
     if (out.length) {
       const prev = out[out.length - 1];
-      const prevEnds = prev.t === 'num' || prev.t === 'var' || prev.t === 'const' || prev.t === 'rp' || prev.t === 'pct';
+      const prevEnds = prev.t === 'num' || prev.t === 'var' || prev.t === 'const' || prev.t === 'rp' || prev.t === 'pct' || prev.t === 'fact';
       const curStarts = cur.t === 'num' || cur.t === 'var' || cur.t === 'const' || cur.t === 'lp' || cur.t === 'fn';
       if (prevEnds && curStarts) out.push({ t: 'op', v: '*', implicit: true });
     }
@@ -156,7 +279,12 @@ class Parser {
 
   parsePostfix() {
     let node = this.parseAtom();
-    while (this.peek() && this.peek().t === 'pct') { this.next(); node = { t: 'bin', op: '/', l: node, r: { t: 'num', v: 100 } }; }
+    while (this.peek() && (this.peek().t === 'pct' || this.peek().t === 'fact')) {
+      const tok = this.next();
+      node = tok.t === 'pct'
+        ? { t: 'bin', op: '/', l: node, r: { t: 'num', v: 100 } }
+        : { t: 'fact', v: node };
+    }
     return node;
   }
 
@@ -176,6 +304,13 @@ class Parser {
       if (this.peek() && this.peek().t === 'lp') {
         this.next();
         arg = this.parseExpression(0);
+        // nCr(n; r) / sum(term; k; a; b) — commas became ';' in normalize()
+        if (this.peek() && this.peek().t === 'sep') {
+          const args = [arg];
+          while (this.peek() && this.peek().t === 'sep') { this.next(); args.push(this.parseExpression(0)); }
+          this.expect('rp');
+          return this.maybePower({ t: 'call', fn: tok.v, arg, args });
+        }
         this.expect('rp');
       } else if (this.peek() && this.peek().t === 'op' && this.peek().v === '*' && this.peek().implicit) {
         // "sqrt2" tokenised as fn * num — consume the implicit * then a tight atom
@@ -228,7 +363,26 @@ export function evaluate(ast, env = {}) {
       return NaN;
     case 'group': return evaluate(ast.v, env);
     case 'neg': return -evaluate(ast.v, env);
+    case 'fact': return factorial(evaluate(ast.v, env));
     case 'call': {
+      if (Array.isArray(ast.args)) {
+        if (ast.fn === 'sum') {
+          // sum(term; k; a; b): the bound variable shadows anything in env
+          if (ast.args.length !== 4) return NaN;
+          const bound = ast.args[1];
+          const name = bound && (bound.t === 'var' || bound.t === 'const') ? bound.v : null;
+          if (!name) return NaN;
+          const lo = evaluate(ast.args[2], env), hi = evaluate(ast.args[3], env);
+          if (!Number.isInteger(lo) || !Number.isInteger(hi) || hi - lo > SUM_LIMIT) return NaN;
+          let total = 0;
+          for (let k = lo; k <= hi; k++) total += evaluate(ast.args[0], { ...env, [name]: k });
+          return total;
+        }
+        const f = MULTI_FUNCTIONS[ast.fn];
+        if (!f || ast.args.length !== f.length) return NaN;
+        return f(...ast.args.map(a => evaluate(a, env)));
+      }
+      if (MULTI_FUNCTIONS[ast.fn] || ast.fn === 'sum') return NaN;
       const a = evaluate(ast.arg, env);
       const f = FUNCTIONS[ast.fn];
       if (!f) return NaN;
@@ -259,6 +413,20 @@ export function variablesOf(ast, acc = new Set()) {
   if (!ast || typeof ast !== 'object') return acc;
   if (ast.t === 'var') acc.add(ast.v);
   if (ast.t === 'const' && !(ast.v in CONSTANTS)) acc.add(ast.v);
+  if (ast.t === 'call' && Array.isArray(ast.args)) {
+    if (ast.fn === 'sum' && ast.args.length === 4) {
+      // the index of a summation is bound, not free
+      const bound = ast.args[1];
+      const name = bound && (bound.t === 'var' || bound.t === 'const') ? bound.v : null;
+      const inner = variablesOf(ast.args[0], new Set());
+      for (const v of inner) if (v !== name) acc.add(v);
+      variablesOf(ast.args[2], acc);
+      variablesOf(ast.args[3], acc);
+      return acc;
+    }
+    for (const a of ast.args) variablesOf(a, acc);
+    return acc;
+  }
   for (const key of ['l', 'r', 'v', 'arg']) {
     if (ast[key] && typeof ast[key] === 'object') variablesOf(ast[key], acc);
   }
