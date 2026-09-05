@@ -68,7 +68,11 @@ function validateMetadata(file, expectedHead, expectedBase, expectedBranch) {
 }
 
 function gitNameOnly(repoDir, args) {
-  const raw = execFileSync('git', ['-C', repoDir, ...args, '-z'], { encoding: 'buffer' });
+  const separator = args.indexOf('--');
+  const commandArgs = separator === -1
+    ? [...args, '-z']
+    : [...args.slice(0, separator), '-z', ...args.slice(separator)];
+  const raw = execFileSync('git', ['-C', repoDir, ...commandArgs], { encoding: 'buffer' });
   return raw.toString('utf8').split('\0').filter(Boolean);
 }
 
