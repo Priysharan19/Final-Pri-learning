@@ -138,6 +138,22 @@ export default function App() {
     mainRef.current?.focus({ preventScroll: true });
   };
 
+  // A link into a section of a page — Login's "Sign in to your Pri cloud
+  // account" lands on /settings#cloud-account-title — only scrolls by itself
+  // on a full document load. After a client-side navigation the section is
+  // rendered a moment later, so it is looked up until it is there.
+  useEffect(() => {
+    if (!loc.hash) return;
+    const id = decodeURIComponent(loc.hash.slice(1));
+    let tries = 0;
+    const t = setInterval(() => {
+      const el = document.getElementById(id);
+      if (el) { el.scrollIntoView({ block: 'start' }); clearInterval(t); }
+      else if (++tries > 20) clearInterval(t);
+    }, 80);
+    return () => clearInterval(t);
+  }, [loc.pathname, loc.hash]);
+
   const toast = useCallback((content, ms = 3800, kind = '') => {
     const id = Math.random().toString(36).slice(2);
     setToasts(t => [...t, { id, content, kind }]);

@@ -1,16 +1,31 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Pri Learning · Landing + profile entry
-// There is no sign-in service behind this screen, and nothing here pretends
-// otherwise. A profile is a record in this iPad's own storage — created here,
-// unlocked here, wiped here. No provider is contacted, no address is verified,
-// no password can be reset by anyone but the person holding the device.
+// A profile is a record in this device's own storage — created here, unlocked
+// here, wiped here. Nothing on this screen contacts a provider, verifies an
+// address or resets a password. The optional Pri cloud account lives in
+// Settings: this screen only offers the way there, and never passes a local
+// profile off as a cloud sign-in.
 // ─────────────────────────────────────────────────────────────────────────────
 import React, { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
 import { useApp, Logo } from '../App.jsx';
 
 const AVATARS = ['🚀', '🦊', '🐨', '🦉', '🌟', '🐯', '🍀', '🎧', '🦄', '⚡', '🌊', '🧠'];
-const INDIA_TRACKS = [['cbse', 'CBSE / NCERT'], ['jee-main', 'JEE Main'], ['jee-advanced', 'JEE Advanced'], ['olympiad', 'Olympiad']];
+// The first thing a student chooses: what they are studying. Classes 7–12 are
+// the CBSE / NCERT track; JEE Main, JEE Advanced and olympiad are tracks of
+// their own with a class beneath them.
+const STUDY = [
+  ...[7, 8, 9, 10, 11, 12].map(y => ({ key: String(y), label: `Class ${y}`, year: y, track: 'cbse' })),
+  { key: 'jee-main', label: 'JEE Main', year: 12, track: 'jee-main' },
+  { key: 'jee-advanced', label: 'JEE Advanced', year: 12, track: 'jee-advanced' },
+  { key: 'olympiad', label: 'Olympiad (IOQM · RMO · INMO)', year: 10, track: 'olympiad' }
+];
+const STUDY_DEFAULT = STUDY.find(o => o.key === '10');
+// The Australian syllabuses stay selectable, folded away behind one link.
+const AU_COURSES = [['nsw', 'NSW · HSC'], ['vic', 'VIC · VCE'], ['qld', 'QLD · QCE'], ['wa', 'WA · WACE'], ['sa', 'SA · SACE'], ['ib', 'IB']];
+// Where the cloud account UI lives. The panel is Settings' own; this screen only links to it.
+export const CLOUD_ACCOUNT_ROUTE = '/settings#cloud-account-title';
 const GLYPHS = ['∑', '∫', '∬', 'π', 'θ', 'Ω', 'Δ', 'Γ', 'Φ', 'λ', 'ε', 'δ', 'η', 'ρ', 'ξ', 'ζ', 'χ', 'ψ', '√', '∞', '≈', '≠', '≤', '≥', '±', '÷', '∈', '∉', '∀', '∃', '⊂', '∪', '∩', 'ℵ', 'ℝ', 'ℤ', 'ℚ', 'ℂ', 'ℕ', '∂', '∇', '↦', '⇌', '∘', 'ϕ', '⊕', '≡', '⟨', '⟩', '4', '2', 'e', 'i', 'x', 'dx'];
 
 function hash01(str) {
@@ -154,10 +169,13 @@ function fmtWait(ms) {
 
 export default function Login() {
   const { setUser, refreshDue } = useApp();
+  const nav = useNavigate();
   const [profiles, setProfiles] = useState(null);
   const [stage, setStage] = useState('hero');   // hero | pick | method | create
   const [withEmail, setWithEmail] = useState(true);
-  const [form, setForm] = useState({ name: '', email: '', password: '', password2: '', year: 12, avatar: '🚀', role: 'student', course: 'nsw', pathway: 'advanced', indiaTrack: 'cbse', protect: false });
+  const [form, setForm] = useState({ name: '', email: '', password: '', password2: '', study: STUDY_DEFAULT.key, year: STUDY_DEFAULT.year, avatar: '🚀', role: 'student', course: 'in', pathway: 'advanced', indiaTrack: STUDY_DEFAULT.track, protect: false });
+  const [australia, setAustralia] = useState(false);     // the secondary, collapsed Australian option
+  const [cloudIntent, setCloudIntent] = useState(false); // came here to sign in to a Pri cloud account
   const [unlockId, setUnlockId] = useState(null);   // profile awaiting its password
   const [unlockPw, setUnlockPw] = useState('');
   const [lock, setLock] = useState(null);           // { id, until } while a profile is shut out
@@ -191,6 +209,10 @@ export default function Login() {
     setBusy(true); setError('');
     try {
       const r = await api.post(path, body);
+      // Somebody who came for the cloud account is taken straight to it. The
+      // panel itself lives in Settings and is the only cloud sign-in there is —
+      // a local profile is never passed off as one.
+      if (cloudIntent) nav(CLOUD_ACCOUNT_ROUTE);
       setUser(r.user); refreshDue();
     } catch (e) {
       setError(e.message);
@@ -206,6 +228,13 @@ export default function Login() {
 
   const enter = () => { localStorage.setItem('pri-seen-hero', '1'); setStage(profiles?.length ? 'pick' : 'method'); };
 
+  /** The way to the cloud account: open (or make) the device profile it will sync, then land in Settings. */
+  const cloudSignIn = () => {
+    localStorage.setItem('pri-seen-hero', '1');
+    setCloudIntent(true); setError('');
+    setStage(profiles?.length ? 'pick' : 'method');
+  };
+
   const pickProfile = (p) => {
     setError('');
     if (p.hasPassword) { setUnlockId(unlockId === p.id ? null : p.id); setUnlockPw(''); }
@@ -217,6 +246,17 @@ export default function Login() {
     setForm(f => ({ ...f, password: '', password2: '', protect: false }));
     setStage('create');
   };
+
+  /** What the student is studying: a class on the CBSE / NCERT track, or a JEE / olympiad track with its own class. */
+  const chooseStudy = (key) => {
+    const opt = STUDY.find(o => o.key === key) || STUDY_DEFAULT;
+    setForm(f => ({
+      ...f, study: opt.key, course: 'in', indiaTrack: opt.track,
+      year: opt.track === 'cbse' ? opt.year : opt.track === 'olympiad' ? f.year : (f.year >= 11 ? f.year : opt.year)
+    }));
+  };
+  const openAustralia = () => { setAustralia(true); setForm(f => ({ ...f, course: 'nsw', indiaTrack: 'cbse' })); };
+  const closeAustralia = () => { setAustralia(false); chooseStudy(form.study); };
 
   const create = () => {
     if (form.protect) {
@@ -231,6 +271,18 @@ export default function Login() {
     });
   };
 
+  const cloudNote = cloudIntent && (
+    <p className="muted cloud-intent" role="status" style={{ fontSize: 12.5, marginBottom: 12 }}>
+      <b>Pri cloud account</b> — first open or create the profile on this device that the account will sync.
+      You’ll land in Account settings to sign in.
+    </p>
+  );
+  const cloudLink = !cloudIntent && (
+    <div style={{ textAlign: 'center', marginTop: 10 }}>
+      <button className="linklike" disabled={busy} onClick={cloudSignIn}>Sign in to your Pri cloud account</button>
+    </div>
+  );
+
   /* ── hero ── */
   if (stage === 'hero') {
     return (
@@ -238,16 +290,19 @@ export default function Login() {
         <MathField />
         <div className="auth-col fade-in">
           <Logo large />
-          <div className="hero-kicker">NSW · HSC · CBSE · JEE · OLYMPIAD · VCE · QCE · WACE · SACE · IB</div>
-          <h1 className="hero-title">Write it by hand.<br />Get it marked like the <span className="gold">HSC</span>.</h1>
-          <p className="hero-sub">344,798 measured distinct questions across all 252 syllabus dot points · your working
-            marked line by line, with method marks · entirely on this iPad, offline.</p>
+          <div className="hero-kicker">CBSE · NCERT · JEE MAIN · JEE ADVANCED · OLYMPIAD</div>
+          <h1 className="hero-title">Write it by hand.<br />Get every step <span className="gold">marked</span>.</h1>
+          <p className="hero-sub">Maths for NCERT Classes 7–12, JEE Main &amp; Advanced and olympiad — questions generated on your
+            device, your working marked line by line, with worked solutions. Works offline.</p>
           <div className="row" style={{ marginTop: 34 }}>
             <button className="btn btn-primary btn-lg btn-glow" onClick={enter}>Get Started</button>
           </div>
           <p className="muted" style={{ marginTop: 26, textAlign: 'center' }}>
-            100% local — private accounts on this device, no uploads, works fully offline.
+            Offline-first and private: profiles, progress and handwriting stay on this device. A Pri cloud account is optional. No ads.
           </p>
+          <div style={{ textAlign: 'center', marginTop: 10 }}>
+            <button className="linklike" onClick={cloudSignIn}>Sign in to your Pri cloud account</button>
+          </div>
         </div>
       </div>
     );
@@ -267,12 +322,12 @@ export default function Login() {
             style={{ display: 'block', background: 'none', border: 'none', padding: 0, margin: 0, font: 'inherit', color: 'inherit', cursor: 'pointer' }}>
             <Logo large />
           </button>
-          <div className="hero-kicker" style={{ marginTop: 14 }}>Years 7–12 · HSC ready</div>
+          <div className="hero-kicker" style={{ marginTop: 14 }}>Classes 7–12 · JEE · Olympiad</div>
           <div className="auth-points">
-            <div className="auth-point"><span className="auth-tick">✓</span>1,300,000+ distinct questions across every syllabus dot point</div>
+            <div className="auth-point"><span className="auth-tick">✓</span>Generated questions across NCERT Classes 7–12, JEE Main &amp; Advanced and olympiad topics</div>
             <div className="auth-point"><span className="auth-tick">✓</span>Handwritten working marked line by line</div>
             <div className="auth-point"><span className="auth-tick">✓</span>An engine that learns exactly how you write</div>
-            <div className="auth-point"><span className="auth-tick">✓</span>Private by design — everything stays on this iPad</div>
+            <div className="auth-point"><span className="auth-tick">✓</span>Offline-first — your work stays on this device unless you choose cloud sync</div>
           </div>
         </div>
 
@@ -280,12 +335,13 @@ export default function Login() {
           {/* Each stage draws its own title as an <h2> sized for its card, so the
               page's one heading is spoken rather than drawn. */}
           <h1 className="sr-only">
-            {stage === 'pick' ? 'Choose a profile' : stage === 'method' ? 'Add a profile to this iPad' : 'Create a profile'}
+            {stage === 'pick' ? 'Choose a profile' : stage === 'method' ? 'Add a profile to this device' : 'Create a profile'}
           </h1>
           {stage === 'pick' && (
             <div className="card auth-card slide-up">
               <h2 style={{ marginBottom: 4 }}>Who’s practising?</h2>
               <p className="sub" style={{ marginBottom: 16 }}>Pick your profile to continue.</p>
+              {cloudNote}
               {error && <div className="error-box" style={{ marginBottom: 12 }}>{error}</div>}
               <div className="acct-list">
                 {(profiles || []).map(p => {
@@ -297,7 +353,7 @@ export default function Login() {
                         <span className="acct-main">
                           <span className="acct-name">{p.name}</span>
                           <span className="acct-sub">
-                            {p.role === 'teacher' ? 'Teacher' : `Year ${p.year}`}
+                            {p.role === 'teacher' ? 'Teacher' : `${p.course === 'in' ? 'Class' : 'Year'} ${p.year}`}
                             {p.email ? ` · ${p.email}` : ''}{p.isDemo ? ' · demo' : ''}
                           </span>
                         </span>
@@ -327,9 +383,10 @@ export default function Login() {
               </button>
               <div style={{ textAlign: 'center', marginTop: 10 }}>
                 <button className="linklike" disabled={busy} onClick={() => go('/profiles/demo', {})}>
-                  Try the demo — six weeks of progress, ready to explore
+                  Try the demo — a Class 10 student with six weeks of progress, ready to explore
                 </button>
               </div>
+              {cloudLink}
             </div>
           )}
 
@@ -337,12 +394,13 @@ export default function Login() {
             <div className="card auth-card slide-up">
               <div className="row" style={{ gap: 10, marginBottom: 6 }}>
                 <span className="prov-badge lg">{Marks.device}</span>
-                <h2 style={{ margin: 0 }}>A private profile on this iPad</h2>
+                <h2 style={{ margin: 0 }}>A private profile on this device</h2>
               </div>
               <p className="sub" style={{ marginBottom: 18 }}>
-                No account is registered and no service is signed in to. Choose how this profile
-                should be labelled — everything after that works the same either way.
+                A profile is a record on this device — no account is registered by making one. Choose how it
+                should be labelled; everything after that works the same either way.
               </p>
+              {cloudNote}
               {error && <div className="error-box" style={{ marginBottom: 12 }}>{error}</div>}
               <button className="sso-btn sso-email" disabled={busy} onClick={() => startCreate(true)}>
                 <span>Continue with email</span>
@@ -352,8 +410,9 @@ export default function Login() {
                 <span>Continue without an email</span>
               </button>
               <p className="auth-note">
-                A profile lives on <b>this iPad</b> and nowhere else. An address, if you give one, only
-                tells profiles apart here — it is never verified, never used to sign in, and never sent.
+                A profile lives on <b>this device</b>. An address, if you give one, only tells profiles apart
+                here — it is never verified and never sent anywhere. Syncing to a Pri cloud account is a
+                separate, optional step in Settings.
               </p>
               {profiles?.length > 0 && (
                 <button className="btn btn-quiet btn-sm" style={{ width: '100%', marginTop: 6 }} onClick={() => { setError(''); setStage('pick'); }}>← Back to profiles</button>
@@ -361,10 +420,11 @@ export default function Login() {
               {!profiles?.length && (
                 <div style={{ textAlign: 'center', marginTop: 12 }}>
                   <button className="linklike" disabled={busy} onClick={() => go('/profiles/demo', {})}>
-                    Or try the demo first — six weeks of progress, ready to explore
+                    Or try the demo first — a Class 10 student with six weeks of progress
                   </button>
                 </div>
               )}
+              {cloudLink}
             </div>
           )}
 
@@ -372,12 +432,13 @@ export default function Login() {
             <div className="card auth-card slide-up">
               <div className="row" style={{ gap: 10, marginBottom: 6 }}>
                 <span className="prov-badge lg">{Marks.device}</span>
-                <h2 style={{ margin: 0 }}>A private profile on this iPad</h2>
+                <h2 style={{ margin: 0 }}>A private profile on this device</h2>
               </div>
               <p className="sub" style={{ marginBottom: 14 }}>
                 Your name, your work and the handwriting model that learns your hand live in this device’s
                 storage — and all of it runs with the Wi-Fi off.
               </p>
+              {cloudNote}
               {error && <div className="error-box" style={{ marginBottom: 12 }}>{error}</div>}
 
               <div className="field">
@@ -403,53 +464,66 @@ export default function Login() {
                   <button className={`pill-opt ${form.role === 'teacher' ? 'on' : ''}`} onClick={() => setForm(f => ({ ...f, role: 'teacher' }))}>Teacher</button>
                 </div>
               </div>
-              {form.role === 'student' && (
-                <div className="grid cols-2" style={{ gap: 12 }}>
-                  <div className="field">
-                    <label className="label" htmlFor="signup-year">{form.course === 'in' ? 'School class' : 'School year'}</label>
-                    <select className="input" id="signup-year" value={form.year} onChange={e => setForm(f => ({ ...f, year: Number(e.target.value) }))}>
-                      {[7, 8, 9, 10, 11, 12].map(y => <option key={y} value={y}>{form.course === 'in' ? 'Class' : 'Year'} {y}</option>)}
-                    </select>
-                  </div>
-                  <div className="field">
-                    <label className="label" htmlFor="signup-course">Syllabus</label>
-                    <select className="input" id="signup-course" value={form.course} onChange={e => setForm(f => ({ ...f, course: e.target.value }))}>
-                      <option value="nsw">NSW · HSC</option>
-                      <option value="vic">VIC · VCE</option>
-                      <option value="qld">QLD · QCE</option>
-                      <option value="wa">WA · WACE</option>
-                      <option value="sa">SA · SACE</option>
-                      <option value="ib">IB</option>
-                      <option value="in">India · CBSE / JEE / Olympiad</option>
-                    </select>
-                  </div>
+
+              {/* The first thing a student chooses is what they are studying:
+                  a class on the CBSE / NCERT track, or JEE / olympiad. The
+                  Australian syllabuses are a step away, folded up. */}
+              {form.role === 'student' && !australia && (
+                <div className="field">
+                  <label className="label" htmlFor="signup-track">I’m studying</label>
+                  <select className="input" id="signup-track" value={form.study} onChange={e => chooseStudy(e.target.value)}>
+                    {STUDY.map(o => <option key={o.key} value={o.key}>{o.label}</option>)}
+                  </select>
+                  {form.indiaTrack !== 'cbse' && (
+                    <div style={{ marginTop: 10 }}>
+                      <label className="label" htmlFor="signup-year">Class</label>
+                      <select className="input" id="signup-year" value={form.year} onChange={e => setForm(f => ({ ...f, year: Number(e.target.value) }))}>
+                        {(form.indiaTrack === 'olympiad' ? [7, 8, 9, 10, 11, 12] : [11, 12]).map(y => <option key={y} value={y}>Class {y}</option>)}
+                      </select>
+                    </div>
+                  )}
                 </div>
               )}
-              {form.role === 'student' && form.course === 'nsw' && form.year >= 11 && (
-                <div className="field">
-                  <div className="label" id="signup-pathway">HSC pathway</div>
-                  <div className="pathway-row" role="group" aria-labelledby="signup-pathway">
-                    {[['standard', 'Standard'], ['advanced', 'Advanced'], ['ext1', 'Extension 1'], ['ext2', 'Extension 2']]
-                      .filter(([k]) => k !== 'ext2' || form.year === 12)
-                      .map(([k, name]) => (
-                        <button key={k} type="button" className={`pathway-pick ${form.pathway === k ? 'on' : ''}`}
-                          onClick={() => setForm(f => ({ ...f, pathway: k }))}>
-                          <b>{name}</b>
-                        </button>
-                      ))}
-                  </div>
+              {form.role === 'student' && !australia && (
+                <div className="field" style={{ marginTop: -4 }}>
+                  <button type="button" className="linklike" onClick={openAustralia}>Studying in Australia? Use NSW HSC or another Australian syllabus</button>
                 </div>
               )}
-              {form.role === 'student' && form.course === 'in' && (
-                <div className="field">
-                  <div className="label" id="signup-india-track">India maths track</div>
-                  <div className="pathway-row" role="group" aria-labelledby="signup-india-track">
-                    {INDIA_TRACKS.filter(([k]) => form.year >= 11 || !k.startsWith('jee-')).map(([k, name]) => (
-                      <button key={k} type="button" className={`pathway-pick ${form.indiaTrack === k ? 'on' : ''}`}
-                        onClick={() => setForm(f => ({ ...f, indiaTrack: k }))}><b>{name}</b></button>
-                    ))}
+              {form.role === 'student' && australia && (
+                <>
+                  <div className="grid cols-2" style={{ gap: 12 }}>
+                    <div className="field">
+                      <label className="label" htmlFor="signup-year">School year</label>
+                      <select className="input" id="signup-year" value={form.year} onChange={e => setForm(f => ({ ...f, year: Number(e.target.value) }))}>
+                        {[7, 8, 9, 10, 11, 12].map(y => <option key={y} value={y}>Year {y}</option>)}
+                      </select>
+                    </div>
+                    <div className="field">
+                      <label className="label" htmlFor="signup-course">Syllabus</label>
+                      <select className="input" id="signup-course" value={form.course} onChange={e => setForm(f => ({ ...f, course: e.target.value }))}>
+                        {AU_COURSES.map(([k, name]) => <option key={k} value={k}>{name}</option>)}
+                      </select>
+                    </div>
                   </div>
-                </div>
+                  {form.course === 'nsw' && form.year >= 11 && (
+                    <div className="field">
+                      <div className="label" id="signup-pathway">HSC pathway</div>
+                      <div className="pathway-row" role="group" aria-labelledby="signup-pathway">
+                        {[['standard', 'Standard'], ['advanced', 'Advanced'], ['ext1', 'Extension 1'], ['ext2', 'Extension 2']]
+                          .filter(([k]) => k !== 'ext2' || form.year === 12)
+                          .map(([k, name]) => (
+                            <button key={k} type="button" className={`pathway-pick ${form.pathway === k ? 'on' : ''}`}
+                              onClick={() => setForm(f => ({ ...f, pathway: k }))}>
+                              <b>{name}</b>
+                            </button>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+                  <div className="field" style={{ marginTop: -4 }}>
+                    <button type="button" className="linklike" onClick={closeAustralia}>← Back to Indian classes and tracks</button>
+                  </div>
+                </>
               )}
               <div className="field">
                 <div className="label" id="signup-avatar">Avatar</div>
@@ -489,14 +563,17 @@ export default function Login() {
 
               <p className="auth-note">
                 No verification email, no reset link, no one to ask: a profile is a record on
-                <b> this iPad</b> and nowhere else. A password keeps it to yourself — stored as a salted
-                hash in the device’s own storage, never uploaded, and only you can lift it.
+                <b> this device</b> and nowhere else. A password keeps it to yourself — stored as a salted
+                hash in the device’s own storage, never uploaded, and only you can lift it. Want your
+                progress on more than one device? Sign in to a Pri cloud account from Settings once the
+                profile exists.
               </p>
             </div>
           )}
 
           <p className="muted auth-foot">
-            100% local: profiles, progress and handwriting live in this device’s storage — nothing is uploaded, and it works fully offline.
+            Offline-first: profiles, progress and handwriting live in this device’s storage and work with no connection.
+            Nothing leaves the device unless you sign in to a Pri cloud account. No ads.
           </p>
         </div>
       </div>
