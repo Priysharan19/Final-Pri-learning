@@ -211,6 +211,23 @@ same('stats report the durable full-rescan requirement', (await outboxStats()).r
 const recoveryDisk = JSON.stringify(rawRows().device || []);
 ok('failed mutation payload never leaked during recovery', !recoveryDisk.includes('MUST NOT ENTER QUEUE') && !recoveryDisk.includes('PRIVATE'), recoveryDisk);
 
+// With no prior queue entries, the failed mutation itself is the oldest known
+// dirty event. Preserve that timestamp across recovery rather than starting the
+// full-rescan clock only when the later recovery mutation arrives.
+resetStorage();
+const emptyFailureAt = Date.now();
+failNextDevicePut = true;
+try {
+  await recordMutation('POST', '/tasks', { task: { id: 'empty-gap', title: 'PRIVATE EMPTY GAP' } });
+} catch { /* expected */ }
+const emptyRecoveredAt = Date.now();
+const emptyRecovered = await recordMutation('POST', '/tasks', { task: { id: 'after-empty-gap' } });
+same('empty-queue failure also recovers to full-rescan', emptyRecovered?.kind, 'full-rescan');
+ok('empty-queue recovery keeps the original failure time', emptyRecovered.firstAt >= emptyFailureAt && emptyRecovered.firstAt <= emptyRecoveredAt, JSON.stringify(emptyRecovered));
+same('empty-queue recovery persists exactly one marker', (await pendingMutations()).length, 1);
+const emptyDisk = JSON.stringify(rawRows().device || []);
+ok('empty-queue failure payload is absent from disk', !emptyDisk.includes('PRIVATE EMPTY GAP'), emptyDisk);
+
 console.log(`\nDurable sync outbox — ${pass}/${pass + fail} checks`);
 if (failures.length) {
   console.log('\nfailures:');
