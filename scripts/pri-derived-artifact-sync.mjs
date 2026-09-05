@@ -16,6 +16,12 @@ const roots = (IOS_RULE.patterns || []).map(pattern => {
   return pattern.slice(0, -2);
 });
 
+// Git's binary patch for the two mirrored web bundles can legitimately exceed
+// Node's ~1 MiB execFileSync default. Keep the capture finite and deliberately
+// bounded while allowing substantial headroom for normal production bundle
+// growth across both declared mirrors.
+const PATCH_MAX_BUFFER_BYTES = 32 * 1024 * 1024;
+
 function safePath(file) {
   if (typeof file !== 'string' || !file) return false;
   if (file.includes('\0') || file.includes('\\')) return false;
@@ -105,7 +111,7 @@ function packageDerived(repoDir, outDir, headRef, headSha, baseSha) {
   const patch = execFileSync(
     'git',
     ['-C', repo, 'diff', '--cached', '--binary', '--', ...roots],
-    { encoding: 'buffer' }
+    { encoding: 'buffer', maxBuffer: PATCH_MAX_BUFFER_BYTES }
   );
 
   writeFileSync(path.join(out, 'mirrors.patch'), patch);
