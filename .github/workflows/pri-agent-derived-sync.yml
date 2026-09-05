@@ -21,6 +21,8 @@ jobs:
     timeout-minutes: 15
     permissions:
       contents: read
+      issues: read
+      pull-requests: read
     outputs:
       has_patch: ${{ steps.package.outputs.has_patch }}
     steps:
@@ -44,17 +46,40 @@ jobs:
         with:
           node-version: '24'
 
-      - name: Verify autonomous ownership before executing candidate build
+      - name: Snapshot current mission ledger read-only
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const issues = await github.paginate(github.rest.issues.listForRepo, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              per_page: 100
+            });
+            fs.writeFileSync('/tmp/pri-derived-issues.json', JSON.stringify(issues.filter(issue => !issue.pull_request), null, 2));
+
+      - name: Verify live mission lease and ownership before candidate execution
         id: scope
         shell: bash
         env:
           HEAD_REF: ${{ github.event.pull_request.head.ref }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_BODY: ${{ github.event.pull_request.body }}
         run: |
           set -euo pipefail
           parsed="$(node trusted/scripts/pri-derived-artifact-sync.mjs branch "$HEAD_REF")"
           agent="$(printf '%s' "$parsed" | node -e "let s='';process.stdin.on('data',d=>s+=d);process.stdin.on('end',()=>process.stdout.write(JSON.parse(s).agent))")"
+          mission="$(printf '%s' "$parsed" | node -e "let s='';process.stdin.on('data',d=>s+=d);process.stdin.on('end',()=>process.stdout.write(JSON.parse(s).mission))")"
+          declared_agent="$(printf '%s\n' "$PR_BODY" | sed -n 's/^Pri-Agent:[[:space:]]*//p' | head -1)"
+          declared_mission="$(printf '%s\n' "$PR_BODY" | sed -n 's/^Pri-Mission-ID:[[:space:]]*//p' | head -1)"
+          declared_risk="$(printf '%s\n' "$PR_BODY" | sed -n 's/^Pri-Risk:[[:space:]]*//p' | head -1)"
+          test "$declared_agent" = "$agent"
+          test "$declared_mission" = "$mission"
+          [[ "$declared_risk" =~ ^R[1-4]$ ]]
+          node trusted/scripts/pri-mission-control.mjs validate-ledger \
+            /tmp/pri-derived-issues.json "$agent" "$mission" "$HEAD_REF" "$declared_risk"
 
           mapfile -t changed < <(git -C candidate diff --name-only "$BASE_SHA...$HEAD_SHA")
           if [[ "${#changed[@]}" -eq 0 ]]; then
@@ -150,6 +175,7 @@ jobs:
     timeout-minutes: 8
     permissions:
       contents: write
+      issues: read
       pull-requests: read
     steps:
       - name: Checkout trusted base policy
@@ -177,12 +203,26 @@ jobs:
           name: pri-derived-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
           path: derived-out
 
-      - name: Validate artifact metadata, path scope and fleet ownership
+      - name: Snapshot current mission ledger before write
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const issues = await github.paginate(github.rest.issues.listForRepo, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              per_page: 100
+            });
+            fs.writeFileSync('/tmp/pri-derived-issues-write.json', JSON.stringify(issues.filter(issue => !issue.pull_request), null, 2));
+
+      - name: Validate live lease, artifact metadata, path scope and fleet ownership
         shell: bash
         env:
           HEAD_REF: ${{ github.event.pull_request.head.ref }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_BODY: ${{ github.event.pull_request.body }}
         run: |
           set -euo pipefail
           node trusted/scripts/pri-derived-artifact-sync.mjs validate-metadata \
@@ -192,6 +232,16 @@ jobs:
 
           parsed="$(node trusted/scripts/pri-derived-artifact-sync.mjs branch "$HEAD_REF")"
           agent="$(printf '%s' "$parsed" | node -e "let s='';process.stdin.on('data',d=>s+=d);process.stdin.on('end',()=>process.stdout.write(JSON.parse(s).agent))")"
+          mission="$(printf '%s' "$parsed" | node -e "let s='';process.stdin.on('data',d=>s+=d);process.stdin.on('end',()=>process.stdout.write(JSON.parse(s).mission))")"
+          declared_agent="$(printf '%s\n' "$PR_BODY" | sed -n 's/^Pri-Agent:[[:space:]]*//p' | head -1)"
+          declared_mission="$(printf '%s\n' "$PR_BODY" | sed -n 's/^Pri-Mission-ID:[[:space:]]*//p' | head -1)"
+          declared_risk="$(printf '%s\n' "$PR_BODY" | sed -n 's/^Pri-Risk:[[:space:]]*//p' | head -1)"
+          test "$declared_agent" = "$agent"
+          test "$declared_mission" = "$mission"
+          [[ "$declared_risk" =~ ^R[1-4]$ ]]
+          node trusted/scripts/pri-mission-control.mjs validate-ledger \
+            /tmp/pri-derived-issues-write.json "$agent" "$mission" "$HEAD_REF" "$declared_risk"
+
           mapfile -t source_files < <(git -C candidate diff --name-only "$BASE_SHA...$HEAD_SHA")
           mapfile -t derived_files < <(node -e "for (const p of require('./derived-out/paths.json')) console.log(p)")
           node trusted/scripts/pri-fleet.mjs simulate-guard "$agent" "${source_files[@]}" "${derived_files[@]}"
