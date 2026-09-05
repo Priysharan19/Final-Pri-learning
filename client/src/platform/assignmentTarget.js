@@ -68,3 +68,32 @@ export function assignmentDotpointText(spec = {}) {
 export function trackCeiling(track, grade = 12) {
   return indiaTrack(track, grade).difficultyCeiling || 4;
 }
+
+/** "Class 10 · Quadratic Equations, Arithmetic Progressions · D2 · CBSE / NCERT" for a local task's targets. */
+export function describeTaskTargets(targets = []) {
+  const list = Array.isArray(targets) ? targets : [];
+  const chapters = [...new Map(list.map(t => [String(t?.chapterId || ''), indiaChapter(t?.chapterId)]).filter(([, ch]) => ch)).values()];
+  if (!chapters.length) return null;
+  const grades = [...new Set(chapters.map(ch => indiaChapterGrade(ch)).filter(Boolean))];
+  const parts = [];
+  if (grades.length === 1) parts.push(`Class ${grades[0]}`);
+  parts.push(chapters.map(ch => ch.name).join(', '));
+  const dp = Number(list[0]?.dotpoint);
+  if (chapters.length === 1 && list[0]?.dotpoint != null && Number.isInteger(dp) && chapters[0].dotpoints[dp]) parts.push(`dot point ${dp + 1}`);
+  const d = Number(list[0]?.difficulty);
+  if (Number.isFinite(d) && d >= 1 && d <= 4) parts.push(`D${d}`);
+  if (TRACK_LABEL[list[0]?.track]) parts.push(TRACK_LABEL[list[0].track]);
+  return parts.join(' · ');
+}
+
+/** The picker section a chapter lives in for a given track. */
+export function sectionKeyForChapter(chapterId, track = 'cbse') {
+  const chapter = indiaChapter(chapterId);
+  if (!chapter) return null;
+  const grade = indiaChapterGrade(chapter);
+  if (!grade) return 'in-olympiad';
+  if (track === 'jee-main' || track === 'jee-advanced') return `in-${track}-${grade >= 11 ? grade : 11}`;
+  return `in-cbse-${grade}`;
+}
+
+export { TRACK_LABEL };
