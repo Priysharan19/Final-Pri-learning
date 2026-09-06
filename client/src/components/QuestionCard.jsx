@@ -12,6 +12,7 @@ import InkCanvas from '../ink/InkCanvas.jsx';
 import { sanitizeFigure } from '../lib/sanitize.js';
 import { clearDraft, queueDraft, readDraft } from './drafts.js';
 import { nativePhotoAvailable, recognizePhoto } from '../native/photo.js';
+import { cloudReadingEnabled, readPhotoWithCloud } from '../ink/cloudReader.js';
 import PriPlot from './PriPlot.jsx';
 import { plotSpecFor } from '../engine/plotSpec.js';
 import { checkWorkingWithCloud, mergeVerdicts, shouldCheckWorking, workingNote } from '../ink/cloudWorking.js';
@@ -267,33 +268,85 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   );
 
 
+  // A photo of paper working is read by whichever reader is actually good at
+  // it. The server reader first where the student has turned it on, because
+  // Apple Vision was built for printed text and a page of algebra is not that;
+  // then Vision, which needs no network and no account; then nothing, said
+  // plainly. Whatever reads it, the text lands in an editable box and is never
+  // submitted on the reader's word alone.
   const decodePhoto = useCallback(async (dataURL) => {
     if (!dataURL) return;
-    if (!nativePhotoAvailable()) {
-      setPhotoOCR({ phase: 'unavailable', text: '', confidence: 0, error: 'Native photo OCR is unavailable in this build.', engine: null });
+    const cloudFirst = cloudReadingEnabled(user);
+    if (!cloudFirst && !nativePhotoAvailable()) {
+      setPhotoOCR({
+        phase: 'unavailable', text: '', confidence: 0, engine: null,
+        error: 'Reading photos is not available here. Turn on server reading in Settings, or type your working instead.'
+      });
       return;
     }
     setPhotoOCR({ phase: 'reading', text: '', confidence: 0, error: '', engine: null });
+
+    const apply = (text, markable, confidence, engine) => {
+      if (isWorking && text) { setWorking(text); setShowWorking(true); }
+      if (markable) setAnswer(markable);
+      setPhotoOCR({ phase: 'done', text, confidence: Number(confidence || 0), error: '', engine });
+    };
+    const lastLine = (text) => text.split(/\n+/).map(x => x.trim()).filter(Boolean).at(-1) || '';
+
+    if (cloudFirst) {
+      const outcome = await readPhotoWithCloud(dataURL, { user });
+      if (outcome && !outcome.error) {
+        const text = String(outcome.transcription.text || '').trim();
+        const markable = lastLine(text);
+        if (text || markable) {
+          apply(text, markable, outcome.transcription.confidence, outcome.transcription.engine);
+          return;
+        }
+      }
+      // Fall through to Vision rather than failing: a refused or unreachable
+      // server should not cost the student the reader already on the device.
+      if (!nativePhotoAvailable()) {
+        setPhotoOCR({
+          phase: 'failed', text: '', confidence: 0, engine: null,
+          error: outcome?.error?.message || 'That photo could not be read. Try a straighter, better-lit shot, or type your working.'
+        });
+        return;
+      }
+    }
+
     try {
       const result = await recognizePhoto(dataURL);
       const text = String(result?.text || '').trim();
-      const finalCandidate = String(result?.answer || '').trim();
-      const fallbackFinal = text.split(/\n+/).map(s => s.trim()).filter(Boolean).at(-1) || '';
-      const markable = finalCandidate || fallbackFinal;
+      const markable = String(result?.answer || '').trim() || lastLine(text);
       if (!text && !markable) throw new Error('No handwriting was detected in that photo.');
-      if (isWorking && text) {
-        setWorking(text);
-        setShowWorking(true);
-      }
-      if (markable) setAnswer(markable);
-      setPhotoOCR({
-        phase: 'done', text, confidence: Number(result?.confidence || 0), error: '',
-        engine: result?.engine || 'apple-vision-photo-v1'
-      });
+      apply(text, markable, result?.confidence, result?.engine || 'apple-vision-photo-v1');
     } catch (err) {
-      setPhotoOCR({ phase: 'failed', text: '', confidence: 0, error: err?.message || 'Photo handwriting could not be read.', engine: null });
+      setPhotoOCR({ phase: 'failed', text: '', confidence: 0, engine: null, error: err?.message || 'Photo handwriting could not be read.' });
     }
-  }, [isWorking]);
+  }, [isWorking, user]);
+
+  // Paste a photo straight in. On a laptop this is how a student moves a shot
+  // from their phone: AirDrop or a screenshot, then ⌘V.
+  useEffect(() => {
+    if (mode !== 'photo' || resolved) return;
+    const onPaste = (event) => {
+      const item = [...(event.clipboardData?.items || [])].find(i => i.type?.startsWith('image/'));
+      if (!item) return;
+      const file = item.getAsFile();
+      if (!file) return;
+      event.preventDefault();
+      const reader = new FileReader();
+      reader.onload = () => {
+        const dataURL = String(reader.result || '');
+        if (!dataURL.startsWith('data:image/')) return;
+        setPhoto(dataURL);
+        decodePhoto(dataURL);
+      };
+      reader.readAsDataURL(file);
+    };
+    window.addEventListener('paste', onPaste);
+    return () => window.removeEventListener('paste', onPaste);
+  }, [mode, resolved, decodePhoto]);
 
   useEffect(() => {
     if (!writeMode) return;
@@ -716,10 +769,13 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
               <div className="editor-body">
                 {mode === 'photo' && (
                   <div style={{ marginBottom: 14 }}>
-                    <input ref={photoInputRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }}
+                    {/* No `capture` attribute: on iOS it forces the camera open and removes
+                        the photo-library option, which is the wrong way round. A student
+                        photographs their exercise book first and picks the shot afterwards. */}
+                    <input ref={photoInputRef} type="file" accept="image/*" style={{ display: 'none' }}
                       onChange={e => attachPhoto(e, setPhoto, decodePhoto)} />
                     {!photo
-                      ? <button className="btn btn-ghost" onClick={() => photoInputRef.current?.click()}>▣ Attach a photo of your working</button>
+                      ? <button className="btn btn-ghost" onClick={() => photoInputRef.current?.click()}>▣ Photograph your working on paper<span className="muted" style={{ display: 'block', fontSize: 11.5, marginTop: 2, fontWeight: 400 }}>or paste a photo you already took</span></button>
                       : (
                         <div className="photo-attach">
                           <div className="photo-thumb"><img src={photo} alt="Paper working" /><button aria-label="Remove photo" onClick={() => { setPhoto(null); setPhotoOCR({ phase: 'idle', text: '', confidence: 0, error: '', engine: null }); }}>✕</button></div>

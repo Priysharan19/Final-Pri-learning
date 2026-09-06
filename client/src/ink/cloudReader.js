@@ -21,6 +21,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { cloud, cloudAvailable } from '../platform/cloudTransport.js';
 import { rasterizeInk } from './cloudRaster.js';
+import { preparePhoto } from './photoRaster.js';
 
 /** How the returned reading is labelled, so History and evidence can tell. */
 export const CLOUD_ENGINE_PREFIX = 'cloud';
@@ -109,4 +110,41 @@ export function shouldSupersede(cloudReading, localReading, { hasManualCorrectio
   if (!cloudReading.text.trim()) return false;
   const normalise = t => String(t || '').replace(/\s+/g, ' ').trim();
   return normalise(cloudReading.text) !== normalise(localReading?.text);
+}
+
+/**
+ * Read a photograph of working done on paper.
+ *
+ * The same route and the same reader as the ink, because to the reader they are
+ * both just an image of handwriting. This is the input most students actually
+ * have — a page of an exercise book — and until now the browser build could
+ * attach a photo and never read it, while the iPad build read it with an OCR
+ * engine built for printed text.
+ *
+ * Returns null for every "carry on without it" case; never throws.
+ */
+export async function readPhotoWithCloud(dataUrl, {
+  user,
+  signal = null,
+  transport = cloud,
+  prepare = preparePhoto,
+  available = cloudAvailable
+} = {}) {
+  if (!cloudReadingEnabled(user, { available })) return null;
+
+  let prepared = null;
+  try { prepared = await prepare(dataUrl); } catch { return null; }
+  if (!prepared?.dataUrl) return null;
+
+  try {
+    const response = await transport.transcribeHandwriting(prepared.dataUrl, { signal });
+    const transcription = response?.transcription;
+    if (!transcription?.lines?.length) return null;
+    return {
+      transcription,
+      photo: { width: prepared.width, height: prepared.height, bytes: prepared.bytes, quality: prepared.quality }
+    };
+  } catch (error) {
+    return { error: { code: error?.code || 'HANDWRITING_FAILED', message: error?.message || '' } };
+  }
 }

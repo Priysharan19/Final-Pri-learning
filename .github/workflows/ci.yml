@@ -50,6 +50,7 @@ jobs:
           grep -Fq 'LEGAL PAGES: PASS — 45/45 checks' suites.log
           grep -Fq 'CLOUD HANDWRITING CLIENT: PASS — 37/37 checks' suites.log
           grep -Fq 'CLOUD WORKING CLIENT: PASS — 36/36 checks' suites.log
+          grep -Fq 'CLOUD PHOTO CLIENT: PASS — 26/26 checks' suites.log
           grep -Fq 'ENTITLEMENT ENFORCEMENT: PASS — 59/59 checks' suites.log
           grep -Fq 'PASS — Grade 9 Ganita Manjari: 1280 seeded forms (1000 numeric handwriting-ready, 280 conceptual).' suites.log
           grep -Fq 'PASS — 8/8 chapters, 200/200 uploaded pages, 42/42 formal exercise sections and 293/293 formal exercise prompts represented and verified.' suites.log
