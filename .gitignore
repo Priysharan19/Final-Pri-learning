@@ -38,3 +38,14 @@ marketing/reel/export/
 *[ ]2.mjs
 *[ ]2.sh
 *[ ]2.js
+*[ ]2.jsx
+*[ ]2.css
+# The same tool went on to make " 3." copies, and two of them — both `sw 3.js`
+# inside the generated iPad bundles — were committed and broke the bundle-match
+# gate, which compares the tracked bundle against a fresh build file by file.
+*[ ]3.py
+*[ ]3.mjs
+*[ ]3.sh
+*[ ]3.js
+*[ ]3.jsx
+*[ ]3.css
