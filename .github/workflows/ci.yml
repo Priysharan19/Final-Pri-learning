@@ -90,6 +90,8 @@ jobs:
         run: npm ci --prefix server
       - name: Runtime dependency security floor
         run: node tools/runtime-audit-floor.mjs server
+      - name: Assignment targeting and class analytics
+        run: node server/test/assignment-targeting-check.mjs
       - name: Commercial platform schema contract
         run: node server/test/platform-schema-check.mjs
       - name: Platform migration contract
