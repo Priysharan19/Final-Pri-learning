@@ -1091,6 +1091,27 @@ async function run() {
     eq('a deleted task is gone', await idb.get('tasks', task.id), undefined);
   } catch (err) { crashed(err); }
 
+  // ── Bulk roster import ─────────────────────────────────────────────────────
+  // A pasted or CSV roster: names already on this device join, unknown names
+  // become password-free student profiles, and the teacher never signs out.
+  section('roster');
+  try {
+    const rosterClass = (await POST('/classes', { name: 'Class 9 B' })).class;
+    const roster = await POST(`/classes/${rosterClass.id}/roster`, {
+      rows: ['Ada Lovelace', { name: 'Srinivasa Ramanujan', class: 9, track: 'cbse' }, '', { name: 'ada lovelace' }]
+    });
+    eq('a roster name matching a profile on this device joins the class', roster.matched, 1);
+    eq('an unknown roster name becomes a new student profile', roster.created, 1);
+    eq('a blank row is skipped', roster.skipped, 1);
+    eq('the class roll holds each student once', roster.class.studentPids.length, 2);
+    const made = (await idb.all('profiles')).find(x => x.name === 'Srinivasa Ramanujan');
+    eq('the new profile is a student on the India syllabus in the class the row named',
+      [made?.role, made?.course, made?.year, made?.indiaTrack, made?.rosteredBy], ['student', 'in', 9, 'cbse', teacher.id]);
+    eq('the teacher stays signed in', (await GET('/me')).user.id, teacher.id);
+    eq('the roll the teacher sees carries the new student', (await GET('/classes')).classes.find(c => c.id === rosterClass.id).students.length, 2);
+    await rejects('a roster for a class the teacher does not run is a 404', POST('/classes/not-real/roster', { rows: ['X'] }), { status: 404 });
+  } catch (err) { crashed(err); }
+
   // ── Task pack round trip ───────────────────────────────────────────────────
   section('task pack');
   try {

@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { classAnalytics, validateAssignmentSpecification } from './assignmentTargets.js';
 import { id, opaqueToken, rateLimit, requireRole, requireSession, requireVerifiedEmail, sha256 } from './security.js';
 
 function classCode() {
@@ -320,8 +321,14 @@ export function createClassRouter(db) {
     const classId = String(req.params.classId || '');
     if (req.platformSession.role !== 'admin' && !teacherOwns(db, req.platformSession.account_id, classId)) return res.status(404).json({ error: { code: 'CLASS_NOT_FOUND', message: 'Class not found.' } });
     const title = cleanTitle(req.body?.title);
-    const spec = req.body?.specification;
-    if (!title || !plain(spec)) return res.status(400).json({ error: { code: 'ASSIGNMENT_INVALID', message: 'Assignment title and specification are required.' } });
+    const raw = req.body?.specification;
+    if (!title || !plain(raw)) return res.status(400).json({ error: { code: 'ASSIGNMENT_INVALID', message: 'Assignment title and specification are required.' } });
+    // The server decides whether the target exists: chapter ids, dot point,
+    // difficulty and track are checked against the India curriculum, and
+    // unknown keys never reach storage.
+    const checked = validateAssignmentSpecification(raw);
+    if (!checked.ok) return res.status(400).json({ error: { code: checked.code, message: checked.message } });
+    const spec = checked.spec;
     const encoded = JSON.stringify(spec);
     if (Buffer.byteLength(encoded) > 128 * 1024) return res.status(413).json({ error: { code: 'ASSIGNMENT_TOO_LARGE', message: 'Assignment specification is too large.' } });
     const dueAt = Number.isFinite(Number(req.body?.dueAt)) ? Math.max(Date.now(), Number(req.body.dueAt)) : null;
@@ -372,24 +379,10 @@ export function createClassRouter(db) {
   router.get('/:classId/analytics', requireRole('teacher', 'admin'), (req, res) => {
     const classId = String(req.params.classId || '');
     if (req.platformSession.role !== 'admin' && !teacherOwns(db, req.platformSession.account_id, classId)) return res.status(404).json({ error: { code: 'CLASS_NOT_FOUND', message: 'Class not found.' } });
-    const students = db.prepare('SELECT COUNT(*) AS n FROM class_members WHERE class_id=? AND removed_at IS NULL').get(classId)?.n || 0;
-    const assignments = db.prepare('SELECT COUNT(*) AS n FROM assignments WHERE class_id=? AND archived_at IS NULL').get(classId)?.n || 0;
-    const submissions = db.prepare(`SELECT s.assignment_id,s.student_account_id,s.state,s.summary_json,s.submitted_at,s.updated_at,
-      f.feedback_json,f.returned_at
-      FROM assignment_submissions s
-      JOIN assignments a ON a.id=s.assignment_id
-      LEFT JOIN assignment_feedback f ON f.assignment_id=s.assignment_id AND f.student_account_id=s.student_account_id
-      WHERE a.class_id=?`).all(classId);
-    const submitted = submissions.filter(x => x.state === 'submitted').length;
-    const returned = submissions.filter(x => x.state === 'returned').length;
-    res.json({
-      classId, students, assignments, startedSubmissions: submissions.length, submitted, returned,
-      submissionRows: submissions.map(x => ({
-        assignmentId: x.assignment_id, studentId: x.student_account_id, state: x.state,
-        summary: JSON.parse(x.summary_json || '{}'), submittedAt: x.submitted_at, updatedAt: x.updated_at,
-        feedback: x.feedback_json ? JSON.parse(x.feedback_json) : null, returnedAt: x.returned_at
-      }))
-    });
+    // Aggregated for the teacher: per student, per assignment and per targeted
+    // chapter, with intervention flags and their reasons. Summaries are
+    // re-sanitised on the way out so a legacy row cannot leak anything.
+    res.json(classAnalytics(db, classId));
   });
 
   return router;

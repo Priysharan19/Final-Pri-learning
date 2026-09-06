@@ -17,8 +17,9 @@ import {
 } from '../engine/curriculum.js';
 import {
   cleanIndiaTrack, indiaTrack, indiaCourseLabel, indiaScope, indiaChapter,
-  indiaChapterGrade, resolveIndiaTarget, indiaProductSections
+  indiaChapterGrade, indiaDotpointIndex, resolveIndiaTarget, indiaProductSections
 } from '../engine/indiaProduct.js';
+import { IN_CHAPTERS, OLYMPIAD_TOPICS } from '../engine/curriculum-in.js';
 import { generateQuestion } from '../engine/generators/index.js';
 import { checkAnswer, stepCheck, methodMarks } from '../engine/checker.js';
 import { authoredRegion, formatRegion, formatMatrix, formatVector } from '../engine/answer-forms.js';
@@ -714,6 +715,241 @@ async function createIndiaQuestion(pid, chapter, target, mode, trackId, examId =
   return { row, payload: q };
 }
 
+// ── India teacher model ──────────────────────────────────────────────────────
+// A teacher of an India class sees the evidence the India student product
+// shows — chapters started, attempts, demonstrated accuracy, chapter mastery —
+// and never an HSC-scaled predicted mark or band. Everything here is computed
+// from the same ratings the practice engine writes, keyed by generator id, so
+// a chapter covered by a shared generator (an NSW-era bank reused as an asset)
+// is still credited to the NCERT chapter the student was actually working on.
+
+/** generator id → the India chapter/topic ids whose covers name it */
+const INDIA_CHAPTER_IDS_BY_GEN = (() => {
+  const map = Object.create(null);
+  for (const ch of [...IN_CHAPTERS, ...OLYMPIAD_TOPICS]) {
+    for (const gen of indiaGeneratorIds(ch)) (map[gen] ||= []).push(ch.id);
+  }
+  return map;
+})();
+
+const isIndiaGenerator = id => !!INDIA_CHAPTER_IDS_BY_GEN[id];
+
+/** One evidence row per chapter in the profile's India scope. */
+function indiaChapterRows(trackId, year, ratings, now = Date.now()) {
+  return indiaScope(trackId, year).map(ch => {
+    const st = indiaState(ch, ratings, now);
+    return {
+      id: ch.id, name: ch.name, strand: ch.strand,
+      attempts: st.attempts, correct: st.correct,
+      accuracy: st.attempts ? Math.round(100 * st.correct / st.attempts) : null,
+      mastery: Math.round(100 * st.mastery),
+      band: st.attempts ? masteryBand(st.mastery) : 'unseen'
+    };
+  });
+}
+
+/** Chapter coverage summary — the India product's own numbers, no prediction. */
+function indiaEvidence(rows) {
+  const started = rows.filter(r => r.attempts > 0);
+  return {
+    chaptersStarted: started.length, chaptersTotal: rows.length,
+    chaptersPractised: rows.filter(r => r.attempts >= 5).length,
+    mastery: started.length ? Math.round(started.reduce((n, r) => n + r.mastery, 0) / started.length) : null,
+    weakest: [...started].sort((a, b) => a.mastery - b.mastery || (a.accuracy ?? 0) - (b.accuracy ?? 0) || b.attempts - a.attempts).slice(0, 3)
+      .map(r => ({ id: r.id, name: r.name, mastery: r.mastery, accuracy: r.accuracy, attempts: r.attempts }))
+  };
+}
+
+/** Repeated misconceptions for an India profile, named by NCERT chapter. */
+function indiaWeaknesses(ratings, nowMs = Date.now(), limit = 6) {
+  const out = [];
+  for (const [gen, st] of Object.entries(ratings || {})) {
+    const ids = INDIA_CHAPTER_IDS_BY_GEN[gen];
+    if (!ids) continue;
+    const ch = indiaChapter(ids[0]);
+    for (const t of activeTraps(st.traps, nowMs)) {
+      out.push({
+        key: t.key, subtopic: gen, subtopicName: ch?.name || gen, strand: ch?.strand || null, chapterId: ch?.id || null,
+        label: t.label, count: t.n, lastAt: t.lastAt, dotpoint: null, dotpointText: null
+      });
+    }
+  }
+  return out.sort((a, b) => b.count - a.count || b.lastAt - a.lastAt).slice(0, limit);
+}
+
+/** Distinct days with at least one answered question inside the window. */
+function activeDaysIn(days, nowMs, windowDays = 28) {
+  const cutoff = sydneyDate(nowMs - windowDays * 86400000);
+  return days.filter(d => d.questions > 0 && d.date >= cutoff).length;
+}
+
+// Intervention thresholds. Each flag carries the plain-language reason a
+// teacher would say out loud, so the chip in the class table is explainable.
+const INACTIVE_DAYS = 7;
+const DROP_WINDOW = 20;
+const DROP_POINTS = 15;
+
+function interventionFlags({ attempts, lastActiveAt, sinceMs, overdueTasks, weaknesses, nowMs }) {
+  const flags = [];
+  const anchor = lastActiveAt || sinceMs || null;
+  const idle = anchor ? Math.floor((nowMs - anchor) / 86400000) : null;
+  if (!attempts.length) {
+    if (idle == null || idle >= INACTIVE_DAYS) {
+      flags.push({ code: 'inactive', label: 'Not started', reason: idle == null ? 'No practice recorded yet.' : `No practice recorded in the ${idle} days since joining.` });
+    }
+  } else if (idle != null && idle >= INACTIVE_DAYS) {
+    flags.push({ code: 'inactive', label: `Inactive ${idle}d`, reason: `Last answered a question ${idle} days ago.` });
+  }
+  if (overdueTasks.length) {
+    flags.push({
+      code: 'overdue', label: `${overdueTasks.length} overdue`,
+      reason: `Past due and unfinished: ${overdueTasks.map(t => `${t.title} (${t.done}/${t.count})`).join(', ')}.`
+    });
+  }
+  const recent = attempts.slice(-DROP_WINDOW);
+  if (recent.length >= DROP_WINDOW) {
+    const half = DROP_WINDOW / 2;
+    const acc = rows => Math.round(100 * rows.filter(a => a.correct).length / rows.length);
+    const before = acc(recent.slice(0, half));
+    const after = acc(recent.slice(half));
+    if (before - after >= DROP_POINTS) {
+      flags.push({ code: 'accuracy-drop', label: `Accuracy −${before - after}`, reason: `Accuracy fell from ${before}% to ${after}% across the last ${DROP_WINDOW} questions.` });
+    }
+  }
+  const repeated = (weaknesses || []).filter(w => w.count >= TRAP_ACTIVE_AT);
+  if (repeated.length) {
+    const w = repeated[0];
+    flags.push({ code: 'misconception', label: 'Repeated mistake', reason: `${w.label} — seen ${w.count} times in ${w.subtopicName}.` });
+  }
+  return flags;
+}
+
+/** The class-analytics row for one on-device student. */
+async function studentAnalyticsRow(prof, classTasks, now) {
+  const pid = prof.id;
+  const ratings = await ratingsFor(pid);
+  const attempts = (await byIndex('attempts', 'pid', pid)).sort((a, b) => a.createdAt - b.createdAt);
+  const days = await activityFor(pid);
+  const lastActiveAt = attempts.length ? attempts[attempts.length - 1].createdAt : null;
+  const overdue = [];
+  for (const t of classTasks) {
+    if (!t.dueAt || t.dueAt > now) continue;
+    const tp = await get('taskProgress', `${t.id}:${pid}`);
+    if (!tp?.finishedAt) overdue.push({ id: t.id, title: t.title, done: tp?.done || 0, count: t.count });
+  }
+  const india = (prof.course || 'nsw') === 'in';
+  const trackId = india ? cleanIndiaTrack(prof.indiaTrack, prof.year) : null;
+  const weaknesses = india ? indiaWeaknesses(ratings, now) : namedWeaknesses(ratings, now);
+  const correct = attempts.filter(a => a.correct).length;
+  const base = {
+    id: pid, name: prof.name, avatar: prof.avatar, year: prof.year,
+    course: prof.course || 'nsw', indiaTrack: trackId,
+    courseLabel: courseLabel(prof.course || 'nsw', prof.year, pathwayOf(prof), trackId || 'cbse'),
+    attempts: attempts.length, correct,
+    accuracy: attempts.length ? Math.round(100 * correct / attempts.length) : null,
+    streak: await streakFor(pid, now), activeDays: activeDaysIn(days, now), lastActiveAt,
+    misconceptions: weaknesses.slice(0, 3),
+    flags: interventionFlags({ attempts, lastActiveAt, sinceMs: prof.createdAt || null, overdueTasks: overdue, weaknesses, nowMs: now })
+  };
+  if (india) {
+    const chapters = indiaChapterRows(trackId, prof.year, ratings, now);
+    const evidence = indiaEvidence(chapters);
+    return { ...base, predicted: null, evidence, chapters, weakest: evidence.weakest[0]?.name || '—', weakestChapters: evidence.weakest };
+  }
+  const pred = predictMark(ratings, prof.year, now, pathwayOf(prof));
+  return {
+    ...base, predicted: pred.mark, evidence: null, chapters: null,
+    weakest: priorities(ratings, prof.year, now, 1, pathwayOf(prof))[0]?.name || '—', weakestChapters: []
+  };
+}
+
+/** The class-analytics row for a progress file imported from another device. */
+function importedAnalyticsRow(imp, now) {
+  const d = imp.data || {};
+  const st = d.student || {};
+  const india = st.course === 'in';
+  const ratings = d.ratings || {};
+  const lastActiveAt = Object.values(ratings).reduce((m, r) => Math.max(m, r?.last_at || 0), 0) || null;
+  const attempts = d.totals?.attempts || 0;
+  const correct = d.totals?.correct || 0;
+  const weaknesses = india ? indiaWeaknesses(ratings, now) : [];
+  const base = {
+    id: `import-${imp.id}`, name: st.name || 'Imported student', avatar: st.avatar || '📄', year: st.year,
+    course: india ? 'in' : 'nsw', indiaTrack: india ? cleanIndiaTrack(st.indiaTrack, st.year || 9) : null,
+    courseLabel: india ? courseLabel('in', st.year || 9, null, cleanIndiaTrack(st.indiaTrack, st.year || 9)) : (st.year ? `Year ${st.year}` : '—'),
+    attempts, correct, accuracy: attempts ? Math.round(100 * correct / attempts) : null,
+    streak: d.streak || 0, activeDays: null, lastActiveAt,
+    misconceptions: weaknesses.slice(0, 3),
+    // A file carries totals, not the attempt log, so only the flags a snapshot
+    // can justify are raised: inactivity from the last rating timestamp and a
+    // repeated misconception from the trap ledger.
+    flags: [
+      ...(attempts === 0 ? [{ code: 'inactive', label: 'Not started', reason: 'The imported progress file records no practice yet.' }]
+        : lastActiveAt && now - lastActiveAt >= INACTIVE_DAYS * 86400000
+          ? [{ code: 'inactive', label: `Inactive ${Math.floor((now - lastActiveAt) / 86400000)}d`, reason: `Last answered a question ${Math.floor((now - lastActiveAt) / 86400000)} days ago (from the imported file).` }]
+          : []),
+      ...interventionFlags({ attempts: [], lastActiveAt: now, sinceMs: now, overdueTasks: [], weaknesses, nowMs: now }).filter(f => f.code === 'misconception')
+    ],
+    imported: true, importedAt: imp.importedAt
+  };
+  if (india) {
+    const chapters = indiaChapterRows(base.indiaTrack, st.year || 9, ratings, now);
+    const evidence = indiaEvidence(chapters);
+    return { ...base, predicted: null, evidence, chapters, weakest: evidence.weakest[0]?.name || '—', weakestChapters: evidence.weakest };
+  }
+  let weakest = '—';
+  try { weakest = priorities(ratings, st.year || 9, now, 1, st.pathway || 'advanced')[0]?.name || '—'; } catch { }
+  return { ...base, predicted: d.predicted?.mark ?? null, evidence: null, chapters: null, weakest, weakestChapters: [] };
+}
+
+/** Class-level chapter table: which NCERT chapters this class finds hardest. */
+function classChapterRows(students) {
+  const agg = Object.create(null);
+  for (const s of students) {
+    for (const r of s.chapters || []) {
+      if (!r.attempts) continue;
+      const a = agg[r.id] ||= { id: r.id, name: r.name, strand: r.strand, students: 0, attempts: 0, correct: 0, masterySum: 0 };
+      a.students++; a.attempts += r.attempts; a.correct += r.correct; a.masterySum += r.mastery;
+    }
+  }
+  return Object.values(agg)
+    .map(a => ({
+      id: a.id, name: a.name, strand: a.strand, students: a.students, attempts: a.attempts, correct: a.correct,
+      accuracy: Math.round(100 * a.correct / a.attempts), mastery: Math.round(a.masterySum / a.students)
+    }))
+    .sort((a, b) => a.mastery - b.mastery || a.accuracy - b.accuracy || b.attempts - a.attempts);
+}
+
+/**
+ * India targets for a task: {chapterId, dotpoint, track, difficulty}. Accepts
+ * explicit target objects and, for the student's own Tasks page, chapter ids or
+ * `chapter#dotpoint` refs in the same `subtopics` list the NSW picker uses.
+ */
+function indiaTargetsFrom(rawTargets, rawSubtopics, rawTrack = null, rawDifficulty = null) {
+  const out = [];
+  const push = (chapterId, dotpoint, track, difficulty) => {
+    if (out.length >= 40) return;
+    const chapter = indiaChapter(safeId(chapterId));
+    if (!chapter) return;
+    const grade = indiaChapterGrade(chapter) || 12;
+    const trackId = cleanIndiaTrack(track, grade);
+    const ceiling = indiaTrack(trackId, grade).difficultyCeiling || 4;
+    const dp = indiaDotpointIndex(chapter, dotpoint);
+    const d = difficulty === null || difficulty === undefined || difficulty === '' ? null : Math.min(ceiling, safeInt(difficulty, 1, 4, 2));
+    if (out.some(t => t.chapterId === chapter.id && t.dotpoint === dp && t.track === trackId && t.difficulty === d)) return;
+    out.push({ chapterId: chapter.id, dotpoint: dp, track: trackId, difficulty: d });
+  };
+  for (const t of (Array.isArray(rawTargets) ? rawTargets : []).slice(0, 100)) {
+    if (!t || typeof t !== 'object') continue;
+    push(t.chapterId, t.dotpoint ?? t.dotpointIndex ?? null, t.track ?? rawTrack, t.difficulty ?? rawDifficulty);
+  }
+  for (const s of (Array.isArray(rawSubtopics) ? rawSubtopics : []).slice(0, 100)) {
+    const [chapterId, dp] = String(s || '').split('#');
+    if (!SUBTOPIC_BY_ID[chapterId]) push(chapterId, dp === undefined ? null : dp, rawTrack, rawDifficulty);
+  }
+  return out;
+}
+
 function criteriaFor(q) {
   const steps = q.steps || [];
   const marks = Math.min(4, Math.max(1, q.difficulty));
@@ -1278,17 +1514,21 @@ function importProgress(src) {
   const ratings = Object.create(null);
   for (const [k, v] of Object.entries(src.ratings && typeof src.ratings === 'object' ? src.ratings : {})) {
     const id = safeId(k);
-    if (!id || !SUBTOPIC_BY_ID[id] || !v || typeof v !== 'object') continue;
+    if (!id || !(SUBTOPIC_BY_ID[id] || isIndiaGenerator(id)) || !v || typeof v !== 'object') continue;
     ratings[id] = {
       rating: safeNum(v.rating, START_RATING), attempts: safeInt(v.attempts, 0, 1e7, 0),
-      correct: safeInt(v.correct, 0, 1e7, 0), last_at: safeTime(v.last_at)
+      correct: safeInt(v.correct, 0, 1e7, 0), last_at: safeTime(v.last_at),
+      traps: safeTrapLedger(v.traps)
     };
   }
+  const india = st.course === 'in';
   return {
     format: 'pri-progress', version: 1, exportedAt: safeTime(src.exportedAt) || Date.now(),
     student: {
       name: safeLabel(st.name, 40), year, avatar: safeLabel(st.avatar, 4) || '🙂',
-      pathway: cleanPathway(st.pathway, year)
+      course: india ? 'in' : 'nsw',
+      indiaTrack: india ? cleanIndiaTrack(st.indiaTrack, year) : null,
+      pathway: india ? null : cleanPathway(st.pathway, year)
     },
     predicted: pred ? {
       mark: safeInt(pred.mark, 0, 100, 0), low: safeInt(pred.low, 0, 100, 0), high: safeInt(pred.high, 0, 100, 0),
@@ -1592,6 +1832,28 @@ const routes = {
           return { question: sanitize(payload, row), reason: 'task', why: `Task: ${task.title} — question ${done + 1} of ${task.count}.` };
         }
       }
+      // An India-targeted task (NCERT chapter / dot point / track) is served
+      // through the same resolver as India practice, so the question carries
+      // the chapter it was set for rather than an NSW subtopic name.
+      if (Array.isArray(task.targets) && task.targets.length) {
+        const nowMs = Date.now();
+        const target = task.targets[done % task.targets.length];
+        const chapter = indiaChapter(target.chapterId);
+        if (!chapter) throw Object.assign(new Error('That task targets an India chapter this app no longer knows.'), { status: 409, code: 'INDIA_TARGET_UNCOVERED' });
+        const grade = indiaChapterGrade(chapter) || p.year;
+        const trackId = cleanIndiaTrack(target.track || p.indiaTrack, grade);
+        const ratings = await ratingsFor(p.id);
+        const state = indiaState(chapter, ratings, nowMs);
+        const want = target.difficulty != null ? Number(target.difficulty) : pickDifficulty(state.rating, state.attempts, { state, nowMs });
+        const resolved = resolveIndiaTarget(chapter, { dotpoint: target.dotpoint, difficulty: want, track: trackId, grade });
+        const { row, payload } = await createIndiaQuestion(p.id, chapter, resolved, 'task', trackId, null, taskId);
+        return {
+          question: sanitize(payload, row), reason: 'task',
+          why: `Task: ${task.title} — question ${done + 1} of ${task.count}.`,
+          dotpoint: resolved.dotpointIndex, target: state.mastery, misconception: null
+        };
+      }
+      if (!task.subtopics?.length) throw Object.assign(new Error('That task has no topics to practise.'), { status: 409 });
       const sub = task.subtopics[done % task.subtopics.length];
       const st = await getRating(p.id, sub);
       const aim = pickDifficulty(st?.rating ?? START_RATING, st?.attempts ?? 0, { state: st || {}, nowMs: Date.now() });
@@ -2133,6 +2395,35 @@ const routes = {
     const p = await requireProfile();
     const now = Date.now();
     const ratings = await ratingsFor(p.id);
+    if (p.course === 'in') {
+      // The India report is the India product's own evidence: chapter coverage,
+      // attempts, accuracy and mastery. No predicted board/JEE score exists,
+      // so none is reported — the same rule the student progress page keeps.
+      const trackId = cleanIndiaTrack(p.indiaTrack, p.year);
+      const rows = indiaChapterRows(trackId, p.year, ratings, now);
+      const evidence = indiaEvidence(rows);
+      const attempts = (await byIndex('attempts', 'pid', p.id)).sort((a, b) => a.createdAt - b.createdAt);
+      const acts = await activityFor(p.id);
+      const weaknesses = indiaWeaknesses(ratings, now);
+      return {
+        student: {
+          name: p.name, year: p.year, course: courseLabel('in', p.year, null, trackId),
+          country: 'in', track: trackId, trackName: indiaTrack(trackId, p.year).name
+        },
+        generatedAt: now, predicted: null, evidence, chapters: rows,
+        misconceptions: weaknesses,
+        strengths: [...rows].filter(r => r.attempts >= 3).sort((a, b) => b.mastery - a.mastery).slice(0, 3),
+        focus: evidence.weakest,
+        weekly: acts.slice(-28),
+        totals: { attempts: attempts.length, correct: attempts.filter(a => a.correct).length },
+        streak: await streakFor(p.id, now),
+        activeDays: activeDaysIn(acts, now),
+        flags: interventionFlags({
+          attempts, lastActiveAt: attempts.length ? attempts[attempts.length - 1].createdAt : null,
+          sinceMs: p.createdAt || null, overdueTasks: [], weaknesses, nowMs: now
+        })
+      };
+    }
     const pred = predictMark(ratings, p.year, now, pathwayOf(p));
     const { own } = scopeForYear(p.year, pathwayOf(p));
     const rows = own.map(s => {
@@ -2160,11 +2451,15 @@ const routes = {
     const classes = (await all('classes')).filter(c => c.teacherPid === p.id);
     const profiles = await all('profiles');
     const out = [];
+    const brief = x => ({
+      id: x.id, name: x.name, year: x.year, avatar: x.avatar,
+      course: x.course || 'nsw', indiaTrack: x.course === 'in' ? cleanIndiaTrack(x.indiaTrack, x.year) : null
+    });
     for (const c of classes) {
-      const students = profiles.filter(x => c.studentPids.includes(x.id)).map(x => ({ id: x.id, name: x.name, year: x.year, avatar: x.avatar }));
+      const students = profiles.filter(x => c.studentPids.includes(x.id)).map(brief);
       out.push({ ...c, students });
     }
-    return { classes: out, allProfiles: profiles.filter(x => (x.role || 'student') === 'student').map(x => ({ id: x.id, name: x.name, year: x.year, avatar: x.avatar })) };
+    return { classes: out, allProfiles: profiles.filter(x => (x.role || 'student') === 'student').map(brief) };
   },
   'POST /classes': async (body) => {
     const p = await requireProfile();
@@ -2192,42 +2487,74 @@ const routes = {
     }
     return { class: c };
   },
+  // Bulk roster: a pasted/CSV list of names. A name that matches a student
+  // profile already on this device joins the class; any other name becomes a
+  // new password-free student profile (India syllabus unless the row says
+  // otherwise) and joins. The teacher stays signed in throughout.
+  'POST /classes/:id/roster': async (body, params) => {
+    const teacher = await requireProfile();
+    const c = await requireClass(params.id);
+    const rows = (Array.isArray(body?.rows) ? body.rows : []).slice(0, 200);
+    const profiles = await all('profiles');
+    const byName = new Map(profiles.filter(x => (x.role || 'student') === 'student').map(x => [String(x.name || '').trim().toLowerCase(), x]));
+    const matched = [];
+    const created = [];
+    let skipped = 0;
+    const now = Date.now();
+    // India first: a row's own `course` wins, a row naming an India track is
+    // India, and otherwise a new student follows the class it is joining — the
+    // syllabus most of its current students use, or India when it is empty and
+    // the teacher has not chosen an Australian syllabus for themselves.
+    const current = profiles.filter(x => (c.studentPids || []).includes(x.id));
+    const nswMajority = current.length > 0 && current.filter(x => (x.course || 'nsw') !== 'in').length > current.length / 2;
+    const defaultCourse = teacher.course === 'in' ? 'in' : nswMajority ? 'nsw' : 'in';
+    for (const raw of rows) {
+      const name = safeLabel(raw && typeof raw === 'object' ? raw.name : raw, 40);
+      if (!name) { skipped++; continue; }
+      let prof = byName.get(name.toLowerCase());
+      if (!prof) {
+        const year = safeInt(raw?.year ?? raw?.class, 7, 12, safeInt(teacher.year, 7, 12, 9));
+        const rowTrack = raw?.track ?? raw?.indiaTrack;
+        const course = COURSES[raw?.course] ? raw.course : rowTrack ? 'in' : defaultCourse;
+        prof = {
+          id: uuid(), name, year, course, role: 'student',
+          avatar: safeLabel(raw?.avatar, 4) || '🙂', theme: 'dark', dailyGoal: 10, xp: 0,
+          pathway: course === 'nsw' ? (year >= 11 ? 'advanced' : null) : null,
+          indiaTrack: course === 'in' ? cleanIndiaTrack(raw?.track ?? raw?.indiaTrack, year) : null,
+          rosteredBy: teacher.id, createdAt: now, lastActiveAt: now
+        };
+        await put('profiles', prof);
+        byName.set(name.toLowerCase(), prof);
+        created.push({ id: prof.id, name: prof.name });
+      } else if (!matched.some(m => m.id === prof.id) && !created.some(m => m.id === prof.id)) {
+        matched.push({ id: prof.id, name: prof.name });
+      }
+    }
+    const ids = [...matched, ...created].map(x => x.id);
+    c.studentPids = [...new Set([...(c.studentPids || []), ...ids])];
+    await put('classes', c);
+    for (const t of await all('tasks')) {
+      if (t.classId === c.id) await put('tasks', t);
+    }
+    return { class: c, matched: matched.length, created: created.length, skipped, students: ids };
+  },
   'GET /classes/:id/analytics': async (body, params) => {
     const c = await requireClass(params.id);
     const now = Date.now();
-    const students = [];
-    for (const pid of c.studentPids) {
-      const prof = await get('profiles', pid);
-      if (!prof) continue;
-      const ratings = await ratingsFor(pid);
-      const attempts = await byIndex('attempts', 'pid', pid);
-      const pred = predictMark(ratings, prof.year, now, pathwayOf(prof));
-      students.push({
-        id: pid, name: prof.name, avatar: prof.avatar, year: prof.year,
-        attempts: attempts.length, correct: attempts.filter(a => a.correct).length,
-        predicted: pred.mark, streak: await streakFor(pid, now),
-        weakest: priorities(ratings, prof.year, now, 1, pathwayOf(prof))[0]?.name || '—'
-      });
-    }
-    // Progress files imported from other devices join the class analytics
-    const imports = (await all('progressImports')).filter(r => r.classId === params.id);
-    for (const imp of imports) {
-      const d = imp.data || {};
-      const st = d.student || {};
-      let weakest = '—';
-      try { weakest = priorities(d.ratings || {}, st.year || 9, Date.now(), 1, st.pathway || 'advanced')[0]?.name || '—'; } catch { }
-      students.push({
-        id: `import-${imp.id}`, name: st.name || 'Imported student', avatar: st.avatar || '📄', year: st.year,
-        attempts: d.totals?.attempts || 0, correct: d.totals?.correct || 0,
-        predicted: d.predicted?.mark ?? null, streak: d.streak || 0,
-        weakest, imported: true, importedAt: imp.importedAt
-      });
-    }
     // Which class a task belongs to is inside the task's sealed body, so this
     // is a scan and a filter rather than an index lookup. The store holds the
     // tasks one teacher typed out by hand, and only the ones this profile can
     // open come back at all.
     const tasks = (await all('tasks')).filter(t => t.classId === params.id);
+    const students = [];
+    for (const pid of c.studentPids) {
+      const prof = await get('profiles', pid);
+      if (!prof) continue;
+      students.push(await studentAnalyticsRow(prof, tasks, now));
+    }
+    // Progress files imported from other devices join the class analytics
+    const imports = (await all('progressImports')).filter(r => r.classId === params.id);
+    for (const imp of imports) students.push(importedAnalyticsRow(imp, now));
     const taskRows = [];
     for (const t of tasks) {
       const progress = [];
@@ -2241,9 +2568,16 @@ const routes = {
         const tp = (imp.data?.taskProgress || []).find(x => x.taskId === t.id);
         if (tp) progress.push({ pid: `import-${imp.id}`, name: `${imp.data?.student?.name || '?'} (file)`, done: tp.done, correct: tp.correct, finished: tp.finished });
       }
-      taskRows.push({ ...t, progress });
+      taskRows.push({ ...t, overdue: !!t.dueAt && t.dueAt < now, progress });
     }
-    return { class: c, students, tasks: taskRows };
+    const chapters = classChapterRows(students);
+    const courses = new Set(students.map(s => s.course));
+    const syllabus = courses.size === 0 ? null : courses.size > 1 ? 'mixed' : [...courses][0];
+    const attention = students.filter(s => s.flags.length).map(s => ({ id: s.id, name: s.name, flags: s.flags }));
+    return {
+      class: c, generatedAt: now, syllabus, students, tasks: taskRows,
+      chapters, weakestChapters: chapters.slice(0, 3), attention
+    };
   },
   'GET /tasks': async () => {
     const p = await requireProfile();
@@ -2260,17 +2594,19 @@ const routes = {
   },
   'POST /tasks': async (body) => {
     const p = await requireProfile();
+    const targets = indiaTargetsFrom(body.targets, body.subtopics, body.track, body.difficulty);
     const t = {
       id: uuid(), classId: body.classId || null, ownerPid: p.id,
       title: String(body.title || 'Practice task').slice(0, 80),
-      mode: body.customIds?.length ? 'custom' : 'subtopics',
-      subtopics: (body.subtopics || []).filter(s => SUBTOPIC_BY_ID[s]),
+      mode: body.customIds?.length ? 'custom' : targets.length ? 'india' : 'subtopics',
+      subtopics: (Array.isArray(body.subtopics) ? body.subtopics : []).filter(s => SUBTOPIC_BY_ID[s]),
+      targets,
       customIds: body.customIds || [],
       count: Math.min(40, Math.max(1, Number(body.count) || 10)),
       dueAt: body.dueAt ? Number(body.dueAt) : null,
       createdAt: Date.now()
     };
-    if (!t.subtopics.length && !t.customIds.length) throw Object.assign(new Error('Pick at least one topic or custom question'), { status: 400 });
+    if (!t.subtopics.length && !t.targets.length && !t.customIds.length) throw Object.assign(new Error('Pick at least one topic or custom question'), { status: 400 });
     await put('tasks', t);
     return { task: t };
   },
@@ -2423,7 +2759,7 @@ const routes = {
     }
     return {
       format: 'pri-task-pack', version: 1, exportedAt: Date.now(), teacher: p.name,
-      task: { title: t.title, mode: t.mode, subtopics: t.subtopics, customIds: t.customIds, count: t.count, dueAt: t.dueAt },
+      task: { title: t.title, mode: t.mode, subtopics: t.subtopics, targets: t.targets || [], customIds: t.customIds, count: t.count, dueAt: t.dueAt },
       customQs
     };
   },
@@ -2446,18 +2782,20 @@ const routes = {
     const src = body.task && typeof body.task === 'object' ? body.task : {};
     const customIds = (Array.isArray(src.customIds) ? src.customIds : [])
       .slice(0, 100).map(cid => idMap[safeId(cid)]).filter(Boolean);
+    const targets = indiaTargetsFrom(src.targets, src.subtopics);
     const t = {
       id: uuid(), classId: null, ownerPid: p.id,
       title: safeLabel(src.title, 80) || 'Imported task',
-      mode: customIds.length ? 'custom' : 'subtopics',
+      mode: customIds.length ? 'custom' : targets.length ? 'india' : 'subtopics',
       subtopics: (Array.isArray(src.subtopics) ? src.subtopics : []).slice(0, 100).filter(s => SUBTOPIC_BY_ID[s]),
+      targets,
       customIds,
       count: safeInt(src.count, 1, 40, 10),
       dueAt: safeTime(src.dueAt),
       fromPack: safeLabel(body.teacher, 40) || true,
       createdAt: Date.now()
     };
-    if (!t.subtopics.length && !t.customIds.length) throw Object.assign(new Error('This pack has no usable content.'), { status: 400 });
+    if (!t.subtopics.length && !t.targets.length && !t.customIds.length) throw Object.assign(new Error('This pack has no usable content.'), { status: 400 });
     await put('tasks', t);
     return { task: t };
   },
@@ -2468,13 +2806,22 @@ const routes = {
     const ratings = await ratingsFor(p.id);
     const attempts = await byIndex('attempts', 'pid', p.id);
     const tps = await byIndex('taskProgress', 'pid', p.id);
+    const india = p.course === 'in';
+    const trackId = india ? cleanIndiaTrack(p.indiaTrack, p.year) : null;
     return {
       format: 'pri-progress', version: 1, exportedAt: now,
-      student: { name: p.name, year: p.year, avatar: p.avatar || '🙂', pathway: p.year >= 11 ? pathwayOf(p) : null },
-      predicted: predictMark(ratings, p.year, now, pathwayOf(p)),
+      student: {
+        name: p.name, year: p.year, avatar: p.avatar || '🙂',
+        course: india ? 'in' : 'nsw', indiaTrack: trackId,
+        pathway: !india && p.year >= 11 ? pathwayOf(p) : null
+      },
+      // India profiles export the evidence the India product shows; there is
+      // no predicted mark to export because none exists for them.
+      predicted: india ? null : predictMark(ratings, p.year, now, pathwayOf(p)),
+      evidence: india ? indiaEvidence(indiaChapterRows(trackId, p.year, ratings, now)) : null,
       streak: await streakFor(p.id, now),
       totals: { attempts: attempts.length, correct: attempts.filter(a => a.correct).length },
-      ratings: Object.fromEntries(Object.entries(ratings).map(([k, v]) => [k, { rating: v.rating, attempts: v.attempts, correct: v.correct, last_at: v.last_at }])),
+      ratings: Object.fromEntries(Object.entries(ratings).map(([k, v]) => [k, { rating: v.rating, attempts: v.attempts, correct: v.correct, last_at: v.last_at, traps: trimTraps(v.traps || {}) }])),
       taskProgress: tps.map(tp => ({ taskId: tp.taskId, done: tp.done, correct: tp.correct, finished: !!tp.finishedAt }))
     };
   },
