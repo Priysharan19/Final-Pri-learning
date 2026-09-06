@@ -85,7 +85,7 @@
     "test:ncert:class9": "node client/test/ncert-class9-check.mjs",
     "test:audit-floor": "node client/test/runtime-audit-floor-check.mjs",
     "test:platform:security": "node server/test/security-headers-check.mjs && node server/test/login-lockout-check.mjs && node server/test/admin-bootstrap-check.mjs && node server/test/teacher-invite-check.mjs && node server/test/oidc-verification-check.mjs && node server/test/verification-enforcement-check.mjs && node server/test/housekeeping-check.mjs && node server/test/production-runtime-image-check.mjs",
-    "test:platform:commerce": "node server/test/billing-cancel-refund-check.mjs && node server/test/billing-webhook-router-check.mjs && node server/test/platform-db-operations-check.mjs && node server/test/platform-http-journeys-check.mjs"
+    "test:platform:commerce": "node server/test/billing-cancel-refund-check.mjs && node server/test/billing-webhook-router-check.mjs && node server/test/platform-db-operations-check.mjs && node server/test/platform-http-journeys-check.mjs",
     "test:marker:forms": "node client/test/marker-ncert-forms-check.mjs"
   }
 }
