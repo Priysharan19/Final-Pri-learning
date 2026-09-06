@@ -13,6 +13,7 @@ import { sanitizeFigure } from '../lib/sanitize.js';
 import { clearDraft, queueDraft, readDraft } from './drafts.js';
 import { nativePhotoAvailable, recognizePhoto } from '../native/photo.js';
 import { cloudReadingEnabled, readPhotoWithCloud } from '../ink/cloudReader.js';
+import { MAX_PDF_PAGES, renderPdfPages } from '../ink/pdfPage.js';
 import PriPlot from './PriPlot.jsx';
 import { plotSpecFor } from '../engine/plotSpec.js';
 import { checkWorkingWithCloud, mergeVerdicts, shouldCheckWorking, workingNote } from '../ink/cloudWorking.js';
@@ -324,6 +325,52 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       setPhotoOCR({ phase: 'failed', text: '', confidence: 0, engine: null, error: err?.message || 'Photo handwriting could not be read.' });
     }
   }, [isWorking, user]);
+
+  // A scanned PDF becomes pages, and the pages become the same thing a photo
+  // already is. More than one page of working is joined in order, because a
+  // student who scanned two sides of a page wrote one solution across them.
+  const decodePdf = useCallback(async (dataURL) => {
+    if (!dataURL) return;
+    setPhotoOCR({ phase: 'reading', text: '', confidence: 0, error: '', engine: null });
+    let result = { pages: [], reason: 'unreadable' };
+    try { result = await renderPdfPages(dataURL); } catch { /* reported below */ }
+    const pages = result.pages || [];
+    if (!pages.length) {
+      setPhotoOCR({
+        phase: 'failed', text: '', confidence: 0, engine: null,
+        error: result.reason === 'renderer-unavailable'
+          ? 'Reading PDFs needs a one-off download that has not happened on this device yet. Connect to the internet once and try again, or photograph the page instead — photos work offline.'
+          : 'That PDF could not be opened. If it is password-protected or was made by a scanner that locks it, photograph the page instead.'
+      });
+      return;
+    }
+    setPhoto(pages[0].dataUrl);
+    if (pages.length === 1) { decodePhoto(pages[0].dataUrl); return; }
+
+    const texts = [];
+    let worst = 1;
+    let engine = null;
+    for (const page of pages) {
+      const outcome = await readPhotoWithCloud(page.dataUrl, { user });
+      if (!outcome || outcome.error) continue;
+      const text = String(outcome.transcription.text || '').trim();
+      if (text) texts.push(text);
+      worst = Math.min(worst, Number(outcome.transcription.confidence || 0));
+      engine = outcome.transcription.engine || engine;
+    }
+    if (!texts.length) {
+      setPhotoOCR({
+        phase: 'failed', text: '', confidence: 0, engine: null,
+        error: 'Nothing could be read from that PDF. Try photographing the page instead.'
+      });
+      return;
+    }
+    const joined = texts.join('\n');
+    if (isWorking) { setWorking(joined); setShowWorking(true); }
+    const last = joined.split(/\n+/).map(x => x.trim()).filter(Boolean).at(-1) || '';
+    if (last) setAnswer(last);
+    setPhotoOCR({ phase: 'done', text: joined, confidence: worst, error: '', engine: engine || 'cloud-pdf' });
+  }, [decodePhoto, isWorking, user]);
 
   // Paste a photo straight in. On a laptop this is how a student moves a shot
   // from their phone: AirDrop or a screenshot, then ⌘V.
@@ -772,10 +819,10 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                     {/* No `capture` attribute: on iOS it forces the camera open and removes
                         the photo-library option, which is the wrong way round. A student
                         photographs their exercise book first and picks the shot afterwards. */}
-                    <input ref={photoInputRef} type="file" accept="image/*" style={{ display: 'none' }}
-                      onChange={e => attachPhoto(e, setPhoto, decodePhoto)} />
+                    <input ref={photoInputRef} type="file" accept="image/*,application/pdf" style={{ display: 'none' }}
+                      onChange={e => attachPhoto(e, setPhoto, decodePhoto, decodePdf)} />
                     {!photo
-                      ? <button className="btn btn-ghost" onClick={() => photoInputRef.current?.click()}>▣ Photograph your working on paper<span className="muted" style={{ display: 'block', fontSize: 11.5, marginTop: 2, fontWeight: 400 }}>or paste a photo you already took</span></button>
+                      ? <button className="btn btn-ghost" onClick={() => photoInputRef.current?.click()}>▣ Photograph your working on paper<span className="muted" style={{ display: 'block', fontSize: 11.5, marginTop: 2, fontWeight: 400 }}>a photo, a scanned PDF up to {MAX_PDF_PAGES} pages, or paste one you already took</span></button>
                       : (
                         <div className="photo-attach">
                           <div className="photo-thumb"><img src={photo} alt="Paper working" /><button aria-label="Remove photo" onClick={() => { setPhoto(null); setPhotoOCR({ phase: 'idle', text: '', confidence: 0, error: '', engine: null }); }}>✕</button></div>
@@ -1172,9 +1219,18 @@ function Diagnosis({ d }) {
   );
 }
 
-function attachPhoto(e, setPhoto, onReady) {
+function attachPhoto(e, setPhoto, onReady, onPdf) {
   const f = e.target.files?.[0];
   if (!f) return;
+  // A scanner app hands back a PDF, not a photo. Read it as bytes and let the
+  // caller render its pages; everything after that is identical.
+  if (f.type === 'application/pdf' || /\.pdf$/i.test(f.name || '')) {
+    const reader = new FileReader();
+    reader.onload = () => { onPdf?.(String(reader.result || '')); };
+    reader.readAsDataURL(f);
+    e.target.value = '';
+    return;
+  }
   const img = new Image();
   const url = URL.createObjectURL(f);
   img.onload = () => {

@@ -56,7 +56,8 @@ const REQUIRED = [
 const OPTIONAL = [
   { name: 'PRI_HANDWRITING_API_KEY', what: 'Turns on server-side handwriting reading and step checking. Without it both routes report themselves unavailable and the settings hide themselves.' },
   { name: 'PRI_AUTH_EMAIL_PROVIDER', what: 'Set to "resend" with PRI_RESEND_API_KEY and PRI_AUTH_EMAIL_FROM to actually send verification email. Without it accounts cannot verify, and verified email gates the reading and marking routes.' },
-  { name: 'PRI_RAZORPAY_KEY_ID', what: 'Web subscriptions. Only needed once a plan id is configured; configuring a plan without these fails the boot check on purpose.' }
+  { name: 'PRI_RAZORPAY_KEY_ID', what: 'Web subscriptions. Only needed once a plan id is configured; configuring a plan without these fails the boot check on purpose.' },
+  { name: 'PRI_DISPLAY_MONTHLY_PRICE', what: 'What the account panel shows, with PRI_DISPLAY_ANNUAL_PRICE. Until both are set the panel tells visitors that pricing has not been configured for this deployment, which is true and is not what a paying visitor should read.' }
 ];
 
 const missing = REQUIRED.filter(item => !has(item.name));
