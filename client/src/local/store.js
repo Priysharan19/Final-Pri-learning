@@ -27,18 +27,35 @@ export async function activityFor(pid) {
   return rows.sort((a, b) => a.date < b.date ? -1 : 1);
 }
 
+/**
+ * The calendar date before this one, as another `YYYY-MM-DD`.
+ *
+ * Deliberately computed in UTC: UTC has no daylight saving, so stepping back a
+ * day there is pure calendar arithmetic — month lengths and leap years included
+ * — and never depends on how long the student's own day happened to be.
+ */
+function previousDate(date) {
+  const [y, m, d] = String(date).split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d) - 86400000).toISOString().slice(0, 10);
+}
+
 export async function streakFor(pid, nowMs = Date.now(), tz = null) {
   const zone = tz || await profileTimezone(pid);
   const rows = await byIndex('activity', 'pid', pid);
   const dates = new Set(rows.filter(r => r.questions > 0).map(r => r.date));
   if (!dates.size) return 0;
+  // The walk moves through calendar dates, not through 86,400,000 ms at a time.
+  // A day is not always 24 hours: in Australia/Sydney — the default for every
+  // shipped Australian course, and available to any profile — it is 23 hours
+  // the morning daylight saving starts and 25 the morning it ends. A fixed
+  // millisecond step lands on the wrong date each time, once skipping a day the
+  // student did practise (a five-day streak read as four) and once visiting the
+  // same day twice (a two-day streak read as three). Activity rows are filed
+  // under calendar dates, so calendar dates are what this counts.
+  let cursor = dayKey(nowMs, zone);
+  if (!dates.has(cursor)) cursor = previousDate(cursor);
   let streak = 0;
-  let cursor = nowMs;
-  if (!dates.has(dayKey(nowMs, zone))) cursor -= 86400000;
-  for (; ;) {
-    const d = dayKey(cursor, zone);
-    if (dates.has(d)) { streak++; cursor -= 86400000; } else break;
-  }
+  while (dates.has(cursor)) { streak++; cursor = previousDate(cursor); }
   return streak;
 }
 

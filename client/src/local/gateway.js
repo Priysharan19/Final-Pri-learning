@@ -305,8 +305,17 @@ export function validateRequest(method, path, body) {
   }
   const key = `${verb} ${cleanPath}`;
   const contract = BODY_RULES.find(([pattern]) => pattern.test(key));
-  if (contract) contract[1](body ?? {});
-  return { method: verb, path: cleanPath, body };
+  // A route with a contract is handed back the body the contract was applied
+  // to, not the one that came in. `requireObject` reads a missing body as `{}`
+  // — which is the right reading, since every field these routes take is
+  // optional — but forwarding the original `null` meant the handler still got
+  // the value the check had just decided not to look at, and `body.targets` on
+  // a null body is a TypeError the UI cannot turn into a message. What was
+  // validated is what runs.
+  if (!contract) return { method: verb, path: cleanPath, body };
+  const checked = body ?? {};
+  contract[1](checked);
+  return { method: verb, path: cleanPath, body: checked };
 }
 
 export function beginRequest(method, path) {
