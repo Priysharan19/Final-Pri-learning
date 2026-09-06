@@ -268,6 +268,26 @@ eq('the local edit survives its own successful sync', (await get('profiles', 'p1
 eq('the queue is empty once that edit is committed', (await profileOutboxStats('p1')).pending, 0);
 
 console.log(`\nCloud sync acknowledgement — ${pass}/${pass + fail} checks`);
+// ── The idempotency key must cover the CONTENT, not just the sequence range ──
+// The server now refuses a key that arrives carrying different content — it has
+// to, because replaying the old response for a new batch threw the new work
+// away silently. But this device derived its keys from sequence numbers alone,
+// so a lost response followed by a changed local row rebuilt the SAME key over
+// DIFFERENT content and would have wedged that queue for the key's full 24-hour
+// life. Merging the two fixes without this would have traded silent data loss
+// for a visible stall.
+{
+  const { contentDigest } = await import('../src/platform/syncWorker.js');
+  const batchA = { events: [{ id: 'e1', kind: 'practice-progress' }], entities: [{ kind: 'settings', entityId: 'settings1', body: { theme: 'light' } }] };
+  const batchB = { events: [{ id: 'e1', kind: 'practice-progress' }], entities: [{ kind: 'settings', entityId: 'settings1', body: { theme: 'dark' } }] };
+  ok('the same batch always digests the same', contentDigest(batchA) === contentDigest(batchA));
+  ok('a batch that differs only in a value digests differently', contentDigest(batchA) !== contentDigest(batchB));
+  ok('and so the retried key differs, instead of colliding with the stored one',
+    `sync-dev-1-3-${contentDigest(batchA)}` !== `sync-dev-1-3-${contentDigest(batchB)}`);
+  ok('an empty and a populated batch never share a digest', contentDigest({ events: [], entities: [] }) !== contentDigest(batchA));
+  ok('the digest is short enough to leave the key inside its 160-character cap', contentDigest(batchA).length <= 13);
+}
+
 if (failures.length) {
   console.log('\nfailures:');
   for (const line of failures) console.log(`  ${line}`);

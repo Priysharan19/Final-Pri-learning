@@ -420,11 +420,36 @@ async function pullAll(pid, deviceId, state, unpublished) {
   return { pulledEvents, pulledEntities };
 }
 
+/**
+ * A stable digest of what a push actually carries.
+ *
+ * The server refuses an Idempotency-Key that arrives with different content —
+ * it has to, because replaying the old response for a new batch silently threw
+ * the new work away. But this device derived its keys from sequence ranges
+ * alone, so a lost response followed by a changed local row rebuilt the same
+ * key over different content and would wedge that queue for the key's whole
+ * 24-hour life. Folding the content in means new content is simply a new key.
+ *
+ * Not a security hash. A collision here only replays a response, which is the
+ * behaviour this had before, so speed and no dependencies win.
+ */
+export function contentDigest(payload) {
+  const text = JSON.stringify(payload ?? null);
+  let h1 = 0x811c9dc5;
+  let h2 = 0x01000193;
+  for (let i = 0; i < text.length; i += 1) {
+    const c = text.charCodeAt(i);
+    h1 = Math.imul(h1 ^ c, 0x01000193) >>> 0;
+    h2 = Math.imul(h2 + c, 0x85ebca6b) >>> 0;
+  }
+  return (h1.toString(36) + h2.toString(36)).slice(0, 13);
+}
+
 function rescanKey(prefix, deviceId, index, chunk) {
   const first = chunk[0]?.entityId || chunk[0]?.id || 'none';
   const last = chunk[chunk.length - 1]?.entityId || chunk[chunk.length - 1]?.id || 'none';
   const clean = value => String(value).replace(/[^A-Za-z0-9._:-]/g, '_').slice(0, 36);
-  return `${prefix}-${clean(deviceId)}-${index}-${chunk.length}-${clean(first)}-${clean(last)}`.slice(0, 160);
+  return `${prefix}-${clean(deviceId)}-${index}-${chunk.length}-${clean(first)}-${clean(last)}-${contentDigest(chunk)}`.slice(0, 160);
 }
 
 async function pushFullRescan(pid, deviceId, marker, state, coveredBelow) {
@@ -521,7 +546,8 @@ export async function syncNow(pid) {
         const envelope = createPushEnvelope({ deviceId, baseCursor: state.cursor, events: batch.events, entities: batch.entities });
         const first = Math.min(...batch.represented);
         const last = Math.max(...batch.represented);
-        const result = validatePushResult(await cloud.syncPush(envelope, `sync-${deviceId}-${first}-${last}`));
+        const key = `sync-${deviceId}-${first}-${last}-${contentDigest({ events: batch.events, entities: batch.entities })}`;
+        const result = validatePushResult(await cloud.syncPush(envelope, key));
         // Acknowledge what the server COMMITTED, never what this device sent.
         // Dropping a queue entry is the one irreversible act in a sync: the
         // local rows stay, but nothing will ever look at them again, so an
