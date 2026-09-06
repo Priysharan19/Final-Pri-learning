@@ -12,8 +12,6 @@ import InkCanvas from '../ink/InkCanvas.jsx';
 import { sanitizeFigure } from '../lib/sanitize.js';
 import { clearDraft, queueDraft, readDraft } from './drafts.js';
 import { nativePhotoAvailable, recognizePhoto } from '../native/photo.js';
-import PriPlot from './PriPlot.jsx';
-import { plotSpecFor } from '../engine/plotSpec.js';
 
 const DIFF_CLASS = { 1: 'tag-d1', 2: 'tag-d2', 3: 'tag-d3', 4: 'tag-d4' };
 // Public question metadata may constrain what a single answer glyph can be,
@@ -194,15 +192,7 @@ function compactInkStrokes(strokes) {
   }));
 }
 
-// The public name of each reason tag a serve can carry. A serve that names its
-// tag (the India path does) is labelled from here; one that carries only the
-// legacy `reason` keeps the tags it always had.
-const REASON_TAG_LABEL = {
-  'review-due': 'Spaced review', 'weak-spot': 'Weak spot', misconception: 'Repeated slip',
-  'new-ground': 'New ground', interleave: 'Interleaving'
-};
-
-export default function QuestionCard({ question, why, reason, reasonTag = null, onResolved, onNext, onRedo, compact = false }) {
+export default function QuestionCard({ question, why, reason, onResolved, onNext, onRedo, compact = false }) {
   const { celebrate, refreshUser, refreshDue, refreshRecent, toast } = useApp();
   const [answer, setAnswer] = useState('');
   const [mcqSel, setMcqSel] = useState(null);
@@ -310,22 +300,6 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const inkStuck = inkPhase === 'failed' && inkExhausted();
 
   const figure = useMemo(() => sanitizeFigure(question.figure), [question.figure]);
-
-  // A graph, when the question states a function outright. plotSpecFor declines
-  // far more often than it offers, because a wrong graph teaches a wrong thing;
-  // where it declines there is simply no graph.
-  const plotSpec = useMemo(() => {
-    if (!res?.solution) return null;
-    try {
-      return plotSpecFor({
-        prompt: question.prompt,
-        solutionText: res.solution.solutionText,
-        steps: res.solution.steps,
-        subtopic: question.subtopic,
-        chapterId: question.chapterId
-      });
-    } catch { return null; }
-  }, [question.prompt, question.subtopic, question.chapterId, res]);
 
   // The recogniser is only fetched once something on screen needs its LaTeX.
   // Outside write mode the only strings that reach texOf are these two.
@@ -609,10 +583,9 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         )}
         <span className="tag">{question.subtopicName}</span>
         <span className={`tag ${DIFF_CLASS[question.difficulty] || ''}`}>{question.diffLabel}</span>
-        {reasonTag && REASON_TAG_LABEL[reasonTag] && <span className="tag tag-brand" data-reason-tag={reasonTag}>{REASON_TAG_LABEL[reasonTag]}</span>}
-        {!reasonTag && reason === 'review' && <span className="tag tag-brand">Spaced review</span>}
-        {!reasonTag && reason === 'weak-spot' && <span className="tag tag-brand">Weak spot</span>}
-        {!reasonTag && reason === 'new-ground' && <span className="tag tag-brand">New ground</span>}
+        {reason === 'review' && <span className="tag tag-brand">Spaced review</span>}
+        {reason === 'weak-spot' && <span className="tag tag-brand">Weak spot</span>}
+        {reason === 'new-ground' && <span className="tag tag-brand">New ground</span>}
         {reason === 'task' && <span className="tag tag-brand">Task</span>}
         <span className="q-timer">◷ {fmtTime(elapsed)}</span>
       </div>
@@ -930,11 +903,6 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
             {res.solution?.steps && (
               <div className="solution-block">
                 <div className="sc-label" style={{ margin: '12px 0' }}>Worked solution</div>
-                {plotSpec && (
-                  <div className="q-plot" style={{ margin: '4px 0 14px' }}>
-                    <PriPlot spec={plotSpec} progress={1} reduceMotion />
-                  </div>
-                )}
                 <div className="steps">
                   {res.solution.steps.map((s, i) => (
                     <div className="step" key={i}>

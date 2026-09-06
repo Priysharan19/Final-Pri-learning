@@ -4,6 +4,7 @@ import { sanitizeFigure } from '../lib/sanitize.js';
 import { clamp01, figureRevealSchedule, primitiveReveal, tokenMotionPlan } from '../explain/choreography.js';
 import './PriExplainVisuals.css';
 import './PriExplainV6.css';
+import PriPlot from './PriPlot.jsx';
 
 function TokenStrip({ tokens, label, phase = 'rest', registerToken, motionOrder }) {
   if (!tokens?.length) return null;
@@ -356,5 +357,6 @@ export function VisualBlock({ visual, progress = 1, complete = true }) {
   if (visual.kind === 'ink') return <InkReplay visual={visual} progress={progress} />;
   if (visual.kind === 'attempt') return <AttemptReplay visual={visual} />;
   if (visual.kind === 'figure') return <AnimatedFigure visual={visual} progress={progress} />;
+  if (visual.kind === 'plot') return <PriPlot spec={visual.spec} progress={progress} title={visual.label} />;
   return null;
 }

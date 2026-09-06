@@ -167,7 +167,13 @@ export function checkAnswer(question, rawInput) {
           let gn, gd;
           if (frac) { gn = Number(frac[1]); gd = Number(frac[2]); }
           else if (mixed) { const sign = mixed[1] === '-' ? -1 : 1; gd = Number(mixed[4]); gn = sign * (Number(mixed[2]) * gd + Number(mixed[3])); }
-          else if (d !== 1) return { correct: false, feedback: 'Give your answer as a fraction in simplest form (like 2/3).' };
+          else if (d !== 1) {
+            // Before asking for a different notation, check whether the value
+            // they gave is one a trap predicts: naming the misconception is
+            // worth more to the student than a note about form.
+            const why = matchTraps(question, parseNumericInput(rawInput).value, rawInput);
+            return { correct: false, feedback: why ?? 'Give your answer as a fraction in simplest form (like 2/3).' };
+          }
           if (gd !== undefined) {
             if (!numsClose(gn / gd, n / d)) {
               const why = matchTraps(question, gn / gd, rawInput);
@@ -223,6 +229,11 @@ export function checkAnswer(question, rawInput) {
         const values = parts.map(p => parseNumericInput(p).value);
         const targets = [...ans.values];
         if (values.length !== targets.length) {
+          // A designed wrong answer is worth more than a count: if the student
+          // gave exactly the value a trap predicts, name the misconception
+          // rather than telling them how many solutions to write.
+          const why = matchTraps(question, values.length === 1 ? values[0] : null, rawInput);
+          if (why) return { correct: false, feedback: why };
           return { correct: false, feedback: targets.length > values.length ? `There ${targets.length === 2 ? 'are two solutions' : `are ${targets.length} solutions`} — you've given ${values.length}.` : 'You have listed too many solutions.' };
         }
         for (const v of values) {

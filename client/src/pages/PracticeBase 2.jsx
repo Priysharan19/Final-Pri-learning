@@ -303,7 +303,6 @@ export default function Practice() {
             key={serve.question.id}
             question={serve.question}
             reason={serve.reason}
-            reasonTag={serve.reasonTag || null}
             why={serve.why}
             onResolved={onResolved}
             onNext={load}
@@ -342,7 +341,6 @@ export default function Practice() {
             <div className="ctx-pill-name">
               {heading}
               {dotpoint != null && <span className="muted"> · dot point {Number(dotpoint) + 1}</span>}
-              {serve?.nextUp?.name && <span className="muted" data-next-up={serve.nextUp.subtopic}> · next up: {serve.nextUp.name}</span>}
             </div>
           </div>
           {(subtopic || taskId || difficulty || assignmentMode) && (

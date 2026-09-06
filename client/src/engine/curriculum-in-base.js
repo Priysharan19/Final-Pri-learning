@@ -563,9 +563,17 @@ export const IN_CURRICULUM = [
 // A track is a scope over the chapters above plus, for the olympiad, subjects
 // that are not in any school chapter at all. JEE Main and JEE Advanced share the
 // Class 11–12 chapter list — what separates them is depth, so they are the same
-// scope at different difficulty ceilings rather than two different syllabi, and
+// scope at different difficulty windows rather than two different syllabi, and
 // saying that here is more honest than duplicating the list and implying
 // otherwise.
+//
+// A window is a floor and a ceiling on the difficulty rung served in practice:
+// CBSE D1–D3, JEE Main D2–D4, JEE Advanced D3–D4. The floor is what makes the
+// "difficulty is the difference" caption true in the engine rather than only on
+// the picker — without it a JEE Advanced student's first question in every
+// chapter is a D1 warm-up. The JEE tracks are also class-aware: `scopeFor` still
+// lists both senior years (a Class 11 student may choose a Class 12 chapter),
+// and `ownGrades` says which of them smart practice serves first.
 
 const senior = grade => IN_CURRICULUM.find(g => g.grade === grade).chapters.map(c => c.id);
 
@@ -574,29 +582,37 @@ export const IN_TRACKS = {
     id: 'cbse',
     name: 'CBSE / NCERT',
     caption: 'The school syllabus, Classes 7–12',
+    difficultyFloor: 1,
     difficultyCeiling: 3,
-    scopeFor: grade => senior(grade)
+    scopeFor: grade => senior(grade),
+    ownGrades: grade => [grade]
   },
   'jee-main': {
     id: 'jee-main',
     name: 'JEE Main',
     caption: 'Classes 11–12 at objective-exam depth, negative marking, 3 hours',
+    difficultyFloor: 2,
     difficultyCeiling: 4,
-    scopeFor: () => [...senior(11), ...senior(12)]
+    scopeFor: () => [...senior(11), ...senior(12)],
+    ownGrades: grade => (grade === 11 ? [11] : [11, 12])
   },
   'jee-advanced': {
     id: 'jee-advanced',
     name: 'JEE Advanced',
     caption: 'The same syllabus taken to multi-concept depth — the difficulty is the difference',
+    difficultyFloor: 3,
     difficultyCeiling: 4,
-    scopeFor: () => [...senior(11), ...senior(12)]
+    scopeFor: () => [...senior(11), ...senior(12)],
+    ownGrades: grade => (grade === 11 ? [11] : [11, 12])
   },
   olympiad: {
     id: 'olympiad',
     name: 'Olympiad (PRMO → RMO → INMO)',
     caption: 'Not harder school maths — a different subject',
+    difficultyFloor: 1,
     difficultyCeiling: 4,
-    scopeFor: () => OLYMPIAD_TOPICS.map(t => t.id)
+    scopeFor: () => OLYMPIAD_TOPICS.map(t => t.id),
+    ownGrades: () => []
   }
 };
 

@@ -6,12 +6,15 @@
 // Any unsafe storyboard is rejected and callers fall back to the deterministic
 // renderer, whose text originates from the marking/solution pipeline.
 
+import { plotSpecFor } from '../engine/plotSpec.js';
+
 export const STORYBOARD_VERSION = 3;
 export const ACTION_KINDS = Object.freeze([
   'replay_attempt',
   'transform_equation',
   'focus_math',
   'show_figure',
+  'plot_function',
   'checkpoint',
 ]);
 
@@ -107,6 +110,30 @@ function cleanAction(raw, evidence, context) {
       ? raw.mode
       : 'figure';
     return { ok: true, reason: '', action: { kind, mode } };
+  }
+
+  if (kind === 'plot_function') {
+    // A graph is a mathematical claim, so it is held to the same rule as the
+    // rest: the function drawn must be one this question or its verified
+    // solution actually states. The spec is re-derived here from the same
+    // context and the expression must match; a storyboard cannot introduce a
+    // curve of its own.
+    const expr = text(raw?.spec?.fn, 120);
+    if (!expr) return { ok: false, reason: 'invalid plot', action: null };
+    let derived = null;
+    try {
+      derived = plotSpecFor({
+        prompt: context?.questionPrompt,
+        solutionText: context?.solutionText,
+        steps: context?.solutionSteps,
+        subtopic: context?.subtopic,
+        chapterId: context?.chapterId
+      });
+    } catch { derived = null; }
+    if (!derived || derived.fn !== expr) {
+      return { ok: false, reason: 'plotted function is not stated by the question', action: null };
+    }
+    return { ok: true, reason: '', action: { kind, spec: derived, label: text(raw.label, 120) || derived.label } };
   }
 
   if (kind === 'checkpoint') {

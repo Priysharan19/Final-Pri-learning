@@ -114,6 +114,12 @@ export default function PriExplainV5({ questionId, questionPrompt, questionFigur
     ...payload,
     questionPrompt,
     questionFigure,
+    // The storyboard validator re-derives any graph from these, so a plotted
+    // curve can only be one the question or its verified solution states.
+    solutionText: payload?.solution?.solutionText,
+    solutionSteps: payload?.solution?.steps,
+    subtopic: payload?.subtopic,
+    chapterId: payload?.chapterId,
     wrongAttempt: payload?.wrongAttempt || wrongRef.current?.submission || null,
   }), [payload, questionPrompt, questionFigure]);
 

@@ -3,6 +3,7 @@
 // after storyboard.js proves every mathematical reference came from the
 // verified solution payload.
 
+import { plotSpecFor } from '../engine/plotSpec.js';
 import { STORYBOARD_VERSION, validateStoryboard } from './storyboard.js';
 
 const MATH = /\$([^$]+)\$/g;
@@ -142,6 +143,20 @@ export function buildDeterministicStoryboard(solution, context = {}) {
     });
   }
 
+  // plotSpecFor declines unless the question states a function outright, so
+  // most lessons have no graph and that is the honest outcome.
+  let plotSpec = null;
+  try {
+    plotSpec = plotSpecFor({
+      prompt,
+      solutionText: solution?.solutionText,
+      steps: solution?.steps,
+      subtopic: context.subtopic,
+      chapterId: context.chapterId
+    });
+  } catch { plotSpec = null; }
+  let plotted = false;
+
   let previous = null;
   for (const [stepIndex, step] of (solution?.steps || []).entries()) {
     const heading = String(step?.h || `Step ${stepIndex + 1}`);
@@ -160,6 +175,12 @@ export function buildDeterministicStoryboard(solution, context = {}) {
     }
     if (figure && ['graph', 'geometry', 'calculus', 'statistics', 'figure'].includes(concept)) {
       actions.push({ kind: 'show_figure', mode: concept });
+    }
+    // One graph per lesson, on the first step that has one to draw: a curve
+    // redrawn at every step is noise, not teaching.
+    if (plotSpec && !plotted) {
+      actions.push({ kind: 'plot_function', spec: plotSpec, label: plotSpec.label });
+      plotted = true;
     }
 
     scenes.push({
@@ -214,6 +235,9 @@ function visualFromAction(action, context) {
   }
   if (action.kind === 'show_figure' && context.questionFigure) {
     return { kind: 'figure', mode: action.mode || 'figure', figure: String(context.questionFigure) };
+  }
+  if (action.kind === 'plot_function' && action.spec) {
+    return { kind: 'plot', spec: action.spec, label: action.label || '' };
   }
   if (action.kind === 'checkpoint') {
     return { kind: 'checkpoint', prompt: action.prompt };
