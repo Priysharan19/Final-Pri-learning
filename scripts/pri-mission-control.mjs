@@ -138,19 +138,19 @@ function globRegex(pattern) {
   return new RegExp(`^${escaped}$`);
 }
 
-function ruleSpecificity(rule) { return String(rule.pattern || '').replace(/\*/g, '').length; }
 function canonicalOwner(file) {
-  const matched = (fleet.ownership_rules || []).filter(rule => globRegex(rule.pattern).test(file));
-  if (!matched.length) return null;
-  matched.sort((a, b) => ruleSpecificity(b) - ruleSpecificity(a) || b.pattern.length - a.pattern.length);
-  const best = matched[0];
-  const tied = matched.filter(rule => ruleSpecificity(rule) === ruleSpecificity(best) && rule.pattern.length === best.pattern.length);
-  if (new Set(tied.map(rule => rule.primary)).size !== 1) return null;
-  return best.primary;
+  if (/[*?]/.test(file)) return null;
+  try {
+    const output = execFileSync(process.execPath, [path.join(ROOT, 'scripts', 'pri-fleet.mjs'), 'route', file], { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+    const route = JSON.parse(output);
+    return route?.owned === true ? route.primary || null : null;
+  } catch {
+    return null;
+  }
 }
 
 function hasCanonicalPrimaryPath(agent, paths) {
-  return paths.some(file => !/[*?]/.test(file) && canonicalOwner(file) === agent);
+  return paths.some(file => canonicalOwner(file) === agent);
 }
 
 function literalPrefix(pattern) { return String(pattern).split(/[*?]/, 1)[0]; }
