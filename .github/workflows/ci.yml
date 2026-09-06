@@ -45,6 +45,7 @@ jobs:
           grep -Fq 'INDIA EXAM FLOW: PASS — 122/122 checks' suites.log
           grep -Fq '✔ INDIA IDENTITY SUITE PASSED — 102/102 checks across 5 groups' suites.log
           grep -Fq 'INDIA ADAPTIVE: PASS — 304/304 checks' suites.log
+          grep -Fq 'PLOTTING: PASS — 72/72 checks' suites.log
           grep -Fq 'PASS — Grade 9 Ganita Manjari: 1280 seeded forms (1000 numeric handwriting-ready, 280 conceptual).' suites.log
           grep -Fq 'PASS — 8/8 chapters, 200/200 uploaded pages, 42/42 formal exercise sections and 293/293 formal exercise prompts represented and verified.' suites.log
           if grep -Fq 'not measured:' suites.log; then
