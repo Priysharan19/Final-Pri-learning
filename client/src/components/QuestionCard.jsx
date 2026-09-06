@@ -16,6 +16,7 @@ import { cloudReadingEnabled, readPhotoWithCloud } from '../ink/cloudReader.js';
 import { MAX_PDF_PAGES, renderPdfPages } from '../ink/pdfPage.js';
 import PriPlot from './PriPlot.jsx';
 import { plotSpecFor } from '../engine/plotSpec.js';
+import { awardStepMarks, marksSentence } from '../engine/cbseMarking.js';
 import { checkWorkingWithCloud, mergeVerdicts, shouldCheckWorking, workingNote } from '../ink/cloudWorking.js';
 
 const DIFF_CLASS = { 1: 'tag-d1', 2: 'tag-d2', 3: 'tag-d3', 4: 'tag-d4' };
@@ -680,6 +681,27 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   );
   const cloudWorkingNote = useMemo(() => workingNote(cloudCheck), [cloudCheck]);
 
+  // ── The board's own arithmetic ─────────────────────────────────────────────
+  // CBSE marks per step: formula, substitution, final answer with units. A
+  // student whose method is sound and whose arithmetic slipped keeps most of
+  // the marks, and a student who wrote only the answer forfeits the rest. Every
+  // Indian student is told this and almost none get to practise it, because the
+  // teacher who would read their working has twenty-six other children.
+  const boardAward = useMemo(() => {
+    if (!resolved || res?.invalid || res?.revealed) return null;
+    const lines = writeMode ? (inkResult?.lines || []) : String(working || '').split(/\n+/);
+    const shown = lines.map(l => String(l || '').trim()).filter(Boolean);
+    try {
+      return awardStepMarks({
+        question: { ...question, marks: totalMarks, steps: res?.solution?.steps || question.steps },
+        workingLines: shown,
+        stepReport: activeReport,
+        answerText: writeMode ? (inkResult?.answerLine || '') : String(answer || ''),
+        correct: !!res?.correct
+      });
+    } catch { return null; }
+  }, [resolved, res, writeMode, inkResult, working, answer, question, totalMarks, activeReport]);
+
   // Teacher comments panel — one card per marked step, like a margin column.
   const inkComments = useMemo(() => {
     if (!writeMode || !lineVerdicts || !inkResult?.lines?.length) return null;
@@ -1083,6 +1105,33 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
               </div>
               {res.feedback && !verdictGood && <div style={{ marginTop: 6 }}><b>Reasoning:</b> <MathText text={res.feedback} /></div>}
               {res.partial && !verdictGood && <div className="muted" style={{ marginTop: 6, fontSize: 13.5 }}>◐ {res.partial.note}</div>}
+              {boardAward && (
+                <div className="board-award" style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid var(--line, rgba(128,128,128,.22))' }}>
+                  <div className="spread" style={{ alignItems: 'baseline' }}>
+                    <span className="sc-label" style={{ margin: 0 }}>Marked step by step</span>
+                    <b style={{ fontVariantNumeric: 'tabular-nums' }}>{boardAward.awarded} / {boardAward.total}</b>
+                  </div>
+                  {boardAward.rows.map((row, i) => (
+                    <div key={i} className="set-row" style={{ paddingTop: 5, paddingBottom: 5 }}>
+                      <span className="set-k" style={{ fontWeight: 400 }}>
+                        <span aria-hidden="true" style={{ marginRight: 7, color: row.earned === row.outOf ? 'var(--good, #1a8f4c)' : 'var(--bad, #c0392b)' }}>
+                          {row.earned === row.outOf ? '✓' : '✗'}
+                        </span>
+                        {row.label}
+                        {row.why && <span className="muted" style={{ display: 'block', fontSize: 11.5, marginTop: 2, marginLeft: 20 }}>{row.why}</span>}
+                      </span>
+                      <span className="set-v" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                        <span className="sr-only">{row.earned} of {row.outOf} marks. </span>{row.earned}/{row.outOf}
+                      </span>
+                    </div>
+                  ))}
+                  <p style={{ marginTop: 8, fontSize: 13 }}>{marksSentence(boardAward)}</p>
+                  <p className="muted" style={{ fontSize: 11.5, marginTop: 6 }}>
+                    Board-style step marking, worked out from this question's own solution. It follows the convention CBSE
+                    publishes; it is not CBSE's official marking scheme for a past paper.
+                  </p>
+                </div>
+              )}
               {verdictGood && writeMode && inkResult?.lines?.length > 1 && (
                 <div style={{ marginTop: 6 }}><b>Reasoning:</b> Every line of your handwritten working was checked — {inkResult.lines.length} steps read and verified, reaching the required result through a logical chain.</div>
               )}
