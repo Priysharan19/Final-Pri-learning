@@ -88,17 +88,17 @@ export const flow = {
     await check('a question renders on a phone', await page.locator('.q-prompt').count() === 1);
     const typeTab = page.getByRole('button', { name: 'Answer by typing' });
     if (await typeTab.count()) { await typeTab.click(); await settle(); }
-    const box = page.locator('.editor-body input.answer-input');
-    if (await box.count()) {
-      const inside = await page.evaluate(() => {
-        const el = document.querySelector('.editor-body input.answer-input');
-        const r = el.getBoundingClientRect();
-        return r.left >= -1 && r.right <= document.documentElement.clientWidth + 1;
-      });
-      await check('the answer box fits the screen', inside);
-    } else {
-      note('this question does not take a typed answer; the box is covered by the desktop flow');
-    }
+    // Whether a given question takes a typed answer depends on which one was
+    // served, so this is one check either way rather than a conditional one:
+    // a suite whose check count moves with the draw cannot be gated on.
+    const fits = await page.evaluate(() => {
+      const el = document.querySelector('.editor-body input.answer-input');
+      if (!el) return 'no-typed-answer';
+      const r = el.getBoundingClientRect();
+      return r.left >= -1 && r.right <= document.documentElement.clientWidth + 1 ? 'fits' : 'overflows';
+    });
+    await check('a typed answer box, when this question has one, fits the screen', fits !== 'overflows', `answer box: ${fits}`);
+    if (fits === 'no-typed-answer') note('this question does not take a typed answer; the box is covered by the desktop flow');
   }
 };
 
