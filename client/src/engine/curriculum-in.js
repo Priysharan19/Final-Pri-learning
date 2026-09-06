@@ -3,6 +3,7 @@
 // layer upgrades source-audited chapters while preserving Pri Learning's
 // established India product contract.
 import { IN_CURRICULUM, IN_CHAPTERS, IN_CHAPTER_BY_ID } from './curriculum-in-base.js';
+import { indiaExamFieldsFor } from './indiaExamMarks.js';
 import { NCERT_CLASS7_2026_27_CHAPTERS } from './ncert/class7-2026-27-production.js';
 import { NCERT_CLASS7_PART2_2026_27_CHAPTERS } from './ncert/class7-part2-2026-27-production.js';
 import {
@@ -31,8 +32,13 @@ function replaceClass7() {
     id: src.id,
     name: src.title,
     strand: src.strand,
-    weight: src.weight,
     dotpoints: [...src.dotpoints],
+    // Grade 7 sits under no published board paper, so `indiaExamFieldsFor`
+    // keeps the source file's authored emphasis and marks it as such. A chapter
+    // rebuilt here must carry the same exam fields the base spine's `C()` gives
+    // every other chapter, or a surface reading `examSource` would see
+    // `undefined` on exactly the classes that have no examination behind them.
+    ...indiaExamFieldsFor(src.id, src.weight),
     native: true,
     covers: src.covers.map(c => ({ gen:c.gen, dp:[...c.dp], diff:[...c.diff] }))
   }));
@@ -81,8 +87,12 @@ function replaceClass9() {
     id: src.id,
     name: src.title,
     strand: src.strand,
-    weight: src.weight,
     dotpoints: [...src.dotpoints],
+    // Same as Grade 7: the Classes IX–X course structure is cited in
+    // indiaExams.js, but only the Class X half is read into a blueprint there,
+    // so Grade 9 keeps its authored emphasis rather than being handed a unit
+    // weightage nobody in this repo has source-checked.
+    ...indiaExamFieldsFor(src.id, src.weight),
     native: true,
     covers: src.covers.map(c => ({ gen:c.gen, dp:[...c.dp], diff:[...c.diff] }))
   }));
