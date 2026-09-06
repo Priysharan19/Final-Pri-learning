@@ -1169,3 +1169,27 @@ body { overscroll-behavior-y: none; }
   display: inline-flex;
   align-items: baseline;
 }
+
+/* The More sheet: the destinations the five-slot bottom bar cannot hold.
+   Before it existed, Exams, Favorites and Classes had no entry point at all on
+   a phone, which is the device most Indian students have. */
+.mnav-sheet-scrim {
+  position: fixed; inset: 0; z-index: 81; border: none; padding: 0;
+  background: rgba(0, 0, 0, 0.45); backdrop-filter: blur(2px);
+}
+.mnav-sheet {
+  position: fixed; z-index: 82; left: 8px; right: 8px;
+  bottom: calc(64px + env(safe-area-inset-bottom));
+  background: var(--surface); border: 1px solid var(--hairline-strong);
+  border-radius: var(--radius); box-shadow: 0 18px 60px rgba(0, 0, 0, 0.45);
+  padding: 8px; display: grid; gap: 2px;
+}
+.mnav-sheet-item {
+  display: flex; align-items: center; gap: 12px;
+  min-height: 48px; padding: 10px 14px; border-radius: var(--radius-sm);
+  color: var(--ink-2); font-size: 15px; text-decoration: none;
+}
+.mnav-sheet-item:hover, .mnav-sheet-item:focus-visible { background: var(--surface-2); color: var(--ink); }
+.mnav-sheet-item .nav-ico { font-size: 18px; }
+.mnav-item { min-width: 48px; min-height: 48px; }
+@media (min-width: 761px) { .mnav-sheet, .mnav-sheet-scrim { display: none; } }

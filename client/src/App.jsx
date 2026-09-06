@@ -70,6 +70,10 @@ export function Logo({ large = false, onClick }) {
 
 export default function App() {
   const [user, setUser] = useState(undefined);
+  // Declared with the other top-level state: the app returns early for the
+  // boot screen and the profile gate, and a hook after those would not run on
+  // every render.
+  const [moreOpen, setMoreOpen] = useState(false);
   const [toasts, setToasts] = useState([]);
   const [dueCount, setDueCount] = useState(0);
   const [recent, setRecent] = useState([]);
@@ -270,13 +274,41 @@ export default function App() {
         </div>
       </div>
 
-      <nav className="mobilenav no-print">
-        {[navItems[0], navItems[1], navItems[2], navItems[3], navItems[7]].map(n => (
+      {/* The bar holds five destinations; the rest live behind More. Before
+          this, Exams, Favorites and Classes had no entry point at all on a
+          phone — an Indian student on a phone could not reach an exam. */}
+      <nav className="mobilenav no-print" aria-label="Primary">
+        {[navItems[0], navItems[1], navItems[2], navItems[3]].map(n => (
           <NavLink key={n.to} to={n.to} end={n.to === '/'} className={({ isActive }) => 'mnav-item' + (isActive ? ' active' : '')}>
             <span className="nav-ico">{n.ico}</span><span>{n.label}</span>
           </NavLink>
         ))}
+        <button
+          type="button"
+          className={'mnav-item' + (moreOpen ? ' active' : '')}
+          aria-expanded={moreOpen}
+          aria-controls="mobile-more"
+          onClick={() => setMoreOpen(v => !v)}
+        >
+          <span className="nav-ico" aria-hidden="true">☰</span><span>More</span>
+        </button>
       </nav>
+
+      {moreOpen && (
+        <>
+          <button type="button" className="mnav-sheet-scrim" aria-label="Close" onClick={() => setMoreOpen(false)} />
+          <div className="mnav-sheet" id="mobile-more" role="dialog" aria-modal="true" aria-label="More places to go">
+            {navItems.slice(4).map(n => (
+              <NavLink key={n.to} to={n.to} className="mnav-sheet-item" onClick={() => setMoreOpen(false)}>
+                <span className="nav-ico" aria-hidden="true">{n.ico}</span><span>{n.label}</span>
+              </NavLink>
+            ))}
+            <NavLink to="/history" className="mnav-sheet-item" onClick={() => setMoreOpen(false)}>
+              <span className="nav-ico" aria-hidden="true">↺</span><span>History</span>
+            </NavLink>
+          </div>
+        </>
+      )}
       <ToastLayer toasts={toasts} />
     </AppCtx.Provider>
   );
