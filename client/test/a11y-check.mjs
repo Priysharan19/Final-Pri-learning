@@ -851,6 +851,7 @@ async function run() {
       await wait(page, 700);
     });
 
+
     await step('settings · editing the profile', '/settings', async () => {
       await click(page, 'button.btn-ghost', { text: 'Edit' });
     });
@@ -871,6 +872,16 @@ async function run() {
       await page.waitForSelector('.ink-wrap', { timeout: 30000 });
       await wait(page, 600);
     });
+
+    // ── the documents a store, a payment provider and the DPDP Act require ──
+    // A parent reading a privacy notice on a phone with a screen reader is
+    // exactly the reader these pages have to work for.
+    for (const path of ['/privacy', '/terms', '/refund-policy', '/grievance']) {
+      await step(`legal · ${path.slice(1)}`, path, async () => {
+        await goTo(page, BASE, path);
+        await wait(page, 500);
+      });
+    }
 
     // ── the redirects are routes too ──
     for (const [path, route] of [['/map', '/map'], ['/stats', '/stats'], ['/badges', '/badges'], ['/no-such-page', '*']]) {

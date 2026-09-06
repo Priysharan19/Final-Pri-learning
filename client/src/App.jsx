@@ -9,6 +9,7 @@ import Login from './pages/Login.jsx';
 import Home from './pages/Home.jsx';
 import Practice from './pages/Practice.jsx';
 import Progress from './pages/Progress.jsx';
+import Legal from './pages/Legal.jsx';
 import Exams from './pages/Exams.jsx';
 import ExamRoom from './pages/ExamRoom.jsx';
 import Rush from './pages/Rush.jsx';
@@ -185,7 +186,15 @@ export default function App() {
   if (!user) {
     return (
       <AppCtx.Provider value={ctx}>
-        <Login />
+        <Routes>
+          {/* A store reviewer and a payment provider open these without an
+              account, so they are reachable before the profile gate. */}
+          <Route path="/privacy" element={<Legal />} />
+          <Route path="/terms" element={<Legal />} />
+          <Route path="/refund-policy" element={<Legal />} />
+          <Route path="/grievance" element={<Legal />} />
+          <Route path="*" element={<Login />} />
+        </Routes>
         <ToastLayer toasts={toasts} />
       </AppCtx.Provider>
     );
@@ -248,6 +257,10 @@ export default function App() {
                   <Route path="/favorites" element={<Favorites />} />
                   <Route path="/classes" element={<Classes />} />
                   <Route path="/history" element={<History />} />
+                  <Route path="/privacy" element={<Legal />} />
+                  <Route path="/terms" element={<Legal />} />
+                  <Route path="/refund-policy" element={<Legal />} />
+                  <Route path="/grievance" element={<Legal />} />
                   <Route path="/settings" element={<Settings />} />
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
