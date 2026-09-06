@@ -276,10 +276,33 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   // then Vision, which needs no network and no account; then nothing, said
   // plainly. Whatever reads it, the text lands in an editable box and is never
   // submitted on the reader's word alone.
+  /**
+   * Read one image of working with whichever reader is actually good at it:
+   * the server reader where the student has switched it on, then Apple Vision,
+   * which needs no network and no account. Returns null when neither could.
+   */
+  const readOnePage = useCallback(async (dataURL) => {
+    const lastLine = t => String(t || '').split(/\n+/).map(x => x.trim()).filter(Boolean).at(-1) || '';
+    if (cloudReadingEnabled(user)) {
+      const outcome = await readPhotoWithCloud(dataURL, { user });
+      if (outcome && !outcome.error && !outcome.reason) {
+        const text = String(outcome.transcription.text || '').trim();
+        if (text) return { text, markable: lastLine(text), confidence: outcome.transcription.confidence, engine: outcome.transcription.engine };
+      }
+    }
+    if (!nativePhotoAvailable()) return null;
+    try {
+      const result = await recognizePhoto(dataURL);
+      const text = String(result?.text || '').trim();
+      const markable = String(result?.answer || '').trim() || lastLine(text);
+      if (!text && !markable) return null;
+      return { text, markable, confidence: result?.confidence, engine: result?.engine || 'apple-vision-photo-v1' };
+    } catch { return null; }
+  }, [user]);
+
   const decodePhoto = useCallback(async (dataURL) => {
     if (!dataURL) return;
-    const cloudFirst = cloudReadingEnabled(user);
-    if (!cloudFirst && !nativePhotoAvailable()) {
+    if (!cloudReadingEnabled(user) && !nativePhotoAvailable()) {
       setPhotoOCR({
         phase: 'unavailable', text: '', confidence: 0, engine: null,
         error: 'Reading photos is not available here. Turn on server reading in Settings, or type your working instead.'
@@ -287,45 +310,18 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       return;
     }
     setPhotoOCR({ phase: 'reading', text: '', confidence: 0, error: '', engine: null });
-
-    const apply = (text, markable, confidence, engine) => {
-      if (isWorking && text) { setWorking(text); setShowWorking(true); }
-      if (markable) setAnswer(markable);
-      setPhotoOCR({ phase: 'done', text, confidence: Number(confidence || 0), error: '', engine });
-    };
-    const lastLine = (text) => text.split(/\n+/).map(x => x.trim()).filter(Boolean).at(-1) || '';
-
-    if (cloudFirst) {
-      const outcome = await readPhotoWithCloud(dataURL, { user });
-      if (outcome && !outcome.error) {
-        const text = String(outcome.transcription.text || '').trim();
-        const markable = lastLine(text);
-        if (text || markable) {
-          apply(text, markable, outcome.transcription.confidence, outcome.transcription.engine);
-          return;
-        }
-      }
-      // Fall through to Vision rather than failing: a refused or unreachable
-      // server should not cost the student the reader already on the device.
-      if (!nativePhotoAvailable()) {
-        setPhotoOCR({
-          phase: 'failed', text: '', confidence: 0, engine: null,
-          error: outcome?.error?.message || 'That photo could not be read. Try a straighter, better-lit shot, or type your working.'
-        });
-        return;
-      }
+    const page = await readOnePage(dataURL);
+    if (!page) {
+      setPhotoOCR({
+        phase: 'failed', text: '', confidence: 0, engine: null,
+        error: 'That photo could not be read. Try a straighter, better-lit shot, or type your working.'
+      });
+      return;
     }
-
-    try {
-      const result = await recognizePhoto(dataURL);
-      const text = String(result?.text || '').trim();
-      const markable = String(result?.answer || '').trim() || lastLine(text);
-      if (!text && !markable) throw new Error('No handwriting was detected in that photo.');
-      apply(text, markable, result?.confidence, result?.engine || 'apple-vision-photo-v1');
-    } catch (err) {
-      setPhotoOCR({ phase: 'failed', text: '', confidence: 0, engine: null, error: err?.message || 'Photo handwriting could not be read.' });
-    }
-  }, [isWorking, user]);
+    if (isWorking && page.text) { setWorking(page.text); setShowWorking(true); }
+    if (page.markable) setAnswer(page.markable);
+    setPhotoOCR({ phase: 'done', text: page.text, confidence: Number(page.confidence || 0), error: '', engine: page.engine });
+  }, [isWorking, user, readOnePage]);
 
   // A scanned PDF becomes pages, and the pages become the same thing a photo
   // already is. More than one page of working is joined in order, because a
@@ -351,13 +347,16 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     const texts = [];
     let worst = 1;
     let engine = null;
+    let unread = 0;
     for (const page of pages) {
-      const outcome = await readPhotoWithCloud(page.dataUrl, { user });
-      if (!outcome || outcome.error) continue;
-      const text = String(outcome.transcription.text || '').trim();
-      if (text) texts.push(text);
-      worst = Math.min(worst, Number(outcome.transcription.confidence || 0));
-      engine = outcome.transcription.engine || engine;
+      // The same ladder decodePhoto uses. Reading each page with the server
+      // reader alone meant a student who had not switched it on saw "nothing
+      // could be read" on a device that could have read it perfectly well.
+      const page1 = await readOnePage(page.dataUrl);
+      if (!page1) { unread += 1; continue; }
+      if (page1.text) texts.push(page1.text);
+      worst = Math.min(worst, Number(page1.confidence || 0));
+      engine = page1.engine || engine;
     }
     if (!texts.length) {
       setPhotoOCR({
@@ -365,6 +364,11 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         error: 'Nothing could be read from that PDF. Try photographing the page instead.'
       });
       return;
+    }
+    if (unread > 0) {
+      // Presenting two of three pages as the whole of the working would submit
+      // an answer the student never wrote.
+      toast(<span>{unread} of {pages.length} pages could not be read — check the working below before marking.</span>);
     }
     const joined = texts.join('\n');
     if (isWorking) { setWorking(joined); setShowWorking(true); }
@@ -534,7 +538,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         if (!inkResult?.lines?.length) return;
         given = inkResult.lines.join('\n');
         viaInk = true;
-        ink = { strokes: compactInkStrokes(inkResult.strokes), recognized: inkResult.text };
+        ink = { strokes: compactInkStrokes(inkResult.strokes), recognized: inkResult.text, engine: inkResult.engine || null };
       } else {
         given = working;
         if (!given.trim()) return;
@@ -544,7 +548,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       given = inkResult.answerLine;
       steps = inkResult.lines.length > 1 ? inkResult.lines.join('\n') : undefined;
       viaInk = true;
-      ink = { strokes: compactInkStrokes(inkResult.strokes), recognized: inkResult.text };
+      ink = { strokes: compactInkStrokes(inkResult.strokes), recognized: inkResult.text, engine: inkResult.engine || null };
     } else {
       given = answer;
       if (String(given).trim() === '') return;
@@ -842,23 +846,32 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                         the photo-library option, which is the wrong way round. A student
                         photographs their exercise book first and picks the shot afterwards. */}
                     <input ref={photoInputRef} type="file" accept="image/*,application/pdf" style={{ display: 'none' }}
-                      onChange={e => attachPhoto(e, setPhoto, decodePhoto, decodePdf)} />
-                    {!photo
+                      onChange={e => attachPhoto(e, setPhoto, decodePhoto, decodePdf, message => setPhotoOCR({ phase: 'failed', text: '', confidence: 0, engine: null, error: message }))} />
+                    {!photo && photoOCR.phase === 'idle'
                       ? <button className="btn btn-ghost" onClick={() => photoInputRef.current?.click()}>▣ Photograph your working on paper<span className="muted" style={{ display: 'block', fontSize: 11.5, marginTop: 2, fontWeight: 400 }}>a photo, a scanned PDF up to {MAX_PDF_PAGES} pages, or paste one you already took</span></button>
                       : (
                         <div className="photo-attach">
-                          <div className="photo-thumb"><img src={photo} alt="Paper working" /><button aria-label="Remove photo" onClick={() => { setPhoto(null); setPhotoOCR({ phase: 'idle', text: '', confidence: 0, error: '', engine: null }); }}>✕</button></div>
+                          {photo
+                            ? <div className="photo-thumb"><img src={photo} alt="Paper working" /><button aria-label="Remove photo" onClick={() => { setPhoto(null); setPhotoOCR({ phase: 'idle', text: '', confidence: 0, error: '', engine: null }); }}>✕</button></div>
+                            : <div className="photo-thumb" aria-hidden="true" style={{ display: 'grid', placeItems: 'center', fontSize: 22 }}>▤<button aria-label="Remove attachment" onClick={() => setPhotoOCR({ phase: 'idle', text: '', confidence: 0, error: '', engine: null })}>✕</button></div>}
                           <div style={{ flex: 1 }}>
-                            {photoOCR.phase === 'reading' && <span className="muted">Reading your handwriting on-device with Apple Vision…</span>}
+                            {photoOCR.phase === 'reading' && (
+                              <span className="muted">{cloudReadingEnabled(user) ? 'Reading your handwriting…' : 'Reading your handwriting on-device with Apple Vision…'}</span>
+                            )}
                             {photoOCR.phase === 'done' && (
                               <>
-                                <div style={{ fontSize: 12.5, marginBottom: 6 }}><b>Decoded on-device</b>{photoOCR.confidence ? ` · ${Math.round(photoOCR.confidence * 100)}% OCR confidence` : ''}</div>
+                                {/* What actually read it. Saying "on-device" over a photo that
+                                    was uploaded is the one thing this screen must never do. */}
+                                <div style={{ fontSize: 12.5, marginBottom: 6 }}>
+                                  <b>{String(photoOCR.engine || '').startsWith('cloud') ? 'Read on the server' : 'Decoded on-device'}</b>
+                                  {photoOCR.confidence ? ` · ${Math.round(photoOCR.confidence * 100)}% OCR confidence` : ''}
+                                </div>
                                 <pre style={{ whiteSpace: 'pre-wrap', margin: 0, font: 'inherit', color: 'var(--ink)' }}>{photoOCR.text}</pre>
                                 <div className="muted" style={{ marginTop: 6 }}>Pri filled the answer box from the final recognised line. Check or edit it before marking.</div>
                               </>
                             )}
                             {(photoOCR.phase === 'failed' || photoOCR.phase === 'unavailable') && <span style={{ color: 'var(--warn)' }}>{photoOCR.error}</span>}
-                            {photoOCR.phase === 'idle' && <span className="muted">Photo attached. Native Pri will decode it into editable maths before marking.</span>}
+                            {photoOCR.phase === 'idle' && <span className="muted">Attached. Pri will read it into editable maths before marking.</span>}
                           </div>
                         </div>
                       )}
@@ -1268,7 +1281,7 @@ function Diagnosis({ d }) {
   );
 }
 
-function attachPhoto(e, setPhoto, onReady, onPdf) {
+function attachPhoto(e, setPhoto, onReady, onPdf, onFailed) {
   const f = e.target.files?.[0];
   if (!f) return;
   // A scanner app hands back a PDF, not a photo. Read it as bytes and let the
@@ -1292,7 +1305,12 @@ function attachPhoto(e, setPhoto, onReady, onPdf) {
     onReady?.(dataURL);
     URL.revokeObjectURL(url);
   };
-  img.onerror = () => URL.revokeObjectURL(url);
+  img.onerror = () => {
+    URL.revokeObjectURL(url);
+    // Previously a silent no-op: the student picked a file and the UI did not
+    // move. A HEIC from an iPhone opened on Android lands here.
+    onFailed?.('That image could not be opened. Try photographing the page again, or save it as a JPEG first.');
+  };
   img.src = url;
   e.target.value = '';
 }

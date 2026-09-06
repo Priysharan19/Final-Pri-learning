@@ -59,13 +59,32 @@ export async function checkWorkingWithCloud(lines, {
   available = cloudAvailable
 } = {}) {
   if (!workingCheckEnabled(user, { available })) return null;
-  const clean = (lines || []).map(l => String(l ?? '').trim()).filter(Boolean);
+
+  // Blank lines are not sent — there is nothing to check on them — so the
+  // server's indices count only the non-blank lines while the ink surface
+  // indexes every line it read. Without this map a verdict lands on the wrong
+  // row: a ✗ and "the mistake is here" on a line that was correct.
+  const clean = [];
+  const originalIndex = [];
+  (lines || []).forEach((line, i) => {
+    const t = String(line ?? '').trim();
+    if (!t) return;
+    clean.push(t);
+    originalIndex.push(i);
+  });
   if (clean.length < 2) return null;
+
   try {
     const response = await transport.checkWorking(String(prompt || ''), clean, { signal });
     const check = response?.check;
     if (!check || !Array.isArray(check.lines) || !check.lines.length) return null;
-    return check;
+    return {
+      ...check,
+      lines: check.lines.map(l => ({ ...l, index: originalIndex[l.index] ?? l.index })),
+      firstBreak: Number.isInteger(check.firstBreak) && check.firstBreak >= 0
+        ? (originalIndex[check.firstBreak] ?? check.firstBreak)
+        : -1
+    };
   } catch (error) {
     return { error: { code: error?.code || 'WORKING_FAILED', message: error?.message || '' } };
   }
@@ -84,6 +103,12 @@ export function mergeVerdicts(localVerdicts, check, { lineCount } = {}) {
   if (!n || !check || check.error) return localVerdicts || null;
 
   const confident = check.needsConfirmation !== true;
+  // When the server found no break at all, its words are useful and its ticks
+  // are not: a green ✓ from a judgement renders identically to one from a
+  // verified rule, and this only runs when the answer is already known to be
+  // wrong. Saying "every line is fine" in ticks on a wrong answer is worse than
+  // saying nothing.
+  if (!Number.isInteger(check.firstBreak) || check.firstBreak < 0) return localVerdicts || null;
   const out = [];
   let changed = false;
 

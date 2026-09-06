@@ -137,9 +137,14 @@ export function rasterizeInk(strokes, {
 
     const dataUrl = canvas.toDataURL('image/png');
     const bytes = dataUrlBytes(dataUrl);
-    if (bytes <= maxBytes || scale <= MIN_SCALE) {
+    if (bytes <= maxBytes) {
       return { dataUrl, width, height, bytes, scale, strokes: painted.strokes, points: bounds.points };
     }
+    // At the floor and still over budget, this page cannot be sent. Returning it
+    // anyway used to hand cloudTransport an image five times its 1 MB body cap,
+    // which threw and surfaced to the student as "couldn't reach the reader" for
+    // a page that was never sent. Refusing here is the honest outcome.
+    if (scale <= MIN_SCALE) return null;
     // Area scales with the square of the linear scale, so aim straight at the
     // budget rather than stepping down blindly.
     scale = Math.max(MIN_SCALE, scale * Math.sqrt(maxBytes / bytes) * 0.95);

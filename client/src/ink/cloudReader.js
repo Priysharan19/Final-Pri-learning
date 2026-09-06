@@ -78,16 +78,19 @@ export async function readWithCloud(strokes, {
   rasterize = rasterizeInk,
   available = cloudAvailable
 } = {}) {
-  if (!cloudReadingEnabled(user, { available })) return null;
+  if (!cloudReadingEnabled(user, { available })) return { reason: 'disabled' };
 
   let raster = null;
-  try { raster = rasterize(strokes); } catch { return null; }
-  if (!raster?.dataUrl) return null;
+  try { raster = rasterize(strokes); } catch { return { reason: 'unrenderable' }; }
+  // Null here means the ink could not be drawn small enough to send. That is a
+  // different answer from "switched off", and the caller can only say something
+  // useful if it can tell them apart.
+  if (!raster?.dataUrl) return { reason: 'too-large' };
 
   try {
     const response = await transport.transcribeHandwriting(raster.dataUrl, { signal });
     const transcription = response?.transcription;
-    if (!transcription?.lines?.length) return null;
+    if (!transcription?.lines?.length) return { reason: 'empty' };
     return { transcription, raster: { width: raster.width, height: raster.height, bytes: raster.bytes } };
   } catch (error) {
     // A refusal is information for the setting screen, not an error the student
@@ -108,6 +111,12 @@ export function shouldSupersede(cloudReading, localReading, { hasManualCorrectio
   if (!cloudReading || hasManualCorrections) return false;
   if (cloudReading.needsConfirmation) return false;
   if (!cloudReading.text.trim()) return false;
+  // A reading that split the page into a different number of lines cannot be
+  // applied silently. Its lines carry no boxes, so the ✓/✗ overlay draws
+  // nothing, and toReading drops per-glyph symbols, so the tap-to-correct row
+  // is empty — the student would be unable to fix a single character of a
+  // reading they did not produce. Offer it instead.
+  if (cloudReading.alignedToLocalLines !== true) return false;
   const normalise = t => String(t || '').replace(/\s+/g, ' ').trim();
   return normalise(cloudReading.text) !== normalise(localReading?.text);
 }
@@ -130,16 +139,19 @@ export async function readPhotoWithCloud(dataUrl, {
   prepare = preparePhoto,
   available = cloudAvailable
 } = {}) {
-  if (!cloudReadingEnabled(user, { available })) return null;
+  if (!cloudReadingEnabled(user, { available })) return { reason: 'disabled' };
 
   let prepared = null;
-  try { prepared = await prepare(dataUrl); } catch { return null; }
-  if (!prepared?.dataUrl) return null;
+  try { prepared = await prepare(dataUrl); } catch { return { reason: 'unreadable' }; }
+  // A photo the browser cannot decode — a HEIC on Android, say — or one that
+  // never compresses under the budget. Both are the student's to act on, and
+  // neither is "server reading is off".
+  if (!prepared?.dataUrl) return { reason: 'unreadable' };
 
   try {
     const response = await transport.transcribeHandwriting(prepared.dataUrl, { signal });
     const transcription = response?.transcription;
-    if (!transcription?.lines?.length) return null;
+    if (!transcription?.lines?.length) return { reason: 'empty' };
     return {
       transcription,
       photo: { width: prepared.width, height: prepared.height, bytes: prepared.bytes, quality: prepared.quality }
