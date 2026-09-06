@@ -2,7 +2,7 @@
 // The question experience, styled as a full page: marks + live timer up top,
 // hint bulbs that trade credit for help, three answer modes (type / write /
 // photo), an evaluation card with reasoning, worked solution, final answer and
-// an HSC-style criteria table. All marking logic is the verified v3 engine.
+// a marks criteria table. All marking logic is the verified v3 engine.
 // ─────────────────────────────────────────────────────────────────────────────
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../api.js';

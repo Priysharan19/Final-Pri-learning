@@ -858,6 +858,46 @@ const INDIA_WHY = {
  * own ground; a Class 11 JEE student's Class 12 chapters stay reachable by
  * explicit choice whether or not they are in the pool.
  */
+/**
+ * The pool a game mode should draw from: this student's own curriculum.
+ *
+ * Rapid Fire and Match both called scopeForYear() directly, which is the NSW
+ * scope and has no India branch — so two top-level navigation items served
+ * Australian subtopics to Indian students and then counted the results into
+ * India Progress. Everything either mode needs is a chapter with an id and a
+ * strand, which both spines provide.
+ */
+async function practicePoolFor(profile, now = Date.now()) {
+  if (profile.course !== 'in') {
+    const { own, revision } = scopeForYear(profile.year, pathwayOf(profile));
+    return { india: false, entries: [...own, ...revision] };
+  }
+  const trackId = cleanIndiaTrack(profile.indiaTrack, profile.year);
+  const ratings = await ratingsFor(profile.id);
+  const { pool } = indiaPool(trackId, profile.year, ratings, now);
+  return { india: true, trackId, grade: profile.year, entries: pool };
+}
+
+/**
+ * One drawable question target from that pool.
+ *
+ * An India chapter is not itself a generator id — the chapter declares which
+ * generators cover which dot points, and resolveIndiaTarget picks one inside
+ * the track's difficulty window. The Australian scope is already keyed by
+ * generator, so it passes straight through.
+ */
+function practiceTargetFrom(pool, entry, difficulty) {
+  if (!pool.india) return { subtopic: entry.id, difficulty };
+  const target = resolveIndiaTarget(entry, { track: pool.trackId, grade: pool.grade, difficulty });
+  if (!target?.generator) return null;
+  // Past-paper questions are deliberately excluded from the timed modes. A
+  // board question is written to be worked, not answered in four seconds
+  // against Captain Cosine, and its archive is a lazily-loaded chunk that has
+  // no business being fetched inside a draw loop. The caller retries.
+  if (target.pyq) return null;
+  return { subtopic: target.generator, difficulty: target.difficulty ?? difficulty };
+}
+
 function indiaPool(trackId, grade, ratings, now) {
   const { own, ahead } = indiaPracticeScope(trackId, grade);
   const states = Object.fromEntries([...own, ...ahead].map(c => [c.id, indiaState(c, ratings, now)]));
@@ -2742,13 +2782,17 @@ const routes = {
   // ---- rush ----
   'POST /rush/start': async () => {
     const p = await requireProfile();
-    const { own, revision } = scopeForYear(p.year, pathwayOf(p));
-    const pool = [...own, ...revision];
+    // Rapid Fire drew from the NSW scope for every profile, so an Indian
+    // Class 10 student playing it was answering MA5 subtopics. The India spine
+    // already knows this student's chapters; there is no reason a game mode
+    // should be the one surface that forgets which country they are in.
+    const pool = await practicePoolFor(p);
     const questions = [];
-    for (let i = 0; i < 20; i++) {
-      const s = pool[Math.floor(Math.random() * pool.length)];
-      const d = Math.random() < 0.7 ? 1 : 2;
-      const { row, payload } = await createQuestion(p.id, s.id, d, 'rush');
+    for (let guard = 0; questions.length < 20 && guard < 120; guard++) {
+      const entry = pool.entries[Math.floor(Math.random() * pool.entries.length)];
+      const target = practiceTargetFrom(pool, entry, Math.random() < 0.7 ? 1 : 2);
+      if (!target) continue;
+      const { row, payload } = await createQuestion(p.id, target.subtopic, target.difficulty, 'rush');
       questions.push(sanitize(payload, row));
     }
     return { questions, seconds: 90 };
@@ -2784,17 +2828,18 @@ const routes = {
     };
     const rival = rivals[body?.rival] || rivals.rookie;
     const strandPick = body?.strand; // 'Algebra' | 'Calculus' | 'Statistics & Probability' | undefined
-    const { own, revision } = scopeForYear(p.year, pathwayOf(p));
-    let pool = [...own, ...revision];
+    const pool = await practicePoolFor(p);
+    let entries = pool.entries;
     if (strandPick) {
-      const filtered = pool.filter(s => strandPick === 'Calculus' ? s.strand === 'Calculus' : s.strand === strandPick);
-      if (filtered.length) pool = filtered;
+      const filtered = entries.filter(s => strandPick === 'Calculus' ? s.strand === 'Calculus' : s.strand === strandPick);
+      if (filtered.length) entries = filtered;
     }
     const questions = [];
-    for (let i = 0; i < 10; i++) {
-      const s = pool[Math.floor(Math.random() * pool.length)];
-      const d = Math.random() < 0.6 ? 1 : 2;
-      const { row, payload } = await createQuestion(p.id, s.id, d, 'match');
+    for (let guard = 0; questions.length < 10 && guard < 60; guard++) {
+      const entry = entries[Math.floor(Math.random() * entries.length)];
+      const target = practiceTargetFrom(pool, entry, Math.random() < 0.6 ? 1 : 2);
+      if (!target) continue;
+      const { row, payload } = await createQuestion(p.id, target.subtopic, target.difficulty, 'match');
       questions.push(sanitize(payload, row));
     }
     return { questions, rival, total: 10 };

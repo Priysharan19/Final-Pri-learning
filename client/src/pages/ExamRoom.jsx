@@ -109,7 +109,7 @@ export default function ExamRoom() {
             {pct}%<span className="sr-only"> of the paper's marks — {pct >= 80 ? 'a strong result' : pct >= 50 ? 'a fair result' : 'below half'}</span>
           </div>
           <p className="sub" style={{ marginTop: 6 }}>{result.score} of {result.total} marks · {
-            pct >= 90 ? 'Outstanding — Band 6 territory.' :
+            pct >= 90 ? 'Outstanding — this is board-topper territory.' :
               pct >= 80 ? 'Excellent work — exam ready.' :
                 pct >= 65 ? 'Solid — a few areas to tighten up.' :
                   pct >= 50 ? 'A fair base — the review below shows exactly where the marks went.' :

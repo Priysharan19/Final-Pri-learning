@@ -582,11 +582,13 @@ export default function Settings() {
           <div className="card" ref={el => secRefs.current.help = el}>
             <h2 style={{ marginBottom: 8 }}>? Help & Safety</h2>
             <p className="sub">
-              Every subtopic tracks a skill rating that moves with each answer — harder questions move it more.
-              Smart Practice targets ~70% success, weaves in spaced reviews before topics fade, and the mark
-              predictor weighs mastery across the syllabus by exam weight, calibrated to HSC bands. Handwritten
-              answers are recognised entirely on-device — strokes → symbols → maths — then marked by the same
-              engine as typed answers, line by line. Hints and retries still earn credit, just a little less.
+              Every chapter tracks a skill rating that moves with each answer — harder questions move it more.
+              Smart Practice targets ~70% success and weaves in spaced reviews before topics fade.
+              {' '}{user.course === 'in'
+                ? 'The mark estimate covers only the parts of the paper you have practised, and it never converts that into a CBSE percentage, a JEE percentile or a rank — none of those can be honestly derived from practice at home.'
+                : 'The mark predictor weighs mastery across the syllabus by exam weight, calibrated to HSC bands.'}
+              {' '}Handwritten answers are recognised on this device — strokes → symbols → maths — then marked by
+              the same engine as typed answers, line by line. Hints and retries still earn credit, just a little less.
               {!window.__PRI_NATIVE__ && <> For the full-screen iPad experience: <b>Share → Add to Home Screen</b>.</>}
             </p>
           </div>
