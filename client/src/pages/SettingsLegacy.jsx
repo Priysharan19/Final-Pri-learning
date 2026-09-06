@@ -4,6 +4,7 @@ import { useApp } from '../App.jsx';
 import { downloadJSON, readJSONFile, dateStamp } from '../lib/files.js';
 import Calibrate from '../ink/Calibrate.jsx';
 import { personalStats, clearPersonal, ensurePersonalLoaded } from '../ink/personal.js';
+import { cloud, cloudAvailable } from '../platform/cloudTransport.js';
 import { MIN_PASSWORD, PasswordMeter, passwordVerdict } from './Login.jsx';
 
 const AVATARS = ['🚀', '🦊', '🐨', '🦉', '🌟', '🐯', '🍀', '🎧', '🦄', '⚡', '🌊', '🧠'];
@@ -18,7 +19,76 @@ export const PATHWAY_OPTS = [
 
 const fmtBytes = (b) => b > 1e9 ? `${(b / 1e9).toFixed(1)} GB` : b > 1e6 ? `${(b / 1e6).toFixed(1)} MB` : `${Math.round(b / 1e3)} KB`;
 
+/**
+ * The opt-in for server-side reading.
+ *
+ * Off until the student turns it on, and only shown where the deployment can
+ * actually do it. The copy says exactly what leaves the iPad, because "a
+ * picture of your handwriting" is the whole of it and a student is owed the
+ * plain version rather than a euphemism.
+ */
+function CloudReadingRow({ user, setUser, toast }) {
+  const [status, setStatus] = useState(null);   // null = still asking, {available}
+  const [busy, setBusy] = useState(false);
+  const on = user?.cloudHandwriting === true;
+
+  useEffect(() => {
+    let live = true;
+    if (!cloudAvailable()) { setStatus({ available: false }); return () => { live = false; }; }
+    cloud.handwritingStatus()
+      .then(r => { if (live) setStatus({ available: !!r?.available }); })
+      .catch(() => { if (live) setStatus({ available: false }); });
+    return () => { live = false; };
+  }, []);
+
+  async function toggle(next) {
+    setBusy(true);
+    try {
+      const r = await api.patch('/me', { cloudHandwriting: next });
+      setUser(r.user);
+      toast(<span>{next ? 'Server reading is on for this profile' : 'Server reading is off — reading stays on this device'}</span>);
+    } catch (e) { toast(<span>{e.message}</span>); }
+    finally { setBusy(false); }
+  }
+
+  if (status && !status.available) {
+    return (
+      <p className="sub" style={{ marginTop: 12 }}>
+        Reading handwriting on a server is not available on this install, so every reading happens on this device.
+      </p>
+    );
+  }
+
+  return (
+    <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--line, rgba(128,128,128,.25))' }}>
+      <div className="set-row">
+        <span className="set-k">
+          Also read my handwriting on the server
+          <span className="muted" style={{ display: 'block', fontSize: 12, marginTop: 3, maxWidth: 460 }}>
+            The on-device reader knows 58 symbols and has no comma, so lines like <b>−1, 0, 1, 2, 4</b> are beyond it.
+            Turn this on and a picture drawn from your strokes is sent to be read as well. It is a picture of your
+            writing only — never the question, never the answer, never your name. Your working still appears
+            instantly from the on-device reading; the server reading arrives after, and you can always keep yours.
+          </span>
+        </span>
+        <span className="set-v">
+          <button
+            type="button"
+            className={`btn btn-sm ${on ? 'btn-primary' : 'btn-quiet'}`}
+            aria-pressed={on}
+            disabled={busy || !status}
+            onClick={() => toggle(!on)}
+          >
+            {!status ? 'Checking…' : on ? 'On' : 'Off'}
+          </button>
+        </span>
+      </div>
+    </div>
+  );
+}
+
 function HandwritingSection({ toast }) {
+  const { user, setUser } = useApp();
   const [teaching, setTeaching] = useState(false);
   const [, refresh] = useState(0);
   useEffect(() => { ensurePersonalLoaded().then(() => refresh(x => x + 1)); }, []);
@@ -47,6 +117,7 @@ function HandwritingSection({ toast }) {
           </button>
         )}
       </div>
+      <CloudReadingRow user={user} setUser={setUser} toast={toast} />
     </div>
   );
 }

@@ -10,6 +10,7 @@ import { createEntitlementRouter } from './entitlements.js';
 import { createIdentityRouter } from './identities.js';
 import { createReportRouter } from './reports.js';
 import { createSyncRouter } from './sync.js';
+import { createHandwritingRouter } from './handwriting.js';
 import { createTelemetryRouter } from './telemetry.js';
 import { assertPlatformConfig, platformConfigStatus } from './config.js';
 import { csrfGuard, originGuard } from './security.js';
@@ -85,6 +86,7 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
   router.use('/assignments', createAssignmentExecutionRouter(db));
   router.use('/content', createContentRouter(db));
   router.use('/reports', createReportRouter(db));
+  router.use('/handwriting', createHandwritingRouter(db));
   router.use('/telemetry', createTelemetryRouter(db));
   router.use('/admin', createAdminRouter(db));
 

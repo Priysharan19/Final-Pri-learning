@@ -12,6 +12,8 @@ import { nativeInk, nativeInkAvailable, inferredNotationContext } from './native
 import { chooseNativeConsensus, hasReading, normalizedReadingText } from './nativeConsensus.js';
 import { recognizeWithStructuralDev } from '../../dev/devStructural.js';
 import { recognize, exprToLatex } from './recognizer.js';
+import { cloudReadingEnabled, readWithCloud, shouldSupersede, toReading } from './cloudReader.js';
+import { useApp } from '../App.jsx';
 import { recognizeWithoutDetachedSideWork } from './runtimeSpatial.js';
 import { feedbackGeometry } from './feedbackGeometry.js';
 import { ALPHABET } from './templates.js';
@@ -108,6 +110,9 @@ function readingConfidence(result) {
  */
 export default function InkAnswer({ onRecognized, height = 300, disabled, lineVerdicts = null, focusSymbol = null, recognitionContext = null }) {
   const canvasRef = useRef(null);
+  // The signed-in profile carries the server-reading opt-in, which is off
+  // unless the student turned it on.
+  const { user } = useApp();
   const [tool, setTool] = useState('pen');
   const [finger, setFinger] = useState(false);
   const [rec, setRec] = useState({ lines: [], text: '' });
@@ -116,9 +121,19 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
   const [extraHeight, setExtraHeight] = useState(0);
   const timerRef = useRef(null);
   const readSeqRef = useRef(0);
+  const cloudAbortRef = useRef(null);
+  const [cloudState, setCloudState] = useState(null);   // null | 'reading' | 'confirm' | 'failed'
+  // An unconfident server reading is kept here and offered, never applied. The
+  // student decides, because they are the only one who knows what they wrote.
+  const [cloudOffer, setCloudOffer] = useState(null);
+  // Read inside the async cloud pass, where the `overrides` of the render that
+  // started it would be stale by the time the server answers.
+  const overridesRef = useRef({});
   const strokesRef = useRef([]);
   const pickerRef = useRef(null);
   const focusedRef = useRef(null);
+
+  useEffect(() => { overridesRef.current = overrides; }, [overrides]);
 
   const publish = useCallback((r, strokes) => {
     setRec(r);
@@ -137,6 +152,47 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
       strokes
     });
   }, [onRecognized]);
+
+  /**
+   * Ask the server to read the same strokes, after the local reading is already
+   * on screen. Supersedes only a reading the student has not corrected, and only
+   * when the server says it is confident; otherwise the local reading stands and
+   * the student is offered the alternative.
+   */
+  const runCloudPass = useCallback((strokes, seq, localReading) => {
+    if (!cloudReadingEnabled(user)) return;
+    cloudAbortRef.current?.abort?.();
+    const controller = typeof AbortController === 'function' ? new AbortController() : null;
+    cloudAbortRef.current = controller;
+    setCloudState('reading');
+
+    readWithCloud(strokes, { user, signal: controller?.signal }).then(outcome => {
+      // Newer writing has already replaced this read.
+      if (seq !== readSeqRef.current) return;
+      if (!outcome) { setCloudState(null); setCloudOffer(null); return; }
+      if (outcome.error) { setCloudState('failed'); setCloudOffer(null); return; }
+
+      const reading = toReading(outcome.transcription, localReading);
+      if (!reading) { setCloudState(null); setCloudOffer(null); return; }
+      const corrected = Object.keys(overridesRef.current || {}).length > 0;
+      if (shouldSupersede(reading, localReading, { hasManualCorrections: corrected })) {
+        publish(reading, strokes);
+        setCloudState(null);
+        setCloudOffer(null);
+        return;
+      }
+      // Not applied. Offer it only when it actually says something different —
+      // and never over a correction the student made by hand.
+      const differs = reading.text.trim() && reading.text.trim() !== (localReading?.text || '').trim();
+      if (differs && !corrected) {
+        setCloudOffer({ reading, strokes });
+        setCloudState('confirm');
+      } else {
+        setCloudOffer(null);
+        setCloudState(null);
+      }
+    }).catch(() => { if (seq === readSeqRef.current) { setCloudState('failed'); setCloudOffer(null); } });
+  }, [user, publish]);
 
   const runRecognition = useCallback((strokes, ovr) => {
     const seq = ++readSeqRef.current;
@@ -164,7 +220,9 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
         const local = readWithJS();
         if (seq !== readSeqRef.current) return;
         const engine = structuralLanExpected() ? 'pri-js-v3-v4-unavailable' : 'pri-js-v3';
-        publish(local ? { ...local, engine } : { ...EMPTY_READING, engine }, strokes);
+        const published = local ? { ...local, engine } : { ...EMPTY_READING, engine };
+        publish(published, strokes);
+        runCloudPass(strokes, seq, published);
       });
       return;
     }
@@ -183,7 +241,9 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
       if (hasReading(foundation) && hasReading(local)
           && normalizedReadingText(foundation) === normalizedReadingText(local)) {
         const agreed = chooseNativeConsensus([foundation, local], effectiveContext);
-        publish(agreed || { ...EMPTY_READING, engine: 'pri-native-no-reading' }, strokes);
+        const published = agreed || { ...EMPTY_READING, engine: 'pri-native-no-reading' };
+        publish(published, strokes);
+        runCloudPass(strokes, seq, published);
         return;
       }
 
@@ -193,10 +253,14 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
           ? readUnreadLines(nativeRaw, strokes, ovr, effectiveContext)
           : null;
         const chosen = chooseNativeConsensus([foundation, local, nativeReading], effectiveContext);
-        publish(chosen || { ...EMPTY_READING, engine: 'pri-native-no-reading' }, strokes);
+        const published = chosen || { ...EMPTY_READING, engine: 'pri-native-no-reading' };
+        publish(published, strokes);
+        // The three on-device readers disagreed often enough to need a fourth
+        // opinion; this is where a server read earns its cost.
+        runCloudPass(strokes, seq, published);
       });
     });
-  }, [publish, recognitionContext]);
+  }, [publish, recognitionContext, runCloudPass]);
 
   const onStrokesChange = useCallback((strokes) => {
     strokesRef.current = strokes;
@@ -349,7 +413,29 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
         <div className="ink-preview">
           <div className="ink-preview-title" id="ink-reading">
             I'm reading:{engineNote && <span className="muted" style={{ marginLeft: 10, textTransform: 'none', letterSpacing: 0 }}>{engineNote}</span>}
+            {cloudState === 'reading' && (
+              <span className="muted" style={{ marginLeft: 10, textTransform: 'none', letterSpacing: 0 }}>· checking this reading</span>
+            )}
+            {cloudState === 'failed' && (
+              <span className="muted" style={{ marginLeft: 10, textTransform: 'none', letterSpacing: 0 }}>· couldn’t reach the reader — this is the on-device reading</span>
+            )}
           </div>
+          {cloudOffer && (
+            <div className="ink-cloud-offer" style={{ margin: '6px 14px 2px', fontSize: 12.5 }}>
+              <div className="muted" style={{ marginBottom: 4 }}>Another reading of the same ink — use it if it is closer to what you wrote:</div>
+              <div className="row" style={{ alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <span className="ink-line-math"><MathText text={`$${exprToLatex(cloudOffer.reading.text) || '\\;'}$`} /></span>
+                <button type="button" className="btn btn-quiet btn-sm"
+                  onClick={() => { publish(cloudOffer.reading, cloudOffer.strokes); setCloudOffer(null); setCloudState(null); }}>
+                  Use this reading
+                </button>
+                <button type="button" className="btn btn-quiet btn-sm"
+                  onClick={() => { setCloudOffer(null); setCloudState(null); }}>
+                  Keep mine
+                </button>
+              </div>
+            </div>
+          )}
           {rec.disagreement && Array.isArray(rec.candidateReadings) && rec.candidateReadings.length > 1 && (
             <details style={{ margin: '8px 14px 2px', fontSize: 11.5 }} className="muted">
               <summary style={{ cursor: 'pointer' }}>Recognition evidence</summary>

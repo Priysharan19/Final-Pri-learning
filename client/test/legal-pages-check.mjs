@@ -66,8 +66,18 @@ ok(!/stroke/i.test(syncContract) || !/upload/i.test(syncContract) || true,
   'the sync contract is readable for the notice to describe');
 // Markdown wraps its lines, so the prose is compared with whitespace flattened.
 const privacy = readFileSync(join(ROOT, 'docs/legal/privacy.md'), 'utf8').replace(/\s+/g, ' ');
-ok(/handwriting strokes are not uploaded/i.test(privacy),
-  'the notice states that handwriting strokes are not uploaded');
+ok(/reading your writing happens on your device by default/i.test(privacy)
+  && /your strokes stay there/i.test(privacy),
+  'the notice states that reading is on-device by default and the strokes stay there');
+// The optional server reading must be described where a student reads about it,
+// with the promise the code actually keeps. A notice that still claims strokes
+// never leave the device would now be false for anyone who turned it on.
+ok(/off unless you turn it on/i.test(privacy),
+  'and that sending handwriting to a server is off unless the student turns it on');
+ok(/not the question, not the expected answer/i.test(privacy),
+  'and names what is never sent alongside the image');
+ok(!/handwriting strokes are not uploaded/i.test(privacy),
+  'and no longer makes the unconditional claim the optional setting would break');
 ok(/90 days/.test(privacy), 'the notice states the telemetry retention window');
 ok(/without a password is not encrypted|profile without a password is not/i.test(privacy),
   'the notice admits that a profile without a password is not encrypted');
