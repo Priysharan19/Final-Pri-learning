@@ -92,6 +92,35 @@ eq(unsureMerge, localQuiet, 'an unsure check puts no mark on any line');
 eq(mergeVerdicts(localQuiet, { error: { code: 'X' } }, { lineCount: 3 }), localQuiet, 'and a failed check changes nothing');
 eq(mergeVerdicts(null, check, { lineCount: 3 })[1].status, 'break', 'it also works where there were no local verdicts at all');
 
+// ── 4b · A verdict must land on the line the student actually wrote ──────────
+// Blank lines are not sent, so the server counts only non-blank lines while the
+// ink surface indexes every line it read. Untranslated, a ✗ and "the mistake is
+// here" landed on a line that was correct.
+let sentLines = null;
+const blanksSpy = {
+  checkWorking: async (prompt, lines) => {
+    sentLines = lines;
+    return { check: { lines: [{ index: 0, status: 'ok', carried: false, why: '' }, { index: 1, status: 'ok', carried: false, why: '' }, { index: 2, status: 'break', carried: false, why: 'sign error' }], firstBreak: 2, hint: 'check the sign', confidence: 0.93, needsConfirmation: false } };
+  }
+};
+const withBlanks = ['2x+3=9', '', '2x=6', '', 'x=2'];
+const translated = await checkWorkingWithCloud(withBlanks, { user: { cloudMarking: true }, transport: blanksSpy, available: there });
+eq(sentLines, ['2x+3=9', '2x=6', 'x=2'], 'blank lines are not sent — there is nothing to check on them');
+eq(translated.firstBreak, 4, 'and the break comes back indexed to the line the student actually wrote');
+eq(translated.lines.map(l => l.index), [0, 2, 4], 'every verdict is translated back through the blanks');
+const landed = mergeVerdicts(null, translated, { lineCount: 5 });
+eq(landed[4].status, 'break', 'so the ✗ lands on line 5, not on the correct line 3');
+ok(!landed[2] || landed[2].status !== 'break', 'and never on a line that was right');
+ok(/Line 5/.test(workingNote(translated).text), 'and the sentence names the line the student sees');
+
+// ── 4c · A confident "nothing is wrong" must not tick a wrong answer's lines ─
+// This only runs when the answer is already known to be wrong, and a cloud tick
+// renders identically to a rule-verified one.
+const noFault = { lines: [{ index: 0, status: 'ok', carried: false, why: '' }, { index: 1, status: 'ok', carried: false, why: '' }], firstBreak: -1, hint: '', confidence: 0.95, needsConfirmation: false };
+eq(mergeVerdicts(localQuiet, noFault, { lineCount: 3 }), localQuiet,
+  'a check that found no break contributes its words and no ticks');
+ok(workingNote(noFault).text.length > 0, 'while still telling the student the algebra held up');
+
 // ── 5 · What the student reads ───────────────────────────────────────────────
 const note = workingNote(check);
 ok(/Line 2 is where it goes wrong/.test(note.text), 'the note names the line, counting from 1 as the student sees it');

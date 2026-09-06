@@ -86,6 +86,11 @@ const shrinking = rasterizeInk(STROKES, {
 ok(attempts >= 2, 'an oversized page is redrawn smaller rather than refused');
 ok(shrinking && shrinking.bytes <= MAX_IMAGE_BYTES, 'until it fits');
 ok(rasterizeInk([], { createCanvas: () => recordingCanvas().canvas }) === null, 'a blank page produces nothing to send');
+// At the smallest scale and still over budget, the old code returned the image
+// anyway — five times the transport's 1 MB body cap — which threw and reached
+// the student as "couldn't reach the reader" for a page that was never sent.
+ok(rasterizeInk(STROKES, { createCanvas: () => recordingCanvas(4_000_000).canvas }) === null,
+  'a page that cannot be drawn under the budget is refused rather than sent unsendably');
 
 // ── 4 · Off unless the student turned it on ──────────────────────────────────
 const there = () => true;
@@ -99,8 +104,19 @@ let called = 0;
 const transport = { transcribeHandwriting: async () => { called += 1; return { transcription: { lines: [{ text: 'x = 4', confidence: 0.9 }], text: 'x = 4', confidence: 0.9, needsConfirmation: false, engine: 'cloud-test' } }; } };
 const rasterize = () => ({ dataUrl: 'data:image/png;base64,AAAA', width: 10, height: 10, bytes: 3 });
 
-await readWithCloud(STROKES, { user: { cloudHandwriting: false }, transport, rasterize, available: there });
+const offOutcome = await readWithCloud(STROKES, { user: { cloudHandwriting: false }, transport, rasterize, available: there });
 eq(called, 0, 'with the setting off, nothing is sent');
+// Three different things used to come back as a bare null — switched off, a page
+// that could not be drawn, and a server that read nothing — so the caller could
+// only ever offer one generic message.
+eq(offOutcome.reason, 'disabled', 'and the caller is told it was switched off, not that something failed');
+const unrenderable = await readWithCloud(STROKES, { user: { cloudHandwriting: true }, transport, rasterize: () => null, available: there });
+eq(unrenderable.reason, 'too-large', 'a page that could not be drawn small enough says so');
+const nothingRead = await readWithCloud(STROKES, {
+  user: { cloudHandwriting: true }, rasterize, available: there,
+  transport: { transcribeHandwriting: async () => ({ transcription: { lines: [] } }) }
+});
+eq(nothingRead.reason, 'empty', 'and a server that read nothing says that instead');
 
 // ── 5 · Turning it on sends the ink, and only the ink ────────────────────────
 let sentArgs = null;
@@ -127,14 +143,20 @@ ok(!mismatched.alignedToLocalLines, 'and it says so');
 ok(toReading({ lines: [] }, local) === null, 'an empty transcription is not a reading');
 
 // ── 7 · When a server read may replace what is on screen ─────────────────────
-const confident = { text: '-1, 0, 1, 2, 4', needsConfirmation: false };
-ok(shouldSupersede(confident, local), 'a confident, different reading supersedes');
+const confident = { text: '-1, 0, 1, 2, 4', needsConfirmation: false, alignedToLocalLines: true };
+ok(shouldSupersede(confident, local), 'a confident, different reading that lines up supersedes');
 ok(!shouldSupersede(confident, local, { hasManualCorrections: true }),
   'but never one the student has corrected by hand');
+// A reading that re-split the page carries no boxes and no per-glyph symbols,
+// so the ✓/✗ overlay draws nothing and the tap-to-correct row is empty. Applying
+// it would leave the student unable to fix a single character of a reading they
+// did not produce.
+ok(!shouldSupersede({ ...confident, alignedToLocalLines: false }, local),
+  'a reading that split the page differently is never applied, however confident');
 ok(!shouldSupersede({ text: 'x', needsConfirmation: true }, local), 'an unconfident reading is never applied');
-ok(!shouldSupersede({ text: '-1/0/1/2)4', needsConfirmation: false }, local),
+ok(!shouldSupersede({ text: '-1/0/1/2)4', needsConfirmation: false, alignedToLocalLines: true }, local),
   'a reading identical to the local one does not redraw the screen');
-ok(!shouldSupersede({ text: '   ', needsConfirmation: false }, local), 'an empty reading never supersedes');
+ok(!shouldSupersede({ text: '   ', needsConfirmation: false, alignedToLocalLines: true }, local), 'an empty reading never supersedes');
 ok(!shouldSupersede(null, local), 'no reading, no change');
 
 console.log(failures.length

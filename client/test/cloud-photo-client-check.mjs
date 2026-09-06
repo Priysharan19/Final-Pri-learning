@@ -43,6 +43,12 @@ function fakeCanvas(bytesFor) {
 }
 const loadImage = async () => ({ naturalWidth: 4032, naturalHeight: 3024 });
 
+// A photo already smaller than the cap must not waste an attempt re-rendering
+// its own size before it can shrink.
+const sizes = [];
+await preparePhoto(PHOTO, { loadImage: async () => ({ naturalWidth: 900, naturalHeight: 700 }), createCanvas: (w, h) => { sizes.push(w); return fakeCanvas(() => 2_000_000)(w, h); } });
+ok(new Set(sizes).size === sizes.length, `a small photo shrinks on every attempt rather than rendering the same size twice (${sizes.join(', ')})`);
+
 const easy = await preparePhoto(PHOTO, { loadImage, createCanvas: fakeCanvas(() => 200_000) });
 ok(easy && easy.bytes <= MAX_PHOTO_BYTES, `an ordinary page fits at full quality (${easy?.bytes} bytes)`);
 eq(easy.quality, 0.85, 'and is not degraded for no reason');
@@ -75,8 +81,9 @@ const spy = {
 const prepare = async () => ({ dataUrl: 'data:image/jpeg;base64,AAAA', width: 100, height: 80, bytes: 3, quality: 0.85 });
 
 let called = 0;
-await readPhotoWithCloud(PHOTO, { user: { cloudHandwriting: false }, transport: { transcribeHandwriting: async () => { called += 1; } }, prepare, available: there });
+const off = await readPhotoWithCloud(PHOTO, { user: { cloudHandwriting: false }, transport: { transcribeHandwriting: async () => { called += 1; } }, prepare, available: there });
 eq(called, 0, 'a photo is not sent unless the student turned server reading on');
+eq(off.reason, 'disabled', 'and the caller is told that is why, so it can fall back rather than report a failure');
 
 const outcome = await readPhotoWithCloud(PHOTO, { user: { cloudHandwriting: true }, transport: spy, prepare, available: there });
 ok(sent?.image?.startsWith('data:image/'), 'with it on, the prepared photo is sent');
@@ -88,8 +95,8 @@ ok(outcome.photo.bytes > 0, 'and the result reports what was actually sent');
 const failing = { transcribeHandwriting: async () => { const e = new Error('down'); e.code = 'HANDWRITING_UNAVAILABLE'; throw e; } };
 const failed = await readPhotoWithCloud(PHOTO, { user: { cloudHandwriting: true }, transport: failing, prepare, available: there });
 ok(failed?.error?.code === 'HANDWRITING_UNAVAILABLE', 'a refusal is reported so the caller can fall back to the on-device reader');
-ok(await readPhotoWithCloud(PHOTO, { user: { cloudHandwriting: true }, transport: spy, prepare: async () => null, available: there }) === null,
-  'a photo that could not be prepared is never sent');
+const undecodable = await readPhotoWithCloud(PHOTO, { user: { cloudHandwriting: true }, transport: spy, prepare: async () => null, available: there });
+eq(undecodable.reason, 'unreadable', 'a photo that could not be prepared is never sent, and says why — a HEIC on Android lands here');
 
 console.log(failures.length
   ? `CLOUD PHOTO CLIENT: FAIL — ${failures.length} of ${pass + failures.length} checks failed\n  · ${failures.join('\n  · ')}`
