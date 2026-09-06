@@ -9,7 +9,7 @@ import { normalize, parse, evaluate, exprEquivalent, numsClose } from './expr.js
 import { diagnoseStep } from './diagnose.js';
 import {
   assessEquationLine, sameEquationClaim, sameExpressionClaim,
-  assessRelationLine, assessDerivativeLine, parseRelation, sameRelationClaim
+  assessRelationLine, assessDerivativeLine, parseRelation
 } from './reason-v2-safe.js';
 import { assessEvaluationLine, assessPointLine } from './reason-v3.js';
 import { assessRelationChainLine, assessModulusInequalityLine } from './reason-v4.js';
@@ -163,10 +163,20 @@ function readSolutionList(raw, meta) {
   const lead = new RegExp(`^${variable}\\s*=\\s*`, 'i');
   const parts = src.split(/\bor\b|,|;/i).map(s => s.trim()).filter(Boolean);
   if (parts.length < 2) return null;
+  // "x + 3 = 0 or x + 6 = 0" is how NCERT writes the two branches of a factorised
+  // quadratic on one line. Each part names its root as directly as "x = -3".
+  const branch = new RegExp(`^${variable}\\s*([+-])\\s*(.+?)\\s*=\\s*0$`, 'i');
   const values = [];
   for (let part of parts) {
     part = part.replace(lead, '').trim();
-    if (!part || part.includes('=')) return { values: [], invalid: true };
+    if (!part) return { values: [], invalid: true };
+    if (part.includes('=')) {
+      const m = part.match(branch);
+      if (!m) return { values: [], invalid: true };
+      try { values.push((m[1] === '+' ? -1 : 1) * parseNumericInput(m[2]).value); }
+      catch { return { values: [], invalid: true }; }
+      continue;
+    }
     try { values.push(parseNumericInput(part).value); }
     catch { return { values: [], invalid: true }; }
   }
@@ -190,7 +200,9 @@ export function checkWorking(q, workingText) {
     return { correct: false, feedback: diagnosisVerdict(report.diagnosis, report.firstBreak + 1), stepReport: report, validLines: okLines.length };
   }
 
-  const lastLine = [...report.lines].reverse().find(l => l.status === 'ok');
+  // A student who finishes by substituting their answer back has still finished
+  // at the line before it: the check states no new result.
+  const lastLine = [...report.lines].reverse().find(l => l.status === 'ok' && !l.check);
   if (!lastLine) return { correct: false, feedback: 'Finish with a line Pri can verify as the final result.', stepReport: report, validLines: 0 };
 
   let reached = false;
@@ -226,6 +238,49 @@ export function checkWorking(q, workingText) {
   return { correct: true, stepReport: report, validLines: okLines.length };
 }
 
+// ── The zero-product branch ──────────────────────────────────────────────────
+// "(x + 3)(x + 6) = 0 → x + 3 = 0, x + 6 = 0" is the method NCERT prints. Each
+// branch is true of exactly one root by construction, so a checker that
+// demands every authored solution satisfy every line calls the taught method a
+// mistake and greys out everything after it. A line whose solutions are a
+// non-empty proper subset of the authored ones is read as a branch once a
+// trusted product-equals-zero line has been shown above it. Nothing is
+// forgiven: if the working ends without the branches between them covering
+// every root, the first branch becomes the lost-root break it always was.
+
+/** Is this line a product (or a power) set equal to zero? */
+function productEqualsZero(ast) {
+  if (!ast || ast.t !== 'equation') return false;
+  const isZero = (side) => {
+    const n = unwrapGroup(side);
+    return n && n.t === 'num' && Math.abs(n.v) < 1e-12;
+  };
+  const isProduct = (side) => {
+    const n = unwrapGroup(side);
+    if (!n) return false;
+    if (n.t === 'neg') return isProduct(n.v);
+    return n.t === 'bin' && (n.op === '*' || n.op === '^');
+  };
+  return (isZero(ast.r) && isProduct(ast.l)) || (isZero(ast.l) && isProduct(ast.r));
+}
+
+/** Which of the authored solutions satisfy this line. */
+function solutionsSatisfying(ast, meta) {
+  const wanted = uniqueNumeric(meta?.solutions);
+  if (!ast || ast.t !== 'equation' || !meta?.variable || !wanted.length) return [];
+  const held = [];
+  for (const sol of wanted) {
+    try {
+      const env = { [meta.variable]: sol };
+      const L = evaluate(ast.l, env);
+      const R = evaluate(ast.r, env);
+      if (Number.isFinite(L) && Number.isFinite(R)
+          && Math.abs(L - R) <= Math.max(1e-6, Math.abs(L), Math.abs(R)) * 1e-6) held.push(sol);
+    } catch { /* a branch Pri cannot evaluate is not a branch */ }
+  }
+  return held;
+}
+
 function stepCheckSingle(meta, workingText) {
   const rawLines = String(workingText || '').split('\n').map(l => l.trim()).filter(Boolean);
   const out = [];
@@ -234,6 +289,8 @@ function stepCheckSingle(meta, workingText) {
   let previousEquationTrusted = false;
   let previousRelation = null;
   let previousRelationTrusted = false;
+  let branchesOpen = false;
+  const branchLines = [];
 
   rawLines.forEach((line, i) => {
     let status = 'note';
@@ -262,7 +319,7 @@ function stepCheckSingle(meta, workingText) {
           }
         }
         if (status === 'break' && firstBreak === -1) firstBreak = i;
-        out.push({ text: line, status, note, ...(lineDiagnosis ? { diagnosis: lineDiagnosis } : {}) });
+        out.push({ text: line, status, note, ...(status === 'ok' ? { coversAll: true } : {}), ...(lineDiagnosis ? { diagnosis: lineDiagnosis } : {}) });
         return;
       }
 
@@ -360,7 +417,8 @@ function stepCheckSingle(meta, workingText) {
           note = ok ? undefined : 'The ± branches do not reproduce the complete solution set — check the signs or the missing branch.';
           if (!ok) lineDiagnosis = lostRootDiagnosis(meta.variable, covered.join(' or ') || 'this branch', wanted.length);
           if (status === 'break' && firstBreak === -1) firstBreak = i;
-          out.push({ text: line, status, note, ...(lineDiagnosis ? { diagnosis: lineDiagnosis } : {}) });
+          // An accepted ± line has already been proved to reproduce every root.
+          out.push({ text: line, status, note, ...(ok ? { coversAll: true } : {}), ...(lineDiagnosis ? { diagnosis: lineDiagnosis } : {}) });
           return;
         }
       }
@@ -369,20 +427,39 @@ function stepCheckSingle(meta, workingText) {
         if (cleaned.includes('=')) {
           const ast = parse(cleaned);
           if (ast.t === 'equation') {
+            const wantedRoots = uniqueNumeric(meta.solutions);
+            const held = branchesOpen && wantedRoots.length > 1 ? solutionsSatisfying(ast, meta) : [];
+            if (held.length && held.length < wantedRoots.length) {
+              // One branch of a factorisation already shown. It is true of the
+              // roots it names; whether the working keeps the rest is settled
+              // once every line has been read.
+              status = 'ok';
+              branchLines.push({ index: i, covered: held });
+              out.push({ text: line, status, branch: true });
+              return;
+            }
             // The common case is a reversible rearrangement of a line already
             // proved correct. Verify that cheaply before invoking counterevidence.
             if (previousEquationTrusted && previousEquation && sameEquationClaim(previousEquation, ast, meta.variable)) {
               status = 'ok';
               previousEquation = ast;
               previousEquationTrusted = true;
+              if (productEqualsZero(ast)) branchesOpen = true;
             } else {
               const assessed = assessEquationLine({ ast, previousAst: previousEquation, previousTrusted: previousEquationTrusted, meta });
               status = assessed.status;
               note = assessed.note;
               lineDiagnosis = assessed.diagnosis || null;
+              if (assessed.check) {
+                // A check of the answer makes no claim to reason from.
+                out.push({ text: line, status, note, check: true, ...(lineDiagnosis ? { diagnosis: lineDiagnosis } : {}) });
+                if (status === 'break' && firstBreak === -1) firstBreak = i;
+                return;
+              }
               if (status !== 'break') {
                 previousEquation = ast;
                 previousEquationTrusted = !!assessed.trusted;
+                if (assessed.trusted && productEqualsZero(ast)) branchesOpen = true;
               }
             }
           }
@@ -414,9 +491,24 @@ function stepCheckSingle(meta, workingText) {
     out.push({ text: line, status, note, ...(lineDiagnosis ? { diagnosis: lineDiagnosis } : {}) });
   });
 
+  // Branches were allowed on the promise that the working keeps every root.
+  // If it does not, the first branch is the line where the root was lost.
+  if (branchLines.length) {
+    const wanted = uniqueNumeric(meta.solutions);
+    const covered = uniqueNumeric(branchLines.flatMap(b => b.covered));
+    const listedInFull = out.some(l => l.status === 'ok' && l.coversAll);
+    const complete = covered.length === wanted.length && wanted.every(sol => covered.some(v => numsClose(v, sol)));
+    if (!listedInFull && !complete) {
+      const { index } = branchLines[0];
+      const diagnosis = lostRootDiagnosis(meta.variable, covered.join(' or ') || 'this branch', wanted.length);
+      out[index] = { text: out[index].text, status: 'break', note: diagnosis.message, diagnosis };
+      firstBreak = firstBreak === -1 ? index : Math.min(firstBreak, index);
+    }
+  }
+
   if (firstBreak === -1) return { lines: out, firstBreak, diagnosis: null };
   for (let i = firstBreak + 1; i < out.length; i++) {
-    if (out[i].status === 'break') {
+    if (out[i].status === 'break' || out[i].branch) {
       out[i].status = 'note';
       out[i].note = 'Follows from the earlier slip.';
       delete out[i].diagnosis;
@@ -699,12 +791,82 @@ function readClaim(text) {
   } catch { return null; }
 }
 
-function sameClaim(a, b) {
+// ── What counts as restating the question ────────────────────────────────────
+// A line restates the question when it is that line written again: the same
+// symbols, allowing spacing, unicode notation, an explicit ×, the order of a
+// sum or a product, and the two sides of an equation swapped.
+//
+// It is NOT enough for the line to be logically equivalent to the question.
+// Every valid rearrangement of an equation is equivalent to it, so defining
+// restatement as equivalence made every correct step a copy of the question:
+// "Solve 2x − 7 = −11" with working 2x − 7 = −11 / 2x = −4 / x = −2 earned no
+// method marks at all, while the exam path — which counts verified lines —
+// awarded two. Restatement is a syntactic test, and only a syntactic one.
+
+function unwrapGroup(node) {
+  let out = node;
+  while (out && out.t === 'group') out = out.v;
+  return out;
+}
+
+/** Flatten one commutative operator's chain, rewriting a − b as a + (−b). */
+function commutativeParts(node, op, acc = []) {
+  const n = unwrapGroup(node);
+  if (n && n.t === 'bin' && (n.op === op || (op === '+' && n.op === '-'))) {
+    commutativeParts(n.l, op, acc);
+    if (n.op === '-') acc.push({ t: 'neg', v: n.r });
+    else commutativeParts(n.r, op, acc);
+    return acc;
+  }
+  acc.push(n);
+  return acc;
+}
+
+/** A canonical rendering of what was written, not of what it means. */
+function writtenKey(node) {
+  const n = unwrapGroup(node);
+  if (!n || typeof n !== 'object') return '?';
+  switch (n.t) {
+    case 'num': return `#${Number(n.v)}`;
+    case 'var': return `v${n.v}`;
+    case 'const': return `k${n.v}`;
+    case 'neg': {
+      const inner = unwrapGroup(n.v);
+      if (inner && inner.t === 'num') return `#${-Number(inner.v)}`;
+      return `-(${writtenKey(n.v)})`;
+    }
+    case 'fact': return `!(${writtenKey(n.v)})`;
+    case 'call': return `${n.fn}(${(Array.isArray(n.args) ? n.args : [n.arg]).map(writtenKey).join(',')})`;
+    case 'bin': {
+      if (n.op === '+' || n.op === '-' || n.op === '*') {
+        const op = n.op === '-' ? '+' : n.op;
+        return `${op}(${commutativeParts(n, op).map(writtenKey).sort().join(',')})`;
+      }
+      return `${n.op}(${writtenKey(n.l)},${writtenKey(n.r)})`;
+    }
+    default: return '?';
+  }
+}
+
+const MIRRORED_RELATION = { '<': '>', '>': '<', '<=': '>=', '>=': '<=' };
+
+/** Is this line the same line, written again? */
+function sameWrittenClaim(a, b) {
   if (!a || !b || a.kind !== b.kind) return false;
   try {
-    if (a.kind === 'relation') return sameRelationClaim(a.relation, b.relation);
-    if (a.kind === 'equation') return sameEquationClaim(a.ast, b.ast, null);
-    return sameExpressionClaim(a.ast, b.ast) || exprEquivalent(a.ast, b.ast);
+    if (a.kind === 'relation') {
+      const [al, ar] = [writtenKey(a.relation.l), writtenKey(a.relation.r)];
+      const [bl, br] = [writtenKey(b.relation.l), writtenKey(b.relation.r)];
+      if (a.relation.op === b.relation.op) return al === bl && ar === br;
+      return MIRRORED_RELATION[a.relation.op] === b.relation.op && al === br && ar === bl;
+    }
+    if (a.kind === 'equation') {
+      const [al, ar] = [writtenKey(a.ast.l), writtenKey(a.ast.r)];
+      const [bl, br] = [writtenKey(b.ast.l), writtenKey(b.ast.r)];
+      return (al === bl && ar === br) || (al === br && ar === bl);
+    }
+    if (a.kind === 'text') return String(a.text).trim() === String(b.text).trim();
+    return writtenKey(a.ast) === writtenKey(b.ast);
   } catch { return false; }
 }
 
@@ -731,7 +893,7 @@ export function questionClaims(meta, prompt = '') {
 export function restatesQuestion(line, meta, prompt = '') {
   const claim = readClaim(line);
   if (!claim) return false;
-  return questionClaims(meta, prompt).some(c => sameClaim(claim, c));
+  return questionClaims(meta, prompt).some(c => sameWrittenClaim(claim, c));
 }
 
 /**
@@ -752,8 +914,8 @@ export function methodMarks({ meta, working, marks, prompt = '', report = null }
   let restated = 0;
   for (const l of okLines) {
     const claim = readClaim(l.text);
-    if (claim && given.some(c => sameClaim(claim, c))) { restated++; continue; }
-    if (claim && counted.some(c => sameClaim(claim, c))) continue;
+    if (claim && given.some(c => sameWrittenClaim(claim, c))) { restated++; continue; }
+    if (claim && counted.some(c => sameWrittenClaim(claim, c))) continue;
     counted.push(claim || { kind: 'text', text: String(l.text).trim() });
   }
   const total = Math.max(1, Number(marks) || 1);

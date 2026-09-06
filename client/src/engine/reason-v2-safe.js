@@ -21,7 +21,8 @@ import {
 } from './reason-v2.js';
 import {
   sameEquationClaim as sameEquationClaimV1,
-  assessEquationLine as assessEquationLineV1
+  assessEquationLine as assessEquationLineV1,
+  assessNumericCheckLine
 } from './reason.js';
 import {
   compareDomainAwareEquationClaims,
@@ -98,6 +99,11 @@ function exactDomainComparison(a, b, variable = null) {
 }
 
 export function assessEquationLine({ ast, previousAst = null, previousTrusted = false, meta = null } = {}) {
+  // A line with no unknown left in it is a check of the answer, whichever
+  // reasoner would otherwise own it.
+  const numericCheck = assessNumericCheckLine(ast, { previousAst, meta });
+  if (numericCheck) return numericCheck;
+
   const variable = meta?.variable || null;
   let source = null;
   if (meta?.source) {

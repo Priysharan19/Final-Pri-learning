@@ -16,13 +16,55 @@ import {
 
 const UNIT_TAIL = /(cm³|m³|mm³|cm²|m²|mm²|km²|km\/h|m\/s|cm|mm|km|kg|ml|l\b|m\b|s\b|h\b|hours?|mins?|minutes?|seconds?|degrees?|deg|°|units?²?|sq units)\s*$/i;
 
-/** Light clean: trim, strip currency/units/thousands separators, unify symbols. */
-export function cleanInput(raw) {
+// India-first currency. A student answering a question priced in rupees writes
+// ₹9.75, Rs 9.75, Rs. 9.75 or 9.75 rupees; the dollar sign was already read by
+// normalize(). The sign carries no value, so it is stripped before parsing —
+// but it can never rescue a wrong number, because the number is still compared.
+const CURRENCY_LEAD = /^\s*(?:[₹$]|Rs\.?|INR|रु\.?|₨)\s*/i;
+const CURRENCY_TAIL = /\s*(?:\b(?:rupees?|paise|rs)\.?|₹)\s*$/i;
+
+/**
+ * Light clean: trim, strip currency/units/thousands separators, unify symbols.
+ * `stripUnits` is off for expression answers, where a trailing `s`, `m`, `h` or
+ * `l` is a variable the student named, not a unit they appended.
+ */
+export function cleanInput(raw, { stripUnits = true } = {}) {
   if (raw == null) return '';
   let s = String(raw).trim();
-  s = s.replace(/^[a-zA-Zθ]\s*[=≈]\s*/, '');       // "x = 3" → "3"
-  s = s.replace(UNIT_TAIL, '');
+  // "x = 3" → "3", and the bare "= 3" a student writes when continuing the
+  // question's own line. Nothing valid begins with an equals sign.
+  s = s.replace(/^[a-zA-Zθ]?\s*[=≈]\s*/, '');
+  s = s.replace(CURRENCY_LEAD, '');
+  // A full stop that ends a sentence rather than a number: "2pi.", "9.75.",
+  // "3sqrt(2)." — it never carries value. A run of dots is left alone, because
+  // "0.333..." means something else.
+  s = s.replace(/(?<!\.)\.\s*$/, '').trim();
+  s = s.replace(CURRENCY_TAIL, '');
+  if (stripUnits) s = s.replace(UNIT_TAIL, '');
   return s.trim();
+}
+
+// A prompt demands the fraction when it says so. `simplestFraction` on its own
+// is how a generator states the canonical fraction for display — it is not a
+// licence to refuse the exact decimal of a question that never asked for one.
+const ASKS_FRACTION = /fraction|simplest form|lowest terms|simplify|in the form|\\d?frac/i;
+
+/** Does this question actually demand its answer as a fraction? */
+function fractionFormDemanded(question, ans) {
+  if (ans && typeof ans.requireFraction === 'boolean') return ans.requireFraction;
+  return ASKS_FRACTION.test(String(question?.prompt ?? ''));
+}
+
+// A "%" the student typed is worth a second reading at value × 100 only on a
+// question that asked for a percentage. On a question that asked for a
+// probability, "0.44%" is the wrong number written with the wrong sign, and
+// giving it a second chance would mark a wrong answer right. The word, not the
+// symbol: prompts quote percentages in their data all the time.
+const ASKS_PERCENT = /\bper\s?cent(?:age)?s?\b/i;
+
+function percentAnswerWanted(question, ans) {
+  if (ans && typeof ans.percent === 'boolean') return ans.percent;
+  return ASKS_PERCENT.test(String(question?.prompt ?? ''));
 }
 
 /** Parse a numeric-ish student answer: "2 1/2", "3/4", "50%", "$1,200", "sqrt(2)+1". */
@@ -127,7 +169,7 @@ export function checkAnswer(question, rawInput) {
     }
     // Surd-form questions: require k√r exactly (accepts 2sqrt5, 2*sqrt(5), 2√5)
     if (ans && ans.surdForm && type === 'numeric') {
-      const s = normalize(cleanInput(rawInput)).replace(/\s|\*/g, '');
+      const s = normalize(cleanInput(rawInput)).replace(/\s|\*/g, '').replace(/^\+/, '');
       const mm = s.match(/^(-?\d*)sqrt\(?(\d+)\)?$/);
       if (mm) {
         const k = mm[1] === '' ? 1 : mm[1] === '-' ? -1 : Number(mm[1]);
@@ -150,7 +192,14 @@ export function checkAnswer(question, rawInput) {
     }
     switch (type) {
       case 'mcq': {
-        const idx = Number(rawInput);
+        // Number('') and Number(null) are both 0, so an unanswered question
+        // used to mark right against every option keyed to index 0. Nothing
+        // submitted is never an answer, and neither is a non-integer index.
+        if (rawInput == null) return { correct: false };
+        const text = String(rawInput).trim();
+        if (!text) return { correct: false };
+        const idx = Number(text);
+        if (!Number.isInteger(idx)) return { correct: false };
         return { correct: idx === ans.correctIndex };
       }
 
@@ -158,21 +207,33 @@ export function checkAnswer(question, rawInput) {
         const { value, meta } = parseNumericInput(rawInput);
         let target = ans.value;
         let ok = numsClose(value, target, ans.tol);
+        let matched = ok ? value : null;
+        let wantsExactValue = false;
         // Fraction questions that demand simplest form (e.g. simplify 12/18 → 2/3)
         if (ans.simplestFraction) {
           const { n, d } = ans.simplestFraction;
-          const s = cleanInput(rawInput).replace(/\s+/g, ' ');
-          const frac = s.match(/^(-?\d+)\s*\/\s*(\d+)$/) || s.match(/^\((-?\d+)\)\s*\/\s*\((\d+)\)$/);
-          const mixed = s.match(/^(-?)(\d+) (\d+)\s*\/\s*(\d+)$/) || s.match(/^(-?)(\d+) ?\((\d+)\)\s*\/\s*\((\d+)\)$/);
+          // normalize() first: a unicode minus is what the iPad ink and the
+          // cloud OCR produce, and an ascii regex against the raw string
+          // rejected the right answer for writing it the way it was drawn.
+          const s = normalize(cleanInput(rawInput)).replace(/\s+/g, ' ')
+            .replace(/^\+\s*/, '')                                     // a leading plus
+            .replace(/\.\s*$/, '');                                    // a trailing full stop
+          const frac = s.match(/^(-?\s*\d+)\s*\/\s*(\d+)$/) || s.match(/^\((-?\s*\d+)\)\s*\/\s*\((\d+)\)$/);
+          const mixed = s.match(/^(-?)\s*(\d+) (\d+)\s*\/\s*(\d+)$/) || s.match(/^(-?)\s*(\d+) ?\((\d+)\)\s*\/\s*\((\d+)\)$/);
           let gn, gd;
-          if (frac) { gn = Number(frac[1]); gd = Number(frac[2]); }
+          if (frac) { gn = Number(frac[1].replace(/\s+/g, '')); gd = Number(frac[2]); }
           else if (mixed) { const sign = mixed[1] === '-' ? -1 : 1; gd = Number(mixed[4]); gn = sign * (Number(mixed[2]) * gd + Number(mixed[3])); }
           else if (d !== 1) {
             // Before asking for a different notation, check whether the value
             // they gave is one a trap predicts: naming the misconception is
             // worth more to the student than a note about form.
-            const why = matchTraps(question, parseNumericInput(rawInput).value, rawInput);
-            return { correct: false, feedback: why ?? 'Give your answer as a fraction in simplest form (like 2/3).' };
+            if (fractionFormDemanded(question, ans)) {
+              const why = matchTraps(question, parseNumericInput(rawInput).value, rawInput);
+              return { correct: false, feedback: why ?? 'Give your answer as a fraction in simplest form (like 2/3).' };
+            }
+            // The question never asked for a fraction, so the value decides —
+            // but the authored fraction is exact, so a rounded decimal is not it.
+            wantsExactValue = true;
           }
           if (gd !== undefined) {
             if (!numsClose(gn / gd, n / d)) {
@@ -186,16 +247,21 @@ export function checkAnswer(question, rawInput) {
             return { correct: true };
           }
         }
-        // Percentage forgiveness: expected 25 (%) but student typed 0.25, or vice versa
-        if (!ok && ans.percent) {
-          if (numsClose(value * 100, target, ans.tol)) ok = true;
-          if (meta.isPercent && numsClose(value / 100, target, ans.tol)) ok = false;
+        // Percentage forgiveness: expected 25 (%) but student typed 0.25, or
+        // vice versa. A student who writes the % sign on a question that asked
+        // for a percentage has answered it, whether or not the author thought
+        // to set ans.percent — but the sign alone earns nothing: the value is
+        // still compared, and a bare 0.25 is not a second chance at 25.
+        if (!ok && (ans.percent || (meta.isPercent && percentAnswerWanted(question, ans)))) {
+          if (numsClose(value * 100, target, ans.tol)) { ok = true; matched = value * 100; }
+          if (ans.percent && meta.isPercent && numsClose(value / 100, target, ans.tol)) { ok = false; matched = null; }
         }
-        if (ok && ans.requireExact && looksLikeDecimalApprox(rawInput)) {
-          const exact = numsClose(value, target, Math.max(1e-9, Math.abs(target) * 1e-9));
-          if (!exact) {
-            return { correct: false, feedback: 'So close — but this question wants an exact value (leave it as a fraction, surd or multiple of π rather than a rounded decimal).' };
-          }
+        const exactTol = Math.max(1e-9, Math.abs(target) * 1e-9);
+        if (ok && ans.requireExact && looksLikeDecimalApprox(rawInput) && !numsClose(value, target, exactTol)) {
+          return { correct: false, feedback: 'So close — but this question wants an exact value (leave it as a fraction, surd or multiple of π rather than a rounded decimal).' };
+        }
+        if (ok && wantsExactValue && !numsClose(matched, target, exactTol)) {
+          return { correct: false, feedback: 'So close — but this question wants an exact value (leave it as a fraction, surd or multiple of π rather than a rounded decimal).' };
         }
         if (!ok) {
           const why = matchTraps(question, value, rawInput);
@@ -205,7 +271,9 @@ export function checkAnswer(question, rawInput) {
       }
 
       case 'expression': {
-        let student = cleanInput(rawInput);
+        // Units are never stripped from an expression: a trailing s, m, h or l
+        // is a variable the student named, not a unit they appended.
+        let student = cleanInput(rawInput, { stripUnits: false });
         if (ans.stripC) student = student.replace(/[+\-]\s*c\s*$/i, '').trim();
         const opts = { domain: ans.domain, positiveOnly: ans.positiveOnly };
         const candidates = [ans.expr, ...(ans.anyOf || [])];
