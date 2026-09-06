@@ -138,6 +138,21 @@ function globRegex(pattern) {
   return new RegExp(`^${escaped}$`);
 }
 
+function ruleSpecificity(rule) { return String(rule.pattern || '').replace(/\*/g, '').length; }
+function canonicalOwner(file) {
+  const matched = (fleet.ownership_rules || []).filter(rule => globRegex(rule.pattern).test(file));
+  if (!matched.length) return null;
+  matched.sort((a, b) => ruleSpecificity(b) - ruleSpecificity(a) || b.pattern.length - a.pattern.length);
+  const best = matched[0];
+  const tied = matched.filter(rule => ruleSpecificity(rule) === ruleSpecificity(best) && rule.pattern.length === best.pattern.length);
+  if (new Set(tied.map(rule => rule.primary)).size !== 1) return null;
+  return best.primary;
+}
+
+function hasCanonicalPrimaryPath(agent, paths) {
+  return paths.some(file => !/[*?]/.test(file) && canonicalOwner(file) === agent);
+}
+
 function literalPrefix(pattern) { return String(pattern).split(/[*?]/, 1)[0]; }
 function patternOverlap(a, b) {
   if (a === b) return true;
@@ -168,6 +183,7 @@ function fleetGuard(agent, paths) {
   if (paths.some(file => /[*?]/.test(file))) return { ok: false, reason: 'AMBIGUOUS_GLOB_OWNERSHIP' };
   try {
     execFileSync(process.execPath, [path.join(ROOT, 'scripts', 'pri-fleet.mjs'), 'simulate-guard', agent, ...paths], { cwd: ROOT, stdio: 'pipe' });
+    if (!hasCanonicalPrimaryPath(agent, paths)) return { ok: false, reason: 'NO_CANONICAL_PRIMARY_PATH' };
     return { ok: true };
   } catch (error) {
     return { ok: false, reason: 'OWNERSHIP_DENY', detail: String(error.stderr || error.message).trim() };
@@ -188,6 +204,8 @@ function canRunConcurrently(leftInput, rightInput) {
   if (!a.id || !b.id || a.id === b.id) return deny('MISSION_ID_CONFLICT');
   if (!agents.has(a.agent) || !agents.has(b.agent) || a.agent === 'director' || b.agent === 'director') return deny('INVALID_AGENT');
   if (a.agent === b.agent) return deny('OWNER_NOT_DISTINCT');
+  if (!/^[0-9a-f]{7,40}$/i.test(a.base_sha) || !/^[0-9a-f]{7,40}$/i.test(b.base_sha)) return deny('INVALID_BASE_SHA');
+  if (a.base_sha !== b.base_sha) return deny('BASE_SHA_MISMATCH');
   if (a.dependencies.includes(b.id) || b.dependencies.includes(a.id)) return deny('DEPENDENCY_EDGE');
   const ag = fleetGuard(a.agent, a.paths), bg = fleetGuard(b.agent, b.paths);
   if (!ag.ok) return deny(ag.reason, { mission: a.id, detail: ag.detail || null });
@@ -198,7 +216,7 @@ function canRunConcurrently(leftInput, rightInput) {
   for (const id of ar) if (br.has(id)) return deny('SHARED_DERIVED_ROOT', id);
   const ac = new Set(sensitiveClasses(a.paths)), bc = new Set(sensitiveClasses(b.paths));
   for (const id of ac) if (bc.has(id)) return deny('SHARED_SENSITIVE_AUTHORITY', id);
-  return { decision: 'ALLOW', reason: 'DISJOINT', left: a.id, right: b.id, evidence: { left_agent: a.agent, right_agent: b.agent, left_paths: a.paths, right_paths: b.paths, left_derived_roots: [...ar], right_derived_roots: [...br] } };
+  return { decision: 'ALLOW', reason: 'DISJOINT', left: a.id, right: b.id, evidence: { left_agent: a.agent, right_agent: b.agent, base_sha: a.base_sha, left_paths: a.paths, right_paths: b.paths, left_derived_roots: [...ar], right_derived_roots: [...br] } };
 }
 
 function admit(candidateInput, activeInputs, now = Date.now()) {
@@ -211,6 +229,10 @@ function admit(candidateInput, activeInputs, now = Date.now()) {
     if (fresh.valid) validActive.push(mission); else stale.push(mission.id || '?');
   }
   if (validActive.length >= cap) return { decision: 'DENY', reason: 'WRITER_CAP', max_writers: cap, active_writers: validActive.map(item => item.id), stale_ignored: stale };
+  if (!validActive.length) {
+    const guard = fleetGuard(candidate.agent, candidate.paths);
+    if (!guard.ok) return { decision: 'DENY', reason: guard.reason, detail: guard.detail || null, max_writers: cap, active_writers: [], stale_ignored: stale };
+  }
   for (const active of validActive) {
     const result = canRunConcurrently(candidate, active);
     if (result.decision !== 'ALLOW') return { ...result, max_writers: cap, active_writers: validActive.map(item => item.id), stale_ignored: stale };
