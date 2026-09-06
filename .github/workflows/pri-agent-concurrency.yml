@@ -5,12 +5,14 @@ on:
     paths:
       - '.pri-os/mission-control.json'
       - 'scripts/pri-mission-control.mjs'
+      - 'scripts/pri-fleet.mjs'
       - '.github/workflows/pri-agent-concurrency.yml'
   push:
     branches: [main]
     paths:
       - '.pri-os/mission-control.json'
       - 'scripts/pri-mission-control.mjs'
+      - 'scripts/pri-fleet.mjs'
       - '.github/workflows/pri-agent-concurrency.yml'
   workflow_dispatch:
 
@@ -32,6 +34,7 @@ jobs:
       - name: Syntax and control-plane invariants
         run: |
           set -euo pipefail
+          node --check scripts/pri-fleet.mjs
           node --check scripts/pri-mission-control.mjs
           node scripts/pri-fleet.mjs validate
           node scripts/pri-mission-control.mjs validate
@@ -87,15 +90,17 @@ jobs:
             exit 1
           fi
 
-          mission /tmp/engine.json math-reasoning client/src/engine/checker.js
-          if node scripts/pri-mission-control.mjs can-run-concurrently /tmp/engine.json /tmp/derived-a.json; then
-            echo 'math/derived authority collision was incorrectly concurrent' >&2
+          mission /tmp/platform.json platform server/platform/session-store.js
+          mission /tmp/auth-test.json qa-release server/test/auth-session-isolation-check.mjs
+          if node scripts/pri-mission-control.mjs can-run-concurrently /tmp/platform.json /tmp/auth-test.json; then
+            echo 'shared auth/session authority was incorrectly concurrent' >&2
             exit 1
           fi
 
-          mission /tmp/platform.json platform server/platform/session-store.js
-          if node scripts/pri-mission-control.mjs can-run-concurrently /tmp/platform.json /tmp/backend-test.json; then
-            echo 'cross-cutting platform authority was incorrectly concurrent with backend test lane' >&2
+          mission /tmp/schema.json platform server/platform/schema/store.js
+          mission /tmp/schema-test.json qa-release server/test/schema-migration-check.mjs
+          if node scripts/pri-mission-control.mjs can-run-concurrently /tmp/schema.json /tmp/schema-test.json; then
+            echo 'shared migration/schema authority was incorrectly concurrent' >&2
             exit 1
           fi
 
