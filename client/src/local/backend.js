@@ -20,7 +20,8 @@ import {
   indiaChapterGrade, resolveIndiaTarget, indiaProductSections
 } from '../engine/indiaProduct.js';
 import { generateQuestion } from '../engine/generators/index.js';
-import { checkAnswer, stepCheck } from '../engine/checker.js';
+import { checkAnswer, stepCheck, methodMarks } from '../engine/checker.js';
+import { authoredRegion, formatRegion, formatMatrix, formatVector } from '../engine/answer-forms.js';
 import { stepTrapKey } from '../engine/diagnose.js';
 import {
   START_RATING, updateRating, masteryOf, masteryBand, pickDifficulty, pickNext,
@@ -845,6 +846,12 @@ function displayAnswer(q) {
     case 'point': return `(${a.x}, ${a.y})`;
     case 'ratio': return `${a.a} : ${a.b}`;
     case 'working': return a.canonicalWorking || '';
+    case 'interval': {
+      const region = authoredRegion(a);
+      return region ? formatRegion(region, a.variable || 'x') : (a.region || '');
+    }
+    case 'matrix': return Array.isArray(a.rows) ? formatMatrix(a.rows) : '';
+    case 'vector': return Array.isArray(a.components) ? formatVector(a.components) : '';
     default: return '';
   }
 }
@@ -1697,6 +1704,16 @@ const routes = {
     }
     // Working-type questions mark every submitted line — surface that report
     if (!stepReport && result.stepReport) stepReport = result.stepReport;
+    // Method marks under the exam rule: a wrong answer with working that moves
+    // the solution on earns marks for those lines; restating the question does
+    // not. Practice and exams share methodMarks() so the two never disagree.
+    let partial = null;
+    if (!result.correct && !result.invalid && steps && String(steps).trim() && meta0) {
+      try {
+        const mm = methodMarks({ meta: meta0, working: String(steps), marks: criteriaFor(q).length, prompt: q.prompt, report: stepReport });
+        if (mm) partial = { okLines: mm.okLines, awarded: mm.awarded, note: mm.note };
+      } catch { partial = null; }
+    }
     // A wrong answer that landed on a designed distractor is not a random miss:
     // the trap names the misconception behind it. Counted here, before the
     // two-try branch below, because the first attempt is the honest evidence.
@@ -1726,14 +1743,14 @@ const routes = {
     if (!result.correct && !result.invalid && !isFast && (row.tries || 0) < 1) {
       row.tries = (row.tries || 0) + 1;
       await put('questions', row);
-      return { correct: false, resolved: false, triesLeft: 1, feedback: feedback || 'Not quite — check your working and try once more.', stepReport, diagnosis: stepReport?.diagnosis || null, misconception: await namedTrap(p.id, q.subtopic, trapHit) };
+      return { correct: false, resolved: false, triesLeft: 1, feedback: feedback || 'Not quite — check your working and try once more.', stepReport, partial, diagnosis: stepReport?.diagnosis || null, misconception: await namedTrap(p.id, q.subtopic, trapHit) };
     }
     if (result.invalid && !isFast) {
       return { correct: false, resolved: false, triesLeft: Math.max(0, 1 - (row.tries || 0)), invalid: true, feedback, stepReport };
     }
     const meta = await resolve(p, row, q, result.correct, answer, ms, row.mode, !!viaInk);
     return {
-      correct: result.correct, resolved: true, feedback, stepReport,
+      correct: result.correct, resolved: true, feedback, stepReport, partial,
       diagnosis: stepReport?.diagnosis || null,
       misconception: await namedTrap(p.id, q.subtopic, trapHit),
       solution: { steps: q.steps, answerText: displayAnswer(q), criteria: criteriaFor(q), solutionText: q.solutionText },
@@ -1919,12 +1936,14 @@ const routes = {
       const wk = workings[qid];
       const metaQ = stepMetaFor(q);
       if (!result.correct && wk && String(wk).trim() && metaQ) {
+        // The same rule Practice applies: restating the question earns
+        // nothing; each verified line that moves the solution on earns one
+        // mark, capped one below the question's marks.
         try {
-          const rep = stepCheck(metaQ, String(wk));
-          const okLines = (rep?.lines || []).filter(l => l.status === 'ok').length;
-          if (okLines > 0) {
-            awarded = Math.min(qMarks - 1, okLines);
-            partial = { okLines, awarded, note: `${awarded} mark${awarded === 1 ? '' : 's'} for correct working — the final answer was wrong, but ${okLines} line${okLines === 1 ? '' : 's'} of your working checked out.` };
+          const mm = methodMarks({ meta: metaQ, working: String(wk), marks: qMarks, prompt: q.prompt });
+          if (mm) {
+            awarded = mm.awarded;
+            partial = { okLines: mm.okLines, awarded: mm.awarded, note: mm.note };
           }
         } catch { }
       }
