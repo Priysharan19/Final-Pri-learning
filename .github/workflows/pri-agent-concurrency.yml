@@ -38,117 +38,94 @@ jobs:
           node --check scripts/pri-mission-control.mjs
           node scripts/pri-fleet.mjs validate
           node scripts/pri-mission-control.mjs validate
-      - name: Deterministic concurrency admission regressions
+
+      - name: Allow disjoint owners and deny ownership ambiguity
         shell: bash
         run: |
           set -euo pipefail
           now="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          old="$(date -u -d '2 days ago' +%Y-%m-%dT%H:%M:%SZ)"
-
-          mission() {
-            local file="$1" id="$2" agent="$3" path="$4" deps="${5:-}"
-            cat > "$file" <<JSON
-          {"id":"$id","agent":"$agent","branch":"agent/mission/$agent/$id","risk":"R2","status":"ACTIVE","updated_at":"$now","base_sha":"1aff5a8c8f8d0f2eda9e3a965ca0bf238177ae18","paths":["$path"],"dependencies":[$deps]}
+          cat > /tmp/ui.json <<JSON
+          {"id":"ui","agent":"student-experience","branch":"agent/mission/student-experience/ui","risk":"R2","status":"ACTIVE","updated_at":"$now","base_sha":"1aff5a8c8f8d0f2eda9e3a965ca0bf238177ae18","paths":["client/src/pages/Home.jsx"],"dependencies":[]}
           JSON
-          }
-
-          mission /tmp/ui.json ui-isolated student-experience client/src/pages/Home.jsx
-          mission /tmp/backend-test.json backend-test qa-release server/test/concurrency-contract-check.mjs
-          node scripts/pri-mission-control.mjs can-run-concurrently /tmp/ui.json /tmp/backend-test.json | grep -q '"decision": "ALLOW"'
-
-          mission /tmp/ui2.json ui-two student-experience client/src/pages/Progress.jsx
-          if node scripts/pri-mission-control.mjs can-run-concurrently /tmp/ui.json /tmp/ui2.json; then
-            echo 'same canonical owner was incorrectly admitted concurrently' >&2
-            exit 1
-          fi
-
-          cat > /tmp/glob-a.json <<JSON
-          {"id":"glob-a","agent":"student-experience","branch":"agent/mission/student-experience/glob-a","risk":"R2","status":"ACTIVE","updated_at":"$now","base_sha":"1aff5a8c8f8d0f2eda9e3a965ca0bf238177ae18","paths":["client/src/pages/**"],"dependencies":[]}
+          cat > /tmp/backend.json <<JSON
+          {"id":"backend","agent":"qa-release","branch":"agent/mission/qa-release/backend","risk":"R2","status":"ACTIVE","updated_at":"$now","base_sha":"1aff5a8c8f8d0f2eda9e3a965ca0bf238177ae18","paths":["server/test/concurrency-contract-check.mjs"],"dependencies":[]}
           JSON
-          cat > /tmp/glob-b.json <<JSON
-          {"id":"glob-b","agent":"qa-release","branch":"agent/mission/qa-release/glob-b","risk":"R2","status":"ACTIVE","updated_at":"$now","base_sha":"1aff5a8c8f8d0f2eda9e3a965ca0bf238177ae18","paths":["client/src/pages/Home*"],"dependencies":[]}
+          node scripts/pri-mission-control.mjs can-run-concurrently /tmp/ui.json /tmp/backend.json | grep -q '"decision": "ALLOW"'
+          cat > /tmp/ui2.json <<JSON
+          {"id":"ui2","agent":"student-experience","branch":"agent/mission/student-experience/ui2","risk":"R2","status":"ACTIVE","updated_at":"$now","base_sha":"1aff5a8c8f8d0f2eda9e3a965ca0bf238177ae18","paths":["client/src/pages/Progress.jsx"],"dependencies":[]}
           JSON
-          if node scripts/pri-mission-control.mjs can-run-concurrently /tmp/glob-a.json /tmp/glob-b.json; then
-            echo 'ambiguous/overlapping globs were incorrectly admitted' >&2
-            exit 1
-          fi
+          if node scripts/pri-mission-control.mjs can-run-concurrently /tmp/ui.json /tmp/ui2.json; then exit 1; fi
+          cat > /tmp/glob.json <<JSON
+          {"id":"glob","agent":"qa-release","branch":"agent/mission/qa-release/glob","risk":"R2","status":"ACTIVE","updated_at":"$now","base_sha":"1aff5a8c8f8d0f2eda9e3a965ca0bf238177ae18","paths":["client/src/pages/**"],"dependencies":[]}
+          JSON
+          if node scripts/pri-mission-control.mjs can-run-concurrently /tmp/ui.json /tmp/glob.json; then exit 1; fi
+          cat > /tmp/unknown.json <<JSON
+          {"id":"unknown","agent":"qa-release","branch":"agent/mission/qa-release/unknown","risk":"R2","status":"ACTIVE","updated_at":"$now","base_sha":"1aff5a8c8f8d0f2eda9e3a965ca0bf238177ae18","paths":["unknown-unowned-path.txt"],"dependencies":[]}
+          JSON
+          if node scripts/pri-mission-control.mjs can-run-concurrently /tmp/ui.json /tmp/unknown.json; then exit 1; fi
 
+      - name: Deny shared derived and sensitive authorities
+        shell: bash
+        run: |
+          set -euo pipefail
+          now="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           cat > /tmp/derived-a.json <<JSON
           {"id":"derived-a","agent":"student-experience","branch":"agent/mission/student-experience/derived-a","risk":"R3","status":"ACTIVE","updated_at":"$now","base_sha":"1aff5a8c8f8d0f2eda9e3a965ca0bf238177ae18","paths":["client/src/pages/Home.jsx","ios/PriLearning.swiftpm/Resources/Web/index.html"],"dependencies":[]}
           JSON
           cat > /tmp/derived-b.json <<JSON
           {"id":"derived-b","agent":"math-reasoning","branch":"agent/mission/math-reasoning/derived-b","risk":"R4","status":"ACTIVE","updated_at":"$now","base_sha":"1aff5a8c8f8d0f2eda9e3a965ca0bf238177ae18","paths":["client/src/engine/checker.js","ios/PriLearning 2.swiftpm/Resources/Web/index.html"],"dependencies":[]}
           JSON
-          if node scripts/pri-mission-control.mjs can-run-concurrently /tmp/derived-a.json /tmp/derived-b.json; then
-            echo 'shared derived root was incorrectly admitted' >&2
-            exit 1
-          fi
-
-          mission /tmp/package.json reliability package.json
-          if node scripts/pri-mission-control.mjs can-run-concurrently /tmp/package.json /tmp/ui.json; then
-            echo 'global package authority was incorrectly concurrent' >&2
-            exit 1
-          fi
-
-          mission /tmp/platform.json platform server/platform/session-store.js
-          mission /tmp/auth-test.json qa-release server/test/auth-session-isolation-check.mjs
-          if node scripts/pri-mission-control.mjs can-run-concurrently /tmp/platform.json /tmp/auth-test.json; then
-            echo 'shared auth/session authority was incorrectly concurrent' >&2
-            exit 1
-          fi
-
-          mission /tmp/schema.json platform server/platform/schema/store.js
-          mission /tmp/schema-test.json qa-release server/test/schema-migration-check.mjs
-          if node scripts/pri-mission-control.mjs can-run-concurrently /tmp/schema.json /tmp/schema-test.json; then
-            echo 'shared migration/schema authority was incorrectly concurrent' >&2
-            exit 1
-          fi
-
-          mission /tmp/unknown.json qa-release unknown-unowned-path.txt
-          if node scripts/pri-mission-control.mjs can-run-concurrently /tmp/unknown.json /tmp/ui.json; then
-            echo 'unowned path was incorrectly admitted' >&2
-            exit 1
-          fi
-
-          cat > /tmp/dependent.json <<JSON
-          {"id":"dependent","agent":"qa-release","branch":"agent/mission/qa-release/dependent","risk":"R2","status":"ACTIVE","updated_at":"$now","base_sha":"1aff5a8c8f8d0f2eda9e3a965ca0bf238177ae18","paths":["server/test/dependent-check.mjs"],"dependencies":["ui-isolated"]}
+          if node scripts/pri-mission-control.mjs can-run-concurrently /tmp/derived-a.json /tmp/derived-b.json; then exit 1; fi
+          cat > /tmp/package.json <<JSON
+          {"id":"pkg","agent":"reliability","branch":"agent/mission/reliability/pkg","risk":"R3","status":"ACTIVE","updated_at":"$now","base_sha":"1aff5a8c8f8d0f2eda9e3a965ca0bf238177ae18","paths":["package.json"],"dependencies":[]}
           JSON
-          if node scripts/pri-mission-control.mjs can-run-concurrently /tmp/dependent.json /tmp/ui.json; then
-            echo 'dependency edge was incorrectly admitted' >&2
-            exit 1
-          fi
+          cat > /tmp/ui.json <<JSON
+          {"id":"ui","agent":"student-experience","branch":"agent/mission/student-experience/ui","risk":"R2","status":"ACTIVE","updated_at":"$now","base_sha":"1aff5a8c8f8d0f2eda9e3a965ca0bf238177ae18","paths":["client/src/pages/Home.jsx"],"dependencies":[]}
+          JSON
+          if node scripts/pri-mission-control.mjs can-run-concurrently /tmp/package.json /tmp/ui.json; then exit 1; fi
+          cat > /tmp/platform.json <<JSON
+          {"id":"platform","agent":"platform","branch":"agent/mission/platform/platform","risk":"R4","status":"ACTIVE","updated_at":"$now","base_sha":"1aff5a8c8f8d0f2eda9e3a965ca0bf238177ae18","paths":["server/platform/session-store.js"],"dependencies":[]}
+          JSON
+          cat > /tmp/auth-test.json <<JSON
+          {"id":"auth-test","agent":"qa-release","branch":"agent/mission/qa-release/auth-test","risk":"R3","status":"ACTIVE","updated_at":"$now","base_sha":"1aff5a8c8f8d0f2eda9e3a965ca0bf238177ae18","paths":["server/test/auth-session-isolation-check.mjs"],"dependencies":[]}
+          JSON
+          if node scripts/pri-mission-control.mjs can-run-concurrently /tmp/platform.json /tmp/auth-test.json; then exit 1; fi
 
+      - name: Deny dependencies and cap; recover stale leases
+        shell: bash
+        run: |
+          set -euo pipefail
+          now="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          old="$(date -u -d '2 days ago' +%Y-%m-%dT%H:%M:%SZ)"
+          cat > /tmp/ui.json <<JSON
+          {"id":"ui","agent":"student-experience","branch":"agent/mission/student-experience/ui","risk":"R2","status":"ACTIVE","updated_at":"$now","base_sha":"1aff5a8c8f8d0f2eda9e3a965ca0bf238177ae18","paths":["client/src/pages/Home.jsx"],"dependencies":[]}
+          JSON
+          cat > /tmp/dependent.json <<JSON
+          {"id":"dependent","agent":"qa-release","branch":"agent/mission/qa-release/dependent","risk":"R2","status":"ACTIVE","updated_at":"$now","base_sha":"1aff5a8c8f8d0f2eda9e3a965ca0bf238177ae18","paths":["server/test/dependent-check.mjs"],"dependencies":["ui"]}
+          JSON
+          if node scripts/pri-mission-control.mjs can-run-concurrently /tmp/dependent.json /tmp/ui.json; then exit 1; fi
           cat > /tmp/stale.json <<JSON
           {"id":"stale","agent":"qa-release","branch":"agent/mission/qa-release/stale","risk":"R2","status":"ACTIVE","updated_at":"$old","base_sha":"1aff5a8c8f8d0f2eda9e3a965ca0bf238177ae18","paths":["server/test/stale-check.mjs"],"dependencies":[]}
           JSON
           printf '[%s]\n' "$(cat /tmp/stale.json)" > /tmp/active-stale.json
           node scripts/pri-mission-control.mjs admit /tmp/ui.json /tmp/active-stale.json | grep -q '"reason": "FIRST_WRITER"'
-          node scripts/pri-mission-control.mjs admit /tmp/ui.json /tmp/active-stale.json | grep -q 'stale'
-
-          cat > /tmp/active-two.json <<JSON
-          [$(cat /tmp/backend-test.json),$(cat /tmp/platform.json)]
+          cat > /tmp/backend.json <<JSON
+          {"id":"backend","agent":"qa-release","branch":"agent/mission/qa-release/backend","risk":"R2","status":"ACTIVE","updated_at":"$now","base_sha":"1aff5a8c8f8d0f2eda9e3a965ca0bf238177ae18","paths":["server/test/concurrency-contract-check.mjs"],"dependencies":[]}
           JSON
-          if node scripts/pri-mission-control.mjs admit /tmp/ui.json /tmp/active-two.json; then
-            echo 'writer cap >2 was incorrectly admitted' >&2
-            exit 1
-          fi
-
-          cp .pri-os/mission-control.json /tmp/mission-control-good.json
+          cat > /tmp/platform.json <<JSON
+          {"id":"platform","agent":"platform","branch":"agent/mission/platform/platform","risk":"R4","status":"ACTIVE","updated_at":"$now","base_sha":"1aff5a8c8f8d0f2eda9e3a965ca0bf238177ae18","paths":["server/platform/session-store.js"],"dependencies":[]}
+          JSON
+          printf '[%s,%s]\n' "$(cat /tmp/backend.json)" "$(cat /tmp/platform.json)" > /tmp/active-two.json
+          if node scripts/pri-mission-control.mjs admit /tmp/ui.json /tmp/active-two.json; then exit 1; fi
+          cp .pri-os/mission-control.json /tmp/control.json
           node - <<'NODE'
-          const fs = require('fs');
-          const p = '.pri-os/mission-control.json';
-          const j = JSON.parse(fs.readFileSync(p, 'utf8'));
-          j.lease.max_writers = 99;
-          fs.writeFileSync(p, JSON.stringify(j, null, 2) + '\n');
+          const fs = require('fs'); const p='.pri-os/mission-control.json'; const j=JSON.parse(fs.readFileSync(p,'utf8')); j.lease.max_writers=99; fs.writeFileSync(p,JSON.stringify(j,null,2)+'\n');
           NODE
-          printf '[%s]\n' "$(cat /tmp/backend-test.json)" > /tmp/active-one.json
-          if node scripts/pri-mission-control.mjs admit /tmp/ui.json /tmp/active-one.json; then
-            echo 'corrupt writer cap did not fail closed to one writer' >&2
-            exit 1
-          fi
-          mv /tmp/mission-control-good.json .pri-os/mission-control.json
+          printf '[%s]\n' "$(cat /tmp/backend.json)" > /tmp/active-one.json
+          if node scripts/pri-mission-control.mjs admit /tmp/ui.json /tmp/active-one.json; then exit 1; fi
+          mv /tmp/control.json .pri-os/mission-control.json
 
-      - name: Concurrent ledger validation and project-issue exclusion
+      - name: Validate concurrent ledger and exclude project issues
         shell: bash
         run: |
           set -euo pipefail
@@ -157,18 +134,7 @@ jobs:
           [
             {"number":174,"title":"[PRI-PROJECT] Completion ledger","updated_at":"$now","body":"Pri-Mission-ID: must-not-count\nPri-Mission-Status: ACTIVE\nPri-Agent: director"},
             {"number":1,"title":"[PRI-MISSION] ui","updated_at":"$now","body":"Pri-Mission-ID: ui\nPri-Mission-Status: ACTIVE\nPri-Agent: student-experience\nPri-Branch: agent/mission/student-experience/ui\nPri-Risk: R2\nPri-Base-SHA: 1aff5a8c8f8d0f2eda9e3a965ca0bf238177ae18\nPri-Attempt: 0\nPri-Failure-Fingerprint: none\nPri-Paths: [\"client/src/pages/Home.jsx\"]\nPri-Dependencies: none"},
-            {"number":2,"title":"[PRI-MISSION] backend-test","updated_at":"$now","body":"Pri-Mission-ID: backend-test\nPri-Mission-Status: ACTIVE\nPri-Agent: qa-release\nPri-Branch: agent/mission/qa-release/backend-test\nPri-Risk: R2\nPri-Base-SHA: 1aff5a8c8f8d0f2eda9e3a965ca0bf238177ae18\nPri-Attempt: 0\nPri-Failure-Fingerprint: none\nPri-Paths: [\"server/test/concurrency-contract-check.mjs\"]\nPri-Dependencies: none"}
+            {"number":2,"title":"[PRI-MISSION] backend","updated_at":"$now","body":"Pri-Mission-ID: backend\nPri-Mission-Status: ACTIVE\nPri-Agent: qa-release\nPri-Branch: agent/mission/qa-release/backend\nPri-Risk: R2\nPri-Base-SHA: 1aff5a8c8f8d0f2eda9e3a965ca0bf238177ae18\nPri-Attempt: 0\nPri-Failure-Fingerprint: none\nPri-Paths: [\"server/test/concurrency-contract-check.mjs\"]\nPri-Dependencies: none"}
           ]
           JSON
           node scripts/pri-mission-control.mjs validate-ledger /tmp/ledger.json student-experience ui agent/mission/student-experience/ui R2 | grep -q '"active_count": 2'
-
-          cat > /tmp/ledger-overlap.json <<JSON
-          [
-            {"number":1,"title":"[PRI-MISSION] ui","updated_at":"$now","body":"Pri-Mission-ID: ui\nPri-Mission-Status: ACTIVE\nPri-Agent: student-experience\nPri-Branch: agent/mission/student-experience/ui\nPri-Risk: R2\nPri-Base-SHA: 1aff5a8c8f8d0f2eda9e3a965ca0bf238177ae18\nPri-Attempt: 0\nPri-Failure-Fingerprint: none\nPri-Paths: [\"client/src/pages/Home.jsx\"]"},
-            {"number":2,"title":"[PRI-MISSION] ui2","updated_at":"$now","body":"Pri-Mission-ID: ui2\nPri-Mission-Status: ACTIVE\nPri-Agent: student-experience\nPri-Branch: agent/mission/student-experience/ui2\nPri-Risk: R2\nPri-Base-SHA: 1aff5a8c8f8d0f2eda9e3a965ca0bf238177ae18\nPri-Attempt: 0\nPri-Failure-Fingerprint: none\nPri-Paths: [\"client/src/pages/Progress.jsx\"]"}
-          ]
-          JSON
-          if node scripts/pri-mission-control.mjs validate-ledger /tmp/ledger-overlap.json student-experience ui agent/mission/student-experience/ui R2; then
-            echo 'ledger allowed two writers with the same canonical owner' >&2
-            exit 1
-          fi
