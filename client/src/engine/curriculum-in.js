@@ -20,6 +20,7 @@ import {
 } from './ncert/class8-chapters-3-13-production.js';
 import { NCERT_CLASS9_CHAPTERS } from './ncert/class9-chapters-production.js';
 import { CBSE_CLASS10_2026_27_CHAPTERS } from './ncert/class10-2026-27-production.js';
+import { INDIA_NATIVE_COVERS } from './curriculum-in-native-covers.js';
 
 function replaceClass7() {
   const group = IN_CURRICULUM.find(g => g.grade === 7);
@@ -122,5 +123,46 @@ function overlayClass10() {
 }
 
 overlayClass10();
+
+// India-native question banks replace the borrowed NSW ones.
+//
+// Nineteen chapters reached at least one dot point through a generator written
+// against the NSW syllabus. curriculum-in-native-covers.js says which generator
+// now serves each of those dot points, and this pass installs it on every view
+// of the chapter the app can reach — the chooser's grouped list, the flat list
+// and the id lookup — so no surface can still be handing a Class 11 student an
+// NSW Year 11 question.
+//
+// Only `covers` moves. The dot points stay exactly as declared, because they
+// are the claim about what the chapter teaches and changing one is a curriculum
+// decision rather than a generator decision; the `native` flag is left alone
+// too, because the Class X overlay above sets it deliberately as a provenance
+// statement and this pass has nothing to say about provenance. The rewrite is
+// refused outright if
+// it would leave a dot point with nothing behind it: a chapter that silently
+// lost coverage here would show up as a student selecting a topic and getting
+// nothing back, which is the failure this whole file exists to prevent. The
+// Class X source contract in ncert/class10-2026-27-production.js is left as the
+// record of what was reviewed against the syllabus and is deliberately not
+// edited from here — it says which OUTCOMES were checked, and swapping the
+// generator behind an outcome does not re-check the outcome.
+function installNativeCovers() {
+  for (const [chapterId, covers] of Object.entries(INDIA_NATIVE_COVERS)) {
+    const views = new Set([
+      IN_CURRICULUM.flatMap(group => group.chapters).find(chapter => chapter.id === chapterId),
+      IN_CHAPTER_BY_ID[chapterId],
+      IN_CHAPTERS.find(chapter => chapter.id === chapterId)
+    ].filter(Boolean));
+    if (!views.size) throw new Error(`${chapterId} is not a chapter of this curriculum`);
+    for (const chapter of views) {
+      const reached = new Set(covers.flatMap(entry => (entry.diff.length ? entry.dp : [])));
+      const missing = chapter.dotpoints.map((_, i) => i).filter(i => !reached.has(i));
+      if (missing.length) throw new Error(`${chapterId}: native covers leave dot point(s) ${missing.join(', ')} with no generator`);
+      chapter.covers = covers.map(entry => ({ gen: entry.gen, dp: [...entry.dp], diff: [...entry.diff] }));
+    }
+  }
+}
+
+installNativeCovers();
 
 export * from './curriculum-in-base.js';

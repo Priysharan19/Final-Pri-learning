@@ -49,11 +49,23 @@ for (const file of SHARED) {
 }
 
 // ── 2 · Where Australian vocabulary IS allowed, it is branched ───────────────
+// The copy itself now lives in the string catalogues, so that is where to look.
+// The page's job is only to pick the right key for the course.
 const settings = read('client/src/pages/SettingsLegacy.jsx');
 ok(/user\.course === 'in'/.test(settings),
   'Settings branches its explanation on the course rather than describing one country to everyone');
-ok(/calibrated to HSC bands/.test(settings) === true && /course === 'in'\s*\?[\s\S]{0,400}CBSE percentage/.test(settings),
-  'the HSC sentence is reachable only on the Australian branch, and the India branch describes what India actually gets');
+ok(/settings\.helpBodyIndia/.test(settings),
+  'and an India profile is sent to its own key');
+
+for (const catalogue of ['client/src/i18n/strings.en.js', 'client/src/i18n/strings.hi.js']) {
+  const src = read(catalogue);
+  const india = src.split("'settings.helpBodyIndia':")[1]?.split('\n')[0] || '';
+  ok(india.length > 0, `${catalogue} defines the India help text`);
+  ok(!/HSC|Band\s*[1-6]|ATAR/.test(india),
+    `${catalogue} never describes an Australian qualification to an Indian student`);
+  ok(/CBSE|JEE/.test(india),
+    `${catalogue} names what India actually gets instead`);
+}
 
 // ── 3 · The game modes draw from the student's own curriculum ───────────────
 // The behavioural half. A copy check would not have caught this one.

@@ -36,10 +36,10 @@ jobs:
         run: |
           set -euo pipefail
           test -s suites.log
-          grep -Fq '1544000/1544000 self-checks passed across 193 subtopics' suites.log
+          grep -Fq '1704000/1704000 self-checks passed across 213 subtopics' suites.log
           grep -Fq '21000/21000 multipart part-checks passed' suites.log
-          grep -Fq '✔ INDIA SUITE PASSED — 1724/1724 checks' suites.log
-          grep -Fq '43800 questions from 438 declared (generator, difficulty) pairs × 100 draws — 43800 marked correct by their own marker, 43800 well formed' suites.log
+          grep -Fq '✔ INDIA SUITE PASSED — 1832/1832 checks' suites.log
+          grep -Fq '44000 questions from 440 declared (generator, difficulty) pairs × 100 draws — 44000 marked correct by their own marker, 44000 well formed' suites.log
           grep -Fq '258/258 dot points have a generator behind them; 0 do not' suites.log
           grep -Fq 'NCERT ANSWER FORMS: PASS — 212/212 checks' suites.log
           grep -Fq 'METHOD MARKS: PASS — 37/37 checks' suites.log
@@ -49,6 +49,8 @@ jobs:
           grep -Fq 'Pri Reason V3 regression gate: PASS' suites.log
           grep -Fq 'Pri Reason V4 regression gate: PASS' suites.log
           grep -Fq 'Pri Reason V2 curriculum integration gate: PASS' suites.log
+          grep -Fq 'INDIA NATIVE BANKS: PASS — 313/313 checks — 19 chapters rewired onto 20 NCERT-native generators' suites.log
+          grep -Fq 'NCERT ANSWER FORMS: PASS — 93/93 checks' suites.log
           grep -Fq 'INDIA EXAM FLOW: PASS — 122/122 checks' suites.log
           grep -Fq 'INDIA PYQ: PASS — 1079/1079 checks — 45 source-cited previous-year questions' suites.log
           grep -Fq '✔ INDIA IDENTITY SUITE PASSED — 102/102 checks across 5 groups' suites.log
@@ -66,7 +68,7 @@ jobs:
           grep -Fq 'MARK PREDICTOR: PASS — 39/39 checks' suites.log
           grep -Fq 'PDF WORKING: PASS — 25/25 checks' suites.log
           grep -Fq 'MCQ DISTINCTNESS: PASS — 14/14 checks' suites.log
-          grep -Fq 'INDIA NATIVE SURFACES: PASS — 25/25 checks' suites.log
+          grep -Fq 'INDIA NATIVE SURFACES: PASS — 31/31 checks' suites.log
           grep -Eq 'INSTALL BUDGET: PASS — 44/44 checks — install [0-9]+ kB raw / [0-9]+ kB gzip under' suites.log
           grep -Fq 'nothing emitted left uncovered.' suites.log
           grep -Fq 'CBSE STEP MARKING: PASS — 37/37 checks' suites.log

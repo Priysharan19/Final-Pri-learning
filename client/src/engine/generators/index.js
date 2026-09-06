@@ -33,7 +33,13 @@ const BANKS = {
   // source-audited NCERT Class 8 Chapter 1 and Chapter 2 skill generators.
   'india-junior': () => import('./india-junior-overlay.js').then(m => m.indiaJunior),
   'india-class10': () => import('./india-class10.js').then(m => m.indiaClass10),
-  'india-senior': () => import('./india-senior.js').then(m => m.indiaSenior)
+  'india-senior': () => import('./india-senior.js').then(m => m.indiaSenior),
+  // The Class 11 and Class 12 chapters that used to borrow an NSW Year 10/11/12
+  // or Extension generator for their central dot points. They are their own
+  // banks rather than an overlay on india-senior, because india-senior is the
+  // "corners nothing else covered" bank and these are whole chapters.
+  'india-class11': () => import('./india-class11.js').then(m => m.indiaClass11),
+  'india-class12': () => import('./india-class12.js').then(m => m.indiaClass12)
 };
 
 // Subtopic ids are namespaced by the bank that authors them: y9-surds lives in
@@ -152,6 +158,26 @@ const INDIA_BANK_OF = {
   'c10-areas-circles': 'india-class10',
   'c10-surface-volume-combo': 'india-class10',
   'c10-statistics': 'india-class10',
+  'c10-linear-pair-methods': 'india-class10',
+  'c10-quadratic-roots': 'india-class10',
+  'c10-probability-classical': 'india-class10',
+  'c11-relations-functions': 'india-class11',
+  'c11-trig-functions': 'india-class11',
+  'c11-complex-numbers': 'india-class11',
+  'c11-permutations-combinations': 'india-class11',
+  'c11-sequences-series': 'india-class11',
+  'c11-straight-lines': 'india-class11',
+  'c11-limits-derivatives': 'india-class11',
+  'c11-probability': 'india-class11',
+  'c12-functions-onto-inverse': 'india-class12',
+  'c12-inverse-trigonometric': 'india-class12',
+  'c12-differentiation-rules': 'india-class12',
+  'c12-applications-derivatives': 'india-class12',
+  'c12-integrals-methods': 'india-class12',
+  'c12-definite-integrals': 'india-class12',
+  'c12-vector-dot-product': 'india-class12',
+  'c12-conditional-probability': 'india-class12',
+  'c12-random-variable': 'india-class12',
   'c11-sequence-means': 'india-senior',
   'c11-statistics': 'india-senior',
   'c12-relations-equivalence': 'india-senior',
