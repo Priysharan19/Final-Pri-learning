@@ -49,3 +49,16 @@ marketing/reel/export/
 *[ ]3.js
 *[ ]3.jsx
 *[ ]3.css
+# And again with the fonts and icons the build emits into the iPad bundles —
+# a KaTeX face copied as "… 2.ttf" is an extra file, and the bundle-match gate
+# compares tracked against freshly built file by file.
+*[ ]2.ttf
+*[ ]2.woff
+*[ ]2.woff2
+*[ ]2.png
+*[ ]2.svg
+*[ ]3.ttf
+*[ ]3.woff
+*[ ]3.woff2
+*[ ]3.png
+*[ ]3.svg
