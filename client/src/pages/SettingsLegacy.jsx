@@ -17,59 +17,57 @@ export const PATHWAY_OPTS = [
   ['ext2', 'Extension 2', 'Year 12 only — proof, complex numbers, mechanics']
 ];
 
+const askHandwritingStatus = () => cloud.handwritingStatus();
+const askWorkingStatus = () => cloud.workingStatus();
+
 const fmtBytes = (b) => b > 1e9 ? `${(b / 1e9).toFixed(1)} GB` : b > 1e6 ? `${(b / 1e6).toFixed(1)} MB` : `${Math.round(b / 1e3)} KB`;
 
 /**
- * The opt-in for server-side reading.
+ * One opt-in row for one thing that would leave the device.
  *
- * Off until the student turns it on, and only shown where the deployment can
- * actually do it. The copy says exactly what leaves the iPad, because "a
- * picture of your handwriting" is the whole of it and a student is owed the
- * plain version rather than a euphemism.
+ * Two separate switches rather than one, because they send different things: a
+ * picture of your handwriting is not the same as the words of your working, and
+ * a student may reasonably want one and not the other. Both are off until
+ * turned on, and each is hidden where the deployment cannot do it, so nothing
+ * is offered that would only fail.
+ *
+ * The copy says exactly what is sent. "A picture of your handwriting" is the
+ * whole of it, and a student is owed the plain version rather than a euphemism.
  */
-function CloudReadingRow({ user, setUser, toast }) {
+function CloudOptInRow({ field, user, setUser, toast, ask, label, copy, unavailable }) {
   const [status, setStatus] = useState(null);   // null = still asking, {available}
   const [busy, setBusy] = useState(false);
-  const on = user?.cloudHandwriting === true;
+  const on = user?.[field] === true;
 
   useEffect(() => {
     let live = true;
     if (!cloudAvailable()) { setStatus({ available: false }); return () => { live = false; }; }
-    cloud.handwritingStatus()
+    ask()
       .then(r => { if (live) setStatus({ available: !!r?.available }); })
       .catch(() => { if (live) setStatus({ available: false }); });
     return () => { live = false; };
-  }, []);
+  }, [ask]);
 
   async function toggle(next) {
     setBusy(true);
     try {
-      const r = await api.patch('/me', { cloudHandwriting: next });
+      const r = await api.patch('/me', { [field]: next });
       setUser(r.user);
-      toast(<span>{next ? 'Server reading is on for this profile' : 'Server reading is off — reading stays on this device'}</span>);
+      toast(<span>{next ? `${label} is on for this profile` : `${label} is off — this stays on your device`}</span>);
     } catch (e) { toast(<span>{e.message}</span>); }
     finally { setBusy(false); }
   }
 
   if (status && !status.available) {
-    return (
-      <p className="sub" style={{ marginTop: 12 }}>
-        Reading handwriting on a server is not available on this install, so every reading happens on this device.
-      </p>
-    );
+    return <p className="sub" style={{ marginTop: 12 }}>{unavailable}</p>;
   }
 
   return (
     <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--line, rgba(128,128,128,.25))' }}>
       <div className="set-row">
         <span className="set-k">
-          Also read my handwriting on the server
-          <span className="muted" style={{ display: 'block', fontSize: 12, marginTop: 3, maxWidth: 460 }}>
-            The on-device reader knows 58 symbols and has no comma, so lines like <b>−1, 0, 1, 2, 4</b> are beyond it.
-            Turn this on and a picture drawn from your strokes is sent to be read as well. It is a picture of your
-            writing only — never the question, never the answer, never your name. Your working still appears
-            instantly from the on-device reading; the server reading arrives after, and you can always keep yours.
-          </span>
+          {label}
+          <span className="muted" style={{ display: 'block', fontSize: 12, marginTop: 3, maxWidth: 460 }}>{copy}</span>
         </span>
         <span className="set-v">
           <button
@@ -117,7 +115,33 @@ function HandwritingSection({ toast }) {
           </button>
         )}
       </div>
-      <CloudReadingRow user={user} setUser={setUser} toast={toast} />
+      <CloudOptInRow
+        field="cloudHandwriting"
+        user={user} setUser={setUser} toast={toast}
+        ask={askHandwritingStatus}
+        label="Also read my handwriting on the server"
+        unavailable="Reading handwriting on a server is not available on this install, so every reading happens on this device."
+        copy={<>
+          The on-device reader knows 58 symbols and has no comma, so lines like <b>−1, 0, 1, 2, 4</b> are beyond it.
+          Turn this on and a picture drawn from your strokes is sent to be read as well. It is a picture of your
+          writing only — never the question, never the answer, never your name. Your working still appears
+          instantly from the on-device reading; the server reading arrives after, and you can always keep yours.
+        </>}
+      />
+      <CloudOptInRow
+        field="cloudMarking"
+        user={user} setUser={setUser} toast={toast}
+        ask={askWorkingStatus}
+        label="Tell me which line my working went wrong on"
+        unavailable="Checking working on a server is not available on this install, so marking happens entirely on this device."
+        copy={<>
+          When an answer is wrong and Pri cannot tell you <i>where</i>, turn this on and your working is checked
+          line by line. It says which line broke and what kind of mistake it was — and if you slipped once and
+          then worked correctly from your own wrong number, it says that too, instead of marking you wrong five
+          times for one mistake. Your question and your working are sent; the expected answer never is, and it
+          will not tell you the answer. Your mark is decided on this device either way and does not change.
+        </>}
+      />
     </div>
   );
 }

@@ -14,6 +14,7 @@ import { clearDraft, queueDraft, readDraft } from './drafts.js';
 import { nativePhotoAvailable, recognizePhoto } from '../native/photo.js';
 import PriPlot from './PriPlot.jsx';
 import { plotSpecFor } from '../engine/plotSpec.js';
+import { checkWorkingWithCloud, mergeVerdicts, shouldCheckWorking, workingNote } from '../ink/cloudWorking.js';
 
 const DIFF_CLASS = { 1: 'tag-d1', 2: 'tag-d2', 3: 'tag-d3', 4: 'tag-d4' };
 // Public question metadata may constrain what a single answer glyph can be,
@@ -203,7 +204,7 @@ const REASON_TAG_LABEL = {
 };
 
 export default function QuestionCard({ question, why, reason, reasonTag = null, onResolved, onNext, onRedo, compact = false }) {
-  const { celebrate, refreshUser, refreshDue, refreshRecent, toast } = useApp();
+  const { celebrate, refreshUser, refreshDue, refreshRecent, toast, user } = useApp();
   const [answer, setAnswer] = useState('');
   const [mcqSel, setMcqSel] = useState(null);
   const [mode, setMode] = useState(preferMode());       // 'type' | 'write' | 'photo'
@@ -503,7 +504,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   // pinpoints the exact line where the maths breaks; if every line is
   // consistent but the answer is still wrong, the final line gets the ✗ — the
   // mistake is always pointed at, never just "incorrect".
-  const lineVerdicts = useMemo(() => {
+  const localLineVerdicts = useMemo(() => {
     if (!writeMode) return null;
     const n = inkResult?.lines?.length || 0;
     let base = activeReport?.lines
@@ -530,6 +531,46 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     }
     return base;
   }, [writeMode, activeReport, state.phase, state.res?.invalid, resolved, res, inkResult]);
+
+  // ── A second read of the working ───────────────────────────────────────────
+  // Asked for only when the answer is wrong and the on-device checker could not
+  // say which line broke. That is the case where the app would otherwise have
+  // nothing to offer but "try again", which a student staring at six lines of
+  // their own algebra does not need to hear.
+  //
+  // It is feedback, not marking. The mark above has already been decided by the
+  // deterministic engine and does not move when this arrives.
+  const [cloudCheck, setCloudCheck] = useState(null);
+  const cloudCheckRef = useRef(null);
+  useEffect(() => { setCloudCheck(null); }, [question?.id]);
+  useEffect(() => {
+    if (!writeMode || !resolved) return;
+    const lines = inkResult?.lines || [];
+    if (!shouldCheckWorking({
+      correct: res?.correct, invalid: res?.invalid, revealed: res?.revealed,
+      lines, localReport: activeReport
+    })) return;
+
+    const key = `${question?.id}:${lines.join('|')}`;
+    if (cloudCheckRef.current === key) return;              // already asked for this page
+    cloudCheckRef.current = key;
+
+    let live = true;
+    const controller = typeof AbortController === 'function' ? new AbortController() : null;
+    checkWorkingWithCloud(lines, {
+      user,
+      prompt: question?.prompt || '',
+      signal: controller?.signal
+    }).then(result => { if (live && result && !result.error) setCloudCheck(result); })
+      .catch(() => { });
+    return () => { live = false; controller?.abort?.(); };
+  }, [writeMode, resolved, res?.correct, res?.invalid, res?.revealed, inkResult, activeReport, user, question?.id, question?.prompt]);
+
+  const lineVerdicts = useMemo(
+    () => mergeVerdicts(localLineVerdicts, cloudCheck, { lineCount: inkResult?.lines?.length || 0 }),
+    [localLineVerdicts, cloudCheck, inkResult]
+  );
+  const cloudWorkingNote = useMemo(() => workingNote(cloudCheck), [cloudCheck]);
 
   // Teacher comments panel — one card per marked step, like a margin column.
   const inkComments = useMemo(() => {
@@ -835,6 +876,14 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                       {c.text}
                     </div>
                   ))}
+                  {cloudWorkingNote && (
+                    <div className={`ink-comment ${cloudWorkingNote.tone === 'break' ? 'bad' : 'note'}`}>
+                      <div className="ic-head">
+                        {cloudWorkingNote.tone === 'break' ? 'Where it breaks' : cloudWorkingNote.tone === 'maybe' ? 'Possibly' : 'Your algebra'}
+                      </div>
+                      {cloudWorkingNote.text}
+                    </div>
+                  )}
                 </aside>
               )}
             </div>

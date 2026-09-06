@@ -713,6 +713,7 @@ async function publicUser(p, nowMs = Date.now()) {
     isDemo: !!p.isDemo, handwriting: p.handwriting !== false,
     // Default false, and false for every profile that predates the setting.
     cloudHandwriting: p.cloudHandwriting === true,
+    cloudMarking: p.cloudMarking === true,
     // Plan and free-tier usage are read from device rows: the entitlement is the
     // server-issued snapshot (or 'free'), the usage is the local counter.
     // The free-tier counter keeps its own clock (entitlementGate's), so the
@@ -2023,6 +2024,7 @@ const routes = {
     // Server-side handwriting reading is off unless the student turns it on:
     // it is the one setting that sends their work off the device.
     if (body.cloudHandwriting !== undefined) p.cloudHandwriting = body.cloudHandwriting === true;
+    if (body.cloudMarking !== undefined) p.cloudMarking = body.cloudMarking === true;
     if (body.email !== undefined) {
       const email = String(body.email || '').trim().toLowerCase().slice(0, 120);
       if (email && !EMAIL_RE.test(email)) throw Object.assign(new Error('That email doesn’t look right.'), { status: 400 });

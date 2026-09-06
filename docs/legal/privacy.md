@@ -48,6 +48,13 @@ device can open a profile that has no password.
   expected answer, not your name or profile. It is used to return the reading
   and is not kept after that, not used to train anyone's model, and turning the
   setting off stops it at once.
+- **Your working and the question, only if you switch that on.** There is a
+  second setting, also off unless you turn it on, that sends the lines of
+  working you wrote and the text of the question when an answer is wrong and
+  the app cannot tell you which line went wrong. It is used to tell you where
+  the mistake is and is not kept afterwards. The expected answer is never sent
+  with it, and your name and profile are never sent with it. Your mark is
+  decided on your device either way.
 - **Device information** needed to keep you signed in: a device identifier you
   chose, and the times you signed in and last synced.
 - **Subscription status** from your payment provider, if you subscribe.
@@ -79,6 +86,8 @@ Only the services needed to run the parts you use:
   handwriting.
 - **A handwriting reader**, only while the optional server-reading setting is
   on, and only the image of your writing described above.
+- **A step checker**, only while the optional working-check setting is on, and
+  only the working and question described above.
 
 We do not sell your data. We do not share it for advertising.
 

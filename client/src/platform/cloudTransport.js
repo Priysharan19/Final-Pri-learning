@@ -311,6 +311,11 @@ export const cloud = Object.freeze({
   handwritingStatus: () => cloudRequest('/v1/handwriting/status'),
   transcribeHandwriting: (image, { signal = null, timeoutMs = 25000 } = {}) =>
     cloudRequest('/v1/handwriting/transcribe', { method: 'POST', body: { image }, signal, timeoutMs }),
+  workingStatus: () => cloudRequest('/v1/working/status'),
+  // The question is sent; the expected answer never is, and the route refuses
+  // a body that carries one.
+  checkWorking: (prompt, lines, { signal = null, timeoutMs = 35000 } = {}) =>
+    cloudRequest('/v1/working/check', { method: 'POST', body: { prompt, lines }, signal, timeoutMs }),
   deleteAccount: body => cloudRequest('/v1/account', { method: 'DELETE', body }),
   identities: () => cloudRequest('/v1/account/identity'),
   socialSignIn: (provider, body) => cloudRequest(`/v1/account/identity/${pathId(provider, 'provider')}/sign-in`, { method: 'POST', body }),

@@ -78,6 +78,13 @@ ok(/not the question, not the expected answer/i.test(privacy),
   'and names what is never sent alongside the image');
 ok(!/handwriting strokes are not uploaded/i.test(privacy),
   'and no longer makes the unconditional claim the optional setting would break');
+// The second optional setting sends different data and gets its own paragraph.
+ok(/sends the lines of\s+working you wrote/i.test(privacy),
+  'the notice describes the optional working check and what it sends');
+ok(/expected answer is never sent with it/i.test(privacy),
+  'and that the expected answer is never sent with it');
+ok(/Two\s+optional settings/i.test(privacy),
+  'and the summary counts both, so a reader is not surprised by the second');
 ok(/90 days/.test(privacy), 'the notice states the telemetry retention window');
 ok(/without a password is not encrypted|profile without a password is not/i.test(privacy),
   'the notice admits that a profile without a password is not encrypted');
