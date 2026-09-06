@@ -40,10 +40,16 @@ export const flow = {
     await check('the landing screen names NCERT and JEE', /NCERT/.test(hero) && /JEE/.test(hero),
       `hero reads ${JSON.stringify(hero.slice(0, 160))}`);
     await check('and says nothing about the HSC', !HSC.test(hero), `hero reads ${JSON.stringify(hero.slice(0, 160))}`);
-    const privacy = await page.locator('.auth-col p.muted').innerText();
+    // The welcome screen now also carries the legal links in a muted line, so
+    // the privacy copy is named rather than taken as the only muted paragraph.
+    const privacy = await page.locator('.auth-col p.muted').first().innerText();
     await check('the privacy copy is offline-first, optional cloud, no ads',
       /offline-first/i.test(privacy) && /cloud account is optional/i.test(privacy) && /no ads/i.test(privacy),
       `privacy copy reads ${JSON.stringify(privacy)}`);
+    for (const [label, href] of [['Privacy', '/privacy'], ['Terms', '/terms'], ['Refunds', '/refund-policy'], ['Grievances', '/grievance']]) {
+      await check(`the landing screen links to ${label.toLowerCase()}`,
+        await page.locator(`.auth-col a[href="${href}"]`).count() === 1, `${label} -> ${href}`);
+    }
     await check('the landing screen offers the cloud account sign-in',
       await page.getByRole('button', { name: 'Sign in to your Pri cloud account' }).count() === 1);
     await check('the tab is titled after the app', (await page.title()) === 'Pri Learning',

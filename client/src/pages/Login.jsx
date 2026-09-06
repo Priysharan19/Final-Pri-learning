@@ -7,7 +7,7 @@
 // profile off as a cloud sign-in.
 // ─────────────────────────────────────────────────────────────────────────────
 import React, { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
 import { useApp, Logo } from '../App.jsx';
 
@@ -303,6 +303,12 @@ export default function Login() {
           <div style={{ textAlign: 'center', marginTop: 10 }}>
             <button className="linklike" onClick={cloudSignIn}>Sign in to your Pri cloud account</button>
           </div>
+          {/* A store reviewer, a payment provider and a parent all look for
+              these, and each is required of us before the app can be sold. */}
+          <p className="muted" style={{ marginTop: 22, textAlign: 'center', fontSize: 12.5 }}>
+            <Link to="/privacy">Privacy</Link> · <Link to="/terms">Terms</Link> ·{' '}
+            <Link to="/refund-policy">Refunds</Link> · <Link to="/grievance">Grievances</Link>
+          </p>
         </div>
       </div>
     );
