@@ -862,6 +862,25 @@ async function run() {
   // ── Exams ──────────────────────────────────────────────────────────────────
   section('exams');
   try {
+    // This group exercises the paper builder and its marking, not the free
+    // tier, which allows one simulation every 30 days and is covered by
+    // entitlement-enforcement-check.mjs. Give this profile a server-issued
+    // Premium snapshot so the cap is not what is under test here.
+    {
+      const { cloudLinkRowId } = await import(`${SRC}platform/cloudAccount.js`);
+      const nowMs = Date.now();
+      const examinee = (await GET('/me')).user.id;
+      await idb.put('device', {
+        id: cloudLinkRowId(examinee), accountId: `acct-${examinee}`, role: 'student',
+        emailVerified: true, linkedAt: nowMs, lastVerifiedAt: nowMs, lastSyncAt: null,
+        entitlement: {
+          plan: 'premium', status: 'active', provider: 'web',
+          currentPeriodEnd: nowMs + 30 * 86400000,
+          offlineUntil: nowMs + 7 * 86400000,
+          issuedAt: nowMs, sourceVersion: 1
+        }
+      });
+    }
     created = (await POST('/exams', { length: 10, minutes: 30 })).exam;
     ok('an exam is built with at least the length asked for', created.questions.length >= 10, `${created.questions.length} questions`);
     eq('the exam keeps its duration', created.durationMin, 30);

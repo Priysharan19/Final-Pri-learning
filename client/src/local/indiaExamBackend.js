@@ -25,6 +25,7 @@ import {
 } from '../engine/indiaExams.js';
 import { composeIndiaPaper, composerNotes, answerText } from '../engine/indiaExamComposer.js';
 import { examStepMeta, recordIndiaExamEvidence, finishIndiaExamEvidence } from './backend.js';
+import { assertExamAllowed, examAllowance, recordExamSimulation } from './entitlementGate.js';
 
 function error(message, status = 400, code = 'INDIA_EXAM_ERROR') {
   return Object.assign(new Error(message), { status, code });
@@ -494,7 +495,14 @@ export function indiaExamRoute(method, path) {
 export async function dispatchIndiaExam(profile, method, path, body = {}) {
   if (!profile?.id || profile.course !== 'in') throw error('India exam routing requires an India profile.', 400, 'INDIA_PROFILE_REQUIRED');
   if (path === '/exams' && method === 'GET') return listExams(profile);
-  if (path === '/exams' && method === 'POST') return createIndiaExam(profile, body || {});
+  if (path === '/exams' && method === 'POST') {
+    // The free tier allows one exam simulation per 30 days; Premium lifts it.
+    // Nothing is counted until a paper has actually been composed.
+    await assertExamAllowed(profile);
+    const created = await createIndiaExam(profile, body || {});
+    await recordExamSimulation(profile);
+    return { ...created, allowance: await examAllowance(profile) };
+  }
 
   const m = path.match(/^\/exams\/([^/]+)(?:\/(paper|submit))?$/);
   if (!m) throw error('India exam route not found.', 404, 'INDIA_EXAM_ROUTE_NOT_FOUND');

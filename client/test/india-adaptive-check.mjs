@@ -32,6 +32,30 @@ import { installBrowserEnv, resetStorage, rawRows } from './backend-check.mjs';
 const SRC = new URL('../src/', import.meta.url).href;
 const DAY = 86400000;
 
+/**
+ * This suite drives dozens of questions through one profile to watch the
+ * adaptive engine move. The free tier allows twenty a day, which is the
+ * subject of entitlement-enforcement-check.mjs, not of this one — so every
+ * profile here is given a server-issued Premium snapshot and the cap stays out
+ * of the way. Without this the suite would be measuring the cap.
+ */
+async function liftFreeCap(pid) {
+  const [{ cloudLinkRowId }, idb] = await Promise.all([
+    import(`${SRC}platform/cloudAccount.js`),
+    import(`${SRC}local/idb.js`)
+  ]);
+  const now = Date.now();
+  await idb.put('device', {
+    id: cloudLinkRowId(pid), accountId: `acct-${pid}`, role: 'student',
+    emailVerified: true, linkedAt: now, lastVerifiedAt: now, lastSyncAt: null,
+    entitlement: {
+      plan: 'premium', status: 'active', provider: 'web',
+      currentPeriodEnd: now + 30 * DAY, offlineUntil: now + 7 * DAY,
+      issuedAt: now, sourceVersion: 1
+    }
+  });
+}
+
 // ── Determinism ──────────────────────────────────────────────────────────────
 
 function mulberry32(a) {
@@ -370,6 +394,7 @@ async function run() {
 
   // ── Class 8 CBSE ──────────────────────────────────────────────────────────
   const c8 = (await POST('/profiles', { name: 'Aarav', year: 8, course: 'in', indiaTrack: 'cbse' })).user;
+  await liftFreeCap(c8.id);
   const c8log = await drive(60);
   await assertSitting('class 8 cbse', c8, c8log, { grades: [8] });
   await assertMisconception('class 8 cbse', c8);
@@ -377,6 +402,7 @@ async function run() {
 
   // ── Class 10 CBSE ─────────────────────────────────────────────────────────
   const c10 = (await POST('/profiles', { name: 'Diya', year: 10, course: 'in', indiaTrack: 'cbse' })).user;
+  await liftFreeCap(c10.id);
   const c10log = await drive(60);
   await assertSitting('class 10 cbse', c10, c10log, { grades: [10] });
   await assertMisconception('class 10 cbse', c10);
@@ -384,6 +410,7 @@ async function run() {
 
   // ── JEE Main, Class 11 ────────────────────────────────────────────────────
   const j11 = (await POST('/profiles', { name: 'Kabir', year: 11, course: 'in', indiaTrack: 'jee-main' })).user;
+  await liftFreeCap(j11.id);
   const j11log = await drive(60);
   const j11sit = await assertSitting('jee main class 11', j11, j11log, { grades: [11] });
   section('jee main class 11 · class-aware');
@@ -429,6 +456,7 @@ async function run() {
   // ── JEE Advanced, Class 12 — the D3–D4 window ─────────────────────────────
   section('jee advanced class 12');
   const j12 = (await POST('/profiles', { name: 'Ira', year: 12, course: 'in', indiaTrack: 'jee-advanced' })).user;
+  await liftFreeCap(j12.id);
   const j12log = await drive(24);
   ok('every JEE Advanced serve is D3 or D4', j12log.every(e => e.difficulty >= 3 && e.difficulty <= 4 && e.windowed === true), show([...new Set(j12log.map(e => e.difficulty))]));
   ok('JEE Advanced draws on both senior years', j12log.some(e => e.year === 11) && j12log.some(e => e.year === 12), show([...new Set(j12log.map(e => e.year))]));
@@ -438,6 +466,7 @@ async function run() {
 
   // ── Olympiad ──────────────────────────────────────────────────────────────
   const oly = (await POST('/profiles', { name: 'Meera', year: 9, course: 'in', indiaTrack: 'olympiad' })).user;
+  await liftFreeCap(oly.id);
   const olylog = await drive(60);
   await assertSitting('olympiad', oly, olylog, { grades: [null], prefix: 'olymp-' });
   await assertReviews('olympiad', oly, [null]);

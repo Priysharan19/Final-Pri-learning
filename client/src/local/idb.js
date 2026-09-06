@@ -1402,6 +1402,14 @@ export async function wipeProfile(pid) {
       await put('classes', c);
     }
   }
+  // The device store is install-wide rather than profile-indexed, so its rows
+  // are not caught by the loops above. A deleted profile must not leave its
+  // cloud-account link, entitlement snapshot or free-tier counter behind: they
+  // name the profile, and the next profile to take that id would inherit them.
+  for (const row of await all('device')) {
+    const id = String(row?.id ?? '');
+    if (row?.pid === pid || id.includes(pid)) await del('device', row.id);
+  }
   dataKeys.delete(pid);
   blindKeys.delete(pid);
   forgetShare(pid);

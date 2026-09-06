@@ -7,6 +7,7 @@ import './ink/interactionGuard.js';
 import App from './App.jsx';
 import AccountAction from './pages/AccountAction.jsx';
 import { accountActionCleanUrl, parseAccountActionFragment } from './platform/accountAction.js';
+import { discoverCloudOrigin } from './platform/cloudTransport.js';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 
 // Account verification/password-reset links carry their secret only in the URL
@@ -60,18 +61,24 @@ if (ACCOUNT_ACTION_MODE) {
     </ErrorBoundary>
   );
 } else {
-  // The root boundary sits outside the router so that everything is covered —
-  // the boot screen, the whole Login and cold-start path, the topbar, the account
-  // menu, the sidebar, the toasts and the mobile nav, not only the routes.
-  root.render(
-    <React.StrictMode>
-      <ErrorBoundary scope="app">
-        <BrowserRouter>
-          <App />
-        </BrowserRouter>
-      </ErrorBoundary>
-    </React.StrictMode>
-  );
+  // When the page is served by the Pri platform server, that server is the
+  // cloud authority: settle that before the first render so account, billing
+  // and sync controls do not first paint as "cloud disabled". The probe is
+  // bounded (1.5 s) and offline learning never waits on its answer.
+  void discoverCloudOrigin().catch(() => null).then(() => {
+    // The root boundary sits outside the router so that everything is covered —
+    // the boot screen, the whole Login and cold-start path, the topbar, the account
+    // menu, the sidebar, the toasts and the mobile nav, not only the routes.
+    root.render(
+      <React.StrictMode>
+        <ErrorBoundary scope="app">
+          <BrowserRouter>
+            <App />
+          </BrowserRouter>
+        </ErrorBoundary>
+      </React.StrictMode>
+    );
+  });
 }
 
 // Offline support — registration is intentionally started as soon as the

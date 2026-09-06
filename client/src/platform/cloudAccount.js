@@ -8,7 +8,7 @@
 
 import { get, put, del, uuid } from '../local/idb.js';
 import { cloud, cloudAvailable } from './cloudTransport.js';
-import { announceCloudSessionChange } from './cloudSession.js';
+import { announceCloudSessionChange, announceEntitlementChange } from './cloudSession.js';
 import { normalizeEntitlementSnapshot } from './entitlements.js';
 import { resetProfileOutboxForRelink } from './profileOutbox.js';
 import { clearCloudReplicaState } from './syncReplicaState.js';
@@ -20,6 +20,9 @@ function linkRowId(pid) {
   if (!pid) throw new Error('A local profile id is required');
   return `${LINK_PREFIX}${pid}`;
 }
+
+/** The device row that holds a profile's link — read-only for the local gate. */
+export const cloudLinkRowId = linkRowId;
 
 function announceLink(pid, link, connected) {
   announceCloudSessionChange({
@@ -106,7 +109,11 @@ export async function verifyCloudSession(pid) {
   if (!cloudAvailable()) return { connected: false, reason: 'cloud-disabled', link: await cloudAccountLink(pid) };
   try {
     const result = await cloud.me();
+    const prior = await cloudAccountLink(pid);
     const link = await saveAccount(pid, result.account);
+    // A verification that happened elsewhere (the emailed link) must reach the
+    // nudge banner and checkout gates already on screen.
+    if (prior && prior.emailVerified !== link.emailVerified) announceLink(pid, link, true);
     return { connected: true, account: result.account, link };
   } catch (error) {
     if (error?.status === 401) return { connected: false, reason: 'signed-out', link: await cloudAccountLink(pid) };
@@ -121,6 +128,7 @@ export async function refreshCloudEntitlement(pid) {
   const prior = await get('device', id).catch(() => null);
   if (!prior?.accountId) throw new Error('This local profile is not linked to a cloud account');
   await put('device', { ...prior, entitlement: { ...result.entitlement }, lastVerifiedAt: Date.now() });
+  announceEntitlementChange({ localProfileId: String(pid), plan: entitlement.plan, status: entitlement.status, active: entitlement.active });
   return entitlement;
 }
 

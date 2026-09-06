@@ -41,6 +41,11 @@ import {
   createVault, openVault, rewrapVault, blindHash, sealValue, openValue
 } from './auth.js';
 import { sanitizeFigure, sanitizeText } from '../lib/sanitize.js';
+import {
+  assertExamAllowed, assertPracticeAllowed, examAllowance, practiceAllowance,
+  planView, recordExamSimulation, recordPracticeServed, requireCapability, usageView
+} from './entitlementGate.js';
+import { ENTITLEMENTS } from '../platform/entitlements.js';
 
 export const COURSES = {
   nsw: { name: 'NSW · HSC', junior: y => `Year ${y} · Stage ${y <= 8 ? 4 : 5}`, senior: y => y === 11 ? 'Year 11 · Mathematics Advanced' : 'Year 12 · Mathematics Advanced (HSC)' },
@@ -705,7 +710,14 @@ async function publicUser(p, nowMs = Date.now()) {
     dailyGoal: p.dailyGoal || 10, xp: p.xp || 0, level, levelProgress: progress, levelNeeded: needed,
     streak: await streakFor(p.id, nowMs, tz),
     today: { questions: today.questions, correct: today.correct, xp: today.xp },
-    isDemo: !!p.isDemo, handwriting: p.handwriting !== false
+    isDemo: !!p.isDemo, handwriting: p.handwriting !== false,
+    // Plan and free-tier usage are read from device rows: the entitlement is the
+    // server-issued snapshot (or 'free'), the usage is the local counter.
+    // The free-tier counter keeps its own clock (entitlementGate's), so the
+    // allowance a student is shown and the allowance the gate enforces can
+    // never disagree about when the day turns over.
+    plan: await planView(p),
+    usage: await usageView(p)
   };
 }
 
@@ -3222,10 +3234,47 @@ export async function finishIndiaExamEvidence(pct) {
   return checkBadges(p.id, { type: 'exam', pct: Number(pct) || 0 }, Date.now());
 }
 
+// ── Entitlement gates ────────────────────────────────────────────────────────
+// The free tier (20 practice questions a day, one exam simulation per 30 days)
+// and the Premium-only JEE Advanced track are enforced at the dispatcher, so a
+// smart-practice call, a retry from History and a teacher task all meet the same
+// rule on the same device-local counter. The route bodies stay pure builders.
+// Nothing is counted until the route has actually produced a question or paper.
+async function entitlementGate(method, pattern, body) {
+  const key = `${method} ${pattern}`;
+  if (key === 'POST /practice/next' || key === 'POST /history/:id/retry') {
+    const p = await requireProfile();
+    await assertPracticeAllowed(p);
+    if (key === 'POST /practice/next' && p.course === 'in' && !body?.taskId &&
+      cleanIndiaTrack(body?.track || p.indiaTrack, p.year) === 'jee-advanced') {
+      await requireCapability(p, ENTITLEMENTS.JEE_ADVANCED);
+    }
+    return async result => {
+      await recordPracticeServed(p);
+      return { ...result, allowance: await practiceAllowance(p) };
+    };
+  }
+  if (key === 'POST /exams') {
+    const p = await requireProfile();
+    await assertExamAllowed(p);
+    return async result => {
+      await recordExamSimulation(p);
+      return { ...result, allowance: await examAllowance(p) };
+    };
+  }
+  return null;
+}
+
+async function runGated(method, pattern, handler, body, params) {
+  const settle = await entitlementGate(method, pattern, body);
+  const result = await handler(body, params);
+  return settle ? settle(result) : result;
+}
+
 export async function dispatch(method, path, body) {
   // exact match first
   const exact = routes[`${method} ${path}`];
-  if (exact) return exact(body, {});
+  if (exact) return runGated(method, path, exact, body, {});
   // parameterised match
   for (const key of Object.keys(routes)) {
     const [m, pattern] = key.split(' ');
@@ -3239,7 +3288,7 @@ export async function dispatch(method, path, body) {
       if (pp[i].startsWith(':')) params[pp[i].slice(1)] = aa[i];
       else if (pp[i] !== aa[i]) { ok = false; break; }
     }
-    if (ok) return routes[key](body, params);
+    if (ok) return runGated(method, pattern, routes[key], body, params);
   }
   throw Object.assign(new Error(`No local route for ${method} ${path}`), { status: 404 });
 }

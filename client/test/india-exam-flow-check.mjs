@@ -29,6 +29,22 @@ const eq = (actual, expected, label) => ok(actual === expected, `${label} — ex
 async function profileFor(spec) {
   const created = await dispatch('POST', '/profiles', spec);
   ok(!!created?.user?.id, `${spec.name}: profile created`);
+  // The free tier allows one exam simulation every 30 days, which
+  // entitlement-enforcement-check.mjs is the suite for. This one is about
+  // whether each track can compose, sit and mark a paper at all, so every
+  // profile here holds a server-issued Premium snapshot.
+  const { cloudLinkRowId } = await import('../src/platform/cloudAccount.js');
+  const idb = await import('../src/local/idb.js');
+  const now = Date.now();
+  await idb.put('device', {
+    id: cloudLinkRowId(created.user.id), accountId: `acct-${created.user.id}`, role: 'student',
+    emailVerified: true, linkedAt: now, lastVerifiedAt: now, lastSyncAt: null,
+    entitlement: {
+      plan: 'premium', status: 'active', provider: 'web',
+      currentPeriodEnd: now + 30 * 86400000, offlineUntil: now + 7 * 86400000,
+      issuedAt: now, sourceVersion: 1
+    }
+  });
   return created.user;
 }
 
