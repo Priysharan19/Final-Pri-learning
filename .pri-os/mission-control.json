@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "ledger": {
     "backend": "github_issues",
     "title_prefix": "[PRI-MISSION]",
@@ -12,14 +12,19 @@
       "risk": "Pri-Risk",
       "base_sha": "Pri-Base-SHA",
       "attempt": "Pri-Attempt",
-      "failure_fingerprint": "Pri-Failure-Fingerprint"
+      "failure_fingerprint": "Pri-Failure-Fingerprint",
+      "paths": "Pri-Paths",
+      "dependencies": "Pri-Dependencies"
     }
   },
   "lease": {
     "ttl_hours": 12,
-    "single_active_writer": true,
+    "single_active_writer": false,
+    "max_writers": 2,
+    "fallback_max_writers": 1,
     "renew_on_progress": true,
-    "stale_action": "release_and_retriage"
+    "stale_action": "release_and_retriage",
+    "revalidate_after_main_move": true
   },
   "retry_policy": {
     "max_identical_failure_attempts": 3,
@@ -64,6 +69,8 @@
       "broken_build",
       "auth",
       "unsafe_handwriting_authority",
+      "billing_entitlement",
+      "sync_durability",
       "normal"
     ],
     "weights": {

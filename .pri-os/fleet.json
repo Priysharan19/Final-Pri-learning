@@ -2,7 +2,9 @@
   "version": 2,
   "name": "Pri Learning Autonomous Engineering Fleet",
   "principles": {
-    "single_writer": true,
+    "single_primary_writer_per_mission": true,
+    "bounded_writer_pool": true,
+    "writer_pool_authority": ".pri-os/mission-control.json",
     "evidence_before_claims": true,
     "no_threshold_weakening": true,
     "no_fabricated_human_or_hardware_evidence": true,
