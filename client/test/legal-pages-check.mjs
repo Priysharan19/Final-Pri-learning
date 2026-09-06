@@ -74,6 +74,24 @@ ok(/without a password is not encrypted|profile without a password is not/i.test
 
 ok(existsSync(join(ROOT, 'tools/legal-status.mjs')), 'there is a tool listing what is still unfilled');
 
+// The client build imports these documents from outside client/, so the
+// container's build context has to carry them. It did not, and the production
+// image failed to build with "Module not found" — a regression only the
+// container job could catch. This check makes it a fast one instead.
+const dockerfile = readFileSync(join(ROOT, 'Dockerfile'), 'utf8');
+const clientBuildStage = dockerfile.slice(0, dockerfile.indexOf('AS server-deps'));
+const imported = [...new Set(
+  (readFileSync(join(ROOT, 'client/src/pages/Legal.jsx'), 'utf8').match(/from '([^']*\.\.\/[^']*)'/g) || [])
+    .map(line => line.replace(/^from '|'$/g, ''))
+    .filter(spec => spec.includes('../../../'))
+    .map(spec => spec.replace(/^(\.\.\/)+/, '').replace(/\?raw$/, '').split('/').slice(0, 2).join('/'))
+)];
+for (const dir of imported) {
+  ok(clientBuildStage.includes(`COPY ${dir}`),
+    `the image's client build copies ${dir}, which the client imports from outside client/`);
+}
+ok(imported.length > 0, 'the legal page imports its documents from the repository, not a copy');
+
 console.log(failures.length
   ? `LEGAL PAGES: FAIL — ${failures.length} of ${pass + failures.length} checks failed\n  · ${failures.join('\n  · ')}`
   : `LEGAL PAGES: PASS — ${pass}/${pass} checks — privacy, terms, refunds and grievances exist, route signed in and out, and say they are unreviewed while ${placeholderCount} placeholders remain.`);

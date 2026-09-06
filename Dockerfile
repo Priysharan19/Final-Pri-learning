@@ -3,6 +3,10 @@ WORKDIR /app
 COPY client/package.json client/package-lock.json ./client/
 RUN npm ci --prefix client
 COPY client ./client
+# The four legal documents are imported by the client build (client/src/pages/
+# Legal.jsx renders docs/legal/*.md), so they are part of the build context.
+# Without them the image's client build fails with "Module not found".
+COPY docs/legal ./docs/legal
 RUN npm run build --prefix client
 
 FROM node:24-bookworm-slim AS server-deps
