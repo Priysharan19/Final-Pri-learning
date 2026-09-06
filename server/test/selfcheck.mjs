@@ -65,6 +65,7 @@ import { GENERATORS, generateQuestion } from '../engine/generators/index.js';
 import { MULTIPART, generateMultipart } from '../engine/generators/multipart.js';
 import { checkAnswer } from '../../client/src/engine/checker.js';
 import { parse, evaluate } from '../../client/src/engine/expr.js';
+import { authoredRegion, formatRegion, formatMatrix, formatVector } from '../../client/src/engine/answer-forms.js';
 import { pathToFileURL } from 'node:url';
 
 // ── Command line ─────────────────────────────────────────────────────────────
@@ -395,6 +396,28 @@ function answerForms(q) {
     case 'point': declare('point', `(${a.x}, ${a.y})`); break;
     case 'ratio': declare('ratio', `${a.a}:${a.b}`); break;
     case 'working': declare('canonicalWorking', a.canonicalWorking); break;
+    // NCERT answer forms: the authored region in both notations, the matrix
+    // in nested-list and row form, the vector as a tuple and in i, j, k.
+    case 'interval': {
+      const region = authoredRegion(a);
+      if (region) {
+        declare('inequality', formatRegion(region, a.variable || 'x'));
+        declare('interval', formatRegion(region, a.variable || 'x', 'interval'));
+      }
+      break;
+    }
+    case 'matrix':
+      if (Array.isArray(a.rows)) {
+        declare('rows', formatMatrix(a.rows));
+        declare('rowForm', a.rows.map(r => r.join(' ')).join('; '));
+      }
+      break;
+    case 'vector':
+      if (Array.isArray(a.components)) {
+        declare('tuple', formatVector(a.components, 'tuple'));
+        declare('ijk', formatVector(a.components, 'ijk'));
+      }
+      break;
     default: break;
   }
   return forms;

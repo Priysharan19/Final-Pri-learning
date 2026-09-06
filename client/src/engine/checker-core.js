@@ -8,6 +8,11 @@
 
 import { normalize, parse, evaluate, evalNumeric, exprEquivalent, numsClose, variablesOf } from './expr.js';
 import { diagnoseStep } from './diagnose.js';
+import {
+  parseIntervalInput, authoredRegion, sameRegion, sameRegionIgnoringEndpoints, formatRegion,
+  parseMatrixInput, sameMatrix, transposeMatrix,
+  parseVectorInput, sameVector
+} from './answer-forms.js';
 
 const UNIT_TAIL = /(cm³|m³|mm³|cm²|m²|mm²|km²|km\/h|m\/s|cm|mm|km|kg|ml|l\b|m\b|s\b|h\b|hours?|mins?|minutes?|seconds?|degrees?|deg|°|units?²?|sq units)\s*$/i;
 
@@ -23,6 +28,9 @@ export function cleanInput(raw) {
 /** Parse a numeric-ish student answer: "2 1/2", "3/4", "50%", "$1,200", "sqrt(2)+1". */
 export function parseNumericInput(raw) {
   let s = cleanInput(raw);
+  // A single value written as a one-element roster: "{5}"
+  const roster = s.match(/^\{\s*([^{}]*?)\s*\}$/);
+  if (roster && !roster[1].includes(',')) s = cleanInput(roster[1]);
   if (!s) throw new Error('Empty answer');
   const meta = { isPercent: /%\s*$/.test(s), text: s };
 
@@ -46,39 +54,70 @@ function looksLikeDecimalApprox(raw) {
 
 const isNum = (v) => typeof v === 'number' && Number.isFinite(v);
 
+/**
+ * The solution set the way NCERT writes it: "{10, 12}", "x ∈ {−2, 3}",
+ * "S = {3, 5}", "x = 10 or x = 12", "10, 12". Braces, a leading "x ∈" or
+ * "S =" and the empty-set symbol are stripped before the list is split.
+ */
 function splitList(raw) {
-  const s = cleanInput(raw)
+  let s = String(raw ?? '').trim()
+    .replace(/^[a-zA-Z]\s*(?:∈|\\in)\s*/, '')          // "x ∈ {…}"
+    .replace(/^[A-Za-z]\s*=\s*(?=\{)/, '')            // "S = {…}"
+    .replace(/^(∅|\\emptyset|\\varnothing|phi|φ)$/i, '{}');
+  const braced = s.match(/^\{\s*([\s\S]*?)\s*\}$/);
+  if (braced) s = braced[1];
+  s = cleanInput(s)
     .replace(/\bor\b/gi, ',')
     .replace(/\band\b/gi, ',')
     .replace(/;/g, ',');
   return s.split(',').map(p => p.trim()).filter(Boolean);
 }
 
-function matchTraps(question, studentValue, studentRaw) {
+function matchTraps(question, studentValue, studentRaw, shape = null) {
   const traps = question.traps || [];
   for (const trap of traps) {
     try {
       if (trap.value !== undefined && isNum(studentValue) && numsClose(studentValue, trap.value, trap.tol)) return trap.why;
       if (trap.expr !== undefined && exprEquivalent(cleanInput(studentRaw), trap.expr)) return trap.why;
+      if (shape?.intervals && (trap.region !== undefined || trap.intervals !== undefined)
+          && sameRegion(shape.intervals, authoredRegion(trap), trap.tol)) return trap.why;
+      if (shape?.rows && Array.isArray(trap.rows) && sameMatrix(shape.rows, trap.rows, trap.tol)) return trap.why;
+      if (shape?.components && Array.isArray(trap.components) && sameVector(shape.components, trap.components, trap.tol)) return trap.why;
     } catch { /* keep trying */ }
   }
   return null;
 }
 
+const READ_HELP = {
+  interval: 'I couldn’t read that as a solution set — write it like x > 3, 2 < x ≤ 5, (2, 5] or x < 1 or x > 4.',
+  matrix: 'I couldn’t read that as a matrix — write the rows like [[1, 2], [3, 4]] or 1 2; 3 4.',
+  vector: 'I couldn’t read that as a vector — write it like (1, 2, 3) or i − 2j + 3k.'
+};
+
 /**
  * Check a student answer. `question.answer` shape depends on answerType:
  *  numeric    { value, tol?, requireExact?, percent? }
  *  expression { expr, anyOf?, domain?, positiveOnly? }
- *  set        { values: [..], tol? }           — any order, "x=1 or x=-2" ok
+ *  set        { values: [..], tol? }           — any order, "x=1 or x=-2", "{1, -2}" ok
  *  point      { x, y }                          — "(2, -3)"
  *  ratio      { a, b }                          — "2:3", "2 to 3", "2/3"
  *  mcq        { correctIndex }
+ *  interval   { region: 'x > 3' | intervals: [{lo,hi,loOpen,hiOpen}], variable?, tol? }
+ *             — inequality and interval notation are interchangeable: "x > 3",
+ *               "(3, ∞)", "x ∈ (3, ∞)", "2 < x ≤ 5", "(2, 5]", unions with "or"/∪
+ *  matrix     { rows: [[..], [..]], tol? }      — "[[1,2],[3,4]]", "1 2; 3 4", a pmatrix
+ *  vector     { components: [x, y, z], tol? }   — "(1, 2, 3)", "i − 2j + 3k", "1i−2j+3k"
  * Returns { correct, feedback?, normalized? }
  */
 export function checkAnswer(question, rawInput) {
   const type = question.answerType;
   const ans = question.answer;
   try {
+    // NCERT answer forms a numeric box cannot hold. Each parser throws on
+    // input it cannot read, and the message a student sees names the form.
+    if (type === 'interval' || type === 'matrix' || type === 'vector') {
+      return checkForm(question, rawInput);
+    }
     // Optional form guard: reject inputs matching a forbidden pattern
     if (ans && ans.forbid) {
       const s = normalize(cleanInput(rawInput));
@@ -240,6 +279,78 @@ export function checkAnswer(question, rawInput) {
 }
 
 function gcdInt(a, b) { a = Math.abs(a); b = Math.abs(b); while (b) [a, b] = [b, a % b]; return a || 1; }
+
+// ── Interval, matrix and vector answers ──────────────────────────────────────
+// Deterministic: each form is parsed into one canonical shape and compared on
+// that shape, so "x > 3" and "(3, ∞)" are the same answer and "[[1,2],[3,4]]"
+// and "1 2; 3 4" are the same matrix. The near misses a marker can name — the
+// endpoint included or not, the transpose, the opposite direction — are named.
+function checkForm(question, rawInput) {
+  const type = question.answerType;
+  const ans = question.answer || {};
+  const raw = String(rawInput ?? '');
+  if (!raw.trim()) return { correct: false, invalid: true, feedback: READ_HELP[type] };
+
+  if (type === 'interval') {
+    const want = authoredRegion(ans);
+    if (!want) return { correct: false, feedback: 'This question has no authored solution set.' };
+    let got;
+    try { got = parseIntervalInput(raw, ans.variable || 'x'); }
+    catch { return { correct: false, invalid: true, feedback: READ_HELP.interval }; }
+    if (sameRegion(got.intervals, want, ans.tol)) return { correct: true };
+    const why = matchTraps(question, null, raw, got);
+    if (why) return { correct: false, feedback: why };
+    if (sameRegionIgnoringEndpoints(got.intervals, want, ans.tol)) {
+      return { correct: false, feedback: 'Right boundary — but check whether the endpoint is included: ≤ (a square bracket) includes it, < (a round bracket) does not.' };
+    }
+    const flipped = want.map(iv => ({ lo: iv.hi === Infinity ? -Infinity : -iv.hi, hi: iv.lo === -Infinity ? Infinity : -iv.lo, loOpen: iv.hiOpen, hiOpen: iv.loOpen }));
+    const mirrored = want.length === 1 && Number.isFinite(want[0].lo) !== Number.isFinite(want[0].hi)
+      && sameRegion(got.intervals, [{
+        lo: Number.isFinite(want[0].lo) ? -Infinity : want[0].hi,
+        hi: Number.isFinite(want[0].lo) ? want[0].lo : Infinity,
+        loOpen: Number.isFinite(want[0].lo) ? true : want[0].hiOpen,
+        hiOpen: Number.isFinite(want[0].lo) ? want[0].loOpen : true
+      }], ans.tol);
+    if (mirrored) return { correct: false, feedback: 'The boundary is right but the inequality points the wrong way — remember the sign reverses when you multiply or divide by a negative number.' };
+    if (sameRegion(got.intervals, flipped, ans.tol)) return { correct: false, feedback: 'Check the sign of the boundary — the solution set is reflected.' };
+    return { correct: false, feedback: `Not the solution set. The answer is written as ${formatRegion(want, ans.variable || 'x')}, or in interval notation ${formatRegion(want, ans.variable || 'x', 'interval')} — check your working.` };
+  }
+
+  if (type === 'matrix') {
+    const want = ans.rows;
+    if (!Array.isArray(want) || !want.length) return { correct: false, feedback: 'This question has no authored matrix.' };
+    let got;
+    try { got = parseMatrixInput(raw); }
+    catch { return { correct: false, invalid: true, feedback: READ_HELP.matrix }; }
+    if (sameMatrix(got.rows, want, ans.tol)) return { correct: true };
+    const why = matchTraps(question, null, raw, got);
+    if (why) return { correct: false, feedback: why };
+    if (got.rows.length !== want.length || got.rows[0].length !== want[0].length) {
+      return { correct: false, feedback: `The answer is a ${want.length}×${want[0].length} matrix — you have given ${got.rows.length}×${got.rows[0].length}.` };
+    }
+    if (sameMatrix(transposeMatrix(got.rows), want, ans.tol)) return { correct: false, feedback: 'That is the transpose — rows and columns are swapped. Check which index runs along the row.' };
+    const negated = want.map(r => r.map(v => -v));
+    if (sameMatrix(got.rows, negated, ans.tol)) return { correct: false, feedback: 'Every entry has the wrong sign — check the sign of the scalar or the order of the subtraction.' };
+    let wrong = 0;
+    got.rows.forEach((r, i) => r.forEach((v, j) => { if (!numsClose(v, want[i][j], ans.tol)) wrong++; }));
+    return { correct: false, feedback: wrong === 1 ? 'One entry is wrong — recheck each entry against its row and column.' : `${wrong} entries are wrong — recompute each entry from its row and column.` };
+  }
+
+  // vector
+  const want = ans.components;
+  if (!Array.isArray(want) || !want.length) return { correct: false, feedback: 'This question has no authored vector.' };
+  let got;
+  try { got = parseVectorInput(raw); }
+  catch { return { correct: false, invalid: true, feedback: READ_HELP.vector }; }
+  if (sameVector(got.components, want, ans.tol)) return { correct: true };
+  const why = matchTraps(question, null, raw, got);
+  if (why) return { correct: false, feedback: why };
+  if (sameVector(got.components, want.map(v => -v), ans.tol)) return { correct: false, feedback: 'That vector points the opposite way — every component has the wrong sign. Check the order of the subtraction.' };
+  const mag = v => Math.sqrt(v.reduce((s, c) => s + c * c, 0));
+  const wantMag = mag(want), gotMag = mag(got.components);
+  if (gotMag > 0 && wantMag > 0 && numsClose(gotMag, wantMag) ) return { correct: false, feedback: 'The magnitude is right but the direction is not — check the components one at a time.' };
+  return { correct: false, feedback: 'Not the required vector — check each component against the working.' };
+}
 
 // ── "Show your working" questions ────────────────────────────────────────────
 /**

@@ -301,6 +301,22 @@ class Parser {
     }
     if (tok.t === 'fn') {
       let arg;
+      // sin^2(x), sec²θ, cos^2 x — the power written on the function name is
+      // the power of the whole value: (sin x)^2. The exponent is a tight atom
+      // (a number or a bracketed expression) so "^-1" still reads as a group.
+      if (this.peek() && this.peek().t === 'op' && this.peek().v === '^') {
+        this.next();
+        const power = this.parseAtom();
+        if (this.peek() && this.peek().t === 'op' && this.peek().v === '*' && this.peek().implicit) this.next();
+        if (this.peek() && this.peek().t === 'lp') {
+          this.next();
+          arg = this.parseExpression(0);
+          this.expect('rp');
+        } else {
+          arg = this.parseUnary();
+        }
+        return { t: 'bin', op: '^', l: { t: 'call', fn: tok.v, arg }, r: power };
+      }
       if (this.peek() && this.peek().t === 'lp') {
         this.next();
         arg = this.parseExpression(0);
@@ -433,6 +449,25 @@ export function variablesOf(ast, acc = new Set()) {
   return acc;
 }
 
+/**
+ * Variables that stand in the bounds of a summation. Σ_{k=1}^{n} k only has a
+ * value at whole-number n, so an equivalence test has to sample those names
+ * over the integers — a real-valued sample would make every evaluation NaN and
+ * a true identity like Σ_{k=1}^{n} k = n(n+1)/2 undecidable.
+ */
+function integerVarsOf(ast, acc = new Set()) {
+  if (!ast || typeof ast !== 'object') return acc;
+  if (ast.t === 'call' && ast.fn === 'sum' && Array.isArray(ast.args) && ast.args.length === 4) {
+    variablesOf(ast.args[2], acc);
+    variablesOf(ast.args[3], acc);
+  }
+  for (const key of ['l', 'r', 'v', 'arg']) {
+    if (ast[key] && typeof ast[key] === 'object') integerVarsOf(ast[key], acc);
+  }
+  if (Array.isArray(ast.args)) for (const a of ast.args) integerVarsOf(a, acc);
+  return acc;
+}
+
 /** Parse + evaluate a variable-free expression to a number. Throws on failure. */
 export function evalNumeric(input, env = {}) {
   const ast = parse(input);
@@ -463,6 +498,7 @@ export function exprEquivalent(a, b, opts = {}) {
 
   const vars = new Set([...variablesOf(astA), ...variablesOf(astB)]);
   const names = [...vars];
+  const integers = new Set([...integerVarsOf(astA), ...integerVarsOf(astB)]);
   const domain = opts.domain || [-3.5, 3.5];
   const needed = opts.samples || 8;
   let matches = 0, valid = 0;
@@ -472,6 +508,7 @@ export function exprEquivalent(a, b, opts = {}) {
       const env = {};
       names.forEach((n, idx) => {
         const raw = base[(s + idx * 3) % base.length];
+        if (integers.has(n)) { env[n] = 1 + Math.floor(((raw + 3.5) / 7) * 8); return; }   // 1‥8
         env[n] = domain[0] + ((raw + 3.5) / 7) * (domain[1] - domain[0]);
         if (opts.positiveOnly) env[n] = Math.abs(env[n]) + 0.3;
       });

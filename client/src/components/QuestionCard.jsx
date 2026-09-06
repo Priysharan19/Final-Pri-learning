@@ -847,6 +847,7 @@ export default function QuestionCard({ question, why, reason, onResolved, onNext
           <div>
             <b>{state.res.invalid ? 'I couldn’t read that.' : 'Not quite.'}</b>{' '}
             <MathText text={state.res.feedback || 'Have another look and try again — you have one more go.'} />
+            {state.res.partial && <div className="muted" style={{ marginTop: 6, fontSize: 13.5 }}>◐ {state.res.partial.note}</div>}
             {state.res.stepReport && <StepReport report={state.res.stepReport} />}
           </div>
         </div>
@@ -882,6 +883,7 @@ export default function QuestionCard({ question, why, reason, onResolved, onNext
                 </span>
               </div>
               {res.feedback && !verdictGood && <div style={{ marginTop: 6 }}><b>Reasoning:</b> <MathText text={res.feedback} /></div>}
+              {res.partial && !verdictGood && <div className="muted" style={{ marginTop: 6, fontSize: 13.5 }}>◐ {res.partial.note}</div>}
               {verdictGood && writeMode && inkResult?.lines?.length > 1 && (
                 <div style={{ marginTop: 6 }}><b>Reasoning:</b> Every line of your handwritten working was checked — {inkResult.lines.length} steps read and verified, reaching the required result through a logical chain.</div>
               )}
@@ -1019,10 +1021,14 @@ function StepReport({ report }) {
  */
 function Diagnosis({ d }) {
   if (!d) return null;
+  // A diagnosis the engine could pin to exactly one move is stated; one where
+  // more than one move reproduces the line, or that rests on a counterexample
+  // alone, is hedged — the student should weigh it, not obey it.
+  const hedged = d.confidence !== 'high';
   return (
-    <div className="diagnosis-card">
-      <div className="diagnosis-label">{d.code === 'counterexample' ? 'Why it fails' : 'What went wrong'}</div>
-      <div className="diagnosis-title">{d.title}</div>
+    <div className="diagnosis-card" data-confidence={d.confidence || 'medium'}>
+      <div className="diagnosis-label">{d.code === 'counterexample' ? 'Why it fails' : hedged ? 'This looks like…' : 'What went wrong'}</div>
+      <div className="diagnosis-title">{hedged && d.code !== 'counterexample' ? `This looks like: ${d.title}` : d.title}</div>
       <div className="diagnosis-body">{d.message}</div>
       {d.fix && <div className="diagnosis-fix">{d.fix}</div>}
     </div>
