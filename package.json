@@ -103,6 +103,7 @@
     "test:working:cloud": "node client/test/cloud-working-client-check.mjs",
     "test:platform:working": "node server/test/working-check-check.mjs",
     "test:photo:cloud": "node client/test/cloud-photo-client-check.mjs",
-    "test:predictor": "node client/test/mark-predictor-check.mjs"
+    "test:predictor": "node client/test/mark-predictor-check.mjs",
+    "preflight": "node tools/production-preflight.mjs"
   }
 }
