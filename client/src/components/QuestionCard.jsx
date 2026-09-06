@@ -192,7 +192,15 @@ function compactInkStrokes(strokes) {
   }));
 }
 
-export default function QuestionCard({ question, why, reason, onResolved, onNext, onRedo, compact = false }) {
+// The public name of each reason tag a serve can carry. A serve that names its
+// tag (the India path does) is labelled from here; one that carries only the
+// legacy `reason` keeps the tags it always had.
+const REASON_TAG_LABEL = {
+  'review-due': 'Spaced review', 'weak-spot': 'Weak spot', misconception: 'Repeated slip',
+  'new-ground': 'New ground', interleave: 'Interleaving'
+};
+
+export default function QuestionCard({ question, why, reason, reasonTag = null, onResolved, onNext, onRedo, compact = false }) {
   const { celebrate, refreshUser, refreshDue, refreshRecent, toast } = useApp();
   const [answer, setAnswer] = useState('');
   const [mcqSel, setMcqSel] = useState(null);
@@ -583,9 +591,10 @@ export default function QuestionCard({ question, why, reason, onResolved, onNext
         )}
         <span className="tag">{question.subtopicName}</span>
         <span className={`tag ${DIFF_CLASS[question.difficulty] || ''}`}>{question.diffLabel}</span>
-        {reason === 'review' && <span className="tag tag-brand">Spaced review</span>}
-        {reason === 'weak-spot' && <span className="tag tag-brand">Weak spot</span>}
-        {reason === 'new-ground' && <span className="tag tag-brand">New ground</span>}
+        {reasonTag && REASON_TAG_LABEL[reasonTag] && <span className="tag tag-brand" data-reason-tag={reasonTag}>{REASON_TAG_LABEL[reasonTag]}</span>}
+        {!reasonTag && reason === 'review' && <span className="tag tag-brand">Spaced review</span>}
+        {!reasonTag && reason === 'weak-spot' && <span className="tag tag-brand">Weak spot</span>}
+        {!reasonTag && reason === 'new-ground' && <span className="tag tag-brand">New ground</span>}
         {reason === 'task' && <span className="tag tag-brand">Task</span>}
         <span className="q-timer">◷ {fmtTime(elapsed)}</span>
       </div>

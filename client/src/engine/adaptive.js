@@ -465,20 +465,45 @@ function jitterFor(id, rand) {
  */
 export function pickNext({ ratings, reviewsDue, year, pathway = 'advanced', rand = Math.random(), recent = [], nowMs = Date.now() }) {
   const { own, revision } = scopeForYear(year, pathway);
-  const ownIds = new Set(own.map(s => s.id));
-  const scope = [...own, ...revision];
-  const stateOf = id => ratings[id] || { rating: START_RATING, attempts: 0, correct: 0, last_at: 0 };
+  const candidates = [
+    ...own.map(s => ({ id: s.id, weight: s.weight, own: true })),
+    ...revision.map(s => ({ id: s.id, weight: s.weight, own: false }))
+  ];
+  return pickNextAmong({ candidates, ratings, reviewsDue, rand, recent, nowMs, fallbackId: (own[0] || revision[0] || SUBTOPICS[0]).id });
+}
+
+/**
+ * The public name of each reason: what a student is told drove the choice.
+ * `rotation` is the interleaving axis — nothing was due, weak or slipping, so
+ * the picker kept practice balanced instead of blocking on one idea.
+ */
+export const REASON_TAG = Object.freeze({
+  review: 'review-due', 'weak-spot': 'weak-spot', misconception: 'misconception',
+  'new-ground': 'new-ground', rotation: 'interleave'
+});
+
+/**
+ * The four-axis optimiser over an explicit candidate list, so the same scoring
+ * serves a syllabus that is not the NSW one. A candidate is `{ id, weight, own }`
+ * — `own` marks the student's own year (or class), whose unseen ground counts
+ * for more than revision material. `ratings`, `reviewsDue` and `recent` are
+ * keyed by the same ids as the candidates. Returns the winner and the runner-up
+ * (`nextUp`), with the same shape pickNext has always returned.
+ */
+export function pickNextAmong({ candidates, ratings, reviewsDue, rand = Math.random(), recent = [], nowMs = Date.now(), fallbackId = null }) {
+  const stateOf = id => (ratings || {})[id] || { rating: START_RATING, attempts: 0, correct: 0, last_at: 0 };
   const recentWrongOf = st => (Array.isArray(st.recent) ? st.recent : []).slice(0, 3).filter(v => !v).length;
   const dueBy = new Map((reviewsDue || []).map(r => [r.subtopic, r]));
   const seen = (recent || []).filter(id => typeof id === 'string');
 
   let best = null;
-  for (const s of scope) {
+  let second = null;
+  for (const s of candidates || []) {
     const st = stateOf(s.id);
     const rev = dueBy.get(s.id);
     const mastery = masteryOf(st.rating, st.attempts, st.last_at, nowMs);
     const pressure = trapPressureOf(st.traps, nowMs);
-    const ownYear = ownIds.has(s.id);
+    const ownYear = s.own !== false;
 
     // 1. Retrieval urgency — how much of this item has already leaked away.
     let score = 0;
@@ -505,12 +530,14 @@ export function pickNext({ ratings, reviewsDue, year, pathway = 'advanced', rand
     score *= interleavePenalty(s.id, seen, st);
     score *= 0.88 + 0.24 * jitterFor(s.id, rand);
 
-    if (!best || score > best.score) best = { s, st, score, reason, pressure, mastery };
+    const entry = { s, st, score, reason, pressure, mastery, review: rev || null };
+    if (!best || score > best.score) { second = best; best = entry; }
+    else if (!second || score > second.score) second = entry;
   }
 
   if (!best) {
-    const fallback = scope[0] || SUBTOPICS[0];
-    return { subtopic: fallback.id, difficulty: 1, reason: 'new-ground', why: 'Fresh territory — expanding your syllabus coverage.', target: TARGET_SUCCESS.fresh, score: 0 };
+    const fallback = fallbackId || (candidates?.[0]?.id ?? SUBTOPICS[0].id);
+    return { subtopic: fallback, difficulty: 1, reason: 'new-ground', why: 'Fresh territory — expanding your syllabus coverage.', target: TARGET_SUCCESS.fresh, score: 0, nextUp: null };
   }
 
   const target = targetSuccess({ ...best.st, trapPressure: best.pressure, recentWrong: recentWrongOf(best.st) }, nowMs);
@@ -524,7 +551,11 @@ export function pickNext({ ratings, reviewsDue, year, pathway = 'advanced', rand
     rotation: 'Keeping your practice balanced across the syllabus.'
   }[best.reason];
 
-  return { subtopic: best.s.id, difficulty, reason: best.reason, why, target, score: best.score, trap };
+  const nextUp = second ? { subtopic: second.s.id, reason: second.reason, reasonTag: REASON_TAG[second.reason], mastery: second.mastery, score: second.score } : null;
+  return {
+    subtopic: best.s.id, difficulty, reason: best.reason, reasonTag: REASON_TAG[best.reason], why, target, score: best.score, trap,
+    mastery: best.mastery, pressure: best.pressure, review: best.review, attempts: best.st.attempts, nextUp
+  };
 }
 
 /**
@@ -617,8 +648,19 @@ export function bandFor(mark, year, pathway = 'advanced') {
 export function priorities(ratings, year, nowMs = Date.now(), n = 5, pathway = 'advanced', notes = {}) {
   const { own, revision } = scopeForYear(year, pathway);
   const scope = [...own.map(s => ({ ...s, rev: false })), ...revision.map(s => ({ ...s, rev: true }))];
-  const scored = scope.map(s => {
-    const st = ratings[s.id];
+  return prioritiesAmong(scope, ratings, nowMs, n, notes);
+}
+
+/**
+ * The same impact ranking over an explicit candidate list, so a syllabus that
+ * is not the NSW one — an Indian class, a JEE track — gets the same priorities
+ * rather than none. A candidate is `{ id, name, year, strand, weight, rev }`;
+ * `rev` marks revision material, which counts for less than the student's own
+ * year. `ratings` and `notes` are keyed by the candidate ids.
+ */
+export function prioritiesAmong(scope, ratings, nowMs = Date.now(), n = 5, notes = {}) {
+  const scored = (scope || []).map(s => {
+    const st = (ratings || {})[s.id];
     const m = st ? masteryOf(st.rating, st.attempts, st.last_at, nowMs) : 0;
     const days = st && st.last_at ? (nowMs - st.last_at) / DAY : 999;
     const urgency = st ? Math.min(2, 1 + days / 21) : 1.25;

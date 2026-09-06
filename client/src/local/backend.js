@@ -18,16 +18,19 @@ import {
 } from '../engine/curriculum.js';
 import {
   cleanIndiaTrack, indiaTrack, indiaCourseLabel, indiaScope, indiaChapter,
-  indiaChapterGrade, indiaDotpointIndex, resolveIndiaTarget, indiaProductSections
+  indiaChapterGrade, indiaDotpointIndex, resolveIndiaTarget, indiaProductSections,
+  indiaDotpointKey, indiaNameOf, indiaDifficultyWindow, clampToIndiaWindow,
+  indiaPracticeScope, indiaAheadUnlocked, indiaDotpointsInWindow
 } from '../engine/indiaProduct.js';
+import { indiaReasonLabel } from '../engine/indiaProgress.js';
 import { IN_CHAPTERS, OLYMPIAD_TOPICS } from '../engine/curriculum-in.js';
 import { generateQuestion } from '../engine/generators/index.js';
 import { checkAnswer, stepCheck, methodMarks } from '../engine/checker.js';
 import { authoredRegion, formatRegion, formatMatrix, formatVector } from '../engine/answer-forms.js';
 import { stepTrapKey } from '../engine/diagnose.js';
 import {
-  START_RATING, updateRating, masteryOf, masteryBand, pickDifficulty, pickNext,
-  predictMark, priorities, xpFor, levelFromXp, bandFor,
+  START_RATING, updateRating, masteryOf, masteryBand, pickDifficulty, pickNext, pickNextAmong,
+  predictMark, priorities, prioritiesAmong, xpFor, levelFromXp, bandFor,
   pickDotpoint, scheduleReview, migrateReview, gradeFor,
   retrievability, misconceptionKey, misconceptionLabel, activeTraps, trapPressureOf,
   TRAP_ACTIVE_AT, TRAP_CREDIT_FORGET
@@ -163,14 +166,35 @@ function dotpointOf(subtopicId, ref) {
 const SERVED_WINDOW = 8;
 const SERVED_PROFILES = 6;
 const servedByPid = new Map();
+// The dot points served this sitting, kept apart from the subtopic list so the
+// dot-point picker's recency penalty has something real to read.
+const servedDpByPid = new Map();
 
 const recentlyServed = pid => servedByPid.get(pid) || [];
+const recentlyServedDotpoints = pid => servedDpByPid.get(pid) || [];
 
-function noteServed(pid, subtopicId) {
-  const list = [subtopicId, ...(servedByPid.get(pid) || [])].slice(0, SERVED_WINDOW);
-  servedByPid.set(pid, list);
-  while (servedByPid.size > SERVED_PROFILES) servedByPid.delete(servedByPid.keys().next().value);
+function remember(map, pid, id) {
+  const list = [id, ...(map.get(pid) || [])].slice(0, SERVED_WINDOW);
+  map.set(pid, list);
+  while (map.size > SERVED_PROFILES) map.delete(map.keys().next().value);
 }
+
+const noteServed = (pid, subtopicId) => remember(servedByPid, pid, subtopicId);
+const noteServedDotpoint = (pid, dotpointKey) => { if (dotpointKey) remember(servedDpByPid, pid, dotpointKey); };
+
+// ── Indian evidence keys ─────────────────────────────────────────────────────
+// An Indian question row carries `india: { chapterId, track, dotpointIndex }`.
+// Its evidence — rating, dot points, traps, review, attempt — is keyed by that
+// chapter id, never by `q.subtopic`: that is the generator which authored the
+// question and, for 36 of the generators the Indian spine reaches, an NSW
+// subtopic id. The dot point hangs off the chapter row under the chapter's own
+// dot-point key, so two chapters that borrow one generator keep separate books.
+
+/** The rating-row id a question's evidence lands on. */
+const evidenceKeyOf = (row, q) => row?.india?.chapterId || q?.subtopic;
+
+/** The stored dot-point key of an Indian question, or null at chapter level. */
+const indiaDpKeyOf = row => (row?.india ? indiaDotpointKey(row.india.chapterId, row.india.dotpointIndex) : null);
 
 // ── Dot-point and misconception state ────────────────────────────────────────
 // Both hang off the subtopic's existing rating row rather than a new store, so
@@ -241,18 +265,19 @@ async function recordTrap(pid, row, q, feedback) {
   if (row.mode === 'rush' || row.mode === 'match') return null;
   const hit = trapHitBy(q, feedback);
   if (!hit) return null;
-  const key = misconceptionKey(q.subtopic, hit.why);
+  const owner = evidenceKeyOf(row, q);
+  const key = misconceptionKey(owner, hit.why);
   if (!key) return null;
   const now = Date.now();
-  const st = (await getRating(pid, q.subtopic)) || { rating: START_RATING, attempts: 0, correct: 0, last_at: null };
+  const st = (await getRating(pid, owner)) || { rating: START_RATING, attempts: 0, correct: 0, last_at: null };
   const traps = { ...(st.traps || {}) };
   const prev = traps[key] || { n: 0, credit: 0, firstAt: now };
   traps[key] = {
     n: Math.min(9, (prev.n || 0) + 1), credit: 0, firstAt: prev.firstAt || now, lastAt: now,
     label: safeLabel(misconceptionLabel(hit.why), 140),
-    dotpoint: q.dotpoint || prev.dotpoint || null
+    dotpoint: indiaDpKeyOf(row) || (row.india ? null : q.dotpoint) || prev.dotpoint || null
   };
-  await putRating(pid, q.subtopic, { ...st, traps: trimTraps(traps) });
+  await putRating(pid, owner, { ...st, traps: trimTraps(traps) });
   row.trapKey = key;
   return key;
 }
@@ -270,18 +295,19 @@ async function recordStepTrap(pid, row, q, diagnosis) {
   if (!diagnosis || row.trapKey || q.custom || !q.subtopic) return null;
   if (row.mode === 'rush' || row.mode === 'match') return null;
   if (diagnosis.confidence !== 'high' || diagnosis.code === 'counterexample') return null;
-  const key = stepTrapKey(q.subtopic, diagnosis.code);
+  const owner = evidenceKeyOf(row, q);
+  const key = stepTrapKey(owner, diagnosis.code);
   if (!key) return null;
   const now = Date.now();
-  const st = (await getRating(pid, q.subtopic)) || { rating: START_RATING, attempts: 0, correct: 0, last_at: null };
+  const st = (await getRating(pid, owner)) || { rating: START_RATING, attempts: 0, correct: 0, last_at: null };
   const traps = { ...(st.traps || {}) };
   const prev = traps[key] || { n: 0, credit: 0, firstAt: now };
   traps[key] = {
     n: Math.min(9, (prev.n || 0) + 1), credit: 0, firstAt: prev.firstAt || now, lastAt: now,
     label: safeLabel(diagnosis.title, 140),
-    dotpoint: q.dotpoint || prev.dotpoint || null
+    dotpoint: indiaDpKeyOf(row) || (row.india ? null : q.dotpoint) || prev.dotpoint || null
   };
-  await putRating(pid, q.subtopic, { ...st, traps: trimTraps(traps) });
+  await putRating(pid, owner, { ...st, traps: trimTraps(traps) });
   row.trapKey = key;
   return key;
 }
@@ -320,17 +346,23 @@ function decayTraps(traps) {
  * a name on it. "You keep reading the vertex off with the sign of the bracket"
  * is something a student can fix this afternoon; "Quadratics · 41%" is not.
  */
-function namedWeaknesses(ratings, nowMs = Date.now(), limit = 6) {
+function namedWeaknesses(ratings, nowMs = Date.now(), limit = 6, { india = false, grade = null } = {}) {
   const out = [];
   for (const [subtopic, st] of Object.entries(ratings || {})) {
-    const sub = SUBTOPIC_BY_ID[subtopic];
-    if (!sub) continue;
+    // An Indian profile names its rows through the Indian spine — a chapter id,
+    // or a generator id from before evidence was keyed by chapter — and never
+    // through the NSW table, which would label a Class 7 chapter "Year 7".
+    const named = india ? indiaNameOf(subtopic, { grade }) : null;
+    const sub = india ? null : SUBTOPIC_BY_ID[subtopic];
+    if (!named && !sub) continue;
     for (const t of activeTraps(st.traps, nowMs)) {
-      const dp = dotpointOf(subtopic, t.dotpoint);
+      const dp = named ? indiaNameOf(t.dotpoint) : dotpointOf(subtopic, t.dotpoint);
       out.push({
-        key: t.key, subtopic, subtopicName: sub.name, strand: sub.strand,
+        key: t.key, subtopic, subtopicName: named ? named.name : sub.name, strand: named ? named.strand : sub.strand,
+        year: named ? named.year : sub.year,
         label: t.label, count: t.n, lastAt: t.lastAt,
-        dotpoint: dp ? dp.id : null, dotpointText: dp ? dp.text : null
+        dotpoint: named ? (dp && dp.dotpoint != null ? dp.dotpoint : null) : (dp ? dp.id : null),
+        dotpointText: named ? (dp?.dotpointText || null) : (dp ? dp.text : null)
       });
     }
   }
@@ -696,27 +728,262 @@ function loadMultipart() {
 
 const indiaGeneratorIds = chapter => [...new Set((chapter?.covers || []).map(c => c.gen))];
 
-function indiaState(chapter, ratings, now = Date.now()) {
-  const rows = indiaGeneratorIds(chapter).map(id => ratings[id]).filter(Boolean);
-  if (!rows.length) return { attempts: 0, correct: 0, rating: START_RATING, mastery: 0 };
+/** Attempt-weighted aggregate of rating rows — the legacy, generator-keyed reading of a chapter. */
+function aggregateRows(rows, now) {
   const attempts = rows.reduce((n, st) => n + (st.attempts || 0), 0);
   const correct = rows.reduce((n, st) => n + (st.correct || 0), 0);
   const weights = rows.reduce((n, st) => n + Math.max(1, st.attempts || 0), 0);
   const rating = rows.reduce((n, st) => n + (st.rating || START_RATING) * Math.max(1, st.attempts || 0), 0) / Math.max(1, weights);
   const mastery = rows.reduce((n, st) => n + masteryOf(st.rating, st.attempts, st.last_at, now) * Math.max(1, st.attempts || 0), 0) / Math.max(1, weights);
-  return { attempts, correct, rating, mastery };
+  const last_at = rows.reduce((n, st) => Math.max(n, st.last_at || 0), 0) || null;
+  return { attempts, correct, rating, mastery, last_at };
 }
 
-async function createIndiaQuestion(pid, chapter, target, mode, trackId, examId = null, taskId = null) {
+/**
+ * The evidence on an Indian chapter, in the shape the picker ranks: the
+ * chapter's own rating row — with its dot points, traps and recent outcomes —
+ * or, on a device whose rows predate chapter keying, the aggregate of the
+ * generator rows its covers name, which carries none of those.
+ */
+function indiaState(chapter, ratings, now = Date.now()) {
+  const own = chapter?.id ? ratings[chapter.id] : null;
+  if (own) {
+    return {
+      ...own, rating: own.rating || START_RATING, attempts: own.attempts || 0, correct: own.correct || 0,
+      mastery: masteryOf(own.rating, own.attempts, own.last_at, now), legacy: false
+    };
+  }
+  const rows = indiaGeneratorIds(chapter).map(id => ratings[id]).filter(Boolean);
+  if (!rows.length) return { attempts: 0, correct: 0, rating: START_RATING, mastery: 0, last_at: null, legacy: false };
+  return { ...aggregateRows(rows, now), legacy: true };
+}
+
+/** The rating state of one Indian dot point: its own row under the chapter, or the legacy generator aggregate. */
+function indiaDotpointState(chapter, ordinal, chapterRow, ratings, now = Date.now()) {
+  if (chapterRow) return dpStateOf(chapterRow, indiaDotpointKey(chapter.id, ordinal));
+  const ids = [...new Set((chapter.covers || []).filter(c => c.dp.includes(ordinal)).map(c => c.gen))];
+  const rows = ids.map(id => ratings[id]).filter(Boolean);
+  if (!rows.length) return EMPTY_DP();
+  const { rating, attempts, correct, last_at } = aggregateRows(rows, now);
+  return { rating, attempts, correct, last_at };
+}
+
+/**
+ * The dot points of an Indian chapter in the shape the dot-point picker ranks,
+ * limited to the ones an authored form reaches inside the track's window.
+ */
+function indiaDotpointStates(chapter, chapterRow, trackId, grade, ratings, now = Date.now()) {
+  return indiaDotpointsInWindow(chapter, trackId, grade).map(ordinal => {
+    const key = indiaDotpointKey(chapter.id, ordinal);
+    return {
+      id: key, index: ordinal, text: chapter.dotpoints[ordinal],
+      ...indiaDotpointState(chapter, ordinal, chapterRow, ratings, now),
+      traps: trapsForDotpoint(chapterRow?.traps, key)
+    };
+  });
+}
+
+/**
+ * Generate an Indian question at a resolved target. When a misconception is
+ * being hunted the bank is asked up to TRAP_SEEK_TRIES times for a form that
+ * carries that trap, and `trapKey` in the reply says whether one was found —
+ * the same honesty the NSW path keeps, so a "same slip" question is one that
+ * can actually spring the slip.
+ */
+async function createIndiaQuestion(pid, chapter, target, mode, trackId, examId = null, taskId = null, trapKey = null) {
   if (!chapter || !target) throw Object.assign(new Error('That India syllabus target has no authored question form yet.'), { status: 409, code: 'INDIA_TARGET_UNCOVERED' });
-  const q = generateQuestion(target.generator, target.difficulty);
+  let q = null;
+  let delivered = null;
+  for (let i = 0; i < (trapKey ? TRAP_SEEK_TRIES : 1); i++) {
+    const cand = generateQuestion(target.generator, target.difficulty);
+    if (!q) q = cand;
+    if (!trapKey) break;
+    const probes = (Array.isArray(cand.traps) ? cand.traps : [])
+      .concat(Object.values(cand.answer?.optionTraps || {}).map(why => ({ why })));
+    if (probes.some(t => misconceptionKey(chapter.id, t.why) === trapKey)) { q = cand; delivered = trapKey; break; }
+  }
   const row = {
     id: uuid(), pid, subtopic: q.subtopic, difficulty: q.difficulty || target.difficulty, payload: q,
     india: { chapterId: chapter.id, track: trackId, dotpointIndex: target.dotpointIndex },
     mode, examId, taskId, answered: 0, tries: 0, hintsUsed: 0, createdAt: Date.now()
   };
   await put('questions', row);
-  return { row, payload: q };
+  return { row, payload: q, trapKey: delivered };
+}
+
+// ── Indian smart practice ────────────────────────────────────────────────────
+// The same four axes NSW smart practice runs on — retrieval urgency from the
+// FSRS rows, weakness weighted by chapter weight, misconception pressure, and
+// coverage of the student's own class — scored over the chapters of the
+// profile's track at the track's difficulty window, then narrowed to one dot
+// point by the same dot-point picker. Nothing here is a second engine: it is
+// pickNextAmong and pickDotpoint over Indian ids.
+
+const INDIA_WHY = {
+  review: c => `Spaced review — your memory of ${c.name} is due to fade.`,
+  'weak-spot': c => `Targeting your weakest chapter — ${c.name} has the most room to grow.`,
+  misconception: (c, trap) => (trap ? `Same slip keeps coming back in ${c.name}: ${trap.label}` : `Working on a mistake that keeps repeating in ${c.name}.`),
+  'new-ground': c => `New ground — ${c.name} has not been practised yet.`,
+  rotation: (c, _t, track) => `Keeping your practice balanced across ${track} — ${c.name} is up.`,
+  topic: (c, _t, track) => `${track} · focused practice on ${c.name}.`
+};
+
+/**
+ * The chapters smart practice may draw on right now — the student's own class,
+ * plus the year ahead once it has been earned — with every chapter's state.
+ * `aheadIds` is what the picker's coverage axis treats as revision rather than
+ * own ground; a Class 11 JEE student's Class 12 chapters stay reachable by
+ * explicit choice whether or not they are in the pool.
+ */
+function indiaPool(trackId, grade, ratings, now) {
+  const { own, ahead } = indiaPracticeScope(trackId, grade);
+  const states = Object.fromEntries([...own, ...ahead].map(c => [c.id, indiaState(c, ratings, now)]));
+  const aheadUnlocked = ahead.length > 0 && indiaAheadUnlocked(own.map(c => states[c.id]));
+  return { own, ahead, states, aheadUnlocked, pool: aheadUnlocked ? [...own, ...ahead] : own, aheadIds: new Set(ahead.map(c => c.id)) };
+}
+
+/**
+ * What to serve an Indian profile next, and why. With `chapter` the choice is
+ * the student's (reason 'topic'); without it the optimiser chooses, and the
+ * reply carries the reason tag, the plain-language why and the runner-up. The
+ * result is a resolved target — chapter, dot point, generator, difficulty in
+ * the track's window — and nothing is written, so GET /stats can ask the same
+ * question for its "what next" strip.
+ */
+function indiaPick(p, trackId, ratings, reviews, now, { chapter = null, dotpoint = null, difficulty = null, rand = Math.random() } = {}) {
+  const grade = p.year;
+  const trackName = indiaTrack(trackId, grade).name;
+  const { pool, states, aheadIds, aheadUnlocked } = indiaPool(trackId, grade, ratings, now);
+  let choice;
+  if (chapter) {
+    const st = states[chapter.id] || indiaState(chapter, ratings, now);
+    choice = { chapter, st, reason: 'topic', reasonTag: null, trap: activeTraps(st.traps, now)[0] || null, target: null, difficulty: null, nextUp: null, explicit: true };
+  } else {
+    if (!pool.length) throw Object.assign(new Error('No generated questions are available for this India track yet.'), { status: 409, code: 'INDIA_TRACK_UNCOVERED' });
+    const poolIds = new Set(pool.map(c => c.id));
+    const reviewsDue = reviews.filter(r => r.dueAt <= now && poolIds.has(r.subtopic)).sort((a, b) => a.dueAt - b.dueAt);
+    const picked = pickNextAmong({
+      candidates: pool.map(c => ({ id: c.id, weight: c.weight, own: !aheadIds.has(c.id) })),
+      ratings: states, reviewsDue, rand, recent: recentlyServed(p.id), nowMs: now
+    });
+    const c = indiaChapter(picked.subtopic);
+    const up = picked.nextUp ? indiaChapter(picked.nextUp.subtopic) : null;
+    choice = {
+      chapter: c, st: states[c.id] || indiaState(c, ratings, now), reason: picked.reason, reasonTag: picked.reasonTag,
+      trap: picked.trap, target: picked.target, difficulty: picked.difficulty, explicit: false,
+      nextUp: up ? { subtopic: up.id, name: up.name, year: indiaChapterGrade(up), reasonTag: picked.nextUp.reasonTag, label: indiaReasonLabel(picked.nextUp.reasonTag) } : null
+    };
+  }
+  const { chapter: c, st } = choice;
+  const chapterRow = ratings[c.id] || null;
+  const asked = indiaDotpointIndex(c, dotpoint);
+  let dp = null;
+  if (asked == null) {
+    const dpPool = indiaDotpointStates(c, chapterRow, trackId, grade, ratings, now);
+    // A misconception lives on a dot point: when one is being hunted, that dot
+    // point is the place to hunt it.
+    const preferred = choice.trap?.dotpoint ? dpPool.find(d => d.id === choice.trap.dotpoint) : null;
+    dp = preferred || pickDotpoint(dpPool, { rand, nowMs: now, recent: recentlyServedDotpoints(p.id) });
+  }
+  const ordinal = asked != null ? asked : (dp ? dp.index : null);
+  // Difficulty is read off whichever rating describes what is about to be
+  // asked — the dot point's own once it has evidence, the chapter's otherwise
+  // — then held inside the track's window.
+  const basis = dp && dp.attempts ? dp : { rating: st.rating ?? START_RATING, attempts: st.attempts || 0, correct: st.correct || 0, last_at: st.last_at || 0 };
+  let want;
+  if (difficulty != null && difficulty !== '') want = Number(difficulty);
+  else if (choice.explicit || !dp || dp.attempts) {
+    want = pickDifficulty(basis.rating, basis.attempts, {
+      state: { ...basis, trapPressure: trapPressureOf(st.traps, now), recentWrong: recentWrongOf(st) }, nowMs: now, rand
+    });
+  } else want = choice.difficulty;
+  want = clampToIndiaWindow(want, trackId, grade);
+  const target = resolveIndiaTarget(c, { dotpoint: ordinal, difficulty: want, track: trackId, grade });
+  if (!target) {
+    throw Object.assign(new Error(`That India ${ordinal != null ? 'dot point' : 'chapter'} has no authored question form at this track yet.`), { status: 409, code: 'INDIA_TARGET_UNCOVERED' });
+  }
+  let why = INDIA_WHY[choice.reason](c, choice.trap, trackName);
+  if (target.dotpointIndex != null) why += ` Dot point: ${c.dotpoints[target.dotpointIndex]}`;
+  if (target.windowed === false) why += ` (Served at D${target.difficulty} — this dot point has no authored form at ${trackName} depth yet.)`;
+  return {
+    chapter: c, target, dotpointKey: target.dotpointIndex != null ? indiaDotpointKey(c.id, target.dotpointIndex) : null,
+    reason: choice.reason, reasonTag: choice.reasonTag, why, nextUp: choice.nextUp, trap: choice.trap,
+    successTarget: choice.target, mastery: st.mastery || 0, explicit: choice.explicit, aheadUnlocked
+  };
+}
+
+/** GET /stats for an Indian profile: every surface named through the Indian spine. */
+async function indiaStats(p, ratings, now) {
+  const pid = p.id;
+  const trackId = cleanIndiaTrack(p.indiaTrack, p.year);
+  const { pool, states, aheadIds, aheadUnlocked } = indiaPool(trackId, p.year, ratings, now);
+  const reviews = await byIndex('reviews', 'pid', pid);
+  const due = new Set(reviews.filter(r => r.dueAt <= now).map(r => r.subtopic));
+  const misconceptions = namedWeaknesses(ratings, now, 6, { india: true, grade: p.year });
+  const notes = Object.fromEntries(misconceptions.map(m => [m.subtopic, `keeps repeating: ${m.label}`]));
+  const prio = prioritiesAmong(
+    pool.map(c => ({ id: c.id, name: c.name, year: indiaChapterGrade(c), strand: c.strand, weight: c.weight, rev: aheadIds.has(c.id) })),
+    states, now, 5, notes
+  ).map(row => ({ ...row, due: due.has(row.subtopic) }));
+  const strandAgg = {};
+  for (const c of pool) {
+    const m = states[c.id]?.attempts ? states[c.id].mastery : 0;
+    strandAgg[c.strand] = strandAgg[c.strand] || { sum: 0, n: 0 };
+    strandAgg[c.strand].sum += m; strandAgg[c.strand].n++;
+  }
+  const strands = Object.entries(strandAgg).map(([name, v]) => ({ name, mastery: Math.round(100 * v.sum / v.n) }));
+  const chapters = pool.map(c => {
+    const st = states[c.id];
+    const m = st.attempts ? st.mastery : 0;
+    return {
+      id: c.id, name: c.name, year: indiaChapterGrade(c), strand: c.strand, weight: c.weight,
+      mastery: Math.round(m * 100), band: st.attempts ? masteryBand(m) : 'unseen',
+      attempts: st.attempts, correct: st.correct, due: due.has(c.id), ahead: aheadIds.has(c.id)
+    };
+  });
+  // The "what next" strip: the picker's answer right now, with a fixed jitter
+  // seed so the strip does not change on every refresh. The next real serve
+  // draws its own randomness, so it can differ — this is a preview, not a lock.
+  let recommendation = null;
+  try {
+    const pick = indiaPick(p, trackId, ratings, reviews, now, { rand: 0.5 });
+    recommendation = {
+      subtopic: pick.chapter.id, name: pick.chapter.name, year: indiaChapterGrade(pick.chapter), strand: pick.chapter.strand,
+      reason: pick.reason, reasonTag: pick.reasonTag, label: indiaReasonLabel(pick.reasonTag), why: pick.why,
+      dotpoint: pick.target.dotpointIndex,
+      dotpointText: pick.target.dotpointIndex != null ? pick.chapter.dotpoints[pick.target.dotpointIndex] : null,
+      difficulty: pick.target.difficulty, misconception: pick.trap?.label || null, nextUp: pick.nextUp
+    };
+  } catch { recommendation = null; }
+  const days = await activityFor(pid);
+  const attempts = await byIndex('attempts', 'pid', pid);
+  const totals = { attempts: attempts.length, correct: attempts.filter(a => a.correct).length, ms: attempts.reduce((s, a) => s + (a.ms || 0), 0) };
+  const byDiff = [1, 2, 3, 4].map(d => {
+    const rows = attempts.filter(a => a.difficulty === d);
+    return { difficulty: d, n: rows.length, c: rows.filter(a => a.correct).length };
+  }).filter(r => r.n);
+  const rushRuns = await byIndex('rushRuns', 'pid', pid);
+  const matchRuns = await byIndex('matchRuns', 'pid', pid);
+  const exams = await byIndex('exams', 'pid', pid);
+  const recent = attempts.slice(-15).reverse().map(a => {
+    const named = indiaNameOf(a.subtopic, { grade: p.year });
+    return {
+      subtopic: a.subtopic, difficulty: a.difficulty, correct: a.correct, created_at: a.createdAt, mode: a.mode,
+      name: named ? named.name : (a.subtopic === 'custom' ? 'Custom question' : a.subtopic), year: named ? named.year : null
+    };
+  });
+  return {
+    course: 'in', indiaTrack: trackId, window: indiaDifficultyWindow(trackId, p.year), aheadUnlocked,
+    // No NSW-scaled mark for an Indian student: the India progress page says
+    // so in words, and the number is not manufactured here either.
+    predicted: null, trajectory: [],
+    priorities: prio, strands, misconceptions, recommendation, chapters, reviewsDue: due.size,
+    activity: days.slice(-120), totals, byDiff,
+    bestRush: rushRuns.length ? Math.max(...rushRuns.map(r => r.score)) : 0,
+    matchWins: matchRuns.filter(r => r.won).length, matchPlayed: matchRuns.length,
+    examCount: exams.filter(e => e.finishedAt).length, inkCount: attempts.filter(a => a.viaInk).length, recent,
+    streak: await streakFor(pid, now)
+  };
 }
 
 // ── India teacher model ──────────────────────────────────────────────────────
@@ -1103,7 +1370,10 @@ function displayAnswer(q) {
 async function resolve(profile, row, q, correct, answerGiven, ms, mode, viaInk = false) {
   const pid = profile.id;
   const now = Date.now();
-  const st = (await getRating(pid, q.subtopic)) || { rating: START_RATING, attempts: 0, correct: 0, last_at: null };
+  // Evidence lands on the chapter for an Indian question, on the subtopic for
+  // an NSW one — never on the generator that happened to author the form.
+  const owner = evidenceKeyOf(row, q);
+  const st = (await getRating(pid, owner)) || { rating: START_RATING, attempts: 0, correct: 0, last_at: null };
   const effHints = (row.hintsUsed || 0) + Math.max(0, (row.tries || 0) - (correct ? 1 : 0));
   let ratingAfter = st.rating;
   const isRush = mode === 'rush' || mode === 'match';
@@ -1118,7 +1388,8 @@ async function resolve(profile, row, q, correct, answerGiven, ms, mode, viaInk =
     // came from, and pretending we can would put a made-up number on a screen.
     // A question that names none moves only the subtopic, exactly as before.
     const dp = { ...(st.dp || {}) };
-    for (const dpId of dotpointsCredited(q)) {
+    const credited = row.india ? [indiaDpKeyOf(row)].filter(Boolean) : dotpointsCredited(q);
+    for (const dpId of credited) {
       const prev = dpStateOf(st, dpId);
       dp[dpId] = {
         rating: updateRating(prev.rating, prev.attempts, q.difficulty, correct, effHints),
@@ -1138,7 +1409,7 @@ async function resolve(profile, row, q, correct, answerGiven, ms, mode, viaInk =
     // last three" — which are different students needing different questions.
     const recent = [correct ? 1 : 0, ...(Array.isArray(st.recent) ? st.recent : [])].slice(0, RECENT_WINDOW);
 
-    await putRating(pid, q.subtopic, {
+    await putRating(pid, owner, {
       rating: ratingAfter, attempts: st.attempts + 1, correct: st.correct + (correct ? 1 : 0), last_at: now,
       dp, traps, recent
     });
@@ -1148,16 +1419,16 @@ async function resolve(profile, row, q, correct, answerGiven, ms, mode, viaInk =
     // Spaced review, FSRS-5. The grade carries more than right/wrong: a correct
     // answer that needed a hint or a second try is Hard, and a clean fast one is
     // Easy, so two students who both "got it" are not scheduled the same.
-    const key = `${pid}:${q.subtopic}`;
+    const key = `${pid}:${owner}`;
     const rev = await get('reviews', key);
     const grade = gradeFor({
       correct, hintsUsed: row.hintsUsed || 0, tries: row.tries || 0,
       ms: ms || 0, difficulty: q.difficulty || 2
     });
     if (rev) {
-      await put('reviews', { ...rev, subtopic: q.subtopic, ...scheduleReview(rev, grade, now) });
+      await put('reviews', { ...rev, subtopic: owner, ...scheduleReview(rev, grade, now) });
     } else if (st.attempts + 1 >= 3) {
-      await put('reviews', { key, pid, subtopic: q.subtopic, ...scheduleReview(null, grade, now) });
+      await put('reviews', { key, pid, subtopic: owner, ...scheduleReview(null, grade, now) });
     }
   }
 
@@ -1168,7 +1439,7 @@ async function resolve(profile, row, q, correct, answerGiven, ms, mode, viaInk =
   await bumpActivity(pid, { correct, xp, ms }, now, tz);
 
   await add('attempts', {
-    pid, questionId: row.id, subtopic: q.subtopic, difficulty: q.difficulty || 2,
+    pid, questionId: row.id, subtopic: owner, generator: q.subtopic, difficulty: q.difficulty || 2,
     correct: correct ? 1 : 0, answerGiven: String(answerGiven ?? '').slice(0, 300),
     ms: ms || 0, hintsUsed: row.hintsUsed || 0, mode, viaInk,
     ratingBefore: st.rating, ratingAfter, createdAt: now
@@ -1192,13 +1463,15 @@ async function resolve(profile, row, q, correct, answerGiven, ms, mode, viaInk =
   const pred = predictMark(ratings, profile.year, now, pathwayOf(profile));
   await setPredictedToday(pid, pred.mark, now, tz);
 
-  const stNew = ratings[q.subtopic];
+  const stNew = ratings[owner];
   const mastery = stNew ? Math.round(masteryOf(stNew.rating, stNew.attempts, stNew.last_at, now) * 100) : 0;
 
   return {
     xp, totalXp: profile.xp, level: levelFromXp(profile.xp),
     ratingDelta: ratingAfter - st.rating, mastery, band: masteryBand(mastery / 100),
-    predicted: pred, streak: await streakFor(pid, now, tz), newBadges
+    // The NSW-scaled mark is not a number an Indian student is ever shown, and
+    // the streak is counted in the student's own timezone.
+    predicted: profile.course === 'in' ? null : pred, streak: await streakFor(pid, now, tz), newBadges
   };
 }
 
@@ -1754,34 +2027,42 @@ const routes = {
     const now = Date.now();
     if (p.course === 'in') {
       const product = indiaProductSections();
+      const trackId = cleanIndiaTrack(p.indiaTrack, p.year);
+      const { own, aheadIds, aheadUnlocked } = indiaPool(trackId, p.year, ratings, now);
+      const ownIds = new Set(own.map(c => c.id));
       const decorate = chapter => {
         const state = indiaState(chapter, ratings, now);
+        const chapterRow = ratings[chapter.id] || null;
         const dotpoints = chapter.dotpoints.map((text, ordinal) => {
           const covers = (chapter.covers || []).filter(c => c.dp.includes(ordinal));
           const forms = [...new Set(covers.flatMap(c => c.diff || []))].sort((a, b) => a - b);
-          const ids = [...new Set(covers.map(c => c.gen))];
-          const dRows = ids.map(id => ratings[id]).filter(Boolean);
-          const attempts = dRows.reduce((n, st) => n + (st.attempts || 0), 0);
-          const correct = dRows.reduce((n, st) => n + (st.correct || 0), 0);
-          const weights = dRows.reduce((n, st) => n + Math.max(1, st.attempts || 0), 0);
-          const m = dRows.length ? dRows.reduce((n, st) => n + masteryOf(st.rating, st.attempts, st.last_at, now) * Math.max(1, st.attempts || 0), 0) / Math.max(1, weights) : 0;
-          return { id: `${chapter.id}#${ordinal}`, key: String(ordinal), text, difficulties: forms, mastery: Math.round(m * 100), band: attempts ? masteryBand(m) : 'unseen', attempts, correct, generated: forms.length > 0 };
+          const d = indiaDotpointState(chapter, ordinal, chapterRow, ratings, now);
+          const m = d.attempts ? masteryOf(d.rating, d.attempts, d.last_at, now) : 0;
+          return { id: `${chapter.id}#${ordinal}`, key: String(ordinal), text, difficulties: forms, mastery: Math.round(m * 100), band: d.attempts ? masteryBand(m) : 'unseen', attempts: d.attempts, correct: d.correct, generated: forms.length > 0 };
         });
+        const ahead = aheadIds.has(chapter.id);
         return {
           id: chapter.id, name: chapter.name, strand: chapter.strand, weight: chapter.weight, code: null, dotpoints,
+          year: indiaChapterGrade(chapter),
           mastery: Math.round(state.mastery * 100), band: state.attempts ? masteryBand(state.mastery) : 'unseen',
-          attempts: state.attempts, correct: state.correct, due: indiaGeneratorIds(chapter).some(id => due.has(id)), rating: state.attempts ? state.rating : null
+          attempts: state.attempts, correct: state.correct,
+          due: due.has(chapter.id) || (state.legacy && indiaGeneratorIds(chapter).some(id => due.has(id))),
+          rating: state.attempts ? Math.round(state.rating) : null,
+          // `ahead` is the year ahead of the student's class on a JEE track;
+          // `smart` says whether smart practice draws on it yet. Explicit
+          // choice is never gated.
+          ahead, smart: ownIds.has(chapter.id) || (ahead && aheadUnlocked)
         };
       };
       const years = product.years.map(section => ({
         year: section.year, key: section.key, track: section.track, title: section.title, caption: section.caption,
-        courseLabel: section.label, difficultyCeiling: section.difficultyCeiling, subtopics: section.chapters.map(decorate)
+        courseLabel: section.label, difficultyFloor: section.difficultyFloor, difficultyCeiling: section.difficultyCeiling, subtopics: section.chapters.map(decorate)
       }));
       const streams = product.streams.map(section => ({
         year: section.year, allYears: !!section.allYears, key: section.key, track: section.track, title: section.title, caption: section.caption,
-        courseLabel: section.label, difficultyCeiling: section.difficultyCeiling, subtopics: section.chapters.map(decorate)
+        courseLabel: section.label, difficultyFloor: section.difficultyFloor, difficultyCeiling: section.difficultyCeiling, subtopics: section.chapters.map(decorate)
       }));
-      return { country: 'in', years, streams, userYear: p.year, pathway: null, course: 'in', indiaTrack: cleanIndiaTrack(p.indiaTrack, p.year) };
+      return { country: 'in', years, streams, userYear: p.year, pathway: null, course: 'in', indiaTrack: trackId, aheadUnlocked, window: indiaDifficultyWindow(trackId, p.year) };
     }
     /** Dot points with their own mastery, and an honest `generated` flag. */
     const dotpointRows = (s, st) => dotpointsFor(s.id).map(dp => {
@@ -1888,27 +2169,23 @@ const routes = {
     if (p.course === 'in' && !taskId) {
       const trackId = cleanIndiaTrack(track || p.indiaTrack, p.year);
       const ratings = await ratingsFor(p.id);
-      let chapter = subtopic ? indiaChapter(subtopic) : null;
+      const chapter = subtopic ? indiaChapter(subtopic) : null;
       if (subtopic && !chapter) throw Object.assign(new Error('That topic is not part of the India syllabus.'), { status: 404, code: 'INDIA_TOPIC_NOT_FOUND' });
-      if (!chapter) {
-        const scope = indiaScope(trackId, p.year).filter(c => (c.covers || []).some(x => (x.diff || []).length));
-        if (!scope.length) throw Object.assign(new Error('No generated questions are available for this India track yet.'), { status: 409, code: 'INDIA_TRACK_UNCOVERED' });
-        const ranked = scope.map(c => ({ chapter: c, ...indiaState(c, ratings, now) }))
-          .sort((a, b) => a.attempts - b.attempts || a.mastery - b.mastery);
-        chapter = ranked[Math.floor(Math.random() * Math.min(4, ranked.length))].chapter;
-      }
-      const state = indiaState(chapter, ratings, now);
-      const want = difficulty != null ? Number(difficulty) : pickDifficulty(state.rating, state.attempts, { state, nowMs: now });
-      const target = resolveIndiaTarget(chapter, { dotpoint, difficulty: want, track: trackId, grade: indiaChapterGrade(chapter) || p.year });
-      if (!target) {
-        const suffix = dotpoint != null ? 'dot point' : 'chapter';
-        throw Object.assign(new Error(`That India ${suffix} has no authored question form at this track yet.`), { status: 409, code: 'INDIA_TARGET_UNCOVERED' });
-      }
-      const { row, payload } = await createIndiaQuestion(p.id, chapter, target, 'practice', trackId);
+      const reviews = await byIndex('reviews', 'pid', p.id);
+      const pick = indiaPick(p, trackId, ratings, reviews, now, {
+        chapter, dotpoint, difficulty: difficulty != null && difficulty !== '' ? difficulty : null, rand: Math.random()
+      });
+      const { row, payload, trapKey } = await createIndiaQuestion(
+        p.id, pick.chapter, pick.target, pick.reason === 'review' ? 'review' : 'practice', trackId, null, null, pick.trap?.key || null
+      );
+      // Only what the optimiser chose feeds the interleaving memory: a chapter
+      // the student asked for by name is their sitting, not the picker's.
+      if (!pick.explicit) { noteServed(p.id, pick.chapter.id); noteServedDotpoint(p.id, pick.dotpointKey); }
       return {
-        question: sanitize(payload, row), reason: subtopic ? 'topic' : 'smart',
-        why: subtopic ? `${indiaTrack(trackId, p.year).name} · focused practice on ${chapter.name}.` : `${indiaTrack(trackId, p.year).name} · adapting across ${chapter.name}.`,
-        dotpoint: target.dotpointIndex, target: state.mastery, misconception: null
+        question: sanitize(payload, row), reason: pick.reason, reasonTag: pick.reasonTag, why: pick.why, nextUp: pick.nextUp,
+        dotpoint: pick.target.dotpointIndex, target: pick.successTarget ?? null,
+        misconception: trapKey ? pick.trap?.label || null : null,
+        windowed: pick.target.windowed !== false, aheadUnlocked: pick.aheadUnlocked
       };
     }
     let choice;
@@ -2063,7 +2340,7 @@ const routes = {
     if (!result.correct && !result.invalid && !isFast && (row.tries || 0) < 1) {
       row.tries = (row.tries || 0) + 1;
       await put('questions', row);
-      return { correct: false, resolved: false, triesLeft: 1, feedback: feedback || 'Not quite — check your working and try once more.', stepReport, partial, diagnosis: stepReport?.diagnosis || null, misconception: await namedTrap(p.id, q.subtopic, trapHit) };
+      return { correct: false, resolved: false, triesLeft: 1, feedback: feedback || 'Not quite — check your working and try once more.', stepReport, partial, diagnosis: stepReport?.diagnosis || null, misconception: await namedTrap(p.id, evidenceKeyOf(row, q), trapHit) };
     }
     if (result.invalid && !isFast) {
       return { correct: false, resolved: false, triesLeft: Math.max(0, 1 - (row.tries || 0)), invalid: true, feedback, stepReport };
@@ -2072,7 +2349,7 @@ const routes = {
     return {
       correct: result.correct, resolved: true, feedback, stepReport, partial,
       diagnosis: stepReport?.diagnosis || null,
-      misconception: await namedTrap(p.id, q.subtopic, trapHit),
+      misconception: await namedTrap(p.id, evidenceKeyOf(row, q), trapHit),
       solution: { steps: q.steps, answerText: displayAnswer(q), criteria: criteriaFor(q), solutionText: q.solutionText },
       ...meta
     };
@@ -2098,11 +2375,18 @@ const routes = {
     // bookkeeping behind it.
     const decorate = r => {
       const st = migrateReview(r, now);
+      // An Indian profile's rows are named through the Indian spine — the
+      // chapter, or the generator a row written before chapter keying carries —
+      // and never through the NSW table.
+      const named = p.course === 'in' ? indiaNameOf(r.subtopic, { grade: p.year }) : null;
+      const sub = p.course === 'in' ? null : SUBTOPIC_BY_ID[r.subtopic];
       return {
         subtopic: r.subtopic, due_at: r.dueAt, interval_days: r.intervalDays,
         recall: Math.round(100 * retrievability(Math.max(0, (now - st.lastAt) / DAY), st.stability)),
         stability_days: Math.round(st.stability * 10) / 10, lapses: st.lapses, reps: st.reps,
-        name: SUBTOPIC_BY_ID[r.subtopic]?.name, year: SUBTOPIC_BY_ID[r.subtopic]?.year, strand: SUBTOPIC_BY_ID[r.subtopic]?.strand
+        name: named ? named.name : (p.course === 'in' ? r.subtopic : sub?.name),
+        year: named ? named.year : (p.course === 'in' ? null : sub?.year),
+        strand: named ? named.strand : (p.course === 'in' ? null : sub?.strand)
       };
     };
     return {
@@ -2372,6 +2656,7 @@ const routes = {
     const now = Date.now();
     const pid = p.id;
     const ratings = await ratingsFor(pid);
+    if (p.course === 'in') return indiaStats(p, ratings, now);
     const pred = predictMark(ratings, p.year, now, pathwayOf(p));
     const misconceptions = namedWeaknesses(ratings, now);
     const notes = Object.fromEntries(misconceptions.map(m => [m.subtopic, `keeps repeating: ${m.label}`]));
@@ -2459,7 +2744,7 @@ const routes = {
     return {
       student: { name: p.name, year: p.year, course: courseLabel(p.course || 'nsw', p.year, pathwayOf(p)) },
       generatedAt: now, predicted: pred, subtopics: rows,
-      misconceptions: namedWeaknesses(ratings, now),
+      misconceptions: namedWeaknesses(ratings, now, 6, { india: p.course === 'in', grade: p.year }),
       strengths: [...rows].filter(r => r.attempts >= 3).sort((a, b) => b.mastery - a.mastery).slice(0, 3),
       focus: [...rows].sort((a, b) => a.mastery - b.mastery).slice(0, 3),
       weekly: acts.slice(-28),
@@ -2662,8 +2947,10 @@ const routes = {
       // the row must carry the chapter id the practice route understands.
       const inChapter = r.india ? indiaChapter(r.india.chapterId) : null;
       return {
-        id: r.id, subtopic: inChapter?.id || r.subtopic,
+        id: r.id, subtopic: inChapter ? inChapter.id : r.subtopic,
         subtopicName: q.multipart ? q.title : (inChapter?.name || (q.custom ? q.customName || 'Custom question' : (SUBTOPIC_BY_ID[r.subtopic]?.name || r.subtopic))),
+        year: inChapter ? indiaChapterGrade(inChapter) : undefined,
+        dotpointText: inChapter && Number.isInteger(r.india?.dotpointIndex) ? inChapter.dotpoints[r.india.dotpointIndex] : undefined,
         multipart: !!q.multipart,
         prompt: q.multipart ? q.stem : q.prompt,
         difficulty: r.difficulty, mode: r.mode,
@@ -2704,7 +2991,9 @@ const routes = {
     if (q.multipart) throw Object.assign(new Error('Structured exam questions live in exam review'), { status: 400 });
     const same = (body?.variant || 'same') === 'same';
     const payload = generateQuestion(row.subtopic, row.difficulty, same ? q.seed : undefined);
-    const newRow = { id: uuid(), pid: p.id, subtopic: row.subtopic, difficulty: row.difficulty, payload, mode: 'practice', examId: null, taskId: null, answered: 0, tries: 0, hintsUsed: 0, createdAt: Date.now() };
+    // A retried Indian question keeps its chapter, or its evidence would fall
+    // onto the generator id instead of the chapter the student is working on.
+    const newRow = { id: uuid(), pid: p.id, subtopic: row.subtopic, difficulty: row.difficulty, payload, india: row.india || undefined, mode: 'practice', examId: null, taskId: null, answered: 0, tries: 0, hintsUsed: 0, createdAt: Date.now() };
     await put('questions', newRow);
     return { question: sanitize(payload, newRow), variant: same ? 'same' : 'fresh' };
   },
