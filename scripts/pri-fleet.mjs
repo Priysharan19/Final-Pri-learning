@@ -145,17 +145,16 @@ function validate(fleet, policy) {
     if (!RISK_ORDER.includes(rule.risk)) errors.push(`${rule.pattern}: invalid risk '${rule.risk}'`);
     for (const reviewer of rule.reviewers || []) { if (!ids.has(reviewer)) errors.push(`${rule.pattern}: unknown reviewer '${reviewer}'`); if (reviewer === rule.primary) errors.push(`${rule.pattern}: primary owner cannot review itself`); }
   }
-  for (const key of ['single_writer','evidence_before_claims','no_threshold_weakening','no_fabricated_human_or_hardware_evidence','offline_first','answer_blind_handwriting','pr_before_main','independent_review','persistent_mission_ledger']) if (fleet.principles?.[key] !== true) errors.push(`principle must remain true: ${key}`);
+  for (const key of ['single_primary_writer_per_mission','bounded_writer_pool','evidence_before_claims','no_threshold_weakening','no_fabricated_human_or_hardware_evidence','offline_first','answer_blind_handwriting','pr_before_main','independent_review','persistent_mission_ledger']) if (fleet.principles?.[key] !== true) errors.push(`principle must remain true: ${key}`);
+  if (fleet.principles?.writer_pool_authority !== '.pri-os/mission-control.json') errors.push('writer_pool_authority must remain .pri-os/mission-control.json');
+  if ('single_writer' in (fleet.principles || {})) errors.push('legacy single_writer principle must not conflict with bounded writer-pool semantics');
   for (const risk of RISK_ORDER) if (!fleet.risk_classes?.[risk]) errors.push(`missing risk class ${risk}`);
   try {
     const mission = readJson(MISSION_CONTROL_FILE);
-    if (![1,2].includes(mission.version)) errors.push('mission-control.version must be 1 or 2');
-    if (mission.version === 1 && !mission.lease?.single_active_writer) errors.push('mission-control v1 must enforce a single active writer');
-    if (mission.version === 2) {
-      if (mission.lease?.single_active_writer !== false) errors.push('mission-control v2 must use bounded writer-pool semantics');
-      if (!Number.isInteger(mission.lease?.max_writers) || mission.lease.max_writers < 1 || mission.lease.max_writers > 2) errors.push('mission-control v2 max_writers must be 1..2');
-      if (mission.lease?.fallback_max_writers !== 1) errors.push('mission-control v2 fallback_max_writers must remain 1');
-    }
+    if (mission.version !== 2) errors.push('bounded fleet requires mission-control.version 2');
+    if (mission.lease?.single_active_writer !== false) errors.push('mission-control v2 must use bounded writer-pool semantics');
+    if (!Number.isInteger(mission.lease?.max_writers) || mission.lease.max_writers < 1 || mission.lease.max_writers > 2) errors.push('mission-control v2 max_writers must be 1..2');
+    if (mission.lease?.fallback_max_writers !== 1) errors.push('mission-control v2 fallback_max_writers must remain 1');
   } catch (error) { errors.push(`mission-control config invalid: ${error.message}`); }
   errors.push(...validateDerivedPolicy(fleet, policy, ids));
   return errors;
@@ -176,7 +175,7 @@ function printUsage() { console.log('Pri Learning agent fleet V2\n\nCommands:\n 
 const fleet = loadFleet(); const derivedPolicy = loadDerivedArtifacts(); const [command = 'validate', ...args] = process.argv.slice(2);
 if (command === 'validate') {
   const errors = validate(fleet, derivedPolicy); if (errors.length) { for (const error of errors) console.error(`ERROR: ${error}`); process.exit(1); }
-  const mission = readJson(MISSION_CONTROL_FILE); const writerMode = mission.version === 2 ? `bounded<=${mission.lease.max_writers}` : 'single';
+  const mission = readJson(MISSION_CONTROL_FILE); const writerMode = `bounded<=${mission.lease.max_writers}`;
   console.log(`PASS: ${fleet.agents.length} agents, ${Object.keys(fleet.gates).length} typed gates, ${fleet.ownership_rules.length} ownership rules, ${derivedPolicy.artifacts.length} derived-artifact rule(s), writer mode ${writerMode}.`);
 } else if (command === 'list') {
   for (const agent of fleet.agents) console.log(`${agent.id}\t${agent.role}`);
@@ -206,5 +205,5 @@ if (command === 'validate') {
   if (RISK_ORDER.indexOf(declared) < RISK_ORDER.indexOf(actual.risk)) { console.error(`declared risk ${declared} understates actual ${actual.risk}`); process.exitCode = 1; }
 } else if (command === 'status') {
   const mission = readJson(MISSION_CONTROL_FILE);
-  console.log(JSON.stringify({ name: fleet.name, version: fleet.version, agents: fleet.agents.length, gates: Object.keys(fleet.gates).length, ownership_rules: fleet.ownership_rules.length, derived_artifacts: derivedPolicy.artifacts.length, writer_pool: { mode: mission.version === 2 ? 'bounded' : 'single', max_writers: mission.version === 2 ? mission.lease.max_writers : 1, fallback_max_writers: mission.version === 2 ? mission.lease.fallback_max_writers : 1 } }, null, 2));
+  console.log(JSON.stringify({ name: fleet.name, version: fleet.version, agents: fleet.agents.length, gates: Object.keys(fleet.gates).length, ownership_rules: fleet.ownership_rules.length, derived_artifacts: derivedPolicy.artifacts.length, writer_pool: { mode: 'bounded', max_writers: mission.lease.max_writers, fallback_max_writers: mission.lease.fallback_max_writers, authority: fleet.principles.writer_pool_authority, single_primary_writer_per_mission: fleet.principles.single_primary_writer_per_mission } }, null, 2));
 } else { printUsage(); process.exitCode = 2; }
