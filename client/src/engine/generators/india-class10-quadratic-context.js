@@ -11,7 +11,7 @@ function rectangleProblem(rng, harder = false) {
   const length = width + gap;
   const area = width * length;
   return {
-    prompt: `A rectangular garden has area $${area}\,\text{m}^2$. Its length is $${gap}$ m more than its width. Find the width.`,
+    prompt: `A rectangular garden has area $${area}\\,\\text{m}^2$. Its length is $${gap}$ m more than its width. Find the width.`,
     answerType: 'numeric', answer: { value: width }, answerSuffix: 'm',
     traps: [
       { value: length, why: 'That is the length. The question asks for the shorter dimension, the width.' },

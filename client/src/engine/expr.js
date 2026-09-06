@@ -524,9 +524,21 @@ export function exprEquivalent(a, b, opts = {}) {
   return valid >= Math.min(3, needed) && matches === valid;
 }
 
-/** Compare two numbers with sensible tolerance. */
+/**
+ * Compare two numbers with sensible tolerance.
+ *
+ * An authored `tol` always wins — that is how a question says its answer is
+ * measured or rounded. With no authored tolerance the default depends on the
+ * target: a whole number is an exact answer (12 m² is 120000 cm², not 120012),
+ * so it is compared to within floating-point noise only, while a target that
+ * is not a whole number is the result of a real calculation and keeps the
+ * relative 1e-4 band that forgives a student's rounding. The exact band is
+ * capped well below a half so no other whole number can ever fall inside it.
+ */
 export function numsClose(a, b, tol) {
   if (!Number.isFinite(a) || !Number.isFinite(b)) return false;
-  const t = tol ?? Math.max(1e-6, Math.abs(b) * 1e-4);
+  const t = tol ?? (Number.isInteger(b)
+    ? Math.min(0.25, Math.max(1e-9, Math.abs(b) * 1e-9))
+    : Math.max(1e-6, Math.abs(b) * 1e-4));
   return Math.abs(a - b) <= t;
 }

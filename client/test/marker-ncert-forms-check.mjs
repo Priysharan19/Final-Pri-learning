@@ -183,7 +183,222 @@ const trig = { answerType: 'numeric', answer: { value: 2 } };
 correct(trig, 'sec(pi/3)', 'vocabulary: sec answers a numeric question');
 correct(trig, '1/cos(pi/3)', 'vocabulary: the reciprocal written out');
 
-// ── 6. Restating the question earns nothing ──────────────────────────────────
+// ── 6. Indian money: a rupee answer to a rupee question ─────────────────────
+// The product is India-first. A student who answers "₹9.75" to a question
+// priced in rupees has answered it. The dollar sign was already read; the
+// rupee had no reading at all.
+const rupees = {
+  answerType: 'numeric',
+  answer: { value: 9.75 },
+  prompt: 'One item costs ₹3.25. What is the cost of $3$ identical items?'
+};
+for (const [input, label] of [
+  ['9.75', 'the bare number'],
+  ['₹9.75', 'rupee sign, no space'],
+  ['₹ 9.75', 'rupee sign with a space'],
+  ['Rs 9.75', 'Rs as NCERT prints it'],
+  ['Rs. 9.75', 'Rs. with the full stop'],
+  ['rs 9.75', 'lower-case rs'],
+  ['INR 9.75', 'the currency code'],
+  ['9.75 rupees', 'the word after the number'],
+  ['9.75 Rupees', 'the word capitalised'],
+  ['$9.75', 'the dollar sign still works'],
+]) correct(rupees, input, `money: ${label}`);
+wrong(rupees, '₹9.85', 'money: a rupee sign does not make a wrong number right');
+wrong(rupees, '₹', 'money: a currency sign alone is not an answer');
+wrong(rupees, 'rupees', 'money: the word alone is not an answer');
+
+const paise = { answerType: 'numeric', answer: { value: 50 }, prompt: 'How many paise are there in half a rupee?' };
+correct(paise, '50 paise', 'money: paise as the trailing unit');
+correct(paise, '50', 'money: a paise question answered bare');
+wrong(paise, '60 paise', 'money: a paise unit does not rescue a wrong number');
+
+// ── 7. Fractions: the form is a demand only when the question makes it ───────
+// `simplestFraction` is how a generator states the canonical fraction. It is a
+// display hint, not a licence to refuse the exact decimal of a question that
+// never asked for a fraction.
+const asksFraction = {
+  answerType: 'numeric',
+  answer: { value: 0.25, simplestFraction: { n: 1, d: 4 } },
+  prompt: 'Simplify $\\dfrac{3}{12}$ fully. Give your answer as a fraction in simplest form.'
+};
+for (const [input, label] of [
+  ['1/4', 'the canonical form'],
+  ['1 / 4', 'loose spaces'],
+  ['+1/4', 'a leading plus'],
+  ['1/4.', 'a trailing full stop'],
+  ['(1)/(4)', 'handwritten brackets'],
+]) correct(asksFraction, input, `fraction asked: ${label}`);
+wrong(asksFraction, '2/8', 'fraction asked: an unsimplified equivalent is not simplest form');
+wrong(asksFraction, '0.25', 'fraction asked: the decimal is refused when the question asked for a fraction');
+wrong(asksFraction, '1/5', 'fraction asked: a wrong fraction is wrong');
+
+const negativeFraction = {
+  answerType: 'numeric',
+  answer: { value: -1.4, simplestFraction: { n: -7, d: 5 } },
+  prompt: 'Solve $5x+7=0$ exactly. Give the answer as a fraction in simplest form.'
+};
+for (const [input, label] of [
+  ['-7/5', 'ascii minus'],
+  ['−7/5', 'unicode minus, as the iPad ink and cloud OCR produce it'],
+  ['- 7/5', 'a space after the minus'],
+  ['-7/5.', 'a trailing full stop'],
+  ['(-7)/(5)', 'handwritten brackets'],
+  ['-1 2/5', 'the mixed numeral'],
+  ['−1 2/5', 'the mixed numeral with a unicode minus'],
+]) correct(negativeFraction, input, `negative fraction: ${label}`);
+wrong(negativeFraction, '7/5', 'negative fraction: the sign still matters');
+wrong(negativeFraction, '−14/10', 'negative fraction: unsimplified is still unsimplified');
+
+// A question that never asks for a fraction must accept its own exact decimal.
+const neverAsked = {
+  answerType: 'numeric',
+  answer: { value: 0.5, simplestFraction: { n: 1, d: 2 } },
+  prompt: 'A line has gradient $-2$. What is the gradient of a line **perpendicular** to it?'
+};
+correct(neverAsked, '0.5', 'no fraction asked: the exact decimal is the answer');
+correct(neverAsked, '.5', 'no fraction asked: the decimal without a leading zero');
+correct(neverAsked, '0.50', 'no fraction asked: a trailing zero');
+correct(neverAsked, '1/2', 'no fraction asked: the fraction still works');
+wrong(neverAsked, '2', 'no fraction asked: the wrong value is still wrong');
+wrong(neverAsked, '-0.5', 'no fraction asked: the wrong sign is still wrong');
+wrong(neverAsked, '2/4', 'no fraction asked: an unsimplified fraction still asks to be simplified');
+
+const repeating = {
+  answerType: 'numeric',
+  answer: { value: 25 / 3, simplestFraction: { n: 25, d: 3 } },
+  prompt: 'Find the distance from the point $(-6, -4, -5)$ to the plane $x + 2y + 2z - 1 = 0$.'
+};
+correct(repeating, '25/3', 'no fraction asked: the exact fraction');
+correct(repeating, String(25 / 3), 'no fraction asked: the exact decimal');
+wrong(repeating, '8.3333', 'no fraction asked: a rounded decimal is not the exact value');
+wrong(repeating, '8.33', 'no fraction asked: a coarsely rounded decimal is wrong');
+
+// An author who really does want the fraction says so.
+const requiredFraction = {
+  answerType: 'numeric',
+  answer: { value: 0.5, simplestFraction: { n: 1, d: 2 }, requireFraction: true },
+  prompt: 'What is the gradient of a perpendicular line?'
+};
+correct(requiredFraction, '1/2', 'requireFraction: the fraction is accepted');
+wrong(requiredFraction, '0.5', 'requireFraction: the decimal is refused when the author demanded the form');
+
+// ── 8. A blank answer is never a correct answer ──────────────────────────────
+// Number('') is 0, so every MCQ keyed to option 0 marked an empty submission
+// right. Nothing typed can never be right.
+const mcqZero = {
+  answerType: 'mcq',
+  mcqOptions: ['Even', 'Odd', 'Neither even nor odd'],
+  answer: { correctIndex: 0 }
+};
+correct(mcqZero, '0', 'mcq: the keyed index');
+correct(mcqZero, 0, 'mcq: the keyed index as a number');
+correct(mcqZero, ' 0 ', 'mcq: the keyed index with padding');
+for (const [input, label] of [
+  ['', 'the empty string'],
+  ['   ', 'whitespace'],
+  ['\n', 'a bare newline'],
+  ['\t', 'a tab'],
+  [null, 'null'],
+  [undefined, 'undefined'],
+  ['abc', 'text'],
+  ['0.5', 'a fractional index'],
+  ['1', 'a different option'],
+]) wrong(mcqZero, input, `mcq blank: ${label} is not option 0`);
+
+// ── 9. An exact answer is exact ──────────────────────────────────────────────
+// numsClose defaulted to a relative 1e-4 band, so a converted area of 120000
+// accepted 120012. An integer answer with no authored tolerance is exact.
+const conversion = { answerType: 'numeric', answer: { value: 120000 }, prompt: 'Convert $12$ m² to cm².' };
+correct(conversion, '120000', 'exactness: the answer');
+correct(conversion, '1.2e5', 'exactness: scientific notation');
+correct(conversion, '12*100^2', 'exactness: the calculation left unevaluated');
+correct(conversion, '(1/3)*360000', 'exactness: floating-point noise is still the answer');
+correct(conversion, '120,000', 'exactness: a thousands separator');
+for (const [input, label] of [
+  ['120001', 'one too many'],
+  ['120012', 'twelve too many'],
+  ['119988', 'twelve too few'],
+  ['120000.5', 'half a unit out'],
+]) wrong(conversion, input, `exactness: ${label}`);
+
+const measured = { answerType: 'numeric', answer: { value: 120000, tol: 50 } };
+correct(measured, '120001', 'authored tolerance: still forgiving inside the band');
+correct(measured, '120040', 'authored tolerance: the edge of the band');
+wrong(measured, '120060', 'authored tolerance: outside the band is still wrong');
+
+const roundedTarget = { answerType: 'numeric', answer: { value: 3.14159 } };
+correct(roundedTarget, '3.1416', 'non-integer answers keep the relative band');
+correct(roundedTarget, '3.14159', 'non-integer answers accept themselves');
+
+const smallInteger = { answerType: 'numeric', answer: { value: 12 } };
+correct(smallInteger, '12', 'small integer: itself');
+correct(smallInteger, '36/3', 'small integer: a calculation');
+correct(smallInteger, 'sqrt(144)', 'small integer: a surd that lands on it');
+wrong(smallInteger, '12.01', 'small integer: a hundredth out is wrong');
+
+// ── 10. A percentage written with its sign ───────────────────────────────────
+const percentage = {
+  answerType: 'numeric',
+  answer: { value: 47.5, tol: 0.11 },
+  prompt: 'What **percentage** lies between $55$ and $59$?'
+};
+correct(percentage, '47.5', 'percent: the bare number');
+correct(percentage, '47.5%', 'percent: written with its sign');
+correct(percentage, '47.5 %', 'percent: a space before the sign');
+wrong(percentage, '0.475', 'percent: the proportion without a sign is not the percentage');
+wrong(percentage, '52.5%', 'percent: a wrong percentage is wrong');
+
+const proportion = { answerType: 'numeric', answer: { value: 0.475 } };
+correct(proportion, '47.5%', 'percent: a proportion answered as a percentage');
+correct(proportion, '0.475', 'percent: the proportion itself');
+
+// ── 11. A variable is not a unit ─────────────────────────────────────────────
+// cleanInput strips a trailing unit. Applied to an expression answer it ate the
+// last variable, so "a + s" became "a + " and would not parse.
+for (const [expr, inputs, label] of [
+  ['2h', ['2h', 'h*2', 'h + h'], 'a variable named like an hour'],
+  ['a + s', ['a + s', 's + a'], 'a variable named like a second'],
+  ['3n + m', ['3n + m', 'm + 3n'], 'a variable named like a metre'],
+  ['l*w', ['l*w', 'w*l'], 'length times width'],
+]) {
+  const question = { answerType: 'expression', answer: { expr } };
+  for (const input of inputs) correct(question, input, `expression units: ${label} — "${input}"`);
+}
+wrong({ answerType: 'expression', answer: { expr: '2h' } }, '2', 'expression units: dropping the variable is wrong');
+
+// A numeric answer still forgives the unit the question was asked in.
+const withUnits = { answerType: 'numeric', answer: { value: 12 } };
+for (const input of ['12 cm', '12 m', '12 s', '12 kg', '12 cm²', '12 hours', '12 degrees'])
+  correct(withUnits, input, `numeric units: "${input}" still reads as 12`);
+
+// ── 12. Decorations a student writes around a right answer ───────────────────
+// Continuing the question's own line with "= 9.75", ending the answer with a
+// full stop, or writing the sign of a positive number. None of them change the
+// value, and none of them may change the mark.
+const plain = { answerType: 'numeric', answer: { value: 9.75 } };
+for (const input of ['= 9.75', '=9.75', '≈ 9.75', '+9.75', '9.75.', ' 9.75 ', '9.75\n'])
+  correct(plain, input, `decoration: ${JSON.stringify(input)}`);
+wrong(plain, '= 9.85', 'decoration: an equals sign does not make a wrong number right');
+wrong(plain, '=', 'decoration: an equals sign alone is not an answer');
+
+const surd = { answerType: 'numeric', answer: { value: Math.sqrt(18), surdForm: { k: 3, r: 2 } } };
+correct(surd, '3sqrt(2)', 'decoration: the surd itself');
+correct(surd, '+3sqrt(2)', 'decoration: a leading plus on a surd');
+correct(surd, '3sqrt(2).', 'decoration: a trailing full stop on a surd');
+correct(surd, '3√2', 'decoration: the unicode root sign');
+wrong(surd, 'sqrt(18)', 'decoration: an unsimplified surd is still unsimplified');
+
+const exactPi = { answerType: 'numeric', answer: { value: 2 * Math.PI, requireExact: true } };
+correct(exactPi, '2pi', 'decoration: an exact multiple of pi');
+correct(exactPi, '2pi.', 'decoration: a trailing full stop after pi');
+wrong(exactPi, '6.28', 'decoration: a rounded decimal is still not the exact value');
+
+const solutionSet = { answerType: 'set', answer: { values: [-4, -8] } };
+correct(solutionSet, '= -4, -8', 'decoration: a solution set continued from an equals sign');
+wrong(solutionSet, '= -4', 'decoration: an equals sign does not complete a partial set');
+
+// ── 13. Restating the question earns nothing ─────────────────────────────────
 // A student who copies the question back has shown no working. This is the
 // partial-credit safety rule: it must hold wherever method marks are awarded.
 const restated = checkAnswer({ answer: { type: 'numeric', value: 12 }, prompt: 'Solve 2x + 4 = 28' }, '2x + 4 = 28');
@@ -191,5 +406,5 @@ ok(restated.correct === false, 'partial credit: restating the question is not a 
 
 console.log(failures.length
   ? `NCERT ANSWER FORMS: FAIL — ${failures.length} of ${pass + failures.length} checks failed\n  · ${failures.join('\n  · ')}`
-  : `NCERT ANSWER FORMS: PASS — ${pass}/${pass} checks — solution sets, inequality/interval equivalence, matrices, vectors and the n!/nCr/nPr/sec/cosec/cot vocabulary.`);
+  : `NCERT ANSWER FORMS: PASS — ${pass}/${pass} checks — solution sets, inequality/interval equivalence, matrices, vectors, the n!/nCr/nPr/sec/cosec/cot vocabulary, rupees and paise, fraction form only where the question asks for it, blank answers, exact integers, the percent sign and unit-named variables.`);
 process.exit(failures.length ? 1 : 0);

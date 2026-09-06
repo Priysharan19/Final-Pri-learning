@@ -41,7 +41,14 @@ jobs:
           grep -Fq '✔ INDIA SUITE PASSED — 1724/1724 checks' suites.log
           grep -Fq '43800 questions from 438 declared (generator, difficulty) pairs × 100 draws — 43800 marked correct by their own marker, 43800 well formed' suites.log
           grep -Fq '258/258 dot points have a generator behind them; 0 do not' suites.log
-          grep -Fq 'NCERT ANSWER FORMS: PASS — 93/93 checks' suites.log
+          grep -Fq 'NCERT ANSWER FORMS: PASS — 212/212 checks' suites.log
+          grep -Fq 'METHOD MARKS: PASS — 37/37 checks' suites.log
+          grep -Fq 'WORKING BRANCHES: PASS — 29/29 checks' suites.log
+          grep -Fq 'Pri Reason V1 precision gate: PASS' suites.log
+          grep -Fq 'Pri Reason V2 safety gate: PASS' suites.log
+          grep -Fq 'Pri Reason V3 regression gate: PASS' suites.log
+          grep -Fq 'Pri Reason V4 regression gate: PASS' suites.log
+          grep -Fq 'Pri Reason V2 curriculum integration gate: PASS' suites.log
           grep -Fq 'INDIA EXAM FLOW: PASS — 122/122 checks' suites.log
           grep -Fq '✔ INDIA IDENTITY SUITE PASSED — 102/102 checks across 5 groups' suites.log
           grep -Fq 'INDIA ADAPTIVE: PASS — 304/304 checks' suites.log
