@@ -108,8 +108,10 @@ jobs:
           node server/test/billing-webhook-router-check.mjs
           node server/test/platform-db-operations-check.mjs
           node server/test/platform-http-journeys-check.mjs
-      - name: Assignment targeting and class analytics
-        run: node server/test/assignment-targeting-check.mjs
+      - name: Assignment targeting, syllabus snapshot and class analytics
+        run: |
+          node server/test/india-syllabus-snapshot-check.mjs
+          node server/test/assignment-targeting-check.mjs
       - name: Commercial platform schema contract
         run: node server/test/platform-schema-check.mjs
       - name: Platform migration contract

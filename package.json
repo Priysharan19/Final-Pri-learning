@@ -88,6 +88,7 @@
     "test:platform:commerce": "node server/test/billing-cancel-refund-check.mjs && node server/test/billing-webhook-router-check.mjs && node server/test/platform-db-operations-check.mjs && node server/test/platform-http-journeys-check.mjs",
     "test:marker:forms": "node client/test/marker-ncert-forms-check.mjs",
     "test:india:exams": "node client/test/india-exam-flow-check.mjs",
-    "test:teacher:targeting": "node server/test/assignment-targeting-check.mjs"
+    "test:teacher:targeting": "node server/test/india-syllabus-snapshot-check.mjs && node server/test/assignment-targeting-check.mjs",
+    "syllabus:server": "node tools/generate-server-syllabus.mjs"
   }
 }

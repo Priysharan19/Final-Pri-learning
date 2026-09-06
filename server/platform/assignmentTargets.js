@@ -2,16 +2,17 @@
 //
 // A teacher's assignment names what to practise — a track, chapters, at most
 // one dot point, a difficulty and a question count — and the server is the
-// authority on whether that target exists. The curriculum spine the client
-// serves questions from is the same module the production image ships
-// (Dockerfile copies client/src/engine beside the server), so an assignment
-// can never point at a chapter, dot point or difficulty no student can reach.
+// authority on whether that target exists. The production image ships no client
+// source, so the syllabus is read from a generated snapshot of the curriculum
+// (india-syllabus.generated.js, kept honest by india-syllabus-snapshot-check),
+// and an assignment can never point at a chapter, dot point or difficulty no
+// student can reach.
 //
 // Class analytics are aggregated here from the aggregate-only submission
 // summaries: per student, per assignment and per targeted chapter, with the
 // intervention flags a teacher acts on and the plain-language reason for each.
 // No answer, prompt, working or handwriting ever exists in this data.
-import { IN_CHAPTER_BY_ID, IN_TRACKS } from '../../client/src/engine/curriculum-in.js';
+import { IN_CHAPTER_BY_ID, IN_TRACKS } from './india-syllabus.generated.js';
 import { sanitizeAssignmentSummary } from './assignmentProgress.js';
 
 const ID = /^[A-Za-z0-9._-]{1,80}$/;
@@ -106,7 +107,10 @@ export function validateAssignmentSpecification(input) {
     const dp = integer(input.dotpoint);
     if (dp === null || dp < 0) return invalid('Dot point must be a whole number.');
     if (chapters.length !== 1) return invalid('A dot point can only be chosen for a single chapter.');
-    if (dp >= chapters[0].dotpoints.length) return invalid(`${chapters[0].name} has ${chapters[0].dotpoints.length} dot points.`);
+    // The snapshot carries the dot-point COUNT, not the list: the server only
+    // has to know how many a chapter has to refuse an index past the end.
+    const dotpoints = chapters[0].dotpoints;
+    if (dp >= dotpoints) return invalid(`${chapters[0].name} has ${dotpoints} dot points.`);
     spec.dotpoint = dp;
   }
 
