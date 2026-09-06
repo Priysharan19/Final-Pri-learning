@@ -55,6 +55,16 @@ function manualChunks(id) {
 
 const PRECACHE_SKIP = /(^|\/)sw\.js$|(^|\/)\.DS_Store$|\.map$|\.woff$|\.ttf$/;
 
+// The PDF renderer and its worker are ~2.7 MB together and are needed only by
+// the student who attaches a scanned PDF. Precaching them would make every
+// install carry the cost of a feature most people never touch, on connections
+// where that is a real cost. They stay out of the install and are cached at
+// runtime by the ordinary /assets/ rule the first time one is opened — so a
+// student who has used it once has it offline, and a student who never does
+// never pays for it. The one place this shows is opening a PDF offline having
+// never opened one before; pdfPage.js reports that case specifically.
+const RUNTIME_ONLY = /(^|\/)pdf(\.worker)?-[^/]*\.(js|mjs)$/;
+
 function filesIn(dir, base = '') {
   const out = [];
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -80,12 +90,13 @@ function precache() {
     // `dist/` exists and mask the real error with an ENOENT from this plugin.
     writeBundle() {
       const files = filesIn(outDir).filter(f => !PRECACHE_SKIP.test(f)).sort();
+      const precached = files.filter(f => !RUNTIME_ONLY.test(f));
       const digest = createHash('sha256');
       for (const f of files) {
         digest.update(f).update(createHash('sha256').update(readFileSync(join(outDir, f))).digest());
       }
       const version = `pri-${digest.digest('hex').slice(0, 12)}`;
-      const urls = ['/', ...files.map(f => `/${f}`)];
+      const urls = ['/', ...precached.map(f => `/${f}`)];
       const original = readFileSync(swSource, 'utf8');
       const filled = original
         .replace(/^const VERSION = .*$/m, `const VERSION = '${version}';`)
