@@ -129,13 +129,38 @@ function generates(method, path) {
   return method === 'POST' && (GENERATING.has(path) || path === '/profiles/demo' || RETRY_PATH.test(path));
 }
 
+/**
+ * A question bank is a chunk of its own, and since the install stopped carrying
+ * all six years it is fetched the first time a profile needs it. That makes one
+ * failure ordinary and worth naming: the student has asked for a chapter this
+ * device has never opened, and there is no network to fetch it with. Retrying
+ * fixes nothing and "Failed to fetch dynamically imported module" tells them
+ * nothing, so say what actually happened and what would fix it.
+ *
+ * Every other failure keeps its own message. This only relabels the one case it
+ * can be sure of, and it is sure because it checked.
+ */
+async function withBanks(job) {
+  try {
+    return await job;
+  } catch (error) {
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+      throw Object.assign(
+        new Error('This chapter has not been downloaded to this device yet, and there is no connection to fetch it with. Connect for a moment and it is yours offline from then on. Chapters you have already practised still work.'),
+        { status: 503, code: 'BANK_UNAVAILABLE_OFFLINE' }
+      );
+    }
+    throw error;
+  }
+}
+
 async function preload(method, path, body) {
   if (!generates(method, path)) return;
   // The demo seeds a whole fictional history at a fixed year of its own choosing.
-  if (path === '/profiles/demo') return loadAllBanks();
+  if (path === '/profiles/demo') return withBanks(loadAllBanks());
   if (body?.subtopic) {
     const chapter = indiaChapter(body.subtopic);
-    await loadBanksFor(chapter ? [...new Set((chapter.covers || []).map(c => c.gen))] : [body.subtopic]);
+    await withBanks(loadBanksFor(chapter ? [...new Set((chapter.covers || []).map(c => c.gen))] : [body.subtopic]));
   }
   if (path === '/exams' && body?.year) warmScope(body.year, pathway, course, indiaTrackId);
   await scopeReady;
@@ -192,7 +217,7 @@ async function call(method, path, body) {
         return result;
       } catch (err) {
         if (!err?.bankMissing || faults >= MAX_BANK_FAULTS) throw err;
-        await loadBanks([err.bank]);
+        await withBanks(loadBanks([err.bank]));
       }
     }
   } catch (error) {

@@ -409,6 +409,14 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
 
   const InkAnswer = inkPhase === 'ready' ? inkModule?.default : null;
   const inkStuck = inkPhase === 'failed' && inkExhausted();
+  // The recogniser is 0.9 MB and is deliberately not in the install precache:
+  // a phone with no stylus should not pay for it before its student has ever
+  // asked to write. That makes "this is the first time you have opened the
+  // write tab and you are offline" a real, ordinary case, and a different one
+  // from "something went wrong" — the student can fix the first by finding a
+  // signal for a moment, and nothing by retrying the second. Same distinction
+  // pdfPage.js draws for the PDF renderer, and for the same reason.
+  const inkNeedsNetwork = inkPhase === 'failed' && typeof navigator !== 'undefined' && navigator.onLine === false;
 
   const figure = useMemo(() => sanitizeFigure(question.figure), [question.figure]);
 
@@ -909,10 +917,22 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                 {inkPhase === 'failed' && (
                   <div className="editor-body">
                     <div className="error-box" role="alert" style={{ marginBottom: 0 }}>
-                      <b>Handwriting couldn’t load.</b> The recogniser is kept in a file of its own and this
-                      device couldn’t read it just now. Nothing you have done is lost — {inkStuck
-                        ? 'reload the app, or answer by typing.'
-                        : 'try again, or answer by typing.'}
+                      {inkNeedsNetwork ? (
+                        <>
+                          <b>Handwriting needs a one-off download.</b> The recogniser is a separate file, kept out of
+                          the first install so that a phone that never writes by hand never pays for it — and this
+                          device is offline, so it cannot be fetched. Connect for a moment and it is yours for good,
+                          on this device, with no network needed after that. Nothing you have done is lost, and you
+                          can answer by typing right now.
+                        </>
+                      ) : (
+                        <>
+                          <b>Handwriting couldn’t load.</b> The recogniser is kept in a file of its own and this
+                          device couldn’t read it just now. Nothing you have done is lost — {inkStuck
+                            ? 'reload the app, or answer by typing.'
+                            : 'try again, or answer by typing.'}
+                        </>
+                      )}
                     </div>
                     <div className="row" style={{ marginTop: 12 }}>
                       {inkStuck

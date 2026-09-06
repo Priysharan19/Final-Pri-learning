@@ -53,6 +53,8 @@ jobs:
           grep -Fq 'CLOUD PHOTO CLIENT: PASS — 26/26 checks' suites.log
           grep -Fq 'MARK PREDICTOR: PASS — 39/39 checks' suites.log
           grep -Fq 'PDF WORKING: PASS — 25/25 checks' suites.log
+          grep -Eq 'INSTALL BUDGET: PASS — 44/44 checks — install [0-9]+ kB raw / [0-9]+ kB gzip under' suites.log
+          grep -Fq 'nothing emitted left uncovered.' suites.log
           grep -Fq 'ENTITLEMENT ENFORCEMENT: PASS — 59/59 checks' suites.log
           grep -Fq 'PASS — Grade 9 Ganita Manjari: 1280 seeded forms (1000 numeric handwriting-ready, 280 conceptual).' suites.log
           grep -Fq 'PASS — 8/8 chapters, 200/200 uploaded pages, 42/42 formal exercise sections and 293/293 formal exercise prompts represented and verified.' suites.log
@@ -181,7 +183,7 @@ jobs:
         run: |
           set -euo pipefail
           test -s browser.log
-          grep -Eq 'E2E SUITE.*195/195.*7 flows' browser.log
+          grep -Eq 'E2E SUITE.*222/222.*7 flows' browser.log
           grep -Fq 'Phone · every destination reachable at 390px' browser.log
           grep -Fq 'India · onboarding, class labels, demo, cloud entry' browser.log
           grep -Fq 'Cloud · account, live Settings refresh, assignment hand-off' browser.log
