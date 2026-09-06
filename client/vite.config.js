@@ -48,7 +48,9 @@ import { join, resolve } from 'node:path';
 // are over it, and raising the bar past them would only hide that.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const CHUNK_GROUPS = [
+// Exported so client/test/i18n-check.mjs can assert against the rules the
+// build actually uses, rather than a second copy that would drift.
+export const CHUNK_GROUPS = [
   // Higher priority than the vendor rules so a src/ path is never claimed by
   // one of them first.
   { name: 'ink-model', test: /\/src\/ink\/model-data\.js$/, priority: 40 },
@@ -135,7 +137,17 @@ export const ON_DEMAND = [
   // out of step with the generator registry. The runtime rule keeps what it
   // pulled, so the student is offline-ready for their own year and carries none
   // of the other five.
-  [/(^|\/)(year(7|8|9|10|11|12)|streams-(standard|ext)|india-(algebra|calculus|class10|coordinate|foundation|junior-overlay|olympiad|senior))-[^/]*\.js$/, 'question bank for another year'],
+  // india-class11 and india-class12 joined this list late: they are the
+  // NCERT-native banks authored to replace the borrowed Australian ones, and
+  // they are question banks for one class each, exactly like the rest of this
+  // rule. Without naming them they fell through to the warm set, so a Class 10
+  // student was fetching 90 kB of Class 11 and 12 questions in the background.
+  [/(^|\/)(year(7|8|9|10|11|12)|streams-(standard|ext)|india-(algebra|calculus|class10|class11|class12|coordinate|foundation|junior-overlay|olympiad|senior|native-helpers))-[^/]*\.js$/, 'question bank for another year'],
+
+  // The previous-year archive is reached only by a student who asks for past
+  // papers. It is behind an import() already; warming it spent 48 kB on the
+  // majority who never open one.
+  [/(^|\/)pyqArchive-[^/]*\.js$/, 'previous-year question archive'],
 
   // A translation catalogue is the same argument in miniature. Every install
   // would otherwise carry every language: an English reader paying to download

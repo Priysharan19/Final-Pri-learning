@@ -79,7 +79,17 @@ import { parseAst } from 'vite';
 import en from '../src/i18n/strings.en.js';
 import hi from '../src/i18n/strings.hi.js';
 import { DEFAULT_LANGUAGE, LANGUAGES, cleanLanguage, isLanguage, pluralCategory } from '../src/i18n/languages.js';
-import { PRECACHE_SKIP, RUNTIME_ONLY, manualChunks } from '../vite.config.js';
+import { PRECACHE_SKIP, ON_DEMAND, CHUNK_GROUPS } from '../vite.config.js';
+
+// The build's chunker moved from a chunkFor() function to a priority-ordered
+// CHUNK_GROUPS table, because manualChunks had silently stopped being honoured
+// under Rolldown. These two read the live rules rather than restating them.
+const chunkFor = (id) => {
+  const p = String(id).replace(/\\/g, '/');
+  return [...CHUNK_GROUPS].sort((a, b) => (b.priority || 0) - (a.priority || 0))
+    .find(g => g.test.test(p))?.name;
+};
+const runtimeOnly = (file) => ON_DEMAND.some(([re]) => re.test(file));
 import { installBrowserEnv, resetStorage } from './backend-check.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
@@ -384,15 +394,15 @@ eq(pluralCategory(NaN, 'hi'), 'other', 'a count that is not a number falls back 
 // ─────────────────────────────────────────────────────────────────────────────
 // 6 · The Hindi catalogue is a chunk of its own, and not in the install
 // ─────────────────────────────────────────────────────────────────────────────
-eq(manualChunks('/repo/client/src/i18n/strings.hi.js'), 'i18n-hi', 'the Hindi catalogue is emitted as its own named chunk');
-eq(manualChunks('/repo/client/src/i18n/strings.en.js'), undefined, 'English is not split out — it is the language the entry must always have');
-eq(manualChunks('/repo/client/src/i18n/index.js'), undefined, 'and neither is the runtime that decides the language');
+eq(chunkFor('/repo/client/src/i18n/strings.hi.js'), 'i18n-hi', 'the Hindi catalogue is emitted as its own named chunk');
+eq(chunkFor('/repo/client/src/i18n/strings.en.js'), undefined, 'English is not split out — it is the language the entry must always have');
+eq(chunkFor('/repo/client/src/i18n/index.js'), undefined, 'and neither is the runtime that decides the language');
 
-ok(RUNTIME_ONLY.test('assets/i18n-hi-D4kd93Xz.js'), 'the built Hindi chunk is marked runtime-only, so the install does not fetch it');
-ok(!RUNTIME_ONLY.test('assets/index-D4kd93Xz.js'), 'the entry is still precached');
-ok(!RUNTIME_ONLY.test('assets/App-D4kd93Xz.js'), 'and so is the app chunk');
-ok(RUNTIME_ONLY.test('assets/pdf-D4kd93Xz.js'), 'the PDF renderer keeps the exemption it already had');
-ok(RUNTIME_ONLY.test('assets/pdf.worker-D4kd93Xz.mjs'), 'and so does its worker');
+ok(runtimeOnly('assets/i18n-hi-D4kd93Xz.js'), 'the built Hindi chunk is marked runtime-only, so the install does not fetch it');
+ok(!runtimeOnly('assets/index-D4kd93Xz.js'), 'the entry is still precached');
+ok(!runtimeOnly('assets/App-D4kd93Xz.js'), 'and so is the app chunk');
+ok(runtimeOnly('assets/pdf-D4kd93Xz.js'), 'the PDF renderer keeps the exemption it already had');
+ok(runtimeOnly('assets/pdf.worker-D4kd93Xz.mjs'), 'and so does its worker');
 ok(!PRECACHE_SKIP.test('assets/i18n-hi-D4kd93Xz.js'),
   'the chunk is still part of the build listing — it is skipped from the install, not from existence');
 
@@ -632,9 +642,9 @@ for (const [file, why] of [
 
 // The glossary is a chunk of its own and out of the install, for the same
 // reason the Hindi catalogue is.
-eq(manualChunks('/repo/client/src/i18n/ncertTerms.js'), 'i18n-terms', 'the glossary is emitted as its own named chunk');
-eq(manualChunks('/repo/client/src/i18n/glossary.js'), undefined, 'while the matcher that uses it stays in the entry');
-ok(RUNTIME_ONLY.test('assets/i18n-terms-D4kd93Xz.js'), 'and the built glossary is left out of the install precache');
+eq(chunkFor('/repo/client/src/i18n/ncertTerms.js'), 'i18n-terms', 'the glossary is emitted as its own named chunk');
+eq(chunkFor('/repo/client/src/i18n/glossary.js'), undefined, 'while the matcher that uses it stays in the entry');
+ok(runtimeOnly('assets/i18n-terms-D4kd93Xz.js'), 'and the built glossary is left out of the install precache');
 const staticTerms = sourceFiles(join(ROOT, 'src')).filter(f => /\bfrom\s*'[^']*ncertTerms\.js'/.test(readFileSync(f, 'utf8')));
 eq(staticTerms.map(f => f.slice(ROOT.length)), [], 'nothing statically imports the glossary — it is reached by import() alone');
 ok(!/^\s*import\s/m.test(read('src/i18n/ncertTerms.js')), 'and the glossary imports nothing, so its chunk is only data');

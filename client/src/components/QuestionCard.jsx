@@ -376,7 +376,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     if (unread > 0) {
       // Presenting two of three pages as the whole of the working would submit
       // an answer the student never wrote.
-      toast(<span>{unread} of {pages.length} pages could not be read — check the working below before marking.</span>);
+      toast(<span>{t('verdict.pdfPagesUnread', { unread, total: pages.length })}</span>);
     }
     const joined = texts.join('\n');
     if (isWorking) { setWorking(joined); setShowWorking(true); }
@@ -1133,7 +1133,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
               {boardAward && (
                 <div className="board-award" style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid var(--line, rgba(128,128,128,.22))' }}>
                   <div className="spread" style={{ alignItems: 'baseline' }}>
-                    <span className="sc-label" style={{ margin: 0 }}>Marked step by step</span>
+                    <span className="sc-label" style={{ margin: 0 }}>{t('verdict.markedStepByStep')}</span>
                     <b style={{ fontVariantNumeric: 'tabular-nums' }}>{boardAward.awarded} / {boardAward.total}</b>
                   </div>
                   {boardAward.rows.map((row, i) => (
@@ -1146,14 +1146,13 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                         {row.why && <span className="muted" style={{ display: 'block', fontSize: 11.5, marginTop: 2, marginLeft: 20 }}>{row.why}</span>}
                       </span>
                       <span className="set-v" style={{ fontVariantNumeric: 'tabular-nums' }}>
-                        <span className="sr-only">{row.earned} of {row.outOf} marks. </span>{row.earned}/{row.outOf}
+                        <span className="sr-only">{t('verdict.rowMarks', { earned: row.earned, total: row.outOf })} </span>{row.earned}/{row.outOf}
                       </span>
                     </div>
                   ))}
                   <p style={{ marginTop: 8, fontSize: 13 }}>{marksSentence(boardAward)}</p>
                   <p className="muted" style={{ fontSize: 11.5, marginTop: 6 }}>
-                    Board-style step marking, worked out from this question's own solution. It follows the convention CBSE
-                    publishes; it is not CBSE's official marking scheme for a past paper.
+                    {t('verdict.boardStyleNote')}
                   </p>
                 </div>
               )}

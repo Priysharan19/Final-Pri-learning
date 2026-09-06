@@ -316,12 +316,12 @@ export default function Practice() {
           <button
             className={`btn btn-sm ${pyqOnly ? 'btn-primary' : 'btn-quiet'}`}
             aria-pressed={pyqOnly}
-            title="Practise only real questions from past JEE and CBSE papers"
+            title={t('practice.pyqOnlyTitle')}
             onClick={() => setPyqOnly(!pyqOnly)}
           >
             {pyqOnly ? 'Past papers only · on' : 'Past papers only'}
           </button>
-          {pyqOnly && <span className="muted">Every question below was set in a real exam and carries the paper it came from.</span>}
+          {pyqOnly && <span className="muted">{t('practice.pyqOnlyNote')}</span>}
         </div>
       )}
 
@@ -348,10 +348,10 @@ export default function Practice() {
         <>
           {serve.question.pyq && (
             <div className="notice" role="note" style={{ marginBottom: 12 }}>
-              <strong>Previous year question</strong> · {serve.question.pyqSource}
+              <strong>{t('practice.pyqBadge')}</strong> · {serve.question.pyqSource}
               {serve.question.pyqArchive?.citations?.length > 0 && (
                 <div className="muted" style={{ marginTop: 4 }}>
-                  Transcribed from {serve.question.pyqArchive.citations.map((c, i) => (
+                  {t('practice.pyqTranscribedFrom')} {serve.question.pyqArchive.citations.map((c, i) => (
                     <React.Fragment key={c.id}>
                       {i > 0 && ' · '}
                       <a href={c.archivedAt || c.url} target="_blank" rel="noreferrer noopener">{c.title}</a>

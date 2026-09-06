@@ -102,15 +102,26 @@ assert.match(practice, /api\.post\('\/practice\/next'/);
 assert.match(practice, /cloud\.updateSubmission\(/);
 assert.match(practice, /assignmentSessionFromSubmission\(/);
 assert.match(practice, /assignmentTargetReached\.current/);
-assert.match(practice, /Retry submission/);
-assert.match(practice, /Teacher feedback/);
+// The copy moved into the string catalogues; the page's job is now to reach for
+// the right key. Both halves are checked, because a page that drops the key and
+// a catalogue that loses the string are different failures with one symptom.
+assert.match(practice, /assignment\.retrySubmission/);
+assert.match(practice, /assignment\.teacherFeedback/);
+for (const catalogue of ['src/i18n/strings.en.js', 'src/i18n/strings.hi.js']) {
+  const src = fs.readFileSync(new URL(`../${catalogue}`, import.meta.url), 'utf8');
+  for (const key of ['assignment.retrySubmission', 'assignment.teacherFeedback']) {
+    assert.ok(src.includes(`'${key}':`), `${catalogue} defines ${key}`);
+  }
+}
 assert.doesNotMatch(practice, /summary:\s*\{[^}]*strokes:/s);
 assert.doesNotMatch(practice, /summary:\s*\{[^}]*answer:/s);
 assert.doesNotMatch(practice, /summary:\s*\{[^}]*steps:/s);
 
 const classesPage = fs.readFileSync(new URL('../src/pages/Classes.jsx', import.meta.url), 'utf8');
 assert.match(classesPage, /AssignmentInboxPanel/);
-assert.match(classesPage, /Offline class packs/);
+assert.match(classesPage, /classes\.offlineTitle/);
+assert.ok(fs.readFileSync(new URL('../src/i18n/strings.en.js', import.meta.url), 'utf8').includes("'classes.offlineTitle':"),
+  'the offline class packs heading is defined in the catalogue');
 
 const classroom = fs.readFileSync(new URL('../src/components/ClassroomPanel.jsx', import.meta.url), 'utf8');
 assert.match(classroom, /assignmentSubmissions\(/);

@@ -74,7 +74,8 @@ const TITLE_KEYS = {
 // than silent because on a slow connection that moment is long enough for a
 // student to wonder whether the tap registered.
 function RouteLoading() {
-  return <p className="muted" role="status" aria-live="polite">Loading…</p>;
+  const t = useT();
+  return <p className="muted" role="status" aria-live="polite">{t('common.loading')}</p>;
 }
 
 export function Logo({ large = false, onClick }) {
