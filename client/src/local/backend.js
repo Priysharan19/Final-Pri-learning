@@ -1292,7 +1292,7 @@ function sanitize(q, row) {
       id: row.id, multipart: true, title: q.title, stem: q.stem, figure: safeFigure(q.figure),
       subtopicName: q.title, difficulty: q.difficulty, diffLabel: 'Structured question',
       marks: q.totalMarks,
-      parts: q.parts.map(pt => ({
+      parts: partsOf(q).map(pt => ({
         key: pt.key, prompt: pt.prompt, answerType: pt.answerType, mcqOptions: pt.mcqOptions,
         inputHint: pt.inputHint, answerPrefix: pt.answerPrefix, answerSuffix: pt.answerSuffix, marks: pt.marks
       })),
@@ -1608,6 +1608,10 @@ function safePayload(src) {
   out.steps = safeSteps(src.steps);
   out.hints = (Array.isArray(src.hints) ? src.hints : []).slice(0, 8).map(h => sanitizeText(h, 500));
   out.solutionText = sanitizeText(src.solutionText, 4000) || undefined;
+  // `multipart` is a promise about the shape of the row: everything that reads
+  // one walks `parts`. A file can set the flag and leave the list off, and the
+  // row that produced used to be a TypeError in History, in the exam room and
+  // in marking. The flag and the list arrive together, or the flag means nothing.
   if (Array.isArray(src.parts)) {
     out.parts = src.parts.slice(0, 20).map(pt => {
       const part = {};
@@ -1621,8 +1625,18 @@ function safePayload(src) {
       return part;
     });
   }
+  if (out.multipart && !Array.isArray(out.parts)) out.parts = [];
   return out.prompt || out.stem ? out : null;
 }
+
+/**
+ * The parts of a structured question, for code that has already decided the
+ * payload is multipart. safePayload guarantees the list on everything that has
+ * come through the import boundary since, but a row this device stored before
+ * that may still be sitting in IndexedDB, and a question that cannot be drawn
+ * is a blank card — not a crash that takes History or the exam room with it.
+ */
+const partsOf = q => (Array.isArray(q?.parts) ? q.parts : []);
 
 const safeSolution = (s) => ({
   steps: safeSteps(s?.steps),
@@ -1632,12 +1646,16 @@ const safeSolution = (s) => ({
   solutionText: sanitizeText(s?.solutionText, 4000) || undefined
 });
 
-function safeExamDetail(rows) {
+// A marked-up detail row names the question it marked, so on a restore its id
+// goes through the same map the questions themselves did; without `ids` — any
+// caller that is not the importer — the id is only sanitised.
+function safeExamDetail(rows, ids = null) {
   if (!Array.isArray(rows)) return null;
+  const questionId = ids ? ids.question : safeId;
   return rows.slice(0, 60).map(src => {
     const d = src && typeof src === 'object' ? src : {};
     const out = {
-      id: safeId(d.id), difficulty: safeInt(d.difficulty, 1, 4, 2),
+      id: questionId(d.id), difficulty: safeInt(d.difficulty, 1, 4, 2),
       subtopicName: safeLabel(d.subtopicName, 120), figure: safeFigure(d.figure),
       correct: !!d.correct, marks: safeInt(d.marks, 0, 40, 0), awarded: safeInt(d.awarded, 0, 40, 0)
     };
@@ -1669,9 +1687,44 @@ function safeExamDetail(rows) {
 }
 
 /**
+ * Fresh ids for the stores a backup cannot safely re-key by itself.
+ *
+ * Most backup stores are keyed by `${pid}:${something}`, so rebuilding the key
+ * around the new profile id is enough to guarantee a restored row lands on the
+ * profile the import just made. `questions`, `exams` and `inks` are keyed by an
+ * id instead, and the id in the file is the one the profile that MADE the backup
+ * is still using. Restoring your own backup on your own iPad therefore used to
+ * `put()` straight over the live row and rewrite its `pid`: the original
+ * profile's History, handwriting archive and papers moved to the copy, and
+ * deleting the copy afterwards destroyed them for good.
+ *
+ * So every id-keyed row is minted a new id here, and one shared map does the
+ * rewriting, so that every reference between restored rows follows it — an
+ * exam's question list and marked-up detail, an ink's question, and the question
+ * a bookmark or an attempt is about. An id the file never declared as a row
+ * still gets an entry, so two rows that pointed at the same missing question
+ * still point at the same thing afterwards.
+ */
+function restoreIds() {
+  const minted = { questions: new Map(), exams: new Map() };
+  const mint = (map, raw) => {
+    const id = safeId(raw);
+    if (!id) return null;
+    if (!map.has(id)) map.set(id, uuid());
+    return map.get(id);
+  };
+  return {
+    question: raw => mint(minted.questions, raw),
+    exam: raw => mint(minted.exams, raw)
+  };
+}
+
+/**
  * The shape each backup store accepts. Keys are re-derived from the values that
  * survived sanitising rather than carried over from the file, so a crafted row
- * cannot choose which profile — or which other row — it lands on.
+ * cannot choose which profile — or which other row — it lands on. `ids` is the
+ * per-import id map above; an id-keyed store must take its key from there and
+ * never from the file.
  */
 const IMPORT_ROWS = {
   ratings: (r, pid) => {
@@ -1718,8 +1771,8 @@ const IMPORT_ROWS = {
       predicted: r.predicted == null ? null : safeInt(r.predicted, 0, 100, 0)
     };
   },
-  bookmarks: (r, pid) => {
-    const questionId = safeId(r.questionId);
+  bookmarks: (r, pid, ids) => {
+    const questionId = ids.question(r.questionId);
     return questionId && { key: `${pid}:${questionId}`, pid, questionId, createdAt: safeTime(r.createdAt) || Date.now() };
   },
   taskProgress: (r, pid) => {
@@ -1729,8 +1782,8 @@ const IMPORT_ROWS = {
       done: safeInt(r.done, 0, 1e5, 0), correct: safeInt(r.correct, 0, 1e5, 0), finishedAt: safeTime(r.finishedAt)
     };
   },
-  attempts: (r, pid) => ({
-    pid, questionId: safeId(r.questionId), subtopic: safeId(r.subtopic) || 'custom',
+  attempts: (r, pid, ids) => ({
+    pid, questionId: ids.question(r.questionId), subtopic: safeId(r.subtopic) || 'custom',
     difficulty: safeInt(r.difficulty, 1, 4, 2), correct: r.correct ? 1 : 0,
     answerGiven: sanitizeText(r.answerGiven, 300), ms: safeInt(r.ms, 0, 1e9, 0),
     hintsUsed: safeInt(r.hintsUsed, 0, 20, 0), mode: sanitizeText(r.mode, 20) || 'practice',
@@ -1747,8 +1800,10 @@ const IMPORT_ROWS = {
     rivalScore: safeInt(r.rivalScore, 0, 100, 0), rival: safeLabel(r.rival, 40),
     ms: safeInt(r.ms, 0, 1e9, 0), createdAt: safeTime(r.createdAt) || Date.now()
   }),
-  inks: (r, pid) => {
-    const id = safeId(r.id);
+  inks: (r, pid, ids) => {
+    // An ink row is filed under the id of the question it was written for, so
+    // it follows the question map rather than getting an id of its own.
+    const id = ids.question(r.id);
     return id && {
       id, pid, strokes: safeStrokes(r.strokes, 4000),
       recognized: sanitizeText(r.recognized, 500) || null, photo: safePhoto(r.photo),
@@ -1756,27 +1811,33 @@ const IMPORT_ROWS = {
       createdAt: safeTime(r.createdAt) || Date.now()
     };
   },
-  questions: (r, pid) => {
-    const id = safeId(r.id);
+  questions: (r, pid, ids) => {
+    const id = ids.question(r.id);
     const payload = safePayload(r.payload);
     return id && payload && {
       id, pid, subtopic: safeId(r.subtopic) || 'custom', difficulty: safeInt(r.difficulty, 1, 4, 2),
       payload, mode: sanitizeText(r.mode, 20) || 'practice',
-      examId: safeId(r.examId), taskId: safeId(r.taskId),
+      examId: ids.exam(r.examId), taskId: safeId(r.taskId),
       answered: r.answered ? 1 : 0, tries: safeInt(r.tries, 0, 9, 0), hintsUsed: safeInt(r.hintsUsed, 0, 20, 0),
-      createdAt: safeTime(r.createdAt) || Date.now()
+      createdAt: safeTime(r.createdAt) || Date.now(),
+      // WP india-exams: an India question is filed under its NCERT chapter and
+      // marked on its section's own grid. Dropping these fields on the way back
+      // in re-graded a restored 100-mark JEE Main paper as 25 marks with no
+      // negative marking, and moved every answer's evidence off the chapter and
+      // onto whichever NSW generator happened to draw the question.
+      ...safeIndiaQuestion(r)
     };
   },
-  exams: (r, pid) => {
-    const id = safeId(r.id);
+  exams: (r, pid, ids) => {
+    const id = ids.exam(r.id);
     return id && {
       id, pid, year: safeInt(r.year, 7, 12, 9), pathway: PATHWAYS[r.pathway] ? r.pathway : null,
       title: safeLabel(r.title, 80) || 'Practice paper', durationMin: safeInt(r.durationMin, 5, 240, 30),
-      questionIds: (Array.isArray(r.questionIds) ? r.questionIds : []).slice(0, 80).map(safeId).filter(Boolean),
+      questionIds: (Array.isArray(r.questionIds) ? r.questionIds : []).slice(0, 80).map(ids.question).filter(Boolean),
       createdAt: safeTime(r.createdAt) || Date.now(), finishedAt: safeTime(r.finishedAt),
       score: r.score == null ? null : safeInt(r.score, -999, 999, 0),
       total: r.total == null ? null : safeInt(r.total, 0, 999, 0),
-      detail: safeExamDetail(r.detail),
+      detail: safeExamDetail(r.detail, ids),
       // WP india-exams: an India paper is only listed and reviewed while it
       // carries its blueprint; a restore that dropped this would make every
       // sat CBSE/JEE/IOQM paper vanish from the India exams page.
@@ -1784,6 +1845,46 @@ const IMPORT_ROWS = {
     };
   }
 };
+
+/**
+ * The India fields a question row carries, rebuilt from the backup.
+ *
+ * `india` is what files the row under an NCERT chapter instead of the generator
+ * that drew it, and it only survives if the chapter still exists in this build —
+ * a chapter id nobody knows any more would put the evidence nowhere. The rest is
+ * what the exam room and the marker read back: which section the question sat
+ * in, what number it was, and the grid it is marked on. Each field is present
+ * only when the file actually had it, so an ordinary NSW question row restores
+ * exactly as it did before.
+ */
+function safeIndiaQuestion(r) {
+  const out = {};
+  const chapter = r.india && typeof r.india === 'object' ? indiaChapter(safeId(r.india.chapterId)) : null;
+  if (chapter) {
+    out.india = {
+      chapterId: chapter.id,
+      track: cleanIndiaTrack(r.india.track, indiaChapterGrade(chapter) || 12),
+      dotpointIndex: indiaDotpointIndex(chapter, r.india.dotpointIndex)
+    };
+  }
+  if (r.indiaExamSection !== undefined && r.indiaExamSection !== null) out.indiaExamSection = sanitizeText(r.indiaExamSection, 8);
+  if (r.indiaExamSectionLabel !== undefined && r.indiaExamSectionLabel !== null) out.indiaExamSectionLabel = safeLabel(r.indiaExamSectionLabel, 80);
+  if (r.indiaExamItem !== undefined && r.indiaExamItem !== null) out.indiaExamItem = sanitizeText(r.indiaExamItem, 40);
+  if (r.examOrder !== undefined && r.examOrder !== null) out.examOrder = safeInt(r.examOrder, 0, 400, 0);
+  if (r.sourceKind !== undefined && r.sourceKind !== null) out.sourceKind = sanitizeText(r.sourceKind, 40);
+  // The marking grid decides what the paper is worth, so it is clamped rather
+  // than trusted: `correct` and `partialPerOption` award marks, `incorrect` is
+  // the negative-marking penalty and is negative or zero on every real grid.
+  if (r.examMarking && typeof r.examMarking === 'object' && !Array.isArray(r.examMarking)) {
+    out.examMarking = {
+      correct: safeInt(r.examMarking.correct, 0, 20, 1),
+      incorrect: safeInt(r.examMarking.incorrect, -20, 0, 0),
+      unanswered: safeInt(r.examMarking.unanswered, -20, 20, 0),
+      partialPerOption: r.examMarking.partialPerOption == null ? null : safeInt(r.examMarking.partialPerOption, 0, 20, 0)
+    };
+  }
+  return out;
+}
 
 function safeIndiaExamMeta(m) {
   const out = {
@@ -2483,17 +2584,22 @@ const routes = {
     const questions = [];
     for (const qid of e.questionIds) {
       const row = await get('questions', qid);
+      // An exam lists question ids; the rows they name can be missing — a
+      // restore whose questions store was truncated, or a half-finished delete.
+      // examFor() has always skipped those, and the printable paper does too:
+      // one lost question must not take the paper it was on with it.
+      if (!row?.payload) continue;
       const q = row.payload;
       if (q.multipart) {
         questions.push({
           multipart: true, stem: q.stem, title: q.title, figure: safeFigure(q.figure),
           subtopicName: q.title, difficulty: q.difficulty,
-          parts: q.parts.map(pt => ({
+          parts: partsOf(q).map(pt => ({
             key: pt.key, prompt: pt.prompt, marks: pt.marks, answerType: pt.answerType, mcqOptions: pt.mcqOptions,
             answerText: displayAnswer({ answerType: pt.answerType, answer: pt.answer, mcqOptions: pt.mcqOptions, answerPrefix: pt.answerPrefix, answerSuffix: pt.answerSuffix }),
             steps: pt.steps
           })),
-          criteria: q.parts.map(pt => ({ mark: pt.marks, text: `Part (${pt.key})` }))
+          criteria: partsOf(q).map(pt => ({ mark: pt.marks, text: `Part (${pt.key})` }))
         });
         continue;
       }
@@ -2519,13 +2625,17 @@ const routes = {
     const detail = [];
     for (const qid of e.questionIds) {
       const row = await get('questions', qid);
+      // A question whose row is gone cannot be marked, and must not be marked
+      // as wrong either: it contributes neither marks awarded nor marks
+      // available, so the score is out of what was actually there to answer.
+      if (!row?.payload) continue;
       const q = row.payload;
 
       // ── Structured multipart question: mark each part on its own marks ──
       if (q.multipart) {
         const partsOut = [];
         let qMarks = 0, qAwarded = 0, allCorrect = true;
-        for (const part of q.parts) {
+        for (const part of partsOf(q)) {
           const given = answers[`${qid}::${part.key}`];
           const synth = { answerType: part.answerType, answer: part.answer, mcqOptions: part.mcqOptions, traps: part.traps };
           const result = given === undefined || given === null || given === '' ? { correct: false } : checkAnswer(synth, given);
@@ -3038,7 +3148,7 @@ const routes = {
     return {
       question: sanitize(q, row),
       solution: q.multipart
-        ? { parts: q.parts.map(pt => ({ key: pt.key, answerText: displayAnswer({ answerType: pt.answerType, answer: pt.answer, mcqOptions: pt.mcqOptions }), steps: pt.steps })) }
+        ? { parts: partsOf(q).map(pt => ({ key: pt.key, answerText: displayAnswer({ answerType: pt.answerType, answer: pt.answer, mcqOptions: pt.mcqOptions }), steps: pt.steps })) }
         : { steps: q.steps, answerText: displayAnswer(q), criteria: criteriaFor(q) },
       ink: ink ? { strokes: ink.strokes || [], recognized: ink.recognized, scribble: ink.scribble || null, photo: safePhoto(ink.photo) } : null
     };
@@ -3076,6 +3186,10 @@ const routes = {
     await put('profiles', prof);
 
     const stores = body.stores && typeof body.stores === 'object' ? body.stores : {};
+    // One map for the whole import, so a question, the exam that lists it, the
+    // handwriting written on it and the bookmark that marks it all arrive under
+    // the same new id — and none of them under an id this device already uses.
+    const ids = restoreIds();
     let rows = 0;
     for (const st of BACKUP_STORES) {
       const shape = IMPORT_ROWS[st];
@@ -3083,7 +3197,7 @@ const routes = {
       for (const raw of src) {
         if (!raw || typeof raw !== 'object' || Array.isArray(raw)) continue;
         let row = null;
-        try { row = shape(raw, newPid); } catch { row = null; }
+        try { row = shape(raw, newPid, ids); } catch { row = null; }
         if (!row) continue;
         try {
           if (AUTO_ID_STORES.includes(st)) await add(st, row);
@@ -3259,13 +3373,47 @@ export async function finishIndiaExamEvidence(pct) {
 // smart-practice call, a retry from History and a teacher task all meet the same
 // rule on the same device-local counter. The route bodies stay pure builders.
 // Nothing is counted until the route has actually produced a question or paper.
-async function entitlementGate(method, pattern, body) {
+
+/**
+ * Which India track a request will actually be served from.
+ *
+ * The gate has to ask the same question the route is about to answer, not what
+ * the request looks like. A request with a `taskId` used to be exempt from the
+ * JEE Advanced check on the grounds that a task is something a teacher set —
+ * but the shipped Tasks page lets a student set their own, so "has a taskId"
+ * bought the track for free. `null` means nothing on this request resolves to
+ * an India track that needs checking.
+ */
+async function resolvedIndiaTrack(profile, key, body, params) {
+  if (key === 'POST /history/:id/retry') {
+    // A retry re-draws the question that is already in History, which keeps its
+    // own track — including one earned during a subscription that has lapsed.
+    const row = await get('questions', params?.id).catch(() => null);
+    if (!row || row.pid !== profile.id || !row.india) return null;
+    return cleanIndiaTrack(row.india.track, profile.year);
+  }
+  if (key !== 'POST /practice/next') return null;
+  if (!body?.taskId) return cleanIndiaTrack(body?.track || profile.indiaTrack, profile.year);
+  const task = await get('tasks', body.taskId).catch(() => null);
+  const targets = Array.isArray(task?.targets) ? task.targets : [];
+  if (!targets.length) return null;
+  // A task serves one target per question and works through them in turn, so a
+  // task holding a JEE Advanced target is a JEE Advanced task from the first
+  // question: the gate reads the whole list rather than only today's slot.
+  for (const target of targets) {
+    const chapter = indiaChapter(target?.chapterId);
+    const grade = (chapter && indiaChapterGrade(chapter)) || profile.year;
+    if (cleanIndiaTrack(target?.track || profile.indiaTrack, grade) === 'jee-advanced') return 'jee-advanced';
+  }
+  return null;
+}
+
+async function entitlementGate(method, pattern, body, params) {
   const key = `${method} ${pattern}`;
   if (key === 'POST /practice/next' || key === 'POST /history/:id/retry') {
     const p = await requireProfile();
     await assertPracticeAllowed(p);
-    if (key === 'POST /practice/next' && p.course === 'in' && !body?.taskId &&
-      cleanIndiaTrack(body?.track || p.indiaTrack, p.year) === 'jee-advanced') {
+    if (p.course === 'in' && await resolvedIndiaTrack(p, key, body, params) === 'jee-advanced') {
       await requireCapability(p, ENTITLEMENTS.JEE_ADVANCED);
     }
     return async result => {
@@ -3285,7 +3433,7 @@ async function entitlementGate(method, pattern, body) {
 }
 
 async function runGated(method, pattern, handler, body, params) {
-  const settle = await entitlementGate(method, pattern, body);
+  const settle = await entitlementGate(method, pattern, body, params);
   const result = await handler(body, params);
   return settle ? settle(result) : result;
 }

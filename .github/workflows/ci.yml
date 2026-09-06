@@ -55,6 +55,11 @@ jobs:
           grep -Fq 'PDF WORKING: PASS — 25/25 checks' suites.log
           grep -Fq 'MCQ DISTINCTNESS: PASS — 14/14 checks' suites.log
           grep -Fq 'ENTITLEMENT ENFORCEMENT: PASS — 59/59 checks' suites.log
+          grep -Fq 'JEE ADVANCED GATE: PASS — 27/27 checks' suites.log
+          grep -Fq 'RESTORE FIDELITY: PASS — 45/45 checks' suites.log
+          grep -Fq 'STREAK CALENDAR: PASS — 19/19 checks' suites.log
+          grep -Fq 'BAD INPUT: PASS — 38/38 checks' suites.log
+          grep -Fq 'CLOUD SYNC ACK: PASS — 39/39 checks' suites.log
           grep -Fq 'PASS — Grade 9 Ganita Manjari: 1280 seeded forms (1000 numeric handwriting-ready, 280 conceptual).' suites.log
           grep -Fq 'PASS — 8/8 chapters, 200/200 uploaded pages, 42/42 formal exercise sections and 293/293 formal exercise prompts represented and verified.' suites.log
           if grep -Fq 'not measured:' suites.log; then
@@ -73,6 +78,10 @@ jobs:
           node client/test/india-practice-availability-check.mjs
           node client/test/entitlement-check.mjs
           node client/test/sync-contract-check.mjs
+          # Both of these guard the offline-first backup and cloud-sync paths and
+          # were not being run anywhere in CI.
+          node client/test/restore-durability-check.mjs
+          node client/test/cloud-sync-worker-check.mjs
           node client/test/cloud-session-refresh-check.mjs
           node client/test/account-action-boundary-check.mjs
           node client/test/india-exam-blueprint-check.mjs

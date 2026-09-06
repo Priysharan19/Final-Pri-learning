@@ -1,4 +1,4 @@
-import { byIndex, get, wipeProfile } from './idb.js';
+import { byIndex, get, rawByIndex, wipeProfile } from './idb.js';
 import { currentPid, setCurrentPid } from './store.js';
 
 export const BACKUP_FORMAT = 'pri-learning-backup';
@@ -101,13 +101,67 @@ async function rollbackProfiles(ids, previousPid) {
   }
 }
 
-async function verifyRestore(pid, expected) {
-  if (!(await get('profiles', pid))) return false;
-  for (const store of BACKUP_PROFILE_STORES) {
-    const rows = await byIndex(store, 'pid', pid);
-    if (rows.length !== expected.counts[store]) return false;
+// The three backup stores keyed by an id rather than by `${pid}:${something}`.
+// Every other store rebuilds its key around the profile being staged, so a
+// restored row physically cannot land on a profile that already exists. These
+// three can: their key is an id that came out of the file, and the file was
+// written by a profile that is very likely still on this device. A restore that
+// reused one would move that row — a question and its History entry, a page of
+// handwriting, a whole exam — from its owner to the staged copy.
+const ID_KEYED_STORES = Object.freeze(['questions', 'exams', 'inks']);
+
+/**
+ * Which rows of the id-keyed stores each existing profile owns.
+ *
+ * Read through `rawByIndex` so a profile nobody is signed in to — whose rows are
+ * ciphertext without its password — is still accounted for: the owning id is an
+ * index and is in the clear, which is all this needs. Only keys are kept; no row
+ * body is read, copied or retained.
+ */
+async function ownershipCensus(pids) {
+  const census = new Map();
+  for (const pid of pids) {
+    const owned = {};
+    for (const store of ID_KEYED_STORES) {
+      const rows = await rawByIndex(store, 'pid', pid).catch(() => []);
+      owned[store] = new Set(rows.map(row => row?.id ?? row?.key).filter(key => key !== undefined && key !== null));
+    }
+    census.set(pid, owned);
+  }
+  return census;
+}
+
+/** True when every profile that existed before the restore still owns exactly what it did. */
+async function ownershipUnchanged(before) {
+  const after = await ownershipCensus(before.keys());
+  for (const [pid, owned] of before) {
+    const now = after.get(pid);
+    for (const store of ID_KEYED_STORES) {
+      if (now[store].size !== owned[store].size) return false;
+      for (const key of owned[store]) if (!now[store].has(key)) return false;
+    }
   }
   return true;
+}
+
+/**
+ * The staged profile holds everything the file declared, and — the part row
+ * counting cannot see — it took none of it from a profile that was already here.
+ * A stolen row counts as a restored row, so a restore that emptied the original
+ * profile used to report itself verified.
+ */
+async function verifyRestore(pid, expected, ownedBefore) {
+  if (!(await get('profiles', pid))) return 'incomplete';
+  for (const store of BACKUP_PROFILE_STORES) {
+    const rows = await byIndex(store, 'pid', pid);
+    if (rows.length !== expected.counts[store]) return 'incomplete';
+  }
+  // Reported separately from a short restore, because the two need different
+  // things said to the person in front of the iPad. A short restore leaves what
+  // was already here untouched. A restore that moved somebody's rows has already
+  // changed data this guard did not stage and cannot put back, so telling them
+  // their existing data is unchanged would be a promise this code cannot keep.
+  return (await ownershipUnchanged(ownedBefore)) ? 'ok' : 'ownership-moved';
 }
 
 /**
@@ -122,6 +176,9 @@ export async function restoreBackupSafely(dispatch, body) {
   const expected = inspectBackupEnvelope(body);
   const previousPid = currentPid();
   const before = await profileIds(dispatch);
+  // Taken before the first write, because it is the only thing that can prove
+  // afterwards that the restore added a profile rather than moving one.
+  const ownedBefore = await ownershipCensus(before);
   let result;
 
   try {
@@ -139,12 +196,18 @@ export async function restoreBackupSafely(dispatch, body) {
   const restoredId = result?.user?.id;
   const identityOk = !!restoredId && added.length === 1 && added[0] === restoredId;
   const rowCountOk = Number(result?.rows) === expected.rows;
-  const storedOk = identityOk && await verifyRestore(restoredId, expected).catch(() => false);
+  const stored = identityOk ? await verifyRestore(restoredId, expected, ownedBefore).catch(() => 'incomplete') : 'incomplete';
 
-  if (!identityOk || !rowCountOk || !storedOk) {
+  if (!identityOk || !rowCountOk || stored !== 'ok') {
     const cleanup = added.length ? added : (restoredId ? [restoredId] : []);
     if (cleanup.length) await rollbackProfiles(cleanup, previousPid);
     else setCurrentPid(previousPid || null);
+    if (stored === 'ownership-moved') {
+      throw restoreFailure(
+        'The restore was stopped because it would have taken records that belong to a profile already on this device. The partly restored profile was removed. Check that profile before restoring again.',
+        'RESTORE_OWNERSHIP_CONFLICT'
+      );
+    }
     throw restoreFailure(
       'The backup could not be restored completely. No partial restored profile was kept; your existing local data is unchanged.',
       'RESTORE_INCOMPLETE'

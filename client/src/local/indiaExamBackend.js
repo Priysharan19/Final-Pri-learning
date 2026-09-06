@@ -25,7 +25,8 @@ import {
 } from '../engine/indiaExams.js';
 import { composeIndiaPaper, composerNotes, answerText } from '../engine/indiaExamComposer.js';
 import { examStepMeta, recordIndiaExamEvidence, finishIndiaExamEvidence } from './backend.js';
-import { assertExamAllowed, examAllowance, recordExamSimulation } from './entitlementGate.js';
+import { assertExamAllowed, examAllowance, recordExamSimulation, requireCapability } from './entitlementGate.js';
+import { ENTITLEMENTS } from '../platform/entitlements.js';
 
 function error(message, status = 400, code = 'INDIA_EXAM_ERROR') {
   return Object.assign(new Error(message), { status, code });
@@ -496,6 +497,15 @@ export async function dispatchIndiaExam(profile, method, path, body = {}) {
   if (!profile?.id || profile.course !== 'in') throw error('India exam routing requires an India profile.', 400, 'INDIA_PROFILE_REQUIRED');
   if (path === '/exams' && method === 'GET') return listExams(profile);
   if (path === '/exams' && method === 'POST') {
+    // A JEE Advanced paper is JEE Advanced content, so it meets the track's own
+    // gate before the free-simulation window is even consulted: a free profile
+    // on that track is told the track is Premium, which is the true reason, and
+    // not that it has used up a simulation it was never entitled to. The paper
+    // is composed from `profile.indiaTrack`, so that — not the request — is what
+    // decides. createIndiaExam() resolves the track the same way.
+    if (cleanIndiaTrack(profile.indiaTrack || 'cbse', Number(profile.year)) === 'jee-advanced') {
+      await requireCapability(profile, ENTITLEMENTS.JEE_ADVANCED);
+    }
     // The free tier allows one exam simulation per 30 days; Premium lifts it.
     // Nothing is counted until a paper has actually been composed.
     await assertExamAllowed(profile);
