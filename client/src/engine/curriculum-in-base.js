@@ -42,7 +42,33 @@
 //
 // `maps: X` is sugar for "X covers every dot point at every difficulty", and
 // `native: true` the same with the chapter's own id.
+//
+// ── How much a chapter is worth, and where that number comes from ───────────
+// Every chapter used to declare a hand-written weight in the 9–14 band. That
+// band is the NSW convention — nine subtopics a year, summing to 100 — and it
+// meant nothing here: Class X's fourteen chapters summed to 148 against a real
+// 80-mark paper. Where CBSE publishes a unit weightage, the chapter's weight is
+// now read from it (`indiaExamMarks.js`) and the declaration says `BOARD`:
+//
+//   C('c10-triangles', 'Triangles', 'Geometry', BOARD, [...])
+//
+// Triangles then weighs 7.5, because Geometry is 15 marks over two chapters,
+// and the fourteen Class X chapters sum to exactly the paper's 80. Classes VII
+// to IX, the olympiad ladder and anything else no published paper weighs keep
+// their authored number, which is an editorial emphasis and is never described
+// to a student as an examination weight. The two scales never meet: a practice
+// scope is one class (or, on the JEE tracks, Classes XI and XII, which are both
+// board-weighted), and the ranker normalises a candidate list against its own
+// average before using it.
 // ─────────────────────────────────────────────────────────────────────────────
+import { indiaExamFieldsFor } from './indiaExamMarks.js';
+
+/**
+ * "This chapter's weight is the published paper's, not a number typed here."
+ * A chapter declaring BOARD must be in a blueprint unit; one that is not is a
+ * load-time error rather than a silent zero.
+ */
+const BOARD = null;
 
 export const IN_STRANDS = [
   'Number & Arithmetic',
@@ -70,6 +96,8 @@ export const OWN_GENERATOR = /^(c(?:7|8|9|10|11|12)|olymp)-/;
 
 /**
  * C(id, name, strand, weight, dotpoints, link)
+ *   weight      — BOARD when a published CBSE unit weighs this chapter, so the
+ *                 paper decides; otherwise the authored editorial emphasis
  *   link.native — a generator authored against this chapter's own id, covering
  *                 every dot point (the topic exists here and in no NSW syllabus)
  *   link.maps   — one existing generator covering every dot point
@@ -83,7 +111,12 @@ const C = (id, name, strand, weight, dotpoints, link = {}) => {
   else if (link.maps) covers = [{ gen: link.maps, dp: all }];
   const resolved = covers.map(c => ({ gen: c.gen, dp: [...c.dp], diff: c.diff ? [...c.diff] : [...DIFFICULTIES] }));
   return {
-    id, name, strand, weight, dotpoints,
+    id, name, strand, dotpoints,
+    // `weight` is the paper's marks where a paper weighs this chapter, and the
+    // authored emphasis where none does; `examMarks` and `examSource` say which
+    // of the two the student is looking at, so no surface can present an
+    // editorial number as an examination weight.
+    ...indiaExamFieldsFor(id, weight),
     // Native means at least one generator was written for this curriculum
     // rather than borrowed from the NSW banks.
     native: resolved.some(c => OWN_GENERATOR.test(c.gen)),
@@ -336,72 +369,72 @@ export const IN_CURRICULUM = [
     title: 'Class 10',
     caption: 'NCERT Class 10 — the board year: quadratics, AP, similarity, trigonometry',
     chapters: [
-      C('c10-real-numbers', 'Real Numbers', 'Number Theory', 10, [
+      C('c10-real-numbers', 'Real Numbers', 'Number Theory', BOARD, [
         "Apply Euclid's division lemma and the fundamental theorem of arithmetic",
         'Find HCF and LCM by prime factorisation and use HCF × LCM = product',
         'Prove that a given surd is irrational'
       ], { native: true }),
-      C('c10-polynomials', 'Polynomials', 'Algebra', 11, [
+      C('c10-polynomials', 'Polynomials', 'Algebra', BOARD, [
         'Relate the zeroes of a quadratic to its coefficients',
         'Find a polynomial from its zeroes',
         'Divide polynomials and apply the division algorithm'
       ], { covers: [{ gen: 'c10-polynomial-zeroes', dp: [0], diff: [1, 2] }, { gen: 'c10-polynomial-zeroes', dp: [1], diff: [3, 4] }, { gen: 'y11-polynomials', dp: [2], diff: [2, 3] }] }),
-      C('c10-pair-linear-equations', 'Pair of Linear Equations in Two Variables', 'Algebra', 12, [
+      C('c10-pair-linear-equations', 'Pair of Linear Equations in Two Variables', 'Algebra', BOARD, [
         'Solve a pair of linear equations by substitution and elimination',
         'Decide consistency from the ratios of the coefficients',
         'Set up and solve word problems as a pair of equations'
       ], { maps: 'y10-simeq' }),
-      C('c10-quadratic-equations', 'Quadratic Equations', 'Algebra', 13, [
+      C('c10-quadratic-equations', 'Quadratic Equations', 'Algebra', BOARD, [
         'Solve a quadratic by factorisation and by completing the square',
         'Solve using the quadratic formula and interpret the discriminant',
         'Set up and solve word problems leading to a quadratic'
       ], { maps: 'y10-quadratics' }),
-      C('c10-arithmetic-progressions', 'Arithmetic Progressions', 'Algebra', 11, [
+      C('c10-arithmetic-progressions', 'Arithmetic Progressions', 'Algebra', BOARD, [
         'Find the nth term of an arithmetic progression',
         'Find the sum of the first n terms',
         'Solve word problems set as an arithmetic progression'
       ], { covers: [{ gen: 'c10-arithmetic-progressions', dp: [0], diff: [1, 3] }, { gen: 'y12-series', dp: [0], diff: [1] }, { gen: 'c10-arithmetic-progressions', dp: [1], diff: [2] }, { gen: 'y12-series', dp: [1], diff: [2] }, { gen: 'c10-arithmetic-progressions', dp: [2], diff: [4] }] }),
-      C('c10-triangles', 'Triangles', 'Geometry', 12, [
+      C('c10-triangles', 'Triangles', 'Geometry', BOARD, [
         'Apply the basic proportionality (Thales) theorem',
         'Prove and use the criteria for similar triangles',
         'Relate the areas of similar triangles to their sides'
       ], { maps: 'y10-similarity' }),
-      C('c10-coordinate-geometry', 'Coordinate Geometry', 'Coordinate Geometry', 10, [
+      C('c10-coordinate-geometry', 'Coordinate Geometry', 'Coordinate Geometry', BOARD, [
         'Find the distance between two points',
         'Find a point dividing a segment in a given ratio',
         'Find the area of a triangle from its vertices'
       ], { covers: [{ gen: 'c10-coordinate-geometry', dp: [0], diff: [1] }, { gen: 'c10-coordinate-geometry', dp: [1], diff: [2] }, { gen: 'c10-coordinate-geometry', dp: [2], diff: [3, 4] }] }),
-      C('c10-trigonometry', 'Introduction to Trigonometry', 'Trigonometry', 12, [
+      C('c10-trigonometry', 'Introduction to Trigonometry', 'Trigonometry', BOARD, [
         'Define the trigonometric ratios of an acute angle',
         'Use the exact ratios of 0°, 30°, 45°, 60° and 90°',
         'Prove and apply trigonometric identities'
       ], { covers: [{ gen: 'y9-trig', dp: [0], diff: [1, 2, 3] }, { gen: 'y11-trigfunc', dp: [1], diff: [1, 2] }, { gen: 'y11-trigfunc', dp: [2], diff: [4] }] }),
-      C('c10-trig-applications', 'Some Applications of Trigonometry', 'Trigonometry', 10, [
+      C('c10-trig-applications', 'Some Applications of Trigonometry', 'Trigonometry', BOARD, [
         'Solve heights and distances using angles of elevation',
         'Solve problems using angles of depression',
         'Solve two-observer and two-stage height problems'
       ], { maps: 'y10-trig' }),
-      C('c10-circles', 'Circles', 'Geometry', 9, [
+      C('c10-circles', 'Circles', 'Geometry', BOARD, [
         'Use the tangent-radius perpendicularity property',
         'Apply the equal-tangents-from-an-external-point property',
         'Solve problems combining tangents and chords'
       ], { native: true }),
-      C('c10-areas-circles', 'Areas Related to Circles', 'Mensuration', 9, [
+      C('c10-areas-circles', 'Areas Related to Circles', 'Mensuration', BOARD, [
         'Find the area and perimeter of a sector',
         'Find the area of a segment of a circle',
         'Find areas of combinations of plane figures'
       ], { covers: [{ gen: 'c10-areas-circles', dp: [0], diff: [1, 2] }, { gen: 'c10-areas-circles', dp: [1], diff: [3] }, { gen: 'c10-areas-circles', dp: [2], diff: [4] }] }),
-      C('c10-surface-volume', 'Surface Areas and Volumes', 'Mensuration', 10, [
+      C('c10-surface-volume', 'Surface Areas and Volumes', 'Mensuration', BOARD, [
         'Surface area of a combination of solids',
         'Volume of a combination of solids',
         'Solve problems where one solid is recast as another'
       ], { covers: [{ gen: 'y9-surface-area', dp: [0], diff: [3] }, { gen: 'c10-surface-volume-combo', dp: [1], diff: [1, 2] }, { gen: 'c10-surface-volume-combo', dp: [2], diff: [3, 4] }] }),
-      C('c10-statistics', 'Statistics', 'Statistics & Probability', 10, [
+      C('c10-statistics', 'Statistics', 'Statistics & Probability', BOARD, [
         'Find the mean of grouped data by the direct and assumed-mean methods',
         'Find the mode and median of grouped data',
         'Read a cumulative frequency (ogive) curve'
       ], { covers: [{ gen: 'c10-statistics', dp: [0], diff: [1] }, { gen: 'y10-stats', dp: [0], diff: [1] }, { gen: 'c10-statistics', dp: [1], diff: [2, 3] }, { gen: 'c10-statistics', dp: [2], diff: [4] }] }),
-      C('c10-probability', 'Probability', 'Statistics & Probability', 9, [
+      C('c10-probability', 'Probability', 'Statistics & Probability', BOARD, [
         'Find the theoretical probability of a single event',
         'Use the complement of an event',
         'Solve problems on cards, dice and coloured balls'
@@ -413,72 +446,72 @@ export const IN_CURRICULUM = [
     title: 'Class 11',
     caption: 'NCERT Class 11 — the JEE foundation year',
     chapters: [
-      C('c11-sets', 'Sets', 'Reasoning & Proof', 8, [
+      C('c11-sets', 'Sets', 'Reasoning & Proof', BOARD, [
         'Use set notation, subsets, power sets and the universal set',
         'Take unions, intersections, differences and complements',
         'Apply the inclusion–exclusion formula for two and three sets'
       ], { native: true }),
-      C('c11-relations-functions', 'Relations and Functions', 'Algebra', 10, [
+      C('c11-relations-functions', 'Relations and Functions', 'Algebra', BOARD, [
         'Find the Cartesian product and represent a relation',
         'Determine the domain and range of a function',
         'Recognise and sketch the standard real functions'
       ], { maps: 'y11-functions' }),
-      C('c11-trig-functions', 'Trigonometric Functions', 'Trigonometry', 13, [
+      C('c11-trig-functions', 'Trigonometric Functions', 'Trigonometry', BOARD, [
         'Convert between degrees and radians and use the unit circle',
         'Apply compound-angle, double-angle and product-to-sum identities',
         'Find the general solution of a trigonometric equation'
       ], { covers: [{ gen: 'y11-trigfunc', dp: [0], diff: [2] }, { gen: 'me11-trigid', dp: [1] }, { gen: 'me12-trigeq', dp: [2] }] }),
-      C('c11-complex-numbers', 'Complex Numbers and Quadratic Equations', 'Algebra', 11, [
+      C('c11-complex-numbers', 'Complex Numbers and Quadratic Equations', 'Algebra', BOARD, [
         'Operate on complex numbers and find modulus and conjugate',
         'Write a complex number in polar form and use the argument',
         'Solve quadratic equations with complex roots'
       ], { maps: 'mex-complex' }),
-      C('c11-linear-inequalities', 'Linear Inequalities', 'Algebra', 8, [
+      C('c11-linear-inequalities', 'Linear Inequalities', 'Algebra', BOARD, [
         'Solve a linear inequality in one variable and graph the solution',
         'Solve a system of linear inequalities in one variable',
         'Graph the solution region of linear inequalities in two variables'
       ], { native: true }),
-      C('c11-permutations-combinations', 'Permutations and Combinations', 'Combinatorics', 12, [
+      C('c11-permutations-combinations', 'Permutations and Combinations', 'Combinatorics', BOARD, [
         'Apply the fundamental principle of counting',
         'Count arrangements with and without repetition and with restrictions',
         'Count selections and apply the standard combination identities'
       ], { maps: 'me11-comb' }),
-      C('c11-binomial-theorem', 'Binomial Theorem', 'Combinatorics', 11, [
+      C('c11-binomial-theorem', 'Binomial Theorem', 'Combinatorics', BOARD, [
         'Expand a binomial using the binomial theorem',
         'Find a general term and a specified term of an expansion',
         'Find the middle term and the term independent of x'
       ], { native: true }),
-      C('c11-sequences-series', 'Sequences and Series', 'Algebra', 11, [
+      C('c11-sequences-series', 'Sequences and Series', 'Algebra', BOARD, [
         'Find the nth term and sum of an arithmetic progression',
         'Find the nth term and sum of a geometric progression, finite and infinite',
         'Use arithmetic, geometric and harmonic means and standard sums'
       ], { covers: [{ gen: 'y12-series', dp: [0], diff: [1, 2] }, { gen: 'y12-series', dp: [1], diff: [3, 4] }, { gen: 'c11-sequence-means', dp: [2] }] }),
-      C('c11-straight-lines', 'Straight Lines', 'Coordinate Geometry', 11, [
+      C('c11-straight-lines', 'Straight Lines', 'Coordinate Geometry', BOARD, [
         'Find the slope and the equation of a line in every standard form',
         'Find the angle between two lines and conditions for parallel and perpendicular',
         'Find the distance from a point to a line and between parallel lines'
       ], { maps: 'y11-lines' }),
-      C('c11-conic-sections', 'Conic Sections', 'Coordinate Geometry', 12, [
+      C('c11-conic-sections', 'Conic Sections', 'Coordinate Geometry', BOARD, [
         'Find the centre, radius and equation of a circle',
         'Find the focus, directrix and latus rectum of a parabola',
         'Find the foci, axes and eccentricity of an ellipse and a hyperbola'
       ], { native: true }),
-      C('c11-3d-introduction', 'Introduction to Three Dimensional Geometry', 'Vectors & 3D', 7, [
+      C('c11-3d-introduction', 'Introduction to Three Dimensional Geometry', 'Vectors & 3D', BOARD, [
         'Locate a point by its coordinates in three dimensions',
         'Find the distance between two points in space',
         'Apply the section formula in three dimensions'
       ], { native: true }),
-      C('c11-limits-derivatives', 'Limits and Derivatives', 'Calculus', 13, [
+      C('c11-limits-derivatives', 'Limits and Derivatives', 'Calculus', BOARD, [
         'Evaluate limits algebraically and use the standard trigonometric limits',
         'Find a derivative from first principles',
         'Differentiate polynomials, and products and quotients'
       ], { maps: 'y11-diff' }),
-      C('c11-statistics', 'Statistics', 'Statistics & Probability', 9, [
+      C('c11-statistics', 'Statistics', 'Statistics & Probability', BOARD, [
         'Find the mean deviation about the mean and median',
         'Find the variance and standard deviation of grouped and ungrouped data',
         'Compare two data sets by the coefficient of variation'
       ], { covers: [{ gen: 'c11-statistics', dp: [0], diff: [1] }, { gen: 'c11-statistics', dp: [1], diff: [2, 3] }, { gen: 'y10-stats', dp: [1], diff: [2] }, { gen: 'c11-statistics', dp: [2], diff: [4] }] }),
-      C('c11-probability', 'Probability', 'Statistics & Probability', 10, [
+      C('c11-probability', 'Probability', 'Statistics & Probability', BOARD, [
         'Describe a sample space and events for a random experiment',
         'Use the addition rule and mutually exclusive events',
         'Find probabilities of compound events'
@@ -490,67 +523,67 @@ export const IN_CURRICULUM = [
     title: 'Class 12',
     caption: 'NCERT Class 12 — calculus, matrices, vectors and the board exam',
     chapters: [
-      C('c12-relations-functions', 'Relations and Functions', 'Algebra', 9, [
+      C('c12-relations-functions', 'Relations and Functions', 'Algebra', BOARD, [
         'Classify relations as reflexive, symmetric and transitive',
         'Determine whether a function is one-one, onto or a bijection',
         'Compose functions and find an inverse function'
       ], { covers: [{ gen: 'c12-relations-equivalence', dp: [0] }, { gen: 'me11-functions', dp: [1], diff: [2] }, { gen: 'me11-functions', dp: [2], diff: [1, 3, 4] }] }),
-      C('c12-inverse-trigonometric', 'Inverse Trigonometric Functions', 'Trigonometry', 9, [
+      C('c12-inverse-trigonometric', 'Inverse Trigonometric Functions', 'Trigonometry', BOARD, [
         'State the domain, range and principal value branch of each inverse ratio',
         'Evaluate expressions involving inverse trigonometric functions',
         'Apply the standard inverse trigonometric identities'
       ], { maps: 'me11-inversetrig' }),
-      C('c12-matrices', 'Matrices', 'Algebra', 11, [
+      C('c12-matrices', 'Matrices', 'Algebra', BOARD, [
         'Add, subtract and multiply matrices and use the transpose',
         'Recognise symmetric and skew-symmetric matrices',
         'Find an inverse by elementary row operations'
       ], { native: true }),
-      C('c12-determinants', 'Determinants', 'Algebra', 11, [
+      C('c12-determinants', 'Determinants', 'Algebra', BOARD, [
         'Evaluate a determinant and use its properties',
         'Find minors, cofactors and the adjugate, and the area of a triangle',
         'Solve a system of linear equations by the matrix method'
       ], { native: true }),
-      C('c12-continuity-differentiability', 'Continuity and Differentiability', 'Calculus', 13, [
+      C('c12-continuity-differentiability', 'Continuity and Differentiability', 'Calculus', BOARD, [
         'Test continuity and differentiability at a point',
         'Differentiate composite, implicit, inverse-trigonometric and logarithmic functions',
         "Apply Rolle's theorem and the mean value theorem"
       ], { covers: [{ gen: 'c12-continuity-mvt', dp: [0], diff: [1, 2] }, { gen: 'y12-diff', dp: [1] }, { gen: 'c12-continuity-mvt', dp: [2], diff: [3, 4] }] }),
-      C('c12-applications-derivatives', 'Application of Derivatives', 'Calculus', 12, [
+      C('c12-applications-derivatives', 'Application of Derivatives', 'Calculus', BOARD, [
         'Find rates of change and approximations',
         'Find intervals of increase and decrease, and tangents and normals',
         'Find local and absolute maxima and minima and solve optimisation problems'
       ], { maps: 'y12-appdiff' }),
-      C('c12-integrals', 'Integrals', 'Calculus', 14, [
+      C('c12-integrals', 'Integrals', 'Calculus', BOARD, [
         'Integrate by substitution, by parts and by partial fractions',
         'Evaluate a definite integral and use the fundamental theorem',
         'Apply the properties of definite integrals'
       ], { covers: [{ gen: 'mex-integration', dp: [0], diff: [1, 3, 4] }, { gen: 'y12-integration', dp: [0], diff: [1] }, { gen: 'y12-integration', dp: [1], diff: [2] }, { gen: 'mex-integration', dp: [1], diff: [2] }, { gen: 'c12-integral-properties', dp: [2] }] }),
-      C('c12-applications-integrals', 'Application of Integrals', 'Calculus', 9, [
+      C('c12-applications-integrals', 'Application of Integrals', 'Calculus', BOARD, [
         'Find the area under a curve between two ordinates',
         'Find the area between two curves',
         'Find areas bounded by a line and a conic'
       ], { native: true }),
-      C('c12-differential-equations', 'Differential Equations', 'Calculus', 11, [
+      C('c12-differential-equations', 'Differential Equations', 'Calculus', BOARD, [
         'State the order and degree and verify a solution',
         'Solve by separating the variables and by homogeneous substitution',
         'Solve a linear differential equation by an integrating factor'
       ], { native: true }),
-      C('c12-vector-algebra', 'Vector Algebra', 'Vectors & 3D', 10, [
+      C('c12-vector-algebra', 'Vector Algebra', 'Vectors & 3D', BOARD, [
         'Add vectors and find magnitude, direction cosines and unit vectors',
         'Find and use the scalar (dot) product and the angle between vectors',
         'Find and use the vector (cross) product and its geometric meaning'
       ], { covers: [{ gen: 'c12-vector-algebra', dp: [0], diff: [1, 2] }, { gen: 'mex-vectors', dp: [0], diff: [1] }, { gen: 'mex-vectors', dp: [1], diff: [2, 3, 4] }, { gen: 'c12-vector-algebra', dp: [2], diff: [3, 4] }] }),
-      C('c12-3d-geometry', 'Three Dimensional Geometry', 'Vectors & 3D', 11, [
+      C('c12-3d-geometry', 'Three Dimensional Geometry', 'Vectors & 3D', BOARD, [
         'Find the equation of a line in vector and Cartesian form',
         'Find the angle and shortest distance between two lines',
         'Find the equation of a plane and the angle and distance from a point'
       ], { native: true }),
-      C('c12-linear-programming', 'Linear Programming', 'Algebra', 7, [
+      C('c12-linear-programming', 'Linear Programming', 'Algebra', BOARD, [
         'Formulate a linear programming problem from a context',
         'Graph the feasible region of a set of constraints',
         'Find the optimal value at a corner point'
       ], { native: true }),
-      C('c12-probability', 'Probability', 'Statistics & Probability', 11, [
+      C('c12-probability', 'Probability', 'Statistics & Probability', BOARD, [
         'Find conditional probability and use the multiplication rule',
         "Apply the theorem of total probability and Bayes' theorem",
         'Work with a random variable, its mean and the binomial distribution'
