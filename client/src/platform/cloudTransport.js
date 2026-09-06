@@ -13,10 +13,69 @@ const NATIVE_RESPONSE_EVENT = 'pri:native-cloud-response';
 const nativePending = new Map();
 let nativeListenerInstalled = false;
 
+// Cloud origin discovery, in order of authority:
+//   1. the origin that served this page, when it is the Pri platform server
+//      (its /v1/health identifies `pri-learning-platform`) — set on
+//      globalThis.__PRI_CLOUD_ORIGIN__ by discoverCloudOrigin() at boot, which
+//      is also where the iOS shell and the browser tours inject an origin;
+//   2. VITE_PRI_CLOUD_ORIGIN, baked in at build time;
+//   3. <meta name="pri-cloud-origin"> in index.html, which a static host can
+//      stamp into an already-built bundle.
+// docs/production-deployment.md (Client) documents the same order.
+const ORIGIN_META = 'pri-cloud-origin';
+const HEALTH_SERVICE = 'pri-learning-platform';
+let discovery = null;
+
+function metaOrigin() {
+  try { return String(globalThis.document?.querySelector?.(`meta[name="${ORIGIN_META}"]`)?.getAttribute('content') || '').trim(); }
+  catch { return ''; }
+}
+
 function envOrigin() {
-  const vite = import.meta?.env?.VITE_PRI_CLOUD_ORIGIN;
   const injected = globalThis.__PRI_CLOUD_ORIGIN__;
-  return String(vite || injected || '').trim();
+  const vite = import.meta?.env?.VITE_PRI_CLOUD_ORIGIN;
+  return String(injected || vite || metaOrigin() || '').trim();
+}
+
+/**
+ * Probe the serving origin once for the platform health signature and, when it
+ * answers, make that origin the cloud authority. Resolves to the origin or
+ * null; never throws, never delays boot for more than `timeoutMs`.
+ */
+export function discoverCloudOrigin({ timeoutMs = 1500 } = {}) {
+  if (discovery) return discovery;
+  discovery = (async () => {
+    const injected = String(globalThis.__PRI_CLOUD_ORIGIN__ || '').trim();
+    if (injected) return injected;
+    if (nativeCloudAvailable()) return null;
+    const loc = globalThis.location;
+    if (!loc || !/^https?:$/.test(String(loc.protocol || '')) || typeof fetch !== 'function') return null;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(new DOMException('Timed out', 'TimeoutError')), Math.max(200, Math.min(10_000, Number(timeoutMs) || 1500)));
+    try {
+      const response = await fetch(`${loc.origin}/v1/health`, {
+        method: 'GET',
+        headers: { Accept: 'application/json', 'X-Pri-Client': 'web-v1' },
+        credentials: 'omit',
+        cache: 'no-store',
+        redirect: 'error',
+        signal: controller.signal
+      });
+      if (!response.ok || !/json/i.test(response.headers.get('content-type') || '')) return null;
+      const text = await response.text();
+      if (byteLength(text) > 64 * 1024) return null;
+      const data = parseJson(text);
+      if (data?.service !== HEALTH_SERVICE) return null;
+      const origin = normalizeCloudOrigin(loc.origin);
+      globalThis.__PRI_CLOUD_ORIGIN__ = origin;
+      return origin;
+    } catch {
+      return null;
+    } finally {
+      clearTimeout(timer);
+    }
+  })();
+  return discovery;
 }
 
 export function normalizeCloudOrigin(raw = envOrigin()) {
@@ -262,6 +321,10 @@ export const cloud = Object.freeze({
     method: 'POST', body: { signedTransaction: String(signedTransaction || '') }
   }),
   restoreBilling: (provider, body = {}) => cloudRequest(`/v1/billing/restore/${pathId(provider, 'provider')}`, { method: 'POST', body }),
+  // Cancel/manage contract (server: wp/server-commerce-classes). Web cancels at
+  // the end of the paid cycle; Apple subscriptions are managed in the App Store.
+  cancelWebBilling: () => cloudRequest('/v1/billing/web/cancel', { method: 'POST', body: {} }),
+  billingManage: () => cloudRequest('/v1/billing/manage'),
   classes: () => cloudRequest('/v1/classes'),
   classDetails: classId => cloudRequest(`/v1/classes/${pathId(classId, 'class id')}`),
   classStudents: classId => cloudRequest(`/v1/classes/${pathId(classId, 'class id')}/students`),

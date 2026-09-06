@@ -8,6 +8,7 @@ import {
 } from '../platform/assignmentProgress.js';
 import QuestionCard, { SR_ONLY } from '../components/QuestionCard.jsx';
 import PriExplain from '../components/PriExplain.jsx';
+import FreeCapNotice from '../components/FreeCapNotice.jsx';
 
 const EMPTY_SESSION = Object.freeze({ answered: 0, correct: 0, xp: 0 });
 
@@ -31,6 +32,7 @@ export default function Practice() {
   const [serve, setServe] = useState(null);
   const handedRef = useRef(location.state?.serve || null);   // a retry handed over from History
   const [error, setError] = useState('');
+  const [capped, setCapped] = useState(null);
   const [session, setSession] = useState({ ...EMPTY_SESSION });
   const sessionRef = useRef({ ...EMPTY_SESSION });
   const loading = useRef(false);
@@ -118,6 +120,7 @@ export default function Practice() {
     }
     loading.current = true;
     setError('');
+    setCapped(null);
     try {
       const assignmentSpec = assignmentContext?.specification || {};
       const assignmentSubtopic = assignmentSpec.subtopic ? String(assignmentSpec.subtopic) : null;
@@ -137,7 +140,12 @@ export default function Practice() {
             : { mode: 'smart', track: track || undefined, difficulty: difficulty != null ? Number(difficulty) : undefined };
       const r = await api.post('/practice/next', body);
       setServe(r);
-    } catch (e) { setError(e.message); }
+    } catch (e) {
+      // A free-tier refusal is not a fault: it is the end of today's free
+      // questions, and it is explained rather than shown as an error string.
+      if (e?.code === 'FREE_CAP_REACHED' || e?.code === 'FREE_EXAM_CAP_REACHED') setCapped(e);
+      else setError(e.message);
+    }
     finally { loading.current = false; }
   }, [subtopic, dotpoint, difficulty, taskId, track, assignmentMode, assignmentContext, assignmentClassId, assignmentId]);
 
@@ -218,6 +226,7 @@ export default function Practice() {
     if (loading.current) return;
     loading.current = true;
     setError('');
+    setCapped(null);
     // Clear the resolved question before generation starts. Otherwise closing
     // Pri Explain briefly exposes the stale evaluation card while the fresh
     // transfer question is being created, which makes the hand-off feel like
@@ -282,14 +291,16 @@ export default function Practice() {
         </div>}
       </div>}
 
-      {error && (
+      {capped && <FreeCapNotice gate={capped} onRetry={load} />}
+
+      {error && !capped && (
         <div className="qpage">
           <p className="error-box">{error}</p>
           <button className="btn btn-primary" onClick={load}>Try again</button>
         </div>
       )}
 
-      {!serve && !error && !assignmentCompleteLocally && (
+      {!serve && !error && !capped && !assignmentCompleteLocally && (
         <div className="qpage">
           <div className="skeleton" style={{ height: 18, width: 180, marginBottom: 22 }} />
           <div className="skeleton" style={{ height: 54, marginBottom: 16 }} />
