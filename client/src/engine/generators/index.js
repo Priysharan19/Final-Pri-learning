@@ -10,6 +10,7 @@
 import { makeRng } from '../qhelpers.js';
 import { dotpointById, dotpointAt, formDotpoints } from '../curriculum.js';
 import { hasJeePyqGenerator, loadJeePyqGenerator } from './jee-pyq-runtime.js';
+import { hasPyqGenerator } from '../pyq/pyqCoverage.js';
 
 // ── Banks ────────────────────────────────────────────────────────────────────
 
@@ -166,18 +167,34 @@ export const GENERATORS = {};
 const loaded = new Set();
 const inflight = new Map();
 const JEE_BANK_PREFIX = 'jee-pyq:';
+// The source-cited previous-year archive (engine/pyq) is a second, separately
+// owned PYQ source: the department pipeline above packs a project-owner PDF,
+// this one is hand-transcribed from documents the exam boards publish. Its
+// generator ids are namespaced `pyq-…` so neither archive can be mistaken for
+// the other by id alone.
+const PYQ_BANK_PREFIX = 'pyq-archive:';
 
 /** The bank a subtopic id belongs to, or null if the id names no bank. */
 export function bankOf(subtopicId) {
   const id = String(subtopicId ?? '');
   if (hasJeePyqGenerator(id)) return `${JEE_BANK_PREFIX}${id}`;
+  if (hasPyqGenerator(id)) return `${PYQ_BANK_PREFIX}${id}`;
   return INDIA_BANK_OF[id] || BANK_OF[id.split('-')[0]] || null;
 }
 
 function bankLoader(name) {
   if (BANKS[name]) return BANKS[name];
-  if (!String(name || '').startsWith(JEE_BANK_PREFIX)) return null;
-  const generatorId = String(name).slice(JEE_BANK_PREFIX.length);
+  const label = String(name || '');
+  if (label.startsWith(PYQ_BANK_PREFIX)) {
+    const generatorId = label.slice(PYQ_BANK_PREFIX.length);
+    return async () => {
+      const { pyqGenerator } = await import('../pyq/pyqArchive.js');
+      const generator = pyqGenerator(generatorId);
+      return generator ? { [generatorId]: generator } : {};
+    };
+  }
+  if (!label.startsWith(JEE_BANK_PREFIX)) return null;
+  const generatorId = label.slice(JEE_BANK_PREFIX.length);
   return async () => {
     const generator = await loadJeePyqGenerator(generatorId);
     return generator ? { [generatorId]: generator } : {};

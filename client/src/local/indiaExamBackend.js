@@ -12,6 +12,7 @@
 // evidence path in backend.js so progress and the adaptive engine see it.
 import { get, put, del, byIndex, uuid } from './idb.js';
 import { indiaScope, indiaChapter, cleanIndiaTrack, resolveIndiaTarget } from '../engine/indiaProduct.js';
+import { pyqCellsFor, pyqAbsenceFor, PYQ_MANIFEST } from '../engine/pyq/pyqCoverage.js';
 import { generateQuestion, loadBanksFor } from '../engine/generators/index.js';
 import { checkAnswer, stepCheck } from '../engine/checker.js';
 import { sanitizeFigure } from '../lib/sanitize.js';
@@ -72,7 +73,15 @@ function publicQuestion(row) {
     partialPerOption: marking.partialPerOption ?? null,
     subtopic: chapter?.id || q.subtopic, subtopicName: chapter?.name || q.subtopic, chapterId: chapter?.id || null,
     difficulty: q.difficulty || row.difficulty || 2, diffLabel: `D${q.difficulty || row.difficulty || 2}`,
-    sourceKind: row.sourceKind, pyq: row.sourceKind === 'reviewed-jee-pyq'
+    // A past-paper question says so on the card, with the sitting it came from
+    // and the documents it was transcribed from. A student practising PYQs is
+    // asking for exactly that label, so it travels with the question.
+    sourceKind: row.sourceKind,
+    pyq: !!q.pyq || row.sourceKind === 'reviewed-jee-pyq',
+    pyqSource: q.pyqSource || null,
+    pyqYear: q.pyqYear || null,
+    pyqExam: q.pyqExam || null,
+    pyqArchive: q.archive || null
   };
   if (q.multipart) {
     return { ...base, multipart: true, title: q.title, stem: q.stem, figure: safeFigure(q.figure), parts: (q.parts || []).map(publicPart) };
@@ -89,25 +98,46 @@ function titleFor(spec, n) {
   return `${spec.label.replace(/\s*·\s*reference pattern$/, '').replace(/\s*·\s*school-style pattern$/, '')} · Paper ${n}`;
 }
 
-/** Reviewed-PYQ cells for a JEE chapter, once their banks are loaded. */
+/**
+ * Previous-year cells for every chapter in scope, once their banks are loaded.
+ * Two archives can contribute and both are used: the reviewed JEE department
+ * catalog for JEE tracks, and the source-cited archive (engine/pyq) for any
+ * track it publishes — which today is CBSE Classes 10 and 12 and JEE Advanced.
+ * Authored forms fill whatever the archives cannot, and the composer labels
+ * every question with which of the two it was.
+ */
 async function pyqCellsByChapter(track, chapters) {
   const cells = new Map();
-  if (track !== 'jee-main' && track !== 'jee-advanced') return cells;
   const generators = new Set();
   for (const chapter of chapters) {
-    for (const difficulty of [3, 4]) {
-      const target = resolveIndiaTarget(chapter, { track, grade: 12, difficulty, random: () => 0 });
-      // Authentic JEE content is the reviewed archive; authored JEE-depth forms
-      // fill the rest of the section and are labelled as authored.
-      if (!target?.pyq) continue;
-      generators.add(target.generator);
-      const list = cells.get(chapter.id) || [];
-      list.push({ generator: target.generator, difficulty: target.difficulty, pyq: true });
-      cells.set(chapter.id, list);
+    const list = [];
+    if (track === 'jee-main' || track === 'jee-advanced') {
+      for (const difficulty of [3, 4]) {
+        const target = resolveIndiaTarget(chapter, { track, grade: 12, difficulty, random: () => 0 });
+        if (target?.pyqArchive !== 'jee-question-department') continue;
+        if (list.some(c => c.generator === target.generator && c.difficulty === target.difficulty)) continue;
+        list.push({ generator: target.generator, difficulty: target.difficulty, pyq: true });
+      }
     }
+    // Every rung the source-cited archive actually publishes for this chapter.
+    // buildItem narrows them to the section's own window before drawing.
+    for (const cell of pyqCellsFor(track, chapter.id)) list.push(cell);
+    if (!list.length) continue;
+    for (const cell of list) generators.add(cell.generator);
+    cells.set(chapter.id, list);
   }
   if (generators.size) await loadBanksFor([...generators]);
   return cells;
+}
+
+/** Cells inside a difficulty window, or the nearest rungs to it when none are. */
+function narrowCells(cells, { min = 1, max = 4 } = {}) {
+  if (!cells.length) return cells;
+  const inside = cells.filter(c => c.difficulty >= min && c.difficulty <= max);
+  if (inside.length) return inside;
+  const gap = c => Math.min(Math.abs(c.difficulty - min), Math.abs(c.difficulty - max));
+  const best = Math.min(...cells.map(gap));
+  return cells.filter(c => gap(c) === best);
 }
 
 async function createIndiaExam(profile, body = {}) {
@@ -128,7 +158,12 @@ async function createIndiaExam(profile, body = {}) {
 
   const paper = composeIndiaPaper(spec, {
     seed, draw: generateQuestion, chapters,
-    pyqCellsFor: chapter => pyqCells.get(chapter.id) || []
+    // The section's own difficulty window narrows the chapter's archive cells,
+    // by the same nearest-rung rule chapterCells uses for authored ones: a
+    // one-mark Section A slot should not be handed a D4 JEE Advanced item just
+    // because the chapter has one, but a chapter whose only past-paper question
+    // sits a rung outside the window is still better than no past paper at all.
+    pyqCellsFor: (chapter, range) => narrowCells(pyqCells.get(chapter.id) || [], range)
   });
   if (body.source === 'reviewed' && paper.composition.pyq < paper.questions.length) {
     throw error(
@@ -194,6 +229,16 @@ async function createIndiaExam(profile, body = {}) {
         types: s.types || [s.type]
       })),
       units: paper.units,
+      // What this paper actually drew from the previous-year archive, and what
+      // the archive holds. `absent` is present when the student's track is one
+      // the archive deliberately carries nothing for, so an empty PYQ count is
+      // a stated reason rather than a silence.
+      pyq: {
+        used: paper.composition.pyq,
+        questions: paper.questions.length,
+        archive: PYQ_MANIFEST,
+        absent: pyqAbsenceFor(track)
+      },
       composition: paper.composition,
       reducedPattern: paper.reducedPattern,
       composerNotes: composerNotes(spec),

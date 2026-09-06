@@ -21,6 +21,11 @@ export default function Practice() {
   const difficulty = params.get('difficulty');
   const track = params.get('track');
   const taskId = params.get('task');
+  // "Past papers only": the PYQ filter Indian students ask for by name. It is a
+  // filter, not a preference — when the archive has no past-paper question for
+  // the chapter the request is refused with a reason rather than quietly
+  // serving an authored one, so the label on the card is always true.
+  const pyqOnly = params.get('pyq') === '1';
   const assignmentClassId = params.get('classId');
   const assignmentId = params.get('assignment');
   const assignmentMode = !!assignmentClassId && !!assignmentId;
@@ -32,6 +37,7 @@ export default function Practice() {
   const [serve, setServe] = useState(null);
   const handedRef = useRef(location.state?.serve || null);   // a retry handed over from History
   const [error, setError] = useState('');
+  const [errorCode, setErrorCode] = useState('');
   const [capped, setCapped] = useState(null);
   const [session, setSession] = useState({ ...EMPTY_SESSION });
   const sessionRef = useRef({ ...EMPTY_SESSION });
@@ -120,6 +126,7 @@ export default function Practice() {
     }
     loading.current = true;
     setError('');
+    setErrorCode('');
     setCapped(null);
     try {
       const assignmentSpec = assignmentContext?.specification || {};
@@ -136,18 +143,24 @@ export default function Practice() {
               mode: 'smart', track: assignmentTrack || undefined,
               difficulty: assignmentDifficulty ?? undefined
             }
-          : subtopic ? { mode: 'topic', subtopic, track: track || undefined, dotpoint: dotpoint != null ? Number(dotpoint) : undefined, difficulty: difficulty != null ? Number(difficulty) : undefined }
-            : { mode: 'smart', track: track || undefined, difficulty: difficulty != null ? Number(difficulty) : undefined };
+          : subtopic ? { mode: 'topic', subtopic, track: track || undefined, dotpoint: dotpoint != null ? Number(dotpoint) : undefined, difficulty: difficulty != null ? Number(difficulty) : undefined, pyqOnly: pyqOnly || undefined }
+            : { mode: 'smart', track: track || undefined, difficulty: difficulty != null ? Number(difficulty) : undefined, pyqOnly: pyqOnly || undefined };
       const r = await api.post('/practice/next', body);
       setServe(r);
     } catch (e) {
       // A free-tier refusal is not a fault: it is the end of today's free
       // questions, and it is explained rather than shown as an error string.
       if (e?.code === 'FREE_CAP_REACHED' || e?.code === 'FREE_EXAM_CAP_REACHED') setCapped(e);
-      else setError(e.message);
+      else { setError(e.message); setErrorCode(e?.code || ''); }
     }
     finally { loading.current = false; }
-  }, [subtopic, dotpoint, difficulty, taskId, track, assignmentMode, assignmentContext, assignmentClassId, assignmentId]);
+  }, [subtopic, dotpoint, difficulty, taskId, track, pyqOnly, assignmentMode, assignmentContext, assignmentClassId, assignmentId]);
+
+  const setPyqOnly = useCallback((on) => {
+    const next = new URLSearchParams(params);
+    if (on) next.set('pyq', '1'); else next.delete('pyq');
+    setParams(next);
+  }, [params, setParams]);
 
   useEffect(() => {
     setServe(null);
@@ -226,6 +239,7 @@ export default function Practice() {
     if (loading.current) return;
     loading.current = true;
     setError('');
+    setErrorCode('');
     setCapped(null);
     // Clear the resolved question before generation starts. Otherwise closing
     // Pri Explain briefly exposes the stale evaluation card while the fresh
@@ -240,7 +254,7 @@ export default function Practice() {
         difficulty: q.difficulty,
       });
       setServe(r);
-    } catch (e) { setError(e.message); }
+    } catch (e) { setError(e.message); setErrorCode(e?.code || ''); }
     finally { loading.current = false; }
   }, [serve, track]);
 
@@ -291,12 +305,32 @@ export default function Practice() {
         </div>}
       </div>}
 
+      {/* PYQ filter. Indian students work through past papers as the central
+          study ritual, so the filter is a first-class control rather than a
+          setting: on, every question served is a real question from a published
+          paper, and a chapter the archive cannot serve says so. */}
+      {user.course === 'in' && !assignmentMode && !taskId && (
+        <div className="spread" style={{ marginBottom: 12, gap: 10, alignItems: 'center' }}>
+          <button
+            className={`btn btn-sm ${pyqOnly ? 'btn-primary' : 'btn-quiet'}`}
+            aria-pressed={pyqOnly}
+            title="Practise only real questions from past JEE and CBSE papers"
+            onClick={() => setPyqOnly(!pyqOnly)}
+          >
+            {pyqOnly ? 'Past papers only · on' : 'Past papers only'}
+          </button>
+          {pyqOnly && <span className="muted">Every question below was set in a real exam and carries the paper it came from.</span>}
+        </div>
+      )}
+
       {capped && <FreeCapNotice gate={capped} onRetry={load} />}
 
       {error && !capped && (
         <div className="qpage">
           <p className="error-box">{error}</p>
-          <button className="btn btn-primary" onClick={load}>Try again</button>
+          {errorCode === 'INDIA_PYQ_UNAVAILABLE'
+            ? <button className="btn btn-primary" onClick={() => setPyqOnly(false)}>Turn the past-papers-only filter off</button>
+            : <button className="btn btn-primary" onClick={load}>Try again</button>}
         </div>
       )}
 
@@ -310,6 +344,21 @@ export default function Practice() {
 
       {serve && !assignmentCompleteLocally && (
         <>
+          {serve.question.pyq && (
+            <div className="notice" role="note" style={{ marginBottom: 12 }}>
+              <strong>Previous year question</strong> · {serve.question.pyqSource}
+              {serve.question.pyqArchive?.citations?.length > 0 && (
+                <div className="muted" style={{ marginTop: 4 }}>
+                  Transcribed from {serve.question.pyqArchive.citations.map((c, i) => (
+                    <React.Fragment key={c.id}>
+                      {i > 0 && ' · '}
+                      <a href={c.archivedAt || c.url} target="_blank" rel="noreferrer noopener">{c.title}</a>
+                    </React.Fragment>
+                  ))}. {serve.question.pyqArchive.stepsAuthorship}
+                </div>
+              )}
+            </div>
+          )}
           <QuestionCard
             key={serve.question.id}
             question={serve.question}
@@ -356,7 +405,7 @@ export default function Practice() {
               {serve?.nextUp?.name && <span className="muted" data-next-up={serve.nextUp.subtopic}> · next up: {serve.nextUp.name}</span>}
             </div>
           </div>
-          {(subtopic || taskId || difficulty || assignmentMode) && (
+          {(subtopic || taskId || difficulty || pyqOnly || assignmentMode) && (
             <button className="btn btn-quiet btn-sm" title={assignmentMode ? 'Leave assignment' : 'Clear filters — back to smart practice'}
               aria-label={assignmentMode ? 'Leave assignment' : 'Clear filters — back to smart practice'} onClick={() => setParams({})}>✕</button>
           )}

@@ -259,6 +259,10 @@ export default function ExamRoom() {
           <span className="tag">{q.subtopicName}</span>
           <span className="tag">{q.multipart ? `${q.marks} marks` : q.diffLabel}</span>
           {q.multipart && <span className="tag tag-brand">Structured — parts (a)–({q.parts[q.parts.length - 1].key})</span>}
+          {/* A question that was actually set in an exam says which one. Every
+              other question in the paper is authored practice, and a student
+              is entitled to tell them apart while they are sitting it. */}
+          {q.pyq && <span className="tag tag-brand" title={q.pyqSource || 'Previous year question'}>PYQ · {q.pyqSource || 'previous year question'}</span>}
         </div>
         {q.multipart ? (
           <>

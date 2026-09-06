@@ -625,6 +625,13 @@ export function composeIndiaPaper(spec, { seed, draw, chapters, pyqCellsFor = ()
   if (composition.writtenAsObjective) reduced.push(`${composition.writtenAsObjective} written-answer slot(s) were filled with objective items because the chapter has no written-answer generator at this depth.`);
   if (composition.multiCorrect) reduced.push('Multiple-correct items are paired claims about two problems’ answers.');
   if (composition.matrixMatch) reduced.push('Matching-list items match four problems to their answers.');
+  // How much of the paper is real. A student sitting a simulation is entitled
+  // to know which questions were actually set in an exam and which were written
+  // for practice, so the count is stated either way rather than only when it is
+  // flattering.
+  if (composition.pyq) {
+    reduced.push(`${composition.pyq} of ${questions.length} questions are previous-year questions from a published paper, each labelled with the exam and year it was set in; the remaining ${questions.length - composition.pyq} are authored practice.`);
+  }
   if (spec.track === 'jee-main' && composition.pyq === 0) reduced.push('No reviewed previous-year questions are published yet; every question is authored JEE-depth practice.');
   if (units) {
     const off = units.filter(u => Math.abs(u.assigned - u.target) > 2);

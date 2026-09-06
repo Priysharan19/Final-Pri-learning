@@ -50,6 +50,7 @@ jobs:
           grep -Fq 'Pri Reason V4 regression gate: PASS' suites.log
           grep -Fq 'Pri Reason V2 curriculum integration gate: PASS' suites.log
           grep -Fq 'INDIA EXAM FLOW: PASS — 122/122 checks' suites.log
+          grep -Fq 'INDIA PYQ: PASS — 1079/1079 checks — 45 source-cited previous-year questions' suites.log
           grep -Fq '✔ INDIA IDENTITY SUITE PASSED — 102/102 checks across 5 groups' suites.log
           grep -Fq 'INDIA ADAPTIVE: PASS — 304/304 checks' suites.log
           grep -Fq 'PLOTTING: PASS — 78/78 checks' suites.log

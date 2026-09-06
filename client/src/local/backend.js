@@ -821,6 +821,12 @@ async function createIndiaQuestion(pid, chapter, target, mode, trackId, examId =
   }
   const row = {
     id: uuid(), pid, subtopic: q.subtopic, difficulty: q.difficulty || target.difficulty, payload: q,
+    // The generator is stored alongside the subtopic because they are not
+    // always the same id: a previous-year question's payload names the chapter
+    // it belongs to, while the bank that produced it is the archive. Retry
+    // regenerates from this, so "the same question again" really is the same
+    // past-paper question rather than an authored one from the same chapter.
+    generator: target.generator,
     india: { chapterId: chapter.id, track: trackId, dotpointIndex: target.dotpointIndex },
     mode, examId, taskId, answered: 0, tries: 0, hintsUsed: 0, createdAt: Date.now()
   };
@@ -867,7 +873,7 @@ function indiaPool(trackId, grade, ratings, now) {
  * the track's window — and nothing is written, so GET /stats can ask the same
  * question for its "what next" strip.
  */
-function indiaPick(p, trackId, ratings, reviews, now, { chapter = null, dotpoint = null, difficulty = null, rand = Math.random() } = {}) {
+function indiaPick(p, trackId, ratings, reviews, now, { chapter = null, dotpoint = null, difficulty = null, pyqOnly = false, rand = Math.random() } = {}) {
   const grade = p.year;
   const trackName = indiaTrack(trackId, grade).name;
   const { pool, states, aheadIds, aheadUnlocked } = indiaPool(trackId, grade, ratings, now);
@@ -915,11 +921,22 @@ function indiaPick(p, trackId, ratings, reviews, now, { chapter = null, dotpoint
     });
   } else want = choice.difficulty;
   want = clampToIndiaWindow(want, trackId, grade);
-  const target = resolveIndiaTarget(c, { dotpoint: ordinal, difficulty: want, track: trackId, grade });
+  // "Past papers only" is a filter on what may be served, not a preference:
+  // when the archive has nothing for the chapter the request is refused with a
+  // reason, because serving an authored question under that filter would be
+  // telling the student it came from a real paper.
+  const target = resolveIndiaTarget(c, { dotpoint: ordinal, difficulty: want, track: trackId, grade, pyqOnly });
+  if (!target && pyqOnly) {
+    throw Object.assign(
+      new Error(`Pri's previous-year archive has no ${trackName} past-paper question for ${c.name} yet. Turn the past-papers-only filter off to practise authored questions on this chapter.`),
+      { status: 409, code: 'INDIA_PYQ_UNAVAILABLE' }
+    );
+  }
   if (!target) {
     throw Object.assign(new Error(`That India ${ordinal != null ? 'dot point' : 'chapter'} has no authored question form at this track yet.`), { status: 409, code: 'INDIA_TARGET_UNCOVERED' });
   }
   let why = INDIA_WHY[choice.reason](c, choice.trap, trackName);
+  if (target.pyq) why += ' This one is a real previous-year question.';
   if (target.dotpointIndex != null) why += ` Dot point: ${c.dotpoints[target.dotpointIndex]}`;
   if (target.windowed === false) why += ` (Served at D${target.difficulty} — this dot point has no authored form at ${trackName} depth yet.)`;
   return {
@@ -1314,6 +1331,13 @@ function sanitize(q, row) {
     difficulty: q.difficulty, diffLabel: DIFF_LABELS[q.difficulty] || 'Custom',
     prompt: q.prompt, answerType: q.answerType, mcqOptions: q.mcqOptions,
     figure: safeFigure(q.figure), code: s?.code || null,
+    // A previous-year question carries its sitting and its sources with it, so
+    // the card can say "JEE Advanced 2025 · Paper 1 · Q12" and mean it.
+    pyq: !!q.pyq,
+    pyqSource: q.pyqSource || null,
+    pyqYear: q.pyqYear || null,
+    pyqExam: q.pyqExam || null,
+    pyqArchive: q.archive || null,
     inputHint: q.inputHint, answerPrefix: q.answerPrefix, answerSuffix: q.answerSuffix,
     hintsAvailable: (q.hints || []).length, hintsUsed: row.hintsUsed || 0,
     triesLeft: 2 - (row.tries || 0),
@@ -2254,7 +2278,7 @@ const routes = {
   // ---- practice ----
   'POST /practice/next': async (body) => {
     const p = await requireProfile();
-    const { mode = 'smart', subtopic, difficulty, dotpoint, taskId, track } = body || {};
+    const { mode = 'smart', subtopic, difficulty, dotpoint, taskId, track, pyqOnly = false } = body || {};
     // Task-driven question
     if (taskId) {
       const task = await get('tasks', taskId);
@@ -2305,7 +2329,8 @@ const routes = {
       if (subtopic && !chapter) throw Object.assign(new Error('That topic is not part of the India syllabus.'), { status: 404, code: 'INDIA_TOPIC_NOT_FOUND' });
       const reviews = await byIndex('reviews', 'pid', p.id);
       const pick = indiaPick(p, trackId, ratings, reviews, now, {
-        chapter, dotpoint, difficulty: difficulty != null && difficulty !== '' ? difficulty : null, rand: Math.random()
+        chapter, dotpoint, difficulty: difficulty != null && difficulty !== '' ? difficulty : null,
+        pyqOnly: !!pyqOnly, rand: Math.random()
       });
       const { row, payload, trapKey } = await createIndiaQuestion(
         p.id, pick.chapter, pick.target, pick.reason === 'review' ? 'review' : 'practice', trackId, null, null, pick.trap?.key || null
@@ -2317,7 +2342,8 @@ const routes = {
         question: sanitize(payload, row), reason: pick.reason, reasonTag: pick.reasonTag, why: pick.why, nextUp: pick.nextUp,
         dotpoint: pick.target.dotpointIndex, target: pick.successTarget ?? null,
         misconception: trapKey ? pick.trap?.label || null : null,
-        windowed: pick.target.windowed !== false, aheadUnlocked: pick.aheadUnlocked
+        windowed: pick.target.windowed !== false, aheadUnlocked: pick.aheadUnlocked,
+        pyq: !!pick.target.pyq
       };
     }
     let choice;
@@ -3131,10 +3157,14 @@ const routes = {
     if (q.custom) throw Object.assign(new Error('Custom questions can’t be regenerated'), { status: 400 });
     if (q.multipart) throw Object.assign(new Error('Structured exam questions live in exam review'), { status: 400 });
     const same = (body?.variant || 'same') === 'same';
-    const payload = generateQuestion(row.subtopic, row.difficulty, same ? q.seed : undefined);
+    // Regenerate from the bank that made this question. For almost every
+    // question that is its subtopic; for a previous-year question it is the
+    // archive, whose payload names the chapter instead.
+    const generator = row.generator || row.subtopic;
+    const payload = generateQuestion(generator, row.difficulty, same ? q.seed : undefined);
     // A retried Indian question keeps its chapter, or its evidence would fall
     // onto the generator id instead of the chapter the student is working on.
-    const newRow = { id: uuid(), pid: p.id, subtopic: row.subtopic, difficulty: row.difficulty, payload, india: row.india || undefined, mode: 'practice', examId: null, taskId: null, answered: 0, tries: 0, hintsUsed: 0, createdAt: Date.now() };
+    const newRow = { id: uuid(), pid: p.id, subtopic: row.subtopic, difficulty: row.difficulty, payload, generator, india: row.india || undefined, mode: 'practice', examId: null, taskId: null, answered: 0, tries: 0, hintsUsed: 0, createdAt: Date.now() };
     await put('questions', newRow);
     return { question: sanitize(payload, newRow), variant: same ? 'same' : 'fresh' };
   },
