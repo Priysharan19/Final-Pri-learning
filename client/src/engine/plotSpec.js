@@ -81,6 +81,20 @@ export function plotSpecFor({ prompt = '', solutionText = '', steps = [], subtop
     }
     if (expr) break;
   }
+  // "Solve x² − 5x + 6 = 0" is a graph question in disguise: the roots the
+  // student is asked for are where the curve crosses the axis, and seeing that
+  // is most of the idea. Only for a polynomial in one variable set to zero —
+  // an equation with terms on both sides is a different lesson.
+  if (!expr) {
+    for (const text of haystacks) {
+      const solve = text.match(/\b(?:solve|find the (?:roots|zero(?:e?s)?)\s+of|factorise)\b[^.]*?([-+0-9a-zA-Z^ .*/()]+?)\s*=\s*0\b/i);
+      if (!solve) continue;
+      const candidate = solve[1].trim();
+      if (candidate.length > 60 || !/x/.test(candidate)) continue;
+      if (!/[+\-]/.test(candidate) && !/\^/.test(candidate)) continue;
+      if (readsAsFunction(candidate)) { expr = candidate; break; }
+    }
+  }
   if (!expr) return null;
 
   const all = haystacks.join(' ');

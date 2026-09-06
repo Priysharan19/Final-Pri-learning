@@ -1,38 +1,65 @@
 # Pri Learning
 
-**Adaptive Years 7–12 maths practice, built for iPad and run entirely by your device — questions
-generated, handwriting read and answers marked without a network.**
+**Maths practice for Indian students — NCERT Classes 7 to 12, JEE Main, JEE Advanced and the
+olympiad — that generates its own questions, reads Apple Pencil handwriting on the device, and
+marks the working line by line.**
 
-Write your working with an Apple Pencil, watch it turn into maths in real time, and get it marked
-line by line — with teacher-style ✓/✗ annotations appearing on your own ink. It sets out to cover
-the ground Leibniz (start.leibniz.com.au) covers — the table below says exactly what that means,
-feature by feature — and everything runs **100% locally**: no accounts, no cloud, no API keys, fully
-offline once installed. The one piece of machine learning it uses ships *inside* the app: a
-convolutional net whose weights are **597 kB** of int8 coefficients, running in your browser rather
-than on anyone's server.
+Write your working with a Pencil or type it, and get it marked the way a teacher marks: not just
+right or wrong, but which line stopped being true and which mistake it was. The learning engine
+runs entirely on the device — questions, handwriting recognition and marking all work with the
+network off. A Pri cloud account is optional, and adds only what needs a server: sign-in across
+devices, classes and assignments, and a subscription.
 
-**v4 — a Leibniz-inspired redesign.** The whole interface now speaks the same visual
-language as the reference platform: near-black paper, Computer Modern serif throughout (the bundled
-KaTeX fonts), ivory/cream primary actions, gold accents, hairline borders and small-caps labels.
-Navigation, layouts and flows follow it too — landing hero with a field of mathematical symbols;
-Home with a serif greeting, rotating typewriter tagline and the filter-chip question generator
-(Year → Course → Topics → Dot Points → Difficulty); a question page with marks + live timer,
-hint bulbs that cost 15% credit each, three answer modes (maths editor ⌨ / handwriting ✎ / photo ▣)
-and an Evaluation card with reasoning, worked solution, boxed final answer and an HSC-style
-criteria/marks table; Progress with Overview (predicted band, demonstrated mark history, syllabus
-performance board), Priorities and a zoomable Knowledge-map constellation of every syllabus idea;
-Match Mode with rival ratings and a leaderboard; plus Tasks, Favorites, Classes and sectioned
-Settings. The hover sidebar carries your recent Question History, exactly where you'd expect it.
+## What it is for
 
-**What changed between v3 and v4 is history, not measurement.** As a changelog: the generator banks
-were rewritten; the recogniser gained a Platt-calibrated confidence contract and question-context
-conditioning; the CNN ensemble was retrained; the local data model added encryption at rest for
-password-protected profiles; and what carried over is the *shape* of the thing — a self-check gate
-over every generator, marks-based exams, the same local-first storage contract. Read that list as
-provenance and nothing more: there is no v3 in this repo and no command here compares the two, so
-none of it is a measured claim. The load-bearing half is the part that *is* checkable — every figure
-in **[Measured accuracy](#measured-accuracy)** was produced, at the stated n, by running the command
-beside it against the code and the model in this repo today.
+An Indian student picks their class or track on the first screen — Class 7 to 12, JEE Main, JEE
+Advanced or the olympiad — and practises against the NCERT chapter list, with their day, streak
+and dates counted in their own timezone. Australian syllabuses (HSC, VCE, QCE and the rest)
+remain fully supported one link away; they are no longer the default.
+
+Where the numbers below come from is stated beside each one. Where something is unmeasured, it
+says so: this project has a written rule against quoting a figure without the suite, the sample
+size and the split that produced it.
+
+## What is built
+
+**Questions.** 258 of 258 dot points across 77 Indian chapters have a generator behind them
+(`node tools/india-coverage.mjs`). Class 8, 9 and 10 are authored against their own NCERT
+textbooks, exercise by exercise; Class 7 follows the current Ganita Prakash Parts I and II. The
+provenance of every chapter is published rather than implied: 36 source-reviewed, 14 with a
+current-outcome overlay, 27 still mapped from the Australian banks and labelled as such
+(`node tools/india-production-census.mjs`).
+
+**Marking.** Answers are accepted the way NCERT and JEE students write them: solution sets in
+braces or with "or", inequality and interval notation interchangeably, matrices, vectors in ijk
+form, and the n!, nCr, nPr, sec, cosec and cot vocabulary. Working is checked line by line, the
+first line that stops being true is named, and where a designed wrong answer matches, the
+misconception behind it is named too.
+
+**Exams.** Every track can sit a real paper: CBSE Class 10 Standard and Basic and Class 12 at 80
+marks across Sections A to E with internal choice, JEE Main's 20 multiple-choice plus 5 numerical
+at +4/−1/0, JEE Advanced Paper 1 with per-option partial marking, and the IOQM's 30
+integer-answer questions.
+
+**Teaching.** A worked solution plays back as a narrated, step-by-step lesson, and where a
+question states a function, the graph is drawn on screen the way a teacher draws it at a board —
+with its roots, turning points, a tangent whose gradient is the derivative, or the region whose
+area is the integral. A graph is held to the same rule as the rest: the curve must be one the
+question or its verified solution actually states.
+
+**Adaptation.** Spaced review on an FSRS-5 schedule, misconception pressure, interleaving and
+mastery targeting choose the next question, and the student is told which of those reasons
+applied.
+
+**Teachers.** Classes, assignments targeted at a chapter, dot point and difficulty, class
+analytics without a fabricated predicted mark, and intervention flags with the reason spelled
+out. Both offline (AirDrop task packs) and cloud classrooms.
+
+**The cloud, when you want it.** 71 handlers under `/v1`: accounts with verified email, Google
+and Apple sign-in, cross-device sync, Razorpay and Apple subscriptions with cancellation, classes
+and assignments, a content CMS with independent review, and an admin surface. It runs as one
+container against a persistent SQLite volume and fails closed without its configuration.
+
 
 ## Quick start
 
@@ -50,18 +77,22 @@ from the command line and no timing is quoted for it. On an iPad, open it in Saf
 then on. All data lives in the device's IndexedDB, protected from eviction via the Persistent
 Storage API — and one tap exports a full backup file.
 
-> `npm start` runs `server/index.js`, which is **legacy**. It static-hosts `client/dist`, but it also
-> mounts 22 live Express routes (4 auth + 18 API) in front of that static fallback. The app never
-> calls them — the real backend is `client/src/local/backend.js`, 51 routes running in the browser
-> against IndexedDB. Any static file server works just as well. See **[`server/README.md`](server/README.md)**.
+> `npm start` runs `server/index.js`. It static-hosts `client/dist` and mounts the **`/v1` cloud
+> control plane** — 71 handlers for accounts, sync, billing, classes, content and admin. The
+> learning engine is still the browser's: `client/src/local/backend.js` runs against IndexedDB and
+> needs no server at all. The old `/api` routes are development-only reference code; they do not
+> mount when `NODE_ENV=production` and are not in the container image. See
+> **[`server/README.md`](server/README.md)** and **[`docs/production-deployment.md`](docs/production-deployment.md)**.
 
 Development: `npm run dev` (Vite on :5173, alongside the legacy server on :4000).
 
 Tests come in two halves, and the split is deliberate:
 
-- **`npm test`** — engine self-check, backend, security, five handwriting suites and the
-  question-context guard. No browser, no build, nothing installed: it runs on a clean checkout with
-  no network. `npm run test:ink` runs **one** of the five handwriting suites (symbol self-recognition, 2,240 samples) — not the held-out writers. `npm test` runs all five.
+- **`npm test`** — the engine self-check, the India curriculum, exam and adaptive suites, marking
+  and misconception diagnosis, plotting, the browser-free client suites and the handwriting
+  regression suites. No browser, no build, nothing installed: it runs on a clean checkout with no
+  network, which is why the suites that need `express` and `better-sqlite3` live in
+  `npm run test:platform` instead.
 - **`npm run test:browser`** — the end-to-end and accessibility suites, which build the app and drive
   it in a real Chromium. These need `npm ci --prefix client` and `npx playwright install chromium`
   first.
@@ -69,50 +100,37 @@ Tests come in two halves, and the split is deliberate:
 **[Verification](#verification)** says what each one does and does not check; accuracy figures and
 the exact commands behind them are in **[Measured accuracy](#measured-accuracy)** below.
 
+- **`npm run test:platform`** — the `/v1` control plane: security headers, login lockout, admin
+  bootstrap, teacher invites, OIDC, email-verification enforcement, housekeeping, the production
+  image contract, billing cancellation and refunds, database operations, and HTTP journeys against
+  the real router. Run `npm ci --prefix server` first.
+
 **Native iPad app:** `ios/PriLearning.swiftpm` is a complete Swift project — open it in
 Swift Playground on the iPad itself (no Mac needed) or in Xcode 15+ and press Run. It bundles the
 entire app with a SwiftUI shell: native share sheet for exports, camera for photo attach, and
 sandboxed persistent storage. See **RUN-ON-IPAD.md**.
 
-## Feature coverage, measured against Leibniz
+## What a student gets, feature by feature
 
-A design checklist, not a benchmark. The left column is what Leibniz advertises publicly; the right
-column is what this repo implements, and only the right column is something the tests here can speak
-to. Nothing in this project compares the two products head to head.
+This is a checklist of what the repository implements, not a benchmark against anyone else. Each
+row is something the suites or the tools can speak to; the numbers are in
+[Measured accuracy](#measured-accuracy).
 
-| Leibniz | Pri Learning |
+| | |
 |---|---|
-| Unlimited exam-style questions per syllabus dot point (Yr 11–12 focus) | **84 parameterized generators across Years 7–12** × 4 difficulty tiers (D1 Foundation → D4 Exam Extension) — every question built from a seed rather than drawn from a fixed pool, so the space is counted rather than asserted (`node tools/count-questions.mjs`, [figures below](#measured-accuracy)); incl. diagram questions with generated SVG figures. **Per *dot point*, now everywhere — read the second number too:** forms are authored per (subtopic × difficulty) and tagged to the dot points they assess, which reaches **252 of 252 dot points (100.0%)** — **220 exactly**, 32 only alongside a sibling — and leaves **0 with no generator behind them** (`node tools/dotpoint-coverage.mjs`). A shared dot point is practised but cannot be *labelled*, so 220 is the number to quote where precision matters; [the census below](#measured-accuracy) keeps both halves together |
-| HSC courses: Standard, Advanced, Extension 1, Extension 2 | **Full pathway support**: Standard (MS-F/A/M/S/N), Advanced, Extension 1 (ME — vectors, induction, projectiles, further calculus) and Extension 2 (MEX — proof, complex numbers, mechanics), each with its own syllabus scope, exams, predictor and skill map sections |
-| Syllabus-aligned content | Every subtopic carries a code, shown on tiles, drawers and reports — for Years 11–12 the real **NESA course topic code** (48 subtopics: `MA-F1`, `MS-A1`, `ME-V1`, `MEX-P1/P2` …); for Years 7–10 a stage-and-strand label of this project's own devising (36 subtopics: `MA4 · Number`, `MA5 · Algebra` …), which is **not** a NESA outcome code. Neither set has been checked against a NESA document — [What is not done](#what-is-not-done) says so and gives the count |
-| Multi-part structured exam questions | **Section II multipart questions** — one stem, parts (a)(b)(c) with per-part marks, “hence” chains, marked part by part in review and printed papers |
-| Filter by topic, subtopic and dot point | Skill Map (and the Home filter chips) → any subtopic → **practise a single dot point**. Each dot point carries a stable id and resolves to the difficulties whose authored form actually assesses it, so two dot points of one subtopic no longer share a pool by default — and a generated question reports which dot points it exercises. A question is only *labelled* with the dot point you asked for when it can be shown to be on it — the generator declared that dot point for the branch it took, or the one declaration behind the question names it and nothing else. Every dot point now has a form behind it, but the **32 that no form reaches alone** still fall back to subtopic-level practice with `dotpoint: null` on the payload, and so does a request whose difficulty lands on a shared form of an otherwise exactly-targeted dot point. A sibling's question is never handed back labelled as the dot point you asked for |
-| “Mathematically optimised recommendation” | Elo-based Smart Practice targeting ~70% success, weaving in weak spots and spaced reviews — pathway-aware in Years 11–12 |
-| Type answers with beautiful rendered maths | Typed input with **live KaTeX preview** (“reads as …”) |
-| Draw/handwrite answers (Apple Pencil, iPad-first) | **On-device handwriting engine**: pressure-sensitive ink, palm rejection, stroke eraser, undo/redo — digits, 25 lowercase letters (a–z except j) plus L H R, π θ, + − × ÷ ± = ≠ < > ≤ ≥ %, °, brackets, decimals, mixed numbers, fractions, roots, exponents, multi-line working — live preview with per-symbol tap-to-correct |
-| Line-by-line feedback on handwritten responses | Recognised working feeds **Step Check**, and after marking, **✓/✗ annotations appear directly on your handwritten lines** — like a teacher's pen on your page |
-| Instant marking, annotations, comments, marking criteria, worked solutions | Equivalence marking (1/2 = 0.5 = 50%, any algebraic form, sets in any order, simplest-form and exact-value enforcement, ± branch checking), misconception-tagged feedback, full worked solutions, **marking criteria** per question |
-| Partial credit for working | **Marks-based exam scoring**: show working on any question — if the final answer is wrong but the reasoning holds, Step Check awards method marks, exactly like a real HSC marker |
-| “Show that…” full-working questions | **Working-type questions** where the working *is* the answer — every line marked, minimum-line requirements, final-line verification (e.g. induction, factorise-then-cancel) |
-| Upload an image of your working | **📷 Photo attach**: photograph your paper working; it's stored with the attempt and viewable in History — plus self-marking against criteria |
-| Hints & step-by-step solutions | 3-level hint ladder on every question (hints soft-discount rating credit, so trying always pays) |
-| “Circuit Board” syllabus visualisation | **Skill Map**: every dot point drawn as its own square — coloured, to be exact, by its **subtopic's** live mastery rather than its own, so the three squares of one subtopic share a shade — plus review-due markers, per-topic drawer, stream sections per pathway, and a zoomable Knowledge-map constellation with a node per dot point |
-| Priorities (“the islands”) | Impact-ranked priorities: exam weight × mastery gap × recency, with plain-language reasons |
-| Scaled mark predictor with confidence | Predicted mark with confidence band + trajectory — **calibrated to HSC bands** (Band 1–6, E1–E4 for extension, A–E grades for Years 7–10) |
-| Difficulties D1–D4 | Same tiers, adaptively selected |
-| Courses: HSC, QCE, VCE, WACE, SACE, IB | Course setting maps naming/labels across the UI and reports; NSW gets full pathway depth |
-| Match mode (algebra, calculus, statistics) | **Match**: race three rivals (Rookie/Pro/Legend) in Everything, Algebra, Calculus or Statistics arenas |
-| Tasks set by your teacher | **Teacher Studio**: local teacher profiles create classes, assign topic tasks with due dates, and track per-student progress |
-| Teacher dashboard, class management, class/task analytics | Class analytics table (predicted mark, accuracy, streak, weakest area) + per-task completion — including students imported from **progress files** |
-| Set tasks across devices (school accounts) | **Task packs**: export any task as a file, AirDrop it to student iPads, import in one tap — and students export **progress files** back for class analytics. A whole classroom, no server |
-| Review past questions | **History**: every answered question kept forever — filter (wrong/correct/bookmarked/ink), bookmark, replay your handwriting and scribbles, view attached photos, and **re-attempt any question with the same numbers or fresh ones** |
-| Full exam paper downloads | Any generated paper renders as a **print-ready sheet** — questions with figures up front, marking criteria and worked solutions behind, multipart included — then `window.print()` hands it to the browser, where **Save as PDF** produces the file. The app formats the paper (there is a dedicated print stylesheet); it does not generate the PDF itself |
-| Scribble pad (rough work, never submitted) | Collapsible scribble pad on every question — **saved with the attempt** and replayable in History |
-| Progress at “idea level” | Per-subtopic ratings, mastery bands, strand analytics, activity calendar, printable progress report |
-| Account data in the cloud | **Data safety, locally**: persistent-storage protection, storage usage meter, **encryption at rest** on password-protected profiles (13 stores sealed row by row under a per-profile AES-GCM-256 key, two more sealed to a whole class roll, and the profile record itself sealed field by field on top — [counted below](#architecture)), and **one-file full backup/restore** that moves your entire history between devices. What that does **not** cover — row counts, and a profile with no password — is in [What is not done](#what-is-not-done) |
-| Free tier limits (5/day), Pro $9.99/mo | **No daily cap, no tiers, nothing to pay** — it's your device doing the work. "Unlimited" is bounded, and the [census below](#measured-accuracy) says where: questions are built from a seed rather than drawn from a pool, so the space is large (**344,798** distinct observed) but finite, and the thinnest (subtopic × difficulty) cell holds **54** |
-| — | **The mistake by name, not just the line it is on.** Where Step Check finds working that stops being true, a diagnosis engine works out *which* move the student made — a term that crossed the equals sign without changing sign, a bracket expanded onto its first term only, (a+b)² squared term by term, two fractions added straight across, a root thrown away by dividing through by x, one side of an equation divided and the other left alone — and says the rule that move breaks. **20 named mistakes**, found by applying each one to the last true line and testing which reproduces what the student wrote, so it holds however they wrote it down; where nothing fits it gives a counterexample rather than a guess. A named misstep then feeds the same misconception model a designed wrong answer does, so the scheduler works against it. All on-device, deterministic, no model. [Measured below](#step-diagnosis) |
-| — | Plus: streaks & XP levels, 22 achievements, 90-second Rush, spaced-review scheduler, dark/light themes, offline PWA, multi-profile |
+| **Questions** | 258 of 258 Indian dot points have a generator; every question is built from a seed rather than drawn from a fixed pool. Classes 8, 9 and 10 are authored against their NCERT textbooks exercise by exercise; Class 7 follows the current Ganita Prakash. Four difficulty tiers, with per-track windows. |
+| **Marking** | Equivalence marking across seven answer types, plus the forms NCERT and JEE actually use: solution sets, inequality and interval notation interchangeably, matrices, vectors in ijk form, n!, nCr, nPr, sec, cosec, cot. |
+| **Working, not just answers** | Step Check finds the first line that stops being true; a diagnosis engine names which mistake was made and the rule it breaks, and abstains rather than guessing. Method marks for correct reasoning behind a wrong answer. |
+| **Handwriting** | On-device recognition of Pencil ink: digits, letters, Greek, operators, fractions, roots, powers, multi-line working, ∫, !, ≡, ∞. Recognised working feeds Step Check, and ✓/✗ annotations land on the student's own ink. |
+| **Video-style solutions** | The worked solution plays back as a narrated, step-by-step lesson with play, pause and speed, built deterministically from the verified solution — no model writes the maths. |
+| **Animated graphs** | Where a question states a function, the curve is drawn on screen with its roots, turning points, tangent or shaded area. The curve must be one the question or its solution states. |
+| **Exams** | CBSE Class 10 Standard and Basic and Class 12 at 80 marks, Sections A–E with internal choice; JEE Main at +4/−1/0; JEE Advanced Paper 1 with partial marking; IOQM's 30 integer answers. |
+| **Adaptation** | Elo mastery per chapter and dot point, FSRS-5 spaced review, misconception pressure, interleaving — and the reason this question came next, in words. |
+| **Progress** | Chapter mastery, priorities, activity and streaks in the student's own timezone. No invented board mark or percentile: the India product refuses to show one. |
+| **Teachers** | Classes and assignments targeted at a chapter, dot point and difficulty; class analytics; intervention flags with reasons; printable reports; offline task packs and cloud classrooms. |
+| **Offline** | The whole learning loop runs with the network off, installed as a PWA or as the native iPad app. |
+| **Cloud, optional** | Verified email accounts, Google and Apple sign-in, cross-device sync, Razorpay and Apple subscriptions with cancellation, a content CMS with independent review. |
+
 
 ## The handwriting engine
 
@@ -126,7 +144,7 @@ convolutional network ships **inside the bundle** and does the heavy lifting on 
    pre-pass keeps ÷'s dots with its bar. Low-confidence groups get merge *and* split retries.
 3. **Recognition — three classifiers, CNN first.**
    - **A bundled CNN ensemble is the primary classifier** (`client/src/ink/nn.js` +
-     `client/src/ink/model-data.js`). Three int8-quantised conv nets vote over **56 shape classes**
+     `client/src/ink/model-data.js`). Three int8-quantised conv nets vote over **58 shape classes**
      and their softmaxes are averaged: model **A** reads a 28² render, **B** a deeper/wider 32²
      render, and **C** a 32² render with an *aspect floor*, which exists so the tall-thin glyphs
      (`1 l ( ) /`) are not all handed to the net as the same vertical smear. Trained on **553,200
@@ -139,7 +157,7 @@ convolutional network ships **inside the bundle** and does the heavy lifting on 
      `/tmp/inktrain/manifest.json`, which is not committed — regenerate it to check them.
      **Validation accuracy 0.9395** for the ensemble
      (0.9316 / 0.9365 / 0.9339 for A / B / C) — read `val_acc` out of `model-data.js` itself, which
-     is where those figures are recorded. **`model-data.js` is 798,305 bytes; the weights are not.**
+     is where those figures are recorded. **`model-data.js` is 799,804 bytes; the weights are not.**
      796,032 of those characters are base64, spread over 30 `"b64"` runs; the remaining 2,271 are the
      JSON and JavaScript that wrap them; and the base64 decodes to **597,004 bytes — 597 kB — of
      int8 coefficients**. Quote 798 kB as what the module costs the bundle, never as the size of the
@@ -158,7 +176,7 @@ convolutional network ships **inside the bundle** and does the heavy lifting on 
      # 30 runs, 796032 base64 chars, 597004 decoded bytes
      ```
 
-     (`wc -c` counts bytes and the wrapper holds one multi-byte character, so the file is 798,305
+     (`wc -c` counts bytes and the wrapper holds one multi-byte character, so the file is 799,804
      bytes and 798,303 characters — the two-byte gap is that em dash, not a miscount.)
      The forward pass is plain JavaScript and costs **19.6 ms per symbol** for all three voters —
      the median of three timed runs of 1,000 `nnClassify` calls after 1,000 warmup calls, on Node
@@ -273,7 +291,7 @@ very day it was read. Re-run the commands; the stamp is when, not what.
 
 | Command | n | Result |
 |---|---|---|
-| `node server/test/selfcheck.mjs` | 2,000 draws × 336 cells (84 subtopics × 4 difficulties) | **672,000 / 672,000** self-checks passed |
+| `node server/test/selfcheck.mjs` | 2,000 draws per cell across 193 subtopics | **1,544,000 / 1,544,000** self-checks passed |
 | `node server/test/selfcheck.mjs` | 14 multipart questions × 1,500 draws | **21,000 / 21,000** part-checks passed |
 | `node tools/count-questions.mjs` | 3,000 samples × 336 cells | 336 authored forms; **344,798 distinct questions observed** (Chao1 estimate ≈ 24.6 M); thinnest cell **54** |
 | `node tools/count-questions.mjs 3000 server` | 3,000 samples × 336 cells | 420 authored forms; 365,333 observed (Chao1 ≈ 23.8 M) — *not a product figure* |
@@ -424,7 +442,7 @@ counterexample is never recorded as a misconception.
 | `node client/test/inkcheck-hard.mjs` | 24 trials × 55 template symbols = 1,320 | **1,271 / 1,320 (96.3%)** under heavy distortion; scenes **14 / 15**; messy digit strings **38 / 40 (95%)** |
 | `node client/test/inkcheck-lines.mjs 40` | 40 lines × 6 style conditions = 240 lines | **224 / 240 (93.3%)** lines exact, **97.9%** chars; cramped spacing costs nothing at this n — the suite prints **−7% drop when cramped**, tight 116 exact against roomy 108 |
 | `node client/test/inkcheck-holdout.mjs 24` | 24 simulated writers × 14 lines = 336 lines | **320 / 336 (95.2%)** lines exact, **98.9%** chars, **worst writer 86%** |
-| `node client/test/inkcheck-holdout2.mjs 40` | 40 simulated writers × 14 lines = 560 lines | **529 / 560 (94.5%)** lines exact, **98.4%** chars, **worst writer 71%** |
+| `node client/test/inkcheck-holdout2.mjs 40` | 40 simulated writers × 14 lines = 560 lines | **545 / 560 (97.3%)** lines exact, **99.5%** chars, **worst writer 86%** |
 | `node client/test/inkcheck-context.mjs` | 256 wrong-answer readings + 11 misread correct answers | **0** wrong answers rewritten as the expected one, **0** drawn nearer it, **0** correct readings broken, **0** confidence-contract violations; 2 readings repaired |
 | `npm run test:real` | 0 corpora recorded | **no score — there is no real-handwriting number yet** |
 
@@ -444,7 +462,7 @@ Read these in the right order, because they do not all mean the same thing:
 - **`inkcheck.mjs`, `inkcheck-hard.mjs` and `inkcheck-lines.mjs` are tuning targets**, not evidence.
   They are regression guards. Anything tuned against is eventually tuned *to*.
 - **The worst-writer figure matters more than the mean.** At 40 writers one simulated hand scores
-  **71%** — nearly 24 points below the 94.5% headline. A student the engine cannot read does not care
+  **86%** — 11 points below the 97.3% headline. A student the engine cannot read does not care
   about the average, and no headline number should hide that gap. Quote the pair or neither.
 - **Run these yourself before quoting them.** The commands above take the sample size as their last
   argument and default to a *smaller, more flattering* one — `inkcheck-holdout.mjs` with no argument
@@ -546,183 +564,76 @@ Read these the same careful way as the ink table:
 ## What is not done
 
 <!-- ═══════════════════════════════════════════════════════════════════════════
-     NOT-DONE BLOCK — the six gaps a reader finds on their own within an hour.
-     Naming them here is worth more than making them findable. Each bullet
-     carries the command or the file that proves the gap is real, so this
-     section is checkable in both directions: nothing here may be softened
-     while the check below it still says what it says, and a bullet whose
-     check stops being true should be deleted rather than reworded.
-
-     Two of the six are limits on the encryption the feature table advertises.
-     They are here because client/src/local/idb.js and client/src/local/auth.js
-     both document them at length and this README used to claim "never enough
-     to read one" and stop. Where the code is more honest than the README, the
-     README is the thing that is wrong.
+     NOT-DONE BLOCK. Every bullet carries the command or the file that proves
+     the gap is real, so this section is checkable in both directions: nothing
+     here may be softened while the check below it still says what it says, and
+     a bullet whose check stops being true should be deleted rather than
+     reworded. Where the code is more honest than this README, the README is
+     the thing that is wrong.
      ═══════════════════════════════════════════════════════════════════════════ -->
 
-Everything above is either measured or labelled as unmeasured. This section is the other half: six
-things a reader would reasonably assume are here, and are not. None of them is a defect — they are
-the edge of what this repo can currently show.
+Everything above is either measured or labelled as unmeasured. This section is the other half:
+what a reader would reasonably assume is here and is not. None of it is hidden anywhere else.
 
-- **No real handwriting has ever been read by this engine.** Every ink figure in
-  [Measured accuracy](#measured-accuracy) — all six suites, without exception — scores ink this repo
-  generated itself. `npm run test:real` is wired up and refuses to invent a number:
-  `client/test/ink-corpus/` holds a README and nothing else, and the suite ends
-  **`REAL-INK SCORE — none (no corpus)`**. The capture tool
-  (`tools/ink-collect/index.html`) exists and works; nobody has written into it. So 94.5% is a
-  statement about simulated writers, and until eight or more different real hands are recorded it
-  cannot be repeated as a statement about a student's page. This is the project's largest evidence
-  gap and [it has its own section](#the-gap-this-table-admits).
+- **Handwriting accuracy on real hands is barely measured.** The repository holds **one** real
+  Apple Pencil writer, 50 expressions, on the *train* split — the split the engine is allowed to
+  learn from, so the number is a diagnostic, not a generalisation. `npm run test:real` scores it:
+  **64.0% of lines exact, 87.0% of characters**, and prints that one writer is too few for any
+  product claim. The release standard in `handwriting/v12/` asks for at least 20 writer-disjoint
+  people, 1,000 expressions and two physical iPad model classes before an accuracy claim is made;
+  `node scripts/ink-physical-study-status.mjs --split test` currently reports **NOT MEASURED** with
+  all 24 planned writers missing. Every other ink figure in this README scores ink the repository
+  generated itself. No amount of code closes this: it needs real people writing on real iPads.
 
-- **No cross-device sync.** Data moves between devices only as files a person carries: a full backup,
-  a task pack, a progress file — export, AirDrop, import. Nothing reconciles two devices that have
-  both been used, and nothing merges: importing a backup on a second device **creates another
-  profile** (`(restored)` appended if the name collides) rather than joining the two histories, and
-  the restored profile comes back **unprotected**, because a backup carries no password verifier and
-  no wrapped key. Practise on the iPad and then on a laptop and you have two separate students as far
-  as this app is concerned. That is the price of having no account and no server, and it is a price,
-  not a feature.
+- **Class 11 and 12 have no NCERT source layer.** 27 of 77 chapters are still served by generators
+  written for the Australian syllabus and are published as such — `node tools/india-production-census.mjs`
+  prints them as **C — mapped but source review missing**. They ask about the right ideas, but
+  nobody has checked them against a Class 11 or 12 NCERT textbook.
 
-- **Encryption at rest hides what a row says, never that it exists — the row counts leak.** This is
-  an accepted, deliberate limit, argued out in `client/src/local/idb.js` under *"What a row count
-  still says"*, and this README used to stop at "never enough to read one". Sealing a row hides its
-  contents and blinding its key hides which idea it is about, but the row is still there and the
-  profile that owns it is still written beside it in the clear — that is exactly what lets IndexedDB
-  find it again. So a raw copy of the database, with **no password and no key held**, still counts:
-  how many days were studied (`activity`, one row per day), how many subtopics were practised
-  (`ratings`, one row each), how many ideas reached the revision schedule (`reviews`), how many
-  achievements were earned (`badges`), and how much work in total (`attempts`, `questions`, `exams`,
-  `rushRuns`, `matchRuns`, `inks`). Never *which* day, *which* subtopic or *which* badge — but the
-  counts are exact, and a count of zero reads as clearly as a count of two hundred. The clear field
-  that makes it countable is exported store by store:
+- **No Indian teacher has reviewed a single question.** The coverage tool says so itself, every
+  time it runs: *"No Indian teacher has read one."* Machine-checked coverage is not editorial
+  review, and this product should not be sold to a family as though it were.
 
-  ```bash
-  node --input-type=module -e "
-  import {ENCRYPTED_STORES} from './client/src/local/idb.js';
-  console.log(ENCRYPTED_STORES.map(([s, owner]) => s + ' keeps ' + owner + ' in the clear').join('\n'));"
-  # ratings keeps pid in the clear   … 13 lines, one per sealed store
-  ```
+- **The JEE previous-year archive is empty.** The intake pipeline exists and is gated
+  (`tools/jee-question-department/`), but **0 of 1,968 candidate questions have been reviewed and
+  published**, so JEE papers are composed from authored generators rather than real past papers.
+  Publishing needs a human reviewer and a decision about rights to the source.
 
-  Record *length* is a second channel, and padding narrows it rather than closing it. Every record is
-  grown with spaces to a 512-byte bucket before it is sealed, which is enough to make a fresh
-  `ratings` row say nothing about which topic it is — one answered question on each of the 84
-  subtopics writes rows of **246–359 bytes of JSON that all land at 528 bytes of ciphertext** — and
-  not enough to hide a practised topic from a new one: **300 questions answered to resolution left 18
-  `ratings` rows spread across the 528, 1,040 and 1,552-byte bands**. `client/src/local/auth.js`
-  states that residual exactly, beside the code that does the padding, including how much of it the
-  subtopic id alone accounts for. Decoy rows would move the counts and were weighed and refused; the
-  reasoning is written where the decision is, so the trade was made in the open rather than missed.
+- **Cross-device sync carries settings, not learning.** The `/v1` sync API and the client worker
+  both exist and are tested, but what actually lands on a second device is the profile and its
+  bookmarks. Practice, exam, rush and match events are uploaded and, on pull, cached rather than
+  replayed into the stores History and Progress read; ratings, spaced-review rows and misconception
+  traps are not uploaded at all. Practise on an iPad and then on a phone and the second device
+  still shows an empty history.
 
-- **A profile with no password gets none of that, and no password is the default.** Every guarantee
-  in the paragraph above is bought with a key derived from a password. A profile that has none has no
-  key, so nothing is sealed for it at all — not the rows, and not the keys they sit at, because
-  blinding is derived from the same data key. Driven through the real backend, an unprotected
-  profile's answered questions leave `ratings` at `<pid>:<subtopic-id>` and `activity` at
-  `<pid>:<the date>`, **zero of those rows sealed**, and the
-  bodies beside them — rating, attempts, per-dot-point history — in plain JSON. (Which subtopic id
-  appears depends on which question the adaptive picker hands out, so the command below prints a
-  different one run to run — `y9-linear`, `y9-probability`, `y9-algebra`. That it is a *readable
-  subtopic id* is the part that does not vary, and the part that matters.) This is the case that
-  matters most and is least likely to be noticed: the standard classroom setup is a teacher with a
-  password and children without one, so a child on a shared iPad is the likeliest unprotected profile
-  in the app. One answered question is enough to show it, through the real backend:
+- **Premium buys nothing yet.** Six premium capabilities are declared in
+  `client/src/platform/entitlements.js` and the billing lifecycle is implemented and tested end to
+  end, but nothing in the app is gated on them: there is no free-tier cap, no paywall, and no
+  configured price. Settings still tells the student everything is unlocked.
 
-  ```bash
-  node --input-type=module -e "
-  import {installBrowserEnv, rawRows} from './client/test/backend-check.mjs';
-  installBrowserEnv();
-  const {dispatch} = await import('./client/src/local/backend.js');
-  const {loadAllBanks} = await import('./client/src/engine/generators/index.js');
-  await loadAllBanks();
-  const kid = (await dispatch('POST', '/profiles', {name: 'Child', year: 9})).user;
-  const q = (await dispatch('POST', '/practice/next', {})).question;
-  for (let i = 0; i < 2; i++) await dispatch('POST', '/practice/' + q.id + '/submit', {answer: '0', ms: 5000});
-  const rows = Object.entries(rawRows()).flatMap(([s, rs]) =>
-    rs.filter(r => r.pid === kid.id).map(r => s + ' @ ' + (r.key ?? r.id) + (r.sealed ? ' [sealed]' : '')));
-  console.log(rows.length + ' rows, ' + rows.filter(r => r.includes('[sealed]')).length + ' sealed');
-  console.log(rows.join('\n'));"
-  # 4 rows, 0 sealed
-  # ratings   @ <pid>:y9-linear        ← the subtopic varies; that it is readable does not
-  # attempts  @ <pid>:000000000001
-  # questions @ <uuid>
-  # activity  @ <pid>:2026-08-21
-  ```
+- **No age or guardian-consent capture.** India's Digital Personal Data Protection Act 2023 treats
+  children's data specially. The app asks for no age band and records no guardian consent, and
+  there are no privacy, terms or refund pages in the product — all of which a subscription store
+  and a payment provider will require.
 
-  The subtopic and the date are in those keys, unblinded, and the row bodies beside them are not
-  sealed at all. Run the same profile with `{name: 'Child', year: 9, password: 'anything-at-all'}` and
-  the same four rows come back **4 sealed**, with the two keys that named something — the subtopic and
-  the date — replaced by opaque tags (`<pid>#h8zY8jp47UZ-mlLAVle4-JjI`). The other two keys are a
-  per-profile counter and a uuid, which named nothing to begin with.
+- **The iPad app has no release pipeline.** The Swift package builds and now carries a real icon
+  and a release audit, but there is no signing, archive or TestFlight path in the repository, and
+  no Apple Developer account, App ID or provisioning profile exists to hang one on.
 
-  One thing such a profile *does* get, stated precisely because it is easy to read as more than it
-  is: every profile carries a sharing keypair from the moment its row is first written, and where
-  there is no password the private half is sealed under a non-extractable AES key this install keeps
-  in its `device` store. That keeps class names, rolls, task titles and subtopic lists out of a *copy
-  of the records* — an export, a JSON dump, a file pulled off the iPad — which is the attack that
-  closed. It is not a password and does not stand in for one: anyone holding the device picks that
-  child out of the picker with nothing to type, script running as this origin can use the wrapping
-  key without ever exporting it, and a backup carrying the browser's own key store carries the
-  wrapping key with it. The line it draws is *"the data does not leave"*, not *"the person holding
-  the device cannot read it"* — and for a profile with no password there is no key material anywhere
-  on the device that could draw the second line. `client/src/local/idb.js` says the same at *"A
-  profile with no password"* and at *"What an attacker can still infer"*. The only fix is a password,
-  and only for the profile that takes one.
+- **Nothing is deployed.** There is no live origin: the container builds and its health contract is
+  gated in CI, but no persistent volume, domain, email provider, payment keys or Apple credentials
+  have been configured, so no student can reach any of the cloud half today.
 
-- **The mistake catalogue has never met a real mistake.** The step diagnoser knows 20 named missteps
-  and is measured at 35/35 authored cases, 795/795 seeded ones and 0 false positives in 816 correct
-  steps ([above](#step-diagnosis)) — every one of which this repo generated. No student's working has
-  been through it. So the measured half is *"when the mistake is one of these 20, it is named"*, and
-  the unmeasured half is the one that decides whether the feature is any good: **what fraction of the
-  slips a real Year 9 makes are in the catalogue at all**. Nothing here can answer that, and the
-  design takes the safe side of it — a line the catalogue cannot explain gets a counterexample rather
-  than an invented reason, and only a confidently named misstep is written into the misconception
-  model:
+- **Accessibility is audited on the Australian screens.** The 38-check gate drives the Australian
+  Home generator and Progress board, because that is where those widgets live. The Indian screens
+  are covered functionally by the India end-to-end flow but have no accessibility audit yet.
 
-  ```bash
-  node --input-type=module -e "
-  import {diagnoseStep} from './client/src/engine/diagnose.js';
-  const d = diagnoseStep({prevText: '3x + 2', brokenText: '7x - 5'});
-  console.log(d.code + ' — ' + d.message);"
-  # counterexample — At x = 2 the line above is 8 and this line is 9.
-  ```
+- **Encryption at rest hides what a row says, never that it exists — the row counts leak,** and a
+  profile with no password gets none of it. Both limits are argued out at length in
+  `client/src/local/idb.js` and `client/src/local/auth.js`; the standard classroom setup, a teacher
+  with a password and children without one, is exactly the case that gets the least protection.
+  Server-side, a cloud replica stores children's learning events as plaintext JSON.
 
-- **No teacher has reviewed any of this, and nothing has been checked against NESA.** The 84
-  subtopics, 252 dot points, exam weights and topic codes in `client/src/engine/curriculum.js` were
-  written by hand — its own header says *"in the style of the Australian Curriculum / NSW syllabus"*,
-  and the word NESA does not appear in the file (`grep -c NESA client/src/engine/curriculum.js` → 0).
-  Only the senior half of the codes are NESA's at all: 48 subtopics carry a real course topic code
-  and the 36 Years 7–10 subtopics carry a stage-and-strand label this project made up, which the
-  feature table above now says rather than calling all 84 "NESA topic codes":
-
-  ```bash
-  node --input-type=module -e "
-  import {SUBTOPICS} from './client/src/engine/curriculum.js';
-  const course = SUBTOPICS.filter(s => /^(MA|MS|ME|MEX)-/.test(s.code));
-  const stage  = SUBTOPICS.filter(s => /^MA[45] · /.test(s.code));
-  console.log(course.length + ' course topic codes, ' + stage.length + ' stage labels, '
-    + (SUBTOPICS.length - course.length - stage.length) + ' neither');"
-  # 48 course topic codes, 36 stage labels, 0 neither
-  ```
-
-  No qualified teacher has read a generated question, a worked solution, a hint or a marking
-  criterion; no dot point has been checked against NESA's published syllabus; the per-subtopic exam
-  weights that drive the predictor and the priorities engine are estimates, not published
-  weightings. `selfcheck.mjs` proves that every generator's own canonical answer passes its own
-  marker at 672,000 / 672,000 — that is internal consistency, and it says nothing about whether the
-  question is on the syllabus, pitched at the right year, or worded the way a marker would word it.
-  The predicted mark inherits this: `bandFor` in `client/src/engine/adaptive.js` maps a computed
-  0–99 score onto the published Band 1–6 / E1–E4 / A–E cut-offs, which is what "calibrated to HSC
-  bands" means and all it means. **No real student mark has ever been compared against a prediction
-  this app made**, so the confidence band is a function of how much you have practised, not a
-  measured error bar.
-
-- **No telemetry — and therefore no field evidence.** The app makes no network call of any kind;
-  `grep -rn "fetch(\|XMLHttpRequest\|sendBeacon\|new WebSocket\|EventSource" client/src` returns
-  nothing, and there is no analytics SDK, no crash reporter and no remote URL in the source at all.
-  That is the privacy promise kept literally, and the cost is symmetrical: nobody here can see a
-  question that renders wrong, a generator that loops, or a step-check that marks a correct method
-  down. There is no usage data behind any claim in this README, and there cannot be — the only
-  route from a broken question to a fix is a person noticing and saying so.
 
 ## Architecture
 
@@ -779,7 +690,7 @@ the edge of what this repo can currently show.
   shell; everything here still runs in a browser, and still reads any single line Vision returns
   nothing for. Ink canvas (`InkCanvas.jsx`), the $P template library (`templates.js`),
   **the bundled CNN: `nn.js` (on-device forward pass), `model-data.js` (a 798 kB module carrying
-  597 kB of trained int8 weights as base64, 3 voters) and `classes.js` (the 56 shape classes it
+  597 kB of trained int8 weights as base64, 3 voters) and `classes.js` (the 58 shape classes it
   predicts)**, the deskewing rasteriser (`raster.js`), stroke smoothing (`smooth.js`), shape
   features (`features.js`), geometry re-ranker
   (`rerank.js` + `rerank-data.js`), per-profile learned templates (`personal.js`), stroke
@@ -799,7 +710,7 @@ the edge of what this repo can currently show.
   a different question in **84 of the 336 cells**. That is deliberate — writing the extras back into
   the client's registry would mean importing this module changed what the client produces — but it
   means a server-side figure is never automatically a client-side one. Two things under `server/`
-  *are* live: **`server/test/selfcheck.mjs`** (the 672,000-check gate, first command in `npm test`)
+  *are* live: **`server/test/selfcheck.mjs`** (the 1,544,000-check gate, first command in `npm test`)
   and **`server/engine/generators/extras.js`** (the 84 extra authored question forms that shim
   layers in, which exist nowhere else).
   Nothing in the shipped client can reach the extras. Read
@@ -882,8 +793,8 @@ are the two rules that matter more than style.
 
 **1 · Every figure is quoted with the command and the sample size that produced it.**
 
-Not "94.5% accuracy". `node client/test/inkcheck-holdout2.mjs 40`, 40 simulated writers × 14 lines =
-560 lines, 529/560 exact, worst writer 71%. A figure without its command is a rumour: it cannot be
+Not "97.3% accuracy". `node client/test/inkcheck-holdout2.mjs 40`, 40 simulated writers × 14 lines =
+560 lines, 545/560 exact, worst writer 86%. A figure without its command is a rumour: it cannot be
 re-run, it cannot be falsified, and it goes stale silently. This block has been wrong before under a
 date stamp reading the very day it was read — **a date is not a measurement**. The same rule kills
 the softer version of the mistake: no headline number may hide the worst case behind it, which is why

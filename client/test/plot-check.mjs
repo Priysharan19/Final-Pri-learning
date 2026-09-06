@@ -181,6 +181,18 @@ const noFunction = validateStoryboard(
 );
 ok(!noFunction.ok, 'a graph on a question with no function is refused');
 
+
+// A "solve = 0" question is a graph question in disguise: the roots asked for
+// are where the curve crosses the axis.
+const solveQ = plotSpecFor({ prompt: 'Solve x^2 - 5x + 6 = 0.' });
+ok(solveQ?.fn === 'x^2 - 5x + 6', `solving a quadratic offers its curve (${JSON.stringify(solveQ && solveQ.fn)})`);
+const solvePlot = buildPlot(solveQ);
+ok(solvePlot.features.roots.length === 2, 'and the curve shows both roots');
+near(Math.min(...solvePlot.features.roots), 2, 1e-3, 'the smaller root is 2');
+near(Math.max(...solvePlot.features.roots), 3, 1e-3, 'the larger root is 3');
+ok(plotSpecFor({ prompt: 'Solve 2x + 3 = 11.' }) === null, 'a one-step linear equation gets no graph');
+ok(plotSpecFor({ prompt: 'Solve for x: 3x - 7 = 2x + 1.' }) === null, 'an equation with terms on both sides gets no graph');
+
 console.log(failures.length
   ? `PLOTTING: FAIL — ${failures.length} of ${pass + failures.length} checks failed\n  · ${failures.join('\n  · ')}`
   : `PLOTTING: PASS — ${pass}/${pass} checks — curves, roots, turning points, tangents, areas, asymptote breaks and transformation frames.`);
