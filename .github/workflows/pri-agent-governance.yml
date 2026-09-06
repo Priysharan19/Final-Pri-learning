@@ -39,6 +39,7 @@ jobs:
           node --check scripts/pri-fleet.mjs
           node --check scripts/pri-mission-control.mjs
           node --check scripts/pri-derived-artifact-sync.mjs
+          node --check scripts/pri-pr-lane.mjs
           node -e "JSON.parse(require('fs').readFileSync('.pri-os/derived-artifacts.json', 'utf8'))"
 
       - name: Validate fleet and mission invariants
@@ -253,6 +254,16 @@ jobs:
           JSON
           node scripts/pri-mission-control.mjs validate-ledger /tmp/pri-ledger-smoke.json qa-release smoke agent/mission/qa-release/smoke R2
 
+      - name: PR lane classifier self-test
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/pri-pr-lane.mjs simulate docs/RELEASE.md README.md | grep -q '"lane":"manual-docs"'
+          node scripts/pri-pr-lane.mjs simulate client/src/pages/Home.jsx | grep -q '"lane":"governed-required"'
+          node scripts/pri-pr-lane.mjs simulate docs/README.md client/src/styles/app.css | grep -q '"lane":"governed-required"'
+          node scripts/pri-pr-lane.mjs simulate .github/workflows/ci.yml | grep -q '"lane":"governed-required"'
+          node scripts/pri-pr-lane.mjs simulate unknown-unowned-path.txt | grep -q '"lane":"governed-required"'
+
       - name: Classify PR diff and parse autonomous metadata
         if: github.event_name == 'pull_request'
         id: meta
@@ -265,9 +276,17 @@ jobs:
           set -euo pipefail
           git fetch --no-tags origin "$BASE_REF"
           node scripts/pri-fleet.mjs risk "origin/$BASE_REF" | tee /tmp/pri-risk.json >> "$GITHUB_STEP_SUMMARY"
+          lane_json="$(node scripts/pri-pr-lane.mjs classify "origin/$BASE_REF")"
+          printf '%s\n' "$lane_json" >> "$GITHUB_STEP_SUMMARY"
+          lane="$(printf '%s' "$lane_json" | node -e "let s='';process.stdin.on('data',d=>s+=d);process.stdin.on('end',()=>process.stdout.write(JSON.parse(s).lane))")"
           if [[ "$HEAD_REF" != agent/mission/* ]]; then
-            echo "autonomous=false" >> "$GITHUB_OUTPUT"
-            exit 0
+            if [[ "$lane" == "manual-docs" ]]; then
+              echo "autonomous=false" >> "$GITHUB_OUTPUT"
+              echo "lane=manual-docs" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            echo "Non-mission branch '$HEAD_REF' touches governed product/release/config/runtime or unowned paths; use agent/mission/<agent>/<mission-id>." >&2
+            exit 1
           fi
           remainder="${HEAD_REF#agent/mission/}"
           agent="${remainder%%/*}"
@@ -285,6 +304,7 @@ jobs:
           node scripts/pri-fleet.mjs guard "$agent" "origin/$BASE_REF"
           node scripts/pri-fleet.mjs compare-risk "$declared_risk" "origin/$BASE_REF"
           echo "autonomous=true" >> "$GITHUB_OUTPUT"
+          echo "lane=governed-pass" >> "$GITHUB_OUTPUT"
           echo "agent=$agent" >> "$GITHUB_OUTPUT"
           echo "mission=$mission" >> "$GITHUB_OUTPUT"
           echo "risk=$declared_risk" >> "$GITHUB_OUTPUT"
