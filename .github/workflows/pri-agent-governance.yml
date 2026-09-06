@@ -1,0 +1,316 @@
+name: Pri Agent Fleet Governance
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+    paths:
+      - 'AGENTS.md'
+      - '.pri-os/**'
+      - 'scripts/pri-*.mjs'
+      - '.github/workflows/pri-agent-*.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+
+concurrency:
+  group: pri-agent-governance-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fleet-contract:
+    name: Autonomous fleet V2 contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Control-plane syntax
+        run: |
+          node --check scripts/pri-fleet.mjs
+          node --check scripts/pri-mission-control.mjs
+          node --check scripts/pri-derived-artifact-sync.mjs
+          node -e "JSON.parse(require('fs').readFileSync('.pri-os/derived-artifacts.json', 'utf8'))"
+
+      - name: Validate fleet and mission invariants
+        run: |
+          node scripts/pri-fleet.mjs validate
+          node scripts/pri-mission-control.mjs validate
+
+      - name: Machine-readable fleet status
+        run: node scripts/pri-fleet.mjs status >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Smoke-test canonical primary ownership
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/pri-fleet.mjs route client/src/ink/native.js | grep -q '"primary":"handwriting"'
+          node scripts/pri-fleet.mjs route server/platform/index.js | grep -q '"primary":"platform"'
+          node scripts/pri-fleet.mjs route server/test/platform-schema-check.mjs | grep -q '"primary":"qa-release"'
+          node scripts/pri-fleet.mjs route client/src/pages/Home.jsx | grep -q '"primary":"student-experience"'
+          node scripts/pri-fleet.mjs route 'ios/PriLearning.swiftpm/Resources/Web/index.html' | grep -q '"derived":"ios-web-mirrors"'
+
+      - name: Derived iPad artifact collaboration policy
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # A domain specialist may carry the generated web mirrors only when
+          # the same diff includes a canonical client/src source change it owns.
+          node scripts/pri-fleet.mjs simulate-guard math-reasoning \
+            client/src/engine/checker.js \
+            'ios/PriLearning.swiftpm/Resources/Web/index.html' \
+            'ios/PriLearning 2.swiftpm/Resources/Web/sw.js'
+          node scripts/pri-fleet.mjs simulate-guard student-experience \
+            client/src/pages/Home.jsx \
+            'ios/PriLearning.swiftpm/Resources/Web/assets/index-example.js'
+
+          # A generated mirror by itself is still iOS-owned.
+          if node scripts/pri-fleet.mjs simulate-guard math-reasoning \
+            'ios/PriLearning.swiftpm/Resources/Web/index.html'; then
+            echo 'derived artifact was accepted without a primary-owned source change' >&2
+            exit 1
+          fi
+
+          # The exception must never cover native package or Swift/Pencil code.
+          if node scripts/pri-fleet.mjs simulate-guard math-reasoning \
+            client/src/engine/checker.js \
+            'ios/PriLearning.swiftpm/Package.swift'; then
+            echo 'derived artifact exception escaped into Package.swift' >&2
+            exit 1
+          fi
+          if node scripts/pri-fleet.mjs simulate-guard math-reasoning \
+            client/src/engine/checker.js \
+            'ios/PriLearning.swiftpm/Sources/PriLearningApp.swift'; then
+            echo 'derived artifact exception escaped into native Swift source' >&2
+            exit 1
+          fi
+
+      - name: Derived sync validator and trust-boundary self-test
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          cat > /tmp/pri-derived-good.json <<'JSON'
+          [
+            "ios/PriLearning.swiftpm/Resources/Web/index.html",
+            "ios/PriLearning 2.swiftpm/Resources/Web/assets/index-example.js"
+          ]
+          JSON
+          node scripts/pri-derived-artifact-sync.mjs validate-paths /tmp/pri-derived-good.json
+          node scripts/pri-derived-artifact-sync.mjs branch agent/mission/math-reasoning/ratio-extra-component-authority | grep -q '"agent":"math-reasoning"'
+
+          cat > /tmp/pri-derived-bad-native.json <<'JSON'
+          ["ios/PriLearning.swiftpm/Package.swift"]
+          JSON
+          if node scripts/pri-derived-artifact-sync.mjs validate-paths /tmp/pri-derived-bad-native.json; then
+            echo 'derived sync accepted native Package.swift' >&2
+            exit 1
+          fi
+
+          cat > /tmp/pri-derived-bad-traversal.json <<'JSON'
+          ["ios/PriLearning.swiftpm/Resources/Web/../../Package.swift"]
+          JSON
+          if node scripts/pri-derived-artifact-sync.mjs validate-paths /tmp/pri-derived-bad-traversal.json; then
+            echo 'derived sync accepted path traversal' >&2
+            exit 1
+          fi
+
+          if node scripts/pri-derived-artifact-sync.mjs branch feature/not-an-agent-mission; then
+            echo 'derived sync accepted a non-mission branch' >&2
+            exit 1
+          fi
+
+          cat > /tmp/pri-derived-meta.json <<'JSON'
+          {
+            "rule_id":"ios-web-mirrors",
+            "required_gate_id":"ios-sync",
+            "head_ref":"agent/mission/math-reasoning/smoke",
+            "head_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "base_sha":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          }
+          JSON
+          node scripts/pri-derived-artifact-sync.mjs validate-metadata \
+            /tmp/pri-derived-meta.json \
+            aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa \
+            bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb \
+            agent/mission/math-reasoning/smoke
+
+          # Behavioral regression for the live failure that originally escaped:
+          # sync:ios creates a new content-hashed file that is untracked. The
+          # packager must capture it, plus tracked modifications/deletions, while
+          # leaving every path outside the two declared mirror roots unstaged.
+          fixture="$(mktemp -d)"
+          repo="$fixture/repo"
+          out="$fixture/out"
+          git init -q "$repo"
+          git -C "$repo" config user.name 'Pri Fleet Test'
+          git -C "$repo" config user.email 'pri-fleet-test@invalid.example'
+          mkdir -p \
+            "$repo/ios/PriLearning.swiftpm/Resources/Web/assets" \
+            "$repo/ios/PriLearning 2.swiftpm/Resources/Web/assets"
+          printf 'old-index\n' > "$repo/ios/PriLearning.swiftpm/Resources/Web/index.html"
+          printf 'old-index\n' > "$repo/ios/PriLearning 2.swiftpm/Resources/Web/index.html"
+          printf 'old-payload\n' > "$repo/ios/PriLearning.swiftpm/Resources/Web/assets/index-old.js"
+          printf 'old-payload\n' > "$repo/ios/PriLearning 2.swiftpm/Resources/Web/assets/index-old.js"
+          git -C "$repo" add .
+          git -C "$repo" commit -qm seed
+
+          printf 'new-index\n' > "$repo/ios/PriLearning.swiftpm/Resources/Web/index.html"
+          printf 'new-index\n' > "$repo/ios/PriLearning 2.swiftpm/Resources/Web/index.html"
+          rm "$repo/ios/PriLearning.swiftpm/Resources/Web/assets/index-old.js"
+          rm "$repo/ios/PriLearning 2.swiftpm/Resources/Web/assets/index-old.js"
+          printf 'new-generated-payload\n' > "$repo/ios/PriLearning.swiftpm/Resources/Web/assets/index-newhash.js"
+          printf 'new-generated-payload\n' > "$repo/ios/PriLearning 2.swiftpm/Resources/Web/assets/index-newhash.js"
+          printf 'native-trap\n' > "$repo/ios/PriLearning.swiftpm/Package.swift"
+          printf 'outside-trap\n' > "$repo/outside.txt"
+
+          node scripts/pri-derived-artifact-sync.mjs package \
+            "$repo" "$out" \
+            agent/mission/math-reasoning/smoke \
+            aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa \
+            bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+          node scripts/pri-derived-artifact-sync.mjs validate-paths "$out/paths.json"
+
+          node - "$out/paths.json" <<'NODE'
+          const fs = require('fs');
+          const paths = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+          const required = [
+            'ios/PriLearning.swiftpm/Resources/Web/assets/index-newhash.js',
+            'ios/PriLearning 2.swiftpm/Resources/Web/assets/index-newhash.js',
+            'ios/PriLearning.swiftpm/Resources/Web/assets/index-old.js',
+            'ios/PriLearning 2.swiftpm/Resources/Web/assets/index-old.js',
+            'ios/PriLearning.swiftpm/Resources/Web/index.html',
+            'ios/PriLearning 2.swiftpm/Resources/Web/index.html'
+          ];
+          for (const file of required) {
+            if (!paths.includes(file)) throw new Error(`packager omitted ${file}`);
+          }
+          if (paths.some(file => file.includes('Package.swift') || file === 'outside.txt')) {
+            throw new Error(`packager escaped derived roots: ${JSON.stringify(paths)}`);
+          }
+          NODE
+
+          git -C "$repo" diff --cached --diff-filter=A --name-only | grep -Fxq \
+            'ios/PriLearning.swiftpm/Resources/Web/assets/index-newhash.js'
+          git -C "$repo" diff --cached --diff-filter=A --name-only | grep -Fxq \
+            'ios/PriLearning 2.swiftpm/Resources/Web/assets/index-newhash.js'
+          git -C "$repo" diff --cached --diff-filter=D --name-only | grep -Fxq \
+            'ios/PriLearning.swiftpm/Resources/Web/assets/index-old.js'
+          if git -C "$repo" diff --cached --name-only | grep -Eq 'Package\.swift|^outside\.txt$'; then
+            echo 'derived packager staged an out-of-root trap' >&2
+            exit 1
+          fi
+          grep -Fq 'new-generated-payload' "$out/mirrors.patch"
+          rm -rf "$fixture"
+
+          test -s .github/workflows/pri-agent-derived-sync.yml
+          grep -Fq 'pull_request_target:' .github/workflows/pri-agent-derived-sync.yml
+          grep -Fq 'pri-derived-artifact-sync.mjs package' .github/workflows/pri-agent-derived-sync.yml
+          apply_job="$(awk '/^  apply-derived:/{flag=1} flag{print}' .github/workflows/pri-agent-derived-sync.yml)"
+          printf '%s\n' "$apply_job" | grep -Fq 'contents: write'
+          printf '%s\n' "$apply_job" | grep -Fq 'Apply validated mirrors without executing candidate code'
+          if printf '%s\n' "$apply_job" | grep -Eq 'npm (ci|run)|working-directory:[[:space:]]*candidate'; then
+            echo 'write-authority job must never execute candidate npm code' >&2
+            exit 1
+          fi
+
+      - name: Mission ranker preempts critical categories
+        shell: bash
+        run: |
+          cat > /tmp/pri-candidates.json <<'JSON'
+          [
+            {"id":"normal-high","category":"normal","severity":5,"student_impact":5,"unblock_value":5,"recurrence":5,"strategic_value":5,"diagnosis_confidence":5,"effort":0,"regression_risk":0},
+            {"id":"security-first","category":"security","severity":1,"student_impact":1,"unblock_value":1,"recurrence":1,"strategic_value":1,"diagnosis_confidence":1,"effort":5,"regression_risk":5}
+          ]
+          JSON
+          first="$(node scripts/pri-mission-control.mjs rank /tmp/pri-candidates.json | node -e "let s='';process.stdin.on('data',d=>s+=d);process.stdin.on('end',()=>process.stdout.write(JSON.parse(s)[0].id))")"
+          test "$first" = "security-first"
+
+      - name: Mission ledger validator self-test
+        shell: bash
+        run: |
+          set -euo pipefail
+          now="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          cat > /tmp/pri-ledger-smoke.json <<JSON
+          [
+            {
+              "number": 1,
+              "title": "[PRI-MISSION] smoke",
+              "updated_at": "$now",
+              "body": "Pri-Mission-ID: smoke\nPri-Mission-Status: ACTIVE\nPri-Agent: qa-release\nPri-Branch: agent/mission/qa-release/smoke\nPri-Risk: R2\nPri-Base-SHA: 8458a735fda3637656a8e9e23329f235b5277fb6\nPri-Attempt: 0\nPri-Failure-Fingerprint: none"
+            }
+          ]
+          JSON
+          node scripts/pri-mission-control.mjs validate-ledger /tmp/pri-ledger-smoke.json qa-release smoke agent/mission/qa-release/smoke R2
+
+      - name: Classify PR diff and parse autonomous metadata
+        if: github.event_name == 'pull_request'
+        id: meta
+        shell: bash
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+          BASE_REF: ${{ github.base_ref }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin "$BASE_REF"
+          node scripts/pri-fleet.mjs risk "origin/$BASE_REF" | tee /tmp/pri-risk.json >> "$GITHUB_STEP_SUMMARY"
+          if [[ "$HEAD_REF" != agent/mission/* ]]; then
+            echo "autonomous=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          remainder="${HEAD_REF#agent/mission/}"
+          agent="${remainder%%/*}"
+          mission="${remainder#*/}"
+          if [[ -z "$agent" || -z "$mission" || "$mission" == "$remainder" ]]; then
+            echo "Invalid autonomous branch; expected agent/mission/<agent>/<mission-id>" >&2
+            exit 1
+          fi
+          declared_agent="$(printf '%s\n' "$PR_BODY" | sed -n 's/^Pri-Agent:[[:space:]]*//p' | head -1)"
+          declared_mission="$(printf '%s\n' "$PR_BODY" | sed -n 's/^Pri-Mission-ID:[[:space:]]*//p' | head -1)"
+          declared_risk="$(printf '%s\n' "$PR_BODY" | sed -n 's/^Pri-Risk:[[:space:]]*//p' | head -1)"
+          test "$declared_agent" = "$agent"
+          test "$declared_mission" = "$mission"
+          [[ "$declared_risk" =~ ^R[1-4]$ ]]
+          node scripts/pri-fleet.mjs guard "$agent" "origin/$BASE_REF"
+          node scripts/pri-fleet.mjs compare-risk "$declared_risk" "origin/$BASE_REF"
+          echo "autonomous=true" >> "$GITHUB_OUTPUT"
+          echo "agent=$agent" >> "$GITHUB_OUTPUT"
+          echo "mission=$mission" >> "$GITHUB_OUTPUT"
+          echo "risk=$declared_risk" >> "$GITHUB_OUTPUT"
+
+      - name: Snapshot GitHub-Issue mission ledger
+        if: github.event_name == 'pull_request' && steps.meta.outputs.autonomous == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const issues = await github.paginate(github.rest.issues.listForRepo, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              per_page: 100
+            });
+            fs.writeFileSync('/tmp/pri-issues.json', JSON.stringify(issues.filter(issue => !issue.pull_request), null, 2));
+
+      - name: Verify active writer lease
+        if: github.event_name == 'pull_request' && steps.meta.outputs.autonomous == 'true'
+        shell: bash
+        env:
+          EXPECTED_AGENT: ${{ steps.meta.outputs.agent }}
+          EXPECTED_MISSION: ${{ steps.meta.outputs.mission }}
+          EXPECTED_BRANCH: ${{ github.head_ref }}
+          EXPECTED_RISK: ${{ steps.meta.outputs.risk }}
+        run: |
+          set -euo pipefail
+          node scripts/pri-mission-control.mjs validate-ledger /tmp/pri-issues.json "$EXPECTED_AGENT" "$EXPECTED_MISSION" "$EXPECTED_BRANCH" "$EXPECTED_RISK"

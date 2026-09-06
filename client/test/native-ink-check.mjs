@@ -198,5 +198,44 @@ check('Foundation and rescue readers both reject stale revisions',
   && swift.includes('native-rescue-stale')
   && (swift.match(/revisionIsCurrent\(revision\)/g)?.length || 0) >= 4);
 
+// ── release configuration belongs to the same native trust boundary ─────────
+const packageRoot = join(HERE, '../../ios/PriLearning.swiftpm');
+const duplicateRoot = join(HERE, '../../ios/PriLearning 2.swiftpm');
+const packageSwift = readFileSync(join(packageRoot, 'Package.swift'), 'utf8');
+const duplicatePackageSwift = readFileSync(join(duplicateRoot, 'Package.swift'), 'utf8');
+const infoPlist = readFileSync(join(packageRoot, 'Info.plist'), 'utf8');
+const duplicateInfoPlist = readFileSync(join(duplicateRoot, 'Info.plist'), 'utf8');
+const webShell = readFileSync(join(packageRoot, 'WebShell.swift'), 'utf8');
+const duplicateWebShell = readFileSync(join(duplicateRoot, 'WebShell.swift'), 'utf8');
+const iconManifest = readFileSync(join(packageRoot, 'Assets.xcassets/AppIcon.appiconset/Contents.json'), 'utf8');
+const duplicateIconManifest = readFileSync(join(duplicateRoot, 'Assets.xcassets/AppIcon.appiconset/Contents.json'), 'utf8');
+const icon = readFileSync(join(packageRoot, 'Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png'));
+const duplicateIcon = readFileSync(join(duplicateRoot, 'Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png'));
+
+check('native packages keep identical release manifests', packageSwift === duplicatePackageSwift);
+check('release package never falls back to a placeholder app icon',
+  !packageSwift.includes('.placeholder(') && packageSwift.includes('appIcon: .asset("AppIcon")'));
+check('the AppIcon asset catalog is processed by SwiftPM', packageSwift.includes('.process("Assets.xcassets")'));
+check('native packages keep identical release plist configuration', infoPlist === duplicateInfoPlist);
+check('native cloud origin remains build-supplied and fail-closed',
+  infoPlist.includes('<key>PRICloudOrigin</key>') && infoPlist.includes('$(PRI_CLOUD_ORIGIN)'));
+check('export-compliance declaration remains explicit',
+  /<key>ITSAppUsesNonExemptEncryption<\/key>\s*<false\/>/.test(infoPlist));
+check('native packages keep identical AppIcon manifests', iconManifest === duplicateIconManifest);
+const iconJson = JSON.parse(iconManifest);
+check('AppIcon manifest declares the production 1024px iOS source',
+  iconJson.images?.some(entry => entry.filename === 'AppIcon-1024.png'
+    && entry.idiom === 'universal' && entry.platform === 'ios' && entry.size === '1024x1024'));
+check('native packages keep byte-identical AppIcon images', icon.equals(duplicateIcon));
+check('AppIcon is a real 1024×1024 PNG',
+  icon.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))
+  && icon.readUInt32BE(16) === 1024 && icon.readUInt32BE(20) === 1024);
+check('AppIcon source is opaque RGB rather than alpha-dependent artwork', icon[25] === 2, `PNG colour type ${icon[25]}`);
+check('duplicate native shell remains byte-identical', webShell === duplicateWebShell);
+const debugInspector = /#if DEBUG[\s\S]*?webView\.isInspectable = true[\s\S]*?#endif/.exec(webShell)?.[0] || '';
+check('Web Inspector is debug-only', Boolean(debugInspector));
+check('release shell has no inspectability assignment outside DEBUG',
+  !webShell.replace(debugInspector, '').includes('isInspectable'));
+
 console.log(`\n${failures === 0 ? 'PASS' : `FAIL — ${failures} problem(s)`}`);
 process.exit(failures === 0 ? 0 : 1);

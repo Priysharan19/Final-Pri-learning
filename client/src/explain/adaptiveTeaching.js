@@ -45,8 +45,18 @@ function bounded(value, low, high, fallback = 0) {
 
 function sessionAccuracy(studentContext = {}) {
   const answered = bounded(studentContext?.session?.answered, 0, 10000, 0);
-  const correct = bounded(studentContext?.session?.correct, 0, answered, 0);
-  return answered > 0 ? correct / answered : null;
+  if (answered <= 0) return null;
+
+  // Missing correctness evidence is not negative evidence. Keep adaptation
+  // neutral until the session model supplies a finite correctness count rather
+  // than silently turning incomplete telemetry into a 0% accuracy signal.
+  const rawCorrect = studentContext?.session?.correct;
+  if (rawCorrect == null || (typeof rawCorrect === 'string' && rawCorrect.trim() === '')) return null;
+  const numericCorrect = Number(rawCorrect);
+  if (!Number.isFinite(numericCorrect)) return null;
+
+  const correct = bounded(numericCorrect, 0, answered, 0);
+  return correct / answered;
 }
 
 function evidenceFocus(payload = {}) {

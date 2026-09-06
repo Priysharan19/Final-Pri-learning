@@ -14,7 +14,7 @@
 //            is a hard gate: one false positive fails the suite.
 // ─────────────────────────────────────────────────────────────────────────────
 import { diagnoseStep, stepTrapKey, DIAGNOSIS_CODES } from '../src/engine/diagnose.js';
-import { stepCheck } from '../src/engine/checker.js';
+import { stepCheck, checkAnswer } from '../src/engine/checker.js';
 
 // The floor the sweep must hold. Set at what the engine measures today, so a
 // regression that costs even one case fails the suite rather than passing quietly.
@@ -319,6 +319,16 @@ for (const junk of ['', '   ', '???', 'because I said so', '=', '((((', 'x = ', 
 let threw = false;
 try { diagnoseStep({}); diagnoseStep({ brokenText: 'x = 1', meta: { kind: 'equation' } }); } catch { threw = true; }
 ok('survives a missing previous line and a half-built meta', !threw);
+
+// ── Ratio input authority regression ────────────────────────────────────────
+console.log('\nRATIO INPUT AUTHORITY');
+const ratioQuestion = { answerType: 'ratio', answer: { a: 2, b: 3 } };
+for (const valid of ['2:3', '4:6', '2 to 3', '2/3']) {
+  ok(`accepts valid two-part ratio ${valid}`, checkAnswer(ratioQuestion, valid).correct === true);
+}
+for (const malformed of ['2:3:999', '2/3/999', '2::3', '2:', ':3', '2:3/4']) {
+  ok(`rejects malformed ratio ${malformed}`, checkAnswer(ratioQuestion, malformed).correct === false);
+}
 
 // ── Trap keys ───────────────────────────────────────────────────────────────
 console.log('\nTRAP KEYS');

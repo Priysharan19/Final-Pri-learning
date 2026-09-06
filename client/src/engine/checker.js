@@ -17,8 +17,21 @@ import { cleanInput, parseNumericInput, checkAnswer as coreCheckAnswer } from '.
 
 export { cleanInput, parseNumericInput };
 
+function malformedRatioInput(rawInput) {
+  const s = cleanInput(rawInput).replace(/\bto\b/gi, ':').replace(/\s+/g, '');
+  const hasColon = s.includes(':');
+  const hasSlash = s.includes('/');
+  if (hasColon && hasSlash) return true;
+  if (!hasColon && !hasSlash) return false;
+  const parts = s.split(hasColon ? ':' : '/');
+  return parts.length !== 2 || parts.some(part => part === '');
+}
+
 export function checkAnswer(question, rawInput) {
   if (question?.answerType === 'working') return checkWorking(question, String(rawInput ?? ''));
+  if (question?.answerType === 'ratio' && malformedRatioInput(rawInput)) {
+    return { correct: false, feedback: 'Write the ratio with exactly two parts, like 2 : 3.' };
+  }
   return coreCheckAnswer(question, rawInput);
 }
 

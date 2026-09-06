@@ -66,7 +66,11 @@ final class InkBridge: NSObject, InkSurfaceDelegate {
         case "mount":
             applyAppearance(message)
             updateGeometry(message)
-            surface.clear()
+            // A mount is a fresh sheet. Reset drawing and history together so
+            // Undo on question B can never resurrect strokes from question A.
+            // Restored strokes, if any, arrive through setStrokes and establish
+            // the new sheet's baseline.
+            surface.resetForNewSheet()
             isMounted = true
             clipView.isHidden = false
             applyLayout()

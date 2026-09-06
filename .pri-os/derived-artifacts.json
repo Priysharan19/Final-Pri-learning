@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "artifacts": [
+    {
+      "id": "ios-web-mirrors",
+      "patterns": [
+        "ios/PriLearning.swiftpm/Resources/Web/**",
+        "ios/PriLearning 2.swiftpm/Resources/Web/**"
+      ],
+      "canonical_owner": "ios-native",
+      "source_patterns": [
+        "client/src/**"
+      ],
+      "producer": "npm run build && npm run sync:ios",
+      "required_gate_id": "ios-sync",
+      "requires_primary_owned_source": true
+    }
+  ]
+}
