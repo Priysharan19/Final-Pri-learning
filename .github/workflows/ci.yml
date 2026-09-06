@@ -100,6 +100,12 @@ jobs:
           node server/test/verification-enforcement-check.mjs
           node server/test/housekeeping-check.mjs
           node server/test/production-runtime-image-check.mjs
+      - name: Billing lifecycle, database operations and HTTP journeys
+        run: |
+          node server/test/billing-cancel-refund-check.mjs
+          node server/test/billing-webhook-router-check.mjs
+          node server/test/platform-db-operations-check.mjs
+          node server/test/platform-http-journeys-check.mjs
       - name: Commercial platform schema contract
         run: node server/test/platform-schema-check.mjs
       - name: Platform migration contract

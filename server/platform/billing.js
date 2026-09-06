@@ -3,6 +3,33 @@ import { applyVerifiedEntitlement } from './entitlements.js';
 import { rateLimit, requireSession, requireVerifiedEmail, sha256 } from './security.js';
 
 const PROVIDERS = new Set(['apple', 'google', 'web']);
+// Lifecycle states in which a web (Razorpay) subscription still has a mandate
+// that can charge again and therefore something the student can cancel.
+const CANCELLABLE = new Set(['trialing', 'active', 'grace', 'past_due', 'paused']);
+const APPLE_MANAGE_URL = 'https://apps.apple.com/account/subscriptions';
+
+/**
+ * Server-side view used by GET /billing/manage and the cancel endpoint. A
+ * subscription is cancellable only while the verified entitlement snapshot is
+ * provider 'web' in a chargeable state and the bound Razorpay subscription has
+ * no pending cancellation. Nothing here trusts client state.
+ */
+export function webSubscriptionManageState(db, accountId, { adapterAvailable = false } = {}) {
+  const snapshot = db.prepare('SELECT plan,status,provider,current_period_end,grace_until FROM entitlement_snapshots WHERE account_id=?').get(accountId);
+  const binding = db.prepare(`SELECT provider_subscription_id,cancel_requested_at,cancel_mode FROM billing_subscriptions
+    WHERE provider='web' AND account_id=? ORDER BY last_effective_at DESC, created_at DESC LIMIT 1`).get(accountId);
+  const live = !!snapshot && snapshot.provider === 'web' && CANCELLABLE.has(snapshot.status);
+  const periodEnd = live ? (snapshot.status === 'grace' ? snapshot.grace_until : snapshot.current_period_end) || null : null;
+  const cancelling = live && !!binding?.cancel_requested_at;
+  return {
+    provider: 'razorpay',
+    cancellable: adapterAvailable && live && !!binding && !binding.cancel_requested_at,
+    cancelling,
+    status: live ? snapshot.status : 'none',
+    currentPeriodEnd: periodEnd,
+    cancelRequestedAt: cancelling ? binding.cancel_requested_at : null
+  };
+}
 
 function positiveInt(name, fallback) {
   const raw = String(process.env[name] || '').trim();
@@ -53,10 +80,35 @@ function validateVerifiedResult(result, provider) {
   return result;
 }
 
-export function createBillingRouter(db, { verifiers = {}, checkout = {}, native = {} } = {}) {
+export function createBillingRouter(db, { verifiers = {}, checkout = {}, native = {}, lifecycle = {} } = {}) {
   const router = Router();
 
   router.get('/config', (req, res) => res.json(commercialConfig()));
+
+  // Where a student manages each provider's subscription. Apple subscriptions
+  // are managed only through the App Store; web subscriptions cancel here.
+  router.get('/manage', requireSession(db), (req, res) => {
+    const web = webSubscriptionManageState(db, req.platformSession.account_id, {
+      adapterAvailable: typeof lifecycle.web?.cancel === 'function'
+    });
+    res.set('Cache-Control', 'no-store');
+    res.json({ web, apple: { manageUrl: APPLE_MANAGE_URL } });
+  });
+
+  // Cancel at the end of the current billing cycle. The entitlement snapshot is
+  // untouched here: Premium stays active until currentPeriodEnd and the verified
+  // subscription.cancelled/completed webhook is what expires it.
+  router.post('/web/cancel', requireSession(db), rateLimit(db, 'billing-cancel-web', { limit: 6, windowMs: 60 * 60 * 1000 }), async (req, res, next) => {
+    const cancel = lifecycle.web?.cancel;
+    if (typeof cancel !== 'function') return res.status(503).json({ error: { code: 'BILLING_PROVIDER_NOT_CONFIGURED', message: 'Web subscription management is not configured on this deployment.' } });
+    try {
+      const result = await cancel({ accountId: req.platformSession.account_id, atCycleEnd: true, reason: 'user', request: req });
+      if (result?.status === 'none') {
+        return res.status(409).json({ error: { code: 'BILLING_SUBSCRIPTION_NOT_CANCELLABLE', message: 'This account has no active web subscription to cancel.' } });
+      }
+      res.json({ status: 'cancelling', currentPeriodEnd: result.currentPeriodEnd ?? null, provider: 'web', subscriptionId: result.subscriptionId || null, requestedAt: result.requestedAt || null });
+    } catch (err) { next(err); }
+  });
 
   router.get('/status', requireSession(db), (req, res) => {
     const row = db.prepare('SELECT plan,status,provider,product_id,current_period_end,grace_until,source_version,updated_at FROM entitlement_snapshots WHERE account_id=?').get(req.platformSession.account_id);

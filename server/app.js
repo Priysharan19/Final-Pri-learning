@@ -70,7 +70,8 @@ export async function createServerApp(db, {
   app.use('/v1', createPlatformRouter(db, {
     billingVerifiers: { ...webBilling.verifiers, ...appleBilling.verifiers },
     billingCheckout: webBilling.checkout,
-    billingNative: appleBilling.native
+    billingNative: appleBilling.native,
+    billingLifecycle: webBilling.lifecycle
   }));
 
   if (legacy && !production) {

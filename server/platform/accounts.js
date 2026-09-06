@@ -128,7 +128,7 @@ export async function authorizeAccountDeletion(db, accountId, body = {}, identit
   return { method: provider, subject: identity.subject };
 }
 
-export function createAccountRouter(db) {
+export function createAccountRouter(db, { beforeDelete = null } = {}) {
   ensureDeliveryTable(db);
   const router = Router();
 
@@ -351,6 +351,10 @@ export function createAccountRouter(db) {
       }
       await authorizeAccountDeletion(db, req.platformSession.account_id, body);
       const accountId = req.platformSession.account_id;
+      // Provider subscriptions outlive our rows: a deleted account must never
+      // keep being charged. The hook cancels at the provider first and aborts
+      // the deletion (with a retryable status) when the provider is unreachable.
+      if (typeof beforeDelete === 'function') await beforeDelete({ accountId, request: req });
       db.prepare('DELETE FROM accounts WHERE id = ?').run(accountId); // foreign keys cascade cloud student data
       clearSessionCookies(res);
       res.json({ deleted: true });

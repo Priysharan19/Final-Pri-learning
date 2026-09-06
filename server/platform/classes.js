@@ -19,6 +19,33 @@ function teacherOwns(db, teacherId, classId) {
   return !!db.prepare('SELECT id FROM classes WHERE id=? AND teacher_account_id=? AND archived_at IS NULL').get(classId, teacherId);
 }
 
+function staffOwns(db, session, classId) {
+  return session.role === 'admin' || teacherOwns(db, session.account_id, classId);
+}
+
+function issueClassCode(db) {
+  let code;
+  let hash;
+  for (let attempts = 0; attempts < 8; attempts++) {
+    code = classCode(); hash = sha256(code);
+    if (!db.prepare('SELECT 1 FROM classes WHERE join_code_hash=?').get(hash)) break;
+  }
+  return { code, hash };
+}
+
+function publicClass(row) {
+  return { id: row.id, name: row.name, createdAt: row.created_at, archived: !!row.archived_at, archivedAt: row.archived_at || null };
+}
+
+function publicAssignmentRow(row) {
+  let specification = {};
+  try { specification = JSON.parse(row.specification_json || '{}'); } catch { specification = {}; }
+  return {
+    id: row.id, classId: row.class_id, title: row.title, specification, dueAt: row.due_at,
+    createdAt: row.created_at, archived: !!row.archived_at, archivedAt: row.archived_at || null
+  };
+}
+
 function audit(db, actor, action, targetKind, targetId, metadata = {}, now = Date.now()) {
   db.prepare(`INSERT INTO audit_log(actor_account_id,action,target_kind,target_id,metadata_json,created_at) VALUES (?,?,?,?,?,?)`)
     .run(actor, action, targetKind, targetId, JSON.stringify(metadata), now);
@@ -97,18 +124,84 @@ export function createClassRouter(db) {
   router.post('/', requireVerifiedEmail, requireRole('teacher', 'admin'), rateLimit(db, 'class-create', { limit: 20, windowMs: 60 * 60 * 1000 }), (req, res) => {
     const name = cleanTitle(req.body?.name, 120);
     if (!name) return res.status(400).json({ error: { code: 'CLASS_NAME_INVALID', message: 'Class name is required.' } });
-    let code;
-    let hash;
-    for (let attempts = 0; attempts < 8; attempts++) {
-      code = classCode(); hash = sha256(code);
-      if (!db.prepare('SELECT 1 FROM classes WHERE join_code_hash=?').get(hash)) break;
-    }
+    const { code, hash } = issueClassCode(db);
     const classId = id('cls');
     const now = Date.now();
-    db.prepare('INSERT INTO classes(id,teacher_account_id,name,join_code_hash,created_at) VALUES (?,?,?,?,?)')
-      .run(classId, req.platformSession.account_id, name, hash, now);
+    db.prepare('INSERT INTO classes(id,teacher_account_id,name,join_code_hash,join_code,join_code_rotated_at,created_at) VALUES (?,?,?,?,?,?,?)')
+      .run(classId, req.platformSession.account_id, name, hash, code, now, now);
     audit(db, req.platformSession.account_id, 'class.create', 'class', classId, {}, now);
     res.status(201).json({ class: { id: classId, name, createdAt: now }, joinCode: code });
+  });
+
+  // Teachers lose codes: reveal the current one (audited) or rotate it so a
+  // leaked code stops admitting students. Rotation never touches the roster.
+  router.get('/:classId/join-code', requireRole('teacher', 'admin'), (req, res) => {
+    const classId = String(req.params.classId || '');
+    if (!staffOwns(db, req.platformSession, classId)) return res.status(404).json({ error: { code: 'CLASS_NOT_FOUND', message: 'Class not found.' } });
+    const row = db.prepare('SELECT join_code,join_code_rotated_at FROM classes WHERE id=? AND archived_at IS NULL').get(classId);
+    if (!row) return res.status(404).json({ error: { code: 'CLASS_NOT_FOUND', message: 'Class not found.' } });
+    if (!row.join_code) return res.status(409).json({ error: { code: 'JOIN_CODE_UNAVAILABLE', message: 'This class predates recoverable codes. Rotate the code to issue a new one.' } });
+    audit(db, req.platformSession.account_id, 'class.join-code.reveal', 'class', classId);
+    res.set('Cache-Control', 'no-store');
+    res.json({ joinCode: row.join_code, rotatedAt: row.join_code_rotated_at });
+  });
+
+  router.post('/:classId/join-code/rotate', requireRole('teacher', 'admin'), rateLimit(db, 'class-code-rotate', { limit: 30, windowMs: 60 * 60 * 1000 }), (req, res) => {
+    const classId = String(req.params.classId || '');
+    if (!staffOwns(db, req.platformSession, classId)) return res.status(404).json({ error: { code: 'CLASS_NOT_FOUND', message: 'Class not found.' } });
+    if (!db.prepare('SELECT 1 FROM classes WHERE id=? AND archived_at IS NULL').get(classId)) return res.status(404).json({ error: { code: 'CLASS_NOT_FOUND', message: 'Class not found.' } });
+    const { code, hash } = issueClassCode(db);
+    const now = Date.now();
+    db.transaction(() => {
+      db.prepare('UPDATE classes SET join_code_hash=?,join_code=?,join_code_rotated_at=? WHERE id=?').run(hash, code, now, classId);
+      audit(db, req.platformSession.account_id, 'class.join-code.rotate', 'class', classId, {}, now);
+    })();
+    res.set('Cache-Control', 'no-store');
+    res.json({ joinCode: code, rotatedAt: now });
+  });
+
+  // Rename and archive/restore. Archiving hides the class from students and
+  // closes the join code without deleting any submission history.
+  router.patch('/:classId', requireRole('teacher', 'admin'), (req, res) => {
+    const classId = String(req.params.classId || '');
+    const row = req.platformSession.role === 'admin'
+      ? db.prepare('SELECT * FROM classes WHERE id=?').get(classId)
+      : db.prepare('SELECT * FROM classes WHERE id=? AND teacher_account_id=?').get(classId, req.platformSession.account_id);
+    if (!row) return res.status(404).json({ error: { code: 'CLASS_NOT_FOUND', message: 'Class not found.' } });
+    const body = plain(req.body) ? req.body : {};
+    const now = Date.now();
+    const changes = [];
+    let name = row.name;
+    let archivedAt = row.archived_at;
+    if (body.name !== undefined) {
+      const clean = cleanTitle(body.name, 120);
+      if (!clean) return res.status(400).json({ error: { code: 'CLASS_NAME_INVALID', message: 'Class name is required.' } });
+      if (clean !== row.name) { name = clean; changes.push(['class.rename', { from: row.name, to: clean }]); }
+    }
+    if (body.archived !== undefined) {
+      if (typeof body.archived !== 'boolean') return res.status(400).json({ error: { code: 'CLASS_ARCHIVE_INVALID', message: 'archived must be true or false.' } });
+      if (body.archived && !row.archived_at) { archivedAt = now; changes.push(['class.archive', {}]); }
+      else if (!body.archived && row.archived_at) { archivedAt = null; changes.push(['class.restore', {}]); }
+    }
+    if (changes.length) {
+      db.transaction(() => {
+        db.prepare('UPDATE classes SET name=?,archived_at=? WHERE id=?').run(name, archivedAt, classId);
+        for (const [action, metadata] of changes) audit(db, req.platformSession.account_id, action, 'class', classId, metadata, now);
+      })();
+    }
+    res.json({ class: publicClass({ ...row, name, archived_at: archivedAt }), changed: changes.map(([action]) => action) });
+  });
+
+  // A student may leave a class at any time; the teacher sees the roster shrink
+  // and can re-admit with the join code. Submissions are retained.
+  router.post('/:classId/leave', requireRole('student'), (req, res) => {
+    const classId = String(req.params.classId || '');
+    const now = Date.now();
+    const info = db.prepare('UPDATE class_members SET removed_at=? WHERE class_id=? AND student_account_id=? AND removed_at IS NULL')
+      .run(now, classId, req.platformSession.account_id);
+    if (info.changes !== 1) return res.status(404).json({ error: { code: 'CLASS_NOT_FOUND', message: 'You are not a member of this class.' } });
+    audit(db, req.platformSession.account_id, 'class.leave', 'class', classId, {}, now);
+    res.json({ left: true, classId, leftAt: now });
   });
 
   router.post('/join', requireVerifiedEmail, requireRole('student'), rateLimit(db, 'class-join', { limit: 20, windowMs: 60 * 60 * 1000 }), (req, res) => {
@@ -164,9 +257,63 @@ export function createClassRouter(db) {
   router.delete('/:classId/students/:studentId', requireRole('teacher', 'admin'), (req, res) => {
     const classId = String(req.params.classId || '');
     if (req.platformSession.role !== 'admin' && !teacherOwns(db, req.platformSession.account_id, classId)) return res.status(404).json({ error: { code: 'CLASS_NOT_FOUND', message: 'Class not found.' } });
+    const studentId = String(req.params.studentId || '');
+    const now = Date.now();
     const info = db.prepare('UPDATE class_members SET removed_at=? WHERE class_id=? AND student_account_id=? AND removed_at IS NULL')
-      .run(Date.now(), classId, String(req.params.studentId || ''));
+      .run(now, classId, studentId);
+    if (info.changes === 1) audit(db, req.platformSession.account_id, 'class.student.remove', 'class', classId, { studentId }, now);
     res.json({ removed: info.changes === 1 });
+  });
+
+  // Edit or archive/restore an assignment. Archiving removes it from student
+  // inboxes and blocks new submissions while keeping returned feedback intact.
+  router.patch('/:classId/assignments/:assignmentId', requireRole('teacher', 'admin'), (req, res) => {
+    const classId = String(req.params.classId || '');
+    const assignmentId = String(req.params.assignmentId || '');
+    if (!staffOwns(db, req.platformSession, classId)) return res.status(404).json({ error: { code: 'CLASS_NOT_FOUND', message: 'Class not found.' } });
+    const row = db.prepare('SELECT * FROM assignments WHERE id=? AND class_id=?').get(assignmentId, classId);
+    if (!row) return res.status(404).json({ error: { code: 'ASSIGNMENT_NOT_FOUND', message: 'Assignment not found.' } });
+    const body = plain(req.body) ? req.body : {};
+    const now = Date.now();
+    const edited = [];
+    const changes = [];
+    let title = row.title;
+    let specificationJson = row.specification_json;
+    let dueAt = row.due_at;
+    let archivedAt = row.archived_at;
+    if (body.title !== undefined) {
+      const clean = cleanTitle(body.title);
+      if (!clean) return res.status(400).json({ error: { code: 'ASSIGNMENT_INVALID', message: 'Assignment title is invalid.' } });
+      if (clean !== row.title) { title = clean; edited.push('title'); }
+    }
+    if (body.specification !== undefined) {
+      if (!plain(body.specification)) return res.status(400).json({ error: { code: 'ASSIGNMENT_INVALID', message: 'Assignment specification must be an object.' } });
+      const encoded = JSON.stringify(body.specification);
+      if (Buffer.byteLength(encoded) > 128 * 1024) return res.status(413).json({ error: { code: 'ASSIGNMENT_TOO_LARGE', message: 'Assignment specification is too large.' } });
+      if (encoded !== row.specification_json) { specificationJson = encoded; edited.push('specification'); }
+    }
+    if (body.dueAt !== undefined) {
+      if (body.dueAt !== null && !Number.isFinite(Number(body.dueAt))) return res.status(400).json({ error: { code: 'ASSIGNMENT_INVALID', message: 'Assignment due date is invalid.' } });
+      const next = body.dueAt === null ? null : Math.max(now, Number(body.dueAt));
+      if (next !== row.due_at) { dueAt = next; edited.push('dueAt'); }
+    }
+    if (body.archived !== undefined) {
+      if (typeof body.archived !== 'boolean') return res.status(400).json({ error: { code: 'ASSIGNMENT_INVALID', message: 'archived must be true or false.' } });
+      if (body.archived && !row.archived_at) { archivedAt = now; changes.push(['assignment.archive', { classId }]); }
+      else if (!body.archived && row.archived_at) { archivedAt = null; changes.push(['assignment.restore', { classId }]); }
+    }
+    if (edited.length) changes.unshift(['assignment.edit', { classId, fields: edited }]);
+    if (changes.length) {
+      db.transaction(() => {
+        db.prepare('UPDATE assignments SET title=?,specification_json=?,due_at=?,archived_at=? WHERE id=?')
+          .run(title, specificationJson, dueAt, archivedAt, assignmentId);
+        for (const [action, metadata] of changes) audit(db, req.platformSession.account_id, action, 'assignment', assignmentId, metadata, now);
+      })();
+    }
+    res.json({
+      assignment: publicAssignmentRow({ ...row, title, specification_json: specificationJson, due_at: dueAt, archived_at: archivedAt }),
+      changed: changes.map(([action]) => action)
+    });
   });
 
   router.post('/:classId/assignments', requireRole('teacher', 'admin'), rateLimit(db, 'assignment-create', { limit: 100, windowMs: 60 * 60 * 1000 }), (req, res) => {
