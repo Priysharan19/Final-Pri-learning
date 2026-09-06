@@ -1,0 +1,768 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// Pri Learning · हिन्दी — the Hindi catalogue.
+//
+// Reached only through `import()` from i18n/index.js, so it is a chunk of its
+// own and an English reader never downloads it. Nothing may be imported into
+// this file: an import would drag whatever it points at into the chunk, and the
+// chunk is meant to be nothing but strings.
+//
+// ── HOW THESE WERE CHOSEN ────────────────────────────────────────────────────
+//
+// Terminology was checked against NCERT's own Hindi mathematics textbooks
+// (ncert.nic.in, Classes 7–12) and against three shipping Hindi localisations
+// rather than translated from English: AOSP's values-hi (what the student's own
+// Android phone says), MediaWiki's hi.json, and Sunbird/DIKSHA's hi.json — the
+// Government of India's national education app, which is the closest existing
+// thing to this product. Where those disagreed, the education corpus won.
+//
+// The register is आप, with -ें imperatives on controls. This is measured, not
+// assumed: across seven NCERT chapters sampled, आप appears 126 times and तुम
+// zero times, with -इए imperatives throughout (ज्ञात कीजिए 507, सिद्ध कीजिए 86).
+// -इए is the textbook's instruction voice; -ें is the UI voice every Hindi app
+// uses on a button, and both are आप-register, so controls here use -ें.
+//
+// Numerals are the international 0–9, not Devanagari ०–९. This is not a
+// preference: every rendered NCERT Hindi page uses Western digits for page
+// numbers, section numbers, exercise numbers and every value in the maths
+// itself. Devanagari digits appear in modern Indian material only where the
+// glyphs are the lesson. Every {n} interpolates a Western numeral and needs no
+// special handling.
+//
+// Sentences end with the danda ।, not a full stop, because that is what the
+// student reads in their textbook. The full stop is kept for decimals.
+//
+// ── THE TWO GRAMMAR FACTS THAT SHAPE THESE STRINGS ───────────────────────────
+//
+// 1. A counted noun does NOT change after a numeral. "3 questions" is 3 प्रश्न,
+//    never 3 प्रश्नों — attested across the corpus as 62 अंक, 30 दिन, 12 मिनट,
+//    1000 विद्यार्थी. So the `one` and `other` forms of a bare counted noun are
+//    the same word. They are still written out separately, because the moment a
+//    string needs the oblique (below) they stop being the same.
+//
+// 2. It DOES change before a postposition — को, में, से, का, के, पर. Then it
+//    takes the oblique plural -ओं: 10 अंक but 10 अंकों में से, 5 दिन but 5 दिनों
+//    में, {n} प्रश्न but {n} प्रश्नों के आधार पर. This is the reason a counted noun
+//    cannot be assembled from "a number" plus "a noun" at the call site the way
+//    the English code did it: whether the noun inflects depends on what comes
+//    after it in the sentence, which the call site does not know. Every counted
+//    string here is therefore a whole sentence, and the ones followed by a
+//    postposition carry the oblique form.
+//
+// ── ENGLISH WORDS THAT STAY ENGLISH ──────────────────────────────────────────
+//
+// A Hindi-medium maths student says "graph", "function", "practice", "level",
+// "bookmark", "backup", "password", "server" and "XP". Some of those have
+// Sanskrit-derived equivalents that exist in a dictionary and nowhere in a
+// classroom; inventing or reviving them would make the app harder to read, not
+// more Hindi. Where the standard classroom word IS Hindi — अध्याय for chapter,
+// प्रश्न for question, अंक for marks, हल for solution, मूल्यांकन for evaluation,
+// प्रश्नावली for an exercise set, दक्षता for mastery — the Hindi word is used,
+// because those are the words on the page in front of the student.
+//
+// Proper nouns keep their own spelling in Latin script: JEE Main, JEE Advanced,
+// NCERT, CBSE, Pri Learning, D1–D4. These appear in Latin on Hindi-medium
+// admit cards and textbook covers, and transliterating them would make them
+// harder to recognise, not easier.
+//
+// ── WHAT STILL NEEDS A HUMAN ─────────────────────────────────────────────────
+//
+// The six settings.cloud* strings are consent copy: they tell a student what
+// leaves their device. They are translated here rather than left in English,
+// because consent a student cannot read is not consent — but a translation of
+// consent copy is a legal artefact and this one has NOT been reviewed by a
+// native Hindi speaker or by counsel. Do not treat the Hindi wording of those
+// six as release-ready without that review.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export default {
+  // ── भाषा ───────────────────────────────────────────────────────────────────
+  'lang.label': 'भाषा',
+  'lang.help': 'इससे ऐप के बटन, मेन्यू और लेबल बदलते हैं। प्रश्न और उनके हल फ़िलहाल अंग्रेज़ी में ही रहेंगे।',
+  'lang.switchTo': 'ऐप को {language} में बदलें',
+  'lang.changed': 'भाषा {language} कर दी गई',
+
+  // ── NCERT शब्द सेतु ────────────────────────────────────────────────────────
+  'gloss.label': 'NCERT के हिन्दी शब्द दिखाएँ',
+  'gloss.help': 'अध्याय और टॉपिक के नामों में अंग्रेज़ी शब्द के साथ वही शब्द जोड़ देता है जो आपकी गणित की किताब में है। अंग्रेज़ी जहाँ थी वहीं रहती है — JEE और NEET अंग्रेज़ी में दिए जाते हैं, और हिन्दी अनुवाद में कोई संदेह हो तो बोर्ड अंग्रेज़ी को ही अंतिम मानता है।',
+  'gloss.example': 'जैसे: Circles · वृत्त, Probability · प्रायिकता। प्रश्न, हल और उनके चरण अनुवादित नहीं किए जाते।',
+  'gloss.on': 'NCERT के हिन्दी शब्द चालू — अंग्रेज़ी साथ ही रहेगी',
+  'gloss.off': 'NCERT के हिन्दी शब्द बंद',
+  'gloss.filterTopics': 'टॉपिक छाँटें — English, हिन्दी या हिंग्लिश',
+  'gloss.noTopicMatch': '“{query}” से कोई टॉपिक नहीं मिला।',
+
+  // ── नेविगेशन ───────────────────────────────────────────────────────────────
+  'nav.home': 'होम',
+  'nav.tasks': 'कार्य',
+  'nav.match': 'मैच',
+  'nav.progress': 'प्रगति',
+  'nav.favorites': 'पसंदीदा',
+  'nav.exams': 'परीक्षाएँ',
+  'nav.classes': 'कक्षाएँ',
+  'nav.settings': 'सेटिंग्स',
+  'nav.history': 'इतिहास',
+  'nav.practice': 'अभ्यास',
+  'nav.rush': 'रैपिड फ़ायर',
+  'nav.exam': 'परीक्षा',
+  'nav.more': 'और',
+  'nav.morePlaces': 'और जगहें',
+  'nav.primary': 'मुख्य',
+  'nav.close': 'बंद करें',
+  // "बाकी" = outstanding/left over. The count sits before it either way, so the
+  // two forms are the same — but both are written out, because a language that
+  // needs them separate must be able to have them separate.
+  'nav.due': { one: '{n} बाकी', other: '{n} बाकी' },
+
+  // ── ऐप का ढाँचा ────────────────────────────────────────────────────────────
+  'app.skipToMain': 'मुख्य सामग्री पर जाएँ',
+  'app.logoHome': 'Pri Learning — होम पर जाएँ',
+  'app.dayStreak': 'लगातार दिन',
+  'app.themeToDark': 'डार्क थीम पर जाएँ',
+  'app.themeToLight': 'लाइट थीम पर जाएँ',
+  'app.account': 'खाता',
+  'app.accountSettings': 'खाता सेटिंग्स',
+  'app.myProgress': 'मेरी प्रगति',
+  'app.switchProfile': 'प्रोफ़ाइल बदलें',
+  'app.profileOnDevice': 'प्रोफ़ाइल इसी डिवाइस पर सुरक्षित है',
+  'app.dataStaysHere': 'सारा डेटा इसी डिवाइस पर रहता है — निजता पहले से ही तय है।',
+  'app.questionHistory': 'प्रश्नों का इतिहास',
+  'app.noQuestionsYet': 'अभी कोई प्रश्न नहीं',
+  'app.viewAll': 'सभी देखें →',
+  'app.correct': 'सही',
+  'app.incorrect': 'गलत',
+  'app.notMarkedYet': 'अभी जाँचा नहीं गया',
+  'app.difficultyIs': 'कठिनाई: {level}',
+  'app.badgeUnlocked': 'उपलब्धि मिली — {name}',
+
+  // ── पूरे ऐप में साझा शब्द ───────────────────────────────────────────────────
+  'common.save': 'सहेजें',
+  'common.saving': 'सहेजा जा रहा है…',
+  'common.saveChanges': 'बदलाव सहेजें',
+  'common.cancel': 'रद्द करें',
+  'common.edit': 'संपादित करें',
+  'common.continue': 'जारी रखें',
+  'common.tryAgain': 'फिर कोशिश करें',
+  'common.checking': 'जाँचा जा रहा है…',
+  'common.on': 'चालू',
+  'common.off': 'बंद',
+  'common.topic': 'टॉपिक',
+  'common.class': 'कक्षा',
+  'common.classNumber': 'कक्षा {n}',
+  'common.yearNumber': 'वर्ष {n}',
+  'common.attempts': 'प्रयास',
+  'common.accuracy': 'सटीकता',
+  'common.difficulty': 'कठिनाई',
+  'common.adaptive': 'अनुकूली',
+  'common.percent': '{n}%',
+  'common.none': '—',
+  // Hindi's plural of प्रश्न before a postposition is प्रश्नों, but a bare counted
+  // noun in the nominative stays प्रश्न — "3 प्रश्न", never "3 प्रश्नों". These are
+  // bare, so both forms are the same word; the entry keeps them separate anyway
+  // so a future string that needs the oblique can have it.
+  'common.questionsCounted': { one: '{n} प्रश्न', other: '{n} प्रश्न' },
+
+  'difficulty.1': 'आधारभूत',
+  'difficulty.2': 'मध्यम',
+  'difficulty.3': 'उन्नत',
+  'difficulty.4': 'विस्तारित',
+
+  // ── होम ────────────────────────────────────────────────────────────────────
+  // Hindi has no separate "good afternoon"; नमस्कार is the neutral greeting used
+  // through the middle of the day, and translating "Good Afternoon" literally
+  // would produce something nobody says.
+  'home.goodMorning': 'सुप्रभात',
+  'home.goodAfternoon': 'नमस्कार',
+  'home.goodEvening': 'शुभ संध्या',
+  'home.greeting': '{greeting}, {name}।',
+  'home.showFilters': 'प्रश्न के फ़िल्टर दिखाएँ',
+  'home.hideFilters': 'प्रश्न के फ़िल्टर छिपाएँ',
+  'home.noFilters': 'कोई फ़िल्टर नहीं लगा',
+  'home.configureFilters': 'फ़िल्टर चुनने के लिए दबाएँ',
+  'home.removeFilter': '{filter} फ़िल्टर हटाएँ',
+  'home.clearFilters': 'सभी फ़िल्टर हटाएँ',
+  'home.generate': 'प्रश्न बनाएँ',
+  'home.catYear': 'वर्ष',
+  'home.catClass': 'कक्षा',
+  'home.catCourse': 'कोर्स',
+  'home.catTrack': 'ट्रैक',
+  'home.catTopics': 'टॉपिक',
+  'home.catDots': 'बिंदु',
+  'home.catDifficulty': 'कठिनाई',
+  'home.pickClass': 'जिस कक्षा का अभ्यास करना है वह चुनें',
+  'home.pickYear': 'जिस वर्ष का अभ्यास करना है वह चुनें',
+  'home.pickTrack': 'अब भारत का गणित ट्रैक चुनें',
+  'home.pickCourse': 'अब गणित का कोर्स चुनें',
+  'home.pickTopic': 'अपने प्रश्न के लिए एक टॉपिक चुनें',
+  'home.pickDotpoint': '{topic} — पाठ्यक्रम का कोई एक बिंदु चुनें',
+  'home.pickDifficulty': 'कठिनाई खुद तय करें — या अनुकूली इंजन पर छोड़ दें',
+  'home.optional': '(वैकल्पिक)',
+  'home.yours': ' · आपकी',
+  'home.comingSoon': ' · जल्द आ रहा है',
+  'home.topicComingSoon': '{topic}, जल्द आ रहा है',
+  'home.formsComingSoon': ' · इसके प्रश्न जल्द आ रहे हैं',
+  'home.dotpointComingSoon': '{dotpoint}, इसके प्रश्न जल्द आ रहे हैं',
+  'home.loadingSyllabus': 'पाठ्यक्रम लोड हो रहा है…',
+  'home.dotpointChip': 'बिंदु {n}',
+  'home.difficultyChip': 'D{n} {label}',
+  'home.questionsCompleted': 'हल किए गए प्रश्न',
+  'home.gettingStronger': 'पकड़ मज़बूत हो रही है',
+  'home.firstQuestions': 'आपके पहले प्रश्न यहाँ दिखेंगे।',
+  'home.recentQuestions': 'आपके सबसे हाल के प्रश्न, सबसे पुराने पहले',
+  'home.recentVerdict': '{topic} — {verdict}',
+  'home.adaptiveEngine': 'अनुकूली इंजन',
+  'home.dismissAdaptive': 'अनुकूली इंजन का कार्ड हटाएँ',
+  // SOV: the count and its noun come first, the verb last. An English sentence
+  // split into "You have" + count + "due for spaced review" could not produce
+  // this at all.
+  'home.reviewDue': {
+    one: 'अंतराल पुनरावृत्ति के लिए आपका {n} टॉपिक बाकी है।',
+    other: 'अंतराल पुनरावृत्ति के लिए आपके {n} टॉपिक बाकी हैं।'
+  },
+  'home.adaptiveOn': 'अनुकूली इंजन पूरी तरह चालू है।',
+  'home.startReviewing': 'पुनरावृत्ति शुरू करें →',
+  'home.smartPractice': 'स्मार्ट अभ्यास →',
+  'home.goalRing': 'दैनिक लक्ष्य: {goal} में से {done} प्रश्न',
+  'home.today': 'आज',
+  'home.goalComplete': 'आज का लक्ष्य पूरा — बढ़िया काम।',
+  'home.goalRemaining': {
+    one: 'आज का लक्ष्य पूरा करने के लिए {n} और।',
+    other: 'आज का लक्ष्य पूरा करने के लिए {n} और।'
+  },
+  'home.goalTarget': {
+    one: 'दैनिक लक्ष्य: {n} प्रश्न।',
+    other: 'दैनिक लक्ष्य: {n} प्रश्न।'
+  },
+  'home.streakExtended': {
+    one: 'लगातार {n} दिन — आज भी जारी',
+    other: 'लगातार {n} दिन — आज भी जारी'
+  },
+  'home.streakOnTheLine': {
+    one: 'लगातार {n} दिन — आज टूट सकता है',
+    other: 'लगातार {n} दिन — आज टूट सकता है'
+  },
+  'home.startStreak': 'एक प्रश्न हल करके सिलसिला शुरू करें।',
+  'home.keepGoing': 'चलते रहें →',
+  'home.startNow': 'अभी शुरू करें →',
+
+  // ── प्रगति ─────────────────────────────────────────────────────────────────
+  'progress.title': '{track} की प्रगति',
+  'progress.couldNotLoad': 'प्रगति लोड नहीं हो सकी।',
+  'progress.evidenceSub': 'यह उन्हीं प्रश्नों का ब्योरा है जो आपने वाकई हल किए हैं, आपके भारतीय पाठ्यक्रम के अनुसार क्रम में।',
+  'progress.noPercentile': 'न पर्सेंटाइल, न रैंक',
+  'progress.honesty': 'Pri Learning घर पर किए गए अभ्यास को CBSE प्रतिशत, JEE पर्सेंटाइल या रैंक के अनुमान में नहीं बदलता। इनमें से कोई भी घर पर हल किए गए प्रश्नों से ईमानदारी से निकाला नहीं जा सकता। नीचे जो है वह इससे कम दावा करता है: आपने किन अध्यायों पर काम किया, कितने प्रयास किए, कितनी सटीकता रही, और पेपर के जिन हिस्सों का आपने वाकई अभ्यास किया है उन पर अंकों का अनुमान।',
+  'progress.ifYouSatTomorrow': 'अगर यह पेपर कल देना पड़े',
+  'progress.likelyRange': 'संभावित दायरा {low}–{high}',
+  'progress.marksPractised': '{total} में से {covered} अंकों का अभ्यास हुआ',
+  'progress.marksUntouched': ' · {n} अंक अभी अछूते',
+  'progress.whereTheMarksAre': 'अंक कहाँ हैं',
+  'progress.unitCovered': {
+    one: '{n} प्रश्न के आधार पर {marks} में से {expected} अंक',
+    other: '{n} प्रश्नों के आधार पर {marks} में से {expected} अंक'
+  },
+  'progress.unitUntouched': '{marks} अंक, अभी एक भी प्रयास नहीं',
+  'progress.rankedByMarks': 'क्रम उन अंकों के हिसाब से है जो अभी छूट रहे हैं, इसलिए सबसे ऊपर वही अभ्यास है जिससे यह आँकड़ा सबसे ज़्यादा बदलेगा।',
+  'progress.chaptersStarted': 'शुरू किए गए अध्याय',
+  'progress.chaptersPractised': 'अभ्यास किए गए अध्याय',
+  'progress.fivePlusAttempts': '5 या अधिक प्रयास',
+  'progress.questionsAnswered': 'हल किए गए प्रश्न',
+  'progress.demonstratedAccuracy': 'प्रमाणित सटीकता',
+  'progress.acrossAttempts': 'दर्ज सभी प्रयासों पर',
+  'progress.syllabusEvidence': '{scope} — पाठ्यक्रम का ब्योरा',
+  'progress.rowCount': { one: '{n} अध्याय/टॉपिक', other: '{n} अध्याय/टॉपिक' },
+  'progress.noRows': 'इस ट्रैक के लिए अभी कोई पाठ्यक्रम पंक्ति जारी नहीं हुई है।',
+  'progress.colChapter': 'अध्याय / टॉपिक',
+  'progress.colCorrect': 'सही',
+  'progress.colAction': 'कार्रवाई',
+  'progress.practise': 'अभ्यास करें',
+  'progress.howToRead': 'इस पन्ने को कैसे पढ़ें',
+  'progress.howToReadBody': '“शुरू किया” का अर्थ है कम से कम एक दर्ज प्रयास। “अभ्यास किया” पाँच प्रयासों की एक सीधी-सादी दिखाने वाली सीमा है, कोई सीखने से जुड़ा निर्णय नहीं। सटीकता केवल ब्योरा है। दक्षता का आकलन, पुनरावृत्ति का समय और Pri Explain — ये सब सीखने वाली परत के ज़िम्मे हैं।',
+
+  // ── इतिहास ─────────────────────────────────────────────────────────────────
+  'history.title': 'प्रश्नों का इतिहास',
+  'history.heading': 'आपके प्रश्नों का इतिहास',
+  'history.sub': 'आपने जो भी प्रश्न हल किया है वह इसी डिवाइस पर रहता है — किसी को भी फिर से हल करें, उन्हीं संख्याओं के साथ या नई संख्याओं के साथ।',
+  'history.filterAll': 'सभी',
+  'history.filterWrong': '✖ गलत',
+  'history.filterCorrect': '✔ सही',
+  'history.filterBookmarked': '★ बुकमार्क',
+  'history.filterInk': '✍️ हैंडराइटिंग वाले',
+  'history.filterGroup': 'अपना इतिहास छाँटें',
+  'history.modePractice': 'अभ्यास',
+  'history.modeReview': 'पुनरावृत्ति',
+  'history.modeExam': 'परीक्षा',
+  'history.modeRush': 'रश',
+  'history.modeMatch': 'मैच',
+  'history.modeTask': 'कार्य',
+  'history.emptyAll': 'अभी यहाँ कुछ नहीं — कुछ प्रश्न हल कीजिए, वे तुरंत यहाँ दिखने लगेंगे।',
+  'history.emptyFiltered': 'इस फ़िल्टर से अभी कुछ नहीं मिला।',
+  'history.addBookmark': 'इस प्रश्न को बुकमार्क करें',
+  'history.removeBookmark': 'बुकमार्क हटाएँ',
+  'history.addBookmarkOn': '{topic} के इस प्रश्न पर बुकमार्क लगाएँ',
+  'history.removeBookmarkOn': '{topic} के इस प्रश्न से बुकमार्क हटाएँ',
+  'history.notMarked': 'जाँचा नहीं गया',
+  'history.viaInk': 'हैंडराइटिंग से दिया गया उत्तर',
+  'history.viaInkSpoken': ' हैंडराइटिंग से दिया गया उत्तर',
+  'history.hasPhoto': 'कागज़ पर किए काम की तस्वीर लगी है',
+  'history.hasPhotoSpoken': ' कागज़ पर किए काम की तस्वीर लगी है',
+  'history.retrySame': '↻ वही',
+  'history.retrySameTitle': 'ठीक यही प्रश्न फिर से — वही संख्याएँ',
+  'history.retryFresh': '✦ नया',
+  'history.retryFreshTitle': 'वही कौशल, नई संख्याएँ',
+  'history.whySame': 'वही प्रश्न, वही संख्याएँ — इस बार जीत कर दिखाइए।',
+  'history.whyFresh': 'वही कौशल, नई संख्याएँ — साबित कीजिए कि यह तुक्का नहीं था।',
+  'history.yourAnswerWas': 'आपका उत्तर:',
+  'history.correctAnswerWas': 'सही उत्तर:',
+  'history.yourHandwriting': 'आपकी हैंडराइटिंग',
+  'history.readAs': 'आपकी हैंडराइटिंग — “{text}” पढ़ा गया',
+  'history.scribblePad': 'रफ़ पन्ना',
+  'history.attachedWorking': 'कागज़ पर किया गया काम',
+  'history.paperWorking': 'कागज़ पर किया गया काम',
+  'history.newer': '← नए',
+  'history.older': 'पुराने →',
+  'history.pageOf': 'पृष्ठ {page} / {total}',
+
+  // ── पसंदीदा ────────────────────────────────────────────────────────────────
+  'favorites.title': 'पसंदीदा',
+  'favorites.emptyTitle': 'अभी कोई पसंदीदा नहीं',
+  'favorites.emptySub': 'किसी भी प्रश्न पर तारा लगाइए — प्रश्न के पन्ने से या इतिहास से — और वह जल्दी दोहराने के लिए यहाँ आ जाएगा।',
+  'favorites.openHistory': 'इतिहास खोलें',
+  'favorites.saved': { one: '{n} सहेजा गया प्रश्न', other: '{n} सहेजे गए प्रश्न' },
+  'favorites.remove': 'पसंदीदा से हटाएँ',
+  'favorites.removeOn': '{topic} के इस प्रश्न को पसंदीदा से हटाएँ',
+  'favorites.retrySame': '↻ वही',
+  'favorites.retryVariant': '⇢ दूसरा रूप',
+
+  // ── कार्य ──────────────────────────────────────────────────────────────────
+  'tasks.title': 'कार्य',
+  'tasks.sub': 'इस डिवाइस पर आपके शिक्षक के दिए काम, और वे लक्ष्य जो आप खुद तय करते हैं।',
+  'tasks.importPack': '📦 कार्य पैक लाएँ',
+  'tasks.setMyself': '＋ खुद के लिए कार्य बनाएँ',
+  'tasks.name': 'कार्य का नाम',
+  'tasks.namePlaceholderIndia': 'जैसे: यूनिट टेस्ट से पहले द्विघात समीकरण',
+  'tasks.namePlaceholder': 'जैसे: शुक्रवार से पहले त्रिकोणमिति दोहराना',
+  'tasks.defaultName': 'मेरा अभ्यास लक्ष्य',
+  'tasks.classOrTrack': 'कक्षा / ट्रैक',
+  'tasks.chaptersSelected': 'अध्याय ({n} चुने गए)',
+  'tasks.topicsSelected': 'टॉपिक ({n} चुने गए)',
+  'tasks.dotpointIn': '{chapter} का बिंदु',
+  'tasks.wholeChapter': 'पूरा अध्याय',
+  'tasks.questionCount': 'प्रश्न — {n}',
+  'tasks.create': 'कार्य बनाएँ',
+  'tasks.empty': 'अभी कोई कार्य नहीं। इस डिवाइस पर बनी शिक्षक प्रोफ़ाइल Teacher Studio से कार्य दे सकती है — या ऊपर से आप खुद अपना लक्ष्य तय कर सकते हैं।',
+  'tasks.finished': '✓ पूरा',
+  'tasks.fromClass': '{className} से · ',
+  'tasks.personal': 'निजी · ',
+  'tasks.answeredOf': '{count} में से {done} हल',
+  'tasks.percentCorrect': ' · {n}% सही',
+  'tasks.due': ' · {date} तक',
+  'tasks.imported': '📦 “{title}” लाया गया',
+  'tasks.importedFrom': '📦 {teacher} से “{title}” लाया गया',
+
+  // ── कक्षाएँ ────────────────────────────────────────────────────────────────
+  'classes.title': 'कक्षाएँ',
+  'classes.importPack': '＋ क्लास पैक लाएँ',
+  'classes.sub': 'क्लाउड असाइनमेंट और ऑफ़लाइन क्लास पैक',
+  'classes.offlineTitle': 'ऑफ़लाइन क्लास पैक',
+  'classes.offlineSub': 'Teacher Studio के पैक बिना क्लाउड खाते के भी पूरी तरह चलते हैं।',
+  'classes.emptyTitle': 'अभी कोई ऑफ़लाइन क्लास पैक नहीं',
+  'classes.emptySub': 'एक क्लास पैक लाइए — यह एक छोटी फ़ाइल होती है जिसे आपके शिक्षक Pri Learning Teacher Studio से निकालकर आपको देते हैं (AirDrop, ईमेल, USB — इंटरनेट खाते की ज़रूरत नहीं)।',
+  'classes.emptyImport': '＋ एक क्लास पैक लाएँ',
+  'classes.cloudNote': 'क्लाउड से जुड़े होने पर कक्षा के असाइनमेंट ऊपर दिखते हैं; वे ऑफ़लाइन पैक की जगह नहीं लेते।',
+  'classes.classTask': 'कक्षा का कार्य',
+  'classes.allTasks': 'सभी कार्य',
+  'classes.continue': 'जारी रखें →',
+  'classes.dueOn': ' · {date} तक',
+  'classes.joined': 'जुड़ गए!',
+  'classes.joinedFrom': '{teacher} से “{title}” आपके कार्यों में जोड़ दिया गया।',
+  'classes.yourTeacher': 'आपके शिक्षक',
+  'classes.notAPack': 'यह फ़ाइल क्लास पैक नहीं है।',
+  'classes.aTask': 'कार्य',
+
+  // ── अभ्यास ─────────────────────────────────────────────────────────────────
+  'practice.loading': 'अभ्यास का पन्ना लोड हो रहा है…',
+  'practice.loadingPhysical': 'Pencil प्रमाण सत्र लोड हो रहा है…',
+  'practice.heading': 'अभ्यास · {name}',
+  'practice.taskPractice': 'कार्य अभ्यास',
+  'practice.topicPractice': 'टॉपिक अभ्यास',
+  'practice.smartPractice': 'स्मार्ट अभ्यास',
+  'practice.nextQuestion': 'अगला प्रश्न',
+  'practice.clearFilters': 'फ़िल्टर हटाएँ — स्मार्ट अभ्यास पर लौटें',
+  'practice.sessionScore': ' · इस सत्र में {answered} में से {correct} · +{xp} XP',
+  'practice.dotpointMeta': ' · बिंदु {n}',
+  'practice.nextUp': ' · आगे: {name}',
+
+  // ── मूल्यांकन और प्रतिक्रिया ────────────────────────────────────────────────
+  'verdict.marksAvailable': { one: '{n} अंक', other: '{n} अंक' },
+  'verdict.creditAvailable': '{percent}% श्रेय बचा है ({marks} अंक)',
+  'verdict.spacedReview': 'अंतराल पुनरावृत्ति',
+  'verdict.weakSpot': 'कमज़ोर बिंदु',
+  'verdict.newGround': 'नया क्षेत्र',
+  'verdict.repeatedSlip': 'बार-बार होने वाली चूक',
+  'verdict.interleaving': 'मिश्रित अभ्यास',
+  'verdict.task': 'कार्य',
+  'verdict.favorite': 'पसंदीदा',
+  'verdict.favoriteThis': 'इस प्रश्न को पसंदीदा बनाएँ',
+  'verdict.whyThis': 'यही प्रश्न क्यों?',
+  'verdict.scribblePad': 'रफ़ पन्ना',
+  'verdict.scribbleRough': 'रफ़ पन्ना — यह कभी जाँचा नहीं जाता',
+  'verdict.undoScribble': 'रफ़ काम पूर्ववत करें',
+  'verdict.clearScribble': 'रफ़ पन्ना साफ़ करें',
+  'verdict.hintTitle': 'संकेत {n} — 15% श्रेय घटेगा',
+  'verdict.hintLabel': '{total} में से संकेत {n} खोलें — इस प्रश्न के 15% श्रेय की कीमत पर',
+  'verdict.hints': 'संकेत',
+  'verdict.hintNumber': 'संकेत {n}',
+  'verdict.submit': '➤ उत्तर जमा करें',
+  'verdict.marking': 'जाँचा जा रहा है…',
+  'verdict.checkReadingFirst': 'पहले यह पढ़ाई जाँच लें',
+  'verdict.keepWriting': 'लिखते रहें',
+  'verdict.unreadable': 'यह पढ़ा नहीं जा सका।',
+  'verdict.notQuite': 'बिलकुल सही नहीं।',
+  'verdict.oneMoreGo': 'एक बार फिर देखिए और कोशिश कीजिए — एक मौका और है।',
+  'verdict.yourAnswer': 'आपका उत्तर',
+  'verdict.attachedWorking': 'लगाया गया काम',
+  'verdict.evaluation': 'मूल्यांकन',
+  'verdict.marksOutOf': '{total} में से {earned} अंक',
+  'verdict.markedOnDevice': 'जाँच इसी डिवाइस पर Pri इंजन ने की है। अगर आपका तरीका दिए गए हल से अलग है तो उसे अपने शिक्षक से जँचवा लीजिए।',
+  'verdict.nailedIt': 'एकदम सही।',
+  'verdict.correct': 'सही।',
+  'verdict.beautifulWork': 'बहुत सुंदर काम।',
+  'verdict.thatsIt': 'यही तो है।',
+  'verdict.revealed': 'हल दिखा दिया गया।',
+  'verdict.notThisTime': 'इस बार नहीं।',
+  'verdict.afterHints': { one: '{n} संकेत के बाद', other: '{n} संकेतों के बाद' },
+  'verdict.reasoning': 'कारण:',
+  'verdict.everyLineChecked': {
+    one: 'आपके हाथ से लिखे काम की हर पंक्ति जाँची गई — {n} चरण पढ़ा और सत्यापित किया गया, जो तर्क की एक कड़ी से सही परिणाम तक पहुँचता है।',
+    other: 'आपके हाथ से लिखे काम की हर पंक्ति जाँची गई — {n} चरण पढ़े और सत्यापित किए गए, जो तर्क की एक कड़ी से सही परिणाम तक पहुँचते हैं।'
+  },
+  'verdict.expected': 'अपेक्षित:',
+  'verdict.mastery': 'दक्षता {n}%',
+  'verdict.skillUp': '▲ {n} कौशल',
+  'verdict.skillDown': '▼ {n} कौशल',
+  'verdict.predictedMark': 'अनुमानित अंक {mark}',
+  'verdict.workedSolution': 'विस्तृत हल',
+  'verdict.finalAnswer': 'अंतिम उत्तर',
+  'verdict.mistake': 'गलती',
+  'verdict.onLine': 'पंक्ति {n}',
+  'verdict.speechUnreadable': 'यह पढ़ा नहीं जा सका। {feedback}',
+  'verdict.speechRetry': 'बिलकुल सही नहीं। {feedback}',
+  'verdict.speechMarks': { one: '{total} में से {earned} अंक।', other: '{total} में से {earned} अंक।' },
+  'verdict.speechRevealed': 'हल दिखा दिया गया। {marks}',
+  'verdict.speechCorrect': 'सही। {marks}',
+  'verdict.speechIncorrect': 'सही नहीं। {marks}',
+  'verdict.speechExpected': ' अपेक्षित उत्तर {answer}।',
+
+  // उत्तर देने की सतह: इनपुट के तरीके, फ़ोटो का रास्ता, इंक इंजन की अपनी स्थितियाँ,
+  // स्व-मूल्यांकन और चरण-जाँच।
+  'verdict.redoQuestion': '↻ प्रश्न दोबारा करें',
+  'verdict.outcomeUpdated': 'पाठ्यक्रम का परिणाम अद्यतन हुआ',
+  'verdict.outcomeBasis': '{topic} — आपके प्रदर्शन के आधार पर',
+  // The three input tabs are drawn as one glyph each. T stands for typing in
+  // both languages; ट would be a different letter with no meaning here.
+  'verdict.modeTypeGlyph': 'T',
+  'verdict.modeTypeTitle': 'गणित संपादक — समीकरण और हल टाइप कीजिए',
+  'verdict.modeTypeLabel': 'टाइप करके उत्तर दें',
+  'verdict.modeWriteTitle': 'हैंडराइटिंग — पेंसिल या उँगली से लिखिए',
+  'verdict.modeWriteLabel': 'हाथ से लिखकर उत्तर दें',
+  'verdict.modePhotoTitle': 'फ़ोटो — हाथ से किया काम लगाइए',
+  'verdict.modePhotoLabel': 'अपने काम की फ़ोटो से उत्तर दें',
+  'verdict.symbolPalette': 'चिह्न पट्टी',
+  'verdict.insertSymbol': '{name} डालें',
+  'verdict.kbdType': 'टाइप',
+  'verdict.editorHintWorking': 'हर पंक्ति में हल का एक चरण',
+  'verdict.editorHintType': 'करके गणित लिखिए — यह अपने आप सही रूप ले लेता है',
+  'verdict.answerIn': 'उत्तर {unit} में',
+  'verdict.photographWorking': '▣ कागज़ पर किए अपने काम की फ़ोटो लीजिए',
+  'verdict.photoFormats': 'एक फ़ोटो, {pages} पृष्ठ तक की स्कैन की गई PDF, या पहले से ली गई कोई तस्वीर चिपकाइए',
+  'verdict.removePhoto': 'फ़ोटो हटाएँ',
+  'verdict.readingWithVision': 'आपकी हैंडराइटिंग इसी डिवाइस पर Apple Vision से पढ़ी जा रही है…',
+  'verdict.decodedOnDevice': 'इसी डिवाइस पर पढ़ा गया',
+  'verdict.ocrConfidence': ' · {percent}% OCR भरोसा',
+  'verdict.filledFromLastLine': 'Pri ने पहचानी गई आख़िरी पंक्ति से उत्तर का खाना भर दिया है। जाँच से पहले इसे देख लीजिए या बदल लीजिए।',
+  'verdict.photoAttachedIdle': 'फ़ोटो लग गई। नेटिव Pri जाँच से पहले इसे संपादन योग्य गणित में बदल देगा।',
+  'verdict.workingAria': 'आपका हल — हर पंक्ति में एक चरण, हर पंक्ति जाँची जाती है',
+  'verdict.workingPlaceholder': 'अपने हल की हर पंक्ति लिखिए — हर पंक्ति जाँची जाती है।\nअंत में वही परिणाम लिखिए जो पूछा गया था।',
+  'verdict.answerAria': 'आपका उत्तर',
+  'verdict.answerAriaWithUnit': 'आपका उत्तर {unit} में',
+  'verdict.answerPlaceholder': 'आपका उत्तर…',
+  'verdict.readsAs': 'यह ऐसा पढ़ा जा रहा है',
+  'verdict.showWorkingToggle': 'आंशिक अंकों के लिए हल दिखाइए — हर पंक्ति जाँची जाती है',
+  'verdict.workingPartialAria': 'आंशिक अंकों के लिए आपका हल — हर पंक्ति में एक चरण',
+  'verdict.workingPartialPlaceholder': 'हर पंक्ति में एक चरण, जैसे\n2x + 3 = 13\n2x = 10\nx = 5',
+  'verdict.inkEngine': '✒ Pri इंक इंजन',
+  'verdict.inkEngineOnDevice': '✒ Pri इंक इंजन — इसी डिवाइस पर पहचान',
+  'verdict.inkFailedTitle': 'हैंडराइटिंग लोड नहीं हो सकी।',
+  'verdict.inkFailedStuck': 'पहचानकर्ता एक अलग फ़ाइल में रखा है और यह डिवाइस अभी उसे पढ़ नहीं सका। आपका किया हुआ कुछ भी नहीं गया — ऐप दोबारा लोड कीजिए, या टाइप करके उत्तर दीजिए।',
+  'verdict.inkFailedRetry': 'पहचानकर्ता एक अलग फ़ाइल में रखा है और यह डिवाइस अभी उसे पढ़ नहीं सका। आपका किया हुआ कुछ भी नहीं गया — फिर कोशिश कीजिए, या टाइप करके उत्तर दीजिए।',
+  'verdict.reloadApp': 'Pri Learning दोबारा लोड करें',
+  'verdict.typeInstead': 'इसकी जगह उत्तर टाइप करें',
+  'verdict.warmingUp': 'हैंडराइटिंग इंजन तैयार हो रहा है…',
+  'verdict.readingItAs': 'इसे ऐसा पढ़ा जा रहा है',
+  'verdict.thatsWhatIWrote': '✓ मैंने यही लिखा था',
+  'verdict.submitting': 'जमा किया जा रहा है:',
+  'verdict.comments': 'टिप्पणियाँ',
+  'verdict.commentsOnPage': { one: 'इस पन्ने पर {n}', other: 'इस पन्ने पर {n}' },
+  'verdict.whereItBreaks': 'गड़बड़ी यहाँ है',
+  'verdict.possibly': 'शायद',
+  'verdict.yourAlgebra': 'आपका बीजगणित',
+  'verdict.showSolution': 'हल देखें',
+  'verdict.enterKey': 'Enter',
+  'verdict.pressEnter': 'जमा करने के लिए {key} दबाइए',
+  'verdict.criteria': 'मानदंड',
+  'verdict.marksColumn': 'अंक',
+  'verdict.tickCriteria': 'जो मानदंड आपके हल ने पूरे किए उन पर निशान लगाइए, फिर सहेजिए।',
+  'verdict.saveSelfMarking': 'स्व-मूल्यांकन सहेजें',
+  'verdict.selfMarkingRecorded': '✓ स्व-मूल्यांकन दर्ज — {total} में से {earned} अंक',
+  'verdict.stepCheck': 'आपके हल की चरण-दर-चरण जाँच',
+  'verdict.mistakeIsHere': '← गलती यहाँ है',
+
+  // चिह्न पट्टी हर कुंजी का नाम बोलकर बताती है।
+  'sym.pi': 'पाई',
+  'sym.sqrt': 'वर्गमूल',
+  'sym.power': 'की घात',
+  'sym.plusMinus': 'धन या ऋण',
+  'sym.times': 'गुणा',
+  'sym.divide': 'भाग',
+  'sym.lte': 'से छोटा या बराबर',
+  'sym.gte': 'से बड़ा या बराबर',
+  'sym.neq': 'बराबर नहीं',
+  'sym.degrees': 'अंश',
+  'sym.theta': 'थीटा',
+  'sym.openBracket': 'कोष्ठक खोलें',
+  'sym.closeBracket': 'कोष्ठक बंद करें',
+  'sym.dividedBy': 'बटा',
+  'sym.ratio': 'अनुपात',
+
+  // ── कक्षा के असाइनमेंट ─────────────────────────────────────────────────────
+  'assignment.title': 'कक्षा का असाइनमेंट',
+  'assignment.tag': 'असाइनमेंट',
+  'assignment.needsCloud': 'इस कक्षा असाइनमेंट के लिए Pri Learning क्लाउड कनेक्शन चाहिए, ताकि सदस्यता की पुष्टि हो सके और इसका विवरण लोड हो सके। आपका सामान्य ऑफ़लाइन अभ्यास अब भी उपलब्ध है।',
+  'assignment.notFound': 'असाइनमेंट नहीं मिला।',
+  'assignment.couldNotOpen': 'यह असाइनमेंट खोला नहीं जा सका।',
+  'assignment.leave': 'असाइनमेंट छोड़कर सामान्य अभ्यास खोलें',
+  'assignment.leaveShort': 'असाइनमेंट छोड़ें',
+  'assignment.completed': '{total} में से {done} प्रश्न पूरे',
+  'assignment.submitted': 'जमा हो गया',
+  'assignment.readyToSubmit': 'जमा करने के लिए तैयार',
+  'assignment.teacherFeedback': 'शिक्षक की टिप्पणी',
+  'assignment.returnedForRevision': 'आपके शिक्षक ने यह असाइनमेंट दोबारा करने के लिए लौटाया है।',
+  'assignment.submittedNote': 'असाइनमेंट जमा हो गया। और असाइनमेंट काम जोड़ने से पहले आपके शिक्षक को इसे लौटाना होगा।',
+  'assignment.targetReached': 'आप असाइनमेंट के लक्ष्य तक पहुँच गए। जब तक यह जमा नहीं हो जाता, इसके लिए और प्रश्न नहीं बनाए जाएँगे।',
+  'assignment.retrySubmission': 'जमा करना फिर से आज़माएँ',
+
+  // ── सेटिंग्स ───────────────────────────────────────────────────────────────
+  'settings.title': 'सेटिंग्स',
+  'settings.saved': 'सेटिंग्स सहेज दी गईं',
+  'settings.secPlan': 'प्लान',
+  'settings.secProfile': 'प्रोफ़ाइल',
+  'settings.secSecurity': 'खाता और सुरक्षा',
+  // AOSP's Hindi uses हैंडराइटिंग rather than हस्तलेखन or लिखावट for stylus input,
+  // and that is what the student's own device says. Followed throughout.
+  'settings.secHandwriting': 'हैंडराइटिंग',
+  'settings.secLanguage': 'भाषा',
+  'settings.secAppearance': 'रूप-रंग',
+  'settings.secCourses': 'कोर्स',
+  'settings.secData': 'डेटा और बैकअप',
+  'settings.secHelp': 'मदद और सुरक्षा',
+
+  'settings.localPlan': 'लोकल प्लान',
+  'settings.localPlanSub': 'सब कुछ खुला हुआ — न खाता, न सब्सक्रिप्शन, न कोई सीमा',
+  'settings.questionBank': 'प्रश्न बैंक',
+  'settings.questionBankValue': '13,29,679+ अलग-अलग — गिने हुए, और बढ़ रहे हैं',
+  'settings.status': 'स्थिति',
+  'settings.active': 'चालू',
+  'settings.allDifficulties': 'सभी कठिनाई स्तर (D1–D4)',
+  'settings.allCourses': 'सभी कोर्स और पाथवे',
+  'settings.allFeatures': 'संकेत, परीक्षाएँ, मैच, विश्लेषण',
+
+  'settings.accountInfo': 'खाते की जानकारी',
+  'settings.dataLocation': '⌂ डेटा कहाँ है',
+  'settings.dataLocationNative': 'ऐप का अपना स्टोरेज — इसी डिवाइस पर',
+  'settings.dataLocationBrowser': 'यही डिवाइस — ब्राउज़र स्टोरेज',
+  'settings.storageProtection': '🛡 स्टोरेज की सुरक्षा',
+  'settings.storageSandbox': 'ऐप सैंडबॉक्स — इसे कोई हटा नहीं सकता',
+  'settings.storagePersisted': 'सुरक्षित — ब्राउज़र इसे नहीं हटाएगा',
+  'settings.storagePending': 'प्रतीक्षा में — ऐप इस्तेमाल करते रहिए',
+  'settings.spaceUsed': '# इस्तेमाल हुई जगह',
+  'settings.spaceOf': '{total} में से {used} ({percent}%)',
+  'settings.accounts': '✉ खाते',
+  'settings.accountsValue': 'इसी डिवाइस पर निजी प्रोफ़ाइल — कुछ भी बाहर नहीं जाता',
+
+  'settings.profileInfo': '☺ प्रोफ़ाइल की जानकारी',
+  'settings.fullName': 'पूरा नाम',
+  'settings.name': 'नाम',
+  'settings.avatar': 'अवतार',
+  'settings.avatarPick': 'अवतार {emoji}',
+  'settings.classLevel': 'कक्षा',
+  'settings.yearLevel': 'वर्ष',
+  'settings.schoolClass': 'स्कूल की कक्षा',
+  'settings.schoolYear': 'स्कूल का वर्ष',
+  'settings.course': 'कोर्स',
+  'settings.syllabus': 'पाठ्यक्रम',
+  'settings.hscPathway': 'HSC पाथवे',
+  'settings.indiaTrack': 'भारत का गणित ट्रैक',
+  'settings.dailyGoal': 'दैनिक लक्ष्य',
+  'settings.dailyGoalValue': { one: '{n} प्रश्न', other: '{n} प्रश्न' },
+  'settings.dailyGoalSlider': { one: 'दैनिक लक्ष्य — {n} प्रश्न', other: 'दैनिक लक्ष्य — {n} प्रश्न' },
+
+  'settings.accountType': 'खाते का प्रकार',
+  'settings.accountTypeValue': 'इसी डिवाइस पर निजी प्रोफ़ाइल — कोई साइन-इन सेवा नहीं',
+  'settings.email': 'ईमेल',
+  'settings.emailNotSet': 'तय नहीं',
+  'settings.editEmail': 'खाते का ईमेल बदलें',
+  'settings.accountEmail': 'खाते का ईमेल',
+  'settings.emailUpdated': 'ईमेल बदल दिया गया',
+  'settings.profilePassword': 'प्रोफ़ाइल पासवर्ड',
+  'settings.passwordOn': 'चालू — साइन-इन पर पूछा जाएगा',
+  'settings.changePassword': 'बदलें',
+  'settings.setPassword': 'पासवर्ड लगाएँ',
+  'settings.currentPassword': 'मौजूदा पासवर्ड',
+  'settings.newPassword': 'नया पासवर्ड',
+  'settings.repeatPassword': 'दोबारा लिखें',
+  'settings.repeatNewPassword': 'नया पासवर्ड दोबारा लिखें',
+  'settings.changePasswordAction': 'पासवर्ड बदलें',
+  'settings.turnProtectionOn': 'सुरक्षा चालू करें',
+  'settings.removePassword': 'पासवर्ड हटाएँ',
+  'settings.passwordsDontMatch': 'दोनों पासवर्ड एक जैसे नहीं हैं।',
+  'settings.passwordRemoved': 'पासवर्ड हटा दिया गया',
+  'settings.passwordSaved': 'पासवर्ड सहेज दिया गया — साइन-इन पर इसकी ज़रूरत पड़ेगी',
+  'settings.passwordNote': 'कम से कम {min} अक्षर। इसे इसी डिवाइस के स्टोरेज में सॉल्ट लगे PBKDF2 हैश के रूप में रखा जाता है — यह आपकी प्रोफ़ाइल को इसी डिवाइस पर बंद रखता है, और कहीं भी अपलोड नहीं होता।',
+
+  'settings.handwriting': '✒ हैंडराइटिंग',
+  'settings.handwritingNative': 'नेटिव iPad ऐप Apple Pencil की स्याही PencilKit से लेता है। जब उस बिल्ड में मॉडल की जानकारी उपलब्ध होती है तभी Pri साथ में दिए गए फ़ाउंडेशन मॉडल का उपयोग करता है; वरना वह लोकल पहचानकर्ता पर लौट आता है। आपकी सुधारी गई हैंडराइटिंग फिर भी सीखी जाती है और इसी iPad पर रहती है।',
+  'settings.handwritingBrowser': 'यह ब्राउज़र बिल्ड Pri के पुराने JavaScript हैंडराइटिंग विकल्प का उपयोग करता है। यह वेब UI जाँचने के लिए ठीक है, नेटिव PencilKit/Core ML हैंडराइटिंग का आकलन करने के लिए नहीं। सुधार फिर भी इसी डिवाइस पर ही रहते हैं।',
+  'settings.templatesLearned': 'सीखे गए निजी नमूने',
+  'settings.templatesNone': 'अभी कोई नहीं',
+  'settings.templatesCount': '{symbols} चिह्नों में कुल {total}',
+  'settings.teachHandwriting': '✒ अपनी हैंडराइटिंग सिखाएँ (2 मिनट)',
+  'settings.resetHandwriting': 'सीखी हुई हैंडराइटिंग मिटाएँ',
+  'settings.handwritingCleared': 'सीखी हुई हैंडराइटिंग मिटा दी गई',
+  'settings.cloudOnFor': 'इस प्रोफ़ाइल के लिए “{label}” चालू है',
+  'settings.cloudOffFor': '“{label}” बंद है — यह आपके डिवाइस पर ही रहेगा',
+
+  // Consent copy — see the note at the head of this file. NOT legally reviewed.
+  'settings.cloudHandwritingLabel': 'मेरी हैंडराइटिंग सर्वर पर भी पढ़ी जाए',
+  'settings.cloudHandwritingUnavailable': 'इस इंस्टॉल पर सर्वर पर हैंडराइटिंग पढ़ने की सुविधा नहीं है, इसलिए हर पढ़ाई इसी डिवाइस पर होती है।',
+  'settings.cloudHandwritingCopy': 'इस डिवाइस पर चलने वाला पहचानकर्ता 58 चिह्न जानता है और उसमें अल्पविराम नहीं है, इसलिए −1, 0, 1, 2, 4 जैसी पंक्तियाँ उसके बस की नहीं हैं। इसे चालू करने पर आपकी स्ट्रोक से बनी एक तस्वीर पढ़ने के लिए भेजी जाती है। भेजी जाने वाली चीज़ केवल आपकी हैंडराइटिंग की तस्वीर है — न प्रश्न, न उत्तर, न आपका नाम। आपका काम इस डिवाइस की पढ़ाई से तुरंत दिखता रहेगा; सर्वर की पढ़ाई बाद में आती है, और आप हमेशा अपनी वाली रख सकते हैं।',
+  'settings.cloudMarkingLabel': 'बताइए कि मेरा काम किस पंक्ति पर गलत हुआ',
+  'settings.cloudMarkingUnavailable': 'इस इंस्टॉल पर सर्वर पर काम जाँचने की सुविधा नहीं है, इसलिए जाँच पूरी तरह इसी डिवाइस पर होती है।',
+  'settings.cloudMarkingCopy': 'जब उत्तर गलत हो और Pri यह न बता पाए कि गलती कहाँ हुई, तब इसे चालू कीजिए और आपका काम पंक्ति दर पंक्ति जाँचा जाएगा। यह बताता है कि कौन-सी पंक्ति टूटी और गलती किस तरह की थी — और अगर आपसे एक बार चूक हुई और उसके बाद आपने अपनी ही गलत संख्या से आगे सही काम किया, तो यह वह भी बताता है, बजाय एक गलती के लिए आपको पाँच बार गलत ठहराने के। आपका प्रश्न और आपका काम भेजा जाता है; अपेक्षित उत्तर कभी नहीं भेजा जाता, और यह आपको उत्तर नहीं बताएगा। आपके अंक दोनों ही हालत में इसी डिवाइस पर तय होते हैं और बदलते नहीं।',
+
+  'settings.appearance': '◐ रूप-रंग',
+  'settings.themeDark': 'गहरा — ब्लैकबोर्ड',
+  'settings.themeLight': 'हल्का — कागज़',
+
+  'settings.courses': '📖 कोर्स',
+  'settings.enrolled': 'नामांकित',
+  'settings.coursesNote': 'सामग्री इसी डिवाइस पर बनती है और आपके पाठ्यक्रम के नामों से जोड़ी जाती है — प्रोफ़ाइल में कक्षा या पाथवे बदलते ही स्मार्ट अभ्यास, परीक्षाएँ, प्राथमिकताएँ और अंक अनुमानक तुरंत उसी दायरे में आ जाते हैं।',
+
+  'settings.dataBackup': '⇅ डेटा और बैकअप',
+  'settings.dataNote': 'एक ही JSON फ़ाइल में सब कुछ रहता है — प्रोफ़ाइल, रेटिंग, प्रयास, परीक्षाएँ, हैंडराइटिंग। इसे किसी भी डिवाइस पर वापस लाकर आप वहीं से आगे बढ़ सकते हैं जहाँ छोड़ा था। फ़ाइल खुद एन्क्रिप्ट नहीं होती और वापस लाई गई प्रोफ़ाइल बिना पासवर्ड के आती है, क्योंकि बैकअप में पासवर्ड की जाँच का कोई हिस्सा नहीं होता — वापस लाने के बाद उसे फिर से सुरक्षित करने के लिए दोबारा पासवर्ड लगाइए। फ़ाइल को वहीं रखिए जहाँ आप अपनी कॉपी रखने में सहज हों। प्रगति फ़ाइलें छोटे सारांश होते हैं जिन्हें आप शिक्षक को भेज सकते हैं, और वे उन्हें कक्षा के विश्लेषण में जोड़ लेते हैं।',
+  'settings.exportBackup': 'पूरा बैकअप निकालें',
+  'settings.restoreBackup': 'बैकअप से वापस लाएँ',
+  'settings.progressFile': 'शिक्षक के लिए प्रगति फ़ाइल',
+  'settings.backupExported': 'बैकअप निकाल लिया गया — इसे सुरक्षित जगह रखिए',
+  'settings.progressExported': 'प्रगति फ़ाइल निकाल ली गई — इसे अपने शिक्षक को भेजिए',
+  'settings.backupRestored': 'बैकअप वापस आ गया — {rows} रिकॉर्ड',
+  'settings.backupRestoredUnprotected': 'बैकअप वापस आ गया — {rows} रिकॉर्ड। इस प्रोफ़ाइल पर कोई पासवर्ड नहीं है; इसे फिर से सुरक्षित करने के लिए खाता सेटिंग्स में पासवर्ड लगाइए।',
+  'settings.deleteProfile': 'यह प्रोफ़ाइल मिटाएँ…',
+  'settings.deleteWarning': '“{name}” को मिटाने पर इसकी रेटिंग, प्रयास, परीक्षाएँ, पसंदीदा और सीखी हुई हैंडराइटिंग इस डिवाइस से हट जाएँगी। यह कहीं और नहीं रखी जाती — अगर ज़रा भी संभावना है कि आपको यह वापस चाहिए, तो पहले पूरा बैकअप निकाल लीजिए।',
+  'settings.typeNameToConfirm': 'पक्का करने के लिए “{name}” लिखिए',
+  'settings.typeNameLabel': 'मिटाने की पुष्टि के लिए {name} लिखिए',
+  'settings.typeTheName': 'पक्का करने के लिए प्रोफ़ाइल का नाम — “{name}” — लिखिए।',
+  'settings.enterPasswordToDelete': 'इस प्रोफ़ाइल को मिटाने के लिए इसका पासवर्ड डालिए।',
+  'settings.deleting': 'मिटाया जा रहा है…',
+  'settings.reallyDelete': '“{name}” और इसका सारा डेटा सचमुच मिटा दें',
+
+  'settings.helpSafety': '? मदद और सुरक्षा',
+  'settings.helpBody': 'हर टॉपिक की एक कौशल रेटिंग होती है जो हर उत्तर के साथ बदलती है — कठिन प्रश्न उसे ज़्यादा बदलते हैं। स्मार्ट अभ्यास लगभग 70% सफलता का लक्ष्य रखता है, टॉपिक भूलने से पहले उनकी पुनरावृत्ति बीच-बीच में डालता है, और अंक अनुमानक पूरे पाठ्यक्रम में दक्षता को परीक्षा के भार के हिसाब से तौलता है। हाथ से लिखे उत्तर पूरी तरह इसी डिवाइस पर पहचाने जाते हैं — स्ट्रोक → चिह्न → गणित — और फिर उसी इंजन से पंक्ति दर पंक्ति जाँचे जाते हैं जो टाइप किए उत्तरों को जाँचता है। संकेत और दोबारा कोशिश पर भी श्रेय मिलता है, बस थोड़ा कम।',
+  'settings.addToHomeScreen': ' पूरे स्क्रीन वाले iPad अनुभव के लिए: Share → Add to Home Screen।',
+
+  // ── साइन-इन ────────────────────────────────────────────────────────────────
+  // {br} is a slot, not a fixed line break: the English sentence breaks after
+  // "by hand", and the Hindi one breaks where the Hindi sentence breaks.
+  'login.heroTitle': 'हाथ से लिखिए।{br}हर चरण {marked} पाइए।',
+  'login.heroMarked': 'जाँचा हुआ',
+  'login.heroSub': 'NCERT कक्षा 7–12, JEE Main और Advanced तथा ओलंपियाड का गणित — प्रश्न आपके अपने डिवाइस पर बनते हैं, आपका हल पंक्ति दर पंक्ति जाँचा जाता है, और साथ में विस्तृत हल मिलता है। बिना इंटरनेट के भी चलता है।',
+  'login.getStarted': 'शुरू करें',
+  'login.heroPrivacy': 'पहले ऑफ़लाइन और निजी: प्रोफ़ाइल, प्रगति और हैंडराइटिंग इसी डिवाइस पर रहती हैं। Pri क्लाउड खाता वैकल्पिक है। कोई विज्ञापन नहीं।',
+  'login.cloudSignIn': 'अपने Pri क्लाउड खाते में लॉग इन करें',
+  'login.cloudIntent': 'Pri क्लाउड खाता — पहले इस डिवाइस पर वह प्रोफ़ाइल खोलिए या बनाइए जिसे यह खाता सिंक करेगा। उसके बाद आप लॉग इन करने के लिए खाता सेटिंग्स पर पहुँचेंगे।',
+  'login.privacy': 'निजता',
+  'login.terms': 'शर्तें',
+  'login.refunds': 'रिफ़ंड',
+  'login.grievances': 'शिकायतें',
+  'login.chooseLanguage': 'अपनी भाषा चुनें',
+
+  'login.backToWelcome': 'Pri Learning के स्वागत पन्ने पर लौटें',
+  'login.brandKicker': 'कक्षा 7–12 · JEE · ओलंपियाड',
+  'login.point1': 'NCERT कक्षा 7–12, JEE Main और Advanced तथा ओलंपियाड के टॉपिक पर बने प्रश्न',
+  'login.point2': 'हाथ से लिखा हल पंक्ति दर पंक्ति जाँचा जाता है',
+  'login.point3': 'एक इंजन जो सीखता है कि आप ठीक कैसे लिखते हैं',
+  'login.point4': 'पहले ऑफ़लाइन — जब तक आप क्लाउड सिंक न चुनें, आपका काम इसी डिवाइस पर रहता है',
+
+  'login.h1Pick': 'एक प्रोफ़ाइल चुनें',
+  'login.h1Method': 'इस डिवाइस पर एक प्रोफ़ाइल जोड़ें',
+  'login.h1Create': 'एक प्रोफ़ाइल बनाएँ',
+  'login.whosPractising': 'कौन अभ्यास कर रहा है?',
+  'login.pickToContinue': 'आगे बढ़ने के लिए अपनी प्रोफ़ाइल चुनिए।',
+  'login.student': 'विद्यार्थी',
+  'login.teacher': 'शिक्षक',
+  'login.demoSuffix': ' · डेमो',
+  'login.passwordProtected': 'पासवर्ड से सुरक्षित',
+  'login.password': 'पासवर्ड',
+  'login.repeatPassword': 'पासवर्ड दोबारा लिखें',
+  'login.passwordFor': '{name} का पासवर्ड',
+  'login.unlock': 'खोलें',
+  'login.lockedForAnother': 'और {wait} के लिए बंद है।',
+  'login.addAnother': '＋ एक और प्रोफ़ाइल जोड़ें',
+  'login.tryDemoIndia': 'डेमो देखिए — कक्षा 10 का एक विद्यार्थी, छह हफ़्ते की प्रगति के साथ, घूमने-फिरने के लिए तैयार',
+
+  'login.privateProfile': 'इस डिवाइस पर एक निजी प्रोफ़ाइल',
+  'login.methodSub': 'प्रोफ़ाइल इसी डिवाइस पर रखा गया एक रिकॉर्ड है — इसे बनाने से कोई खाता कहीं दर्ज नहीं होता। बस यह चुनिए कि इसे किस नाम से पहचाना जाए; उसके बाद सब कुछ दोनों ही तरह से एक जैसा चलता है।',
+  'login.continueWithEmail': 'ईमेल के साथ आगे बढ़ें',
+  'login.continueWithoutEmail': 'बिना ईमेल के आगे बढ़ें',
+  'login.or': 'या',
+  'login.methodNote': 'प्रोफ़ाइल इसी डिवाइस पर रहती है। अगर आप कोई पता देते हैं तो वह सिर्फ़ यहाँ प्रोफ़ाइलों को एक-दूसरे से अलग पहचानने के लिए है — उसे न कभी सत्यापित किया जाता है, न कहीं भेजा जाता है। Pri क्लाउड खाते से सिंक करना सेटिंग्स में एक अलग और वैकल्पिक कदम है।',
+  'login.backToProfiles': '← प्रोफ़ाइलों पर लौटें',
+  'login.orTryDemoIndia': 'या पहले डेमो देखिए — कक्षा 10 का एक विद्यार्थी, छह हफ़्ते की प्रगति के साथ',
+  'login.orTryDemoAustralia': 'या पहले डेमो देखिए — वर्ष 10 का एक विद्यार्थी, छह हफ़्ते की प्रगति के साथ',
+
+  'login.createSub': 'आपका नाम, आपका काम और वह मॉडल जो आपकी लिखने की शैली सीखता है — सब इसी डिवाइस के स्टोरेज में रहता है, और यह सब Wi-Fi बंद रहने पर भी चलता है।',
+  'login.namePlaceholder': 'जैसे: प्रियशरण',
+  'login.optional': '(वैकल्पिक)',
+  'login.emailNote': 'सिर्फ़ इस डिवाइस पर प्रोफ़ाइलों को अलग पहचानने के लिए — न सत्यापित, न कहीं भेजा जाता है।',
+  'login.iAmA': 'मैं हूँ…',
+  'login.imStudying': 'मैं पढ़ रहा/रही हूँ',
+  'login.studyingInAustralia': 'ऑस्ट्रेलिया में पढ़ रहे हैं? ऑस्ट्रेलियाई पाठ्यक्रम चुनें',
+  'login.backToIndian': '← भारतीय कक्षाओं और ट्रैक पर लौटें',
+  'login.tryAustralianDemo': 'ऑस्ट्रेलियाई डेमो देखिए — वर्ष 10 का एक विद्यार्थी, छह हफ़्ते की प्रगति के साथ',
+  'login.protectWithPassword': 'इस प्रोफ़ाइल को पासवर्ड से सुरक्षित करें',
+  'login.oneMoment': 'एक क्षण…',
+  'login.startLearning': 'सीखना शुरू करें',
+  'login.back': 'पीछे',
+  'login.createNote': 'न कोई सत्यापन ईमेल, न रीसेट लिंक, न पूछने के लिए कोई: प्रोफ़ाइल इसी डिवाइस पर रखा गया एक रिकॉर्ड है और कहीं नहीं। पासवर्ड इसे आप तक सीमित रखता है — यह डिवाइस के अपने स्टोरेज में सॉल्ट लगे हैश के रूप में रहता है, कभी अपलोड नहीं होता, और इसे केवल आप हटा सकते हैं। अपनी प्रगति एक से ज़्यादा डिवाइस पर चाहिए? प्रोफ़ाइल बन जाने के बाद सेटिंग्स से Pri क्लाउड खाते में लॉग इन कीजिए।',
+  'login.authFoot': 'पहले ऑफ़लाइन: प्रोफ़ाइल, प्रगति और हैंडराइटिंग इसी डिवाइस के स्टोरेज में रहती हैं और बिना किसी कनेक्शन के काम करती हैं। जब तक आप Pri क्लाउड खाते में लॉग इन न करें, कुछ भी इस डिवाइस से बाहर नहीं जाता। कोई विज्ञापन नहीं।',
+
+  // ── पासवर्ड की मज़बूती ──────────────────────────────────────────────────────
+  'pw.atLeast': 'कम से कम {min} अक्षर।',
+  'pw.tooShort': 'बहुत छोटा',
+  'pw.charsToGo': { one: '{n} अक्षर और चाहिए।', other: '{n} अक्षर और चाहिए।' },
+  'pw.tooEasy': 'अंदाज़ा लगाना बहुत आसान',
+  'pw.firstTried': 'यह उन पहली चीज़ों में है जो कोई भी आज़माता है।',
+  'pw.oneCharRepeated': 'एक ही अक्षर बार-बार लिखना एक ही अंदाज़ा है।',
+  'pw.keyboardRun': 'यह कीबोर्ड की सीधी कतार है।',
+  'pw.readableFromList': 'प्रोफ़ाइल की सूची देखने वाला कोई भी इसे पहले ही पढ़ सकता है।',
+  'pw.fair': 'ठीक-ठाक',
+  'pw.good': 'अच्छा',
+  'pw.strong': 'मज़बूत',
+  'pw.holdsUp': 'लंबा और विविध — यह टिकता है।',
+  'pw.solid': 'ठोस। कुछ अक्षर और होते तो और मज़बूत होता।',
+  'pw.pastMinimum': 'न्यूनतम से ऊपर। लंबाई बढ़ाना अतिरिक्त चिह्न जोड़ने से ज़्यादा काम आता है।',
+
+  // ── अवधि ───────────────────────────────────────────────────────────────────
+  // सेकंड, मिनट and घंटा do not change after a numeral (12 मिनट is attested in
+  // the NCERT corpus), so both forms are the same word here.
+  'time.seconds': { one: '{n} सेकंड', other: '{n} सेकंड' },
+  'time.minutes': { one: '{n} मिनट', other: '{n} मिनट' },
+  'time.hours': { one: '{n} घंटा', other: '{n} घंटे' }
+};

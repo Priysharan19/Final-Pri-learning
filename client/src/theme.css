@@ -1193,3 +1193,8 @@ body { overscroll-behavior-y: none; }
 .mnav-sheet-item .nav-ico { font-size: 18px; }
 .mnav-item { min-width: 48px; min-height: 48px; }
 @media (min-width: 761px) { .mnav-sheet, .mnav-sheet-scrim { display: none; } }
+
+/* The NCERT Hindi term shown beside its English one. Subdued, because the
+   English is what the exam paper treats as final and what has to read first;
+   the gloss is support, not a replacement. */
+.gloss-hi { color: var(--ink-3); font-weight: 400; white-space: nowrap; }

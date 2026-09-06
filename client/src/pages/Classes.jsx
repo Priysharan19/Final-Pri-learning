@@ -5,10 +5,12 @@ import { useApp } from '../App.jsx';
 import AssignmentInboxPanel from '../components/AssignmentInboxPanel.jsx';
 import Class10NCERTLibrary from '../components/Class10NCERTLibrary.jsx';
 import { readJSONFile } from '../lib/files.js';
+import { useT } from '../i18n/index.js';
 
 export default function Classes() {
   const { user, toast } = useApp();
   const nav = useNavigate();
+  const t = useT();
   const [tasks, setTasks] = useState(null);
   const fileRef = useRef(null);
 
@@ -23,9 +25,12 @@ export default function Classes() {
     try {
       const data = await readJSONFile(f);
       const r = await api.post('/tasks/import-pack', data);
-      toast(<div><b>Joined!</b><div className="badge-desc">“{r.task?.title || 'Task'}” from {typeof data.teacher === 'string' ? data.teacher : 'your teacher'} added to Tasks.</div></div>, 4600);
-      const t = await api.get('/tasks'); setTasks(t.tasks || []);
-    } catch (err) { toast(err.message || 'That file isn’t a class pack.', 4200); }
+      toast(<div><b>{t('classes.joined')}</b><div className="badge-desc">{t('classes.joinedFrom', {
+        title: r.task?.title || t('classes.aTask'),
+        teacher: typeof data.teacher === 'string' ? data.teacher : t('classes.yourTeacher')
+      })}</div></div>, 4600);
+      const fresh = await api.get('/tasks'); setTasks(fresh.tasks || []);
+    } catch (err) { toast(err.message || t('classes.notAPack'), 4200); }
   };
 
   if (user.role === 'teacher') {
@@ -36,10 +41,10 @@ export default function Classes() {
   return (
     <div>
       <div className="spread" style={{ marginBottom: 6 }}>
-        <h1>Classes</h1>
-        <button className="btn btn-primary" onClick={() => fileRef.current?.click()}>＋ Import Class Pack</button>
+        <h1>{t('classes.title')}</h1>
+        <button className="btn btn-primary" onClick={() => fileRef.current?.click()}>{t('classes.importPack')}</button>
       </div>
-      <p className="muted" style={{ marginBottom: 20 }}>cloud assignments and offline class packs</p>
+      <p className="muted" style={{ marginBottom: 20 }}>{t('classes.sub')}</p>
       <input ref={fileRef} type="file" accept="application/json,.json" style={{ display: 'none' }} onChange={importPack} />
 
       <AssignmentInboxPanel />
@@ -49,8 +54,8 @@ export default function Classes() {
       <section style={{ marginTop: 20 }} aria-labelledby="offline-class-packs-title">
         <div className="spread" style={{ marginBottom: 10 }}>
           <div>
-            <h2 id="offline-class-packs-title" style={{ marginBottom: 2 }}>Offline class packs</h2>
-            <p className="muted" style={{ margin: 0 }}>Teacher Studio packs remain fully usable without a cloud account.</p>
+            <h2 id="offline-class-packs-title" style={{ marginBottom: 2 }}>{t('classes.offlineTitle')}</h2>
+            <p className="muted" style={{ margin: 0 }}>{t('classes.offlineSub')}</p>
           </div>
         </div>
 
@@ -58,31 +63,27 @@ export default function Classes() {
           <div className="locked-wrap">
             <div className="card locked-card" style={{ padding: 40 }}>
               <div className="locked-icon" aria-hidden="true">🎓</div>
-              <div className="locked-title">No offline class packs yet</div>
-              <div className="locked-sub">
-                Import a <b>class pack</b> — a small file your teacher exports from Pri Learning Teacher Studio
-                and shares with you (AirDrop, email, USB — no internet account needed).
-              </div>
-              <button className="btn btn-primary" onClick={() => fileRef.current?.click()}>＋ Import a Class Pack</button>
-              <div className="muted" style={{ marginTop: 16, fontSize: 12.5 }}>
-                Cloud classroom assignments, when connected, appear above and do not replace offline packs.
-              </div>
+              <div className="locked-title">{t('classes.emptyTitle')}</div>
+              <div className="locked-sub">{t('classes.emptySub')}</div>
+              <button className="btn btn-primary" onClick={() => fileRef.current?.click()}>{t('classes.emptyImport')}</button>
+              <div className="muted" style={{ marginTop: 16, fontSize: 12.5 }}>{t('classes.cloudNote')}</div>
             </div>
           </div>
         ) : (
           <div className="grid cols-2">
-            {joined.map(t => (
-              <div className="card" key={t.id}>
+            {joined.map(task => (
+              <div className="card" key={task.id}>
                 <div className="spread">
-                  <h3>{t.title}</h3>
-                  <span className="tag tag-brand">{typeof t.fromPack === 'string' ? t.fromPack : 'Class task'}</span>
+                  <h3>{task.title}</h3>
+                  <span className="tag tag-brand">{typeof task.fromPack === 'string' ? task.fromPack : t('classes.classTask')}</span>
                 </div>
                 <p className="muted" style={{ margin: '6px 0 14px' }}>
-                  {t.count} questions{t.dueAt ? ` · due ${new Date(t.dueAt).toLocaleDateString()}` : ''}
+                  {t('common.questionsCounted', { count: task.count, n: task.count })}
+                  {task.dueAt ? t('classes.dueOn', { date: new Date(task.dueAt).toLocaleDateString(user.locale) }) : ''}
                 </p>
                 <div className="row">
-                  <button className="btn btn-primary btn-sm" onClick={() => nav(`/practice?task=${t.id}`)}>Continue →</button>
-                  <button className="btn btn-quiet btn-sm" onClick={() => nav('/tasks')}>All tasks</button>
+                  <button className="btn btn-primary btn-sm" onClick={() => nav(`/practice?task=${task.id}`)}>{t('classes.continue')}</button>
+                  <button className="btn btn-quiet btn-sm" onClick={() => nav('/tasks')}>{t('classes.allTasks')}</button>
                 </div>
               </div>
             ))}

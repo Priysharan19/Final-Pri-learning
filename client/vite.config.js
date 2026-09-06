@@ -29,9 +29,17 @@ import { join, resolve } from 'node:path';
 // are over it, and raising the bar past them would only hide that.
 // ─────────────────────────────────────────────────────────────────────────────
 
-function manualChunks(id) {
+// The Hindi catalogue gets a name of its own for the same reason the ink
+// weights do: so the service worker can recognise it by that name and leave it
+// out of the install, and so the i18n contract suite can assert that it did.
+// Only the strings are split. i18n/index.js and i18n/languages.js stay in the
+// entry — the runtime has to be there to decide a language, and languages.js is
+// what local/backend.js validates the profile field with.
+export function manualChunks(id) {
   const p = id.replace(/\\/g, '/');
   if (p.includes('vite/preload-helper')) return 'vite-preload';
+  if (p.endsWith('/src/i18n/strings.hi.js')) return 'i18n-hi';
+  if (p.endsWith('/src/i18n/ncertTerms.js')) return 'i18n-terms';
   if (p.includes('/node_modules/')) {
     if (/\/node_modules\/(react|react-dom|react-router|react-router-dom|scheduler)\//.test(p)) return 'vendor-react';
     if (/\/node_modules\/katex\//.test(p)) return 'vendor-katex';
@@ -53,7 +61,7 @@ function manualChunks(id) {
 // Legacy .woff/.ttf duplicates of the .woff2 faces are left to the runtime cache.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const PRECACHE_SKIP = /(^|\/)sw\.js$|(^|\/)\.DS_Store$|\.map$|\.woff$|\.ttf$/;
+export const PRECACHE_SKIP = /(^|\/)sw\.js$|(^|\/)\.DS_Store$|\.map$|\.woff$|\.ttf$/;
 
 // The PDF renderer and its worker are ~2.7 MB together and are needed only by
 // the student who attaches a scanned PDF. Precaching them would make every
@@ -63,7 +71,32 @@ const PRECACHE_SKIP = /(^|\/)sw\.js$|(^|\/)\.DS_Store$|\.map$|\.woff$|\.ttf$/;
 // student who has used it once has it offline, and a student who never does
 // never pays for it. The one place this shows is opening a PDF offline having
 // never opened one before; pdfPage.js reports that case specifically.
-const RUNTIME_ONLY = /(^|\/)pdf(\.worker)?-[^/]*\.(js|mjs)$/;
+//
+// A translation catalogue is the same argument in miniature. Every install
+// would otherwise carry every language, and this app is aimed squarely at
+// budget Android phones on metered data — an English reader paying to download
+// Hindi, and a Hindi reader paying to download every other language we ever
+// add, is a cost nobody agreed to. The catalogue is fetched the moment the
+// language is switched and then cached by the ordinary /assets/ rule, so a
+// student who reads Hindi has it offline from their first switch onwards.
+//
+// The one place this shows is switching language while offline, having never
+// done it before: the strings do not arrive, the app stays in English, and the
+// setting is remembered so the next connected boot lands in Hindi. That is
+// spelled out in i18n/index.js where setLanguage swallows the failure.
+//
+// The NCERT term glossary is the same again: reached only when the term bridge
+// is turned on, and worth nothing to the install of somebody who never does.
+//
+// A NOTE ON WHAT YOU WILL SEE IN dist/. Each of these leaves TWO files behind:
+// the named chunk that holds the data (i18n-hi-*.js, i18n-terms-*.js) and a
+// ~60-byte re-export stub named after the module the import() actually points
+// at (strings.hi-*.js, ncertTerms-*.js). Only the stubs are precached, which is
+// exactly right — sixty bytes in the install, and the sixty kilobytes behind
+// them fetched only if a student asks. CI asserts both halves: the named chunks
+// are absent from the install list, and nothing precached under those module
+// names is big enough to be the data.
+export const RUNTIME_ONLY = /(^|\/)(?:pdf(?:\.worker)?|i18n-[a-z-]+)-[^/]*\.(js|mjs)$/;
 
 function filesIn(dir, base = '') {
   const out = [];

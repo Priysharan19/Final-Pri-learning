@@ -9,16 +9,21 @@ import { api } from '../api.js';
 import { MathText } from '../lib/latex.jsx';
 import { formatDate, formatNumber } from '../lib/locale.js';
 import { useApp } from '../App.jsx';
+import { useT } from '../i18n/index.js';
+import TermGloss from '../components/TermGloss.jsx';
 
 const FILTERS = [
-  ['all', 'All'],
-  ['wrong', '✖ Incorrect'],
-  ['correct', '✔ Correct'],
-  ['bookmarked', '★ Bookmarked'],
-  ['ink', '✍️ With ink']
+  ['all', 'history.filterAll'],
+  ['wrong', 'history.filterWrong'],
+  ['correct', 'history.filterCorrect'],
+  ['bookmarked', 'history.filterBookmarked'],
+  ['ink', 'history.filterInk']
 ];
 
-const MODE_LABEL = { practice: 'Practice', review: 'Review', exam: 'Exam', rush: 'Rush', match: 'Match', task: 'Task' };
+const MODE_KEY = {
+  practice: 'history.modePractice', review: 'history.modeReview', exam: 'history.modeExam',
+  rush: 'history.modeRush', match: 'history.modeMatch', task: 'history.modeTask'
+};
 
 /** Render saved strokes as a scaled SVG — a faithful replay of the ink. */
 function InkReplay({ strokes, height = 160, label }) {
@@ -47,6 +52,7 @@ function InkReplay({ strokes, height = 160, label }) {
 
 export default function History() {
   const { toast, user } = useApp();
+  const t = useT();
   const [filter, setFilter] = useState('all');
   const [page, setPage] = useState(0);
   const [data, setData] = useState(null);
@@ -73,9 +79,7 @@ export default function History() {
           serve: {
             question: r.question,
             reason: 'retry',
-            why: variant === 'same'
-              ? 'Same question, same numbers — beat it this time.'
-              : 'Same skill, fresh numbers — prove it wasn’t luck.'
+            why: t(variant === 'same' ? 'history.whySame' : 'history.whyFresh')
           }
         }
       });
@@ -94,19 +98,19 @@ export default function History() {
 
   return (
     <div className="grid" style={{ gap: 18 }}>
-      <h1 className="sr-only">Question history</h1>
+      <h1 className="sr-only">{t('history.title')}</h1>
       <div className="spread" style={{ flexWrap: 'wrap', gap: 12 }}>
         <div>
-          <h2>Your question history</h2>
-          <p className="sub" style={{ marginTop: 3 }}>Every question you've answered stays on this device — retry any of them, with the same numbers or new ones.</p>
+          <h2>{t('history.heading')}</h2>
+          <p className="sub" style={{ marginTop: 3 }}>{t('history.sub')}</p>
         </div>
-        <span className="chip">{data ? `${formatNumber(data.total, user)} question${data.total === 1 ? '' : 's'}` : '…'}</span>
+        <span className="chip">{data ? t('common.questionsCounted', { count: data.total, n: formatNumber(data.total, user) }) : '…'}</span>
       </div>
 
-      <div className="row" role="group" aria-label="Filter your history" style={{ flexWrap: 'wrap', gap: 8 }}>
-        {FILTERS.map(([k, label]) => (
+      <div className="row" role="group" aria-label={t('history.filterGroup')} style={{ flexWrap: 'wrap', gap: 8 }}>
+        {FILTERS.map(([k, key]) => (
           <button key={k} className={`pill-opt ${filter === k ? 'on' : ''}`} aria-pressed={filter === k}
-            onClick={() => { setFilter(k); setPage(0); }}>{label}</button>
+            onClick={() => { setFilter(k); setPage(0); }}>{t(key)}</button>
         ))}
       </div>
 
@@ -114,26 +118,26 @@ export default function History() {
         {!data && <div className="skeleton" style={{ height: 300 }} />}
         {data && !data.items.length && (
           <p className="muted" style={{ padding: 14 }}>
-            {filter === 'all' ? 'Nothing here yet — answer some questions and they’ll appear immediately.' : 'Nothing matches this filter yet.'}
+            {t(filter === 'all' ? 'history.emptyAll' : 'history.emptyFiltered')}
           </p>
         )}
         {data && data.items.map(item => (
           <div key={item.id} className="hist-row">
-            <button className={`hist-star ${item.bookmarked ? 'on' : ''}`} title={item.bookmarked ? 'Remove bookmark' : 'Bookmark this question'}
-              aria-label={`${item.bookmarked ? 'Remove' : 'Add'} the bookmark on this ${item.subtopicName} question`}
+            <button className={`hist-star ${item.bookmarked ? 'on' : ''}`} title={t(item.bookmarked ? 'history.removeBookmark' : 'history.addBookmark')}
+              aria-label={t(item.bookmarked ? 'history.removeBookmarkOn' : 'history.addBookmarkOn', { topic: item.subtopicName })}
               aria-pressed={!!item.bookmarked}
               onClick={() => toggleBookmark(item.id)}>{item.bookmarked ? '★' : '☆'}</button>
             <button className="hist-main" onClick={() => openDetail(item.id)}>
               <div className="hist-top">
                 <span className={`hist-verdict ${item.correct ? 'good' : item.correct === false ? 'bad' : ''}`}>
                   {item.correct ? '✔' : item.correct === false ? '✖' : '·'}
-                  <span className="sr-only">{item.correct ? 'Correct' : item.correct === false ? 'Incorrect' : 'Not marked'}</span>
+                  <span className="sr-only">{item.correct ? t('app.correct') : item.correct === false ? t('app.incorrect') : t('history.notMarked')}</span>
                 </span>
-                <span className="hist-name">{item.subtopicName}</span>
+                <span className="hist-name"><TermGloss text={item.subtopicName} /></span>
                 <span className="tag">D{item.difficulty}</span>
-                <span className="tag">{MODE_LABEL[item.mode] || item.mode}</span>
-                {item.viaInk && <span className="tag" title="Answered by handwriting">✍️<span className="sr-only"> answered by handwriting</span></span>}
-                {item.hasPhoto && <span className="tag" title="Paper working photo attached">📷<span className="sr-only"> photo of paper working attached</span></span>}
+                <span className="tag">{MODE_KEY[item.mode] ? t(MODE_KEY[item.mode]) : item.mode}</span>
+                {item.viaInk && <span className="tag" title={t('history.viaInk')}>✍️<span className="sr-only">{t('history.viaInkSpoken')}</span></span>}
+                {item.hasPhoto && <span className="tag" title={t('history.hasPhoto')}>📷<span className="sr-only">{t('history.hasPhotoSpoken')}</span></span>}
                 <span className="muted" style={{ marginLeft: 'auto', fontSize: 12, whiteSpace: 'nowrap' }}>
                   {formatDate(item.answeredAt, user)}
                 </span>
@@ -143,18 +147,18 @@ export default function History() {
             <div className="hist-actions">
               {item.canRetry && (
                 <>
-                  <button className="btn btn-ghost btn-sm" title="Regenerate this exact question — identical numbers"
-                    onClick={() => retry(item.id, 'same')}>↻ Same</button>
-                  <button className="btn btn-ghost btn-sm" title="Same skill, new random numbers"
-                    onClick={() => retry(item.id, 'fresh')}>✦ Fresh</button>
+                  <button className="btn btn-ghost btn-sm" title={t('history.retrySameTitle')}
+                    onClick={() => retry(item.id, 'same')}>{t('history.retrySame')}</button>
+                  <button className="btn btn-ghost btn-sm" title={t('history.retryFreshTitle')}
+                    onClick={() => retry(item.id, 'fresh')}>{t('history.retryFresh')}</button>
                 </>
               )}
             </div>
             {open?.id === item.id && open.detail && (
               <div className="hist-detail">
-                {item.answerGiven !== '' && <p style={{ marginBottom: 8 }}>Your answer: <b>{item.answerGiven}</b></p>}
+                {item.answerGiven !== '' && <p style={{ marginBottom: 8 }}>{t('history.yourAnswerWas')} <b>{item.answerGiven}</b></p>}
                 {open.detail.solution?.answerText !== undefined && (
-                  <p style={{ marginBottom: 8 }}>Correct answer: <b><MathText text={open.detail.solution.answerText} /></b></p>
+                  <p style={{ marginBottom: 8 }}>{t('history.correctAnswerWas')} <b><MathText text={open.detail.solution.answerText} /></b></p>
                 )}
                 {open.detail.question?.figure && <div className="q-figure" dangerouslySetInnerHTML={{ __html: open.detail.question.figure }} />}
                 {open.detail.solution?.steps && (
@@ -170,12 +174,13 @@ export default function History() {
                     ))}
                   </div>
                 )}
-                {open.detail.ink?.strokes?.length > 0 && <InkReplay strokes={open.detail.ink.strokes} label={`Your handwriting${open.detail.ink.recognized ? ` — read as “${open.detail.ink.recognized}”` : ''}`} />}
-                {open.detail.ink?.scribble?.length > 0 && <InkReplay strokes={open.detail.ink.scribble} label="Scribble pad" height={120} />}
+                {open.detail.ink?.strokes?.length > 0 && <InkReplay strokes={open.detail.ink.strokes}
+                  label={open.detail.ink.recognized ? t('history.readAs', { text: open.detail.ink.recognized }) : t('history.yourHandwriting')} />}
+                {open.detail.ink?.scribble?.length > 0 && <InkReplay strokes={open.detail.ink.scribble} label={t('history.scribblePad')} height={120} />}
                 {open.detail.ink?.photo && (
                   <div style={{ marginTop: 8 }}>
-                    <div className="muted" style={{ fontSize: 12, marginBottom: 4 }}>Attached paper working</div>
-                    <img src={open.detail.ink.photo} alt="Paper working" style={{ maxWidth: '100%', borderRadius: 10, border: '1px solid var(--hairline)' }} />
+                    <div className="muted" style={{ fontSize: 12, marginBottom: 4 }}>{t('history.attachedWorking')}</div>
+                    <img src={open.detail.ink.photo} alt={t('history.paperWorking')} style={{ maxWidth: '100%', borderRadius: 10, border: '1px solid var(--hairline)' }} />
                   </div>
                 )}
               </div>
@@ -186,9 +191,9 @@ export default function History() {
 
       {pages > 1 && (
         <div className="row" style={{ justifyContent: 'center' }}>
-          <button className="btn btn-quiet btn-sm" disabled={page === 0} onClick={() => setPage(p => p - 1)}>← Newer</button>
-          <span className="muted">page {page + 1} of {pages}</span>
-          <button className="btn btn-quiet btn-sm" disabled={page >= pages - 1} onClick={() => setPage(p => p + 1)}>Older →</button>
+          <button className="btn btn-quiet btn-sm" disabled={page === 0} onClick={() => setPage(p => p - 1)}>{t('history.newer')}</button>
+          <span className="muted">{t('history.pageOf', { page: page + 1, total: pages })}</span>
+          <button className="btn btn-quiet btn-sm" disabled={page >= pages - 1} onClick={() => setPage(p => p + 1)}>{t('history.older')}</button>
         </div>
       )}
     </div>

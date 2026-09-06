@@ -12,6 +12,7 @@ import {
   ratingsFor, getRating, putRating, currentPid, setCurrentPid, activityFor
 } from './store.js';
 import { cleanTimezone, dayKey, defaultTimezone, timezoneOf, localeOf } from '../lib/locale.js';
+import { cleanLanguage } from '../i18n/languages.js';
 import {
   CURRICULUM, STREAM_CURRICULUM, PATHWAYS, streamSubtopics, SUBTOPIC_BY_ID, subtopicsForYear,
   scopeForYear, DIFF_LABELS, dotpointsFor, dotpointById, dotpointAt
@@ -701,6 +702,17 @@ async function publicUser(p, nowMs = Date.now()) {
   const today = (await get('activity', `${p.id}:${dayKey(nowMs, tz)}`)) || { questions: 0, correct: 0, xp: 0 };
   return {
     id: p.id, name: p.name, year: p.year, theme: p.theme || 'dark',
+    // The language the interface is drawn in. `locale` above is a different
+    // thing and stays as it is: it decides how a date, a number and a price are
+    // written for this student's region, and a Hindi-medium student in India
+    // still reads en-IN dates and ₹ prices. One is region, one is language.
+    language: cleanLanguage(p.language),
+    // The NCERT term bridge is deliberately not part of `language`. A student
+    // who reads the interface in English and studied maths in Hindi is exactly
+    // who it is for, and nesting it under the interface language would make
+    // them switch the whole app to get it. Off until turned on, like every
+    // other setting that changes what a student is shown.
+    mathsGloss: p.mathsGloss === true,
     course: p.course || 'nsw', timezone: tz, locale: localeOf(p),
     courseLabel: courseLabel(p.course || 'nsw', p.year, pathwayOf(p), cleanIndiaTrack(p.indiaTrack, p.year)),
     pathway: p.course === 'nsw' && p.year >= 11 ? pathwayOf(p) : null,
@@ -1559,7 +1571,8 @@ function packQuestion(cq) {
 const exportProfile = p => ({
   name: p.name, year: p.year, course: p.course || 'nsw', indiaTrack: p.indiaTrack || null, role: p.role || 'student',
   timezone: timezoneOf(p),
-  avatar: p.avatar || '🙂', theme: p.theme || 'dark', dailyGoal: p.dailyGoal || 10,
+  avatar: p.avatar || '🙂', theme: p.theme || 'dark', language: cleanLanguage(p.language),
+  mathsGloss: p.mathsGloss === true, dailyGoal: p.dailyGoal || 10,
   xp: p.xp || 0, pathway: p.pathway ?? null, provider: p.provider || null,
   handwriting: p.handwriting !== false, isDemo: false,
   createdAt: p.createdAt || null
@@ -1575,6 +1588,8 @@ function importProfile(src, id) {
     role: src.role === 'teacher' ? 'teacher' : 'student',
     avatar: safeLabel(src.avatar, 4) || '🙂',
     theme: src.theme === 'light' ? 'light' : 'dark',
+    language: cleanLanguage(src.language),
+    mathsGloss: src.mathsGloss === true,
     dailyGoal: safeInt(src.dailyGoal, 3, 60, 10),
     xp: safeInt(src.xp, 0, 1e9, 0),
     pathway: (COURSES[src.course] ? src.course : 'nsw') === 'nsw' ? (cleanPathway(src.pathway, year) || (year >= 11 ? 'advanced' : null)) : null,
@@ -1880,6 +1895,13 @@ const routes = {
       course: COURSES[body.course] ? body.course : 'nsw',
       role: body.role === 'teacher' ? 'teacher' : 'student',
       avatar: body.avatar || '🙂', theme: 'dark', dailyGoal: 10, xp: 0,
+      // The language the sign-up screen was being read in. Somebody who chose
+      // Hindi and then filled this form in Hindi has already told us what they
+      // read; making them find the setting afterwards to say it a second time
+      // would be a poor welcome. Absent, it cleans to English like every other
+      // profile.
+      language: cleanLanguage(body.language),
+      mathsGloss: body.mathsGloss === true,
       createdAt: Date.now(), lastActiveAt: Date.now()
     };
     const email = String(body.email || '').trim().toLowerCase().slice(0, 120);
@@ -2016,6 +2038,12 @@ const routes = {
     if (body.pathway !== undefined && p.course === 'nsw') p.pathway = cleanPathway(body.pathway, p.year) || (p.year >= 11 ? 'advanced' : null);
     if (body.year !== undefined && body.pathway === undefined && p.course === 'nsw') p.pathway = cleanPathway(p.pathway, p.year) || (p.year >= 11 ? 'advanced' : null);
     if (body.theme !== undefined && ['dark', 'light'].includes(body.theme)) p.theme = body.theme;
+    // Language is per profile, not per device: two siblings sharing one iPad
+    // each get their own. An unrecognised id is cleaned to English rather than
+    // rejected — a profile restored from a backup written by a build that had a
+    // language this one does not must still open.
+    if (body.language !== undefined) p.language = cleanLanguage(body.language);
+    if (body.mathsGloss !== undefined) p.mathsGloss = body.mathsGloss === true;
     if (body.dailyGoal !== undefined) p.dailyGoal = Math.min(60, Math.max(3, Number(body.dailyGoal) || p.dailyGoal));
     const courseBefore = p.course || 'nsw';
     if (body.course !== undefined && COURSES[body.course]) p.course = body.course;

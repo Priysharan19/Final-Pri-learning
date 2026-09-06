@@ -134,6 +134,7 @@ const BODY_RULES = [
     requireObject(body, 'POST /profiles');
     optionalString(body, 'name', 80); optionalNumber(body, 'year');
     optionalString(body, 'course', 30); optionalString(body, 'role', 30);
+    optionalString(body, 'language', 20); optionalBoolean(body, 'mathsGloss');
     optionalString(body, 'avatar', 32); optionalString(body, 'email', 180);
     optionalString(body, 'provider', 30); optionalString(body, 'password', 1024);
     optionalString(body, 'pathway', 30); optionalString(body, 'indiaTrack', 30); optionalString(body, 'timezone', 64);
@@ -152,7 +153,8 @@ const BODY_RULES = [
   }],
   [/^PATCH \/me$/, body => {
     requireObject(body, 'PATCH /me'); optionalString(body, 'name', 80); optionalNumber(body, 'year');
-    optionalString(body, 'pathway', 30); optionalString(body, 'theme', 20); optionalNumber(body, 'dailyGoal');
+    optionalString(body, 'pathway', 30); optionalString(body, 'theme', 20); optionalString(body, 'language', 20);
+    optionalBoolean(body, 'mathsGloss'); optionalNumber(body, 'dailyGoal');
     optionalString(body, 'course', 30); optionalString(body, 'indiaTrack', 30); optionalString(body, 'avatar', 32); optionalBoolean(body, 'handwriting'); optionalString(body, 'email', 180);
     optionalString(body, 'timezone', 64);
   }],

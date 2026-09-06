@@ -1,0 +1,1 @@
+import{t as e}from"./i18n-terms-BqYk50BT.js";export{e as default};
