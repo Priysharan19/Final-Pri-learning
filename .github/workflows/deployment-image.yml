@@ -56,6 +56,7 @@ jobs:
             -e PRI_CSRF_SECRET=ci-csrf-secret-not-for-production \
             -e PRI_AUTH_DELIVERY_KEY=3333333333333333333333333333333333333333333333333333333333333333 \
             -e PRI_PLATFORM_DB=/data/pri-learning-platform.db \
+            -e PRI_TRUSTED_PROXY_HOPS=0 \
             -e PRI_AUTH_EMAIL_PROVIDER=resend \
             -e PRI_RESEND_API_KEY=ci-resend-key \
             -e 'PRI_AUTH_EMAIL_FROM=Pri Learning <noreply@pri.example>' \
