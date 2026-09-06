@@ -90,6 +90,16 @@ jobs:
         run: npm ci --prefix server
       - name: Runtime dependency security floor
         run: node tools/runtime-audit-floor.mjs server
+      - name: Platform security floor
+        run: |
+          node server/test/security-headers-check.mjs
+          node server/test/login-lockout-check.mjs
+          node server/test/admin-bootstrap-check.mjs
+          node server/test/teacher-invite-check.mjs
+          node server/test/oidc-verification-check.mjs
+          node server/test/verification-enforcement-check.mjs
+          node server/test/housekeeping-check.mjs
+          node server/test/production-runtime-image-check.mjs
       - name: Commercial platform schema contract
         run: node server/test/platform-schema-check.mjs
       - name: Platform migration contract

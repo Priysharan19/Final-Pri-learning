@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { id, opaqueToken, rateLimit, requireRole, requireSession, sha256 } from './security.js';
+import { id, opaqueToken, rateLimit, requireRole, requireSession, requireVerifiedEmail, sha256 } from './security.js';
 
 function classCode() {
   return opaqueToken(6).replace(/[-_]/g, '').slice(0, 8).toUpperCase();
@@ -94,7 +94,7 @@ export function createClassRouter(db) {
     res.json({ classes: rows.map(x => ({ id: x.id, name: x.name, createdAt: x.created_at, joinedAt: x.joined_at, role: 'student' })) });
   });
 
-  router.post('/', requireRole('teacher', 'admin'), rateLimit(db, 'class-create', { limit: 20, windowMs: 60 * 60 * 1000 }), (req, res) => {
+  router.post('/', requireVerifiedEmail, requireRole('teacher', 'admin'), rateLimit(db, 'class-create', { limit: 20, windowMs: 60 * 60 * 1000 }), (req, res) => {
     const name = cleanTitle(req.body?.name, 120);
     if (!name) return res.status(400).json({ error: { code: 'CLASS_NAME_INVALID', message: 'Class name is required.' } });
     let code;
@@ -111,7 +111,7 @@ export function createClassRouter(db) {
     res.status(201).json({ class: { id: classId, name, createdAt: now }, joinCode: code });
   });
 
-  router.post('/join', requireRole('student'), rateLimit(db, 'class-join', { limit: 20, windowMs: 60 * 60 * 1000 }), (req, res) => {
+  router.post('/join', requireVerifiedEmail, requireRole('student'), rateLimit(db, 'class-join', { limit: 20, windowMs: 60 * 60 * 1000 }), (req, res) => {
     const code = String(req.body?.code || '').trim().toUpperCase();
     if (!/^[A-Z0-9]{4,12}$/.test(code)) return res.status(400).json({ error: { code: 'JOIN_CODE_INVALID', message: 'Class code is invalid.' } });
     const row = db.prepare('SELECT id,name FROM classes WHERE join_code_hash=? AND archived_at IS NULL').get(sha256(code));

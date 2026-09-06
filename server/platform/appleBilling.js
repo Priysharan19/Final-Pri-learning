@@ -11,10 +11,17 @@ function billingError(code, message, status = 400) {
   return Object.assign(new Error(message), { code, status });
 }
 
+function sandboxAllowed() {
+  return String(process.env.PRI_APPLE_ALLOW_SANDBOX || '').trim().toLowerCase() === 'true';
+}
+
 function envList() {
+  // Sandbox-signed transactions are only honoured when the deployment says so
+  // explicitly; a TestFlight or Xcode purchase must never unlock production
+  // Premium by default.
   const configured = String(process.env.PRI_APPLE_ENVIRONMENTS || 'Production,Sandbox')
     .split(',').map(v => v.trim()).filter(Boolean);
-  return new Set(configured.filter(value => ['Production', 'Sandbox'].includes(value)));
+  return new Set(configured.filter(value => value === 'Production' || (value === 'Sandbox' && sandboxAllowed())));
 }
 
 function readConfig() {

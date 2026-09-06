@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { applyVerifiedEntitlement } from './entitlements.js';
-import { rateLimit, requireSession, sha256 } from './security.js';
+import { rateLimit, requireSession, requireVerifiedEmail, sha256 } from './security.js';
 
 const PROVIDERS = new Set(['apple', 'google', 'web']);
 
@@ -99,7 +99,7 @@ export function createBillingRouter(db, { verifiers = {}, checkout = {}, native 
   // enter the browser. The returned URL is a provider-hosted authorization page;
   // Premium still unlocks only after a verified webhook/restore updates the
   // server entitlement snapshot.
-  router.post('/checkout/web', requireSession(db), rateLimit(db, 'billing-checkout-web', { limit: 8, windowMs: 60 * 60 * 1000 }), async (req, res, next) => {
+  router.post('/checkout/web', requireSession(db), requireVerifiedEmail, rateLimit(db, 'billing-checkout-web', { limit: 8, windowMs: 60 * 60 * 1000 }), async (req, res, next) => {
     const create = checkout.web?.create;
     if (typeof create !== 'function') return res.status(503).json({ error: { code: 'BILLING_PROVIDER_NOT_CONFIGURED', message: 'Web subscription checkout is not configured on this deployment.' } });
     try {

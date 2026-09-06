@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { nextSyncCursor } from './db.js';
-import { id, rateLimit, requireSession } from './security.js';
+import { id, rateLimit, requireSession, requireVerifiedEmail } from './security.js';
 
 const SCHEMA = 1;
 const MAX_PUSH = 100;
@@ -81,7 +81,9 @@ export function createSyncRouter(db) {
   const router = Router();
   router.use(requireSession(db));
 
-  router.post('/push', rateLimit(db, 'sync-push', { limit: 120, windowMs: 60 * 1000 }), (req, res) => {
+  // Push needs a verified mailbox so an unverified sign-up cannot fill an
+  // account it may not own; pull stays open so a device can still read back.
+  router.post('/push', requireVerifiedEmail, rateLimit(db, 'sync-push', { limit: 120, windowMs: 60 * 1000 }), (req, res) => {
     const body = req.body || {};
     if (body.schemaVersion !== SCHEMA) return res.status(409).json({ error: { code: 'SYNC_SCHEMA_UNSUPPORTED', message: `Expected sync schema ${SCHEMA}.` } });
     const deviceId = String(body.deviceId || '');

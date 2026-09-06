@@ -1,6 +1,21 @@
 import { Router } from 'express';
 import { createSession, id, rateLimit, requireSession } from './security.js';
 import { verifyIdentityToken } from './oidc.js';
+import { consumeOidcNonce, issueOidcNonce } from './oidcNonce.js';
+import { maybeBootstrapAdmin } from './bootstrapAdmin.js';
+
+function requireIssuedNonce(db, req, res) {
+  const nonce = req.body?.nonce == null ? '' : String(req.body.nonce);
+  if (!nonce) {
+    res.status(400).json({ error: { code: 'OIDC_NONCE_REQUIRED', message: 'Request a sign-in nonce from the server before signing in with a provider.' } });
+    return null;
+  }
+  if (!consumeOidcNonce(db, nonce)) {
+    res.status(401).json({ error: { code: 'OIDC_NONCE_INVALID', message: 'The sign-in nonce is unknown, expired or already used.' } });
+    return null;
+  }
+  return nonce;
+}
 
 function publicAccount(row) {
   return { id: row.id, email: row.email, name: row.name, role: row.role, emailVerified: !!row.email_verified_at };
@@ -21,16 +36,25 @@ export function createIdentityRouter(db) {
     res.json({ providers: rows.map(row => ({ provider: row.provider, linkedAt: row.linked_at })) });
   });
 
+  // The nonce a provider token must carry is issued here, stored only as a
+  // hash, accepted once and expires after ten minutes.
+  router.post('/nonce', rateLimit(db, 'oidc-nonce', { limit: 30, windowMs: 15 * 60 * 1000 }), (req, res) => {
+    res.status(201).json(issueOidcNonce(db));
+  });
+
   router.post('/:provider/sign-in', rateLimit(db, 'oidc-signin', { limit: 20, windowMs: 15 * 60 * 1000 }), async (req, res, next) => {
     try {
       const provider = String(req.params.provider || '');
       if (!providerOk(provider)) return res.status(404).json({ error: { code: 'OIDC_PROVIDER_UNSUPPORTED', message: 'Identity provider is not supported.' } });
-      const identity = await verifyIdentityToken(provider, req.body?.idToken, { nonce: req.body?.nonce == null ? null : String(req.body.nonce) });
+      const nonce = requireIssuedNonce(db, req, res);
+      if (!nonce) return;
+      const identity = await verifyIdentityToken(provider, req.body?.idToken, { nonce });
       const linked = db.prepare(`SELECT a.* FROM account_identities i JOIN accounts a ON a.id=i.account_id
         WHERE i.provider=? AND i.provider_subject=? AND a.deleted_at IS NULL`).get(provider, identity.subject);
       if (linked) {
+        maybeBootstrapAdmin(db, linked.id);
         createSession(db, res, linked.id, String(req.body?.deviceId || 'web').slice(0, 160), req.get('user-agent') || '');
-        return res.json({ account: publicAccount(linked), created: false });
+        return res.json({ account: publicAccount(db.prepare('SELECT * FROM accounts WHERE id=?').get(linked.id)), created: false });
       }
       if (!identity.email || !identity.emailVerified) {
         return res.status(409).json({ error: { code: 'OIDC_EMAIL_REQUIRED', message: 'This identity provider did not supply a verified email address for a new Pri Learning account.' } });
@@ -52,6 +76,8 @@ export function createIdentityRouter(db) {
         db.prepare(`INSERT INTO entitlement_snapshots(account_id,plan,status,provider,source_version,updated_at)
           VALUES (?,'free','free','none',0,?)`).run(accountId, now);
       })();
+      // The provider vouched for the mailbox, which is what first-admin bootstrap waits for.
+      maybeBootstrapAdmin(db, accountId, now);
       createSession(db, res, accountId, String(req.body?.deviceId || 'web').slice(0, 160), req.get('user-agent') || '', now);
       const row = db.prepare('SELECT * FROM accounts WHERE id=?').get(accountId);
       res.status(201).json({ account: publicAccount(row), created: true });
@@ -65,7 +91,9 @@ export function createIdentityRouter(db) {
     try {
       const provider = String(req.params.provider || '');
       if (!providerOk(provider)) return res.status(404).json({ error: { code: 'OIDC_PROVIDER_UNSUPPORTED', message: 'Identity provider is not supported.' } });
-      const identity = await verifyIdentityToken(provider, req.body?.idToken, { nonce: req.body?.nonce == null ? null : String(req.body.nonce) });
+      const nonce = requireIssuedNonce(db, req, res);
+      if (!nonce) return;
+      const identity = await verifyIdentityToken(provider, req.body?.idToken, { nonce });
       const existing = db.prepare('SELECT account_id FROM account_identities WHERE provider=? AND provider_subject=?').get(provider, identity.subject);
       if (existing && existing.account_id !== req.platformSession.account_id) return res.status(409).json({ error: { code: 'IDENTITY_ALREADY_LINKED', message: 'This identity is already linked to another Pri Learning account.' } });
       const account = db.prepare('SELECT email FROM accounts WHERE id=?').get(req.platformSession.account_id);

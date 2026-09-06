@@ -12,7 +12,7 @@ import { applyVerifiedEntitlement } from '../platform/entitlements.js';
 const envNames = [
   'PRI_APPLE_ROOT_CA_PEM', 'PRI_APPLE_ROOT_CA_FILE', 'PRI_APPLE_APP_ID',
   'PRI_APPLE_BUNDLE_ID', 'PRI_APPLE_MONTHLY_PRODUCT_ID',
-  'PRI_APPLE_ANNUAL_PRODUCT_ID', 'PRI_APPLE_ENVIRONMENTS'
+  'PRI_APPLE_ANNUAL_PRODUCT_ID', 'PRI_APPLE_ENVIRONMENTS', 'PRI_APPLE_ALLOW_SANDBOX'
 ];
 const previous = Object.fromEntries(envNames.map(name => [name, process.env[name]]));
 const dir = mkdtempSync(join(tmpdir(), 'pri-apple-billing-'));
@@ -241,7 +241,30 @@ try {
   await assert.rejects(async () => apple.verifiers.apple.restore({ accountId: 'acct-apple-a', body: { transactions: [] } }),
     error => error?.code === 'APPLE_NO_VERIFIED_ENTITLEMENT');
 
-  console.log('PASS — Apple ES256/x5c verification, appAccountToken binding, device transaction, restore, notification replay and stale-event suppression are enforced.');
+  // cloud-13: Sandbox-signed data never unlocks Premium unless the deployment
+  // opts in with PRI_APPLE_ALLOW_SANDBOX=true, even when PRI_APPLE_ENVIRONMENTS
+  // lists Sandbox (it has all along in this contract).
+  delete process.env.PRI_APPLE_ALLOW_SANDBOX;
+  const productionOnly = createAppleBilling(db);
+  assert.deepEqual(productionOnly.native.apple.bootstrap({ accountId: 'acct-apple-a' }).environments, ['Production'],
+    'Sandbox must be filtered out of the accepted environments by default');
+  const sandboxTx = jws(transactionPayload({
+    appAccountToken: bootstrap.appAccountToken, transactionId: '200000000000020',
+    originalTransactionId: '100000000000020', environment: 'Sandbox'
+  }));
+  await assert.rejects(async () => productionOnly.native.apple.transaction({ accountId: 'acct-apple-a', body: { signedTransaction: sandboxTx } }),
+    error => error?.code === 'APPLE_ENVIRONMENT_MISMATCH', 'a Sandbox transaction must be refused by default');
+  process.env.PRI_APPLE_ALLOW_SANDBOX = 'true';
+  const sandboxAllowed = createAppleBilling(db);
+  assert.ok(sandboxAllowed.native.apple.bootstrap({ accountId: 'acct-apple-a' }).environments.includes('Sandbox'),
+    'PRI_APPLE_ALLOW_SANDBOX=true admits Sandbox');
+  const sandboxVerified = sandboxAllowed.native.apple.transaction({ accountId: 'acct-apple-a', body: { signedTransaction: sandboxTx } });
+  assert.equal(sandboxVerified.verified, true, 'the same Sandbox transaction verifies once explicitly allowed');
+  process.env.PRI_APPLE_ALLOW_SANDBOX = 'yes';
+  assert.deepEqual(createAppleBilling(db).native.apple.bootstrap({ accountId: 'acct-apple-a' }).environments, ['Production'],
+    'only the literal true opts in');
+
+  console.log('PASS — Apple ES256/x5c verification, appAccountToken binding, device transaction, restore, notification replay, stale-event suppression and the explicit Sandbox opt-in are enforced.');
 } finally {
   db.close();
   rmSync(dir, { recursive: true, force: true });
