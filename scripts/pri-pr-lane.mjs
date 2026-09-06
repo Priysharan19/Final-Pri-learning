@@ -5,6 +5,7 @@ import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const MANUAL_NON_WRITER_PATHS = new Set(['README.md', 'docs/RELEASE.md']);
 
 function changedFiles(base = 'origin/main') {
   const text = execFileSync('git', ['diff', '--name-only', `${base}...HEAD`], {
@@ -15,7 +16,7 @@ function changedFiles(base = 'origin/main') {
 }
 
 function isManualNonWriterPath(file) {
-  return file === 'README.md' || file.startsWith('docs/');
+  return MANUAL_NON_WRITER_PATHS.has(file);
 }
 
 function classify(files) {
