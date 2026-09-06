@@ -28,6 +28,25 @@ Missing, relative, and `:memory:` production database paths are rejected before 
 
 Terminate TLS at the hosting platform or reverse proxy and set `PRI_PUBLIC_ORIGIN` to the exact clean HTTPS browser origin, for example `https://learn.example.com`. The container listens on `PORT` (default `4000`).
 
+## The proxy topology is configuration, not a guess
+
+`PRI_TRUSTED_PROXY_HOPS` is required in production and has no default. It states how many reverse proxies stand between the internet and the process, and it is the number Express uses to derive `req.ip` from `X-Forwarded-For` — the identity the anonymous rate limiters count against.
+
+```text
+PRI_TRUSTED_PROXY_HOPS=0   # the process is exposed directly
+PRI_TRUSTED_PROXY_HOPS=1   # one load balancer, CDN or platform router (the usual answer)
+PRI_TRUSTED_PROXY_HOPS=2   # two, for example Cloudflare in front of a platform router
+```
+
+Both wrong answers fail silently, which is why the value is stated rather than assumed:
+
+- **Too high.** The server believes a header the client controls. One socket sending a rotating `X-Forwarded-For` gets a fresh rate-limit identity per request, so the 8-registrations-per-hour and 6-reset-emails-per-hour limits never fire.
+- **Too low.** Every request appears to come from the proxy, so all users share one bucket and one busy school rate-limits everyone else.
+
+Count the hops that actually rewrite the header for your deployment, and check the value after any change to the edge: adding a CDN in front of an existing load balancer changes the correct answer from `1` to `2`.
+
+If the count is wrong upward, `server/test/proxy-identity-contract-check.mjs` is the shape of the failure: a spoofed `X-Forwarded-For` creating a second rate bucket.
+
 Verify a live deployment with:
 
 ```bash

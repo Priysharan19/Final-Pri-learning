@@ -128,6 +128,21 @@ jobs:
         run: |
           node server/test/handwriting-transcription-check.mjs
           node server/test/working-check-check.mjs
+      - name: Account, origin, CMS and classroom contracts
+        run: |
+          node server/test/account-deletion-reauth-check.mjs
+          node server/test/native-origin-csrf-check.mjs
+          node server/test/billing-config-check.mjs
+          node server/test/content-review-contract-check.mjs
+          node server/test/assignment-execution-contract-check.mjs
+          node server/test/classroom-submission-contract-check.mjs
+      - name: Rate-limit identity, sync idempotency, grants, body size and catalogue exposure
+        run: |
+          node server/test/proxy-identity-contract-check.mjs
+          node server/test/sync-idempotency-contract-check.mjs
+          node server/test/entitlement-admin-grant-check.mjs
+          node server/test/request-size-contract-check.mjs
+          node server/test/content-index-exposure-check.mjs
       - name: Commercial platform schema contract
         run: node server/test/platform-schema-check.mjs
       - name: Platform migration contract

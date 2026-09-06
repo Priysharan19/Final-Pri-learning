@@ -4,6 +4,7 @@ import { assertPlatformConfig, platformConfigStatus, platformDatabasePath } from
 
 const names = [
   'NODE_ENV', 'PRI_PUBLIC_ORIGIN', 'PRI_CSRF_SECRET', 'PRI_AUTH_DELIVERY_KEY', 'PRI_PLATFORM_DB',
+  'PRI_TRUSTED_PROXY_HOPS',
   'PRI_RAZORPAY_MONTHLY_PLAN_ID', 'PRI_WEB_MONTHLY_PRICE_ID',
   'PRI_RAZORPAY_ANNUAL_PLAN_ID', 'PRI_WEB_ANNUAL_PRICE_ID',
   'PRI_APPLE_MONTHLY_PRODUCT_ID', 'PRI_APPLE_ANNUAL_PRODUCT_ID'
@@ -21,6 +22,7 @@ try {
   process.env.PRI_PUBLIC_ORIGIN = 'https://learn.pri.example';
   process.env.PRI_CSRF_SECRET = 'csrf-production-secret';
   process.env.PRI_AUTH_DELIVERY_KEY = '33'.repeat(32);
+  process.env.PRI_TRUSTED_PROXY_HOPS = '1';
   clearOptionalProducts();
 
   delete process.env.PRI_PLATFORM_DB;

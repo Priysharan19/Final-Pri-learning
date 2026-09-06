@@ -3,6 +3,8 @@ import { id, rateLimit, requireRole, requireSession } from './security.js';
 
 const KEY = /^[A-Za-z0-9._:/-]{3,200}$/;
 const CURRICULUM = /^[A-Za-z0-9._:/ -]{2,120}$/;
+const INDEX_PAGE = 100;
+const INDEX_MAX_PAGE = 500;
 
 function plain(value) {
   return !!value && typeof value === 'object' && !Array.isArray(value) && (Object.getPrototypeOf(value) === Object.prototype || Object.getPrototypeOf(value) === null);
@@ -15,7 +17,7 @@ function encodedObject(value, label, limit) {
   return json;
 }
 
-function revisionPublic(row, includeBody = true) {
+function revisionPublic(row, { includeBody = true, includeSource = true } = {}) {
   if (!row) return null;
   return {
     id: row.id,
@@ -25,7 +27,7 @@ function revisionPublic(row, includeBody = true) {
     revision: row.revision,
     authorAccountId: row.author_account_id,
     reviewerAccountId: row.reviewer_account_id,
-    source: JSON.parse(row.source_json || '{}'),
+    ...(includeSource ? { source: JSON.parse(row.source_json || '{}') } : {}),
     ...(includeBody ? { body: JSON.parse(row.body_json || '{}') } : {}),
     createdAt: row.created_at,
     publishedAt: row.published_at
@@ -60,16 +62,38 @@ export function createContentRouter(db) {
     res.json({ revision: revisionPublic(row) });
   });
 
-  router.get('/published-index', (req, res) => {
+  // The catalogue of what is published, for a device deciding what to download.
+  // It is anonymous like the route above, which makes it the cheapest thing on
+  // the server to point a script at, so it is bounded three ways: one page at a
+  // time, keys only, and a limit per caller.
+  //
+  // `source` is the reviewed input a revision was built from — the largest field
+  // on the row and of no use to a client choosing what to fetch. Serialising it
+  // for every published key turned a listing into a multi-megabyte anonymous
+  // download; the index now drops it exactly as it already drops `body`, and a
+  // client that wants either asks for the one key it needs.
+  router.get('/published-index', rateLimit(db, 'content-index', { limit: 60, windowMs: 60 * 1000 }), (req, res) => {
     const curriculumVersion = String(req.query?.curriculumVersion || '').trim();
-    const rows = curriculumVersion
-      ? db.prepare(`SELECT c.* FROM content_revisions c JOIN (
-          SELECT content_key,MAX(revision) AS revision FROM content_revisions WHERE status='published' AND curriculum_version=? GROUP BY content_key
-        ) x ON x.content_key=c.content_key AND x.revision=c.revision WHERE c.status='published' ORDER BY c.content_key`).all(curriculumVersion)
-      : db.prepare(`SELECT c.* FROM content_revisions c JOIN (
-          SELECT content_key,MAX(revision) AS revision FROM content_revisions WHERE status='published' GROUP BY content_key
-        ) x ON x.content_key=c.content_key AND x.revision=c.revision WHERE c.status='published' ORDER BY c.content_key`).all();
-    res.json({ revisions: rows.map(row => revisionPublic(row, false)) });
+    const requested = Math.floor(Number(req.query?.limit));
+    const limit = Number.isFinite(requested) && requested > 0 ? Math.min(INDEX_MAX_PAGE, requested) : INDEX_PAGE;
+    // Keyset pagination on the ordering column: a page is "the keys after this
+    // one", which stays correct while content is published underneath it.
+    const after = String(req.query?.after || '');
+    const latest = curriculumVersion
+      ? { filter: "WHERE status='published' AND curriculum_version=?", params: [curriculumVersion] }
+      : { filter: "WHERE status='published'", params: [] };
+    const rows = db.prepare(`SELECT c.* FROM content_revisions c JOIN (
+        SELECT content_key,MAX(revision) AS revision FROM content_revisions ${latest.filter} GROUP BY content_key
+      ) x ON x.content_key=c.content_key AND x.revision=c.revision
+      WHERE c.status='published' AND c.content_key>? ORDER BY c.content_key LIMIT ?`)
+      .all(...latest.params, after, limit + 1);
+    const hasMore = rows.length > limit;
+    const page = hasMore ? rows.slice(0, limit) : rows;
+    res.json({
+      revisions: page.map(row => revisionPublic(row, { includeBody: false, includeSource: false })),
+      hasMore,
+      nextCursor: hasMore ? page[page.length - 1].content_key : null
+    });
   });
 
   router.use(requireSession(db));
@@ -178,7 +202,7 @@ export function createContentRouter(db) {
     const rows = status
       ? db.prepare('SELECT * FROM content_revisions WHERE status=? ORDER BY created_at DESC LIMIT 250').all(status)
       : db.prepare('SELECT * FROM content_revisions ORDER BY created_at DESC LIMIT 250').all();
-    res.json({ revisions: rows.map(row => revisionPublic(row, false)) });
+    res.json({ revisions: rows.map(row => revisionPublic(row, { includeBody: false })) });
   });
 
   return router;

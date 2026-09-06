@@ -90,8 +90,25 @@ export function providerConfig(env = process.env) {
   });
 }
 
+/**
+ * The largest picture of ink this route accepts, in decoded bytes.
+ *
+ * The transport decides this, not the model: /v1 parses at most a 1 MB JSON
+ * body and base64 adds a third, so the 4 MB this module used to advertise was
+ * never reachable. Anything past roughly 785 kB died in the body parser, which
+ * meant HANDWRITING_IMAGE_TOO_LARGE was unreachable code and a student with a
+ * dense page got an uncoded 413 that reads like a server fault. 750 kB is what
+ * genuinely fits (about 1,000,040 bytes of JSON body), and it sits above the
+ * 700 kB the shipped client rasters to (client/src/ink/cloudRaster.js), so a
+ * client honouring its own budget is always refused here, by name, rather than
+ * by the parser. Raising the parser instead would mean paying for a 4 MB read
+ * that reads no better than the 700 kB one — the raster is already scaled to
+ * the resolution the model uses.
+ */
+export const MAX_IMAGE_BYTES = 750_000;
+
 /** A data URL is the only shape accepted, and only for a raster image. */
-export function validateImage(dataUrl, { maxBytes = 4_000_000 } = {}) {
+export function validateImage(dataUrl, { maxBytes = MAX_IMAGE_BYTES } = {}) {
   const value = String(dataUrl || '');
   const match = value.match(/^data:image\/(png|jpeg|webp);base64,([A-Za-z0-9+/=]+)$/);
   if (!match) throw new HandwritingProviderError('The image must be a base64 PNG, JPEG or WebP data URL.', { code: 'HANDWRITING_IMAGE_INVALID', status: 400 });

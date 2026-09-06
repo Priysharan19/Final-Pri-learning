@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { nextSyncCursor } from './db.js';
-import { id, rateLimit, requireSession, requireVerifiedEmail } from './security.js';
+import { id, rateLimit, requireSession, requireVerifiedEmail, sha256 } from './security.js';
 
 const SCHEMA = 1;
 const MAX_PUSH = 100;
@@ -39,6 +39,48 @@ function cleanEntity(raw) {
     if (Buffer.byteLength(body) > 512 * 1024) throw Object.assign(new Error('Entity body is too large.'), { status: 413, code: 'SYNC_ENTITY_TOO_LARGE' });
   }
   return { kind: raw.kind, entityId: String(raw.entityId), operation: raw.operation, baseVersion: raw.baseVersion, body };
+}
+
+/**
+ * What an idempotency key acknowledged, as one hash.
+ *
+ * An Idempotency-Key names a request; on its own it does not identify one. A
+ * client that reuses a key for different content — a rebuilt batch after a
+ * settings change, a key derived from a rescan window — used to be handed the
+ * first response again with a 200 while the new writes were dropped, which the
+ * device reads as "synced". Binding the key to the cleaned batch makes that
+ * collision visible as a 409 instead of silent data loss.
+ *
+ * It is built from the cleaned events and entities rather than the raw body, so
+ * key order, whitespace and fields the server ignores cannot make one request
+ * look like two.
+ */
+function pushDigest({ deviceId, events, entities, fullRescan }) {
+  return sha256(JSON.stringify({
+    deviceId,
+    events: events.map(event => [event.id, event.deviceSeq, event.kind, event.entityId, event.occurredAt, event.payload]),
+    entities: entities.map(entity => [entity.kind, entity.entityId, entity.operation, entity.baseVersion, entity.body]),
+    fullRescan: !!fullRescan
+  }));
+}
+
+/**
+ * One id may appear once in a batch.
+ *
+ * The database holds UNIQUE(account_id, id) and cleanEvent() only deduplicates
+ * on (device_id, device_seq), so a batch carrying the same id twice used to
+ * reach the insert and come back as a 500 with SQLITE_CONSTRAINT_UNIQUE. That
+ * is not retryable: the device resends the same batch forever and its outbox
+ * never drains again.
+ */
+function assertDistinctEventIds(events) {
+  const seen = new Set();
+  for (const event of events) {
+    if (seen.has(event.id)) {
+      throw Object.assign(new Error(`Event id ${event.id} appears more than once in this batch.`), { status: 409, code: 'SYNC_EVENT_ID_CONFLICT' });
+    }
+    seen.add(event.id);
+  }
 }
 
 function conflictPayload(row) {
@@ -92,13 +134,23 @@ export function createSyncRouter(db) {
     const entitiesRaw = Array.isArray(body.entities) ? body.entities : [];
     if (eventsRaw.length + entitiesRaw.length > MAX_PUSH) return res.status(413).json({ error: { code: 'SYNC_BATCH_TOO_LARGE', message: `At most ${MAX_PUSH} sync items are accepted per push.` } });
     const events = eventsRaw.map(item => cleanEvent(item, deviceId));
+    assertDistinctEventIds(events);
     const entities = entitiesRaw.map(cleanEntity);
     const accountId = req.platformSession.account_id;
     const idem = String(req.get('idempotency-key') || '').slice(0, 160);
     if (!ID.test(idem)) return res.status(400).json({ error: { code: 'IDEMPOTENCY_REQUIRED', message: 'A valid Idempotency-Key is required.' } });
+    const digest = pushDigest({ deviceId, events, entities, fullRescan: body.fullRescan });
 
-    const prior = db.prepare(`SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope='sync-push' AND key=? AND expires_at>?`).get(accountId, idem, Date.now());
-    if (prior) return res.json(parseJson(prior.response_json, { ok: true, replayed: true }));
+    const prior = db.prepare(`SELECT response_json,request_digest FROM idempotency_keys WHERE account_id=? AND scope='sync-push' AND key=? AND expires_at>?`).get(accountId, idem, Date.now());
+    if (prior) {
+      // A key that recorded its request may only answer that request again.
+      // Pre-v5 rows have no digest and stay replayable rather than failing a
+      // device that is mid-retry across the upgrade.
+      if (prior.request_digest && prior.request_digest !== digest) {
+        return res.status(409).json({ error: { code: 'IDEMPOTENCY_KEY_REUSED', message: 'This Idempotency-Key already acknowledged a different batch. Send new content under a new key.' } });
+      }
+      return res.json(parseJson(prior.response_json, { ok: true, replayed: true }));
+    }
 
     try {
       const response = db.transaction(() => {
@@ -112,6 +164,14 @@ export function createSyncRouter(db) {
             if (!same) throw Object.assign(new Error(`Device sequence ${event.deviceSeq} was already committed with different content.`), { status: 409, code: 'SYNC_SEQUENCE_CONFLICT' });
             acceptedEvents.push({ id: event.id, serverCursor: priorSeq.server_cursor, replayed: true });
             continue;
+          }
+          // Not a retry of a committed sequence, so this id must be new to the
+          // account. A device that reinstalls and replays its outbox under a
+          // fresh device id lands here; it needs an answer it can act on, not
+          // the constraint violation this used to raise.
+          const priorId = db.prepare('SELECT device_seq FROM learning_events WHERE account_id=? AND id=?').get(accountId, event.id);
+          if (priorId) {
+            throw Object.assign(new Error(`Event id ${event.id} was already stored for this account at sequence ${priorId.device_seq}.`), { status: 409, code: 'SYNC_EVENT_ID_CONFLICT' });
           }
           const cursor = nextSyncCursor(db);
           db.prepare(`INSERT INTO learning_events(server_cursor,id,account_id,device_id,device_seq,kind,entity_id,occurred_at,payload_json,created_at)
@@ -136,8 +196,8 @@ export function createSyncRouter(db) {
 
         const cursor = db.prepare('SELECT value FROM sync_cursors WHERE id=1').get()?.value || 0;
         const out = { schemaVersion: SCHEMA, cursor, acceptedEvents, acceptedEntities, fullRescanAccepted: !!body.fullRescan };
-        db.prepare(`INSERT INTO idempotency_keys(account_id,scope,key,response_json,created_at,expires_at)
-          VALUES (?,'sync-push',?,?,?,?)`).run(accountId, idem, JSON.stringify(out), Date.now(), Date.now() + 24 * 60 * 60 * 1000);
+        db.prepare(`INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at)
+          VALUES (?,'sync-push',?,?,?,?,?)`).run(accountId, idem, JSON.stringify(out), digest, Date.now(), Date.now() + 24 * 60 * 60 * 1000);
         return out;
       })();
       res.json(response);

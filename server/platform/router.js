@@ -2,7 +2,6 @@ import { Router } from 'express';
 import { createAccountRouter } from './accounts.js';
 import { createAdminRouter } from './admin.js';
 import { createAssignmentExecutionRouter } from './assignments.js';
-import { assignmentSubmissionPrivacyGuard } from './assignmentProgress.js';
 import { createBillingRouter } from './billing.js';
 import { createClassRouter } from './classes.js';
 import { createContentRouter } from './content.js';
@@ -60,10 +59,12 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
   });
   router.use(csrfGuard);
 
-  // Defence in depth for child/privacy architecture: even a modified client can
-  // persist only aggregate assignment completion metrics. Answers and ink are
-  // removed before the classroom router reaches storage.
-  router.use(assignmentSubmissionPrivacyGuard);
+  // The child/privacy architecture — a modified client can persist only aggregate
+  // assignment completion metrics, never answers or ink — is enforced inside
+  // writeStudentSubmission() in classes.js, the single writer of that table. It
+  // used to live here as a middleware matching the submission path, which meant
+  // `.../submission/` with a trailing slash routed to the same handler and wrote
+  // whatever it was sent. Storage is the boundary; a path pattern is not.
 
   // Account deletion cancels any charging web subscription at the provider
   // before the rows disappear (immediate cancel: the account cannot use the
@@ -96,9 +97,20 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
   router.use((err, req, res, next) => {
     // No request bodies, tokens, handwriting or provider payloads are logged.
     const requestId = req.get('x-pri-request-id') || null;
-    console.error('platform_error', { requestId, path: req.path, method: req.method, code: err?.code || 'INTERNAL', status: err?.status || 500 });
+    const declaredStatus = Number.isInteger(err?.status) && err.status >= 400 && err.status <= 599;
+    const status = declaredStatus ? err.status : 500;
+    // An error code is a contract: the client branches on it. Only an error that
+    // named its own HTTP status is an answer this server composed, and only
+    // those keep their code — including the deliberate 5xx ones a client acts on,
+    // such as a retryable transcription failure or an unconfigured billing
+    // provider. Anything that arrived here unclaimed answers INTERNAL whatever it
+    // called itself: a driver's SQLITE_CONSTRAINT_UNIQUE gives a student's iPad
+    // nothing to do and tells everyone else about the schema. The real code is
+    // still logged for whoever has to fix it.
+    const code = declaredStatus ? (err?.code || 'INTERNAL') : 'INTERNAL';
+    console.error('platform_error', { requestId, path: req.path, method: req.method, code: err?.code || 'INTERNAL', status });
     if (res.headersSent) return next(err);
-    res.status(err?.status || 500).json({ error: { code: err?.code || 'INTERNAL', message: err?.status && err.status < 500 ? err.message : 'Something went wrong.' }, requestId });
+    res.status(status).json({ error: { code, message: status < 500 ? err.message : 'Something went wrong.' }, requestId });
   });
 
   return router;

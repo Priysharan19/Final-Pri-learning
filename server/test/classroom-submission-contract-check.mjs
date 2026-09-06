@@ -74,5 +74,43 @@ assert.throws(() => returnStudentSubmission(db, {
 const audit = db.prepare(`SELECT action,target_id FROM audit_log WHERE action='assignment.return'`).all();
 assert.deepEqual(audit, [{ action: 'assignment.return', target_id: 'assignment-1' }]);
 
+// ── The privacy guarantee is a property of the writer, not of a path ─────────
+//
+// Express routes `.../submission/` to the same handler as `.../submission`, so a
+// middleware matching the exact path let a trailing slash carry answers and raw
+// ink into the classroom control plane while the write still succeeded. Both
+// spellings, and the function itself, must strip.
+const forbidden = {
+  kind: 'practice', questionsAnswered: 3, correct: 2, xp: 10,
+  answers: ['x = 42 (the student wrote this)'], ink: 'RAW-HANDWRITING-STROKES', studentNote: 'private free text'
+};
+const { startApp } = await import('./support/app-harness.mjs');
+const http = await startApp({ db });
+try {
+  const jar = {};
+  const registration = await http.request('/v1/account/register', {
+    method: 'POST', jar, body: { email: 'slash.student@example.test', name: 'Slash', password: 'correct-horse-battery', deviceId: 'ipad-slash' }
+  });
+  assert.equal(registration.status, 201);
+  const studentId = registration.data.account.id;
+  db.prepare("UPDATE accounts SET email_verified_at=? WHERE id=?").run(now + 80, studentId);
+  db.prepare(`INSERT INTO class_members(class_id,student_account_id,joined_at) VALUES ('class-1',?,?)`).run(studentId, now + 80);
+
+  for (const path of [
+    `/v1/classes/class-1/assignments/assignment-1/submission`,
+    `/v1/classes/class-1/assignments/assignment-1/submission/`
+  ]) {
+    const response = await http.request(path, { method: 'PATCH', jar, body: { state: 'started', summary: forbidden } });
+    assert.equal(response.status, 200, `${path} is the same route`);
+    const row = db.prepare(`SELECT summary_json FROM assignment_submissions
+      WHERE assignment_id='assignment-1' AND student_account_id=?`).get(studentId).summary_json;
+    assert.deepEqual(JSON.parse(row), { kind: 'practice', questionsAnswered: 3, correct: 2, xp: 10 }, `${path} stores metrics only`);
+    assert.ok(!/answers|ink|studentNote|wrote this/.test(row), `${path} stores no answer, ink or free text`);
+    db.prepare(`DELETE FROM assignment_submissions WHERE assignment_id='assignment-1' AND student_account_id=?`).run(studentId);
+  }
+} finally {
+  await http.close();
+}
+
 db.close();
-console.log('PASS — classroom submissions cannot be silently unsubmitted; teacher returns are bounded, persisted and auditable.');
+console.log('PASS — classroom submissions cannot be silently unsubmitted; teacher returns are bounded, persisted and auditable; and no spelling of the submission route can store an answer or ink.');

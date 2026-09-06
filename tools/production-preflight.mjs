@@ -50,6 +50,13 @@ const REQUIRED = [
     example: '/data/pri-learning-platform.db',
     generate: null,
     note: 'Must be absolute and on a mounted volume. A path inside the image is wiped on every deploy, which silently loses every account.'
+  },
+  {
+    name: 'PRI_TRUSTED_PROXY_HOPS',
+    what: 'How many reverse proxies sit in front of this process. It decides which address the rate limiters count against, so a wrong value either lets one client mint a new identity per request or puts every user in one bucket.',
+    example: '1',
+    generate: null,
+    note: '0 when nothing is in front of it, 1 behind a single load balancer/CDN such as Railway or Fly, 2 behind two (Cloudflare in front of a platform router). Re-check it whenever the edge changes.'
   }
 ];
 
@@ -66,7 +73,7 @@ const present = REQUIRED.filter(item => has(item.name));
 console.log('\nPri Learning · production preflight\n' + '─'.repeat(70));
 
 if (!missing.length) {
-  console.log('\nAll four required variables are set in THIS shell.');
+  console.log(`\nAll ${REQUIRED.length} required variables are set in THIS shell.`);
   console.log('If production still exits on boot, the variables are missing where the');
   console.log('server actually runs, not here. Set them on the Railway service.\n');
 } else {
