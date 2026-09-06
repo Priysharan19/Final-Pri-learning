@@ -39,6 +39,42 @@ export function platformDatabasePath() {
   return path;
 }
 
+/** More hops than any sane deployment has; a typo like "80" is not a topology. */
+const MAX_TRUSTED_PROXY_HOPS = 8;
+
+/**
+ * How many reverse proxies stand between the internet and this process.
+ *
+ * Express turns this number into `req.ip` by walking X-Forwarded-For from the
+ * right, and `req.ip` is the identity every anonymous rate limiter counts
+ * against. Both ways of guessing it are silent failures. One hop too many and a
+ * client mints a fresh identity per request by sending its own header, so the
+ * 8-per-hour registration limiter never fires and one socket can queue twenty
+ * verification emails. One hop too few and every user behind the proxy collapses
+ * into a single bucket, so one busy school rate-limits the rest.
+ *
+ * Neither is visible in a response, so there is no default: the deployment
+ * states its topology. 0 when the process is exposed directly (and the socket
+ * address is the client), 1 behind a single load balancer or CDN, 2 behind two.
+ * Production refuses to start until it is stated; development and the focused
+ * contracts talk to the socket, which is 0.
+ */
+export function trustedProxyHops(env = process.env) {
+  const raw = String(env.PRI_TRUSTED_PROXY_HOPS ?? '').trim();
+  if (!raw) {
+    if (String(env.NODE_ENV || '') !== 'production') return 0;
+    throw Object.assign(new Error('PRI_TRUSTED_PROXY_HOPS is required in production: state how many reverse proxies sit in front of this process (0 when it is exposed directly).'), {
+      code: 'TRUSTED_PROXY_HOPS_NOT_CONFIGURED'
+    });
+  }
+  if (!/^\d+$/.test(raw) || Number(raw) > MAX_TRUSTED_PROXY_HOPS) {
+    throw Object.assign(new Error(`PRI_TRUSTED_PROXY_HOPS must be a whole number of proxy hops between 0 and ${MAX_TRUSTED_PROXY_HOPS}.`), {
+      code: 'TRUSTED_PROXY_HOPS_INVALID'
+    });
+  }
+  return Number(raw);
+}
+
 function webMonthlyConfigured() {
   return nonEmpty('PRI_RAZORPAY_MONTHLY_PLAN_ID') || nonEmpty('PRI_WEB_MONTHLY_PRICE_ID');
 }
@@ -63,6 +99,7 @@ export function platformConfigStatus() {
   if (production && !nonEmpty('PRI_CSRF_SECRET')) missing.push('PRI_CSRF_SECRET');
   if (production && !nonEmpty('PRI_AUTH_DELIVERY_KEY')) missing.push('PRI_AUTH_DELIVERY_KEY');
   if (production && !configuredDbPath()) missing.push('PRI_PLATFORM_DB');
+  if (production && !nonEmpty('PRI_TRUSTED_PROXY_HOPS')) missing.push('PRI_TRUSTED_PROXY_HOPS');
 
   const webMonthly = webMonthlyConfigured();
   const webAnnual = webAnnualConfigured();
@@ -115,8 +152,11 @@ export function assertPlatformConfig() {
   }
   if (status.production) {
     // Re-run the storage resolver here so router-only startup and direct server
-    // startup share one fail-closed contract.
+    // startup share one fail-closed contract. The proxy topology is resolved for
+    // the same reason: an unparseable hop count must stop the boot, not quietly
+    // become somebody's rate-limit identity.
     platformDatabasePath();
+    trustedProxyHops();
     let origin;
     try { origin = new URL(process.env.PRI_PUBLIC_ORIGIN); } catch { throw new Error('PRI_PUBLIC_ORIGIN is invalid'); }
     if (origin.protocol !== 'https:' || origin.username || origin.password || origin.search || origin.hash) throw new Error('PRI_PUBLIC_ORIGIN must be a clean HTTPS origin in production');

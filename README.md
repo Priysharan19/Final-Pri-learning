@@ -665,7 +665,11 @@ what a reader would reasonably assume is here and is not. None of it is hidden a
   key stay legible while the rest of the record stays shut. `customQs` is the one profile-owned store
   left unsealed on purpose: a teacher's custom questions are answered by students signed in under
   their own keys. What none of this covers is in [What is not done](#what-is-not-done).
-  A service worker precaches the app shell for full offline use.
+  A service worker installs the app shell, then finishes the rest of the offline build once the page
+  is on screen and idle — two passes rather than one, so the install does not compete with the load a
+  student is watching on a slow connection. What it deliberately does **not** carry, and why each one
+  is safe to leave out, is set out at the top of `client/vite.config.js` and pinned by
+  `client/test/install-budget-check.mjs`.
 - **`client/src/engine/`** — **the single source of truth for the maths engine.** Expression
   parser/evaluator, equivalence checker + Step Check + working-marker, curriculum (84 subtopics incl.
   Standard/Ext1/Ext2 streams, 252 dot points each with a stable id and a `DOTPOINT_FORMS` entry

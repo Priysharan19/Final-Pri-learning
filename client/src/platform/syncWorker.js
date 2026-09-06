@@ -13,12 +13,16 @@ import {
 import { cloud } from './cloudTransport.js';
 import { cloudAccountLink, cloudDeviceId, markCloudSynced, verifyCloudSession } from './cloudAccount.js';
 import {
-  MAX_PUSH_ITEMS, createPushEnvelope, syncPolicyFor, SYNC_POLICY, validatePullEnvelope
+  MAX_PUSH_ITEMS, SYNC_SCHEMA_VERSION, createPushEnvelope, resolveEntityConflict,
+  syncPolicyFor, SYNC_POLICY, validatePullEnvelope
 } from './syncContract.js';
 import { historicalSupplementalEvents } from './syncHistorical.js';
 import { remoteEventPrefix, syncStateId } from './syncReplicaState.js';
 
 const MAX_REMOTE_EVENT_CACHE = 2000;
+// The profile outbox's own ceiling. Asking for fewer than it can hold would let
+// a full queue hide entries from the rescan reconciliation below.
+const MAX_OUTBOX_ITEMS = 500;
 const HISTORIC_OLD_ATTEMPT_BASE = 4_000_000_000_000_000;
 const HISTORIC_NEW_ATTEMPT_BASE = 5_000_000_000_000_000;
 const HISTORIC_FALLBACK_BASE = 6_000_000_000_000_000;
@@ -92,6 +96,35 @@ async function saveState(pid, state) {
 }
 
 const versionKey = (kind, entityId) => `${kind}:${entityId}`;
+
+/**
+ * What a push response has to be before one queue entry may be dropped.
+ *
+ * The pull side has validatePullEnvelope and the push side had nothing: the
+ * worker read `result.acceptedEvents || []` and acknowledged the whole batch
+ * regardless. A 200 carrying an error document, a truncated body, or a replayed
+ * idempotency record that no longer parses all read as "the server took
+ * everything", and a student's evening of offline work left the durable queue
+ * without ever reaching the cloud. A response this cannot vouch for throws, and
+ * a throw leaves the queue exactly as it was for the next attempt.
+ */
+function validatePushResult(raw) {
+  if (!plain(raw)) throw new TypeError('sync push response must be a plain object');
+  if (raw.schemaVersion !== SYNC_SCHEMA_VERSION) throw new Error(`unsupported sync schema ${raw.schemaVersion}`);
+  if (!Array.isArray(raw.acceptedEvents) || !Array.isArray(raw.acceptedEntities)) {
+    throw new TypeError('sync push response is missing acceptedEvents/acceptedEntities');
+  }
+  for (const row of raw.acceptedEvents) {
+    if (!plain(row) || typeof row.id !== 'string' || !row.id) throw new TypeError('accepted learning event is malformed');
+  }
+  for (const row of raw.acceptedEntities) {
+    if (!plain(row) || typeof row.kind !== 'string' || typeof row.entityId !== 'string' || !row.entityId) {
+      throw new TypeError('accepted entity mutation is malformed');
+    }
+    if (!Number.isSafeInteger(row.version) || row.version <= 0) throw new TypeError('accepted entity version is invalid');
+  }
+  return raw;
+}
 
 async function exactAttempt(pid, item) {
   if (item.sourceId !== null && item.sourceId !== undefined) {
@@ -176,6 +209,11 @@ async function buildNormalBatch(items, pid, deviceId, state) {
   const entities = [];
   const represented = [];
   const blocked = [];
+  // Which queue entry produced which item. `represented` is what went into the
+  // envelope; these two are what turn the server's answer back into sequence
+  // numbers, so only the entries it actually confirmed are acknowledged.
+  const eventSeq = new Map();
+  const entitySeq = new Map();
 
   for (const item of items) {
     if (events.length + entities.length >= MAX_PUSH_ITEMS) break;
@@ -183,11 +221,11 @@ async function buildNormalBatch(items, pid, deviceId, state) {
     try {
       if (policy === SYNC_POLICY.APPEND_ONLY || item.kind === 'exam') {
         const event = await eventForOutbox(item, pid, deviceId);
-        if (event) { events.push(event); represented.push(item.seq); }
+        if (event) { events.push(event); represented.push(item.seq); eventSeq.set(event.id, item.seq); }
         else blocked.push({ seq: item.seq, kind: item.kind, reason: 'local-source-missing' });
       } else if (CLIENT_ENTITY_KINDS.has(item.kind)) {
         const entity = await entityForOutbox(item, pid, state);
-        if (entity) { entities.push(entity); represented.push(item.seq); }
+        if (entity) { entities.push(entity); represented.push(item.seq); entitySeq.set(versionKey(entity.kind, entity.entityId), item.seq); }
         else blocked.push({ seq: item.seq, kind: item.kind, reason: 'local-source-missing' });
       } else {
         blocked.push({ seq: item.seq, kind: item.kind, reason: 'not-client-syncable' });
@@ -196,7 +234,7 @@ async function buildNormalBatch(items, pid, deviceId, state) {
       blocked.push({ seq: item.seq, kind: item.kind, reason: error?.code || error?.message || 'build-failed' });
     }
   }
-  return { events, entities, represented, blocked };
+  return { events, entities, represented, blocked, eventSeq, entitySeq };
 }
 
 async function fullRescanEntities(pid, state) {
@@ -264,15 +302,66 @@ async function trimRemoteEventCache(pid) {
   await Promise.all(rows.slice(MAX_REMOTE_EVENT_CACHE).map(row => del('device', row.id).catch(() => {})));
 }
 
-async function applyRemoteEntity(pid, entity, state) {
+/**
+ * This device's own copy of a remote entity, in the shape resolveEntityConflict
+ * compares. `version` is the last version the server acknowledged for it, which
+ * is 0 for anything never published. Kinds this worker does not write back get
+ * null: there is no local record to weigh, only a version to learn.
+ */
+async function localEntity(pid, entity, version) {
+  if (entity.kind === 'profile' && entity.entityId === 'self') {
+    const body = safeProfile(await get('profiles', pid).catch(() => null));
+    return body ? { kind: entity.kind, entityId: entity.entityId, version, body, tombstone: false } : null;
+  }
+  if (entity.kind === 'bookmark' || entity.kind === 'favorite') {
+    const row = await get('bookmarks', `${pid}:${entity.entityId}`).catch(() => null);
+    return {
+      kind: entity.kind, entityId: entity.entityId, version,
+      body: row ? { present: true, questionId: entity.entityId } : null, tombstone: !row
+    };
+  }
+  return null;
+}
+
+async function applyRemoteEntity(pid, entity, state, unpublished) {
   const key = versionKey(entity.kind, entity.entityId);
-  state.entityVersions[key] = Math.max(safeInt(state.entityVersions[key]), safeInt(entity.version));
+  const known = safeInt(state.entityVersions[key]);
+  state.entityVersions[key] = Math.max(known, safeInt(entity.version));
+
+  // Learning the authoritative version happens either way: it is what lets the
+  // push that follows land at the right baseVersion, and it is the whole point
+  // of pulling before a first-link rescan. Whether the remote BODY replaces the
+  // local one is a separate question, and it belongs to syncContract — which has
+  // declared a policy per entity kind since it was written, and which this
+  // worker never once asked.
+  const local = await localEntity(pid, entity, known);
+  if (local) {
+    // Version order can only rank two replicas of the same record. A local
+    // entity the cloud has never seen is not a stale copy of the remote one, it
+    // is the only copy — the server has never had the chance to hold it — so no
+    // remote version, however high, outranks it. On a first link that is the
+    // entire profile: taking an older device's body would set `year`, which for
+    // an Indian student selects the whole NCERT scope, from a record the student
+    // may not have touched in a year, and the rescan would then publish the
+    // overwritten values straight back over the real ones. The push that comes
+    // next is what makes the server converge.
+    if (unpublished(key)) return;
+    const remote = {
+      kind: entity.kind, entityId: entity.entityId, version: safeInt(entity.version),
+      body: plain(entity.body) ? entity.body : null, tombstone: !!entity.tombstone
+    };
+    // 'local' is the only verdict that keeps what is on this device. A
+    // same-version divergence asks for a merge this offline client has no way to
+    // put to anyone, and by here the local copy holds nothing unpublished to
+    // lose, so the authoritative record is taken.
+    if (resolveEntityConflict(local, remote).winner === 'local') return;
+  }
 
   if (entity.kind === 'profile' && entity.entityId === 'self' && !entity.tombstone && plain(entity.body)) {
-    const local = await get('profiles', pid).catch(() => null);
-    if (local) {
+    const row = await get('profiles', pid).catch(() => null);
+    if (row) {
       const allowed = ['name', 'year', 'course', 'pathway', 'indiaTrack', 'avatar', 'theme', 'dailyGoal', 'handwriting'];
-      const next = { ...local };
+      const next = { ...row };
       for (const field of allowed) if (entity.body[field] !== undefined) next[field] = entity.body[field];
       await put('profiles', next);
     }
@@ -286,7 +375,26 @@ async function applyRemoteEntity(pid, entity, state) {
   }
 }
 
-async function pullAll(pid, deviceId, state) {
+/**
+ * Which entities this device holds a change the cloud has not acknowledged.
+ *
+ * A full rescan says the whole profile is in that state: nothing local has ever
+ * been published, so every entity the pull touches counts. Otherwise it is
+ * exactly what is still queued — an entity with a pending outbox entry has a
+ * local edit that has not landed yet. `profile` is queued under the local
+ * profile id and pushed as `self`, the same normalisation entityForOutbox does.
+ */
+function unpublishedEntities(pending) {
+  if (pending.some(item => item.kind === 'full-rescan')) return () => true;
+  const keys = new Set();
+  for (const item of pending) {
+    if (!CLIENT_ENTITY_KINDS.has(item.kind)) continue;
+    keys.add(versionKey(item.kind, item.kind === 'profile' ? 'self' : item.entityId));
+  }
+  return key => keys.has(key);
+}
+
+async function pullAll(pid, deviceId, state, unpublished) {
   let cursor = safeInt(state.cursor);
   let pulledEvents = 0;
   let pulledEntities = 0;
@@ -300,7 +408,7 @@ async function pullAll(pid, deviceId, state) {
       }
     }
     for (const entity of raw.entities) {
-      await applyRemoteEntity(pid, entity, state);
+      await applyRemoteEntity(pid, entity, state, unpublished);
       pulledEntities++;
     }
     cursor = raw.cursor;
@@ -312,14 +420,39 @@ async function pullAll(pid, deviceId, state) {
   return { pulledEvents, pulledEntities };
 }
 
+/**
+ * A stable digest of what a push actually carries.
+ *
+ * The server refuses an Idempotency-Key that arrives with different content —
+ * it has to, because replaying the old response for a new batch silently threw
+ * the new work away. But this device derived its keys from sequence ranges
+ * alone, so a lost response followed by a changed local row rebuilt the same
+ * key over different content and would wedge that queue for the key's whole
+ * 24-hour life. Folding the content in means new content is simply a new key.
+ *
+ * Not a security hash. A collision here only replays a response, which is the
+ * behaviour this had before, so speed and no dependencies win.
+ */
+export function contentDigest(payload) {
+  const text = JSON.stringify(payload ?? null);
+  let h1 = 0x811c9dc5;
+  let h2 = 0x01000193;
+  for (let i = 0; i < text.length; i += 1) {
+    const c = text.charCodeAt(i);
+    h1 = Math.imul(h1 ^ c, 0x01000193) >>> 0;
+    h2 = Math.imul(h2 + c, 0x85ebca6b) >>> 0;
+  }
+  return (h1.toString(36) + h2.toString(36)).slice(0, 13);
+}
+
 function rescanKey(prefix, deviceId, index, chunk) {
   const first = chunk[0]?.entityId || chunk[0]?.id || 'none';
   const last = chunk[chunk.length - 1]?.entityId || chunk[chunk.length - 1]?.id || 'none';
   const clean = value => String(value).replace(/[^A-Za-z0-9._:-]/g, '_').slice(0, 36);
-  return `${prefix}-${clean(deviceId)}-${index}-${chunk.length}-${clean(first)}-${clean(last)}`.slice(0, 160);
+  return `${prefix}-${clean(deviceId)}-${index}-${chunk.length}-${clean(first)}-${clean(last)}-${contentDigest(chunk)}`.slice(0, 160);
 }
 
-async function pushFullRescan(pid, deviceId, marker, state) {
+async function pushFullRescan(pid, deviceId, marker, state, coveredBelow) {
   const entities = await fullRescanEntities(pid, state);
   const historical = [
     ...(await historicalAttemptEvents(pid, deviceId)),
@@ -327,26 +460,53 @@ async function pushFullRescan(pid, deviceId, marker, state) {
   ].sort((a, b) => a.deviceSeq - b.deviceSeq);
   let pushedEntities = 0;
   let pushedEvents = 0;
+  // The marker says "this device has never reconciled". Clearing it is a claim
+  // that it now has, so it is only cleared once every item the rescan sent came
+  // back committed. A short answer leaves the requirement standing and the next
+  // sync reconciles again — more work, which is the trade the outbox is built on.
+  let complete = true;
 
   for (let offset = 0; offset < entities.length; offset += MAX_PUSH_ITEMS) {
     const chunk = entities.slice(offset, offset + MAX_PUSH_ITEMS);
+    const sent = new Set(chunk.map(row => versionKey(row.kind, row.entityId)));
     const envelope = createPushEnvelope({ deviceId, baseCursor: state.cursor, entities: chunk, fullRescan: true });
-    const result = await cloud.syncPush(envelope, rescanKey('rescan-ent', deviceId, offset / MAX_PUSH_ITEMS, chunk));
-    for (const row of result.acceptedEntities || []) {
-      state.entityVersions[versionKey(row.kind, row.entityId)] = row.version;
+    const result = validatePushResult(await cloud.syncPush(envelope, rescanKey('rescan-ent', deviceId, offset / MAX_PUSH_ITEMS, chunk)));
+    for (const row of result.acceptedEntities) {
+      const key = versionKey(row.kind, row.entityId);
+      if (!sent.has(key)) continue;
+      state.entityVersions[key] = row.version;
       pushedEntities++;
     }
+    if (result.acceptedEntities.length < chunk.length) complete = false;
   }
 
   for (let offset = 0; offset < historical.length; offset += MAX_PUSH_ITEMS) {
     const chunk = historical.slice(offset, offset + MAX_PUSH_ITEMS);
+    const sent = new Set(chunk.map(event => event.id));
     const envelope = createPushEnvelope({ deviceId, baseCursor: state.cursor, events: chunk, fullRescan: true });
-    const result = await cloud.syncPush(envelope, rescanKey('rescan-hist', deviceId, offset / MAX_PUSH_ITEMS, chunk));
-    pushedEvents += (result.acceptedEvents || []).length;
+    const result = validatePushResult(await cloud.syncPush(envelope, rescanKey('rescan-hist', deviceId, offset / MAX_PUSH_ITEMS, chunk)));
+    const committed = result.acceptedEvents.filter(row => sent.has(row.id)).length;
+    pushedEvents += committed;
+    if (committed < chunk.length) complete = false;
   }
 
+  if (!complete) return { pushedEvents, pushedEntities, acknowledged: 0, blocked: [{ seq: marker.seq, kind: marker.kind, reason: 'rescan-not-fully-committed' }] };
+
   await acknowledgeProfileMutations(pid, [marker.seq]);
-  return { pushedEvents, pushedEntities, acknowledged: 1, blocked: [] };
+  // Acking the marker is what makes the rest of the queue visible:
+  // pendingProfileMutations answers with the marker alone until the initial
+  // reconciliation is complete. Whatever is queued from before the rescan
+  // started has just been republished as a `hist:` event, and leaving it would
+  // send the same attempt again as an `evt-` event under a different id — two
+  // cloud events for one local answer, which idempotency cannot dedupe because
+  // nothing about them matches. Entries above `coveredBelow` were queued while
+  // this sync was running, may postdate the state the rescan read, and keep
+  // their place.
+  const leftover = (await pendingProfileMutations(pid, MAX_OUTBOX_ITEMS))
+    .filter(item => item.seq > 0 && item.seq < coveredBelow)
+    .map(item => item.seq);
+  if (leftover.length) await acknowledgeProfileMutations(pid, leftover);
+  return { pushedEvents, pushedEntities, acknowledged: 1 + leftover.length, blocked: [] };
 }
 
 export async function syncNow(pid) {
@@ -368,34 +528,64 @@ export async function syncNow(pid) {
     let push = { pushedEvents: 0, pushedEntities: 0, acknowledged: 0, blocked: [] };
     let prePull = { pulledEvents: 0, pulledEntities: 0 };
     const rescan = pending.find(item => item.kind === 'full-rescan');
+    const unpublished = unpublishedEntities(pending);
 
     // On first link to an existing cloud account, learn authoritative entity
     // versions before trying to publish local state. This turns the initial
     // reconciliation into a merge/union rather than a blind version-0 overwrite.
     if (rescan) {
-      prePull = await pullAll(pid, deviceId, state);
-      push = await pushFullRescan(pid, deviceId, rescan, state);
+      // The queue's position is read before the rescan looks at local state, so
+      // that a mutation the student makes while this sync is running is not
+      // mistaken for one the rescan already published.
+      const coveredBelow = (await profileOutboxStats(pid)).nextSeq;
+      prePull = await pullAll(pid, deviceId, state, unpublished);
+      push = await pushFullRescan(pid, deviceId, rescan, state, coveredBelow);
     } else if (pending.length) {
       const batch = await buildNormalBatch(pending, pid, deviceId, state);
       if (batch.events.length || batch.entities.length) {
         const envelope = createPushEnvelope({ deviceId, baseCursor: state.cursor, events: batch.events, entities: batch.entities });
         const first = Math.min(...batch.represented);
         const last = Math.max(...batch.represented);
-        const result = await cloud.syncPush(envelope, `sync-${deviceId}-${first}-${last}`);
-        for (const row of result.acceptedEntities || []) state.entityVersions[versionKey(row.kind, row.entityId)] = row.version;
-        await acknowledgeProfileMutations(pid, batch.represented);
+        const key = `sync-${deviceId}-${first}-${last}-${contentDigest({ events: batch.events, entities: batch.entities })}`;
+        const result = validatePushResult(await cloud.syncPush(envelope, key));
+        // Acknowledge what the server COMMITTED, never what this device sent.
+        // Dropping a queue entry is the one irreversible act in a sync: the
+        // local rows stay, but nothing will ever look at them again, so an
+        // answer the server declined would simply never reach the cloud. Each
+        // accepted id and entity key is mapped back to the entry that produced
+        // it; anything the response does not account for stays queued and is
+        // retried on the next sync.
+        const committed = [];
+        for (const row of result.acceptedEvents) {
+          const seq = batch.eventSeq.get(row.id);
+          if (seq !== undefined) committed.push(seq);
+        }
+        for (const row of result.acceptedEntities) {
+          const key = versionKey(row.kind, row.entityId);
+          const seq = batch.entitySeq.get(key);
+          if (seq === undefined) continue;
+          state.entityVersions[key] = row.version;
+          committed.push(seq);
+        }
+        await acknowledgeProfileMutations(pid, committed);
         push = {
-          pushedEvents: (result.acceptedEvents || []).length,
-          pushedEntities: (result.acceptedEntities || []).length,
-          acknowledged: batch.represented.length,
-          blocked: batch.blocked
+          pushedEvents: result.acceptedEvents.length,
+          pushedEntities: result.acceptedEntities.length,
+          acknowledged: committed.length,
+          blocked: [
+            ...batch.blocked,
+            ...batch.represented.filter(seq => !committed.includes(seq))
+              .map(seq => ({ seq, kind: pending.find(item => item.seq === seq)?.kind || null, reason: 'not-committed-remotely' }))
+          ]
         };
       } else push.blocked = batch.blocked;
     }
 
     // Pull from the previous canonical cursor after the push as well. That catches
     // mutations another device committed between the pre-pull and this commit.
-    const postPull = await pullAll(pid, deviceId, state);
+    // Whatever is still queued after the push is still unpublished, so the second
+    // pull protects it on the same terms the first one did.
+    const postPull = await pullAll(pid, deviceId, state, unpublishedEntities(await pendingProfileMutations(pid, MAX_OUTBOX_ITEMS)));
     state.lastSyncAt = Date.now();
     state.lastError = null;
     await saveState(pid, state);

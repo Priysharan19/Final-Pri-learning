@@ -36,25 +36,49 @@ jobs:
         run: |
           set -euo pipefail
           test -s suites.log
-          grep -Fq '1544000/1544000 self-checks passed across 193 subtopics' suites.log
+          grep -Fq '1704000/1704000 self-checks passed across 213 subtopics' suites.log
           grep -Fq '21000/21000 multipart part-checks passed' suites.log
-          grep -Fq '✔ INDIA SUITE PASSED — 1724/1724 checks' suites.log
-          grep -Fq '43800 questions from 438 declared (generator, difficulty) pairs × 100 draws — 43800 marked correct by their own marker, 43800 well formed' suites.log
+          grep -Fq '✔ INDIA SUITE PASSED — 1832/1832 checks' suites.log
+          grep -Fq '44000 questions from 440 declared (generator, difficulty) pairs × 100 draws — 44000 marked correct by their own marker, 44000 well formed' suites.log
           grep -Fq '258/258 dot points have a generator behind them; 0 do not' suites.log
-          grep -Fq 'NCERT ANSWER FORMS: PASS — 93/93 checks' suites.log
+          grep -Fq 'NCERT ANSWER FORMS: PASS — 212/212 checks' suites.log
+          grep -Fq 'METHOD MARKS: PASS — 37/37 checks' suites.log
+          grep -Fq 'WORKING BRANCHES: PASS — 29/29 checks' suites.log
+          grep -Fq 'Pri Reason V1 precision gate: PASS' suites.log
+          grep -Fq 'Pri Reason V2 safety gate: PASS' suites.log
+          grep -Fq 'Pri Reason V3 regression gate: PASS' suites.log
+          grep -Fq 'Pri Reason V4 regression gate: PASS' suites.log
+          grep -Fq 'Pri Reason V2 curriculum integration gate: PASS' suites.log
+          grep -Fq 'INDIA NATIVE BANKS: PASS — 313/313 checks — 19 chapters rewired onto 20 NCERT-native generators' suites.log
+          grep -Fq 'NCERT ANSWER FORMS: PASS — 212/212 checks' suites.log
           grep -Fq 'INDIA EXAM FLOW: PASS — 122/122 checks' suites.log
+          grep -Fq 'INDIA PYQ: PASS — 1079/1079 checks — 45 source-cited previous-year questions' suites.log
           grep -Fq '✔ INDIA IDENTITY SUITE PASSED — 102/102 checks across 5 groups' suites.log
-          grep -Fq 'INDIA ADAPTIVE: PASS — 304/304 checks' suites.log
+          grep -Fq 'INDIA ADAPTIVE: PASS — 302/302 checks' suites.log
+          grep -Fq 'INDIA EXAM WEIGHT: PASS — 628/628 checks' suites.log
           grep -Fq 'PLOTTING: PASS — 78/78 checks' suites.log
           grep -Fq 'README TRUTH: PASS — 16/16 checks' suites.log
           grep -Fq 'LEGAL PAGES: PASS — 45/45 checks' suites.log
-          grep -Fq 'CLOUD HANDWRITING CLIENT: PASS — 37/37 checks' suites.log
-          grep -Fq 'CLOUD WORKING CLIENT: PASS — 36/36 checks' suites.log
-          grep -Fq 'CLOUD PHOTO CLIENT: PASS — 26/26 checks' suites.log
+          grep -Fq 'CLOUD HANDWRITING CLIENT: PASS — 42/42 checks' suites.log
+          grep -Fq 'CLOUD WORKING CLIENT: PASS — 44/44 checks' suites.log
+          grep -Fq 'CLOUD PHOTO CLIENT: PASS — 28/28 checks' suites.log
+          grep -Fq 'I18N: PASS — 180/180 checks' suites.log
+          grep -Fq 'CLOUD HANDWRITING CLIENT: PASS — 42/42 checks' suites.log
+          grep -Fq 'CLOUD WORKING CLIENT: PASS — 44/44 checks' suites.log
+          grep -Fq 'CLOUD PHOTO CLIENT: PASS — 28/28 checks' suites.log
           grep -Fq 'MARK PREDICTOR: PASS — 39/39 checks' suites.log
           grep -Fq 'PDF WORKING: PASS — 25/25 checks' suites.log
           grep -Fq 'MCQ DISTINCTNESS: PASS — 14/14 checks' suites.log
+          grep -Fq 'INDIA NATIVE SURFACES: PASS — 31/31 checks' suites.log
+          grep -Eq 'INSTALL BUDGET: PASS — 44/44 checks — install [0-9]+ kB raw / [0-9]+ kB gzip under' suites.log
+          grep -Fq 'nothing emitted left uncovered.' suites.log
+          grep -Fq 'CBSE STEP MARKING: PASS — 37/37 checks' suites.log
           grep -Fq 'ENTITLEMENT ENFORCEMENT: PASS — 59/59 checks' suites.log
+          grep -Fq 'JEE ADVANCED GATE: PASS — 27/27 checks' suites.log
+          grep -Fq 'RESTORE FIDELITY: PASS — 45/45 checks' suites.log
+          grep -Fq 'STREAK CALENDAR: PASS — 19/19 checks' suites.log
+          grep -Fq 'BAD INPUT: PASS — 38/38 checks' suites.log
+          grep -Fq 'CLOUD SYNC ACK: PASS — 44/44 checks' suites.log
           grep -Fq 'PASS — Grade 9 Ganita Manjari: 1280 seeded forms (1000 numeric handwriting-ready, 280 conceptual).' suites.log
           grep -Fq 'PASS — 8/8 chapters, 200/200 uploaded pages, 42/42 formal exercise sections and 293/293 formal exercise prompts represented and verified.' suites.log
           if grep -Fq 'not measured:' suites.log; then
@@ -73,6 +97,10 @@ jobs:
           node client/test/india-practice-availability-check.mjs
           node client/test/entitlement-check.mjs
           node client/test/sync-contract-check.mjs
+          # Both of these guard the offline-first backup and cloud-sync paths and
+          # were not being run anywhere in CI.
+          node client/test/restore-durability-check.mjs
+          node client/test/cloud-sync-worker-check.mjs
           node client/test/cloud-session-refresh-check.mjs
           node client/test/account-action-boundary-check.mjs
           node client/test/india-exam-blueprint-check.mjs
@@ -128,6 +156,21 @@ jobs:
         run: |
           node server/test/handwriting-transcription-check.mjs
           node server/test/working-check-check.mjs
+      - name: Account, origin, CMS and classroom contracts
+        run: |
+          node server/test/account-deletion-reauth-check.mjs
+          node server/test/native-origin-csrf-check.mjs
+          node server/test/billing-config-check.mjs
+          node server/test/content-review-contract-check.mjs
+          node server/test/assignment-execution-contract-check.mjs
+          node server/test/classroom-submission-contract-check.mjs
+      - name: Rate-limit identity, sync idempotency, grants, body size and catalogue exposure
+        run: |
+          node server/test/proxy-identity-contract-check.mjs
+          node server/test/sync-idempotency-contract-check.mjs
+          node server/test/entitlement-admin-grant-check.mjs
+          node server/test/request-size-contract-check.mjs
+          node server/test/content-index-exposure-check.mjs
       - name: Commercial platform schema contract
         run: node server/test/platform-schema-check.mjs
       - name: Platform migration contract
@@ -182,7 +225,7 @@ jobs:
         run: |
           set -euo pipefail
           test -s browser.log
-          grep -Eq 'E2E SUITE.*195/195.*7 flows' browser.log
+          grep -Eq 'E2E SUITE.*222/222.*7 flows' browser.log
           grep -Fq 'Phone · every destination reachable at 390px' browser.log
           grep -Fq 'India · onboarding, class labels, demo, cloud entry' browser.log
           grep -Fq 'Cloud · account, live Settings refresh, assignment hand-off' browser.log
@@ -234,3 +277,29 @@ jobs:
           echo "read $count built HTML/CSS files: none loads remote presentation assets"
       - name: Client network calls stay behind audited transport
         run: node tools/check-client-network-boundary.mjs
+      # The bytes, not just the names. Rolldown emits a ~60-byte re-export stub
+      # beside each named chunk (strings.hi-*.js, ncertTerms-*.js) and those do
+      # land in the precache; what must not is the data behind them. So this
+      # asserts both: the big chunks are absent from the install, and nothing
+      # precached that names these modules is large enough to BE them.
+      - name: Hindi and the NCERT glossary stay out of the install precache
+        run: |
+          set -euo pipefail
+          for name in i18n-hi i18n-terms; do
+            chunk="$(find client/dist/assets -name "$name-*.js" -type f | head -1)"
+            test -n "$chunk"
+            echo "$name built as $(basename "$chunk") ($(wc -c < "$chunk" | tr -d ' ') bytes)"
+            if grep -Fq "$(basename "$chunk")" client/dist/sw.js; then
+              echo "$name is in the service worker install precache — every reader would download it." >&2
+              exit 1
+            fi
+            echo "  absent from the generated service worker's install list"
+          done
+          for stub in $(grep -oE '(strings\.hi|ncertTerms)-[A-Za-z0-9_-]+\.js' client/dist/sw.js | sort -u); do
+            bytes="$(wc -c < "client/dist/assets/$stub" | tr -d ' ')"
+            echo "precached $stub is $bytes bytes"
+            if [ "$bytes" -gt 1024 ]; then
+              echo "$stub is precached and is not a re-export stub — the catalogue itself is in the install." >&2
+              exit 1
+            fi
+          done

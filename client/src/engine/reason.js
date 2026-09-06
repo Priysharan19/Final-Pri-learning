@@ -12,7 +12,7 @@
 // is allowed to certify an equation transformation as correct.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { parse, evaluate, numsClose } from './expr.js';
+import { parse, evaluate, numsClose, variablesOf } from './expr.js';
 
 const SAMPLE = [0.73, 1.31, -0.64, 2.17, -1.72, 0.37, 3.08, -2.29, 4.61, -4.13];
 const EPS = 1e-7;
@@ -321,9 +321,97 @@ function droppedConstraintDiagnosis() {
   };
 }
 
+/** A bare number, however it is written: 0, −3, (7), +2. */
+function isLiteralNumber(node) {
+  let n = node;
+  while (n && n.t === 'group') n = n.v;
+  if (!n || typeof n !== 'object') return false;
+  if (n.t === 'num') return true;
+  if (n.t === 'neg') return isLiteralNumber(n.v);
+  return false;
+}
+
+const exactBand = (v) => Math.max(1e-9, Math.abs(v) * 1e-9);
+
+/**
+ * Is this bare "a = a" the line above with the answer substituted into it?
+ *
+ * The distinction matters. "x = −4" followed by "−4 = −4" is the student
+ * checking the line they just wrote. "3x = 15" followed by "0 = 0" is not: no
+ * substitution of the solution into 3x = 15 produces 0 = 0, so that line
+ * replaced the constraint rather than confirming it, and it stays the break
+ * client/test/pri-reason-check.mjs has pinned since the identity rule landed.
+ */
+function substitutesPreviousLine(ast, previousAst, meta) {
+  if (!previousAst || previousAst.t !== 'equation') return false;
+  const variable = meta?.variable;
+  const solutions = distinctNumbers(meta?.solutions);
+  if (!variable || !solutions.length) return false;
+  let left, right;
+  try {
+    left = evaluate(ast.l, {});
+    right = evaluate(ast.r, {});
+  } catch { return false; }
+  for (const sol of solutions) {
+    try {
+      const env = { [variable]: sol };
+      const a = evaluate(previousAst.l, env);
+      const b = evaluate(previousAst.r, env);
+      if (Number.isFinite(a) && Number.isFinite(b)
+          && numsClose(a, left, exactBand(left)) && numsClose(b, right, exactBand(right))) return true;
+    } catch { /* try the next solution */ }
+  }
+  return false;
+}
+
+/**
+ * A line with no unknown left in it is a check, not an equation.
+ *
+ * "(−3)² + 9(−3) + 18 = 0" is what every NCERT equations chapter tells a
+ * student to write once they have an answer. It carries no constraint because
+ * it was never meant to: it asserts that the answer works. Reading it as an
+ * equation that dropped its constraint marked the taught final step a mistake.
+ * A check that does not balance is still a break.
+ */
+export function assessNumericCheckLine(ast, { previousAst = null, meta = null } = {}) {
+  if (!ast || ast.t !== 'equation' || variablesOf(ast).size) return null;
+  let left, right;
+  try {
+    left = evaluate(ast.l, {});
+    right = evaluate(ast.r, {});
+  } catch { return null; }
+  if (!Number.isFinite(left) || !Number.isFinite(right)) return null;
+  if (numsClose(left, right, exactBand(right))) {
+    // "−2 = −2" evaluates nothing, so it proves nothing and earns nothing. It
+    // is a note when it is the line above with the answer put in, and stays a
+    // dropped constraint when it is not.
+    if (isLiteralNumber(ast.l) && isLiteralNumber(ast.r)) {
+      if (!substitutesPreviousLine(ast, previousAst, meta)) return null;
+      return {
+        status: 'note', trusted: false, check: true,
+        note: 'True — this is the line above with your answer put in. It confirms the answer rather than moving it on.'
+      };
+    }
+    return {
+      status: 'ok', trusted: false, check: true,
+      note: 'Check — both sides come to the same number, so the answer satisfies the equation.'
+    };
+  }
+  const diagnosis = {
+    code: 'check-does-not-balance',
+    title: 'The check does not balance',
+    message: `Substituting back gives ${Number(left.toPrecision(8))} on the left and ${Number(right.toPrecision(8))} on the right, so this line is not true.`,
+    fix: 'Re-evaluate each side with the value you substituted, or check the value itself.',
+    confidence: 'high'
+  };
+  return { status: 'break', trusted: false, check: true, note: diagnosis.message, diagnosis };
+}
+
 /** Assess one parsed equation line. */
 export function assessEquationLine({ ast, previousAst = null, previousTrusted = false, meta = null } = {}) {
   if (!ast || ast.t !== 'equation') return { status: 'note', trusted: false, note: 'Skipped — this is not an equation.' };
+  const numericCheck = assessNumericCheckLine(ast, { previousAst, meta });
+  if (numericCheck) return numericCheck;
   const variable = meta?.variable;
   const solutions = distinctNumbers(meta?.solutions);
 

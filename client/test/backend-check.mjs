@@ -1236,10 +1236,24 @@ async function run() {
     for (const store of Object.keys(backup.stores)) {
       eq(`every ${store} row survived the round trip`, reexport.stores[store].length, backup.stores[store].length);
     }
-    const restoredExam = reexport.stores.exams.find(e => e.id === created.id);
+    // A restored paper is a second copy, so it is found by what identifies the
+    // paper rather than by the id: the id belongs to the ORIGINAL profile's row
+    // and reusing it is what used to take that row — and the questions and
+    // handwriting hanging off it — away from the profile that owns it.
+    const restoredExam = reexport.stores.exams.find(e => e.title === created.title);
     ok('the marked exam survived with its score', restoredExam && restoredExam.score === marked.score, show(restoredExam?.score));
-    eq('the blank exam survived too', reexport.stores.exams.find(e => e.id === blankExam.id)?.score, 0);
+    eq('the blank exam survived too', reexport.stores.exams.find(e => e.title === blankExam.title)?.score, 0);
     ok('the exam kept its marking detail', Array.isArray(restoredExam?.detail) && restoredExam.detail.length === marked.detail.length, show(restoredExam?.detail?.length));
+    ok('no restored exam reuses an id the source profile still holds',
+      reexport.stores.exams.every(e => e.id !== created.id && e.id !== blankExam.id),
+      show(reexport.stores.exams.map(e => e.id)));
+    ok('the restored exam lists question ids the source profile does not hold',
+      Array.isArray(restoredExam?.questionIds) && restoredExam.questionIds.length > 0 &&
+      restoredExam.questionIds.every(qid => !backup.stores.questions.some(q => q.id === qid)),
+      show(restoredExam?.questionIds?.length));
+    ok('the restored exam still names its own questions',
+      restoredExam.questionIds.every(qid => reexport.stores.questions.some(q => q.id === qid)),
+      'a restored exam pointed at a question the restored profile does not have');
     const restoredInk = reexport.stores.inks[0];
     ok('handwriting survived the round trip', restoredInk?.strokes?.length === 1 && restoredInk.recognized === inkQ.right, show(restoredInk?.recognized));
     eq('the bookmark survived', reexport.stores.bookmarks.length, backup.stores.bookmarks.length);

@@ -10,7 +10,11 @@ try {
     'content_revisions','issue_reports','audit_log','idempotency_keys','rate_limits',
     'teacher_invites','login_attempts','oidc_nonces'
   ]) assert.ok(tables.has(required), `missing platform table ${required}`);
-  assert.equal(db.prepare("SELECT value FROM platform_meta WHERE key='schema_version'").get()?.value, '4');
+  assert.equal(db.prepare("SELECT value FROM platform_meta WHERE key='schema_version'").get()?.value, '5');
+  // v5: an idempotency key records the request it answered, so replaying a key
+  // over different content is a conflict rather than a silently dropped write.
+  assert.ok(db.pragma("table_info('idempotency_keys')").some(column => column.name === 'request_digest'),
+    'idempotency keys must be able to record which request they acknowledged');
 
   const now = Date.now();
   db.prepare(`INSERT INTO accounts(id,email,name,password_hash,role,created_at,updated_at)

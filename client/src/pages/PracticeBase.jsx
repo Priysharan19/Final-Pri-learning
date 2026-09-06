@@ -9,11 +9,13 @@ import {
 import QuestionCard, { SR_ONLY } from '../components/QuestionCard.jsx';
 import PriExplain from '../components/PriExplain.jsx';
 import FreeCapNotice from '../components/FreeCapNotice.jsx';
+import { useT } from '../i18n/index.js';
 
 const EMPTY_SESSION = Object.freeze({ answered: 0, correct: 0, xp: 0 });
 
 export default function Practice() {
   const { user } = useApp();
+  const t = useT();
   const [params, setParams] = useSearchParams();
   const location = useLocation();
   const subtopic = params.get('subtopic');
@@ -21,6 +23,11 @@ export default function Practice() {
   const difficulty = params.get('difficulty');
   const track = params.get('track');
   const taskId = params.get('task');
+  // "Past papers only": the PYQ filter Indian students ask for by name. It is a
+  // filter, not a preference — when the archive has no past-paper question for
+  // the chapter the request is refused with a reason rather than quietly
+  // serving an authored one, so the label on the card is always true.
+  const pyqOnly = params.get('pyq') === '1';
   const assignmentClassId = params.get('classId');
   const assignmentId = params.get('assignment');
   const assignmentMode = !!assignmentClassId && !!assignmentId;
@@ -32,6 +39,7 @@ export default function Practice() {
   const [serve, setServe] = useState(null);
   const handedRef = useRef(location.state?.serve || null);   // a retry handed over from History
   const [error, setError] = useState('');
+  const [errorCode, setErrorCode] = useState('');
   const [capped, setCapped] = useState(null);
   const [session, setSession] = useState({ ...EMPTY_SESSION });
   const sessionRef = useRef({ ...EMPTY_SESSION });
@@ -54,7 +62,7 @@ export default function Practice() {
     replaceSession(EMPTY_SESSION);
     if (!assignmentMode) return () => { live = false; };
     if (!cloudAvailable()) {
-      setAssignmentError('This classroom assignment needs the Pri Learning cloud connection to verify membership and load its specification. Your normal offline practice is still available.');
+      setAssignmentError(t('assignment.needsCloud'));
       return () => { live = false; };
     }
 
@@ -62,7 +70,7 @@ export default function Practice() {
       const result = await cloud.assignmentDetails(assignmentClassId, assignmentId);
       if (!live) return;
       const assignment = result?.assignment;
-      if (!assignment) throw new Error('Assignment not found.');
+      if (!assignment) throw new Error(t('assignment.notFound'));
 
       const target = assignmentQuestionTarget(assignment.specification);
       const state = assignment.submission?.state || null;
@@ -99,7 +107,7 @@ export default function Practice() {
       setAssignmentContext(nextAssignment);
     })().catch(err => {
       if (!live) return;
-      setAssignmentError(err.message || 'This assignment could not be opened.');
+      setAssignmentError(err.message || t('assignment.couldNotOpen'));
     });
     return () => { live = false; };
   }, [assignmentMode, assignmentClassId, assignmentId, replaceSession]);
@@ -120,6 +128,7 @@ export default function Practice() {
     }
     loading.current = true;
     setError('');
+    setErrorCode('');
     setCapped(null);
     try {
       const assignmentSpec = assignmentContext?.specification || {};
@@ -136,18 +145,24 @@ export default function Practice() {
               mode: 'smart', track: assignmentTrack || undefined,
               difficulty: assignmentDifficulty ?? undefined
             }
-          : subtopic ? { mode: 'topic', subtopic, track: track || undefined, dotpoint: dotpoint != null ? Number(dotpoint) : undefined, difficulty: difficulty != null ? Number(difficulty) : undefined }
-            : { mode: 'smart', track: track || undefined, difficulty: difficulty != null ? Number(difficulty) : undefined };
+          : subtopic ? { mode: 'topic', subtopic, track: track || undefined, dotpoint: dotpoint != null ? Number(dotpoint) : undefined, difficulty: difficulty != null ? Number(difficulty) : undefined, pyqOnly: pyqOnly || undefined }
+            : { mode: 'smart', track: track || undefined, difficulty: difficulty != null ? Number(difficulty) : undefined, pyqOnly: pyqOnly || undefined };
       const r = await api.post('/practice/next', body);
       setServe(r);
     } catch (e) {
       // A free-tier refusal is not a fault: it is the end of today's free
       // questions, and it is explained rather than shown as an error string.
       if (e?.code === 'FREE_CAP_REACHED' || e?.code === 'FREE_EXAM_CAP_REACHED') setCapped(e);
-      else setError(e.message);
+      else { setError(e.message); setErrorCode(e?.code || ''); }
     }
     finally { loading.current = false; }
-  }, [subtopic, dotpoint, difficulty, taskId, track, assignmentMode, assignmentContext, assignmentClassId, assignmentId]);
+  }, [subtopic, dotpoint, difficulty, taskId, track, pyqOnly, assignmentMode, assignmentContext, assignmentClassId, assignmentId]);
+
+  const setPyqOnly = useCallback((on) => {
+    const next = new URLSearchParams(params);
+    if (on) next.set('pyq', '1'); else next.delete('pyq');
+    setParams(next);
+  }, [params, setParams]);
 
   useEffect(() => {
     setServe(null);
@@ -226,6 +241,7 @@ export default function Practice() {
     if (loading.current) return;
     loading.current = true;
     setError('');
+    setErrorCode('');
     setCapped(null);
     // Clear the resolved question before generation starts. Otherwise closing
     // Pri Explain briefly exposes the stale evaluation card while the fresh
@@ -240,23 +256,23 @@ export default function Practice() {
         difficulty: q.difficulty,
       });
       setServe(r);
-    } catch (e) { setError(e.message); }
+    } catch (e) { setError(e.message); setErrorCode(e?.code || ''); }
     finally { loading.current = false; }
   }, [serve, track]);
 
   const course = (user.courseLabel || 'Mathematics').replace(/^(?:Year|Class) \d+\s*·\s*/, '');
-  const metaLine = `${user.course === 'in' ? 'Class' : 'Year'} ${serve?.question?.year ?? user.year} · ${serve?.question?.indiaTrack ? (user.indiaTrackName || course) : course}`;
+  const metaLine = `${t(user.course === 'in' ? 'common.classNumber' : 'common.yearNumber', { n: serve?.question?.year ?? user.year })} · ${serve?.question?.indiaTrack ? (user.indiaTrackName || course) : course}`;
   const heading = assignmentContext?.title
     || serve?.question?.subtopicName
-    || (taskId ? 'Task practice' : subtopic ? 'Topic practice' : 'Smart practice');
+    || t(taskId ? 'practice.taskPractice' : subtopic ? 'practice.topicPractice' : 'practice.smartPractice');
   const assignmentCompleteLocally = !!assignmentContext && assignmentTargetReached.current;
 
   if (assignmentMode && assignmentError && !assignmentContext) {
     return (
       <div className="qpage">
-        <h1 style={SR_ONLY}>Classroom assignment</h1>
+        <h1 style={SR_ONLY}>{t('assignment.title')}</h1>
         <p className="error-box">{assignmentError}</p>
-        <button className="btn btn-ghost" onClick={() => setParams({})}>Leave assignment and open normal Practice</button>
+        <button className="btn btn-ghost" onClick={() => setParams({})}>{t('assignment.leave')}</button>
       </div>
     );
   }
@@ -264,39 +280,59 @@ export default function Practice() {
   return (
     <div style={{ position: 'relative', paddingBottom: 70 }}>
       {/* the question itself is the page's visual title; this names it for a reader */}
-      <h1 style={SR_ONLY}>Practice · {heading}</h1>
+      <h1 style={SR_ONLY}>{t('practice.heading', { name: heading })}</h1>
 
       {assignmentContext && <div className="card" style={{ marginBottom: 14, padding: 14 }}>
         <div className="spread" style={{ gap: 12, alignItems: 'flex-start' }}>
           <div>
             <strong>{assignmentContext.title}</strong>
-            <div className="muted">{assignmentContext.className} · {session.answered}/{assignmentTarget} questions completed</div>
+            <div className="muted">{assignmentContext.className} · {t('assignment.completed', { done: session.answered, total: assignmentTarget })}</div>
             {assignmentContext.specification?.instructions && <p style={{ margin: '8px 0 0' }}>{String(assignmentContext.specification.instructions)}</p>}
           </div>
           <span className={`tag ${assignmentSubmitted.current ? 'tag-brand' : ''}`}>
-            {assignmentSubmitted.current ? 'Submitted' : assignmentCompleteLocally ? 'Ready to submit' : 'Assignment'}
+            {t(assignmentSubmitted.current ? 'assignment.submitted' : assignmentCompleteLocally ? 'assignment.readyToSubmit' : 'assignment.tag')}
           </span>
         </div>
         {assignmentContext.submission?.feedback && <div className="notice" style={{ marginTop: 10 }}>
-          <strong>Teacher feedback</strong>
-          <div style={{ marginTop: 4 }}>{assignmentContext.submission.feedback.note || 'Your teacher returned this assignment for revision.'}</div>
+          <strong>{t('assignment.teacherFeedback')}</strong>
+          <div style={{ marginTop: 4 }}>{assignmentContext.submission.feedback.note || t('assignment.returnedForRevision')}</div>
         </div>}
         {assignmentError && <div className="notice error" role="alert" style={{ marginTop: 10 }}>{assignmentError}</div>}
         {assignmentSubmitted.current && <div className="notice success" role="status" style={{ marginTop: 10 }}>
-          Assignment submitted. Your teacher must return it before more assignment work can be added.
+          {t('assignment.submittedNote')}
         </div>}
         {assignmentCompleteLocally && !assignmentSubmitted.current && <div className="notice" role="status" style={{ marginTop: 10 }}>
-          You reached the assignment target. No extra assignment questions will be generated while submission is pending.
-          <div style={{ marginTop: 8 }}><button className="btn btn-primary btn-sm" onClick={retryAssignmentSubmission}>Retry submission</button></div>
+          {t('assignment.targetReached')}
+          <div style={{ marginTop: 8 }}><button className="btn btn-primary btn-sm" onClick={retryAssignmentSubmission}>{t('assignment.retrySubmission')}</button></div>
         </div>}
       </div>}
+
+      {/* PYQ filter. Indian students work through past papers as the central
+          study ritual, so the filter is a first-class control rather than a
+          setting: on, every question served is a real question from a published
+          paper, and a chapter the archive cannot serve says so. */}
+      {user.course === 'in' && !assignmentMode && !taskId && (
+        <div className="spread" style={{ marginBottom: 12, gap: 10, alignItems: 'center' }}>
+          <button
+            className={`btn btn-sm ${pyqOnly ? 'btn-primary' : 'btn-quiet'}`}
+            aria-pressed={pyqOnly}
+            title={t('practice.pyqOnlyTitle')}
+            onClick={() => setPyqOnly(!pyqOnly)}
+          >
+            {pyqOnly ? 'Past papers only · on' : 'Past papers only'}
+          </button>
+          {pyqOnly && <span className="muted">{t('practice.pyqOnlyNote')}</span>}
+        </div>
+      )}
 
       {capped && <FreeCapNotice gate={capped} onRetry={load} />}
 
       {error && !capped && (
         <div className="qpage">
           <p className="error-box">{error}</p>
-          <button className="btn btn-primary" onClick={load}>Try again</button>
+          {errorCode === 'INDIA_PYQ_UNAVAILABLE'
+            ? <button className="btn btn-primary" onClick={() => setPyqOnly(false)}>{t('practice.pyqFilterOff')}</button>
+            : <button className="btn btn-primary" onClick={load}>{t('common.tryAgain')}</button>}
         </div>
       )}
 
@@ -310,6 +346,21 @@ export default function Practice() {
 
       {serve && !assignmentCompleteLocally && (
         <>
+          {serve.question.pyq && (
+            <div className="notice" role="note" style={{ marginBottom: 12 }}>
+              <strong>{t('practice.pyqBadge')}</strong> · {serve.question.pyqSource}
+              {serve.question.pyqArchive?.citations?.length > 0 && (
+                <div className="muted" style={{ marginTop: 4 }}>
+                  {t('practice.pyqTranscribedFrom')} {serve.question.pyqArchive.citations.map((c, i) => (
+                    <React.Fragment key={c.id}>
+                      {i > 0 && ' · '}
+                      <a href={c.archivedAt || c.url} target="_blank" rel="noreferrer noopener">{c.title}</a>
+                    </React.Fragment>
+                  ))}. {serve.question.pyqArchive.stepsAuthorship}
+                </div>
+              )}
+            </div>
+          )}
           <QuestionCard
             key={serve.question.id}
             question={serve.question}
@@ -348,20 +399,20 @@ export default function Practice() {
           <div>
             <div className="ctx-pill-meta">
               {metaLine}
-              {session.answered > 0 && <> · session {session.correct}/{session.answered} · +{session.xp} XP</>}
+              {session.answered > 0 && t('practice.sessionScore', { correct: session.correct, answered: session.answered, xp: session.xp })}
             </div>
             <div className="ctx-pill-name">
               {heading}
-              {dotpoint != null && <span className="muted"> · dot point {Number(dotpoint) + 1}</span>}
-              {serve?.nextUp?.name && <span className="muted" data-next-up={serve.nextUp.subtopic}> · next up: {serve.nextUp.name}</span>}
+              {dotpoint != null && <span className="muted">{t('practice.dotpointMeta', { n: Number(dotpoint) + 1 })}</span>}
+              {serve?.nextUp?.name && <span className="muted" data-next-up={serve.nextUp.subtopic}>{t('practice.nextUp', { name: serve.nextUp.name })}</span>}
             </div>
           </div>
-          {(subtopic || taskId || difficulty || assignmentMode) && (
-            <button className="btn btn-quiet btn-sm" title={assignmentMode ? 'Leave assignment' : 'Clear filters — back to smart practice'}
-              aria-label={assignmentMode ? 'Leave assignment' : 'Clear filters — back to smart practice'} onClick={() => setParams({})}>✕</button>
+          {(subtopic || taskId || difficulty || pyqOnly || assignmentMode) && (
+            <button className="btn btn-quiet btn-sm" title={t(assignmentMode ? 'assignment.leaveShort' : 'practice.clearFilters')}
+              aria-label={t(assignmentMode ? 'assignment.leaveShort' : 'practice.clearFilters')} onClick={() => setParams({})}>✕</button>
           )}
         </div>
-        {!assignmentCompleteLocally && <button className="ctx-next" title="Next question" aria-label="Next question" onClick={load}>›</button>}
+        {!assignmentCompleteLocally && <button className="ctx-next" title={t('practice.nextQuestion')} aria-label={t('practice.nextQuestion')} onClick={load}>›</button>}
       </div>
     </div>
   );

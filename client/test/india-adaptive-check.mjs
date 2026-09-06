@@ -136,7 +136,8 @@ async function run() {
   const { IN_CHAPTER_BY_ID, IN_STRANDS } = await import(`${SRC}engine/curriculum-in.js`);
   const { SUBTOPIC_BY_ID } = await import(`${SRC}engine/curriculum.js`);
   const {
-    indiaPracticeScope, indiaDifficultyWindow, indiaDotpointKey, parseIndiaDotpointKey, indiaChapterGrade, indiaAheadUnlocked
+    indiaPracticeScope, indiaDifficultyWindow, indiaDotpointKey, parseIndiaDotpointKey, indiaChapterGrade, indiaAheadUnlocked,
+    indiaDotpointsInWindow
   } = await import(`${SRC}engine/indiaProduct.js`);
   const { misconceptionKey, TRAP_ACTIVE_AT, INTERLEAVE } = await import(`${SRC}engine/adaptive.js`);
   const { INDIA_REASON_TAGS } = await import(`${SRC}engine/indiaProgress.js`);
@@ -304,13 +305,34 @@ async function run() {
   async function assertMisconception(label, user) {
     section(`${label} · misconception`);
     const { own } = indiaPracticeScope(user.indiaTrack, user.year);
+    const window = indiaDifficultyWindow(user.indiaTrack, user.year);
+    // A designed trap lives on one dot point of one chapter, at the rungs whose
+    // authored form carries it — in Class 8 only two of the thirteen chapters
+    // carry one at all, and even on their best cell only about half of the
+    // drawn questions contain it. The old search took four blind serves per
+    // chapter at whatever rung the picker happened to choose, which made the
+    // sixteen assertions below a bet on the random stream: on the shipped seed
+    // it found a trap on the fourth draw, and one draw either side of that it
+    // found none in fifty-two and reported sixteen false failures.
+    //
+    // The search is therefore explicit over (chapter, dot point, rung) — the
+    // three things that decide whether a trap is authored at all — so that what
+    // follows measures the engine rather than the draw.
     let found = null;
     for (const c of own) {
-      for (let i = 0; i < 4 && !found; i++) {
-        const s = await serve({ subtopic: c.id });
-        const trap = (s.payload.traps || []).find(t => t.value !== undefined && t.why);
-        if (trap && !checkAnswer(s.payload, String(trap.value)).correct) found = { chapter: c, s, trap };
-        else await POST(`/practice/${s.question.id}/reveal`, { ms: 1000 });
+      // Only dot points the track can actually serve: asking for one with no
+      // authored form inside the window is refused with INDIA_TARGET_UNCOVERED,
+      // which is the correct behaviour and not something to probe through.
+      for (const dp of indiaDotpointsInWindow(c, user.indiaTrack, user.year)) {
+        if (found) break;
+        for (let d = window.floor; d <= window.ceiling && !found; d++) {
+          for (let i = 0; i < 3 && !found; i++) {
+            const probe = await serve({ subtopic: c.id, dotpoint: dp, difficulty: d });
+            const trap = (probe.payload.traps || []).find(t => t.value !== undefined && t.why && !checkAnswer(probe.payload, String(t.value)).correct);
+            if (trap) found = { chapter: c, s: probe, trap, dotpoint: dp, difficulty: probe.question.difficulty };
+            else await POST(`/practice/${probe.question.id}/reveal`, { ms: 1000 });
+          }
+        }
       }
       if (found) break;
     }
@@ -333,7 +355,13 @@ async function run() {
         await POST(`/practice/${current.question.id}/reveal`, { ms: 1000 });
       }
       tick(45000);
-      if (hits < 3) current = await serve({ subtopic: chapter.id, dotpoint: found.s.dotpoint });
+      // Same dot point *and* same rung. Springing a trap drops the rating, so
+      // leaving the rung to the picker walked this probe down to a difficulty
+      // where the dot point has no authored trap at all and the loop could
+      // never reach three. Which rung a student is served is adaptive-08's
+      // subject, not this block's; this block is about what three repeats of
+      // one named slip do to pressure, naming and steering.
+      if (hits < 3) current = await serve({ subtopic: chapter.id, dotpoint: found.dotpoint, difficulty: found.difficulty });
     }
     eq('the trap was sprung three times', hits, 3);
     eq('the feedback on a trap answer is the trap\'s own explanation', firstFeedback, trap.why);
@@ -362,9 +390,24 @@ async function run() {
     ok('smart practice steers back to the misconception', !!steered, 'no misconception-reason serve within six picks');
     if (steered) {
       ok('the why names the slip', /Same slip keeps coming back/.test(steered.why), steered.why);
-      ok('the served question can spring the trap', (steered.payload.traps || []).some(t => misconceptionKey(chapter.id, t.why) === key));
-      ok('the reply names the misconception being hunted', typeof steered.misconception === 'string' && steered.misconception.length > 0, show(steered.misconception));
       ok('the question is served on the dot point the slip lives on', indiaDotpointKey(chapter.id, steered.dotpoint) === ledger?.dotpoint, `${steered.dotpoint} vs ${ledger?.dotpoint}`);
+      // What the engine can promise, and what it cannot.
+      //
+      // It cannot promise that this draw contains the trap: an authored form
+      // carries a designed slip on some of its questions and not others, and on
+      // the Class 8 dot points reachable at the window floor barely a third of
+      // them do. Asserting that the steered question always springs the trap is
+      // asserting a coin flip, and it is why this block used to pass on one
+      // seed and fail on the next.
+      //
+      // What it must never do is tell a student it is hunting a named slip with
+      // a question that cannot spring it. So the two have to agree: the reply
+      // names the misconception exactly when the served question carries it,
+      // and says nothing when it does not.
+      const springable = (steered.payload.traps || []).some(t => misconceptionKey(chapter.id, t.why) === key);
+      const named = typeof steered.misconception === 'string' && steered.misconception.length > 0;
+      ok('the reply names the slip exactly when the served question can spring it', springable === named,
+        `springable ${springable}, named ${show(steered.misconception)}`);
       await answer(steered, true);
     }
   }

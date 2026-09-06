@@ -91,6 +91,8 @@ const env = {
   PRI_CSRF_SECRET: 'runtime-image-contract-secret',
   PRI_AUTH_DELIVERY_KEY: '33'.repeat(32),
   PRI_PLATFORM_DB: join(dataDir, 'pri-learning-platform.db'),
+  // Nothing forwards for this child: the test talks straight to its socket.
+  PRI_TRUSTED_PROXY_HOPS: '0',
   PRI_AUTH_EMAIL_PROVIDER: 'resend',
   PRI_RESEND_API_KEY: 'contract-key-not-real',
   PRI_AUTH_EMAIL_FROM: 'Pri Learning <noreply@pri.example>'
@@ -147,8 +149,15 @@ try {
   c.match(missing.headers.get('content-security-policy'), /default-src 'self'/, '404 carries the CSP');
   await fetch(`${origin}/v1/health?secret=do-not-log`);
 } finally {
-  child.kill('SIGTERM');
-  await new Promise(resolve => child.once('exit', resolve));
+  // Only wait for an exit that is still coming. When the child died on its own
+  // — a boot that fails closed on missing configuration, say — this await never
+  // settled, and Node exits 0 on an unsettled top-level await: the contract
+  // reported success by falling silent, which is the one thing a contract may
+  // not do.
+  if (!exited) {
+    child.kill('SIGTERM');
+    await new Promise(resolve => child.once('exit', resolve));
+  }
 }
 
 const jsonLines = stdout.split('\n').map(line => { try { return JSON.parse(line); } catch { return null; } }).filter(Boolean);

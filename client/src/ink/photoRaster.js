@@ -85,7 +85,10 @@ export async function preparePhoto(dataUrl, {
   const natural = { width: img.naturalWidth || img.width, height: img.naturalHeight || img.height };
   if (!natural.width || !natural.height) return null;
 
-  let edge = maxEdge;
+  // Seeded from the photo's own longest edge, not from the cap: a 900px photo
+  // against an 1800px cap would otherwise spend its first two attempts
+  // rendering the identical size, leaving only two real shrinks.
+  let edge = Math.min(maxEdge, Math.max(natural.width, natural.height));
   for (let attempt = 0; attempt < 4; attempt += 1) {
     const size = photoDimensions(natural.width, natural.height, { maxEdge: edge });
     const canvas = createCanvas(size.width, size.height);

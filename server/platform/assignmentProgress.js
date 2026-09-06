@@ -12,6 +12,9 @@ function boundedInteger(value, min, max, fallback = min) {
 // Assignment submissions deliberately contain aggregate completion metrics only.
 // Student answers, prompts, solution steps, images and handwriting never belong in
 // the classroom control plane. Unknown keys are dropped rather than persisted.
+//
+// Called by writeStudentSubmission() on the way into storage and by the read
+// paths on the way out, so the guarantee holds for rows written before it did.
 export function sanitizeAssignmentSummary(input) {
   const summary = plain(input) ? input : {};
   const questionsAnswered = boundedInteger(summary.questionsAnswered, 0, 50, 0);
@@ -28,17 +31,4 @@ export function sanitizeAssignmentSummary(input) {
     output.targetQuestions = boundedInteger(summary.targetQuestions, 1, 50, 10);
   }
   return output;
-}
-
-export function assignmentSubmissionPrivacyGuard(req, res, next) {
-  const isSubmissionWrite = req.method === 'PATCH' &&
-    /^\/classes\/[^/]+\/assignments\/[^/]+\/submission$/.test(String(req.path || ''));
-  if (!isSubmissionWrite) return next();
-
-  const body = plain(req.body) ? req.body : {};
-  req.body = {
-    ...body,
-    summary: sanitizeAssignmentSummary(body.summary)
-  };
-  return next();
 }

@@ -14,6 +14,7 @@ import {
 } from './curriculum-in.js';
 import { attachIndiaProductionStatus, indiaProductionStatus } from './indiaProductionMeta.js';
 import { hasJeePyqGenerator } from './generators/jee-pyq-runtime.js';
+import { hasPyqGenerator, pyqCoverageOf, pyqGeneratorId } from './pyq/pyqCoverage.js';
 
 export const INDIA_COURSE = 'in';
 export const INDIA_TRACK_IDS = Object.freeze(Object.keys(IN_TRACKS));
@@ -205,19 +206,36 @@ export function indiaDotpointIndex(chapter, ref) {
   return Number.isInteger(n) && n >= 0 && n < chapter.dotpoints.length ? n : null;
 }
 
+/** One of `pool`, chosen by `random`, without ever running off the end. */
+function drawFrom(pool, random) {
+  const unit = Math.max(0, Math.min(0.999999, Number(random()) || 0));
+  return pool[Math.min(pool.length - 1, Math.floor(unit * pool.length))];
+}
+
 /**
- * Resolve an India chapter request to a real generator/difficulty. Reviewed JEE
- * PYQs are preferred only for chapter-level JEE practice: the archive has source
- * chapter provenance but does not claim syllabus-dot-point precision. A request
- * for a specific dot point therefore stays on the authored generator that can
- * prove it covers that dot point. If no reviewed PYQ has been published for the
- * chapter yet, JEE practice falls back to the existing authored form.
+ * Resolve an India chapter request to a real generator/difficulty. Two separate
+ * previous-year archives can answer at chapter level, and both are chapter-level
+ * only: neither claims syllabus-dot-point precision, so a request for a specific
+ * dot point stays on the authored generator that can prove it covers that dot
+ * point.
+ *
+ *   · the reviewed JEE department catalog (generators/jee-pyq-runtime.js) is
+ *     preferred outright for JEE tracks when it has the chapter, which is the
+ *     behaviour that pipeline was built for;
+ *   · the source-cited archive (engine/pyq) joins the ordinary pool of authored
+ *     forms instead, so a chapter with three past-paper questions and four
+ *     authored forms serves a mix rather than the same three questions forever.
+ *
+ * `pyqOnly` is the student-facing filter — "practise past papers only". It
+ * returns null rather than an authored question when the archive has nothing for
+ * the chapter, so the caller can say so instead of quietly serving practice.
  */
 export function resolveIndiaTarget(chapter, {
   dotpoint = null,
   difficulty = null,
   track: rawTrack = 'cbse',
   grade = indiaChapterGrade(chapter) || 12,
+  pyqOnly = false,
   random = Math.random
 } = {}) {
   if (!chapter) return null;
@@ -229,17 +247,32 @@ export function resolveIndiaTarget(chapter, {
   if (ordinal == null && (track.id === 'jee-main' || track.id === 'jee-advanced')) {
     const pyqGenerator = `${track.id}-${chapter.id}`;
     if (hasJeePyqGenerator(pyqGenerator)) {
-      return { generator: pyqGenerator, difficulty: want, dotpointIndex: null, pyq: true, windowed: true };
+      return { generator: pyqGenerator, difficulty: want, dotpointIndex: null, pyq: true, pyqArchive: 'jee-question-department', windowed: true };
     }
+  }
+
+  const archiveId = pyqGeneratorId(track.id, chapter.id);
+  const archiveCells = ordinal == null && hasPyqGenerator(archiveId)
+    ? pyqCoverageOf(archiveId).difficulties.map(d => ({
+      generator: archiveId, difficulty: d, dotpointIndex: null,
+      pyq: true, pyqArchive: 'source-cited-archive', windowed: d >= floor && d <= ceiling
+    }))
+    : [];
+
+  if (pyqOnly) {
+    if (!archiveCells.length) return null;
+    const gap = Math.min(...archiveCells.map(c => Math.abs(c.difficulty - want)));
+    return drawFrom(archiveCells.filter(c => Math.abs(c.difficulty - want) === gap), random);
   }
 
   const covers = ordinal == null ? (chapter.covers || []) : coversForDotpoint(chapter, ordinal);
   const choices = [];
   const below = [];
+  for (const cell of archiveCells) (cell.windowed ? choices : below).push(cell);
   for (const cover of covers) {
     for (const d of cover.diff || []) {
-      if (d >= floor && d <= ceiling) choices.push({ generator: cover.gen, difficulty: d, dotpointIndex: ordinal, pyq: false, windowed: true });
-      else if (d >= 1 && d < floor) below.push({ generator: cover.gen, difficulty: d, dotpointIndex: ordinal, pyq: false, windowed: false });
+      if (d >= floor && d <= ceiling) choices.push({ generator: cover.gen, difficulty: d, dotpointIndex: ordinal, pyq: false, pyqArchive: null, windowed: true });
+      else if (d >= 1 && d < floor) below.push({ generator: cover.gen, difficulty: d, dotpointIndex: ordinal, pyq: false, pyqArchive: null, windowed: false });
     }
   }
   // Every chapter has an authored form inside its track's window, but a single
@@ -249,8 +282,7 @@ export function resolveIndiaTarget(chapter, {
   const pool = choices.length ? choices : below;
   if (!pool.length) return null;
   const gap = Math.min(...pool.map(c => Math.abs(c.difficulty - want)));
-  const nearest = pool.filter(c => Math.abs(c.difficulty - want) === gap);
-  return nearest[Math.min(nearest.length - 1, Math.floor(Math.max(0, Math.min(0.999999, Number(random()) || 0)) * nearest.length))];
+  return drawFrom(pool.filter(c => Math.abs(c.difficulty - want) === gap), random);
 }
 
 function productionSummary(chapters, grade) {

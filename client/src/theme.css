@@ -589,6 +589,13 @@ select.input {
 .stat-line .big { font-size: 21px; }
 .stat-line .sc-label { margin: 0 0 0 auto; }
 
+/* A five-column syllabus table cannot be made to fit 360 px and stay readable,
+   so it scrolls inside its own box rather than dragging the page sideways with
+   it. `position: relative` is load-bearing: the header's `.sr-only` label is
+   absolutely positioned, and without a containing block here it escaped the
+   scroller and sat at document x = 373, which pushed the whole Progress page
+   14 px wide on a 360 px phone. */
+.table-scroll { overflow-x: auto; position: relative; }
 .syl-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
 .syl-table td { padding: 10px 8px; border-bottom: 1px solid var(--hairline-faint); vertical-align: middle; }
 .syl-name { text-align: right; color: var(--ink-2); width: 200px; padding-right: 16px !important; }
@@ -1193,3 +1200,90 @@ body { overscroll-behavior-y: none; }
 .mnav-sheet-item .nav-ico { font-size: 18px; }
 .mnav-item { min-width: 48px; min-height: 48px; }
 @media (min-width: 761px) { .mnav-sheet, .mnav-sheet-scrim { display: none; } }
+
+/* ── The phone ─────────────────────────────────────────────────────────────
+   Everything above this line was designed against a 1440 px window and an
+   iPad. The device most Indian secondary students actually have is a 360–390 px
+   Android phone, and three of the app's own screens did not fit on it:
+
+     · Progress scrolled 66 px sideways at 375 px and 81 px at 360 px, with the
+       "Practise" button off the right-hand edge;
+     · Practice — the screen the product exists for — scrolled 166 px sideways,
+       because the line above the question is a nowrap flex row;
+     · Settings scrolled 11 px, and its section menu ran 10 px past the screen.
+
+   All three are the same failure: a grid track or flex item whose automatic
+   minimum size is its content, so it refuses to shrink and pushes the document
+   wider than the screen instead of wrapping. `min-width: 0` is what lets those
+   items be as narrow as the phone is. Measured with client/test/tour-phone.js,
+   which now fails if any of them comes back.
+
+   The home strip is a fourth: two cards side by side inside `overflow: hidden`,
+   so at 375 px the second card — "Smart practice", and the button that
+   dismisses the strip — was clipped away with no way to reach it. On a phone
+   they stack.
+
+   The fifth is the worst of them. The context pill at the foot of the practice
+   page carries "Next question", the control a student presses more than any
+   other, and on a phone it sat at `bottom: 18px` behind a bottom navigation bar
+   that is 64 px tall and two stacking levels above it. It was also wider than
+   the screen, which squeezed that button from 52 px to a 22 px sliver. It now
+   sits above the bar and spans the width, and the line of context inside it
+   gives way instead.
+   ────────────────────────────────────────────────────────────────────────── */
+
+@media (max-width: 760px) {
+  .grid > *, .settings-grid > *, .cols-2 > *, .cols-3 > *, .cols-4 > * { min-width: 0; }
+  .q-topmeta { flex-wrap: wrap; row-gap: 4px; }
+  .q-topmeta > * { min-width: 0; }
+  .q-timer { margin-left: 0; }
+  .qpage, .qcard, .editor-shell { max-width: 100%; }
+  .home-cards { flex-direction: column; width: 100%; }
+  .home-card + .home-card { border-left: none; border-top: 1px solid var(--hairline); }
+  /* A long unbroken token — a pasted link, a fourteen-digit answer — wraps
+     rather than widening the page under it. */
+  .q-prompt, .hintbox, .set-row { overflow-wrap: anywhere; }
+
+  .ctx-pill {
+    left: 8px; right: 8px; transform: none;
+    bottom: calc(74px + env(safe-area-inset-bottom));
+  }
+  .ctx-pill-info { min-width: 0; flex: 1; padding: 8px 10px; }
+  .ctx-pill-info > div { min-width: 0; }
+  .ctx-pill-meta, .ctx-pill-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ctx-next { flex: none; width: 52px; }
+}
+
+/* ── Something a finger can hit ────────────────────────────────────────────
+   On a phone the pointer is about 9 mm across and there is no hover to tell
+   you what you are about to press. These are the controls a student uses to do
+   the work — switch between typing and writing, pick a pen, take a hint, move
+   between settings sections — and they were between 24 px and 36 px tall.
+
+   The last three are different: a filter's "remove" cross, the home strip's
+   dismiss, the question-filter disclosure. They are 11–22 px on purpose,
+   because at 44 px they would dominate the row they sit in. Those keep their
+   size and get a 44 px hit area underneath instead, which is the thing the
+   finger actually has to land in.
+   ────────────────────────────────────────────────────────────────────────── */
+
+@media (pointer: coarse) and (max-width: 760px) {
+  .mode-tab, .q-rail-btn, .hint-bulb { width: 44px; height: 44px; }
+  .pill-opt, .set-menu-item, .acct-menu-item, .editor-tool, .ink-tool, .user-chip { min-height: 44px; }
+  .editor-tool, .ink-tool { padding: 0 12px; }
+
+  /* .home-card-x is already absolutely positioned, so it is its own containing
+     block; the other two need to become one. All three need to be raised, or
+     the hit area is painted under the text that follows them in the card. */
+  .chip-x, .genbar-toggle { position: relative; }
+  .chip-x, .home-card-x, .genbar-toggle { z-index: 1; }
+  .chip-x::after, .home-card-x::after, .genbar-toggle::after {
+    content: ''; position: absolute; left: 50%; top: 50%;
+    width: 44px; height: 44px; transform: translate(-50%, -50%);
+  }
+}
+
+/* The NCERT Hindi term shown beside its English one. Subdued, because the
+   English is what the exam paper treats as final and what has to read first;
+   the gloss is support, not a replacement. */
+.gloss-hi { color: var(--ink-3); font-weight: 400; white-space: nowrap; }

@@ -17,6 +17,7 @@
 import { normalize, parse, evaluate, numsClose, variablesOf } from './expr.js';
 import {
   assessEquationLine as assessEquationLineV1,
+  assessNumericCheckLine as assessNumericCheckLineV1,
   sameEquationClaim as sameEquationClaimV1
 } from './reason.js';
 
@@ -451,6 +452,13 @@ function constraintDroppedDiagnosis() {
 
 export function assessEquationLine({ ast, previousAst = null, previousTrusted = false, meta = null } = {}) {
   if (!ast || ast.t !== 'equation') return { status: 'note', trusted: false, note: 'Skipped — this is not an equation.' };
+
+  // A line with no unknown left in it is the student checking their answer,
+  // not an equation that lost its constraint. V1 owns that verdict so the two
+  // reasoners cannot disagree about the same line.
+  const numericCheck = assessNumericCheckLineV1(ast, { previousAst, meta });
+  if (numericCheck) return numericCheck;
+
   const variable = meta?.variable || inferSingleVariable(ast, previousAst);
 
   if (Array.isArray(meta?.solutions) && meta.solutions.length

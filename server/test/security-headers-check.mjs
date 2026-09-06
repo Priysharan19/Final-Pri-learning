@@ -27,6 +27,8 @@ process.env.PRI_PUBLIC_ORIGIN = 'https://learn.pri.example';
 process.env.PRI_CSRF_SECRET = 'security-headers-contract-secret';
 process.env.PRI_AUTH_DELIVERY_KEY = '22'.repeat(32);
 process.env.PRI_PLATFORM_DB = join(tmp, 'platform.db');
+// This harness is the socket, so nothing forwards for it.
+process.env.PRI_TRUSTED_PROXY_HOPS = '0';
 delete process.env.PRI_CSP_CONNECT_SRC;
 
 const { startApp, registerAccount, checks } = await import('./support/app-harness.mjs');

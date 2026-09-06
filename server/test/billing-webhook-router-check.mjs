@@ -13,7 +13,8 @@ const prior = {
   PRI_PUBLIC_ORIGIN: process.env.PRI_PUBLIC_ORIGIN,
   PRI_CSRF_SECRET: process.env.PRI_CSRF_SECRET,
   PRI_AUTH_DELIVERY_KEY: process.env.PRI_AUTH_DELIVERY_KEY,
-  PRI_PLATFORM_DB: process.env.PRI_PLATFORM_DB
+  PRI_PLATFORM_DB: process.env.PRI_PLATFORM_DB,
+  PRI_TRUSTED_PROXY_HOPS: process.env.PRI_TRUSTED_PROXY_HOPS
 };
 const scratch = mkdtempSync(join(tmpdir(), 'pri-webhook-router-'));
 process.env.NODE_ENV = 'production';
@@ -21,6 +22,8 @@ process.env.PRI_PUBLIC_ORIGIN = 'https://app.pri.example';
 process.env.PRI_CSRF_SECRET = 'test-csrf-secret-not-production';
 process.env.PRI_AUTH_DELIVERY_KEY = '22'.repeat(32);
 process.env.PRI_PLATFORM_DB = join(scratch, 'platform.db');
+// Requests are made straight to the router here; nothing forwards for it.
+process.env.PRI_TRUSTED_PROXY_HOPS = '0';
 
 const [
   { default: express },

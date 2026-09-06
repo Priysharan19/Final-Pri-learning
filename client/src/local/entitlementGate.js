@@ -35,7 +35,7 @@ export const FREE_TIER = Object.freeze({
 export const CAPABILITY_ENFORCEMENT = Object.freeze({
   [ENTITLEMENTS.UNLIMITED_PRACTICE]: 'local backend · POST /practice/next and /history/:id/retry lift the daily free cap',
   [ENTITLEMENTS.PREMIUM_EXAMS]: 'local backend · POST /exams (HSC paper builder and India exam module) beyond the free simulation',
-  [ENTITLEMENTS.JEE_ADVANCED]: 'local backend · POST /practice/next on the jee-advanced track',
+  [ENTITLEMENTS.JEE_ADVANCED]: 'local backend · every route that can serve jee-advanced content, checked on the RESOLVED track rather than the request shape: POST /practice/next smart practice, POST /practice/next against a task whose targets name the track (a student can set one themselves on the Tasks page), POST /history/:id/retry on a row whose india.track is jee-advanced, and POST /exams in the India exam module',
   [ENTITLEMENTS.ADVANCED_EXPLAIN]: 'client · PriExplainV5 adaptive teaching plan, retrieval checkpoints and follow-up (basic playback stays free)',
   [ENTITLEMENTS.ADVANCED_ANALYTICS]: 'client · Progress priorities / knowledge map tabs and the teacher progress-file export',
   [ENTITLEMENTS.EXTRA_AI]: 'reserved · no call site consumes additional AI usage yet (no-op by design)'

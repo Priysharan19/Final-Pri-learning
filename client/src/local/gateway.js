@@ -134,6 +134,7 @@ const BODY_RULES = [
     requireObject(body, 'POST /profiles');
     optionalString(body, 'name', 80); optionalNumber(body, 'year');
     optionalString(body, 'course', 30); optionalString(body, 'role', 30);
+    optionalString(body, 'language', 20); optionalBoolean(body, 'mathsGloss');
     optionalString(body, 'avatar', 32); optionalString(body, 'email', 180);
     optionalString(body, 'provider', 30); optionalString(body, 'password', 1024);
     optionalString(body, 'pathway', 30); optionalString(body, 'indiaTrack', 30); optionalString(body, 'timezone', 64);
@@ -152,7 +153,8 @@ const BODY_RULES = [
   }],
   [/^PATCH \/me$/, body => {
     requireObject(body, 'PATCH /me'); optionalString(body, 'name', 80); optionalNumber(body, 'year');
-    optionalString(body, 'pathway', 30); optionalString(body, 'theme', 20); optionalNumber(body, 'dailyGoal');
+    optionalString(body, 'pathway', 30); optionalString(body, 'theme', 20); optionalString(body, 'language', 20);
+    optionalBoolean(body, 'mathsGloss'); optionalNumber(body, 'dailyGoal');
     optionalString(body, 'course', 30); optionalString(body, 'indiaTrack', 30); optionalString(body, 'avatar', 32); optionalBoolean(body, 'handwriting'); optionalString(body, 'email', 180);
     optionalString(body, 'timezone', 64);
   }],
@@ -161,6 +163,10 @@ const BODY_RULES = [
     optionalNumber(body, 'difficulty');
     if (typeof body.dotpoint === 'number') optionalNumber(body, 'dotpoint'); else optionalId(body, 'dotpoint');
     optionalId(body, 'taskId');
+    // "Past papers only" — the PYQ filter. Refused rather than ignored when the
+    // archive has nothing for the chapter, so the student is never told they
+    // are sitting a past paper when they are not.
+    optionalBoolean(body, 'pyqOnly');
   }],
   [/^POST \/practice\/[A-Za-z0-9._-]+\/(?:hint|reveal)$/, body => {
     requireObject(body, 'practice action'); optionalNumber(body, 'ms');
@@ -305,8 +311,17 @@ export function validateRequest(method, path, body) {
   }
   const key = `${verb} ${cleanPath}`;
   const contract = BODY_RULES.find(([pattern]) => pattern.test(key));
-  if (contract) contract[1](body ?? {});
-  return { method: verb, path: cleanPath, body };
+  // A route with a contract is handed back the body the contract was applied
+  // to, not the one that came in. `requireObject` reads a missing body as `{}`
+  // — which is the right reading, since every field these routes take is
+  // optional — but forwarding the original `null` meant the handler still got
+  // the value the check had just decided not to look at, and `body.targets` on
+  // a null body is a TypeError the UI cannot turn into a message. What was
+  // validated is what runs.
+  if (!contract) return { method: verb, path: cleanPath, body };
+  const checked = body ?? {};
+  contract[1](checked);
+  return { method: verb, path: cleanPath, body: checked };
 }
 
 export function beginRequest(method, path) {

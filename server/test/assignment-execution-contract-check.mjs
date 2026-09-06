@@ -3,7 +3,8 @@ import { createPlatformDb } from '../platform/db.js';
 import {
   assignmentForAccount, assignmentSubmissionsForStaff, listAssignmentsForAccount
 } from '../platform/assignments.js';
-import { assignmentSubmissionPrivacyGuard, sanitizeAssignmentSummary } from '../platform/assignmentProgress.js';
+import { sanitizeAssignmentSummary } from '../platform/assignmentProgress.js';
+import { writeStudentSubmission } from '../platform/classes.js';
 
 const db = createPlatformDb(':memory:');
 const now = 1_900_000_000_000;
@@ -91,25 +92,20 @@ assert.deepEqual(sanitizeAssignmentSummary({
   kind: 'practice', questionsAnswered: 50, correct: 50, xp: 1_000_000, targetQuestions: 50
 });
 
-const guarded = {
-  method: 'PATCH',
-  path: '/classes/class-1/assignments/assignment-1/submission',
-  body: {
-    state: 'started',
-    summary: { questionsAnswered: 4, correct: 3, xp: 40, targetQuestions: 8, rawInk: 'secret', answers: ['secret'] }
-  }
-};
-let nextCalled = false;
-assignmentSubmissionPrivacyGuard(guarded, {}, () => { nextCalled = true; });
-assert.equal(nextCalled, true);
-assert.deepEqual(guarded.body.summary, {
+// The writer sanitises: whatever a caller hands it, only aggregate metrics
+// reach the row. No route, spelling of a route or future caller can pass this.
+writeStudentSubmission(db, {
+  assignmentId: 'assignment-1', studentId: 'student-1', state: 'submitted',
+  summary: { questionsAnswered: 4, correct: 3, xp: 40, targetQuestions: 8, rawInk: 'secret', answers: ['secret'] },
+  now: now + 30
+});
+const stored = db.prepare(`SELECT summary_json FROM assignment_submissions
+  WHERE assignment_id='assignment-1' AND student_account_id='student-1'`).get().summary_json;
+assert.deepEqual(JSON.parse(stored), {
   kind: 'practice', questionsAnswered: 4, correct: 3, xp: 40, targetQuestions: 8
 });
-
-// Non-assignment routes are untouched by the privacy middleware.
-const unrelated = { method: 'PATCH', path: '/account/profile', body: { summary: { answer: 'keep' } } };
-assignmentSubmissionPrivacyGuard(unrelated, {}, () => {});
-assert.deepEqual(unrelated.body.summary, { answer: 'keep' });
+assert.ok(!stored.includes('rawInk') && !stored.includes('answers') && !stored.includes('secret'),
+  'ink and answers must not reach the classroom control plane at all');
 
 db.close();
 console.log('PASS — assignment execution is authorised, staff review is class-scoped, and classroom progress exposes only bounded aggregate metrics.');

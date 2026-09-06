@@ -36,6 +36,9 @@ const showSym = s => NICE[s] || s;
 // model without pretending it is a production/offline asset.
 const NATIVE_INK = nativeInkAvailable();
 const Surface = NATIVE_INK ? NativeInkCanvas : InkCanvas;
+/** How long the page must be still before it is worth sending. */
+const CLOUD_SETTLE_MS = 1800;
+
 const EMPTY_READING = { lines: [], text: '', symbols: [], minConf: 1, margin: 1, weakest: null };
 const structuralLanExpected = () => !NATIVE_INK && typeof window !== 'undefined' && window.__PRI_LAN_DEV__ === true;
 
@@ -122,6 +125,8 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
   const timerRef = useRef(null);
   const readSeqRef = useRef(0);
   const cloudAbortRef = useRef(null);
+  const cloudSettleRef = useRef(null);
+  const cloudSentRef = useRef(null);
   const [cloudState, setCloudState] = useState(null);   // null | 'reading' | 'confirm' | 'failed'
   // An unconfident server reading is kept here and offered, never applied. The
   // student decides, because they are the only one who knows what they wrote.
@@ -137,7 +142,13 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
 
   const publish = useCallback((r, strokes) => {
     setRec(r);
-    const sure = readingConfidence(r);
+    // A server reading has no per-glyph symbols, so readingConfidence would
+    // find an empty list and report a perfect 1/1 — which walked straight past
+    // the confirmation gate that exists to catch an unsure reading. Its own
+    // confidence is the number that means something here.
+    const sure = r.cloud === true
+      ? { minConf: Number(r.confidence ?? 0), margin: Number(r.confidence ?? 0), weakest: null }
+      : readingConfidence(r);
     onRecognized?.({
       lines: r.lines.map(l => l.text),
       lineBoxes: r.lines.map(l => l.box),
@@ -159,7 +170,7 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
    * when the server says it is confident; otherwise the local reading stands and
    * the student is offered the alternative.
    */
-  const runCloudPass = useCallback((strokes, seq, localReading) => {
+  const sendCloudPass = useCallback((strokes, seq, localReading) => {
     if (!cloudReadingEnabled(user)) return;
     cloudAbortRef.current?.abort?.();
     const controller = typeof AbortController === 'function' ? new AbortController() : null;
@@ -169,7 +180,7 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
     readWithCloud(strokes, { user, signal: controller?.signal }).then(outcome => {
       // Newer writing has already replaced this read.
       if (seq !== readSeqRef.current) return;
-      if (!outcome) { setCloudState(null); setCloudOffer(null); return; }
+      if (!outcome || outcome.reason) { setCloudState(null); setCloudOffer(null); return; }
       if (outcome.error) { setCloudState('failed'); setCloudOffer(null); return; }
 
       const reading = toReading(outcome.transcription, localReading);
@@ -193,6 +204,22 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
       }
     }).catch(() => { if (seq === readSeqRef.current) { setCloudState('failed'); setCloudOffer(null); } });
   }, [user, publish]);
+
+  const runCloudPass = useCallback((strokes, seq, localReading) => {
+    if (!cloudReadingEnabled(user)) return;
+    // A student writing five lines of working pauses past the browser's 240 ms
+    // quiet window dozens of times, and each pause used to send the whole page
+    // again. The previous request was aborted, but usually only after it had
+    // gone. Settle properly first, and never send the same strokes twice.
+    const signature = `${strokes.length}:${strokes.reduce((n, st) => n + (st?.points?.length || 0), 0)}`;
+    if (cloudSentRef.current === signature) return;
+    if (cloudSettleRef.current) clearTimeout(cloudSettleRef.current);
+    cloudSettleRef.current = setTimeout(() => {
+      cloudSentRef.current = signature;
+      sendCloudPass(strokes, seq, localReading);
+    }, CLOUD_SETTLE_MS);
+  }, [user, sendCloudPass]);
+
 
   const runRecognition = useCallback((strokes, ovr) => {
     const seq = ++readSeqRef.current;
@@ -277,6 +304,9 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
   useEffect(() => () => {
     readSeqRef.current += 1;
     if (timerRef.current) clearTimeout(timerRef.current);
+    // A student who leaves the question mid-read was still uploading their ink.
+    if (cloudSettleRef.current) clearTimeout(cloudSettleRef.current);
+    cloudAbortRef.current?.abort?.();
   }, []);
 
   useEffect(() => {
@@ -312,17 +342,23 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
     canvasRef.current?.[fn]();
   };
 
-  const engineNote = rec.engine === 'pri-structural-v4-dev-lan'
-    ? 'Structural V4 research · Mac LAN · not production'
-    : rec.engine === 'pri-js-v3-v4-unavailable'
-      ? 'Structural V4 returned no reading · showing JS V3 fallback'
-      : rec.engine === 'pri-js-v3'
-        ? 'Legacy JS V3 fallback · not native PencilKit/Core ML'
-        : rec.disagreement
-          ? `Native engines disagree · confirmation required · ${rec.engine}`
-          : NATIVE_INK && rec.engine
-            ? `Native recognition path · ${rec.engine}`
-            : null;
+  // Which engine actually produced what is on screen. A server reading was
+  // previously labelled "Native recognition path" on iPad and given no label at
+  // all in the browser — cloudReader tags a reading `cloud` precisely so that
+  // History and the student can tell the two apart.
+  const engineNote = rec.cloud === true
+    ? `Read on the server · ${rec.engine || 'cloud'}`
+    : rec.engine === 'pri-structural-v4-dev-lan'
+      ? 'Structural V4 research · Mac LAN · not production'
+      : rec.engine === 'pri-js-v3-v4-unavailable'
+        ? 'Structural V4 returned no reading · showing JS V3 fallback'
+        : rec.engine === 'pri-js-v3'
+          ? 'Legacy JS V3 fallback · not native PencilKit/Core ML'
+          : rec.disagreement
+            ? `Native engines disagree · confirmation required · ${rec.engine}`
+            : NATIVE_INK && rec.engine
+              ? `Native recognition path · ${rec.engine}`
+              : null;
 
   return (
     <div className={`ink-answer ${disabled ? 'ink-disabled' : ''}`}>

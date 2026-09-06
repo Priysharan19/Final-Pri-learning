@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { sanitizeAssignmentSummary } from './assignmentProgress.js';
 import { classAnalytics, validateAssignmentSpecification } from './assignmentTargets.js';
 import { id, opaqueToken, rateLimit, requireRole, requireSession, requireVerifiedEmail, sha256 } from './security.js';
 
@@ -65,8 +66,16 @@ export function writeStudentSubmission(db, {
   assignmentId, studentId, state, summary = {}, now = Date.now()
 }) {
   if (!plain(summary)) throw Object.assign(new Error('Submission summary is invalid.'), { status: 400, code: 'SUBMISSION_INVALID' });
-  const encoded = JSON.stringify(summary);
-  if (Buffer.byteLength(encoded) > 64 * 1024) throw Object.assign(new Error('Submission summary is too large.'), { status: 413, code: 'SUBMISSION_TOO_LARGE' });
+  // Refuse an absurd body before doing any work on it; what is stored below is
+  // bounded by the sanitiser regardless.
+  if (Buffer.byteLength(JSON.stringify(summary)) > 64 * 1024) throw Object.assign(new Error('Submission summary is too large.'), { status: 413, code: 'SUBMISSION_TOO_LARGE' });
+  // Aggregate completion metrics are the whole of what the classroom control
+  // plane is allowed to hold: answers, prompts, images and handwriting stay on
+  // the student's device. This is enforced here, in the only function that
+  // writes the table, rather than in a middleware that matches the request path
+  // — a path pattern defends one spelling of one route, and `.../submission/`
+  // with a trailing slash reaches the same handler without matching it.
+  const encoded = JSON.stringify(sanitizeAssignmentSummary(summary));
   const current = db.prepare(`SELECT state,started_at,submitted_at FROM assignment_submissions
     WHERE assignment_id=? AND student_account_id=?`).get(assignmentId, studentId);
   if (!studentSubmissionTransitionAllowed(current?.state || null, state)) {

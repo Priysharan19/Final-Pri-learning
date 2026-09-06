@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { rateLimit, requireRole, requireSession, sha256 } from './security.js';
+import { opaqueToken, rateLimit, requireRole, requireSession, sha256 } from './security.js';
 
 const PAID = new Set(['trialing', 'active', 'grace']);
 const STATUS = new Set(['free', 'trialing', 'active', 'grace', 'paused', 'past_due', 'expired', 'revoked']);
@@ -114,7 +114,21 @@ export function applyVerifiedEntitlement(db, {
   })();
 }
 
-export function createEntitlementRouter(db) {
+/**
+ * The id of one support grant.
+ *
+ * It names the actor, the target and the moment, and carries a random tail.
+ * Keyed on actor and clock alone, two grants issued in the same millisecond — a
+ * bulk grant loop, two support staff, one script — produced the same id, and
+ * the second was then indistinguishable from a replay of the first: the second
+ * student got no entitlement while the audit log recorded a grant that never
+ * happened.
+ */
+export function supportGrantEventId({ actorAccountId, accountId, now }) {
+  return `admin-${actorAccountId}-${accountId}-${now}-${opaqueToken(9)}`;
+}
+
+export function createEntitlementRouter(db, { grantEventId = supportGrantEventId } = {}) {
   const router = Router();
   router.get('/', requireSession(db), rateLimit(db, 'entitlements', { limit: 120, windowMs: 60 * 1000 }), (req, res) => {
     const row = db.prepare('SELECT * FROM entitlement_snapshots WHERE account_id=?').get(req.platformSession.account_id) || { plan: 'free', status: 'free', provider: 'none' };
@@ -129,12 +143,21 @@ export function createEntitlementRouter(db) {
     const accountId = String(req.body?.accountId || '');
     const durationMs = Math.max(60_000, Math.min(365 * 24 * 60 * 60 * 1000, Number(req.body?.durationMs) || 0));
     const now = Date.now();
+    // Injectable only so a contract can force the replay branch below; production
+    // always uses supportGrantEventId.
+    const eventId = grantEventId({ actorAccountId: req.platformSession.account_id, accountId, now });
     const result = applyVerifiedEntitlement(db, {
-      verified: true, provider: 'admin', eventId: `admin-${req.platformSession.account_id}-${now}`,
+      verified: true, provider: 'admin', eventId,
       accountId, eventType: 'support-grant', productId: 'pri-premium-support', plan: 'premium', status: 'active',
       currentPeriodEnd: now + durationMs, offlineUntil: now + Math.min(durationMs, MAX_OFFLINE_MS),
       payloadDigest: sha256(JSON.stringify({ actor: req.platformSession.account_id, accountId, durationMs })), now
     });
+    // Nothing was applied, so nothing is recorded as applied. A grant the audit
+    // log claims but the entitlement table never received is worse than a
+    // failure the operator can see and retry.
+    if (result.replayed) {
+      return res.status(409).json({ error: { code: 'ENTITLEMENT_GRANT_REPLAYED', message: 'This grant was already applied and was not applied again.' } });
+    }
     db.prepare(`INSERT INTO audit_log(actor_account_id,action,target_kind,target_id,metadata_json,created_at)
       VALUES (?,?,?,?,?,?)`).run(req.platformSession.account_id, 'entitlement.grant', 'account', accountId, JSON.stringify({ durationMs }), now);
     res.json(result);

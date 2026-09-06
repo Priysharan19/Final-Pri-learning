@@ -220,6 +220,15 @@ function helpers(page, base, flowId) {
   const goto = async (path = '/') => {
     await page.goto(base + path, { waitUntil: 'domcontentloaded' });
     await page.waitForSelector('.auth-wrap .hero-title, .auth-card, .shell', { timeout: 30000 });
+    // Routes are lazily loaded now, so the shell paints before the page inside
+    // it does and Suspense shows "Loading…" in between. Without this wait the
+    // next assertion races the chunk over the network and fails on a slow CI
+    // runner while passing on a fast laptop — which is exactly what happened.
+    await page.waitForFunction(
+      () => ![...document.querySelectorAll('[role="status"]')]
+        .some(el => (el.textContent || '').trim().startsWith('Loading')),
+      { timeout: 30000 }
+    ).catch(() => { /* a screen with no lazy route never shows the fallback */ });
   };
 
   /**

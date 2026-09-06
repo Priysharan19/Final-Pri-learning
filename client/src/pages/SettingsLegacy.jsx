@@ -6,6 +6,8 @@ import Calibrate from '../ink/Calibrate.jsx';
 import { personalStats, clearPersonal, ensurePersonalLoaded } from '../ink/personal.js';
 import { cloud, cloudAvailable } from '../platform/cloudTransport.js';
 import { MIN_PASSWORD, PasswordMeter, passwordVerdict } from './Login.jsx';
+import { LANGUAGES, useLanguage, useT } from '../i18n/index.js';
+import { loadGlossary } from '../i18n/glossary.js';
 
 const AVATARS = ['🚀', '🦊', '🐨', '🦉', '🌟', '🐯', '🍀', '🎧', '🦄', '⚡', '🌊', '🧠'];
 const COURSES = [['nsw', 'NSW · HSC'], ['vic', 'VIC · VCE'], ['qld', 'QLD · QCE'], ['wa', 'WA · WACE'], ['sa', 'SA · SACE'], ['ib', 'IB'], ['in', 'India · CBSE / JEE / Olympiad']];
@@ -35,6 +37,7 @@ const fmtBytes = (b) => b > 1e9 ? `${(b / 1e9).toFixed(1)} GB` : b > 1e6 ? `${(b
  * whole of it, and a student is owed the plain version rather than a euphemism.
  */
 function CloudOptInRow({ field, user, setUser, toast, ask, label, copy, unavailable }) {
+  const t = useT();
   const [status, setStatus] = useState(null);   // null = still asking, {available}
   const [busy, setBusy] = useState(false);
   const on = user?.[field] === true;
@@ -53,7 +56,7 @@ function CloudOptInRow({ field, user, setUser, toast, ask, label, copy, unavaila
     try {
       const r = await api.patch('/me', { [field]: next });
       setUser(r.user);
-      toast(<span>{next ? `${label} is on for this profile` : `${label} is off — this stays on your device`}</span>);
+      toast(<span>{t(next ? 'settings.cloudOnFor' : 'settings.cloudOffFor', { label })}</span>);
     } catch (e) { toast(<span>{e.message}</span>); }
     finally { setBusy(false); }
   }
@@ -77,7 +80,7 @@ function CloudOptInRow({ field, user, setUser, toast, ask, label, copy, unavaila
             disabled={busy || !status}
             onClick={() => toggle(!on)}
           >
-            {!status ? 'Checking…' : on ? 'On' : 'Off'}
+            {!status ? t('common.checking') : t(on ? 'common.on' : 'common.off')}
           </button>
         </span>
       </div>
@@ -85,8 +88,104 @@ function CloudOptInRow({ field, user, setUser, toast, ask, label, copy, unavaila
   );
 }
 
+/**
+ * The language switch.
+ *
+ * It is a row of buttons rather than a <select> for one reason: a student who
+ * has the app in a language they cannot read has to be able to find their way
+ * back out of it, and a closed dropdown showing one word in the wrong script is
+ * a worse place to be lost than two buttons showing both names at once. Each
+ * button is written in its own language, so "हिन्दी" is legible to the person
+ * looking for Hindi whatever the app is currently set to.
+ *
+ * `chosen` drives the pressed state, not the language on screen: the tap is
+ * acknowledged the instant it happens, even though the Hindi strings arrive a
+ * moment later over the network the first time.
+ */
+function LanguageSection() {
+  const { user, setUser, toast } = useApp();
+  const { chosen, t } = useLanguage();
+  const [busy, setBusy] = useState(false);
+
+  async function pick(id) {
+    if (id === user.language) return;
+    setBusy(true);
+    // The profile is the authority, and App.jsx applies whatever comes back —
+    // so the switch cannot end up showing a language the profile did not store.
+    try {
+      const r = await api.patch('/me', { language: id });
+      setUser(r.user);
+      toast(<span>{t('lang.changed', { language: LANGUAGES.find(l => l.id === id).label })}</span>);
+    } catch (e) { toast(<span>{e.message}</span>); }
+    finally { setBusy(false); }
+  }
+
+  return (
+    <div className="card">
+      <h2 style={{ marginBottom: 12 }}>◍ {t('lang.label')}</h2>
+      <div className="row" role="group" aria-label={t('lang.label')}>
+        {LANGUAGES.map(l => (
+          <button key={l.id} type="button" className={`gen-opt ${chosen === l.id ? 'on' : ''}`}
+            style={{ width: 160 }} lang={l.htmlLang} disabled={busy}
+            aria-pressed={chosen === l.id} aria-label={t('lang.switchTo', { language: l.english })}
+            onClick={() => pick(l.id)}>{l.label}</button>
+        ))}
+      </div>
+      <p className="muted" style={{ marginTop: 12, maxWidth: 520 }}>{t('lang.help')}</p>
+      <GlossRow />
+    </div>
+  );
+}
+
+/**
+ * The NCERT term bridge, and the reason it sits under Language but is not part
+ * of the language switch above it.
+ *
+ * A student who studied in Hindi medium will sit JEE or NEET in English —
+ * around 93% of JEE Main candidates do, and JEE Advanced is offered in English
+ * and Hindi only. What they are short of is not an app in Hindi; it is the
+ * pairing between the word their textbook used and the word the paper will use.
+ * So this shows both, and it can be on while the interface stays in English.
+ */
+function GlossRow() {
+  const { user, setUser, toast } = useApp();
+  const t = useT();
+  const [busy, setBusy] = useState(false);
+  const on = user?.mathsGloss === true;
+
+  async function toggle() {
+    setBusy(true);
+    try {
+      const r = await api.patch('/me', { mathsGloss: !on });
+      setUser(r.user);
+      if (!on) void loadGlossary();
+      toast(<span>{t(!on ? 'gloss.on' : 'gloss.off')}</span>);
+    } catch (e) { toast(<span>{e.message}</span>); }
+    finally { setBusy(false); }
+  }
+
+  return (
+    <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--hairline)' }}>
+      <div className="set-row">
+        <span className="set-k">
+          {t('gloss.label')}
+          <span className="muted" style={{ display: 'block', fontSize: 12, marginTop: 3, maxWidth: 460 }}>{t('gloss.help')}</span>
+        </span>
+        <span className="set-v">
+          <button type="button" className={`btn btn-sm ${on ? 'btn-primary' : 'btn-quiet'}`}
+            aria-pressed={on} disabled={busy} onClick={toggle}>
+            {t(on ? 'common.on' : 'common.off')}
+          </button>
+        </span>
+      </div>
+      <p className="muted" style={{ marginTop: 10, fontSize: 12, maxWidth: 520 }}>{t('gloss.example')}</p>
+    </div>
+  );
+}
+
 function HandwritingSection({ toast }) {
   const { user, setUser } = useApp();
+  const t = useT();
   const [teaching, setTeaching] = useState(false);
   const [, refresh] = useState(0);
   useEffect(() => { ensurePersonalLoaded().then(() => refresh(x => x + 1)); }, []);
@@ -97,68 +196,65 @@ function HandwritingSection({ toast }) {
   }
   return (
     <div className="card">
-      <h2 style={{ marginBottom: 8 }}>✒ Handwriting</h2>
+      <h2 style={{ marginBottom: 8 }}>{t('settings.handwriting')}</h2>
       <p className="sub" style={{ marginBottom: 12 }}>
-        {window.__PRI_NATIVE__
-          ? <>The native iPad app captures Apple Pencil ink with PencilKit. Pri uses the bundled foundation model only when that build permits the model metadata; otherwise it falls back to the local recogniser. <b>Corrections still learn your hand</b> and stay on this iPad.</>
-          : <>This browser build uses Pri’s legacy JavaScript handwriting fallback. It is useful for testing the web UI, <b>not</b> for judging the native PencilKit/Core ML handwriting experience. Corrections still stay local to this device.</>}
+        {t(window.__PRI_NATIVE__ ? 'settings.handwritingNative' : 'settings.handwritingBrowser')}
       </p>
       <div className="set-row">
-        <span className="set-k">Personal templates learned</span>
-        <span className="set-v" data-t="templates-learned">{stats.total === 0 ? 'None yet' : `${stats.total} across ${Object.keys(stats.bySymbol).length} symbols`}</span>
+        <span className="set-k">{t('settings.templatesLearned')}</span>
+        <span className="set-v" data-t="templates-learned">{stats.total === 0
+          ? t('settings.templatesNone')
+          : t('settings.templatesCount', { total: stats.total, symbols: Object.keys(stats.bySymbol).length })}</span>
       </div>
       <div className="row" style={{ marginTop: 12, flexWrap: 'wrap' }}>
-        <button className="btn btn-primary btn-sm" onClick={() => setTeaching(true)}>✒ Teach it your handwriting (2 min)</button>
+        <button className="btn btn-primary btn-sm" onClick={() => setTeaching(true)}>{t('settings.teachHandwriting')}</button>
         {stats.total > 0 && (
-          <button className="btn btn-quiet btn-sm" onClick={async () => { await clearPersonal(); refresh(x => x + 1); toast('Learned handwriting cleared'); }}>
-            Reset learned handwriting
+          <button className="btn btn-quiet btn-sm" onClick={async () => { await clearPersonal(); refresh(x => x + 1); toast(t('settings.handwritingCleared')); }}>
+            {t('settings.resetHandwriting')}
           </button>
         )}
       </div>
+      {/* The consent copy is in the catalogue like everything else, so a Hindi
+          reader is told what leaves their device in the language they read. The
+          emphasis these two carried in JSX is gone: a <b> around a fragment of
+          an English sentence has no home in a Hindi one, and a sentence that
+          has to be broken into three pieces to be styled is a sentence that
+          cannot be translated. */}
       <CloudOptInRow
         field="cloudHandwriting"
         user={user} setUser={setUser} toast={toast}
         ask={askHandwritingStatus}
-        label="Also read my handwriting on the server"
-        unavailable="Reading handwriting on a server is not available on this install, so every reading happens on this device."
-        copy={<>
-          The on-device reader knows 58 symbols and has no comma, so lines like <b>−1, 0, 1, 2, 4</b> are beyond it.
-          Turn this on and a picture drawn from your strokes is sent to be read as well. It is a picture of your
-          writing only — never the question, never the answer, never your name. Your working still appears
-          instantly from the on-device reading; the server reading arrives after, and you can always keep yours.
-        </>}
+        label={t('settings.cloudHandwritingLabel')}
+        unavailable={t('settings.cloudHandwritingUnavailable')}
+        copy={t('settings.cloudHandwritingCopy')}
       />
       <CloudOptInRow
         field="cloudMarking"
         user={user} setUser={setUser} toast={toast}
         ask={askWorkingStatus}
-        label="Tell me which line my working went wrong on"
-        unavailable="Checking working on a server is not available on this install, so marking happens entirely on this device."
-        copy={<>
-          When an answer is wrong and Pri cannot tell you <i>where</i>, turn this on and your working is checked
-          line by line. It says which line broke and what kind of mistake it was — and if you slipped once and
-          then worked correctly from your own wrong number, it says that too, instead of marking you wrong five
-          times for one mistake. Your question and your working are sent; the expected answer never is, and it
-          will not tell you the answer. Your mark is decided on this device either way and does not change.
-        </>}
+        label={t('settings.cloudMarkingLabel')}
+        unavailable={t('settings.cloudMarkingUnavailable')}
+        copy={t('settings.cloudMarkingCopy')}
       />
     </div>
   );
 }
 
 const SECTIONS = [
-  ['plan', '♛', 'Plan'],
-  ['profile', '☺', 'Profile'],
-  ['security', '⚿', 'Account & Security'],
-  ['handwriting', '✒', 'Handwriting'],
-  ['appearance', '◐', 'Appearance'],
-  ['courses', '📖', 'Courses'],
-  ['data', '⇅', 'Data & Backup'],
-  ['help', '?', 'Help & Safety'],
+  ['plan', '♛', 'settings.secPlan'],
+  ['profile', '☺', 'settings.secProfile'],
+  ['security', '⚿', 'settings.secSecurity'],
+  ['handwriting', '✒', 'settings.secHandwriting'],
+  ['language', '◍', 'settings.secLanguage'],
+  ['appearance', '◐', 'settings.secAppearance'],
+  ['courses', '📖', 'settings.secCourses'],
+  ['data', '⇅', 'settings.secData'],
+  ['help', '?', 'settings.secHelp'],
 ];
 
 function SecuritySection({ toast }) {
   const { user, setUser } = useApp();
+  const t = useT();
   const [email, setEmail] = useState(user.email || '');
   const [editEmail, setEditEmail] = useState(false);
   const [pwOpen, setPwOpen] = useState(false);
@@ -171,7 +267,7 @@ function SecuritySection({ toast }) {
     try {
       const r = await api.patch('/me', { email });
       setUser(r.user); setEditEmail(false);
-      toast(<span>Email updated</span>);
+      toast(<span>{t('settings.emailUpdated')}</span>);
     } catch (e) { toast(<span>{e.message}</span>); }
     finally { setBusy(false); }
   };
@@ -179,46 +275,46 @@ function SecuritySection({ toast }) {
   const savePassword = async (remove = false) => {
     if (!remove) {
       if (!pwVerdict.ok) { toast(<span>{pwVerdict.note}</span>); return; }
-      if (pw.next !== pw.next2) { toast(<span>Those passwords don’t match.</span>); return; }
+      if (pw.next !== pw.next2) { toast(<span>{t('settings.passwordsDontMatch')}</span>); return; }
     }
     setBusy(true);
     try {
       const r = await api.post('/profiles/password', { current: pw.current, next: remove ? '' : pw.next });
       setUser(r.user); setPwOpen(false); setPw({ current: '', next: '', next2: '' });
-      toast(<span>{remove ? 'Password removed' : 'Password saved — you’ll need it at sign-in'}</span>);
+      toast(<span>{t(remove ? 'settings.passwordRemoved' : 'settings.passwordSaved')}</span>);
     } catch (e) { toast(<span>{e.message}</span>); }
     finally { setBusy(false); }
   };
 
   return (
     <div className="card">
-      <h2 style={{ marginBottom: 8 }}>⚿ Account & Security</h2>
+      <h2 style={{ marginBottom: 8 }}>⚿ {t('settings.secSecurity')}</h2>
       <div className="set-row">
-        <span className="set-k">Account type</span>
-        <span className="set-v">Private profile on this device — no sign-in service</span>
+        <span className="set-k">{t('settings.accountType')}</span>
+        <span className="set-v">{t('settings.accountTypeValue')}</span>
       </div>
       <div className="set-row">
-        <span className="set-k">Email</span>
+        <span className="set-k">{t('settings.email')}</span>
         {!editEmail ? (
           <span className="set-v" style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-            {user.email || <span className="muted">not set</span>}
-            <button className="btn btn-quiet btn-sm" aria-label="Edit account email"
+            {user.email || <span className="muted">{t('settings.emailNotSet')}</span>}
+            <button className="btn btn-quiet btn-sm" aria-label={t('settings.editEmail')}
               onClick={() => { setEmail(user.email || ''); setEditEmail(true); }}>✎</button>
           </span>
         ) : (
           <span style={{ display: 'flex', gap: 8 }}>
             <input className="input" id="set-email" type="email" value={email} placeholder="you@example.com" style={{ width: 220 }}
-              aria-label="Account email" onChange={e => setEmail(e.target.value)} />
-            <button className="btn btn-primary btn-sm" disabled={busy} onClick={saveEmail}>Save</button>
-            <button className="btn btn-quiet btn-sm" onClick={() => setEditEmail(false)}>Cancel</button>
+              aria-label={t('settings.accountEmail')} onChange={e => setEmail(e.target.value)} />
+            <button className="btn btn-primary btn-sm" disabled={busy} onClick={saveEmail}>{t('common.save')}</button>
+            <button className="btn btn-quiet btn-sm" onClick={() => setEditEmail(false)}>{t('common.cancel')}</button>
           </span>
         )}
       </div>
       <div className="set-row">
-        <span className="set-k">Profile password</span>
+        <span className="set-k">{t('settings.profilePassword')}</span>
         <span className="set-v" style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-          {user.hasPassword ? <span style={{ color: 'var(--good)' }}>On — asked at sign-in</span> : <span className="muted">Off</span>}
-          <button className="btn btn-ghost btn-sm" onClick={() => setPwOpen(o => !o)}>{user.hasPassword ? 'Change' : 'Set password'}</button>
+          {user.hasPassword ? <span style={{ color: 'var(--good)' }}>{t('settings.passwordOn')}</span> : <span className="muted">{t('common.off')}</span>}
+          <button className="btn btn-ghost btn-sm" onClick={() => setPwOpen(o => !o)}>{t(user.hasPassword ? 'settings.changePassword' : 'settings.setPassword')}</button>
         </span>
       </div>
       {pwOpen && (
@@ -226,35 +322,32 @@ function SecuritySection({ toast }) {
           <div className="grid cols-2" style={{ gap: 12 }}>
             {user.hasPassword && (
               <div className="field" style={{ gridColumn: '1 / -1' }}>
-                <label className="label" htmlFor="set-pw-current">Current password</label>
-                <input className="input" id="set-pw-current" type="password" value={pw.current} aria-label="Current password"
+                <label className="label" htmlFor="set-pw-current">{t('settings.currentPassword')}</label>
+                <input className="input" id="set-pw-current" type="password" value={pw.current} aria-label={t('settings.currentPassword')}
                   onChange={e => setPw(p => ({ ...p, current: e.target.value }))} />
               </div>
             )}
             <div className="field">
-              <label className="label" htmlFor="set-pw-next">New password</label>
-              <input className="input" id="set-pw-next" type="password" value={pw.next} aria-label="New password"
+              <label className="label" htmlFor="set-pw-next">{t('settings.newPassword')}</label>
+              <input className="input" id="set-pw-next" type="password" value={pw.next} aria-label={t('settings.newPassword')}
                 onChange={e => setPw(p => ({ ...p, next: e.target.value }))} />
             </div>
             <div className="field">
-              <label className="label" htmlFor="set-pw-next2">Repeat it</label>
-              <input className="input" id="set-pw-next2" type="password" value={pw.next2} aria-label="Repeat new password"
+              <label className="label" htmlFor="set-pw-next2">{t('settings.repeatPassword')}</label>
+              <input className="input" id="set-pw-next2" type="password" value={pw.next2} aria-label={t('settings.repeatNewPassword')}
                 onChange={e => setPw(p => ({ ...p, next2: e.target.value }))} />
             </div>
           </div>
           <PasswordMeter verdict={pwVerdict} />
           <div className="row" style={{ marginTop: 12 }}>
             <button className="btn btn-primary btn-sm" disabled={busy || !pwVerdict.ok} onClick={() => savePassword(false)}>
-              {user.hasPassword ? 'Change password' : 'Turn protection on'}
+              {t(user.hasPassword ? 'settings.changePasswordAction' : 'settings.turnProtectionOn')}
             </button>
             {user.hasPassword && (
-              <button className="btn btn-quiet btn-sm" disabled={busy || !pw.current} onClick={() => savePassword(true)}>Remove password</button>
+              <button className="btn btn-quiet btn-sm" disabled={busy || !pw.current} onClick={() => savePassword(true)}>{t('settings.removePassword')}</button>
             )}
           </div>
-          <p className="muted" style={{ marginTop: 10, fontSize: 12.5 }}>
-            At least {MIN_PASSWORD} characters. Stored as a salted PBKDF2 hash in this device’s storage — it locks
-            your profile on this iPad, and is never uploaded anywhere.
-          </p>
+          <p className="muted" style={{ marginTop: 10, fontSize: 12.5 }}>{t('settings.passwordNote', { min: MIN_PASSWORD })}</p>
         </div>
       )}
     </div>
@@ -263,6 +356,7 @@ function SecuritySection({ toast }) {
 
 export default function Settings() {
   const { user, setUser, toast } = useApp();
+  const t = useT();
   const [storageInfo, setStorageInfo] = useState(null);
   const [active, setActive] = useState('plan');
   const importRef = useRef(null);
@@ -284,7 +378,7 @@ export default function Settings() {
       const r = await api.patch('/me', form);
       setUser(r.user);
       setEditing(false);
-      toast(<span>Settings saved</span>);
+      toast(<span>{t('settings.saved')}</span>);
     } catch (e) { toast(<span>{e.message}</span>); }
     finally { setBusy(false); }
   }
@@ -309,11 +403,11 @@ export default function Settings() {
     const typed = (del?.name || '').trim();
     const expected = String(user.name || '').trim();
     if (typed.toLowerCase() !== expected.toLowerCase()) {
-      setDel(d => ({ ...d, error: `Type the profile name — “${expected}” — to confirm.` }));
+      setDel(d => ({ ...d, error: t('settings.typeTheName', { name: expected }) }));
       return;
     }
     if (user.hasPassword && !del?.password) {
-      setDel(d => ({ ...d, error: 'Enter this profile’s password to delete it.' }));
+      setDel(d => ({ ...d, error: t('settings.enterPasswordToDelete') }));
       return;
     }
     setDel(d => ({ ...d, error: '', busy: true }));
@@ -332,7 +426,7 @@ export default function Settings() {
     try {
       const data = await api.get('/data/export');
       downloadJSON(data, `pri-learning-backup-${user.name.replace(/\s+/g, '-').toLowerCase()}-${dateStamp()}.json`);
-      toast(<span>Backup exported — keep it somewhere safe</span>);
+      toast(<span>{t('settings.backupExported')}</span>);
     } catch (e) { toast(<span>{e.message}</span>); }
   }
 
@@ -340,7 +434,7 @@ export default function Settings() {
     try {
       const data = await api.get('/data/progress-file');
       downloadJSON(data, `pri-progress-${user.name.replace(/\s+/g, '-').toLowerCase()}-${dateStamp()}.json`);
-      toast(<span>Progress file exported — send it to your teacher</span>);
+      toast(<span>{t('settings.progressExported')}</span>);
     } catch (e) { toast(<span>{e.message}</span>); }
   }
 
@@ -354,9 +448,8 @@ export default function Settings() {
       // A restored profile has no password, so if the original had one the user
       // has just lost that protection. Saying "restored" and nothing else lets
       // them walk away believing the profile is still locked.
-      toast(r.unprotected
-        ? <span>Backup restored — {r.rows.toLocaleString()} records. This profile has <strong>no password</strong>; set one in Account to protect it again.</span>
-        : <span>Backup restored — {r.rows.toLocaleString()} records</span>);
+      toast(<span>{t(r.unprotected ? 'settings.backupRestoredUnprotected' : 'settings.backupRestored',
+        { rows: r.rows.toLocaleString(user.locale) })}</span>);
       setUser(r.user);
     } catch (err) { toast(<span>{err.message}</span>); }
   }
@@ -365,12 +458,12 @@ export default function Settings() {
 
   return (
     <div>
-      <h1 style={{ marginBottom: 24 }}>Settings</h1>
+      <h1 style={{ marginBottom: 24 }}>{t('settings.title')}</h1>
       <div className="settings-grid">
         <div className="set-menu no-print">
-          {SECTIONS.map(([k, ico, label]) => (
+          {SECTIONS.map(([k, ico, key]) => (
             <button key={k} className={`set-menu-item ${active === k ? 'on' : ''}`} onClick={() => goto(k)}>
-              <span style={{ width: 18, textAlign: 'center' }}>{ico}</span>{label}
+              <span style={{ width: 18, textAlign: 'center' }}>{ico}</span>{t(key)}
             </button>
           ))}
         </div>
@@ -378,60 +471,60 @@ export default function Settings() {
         <div className="grid" style={{ gap: 18 }}>
           {/* ── Plan ── */}
           <div className="card" ref={el => secRefs.current.plan = el}>
-            <h2>Local Plan</h2>
-            <p className="muted" style={{ margin: '4px 0 14px' }}>Everything unlocked — no account, no subscription, no limits</p>
+            <h2>{t('settings.localPlan')}</h2>
+            <p className="muted" style={{ margin: '4px 0 14px' }}>{t('settings.localPlanSub')}</p>
             <div className="spread" style={{ fontSize: 14 }}>
-              <span className="sub">Question bank</span><span>1,329,679+ distinct — measured, still growing</span>
+              <span className="sub">{t('settings.questionBank')}</span><span>{t('settings.questionBankValue')}</span>
             </div>
             <div className="meter" style={{ margin: '6px 0 14px' }}><i style={{ width: '100%' }} /></div>
-            <div className="set-row"><span className="set-k">Status</span><span className="set-v" style={{ color: 'var(--good)' }}>Active</span></div>
-            <div className="set-row"><span className="set-k">All difficulties (D1–D4)</span><span className="set-v">✓</span></div>
-            <div className="set-row"><span className="set-k">All courses & pathways</span><span className="set-v">✓</span></div>
-            <div className="set-row"><span className="set-k">Hints, exams, match, analytics</span><span className="set-v">✓</span></div>
+            <div className="set-row"><span className="set-k">{t('settings.status')}</span><span className="set-v" style={{ color: 'var(--good)' }}>{t('settings.active')}</span></div>
+            <div className="set-row"><span className="set-k">{t('settings.allDifficulties')}</span><span className="set-v">✓</span></div>
+            <div className="set-row"><span className="set-k">{t('settings.allCourses')}</span><span className="set-v">✓</span></div>
+            <div className="set-row"><span className="set-k">{t('settings.allFeatures')}</span><span className="set-v">✓</span></div>
           </div>
 
           {/* ── Account information ── */}
           <div className="card">
-            <h2 style={{ marginBottom: 8 }}>Account Information</h2>
-            <div className="set-row"><span className="set-k">⌂ Data location</span><span className="set-v">{storageInfo?.native ? 'Native app storage — this iPad' : 'This device — browser storage'}</span></div>
+            <h2 style={{ marginBottom: 8 }}>{t('settings.accountInfo')}</h2>
+            <div className="set-row"><span className="set-k">{t('settings.dataLocation')}</span><span className="set-v">{t(storageInfo?.native ? 'settings.dataLocationNative' : 'settings.dataLocationBrowser')}</span></div>
             <div className="set-row">
-              <span className="set-k">🛡 Storage protection</span>
+              <span className="set-k">{t('settings.storageProtection')}</span>
               <span className="set-v" style={{ color: storageInfo?.native || storageInfo?.persisted ? 'var(--good)' : 'var(--warn)' }}>
-                {storageInfo?.native ? 'App sandbox — nothing can evict it' : storageInfo?.persisted ? 'Protected — browser won’t evict' : 'Pending — keep using the app'}
+                {t(storageInfo?.native ? 'settings.storageSandbox' : storageInfo?.persisted ? 'settings.storagePersisted' : 'settings.storagePending')}
               </span>
             </div>
             {storageInfo && storageInfo.quota > 0 && (
-              <div className="set-row"><span className="set-k"># Space used</span><span className="set-v">{fmtBytes(storageInfo.usage)} of {fmtBytes(storageInfo.quota)} ({usagePct}%)</span></div>
+              <div className="set-row"><span className="set-k">{t('settings.spaceUsed')}</span><span className="set-v">{t('settings.spaceOf', { used: fmtBytes(storageInfo.usage), total: fmtBytes(storageInfo.quota), percent: usagePct })}</span></div>
             )}
-            <div className="set-row"><span className="set-k">✉ Accounts</span><span className="set-v">Private on-device profiles — nothing ever leaves this device</span></div>
+            <div className="set-row"><span className="set-k">{t('settings.accounts')}</span><span className="set-v">{t('settings.accountsValue')}</span></div>
           </div>
 
           {/* ── Profile ── */}
           <div className="card" ref={el => secRefs.current.profile = el}>
             <div className="spread">
-              <h2>☺ Profile Information</h2>
-              {!editing && <button className="btn btn-ghost btn-sm" onClick={() => setEditing(true)}>✎ Edit</button>}
+              <h2>{t('settings.profileInfo')}</h2>
+              {!editing && <button className="btn btn-ghost btn-sm" onClick={() => setEditing(true)}>✎ {t('common.edit')}</button>}
             </div>
             {!editing ? (
               <div style={{ marginTop: 8 }}>
-                <div className="set-row"><span className="set-k">Full name</span><span className="set-v">{user.name}</span></div>
-                <div className="set-row"><span className="set-k">Avatar</span><span className="set-v" style={{ fontSize: 20 }}>{user.avatar}</span></div>
-                {user.role !== 'teacher' && <div className="set-row"><span className="set-k">{user.course === 'in' ? 'Class level' : 'Year level'}</span><span className="set-v">{user.course === 'in' ? 'Class' : 'Year'} {user.year}</span></div>}
-                <div className="set-row"><span className="set-k">Course</span><span className="set-v">{user.courseLabel}</span></div>
-                <div className="set-row"><span className="set-k">Daily goal</span><span className="set-v">{user.dailyGoal} questions</span></div>
+                <div className="set-row"><span className="set-k">{t('settings.fullName')}</span><span className="set-v">{user.name}</span></div>
+                <div className="set-row"><span className="set-k">{t('settings.avatar')}</span><span className="set-v" style={{ fontSize: 20 }}>{user.avatar}</span></div>
+                {user.role !== 'teacher' && <div className="set-row"><span className="set-k">{t(user.course === 'in' ? 'settings.classLevel' : 'settings.yearLevel')}</span><span className="set-v">{t(user.course === 'in' ? 'common.classNumber' : 'common.yearNumber', { n: user.year })}</span></div>}
+                <div className="set-row"><span className="set-k">{t('settings.course')}</span><span className="set-v">{user.courseLabel}</span></div>
+                <div className="set-row"><span className="set-k">{t('settings.dailyGoal')}</span><span className="set-v">{t('settings.dailyGoalValue', { count: user.dailyGoal, n: user.dailyGoal })}</span></div>
               </div>
             ) : (
               <div style={{ marginTop: 12 }}>
                 <div className="field">
-                  <label className="label" htmlFor="set-name">Name</label>
+                  <label className="label" htmlFor="set-name">{t('settings.name')}</label>
                   <input className="input" id="set-name" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
                 </div>
                 <div className="field">
-                  <div className="label" id="set-avatar">Avatar</div>
+                  <div className="label" id="set-avatar">{t('settings.avatar')}</div>
                   <div className="avatar-row" role="group" aria-labelledby="set-avatar">
                     {AVATARS.map(a => (
                       <button key={a} className={`avatar-pick ${form.avatar === a ? 'on' : ''}`}
-                        aria-label={`Avatar ${a}`} aria-pressed={form.avatar === a}
+                        aria-label={t('settings.avatarPick', { emoji: a })} aria-pressed={form.avatar === a}
                         onClick={() => setForm(f => ({ ...f, avatar: a }))}>{a}</button>
                     ))}
                   </div>
@@ -439,13 +532,13 @@ export default function Settings() {
                 {user.role !== 'teacher' && (
                   <div className="grid cols-2" style={{ gap: 12 }}>
                     <div className="field">
-                      <label className="label" htmlFor="set-year">{form.course === 'in' ? 'School class' : 'School year'}</label>
+                      <label className="label" htmlFor="set-year">{t(form.course === 'in' ? 'settings.schoolClass' : 'settings.schoolYear')}</label>
                       <select className="input" id="set-year" value={form.year} onChange={e => setForm(f => ({ ...f, year: Number(e.target.value) }))}>
-                        {[7, 8, 9, 10, 11, 12].map(y => <option key={y} value={y}>{form.course === 'in' ? 'Class' : 'Year'} {y}</option>)}
+                        {[7, 8, 9, 10, 11, 12].map(y => <option key={y} value={y}>{t(form.course === 'in' ? 'common.classNumber' : 'common.yearNumber', { n: y })}</option>)}
                       </select>
                     </div>
                     <div className="field">
-                      <label className="label" htmlFor="set-course">Syllabus</label>
+                      <label className="label" htmlFor="set-course">{t('settings.syllabus')}</label>
                       <select className="input" id="set-course" value={form.course} onChange={e => setForm(f => ({ ...f, course: e.target.value }))}>
                         {COURSES.map(([k, label]) => <option key={k} value={k}>{label}</option>)}
                       </select>
@@ -454,7 +547,7 @@ export default function Settings() {
                 )}
                 {user.role !== 'teacher' && form.course === 'nsw' && form.year >= 11 && (
                   <div className="field">
-                    <div className="label" id="set-pathway">HSC pathway</div>
+                    <div className="label" id="set-pathway">{t('settings.hscPathway')}</div>
                     <div className="pathway-row" role="group" aria-labelledby="set-pathway">
                       {PATHWAY_OPTS.filter(([k]) => k !== 'ext2' || form.year === 12).map(([k, name, desc]) => (
                         <button key={k} type="button" className={`pathway-pick ${form.pathway === k ? 'on' : ''}`}
@@ -468,7 +561,7 @@ export default function Settings() {
                 )}
                 {user.role !== 'teacher' && form.course === 'in' && (
                   <div className="field">
-                    <div className="label" id="set-india-track">India maths track</div>
+                    <div className="label" id="set-india-track">{t('settings.indiaTrack')}</div>
                     <div className="pathway-row" role="group" aria-labelledby="set-india-track">
                       {INDIA_TRACKS.filter(([k]) => form.year >= 11 || !k.startsWith('jee-')).map(([k, name, desc]) => (
                         <button key={k} type="button" className={`pathway-pick ${form.indiaTrack === k ? 'on' : ''}`}
@@ -478,13 +571,13 @@ export default function Settings() {
                   </div>
                 )}
                 <div className="field">
-                  <label className="label" htmlFor="set-goal">Daily goal — {form.dailyGoal} questions</label>
+                  <label className="label" htmlFor="set-goal">{t('settings.dailyGoalSlider', { count: form.dailyGoal, n: form.dailyGoal })}</label>
                   <input type="range" id="set-goal" min="3" max="40" value={form.dailyGoal} style={{ width: '100%', accentColor: 'var(--gold)' }}
                     onChange={e => setForm(f => ({ ...f, dailyGoal: Number(e.target.value) }))} />
                 </div>
                 <div className="row">
-                  <button className="btn btn-primary" onClick={save} disabled={busy}>{busy ? 'Saving…' : 'Save changes'}</button>
-                  <button className="btn btn-quiet" onClick={() => setEditing(false)}>Cancel</button>
+                  <button className="btn btn-primary" onClick={save} disabled={busy}>{t(busy ? 'common.saving' : 'common.saveChanges')}</button>
+                  <button className="btn btn-quiet" onClick={() => setEditing(false)}>{t('common.cancel')}</button>
                 </div>
               </div>
             )}
@@ -500,69 +593,60 @@ export default function Settings() {
             <HandwritingSection toast={toast} />
           </div>
 
+          {/* ── Language ── */}
+          <div ref={el => secRefs.current.language = el}>
+            <LanguageSection />
+          </div>
+
           {/* ── Appearance ── */}
           <div className="card" ref={el => secRefs.current.appearance = el}>
-            <h2 style={{ marginBottom: 12 }}>◐ Appearance</h2>
+            <h2 style={{ marginBottom: 12 }}>{t('settings.appearance')}</h2>
             <div className="row">
-              <button className={`gen-opt ${user.theme !== 'light' ? 'on' : ''}`} aria-pressed={user.theme !== 'light'} style={{ width: 160 }} onClick={() => setTheme('dark')}>Dark — blackboard</button>
-              <button className={`gen-opt ${user.theme === 'light' ? 'on' : ''}`} aria-pressed={user.theme === 'light'} style={{ width: 160 }} onClick={() => setTheme('light')}>Light — paper</button>
+              <button className={`gen-opt ${user.theme !== 'light' ? 'on' : ''}`} aria-pressed={user.theme !== 'light'} style={{ width: 160 }} onClick={() => setTheme('dark')}>{t('settings.themeDark')}</button>
+              <button className={`gen-opt ${user.theme === 'light' ? 'on' : ''}`} aria-pressed={user.theme === 'light'} style={{ width: 160 }} onClick={() => setTheme('light')}>{t('settings.themeLight')}</button>
             </div>
           </div>
 
           {/* ── Courses ── */}
           <div className="card" ref={el => secRefs.current.courses = el}>
-            <h2 style={{ marginBottom: 8 }}>📖 Courses</h2>
-            <div className="set-row"><span className="set-k">Enrolled</span><span className="set-v">{user.courseLabel}</span></div>
-            <p className="muted" style={{ marginTop: 10 }}>
-              Content is generated on-device and mapped to your syllabus's naming — changing year or pathway in
-              Profile re-scopes Smart Practice, exams, priorities and the mark predictor instantly.
-            </p>
+            <h2 style={{ marginBottom: 8 }}>{t('settings.courses')}</h2>
+            <div className="set-row"><span className="set-k">{t('settings.enrolled')}</span><span className="set-v">{user.courseLabel}</span></div>
+            <p className="muted" style={{ marginTop: 10 }}>{t('settings.coursesNote')}</p>
           </div>
 
           {/* ── Data ── */}
           <div className="card" ref={el => secRefs.current.data = el}>
-            <h2 style={{ marginBottom: 8 }}>⇅ Data & Backup</h2>
-            <p className="sub" style={{ marginBottom: 12 }}>
-              One JSON file holds everything — profile, ratings, attempts, exams, handwriting. Restore it on any
-              device to pick up where you left off. The file itself is <strong>not</strong> encrypted and a restored
-              profile comes back <strong>without its password</strong>, because a backup carries no password
-              verifier — set one again after restoring to re-protect it. Keep the file somewhere you would be happy
-              to keep a notebook. Progress files are small summaries you can AirDrop to a teacher, who imports them
-              into class analytics.
-            </p>
+            <h2 style={{ marginBottom: 8 }}>{t('settings.dataBackup')}</h2>
+            <p className="sub" style={{ marginBottom: 12 }}>{t('settings.dataNote')}</p>
             <div className="row" style={{ flexWrap: 'wrap', gap: 8 }}>
-              <button className="btn btn-ghost btn-sm" onClick={exportBackup}>Export full backup</button>
-              <button className="btn btn-ghost btn-sm" onClick={() => importRef.current?.click()}>Restore from backup</button>
-              {user.role !== 'teacher' && <button className="btn btn-ghost btn-sm" onClick={exportProgressFile}>Progress file for my teacher</button>}
+              <button className="btn btn-ghost btn-sm" onClick={exportBackup}>{t('settings.exportBackup')}</button>
+              <button className="btn btn-ghost btn-sm" onClick={() => importRef.current?.click()}>{t('settings.restoreBackup')}</button>
+              {user.role !== 'teacher' && <button className="btn btn-ghost btn-sm" onClick={exportProgressFile}>{t('settings.progressFile')}</button>}
               <input ref={importRef} type="file" accept=".json,application/json" style={{ display: 'none' }} onChange={importBackup} />
             </div>
             <hr className="divider" />
             <div className="row" style={{ flexWrap: 'wrap' }}>
-              <button className="btn btn-ghost btn-sm" onClick={switchProfile}>Switch profile</button>
+              <button className="btn btn-ghost btn-sm" onClick={switchProfile}>{t('app.switchProfile')}</button>
               {!del && (
                 <button className="btn btn-quiet btn-sm" onClick={() => setDel({ name: '', password: '', error: '', busy: false })}>
-                  Delete this profile…
+                  {t('settings.deleteProfile')}
                 </button>
               )}
             </div>
             {del && (
               <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--hairline)' }}>
-                <p className="sub" style={{ marginBottom: 12 }}>
-                  Deleting “{user.name}” wipes its ratings, attempts, exams, favourites and learned handwriting
-                  from this iPad. Nothing is held anywhere else — export a full backup first if there is any
-                  chance you want it back.
-                </p>
+                <p className="sub" style={{ marginBottom: 12 }}>{t('settings.deleteWarning', { name: user.name })}</p>
                 {del.error && <div className="error-box" role="alert">{del.error}</div>}
                 <div className="grid cols-2" style={{ gap: 12 }}>
                   <div className="field" style={{ marginBottom: 0 }}>
-                    <label className="label" htmlFor="set-del-name">Type “{user.name}” to confirm</label>
-                    <input className="input" id="set-del-name" value={del.name} placeholder={user.name} aria-label={`Type ${user.name} to confirm deletion`}
+                    <label className="label" htmlFor="set-del-name">{t('settings.typeNameToConfirm', { name: user.name })}</label>
+                    <input className="input" id="set-del-name" value={del.name} placeholder={user.name} aria-label={t('settings.typeNameLabel', { name: user.name })}
                       onChange={e => setDel(d => ({ ...d, name: e.target.value }))} />
                   </div>
                   {user.hasPassword && (
                     <div className="field" style={{ marginBottom: 0 }}>
-                      <label className="label" htmlFor="set-del-pw">Profile password</label>
-                      <input className="input" id="set-del-pw" type="password" value={del.password} aria-label="Profile password"
+                      <label className="label" htmlFor="set-del-pw">{t('settings.profilePassword')}</label>
+                      <input className="input" id="set-del-pw" type="password" value={del.password} aria-label={t('settings.profilePassword')}
                         onChange={e => setDel(d => ({ ...d, password: e.target.value }))} />
                     </div>
                   )}
@@ -570,9 +654,9 @@ export default function Settings() {
                 <div className="row" style={{ marginTop: 12 }}>
                   <button className="btn btn-sm" style={{ background: 'var(--bad)', color: '#fff', borderColor: 'var(--bad)' }}
                     disabled={del.busy} onClick={deleteProfile}>
-                    {del.busy ? 'Deleting…' : `Really delete “${user.name}” and all its data`}
+                    {del.busy ? t('settings.deleting') : t('settings.reallyDelete', { name: user.name })}
                   </button>
-                  <button className="btn btn-quiet btn-sm" disabled={del.busy} onClick={() => setDel(null)}>Cancel</button>
+                  <button className="btn btn-quiet btn-sm" disabled={del.busy} onClick={() => setDel(null)}>{t('common.cancel')}</button>
                 </div>
               </div>
             )}
@@ -580,14 +664,13 @@ export default function Settings() {
 
           {/* ── Help ── */}
           <div className="card" ref={el => secRefs.current.help = el}>
-            <h2 style={{ marginBottom: 8 }}>? Help & Safety</h2>
+            <h2 style={{ marginBottom: 8 }}>{t('settings.helpSafety')}</h2>
             <p className="sub">
-              Every subtopic tracks a skill rating that moves with each answer — harder questions move it more.
-              Smart Practice targets ~70% success, weaves in spaced reviews before topics fade, and the mark
-              predictor weighs mastery across the syllabus by exam weight, calibrated to HSC bands. Handwritten
-              answers are recognised entirely on-device — strokes → symbols → maths — then marked by the same
-              engine as typed answers, line by line. Hints and retries still earn credit, just a little less.
-              {!window.__PRI_NATIVE__ && <> For the full-screen iPad experience: <b>Share → Add to Home Screen</b>.</>}
+              {/* An India profile is told what India actually gets. The other
+                  branch describes a scaled-band predictor that does not exist
+                  for a CBSE or JEE student. */}
+              {t(user.course === 'in' ? 'settings.helpBodyIndia' : 'settings.helpBody')}
+              {!window.__PRI_NATIVE__ && t('settings.addToHomeScreen')}
             </p>
           </div>
         </div>

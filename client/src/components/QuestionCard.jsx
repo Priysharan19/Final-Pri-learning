@@ -2,7 +2,7 @@
 // The question experience, styled as a full page: marks + live timer up top,
 // hint bulbs that trade credit for help, three answer modes (type / write /
 // photo), an evaluation card with reasoning, worked solution, final answer and
-// an HSC-style criteria table. All marking logic is the verified v3 engine.
+// a marks criteria table. All marking logic is the verified v3 engine.
 // ─────────────────────────────────────────────────────────────────────────────
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../api.js';
@@ -16,9 +16,16 @@ import { cloudReadingEnabled, readPhotoWithCloud } from '../ink/cloudReader.js';
 import { MAX_PDF_PAGES, renderPdfPages } from '../ink/pdfPage.js';
 import PriPlot from './PriPlot.jsx';
 import { plotSpecFor } from '../engine/plotSpec.js';
+import { awardStepMarks, marksSentence } from '../engine/cbseMarking.js';
 import { checkWorkingWithCloud, mergeVerdicts, shouldCheckWorking, workingNote } from '../ink/cloudWorking.js';
+import { useT, useTx } from '../i18n/index.js';
+import TermGloss from './TermGloss.jsx';
 
 const DIFF_CLASS = { 1: 'tag-d1', 2: 'tag-d2', 3: 'tag-d3', 4: 'tag-d4' };
+// Four ways of saying "right", picked by question id so one question always
+// praises the same way. Keys, not literals: a Hindi profile gets four Hindi
+// ways of saying it rather than the same English one four times over.
+const PRAISE_KEYS = ['verdict.nailedIt', 'verdict.correct', 'verdict.beautifulWork', 'verdict.thatsIt'];
 // Public question metadata may constrain what a single answer glyph can be,
 // but it must never disclose or encode the expected answer. Numeric questions
 // therefore expose only the ten digit symbols to the one-glyph tie-breaker.
@@ -30,10 +37,10 @@ const recognitionContextForQuestion = question => question?.answerType === 'nume
 // Each key carries the name of the thing it inserts, because "≥" and "√(" are
 // read out as punctuation — or not at all — by a screen reader.
 const SYMBOLS = [
-  ['π', 'pi'], ['√(', 'square root'], ['^', 'to the power of'], ['±', 'plus or minus'],
-  ['×', 'multiply'], ['÷', 'divide'], ['≤', 'less than or equal to'], ['≥', 'greater than or equal to'],
-  ['≠', 'not equal to'], ['°', 'degrees'], ['θ', 'theta'], ['(', 'open bracket'],
-  [')', 'close bracket'], ['/', 'divided by'], [':', 'ratio']
+  ['π', 'sym.pi'], ['√(', 'sym.sqrt'], ['^', 'sym.power'], ['±', 'sym.plusMinus'],
+  ['×', 'sym.times'], ['÷', 'sym.divide'], ['≤', 'sym.lte'], ['≥', 'sym.gte'],
+  ['≠', 'sym.neq'], ['°', 'sym.degrees'], ['θ', 'sym.theta'], ['(', 'sym.openBracket'],
+  [')', 'sym.closeBracket'], ['/', 'sym.dividedBy'], [':', 'sym.ratio']
 ];
 const preferMode = () => {
   const saved = localStorage.getItem('pri-input-mode');
@@ -200,13 +207,15 @@ function compactInkStrokes(strokes) {
 // The public name of each reason tag a serve can carry. A serve that names its
 // tag (the India path does) is labelled from here; one that carries only the
 // legacy `reason` keeps the tags it always had.
-const REASON_TAG_LABEL = {
-  'review-due': 'Spaced review', 'weak-spot': 'Weak spot', misconception: 'Repeated slip',
-  'new-ground': 'New ground', interleave: 'Interleaving'
+const REASON_TAG_KEY = {
+  'review-due': 'verdict.spacedReview', 'weak-spot': 'verdict.weakSpot', misconception: 'verdict.repeatedSlip',
+  'new-ground': 'verdict.newGround', interleave: 'verdict.interleaving'
 };
 
 export default function QuestionCard({ question, why, reason, reasonTag = null, onResolved, onNext, onRedo, compact = false }) {
   const { celebrate, refreshUser, refreshDue, refreshRecent, toast, user } = useApp();
+  const t = useT();
+  const tx = useTx();
   const [answer, setAnswer] = useState('');
   const [mcqSel, setMcqSel] = useState(null);
   const [mode, setMode] = useState(preferMode());       // 'type' | 'write' | 'photo'
@@ -275,10 +284,33 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   // then Vision, which needs no network and no account; then nothing, said
   // plainly. Whatever reads it, the text lands in an editable box and is never
   // submitted on the reader's word alone.
+  /**
+   * Read one image of working with whichever reader is actually good at it:
+   * the server reader where the student has switched it on, then Apple Vision,
+   * which needs no network and no account. Returns null when neither could.
+   */
+  const readOnePage = useCallback(async (dataURL) => {
+    const lastLine = t => String(t || '').split(/\n+/).map(x => x.trim()).filter(Boolean).at(-1) || '';
+    if (cloudReadingEnabled(user)) {
+      const outcome = await readPhotoWithCloud(dataURL, { user });
+      if (outcome && !outcome.error && !outcome.reason) {
+        const text = String(outcome.transcription.text || '').trim();
+        if (text) return { text, markable: lastLine(text), confidence: outcome.transcription.confidence, engine: outcome.transcription.engine };
+      }
+    }
+    if (!nativePhotoAvailable()) return null;
+    try {
+      const result = await recognizePhoto(dataURL);
+      const text = String(result?.text || '').trim();
+      const markable = String(result?.answer || '').trim() || lastLine(text);
+      if (!text && !markable) return null;
+      return { text, markable, confidence: result?.confidence, engine: result?.engine || 'apple-vision-photo-v1' };
+    } catch { return null; }
+  }, [user]);
+
   const decodePhoto = useCallback(async (dataURL) => {
     if (!dataURL) return;
-    const cloudFirst = cloudReadingEnabled(user);
-    if (!cloudFirst && !nativePhotoAvailable()) {
+    if (!cloudReadingEnabled(user) && !nativePhotoAvailable()) {
       setPhotoOCR({
         phase: 'unavailable', text: '', confidence: 0, engine: null,
         error: 'Reading photos is not available here. Turn on server reading in Settings, or type your working instead.'
@@ -286,45 +318,18 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       return;
     }
     setPhotoOCR({ phase: 'reading', text: '', confidence: 0, error: '', engine: null });
-
-    const apply = (text, markable, confidence, engine) => {
-      if (isWorking && text) { setWorking(text); setShowWorking(true); }
-      if (markable) setAnswer(markable);
-      setPhotoOCR({ phase: 'done', text, confidence: Number(confidence || 0), error: '', engine });
-    };
-    const lastLine = (text) => text.split(/\n+/).map(x => x.trim()).filter(Boolean).at(-1) || '';
-
-    if (cloudFirst) {
-      const outcome = await readPhotoWithCloud(dataURL, { user });
-      if (outcome && !outcome.error) {
-        const text = String(outcome.transcription.text || '').trim();
-        const markable = lastLine(text);
-        if (text || markable) {
-          apply(text, markable, outcome.transcription.confidence, outcome.transcription.engine);
-          return;
-        }
-      }
-      // Fall through to Vision rather than failing: a refused or unreachable
-      // server should not cost the student the reader already on the device.
-      if (!nativePhotoAvailable()) {
-        setPhotoOCR({
-          phase: 'failed', text: '', confidence: 0, engine: null,
-          error: outcome?.error?.message || 'That photo could not be read. Try a straighter, better-lit shot, or type your working.'
-        });
-        return;
-      }
+    const page = await readOnePage(dataURL);
+    if (!page) {
+      setPhotoOCR({
+        phase: 'failed', text: '', confidence: 0, engine: null,
+        error: 'That photo could not be read. Try a straighter, better-lit shot, or type your working.'
+      });
+      return;
     }
-
-    try {
-      const result = await recognizePhoto(dataURL);
-      const text = String(result?.text || '').trim();
-      const markable = String(result?.answer || '').trim() || lastLine(text);
-      if (!text && !markable) throw new Error('No handwriting was detected in that photo.');
-      apply(text, markable, result?.confidence, result?.engine || 'apple-vision-photo-v1');
-    } catch (err) {
-      setPhotoOCR({ phase: 'failed', text: '', confidence: 0, engine: null, error: err?.message || 'Photo handwriting could not be read.' });
-    }
-  }, [isWorking, user]);
+    if (isWorking && page.text) { setWorking(page.text); setShowWorking(true); }
+    if (page.markable) setAnswer(page.markable);
+    setPhotoOCR({ phase: 'done', text: page.text, confidence: Number(page.confidence || 0), error: '', engine: page.engine });
+  }, [isWorking, user, readOnePage]);
 
   // A scanned PDF becomes pages, and the pages become the same thing a photo
   // already is. More than one page of working is joined in order, because a
@@ -350,13 +355,16 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     const texts = [];
     let worst = 1;
     let engine = null;
+    let unread = 0;
     for (const page of pages) {
-      const outcome = await readPhotoWithCloud(page.dataUrl, { user });
-      if (!outcome || outcome.error) continue;
-      const text = String(outcome.transcription.text || '').trim();
-      if (text) texts.push(text);
-      worst = Math.min(worst, Number(outcome.transcription.confidence || 0));
-      engine = outcome.transcription.engine || engine;
+      // The same ladder decodePhoto uses. Reading each page with the server
+      // reader alone meant a student who had not switched it on saw "nothing
+      // could be read" on a device that could have read it perfectly well.
+      const page1 = await readOnePage(page.dataUrl);
+      if (!page1) { unread += 1; continue; }
+      if (page1.text) texts.push(page1.text);
+      worst = Math.min(worst, Number(page1.confidence || 0));
+      engine = page1.engine || engine;
     }
     if (!texts.length) {
       setPhotoOCR({
@@ -364,6 +372,11 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         error: 'Nothing could be read from that PDF. Try photographing the page instead.'
       });
       return;
+    }
+    if (unread > 0) {
+      // Presenting two of three pages as the whole of the working would submit
+      // an answer the student never wrote.
+      toast(<span>{t('verdict.pdfPagesUnread', { unread, total: pages.length })}</span>);
     }
     const joined = texts.join('\n');
     if (isWorking) { setWorking(joined); setShowWorking(true); }
@@ -409,6 +422,14 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
 
   const InkAnswer = inkPhase === 'ready' ? inkModule?.default : null;
   const inkStuck = inkPhase === 'failed' && inkExhausted();
+  // The recogniser is 0.9 MB and is deliberately not in the install precache:
+  // a phone with no stylus should not pay for it before its student has ever
+  // asked to write. That makes "this is the first time you have opened the
+  // write tab and you are offline" a real, ordinary case, and a different one
+  // from "something went wrong" — the student can fix the first by finding a
+  // signal for a moment, and nothing by retrying the second. Same distinction
+  // pdfPage.js draws for the PDF renderer, and for the same reason.
+  const inkNeedsNetwork = inkPhase === 'failed' && typeof navigator !== 'undefined' && navigator.onLine === false;
 
   const figure = useMemo(() => sanitizeFigure(question.figure), [question.figure]);
 
@@ -533,7 +554,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         if (!inkResult?.lines?.length) return;
         given = inkResult.lines.join('\n');
         viaInk = true;
-        ink = { strokes: compactInkStrokes(inkResult.strokes), recognized: inkResult.text };
+        ink = { strokes: compactInkStrokes(inkResult.strokes), recognized: inkResult.text, engine: inkResult.engine || null };
       } else {
         given = working;
         if (!given.trim()) return;
@@ -543,7 +564,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       given = inkResult.answerLine;
       steps = inkResult.lines.length > 1 ? inkResult.lines.join('\n') : undefined;
       viaInk = true;
-      ink = { strokes: compactInkStrokes(inkResult.strokes), recognized: inkResult.text };
+      ink = { strokes: compactInkStrokes(inkResult.strokes), recognized: inkResult.text, engine: inkResult.engine || null };
     } else {
       given = answer;
       if (String(given).trim() === '') return;
@@ -560,7 +581,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       if (r.resolved) {
         setState({ phase: 'resolved', res: r });
         celebrate(r); refreshUser(); refreshDue(); refreshRecent?.();
-        toast(<div><b>Syllabus outcome updated</b><div className="badge-desc">{question.subtopicName} — based on your performance</div></div>, 4200);
+        toast(<div><b>{t('verdict.outcomeUpdated')}</b><div className="badge-desc">{t('verdict.outcomeBasis', { topic: question.subtopicName })}</div></div>, 4200);
         onResolved?.(r);
       } else {
         setState({ phase: 'retry', res: r });
@@ -672,6 +693,27 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   );
   const cloudWorkingNote = useMemo(() => workingNote(cloudCheck), [cloudCheck]);
 
+  // ── The board's own arithmetic ─────────────────────────────────────────────
+  // CBSE marks per step: formula, substitution, final answer with units. A
+  // student whose method is sound and whose arithmetic slipped keeps most of
+  // the marks, and a student who wrote only the answer forfeits the rest. Every
+  // Indian student is told this and almost none get to practise it, because the
+  // teacher who would read their working has twenty-six other children.
+  const boardAward = useMemo(() => {
+    if (!resolved || res?.invalid || res?.revealed) return null;
+    const lines = writeMode ? (inkResult?.lines || []) : String(working || '').split(/\n+/);
+    const shown = lines.map(l => String(l || '').trim()).filter(Boolean);
+    try {
+      return awardStepMarks({
+        question: { ...question, marks: totalMarks, steps: res?.solution?.steps || question.steps },
+        workingLines: shown,
+        stepReport: activeReport,
+        answerText: writeMode ? (inkResult?.answerLine || '') : String(answer || ''),
+        correct: !!res?.correct
+      });
+    } catch { return null; }
+  }, [resolved, res, writeMode, inkResult, working, answer, question, totalMarks, activeReport]);
+
   // Teacher comments panel — one card per marked step, like a margin column.
   const inkComments = useMemo(() => {
     if (!writeMode || !lineVerdicts || !inkResult?.lines?.length) return null;
@@ -703,15 +745,17 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const verdictSpeech = useMemo(() => {
     if (state.phase === 'retry') {
       return state.res?.invalid
-        ? `I couldn’t read that. ${state.res.feedback || ''}`
-        : `Not quite. ${state.res?.feedback || 'Have another look and try again — you have one more go.'}`;
+        ? t('verdict.speechUnreadable', { feedback: state.res.feedback || '' })
+        : t('verdict.speechRetry', { feedback: state.res?.feedback || t('verdict.oneMoreGo') });
     }
     if (!resolved) return '';
-    const marks = `${verdictGood ? shownMarks : earnedMarks} out of ${totalMarks} marks.`;
-    if (res.revealed) return `Solution revealed. ${marks}`;
-    if (verdictGood) return `Correct. ${marks}`;
-    return `Not correct. ${marks}${res.solution?.answerText ? ` Expected ${res.solution.answerText}.` : ''}`;
-  }, [state.phase, state.res, resolved, res, verdictGood, shownMarks, earnedMarks, totalMarks]);
+    const earned = verdictGood ? shownMarks : earnedMarks;
+    const marks = t('verdict.speechMarks', { count: totalMarks, earned, total: totalMarks });
+    if (res.revealed) return t('verdict.speechRevealed', { marks });
+    if (verdictGood) return t('verdict.speechCorrect', { marks });
+    return t('verdict.speechIncorrect', { marks })
+      + (res.solution?.answerText ? t('verdict.speechExpected', { answer: res.solution.answerText }) : '');
+  }, [state.phase, state.res, resolved, res, verdictGood, shownMarks, earnedMarks, totalMarks, t]);
 
   const answerLines = isMcq ? [] : writeMode
     ? (inkResult?.lines || [])
@@ -722,9 +766,9 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     <div className="qpage">
       {/* left action rail */}
       <div className="q-rail no-print">
-        <button className={`q-rail-btn ${bookmarked ? 'on' : ''}`} title="Favorite" aria-label="Favorite this question" aria-pressed={bookmarked} onClick={toggleBookmark}>☆</button>
-        <button className={`q-rail-btn ${showWhy ? 'on' : ''}`} title="Why this question?" aria-label="Why this question?" aria-pressed={showWhy} onClick={() => setShowWhy(s => !s)}>ⓘ</button>
-        <button className={`q-rail-btn ${showScribble ? 'on' : ''}`} title="Scribble pad" aria-label="Scribble pad" aria-pressed={showScribble} onClick={() => setShowScribble(s => !s)}>✎</button>
+        <button className={`q-rail-btn ${bookmarked ? 'on' : ''}`} title={t('verdict.favorite')} aria-label={t('verdict.favoriteThis')} aria-pressed={bookmarked} onClick={toggleBookmark}>☆</button>
+        <button className={`q-rail-btn ${showWhy ? 'on' : ''}`} title={t('verdict.whyThis')} aria-label={t('verdict.whyThis')} aria-pressed={showWhy} onClick={() => setShowWhy(s => !s)}>ⓘ</button>
+        <button className={`q-rail-btn ${showScribble ? 'on' : ''}`} title={t('verdict.scribblePad')} aria-label={t('verdict.scribblePad')} aria-pressed={showScribble} onClick={() => setShowScribble(s => !s)}>✎</button>
       </div>
 
       {/* hint bulbs */}
@@ -733,8 +777,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
           {Array.from({ length: question.hintsAvailable }, (_, i) => (
             <button key={i} className={`hint-bulb ${i < hintsUsed ? 'lit' : ''}`}
               disabled={resolved || i !== hintsUsed}
-              title={`Hint ${i + 1} — costs 15% credit`}
-              aria-label={`Reveal hint ${i + 1} of ${question.hintsAvailable} — costs 15% of the credit for this question`}
+              title={t('verdict.hintTitle', { n: i + 1 })}
+              aria-label={t('verdict.hintLabel', { n: i + 1, total: question.hintsAvailable })}
               onClick={getHint}>
               <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.7"><path d="M9.5 18h5M10 21h4M12 3a6 6 0 0 0-3.4 10.9c.7.5 1.1 1.2 1.2 2.1h4.4c.1-.9.5-1.6 1.2-2.1A6 6 0 0 0 12 3Z" /></svg>
               <sup>{i + 1}</sup>
@@ -744,17 +788,20 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       )}
 
       <div className="q-topmeta">
-        <span>{totalMarks} mark{totalMarks === 1 ? '' : 's'}</span>
+        <span>{t('verdict.marksAvailable', { count: totalMarks, n: totalMarks })}</span>
         {hintsUsed > 0 && !resolved && (
-          <span className="q-credit"><span className="dot">•</span> {Math.round(credit * 100)}% credit available ({Math.round(totalMarks * credit * 10) / 10} marks) <span className="dot">•</span></span>
+          <span className="q-credit"><span className="dot">•</span> {t('verdict.creditAvailable', { percent: Math.round(credit * 100), marks: Math.round(totalMarks * credit * 10) / 10 })} <span className="dot">•</span></span>
         )}
-        <span className="tag">{question.subtopicName}</span>
+        {/* The topic chip is where a student meets the name of what they are
+            being asked, so it is the first place worth pairing. The question
+            itself below is untouched: it will be in English in the exam hall. */}
+        <span className="tag"><TermGloss text={question.subtopicName} /></span>
         <span className={`tag ${DIFF_CLASS[question.difficulty] || ''}`}>{question.diffLabel}</span>
-        {reasonTag && REASON_TAG_LABEL[reasonTag] && <span className="tag tag-brand" data-reason-tag={reasonTag}>{REASON_TAG_LABEL[reasonTag]}</span>}
-        {!reasonTag && reason === 'review' && <span className="tag tag-brand">Spaced review</span>}
-        {!reasonTag && reason === 'weak-spot' && <span className="tag tag-brand">Weak spot</span>}
-        {!reasonTag && reason === 'new-ground' && <span className="tag tag-brand">New ground</span>}
-        {reason === 'task' && <span className="tag tag-brand">Task</span>}
+        {reasonTag && REASON_TAG_KEY[reasonTag] && <span className="tag tag-brand" data-reason-tag={reasonTag}>{t(REASON_TAG_KEY[reasonTag])}</span>}
+        {!reasonTag && reason === 'review' && <span className="tag tag-brand">{t('verdict.spacedReview')}</span>}
+        {!reasonTag && reason === 'weak-spot' && <span className="tag tag-brand">{t('verdict.weakSpot')}</span>}
+        {!reasonTag && reason === 'new-ground' && <span className="tag tag-brand">{t('verdict.newGround')}</span>}
+        {reason === 'task' && <span className="tag tag-brand">{t('verdict.task')}</span>}
         <span className="q-timer">◷ {fmtTime(elapsed)}</span>
       </div>
 
@@ -765,7 +812,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
 
       {resolved && (
         <div className="row no-print" style={{ margin: '14px 0 2px' }}>
-          <button className="redo-chip" onClick={() => onRedo ? onRedo() : onNext?.()}>↻ Redo Question</button>
+          <button className="redo-chip" onClick={() => onRedo ? onRedo() : onNext?.()}>{t('verdict.redoQuestion')}</button>
         </div>
       )}
 
@@ -790,26 +837,26 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       ) : (
         <>
           <div className="mode-tabs no-print">
-            <button className={`mode-tab ${mode === 'type' ? 'on' : ''}`} title="Maths editor — type equations and working"
-              aria-label="Answer by typing" onClick={() => flipMode('type')}>T</button>
-            <button className={`mode-tab ${mode === 'write' ? 'on' : ''}`} title="Handwriting — draw with pencil or finger"
-              aria-label="Answer by handwriting" onClick={() => flipMode('write')}>✎</button>
-            <button className={`mode-tab ${mode === 'photo' ? 'on' : ''}`} title="Photo — attach handwritten work"
-              aria-label="Answer with a photo of your working" onClick={() => flipMode('photo')}>▣</button>
+            <button className={`mode-tab ${mode === 'type' ? 'on' : ''}`} title={t('verdict.modeTypeTitle')}
+              aria-label={t('verdict.modeTypeLabel')} onClick={() => flipMode('type')}>{t('verdict.modeTypeGlyph')}</button>
+            <button className={`mode-tab ${mode === 'write' ? 'on' : ''}`} title={t('verdict.modeWriteTitle')}
+              aria-label={t('verdict.modeWriteLabel')} onClick={() => flipMode('write')}>✎</button>
+            <button className={`mode-tab ${mode === 'photo' ? 'on' : ''}`} title={t('verdict.modePhotoTitle')}
+              aria-label={t('verdict.modePhotoLabel')} onClick={() => flipMode('photo')}>▣</button>
           </div>
 
           {mode !== 'write' ? (
             <div className={`editor-shell ${resolved ? 'ink-disabled' : ''}`}>
               <div className="editor-toolbar">
-                <button className={`editor-tool ${showSyms ? 'on' : ''}`} title="Symbol palette" aria-label="Symbol palette" aria-pressed={showSyms} onClick={() => setShowSyms(s => !s)}>Σ</button>
-                <span className="editor-hint"><span className="kbd">{isWorking ? '⏎' : 'type'}</span> {isWorking ? 'one line of working per row' : 'to write math — it reads naturally'}</span>
+                <button className={`editor-tool ${showSyms ? 'on' : ''}`} title={t('verdict.symbolPalette')} aria-label={t('verdict.symbolPalette')} aria-pressed={showSyms} onClick={() => setShowSyms(s => !s)}>Σ</button>
+                <span className="editor-hint"><span className="kbd">{isWorking ? '⏎' : t('verdict.kbdType')}</span> {t(isWorking ? 'verdict.editorHintWorking' : 'verdict.editorHintType')}</span>
                 <span style={{ flex: 1 }} />
-                {question.answerSuffix && <span className="answer-suffix">answer in {question.answerSuffix}</span>}
+                {question.answerSuffix && <span className="answer-suffix">{t('verdict.answerIn', { unit: question.answerSuffix })}</span>}
               </div>
               {showSyms && (
                 <div className="sym-palette">
-                  {SYMBOLS.map(([sym, name]) => (
-                    <button key={sym} className="sym-key" aria-label={`Insert ${name}`} onClick={() => insertSym(sym)}>{sym}</button>
+                  {SYMBOLS.map(([sym, nameKey]) => (
+                    <button key={sym} className="sym-key" aria-label={t('verdict.insertSymbol', { name: t(nameKey) })} onClick={() => insertSym(sym)}>{sym}</button>
                   ))}
                 </div>
               )}
@@ -820,23 +867,36 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                         the photo-library option, which is the wrong way round. A student
                         photographs their exercise book first and picks the shot afterwards. */}
                     <input ref={photoInputRef} type="file" accept="image/*,application/pdf" style={{ display: 'none' }}
-                      onChange={e => attachPhoto(e, setPhoto, decodePhoto, decodePdf)} />
-                    {!photo
-                      ? <button className="btn btn-ghost" onClick={() => photoInputRef.current?.click()}>▣ Photograph your working on paper<span className="muted" style={{ display: 'block', fontSize: 11.5, marginTop: 2, fontWeight: 400 }}>a photo, a scanned PDF up to {MAX_PDF_PAGES} pages, or paste one you already took</span></button>
+                      onChange={e => attachPhoto(e, setPhoto, decodePhoto, decodePdf, message => setPhotoOCR({ phase: 'failed', text: '', confidence: 0, engine: null, error: message }))} />
+                    {!photo && photoOCR.phase === 'idle'
+                      ? <button className="btn btn-ghost" onClick={() => photoInputRef.current?.click()}>{t('verdict.photographWorking')}<span className="muted" style={{ display: 'block', fontSize: 11.5, marginTop: 2, fontWeight: 400 }}>{t('verdict.photoFormats', { pages: MAX_PDF_PAGES })}</span></button>
                       : (
                         <div className="photo-attach">
-                          <div className="photo-thumb"><img src={photo} alt="Paper working" /><button aria-label="Remove photo" onClick={() => { setPhoto(null); setPhotoOCR({ phase: 'idle', text: '', confidence: 0, error: '', engine: null }); }}>✕</button></div>
+                          {/* A PDF sets no thumbnail until its pages render, and the whole
+                              status block used to live inside the photo branch — so every
+                              PDF failure message was unreachable and the screen simply did
+                              not move. */}
+                          {photo
+                            ? <div className="photo-thumb"><img src={photo} alt={t('history.paperWorking')} /><button aria-label={t('verdict.removePhoto')} onClick={() => { setPhoto(null); setPhotoOCR({ phase: 'idle', text: '', confidence: 0, error: '', engine: null }); }}>✕</button></div>
+                            : <div className="photo-thumb" aria-hidden="true" style={{ display: 'grid', placeItems: 'center', fontSize: 22 }}>▤<button aria-label={t('verdict.removeAttachment')} onClick={() => setPhotoOCR({ phase: 'idle', text: '', confidence: 0, error: '', engine: null })}>✕</button></div>}
                           <div style={{ flex: 1 }}>
-                            {photoOCR.phase === 'reading' && <span className="muted">Reading your handwriting on-device with Apple Vision…</span>}
+                            {photoOCR.phase === 'reading' && (
+                              <span className="muted">{cloudReadingEnabled(user) ? t('verdict.readingWork') : t('verdict.readingWithVision')}</span>
+                            )}
                             {photoOCR.phase === 'done' && (
                               <>
-                                <div style={{ fontSize: 12.5, marginBottom: 6 }}><b>Decoded on-device</b>{photoOCR.confidence ? ` · ${Math.round(photoOCR.confidence * 100)}% OCR confidence` : ''}</div>
+                                {/* What actually read it. Saying "on-device" over a photo that
+                                    was uploaded is the one thing this screen must never do. */}
+                                <div style={{ fontSize: 12.5, marginBottom: 6 }}>
+                                  <b>{String(photoOCR.engine || '').startsWith('cloud') ? t('verdict.readOnServer') : t('verdict.decodedOnDevice')}</b>
+                                  {photoOCR.confidence ? t('verdict.ocrConfidence', { percent: Math.round(photoOCR.confidence * 100) }) : ''}
+                                </div>
                                 <pre style={{ whiteSpace: 'pre-wrap', margin: 0, font: 'inherit', color: 'var(--ink)' }}>{photoOCR.text}</pre>
-                                <div className="muted" style={{ marginTop: 6 }}>Pri filled the answer box from the final recognised line. Check or edit it before marking.</div>
+                                <div className="muted" style={{ marginTop: 6 }}>{t('verdict.filledFromLastLine')}</div>
                               </>
                             )}
                             {(photoOCR.phase === 'failed' || photoOCR.phase === 'unavailable') && <span style={{ color: 'var(--warn)' }}>{photoOCR.error}</span>}
-                            {photoOCR.phase === 'idle' && <span className="muted">Photo attached. Native Pri will decode it into editable maths before marking.</span>}
+                            {photoOCR.phase === 'idle' && <span className="muted">{t('verdict.photoAttachedIdle')}</span>}
                           </div>
                         </div>
                       )}
@@ -846,9 +906,9 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                   <textarea
                     ref={inputRef}
                     className="working-input"
-                    aria-label="Your working — one line per row, every line is marked"
+                    aria-label={t('verdict.workingAria')}
                     style={{ background: 'none', border: 'none', outline: 'none', color: 'var(--ink)' }}
-                    placeholder={question.inputHint || 'Show every line of your working — each line is marked.\nFinish with the result you were asked to reach.'}
+                    placeholder={question.inputHint || t('verdict.workingPlaceholder')}
                     value={working} disabled={resolved}
                     onChange={e => editWorking(e.target.value)}
                     rows={6}
@@ -859,8 +919,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                     <input
                       ref={inputRef}
                       className="answer-input"
-                      aria-label={`Your answer${question.answerSuffix ? ` in ${question.answerSuffix}` : ''}`}
-                      placeholder={question.inputHint || 'Your answer…'}
+                      aria-label={question.answerSuffix ? t('verdict.answerAriaWithUnit', { unit: question.answerSuffix }) : t('verdict.answerAria')}
+                      placeholder={question.inputHint || t('verdict.answerPlaceholder')}
                       value={answer}
                       disabled={resolved}
                       onChange={e => editAnswer(e.target.value)}
@@ -871,18 +931,18 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                   </div>
                 )}
                 {typedPreview && !resolved && !isWorking && (
-                  <div className="typed-preview">reads as&nbsp; <MathText text={`$${typedPreview}$`} /></div>
+                  <div className="typed-preview">{t('verdict.readsAs')}&nbsp; <MathText text={`$${typedPreview}$`} /></div>
                 )}
                 {question.supportsSteps && !resolved && !isWorking && mode === 'type' && (
                   <div style={{ marginTop: 14 }}>
                     <button className="btn btn-quiet btn-sm" onClick={() => setShowWorking(s => !s)}>
-                      {showWorking ? '⌄' : '›'} Show working for partial credit — every line is checked
+                      {showWorking ? '⌄' : '›'} {t('verdict.showWorkingToggle')}
                     </button>
                     {showWorking && (
                       <textarea
                         className="input" style={{ marginTop: 8 }}
-                        aria-label="Your working for partial credit — one step per line"
-                        placeholder={'One step per line, e.g.\n2x + 3 = 13\n2x = 10\nx = 5'}
+                        aria-label={t('verdict.workingPartialAria')}
+                        placeholder={t('verdict.workingPartialPlaceholder')}
                         value={working} onChange={e => editWorking(e.target.value)}
                       />
                     )}
@@ -890,11 +950,11 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                 )}
               </div>
               <div className="editor-foot no-print">
-                <span className="editor-brand">✒ Pri Ink Engine</span>
+                <span className="editor-brand">{t('verdict.inkEngine')}</span>
                 <span style={{ flex: 1 }} />
                 {!resolved && (
                   <button className={`btn btn-primary ${canSubmit ? 'btn-glow' : ''}`} onClick={() => submit()} disabled={busy || !canSubmit}>
-                    {busy ? 'Marking…' : '➤ Submit Answer'}
+                    {t(busy ? 'verdict.marking' : 'verdict.submit')}
                   </button>
                 )}
               </div>
@@ -909,23 +969,27 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                 {inkPhase === 'failed' && (
                   <div className="editor-body">
                     <div className="error-box" role="alert" style={{ marginBottom: 0 }}>
-                      <b>Handwriting couldn’t load.</b> The recogniser is kept in a file of its own and this
-                      device couldn’t read it just now. Nothing you have done is lost — {inkStuck
-                        ? 'reload the app, or answer by typing.'
-                        : 'try again, or answer by typing.'}
+                      {/* Three outcomes, not two. "You are offline and this needs one
+                          download" is a different thing from "it would not load", and
+                          only one of them is the student's to act on. */}
+                      {inkNeedsNetwork ? (
+                        <><b>{t('verdict.inkNeedsDownloadTitle')}</b>{' '}{t('verdict.inkNeedsDownloadBody')}</>
+                      ) : (
+                        <><b>{t('verdict.inkFailedTitle')}</b>{' '}{t(inkStuck ? 'verdict.inkFailedStuck' : 'verdict.inkFailedRetry')}</>
+                      )}
                     </div>
                     <div className="row" style={{ marginTop: 12 }}>
                       {inkStuck
-                        ? <button className="btn btn-ghost btn-sm" onClick={() => window.location.reload()}>Reload Pri Learning</button>
-                        : <button className="btn btn-ghost btn-sm" onClick={() => setInkTry(n => n + 1)}>Try again</button>}
-                      <button className="btn btn-quiet btn-sm" onClick={() => flipMode('type')}>Type the answer instead</button>
+                        ? <button className="btn btn-ghost btn-sm" onClick={() => window.location.reload()}>{t('verdict.reloadApp')}</button>
+                        : <button className="btn btn-ghost btn-sm" onClick={() => setInkTry(n => n + 1)}>{t('common.tryAgain')}</button>}
+                      <button className="btn btn-quiet btn-sm" onClick={() => flipMode('type')}>{t('verdict.typeInstead')}</button>
                     </div>
                   </div>
                 )}
                 {(inkPhase === 'idle' || inkPhase === 'loading') && (
                   <div className="editor-body">
                     <div className="skeleton" style={{ height: 380 }} />
-                    <p className="muted" role="status" style={{ marginTop: 10 }}>Warming up the handwriting engine…</p>
+                    <p className="muted" role="status" style={{ marginTop: 10 }}>{t('verdict.warmingUp')}</p>
                   </div>
                 )}
                 {needsCheck && checking && (
@@ -933,35 +997,35 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                     style={{ borderTop: '1px solid var(--hairline)', background: 'var(--brand-soft)' }}>
                     <div className="spread" style={{ gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
                       <div>
-                        <b>Check this reading first</b>
+                        <b>{t('verdict.checkReadingFirst')}</b>
                         <div className="muted" style={{ fontSize: 13, marginTop: 2 }}>{checkCopy}</div>
                         <div style={{ marginTop: 6 }}>
-                          reading it as&nbsp;<MathText text={`$${texOf(reading)}$`} />
+                          {t('verdict.readingItAs')}&nbsp;<MathText text={`$${texOf(reading)}$`} />
                         </div>
                       </div>
                       <div className="row" style={{ gap: 8 }}>
                         <button className="btn btn-primary btn-sm" onClick={acceptReading} disabled={busy}>
-                          ✓ That’s what I wrote
+                          {t('verdict.thatsWhatIWrote')}
                         </button>
-                        <button className="btn btn-quiet btn-sm" onClick={() => setChecking(false)}>Keep writing</button>
+                        <button className="btn btn-quiet btn-sm" onClick={() => setChecking(false)}>{t('verdict.keepWriting')}</button>
                       </div>
                     </div>
                   </div>
                 )}
                 {InkAnswer && (
                   <div className="editor-foot no-print">
-                    <span className="editor-brand">✒ Pri Ink Engine — on-device recognition</span>
+                    <span className="editor-brand">{t('verdict.inkEngineOnDevice')}</span>
                     <span style={{ flex: 1 }} />
                     {inkResult?.answerLine && !needsCheck && (
                       <span className="muted" style={{ marginRight: 10 }}>
-                        submitting: <MathText text={`$${texOf(isWorking ? inkResult.lines[inkResult.lines.length - 1] : inkResult.answerLine)}$`} />
+                        {t('verdict.submitting')} <MathText text={`$${texOf(isWorking ? inkResult.lines[inkResult.lines.length - 1] : inkResult.answerLine)}$`} />
                       </span>
                     )}
                     {!resolved && (
                       <button
                         className={`btn ${needsCheck ? 'btn-ghost' : `btn-primary ${canSubmit ? 'btn-glow' : ''}`}`}
                         onClick={() => submit()} disabled={busy || !canSubmit}>
-                        {busy ? 'Marking…' : needsCheck ? 'Check this reading first' : '➤ Submit Answer'}
+                        {t(busy ? 'verdict.marking' : needsCheck ? 'verdict.checkReadingFirst' : 'verdict.submit')}
                       </button>
                     )}
                   </div>
@@ -970,19 +1034,19 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
               {inkComments && (
                 <aside className="ink-comments">
                   <div className="spread">
-                    <span className="sc-label" style={{ margin: 0 }}>Comments</span>
-                    <span className="muted" style={{ fontSize: 11.5 }}>{inkComments.length} on this page</span>
+                    <span className="sc-label" style={{ margin: 0 }}>{t('verdict.comments')}</span>
+                    <span className="muted" style={{ fontSize: 11.5 }}>{t('verdict.commentsOnPage', { count: inkComments.length, n: inkComments.length })}</span>
                   </div>
                   {inkComments.map((c, i) => (
                     <div key={i} className={`ink-comment ${c.kind}`}>
-                      <div className="ic-head">{c.kind === 'good' ? 'Correct' : 'Mistake'}<span className="ic-line">line {c.line}</span></div>
+                      <div className="ic-head">{t(c.kind === 'good' ? 'app.correct' : 'verdict.mistake')}<span className="ic-line">{t('verdict.onLine', { n: c.line })}</span></div>
                       {c.text}
                     </div>
                   ))}
                   {cloudWorkingNote && (
                     <div className={`ink-comment ${cloudWorkingNote.tone === 'break' ? 'bad' : 'note'}`}>
                       <div className="ic-head">
-                        {cloudWorkingNote.tone === 'break' ? 'Where it breaks' : cloudWorkingNote.tone === 'maybe' ? 'Possibly' : 'Your algebra'}
+                        {t(cloudWorkingNote.tone === 'break' ? 'verdict.whereItBreaks' : cloudWorkingNote.tone === 'maybe' ? 'verdict.possibly' : 'verdict.yourAlgebra')}
                       </div>
                       {cloudWorkingNote.text}
                     </div>
@@ -1000,21 +1064,21 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       {showScribble && !resolved && (
         <div className="editor-shell" style={{ marginTop: 12 }}>
           <div className="editor-toolbar">
-            <span className="editor-hint">Scribble pad — rough work, never marked</span>
+            <span className="editor-hint">{t('verdict.scribbleRough')}</span>
             <span style={{ flex: 1 }} />
-            <button className="editor-tool" aria-label="Undo scribble" onClick={() => scribbleRef.current?.undo()}>↩</button>
-            <button className="editor-tool" aria-label="Clear the scribble pad" onClick={() => scribbleRef.current?.clear()}>🗑</button>
+            <button className="editor-tool" aria-label={t('verdict.undoScribble')} onClick={() => scribbleRef.current?.undo()}>↩</button>
+            <button className="editor-tool" aria-label={t('verdict.clearScribble')} onClick={() => scribbleRef.current?.clear()}>🗑</button>
           </div>
-          <InkCanvas ref={scribbleRef} height={200} guides={false} ariaLabel="Scribble pad" />
+          <InkCanvas ref={scribbleRef} height={200} guides={false} ariaLabel={t('verdict.scribblePad')} />
         </div>
       )}
 
       {/* hints shown */}
       {hints.length > 0 && (
         <div className="hints-block">
-          <div className="hints-block-title">Hints</div>
+          <div className="hints-block-title">{t('verdict.hints')}</div>
           {hints.map((h, i) => (
-            <div className="hintbox" key={i}><span className="h-n">Hint {i + 1}</span><MathText text={h} /></div>
+            <div className="hintbox" key={i}><span className="h-n">{t('verdict.hintNumber', { n: i + 1 })}</span><MathText text={h} /></div>
           ))}
         </div>
       )}
@@ -1024,8 +1088,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         <div className="verdict verdict-bad">
           <span className="verdict-ico">{state.res.invalid ? '?' : '✗'}</span>
           <div>
-            <b>{state.res.invalid ? 'I couldn’t read that.' : 'Not quite.'}</b>{' '}
-            <MathText text={state.res.feedback || 'Have another look and try again — you have one more go.'} />
+            <b>{t(state.res.invalid ? 'verdict.unreadable' : 'verdict.notQuite')}</b>{' '}
+            <MathText text={state.res.feedback || t('verdict.oneMoreGo')} />
             {state.res.partial && <div className="muted" style={{ marginTop: 6, fontSize: 13.5 }}>◐ {state.res.partial.note}</div>}
             {state.res.stepReport && <StepReport report={state.res.stepReport} />}
           </div>
@@ -1037,51 +1101,80 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         <>
           {answerLines.length > 0 && (
             <div className="your-answer">
-              <div className="sc-label">Your answer</div>
+              <div className="sc-label">{t('verdict.yourAnswer')}</div>
               {answerLines.map((l, i) => (
                 <div className="ya-line" key={i}><MathText text={`$${texOf(l)}$`} /></div>
               ))}
-              {photo && <div className="photo-thumb" style={{ marginTop: 8 }}><img src={photo} alt="Attached working" /></div>}
+              {photo && <div className="photo-thumb" style={{ marginTop: 8 }}><img src={photo} alt={t('verdict.attachedWorking')} /></div>}
             </div>
           )}
 
           <div className="eval-card">
             <div className="eval-head">
-              <span className="logo-bb">P</span><span className="eval-title">ri Learning. <span style={{ color: 'var(--ink-2)' }}>Evaluation</span></span>
+              <span className="logo-bb">P</span><span className="eval-title">ri Learning. <span style={{ color: 'var(--ink-2)' }}>{t('verdict.evaluation')}</span></span>
               <span className="eval-marks">
-                <b>{verdictGood ? shownMarks : earnedMarks} / {totalMarks}</b> marks <small>({verdictGood ? pct : (selfSaved ? Math.round(100 * earnedMarks / totalMarks) : 0)}%)</small>
+                {t('verdict.marksOutOf', { earned: verdictGood ? shownMarks : earnedMarks, total: totalMarks })}
+                {' '}<small>({verdictGood ? pct : (selfSaved ? Math.round(100 * earnedMarks / totalMarks) : 0)}%)</small>
               </span>
             </div>
-            <div className="eval-disclaimer">Marked on-device by the Pri engine. If your working differs from the sample, check it with your teacher.</div>
+            <div className="eval-disclaimer">{t('verdict.markedOnDevice')}</div>
             <div className="eval-body">
               <div className="spread">
-                <b>{verdictGood ? ['Nailed it.', 'Correct.', 'Beautiful work.', 'That’s it.'][question.id.charCodeAt(0) % 4] : res.revealed ? 'Solution revealed.' : 'Not this time.'}</b>
+                <b>{verdictGood
+                  ? t(PRAISE_KEYS[question.id.charCodeAt(0) % PRAISE_KEYS.length])
+                  : t(res.revealed ? 'verdict.revealed' : 'verdict.notThisTime')}</b>
                 <span>
                   {res.xp > 0 && <span className="xp-pop">+{res.xp} XP</span>}
-                  {hintsUsed > 0 && <span className="muted" style={{ marginLeft: 8 }}>after {hintsUsed} hint{hintsUsed > 1 ? 's' : ''}</span>}
+                  {hintsUsed > 0 && <span className="muted" style={{ marginLeft: 8 }}>{t('verdict.afterHints', { count: hintsUsed, n: hintsUsed })}</span>}
                 </span>
               </div>
-              {res.feedback && !verdictGood && <div style={{ marginTop: 6 }}><b>Reasoning:</b> <MathText text={res.feedback} /></div>}
+              {res.feedback && !verdictGood && <div style={{ marginTop: 6 }}><b>{t('verdict.reasoning')}</b> <MathText text={res.feedback} /></div>}
               {res.partial && !verdictGood && <div className="muted" style={{ marginTop: 6, fontSize: 13.5 }}>◐ {res.partial.note}</div>}
+              {boardAward && (
+                <div className="board-award" style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid var(--line, rgba(128,128,128,.22))' }}>
+                  <div className="spread" style={{ alignItems: 'baseline' }}>
+                    <span className="sc-label" style={{ margin: 0 }}>{t('verdict.markedStepByStep')}</span>
+                    <b style={{ fontVariantNumeric: 'tabular-nums' }}>{boardAward.awarded} / {boardAward.total}</b>
+                  </div>
+                  {boardAward.rows.map((row, i) => (
+                    <div key={i} className="set-row" style={{ paddingTop: 5, paddingBottom: 5 }}>
+                      <span className="set-k" style={{ fontWeight: 400 }}>
+                        <span aria-hidden="true" style={{ marginRight: 7, color: row.earned === row.outOf ? 'var(--good, #1a8f4c)' : 'var(--bad, #c0392b)' }}>
+                          {row.earned === row.outOf ? '✓' : '✗'}
+                        </span>
+                        {row.label}
+                        {row.why && <span className="muted" style={{ display: 'block', fontSize: 11.5, marginTop: 2, marginLeft: 20 }}>{row.why}</span>}
+                      </span>
+                      <span className="set-v" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                        <span className="sr-only">{t('verdict.rowMarks', { earned: row.earned, total: row.outOf })} </span>{row.earned}/{row.outOf}
+                      </span>
+                    </div>
+                  ))}
+                  <p style={{ marginTop: 8, fontSize: 13 }}>{marksSentence(boardAward)}</p>
+                  <p className="muted" style={{ fontSize: 11.5, marginTop: 6 }}>
+                    {t('verdict.boardStyleNote')}
+                  </p>
+                </div>
+              )}
               {verdictGood && writeMode && inkResult?.lines?.length > 1 && (
-                <div style={{ marginTop: 6 }}><b>Reasoning:</b> Every line of your handwritten working was checked — {inkResult.lines.length} steps read and verified, reaching the required result through a logical chain.</div>
+                <div style={{ marginTop: 6 }}><b>{t('verdict.reasoning')}</b> {t('verdict.everyLineChecked', { count: inkResult.lines.length, n: inkResult.lines.length })}</div>
               )}
               {!verdictGood && res.solution && (
-                <div style={{ marginTop: 4 }}>Expected: <b><MathText text={res.solution.answerText} /></b></div>
+                <div style={{ marginTop: 4 }}>{t('verdict.expected')} <b><MathText text={res.solution.answerText} /></b></div>
               )}
               {res.stepReport && <StepReport report={res.stepReport} />}
               <div className="row" style={{ marginTop: 10, flexWrap: 'wrap', gap: 8 }}>
-                <span className="tag">Mastery {res.mastery}%</span>
+                <span className="tag">{t('verdict.mastery', { n: res.mastery })}</span>
                 <span className="tag" style={{ color: res.ratingDelta >= 0 ? 'var(--good)' : 'var(--bad)' }}>
-                  {res.ratingDelta >= 0 ? '▲' : '▼'} {Math.abs(res.ratingDelta)} skill
+                  {t(res.ratingDelta >= 0 ? 'verdict.skillUp' : 'verdict.skillDown', { n: Math.abs(res.ratingDelta) })}
                 </span>
-                {res.predicted && <span className="tag">Predicted mark {res.predicted.mark}</span>}
+                {res.predicted && <span className="tag">{t('verdict.predictedMark', { mark: res.predicted.mark })}</span>}
               </div>
             </div>
 
             {res.solution?.steps && (
               <div className="solution-block">
-                <div className="sc-label" style={{ margin: '12px 0' }}>Worked solution</div>
+                <div className="sc-label" style={{ margin: '12px 0' }}>{t('verdict.workedSolution')}</div>
                 {plotSpec && (
                   <div className="q-plot" style={{ margin: '4px 0 14px' }}>
                     <PriPlot spec={plotSpec} progress={1} reduceMotion />
@@ -1100,7 +1193,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                 </div>
                 {res.solution.answerText && (
                   <div className="final-answer">
-                    <div className="sc-label" style={{ marginBottom: 8 }}>Final answer</div>
+                    <div className="sc-label" style={{ marginBottom: 8 }}>{t('verdict.finalAnswer')}</div>
                     <MathText text={res.solution.answerText} />
                   </div>
                 )}
@@ -1124,11 +1217,11 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         <div className="row no-print" style={{ marginTop: 18, flexWrap: 'wrap' }}>
           {isMcq && (
             <button className={`btn btn-primary ${canSubmit ? 'btn-glow' : ''}`} onClick={() => submit()} disabled={busy || !canSubmit}>
-              {busy ? 'Marking…' : '➤ Submit Answer'}
+              {t(busy ? 'verdict.marking' : 'verdict.submit')}
             </button>
           )}
-          <button className="btn btn-quiet" onClick={reveal} disabled={busy}>Show solution</button>
-          {!writeMode && !isMcq && <span className="muted" style={{ marginLeft: 'auto' }}>press <span className="kbd">Enter</span> to submit</span>}
+          <button className="btn btn-quiet" onClick={reveal} disabled={busy}>{t('verdict.showSolution')}</button>
+          {!writeMode && !isMcq && <span className="muted" style={{ marginLeft: 'auto' }}>{tx('verdict.pressEnter', { key: <span className="kbd">{t('verdict.enterKey')}</span> })}</span>}
         </div>
       )}
     </div>
@@ -1136,6 +1229,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
 }
 
 function CriteriaTable({ criteria, correct, selfMarks, setSelfMarks, selfSaved, setSelfSaved }) {
+  const t = useT();
   const marked = i => correct || !!selfMarks[i];
   const missed = i => selfSaved && !marked(i);
   const earned = i => (correct || selfSaved) && marked(i);
@@ -1143,7 +1237,7 @@ function CriteriaTable({ criteria, correct, selfMarks, setSelfMarks, selfSaved, 
     <div>
       <table className="criteria-table">
         <thead>
-          <tr><th style={{ width: '100%', textAlign: 'center' }}>Criteria</th><th>Marks</th></tr>
+          <tr><th style={{ width: '100%', textAlign: 'center' }}>{t('verdict.criteria')}</th><th>{t('verdict.marksColumn')}</th></tr>
         </thead>
         <tbody>
           {criteria.map((c, i) => (
@@ -1168,10 +1262,10 @@ function CriteriaTable({ criteria, correct, selfMarks, setSelfMarks, selfSaved, 
         <div className="row" style={{ marginTop: 10 }}>
           {!selfSaved
             ? <>
-              <span className="muted">Tick the criteria your working earned, then save.</span>
-              <button className="btn btn-ghost btn-sm" style={{ marginLeft: 'auto' }} onClick={() => setSelfSaved(true)}>Save self-marking</button>
+              <span className="muted">{t('verdict.tickCriteria')}</span>
+              <button className="btn btn-ghost btn-sm" style={{ marginLeft: 'auto' }} onClick={() => setSelfSaved(true)}>{t('verdict.saveSelfMarking')}</button>
             </>
-            : <span className="tag" style={{ color: 'var(--good)' }}>✓ self-marking recorded — {Object.values(selfMarks).filter(Boolean).length}/{criteria.length} marks</span>}
+            : <span className="tag" style={{ color: 'var(--good)' }}>{t('verdict.selfMarkingRecorded', { earned: Object.values(selfMarks).filter(Boolean).length, total: criteria.length })}</span>}
         </div>
       )}
     </div>
@@ -1179,16 +1273,17 @@ function CriteriaTable({ criteria, correct, selfMarks, setSelfMarks, selfSaved, 
 }
 
 function StepReport({ report }) {
+  const t = useT();
   if (!report?.lines?.length) return null;
   return (
     <div style={{ marginTop: 10, display: 'grid', gap: 3 }}>
-      <div className="muted" style={{ fontSize: 12, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Step check on your working</div>
+      <div className="muted" style={{ fontSize: 12, letterSpacing: '0.1em', textTransform: 'uppercase' }}>{t('verdict.stepCheck')}</div>
       {report.lines.map((l, i) => (
         <React.Fragment key={i}>
           <div className={`stepcheck-line sc-${l.status}`}>
             <span>{l.status === 'ok' ? '✓' : l.status === 'break' ? '✗' : '·'}</span>
             <span>{l.text}</span>
-            {l.status === 'break' && <b style={{ fontFamily: 'var(--font)', fontSize: 12.5, whiteSpace: 'nowrap' }}>← the mistake is here</b>}
+            {l.status === 'break' && <b style={{ fontFamily: 'var(--font)', fontSize: 12.5, whiteSpace: 'nowrap' }}>{t('verdict.mistakeIsHere')}</b>}
             {l.note && !l.diagnosis && <span style={{ fontFamily: 'var(--font)', fontWeight: 400, fontSize: 12.5 }}> — {l.note}</span>}
           </div>
           {l.diagnosis && <Diagnosis d={l.diagnosis} />}
@@ -1219,7 +1314,7 @@ function Diagnosis({ d }) {
   );
 }
 
-function attachPhoto(e, setPhoto, onReady, onPdf) {
+function attachPhoto(e, setPhoto, onReady, onPdf, onFailed) {
   const f = e.target.files?.[0];
   if (!f) return;
   // A scanner app hands back a PDF, not a photo. Read it as bytes and let the
@@ -1243,7 +1338,12 @@ function attachPhoto(e, setPhoto, onReady, onPdf) {
     onReady?.(dataURL);
     URL.revokeObjectURL(url);
   };
-  img.onerror = () => URL.revokeObjectURL(url);
+  img.onerror = () => {
+    URL.revokeObjectURL(url);
+    // Previously a silent no-op: the student picked a file and the UI did not
+    // move. A HEIC from an iPhone opened on Android lands here.
+    onFailed?.('That image could not be opened. Try photographing the page again, or save it as a JPEG first.');
+  };
   img.src = url;
   e.target.value = '';
 }

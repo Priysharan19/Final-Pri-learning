@@ -165,7 +165,7 @@ try {
 
   // ── Security floor on the real router ──────────────────────────────────
   const health = await call('/health');
-  check(health.status === 200 && health.data.ok === true && health.data.service === 'pri-learning-platform' && health.data.schemaVersion === '4', 'health reports the platform and schema version');
+  check(health.status === 200 && health.data.ok === true && health.data.service === 'pri-learning-platform' && health.data.schemaVersion === '5', 'health reports the platform and schema version');
   check(health.headers.get('x-content-type-options') === 'nosniff' && health.headers.get('cache-control') === 'no-store' && health.headers.get('x-frame-options') === 'DENY', 'security headers are applied to every /v1 response');
   check((await call('/does-not-exist')).status === 404 && (await call('/does-not-exist')).data.error.code === 'NOT_FOUND', 'unknown routes are a JSON 404');
   check((await call('/sync/pull/0')).status === 401 && (await call('/sync/pull/0')).data.error.code === 'AUTH_REQUIRED', 'session-gated routes reject anonymous callers');
@@ -204,8 +204,12 @@ try {
   const firstPush = await push(pushBody([eventA, eventB], [profileV1]), 'push-1');
   check(firstPush.status === 200 && firstPush.data.acceptedEvents.length === 2 && firstPush.data.acceptedEvents.every(e => e.replayed === false), 'first push accepts both events');
   check(firstPush.data.acceptedEntities.length === 1 && firstPush.data.acceptedEntities[0].version === 1, 'first push creates profile version 1');
-  const replayPush = await push(pushBody([], []), 'push-1');
-  check(replayPush.status === 200 && JSON.stringify(replayPush.data) === JSON.stringify(firstPush.data), 'replaying an Idempotency-Key returns the stored response even with a different body');
+  const replayPush = await push(pushBody([eventA, eventB], [profileV1]), 'push-1');
+  check(replayPush.status === 200 && JSON.stringify(replayPush.data) === JSON.stringify(firstPush.data), 'replaying an Idempotency-Key with the same batch returns the stored response');
+  // The same key over different content is a client bug either way; answering it
+  // with the old response would drop the new writes and still say 200.
+  const reusedKey = await push(pushBody([], []), 'push-1');
+  check(reusedKey.status === 409 && reusedKey.data.error.code === 'IDEMPOTENCY_KEY_REUSED', 'the same Idempotency-Key over a different batch is refused, not silently replayed');
   const seqConflict = await push(pushBody([{ ...eventA, id: 'evt-1-rewritten', payload: { correct: false } }], []), 'push-2');
   check(seqConflict.status === 409 && seqConflict.data.error.code === 'SYNC_SEQUENCE_CONFLICT', 'a device sequence with different content is a conflict');
   const seqReplay = await push(pushBody([eventA], []), 'push-3');

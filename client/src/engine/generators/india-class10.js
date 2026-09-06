@@ -9,6 +9,8 @@ import { currentQuadraticContext } from './india-class10-quadratic-context.js';
 import { currentSurfaceAreaCombination } from './india-class10-surface-combo.js';
 import { currentClass10Trigonometry, currentClass10TrigApplications } from './india-class10-trigonometry.js';
 import { currentLinearSolutionConditions, currentQuadraticDiscriminant, currentTrigBoundaryRelations } from './india-class10-production-gaps.js';
+// The three outcomes that were still served by an NSW Year 8/Year 10 generator.
+import { indiaClass10Core } from './india-class10-core.js';
 
 const basePolynomialZeroes = baseIndiaClass10['c10-polynomial-zeroes'];
 
@@ -20,6 +22,7 @@ function polynomialZeroes(rng, diff) {
 
 export const indiaClass10 = Object.freeze({
   ...baseIndiaClass10,
+  ...indiaClass10Core,
   'c10-polynomial-zeroes': polynomialZeroes,
   'c10-triangles-current': currentTriangles,
   'c10-irrationality-proofs': currentIrrationalityProof,

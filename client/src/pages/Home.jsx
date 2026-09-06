@@ -4,7 +4,16 @@ import { api } from '../api.js';
 import { useApp } from '../App.jsx';
 import { dotpointAvailable, practiceTargetAvailable, topicAvailability } from '../engine/curriculumAvailability.js';
 import { dayKey, formatWeekday } from '../lib/locale.js';
+import { useT, useTx } from '../i18n/index.js';
+import { textMatches, useGlossary } from '../i18n/glossary.js';
+import TermGloss from '../components/TermGloss.jsx';
 
+// Deliberately English in every language. These are jokes that live entirely
+// in the English idiom of a maths classroom — "The proof is left as an exercise
+// for you", "Integrate practice. Differentiate yourself." A translated pun is
+// not the same joke, and a limp one on the home screen is worse than an English
+// one a Hindi-medium student will read perfectly well. If they are ever
+// rewritten for Hindi it should be as new jokes, not as translations of these.
 const TAGLINES = [
   'The rest is algebra.',
   'The proof is left as an exercise for you.',
@@ -15,7 +24,7 @@ const TAGLINES = [
   'Q.E.D. before dinner.',
 ];
 
-const DIFF_LABELS = { 1: 'Foundation', 2: 'Intermediate', 3: 'Advanced', 4: 'Extension' };
+const DIFF_KEYS = { 1: 'difficulty.1', 2: 'difficulty.2', 3: 'difficulty.3', 4: 'difficulty.4' };
 
 function loadSaved() {
   try { return JSON.parse(localStorage.getItem('pri-gen-filters')) || {}; } catch { return {}; }
@@ -24,6 +33,8 @@ function loadSaved() {
 export default function Home() {
   const { user, dueCount } = useApp();
   const nav = useNavigate();
+  const t = useT();
+  const tx = useTx();
   const [stats, setStats] = useState(null);
   const [curriculum, setCurriculum] = useState(null);
   const [open, setOpen] = useState(false);
@@ -35,6 +46,13 @@ export default function Home() {
   const [dotpoint, setDotpoint] = useState(saved.current.dotpoint ?? null);
   const [difficulty, setDifficulty] = useState(saved.current.difficulty ?? null);
   const [promoGone, setPromoGone] = useState(localStorage.getItem('pri-home-promo') === 'off');
+  // Typed into the topic filter. Kept out of the saved filter set on purpose:
+  // it is how you find a topic, not part of what you asked for.
+  const [topicQuery, setTopicQuery] = useState('');
+  // The glossary is what lets the filter answer Hinglish. Loading it here means
+  // a student with the bridge on can type "trikonmiti"; one without it still
+  // gets a working English filter, because textMatches falls back to the label.
+  useGlossary(user?.mathsGloss === true);
 
   useEffect(() => { api.get('/stats').then(setStats).catch(() => { }); }, []);
   useEffect(() => { api.get('/curriculum').then(setCurriculum).catch(() => { }); }, []);
@@ -43,7 +61,7 @@ export default function Home() {
   }, [year, sectionKey, subtopic, dotpoint, difficulty]);
 
   const hour = new Date().getHours();
-  const greeting = hour < 12 ? 'Good Morning' : hour < 18 ? 'Good Afternoon' : 'Good Evening';
+  const greeting = hour < 12 ? t('home.goodMorning') : hour < 18 ? t('home.goodAfternoon') : t('home.goodEvening');
   const firstName = user.name.split(' ')[0];
 
   // ── sections available for the chosen year ──
@@ -63,15 +81,20 @@ export default function Home() {
     [sections, sectionKey]
   );
 
+  // Indian students type Hindi words in Latin letters and English words in
+  // half: "trikonmiti", "trig", "quadratic", "समुच्चय". The matcher folds all
+  // four onto the same topic, so the box finds what was meant rather than what
+  // was spelled. An empty query matches everything, which is the old behaviour.
   const byStrand = useMemo(() => {
     if (!section) return [];
     const m = new Map();
     for (const s of section.subtopics) {
+      if (topicQuery.trim() && !textMatches(s.name, topicQuery) && !textMatches(s.strand || '', topicQuery)) continue;
       if (!m.has(s.strand)) m.set(s.strand, []);
       m.get(s.strand).push(s);
     }
     return [...m.entries()];
-  }, [section]);
+  }, [section, topicQuery]);
 
   const selSub = useMemo(() => {
     if (!subtopic || !curriculum) return null;
@@ -107,12 +130,13 @@ export default function Home() {
     if (selectedDotpoint && !dotpointAvailable(selectedDotpoint)) setDotpoint(null);
   }, [curriculum, subtopic, selSub, selectedDotpoint]);
 
+  const india = curriculum?.country === 'in';
   const chips = [];
-  if (year != null) chips.push({ k: 'year', label: `${curriculum?.country === 'in' ? 'Class' : 'Year'} ${year}`, clear: () => { setYear(user.year); setSectionKey(null); setSubtopic(null); setDotpoint(null); } });
+  if (year != null) chips.push({ k: 'year', label: t(india ? 'common.classNumber' : 'common.yearNumber', { n: year }), clear: () => { setYear(user.year); setSectionKey(null); setSubtopic(null); setDotpoint(null); } });
   if (section) chips.push({ k: 'course', label: section.label, clear: () => { setSectionKey(null); setSubtopic(null); setDotpoint(null); } });
   if (selSub) chips.push({ k: 'topic', label: selSub.name, clear: () => { setSubtopic(null); setDotpoint(null); } });
-  if (dotpoint != null && selSub) chips.push({ k: 'dp', label: `Dot point ${dotpoint + 1}`, clear: () => setDotpoint(null) });
-  if (difficulty != null) chips.push({ k: 'diff', label: `D${difficulty} ${DIFF_LABELS[difficulty]}`, clear: () => setDifficulty(null) });
+  if (dotpoint != null && selSub) chips.push({ k: 'dp', label: t('home.dotpointChip', { n: dotpoint + 1 }), clear: () => setDotpoint(null) });
+  if (difficulty != null) chips.push({ k: 'diff', label: t('home.difficultyChip', { n: difficulty, label: t(DIFF_KEYS[difficulty]) }), clear: () => setDifficulty(null) });
 
   const generate = () => {
     if (impossibleTarget) return;
@@ -128,41 +152,41 @@ export default function Home() {
 
   return (
     <div className="home-wrap">
-      <h1 className="home-greet">{greeting}, <b>{firstName}</b>.</h1>
+      <h1 className="home-greet">{tx('home.greeting', { greeting, name: <b>{firstName}</b> })}</h1>
       <Tagline />
 
       {/* ── The question generator ── */}
       <div className="genbar">
         <div className={`genbar-head ${open ? 'open' : ''}`}>
           <button className="genbar-toggle" onClick={() => setOpen(o => !o)}
-            aria-label={open ? 'Hide the question filters' : 'Show the question filters'}
+            aria-label={open ? t('home.hideFilters') : t('home.showFilters')}
             aria-expanded={open} aria-controls="gen-panel">{open ? '⌄' : '⌃'}</button>
           {chips.length === 0 ? (
             <button className="genbar-empty" onClick={() => setOpen(true)}>
-              {open ? 'No filters applied' : 'Click to configure filters'}
+              {open ? t('home.noFilters') : t('home.configureFilters')}
             </button>
           ) : (
             <div className="genbar-chips">
               {chips.map(c => (
                 <span className="chip" key={c.k}>{c.label}
-                  <button className="chip-x" aria-label={`Remove the ${c.label} filter`}
+                  <button className="chip-x" aria-label={t('home.removeFilter', { filter: c.label })}
                     onClick={e => { e.stopPropagation(); c.clear(); }}>✕</button>
                 </span>
               ))}
             </div>
           )}
           {chips.length > 0 && (
-            <button className="editor-tool" title="Clear all filters" aria-label="Clear all filters" onClick={resetAll}>↺</button>
+            <button className="editor-tool" title={t('home.clearFilters')} aria-label={t('home.clearFilters')} onClick={resetAll}>↺</button>
           )}
-          <button className="btn btn-primary" style={{ padding: '7px 18px' }} onClick={generate} disabled={impossibleTarget}>Generate</button>
+          <button className="btn btn-primary" style={{ padding: '7px 18px' }} onClick={generate} disabled={impossibleTarget}>{t('home.generate')}</button>
         </div>
 
         {open && (
           <div className="gen-panel" id="gen-panel">
             <div className="gen-cats">
               {[
-                ['year', curriculum?.country === 'in' ? 'Class' : 'Year'], ['course', curriculum?.country === 'in' ? 'Track' : 'Course'], ['topics', 'Topics'],
-                ['dots', 'Dot Points'], ['difficulty', 'Difficulty'],
+                ['year', t(india ? 'home.catClass' : 'home.catYear')], ['course', t(india ? 'home.catTrack' : 'home.catCourse')], ['topics', t('home.catTopics')],
+                ['dots', t('home.catDots')], ['difficulty', t('home.catDifficulty')],
               ].map(([k, label]) => (
                 <button
                   key={k}
@@ -179,12 +203,12 @@ export default function Home() {
             <div className="gen-pane">
               {cat === 'year' && (
                 <>
-                  <div className="gen-pane-title">Select the {curriculum?.country === 'in' ? 'class' : 'year level'} to target</div>
+                  <div className="gen-pane-title">{t(india ? 'home.pickClass' : 'home.pickYear')}</div>
                   <div className="gen-opts">
                     {[7, 8, 9, 10, 11, 12].map(y => (
                       <button key={y} className={`gen-opt ${year === y ? 'on' : ''}`}
                         onClick={() => { setYear(y); setSectionKey(null); setSubtopic(null); setDotpoint(null); setCat('course'); }}>
-                        {curriculum?.country === 'in' ? 'Class' : 'Year'} {y}{y === user.year ? <small> · yours</small> : null}
+                        {t(india ? 'common.classNumber' : 'common.yearNumber', { n: y })}{y === user.year ? <small>{t('home.yours')}</small> : null}
                       </button>
                     ))}
                   </div>
@@ -193,7 +217,7 @@ export default function Home() {
 
               {cat === 'course' && (
                 <>
-                  <div className="gen-pane-title">Now select the {curriculum?.country === 'in' ? 'India maths track' : 'maths course'}</div>
+                  <div className="gen-pane-title">{t(india ? 'home.pickTrack' : 'home.pickCourse')}</div>
                   <div className="gen-opts">
                     {sections.map(s => (
                       <button key={s.key} className={`gen-opt ${sectionKey === s.key ? 'on' : ''}`}
@@ -201,27 +225,31 @@ export default function Home() {
                         {s.label}
                       </button>
                     ))}
-                    {!sections.length && <div className="muted">Loading syllabus…</div>}
+                    {!sections.length && <div className="muted">{t('home.loadingSyllabus')}</div>}
                   </div>
                 </>
               )}
 
               {cat === 'topics' && section && (
                 <>
-                  <div className="gen-pane-note">(optional)</div>
-                  <div className="gen-pane-title">Pick a topic for your question</div>
+                  <div className="gen-pane-note">{t('home.optional')}</div>
+                  <div className="gen-pane-title">{t('home.pickTopic')}</div>
+                  <input className="input" type="search" value={topicQuery} style={{ marginBottom: 12 }}
+                    placeholder={t('gloss.filterTopics')} aria-label={t('gloss.filterTopics')}
+                    onChange={e => setTopicQuery(e.target.value)} />
+                  {!byStrand.length && <div className="muted">{t('gloss.noTopicMatch', { query: topicQuery.trim() })}</div>}
                   {byStrand.map(([strand, subs]) => (
                     <div key={strand} style={{ marginBottom: 14 }}>
-                      <div className="gen-sub-head">{strand}</div>
+                      <div className="gen-sub-head"><TermGloss text={strand} /></div>
                       <div className="gen-opts">
                         {subs.map(s => {
                           const available = topicAvailability(s).selectable;
                           return (
                             <button key={s.id} className={`gen-opt ${subtopic === s.id ? 'on' : ''}`} style={{ textAlign: 'left' }}
                               disabled={!available}
-                              aria-label={available ? s.name : `${s.name}, coming soon`}
+                              aria-label={available ? s.name : t('home.topicComingSoon', { topic: s.name })}
                               onClick={() => { if (!available) return; setSubtopic(subtopic === s.id ? null : s.id); setDotpoint(null); }}>
-                              {s.name}{!available ? <small> · Coming soon</small> : null}
+                              <TermGloss text={s.name} />{!available ? <small>{t('home.comingSoon')}</small> : null}
                             </button>
                           );
                         })}
@@ -233,8 +261,8 @@ export default function Home() {
 
               {cat === 'dots' && selSub && (
                 <>
-                  <div className="gen-pane-note">(optional)</div>
-                  <div className="gen-pane-title">{selSub.name} — target a single syllabus dot point</div>
+                  <div className="gen-pane-note">{t('home.optional')}</div>
+                  <div className="gen-pane-title">{t('home.pickDotpoint', { topic: selSub.name })}</div>
                   <div className="gen-opts narrow">
                     {selSub.dotpoints.map((dp, i) => {
                       const text = typeof dp === 'string' ? dp : dp.text;
@@ -242,9 +270,9 @@ export default function Home() {
                       return (
                         <button key={i} className={`gen-opt ${dotpoint === i ? 'on' : ''}`} style={{ textAlign: 'left' }}
                           disabled={!available}
-                          aria-label={available ? text : `${text}, question forms coming soon`}
+                          aria-label={available ? text : t('home.dotpointComingSoon', { dotpoint: text })}
                           onClick={() => { if (available) setDotpoint(dotpoint === i ? null : i); }}>
-                          {text}{!available ? <small> · Question forms coming soon</small> : null}
+                          {text}{!available ? <small>{t('home.formsComingSoon')}</small> : null}
                         </button>
                       );
                     })}
@@ -254,13 +282,13 @@ export default function Home() {
 
               {cat === 'difficulty' && (
                 <>
-                  <div className="gen-pane-note">(optional)</div>
-                  <div className="gen-pane-title">Fix the difficulty — or leave it to the adaptive engine</div>
+                  <div className="gen-pane-note">{t('home.optional')}</div>
+                  <div className="gen-pane-title">{t('home.pickDifficulty')}</div>
                   <div className="gen-opts">
                     {[1, 2, 3, 4].filter(d => !section?.difficultyCeiling || d <= section.difficultyCeiling).map(d => (
                       <button key={d} className={`gen-opt ${difficulty === d ? 'on' : ''}`}
                         onClick={() => setDifficulty(difficulty === d ? null : d)}>
-                        D{d} · {DIFF_LABELS[d]}
+                        D{d} · {t(DIFF_KEYS[d])}
                       </button>
                     ))}
                   </div>
@@ -276,24 +304,24 @@ export default function Home() {
         <GoalCard user={user} activity={stats?.activity || []} onGo={() => nav('/practice')} />
         <div className="home-card" style={{ maxWidth: 380 }}>
           <div className="spread">
-            <span className="sc-label" style={{ margin: 0 }}>Questions completed</span>
-            {stats && stats.recent?.some(a => a.correct) && <span className="sc-label" style={{ margin: 0, color: 'var(--good)' }}>Getting stronger</span>}
+            <span className="sc-label" style={{ margin: 0 }}>{t('home.questionsCompleted')}</span>
+            {stats && stats.recent?.some(a => a.correct) && <span className="sc-label" style={{ margin: 0, color: 'var(--good)' }}>{t('home.gettingStronger')}</span>}
           </div>
           <DiamondTrack recent={stats?.recent || []} />
         </div>
         {!promoGone && (
           <div className="home-card">
-            <button className="home-card-x" aria-label="Dismiss the adaptive engine card"
+            <button className="home-card-x" aria-label={t('home.dismissAdaptive')}
               onClick={() => { setPromoGone(true); localStorage.setItem('pri-home-promo', 'off'); }}>✕</button>
-            <span className="sc-label" style={{ margin: 0 }}>Adaptive engine</span>
+            <span className="sc-label" style={{ margin: 0 }}>{t('home.adaptiveEngine')}</span>
             <div className="spread" style={{ marginTop: 8, flexWrap: 'wrap', gap: 14 }}>
               <div style={{ fontSize: 21, lineHeight: 1.35, maxWidth: 300 }}>
                 {dueCount > 0
-                  ? <>You have <b>{dueCount} topic{dueCount === 1 ? '' : 's'}</b> due for spaced review.</>
-                  : <>The full adaptive potential is on.</>}
+                  ? tx('home.reviewDue', { count: dueCount, n: <b>{dueCount}</b> })
+                  : t('home.adaptiveOn')}
               </div>
               <button className="btn btn-primary" onClick={() => nav('/practice')}>
-                {dueCount > 0 ? 'Start reviewing' : 'Smart practice'} →
+                {dueCount > 0 ? t('home.startReviewing') : t('home.smartPractice')}
               </button>
             </div>
           </div>
@@ -332,6 +360,7 @@ function Tagline() {
 }
 
 function GoalCard({ user, activity, onGo }) {
+  const t = useT();
   const done = user.today?.questions || 0;
   const goal = user.dailyGoal || 10;
   const frac = Math.min(1, done / goal);
@@ -350,7 +379,7 @@ function GoalCard({ user, activity, onGo }) {
   });
   return (
     <div className="home-card goal-card" style={{ maxWidth: 420 }}>
-      <div className="goal-ring" role="img" aria-label={`Daily goal: ${done} of ${goal} questions`}>
+      <div className="goal-ring" role="img" aria-label={t('home.goalRing', { done, goal })}>
         <svg width="92" height="92" viewBox="0 0 92 92">
           <circle className="goal-ring-track" cx="46" cy="46" r={R} fill="none" strokeWidth="7" />
           <circle className={`goal-ring-fill ${frac >= 1 ? 'done' : ''}`} cx="46" cy="46" r={R} fill="none" strokeWidth="7"
@@ -359,19 +388,20 @@ function GoalCard({ user, activity, onGo }) {
         <div className="goal-ring-num">
           <div style={{ textAlign: 'center' }}>
             {done}<span style={{ color: 'var(--ink-3)', fontSize: 13 }}>/{goal}</span>
-            <small>TODAY</small>
+            <small>{t('home.today')}</small>
           </div>
         </div>
       </div>
       <div className="goal-copy">
         <div className="goal-title">
-          {frac >= 1 ? <>Daily goal complete — nice work.</> :
-            done > 0 ? <>{goal - done} more to hit today’s goal.</> : <>Daily goal: {goal} questions.</>}
+          {frac >= 1 ? t('home.goalComplete')
+            : done > 0 ? t('home.goalRemaining', { count: goal - done, n: goal - done })
+              : t('home.goalTarget', { count: goal, n: goal })}
         </div>
         <div className="goal-sub">
           {user.streak > 0
-            ? <><span className="streak-flame">▲</span> {user.streak}-day streak{frac >= 1 ? ' — extended today' : ' on the line'}</>
-            : 'Answer one question to start a streak.'}
+            ? <><span className="streak-flame">▲</span> {t(frac >= 1 ? 'home.streakExtended' : 'home.streakOnTheLine', { count: user.streak, n: user.streak })}</>
+            : t('home.startStreak')}
         </div>
         <div className="week-strip" aria-hidden="true">
           {days.map(d => (
@@ -383,7 +413,7 @@ function GoalCard({ user, activity, onGo }) {
         </div>
         {frac < 1 && (
           <button className="btn btn-ghost btn-sm" style={{ marginTop: 12 }} onClick={onGo}>
-            {done > 0 ? 'Keep going →' : 'Start now →'}
+            {done > 0 ? t('home.keepGoing') : t('home.startNow')}
           </button>
         )}
       </div>
@@ -392,24 +422,28 @@ function GoalCard({ user, activity, onGo }) {
 }
 
 function DiamondTrack({ recent }) {
+  const t = useT();
   const items = recent.slice(0, 7).reverse();
   if (!items.length) {
-    return <div className="muted" style={{ marginTop: 20 }}>Your first questions will appear here.</div>;
+    return <div className="muted" style={{ marginTop: 20 }}>{t('home.firstQuestions')}</div>;
   }
   const color = a => a.correct ? 'var(--m5)' : 'var(--m1)';
   // Right and wrong were a red diamond and a green one, and a tooltip: nothing
   // a screen reader or a colour-blind student could read. The verdict is spelled
   // out beside each mark, off-screen, and the joining bars are decoration.
   return (
-    <div className="diamond-track" role="group" aria-label="Your most recent questions, oldest first">
-      {items.map((a, i) => (
+    <div className="diamond-track" role="group" aria-label={t('home.recentQuestions')}>
+      {items.map((a, i) => {
+        const verdict = t('home.recentVerdict', { topic: a.name, verdict: t(a.correct ? 'app.correct' : 'app.incorrect') });
+        return (
         <React.Fragment key={i}>
           {i > 0 && <span className="diamond-link" aria-hidden="true" style={{ background: `linear-gradient(90deg, ${color(items[i - 1])}, ${color(a)})` }} />}
-          <span className="diamond" style={{ background: color(a) }} title={`${a.name} — ${a.correct ? 'correct' : 'incorrect'}`}>
-            <span className="sr-only">{a.name} — {a.correct ? 'correct' : 'incorrect'}</span>
+          <span className="diamond" style={{ background: color(a) }} title={verdict}>
+            <span className="sr-only">{verdict}</span>
           </span>
         </React.Fragment>
-      ))}
+        );
+      })}
     </div>
   );
 }

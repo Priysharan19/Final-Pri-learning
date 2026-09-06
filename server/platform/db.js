@@ -6,7 +6,7 @@ import { platformDatabasePath } from './config.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_PATH = join(here, '..', 'data', 'pri-learning-platform.db');
-const SCHEMA_VERSION = 4;
+const SCHEMA_VERSION = 5;
 
 function addColumnIfMissing(db, table, column, ddl) {
   const safeTable = String(table).replaceAll("'", "''");
@@ -345,6 +345,14 @@ export function createPlatformDb(path = DEFAULT_PATH) {
   // Classes created before v4 keep join_code NULL until the teacher rotates.
   addColumnIfMissing(db, 'classes', 'join_code', 'join_code TEXT');
   addColumnIfMissing(db, 'classes', 'join_code_rotated_at', 'join_code_rotated_at INTEGER');
+
+  // Schema v5 — an idempotency key remembers which request it answered.
+  // Without the digest a key is only a name, so a second push under the same
+  // name replayed the first response and discarded the new writes with a 200:
+  // the device believed it had synced work the server never stored. Rows
+  // written before v5 keep a NULL digest and are still replayable; only a key
+  // that recorded what it acknowledged can refuse a different request.
+  addColumnIfMissing(db, 'idempotency_keys', 'request_digest', 'request_digest TEXT');
 
   db.prepare("INSERT OR REPLACE INTO platform_meta(key,value) VALUES ('schema_version',?)").run(String(SCHEMA_VERSION));
   return db;

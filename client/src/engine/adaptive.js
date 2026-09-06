@@ -449,6 +449,85 @@ function jitterFor(id, rand) {
   return ((h >>> 0) % 10000) / 10000;
 }
 
+// ── Exam weight, as a share rather than a number ─────────────────────────────
+// Both rankers below are told how much the exam cares about a candidate. They
+// used to read that straight off `weight` and compare it against constants —
+// `weight / 22`, `weight >= 12` — that only mean anything on the scale those
+// constants were tuned against: the NSW one, whose nine subtopics a year sum to
+// 100, so an average subtopic weighs 100/9 ≈ 11.1.
+//
+// The India spine now hands over the real CBSE marks instead: Class X's
+// fourteen chapters sum to the paper's 80, so an average chapter weighs 5.7 and
+// the heaviest weighs 7.5. Dropped into `weight >= 12` those numbers would have
+// silenced "high exam weight" for every Indian student forever, and `weight/22`
+// would have shrunk the weak-topic boost by half — a quiet flattening of the
+// recommendation loop, which is a worse bug than the one being fixed.
+//
+// So the rankers no longer consume an absolute number. They consume a **share**:
+// how heavy this candidate is against the average of the candidates it is being
+// ranked with. That is the question the score actually wants answered — "is
+// this worth more of your remaining time than the other things you could
+// practise?" — and it has the same meaning whichever country's syllabus, and
+// whichever unit, the weights arrived in.
+//
+// The two constants below are the old ones re-expressed on that share, so the
+// Australian path does not move:
+//
+//   weight / 22            at the NSW average (100/9)  =  0.5051
+//   weight >= 12           at the NSW average (100/9)  =  share >= 1.08
+//
+// A NSW scope whose average subtopic weighs exactly 100/9 — Years 7–10, and
+// Years 11–12 on the advanced pathway — therefore produces bit-identical
+// numbers. The standard and extension pathways carry a slightly lighter average
+// (10.67–11.10), so their weak-topic term moves by at most 1.3%, always in the
+// direction of "heavy relative to your own course" rather than "heavy relative
+// to a course you are not taking".
+//
+// Nothing else needed recalibrating. The revision dampers (0.4 in `priorities`,
+// 0.2 in `predictMark`) and `predictMark`'s weighted mastery are ratios of
+// weights to weights, so they are already scale-free: multiply every weight in
+// a scope by any constant and they return the same answer.
+
+/** An average-weight topic's contribution, on the NSW scale that set it. */
+export const EXAM_PULL_AT_AVERAGE = (100 / 9) / 22;
+
+/**
+ * The share at which a topic is worth telling a student about. 1.08 is NSW's
+ * old `weight >= 12` measured against its own average subtopic (100/9), so the
+ * same NSW subtopics say "high exam weight" as said it before; on a CBSE class
+ * it now fires on chapters that really do carry more of the 80-mark paper than
+ * an average chapter does — Triangles and Circles at 7.5 marks in Class X,
+ * Probability at 8 in Class XII.
+ */
+export const HIGH_EXAM_SHARE = 12 / (100 / 9);
+
+/**
+ * A `share(candidate)` for one candidate list: the candidate's exam weight as a
+ * multiple of the list's average, so 1.0 is "an ordinary topic in this scope".
+ *
+ * A candidate with no usable weight counts as ordinary rather than as the old
+ * hard-coded 6, which was a below-average topic on the NSW scale and an
+ * above-average one on the CBSE scale — the exact scale-dependence this
+ * removes. An empty or weightless list falls back to 1 throughout, which leaves
+ * the weakness axis flat and lets the other three axes decide.
+ */
+export function examShares(candidates) {
+  let sum = 0;
+  let n = 0;
+  for (const c of candidates || []) {
+    const w = Number(c?.weight);
+    if (Number.isFinite(w) && w > 0) { sum += w; n++; }
+  }
+  const average = n ? sum / n : 0;
+  return {
+    average,
+    share(candidate) {
+      const w = Number(candidate?.weight);
+      return average > 0 && Number.isFinite(w) && w > 0 ? w / average : 1;
+    }
+  };
+}
+
 /**
  * Decide what to serve next.
  *  ratings:     { subtopicId: {rating, attempts, correct, last_at, traps?} }
@@ -491,6 +570,7 @@ export const REASON_TAG = Object.freeze({
  * (`nextUp`), with the same shape pickNext has always returned.
  */
 export function pickNextAmong({ candidates, ratings, reviewsDue, rand = Math.random(), recent = [], nowMs = Date.now(), fallbackId = null }) {
+  const { share } = examShares(candidates);
   const stateOf = id => (ratings || {})[id] || { rating: START_RATING, attempts: 0, correct: 0, last_at: 0 };
   const recentWrongOf = st => (Array.isArray(st.recent) ? st.recent : []).slice(0, 3).filter(v => !v).length;
   const dueBy = new Map((reviewsDue || []).map(r => [r.subtopic, r]));
@@ -513,9 +593,13 @@ export function pickNextAmong({ candidates, ratings, reviewsDue, rand = Math.ran
       score += 1.55 + 1.10 * forgotten;
       reason = 'review';
     }
-    // 2. Weakness, weighted by how much the exam cares about it.
+    // 2. Weakness, weighted by how much the exam cares about it. The 0.55 floor
+    //    stays where it was: it is the part of the boost that is about the gap
+    //    alone, so that a light topic a student cannot do is still worth
+    //    practising, and it is expressed in the score's own units rather than
+    //    in anybody's exam scale.
     const gap = Math.max(0, 0.90 - mastery);
-    const weak = 1.35 * gap * (0.55 + (s.weight || 6) / 22);
+    const weak = 1.35 * gap * (0.55 + EXAM_PULL_AT_AVERAGE * share(s));
     if (st.attempts >= 3 && mastery < 0.55 && weak > (rev ? 1.55 : 0)) reason = 'weak-spot';
     score += weak;
     // 3. A repeated, named misconception is the most fixable thing on the list.
@@ -590,6 +674,12 @@ export function pickDotpoint(states, { rand = Math.random(), nowMs = Date.now(),
 /**
  * Weighted mastery → scaled mark with a confidence band.
  * Unattempted subtopics count partially so the mark starts conservative.
+ *
+ * This one needs no normalising and deliberately gets none: every weight below
+ * appears in both a numerator and a denominator, so scaling the whole scope by
+ * any constant leaves `raw` and `coverage` exactly where they were. It is a
+ * NSW-only surface in any case — an Indian student's predicted mark comes from
+ * `markPredictor.js`, which has always worked from the real paper's unit marks.
  */
 export function predictMark(ratings, year, nowMs = Date.now(), pathway = 'advanced') {
   const { own, revision } = scopeForYear(year, pathway);
@@ -657,30 +747,62 @@ export function priorities(ratings, year, nowMs = Date.now(), n = 5, pathway = '
  * rather than none. A candidate is `{ id, name, year, strand, weight, rev }`;
  * `rev` marks revision material, which counts for less than the student's own
  * year. `ratings` and `notes` are keyed by the candidate ids.
+ *
+ * `weight` may arrive on any scale — NSW percentage points, real CBSE marks —
+ * because it is normalised against the list's own average before use. Each row
+ * carries the resulting `examShare` so a caller can say how heavy a topic is.
  */
 export function prioritiesAmong(scope, ratings, nowMs = Date.now(), n = 5, notes = {}) {
+  const { share } = examShares(scope);
   const scored = (scope || []).map(s => {
     const st = (ratings || {})[s.id];
     const m = st ? masteryOf(st.rating, st.attempts, st.last_at, nowMs) : 0;
     const days = st && st.last_at ? (nowMs - st.last_at) / DAY : 999;
     const urgency = st ? Math.min(2, 1 + days / 21) : 1.25;
-    const weight = s.rev ? s.weight * 0.4 : s.weight;
+    // How much of this student's assessment the topic is, against an ordinary
+    // topic in the same scope. Revision material is damped afterwards rather
+    // than before: how heavy a chapter is in its own paper is a fact about the
+    // chapter, and 0.4 is a statement about how much last year's paper should
+    // pull on this year's practice.
+    const examShare = share(s);
+    const pull = s.rev ? examShare * 0.4 : examShare;
     const gap = Math.max(0, 0.92 - m);
     const trap = notes[s.id] || null;
     // A named, repeating mistake is worth more attention than the same-sized
     // gap with no explanation behind it: it says exactly what to practise.
-    const impact = weight * gap * urgency * (trap ? 1.35 : 1);
+    // `impact` is now on the share's scale — roughly a tenth of what it used to
+    // print — because it is a share times a gap times an urgency. The extra
+    // decimal keeps the ordering as finely resolved as the old two decimals
+    // were on the old scale; nothing renders the number itself.
+    const impact = pull * gap * urgency * (trap ? 1.35 : 1);
     let reasonBits = [];
     if (!st || st.attempts === 0) reasonBits.push('not attempted yet');
     else {
       reasonBits.push(`mastery ${Math.round(m * 100)}%`);
       if (days > 14 && days < 900) reasonBits.push(`untouched for ${Math.round(days)} days`);
     }
-    if (weight >= 12) reasonBits.push('high exam weight');
+    // Said only where it is true. The test is the chapter's own share of the
+    // paper, not the damped pull, and revision material never claims it — a
+    // Year 10 topic being revised by a Year 11 student is not heavy in the
+    // Year 11 paper. That was already the effect of gating on the damped
+    // weight (0.4 × 13 never reached 12); it is now the stated rule rather
+    // than an accident of the damper.
+    //
+    // The line says "high", not "9% of the paper", on purpose: this function is
+    // handed a candidate list, not a paper. On a CBSE class the list *is* the
+    // paper and 9% would be exactly right; on a NSW scope it is a year plus a
+    // year of revision, and on a JEE track two classes at once, where the same
+    // arithmetic would name a denominator that is not any real examination.
+    // `examShare` is published on the row instead, so a surface that does know
+    // which paper its student is sitting can say the number.
+    if (!s.rev && examShare >= HIGH_EXAM_SHARE) reasonBits.push('high exam weight');
     if (trap) reasonBits.push(trap);
     return {
       subtopic: s.id, name: s.name, year: s.year, strand: s.strand,
-      impact: Math.round(impact * 100) / 100, mastery: Math.round(m * 100),
+      impact: Math.round(impact * 1000) / 1000, mastery: Math.round(m * 100),
+      // Published so a surface can say how heavy the topic is instead of only
+      // that it is heavy, and so the contract suite can check the claim.
+      examShare: Math.round(examShare * 100) / 100,
       misconception: trap, reason: reasonBits.join(' · ')
     };
   });

@@ -119,9 +119,15 @@ assert.ok(chapterTarget);
 if (hasJeePyqGenerator(gid)) {
   assert.equal(chapterTarget.generator, gid);
   assert.equal(chapterTarget.pyq, true);
+  assert.equal(chapterTarget.pyqArchive, 'jee-question-department');
 } else {
+  // The separately-owned source-cited archive (engine/pyq, covered by
+  // india-pyq-check.mjs) may serve this chapter, so `pyq` alone no longer
+  // isolates this pipeline. What must stay true is the statement this file
+  // exists to make: with an empty department catalog, the department serves
+  // nothing and its generator id resolves to no bank.
   assert.notEqual(chapterTarget.generator, gid);
-  assert.equal(chapterTarget.pyq, false);
+  assert.notEqual(chapterTarget.pyqArchive, 'jee-question-department');
   assert.equal(bankOf(gid), null);
 }
 const dotpointTarget = resolveIndiaTarget(chapter, { track: 'jee-main', dotpoint: 0, difficulty: 3, random: () => 0 });

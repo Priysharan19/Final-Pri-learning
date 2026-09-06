@@ -27,13 +27,31 @@ assert.match(progress, /user\?\.course === 'in' \? <IndiaProgress \/> : <Progres
   'India users must route to the India-native progress presentation');
 assert.match(australia, /ProgressLegacy/,
   'Australian progress must remain available as the preserved legacy implementation');
-assert.match(indiaProgress, /No percentile, no rank/,
-  'India progress must explicitly refuse the predictions a practice history cannot support');
-assert.match(indiaProgress, /does not convert a practice history into a CBSE percentage, a JEE percentile or a rank/,
-  'and must say in words which three things it will not claim');
+// The copy lives in the string catalogues now, so the page's job is to reach
+// for the right keys and the catalogue's job is to say the right thing. Both
+// are checked, because a page that drops the key and a catalogue that softens
+// the sentence are different failures with the same symptom.
+assert.match(indiaProgress, /progress\.noPercentile/,
+  'India progress must reach for the key that refuses percentile and rank');
+assert.match(indiaProgress, /progress\.honesty/,
+  'and for the key that says which predictions it will not make');
+
+for (const catalogue of ['src/i18n/strings.en.js', 'src/i18n/strings.hi.js']) {
+  const src = read(catalogue);
+  for (const key of ['progress.noPercentile', 'progress.honesty']) {
+    const line = src.split(`'${key}':`)[1]?.split('\n')[0] || '';
+    assert.ok(line.length > 0, `${catalogue} defines ${key}`);
+  }
+  const coverage = src.split("'progress.marksPractised':")[1]?.split('\n')[0] || '';
+  assert.ok(/\{covered\}/.test(coverage) && /\{total\}/.test(coverage),
+    `${catalogue} states the coverage as a share of the paper, not a bare number`);
+  const honesty = src.split("'progress.honesty':")[1].split('\n')[0];
+  assert.match(honesty, /CBSE/, `${catalogue} names the CBSE percentage it will not claim`);
+  assert.match(honesty, /JEE/, `${catalogue} names the JEE percentile it will not claim`);
+}
 // A mark estimate over practised content is a different claim from a board
 // percentage, and it is only honest while it travels with its coverage.
-assert.match(indiaProgress, /marks practised/,
+assert.match(indiaProgress, /progress\.marksPractised/,
   'any mark estimate on this page must state how much of the paper it covers');
 // Targeted at the Australian UI itself, not at the words: this page has to be
 // able to SAY "percentile" and "rank" in order to refuse them, and an earlier
