@@ -51,7 +51,7 @@ function sessionAccuracy(studentContext = {}) {
   // neutral until the session model supplies a finite correctness count rather
   // than silently turning incomplete telemetry into a 0% accuracy signal.
   const rawCorrect = studentContext?.session?.correct;
-  if (rawCorrect == null || rawCorrect === '') return null;
+  if (rawCorrect == null || (typeof rawCorrect === 'string' && rawCorrect.trim() === '')) return null;
   const numericCorrect = Number(rawCorrect);
   if (!Number.isFinite(numericCorrect)) return null;
 
