@@ -146,7 +146,7 @@ export default function IndiaProgress() {
           <span className="muted">{rows.length} chapters/topics</span>
         </div>
         {!rows.length ? <p className="muted" style={{ marginTop: 16 }}>No released curriculum rows are available for this track yet.</p> : (
-          <div style={{ overflowX: 'auto', marginTop: 12 }}>
+          <div className="table-scroll" style={{ marginTop: 12 }}>
             <table className="syl-table">
               <thead><tr><th style={{ textAlign: 'left' }}>Chapter / topic</th><th>Attempts</th><th>Correct</th><th>Accuracy</th><th><span className="sr-only">Action</span></th></tr></thead>
               <tbody>

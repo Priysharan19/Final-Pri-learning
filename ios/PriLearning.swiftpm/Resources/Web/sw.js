@@ -1,11 +1,30 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Pri Learning · service worker — the app runs with the network switched off.
-// Install writes the whole build into a cache named after it: the shell, every
-// code chunk down to the handwriting model, styles, fonts and icons, so a first
-// run followed by a flight still has a working write tab. The name is a digest
-// of that build, so a redeploy lands in a cache of its own and takes effect on
-// the next navigation instead of leaving a stale shell that names chunks which
-// are no longer on the server.
+// The build is written into a cache named after it, so a first run followed by
+// a flight still has a working app. The name is a digest of that build, so a
+// redeploy lands in a cache of its own and takes effect on the next navigation
+// instead of leaving a stale shell that names chunks which are no longer on the
+// server.
+//
+// It arrives in two passes, because on a 700 kbps line one pass is a hazard.
+// Install used to write the whole 3.7 MB build, and it did so while the browser
+// was still fetching the very files the first paint was blocked on — the phone
+// downloaded everything twice over a link that could not carry it once, and the
+// profile screen took half a minute to appear. So:
+//
+//   install   writes only what the shell needs to render — the files
+//             index.html actually references, the icons and the two faces the
+//             first screens paint in. Seconds, not half a minute.
+//   warm      writes the rest of the offline build when the app asks, which it
+//             does once it is on screen and the main thread is idle. Nothing a
+//             student is waiting for is behind it.
+//
+// Fetches use the default HTTP cache rather than forcing a revalidation. Every
+// name in both lists carries a content hash except the shell, so the name IS
+// the identity and a cache hit cannot be stale — while forcing a reload meant
+// re-downloading the entry, React, KaTeX and the app chunk that the page had
+// just finished fetching. The shell alone is fetched with `reload`, since
+// /index.html keeps its name across builds and a stale one names dead chunks.
 //
 // The build before this one is kept rather than dropped. A page that was open
 // across the redeploy is now driven by this worker but still asks for its own
@@ -14,8 +33,10 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ── Build manifest, filled in by the pri-precache plugin ─────────────────────
-const VERSION = 'pri-e2ce732fe45c';
-const PRECACHE = ["/","/assets/App-BU6NOG9Q.js","/assets/InkAnswer-BZ8_M2ir.js","/assets/InkAnswer-Blitdwew.js","/assets/InkAnswer-C3rF8USK.js","/assets/InkAnswer-CUbgMFBb.js","/assets/InkAnswer-DVvGB2Zk.js","/assets/InkPhysicalEvidenceSession-B1_BU66C.js","/assets/KaTeX_AMS-Regular-BQhdFMY1.woff2","/assets/KaTeX_Caligraphic-Bold-Dq_IR9rO.woff2","/assets/KaTeX_Caligraphic-Regular-Di6jR-x-.woff2","/assets/KaTeX_Fraktur-Bold-CL6g_b3V.woff2","/assets/KaTeX_Fraktur-Regular-CTYiF6lA.woff2","/assets/KaTeX_Main-Bold-Cx986IdX.woff2","/assets/KaTeX_Main-BoldItalic-DxDJ3AOS.woff2","/assets/KaTeX_Main-Italic-NWA7e6Wa.woff2","/assets/KaTeX_Main-Regular-B22Nviop.woff2","/assets/KaTeX_Math-BoldItalic-CZnvNsCZ.woff2","/assets/KaTeX_Math-Italic-t53AETM-.woff2","/assets/KaTeX_SansSerif-Bold-D1sUS0GD.woff2","/assets/KaTeX_SansSerif-Italic-C3H0VqGB.woff2","/assets/KaTeX_SansSerif-Regular-DDBCnlJ7.woff2","/assets/KaTeX_Script-Regular-D3wIWfF6.woff2","/assets/KaTeX_Size1-Regular-mCD8mA8B.woff2","/assets/KaTeX_Size2-Regular-Dy4dx90m.woff2","/assets/KaTeX_Size4-Regular-Dl5lxZxV.woff2","/assets/KaTeX_Typewriter-Regular-CO6r4hn1.woff2","/assets/LinearEquationsTopperSectionProduction-CjskN2y_.js","/assets/NcertClass8ChapterSection-DlZsLw8k.js","/assets/NcertClass9ChapterSection-BQ9PSl3N.js","/assets/PracticeBase-CnywPLBT.js","/assets/PracticeBase-LbQyqki1.css","/assets/RationalNumbersTopperSectionProduction-Cpd1tixR.js","/assets/class7-part2-2026-27-production-max_UemZ.js","/assets/class8-chapters-3-13-production-CJqsY6V1.js","/assets/class8-linear-production-BM4WLA4-.js","/assets/class8-rational-production-CAP_H0zO.js","/assets/class9-chapters-production-DEubpst-.js","/assets/cloudReader-CTlS4EAN.js","/assets/defineProperty-BbfpZ9Tg.js","/assets/demoSeed-D2SESrju.js","/assets/feedbackGeometry-DOZDEIeN.js","/assets/figures--_2Ot-DF.js","/assets/generators-CHSpD-oo.js","/assets/index-Cd_ba0bQ.js","/assets/index-D4dum2Kc.css","/assets/india-algebra-vjIrfVel.js","/assets/india-calculus-Bf1NSBl9.js","/assets/india-class10-j1_M3YMC.js","/assets/india-coordinate-B3WtjUst.js","/assets/india-foundation-_eSFF5BE.js","/assets/india-junior-overlay-z1EC8Obu.js","/assets/india-olympiad-D49dlyYM.js","/assets/india-senior-CCGFsGIE.js","/assets/ink-engine-CVEW77iN.js","/assets/ink-model-D3cN_hBH.js","/assets/inter-cyrillic-ext-wght-normal-BOeWTOD4.woff2","/assets/inter-cyrillic-wght-normal-DqGufNeO.woff2","/assets/inter-greek-ext-wght-normal-DlzME5K_.woff2","/assets/inter-greek-wght-normal-CkhJZR-_.woff2","/assets/inter-latin-ext-wght-normal-DO1Apj_S.woff2","/assets/inter-latin-wght-normal-Dx4kXJAl.woff2","/assets/inter-vietnamese-wght-normal-CBcvBZtf.woff2","/assets/latex-CMyNsPi5.js","/assets/model-data-DsXS_xxz.js","/assets/multipart-DEZWYKq6.js","/assets/pyqArchive-DVFVEEnC.js","/assets/pyqCoverage-DxGEMn5P.js","/assets/qhelpers-Dq1uC5IS.js","/assets/recognizer-CS0U_ZRE.js","/assets/rolldown-runtime-CbXtAM7H.js","/assets/streams-ext-BX6vFLJW.js","/assets/streams-standard-EAeJMBB_.js","/assets/vendor-katex-BkSWQkk7.js","/assets/vendor-katex-DEcVZfaU.css","/assets/vendor-react-DK8ReCxq.js","/assets/year10-ySGvk5Sp.js","/assets/year11-RaxVHhBv.js","/assets/year12-0orhQEbL.js","/assets/year7-CQz82Lgf.js","/assets/year8-C5iPbJFu.js","/assets/year9-DEk_XSq1.js","/favicon.svg","/icons/icon-180.png","/icons/icon-192.png","/icons/icon-512.png","/index.html","/manifest.webmanifest"];
+const VERSION = 'pri-6c6b7d218b4d';
+const PRECACHE = ["/","/assets/App-wyUm7jqO.js","/assets/KaTeX_AMS-Regular-BQhdFMY1.woff2","/assets/KaTeX_Main-Bold-Cx986IdX.woff2","/assets/KaTeX_Main-BoldItalic-DxDJ3AOS.woff2","/assets/KaTeX_Main-Italic-NWA7e6Wa.woff2","/assets/KaTeX_Main-Regular-B22Nviop.woff2","/assets/KaTeX_Math-BoldItalic-CZnvNsCZ.woff2","/assets/KaTeX_Math-Italic-t53AETM-.woff2","/assets/KaTeX_Size1-Regular-mCD8mA8B.woff2","/assets/KaTeX_Size2-Regular-Dy4dx90m.woff2","/assets/KaTeX_Size4-Regular-Dl5lxZxV.woff2","/assets/api-Blrb9qz6.js","/assets/class7-part2-2026-27-production-max_UemZ.js","/assets/class8-chapters-3-13-production-CJqsY6V1.js","/assets/class8-linear-production-BM4WLA4-.js","/assets/class8-rational-production-CAP_H0zO.js","/assets/class9-chapters-production-Y7GmBmYl.js","/assets/defineProperty-BbfpZ9Tg.js","/assets/generators-DucHeeXK.js","/assets/index-CAyKRBs5.css","/assets/index-CdkYHpMx.js","/assets/inter-latin-wght-normal-Dx4kXJAl.woff2","/assets/preload-helper-Czpn1I53.js","/assets/pyqCoverage-DGcOYWV6.js","/assets/qhelpers-Dq1uC5IS.js","/assets/rolldown-runtime-CbXtAM7H.js","/assets/vendor-react-Dlayjq1H.js","/favicon.svg","/icons/icon-180.png","/index.html","/manifest.webmanifest"];
+const WARM = ["/assets/AssignmentInboxPanel-DbTB-t1u.js","/assets/Charts-klH-9Wyv.js","/assets/Classes-D9urKIGA.js","/assets/ClassroomPanel--cCKR5Qt.js","/assets/ExamRoom-DgIMAq_v.js","/assets/Exams-DBHQtcqQ.js","/assets/Favorites-WPDrHXNZ.js","/assets/History-BUt-nalo.js","/assets/InkCanvas-B15GLehu.js","/assets/LinearEquationsTopperSectionProduction-m7B_ck9Y.js","/assets/Match-sM6zXZBo.js","/assets/NcertClass8ChapterSection-D3v7NUTR.js","/assets/NcertClass9ChapterSection-Cdod8lrR.js","/assets/PracticeBase-CqgUNC2j.js","/assets/PracticeBase-LbQyqki1.css","/assets/Progress-DyTGjSjJ.js","/assets/RationalNumbersTopperSectionProduction-ClYTUPKC.js","/assets/Rush-D91TSbOG.js","/assets/Settings-D_aAof1-.js","/assets/Tasks-CaOetHfP.js","/assets/Teach-V--2XZRU.js","/assets/assignmentTarget-CBPw57JO.js","/assets/cloudReader-ByPoLOAx.js","/assets/demoSeed-_e5E2XeF.js","/assets/figures--_2Ot-DF.js","/assets/files-BjlwdoHp.js","/assets/latex-CqAS5Udr.js","/assets/multipart-DEZWYKq6.js","/assets/personal-BuYYHsz8.js","/assets/pyqArchive-Bh_PAZmn.js","/assets/vendor-katex-BkSWQkk7.js","/assets/vendor-katex-DEcVZfaU.css","/icons/icon-192.png","/icons/icon-512.png"];
+const OPTIONAL = ["/assets/InkAnswer-BBnlFYp0.js","/assets/InkAnswer-BurB3GjB.js","/assets/InkAnswer-D7ylJYiu.js","/assets/InkAnswer-fSA1u5-n.js","/assets/InkAnswer-rNGTre3f.js","/assets/NativeInkCanvas-DucZdBRQ.js","/assets/feedbackGeometry-Ca8ev77D.js","/assets/ink-engine-CfpPOKz1.js","/assets/ink-model-D3cN_hBH.js","/assets/ink-personal-BudlgchY.js","/assets/model-data-DsXS_xxz.js","/assets/recognizer-DVtGBfxV.js"];
 // ─────────────────────────────────────────────────────────────────────────────
 
 const SHELL = '/index.html';
@@ -25,11 +46,15 @@ const CACHEABLE = /^\/assets\/|\.(?:js|css|html|svg|png|webmanifest|woff2?|ttf)$
 
 // ── Install ──────────────────────────────────────────────────────────────────
 
+// A hashed filename is its own identity, so the HTTP cache cannot answer with
+// the wrong bytes; the shell is the one name that outlives its contents.
+const hashed = (url) => url !== '/' && url !== SHELL;
+
 async function fill(cache, urls) {
   const missed = [];
   await Promise.all(urls.map(async (url) => {
     try {
-      const res = await fetch(new Request(url, { cache: 'reload', credentials: 'same-origin' }));
+      const res = await fetch(new Request(url, { cache: hashed(url) ? 'default' : 'reload', credentials: 'same-origin' }));
       if (!res.ok) throw new Error(String(res.status));
       await cache.put(url, res);
     } catch {
@@ -49,6 +74,49 @@ self.addEventListener('install', (e) => {
     await cache.put(STAMP, new Response(String(Date.now())));
     await self.skipWaiting();
   })());
+});
+
+// ── Warm ─────────────────────────────────────────────────────────────────────
+// The second pass. The app asks for it once it is rendered and idle; asking
+// twice costs one cache lookup per file and no network, so a reload mid-warm is
+// harmless. `warmed` is reported back so a caller — the browser suite included
+// — can tell "the offline build is complete" from "it is still arriving".
+//
+// OPTIONAL is the handwriting recogniser: 0.9 MB that a phone with no stylus
+// may never open. It is included only when the page asks for it, because
+// whether those bytes are cheap or expensive depends on facts — Data Saver, the
+// browser's own view of the link, whether this is the native shell reading off
+// an app bundle — that live on the page and not in here. offlineWarm.js decides
+// and says so in the message; this only obeys.
+
+let warming = null;
+
+async function warm(withOptional) {
+  const wanted = withOptional ? [...WARM, ...OPTIONAL] : WARM;
+  const cache = await caches.open(VERSION);
+  const already = new Set((await cache.keys()).map(r => new URL(r.url).pathname));
+  const missing = wanted.filter(url => !already.has(url));
+  if (missing.length) {
+    const missed = await fill(cache, missing);
+    if (missed.length) await fill(cache, missed);
+  }
+  const held = new Set((await cache.keys()).map(r => new URL(r.url).pathname));
+  return { warmed: wanted.filter(url => held.has(url)).length, of: wanted.length };
+}
+
+self.addEventListener('message', (e) => {
+  if (e.data?.type !== 'pri-warm') return;
+  const optional = Boolean(e.data.optional);
+  // One pass at a time. A second ask while one is in flight joins it rather
+  // than doubling the requests on a link that has none to spare.
+  warming = warming || warm(optional).finally(() => { warming = null; });
+  const reply = warming.then(
+    result => ({ type: 'pri-warmed', ...result }),
+    () => ({ type: 'pri-warmed', warmed: 0, of: WARM.length })
+  );
+  // A port when the caller wants an answer, the client itself when it does not.
+  const port = e.ports?.[0];
+  e.waitUntil(reply.then(msg => { if (port) port.postMessage(msg); else e.source?.postMessage(msg); }));
 });
 
 // ── Activate ─────────────────────────────────────────────────────────────────

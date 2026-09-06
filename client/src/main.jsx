@@ -8,6 +8,7 @@ import App from './App.jsx';
 import AccountAction from './pages/AccountAction.jsx';
 import { accountActionCleanUrl, parseAccountActionFragment } from './platform/accountAction.js';
 import { discoverCloudOrigin } from './platform/cloudTransport.js';
+import { scheduleOfflineWarm } from './local/offlineWarm.js';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 
 // Account verification/password-reset links carry their secret only in the URL
@@ -99,4 +100,8 @@ if ('serviceWorker' in navigator && import.meta.env.PROD && !window.__PRI_NATIVE
       // a permanently silent release regression.
     }
   })();
+  // Install writes only what the first paint needs; the rest of the offline
+  // build is asked for once the page is rendered and the thread is idle, so it
+  // never competes with the load a student is watching.
+  scheduleOfflineWarm(window);
 }

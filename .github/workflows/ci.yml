@@ -62,6 +62,8 @@ jobs:
           grep -Fq 'MARK PREDICTOR: PASS — 39/39 checks' suites.log
           grep -Fq 'PDF WORKING: PASS — 25/25 checks' suites.log
           grep -Fq 'MCQ DISTINCTNESS: PASS — 14/14 checks' suites.log
+          grep -Eq 'INSTALL BUDGET: PASS — 44/44 checks — install [0-9]+ kB raw / [0-9]+ kB gzip under' suites.log
+          grep -Fq 'nothing emitted left uncovered.' suites.log
           grep -Fq 'ENTITLEMENT ENFORCEMENT: PASS — 59/59 checks' suites.log
           grep -Fq 'JEE ADVANCED GATE: PASS — 27/27 checks' suites.log
           grep -Fq 'RESTORE FIDELITY: PASS — 45/45 checks' suites.log
@@ -214,7 +216,7 @@ jobs:
         run: |
           set -euo pipefail
           test -s browser.log
-          grep -Eq 'E2E SUITE.*195/195.*7 flows' browser.log
+          grep -Eq 'E2E SUITE.*222/222.*7 flows' browser.log
           grep -Fq 'Phone · every destination reachable at 390px' browser.log
           grep -Fq 'India · onboarding, class labels, demo, cloud entry' browser.log
           grep -Fq 'Cloud · account, live Settings refresh, assignment hand-off' browser.log

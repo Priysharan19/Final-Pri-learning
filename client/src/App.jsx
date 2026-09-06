@@ -2,24 +2,36 @@ import React, { createContext, useContext, useEffect, useMemo, useState, useCall
 import { Routes, Route, NavLink, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import { api } from './api.js';
 import { requestPersistentStorage } from './local/idb.js';
-import { setPersonalProfile } from './ink/personal.js';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 import { setDraftProfile } from './components/drafts.js';
 import Login from './pages/Login.jsx';
 import Home from './pages/Home.jsx';
 import Practice from './pages/Practice.jsx';
-import Progress from './pages/Progress.jsx';
 import Legal from './pages/Legal.jsx';
-import Exams from './pages/Exams.jsx';
-import ExamRoom from './pages/ExamRoom.jsx';
-import Rush from './pages/Rush.jsx';
-import Match from './pages/Match.jsx';
-import Tasks from './pages/Tasks.jsx';
-import Teach from './pages/Teach.jsx';
-import History from './pages/History.jsx';
-import Favorites from './pages/Favorites.jsx';
-import Classes from './pages/Classes.jsx';
-import Settings from './pages/Settings.jsx';
+
+// ── Routes nobody has opened yet ─────────────────────────────────────────────
+// Login, Home, Practice and Legal are the screens a first run reaches: the
+// profile gate, the landing page behind it, the practice workspace the product
+// is for, and the policy pages a store reviewer opens without an account. Those
+// four are worth having in the shell.
+//
+// The other eleven were too. Every student downloaded the exam room, the
+// teacher console, the classroom panels, the progress charts and the whole
+// settings surface before the profile screen could paint — 665 kB of app chunk
+// on a link that delivers about 90 kB a second. They are behind a boundary now.
+// The service worker still holds every one of them for offline use; the change
+// is only about what has to arrive before a student can do anything.
+const Progress = React.lazy(() => import('./pages/Progress.jsx'));
+const Exams = React.lazy(() => import('./pages/Exams.jsx'));
+const ExamRoom = React.lazy(() => import('./pages/ExamRoom.jsx'));
+const Rush = React.lazy(() => import('./pages/Rush.jsx'));
+const Match = React.lazy(() => import('./pages/Match.jsx'));
+const Tasks = React.lazy(() => import('./pages/Tasks.jsx'));
+const Teach = React.lazy(() => import('./pages/Teach.jsx'));
+const History = React.lazy(() => import('./pages/History.jsx'));
+const Favorites = React.lazy(() => import('./pages/Favorites.jsx'));
+const Classes = React.lazy(() => import('./pages/Classes.jsx'));
+const Settings = React.lazy(() => import('./pages/Settings.jsx'));
 
 const AppCtx = createContext(null);
 export const useApp = () => useContext(AppCtx);
@@ -52,6 +64,13 @@ const TITLES = {
   '/exams': 'Exams', '/rush': 'Rapid Fire', '/match': 'Match', '/teach': 'Classes',
   '/history': 'History', '/favorites': 'Favorites', '/classes': 'Classes', '/settings': 'Settings'
 };
+
+// Shown for the moment a route's own chunk is arriving. It is announced rather
+// than silent because on a slow connection that moment is long enough for a
+// student to wonder whether the tap registered.
+function RouteLoading() {
+  return <p className="muted" role="status" aria-live="polite">Loading…</p>;
+}
 
 export function Logo({ large = false, onClick }) {
   // With an onClick this is a control, so it has to be one: a bare <span> takes
@@ -107,9 +126,17 @@ export default function App() {
 
   // Each profile keeps its OWN learned handwriting and its OWN unsent drafts —
   // retarget both banks on switch so nobody inherits another student's work.
+  //
+  // The handwriting bank is reached through import() rather than named at the
+  // top of this file. ink/personal.js shares a chunk with the recogniser, so a
+  // static import here put 102 kB of it in the shell's own preload list — paid
+  // for on every cold open, by every student, including the ones on a phone who
+  // will never write a stroke. Nothing here needs it synchronously: the bank is
+  // read when a canvas asks, which is always later than this.
   useEffect(() => {
-    setPersonalProfile(user?.id || null);
-    setDraftProfile(user?.id || null);
+    const id = user?.id || null;
+    void import('./ink/personal.js').then(m => m.setPersonalProfile(id)).catch(() => { });
+    setDraftProfile(id);
   }, [user?.id]);
 
   useEffect(() => {
@@ -245,29 +272,33 @@ export default function App() {
             <main className="content fade-in" id="main" tabIndex={-1} ref={mainRef}
               aria-label={pageTitle || 'Pri Learning'} key={loc.pathname}>
               <ErrorBoundary scope="route" resetKey={loc.pathname} onHome={() => nav('/')}>
-                <Routes>
-                  <Route path="/" element={<Home />} />
-                  <Route path="/practice" element={<Practice />} />
-                  <Route path="/progress" element={<Progress />} />
-                  <Route path="/map" element={<Navigate to="/progress?tab=map" replace />} />
-                  <Route path="/stats" element={<Navigate to="/progress" replace />} />
-                  <Route path="/badges" element={<Navigate to="/progress" replace />} />
-                  <Route path="/tasks" element={<Tasks />} />
-                  <Route path="/teach" element={<Teach />} />
-                  <Route path="/exams" element={<Exams />} />
-                  <Route path="/exams/:id" element={<ExamRoom />} />
-                  <Route path="/rush" element={<Rush />} />
-                  <Route path="/match" element={<Match />} />
-                  <Route path="/favorites" element={<Favorites />} />
-                  <Route path="/classes" element={<Classes />} />
-                  <Route path="/history" element={<History />} />
-                  <Route path="/privacy" element={<Legal />} />
-                  <Route path="/terms" element={<Legal />} />
-                  <Route path="/refund-policy" element={<Legal />} />
-                  <Route path="/grievance" element={<Legal />} />
-                  <Route path="/settings" element={<Settings />} />
-                  <Route path="*" element={<Navigate to="/" replace />} />
-                </Routes>
+                {/* Inside the boundary, so a route chunk that will not load is
+                    reported as a broken route rather than blanking the shell. */}
+                <React.Suspense fallback={<RouteLoading />}>
+                  <Routes>
+                    <Route path="/" element={<Home />} />
+                    <Route path="/practice" element={<Practice />} />
+                    <Route path="/progress" element={<Progress />} />
+                    <Route path="/map" element={<Navigate to="/progress?tab=map" replace />} />
+                    <Route path="/stats" element={<Navigate to="/progress" replace />} />
+                    <Route path="/badges" element={<Navigate to="/progress" replace />} />
+                    <Route path="/tasks" element={<Tasks />} />
+                    <Route path="/teach" element={<Teach />} />
+                    <Route path="/exams" element={<Exams />} />
+                    <Route path="/exams/:id" element={<ExamRoom />} />
+                    <Route path="/rush" element={<Rush />} />
+                    <Route path="/match" element={<Match />} />
+                    <Route path="/favorites" element={<Favorites />} />
+                    <Route path="/classes" element={<Classes />} />
+                    <Route path="/history" element={<History />} />
+                    <Route path="/privacy" element={<Legal />} />
+                    <Route path="/terms" element={<Legal />} />
+                    <Route path="/refund-policy" element={<Legal />} />
+                    <Route path="/grievance" element={<Legal />} />
+                    <Route path="/settings" element={<Settings />} />
+                    <Route path="*" element={<Navigate to="/" replace />} />
+                  </Routes>
+                </React.Suspense>
               </ErrorBoundary>
             </main>
           </div>
