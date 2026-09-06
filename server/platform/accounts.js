@@ -36,8 +36,12 @@ function strongPassword(value) {
 }
 
 function publicAccount(row) {
+  // A session row is a JOIN of account_sessions and accounts, so its `id` is the
+  // SESSION id; only `account_id` names the account. Account rows have `id` and
+  // no `account_id`. Preferring account_id keeps /v1/account/me reporting a
+  // stable account identity instead of one that changes with every sign-in.
   return {
-    id: row.id || row.account_id,
+    id: row.account_id || row.id,
     email: row.email,
     name: row.name,
     role: row.role,
