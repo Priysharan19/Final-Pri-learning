@@ -1,0 +1,140 @@
+name: Pri Agent Concurrency Safety
+
+on:
+  pull_request:
+    paths:
+      - '.pri-os/mission-control.json'
+      - 'scripts/pri-mission-control.mjs'
+      - 'scripts/pri-fleet.mjs'
+      - '.github/workflows/pri-agent-concurrency.yml'
+  push:
+    branches: [main]
+    paths:
+      - '.pri-os/mission-control.json'
+      - 'scripts/pri-mission-control.mjs'
+      - 'scripts/pri-fleet.mjs'
+      - '.github/workflows/pri-agent-concurrency.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  concurrency-contract:
+    name: Bounded writer admission contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Syntax and control-plane invariants
+        run: |
+          set -euo pipefail
+          node --check scripts/pri-fleet.mjs
+          node --check scripts/pri-mission-control.mjs
+          node scripts/pri-fleet.mjs validate
+          node scripts/pri-mission-control.mjs validate
+
+      - name: Allow disjoint owners and deny ownership ambiguity
+        shell: bash
+        run: |
+          set -euo pipefail
+          now="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          cat > /tmp/ui.json <<JSON
+          {"id":"ui","agent":"student-experience","branch":"agent/mission/student-experience/ui","risk":"R2","status":"ACTIVE","updated_at":"$now","base_sha":"1aff5a8c8f8d0f2eda9e3a965ca0bf238177ae18","paths":["client/src/pages/Home.jsx"],"dependencies":[]}
+          JSON
+          cat > /tmp/backend.json <<JSON
+          {"id":"backend","agent":"qa-release","branch":"agent/mission/qa-release/backend","risk":"R2","status":"ACTIVE","updated_at":"$now","base_sha":"1aff5a8c8f8d0f2eda9e3a965ca0bf238177ae18","paths":["server/test/concurrency-contract-check.mjs"],"dependencies":[]}
+          JSON
+          node scripts/pri-mission-control.mjs can-run-concurrently /tmp/ui.json /tmp/backend.json | grep -q '"decision": "ALLOW"'
+          cat > /tmp/ui2.json <<JSON
+          {"id":"ui2","agent":"student-experience","branch":"agent/mission/student-experience/ui2","risk":"R2","status":"ACTIVE","updated_at":"$now","base_sha":"1aff5a8c8f8d0f2eda9e3a965ca0bf238177ae18","paths":["client/src/pages/Progress.jsx"],"dependencies":[]}
+          JSON
+          if node scripts/pri-mission-control.mjs can-run-concurrently /tmp/ui.json /tmp/ui2.json; then exit 1; fi
+          cat > /tmp/glob.json <<JSON
+          {"id":"glob","agent":"qa-release","branch":"agent/mission/qa-release/glob","risk":"R2","status":"ACTIVE","updated_at":"$now","base_sha":"1aff5a8c8f8d0f2eda9e3a965ca0bf238177ae18","paths":["client/src/pages/**"],"dependencies":[]}
+          JSON
+          if node scripts/pri-mission-control.mjs can-run-concurrently /tmp/ui.json /tmp/glob.json; then exit 1; fi
+          cat > /tmp/unknown.json <<JSON
+          {"id":"unknown","agent":"qa-release","branch":"agent/mission/qa-release/unknown","risk":"R2","status":"ACTIVE","updated_at":"$now","base_sha":"1aff5a8c8f8d0f2eda9e3a965ca0bf238177ae18","paths":["unknown-unowned-path.txt"],"dependencies":[]}
+          JSON
+          if node scripts/pri-mission-control.mjs can-run-concurrently /tmp/ui.json /tmp/unknown.json; then exit 1; fi
+
+      - name: Deny shared derived and sensitive authorities
+        shell: bash
+        run: |
+          set -euo pipefail
+          now="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          cat > /tmp/derived-a.json <<JSON
+          {"id":"derived-a","agent":"student-experience","branch":"agent/mission/student-experience/derived-a","risk":"R3","status":"ACTIVE","updated_at":"$now","base_sha":"1aff5a8c8f8d0f2eda9e3a965ca0bf238177ae18","paths":["client/src/pages/Home.jsx","ios/PriLearning.swiftpm/Resources/Web/index.html"],"dependencies":[]}
+          JSON
+          cat > /tmp/derived-b.json <<JSON
+          {"id":"derived-b","agent":"math-reasoning","branch":"agent/mission/math-reasoning/derived-b","risk":"R4","status":"ACTIVE","updated_at":"$now","base_sha":"1aff5a8c8f8d0f2eda9e3a965ca0bf238177ae18","paths":["client/src/engine/checker.js","ios/PriLearning 2.swiftpm/Resources/Web/index.html"],"dependencies":[]}
+          JSON
+          if node scripts/pri-mission-control.mjs can-run-concurrently /tmp/derived-a.json /tmp/derived-b.json; then exit 1; fi
+          cat > /tmp/package.json <<JSON
+          {"id":"pkg","agent":"reliability","branch":"agent/mission/reliability/pkg","risk":"R3","status":"ACTIVE","updated_at":"$now","base_sha":"1aff5a8c8f8d0f2eda9e3a965ca0bf238177ae18","paths":["package.json"],"dependencies":[]}
+          JSON
+          cat > /tmp/ui.json <<JSON
+          {"id":"ui","agent":"student-experience","branch":"agent/mission/student-experience/ui","risk":"R2","status":"ACTIVE","updated_at":"$now","base_sha":"1aff5a8c8f8d0f2eda9e3a965ca0bf238177ae18","paths":["client/src/pages/Home.jsx"],"dependencies":[]}
+          JSON
+          if node scripts/pri-mission-control.mjs can-run-concurrently /tmp/package.json /tmp/ui.json; then exit 1; fi
+          cat > /tmp/platform.json <<JSON
+          {"id":"platform","agent":"platform","branch":"agent/mission/platform/platform","risk":"R4","status":"ACTIVE","updated_at":"$now","base_sha":"1aff5a8c8f8d0f2eda9e3a965ca0bf238177ae18","paths":["server/platform/session-store.js"],"dependencies":[]}
+          JSON
+          cat > /tmp/auth-test.json <<JSON
+          {"id":"auth-test","agent":"qa-release","branch":"agent/mission/qa-release/auth-test","risk":"R3","status":"ACTIVE","updated_at":"$now","base_sha":"1aff5a8c8f8d0f2eda9e3a965ca0bf238177ae18","paths":["server/test/auth-session-isolation-check.mjs"],"dependencies":[]}
+          JSON
+          if node scripts/pri-mission-control.mjs can-run-concurrently /tmp/platform.json /tmp/auth-test.json; then exit 1; fi
+
+      - name: Deny dependencies and cap; recover stale leases
+        shell: bash
+        run: |
+          set -euo pipefail
+          now="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          old="$(date -u -d '2 days ago' +%Y-%m-%dT%H:%M:%SZ)"
+          cat > /tmp/ui.json <<JSON
+          {"id":"ui","agent":"student-experience","branch":"agent/mission/student-experience/ui","risk":"R2","status":"ACTIVE","updated_at":"$now","base_sha":"1aff5a8c8f8d0f2eda9e3a965ca0bf238177ae18","paths":["client/src/pages/Home.jsx"],"dependencies":[]}
+          JSON
+          cat > /tmp/dependent.json <<JSON
+          {"id":"dependent","agent":"qa-release","branch":"agent/mission/qa-release/dependent","risk":"R2","status":"ACTIVE","updated_at":"$now","base_sha":"1aff5a8c8f8d0f2eda9e3a965ca0bf238177ae18","paths":["server/test/dependent-check.mjs"],"dependencies":["ui"]}
+          JSON
+          if node scripts/pri-mission-control.mjs can-run-concurrently /tmp/dependent.json /tmp/ui.json; then exit 1; fi
+          cat > /tmp/stale.json <<JSON
+          {"id":"stale","agent":"qa-release","branch":"agent/mission/qa-release/stale","risk":"R2","status":"ACTIVE","updated_at":"$old","base_sha":"1aff5a8c8f8d0f2eda9e3a965ca0bf238177ae18","paths":["server/test/stale-check.mjs"],"dependencies":[]}
+          JSON
+          printf '[%s]\n' "$(cat /tmp/stale.json)" > /tmp/active-stale.json
+          node scripts/pri-mission-control.mjs admit /tmp/ui.json /tmp/active-stale.json | grep -q '"reason": "FIRST_WRITER"'
+          cat > /tmp/backend.json <<JSON
+          {"id":"backend","agent":"qa-release","branch":"agent/mission/qa-release/backend","risk":"R2","status":"ACTIVE","updated_at":"$now","base_sha":"1aff5a8c8f8d0f2eda9e3a965ca0bf238177ae18","paths":["server/test/concurrency-contract-check.mjs"],"dependencies":[]}
+          JSON
+          cat > /tmp/platform.json <<JSON
+          {"id":"platform","agent":"platform","branch":"agent/mission/platform/platform","risk":"R4","status":"ACTIVE","updated_at":"$now","base_sha":"1aff5a8c8f8d0f2eda9e3a965ca0bf238177ae18","paths":["server/platform/session-store.js"],"dependencies":[]}
+          JSON
+          printf '[%s,%s]\n' "$(cat /tmp/backend.json)" "$(cat /tmp/platform.json)" > /tmp/active-two.json
+          if node scripts/pri-mission-control.mjs admit /tmp/ui.json /tmp/active-two.json; then exit 1; fi
+          cp .pri-os/mission-control.json /tmp/control.json
+          node - <<'NODE'
+          const fs = require('fs'); const p='.pri-os/mission-control.json'; const j=JSON.parse(fs.readFileSync(p,'utf8')); j.lease.max_writers=99; fs.writeFileSync(p,JSON.stringify(j,null,2)+'\n');
+          NODE
+          printf '[%s]\n' "$(cat /tmp/backend.json)" > /tmp/active-one.json
+          if node scripts/pri-mission-control.mjs admit /tmp/ui.json /tmp/active-one.json; then exit 1; fi
+          mv /tmp/control.json .pri-os/mission-control.json
+
+      - name: Validate concurrent ledger and exclude project issues
+        shell: bash
+        run: |
+          set -euo pipefail
+          now="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          cat > /tmp/ledger.json <<JSON
+          [
+            {"number":174,"title":"[PRI-PROJECT] Completion ledger","updated_at":"$now","body":"Pri-Mission-ID: must-not-count\nPri-Mission-Status: ACTIVE\nPri-Agent: director"},
+            {"number":1,"title":"[PRI-MISSION] ui","updated_at":"$now","body":"Pri-Mission-ID: ui\nPri-Mission-Status: ACTIVE\nPri-Agent: student-experience\nPri-Branch: agent/mission/student-experience/ui\nPri-Risk: R2\nPri-Base-SHA: 1aff5a8c8f8d0f2eda9e3a965ca0bf238177ae18\nPri-Attempt: 0\nPri-Failure-Fingerprint: none\nPri-Paths: [\"client/src/pages/Home.jsx\"]\nPri-Dependencies: none"},
+            {"number":2,"title":"[PRI-MISSION] backend","updated_at":"$now","body":"Pri-Mission-ID: backend\nPri-Mission-Status: ACTIVE\nPri-Agent: qa-release\nPri-Branch: agent/mission/qa-release/backend\nPri-Risk: R2\nPri-Base-SHA: 1aff5a8c8f8d0f2eda9e3a965ca0bf238177ae18\nPri-Attempt: 0\nPri-Failure-Fingerprint: none\nPri-Paths: [\"server/test/concurrency-contract-check.mjs\"]\nPri-Dependencies: none"}
+          ]
+          JSON
+          node scripts/pri-mission-control.mjs validate-ledger /tmp/ledger.json student-experience ui agent/mission/student-experience/ui R2 | grep -q '"active_count": 2'

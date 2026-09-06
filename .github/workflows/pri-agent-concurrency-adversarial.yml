@@ -1,0 +1,64 @@
+name: Pri Agent Concurrency Adversarial
+
+on:
+  pull_request:
+    paths:
+      - '.pri-os/mission-control.json'
+      - 'scripts/pri-mission-control.mjs'
+      - 'scripts/pri-fleet.mjs'
+      - '.github/workflows/pri-agent-concurrency*.yml'
+  push:
+    branches: [main]
+    paths:
+      - '.pri-os/mission-control.json'
+      - 'scripts/pri-mission-control.mjs'
+      - 'scripts/pri-fleet.mjs'
+      - '.github/workflows/pri-agent-concurrency*.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  adversarial-admission:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Reject collaborative-test-only fake ownership
+        shell: bash
+        run: |
+          set -euo pipefail
+          now="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          cat > /tmp/ui.json <<JSON
+          {"id":"ui","agent":"student-experience","branch":"agent/mission/student-experience/ui","risk":"R2","status":"ACTIVE","updated_at":"$now","base_sha":"1aff5a8c8f8d0f2eda9e3a965ca0bf238177ae18","paths":["client/src/pages/Home.jsx"],"dependencies":[]}
+          JSON
+          cat > /tmp/test-only.json <<JSON
+          {"id":"test-only","agent":"math-reasoning","branch":"agent/mission/math-reasoning/test-only","risk":"R3","status":"ACTIVE","updated_at":"$now","base_sha":"1aff5a8c8f8d0f2eda9e3a965ca0bf238177ae18","paths":["server/test/concurrency-contract-check.mjs"],"dependencies":[]}
+          JSON
+          if node scripts/pri-mission-control.mjs can-run-concurrently /tmp/ui.json /tmp/test-only.json; then
+            echo 'mission without a canonically primary-owned path was admitted' >&2
+            exit 1
+          fi
+          node scripts/pri-mission-control.mjs can-run-concurrently /tmp/ui.json /tmp/test-only.json 2>&1 | grep -q 'NO_CANONICAL_PRIMARY_PATH' || true
+      - name: Reject writers prepared from different main bases
+        shell: bash
+        run: |
+          set -euo pipefail
+          now="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          cat > /tmp/a.json <<JSON
+          {"id":"a","agent":"student-experience","branch":"agent/mission/student-experience/a","risk":"R2","status":"ACTIVE","updated_at":"$now","base_sha":"1aff5a8c8f8d0f2eda9e3a965ca0bf238177ae18","paths":["client/src/pages/Home.jsx"],"dependencies":[]}
+          JSON
+          cat > /tmp/b.json <<JSON
+          {"id":"b","agent":"qa-release","branch":"agent/mission/qa-release/b","risk":"R2","status":"ACTIVE","updated_at":"$now","base_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","paths":["server/test/concurrency-contract-check.mjs"],"dependencies":[]}
+          JSON
+          if node scripts/pri-mission-control.mjs can-run-concurrently /tmp/a.json /tmp/b.json; then
+            echo 'writers from different base SHAs were admitted' >&2
+            exit 1
+          fi
+          node scripts/pri-mission-control.mjs can-run-concurrently /tmp/a.json /tmp/b.json 2>&1 | grep -q 'BASE_SHA_MISMATCH' || true
