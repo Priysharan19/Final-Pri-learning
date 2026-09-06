@@ -148,10 +148,27 @@ function fractionDistractors(q, count = 3) {
 export function numericToMcq(q, rng) {
   if (!convertibleToMcq(q)) return null;
   const correct = answerText(q);
+  // More candidates than needed, because the dedup below is by rendered text
+  // and will discard some of them.
   const distractors = q.answer.simplestFraction
-    ? fractionDistractors(q, 3)
-    : numericDistractors(q, 3).map(w => ({ text: formatLike(q, w.value), why: w.why }));
-  const distinct = distractors.filter(w => w.text !== correct);
+    ? fractionDistractors(q, 8)
+    : numericDistractors(q, 8).map(w => ({ text: formatLike(q, w.value), why: w.why }));
+
+  // Deduplicate on the TEXT the student reads, not on the underlying number.
+  // numericDistractors already rejects duplicate values, but two different
+  // values can print identically once formatLike has rounded them to the
+  // answer's precision — 0 and -0, or two probabilities that both render "0".
+  // The paper promises one guess in four; a repeated option quietly makes it
+  // one in three.
+  const distinct = [];
+  const seenText = new Set([correct]);
+  for (const w of distractors) {
+    const text = String(w.text ?? '').trim();
+    if (!text || seenText.has(text)) continue;
+    seenText.add(text);
+    distinct.push({ ...w, text });
+    if (distinct.length === 3) break;
+  }
   if (distinct.length < 3) return null;
   const all = shuffle(rng, [{ text: correct, ok: true }, ...distinct.slice(0, 3)]);
   const correctIndex = all.findIndex(o => o.ok);
@@ -210,7 +227,12 @@ function shapeFor(q, need, rng) {
   if (!NEEDS[need]?.(q)) return null;
   if (need === 'mcq' && q.answerType !== 'mcq') {
     const converted = numericToMcq(q, rng);
-    return converted ? { payload: converted, conversion: 'numeric-to-mcq' } : null;
+    // Checked again after conversion, not only before it. NEEDS.mcq can only
+    // ask whether a question COULD become an MCQ; whether the MCQ it became is
+    // a sound one is a different question, and the answer has to be verified
+    // on the finished item or a distractor bug reaches a real paper.
+    if (!converted || !hasFourDistinctOptions(converted)) return null;
+    return { payload: converted, conversion: 'numeric-to-mcq' };
   }
   return { payload: q, conversion: q.answerType === 'mcq' ? 'native-mcq' : null };
 }

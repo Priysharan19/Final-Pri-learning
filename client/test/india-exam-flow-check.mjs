@@ -175,13 +175,19 @@ if (mainMarking) {
 // Some generators author two- and three-option questions, and one reaching a
 // JEE Main paper turns a one-in-four guess into a one-in-three: it showed up in
 // roughly one paper in six before the composer began refusing them. A single
-// sampled paper cannot gate that, so this sweeps twenty seeded papers.
+// sampled paper cannot gate that, so this sweeps five hundred seeded papers.
+//
+// It was twenty. Twenty was too few: a repeated option appeared in roughly one
+// paper in ninety-five and survived every CI run until the sweep was raised.
+// Five hundred papers cost about three seconds, which was never the reason it
+// was twenty. Note the draws depend on accumulated profile history, not on the
+// seed alone, so the run has to stay sequential to reproduce.
 {
   const user = papers['JEE Main']?.user;
   if (user) {
     let examined = 0;
     const bad = [];
-    for (let seed = 1; seed <= 20; seed += 1) {
+    for (let seed = 1; seed <= 500; seed += 1) {
       const made = await examCall(user, 'POST', '/exams', { seed });
       const paper = (await examCall(user, 'GET', `/exams/${made.exam.id}`, {})).exam;
       for (const q of (paper.questions || []).filter(q => q.mcqOptions?.length)) {
@@ -190,8 +196,8 @@ if (mainMarking) {
         if (texts.length !== 4 || new Set(texts).size !== 4) bad.push(`seed ${seed} · ${q.subtopic}: ${JSON.stringify(texts)}`);
       }
     }
-    ok(examined >= 300, `JEE Main sweep: enough MCQs examined (${examined})`);
-    ok(bad.length === 0, `JEE Main sweep: every MCQ in 20 papers offers four distinct options — ${bad.length} did not (${bad[0] || ''})`);
+    ok(examined >= 7000, `JEE Main sweep: enough MCQs examined (${examined})`);
+    ok(bad.length === 0, `JEE Main sweep: every MCQ in 500 papers offers four distinct options — ${bad.length} did not (${bad[0] || ''})`);
   }
 }
 

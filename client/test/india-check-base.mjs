@@ -72,7 +72,12 @@ console.log(`  ${entries} cover entries across ${mapped.length} chapters, reachi
 // is *about* the dot point claimed — is a human judgement, made once per entry
 // against sampled output, and is not something this suite can verify.
 console.log('\nQUESTIONS — every declared (generator, difficulty), marked and inspected');
-const DRAWS = 12;
+// 12 was the historical value and it was too few. Rare generator faults hide
+// below a low draw count — the sibling exam sweep was missing a repeated MCQ
+// option at roughly one paper in ninety-five for exactly that reason. 100 draws
+// is 43,800 questions and costs about half a second, so the low number was
+// never buying anything.
+const DRAWS = 100;
 let made = 0, marked = 0, wellFormed = 0;
 const broken = [];
 const pairs = new Set();
