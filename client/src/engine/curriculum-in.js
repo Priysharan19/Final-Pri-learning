@@ -3,6 +3,8 @@
 // layer upgrades source-audited chapters while preserving Pri Learning's
 // established India product contract.
 import { IN_CURRICULUM, IN_CHAPTERS, IN_CHAPTER_BY_ID } from './curriculum-in-base.js';
+import { NCERT_CLASS7_2026_27_CHAPTERS } from './ncert/class7-2026-27-production.js';
+import { NCERT_CLASS7_PART2_2026_27_CHAPTERS } from './ncert/class7-part2-2026-27-production.js';
 import {
   NCERT_CLASS8_RATIONAL_DOTPOINTS,
   NCERT_CLASS8_RATIONAL_COVERS
@@ -18,6 +20,36 @@ import {
 } from './ncert/class8-chapters-3-13-production.js';
 import { NCERT_CLASS9_CHAPTERS } from './ncert/class9-chapters-production.js';
 import { CBSE_CLASS10_2026_27_CHAPTERS } from './ncert/class10-2026-27-production.js';
+
+function replaceClass7() {
+  const group = IN_CURRICULUM.find(g => g.grade === 7);
+  if (!group) throw new Error('Class 7 curriculum group is missing');
+  const oldIds = group.chapters.map(ch => ch.id);
+  const source = [...NCERT_CLASS7_2026_27_CHAPTERS, ...NCERT_CLASS7_PART2_2026_27_CHAPTERS];
+  const chapters = source.map(src => ({
+    id: src.id,
+    name: src.title,
+    strand: src.strand,
+    weight: src.weight,
+    dotpoints: [...src.dotpoints],
+    native: true,
+    covers: src.covers.map(c => ({ gen:c.gen, dp:[...c.dp], diff:[...c.diff] }))
+  }));
+
+  const first = IN_CHAPTERS.findIndex(ch => ch.grade === 7);
+  const count = IN_CHAPTERS.filter(ch => ch.grade === 7).length;
+  if (first < 0 || !count) throw new Error('Class 7 flat curriculum is missing');
+
+  for (const id of oldIds) delete IN_CHAPTER_BY_ID[id];
+  group.caption = 'NCERT Ganita Prakash Grade 7 Parts I–II — current source-authored production coverage';
+  group.chapters = chapters;
+
+  const flat = chapters.map(ch => ({ ...ch, dotpoints:[...ch.dotpoints], covers:ch.covers.map(c=>({gen:c.gen,dp:[...c.dp],diff:[...c.diff]})), grade:7 }));
+  IN_CHAPTERS.splice(first, count, ...flat);
+  for (const ch of flat) IN_CHAPTER_BY_ID[ch.id] = ch;
+}
+
+replaceClass7();
 
 function applyChapterOverlay(chapterId, dotpoints, covers, { native = true } = {}) {
   const curriculumChapter = IN_CURRICULUM.flatMap(group => group.chapters).find(chapter => chapter.id === chapterId);

@@ -9,7 +9,7 @@ import { normalize, parse, evaluate, exprEquivalent, numsClose } from './expr.js
 import { diagnoseStep } from './diagnose.js';
 import {
   assessEquationLine, sameEquationClaim, sameExpressionClaim,
-  assessRelationLine, assessDerivativeLine
+  assessRelationLine, assessDerivativeLine, parseRelation, sameRelationClaim
 } from './reason-v2-safe.js';
 import { assessEvaluationLine, assessPointLine } from './reason-v3.js';
 import { assessRelationChainLine, assessModulusInequalityLine } from './reason-v4.js';
@@ -65,6 +65,85 @@ function extraListedRootDiagnosis(variable, value) {
   };
 }
 
+// ── Diagnosis confidence ─────────────────────────────────────────────────────
+// Every diagnosis that leaves Step Check says how sure the engine is. `high`
+// means exactly one authored move reproduces the student's line, or the line
+// was disproved outright against the authored solution; `medium` means more
+// than one move fits, or the verdict rests on a counterexample alone. The copy
+// a student reads hedges medium ("This looks like …") and states high.
+export const DIAGNOSIS_CONFIDENCE = ['high', 'medium'];
+
+function withConfidence(diagnosis) {
+  if (!diagnosis || typeof diagnosis !== 'object') return diagnosis;
+  const confidence = DIAGNOSIS_CONFIDENCE.includes(diagnosis.confidence) ? diagnosis.confidence : 'medium';
+  return diagnosis.confidence === confidence ? diagnosis : { ...diagnosis, confidence };
+}
+
+/** The one-line verdict for a broken line, hedged when the diagnosis is not certain. */
+export function diagnosisVerdict(diagnosis, lineNumber) {
+  const d = withConfidence(diagnosis);
+  if (!d || d.code === 'counterexample') return 'There’s a slip in your working — Step Check has marked the line where it breaks.';
+  const where = lineNumber ? ` — line ${lineNumber} is marked below.` : '.';
+  return d.confidence === 'high' ? `${d.title}${where}` : `This looks like: ${d.title}${where}`;
+}
+
+// ── Pairs of linear equations (and any system with one authored solution) ───
+// A system pins its solution, so every equation a student writes on the way is
+// a consequence of it exactly when it holds at that solution — the line can be
+// proved or disproved by substitution alone, whichever variable it is in. A
+// pair "x = 2, y = 3" and a point "(2, 3)" are read the same way.
+function systemDiagnosis(vars, sol, L, R) {
+  const fmt = v => Number(Number(v).toPrecision(10));
+  return {
+    code: 'system-line-false',
+    title: 'This line is not true for the solution of the system',
+    message: `With ${vars.map(v => `${v} = ${fmt(sol[v])}`).join(' and ')} — the solution of the pair — this line reads ${fmt(L)} = ${fmt(R)}, which is false.`,
+    fix: 'Compare it term by term with the line above: a term or a sign changed on the way, or the substitution was made into the wrong equation.',
+    confidence: 'high'
+  };
+}
+
+export function assessSystemLine({ text, meta = null } = {}) {
+  const vars = Array.isArray(meta?.variables) && meta.variables.length ? meta.variables : Object.keys(meta?.solution || {});
+  const sol = meta?.solution || {};
+  if (!vars.length || vars.some(v => !Number.isFinite(Number(sol[v])))) {
+    return { status: 'note', trusted: false, note: 'Pri needs the authored solution of the system before it can verify this line.' };
+  }
+  const env = {};
+  for (const v of vars) env[v] = Number(sol[v]);
+  const src = String(text || '').trim().replace(/[−–—]/g, '-').replace(/^∴\s*/, '').replace(/^(so|hence|then|therefore)\s+/i, '');
+  if (!src) return { status: 'note', trusted: false, note: 'Skipped — an empty line.' };
+
+  const holds = ast => {
+    const L = evaluate(ast.l, env), R = evaluate(ast.r, env);
+    if (!Number.isFinite(L) || !Number.isFinite(R)) return null;
+    return { same: Math.abs(L - R) <= Math.max(1e-6, Math.abs(L), Math.abs(R)) * 1e-6, L, R };
+  };
+
+  // "(2, 3)" — the solution as a point, in the order the variables were named
+  if (vars.length === 2 && !src.includes('=')) {
+    const assessed = assessPointLine({ text: src, meta: { kind: 'point', x: env[vars[0]], y: env[vars[1]] } });
+    if (assessed.status !== 'note') return assessed;
+  }
+  if (!src.includes('=')) return { status: 'note', trusted: false, note: 'Skipped — this line makes no claim Pri can test against the solution.' };
+
+  // "x = 2, y = 3" / "x = 2 and y = 3" — every part must hold
+  const parts = src.split(/,|;|\band\b/i).map(p => p.trim()).filter(Boolean);
+  if (!parts.length) return { status: 'note', trusted: false, note: 'Skipped — I couldn’t read this line safely.' };
+  for (const part of parts) {
+    let ast;
+    try { ast = parse(normalize(part)); } catch { return { status: 'note', trusted: false, note: 'Skipped — I couldn’t parse this line as maths.' }; }
+    if (ast.t !== 'equation') return { status: 'note', trusted: false, note: 'Skipped — this is not an equation.' };
+    const h = holds(ast);
+    if (!h) return { status: 'note', trusted: false, note: 'Skipped — this line could not be evaluated at the solution.' };
+    if (!h.same) {
+      const diagnosis = systemDiagnosis(vars, sol, h.L, h.R);
+      return { status: 'break', trusted: false, note: diagnosis.message, diagnosis };
+    }
+  }
+  return { status: 'ok', trusted: true };
+}
+
 /**
  * Read a natural final solution list before normalize() removes commas.
  * Accepted forms include:
@@ -108,10 +187,7 @@ export function checkWorking(q, workingText) {
     return { correct: false, feedback: `Show at least ${minLines} lines of mathematical working — I could only verify ${parsed.length}.`, stepReport: report, validLines: okLines.length };
   }
   if (report.firstBreak !== -1) {
-    const named = report.diagnosis && report.diagnosis.code !== 'counterexample'
-      ? `${report.diagnosis.title} — line ${report.firstBreak + 1} is marked below.`
-      : 'There’s a slip in your working — Step Check has marked the line where it breaks.';
-    return { correct: false, feedback: named, stepReport: report, validLines: okLines.length };
+    return { correct: false, feedback: diagnosisVerdict(report.diagnosis, report.firstBreak + 1), stepReport: report, validLines: okLines.length };
   }
 
   const lastLine = [...report.lines].reverse().find(l => l.status === 'ok');
@@ -235,6 +311,18 @@ function stepCheckSingle(meta, workingText) {
         return;
       }
 
+      // A pair of linear equations (or any system with one authored solution):
+      // every line is proved or disproved at the solution point.
+      if (meta?.kind === 'system') {
+        const assessed = assessSystemLine({ text: proseClean, meta });
+        status = assessed.status;
+        note = assessed.note;
+        lineDiagnosis = assessed.diagnosis || null;
+        if (status === 'break' && firstBreak === -1) firstBreak = i;
+        out.push({ text: line, status, note, ...(lineDiagnosis ? { diagnosis: lineDiagnosis } : {}) });
+        return;
+      }
+
       // Authored derivative metadata lets Pri verify the mathematical operation,
       // not merely whether the student's final expression happens to match.
       if (meta?.kind === 'derivative') {
@@ -341,13 +429,14 @@ function stepCheckSingle(meta, workingText) {
   }
 
   let diagnosis = out[firstBreak]?.diagnosis || null;
-  if (!diagnosis || diagnosis.code === 'lost-solution') {
+  if (!diagnosis || diagnosis.code === 'lost-solution' || diagnosis.code === 'system-line-false') {
     try {
       const specific = diagnoseStep({ prevText, brokenText: out[firstBreak].text, meta });
       if (specific) diagnosis = specific;
     } catch { /* remain conservative */ }
   }
   if (diagnosis) {
+    diagnosis = withConfidence(diagnosis);
     out[firstBreak].diagnosis = diagnosis;
     out[firstBreak].note = diagnosis.message;
   }
@@ -356,10 +445,28 @@ function stepCheckSingle(meta, workingText) {
 
 
 // ── Pri Reason V3: authored multi-operation proof plans ─────────────────────
-// A plan is an ordered list of already-safe verifiers. It cannot skip a stage:
-// a later-stage truth shown before its prerequisite is recognised only as a
-// note. This preserves the V1/V2 prove/disprove/abstain contract while allowing
-// a real solution to move from differentiation into solving and substitution.
+// A plan is a list of already-safe verifiers with prerequisites between them.
+// A stage cannot be credited before its prerequisites: a later-stage truth
+// shown before them is recognised only as a note. This preserves the V1/V2
+// prove/disprove/abstain contract while allowing a real solution to move from
+// differentiation into solving and substitution.
+//
+// Stage order (marking-10). By default every stage requires the one before it,
+// which is the authored order. A plan may declare that stages are independent
+// so any valid order of working is accepted:
+//
+//   { kind: 'plan', anyOrder: true, stages: [...] }   every stage independent
+//   { kind: 'evaluation', ..., independent: true }     this stage needs nothing
+//   { kind: 'equation', ..., requires: [0, 2] }        explicit prerequisites
+//
+// The rule: a line earns credit for a stage only when every stage that stage
+// requires has already been verified in the working above it. Stages with no
+// requirement between them may appear in either order (solve for x before y or
+// y before x; compute the three minors of a determinant in any order). A stage
+// that names a prerequisite still cannot be skipped — a substitution stage
+// that requires the derivative stage is a note, never credit, until the
+// derivative has been shown. Nothing here makes a wrong line right: a line
+// that disproves an available stage is a break wherever it appears.
 
 function planClause(line) {
   return String(line || '').split(/(?:=>|⇒|→)/).pop().trim();
@@ -422,6 +529,18 @@ function assessPlanStage(stage, line) {
   };
 }
 
+/** The prerequisite stages of each stage — the authored order unless the plan says otherwise. */
+export function planRequirements(meta) {
+  const stages = Array.isArray(meta?.stages) ? meta.stages.filter(Boolean) : [];
+  return stages.map((stage, i) => {
+    if (Array.isArray(stage?.requires)) {
+      return [...new Set(stage.requires.filter(r => Number.isInteger(r) && r >= 0 && r < stages.length && r !== i))];
+    }
+    if (stage?.independent === true || meta?.anyOrder === true) return [];
+    return i === 0 ? [] : [i - 1];
+  });
+}
+
 function stepCheckPlan(meta, workingText) {
   const rawLines = String(workingText || '').split('\n').map(line => line.trim()).filter(Boolean);
   const stages = Array.isArray(meta?.stages) ? meta.stages.filter(Boolean) : [];
@@ -432,12 +551,14 @@ function stepCheckPlan(meta, workingText) {
     };
   }
 
+  const requires = planRequirements(meta);
   const out = [];
   const completed = new Set();
   let active = 0;
-  let activeSatisfied = false;
   let firstBreak = -1;
   let diagnosis = null;
+
+  const ready = idx => requires[idx].every(r => completed.has(r));
 
   for (let i = 0; i < rawLines.length; i++) {
     const line = rawLines[i];
@@ -446,97 +567,84 @@ function stepCheckPlan(meta, workingText) {
       continue;
     }
 
-    const currentStage = stages[active];
+    // Every verdict on this line is drawn once and kept.
+    const verdicts = new Map();
+    const assess = idx => {
+      if (!verdicts.has(idx)) verdicts.set(idx, assessPlanStage(stages[idx], line));
+      return verdicts.get(idx);
+    };
+    const open = [];        // not yet verified, prerequisites verified
+    const blocked = [];     // not yet verified, a prerequisite still missing
+    for (let idx = 0; idx < stages.length; idx++) {
+      if (completed.has(idx)) continue;
+      (ready(idx) ? open : blocked).push(idx);
+    }
+    const done = [...completed].sort((a, b) => b - a);   // most recent first
 
-    if (!activeSatisfied) {
-      const current = assessPlanStage(currentStage, line);
-      if (current.status === 'ok') {
-        activeSatisfied = true;
-        completed.add(active);
-        out.push({ text: line, status: 'ok', stage: active });
-        continue;
-      }
-
-      // Do not falsely call a correct later-stage result a derivative/algebra
-      // error merely because the prerequisite working was omitted. It still
-      // cannot advance the plan, so it receives a note rather than credit.
-      let laterTruth = false;
-      for (let s = active + 1; s < stages.length; s++) {
-        const later = assessPlanStage(stages[s], line);
-        if (later.status === 'ok') { laterTruth = true; break; }
-      }
-      if (laterTruth) {
-        out.push({
-          text: line, status: 'note', stage: active,
-          note: 'This matches a later result, but Pri has not yet verified the prerequisite stage, so it cannot receive step credit.'
-        });
-        continue;
-      }
-
-      if (current.status === 'break') {
-        firstBreak = i;
-        diagnosis = current.diagnosis || null;
-        out.push({ text: line, status: 'break', stage: active, note: current.note, ...(diagnosis ? { diagnosis } : {}) });
-      } else {
-        out.push({ text: line, status: 'note', stage: active, note: current.note });
-      }
+    // 1. A line that proves an available stage completes it.
+    const proved = open.find(idx => assess(idx).status === 'ok');
+    if (proved !== undefined) {
+      completed.add(proved);
+      active = proved;
+      out.push({ text: line, status: 'ok', stage: proved });
       continue;
     }
 
-    const hasNext = active + 1 < stages.length;
-    if (hasNext) {
-      const nextIndex = active + 1;
-      const next = assessPlanStage(stages[nextIndex], line);
-      if (next.status === 'ok') {
-        active = nextIndex;
-        activeSatisfied = true;
-        completed.add(active);
-        out.push({ text: line, status: 'ok', stage: active });
-        continue;
-      }
-      if (next.status === 'break') {
-        active = nextIndex;
-        firstBreak = i;
-        diagnosis = next.diagnosis || null;
-        out.push({ text: line, status: 'break', stage: active, note: next.note, ...(diagnosis ? { diagnosis } : {}) });
-        continue;
-      }
-
-      // The line may be another equivalent form within the already-completed
-      // stage (for example source equation then x = 2). Keep that stage active.
-      const current = assessPlanStage(currentStage, line);
-      if (current.status === 'ok') {
-        out.push({ text: line, status: 'ok', stage: active });
-        continue;
-      }
-      // Equation solvers have strong exact solution-set diagnostics. Preserve
-      // those rather than hiding a wrong solved root as an unsupported next op.
-      if (current.status === 'break' && currentStage.kind === 'equation') {
-        firstBreak = i;
-        diagnosis = current.diagnosis || null;
-        out.push({ text: line, status: 'break', stage: active, note: current.note, ...(diagnosis ? { diagnosis } : {}) });
-        continue;
-      }
-
+    // 2. Do not falsely call a correct later-stage result an error merely
+    //    because its prerequisite working was omitted. It still cannot earn
+    //    credit, so it receives a note.
+    const later = blocked.find(idx => assess(idx).status === 'ok');
+    if (later !== undefined) {
       out.push({
         text: line, status: 'note', stage: active,
-        note: next.note || current.note || 'Pri could not prove which authored operation this line belongs to.'
+        note: 'This matches a later result, but Pri has not yet verified the prerequisite stage, so it cannot receive step credit.'
       });
       continue;
     }
 
-    // Final stage: a positively disproved final claim is a real break.
-    const current = assessPlanStage(currentStage, line);
-    if (current.status === 'break') {
+    // 3. A line that disproves an available stage is the break.
+    const broken = open.find(idx => assess(idx).status === 'break');
+    if (broken !== undefined) {
+      const verdict = assess(broken);
+      active = broken;
       firstBreak = i;
-      diagnosis = current.diagnosis || null;
-      out.push({ text: line, status: 'break', stage: active, note: current.note, ...(diagnosis ? { diagnosis } : {}) });
-    } else {
-      if (current.status === 'ok') completed.add(active);
-      out.push({ text: line, status: current.status, stage: active, ...(current.note ? { note: current.note } : {}) });
+      diagnosis = verdict.diagnosis || null;
+      out.push({ text: line, status: 'break', stage: broken, note: verdict.note, ...(diagnosis ? { diagnosis } : {}) });
+      continue;
     }
+
+    // 4. Another equivalent form within a stage already verified (for
+    //    example the source equation and then x = 2) keeps that stage's credit.
+    const again = done.find(idx => assess(idx).status === 'ok');
+    if (again !== undefined) {
+      out.push({ text: line, status: 'ok', stage: again });
+      continue;
+    }
+
+    // 5. Equation solvers have strong exact solution-set diagnostics. A wrong
+    //    root written after the equation stage was verified is a real break,
+    //    not an unsupported next operation.
+    const wrongRoot = done.find(idx => stages[idx].kind === 'equation' && assess(idx).status === 'break');
+    if (wrongRoot !== undefined) {
+      const verdict = assess(wrongRoot);
+      firstBreak = i;
+      diagnosis = verdict.diagnosis || null;
+      out.push({ text: line, status: 'break', stage: wrongRoot, note: verdict.note, ...(diagnosis ? { diagnosis } : {}) });
+      continue;
+    }
+
+    // 6. Abstain, saying why the nearest stage could not use the line.
+    const reason = [...open, ...done].map(idx => assess(idx).note).find(Boolean);
+    out.push({
+      text: line, status: 'note', stage: active,
+      note: reason || 'Pri could not prove which authored operation this line belongs to.'
+    });
   }
 
+  if (diagnosis) {
+    diagnosis = withConfidence(diagnosis);
+    out[firstBreak].diagnosis = diagnosis;
+  }
   return {
     lines: out,
     firstBreak,
@@ -549,4 +657,113 @@ function stepCheckPlan(meta, workingText) {
 export function stepCheck(meta, workingText) {
   if (meta?.kind === 'plan') return stepCheckPlan(meta, workingText);
   return stepCheckSingle(meta, workingText);
+}
+
+// ── Method marks (marking-11) ────────────────────────────────────────────────
+// One rule for Practice and for exams: a mark for each verified line that
+// moves the solution on, capped one below the question's marks (the final mark
+// is for the answer). A line that restates the question — the equation or
+// expression the prompt gave — earns nothing, and a step written twice is
+// counted once.
+
+const TEX_MATH = /\$([^$]+)\$/g;
+
+/** A KaTeX span reduced to what the expression engine reads; null when it cannot be. */
+function plainTex(tex) {
+  let s = String(tex || '');
+  for (let guard = 0; guard < 6 && /\\d?frac/.test(s); guard++) {
+    s = s.replace(/\\d?frac\s*(\{[^{}]*\}|[0-9a-zA-Z])\s*(\{[^{}]*\}|[0-9a-zA-Z])/g, (_, a, b) =>
+      `((${a.replace(/^\{|\}$/g, '')})/(${b.replace(/^\{|\}$/g, '')}))`);
+  }
+  s = s.replace(/\\sqrt\s*\{([^{}]*)\}/g, 'sqrt($1)')
+    .replace(/\\(times|cdot)/g, '*').replace(/\\div/g, '/')
+    .replace(/\\le(q|qslant)?\b/g, '<=').replace(/\\ge(q|qslant)?\b/g, '>=')
+    .replace(/\\(left|right|,|;|!|quad|qquad|displaystyle)/g, '')
+    .replace(/\\pi/g, 'pi')
+    .replace(/[{}]/g, '');
+  if (/\\[a-zA-Z]+/.test(s)) return null;   // a command the engine has no reading of
+  return s.trim();
+}
+
+function readClaim(text) {
+  const src = String(text ?? '').trim()
+    .replace(/[−–—]/g, '-')
+    .replace(/^∴\s*/, '')
+    .replace(/^(so|hence|then|therefore)\s+/i, '');
+  if (!src) return null;
+  const relation = parseRelation(src);
+  if (relation) return { kind: 'relation', relation };
+  try {
+    const ast = parse(normalize(src));
+    return ast.t === 'equation' ? { kind: 'equation', ast } : { kind: 'expression', ast };
+  } catch { return null; }
+}
+
+function sameClaim(a, b) {
+  if (!a || !b || a.kind !== b.kind) return false;
+  try {
+    if (a.kind === 'relation') return sameRelationClaim(a.relation, b.relation);
+    if (a.kind === 'equation') return sameEquationClaim(a.ast, b.ast, null);
+    return sameExpressionClaim(a.ast, b.ast) || exprEquivalent(a.ast, b.ast);
+  } catch { return false; }
+}
+
+/** The claims a question hands the student: authored sources and the maths spans of the prompt. */
+export function questionClaims(meta, prompt = '') {
+  const texts = [];
+  if (meta && typeof meta === 'object') {
+    if (typeof meta.source === 'string') texts.push(meta.source);
+    if (Array.isArray(meta.sources)) texts.push(...meta.sources.filter(s => typeof s === 'string'));
+    if (Array.isArray(meta.stages)) {
+      for (const stage of meta.stages) {
+        if (stage && typeof stage.source === 'string' && stage.kind !== 'derivative' && stage.kind !== 'evaluation') texts.push(stage.source);
+      }
+    }
+  }
+  for (const m of String(prompt || '').matchAll(TEX_MATH)) {
+    const plain = plainTex(m[1]);
+    if (plain && /[=<>≤≥]/.test(plain)) texts.push(plain);
+  }
+  return texts.map(readClaim).filter(Boolean);
+}
+
+/** Does this line of working merely restate the question? */
+export function restatesQuestion(line, meta, prompt = '') {
+  const claim = readClaim(line);
+  if (!claim) return false;
+  return questionClaims(meta, prompt).some(c => sameClaim(claim, c));
+}
+
+/**
+ * Method marks for a wrong final answer, from the student's working.
+ * Returns null when nothing in the working could be verified; otherwise
+ * { okLines, progressLines, awarded, note, report }.
+ */
+export function methodMarks({ meta, working, marks, prompt = '', report = null } = {}) {
+  if (!meta || working == null || !String(working).trim()) return null;
+  let rep = report;
+  if (!rep) {
+    try { rep = stepCheck(meta, String(working)); } catch { return null; }
+  }
+  const okLines = (rep?.lines || []).filter(l => l.status === 'ok');
+  if (!okLines.length) return null;
+  const given = questionClaims(meta, prompt);
+  const counted = [];
+  let restated = 0;
+  for (const l of okLines) {
+    const claim = readClaim(l.text);
+    if (claim && given.some(c => sameClaim(claim, c))) { restated++; continue; }
+    if (claim && counted.some(c => sameClaim(claim, c))) continue;
+    counted.push(claim || { kind: 'text', text: String(l.text).trim() });
+  }
+  const total = Math.max(1, Number(marks) || 1);
+  const progress = counted.length;
+  const awarded = Math.min(Math.max(0, total - 1), progress);
+  const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+  const note = awarded > 0
+    ? `${plural(awarded, 'mark')} for correct working — the final answer was wrong, but ${plural(progress, 'line')} of your working moved the solution on.`
+    : restated
+      ? 'No method marks: the lines that check out only restate the question. Marks come from steps that move the solution on.'
+      : 'No method marks: correct working earns marks only when it moves the solution on, and this question carries a single mark for the answer.';
+  return { okLines: okLines.length, progressLines: progress, restatedLines: restated, awarded, note, report: rep };
 }

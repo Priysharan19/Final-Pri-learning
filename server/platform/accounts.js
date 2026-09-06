@@ -6,9 +6,23 @@ import {
 } from './security.js';
 import { encryptDeliveryToken } from './deliveryCrypto.js';
 import { verifyIdentityToken } from './oidc.js';
+import { clearLoginFailures, loginLockStatus, recordLoginFailure } from './loginLockout.js';
+import { consumeTeacherInvite, findLiveTeacherInvite } from './teacherInvites.js';
+import { maybeBootstrapAdmin } from './bootstrapAdmin.js';
+import { consumeOidcNonce } from './oidcNonce.js';
 
 const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const TOKEN_MS = 1000 * 60 * 60;
+const BCRYPT_COST = 12;
+// Compared against when no account (or no password) matches the submitted
+// email, so an unknown address costs the same bcrypt work as a wrong password.
+// Not a secret: nothing is ever authenticated against it.
+const DUMMY_PASSWORD_HASH = '$2a$12$Vat.Y0eTJ6drWz5OyiVI1u8VH0sr/2wWJbDx2DmV44ZNEkyWFW0d2';
+
+function audit(db, actor, action, targetKind, targetId, metadata = {}, now = Date.now()) {
+  db.prepare('INSERT INTO audit_log(actor_account_id,action,target_kind,target_id,metadata_json,created_at) VALUES (?,?,?,?,?,?)')
+    .run(actor, action, targetKind, targetId, JSON.stringify(metadata), now);
+}
 
 function email(value) {
   const normalized = String(value || '').trim().toLowerCase();
@@ -22,8 +36,12 @@ function strongPassword(value) {
 }
 
 function publicAccount(row) {
+  // A session row is a JOIN of account_sessions and accounts, so its `id` is the
+  // SESSION id; only `account_id` names the account. Account rows have `id` and
+  // no `account_id`. Preferring account_id keeps /v1/account/me reporting a
+  // stable account identity instead of one that changes with every sign-in.
   return {
-    id: row.id || row.account_id,
+    id: row.account_id || row.id,
     email: row.email,
     name: row.name,
     role: row.role,
@@ -82,7 +100,7 @@ export async function authorizeAccountDeletion(db, accountId, body = {}, identit
 
   if (row.password_hash) {
     const password = String(body?.password || '');
-    if (!password || !bcrypt.compareSync(password, row.password_hash)) {
+    if (!password || !(await bcrypt.compare(password, row.password_hash))) {
       throw reauthError('REAUTH_REQUIRED', 'Confirm your password before deleting the account.');
     }
     return { method: 'password' };
@@ -110,49 +128,82 @@ export async function authorizeAccountDeletion(db, accountId, body = {}, identit
   return { method: provider, subject: identity.subject };
 }
 
-export function createAccountRouter(db) {
+export function createAccountRouter(db, { beforeDelete = null } = {}) {
   ensureDeliveryTable(db);
   const router = Router();
 
-  router.post('/register', rateLimit(db, 'register', { limit: 8, windowMs: 60 * 60 * 1000 }), (req, res) => {
-    const em = email(req.body?.email);
-    const name = String(req.body?.name || '').trim().slice(0, 80);
-    const password = String(req.body?.password || '');
-    const deviceId = String(req.body?.deviceId || 'web').slice(0, 160);
-    if (!em || !name || !strongPassword(password)) {
-      return res.status(400).json({ error: { code: 'INVALID_ACCOUNT', message: 'Use a valid name, email and password of at least 10 characters.' } });
-    }
-    const now = Date.now();
-    const accountId = id('acct');
-    const passwordHash = bcrypt.hashSync(password, 12);
+  router.post('/register', rateLimit(db, 'register', { limit: 8, windowMs: 60 * 60 * 1000 }), async (req, res, next) => {
     try {
-      db.transaction(() => {
-        db.prepare(`INSERT INTO accounts(id,email,name,password_hash,role,created_at,updated_at)
-          VALUES (?, ?, ?, ?, 'student', ?, ?)`).run(accountId, em, name, passwordHash, now, now);
-        db.prepare(`INSERT INTO account_identities(provider,provider_subject,account_id,email_at_link,linked_at)
-          VALUES ('password', ?, ?, ?, ?)`).run(em, accountId, em, now);
-        db.prepare(`INSERT INTO entitlement_snapshots(account_id,plan,status,provider,source_version,updated_at)
-          VALUES (?, 'free', 'free', 'none', 0, ?)`).run(accountId, now);
-        queueAccountToken(db, accountId, em, 'verify-email', now);
-      })();
-    } catch (err) {
-      if (/unique/i.test(String(err?.message))) return res.status(409).json({ error: { code: 'EMAIL_EXISTS', message: 'An account already exists for this email.' } });
-      throw err;
-    }
-    createSession(db, res, accountId, deviceId, req.get('user-agent') || '', now);
-    const row = db.prepare('SELECT * FROM accounts WHERE id = ?').get(accountId);
-    res.status(201).json({ account: publicAccount(row), verificationRequired: true });
+      const em = email(req.body?.email);
+      const name = String(req.body?.name || '').trim().slice(0, 80);
+      const password = String(req.body?.password || '');
+      const deviceId = String(req.body?.deviceId || 'web').slice(0, 160);
+      if (!em || !name || !strongPassword(password)) {
+        return res.status(400).json({ error: { code: 'INVALID_ACCOUNT', message: 'Use a valid name, email and password of at least 10 characters.' } });
+      }
+      const now = Date.now();
+      // A teacher invite (minted by an admin, single-use, expiring) is the only
+      // way registration produces anything other than a student account.
+      const inviteCode = req.body?.teacherInviteCode == null ? '' : String(req.body.teacherInviteCode).trim().slice(0, 64);
+      const inviteInvalid = () => res.status(400).json({ error: { code: 'TEACHER_INVITE_INVALID', message: 'Teacher invite code is invalid, expired or already used.' } });
+      if (inviteCode && !findLiveTeacherInvite(db, inviteCode, now)) return inviteInvalid();
+      const role = inviteCode ? 'teacher' : 'student';
+      const accountId = id('acct');
+      const passwordHash = await bcrypt.hash(password, BCRYPT_COST);
+      try {
+        db.transaction(() => {
+          db.prepare(`INSERT INTO accounts(id,email,name,password_hash,role,created_at,updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)`).run(accountId, em, name, passwordHash, role, now, now);
+          db.prepare(`INSERT INTO account_identities(provider,provider_subject,account_id,email_at_link,linked_at)
+            VALUES ('password', ?, ?, ?, ?)`).run(em, accountId, em, now);
+          db.prepare(`INSERT INTO entitlement_snapshots(account_id,plan,status,provider,source_version,updated_at)
+            VALUES (?, 'free', 'free', 'none', 0, ?)`).run(accountId, now);
+          queueAccountToken(db, accountId, em, 'verify-email', now);
+          if (inviteCode) {
+            if (!consumeTeacherInvite(db, inviteCode, accountId, now)) {
+              throw Object.assign(new Error('Teacher invite code is invalid, expired or already used.'), { code: 'TEACHER_INVITE_INVALID' });
+            }
+            audit(db, accountId, 'teacher-invite.redeem', 'account', accountId, { role }, now);
+          }
+        })();
+      } catch (err) {
+        if (err?.code === 'TEACHER_INVITE_INVALID') return inviteInvalid();
+        if (/unique/i.test(String(err?.message))) return res.status(409).json({ error: { code: 'EMAIL_EXISTS', message: 'An account already exists for this email.' } });
+        throw err;
+      }
+      createSession(db, res, accountId, deviceId, req.get('user-agent') || '', now);
+      const row = db.prepare('SELECT * FROM accounts WHERE id = ?').get(accountId);
+      res.status(201).json({ account: publicAccount(row), verificationRequired: true });
+    } catch (err) { next(err); }
   });
 
-  router.post('/login', rateLimit(db, 'login', { limit: 12, windowMs: 15 * 60 * 1000 }), (req, res) => {
-    const em = email(req.body?.email);
-    const password = String(req.body?.password || '');
-    const row = em ? db.prepare('SELECT * FROM accounts WHERE email = ? AND deleted_at IS NULL').get(em) : null;
-    if (!row || !row.password_hash || !bcrypt.compareSync(password, row.password_hash)) {
-      return res.status(401).json({ error: { code: 'BAD_CREDENTIALS', message: 'Incorrect email or password.' } });
-    }
-    createSession(db, res, row.id, String(req.body?.deviceId || 'web').slice(0, 160), req.get('user-agent') || '');
-    res.json({ account: publicAccount(row) });
+  router.post('/login', rateLimit(db, 'login', { limit: 12, windowMs: 15 * 60 * 1000 }), async (req, res, next) => {
+    try {
+      const em = email(req.body?.email);
+      const password = String(req.body?.password || '');
+      // Lockout is keyed on whatever email was submitted, registered or not, so
+      // the locked response cannot reveal which addresses have accounts.
+      const submitted = String(req.body?.email || '').trim().toLowerCase().slice(0, 254);
+      const now = Date.now();
+      const lock = loginLockStatus(db, submitted, now);
+      if (lock.locked) {
+        res.set('Retry-After', String(Math.max(1, Math.ceil(lock.retryAfterMs / 1000))));
+        return res.status(429).json({ error: { code: 'ACCOUNT_LOCKED', message: 'Too many failed sign-in attempts. Try again later.' } });
+      }
+      const row = em ? db.prepare('SELECT * FROM accounts WHERE email = ? AND deleted_at IS NULL').get(em) : null;
+      // One bcrypt comparison always runs, so unknown emails, password-less
+      // accounts and wrong passwords all answer in the same time with one body.
+      const matched = await bcrypt.compare(password, row?.password_hash || DUMMY_PASSWORD_HASH);
+      if (!row || !row.password_hash || !matched) {
+        recordLoginFailure(db, submitted, now);
+        return res.status(401).json({ error: { code: 'BAD_CREDENTIALS', message: 'Incorrect email or password.' } });
+      }
+      clearLoginFailures(db, submitted);
+      maybeBootstrapAdmin(db, row.id, now);
+      createSession(db, res, row.id, String(req.body?.deviceId || 'web').slice(0, 160), req.get('user-agent') || '', now);
+      const account = db.prepare('SELECT * FROM accounts WHERE id = ?').get(row.id);
+      res.json({ account: publicAccount(account) });
+    } catch (err) { next(err); }
   });
 
   router.get('/me', requireSession(db), (req, res) => {
@@ -189,6 +240,8 @@ export function createAccountRouter(db) {
       db.prepare('UPDATE accounts SET email_verified_at = COALESCE(email_verified_at, ?), updated_at = ? WHERE id = ?').run(now, now, token.account_id);
       db.prepare('DELETE FROM auth_delivery_outbox WHERE token_id = ?').run(token.id);
     })();
+    // Proof of mailbox control is what PRI_BOOTSTRAP_ADMIN_EMAIL waits for.
+    maybeBootstrapAdmin(db, token.account_id, now);
     res.json({ ok: true });
   });
 
@@ -206,47 +259,53 @@ export function createAccountRouter(db) {
     res.json({ ok: true });
   });
 
-  router.post('/password/reset', rateLimit(db, 'reset', { limit: 10, windowMs: 60 * 60 * 1000 }), (req, res) => {
-    const raw = String(req.body?.token || '');
-    const password = String(req.body?.password || '');
-    if (!strongPassword(password)) return res.status(400).json({ error: { code: 'WEAK_PASSWORD', message: 'Password must be at least 10 characters.' } });
-    const now = Date.now();
-    const token = raw ? db.prepare(`SELECT * FROM account_tokens
-      WHERE token_hash = ? AND purpose = 'reset-password' AND consumed_at IS NULL AND expires_at > ?`).get(sha256(raw), now) : null;
-    if (!token) return res.status(400).json({ error: { code: 'TOKEN_INVALID', message: 'Reset link is invalid or expired.' } });
-    db.transaction(() => {
-      db.prepare('UPDATE accounts SET password_hash = ?, updated_at = ? WHERE id = ?').run(bcrypt.hashSync(password, 12), now, token.account_id);
-      db.prepare('UPDATE account_tokens SET consumed_at = ? WHERE id = ?').run(now, token.id);
-      db.prepare('UPDATE account_sessions SET revoked_at = ? WHERE account_id = ? AND revoked_at IS NULL').run(now, token.account_id);
-      db.prepare('DELETE FROM auth_delivery_outbox WHERE token_id = ?').run(token.id);
-    })();
-    clearSessionCookies(res);
-    res.json({ ok: true, signInRequired: true });
+  router.post('/password/reset', rateLimit(db, 'reset', { limit: 10, windowMs: 60 * 60 * 1000 }), async (req, res, next) => {
+    try {
+      const raw = String(req.body?.token || '');
+      const password = String(req.body?.password || '');
+      if (!strongPassword(password)) return res.status(400).json({ error: { code: 'WEAK_PASSWORD', message: 'Password must be at least 10 characters.' } });
+      const now = Date.now();
+      const token = raw ? db.prepare(`SELECT * FROM account_tokens
+        WHERE token_hash = ? AND purpose = 'reset-password' AND consumed_at IS NULL AND expires_at > ?`).get(sha256(raw), now) : null;
+      if (!token) return res.status(400).json({ error: { code: 'TOKEN_INVALID', message: 'Reset link is invalid or expired.' } });
+      const passwordHash = await bcrypt.hash(password, BCRYPT_COST);
+      db.transaction(() => {
+        db.prepare('UPDATE accounts SET password_hash = ?, updated_at = ? WHERE id = ?').run(passwordHash, now, token.account_id);
+        db.prepare('UPDATE account_tokens SET consumed_at = ? WHERE id = ?').run(now, token.id);
+        db.prepare('UPDATE account_sessions SET revoked_at = ? WHERE account_id = ? AND revoked_at IS NULL').run(now, token.account_id);
+        db.prepare('DELETE FROM auth_delivery_outbox WHERE token_id = ?').run(token.id);
+      })();
+      clearSessionCookies(res);
+      res.json({ ok: true, signInRequired: true });
+    } catch (err) { next(err); }
   });
 
-  router.patch('/password', requireSession(db), rateLimit(db, 'password-change', { limit: 5, windowMs: 60 * 60 * 1000 }), (req, res) => {
-    const currentPassword = String(req.body?.currentPassword || '');
-    const newPassword = String(req.body?.newPassword || '');
-    if (!strongPassword(newPassword)) return res.status(400).json({ error: { code: 'WEAK_PASSWORD', message: 'New password must be at least 10 characters.' } });
-    const account = db.prepare('SELECT * FROM accounts WHERE id = ? AND deleted_at IS NULL').get(req.platformSession.account_id);
-    if (!account?.password_hash) return res.status(409).json({ error: { code: 'PASSWORD_NOT_CONFIGURED', message: 'This account uses a linked identity provider and has no password to change.' } });
-    if (!bcrypt.compareSync(currentPassword, account.password_hash)) {
-      return res.status(401).json({ error: { code: 'REAUTH_REQUIRED', message: 'Current password is incorrect.' } });
-    }
-    if (bcrypt.compareSync(newPassword, account.password_hash)) {
-      return res.status(400).json({ error: { code: 'PASSWORD_UNCHANGED', message: 'Choose a different new password.' } });
-    }
+  router.patch('/password', requireSession(db), rateLimit(db, 'password-change', { limit: 5, windowMs: 60 * 60 * 1000 }), async (req, res, next) => {
+    try {
+      const currentPassword = String(req.body?.currentPassword || '');
+      const newPassword = String(req.body?.newPassword || '');
+      if (!strongPassword(newPassword)) return res.status(400).json({ error: { code: 'WEAK_PASSWORD', message: 'New password must be at least 10 characters.' } });
+      const account = db.prepare('SELECT * FROM accounts WHERE id = ? AND deleted_at IS NULL').get(req.platformSession.account_id);
+      if (!account?.password_hash) return res.status(409).json({ error: { code: 'PASSWORD_NOT_CONFIGURED', message: 'This account uses a linked identity provider and has no password to change.' } });
+      if (!(await bcrypt.compare(currentPassword, account.password_hash))) {
+        return res.status(401).json({ error: { code: 'REAUTH_REQUIRED', message: 'Current password is incorrect.' } });
+      }
+      if (await bcrypt.compare(newPassword, account.password_hash)) {
+        return res.status(400).json({ error: { code: 'PASSWORD_UNCHANGED', message: 'Choose a different new password.' } });
+      }
 
-    const now = Date.now();
-    const deviceId = req.platformSession.device_id;
-    db.transaction(() => {
-      db.prepare('UPDATE accounts SET password_hash = ?, updated_at = ? WHERE id = ?').run(bcrypt.hashSync(newPassword, 12), now, account.id);
-      db.prepare('UPDATE account_sessions SET revoked_at = ? WHERE account_id = ? AND revoked_at IS NULL').run(now, account.id);
-    })();
-    // Rotate the current session after a credential change rather than leaving a
-    // pre-change bearer token alive. Other devices stay revoked until they sign in.
-    createSession(db, res, account.id, deviceId, req.get('user-agent') || '', now);
-    res.json({ ok: true, account: publicAccount(account), sessionsRotated: true });
+      const now = Date.now();
+      const deviceId = req.platformSession.device_id;
+      const passwordHash = await bcrypt.hash(newPassword, BCRYPT_COST);
+      db.transaction(() => {
+        db.prepare('UPDATE accounts SET password_hash = ?, updated_at = ? WHERE id = ?').run(passwordHash, now, account.id);
+        db.prepare('UPDATE account_sessions SET revoked_at = ? WHERE account_id = ? AND revoked_at IS NULL').run(now, account.id);
+      })();
+      // Rotate the current session after a credential change rather than leaving a
+      // pre-change bearer token alive. Other devices stay revoked until they sign in.
+      createSession(db, res, account.id, deviceId, req.get('user-agent') || '', now);
+      res.json({ ok: true, account: publicAccount(account), sessionsRotated: true });
+    } catch (err) { next(err); }
   });
 
   router.get('/devices', requireSession(db), (req, res) => {
@@ -284,8 +343,18 @@ export function createAccountRouter(db) {
 
   router.delete('/', requireSession(db), rateLimit(db, 'account-delete', { limit: 3, windowMs: 24 * 60 * 60 * 1000 }), async (req, res, next) => {
     try {
-      await authorizeAccountDeletion(db, req.platformSession.account_id, req.body || {});
+      const body = req.body || {};
+      // Social re-authentication must present a server-issued, unused nonce so
+      // a captured identity token cannot be replayed to delete the account.
+      if (body.provider && !consumeOidcNonce(db, body.nonce)) {
+        return res.status(401).json({ error: { code: 'OIDC_NONCE_INVALID', message: 'Request a fresh sign-in nonce before confirming your identity.' } });
+      }
+      await authorizeAccountDeletion(db, req.platformSession.account_id, body);
       const accountId = req.platformSession.account_id;
+      // Provider subscriptions outlive our rows: a deleted account must never
+      // keep being charged. The hook cancels at the provider first and aborts
+      // the deletion (with a retryable status) when the provider is unreachable.
+      if (typeof beforeDelete === 'function') await beforeDelete({ accountId, request: req });
       db.prepare('DELETE FROM accounts WHERE id = ?').run(accountId); // foreign keys cascade cloud student data
       clearSessionCookies(res);
       res.json({ deleted: true });

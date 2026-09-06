@@ -40,3 +40,13 @@ export function readJSONFile(file) {
 export function dateStamp(d = new Date()) {
   return d.toISOString().slice(0, 10);
 }
+
+/** Read a picked File as text (rejects with a friendly message). */
+export function readTextFile(file) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result ?? ''));
+    r.onerror = () => reject(new Error('Couldn’t read that file.'));
+    r.readAsText(file);
+  });
+}

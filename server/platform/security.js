@@ -3,6 +3,9 @@ import { createHash, createHmac, randomBytes, randomUUID, timingSafeEqual } from
 export const SESSION_COOKIE = 'pri_cloud_session';
 export const CSRF_COOKIE = 'pri_csrf';
 const SESSION_MS = 1000 * 60 * 60 * 24 * 30;
+// Idle timeout slides on use; a write at most once a minute per session keeps
+// the sliding window from turning every request into an UPDATE.
+const SESSION_SLIDE_MIN_MS = 60 * 1000;
 const CSRF_SECRET = process.env.PRI_CSRF_SECRET || randomBytes(32).toString('hex');
 
 export function id(prefix = 'id') {
@@ -57,16 +60,33 @@ export function sessionFromRequest(db, req, now = Date.now()) {
     FROM account_sessions s JOIN accounts a ON a.id = s.account_id
     WHERE s.token_hash = ? AND s.revoked_at IS NULL AND s.expires_at > ? AND a.deleted_at IS NULL`).get(sha256(raw), now);
   if (!row) return null;
-  return { ...row, rawToken: raw };
+  let slid = false;
+  if (now - row.last_seen_at >= SESSION_SLIDE_MIN_MS) {
+    const expiresAt = now + SESSION_MS;
+    db.prepare('UPDATE account_sessions SET last_seen_at = ?, expires_at = ? WHERE id = ?').run(now, expiresAt, row.id);
+    row.last_seen_at = now;
+    row.expires_at = expiresAt;
+    slid = true;
+  }
+  return { ...row, rawToken: raw, slid };
 }
 
 export function requireSession(db) {
   return (req, res, next) => {
     const session = sessionFromRequest(db, req);
     if (!session) return res.status(401).json({ error: { code: 'AUTH_REQUIRED', message: 'Sign in is required.' } });
+    // Keep the browser/native cookie lifetime in step with the slid server row.
+    if (session.slid) setSessionCookies(res, session.rawToken, SESSION_MS);
     req.platformSession = session;
     next();
   };
+}
+
+export function requireVerifiedEmail(req, res, next) {
+  if (!req.platformSession?.email_verified_at) {
+    return res.status(403).json({ error: { code: 'EMAIL_UNVERIFIED', message: 'Verify your email address before using this feature.' } });
+  }
+  next();
 }
 
 export function requireRole(...roles) {

@@ -1,4 +1,4 @@
-import { createPublicKey, verify as verifySignature } from 'node:crypto';
+import { createHash, createPublicKey, verify as verifySignature } from 'node:crypto';
 
 const PROVIDERS = Object.freeze({
   google: Object.freeze({
@@ -60,7 +60,16 @@ export async function verifyIdentityToken(provider, token, { nonce = null, now =
   if (!Number.isFinite(Number(claims.exp)) || Number(claims.exp) < nowSec - 30) throw Object.assign(new Error('Identity token has expired.'), { code: 'OIDC_TOKEN_EXPIRED' });
   if (claims.iat != null && Number(claims.iat) > nowSec + 120) throw Object.assign(new Error('Identity token was issued in the future.'), { code: 'OIDC_TOKEN_INVALID' });
   if (!claims.sub || String(claims.sub).length > 255) throw Object.assign(new Error('Identity token subject is invalid.'), { code: 'OIDC_TOKEN_INVALID' });
-  if (nonce != null && claims.nonce !== nonce) throw Object.assign(new Error('Identity token nonce does not match.'), { code: 'OIDC_NONCE_MISMATCH' });
+  // A nonce is mandatory: the server issues it (oidcNonce.js), the client hands
+  // it to the provider, and the token must carry it back. Google returns the
+  // nonce verbatim; Sign in with Apple's documented pattern passes SHA-256 of
+  // the nonce to the request, so the token may carry either the raw value or
+  // its lowercase hex SHA-256 digest. Both forms are still bound to the single
+  // server-issued, single-use nonce.
+  if (nonce == null || String(nonce) === '') throw Object.assign(new Error('A server-issued nonce is required.'), { code: 'OIDC_NONCE_REQUIRED' });
+  const tokenNonce = claims.nonce == null ? '' : String(claims.nonce);
+  const expectedNonces = [String(nonce), createHash('sha256').update(String(nonce)).digest('hex')];
+  if (!tokenNonce || !expectedNonces.includes(tokenNonce)) throw Object.assign(new Error('Identity token nonce does not match.'), { code: 'OIDC_NONCE_MISMATCH' });
 
   const keys = await jwksFor(provider, now);
   let jwk = keys.find(key => key.kid === header.kid && (!key.alg || key.alg === 'RS256'));

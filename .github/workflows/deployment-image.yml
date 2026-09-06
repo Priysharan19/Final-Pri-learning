@@ -42,6 +42,9 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/pri-platform-data"
+          # The image runs as the unprivileged `node` user (uid 1000); the
+          # bind-mounted volume must be writable by it.
+          chmod 0777 "$RUNNER_TEMP/pri-platform-data"
           docker rm -f pri-learning-ci >/dev/null 2>&1 || true
           docker run -d \
             --name pri-learning-ci \

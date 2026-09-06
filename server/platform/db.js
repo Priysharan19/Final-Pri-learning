@@ -6,7 +6,15 @@ import { platformDatabasePath } from './config.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_PATH = join(here, '..', 'data', 'pri-learning-platform.db');
-const SCHEMA_VERSION = 3;
+const SCHEMA_VERSION = 4;
+
+function addColumnIfMissing(db, table, column, ddl) {
+  const safeTable = String(table).replaceAll("'", "''");
+  const columns = new Set(db.pragma(`table_info('${safeTable}')`).map(row => row.name));
+  if (columns.has(column)) return false;
+  db.exec(`ALTER TABLE ${table} ADD COLUMN ${ddl}`);
+  return true;
+}
 
 function uniqueIndexColumns(db, table) {
   const safeTable = String(table).replaceAll("'", "''");
@@ -61,6 +69,11 @@ export function createPlatformDb(path = DEFAULT_PATH) {
   if (path !== ':memory:') mkdirSync(dirname(path), { recursive: true });
   const db = new Database(path);
   db.pragma('journal_mode = WAL');
+  // WAL + NORMAL keeps every committed transaction durable against process
+  // crashes (the WAL is fsynced at checkpoint) while avoiding an fsync per
+  // commit on the single-writer volume. Graceful shutdown checkpoints the WAL
+  // (closePlatformDb) so the main file is complete for backup/restore.
+  db.pragma('synchronous = NORMAL');
   db.pragma('foreign_keys = ON');
   db.pragma('busy_timeout = 5000');
   db.exec(`
@@ -185,6 +198,8 @@ export function createPlatformDb(path = DEFAULT_PATH) {
       teacher_account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
       name TEXT NOT NULL,
       join_code_hash TEXT NOT NULL UNIQUE,
+      join_code TEXT,
+      join_code_rotated_at INTEGER,
       created_at INTEGER NOT NULL,
       archived_at INTEGER
     );
@@ -290,8 +305,70 @@ export function createPlatformDb(path = DEFAULT_PATH) {
   `);
 
   migrateLearningEventIdentity(db);
+
+  // WP server-security: teacher invite codes, per-account login lockout and
+  // server-issued OIDC nonces (schema v4). Only one-way hashes are stored; raw
+  // invite codes and nonces never touch the database.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS teacher_invites (
+      id TEXT PRIMARY KEY,
+      code_hash TEXT NOT NULL UNIQUE,
+      code_prefix TEXT NOT NULL,
+      created_by TEXT REFERENCES accounts(id) ON DELETE SET NULL,
+      created_at INTEGER NOT NULL,
+      expires_at INTEGER NOT NULL,
+      used_by TEXT REFERENCES accounts(id) ON DELETE SET NULL,
+      used_at INTEGER
+    );
+
+    CREATE TABLE IF NOT EXISTS login_attempts (
+      email_hash TEXT PRIMARY KEY,
+      failures INTEGER NOT NULL,
+      window_start INTEGER NOT NULL,
+      last_failed_at INTEGER NOT NULL,
+      locked_until INTEGER
+    );
+
+    CREATE TABLE IF NOT EXISTS oidc_nonces (
+      nonce_hash TEXT PRIMARY KEY,
+      created_at INTEGER NOT NULL,
+      expires_at INTEGER NOT NULL,
+      consumed_at INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS idx_oidc_nonces_expiry ON oidc_nonces(expires_at);
+  `);
+  // WP server-commerce-classes: schema v4 — recoverable classroom join codes.
+  // Teachers must be able to reveal and rotate a class code (cloud-05). The
+  // hashed column remains the join lookup key; the plain code is kept beside it
+  // because an 8-character code has no meaningful hashing protection and the
+  // only consequence of disclosure is joining a class the teacher can prune.
+  // Classes created before v4 keep join_code NULL until the teacher rotates.
+  addColumnIfMissing(db, 'classes', 'join_code', 'join_code TEXT');
+  addColumnIfMissing(db, 'classes', 'join_code_rotated_at', 'join_code_rotated_at INTEGER');
+
   db.prepare("INSERT OR REPLACE INTO platform_meta(key,value) VALUES ('schema_version',?)").run(String(SCHEMA_VERSION));
   return db;
+}
+
+/**
+ * Flush the write-ahead log into the main database file. TRUNCATE leaves the
+ * WAL empty so the main file alone is a complete, consistent snapshot for
+ * backup tooling. Returns SQLite's checkpoint counters.
+ */
+export function checkpointPlatformDb(db) {
+  const [row] = db.pragma('wal_checkpoint(TRUNCATE)');
+  return { busy: Number(row?.busy || 0), log: Number(row?.log || 0), checkpointed: Number(row?.checkpointed || 0) };
+}
+
+/**
+ * Graceful shutdown: checkpoint, then close so the last connection removes the
+ * -wal/-shm sidecars and no committed transaction is left only in the WAL.
+ */
+export function closePlatformDb(db) {
+  if (!db || !db.open) return { closed: false, checkpoint: null };
+  let checkpoint = null;
+  try { checkpoint = checkpointPlatformDb(db); } finally { db.close(); }
+  return { closed: true, checkpoint };
 }
 
 export function nextSyncCursor(db) {

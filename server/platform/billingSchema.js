@@ -1,4 +1,11 @@
-export const BILLING_SCHEMA_VERSION = 2;
+export const BILLING_SCHEMA_VERSION = 3;
+
+function addColumnIfMissing(db, table, column, ddl) {
+  const columns = new Set(db.pragma(`table_info('${table}')`).map(row => row.name));
+  if (columns.has(column)) return false;
+  db.exec(`ALTER TABLE ${table} ADD COLUMN ${ddl}`);
+  return true;
+}
 
 /**
  * Billing is an optional deployment subsystem, so its schema is versioned
@@ -44,6 +51,47 @@ export function ensureBillingSchema(db) {
       created_at INTEGER NOT NULL
     );
   `);
+
+  // WP server-commerce-classes: billing schema v3 — cancellation state and the
+  // payment/refund ledger that lets refund webhooks be mapped back to a
+  // subscription and account (cloud-03, cloud-11, commercial-14).
+  addColumnIfMissing(db, 'billing_subscriptions', 'cancel_requested_at', 'cancel_requested_at INTEGER');
+  addColumnIfMissing(db, 'billing_subscriptions', 'cancel_mode',
+    "cancel_mode TEXT CHECK(cancel_mode IN ('cycle-end','immediate') OR cancel_mode IS NULL)");
+  addColumnIfMissing(db, 'billing_subscriptions', 'cancel_reason', 'cancel_reason TEXT');
+  db.exec(`
+    -- Provider payments observed through verified webhooks. Amounts are the
+    -- provider's minor units (paise). Only ids, amounts and timestamps are kept;
+    -- no card, UPI or customer details ever reach this table.
+    CREATE TABLE IF NOT EXISTS billing_payments (
+      provider TEXT NOT NULL CHECK(provider IN ('apple','google','web')),
+      payment_id TEXT NOT NULL,
+      provider_subscription_id TEXT NOT NULL,
+      account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+      amount INTEGER NOT NULL DEFAULT 0,
+      currency TEXT,
+      status TEXT,
+      captured_at INTEGER NOT NULL,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      PRIMARY KEY(provider, payment_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_billing_payments_subscription
+      ON billing_payments(provider, provider_subscription_id, captured_at);
+
+    CREATE TABLE IF NOT EXISTS billing_refunds (
+      provider TEXT NOT NULL CHECK(provider IN ('apple','google','web')),
+      refund_id TEXT NOT NULL,
+      payment_id TEXT NOT NULL,
+      amount INTEGER NOT NULL DEFAULT 0,
+      status TEXT NOT NULL CHECK(status IN ('pending','processed','failed')),
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      PRIMARY KEY(provider, refund_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_billing_refunds_payment ON billing_refunds(provider, payment_id);
+  `);
+
   db.prepare("INSERT OR REPLACE INTO platform_meta(key,value) VALUES ('billing_schema_version',?)")
     .run(String(BILLING_SCHEMA_VERSION));
   return BILLING_SCHEMA_VERSION;
