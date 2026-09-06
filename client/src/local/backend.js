@@ -1227,12 +1227,47 @@ const IMPORT_ROWS = {
       title: safeLabel(r.title, 80) || 'Practice paper', durationMin: safeInt(r.durationMin, 5, 240, 30),
       questionIds: (Array.isArray(r.questionIds) ? r.questionIds : []).slice(0, 80).map(safeId).filter(Boolean),
       createdAt: safeTime(r.createdAt) || Date.now(), finishedAt: safeTime(r.finishedAt),
-      score: r.score == null ? null : safeInt(r.score, 0, 999, 0),
+      score: r.score == null ? null : safeInt(r.score, -999, 999, 0),
       total: r.total == null ? null : safeInt(r.total, 0, 999, 0),
-      detail: safeExamDetail(r.detail)
+      detail: safeExamDetail(r.detail),
+      // WP india-exams: an India paper is only listed and reviewed while it
+      // carries its blueprint; a restore that dropped this would make every
+      // sat CBSE/JEE/IOQM paper vanish from the India exams page.
+      ...(r.indiaExam && typeof r.indiaExam === 'object' ? { indiaExam: safeIndiaExamMeta(r.indiaExam), summary: safeIndiaExamSummary(r.summary) } : {})
     };
   }
 };
+
+function safeIndiaExamMeta(m) {
+  const out = {
+    blueprintId: safeId(m.blueprintId) || null, track: sanitizeText(m.track, 20) || 'cbse', variant: sanitizeText(m.variant, 20) || null,
+    authenticity: sanitizeText(m.authenticity, 60) || null, sourceSession: sanitizeText(m.sourceSession, 20) || null,
+    fullPaper: !!m.fullPaper, sectionTimerOfficial: !!m.sectionTimerOfficial, seed: safeInt(m.seed, 0, 0x7fffffff, 0),
+    reducedPattern: (Array.isArray(m.reducedPattern) ? m.reducedPattern : []).slice(0, 20).map(t => sanitizeText(t, 300)),
+    sections: (Array.isArray(m.sections) ? m.sections : []).slice(0, 10).map(x => ({
+      id: sanitizeText(x?.id, 8), label: sanitizeText(x?.label, 80), questions: safeInt(x?.questions, 0, 80, 0), marks: safeInt(x?.marks, 0, 200, 0),
+      marksEach: safeInt(x?.marksEach, 0, 20, 1), negative: safeInt(x?.negative, 0, 20, 0), partialPerOption: x?.partialPerOption == null ? null : safeInt(x.partialPerOption, 0, 20, 0)
+    }))
+  };
+  if (Number.isFinite(Number(m.fullPaperDurationMinutes))) out.fullPaperDurationMinutes = safeInt(m.fullPaperDurationMinutes, 5, 600, 180);
+  return out;
+}
+
+function safeIndiaExamSummary(s) {
+  if (!s || typeof s !== 'object') return null;
+  const row = x => ({
+    id: sanitizeText(x?.id, 80), label: sanitizeText(x?.label, 120), questions: safeInt(x?.questions, 0, 80, 0), attempted: safeInt(x?.attempted, 0, 80, 0),
+    correct: safeInt(x?.correct, 0, 80, 0), incorrect: safeInt(x?.incorrect, 0, 80, 0), partial: safeInt(x?.partial, 0, 80, 0), unanswered: safeInt(x?.unanswered, 0, 80, 0),
+    marks: safeInt(x?.marks, 0, 200, 0), awarded: safeInt(x?.awarded, -200, 200, 0), negative: safeInt(x?.negative, 0, 200, 0), ms: safeInt(x?.ms, 0, 1e8, 0)
+  });
+  return {
+    sections: (Array.isArray(s.sections) ? s.sections : []).slice(0, 10).map(row),
+    chapters: (Array.isArray(s.chapters) ? s.chapters : []).slice(0, 40).map(row),
+    negativeMarks: safeInt(s.negativeMarks, 0, 200, 0), totalMs: safeInt(s.totalMs, 0, 1e8, 0),
+    markingSchemes: s.markingSchemes && typeof s.markingSchemes === 'object'
+      ? Object.fromEntries(Object.entries(s.markingSchemes).slice(0, 6).map(([k, v]) => [sanitizeText(k, 30), safeInt(v, 0, 80, 0)])) : {}
+  };
+}
 
 /** A teacher's copy of someone else's progress, rebuilt from the file. */
 function importProgress(src) {
@@ -2504,6 +2539,24 @@ async function examFor(pid, examId) {
 }
 
 // ── Dispatcher (same contract as the old fetch layer) ────────────────────────
+
+// ── WP india-exams: evidence from India exam simulations ─────────────────────
+// local/indiaExamBackend.js composes and marks CBSE/JEE/IOQM papers, but the
+// evidence a sat paper produces — ratings, traps, activity, XP, the attempt
+// row — is recorded through exactly the path every practice answer takes, so
+// progress and the adaptive engine read exam outcomes without a second system.
+export function examStepMeta(q) { return stepMetaFor(q); }
+
+export async function recordIndiaExamEvidence(row, q, { correct, given, ms, feedback } = {}) {
+  const p = await requireProfile();
+  if (!correct) await recordTrap(p.id, row, q, feedback);
+  return resolve(p, row, q, !!correct, given ?? '', Math.max(0, Number(ms) || 0), 'exam');
+}
+
+export async function finishIndiaExamEvidence(pct) {
+  const p = await requireProfile();
+  return checkBadges(p.id, { type: 'exam', pct: Number(pct) || 0 }, Date.now());
+}
 
 export async function dispatch(method, path, body) {
   // exact match first

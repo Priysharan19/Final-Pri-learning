@@ -10,7 +10,7 @@
     "build": "npm run build --prefix client",
     "start": "node server/index.js",
     "seed": "node server/seed.js",
-    "test": "npm run test:engine && npm run test:audit-floor && npm run test:platform:security && npm run test:platform:commerce && npm run test:gateway && npm run test:outbox && npm run test:backend && npm run test:security && npm run test:diagnose && npm run test:marker:forms && npm run test:india && npm run test:ncert:rational && npm run test:ncert:linear && npm run test:ncert:class8:rest && npm run test:ncert:class9 && npm run test:explain && npm run test:ink && npm run test:calculus && npm run test:jee && npm run test:hard && npm run test:lines && npm run test:holdout && npm run test:holdout2 && npm run test:holdout3 && npm run test:ink:collector && npm run test:ink:feedback && npm run test:ink:structure && npm run test:ink:corpus && npm run test:context && npm run test:ink:bridge && npm run test:photo:bridge && npm run test:ink:interaction && npm run test:ink:personal && npm run test:ink:hybrid && npm run test:ink:arbitration && npm run test:ink:sets && npm run test:ink:stability",
+    "test": "npm run test:engine && npm run test:audit-floor && npm run test:platform:security && npm run test:platform:commerce && npm run test:gateway && npm run test:outbox && npm run test:backend && npm run test:security && npm run test:diagnose && npm run test:marker:forms && npm run test:india && npm run test:india:exams && npm run test:ncert:rational && npm run test:ncert:linear && npm run test:ncert:class8:rest && npm run test:ncert:class9 && npm run test:explain && npm run test:ink && npm run test:calculus && npm run test:jee && npm run test:hard && npm run test:lines && npm run test:holdout && npm run test:holdout2 && npm run test:holdout3 && npm run test:ink:collector && npm run test:ink:feedback && npm run test:ink:structure && npm run test:ink:corpus && npm run test:context && npm run test:ink:bridge && npm run test:photo:bridge && npm run test:ink:interaction && npm run test:ink:personal && npm run test:ink:hybrid && npm run test:ink:arbitration && npm run test:ink:sets && npm run test:ink:stability",
     "test:engine": "node server/test/selfcheck.mjs",
     "test:engine:quick": "node server/test/selfcheck.mjs --quick",
     "test:engine:thorough": "node server/test/selfcheck.mjs --thorough",
@@ -86,6 +86,7 @@
     "test:audit-floor": "node client/test/runtime-audit-floor-check.mjs",
     "test:platform:security": "node server/test/security-headers-check.mjs && node server/test/login-lockout-check.mjs && node server/test/admin-bootstrap-check.mjs && node server/test/teacher-invite-check.mjs && node server/test/oidc-verification-check.mjs && node server/test/verification-enforcement-check.mjs && node server/test/housekeeping-check.mjs && node server/test/production-runtime-image-check.mjs",
     "test:platform:commerce": "node server/test/billing-cancel-refund-check.mjs && node server/test/billing-webhook-router-check.mjs && node server/test/platform-db-operations-check.mjs && node server/test/platform-http-journeys-check.mjs",
-    "test:marker:forms": "node client/test/marker-ncert-forms-check.mjs"
+    "test:marker:forms": "node client/test/marker-ncert-forms-check.mjs",
+    "test:india:exams": "node client/test/india-exam-flow-check.mjs"
   }
 }

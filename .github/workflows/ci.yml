@@ -42,6 +42,7 @@ jobs:
           grep -Fq '5256 questions from 438 declared (generator, difficulty) pairs × 12 draws — 5256 marked correct by their own marker, 5256 well formed' suites.log
           grep -Fq '258/258 dot points have a generator behind them; 0 do not' suites.log
           grep -Fq 'NCERT ANSWER FORMS: PASS — 93/93 checks' suites.log
+          grep -Fq 'INDIA EXAM FLOW: PASS — 122/122 checks' suites.log
           grep -Fq 'PASS — Grade 9 Ganita Manjari: 1280 seeded forms (1000 numeric handwriting-ready, 280 conceptual).' suites.log
           grep -Fq 'PASS — 8/8 chapters, 200/200 uploaded pages, 42/42 formal exercise sections and 293/293 formal exercise prompts represented and verified.' suites.log
           if grep -Fq 'not measured:' suites.log; then
