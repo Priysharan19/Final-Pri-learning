@@ -34,8 +34,11 @@ async function draw(page, box, sym) {
   }
 }
 
+// Addressed by its own hook rather than by "the .set-v in that card": the card
+// holds other rows now, and a selector that was unique only by accident breaks
+// the moment a row is added beside it.
 const learnedLine = (page) =>
-  page.locator('.card', { hasText: 'Personal templates learned' }).locator('.set-v').innerText();
+  page.locator('[data-t="templates-learned"]').innerText();
 
 export const flow = {
   id: 'calibrate',

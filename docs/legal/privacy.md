@@ -13,7 +13,9 @@ The person responsible for your data (the "data fiduciary") is
 
 Pri Learning is built to work without sending your work anywhere. Questions,
 handwriting recognition, marking and your progress all run on your own device.
-You can use the whole app without an account and without a network.
+You can use the whole app without an account and without a network. Two
+optional settings send work off the device if you switch them on, and both are
+described below; neither is on unless you turn it on.
 
 A Pri cloud account is optional. It exists so your progress can follow you to a
 second device, so a teacher can set work, and so a subscription can be verified.
@@ -36,8 +38,23 @@ device can open a profile that has no password.
   reset links.
 - **Your name**, as you typed it.
 - **Learning events**: that you answered a question, which chapter it belonged
-  to, whether you were right, and how long you took. Handwriting strokes are not
-  uploaded: recognition happens on your device and the strokes stay there.
+  to, whether you were right, and how long you took.
+- **A picture of your handwriting, only if you switch that on.** Reading your
+  writing happens on your device by default, and your strokes stay there. There
+  is a setting in Settings → Handwriting, off unless you turn it on, that also
+  sends your writing to be read on a server, because the on-device reader knows
+  a fixed set of symbols and some notation is beyond it. What is sent is an
+  image drawn from your own strokes and nothing else: not the question, not the
+  expected answer, not your name or profile. It is used to return the reading
+  and is not kept after that, not used to train anyone's model, and turning the
+  setting off stops it at once.
+- **Your working and the question, only if you switch that on.** There is a
+  second setting, also off unless you turn it on, that sends the lines of
+  working you wrote and the text of the question when an answer is wrong and
+  the app cannot tell you which line went wrong. It is used to tell you where
+  the mistake is and is not kept afterwards. The expected answer is never sent
+  with it, and your name and profile are never sent with it. Your mark is
+  decided on your device either way.
 - **Device information** needed to keep you signed in: a device identifier you
   chose, and the times you signed in and last synced.
 - **Subscription status** from your payment provider, if you subscribe.
@@ -67,6 +84,10 @@ Only the services needed to run the parts you use:
 - **Your teacher**, if you join their class — and then only aggregate progress
   on the work they set. A teacher never sees your answers, your working or your
   handwriting.
+- **A handwriting reader**, only while the optional server-reading setting is
+  on, and only the image of your writing described above.
+- **A step checker**, only while the optional working-check setting is on, and
+  only the working and question described above.
 
 We do not sell your data. We do not share it for advertising.
 

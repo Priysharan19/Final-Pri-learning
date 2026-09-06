@@ -47,7 +47,11 @@ jobs:
           grep -Fq 'INDIA ADAPTIVE: PASS — 304/304 checks' suites.log
           grep -Fq 'PLOTTING: PASS — 78/78 checks' suites.log
           grep -Fq 'README TRUTH: PASS — 16/16 checks' suites.log
-          grep -Fq 'LEGAL PAGES: PASS — 39/39 checks' suites.log
+          grep -Fq 'LEGAL PAGES: PASS — 45/45 checks' suites.log
+          grep -Fq 'CLOUD HANDWRITING CLIENT: PASS — 37/37 checks' suites.log
+          grep -Fq 'CLOUD WORKING CLIENT: PASS — 36/36 checks' suites.log
+          grep -Fq 'CLOUD PHOTO CLIENT: PASS — 26/26 checks' suites.log
+          grep -Fq 'MARK PREDICTOR: PASS — 39/39 checks' suites.log
           grep -Fq 'ENTITLEMENT ENFORCEMENT: PASS — 59/59 checks' suites.log
           grep -Fq 'PASS — Grade 9 Ganita Manjari: 1280 seeded forms (1000 numeric handwriting-ready, 280 conceptual).' suites.log
           grep -Fq 'PASS — 8/8 chapters, 200/200 uploaded pages, 42/42 formal exercise sections and 293/293 formal exercise prompts represented and verified.' suites.log
@@ -118,6 +122,10 @@ jobs:
         run: |
           node server/test/india-syllabus-snapshot-check.mjs
           node server/test/assignment-targeting-check.mjs
+      - name: Server reading and step checking contracts
+        run: |
+          node server/test/handwriting-transcription-check.mjs
+          node server/test/working-check-check.mjs
       - name: Commercial platform schema contract
         run: node server/test/platform-schema-check.mjs
       - name: Platform migration contract
@@ -172,7 +180,7 @@ jobs:
         run: |
           set -euo pipefail
           test -s browser.log
-          grep -Eq 'E2E SUITE.*194/194.*7 flows' browser.log
+          grep -Eq 'E2E SUITE.*195/195.*7 flows' browser.log
           grep -Fq 'Phone · every destination reachable at 390px' browser.log
           grep -Fq 'India · onboarding, class labels, demo, cloud entry' browser.log
           grep -Fq 'Cloud · account, live Settings refresh, assignment hand-off' browser.log

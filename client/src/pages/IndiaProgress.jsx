@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
 import { useApp } from '../App.jsx';
+import { predictionSentence } from '../engine/markPredictor.js';
 
 function pct(correct, attempts) {
   const a = Number(attempts || 0);
@@ -47,6 +48,7 @@ export default function IndiaProgress() {
   const started = chapterEvidence.filter(x => x.evidence.attempts > 0).length;
   const practiced = chapterEvidence.filter(x => x.evidence.attempts >= 5).length;
   const totals = stats?.totals || {};
+  const prediction = stats?.examPrediction || null;
   const accuracy = pct(totals.correct, totals.attempts);
   const trackName = user.indiaTrack === 'jee-main' ? 'JEE Main'
     : user.indiaTrack === 'jee-advanced' ? 'JEE Advanced'
@@ -67,12 +69,69 @@ export default function IndiaProgress() {
               Evidence from the questions you have actually solved, organised by your India curriculum scope.
             </p>
           </div>
-          <span className="tag tag-brand">No predicted board/JEE score</span>
+          <span className="tag tag-brand">No percentile, no rank</span>
         </div>
         <p className="muted" style={{ marginTop: 12, maxWidth: 820 }}>
-          Pri Learning does not convert a small practice history into a fake CBSE percentage, JEE percentile or rank prediction. This page shows demonstrated chapter coverage, attempts and accuracy; exam results are reported separately from exam simulations.
+          Pri Learning does not convert a practice history into a CBSE percentage, a JEE percentile or a rank prediction. None of those can be honestly derived from questions answered at home. What is below is narrower: demonstrated chapter coverage, attempts and accuracy, and a mark estimate over the parts of the paper you have actually practised.
         </p>
       </div>
+
+      {prediction && (
+        <div className="card">
+          <div className="spread" style={{ alignItems: 'flex-start', gap: 16 }}>
+            <div>
+              <div className="card-title" style={{ marginBottom: 4 }}>If you sat this paper tomorrow</div>
+              <p className="sub" style={{ margin: 0 }}>{prediction.label}</p>
+            </div>
+            {prediction.show && (
+              <div style={{ textAlign: 'right' }}>
+                <div className="big" style={{ lineHeight: 1.1 }}>
+                  {prediction.expected}<span className="muted" style={{ fontSize: '0.5em' }}>/{prediction.coveredMarks}</span>
+                </div>
+                <div className="muted" style={{ fontSize: 12 }}>{prediction.low}–{prediction.high} likely range</div>
+              </div>
+            )}
+          </div>
+
+          <p style={{ marginTop: 12, maxWidth: 820 }}>{predictionSentence(prediction)}</p>
+
+          {/* Coverage is drawn, not just stated: the practised share of the paper
+              against the whole, so an impressive number over a quarter of the
+              paper cannot be mistaken for an impressive number over all of it. */}
+          <div style={{ marginTop: 10 }}>
+            <div style={{ height: 8, borderRadius: 999, background: 'var(--line, rgba(128,128,128,.2))', overflow: 'hidden' }}
+              role="img" aria-label={`${prediction.coveredMarks} of ${prediction.totalMarks} marks practised`}>
+              <div style={{ width: `${Math.round(prediction.coverage * 100)}%`, height: '100%', background: 'var(--brand, #4f7cff)' }} />
+            </div>
+            <div className="muted" style={{ fontSize: 12, marginTop: 5 }}>
+              {prediction.coveredMarks} of {prediction.totalMarks} marks practised
+              {prediction.unseenMarks > 0 && ` · ${prediction.unseenMarks} marks untouched`}
+            </div>
+          </div>
+
+          {prediction.priorities.length > 0 && (
+            <div style={{ marginTop: 16 }}>
+              <div className="sc-label" style={{ marginBottom: 6 }}>Where the marks are</div>
+              {prediction.priorities.slice(0, 4).map(unit => (
+                <div key={unit.unitId} className="set-row">
+                  <span className="set-k">
+                    {unit.name}
+                    <span className="muted" style={{ display: 'block', fontSize: 11.5, marginTop: 2 }}>
+                      {unit.covered
+                        ? `${unit.expected} of ${unit.marks} marks on ${unit.attempts} question${unit.attempts === 1 ? '' : 's'} of evidence`
+                        : `${unit.marks} marks, nothing attempted yet`}
+                    </span>
+                  </span>
+                  <span className="set-v">+{unit.atStake}</span>
+                </div>
+              ))}
+              <p className="muted" style={{ fontSize: 12, marginTop: 8 }}>
+                Ranked by marks you are currently leaving on the table, so the top row is the practice that moves this number most.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="grid cols-4">
         <div className="card"><div className="sc-label">Chapters started</div><div className="big">{started}<span className="muted">/{rows.length}</span></div></div>

@@ -10,7 +10,7 @@
     "build": "npm run build --prefix client",
     "start": "node server/index.js",
     "seed": "node server/seed.js",
-    "test": "npm run test:engine && npm run test:audit-floor && npm run test:gateway && npm run test:outbox && npm run test:backend && npm run test:entitlements && npm run test:security && npm run test:diagnose && npm run test:marker:forms && npm run test:india && npm run test:india:adaptive && npm run test:india:identity && npm run test:india:exams && npm run test:ncert:rational && npm run test:ncert:linear && npm run test:ncert:class8:rest && npm run test:ncert:class9 && npm run test:explain && npm run test:plot && npm run test:readme && npm run test:legal && npm run test:ink && npm run test:calculus && npm run test:jee && npm run test:hard && npm run test:lines && npm run test:holdout && npm run test:holdout2 && npm run test:holdout3 && npm run test:ink:collector && npm run test:ink:feedback && npm run test:ink:structure && npm run test:ink:corpus && npm run test:context && npm run test:ink:bridge && npm run test:photo:bridge && npm run test:ink:interaction && npm run test:ink:personal && npm run test:ink:hybrid && npm run test:ink:arbitration && npm run test:ink:sets && npm run test:ink:stability",
+    "test": "npm run test:engine && npm run test:audit-floor && npm run test:gateway && npm run test:outbox && npm run test:backend && npm run test:entitlements && npm run test:security && npm run test:diagnose && npm run test:marker:forms && npm run test:india && npm run test:india:adaptive && npm run test:india:identity && npm run test:india:exams && npm run test:ncert:rational && npm run test:ncert:linear && npm run test:ncert:class8:rest && npm run test:ncert:class9 && npm run test:explain && npm run test:plot && npm run test:readme && npm run test:legal && npm run test:ink && npm run test:calculus && npm run test:jee && npm run test:hard && npm run test:lines && npm run test:holdout && npm run test:holdout2 && npm run test:holdout3 && npm run test:ink:collector && npm run test:ink:feedback && npm run test:ink:structure && npm run test:ink:corpus && npm run test:context && npm run test:ink:bridge && npm run test:photo:bridge && npm run test:ink:interaction && npm run test:ink:personal && npm run test:ink:hybrid && npm run test:ink:arbitration && npm run test:ink:sets && npm run test:ink:stability && npm run test:handwriting:cloud && npm run test:working:cloud && npm run test:photo:cloud && npm run test:predictor",
     "test:engine": "node server/test/selfcheck.mjs",
     "test:engine:quick": "node server/test/selfcheck.mjs --quick",
     "test:engine:thorough": "node server/test/selfcheck.mjs --thorough",
@@ -91,12 +91,19 @@
     "test:india:exams": "node client/test/india-exam-flow-check.mjs",
     "test:teacher:targeting": "node server/test/india-syllabus-snapshot-check.mjs && node server/test/assignment-targeting-check.mjs",
     "syllabus:server": "node tools/generate-server-syllabus.mjs",
-    "test:platform": "npm run test:platform:security && npm run test:platform:commerce && npm run test:teacher:targeting",
+    "test:platform": "npm run test:platform:security && npm run test:platform:commerce && npm run test:teacher:targeting && npm run test:platform:handwriting && npm run test:platform:working",
     "test:india:identity": "node client/test/india-identity-check.mjs",
     "test:plot": "node client/test/plot-check.mjs",
     "test:readme": "node client/test/readme-truth-check.mjs",
     "test:entitlements": "node client/test/entitlement-enforcement-check.mjs",
     "test:legal": "node client/test/legal-pages-check.mjs",
-    "legal:status": "node tools/legal-status.mjs"
+    "legal:status": "node tools/legal-status.mjs",
+    "test:handwriting:cloud": "node client/test/cloud-handwriting-client-check.mjs",
+    "test:platform:handwriting": "node server/test/handwriting-transcription-check.mjs",
+    "test:working:cloud": "node client/test/cloud-working-client-check.mjs",
+    "test:platform:working": "node server/test/working-check-check.mjs",
+    "test:photo:cloud": "node client/test/cloud-photo-client-check.mjs",
+    "test:predictor": "node client/test/mark-predictor-check.mjs",
+    "preflight": "node tools/production-preflight.mjs"
   }
 }

@@ -4,6 +4,7 @@ import { useApp } from '../App.jsx';
 import { downloadJSON, readJSONFile, dateStamp } from '../lib/files.js';
 import Calibrate from '../ink/Calibrate.jsx';
 import { personalStats, clearPersonal, ensurePersonalLoaded } from '../ink/personal.js';
+import { cloud, cloudAvailable } from '../platform/cloudTransport.js';
 import { MIN_PASSWORD, PasswordMeter, passwordVerdict } from './Login.jsx';
 
 const AVATARS = ['🚀', '🦊', '🐨', '🦉', '🌟', '🐯', '🍀', '🎧', '🦄', '⚡', '🌊', '🧠'];
@@ -16,9 +17,76 @@ export const PATHWAY_OPTS = [
   ['ext2', 'Extension 2', 'Year 12 only — proof, complex numbers, mechanics']
 ];
 
+const askHandwritingStatus = () => cloud.handwritingStatus();
+const askWorkingStatus = () => cloud.workingStatus();
+
 const fmtBytes = (b) => b > 1e9 ? `${(b / 1e9).toFixed(1)} GB` : b > 1e6 ? `${(b / 1e6).toFixed(1)} MB` : `${Math.round(b / 1e3)} KB`;
 
+/**
+ * One opt-in row for one thing that would leave the device.
+ *
+ * Two separate switches rather than one, because they send different things: a
+ * picture of your handwriting is not the same as the words of your working, and
+ * a student may reasonably want one and not the other. Both are off until
+ * turned on, and each is hidden where the deployment cannot do it, so nothing
+ * is offered that would only fail.
+ *
+ * The copy says exactly what is sent. "A picture of your handwriting" is the
+ * whole of it, and a student is owed the plain version rather than a euphemism.
+ */
+function CloudOptInRow({ field, user, setUser, toast, ask, label, copy, unavailable }) {
+  const [status, setStatus] = useState(null);   // null = still asking, {available}
+  const [busy, setBusy] = useState(false);
+  const on = user?.[field] === true;
+
+  useEffect(() => {
+    let live = true;
+    if (!cloudAvailable()) { setStatus({ available: false }); return () => { live = false; }; }
+    ask()
+      .then(r => { if (live) setStatus({ available: !!r?.available }); })
+      .catch(() => { if (live) setStatus({ available: false }); });
+    return () => { live = false; };
+  }, [ask]);
+
+  async function toggle(next) {
+    setBusy(true);
+    try {
+      const r = await api.patch('/me', { [field]: next });
+      setUser(r.user);
+      toast(<span>{next ? `${label} is on for this profile` : `${label} is off — this stays on your device`}</span>);
+    } catch (e) { toast(<span>{e.message}</span>); }
+    finally { setBusy(false); }
+  }
+
+  if (status && !status.available) {
+    return <p className="sub" style={{ marginTop: 12 }}>{unavailable}</p>;
+  }
+
+  return (
+    <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--line, rgba(128,128,128,.25))' }}>
+      <div className="set-row">
+        <span className="set-k">
+          {label}
+          <span className="muted" style={{ display: 'block', fontSize: 12, marginTop: 3, maxWidth: 460 }}>{copy}</span>
+        </span>
+        <span className="set-v">
+          <button
+            type="button"
+            className={`btn btn-sm ${on ? 'btn-primary' : 'btn-quiet'}`}
+            aria-pressed={on}
+            disabled={busy || !status}
+            onClick={() => toggle(!on)}
+          >
+            {!status ? 'Checking…' : on ? 'On' : 'Off'}
+          </button>
+        </span>
+      </div>
+    </div>
+  );
+}
+
 function HandwritingSection({ toast }) {
+  const { user, setUser } = useApp();
   const [teaching, setTeaching] = useState(false);
   const [, refresh] = useState(0);
   useEffect(() => { ensurePersonalLoaded().then(() => refresh(x => x + 1)); }, []);
@@ -37,7 +105,7 @@ function HandwritingSection({ toast }) {
       </p>
       <div className="set-row">
         <span className="set-k">Personal templates learned</span>
-        <span className="set-v">{stats.total === 0 ? 'None yet' : `${stats.total} across ${Object.keys(stats.bySymbol).length} symbols`}</span>
+        <span className="set-v" data-t="templates-learned">{stats.total === 0 ? 'None yet' : `${stats.total} across ${Object.keys(stats.bySymbol).length} symbols`}</span>
       </div>
       <div className="row" style={{ marginTop: 12, flexWrap: 'wrap' }}>
         <button className="btn btn-primary btn-sm" onClick={() => setTeaching(true)}>✒ Teach it your handwriting (2 min)</button>
@@ -47,6 +115,33 @@ function HandwritingSection({ toast }) {
           </button>
         )}
       </div>
+      <CloudOptInRow
+        field="cloudHandwriting"
+        user={user} setUser={setUser} toast={toast}
+        ask={askHandwritingStatus}
+        label="Also read my handwriting on the server"
+        unavailable="Reading handwriting on a server is not available on this install, so every reading happens on this device."
+        copy={<>
+          The on-device reader knows 58 symbols and has no comma, so lines like <b>−1, 0, 1, 2, 4</b> are beyond it.
+          Turn this on and a picture drawn from your strokes is sent to be read as well. It is a picture of your
+          writing only — never the question, never the answer, never your name. Your working still appears
+          instantly from the on-device reading; the server reading arrives after, and you can always keep yours.
+        </>}
+      />
+      <CloudOptInRow
+        field="cloudMarking"
+        user={user} setUser={setUser} toast={toast}
+        ask={askWorkingStatus}
+        label="Tell me which line my working went wrong on"
+        unavailable="Checking working on a server is not available on this install, so marking happens entirely on this device."
+        copy={<>
+          When an answer is wrong and Pri cannot tell you <i>where</i>, turn this on and your working is checked
+          line by line. It says which line broke and what kind of mistake it was — and if you slipped once and
+          then worked correctly from your own wrong number, it says that too, instead of marking you wrong five
+          times for one mistake. Your question and your working are sent; the expected answer never is, and it
+          will not tell you the answer. Your mark is decided on this device either way and does not change.
+        </>}
+      />
     </div>
   );
 }

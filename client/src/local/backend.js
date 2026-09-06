@@ -23,6 +23,8 @@ import {
   indiaPracticeScope, indiaAheadUnlocked, indiaDotpointsInWindow
 } from '../engine/indiaProduct.js';
 import { indiaReasonLabel } from '../engine/indiaProgress.js';
+import { indiaExamBlueprint } from '../engine/indiaExams.js';
+import { predictExamMark } from '../engine/markPredictor.js';
 import { IN_CHAPTERS, OLYMPIAD_TOPICS } from '../engine/curriculum-in.js';
 import { generateQuestion } from '../engine/generators/index.js';
 import { checkAnswer, stepCheck, methodMarks } from '../engine/checker.js';
@@ -711,6 +713,9 @@ async function publicUser(p, nowMs = Date.now()) {
     streak: await streakFor(p.id, nowMs, tz),
     today: { questions: today.questions, correct: today.correct, xp: today.xp },
     isDemo: !!p.isDemo, handwriting: p.handwriting !== false,
+    // Default false, and false for every profile that predates the setting.
+    cloudHandwriting: p.cloudHandwriting === true,
+    cloudMarking: p.cloudMarking === true,
     // Plan and free-tier usage are read from device rows: the entitlement is the
     // server-issued snapshot (or 'free'), the usage is the local counter.
     // The free-tier counter keeps its own clock (entitlementGate's), so the
@@ -986,9 +991,19 @@ async function indiaStats(p, ratings, now) {
   });
   return {
     course: 'in', indiaTrack: trackId, window: indiaDifficultyWindow(trackId, p.year), aheadUnlocked,
-    // No NSW-scaled mark for an Indian student: the India progress page says
-    // so in words, and the number is not manufactured here either.
+    // Still no NSW-scaled mark, no CBSE percentage, no JEE percentile and no
+    // rank: none of those can be honestly derived from a practice history, and
+    // the India progress page says so in words.
     predicted: null, trajectory: [],
+    // What CAN be said honestly is narrower and more useful: on the marks of
+    // this paper the student has actually practised, what would they score.
+    // It never scales to the untouched remainder, and it refuses a headline
+    // below a coverage floor. See engine/markPredictor.js.
+    examPrediction: (() => {
+      const blueprint = indiaExamBlueprint({ track: trackId, grade: p.year, variant: p.indiaVariant || 'standard' });
+      if (!blueprint?.units?.length) return null;
+      try { return predictExamMark(blueprint, ratings, { nowMs: now }); } catch { return null; }
+    })(),
     priorities: prio, strands, misconceptions, recommendation, chapters, reviewsDue: due.size,
     activity: days.slice(-120), totals, byDiff,
     bestRush: rushRuns.length ? Math.max(...rushRuns.map(r => r.score)) : 0,
@@ -2018,6 +2033,10 @@ const routes = {
     }
     if (body.avatar !== undefined) p.avatar = String(body.avatar).slice(0, 4);
     if (body.handwriting !== undefined) p.handwriting = !!body.handwriting;
+    // Server-side handwriting reading is off unless the student turns it on:
+    // it is the one setting that sends their work off the device.
+    if (body.cloudHandwriting !== undefined) p.cloudHandwriting = body.cloudHandwriting === true;
+    if (body.cloudMarking !== undefined) p.cloudMarking = body.cloudMarking === true;
     if (body.email !== undefined) {
       const email = String(body.email || '').trim().toLowerCase().slice(0, 120);
       if (email && !EMAIL_RE.test(email)) throw Object.assign(new Error('That email doesn’t look right.'), { status: 400 });

@@ -4,6 +4,10 @@ client/dist/
 .venv-ink/
 .venv-ink-export/
 server/data/*.db
+# SQLite writes these beside the database whenever the server or its tests run.
+# They are runtime state, never source, and they were committed once by accident.
+server/data/*.db-shm
+server/data/*.db-wal
 .DS_Store
 *.log
 Pri-learning-final-production/
