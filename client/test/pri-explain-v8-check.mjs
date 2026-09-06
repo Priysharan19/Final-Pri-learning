@@ -32,6 +32,31 @@ check('strong clean session becomes a quick review', () => {
   assert.equal(profile.pauseAtKeyStep, false);
 });
 
+check('incomplete session correctness evidence stays unknown instead of becoming 0%', () => {
+  const incompleteValues = [undefined, null, '', '   ', 'not-a-number'];
+  for (const correct of incompleteValues) {
+    const profile = buildTeachingProfile({
+      payload: { correct: true },
+      studentContext: { year: 11, difficulty: 2, session: { answered: 5, correct } },
+      timeline,
+    });
+    assert.equal(profile.sessionAccuracy, null, `expected unknown accuracy for ${String(correct)}`);
+    assert.equal(profile.mode, TEACHING_MODES.GUIDED, `expected neutral guidance for ${String(correct)}`);
+  }
+});
+
+check('genuine zero-correct evidence remains 0% and keeps low-accuracy scaffolding', () => {
+  for (const correct of [0, '0']) {
+    const profile = buildTeachingProfile({
+      payload: { correct: true },
+      studentContext: { year: 11, difficulty: 2, session: { answered: 5, correct } },
+      timeline,
+    });
+    assert.equal(profile.sessionAccuracy, 0);
+    assert.equal(profile.mode, TEACHING_MODES.SCAFFOLDED);
+  }
+});
+
 check('first wrong attempt always becomes targeted recovery', () => {
   const profile = buildTeachingProfile({
     payload: { correct: true, hadWrongAttempt: true },
