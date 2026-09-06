@@ -1,13 +1,15 @@
 {
   "name": "Pri Learning",
   "short_name": "Pri Learning",
-  "description": "Adaptive Years 7–12 maths practice, generated and marked on your device — handwriting recognition, HSC-style marking and exam papers. Fully offline.",
+  "description": "Maths practice for Indian students — NCERT Classes 7–12, JEE Main & Advanced and olympiad. Questions generated and marked on your device, with handwriting recognition and worked solutions. Offline-first; a Pri cloud account is optional.",
+  "lang": "en-IN",
+  "categories": ["education"],
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "any",
-  "background_color": "#0e1117",
-  "theme_color": "#0e1117",
+  "background_color": "#0a0a09",
+  "theme_color": "#0a0a09",
   "icons": [
     { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
     { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },

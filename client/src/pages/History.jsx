@@ -7,6 +7,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
 import { MathText } from '../lib/latex.jsx';
+import { formatDate, formatNumber } from '../lib/locale.js';
 import { useApp } from '../App.jsx';
 
 const FILTERS = [
@@ -45,7 +46,7 @@ function InkReplay({ strokes, height = 160, label }) {
 }
 
 export default function History() {
-  const { toast } = useApp();
+  const { toast, user } = useApp();
   const [filter, setFilter] = useState('all');
   const [page, setPage] = useState(0);
   const [data, setData] = useState(null);
@@ -97,9 +98,9 @@ export default function History() {
       <div className="spread" style={{ flexWrap: 'wrap', gap: 12 }}>
         <div>
           <h2>Your question history</h2>
-          <p className="sub" style={{ marginTop: 3 }}>Every question you've answered stays on this iPad — retry any of them, with the same numbers or new ones.</p>
+          <p className="sub" style={{ marginTop: 3 }}>Every question you've answered stays on this device — retry any of them, with the same numbers or new ones.</p>
         </div>
-        <span className="chip">{data ? `${data.total.toLocaleString()} question${data.total === 1 ? '' : 's'}` : '…'}</span>
+        <span className="chip">{data ? `${formatNumber(data.total, user)} question${data.total === 1 ? '' : 's'}` : '…'}</span>
       </div>
 
       <div className="row" role="group" aria-label="Filter your history" style={{ flexWrap: 'wrap', gap: 8 }}>
@@ -134,7 +135,7 @@ export default function History() {
                 {item.viaInk && <span className="tag" title="Answered by handwriting">✍️<span className="sr-only"> answered by handwriting</span></span>}
                 {item.hasPhoto && <span className="tag" title="Paper working photo attached">📷<span className="sr-only"> photo of paper working attached</span></span>}
                 <span className="muted" style={{ marginLeft: 'auto', fontSize: 12, whiteSpace: 'nowrap' }}>
-                  {new Date(item.answeredAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}
+                  {formatDate(item.answeredAt, user)}
                 </span>
               </div>
               <div className="hist-prompt"><MathText text={item.prompt} /></div>

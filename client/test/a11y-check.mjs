@@ -457,7 +457,20 @@ async function signInToDemo(page, base) {
   await wait(page, 500);
   const started = page.getByRole('button', { name: 'Get Started' });
   if (await started.count()) { await started.click(); await wait(page, 400); }
-  const demo = page.getByRole('button', { name: /try the demo/i }).first();
+  // By the time the audit reaches here a profile may already exist, so the
+  // welcome screen opens on the profile picker rather than the sign-up
+  // methods. Step forward to the methods either way.
+  const addAnother = page.getByRole('button', { name: /Add another profile/ });
+  if (await addAnother.count()) { await addAnother.click(); await wait(page, 400); }
+  // These groups audit the Australian screens — the Home generator's course,
+  // topic and dot-point pickers, and the NSW Progress board with its
+  // priorities and knowledge map. The Indian screens are driven end to end by
+  // tour-india.js; auditing their accessibility here is still to do.
+  const withoutEmail = page.getByRole('button', { name: /Continue without an email/ });
+  if (await withoutEmail.count()) { await withoutEmail.click(); await wait(page, 500); }
+  const australia = page.getByRole('button', { name: /Studying in Australia/ });
+  if (await australia.count()) { await australia.click(); await wait(page, 500); }
+  const demo = page.getByRole('button', { name: /try the (australian )?demo/i }).first();
   await demo.waitFor({ state: 'visible', timeout: 10000 });
   await demo.click();
   await page.waitForSelector('.shell', { timeout: 120000 });

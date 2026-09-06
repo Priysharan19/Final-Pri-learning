@@ -228,14 +228,25 @@ function helpers(page, base, flowId) {
    * needs a signed-in profile before it can start, and none of them should be
    * reaching into storage to fake one.
    */
-  const createProfile = async ({ name = 'E2E Student', year = 9, email = null, password = null } = {}) => {
+  const createProfile = async ({ name = 'E2E Student', year = 9, email = null, password = null, course = 'nsw', track = null } = {}) => {
     await page.getByRole('button', { name: 'Get Started' }).click();
     await page.waitForSelector('.sso-btn', { timeout: 15000 });
     await page.getByRole('button', { name: email ? /Continue with email/ : /Continue without an email/ }).click();
     await page.waitForSelector('.auth-card input.input', { timeout: 15000 });
     await page.getByPlaceholder('e.g. Priysharan').fill(name);
     if (email) await page.locator('.auth-card input[type=email]').fill(email);
-    await page.locator('.auth-card select').first().selectOption(String(year));
+    if (course === 'in') {
+      // The form opens on India: the first control is the class / track
+      // picker. A JEE or olympiad track puts its own class select beneath it.
+      await page.locator('#signup-track').selectOption(track || String(year));
+      if (track) await page.locator('#signup-year').selectOption(String(year));
+    } else {
+      // The Australian syllabuses the legacy flows exercise (the NSW paper,
+      // the HSC marker) are a step away, folded up behind one link.
+      await page.getByRole('button', { name: /Studying in Australia/ }).click();
+      await page.locator('#signup-course').selectOption(course);
+      await page.locator('#signup-year').selectOption(String(year));
+    }
     if (password) {
       await page.locator('.check-row input[type=checkbox]').check();
       await page.getByLabel('Password', { exact: true }).fill(password);
@@ -250,7 +261,7 @@ function helpers(page, base, flowId) {
 
 // ── Flow runner ──────────────────────────────────────────────────────────────
 
-const FLOWS = ['./tour-login.js', './tour-v3.js', './tour-ink.js', './tour-v4.js', './cal-smoke.mjs'];
+const FLOWS = ['./tour-login.js', './tour-india.js', './tour-v3.js', './tour-ink.js', './tour-v4.js', './cal-smoke.mjs'];
 
 async function loadFlows() {
   const loaded = [];

@@ -2,7 +2,7 @@
 // Pri Learning · Achievements (local edition)
 // ─────────────────────────────────────────────────────────────────────────────
 import { get, put, byIndex } from './idb.js';
-import { streakFor, sydneyHour } from './store.js';
+import { streakFor, localHour, profileTimezone } from './store.js';
 import { levelFromXp } from '../engine/adaptive.js';
 import { subtopicsForYear } from '../engine/curriculum.js';
 
@@ -31,7 +31,10 @@ export const BADGES = [
   { id: 'extension', name: 'Extension Thinker', icon: '🚀', desc: 'Answer a D4 Exam-Extension question correctly without hints.' }
 ];
 
-export async function checkBadges(pid, event, nowMs = Date.now()) {
+export async function checkBadges(pid, event, nowMs = Date.now(), tz = null) {
+  // Streak days and the time-of-day badges are judged in the student's own
+  // timezone — 11 pm in Kolkata is a night owl whatever the clock says in Sydney.
+  const zone = tz || await profileTimezone(pid);
   const haveRows = await byIndex('badges', 'pid', pid);
   const have = new Set(haveRows.map(r => r.badgeId));
   const out = [];
@@ -51,7 +54,7 @@ export async function checkBadges(pid, event, nowMs = Date.now()) {
   await maybe('half-century', totalCorrect >= 50);
   await maybe('century', totalCorrect >= 100);
 
-  const streak = await streakFor(pid, nowMs);
+  const streak = await streakFor(pid, nowMs, zone);
   await maybe('streak-3', streak >= 3);
   await maybe('streak-7', streak >= 7);
   await maybe('streak-14', streak >= 14);
@@ -62,7 +65,7 @@ export async function checkBadges(pid, event, nowMs = Date.now()) {
     const lastTen = recent.slice(0, 10);
     await maybe('sharpshooter', lastTen.length === 10 && lastTen.every(r => r.correct));
     await maybe('comeback', recent.length >= 4 && recent[0].correct && recent.slice(1, 4).every(r => !r.correct));
-    const hour = sydneyHour(nowMs);
+    const hour = localHour(nowMs, zone);
     await maybe('night-owl', hour >= 22 || hour < 4);
     await maybe('early-bird', hour >= 5 && hour < 8);
     await maybe('extension', event.difficulty === 4 && event.correct && !event.hintsUsed);

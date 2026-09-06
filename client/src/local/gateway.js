@@ -136,7 +136,10 @@ const BODY_RULES = [
     optionalString(body, 'course', 30); optionalString(body, 'role', 30);
     optionalString(body, 'avatar', 32); optionalString(body, 'email', 180);
     optionalString(body, 'provider', 30); optionalString(body, 'password', 1024);
-    optionalString(body, 'pathway', 30); optionalString(body, 'indiaTrack', 30);
+    optionalString(body, 'pathway', 30); optionalString(body, 'indiaTrack', 30); optionalString(body, 'timezone', 64);
+  }],
+  [/^POST \/profiles\/demo$/, body => {
+    requireObject(body, 'POST /profiles/demo'); optionalString(body, 'course', 30);
   }],
   [/^POST \/profiles\/select$/, body => {
     requireObject(body, 'POST /profiles/select'); requiredId(body); optionalString(body, 'password', 1024);
@@ -151,6 +154,7 @@ const BODY_RULES = [
     requireObject(body, 'PATCH /me'); optionalString(body, 'name', 80); optionalNumber(body, 'year');
     optionalString(body, 'pathway', 30); optionalString(body, 'theme', 20); optionalNumber(body, 'dailyGoal');
     optionalString(body, 'course', 30); optionalString(body, 'indiaTrack', 30); optionalString(body, 'avatar', 32); optionalBoolean(body, 'handwriting'); optionalString(body, 'email', 180);
+    optionalString(body, 'timezone', 64);
   }],
   [/^POST \/practice\/next$/, body => {
     requireObject(body, 'POST /practice/next'); optionalString(body, 'mode', 30); optionalId(body, 'subtopic'); optionalString(body, 'track', 30);

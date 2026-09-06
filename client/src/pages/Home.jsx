@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
 import { useApp } from '../App.jsx';
 import { dotpointAvailable, practiceTargetAvailable, topicAvailability } from '../engine/curriculumAvailability.js';
+import { dayKey, formatWeekday } from '../lib/locale.js';
 
 const TAGLINES = [
   'The rest is algebra.',
@@ -330,22 +331,20 @@ function Tagline() {
   );
 }
 
-function sydneyDate(ms) {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Australia/Sydney', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(ms));
-}
-
 function GoalCard({ user, activity, onGo }) {
   const done = user.today?.questions || 0;
   const goal = user.dailyGoal || 10;
   const frac = Math.min(1, done / goal);
   const R = 38, C = 2 * Math.PI * R;
   const byDate = Object.fromEntries(activity.map(d => [d.date, d]));
+  // The week is the student's week: each day is keyed and labelled in the
+  // profile's own timezone, the same boundary the backend files activity under.
   const days = Array.from({ length: 7 }, (_, i) => {
     const ms = Date.now() - (6 - i) * 86400000;
-    const date = sydneyDate(ms);
+    const date = dayKey(ms, user.timezone);
     const row = byDate[date];
     return {
-      date, lbl: new Intl.DateTimeFormat('en-AU', { timeZone: 'Australia/Sydney', weekday: 'narrow' }).format(new Date(ms)),
+      date, lbl: formatWeekday(ms, user),
       hit: (row?.questions || 0) > 0, today: i === 6
     };
   });
