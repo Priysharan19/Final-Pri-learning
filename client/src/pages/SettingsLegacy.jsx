@@ -105,7 +105,7 @@ function HandwritingSection({ toast }) {
       </p>
       <div className="set-row">
         <span className="set-k">Personal templates learned</span>
-        <span className="set-v">{stats.total === 0 ? 'None yet' : `${stats.total} across ${Object.keys(stats.bySymbol).length} symbols`}</span>
+        <span className="set-v" data-t="templates-learned">{stats.total === 0 ? 'None yet' : `${stats.total} across ${Object.keys(stats.bySymbol).length} symbols`}</span>
       </div>
       <div className="row" style={{ marginTop: 12, flexWrap: 'wrap' }}>
         <button className="btn btn-primary btn-sm" onClick={() => setTeaching(true)}>✒ Teach it your handwriting (2 min)</button>
