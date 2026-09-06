@@ -66,6 +66,7 @@
   "ownership_rules": [
     {"pattern":".pri-os/**","primary":"qa-release","reviewers":["security"],"risk":"R3"},
     {"pattern":"AGENTS.md","primary":"qa-release","reviewers":["security"],"risk":"R2"},
+    {"pattern":"Dockerfile","primary":"qa-release","reviewers":["reliability","security"],"risk":"R4"},
     {"pattern":"scripts/pri-*.mjs","primary":"qa-release","reviewers":["security","reliability"],"risk":"R3"},
     {"pattern":".github/workflows/pri-agent-*.yml","primary":"qa-release","reviewers":["security","reliability"],"risk":"R4"},
     {"pattern":"client/src/ink/**","primary":"handwriting","reviewers":["ios-native","security","reliability","qa-release"],"risk":"R4"},
