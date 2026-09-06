@@ -23,6 +23,8 @@ import {
   indiaPracticeScope, indiaAheadUnlocked, indiaDotpointsInWindow
 } from '../engine/indiaProduct.js';
 import { indiaReasonLabel } from '../engine/indiaProgress.js';
+import { indiaExamBlueprint } from '../engine/indiaExams.js';
+import { predictExamMark } from '../engine/markPredictor.js';
 import { IN_CHAPTERS, OLYMPIAD_TOPICS } from '../engine/curriculum-in.js';
 import { generateQuestion } from '../engine/generators/index.js';
 import { checkAnswer, stepCheck, methodMarks } from '../engine/checker.js';
@@ -989,9 +991,19 @@ async function indiaStats(p, ratings, now) {
   });
   return {
     course: 'in', indiaTrack: trackId, window: indiaDifficultyWindow(trackId, p.year), aheadUnlocked,
-    // No NSW-scaled mark for an Indian student: the India progress page says
-    // so in words, and the number is not manufactured here either.
+    // Still no NSW-scaled mark, no CBSE percentage, no JEE percentile and no
+    // rank: none of those can be honestly derived from a practice history, and
+    // the India progress page says so in words.
     predicted: null, trajectory: [],
+    // What CAN be said honestly is narrower and more useful: on the marks of
+    // this paper the student has actually practised, what would they score.
+    // It never scales to the untouched remainder, and it refuses a headline
+    // below a coverage floor. See engine/markPredictor.js.
+    examPrediction: (() => {
+      const blueprint = indiaExamBlueprint({ track: trackId, grade: p.year, variant: p.indiaVariant || 'standard' });
+      if (!blueprint?.units?.length) return null;
+      try { return predictExamMark(blueprint, ratings, { nowMs: now }); } catch { return null; }
+    })(),
     priorities: prio, strands, misconceptions, recommendation, chapters, reviewsDue: due.size,
     activity: days.slice(-120), totals, byDiff,
     bestRush: rushRuns.length ? Math.max(...rushRuns.map(r => r.score)) : 0,

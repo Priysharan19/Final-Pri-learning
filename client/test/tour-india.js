@@ -132,7 +132,12 @@ export const flow = {
     const started = await page.locator('.grid.cols-4 .card').first().innerText();
     const startedN = Number((/(\d+)\s*\/\s*(\d+)/.exec(started.replace(/\s+/g, ' ')) || [])[1]);
     await check('the demo has NCERT chapters started', startedN >= 8, `chapters card reads ${JSON.stringify(started)}`);
-    await check('Progress never predicts a board mark', await page.locator('text=No predicted board/JEE score').count() === 1);
+    await check('Progress refuses percentile and rank predictions', await page.locator('text=No percentile, no rank').count() === 1);
+    // A mark estimate is allowed, but only alongside how much of the paper it
+    // covers. A number without that context is the dishonest version.
+    const estimate = await page.locator('text=If you sat this paper tomorrow').count();
+    const coverage = await page.locator('text=/marks practised/').count();
+    await check('any mark estimate travels with its coverage', estimate === 0 || coverage >= 1);
     note(`the demo opens with ${started.replace(/\s+/g, ' ').trim()}`);
 
     await page.goto(`${base}/history`, { waitUntil: 'domcontentloaded' });

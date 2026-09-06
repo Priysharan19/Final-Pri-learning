@@ -27,10 +27,21 @@ assert.match(progress, /user\?\.course === 'in' \? <IndiaProgress \/> : <Progres
   'India users must route to the India-native progress presentation');
 assert.match(australia, /ProgressLegacy/,
   'Australian progress must remain available as the preserved legacy implementation');
-assert.match(indiaProgress, /No predicted board\/JEE score/,
-  'India progress must explicitly avoid unsupported score prediction');
-assert.doesNotMatch(indiaProgress, /Predicted mark|Demonstrated Mark History|Band \(predicted\)/,
-  'Australian prediction UI must not leak into India progress');
+assert.match(indiaProgress, /No percentile, no rank/,
+  'India progress must explicitly refuse the predictions a practice history cannot support');
+assert.match(indiaProgress, /does not convert a practice history into a CBSE percentage, a JEE percentile or a rank/,
+  'and must say in words which three things it will not claim');
+// A mark estimate over practised content is a different claim from a board
+// percentage, and it is only honest while it travels with its coverage.
+assert.match(indiaProgress, /marks practised/,
+  'any mark estimate on this page must state how much of the paper it covers');
+// Targeted at the Australian UI itself, not at the words: this page has to be
+// able to SAY "percentile" and "rank" in order to refuse them, and an earlier
+// version of this assertion banned the vocabulary the refusal is written in.
+assert.doesNotMatch(indiaProgress, /Demonstrated Mark History|Band \(predicted\)|ProgressAustralia|scaledBand/,
+  'the Australian scaled-band prediction UI must not leak into India progress');
+assert.doesNotMatch(indiaProgress, /your (?:predicted )?(?:percentile|rank) (?:is|would be)/i,
+  'and the page must never state a percentile or a rank as a result');
 assert.doesNotMatch(exams, /same difficulty profile as the real thing/i,
   'generic exam copy must not make an authenticity claim');
 assert.match(exams, /Mathematics section/,
