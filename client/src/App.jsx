@@ -4,6 +4,7 @@ import { api } from './api.js';
 import { requestPersistentStorage } from './local/idb.js';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 import { setDraftProfile } from './components/drafts.js';
+import { setLanguage, signInLanguage, useT } from './i18n/index.js';
 import Login from './pages/Login.jsx';
 import Home from './pages/Home.jsx';
 import Practice from './pages/Practice.jsx';
@@ -48,21 +49,25 @@ const I = {
   settings: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><circle cx="12" cy="12" r="3.2" /><path d="M19 12a7 7 0 0 0-.15-1.4l2.1-1.6-2-3.4-2.45 1a7 7 0 0 0-2.4-1.4L13.7 2.6h-3.9l-.4 2.6a7 7 0 0 0-2.4 1.4l-2.45-1-2 3.4 2.1 1.6A7 7 0 0 0 4.5 12c0 .5.05.9.15 1.4l-2.1 1.6 2 3.4 2.45-1a7 7 0 0 0 2.4 1.4l.4 2.6h3.9l.4-2.6a7 7 0 0 0 2.4-1.4l2.45 1 2-3.4-2.1-1.6c.1-.5.15-.9.15-1.4Z" /></svg>,
 };
 
+// Destinations carry a catalogue key rather than a label. A label frozen into
+// a module constant is read once at import time and never again, so it would
+// still be in English on a Hindi profile — the one bug this whole seam exists
+// to make impossible.
 const NAV = [
-  { to: '/', label: 'Home', ico: I.home },
-  { to: '/tasks', label: 'Tasks', ico: I.tasks },
-  { to: '/match', label: 'Match', ico: I.match },
-  { to: '/progress', label: 'Progress', ico: I.progress },
-  { to: '/favorites', label: 'Favorites', ico: I.fav },
-  { to: '/exams', label: 'Exams', ico: I.exams },
-  { to: '/classes', label: 'Classes', ico: I.classes },
-  { to: '/settings', label: 'Settings', ico: I.settings },
+  { to: '/', key: 'nav.home', ico: I.home },
+  { to: '/tasks', key: 'nav.tasks', ico: I.tasks },
+  { to: '/match', key: 'nav.match', ico: I.match },
+  { to: '/progress', key: 'nav.progress', ico: I.progress },
+  { to: '/favorites', key: 'nav.favorites', ico: I.fav },
+  { to: '/exams', key: 'nav.exams', ico: I.exams },
+  { to: '/classes', key: 'nav.classes', ico: I.classes },
+  { to: '/settings', key: 'nav.settings', ico: I.settings },
 ];
 
-const TITLES = {
-  '/': 'Home', '/practice': 'Practice', '/progress': 'Progress', '/tasks': 'Tasks',
-  '/exams': 'Exams', '/rush': 'Rapid Fire', '/match': 'Match', '/teach': 'Classes',
-  '/history': 'History', '/favorites': 'Favorites', '/classes': 'Classes', '/settings': 'Settings'
+const TITLE_KEYS = {
+  '/': 'nav.home', '/practice': 'nav.practice', '/progress': 'nav.progress', '/tasks': 'nav.tasks',
+  '/exams': 'nav.exams', '/rush': 'nav.rush', '/match': 'nav.match', '/teach': 'nav.classes',
+  '/history': 'nav.history', '/favorites': 'nav.favorites', '/classes': 'nav.classes', '/settings': 'nav.settings'
 };
 
 // Shown for the moment a route's own chunk is arriving. It is announced rather
@@ -73,11 +78,12 @@ function RouteLoading() {
 }
 
 export function Logo({ large = false, onClick }) {
+  const t = useT();
   // With an onClick this is a control, so it has to be one: a bare <span> takes
   // the click and gives a keyboard no way to follow it.
   const Tag = onClick ? 'button' : 'span';
   const controlProps = onClick
-    ? { type: 'button', onClick, 'aria-label': 'Pri Learning — go to Home' }
+    ? { type: 'button', onClick, 'aria-label': t('app.logoHome') }
     : {};
   return (
     <Tag className={`logo ${large ? 'logo-lg' : ''}${onClick ? ' logo-btn' : ''}`} {...controlProps}>
@@ -98,6 +104,7 @@ export default function App() {
   const [recent, setRecent] = useState([]);
   const loc = useLocation();
   const nav = useNavigate();
+  const t = useT();
 
   const refreshUser = useCallback(async () => {
     try {
@@ -124,6 +131,12 @@ export default function App() {
   // Guard months of practice from storage eviction — ask the browser once per boot.
   useEffect(() => { requestPersistentStorage(); }, []);
 
+  // The interface follows the profile's own language. Before a profile is
+  // chosen there is nothing to follow, so the sign-in screen falls back to the
+  // language last picked on this device — otherwise a Hindi-medium student
+  // would meet the product in English every single time they opened it.
+  useEffect(() => { setLanguage(user ? user.language : signInLanguage()); }, [user]);
+
   // Each profile keeps its OWN learned handwriting and its OWN unsent drafts —
   // retarget both banks on switch so nobody inherits another student's work.
   //
@@ -144,8 +157,8 @@ export default function App() {
   }, [user?.theme]);
 
   const pageTitle = useMemo(
-    () => TITLES[loc.pathname] || (loc.pathname.startsWith('/exams') ? 'Exam' : null),
-    [loc.pathname]
+    () => (TITLE_KEYS[loc.pathname] ? t(TITLE_KEYS[loc.pathname]) : loc.pathname.startsWith('/exams') ? t('nav.exam') : null),
+    [loc.pathname, t]
   );
 
   useEffect(() => {
@@ -197,9 +210,9 @@ export default function App() {
 
   const celebrate = useCallback((res) => {
     for (const b of res?.newBadges || []) {
-      toast(<><span className="badge-ico">{b.icon}</span><div><div className="badge-name">Achievement unlocked — {b.name}</div><div className="badge-desc">{b.desc}</div></div></>, 5200, 'gold');
+      toast(<><span className="badge-ico">{b.icon}</span><div><div className="badge-name">{t('app.badgeUnlocked', { name: b.name })}</div><div className="badge-desc">{b.desc}</div></div></>, 5200, 'gold');
     }
-  }, [toast]);
+  }, [toast, t]);
 
   const ctx = useMemo(() => ({ user, setUser, refreshUser, toast, celebrate, dueCount, refreshDue, refreshRecent }),
     [user, refreshUser, toast, celebrate, dueCount, refreshDue, refreshRecent]);
@@ -232,7 +245,7 @@ export default function App() {
   }
 
   const navItems = user.role === 'teacher'
-    ? NAV.map(n => n.to === '/classes' ? { ...n, to: '/teach', label: 'Classes' } : n)
+    ? NAV.map(n => n.to === '/classes' ? { ...n, to: '/teach' } : n)
     : NAV;
 
   const switchProfile = async () => {
@@ -243,11 +256,11 @@ export default function App() {
   return (
     <AppCtx.Provider value={ctx}>
       <div className="shell">
-        <a className="skip-link" href="#main" onClick={skipToMain}>Skip to main content</a>
+        <a className="skip-link" href="#main" onClick={skipToMain}>{t('app.skipToMain')}</a>
         <header className="topbar">
           <Logo onClick={() => nav('/')} />
           <div className="top-stats">
-            {user.streak > 0 && <span className="chip" title="Day streak"><span className="flame">▲</span><b>{user.streak}</b></span>}
+            {user.streak > 0 && <span className="chip" title={t('app.dayStreak')}><span className="flame">▲</span><b>{user.streak}</b></span>}
             <ThemeToggle />
             <AccountMenu user={user} onSwitch={switchProfile} />
           </div>
@@ -259,8 +272,8 @@ export default function App() {
               {navItems.map(n => (
                 <NavLink key={n.to} to={n.to} end={n.to === '/'} className={({ isActive }) => 'nav-item' + (isActive ? ' active' : '')}>
                   <span className="nav-ico">{n.ico}</span>
-                  <span className="nav-label">{n.label}</span>
-                  {n.to === '/' && dueCount > 0 && <span className="nav-badge">{dueCount} due</span>}
+                  <span className="nav-label">{t(n.key)}</span>
+                  {n.to === '/' && dueCount > 0 && <span className="nav-badge">{t('nav.due', { count: dueCount, n: dueCount })}</span>}
                 </NavLink>
               ))}
               <div className="nav-spacer" />
@@ -308,10 +321,10 @@ export default function App() {
       {/* The bar holds five destinations; the rest live behind More. Before
           this, Exams, Favorites and Classes had no entry point at all on a
           phone — an Indian student on a phone could not reach an exam. */}
-      <nav className="mobilenav no-print" aria-label="Primary">
+      <nav className="mobilenav no-print" aria-label={t('nav.primary')}>
         {[navItems[0], navItems[1], navItems[2], navItems[3]].map(n => (
           <NavLink key={n.to} to={n.to} end={n.to === '/'} className={({ isActive }) => 'mnav-item' + (isActive ? ' active' : '')}>
-            <span className="nav-ico">{n.ico}</span><span>{n.label}</span>
+            <span className="nav-ico">{n.ico}</span><span>{t(n.key)}</span>
           </NavLink>
         ))}
         <button
@@ -321,21 +334,21 @@ export default function App() {
           aria-controls="mobile-more"
           onClick={() => setMoreOpen(v => !v)}
         >
-          <span className="nav-ico" aria-hidden="true">☰</span><span>More</span>
+          <span className="nav-ico" aria-hidden="true">☰</span><span>{t('nav.more')}</span>
         </button>
       </nav>
 
       {moreOpen && (
         <>
-          <button type="button" className="mnav-sheet-scrim" aria-label="Close" onClick={() => setMoreOpen(false)} />
-          <div className="mnav-sheet" id="mobile-more" role="dialog" aria-modal="true" aria-label="More places to go">
+          <button type="button" className="mnav-sheet-scrim" aria-label={t('nav.close')} onClick={() => setMoreOpen(false)} />
+          <div className="mnav-sheet" id="mobile-more" role="dialog" aria-modal="true" aria-label={t('nav.morePlaces')}>
             {navItems.slice(4).map(n => (
               <NavLink key={n.to} to={n.to} className="mnav-sheet-item" onClick={() => setMoreOpen(false)}>
-                <span className="nav-ico" aria-hidden="true">{n.ico}</span><span>{n.label}</span>
+                <span className="nav-ico" aria-hidden="true">{n.ico}</span><span>{t(n.key)}</span>
               </NavLink>
             ))}
             <NavLink to="/history" className="mnav-sheet-item" onClick={() => setMoreOpen(false)}>
-              <span className="nav-ico" aria-hidden="true">↺</span><span>History</span>
+              <span className="nav-ico" aria-hidden="true">↺</span><span>{t('nav.history')}</span>
             </NavLink>
           </div>
         </>
@@ -347,17 +360,18 @@ export default function App() {
 
 function SidebarHistory({ recent }) {
   const nav = useNavigate();
+  const t = useT();
   if (!recent.length) {
     return (
       <div className="nav-hist">
-        <div className="nav-hist-title">Question History</div>
-        <div className="muted" style={{ fontSize: 12 }}>No questions yet</div>
+        <div className="nav-hist-title">{t('app.questionHistory')}</div>
+        <div className="muted" style={{ fontSize: 12 }}>{t('app.noQuestionsYet')}</div>
       </div>
     );
   }
   return (
     <div className="nav-hist">
-      <div className="nav-hist-title">Question History</div>
+      <div className="nav-hist-title">{t('app.questionHistory')}</div>
       {recent.slice(0, 3).map(it => {
         const cls = it.correct === true ? 'g' : it.correct === false ? 'b' : 'w';
         return (
@@ -365,19 +379,19 @@ function SidebarHistory({ recent }) {
             <div className="hist-mini-top">
               <span className="hist-mini-name">{it.subtopicName}</span>
               <span className={`hist-mini-pct ${cls}`}
-                aria-label={it.correct === true ? 'Correct' : it.correct === false ? 'Incorrect' : 'Not marked yet'}>
+                aria-label={it.correct === true ? t('app.correct') : it.correct === false ? t('app.incorrect') : t('app.notMarkedYet')}>
                 {it.correct === true ? '100% ✓' : it.correct === false ? '0.0% ✗' : '—'}
               </span>
             </div>
             <div className="hist-mini-preview">{stripTex(it.prompt)}</div>
             <div className="hist-mini-tags">
-              <span className="tag" style={{ fontSize: 10.5 }}>{it.mode === 'practice' ? 'Practice' : it.mode}</span>
-              <span className="tag" style={{ fontSize: 10.5 }}>Difficulty: {it.difficulty}</span>
+              <span className="tag" style={{ fontSize: 10.5 }}>{it.mode === 'practice' ? t('history.modePractice') : it.mode}</span>
+              <span className="tag" style={{ fontSize: 10.5 }}>{t('app.difficultyIs', { level: it.difficulty })}</span>
             </div>
           </button>
         );
       })}
-      <button className="btn btn-quiet btn-sm" style={{ width: '100%' }} onClick={() => nav('/history')}>View all →</button>
+      <button className="btn btn-quiet btn-sm" style={{ width: '100%' }} onClick={() => nav('/history')}>{t('app.viewAll')}</button>
     </div>
   );
 }
@@ -400,14 +414,15 @@ function AccountMenu({ user, onSwitch }) {
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
   const nav = useNavigate();
+  const t = useT();
   const ref = useRef(null);
   const btnRef = useRef(null);
   const itemRefs = useRef([]);
 
   const items = [
-    { key: 'settings', label: 'Account settings', run: () => nav('/settings') },
-    { key: 'progress', label: 'My progress', run: () => nav('/progress') },
-    { key: 'switch', label: 'Switch profile', run: onSwitch, sep: true },
+    { key: 'settings', label: t('app.accountSettings'), run: () => nav('/settings') },
+    { key: 'progress', label: t('app.myProgress'), run: () => nav('/progress') },
+    { key: 'switch', label: t('app.switchProfile'), run: onSwitch, sep: true },
   ];
   const last = items.length - 1;
 
@@ -442,7 +457,7 @@ function AccountMenu({ user, onSwitch }) {
 
   return (
     <div className="acct-menu-wrap" ref={ref}>
-      <button className="user-chip" id="acct-menu-btn" ref={btnRef} title="Account"
+      <button className="user-chip" id="acct-menu-btn" ref={btnRef} title={t('app.account')}
         aria-haspopup="menu" aria-expanded={open}
         onClick={() => (open ? shut(false) : openAt(0))} onKeyDown={onButtonKey}
         style={{ background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>
@@ -457,7 +472,7 @@ function AccountMenu({ user, onSwitch }) {
             <span style={{ minWidth: 0 }}>
               <span className="acct-name" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 {user.name}
-                <span className="acct-local-mark" role="img" aria-label="Profile stored on this device">{DeviceMark}</span>
+                <span className="acct-local-mark" role="img" aria-label={t('app.profileOnDevice')}>{DeviceMark}</span>
               </span>
               <span className="acct-sub">{user.email || user.courseLabel}</span>
             </span>
@@ -472,7 +487,7 @@ function AccountMenu({ user, onSwitch }) {
               </button>
             ))}
           </div>
-          <div className="acct-menu-note">All data stays on this iPad — private by design.</div>
+          <div className="acct-menu-note">{t('app.dataStaysHere')}</div>
         </div>
       )}
     </div>
@@ -485,6 +500,7 @@ function stripTex(s = '') {
 
 function ThemeToggle() {
   const { user, setUser } = useApp();
+  const t = useT();
   const flip = async () => {
     const theme = user.theme === 'light' ? 'dark' : 'light';
     setUser({ ...user, theme });
@@ -492,7 +508,7 @@ function ThemeToggle() {
   };
   return (
     <button className="btn btn-quiet btn-sm" onClick={flip}
-      aria-label={user.theme === 'light' ? 'Switch to dark theme' : 'Switch to light theme'}
+      aria-label={user.theme === 'light' ? t('app.themeToDark') : t('app.themeToLight')}
       style={{ padding: '6px 9px' }}>
       <span aria-hidden="true">{user.theme === 'light' ? '☾' : '☼'}</span>
     </button>

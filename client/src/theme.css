@@ -1282,3 +1282,8 @@ body { overscroll-behavior-y: none; }
     width: 44px; height: 44px; transform: translate(-50%, -50%);
   }
 }
+
+/* The NCERT Hindi term shown beside its English one. Subdued, because the
+   English is what the exam paper treats as final and what has to read first;
+   the gloss is support, not a replacement. */
+.gloss-hi { color: var(--ink-3); font-weight: 400; white-space: nowrap; }

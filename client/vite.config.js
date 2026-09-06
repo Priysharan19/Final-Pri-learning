@@ -54,6 +54,13 @@ const CHUNK_GROUPS = [
   { name: 'ink-model', test: /\/src\/ink\/model-data\.js$/, priority: 40 },
   { name: 'ink-personal', test: /\/src\/ink\/personal\.js$/, priority: 40 },
   { name: 'ink-engine', test: /\/src\/ink\/(recognizer|nn|rerank|rerank-data|classes|raster|features|templates|aug)\.js$/, priority: 40 },
+  // The Hindi catalogue and the NCERT term glossary get names of their own for
+  // the same reason the ink weights do: so the service worker can recognise
+  // them by name and leave them out of the install, and so the i18n contract
+  // suite can assert that it did. Only the data is split — i18n/index.js stays
+  // in the entry, because the runtime has to be there to decide a language.
+  { name: 'i18n-hi', test: /\/src\/i18n\/strings\.hi\.js$/, priority: 40 },
+  { name: 'i18n-terms', test: /\/src\/i18n\/ncertTerms\.js$/, priority: 40 },
   { name: 'vendor-react', test: /\/node_modules\/(react|react-dom|react-router|react-router-dom|scheduler)\//, priority: 30 },
   { name: 'vendor-katex', test: /\/node_modules\/katex\//, priority: 30 }
 ];
@@ -128,7 +135,22 @@ export const ON_DEMAND = [
   // out of step with the generator registry. The runtime rule keeps what it
   // pulled, so the student is offline-ready for their own year and carries none
   // of the other five.
-  [/(^|\/)(year(7|8|9|10|11|12)|streams-(standard|ext)|india-(algebra|calculus|class10|coordinate|foundation|junior-overlay|olympiad|senior))-[^/]*\.js$/, 'question bank for another year']
+  [/(^|\/)(year(7|8|9|10|11|12)|streams-(standard|ext)|india-(algebra|calculus|class10|coordinate|foundation|junior-overlay|olympiad|senior))-[^/]*\.js$/, 'question bank for another year'],
+
+  // A translation catalogue is the same argument in miniature. Every install
+  // would otherwise carry every language: an English reader paying to download
+  // Hindi, and a Hindi reader paying for every language added after. It is
+  // fetched the moment the language is switched and cached from then on, so a
+  // student who reads Hindi has it offline from their first switch onwards.
+  // The one case this shows is switching language while offline having never
+  // done it: the strings do not arrive, the app stays in English, and the
+  // choice is remembered so the next connected boot lands in Hindi — which
+  // i18n/index.js spells out where setLanguage swallows the failure.
+  [/(^|\/)i18n-hi-[^/]*\.js$/, 'Hindi string catalogue'],
+
+  // The NCERT term glossary is reached only when the term bridge is switched
+  // on, and is worth nothing to the install of a student who never does.
+  [/(^|\/)i18n-terms-[^/]*\.js$/, 'NCERT term glossary']
 ];
 
 // The faces the first screens genuinely paint in: the Latin Inter subset for

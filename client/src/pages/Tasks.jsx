@@ -9,9 +9,11 @@ import { useApp } from '../App.jsx';
 import { Ring } from '../components/Charts.jsx';
 import { readJSONFile } from '../lib/files.js';
 import { assignmentSections, defaultSectionKey, describeTaskTargets } from '../platform/assignmentTarget.js';
+import { useT } from '../i18n/index.js';
 
 export default function Tasks() {
   const { user, toast } = useApp();
+  const t = useT();
   const india = user?.course === 'in';
   const [tasks, setTasks] = useState(null);
   const [curriculum, setCurriculum] = useState(null);
@@ -44,7 +46,9 @@ export default function Tasks() {
     try {
       const data = await readJSONFile(f);
       const r = await api.post('/tasks/import-pack', data);
-      toast?.(<span>📦 Imported “{r.task.title}”{data.teacher ? ` from ${data.teacher}` : ''}</span>);
+      toast?.(<span>{data.teacher
+        ? t('tasks.importedFrom', { title: r.task.title, teacher: data.teacher })
+        : t('tasks.imported', { title: r.task.title })}</span>);
       load();
     } catch (err) { toast?.(<span>⚠️ {err.message}</span>); }
   }
@@ -52,10 +56,10 @@ export default function Tasks() {
   async function create() {
     const body = india
       ? {
-          title: form.title || 'My practice goal', count: form.count,
+          title: form.title || t('tasks.defaultName'), count: form.count,
           targets: form.chapters.map(id => ({ chapterId: id, dotpoint: soleChapter ? form.dotpoint : null, track: section?.track || user.indiaTrack || 'cbse', difficulty: form.difficulty }))
         }
-      : { title: form.title || 'My practice goal', subtopics: form.subtopics, count: form.count };
+      : { title: form.title || t('tasks.defaultName'), subtopics: form.subtopics, count: form.count };
     await api.post('/tasks', body);
     setCreating(false);
     setForm(f => ({ ...f, title: '', subtopics: [], chapters: [], dotpoint: null, difficulty: null, count: 10 }));
@@ -67,39 +71,39 @@ export default function Tasks() {
 
   return (
     <div className="grid" style={{ gap: 18 }}>
-      <h1 className="sr-only">Tasks</h1>
+      <h1 className="sr-only">{t('tasks.title')}</h1>
       <div className="spread" style={{ flexWrap: 'wrap', gap: 10 }}>
         <div>
-          <h2>Tasks</h2>
-          <p className="sub" style={{ marginTop: 3 }}>Assignments from your teacher on this device, plus goals you set yourself.</p>
+          <h2>{t('tasks.title')}</h2>
+          <p className="sub" style={{ marginTop: 3 }}>{t('tasks.sub')}</p>
         </div>
         <div className="row">
           {/* this was a <label> wrapping a display:none file input — clickable
               with a mouse, unreachable with a keyboard, because a hidden input
               is not focusable and a label is not a control */}
-          <button className="btn btn-ghost" onClick={() => packRef.current?.click()}>📦 Import task pack</button>
+          <button className="btn btn-ghost" onClick={() => packRef.current?.click()}>{t('tasks.importPack')}</button>
           <input ref={packRef} type="file" accept=".json,application/json" style={{ display: 'none' }} onChange={importPack} />
-          <button className="btn btn-primary" onClick={() => setCreating(c => !c)}>{creating ? 'Cancel' : '＋ Set myself a task'}</button>
+          <button className="btn btn-primary" onClick={() => setCreating(c => !c)}>{creating ? t('common.cancel') : t('tasks.setMyself')}</button>
         </div>
       </div>
 
       {creating && (
         <div className="card">
           <div className="field">
-            <label className="label" htmlFor="task-title">Task name</label>
-            <input className="input" id="task-title" value={form.title} placeholder={india ? 'e.g. Quadratics before the unit test' : 'e.g. Trig tune-up before Friday'}
+            <label className="label" htmlFor="task-title">{t('tasks.name')}</label>
+            <input className="input" id="task-title" value={form.title} placeholder={t(india ? 'tasks.namePlaceholderIndia' : 'tasks.namePlaceholder')}
               onChange={e => setForm(f => ({ ...f, title: e.target.value }))} />
           </div>
           {india ? (
             <>
               <div className="field" style={{ maxWidth: 360 }}>
-                <label className="label" htmlFor="task-section">Class / track</label>
+                <label className="label" htmlFor="task-section">{t('tasks.classOrTrack')}</label>
                 <select className="input" id="task-section" value={form.sectionKey} onChange={e => setForm(f => ({ ...f, sectionKey: e.target.value, dotpoint: null }))}>
                   {sections.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
                 </select>
               </div>
               <div className="field">
-                <div className="label" id="task-topics">Chapters ({form.chapters.length} selected)</div>
+                <div className="label" id="task-topics">{t('tasks.chaptersSelected', { n: form.chapters.length })}</div>
                 <div className="pill-select" role="group" aria-labelledby="task-topics">
                   {(section?.chapters || []).map(ch => (
                     <button key={ch.id} className={`pill-opt ${form.chapters.includes(ch.id) ? 'on' : ''}`} aria-pressed={form.chapters.includes(ch.id)}
@@ -111,9 +115,9 @@ export default function Tasks() {
               </div>
               {soleChapter && (
                 <div className="field">
-                  <div className="label" id="task-dotpoint">Dot point in {soleChapter.name}</div>
+                  <div className="label" id="task-dotpoint">{t('tasks.dotpointIn', { chapter: soleChapter.name })}</div>
                   <div className="pill-select" role="group" aria-labelledby="task-dotpoint">
-                    <button className={`pill-opt ${form.dotpoint == null ? 'on' : ''}`} aria-pressed={form.dotpoint == null} onClick={() => setForm(f => ({ ...f, dotpoint: null }))}>Whole chapter</button>
+                    <button className={`pill-opt ${form.dotpoint == null ? 'on' : ''}`} aria-pressed={form.dotpoint == null} onClick={() => setForm(f => ({ ...f, dotpoint: null }))}>{t('tasks.wholeChapter')}</button>
                     {soleChapter.dotpoints.map((text, i) => (
                       <button key={i} className={`pill-opt ${form.dotpoint === i ? 'on' : ''}`} aria-pressed={form.dotpoint === i} title={text}
                         onClick={() => setForm(f => ({ ...f, dotpoint: i }))}>{i + 1}. {text.length > 44 ? `${text.slice(0, 42)}…` : text}</button>
@@ -122,18 +126,18 @@ export default function Tasks() {
                 </div>
               )}
               <div className="field">
-                <div className="label" id="task-difficulty">Difficulty</div>
+                <div className="label" id="task-difficulty">{t('common.difficulty')}</div>
                 <div className="pill-select" role="group" aria-labelledby="task-difficulty">
                   {[null, ...Array.from({ length: section?.difficultyCeiling || 3 }, (_, i) => i + 1)].map(d => (
                     <button key={String(d)} className={`pill-opt ${form.difficulty === d ? 'on' : ''}`} aria-pressed={form.difficulty === d}
-                      onClick={() => setForm(f => ({ ...f, difficulty: d }))}>{d == null ? 'Adaptive' : `D${d}`}</button>
+                      onClick={() => setForm(f => ({ ...f, difficulty: d }))}>{d == null ? t('common.adaptive') : `D${d}`}</button>
                   ))}
                 </div>
               </div>
             </>
           ) : (
             <div className="field">
-              <div className="label" id="task-topics">Topics ({form.subtopics.length} selected)</div>
+              <div className="label" id="task-topics">{t('tasks.topicsSelected', { n: form.subtopics.length })}</div>
               <div className="pill-select" role="group" aria-labelledby="task-topics">
                 {mySubtopics.map(s => (
                   <button key={s.id} className={`pill-opt ${form.subtopics.includes(s.id) ? 'on' : ''}`}
@@ -145,37 +149,38 @@ export default function Tasks() {
             </div>
           )}
           <div className="field" style={{ maxWidth: 260 }}>
-            <label className="label" htmlFor="task-count">Questions — {form.count}</label>
+            <label className="label" htmlFor="task-count">{t('tasks.questionCount', { n: form.count })}</label>
             <input type="range" id="task-count" min="5" max="30" step="5" value={form.count} style={{ width: '100%', accentColor: 'var(--brand-1)' }}
               onChange={e => setForm(f => ({ ...f, count: Number(e.target.value) }))} />
           </div>
-          <button className="btn btn-primary" disabled={!canCreate} onClick={create}>Create task</button>
+          <button className="btn btn-primary" disabled={!canCreate} onClick={create}>{t('tasks.create')}</button>
         </div>
       )}
 
       <div className="card">
         {!tasks && <div className="skeleton" style={{ height: 120 }} />}
         {tasks && !tasks.length && (
-          <p className="muted">No tasks yet. A teacher profile on this device can assign them from Teacher Studio — or set yourself a goal above.</p>
+          <p className="muted">{t('tasks.empty')}</p>
         )}
-        {tasks && tasks.map(t => (
-          <div className="task-row" key={t.id}>
+        {tasks && tasks.map(task => (
+          <div className="task-row" key={task.id}>
             <div className="task-ring">
-              <Ring value={Math.min(t.done, t.count)} max={t.count} size={40}>
-                <span style={{ fontSize: 10, fontWeight: 700 }}>{Math.min(t.done, t.count)}</span>
+              <Ring value={Math.min(task.done, task.count)} max={task.count} size={40}>
+                <span style={{ fontSize: 10, fontWeight: 700 }}>{Math.min(task.done, task.count)}</span>
               </Ring>
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontWeight: 650 }}>{t.title} {t.finished && <span className="tag" style={{ color: 'var(--good)' }}>✓ done</span>}</div>
+              <div style={{ fontWeight: 650 }}>{task.title} {task.finished && <span className="tag" style={{ color: 'var(--good)' }}>{t('tasks.finished')}</span>}</div>
               <div className="muted" style={{ fontSize: 12.5 }}>
-                {t.className ? `From ${t.className} · ` : 'Personal · '}
-                {t.done}/{t.count} answered{t.done ? ` · ${Math.round(100 * t.correctCount / Math.max(1, t.done))}% correct` : ''}
-                {t.dueAt ? ` · due ${dueText(t.dueAt)}` : ''}
+                {task.className ? t('tasks.fromClass', { className: task.className }) : t('tasks.personal')}
+                {t('tasks.answeredOf', { done: task.done, count: task.count })}
+                {task.done ? t('tasks.percentCorrect', { n: Math.round(100 * task.correctCount / Math.max(1, task.done)) }) : ''}
+                {task.dueAt ? t('tasks.due', { date: dueText(task.dueAt) }) : ''}
               </div>
-              {t.targets?.length > 0 && <div className="muted" style={{ fontSize: 12.5 }}>{describeTaskTargets(t.targets)}</div>}
+              {task.targets?.length > 0 && <div className="muted" style={{ fontSize: 12.5 }}>{describeTaskTargets(task.targets)}</div>}
             </div>
-            {!t.finished && (
-              <button className="btn btn-ghost btn-sm" onClick={() => nav(`/practice?task=${t.id}`)}>Continue</button>
+            {!task.finished && (
+              <button className="btn btn-ghost btn-sm" onClick={() => nav(`/practice?task=${task.id}`)}>{t('common.continue')}</button>
             )}
           </div>
         ))}

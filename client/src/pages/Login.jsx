@@ -10,13 +10,17 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
 import { useApp, Logo } from '../App.jsx';
+import { LANGUAGES, rememberSignInLanguage, setLanguage, signInLanguage, useLanguage, useT, useTx } from '../i18n/index.js';
 
 const AVATARS = ['🚀', '🦊', '🐨', '🦉', '🌟', '🐯', '🍀', '🎧', '🦄', '⚡', '🌊', '🧠'];
 // The first thing a student chooses: what they are studying. Classes 7–12 are
 // the CBSE / NCERT track; JEE Main, JEE Advanced and olympiad are tracks of
 // their own with a class beneath them.
+// JEE Main, JEE Advanced and the olympiad names are printed in Latin on the
+// Hindi-medium admit card too, so they are the label in both languages and are
+// not catalogue entries. Only "Class {n}" is a phrase that has to translate.
 const STUDY = [
-  ...[7, 8, 9, 10, 11, 12].map(y => ({ key: String(y), label: `Class ${y}`, year: y, track: 'cbse' })),
+  ...[7, 8, 9, 10, 11, 12].map(y => ({ key: String(y), classOf: y, year: y, track: 'cbse' })),
   { key: 'jee-main', label: 'JEE Main', year: 12, track: 'jee-main' },
   { key: 'jee-advanced', label: 'JEE Advanced', year: 12, track: 'jee-advanced' },
   { key: 'olympiad', label: 'Olympiad (IOQM · RMO · INMO)', year: 10, track: 'olympiad' }
@@ -87,36 +91,40 @@ const isRun = (s) => RUNS.some(run => run.includes(s) || [...run].reverse().join
  * The verdict behind the strength meter. `ok` is the same gate the submit
  * button uses, so the meter can never call something strong that the profile
  * store will turn away.
+ *
+ * It returns catalogue keys rather than sentences. This function is a pure
+ * rule, called from two components and from a plain event handler, and it has
+ * no hook to reach a translator with — so the language is decided by whoever
+ * renders the verdict, which is the only place that knows.
  */
 export function passwordVerdict(raw, { name = '', email = '' } = {}) {
   const pw = String(raw || '');
-  if (!pw) return { score: 0, label: '', note: `At least ${MIN_PASSWORD} characters.`, ok: false };
+  const weak = (noteKey, noteVars) => ({ score: 0, labelKey: 'pw.tooEasy', noteKey, noteVars, ok: false });
+  if (!pw) return { score: 0, labelKey: null, noteKey: 'pw.atLeast', noteVars: { min: MIN_PASSWORD }, ok: false };
   if (pw.length < MIN_PASSWORD) {
     const missing = MIN_PASSWORD - pw.length;
-    return { score: 0, label: 'Too short', note: `${missing} more character${missing === 1 ? '' : 's'} to go.`, ok: false };
+    return { score: 0, labelKey: 'pw.tooShort', noteKey: 'pw.charsToGo', noteVars: { count: missing, n: missing }, ok: false };
   }
   const flat = pw.toLowerCase();
-  if (OBVIOUS.has(flat)) return { score: 0, label: 'Too easy to guess', note: 'One of the first values anyone tries.', ok: false };
-  if (/^(.)\1+$/.test(pw)) return { score: 0, label: 'Too easy to guess', note: 'A single character repeated is a single guess.', ok: false };
-  if (isRun(flat)) return { score: 0, label: 'Too easy to guess', note: 'That is a straight run across the keyboard.', ok: false };
+  if (OBVIOUS.has(flat)) return weak('pw.firstTried');
+  if (/^(.)\1+$/.test(pw)) return weak('pw.oneCharRepeated');
+  if (isRun(flat)) return weak('pw.keyboardRun');
   const mine = [name, String(email).split('@')[0]].map(s => String(s).trim().toLowerCase()).filter(s => s.length >= 3);
-  if (mine.some(s => flat.includes(s) || s.includes(flat))) {
-    return { score: 0, label: 'Too easy to guess', note: 'Anyone looking at the profile list can already read this.', ok: false };
-  }
+  if (mine.some(s => flat.includes(s) || s.includes(flat))) return weak('pw.readableFromList');
   const variety = [/[a-z]/, /[A-Z]/, /\d/, /[^A-Za-z0-9]/].filter(re => re.test(pw)).length;
   const score = Math.min(3, (pw.length >= 16 ? 3 : pw.length >= 12 ? 2 : 1) + (variety >= 3 ? 1 : 0));
   return {
     score,
-    label: ['', 'Fair', 'Good', 'Strong'][score],
-    note: score >= 3 ? 'Long and varied — this one holds up.'
-      : score === 2 ? 'Solid. A few more characters would make it stronger still.'
-        : 'Past the minimum. Extra length buys more than extra symbols do.',
+    labelKey: [null, 'pw.fair', 'pw.good', 'pw.strong'][score],
+    noteKey: score >= 3 ? 'pw.holdsUp' : score === 2 ? 'pw.solid' : 'pw.pastMinimum',
+    noteVars: undefined,
     ok: true
   };
 }
 
 /** Live read-out for a password field: a bar, a word, and what to do next. */
 export function PasswordMeter({ verdict }) {
+  const t = useT();
   const pct = verdict.ok ? [0, 45, 74, 100][verdict.score] : 10;
   const tone = !verdict.ok ? 'var(--bad)'
     : verdict.score >= 3 ? 'var(--good)'
@@ -125,7 +133,7 @@ export function PasswordMeter({ verdict }) {
     <div style={{ marginTop: 10 }}>
       <div className="meter" aria-hidden="true"><i style={{ width: `${pct}%`, background: tone }} /></div>
       <p className="muted" role="status" style={{ marginTop: 6, fontSize: 12.5 }}>
-        {verdict.label && <><b style={{ color: tone }}>{verdict.label}</b> — </>}{verdict.note}
+        {verdict.labelKey && <><b style={{ color: tone }}>{t(verdict.labelKey)}</b> — </>}{t(verdict.noteKey, verdict.noteVars)}
       </p>
     </div>
   );
@@ -158,18 +166,50 @@ function lockDeadline(err) {
   return spoken ? Date.now() + Number(spoken[1]) * WAIT_UNIT[spoken[2].toLowerCase()] : 0;
 }
 
-function fmtWait(ms) {
+// Takes the translator rather than reaching for one: it is a plain function,
+// and a plain function that reads a language it did not receive is a plain
+// function that goes stale the moment the language changes.
+function fmtWait(ms, t) {
   const secs = Math.max(1, Math.ceil(ms / 1000));
-  if (secs < 60) return `${secs} second${secs === 1 ? '' : 's'}`;
+  if (secs < 60) return t('time.seconds', { count: secs, n: secs });
   const mins = Math.ceil(secs / 60);
-  if (mins < 60) return `${mins} minute${mins === 1 ? '' : 's'}`;
+  if (mins < 60) return t('time.minutes', { count: mins, n: mins });
   const hours = Math.ceil(mins / 60);
-  return `${hours} hour${hours === 1 ? '' : 's'}`;
+  return t('time.hours', { count: hours, n: hours });
+}
+
+/**
+ * The one language control that exists before a profile does.
+ *
+ * Without it a Hindi-medium student meets this product in English every single
+ * time they open it, because the only other switch lives on a profile they have
+ * not made yet. The choice made here is remembered for the device and governs
+ * this screen only — the moment a profile is opened, that profile's own
+ * language takes over, so nothing here leaks between two students sharing an
+ * iPad. Each name is written in its own script, so a Hindi reader can find
+ * Hindi whatever the screen currently says.
+ */
+function LanguagePicker() {
+  const { chosen, t } = useLanguage();
+  const pick = (id) => { rememberSignInLanguage(id); setLanguage(id); };
+  return (
+    <div className="row" style={{ justifyContent: 'center', gap: 8, marginTop: 18 }}
+      role="group" aria-label={t('login.chooseLanguage')}>
+      {LANGUAGES.map(l => (
+        <button key={l.id} type="button" className={`pill-opt ${chosen === l.id ? 'on' : ''}`}
+          lang={l.htmlLang} aria-pressed={chosen === l.id}
+          aria-label={t('lang.switchTo', { language: l.english })}
+          onClick={() => pick(l.id)}>{l.label}</button>
+      ))}
+    </div>
+  );
 }
 
 export default function Login() {
   const { setUser, refreshDue } = useApp();
   const nav = useNavigate();
+  const t = useT();
+  const tx = useTx();
   const [profiles, setProfiles] = useState(null);
   const [stage, setStage] = useState('hero');   // hero | pick | method | create
   const [withEmail, setWithEmail] = useState(true);
@@ -260,11 +300,14 @@ export default function Login() {
 
   const create = () => {
     if (form.protect) {
-      if (!pwVerdict.ok) { setError(pwVerdict.note); return; }
-      if (form.password !== form.password2) { setError('Those passwords don’t match.'); return; }
+      if (!pwVerdict.ok) { setError(t(pwVerdict.noteKey, pwVerdict.noteVars)); return; }
+      if (form.password !== form.password2) { setError(t('settings.passwordsDontMatch')); return; }
     }
     go('/profiles', {
       name: form.name, year: form.year, avatar: form.avatar, role: form.role,
+      // The new profile keeps the language this screen was read in, so a
+      // student who chose Hindi to sign up does not land on a Home in English.
+      language: signInLanguage(),
       course: form.course, pathway: form.course === 'nsw' ? form.pathway : undefined, indiaTrack: form.course === 'in' ? form.indiaTrack : undefined,
       email: withEmail && form.email ? form.email : undefined,
       password: form.protect ? form.password : undefined
@@ -273,13 +316,12 @@ export default function Login() {
 
   const cloudNote = cloudIntent && (
     <p className="muted cloud-intent" role="status" style={{ fontSize: 12.5, marginBottom: 12 }}>
-      <b>Pri cloud account</b> — first open or create the profile on this device that the account will sync.
-      You’ll land in Account settings to sign in.
+      {t('login.cloudIntent')}
     </p>
   );
   const cloudLink = !cloudIntent && (
     <div style={{ textAlign: 'center', marginTop: 10 }}>
-      <button className="linklike" disabled={busy} onClick={cloudSignIn}>Sign in to your Pri cloud account</button>
+      <button className="linklike" disabled={busy} onClick={cloudSignIn}>{t('login.cloudSignIn')}</button>
     </div>
   );
 
@@ -291,23 +333,26 @@ export default function Login() {
         <div className="auth-col fade-in">
           <Logo large />
           <div className="hero-kicker">CBSE · NCERT · JEE MAIN · JEE ADVANCED · OLYMPIAD</div>
-          <h1 className="hero-title">Write it by hand.<br />Get every step <span className="gold">marked</span>.</h1>
-          <p className="hero-sub">Maths for NCERT Classes 7–12, JEE Main &amp; Advanced and olympiad — questions generated on your
-            device, your working marked line by line, with worked solutions. Works offline.</p>
+          {/* The gold word is a slot, not a tail fragment: Hindi puts the verb
+              last, so "marked" cannot be the last word of the sentence there. */}
+          <h1 className="hero-title">{tx('login.heroTitle', {
+            br: <br />,
+            marked: <span className="gold">{t('login.heroMarked')}</span>
+          })}</h1>
+          <p className="hero-sub">{t('login.heroSub')}</p>
           <div className="row" style={{ marginTop: 34 }}>
-            <button className="btn btn-primary btn-lg btn-glow" onClick={enter}>Get Started</button>
+            <button className="btn btn-primary btn-lg btn-glow" onClick={enter}>{t('login.getStarted')}</button>
           </div>
-          <p className="muted" style={{ marginTop: 26, textAlign: 'center' }}>
-            Offline-first and private: profiles, progress and handwriting stay on this device. A Pri cloud account is optional. No ads.
-          </p>
+          <p className="muted" style={{ marginTop: 26, textAlign: 'center' }}>{t('login.heroPrivacy')}</p>
           <div style={{ textAlign: 'center', marginTop: 10 }}>
-            <button className="linklike" onClick={cloudSignIn}>Sign in to your Pri cloud account</button>
+            <button className="linklike" onClick={cloudSignIn}>{t('login.cloudSignIn')}</button>
           </div>
+          <LanguagePicker />
           {/* A store reviewer, a payment provider and a parent all look for
               these, and each is required of us before the app can be sold. */}
           <p className="muted" style={{ marginTop: 22, textAlign: 'center', fontSize: 12.5 }}>
-            <Link to="/privacy">Privacy</Link> · <Link to="/terms">Terms</Link> ·{' '}
-            <Link to="/refund-policy">Refunds</Link> · <Link to="/grievance">Grievances</Link>
+            <Link to="/privacy">{t('login.privacy')}</Link> · <Link to="/terms">{t('login.terms')}</Link> ·{' '}
+            <Link to="/refund-policy">{t('login.refunds')}</Link> · <Link to="/grievance">{t('login.grievances')}</Link>
           </p>
         </div>
       </div>
@@ -324,29 +369,30 @@ export default function Login() {
               mouse-only route back to the welcome screen. It is a real button
               on the wordmark now, drawn with no chrome of its own. */}
           <button type="button" onClick={() => setStage('hero')}
-            aria-label="Back to the Pri Learning welcome screen"
+            aria-label={t('login.backToWelcome')}
             style={{ display: 'block', background: 'none', border: 'none', padding: 0, margin: 0, font: 'inherit', color: 'inherit', cursor: 'pointer' }}>
             <Logo large />
           </button>
-          <div className="hero-kicker" style={{ marginTop: 14 }}>Classes 7–12 · JEE · Olympiad</div>
+          <div className="hero-kicker" style={{ marginTop: 14 }}>{t('login.brandKicker')}</div>
           <div className="auth-points">
-            <div className="auth-point"><span className="auth-tick">✓</span>Generated questions across NCERT Classes 7–12, JEE Main &amp; Advanced and olympiad topics</div>
-            <div className="auth-point"><span className="auth-tick">✓</span>Handwritten working marked line by line</div>
-            <div className="auth-point"><span className="auth-tick">✓</span>An engine that learns exactly how you write</div>
-            <div className="auth-point"><span className="auth-tick">✓</span>Offline-first — your work stays on this device unless you choose cloud sync</div>
+            <div className="auth-point"><span className="auth-tick">✓</span>{t('login.point1')}</div>
+            <div className="auth-point"><span className="auth-tick">✓</span>{t('login.point2')}</div>
+            <div className="auth-point"><span className="auth-tick">✓</span>{t('login.point3')}</div>
+            <div className="auth-point"><span className="auth-tick">✓</span>{t('login.point4')}</div>
           </div>
+          <LanguagePicker />
         </div>
 
         <div className="auth-panel">
           {/* Each stage draws its own title as an <h2> sized for its card, so the
               page's one heading is spoken rather than drawn. */}
           <h1 className="sr-only">
-            {stage === 'pick' ? 'Choose a profile' : stage === 'method' ? 'Add a profile to this device' : 'Create a profile'}
+            {t(stage === 'pick' ? 'login.h1Pick' : stage === 'method' ? 'login.h1Method' : 'login.h1Create')}
           </h1>
           {stage === 'pick' && (
             <div className="card auth-card slide-up">
-              <h2 style={{ marginBottom: 4 }}>Who’s practising?</h2>
-              <p className="sub" style={{ marginBottom: 16 }}>Pick your profile to continue.</p>
+              <h2 style={{ marginBottom: 4 }}>{t('login.whosPractising')}</h2>
+              <p className="sub" style={{ marginBottom: 16 }}>{t('login.pickToContinue')}</p>
               {cloudNote}
               {error && <div className="error-box" style={{ marginBottom: 12 }}>{error}</div>}
               <div className="acct-list">
@@ -359,23 +405,23 @@ export default function Login() {
                         <span className="acct-main">
                           <span className="acct-name">{p.name}</span>
                           <span className="acct-sub">
-                            {p.role === 'teacher' ? 'Teacher' : `${p.course === 'in' ? 'Class' : 'Year'} ${p.year}`}
-                            {p.email ? ` · ${p.email}` : ''}{p.isDemo ? ' · demo' : ''}
+                            {p.role === 'teacher' ? t('login.teacher') : t(p.course === 'in' ? 'common.classNumber' : 'common.yearNumber', { n: p.year })}
+                            {p.email ? ` · ${p.email}` : ''}{p.isDemo ? t('login.demoSuffix') : ''}
                           </span>
                         </span>
-                        {p.hasPassword && <span className="acct-lock" role="img" aria-label="Password protected">{Marks.lock}</span>}
+                        {p.hasPassword && <span className="acct-lock" role="img" aria-label={t('login.passwordProtected')}>{Marks.lock}</span>}
                         <span className="acct-go" aria-hidden="true">→</span>
                       </button>
                       {unlockId === p.id && p.hasPassword && (
                         <>
                           <form className="acct-unlock" onSubmit={e => { e.preventDefault(); if (!shut) go('/profiles/select', { id: p.id, password: unlockPw }); }}>
-                            <input className="input" type="password" placeholder="Password" autoFocus value={unlockPw} disabled={shut}
-                              aria-label={`Password for ${p.name}`} onChange={e => setUnlockPw(e.target.value)} />
-                            <button className="btn btn-primary btn-sm" disabled={busy || shut || !unlockPw} type="submit">Unlock</button>
+                            <input className="input" type="password" placeholder={t('login.password')} autoFocus value={unlockPw} disabled={shut}
+                              aria-label={t('login.passwordFor', { name: p.name })} onChange={e => setUnlockPw(e.target.value)} />
+                            <button className="btn btn-primary btn-sm" disabled={busy || shut || !unlockPw} type="submit">{t('login.unlock')}</button>
                           </form>
                           {shut && (
                             <p className="muted" role="status" style={{ padding: '0 13px 12px', margin: 0, fontSize: 12.5 }}>
-                              Locked for another {fmtWait(lockedFor)}.
+                              {t('login.lockedForAnother', { wait: fmtWait(lockedFor, t) })}
                             </p>
                           )}
                         </>
@@ -385,11 +431,11 @@ export default function Login() {
                 })}
               </div>
               <button className="btn btn-ghost" style={{ width: '100%', marginTop: 14 }} disabled={busy} onClick={() => { setError(''); setStage('method'); }}>
-                ＋ Add another profile
+                {t('login.addAnother')}
               </button>
               <div style={{ textAlign: 'center', marginTop: 10 }}>
                 <button className="linklike" disabled={busy} onClick={() => go('/profiles/demo', {})}>
-                  Try the demo — a Class 10 student with six weeks of progress, ready to explore
+                  {t('login.tryDemoIndia')}
                 </button>
               </div>
               {cloudLink}
@@ -400,37 +446,28 @@ export default function Login() {
             <div className="card auth-card slide-up">
               <div className="row" style={{ gap: 10, marginBottom: 6 }}>
                 <span className="prov-badge lg">{Marks.device}</span>
-                <h2 style={{ margin: 0 }}>A private profile on this device</h2>
+                <h2 style={{ margin: 0 }}>{t('login.privateProfile')}</h2>
               </div>
-              <p className="sub" style={{ marginBottom: 18 }}>
-                A profile is a record on this device — no account is registered by making one. Choose how it
-                should be labelled; everything after that works the same either way.
-              </p>
+              <p className="sub" style={{ marginBottom: 18 }}>{t('login.methodSub')}</p>
               {cloudNote}
               {error && <div className="error-box" style={{ marginBottom: 12 }}>{error}</div>}
               <button className="sso-btn sso-email" disabled={busy} onClick={() => startCreate(true)}>
-                <span>Continue with email</span>
+                <span>{t('login.continueWithEmail')}</span>
               </button>
-              <div className="sso-or"><i />or<i /></div>
+              <div className="sso-or"><i />{t('login.or')}<i /></div>
               <button className="sso-btn sso-email" disabled={busy} onClick={() => startCreate(false)}>
-                <span>Continue without an email</span>
+                <span>{t('login.continueWithoutEmail')}</span>
               </button>
-              <p className="auth-note">
-                A profile lives on <b>this device</b>. An address, if you give one, only tells profiles apart
-                here — it is never verified and never sent anywhere. Syncing to a Pri cloud account is a
-                separate, optional step in Settings.
-              </p>
+              <p className="auth-note">{t('login.methodNote')}</p>
               {profiles?.length > 0 && (
-                <button className="btn btn-quiet btn-sm" style={{ width: '100%', marginTop: 6 }} onClick={() => { setError(''); setStage('pick'); }}>← Back to profiles</button>
+                <button className="btn btn-quiet btn-sm" style={{ width: '100%', marginTop: 6 }} onClick={() => { setError(''); setStage('pick'); }}>{t('login.backToProfiles')}</button>
               )}
               {!profiles?.length && (
                 <div style={{ textAlign: 'center', marginTop: 12 }}>
                   {/* A visitor who has opened the Australian syllabuses should
                       see the Australian demo, not an NCERT one. */}
                   <button className="linklike" disabled={busy} onClick={() => go('/profiles/demo', australia ? { course: 'nsw' } : {})}>
-                    {australia
-                      ? 'Or try the demo first — a Year 10 student with six weeks of progress'
-                      : 'Or try the demo first — a Class 10 student with six weeks of progress'}
+                    {t(australia ? 'login.orTryDemoAustralia' : 'login.orTryDemoIndia')}
                   </button>
                 </div>
               )}
@@ -442,36 +479,33 @@ export default function Login() {
             <div className="card auth-card slide-up">
               <div className="row" style={{ gap: 10, marginBottom: 6 }}>
                 <span className="prov-badge lg">{Marks.device}</span>
-                <h2 style={{ margin: 0 }}>A private profile on this device</h2>
+                <h2 style={{ margin: 0 }}>{t('login.privateProfile')}</h2>
               </div>
-              <p className="sub" style={{ marginBottom: 14 }}>
-                Your name, your work and the handwriting model that learns your hand live in this device’s
-                storage — and all of it runs with the Wi-Fi off.
-              </p>
+              <p className="sub" style={{ marginBottom: 14 }}>{t('login.createSub')}</p>
               {cloudNote}
               {error && <div className="error-box" style={{ marginBottom: 12 }}>{error}</div>}
 
               <div className="field">
-                <label className="label" htmlFor="signup-name">Name</label>
-                <input className="input" id="signup-name" value={form.name} autoFocus placeholder="e.g. Priysharan"
+                <label className="label" htmlFor="signup-name">{t('settings.name')}</label>
+                <input className="input" id="signup-name" value={form.name} autoFocus placeholder={t('login.namePlaceholder')}
                   onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
               </div>
               {withEmail && (
                 <div className="field">
-                  <label className="label" htmlFor="signup-email">Email <span className="muted">(optional)</span></label>
+                  <label className="label" htmlFor="signup-email">{t('settings.email')} <span className="muted">{t('login.optional')}</span></label>
                   <input className="input" id="signup-email" type="email" value={form.email} placeholder="you@example.com"
                     onChange={e => setForm(f => ({ ...f, email: e.target.value }))} />
                   <p className="muted" style={{ marginTop: 6, fontSize: 12.5 }}>
-                    Only to tell profiles apart on this device — never verified, never sent.
+                    {t('login.emailNote')}
                   </p>
                 </div>
               )}
 
               <div className="field">
-                <div className="label" id="signup-role">I am a…</div>
+                <div className="label" id="signup-role">{t('login.iAmA')}</div>
                 <div className="pill-select" role="group" aria-labelledby="signup-role">
-                  <button className={`pill-opt ${form.role === 'student' ? 'on' : ''}`} onClick={() => setForm(f => ({ ...f, role: 'student' }))}>Student</button>
-                  <button className={`pill-opt ${form.role === 'teacher' ? 'on' : ''}`} onClick={() => setForm(f => ({ ...f, role: 'teacher' }))}>Teacher</button>
+                  <button className={`pill-opt ${form.role === 'student' ? 'on' : ''}`} onClick={() => setForm(f => ({ ...f, role: 'student' }))}>{t('login.student')}</button>
+                  <button className={`pill-opt ${form.role === 'teacher' ? 'on' : ''}`} onClick={() => setForm(f => ({ ...f, role: 'teacher' }))}>{t('login.teacher')}</button>
                 </div>
               </div>
 
@@ -480,15 +514,15 @@ export default function Login() {
                   Australian syllabuses are a step away, folded up. */}
               {form.role === 'student' && !australia && (
                 <div className="field">
-                  <label className="label" htmlFor="signup-track">I’m studying</label>
+                  <label className="label" htmlFor="signup-track">{t('login.imStudying')}</label>
                   <select className="input" id="signup-track" value={form.study} onChange={e => chooseStudy(e.target.value)}>
-                    {STUDY.map(o => <option key={o.key} value={o.key}>{o.label}</option>)}
+                    {STUDY.map(o => <option key={o.key} value={o.key}>{o.label || t('common.classNumber', { n: o.classOf })}</option>)}
                   </select>
                   {form.indiaTrack !== 'cbse' && (
                     <div style={{ marginTop: 10 }}>
-                      <label className="label" htmlFor="signup-year">Class</label>
+                      <label className="label" htmlFor="signup-year">{t('common.class')}</label>
                       <select className="input" id="signup-year" value={form.year} onChange={e => setForm(f => ({ ...f, year: Number(e.target.value) }))}>
-                        {(form.indiaTrack === 'olympiad' ? [7, 8, 9, 10, 11, 12] : [11, 12]).map(y => <option key={y} value={y}>Class {y}</option>)}
+                        {(form.indiaTrack === 'olympiad' ? [7, 8, 9, 10, 11, 12] : [11, 12]).map(y => <option key={y} value={y}>{t('common.classNumber', { n: y })}</option>)}
                       </select>
                     </div>
                   )}
@@ -496,20 +530,20 @@ export default function Login() {
               )}
               {form.role === 'student' && !australia && (
                 <div className="field" style={{ marginTop: -4 }}>
-                  <button type="button" className="linklike" onClick={openAustralia}>Studying in Australia? Choose an Australian syllabus</button>
+                  <button type="button" className="linklike" onClick={openAustralia}>{t('login.studyingInAustralia')}</button>
                 </div>
               )}
               {form.role === 'student' && australia && (
                 <>
                   <div className="grid cols-2" style={{ gap: 12 }}>
                     <div className="field">
-                      <label className="label" htmlFor="signup-year">School year</label>
+                      <label className="label" htmlFor="signup-year">{t('settings.schoolYear')}</label>
                       <select className="input" id="signup-year" value={form.year} onChange={e => setForm(f => ({ ...f, year: Number(e.target.value) }))}>
-                        {[7, 8, 9, 10, 11, 12].map(y => <option key={y} value={y}>Year {y}</option>)}
+                        {[7, 8, 9, 10, 11, 12].map(y => <option key={y} value={y}>{t('common.yearNumber', { n: y })}</option>)}
                       </select>
                     </div>
                     <div className="field">
-                      <label className="label" htmlFor="signup-course">Syllabus</label>
+                      <label className="label" htmlFor="signup-course">{t('settings.syllabus')}</label>
                       <select className="input" id="signup-course" value={form.course} onChange={e => setForm(f => ({ ...f, course: e.target.value }))}>
                         {AU_COURSES.map(([k, name]) => <option key={k} value={k}>{name}</option>)}
                       </select>
@@ -517,7 +551,7 @@ export default function Login() {
                   </div>
                   {form.course === 'nsw' && form.year >= 11 && (
                     <div className="field">
-                      <div className="label" id="signup-pathway">HSC pathway</div>
+                      <div className="label" id="signup-pathway">{t('settings.hscPathway')}</div>
                       <div className="pathway-row" role="group" aria-labelledby="signup-pathway">
                         {[['standard', 'Standard'], ['advanced', 'Advanced'], ['ext1', 'Extension 1'], ['ext2', 'Extension 2']]
                           .filter(([k]) => k !== 'ext2' || form.year === 12)
@@ -531,22 +565,22 @@ export default function Login() {
                     </div>
                   )}
                   <div className="field" style={{ marginTop: -4 }}>
-                    <button type="button" className="linklike" onClick={closeAustralia}>← Back to Indian classes and tracks</button>
+                    <button type="button" className="linklike" onClick={closeAustralia}>{t('login.backToIndian')}</button>
                     {/* A visitor who has chosen an Australian syllabus should be
                         able to try the Australian demo, not an NCERT one. */}
                     <div style={{ marginTop: 8 }}>
                       <button type="button" className="linklike" disabled={busy} onClick={() => go('/profiles/demo', { course: 'nsw' })}>
-                        Try the Australian demo — a Year 10 student with six weeks of progress
+                        {t('login.tryAustralianDemo')}
                       </button>
                     </div>
                   </div>
                 </>
               )}
               <div className="field">
-                <div className="label" id="signup-avatar">Avatar</div>
+                <div className="label" id="signup-avatar">{t('settings.avatar')}</div>
                 <div className="avatar-row" role="group" aria-labelledby="signup-avatar">
                   {AVATARS.map(a => (
-                    <button key={a} className={`avatar-pick ${form.avatar === a ? 'on' : ''}`} aria-label={`Avatar ${a}`} onClick={() => setForm(f => ({ ...f, avatar: a }))}>{a}</button>
+                    <button key={a} className={`avatar-pick ${form.avatar === a ? 'on' : ''}`} aria-label={t('settings.avatarPick', { emoji: a })} onClick={() => setForm(f => ({ ...f, avatar: a }))}>{a}</button>
                   ))}
                 </div>
               </div>
@@ -554,14 +588,14 @@ export default function Login() {
               <div className="field">
                 <label className="check-row">
                   <input type="checkbox" checked={form.protect} onChange={e => setForm(f => ({ ...f, protect: e.target.checked }))} />
-                  <span>Protect this profile with a password</span>
+                  <span>{t('login.protectWithPassword')}</span>
                 </label>
                 {form.protect && (
                   <>
                     <div className="grid cols-2" style={{ gap: 12, marginTop: 10 }}>
-                      <input className="input" id="signup-password" type="password" placeholder="Password" value={form.password} aria-label="Password"
+                      <input className="input" id="signup-password" type="password" placeholder={t('login.password')} value={form.password} aria-label={t('login.password')}
                         onChange={e => setForm(f => ({ ...f, password: e.target.value }))} />
-                      <input className="input" id="signup-password2" type="password" placeholder="Repeat password" value={form.password2} aria-label="Repeat password"
+                      <input className="input" id="signup-password2" type="password" placeholder={t('login.repeatPassword')} value={form.password2} aria-label={t('login.repeatPassword')}
                         onChange={e => setForm(f => ({ ...f, password2: e.target.value }))} />
                     </div>
                     <PasswordMeter verdict={pwVerdict} />
@@ -573,25 +607,16 @@ export default function Login() {
                 <button className="btn btn-primary btn-lg" style={{ flex: 1 }}
                   disabled={busy || !form.name.trim() || (form.protect && !pwVerdict.ok)}
                   onClick={create}>
-                  {busy ? 'One moment…' : 'Start learning'}
+                  {t(busy ? 'login.oneMoment' : 'login.startLearning')}
                 </button>
-                <button className="btn btn-quiet" onClick={() => { setError(''); setStage('method'); }}>Back</button>
+                <button className="btn btn-quiet" onClick={() => { setError(''); setStage('method'); }}>{t('login.back')}</button>
               </div>
 
-              <p className="auth-note">
-                No verification email, no reset link, no one to ask: a profile is a record on
-                <b> this device</b> and nowhere else. A password keeps it to yourself — stored as a salted
-                hash in the device’s own storage, never uploaded, and only you can lift it. Want your
-                progress on more than one device? Sign in to a Pri cloud account from Settings once the
-                profile exists.
-              </p>
+              <p className="auth-note">{t('login.createNote')}</p>
             </div>
           )}
 
-          <p className="muted auth-foot">
-            Offline-first: profiles, progress and handwriting live in this device’s storage and work with no connection.
-            Nothing leaves the device unless you sign in to a Pri cloud account. No ads.
-          </p>
+          <p className="muted auth-foot">{t('login.authFoot')}</p>
         </div>
       </div>
     </div>

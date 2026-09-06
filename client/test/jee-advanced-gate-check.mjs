@@ -37,7 +37,7 @@ const { ENTITLEMENTS } = await import('../src/platform/entitlements.js');
 const idb = await import('../src/local/idb.js');
 // This suite talks to dispatch() directly, so it loads the question banks the
 // way src/api.js does before a request reaches the backend.
-const { loadAllBanks } = await import('../src/engine/generators/index.js');
+const { loadAllBanks, loadBanks } = await import('../src/engine/generators/index.js');
 await loadAllBanks();
 
 const DAY = 86_400_000;
@@ -52,8 +52,30 @@ const ok = (name, condition, detail = '') => {
   return false;
 };
 
-const POST = (path, body = {}) => dispatch('POST', path, body);
-const GET = path => dispatch('GET', path);
+/**
+ * dispatch() is the backend, which sits BELOW the layer that owns lazy question
+ * banks. When a target resolves into the previous-year archive — a chapter that
+ * has a real past paper behind it — the bank is a separate chunk and the
+ * backend throws `bankMissing` rather than reaching for it. api.js catches
+ * exactly that and retries after loading (see its MAX_BANK_FAULTS loop), so a
+ * student never sees it; a suite calling dispatch() directly would.
+ *
+ * Mirrored here rather than routed through api.js, because what this suite is
+ * about is the entitlement gate, and api.js would drag a request pipeline,
+ * profile mutation recording and the sync outbox into a test about who may
+ * practise what.
+ */
+const withBanks = async (run) => {
+  for (let faults = 0; ; faults += 1) {
+    try { return await run(); }
+    catch (err) {
+      if (!err?.bankMissing || faults >= 4) throw err;
+      await loadBanks([err.bank]);
+    }
+  }
+};
+const POST = (path, body = {}) => withBanks(() => dispatch('POST', path, body));
+const GET = path => withBanks(() => dispatch('GET', path));
 
 /** The call must come back as the Premium paywall for this exact capability. */
 async function refused(name, promise) {

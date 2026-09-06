@@ -25,9 +25,22 @@ for (const source of grade10.chapters) {
   }
 }
 const home = readFileSync(new URL('../src/pages/Home.jsx', import.meta.url), 'utf8');
+// The "coming soon" copy moved into the translation catalogue when the app
+// became bilingual, so Home now names it by key. Both halves are still checked
+// — Home renders the marker, and the marker still says what it said — because a
+// student who is shown a topic the app cannot generate is the failure this
+// guards against, in Hindi exactly as much as in English.
+const strings = {
+  en: readFileSync(new URL('../src/i18n/strings.en.js', import.meta.url), 'utf8'),
+  hi: readFileSync(new URL('../src/i18n/strings.hi.js', import.meta.url), 'utf8')
+};
 assert.ok(home.includes("from '../engine/curriculumAvailability.js'"));
-assert.ok(home.includes('Coming soon'), 'incomplete curriculum outside reviewed Class X must still fail closed');
-assert.ok(home.includes('Question forms coming soon'));
+assert.ok(home.includes("t('home.comingSoon')") && strings.en.includes("'home.comingSoon': ' · Coming soon'"),
+  'incomplete curriculum outside reviewed Class X must still fail closed');
+assert.ok(home.includes("t('home.formsComingSoon')") && strings.en.includes("'home.formsComingSoon': ' · Question forms coming soon'"));
+for (const key of ['home.comingSoon', 'home.formsComingSoon', 'home.topicComingSoon', 'home.dotpointComingSoon']) {
+  assert.ok(strings.hi.includes(`'${key}':`), `${key} is translated, so a Hindi reader is warned too`);
+}
 assert.ok(home.includes('disabled={!available}'));
 assert.ok(home.includes('disabled={impossibleTarget}'));
 console.log('PASS — every current Class X target is selectable while incomplete curriculum elsewhere still fails closed.');

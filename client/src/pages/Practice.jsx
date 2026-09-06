@@ -1,5 +1,6 @@
 import React from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { useT } from '../i18n/index.js';
 
 // Practice is one of the heaviest product surfaces: handwriting, the maths
 // workspace and source-audited curriculum shells are irrelevant to Home/Login/
@@ -13,9 +14,10 @@ const NcertClass9ChapterSection = React.lazy(() => import('../components/NcertCl
 const InkPhysicalEvidenceSession = React.lazy(() => import('../components/InkPhysicalEvidenceSession.jsx'));
 
 function LoadingPractice({ physical = false }) {
+  const t = useT();
   return (
     <p className="muted" role="status" aria-live="polite">
-      {physical ? 'Loading physical Pencil evidence session…' : 'Loading practice workspace…'}
+      {t(physical ? 'practice.loadingPhysical' : 'practice.loading')}
     </p>
   );
 }

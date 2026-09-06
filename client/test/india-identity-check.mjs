@@ -252,7 +252,16 @@ async function run() {
     const hero = login.slice(heroStart, splitStart);
     ok('the Login hero source carries no HSC or NSW copy', heroStart > 0 && splitStart > heroStart && !/HSC|NSW|NESA/.test(hero));
     ok('the sign-up form opens on the India course', /course: 'in'/.test(login) && /STUDY_DEFAULT/.test(login));
-    ok('the Australian option is a secondary, collapsed control', /Studying in Australia/.test(login) && /australia && \(/.test(login));
+    // The copy for this control moved into the translation catalogue when the
+    // app became bilingual, so the check follows it there rather than dropping
+    // the half it can no longer see in the page: the control is still rendered
+    // (by its key), its English words are still those words, and the Australian
+    // form is still behind the collapsed flag.
+    const enStrings = readFileSync(`${CLIENT}src/i18n/strings.en.js`, 'utf8');
+    ok('the Australian option is a secondary, collapsed control',
+      /t\('login\.studyingInAustralia'\)/.test(login)
+      && /'login\.studyingInAustralia': 'Studying in Australia\?/.test(enStrings)
+      && /australia && \(/.test(login));
     ok('the cloud sign-in routes to the cloud account panel', /CLOUD_ACCOUNT_ROUTE = '\/settings#cloud-account-title'/.test(login));
 
     for (const page of ['Home.jsx', 'History.jsx', 'Favorites.jsx', 'Progress.jsx']) {
