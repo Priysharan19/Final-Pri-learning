@@ -352,6 +352,31 @@ export const INDIA_EXAM_PAPER_SPECS = freeze([
   CBSE_CLASS11_ANNUAL_PATTERN, JEE_MAIN_MATHEMATICS_2026, JEE_ADVANCED_PAPER1_2024_REFERENCE, IOQM_2024_REFERENCE
 ]);
 
+// ── Marking rules ───────────────────────────────────────────────────────────
+// Pure, so the flow test can pin them without a paper. A section's marking
+// grid is {correct, incorrect, unanswered, partialPerOption?}.
+
+/** A single-response item: full marks, the section's negative mark, or the unanswered mark. */
+export function markObjective(marking, { unanswered, correct }) {
+  if (unanswered) return Number(marking.unanswered ?? 0);
+  return correct ? Number(marking.correct) : Number(marking.incorrect ?? 0);
+}
+
+/**
+ * JEE Advanced "one or more options correct" marking as printed on the paper:
+ * full marks only for exactly the correct set, +partialPerOption for each chosen
+ * option when every chosen option is correct, the negative mark as soon as any
+ * wrong option is chosen, and the unanswered mark for no choice at all.
+ */
+export function markMultiCorrect(marking, chosen, correct) {
+  const chosenSet = new Set((chosen || []).map(Number).filter(Number.isInteger));
+  const correctSet = new Set((correct || []).map(Number));
+  if (!chosenSet.size) return { awarded: Number(marking.unanswered ?? 0), outcome: 'unanswered' };
+  if ([...chosenSet].some(i => !correctSet.has(i))) return { awarded: Number(marking.incorrect ?? 0), outcome: 'wrong' };
+  if (chosenSet.size === correctSet.size) return { awarded: Number(marking.correct), outcome: 'full' };
+  return { awarded: Number(marking.partialPerOption ?? 0) * chosenSet.size, outcome: 'partial' };
+}
+
 export function indiaExamClaim(blueprint) {
   if (!blueprint) return freeze({ authentic: false, label: 'Pri Learning practice paper', reason: 'No source-versioned examination blueprint is published for this selection.' });
   if (blueprint.authenticity === 'official-mathematics-section') {

@@ -141,9 +141,12 @@ const BODY_RULES = [
   }],
   [/^POST \/exams$/, body => {
     requireObject(body, 'POST /exams'); optionalNumber(body, 'length'); optionalNumber(body, 'minutes'); optionalNumber(body, 'year');
+    // WP india-exams: CBSE Class X Standard/Basic variant and a reproducible paper seed.
+    optionalString(body, 'variant', 20); optionalNumber(body, 'seed'); optionalString(body, 'source', 20);
   }],
   [/^POST \/exams\/[A-Za-z0-9._-]+\/submit$/, body => {
     requireObject(body, 'exam submit'); boundedMap(body, 'answers', 120); boundedMap(body, 'workings', 120); optionalNumber(body, 'ms');
+    boundedMap(body, 'times', 120);   // WP india-exams: time spent per question
   }],
   [/^POST \/rush\/answer$/, body => {
     requireObject(body, 'POST /rush/answer'); requiredId(body);
