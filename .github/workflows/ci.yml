@@ -172,7 +172,8 @@ jobs:
         run: |
           set -euo pipefail
           test -s browser.log
-          grep -Eq 'E2E SUITE.*169/169.*6 flows' browser.log
+          grep -Eq 'E2E SUITE.*194/194.*7 flows' browser.log
+          grep -Fq 'Phone · every destination reachable at 390px' browser.log
           grep -Fq 'India · onboarding, class labels, demo, cloud entry' browser.log
           grep -Fq 'Cloud · account, live Settings refresh, assignment hand-off' browser.log
           grep -Eq 'E2E SUITE.*14/14.*1 flows' browser.log
