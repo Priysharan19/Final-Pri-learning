@@ -8,9 +8,10 @@ import {
   ENCRYPTED_STORES, setDataKey, dataKeyFor, hasDataKey, dropDataKeys, sealField, openField
 } from './idb.js';
 import {
-  sydneyDate, streakFor, bumpActivity, setPredictedToday,
+  streakFor, bumpActivity, setPredictedToday,
   ratingsFor, getRating, putRating, currentPid, setCurrentPid, activityFor
 } from './store.js';
+import { cleanTimezone, dayKey, defaultTimezone, timezoneOf, localeOf } from '../lib/locale.js';
 import {
   CURRICULUM, STREAM_CURRICULUM, PATHWAYS, streamSubtopics, SUBTOPIC_BY_ID, subtopicsForYear,
   scopeForYear, DIFF_LABELS, dotpointsFor, dotpointById, dotpointAt
@@ -655,10 +656,13 @@ async function requireTask(id) {
 
 async function publicUser(p, nowMs = Date.now()) {
   const { level, progress, needed } = levelFromXp(p.xp || 0);
-  const today = (await get('activity', `${p.id}:${sydneyDate(nowMs)}`)) || { questions: 0, correct: 0, xp: 0 };
+  // "Today" is the student's today: an Indian profile's day turns over at
+  // midnight in Kolkata, not in Sydney.
+  const tz = timezoneOf(p);
+  const today = (await get('activity', `${p.id}:${dayKey(nowMs, tz)}`)) || { questions: 0, correct: 0, xp: 0 };
   return {
     id: p.id, name: p.name, year: p.year, theme: p.theme || 'dark',
-    course: p.course || 'nsw',
+    course: p.course || 'nsw', timezone: tz, locale: localeOf(p),
     courseLabel: courseLabel(p.course || 'nsw', p.year, pathwayOf(p), cleanIndiaTrack(p.indiaTrack, p.year)),
     pathway: p.course === 'nsw' && p.year >= 11 ? pathwayOf(p) : null,
     pathwayName: p.course === 'nsw' && p.year >= 11 ? PATHWAYS[pathwayOf(p)].name : null,
@@ -667,7 +671,7 @@ async function publicUser(p, nowMs = Date.now()) {
     role: p.role || 'student', avatar: p.avatar || '🙂',
     email: await profileEmail(p), provider: p.provider || null, hasPassword: !!p.auth,
     dailyGoal: p.dailyGoal || 10, xp: p.xp || 0, level, levelProgress: progress, levelNeeded: needed,
-    streak: await streakFor(p.id, nowMs),
+    streak: await streakFor(p.id, nowMs, tz),
     today: { questions: today.questions, correct: today.correct, xp: today.xp },
     isDemo: !!p.isDemo, handwriting: p.handwriting !== false
   };
@@ -777,9 +781,13 @@ function indiaWeaknesses(ratings, nowMs = Date.now(), limit = 6) {
   return out.sort((a, b) => b.count - a.count || b.lastAt - a.lastAt).slice(0, limit);
 }
 
-/** Distinct days with at least one answered question inside the window. */
-function activeDaysIn(days, nowMs, windowDays = 28) {
-  const cutoff = sydneyDate(nowMs - windowDays * 86400000);
+/**
+ * Distinct days with at least one answered question inside the window, counted
+ * in the student's own timezone. A day boundary fixed to one country would
+ * start and end an Indian student's day in the middle of their evening.
+ */
+function activeDaysIn(days, nowMs, windowDays = 28, timezone = defaultTimezone()) {
+  const cutoff = dayKey(nowMs - windowDays * 86400000, timezone);
   return days.filter(d => d.questions > 0 && d.date >= cutoff).length;
 }
 
@@ -847,7 +855,7 @@ async function studentAnalyticsRow(prof, classTasks, now) {
     courseLabel: courseLabel(prof.course || 'nsw', prof.year, pathwayOf(prof), trackId || 'cbse'),
     attempts: attempts.length, correct,
     accuracy: attempts.length ? Math.round(100 * correct / attempts.length) : null,
-    streak: await streakFor(pid, now), activeDays: activeDaysIn(days, now), lastActiveAt,
+    streak: await streakFor(pid, now, timezoneOf(prof)), activeDays: activeDaysIn(days, now, 28, timezoneOf(prof)), lastActiveAt,
     misconceptions: weaknesses.slice(0, 3),
     flags: interventionFlags({ attempts, lastActiveAt, sinceMs: prof.createdAt || null, overdueTasks: overdue, weaknesses, nowMs: now })
   };
@@ -1156,7 +1164,8 @@ async function resolve(profile, row, q, correct, answerGiven, ms, mode, viaInk =
   const xp = isRush ? (correct ? 6 : 0) : xpFor(q.difficulty, correct, 0, effHints);
   profile.xp = (profile.xp || 0) + xp;
   await put('profiles', profile);
-  await bumpActivity(pid, { correct, xp, ms }, now);
+  const tz = timezoneOf(profile);
+  await bumpActivity(pid, { correct, xp, ms }, now, tz);
 
   await add('attempts', {
     pid, questionId: row.id, subtopic: q.subtopic, difficulty: q.difficulty || 2,
@@ -1177,11 +1186,11 @@ async function resolve(profile, row, q, correct, answerGiven, ms, mode, viaInk =
     await put('taskProgress', tp);
   }
 
-  const newBadges = await checkBadges(pid, { type: 'attempt', difficulty: q.difficulty, correct, hintsUsed: row.hintsUsed, year: profile.year, xp: profile.xp }, now);
+  const newBadges = await checkBadges(pid, { type: 'attempt', difficulty: q.difficulty, correct, hintsUsed: row.hintsUsed, year: profile.year, xp: profile.xp }, now, tz);
 
   const ratings = await ratingsFor(pid);
   const pred = predictMark(ratings, profile.year, now, pathwayOf(profile));
-  await setPredictedToday(pid, pred.mark, now);
+  await setPredictedToday(pid, pred.mark, now, tz);
 
   const stNew = ratings[q.subtopic];
   const mastery = stNew ? Math.round(masteryOf(stNew.rating, stNew.attempts, stNew.last_at, now) * 100) : 0;
@@ -1189,7 +1198,7 @@ async function resolve(profile, row, q, correct, answerGiven, ms, mode, viaInk =
   return {
     xp, totalXp: profile.xp, level: levelFromXp(profile.xp),
     ratingDelta: ratingAfter - st.rating, mastery, band: masteryBand(mastery / 100),
-    predicted: pred, streak: await streakFor(pid, now), newBadges
+    predicted: pred, streak: await streakFor(pid, now, tz), newBadges
   };
 }
 
@@ -1249,6 +1258,7 @@ function packQuestion(cq) {
  */
 const exportProfile = p => ({
   name: p.name, year: p.year, course: p.course || 'nsw', indiaTrack: p.indiaTrack || null, role: p.role || 'student',
+  timezone: timezoneOf(p),
   avatar: p.avatar || '🙂', theme: p.theme || 'dark', dailyGoal: p.dailyGoal || 10,
   xp: p.xp || 0, pathway: p.pathway ?? null, provider: p.provider || null,
   handwriting: p.handwriting !== false, isDemo: false,
@@ -1261,6 +1271,7 @@ function importProfile(src, id) {
     id, name: safeLabel(src.name, 40) || 'Student', year,
     course: COURSES[src.course] ? src.course : 'nsw',
     indiaTrack: (COURSES[src.course] ? src.course : 'nsw') === 'in' ? cleanIndiaTrack(src.indiaTrack, year) : null,
+    timezone: cleanTimezone(src.timezone) || defaultTimezone(COURSES[src.course] ? src.course : 'nsw'),
     role: src.role === 'teacher' ? 'teacher' : 'student',
     avatar: safeLabel(src.avatar, 4) || '🙂',
     theme: src.theme === 'light' ? 'light' : 'dark',
@@ -1556,7 +1567,7 @@ const routes = {
     return {
       profiles: profiles.map(p => ({
         id: p.id, name: p.name, year: p.year, avatar: p.avatar, role: p.role || 'student',
-        isDemo: !!p.isDemo, xp: p.xp || 0,
+        course: p.course || 'nsw', isDemo: !!p.isDemo, xp: p.xp || 0,
         email: maskedEmail(p), provider: p.provider || null, hasPassword: !!p.auth,
         lastActiveAt: p.lastActiveAt || null
       })), currentId: currentPid()
@@ -1591,6 +1602,10 @@ const routes = {
     }
     p.pathway = p.course === 'nsw' ? (cleanPathway(body.pathway, p.year) || (p.year >= 11 ? 'advanced' : null)) : null;
     p.indiaTrack = p.course === 'in' ? cleanIndiaTrack(body.indiaTrack, p.year) : null;
+    // The day boundary for streaks and daily goals: the profile's own IANA
+    // timezone if it named a real one, else the course's home (Asia/Kolkata
+    // for India, Australia/Sydney for the Australian syllabuses).
+    p.timezone = cleanTimezone(body.timezone) || defaultTimezone(p.course);
     await setProfileEmail(p, email);
     await put('profiles', p);
     setCurrentPid(p.id);
@@ -1678,11 +1693,14 @@ const routes = {
       return { user: await publicUser(p) };
     });
   },
-  'POST /profiles/demo': async () => {
-    let demo = (await all('profiles')).find(p => p.isDemo);
+  // The account-less demo is an Indian Class 10 student. The legacy NSW demo
+  // is still there for the Australian flows — ask for it by course.
+  'POST /profiles/demo': async (body) => {
+    const course = body?.course === 'nsw' ? 'nsw' : 'in';
+    let demo = (await all('profiles')).find(p => p.isDemo && (p.course || 'nsw') === course);
     if (!demo) {
       const { seedDemo } = await import('./demoSeed.js');
-      demo = await seedDemo();
+      demo = await seedDemo({ course });
     }
     setCurrentPid(demo.id);
     return { user: await publicUser(demo) };
@@ -1699,7 +1717,12 @@ const routes = {
     if (body.year !== undefined && body.pathway === undefined && p.course === 'nsw') p.pathway = cleanPathway(p.pathway, p.year) || (p.year >= 11 ? 'advanced' : null);
     if (body.theme !== undefined && ['dark', 'light'].includes(body.theme)) p.theme = body.theme;
     if (body.dailyGoal !== undefined) p.dailyGoal = Math.min(60, Math.max(3, Number(body.dailyGoal) || p.dailyGoal));
+    const courseBefore = p.course || 'nsw';
     if (body.course !== undefined && COURSES[body.course]) p.course = body.course;
+    // A profile that never chose its own timezone follows its course when the
+    // course changes; one that named a timezone keeps it.
+    if (body.timezone !== undefined) p.timezone = cleanTimezone(body.timezone) || defaultTimezone(p.course);
+    else if (!cleanTimezone(p.timezone) || (p.course !== courseBefore && p.timezone === defaultTimezone(courseBefore))) p.timezone = defaultTimezone(p.course);
     if (p.course === 'in') {
       p.pathway = null;
       p.indiaTrack = cleanIndiaTrack(body.indiaTrack !== undefined ? body.indiaTrack : p.indiaTrack, p.year);
@@ -2208,7 +2231,7 @@ const routes = {
           const xp = qAwarded * 6;
           p.xp = (p.xp || 0) + xp;
           await put('profiles', p);
-          await bumpActivity(p.id, { correct: allCorrect, xp, ms: Math.round(totalMs / nQ) }, now);
+          await bumpActivity(p.id, { correct: allCorrect, xp, ms: Math.round(totalMs / nQ) }, now, timezoneOf(p));
           await add('attempts', {
             pid: p.id, questionId: row.id, subtopic: q.multipartId, difficulty: 3,
             correct: allCorrect ? 1 : 0, answerGiven: `${qAwarded}/${qMarks} marks`, ms: Math.round(totalMs / nQ),
@@ -2261,7 +2284,7 @@ const routes = {
     const pct = Math.round(100 * marksAwarded / Math.max(1, totalMarks));
     Object.assign(e, { finishedAt: now, score: marksAwarded, total: totalMarks, detail });
     await put('exams', e);
-    const newBadges = await checkBadges(p.id, { type: 'exam', pct }, now);
+    const newBadges = await checkBadges(p.id, { type: 'exam', pct }, now, timezoneOf(p));
     return { score: marksAwarded, total: totalMarks, pct, detail, newBadges };
   },
 
@@ -2296,7 +2319,7 @@ const routes = {
     await add('rushRuns', { pid: p.id, score, correct: score, total: Math.max(score, Number(body.total) || 0), bestCombo: Number(body.bestCombo) || 0, createdAt: now });
     const runs = await byIndex('rushRuns', 'pid', p.id);
     const best = Math.max(...runs.map(r => r.score));
-    const newBadges = await checkBadges(p.id, { type: 'rush', score }, now);
+    const newBadges = await checkBadges(p.id, { type: 'rush', score }, now, timezoneOf(p));
     return { score, best, newBadges };
   },
 
@@ -2331,7 +2354,7 @@ const routes = {
     const won = !!body.won;
     await add('matchRuns', { pid: p.id, won, playerScore: Number(body.playerScore) || 0, rivalScore: Number(body.rivalScore) || 0, rival: String(body.rival || ''), ms: Number(body.ms) || 0, createdAt: now });
     const runs = await byIndex('matchRuns', 'pid', p.id);
-    const newBadges = await checkBadges(p.id, { type: 'match', won }, now);
+    const newBadges = await checkBadges(p.id, { type: 'match', won }, now, timezoneOf(p));
     return { won, wins: runs.filter(r => r.won).length, played: runs.length, newBadges };
   },
   'GET /match/history': async () => {
@@ -2382,7 +2405,7 @@ const routes = {
       activity: days.slice(-120), totals, byDiff, bestRush,
       matchWins: matchRuns.filter(r => r.won).length, matchPlayed: matchRuns.length,
       examCount: exams.filter(e => e.finishedAt).length, inkCount, recent,
-      streak: await streakFor(pid, now)
+      streak: await streakFor(pid, now, timezoneOf(p))
     };
   },
   'GET /badges': async () => {
@@ -2416,8 +2439,8 @@ const routes = {
         focus: evidence.weakest,
         weekly: acts.slice(-28),
         totals: { attempts: attempts.length, correct: attempts.filter(a => a.correct).length },
-        streak: await streakFor(p.id, now),
-        activeDays: activeDaysIn(acts, now),
+        streak: await streakFor(p.id, now, timezoneOf(p)),
+        activeDays: activeDaysIn(acts, now, 28, timezoneOf(p)),
         flags: interventionFlags({
           attempts, lastActiveAt: attempts.length ? attempts[attempts.length - 1].createdAt : null,
           sinceMs: p.createdAt || null, overdueTasks: [], weaknesses, nowMs: now
@@ -2441,7 +2464,7 @@ const routes = {
       focus: [...rows].sort((a, b) => a.mastery - b.mastery).slice(0, 3),
       weekly: acts.slice(-28),
       totals: { attempts: attempts.length, correct: attempts.filter(a => a.correct).length },
-      streak: await streakFor(p.id, now)
+      streak: await streakFor(p.id, now, timezoneOf(p))
     };
   },
 
@@ -2633,9 +2656,14 @@ const routes = {
       const q = r.payload;
       const a = attemptByQ[r.id];
       const ink = inkById[r.id];
+      // An India row is filed under its NCERT chapter, not the generator that
+      // happened to draw it: a student practising Coordinate Geometry from a
+      // reused NSW bank must still see "Coordinate Geometry" in History, and
+      // the row must carry the chapter id the practice route understands.
+      const inChapter = r.india ? indiaChapter(r.india.chapterId) : null;
       return {
-        id: r.id, subtopic: r.subtopic,
-        subtopicName: q.multipart ? q.title : (q.custom ? q.customName || 'Custom question' : (SUBTOPIC_BY_ID[r.subtopic]?.name || r.subtopic)),
+        id: r.id, subtopic: inChapter?.id || r.subtopic,
+        subtopicName: q.multipart ? q.title : (inChapter?.name || (q.custom ? q.customName || 'Custom question' : (SUBTOPIC_BY_ID[r.subtopic]?.name || r.subtopic))),
         multipart: !!q.multipart,
         prompt: q.multipart ? q.stem : q.prompt,
         difficulty: r.difficulty, mode: r.mode,
@@ -2819,7 +2847,7 @@ const routes = {
       // no predicted mark to export because none exists for them.
       predicted: india ? null : predictMark(ratings, p.year, now, pathwayOf(p)),
       evidence: india ? indiaEvidence(indiaChapterRows(trackId, p.year, ratings, now)) : null,
-      streak: await streakFor(p.id, now),
+      streak: await streakFor(p.id, now, timezoneOf(p)),
       totals: { attempts: attempts.length, correct: attempts.filter(a => a.correct).length },
       ratings: Object.fromEntries(Object.entries(ratings).map(([k, v]) => [k, { rating: v.rating, attempts: v.attempts, correct: v.correct, last_at: v.last_at, traps: trimTraps(v.traps || {}) }])),
       taskProgress: tps.map(tp => ({ taskId: tp.taskId, done: tp.done, correct: tp.correct, finished: !!tp.finishedAt }))

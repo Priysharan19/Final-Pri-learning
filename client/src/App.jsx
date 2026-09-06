@@ -117,8 +117,11 @@ export default function App() {
   );
 
   useEffect(() => {
-    document.title = pageTitle ? `${pageTitle} · Pri Learning` : 'Pri Learning';
-  }, [pageTitle]);
+    // Before a profile is chosen the route is still "/", but the screen is the
+    // welcome and sign-in page, not Home. Naming the tab after a page the
+    // visitor cannot see yet is worse than naming the product.
+    document.title = user && pageTitle ? `${pageTitle} · Pri Learning` : 'Pri Learning';
+  }, [pageTitle, user]);
 
   // <main> is keyed on the path, so every navigation replaces the node and focus
   // drops to <body>: a keyboard or VoiceOver user is left at the top of the
@@ -137,6 +140,22 @@ export default function App() {
     window.scrollTo({ top: 0 });
     mainRef.current?.focus({ preventScroll: true });
   };
+
+  // A link into a section of a page — Login's "Sign in to your Pri cloud
+  // account" lands on /settings#cloud-account-title — only scrolls by itself
+  // on a full document load. After a client-side navigation the section is
+  // rendered a moment later, so it is looked up until it is there.
+  useEffect(() => {
+    if (!loc.hash) return;
+    const id = decodeURIComponent(loc.hash.slice(1));
+    let tries = 0;
+    const t = setInterval(() => {
+      const el = document.getElementById(id);
+      if (el) { el.scrollIntoView({ block: 'start' }); clearInterval(t); }
+      else if (++tries > 20) clearInterval(t);
+    }, 80);
+    return () => clearInterval(t);
+  }, [loc.pathname, loc.hash]);
 
   const toast = useCallback((content, ms = 3800, kind = '') => {
     const id = Math.random().toString(36).slice(2);
