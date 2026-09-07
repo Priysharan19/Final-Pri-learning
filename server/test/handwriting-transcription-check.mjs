@@ -92,7 +92,7 @@ const recordingFetch = async (url, init) => {
     json: async () => ({ output_text: JSON.stringify({ lines: [{ text: '-1, 0, 1, 2, 4', confidence: 0.95 }], confidence: 0.95, needs_confirmation: false }) })
   };
 };
-const env = { PRI_HANDWRITING_API_KEY: 'test-key-not-real', PRI_HANDWRITING_MODEL: 'test-primary', PRI_HANDWRITING_FALLBACK_MODEL: 'test-fallback' };
+const env = { PRI_HANDWRITING_API_KEY: 'test-key-not-real', PRI_HANDWRITING_MODEL: 'test-primary', PRI_HANDWRITING_FALLBACK_MODEL: 'test-fallback', PRI_PAID_CALLS_PER_HOUR: '10000', PRI_PAID_CALLS_PER_DAY: '100000' };
 const result = await transcribeHandwriting(PNG, { env, fetchImpl: recordingFetch });
 
 eq(result.text, '-1, 0, 1, 2, 4', 'the transcription comes back, commas and all');

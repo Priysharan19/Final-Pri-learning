@@ -1,4 +1,5 @@
 import { isAbsolute } from 'node:path';
+import { spendCeilingMissing } from './spendCeiling.js';
 
 function nonEmpty(name) {
   return !!String(process.env[name] || '').trim();
@@ -93,12 +94,18 @@ function authEmailConfigured() {
 }
 
 export function platformConfigStatus() {
+  const env = process.env;
   const production = process.env.NODE_ENV === 'production';
   const missing = [];
   if (production && !nonEmpty('PRI_PUBLIC_ORIGIN')) missing.push('PRI_PUBLIC_ORIGIN');
   if (production && !nonEmpty('PRI_CSRF_SECRET')) missing.push('PRI_CSRF_SECRET');
   if (production && !nonEmpty('PRI_AUTH_DELIVERY_KEY')) missing.push('PRI_AUTH_DELIVERY_KEY');
   if (production && !configuredDbPath()) missing.push('PRI_PLATFORM_DB');
+  // A configured provider key is a licence to spend real money on every request
+  // that reaches it. Per-account limits bound one student; only these bound the
+  // bill. No default: too low kills the feature quietly under load and too high
+  // is not a ceiling, and neither shows up in a response.
+  for (const name of spendCeilingMissing(env)) missing.push(name);
   if (production && !nonEmpty('PRI_TRUSTED_PROXY_HOPS')) missing.push('PRI_TRUSTED_PROXY_HOPS');
 
   const webMonthly = webMonthlyConfigured();

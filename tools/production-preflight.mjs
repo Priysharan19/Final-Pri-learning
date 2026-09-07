@@ -45,6 +45,22 @@ const REQUIRED = [
     note: 'Rotating this makes pending unsent emails undeliverable. Set it once, before real users exist.'
   },
   {
+    name: 'PRI_PAID_CALLS_PER_HOUR',
+    what: 'A ceiling on paid handwriting/marking calls across the whole deployment, per hour. Required once PRI_HANDWRITING_API_KEY is set. Per-account limits bound one student; only this bounds the bill.',
+    example: '600',
+    generate: null,
+    note: 'Set it to what you are willing to pay, not to what you hope nobody reaches. Over the ceiling, students fall back to reading on their own device.',
+    onlyWithKey: true
+  },
+  {
+    name: 'PRI_PAID_CALLS_PER_DAY',
+    what: 'The same ceiling over a day. Required once PRI_HANDWRITING_API_KEY is set.',
+    example: '5000',
+    generate: null,
+    note: 'A thousand students at their own hourly limits is 360,000 calls an hour, so this is the number that decides your worst day.',
+    onlyWithKey: true
+  },
+  {
     name: 'PRI_PLATFORM_DB',
     what: 'Absolute path to the SQLite database on the persistent volume.',
     example: '/data/pri-learning-platform.db',
@@ -67,8 +83,10 @@ const OPTIONAL = [
   { name: 'PRI_DISPLAY_MONTHLY_PRICE', what: 'What the account panel shows, with PRI_DISPLAY_ANNUAL_PRICE. Until both are set the panel tells visitors that pricing has not been configured for this deployment, which is true and is not what a paying visitor should read.' }
 ];
 
-const missing = REQUIRED.filter(item => !has(item.name));
-const present = REQUIRED.filter(item => has(item.name));
+// The spend ceilings are required only once there is a key to spend against.
+const applicable = REQUIRED.filter(item => !item.onlyWithKey || has('PRI_HANDWRITING_API_KEY'));
+const missing = applicable.filter(item => !has(item.name));
+const present = applicable.filter(item => has(item.name));
 
 console.log('\nPri Learning · production preflight\n' + '─'.repeat(70));
 
