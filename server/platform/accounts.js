@@ -16,7 +16,6 @@ import { consumeOidcNonce } from './oidcNonce.js';
 
 const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const TOKEN_MS = 1000 * 60 * 60;
-const GUARDIAN_WITHDRAWAL_EXPIRY = 253402300799000; // 9999-12-31T23:59:59Z; withdrawal is fail-closed authority.
 const BCRYPT_COST = 12;
 // Compared against when no account (or no password) matches the submitted
 // email, so an unknown address costs the same bcrypt work as a wrong password.
@@ -80,10 +79,7 @@ function queueAccountToken(db, accountId, destination, purpose, now = Date.now()
   const raw = opaqueToken(32);
   const tokenId = id('tok');
   const ciphertext = encryptDeliveryToken(raw, `${accountId}:${purpose}:${tokenId}`);
-  // Guardian confirmation remains a one-hour action (enforced by created_at in
-  // /guardian/confirm), while the same guardian-held bearer remains usable only
-  // for the permission-reducing withdrawal route for the lifetime of the account.
-  const expiresAt = purpose === 'guardian-consent' ? GUARDIAN_WITHDRAWAL_EXPIRY : now + TOKEN_MS;
+  const expiresAt = now + TOKEN_MS;
   db.prepare(`INSERT INTO account_tokens(id, account_id, purpose, token_hash, created_at, expires_at)
     VALUES (?, ?, ?, ?, ?, ?)`).run(tokenId, accountId, purpose, sha256(raw), now, expiresAt);
   db.prepare(`INSERT INTO auth_delivery_outbox(id, account_id, kind, destination, token_id, token_ciphertext, created_at)
