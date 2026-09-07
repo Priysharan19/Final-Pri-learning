@@ -3,12 +3,67 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { get, put, byIndex, dropDataKeys } from './idb.js';
 
-export function sydneyDate(ms = Date.now()) {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Australia/Sydney', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(ms));
+// ── When "today" ends ────────────────────────────────────────────────────────
+//
+// Streaks, the daily goal and the activity heatmap are all keyed by a date
+// string, and that date needs a timezone. It used to be Australia/Sydney for
+// everyone, which is correct for an HSC app and wrong the moment the product
+// shipped to India: Sydney midnight is 6:30–7:30 pm IST, so an Indian student
+// practising after dinner had their work filed under tomorrow. Their streak
+// then broke on days they had actually studied, and the daily goal reset while
+// they were still working towards it.
+//
+// The zone is per profile, set once at sign-in from the profile's course, and
+// held here as module state for the same reason `currentPid` is — every caller
+// wants "this student's today" and none of them should have to pass it.
+
+const DEFAULT_ZONE = 'Australia/Sydney';
+const COURSE_ZONE = { in: 'Asia/Kolkata' };
+
+let dayZone = DEFAULT_ZONE;
+
+/** The IANA zone a course's school day runs on. */
+export function zoneForCourse(course) {
+  return COURSE_ZONE[course] || DEFAULT_ZONE;
 }
-export function sydneyHour(ms = Date.now()) {
-  return Number(new Intl.DateTimeFormat('en-AU', { timeZone: 'Australia/Sydney', hour: 'numeric', hour12: false }).format(new Date(ms)));
+
+/**
+ * Set the zone every date in this module is computed in. Called when a profile
+ * becomes current; safe to call repeatedly with the same value.
+ *
+ * A zone Intl does not recognise is ignored rather than thrown, because the
+ * alternative is that one bad profile field makes the app fail to open.
+ */
+export function setDayZone(zone) {
+  if (!zone || zone === dayZone) return dayZone;
+  try {
+    new Intl.DateTimeFormat('en-CA', { timeZone: zone });
+    dayZone = zone;
+  } catch { /* keep the previous zone */ }
+  return dayZone;
 }
+
+export const currentDayZone = () => dayZone;
+
+/** YYYY-MM-DD in the profile's own zone. The key every activity row uses. */
+export function localDate(ms = Date.now()) {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: dayZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(ms));
+}
+
+/** Hour of day, 0–23, in the profile's own zone. */
+export function localHour(ms = Date.now()) {
+  return Number(new Intl.DateTimeFormat('en-GB', { timeZone: dayZone, hour: 'numeric', hour12: false }).format(new Date(ms)));
+}
+
+/** Narrow weekday letter in the profile's own zone, for the streak strip. */
+export function localWeekdayNarrow(ms = Date.now()) {
+  return new Intl.DateTimeFormat('en-AU', { timeZone: dayZone, weekday: 'narrow' }).format(new Date(ms));
+}
+
+// The old names, kept so nothing that still imports them breaks. They are no
+// longer Sydney-specific and new code should use localDate/localHour.
+export const sydneyDate = localDate;
+export const sydneyHour = localHour;
 
 export async function activityFor(pid) {
   const rows = await byIndex('activity', 'pid', pid);

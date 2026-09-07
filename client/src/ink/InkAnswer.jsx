@@ -32,6 +32,14 @@ const NATIVE_INK = nativeInkAvailable();
 const Surface = NATIVE_INK ? NativeInkCanvas : InkCanvas;
 const EMPTY_READING = { lines: [], text: '', symbols: [], minConf: 1, margin: 1, weakest: null };
 const structuralLanExpected = () => !NATIVE_INK && typeof window !== 'undefined' && window.__PRI_LAN_DEV__ === true;
+const configuredCloudEndpoint = () => {
+  if (typeof window === 'undefined') return '';
+  return String(
+    window.__PRI_CLOUD_INK_ENDPOINT__ ||
+    import.meta.env.VITE_PRI_CLOUD_INK_ENDPOINT ||
+    ''
+  ).trim();
+};
 
 /**
  * Native rescue reads lines. If it leaves a short line unread (a lone "x", a
@@ -152,11 +160,17 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
     // local correction/confirmation path stays visible instead.
     const manualCorrectionActive = Object.keys(ovr || {}).length > 0;
     if (!manualCorrectionActive && cloudInkConfigured()) {
-      recognizeWithCloud(strokes).then(cloud => {
+      const cloudRead = NATIVE_INK
+        ? nativeInk.cloudRecognize(configuredCloudEndpoint(), effectiveContext)
+        : recognizeWithCloud(strokes);
+
+      cloudRead.then(cloud => {
         if (seq !== readSeqRef.current || !cloud?.lines?.some(line => line.text)) return;
-        if (cloud.needsConfirmation) return;
+
+        // Show the actual OpenAI transcription even when it needs confirmation;
+        // QuestionCard already owns the conservative confirmation gate.
         cloudAccepted = true;
-        publish(cloud, strokes);
+        publish({ ...cloud, cloud: true }, strokes);
       });
     }
 

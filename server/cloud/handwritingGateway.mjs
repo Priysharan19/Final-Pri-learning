@@ -13,13 +13,18 @@
 
 import { createServer as createHttpServer } from 'node:http';
 import { createServer as createHttpsServer } from 'node:https';
-import { randomUUID } from 'node:crypto';
+import { randomUUID, timingSafeEqual } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { networkInterfaces } from 'node:os';
 import { resolve } from 'node:path';
 import { transcribeMathHandwriting } from './openaiHandwriting.mjs';
+import { markHandwrittenWorking } from './markWorking.mjs';
 
-const PORT = Number(process.env.PRI_CLOUD_PORT || 4190);
+// PORT is what every container platform injects, Cloud Run included, and it is
+// not optional there — a container that ignores it fails its health check and
+// the revision never goes live. PRI_CLOUD_PORT stays ahead of it so a developer
+// running several gateways locally can still pin one.
+const PORT = Number(process.env.PRI_CLOUD_PORT || process.env.PORT || 4190);
 const HOST = process.env.PRI_CLOUD_HOST || '0.0.0.0';
 const MAX_BODY = 6 * 1024 * 1024;
 const CLIENT_TOKEN = process.env.PRI_CLOUD_CLIENT_TOKEN || '';
@@ -63,7 +68,69 @@ function send(req, res, status, payload) {
 function authorized(req) {
   if (!CLIENT_TOKEN) return true;
   const supplied = String(req.headers.authorization || '').replace(/^Bearer\s+/i, '');
-  return supplied === CLIENT_TOKEN;
+  // Length differs far more often than content does, and Buffer.compare throws
+  // on a length mismatch, so check it first and compare the rest in constant
+  // time. A token is short; the timing signal is small but it is free to remove.
+  const a = Buffer.from(supplied);
+  const b = Buffer.from(CLIENT_TOKEN);
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+
+// ── Abuse control ────────────────────────────────────────────────────────────
+//
+// Every request past this point spends money on an upstream model, so an
+// unmetered gateway is an unmetered bill. Two independent limits, both per
+// client: a short burst window that stops a runaway client, and a daily cap
+// that bounds the worst case for the day even if the burst limit is respected.
+//
+// This is deliberately in-process. It is not a distributed quota and it resets
+// when the container does — on Cloud Run with scale-to-zero that is often. It
+// exists to make a mistake survivable, not to be a billing system; per-student
+// entitlement is metered on the device, and a real deployment puts an API
+// gateway quota in front of this as well.
+
+const RATE_WINDOW_MS = Number(process.env.PRI_CLOUD_RATE_WINDOW_MS || 60_000);
+const RATE_BURST = Number(process.env.PRI_CLOUD_RATE_BURST || 12);
+const RATE_DAILY = Number(process.env.PRI_CLOUD_RATE_DAILY || 400);
+const DAY_MS = 86_400_000;
+
+const buckets = new Map();
+
+function clientKey(req) {
+  // Cloud Run and every sane proxy set x-forwarded-for; the left-most entry is
+  // the original client. Fall back to the socket for direct LAN use.
+  const fwd = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim();
+  return fwd || req.socket?.remoteAddress || 'unknown';
+}
+
+function rateLimit(req) {
+  const key = clientKey(req);
+  const now = Date.now();
+  let b = buckets.get(key);
+  if (!b) {
+    b = { windowStart: now, windowCount: 0, dayStart: now, dayCount: 0 };
+    buckets.set(key, b);
+  }
+  if (now - b.windowStart >= RATE_WINDOW_MS) { b.windowStart = now; b.windowCount = 0; }
+  if (now - b.dayStart >= DAY_MS) { b.dayStart = now; b.dayCount = 0; }
+
+  if (b.windowCount >= RATE_BURST) {
+    return { ok: false, retryAfter: Math.ceil((b.windowStart + RATE_WINDOW_MS - now) / 1000), scope: 'burst' };
+  }
+  if (b.dayCount >= RATE_DAILY) {
+    return { ok: false, retryAfter: Math.ceil((b.dayStart + DAY_MS - now) / 1000), scope: 'daily' };
+  }
+  b.windowCount += 1;
+  b.dayCount += 1;
+
+  // Unbounded growth from a wide address space is its own denial of service.
+  if (buckets.size > 10_000) {
+    for (const [k, v] of buckets) {
+      if (now - v.dayStart >= DAY_MS) buckets.delete(k);
+      if (buckets.size <= 5_000) break;
+    }
+  }
+  return { ok: true };
 }
 
 async function readJson(req) {
@@ -115,34 +182,83 @@ async function handler(req, res) {
     });
   }
 
-  if (url.pathname !== '/v1/handwriting/recognize') {
-    return send(req, res, 404, { error: 'not found', requestId });
-  }
+  const ROUTES = {
+    '/v1/handwriting/recognize': 'recognition',
+    '/v1/working/mark': 'marking'
+  };
+  const kind = ROUTES[url.pathname];
+  if (!kind) return send(req, res, 404, { error: 'not found', requestId });
+
   if (req.method !== 'POST') return send(req, res, 405, { error: 'POST required', requestId });
   if (!corsOrigin(req) && req.headers.origin) return send(req, res, 403, { error: 'origin not allowed', requestId });
   if (!authorized(req)) return send(req, res, 401, { error: 'unauthorized', requestId });
+
+  const limit = rateLimit(req);
+  if (!limit.ok) {
+    console.warn(`[cloud-ink ${requestId}] rate limited · ${limit.scope}`);
+    return send(req, res, 429, {
+      error: limit.scope === 'daily'
+        ? 'Daily marking limit reached for this device. It resets in a few hours.'
+        : 'Too many requests in a row. Try again in a moment.',
+      code: 'RATE_LIMITED', scope: limit.scope, retryAfter: limit.retryAfter, requestId
+    });
+  }
+
   if (!process.env.OPENAI_API_KEY) {
     return send(req, res, 503, { error: 'OPENAI_API_KEY is not configured', code: 'OPENAI_NOT_CONFIGURED', requestId });
   }
 
   const started = Date.now();
-  // Safe diagnostics only: request id + outcome. Never log image data or the
-  // student's transcription payload.
-  console.log(`[cloud-ink ${requestId}] recognition start`);
+  // Safe diagnostics only: request id, outcome and token usage. Never log image
+  // data, the student's working, or the question they were answering.
+  console.log(`[cloud-ink ${requestId}] ${kind} start`);
   try {
     const body = await readJson(req);
     const image = body?.image || body?.imageDataUrl;
+
+    if (kind === 'marking') {
+      const result = await markHandwrittenWorking(image, body?.question || {});
+      const { usage, ...payload } = result;
+      console.log(
+        `[cloud-ink ${requestId}] marking ok · ${result.marksAwarded}/${result.marksAvailable}` +
+        `${result.capped ? ' (capped)' : ''} · conf ${result.confidence.toFixed(2)} · ` +
+        `${usage?.total_tokens ?? '?'} tok · ${Date.now() - started}ms`
+      );
+      return send(req, res, 200, { ...payload, requestId });
+    }
+
     const result = await transcribeMathHandwriting(image);
     console.log(`[cloud-ink ${requestId}] recognition ok · ${result.engine} · ${Date.now() - started}ms`);
     return send(req, res, 200, { ...result, requestId });
   } catch (error) {
     const status = Number(error?.status) >= 400 && Number(error?.status) < 600 ? Number(error.status) : 500;
+    const failure = kind === 'marking' ? 'Marking failed' : 'Cloud handwriting recognition failed';
     const safeMessage = status >= 500 && !['OPENAI_NOT_CONFIGURED'].includes(error?.code)
-      ? 'Cloud handwriting recognition failed'
-      : String(error?.message || 'Cloud handwriting recognition failed');
-    console.error(`[cloud-ink ${requestId}] recognition failed · HTTP ${status} · ${error?.code || 'CLOUD_INK_FAILED'} · ${String(error?.message || 'unknown error')} · ${Date.now() - started}ms`);
+      ? failure
+      : String(error?.message || failure);
+    console.error(`[cloud-ink ${requestId}] ${kind} failed · HTTP ${status} · ${error?.code || 'CLOUD_INK_FAILED'} · ${String(error?.message || 'unknown error')} · ${Date.now() - started}ms`);
     return send(req, res, status, { error: safeMessage, code: error?.code || 'CLOUD_INK_FAILED', requestId });
   }
+}
+
+// ── Refuse to be an open proxy ───────────────────────────────────────────────
+//
+// Without a client token every route above is reachable by anyone who can
+// resolve the host, and each one spends the OPENAI_API_KEY sitting in this
+// process. That is fine on a laptop and unacceptable on the public internet, so
+// production has to say the token out loud rather than fall into the open case
+// by omission. Failing to boot is the point: a gateway that starts and quietly
+// bills a stranger is worse than one that does not start.
+if (PRODUCTION && !CLIENT_TOKEN) {
+  console.error('FATAL — NODE_ENV=production requires PRI_CLOUD_CLIENT_TOKEN.');
+  console.error('Without it this gateway is an open proxy to your OpenAI billing account.');
+  console.error('Generate one with:  openssl rand -hex 32');
+  process.exit(1);
+}
+if (PRODUCTION && configuredOrigins.length === 0) {
+  console.error('FATAL — NODE_ENV=production requires PRI_CLOUD_ALLOWED_ORIGINS.');
+  console.error('Set it to the exact origins allowed to call this gateway, comma separated.');
+  process.exit(1);
 }
 
 const server = TLS_READY
@@ -156,8 +272,11 @@ server.listen(PORT, HOST, () => {
   const host = lan?.address || '127.0.0.1';
   const scheme = TLS_READY ? 'https' : 'http';
   console.log('Pri Learning cloud handwriting gateway');
-  console.log(`  endpoint  ${scheme}://${host}:${PORT}/v1/handwriting/recognize`);
+  console.log(`  transcribe ${scheme}://${host}:${PORT}/v1/handwriting/recognize`);
+  console.log(`  mark       ${scheme}://${host}:${PORT}/v1/working/mark`);
   console.log(`  model     ${process.env.OPENAI_HANDWRITING_PRIMARY_MODEL || 'gpt-5.6-terra'} -> ${process.env.OPENAI_HANDWRITING_FALLBACK_MODEL || 'gpt-5.6-sol'}`);
+  console.log(`  marking   ${process.env.OPENAI_MARKING_MODEL || 'gpt-5.6-terra'}`);
+  console.log(`  limits    ${RATE_BURST}/${Math.round(RATE_WINDOW_MS / 1000)}s burst · ${RATE_DAILY}/day per client`);
   console.log(`  OpenAI    ${process.env.OPENAI_API_KEY ? 'configured' : 'NOT CONFIGURED'}`);
   console.log(`  TLS       ${TLS_READY ? `using ${TLS_CERT}` : 'off (run npm run serve:lan once to generate a LAN cert, or set PRI_CLOUD_TLS_KEY/CERT)'}`);
   if (!PRODUCTION && configuredOrigins.length === 0) {

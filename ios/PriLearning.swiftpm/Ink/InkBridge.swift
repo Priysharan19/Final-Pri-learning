@@ -29,6 +29,7 @@ final class InkBridge: NSObject, InkSurfaceDelegate {
     private let surface = InkSurfaceView()
     private let foundationRecognizer = InkFoundationPageRecognizer()
     private let recognizer = MathInkRecognizer()
+    private let cloudRecognizer = NativeCloudInkClient()
     private let recognitionQueue = DispatchQueue(label: "com.prilearning.ink.recognize", qos: .userInitiated)
     private let encodingQueue = DispatchQueue(label: "com.prilearning.ink.encode", qos: .userInitiated)
     private let revisionLock = NSLock()
@@ -112,6 +113,11 @@ final class InkBridge: NSObject, InkSurfaceDelegate {
             let requestId = message["reqId"] as? Int ?? 0
             let overrides = message["overrides"] as? [String: String] ?? [:]
             recognize(requestId: requestId, overrides: overrides)
+
+        case "cloudRecognize":
+            let requestId = message["reqId"] as? Int ?? 0
+            let endpoint = message["endpoint"] as? String ?? ""
+            cloudRecognize(requestId: requestId, endpoint: endpoint)
 
         default:
             break
@@ -259,6 +265,36 @@ final class InkBridge: NSObject, InkSurfaceDelegate {
             payload["reqId"] = requestId
             payload["engine"] = "native-rescue"
             DispatchQueue.main.async { self.emit(payload) }
+        }
+    }
+
+    private func cloudRecognize(requestId: Int, endpoint: String) {
+        let strokes = surface.strokes
+        let revision = revisionSnapshot()
+
+        cloudRecognizer.recognise(strokes: strokes, endpoint: endpoint) { [weak self] result in
+            guard let self else { return }
+
+            guard self.revisionIsCurrent(revision) else {
+                var stale = self.emptyReadingPayload(requestId: requestId, engine: "openai-native-cloud-stale")
+                stale["cloud"] = true
+                DispatchQueue.main.async { self.emit(stale) }
+                return
+            }
+
+            switch result {
+            case .success(var payload):
+                payload["type"] = "reading"
+                payload["reqId"] = requestId
+                payload["cloud"] = true
+                DispatchQueue.main.async { self.emit(payload) }
+
+            case .failure(let error):
+                var failed = self.emptyReadingPayload(requestId: requestId, engine: "openai-native-cloud-failed")
+                failed["cloud"] = true
+                failed["failure"] = error.localizedDescription
+                DispatchQueue.main.async { self.emit(failed) }
+            }
         }
     }
 

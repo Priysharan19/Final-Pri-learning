@@ -1,0 +1,24 @@
+{
+  "artboards": [
+    { "file": "Main.dc.html", "x": 0, "y": 0, "w": 794, "h": 1123, "title": "Counter poster · A4" },
+    { "file": "Printed.dc.html", "x": 894, "y": 0, "w": 794, "h": 1123, "title": "Counter poster · printed" },
+    { "file": "Square.dc.html", "x": 1788, "y": 0, "w": 1080, "h": 1080, "title": "Social · 1080²" }
+  ],
+  "annotations": [
+    {
+      "id": "note-qr",
+      "x": 0,
+      "y": -190,
+      "w": 420,
+      "text": "A4 at 96px/in (794×1123).\nQR verified: renders pixel-exact and decodes to /c/a2z. 1.74mm modules — scans from about a metre."
+    },
+    {
+      "id": "note-printed",
+      "x": 894,
+      "y": -190,
+      "w": 420,
+      "text": "Same poster in the brand's light tokens — theme.css calls light mode \"the same paper, printed\".\nSend THIS one to a printer: no flood-black ink, and an unbled A4 edge is invisible on cream."
+    }
+  ],
+  "launch": { "view": "canvas" }
+}

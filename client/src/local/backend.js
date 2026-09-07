@@ -8,7 +8,7 @@ import {
   ENCRYPTED_STORES, setDataKey, dataKeyFor, hasDataKey, dropDataKeys, sealField, openField
 } from './idb.js';
 import {
-  sydneyDate, streakFor, bumpActivity, setPredictedToday,
+  sydneyDate, streakFor, bumpActivity, setPredictedToday, setDayZone, zoneForCourse,
   ratingsFor, getRating, putRating, currentPid, setCurrentPid, activityFor
 } from './store.js';
 import {
@@ -448,6 +448,11 @@ async function requireProfile() {
   if (p.auth && !hasDataKey(p.id)) {
     throw Object.assign(new Error('This profile is protected — enter its password.'), { status: 401, needsPassword: true, profileId: p.id });
   }
+  // Every route that reads or writes a dated row goes through here, so this is
+  // the one place that guarantees "today" means the student's own today before
+  // any date is computed. An Indian profile's day rolls over at IST midnight,
+  // not Sydney's — which is 6:30 pm for them, in the middle of evening study.
+  setDayZone(zoneForCourse(p.course));
   return p;
 }
 
@@ -1738,6 +1743,37 @@ const routes = {
       misconception: await namedTrap(p.id, q.subtopic, trapHit),
       solution: { steps: q.steps, answerText: displayAnswer(q), criteria: criteriaFor(q), solutionText: q.solutionText },
       ...meta
+    };
+  },
+
+  // The examiner's brief for one question: what the cloud marker is marking
+  // against. Pri generated this question, so it already holds the official
+  // answer, the worked steps and the mark scheme — that is the whole advantage
+  // over a competitor who only has a photo, and the reason the model can be
+  // asked the narrow question "is this criterion present?" instead of the wide
+  // one "is this working right?".
+  //
+  // On leaking the answer: everything below is already in this device's
+  // IndexedDB, because the generator ran here. This route exposes nothing the
+  // student could not read out of storage. It is still gated on the question
+  // having been attempted, so it cannot become a one-tap "show me the answer"
+  // for anyone reading the route table.
+  'POST /practice/:id/marking-brief': async (body, params) => {
+    const p = await requireProfile();
+    const row = await get('questions', params.id);
+    if (!row || row.pid !== p.id) throw Object.assign(new Error('Question not found'), { status: 404 });
+    if (!row.answered && !(row.tries > 0)) {
+      throw Object.assign(new Error('Attempt this question first'), { status: 409 });
+    }
+    const q = row.payload;
+    return {
+      prompt: sanitizeText(q.prompt, 1200),
+      criteria: criteriaFor(q),
+      officialAnswer: displayAnswer(q),
+      workedSteps: (q.steps || []).slice(0, 12).map(s => ({
+        h: sanitizeText(s?.h, 160),
+        d: sanitizeText(s?.d, 300)
+      }))
     };
   },
 

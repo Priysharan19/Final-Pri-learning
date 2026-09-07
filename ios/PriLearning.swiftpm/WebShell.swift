@@ -40,9 +40,29 @@ struct WebShell: UIViewRepresentable {
         config.allowsInlineMediaPlayback = true
         config.defaultWebpagePreferences.allowsContentJavaScript = true
 
-        // Tell the web app it is running inside the native shell.
+        // Tell the web app it is running inside the native shell, and hand it
+        // the cloud gateway.
+        //
+        // The endpoint has to come from here and nowhere else. The web app
+        // resolves it from `window.__PRI_CLOUD_INK_ENDPOINT__`, a build-time
+        // Vite variable, or an http(s) LAN origin — and inside this shell the
+        // page is served from `prilearning://app/`, so the origin test can
+        // never fire. Without this line `cloudInkConfigured()` returns false on
+        // every physical iPad, both cloud routes stay inert, and the student
+        // silently gets on-device recognition only. That was the state of the
+        // shipped app: the OpenAI path existed and had never once run on a
+        // device.
+        var bootFlags = "window.__PRI_NATIVE__ = true;"
+            + "window.__PRI_NATIVE_INK__ = true;"
+            + "window.__PRI_NATIVE_PHOTO__ = true;"
+        if let endpoint = CloudInkSettings.endpoint {
+            bootFlags += "window.__PRI_CLOUD_INK_ENDPOINT__ = \(jsString(endpoint));"
+        }
+        if let token = CloudInkSettings.clientToken {
+            bootFlags += "window.__PRI_CLOUD_INK_TOKEN__ = \(jsString(token));"
+        }
         let nativeFlag = WKUserScript(
-            source: "window.__PRI_NATIVE__ = true; window.__PRI_NATIVE_INK__ = true; window.__PRI_NATIVE_PHOTO__ = true;",
+            source: bootFlags,
             injectionTime: .atDocumentStart,
             forMainFrameOnly: false
         )

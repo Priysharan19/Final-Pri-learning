@@ -128,7 +128,11 @@ function post(message) {
 }
 
 function failedReading(op, failure) {
-  const base = op === 'foundationRecognize' ? 'pri-foundation' : 'native-rescue';
+  const base = op === 'foundationRecognize'
+    ? 'pri-foundation'
+    : op === 'cloudRecognize'
+      ? 'openai-native-cloud'
+      : 'native-rescue';
   return {
     type: 'reading', lines: [], text: '', symbols: [], minConf: 0, margin: 0,
     weakest: null, engine: `${base}-${failure}`, failure
@@ -241,5 +245,13 @@ export const nativeInk = {
    * separate from the foundation call so production fallback order is auditable. */
   recognize(overrides = {}, context = null) {
     return requestReading({ op: 'recognize', overrides }, 14000, context);
+  },
+
+  /** Physical-iPad cloud OCR. Swift rasterises the PencilKit drawing and sends
+   * it to Pri's server-side gateway. The OpenAI API key never enters the app. */
+  cloudRecognize(endpoint, context = null) {
+    const url = String(endpoint || '').trim();
+    if (!url) return Promise.resolve(failedReading('cloudRecognize', 'endpoint-missing'));
+    return requestReading({ op: 'cloudRecognize', endpoint: url }, 50000, context);
   }
 };

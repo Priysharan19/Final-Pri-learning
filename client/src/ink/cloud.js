@@ -49,6 +49,20 @@ function clientToken() {
   return String(window.__PRI_CLOUD_INK_TOKEN__ || import.meta.env.VITE_PRI_CLOUD_INK_TOKEN || '').trim();
 }
 
+/**
+ * The gateway base, for callers that need a sibling route rather than the
+ * recognition one. Marking lives at /v1/working/mark on the same host, so it
+ * resolves the endpoint exactly the same way — one configuration switch turns
+ * both on, and neither can be pointed somewhere the other is not.
+ */
+export function cloudGatewayBase() {
+  const url = endpoint();
+  if (!url) return '';
+  return url.replace(/\/v1\/handwriting\/recognize\/?$/, '');
+}
+
+export const cloudClientToken = clientToken;
+
 export function cloudInkConfigured() {
   // A temporary gateway failure must never permanently turn cloud recognition
   // off for the lifetime of the SPA. Earlier code latched `hardUnavailable`
@@ -80,27 +94,38 @@ function boundsOf(points) {
   return { x1, y1, x2, y2, w: Math.max(1, x2 - x1), h: Math.max(1, y2 - y1) };
 }
 
-function renderScale(width, height) {
+function renderScale(width, height, caps = {}) {
+  const maxSide = caps.maxSide || MAX_SIDE;
+  const maxPixels = caps.maxPixels || MAX_PIXELS;
   const paddedW = width + PADDING * 2;
   const paddedH = height + PADDING * 2;
-  let scale = 2;
-  scale = Math.min(scale, MAX_SIDE / Math.max(paddedW, paddedH));
-  scale = Math.min(scale, Math.sqrt(MAX_PIXELS / Math.max(1, paddedW * paddedH)));
+  let scale = caps.maxScale || 2;
+  scale = Math.min(scale, maxSide / Math.max(paddedW, paddedH));
+  scale = Math.min(scale, Math.sqrt(maxPixels / Math.max(1, paddedW * paddedH)));
   return Math.max(0.5, scale);
 }
+
+// Marking pays per image tile, transcription does not pay noticeably less for
+// being smaller — so the two paths want different resolutions from the same
+// renderer. A vision model tiles an image into 512-px patches and charges per
+// tile, so area is the bill: 2048×1200 is twelve tiles, 1100×640 is four. On
+// school handwriting the larger raster reads no better, and over a month of
+// marking the difference is real money per student. Transcription keeps the
+// original caps because its accuracy gate was measured at them.
+export const MARKING_RASTER_CAPS = { maxSide: 1100, maxPixels: 900_000, maxScale: 1.5 };
 
 /**
  * Render stroke vectors, not a screenshot. This is both cheaper and safer: the
  * cloud sees the student's marks and their 2-D layout, but not the question,
  * marks, identity, navigation, feedback, or anything else on screen.
  */
-export function rasterizeInkForCloud(strokes) {
+export function rasterizeInkForCloud(strokes, caps = {}) {
   if (typeof document === 'undefined') return null;
   const points = allPoints(strokes);
   if (!points.length) return null;
 
   const bounds = boundsOf(points);
-  const scale = renderScale(bounds.w, bounds.h);
+  const scale = renderScale(bounds.w, bounds.h, caps);
   const width = Math.max(64, Math.ceil((bounds.w + PADDING * 2) * scale));
   const height = Math.max(64, Math.ceil((bounds.h + PADDING * 2) * scale));
   const canvas = document.createElement('canvas');

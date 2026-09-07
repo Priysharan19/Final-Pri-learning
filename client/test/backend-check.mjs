@@ -834,6 +834,28 @@ async function run() {
     const ratingRow = await idb.get('ratings', `${ada.id}:${topicId}`);
     ok('the rating is stored against the subtopic', !!ratingRow && ratingRow.attempts >= 1, show(ratingRow));
 
+    // The examiner's brief the cloud marker marks against. Everything in it is
+    // already in this device's storage — the generator ran here — so the gate
+    // is not secrecy but sequence: it must not become a one-tap "show me the
+    // answer" for a question nobody has attempted yet.
+    const briefTarget = await answerableQuestion({ mode: 'topic', subtopic: topicId });
+    await rejects('the marking brief is withheld before the question is attempted',
+      POST(`/practice/${briefTarget.question.id}/marking-brief`, {}), { status: 409 });
+    await POST(`/practice/${briefTarget.question.id}/submit`, { answer: briefTarget.wrong, ms: 3000 });
+    const brief = await POST(`/practice/${briefTarget.question.id}/marking-brief`, {});
+    ok('the brief carries the question', typeof brief.prompt === 'string' && brief.prompt.length > 0, show(brief.prompt));
+    ok('the brief carries a mark scheme', Array.isArray(brief.criteria) && brief.criteria.length > 0, show(brief.criteria?.length));
+    ok('every criterion is worth marks', brief.criteria.every(c => Number(c.mark) > 0), show(brief.criteria));
+    ok('the brief carries the official answer', typeof brief.officialAnswer === 'string' && brief.officialAnswer.length > 0, show(brief.officialAnswer));
+    ok('the brief carries the worked steps', Array.isArray(brief.workedSteps), show(brief.workedSteps?.length));
+    {
+      const stranger = await nextQuestion({});
+      await POST('/profiles/select', { id: grace.id, password: 'punch-cards-9' });
+      await rejects('another profile cannot read your marking brief',
+        POST(`/practice/${stranger.question.id}/marking-brief`, {}), { status: 404 });
+      await POST('/profiles/select', { id: ada.id });
+    }
+
     const revealTarget = await nextQuestion({ mode: 'topic', subtopic: topicId });
     const revealed = await POST(`/practice/${revealTarget.question.id}/reveal`, { ms: 1000 });
     eq('reveal resolves the question', revealed.resolved, true);

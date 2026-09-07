@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { localDate, localWeekdayNarrow } from '../local/store.js';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
 import { useApp } from '../App.jsx';
@@ -295,9 +296,7 @@ function Tagline() {
   );
 }
 
-function sydneyDate(ms) {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Australia/Sydney', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(ms));
-}
+
 
 function GoalCard({ user, activity, onGo }) {
   const done = user.today?.questions || 0;
@@ -307,10 +306,10 @@ function GoalCard({ user, activity, onGo }) {
   const byDate = Object.fromEntries(activity.map(d => [d.date, d]));
   const days = Array.from({ length: 7 }, (_, i) => {
     const ms = Date.now() - (6 - i) * 86400000;
-    const date = sydneyDate(ms);
+    const date = localDate(ms);
     const row = byDate[date];
     return {
-      date, lbl: new Intl.DateTimeFormat('en-AU', { timeZone: 'Australia/Sydney', weekday: 'narrow' }).format(new Date(ms)),
+      date, lbl: localWeekdayNarrow(ms),
       hit: (row?.questions || 0) > 0, today: i === 6
     };
   });

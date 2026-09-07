@@ -50,6 +50,10 @@ final class InkSurfaceView: UIView, PKCanvasViewDelegate {
     private var suppressChangeEvents = false
     private let historyLimit = 60
 
+    // Authoritative PencilKit change signal. Debounced so JSON/recognition work
+    // never competes with the active low-latency Pencil rendering path.
+    private var pendingStrokeNotification: DispatchWorkItem?
+
     override init(frame: CGRect) {
         super.init(frame: frame)
         addSubview(canvas)
@@ -130,9 +134,24 @@ final class InkSurfaceView: UIView, PKCanvasViewDelegate {
         pushHistory()
     }
 
+    func canvasViewDrawingDidChange(_ canvasView: PKCanvasView) {
+        guard !suppressChangeEvents else { return }
+        scheduleStrokeNotification(after: 0.18)
+    }
+
     func canvasViewDidEndUsingTool(_ canvasView: PKCanvasView) {
         guard !suppressChangeEvents else { return }
-        delegate?.inkSurfaceDidChangeStrokes(self)
+        scheduleStrokeNotification(after: 0.06)
+    }
+
+    private func scheduleStrokeNotification(after delay: TimeInterval) {
+        pendingStrokeNotification?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            guard let self, !self.suppressChangeEvents else { return }
+            self.delegate?.inkSurfaceDidChangeStrokes(self)
+        }
+        pendingStrokeNotification = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
     }
 
     private func pushHistory() {
@@ -160,6 +179,7 @@ final class InkSurfaceView: UIView, PKCanvasViewDelegate {
     }
 
     private func replaceDrawing(_ drawing: PKDrawing) {
+        pendingStrokeNotification?.cancel()
         suppressChangeEvents = true
         canvas.drawing = drawing
         suppressChangeEvents = false

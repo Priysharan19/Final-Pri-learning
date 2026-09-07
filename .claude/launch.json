@@ -37,6 +37,33 @@
         "marketing/reel/tools/serve.mjs"
       ],
       "port": 4174
+    },
+    {
+      "name": "claim",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "4175",
+        "-d",
+        "marketing/a2z-claim-page"
+      ],
+      "port": 4175
+    },
+    {
+      "name": "prod",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "preview",
+        "--prefix",
+        "client",
+        "--",
+        "--port",
+        "4455",
+        "--strictPort"
+      ],
+      "port": 4455
     }
   ]
 }

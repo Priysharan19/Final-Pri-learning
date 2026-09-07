@@ -12,6 +12,7 @@ import InkCanvas from '../ink/InkCanvas.jsx';
 import { sanitizeFigure } from '../lib/sanitize.js';
 import { clearDraft, queueDraft, readDraft } from './drafts.js';
 import { nativePhotoAvailable, recognizePhoto } from '../native/photo.js';
+import { markingConfigured, markWorking, markingToStepReport, markingUnavailableNote } from '../ink/marker.js';
 
 const DIFF_CLASS = { 1: 'tag-d1', 2: 'tag-d2', 3: 'tag-d3', 4: 'tag-d4' };
 // Public question metadata may constrain what a single answer glyph can be,
@@ -216,6 +217,11 @@ export default function QuestionCard({ question, why, reason, onResolved, onNext
   const [inkPhase, setInkPhase] = useState(() => (inkModule ? 'ready' : 'idle'));   // idle | loading | ready | failed
   const [inkTry, setInkTry] = useState(0);
   const [toTex, setToTex] = useState(() => latexFn);
+  // Cloud marking runs beside the local mark, never in front of it. `phase`
+  // exists so the student is told something is coming rather than watching a
+  // blank space for three seconds after a submission that already resolved.
+  const [cloudMark, setCloudMark] = useState({ phase: 'idle', report: null, note: '' });
+  const markSeqRef = useRef(0);
   const [checking, setChecking] = useState(false);
   const [vouched, setVouched] = useState(null);     // the exact reading the student stood behind
   const startRef = useRef(Date.now());
@@ -231,6 +237,8 @@ export default function QuestionCard({ question, why, reason, onResolved, onNext
     setSelfMarks({}); setSelfSaved(false); setPhoto(null); setBookmarked(false); setElapsed(0);
     setPhotoOCR({ phase: 'idle', text: '', confidence: 0, error: '', engine: null });
     setChecking(false); setVouched(null);
+    setCloudMark({ phase: 'idle', report: null, note: '' });
+    markSeqRef.current += 1;
     startRef.current = Date.now();
     if (mode === 'type') setTimeout(() => inputRef.current?.focus(), 60);
   }, [question.id]); // eslint-disable-line
@@ -394,6 +402,41 @@ export default function QuestionCard({ question, why, reason, onResolved, onNext
 
   // Every submit control leads here, so the confirmation step cannot be walked
   // around: a reading in doubt turns the press into the question instead.
+  /**
+   * Line-by-line marking of the handwriting, fetched after the local mark has
+   * already been shown.
+   *
+   * Deliberately not awaited by submit(): the local engine has already decided
+   * the mark, offline, and making the student wait on a network round trip to
+   * see a verdict Pri already knows would trade the product's one real
+   * advantage for a feature that is meant to sit on top of it. So the marks
+   * land first and the annotated working arrives a moment later.
+   *
+   * Every failure path here is silent-or-quiet by design. Marking adds detail
+   * to a question that is already marked; it can never take a mark away, and a
+   * gateway outage must not look like something the student did wrong.
+   */
+  async function runCloudMarking(strokes) {
+    if (!markingConfigured() || !Array.isArray(strokes) || !strokes.length) return;
+    const seq = ++markSeqRef.current;
+    setCloudMark({ phase: 'marking', report: null, note: '' });
+    try {
+      const brief = await api.post(`/practice/${question.id}/marking-brief`, {});
+      if (seq !== markSeqRef.current) return;
+      const outcome = await markWorking({ strokes, question: brief });
+      if (seq !== markSeqRef.current) return;
+
+      if (!outcome.ok) {
+        setCloudMark({ phase: 'unavailable', report: null, note: markingUnavailableNote(outcome.reason) });
+        return;
+      }
+      setCloudMark({ phase: 'done', report: markingToStepReport(outcome.marked), note: '' });
+    } catch {
+      if (seq !== markSeqRef.current) return;
+      setCloudMark({ phase: 'unavailable', report: null, note: '' });
+    }
+  }
+
   async function submit(vouchedNow) {
     if (busy || resolved) return;
     if (needsCheck && vouchedNow !== reading) { setChecking(true); return; }
@@ -438,6 +481,9 @@ export default function QuestionCard({ question, why, reason, onResolved, onNext
       } else {
         setState({ phase: 'retry', res: r });
       }
+      // Only handwriting is marked line by line: a typed answer has no working
+      // to annotate, and the local step checker already reads typed working.
+      if (viaInk && inkResult?.strokes?.length) runCloudMarking(inkResult.strokes);
     } catch (e) {
       setState({ phase: 'retry', res: { feedback: e.message, invalid: true } });
     } finally { setBusy(false); }
@@ -852,6 +898,9 @@ export default function QuestionCard({ question, why, reason, onResolved, onNext
         </div>
       )}
 
+      {/* ── the handwriting, marked line by line ── */}
+      <CloudMarking state={cloudMark} />
+
       {/* ── evaluation ── */}
       {resolved && (
         <>
@@ -986,6 +1035,99 @@ function CriteriaTable({ criteria, correct, selfMarks, setSelfMarks, selfSaved, 
               <button className="btn btn-ghost btn-sm" style={{ marginLeft: 'auto' }} onClick={() => setSelfSaved(true)}>Save self-marking</button>
             </>
             : <span className="tag" style={{ color: 'var(--good)' }}>✓ self-marking recorded — {Object.values(selfMarks).filter(Boolean).length}/{criteria.length} marks</span>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * The handwriting, marked line by line, with the mark scheme it was marked
+ * against shown underneath it.
+ *
+ * Showing the scheme is the part that matters. A student who loses a mark
+ * learns nothing from a total; they learn from seeing which criterion went
+ * unearned and which line was supposed to earn it. This is what a real examiner
+ * hands back, and it is the reason to mark the working at all rather than only
+ * the answer.
+ *
+ * The marks here are NOT the question's marks. The engine's own mark is
+ * authoritative and is shown in the evaluation card below; this is a second
+ * reading of the working, labelled as such, and it never overrides the first.
+ */
+function CloudMarking({ state }) {
+  if (!state || state.phase === 'idle') return null;
+
+  if (state.phase === 'marking') {
+    return (
+      <div className="muted" style={{ marginTop: 12, fontSize: 13 }} aria-live="polite">
+        Marking your working line by line…
+      </div>
+    );
+  }
+  if (state.phase === 'unavailable') {
+    return state.note
+      ? <div className="muted" style={{ marginTop: 12, fontSize: 13 }}>{state.note}</div>
+      : null;
+  }
+
+  const r = state.report;
+  if (!r) return null;
+  const earned = (r.awards || []).filter(a => a.earned).length;
+
+  return (
+    <div style={{ marginTop: 14 }}>
+      <div className="sc-label" style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
+        <span>Your working, marked</span>
+        <span style={{ marginLeft: 'auto', fontVariantNumeric: 'tabular-nums' }}>
+          {r.marksAwarded}/{r.marksAvailable} method marks
+        </span>
+      </div>
+
+      {r.needsConfirmation && (
+        <div className="muted" style={{ fontSize: 12.5, marginTop: 4 }}>
+          Some of the page was hard to read, so treat this reading as a second opinion — your mark above is unaffected.
+        </div>
+      )}
+
+      {r.lines.length > 0 && (
+        <div style={{ marginTop: 8, display: 'grid', gap: 3 }}>
+          {r.lines.map((l, i) => (
+            <div className={`stepcheck-line sc-${l.status}`} key={i}>
+              <span>{l.status === 'ok' ? '✓' : l.status === 'break' ? '✗' : '·'}</span>
+              <span>{l.text}</span>
+              {l.note && (
+                <span style={{ fontFamily: 'var(--font)', fontWeight: 400, fontSize: 12.5 }}> — {l.note}</span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {(r.awards || []).length > 0 && (
+        <div style={{ marginTop: 10 }}>
+          <div className="sc-label">Mark scheme · {earned} of {r.awards.length} earned</div>
+          <div style={{ display: 'grid', gap: 3, marginTop: 6 }}>
+            {r.awards.map(a => (
+              <div key={a.criterionId} className={`stepcheck-line sc-${a.earned ? 'ok' : 'break'}`}>
+                <span>{a.earned ? '✓' : '✗'}</span>
+                <span style={{ fontFamily: 'var(--font)', fontWeight: 400 }}>
+                  {a.text}
+                  {a.reason && <span className="muted"> — {a.reason}</span>}
+                </span>
+                <b style={{ marginLeft: 'auto', fontVariantNumeric: 'tabular-nums' }}>
+                  {a.earned ? a.mark : 0}/{a.mark}
+                </b>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {r.overallComment && (
+        <div className="diagnosis-card" style={{ marginTop: 10 }}>
+          <div className="diagnosis-label">What to change</div>
+          <div className="diagnosis-title">{r.overallComment}</div>
         </div>
       )}
     </div>
