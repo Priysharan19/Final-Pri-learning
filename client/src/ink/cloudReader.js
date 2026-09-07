@@ -21,7 +21,6 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { cloud, cloudAvailable } from '../platform/cloudTransport.js';
 import { rasterizeInk } from './cloudRaster.js';
-import { preparePhoto } from './photoRaster.js';
 
 /** How the returned reading is labelled, so History and evidence can tell. */
 export const CLOUD_ENGINE_PREFIX = 'cloud';
@@ -122,41 +121,16 @@ export function shouldSupersede(cloudReading, localReading, { hasManualCorrectio
 }
 
 /**
- * Read a photograph of working done on paper.
+ * Paper photographs have a wider privacy boundary than stroke-derived ink.
  *
- * The same route and the same reader as the ink, because to the reader they are
- * both just an image of handwriting. This is the input most students actually
- * have — a page of an exercise book — and until now the browser build could
- * attach a photo and never read it, while the iPad build read it with an OCR
- * engine built for printed text.
- *
- * Returns null for every "carry on without it" case; never throws.
+ * The existing `cloudHandwriting` consent and privacy disclosure authorize only
+ * an image rasterized from the student's in-app strokes. A paper photo can also
+ * contain names, annotations, other people's work or surrounding page content.
+ * Reusing that consent for a full photo therefore exceeds the disclosed data
+ * boundary. Fail closed until Pri has a separate explicit photo-upload consent
+ * and matching disclosure. QuestionCard treats this as a cloud-reader refusal
+ * and falls back to native/local photo OCR when available.
  */
-export async function readPhotoWithCloud(dataUrl, {
-  user,
-  signal = null,
-  transport = cloud,
-  prepare = preparePhoto,
-  available = cloudAvailable
-} = {}) {
-  if (!cloudReadingEnabled(user, { available })) return { reason: 'disabled' };
-
-  let prepared = null;
-  try { prepared = await prepare(dataUrl); } catch { return { reason: 'unreadable' }; }
-  // A photo the browser cannot decode — a HEIC on Android, say — or one that
-  // never compresses under the budget. Both are the student's to act on, and
-  // neither is "server reading is off".
-  if (!prepared?.dataUrl) return { reason: 'unreadable' };
-
-  try {
-    const response = await transport.transcribeHandwriting(prepared.dataUrl, { signal });
-    const transcription = response?.transcription;
-    if (!transcription?.lines?.length) return { reason: 'empty' };
-    return {
-      transcription,
-      photo: { width: prepared.width, height: prepared.height, bytes: prepared.bytes, quality: prepared.quality }
-    };
-  } catch (error) {
-    return { error: { code: error?.code || 'HANDWRITING_FAILED', message: error?.message || '' } };
-  }
+export async function readPhotoWithCloud() {
+  return { reason: 'photo-consent-required' };
 }
