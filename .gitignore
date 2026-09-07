@@ -48,3 +48,26 @@ marketing/reel/export/
 # git cannot re-include a file under an excluded directory, so the directory
 # itself has to be let back in.
 !*[ ][2-9].swiftpm/
+
+# The rule above needs a dot after the digit, so it misses a copy of a file that
+# has no extension: "Dockerfile 2", ".gitignore 2", ".dockerignore 2". Seven of
+# those were sitting untracked in this working tree, and a `git add -A` during a
+# merge staged every one of them. Same failure, one character of pattern apart.
+*[ ][2-9]
+
+# Local secrets. The provider keys for cloud reading and marking live here and
+# must never reach the remote; there is no safe version of committing one.
+.env
+.env.local
+.env.*.local
+
+# SQLite writes a -wal and a -shm beside the database while it is open. They are
+# process state, not data: committed once on a feature branch, they arrive on
+# another machine describing a transaction that never happened there.
+*.db-wal
+*.db-shm
+
+# Xcode rewrites its own per-user state under .swiftpm/xcode — window layout,
+# scheme selection, breakpoints. It also rewrites Package.swift and strips the
+# comments. The state is one person's, never the project's.
+**/.swiftpm/xcode/
