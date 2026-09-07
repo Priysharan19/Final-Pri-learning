@@ -92,8 +92,11 @@ export function consentState(db, accountId) {
 
 /** Mark a guardian's confirmation. Returns false when there was nothing to confirm. */
 export function confirmConsent(db, accountId, now = Date.now()) {
-  const changed = db.prepare(`UPDATE guardian_consents SET confirmed_at = ?, withdrawn_at = NULL
-    WHERE account_id = ? AND confirmed_at IS NULL`).run(now, accountId).changes;
+  // Withdrawal is terminal for the current consent ceremony. Confirmation must
+  // never clear a withdrawal or re-grant sync permission from the same bearer;
+  // a future re-consent flow must create a new request/authority explicitly.
+  const changed = db.prepare(`UPDATE guardian_consents SET confirmed_at = ?
+    WHERE account_id = ? AND confirmed_at IS NULL AND withdrawn_at IS NULL`).run(now, accountId).changes;
   return changed > 0;
 }
 
