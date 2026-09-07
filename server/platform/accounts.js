@@ -16,6 +16,7 @@ import { consumeOidcNonce } from './oidcNonce.js';
 
 const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const TOKEN_MS = 1000 * 60 * 60;
+const GUARDIAN_WITHDRAWAL_EXPIRY = 253402300799000; // 9999-12-31T23:59:59Z; withdrawal is fail-closed authority.
 const BCRYPT_COST = 12;
 // Compared against when no account (or no password) matches the submitted
 // email, so an unknown address costs the same bcrypt work as a wrong password.
@@ -52,7 +53,6 @@ function publicAccount(row) {
   };
 }
 
-
 /** Enough for a student to recognise which mailbox was written to, no more. */
 function maskEmail(value) {
   const text = String(value || '');
@@ -80,8 +80,12 @@ function queueAccountToken(db, accountId, destination, purpose, now = Date.now()
   const raw = opaqueToken(32);
   const tokenId = id('tok');
   const ciphertext = encryptDeliveryToken(raw, `${accountId}:${purpose}:${tokenId}`);
+  // Guardian confirmation remains a one-hour action (enforced by created_at in
+  // /guardian/confirm), while the same guardian-held bearer remains usable only
+  // for the permission-reducing withdrawal route for the lifetime of the account.
+  const expiresAt = purpose === 'guardian-consent' ? GUARDIAN_WITHDRAWAL_EXPIRY : now + TOKEN_MS;
   db.prepare(`INSERT INTO account_tokens(id, account_id, purpose, token_hash, created_at, expires_at)
-    VALUES (?, ?, ?, ?, ?, ?)`).run(tokenId, accountId, purpose, sha256(raw), now, now + TOKEN_MS);
+    VALUES (?, ?, ?, ?, ?, ?)`).run(tokenId, accountId, purpose, sha256(raw), now, expiresAt);
   db.prepare(`INSERT INTO auth_delivery_outbox(id, account_id, kind, destination, token_id, token_ciphertext, created_at)
     VALUES (?, ?, ?, ?, ?, ?, ?)`).run(id('mail'), accountId, purpose, destination, tokenId, ciphertext, now);
   return tokenId;
@@ -153,11 +157,6 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
       if (!em || !name || !strongPassword(password)) {
         return res.status(400).json({ error: { code: 'INVALID_ACCOUNT', message: 'Use a valid name, email and password of at least 10 characters.' } });
       }
-      // Every Class 7-12 student is a child under the DPDP Act, which draws
-      // its line at 18. A local profile never reaches this server and is not
-      // ours to consent to; this account is, so the guardian is asked here and
-      // sync stays shut until they answer. The app itself keeps working — that
-      // is what makes this a gate rather than a wall.
       const child = learnerIsChild({ isAdult: req.body?.isAdult, year: req.body?.year });
       let guardian = null;
       if (child) {
@@ -167,8 +166,6 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
       }
 
       const now = Date.now();
-      // A teacher invite (minted by an admin, single-use, expiring) is the only
-      // way registration produces anything other than a student account.
       const inviteCode = req.body?.teacherInviteCode == null ? '' : String(req.body.teacherInviteCode).trim().slice(0, 64);
       const inviteInvalid = () => res.status(400).json({ error: { code: 'TEACHER_INVITE_INVALID', message: 'Teacher invite code is invalid, expired or already used.' } });
       if (inviteCode && !findLiveTeacherInvite(db, inviteCode, now)) return inviteInvalid();
@@ -210,8 +207,6 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
     try {
       const em = email(req.body?.email);
       const password = String(req.body?.password || '');
-      // Lockout is keyed on whatever email was submitted, registered or not, so
-      // the locked response cannot reveal which addresses have accounts.
       const submitted = String(req.body?.email || '').trim().toLowerCase().slice(0, 254);
       const now = Date.now();
       const lock = loginLockStatus(db, submitted, now);
@@ -220,8 +215,6 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
         return res.status(429).json({ error: { code: 'ACCOUNT_LOCKED', message: 'Too many failed sign-in attempts. Try again later.' } });
       }
       const row = em ? db.prepare('SELECT * FROM accounts WHERE email = ? AND deleted_at IS NULL').get(em) : null;
-      // One bcrypt comparison always runs, so unknown emails, password-less
-      // accounts and wrong passwords all answer in the same time with one body.
       const matched = await bcrypt.compare(password, row?.password_hash || DUMMY_PASSWORD_HASH);
       if (!row || !row.password_hash || !matched) {
         recordLoginFailure(db, submitted, now);
@@ -269,21 +262,20 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
       db.prepare('UPDATE accounts SET email_verified_at = COALESCE(email_verified_at, ?), updated_at = ? WHERE id = ?').run(now, now, token.account_id);
       db.prepare('DELETE FROM auth_delivery_outbox WHERE token_id = ?').run(token.id);
     })();
-    // Proof of mailbox control is what PRI_BOOTSTRAP_ADMIN_EMAIL waits for.
     maybeBootstrapAdmin(db, token.account_id, now);
     res.json({ ok: true });
   });
 
-  // ── A guardian answers ──────────────────────────────────────────────────
-  // Both routes are reached from the link in the guardian's email and take no
-  // session: the guardian is not the account holder and has no reason to have
-  // one. The token is the whole authority, which is why it is single-use, hashed
-  // at rest and expires in an hour like every other account action here.
+  // Guardian confirmation and withdrawal intentionally have different authority
+  // windows. A confirmation can only elevate sync permission for one hour and is
+  // single-use. The same guardian-held bearer remains valid after consumption
+  // only for the fail-closed withdrawal route, which can never grant permission.
   router.post('/guardian/confirm', rateLimit(db, 'guardian-confirm', { limit: 20, windowMs: 60 * 60 * 1000 }), (req, res) => {
     const raw = String(req.body?.token || '');
     const now = Date.now();
     const token = raw ? db.prepare(`SELECT * FROM account_tokens
-      WHERE token_hash = ? AND purpose = 'guardian-consent' AND consumed_at IS NULL AND expires_at > ?`).get(sha256(raw), now) : null;
+      WHERE token_hash = ? AND purpose = 'guardian-consent' AND consumed_at IS NULL
+        AND created_at > ?`).get(sha256(raw), now - TOKEN_MS) : null;
     if (!token) return res.status(400).json({ error: { code: 'TOKEN_INVALID', message: 'This confirmation link is invalid or has expired.' } });
     let confirmed = false;
     db.transaction(() => {
@@ -294,23 +286,19 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
     res.json({ ok: true, confirmed });
   });
 
-  // Withdrawal has to be as easy as consent was to give, so it uses the same
-  // link and needs no account. It is recorded rather than deleted: that consent
-  // was given and then withdrawn is itself what a guardian may need shown back.
   router.post('/guardian/withdraw', rateLimit(db, 'guardian-withdraw', { limit: 20, windowMs: 60 * 60 * 1000 }), (req, res) => {
     const raw = String(req.body?.token || '');
     const now = Date.now();
-    // A withdrawal link stays usable after the confirmation has been consumed,
-    // because a guardian who changes their mind a week later must still be able
-    // to act. It is bounded by the token's own expiry, not by its consumption.
+    // consumed_at is deliberately ignored: after confirmation this bearer has
+    // only permission-reducing authority. The account FK deletes it with the
+    // account, and purpose+hash prevent it crossing accounts or action types.
     const token = raw ? db.prepare(`SELECT * FROM account_tokens
-      WHERE token_hash = ? AND purpose = 'guardian-consent' AND expires_at > ?`).get(sha256(raw), now) : null;
-    if (!token) return res.status(400).json({ error: { code: 'TOKEN_INVALID', message: 'This link is invalid or has expired.' } });
+      WHERE token_hash = ? AND purpose = 'guardian-consent'`).get(sha256(raw)) : null;
+    if (!token) return res.status(400).json({ error: { code: 'TOKEN_INVALID', message: 'This withdrawal link is invalid.' } });
     const withdrawn = withdrawConsent(db, token.account_id, now);
     res.json({ ok: true, withdrawn });
   });
 
-  // What the app shows the student about where their account stands.
   router.get('/guardian/state', requireSession(db), (req, res) => {
     const state = consentState(db, req.platformSession.account_id);
     res.json({
@@ -332,7 +320,6 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
         queueAccountToken(db, row.id, row.email, 'reset-password', now);
       })();
     }
-    // Identical response prevents account enumeration.
     res.json({ ok: true });
   });
 
@@ -378,8 +365,6 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
         db.prepare('UPDATE accounts SET password_hash = ?, updated_at = ? WHERE id = ?').run(passwordHash, now, account.id);
         db.prepare('UPDATE account_sessions SET revoked_at = ? WHERE account_id = ? AND revoked_at IS NULL').run(now, account.id);
       })();
-      // Rotate the current session after a credential change rather than leaving a
-      // pre-change bearer token alive. Other devices stay revoked until they sign in.
       createSession(db, res, account.id, deviceId, req.get('user-agent') || '', now);
       res.json({ ok: true, account: publicAccount(account), sessionsRotated: true });
     } catch (err) { next(err); }
@@ -421,18 +406,13 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
   router.delete('/', requireSession(db), rateLimit(db, 'account-delete', { limit: 3, windowMs: 24 * 60 * 60 * 1000 }), async (req, res, next) => {
     try {
       const body = req.body || {};
-      // Social re-authentication must present a server-issued, unused nonce so
-      // a captured identity token cannot be replayed to delete the account.
       if (body.provider && !consumeOidcNonce(db, body.nonce)) {
         return res.status(401).json({ error: { code: 'OIDC_NONCE_INVALID', message: 'Request a fresh sign-in nonce before confirming your identity.' } });
       }
       await authorizeAccountDeletion(db, req.platformSession.account_id, body);
       const accountId = req.platformSession.account_id;
-      // Provider subscriptions outlive our rows: a deleted account must never
-      // keep being charged. The hook cancels at the provider first and aborts
-      // the deletion (with a retryable status) when the provider is unreachable.
       if (typeof beforeDelete === 'function') await beforeDelete({ accountId, request: req });
-      db.prepare('DELETE FROM accounts WHERE id = ?').run(accountId); // foreign keys cascade cloud student data
+      db.prepare('DELETE FROM accounts WHERE id = ?').run(accountId);
       clearSessionCookies(res);
       res.json({ deleted: true });
     } catch (error) {
