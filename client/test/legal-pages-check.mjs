@@ -76,6 +76,25 @@ ok(/off unless you turn it on/i.test(privacy),
   'and that sending handwriting to a server is off unless the student turns it on');
 ok(/not the question, not the expected answer/i.test(privacy),
   'and names what is never sent alongside the image');
+// ── The notice may never run ahead of the code ──────────────────────────────
+// It described a guardian-consent flow in detail — a name and contact captured
+// at profile creation, a confirmation email before a cloud account could sync —
+// and none of it existed. A privacy notice that misdescribes the processing is
+// worse than a thin one: a parent reads it and believes a protection is there.
+// README.md said the opposite in the same repository.
+const guardianClaims = [
+  [/asks for a parent or guardian's name/i, 'claims it collects a guardian name'],
+  [/records their consent/i, 'claims it records guardian consent'],
+  [/email the guardian a link/i, 'claims it emails a guardian for confirmation']
+];
+for (const [pattern, what] of guardianClaims) {
+  ok(!pattern.test(privacy), `the notice no longer ${what} — nothing in client/src or server/ implements it`);
+}
+ok(/it does not ask for your age/i.test(privacy),
+  'and says plainly that no age is collected');
+ok(/does not ask for or record a parent's consent/i.test(privacy),
+  'and that no parental consent is recorded');
+
 ok(!/handwriting strokes are not uploaded/i.test(privacy),
   'and no longer makes the unconditional claim the optional setting would break');
 // The second optional setting sends different data and gets its own paragraph.

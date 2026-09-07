@@ -65,10 +65,20 @@ Pri Learning is used by children. Under the DPDP Act, a child is anyone under
 18, and a child's data may only be processed with verifiable consent from a
 parent or guardian.
 
-When a profile is created for someone under 18, the app asks for a parent or
-guardian's name and contact and records their consent, with the date and the
-version of this notice they agreed to. For a cloud account, we email the
-guardian a link they must confirm before the account can sync or subscribe.
+**What the app does today, plainly: it does not ask for your age, and it does
+not ask for or record a parent's consent.** It asks which class you are in,
+which tells it what maths to set you, and nothing else about how old you are.
+No guardian is contacted, and there is no consent record.
+
+If you are under 18, please set this up with a parent or guardian and show them
+this notice, particularly the section on what a cloud account sends. Everything
+works without an account, and without an account nothing leaves the device.
+
+The DPDP Act's substantive obligations — including verifiable parental consent
+for anyone under 18 — commence on 14 May 2027. Before then, and before this app
+is offered to children at scale, a guardian consent flow has to be built and
+this section rewritten to describe it. Until it says otherwise, it does not
+exist.
 
 We do not use children's data for advertising, we do not track children across
 other services, and we do not build behavioural profiles for anything other than
