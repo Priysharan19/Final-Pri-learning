@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { createPlatformDb, nextSyncCursor } from '../platform/db.js';
+import { ensureAuthDeliverySchema } from '../platform/authDelivery.js';
 
 const db = createPlatformDb(':memory:');
 try {
@@ -10,7 +11,24 @@ try {
     'content_revisions','issue_reports','audit_log','idempotency_keys','rate_limits',
     'teacher_invites','login_attempts','oidc_nonces'
   ]) assert.ok(tables.has(required), `missing platform table ${required}`);
-  assert.equal(db.prepare("SELECT value FROM platform_meta WHERE key='schema_version'").get()?.value, '5');
+  assert.equal(db.prepare("SELECT value FROM platform_meta WHERE key='schema_version'").get()?.value, '6');
+
+  // v6 — a guardian's confirmation, and the two delivery constraints that had
+  // to widen to carry it. Pinned by shape as well as by number, because the
+  // version alone would not notice a rebuild that lost a column.
+  const guardians = db.prepare("SELECT sql FROM sqlite_master WHERE name='guardian_consents'").get();
+  assert.ok(guardians, 'guardian_consents exists');
+  for (const column of ['account_id', 'guardian_name', 'guardian_email', 'notice_version', 'requested_at', 'confirmed_at', 'withdrawn_at', 'method']) {
+    assert.match(guardians.sql, new RegExp(`\\b${column}\\b`), `guardian_consents keeps ${column}`);
+  }
+  // The delivery outbox is created lazily by the accounts router and the mail
+  // worker rather than by createPlatformDb, so ensure it before asking about
+  // its shape — otherwise this checks a table that does not exist yet.
+  ensureAuthDeliverySchema(db);
+  for (const table of ['account_tokens', 'auth_delivery_outbox']) {
+    const sql = db.prepare('SELECT sql FROM sqlite_master WHERE name=?').get(table)?.sql || '';
+    assert.match(sql, /guardian-consent/, `${table} admits a guardian consent delivery`);
+  }
   // v5: an idempotency key records the request it answered, so replaying a key
   // over different content is a conflict rather than a silently dropped write.
   assert.ok(db.pragma("table_info('idempotency_keys')").some(column => column.name === 'request_digest'),

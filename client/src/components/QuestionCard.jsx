@@ -1306,8 +1306,8 @@ function Diagnosis({ d }) {
   const hedged = d.confidence !== 'high';
   return (
     <div className="diagnosis-card" data-confidence={d.confidence || 'medium'}>
-      <div className="diagnosis-label">{d.code === 'counterexample' ? 'Why it fails' : hedged ? 'This looks like…' : 'What went wrong'}</div>
-      <div className="diagnosis-title">{hedged && d.code !== 'counterexample' ? `This looks like: ${d.title}` : d.title}</div>
+      <div className="diagnosis-label">{t(d.code === 'counterexample' ? 'verdict.whyItFails' : hedged ? 'verdict.thisLooksLike' : 'verdict.whatWentWrong')}</div>
+      <div className="diagnosis-title">{hedged && d.code !== 'counterexample' ? t('verdict.thisLooksLikeTitle', { title: d.title }) : d.title}</div>
       <div className="diagnosis-body">{d.message}</div>
       {d.fix && <div className="diagnosis-fix">{d.fix}</div>}
     </div>

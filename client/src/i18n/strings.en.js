@@ -406,6 +406,8 @@ export default {
   'verdict.photoFormats': 'a photo, a scanned PDF up to {pages} pages, or paste one you already took',
   'verdict.removePhoto': 'Remove photo',
   'common.loading': 'Loading…',
+  'practice.pyqOnlyLabel': 'Past papers only',
+  'practice.pyqOnlyLabelOn': 'Past papers only · on',
   'practice.pyqOnlyTitle': 'Practise only real questions from past JEE and CBSE papers',
   'practice.pyqOnlyNote': 'Every question below was set in a real exam and carries the paper it came from.',
   'practice.pyqBadge': 'Previous year question',
@@ -414,6 +416,10 @@ export default {
   'verdict.markedStepByStep': 'Marked step by step',
   'verdict.boardStyleNote': 'Board-style step marking, worked out from this question\'s own solution. It follows the convention CBSE publishes; it is not CBSE\'s official marking scheme for a past paper.',
   'verdict.rowMarks': '{earned} of {total} marks.',
+  'verdict.whyItFails': 'Why it fails',
+  'verdict.thisLooksLike': 'This looks like…',
+  'verdict.whatWentWrong': 'What went wrong',
+  'verdict.thisLooksLikeTitle': 'This looks like: {title}',
   'verdict.readingWork': 'Reading your handwriting…',
   'verdict.readOnServer': 'Read on the server',
   'verdict.removeAttachment': 'Remove attachment',
@@ -509,7 +515,7 @@ export default {
   'settings.secHelp': 'Help & Safety',
 
   'settings.localPlan': 'Local Plan',
-  'settings.localPlanSub': 'Everything unlocked — no account, no subscription, no limits',
+  'settings.localPlanSub': 'No account and no subscription needed — {limit} practice questions a day, and everything else unlimited',
   'settings.questionBank': 'Question bank',
   'settings.questionBankValue': '1,329,679+ distinct — measured, still growing',
   'settings.status': 'Status',
@@ -529,7 +535,7 @@ export default {
   'settings.spaceUsed': '# Space used',
   'settings.spaceOf': '{used} of {total} ({percent}%)',
   'settings.accounts': '✉ Accounts',
-  'settings.accountsValue': 'Private on-device profiles — nothing ever leaves this device',
+  'settings.accountsValue': 'Private on-device profiles — nothing leaves this device unless you switch on a cloud account or server reading below',
 
   'settings.profileInfo': '☺ Profile Information',
   'settings.fullName': 'Full name',
@@ -710,6 +716,24 @@ export default {
   'pw.holdsUp': 'Long and varied — this one holds up.',
   'pw.solid': 'Solid. A few more characters would make it stronger still.',
   'pw.pastMinimum': 'Past the minimum. Extra length buys more than extra symbols do.',
+
+  // ── The legal notices ──────────────────────────────────────────────────────
+  // Chrome only. The notices themselves are docs/legal/*.md and their Hindi
+  // siblings docs/legal/*.hi.md — prose that long does not belong in a string
+  // catalogue, and a legal document needs to be diffable as a document. These
+  // are the words the page puts around one: what it is called when there is no
+  // such page, what the draft banner says, and how to ask for the other
+  // language. The document names themselves come from each document's own
+  // first heading, so they are never restated here in either language.
+  'legal.notFoundTitle': 'Not found',
+  'legal.notFoundBody': 'There is no such page. The published ones are {pages}',
+  'legal.languageLabel': 'Language of this document',
+  'legal.draftTitle': 'Template — not yet reviewed.',
+  'legal.draftBody': {
+    one: 'This document still has {n} placeholder to complete, and it has not been checked by a lawyer. Do not rely on it, and do not publish the app to a store or a payment provider until it has been finished and reviewed.',
+    other: 'This document still has {n} placeholders to complete, and it has not been checked by a lawyer. Do not rely on it, and do not publish the app to a store or a payment provider until it has been finished and reviewed.'
+  },
+  'legal.translationUnavailable': 'The Hindi translation has not arrived — it is fetched the first time it is asked for, so this is what an offline first read looks like. Below is the English, which is the version that governs in any case.',
 
   // ── Durations ──────────────────────────────────────────────────────────────
   'time.seconds': { one: '{n} second', other: '{n} seconds' },

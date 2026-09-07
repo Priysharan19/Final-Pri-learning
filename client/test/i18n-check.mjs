@@ -206,6 +206,11 @@ const CONVERTED = [
   'src/pages/Practice.jsx',
   'src/pages/PracticeBase.jsx',
   'src/pages/SettingsLegacy.jsx',
+  // The legal pages joined this list when the notices became bilingual. They
+  // are the one screen where an English literal is not merely untranslated but
+  // wrong: the DPDP Act gives a reader the right to the notice in their own
+  // language, and chrome in English over a Hindi notice takes part of that back.
+  'src/pages/Legal.jsx',
   'src/components/QuestionCard.jsx'
 ];
 
@@ -217,6 +222,11 @@ const SPOKEN_ATTRIBUTES = new Set(['aria-label', 'aria-description', 'aria-place
 // the catalogue allowlist: a reason, in writing, about the language.
 const LITERAL_ALLOWLIST = new Map([
   ['Pri Learning', 'the product’s name'],
+  ['ABCD', 'the option letters of a multiple-choice item, indexed into rather than read'],
+  ['Standard', 'the proper name of an NSW course, shown only on the Australian branch'],
+  ['Advanced', 'the proper name of an NSW course, shown only on the Australian branch'],
+  ['Extension 1', 'the proper name of an NSW course, shown only on the Australian branch'],
+  ['Extension 2', 'the proper name of an NSW course, shown only on the Australian branch'],
   ['ri Learning', 'the wordmark, split around the drop-cap P and its full stop'],
   ['ri Learning.', 'the wordmark, split around the drop-cap P'],
   ['P', 'the drop-cap of the wordmark'],
@@ -245,6 +255,47 @@ function walk(node, visit) {
   }
 }
 
+
+/**
+ * Every string a JSX expression could draw.
+ *
+ * Skips the argument of a t()/tx() call — that is a KEY, not prose — and skips
+ * anything shaped like a key, so `{t('practice.pyqOnlyLabel')}` is silent while
+ * `{on ? 'Past papers only · on' : 'Past papers only'}` is not.
+ */
+const KEY_SHAPED = /^[a-z][A-Za-z0-9]*\.[A-Za-z0-9.]+$/;
+function stringLiteralsIn(node, out = []) {
+  if (!node || typeof node !== 'object') return out;
+  if (node.type === 'CallExpression' && ['t', 'tx'].includes(node.callee?.name)) return out;
+  // Stop at a nested element or attribute: the walk visits those in their own
+  // right, and descending into them would read classNames, routes and styles
+  // as if a reader saw them.
+  if (node.type === 'JSXElement' || node.type === 'JSXFragment' || node.type === 'JSXAttribute') return out;
+  // An object literal in a child expression is a style or a config, not prose.
+  if (node.type === 'ObjectExpression') return out;
+  // `mode === 'photo'` compares against an internal name; the reader never sees
+  // it. Only the branches of such a test can be prose, so skip the operands and
+  // keep walking everything else.
+  if (node.type === 'BinaryExpression' && ['===', '!==', '==', '!='].includes(node.operator)) return out;
+  if ((node.type === 'Literal' || node.type === 'StringLiteral') && typeof node.value === 'string') {
+    const value = node.value.trim();
+    // Prose, not an identifier: something a reader could read as words. "Why it
+    // fails" and "Past papers only" qualify; "mcq-opt", "cbse" and "ext2" are
+    // internal names that happen to be strings.
+    const isProse = /\s/.test(value) || /^[A-Z]/.test(value) || /[.!?…]$/.test(value);
+    if (isProse && !KEY_SHAPED.test(value)) out.push(node.value);
+    return out;
+  }
+  for (const key of Object.keys(node)) {
+    if (key === 'parent' || key === 'loc' || key === 'range') continue;
+    const child = node[key];
+    if (Array.isArray(child)) child.forEach(c => stringLiteralsIn(c, out));
+    else if (child && typeof child === 'object' && child.type) stringLiteralsIn(child, out);
+  }
+  return out;
+}
+let expressionsSeen = 0;
+
 for (const rel of CONVERTED) {
   ok(existsSync(join(ROOT, rel)), `${rel} exists to be scanned`);
   if (!existsSync(join(ROOT, rel))) continue;
@@ -266,6 +317,26 @@ for (const rel of CONVERTED) {
       leftInEnglish.push(`${rel}: text “${text.slice(0, 60)}”`);
       return;
     }
+    // A string literal a JSX element draws as one of its CHILDREN is visible
+    // text, exactly like a text node: {cond ? 'Past papers only · on' : 'Past
+    // papers only'} put an English label in the middle of a Hindi screen and
+    // this scan passed it, because it is not a JSXText. Only children are read
+    // — an expression inside an attribute is a className, a route or a style
+    // far more often than it is prose, and the spoken attributes are checked
+    // separately below.
+    if (node.type === 'JSXElement') {
+      for (const child of node.children || []) {
+        if (child.type !== 'JSXExpressionContainer') continue;
+        for (const literal of stringLiteralsIn(child.expression)) {
+          expressionsSeen++;
+          const text = String(literal).replace(/\s+/g, ' ').trim();
+          if (!text || !HAS_WORD.test(text)) continue;
+          if (LITERAL_ALLOWLIST.has(text)) continue;
+          leftInEnglish.push(`${rel}: drawn “${text.slice(0, 60)}”`);
+        }
+      }
+      return;
+    }
     if (node.type === 'JSXAttribute' && SPOKEN_ATTRIBUTES.has(node.name?.name)) {
       attributesSeen++;
       const value = node.value;
@@ -279,6 +350,7 @@ for (const rel of CONVERTED) {
 }
 
 ok(textNodesSeen > 400, `the scan actually read the files (${textNodesSeen} JSX text nodes)`);
+ok(expressionsSeen > 8, `and the string literals their expressions draw (${expressionsSeen})`);
 ok(attributesSeen > 40, `and their spoken attributes (${attributesSeen} aria-label/title/placeholder/alt)`);
 eq(leftInEnglish, [], 'no converted screen draws a literal English string a reader would see');
 
@@ -290,7 +362,10 @@ for (const [text, reason] of LITERAL_ALLOWLIST) {
 // must be reached from somewhere. The first stops a typo shipping as a raw key
 // on screen; the second stops a translated string nothing uses inflating the
 // count this suite reports.
-const CALL = /\bt\(\s*'([a-z][A-Za-z0-9.]*)'/g;
+// `tx()` counts as much as `t()`. It was missed here until the legal pages
+// used it for the one sentence with a link inside it, and a key reached only
+// through tx() looked to this suite like a dead string.
+const CALL = /\btx?\(\s*'([a-z][A-Za-z0-9.]*)'/g;
 const KEY_IN_TABLE = /'((?:nav|app|common|difficulty|home|progress|history|favorites|tasks|classes|practice|verdict|settings|login|lang|pw|time|sym|assignment|gloss)\.[A-Za-z0-9.]+)'/g;
 
 function sourceFiles(dir) {
@@ -768,5 +843,5 @@ ok(JSON.stringify(exported).includes('"language":"hi"'), 'a backup carries the p
 // ─────────────────────────────────────────────────────────────────────────────
 console.log(failures.length
   ? `I18N: FAIL — ${failures.length} of ${pass + failures.length} checks failed\n  · ${failures.join('\n  · ')}`
-  : `I18N: PASS — ${pass}/${pass} checks — ${enKeys.length} interface strings translated to Hindi with ${SAME_IN_BOTH.size} reasoned exceptions; ${textNodesSeen} JSX text nodes and ${attributesSeen} spoken attributes across ${CONVERTED.length} screens carry no English literal; ${ncertTerms.length} NCERT terms glossed beside their English, never in place of it; both off by default and out of the install precache; switching either loses no work.`);
+  : `I18N: PASS — ${pass}/${pass} checks — ${enKeys.length} interface strings translated to Hindi with ${SAME_IN_BOTH.size} reasoned exceptions; ${textNodesSeen} JSX text nodes, ${expressionsSeen} literals drawn from expressions and ${attributesSeen} spoken attributes across ${CONVERTED.length} screens carry no English literal; ${ncertTerms.length} NCERT terms glossed beside their English, never in place of it; both off by default and out of the install precache; switching either loses no work.`);
 process.exit(failures.length ? 1 : 0);

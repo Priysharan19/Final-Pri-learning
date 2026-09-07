@@ -145,10 +145,29 @@ export const flow = {
       `account panel reads ${JSON.stringify((await accountPanel.innerText()).slice(0, 180))}`);
 
     await accountPanel.getByRole('button', { name: 'Create account' }).click();
-    await accountPanel.getByLabel('Name').fill(ACCOUNT.name);
-    await accountPanel.getByLabel('Email').fill(ACCOUNT.email);
+    await accountPanel.getByLabel('Your name').fill(ACCOUNT.name);
+    await accountPanel.getByLabel('Your email').fill(ACCOUNT.email);
     await accountPanel.getByLabel('Password').fill('cloud-e2e-password-42');
-    await accountPanel.getByRole('button', { name: 'Create and connect account' }).click();
+
+    // The form opens on the under-18 path, because under the DPDP Act that is
+    // most students here. Two things are asserted before ticking past it: the
+    // guardian fields are actually on screen, and the submit stays disabled
+    // until the notice is acknowledged. The second is the whole point of the
+    // consent checkbox — a gate that renders but does not gate is worse than
+    // no gate, because it looks like one.
+    const submit = accountPanel.getByRole('button', { name: 'Create and connect account' });
+    await check('a signup starts on the under-18 path and asks for a guardian',
+      await accountPanel.getByLabel("Parent or guardian\u2019s name").isVisible());
+    await check('the notice must be acknowledged before an account can be created',
+      await submit.isDisabled());
+
+    await accountPanel.getByLabel('I am 18 or older').check();
+    await check('declaring 18 or older withdraws the guardian fields',
+      !(await accountPanel.getByLabel("Parent or guardian\u2019s name").isVisible()));
+
+    await accountPanel.getByLabel('I have read the').check();
+    await check('acknowledging the notice releases the gate', await submit.isEnabled());
+    await submit.click();
     await accountPanel.getByText('Connected', { exact: true }).waitFor({ timeout: 15000 });
 
     await check('account creation links the current local profile without leaving Settings',

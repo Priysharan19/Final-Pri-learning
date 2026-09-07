@@ -18,6 +18,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { Router } from 'express';
 import { rateLimit, requireSession, requireVerifiedEmail } from './security.js';
+import { consumePaidCall, refusePaidCall } from './spendCeiling.js';
 import {
   MAX_LINES,
   WorkingProviderError,
@@ -95,6 +96,12 @@ export function createWorkingRouter(db, {
       } catch (error) {
         return res.status(error.status || 400).json({ error: { code: error.code, message: error.message } });
       }
+
+      // Counted here, after the request has been shown to be a real one and
+      // before anything is sent, so a malformed request cannot spend from a
+      // budget shared by every student on this deployment.
+      const overBudget = consumePaidCall(db, { env });
+      if (overBudget) return refusePaidCall(res, overBudget);
 
       try {
         const result = await check(req.body.prompt || '', lines, { env });

@@ -113,7 +113,7 @@ try { validateWorking('2x = 8'); } catch (e) { notArray = e; }
 ok(notArray?.code === 'WORKING_INVALID', 'a string is not a page of working');
 
 // ── 6 · What is actually sent to the provider ────────────────────────────────
-const env = { PRI_HANDWRITING_API_KEY: 'k-test', PRI_WORKING_MODEL: 'test-model' };
+const env = { PRI_HANDWRITING_API_KEY: 'k-test', PRI_WORKING_MODEL: 'test-model', PRI_PAID_CALLS_PER_HOUR: '10000', PRI_PAID_CALLS_PER_DAY: '100000' };
 let sent = null;
 const recordingFetch = async (url, init) => {
   sent = { url, init, body: JSON.parse(init.body) };

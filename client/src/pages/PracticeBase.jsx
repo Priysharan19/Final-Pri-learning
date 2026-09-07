@@ -319,7 +319,7 @@ export default function Practice() {
             title={t('practice.pyqOnlyTitle')}
             onClick={() => setPyqOnly(!pyqOnly)}
           >
-            {pyqOnly ? 'Past papers only · on' : 'Past papers only'}
+            {t(pyqOnly ? 'practice.pyqOnlyLabelOn' : 'practice.pyqOnlyLabel')}
           </button>
           {pyqOnly && <span className="muted">{t('practice.pyqOnlyNote')}</span>}
         </div>

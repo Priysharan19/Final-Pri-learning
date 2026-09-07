@@ -1,4 +1,4 @@
-const ACTIONS = new Set(['verify-email', 'reset-password']);
+const ACTIONS = new Set(['verify-email', 'reset-password', 'guardian-consent']);
 
 export function parseAccountActionFragment(fragment = '') {
   const raw = String(fragment || '').replace(/^#/, '');

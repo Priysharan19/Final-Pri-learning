@@ -20,7 +20,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-const names = ['NODE_ENV', 'PRI_PLATFORM_DB', 'PRI_AUTH_DELIVERY_KEY', 'PRI_PUBLIC_ORIGIN', 'PRI_HANDWRITING_API_KEY'];
+const names = ['NODE_ENV', 'PRI_PLATFORM_DB', 'PRI_AUTH_DELIVERY_KEY', 'PRI_PUBLIC_ORIGIN', 'PRI_HANDWRITING_API_KEY', 'PRI_PAID_CALLS_PER_HOUR', 'PRI_PAID_CALLS_PER_DAY'];
 const prior = Object.fromEntries(names.map(name => [name, process.env[name]]));
 const scratch = mkdtempSync(join(tmpdir(), 'pri-request-size-'));
 process.env.NODE_ENV = 'test';
@@ -29,6 +29,11 @@ process.env.PRI_AUTH_DELIVERY_KEY = '77'.repeat(32);
 delete process.env.PRI_PUBLIC_ORIGIN;
 // Configured, so a refusal below is the size gate and not "no key here".
 process.env.PRI_HANDWRITING_API_KEY = 'request-size-contract-key';
+// A configured key is a licence to spend, and the boot check refuses one
+// without a ceiling — so a fixture that sets a key must set a ceiling too, the
+// same as a real deployment.
+process.env.PRI_PAID_CALLS_PER_HOUR = '10000';
+process.env.PRI_PAID_CALLS_PER_DAY = '100000';
 
 const { startApp, checks } = await import('./support/app-harness.mjs');
 const { createPlatformDb } = await import('../platform/db.js');

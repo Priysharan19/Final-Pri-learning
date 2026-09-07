@@ -165,7 +165,7 @@ try {
 
   // ── Security floor on the real router ──────────────────────────────────
   const health = await call('/health');
-  check(health.status === 200 && health.data.ok === true && health.data.service === 'pri-learning-platform' && health.data.schemaVersion === '5', 'health reports the platform and schema version');
+  check(health.status === 200 && health.data.ok === true && health.data.service === 'pri-learning-platform' && health.data.schemaVersion === '6', 'health reports the platform and schema version');
   check(health.headers.get('x-content-type-options') === 'nosniff' && health.headers.get('cache-control') === 'no-store' && health.headers.get('x-frame-options') === 'DENY', 'security headers are applied to every /v1 response');
   check((await call('/does-not-exist')).status === 404 && (await call('/does-not-exist')).data.error.code === 'NOT_FOUND', 'unknown routes are a JSON 404');
   check((await call('/sync/pull/0')).status === 401 && (await call('/sync/pull/0')).data.error.code === 'AUTH_REQUIRED', 'session-gated routes reject anonymous callers');

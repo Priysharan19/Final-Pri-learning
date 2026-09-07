@@ -23,9 +23,13 @@ being used to attack the service or to harm other users.
 Pri Learning generates practice questions, reads handwriting, marks working and
 estimates progress. It is a practice tool.
 
-**It does not predict your exam result**, and it does not claim to. Where a
-figure is shown, the app states what produced it. Nothing here is a guarantee of
-any mark, rank or admission.
+**It does not predict a percentile, a rank or an admission**, and it never
+converts practice into a CBSE percentage. What it does show, on the progress
+screen, is an estimate of the marks you would score on the parts of a paper you
+have actually practised — stated as a range, with how much of the paper it
+covers, and never scaled up to the parts you have not touched. Where any figure
+is shown, the app states what produced it. Nothing here is a guarantee of any
+mark, rank or admission.
 
 Marking is automatic and can be wrong. If you believe a question was marked
 incorrectly, tell us — it helps us fix it — but a mark inside Pri Learning has

@@ -476,6 +476,8 @@ export default {
   'verdict.photoFormats': 'एक फ़ोटो, {pages} पृष्ठ तक की स्कैन की गई PDF, या पहले से ली गई कोई तस्वीर चिपकाइए',
   'verdict.removePhoto': 'फ़ोटो हटाएँ',
   'common.loading': 'लोड हो रहा है…',
+  'practice.pyqOnlyLabel': 'केवल पिछले पेपर',
+  'practice.pyqOnlyLabelOn': 'केवल पिछले पेपर · चालू',
   'practice.pyqOnlyTitle': 'केवल JEE और CBSE के पिछले पेपरों के असली प्रश्नों का अभ्यास करें',
   'practice.pyqOnlyNote': 'नीचे का हर प्रश्न किसी असली परीक्षा में पूछा गया था और अपने पेपर का नाम साथ रखता है।',
   'practice.pyqBadge': 'पिछले वर्ष का प्रश्न',
@@ -484,6 +486,10 @@ export default {
   'verdict.markedStepByStep': 'चरण दर चरण जाँचा गया',
   'verdict.boardStyleNote': 'बोर्ड-शैली की चरणबद्ध जाँच, इसी प्रश्न के अपने हल से निकाली गई। यह CBSE द्वारा प्रकाशित परिपाटी का पालन करती है; यह किसी पिछले पेपर की CBSE की आधिकारिक मार्किंग स्कीम नहीं है।',
   'verdict.rowMarks': '{total} में से {earned} अंक।',
+  'verdict.whyItFails': 'यह क्यों नहीं चलता',
+  'verdict.thisLooksLike': 'यह ऐसा लगता है…',
+  'verdict.whatWentWrong': 'कहाँ गड़बड़ हुई',
+  'verdict.thisLooksLikeTitle': 'यह ऐसा लगता है: {title}',
   'verdict.readingWork': 'आपकी लिखावट पढ़ी जा रही है…',
   'verdict.readOnServer': 'सर्वर पर पढ़ा गया',
   'verdict.removeAttachment': 'अटैचमेंट हटाएँ',
@@ -580,7 +586,7 @@ export default {
   'settings.secHelp': 'मदद और सुरक्षा',
 
   'settings.localPlan': 'लोकल प्लान',
-  'settings.localPlanSub': 'सब कुछ खुला हुआ — न खाता, न सब्सक्रिप्शन, न कोई सीमा',
+  'settings.localPlanSub': 'न खाता चाहिए, न सदस्यता — रोज़ {limit} अभ्यास प्रश्न, और बाकी सब असीमित',
   'settings.questionBank': 'प्रश्न बैंक',
   'settings.questionBankValue': '13,29,679+ अलग-अलग — गिने हुए, और बढ़ रहे हैं',
   'settings.status': 'स्थिति',
@@ -600,7 +606,7 @@ export default {
   'settings.spaceUsed': '# इस्तेमाल हुई जगह',
   'settings.spaceOf': '{total} में से {used} ({percent}%)',
   'settings.accounts': '✉ खाते',
-  'settings.accountsValue': 'इसी डिवाइस पर निजी प्रोफ़ाइल — कुछ भी बाहर नहीं जाता',
+  'settings.accountsValue': 'इसी डिवाइस पर निजी प्रोफ़ाइल — नीचे क्लाउड खाता या सर्वर पर पढ़ना चालू किए बिना कुछ भी इस डिवाइस से बाहर नहीं जाता',
 
   'settings.profileInfo': '☺ प्रोफ़ाइल की जानकारी',
   'settings.fullName': 'पूरा नाम',
@@ -774,6 +780,22 @@ export default {
   'pw.holdsUp': 'लंबा और विविध — यह टिकता है।',
   'pw.solid': 'ठोस। कुछ अक्षर और होते तो और मज़बूत होता।',
   'pw.pastMinimum': 'न्यूनतम से ऊपर। लंबाई बढ़ाना अतिरिक्त चिह्न जोड़ने से ज़्यादा काम आता है।',
+
+  // ── कानूनी सूचनाएँ ─────────────────────────────────────────────────────────
+  // Only the chrome around a notice; the notices are docs/legal/*.hi.md. Those
+  // are translations and say so at their own top — the English governs, and
+  // neither language has been near a lawyer. draftBody's two forms differ only
+  // in है/हैं: जगह does not inflect after a numeral, but the verb agrees, and
+  // Hindi's `one` form covers 0 as well as 1.
+  'legal.notFoundTitle': 'पन्ना नहीं मिला',
+  'legal.notFoundBody': 'ऐसा कोई पन्ना नहीं है। प्रकाशित पन्ने ये हैं: {pages}',
+  'legal.languageLabel': 'इस दस्तावेज़ की भाषा',
+  'legal.draftTitle': 'नमूना — अभी तक जाँचा नहीं गया।',
+  'legal.draftBody': {
+    one: 'इस दस्तावेज़ में अभी {n} जगह भरनी बाकी है, और इसे किसी अधिवक्ता ने नहीं जाँचा है। इस पर निर्भर मत रहिए, और जब तक यह पूरा होकर जाँच न लिया जाए तब तक ऐप को किसी स्टोर या भुगतान प्रदाता के पास मत भेजिए।',
+    other: 'इस दस्तावेज़ में अभी {n} जगहें भरनी बाकी हैं, और इसे किसी अधिवक्ता ने नहीं जाँचा है। इस पर निर्भर मत रहिए, और जब तक यह पूरा होकर जाँच न लिया जाए तब तक ऐप को किसी स्टोर या भुगतान प्रदाता के पास मत भेजिए।'
+  },
+  'legal.translationUnavailable': 'हिन्दी अनुवाद अभी नहीं आया — वह पहली बार माँगे जाने पर ही उतरता है, इसलिए बिना इंटरनेट के पहली बार पढ़ने पर ऐसा ही होता है। नीचे अंग्रेज़ी पाठ है, और कानूनी रूप से वही पाठ वैसे भी मान्य है।',
 
   // ── अवधि ───────────────────────────────────────────────────────────────────
   // सेकंड, मिनट and घंटा do not change after a numeral (12 मिनट is attested in
