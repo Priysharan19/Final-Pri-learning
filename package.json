@@ -26,6 +26,8 @@
     "test:ncert:rational": "node client/test/ncert-rational-numbers-check.mjs",
     "test:ncert:linear": "node client/test/ncert-linear-equations-check.mjs",
     "india:coverage": "node tools/india-coverage.mjs",
+    "bench:handwriting": "node tools/handwriting-bench/run.mjs",
+    "bench:handwriting:live": "node tools/handwriting-bench/run.mjs --live",
     "test:ink": "node client/test/inkcheck.mjs 40",
     "test:calculus": "node client/test/inkcheck-calculus.mjs",
     "test:jee": "node client/test/inkcheck-jee.mjs",
