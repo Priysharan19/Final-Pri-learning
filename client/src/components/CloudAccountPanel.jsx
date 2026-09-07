@@ -63,6 +63,9 @@ export default function CloudAccountPanel() {
     isAdult: false, guardianName: '', guardianEmail: ''
   });
   const [agreed, setAgreed] = useState(false);
+  // Where this account stands with its guardian. Shown to the student so a
+  // pending account reads as "waiting for a parent" rather than as a fault.
+  const [guardian, setGuardian] = useState(null);
   const [busy, setBusy] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
@@ -72,6 +75,15 @@ export default function CloudAccountPanel() {
   const premium = !!entitlement?.active;
   const pending = status?.pending || 0;
   const canSync = enabled && !!link?.accountId && !!session?.connected;
+
+  useEffect(() => {
+    if (!enabled || !link?.accountId) { setGuardian(null); return; }
+    let live = true;
+    cloud.guardianState()
+      .then(state => { if (live) setGuardian(state); })
+      .catch(() => { if (live) setGuardian(null); });
+    return () => { live = false; };
+  }, [enabled, link?.accountId]);
   const canUseWebBilling = canSync && webCheckout && !nativeShell;
   const canUseAppleBilling = canSync && nativeStoreKit && !!appleBootstrap?.appAccountToken;
   const liveAccount = session?.connected ? session.account : null;
@@ -364,6 +376,22 @@ export default function CloudAccountPanel() {
         This build has no Pri cloud origin configured, so account and sync controls are disabled. Offline practice continues normally.
       </div>}
 
+      {guardian?.required && guardian.state !== 'given' && (
+        <div role="status" style={{ marginTop: 14, padding: '10px 12px', border: '1px solid var(--warn)', borderRadius: 10, fontSize: 13 }}>
+          {guardian.state === 'pending'
+            ? <>Waiting for a parent or guardian to confirm this account{guardian.guardianEmail ? <> at <b>{guardian.guardianEmail}</b></> : null}.
+                Until they do, nothing syncs — <b>your work is safe on this device</b> and nothing has been lost.</>
+            : <>A parent or guardian has asked that this account does not sync. Everything still works here on this
+                device, and nothing of yours leaves it.</>}
+        </div>
+      )}
+      {guardian?.required && guardian.state === 'given' && (
+        <p className="muted" style={{ marginTop: 12, fontSize: 12.5 }}>
+          A parent or guardian confirmed this account. They can change that at any time from the link in the
+          email we sent them, and the <a href="/privacy" target="_blank" rel="noreferrer">privacy notice</a> sets
+          out what an account sends.
+        </p>
+      )}
       {enabled && !link?.accountId && <form onSubmit={submit} style={{ marginTop: 16 }}>
         <div className="row" style={{ gap: 8, marginBottom: 12 }}>
           <button type="button" className={`btn btn-sm ${mode === 'login' ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setMode('login')}>Sign in</button>

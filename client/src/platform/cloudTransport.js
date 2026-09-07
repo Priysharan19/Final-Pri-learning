@@ -296,6 +296,12 @@ export const cloud = Object.freeze({
   health: () => cloudRequest('/v1/health'),
   me: () => cloudRequest('/v1/account/me'),
   register: body => cloudRequest('/v1/account/register', { method: 'POST', body }),
+  // A guardian answering the email has no account and no session — the token in
+  // their link is the whole authority, which is why it is single-use, hashed at
+  // rest and expires in an hour.
+  guardianConfirm: token => cloudRequest('/v1/account/guardian/confirm', { method: 'POST', body: { token } }),
+  guardianWithdraw: token => cloudRequest('/v1/account/guardian/withdraw', { method: 'POST', body: { token } }),
+  guardianState: () => cloudRequest('/v1/account/guardian/state'),
   login: body => cloudRequest('/v1/account/login', { method: 'POST', body }),
   logout: () => cloudRequest('/v1/account/logout', { method: 'POST', body: {} }),
   requestEmailVerification: () => cloudRequest('/v1/account/email/verification-request', { method: 'POST', body: {} }),

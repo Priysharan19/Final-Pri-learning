@@ -61,6 +61,27 @@ ok(/email them a link/i.test(panel), 'and what will actually happen');
 ok(!/verifiable parental consent/i.test(panel),
   'the form does not call this verifiable parental consent — it is a confirmation from a mailbox');
 
+// ── 6 · The guardian's link has somewhere to land ────────────────────────────
+// The email points at /account-action. Until this was wired the page knew only
+// about email verification, so a parent who followed the link got a screen that
+// did nothing — a consent flow that cannot be answered is worse than none,
+// because the student is told a guardian was asked.
+const parser = read('../src/platform/accountAction.js');
+ok(/'guardian-consent'/.test(parser), 'the account-action parser admits the guardian link');
+const page = read('../src/pages/AccountAction.jsx');
+ok(/action === 'guardian-consent'/.test(page), 'and the page has a branch for it');
+ok(/guardianConfirm/.test(page) && /guardianWithdraw/.test(page),
+  'offering both answers on the one screen, so saying no is as easy as saying yes');
+ok(/works on their device without an account|already works on their device/i.test(page),
+  'and telling the parent the app works without the account, so consent is not extracted by false urgency');
+ok(/href="\/privacy"/.test(page), 'with the notice reachable from the decision');
+
+// ── 7 · The student can see where their account stands ───────────────────────
+ok(/guardianState\(\)/.test(panel), 'the account panel asks the server for the consent state');
+ok(/Waiting for a parent or guardian/i.test(panel),
+  'and a pending account reads as waiting for a parent rather than as a fault');
+ok(/work is safe on this device/i.test(panel), 'and says the work is safe, because it is');
+
 console.log(failures.length
   ? `SIGNUP CONSENT: FAIL — ${failures.length} of ${pass + failures.length} checks failed\n  · ${failures.join('\n  · ')}`
   : `SIGNUP CONSENT: PASS — ${pass}/${pass} checks — the notice is at the point of consent, the age is asked rather than assumed, and every answer reaches the server.`);
