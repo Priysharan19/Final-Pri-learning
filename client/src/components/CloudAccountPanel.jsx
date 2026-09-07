@@ -427,11 +427,11 @@ export default function CloudAccountPanel() {
         </div>
         <div className="grid cols-2" style={{ gap: 12 }}>
           {mode === 'register' && <div className="field">
-            <label className="label" htmlFor="cloud-name">Name</label>
+            <label className="label" htmlFor="cloud-name">Your name</label>
             <input className="input" id="cloud-name" autoComplete="name" maxLength={80} value={form.name} onChange={e => setForm(v => ({ ...v, name: e.target.value }))} required />
           </div>}
           <div className="field">
-            <label className="label" htmlFor="cloud-email">Email</label>
+            <label className="label" htmlFor="cloud-email">Your email</label>
             <input className="input" id="cloud-email" type="email" autoComplete="email" maxLength={254} value={form.email} onChange={e => setForm(v => ({ ...v, email: e.target.value }))} required />
           </div>
           <div className="field">

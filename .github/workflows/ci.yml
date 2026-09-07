@@ -231,7 +231,7 @@ jobs:
           grep -Fq 'Phone · every destination reachable at 390px' browser.log
           grep -Fq 'India · onboarding, class labels, demo, cloud entry' browser.log
           grep -Fq 'Cloud · account, live Settings refresh, assignment hand-off' browser.log
-          grep -Eq 'E2E SUITE.*14/14.*1 flows' browser.log
+          grep -Eq 'E2E SUITE.*18/18.*1 flows' browser.log
           grep -Fq 'Cloud admin · CMS lifecycle and role management' browser.log
           grep -Eq 'E2E SUITE.*17/17.*1 flows' browser.log
           grep -Fq 'Cloud admin · independent-review rejection' browser.log
