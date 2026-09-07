@@ -27,10 +27,15 @@ function Verification({chapter}) {
   </div>;
 }
 
+// `formula` carries bare maths with no $…$ of its own — `PQ=\sqrt{…}`, `t_n=ar^{n-1}` —
+// so it is wrapped here, the way Class10NCERTLibrary wraps the identically shaped Class 10
+// field. Unwrapped, MathText finds no math span and prints the backslashes. The Class 8
+// section deliberately does NOT wrap: its formulas are English sentences with Unicode
+// symbols ("Sector angle = … × 360°"), which maths mode would turn into italic letters.
 function Notes({chapter}) { return <div className="grid cols-2" style={{gap:12}}>{chapter.notes.map((n,i)=><article className="card" key={i} style={{padding:16}}>
   <div className="sc-label">{n.level}</div><h3 style={{margin:'5px 0 10px'}}>{n.title}</h3>
   <ul style={{margin:0,paddingLeft:20}}>{n.points.map((p,j)=><li key={j} style={{marginBottom:7}}><Text>{p}</Text></li>)}</ul>
-  <div style={{marginTop:10,padding:10,borderRadius:10,background:'var(--surface-2)'}}><b>Core relation</b><div style={{marginTop:4}}><Text>{n.formula}</Text></div></div>
+  <div style={{marginTop:10,padding:10,borderRadius:10,background:'var(--surface-2)'}}><b>Core relation</b><div style={{marginTop:4}}><MathText text={`$${n.formula}$`}/></div></div>
   <div style={{marginTop:10}}><b>Topper edge:</b> <Text>{n.edge}</Text></div>
 </article>)}</div>; }
 

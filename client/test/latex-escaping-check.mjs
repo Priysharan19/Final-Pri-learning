@@ -21,6 +21,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import fs from 'node:fs';
 import path from 'node:path';
+import katex from 'katex';
 import { makeRng } from '../src/engine/qhelpers.js';
 
 let pass = 0;
@@ -124,6 +125,72 @@ for (const file of ncertFiles) {
 ok(contentStrings > 5000, `the sweep reached the content — ${contentStrings} strings read`);
 ok(contentFaults.length === 0,
   `NCERT content renders its LaTeX — ${contentFaults.length} swallowed backslashes:\n      ${contentFaults.slice(0, 12).join('\n      ')}`);
+
+// ── Sweep 1b: a formula only renders if something puts it in maths mode ──────
+//
+// `formula` carries bare maths with no $…$ of its own (`PQ=\sqrt{…}`), so it
+// renders only if its component wraps it. Class 10's did and Class 9's did not,
+// which printed the backslashes to the student — the same defect as a swallowed
+// one, arrived at from the other side. Class 8 is the deliberate opposite: its
+// formulas are English sentences with Unicode symbols, and wrapping those would
+// turn readable prose into italic letters. So the rule is per class, and both
+// halves — the data and the component — have to agree.
+const WRAPS = 'client/src/components/NcertClass9ChapterSection.jsx';
+const WRAPS10 = 'client/src/components/Class10NCERTLibrary.jsx';
+const PLAIN8 = 'client/src/components/NcertClass8ChapterSection.jsx';
+const src = f => fs.readFileSync(f, 'utf8');
+ok(/<MathText text=\{`\$\$\{n\.formula\}\$`\}/.test(src(WRAPS)),
+  'the Class 9 section puts `formula` in maths mode');
+ok(/<MathText text=\{`\$\$\{n\.formula\}\$`\}/.test(src(WRAPS10)),
+  'the Class 10 library puts `formula` in maths mode');
+ok(/<Text>\{note\.formula\}<\/Text>/.test(src(PLAIN8)),
+  'the Class 8 section leaves `formula` as prose, which is right for its Unicode sentences');
+
+const formulasOf = async file => {
+  const mod = await import(path.resolve(ncertDir, file));
+  const found = []; const seen = new Set();
+  const walk = (v, key) => {
+    if (typeof v === 'string') { if (key === 'formula') found.push(v); return; }
+    if (!v || typeof v !== 'object' || seen.has(v)) return;
+    seen.add(v);
+    if (Array.isArray(v)) return v.forEach(x => walk(x, key));
+    for (const k of Object.keys(v)) walk(v[k], k);
+  };
+  Object.values(mod).forEach(v => walk(v, null));
+  return found;
+};
+
+// Wrapped classes: every formula must survive KaTeX, or maths mode renders an error.
+const wrapped = ['class9-content.js', 'class9-chapters-production.js', 'class10-content.js', 'class10-chapters-production.js'];
+let wrappedFormulas = 0;
+const unparsable = [];
+for (const file of wrapped) {
+  for (const f of await formulasOf(file)) {
+    wrappedFormulas++;
+    try { katex.renderToString(f, { throwOnError: true, strict: false }); }
+    catch (e) { unparsable.push(`${file}: ${JSON.stringify(f.slice(0, 70))} — ${e.message.slice(0, 80)}`); }
+  }
+}
+ok(wrappedFormulas >= 200, `every wrapped formula is checked — ${wrappedFormulas} found`);
+ok(unparsable.length === 0,
+  `every Class 9/10 formula parses as maths — ${unparsable.length} do not:\n      ${unparsable.slice(0, 8).join('\n      ')}`);
+
+// Unwrapped class: a LaTeX command here would print its own backslash.
+const plainFiles = ['class8-chapters-3-13-production.js', 'class8-linear-equations.js', 'class8-linear-production.js',
+  'class8-rational-numbers.js', 'class8-rational-production.js'];
+let plainFormulas = 0;
+const wouldPrintBackslash = [];
+for (const file of plainFiles) {
+  for (const f of await formulasOf(file)) {
+    plainFormulas++;
+    // Strip the $…$ spans it delimits itself; whatever is left is rendered as prose.
+    const prose = f.split(/(?<!\\)\$((?:\\\$|[^$])+?)(?<!\\)\$/g).filter((_, i) => i % 2 === 0).join(' ');
+    if (/\\[A-Za-z]/.test(prose)) wouldPrintBackslash.push(`${file}: ${JSON.stringify(f.slice(0, 70))}`);
+  }
+}
+ok(plainFormulas >= 8, `every unwrapped formula is checked — ${plainFormulas} found`);
+ok(wouldPrintBackslash.length === 0,
+  `no Class 8 formula hides LaTeX its renderer will not run — ${wouldPrintBackslash.length}:\n      ${wouldPrintBackslash.join('\n      ')}`);
 
 // ── Sweep 2: what every registered generator actually emits ──────────────────
 const bankModules = ['year7','year8','year9','year10','year11','year12','streams-standard','streams-ext',
