@@ -36,6 +36,15 @@ import {
 } from './auth.js';
 import { sanitizeFigure, sanitizeText } from '../lib/sanitize.js';
 
+/**
+ * Cloud markings one profile may spend in a day. Sized as a cost guard rather
+ * than a plan: at current model rates this is roughly ₹15 of inference a day
+ * per student, which bounds a runaway device without getting in the way of
+ * anyone actually doing their homework. Becomes the plan allowance when Pri
+ * has plans.
+ */
+export const MARKING_DAILY_LIMIT = 20;
+
 export const COURSES = {
   nsw: { name: 'NSW · HSC', junior: y => `Year ${y} · Stage ${y <= 8 ? 4 : 5}`, senior: y => y === 11 ? 'Year 11 · Mathematics Advanced' : 'Year 12 · Mathematics Advanced (HSC)' },
   vic: { name: 'VIC · VCE', junior: y => `Year ${y} · Victorian Curriculum`, senior: y => `Year ${y} · VCE Mathematical Methods` },
@@ -1731,7 +1740,11 @@ const routes = {
     if (!result.correct && !result.invalid && !isFast && (row.tries || 0) < 1) {
       row.tries = (row.tries || 0) + 1;
       await put('questions', row);
-      return { correct: false, resolved: false, triesLeft: 1, feedback: feedback || 'Not quite — check your working and try once more.', stepReport, diagnosis: stepReport?.diagnosis || null, misconception: await namedTrap(p.id, q.subtopic, trapHit) };
+      // The card renders a bold "Not quite." ahead of this string, so a default
+      // that opened with the same words read as "Not quite. Not quite — check
+      // your working…" on every first wrong answer — the most-seen sentence in
+      // the product. This continues that heading instead of repeating it.
+      return { correct: false, resolved: false, triesLeft: 1, feedback: feedback || 'Check your working and try once more.', stepReport, diagnosis: stepReport?.diagnosis || null, misconception: await namedTrap(p.id, q.subtopic, trapHit) };
     }
     if (result.invalid && !isFast) {
       return { correct: false, resolved: false, triesLeft: Math.max(0, 1 - (row.tries || 0)), invalid: true, feedback, stepReport };
@@ -1746,6 +1759,36 @@ const routes = {
     };
   },
 
+  // ── Cloud marking allowance ────────────────────────────────────────────────
+  //
+  // Every cloud marking costs real money, and the device is the only place that
+  // knows whose it is — the gateway sees an IP, which is a whole school behind
+  // one NAT. So the per-student cap lives here, and the gateway's per-client
+  // limit is the blunt backstop behind it.
+  //
+  // This is a cost guard, not a paywall: Pri has no plans, and Settings tells
+  // the student everything is unlocked. When plans arrive this constant becomes
+  // the plan's allowance — the competitor this feature was modelled on meters
+  // exactly this way, at five evaluations a day on its free tier.
+  //
+  // Claiming is deliberately separate from marking and happens first. A claim
+  // that is spent on a request that then fails costs the student one evaluation
+  // they did not get, which is the right way round: the alternative is a loop
+  // that retries a failing gateway all day on their bill.
+  'POST /marking/claim': async () => {
+    const p = await requireProfile();
+    const date = sydneyDate();
+    const key = `${p.id}:${date}`;
+    const row = (await get('activity', key)) || { key, pid: p.id, date, questions: 0, correct: 0, xp: 0, ms: 0, predicted: null };
+    const used = Number(row.evals || 0);
+    if (used >= MARKING_DAILY_LIMIT) {
+      return { allowed: false, used, limit: MARKING_DAILY_LIMIT };
+    }
+    row.evals = used + 1;
+    await put('activity', row);
+    return { allowed: true, used: row.evals, limit: MARKING_DAILY_LIMIT };
+  },
+
   // The examiner's brief for one question: what the cloud marker is marking
   // against. Pri generated this question, so it already holds the official
   // answer, the worked steps and the mark scheme — that is the whole advantage
@@ -1754,17 +1797,19 @@ const routes = {
   // one "is this working right?".
   //
   // On leaking the answer: everything below is already in this device's
-  // IndexedDB, because the generator ran here. This route exposes nothing the
-  // student could not read out of storage. It is still gated on the question
-  // having been attempted, so it cannot become a one-tap "show me the answer"
-  // for anyone reading the route table.
+  // IndexedDB, because the generator ran here. This route exposes nothing a
+  // student could not read out of storage with the browser tools they already
+  // have, which is why it carries an ownership check and no attempt gate.
+  //
+  // It did carry one — "attempt this question first" — and that was wrong. A
+  // student working on paper submits a photo and nothing else, so the marking
+  // has to read the final line BEFORE there is an attempt to gate on. The gate
+  // made the primary flow for a student without an Apple Pencil fail closed
+  // while protecting a secret the device already holds in the clear.
   'POST /practice/:id/marking-brief': async (body, params) => {
     const p = await requireProfile();
     const row = await get('questions', params.id);
     if (!row || row.pid !== p.id) throw Object.assign(new Error('Question not found'), { status: 404 });
-    if (!row.answered && !(row.tries > 0)) {
-      throw Object.assign(new Error('Attempt this question first'), { status: 409 });
-    }
     const q = row.payload;
     return {
       prompt: sanitizeText(q.prompt, 1200),

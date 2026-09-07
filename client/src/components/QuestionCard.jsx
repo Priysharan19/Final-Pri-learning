@@ -267,7 +267,15 @@ export default function QuestionCard({ question, why, reason, onResolved, onNext
   const decodePhoto = useCallback(async (dataURL) => {
     if (!dataURL) return;
     if (!nativePhotoAvailable()) {
-      setPhotoOCR({ phase: 'unavailable', text: '', confidence: 0, error: 'Native photo OCR is unavailable in this build.', engine: null });
+      // Apple Vision only exists inside the native iPad shell, and for most of
+      // the students this is built for that shell is not the device they own —
+      // a photographed page off an exercise book is. Cloud marking reads the
+      // photo directly, so when it is configured an attached photo is a
+      // complete answer rather than a dead end: no transcription happens here,
+      // and submit sends the image to be marked.
+      setPhotoOCR(markingConfigured()
+        ? { phase: 'will-mark', text: '', confidence: 0, error: '', engine: null }
+        : { phase: 'unavailable', text: '', confidence: 0, error: 'Photo marking is unavailable in this build.', engine: null });
       return;
     }
     setPhotoOCR({ phase: 'reading', text: '', confidence: 0, error: '', engine: null });
@@ -416,31 +424,44 @@ export default function QuestionCard({ question, why, reason, onResolved, onNext
    * to a question that is already marked; it can never take a mark away, and a
    * gateway outage must not look like something the student did wrong.
    */
-  async function runCloudMarking(strokes) {
-    if (!markingConfigured() || !Array.isArray(strokes) || !strokes.length) return;
+  async function runCloudMarking({ strokes, image }) {
+    if (!markingConfigured()) return '';
+    if (!image && !(Array.isArray(strokes) && strokes.length)) return '';
     const seq = ++markSeqRef.current;
     setCloudMark({ phase: 'marking', report: null, note: '' });
     try {
+      const claim = await api.post('/marking/claim', {});
+      if (seq !== markSeqRef.current) return '';
+      if (!claim.allowed) {
+        setCloudMark({
+          phase: 'unavailable', report: null,
+          note: `You have used today's ${claim.limit} line-by-line markings. Your answers are still marked on this device.`
+        });
+        return '';
+      }
       const brief = await api.post(`/practice/${question.id}/marking-brief`, {});
-      if (seq !== markSeqRef.current) return;
-      const outcome = await markWorking({ strokes, question: brief });
+      if (seq !== markSeqRef.current) return '';
+      const outcome = await markWorking({ strokes, image, question: brief });
       if (seq !== markSeqRef.current) return;
 
       if (!outcome.ok) {
         setCloudMark({ phase: 'unavailable', report: null, note: markingUnavailableNote(outcome.reason) });
-        return;
+        return '';
       }
       setCloudMark({ phase: 'done', report: markingToStepReport(outcome.marked), note: '' });
+      // Returned for the photo-only path, which needs the final line to submit.
+      return String(outcome.marked?.finalAnswerSeen || '');
     } catch {
-      if (seq !== markSeqRef.current) return;
+      if (seq !== markSeqRef.current) return '';
       setCloudMark({ phase: 'unavailable', report: null, note: '' });
+      return '';
     }
   }
 
   async function submit(vouchedNow) {
     if (busy || resolved) return;
     if (needsCheck && vouchedNow !== reading) { setChecking(true); return; }
-    let given, steps, viaInk = false, ink;
+    let given, steps, viaInk = false, ink, photoAnswered = false;
     if (isMcq) {
       given = mcqSel;
       if (given === null) return;
@@ -460,6 +481,28 @@ export default function QuestionCard({ question, why, reason, onResolved, onNext
       steps = inkResult.lines.length > 1 ? inkResult.lines.join('\n') : undefined;
       viaInk = true;
       ink = { strokes: compactInkStrokes(inkResult.strokes), recognized: inkResult.text };
+    } else if (mode === 'photo' && photo && !String(answer).trim() && markingConfigured()) {
+      // A photographed page and nothing typed. This is the whole submission
+      // for a student working on paper, so the marking runs first and its
+      // reading of the final line becomes the answer.
+      //
+      // The reading is a suggestion, not a verdict. checkAnswer() still decides
+      // correct or incorrect from it, symbolically, on device — so a model that
+      // misreads the last line costs the student a mark it can explain, rather
+      // than silently awarding one it cannot.
+      setBusy(true);
+      let readAnswer = '';
+      try {
+        readAnswer = await runCloudMarking({ image: photo });
+      } finally { setBusy(false); }
+      if (!String(readAnswer).trim()) {
+        // Rendered after a bold "I couldn't read that." — so this continues the
+        // sentence rather than restating it, and says what to do next.
+        setState({ phase: 'retry', res: { feedback: 'There was no final answer in the photo. Retake it with your last line in frame, or type the answer below.', invalid: true } });
+        return;
+      }
+      given = readAnswer;
+      photoAnswered = true;
     } else {
       given = answer;
       if (String(given).trim() === '') return;
@@ -481,9 +524,12 @@ export default function QuestionCard({ question, why, reason, onResolved, onNext
       } else {
         setState({ phase: 'retry', res: r });
       }
-      // Only handwriting is marked line by line: a typed answer has no working
-      // to annotate, and the local step checker already reads typed working.
-      if (viaInk && inkResult?.strokes?.length) runCloudMarking(inkResult.strokes);
+      // Handwriting is what gets marked line by line, whichever way it arrived:
+      // Pencil strokes on the canvas, or a photo of a page. A typed answer has
+      // no working to annotate, and the local step checker already reads typed
+      // working without a network call.
+      if (viaInk && inkResult?.strokes?.length) runCloudMarking({ strokes: inkResult.strokes });
+      else if (photo && !photoAnswered) runCloudMarking({ image: photo });
     } catch (e) {
       setState({ phase: 'retry', res: { feedback: e.message, invalid: true } });
     } finally { setBusy(false); }
@@ -569,7 +615,13 @@ export default function QuestionCard({ question, why, reason, onResolved, onNext
     });
     return cards.length ? cards : null;
   }, [writeMode, lineVerdicts, inkResult]);
-  const canSubmit = isMcq ? mcqSel !== null : isWorking ? (writeMode ? !!inkResult?.lines?.length : !!working.trim()) : writeMode ? !!inkResult?.answerLine : !!answer.trim();
+  // A photographed page is a complete submission on its own once marking can
+  // read it: the student worked on paper and there is nothing for them to type.
+  const photoIsTheAnswer = mode === 'photo' && !!photo && markingConfigured();
+  const canSubmit = isMcq ? mcqSel !== null
+    : isWorking ? (writeMode ? !!inkResult?.lines?.length : !!working.trim())
+    : writeMode ? !!inkResult?.answerLine
+    : (!!answer.trim() || photoIsTheAnswer);
 
   const earnedMarks = resolved
     ? (verdictGood ? totalMarks : (selfSaved ? Object.values(selfMarks).filter(Boolean).length : 0))
@@ -712,6 +764,11 @@ export default function QuestionCard({ question, why, reason, onResolved, onNext
                             )}
                             {(photoOCR.phase === 'failed' || photoOCR.phase === 'unavailable') && <span style={{ color: 'var(--warn)' }}>{photoOCR.error}</span>}
                             {photoOCR.phase === 'idle' && <span className="muted">Photo attached. Native Pri will decode it into editable maths before marking.</span>}
+                            {photoOCR.phase === 'will-mark' && (
+                              <span className="muted">
+                                Photo attached. Submit and Pri will mark your working line by line against the mark scheme — you do not need to type anything.
+                              </span>
+                            )}
                           </div>
                         </div>
                       )}

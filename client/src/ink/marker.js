@@ -43,25 +43,44 @@ function unavailable(reason, detail = '') {
 /**
  * Mark one page of handwritten working against the question it answers.
  *
+ * Two inputs, one path. `strokes` is the Apple Pencil case and gets rasterised
+ * here; `image` is a photo the student took of paper, already a data URL.
+ *
+ * The photo case is not a lesser fallback — for most of the students this is
+ * built for it is the only case. An Apple Pencil is rare and a phone camera is
+ * universal, and a page of working photographed off an exercise book carries
+ * exactly what the marker needs. The stroke path buys lower latency and a
+ * cleaner raster, nothing more.
+ *
  * @param {object}   opts
- * @param {Array}    opts.strokes   Canvas strokes, [{ points: [{x,y,w}] }, …]
- * @param {object}   opts.question  { prompt, criteria, officialAnswer, workedSteps }
+ * @param {Array}    [opts.strokes]  Canvas strokes, [{ points: [{x,y,w}] }, …]
+ * @param {string}   [opts.image]    A photo of the working, as a data URL.
+ * @param {object}   opts.question   { prompt, criteria, officialAnswer, workedSteps }
  * @param {AbortSignal} [opts.signal]
  */
-export async function markWorking({ strokes, question, signal }) {
+export async function markWorking({ strokes, image, question, signal }) {
   const base = cloudGatewayBase();
   if (!base) return unavailable('not-configured');
 
   if (typeof navigator !== 'undefined' && navigator.onLine === false) {
     return unavailable('offline');
   }
-  if (!Array.isArray(strokes) || !strokes.length) return unavailable('no-ink');
   if (!String(question?.prompt || '').trim()) return unavailable('no-question');
 
-  // Smaller raster than transcription uses: marking pays per image tile and
-  // reads school handwriting no better at the larger size. See cloud.js.
-  const raster = rasterizeInkForCloud(strokes, MARKING_RASTER_CAPS);
-  if (!raster?.image) return unavailable('raster-failed');
+  let payloadImage = '';
+  let rasterSize = null;
+  if (typeof image === 'string' && image.startsWith('data:image/')) {
+    payloadImage = image;
+  } else if (Array.isArray(strokes) && strokes.length) {
+    // Smaller raster than transcription uses: marking pays per image tile and
+    // reads school handwriting no better at the larger size. See cloud.js.
+    const raster = rasterizeInkForCloud(strokes, MARKING_RASTER_CAPS);
+    if (!raster?.image) return unavailable('raster-failed');
+    payloadImage = raster.image;
+    rasterSize = { width: raster.width, height: raster.height };
+  } else {
+    return unavailable('no-ink');
+  }
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
@@ -78,7 +97,7 @@ export async function markWorking({ strokes, question, signal }) {
         ...(token ? { authorization: `Bearer ${token}` } : {})
       },
       body: JSON.stringify({
-        image: raster.image,
+        image: payloadImage,
         question: {
           prompt: question.prompt,
           criteria: question.criteria,
@@ -100,7 +119,7 @@ export async function markWorking({ strokes, question, signal }) {
       return unavailable('malformed');
     }
 
-    return { ok: true, reason: null, detail: '', marked: body, raster: { width: raster.width, height: raster.height } };
+    return { ok: true, reason: null, detail: '', marked: body, raster: rasterSize };
   } catch (error) {
     return unavailable(error?.name === 'AbortError' ? 'timeout' : 'network', String(error?.message || ''));
   } finally {

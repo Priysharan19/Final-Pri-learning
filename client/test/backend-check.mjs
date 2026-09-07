@@ -834,15 +834,13 @@ async function run() {
     const ratingRow = await idb.get('ratings', `${ada.id}:${topicId}`);
     ok('the rating is stored against the subtopic', !!ratingRow && ratingRow.attempts >= 1, show(ratingRow));
 
-    // The examiner's brief the cloud marker marks against. Everything in it is
-    // already in this device's storage — the generator ran here — so the gate
-    // is not secrecy but sequence: it must not become a one-tap "show me the
-    // answer" for a question nobody has attempted yet.
+    // The examiner's brief the cloud marker marks against. A student working on
+    // paper submits a photo and nothing else, so the brief has to be readable
+    // BEFORE the question is attempted — the marking reads the final line and
+    // that reading becomes the answer.
     const briefTarget = await answerableQuestion({ mode: 'topic', subtopic: topicId });
-    await rejects('the marking brief is withheld before the question is attempted',
-      POST(`/practice/${briefTarget.question.id}/marking-brief`, {}), { status: 409 });
-    await POST(`/practice/${briefTarget.question.id}/submit`, { answer: briefTarget.wrong, ms: 3000 });
     const brief = await POST(`/practice/${briefTarget.question.id}/marking-brief`, {});
+    ok('the brief is readable before the question is attempted', !!brief, 'a photo-only submission has no attempt to gate on');
     ok('the brief carries the question', typeof brief.prompt === 'string' && brief.prompt.length > 0, show(brief.prompt));
     ok('the brief carries a mark scheme', Array.isArray(brief.criteria) && brief.criteria.length > 0, show(brief.criteria?.length));
     ok('every criterion is worth marks', brief.criteria.every(c => Number(c.mark) > 0), show(brief.criteria));
@@ -854,6 +852,28 @@ async function run() {
       await rejects('another profile cannot read your marking brief',
         POST(`/practice/${stranger.question.id}/marking-brief`, {}), { status: 404 });
       await POST('/profiles/select', { id: ada.id });
+    }
+
+    // The cloud marking allowance. Every claim is money, so the interesting
+    // property is that it runs out and stays out.
+    {
+      const first = await POST('/marking/claim', {});
+      eq('the first marking of the day is allowed', first.allowed, true);
+      eq('it counts as one', first.used, 1);
+      ok('it reports the allowance', first.limit > 0, show(first.limit));
+      let last = first;
+      for (let i = first.used; i < first.limit; i += 1) last = await POST('/marking/claim', {});
+      eq('the allowance can be spent to the last one', last.allowed, true);
+      eq('the count reaches the limit', last.used, first.limit);
+      const over = await POST('/marking/claim', {});
+      eq('the next claim is refused', over.allowed, false);
+      eq('a refused claim does not spend one', over.used, first.limit);
+      eq('a refused claim still says what the allowance was', over.limit, first.limit);
+      // Spent allowance belongs to this profile alone.
+      await POST('/profiles/select', { id: grace.id, password: 'punch-cards-9' });
+      eq('another profile has its own allowance', (await POST('/marking/claim', {})).allowed, true);
+      await POST('/profiles/select', { id: ada.id });
+      eq('and the spent one is still spent', (await POST('/marking/claim', {})).allowed, false);
     }
 
     const revealTarget = await nextQuestion({ mode: 'topic', subtopic: topicId });

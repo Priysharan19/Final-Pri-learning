@@ -64,6 +64,14 @@
         "--strictPort"
       ],
       "port": 4455
+    },
+    {
+      "name": "stub-marking",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "/private/tmp/claude-501/-Users-priysharantripathi-Desktop-Pri-Learning-Final-Prodcution/560588ad-7828-49a8-92c2-973f631cfcf7/scratchpad/stub-gateway.mjs"
+      ],
+      "port": 4610
     }
   ]
 }
