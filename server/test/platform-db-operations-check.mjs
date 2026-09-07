@@ -148,7 +148,7 @@ try {
   check(migrated.prepare("SELECT cancel_requested_at FROM billing_subscriptions WHERE provider_subscription_id='sub_Legacy00000001'").get()?.cancel_requested_at === null, 'existing bindings are not marked cancelled by the migration');
   const tables = new Set(migrated.prepare("SELECT name FROM sqlite_master WHERE type='table'").all().map(row => row.name));
   check(tables.has('billing_payments') && tables.has('billing_refunds') && tables.has('learning_events'), 'new ledger tables and core tables exist after migration');
-  check(migrated.prepare("SELECT value FROM platform_meta WHERE key='schema_version'").get().value === '5', 'schema version advances to 5');
+  check(migrated.prepare("SELECT value FROM platform_meta WHERE key='schema_version'").get().value === '6', 'schema version advances to 6');
   check(migrated.pragma("table_info('idempotency_keys')").some(row => row.name === 'request_digest'), 'schema v5 gives an existing database the idempotency request digest');
   check(migrated.prepare("SELECT value FROM platform_meta WHERE key='billing_schema_version'").get().value === String(BILLING_SCHEMA_VERSION) && billingVersion === BILLING_SCHEMA_VERSION, 'billing schema version advances');
   check(migrated.pragma('foreign_key_check').length === 0, 'migration leaves referential integrity valid');
@@ -165,7 +165,7 @@ try {
   const t1 = new Date('2026-09-06T10:15:00Z');
   const first = backupPlatformDb({ dbPath: livePath, outDir: backupDir, now: t1 });
   check(first.ok === true && first.path === join(backupDir, 'pri-learning-platform-20260906T101500Z.db'), 'backup file is timestamped');
-  check(first.integrity === 'ok' && first.schemaVersion === '5' && first.accounts === 2 && first.bytes > 0, 'backup is verified after VACUUM INTO');
+  check(first.integrity === 'ok' && first.schemaVersion === '6' && first.accounts === 2 && first.bytes > 0, 'backup is verified after VACUUM INTO');
   check((statSync(first.path).mode & 0o777) === 0o600, 'backup file is owner-only');
   check(accountCount(first.path) === 2, 'backup contains rows that were still only in the WAL of the live database');
   check(!existsSync(`${first.path}-wal`), 'backup is a single self-contained file');
@@ -222,7 +222,7 @@ try {
   check(accountCount(livePath) === 3 && existsSync(restored.previous) && accountCount(restored.previous) === 4, 'the previous database is kept beside the restored one');
   check(restored.previous === `${livePath}.pre-restore-20260909T000000Z` && !existsSync(`${livePath}.restore-20260909T000000Z.tmp`), 'staging file is renamed away and the previous file is labelled');
   const served = createPlatformDb(livePath);
-  check(served.prepare("SELECT value FROM platform_meta WHERE key='schema_version'").get().value === '5' && served.pragma('journal_mode', { simple: true }) === 'wal', 'the restored file opens under the platform in WAL mode');
+  check(served.prepare("SELECT value FROM platform_meta WHERE key='schema_version'").get().value === '6' && served.pragma('journal_mode', { simple: true }) === 'wal', 'the restored file opens under the platform in WAL mode');
   closePlatformDb(served);
 
   // ── CLI entry points ─────────────────────────────────────────────────────

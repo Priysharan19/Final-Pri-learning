@@ -7,6 +7,9 @@ import {
 import { encryptDeliveryToken } from './deliveryCrypto.js';
 import { verifyIdentityToken } from './oidc.js';
 import { clearLoginFailures, loginLockStatus, recordLoginFailure } from './loginLockout.js';
+import {
+  confirmConsent, consentState, learnerIsChild, recordConsentRequest, validateGuardian, withdrawConsent
+} from './guardianConsent.js';
 import { consumeTeacherInvite, findLiveTeacherInvite } from './teacherInvites.js';
 import { maybeBootstrapAdmin } from './bootstrapAdmin.js';
 import { consumeOidcNonce } from './oidcNonce.js';
@@ -49,11 +52,20 @@ function publicAccount(row) {
   };
 }
 
+
+/** Enough for a student to recognise which mailbox was written to, no more. */
+function maskEmail(value) {
+  const text = String(value || '');
+  const at = text.indexOf('@');
+  if (at < 1) return null;
+  return `${text[0]}${'•'.repeat(Math.max(1, at - 1))}${text.slice(at)}`;
+}
+
 function ensureDeliveryTable(db) {
   db.exec(`CREATE TABLE IF NOT EXISTS auth_delivery_outbox (
     id TEXT PRIMARY KEY,
     account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
-    kind TEXT NOT NULL CHECK(kind IN ('verify-email','reset-password')),
+    kind TEXT NOT NULL CHECK(kind IN ('verify-email','reset-password','guardian-consent')),
     destination TEXT NOT NULL,
     token_id TEXT NOT NULL REFERENCES account_tokens(id) ON DELETE CASCADE,
     token_ciphertext TEXT NOT NULL,
@@ -141,6 +153,19 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
       if (!em || !name || !strongPassword(password)) {
         return res.status(400).json({ error: { code: 'INVALID_ACCOUNT', message: 'Use a valid name, email and password of at least 10 characters.' } });
       }
+      // Every Class 7-12 student is a child under the DPDP Act, which draws
+      // its line at 18. A local profile never reaches this server and is not
+      // ours to consent to; this account is, so the guardian is asked here and
+      // sync stays shut until they answer. The app itself keeps working — that
+      // is what makes this a gate rather than a wall.
+      const child = learnerIsChild({ isAdult: req.body?.isAdult, year: req.body?.year });
+      let guardian = null;
+      if (child) {
+        const checked = validateGuardian(req.body || {});
+        if (!checked.ok) return res.status(400).json({ error: { code: checked.code, message: checked.message } });
+        guardian = checked;
+      }
+
       const now = Date.now();
       // A teacher invite (minted by an admin, single-use, expiring) is the only
       // way registration produces anything other than a student account.
@@ -159,6 +184,10 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
           db.prepare(`INSERT INTO entitlement_snapshots(account_id,plan,status,provider,source_version,updated_at)
             VALUES (?, 'free', 'free', 'none', 0, ?)`).run(accountId, now);
           queueAccountToken(db, accountId, em, 'verify-email', now);
+          if (guardian) {
+            const tokenId = queueAccountToken(db, accountId, guardian.email, 'guardian-consent', now);
+            recordConsentRequest(db, { accountId, name: guardian.name, email: guardian.email, tokenHash: tokenId, now });
+          }
           if (inviteCode) {
             if (!consumeTeacherInvite(db, inviteCode, accountId, now)) {
               throw Object.assign(new Error('Teacher invite code is invalid, expired or already used.'), { code: 'TEACHER_INVITE_INVALID' });
@@ -243,6 +272,54 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
     // Proof of mailbox control is what PRI_BOOTSTRAP_ADMIN_EMAIL waits for.
     maybeBootstrapAdmin(db, token.account_id, now);
     res.json({ ok: true });
+  });
+
+  // ── A guardian answers ──────────────────────────────────────────────────
+  // Both routes are reached from the link in the guardian's email and take no
+  // session: the guardian is not the account holder and has no reason to have
+  // one. The token is the whole authority, which is why it is single-use, hashed
+  // at rest and expires in an hour like every other account action here.
+  router.post('/guardian/confirm', rateLimit(db, 'guardian-confirm', { limit: 20, windowMs: 60 * 60 * 1000 }), (req, res) => {
+    const raw = String(req.body?.token || '');
+    const now = Date.now();
+    const token = raw ? db.prepare(`SELECT * FROM account_tokens
+      WHERE token_hash = ? AND purpose = 'guardian-consent' AND consumed_at IS NULL AND expires_at > ?`).get(sha256(raw), now) : null;
+    if (!token) return res.status(400).json({ error: { code: 'TOKEN_INVALID', message: 'This confirmation link is invalid or has expired.' } });
+    let confirmed = false;
+    db.transaction(() => {
+      db.prepare('UPDATE account_tokens SET consumed_at = ? WHERE id = ?').run(now, token.id);
+      db.prepare('DELETE FROM auth_delivery_outbox WHERE token_id = ?').run(token.id);
+      confirmed = confirmConsent(db, token.account_id, now);
+    })();
+    res.json({ ok: true, confirmed });
+  });
+
+  // Withdrawal has to be as easy as consent was to give, so it uses the same
+  // link and needs no account. It is recorded rather than deleted: that consent
+  // was given and then withdrawn is itself what a guardian may need shown back.
+  router.post('/guardian/withdraw', rateLimit(db, 'guardian-withdraw', { limit: 20, windowMs: 60 * 60 * 1000 }), (req, res) => {
+    const raw = String(req.body?.token || '');
+    const now = Date.now();
+    // A withdrawal link stays usable after the confirmation has been consumed,
+    // because a guardian who changes their mind a week later must still be able
+    // to act. It is bounded by the token's own expiry, not by its consumption.
+    const token = raw ? db.prepare(`SELECT * FROM account_tokens
+      WHERE token_hash = ? AND purpose = 'guardian-consent' AND expires_at > ?`).get(sha256(raw), now) : null;
+    if (!token) return res.status(400).json({ error: { code: 'TOKEN_INVALID', message: 'This link is invalid or has expired.' } });
+    const withdrawn = withdrawConsent(db, token.account_id, now);
+    res.json({ ok: true, withdrawn });
+  });
+
+  // What the app shows the student about where their account stands.
+  router.get('/guardian/state', requireSession(db), (req, res) => {
+    const state = consentState(db, req.platformSession.account_id);
+    res.json({
+      required: state.required,
+      state: state.state,
+      guardianEmail: state.row ? maskEmail(state.row.guardian_email) : null,
+      noticeVersion: state.row?.notice_version || null,
+      method: state.row?.method || null
+    });
   });
 
   router.post('/password/reset-request', rateLimit(db, 'reset-request', { limit: 6, windowMs: 60 * 60 * 1000 }), (req, res) => {

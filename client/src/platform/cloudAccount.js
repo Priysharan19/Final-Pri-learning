@@ -83,10 +83,19 @@ async function saveAccount(pid, account, patch = {}) {
   return cloudAccountLink(pid);
 }
 
-export async function registerCloudAccount(pid, { name, email, password }) {
+/**
+ * Create the cloud account this device's profile will sync to.
+ *
+ * `year`, `isAdult`, `guardianName` and `guardianEmail` carry the age
+ * declaration. Every Class 7-12 student is a child under the DPDP Act, and the
+ * server will not let a child's account sync until a guardian confirms — so
+ * these are not optional extras, they are what stops the account being created
+ * in a state it can never leave.
+ */
+export async function registerCloudAccount(pid, { name, email, password, year, isAdult, guardianName, guardianEmail }) {
   if (!cloudAvailable()) throw Object.assign(new Error('Cloud accounts are not configured on this build.'), { code: 'CLOUD_DISABLED' });
   const deviceId = await cloudDeviceId();
-  const result = await cloud.register({ name, email, password, deviceId });
+  const result = await cloud.register({ name, email, password, deviceId, year, isAdult, guardianName, guardianEmail });
   await saveAccount(pid, result.account);
   await refreshCloudEntitlement(pid).catch(() => {});
   const link = await cloudAccountLink(pid);

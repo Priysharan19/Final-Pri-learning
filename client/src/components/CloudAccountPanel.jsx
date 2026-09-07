@@ -55,7 +55,14 @@ export default function CloudAccountPanel() {
   const [appleProducts, setAppleProducts] = useState([]);
   const [appleStoreError, setAppleStoreError] = useState('');
   const [mode, setMode] = useState('login');
-  const [form, setForm] = useState({ name: user?.name || '', email: '', password: '' });
+  const [form, setForm] = useState({
+    name: user?.name || '', email: '', password: '',
+    // Declared, not inferred. The class a student picked already implies a
+    // child, and the server treats silence as one — this asks so the student
+    // knows it was asked, and so an adult can say so.
+    isAdult: false, guardianName: '', guardianEmail: ''
+  });
+  const [agreed, setAgreed] = useState(false);
   const [busy, setBusy] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
@@ -183,7 +190,11 @@ export default function CloudAccountPanel() {
     setMessage('');
     try {
       if (mode === 'register') {
-        await registerCloudAccount(user.id, { name: form.name || user.name, email: form.email, password: form.password });
+        await registerCloudAccount(user.id, {
+          name: form.name || user.name, email: form.email, password: form.password,
+          year: user?.year, isAdult: form.isAdult,
+          guardianName: form.guardianName, guardianEmail: form.guardianEmail
+        });
         setMessage('Cloud account created and linked to this local profile. Your local profile still works offline.');
       } else {
         await loginCloudAccount(user.id, { email: form.email, password: form.password });
@@ -372,8 +383,56 @@ export default function CloudAccountPanel() {
             <input className="input" id="cloud-password" type="password" autoComplete={mode === 'register' ? 'new-password' : 'current-password'} minLength={10} maxLength={200} value={form.password} onChange={e => setForm(v => ({ ...v, password: e.target.value }))} required />
           </div>
         </div>
+        {mode === 'register' && (
+          <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--line, rgba(128,128,128,.22))' }}>
+            {/* Asked before the account exists, not after. Under the DPDP Act a
+                child is anyone under 18, so this is nearly every student here,
+                and the server will not sync a child's account until a guardian
+                confirms. Saying so up front is the difference between a gate a
+                student understands and one that looks like a fault. */}
+            <label className="row" style={{ gap: 8, alignItems: 'flex-start', cursor: 'pointer' }}>
+              <input type="checkbox" checked={form.isAdult} onChange={e => setForm(v => ({ ...v, isAdult: e.target.checked }))} />
+              <span>I am 18 or older</span>
+            </label>
+
+            {!form.isAdult && (
+              <div style={{ marginTop: 10 }}>
+                <p className="muted" style={{ fontSize: 12.5, marginTop: 0, maxWidth: 520 }}>
+                  You are under 18, so a parent or guardian has to confirm this account before your
+                  progress can sync. We will email them a link. <b>Everything in the app keeps working
+                  in the meantime</b> — questions, marking and handwriting all run on this device and
+                  nothing is lost while you wait.
+                </p>
+                <div className="grid cols-2" style={{ gap: 12 }}>
+                  <div className="field">
+                    <label className="label" htmlFor="cloud-guardian-name">Parent or guardian’s name</label>
+                    <input className="input" id="cloud-guardian-name" maxLength={80} value={form.guardianName}
+                      onChange={e => setForm(v => ({ ...v, guardianName: e.target.value }))} required />
+                  </div>
+                  <div className="field">
+                    <label className="label" htmlFor="cloud-guardian-email">Their email</label>
+                    <input className="input" id="cloud-guardian-email" type="email" maxLength={160} value={form.guardianEmail}
+                      onChange={e => setForm(v => ({ ...v, guardianEmail: e.target.value }))} required />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* The notice has to be reachable at the point consent is asked for,
+                not only from a screen the student saw before signing up. */}
+            <label className="row" style={{ gap: 8, alignItems: 'flex-start', marginTop: 12, cursor: 'pointer' }}>
+              <input type="checkbox" checked={agreed} onChange={e => setAgreed(e.target.checked)} required />
+              <span style={{ fontSize: 13 }}>
+                I have read the <a href="/privacy" target="_blank" rel="noreferrer">privacy notice</a> and
+                the <a href="/terms" target="_blank" rel="noreferrer">terms</a>, and I agree to what an
+                account sends.
+              </span>
+            </label>
+          </div>
+        )}
+
         <div className="row" style={{ gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
-          <button className="btn btn-primary" type="submit" disabled={!!busy}>
+          <button className="btn btn-primary" type="submit" disabled={!!busy || (mode === 'register' && !agreed)}>
             {busy === mode ? 'Connecting…' : mode === 'register' ? 'Create and connect account' : 'Connect account'}
           </button>
           {mode === 'login' && <button className="btn btn-quiet" type="button" onClick={requestReset} disabled={!!busy}>

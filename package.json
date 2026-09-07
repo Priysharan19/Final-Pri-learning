@@ -103,7 +103,7 @@
     "syllabus:server": "node tools/generate-server-syllabus.mjs",
     "test:platform:contracts": "node server/test/account-lifecycle-contract-check.mjs && node server/test/apple-billing-check.mjs && node server/test/auth-delivery-config-check.mjs && node server/test/auth-delivery-worker-check.mjs && node server/test/platform-migration-check.mjs && node server/test/platform-schema-check.mjs && node server/test/platform-sync-pagination-check.mjs && node server/test/production-db-bootstrap-check.mjs && node server/test/production-storage-config-check.mjs && node server/test/razorpay-billing-check.mjs",
     "test:platform:hardening": "node server/test/proxy-identity-contract-check.mjs && node server/test/sync-idempotency-contract-check.mjs && node server/test/entitlement-admin-grant-check.mjs && node server/test/request-size-contract-check.mjs && node server/test/content-index-exposure-check.mjs",
-    "test:platform": "npm run test:platform:security && npm run test:platform:commerce && npm run test:teacher:targeting && npm run test:platform:handwriting && npm run test:platform:working && npm run test:platform:contracts && npm run test:platform:hardening && npm run test:platform:spend",
+    "test:platform": "npm run test:platform:security && npm run test:platform:commerce && npm run test:teacher:targeting && npm run test:platform:handwriting && npm run test:platform:working && npm run test:platform:contracts && npm run test:platform:hardening && npm run test:platform:spend && npm run test:platform:guardian",
     "test:india:identity": "node client/test/india-identity-check.mjs",
     "test:plot": "node client/test/plot-check.mjs",
     "test:readme": "node client/test/readme-truth-check.mjs",
@@ -130,7 +130,9 @@
     "test:budget": "node client/test/install-budget-check.mjs",
     "test:india:surfaces": "node client/test/india-native-surfaces-check.mjs",
     "test:cbse:marking": "node client/test/cbse-marking-check.mjs",
-    "test:contracts": "node client/test/account-action-boundary-check.mjs && node client/test/class10-ncert-product-check.mjs && node client/test/cloud-session-refresh-check.mjs && node client/test/cloud-sync-worker-check.mjs && node client/test/entitlement-check.mjs && node client/test/india-class10-current-source-check.mjs && node client/test/india-class10-production-gap-check.mjs && node client/test/india-class7-current-source-check.mjs && node client/test/india-exam-blueprint-check.mjs && node client/test/india-practice-availability-check.mjs && node client/test/india-production-meta-check.mjs && node client/test/india-progress-product-check.mjs && node client/test/ncert-class10-full-book-check.mjs && node client/test/restore-durability-check.mjs && node client/test/sync-contract-check.mjs && node client/test/india-product-routing-check.mjs && node client/test/assignment-staff-product-check.mjs",
-    "test:platform:spend": "node server/test/spend-ceiling-check.mjs"
+    "test:contracts": "node client/test/account-action-boundary-check.mjs && node client/test/class10-ncert-product-check.mjs && node client/test/cloud-session-refresh-check.mjs && node client/test/cloud-sync-worker-check.mjs && node client/test/entitlement-check.mjs && node client/test/india-class10-current-source-check.mjs && node client/test/india-class10-production-gap-check.mjs && node client/test/india-class7-current-source-check.mjs && node client/test/india-exam-blueprint-check.mjs && node client/test/india-practice-availability-check.mjs && node client/test/india-production-meta-check.mjs && node client/test/india-progress-product-check.mjs && node client/test/ncert-class10-full-book-check.mjs && node client/test/restore-durability-check.mjs && node client/test/sync-contract-check.mjs && node client/test/india-product-routing-check.mjs && node client/test/assignment-staff-product-check.mjs && node client/test/signup-consent-check.mjs",
+    "test:platform:spend": "node server/test/spend-ceiling-check.mjs",
+    "test:platform:guardian": "node server/test/guardian-consent-check.mjs",
+    "test:consent:signup": "node client/test/signup-consent-check.mjs"
   }
 }

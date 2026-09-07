@@ -24,7 +24,7 @@ export function ensureAuthDeliverySchema(db) {
   db.exec(`CREATE TABLE IF NOT EXISTS auth_delivery_outbox (
     id TEXT PRIMARY KEY,
     account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
-    kind TEXT NOT NULL CHECK(kind IN ('verify-email','reset-password')),
+    kind TEXT NOT NULL CHECK(kind IN ('verify-email','reset-password','guardian-consent')),
     destination TEXT NOT NULL,
     token_id TEXT NOT NULL REFERENCES account_tokens(id) ON DELETE CASCADE,
     token_ciphertext TEXT NOT NULL,
@@ -62,7 +62,7 @@ function cleanPublicOrigin(raw) {
  * never sent in the HTTP request line, reverse-proxy logs or Referrer headers.
  */
 export function buildAuthActionUrl(publicOrigin, kind, rawToken) {
-  if (!['verify-email', 'reset-password'].includes(kind)) throw new Error('Unsupported auth delivery kind');
+  if (!['verify-email', 'reset-password', 'guardian-consent'].includes(kind)) throw new Error('Unsupported auth delivery kind');
   const token = String(rawToken || '');
   if (!token || token.length > 512) throw new Error('Invalid auth delivery token');
   const url = new URL('/account-action', cleanPublicOrigin(publicOrigin));
@@ -90,6 +90,15 @@ export function authEmailMessage(kind, actionUrl) {
       subject: 'Reset your Pri Learning password',
       text: `Reset your Pri Learning password by opening this link:\n\n${url}\n\nThis link expires in 1 hour. If you did not request a reset, you can ignore this email.`,
       html: `<p>Reset your Pri Learning password.</p><p><a href="${escapeHtml(url)}">Reset password</a></p><p>This link expires in 1 hour. If you did not request a reset, you can ignore this email.</p>`
+    };
+  }
+  if (kind === 'guardian-consent') {
+    // Written to a parent, not to the student, and it says what it is asking
+    // for and what happens if they do nothing.
+    return {
+      subject: 'Confirm your child’s Pri Learning account',
+      text: `Your child has created a Pri Learning account and asked you to confirm it.\n\nConfirm here:\n\n${url}\n\nPri Learning is a maths app. Everything in it works on their device without an account; confirming lets their progress sync between devices and be backed up. If you do nothing, nothing syncs and their work simply stays on their device.\n\nYou can withdraw this at any time from the same link. This link expires in 1 hour.`,
+      html: `<p>Your child has created a Pri Learning account and asked you to confirm it.</p><p><a href="${escapeHtml(url)}">Confirm this account</a></p><p>Pri Learning is a maths app. Everything in it works on their device without an account; confirming lets their progress sync between devices and be backed up. If you do nothing, nothing syncs and their work simply stays on their device.</p><p>You can withdraw this at any time from the same link. This link expires in 1 hour.</p>`
     };
   }
   throw new Error('Unsupported auth delivery kind');
