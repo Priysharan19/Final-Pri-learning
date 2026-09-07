@@ -68,18 +68,49 @@ eq(slipped.total, 3, 'out of three');
 eq(slipped.rows[2].earned, 0, 'and the answer mark is not');
 ok(/method is/i.test(marksSentence(slipped)), 'and the student is told the method earned marks');
 
-// ── 3 · One slip costs one mark, not the question ────────────────────────────
-// A break early on, then three sound lines carried from the student's own wrong
-// value. A board carries the error forward; so must this.
-const carried = awardStepMarks({
+// ── 3 · Error-carried-forward credit must itself be verified ─────────────────
+// A generic `note` means the checker did not verify the mathematics. It must not
+// silently become credit merely because an earlier line was a break: unrelated
+// prose or malformed continuation after an error is not a scheme point.
+const unverifiedCarry = awardStepMarks({
   question: { ...SETS, marks: 4, steps: [...SETS.steps, { h: 'State the answer', d: '14' }] },
-  workingLines: ['rule', 'wrong substitution', 'follows from it', 'and so does this'],
+  workingLines: ['rule', 'wrong substitution', 'unrelated note', 'still unrelated'],
   stepReport: report(['ok', 'break', 'note', 'note']),
   answerText: 'x',
   correct: false
 });
-ok(carried.awarded >= 2, `work carried after one slip still earns marks (got ${carried.awarded}/${carried.total})`);
-ok(carried.awarded < carried.total, 'but not all of them, because the answer is wrong');
+eq(unverifiedCarry.awarded, 1, 'unverified notes after a break do not recover method marks');
+eq(unverifiedCarry.creditedLines, 1, 'only the affirmatively verified pre-break line is creditable');
+
+// Legitimate carried-forward work remains creditable when the checker actually
+// verifies those later mathematical steps as `ok`.
+const verifiedCarry = awardStepMarks({
+  question: { ...SETS, marks: 4, steps: [...SETS.steps, { h: 'State the answer', d: '14' }] },
+  workingLines: ['rule', 'wrong substitution', 'verified continuation', 'verified continuation 2'],
+  stepReport: report(['ok', 'break', 'ok', 'ok']),
+  answerText: 'x',
+  correct: false
+});
+eq(verifiedCarry.awarded, 3, 'verified continuation after one slip can still earn remaining step marks');
+ok(verifiedCarry.awarded < verifiedCarry.total, 'but not the answer mark when the final answer is wrong');
+
+const shortReport = awardStepMarks({
+  question: SETS,
+  workingLines: ['verified method', 'unreported substitution', 'unreported result'],
+  stepReport: report(['ok']),
+  answerText: '15',
+  correct: false
+});
+eq(shortReport.creditedLines, 1, 'missing checker entries never create credit');
+
+const malformedReport = awardStepMarks({
+  question: SETS,
+  workingLines: ['line one', 'line two'],
+  stepReport: { lines: [{ status: 'ok' }, { status: 'maybe' }] },
+  answerText: '15',
+  correct: false
+});
+eq(malformedReport.creditedLines, 1, 'unknown checker statuses fail closed');
 
 // ── 4 · No working shown is the rule students most need told ─────────────────
 const bare = awardStepMarks({ question: SETS, workingLines: [], stepReport: null, answerText: '14', correct: true });
@@ -152,5 +183,5 @@ ok(!/official CBSE marking scheme for this question|CBSE official scheme/i.test(
 
 console.log(failures.length
   ? `CBSE STEP MARKING: FAIL — ${failures.length} of ${pass + failures.length} checks failed\n  · ${failures.join('\n  · ')}`
-  : `CBSE STEP MARKING: PASS — ${pass}/${pass} checks — method survives a wrong answer, one slip costs one mark, no working means no step marks, a missing unit costs the answer.`);
+  : `CBSE STEP MARKING: PASS — ${pass}/${pass} checks — method survives a wrong answer, unverified carried-forward notes earn no credit, no working means no step marks, a missing unit costs the answer.`);
 process.exit(failures.length ? 1 : 0);
