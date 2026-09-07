@@ -93,12 +93,12 @@ export function authEmailMessage(kind, actionUrl) {
     };
   }
   if (kind === 'guardian-consent') {
-    // Written to a parent, not to the student, and it says what it is asking
-    // for and what happens if they do nothing.
+    // Written to a parent, not to the student, and it states the two authority
+    // windows separately: confirmation is short-lived; later withdrawal is not.
     return {
       subject: 'Confirm your child’s Pri Learning account',
-      text: `Your child has created a Pri Learning account and asked you to confirm it.\n\nConfirm here:\n\n${url}\n\nPri Learning is a maths app. Everything in it works on their device without an account; confirming lets their progress sync between devices and be backed up. If you do nothing, nothing syncs and their work simply stays on their device.\n\nYou can withdraw this at any time from the same link. This link expires in 1 hour.`,
-      html: `<p>Your child has created a Pri Learning account and asked you to confirm it.</p><p><a href="${escapeHtml(url)}">Confirm this account</a></p><p>Pri Learning is a maths app. Everything in it works on their device without an account; confirming lets their progress sync between devices and be backed up. If you do nothing, nothing syncs and their work simply stays on their device.</p><p>You can withdraw this at any time from the same link. This link expires in 1 hour.</p>`
+      text: `Your child has created a Pri Learning account and asked you to confirm it.\n\nConfirm here:\n\n${url}\n\nPri Learning is a maths app. Everything in it works on their device without an account; confirming lets their progress sync between devices and be backed up. If you do nothing, nothing syncs and their work simply stays on their device.\n\nConfirmation is available for 1 hour. If you confirm, you can later use this same link to withdraw consent at any time.`,
+      html: `<p>Your child has created a Pri Learning account and asked you to confirm it.</p><p><a href="${escapeHtml(url)}">Confirm this account</a></p><p>Pri Learning is a maths app. Everything in it works on their device without an account; confirming lets their progress sync between devices and be backed up. If you do nothing, nothing syncs and their work simply stays on their device.</p><p>Confirmation is available for 1 hour. If you confirm, you can later use this same link to withdraw consent at any time.</p>`
     };
   }
   throw new Error('Unsupported auth delivery kind');
