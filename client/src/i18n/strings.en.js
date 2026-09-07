@@ -717,6 +717,24 @@ export default {
   'pw.solid': 'Solid. A few more characters would make it stronger still.',
   'pw.pastMinimum': 'Past the minimum. Extra length buys more than extra symbols do.',
 
+  // ── The legal notices ──────────────────────────────────────────────────────
+  // Chrome only. The notices themselves are docs/legal/*.md and their Hindi
+  // siblings docs/legal/*.hi.md — prose that long does not belong in a string
+  // catalogue, and a legal document needs to be diffable as a document. These
+  // are the words the page puts around one: what it is called when there is no
+  // such page, what the draft banner says, and how to ask for the other
+  // language. The document names themselves come from each document's own
+  // first heading, so they are never restated here in either language.
+  'legal.notFoundTitle': 'Not found',
+  'legal.notFoundBody': 'There is no such page. The published ones are {pages}',
+  'legal.languageLabel': 'Language of this document',
+  'legal.draftTitle': 'Template — not yet reviewed.',
+  'legal.draftBody': {
+    one: 'This document still has {n} placeholder to complete, and it has not been checked by a lawyer. Do not rely on it, and do not publish the app to a store or a payment provider until it has been finished and reviewed.',
+    other: 'This document still has {n} placeholders to complete, and it has not been checked by a lawyer. Do not rely on it, and do not publish the app to a store or a payment provider until it has been finished and reviewed.'
+  },
+  'legal.translationUnavailable': 'The Hindi translation has not arrived — it is fetched the first time it is asked for, so this is what an offline first read looks like. Below is the English, which is the version that governs in any case.',
+
   // ── Durations ──────────────────────────────────────────────────────────────
   'time.seconds': { one: '{n} second', other: '{n} seconds' },
   'time.minutes': { one: '{n} minute', other: '{n} minutes' },

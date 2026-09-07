@@ -781,6 +781,22 @@ export default {
   'pw.solid': 'ठोस। कुछ अक्षर और होते तो और मज़बूत होता।',
   'pw.pastMinimum': 'न्यूनतम से ऊपर। लंबाई बढ़ाना अतिरिक्त चिह्न जोड़ने से ज़्यादा काम आता है।',
 
+  // ── कानूनी सूचनाएँ ─────────────────────────────────────────────────────────
+  // Only the chrome around a notice; the notices are docs/legal/*.hi.md. Those
+  // are translations and say so at their own top — the English governs, and
+  // neither language has been near a lawyer. draftBody's two forms differ only
+  // in है/हैं: जगह does not inflect after a numeral, but the verb agrees, and
+  // Hindi's `one` form covers 0 as well as 1.
+  'legal.notFoundTitle': 'पन्ना नहीं मिला',
+  'legal.notFoundBody': 'ऐसा कोई पन्ना नहीं है। प्रकाशित पन्ने ये हैं: {pages}',
+  'legal.languageLabel': 'इस दस्तावेज़ की भाषा',
+  'legal.draftTitle': 'नमूना — अभी तक जाँचा नहीं गया।',
+  'legal.draftBody': {
+    one: 'इस दस्तावेज़ में अभी {n} जगह भरनी बाकी है, और इसे किसी अधिवक्ता ने नहीं जाँचा है। इस पर निर्भर मत रहिए, और जब तक यह पूरा होकर जाँच न लिया जाए तब तक ऐप को किसी स्टोर या भुगतान प्रदाता के पास मत भेजिए।',
+    other: 'इस दस्तावेज़ में अभी {n} जगहें भरनी बाकी हैं, और इसे किसी अधिवक्ता ने नहीं जाँचा है। इस पर निर्भर मत रहिए, और जब तक यह पूरा होकर जाँच न लिया जाए तब तक ऐप को किसी स्टोर या भुगतान प्रदाता के पास मत भेजिए।'
+  },
+  'legal.translationUnavailable': 'हिन्दी अनुवाद अभी नहीं आया — वह पहली बार माँगे जाने पर ही उतरता है, इसलिए बिना इंटरनेट के पहली बार पढ़ने पर ऐसा ही होता है। नीचे अंग्रेज़ी पाठ है, और कानूनी रूप से वही पाठ वैसे भी मान्य है।',
+
   // ── अवधि ───────────────────────────────────────────────────────────────────
   // सेकंड, मिनट and घंटा do not change after a numeral (12 मिनट is attested in
   // the NCERT corpus), so both forms are the same word here.
