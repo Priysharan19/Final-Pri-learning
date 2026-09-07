@@ -163,9 +163,10 @@ export function unitsPresent(question, workingLines, answerText) {
  * demand the order of the printed solution either.
  *
  * `stepReport` is the on-device step check ({ lines: [{ status }] }), or a
- * cloud check merged into that shape. Lines the checker verified are credit;
- * a line after the first break still counts, because it is correct work on the
- * student's own earlier value and the board carries the error forward.
+ * cloud check merged into that shape. Only lines the checker affirmatively
+ * verifies as `ok` are credit-bearing. A later line may still earn
+ * error-carried-forward credit after a break, but only when the checker verifies
+ * that continuation; a generic `note` is explicitly non-authoritative.
  */
 export function awardStepMarks({
   question,
@@ -176,19 +177,15 @@ export function awardStepMarks({
 } = {}) {
   const scheme = markScheme(question);
   const lines = (workingLines || []).map(text).filter(Boolean);
-  const reportLines = stepReport?.lines || [];
+  const reportLines = Array.isArray(stepReport?.lines) ? stepReport.lines : [];
 
-  // Credit-worthy lines: verified by the checker, or carried after a break.
-  // A line the checker could say nothing about earns nothing — that is the
-  // board's position too, and inventing credit for unverifiable work would
-  // make every other number here worthless.
+  // Fail closed: only an affirmative checker verdict can create marking credit.
+  // `break`, `note`, missing entries and unknown statuses earn nothing. This
+  // preserves carried-forward credit for verified post-break work without
+  // allowing unverified prose or malformed continuation to recover marks.
   let credited = 0;
-  let seenBreak = false;
   for (let i = 0; i < lines.length; i += 1) {
-    const status = reportLines[i]?.status;
-    if (status === 'break') { seenBreak = true; continue; }
-    if (status === 'ok') credited += 1;
-    else if (seenBreak && status === 'note') credited += 1;
+    if (reportLines[i]?.status === 'ok') credited += 1;
   }
 
   const stepRows = scheme.rows.filter(r => r.kind !== MARK_KINDS.ANSWER);
