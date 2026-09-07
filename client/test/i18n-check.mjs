@@ -206,6 +206,11 @@ const CONVERTED = [
   'src/pages/Practice.jsx',
   'src/pages/PracticeBase.jsx',
   'src/pages/SettingsLegacy.jsx',
+  // The legal pages joined this list when the notices became bilingual. They
+  // are the one screen where an English literal is not merely untranslated but
+  // wrong: the DPDP Act gives a reader the right to the notice in their own
+  // language, and chrome in English over a Hindi notice takes part of that back.
+  'src/pages/Legal.jsx',
   'src/components/QuestionCard.jsx'
 ];
 
@@ -357,7 +362,10 @@ for (const [text, reason] of LITERAL_ALLOWLIST) {
 // must be reached from somewhere. The first stops a typo shipping as a raw key
 // on screen; the second stops a translated string nothing uses inflating the
 // count this suite reports.
-const CALL = /\bt\(\s*'([a-z][A-Za-z0-9.]*)'/g;
+// `tx()` counts as much as `t()`. It was missed here until the legal pages
+// used it for the one sentence with a link inside it, and a key reached only
+// through tx() looked to this suite like a dead string.
+const CALL = /\btx?\(\s*'([a-z][A-Za-z0-9.]*)'/g;
 const KEY_IN_TABLE = /'((?:nav|app|common|difficulty|home|progress|history|favorites|tasks|classes|practice|verdict|settings|login|lang|pw|time|sym|assignment|gloss)\.[A-Za-z0-9.]+)'/g;
 
 function sourceFiles(dir) {
