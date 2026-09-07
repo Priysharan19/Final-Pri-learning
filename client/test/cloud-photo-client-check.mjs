@@ -6,8 +6,10 @@
 //
 //   · the photo is re-encoded to fit the transport before it is sent, because a
 //     phone hands back three megabytes and the body cap is one;
-//   · it goes to the same reader as the ink, on the same opt-in, and a failure
-//     falls back rather than costing the student the reader on their device.
+//   · it does NOT go to the same reader on the same opt-in. That opt-in covers
+//     a raster of the student's strokes and nothing else, and a photographed
+//     page can carry far more than that, so the cloud photo route fails closed
+//     until a consent exists that actually describes it.
 // ─────────────────────────────────────────────────────────────────────────────
 import { MAX_PHOTO_BYTES, dataUrlBytes, isSupportedPhoto, photoDimensions, preparePhoto } from '../src/ink/photoRaster.js';
 import { readPhotoWithCloud } from '../src/ink/cloudReader.js';
@@ -70,35 +72,56 @@ ok(await preparePhoto(PHOTO, { loadImage: async () => { throw new Error('corrupt
   'and a photo that will not decode is refused rather than thrown');
 eq(dataUrlBytes('data:image/jpeg;base64,' + 'A'.repeat(400)), 300, 'byte counting undoes base64 inflation');
 
-// ── 4 · Same opt-in, same reader ─────────────────────────────────────────────
+// ── 4 · The photo route is closed, and closed for a stated reason ───────────
+//
+// `cloudHandwriting` discloses one thing: an image rasterized from the
+// student's own strokes — "never the question, never the answer, never your
+// name". A photograph of a page is not that. It can carry a name, a school
+// stamp, a date, the facing page, or somebody else's work, and none of that
+// was disclosed to the guardian who agreed.
+//
+// So this route fails closed until there is a consent that describes it. These
+// checks exist to make that boundary expensive to cross by accident: the point
+// is not that the function returns a particular string, it is that NO transport
+// call happens no matter how the caller is configured.
+
+let called = 0;
 let sent = null;
 const spy = {
-  transcribeHandwriting: async (image, opts) => {
-    sent = { image, opts };
-    return { transcription: { lines: [{ text: '2x + 3 = 11', confidence: 0.9 }, { text: 'x = 4', confidence: 0.9 }], text: '2x + 3 = 11\nx = 4', confidence: 0.9, needsConfirmation: false, engine: 'cloud-test' } };
-  }
+  transcribeHandwriting: async (image, opts) => { called += 1; sent = { image, opts }; return { transcription: { lines: [], text: '' } }; }
 };
 const prepare = async () => ({ dataUrl: 'data:image/jpeg;base64,AAAA', width: 100, height: 80, bytes: 3, quality: 0.85 });
 
-let called = 0;
-const off = await readPhotoWithCloud(PHOTO, { user: { cloudHandwriting: false }, transport: { transcribeHandwriting: async () => { called += 1; } }, prepare, available: there });
-eq(called, 0, 'a photo is not sent unless the student turned server reading on');
-eq(off.reason, 'disabled', 'and the caller is told that is why, so it can fall back rather than report a failure');
+// Consent off, consent on, no user at all, and a caller that forgot to pass a
+// transport: every one of them must reach the network zero times.
+for (const [label, user] of [
+  ['with server reading off', { cloudHandwriting: false }],
+  ['with server reading on', { cloudHandwriting: true }],
+  ['with no profile at all', null]
+]) {
+  const outcome = await readPhotoWithCloud(PHOTO, { user, transport: spy, prepare, available: there });
+  eq(outcome.reason, 'photo-consent-required', `a paper photo is refused ${label}`);
+}
+eq(called, 0, 'and the transport was never reached — not once, under any of them');
+eq(sent, null, 'so no image left the device');
 
-const outcome = await readPhotoWithCloud(PHOTO, { user: { cloudHandwriting: true }, transport: spy, prepare, available: there });
-ok(sent?.image?.startsWith('data:image/'), 'with it on, the prepared photo is sent');
-ok(sent.image !== PHOTO, 'and it is the re-encoded one, not the raw camera file');
-eq(Object.keys(sent.opts || {}), ['signal'], 'nothing travels beside it but the cancel signal');
-eq(outcome.transcription.text.split('\n').length, 2, 'every line of the page comes back, not just an answer');
-ok(outcome.photo.bytes > 0, 'and the result reports what was actually sent');
+// The reason has to be its own value. 'disabled' means "you turned this off and
+// may turn it on"; this is "the app has not asked for this yet", and a caller
+// that cannot tell them apart will offer the student a setting that would not
+// help.
+const disabledReason = 'disabled';
+ok((await readPhotoWithCloud(PHOTO, { user: { cloudHandwriting: false } })).reason !== disabledReason,
+  'the refusal is not reported as the student having switched something off');
 
-const failing = { transcribeHandwriting: async () => { const e = new Error('down'); e.code = 'HANDWRITING_UNAVAILABLE'; throw e; } };
-const failed = await readPhotoWithCloud(PHOTO, { user: { cloudHandwriting: true }, transport: failing, prepare, available: there });
-ok(failed?.error?.code === 'HANDWRITING_UNAVAILABLE', 'a refusal is reported so the caller can fall back to the on-device reader');
-const undecodable = await readPhotoWithCloud(PHOTO, { user: { cloudHandwriting: true }, transport: spy, prepare: async () => null, available: there });
-eq(undecodable.reason, 'unreadable', 'a photo that could not be prepared is never sent, and says why — a HEIC on Android lands here');
+// QuestionCard treats any non-success as "use the local/native reader", so this
+// must resolve rather than throw — a rejected promise there is a broken submit
+// button, not a fallback.
+let threw = false;
+try { await readPhotoWithCloud(); } catch { threw = true; }
+ok(!threw, 'calling it with nothing at all resolves rather than throwing');
+ok(typeof (await readPhotoWithCloud()).reason === 'string', 'and always answers with a reason the caller can branch on');
 
 console.log(failures.length
   ? `CLOUD PHOTO CLIENT: FAIL — ${failures.length} of ${pass + failures.length} checks failed\n  · ${failures.join('\n  · ')}`
-  : `CLOUD PHOTO CLIENT: PASS — ${pass}/${pass} checks — paper working is scaled to fit, sent only on the same opt-in, and a failure falls back.`);
+  : `CLOUD PHOTO CLIENT: PASS — ${pass}/${pass} checks — paper working is scaled to fit, and the cloud photo route sends nothing until a consent describes it.`);
 process.exit(failures.length ? 1 : 0);
