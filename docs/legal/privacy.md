@@ -43,11 +43,22 @@ device can open a profile that has no password.
   writing happens on your device by default, and your strokes stay there. There
   is a setting in Settings → Handwriting, off unless you turn it on, that also
   sends your writing to be read on a server, because the on-device reader knows
-  a fixed set of symbols and some notation is beyond it. What is sent is an
-  image drawn from your own strokes and nothing else: not the question, not the
-  expected answer, not your name or profile. It is used to return the reading
-  and is not kept after that, not used to train anyone's model, and turning the
-  setting off stops it at once.
+  a fixed set of symbols and some notation is beyond it.
+
+  When you write with a pencil or your finger, what is sent is an image drawn
+  from your own stroke coordinates and nothing else: not the question, not the
+  expected answer, not your name or profile.
+
+  **The same setting also covers a photograph.** If you attach a photo of work
+  done on paper, or a scanned PDF of it, that photograph is sent to be read by
+  the same service. It is your camera's picture, resized and re-encoded but not
+  otherwise altered — so whatever is in the frame is sent, which can include the
+  printed question, a name written on the page, or anything else on the paper.
+  Keep out of shot whatever you would not want sent, or type your working
+  instead.
+
+  Either way it is used to return the reading and is not kept after that, not
+  used to train anyone's model, and turning the setting off stops it at once.
 - **Your working and the question, only if you switch that on.** There is a
   second setting, also off unless you turn it on, that sends the lines of
   working you wrote and the text of the question when an answer is wrong and
@@ -55,8 +66,10 @@ device can open a profile that has no password.
   the mistake is and is not kept afterwards. The expected answer is never sent
   with it, and your name and profile are never sent with it. Your mark is
   decided on your device either way.
-- **Device information** needed to keep you signed in: a device identifier you
-  chose, and the times you signed in and last synced.
+- **Device information** needed to keep you signed in: a random device
+  identifier this app generates (it is not your device's own id and not
+  anything you typed), a one-way hash of your browser's user-agent string, and
+  the times you signed in and were last seen.
 - **Subscription status** from your payment provider, if you subscribe.
 
 ## Children

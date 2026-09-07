@@ -287,6 +287,34 @@ export default function CloudAccountPanel() {
     finally { setBusy(''); }
   }
 
+  /**
+   * Cancel a website subscription.
+   *
+   * The refund policy has promised this control since it was written; the
+   * server route and the transport call both existed and nothing in the app
+   * ever reached them, so the document was describing a button that was not
+   * there. Cancelling takes effect at the end of the period already paid for,
+   * which is what the policy says and what the server does.
+   */
+  async function cancelWebSubscription() {
+    if (!canUseWebBilling) return;
+    // Ending a subscription is not something to do on a mis-tap.
+    if (!window.confirm('Cancel your Pri Learning subscription? Premium stays active until the end of the period you have already paid for.')) return;
+    setBusy('cancel-web');
+    setError('');
+    setMessage('');
+    try {
+      await cloud.cancelWebBilling();
+      await refreshCloudEntitlement(user.id);
+      await reload({ verify: false });
+      setMessage('Your subscription is cancelled. Premium stays active until the end of the period you have already paid for.');
+    } catch (err) {
+      setError(err?.code === 'BILLING_SUBSCRIPTION_NOT_CANCELLABLE'
+        ? 'There is no active website subscription on this account to cancel.'
+        : err.message || 'Could not cancel the subscription just now.');
+    } finally { setBusy(''); }
+  }
+
   async function startApplePurchase(product) {
     if (!canUseAppleBilling || !product?.id) return;
     setBusy(`apple-${product.id}`);
@@ -497,6 +525,11 @@ export default function CloudAccountPanel() {
             <button className="btn btn-sm btn-quiet" type="button" disabled={!!busy} onClick={restoreWebBilling}>
               {busy === 'restore-web' ? 'Restoring…' : 'Restore web subscription'}
             </button>
+            {premium && entitlement?.provider === 'web' && (
+              <button className="btn btn-sm btn-quiet" type="button" disabled={!!busy} onClick={cancelWebSubscription}>
+                {busy === 'cancel-web' ? 'Cancelling…' : 'Cancel subscription'}
+              </button>
+            )}
           </div>}
 
           {nativeShell && nativeStoreKit && <div style={{ marginTop: 12 }}>

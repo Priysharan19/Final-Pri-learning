@@ -515,7 +515,7 @@ export default {
   'settings.secHelp': 'Help & Safety',
 
   'settings.localPlan': 'Local Plan',
-  'settings.localPlanSub': 'Everything unlocked — no account, no subscription, no limits',
+  'settings.localPlanSub': 'No account and no subscription needed — {limit} practice questions a day, and everything else unlimited',
   'settings.questionBank': 'Question bank',
   'settings.questionBankValue': '1,329,679+ distinct — measured, still growing',
   'settings.status': 'Status',
@@ -535,7 +535,7 @@ export default {
   'settings.spaceUsed': '# Space used',
   'settings.spaceOf': '{used} of {total} ({percent}%)',
   'settings.accounts': '✉ Accounts',
-  'settings.accountsValue': 'Private on-device profiles — nothing ever leaves this device',
+  'settings.accountsValue': 'Private on-device profiles — nothing leaves this device unless you switch on a cloud account or server reading below',
 
   'settings.profileInfo': '☺ Profile Information',
   'settings.fullName': 'Full name',

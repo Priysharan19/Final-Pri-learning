@@ -586,7 +586,7 @@ export default {
   'settings.secHelp': 'मदद और सुरक्षा',
 
   'settings.localPlan': 'लोकल प्लान',
-  'settings.localPlanSub': 'सब कुछ खुला हुआ — न खाता, न सब्सक्रिप्शन, न कोई सीमा',
+  'settings.localPlanSub': 'न खाता चाहिए, न सदस्यता — रोज़ {limit} अभ्यास प्रश्न, और बाकी सब असीमित',
   'settings.questionBank': 'प्रश्न बैंक',
   'settings.questionBankValue': '13,29,679+ अलग-अलग — गिने हुए, और बढ़ रहे हैं',
   'settings.status': 'स्थिति',
@@ -606,7 +606,7 @@ export default {
   'settings.spaceUsed': '# इस्तेमाल हुई जगह',
   'settings.spaceOf': '{total} में से {used} ({percent}%)',
   'settings.accounts': '✉ खाते',
-  'settings.accountsValue': 'इसी डिवाइस पर निजी प्रोफ़ाइल — कुछ भी बाहर नहीं जाता',
+  'settings.accountsValue': 'इसी डिवाइस पर निजी प्रोफ़ाइल — नीचे क्लाउड खाता या सर्वर पर पढ़ना चालू किए बिना कुछ भी इस डिवाइस से बाहर नहीं जाता',
 
   'settings.profileInfo': '☺ प्रोफ़ाइल की जानकारी',
   'settings.fullName': 'पूरा नाम',

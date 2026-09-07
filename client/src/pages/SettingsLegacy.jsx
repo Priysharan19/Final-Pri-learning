@@ -5,6 +5,9 @@ import { downloadJSON, readJSONFile, dateStamp } from '../lib/files.js';
 import Calibrate from '../ink/Calibrate.jsx';
 import { personalStats, clearPersonal, ensurePersonalLoaded } from '../ink/personal.js';
 import { cloud, cloudAvailable } from '../platform/cloudTransport.js';
+// The daily cap is read from the gate that enforces it, so the number a student
+// is shown can never drift from the number they actually hit.
+import { FREE_TIER } from '../local/entitlementGate.js';
 import { MIN_PASSWORD, PasswordMeter, passwordVerdict } from './Login.jsx';
 import { LANGUAGES, useLanguage, useT } from '../i18n/index.js';
 import { loadGlossary } from '../i18n/glossary.js';
@@ -472,7 +475,7 @@ export default function Settings() {
           {/* ── Plan ── */}
           <div className="card" ref={el => secRefs.current.plan = el}>
             <h2>{t('settings.localPlan')}</h2>
-            <p className="muted" style={{ margin: '4px 0 14px' }}>{t('settings.localPlanSub')}</p>
+            <p className="muted" style={{ margin: '4px 0 14px' }}>{t('settings.localPlanSub', { limit: FREE_TIER.practicePerDay })}</p>
             <div className="spread" style={{ fontSize: 14 }}>
               <span className="sub">{t('settings.questionBank')}</span><span>{t('settings.questionBankValue')}</span>
             </div>
