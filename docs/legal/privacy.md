@@ -43,11 +43,22 @@ device can open a profile that has no password.
   writing happens on your device by default, and your strokes stay there. There
   is a setting in Settings → Handwriting, off unless you turn it on, that also
   sends your writing to be read on a server, because the on-device reader knows
-  a fixed set of symbols and some notation is beyond it. What is sent is an
-  image drawn from your own strokes and nothing else: not the question, not the
-  expected answer, not your name or profile. It is used to return the reading
-  and is not kept after that, not used to train anyone's model, and turning the
-  setting off stops it at once.
+  a fixed set of symbols and some notation is beyond it.
+
+  When you write with a pencil or your finger, what is sent is an image drawn
+  from your own stroke coordinates and nothing else: not the question, not the
+  expected answer, not your name or profile.
+
+  **The same setting also covers a photograph.** If you attach a photo of work
+  done on paper, or a scanned PDF of it, that photograph is sent to be read by
+  the same service. It is your camera's picture, resized and re-encoded but not
+  otherwise altered — so whatever is in the frame is sent, which can include the
+  printed question, a name written on the page, or anything else on the paper.
+  Keep out of shot whatever you would not want sent, or type your working
+  instead.
+
+  Either way it is used to return the reading and is not kept after that, not
+  used to train anyone's model, and turning the setting off stops it at once.
 - **Your working and the question, only if you switch that on.** There is a
   second setting, also off unless you turn it on, that sends the lines of
   working you wrote and the text of the question when an answer is wrong and
@@ -55,8 +66,10 @@ device can open a profile that has no password.
   the mistake is and is not kept afterwards. The expected answer is never sent
   with it, and your name and profile are never sent with it. Your mark is
   decided on your device either way.
-- **Device information** needed to keep you signed in: a device identifier you
-  chose, and the times you signed in and last synced.
+- **Device information** needed to keep you signed in: a random device
+  identifier this app generates (it is not your device's own id and not
+  anything you typed), a one-way hash of your browser's user-agent string, and
+  the times you signed in and were last seen.
 - **Subscription status** from your payment provider, if you subscribe.
 
 ## Children
@@ -65,10 +78,20 @@ Pri Learning is used by children. Under the DPDP Act, a child is anyone under
 18, and a child's data may only be processed with verifiable consent from a
 parent or guardian.
 
-When a profile is created for someone under 18, the app asks for a parent or
-guardian's name and contact and records their consent, with the date and the
-version of this notice they agreed to. For a cloud account, we email the
-guardian a link they must confirm before the account can sync or subscribe.
+**What the app does today, plainly: it does not ask for your age, and it does
+not ask for or record a parent's consent.** It asks which class you are in,
+which tells it what maths to set you, and nothing else about how old you are.
+No guardian is contacted, and there is no consent record.
+
+If you are under 18, please set this up with a parent or guardian and show them
+this notice, particularly the section on what a cloud account sends. Everything
+works without an account, and without an account nothing leaves the device.
+
+The DPDP Act's substantive obligations — including verifiable parental consent
+for anyone under 18 — commence on 14 May 2027. Before then, and before this app
+is offered to children at scale, a guardian consent flow has to be built and
+this section rewritten to describe it. Until it says otherwise, it does not
+exist.
 
 We do not use children's data for advertising, we do not track children across
 other services, and we do not build behavioural profiles for anything other than

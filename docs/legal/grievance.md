@@ -7,10 +7,10 @@ says who reads it and what happens next.
 
 ## Grievance officer
 
-{{GRIEVANCE_OFFICER_NAME}}
-{{OWNER_LEGAL_NAME}}
-{{OWNER_ADDRESS}}
-{{GRIEVANCE_OFFICER_EMAIL}}
+- {{GRIEVANCE_OFFICER_NAME}}
+- {{OWNER_LEGAL_NAME}}
+- {{OWNER_ADDRESS}}
+- {{GRIEVANCE_OFFICER_EMAIL}}
 
 Publishing this contact is required of us by India's Digital Personal Data
 Protection Act 2023.

@@ -6,7 +6,86 @@ import { platformDatabasePath } from './config.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_PATH = join(here, '..', 'data', 'pri-learning-platform.db');
-const SCHEMA_VERSION = 5;
+const SCHEMA_VERSION = 6;
+
+
+/**
+ * Widen the delivery CHECK constraints to admit a guardian consent email.
+ *
+ * A no-op once the constraint already allows it, so this costs one PRAGMA on
+ * every boot after the first. Rebuilt inside one transaction with every row
+ * copied, because a half-applied rebuild of the table holding unsent
+ * verification email would lose somebody their account.
+ */
+function widenAuthKinds(db) {
+  const allows = (table, needle) => {
+    const row = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name=?").get(table);
+    return !row?.sql || String(row.sql).includes(needle);
+  };
+  if (allows('account_tokens', "'guardian-consent'") && allows('auth_delivery_outbox', "'guardian-consent'")) return;
+
+  // Two details, both of which cost real data when I got them wrong here:
+  //
+  //  · auth_delivery_outbox.token_id references account_tokens ON DELETE
+  //    CASCADE, so dropping account_tokens during a rebuild takes every unsent
+  //    email with it. Foreign keys must genuinely be off, not merely read.
+  //  · SQLite IGNORES `PRAGMA foreign_keys` inside a transaction, so it has to
+  //    be set outside one — which is why this is not in the transaction below.
+  const foreignKeysWereOn = db.pragma('foreign_keys', { simple: true }) === 1;
+  db.pragma('foreign_keys = OFF');
+  try {
+    db.transaction(() => {
+      if (!allows('account_tokens', "'guardian-consent'")) {
+        db.exec(`
+          CREATE TABLE account_tokens_v6 (
+            id TEXT PRIMARY KEY,
+            account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+            purpose TEXT NOT NULL CHECK(purpose IN ('verify-email','reset-password','guardian-consent')),
+            token_hash TEXT NOT NULL,
+            created_at INTEGER NOT NULL,
+            expires_at INTEGER NOT NULL,
+            consumed_at INTEGER
+          );
+          INSERT INTO account_tokens_v6(id,account_id,purpose,token_hash,created_at,expires_at,consumed_at)
+            SELECT id,account_id,purpose,token_hash,created_at,expires_at,consumed_at FROM account_tokens;
+          DROP TABLE account_tokens;
+          ALTER TABLE account_tokens_v6 RENAME TO account_tokens;
+          CREATE INDEX IF NOT EXISTS idx_account_tokens_account ON account_tokens(account_id, purpose, expires_at);
+        `);
+      }
+      if (!allows('auth_delivery_outbox', "'guardian-consent'")) {
+        const columns = db.pragma('table_info(auth_delivery_outbox)').map(c => c.name);
+        const extra = ['attempt_count', 'last_attempt_at', 'next_attempt_at', 'last_error_code', 'provider_message_id']
+          .filter(c => columns.includes(c));
+        const list = ['id', 'account_id', 'kind', 'destination', 'token_id', 'token_ciphertext', 'created_at', 'delivered_at', ...extra].join(',');
+        db.exec(`
+          CREATE TABLE auth_delivery_outbox_v6 (
+            id TEXT PRIMARY KEY,
+            account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+            kind TEXT NOT NULL CHECK(kind IN ('verify-email','reset-password','guardian-consent')),
+            destination TEXT NOT NULL,
+            token_id TEXT NOT NULL REFERENCES account_tokens(id) ON DELETE CASCADE,
+            token_ciphertext TEXT NOT NULL,
+            created_at INTEGER NOT NULL,
+            delivered_at INTEGER,
+            attempt_count INTEGER NOT NULL DEFAULT 0,
+            last_attempt_at INTEGER,
+            next_attempt_at INTEGER,
+            last_error_code TEXT,
+            provider_message_id TEXT
+          );
+          INSERT INTO auth_delivery_outbox_v6(${list}) SELECT ${list} FROM auth_delivery_outbox;
+          DROP TABLE auth_delivery_outbox;
+          ALTER TABLE auth_delivery_outbox_v6 RENAME TO auth_delivery_outbox;
+          CREATE INDEX IF NOT EXISTS idx_auth_delivery_pending
+            ON auth_delivery_outbox(delivered_at, next_attempt_at, created_at);
+        `);
+      }
+    })();
+  } finally {
+    db.pragma(`foreign_keys = ${foreignKeysWereOn ? 'ON' : 'OFF'}`);
+  }
+}
 
 function addColumnIfMissing(db, table, column, ddl) {
   const safeTable = String(table).replaceAll("'", "''");
@@ -120,7 +199,7 @@ export function createPlatformDb(path = DEFAULT_PATH) {
     CREATE TABLE IF NOT EXISTS account_tokens (
       id TEXT PRIMARY KEY,
       account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
-      purpose TEXT NOT NULL CHECK(purpose IN ('verify-email','reset-password')),
+      purpose TEXT NOT NULL CHECK(purpose IN ('verify-email','reset-password','guardian-consent')),
       token_hash TEXT NOT NULL UNIQUE,
       created_at INTEGER NOT NULL,
       expires_at INTEGER NOT NULL,
@@ -353,6 +432,38 @@ export function createPlatformDb(path = DEFAULT_PATH) {
   // written before v5 keep a NULL digest and are still replayable; only a key
   // that recorded what it acknowledged can refuse a different request.
   addColumnIfMissing(db, 'idempotency_keys', 'request_digest', 'request_digest TEXT');
+
+  // Schema v6 — a guardian's confirmation, and the two CHECK constraints that
+  // have to widen to carry it.
+  //
+  // Every Class 7-12 student is a child under the DPDP Act, which draws its
+  // line at 18 with no younger tier. A local profile never reaches this server
+  // and is not ours to consent to; a cloud account is, so the consent gates the
+  // cloud account and nothing else. The app stays fully usable offline without
+  // one, which is what makes gating the account acceptable rather than a wall.
+  //
+  // SQLite cannot ALTER a CHECK, so the two tables that name the delivery kinds
+  // are rebuilt transactionally, exactly as learning_events was at v3. Every row
+  // is carried across; in-flight verification and reset email survives.
+  widenAuthKinds(db);
+
+  db.exec(`CREATE TABLE IF NOT EXISTS guardian_consents (
+    account_id TEXT PRIMARY KEY REFERENCES accounts(id) ON DELETE CASCADE,
+    guardian_name TEXT NOT NULL,
+    guardian_email TEXT NOT NULL,
+    notice_version TEXT NOT NULL,
+    requested_at INTEGER NOT NULL,
+    confirmed_at INTEGER,
+    withdrawn_at INTEGER,
+    -- What was actually established, so no later reader can mistake this for
+    -- more than it is. See guardianConsent.js: this records that somebody with
+    -- access to the guardian's mailbox followed a link. It does not establish
+    -- that they are an adult, or that they are this child's parent, which is
+    -- what Rule 10 will require.
+    method TEXT NOT NULL
+  );`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_guardian_consents_state
+    ON guardian_consents(confirmed_at, withdrawn_at);`);
 
   db.prepare("INSERT OR REPLACE INTO platform_meta(key,value) VALUES ('schema_version',?)").run(String(SCHEMA_VERSION));
   return db;

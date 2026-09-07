@@ -54,6 +54,65 @@ export default function AccountAction({ actionData }) {
     );
   }
 
+  // ── A guardian answering the email ────────────────────────────────────────
+  // They have no account and no session; the token in their link is the whole
+  // authority. Both choices live on one screen because a parent who wants to
+  // say no should not have to find a second link to do it — withdrawal has to
+  // be as easy as consent was to give.
+  if (action === 'guardian-consent') {
+    const answer = async (choice) => {
+      setState('working');
+      setMessage('');
+      try {
+        if (choice === 'confirm') await cloud.guardianConfirm(token);
+        else await cloud.guardianWithdraw(token);
+        setState('done');
+        setMessage(choice === 'confirm'
+          ? 'Thank you. Their progress can now sync between their devices and be backed up.'
+          : 'Noted. Nothing of theirs will sync, and their work stays on their own device.');
+      } catch (error) {
+        setState('error');
+        setMessage(error?.code === 'TOKEN_INVALID'
+          ? 'This link is invalid or has expired. Ask them to create the account again and a new link will be sent.'
+          : 'Pri Learning could not record that right now. Please try the link again in a moment.');
+      }
+    };
+    return (
+      <Shell>
+        <h1 style={{ marginTop: 0 }}>Confirm your child’s account</h1>
+        {state !== 'done' && (
+          <>
+            <p className="muted" style={{ marginTop: 0 }}>
+              Pri Learning is a maths app. Everything in it — the questions, the marking and the
+              handwriting — already works on their device without an account. Confirming lets their
+              progress sync between devices and be backed up. If you would rather it did not, say no
+              and nothing of theirs will leave their device.
+            </p>
+            <p className="muted" style={{ fontSize: 12.5 }}>
+              You can change this later from this same link. The{' '}
+              <a href="/privacy" target="_blank" rel="noreferrer">privacy notice</a> sets out exactly what an
+              account sends.
+            </p>
+          </>
+        )}
+        {state === 'working' && <Status>Recording your answer…</Status>}
+        {state === 'error' && <Status kind="error">{message}</Status>}
+        {state === 'done'
+          ? <><Status>{message}</Status><a className="btn primary" href="/">Open Pri Learning</a></>
+          : (
+            <div className="row" style={{ gap: 10, marginTop: 16, flexWrap: 'wrap' }}>
+              <button className="btn primary" type="button" disabled={state === 'working'} onClick={() => answer('confirm')}>
+                Yes, allow syncing
+              </button>
+              <button className="btn" type="button" disabled={state === 'working'} onClick={() => answer('withdraw')}>
+                No, keep it on their device
+              </button>
+            </div>
+          )}
+      </Shell>
+    );
+  }
+
   if (action === 'verify-email') {
     return (
       <Shell>

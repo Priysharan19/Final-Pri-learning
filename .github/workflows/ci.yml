@@ -58,11 +58,11 @@ jobs:
           grep -Fq 'INDIA EXAM WEIGHT: PASS — 628/628 checks' suites.log
           grep -Fq 'PLOTTING: PASS — 78/78 checks' suites.log
           grep -Fq 'README TRUTH: PASS — 16/16 checks' suites.log
-          grep -Fq 'LEGAL PAGES: PASS — 45/45 checks' suites.log
+          grep -Fq 'LEGAL PAGES: PASS — 228/228 checks' suites.log
           grep -Fq 'CLOUD HANDWRITING CLIENT: PASS — 42/42 checks' suites.log
           grep -Fq 'CLOUD WORKING CLIENT: PASS — 44/44 checks' suites.log
           grep -Fq 'CLOUD PHOTO CLIENT: PASS — 28/28 checks' suites.log
-          grep -Fq 'I18N: PASS — 180/180 checks' suites.log
+          grep -Fq 'I18N: PASS — 187/187 checks' suites.log
           grep -Fq 'CLOUD HANDWRITING CLIENT: PASS — 42/42 checks' suites.log
           grep -Fq 'CLOUD WORKING CLIENT: PASS — 44/44 checks' suites.log
           grep -Fq 'CLOUD PHOTO CLIENT: PASS — 28/28 checks' suites.log
@@ -156,6 +156,8 @@ jobs:
         run: |
           node server/test/handwriting-transcription-check.mjs
           node server/test/working-check-check.mjs
+          node server/test/spend-ceiling-check.mjs
+          node server/test/guardian-consent-check.mjs
       - name: Account, origin, CMS and classroom contracts
         run: |
           node server/test/account-deletion-reauth-check.mjs
@@ -229,7 +231,7 @@ jobs:
           grep -Fq 'Phone · every destination reachable at 390px' browser.log
           grep -Fq 'India · onboarding, class labels, demo, cloud entry' browser.log
           grep -Fq 'Cloud · account, live Settings refresh, assignment hand-off' browser.log
-          grep -Eq 'E2E SUITE.*14/14.*1 flows' browser.log
+          grep -Eq 'E2E SUITE.*18/18.*1 flows' browser.log
           grep -Fq 'Cloud admin · CMS lifecycle and role management' browser.log
           grep -Eq 'E2E SUITE.*17/17.*1 flows' browser.log
           grep -Fq 'Cloud admin · independent-review rejection' browser.log

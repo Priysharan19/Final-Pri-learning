@@ -55,7 +55,17 @@ export default function CloudAccountPanel() {
   const [appleProducts, setAppleProducts] = useState([]);
   const [appleStoreError, setAppleStoreError] = useState('');
   const [mode, setMode] = useState('login');
-  const [form, setForm] = useState({ name: user?.name || '', email: '', password: '' });
+  const [form, setForm] = useState({
+    name: user?.name || '', email: '', password: '',
+    // Declared, not inferred. The class a student picked already implies a
+    // child, and the server treats silence as one — this asks so the student
+    // knows it was asked, and so an adult can say so.
+    isAdult: false, guardianName: '', guardianEmail: ''
+  });
+  const [agreed, setAgreed] = useState(false);
+  // Where this account stands with its guardian. Shown to the student so a
+  // pending account reads as "waiting for a parent" rather than as a fault.
+  const [guardian, setGuardian] = useState(null);
   const [busy, setBusy] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
@@ -65,6 +75,15 @@ export default function CloudAccountPanel() {
   const premium = !!entitlement?.active;
   const pending = status?.pending || 0;
   const canSync = enabled && !!link?.accountId && !!session?.connected;
+
+  useEffect(() => {
+    if (!enabled || !link?.accountId) { setGuardian(null); return; }
+    let live = true;
+    cloud.guardianState()
+      .then(state => { if (live) setGuardian(state); })
+      .catch(() => { if (live) setGuardian(null); });
+    return () => { live = false; };
+  }, [enabled, link?.accountId]);
   const canUseWebBilling = canSync && webCheckout && !nativeShell;
   const canUseAppleBilling = canSync && nativeStoreKit && !!appleBootstrap?.appAccountToken;
   const liveAccount = session?.connected ? session.account : null;
@@ -183,7 +202,11 @@ export default function CloudAccountPanel() {
     setMessage('');
     try {
       if (mode === 'register') {
-        await registerCloudAccount(user.id, { name: form.name || user.name, email: form.email, password: form.password });
+        await registerCloudAccount(user.id, {
+          name: form.name || user.name, email: form.email, password: form.password,
+          year: user?.year, isAdult: form.isAdult,
+          guardianName: form.guardianName, guardianEmail: form.guardianEmail
+        });
         setMessage('Cloud account created and linked to this local profile. Your local profile still works offline.');
       } else {
         await loginCloudAccount(user.id, { email: form.email, password: form.password });
@@ -262,6 +285,34 @@ export default function CloudAccountPanel() {
       setMessage('Subscription status restored from the payment provider.');
     } catch (err) { setError(err.message || 'Could not restore the web subscription.'); }
     finally { setBusy(''); }
+  }
+
+  /**
+   * Cancel a website subscription.
+   *
+   * The refund policy has promised this control since it was written; the
+   * server route and the transport call both existed and nothing in the app
+   * ever reached them, so the document was describing a button that was not
+   * there. Cancelling takes effect at the end of the period already paid for,
+   * which is what the policy says and what the server does.
+   */
+  async function cancelWebSubscription() {
+    if (!canUseWebBilling) return;
+    // Ending a subscription is not something to do on a mis-tap.
+    if (!window.confirm('Cancel your Pri Learning subscription? Premium stays active until the end of the period you have already paid for.')) return;
+    setBusy('cancel-web');
+    setError('');
+    setMessage('');
+    try {
+      await cloud.cancelWebBilling();
+      await refreshCloudEntitlement(user.id);
+      await reload({ verify: false });
+      setMessage('Your subscription is cancelled. Premium stays active until the end of the period you have already paid for.');
+    } catch (err) {
+      setError(err?.code === 'BILLING_SUBSCRIPTION_NOT_CANCELLABLE'
+        ? 'There is no active website subscription on this account to cancel.'
+        : err.message || 'Could not cancel the subscription just now.');
+    } finally { setBusy(''); }
   }
 
   async function startApplePurchase(product) {
@@ -353,6 +404,22 @@ export default function CloudAccountPanel() {
         This build has no Pri cloud origin configured, so account and sync controls are disabled. Offline practice continues normally.
       </div>}
 
+      {guardian?.required && guardian.state !== 'given' && (
+        <div role="status" style={{ marginTop: 14, padding: '10px 12px', border: '1px solid var(--warn)', borderRadius: 10, fontSize: 13 }}>
+          {guardian.state === 'pending'
+            ? <>Waiting for a parent or guardian to confirm this account{guardian.guardianEmail ? <> at <b>{guardian.guardianEmail}</b></> : null}.
+                Until they do, nothing syncs — <b>your work is safe on this device</b> and nothing has been lost.</>
+            : <>A parent or guardian has asked that this account does not sync. Everything still works here on this
+                device, and nothing of yours leaves it.</>}
+        </div>
+      )}
+      {guardian?.required && guardian.state === 'given' && (
+        <p className="muted" style={{ marginTop: 12, fontSize: 12.5 }}>
+          A parent or guardian confirmed this account. They can change that at any time from the link in the
+          email we sent them, and the <a href="/privacy" target="_blank" rel="noreferrer">privacy notice</a> sets
+          out what an account sends.
+        </p>
+      )}
       {enabled && !link?.accountId && <form onSubmit={submit} style={{ marginTop: 16 }}>
         <div className="row" style={{ gap: 8, marginBottom: 12 }}>
           <button type="button" className={`btn btn-sm ${mode === 'login' ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setMode('login')}>Sign in</button>
@@ -360,11 +427,11 @@ export default function CloudAccountPanel() {
         </div>
         <div className="grid cols-2" style={{ gap: 12 }}>
           {mode === 'register' && <div className="field">
-            <label className="label" htmlFor="cloud-name">Name</label>
+            <label className="label" htmlFor="cloud-name">Your name</label>
             <input className="input" id="cloud-name" autoComplete="name" maxLength={80} value={form.name} onChange={e => setForm(v => ({ ...v, name: e.target.value }))} required />
           </div>}
           <div className="field">
-            <label className="label" htmlFor="cloud-email">Email</label>
+            <label className="label" htmlFor="cloud-email">Your email</label>
             <input className="input" id="cloud-email" type="email" autoComplete="email" maxLength={254} value={form.email} onChange={e => setForm(v => ({ ...v, email: e.target.value }))} required />
           </div>
           <div className="field">
@@ -372,8 +439,56 @@ export default function CloudAccountPanel() {
             <input className="input" id="cloud-password" type="password" autoComplete={mode === 'register' ? 'new-password' : 'current-password'} minLength={10} maxLength={200} value={form.password} onChange={e => setForm(v => ({ ...v, password: e.target.value }))} required />
           </div>
         </div>
+        {mode === 'register' && (
+          <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--line, rgba(128,128,128,.22))' }}>
+            {/* Asked before the account exists, not after. Under the DPDP Act a
+                child is anyone under 18, so this is nearly every student here,
+                and the server will not sync a child's account until a guardian
+                confirms. Saying so up front is the difference between a gate a
+                student understands and one that looks like a fault. */}
+            <label className="row" style={{ gap: 8, alignItems: 'flex-start', cursor: 'pointer' }}>
+              <input type="checkbox" checked={form.isAdult} onChange={e => setForm(v => ({ ...v, isAdult: e.target.checked }))} />
+              <span>I am 18 or older</span>
+            </label>
+
+            {!form.isAdult && (
+              <div style={{ marginTop: 10 }}>
+                <p className="muted" style={{ fontSize: 12.5, marginTop: 0, maxWidth: 520 }}>
+                  You are under 18, so a parent or guardian has to confirm this account before your
+                  progress can sync. We will email them a link. <b>Everything in the app keeps working
+                  in the meantime</b> — questions, marking and handwriting all run on this device and
+                  nothing is lost while you wait.
+                </p>
+                <div className="grid cols-2" style={{ gap: 12 }}>
+                  <div className="field">
+                    <label className="label" htmlFor="cloud-guardian-name">Parent or guardian’s name</label>
+                    <input className="input" id="cloud-guardian-name" maxLength={80} value={form.guardianName}
+                      onChange={e => setForm(v => ({ ...v, guardianName: e.target.value }))} required />
+                  </div>
+                  <div className="field">
+                    <label className="label" htmlFor="cloud-guardian-email">Their email</label>
+                    <input className="input" id="cloud-guardian-email" type="email" maxLength={160} value={form.guardianEmail}
+                      onChange={e => setForm(v => ({ ...v, guardianEmail: e.target.value }))} required />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* The notice has to be reachable at the point consent is asked for,
+                not only from a screen the student saw before signing up. */}
+            <label className="row" style={{ gap: 8, alignItems: 'flex-start', marginTop: 12, cursor: 'pointer' }}>
+              <input type="checkbox" checked={agreed} onChange={e => setAgreed(e.target.checked)} required />
+              <span style={{ fontSize: 13 }}>
+                I have read the <a href="/privacy" target="_blank" rel="noreferrer">privacy notice</a> and
+                the <a href="/terms" target="_blank" rel="noreferrer">terms</a>, and I agree to what an
+                account sends.
+              </span>
+            </label>
+          </div>
+        )}
+
         <div className="row" style={{ gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
-          <button className="btn btn-primary" type="submit" disabled={!!busy}>
+          <button className="btn btn-primary" type="submit" disabled={!!busy || (mode === 'register' && !agreed)}>
             {busy === mode ? 'Connecting…' : mode === 'register' ? 'Create and connect account' : 'Connect account'}
           </button>
           {mode === 'login' && <button className="btn btn-quiet" type="button" onClick={requestReset} disabled={!!busy}>
@@ -410,6 +525,11 @@ export default function CloudAccountPanel() {
             <button className="btn btn-sm btn-quiet" type="button" disabled={!!busy} onClick={restoreWebBilling}>
               {busy === 'restore-web' ? 'Restoring…' : 'Restore web subscription'}
             </button>
+            {premium && entitlement?.provider === 'web' && (
+              <button className="btn btn-sm btn-quiet" type="button" disabled={!!busy} onClick={cancelWebSubscription}>
+                {busy === 'cancel-web' ? 'Cancelling…' : 'Cancel subscription'}
+              </button>
+            )}
           </div>}
 
           {nativeShell && nativeStoreKit && <div style={{ marginTop: 12 }}>
