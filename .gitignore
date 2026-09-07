@@ -41,3 +41,10 @@ marketing/reel/export/
 # Enumerating the numbers was the mistake — every round found a higher one. This
 # matches any single-digit copy of any file type the build emits.
 *[ ][2-9].*
+# ...but ios/PriLearning 2.swiftpm is a real Swift package whose name happens to
+# fit the pattern, and an ignored directory excludes everything beneath it. That
+# silently dropped 23 freshly-hashed bundle assets from `git add -A` — they were
+# never staged, CI built the real thing and found the tracked bundle stale.
+# git cannot re-include a file under an excluded directory, so the directory
+# itself has to be let back in.
+!*[ ][2-9].swiftpm/

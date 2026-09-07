@@ -69,16 +69,16 @@ eq(slipped.rows[2].earned, 0, 'and the answer mark is not');
 ok(/method is/i.test(marksSentence(slipped)), 'and the student is told the method earned marks');
 
 // ── 3 · One slip costs one mark, not the question ────────────────────────────
-// A break early on, then three sound lines carried from the student's own wrong
-// value. A board carries the error forward; so must this.
+// A break early on, then sound lines explicitly verified by the checker from the
+// student's own wrong value. Error-carried-forward credit requires verification.
 const carried = awardStepMarks({
   question: { ...SETS, marks: 4, steps: [...SETS.steps, { h: 'State the answer', d: '14' }] },
-  workingLines: ['rule', 'wrong substitution', 'follows from it', 'and so does this'],
-  stepReport: report(['ok', 'break', 'note', 'note']),
+  workingLines: ['rule', 'wrong substitution', 'verified continuation', 'and so does this'],
+  stepReport: report(['ok', 'break', 'ok', 'ok']),
   answerText: 'x',
   correct: false
 });
-ok(carried.awarded >= 2, `work carried after one slip still earns marks (got ${carried.awarded}/${carried.total})`);
+ok(carried.awarded >= 2, `verified work carried after one slip still earns marks (got ${carried.awarded}/${carried.total})`);
 ok(carried.awarded < carried.total, 'but not all of them, because the answer is wrong');
 
 // ── 4 · No working shown is the rule students most need told ─────────────────
@@ -152,5 +152,5 @@ ok(!/official CBSE marking scheme for this question|CBSE official scheme/i.test(
 
 console.log(failures.length
   ? `CBSE STEP MARKING: FAIL — ${failures.length} of ${pass + failures.length} checks failed\n  · ${failures.join('\n  · ')}`
-  : `CBSE STEP MARKING: PASS — ${pass}/${pass} checks — method survives a wrong answer, one slip costs one mark, no working means no step marks, a missing unit costs the answer.`);
+  : `CBSE STEP MARKING: PASS — ${pass}/${pass} checks — method survives a wrong answer, verified carried-forward work earns credit, no working means no step marks, a missing unit costs the answer.`);
 process.exit(failures.length ? 1 : 0);
