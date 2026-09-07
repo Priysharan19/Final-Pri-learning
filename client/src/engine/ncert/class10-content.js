@@ -38,11 +38,11 @@ C({
  id:'c10-real-numbers',num:1,title:'Real Numbers',sourceFile:'1-10th.pdf',pages:9,strand:'Number Theory',
  sourceMap:[S('1.1 Introduction','Real-number continuation and divisibility context.'),S('1.2 Fundamental Theorem of Arithmetic','Prime factorisation, HCF/LCM applications and textbook divisibility discussion.'),S('1.3 Revisiting Irrational Numbers','Prime-divisor theorem and proof-by-contradiction irrationality.'),S('Book-only source retention','Euclid/division-algorithm exposition is retained as source mastery.',false)],
  notes:[
-  N('Prime factorisation is a fingerprint',['Every composite integer has one prime factorisation apart from order.','HCF takes minimum common exponents; LCM takes maximum exponents.'],'n=\prod p_i^{a_i}','Do not use HCF×LCM = product for three numbers.'),
-  N('HCF–LCM invariant',['For two positive integers a,b, HCF(a,b)·LCM(a,b)=ab.','This can recover a missing integer or LCM instantly.'],'H\cdot L=ab','The identity is for two numbers, not an arbitrary list.'),
-  N('Irrationality proof spine',['Assume the surd is rational in lowest terms.','Square/rearrange until a prime divides both numerator and denominator, contradicting lowest terms.'],'\sqrt p=a/b\Rightarrow p\mid a^2\Rightarrow p\mid a','A decimal approximation never proves irrationality.'),
-  N('Prime divides a square',['If prime p divides a², p divides a.','This is the hinge in the standard contradiction proof.'],'p\mid a^2\Rightarrow p\mid a','The statement needs p prime.'),
-  N('Topper number-theory strategy',['Factor first before brute force.','Track exponents rather than repeatedly listing multiples.'],'v_p(\mathrm{HCF})=\min v_p','Write prime powers vertically to avoid missing a factor.')
+  N('Prime factorisation is a fingerprint',['Every composite integer has one prime factorisation apart from order.','HCF takes minimum common exponents; LCM takes maximum exponents.'],'n=\\prod p_i^{a_i}','Do not use HCF×LCM = product for three numbers.'),
+  N('HCF–LCM invariant',['For two positive integers a,b, HCF(a,b)·LCM(a,b)=ab.','This can recover a missing integer or LCM instantly.'],'H\\cdot L=ab','The identity is for two numbers, not an arbitrary list.'),
+  N('Irrationality proof spine',['Assume the surd is rational in lowest terms.','Square/rearrange until a prime divides both numerator and denominator, contradicting lowest terms.'],'\\sqrt p=a/b\\Rightarrow p\\mid a^2\\Rightarrow p\\mid a','A decimal approximation never proves irrationality.'),
+  N('Prime divides a square',['If prime p divides a², p divides a.','This is the hinge in the standard contradiction proof.'],'p\\mid a^2\\Rightarrow p\\mid a','The statement needs p prime.'),
+  N('Topper number-theory strategy',['Factor first before brute force.','Track exponents rather than repeatedly listing multiples.'],'v_p(\\mathrm{HCF})=\\min v_p','Write prime powers vertically to avoid missing a factor.')
  ],
  examples:[
   E('HCF and LCM of 96 and 404','Find HCF and LCM.',['96=2^5·3 and 404=2^2·101.','HCF uses the common minimum power: 2²=4.','LCM=(96·404)/4=9696.'],'HCF 4, LCM 9696','Use factor exponents before multiplying.'),
@@ -57,11 +57,11 @@ C({
  id:'c10-polynomials',num:2,title:'Polynomials',sourceFile:'2-10th.pdf',pages:14,strand:'Algebra',
  sourceMap:[S('2.1 Introduction','Degree, values and zeroes of polynomials.'),S('2.2 Geometrical Meaning of the Zeroes of a Polynomial','Zeroes as x-axis intersections for linear, quadratic and cubic graphs.'),S('2.3 Relationship between Zeroes and Coefficients','Quadratic zero-coefficient relations and building polynomials.'),S('Textbook extension','Polynomial division-algorithm discussion retained as full-book source material.',false)],
  notes:[
-  N('Zero means p(x)=0',['A zero is an x-value, not a y-value.','Graphically it is the x-coordinate where y=p(x) meets the x-axis.'],'p(\alpha)=0','Do not count a touch/intersection twice.'),
-  N('Quadratic coefficient relations',['For ax²+bx+c, α+β=−b/a and αβ=c/a.','These relations work without solving the quadratic.'],'\alpha+\beta=-b/a,\ \alpha\beta=c/a','Keep the minus sign only on the sum.'),
-  N('Build a quadratic from roots',['A monic quadratic with roots α,β is x²−(α+β)x+αβ.','Any non-zero scalar multiple has the same zeroes.'],'k[x^2-(\alpha+\beta)x+\alpha\beta]','“A polynomial” is not unique unless monic is specified.'),
-  N('Graph count before algebra',['A quadratic has at most two real zeroes; a cubic at most three.','Tangency still gives one distinct zero.'],'\#\text{ real zeroes}=\#\text{x-axis intersections}','Read the graph, not the visual turning points.'),
-  N('Topper verification',['After finding roots, substitute or verify sum/product.','A two-line verification catches most sign errors.'],'\alpha+\beta,\alpha\beta','Verification is part of a board-quality solution.')
+  N('Zero means p(x)=0',['A zero is an x-value, not a y-value.','Graphically it is the x-coordinate where y=p(x) meets the x-axis.'],'p(\\alpha)=0','Do not count a touch/intersection twice.'),
+  N('Quadratic coefficient relations',['For ax²+bx+c, α+β=−b/a and αβ=c/a.','These relations work without solving the quadratic.'],'\\alpha+\\beta=-b/a,\\ \\alpha\\beta=c/a','Keep the minus sign only on the sum.'),
+  N('Build a quadratic from roots',['A monic quadratic with roots α,β is x²−(α+β)x+αβ.','Any non-zero scalar multiple has the same zeroes.'],'k[x^2-(\\alpha+\\beta)x+\\alpha\\beta]','“A polynomial” is not unique unless monic is specified.'),
+  N('Graph count before algebra',['A quadratic has at most two real zeroes; a cubic at most three.','Tangency still gives one distinct zero.'],'\\#\\text{ real zeroes}=\\#\\text{x-axis intersections}','Read the graph, not the visual turning points.'),
+  N('Topper verification',['After finding roots, substitute or verify sum/product.','A two-line verification catches most sign errors.'],'\\alpha+\\beta,\\alpha\\beta','Verification is part of a board-quality solution.')
  ],
  examples:[
   E('Read zeroes from factors','Find zeroes of x²−2x−8.',['Factor: (x−4)(x+2).','Set each factor to zero.','x=4 or x=−2.'],'−2, 4','Immediately verify sum 2 and product −8.'),
@@ -76,11 +76,11 @@ C({
  id:'c10-pair-linear-equations',num:3,title:'Pair of Linear Equations in Two Variables',sourceFile:'3-10th.pdf',pages:15,strand:'Algebra',
  sourceMap:[S('3.1 Introduction','Modelling situations by two linear equations.'),S('3.2 Graphical Method of Solution','Intersecting, parallel and coincident lines; consistency.'),S('3.3 Algebraic Methods','Substitution and elimination with situational problems.'),S('Exercise synthesis','Graphing, coefficient-ratio tests and contextual systems.')],
  notes:[
-  N('Three geometric cases',['Intersect once → unique solution.','Parallel → no solution; coincident → infinitely many solutions.'],'a_1/a_2\ne b_1/b_2\Rightarrow\text{unique}','Classify before solving when ratios make it immediate.'),
-  N('Ratio test',['Coincident when a₁/a₂=b₁/b₂=c₁/c₂.','Parallel distinct when first two ratios match but c-ratio differs.'],'a_1/a_2=b_1/b_2\ne c_1/c_2\Rightarrow\text{none}','Use consistent signs in standard form.'),
+  N('Three geometric cases',['Intersect once → unique solution.','Parallel → no solution; coincident → infinitely many solutions.'],'a_1/a_2\\ne b_1/b_2\\Rightarrow\\text{unique}','Classify before solving when ratios make it immediate.'),
+  N('Ratio test',['Coincident when a₁/a₂=b₁/b₂=c₁/c₂.','Parallel distinct when first two ratios match but c-ratio differs.'],'a_1/a_2=b_1/b_2\\ne c_1/c_2\\Rightarrow\\text{none}','Use consistent signs in standard form.'),
   N('Elimination design',['Multiply equations so one variable has equal/opposite coefficients.','Add/subtract, then back-substitute.'],'A_1x+B_1y=C_1','Choose the cheaper variable to eliminate.'),
-  N('Graphical solution',['Each line needs two reliable points.','The common intersection is the ordered pair solving both equations.'],'(x,y)\in L_1\cap L_2','Check the intersection in both original equations.'),
-  N('Context modelling',['Define variables with units before equations.','Translate every sentence into one independent relation.'],'\text{context}\to\text{equations}\to\text{solution}\to\text{interpret}','A mathematically valid negative age/count may be contextually impossible.')
+  N('Graphical solution',['Each line needs two reliable points.','The common intersection is the ordered pair solving both equations.'],'(x,y)\\in L_1\\cap L_2','Check the intersection in both original equations.'),
+  N('Context modelling',['Define variables with units before equations.','Translate every sentence into one independent relation.'],'\\text{context}\\to\\text{equations}\\to\\text{solution}\\to\\text{interpret}','A mathematically valid negative age/count may be contextually impossible.')
  ],
  examples:[
   E('Classify a pair','Classify 2x+3y=9 and 4x+6y=18.',['Ratios a₁/a₂=1/2 and b₁/b₂=1/2.','c-ratio also matches.','The lines are coincident.'],'Infinitely many solutions','Scale the whole equation, including the constant.'),
@@ -95,11 +95,11 @@ C({
  id:'c10-quadratic-equations',num:4,title:'Quadratic Equations',sourceFile:'4-10th.pdf',pages:10,strand:'Algebra',
  sourceMap:[S('4.1 Introduction and 4.2 Quadratic Equations','Standard form and modelling.'),S('4.3 Solution by Factorisation','Null-factor method and contextual roots.'),S('4.4 Nature of Roots','Quadratic formula, discriminant and admissibility.'),S('Exercise synthesis','Equation recognition, solution and word problems.')],
  notes:[
-  N('Simplify before classifying',['An equation can look cubic and simplify to quadratic, or look quadratic and cancel to linear.','Move everything to one side before deciding degree.'],'ax^2+bx+c=0,\ a\ne0','Never classify from the unsimplified appearance.'),
-  N('Factorisation route',['Write as product of two linear factors when possible.','Use the zero-product law.'],'uv=0\Rightarrow u=0\text{ or }v=0','Do not lose a root by setting only one factor to zero.'),
-  N('Quadratic formula',['For ax²+bx+c=0, x=(−b±√Δ)/(2a).','The entire numerator is divided by 2a.'],'\Delta=b^2-4ac','A common error is dividing only the square-root term.'),
-  N('Nature from discriminant',['Δ>0 distinct real; Δ=0 equal real; Δ<0 no real roots.','Classify before unnecessary arithmetic.'],'\Delta\gtrless0','The sign of Δ, not b, controls the nature of roots.'),
-  N('Admissibility in word problems',['Algebra may produce two roots, but context can reject negative lengths, ages or counts.','State why a root is inadmissible.'],'\text{solve}\to\text{filter by domain}','Never silently discard a mathematical root.')
+  N('Simplify before classifying',['An equation can look cubic and simplify to quadratic, or look quadratic and cancel to linear.','Move everything to one side before deciding degree.'],'ax^2+bx+c=0,\\ a\\ne0','Never classify from the unsimplified appearance.'),
+  N('Factorisation route',['Write as product of two linear factors when possible.','Use the zero-product law.'],'uv=0\\Rightarrow u=0\\text{ or }v=0','Do not lose a root by setting only one factor to zero.'),
+  N('Quadratic formula',['For ax²+bx+c=0, x=(−b±√Δ)/(2a).','The entire numerator is divided by 2a.'],'\\Delta=b^2-4ac','A common error is dividing only the square-root term.'),
+  N('Nature from discriminant',['Δ>0 distinct real; Δ=0 equal real; Δ<0 no real roots.','Classify before unnecessary arithmetic.'],'\\Delta\\gtrless0','The sign of Δ, not b, controls the nature of roots.'),
+  N('Admissibility in word problems',['Algebra may produce two roots, but context can reject negative lengths, ages or counts.','State why a root is inadmissible.'],'\\text{solve}\\to\\text{filter by domain}','Never silently discard a mathematical root.')
  ],
  examples:[
   E('Factorise and solve','Solve x²−3x−10=0.',['Factor: (x−5)(x+2)=0.','Set each factor to zero.','x=5 or x=−2.'],'−2,5','Check by substitution or sum/product.'),
@@ -117,8 +117,8 @@ C({
   N('AP test',['An AP has a constant difference between consecutive terms.','The common difference may be positive, zero or negative.'],'d=a_{n+1}-a_n','A constant ratio describes a geometric pattern, not an AP.'),
   N('nth term',['The first term is a, so the nth term is n−1 jumps away.','$a_n=a+(n-1)d$ gives both forward and reverse-index questions.'],'a_n=a+(n-1)d','Using nd is the classic off-by-one error.'),
   N('Sum formula',['Average first and last, then multiply by number of terms.','Equivalent form uses a and d.'],'S_n=n(a+l)/2=n[2a+(n-1)d]/2','Identify n before summing.'),
-  N('Term-from-end',['Reverse thinking can use the last term as a new first term with difference −d.','Or find total n then convert position.'],'k\text{th from end}=a_{n-k+1}','Do not confuse term value with term number.'),
-  N('Topper modelling',['Translate fixed increase/decrease into a,d,n.','Check that n is a positive integer when solving for a term number.'],'\text{repeated additive change}\Rightarrow\text{AP}','A non-integer n means the target value is not a term.')
+  N('Term-from-end',['Reverse thinking can use the last term as a new first term with difference −d.','Or find total n then convert position.'],'k\\text{th from end}=a_{n-k+1}','Do not confuse term value with term number.'),
+  N('Topper modelling',['Translate fixed increase/decrease into a,d,n.','Check that n is a positive integer when solving for a term number.'],'\\text{repeated additive change}\\Rightarrow\\text{AP}','A non-integer n means the target value is not a term.')
  ],
  examples:[
   E('Identify an AP','Is 15,23,31,… an AP?',['Differences are 8 and 8.','The difference is constant.','So it is an AP with a=15,d=8.'],'Yes, d=8','Check at least two consecutive differences.'),
@@ -134,10 +134,10 @@ C({
  sourceMap:[S('6.1 Introduction and 6.2 Similar Figures','Similarity, scale factor and polygon conditions.'),S('6.3 Similarity of Triangles','BPT/converse and proportional reasoning.'),S('6.4 Criteria for Similarity','AA/AAA, SSS and SAS similarity.'),S('Extended textbook applications','Full source similarity/Pythagoras applications retained; current exam mapping remains narrower where required.',false)],
  notes:[
   N('Similarity is shape, not size',['Corresponding angles equal and corresponding sides proportional.','Congruent figures are similar, but similar figures need not be congruent.'],'AB/PQ=BC/QR=CA/RP','Correspondence order controls every ratio.'),
-  N('Basic Proportionality Theorem',['A line parallel to one side of a triangle divides the other two sides proportionally.','The converse turns proportional division into parallelism.'],'DE\parallel BC\Rightarrow AD/DB=AE/EC','Match segments on the same rays.'),
-  N('AA/AAA similarity',['Two equal corresponding angles are enough for triangles.','The third angle follows automatically.'],'\angle A=\angle P,\angle B=\angle Q\Rightarrow\triangle ABC\sim\triangle PQR','Write triangles in corresponding order.'),
-  N('SSS and SAS',['SSS needs all three side ratios equal.','SAS needs two proportional side pairs and the included angle equal.'],'AB/PQ=AC/PR,\angle A=\angle P','The angle must be included for SAS.'),
-  N('Topper proof discipline',['State theorem/criterion, establish each required equality, then state similarity and consequence.','Never jump from a diagram to proportionality.'],'\text{givens}\to\text{criterion}\to\sim\to\text{ratio}','A clean correspondence line prevents most proof errors.')
+  N('Basic Proportionality Theorem',['A line parallel to one side of a triangle divides the other two sides proportionally.','The converse turns proportional division into parallelism.'],'DE\\parallel BC\\Rightarrow AD/DB=AE/EC','Match segments on the same rays.'),
+  N('AA/AAA similarity',['Two equal corresponding angles are enough for triangles.','The third angle follows automatically.'],'\\angle A=\\angle P,\\angle B=\\angle Q\\Rightarrow\\triangle ABC\\sim\\triangle PQR','Write triangles in corresponding order.'),
+  N('SSS and SAS',['SSS needs all three side ratios equal.','SAS needs two proportional side pairs and the included angle equal.'],'AB/PQ=AC/PR,\\angle A=\\angle P','The angle must be included for SAS.'),
+  N('Topper proof discipline',['State theorem/criterion, establish each required equality, then state similarity and consequence.','Never jump from a diagram to proportionality.'],'\\text{givens}\\to\\text{criterion}\\to\\sim\\to\\text{ratio}','A clean correspondence line prevents most proof errors.')
  ],
  examples:[
   E('Scale factor','Two similar triangles have corresponding sides 6 and 9. Find scale factor large/small.',['Identify corresponding sides.','Scale factor=9/6.','Simplify to 3/2.'],'3/2','State the direction of the scale factor.'),
@@ -152,11 +152,11 @@ C({
  id:'c10-coordinate-geometry',num:7,title:'Coordinate Geometry',sourceFile:'7-10th.pdf',pages:12,strand:'Coordinate Geometry',
  sourceMap:[S('7.1 Introduction and 7.2 Distance Formula','Distance, collinearity and coordinate-shape reasoning.'),S('7.3 Section Formula','Internal division and trisection.'),S('Exercise applications','Flags, parallelograms, diameters and geometric loci.'),S('Full-book extension','Triangle/rhombus area-style coordinate applications retained as book mastery where current exam contract is narrower.',false)],
  notes:[
-  N('Distance formula',['Subtract coordinates in the same order, square, add, square-root.','Axis-parallel cases simplify to absolute coordinate differences.'],'d=\sqrt{(x_2-x_1)^2+(y_2-y_1)^2}','A sign disappears only after squaring, not before subtraction.'),
+  N('Distance formula',['Subtract coordinates in the same order, square, add, square-root.','Axis-parallel cases simplify to absolute coordinate differences.'],'d=\\sqrt{(x_2-x_1)^2+(y_2-y_1)^2}','A sign disappears only after squaring, not before subtraction.'),
   N('Collinearity by distance',['Three points are collinear if one pairwise distance equals the sum of the other two when the middle point lies between.','Coordinate/determinant reasoning can also be used.'],'AB+BC=AC','Compare exact surds before rounding.'),
-  N('Section formula',['If P divides AB internally in m₁:m₂, weight A by m₂ and B by m₁.','The opposite weight is the memorable feature.'],'P=((m_1x_2+m_2x_1)/(m_1+m_2),\dots)','Do not attach m₁ to x₁ automatically.'),
+  N('Section formula',['If P divides AB internally in m₁:m₂, weight A by m₂ and B by m₁.','The opposite weight is the memorable feature.'],'P=((m_1x_2+m_2x_1)/(m_1+m_2),\\dots)','Do not attach m₁ to x₁ automatically.'),
   N('Midpoint special case',['Section ratio 1:1 gives the midpoint.','Diameter endpoints have centre as midpoint.'],'M=((x_1+x_2)/2,(y_1+y_2)/2)','Use midpoint before a longer section-formula computation.'),
-  N('Topper geometry from coordinates',['Prove a shape by distances/slopes, not by appearance.','Square: four equal sides plus a right-angle/diagonal condition.'],'\text{coordinates}\to\text{invariants}\to\text{classification}','A plotted sketch is evidence, not proof.')
+  N('Topper geometry from coordinates',['Prove a shape by distances/slopes, not by appearance.','Square: four equal sides plus a right-angle/diagonal condition.'],'\\text{coordinates}\\to\\text{invariants}\\to\\text{classification}','A plotted sketch is evidence, not proof.')
  ],
  examples:[
   E('Distance','Find distance between (2,3) and (4,1).',['Δx=2, Δy=−2.','d=√(4+4).','=2√2.'],'2√2','Keep exact surd form.'),
@@ -171,11 +171,11 @@ C({
  id:'c10-trigonometry',num:8,title:'Introduction to Trigonometry',sourceFile:'8-10th.pdf',pages:18,strand:'Trigonometry',
  sourceMap:[S('8.1 Trigonometric Ratios','Six ratios in a right triangle and reciprocal/quotient relationships.'),S('8.2 Ratios of Specific Angles','0°,30°,45°,60°,90° exact values.'),S('8.3 Trigonometric Identities','Identity reasoning from sin²A+cos²A=1.'),S('Exercises 8.1–8.3','Ratio evaluation, exact values and identity proof.')],
  notes:[
-  N('SOH–CAH–TOA with reference angle',['Opposite/adjacent depend on the chosen acute angle; hypotenuse does not.','Define sides before writing a ratio.'],'\sin A=O/H,\cos A=A/H,\tan A=O/A','Do not label “opposite” globally.'),
-  N('Reciprocals',['cosec=1/sin, sec=1/cos, cot=1/tan.','tan=sin/cos and cot=cos/sin.'],'\sec A\cos A=1','Reciprocal is not complement.'),
-  N('Exact-value table',['Memorise/derive 0°,30°,45°,60°,90° values.','Prefer exact surds/fractions.'],'\sin30=1/2,\cos60=1/2,\tan45=1','Never decimalise an exact-value question unless asked.'),
-  N('Identity engine',['Start from sin²A+cos²A=1.','Divide by cos² or sin² to derive 1+tan²=sec² and 1+cot²=cosec².'],'\sin^2A+\cos^2A=1','For proofs, transform one side rather than both independently.'),
-  N('Topper simplification',['Convert sec/cosec/cot to sin/cos when stuck.','Factor before substituting values.'],'\tan A=\sin A/\cos A','Protect domain restrictions where denominators could be zero.')
+  N('SOH–CAH–TOA with reference angle',['Opposite/adjacent depend on the chosen acute angle; hypotenuse does not.','Define sides before writing a ratio.'],'\\sin A=O/H,\\cos A=A/H,\\tan A=O/A','Do not label “opposite” globally.'),
+  N('Reciprocals',['cosec=1/sin, sec=1/cos, cot=1/tan.','tan=sin/cos and cot=cos/sin.'],'\\sec A\\cos A=1','Reciprocal is not complement.'),
+  N('Exact-value table',['Memorise/derive 0°,30°,45°,60°,90° values.','Prefer exact surds/fractions.'],'\\sin30=1/2,\\cos60=1/2,\\tan45=1','Never decimalise an exact-value question unless asked.'),
+  N('Identity engine',['Start from sin²A+cos²A=1.','Divide by cos² or sin² to derive 1+tan²=sec² and 1+cot²=cosec².'],'\\sin^2A+\\cos^2A=1','For proofs, transform one side rather than both independently.'),
+  N('Topper simplification',['Convert sec/cosec/cot to sin/cos when stuck.','Factor before substituting values.'],'\\tan A=\\sin A/\\cos A','Protect domain restrictions where denominators could be zero.')
  ],
  examples:[
   E('Ratios from a 7–24–25 triangle','If opposite=7, adjacent=24, hypotenuse=25, find sin and cos.',['sin=opposite/hypotenuse.','cos=adjacent/hypotenuse.','So sin=7/25, cos=24/25.'],'7/25, 24/25','Label relative to the angle first.'),
@@ -190,11 +190,11 @@ C({
  id:'c10-trig-applications',num:9,title:'Some Applications of Trigonometry',sourceFile:'9-10th.pdf',pages:15,strand:'Trigonometry',
  sourceMap:[S('9.1 Heights and Distances','Angles of elevation/depression and right-triangle modelling.'),S('Single-triangle applications','Poles, ropes, slides, towers and kites.'),S('Two-stage applications','Changing observation point and stacked heights.'),S('Exercise 9.1','Fifteen contextual applications with exact-angle reasoning.')],
  notes:[
-  N('Draw the right triangle first',['Mark horizontal, vertical and line of sight.','Place the angle at the observer.'],'\tan\theta=\text{vertical}/\text{horizontal}','Most mistakes are diagram mistakes before they are trig mistakes.'),
-  N('Elevation vs depression',['Elevation is measured upward from horizontal; depression downward.','Parallel horizontals often make these equal alternate angles.'],'\theta_{dep}=\theta_{elev}\text{ in the standard parallel-line setup}','Do not measure from the vertical.'),
-  N('Choose the shortest ratio',['Use tan when opposite and adjacent are involved; sin/cos when hypotenuse appears.','Avoid solving extra sides.'],'\tan30=1/\sqrt3,\tan45=1,\tan60=\sqrt3','Pick the ratio from known/unknown sides.'),
-  N('Observer height',['If eye level is above ground, solve the vertical difference then add/subtract observer height.','State the reference height clearly.'],'H=\Delta h+h_{eye}','Do not forget the 1.5 m-style eye-height adjustment.'),
-  N('Topper two-position method',['Use one variable for the shared height and express both horizontal distances in terms of it.','Subtract distances only after both equations are set.'],'h=x\tan\alpha=(x-d)\tan\beta','Keep geometry consistent across both triangles.')
+  N('Draw the right triangle first',['Mark horizontal, vertical and line of sight.','Place the angle at the observer.'],'\\tan\\theta=\\text{vertical}/\\text{horizontal}','Most mistakes are diagram mistakes before they are trig mistakes.'),
+  N('Elevation vs depression',['Elevation is measured upward from horizontal; depression downward.','Parallel horizontals often make these equal alternate angles.'],'\\theta_{dep}=\\theta_{elev}\\text{ in the standard parallel-line setup}','Do not measure from the vertical.'),
+  N('Choose the shortest ratio',['Use tan when opposite and adjacent are involved; sin/cos when hypotenuse appears.','Avoid solving extra sides.'],'\\tan30=1/\\sqrt3,\\tan45=1,\\tan60=\\sqrt3','Pick the ratio from known/unknown sides.'),
+  N('Observer height',['If eye level is above ground, solve the vertical difference then add/subtract observer height.','State the reference height clearly.'],'H=\\Delta h+h_{eye}','Do not forget the 1.5 m-style eye-height adjustment.'),
+  N('Topper two-position method',['Use one variable for the shared height and express both horizontal distances in terms of it.','Subtract distances only after both equations are set.'],'h=x\\tan\\alpha=(x-d)\\tan\\beta','Keep geometry consistent across both triangles.')
  ],
  examples:[
   E('Rope and pole','20 m rope makes 30° with ground. Find pole height.',['Rope is hypotenuse.','h=20sin30°.','=10 m.'],'10 m','Use sin because hypotenuse is given.'),
@@ -209,11 +209,11 @@ C({
  id:'c10-circles',num:10,title:'Circles',sourceFile:'10-10th.pdf',pages:10,strand:'Geometry',
  sourceMap:[S('10.1 Introduction','Non-intersecting line, secant and tangent.'),S('10.2 Tangent to a Circle','Point of contact and tangent as limiting secant.'),S('10.3 Number/Properties of Tangents','Radius–tangent perpendicularity and equal tangents from an external point.'),S('Exercises 10.1–10.2','Theorem application, angle and length problems.')],
  notes:[
-  N('Tangent definition',['A tangent meets the circle at exactly one point.','That common point is the point of contact.'],'|L\cap C|=1','A secant meets the circle at two points.'),
-  N('Radius perpendicular to tangent',['At point P, radius OP is perpendicular to the tangent.','This creates a right triangle immediately.'],'OP\perp PT','The 90° angle is at the point of contact.'),
+  N('Tangent definition',['A tangent meets the circle at exactly one point.','That common point is the point of contact.'],'|L\\cap C|=1','A secant meets the circle at two points.'),
+  N('Radius perpendicular to tangent',['At point P, radius OP is perpendicular to the tangent.','This creates a right triangle immediately.'],'OP\\perp PT','The 90° angle is at the point of contact.'),
   N('Equal tangents',['Tangents from the same external point have equal lengths.','The proof uses RHS congruence of radius–tangent right triangles.'],'PA=PB','The theorem needs the same external point.'),
-  N('Angle between tangents',['With tangency points A,B and centre O, quadrilateral OAPB has two right angles.','Thus ∠APB+∠AOB=180°.'],'\angle APB=180^\circ-\angle AOB','Do not use 360° without accounting for the two right angles.'),
-  N('Topper proof chain',['Mark radii equal, right angles, common hypotenuse, then RHS.','Only after congruence invoke CPCT.'],'\triangle OAP\cong\triangle OBP\Rightarrow PA=PB','Name the congruence criterion.')
+  N('Angle between tangents',['With tangency points A,B and centre O, quadrilateral OAPB has two right angles.','Thus ∠APB+∠AOB=180°.'],'\\angle APB=180^\\circ-\\angle AOB','Do not use 360° without accounting for the two right angles.'),
+  N('Topper proof chain',['Mark radii equal, right angles, common hypotenuse, then RHS.','Only after congruence invoke CPCT.'],'\\triangle OAP\\cong\\triangle OBP\\Rightarrow PA=PB','Name the congruence criterion.')
  ],
  examples:[
   E('Radius from tangent','External point Q has OQ=25, tangent QT=24. Find radius.',['OT⊥QT.','r²+24²=25².','r=7.'],'7 cm','Recognise the 7–24–25 triangle.'),
@@ -228,11 +228,11 @@ C({
  id:'c10-areas-circles',num:11,title:'Areas Related to Circles',sourceFile:'11-10th.pdf',pages:7,strand:'Mensuration',
  sourceMap:[S('11.1 Areas of Sector and Segment','Minor/major sectors, segments, arc/sector proportionality.'),S('Segment method','Sector area minus triangle area.'),S('Applied sectors','Clock hands, grazing regions, wipers, lighthouse and designs.'),S('Exercise 11.1','Fourteen source questions with specified π/√3 approximations where stated.')],
  notes:[
-  N('Sector fraction',['A sector with angle θ occupies θ/360 of the full circle.','The same fraction governs arc length.'],'A_{sector}=\theta\pi r^2/360','Use degrees consistently.'),
-  N('Arc length',['Arc length is the same fraction of circumference.','Perimeter of a sector includes two radii.'],'L=\theta(2\pi r)/360','Arc length is not sector perimeter.'),
-  N('Segment area',['Minor segment = sector − triangle.','Major segment can be full circle − minor segment.'],'A_{seg}=A_{sector}-A_{\triangle}','Do not subtract a triangle from a major sector without checking geometry.'),
-  N('Approximation discipline',['Use π=22/7, 3.14 or √3 approximation exactly as the source question specifies.','Keep exact values until the requested approximation.'],'\text{follow stated constants}','Mixing π conventions creates answer-key mismatches.'),
-  N('Topper composite-area strategy',['Shade/describe wanted region first.','Decompose into non-overlapping standard pieces.'],'A_{wanted}=\sum A_{included}-\sum A_{removed}','Sketch exposed pieces before calculating.')
+  N('Sector fraction',['A sector with angle θ occupies θ/360 of the full circle.','The same fraction governs arc length.'],'A_{sector}=\\theta\\pi r^2/360','Use degrees consistently.'),
+  N('Arc length',['Arc length is the same fraction of circumference.','Perimeter of a sector includes two radii.'],'L=\\theta(2\\pi r)/360','Arc length is not sector perimeter.'),
+  N('Segment area',['Minor segment = sector − triangle.','Major segment can be full circle − minor segment.'],'A_{seg}=A_{sector}-A_{\\triangle}','Do not subtract a triangle from a major sector without checking geometry.'),
+  N('Approximation discipline',['Use π=22/7, 3.14 or √3 approximation exactly as the source question specifies.','Keep exact values until the requested approximation.'],'\\text{follow stated constants}','Mixing π conventions creates answer-key mismatches.'),
+  N('Topper composite-area strategy',['Shade/describe wanted region first.','Decompose into non-overlapping standard pieces.'],'A_{wanted}=\\sum A_{included}-\\sum A_{removed}','Sketch exposed pieces before calculating.')
  ],
  examples:[
   E('60° sector','r=6 cm, θ=60°.',['A=(60/360)π·36.','=6π.','Using requested convention if any gives final value.'],'6π cm²','Keep π exact unless told otherwise.'),
@@ -247,11 +247,11 @@ C({
  id:'c10-surface-volume',num:12,title:'Surface Areas and Volumes',sourceFile:'12-10th.pdf',pages:15,strand:'Mensuration',
  sourceMap:[S('12.1 Introduction and 12.2 Surface Area of a Combination of Solids','Visible/exposed surfaces of joined solids.'),S('12.3 Volume of a Combination of Solids','Add constituent volumes for joined solids and subtract cavities.'),S('Exercises 12.1–12.2','Combined-solid surface areas and volumes.'),S('Book-only recasting/melting contexts','Retained as full-book mastery but not promoted to current exam coverage.',false)],
  notes:[
-  N('Surface area is exposed area',['When solids are joined, common faces disappear from the outside.','Sum only the surfaces actually visible.'],'A_{outside}=\sum A_{exposed}','Blindly adding total surface areas double-counts hidden joins.'),
-  N('Volume is additive',['Joined solid volume is the sum of component volumes.','A cavity is subtracted.'],'V_{net}=\sum V_{added}-\sum V_{removed}','Surface-area visibility rules do not change volume addition.'),
+  N('Surface area is exposed area',['When solids are joined, common faces disappear from the outside.','Sum only the surfaces actually visible.'],'A_{outside}=\\sum A_{exposed}','Blindly adding total surface areas double-counts hidden joins.'),
+  N('Volume is additive',['Joined solid volume is the sum of component volumes.','A cavity is subtracted.'],'V_{net}=\\sum V_{added}-\\sum V_{removed}','Surface-area visibility rules do not change volume addition.'),
   N('Shared radius/diameter',['Convert diameter to radius immediately.','Joined coaxial solids often share the same base radius.'],'r=d/2','Many source errors come from using diameter as radius.'),
-  N('Cone geometry',['If slant height is needed, use l²=r²+h².','CSA cone=πrl; volume=⅓πr²h.'],'l=\sqrt{r^2+h^2}','Do not use vertical height in the cone CSA formula.'),
-  N('Topper decomposition',['Name each constituent before computing.','Write a symbolic surface/volume expression before substituting.'],'\text{model}\to\text{formula}\to\text{substitute}','A labelled decomposition prevents hidden-face errors.')
+  N('Cone geometry',['If slant height is needed, use l²=r²+h².','CSA cone=πrl; volume=⅓πr²h.'],'l=\\sqrt{r^2+h^2}','Do not use vertical height in the cone CSA formula.'),
+  N('Topper decomposition',['Name each constituent before computing.','Write a symbolic surface/volume expression before substituting.'],'\\text{model}\\to\\text{formula}\\to\\text{substitute}','A labelled decomposition prevents hidden-face errors.')
  ],
  examples:[
   E('Cylinder with hemispherical ends','Find visible surface expression.',['Two hemispheres form a sphere externally.','Cylinder contributes only curved surface.','Total=2πrh+4πr².'],'2πrh+4πr²','The circular joining faces are hidden.'),
@@ -267,10 +267,10 @@ C({
  sourceMap:[S('13.1 Mean of Grouped Data','Direct, assumed-mean and step-deviation methods.'),S('13.2 Mode of Grouped Data','Modal class and algebraic interpolation.'),S('13.3 Median of Grouped Data','Cumulative frequency, median class and formula.'),S('Cumulative-frequency/ogive exposition','Retained because it is in the supplied textbook; not promoted to the current exam contract where excluded.',false)],
  notes:[
   N('Class mark',['Grouped-data mean treats observations in a class as centred at its midpoint.','$x_i=(l_i+u_i)/2$.'],'x_i=(l_i+u_i)/2','Do not use class width as class mark.'),
-  N('Mean methods are equivalent',['Direct: Σfᵢxᵢ/Σfᵢ.','Assumed mean and step deviation reorganise the same computation for convenience.'],'\bar x=\Sigma f_ix_i/\Sigma f_i','Choose a convenient assumed mean/class width.'),
+  N('Mean methods are equivalent',['Direct: Σfᵢxᵢ/Σfᵢ.','Assumed mean and step deviation reorganise the same computation for convenience.'],'\\bar x=\\Sigma f_ix_i/\\Sigma f_i','Choose a convenient assumed mean/class width.'),
   N('Mode formula',['Identify modal class first.','Use neighbouring frequencies f₀,f₁,f₂ in the interpolation formula.'],'Mode=l+[(f_1-f_0)/(2f_1-f_0-f_2)]h','f₁ is the modal-class frequency, not the largest value in the table.'),
   N('Median formula',['Build cumulative frequency and locate first cf ≥ n/2.','Use the previous cumulative frequency in the formula.'],'Median=l+[(n/2-cf)/f]h','The cf is from the class before the median class.'),
-  N('Topper continuity check',['Median/mode grouped formulas assume continuous classes.','Convert inclusive-looking class boundaries when necessary before applying formulas.'],'117.5\text{–}126.5\text{ etc.}','Continuity correction is a data-structure step, not optional decoration.')
+  N('Topper continuity check',['Median/mode grouped formulas assume continuous classes.','Convert inclusive-looking class boundaries when necessary before applying formulas.'],'117.5\\text{–}126.5\\text{ etc.}','Continuity correction is a data-structure step, not optional decoration.')
  ],
  examples:[
   E('Direct mean setup','Classes 0–2,2–4 with frequencies 1,2.',['Class marks are 1 and 3.','Σfx=1·1+2·3=7; Σf=3.','Mean=7/3.'],'7/3','Always compute class marks first.'),
@@ -287,9 +287,9 @@ C({
  notes:[
   N('Classical probability',['For equally likely outcomes, probability=favourable/total.','Define the sample space before counting.'],'P(E)=n(E)/n(S)','Do not use this formula when outcomes are not equally likely.'),
   N('Complement',['The event “not E” contains every outcome outside E.','Complement is often the fastest route for “at least one” style questions.'],'P(E^c)=1-P(E)','Do not confuse complement with an independent event.'),
-  N('Bounds and certainties',['Impossible event has probability 0; certain event 1.','Every probability lies between 0 and 1 inclusive.'],'0\le P(E)\le1','Negative values or values above 1 cannot be probabilities.'),
+  N('Bounds and certainties',['Impossible event has probability 0; certain event 1.','Every probability lies between 0 and 1 inclusive.'],'0\\le P(E)\\le1','Negative values or values above 1 cannot be probabilities.'),
   N('Fairness and equally likely',['A fair coin models head/tail as equally likely.','Two verbal outcomes are not automatically equally likely in real-life processes.'],'P(H)=P(T)=1/2','“Starts/doesn’t start” is not automatically 50–50.'),
-  N('Topper counting',['Count outcomes systematically using tables/lists when needed.','Simplify the fraction only after correct counting.'],'\text{probability}=\text{count ratio}','Most probability errors are sample-space errors, not arithmetic errors.')
+  N('Topper counting',['Count outcomes systematically using tables/lists when needed.','Simplify the fraction only after correct counting.'],'\\text{probability}=\\text{count ratio}','Most probability errors are sample-space errors, not arithmetic errors.')
  ],
  examples:[
   E('Complement','P(E)=0.05. Find P(not E).',['Use P(E)+P(Eᶜ)=1.','P(Eᶜ)=1−0.05.','=0.95.'],'0.95','Complement is immediate.'),

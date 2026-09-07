@@ -707,7 +707,7 @@ export const streamsExt = {
     if (diff === 2) {
       if (rng() < 0.4) {
         const fn = rc(rng, ['sin', 'cos', 'tan']);
-        const [typed, tex, t] = rc(rng, NEG[fn]);
+        const [, tex, t] = rc(rng, NEG[fn]);
         const pf = piFrac(t, 12);
         const inDeg = rc(rng, [true, false]);
         return {
@@ -717,9 +717,9 @@ export const streamsExt = {
           ...(inDeg ? { answerSuffix: '°' } : {}),
           inputHint: inDeg ? 'e.g. 120' : 'e.g. 2pi/3',
           traps: [{ value: inDeg ? -t * 15 : -pf.val, why: `The principal range of $${NAME[fn]}$ is ${RANGE[fn]} — a negative input does not simply flip the sign of the answer for every inverse function.`, tol: 0.001 }].filter(x => Math.abs(x.value - (inDeg ? t * 15 : pf.val)) > 0.002),
-          hints: [`The reference angle comes from $${typed.replace('-', '')}$.`, `Now place it inside ${RANGE[fn]}.`, `$= ${inDeg ? `${t * 15}°` : pf.tex}$.`],
+          hints: [`The reference angle comes from $${tex.replace('-', '')}$.`, `Now place it inside ${RANGE[fn]}.`, `$= ${inDeg ? `${t * 15}°` : pf.tex}$.`],
           steps: [
-            { h: 'Reference angle', d: `$\\${fn}$ of ${Math.abs(t) * 15}° gives $${typed.replace('-', '')}$` },
+            { h: 'Reference angle', d: `$\\${fn}$ of ${Math.abs(t) * 15}° gives $${tex.replace('-', '')}$` },
             { h: 'Principal value', d: `$${NAME[fn]}\\left(${tex}\\right) = ${inDeg ? `${t * 15}°` : pf.tex}$` }
           ]
         };
