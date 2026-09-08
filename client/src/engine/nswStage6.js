@@ -33,7 +33,7 @@ export function resolveNswStage6Syllabus(profile) {
   const year = Number(profile.year);
   if (year !== 11 && year !== 12) return null;
 
-  const pathway = profile.pathway || 'advanced';
+  const pathway = profile.pathway;
   if (!NSW_STAGE6_PATHWAYS.has(pathway)) {
     throw stage6IdentityError('NSW_STAGE6_PATHWAY_INVALID', 'A valid NSW Stage 6 mathematics pathway is required.');
   }
