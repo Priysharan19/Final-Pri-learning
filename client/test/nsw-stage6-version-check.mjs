@@ -23,7 +23,7 @@ assert.equal(resolve({ year: 12, hscCohort: 2028 }), NSW_STAGE6_SYLLABUS.CURRENT
 assert.equal(resolveNswStage6Syllabus({ course: 'nsw', year: 10 }), null);
 assert.equal(resolveNswStage6Syllabus({ course: 'in', year: 12 }), null);
 
-// Missing/invalid senior identity fails closed rather than guessing.
+// Missing/invalid senior cohort identity fails closed rather than guessing.
 assert.throws(
   () => resolve({ year: 12 }),
   error => error?.code === 'NSW_STAGE6_COHORT_REQUIRED' && error?.status === 409
@@ -31,6 +31,19 @@ assert.throws(
 assert.throws(
   () => resolve({ year: 11, hscCohort: 'not-a-year' }),
   error => error?.code === 'NSW_STAGE6_COHORT_REQUIRED'
+);
+
+// Missing/unknown senior pathway identity also fails closed. Do not inherit
+// the historical `advanced` default at this authority boundary: a restored or
+// migrated Standard/Extension profile with corrupt identity must not silently
+// become Advanced.
+assert.throws(
+  () => resolveNswStage6Syllabus({ course: 'nsw', year: 12, hscCohort: 2027 }),
+  error => error?.code === 'NSW_STAGE6_PATHWAY_INVALID' && error?.status === 409
+);
+assert.throws(
+  () => resolveNswStage6Syllabus({ course: 'nsw', year: 12, hscCohort: 2027, pathway: 'unknown' }),
+  error => error?.code === 'NSW_STAGE6_PATHWAY_INVALID'
 );
 
 // Pathway constraints are enforced at the same boundary.
