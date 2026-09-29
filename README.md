@@ -10,6 +10,11 @@ runs entirely on the device — questions, handwriting recognition and marking a
 network off. A Pri cloud account is optional, and adds only what needs a server: sign-in across
 devices, classes and assignments, and a subscription.
 
+**Production authority:** this repository (`Priysharan19/Final-Pri-learning`) on `main`. See
+[`repository-authority.md`](docs/architecture/repository-authority.md),
+[`authoritative-architecture.md`](docs/architecture/authoritative-architecture.md), and the
+[`release policy`](docs/release/release-policy.md) before reconciling old branches or repositories.
+
 ## What it is for
 
 An Indian student picks their class or track on the first screen — Class 7 to 12, JEE Main, JEE

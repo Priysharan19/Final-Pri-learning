@@ -46,8 +46,9 @@ struct WebShell: UIViewRepresentable {
         // cloud transport have independent capability flags so each can fail
         // closed when its native/deployment prerequisite is missing.
         let cloudConfigured = NativeCloudBridge.isConfigured ? "true" : "false"
+        let nativeReleaseIdentity = NativeReleaseIdentity.javaScriptLiteral
         let nativeFlag = WKUserScript(
-            source: "window.__PRI_NATIVE__ = true; window.__PRI_NATIVE_INK__ = true; window.__PRI_NATIVE_PHOTO__ = true; window.__PRI_NATIVE_BILLING__ = true; window.__PRI_NATIVE_CLOUD__ = true; window.__PRI_NATIVE_CLOUD_CONFIGURED__ = \(cloudConfigured);",
+            source: "window.__PRI_NATIVE__ = true; window.__PRI_NATIVE_INK__ = true; window.__PRI_NATIVE_PHOTO__ = true; window.__PRI_NATIVE_BILLING__ = true; window.__PRI_NATIVE_CLOUD__ = true; window.__PRI_NATIVE_CLOUD_CONFIGURED__ = \(cloudConfigured); window.__PRI_NATIVE_RELEASE_IDENTITY__ = \(nativeReleaseIdentity);",
             injectionTime: .atDocumentStart,
             forMainFrameOnly: false
         )

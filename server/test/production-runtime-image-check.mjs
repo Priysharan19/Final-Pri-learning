@@ -68,7 +68,7 @@ for (const tokens of copies) {
 for (const legacy of ['server/auth.js', 'server/routes', 'server/db.js', 'server/badges.js', 'server/seed.js', 'server/engine', 'client/src']) {
   c.ok(!existsSync(join(stage, legacy)), `${legacy} is not in the image`);
 }
-for (const required of ['server/index.js', 'server/app.js', 'server/package.json', 'server/platform/router.js', 'server/tools/housekeeping.mjs', 'server/tools/promote-role.mjs', 'client/dist/index.html']) {
+for (const required of ['server/index.js', 'server/app.js', 'server/package.json', 'server/platform/router.js', 'server/tools/housekeeping.mjs', 'server/tools/promote-role.mjs', 'release/metadata.json', 'release/release-identity.mjs', 'client/dist/index.html']) {
   c.ok(existsSync(join(stage, required)), `${required} is in the image`);
 }
 
@@ -82,11 +82,15 @@ const port = await new Promise((resolve, reject) => {
 });
 const dataDir = join(stage, 'data');
 mkdirSync(dataDir, { recursive: true });
+const testReleaseSha = '0123456789abcdef0123456789abcdef01234567';
+const testBuildTimestamp = '2026-09-30T00:00:00.000Z';
 const env = {
   PATH: process.env.PATH,
   HOME: process.env.HOME,
   NODE_ENV: 'production',
   PORT: String(port),
+  PRI_RELEASE_SHA: testReleaseSha,
+  PRI_BUILD_TIMESTAMP: testBuildTimestamp,
   PRI_PUBLIC_ORIGIN: 'https://learn.pri.example',
   PRI_CSRF_SECRET: 'runtime-image-contract-secret',
   PRI_AUTH_DELIVERY_KEY: '33'.repeat(32),
@@ -124,6 +128,8 @@ try {
   const body = await health.json();
   c.eq(body.ok, true, 'health ok');
   c.eq(body.service, 'pri-learning-platform', 'health names the platform');
+  c.eq(body.releaseIdentity?.releaseSha, testReleaseSha, 'health reports the production release SHA');
+  c.eq(body.releaseIdentity?.buildTimestamp, testBuildTimestamp, 'health reports the production build timestamp');
   c.eq(body.storage.persistentDatabase, true, 'persistent storage acknowledged');
   c.ok(Number.isInteger(body.housekeeping?.lastRunAt), 'housekeeping ran at startup and is reported by health');
   c.ok(existsSync(env.PRI_PLATFORM_DB), 'database created at PRI_PLATFORM_DB');

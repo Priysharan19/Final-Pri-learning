@@ -10,6 +10,7 @@ on:
       - '.env.production.example'
       - 'client/**'
       - 'server/**'
+      - 'release/**'
       - 'docs/production-deployment.md'
       - '.github/workflows/deployment-image.yml'
   pull_request:
@@ -19,6 +20,7 @@ on:
       - '.env.production.example'
       - 'client/**'
       - 'server/**'
+      - 'release/**'
       - 'docs/production-deployment.md'
       - '.github/workflows/deployment-image.yml'
 
@@ -37,7 +39,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Build production image
-        run: docker build --pull -t pri-learning:ci .
+        run: |
+          set -euo pipefail
+          build_timestamp="$(git show -s --format=%cI "$GITHUB_SHA")"
+          docker build --pull \
+            --build-arg PRI_RELEASE_SHA="$GITHUB_SHA" \
+            --build-arg PRI_BUILD_TIMESTAMP="$build_timestamp" \
+            -t pri-learning:ci .
       - name: Run image with mounted persistent storage
         run: |
           set -euo pipefail
@@ -82,12 +90,16 @@ jobs:
             sleep 1
           done
           test "$ok" -eq 1
+          curl -fsS http://127.0.0.1:4010/release.json > release.json
           node --input-type=module <<'NODE'
           import assert from 'node:assert/strict';
           import { readFileSync } from 'node:fs';
           const health = JSON.parse(readFileSync('health.json', 'utf8'));
+          const web = JSON.parse(readFileSync('release.json', 'utf8'));
           assert.equal(health.ok, true);
           assert.equal(health.service, 'pri-learning-platform');
           assert.equal(health.storage?.persistentDatabase, true);
+          assert.equal(health.releaseIdentity?.releaseSha, process.env.GITHUB_SHA);
+          assert.deepEqual(web, health.releaseIdentity);
           NODE
           test -s "$RUNNER_TEMP/pri-platform-data/pri-learning-platform.db"

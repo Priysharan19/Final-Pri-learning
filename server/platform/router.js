@@ -16,6 +16,7 @@ import { createTelemetryRouter } from './telemetry.js';
 import { assertPlatformConfig, platformConfigStatus } from './config.js';
 import { csrfGuard, originGuard } from './security.js';
 import { housekeepingStatus } from './housekeeping.js';
+import { serverReleaseIdentity } from './releaseIdentity.js';
 
 const SERVER_WEBHOOK = /^\/billing\/webhook\/(?:apple|google|web)$/;
 
@@ -36,6 +37,7 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
     res.json({
       ok: true,
       service: 'pri-learning-platform',
+      releaseIdentity: serverReleaseIdentity(),
       schemaVersion: db.prepare("SELECT value FROM platform_meta WHERE key='schema_version'").get()?.value || null,
       billingSchemaVersion: db.prepare("SELECT value FROM platform_meta WHERE key='billing_schema_version'").get()?.value || null,
       storage: { persistentDatabase: config.persistentDatabaseConfigured },

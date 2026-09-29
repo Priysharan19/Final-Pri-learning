@@ -7,10 +7,15 @@ Pri Learning's learning experience remains offline-first. This document covers t
 The root `Dockerfile` uses Node 24, builds the React client, installs only production server dependencies, and serves the client plus `/v1` control plane from one image:
 
 ```bash
-docker build -t pri-learning .
+SHA="$(git rev-parse HEAD)"
+BUILD_TS="$(git show -s --format=%cI "$SHA")"
+docker build \
+  --build-arg PRI_RELEASE_SHA="$SHA" \
+  --build-arg PRI_BUILD_TIMESTAMP="$BUILD_TS" \
+  -t pri-learning .
 ```
 
-The server retains thin compatibility adapters under `server/engine/` which re-export the canonical modules in `client/src/engine/`; the image therefore includes that engine source directory as an intentional runtime dependency. It does not ship client development dependencies.
+The production image deliberately excludes the legacy `/api` backend and `server/engine/` shims. It ships the `/v1` platform runtime, production server dependencies, the built client, and the shared release metadata only. Exact release identity is required at build time because `.git` is excluded from the image context.
 
 Production configuration belongs in the deployment platform, not the image. Start from `.env.production.example`; never commit real secrets.
 
@@ -53,7 +58,7 @@ Verify a live deployment with:
 curl -fsS https://learn.example.com/v1/health
 ```
 
-A healthy response must identify `pri-learning-platform` and report `storage.persistentDatabase: true`. Provider readiness fields expose only booleans, not credentials or filesystem paths.
+A healthy response must identify `pri-learning-platform`, report `storage.persistentDatabase: true`, and include the exact `releaseIdentity` for the running source SHA. Provider readiness fields and release diagnostics expose no credentials, student data or filesystem paths.
 
 ## Email, billing and identity
 

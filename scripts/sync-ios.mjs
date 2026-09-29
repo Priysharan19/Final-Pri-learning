@@ -33,7 +33,7 @@ function fingerprint(dir, base = dir, acc = {}) {
   }
   return acc;
 }
-const drop = m => Object.fromEntries(Object.entries(m).filter(([k]) => !k.startsWith('icons/')));
+const drop = m => Object.fromEntries(Object.entries(m).filter(([k]) => !k.startsWith('icons/') && k !== 'release.json'));
 const built = drop(fingerprint(DIST));
 let failed = false;
 
@@ -41,6 +41,16 @@ for (const bundle of BUNDLES) {
   const bundled = existsSync(bundle.web) ? drop(fingerprint(bundle.web)) : {};
   const names = [...new Set([...Object.keys(built), ...Object.keys(bundled)])].sort();
   const differing = names.filter(n => built[n] !== bundled[n]);
+  const builtRelease = join(DIST, 'release.json');
+  const bundledRelease = join(bundle.web, 'release.json');
+
+  if (CHECK && existsSync(bundledRelease) && readFileSync(bundledRelease, 'utf8') !== readFileSync(builtRelease, 'utf8')) {
+    failed = true;
+    console.error(`${bundle.label} release.json does not match this exact client build.`);
+  } else if (!CHECK && existsSync(builtRelease)) {
+    mkdirSync(bundle.web, { recursive: true });
+    cpSync(builtRelease, bundledRelease);
+  }
 
   if (!differing.length) {
     console.log(`${bundle.label} web bundle matches client/dist — ${names.length} files.`);

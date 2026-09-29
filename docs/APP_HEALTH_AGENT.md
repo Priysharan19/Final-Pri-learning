@@ -16,7 +16,7 @@ Fast mode is used on normal pushes/PRs. It checks:
 
 - production client build;
 - iOS packaged web-bundle drift;
-- local production backend / Practice API;
+- local learning backend / Practice API contract (`client/src/local/backend.js`), not the legacy Express `/api` stack;
 - security and data boundaries;
 - gateway and offline outbox;
 - misconception diagnosis;
