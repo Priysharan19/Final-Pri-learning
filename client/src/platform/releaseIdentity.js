@@ -8,6 +8,8 @@ const developmentIdentity = Object.freeze({
   buildTimestamp: null
 });
 
+const STORAGE_KEY = 'pri.releaseIdentity.v1';
+
 function looksLikeReleaseIdentity(value) {
   return Boolean(
     value &&
@@ -18,16 +20,30 @@ function looksLikeReleaseIdentity(value) {
   );
 }
 
+function storedIdentity(target) {
+  try {
+    const parsed = JSON.parse(target.localStorage?.getItem(STORAGE_KEY) || 'null');
+    return looksLikeReleaseIdentity(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function persistIdentity(target, identity) {
+  try { target.localStorage?.setItem(STORAGE_KEY, JSON.stringify(identity)); } catch { /* diagnostics must not block app startup */ }
+}
+
 export function currentReleaseIdentity(target = globalThis) {
   if (looksLikeReleaseIdentity(target.__PRI_RELEASE_IDENTITY__)) return target.__PRI_RELEASE_IDENTITY__;
   if (looksLikeReleaseIdentity(target.__PRI_NATIVE_RELEASE_IDENTITY__)) return target.__PRI_NATIVE_RELEASE_IDENTITY__;
-  return developmentIdentity;
+  return storedIdentity(target) || developmentIdentity;
 }
 
 export async function installReleaseIdentityDiagnostics(target = globalThis) {
   const nativeIdentity = target.__PRI_NATIVE_RELEASE_IDENTITY__;
   if (looksLikeReleaseIdentity(nativeIdentity)) {
     target.__PRI_RELEASE_IDENTITY__ = Object.freeze({ ...nativeIdentity });
+    persistIdentity(target, target.__PRI_RELEASE_IDENTITY__);
     return target.__PRI_RELEASE_IDENTITY__;
   }
 
@@ -37,8 +53,9 @@ export async function installReleaseIdentityDiagnostics(target = globalThis) {
     const identity = await response.json();
     if (!looksLikeReleaseIdentity(identity)) throw new Error('release manifest is invalid');
     target.__PRI_RELEASE_IDENTITY__ = Object.freeze(identity);
+    persistIdentity(target, target.__PRI_RELEASE_IDENTITY__);
   } catch {
-    target.__PRI_RELEASE_IDENTITY__ = developmentIdentity;
+    target.__PRI_RELEASE_IDENTITY__ = Object.freeze(storedIdentity(target) || developmentIdentity);
   }
   return target.__PRI_RELEASE_IDENTITY__;
 }

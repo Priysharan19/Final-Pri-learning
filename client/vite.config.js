@@ -99,7 +99,7 @@ export const CHUNK_GROUPS = [
 
 // Exported so client/test/install-budget-check.mjs can hold the build to these
 // exact rules rather than to a second copy of them that would drift.
-export const PRECACHE_SKIP = /(^|\/)sw\.js$|(^|\/)\.DS_Store$|\.map$|\.woff$|\.ttf$/;
+export const PRECACHE_SKIP = /(^|\/)sw\.js$|(^|\/)release\.json$|(^|\/)\.DS_Store$|\.map$|\.woff$|\.ttf$/;
 
 export const ON_DEMAND = [
   // ~2.7 MB of renderer and worker, for the student who attaches a scanned PDF.
