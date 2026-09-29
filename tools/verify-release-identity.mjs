@@ -18,13 +18,12 @@ const nativePaths = [
   join(root, 'ios', 'PriLearning 2.swiftpm', 'Resources', 'Web', 'release.json')
 ];
 const requireNative = process.argv.includes('--require-native');
-for (const nativePath of nativePaths) {
-  if (!existsSync(nativePath)) {
-    if (requireNative) assert.fail(`native release identity missing: ${nativePath}`);
-    continue;
+if (requireNative) {
+  for (const nativePath of nativePaths) {
+    assert.ok(existsSync(nativePath), `native release identity missing: ${nativePath}`);
+    const native = JSON.parse(readFileSync(nativePath, 'utf8'));
+    assert.deepEqual(native, expected, `native release identity drift: ${nativePath}`);
   }
-  const native = JSON.parse(readFileSync(nativePath, 'utf8'));
-  assert.deepEqual(native, expected, `native release identity drift: ${nativePath}`);
 }
 
 console.log(`RELEASE IDENTITY: PASS — ${expected.productVersion} ${expected.curriculumVersion} ${expected.releaseSha}`);
