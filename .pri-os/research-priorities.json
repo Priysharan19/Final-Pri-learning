@@ -1,0 +1,113 @@
+{
+  "schema_version": 1,
+  "snapshot_date": "2026-09-30",
+  "baseline_sha": "33e7b6c9bb06b65f00a9f38f88a678a333eec80f",
+  "objective": "Maximize durable independent mathematics learning, transfer and misconception repair while preserving verified mathematical authority, privacy, offline operation and affordability.",
+  "north_star": "durable_independent_mastery_per_student_time",
+  "invariants": [
+    "LLM output is not mathematical marking authority.",
+    "Handwriting transcription stays answer-blind.",
+    "No research claim without reproducible evidence artifacts.",
+    "Immediate assisted correctness is not accepted as a proxy for durable learning.",
+    "Research changes must not destabilize the 2026-10-04 functional demo lane."
+  ],
+  "priorities": [
+    {
+      "id": "R0",
+      "priority": 0,
+      "title": "Preserve 4 October demo lane",
+      "status": "ACTIVE_CONSTRAINT",
+      "implementation": "Keep research changes isolated behind branches/flags; prioritize stable end-to-end demo journey."
+    },
+    {
+      "id": "R1",
+      "priority": 1,
+      "title": "Productive Mistake Repair Tutor",
+      "status": "RESEARCH_READY",
+      "mechanism": "Convert verified first-break/misconception evidence into minimal Socratic repair actions before solution reveal.",
+      "primary_metrics": [
+        "next_attempt_repair",
+        "solution_reveal_rate",
+        "delayed_retention",
+        "false_correct_rate"
+      ]
+    },
+    {
+      "id": "R2",
+      "priority": 2,
+      "title": "Delayed retention and transfer experiments",
+      "status": "GAP_CONFIRMED",
+      "mechanism": "Measure independent learning after delay and on changed surface forms.",
+      "primary_metrics": [
+        "7d_retention",
+        "near_transfer",
+        "far_transfer",
+        "attrition"
+      ]
+    },
+    {
+      "id": "R3",
+      "priority": 3,
+      "title": "Pri Learner State v2",
+      "status": "DESIGN_READY",
+      "mechanism": "Separate acquisition, fluency, retention, transfer, misconception persistence, method repertoire and help dependence.",
+      "primary_metrics": [
+        "calibration",
+        "decision_lift_vs_current_mastery",
+        "delayed_outcome_lift"
+      ]
+    },
+    {
+      "id": "R4",
+      "priority": 4,
+      "title": "Error-carried-forward and alternative-method authority",
+      "status": "GAP_CONFIRMED",
+      "mechanism": "Credit mathematically consistent downstream work after a bounded slip and accept verified alternate methods.",
+      "primary_metrics": [
+        "human_marker_agreement",
+        "false_wrong_rate",
+        "criterion_agreement"
+      ]
+    },
+    {
+      "id": "R5",
+      "priority": 5,
+      "title": "Physical handwriting and marking corpus",
+      "status": "BLOCKED_EXTERNAL_EVIDENCE",
+      "mechanism": "Writer-disjoint real Pencil/photo evidence before OCR/marking architecture selection.",
+      "gates": {
+        "writers": 30,
+        "double_marked_solutions": 300,
+        "stroke_items": 60,
+        "photo_items": 60
+      }
+    },
+    {
+      "id": "R6",
+      "priority": 6,
+      "title": "Teacher intervention copilot",
+      "status": "DESIGN_LATER",
+      "mechanism": "Evidence-backed intervention recommendations with inspectable counts and uncertainty."
+    },
+    {
+      "id": "R7",
+      "priority": 7,
+      "title": "Metacognition/self-regulation layer",
+      "status": "EXPERIMENT_LATER",
+      "mechanism": "Prediction, confidence and explanation prompts tested for calibration and retention."
+    },
+    {
+      "id": "R8",
+      "priority": 8,
+      "title": "India-specific outcome evidence",
+      "status": "EXTERNAL_PILOT_REQUIRED",
+      "mechanism": "Prospective evidence across class, track, language, device and prior-attainment groups."
+    }
+  ],
+  "blocked_claims": [
+    "Vendor handwriting architecture superiority",
+    "Examiner-level marking from real handwriting",
+    "Best-in-class learning outcomes",
+    "Causal improvement in Indian student marks"
+  ]
+}
