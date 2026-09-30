@@ -332,6 +332,12 @@ export default function Teach() {
         </div>
       </div>
 
+      {!cls && (
+        <div id="teacher-assignments" tabIndex={-1} className="card teacher-anchor">
+          <div className="card-title">Assignments</div>
+          <p className="muted">Select or create a class above to build and assign real practice.</p>
+        </div>
+      )}
       {cls && (
         <div id="teacher-assignments" tabIndex={-1} className="card teacher-anchor">
           <div className="card-title">Assign a task to {cls.name}</div>
@@ -452,6 +458,12 @@ export default function Teach() {
         </div>
       )}
 
+      {!analytics && (
+        <div id="teacher-analytics" tabIndex={-1} className="card teacher-anchor">
+          <div className="card-title">Analytics & reports</div>
+          <p className="muted">Select a class above to see demonstrated progress, attention flags and reports.</p>
+        </div>
+      )}
       {analytics && (
         <div id="teacher-analytics" tabIndex={-1} className="card teacher-anchor">
           <div className="spread" style={{ flexWrap: 'wrap', gap: 8 }}>
