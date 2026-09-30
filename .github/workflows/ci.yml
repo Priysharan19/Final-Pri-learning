@@ -51,7 +51,7 @@ jobs:
           grep -Fq 'Pri Reason V2 curriculum integration gate: PASS' suites.log
           grep -Fq 'INDIA NATIVE BANKS: PASS — 313/313 checks — 19 chapters rewired onto 20 NCERT-native generators' suites.log
           grep -Fq 'NCERT ANSWER FORMS: PASS — 212/212 checks' suites.log
-          grep -Fq 'INDIA EXAM FLOW: PASS — 122/122 checks' suites.log
+          grep -Fq 'INDIA EXAM FLOW: PASS — 129/129 checks' suites.log
           grep -Fq 'INDIA PYQ: PASS — 1079/1079 checks — 45 source-cited previous-year questions' suites.log
           grep -Fq '✔ INDIA IDENTITY SUITE PASSED — 102/102 checks across 5 groups' suites.log
           grep -Fq 'INDIA ADAPTIVE: PASS — 302/302 checks' suites.log

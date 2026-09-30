@@ -36,8 +36,8 @@ database.transaction = function transactionWithFailure(name, mode = 'readonly') 
   const transaction = realTransaction(name, mode);
   if (!injected && name === 'activity' && mode === 'readwrite') {
     const realObjectStore = transaction.objectStore.bind(transaction);
-    transaction.objectStore = () => {
-      const handle = realObjectStore();
+    transaction.objectStore = (storeName = name) => {
+      const handle = realObjectStore(storeName);
       handle.put = () => {
         injected = true;
         throw new Error('INJECTED_STORAGE_FAILURE');

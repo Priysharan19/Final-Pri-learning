@@ -166,7 +166,7 @@ const BODY_RULES = [
     // "Past papers only" — the PYQ filter. Refused rather than ignored when the
     // archive has nothing for the chapter, so the student is never told they
     // are sitting a past paper when they are not.
-    optionalBoolean(body, 'pyqOnly');
+    optionalBoolean(body, 'pyqOnly'); optionalBoolean(body, 'resume');
   }],
   [/^POST \/practice\/[A-Za-z0-9._-]+\/(?:hint|reveal)$/, body => {
     requireObject(body, 'practice action'); optionalNumber(body, 'ms');

@@ -77,15 +77,29 @@ class FakeStore {
 }
 
 class FakeHandle {
-  constructor(store, mode) { this.store = store; this.mode = mode; }
+  constructor(store, mode, transaction = null) { this.store = store; this.mode = mode; this.transaction = transaction; }
+  req(work) { return this.transaction ? this.transaction.request(work) : request(work); }
   writable() { if (this.mode !== 'readwrite') throw new Error(`${this.store.name}: read-only transaction`); }
-  get(key) { return request(() => clone(this.store.rows.get(key))); }
-  getAll() { return request(() => this.store.ordered().map(k => clone(this.store.rows.get(k)))); }
-  delete(key) { return request(() => { this.writable(); this.store.rows.delete(key); }); }
-  clear() { return request(() => { this.writable(); this.store.rows.clear(); }); }
-  save(value, exclusive) {
-    return request(() => {
+  get(key) { return this.req(() => clone(this.store.rows.get(key))); }
+  getAll() { return this.req(() => this.store.ordered().map(k => clone(this.store.rows.get(k)))); }
+  delete(key) {
+    return this.req(() => {
       this.writable();
+      this.transaction?.captureKey(this.store, key);
+      this.store.rows.delete(key);
+    });
+  }
+  clear() {
+    return this.req(() => {
+      this.writable();
+      this.transaction?.captureStore(this.store);
+      this.store.rows.clear();
+    });
+  }
+  save(value, exclusive) {
+    return this.req(() => {
+      this.writable();
+      this.transaction?.touchStore(this.store);
       const row = clone(value);
       let key = this.store.keyPath ? row[this.store.keyPath] : undefined;
       if (key === undefined || key === null) {
@@ -95,6 +109,7 @@ class FakeHandle {
       } else if (typeof key === 'number' && key > this.store.seq) {
         this.store.seq = Math.floor(key);
       }
+      this.transaction?.captureKey(this.store, key);
       if (exclusive && this.store.rows.has(key)) throw new Error(`${this.store.name}: key ${key} already exists`);
       this.store.rows.set(key, row);
       return key;
@@ -115,6 +130,118 @@ class FakeHandle {
   }
 }
 
+class FakeTransaction {
+  constructor(db, names, mode = 'readonly') {
+    this.db = db;
+    this.names = Array.isArray(names) ? names : [names];
+    this.mode = mode;
+    this.error = null;
+    this.oncomplete = null;
+    this.onerror = null;
+    this.onabort = null;
+    this.pending = 0;
+    this.done = false;
+    this.aborted = false;
+    // Real IndexedDB provides transactional rollback without copying every row
+    // up front. Journal only keys this fake transaction actually mutates so a
+    // multi-store answer commit does not deep-clone the whole question bank.
+    this.journal = new Map();
+    for (const name of this.names) {
+      const store = db.stores.get(name);
+      if (!store) throw new Error(`No object store "${name}"`);
+    }
+  }
+  touchStore(store) {
+    if (this.mode !== 'readwrite') return null;
+    let entry = this.journal.get(store.name);
+    if (!entry) {
+      entry = { seq: store.seq, keys: new Map(), full: null };
+      this.journal.set(store.name, entry);
+    }
+    return entry;
+  }
+  captureKey(store, key) {
+    const entry = this.touchStore(store);
+    if (!entry || entry.full || entry.keys.has(key)) return;
+    entry.keys.set(key, store.rows.has(key)
+      ? { existed: true, value: clone(store.rows.get(key)) }
+      : { existed: false, value: undefined });
+  }
+  captureStore(store) {
+    const entry = this.touchStore(store);
+    if (!entry || entry.full) return;
+    // clear() is the one operation that can touch every key. If earlier writes
+    // happened in this transaction, rebuild the transaction-start view rather
+    // than snapshotting those already-mutated rows. Ordinary put/add/delete
+    // stay key-journaled and never clone an unrelated question bank.
+    const full = new Map([...store.rows].map(([k, v]) => [k, clone(v)]));
+    for (const [key, before] of entry.keys) {
+      if (before.existed) full.set(key, clone(before.value));
+      else full.delete(key);
+    }
+    entry.full = full;
+    entry.keys.clear();
+  }
+  objectStore(name) {
+    if (!this.names.includes(name)) throw new Error(`Store "${name}" is not in this transaction`);
+    return new FakeHandle(this.db.stores.get(name), this.mode, this);
+  }
+  rollback() {
+    if (this.mode !== 'readwrite') return;
+    for (const [name, entry] of this.journal) {
+      const store = this.db.stores.get(name);
+      if (entry.full) {
+        store.rows = new Map([...entry.full].map(([k, v]) => [k, clone(v)]));
+      } else {
+        for (const [key, before] of entry.keys) {
+          if (before.existed) store.rows.set(key, clone(before.value));
+          else store.rows.delete(key);
+        }
+      }
+      store.seq = entry.seq;
+    }
+  }
+  fail(err, req = null) {
+    if (this.aborted || this.done) return;
+    this.error = err;
+    this.aborted = true;
+    this.rollback();
+    if (req) { req.error = err; req.onerror?.({ target: req }); }
+    this.onerror?.({ target: this });
+    this.onabort?.({ target: this });
+  }
+  request(work) {
+    const req = { result: undefined, error: null, onsuccess: null, onerror: null };
+    if (this.aborted) {
+      queueMicrotask(() => this.fail(this.error || new Error('transaction aborted'), req));
+      return req;
+    }
+    this.pending++;
+    queueMicrotask(() => {
+      if (this.aborted) { this.pending--; return; }
+      try {
+        req.result = work();
+        req.onsuccess?.({ target: req });
+      } catch (err) {
+        this.pending--;
+        this.fail(err, req);
+        return;
+      }
+      this.pending--;
+      queueMicrotask(() => {
+        if (!this.aborted && !this.done && this.pending === 0) {
+          this.done = true;
+          this.oncomplete?.({ target: this });
+        }
+      });
+    });
+    return req;
+  }
+  abort() {
+    this.fail(new Error('transaction aborted'));
+  }
+}
+
 class FakeDB {
   constructor() {
     this.stores = new Map();
@@ -126,9 +253,7 @@ class FakeDB {
     return store;
   }
   transaction(name, mode = 'readonly') {
-    const store = this.stores.get(name);
-    if (!store) throw new Error(`No object store "${name}"`);
-    return { objectStore: () => new FakeHandle(store, mode) };
+    return new FakeTransaction(this, name, mode);
   }
 }
 
@@ -842,6 +967,14 @@ async function run() {
     ok('reveal shows the worked solution', Array.isArray(revealed.solution?.steps) && revealed.solution.steps.length > 0, show(revealed.solution?.steps?.length));
     await rejects('a revealed question cannot then be answered',
       POST(`/practice/${revealTarget.question.id}/submit`, { answer: '1' }), { status: 409 });
+
+    const discardTarget = await nextQuestion({ mode: 'topic', subtopic: topicId });
+    const discarded = await POST(`/practice/${discardTarget.question.id}/discard`, {});
+    eq('explicit Next can safely discard unfinished work', discarded.discarded, true);
+    eq('discarding unfinished work writes no attempt',
+      (await idb.byIndex('attempts', 'pid', ada.id)).filter(a => a.questionId === discardTarget.question.id).length, 0);
+    await rejects('a discarded question cannot later be submitted',
+      POST(`/practice/${discardTarget.question.id}/submit`, { answer: '1' }), { status: 409 });
 
     const strangerQ = await nextQuestion({});
     await POST('/profiles/select', { id: grace.id, password: 'punch-cards-9' });
