@@ -160,27 +160,27 @@ https://doi.org/10.1016/j.lindif.2024.102609
 ## Alternative forgetting functions in knowledge tracing (2026)
 Class: model-comparison research.
 Use: Ebbinghaus/exponential forgetting should not be assumed universally best.
-https://arxiv.org/abs/2604.16472
+https://doi.org/10.1016/j.knosys.2025.114884
 
 ## Prospective spacing/forgetting evaluation of knowledge tracing
 Class: longitudinal/model evaluation.
 Use: retrospective fit can fail to reproduce prospective spacing/forgetting behavior.
-https://doi.org/10.1145/3706468.3706494
+https://doi.org/10.1007/s40593-025-00508-3
 
 ## Uncertainty-aware knowledge tracing
 Class: ML/knowledge-tracing research.
 Use: learner state should carry uncertainty.
-https://ojs.aaai.org/index.php/AAAI/article/view/33761
+https://ojs.aaai.org/index.php/AAAI/article/view/35007
 
 ## Selective prediction on Eedi mathematics data (2026)
 Class: uncertainty/KT evaluation.
 Use: abstention on uncertain predictions can improve retained-prediction quality.
-https://arxiv.org/abs/2607.08792
+https://proceedings.mlr.press/v339/mitton26a.html
 
 ## Subgroup calibration in knowledge tracing (2026)
-Class: large-scale calibration analysis.
-Use: aggregate calibration can hide systematic over/underprediction across performance groups.
-https://arxiv.org/abs/2608.17694
+Class: large-scale calibration analysis on EdNet (20,705 students; 5.89M interactions).
+Use: aggregate calibration can hide systematic over/underprediction across performance groups and consequential mastery-decision errors.
+https://doi.org/10.1109/SIST61674.2026.11596401
 
 ## Causal framework for tutoring requests — EDM 2026
 Class: causal/quasi-experimental analysis of >5,000 middle-school mathematics tutoring sessions.
@@ -214,16 +214,17 @@ Use: formal verification is increasingly useful for bounded proof tasks.
 Limitation: not universal free-form school-proof authority.
 https://ojs.aaai.org/index.php/AAAI/article/view/38903
 
-## AI-generated exam items field study — AAAI 2026
-Class: field study across multiple classes/domains.
-Use: iterative generation/critique can produce promising psychometric items.
-Limitation: local construct/psychometric admission is still required.
-https://ojs.aaai.org/index.php/AAAI/article/view/38841
+## LLM-generated exam items — 2026 medical-education evidence
+Class: systematic review/meta-analysis plus single-center randomized trial in medical education.
+Use: AI-generated MCQs can sometimes show difficulty/discrimination and perceived quality comparable to human/student-authored items, with large authoring-efficiency gains in one trial.
+Limitations: evidence is cross-domain, heterogeneous, largely medical, and does not establish school-mathematics psychometric equivalence or autonomous assessment authority.
+https://doi.org/10.1080/0142159X.2026.2691072
+https://doi.org/10.1186/s12909-026-09671-0
 
-## Cognitive item models / automated item generation
-Class: psychometric item-generation research.
-Use: cognitive features can predict item behavior; differential functioning remains relevant.
-https://doi.org/10.1007/s11336-025-10101-0
+## Cognitive item models / automated mathematics item generation
+Class: large-scale psychometric AIG study; 612 image-based math items, N=35,058.
+Use: predefined cognitive features can drive difficulty while subgroup/context effects remain; supports theory-grounded family design plus fairness checks.
+https://doi.org/10.1080/08957347.2025.2563889
 
 ---
 
@@ -276,14 +277,14 @@ Use: operating-context evidence for multilingual/offline/download/guest/shared-d
 https://diksha.gov.in/
 
 ## Translanguaging in primary mathematics review (2026)
-Class: systematic review.
-Use: home-language support is promising but context/proficiency dependent.
-https://doi.org/10.1080/14790718.2026.2575061
+Class: systematic review of 42 peer-reviewed studies.
+Use: home-language support is promising but context/proficiency and teacher-language capacity matter.
+https://doi.org/10.1007/s10649-026-10552-y
 
-## Bilingual mathematics broader review
-Class: systematic evidence.
-Use: language proficiency can affect measured mathematics performance.
-https://doi.org/10.1007/s11858-024-01603-0
+## Bilingualism and mathematical performance systematic review (2024)
+Class: systematic review of 71 papers / 305,136 participants.
+Use: bilingualism itself was not generally detrimental, while low proficiency in the language of testing/instruction can negatively affect mathematical performance.
+https://www.mdpi.com/2227-7102/14/11/1172
 
 ---
 
