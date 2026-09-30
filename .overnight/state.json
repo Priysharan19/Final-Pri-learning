@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "task": "PRI-01",
-  "status": "verification_in_progress",
+  "status": "final_ci_in_progress",
   "taskStartMainSha": "33e7b6c9bb06b65f00a9f38f88a678a333eec80f",
   "workingBranch": "task/pri-01-repository-authority",
   "pullRequest": 223,
@@ -20,7 +20,8 @@
       "930dfd0"
     ],
     "releaseTransportRecoveryImported": true,
-    "unrelatedLiveLanRecoveryPreservedOnly": true
+    "unrelatedLiveLanRecoveryPreservedOnly": false,
+    "liveLanRecoveryImportedAfterStrictIdentityFailure": true
   },
   "mainProtectionConfigured": true,
   "requiredChecks": [
@@ -29,5 +30,16 @@
     "Browser suites (end-to-end and accessibility)",
     "Client build and offline-first boundary"
   ],
-  "evidenceRule": "Exact-SHA final verification is recorded on PR #223 after the final candidate is pushed."
+  "evidenceRule": "Tracked evidence records the verified pre-evidence code candidate; exact final PR-head SHA and final CI are recorded durably on PR #223 after this evidence commit because a Git commit cannot self-contain its own SHA.",
+  "verificationCandidateBeforeEvidenceCommit": "6cb410a012d578281a4a30c2ea026ca4ea7a4ca3",
+  "staleGovernanceIssueClosed": 75,
+  "preExistingNativeInkFailure": {
+    "taskStartMainSha": "33e7b6c9bb06b65f00a9f38f88a678a333eec80f",
+    "candidateExact": "6/10",
+    "candidateCharacterAccuracy": "93.8%",
+    "baselineExact": "6/10",
+    "baselineCharacterAccuracy": "93.8%",
+    "classification": "pre-existing out-of-scope handwriting-quality defect; threshold unchanged"
+  },
+  "localA11y": "38/38 across 12 groups"
 }
