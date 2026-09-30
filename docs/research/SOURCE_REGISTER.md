@@ -12,6 +12,11 @@ Purpose: give agents enough evidence provenance to distinguish:
 
 This is not an exhaustive bibliography. The live ledger #176 may contain newer evidence.
 
+A final pre-review source audit identified and corrected several inherited locator errors. The authoritative supersession notice is:
+https://github.com/Priysharan19/Final-Pri-learning/issues/176#issuecomment-5914300298
+
+When an older RR comment conflicts with this canonical register or the supersession notice, use the corrected source and check #178 for current decision state.
+
 ## Evidence-reading rules
 
 Before citing a result, ask:
