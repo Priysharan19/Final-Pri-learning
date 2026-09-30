@@ -483,6 +483,31 @@ async function goTo(page, base, path) {
   await wait(page, 700);
 }
 
+/**
+ * Practice legitimately serves MCQ questions, which have no Type/Write/Photo
+ * mode tabs. Accessibility coverage for handwriting must therefore select a
+ * question that actually exposes those controls instead of assuming the first
+ * random/local question is writable. The test still fails closed if the normal
+ * Next-question path cannot reach one.
+ */
+async function reachAnswerModeQuestion(page, base, { attempts = 20 } = {}) {
+  await goTo(page, base, '/practice');
+  await page.waitForSelector('.q-prompt', { timeout: 30000 });
+
+  for (let i = 0; i <= attempts; i++) {
+    if (await page.locator('.mode-tab').count() >= 3) return;
+    if (i === attempts) break;
+
+    const next = page.locator('.ctx-next').first();
+    await next.waitFor({ state: 'visible', timeout: 5000 });
+    await next.click({ timeout: 5000 });
+    await page.waitForSelector('.q-prompt', { timeout: 30000 });
+    await wait(page, SETTLE);
+  }
+
+  throw new Error('no Type/Write/Photo practice question reachable within the bounded search');
+}
+
 // ── The suite ────────────────────────────────────────────────────────────────
 
 async function run() {
@@ -661,8 +686,7 @@ async function run() {
     });
 
     await step('practice · handwriting mode', '/practice', async () => {
-      await goTo(page, BASE, '/practice');
-      await page.waitForSelector('.q-prompt', { timeout: 30000 });
+      await reachAnswerModeQuestion(page, BASE);
       await click(page, '.mode-tab:nth-child(2)');
       await page.waitForSelector('.ink-answer', { timeout: 30000 });
       await wait(page, 700);
@@ -691,8 +715,7 @@ async function run() {
     });
 
     await step('practice · photo mode', '/practice', async () => {
-      await goTo(page, BASE, '/practice');
-      await page.waitForSelector('.q-prompt', { timeout: 30000 });
+      await reachAnswerModeQuestion(page, BASE);
       await click(page, '.mode-tab:nth-child(3)');
       await wait(page, 500);
     });
