@@ -2530,10 +2530,23 @@ const routes = {
     };
   },
 
+  'POST /practice/:id/discard': async (body, params) => {
+    const p = await requireProfile();
+    const row = await get('questions', params.id);
+    if (!row || row.pid !== p.id) throw Object.assign(new Error('Question not found'), { status: 404 });
+    if (row.answered) throw Object.assign(new Error('Already answered'), { status: 409 });
+    if (!row.discardedAt) {
+      row.discardedAt = Date.now();
+      await put('questions', row);
+    }
+    return { discarded: true, id: row.id };
+  },
+
   'POST /practice/:id/hint': async (body, params) => {
     const p = await requireProfile();
     const row = await get('questions', params.id);
     if (!row || row.pid !== p.id) throw Object.assign(new Error('Question not found'), { status: 404 });
+    if (row.discardedAt) throw Object.assign(new Error('Question was skipped'), { status: 409, code: 'QUESTION_DISCARDED' });
     const q = row.payload;
     const hints = q.hints || [];
     if (!hints.length) return { hint: 'No hints for this one — trust your instincts!', level: 0, remaining: 0 };
@@ -2548,6 +2561,7 @@ const routes = {
     const row = await get('questions', params.id);
     if (!row || row.pid !== p.id) throw Object.assign(new Error('Question not found'), { status: 404 });
     if (row.answered) throw Object.assign(new Error('Already answered'), { status: 409 });
+    if (row.discardedAt) throw Object.assign(new Error('Question was skipped'), { status: 409, code: 'QUESTION_DISCARDED' });
     const q = row.payload;
     const { answer, ms, steps, viaInk, ink, photo, scribble } = body || {};
 
@@ -2622,6 +2636,7 @@ const routes = {
     const row = await get('questions', params.id);
     if (!row || row.pid !== p.id) throw Object.assign(new Error('Question not found'), { status: 404 });
     if (row.answered) throw Object.assign(new Error('Already answered'), { status: 409 });
+    if (row.discardedAt) throw Object.assign(new Error('Question was skipped'), { status: 409, code: 'QUESTION_DISCARDED' });
     const q = row.payload;
     const meta = await resolve(p, row, q, false, 'revealed', body?.ms || 0, row.mode);
     return { correct: false, resolved: true, revealed: true, solution: { steps: q.steps, answerText: displayAnswer(q), criteria: criteriaFor(q), solutionText: q.solutionText }, ...meta };
@@ -3521,7 +3536,7 @@ async function resumableQuestion(profile, body = {}) {
     ? Math.min(4, Math.max(1, Number(body.difficulty))) : null;
 
   const candidates = rows.filter(r => {
-    if (!r || r.answered || r.examId || r.mode === 'rush' || r.mode === 'match') return false;
+    if (!r || r.answered || r.discardedAt || r.examId || r.mode === 'rush' || r.mode === 'match') return false;
     if (taskId) return String(r.taskId || '') === taskId;
     if (r.taskId) return false;
     if (!subtopic) return r.mode === 'practice' || r.mode === 'review';
@@ -3640,6 +3655,7 @@ async function runGated(method, pattern, handler, body, params) {
     key === 'POST /practice/:id/submit'
     || key === 'POST /practice/:id/reveal'
     || key === 'POST /practice/:id/hint'
+    || key === 'POST /practice/:id/discard'
   )) return withMutationLock(`question:${params.id}`, work);
 
   if (key === 'POST /practice/next') {

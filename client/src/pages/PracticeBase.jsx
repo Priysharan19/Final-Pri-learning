@@ -37,6 +37,7 @@ export default function Practice() {
   const assignmentTargetReached = useRef(false);
   const assignmentSync = useRef(Promise.resolve());
   const [serve, setServe] = useState(null);
+  const currentQuestionRef = useRef(null);
   const handedRef = useRef(location.state?.serve || null);   // a retry handed over from History
   const [error, setError] = useState('');
   const [errorCode, setErrorCode] = useState('');
@@ -112,7 +113,9 @@ export default function Practice() {
     return () => { live = false; };
   }, [assignmentMode, assignmentClassId, assignmentId, replaceSession]);
 
-  const load = useCallback(async () => {
+  useEffect(() => { currentQuestionRef.current = serve?.question?.id || null; }, [serve]);
+
+  const load = useCallback(async (options = null) => {
     if (loading.current) return;
     if (assignmentMode) {
       const contextMatches = assignmentContext &&
@@ -131,6 +134,14 @@ export default function Practice() {
     setErrorCode('');
     setCapped(null);
     try {
+      // Reload/restart resumes unfinished work. Pressing the explicit Next
+      // control is different: the student chose to skip, so record a safe
+      // discard before serving a fresh question. A resolved row returns 409
+      // here and is already safe to move past.
+      if (options?.fresh === true && currentQuestionRef.current && !assignmentMode) {
+        try { await api.post(`/practice/${currentQuestionRef.current}/discard`, {}); }
+        catch (e) { if (e?.status !== 409) throw e; }
+      }
       const assignmentSpec = assignmentContext?.specification || {};
       const assignmentSubtopic = assignmentSpec.subtopic ? String(assignmentSpec.subtopic) : null;
       const assignmentTrack = assignmentSpec.track ? String(assignmentSpec.track) : null;
@@ -150,7 +161,7 @@ export default function Practice() {
       // Real local practice resumes the exact unresolved question after reload,
       // background termination or a duplicate Next request. Cloud assignments
       // manage their own session contract and are intentionally left alone.
-      if (!assignmentMode || taskId) body.resume = true;
+      if (!assignmentMode || taskId) body.resume = options?.fresh !== true;
       const r = await api.post('/practice/next', body);
       setServe(r);
     } catch (e) {
@@ -372,7 +383,7 @@ export default function Practice() {
             reasonTag={serve.reasonTag || null}
             why={serve.why}
             onResolved={onResolved}
-            onNext={load}
+            onNext={() => load({ fresh: true })}
             onRedo={redo}
           />
           <PriExplain
@@ -416,7 +427,7 @@ export default function Practice() {
               aria-label={t(assignmentMode ? 'assignment.leaveShort' : 'practice.clearFilters')} onClick={() => setParams({})}>✕</button>
           )}
         </div>
-        {!assignmentCompleteLocally && <button className="ctx-next" title={t('practice.nextQuestion')} aria-label={t('practice.nextQuestion')} onClick={load}>›</button>}
+        {!assignmentCompleteLocally && <button className="ctx-next" title={t('practice.nextQuestion')} aria-label={t('practice.nextQuestion')} onClick={() => load({ fresh: true })}>›</button>}
       </div>
     </div>
   );

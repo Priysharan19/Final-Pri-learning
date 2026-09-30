@@ -914,6 +914,14 @@ async function run() {
     await rejects('a revealed question cannot then be answered',
       POST(`/practice/${revealTarget.question.id}/submit`, { answer: '1' }), { status: 409 });
 
+    const discardTarget = await nextQuestion({ mode: 'topic', subtopic: topicId });
+    const discarded = await POST(`/practice/${discardTarget.question.id}/discard`, {});
+    eq('explicit Next can safely discard unfinished work', discarded.discarded, true);
+    eq('discarding unfinished work writes no attempt',
+      (await idb.byIndex('attempts', 'pid', ada.id)).filter(a => a.questionId === discardTarget.question.id).length, 0);
+    await rejects('a discarded question cannot later be submitted',
+      POST(`/practice/${discardTarget.question.id}/submit`, { answer: '1' }), { status: 409 });
+
     const strangerQ = await nextQuestion({});
     await POST('/profiles/select', { id: grace.id, password: 'punch-cards-9' });
     await rejects('another profile cannot answer your question',
