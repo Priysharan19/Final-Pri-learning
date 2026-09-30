@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "measuredFrom": {
+    "workflowRun": 36712083817,
+    "job": 109876040064,
+    "measuredAt": "2026-09-30",
+    "targetSecondsPerShard": 192
+  },
+  "requiredAdditionalScripts": [
+    "test:golden-journey",
+    "test:practice:state",
+    "test:idb:lifecycle"
+  ],
+  "shards": {
+    "holdout3-india-pyq": [
+      "test:holdout3", "test:budget", "test:india", "test:india:pyq",
+      "test:ink:interaction", "test:india:surfaces", "test:practice:state",
+      "test:ink:bridge", "test:streak", "test:photo:cloud", "test:outbox",
+      "test:gateway", "test:ink:collector"
+    ],
+    "holdout2-india-adaptive": [
+      "test:holdout2", "test:india:adaptive", "test:ink:hybrid",
+      "test:photo:bridge", "test:i18n", "test:latex", "test:restore:fidelity",
+      "test:ink:personal", "test:reason", "test:ncert:class9",
+      "test:reason:curriculum", "test:reason:v3", "test:predictor",
+      "test:mcq:distinct", "test:cbse:marking"
+    ],
+    "ink-engine-india-exams": [
+      "test:ink", "test:engine", "test:jee", "test:india:exams",
+      "test:entitlements", "test:audit-floor", "test:security",
+      "test:badinput", "test:ncert:linear", "test:reason:v2",
+      "test:readme", "test:plot", "test:ink:feedback",
+      "test:handwriting:cloud", "test:working:cloud", "test:idb:lifecycle"
+    ],
+    "holdout-lines-backend": [
+      "test:holdout", "test:lines", "test:backend", "test:jee:gate",
+      "test:diagnose", "test:ncert:rational", "test:marker:working",
+      "test:ncert:class8:rest", "test:marker:method", "test:marker:forms",
+      "test:ink:stability", "test:pdf", "test:ink:sets"
+    ],
+    "context-hard-golden": [
+      "test:context", "test:hard", "test:calculus", "test:golden-journey",
+      "test:contracts", "test:india:native", "test:india:identity",
+      "test:legal", "test:sync:ack", "test:ink:corpus", "test:india:weights",
+      "test:reason:v4", "test:explain", "test:ink:arbitration",
+      "test:ink:structure"
+    ]
+  }
+}
