@@ -85,7 +85,7 @@ async function reachFeedback(page, check) {
     }
   }
 
-  const submit = page.locator('.editor-foot .btn-primary:visible').first();
+  const submit = page.locator('.editor-foot .btn-primary:visible, .row.no-print .btn-primary:visible').first();
   if (!(await submit.count())) {
     await check('practice exposes a real submit control', false, 'submit button not found');
     return false;
