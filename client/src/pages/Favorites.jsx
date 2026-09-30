@@ -35,7 +35,7 @@ export default function Favorites() {
             <div className="locked-icon" aria-hidden="true">☆</div>
             <div className="locked-title">{t('favorites.emptyTitle')}</div>
             <div className="locked-sub">{t('favorites.emptySub')}</div>
-            <button className="btn btn-ghost" onClick={() => nav('/history')}>{t('favorites.openHistory')}</button>
+            <button className="btn btn-ghost" onClick={() => nav('/review')}>{t('favorites.openHistory')}</button>
           </div>
         </div>
       </div>
