@@ -149,3 +149,4 @@ The executable repair is durably pushed on
 `task/pri-02-golden-student-journey` and PR #229. Exact-head GitHub checks and
 a final clean-clone verification are the remaining completion evidence; no
 software or external blocker is currently known.
+- CI exact coverage invariant updated from the pre-regression `122/122` India exam total to the stronger `129/129` total so the newly added replay/idempotency checks are mandatory rather than skipped.
