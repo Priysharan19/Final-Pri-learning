@@ -77,14 +77,15 @@ class FakeStore {
 }
 
 class FakeHandle {
-  constructor(store, mode) { this.store = store; this.mode = mode; }
+  constructor(store, mode, transaction = null) { this.store = store; this.mode = mode; this.transaction = transaction; }
+  req(work) { return this.transaction ? this.transaction.request(work) : request(work); }
   writable() { if (this.mode !== 'readwrite') throw new Error(`${this.store.name}: read-only transaction`); }
-  get(key) { return request(() => clone(this.store.rows.get(key))); }
-  getAll() { return request(() => this.store.ordered().map(k => clone(this.store.rows.get(k)))); }
-  delete(key) { return request(() => { this.writable(); this.store.rows.delete(key); }); }
-  clear() { return request(() => { this.writable(); this.store.rows.clear(); }); }
+  get(key) { return this.req(() => clone(this.store.rows.get(key))); }
+  getAll() { return this.req(() => this.store.ordered().map(k => clone(this.store.rows.get(k)))); }
+  delete(key) { return this.req(() => { this.writable(); this.store.rows.delete(key); }); }
+  clear() { return this.req(() => { this.writable(); this.store.rows.clear(); }); }
   save(value, exclusive) {
-    return request(() => {
+    return this.req(() => {
       this.writable();
       const row = clone(value);
       let key = this.store.keyPath ? row[this.store.keyPath] : undefined;
@@ -115,6 +116,78 @@ class FakeHandle {
   }
 }
 
+class FakeTransaction {
+  constructor(db, names, mode = 'readonly') {
+    this.db = db;
+    this.names = Array.isArray(names) ? names : [names];
+    this.mode = mode;
+    this.error = null;
+    this.oncomplete = null;
+    this.onerror = null;
+    this.onabort = null;
+    this.pending = 0;
+    this.done = false;
+    this.aborted = false;
+    this.snapshots = new Map();
+    for (const name of this.names) {
+      const store = db.stores.get(name);
+      if (!store) throw new Error(`No object store "${name}"`);
+      if (mode === 'readwrite') this.snapshots.set(name, { rows: new Map([...store.rows].map(([k, v]) => [k, clone(v)])), seq: store.seq });
+    }
+  }
+  objectStore(name) {
+    if (!this.names.includes(name)) throw new Error(`Store "${name}" is not in this transaction`);
+    return new FakeHandle(this.db.stores.get(name), this.mode, this);
+  }
+  rollback() {
+    if (this.mode !== 'readwrite') return;
+    for (const [name, snap] of this.snapshots) {
+      const store = this.db.stores.get(name);
+      store.rows = new Map([...snap.rows].map(([k, v]) => [k, clone(v)]));
+      store.seq = snap.seq;
+    }
+  }
+  fail(err, req = null) {
+    if (this.aborted || this.done) return;
+    this.error = err;
+    this.aborted = true;
+    this.rollback();
+    if (req) { req.error = err; req.onerror?.({ target: req }); }
+    this.onerror?.({ target: this });
+    this.onabort?.({ target: this });
+  }
+  request(work) {
+    const req = { result: undefined, error: null, onsuccess: null, onerror: null };
+    if (this.aborted) {
+      queueMicrotask(() => this.fail(this.error || new Error('transaction aborted'), req));
+      return req;
+    }
+    this.pending++;
+    queueMicrotask(() => {
+      if (this.aborted) { this.pending--; return; }
+      try {
+        req.result = work();
+        req.onsuccess?.({ target: req });
+      } catch (err) {
+        this.pending--;
+        this.fail(err, req);
+        return;
+      }
+      this.pending--;
+      queueMicrotask(() => {
+        if (!this.aborted && !this.done && this.pending === 0) {
+          this.done = true;
+          this.oncomplete?.({ target: this });
+        }
+      });
+    });
+    return req;
+  }
+  abort() {
+    this.fail(new Error('transaction aborted'));
+  }
+}
+
 class FakeDB {
   constructor() {
     this.stores = new Map();
@@ -126,9 +199,7 @@ class FakeDB {
     return store;
   }
   transaction(name, mode = 'readonly') {
-    const store = this.stores.get(name);
-    if (!store) throw new Error(`No object store "${name}"`);
-    return { objectStore: () => new FakeHandle(store, mode) };
+    return new FakeTransaction(this, name, mode);
   }
 }
 

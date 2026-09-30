@@ -147,6 +147,10 @@ export default function Practice() {
             }
           : subtopic ? { mode: 'topic', subtopic, track: track || undefined, dotpoint: dotpoint != null ? Number(dotpoint) : undefined, difficulty: difficulty != null ? Number(difficulty) : undefined, pyqOnly: pyqOnly || undefined }
             : { mode: 'smart', track: track || undefined, difficulty: difficulty != null ? Number(difficulty) : undefined, pyqOnly: pyqOnly || undefined };
+      // Real local practice resumes the exact unresolved question after reload,
+      // background termination or a duplicate Next request. Cloud assignments
+      // manage their own session contract and are intentionally left alone.
+      if (!assignmentMode || taskId) body.resume = true;
       const r = await api.post('/practice/next', body);
       setServe(r);
     } catch (e) {

@@ -3,7 +3,7 @@
 // Implements every API the UI uses against IndexedDB. No network required.
 // ─────────────────────────────────────────────────────────────────────────────
 import {
-  get, put, del, add, all, byIndex, rawByIndex, uuid, wipeProfile,
+  get, put, del, add, all, byIndex, rawByIndex, atomicBatch, uuid, wipeProfile,
   requestPersistentStorage, storageEstimate,
   ENCRYPTED_STORES, setDataKey, dataKeyFor, hasDataKey, dropDataKeys, sealField, openField
 } from './idb.js';
@@ -1481,15 +1481,10 @@ async function resolve(profile, row, q, correct, answerGiven, ms, mode, viaInk =
   let ratingAfter = st.rating;
   const isRush = mode === 'rush' || mode === 'match';
   const isCustom = q.custom;
+  let ratingNext = null;
 
   if (!isRush && !isCustom) {
     ratingAfter = updateRating(st.rating, st.attempts, q.difficulty, correct, effHints);
-
-    // Dot-point resolution. The bank says which dot points a question actually
-    // exercises; each of them takes the result. A question that spans two of
-    // them is evidence about both — we cannot say which one a wrong answer
-    // came from, and pretending we can would put a made-up number on a screen.
-    // A question that names none moves only the subtopic, exactly as before.
     const dp = { ...(st.dp || {}) };
     const credited = row.india ? [indiaDpKeyOf(row)].filter(Boolean) : dotpointsCredited(q);
     for (const dpId of credited) {
@@ -1501,81 +1496,120 @@ async function resolve(profile, row, q, correct, answerGiven, ms, mode, viaInk =
         last_at: now
       };
     }
-
-    // A clean correct answer walks every live misconception in this subtopic
-    // back one step; a hinted or second-try one leaves the ledger alone.
     const clean = correct && !(row.hintsUsed || 0) && !(row.tries || 0);
     const traps = clean ? decayTraps(st.traps) : (st.traps || {});
-
-    // The last few outcomes, newest first. Long-run mastery is an average, and
-    // an average cannot tell "steady at 60%" from "was fine, just missed the
-    // last three" — which are different students needing different questions.
     const recent = [correct ? 1 : 0, ...(Array.isArray(st.recent) ? st.recent : [])].slice(0, RECENT_WINDOW);
-
-    await putRating(pid, owner, {
-      rating: ratingAfter, attempts: st.attempts + 1, correct: st.correct + (correct ? 1 : 0), last_at: now,
+    ratingNext = {
+      ...st, key: `${pid}:${owner}`, pid, subtopic: owner,
+      rating: ratingAfter, attempts: st.attempts + 1,
+      correct: st.correct + (correct ? 1 : 0), last_at: now,
       dp, traps, recent
-    });
+    };
   }
 
+  let reviewNext = null;
   if ((mode === 'practice' || mode === 'review' || mode === 'task') && !isCustom) {
-    // Spaced review, FSRS-5. The grade carries more than right/wrong: a correct
-    // answer that needed a hint or a second try is Hard, and a clean fast one is
-    // Easy, so two students who both "got it" are not scheduled the same.
     const key = `${pid}:${owner}`;
     const rev = await get('reviews', key);
     const grade = gradeFor({
       correct, hintsUsed: row.hintsUsed || 0, tries: row.tries || 0,
       ms: ms || 0, difficulty: q.difficulty || 2
     });
-    if (rev) {
-      await put('reviews', { ...rev, subtopic: owner, ...scheduleReview(rev, grade, now) });
-    } else if (st.attempts + 1 >= 3) {
-      await put('reviews', { key, pid, subtopic: owner, ...scheduleReview(null, grade, now) });
-    }
+    if (rev) reviewNext = { ...rev, subtopic: owner, ...scheduleReview(rev, grade, now) };
+    else if (st.attempts + 1 >= 3) reviewNext = { key, pid, subtopic: owner, ...scheduleReview(null, grade, now) };
   }
 
   const xp = isRush ? (correct ? 6 : 0) : xpFor(q.difficulty, correct, 0, effHints);
-  profile.xp = (profile.xp || 0) + xp;
-  await put('profiles', profile);
+  const profileNext = { ...profile, xp: (profile.xp || 0) + xp };
   const tz = timezoneOf(profile);
-  await bumpActivity(pid, { correct, xp, ms }, now, tz);
+  const date = dayKey(now, tz);
+  const activityKey = `${pid}:${date}`;
+  const activityNext = (await get('activity', activityKey))
+    || { key: activityKey, pid, date, questions: 0, correct: 0, xp: 0, ms: 0, predicted: null };
+  activityNext.questions += 1;
+  activityNext.correct += correct ? 1 : 0;
+  activityNext.xp += xp || 0;
+  activityNext.ms += ms || 0;
 
-  await add('attempts', {
-    pid, questionId: row.id, subtopic: owner, generator: q.subtopic, difficulty: q.difficulty || 2,
-    correct: correct ? 1 : 0, answerGiven: String(answerGiven ?? '').slice(0, 300),
-    ms: ms || 0, hintsUsed: row.hintsUsed || 0, mode, viaInk,
-    ratingBefore: st.rating, ratingAfter, createdAt: now
-  });
-  row.answered = 1;
-  await put('questions', row);
+  const projectedRatings = await ratingsFor(pid);
+  if (ratingNext) projectedRatings[owner] = ratingNext;
+  const pred = predictMark(projectedRatings, profile.year, now, pathwayOf(profile));
+  activityNext.predicted = pred.mark;
 
-  // Task progress
+  let taskProgressNext = null;
   if (row.taskId) {
     const key = `${row.taskId}:${pid}`;
     const task = await get('tasks', row.taskId);
     const tp = (await get('taskProgress', key)) || { key, taskId: row.taskId, pid, done: 0, correct: 0, finishedAt: null };
-    tp.done += 1; tp.correct += correct ? 1 : 0;
-    if (task && tp.done >= task.count && !tp.finishedAt) tp.finishedAt = now;
-    await put('taskProgress', tp);
+    taskProgressNext = { ...tp, done: tp.done + 1, correct: tp.correct + (correct ? 1 : 0) };
+    if (task && taskProgressNext.done >= task.count && !taskProgressNext.finishedAt) taskProgressNext.finishedAt = now;
   }
 
-  const newBadges = await checkBadges(pid, { type: 'attempt', difficulty: q.difficulty, correct, hintsUsed: row.hintsUsed, year: profile.year, xp: profile.xp }, now, tz);
-
-  const ratings = await ratingsFor(pid);
-  const pred = predictMark(ratings, profile.year, now, pathwayOf(profile));
-  await setPredictedToday(pid, pred.mark, now, tz);
-
-  const stNew = ratings[owner];
-  const mastery = stNew ? Math.round(masteryOf(stNew.rating, stNew.attempts, stNew.last_at, now) * 100) : 0;
-
-  return {
-    xp, totalXp: profile.xp, level: levelFromXp(profile.xp),
-    ratingDelta: ratingAfter - st.rating, mastery, band: masteryBand(mastery / 100),
-    // The NSW-scaled mark is not a number an Indian student is ever shown, and
-    // the streak is counted in the student's own timezone.
-    predicted: profile.course === 'in' ? null : pred, streak: await streakFor(pid, now, tz), newBadges
+  // The attempt id is also the exactly-once claim. It is a keyed digest of the
+  // opaque question id, so it is stable across tabs/restarts without linking an
+  // attempts-row dump back to the clear question primary key.
+  const claim = await blindHash(`practice-resolution:${row.id}`);
+  const attempt = {
+    id: `${pid}:resolved:${claim}`,
+    pid, questionId: row.id, subtopic: owner, generator: q.subtopic, difficulty: q.difficulty || 2,
+    correct: correct ? 1 : 0, answerGiven: String(answerGiven ?? '').slice(0, 300),
+    ms: ms || 0, hintsUsed: row.hintsUsed || 0, mode, viaInk,
+    ratingBefore: st.rating, ratingAfter, createdAt: now
   };
+
+  const stNew = ratingNext || st;
+  const mastery = stNew ? Math.round(masteryOf(stNew.rating, stNew.attempts, stNew.last_at, now) * 100) : 0;
+  const coreMeta = {
+    xp, totalXp: profileNext.xp, level: levelFromXp(profileNext.xp),
+    ratingDelta: ratingAfter - st.rating, mastery, band: masteryBand(mastery / 100),
+    predicted: profile.course === 'in' ? null : pred
+  };
+  const questionNext = {
+    ...row, answered: 1, resolvedAt: now,
+    resolution: { correct: !!correct, at: now, ...coreMeta }
+  };
+
+  try {
+    await atomicBatch([
+      // `add`, not `put`: collision means another delivery already won.
+      { type: 'add', store: 'attempts', value: attempt },
+      ...(ratingNext ? [{ type: 'put', store: 'ratings', value: ratingNext }] : []),
+      ...(reviewNext ? [{ type: 'put', store: 'reviews', value: reviewNext }] : []),
+      { type: 'put', store: 'profiles', value: profileNext },
+      { type: 'put', store: 'activity', value: activityNext },
+      { type: 'put', store: 'questions', value: questionNext },
+      ...(taskProgressNext ? [{ type: 'put', store: 'taskProgress', value: taskProgressNext }] : [])
+    ]);
+  } catch (err) {
+    // On a repeated delivery the winning transaction has already made the
+    // question authoritative. The losing transaction wrote nothing.
+    const latest = await get('questions', row.id).catch(() => null);
+    if (latest?.answered) {
+      throw Object.assign(new Error('Already answered'), {
+        status: 409, code: 'ALREADY_RESOLVED', idempotent: true
+      });
+    }
+    throw err;
+  }
+
+  // Only now is it safe to update the object the caller is still holding.
+  profile.xp = profileNext.xp;
+
+  // Badges are derived, fixed-key and idempotent. They are intentionally after
+  // the learning transaction: a badge may be recomputed after a crash, while
+  // an attempt/rating/activity split-brain must never be possible.
+  let newBadges = [];
+  try {
+    newBadges = await checkBadges(pid, {
+      type: 'attempt', difficulty: q.difficulty, correct,
+      hintsUsed: row.hintsUsed, year: profile.year, xp: profileNext.xp
+    }, now, tz);
+  } catch { /* core learning result is already durable */ }
+
+  let streak = 0;
+  try { streak = await streakFor(pid, now, tz); } catch { }
+
+  return { ...coreMeta, streak, newBadges };
 }
 
 // ── Record builders for file-sourced data ────────────────────────────────────
@@ -2346,6 +2380,8 @@ const routes = {
   // ---- practice ----
   'POST /practice/next': async (body) => {
     const p = await requireProfile();
+    const unfinished = await resumableQuestion(p, body);
+    if (unfinished) return resumedQuestionResponse(unfinished);
     const { mode = 'smart', subtopic, difficulty, dotpoint, taskId, track, pyqOnly = false } = body || {};
     // Task-driven question
     if (taskId) {
@@ -3470,6 +3506,43 @@ export async function finishIndiaExamEvidence(pct) {
   return checkBadges(p.id, { type: 'exam', pct: Number(pct) || 0 }, Date.now());
 }
 
+/**
+ * Latest unresolved real-practice row matching this request. `resume` is an
+ * explicit product-path flag: tests/tools that intentionally generate a bank of
+ * unanswered questions can still ask for fresh rows, while the student UI never
+ * silently throws away the question it was already working on.
+ */
+async function resumableQuestion(profile, body = {}) {
+  if (body?.resume !== true) return null;
+  const rows = await byIndex('questions', 'pid', profile.id);
+  const taskId = body.taskId ? String(body.taskId) : null;
+  const subtopic = body.subtopic ? String(body.subtopic) : null;
+  const difficulty = body.difficulty !== undefined && body.difficulty !== null && body.difficulty !== ''
+    ? Math.min(4, Math.max(1, Number(body.difficulty))) : null;
+
+  const candidates = rows.filter(r => {
+    if (!r || r.answered || r.examId || r.mode === 'rush' || r.mode === 'match') return false;
+    if (taskId) return String(r.taskId || '') === taskId;
+    if (r.taskId) return false;
+    if (!subtopic) return r.mode === 'practice' || r.mode === 'review';
+    const actual = r.india?.chapterId || r.payload?.subtopic || r.subtopic;
+    if (String(actual || '') !== subtopic) return false;
+    if (difficulty !== null && Number(r.difficulty) !== difficulty) return false;
+    return true;
+  }).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+
+  return candidates[0] || null;
+}
+
+function resumedQuestionResponse(row) {
+  return {
+    question: sanitize(row.payload, row),
+    reason: 'resume',
+    why: 'Continuing your unfinished question.',
+    resumed: true
+  };
+}
+
 // ── Entitlement gates ────────────────────────────────────────────────────────
 // The free tier (20 practice questions a day, one exam simulation per 30 days)
 // and the Premium-only JEE Advanced track are enforced at the dispatcher, so a
@@ -3515,12 +3588,13 @@ async function entitlementGate(method, pattern, body, params) {
   const key = `${method} ${pattern}`;
   if (key === 'POST /practice/next' || key === 'POST /history/:id/retry') {
     const p = await requireProfile();
-    await assertPracticeAllowed(p);
-    if (p.course === 'in' && await resolvedIndiaTrack(p, key, body, params) === 'jee-advanced') {
+    const resuming = key === 'POST /practice/next' ? await resumableQuestion(p, body) : null;
+    if (!resuming) await assertPracticeAllowed(p);
+    if (!resuming && p.course === 'in' && await resolvedIndiaTrack(p, key, body, params) === 'jee-advanced') {
       await requireCapability(p, ENTITLEMENTS.JEE_ADVANCED);
     }
     return async result => {
-      await recordPracticeServed(p);
+      if (!result?.resumed) await recordPracticeServed(p);
       return { ...result, allowance: await practiceAllowance(p) };
     };
   }
@@ -3535,10 +3609,43 @@ async function entitlementGate(method, pattern, body, params) {
   return null;
 }
 
+const mutationQueues = new Map();
+
+async function withMutationLock(name, work) {
+  if (globalThis.navigator?.locks?.request) {
+    return globalThis.navigator.locks.request(`pri-learning:${name}`, work);
+  }
+  const prior = mutationQueues.get(name) || Promise.resolve();
+  let release;
+  const gate = new Promise(resolve => { release = resolve; });
+  const tail = prior.catch(() => undefined).then(() => gate);
+  mutationQueues.set(name, tail);
+  await prior.catch(() => undefined);
+  try { return await work(); }
+  finally {
+    release();
+    if (mutationQueues.get(name) === tail) mutationQueues.delete(name);
+  }
+}
+
 async function runGated(method, pattern, handler, body, params) {
-  const settle = await entitlementGate(method, pattern, body, params);
-  const result = await handler(body, params);
-  return settle ? settle(result) : result;
+  const key = `${method} ${pattern}`;
+  const work = async () => {
+    const settle = await entitlementGate(method, pattern, body, params);
+    const result = await handler(body, params);
+    return settle ? settle(result) : result;
+  };
+
+  if (params?.id && (
+    key === 'POST /practice/:id/submit'
+    || key === 'POST /practice/:id/reveal'
+    || key === 'POST /practice/:id/hint'
+  )) return withMutationLock(`question:${params.id}`, work);
+
+  if (key === 'POST /practice/next') {
+    return withMutationLock(`next:${currentPid() || 'none'}`, work);
+  }
+  return work();
 }
 
 export async function dispatch(method, path, body) {
