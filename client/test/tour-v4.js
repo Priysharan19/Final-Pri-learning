@@ -30,13 +30,14 @@ const ANSWER_WITH_SOLUTION = 6;   // how many questions to answer from the print
 // which one it thinks it is.
 const ROUTES = [
   ['/', 'Home'],
+  ['/practice', 'Practice'],
   ['/tasks', 'Tasks'],
-  ['/match', 'Match'],
-  ['/progress', 'Progress'],
-  ['/favorites', 'Favorites'],
   ['/exams', 'Exams'],
   ['/classes', 'Classes'],
-  ['/history', 'History'],
+  ['/progress', 'Progress'],
+  ['/review?filter=wrong', 'Review'],
+  ['/rush', 'Rapid Fire'],
+  ['/match', 'Match'],
   ['/settings', 'Settings']
 ];
 

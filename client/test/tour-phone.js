@@ -49,7 +49,7 @@ export const flow = {
     await check('opening More reports itself open', await more.getAttribute('aria-expanded') === 'true');
 
     const reachable = await hrefsNow();
-    for (const path of ['/', '/tasks', '/match', '/progress', '/exams', '/favorites', '/classes', '/settings', '/history']) {
+    for (const path of ['/', '/practice', '/tasks', '/progress', '/exams', '/classes', '/review?filter=wrong', '/rush', '/match', '/settings']) {
       await check(`a student on a phone can reach ${path}`, reachable.includes(path),
         `reachable: ${JSON.stringify(reachable.sort())}`);
     }
@@ -109,7 +109,7 @@ export const flow = {
     // both at 390 px and at the 360 px an entry-level Android gives you.
     for (const [size, label] of [[PHONE, '390px'], [SMALL, '360px']]) {
       await page.setViewportSize(size);
-      for (const path of ['/', '/tasks', '/match', '/progress', '/exams', '/settings', '/history', '/practice']) {
+      for (const path of ['/', '/tasks', '/match', '/progress', '/exams', '/settings', '/review?filter=wrong', '/practice']) {
         await goto(path);
         await page.waitForTimeout(900);
         const over = await page.evaluate(() =>
