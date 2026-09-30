@@ -51,9 +51,9 @@ Aggregate calibration can hide systematic learner-group errors.
 Recent KT research reports global calibration can coexist with overprediction in low-performing students and underprediction in high-performing students.
 
 Sources:
-https://arxiv.org/abs/2608.17694
-https://arxiv.org/abs/2607.08792
-https://ojs.aaai.org/index.php/AAAI/article/view/33761
+https://doi.org/10.1109/SIST61674.2026.11596401
+https://proceedings.mlr.press/v339/mitton26a.html
+https://ojs.aaai.org/index.php/AAAI/article/view/35007
 
 Pri must evaluate calibration by meaningful operational slices such as:
 - prior performance;
@@ -126,8 +126,8 @@ Source:
 https://doi.org/10.1007/s10648-025-10035-1
 
 Recent KT work suggests standard exponential/Ebbinghaus assumptions are not universally best:
-https://arxiv.org/abs/2604.16472
-https://doi.org/10.1145/3706468.3706494
+https://doi.org/10.1016/j.knosys.2025.114884
+https://doi.org/10.1007/s40593-025-00508-3
 
 Compare prospectively:
 - current scheduler;
