@@ -50,8 +50,8 @@ https://www.education.gov.in/sites/upload_files/mhrd/files/ncf_2023.pdf
 Research supports careful bilingual/translanguaging use, but effects depend on proficiency/context.
 
 Sources:
-https://doi.org/10.1080/14790718.2026.2575061
-https://doi.org/10.1007/s11858-024-01603-0
+https://doi.org/10.1007/s10649-026-10552-y
+https://www.mdpi.com/2227-7102/14/11/1172
 
 Pri implication:
 Use bilingual rendering as a bridge, not a permanent replacement for assessment-language competence.
