@@ -182,10 +182,10 @@ Class: large-scale calibration analysis on EdNet (20,705 students; 5.89M interac
 Use: aggregate calibration can hide systematic over/underprediction across performance groups and consequential mastery-decision errors.
 https://doi.org/10.1109/SIST61674.2026.11596401
 
-## Causal framework for tutoring requests — EDM 2026
+## Causal framework for on-demand tutoring — 2026
 Class: causal/quasi-experimental analysis of >5,000 middle-school mathematics tutoring sessions.
 Use: average tutoring benefit plus large heterogeneity motivates intervention-specific evidence.
-https://educationaldatamining.org/edm2026/proceedings/2026.EDM.full-papers.85/
+https://arxiv.org/abs/2602.19296
 
 ## Personalized AI tutor + RL sequencing field experiment
 Class: randomized field evidence in high-school programming, not mathematics.
