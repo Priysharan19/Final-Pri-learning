@@ -104,7 +104,7 @@ const MIME = {
   '.map': 'application/json; charset=utf-8'
 };
 
-async function serveDist(dir = DIST) {
+export async function serveDist(dir = DIST) {
   const root = normalize(dir).replace(/[\\/]$/, '');
   const shell = join(root, 'index.html');
 
@@ -157,7 +157,7 @@ async function serveDist(dir = DIST) {
  * and vite builds this app in about a second — so the build is made every run
  * unless it is explicitly waved off, and never silently skipped.
  */
-function ensureBuild(build) {
+export function ensureBuild(build) {
   if (!build) {
     if (!existsSync(join(DIST, 'index.html'))) {
       throw new Error('--no-build was given but client/dist is not there — run npm run build --prefix client');

@@ -137,6 +137,9 @@
     "test:consent:signup": "node client/test/signup-consent-check.mjs",
     "test:release-authority": "node tools/pri01-release-authority-check.mjs && node server/test/release-identity-check.mjs",
     "verify:release": "node tools/verify-release-identity.mjs",
-    "verify:release:native": "node tools/verify-release-identity.mjs --require-native"
+    "verify:release:native": "node tools/verify-release-identity.mjs --require-native",
+    "test:idb:lifecycle": "node client/test/idb-lifecycle-check.mjs",
+    "test:practice:state": "node client/test/practice-state-invariants-check.mjs",
+    "test:golden-journey": "node client/test/golden-student-journey.mjs"
   }
 }

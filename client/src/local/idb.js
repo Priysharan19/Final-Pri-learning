@@ -11,6 +11,12 @@ const DB_NAME = 'pri-learning';
 const DB_VERSION = 4;
 
 let dbPromise = null;
+let dbHandle = null;
+
+function forgetDB(db = null) {
+  if (!db || dbHandle === db) dbHandle = null;
+  dbPromise = null;
+}
 
 export function openDB() {
   if (dbPromise) return dbPromise;
@@ -58,8 +64,28 @@ export function openDB() {
       mk('bookmarks', { keyPath: 'key' }, [['pid', 'pid']]);                    // `${pid}:${questionId}`
       mk('device', { keyPath: 'id' });                                          // this install's own secrets
     };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
+    req.onsuccess = () => {
+      const db = req.result;
+      dbHandle = db;
+      db.onversionchange = () => {
+        // A newer build cannot upgrade while this tab keeps the old handle
+        // alive. Close immediately and forget the cached promise so the next
+        // operation opens the current schema instead of reusing a dead handle.
+        try { db.close?.(); } finally { forgetDB(db); }
+      };
+      db.onclose = () => forgetDB(db);
+      resolve(db);
+    };
+    req.onerror = () => {
+      const err = req.error || new Error('IndexedDB open failed');
+      forgetDB();
+      reject(err);
+    };
+  }).catch(err => {
+    // A transient open failure must never be cached for the lifetime of the
+    // page. The next request gets a genuine new indexedDB.open attempt.
+    forgetDB();
+    throw err;
   });
   return dbPromise;
 }
@@ -1333,6 +1359,73 @@ export async function add(store, value) {
   if (sealedRow === null) return undefined;
   return wrap(tx(await openDB(), store, 'readwrite').add(sealedRow));
 }
+
+/**
+ * Commit a resolved learning mutation as one IndexedDB transaction.
+ *
+ * Cryptography and key derivation happen before the transaction opens: WebCrypto
+ * promises may yield to the event loop, and an IndexedDB transaction is allowed
+ * to auto-close while idle. Once the transaction exists, every request is queued
+ * synchronously. An exclusive `add` can therefore be used as an exactly-once
+ * claim: if it collides, IndexedDB aborts the whole transaction and none of the
+ * accompanying puts become visible.
+ */
+export async function atomicBatch(ops) {
+  await ready();
+  const prepared = [];
+  for (const op of Array.isArray(ops) ? ops : []) {
+    if (!op?.store) throw new Error('atomicBatch operation has no store');
+    if (op.type === 'delete') {
+      prepared.push({ type: 'delete', store: op.store, key: await storedKey(op.store, op.key) });
+      continue;
+    }
+    if (op.type !== 'add' && op.type !== 'put') throw new Error(`atomicBatch: unsupported operation ${op.type}`);
+    const spec = SEALED_STORES[op.store];
+    let value = op.value;
+    if (op.type === 'add' && spec?.ownKey && (value?.id === undefined || value?.id === null)) {
+      const id = await nextOwnKey(op.store, spec, op.value);
+      if (id) value = { ...value, id };
+    }
+    const row = await seal(op.store, value);
+    if (row === null) throw new Error(`atomicBatch: ${op.store} row could not be sealed`);
+    prepared.push({ type: op.type, store: op.store, row });
+  }
+  if (!prepared.length) return [];
+
+  for (const op of prepared) touched(op.store);
+  const stores = [...new Set(prepared.map(op => op.store))];
+  const db = await openDB();
+
+  return new Promise((resolve, reject) => {
+    let firstError = null;
+    let tr;
+    try { tr = db.transaction(stores, 'readwrite'); }
+    catch (err) { reject(err); return; }
+
+    const results = [];
+    tr.oncomplete = () => resolve(results);
+    tr.onerror = event => { firstError ||= tr.error || event?.target?.error || null; };
+    tr.onabort = event => reject(firstError || tr.error || event?.target?.error || new Error('IndexedDB transaction aborted'));
+
+    try {
+      for (const op of prepared) {
+        const st = tr.objectStore(op.store);
+        const req = op.type === 'delete'
+          ? st.delete(op.key)
+          : op.type === 'add'
+            ? st.add(op.row)
+            : st.put(op.row);
+        req.onsuccess = () => { results.push(req.result); };
+        req.onerror = () => { firstError ||= req.error || null; };
+      }
+    } catch (err) {
+      firstError = err;
+      try { tr.abort?.(); } catch { }
+      reject(err);
+    }
+  });
+}
+
 export async function clear(store) {
   await ready();
   touched(store);
