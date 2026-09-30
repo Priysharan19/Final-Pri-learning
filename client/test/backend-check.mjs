@@ -82,11 +82,24 @@ class FakeHandle {
   writable() { if (this.mode !== 'readwrite') throw new Error(`${this.store.name}: read-only transaction`); }
   get(key) { return this.req(() => clone(this.store.rows.get(key))); }
   getAll() { return this.req(() => this.store.ordered().map(k => clone(this.store.rows.get(k)))); }
-  delete(key) { return this.req(() => { this.writable(); this.store.rows.delete(key); }); }
-  clear() { return this.req(() => { this.writable(); this.store.rows.clear(); }); }
+  delete(key) {
+    return this.req(() => {
+      this.writable();
+      this.transaction?.captureKey(this.store, key);
+      this.store.rows.delete(key);
+    });
+  }
+  clear() {
+    return this.req(() => {
+      this.writable();
+      this.transaction?.captureStore(this.store);
+      this.store.rows.clear();
+    });
+  }
   save(value, exclusive) {
     return this.req(() => {
       this.writable();
+      this.transaction?.touchStore(this.store);
       const row = clone(value);
       let key = this.store.keyPath ? row[this.store.keyPath] : undefined;
       if (key === undefined || key === null) {
@@ -96,6 +109,7 @@ class FakeHandle {
       } else if (typeof key === 'number' && key > this.store.seq) {
         this.store.seq = Math.floor(key);
       }
+      this.transaction?.captureKey(this.store, key);
       if (exclusive && this.store.rows.has(key)) throw new Error(`${this.store.name}: key ${key} already exists`);
       this.store.rows.set(key, row);
       return key;
@@ -128,12 +142,45 @@ class FakeTransaction {
     this.pending = 0;
     this.done = false;
     this.aborted = false;
-    this.snapshots = new Map();
+    // Real IndexedDB provides transactional rollback without copying every row
+    // up front. Journal only keys this fake transaction actually mutates so a
+    // multi-store answer commit does not deep-clone the whole question bank.
+    this.journal = new Map();
     for (const name of this.names) {
       const store = db.stores.get(name);
       if (!store) throw new Error(`No object store "${name}"`);
-      if (mode === 'readwrite') this.snapshots.set(name, { rows: new Map([...store.rows].map(([k, v]) => [k, clone(v)])), seq: store.seq });
     }
+  }
+  touchStore(store) {
+    if (this.mode !== 'readwrite') return null;
+    let entry = this.journal.get(store.name);
+    if (!entry) {
+      entry = { seq: store.seq, keys: new Map(), full: null };
+      this.journal.set(store.name, entry);
+    }
+    return entry;
+  }
+  captureKey(store, key) {
+    const entry = this.touchStore(store);
+    if (!entry || entry.full || entry.keys.has(key)) return;
+    entry.keys.set(key, store.rows.has(key)
+      ? { existed: true, value: clone(store.rows.get(key)) }
+      : { existed: false, value: undefined });
+  }
+  captureStore(store) {
+    const entry = this.touchStore(store);
+    if (!entry || entry.full) return;
+    // clear() is the one operation that can touch every key. If earlier writes
+    // happened in this transaction, rebuild the transaction-start view rather
+    // than snapshotting those already-mutated rows. Ordinary put/add/delete
+    // stay key-journaled and never clone an unrelated question bank.
+    const full = new Map([...store.rows].map(([k, v]) => [k, clone(v)]));
+    for (const [key, before] of entry.keys) {
+      if (before.existed) full.set(key, clone(before.value));
+      else full.delete(key);
+    }
+    entry.full = full;
+    entry.keys.clear();
   }
   objectStore(name) {
     if (!this.names.includes(name)) throw new Error(`Store "${name}" is not in this transaction`);
@@ -141,10 +188,17 @@ class FakeTransaction {
   }
   rollback() {
     if (this.mode !== 'readwrite') return;
-    for (const [name, snap] of this.snapshots) {
+    for (const [name, entry] of this.journal) {
       const store = this.db.stores.get(name);
-      store.rows = new Map([...snap.rows].map(([k, v]) => [k, clone(v)]));
-      store.seq = snap.seq;
+      if (entry.full) {
+        store.rows = new Map([...entry.full].map(([k, v]) => [k, clone(v)]));
+      } else {
+        for (const [key, before] of entry.keys) {
+          if (before.existed) store.rows.set(key, clone(before.value));
+          else store.rows.delete(key);
+        }
+      }
+      store.seq = entry.seq;
     }
   }
   fail(err, req = null) {
