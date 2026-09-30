@@ -96,4 +96,14 @@ for (const doc of [
   assert.match(body, /\bmain\b/);
 }
 
+
+const releasePolicy = readFileSync(join(root, 'docs', 'release', 'release-policy.md'), 'utf8');
+assert.match(releasePolicy, /task\/feature branch/i, 'release policy must define the normal task/feature PR lane');
+
+const fleetGovernance = readFileSync(join(root, '.github', 'workflows', 'pri-agent-governance.yml'), 'utf8');
+assert.match(fleetGovernance, /HEAD_REF" == task\/\*/, 'fleet governance must allow reviewed task/* branches');
+assert.match(fleetGovernance, /HEAD_REF" == feature\/\*/, 'fleet governance must allow reviewed feature/* branches');
+assert.match(fleetGovernance, /HEAD_REF" != agent\/mission\/\*/, 'fleet governance must retain autonomous mission isolation');
+assert.match(fleetGovernance, /lane=manual-governed/, 'manual task/feature branches must stay outside autonomous mission execution');
+
 console.log('PRI-01 RELEASE AUTHORITY: PASS');
