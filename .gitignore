@@ -48,3 +48,12 @@ marketing/reel/export/
 # git cannot re-include a file under an excluded directory, so the directory
 # itself has to be let back in.
 !*[ ][2-9].swiftpm/
+
+# Exact build identity is generated into native bundles by sync:ios.
+ios/PriLearning.swiftpm/Resources/Web/release.json
+ios/PriLearning 2.swiftpm/Resources/Web/release.json
+
+# Python interpreter caches are generated artifacts, never release source.
+__pycache__/
+*.pyc
+*.pyo

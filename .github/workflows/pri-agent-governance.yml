@@ -285,7 +285,17 @@ jobs:
               echo "lane=manual-docs" >> "$GITHUB_OUTPUT"
               exit 0
             fi
-            echo "Non-mission branch '$HEAD_REF' touches governed product/release/config/runtime or unowned paths; use agent/mission/<agent>/<mission-id>." >&2
+            # PRI-01 establishes task/* and feature/* as the normal reviewed
+            # human/task integration lanes. They are intentionally NOT
+            # autonomous missions: the fleet lease/owner machinery below must
+            # only apply to agent/mission/**. Branch protection + the ordinary
+            # required CI checks still gate these PRs before main can move.
+            if [[ "$HEAD_REF" == task/* || "$HEAD_REF" == feature/* ]]; then
+              echo "autonomous=false" >> "$GITHUB_OUTPUT"
+              echo "lane=manual-governed" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            echo "Non-mission branch '$HEAD_REF' touches governed product/release/config/runtime or unowned paths; use task/<task>, feature/<feature>, or agent/mission/<agent>/<mission-id>." >&2
             exit 1
           fi
           remainder="${HEAD_REF#agent/mission/}"

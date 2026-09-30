@@ -1,103 +1,41 @@
-# `server/` — what is alive in here, and what is not
+# `server/` — current production boundary
 
-Short version: **the Express app in this folder is unused legacy. The engine
-re-exports and the self-check harness are not.** Do not delete the folder as a
-unit.
+This file describes the current server layout for `Priysharan19/Final-Pri-learning` / `main`. The concise cross-runtime authority is [`docs/architecture/authoritative-architecture.md`](../docs/architecture/authoritative-architecture.md).
 
-## The Express app is dead code
+## Production runtime
 
-`index.js`, `routes/api.js`, `auth.js`, `db.js`, `badges.js` and `seed.js` are
-roughly 11,000 lines implementing an account-based, SQLite-backed API. Nothing in
-the shipped product calls any of it: there is no `fetch()` anywhere in
-`client/src/`. No trace of it remains on the client side either: the dev-only
-`/api → http://localhost:4000` proxy that used to sit in `client/vite.config.js`
-has been removed (`grep -n proxy client/vite.config.js` finds nothing).
+`server/index.js` is the production process entrypoint. `server/app.js` static-hosts the built client and mounts the `/v1` platform control plane from `server/platform/`.
 
-The real backend is **`client/src/local/backend.js`** — 51 routes dispatched
-in-process against IndexedDB, in the browser, on the device. That is what makes
-Pri Learning work with no account, no network and no server. `client/src/local/`
-also holds the schema (`idb.js`), the profile store (`store.js`), local password
-hashing (`auth.js`), badge awarding (`badges.js`) and the on-device demo
-(`demoSeed.js`) — each the live counterpart of a dead file listed above.
+The `/v1` control plane owns server-required capabilities such as authenticated accounts, optional cross-device sync, classrooms/assignments, content administration, entitlements/billing, reports and configured cloud-assisted services. `/v1/health` reports safe platform status plus the exact release identity.
 
-Two details worth stating plainly, because both have been described wrongly:
+This server is **not** the student's primary learning engine. Practice, local progress, marking and offline operation continue in the browser/device through `client/src/local/backend.js` and IndexedDB.
 
-- `npm start` is **not** "a static host and nothing more". `index.js` mounts
-  `authRouter` (4 routes) and `api` (18 routes) — **22 live Express routes** —
-  *before* the `client/dist` static fallback. They answer if you call them. The
-  client simply never does.
-- These routes are not a mirror of the local backend. They are older and
-  smaller: no match mode, classes, tasks, task packs, history detail, custom
-  questions, backup/restore or ink storage. Treating them as a spec for the
-  product would be a mistake.
+## Legacy `/api`
 
-Nothing here is installed by default either — `server/node_modules/` is absent
-until you run `npm run setup`, so `npm start` does not even boot from a fresh
-clone without an install step.
+The older Express `/api` implementation under paths such as `server/routes/`, `server/auth.js`, `server/db.js`, `server/badges.js` and `server/seed.js` is retained only as development/historical reference. It is not mounted in the production runtime and is deliberately absent from the production container image.
 
-## What *is* alive under `server/`
+Production requests to the removed legacy surface receive the explicit removal response from the current app boundary rather than being treated as product routes.
 
-| Path | Status | Used by |
-|---|---|---|
-| `server/engine/**` | **alive** — thin re-export shims | `server/test/selfcheck.mjs`, `tools/count-questions.mjs` |
-| `server/engine/generators/extras.js` | **alive and unique** — 84 authored question forms that exist nowhere else | the shim in `generators/index.js` |
-| `server/test/selfcheck.mjs` | **alive** — the engine gate, 672,000 self-checks at its 2,000-draw default | `npm test` (first command in the chain) |
-| `server/index.js`, `routes/`, `auth.js`, `db.js`, `badges.js`, `seed.js` | dead | nothing |
-| `server/package.json`, `package-lock.json` | needed only by the dead app | `npm run setup` |
+## Engine/test support
 
-### The engine is no longer duplicated
+`server/test/` is active verification infrastructure. Some engine shims/support under `server/engine/` remain useful to deterministic test/census tooling, but they are not production server endpoints and are not copied into the production image.
 
-`server/engine/` used to be a hand-copied duplicate of `client/src/engine/` —
-same files, byte for byte, drifting apart one edit at a time. Every one of those
-files is now a one-line re-export:
+The canonical student-facing maths/learning code remains under `client/src/engine/` and `client/src/local/` except where a current test/tool explicitly documents an auxiliary server-side fixture.
 
-```js
-export * from '../../client/src/engine/adaptive.js';
-```
+## Runtime map
 
-So **`client/src/engine/` is the single source of truth**, and the dependency
-arrow points from `server/` into `client/`, never the other way. Editing a
-generator in the client changes what the self-check measures, immediately, with
-no copy step.
+| Path | Current role |
+| --- | --- |
+| `server/index.js` | production process entry |
+| `server/app.js` | production middleware/static hosting and `/v1` mount |
+| `server/platform/**` | live `/v1` cloud control plane |
+| `server/tools/**` | production/operator support copied into the image where required |
+| `server/test/**` | deterministic server contracts; not runtime code |
+| `server/engine/**` | test/census support; not in the production image |
+| legacy `server/routes/**`, `auth.js`, `db.js`, `badges.js`, `seed.js` | non-authoritative legacy/development reference |
 
-Two files are deliberately not pure shims:
+## Release identity
 
-- **`generators/extras.js`** — 84 extra question forms (one per subtopic) that
-  the client cannot generate. Original content, not a copy of anything.
-- **`generators/index.js`** — re-exports `GENERATORS` from the client registry,
-  then layers `extras.js` on top: a seeded picker chooses between a subtopic's
-  base generator and its extras, and exposes `formCount()`. This is why the
-  authored-form count is 420 (336 base cells + 84 extras) rather than 336.
+The server consumes the shared release authority from `release/metadata.json` and `release/release-identity.mjs`. Production startup/health cannot claim a placeholder SHA: the build/runtime must carry an exact release SHA and deterministic timestamp. No separate server version constant should be introduced.
 
-## If you delete `server/`
-
-The app itself is fine — `client/` builds and runs standalone, and the PWA needs
-no server at all. These break:
-
-1. **`npm test` stops working entirely.** Its first command is
-   `node server/test/selfcheck.mjs`; the chain fails before any ink suite runs.
-   The 672,000-check correctness gate on the question generators is gone with it.
-2. **The 84 extra question forms are gone.** `extras.js` lives only here, so the
-   authored-form count drops from 420 to 336. `tools/count-questions.mjs` keeps
-   running — it censuses the client registry by default and only reaches into
-   `server/engine/` in its optional `server` mode, where `formCount` is read as
-   an optional export. That mode, and the 420 figure only it can report, go with
-   the directory.
-3. **`npm start` and `npm run seed` disappear** (both point at files in here).
-4. **`npm run dev` breaks** — `scripts/dev.js` spawns `server/index.js` as one of
-   its two processes.
-5. **`npm run setup` breaks** — it runs `npm install --prefix server`.
-6. Nothing else. **`npm run test:e2e` is unaffected** — `client/test/e2e.mjs`
-   stands up its own static server on an ephemeral port and never touches
-   `:4000`; the legacy Express app is deliberately not involved.
-
-A safe removal is therefore not `rm -rf server/`. It is: move
-`server/test/selfcheck.mjs` and `server/engine/generators/extras.js` into
-`client/` (folding the extras layer into `client/src/engine/generators/index.js`
-so the client can generate all 420 forms), retire the now-redundant `server`
-mode in `tools/count-questions.mjs`, rewrite the root `scripts` block, and give
-the built client a different static host. Only then does the Express app become
-genuinely free to go.
-
-Keeping it costs nothing at runtime — it is never imported by the app and never
-bundled by Vite.
+For deployment details, use [`docs/production-deployment.md`](../docs/production-deployment.md). For repository/branch authority, use [`docs/architecture/repository-authority.md`](../docs/architecture/repository-authority.md).

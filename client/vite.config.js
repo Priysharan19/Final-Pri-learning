@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react';
 import { createHash } from 'node:crypto';
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { resolveReleaseIdentity } from '../release/release-identity.mjs';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Chunking
@@ -98,7 +99,7 @@ export const CHUNK_GROUPS = [
 
 // Exported so client/test/install-budget-check.mjs can hold the build to these
 // exact rules rather than to a second copy of them that would drift.
-export const PRECACHE_SKIP = /(^|\/)sw\.js$|(^|\/)\.DS_Store$|\.map$|\.woff$|\.ttf$/;
+export const PRECACHE_SKIP = /(^|\/)sw\.js$|(^|\/)release\.json$|(^|\/)\.DS_Store$|\.map$|\.woff$|\.ttf$/;
 
 export const ON_DEMAND = [
   // ~2.7 MB of renderer and worker, for the student who attaches a scanned PDF.
@@ -254,23 +255,33 @@ function precache() {
   };
 }
 
-export default defineConfig({
-  plugins: [react(), precache()],
-  server: {
-    port: 5173
-  },
-  build: {
-    outDir: 'dist',
-    // Vite's default 'modules' target bottoms out at Safari 14, which predates
-    // top-level await — and ink/nn.js awaits the weights at module scope so that
-    // nothing in the entry's static graph reaches them. This is the same set one
-    // notch up, at the first release of each engine that ships it. The native
-    // iPad shell is a WKWebView on iOS 16 and clears it comfortably.
-    target: ['es2022', 'safari15', 'chrome91', 'firefox89', 'edge91'],
-    rollupOptions: {
-      output: {
-        codeSplitting: { includeDependenciesRecursively: false, groups: CHUNK_GROUPS }
+function releaseIdentityManifest(identity) {
+  return {
+    name: 'pri-release-identity',
+    generateBundle() {
+      this.emitFile({
+        type: 'asset',
+        fileName: 'release.json',
+        source: `${JSON.stringify(identity, null, 2)}\n`
+      });
+    }
+  };
+}
+
+export default defineConfig(({ command }) => {
+  const releaseIdentity = resolveReleaseIdentity({ production: command === 'build' });
+  return {
+    plugins: [react(), releaseIdentityManifest(releaseIdentity), precache()],
+    server: { port: 5173 },
+    build: {
+      outDir: 'dist',
+      // The native iPad shell is a WKWebView on iOS 16 and clears this target.
+      target: ['es2022', 'safari15', 'chrome91', 'firefox89', 'edge91'],
+      rollupOptions: {
+        output: {
+          codeSplitting: { includeDependenciesRecursively: false, groups: CHUNK_GROUPS }
+        }
       }
     }
-  }
+  };
 });

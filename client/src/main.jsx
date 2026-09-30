@@ -10,6 +10,9 @@ import { accountActionCleanUrl, parseAccountActionFragment } from './platform/ac
 import { discoverCloudOrigin } from './platform/cloudTransport.js';
 import { scheduleOfflineWarm } from './local/offlineWarm.js';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
+import { installReleaseIdentityDiagnostics } from './platform/releaseIdentity.js';
+
+installReleaseIdentityDiagnostics(window);
 
 // Account verification/password-reset links carry their secret only in the URL
 // fragment. Strip it before React, analytics-like browser extensions or later

@@ -114,5 +114,5 @@ jobs:
 
       - name: Client production build still compiles
         run: |
-          npm install --prefix client
+          npm ci --prefix client
           npm run build

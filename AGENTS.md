@@ -10,6 +10,9 @@ Every cycle uses:
 
 The canonical definitions are:
 
+- `docs/architecture/repository-authority.md` — production repository/branch authority and predecessor classification.
+- `docs/architecture/authoritative-architecture.md` — current local-first/web/server/native runtime authority.
+- `docs/release/release-policy.md` — reviewed integration, required CI and release identity policy.
 - `.pri-os/fleet.json` — agents, specificity-resolved primary ownership, reviewer overlays, typed gates and risk classes.
 - `.pri-os/mission-control.json` — persistent GitHub-Issue mission ledger, state machine, writer lease, retry ceiling and deterministic priority policy.
 - `scripts/pri-fleet.mjs` — routing, ownership guard, risk classification and fleet validation.

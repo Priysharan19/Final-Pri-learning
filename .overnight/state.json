@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "task": "PRI-01",
+  "status": "final_ci_in_progress",
+  "taskStartMainSha": "33e7b6c9bb06b65f00a9f38f88a678a333eec80f",
+  "workingBranch": "task/pri-01-repository-authority",
+  "pullRequest": 223,
+  "recovery": {
+    "launcherClonePreserved": true,
+    "recoveredClone": "~/Projects/Pri-Learning-PRI01",
+    "recoveredCommits": [
+      "3f35009fecd3607969e63e94854b796eef81dcf8",
+      "f3e6a1175374f87ccfac0a65bb23cf618e960fd2",
+      "bd9e77a0c6b2fd351282a1906ca194a9920c9d45",
+      "659db5012a686df65679e24e6275e06685076ae2"
+    ],
+    "recoveredUncommittedBranch": "recovery/pri-01-crash-uncommitted",
+    "recoveredUncommittedCommits": [
+      "33dceed",
+      "930dfd0"
+    ],
+    "releaseTransportRecoveryImported": true,
+    "unrelatedLiveLanRecoveryPreservedOnly": false,
+    "liveLanRecoveryImportedAfterStrictIdentityFailure": true
+  },
+  "mainProtectionConfigured": true,
+  "requiredChecks": [
+    "Suites, coverage and accuracy gates",
+    "Production account, sync and commercial schema",
+    "Browser suites (end-to-end and accessibility)",
+    "Client build and offline-first boundary"
+  ],
+  "evidenceRule": "Tracked evidence records the verified pre-evidence code candidate; exact final PR-head SHA and final CI are recorded durably on PR #223 after this evidence commit because a Git commit cannot self-contain its own SHA.",
+  "verificationCandidateBeforeEvidenceCommit": "6cb410a012d578281a4a30c2ea026ca4ea7a4ca3",
+  "staleGovernanceIssueClosed": 75,
+  "preExistingNativeInkFailure": {
+    "taskStartMainSha": "33e7b6c9bb06b65f00a9f38f88a678a333eec80f",
+    "candidateExact": "6/10",
+    "candidateCharacterAccuracy": "93.8%",
+    "baselineExact": "6/10",
+    "baselineCharacterAccuracy": "93.8%",
+    "classification": "pre-existing out-of-scope handwriting-quality defect; threshold unchanged"
+  },
+  "localA11y": "38/38 across 12 groups"
+}

@@ -130,6 +130,8 @@ jobs:
           cache-dependency-path: server/package-lock.json
       - name: Install server dependencies
         run: npm ci --prefix server
+      - name: Server release identity
+        run: node server/test/release-identity-check.mjs
       - name: Runtime dependency security floor
         run: node tools/runtime-audit-floor.mjs server
       - name: Platform security floor
@@ -262,10 +264,18 @@ jobs:
           cache-dependency-path: client/package-lock.json
       - name: Install client dependencies
         run: npm ci --prefix client
+      - name: Release authority contract
+        run: node tools/pri01-release-authority-check.mjs
       - name: Build
         run: npm run build
+      - name: Exact release identity
+        run: node tools/verify-release-identity.mjs
       - name: iOS bundle matches the client build
         run: npm run check:ios
+      - name: Materialize exact native release identity
+        run: npm run sync:ios
+      - name: Verify exact native release identity
+        run: npm run verify:release:native
       - name: Built client loads no remote presentation assets
         run: |
           set -euo pipefail

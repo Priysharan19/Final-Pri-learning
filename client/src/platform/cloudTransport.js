@@ -37,6 +37,31 @@ function envOrigin() {
   return String(injected || vite || metaOrigin() || '').trim();
 }
 
+export async function readReleaseIdentityManifest({ timeoutMs = 1500 } = {}) {
+  const loc = globalThis.location;
+  if (!loc || !/^https?:$/.test(String(loc.protocol || '')) || typeof fetch !== 'function') return null;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(new DOMException('Timed out', 'TimeoutError')), Math.max(200, Math.min(10_000, Number(timeoutMs) || 1500)));
+  try {
+    const response = await fetch(`${loc.origin}/release.json`, {
+      method: 'GET',
+      headers: { Accept: 'application/json', 'X-Pri-Client': 'web-v1' },
+      credentials: 'same-origin',
+      cache: 'no-store',
+      redirect: 'error',
+      signal: controller.signal
+    });
+    if (!response.ok || !/json/i.test(response.headers.get('content-type') || '')) return null;
+    const text = await response.text();
+    if (byteLength(text) > 64 * 1024) return null;
+    return parseJson(text);
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /**
  * Probe the serving origin once for the platform health signature and, when it
  * answers, make that origin the cloud authority. Resolves to the origin or

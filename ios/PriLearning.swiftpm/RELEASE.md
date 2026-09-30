@@ -38,8 +38,10 @@ Start from a clean checkout of the exact candidate SHA. From the repository root
 ```bash
 npm ci --prefix client
 npm run build
+npm run verify:release
 npm run sync:ios
 npm run check:ios
+npm run verify:release:native
 node scripts/check-native-package-sync.mjs
 npm run test:ink:bridge
 ```
