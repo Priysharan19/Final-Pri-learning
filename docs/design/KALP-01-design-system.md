@@ -2,7 +2,7 @@
 
 Status: implemented on `task/kalp-01-design-system`.
 
-`client/src/theme.css` is the canonical visual layer for KALP-01. It preserves existing product behaviour and selectors while replacing reference-derived styling with Pri's own system.
+`client/src/theme.css` is the canonical visual layer for KALP-01; `client/src/theme-state.css` is its small semantic-state companion loaded immediately after it so decorative gold never aliases the warning token. Together they preserve existing product behaviour and selectors while replacing reference-derived styling with Pri's own system.
 
 ## Principles
 
