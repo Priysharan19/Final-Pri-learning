@@ -83,6 +83,10 @@ const router = readFileSync(join(root, 'server/platform/router.js'), 'utf8');
 assert.match(router, /releaseIdentity/);
 const vite = readFileSync(join(root, 'client/vite.config.js'), 'utf8');
 assert.match(vite, /releaseIdentity/);
+assert.match(vite, /__PRI_BUILD_RELEASE_IDENTITY__/);
+const clientIdentity = readFileSync(join(root, 'client/src/platform/releaseIdentity.js'), 'utf8');
+assert.match(clientIdentity, /__PRI_BUILD_RELEASE_IDENTITY__/);
+assert.doesNotMatch(clientIdentity, /\bfetch\s*\(/, 'release diagnostics must not bypass the audited transport boundary');
 const native = readFileSync(join(root, 'ios/PriLearning.swiftpm/WebShell.swift'), 'utf8');
 assert.match(native, /PRI_NATIVE_RELEASE_IDENTITY/);
 

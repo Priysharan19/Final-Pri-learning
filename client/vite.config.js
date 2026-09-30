@@ -272,6 +272,9 @@ export default defineConfig(({ command }) => {
   const releaseIdentity = resolveReleaseIdentity({ production: command === 'build' });
   return {
     plugins: [react(), releaseIdentityManifest(releaseIdentity), precache()],
+    define: {
+      __PRI_BUILD_RELEASE_IDENTITY__: JSON.stringify(releaseIdentity)
+    },
     server: { port: 5173 },
     build: {
       outDir: 'dist',

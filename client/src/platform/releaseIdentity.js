@@ -9,6 +9,9 @@ const developmentIdentity = Object.freeze({
 });
 
 const STORAGE_KEY = 'pri.releaseIdentity.v1';
+const embeddedBuildIdentity = typeof __PRI_BUILD_RELEASE_IDENTITY__ === 'undefined'
+  ? developmentIdentity
+  : Object.freeze(__PRI_BUILD_RELEASE_IDENTITY__);
 
 function looksLikeReleaseIdentity(value) {
   return Boolean(
@@ -36,6 +39,7 @@ function persistIdentity(target, identity) {
 export function currentReleaseIdentity(target = globalThis) {
   if (looksLikeReleaseIdentity(target.__PRI_RELEASE_IDENTITY__)) return target.__PRI_RELEASE_IDENTITY__;
   if (looksLikeReleaseIdentity(target.__PRI_NATIVE_RELEASE_IDENTITY__)) return target.__PRI_NATIVE_RELEASE_IDENTITY__;
+  if (looksLikeReleaseIdentity(embeddedBuildIdentity)) return embeddedBuildIdentity;
   return storedIdentity(target) || developmentIdentity;
 }
 
@@ -47,15 +51,10 @@ export async function installReleaseIdentityDiagnostics(target = globalThis) {
     return target.__PRI_RELEASE_IDENTITY__;
   }
 
-  try {
-    const response = await fetch('/release.json', { cache: 'no-store', credentials: 'same-origin' });
-    if (!response.ok) throw new Error(`release manifest HTTP ${response.status}`);
-    const identity = await response.json();
-    if (!looksLikeReleaseIdentity(identity)) throw new Error('release manifest is invalid');
-    target.__PRI_RELEASE_IDENTITY__ = Object.freeze(identity);
-    persistIdentity(target, target.__PRI_RELEASE_IDENTITY__);
-  } catch {
-    target.__PRI_RELEASE_IDENTITY__ = Object.freeze(storedIdentity(target) || developmentIdentity);
-  }
+  const identity = looksLikeReleaseIdentity(embeddedBuildIdentity)
+    ? embeddedBuildIdentity
+    : (storedIdentity(target) || developmentIdentity);
+  target.__PRI_RELEASE_IDENTITY__ = Object.freeze({ ...identity });
+  persistIdentity(target, target.__PRI_RELEASE_IDENTITY__);
   return target.__PRI_RELEASE_IDENTITY__;
 }
