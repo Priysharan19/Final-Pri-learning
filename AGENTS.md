@@ -15,6 +15,20 @@ The canonical definitions are:
 - `scripts/pri-fleet.mjs` — routing, ownership guard, risk classification and fleet validation.
 - `scripts/pri-mission-control.mjs` — mission ranking, mission-record validation, transitions, failure fingerprints and lease status.
 
+## Research contract
+
+The current research direction is `docs/research/PRI_DREAM_APP_RESEARCH_2026-09-30.md`; machine-readable priorities are in `.pri-os/research-priorities.json`.
+
+Before a mission changes learning logic, AI tutoring, learner modelling, handwriting/marking architecture, telemetry used for research, or teacher intervention logic, the Director and writer must state:
+
+- the intended learning mechanism;
+- the verified evidence the feature may consume;
+- what the feature is forbidden from deciding;
+- the prospective metric, including a delayed/transfer measure when the claim concerns learning;
+- the evidence that would cause the feature to be rejected.
+
+Assisted correctness, chat engagement and questions completed are not sufficient evidence of learning. Prefer a constrained mistake-repair loop over a generic answer-giving chatbot. LLMs may generate pedagogy around verified facts but must not silently become mathematical marking authority. Research architecture changes must not destabilise the 4 October 2026 functional-demo lane.
+
 ## Roles
 
 ### Director / CTO
