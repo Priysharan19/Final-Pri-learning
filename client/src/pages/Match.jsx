@@ -109,7 +109,7 @@ export default function Match() {
           <h1>Match Mode</h1>
           <p>Race a rival — first to 10 questions wins</p>
         </div>
-        <div className="grid" style={{ gridTemplateColumns: 'minmax(300px, 360px) 1fr', alignItems: 'start' }}>
+        <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(320px, 100%), 1fr))', alignItems: 'start' }}>
           <div className="grid" style={{ gap: 14 }}>
             <div className="card card-flush">
               <div className="card-head"><span className="sc-label" style={{ margin: 0 }}>◇ Your rating</span></div>
