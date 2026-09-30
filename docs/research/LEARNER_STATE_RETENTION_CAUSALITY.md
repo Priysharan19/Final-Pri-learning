@@ -231,7 +231,7 @@ Do not infer the second from the first.
 EDM 2026 research on >5,000 middle-school math tutoring sessions reports average tutoring benefit with substantial heterogeneity in estimated session effects.
 
 Source:
-https://educationaldatamining.org/edm2026/proceedings/2026.EDM.full-papers.85/
+https://arxiv.org/abs/2602.19296
 
 A separate adaptive-math study found difficulty adaptation alone did not necessarily improve outcomes.
 
