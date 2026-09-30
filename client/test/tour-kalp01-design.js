@@ -227,8 +227,9 @@ export const flow = {
       await page.waitForTimeout(450);
       box = await fit(page);
       await check(`${name} has no horizontal overflow at phone width`, box.over <= 1, JSON.stringify(box));
+      if (name === 'practice') await snap(page, '08-practice-phone-light');
     }
-    await snap(page, '08-practice-phone-light');
+    await snap(page, '09-settings-phone-light');
 
     await check('no browser console errors were introduced', consoleErrors.length === 0, consoleErrors.slice(0, 4).join(' · '));
   }
