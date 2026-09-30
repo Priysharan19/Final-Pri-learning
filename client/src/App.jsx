@@ -37,7 +37,7 @@ const Settings = React.lazy(() => import('./pages/Settings.jsx'));
 const AppCtx = createContext(null);
 export const useApp = () => useContext(AppCtx);
 
-/* Thin-line icons, drawn to match the reference's icon rail */
+/* Pri Learning navigation marks: restrained, legible line icons for the shared app shell. */
 const I = {
   home: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M3 10.5 12 3l9 7.5" /><path d="M5.5 9.5V21h13V9.5" /><path d="M9.5 21v-6h5v6" /></svg>,
   tasks: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M12 5.5C10 4 7.5 3.5 4 3.8V19c3.5-.3 6 .3 8 1.7 2-1.4 4.5-2 8-1.7V3.8c-3.5-.3-6 .2-8 1.7Z" /><path d="M12 5.5v15.2" /></svg>,
