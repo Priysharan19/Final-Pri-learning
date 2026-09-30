@@ -407,7 +407,7 @@ async function submitExam(profile, id, body = {}) {
     if (q.multipart) {
       const partsOut = [];
       let qMarks = 0, qAwarded = 0, allCorrect = true, anyAnswered = false;
-      for (const part of q.parts || []) {
+      for (const [partIndex, part] of (q.parts || []).entries()) {
         const mainGiven = answers[`${qid}::${part.key}`];
         const useAlt = blank(mainGiven) && part.alt && !blank(answers[`${qid}::${part.key}::or`]);
         const chosen = useAlt ? part.alt : part;
@@ -420,7 +420,10 @@ async function submitExam(profile, id, body = {}) {
         if (!r.correct) allCorrect = false;
         if (!r.unanswered) {
           anyAnswered = true;
-          await recordIndiaExamEvidence(row, synth, { correct: r.correct, given, ms: Math.round(ms / (q.parts.length || 1)), feedback: r.feedback });
+          await recordIndiaExamEvidence(row, synth, {
+            correct: r.correct, given, ms: Math.round(ms / (q.parts.length || 1)), feedback: r.feedback,
+            evidenceKey: `part:${part.key ?? partIndex}`
+          });
         }
         schemes[r.markingScheme] = (schemes[r.markingScheme] || 0) + 1;
         partsOut.push({
@@ -443,7 +446,7 @@ async function submitExam(profile, id, body = {}) {
       const working = useAlt ? workings[`${qid}::or`] : workings[qid];
       const r = markResponse(chosen, given, working, marking);
       if (!r.unanswered) {
-        await recordIndiaExamEvidence(row, chosen, { correct: r.correct, given, ms, feedback: r.feedback });
+        await recordIndiaExamEvidence(row, chosen, { correct: r.correct, given, ms, feedback: r.feedback, evidenceKey: 'question' });
       } else if (!row.answered) {
         row.answered = 1;
         await put('questions', row);

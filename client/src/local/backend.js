@@ -1470,7 +1470,7 @@ function displayAnswer(q) {
   }
 }
 
-async function resolve(profile, row, q, correct, answerGiven, ms, mode, viaInk = false) {
+async function resolve(profile, row, q, correct, answerGiven, ms, mode, viaInk = false, resolution = {}) {
   const pid = profile.id;
   const now = Date.now();
   // Evidence lands on the chapter for an Indian question, on the subtopic for
@@ -1548,12 +1548,17 @@ async function resolve(profile, row, q, correct, answerGiven, ms, mode, viaInk =
   // The attempt id is also the exactly-once claim. It is a keyed digest of the
   // opaque question id, so it is stable across tabs/restarts without linking an
   // attempts-row dump back to the clear question primary key.
-  const claim = await blindHash(`practice-resolution:${row.id}`);
+  const evidenceKey = resolution?.evidenceKey ? String(resolution.evidenceKey) : null;
+  const claimSource = evidenceKey
+    ? `india-exam-resolution:${row.examId || 'unknown'}:${row.id}:${evidenceKey}`
+    : `practice-resolution:${row.id}`;
+  const claim = await blindHash(claimSource);
   const attempt = {
     id: `${pid}:resolved:${claim}`,
     pid, questionId: row.id, subtopic: owner, generator: q.subtopic, difficulty: q.difficulty || 2,
     correct: correct ? 1 : 0, answerGiven: String(answerGiven ?? '').slice(0, 300),
     ms: ms || 0, hintsUsed: row.hintsUsed || 0, mode, viaInk,
+    evidenceKey,
     ratingBefore: st.rating, ratingAfter, createdAt: now
   };
 
@@ -1581,10 +1586,11 @@ async function resolve(profile, row, q, correct, answerGiven, ms, mode, viaInk =
       ...(taskProgressNext ? [{ type: 'put', store: 'taskProgress', value: taskProgressNext }] : [])
     ]);
   } catch (err) {
-    // On a repeated delivery the winning transaction has already made the
-    // question authoritative. The losing transaction wrote nothing.
-    const latest = await get('questions', row.id).catch(() => null);
-    if (latest?.answered) {
+    // The attempt key is the authoritative exactly-once claim. A collision on
+    // that key means another delivery already committed this same resolution;
+    // any other transaction failure must remain visible to the caller.
+    const existingAttempt = await get('attempts', attempt.id).catch(() => null);
+    if (existingAttempt) {
       throw Object.assign(new Error('Already answered'), {
         status: 409, code: 'ALREADY_RESOLVED', idempotent: true
       });
@@ -3510,10 +3516,20 @@ async function examFor(pid, examId) {
 // progress and the adaptive engine read exam outcomes without a second system.
 export function examStepMeta(q) { return stepMetaFor(q); }
 
-export async function recordIndiaExamEvidence(row, q, { correct, given, ms, feedback } = {}) {
+export async function recordIndiaExamEvidence(row, q, { correct, given, ms, feedback, evidenceKey } = {}) {
   const p = await requireProfile();
   if (!correct) await recordTrap(p.id, row, q, feedback);
-  return resolve(p, row, q, !!correct, given ?? '', Math.max(0, Number(ms) || 0), 'exam');
+  try {
+    return await resolve(
+      p, row, q, !!correct, given ?? '', Math.max(0, Number(ms) || 0), 'exam', false,
+      { evidenceKey: evidenceKey || 'question' }
+    );
+  } catch (err) {
+    // Exam submission is replayable after an ambiguous interruption. The same
+    // stable exam-part claim is a no-op; different parts use different claims.
+    if (err?.code === 'ALREADY_RESOLVED' && err?.idempotent) return { idempotent: true };
+    throw err;
+  }
 }
 
 export async function finishIndiaExamEvidence(pct) {

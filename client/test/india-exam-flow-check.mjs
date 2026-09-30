@@ -125,6 +125,59 @@ for (const track of TRACKS) {
   ok(Array.isArray(breakdown) && breakdown.length > 0, `${track.label}: the result breaks the score down by section or chapter`);
 }
 
+// ── PRI-02: multipart evidence is part-scoped and replay-safe ────────────────
+// A crash can happen after learning evidence commits but before the exam row is
+// finalized. Replaying that same submission must fill any missing parts without
+// double-crediting the parts that already committed. This uses the real exam
+// submit path and then recreates only that ambiguous-finalization condition.
+{
+  const base = papers['Class 10 CBSE'];
+  if (base?.user) {
+    const idb = await import('../src/local/idb.js');
+    await dispatch('POST', '/profiles/select', { id: base.user.id });
+    const made = await examCall(base.user, 'POST', '/exams', { seed: 90210 });
+    const paper = (await examCall(base.user, 'GET', `/exams/${made.exam.id}`, {})).exam;
+    const multipart = (paper.questions || []).find(q => q.parts?.length > 1);
+    ok(!!multipart, 'PRI-02 multipart regression: composed paper contains a multipart question');
+
+    if (multipart) {
+      const answers = {};
+      for (const part of multipart.parts) answers[`${multipart.id}::${part.key}`] = '0';
+
+      const snap = async () => {
+        const profile = await idb.get('profiles', base.user.id);
+        const attempts = (await idb.byIndex('attempts', 'pid', base.user.id)).sort((a, b) => String(a.id).localeCompare(String(b.id)));
+        const ratings = (await idb.byIndex('ratings', 'pid', base.user.id)).sort((a, b) => String(a.key).localeCompare(String(b.key)));
+        const activity = (await idb.byIndex('activity', 'pid', base.user.id)).sort((a, b) => String(a.key).localeCompare(String(b.key)));
+        return { xp: profile?.xp || 0, attempts, ratings, activity };
+      };
+
+      const before = await snap();
+      await examCall(base.user, 'POST', `/exams/${paper.id}/submit`, { answers, ms: 12_000 });
+      const first = await snap();
+      const newAttempts = first.attempts.filter(a => !before.attempts.some(b => b.id === a.id));
+      eq(newAttempts.length, multipart.parts.length, 'PRI-02 multipart regression: every answered part records one authoritative attempt');
+      eq(new Set(newAttempts.map(a => a.evidenceKey)).size, multipart.parts.length, 'PRI-02 multipart regression: every part has a distinct stable evidence identity');
+      ok(newAttempts.every(a => String(a.evidenceKey || '').startsWith('part:')), 'PRI-02 multipart regression: multipart attempts are explicitly part-scoped');
+
+      // Simulate the narrow ambiguous-failure window: evidence committed, but
+      // the final exam completion marker did not. The product path must replay
+      // safely and converge without adding learning state a second time.
+      const storedExam = await idb.get('exams', paper.id);
+      await idb.put('exams', { ...storedExam, finishedAt: null });
+      await examCall(base.user, 'POST', `/exams/${paper.id}/submit`, { answers, ms: 12_000 });
+      const replayed = await snap();
+      eq(JSON.stringify(replayed), JSON.stringify(first), 'PRI-02 multipart regression: ambiguous replay cannot duplicate attempts, ratings, activity or XP');
+
+      let completedCode = null;
+      try { await examCall(base.user, 'POST', `/exams/${paper.id}/submit`, { answers, ms: 12_000 }); }
+      catch (error) { completedCode = error?.code || null; }
+      eq(completedCode, 'INDIA_EXAM_ALREADY_SUBMITTED', 'PRI-02 multipart regression: completed exam resubmission is rejected');
+      eq(JSON.stringify(await snap()), JSON.stringify(first), 'PRI-02 multipart regression: rejected completed resubmission leaves learning state unchanged');
+    }
+  }
+}
+
 // ── Class 10 follows the published 80-mark board pattern ─────────────────────
 const class10 = papers['Class 10 CBSE']?.paper;
 if (class10) {
