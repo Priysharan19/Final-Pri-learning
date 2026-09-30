@@ -150,3 +150,144 @@ The executable repair is durably pushed on
 a final clean-clone verification are the remaining completion evidence; no
 software or external blocker is currently known.
 - CI exact coverage invariant updated from the pre-regression `122/122` India exam total to the stronger `129/129` total so the newly added replay/idempotency checks are mandatory rather than skipped.
+
+## Final CI timing repair and exact executable verification — 2026-09-30
+
+### Executable candidate
+
+- Candidate SHA: `d2926624acead83554aa0f69a08160795e835f25`
+- Branch: `task/pri-02-golden-student-journey`
+- PR: #229
+- Change after recovered head `5cb617aedebfea1549e2e2dad41ea895ed1265a8`:
+  `client/test/backend-check.mjs` only.
+- Product/runtime source, test list, assertion thresholds, sample counts, exact
+  coverage invariants, India exam coverage and PYQ coverage were not weakened.
+
+### Why the previous required check was cancelled
+
+GitHub run `36706377636`, suites job `109857778297`, used the configured
+30-minute job budget. The job started at 2026-09-30T11:06:23Z and cancellation
+arrived while `test:holdout` was running at 2026-09-30T11:36:36Z. Before the
+cancellation, the deterministic command had already reported, among other gates:
+
+- `INDIA EXAM FLOW: PASS — 129/129 checks`
+- `INDIA PYQ: PASS — 1079/1079 checks`
+- `BACKEND SUITE PASSED — 343/343 checks`
+- `HARD SUITE PASSED`
+- `LINE SUITE PASSED`
+
+There was no deterministic assertion failure before timeout. The isolated
+"FAIL scene" line inside the handwriting hard-suite output remains an expected
+sample miss inside that suite's quantitative gate; the hard-suite gate itself
+passed.
+
+An untouched local run of the recovered head `5cb617a` also proved the suite
+was logically green:
+
+- start: 2026-09-30T11:53:15Z
+- finish: 2026-09-30T12:10:43Z
+- wall clock: 1048 seconds (17m 28s)
+- exit code: 0
+
+### Performance regression diagnosis
+
+Task-start `main` at
+`81d075acfe7f4a7574b39a77c478eee6641d1bb4` had already proved this was not
+normally a 30-minute workload. In successful CI run `36679887793`, India
+identity completed at 06:46:03Z, the then-current India exam gate
+(`122/122`) completed at 06:46:07Z, and India PYQ completed at 06:46:08Z.
+
+On recovered PRI-02 head `5cb617a`, India identity completed at 11:07:28Z but
+India exam flow did not finish until 11:31:07Z. The regression was caused by
+the Node-only IndexedDB test shim, not by browser IndexedDB or product
+semantics: every read-write `FakeTransaction` eagerly deep-cloned every row
+of every participating object store as a rollback snapshot. PRI-02's required
+multi-store `atomicBatch` correctly increased transaction frequency, exposing
+that artificial whole-store copying against large stored question payloads.
+
+### Repair
+
+Commit `d2926624acead83554aa0f69a08160795e835f25` replaces eager whole-store
+rollback snapshots in the fake IndexedDB transaction with a mutation journal:
+
+- `put`, `add` and `delete` record only the keys actually mutated;
+- original auto-increment sequence state is retained for rollback;
+- `clear` retains a full pre-transaction store image because it genuinely
+  touches every key;
+- a `clear` after earlier mutations reconstructs transaction-start state before
+  storing that full image.
+
+This preserves transaction rollback semantics while matching the operational
+shape of real IndexedDB more closely. No timeout increase was required.
+
+Focused verification on the repaired head:
+
+- `npm run test:india:exams` — PASS, 129/129; measured 2 seconds locally.
+- `npm run test:practice:state` — PASS, including atomic rollback,
+  exactly-once submit/reveal, retry, adaptive persistence and profile isolation.
+- `npm run test:idb:lifecycle` — PASS.
+- `npm run test:backend` — PASS, 343/343 across 19 groups.
+
+### Full deterministic suite after repair
+
+A brand-new clone at exact SHA `d2926624acead83554aa0f69a08160795e835f25`
+ran the unchanged `npm test` command:
+
+- start: 2026-09-30T12:06:21Z
+- finish: 2026-09-30T12:14:26Z
+- wall clock: 485 seconds (8m 05s)
+- exit code: 0
+
+That is the same deterministic suite that took 1048 seconds on the recovered
+head, with no test removed or weakened.
+
+### Exact-head protected CI
+
+GitHub CI run `36712083817` validated exact executable SHA
+`d2926624acead83554aa0f69a08160795e835f25`.
+
+Required contexts:
+
+- Suites, coverage and accuracy gates — PASS
+- Production account, sync and commercial schema — PASS
+- Browser suites (end-to-end and accessibility) — PASS
+- Client build and offline-first boundary — PASS
+
+The suites job `109876040064` ran from 12:00:58Z to 12:17:33Z. Its unchanged
+deterministic-suite step ran from 12:01:13Z to 12:17:07Z (15m 54s), then both
+Exact coverage invariants and Person 2 India + commercial contracts passed.
+The same exact-head log records:
+
+- `21000/21000 multipart part-checks`
+- `1704000/1704000 self-checks`
+- `BACKEND SUITE PASSED — 343/343`
+- `INDIA SUITE PASSED — 1832/1832`
+- `INDIA EXAM FLOW: PASS — 129/129`
+- `INDIA PYQ: PASS — 1079/1079`
+
+### Final clean-clone focused gates
+
+The clean clone at exact executable SHA also proved:
+
+- `npm run test:golden-journey` — PASS:
+  fresh profile -> five real marked questions -> History/Progress/mastery ->
+  restart -> unfinished recovery -> offline marking/next -> offline restart ->
+  continue.
+- `npm run test:practice:state` — PASS.
+- `npm run test:idb:lifecycle` — PASS.
+- `npm run test:india:pyq` — PASS, 1079/1079.
+- `npm run test:india:exams` — PASS, 129/129.
+- `npm run build` — PASS.
+- `npm run check:ios` — PASS, both native bundles matched `client/dist`.
+- A raw `verify:release:native` before materialisation correctly failed because
+  a brand-new checkout does not contain generated native `release.json`.
+  Reproducing the protected CI order with `npm run sync:ios` materialised the
+  exact identity, after which `npm run verify:release:native` passed:
+  `4.0 CATALOG-2026-09 d2926624acead83554aa0f69a08160795e835f25`.
+- `npm run test:release-authority` — PASS; server release identity matched
+  `d2926624acead83554aa0f69a08160795e835f25`.
+
+The executable candidate is therefore verified without relaxing the 30-minute
+CI budget or any product/test acceptance gate. This evidence update is
+documentation-only; the PR's final evidence commit is expected to receive the
+same protected exact-head checks before merge.
