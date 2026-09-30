@@ -111,6 +111,8 @@ Core live entries:
   https://github.com/Priysharan19/Final-Pri-learning/issues/176#issuecomment-5913839141
 - Final Agent Index:
   https://github.com/Priysharan19/Final-Pri-learning/issues/176#issuecomment-5913888462
+- Research source-integrity correction / supersession notice:
+  https://github.com/Priysharan19/Final-Pri-learning/issues/176#issuecomment-5914300298
 
 ## Core decisions
 
