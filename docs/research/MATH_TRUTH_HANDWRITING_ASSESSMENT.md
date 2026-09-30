@@ -216,10 +216,11 @@ CALIBRATED
 ASSESSMENT_AUTHORIZED
 RETIRED
 
-A 2026 multi-class study across math/chemistry/CS suggests iterative generation/critique can yield items with promising psychometric properties, but local admission evidence remains necessary.
+Cross-domain 2026 evidence suggests LLM-generated assessment items can sometimes show psychometric characteristics comparable to human-authored items, but the evidence is heterogeneous and does not establish equivalence for school mathematics. A systematic review/meta-analysis in medical education found no pooled difference in difficulty or discrimination but high heterogeneity, while a single-center randomized medical-education trial found comparable perceived quality and large authoring-time savings. These sources support controlled candidate generation and expert/psychometric admission—not autonomous assessment authority.
 
-Source:
-https://ojs.aaai.org/index.php/AAAI/article/view/38841
+Sources:
+https://doi.org/10.1080/0142159X.2026.2691072
+https://doi.org/10.1186/s12909-026-09671-0
 
 ## 13. Difficulty and psychometrics
 
@@ -235,6 +236,11 @@ Where data permits evaluate:
 - differential item functioning;
 - drift;
 - response time as secondary evidence.
+
+Large-scale mathematics AIG research also shows that predefined cognitive item features can drive difficulty while subgroup/context effects can remain, reinforcing the need for fairness and construct validation.
+
+Source:
+https://doi.org/10.1080/08957347.2025.2563889
 
 Do not claim precise item parameters from tiny samples.
 
