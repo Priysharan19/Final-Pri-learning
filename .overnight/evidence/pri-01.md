@@ -6,7 +6,9 @@ Task-start production `main`: `33e7b6c9bb06b65f00a9f38f88a678a333eec80f`.
 
 The launcher clone at `~/Library/Application Support/PriLearningLauncher/Final-Pri-learning` was inspected read-only and left untouched: local `main` was `a0627e601f30f9e2ba18518fba26344de7094b09`, 69 commits behind fetched `origin/main`, with untracked `.pri-local/`.
 
-A recoverable fresh clone existed at `~/Projects/Pri-Learning-PRI01`. It was based exactly on the task-start `main` and contained four clean PRI-01 commits with no uncommitted/staged changes. Those commits were pushed immediately to `task/pri-01-repository-authority` before continuation.
+A recoverable fresh clone existed at `~/Projects/Pri-Learning-PRI01`. It was based exactly on the task-start `main` and contained four clean PRI-01 commits that had already been preserved on `task/pri-01-repository-authority`.
+
+A second forensic pass found two additional uncommitted recovery changes in that durable clone. They were preserved before reconciliation on `recovery/pri-01-crash-uncommitted`: commit `33dceed` routes the web release manifest through the existing audited network transport; commit `930dfd0` changes an unrelated live-LAN workflow install from `npm install` to `npm ci`. PRI-01 deliberately imported the release-identity transport fix and left the unrelated live-LAN change only on the recovery branch.
 
 ## Authority and reconciliation
 

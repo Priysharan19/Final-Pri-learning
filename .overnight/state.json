@@ -13,7 +13,14 @@
       "f3e6a1175374f87ccfac0a65bb23cf618e960fd2",
       "bd9e77a0c6b2fd351282a1906ca194a9920c9d45",
       "659db5012a686df65679e24e6275e06685076ae2"
-    ]
+    ],
+    "recoveredUncommittedBranch": "recovery/pri-01-crash-uncommitted",
+    "recoveredUncommittedCommits": [
+      "33dceed",
+      "930dfd0"
+    ],
+    "releaseTransportRecoveryImported": true,
+    "unrelatedLiveLanRecoveryPreservedOnly": true
   },
   "mainProtectionConfigured": true,
   "requiredChecks": [
