@@ -1,0 +1,8 @@
+:root {
+  --warn: #ef9461;
+  --warn-soft: rgba(239, 148, 97, 0.13);
+}
+[data-theme="light"] {
+  --warn: #9c531e;
+  --warn-soft: rgba(156, 83, 30, 0.10);
+}
