@@ -1,0 +1,68 @@
+name: Mac Self-Hosted Validation
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - ops/mac-self-hosted-runner-20260930
+    paths:
+      - ".github/workflows/mac-self-hosted-validation.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mac-self-hosted-validation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify-mac-runner:
+    name: Verify Pri Mac runner
+    runs-on: [self-hosted, macOS, ARM64, final-pri-learning]
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Verify isolated runner workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Runner: ${RUNNER_NAME}"
+          echo "OS: ${RUNNER_OS}"
+          echo "Arch: ${RUNNER_ARCH}"
+          echo "Workspace: ${GITHUB_WORKSPACE}"
+
+          test "${RUNNER_OS}" = "macOS"
+          test "${RUNNER_ARCH}" = "ARM64"
+
+          case "${GITHUB_WORKSPACE}" in
+            *"PriLearningLauncher"*)
+              echo "ERROR: workflow is using the protected launcher clone"
+              exit 1
+              ;;
+          esac
+
+          uname -m
+          sw_vers
+
+      - name: Inventory Mac build toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          git --version
+          python3 --version
+          node --version || true
+          npm --version || true
+          pnpm --version || true
+          xcodebuild -version || true
+          xcrun --version || true
+
+      - name: Confirm repository identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          git remote -v
+          git rev-parse HEAD
+          test -f package.json || test -f README.md
