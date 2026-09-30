@@ -64,7 +64,7 @@ async function createTeacherThroughUI(page, settle) {
 }
 
 async function forceTypedAnswerMode(page) {
-  const typeButton = page.locator('.mode-tab').filter({ hasText: /^Type$/i }).first();
+  const typeButton = page.getByRole('button', { name: /Answer by typing/i }).first();
   if (await typeButton.count()) await typeButton.click();
   await page.waitForTimeout(250);
 }
