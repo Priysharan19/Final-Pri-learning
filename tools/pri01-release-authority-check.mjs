@@ -97,6 +97,10 @@ for (const doc of [
 }
 
 
+const gitignore = readFileSync(join(root, '.gitignore'), 'utf8');
+assert.match(gitignore, /^__pycache__\/$/m, 'Python bytecode cache directories must not dirty release source');
+assert.match(gitignore, /^\*\.pyc$/m, 'Python bytecode files must not dirty release source');
+
 const releasePolicy = readFileSync(join(root, 'docs', 'release', 'release-policy.md'), 'utf8');
 assert.match(releasePolicy, /task\/feature branch/i, 'release policy must define the normal task/feature PR lane');
 

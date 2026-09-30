@@ -28,6 +28,8 @@ A second forensic pass found two additional uncommitted changes. They were first
 
 The release-transport recovery was integrated. The live-LAN recovery was initially left isolated as unrelated; after PRI-01's strict dirty-tree identity check exposed the workflow's npm install mutation as a real compatibility failure, that exact recovered change was deliberately cherry-picked as 6cb410a.
 
+A later live-LAN run proved Python smoke imports created unignored interpreter bytecode caches before the production build. A disposable clean-clone reproduction confirmed that generated cache alone dirtied Git. PRI-01 now ignores Python interpreter bytecode caches as generated artifacts and asserts that hygiene in the release-authority contract; actual source modifications remain fail-closed.
+
 ## Repository authority and architecture decision
 
 Production repository: Priysharan19/Final-Pri-learning.

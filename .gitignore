@@ -52,3 +52,8 @@ marketing/reel/export/
 # Exact build identity is generated into native bundles by sync:ios.
 ios/PriLearning.swiftpm/Resources/Web/release.json
 ios/PriLearning 2.swiftpm/Resources/Web/release.json
+
+# Python interpreter caches are generated artifacts, never release source.
+__pycache__/
+*.pyc
+*.pyo
