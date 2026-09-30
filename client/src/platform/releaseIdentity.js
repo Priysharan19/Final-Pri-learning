@@ -1,3 +1,5 @@
+import { readReleaseIdentityManifest } from './cloudTransport.js';
+
 const developmentIdentity = Object.freeze({
   schemaVersion: 1,
   repository: 'Priysharan19/Final-Pri-learning',
@@ -48,9 +50,7 @@ export async function installReleaseIdentityDiagnostics(target = globalThis) {
   }
 
   try {
-    const response = await fetch('/release.json', { cache: 'no-store', credentials: 'same-origin' });
-    if (!response.ok) throw new Error(`release manifest HTTP ${response.status}`);
-    const identity = await response.json();
+    const identity = await readReleaseIdentityManifest();
     if (!looksLikeReleaseIdentity(identity)) throw new Error('release manifest is invalid');
     target.__PRI_RELEASE_IDENTITY__ = Object.freeze(identity);
     persistIdentity(target, target.__PRI_RELEASE_IDENTITY__);
