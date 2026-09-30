@@ -231,8 +231,8 @@ export default function App() {
   }, [loc.pathname, loc.hash]);
 
   const closeMore = useCallback((restoreFocus = false) => {
+    if (restoreFocus) moreButtonRef.current?.focus();
     setMoreOpen(false);
-    if (restoreFocus) requestAnimationFrame(() => moreButtonRef.current?.focus());
   }, []);
 
   useEffect(() => {
