@@ -277,10 +277,14 @@ export default function Teach() {
 
   return (
     <div className="grid" style={{ gap: 18 }}>
-      <h1 className="sr-only">Teacher Studio</h1>
+      <header className="teacher-workspace-head">
+        <div className="hero-kicker">Teacher workspace</div>
+        <h1>Plan, assign and understand learning</h1>
+        <p className="muted">Classes, assignments, reports and question tools in one focused workspace.</p>
+      </header>
       {msg && <div className="card" role="status" style={{ padding: '10px 16px', color: 'var(--good)', fontWeight: 650 }}>{msg}</div>}
 
-      <div className="grid cols-2" style={{ alignItems: 'start' }}>
+      <div id="teacher-classes" tabIndex={-1} className="grid cols-2 teacher-anchor" style={{ alignItems: 'start' }}>
         <div className="card">
           <div className="card-title">Your classes</div>
           {data?.classes.map(c => (
@@ -329,7 +333,7 @@ export default function Teach() {
       </div>
 
       {cls && (
-        <div className="card">
+        <div id="teacher-assignments" tabIndex={-1} className="card teacher-anchor">
           <div className="card-title">Assign a task to {cls.name}</div>
           <div className="grid cols-2" style={{ gap: 14 }}>
             <div>
@@ -449,7 +453,7 @@ export default function Teach() {
       )}
 
       {analytics && (
-        <div className="card">
+        <div id="teacher-analytics" tabIndex={-1} className="card teacher-anchor">
           <div className="spread" style={{ flexWrap: 'wrap', gap: 8 }}>
             <div className="card-title" style={{ marginBottom: 0 }}>Class analytics — {analytics.class.name}</div>
             <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
@@ -558,7 +562,7 @@ export default function Teach() {
         </div>
       )}
 
-      <div className="card">
+      <div id="teacher-questions" tabIndex={-1} className="card teacher-anchor">
         <div className="spread">
           <div className="card-title" style={{ marginBottom: 0 }}>Custom questions ({customs.length})</div>
           <button className="btn btn-ghost btn-sm" onClick={() => setShowQBuilder(s => !s)}>{showQBuilder ? 'Close' : '＋ Write a question'}</button>

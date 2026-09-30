@@ -4,7 +4,7 @@
 // handwriting, and re-attempt any question — same numbers or fresh ones.
 // ─────────────────────────────────────────────────────────────────────────────
 import React, { useCallback, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../api.js';
 import { MathText } from '../lib/latex.jsx';
 import { formatDate, formatNumber } from '../lib/locale.js';
@@ -53,7 +53,9 @@ function InkReplay({ strokes, height = 160, label }) {
 export default function History() {
   const { toast, user } = useApp();
   const t = useT();
-  const [filter, setFilter] = useState('all');
+  const [params, setParams] = useSearchParams();
+  const requestedFilter = params.get('filter');
+  const filter = FILTERS.some(([key]) => key === requestedFilter) ? requestedFilter : 'all';
   const [page, setPage] = useState(0);
   const [data, setData] = useState(null);
   const [open, setOpen] = useState(null);       // {id, detail}
@@ -62,6 +64,7 @@ export default function History() {
   const load = useCallback(() => {
     api.post('/history/list', { filter, page }).then(setData).catch(() => setData({ items: [], total: 0 }));
   }, [filter, page]);
+  useEffect(() => { setPage(0); }, [filter]);
   useEffect(() => { load(); }, [load]);
 
   async function toggleBookmark(id) {
@@ -110,7 +113,7 @@ export default function History() {
       <div className="row" role="group" aria-label={t('history.filterGroup')} style={{ flexWrap: 'wrap', gap: 8 }}>
         {FILTERS.map(([k, key]) => (
           <button key={k} className={`pill-opt ${filter === k ? 'on' : ''}`} aria-pressed={filter === k}
-            onClick={() => { setFilter(k); setPage(0); }}>{t(key)}</button>
+            onClick={() => { setPage(0); setParams(k === 'all' ? {} : { filter: k }); }}>{t(key)}</button>
         ))}
       </div>
 
