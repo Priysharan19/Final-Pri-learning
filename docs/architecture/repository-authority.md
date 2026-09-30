@@ -27,6 +27,8 @@ The canonical release identity is defined by `release/metadata.json` plus the ex
 
 At 2026-09-29T18:44:37Z, GitHub reported `main` at `33e7b6c9bb06b65f00a9f38f88a678a333eec80f`, with no branch protection and no repository rulesets. PRI-01 therefore began from a fresh clone of that remote SHA.
 
+During PRI-01, branch protection was applied to `main`: changes require a pull request, strict/up-to-date status checks, conversation resolution, blocked force-push/deletion, and enforcement for administrators. The required pre-merge contexts are `Suites, coverage and accuracy gates`, `Production account, sync and commercial schema`, `Browser suites (end-to-end and accessibility)`, and `Client build and offline-first boundary`.
+
 A separate launcher checkout was on local `main` at `a0627e601f30f9e2ba18518fba26344de7094b09`, 69 commits behind fetched `origin/main`, with untracked local runtime state. It is not release authority and PRI-01 did not modify or clean it.
 
 Open product PRs and historical branches remain evidence/history, but none changes authority until merged through the production process. See `docs/architecture/branch-reconciliation.md`.

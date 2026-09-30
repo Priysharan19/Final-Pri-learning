@@ -19,9 +19,9 @@ Production branch: `main`
 
 `Main Integrity` remains a post-merge provenance alarm. It is intentionally not a required pre-merge context because it runs on pushes to `main`, not on the pull-request head.
 
-## Main protection intent
+## Main protection
 
-Ordinary direct pushes, force pushes and deletion of `main` are not part of the release workflow. GitHub protection should require a pull request and the four CI contexts above, with strict/up-to-date checking. The rule must not require an impossible self-review or a post-merge-only check that would deadlock a single-maintainer repository.
+Ordinary direct pushes, force pushes and deletion of `main` are not part of the release workflow. PRI-01 configures GitHub protection to require a pull request and the four CI contexts above with strict/up-to-date checking, applies the rule to administrators, requires conversation resolution, and blocks force-push/deletion. The rule deliberately requires no approval count, because this owner-operated repository must enforce the PR/check path without creating an impossible self-review deadlock.
 
 ## Break-glass
 

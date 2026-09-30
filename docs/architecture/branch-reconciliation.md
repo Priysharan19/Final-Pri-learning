@@ -2,7 +2,13 @@
 
 Audit base: `main` = `33e7b6c9bb06b65f00a9f38f88a678a333eec80f`
 
-The PRI-01 inventory found 179 remote refs; 108 branches contained commits not reachable from the audit-base `main`. This count is an inventory signal, not a merge queue. History is preserved.
+The PRI-01 starting inventory found 179 remote refs (178 concrete remote branches plus the symbolic `origin/HEAD`); 108 non-main branches contained commits not reachable from the audit-base `main`. This count is an inventory signal, not a merge queue. History is preserved.
+
+## Inventory coverage
+
+The concrete starting branches fall into these families: `agent/*` (45), `feature/*` (30), `release/*` (17), `marketing/*` (14), `india/*` (13), `person1/*` (11), `pri-*` (9), `fix/*` (6), `ink/*` (4), `scholarship/*` (4), `perf/*` (3), and smaller `admin/*`, `ai/*`, `backend-*`, `chore/*`, `claude/*`, `diagnostic/*`, `docs/*`, `handwriting/*`, `integrate/*`, `ios/*`, `merge/*`, `product/*`, `promotions/*`, `security/*`, `test/*` and validation families. They are all non-authoritative unless their exact change reaches `main` through the production PR/check path.
+
+The family classification is intentionally conservative: a name such as `release/*`, `integrate/*` or `*-ready` does not confer release authority. Current open PRs are assessed separately below; closed or abandoned branches remain historical source material until an owning task proves a specific missing change against current `main`.
 
 ## Current, deliberately unmerged work
 
