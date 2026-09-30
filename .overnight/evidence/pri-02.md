@@ -111,3 +111,41 @@ PASS from that clean clone:
 Historical issue #165 is objectively repaired by this candidate: transient open failure→retry and versionchange→release/reopen are deterministic regression-tested. Close/update it after the PRI-02 merge with the merged-main evidence.
 
 Remaining external blockers: NONE.
+
+## PR #229 CI regression repair — 30 September 2026
+
+The first exact-head PR CI run at `e8acacacf33e2b5e62a2473f9a51e855eaad47c3` failed only the
+`Suites, coverage and accuracy gates` job. The deterministic reproducer was
+`npm run test:india:pyq`, which threw `ALREADY_RESOLVED` from
+`recordIndiaExamEvidence(...)` while submitting a multipart India exam question.
+
+Root cause: PRI-02 correctly made ordinary practice resolution question-scoped
+(`practice-resolution:<question-id>`), but India multipart exam submission records
+multiple legitimate learning-evidence events against the same question row. The
+second part therefore collided with the first part's question-level claim.
+
+Repair candidate: `383c09dfcb3cfabeb27c23b1c63ca06a976b4faa`.
+- ordinary practice remains one authoritative resolution per question;
+- India exam evidence uses a stable exam/question/evidence claim;
+- multipart evidence keys are stable per part;
+- replay of the same exam-part claim is an idempotent no-op;
+- unrelated transaction failures are no longer misclassified merely because the question is answered;
+- tracked iOS bundles are synchronized to the repaired production build.
+
+Regression evidence:
+- `npm run test:india:pyq` — PASS, 1079/1079;
+- focused real-product multipart/replay regression — PASS, 82/82;
+- `npm run test:practice:state` — PASS, including duplicate/concurrent submit, submit/reveal race and atomic rollback;
+- required local regression batch — PASS: golden journey, backend 343/343,
+  entitlements 59/59, outbox 70/70, sync worker 20/20, restore durability,
+  IndexedDB lifecycle, browser E2E 222/222 plus focused cloud/admin tours,
+  accessibility 38/38;
+- `npm run build` — PASS;
+- `npm run check:ios` — PASS, both tracked SwiftPM bundles match client/dist;
+- `npm run verify:release:native` — PASS at `383c09dfcb3cfabeb27c23b1c63ca06a976b4faa`;
+- `npm run test:release-authority` — PASS for client and server authority.
+
+The executable repair is durably pushed on
+`task/pri-02-golden-student-journey` and PR #229. Exact-head GitHub checks and
+a final clean-clone verification are the remaining completion evidence; no
+software or external blocker is currently known.
