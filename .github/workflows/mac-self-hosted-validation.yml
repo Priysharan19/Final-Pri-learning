@@ -66,3 +66,5 @@ jobs:
           git remote -v
           git rev-parse HEAD
           test -f package.json || test -f README.md
+
+# Ephemeral runner validation probe: 2026-09-30
