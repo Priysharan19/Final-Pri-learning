@@ -2453,6 +2453,26 @@ const routes = {
   },
 
   // ---- practice ----
+  // KALP-04 continuity summary: identifiers/context only — never question content.
+  'GET /practice/resume': async () => {
+    const p = await requireProfile();
+    const row = (await byIndex('questions', 'pid', p.id))
+      .filter(r => r && !r.answered && !r.discardedAt && !isExamRow(r) && r.mode !== 'rush' && r.mode !== 'match')
+      .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))[0];
+    if (!row) return { resume: null };
+    const task = row.taskId ? await get('tasks', row.taskId) : null;
+    return { resume: {
+      kind: row.taskId ? 'task' : 'practice',
+      questionId: row.id,
+      taskId: row.taskId || null,
+      title: task?.title || '',
+      subtopic: row.india?.chapterId || row.payload?.subtopic || row.subtopic || null,
+      difficulty: row.difficulty || null,
+      createdAt: row.createdAt || null,
+      destination: row.taskId ? '/practice?task=' + encodeURIComponent(row.taskId) : '/practice'
+    } };
+  },
+
   'POST /practice/next': async (body) => {
     const p = await requireProfile();
     const unfinished = await resumableQuestion(p, body);
