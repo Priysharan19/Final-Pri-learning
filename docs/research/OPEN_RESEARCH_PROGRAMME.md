@@ -329,3 +329,63 @@ Canonical execution plan:
 The V7 rule is:
 
 > Broad literature search is complete for a mechanism when new sources stop changing the architecture, benchmark, experiment or falsifier. At that point, Pri must collect its own evidence.
+
+
+## X. V7 scale-up and epistemic validation
+
+### X1. Assessment validity / fairness
+- Do generated and human-authored items remain psychometrically comparable after school-math pilot data rather than post-secondary data?
+- Which QuestionFamilies exhibit local dependence that materially inflates learner-state confidence?
+- Which items show language/device/accessibility DIF after controlling for the intended construct?
+- How fast do item/family parameters drift after repeated exposure or curriculum changes?
+
+### X2. Knowledge-graph causality
+- Which current prerequisite edges are merely curriculum order or correlational predictors?
+- Does targeted repair of A causally improve acquisition of B?
+- How much learner time is wasted by false-prerequisite edges?
+- Where are OR-pathways required because different valid strategies bypass a canonical prerequisite?
+
+### X3. Teacher augmentation
+- Do Teacher Action Cards improve teacher decision quality over a strong evidence dashboard?
+- Are effects larger for newer teachers/tutors, and does that heterogeneity replicate?
+- Which recommendations experienced teachers systematically reject or improve?
+- Do teacher corrections improve Pri's first-break/misconception benchmark over time?
+
+### X4. Child AI safety
+- Does Pri's relational-safety red-team detect dependency/exclusivity/secrecy failure modes before release?
+- What exact DPDP child-data obligations and effective dates apply to Pri at launch?
+- Which long-horizon memory fields have measurable educational value sufficient to justify retention?
+- Can learner-visible privacy explanations be understood at each supported age?
+
+### X5. Motivation / SRL / help seeking
+- Does trigger-based reflection outperform blanket prompts?
+- Does strategic-help-first improve delayed learning versus step-by-step hinting?
+- Which gamification mechanics increase quality practice without controlled-pressure harms?
+- Can Pri improve confidence calibration without adding excessive session friction?
+
+### X6. Transfer
+- Do T0–T7 structural tiers predict empirical difficulty/generalization?
+- Which structural fingerprint dimensions best identify true sibling leakage?
+- Does analogical comparison improve held-out family transfer relative to a strong worked example?
+- Does Pri Worlds improve transfer beyond a strong static representation?
+
+### X7. Formative feedback
+- What feedback dose restores productive action with the least dependence?
+- Which tasks benefit from immediate versus end-of-step feedback?
+- Does hybrid directive/metacognitive feedback improve delayed math outcomes?
+- How much feedback burden causes learners to ignore otherwise useful interventions?
+
+### X8. AI literacy / Audit-the-AI
+- Does AI-error framing add value beyond ordinary erroneous-example analysis?
+- Does Audit-the-AI improve detection of errors in the learner's own work?
+- Can confidence feedback reduce false acceptance of fluent but invalid AI mathematics?
+- Which epistemic-status labels improve appropriate reliance without becoming a verification crutch?
+
+### X9. CBSE / NCERT authority
+- Can official-source monitoring detect curriculum/SQP/marking-scheme changes without false promotion into production?
+- Which competency mappings require teacher/examiner adjudication?
+- How should two-board-examination policy change exam scheduling and readiness views for Class X cohorts?
+
+Canonical execution remains:
+`V7_EMPIRICAL_SCIENCE_AND_BENCHMARK_PROGRAMME.md`.
+
