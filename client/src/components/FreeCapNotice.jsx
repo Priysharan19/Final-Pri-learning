@@ -73,7 +73,7 @@ export default function FreeCapNotice({ gate, onRetry }) {
           {onRetry && (
             <button className="btn btn-quiet" onClick={onRetry}>Try again</button>
           )}
-          <Link className="btn btn-quiet" to="/history">Review what I have done</Link>
+          <Link className="btn btn-quiet" to="/review">Review what I have done</Link>
         </div>
       </section>
     </div>

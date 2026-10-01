@@ -30,13 +30,14 @@ const ANSWER_WITH_SOLUTION = 6;   // how many questions to answer from the print
 // which one it thinks it is.
 const ROUTES = [
   ['/', 'Home'],
+  ['/practice', 'Practice'],
   ['/tasks', 'Tasks'],
-  ['/match', 'Match'],
-  ['/progress', 'Progress'],
-  ['/favorites', 'Favorites'],
   ['/exams', 'Exams'],
   ['/classes', 'Classes'],
-  ['/history', 'History'],
+  ['/progress', 'Progress'],
+  ['/review?filter=wrong', 'Review'],
+  ['/rush', 'Rapid Fire'],
+  ['/match', 'Match'],
   ['/settings', 'Settings']
 ];
 
@@ -106,8 +107,12 @@ export const flow = {
       await page.goto(base + route, { waitUntil: 'domcontentloaded' });
       const rendered = await page.waitForSelector(RENDERED, { timeout: 20000 }).then(() => true).catch(() => false);
       await check(`${route} renders its own page`, rendered, `nothing matching ${RENDERED} appeared`);
-      await check(`${route} knows which page it is`, await page.title() === `${title} · Pri Learning`,
-        `the tab reads ${JSON.stringify(await page.title())}, expected ${JSON.stringify(title + ' · Pri Learning')}`);
+      const actualTitle = await page.title();
+      const titleMatches = route === '/practice'
+        ? /^.+ · Pri Learning$/.test(actualTitle) && actualTitle !== 'Pri Learning'
+        : actualTitle === `${title} · Pri Learning`;
+      await check(`${route} knows which page it is`, titleMatches,
+        `the tab reads ${JSON.stringify(actualTitle)}, expected ${route === '/practice' ? 'a current-topic Pri Learning title' : JSON.stringify(title + ' · Pri Learning')}`);
       await check(`${route} did not fall to the error boundary`,
         await page.locator('.crash-card').count() === 0);
     }

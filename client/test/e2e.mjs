@@ -49,7 +49,7 @@ function parseArgs(argv) {
     if (arg === '--no-build') opts.build = false;
     else if (arg === '--headed') opts.headed = true;
     else if (arg === '--bail') opts.bail = true;
-    else if (arg.startsWith('--only=')) opts.only = arg.slice(7).split(',').map(s => s.trim()).filter(Boolean);
+    else if (arg.startsWith('--only=')) opts.only = arg.slice(7).split(',').map(s => s.trim() === 'v3' ? 'practice' : s.trim()).filter(Boolean);
   }
   return opts;
 }
