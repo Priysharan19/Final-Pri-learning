@@ -20,6 +20,7 @@ import { ALPHABET } from './templates.js';
 import { classOfSymbol } from './classes.js';
 import { ensurePersonalLoaded, addPersonal } from './personal.js';
 import { MathText } from '../lib/latex.jsx';
+import { currentReleaseIdentity } from '../platform/releaseIdentity.js';
 
 const NICE = { pi: 'π', theta: 'θ', sqrt: '√', percent: '%' };
 const showSym = s => NICE[s] || s;
@@ -142,7 +143,7 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
   useEffect(() => {
     recordLocalHandwritingDiagnostics({
       nativeAvailable: NATIVE_INK,
-      releaseSha: globalThis.__PRI_RELEASE_IDENTITY__?.releaseSha || globalThis.__PRI_NATIVE_RELEASE_IDENTITY__?.releaseSha || null
+      releaseSha: currentReleaseIdentity()?.releaseSha || null
     });
   }, []);
 
