@@ -11,6 +11,7 @@ import { FREE_TIER } from '../local/entitlementGate.js';
 import { MIN_PASSWORD, PasswordMeter, passwordVerdict } from './Login.jsx';
 import { LANGUAGES, useLanguage, useT } from '../i18n/index.js';
 import { loadGlossary } from '../i18n/glossary.js';
+import { priNative } from '../platform/native/index.js';
 
 const AVATARS = ['🚀', '🦊', '🐨', '🦉', '🌟', '🐯', '🍀', '🎧', '🦄', '⚡', '🌊', '🧠'];
 const COURSES = [['nsw', 'NSW · HSC'], ['vic', 'VIC · VCE'], ['qld', 'QLD · QCE'], ['wa', 'WA · WACE'], ['sa', 'SA · SACE'], ['ib', 'IB'], ['in', 'India · CBSE / JEE / Olympiad']];
@@ -201,7 +202,7 @@ function HandwritingSection({ toast }) {
     <div className="card">
       <h2 style={{ marginBottom: 8 }}>{t('settings.handwriting')}</h2>
       <p className="sub" style={{ marginBottom: 12 }}>
-        {t(window.__PRI_NATIVE__ ? 'settings.handwritingNative' : 'settings.handwritingBrowser')}
+        {t(priNative.ink.available() ? 'settings.handwritingNative' : 'settings.handwritingBrowser')}
       </p>
       <div className="set-row">
         <span className="set-k">{t('settings.templatesLearned')}</span>
@@ -673,7 +674,7 @@ export default function Settings() {
                   branch describes a scaled-band predictor that does not exist
                   for a CBSE or JEE student. */}
               {t(user.course === 'in' ? 'settings.helpBodyIndia' : 'settings.helpBody')}
-              {!window.__PRI_NATIVE__ && t('settings.addToHomeScreen')}
+              {!priNative.isNativeShell() && t('settings.addToHomeScreen')}
             </p>
           </div>
         </div>

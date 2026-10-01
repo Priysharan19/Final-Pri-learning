@@ -49,6 +49,7 @@ import {
   planView, recordExamSimulation, recordPracticeServed, requireCapability, usageView
 } from './entitlementGate.js';
 import { ENTITLEMENTS } from '../platform/entitlements.js';
+import { priNative } from '../platform/native/index.js';
 
 export const COURSES = {
   nsw: { name: 'NSW · HSC', junior: y => `Year ${y} · Stage ${y <= 8 ? 4 : 5}`, senior: y => y === 11 ? 'Year 11 · Mathematics Advanced' : 'Year 12 · Mathematics Advanced (HSC)' },
@@ -3428,7 +3429,7 @@ const routes = {
   // ---- data safety: backup, restore, task packs, progress files ----
   'GET /data/storage': async () => {
     const est = await storageEstimate();
-    if (typeof window !== 'undefined' && window.__PRI_NATIVE__) {
+    if (priNative.storage.durable()) {
       // Native app: data lives in the app's own sandbox — nothing can evict it.
       return { supported: true, persisted: true, native: true, usage: est?.usage || 0, quota: est?.quota || 0 };
     }

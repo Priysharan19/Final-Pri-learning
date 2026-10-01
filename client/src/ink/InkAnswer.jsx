@@ -37,8 +37,8 @@ const showSym = s => NICE[s] || s;
 // development-only first opinion from the local Structural V4 PyTorch worker on
 // the developer Mac, so physical iPad testing can exercise the actual research
 // model without pretending it is a production/offline asset.
-const NATIVE_INK = nativeInkAvailable();
-const Surface = NATIVE_INK ? NativeInkCanvas : InkCanvas;
+// The surface is chosen per mount, not at import: a shell's capability can be
+// known only after this module first evaluates (CP-02).
 /** How long the page must be still before it is worth sending. */
 const CLOUD_SETTLE_MS = 1800;
 
@@ -51,7 +51,7 @@ const showEngineNotes = () => typeof window !== 'undefined'
 /** One page of paper. More pages extend the same sheet, so recognition, the
  *  stored strokes and History replay all keep one coordinate space. */
 const MAX_PAGES = 4;
-const structuralLanExpected = () => !NATIVE_INK && typeof window !== 'undefined' && window.__PRI_LAN_DEV__ === true;
+const structuralLanExpected = () => !nativeInkAvailable() && typeof window !== 'undefined' && window.__PRI_LAN_DEV__ === true;
 
 /**
  * Native rescue reads lines. If it leaves a short line unread (a lone "x", a
@@ -127,6 +127,8 @@ export default function InkAnswer({
   initialStrokes = null, onStrokes = null
 }) {
   const t = useT();
+  const [NATIVE_INK] = useState(nativeInkAvailable);
+  const Surface = NATIVE_INK ? NativeInkCanvas : InkCanvas;
   const canvasRef = useRef(null);
   // The signed-in profile carries the server-reading opt-in, which is off
   // unless the student turned it on.

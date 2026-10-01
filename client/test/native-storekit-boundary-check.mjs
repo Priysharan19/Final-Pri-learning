@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 const swift = readFileSync(new URL('../../ios/PriLearning.swiftpm/StoreKitBillingBridge.swift', import.meta.url), 'utf8');
 const shell = readFileSync(new URL('../../ios/PriLearning.swiftpm/WebShell.swift', import.meta.url), 'utf8');
 const native = readFileSync(new URL('../src/platform/nativeBilling.js', import.meta.url), 'utf8');
+const legacy = readFileSync(new URL('../src/platform/native/legacyApple.js', import.meta.url), 'utf8');
 const transport = readFileSync(new URL('../src/platform/cloudTransport.js', import.meta.url), 'utf8');
 const panel = readFileSync(new URL('../src/components/CloudAccountPanel.jsx', import.meta.url), 'utf8');
 
@@ -38,9 +39,12 @@ assert.match(swift.slice(finishStart), /await transaction\.finish\(\)/,
 
 assert.equal(native.includes('fetch('), false, 'native bridge client must not create a second network boundary');
 assert.equal(native.includes('cloudRequest('), false, 'native bridge client must not call cloud directly');
-assert.match(native, /messageHandlers\?\.priBilling/, 'browser/native boundary must target only priBilling');
+assert.match(legacy, /handler\('priBilling'\)/, 'the native adapter must target only priBilling');
+assert.equal(/webkit|messageHandlers/.test(native), false, 'nativeBilling must reach StoreKit only through priNative');
 assert.match(native, /request\('unfinished'/, 'client bootstrap must sweep StoreKit unfinished transactions');
-assert.match(native, /pri:native-billing-update/, 'client must replay unfinished transactions through the normal update path');
+assert.match(legacy, /pri:native-billing-update/, 'native transaction updates must reach the normal update path');
+assert.match(legacy, /billingLate\.set\(id/, 'a late purchase/restore result must be recovered, not dropped');
+assert.equal(legacy.includes('fetch('), false, 'the native adapter must not create a second network boundary');
 
 assert.match(transport, /\/v1\/billing\/apple\/bootstrap/, 'cloud transport must expose Apple account-token bootstrap');
 assert.match(transport, /\/v1\/billing\/apple\/transaction/, 'cloud transport must expose server JWS verification');

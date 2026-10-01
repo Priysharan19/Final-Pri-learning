@@ -13,6 +13,8 @@
 // back to IndexedDB.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { priNative } from '../platform/native/index.js';
+
 const DB_NAME = 'pri-ink-personal';
 const STORE = 'templates';
 const MAX_PER_SYMBOL = 24;
@@ -78,7 +80,7 @@ async function loadBootstrapProfile() {
   if (existing.length) return existing;
   // Browser/web builds deliberately do not request this optional private file.
   // The native bridge is the proof that we are inside the local iPad package.
-  if (typeof document === 'undefined' || !globalThis.__PRI_NATIVE_INK__) return [];
+  if (typeof document === 'undefined' || !priNative.ink.available()) return [];
   if (bootstrapLoading) return bootstrapLoading;
 
   bootstrapLoading = new Promise(resolve => {

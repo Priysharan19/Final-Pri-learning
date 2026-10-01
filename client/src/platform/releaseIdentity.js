@@ -1,4 +1,5 @@
 import { readReleaseIdentityManifest } from './cloudTransport.js';
+import { hostReleaseIdentity } from './native/host.js';
 
 const developmentIdentity = Object.freeze({
   schemaVersion: 1,
@@ -37,12 +38,13 @@ function persistIdentity(target, identity) {
 
 export function currentReleaseIdentity(target = globalThis) {
   if (looksLikeReleaseIdentity(target.__PRI_RELEASE_IDENTITY__)) return target.__PRI_RELEASE_IDENTITY__;
-  if (looksLikeReleaseIdentity(target.__PRI_NATIVE_RELEASE_IDENTITY__)) return target.__PRI_NATIVE_RELEASE_IDENTITY__;
+  const nativeIdentity = hostReleaseIdentity(target);
+  if (looksLikeReleaseIdentity(nativeIdentity)) return nativeIdentity;
   return storedIdentity(target) || developmentIdentity;
 }
 
 export async function installReleaseIdentityDiagnostics(target = globalThis) {
-  const nativeIdentity = target.__PRI_NATIVE_RELEASE_IDENTITY__;
+  const nativeIdentity = hostReleaseIdentity(target);
   if (looksLikeReleaseIdentity(nativeIdentity)) {
     target.__PRI_RELEASE_IDENTITY__ = Object.freeze({ ...nativeIdentity });
     persistIdentity(target, target.__PRI_RELEASE_IDENTITY__);

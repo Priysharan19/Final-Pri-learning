@@ -12,6 +12,7 @@ import {
   onNativeBillingUpdate, purchaseNativeProduct, restoreNativePurchases
 } from '../platform/nativeBilling.js';
 import CloudAccountSecurity from './CloudAccountSecurity.jsx';
+import { priNative } from '../platform/native/index.js';
 
 function when(value) {
   if (!value) return 'Never';
@@ -44,7 +45,7 @@ function pricingText(config) {
 export default function CloudAccountPanel() {
   const { user } = useApp();
   const enabled = cloudAvailable();
-  const nativeShell = typeof window !== 'undefined' && !!window.__PRI_NATIVE__;
+  const nativeShell = priNative.isNativeShell();
   const nativeStoreKit = nativeBillingAvailable();
   const [link, setLink] = useState(null);
   const [status, setStatus] = useState(null);
@@ -172,7 +173,14 @@ export default function CloudAccountPanel() {
       await cloud.submitAppleTransaction(signedTransaction);
       // Finish only after server acceptance. If this step itself fails, StoreKit
       // redelivers the unfinished transaction and the server call is idempotent.
-      await finishNativeTransaction(transactionId);
+      try {
+        await finishNativeTransaction(transactionId);
+      } catch (err) {
+        // The same transaction can be delivered twice (Transaction.updates and
+        // the unfinished sweep). If an earlier delivery already finished it,
+        // the server has accepted it and there is nothing left to do.
+        if (err?.detail?.providerCode !== 'STOREKIT_TRANSACTION_NOT_PENDING') throw err;
+      }
       await refreshCloudEntitlement(user.id);
       await reload({ verify: false });
       if (!quiet) setMessage('App Store purchase verified. Premium status has been refreshed from the server.');
