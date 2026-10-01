@@ -117,6 +117,7 @@ export function createWorkingRouter(db, {
             lines: result.lines,
             firstBreak: result.firstBreak,
             hint: result.hint,
+            misconceptionId: result.misconceptionId ?? null,
             confidence: result.confidence,
             needsConfirmation: result.needsConfirmation
           }
