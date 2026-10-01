@@ -179,18 +179,78 @@ U3. Cross-provider fallback semantic consistency?
 U4. Prompt/retrieval change impact?
 U5. Rolling alias drift detection?
 
+## V. Psychometrics / adaptive measurement
+
+V1. Which latent construct definitions are stable enough to calibrate separately?
+V2. What is the minimum family-diverse sample needed before empirical item parameters outperform authored priors?
+V3. Which families are sufficiently unidimensional for IRT, and where is multidimensional/CDM treatment required?
+V4. How accurate are current authored question-to-component mappings under expert and empirical Q-matrix validation?
+V5. Which prerequisite edges predict target-skill recovery after targeted prerequisite repair?
+V6. How should Pri detect rapid guessing without misclassifying genuine fluency?
+V7. What subgroup calibration slices reveal consequential error without collecting unnecessary sensitive data?
+V8. Does information-gain task selection reduce diagnostic uncertainty faster than the current transparent selector?
+V9. When does diagnostic information gain conflict with expected learning gain?
+V10. How much same-family evidence should be discounted in learner-state confidence?
+
+Required:
+family IDs, component/Q-matrix registry, calibration dataset, family-held-out evaluation and uncertainty reporting.
+
+## W. Semantic learning-data contracts
+
+W1. What is the smallest immutable event schema that can replay every current learner-state decision?
+W2. Can current mutable ratings/reviews be reproduced from an event ledger on frozen fixture histories?
+W3. Which current stores contain evidence that would be irrecoverably lost under a future learner-model migration?
+W4. How should curriculum/component ontology changes preserve historical interpretation?
+W5. What structural fingerprint best identifies a question family across generator refactors?
+W6. Can misconception-opportunity tagging be made complete enough to fix issue #232 without over-crediting repair?
+W7. How should human recognition/marking corrections supersede machine events without deleting audit history?
+W8. Which event fields are truly required for population learning versus private device-local inference?
+W9. What local-first synchronization semantics preserve event immutability and idempotence across devices?
+
+Required:
+versioned event fixtures, replay tests, ontology migrations, privacy review and sync-failure simulations.
+
+## X. Experimentation / efficacy infrastructure
+
+X1. Does an A/A experiment produce nominal false-positive rates and balanced assignment in real Pri traffic?
+X2. Are experiment eligibility/exposure/outcome events complete under offline, retry and sync conditions?
+X3. What minimum detectable learning effect is worth product complexity for each intervention class?
+X4. Which delayed-outcome horizon is valid for each mathematical construct?
+X5. How much cluster/teacher contamination occurs in classroom trials?
+X6. Can Pri maintain a truly held-out transfer bank that tutoring policy cannot train against?
+X7. Which guardrails catch interventions that improve immediate accuracy while increasing dependence or abandonment?
+X8. What logging support is required before any off-policy evaluation is credible?
+X9. Do contextual policies beat a strong global policy prospectively, not just retrospectively?
+X10. Which external cohort/school is appropriate for first independent replication?
+
+Required:
+experiment registry, power calculator, A/A validation, delayed/transfer outcomes, cluster-aware analysis and null-result retention.
+
+## Y. Competitive/frontier monitoring
+
+Y1. Which competitor mechanism would materially change a Pri authority boundary or intervention hypothesis?
+Y2. Is the evidence independent efficacy, vendor capability, benchmark or theory?
+Y3. Does the mechanism transfer to school mathematics rather than another domain?
+Y4. Can Pri test the mechanism against a strong simpler baseline?
+Y5. What failure mode from another system should become a Pri regression/guardrail?
+Y6. Which new multimodal/on-device/formal-verification capability changes what can safely run locally?
+
+Do not maintain feature-count spreadsheets. Track mechanisms, evidence quality, failure modes and falsifiable Pri consequences.
+
 ## Priority empirical sequence
 
-1. Real handwriting / first-break benchmark.
-2. Productive Mistake Repair randomized mechanism test.
-3. Learner-state calibration against delayed independent outcomes.
-4. Criterion graph + alternative-route marking benchmark.
-5. Question-family structural independence and transfer bank.
-6. Transparent spacing/interleaving vs Scheduler v3.
-7. Bilingual bridge transfer experiment.
-8. Experimentation OS A/A and measurement validation.
-9. Teacher action-card shadow/field trial.
-10. Causal personalization only after evidence substrate is credible.
+1. **Semantic evidence foundation:** stable question-family/component/misconception IDs plus event-ledger replay fixtures.
+2. **Measurement validity:** learner-state calibration against delayed independent family-held-out outcomes.
+3. **Real handwriting / first-break benchmark.**
+4. **Question-family psychometrics:** structural independence, Q-matrix validation, calibration uncertainty and transfer bank.
+5. **Experimentation OS A/A + offline/sync assignment validation.**
+6. **Productive Mistake Repair randomized mechanism test** with delayed independent transfer.
+7. **Criterion graph + alternative-route marking benchmark.**
+8. **Transparent spacing/interleaving vs Scheduler v3** on delayed outcomes.
+9. **Bilingual bridge transfer experiment.**
+10. **Teacher action-card shadow/field trial.**
+11. **Information-gain diagnostic selection** versus transparent selector.
+12. **Causal/contextual personalization only after randomized evidence substrate is credible.**
 
 ## Research stopping rule
 
