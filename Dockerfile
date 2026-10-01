@@ -12,7 +12,11 @@ COPY release ./release
 # Legal.jsx renders docs/legal/*.md), so they are part of the build context.
 # Without them the image's client build fails with "Module not found".
 COPY docs/legal ./docs/legal
-RUN npm run build --prefix client
+# GitHub CI supplies PRI_RELEASE_SHA/PRI_BUILD_TIMESTAMP explicitly. Railway
+# supplies RAILWAY_GIT_COMMIT_SHA automatically; when no explicit timestamp is
+# supplied, stamp this exact image build once and bake that same identity into
+# client/dist/release.json for the server to verify at runtime.
+RUN set -eu;     release_sha="${PRI_RELEASE_SHA:-${RAILWAY_GIT_COMMIT_SHA:-}}";     build_timestamp="${PRI_BUILD_TIMESTAMP:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}";     PRI_RELEASE_SHA="$release_sha" PRI_BUILD_TIMESTAMP="$build_timestamp" npm run build --prefix client
 
 FROM node:24-bookworm-slim AS server-deps
 WORKDIR /app

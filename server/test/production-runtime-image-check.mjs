@@ -84,13 +84,22 @@ const dataDir = join(stage, 'data');
 mkdirSync(dataDir, { recursive: true });
 const testReleaseSha = '0123456789abcdef0123456789abcdef01234567';
 const testBuildTimestamp = '2026-09-30T00:00:00.000Z';
+writeFileSync(join(stage, 'client', 'dist', 'release.json'), JSON.stringify({
+  schemaVersion: 1,
+  repository: 'Priysharan19/Final-Pri-learning',
+  branch: 'main',
+  productVersion: '4.0',
+  curriculumVersion: 'CATALOG-2026-09',
+  releaseSha: testReleaseSha,
+  buildTimestamp: testBuildTimestamp
+}, null, 2));
+
 const env = {
   PATH: process.env.PATH,
   HOME: process.env.HOME,
   NODE_ENV: 'production',
   PORT: String(port),
-  PRI_RELEASE_SHA: testReleaseSha,
-  PRI_BUILD_TIMESTAMP: testBuildTimestamp,
+  RAILWAY_GIT_COMMIT_SHA: testReleaseSha,
   PRI_PUBLIC_ORIGIN: 'https://learn.pri.example',
   PRI_CSRF_SECRET: 'runtime-image-contract-secret',
   PRI_AUTH_DELIVERY_KEY: '33'.repeat(32),
