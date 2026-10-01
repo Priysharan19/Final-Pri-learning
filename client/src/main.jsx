@@ -13,9 +13,12 @@ import { scheduleOfflineWarm } from './local/offlineWarm.js';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 import { installReleaseIdentityDiagnostics } from './platform/releaseIdentity.js';
 import { priNative } from './platform/native/index.js';
+import { installFormFactorAttributes } from './platform/formFactor.js';
 
 // Listen for the native shell (if any) before anything else can emit events.
 priNative.start();
+// data-ff / data-short / data-pointer on <html>: semantic form factor (CP-03).
+installFormFactorAttributes(window);
 installReleaseIdentityDiagnostics(window);
 
 // Account verification/password-reset links carry their secret only in the URL

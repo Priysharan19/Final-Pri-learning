@@ -37,6 +37,7 @@ const InkCanvas = forwardRef(function InkCanvas({
   const liveRef = useRef(null);        // in-progress stroke + prediction
   const wrapRef = useRef(null);
   const strokesRef = useRef([]);
+  const widthRef = useRef(0);          // CSS width the committed strokes are expressed in
   const redoRef = useRef([]);
   const currentRef = useRef(null);     // { points, drawnTo, filter, _cx,_cy,_t,_w }
   const predictedRef = useRef([]);
@@ -194,6 +195,20 @@ const InkCanvas = forwardRef(function InkCanvas({
     const resize = () => {
       const dpr = window.devicePixelRatio || 1;
       const w = wrap.clientWidth;
+      // Rotation, split view or a resized window changes the width under ink
+      // that was written in CSS pixels. Scale it uniformly with the width so
+      // the work keeps its shape instead of being clipped (CP-03).
+      const prev = widthRef.current;
+      if (prev > 0 && w > 0 && Math.abs(w - prev) >= 1) {
+        const f = w / prev;
+        const scale = list => list.forEach(stroke => {
+          for (const pt of stroke?.points || []) { pt.x *= f; pt.y *= f; }
+        });
+        scale(strokesRef.current);
+        scale(redoRef.current);
+        if (strokesRef.current.length) queueMicrotask(notify);
+      }
+      if (w > 0) widthRef.current = w;
       for (const c of [baseRef.current, liveRef.current]) {
         if (!c) continue;
         c.width = Math.round(w * dpr);
@@ -209,7 +224,7 @@ const InkCanvas = forwardRef(function InkCanvas({
     const ro = new ResizeObserver(resize);
     ro.observe(wrap);
     return () => ro.disconnect();
-  }, [height, redrawBase, primeContexts]);
+  }, [height, redrawBase, primeContexts, notify]);
 
   // repaint committed ink when the theme flips (this also refreshes cached ink)
   useEffect(() => {

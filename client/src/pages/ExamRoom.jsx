@@ -289,7 +289,7 @@ export default function ExamRoom() {
                 ) : (
                   <div className="answer-row">
                     {pt.answerPrefix && <span className="answer-prefix"><MathText text={pt.answerPrefix} /></span>}
-                    <input className="input answer-input" placeholder={pt.inputHint || 'Your answer…'}
+                    <input className="input answer-input" inputMode="text" enterKeyHint="next" autoCapitalize="none" autoCorrect="off" spellCheck={false} placeholder={pt.inputHint || 'Your answer…'}
                       aria-label={`Your answer to part (${pt.key})`}
                       value={answers[`${q.id}::${pt.key}`] || ''}
                       onChange={e => setAnswers(a => ({ ...a, [`${q.id}::${pt.key}`]: e.target.value }))} />
@@ -327,7 +327,7 @@ export default function ExamRoom() {
         ) : (
           <div className="answer-row">
             {q.answerPrefix && <span className="answer-prefix"><MathText text={q.answerPrefix} /></span>}
-            <input className="input answer-input" placeholder={q.inputHint || 'Your answer…'}
+            <input className="input answer-input" inputMode="text" enterKeyHint="next" autoCapitalize="none" autoCorrect="off" spellCheck={false} placeholder={q.inputHint || 'Your answer…'}
               aria-label={`Your answer to question ${cur + 1}`}
               value={answers[q.id] || ''}
               onChange={e => setAnswers(a => ({ ...a, [q.id]: e.target.value }))}
