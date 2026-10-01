@@ -5,9 +5,11 @@
   "taskStartMainSha": "da6a50e05b5f3dc9f52929a0a8c284e940087bc1",
   "workingBranch": "task/pri-03-handwriting-production-wiring",
   "pullRequest": null,
-  "checkpoint": 3,
+  "checkpoint": 4,
   "serverProviderStatus": "pass",
   "clientCloudWiring": "pass",
+  "failureMatrix": "pass",
+  "secretAudit": "pass",
   "evidence": ".overnight/evidence/pri-03.md",
   "crashResistance": {
     "branchPushed": true,

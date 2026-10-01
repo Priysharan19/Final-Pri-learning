@@ -119,6 +119,14 @@
 - Focused verification: cloud handwriting PASS 52/52; cloud photo PASS 28/28; native bridge PASS.
 - Production build was intentionally deferred until after this checkpoint commit because the release identity gate correctly rejects dirty source trees.
 
+## Checkpoint 4 — failure matrix and secret safety
+- Deterministic matrix covers: provider absent/invalid config; native bridge unavailable and stale-result rejection; invalid/oversized images; anonymous and unverified-account refusal; per-account rate limit; deployment-wide spend ceiling; provider timeout/unreachable/401/429/5xx; malformed/empty provider responses; low confidence; fallback attempt/failure; cancellation; and offline client readiness failure.
+- Answer-blind request enforcement remains covered and passing.
+- Focused matrix results: server handwriting 70/70 PASS; spend ceiling 22/22 PASS; cloud handwriting 52/52 PASS; cloud photo 28/28 PASS; native ink bridge PASS.
+- Clean committed client build PASS; both tracked iOS web bundles regenerated and `npm run check:ios` PASS (157 files each).
+- Secret scans PASS for tracked source, client/dist, both generated native Web resources, and workflow files.
+- No provider credential or secret-like `sk-` value is present in client/native artifacts; only server-side configuration owns the credential boundary.
+
 
 ## Current-main reconciliation
 - Recovered uncommitted Checkpoint-2 provider/status work was preserved first in commit ce0f4cfefe370a7e0ec2c6d04cc7573e81ff1e13 and pushed before history changes.
