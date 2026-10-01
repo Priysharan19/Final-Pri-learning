@@ -42,7 +42,7 @@ Form factors are chosen by **available viewport width in CSS px** (the window, n
 }
 ```
 
-The 600/840 split matches Android's window-size classes and keeps every current iPad width (≥ 744 portrait mini, ≥ 820 others) out of COMPACT. CP-03 migrates the existing 760/1180 rules onto these classes, **with iPad landscape and portrait screenshots held as regression baselines**.
+The 600/840 split matches Android's window-size classes and keeps every current iPad width (≥ 744 portrait mini, ≥ 820 others) out of COMPACT. **Clarification (CP-03):** by width, iPad *portrait* (744–834) is MEDIUM, not EXPANDED. MEDIUM keeps the tablet composition whenever the window is tall: the sidebar above 760 px and the full 380 px writing area. So the iPad portrait experience is unchanged; the class name is just accurate. The EXPANDED row's "iPad portrait" mention above refers to the 13-inch iPads (1024+ px). CP-03 migrates the existing 760/1180 rules onto these classes, **with iPad landscape and portrait screenshots held as regression baselines**.
 
 ## 3. Surface-by-surface adaptation
 

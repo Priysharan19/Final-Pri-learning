@@ -31,7 +31,7 @@ CSS px = viewport in CSS pixels. The form-factor class follows [FORM_FACTOR_SPEC
 | D6 | Android | Foldable inner display | ≈ 673×841 | MEDIUM | required (CP-03) | foldable emulator (CP-10) | optional |
 | D7 | Android | Stylus tablet (S Pen / USI) | 800×1280 | EXPANDED | ➖ | emulator stylus is synthetic only | required for any stylus claim (CP-09) |
 
-The S1 browser matrix is a single Playwright helper (CP-03) that iterates these viewports with `hasTouch` and `isMobile` set correctly. Today `client/test/e2e.mjs` creates a context at 1440×900 with `hasTouch: true` and **no `isMobile`**, so a coarse pointer is not emulated faithfully. The helper should also run **WebKit** for the Apple rows, because WKWebView-specific regressions are invisible to Chromium.
+**Status (CP-03):** the S1 browser matrix exists as `client/test/tour-responsive-matrix.js` and runs in Chromium and WebKit in the required browser job. It covers A1-class (360×640), A2 (390×844), A3-class (430×932), tablet portrait (820×1180), tablet landscape (1180×820) and short (844×390). The original note follows: the S1 browser matrix is a single Playwright helper (CP-03) that iterates these viewports with `hasTouch` and `isMobile` set correctly. Today `client/test/e2e.mjs` creates a context at 1440×900 with `hasTouch: true` and **no `isMobile`**, so a coarse pointer is not emulated faithfully. The helper should also run **WebKit** for the Apple rows, because WKWebView-specific regressions are invisible to Chromium.
 
 ## 2. Gates by journey
 
