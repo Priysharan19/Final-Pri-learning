@@ -39,15 +39,121 @@
 //     callback must not cause effects outside the database — none here do.
 //     readOnly transactions run at REPEATABLE READ READ ONLY: one consistent
 //     snapshot for multi-query reads such as a sync pull page.
+//   · transaction(fn, { lock, isolation: 'repeatable read' }) — snapshot
+//     isolation — is allowed only with a lock (see isolationOption).
+//   · transaction(fn, { lock }) names a lock the transaction holds from before
+//     BEGIN until after COMMIT/ROLLBACK. Postgres: a session advisory lock taken
+//     on the transaction's own client BEFORE the transaction's snapshot, so two
+//     holders of one key run strictly one after the other and the second sees
+//     everything the first committed. SQLite: already true of every transaction
+//     (one connection), so the key is only recorded. heldLock() tells code such
+//     as the sync-cursor allocator which lock the current transaction holds.
+//
+// OVERLOAD. Contention the store cannot resolve — serialization retries
+// exhausted, a statement or lock wait past statement_timeout, no pooled
+// connection within the pool's timeout — is a 503 with a Retry-After and a
+// coded error (PLATFORM_DB_BUSY / PLATFORM_DB_TIMEOUT), never a 500: the request
+// is safe to resend and the client is told so.
 // ─────────────────────────────────────────────────────────────────────────────
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { platformDatabaseUrl, validPostgresUrl } from './config.js';
+import { platformDatabaseUrl, postgresConnectionSettings, validPostgresUrl } from './config.js';
+import { BILLING_SCHEMA_VERSION, SCHEMA_VERSION } from './schemaVersions.js';
 
 const txContext = new AsyncLocalStorage();
 const SAFE_IDENTIFIER = /^[a-z_][a-z0-9_]{0,62}$/;
 
 function storeError(code, message) {
   return Object.assign(new Error(message), { code });
+}
+
+/** Is a transaction of this store open in the current async context? */
+export function inStoreTransaction() {
+  const context = txContext.getStore();
+  // A task spawned inside a transaction keeps its async context after the
+  // transaction ends; only a transaction that is still open counts.
+  return !!context && !context.tx.closed;
+}
+
+/**
+ * Outbound network I/O (a payment provider, a mailer, a JWKS fetch) must never
+ * run while a database transaction is open: on Postgres the transaction would
+ * hold a pooled connection and its row locks for the length of a network call,
+ * and a serialization retry re-runs the whole callback, so the call would be
+ * repeated. Code that talks to the network calls this first.
+ */
+export function assertNoOpenTransaction(what = 'This network call') {
+  if (inStoreTransaction()) {
+    throw storeError('STORE_EXTERNAL_IO_IN_TRANSACTION', `${what} must not run inside a database transaction.`);
+  }
+}
+
+function lockOption(options) {
+  const lock = options?.lock;
+  if (lock === undefined || lock === null) return null;
+  if (typeof lock !== 'string' || !lock || lock.length > 200) throw storeError('STORE_LOCK_INVALID', 'A transaction lock key must be a non-empty string of at most 200 characters.');
+  return lock;
+}
+
+/**
+ * Isolation for a writable transaction. SERIALIZABLE is the default and what
+ * every transaction gets unless it says otherwise. 'repeatable read' (snapshot
+ * isolation) is accepted ONLY together with a lock: the lock then makes every
+ * writer of the rows the transaction touches run one after another, with a
+ * snapshot taken after the previous one committed — serial execution for those
+ * rows — while SERIALIZABLE's page-granular predicate locks would still abort
+ * unrelated transactions that merely share an index page. Without a lock the
+ * store refuses it, so nothing can drop to snapshot isolation by accident.
+ */
+function isolationOption(options, lock) {
+  const isolation = options?.isolation ?? 'serializable';
+  if (isolation !== 'serializable' && isolation !== 'repeatable read') {
+    throw storeError('STORE_ISOLATION_INVALID', "Transaction isolation must be 'serializable' or 'repeatable read'.");
+  }
+  if (isolation === 'repeatable read' && !options?.readOnly && !lock) {
+    throw storeError('STORE_ISOLATION_REQUIRES_LOCK', "A writable 'repeatable read' transaction must hold a lock.");
+  }
+  return isolation;
+}
+
+function assertJoinableLock(joined, lock) {
+  // A lock must be taken before the snapshot it protects. Inside an open
+  // transaction that moment has passed, so asking for a different lock there is
+  // a programming error, not something to paper over.
+  if (lock && joined.lock !== lock) {
+    throw storeError('STORE_LOCK_NESTED', 'A transaction lock can only be taken by the outermost transaction.');
+  }
+}
+
+/**
+ * A retryable database overload, as the HTTP error the /v1 error handler
+ * answers with: 503, Retry-After, a stable code. The driver's code is kept for
+ * the operator log only.
+ */
+function overloaded(code, retryAfter, cause) {
+  return Object.assign(new Error(code === 'PLATFORM_DB_TIMEOUT'
+    ? 'The database did not answer in time. Retry shortly.'
+    : 'The database is busy. Retry shortly.'), {
+    code, status: 503, retryAfter, retryable: true, dbCode: String(cause?.code || '') || undefined
+  });
+}
+
+const BUSY_CODES = new Set(['40001', '40P01', '55P03']);
+const TIMEOUT_CODES = new Set(['57014', '25P03']);
+
+/** A retryable database overload (503 + Retry-After): handlers pass it on to the /v1 error handler untouched. */
+export function isDatabaseOverload(error) {
+  return !!error?.retryable && error.status === 503 && /^PLATFORM_DB_(BUSY|TIMEOUT)$/.test(String(error.code || ''));
+}
+
+/** Map an overload error from the driver to its retryable 503; anything else is returned as is. */
+export function databaseOverload(error) {
+  if (!error || error.status) return error;
+  const code = String(error.code || '');
+  if (BUSY_CODES.has(code)) return overloaded('PLATFORM_DB_BUSY', 1, error);
+  if (TIMEOUT_CODES.has(code)) return overloaded('PLATFORM_DB_TIMEOUT', 2, error);
+  // pg-pool's acquisition timeout carries no code, only this message.
+  if (!code && /timeout exceeded when trying to connect/i.test(String(error.message || ''))) return overloaded('PLATFORM_DB_BUSY', 2, { code: 'POOL_TIMEOUT' });
+  return error;
 }
 
 function asParams(params) {
@@ -98,10 +204,11 @@ const dialectHelpers = {
 // ── SQLite ───────────────────────────────────────────────────────────────────
 
 class SqliteTx {
-  constructor(store, depth = 0) {
+  constructor(store, depth = 0, lock = null) {
     this.store = store;
     this.dialect = 'sqlite';
     this.depth = depth;
+    this.lock = lock;
     this.closed = false;
   }
   #check() { if (this.closed) throw storeError('STORE_TX_FINISHED', 'This transaction has already finished.'); }
@@ -114,7 +221,7 @@ class SqliteTx {
     const name = `pri_sp_${this.depth + 1}`;
     const raw = this.store.raw;
     raw.exec(`SAVEPOINT ${name}`);
-    const nested = new SqliteTx(this.store, this.depth + 1);
+    const nested = new SqliteTx(this.store, this.depth + 1, this.lock);
     try {
       const result = await txContext.run({ store: this.store, tx: nested }, () => fn(nested));
       raw.exec(`RELEASE ${name}`);
@@ -216,16 +323,27 @@ export class SqliteStore {
     this.raw.exec(sql);
   }
 
+  /** The lock key the current transaction holds, or null. */
+  heldLock() {
+    return this.#joined()?.lock ?? null;
+  }
+
   async transaction(fn, options = {}) {
+    const lock = lockOption(options);
+    isolationOption(options, lock); // validated on both engines; SQLite is always serial
     const joined = this.#joined();
-    if (joined) return joined.transaction(fn, options);
+    if (joined) {
+      assertJoinableLock(joined, lock);
+      return joined.transaction(fn, options);
+    }
     // One connection: take the in-process lock so no other request's
-    // statement can land inside this transaction.
+    // statement can land inside this transaction. That already serialises
+    // every transaction, so a named lock needs nothing more than recording.
     while (this.active) await this.active.done;
     let release;
     this.active = { done: new Promise(resolve => { release = resolve; }) };
     this.stats.transactions++;
-    const tx = new SqliteTx(this, 0);
+    const tx = new SqliteTx(this, 0, lock);
     try {
       this.raw.exec('BEGIN');
       let result;
@@ -235,7 +353,18 @@ export class SqliteStore {
         if (this.raw.inTransaction) this.raw.exec('ROLLBACK');
         throw error;
       }
-      this.raw.exec('COMMIT');
+      try {
+        this.raw.exec('COMMIT');
+      } catch (error) {
+        // A COMMIT that fails (SQLITE_BUSY, SQLITE_FULL, an I/O error) can leave
+        // the transaction open. Released like that, the next request's BEGIN
+        // would fail — or, worse, its statements would join this transaction's
+        // uncommitted writes. Roll back before the lock is released.
+        if (this.raw.inTransaction) {
+          try { this.raw.exec('ROLLBACK'); } catch { /* the original error is the one to report */ }
+        }
+        throw error;
+      }
       return result;
     } finally {
       tx.closed = true;
@@ -343,12 +472,13 @@ function runResult(result) {
 }
 
 class PostgresTx {
-  constructor(store, client, depth = 0, readOnly = false) {
+  constructor(store, client, depth = 0, readOnly = false, lock = null) {
     this.store = store;
     this.client = client;
     this.dialect = 'postgres';
     this.depth = depth;
     this.readOnly = readOnly;
+    this.lock = lock;
     this.closed = false;
   }
   #check() { if (this.closed) throw storeError('STORE_TX_FINISHED', 'This transaction has already finished.'); }
@@ -364,7 +494,7 @@ class PostgresTx {
     this.#check();
     const name = `pri_sp_${this.depth + 1}`;
     await this.client.query(`SAVEPOINT ${name}`);
-    const nested = new PostgresTx(this.store, this.client, this.depth + 1, this.readOnly);
+    const nested = new PostgresTx(this.store, this.client, this.depth + 1, this.readOnly, this.lock);
     try {
       const result = await txContext.run({ store: this.store, tx: nested }, () => fn(nested));
       await this.client.query(`RELEASE SAVEPOINT ${name}`);
@@ -384,11 +514,78 @@ class PostgresTx {
 }
 Object.assign(PostgresTx.prototype, dialectHelpers);
 
+// A session advisory lock, keyed by a 64-bit hash of the lock name. Distinct
+// names that collide only serialise more than necessary; they never deadlock,
+// because a transaction takes at most one such lock.
+//
+// Never a blocking pg_advisory_lock: a waiter blocked inside Postgres holds a
+// pooled connection for as long as it waits, so ten concurrent pushes from ONE
+// account (the rate limit allows 120/min) would take a 10-connection pool and
+// starve every other request. Instead (PostgresStore.transaction):
+//   1. waiters for the same key queue IN THIS PROCESS, holding no connection —
+//      one connection per lock key per server instance at most;
+//   2. the queue head checks out a connection and takes the database lock with
+//      pg_try_advisory_lock, retrying briefly — that wait only happens when
+//      ANOTHER instance holds the key;
+//   3. both waits share one bounded budget (lockWaitMs); past it the request
+//      is a retryable 503 PLATFORM_DB_BUSY, not a pool starved for 15 s.
+const ADVISORY_TRY_LOCK = 'SELECT pg_try_advisory_lock(hashtextextended($1, 0)) AS acquired';
+const ADVISORY_UNLOCK = 'SELECT pg_advisory_unlock(hashtextextended($1, 0)) AS released';
+export const DEFAULT_LOCK_WAIT_MS = 5000;
+
+/** FIFO mutexes by key, with a deadline per waiter. In-process only. */
+export class KeyedMutex {
+  constructor() { this.queues = new Map(); }
+  /** Resolves to a release function, or rejects with PLATFORM_DB_BUSY at the deadline. */
+  acquire(key, timeoutMs) {
+    let queue = this.queues.get(key);
+    if (!queue) { queue = { held: false, waiters: [] }; this.queues.set(key, queue); }
+    const release = () => {
+      const next = queue.waiters.shift();
+      if (next) { clearTimeout(next.timer); next.resolve(release); return; }
+      queue.held = false;
+      this.queues.delete(key);
+    };
+    if (!queue.held) { queue.held = true; return Promise.resolve(once(release)); }
+    return new Promise((resolve, reject) => {
+      const waiter = { resolve: r => resolve(once(r)), timer: null };
+      waiter.timer = setTimeout(() => {
+        const at = queue.waiters.indexOf(waiter);
+        if (at !== -1) queue.waiters.splice(at, 1);
+        reject(overloaded('PLATFORM_DB_BUSY', 1, { code: 'LOCK_QUEUE_TIMEOUT' }));
+      }, Math.max(0, timeoutMs));
+      queue.waiters.push(waiter);
+    });
+  }
+  /** Waiters queued behind the holder of `key` (tests, operators). */
+  waiting(key) { return this.queues.get(key)?.waiters.length || 0; }
+}
+
+function once(fn) {
+  let done = false;
+  return () => { if (!done) { done = true; fn(); } };
+}
+
+function sessionMillis(value, name) {
+  if (value === undefined || value === null) return null;
+  const number = Number(value);
+  if (!Number.isSafeInteger(number) || number < 0) throw storeError('STORE_SESSION_INVALID', `${name} must be a whole number of milliseconds.`);
+  return number;
+}
+
 export class PostgresStore {
-  constructor(pool, { schema = 'pri', ownsPool = true, maxAttempts = MAX_ATTEMPTS } = {}) {
+  constructor(pool, { schema = 'pri', ownsPool = true, maxAttempts = MAX_ATTEMPTS, statementTimeoutMs, idleInTransactionTimeoutMs, lockWaitMs = DEFAULT_LOCK_WAIT_MS } = {}) {
     if (!SAFE_IDENTIFIER.test(String(schema))) throw storeError('STORE_SCHEMA_INVALID', 'Postgres schema name is invalid.');
     this.dialect = 'postgres';
+    // Applied to every pooled connection before its first statement.
+    this.session = Object.freeze({
+      statementTimeoutMs: sessionMillis(statementTimeoutMs, 'statementTimeoutMs'),
+      idleInTransactionTimeoutMs: sessionMillis(idleInTransactionTimeoutMs, 'idleInTransactionTimeoutMs')
+    });
     this.maxAttempts = Math.max(1, Math.floor(Number(maxAttempts) || MAX_ATTEMPTS));
+    /** How long a transaction may wait for its named lock (in process + in Postgres) before a 503. */
+    this.lockWaitMs = sessionMillis(lockWaitMs, 'lockWaitMs') ?? DEFAULT_LOCK_WAIT_MS;
+    this.localLocks = new KeyedMutex();
     /** Counters for operators and tests: transactions begun, and re-runs after 40001/40P01. */
     this.stats = { transactions: 0, retries: 0 };
     this.pool = pool;
@@ -404,16 +601,46 @@ export class PostgresStore {
     return context?.store === this ? context.tx : null;
   }
 
+  /** The lock key the current transaction holds, or null. */
+  heldLock() {
+    return this.#joined()?.lock ?? null;
+  }
+
+  /** The session statements every pooled connection runs before first use. */
+  sessionSetup() {
+    const statements = [`SET search_path TO ${this.schema}`];
+    // Integers validated in the constructor; SET cannot take a bind parameter.
+    if (this.session.statementTimeoutMs !== null) statements.push(`SET statement_timeout = ${this.session.statementTimeoutMs}`);
+    if (this.session.idleInTransactionTimeoutMs !== null) statements.push(`SET idle_in_transaction_session_timeout = ${this.session.idleInTransactionTimeoutMs}`);
+    return statements.join('; ');
+  }
+
   /**
-   * A pooled client whose session is ready: search_path set once, on first
-   * use, and awaited before any statement runs on it. (Setting it from the
-   * pool's 'connect' event raced the first query on the same client.)
+   * A pooled client whose session is ready: search_path and the per-session
+   * timeouts set once, on first use, and awaited before any statement runs on
+   * it. (Setting them from the pool's 'connect' event raced the first query on
+   * the same client.) SET, not startup parameters, so they also hold through a
+   * session-mode pooler that does not forward startup options.
    */
   async _client() {
-    const client = await this.pool.connect();
+    let client;
+    try {
+      client = await this.pool.connect();
+    } catch (error) {
+      throw databaseOverload(error);
+    }
+    if (!client.__priErrorListener && typeof client.on === 'function') {
+      // The server can end a checked-out session on its own — most often
+      // idle_in_transaction_session_timeout (25P03). pg reports that as an
+      // 'error' event on the client, and pg-pool only listens while the client
+      // is idle in the pool: unheard, it would crash the process. Record it; the
+      // next statement on this client fails, and the client is destroyed.
+      client.__priErrorListener = error => { client.__priLost ||= error; }; // the first is the cause
+      client.on('error', client.__priErrorListener);
+    }
     if (!client.__priSchema) {
       try {
-        await client.query(`SET search_path TO ${this.schema}`);
+        await client.query(this.sessionSetup());
       } catch (error) {
         client.release(error);
         throw error;
@@ -430,8 +657,9 @@ export class PostgresStore {
       return await client.query(toPostgresPlaceholders(sql), asParams(params));
     } catch (error) {
       // A statement error leaves the session usable; a lost connection does not.
-      if (!error?.code || String(error.code).startsWith('08') || error.code === '57P01') broken = error;
-      throw error;
+      if (client.__priLost) { broken = client.__priLost; throw databaseOverload(client.__priLost); }
+      if (!error?.code || String(error.code).startsWith('08') || error.code === '57P01' || error.code === '25P03') broken = error;
+      throw databaseOverload(error);
     } finally {
       client.release(broken);
     }
@@ -462,34 +690,95 @@ export class PostgresStore {
     try { await client.query(sql); } finally { client.release(); }
   }
 
-  async transaction(fn, { readOnly = false } = {}) {
+  async transaction(fn, options = {}) {
+    const { readOnly = false } = options;
+    const lock = lockOption(options);
+    const isolation = isolationOption(options, lock);
     const joined = this.#joined();
-    if (joined) return joined.transaction(fn);
+    if (joined) {
+      assertJoinableLock(joined, lock);
+      return joined.transaction(fn);
+    }
     for (let attempt = 1; ; attempt++) {
       if (attempt > 1) this.stats.retries++;
       this.stats.transactions++;
-      const client = await this._client();
-      const tx = new PostgresTx(this, client, 0, readOnly);
-      let broken;
+      // Queue for the lock in this process BEFORE taking a pooled connection.
+      const deadline = Date.now() + this.lockWaitMs;
+      const releaseLocal = lock ? await this.localLocks.acquire(lock, this.lockWaitMs) : null;
+      let client;
       try {
+        client = await this._client();
+      } catch (error) {
+        releaseLocal?.();
+        throw error;
+      }
+      const tx = new PostgresTx(this, client, 0, readOnly, lock);
+      let broken;
+      let locked = false;
+      let begun = false;
+      try {
+        // The lock is taken before BEGIN, so this transaction's snapshot is
+        // taken after the previous holder committed and includes its writes.
+        if (lock) {
+          try {
+            locked = await this.#tryLock(client, lock, deadline);
+          } catch (lockError) {
+            // A failed lock statement must not leave any doubt about a session
+            // lock on a pooled connection: end the session.
+            broken = lockError;
+            throw lockError;
+          }
+          if (!locked) throw overloaded('PLATFORM_DB_BUSY', 1, { code: 'LOCK_WAIT_TIMEOUT' });
+        }
         await client.query(readOnly
           ? 'BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY'
-          : 'BEGIN ISOLATION LEVEL SERIALIZABLE');
+          : isolation === 'repeatable read' ? 'BEGIN ISOLATION LEVEL REPEATABLE READ' : 'BEGIN ISOLATION LEVEL SERIALIZABLE');
+        begun = true;
         const result = await txContext.run({ store: this, tx }, () => fn(tx));
         tx.closed = true;
         await client.query('COMMIT');
         return result;
-      } catch (error) {
+      } catch (thrown) {
         tx.closed = true;
+        // A session the server ended (see _client) explains whatever the next
+        // statement then failed with: report the cause, destroy the client.
+        const error = client.__priLost && !thrown?.status ? client.__priLost : thrown;
+        if (client.__priLost) broken = client.__priLost;
         // A client whose ROLLBACK fails is in an unknown state: destroy it
         // rather than hand it to the next request.
-        try { await client.query('ROLLBACK'); } catch (rollbackError) { broken = rollbackError; }
-        if (!RETRYABLE.has(String(error?.code || '')) || attempt >= this.maxAttempts) throw error;
+        if (begun && !broken) {
+          try { await client.query('ROLLBACK'); } catch (rollbackError) { broken = rollbackError; }
+        }
+        if (String(error?.code || '') === '25P03' || String(error?.code || '').startsWith('08')) broken = broken || error;
+        if (!RETRYABLE.has(String(error?.code || '')) || attempt >= this.maxAttempts) throw databaseOverload(error);
       } finally {
         tx.closed = true;
+        // Released only after COMMIT/ROLLBACK. A client that cannot prove it
+        // released the lock is destroyed: ending the session releases it.
+        if (locked && !broken) {
+          try {
+            const unlocked = await client.query(ADVISORY_UNLOCK, [lock]);
+            if (unlocked?.rows?.[0]?.released !== true) broken = storeError('STORE_LOCK_LOST', 'The transaction lock was not held at release.');
+          } catch (unlockError) {
+            broken = unlockError;
+          }
+        }
         client.release(broken);
+        releaseLocal?.();
       }
       await pause(retryDelayMs(attempt));
+    }
+  }
+
+  /** pg_try_advisory_lock until acquired or the deadline; true when held. */
+  async #tryLock(client, lock, deadline) {
+    for (let round = 0; ; round++) {
+      const result = await client.query(ADVISORY_TRY_LOCK, [lock]);
+      if (result?.rows?.[0]?.acquired === true) return true;
+      const left = deadline - Date.now();
+      if (left <= 0) return false;
+      // Another instance holds it: short, jittered waits, capped at 50 ms.
+      await pause(Math.min(left, Math.floor(Math.random() * Math.min(50, 5 * 2 ** Math.min(round, 4))) + 1));
     }
   }
 
@@ -504,23 +793,40 @@ Object.assign(PostgresStore.prototype, dialectHelpers);
 export { platformDatabaseUrl, validPostgresUrl };
 
 /**
- * A pg Pool that parses int8 as Number (PostgresStore sets each client's
- * search_path before first use). Use a direct or session-mode connection string: SERIALIZABLE
- * transactions and the per-connection search_path both need a real session,
- * which a transaction-mode pooler does not give.
+ * The pg Pool options for a connection string and environment: TLS from
+ * sslmode (refused without TLS in production — see config.js
+ * postgresConnectionSettings), the pool size from PRI_DATABASE_POOL_MAX. Pure,
+ * so the exact options are testable without a database.
  */
-export async function createPostgresPool(connectionString, { schema = 'pri', max } = {}) {
+export function postgresPoolOptions(connectionString, { max, env = process.env } = {}) {
+  const settings = postgresConnectionSettings(connectionString, env);
+  const poolMax = max === undefined || max === null ? settings.poolMax : Number(max);
+  if (!Number.isSafeInteger(poolMax) || poolMax < 1 || poolMax > 50) throw storeError('PLATFORM_DB_CONFIG_INVALID', 'The Postgres pool size must be between 1 and 50.');
+  return {
+    settings,
+    options: {
+      connectionString: settings.connectionString,
+      ssl: settings.ssl,
+      max: poolMax,
+      idleTimeoutMillis: 30_000,
+      connectionTimeoutMillis: 10_000,
+      application_name: 'pri-learning-v1'
+    }
+  };
+}
+
+/**
+ * A pg Pool that parses int8 as Number (PostgresStore sets each client's
+ * search_path and timeouts before first use). Use a direct or session-mode connection string: SERIALIZABLE
+ * transactions, session advisory locks and the per-connection settings all need
+ * a real session, which a transaction-mode pooler does not give.
+ */
+export async function createPostgresPool(connectionString, { schema = 'pri', max, env = process.env } = {}) {
   if (!validPostgresUrl(connectionString)) throw storeError('PLATFORM_DB_URL_INVALID', 'PRI_DATABASE_URL must be a postgres:// or postgresql:// URL with a host.');
   if (!SAFE_IDENTIFIER.test(String(schema))) throw storeError('STORE_SCHEMA_INVALID', 'Postgres schema name is invalid.');
+  const { options } = postgresPoolOptions(connectionString, { max, env });
   const { default: pg } = await import('pg');
-  const pool = new pg.Pool({
-    connectionString,
-    max: Math.max(1, Math.min(50, Number(max ?? process.env.PRI_DATABASE_POOL_MAX) || 10)),
-    idleTimeoutMillis: 30_000,
-    connectionTimeoutMillis: 10_000,
-    types: postgresTypes(pg.types),
-    application_name: 'pri-learning-v1'
-  });
+  const pool = new pg.Pool({ ...options, types: postgresTypes(pg.types) });
   // An idle client dropped by the server must not crash the process; the pool
   // discards it and the next query opens a fresh connection.
   pool.on('error', error => {
@@ -529,12 +835,18 @@ export async function createPostgresPool(connectionString, { schema = 'pri', max
   return pool;
 }
 
-export async function createPostgresStore(connectionString, { schema = 'pri', max } = {}) {
+export async function createPostgresStore(connectionString, { schema = 'pri', max, env = process.env, expected } = {}) {
   if (!validPostgresUrl(connectionString)) {
     throw storeError('PLATFORM_DB_URL_INVALID', 'PRI_DATABASE_URL must be a postgres:// or postgresql:// URL with a host.');
   }
-  const pool = await createPostgresPool(connectionString, { schema, max });
-  const store = new PostgresStore(pool, { schema });
+  const { settings } = postgresPoolOptions(connectionString, { max, env });
+  const pool = await createPostgresPool(connectionString, { schema, max, env });
+  const store = new PostgresStore(pool, {
+    schema,
+    statementTimeoutMs: settings.statementTimeoutMs,
+    idleInTransactionTimeoutMs: settings.idleInTransactionTimeoutMs,
+    lockWaitMs: settings.lockWaitMs
+  });
   // Fail at boot, not on the first student request: the database must be
   // reachable and the schema already migrated (supabase/migrations) — this
   // process never creates tables. Only the driver's error code is surfaced:
@@ -552,7 +864,48 @@ export async function createPostgresStore(connectionString, { schema = 'pri', ma
     await store.close().catch(() => {});
     throw storeError('PLATFORM_DB_NOT_MIGRATED', 'Postgres platform schema has no schema_version. Apply supabase/migrations first.');
   }
+  try {
+    await assertSchemaVersions(store, expected);
+  } catch (error) {
+    await store.close().catch(() => {});
+    throw error;
+  }
   return store;
+}
+
+/**
+ * The database must be exactly the schema this build was written against:
+ * platform_meta.schema_version and billing_schema_version equal to the
+ * constants in schemaVersions.js, and the objects later migrations add present.
+ * Older means a migration was not applied; newer means this build is behind the
+ * database. Either way handlers would read or write columns that are not what
+ * they expect, so the process stops before it listens.
+ */
+export async function assertSchemaVersions(store, expected = {}) {
+  const want = {
+    schema_version: String(expected.schemaVersion ?? SCHEMA_VERSION),
+    billing_schema_version: String(expected.billingSchemaVersion ?? BILLING_SCHEMA_VERSION)
+  };
+  const rows = await store.all("SELECT key, value FROM platform_meta WHERE key IN ('schema_version','billing_schema_version')");
+  const found = new Map(rows.map(row => [row.key, String(row.value)]));
+  for (const [key, value] of Object.entries(want)) {
+    const actual = found.get(key);
+    if (actual !== value) {
+      throw storeError('PLATFORM_DB_SCHEMA_MISMATCH',
+        `Postgres platform_meta.${key} is ${actual === undefined ? 'missing' : JSON.stringify(actual.slice(0, 20))}; this server needs ${value}. Apply supabase/migrations or deploy the matching server build.`);
+    }
+  }
+  // supabase/migrations/20261002000000_sync_cursor_sequence.sql. Without it
+  // every sync push would fail at its first event.
+  try {
+    await store.get("SELECT last_value FROM sync_cursor_seq");
+  } catch (error) {
+    if (String(error?.code || '') === '42P01') {
+      throw storeError('PLATFORM_DB_SCHEMA_MISMATCH', 'Postgres is missing pri.sync_cursor_seq. Apply supabase/migrations.');
+    }
+    throw storeError('PLATFORM_DB_UNAVAILABLE', `Postgres sync cursor sequence is not usable (${String(error?.code || 'UNKNOWN').replace(/[^A-Z0-9_]/gi, '').slice(0, 40)}).`);
+  }
+  return true;
 }
 
 export function createSqliteStore(db) {
