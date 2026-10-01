@@ -169,6 +169,34 @@ Structured peer collaboration with rotating cognitive roles, private prediction/
 ### RESEARCH_COMPLETENESS_AUDIT_V6_2026-10-01.md
 Domain-by-domain audit of what is architecture-saturated versus Pri-data-blocked, the evidence assets that now matter most, research freshness classes and explicit stopping rules for future literature searches.
 
+## V7 mechanistic deep-research layer — 1 October 2026
+
+V7 does not add another product vision. It interrogates the mechanisms underneath V5/V6 and connects decades of intelligent-tutoring/psychometric research to the current 2025–26 generative-AI frontier.
+
+### ITS_HISTORY_AND_AI_TUTOR_EVIDENCE_DEEP_DIVE.md
+Historical ITS meta-analyses, Cognitive Tutor/MATHia, ASSISTments, ALEKS and Eedi mechanisms, then direct comparison with current GPT/Khanmigo/NUMI evidence. Defines which classical tutoring mechanics Pri should preserve and where LLMs actually add value.
+
+### LEARNER_MODELING_KT_CDM_IRT_DEEP_DIVE.md
+Bayesian Knowledge Tracing, PFA, IRT, cognitive diagnosis, DKT/SAKT/AKT, Q-matrix risk, time-forward validation, subgroup calibration, abstention, family dependence and a staged Pri model-admission ladder.
+
+### ADAPTIVE_POLICY_CAUSAL_PERSONALIZATION_DEEP_DIVE.md
+Prediction-vs-treatment separation, contextual bandits, sequential policy risk, causal heterogeneity, propensity logging, off-policy evaluation, safe exploration and a dependency-ordered experiment path before learner-specific adaptation.
+
+### HANDWRITTEN_MATH_PERCEPTION_DEEP_DIVE.md
+HMER structure recognition, MathWriting/CROHME, authentic student artifacts, writer/device holdouts, answer blindness, candidate parses, structure-aware error severity, selective confirmation and the exact empirical programme Pri Ink needs.
+
+### MATH_TRUTH_FIRST_BREAK_FORMAL_VERIFICATION_DEEP_DIVE.md
+Domain-aware symbolic truth, typed transformations, first-break authority, error-carried-forward, alternate routes, geometry scenes, formal-verification two-gate architecture, rubric criterion graphs and SafeMath/PriMath evidence stages.
+
+### MULTILINGUAL_MATH_INDIA_DEEP_DIVE.md
+Instruction/terminology/assessment language separation, CSTT terminology authority, Hindi mathematical-model reliability, translation QA, bilingual assistance fading, code-switching and delayed English-assessment transfer.
+
+### FRONTIER_TUTORING_SYSTEMS_MECHANISM_MATRIX_V7.md
+Mechanism-by-mechanism reverse engineering of ALEKS, MATHia/Cognitive Tutor, ASSISTments, Eedi, Khanmigo, NUMI and unrestricted GPT-style tutoring, with an explicit Pri synthesis rather than feature parity.
+
+### V7_EMPIRICAL_SCIENCE_AND_BENCHMARK_PROGRAMME.md
+Execution-grade science programme: semantic instrumentation → adjudicated gold assets → benchmark laboratory → randomized mechanism experiments → India/classroom field evidence, with evidence grades and release claims.
+
 ### V6 agent routing
 
 | Mission surface | Additional V6 module |
@@ -187,6 +215,13 @@ Domain-by-domain audit of what is architecture-saturated versus Pri-data-blocked
 | peer tutoring, group work, pairing, collaborative canvas | PAIRLAB_COLLABORATIVE_LEARNING.md |
 | India device/offline/shared-device/language field assumptions | INDIA_FIELD_OPERATING_REALITY_2026.md |
 | sequencing research-derived engineering work | RESEARCH_TO_BUILD_V6.md + RESEARCH_COMPLETENESS_AUDIT_V6_2026-10-01.md |
+| classical ITS evidence, tutoring-system mechanism choice | ITS_HISTORY_AND_AI_TUTOR_EVIDENCE_DEEP_DIVE.md + FRONTIER_TUTORING_SYSTEMS_MECHANISM_MATRIX_V7.md |
+| mastery model, KT, IRT, CDM, calibration, abstention | LEARNER_MODELING_KT_CDM_IRT_DEEP_DIVE.md |
+| adaptive sequencing, bandits, treatment selection, causal personalization | ADAPTIVE_POLICY_CAUSAL_PERSONALIZATION_DEEP_DIVE.md |
+| handwriting recognition, ink confidence, writer/device generalization | HANDWRITTEN_MATH_PERCEPTION_DEEP_DIVE.md |
+| step validity, first break, SafeMath, formal proof, method marks | MATH_TRUTH_FIRST_BREAK_FORMAL_VERIFICATION_DEEP_DIVE.md |
+| Hindi/Hinglish, bilingual explanations, translation/terminology | MULTILINGUAL_MATH_INDIA_DEEP_DIVE.md |
+| benchmark construction, randomized research, evidence-grade claims | V7_EMPIRICAL_SCIENCE_AND_BENCHMARK_PROGRAMME.md |
 
 ## Domain routing for agents
 
