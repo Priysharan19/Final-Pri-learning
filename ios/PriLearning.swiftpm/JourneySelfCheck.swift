@@ -361,7 +361,7 @@ enum JourneySelfCheck {
     """
 
     // Run with the largest accessibility text size set on the simulator: the
-    // shell scales the page (pageZoom) and nothing may scroll sideways.
+    // shell scales the page (through the viewport) and nothing may scroll sideways.
     private static let dynamicType = cloudHelpers + """
     const overflow = () => Math.max(0, document.scrollingElement.scrollWidth - window.innerWidth);
     await step('dynamicTypeZoom', async () => {
@@ -378,10 +378,11 @@ enum JourneySelfCheck {
         seen.push(path + ':' + o);
         if (o > 1) {
           // Name the widest offenders so the failure is actionable.
-          const wide = [...document.querySelectorAll('body *')].map(el => [el, el.getBoundingClientRect()])
-            .filter(([el, r]) => r.right > window.innerWidth + 1 && r.width > 0)
-            .sort((a, b) => b[1].right - a[1].right).slice(0, 4)
-            .map(([el, r]) => el.tagName.toLowerCase() + '.' + String(el.className || '').split(' ').slice(0, 2).join('.') + '@' + Math.round(r.right));
+          const over = el => { const r = el.getBoundingClientRect(); return r.width > 0 && r.right > window.innerWidth + 1; };
+          // The innermost elements that cross the edge, not their stretched ancestors.
+          const wide = [...document.querySelectorAll('body *')].filter(el => over(el) && ![...el.children].some(over))
+            .map(el => [el, el.getBoundingClientRect()]).slice(0, 5)
+            .map(([el, r]) => el.tagName.toLowerCase() + '.' + String(el.className || '').split(' ').slice(0, 2).join('.') + '@' + Math.round(r.left) + '-' + Math.round(r.right) + (getComputedStyle(el).width ? ' w=' + getComputedStyle(el).width : ''));
           throw new Error('horizontal overflow ' + seen.join(' ') + ' offenders ' + wide.join(' '));
         }
       }
