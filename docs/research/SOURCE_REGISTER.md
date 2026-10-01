@@ -903,3 +903,231 @@ Class: meta-analysis of 11 recent experimental/quasi-experimental studies.
 Use: promising positive mathematics-performance evidence with very high heterogeneity; supports testing structured peer tutoring.
 Limitation: small evidence base and very high heterogeneity; pooled effect should not be treated as a universal constant.
 https://www.malque.pub/ojs/index.php/mr/article/view/17371
+
+
+---
+
+# AF. V7 intelligent-tutoring historical evidence
+
+## Ma et al. — Intelligent Tutoring Systems and Learning Outcomes (2014)
+Class: meta-analysis; 107 effect sizes / 14,321 participants across domains and education levels.
+Use: historical evidence that ITS can outperform large-group teaching, non-ITS computer instruction and textbooks/workbooks on average; useful anchor for mechanisms that predate LLMs.
+Reported comparison effects in the meta-analysis: g=.42 vs teacher-led large-group instruction, g=.57 vs non-ITS computer instruction, g=.35 vs textbooks/workbooks; no significant advantage over individualized human tutoring or small-group instruction.
+Limitation: aggregates heterogeneous systems/populations/outcomes; not Pri efficacy and not school-mathematics-specific.
+https://doi.org/10.1037/a0037123
+
+## Kulik & Fletcher — Effectiveness of Intelligent Tutoring Systems (2016)
+Class: meta-analytic review of 50 controlled evaluations.
+Use: median effect reported as 0.66 SD, but the review shows strong dependence on local-vs-standardized outcome alignment and implementation quality.
+Critical implication: locally aligned assessments can substantially inflate apparent tutoring effects relative to more external measures.
+https://doi.org/10.3102/0034654315581420
+
+## Steenbergen-Hu & Cooper — K–12 mathematics ITS meta-analysis (2013)
+Class: mathematics-specific meta-analysis; 26 reports / 34 independent samples.
+Use: important counterweight to large general ITS estimates; average effects in K–12 mathematics were small (roughly g=.01–.09 depending analysis).
+Limitation: older generation of systems/studies; does not represent current Pri architecture.
+https://doi.org/10.1037/a0032447
+
+## Pane et al. — Cognitive Tutor Algebra I at Scale
+Class: large multi-state randomized effectiveness study.
+Use: no detectable first-year effect but positive second-year evidence; supports separating product architecture from implementation maturity/fidelity.
+https://doi.org/10.3102/0162373713507480
+
+## Roschelle et al. — ASSISTments randomized trial
+Class: school-randomized Grade 7 mathematics effectiveness trial in Maine.
+Use: evidence for a practice + immediate feedback + teacher formative-data system, not merely conversational AI.
+https://doi.org/10.1177/2332858416673968
+
+## ASSISTments long-horizon effect — Feng et al. (2025)
+Class: follow-up achievement study one school year after the Grade 7 intervention ended.
+Use: supports explicitly measuring whether learning persists after the tool/intervention is removed.
+Limitation: one U.S. state / specific implementation; transport to Pri must be tested.
+https://doi.org/10.1111/bjet.13579
+
+## ALEKS Knowledge Space Theory
+Class: official product/theory documentation.
+Use: architectural precedent for representing readiness as a structured knowledge state rather than a single global mastery scalar.
+Limitation: vendor description; not independent causal efficacy evidence.
+https://www.aleks.com/about_aleks/knowledge_space_theory
+https://www.aleks.com/about_aleks/research_behind
+
+## Eedi diagnostic engine and research infrastructure
+Class: official product/research documentation.
+Use: construct IDs, diagnostic distractors, misconception graph and large response-data infrastructure as precedent for durable diagnostic semantics.
+Limitation: vendor capability claims are not independent efficacy evidence.
+https://www.eedi.com/diagnostic-engine
+https://www.eedi.com/data-and-competitions
+https://www.eedi.com/research
+
+---
+
+# AG. V7 learner-model / measurement evidence
+
+## Capturing Session-to-Session Dynamics of Learning and Forgetting (2025)
+Class: longitudinal model-evaluation study.
+Use: BKT, BKT+forgetting and Additive Factors can fit past data yet fail to reproduce future session behavior, spacing and forgetting under time-based validation.
+Critical implication: Pri learner models require time-forward prospective evaluation rather than random interaction splits.
+https://doi.org/10.1007/s40593-025-00508-3
+
+## Is there a better way to forget? (2026)
+Class: comparative deep-knowledge-tracing forgetting-function study.
+Use: widely used Ebbinghaus/exponential-style decay was not consistently best; sigmoid and inverse functions outperformed it in some scenarios.
+Critical implication: Pri must not hard-code one forgetting law as truth.
+https://doi.org/10.1016/j.knosys.2025.114884
+
+## Subgroup Calibration and Mastery Decision Errors in Knowledge Tracing (2026)
+Class: large-scale calibration/decision study; EdNet, 20,705 students / 5.89M interactions; six KT architectures.
+Use: aggregate ECE below .025 concealed systematic overprediction for low-performing learners and underprediction for high-performing learners; at a 0.85 mastery threshold, about 15–20% of low-performing-student promotion decisions were incorrect depending on model.
+Critical implication: evaluate decision errors and subgroup calibration, not AUC alone.
+https://doi.org/10.1109/SIST61674.2026.11596401
+
+## Knowing When to Defer: Selective Prediction for Responsible Knowledge Tracing (2026)
+Class: Eedi mathematics selective-prediction evaluation across DKT, SAKT and AKT.
+Use: abstaining on the 20% most uncertain predictions increased retained-set accuracy/AUC/F1; deferred cases had 1.45–1.60× the error rate.
+Critical implication: “insufficient evidence” is a legitimate learner-model output.
+https://proceedings.mlr.press/v339/mitton26a.html
+
+## Performance Factors Analysis
+Class: interpretable learner-performance model.
+Use: transparent success/failure/component baseline that advanced Pri models should beat prospectively.
+https://doi.org/10.3233/978-1-60750-028-5-531
+
+## Deep Knowledge Tracing
+Class: sequence-model landmark.
+Use: flexible temporal learner modelling; included as model class, not evidence that latent state equals human mastery.
+https://proceedings.neurips.cc/paper/2015/hash/bac9162b47c56fc8a4d2a519803d51b3-Abstract.html
+
+## Generalized DINA / cognitive diagnosis
+Class: psychometric latent-attribute model.
+Use: candidate framework when question-to-component mappings and conjunctive/non-conjunctive assumptions are empirically defensible.
+https://doi.org/10.1007/s11336-011-9207-7
+
+## Q-matrix validation
+Class: psychometric measurement research.
+Use: direct warning that diagnostic inference depends on validity of the item-to-attribute mapping.
+https://doi.org/10.1111/j.1745-3984.2008.00069.x
+https://doi.org/10.1007/s11336-021-09821-x
+
+---
+
+# AH. V7 handwritten-mathematics perception evidence
+
+## MathWriting
+Class: large online handwritten mathematical-expression dataset.
+Use: pretraining/public benchmark source for stroke-based HMER.
+Limitation: isolated copied expressions are not authentic erroneous multi-line school work and cannot establish Pri Ink field reliability.
+https://arxiv.org/abs/2404.10690
+https://research.google/blog/mathwriting-a-dataset-for-handwritten-mathematical-expression-recognition/
+
+## CROHME 2023
+Class: public HMER competition/dataset with online, offline and bimodal tasks plus symbol-level label-graph ground truth.
+Use: structure-aware benchmark precedent rather than LaTeX-string-only evaluation.
+https://doi.org/10.5281/zenodo.8428035
+
+## Seeing Symbols, Missing Structure — ICML 2026
+Class: real-world HMER benchmark for large models, covering structurally complex authentic handwriting.
+Use: symbol-level recognition can remain relatively strong while full structural interpretation degrades sharply; failures concentrate in structural misparsing and context-dependent symbol roles.
+https://proceedings.mlr.press/v306/jiang26bg.html
+
+## EDU-CIRCUIT-HW — ACL Findings 2026
+Class: 1,300+ authentic university STEM handwritten solutions with expert-verified verbatim transcriptions and grading reports.
+Use: exposes substantial latent recognition failures in MLLMs before downstream grading; strong precedent for separating perception from grading and for selective human routing.
+Limitation: university STEM population, not school mathematics.
+https://aclanthology.org/2026.findings-acl.751/
+https://doi.org/10.18653/v1/2026.findings-acl.751
+
+## DrawEduMath follow-up — BEA 2026
+Class: year-long evaluation of 11 VLMs on real student handwritten/drawn mathematics responses.
+Use: evaluated models underperformed on work from students needing more pedagogical support and struggled especially on questions concerning student errors.
+Critical implication: pooled handwriting accuracy can hide exactly the lower-tail failures most consequential for tutoring.
+https://aclanthology.org/2026.bea-1.5/
+https://doi.org/10.18653/v1/2026.bea-1.5
+
+---
+
+# AI. V7 mathematical-truth / tutoring-diagnosis evidence
+
+## LeanTutor — AAAI 2026
+Class: verified proof-tutoring research; autoformalizer/proof checker + next-step generator + natural-language feedback.
+Use: concrete architecture showing how theorem proving can provide a correctness authority underneath generative tutoring.
+Limitation: Peano-arithmetic proof domain; not universal school-proof authority.
+https://doi.org/10.1609/aaai.v40i47.41514
+
+## Faults in Our Formal Benchmarking — 2026
+Class: formal-theorem-benchmark audit.
+Use: a kernel can prove the wrong formalization perfectly; supports separate formalization-fidelity and proof-validity gates.
+https://openreview.net/forum?id=es6ESB3nre
+
+## MathEDU — EACL 2026
+Class: mathematics student-solution benchmark with teacher-written feedback.
+Use: fine-tuning improves correctness/error localization, but generated feedback remains substantially below teacher-written feedback and can be verbose/poorly targeted to misconceptions.
+https://aclanthology.org/2026.eacl-long.132/
+https://doi.org/10.18653/v1/2026.eacl-long.132
+
+## Confirming Correct, Missing the Rest — BEA 2026
+Class: 10,836 solution-feedback-pair benchmark across seven LLM feedback agents in propositional logic.
+Use: models performed strongly on optimal reasoning but systematically over-rejected valid suboptimal solutions and over-validated incorrect solutions; accurate diagnosis did not guarantee actionable pedagogy.
+Limitation: propositional-logic domain, not direct school-mathematics effect evidence.
+https://aclanthology.org/2026.bea-1.56/
+https://doi.org/10.18653/v1/2026.bea-1.56
+
+---
+
+# AJ. V7 multilingual mathematics evidence
+
+## Translanguaging in primary mathematics — systematic review 2026
+Class: PRISMA systematic review; 42 peer-reviewed studies from 2000–2024.
+Use: maps strategies, benefits, constraints and strong context dependence of translanguaging in mathematics; teacher language capacity, shared language and learner literacy materially condition implementation.
+https://doi.org/10.1007/s10649-026-10552-y
+
+## Multilingual Mathematical Reasoning — AAAI 2025
+Class: Hindi/English mathematical-reasoning model study.
+Use: demonstrates material language/model effects and shows bilingual fine-tuning can narrow gaps for studied open models.
+Limitation: model benchmark research, not learner efficacy evidence.
+https://doi.org/10.1609/aaai.v39i22.34509
+
+## CSTT English–Hindi mathematics terminology
+Class: Government of India terminology authority.
+Use: official terminology source for versioned Pri mathematical-language mappings.
+https://shabd.education.gov.in/lexicon.jsp?lexicon=cstt_fund_Maths_EngHin_glossary
+https://shabd.education.gov.in/lexicon.jsp?lexicon=cstt_compr_Maths_EngHin_glossary
+
+## Kannada–English bilingual mathematics study — 2025
+Class: quasi-experimental Class 8 study; six English-medium schools across three Karnataka districts; N=240; 84 hours of intervention reported.
+Use: supports directly testing bilingual mathematical scaffolding in India.
+Limitation: localized design/population; does not justify national generalization or establish Hindi effects.
+https://doi.org/10.1007/s44217-025-00795-x
+
+---
+
+# AK. V7 source interpretation rule
+
+The V7 deep dives intentionally combine three evidence generations:
+
+1. classical tutoring/psychometric mechanisms;
+2. modern machine-learning/multimodal capability research;
+3. 2025–26 generative-AI deployment evidence.
+
+Agents must not interpret recency as superiority.
+
+A 2026 language model is not automatically a better authority than:
+- an exact algebra engine;
+- a validated psychometric model;
+- a durable tutoring mechanism;
+- a qualified teacher.
+
+For every source used to justify a Pri change, record:
+
+- source class;
+- population;
+- mathematical domain;
+- treatment/capability;
+- comparator;
+- outcome;
+- delay;
+- whether outcome was independent;
+- sample;
+- known limitations;
+- exact architectural decision affected.
+
+If those fields cannot be answered, the source may be background but should not carry release authority.
