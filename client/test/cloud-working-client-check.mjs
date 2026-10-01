@@ -12,7 +12,7 @@
 //   · it never puts the answer on screen.
 // ─────────────────────────────────────────────────────────────────────────────
 import {
-  checkWorkingWithCloud, mergeVerdicts, shouldCheckWorking, workingCheckEnabled, workingNote
+  checkWorkingWithCloud, mergeVerdicts, misconceptionProposal, shouldCheckWorking, workingCheckEnabled, workingNote
 } from '../src/ink/cloudWorking.js';
 
 let pass = 0;
@@ -67,6 +67,14 @@ eq(sent.lines, WORKING, 'the working is sent as the student wrote it');
 eq(sent.prompt, 'Solve 2x + 3 = 11.', 'and the question, without which "does this line follow" cannot be asked');
 eq(Object.keys(sent.opts || {}), ['signal'], 'and nothing travels beside them but the cancel signal');
 eq(check.firstBreak, 1, 'the check comes back naming the first broken line');
+
+const proposing = { checkWorking: async () => ({ check: { lines: [{ index: 0, status: 'ok', carried: false, why: '' }, { index: 1, status: 'break', carried: false, why: 'sign' }], firstBreak: 1, hint: '', confidence: 0.9, misconceptionId: 'sign-on-transfer', needsConfirmation: false } }) };
+const proposed = await checkWorkingWithCloud(['3x + 5 = 20', '', '3x = 20 + 5'], { user: { cloudMarking: true }, transport: proposing, available: there });
+eq(proposed.misconceptionId, 'sign-on-transfer', 'a proposed misconception ID travels with the check');
+eq(misconceptionProposal(proposed, ['3x + 5 = 20', '', '3x = 20 + 5'])?.body,
+  { lines: ['3x + 5 = 20', '3x = 20 + 5'], firstBreak: 1, misconceptionId: 'sign-on-transfer', confident: true },
+  'and is handed to the engine in its own line numbering, not recorded here');
+eq(mergeVerdicts(null, proposed, { lineCount: 3 })[2].note, 'sign', 'a proposal changes nothing about how verdicts merge');
 
 const failing = { checkWorking: async () => { const e = new Error('nope'); e.code = 'WORKING_UNAVAILABLE'; throw e; } };
 const failed = await checkWorkingWithCloud(WORKING, { user: { cloudMarking: true }, transport: failing, available: there });
