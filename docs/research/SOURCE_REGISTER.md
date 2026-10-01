@@ -1448,3 +1448,33 @@ Use: hybrid feedback increased revisions relative to directive/metacognitive con
 Limitation: not school mathematics and revision is not delayed learning.
 https://doi.org/10.1016/j.caeai.2026.100553
 
+
+
+---
+
+# AW. V7 AI literacy / epistemic agency
+
+## OECD / European Commission — AI Literacy Framework for Primary and Secondary Education, 2026
+Class: international school AI-literacy competency framework.
+Use: defines AI literacy through knowledge, skills and attitudes enabling learners to understand AI, critically evaluate outputs, use it ethically/creatively and make informed decisions.
+https://doi.org/10.1787/65cd27d4-en
+
+## Critical questioning with GenAI in secondary education — 2026
+Class: Grade 10 classroom action research.
+Use: critical engagement with GenAI depended on instructional design, teacher role, learner knowledge/disposition and platform delivery; supports explicit critical-questioning pedagogy rather than assuming chat access creates critical thinking.
+Limitation: qualitative/action-research context; not mathematics efficacy.
+https://doi.org/10.1016/j.tsc.2025.102043
+
+## Building critical GenAI literacy through mathematical error analysis — 2026
+Class: preliminary undergraduate quantitative-reasoning mixed-methods study.
+Evidence: 20 consented participants / 18 paired pre-post observations; large pre/post changes in mathematical computation and GenAI error detection, plus reported verification habits.
+Critical limitation: no comparison group, small sample, undergraduate population, instructor-curated intentional AI errors. Pre/post effect sizes are not causal treatment estimates.
+Use: direct mechanism inspiration for Audit-the-AI and dual mathematics + AI-error-analysis tasks.
+https://doi.org/10.3389/feduc.2026.1892310
+
+## Secondary AI literacy scale / KAT framework — 2025
+Class: measurement-development study; 1,392 Chinese secondary students, Rasch + EFA + CFA.
+Use: supports multidimensional AI literacy rather than one self-report score; proposed Knowledge, Affectivity and Thinking structure.
+Limitation: scale validation, not intervention or mathematics evidence.
+https://doi.org/10.1016/j.compedu.2024.105230
+
