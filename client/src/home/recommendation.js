@@ -14,7 +14,7 @@ const item = (kind, priority, id, data = {}, destination = '/practice', dueAt = 
 const byPriority = (a, b) =>
   b.priority - a.priority
   || (a.dueAt ?? Infinity) - (b.dueAt ?? Infinity)
-  || String(a.id || '').localeCompare(String(b.id || ''));
+  || a.id.localeCompare(b.id);
 
 function assignment(row, now) {
   const state = row?.submission?.state || 'not_started';
