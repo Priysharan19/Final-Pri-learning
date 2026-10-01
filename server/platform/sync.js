@@ -96,7 +96,9 @@ export async function syncPullPage(db, accountId, cursor = 0, limit = MAX_PULL) 
   // One snapshot for the page and its hasMore probe: on Postgres a push that
   // commits between them must not appear in one and not the other.
   return db.transaction(async () => {
-  const startCursor = Math.max(0, Math.floor(Number(cursor) || 0));
+  // Clamped to the safe-integer range: a cursor of 1e20 used to reach Postgres
+  // as a bigint out of range and answer 500 (SQLite compared it happily).
+  const startCursor = Math.min(Number.MAX_SAFE_INTEGER, Math.max(0, Math.floor(Number(cursor) || 0)));
   const pageLimit = Math.max(1, Math.min(MAX_PULL, Math.floor(Number(limit) || MAX_PULL)));
   const eventRows = await db.all(`SELECT server_cursor,id,device_id,device_seq,kind,entity_id,occurred_at,payload_json,created_at
     FROM learning_events WHERE account_id=? AND server_cursor>? ORDER BY server_cursor LIMIT ?`, [accountId, startCursor, pageLimit]);
