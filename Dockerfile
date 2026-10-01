@@ -16,7 +16,7 @@ COPY docs/legal ./docs/legal
 # supplies RAILWAY_GIT_COMMIT_SHA automatically; when no explicit timestamp is
 # supplied, stamp this exact image build once and bake that same identity into
 # client/dist/release.json for the server to verify at runtime.
-RUN set -eu;     release_sha="${PRI_RELEASE_SHA:-${RAILWAY_GIT_COMMIT_SHA:-}}";     build_timestamp="${PRI_BUILD_TIMESTAMP:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}";     PRI_RELEASE_SHA="$release_sha" PRI_BUILD_TIMESTAMP="$build_timestamp" npm run build --prefix client
+RUN set -eu;     release_sha="${RAILWAY_GIT_COMMIT_SHA:-${PRI_RELEASE_SHA:-}}";     if [ -n "${RAILWAY_GIT_COMMIT_SHA:-}" ]; then       build_timestamp="$(date -u +%Y-%m-%dT%H:%M:%SZ)";     else       build_timestamp="${PRI_BUILD_TIMESTAMP:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}";     fi;     PRI_RELEASE_SHA="$release_sha" PRI_BUILD_TIMESTAMP="$build_timestamp" npm run build --prefix client
 
 FROM node:24-bookworm-slim AS server-deps
 WORKDIR /app

@@ -100,6 +100,11 @@ const env = {
   NODE_ENV: 'production',
   PORT: String(port),
   RAILWAY_GIT_COMMIT_SHA: testReleaseSha,
+  RAILWAY_DEPLOYMENT_ID: 'runtime-image-contract',
+  // These simulate stale values from an earlier manual exact-candidate deploy.
+  // Railway's own Git SHA and the newly built client identity must outrank them.
+  PRI_RELEASE_SHA: 'f'.repeat(40),
+  PRI_BUILD_TIMESTAMP: '2020-01-01T00:00:00.000Z',
   PRI_PUBLIC_ORIGIN: 'https://learn.pri.example',
   PRI_CSRF_SECRET: 'runtime-image-contract-secret',
   PRI_AUTH_DELIVERY_KEY: '33'.repeat(32),
