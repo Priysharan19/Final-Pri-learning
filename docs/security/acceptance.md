@@ -73,14 +73,12 @@ without the fix.
   be attributed to that router's routes. `router.js` mounts every gate beside its own router today;
   the behavioural sweeps in `security-acceptance-check.mjs` (A4: consent) are the backstop.
 
-## Open: sign-out-everywhere
+## Sign-out-everywhere (closed by #263)
 
-TODO(#263): doc §02 makes sign-out-everywhere a V1 requirement. PR #263 adds
-`POST /v1/account/logout-all`. This suite currently proves revoking each device in turn; it does
-not exercise that endpoint. Whichever PR merges second must add the route to
-`route-inventory.json` (the inventory check fails until it does) and add its negatives to section B:
-no session → 401, bad/missing CSRF → 403, revokes every session of the caller including the current
-one, another account's sessions unaffected.
+`POST /v1/account/logout-all` is in `route-inventory.json` (session, account-keyed limit after
+`requireSession`, CSRF + Origin, own account only). Section B proves: no session → 401, missing or
+forged CSRF → 403, foreign Origin → 403, refused attempts revoke nothing, a successful call revokes
+every session of the caller including the current one, and another account stays signed in.
 
 ## Residual risks
 

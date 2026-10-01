@@ -273,9 +273,38 @@ try {
     c.eq((await h.request('/v1/account/me', { jar: second })).status, 401, 'revoked device is signed out');
     c.eq((await h.request('/v1/account/me', { jar: b.jar })).status, 200, 'revoking another device keeps this one');
 
-    // Revoke each device in turn, including the current one. (A single
-    // sign-out-everywhere endpoint, POST /v1/account/logout-all, arrives with
-    // PR #263; its negatives join this section when it merges.)
+    // Sign out everywhere: POST /v1/account/logout-all (#263).
+    {
+      const owner = await account();
+      const bystander = await account();
+      await resetLimits();
+      const phone = {};
+      c.eq((await h.request('/v1/account/login', { method: 'POST', jar: phone, body: { email: owner.email, password: owner.password, deviceId: 'phone' } })).status, 200, 'logout-all: second device signs in');
+      const ownerCopy = { ...owner.jar };
+      const noSession = await h.request('/v1/account/logout-all', { method: 'POST', jar: {}, body: {} });
+      c.deq([noSession.status, noSession.data?.error?.code], [401, 'AUTH_REQUIRED'], 'logout-all without a session is 401');
+      const noCsrf = await h.request('/v1/account/logout-all', { method: 'POST', jar: { pri_cloud_session: owner.jar.pri_cloud_session }, body: {} });
+      c.deq([noCsrf.status, noCsrf.data?.error?.code], [403, 'CSRF_REJECTED'], 'logout-all without the CSRF pair is 403');
+      const badCsrf = await h.request('/v1/account/logout-all', { method: 'POST', jar: owner.jar, headers: { 'x-pri-csrf': 'forged' }, body: {} });
+      c.deq([badCsrf.status, badCsrf.data?.error?.code], [403, 'CSRF_REJECTED'], 'logout-all with a forged CSRF token is 403');
+      const savedOrigin = process.env.PRI_PUBLIC_ORIGIN;
+      process.env.PRI_PUBLIC_ORIGIN = 'https://learn.pri.example';
+      let badOrigin;
+      try {
+        badOrigin = await h.request('/v1/account/logout-all', { method: 'POST', jar: owner.jar, headers: { Origin: 'https://evil.example' }, body: {} });
+      } finally {
+        if (savedOrigin === undefined) delete process.env.PRI_PUBLIC_ORIGIN; else process.env.PRI_PUBLIC_ORIGIN = savedOrigin;
+      }
+      c.deq([badOrigin.status, badOrigin.data?.error?.code], [403, 'ORIGIN_REJECTED'], 'logout-all from a foreign Origin is 403');
+      c.eq((await h.request('/v1/account/me', { jar: phone })).status, 200, 'refused logout-all attempts revoke nothing');
+      const all = await h.request('/v1/account/logout-all', { method: 'POST', jar: owner.jar, body: {} });
+      c.deq([all.status, all.data?.revoked], [200, 2], 'logout-all revokes both sessions');
+      c.eq((await h.request('/v1/account/me', { jar: ownerCopy })).status, 401, 'logout-all signs out the current device');
+      c.eq((await h.request('/v1/account/me', { jar: phone })).status, 401, 'logout-all signs out the other device');
+      c.eq((await h.request('/v1/account/me', { jar: bystander.jar })).status, 200, 'logout-all leaves another account signed in');
+    }
+
+    // Revoke each device in turn, including the current one.
     const everywhere = await account();
     await resetLimits();
     const tablet = {};
@@ -391,6 +420,15 @@ try {
     await db.run('INSERT INTO classes(id,teacher_account_id,name,join_code_hash,created_at) VALUES (?,?,?,?,?)', ['cls_export_alice', teacherOne.id, 'Alice Only Class', 'hash-export-alice', stamp]);
     await db.run('INSERT INTO class_members(class_id,student_account_id,joined_at) VALUES (?,?,?)', ['cls_export_bob', bob.id, stamp]);
     await db.run('INSERT INTO class_members(class_id,student_account_id,joined_at) VALUES (?,?,?)', ['cls_export_alice', alice.id, stamp]);
+    // The sections #263 added: submissions, teacher feedback, issue reports and
+    // telemetry — each seeded for both accounts.
+    for (const [who, tag] of [[bob, 'bob'], [alice, 'alice']]) {
+      await db.run('INSERT INTO assignments(id,class_id,teacher_account_id,title,specification_json,created_at) VALUES (?,?,?,?,?,?)', [`asg_export_${tag}`, `cls_export_${tag}`, teacherOne.id, `${tag} drill`, '{}', stamp]);
+      await db.run(`INSERT INTO assignment_submissions(assignment_id,student_account_id,state,summary_json,started_at,updated_at) VALUES (?,?,'started',?,?,?)`, [`asg_export_${tag}`, who.id, JSON.stringify({ note: `${tag}-submission-secret` }), stamp, stamp]);
+      await db.run('INSERT INTO assignment_feedback(assignment_id,student_account_id,teacher_account_id,feedback_json,returned_at,updated_at) VALUES (?,?,?,?,?,?)', [`asg_export_${tag}`, who.id, teacherOne.id, JSON.stringify({ note: `${tag}-feedback-secret` }), stamp, stamp]);
+      await db.run(`INSERT INTO issue_reports(id,account_id,category,context_json,note,status,created_at) VALUES (?,?,'other','{}',?,'open',?)`, [`rpt_export_${tag}`, who.id, `${tag}-report-secret`, stamp]);
+      await db.run('INSERT INTO operational_events(id,account_id,event_type,surface,metadata_json,created_at) VALUES (?,?,?,?,?,?)', [`op_export_${tag}`, who.id, 'feature-used', `${tag}-telemetry-surface`, '{}', stamp]);
+    }
 
     const exported = await h.request('/v1/account/export', { jar: alice.jar });
     c.eq(exported.status, 200, 'Alice exports');
@@ -404,7 +442,16 @@ try {
     const ownClasses = (await db.all('SELECT class_id FROM class_members WHERE student_account_id=? AND removed_at IS NULL', [alice.id])).map(row => row.class_id).sort();
     c.deq(exported.data.classes.map(row => row.id).sort(), ownClasses, 'export classes are exactly Alice\'s memberships');
     c.ok(!exported.text.includes('cls_export_bob') && !exported.text.includes('Bob Only Class'), 'Bob\'s class membership is not in Alice\'s export');
-    c.deq(Object.keys(exported.data).sort(), ['account', 'classes', 'entities', 'exportedAt', 'format', 'learningEvents'], 'the export has exactly the sections checked above');
+    c.deq(exported.data.assignmentSubmissions.map(row => row.assignment_id), ['asg_export_alice'], 'export assignmentSubmissions are exactly Alice\'s');
+    c.deq(exported.data.assignmentFeedback.map(row => row.assignment_id), ['asg_export_alice'], 'export assignmentFeedback is exactly Alice\'s');
+    c.ok(exported.data.assignmentFeedback.every(row => !('teacher_account_id' in row)) && !exported.text.includes(teacherOne.id), 'feedback carries no teacher id');
+    c.deq(exported.data.issueReports.map(row => row.id), ['rpt_export_alice'], 'export issueReports are exactly Alice\'s');
+    c.deq(exported.data.telemetry.map(row => row.surface), ['alice-telemetry-surface'], 'export telemetry is exactly Alice\'s');
+    c.ok(!/bob-(submission|feedback|report)-secret|bob-telemetry-surface/.test(exported.text), 'none of Bob\'s submissions, feedback, reports or telemetry appear');
+    c.eq(exported.data.entitlement.plan, 'free', 'export entitlement summary is Alice\'s (free)');
+    c.deq(exported.data.identities.map(row => row.provider), ['password'], 'export identities are Alice\'s sign-in methods, without subjects');
+    c.eq(exported.data.guardianConsent, null, 'an adult export has no consent section');
+    c.deq(Object.keys(exported.data).sort(), ['account', 'assignmentFeedback', 'assignmentSubmissions', 'classes', 'entities', 'entitlement', 'exportedAt', 'format', 'guardianConsent', 'identities', 'issueReports', 'learningEvents', 'telemetry'], 'the export has exactly the sections checked above');
     await db.run("DELETE FROM class_members WHERE class_id IN ('cls_export_bob','cls_export_alice')");
     await db.run("DELETE FROM classes WHERE id IN ('cls_export_bob','cls_export_alice')");
     c.eq((await h.request(`/v1/account/export?accountId=${bob.id}`, { jar: alice.jar })).data.account.id, alice.id, 'an accountId query parameter is ignored');
