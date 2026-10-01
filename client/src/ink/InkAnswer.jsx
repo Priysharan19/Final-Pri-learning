@@ -21,6 +21,8 @@ import { classOfSymbol } from './classes.js';
 import { ensurePersonalLoaded, addPersonal } from './personal.js';
 import { MathText } from '../lib/latex.jsx';
 import { currentReleaseIdentity } from '../platform/releaseIdentity.js';
+import { inkCanvasHeight, useFormFactor } from '../platform/formFactor.js';
+import { useT } from '../i18n/index.js';
 
 const NICE = { pi: 'π', theta: 'θ', sqrt: '√', percent: '%' };
 const showSym = s => NICE[s] || s;
@@ -37,6 +39,15 @@ const showSym = s => NICE[s] || s;
 // model without pretending it is a production/offline asset.
 // The surface is chosen per mount, not at import: a shell's capability can be
 // known only after this module first evaluates (CP-02).
+
+// Engine names and fallback warnings are for developers and evaluators, not
+// students: shown in dev builds, LAN research mode, or with ?inkdiag=1.
+const inkDiagnosticsVisible = () => {
+  if (import.meta.env?.DEV) return true;
+  if (typeof window === 'undefined') return false;
+  if (window.__PRI_LAN_DEV__ === true) return true;
+  try { return new URLSearchParams(window.location.search).has('inkdiag'); } catch { return false; }
+};
 /** How long the page must be still before it is worth sending. */
 const CLOUD_SETTLE_MS = 1800;
 
@@ -115,6 +126,12 @@ function readingConfidence(result) {
 export default function InkAnswer({ onRecognized, height = 300, disabled, lineVerdicts = null, focusSymbol = null, recognitionContext = null }) {
   const [NATIVE_INK] = useState(nativeInkAvailable);
   const Surface = NATIVE_INK ? NativeInkCanvas : InkCanvas;
+  const [diagnostics] = useState(inkDiagnosticsVisible);
+  // EXPANDED (the iPad baseline) keeps the requested height; smaller windows get
+  // a writing area that fits the screen (CP-03, FORM_FACTOR_SPEC.md §3).
+  const t = useT();
+  const formFactor = useFormFactor();
+  const fittedHeight = inkCanvasHeight(height, formFactor);
   const canvasRef = useRef(null);
   // The signed-in profile carries the server-reading opt-in, which is off
   // unless the student turned it on.
@@ -369,10 +386,13 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
             : NATIVE_INK && rec.engine
               ? `Native recognition path · ${rec.engine}`
               : null;
+  // Students always learn when their writing was read on the server (privacy);
+  // engine identifiers and fallback labels are diagnostics only.
+  const shownEngineNote = diagnostics ? engineNote : (rec.cloud === true ? t('verdict.readOnServer') : null);
 
   return (
     <div className={`ink-answer ${disabled ? 'ink-disabled' : ''}`}>
-      {!NATIVE_INK && (
+      {!NATIVE_INK && diagnostics && (
         <div role="note" style={{ padding: '9px 12px', marginBottom: 8, border: '1px solid var(--warn)', borderRadius: 10, fontSize: 12.5 }}>
           Browser handwriting = legacy JS fallback. For handwriting quality testing, run the native iPad package with PencilKit; this web fallback is not the production acceptance path.
         </div>
@@ -392,14 +412,14 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
           aria-label="Draw with a finger as well as a Pencil" aria-pressed={finger}
           onClick={() => setFinger(f => !f)}>☝ Finger</button>
         <span className="ink-hint">
-          Write each step on its own line · {NATIVE_INK ? 'Apple Pencil' : 'Pencil or finger'}
+          {t('ink.hintEachLine')}
         </span>
       </div>
 
       <div className="ink-stage">
         <Surface
           ref={canvasRef}
-          height={height + extraHeight}
+          height={fittedHeight + extraHeight}
           tool={tool}
           fingerMode={finger ? 'finger' : 'auto'}
           disabled={disabled}
@@ -458,7 +478,7 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
       {rec.lines.length > 0 && (
         <div className="ink-preview">
           <div className="ink-preview-title" id="ink-reading">
-            I'm reading:{engineNote && <span className="muted" style={{ marginLeft: 10, textTransform: 'none', letterSpacing: 0 }}>{engineNote}</span>}
+            I'm reading:{shownEngineNote && <span className="muted" style={{ marginLeft: 10, textTransform: 'none', letterSpacing: 0 }}>{shownEngineNote}</span>}
             {cloudState === 'reading' && (
               <span className="muted" style={{ marginLeft: 10, textTransform: 'none', letterSpacing: 0 }}>· checking this reading</span>
             )}
