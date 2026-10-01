@@ -97,6 +97,7 @@ class MainActivity : ComponentActivity() {
             WindowInsetsCompat.CONSUMED
         }
 
+        val stylusCapable = stylusDevicePresent()
         val webViewPackage = WebViewCompat.getCurrentWebViewPackage(this)
         if (!WebViewFloor.isSupported(webViewPackage?.versionName)) {
             showUpdateScreen(getString(R.string.webview_update_body))
@@ -118,7 +119,7 @@ class MainActivity : ComponentActivity() {
             HostDescriptor.Shell(BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE.toString(), BuildConfig.APPLICATION_ID),
             ReleaseIdentity.read(assets),
             cloudConfigured = nativeCloud.configured,
-            stylusSeen = stylusDevicePresent(),
+            stylusCapable = stylusCapable,
         )
         // Back is enabled exactly while the page has declared it wants it (a
         // sheet is open or it has in-app history). Otherwise the system default
@@ -134,7 +135,7 @@ class MainActivity : ComponentActivity() {
         val playBilling = PlayBilling(this) { event, payload -> bridge?.emitEvent(event, payload) }
         billing = playBilling
         val priBridge = PriBridge(view, descriptor, { wanted -> backCallback.isEnabled = wanted }, nativeCloud, files, playBilling)
-        if (stylusDevicePresent()) priBridge.noteStylus()
+        priBridge.stylusCapable = stylusCapable
         if (!priBridge.install()) {
             // Fail closed: without origin-scoped messaging the shell offers no
             // native capabilities, so it does not load the app half-working.
@@ -276,7 +277,7 @@ class MainActivity : ComponentActivity() {
         super.onDestroy()
     }
 
-    /** A capability fact for the page (pen-first palm rejection), never a model name. */
+    /** Capability facts for the page, never a model name: a stylus-capable input device. */
     private fun stylusDevicePresent(): Boolean = InputDevice.getDeviceIds().any { id ->
         InputDevice.getDevice(id)?.supportsSource(InputDevice.SOURCE_STYLUS) == true
     }
