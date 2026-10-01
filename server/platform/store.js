@@ -320,7 +320,17 @@ export function postgresTypes(pgTypes) {
 }
 
 const RETRYABLE = new Set(['40001', '40P01']);
-const MAX_ATTEMPTS = 8;
+// Every round of a conflict on one hot row (sync_cursors, a rate bucket)
+// commits at least one writer, so N concurrent writers need at most N
+// attempts. 16 covers a burst well beyond one replica's pool; backoff below
+// spreads the retries so they stop colliding.
+const MAX_ATTEMPTS = 16;
+
+/** Full-jitter exponential backoff: up to 4, 8, 16 … ms, capped at 250 ms. */
+export function retryDelayMs(attempt, random = Math.random) {
+  const ceiling = Math.min(250, 2 ** Math.min(8, attempt + 1));
+  return Math.floor(random() * ceiling) + 1;
+}
 
 function pause(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -479,7 +489,7 @@ export class PostgresStore {
         tx.closed = true;
         client.release(broken);
       }
-      await pause(Math.floor(Math.random() * 10 * attempt) + attempt);
+      await pause(retryDelayMs(attempt));
     }
   }
 

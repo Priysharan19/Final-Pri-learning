@@ -5,8 +5,8 @@
 // service container). Each suite creates its own scratch database, applies
 // supabase/migrations to it exactly as Supabase would, and drops it at the end.
 //
-// The Supabase client API roles (anon, authenticated) are created first when
-// missing, so the migration's revoke branch runs here the way it will on
+// The Supabase client API roles (anon, authenticated) and pri_server are created
+// first when missing, so the migration's revoke branch runs here the way it will on
 // Supabase. They are NOLOGIN; no credential is ever involved.
 
 import { randomBytes } from 'node:crypto';
@@ -42,11 +42,19 @@ function withDatabase(url, database) {
   return parsed.toString();
 }
 
-async function ensureClientApiRoles(admin) {
-  for (const role of ['anon', 'authenticated']) {
-    await admin.query(`DO $$ BEGIN
-      IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '${role}') THEN CREATE ROLE ${role} NOLOGIN; END IF;
-    END $$;`);
+// Roles are cluster-wide. Created here, before any migration runs, so suites
+// migrating scratch databases in parallel do not race the migration's own
+// `create role pri_server` (pri_server is NOLOGIN either way). A concurrent
+// creator winning the race is fine.
+async function ensureClusterRoles(admin) {
+  for (const role of ['anon', 'authenticated', 'pri_server']) {
+    try {
+      await admin.query(`DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '${role}') THEN CREATE ROLE ${role} NOLOGIN; END IF;
+      END $$;`);
+    } catch (error) {
+      if (error?.code !== '23505' && error?.code !== '42710') throw error;
+    }
   }
 }
 
@@ -63,7 +71,7 @@ export async function scratchDatabase(label, { migrations = migrationFiles() } =
   const admin = new pg.Client({ connectionString: base });
   await admin.connect();
   try {
-    await ensureClientApiRoles(admin);
+    await ensureClusterRoles(admin);
     await admin.query(`CREATE DATABASE ${name}`);
   } finally {
     await admin.end();
@@ -123,9 +131,13 @@ export async function serverRoleUrl(database) {
   const admin = new pg.Client({ connectionString: adminUrl() });
   await admin.connect();
   try {
-    await admin.query(`DO $$ BEGIN
-      IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'pri_app_test') THEN CREATE ROLE pri_app_test LOGIN; END IF;
-    END $$;`);
+    try {
+      await admin.query(`DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'pri_app_test') THEN CREATE ROLE pri_app_test LOGIN; END IF;
+      END $$;`);
+    } catch (error) {
+      if (error?.code !== '23505' && error?.code !== '42710') throw error;
+    }
     await admin.query('GRANT pri_server TO pri_app_test');
   } finally {
     await admin.end();

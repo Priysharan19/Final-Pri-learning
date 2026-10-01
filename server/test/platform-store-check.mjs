@@ -15,7 +15,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import assert from 'node:assert/strict';
 import {
-  PostgresStore, isUniqueViolation, postgresTypes, toPostgresPlaceholders
+  PostgresStore, isUniqueViolation, postgresTypes, retryDelayMs, toPostgresPlaceholders
 } from '../platform/store.js';
 import { openTestStore, requestedEngine } from './support/engine.mjs';
 
@@ -93,6 +93,13 @@ const pgError = code => Object.assign(new Error(`fake ${code}`), { code });
   await rejects(() => store.transaction(async () => { runs++; }), error => error.code === '40001', 'exhausted retries surface the serialization failure');
   eq(runs, 3, 'retries stop at maxAttempts');
   eq(pool.released + pool.destroyed, 3, 'every attempt returns its client to the pool');
+}
+{
+  // Backoff grows and is capped; the default budget outlasts a burst of
+  // writers on one hot row (each conflict round commits at least one).
+  ok(retryDelayMs(1, () => 0.999) <= 4 && retryDelayMs(4, () => 0.999) <= 32 && retryDelayMs(30, () => 0.999) <= 250 && retryDelayMs(30, () => 0) >= 1,
+    'retry backoff is full-jitter exponential, at least 1 ms and capped at 250 ms');
+  ok(new PostgresStore(fakePool(() => undefined), { ownsPool: false }).maxAttempts >= 16, 'the default retry budget is at least 16 attempts');
 }
 {
   // A savepoint must not pretend to have absorbed a serialization failure.
