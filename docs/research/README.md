@@ -203,6 +203,34 @@ Instruction/terminology/assessment language separation, CSTT terminology authori
 ### FRONTIER_TUTORING_SYSTEMS_MECHANISM_MATRIX_V7.md
 Mechanism-by-mechanism reverse engineering of ALEKS, MATHia/Cognitive Tutor, ASSISTments, Eedi, Khanmigo, NUMI and unrestricted GPT-style tutoring, with an explicit Pri synthesis rather than feature parity.
 
+
+### ASSESSMENT_VALIDITY_FAIRNESS_PSYCHOMETRICS_DEEP_DIVE_V7.md
+Generated-item field evidence, IRT/CAT, construct validity, local dependence, DIF/fairness, exposure, adaptive stopping, calibration lifecycle and a staged AI-generated-assessment programme.
+
+### KNOWLEDGE_GRAPH_PREREQUISITE_CAUSALITY_DEEP_DIVE_V7.md
+Typed relation semantics, expert/observational/temporal/intervention evidence levels, prerequisite-vs-support separation, alternative pathways, false-prerequisite cost and causal edge validation.
+
+### TEACHER_AI_AUGMENTATION_DECISION_SCIENCE_V7.md
+Tutor CoPilot RCT evidence, dashboard-actionability limits, Teacher Action Cards, shadow mode, override/correction, action libraries, expertise-aware assistance and teacher decision-quality experiments.
+
+### CHILD_AI_SAFETY_PRIVACY_RELATIONAL_BOUNDARIES_V7.md
+UNICEF/OECD child-AI guidance, relational/companion boundaries, India DPDP child-data rules, data minimization, notifications, memory, crisis boundaries and child-specific red-team evidence levels.
+
+### METACOGNITION_SRL_HELP_SEEKING_DEEP_DIVE_V7.md
+Mathematics metacognition evidence, self-regulated learning, confidence calibration, strategic vs step-by-step help, help abuse/avoidance, trigger-based reflection and Audit-the-AI as a regulation skill.
+
+### MOTIVATION_GAMIFICATION_MATH_ANXIETY_DEEP_DIVE_V7.md
+SDT, mathematics gamification second-order evidence, intrinsic/extrinsic motivation, streak/leaderboard/reward guardrails, mathematics-anxiety intervention evidence and healthy-engagement experiments.
+
+### CBSE_NCERT_CURRICULUM_ASSESSMENT_AUTHORITY_V7.md
+Live 2026–27 CBSE/NCERT authority, CBE/SAFAL, current sample-paper/marking-scheme sources, Class X two-board-examination policy, curriculum/version contracts and exam-blueprint freshness gates.
+
+### TRANSFER_GENERALISATION_ANALOGY_DEEP_DIVE_V7.md
+T0–T7 transfer taxonomy, variability, analogical comparison, strategy recognition, representation/context transfer, protected banks, structural fingerprints and transfer-aware learner-state evidence.
+
+### FORMATIVE_ASSESSMENT_FEEDBACK_DEEP_DIVE_V7.md
+Mathematics formative-assessment synthesis, feedback types/timing/dose, directive-vs-metacognitive evidence, actionability, feedback burden, teacher/student uncertainty and closed evidence-to-action evaluation.
+
 ### V7_EMPIRICAL_SCIENCE_AND_BENCHMARK_PROGRAMME.md
 Execution-grade science programme: semantic instrumentation → adjudicated gold assets → benchmark laboratory → randomized mechanism experiments → India/classroom field evidence, with evidence grades and release claims.
 
@@ -233,6 +261,15 @@ Execution-grade science programme: semantic instrumentation → adjudicated gold
 | step validity, first break, SafeMath, formal proof, method marks | MATH_TRUTH_FIRST_BREAK_FORMAL_VERIFICATION_DEEP_DIVE.md |
 | Hindi/Hinglish, bilingual explanations, translation/terminology | MULTILINGUAL_MATH_INDIA_DEEP_DIVE.md |
 | benchmark construction, randomized research, evidence-grade claims | V7_EMPIRICAL_SCIENCE_AND_BENCHMARK_PROGRAMME.md |
+| assessment validity, IRT/CAT, DIF, exposure, adaptive testing | ASSESSMENT_VALIDITY_FAIRNESS_PSYCHOMETRICS_DEEP_DIVE_V7.md |
+| prerequisite graph, knowledge graph, learning progression edges | KNOWLEDGE_GRAPH_PREREQUISITE_CAUSALITY_DEEP_DIVE_V7.md |
+| teacher AI, action cards, teacher decision support/corrections | TEACHER_AI_AUGMENTATION_DECISION_SCIENCE_V7.md |
+| child AI, relational safety, India child-data privacy | CHILD_AI_SAFETY_PRIVACY_RELATIONAL_BOUNDARIES_V7.md |
+| metacognition, confidence, self-regulation, help-seeking | METACOGNITION_SRL_HELP_SEEKING_DEEP_DIVE_V7.md |
+| streaks, leaderboards, rewards, motivation, math anxiety | MOTIVATION_GAMIFICATION_MATH_ANXIETY_DEEP_DIVE_V7.md |
+| current CBSE/NCERT syllabus, exam policy, SQP/MS authority | CBSE_NCERT_CURRICULUM_ASSESSMENT_AUTHORITY_V7.md |
+| transfer, analogy, generalization, protected outcome banks | TRANSFER_GENERALISATION_ANALOGY_DEEP_DIVE_V7.md |
+| formative marking, feedback timing/dose/type, feed-forward | FORMATIVE_ASSESSMENT_FEEDBACK_DEEP_DIVE_V7.md |
 
 ## Domain routing for agents
 
