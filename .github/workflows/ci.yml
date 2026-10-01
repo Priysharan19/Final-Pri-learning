@@ -56,6 +56,7 @@ jobs:
           grep -Fq '✔ INDIA IDENTITY SUITE PASSED — 102/102 checks across 5 groups' suites.log
           grep -Fq 'INDIA ADAPTIVE: PASS — 302/302 checks' suites.log
           grep -Fq 'PLACEMENT: PASS — 268/268 checks' suites.log
+          grep -Fq 'IOS BUNDLE FEATURES: PASS — 16/16 checks' suites.log
           grep -Fq 'INDIA EXAM WEIGHT: PASS — 628/628 checks' suites.log
           grep -Fq 'PLOTTING: PASS — 78/78 checks' suites.log
           grep -Fq 'README TRUTH: PASS — 16/16 checks' suites.log
