@@ -166,7 +166,7 @@ function PaperHistory({ exams, openPaper, nav, india = false }) {
         );
       })}
       <p className="muted" style={{ marginTop: 10 }}>
-        🖨 opens the question paper for printing. Worked solutions are included only after submission for India exam simulations.
+        🖨 opens the question paper for printing. Worked solutions are added once the paper is submitted.
       </p>
     </div>
   );

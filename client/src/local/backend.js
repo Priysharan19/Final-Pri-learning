@@ -249,15 +249,32 @@ function trimTraps(traps) {
   return Object.fromEntries(keep.map(k => [k, traps[k]]));
 }
 
+/** Every designed slip a question carries: its numeric traps and its MCQ distractors. */
+const trapProbesOf = q => [
+  ...(Array.isArray(q?.traps) ? q.traps : []),
+  ...Object.values(q?.answer?.optionTraps || {}).map(why => ({ why }))
+];
+
+/**
+ * The misconception keys a question gave the student a real chance to repeat —
+ * the only misconceptions a clean answer to it can be evidence against. Keyed
+ * by the same owner and the same rule `recordTrap` uses, so the key a slip was
+ * recorded under is the key its repair opportunity carries.
+ */
+function repairOpportunitiesOf(q, owner) {
+  const keys = new Set();
+  for (const t of trapProbesOf(q)) {
+    const key = t && t.why ? misconceptionKey(owner, t.why) : null;
+    if (key) keys.add(key);
+  }
+  return keys;
+}
+
 /** The trap whose explanation the marker just handed back, if it was one. */
 function trapHitBy(q, feedback) {
   if (!feedback) return null;
   const text = String(feedback);
-  const pool = [
-    ...(Array.isArray(q?.traps) ? q.traps : []),
-    ...Object.values(q?.answer?.optionTraps || {}).map(why => ({ why }))
-  ];
-  const hit = pool.find(t => t && String(t.why) === text);
+  const hit = trapProbesOf(q).find(t => t && String(t.why) === text);
   return hit ? { why: String(hit.why) } : null;
 }
 
@@ -335,14 +352,21 @@ async function namedTrap(pid, subtopicId, key) {
 }
 
 /**
- * A clean, unaided correct answer is evidence the slip is receding, so every
- * trap in that subtopic banks a credit. Two credits stop it being surfaced or
- * steering the queue; four and it is forgotten. A hinted or second-try answer
- * banks nothing — it is not evidence the student can do it unaided.
+ * A clean, unaided correct answer is evidence a slip is receding only when the
+ * question gave the student the chance to make that slip — it carried the same
+ * designed trap or distractor. Only those traps bank a credit; every other trap
+ * in the subtopic is left exactly as it was, because getting an unrelated form
+ * right says nothing about the misconception (issue #232). Two credits stop a
+ * trap being surfaced or steering the queue; four and it is forgotten. A hinted
+ * or second-try answer banks nothing — it is not evidence the student can do it
+ * unaided. A Step Check misstep has no authored opportunity on a question, so
+ * no single answer repairs it; it leaves the active set through the recency
+ * window and the ledger cap instead.
  */
-function decayTraps(traps) {
+function decayTraps(traps, opportunities) {
   const out = {};
   for (const [key, t] of Object.entries(traps || {})) {
+    if (!opportunities || !opportunities.has(key)) { out[key] = t; continue; }
     const credit = (Number(t?.credit) || 0) + 1;
     if (credit < TRAP_CREDIT_FORGET) out[key] = { ...t, credit };
   }
@@ -1497,7 +1521,7 @@ async function resolve(profile, row, q, correct, answerGiven, ms, mode, viaInk =
       };
     }
     const clean = correct && !(row.hintsUsed || 0) && !(row.tries || 0);
-    const traps = clean ? decayTraps(st.traps) : (st.traps || {});
+    const traps = clean ? decayTraps(st.traps, repairOpportunitiesOf(q, owner)) : (st.traps || {});
     const recent = [correct ? 1 : 0, ...(Array.isArray(st.recent) ? st.recent : [])].slice(0, RECENT_WINDOW);
     ratingNext = {
       ...st, key: `${pid}:${owner}`, pid, subtopic: owner,
@@ -2569,6 +2593,7 @@ const routes = {
     const p = await requireProfile();
     const row = await get('questions', params.id);
     if (!row || row.pid !== p.id) throw Object.assign(new Error('Question not found'), { status: 404 });
+    assertPracticeRow(row);
     if (row.answered) throw Object.assign(new Error('Already answered'), { status: 409 });
     if (!row.discardedAt) {
       row.discardedAt = Date.now();
@@ -2581,6 +2606,7 @@ const routes = {
     const p = await requireProfile();
     const row = await get('questions', params.id);
     if (!row || row.pid !== p.id) throw Object.assign(new Error('Question not found'), { status: 404 });
+    assertPracticeRow(row);
     if (row.discardedAt) throw Object.assign(new Error('Question was skipped'), { status: 409, code: 'QUESTION_DISCARDED' });
     const q = row.payload;
     const hints = q.hints || [];
@@ -2595,6 +2621,7 @@ const routes = {
     const p = await requireProfile();
     const row = await get('questions', params.id);
     if (!row || row.pid !== p.id) throw Object.assign(new Error('Question not found'), { status: 404 });
+    assertPracticeRow(row);
     if (row.answered) throw Object.assign(new Error('Already answered'), { status: 409 });
     if (row.discardedAt) throw Object.assign(new Error('Question was skipped'), { status: 409, code: 'QUESTION_DISCARDED' });
     const q = row.payload;
@@ -2670,6 +2697,7 @@ const routes = {
     const p = await requireProfile();
     const row = await get('questions', params.id);
     if (!row || row.pid !== p.id) throw Object.assign(new Error('Question not found'), { status: 404 });
+    assertPracticeRow(row);
     if (row.answered) throw Object.assign(new Error('Already answered'), { status: 409 });
     if (row.discardedAt) throw Object.assign(new Error('Question was skipped'), { status: 409, code: 'QUESTION_DISCARDED' });
     const q = row.payload;
@@ -2761,6 +2789,9 @@ const routes = {
     const p = await requireProfile();
     const e = await get('exams', params.id);
     if (!e || e.pid !== p.id) throw Object.assign(new Error('Exam not found'), { status: 404 });
+    // A paper still being sat prints as a question paper only: answers, worked
+    // steps and marking criteria join it once the paper is submitted (#230).
+    const finished = !!e.finishedAt;
     const questions = [];
     for (const qid of e.questionIds) {
       const row = await get('questions', qid);
@@ -2776,20 +2807,24 @@ const routes = {
           subtopicName: q.title, difficulty: q.difficulty,
           parts: partsOf(q).map(pt => ({
             key: pt.key, prompt: pt.prompt, marks: pt.marks, answerType: pt.answerType, mcqOptions: pt.mcqOptions,
-            answerText: displayAnswer({ answerType: pt.answerType, answer: pt.answer, mcqOptions: pt.mcqOptions, answerPrefix: pt.answerPrefix, answerSuffix: pt.answerSuffix }),
-            steps: pt.steps
+            ...(finished ? {
+              answerText: displayAnswer({ answerType: pt.answerType, answer: pt.answer, mcqOptions: pt.mcqOptions, answerPrefix: pt.answerPrefix, answerSuffix: pt.answerSuffix }),
+              steps: pt.steps
+            } : {})
           })),
-          criteria: partsOf(q).map(pt => ({ mark: pt.marks, text: `Part (${pt.key})` }))
+          criteria: finished ? partsOf(q).map(pt => ({ mark: pt.marks, text: `Part (${pt.key})` })) : undefined
         });
         continue;
       }
+      const criteria = criteriaFor(q);
       questions.push({
         prompt: q.prompt, difficulty: q.difficulty, subtopicName: SUBTOPIC_BY_ID[q.subtopic]?.name,
         answerType: q.answerType, mcqOptions: q.mcqOptions, figure: safeFigure(q.figure),
-        answerText: displayAnswer(q), steps: q.steps, criteria: criteriaFor(q)
+        marks: criteria.reduce((n, c) => n + Number(c.mark || 1), 0),
+        ...(finished ? { answerText: displayAnswer(q), steps: q.steps, criteria } : {})
       });
     }
-    return { title: e.title, year: e.year, durationMin: e.durationMin, course: courseLabel(p.course || 'nsw', e.year, e.pathway), questions };
+    return { title: e.title, year: e.year, durationMin: e.durationMin, course: courseLabel(p.course || 'nsw', e.year, e.pathway), questions, solutionsAvailable: finished };
   },
   'POST /exams/:id/submit': async (body, params) => {
     const p = await requireProfile();
@@ -3312,6 +3347,7 @@ const routes = {
     const p = await requireProfile();
     const row = await get('questions', params.id);
     if (!row || row.pid !== p.id) throw Object.assign(new Error('Question not found'), { status: 404 });
+    await assertReviewableRow(row);
     const q = row.payload;
     if (q.custom) throw Object.assign(new Error('Custom questions can’t be regenerated'), { status: 400 });
     if (q.multipart) throw Object.assign(new Error('Structured exam questions live in exam review'), { status: 400 });
@@ -3332,6 +3368,7 @@ const routes = {
     const p = await requireProfile();
     const row = await get('questions', params.id);
     if (!row || row.pid !== p.id) throw Object.assign(new Error('Question not found'), { status: 404 });
+    await assertReviewableRow(row);
     const q = row.payload;
     const ink = await get('inks', params.id);
     return {
@@ -3523,6 +3560,34 @@ const routes = {
     };
   }
 };
+
+// ── Assessment boundary ──────────────────────────────────────────────────────
+// Exam questions live in the same `questions` store as practice, so a route
+// that takes a question id must decide from the stored row — not from which
+// page called it — what that row may be used for. An exam row is answered only
+// through POST /exams/:id/submit; the practice help and marking routes (hints,
+// reveal, two-try submit, skip) never touch it, before or after the paper is
+// finished. Review routes (history detail, retry) may open an exam row only
+// once its paper has been submitted. Anything that cannot prove the paper is
+// finished — a missing exam record included — fails closed.
+
+const isExamRow = row => row?.mode === 'exam' || !!row?.examId;
+
+function examQuestionLocked(message) {
+  return Object.assign(new Error(message), { status: 403, code: 'EXAM_QUESTION_LOCKED' });
+}
+
+function assertPracticeRow(row) {
+  if (isExamRow(row)) throw examQuestionLocked('This question belongs to an exam paper — answer it in the exam room.');
+}
+
+async function assertReviewableRow(row) {
+  if (!isExamRow(row)) return;
+  const exam = row.examId ? await get('exams', row.examId).catch(() => null) : null;
+  if (!exam || exam.pid !== row.pid || !exam.finishedAt) {
+    throw examQuestionLocked('Solutions for this exam question open once the paper is submitted.');
+  }
+}
 
 async function examFor(pid, examId) {
   const e = await get('exams', examId);

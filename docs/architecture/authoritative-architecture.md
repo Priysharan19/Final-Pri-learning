@@ -4,13 +4,15 @@ This document is the concise production architecture authority for `Priysharan19
 
 ## Learning runtime
 
-Pri Learning is local-first. The browser learning engine under `client/src/local/` runs against IndexedDB and owns the student's device-local learning experience. Core practice, marking, local progress and offline behavior do not require the production server to be reachable.
+Pri Learning is online-first (see [ADR-0001](adr-0001-online-first-runtime.md)). The target student experience is a signed-in account served by the `/v1` server hosted on Railway, with Supabase Postgres in the Mumbai region (`ap-south-1`) and server-side OpenAI providers for vision handwriting, working review, tutoring and explanation. Each part becomes current authority only when its ADR-0001 migration phase lands; this document does not assert that any of it is deployed today.
 
-`client/src/local/backend.js` is the current local learning backend. Any historical document that describes the legacy Express `/api` stack as the production learning backend is non-authoritative.
+The deterministic learning engine under `client/src/local/` and `client/src/engine/` stays bundled in the client. It decides every mark (AI proposes, the deterministic engine decides), gives an instant result while a cloud call is in flight, and keeps practice usable when the connection drops. It is a resilience path, not a marketed offline mode.
+
+`client/src/local/backend.js` is the current learning backend until ADR-0001 phase 5 moves learning records server-side. Any historical document that describes the legacy Express `/api` stack as the production learning backend is non-authoritative.
 
 ## Cloud control plane
 
-`server/index.js` starts the production service and `server/app.js` mounts the `/v1` platform router. `/v1` is the cloud control plane for authenticated account and platform capabilities such as identity, optional sync, classrooms, content, entitlements/billing, reports and enabled cloud-assisted services.
+`server/index.js` starts the production service and `server/app.js` mounts the `/v1` platform router. `/v1` is the primary product backend for identity, sync, classrooms, content, entitlements/billing, reports and AI-assisted services. Its target host is Railway (ADR-0001 phase 4). Model-provider and Supabase service-role credentials exist only as server environment variables (Railway variables once hosted there); the client never receives them.
 
 The old `/api` routes are development-only reference code. They are not mounted in the production runtime image; production requests to the legacy surface are deliberately refused. The production container static-hosts `client/dist` and runs `server/index.js`.
 
@@ -22,7 +24,7 @@ The native package does not define a separate web application architecture. `scr
 
 ## Data authority
 
-IndexedDB is authoritative for device-local learning state. The platform database is authoritative only for the server-side `/v1` records it owns. Do not move local learning state behind the server merely to make the topology look conventional.
+Supabase Postgres (Mumbai) is the target system of record for accounts and learning records. Authority moves one ADR-0001 phase at a time: until a phase lands, the current authority for that data (IndexedDB for device learning state, the `/v1` platform database for its records) is unchanged, and IndexedDB then becomes a device cache. Every client-reachable table is protected by Row-Level Security; a cross-account read is a release-blocking security regression.
 
 ## Release identity
 
