@@ -166,6 +166,9 @@ Typed WorldSpec architecture for verified generative mathematical interactives, 
 ### PAIRLAB_COLLABORATIVE_LEARNING.md
 Structured peer collaboration with rotating cognitive roles, private prediction/exit tasks, group-vs-individual evidence separation, AI mediation boundaries, child-safety controls and delayed individual evaluation.
 
+### RESEARCH_COMPLETENESS_AUDIT_V6_2026-10-01.md
+Domain-by-domain audit of what is architecture-saturated versus Pri-data-blocked, the evidence assets that now matter most, research freshness classes and explicit stopping rules for future literature searches.
+
 ### V6 agent routing
 
 | Mission surface | Additional V6 module |
@@ -183,7 +186,7 @@ Structured peer collaboration with rotating cognitive roles, private prediction/
 | generated simulations, manipulatives, multi-representation interactives | PRI_WORLDS_GENERATIVE_INTERACTIVES.md |
 | peer tutoring, group work, pairing, collaborative canvas | PAIRLAB_COLLABORATIVE_LEARNING.md |
 | India device/offline/shared-device/language field assumptions | INDIA_FIELD_OPERATING_REALITY_2026.md |
-| sequencing research-derived engineering work | RESEARCH_TO_BUILD_V6.md |
+| sequencing research-derived engineering work | RESEARCH_TO_BUILD_V6.md + RESEARCH_COMPLETENESS_AUDIT_V6_2026-10-01.md |
 
 ## Domain routing for agents
 
