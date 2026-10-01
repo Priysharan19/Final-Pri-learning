@@ -263,8 +263,8 @@ jobs:
         run: |
           set -euo pipefail
           test -s browser.log
-          grep -Eq 'E2E SUITE.*263/263.*8 flows' browser.log
-          grep -Fq 'Placement · onboarding → diagnostic → mastery map' browser.log
+          grep -Eq 'E2E SUITE.*267/267.*8 flows' browser.log
+          grep -Fq 'Placement · onboarding → diagnostic → evidence map' browser.log
           grep -Fq 'Phone · every destination reachable at 390px' browser.log
           grep -Fq 'India · onboarding, class labels, demo, cloud entry' browser.log
           grep -Fq 'Cloud · account, live Settings refresh, assignment hand-off' browser.log
