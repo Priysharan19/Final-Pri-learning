@@ -11,6 +11,7 @@
 package com.prilearning.app
 
 import android.content.pm.ActivityInfo
+import android.util.Log
 import android.webkit.WebView
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -30,7 +31,7 @@ class ShellJourneyTest {
         val latch = CountDownLatch(1)
         scenario.onActivity { act ->
             val wv: WebView = act.webView ?: run { latch.countDown(); return@onActivity }
-            wv.evaluateJavascript("(function(){try{return JSON.stringify(($js));}catch(e){return JSON.stringify('ERR '+e.message);}})()") { v ->
+            wv.evaluateJavascript("(function(){try{var r=($js);if(r&&r.nodeType)r=true;return JSON.stringify(r);}catch(e){return JSON.stringify('ERR '+e.message);}})()") { v ->
                 out = (JSONTokener(v ?: "null").nextValue() as? String) ?: "null"
                 latch.countDown()
             }
@@ -68,13 +69,16 @@ class ShellJourneyTest {
         // connectedAndroidTest installs the app fresh, so this is a first launch.
         ActivityScenario.launch(MainActivity::class.java).use { s ->
             // ── boot on the stable origin with the capability handshake ───────────
-            assertEquals("\"https://appassets.androidplatform.net\"", waitFor(s, "document.querySelector('.auth-card, .home-greet') && location.origin"))
+            Log.i("PRITEST", "boot on the stable origin with the capability handshake")
+            assertEquals("\"https://appassets.androidplatform.net\"", waitFor(s, "(($byLabel)('Get Started') || document.querySelector('.home-greet')) && location.origin"))
             assertEquals("true", eval(s, "!!window.__PRI_HOST__ && Object.isFrozen(window.__PRI_HOST__) && window.__PRI_HOST__.capabilities.lifecycle.backButton === true"))
             assertEquals("false", eval(s, "'platform' in window.__PRI_HOST__ || 'ink' in window.__PRI_HOST__.capabilities"))
             assertEquals("true", eval(s, "/^[0-9a-f]{40}$/.test((window.__PRI_HOST__.release||{}).releaseSha||'')"))
             assertEquals("false", eval(s, "!!navigator.serviceWorker && !!navigator.serviceWorker.controller"))
 
             // ── onboarding into a local profile ──────────────────────────────────
+
+            Log.i("PRITEST", "onboarding into a local profile")
             click(s, "($byLabel)('Get Started')")
             waitFor(s, "document.querySelector('[data-onboarding-step=\"1\"]')")
             click(s, "($byLabel)('Student')"); click(s, "document.querySelector('.auth-card .btn-primary')")
@@ -90,6 +94,8 @@ class ShellJourneyTest {
         }
 
         // ── a full relaunch keeps the profile (IndexedDB) and localStorage ─────────
+
+        Log.i("PRITEST", "a full relaunch keeps the profile (IndexedDB) and localStorage")
         ActivityScenario.launch(MainActivity::class.java).use { s ->
             val state = waitFor(s, """(function(){if(document.querySelector('.home-greet'))return 'home';
                 var b=[].slice.call(document.querySelectorAll('.auth-card button')).find(function(x){return /Android Student/.test(x.textContent);});
@@ -99,13 +105,17 @@ class ShellJourneyTest {
             assertEquals("\"kept\"", eval(s, "localStorage.getItem('pri-android-marker')"))
 
             // ── SPA routing through the bundled origin, and history Back ─────────
+
+            Log.i("PRITEST", "SPA routing through the bundled origin, and history Back")
             click(s, "[].slice.call(document.querySelectorAll('a[href=\"/practice\"]')).find(function(a){return a.offsetParent;})")
             waitFor(s, "document.querySelector('.q-prompt') && location.pathname === '/practice'")
 
             // ── Back closes an open sheet before it navigates ────────────────────
+
+            Log.i("PRITEST", "Back closes an open sheet before it navigates")
             val compact = eval(s, "document.documentElement.dataset.ff === 'compact'")
             if (compact == "true") {
-                click(s, "($byLabel)('More')")
+                click(s, "document.querySelector('.mobilenav button[aria-expanded]')")
                 waitFor(s, "document.querySelector('.mnav-sheet')")
                 s.onActivity { it.onBackPressedDispatcher.onBackPressed() }
                 waitFor(s, "!document.querySelector('.mnav-sheet') && location.pathname === '/practice'")
@@ -114,6 +124,8 @@ class ShellJourneyTest {
             waitFor(s, "location.pathname === '/'")
 
             // ── rotation keeps an in-progress typed answer (no recreation) ───────
+
+            Log.i("PRITEST", "rotation keeps an in-progress typed answer (no recreation)")
             click(s, "[].slice.call(document.querySelectorAll('a[href=\"/practice\"]')).find(function(a){return a.offsetParent;})")
             waitFor(s, "document.querySelector('.q-prompt')")
             var typed = false
@@ -133,6 +145,8 @@ class ShellJourneyTest {
             Thread.sleep(1500)
 
             // ── schemes outside the policy never navigate the app away ───────────
+
+            Log.i("PRITEST", "schemes outside the policy never navigate the app away")
             eval(s, "(function(){var a=document.createElement('a');a.href='intent://evil#Intent;end';document.body.appendChild(a);a.click();return true;})()")
             Thread.sleep(800)
             assertEquals("\"https://appassets.androidplatform.net\"", eval(s, "location.origin"))

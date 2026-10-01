@@ -94,6 +94,7 @@ class MainActivity : ComponentActivity() {
             override fun handleOnBackPressed() {
                 priBridge.requestBack {
                     val wv = webView
+                    android.util.Log.i("PriShell", "back: canGoBack=${wv?.canGoBack()}")
                     if (wv != null && wv.canGoBack()) wv.goBack() else finish()
                 }
             }

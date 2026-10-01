@@ -14,6 +14,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import android.webkit.WebView
 import androidx.webkit.JavaScriptReplyProxy
 import androidx.webkit.WebMessageCompat
@@ -23,6 +24,7 @@ import com.prilearning.app.shell.AssetOrigin
 import org.json.JSONObject
 
 class PriBridge(private val webView: WebView, private val descriptor: JSONObject) {
+    private companion object { const val TAG = "PriBridge" }
     private val main = Handler(Looper.getMainLooper())
     private var reply: JavaScriptReplyProxy? = null
     private var seq = 0
@@ -89,13 +91,14 @@ class PriBridge(private val webView: WebView, private val descriptor: JSONObject
      * answer window; no page, no answer or "not handled" means the shell decides.
      */
     fun requestBack(unhandled: () -> Unit) {
-        val proxy = reply ?: return unhandled()
+        val proxy = reply ?: run { Log.i(TAG, "back: no page channel"); return unhandled() }
         val id = "${Envelope.NATIVE_ID_PREFIX}${++nextNativeId}"
         var settled = false
         val finish: (Envelope.Reply?) -> Unit = { answer ->
             if (!settled) {
                 settled = true
                 val handled = answer?.ok == true && answer.result?.optBoolean("handled", false) == true
+                Log.i(TAG, "back: answered=${answer != null} handled=$handled")
                 if (!handled) unhandled()
             }
         }
