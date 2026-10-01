@@ -192,6 +192,13 @@ jobs:
           node server/test/entitlement-admin-grant-check.mjs
           node server/test/request-size-contract-check.mjs
           node server/test/content-index-exposure-check.mjs
+      - name: Structured logs, readiness, metrics, alert policy and failure drills (SQLite)
+        run: |
+          set -o pipefail
+          node server/test/observability-check.mjs 2>&1 | tee ops.log
+          node server/test/failure-drills-check.mjs 2>&1 | tee -a ops.log
+          grep -Fq 'OBSERVABILITY: PASS' ops.log
+          grep -Fq 'FAILURE DRILLS: PASS' ops.log
       - name: Commercial platform schema contract
         run: node server/test/platform-schema-check.mjs
       - name: Supabase migrations are self-contained transactions (supabase db push)
@@ -209,9 +216,10 @@ jobs:
         run: |
           set -o pipefail
           node scripts/with-postgres.mjs node server/test/run-platform-postgres.mjs 2>&1 | tee platform-postgres.log
-          grep -Fq 'PLATFORM ON POSTGRES: PASS — 24/24 suites' platform-postgres.log
+          grep -Fq 'PLATFORM ON POSTGRES: PASS — 25/25 suites' platform-postgres.log
           grep -Fq 'POSTGRES SCHEMA MUTATIONS: PASS — 21/21' platform-postgres.log
           grep -Fq 'PLATFORM SYNC BURST: PASS' platform-postgres.log
+          grep -Fq '✓ failure-drills-check.mjs' platform-postgres.log
       - name: Platform migration contract
         run: node server/test/platform-migration-check.mjs
       - name: Cross-account sync pagination regression

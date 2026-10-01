@@ -20,6 +20,8 @@ import { asyncRouter } from './asyncRouter.js';
 import { asStore } from './store.js';
 import { rateLimit, requireSession, requireVerifiedEmail } from './security.js';
 import { consumePaidCall, refusePaidCall } from './spendCeiling.js';
+import { recordProviderCall } from './metrics.js';
+import { logEvent } from './observability.js';
 import {
   MAX_LINES,
   WorkingProviderError,
@@ -105,8 +107,10 @@ export function createWorkingRouter(db, {
       const overBudget = await consumePaidCall(db, { env });
       if (overBudget) return refusePaidCall(res, overBudget);
 
+      const started = Date.now();
       try {
         const result = await check(req.body.prompt || '', lines, { env });
+        recordProviderCall('working', { ok: true, ms: Date.now() - started });
         res.json({
           check: {
             engine: result.engine,
@@ -118,6 +122,9 @@ export function createWorkingRouter(db, {
           }
         });
       } catch (error) {
+        const code = error instanceof WorkingProviderError ? error.code : 'WORKING_FAILED';
+        recordProviderCall('working', { ok: false, code, ms: Date.now() - started });
+        logEvent('warn', 'provider_call_failed', { requestId: req.requestId, provider: 'working', code, latencyMs: Date.now() - started, retryable: !!error?.retryable });
         if (error instanceof WorkingProviderError) {
           return res.status(error.status).json({ error: { code: error.code, message: error.message, retryable: !!error.retryable } });
         }
