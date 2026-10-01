@@ -1478,3 +1478,197 @@ Use: supports multidimensional AI literacy rather than one self-report score; pr
 Limitation: scale validation, not intervention or mathematics evidence.
 https://doi.org/10.1016/j.compedu.2024.105230
 
+
+
+---
+
+# AX. V7 assessment integrity / process evidence
+
+## Redefining student assessment in AI-infused environments — systematic review, 2026
+Class: systematic review focused mainly on higher education.
+Use: supports process-based/multistage assessment, oral verification and explicit AI-use policy over simplistic detection.
+Limitation: higher-education transport; not school mathematics causal evidence.
+https://doi.org/10.1007/s43681-025-00871-w
+
+## Reliability of AI-content detectors for student academic work — 2026
+Class: systematic empirical evaluation of 13 detectors across authentic student assignments, theses and code.
+Use: current detector performance is inadequate for high-stakes assessment; adversarial/hybrid editing creates substantial evasion.
+Critical Pri implication: AI detectors must not be sole misconduct evidence.
+https://doi.org/10.1016/j.compedu.2026.105616
+
+## Automated online proctoring — decade-long systematic review, 2026
+Class: systematic review.
+Use: documents fairness, bias, interpretability and environmental-condition risks in automated proctoring.
+Limitation: broad online-exam context; not a reason to reject all supervised assessment.
+https://doi.org/10.1007/s44217-026-01224-3
+
+## AI and educational measurement — thematic review, 2026
+Class: decade-scale thematic review.
+Use: documents movement toward process-oriented measurement alongside scoring/item/psychometric applications, with validity/fairness challenges.
+https://doi.org/10.1016/j.edurev.2026.100789
+
+---
+
+# AY. V7 learning efficiency / economics
+
+## Technology-enabled high-dosage tutoring — randomized evaluation
+Class: randomized program evaluation.
+Evidence: technology-enabled tutoring reported ~0.23 SD standardized-math gains for participating students with per-pupil cost ~30% below an earlier 2-to-1 tutoring model.
+Use: technology/process design can improve tutoring scalability without assuming full AI replacement.
+https://www.nber.org/papers/w32510
+
+## Tutor CoPilot cost analysis
+Class: field-RCT operational cost report.
+Evidence: API cost in the study implied roughly US$20/tutor/year under observed usage; excludes broader tutoring/software/labor costs.
+Use: high-leverage human-AI augmentation can have attractive inference economics; exact figure must not be extrapolated to Pri.
+https://www.povertyactionlab.org/evaluation/human-ai-cooperation-improve-tutoring-united-states
+
+## Multi-agent tutor latency/cost at scale — 2026 preprint
+Class: systems measurement study; 3,000+ requests, up to 50 concurrent users, specific Gemini/Vertex architecture.
+Use: latency and cost depend strongly on concurrency/provisioning; classroom-scale load must be benchmarked.
+Limitation: graduate STEM deployment / provider-specific.
+https://arxiv.org/abs/2604.24110
+
+## AI tutor usage without measured learning gains — economics field study 2026
+Class: small observational classroom deployment, N=32.
+Use: AI hint use increased attempts but did not improve measured course outcomes in the studied cohort; reinforces “activity != learning.”
+Limitation: tiny high-achieving economics sample and self-selected hint use.
+https://doi.org/10.1016/j.iree.2026.100350
+
+---
+
+# AZ. V7 long-horizon learning memory / data governance
+
+## UNICEF Guidance on AI and Children v3.0 — data agency
+Class: international child-rights guidance.
+Use: child data agency, privacy, control/deletion, age-appropriate transparency and minimization.
+https://www.unicef.org/innocenti/reports/policy-guidance-ai-children
+
+## UNICEF Child-Centric AI — 2026
+Class: child-centred AI implementation principles.
+Use: privacy by default, minimization, limited retention, avoidance of emotional/behavioral tracking for engagement.
+https://www.unicef.org/digitalimpact/stories/child-centric-ai
+
+## OECD digital-education data governance
+Class: international policy/evidence synthesis.
+Use: explicitly frames the educational-value versus privacy/security tension of granular learner data and need for trustworthy governance.
+https://www.oecd.org/en/publications/oecd-digital-education-outlook-2023_c74f03de-en/full-report/data-and-technology-governance-fostering-trust-in-the-use-of-data_171e56b9.html
+
+## Federated/explainable learning analytics — 2026
+Class: higher-education ML systems study.
+Use: demonstrates possible privacy-preserving distributed analytics while also showing explanatory divergence across datasets.
+Limitation: federated learning is not a privacy guarantee or current Pri requirement.
+https://doi.org/10.1016/j.caeai.2026.100629
+
+---
+
+# BA. V7 content rights / provenance
+
+## NCERT e-content licence / online textbook terms
+Class: official NCERT terms.
+Use: current direct evidence that download/access does not automatically permit commercial use, redistribution, adaptation or translation; terms distinguish permitted access from restricted reuse.
+https://epathshala.nic.in/wp-content/doc/book/gtextbook/textbook.htm
+https://epathshala.nic.in/wp-content/doc/book/btextbook/textbook.htm
+
+## NCERT Copyright Infringement press release — 7 April 2024
+Class: official rights-holder notice.
+Use: NCERT warns against commercial publication of textbook content without copyright permission.
+https://www.ncert.nic.in/pdf/announcement/notices/Press_Release_Copyright_Infringement-NCERT.pdf
+
+## Indian Copyright Office — Section 52 exceptions
+Class: official statutory reference.
+Use: records education/research/exam/accessibility exceptions, but application to a commercial product requires qualified legal interpretation.
+https://copyright.gov.in/Exceptions.aspx
+
+---
+
+# BB. V7 experimentation / reproducibility
+
+## What Works Clearinghouse standards
+Class: U.S. official evidence-review standards.
+Use: attrition, baseline equivalence, confounding, cluster composition and outcome-quality discipline for Pri experiments.
+https://ies.ed.gov/ncee/wwc/handbooks
+https://ies.ed.gov/ncee/wwc/reviewresources2
+
+## Sample Ratio Mismatch — Microsoft experimentation
+Class: mature online-experiment engineering guidance.
+Use: SRM as end-to-end instrumentation/randomization integrity check before treatment-effect interpretation.
+https://www.microsoft.com/en-us/research/articles/diagnosing-sample-ratio-mismatch-in-a-b-testing/
+
+---
+
+# BC. V7 model / agent security
+
+## NIST Generative AI Profile — AI 600-1
+Class: official risk-management profile.
+Use: confabulation, privacy, information-integrity and security risk framework for generative systems.
+https://doi.org/10.6028/NIST.AI.600-1
+
+## OWASP LLM / GenAI Top 10 2025
+Class: security-practice reference.
+Use: prompt injection, sensitive information, supply chain, poisoning, output handling, excessive agency, system-prompt leakage, vector/embedding weaknesses, misinformation and unbounded consumption.
+https://genai.owasp.org/llm-top-10/
+
+## OWASP prompt injection / excessive agency / vector weaknesses
+Class: security guidance.
+Use: supports untrusted-content authority separation, least privilege and RAG access/poisoning controls.
+https://genai.owasp.org/llmrisk/llm01-prompt-injection/
+https://genai.owasp.org/llmrisk/llm062025-excessive-agency/
+https://genai.owasp.org/llmrisk/llm082025-vector-and-embedding-weaknesses/
+
+## Prompt injection attacks on educational LLMs — Scientific Reports 2026
+Class: educational attack study.
+Use: demonstrates direct prompt-injection risk in grading/tutoring/question-answering workflows.
+https://doi.org/10.1038/s41598-026-46563-1
+
+## NIST AI agent security response synthesis / red-team evidence — 2026
+Class: official security research/guidance.
+Use: agent systems introduce novel security threats; indirect prompt injection / agent hijacking remains a major risk for systems processing external content.
+https://www.nist.gov/publications/summary-analysis-responses-request-information-regarding-security-considerations-ai
+https://www.nist.gov/blogs/caisi-research-blog/insights-ai-agent-security-large-scale-red-teaming-competition
+
+---
+
+# BD. V7 accessible mathematics semantics
+
+## MathML 4 — W3C Working Draft, June 2026
+Class: web mathematics standard in development.
+Use: mathematical notation/content semantics plus intent annotations for accessible audio/braille rendering.
+https://www.w3.org/TR/mathml4/
+
+## W3C Math Working Group 2026 charter
+Class: implementation roadmap.
+Use: screen-reader/intent/accessibility technique and implementation-test direction.
+https://www.w3.org/Math/Documents/Charter2026.html
+
+## Accessible Mathematics for Students who are Blind or have Low Vision — Australia 2025–28
+Class: ARC Linkage co-design research programme for upper-secondary mathematics.
+Use: strong architectural precedent for one workspace supporting braille, LaTeX, HTML+MathML, speech, visual, tactile and sonification pathways.
+https://www.accessiblemaths.org/
+
+## Adaptive sonification of mathematical function graphs — 2026
+Class: user experiments with visually impaired participants.
+Use: sonification density/parameters materially influence usability; “add sound” is not enough.
+https://www.mdpi.com/2076-3417/16/14/7137
+
+---
+
+# BE. V7 misconception / diagnostic evidence
+
+## Eedi Misconception Graph public-good release
+Class: vendor/open-data infrastructure.
+Claimed scope: 8,000+ mathematics misconceptions informed by 200M student responses, released through Learning Commons under CC BY 4.0.
+Use: candidate external misconception ontology/benchmark prior; requires exact licence/data snapshot and Pri transport validation before production import.
+https://www.eedi.com/news/eedis-misconception-graph-is-now-a-public-good
+https://www.eedi.com/data-and-competitions
+
+## Eedi Diagnostic Engine
+Class: vendor diagnostic-system description.
+Use: engineered distractors linked to specific misconceptions; large-scale precedent for misconception opportunities rather than wrong-answer-only labels.
+Limitation: capability/vendor claims do not establish Pri validity.
+https://www.eedi.com/diagnostic-engine
+
+## Erroneous examples systematic review — 2025
+Class: systematic review; 40 studies, 26 mathematics.
+Use: misconception/error patterns can become controlled erroneous/contrasting-example interventions, with effects moderated by prompt, prior knowledge, complexity and cognitive load.
+https://doi.org/10.1007/s10648-025-10071-x
