@@ -15,5 +15,8 @@
   },
   "physicalIpad": "blocked_external_unavailable",
   "productionProvider": "absent",
-  "exactHeadCi": "not_started"
+  "exactHeadCi": "not_started",
+  "currentMainSha": "dd5a1da68b971c797845eb6ed28dd9ae72221160",
+  "mainReconciled": true,
+  "recoveredWorkCommit": "ce0f4cfefe370a7e0ec2c6d04cc7573e81ff1e13"
 }

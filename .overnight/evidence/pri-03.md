@@ -98,3 +98,10 @@
 - Persist only payload-free handwriting operational diagnostics (engine, availability, latency, code, fallback, release SHA).
 - Extend deterministic server/client/native contracts for failure taxonomy, cancellation, fallback and status truthfulness.
 - Keep hybrid arbitration/accuracy redesign out of PRI-03.
+
+## Current-main reconciliation
+- Recovered uncommitted Checkpoint-2 provider/status work was preserved first in commit ce0f4cfefe370a7e0ec2c6d04cc7573e81ff1e13 and pushed before history changes.
+- Fetched live production main explicitly because this crash-recovery clone originally had a single-branch fetchspec.
+- Reconciled live main dd5a1da68b971c797845eb6ed28dd9ae72221160 into the PRI-03 branch with a normal merge; no conflicts.
+- Post-merge focused sanity: npm run test:platform:handwriting PASS, 53/53 checks.
+
