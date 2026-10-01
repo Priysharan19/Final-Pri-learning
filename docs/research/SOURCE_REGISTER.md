@@ -881,3 +881,25 @@ Class: meta-analysis of 30 studies from 2015–2025.
 Use: positive mathematics-achievement effect with substantial moderation; simulation-oriented designs performed strongly in included evidence.
 Limitation: elementary focus and heterogeneous implementations.
 https://doi.org/10.1002/jcal.70295
+
+
+---
+
+# AE. PairLab / collaborative learning
+
+## AI agents in computer-supported collaborative learning — systematic review 2026
+Class: systematic review of 46 empirical studies from 2014–2025.
+Use: maps AI-agent roles/functions and outcomes in collaborative learning; supports bounded mediation rather than assuming one collaboration architecture.
+https://doi.org/10.1016/j.caeai.2026.100579
+
+## AI-assisted pair programming comparative study — 2025
+Class: quasi-experimental undergraduate programming study, N=234.
+Use: AI-assisted pairs improved performance/motivation versus individual work under studied conditions, but human–human pairs showed higher collaboration/social presence.
+Limitation: programming domain, not school mathematics.
+https://doi.org/10.1186/s40594-025-00537-3
+
+## Secondary mathematics peer-tutoring meta-analysis — 2026
+Class: meta-analysis of 11 recent experimental/quasi-experimental studies.
+Use: promising positive mathematics-performance evidence with very high heterogeneity; supports testing structured peer tutoring.
+Limitation: small evidence base and very high heterogeneity; pooled effect should not be treated as a universal constant.
+https://www.malque.pub/ojs/index.php/mr/article/view/17371
