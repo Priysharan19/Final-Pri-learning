@@ -24,6 +24,7 @@
 // worse reader, not a broken app.
 // ─────────────────────────────────────────────────────────────────────────────
 import { consumeRateLimit } from './security.js';
+import { asStore } from './store.js';
 
 /** One budget for both routes: one key, one bill. */
 export const PAID_BUDGET = 'paid-provider';
@@ -66,7 +67,7 @@ export function spendCeilingMissing(env = process.env) {
  *
  * Returns null when the call may proceed.
  */
-export function consumePaidCall(db, { env = process.env, now = Date.now() } = {}) {
+export async function consumePaidCall(db, { env = process.env, now = Date.now() } = {}) {
   const ceiling = spendCeiling(env);
   if (!ceiling.required) return null;
 
@@ -77,11 +78,16 @@ export function consumePaidCall(db, { env = process.env, now = Date.now() } = {}
     return { status: 503, code: 'PAID_CAPACITY_NOT_CONFIGURED', message: 'Server reading is unavailable on this deployment.' };
   }
 
-  const hour = consumeRateLimit(db, `${PAID_BUDGET}:hour`, { limit: ceiling.perHour, windowMs: 60 * 60 * 1000 }, now);
-  if (!hour.allowed) return spent(hour.resetAt);
-  const day = consumeRateLimit(db, `${PAID_BUDGET}:day`, { limit: ceiling.perDay, windowMs: 24 * 60 * 60 * 1000 }, now);
-  if (!day.allowed) return spent(day.resetAt);
-  return null;
+  // Both buckets in one transaction, as when this ran synchronously: two
+  // concurrent calls can never both take the last unit of either budget.
+  const store = asStore(db);
+  return store.transaction(async () => {
+    const hour = await consumeRateLimit(store, `${PAID_BUDGET}:hour`, { limit: ceiling.perHour, windowMs: 60 * 60 * 1000 }, now);
+    if (!hour.allowed) return spent(hour.resetAt);
+    const day = await consumeRateLimit(store, `${PAID_BUDGET}:day`, { limit: ceiling.perDay, windowMs: 24 * 60 * 60 * 1000 }, now);
+    if (!day.allowed) return spent(day.resetAt);
+    return null;
+  });
 }
 
 function spent(resetAt) {

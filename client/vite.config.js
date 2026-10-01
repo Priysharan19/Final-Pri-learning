@@ -64,6 +64,12 @@ export const CHUNK_GROUPS = [
   // in the entry, because the runtime has to be there to decide a language.
   { name: 'i18n-hi', test: /\/src\/i18n\/strings\.hi\.js$/, priority: 40 },
   { name: 'i18n-terms', test: /\/src\/i18n\/ncertTerms\.js$/, priority: 40 },
+  // The NCERT syllabus layers — chapter lists, dot points and coverage split
+  // out of the Class 7–9 production banks so the curriculum spine can read them
+  // at boot without the generators and teaching content behind them. They are
+  // small and always wanted together, so they share one chunk rather than
+  // costing the boot path five requests.
+  { name: 'ncert-syllabus', test: /\/src\/engine\/ncert\/[a-z0-9-]+-syllabus\.js$/, priority: 40 },
   { name: 'vendor-react', test: /\/node_modules\/(react|react-dom|react-router|react-router-dom|scheduler)\//, priority: 30 },
   { name: 'vendor-katex', test: /\/node_modules\/katex\//, priority: 30 }
 ];
@@ -145,6 +151,19 @@ export const ON_DEMAND = [
   // student was fetching 90 kB of Class 11 and 12 questions in the background.
   [/(^|\/)(year(7|8|9|10|11|12)|streams-(standard|ext)|india-(algebra|calculus|class10|class11|class12|coordinate|foundation|junior-overlay|olympiad|senior|native-helpers))-[^/]*\.js$/, 'question bank for another year'],
 
+  // The source-audited NCERT Class 7–9 production banks: each class's
+  // generators, topper notes, worked examples and answer audits. They used to
+  // ride in the install because the curriculum spine imported its chapter list
+  // from the same modules; that list now lives in the small ncert-syllabus
+  // chunk, and these are reached only through the india-junior question bank
+  // and the chapter shells in Practice.jsx. That bank is exactly what api.js
+  // warmScope() loads at sign-in for a Class 7, 8 or 9 profile, and its static
+  // imports pull these in with it, so the students who practise from them are
+  // offline-ready for them; a Class 10–12 profile carries none of them.
+  // Practice.jsx mounts a chapter shell only for its own chapters and renders
+  // nothing, never a crash, if one cannot be fetched.
+  [/(^|\/)class(7|8|9)-[a-z0-9-]+-production-[^/]*\.js$/, 'NCERT Class 7–9 production bank'],
+
   // The previous-year archive is reached only by a student who asks for past
   // papers. It is behind an import() already; warming it spent 48 kB on the
   // majority who never open one.
@@ -163,7 +182,27 @@ export const ON_DEMAND = [
 
   // The NCERT term glossary is reached only when the term bridge is switched
   // on, and is worth nothing to the install of a student who never does.
-  [/(^|\/)i18n-terms-[^/]*\.js$/, 'NCERT term glossary']
+  [/(^|\/)i18n-terms-[^/]*\.js$/, 'NCERT term glossary'],
+
+  // The Hindi legal notices, by the same argument as the Hindi catalogue: an
+  // English reader should not carry 37 kB of Devanagari they will never open.
+  // Legal.jsx reaches them by import() only when the page is read in Hindi,
+  // and if they cannot be fetched it shows the English — the text that
+  // governs — and says so, which legal-pages-check.mjs holds it to.
+  [/(^|\/)legalHindi-[^/]*\.js$/, 'Hindi legal notices'],
+
+  // Staff-only screens. ADR-0001 makes the product online-first, and these are
+  // the screens a student never opens, so nothing a student does offline
+  // depends on them and no student should pay to download them:
+  //   · Teach — the teacher workspace. App.jsx renders it only through
+  //     teacherOnly(), which redirects every other role before the lazy route
+  //     is ever rendered, and only TEACHER_NAV links to it. A teacher's first
+  //     open fetches it and the runtime rule keeps it from then on.
+  //   · StaffOperationsPanel — the content-operations and admin console.
+  //     Settings.jsx asks for it only once the signed-in cloud account reports
+  //     a support or admin role, and the server authorises every call it makes
+  //     regardless.
+  [/(^|\/)(Teach|StaffOperationsPanel)-[^/]*\.js$/, 'staff-only screen']
 ];
 
 // The faces the first screens genuinely paint in: the Latin Inter subset for

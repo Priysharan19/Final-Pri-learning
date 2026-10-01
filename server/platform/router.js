@@ -1,4 +1,5 @@
-import { Router } from 'express';
+import { asyncRouter } from './asyncRouter.js';
+import { asStore } from './store.js';
 import { createAccountRouter } from './accounts.js';
 import { createAdminRouter } from './admin.js';
 import { createAssignmentExecutionRouter } from './assignments.js';
@@ -22,7 +23,8 @@ const SERVER_WEBHOOK = /^\/billing\/webhook\/(?:apple|google|web)$/;
 
 export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckout = {}, billingNative = {}, billingLifecycle = {} } = {}) {
   assertPlatformConfig();
-  const router = Router();
+  db = asStore(db);
+  const router = asyncRouter();
 
   router.use((req, res, next) => {
     res.set('X-Content-Type-Options', 'nosniff');
@@ -32,15 +34,17 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
     next();
   });
 
-  router.get('/health', (req, res) => {
+  router.get('/health', async (req, res) => {
     const config = platformConfigStatus();
     res.json({
       ok: true,
       service: 'pri-learning-platform',
       releaseIdentity: serverReleaseIdentity(),
-      schemaVersion: db.prepare("SELECT value FROM platform_meta WHERE key='schema_version'").get()?.value || null,
-      billingSchemaVersion: db.prepare("SELECT value FROM platform_meta WHERE key='billing_schema_version'").get()?.value || null,
+      schemaVersion: (await db.get("SELECT value FROM platform_meta WHERE key='schema_version'"))?.value || null,
+      billingSchemaVersion: (await db.get("SELECT value FROM platform_meta WHERE key='billing_schema_version'"))?.value || null,
       storage: { persistentDatabase: config.persistentDatabaseConfigured },
+      // Which driver serves /v1 — never the URL, host, user or file path.
+      database: { engine: db.dialect },
       identityProviders: { google: config.googleConfigured, apple: config.appleConfigured },
       authDelivery: { email: config.authEmailProviderConfigured },
       billingProviders: {
@@ -48,7 +52,7 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
         apple: config.appleBillingProviderConfigured,
         google: false
       },
-      housekeeping: housekeepingStatus(db),
+      housekeeping: await housekeepingStatus(db),
       checkedAt: Date.now()
     });
   });

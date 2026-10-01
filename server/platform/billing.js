@@ -1,4 +1,5 @@
-import { Router } from 'express';
+import { asyncRouter } from './asyncRouter.js';
+import { asStore } from './store.js';
 import { applyVerifiedEntitlement } from './entitlements.js';
 import { rateLimit, requireSession, requireVerifiedEmail, sha256 } from './security.js';
 
@@ -14,10 +15,11 @@ const APPLE_MANAGE_URL = 'https://apps.apple.com/account/subscriptions';
  * provider 'web' in a chargeable state and the bound Razorpay subscription has
  * no pending cancellation. Nothing here trusts client state.
  */
-export function webSubscriptionManageState(db, accountId, { adapterAvailable = false } = {}) {
-  const snapshot = db.prepare('SELECT plan,status,provider,current_period_end,grace_until FROM entitlement_snapshots WHERE account_id=?').get(accountId);
-  const binding = db.prepare(`SELECT provider_subscription_id,cancel_requested_at,cancel_mode FROM billing_subscriptions
-    WHERE provider='web' AND account_id=? ORDER BY last_effective_at DESC, created_at DESC LIMIT 1`).get(accountId);
+export async function webSubscriptionManageState(db, accountId, { adapterAvailable = false } = {}) {
+  db = asStore(db);
+  const snapshot = await db.get('SELECT plan,status,provider,current_period_end,grace_until FROM entitlement_snapshots WHERE account_id=?', [accountId]);
+  const binding = await db.get(`SELECT provider_subscription_id,cancel_requested_at,cancel_mode FROM billing_subscriptions
+    WHERE provider='web' AND account_id=? ORDER BY last_effective_at DESC, created_at DESC LIMIT 1`, [accountId]);
   const live = !!snapshot && snapshot.provider === 'web' && CANCELLABLE.has(snapshot.status);
   const periodEnd = live ? (snapshot.status === 'grace' ? snapshot.grace_until : snapshot.current_period_end) || null : null;
   const cancelling = live && !!binding?.cancel_requested_at;
@@ -81,14 +83,15 @@ function validateVerifiedResult(result, provider) {
 }
 
 export function createBillingRouter(db, { verifiers = {}, checkout = {}, native = {}, lifecycle = {} } = {}) {
-  const router = Router();
+  db = asStore(db);
+  const router = asyncRouter();
 
   router.get('/config', (req, res) => res.json(commercialConfig()));
 
   // Where a student manages each provider's subscription. Apple subscriptions
   // are managed only through the App Store; web subscriptions cancel here.
-  router.get('/manage', requireSession(db), (req, res) => {
-    const web = webSubscriptionManageState(db, req.platformSession.account_id, {
+  router.get('/manage', requireSession(db), async (req, res) => {
+    const web = await webSubscriptionManageState(db, req.platformSession.account_id, {
       adapterAvailable: typeof lifecycle.web?.cancel === 'function'
     });
     res.set('Cache-Control', 'no-store');
@@ -110,8 +113,8 @@ export function createBillingRouter(db, { verifiers = {}, checkout = {}, native 
     } catch (err) { next(err); }
   });
 
-  router.get('/status', requireSession(db), (req, res) => {
-    const row = db.prepare('SELECT plan,status,provider,product_id,current_period_end,grace_until,source_version,updated_at FROM entitlement_snapshots WHERE account_id=?').get(req.platformSession.account_id);
+  router.get('/status', requireSession(db), async (req, res) => {
+    const row = await db.get('SELECT plan,status,provider,product_id,current_period_end,grace_until,source_version,updated_at FROM entitlement_snapshots WHERE account_id=?', [req.platformSession.account_id]);
     res.set('Cache-Control', 'no-store');
     res.json({ billing: row ? {
       plan: row.plan, status: row.status, provider: row.provider, productId: row.product_id,
@@ -124,11 +127,11 @@ export function createBillingRouter(db, { verifiers = {}, checkout = {}, native 
   // random UUID rather than a Pri account id/email. StoreKit echoes it inside
   // the Apple-signed transaction so the server can bind purchases to accounts
   // without trusting anything the web view says after checkout.
-  router.get('/apple/bootstrap', requireSession(db), rateLimit(db, 'billing-apple-bootstrap', { limit: 60, windowMs: 60 * 60 * 1000 }), (req, res, next) => {
+  router.get('/apple/bootstrap', requireSession(db), rateLimit(db, 'billing-apple-bootstrap', { limit: 60, windowMs: 60 * 60 * 1000 }), async (req, res, next) => {
     const bootstrap = native.apple?.bootstrap;
     if (typeof bootstrap !== 'function') return res.status(503).json({ error: { code: 'BILLING_PROVIDER_NOT_CONFIGURED', message: 'App Store billing is not configured on this deployment.' } });
     try {
-      res.json({ apple: bootstrap({ accountId: req.platformSession.account_id, request: req }) });
+      res.json({ apple: await bootstrap({ accountId: req.platformSession.account_id, request: req }) });
     } catch (err) { next(err); }
   });
 
@@ -136,13 +139,13 @@ export function createBillingRouter(db, { verifiers = {}, checkout = {}, native 
   // entitlement authority. The native shell sends the JWS representation here;
   // only after the server re-verifies Apple's certificate chain, app identity,
   // product id and appAccountToken does Premium change.
-  router.post('/apple/transaction', requireSession(db), rateLimit(db, 'billing-apple-transaction', { limit: 30, windowMs: 60 * 60 * 1000 }), (req, res, next) => {
+  router.post('/apple/transaction', requireSession(db), rateLimit(db, 'billing-apple-transaction', { limit: 30, windowMs: 60 * 60 * 1000 }), async (req, res, next) => {
     const verify = native.apple?.transaction;
     if (typeof verify !== 'function') return res.status(503).json({ error: { code: 'BILLING_PROVIDER_NOT_CONFIGURED', message: 'App Store transaction verification is not configured on this deployment.' } });
     try {
-      const result = validateVerifiedResult(verify({ accountId: req.platformSession.account_id, body: req.body || {}, request: req }), 'apple');
+      const result = validateVerifiedResult(await verify({ accountId: req.platformSession.account_id, body: req.body || {}, request: req }), 'apple');
       if (result.accountId !== req.platformSession.account_id) throw new Error('Apple transaction account binding mismatch');
-      const applied = applyVerifiedEntitlement(db, result);
+      const applied = await applyVerifiedEntitlement(db, result);
       res.json({ accepted: true, ...applied });
     } catch (err) { next(err); }
   });
@@ -171,7 +174,7 @@ export function createBillingRouter(db, { verifiers = {}, checkout = {}, native 
     try {
       const result = validateVerifiedResult(await verifier({ accountId: req.platformSession.account_id, body: req.body || {}, request: req }), provider);
       if (result.accountId !== req.platformSession.account_id) throw new Error('Billing restore account binding mismatch');
-      const applied = applyVerifiedEntitlement(db, { ...result, payloadDigest: result.payloadDigest || sha256(JSON.stringify(req.body || {})) });
+      const applied = await applyVerifiedEntitlement(db, { ...result, payloadDigest: result.payloadDigest || sha256(JSON.stringify(req.body || {})) });
       res.json(applied);
     } catch (err) { next(err); }
   });
@@ -185,13 +188,20 @@ export function createBillingRouter(db, { verifiers = {}, checkout = {}, native 
     const verifier = verifiers[provider]?.webhook;
     if (typeof verifier !== 'function') return res.status(503).json({ error: { code: 'BILLING_PROVIDER_NOT_CONFIGURED', message: `${provider} webhook verification is not configured on this deployment.` } });
     try {
-      const events = await verifier({ body: req.body, headers: req.headers, request: req });
-      const list = Array.isArray(events) ? events : [events];
-      const results = [];
-      for (const candidate of list) {
-        const result = validateVerifiedResult(candidate, provider);
-        results.push(applyVerifiedEntitlement(db, result));
-      }
+      // A webhook verifier only checks a signature and reads/writes this
+      // database (no provider call), so verification and application share one
+      // transaction: two deliveries of one event id apply, ledger and audit it
+      // exactly once, however their requests interleave.
+      const results = await db.transaction(async () => {
+        const events = await verifier({ body: req.body, headers: req.headers, request: req });
+        const list = Array.isArray(events) ? events : [events];
+        const applied = [];
+        for (const candidate of list) {
+          const result = validateVerifiedResult(candidate, provider);
+          applied.push(await applyVerifiedEntitlement(db, result));
+        }
+        return applied;
+      });
       res.json({ ok: true, applied: results.length, stale: results.filter(result => result?.stale).length });
     } catch (err) { next(err); }
   });

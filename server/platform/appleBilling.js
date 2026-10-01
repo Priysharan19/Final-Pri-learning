@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { configuredAppleRoots, verifyAppleJWS } from './appleSignedData.js';
 import { sha256 } from './security.js';
+import { asStore } from './store.js';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const TRANSACTION_ID = /^\d{6,32}$/;
@@ -87,44 +88,42 @@ function assertApp(cfg, payload, { notification = false } = {}) {
   }
 }
 
-function ensureAccountToken(db, accountId) {
-  const account = db.prepare('SELECT id FROM accounts WHERE id=? AND deleted_at IS NULL').get(accountId);
-  if (!account) throw billingError('BILLING_ACCOUNT_INVALID', 'Billing account does not exist.', 404);
-  let row = db.prepare('SELECT app_account_token FROM billing_apple_accounts WHERE account_id=?').get(accountId);
-  if (!row) {
-    const token = randomUUID();
-    db.prepare('INSERT INTO billing_apple_accounts(account_id,app_account_token,created_at) VALUES (?,?,?)')
-      .run(accountId, token, Date.now());
-    row = { app_account_token: token };
-  }
-  return row.app_account_token;
+async function ensureAccountToken(db, accountId) {
+  // One token per account even when two bootstraps race: the insert yields to
+  // an existing row and the token is read back from the table, never assumed.
+  return db.transaction(async () => {
+    const account = await db.get('SELECT id FROM accounts WHERE id=? AND deleted_at IS NULL', [accountId]);
+    if (!account) throw billingError('BILLING_ACCOUNT_INVALID', 'Billing account does not exist.', 404);
+    await db.run(`INSERT INTO billing_apple_accounts(account_id,app_account_token,created_at) VALUES (?,?,?)
+      ON CONFLICT(account_id) DO NOTHING`, [accountId, randomUUID(), Date.now()]);
+    return (await db.get('SELECT app_account_token FROM billing_apple_accounts WHERE account_id=?', [accountId])).app_account_token;
+  });
 }
 
-function accountForToken(db, token) {
+async function accountForToken(db, token) {
   if (!UUID.test(String(token || ''))) return null;
-  return db.prepare('SELECT account_id FROM billing_apple_accounts WHERE app_account_token=?').get(String(token))?.account_id || null;
+  return (await db.get('SELECT account_id FROM billing_apple_accounts WHERE app_account_token=?', [String(token)]))?.account_id || null;
 }
 
-function subscriptionBinding(db, originalTransactionId) {
-  return db.prepare(`SELECT * FROM billing_subscriptions
-    WHERE provider='apple' AND provider_subscription_id=?`).get(originalTransactionId);
+async function subscriptionBinding(db, originalTransactionId) {
+  return await db.get(`SELECT * FROM billing_subscriptions
+    WHERE provider='apple' AND provider_subscription_id=?`, [originalTransactionId]);
 }
 
-function bindSubscription(db, { accountId, transaction, cfg, now = Date.now() }) {
+async function bindSubscription(db, { accountId, transaction, cfg, now = Date.now() }) {
   const original = String(transaction.originalTransactionId || '');
   const productId = String(transaction.productId || '');
   const cadence = cadenceForProduct(cfg, productId);
   if (!TRANSACTION_ID.test(original) || !cadence) throw billingError('APPLE_TRANSACTION_INVALID', 'Apple transaction metadata is incomplete.');
-  const prior = subscriptionBinding(db, original);
+  const prior = await subscriptionBinding(db, original);
   if (prior && prior.account_id !== accountId) {
     throw billingError('BILLING_ACCOUNT_MISMATCH', 'This App Store subscription is already bound to another Pri Learning account.', 409);
   }
-  db.prepare(`INSERT INTO billing_subscriptions
+  await db.run(`INSERT INTO billing_subscriptions
     (provider,provider_subscription_id,account_id,product_id,cadence,trial_claimed,created_at,updated_at,last_effective_at,last_event_rank,last_event_id)
     VALUES ('apple',?,?,?,?,0,?,?,0,0,NULL)
     ON CONFLICT(provider,provider_subscription_id) DO UPDATE SET
-      product_id=excluded.product_id,cadence=excluded.cadence,updated_at=excluded.updated_at`)
-    .run(original, accountId, productId, cadence, now, now);
+      product_id=excluded.product_id,cadence=excluded.cadence,updated_at=excluded.updated_at`, [original, accountId, productId, cadence, now, now]);
   return original;
 }
 
@@ -185,10 +184,10 @@ function normalizeTransaction(cfg, transaction, {
   };
 }
 
-function resolveTransactionAccount(db, transaction, expectedAccountId = null) {
+async function resolveTransactionAccount(db, transaction, expectedAccountId = null) {
   const token = String(transaction?.appAccountToken || '');
-  const tokenAccount = accountForToken(db, token);
-  const prior = subscriptionBinding(db, String(transaction?.originalTransactionId || ''));
+  const tokenAccount = await accountForToken(db, token);
+  const prior = await subscriptionBinding(db, String(transaction?.originalTransactionId || ''));
   const accountId = tokenAccount || prior?.account_id || null;
   if (!accountId) throw billingError('APPLE_ACCOUNT_UNBOUND', 'Apple transaction is not bound to a Pri Learning account.', 409);
   if (expectedAccountId && accountId !== expectedAccountId) {
@@ -220,11 +219,20 @@ function statusForNotification(type, subtype, transaction, renewal) {
 }
 
 export function createAppleBilling(db) {
+  db = asStore(db);
   const cfg = readConfig();
+  // Resolving which account a transaction belongs to and recording that
+  // binding is one transaction, so two deliveries of the same subscription
+  // cannot bind it to two accounts.
+  const resolveAndBind = (decoded, expectedAccountId = null) => db.transaction(async () => {
+    const accountId = await resolveTransactionAccount(db, decoded, expectedAccountId);
+    await bindSubscription(db, { accountId, transaction: decoded, cfg });
+    return accountId;
+  });
 
-  function bootstrap({ accountId }) {
+  async function bootstrap({ accountId }) {
     requireConfigured(cfg);
-    const token = ensureAccountToken(db, accountId);
+    const token = await ensureAccountToken(db, accountId);
     return {
       provider: 'apple',
       appAccountToken: token,
@@ -233,16 +241,15 @@ export function createAppleBilling(db) {
     };
   }
 
-  function transaction({ accountId, body }) {
+  async function transaction({ accountId, body }) {
     requireConfigured(cfg);
     const signedTransaction = String(body?.signedTransaction || '');
     const decoded = verifyTransaction(cfg, signedTransaction);
-    const boundToken = db.prepare('SELECT app_account_token FROM billing_apple_accounts WHERE account_id=?').get(accountId)?.app_account_token;
+    const boundToken = (await db.get('SELECT app_account_token FROM billing_apple_accounts WHERE account_id=?', [accountId]))?.app_account_token;
     if (!boundToken || String(decoded.appAccountToken || '').toLowerCase() !== String(boundToken).toLowerCase()) {
       throw billingError('APPLE_ACCOUNT_TOKEN_MISMATCH', 'App Store purchase is not bound to this Pri Learning account.', 409);
     }
-    const resolved = resolveTransactionAccount(db, decoded, accountId);
-    bindSubscription(db, { accountId: resolved, transaction: decoded, cfg });
+    const resolved = await resolveAndBind(decoded, accountId);
     return normalizeTransaction(cfg, decoded, {
       accountId: resolved,
       eventId: `tx:${decoded.transactionId}`,
@@ -251,7 +258,7 @@ export function createAppleBilling(db) {
     });
   }
 
-  function restore({ accountId, body }) {
+  async function restore({ accountId, body }) {
     requireConfigured(cfg);
     const transactions = Array.isArray(body?.transactions) ? body.transactions.slice(0, 20) : [];
     if (!transactions.length) throw billingError('APPLE_NO_VERIFIED_ENTITLEMENT', 'No active App Store entitlement was supplied for restore.', 404);
@@ -259,10 +266,9 @@ export function createAppleBilling(db) {
     for (const value of transactions) {
       const signedTransaction = String(value || '');
       const decoded = verifyTransaction(cfg, signedTransaction);
-      const boundToken = db.prepare('SELECT app_account_token FROM billing_apple_accounts WHERE account_id=?').get(accountId)?.app_account_token;
+      const boundToken = (await db.get('SELECT app_account_token FROM billing_apple_accounts WHERE account_id=?', [accountId]))?.app_account_token;
       if (!boundToken || String(decoded.appAccountToken || '').toLowerCase() !== String(boundToken).toLowerCase()) continue;
-      const resolved = resolveTransactionAccount(db, decoded, accountId);
-      bindSubscription(db, { accountId: resolved, transaction: decoded, cfg });
+      const resolved = await resolveAndBind(decoded, accountId);
       normalized.push(normalizeTransaction(cfg, decoded, {
         accountId: resolved,
         eventId: `tx:${decoded.transactionId}`,
@@ -275,7 +281,7 @@ export function createAppleBilling(db) {
     return normalized[0];
   }
 
-  function webhook({ body }) {
+  async function webhook({ body }) {
     requireConfigured(cfg);
     const signedPayload = String(body?.signedPayload || '');
     const { payload: notification } = verifyAppleJWS(signedPayload, { roots: configuredAppleRoots() });
@@ -295,8 +301,7 @@ export function createAppleBilling(db) {
       renewal = verifyAppleJWS(String(data.signedRenewalInfo), { roots: configuredAppleRoots() }).payload;
       assertEnvironment(cfg, renewal?.environment);
     }
-    const accountId = resolveTransactionAccount(db, decoded);
-    bindSubscription(db, { accountId, transaction: decoded, cfg });
+    const accountId = await resolveAndBind(decoded);
     const type = String(notification.notificationType || 'UNKNOWN');
     const subtype = String(notification.subtype || '');
     const lifecycle = statusForNotification(type, subtype, decoded, renewal);

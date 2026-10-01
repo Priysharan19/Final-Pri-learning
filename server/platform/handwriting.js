@@ -14,7 +14,8 @@
 // Reading is billed per request, so it is rate limited per account and requires
 // a verified email. It is never anonymous.
 // ─────────────────────────────────────────────────────────────────────────────
-import { Router } from 'express';
+import { asyncRouter } from './asyncRouter.js';
+import { asStore } from './store.js';
 import { rateLimit, requireSession, requireVerifiedEmail } from './security.js';
 import { consumePaidCall, refusePaidCall, spendCeilingMissing } from './spendCeiling.js';
 import { serverReleaseIdentity } from './releaseIdentity.js';
@@ -63,7 +64,8 @@ export function createHandwritingRouter(db, {
   releaseIdentity = serverReleaseIdentity,
   env = process.env
 } = {}) {
-  const router = Router();
+  db = asStore(db);
+  const router = asyncRouter();
 
   // One provider probe at a time per router. Concurrent /status requests share
   // the in-flight promise rather than each spending a probe against the
@@ -168,7 +170,7 @@ export function createHandwritingRouter(db, {
       // Counted here, after the request has been shown to be a real one and
       // before anything is sent, so a malformed request cannot spend from a
       // budget shared by every student on this deployment.
-      const overBudget = consumePaidCall(db, { env });
+      const overBudget = await consumePaidCall(db, { env });
       if (overBudget) return refusePaidCall(res, overBudget);
 
       try {

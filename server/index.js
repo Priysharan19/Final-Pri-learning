@@ -10,10 +10,24 @@
 // and shutdown. app.js owns the HTTP middleware chain, so tests can drive the
 // exact production stack in-process.
 import { writeSync } from 'node:fs';
-import { closePlatformDb, platformDb } from './platform/db.js';
+import { closePlatformStore } from './platform/db.js';
+import { openPlatformStore } from './platform/store.js';
 import { startAuthDeliveryWorker } from './platform/authDelivery.js';
 import { startHousekeeping } from './platform/housekeeping.js';
 import { createServerApp } from './app.js';
+
+// The platform store: Supabase Postgres when PRI_DATABASE_URL is set (ADR-0001),
+// otherwise the SQLite file. A configured Postgres that is malformed,
+// unreachable or unmigrated stops the process here with a coded error — it
+// never falls back to SQLite, and the URL is never printed.
+let platformDb;
+try {
+  platformDb = await openPlatformStore();
+} catch (error) {
+  writeSync(2, `platform_db_unavailable ${JSON.stringify({ code: error?.code || 'PLATFORM_DB_UNAVAILABLE' })}\n`);
+  process.exit(1);
+}
+console.log('platform_db_open', { engine: platformDb.dialect });
 
 const app = await createServerApp(platformDb);
 
@@ -38,9 +52,9 @@ startHousekeeping(platformDb);
 const PORT = process.env.PORT || 4000;
 const server = app.listen(PORT, () => console.log(`Pri Learning server running on port ${server.address().port}`));
 
-// Graceful shutdown for the single-writer SQLite volume: stop taking requests,
-// let in-flight responses finish, checkpoint the WAL into the main file and
-// close the handle so backups see one complete database file. Container
+// Graceful shutdown: stop taking requests, let in-flight responses finish, then
+// close the store. SQLite checkpoints the WAL into the main file and closes the
+// handle so backups see one complete database file; Postgres drains its pool. Container
 // orchestrators send SIGTERM before SIGKILL; a hard deadline guarantees exit.
 const SHUTDOWN_DEADLINE_MS = Number(process.env.PRI_SHUTDOWN_DEADLINE_MS) || 10_000;
 let shuttingDown = false;
@@ -53,18 +67,18 @@ function shutdown(signal) {
   const finish = reason => {
     if (finished) return;
     finished = true;
-    let exitCode = 0;
     // Written synchronously: process.exit() may drop buffered async stdout/stderr
     // writes on pipes, and this line is the operator's evidence of a clean stop.
-    try {
-      const result = closePlatformDb(platformDb);
+    closePlatformStore(platformDb).then(result => {
       writeSync(1, `platform_db_closed ${JSON.stringify({ reason, closed: result.closed, checkpoint: result.checkpoint })}\n`);
-    } catch (error) {
-      exitCode = 1;
+      return 0;
+    }, error => {
       writeSync(2, `platform_db_close_failed ${JSON.stringify({ reason, code: error?.code || 'CLOSE_FAILED' })}\n`);
-    }
-    try { if (legacyDb?.open) legacyDb.close(); } catch { /* legacy store is best-effort */ }
-    process.exit(exitCode);
+      return 1;
+    }).then(exitCode => {
+      try { if (legacyDb?.open) legacyDb.close(); } catch { /* legacy store is best-effort */ }
+      process.exit(exitCode);
+    });
   };
   const deadline = setTimeout(() => finish('deadline'), SHUTDOWN_DEADLINE_MS);
   deadline.unref();

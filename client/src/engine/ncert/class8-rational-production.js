@@ -8,34 +8,21 @@ import {
   NCERT_CLASS8_RATIONAL_CONTENT as SOURCE_CONTENT,
   NCERT_CLASS8_RATIONAL_GENERATORS as SOURCE_GENERATORS
 } from './class8-rational-numbers.js';
+import {
+  NCERT_CLASS8_RATIONAL_SKILLS,
+  NCERT_CLASS8_RATIONAL_DOTPOINTS,
+  NCERT_CLASS8_RATIONAL_GENERATOR_IDS,
+  NCERT_CLASS8_RATIONAL_COVERS
+} from './class8-rational-syllabus.js';
 
 export * from './class8-rational-numbers.js';
 
-export const NCERT_CLASS8_RATIONAL_DOTPOINTS = Object.freeze([
-  'Define rational numbers and analyse closure under addition, subtraction, multiplication and division, including the non-zero divisor condition',
-  'Use and distinguish commutativity, associativity, additive/multiplicative identities and additive/multiplicative inverses',
-  'Use distributivity and structural fraction strategies, and construct rational numbers between two given rational numbers'
-]);
-
-const SKILLS = Object.freeze([
-  ['c8-rational-numbers-foundations', 'y8-ncert-rational-foundations', 0],
-  ['c8-rational-numbers-closure', 'y8-ncert-rational-closure', 0],
-  ['c8-rational-numbers-commutativity', 'y8-ncert-rational-commutativity', 1],
-  ['c8-rational-numbers-associativity', 'y8-ncert-rational-associativity', 1],
-  ['c8-rational-numbers-identities', 'y8-ncert-rational-identities', 1],
-  ['c8-rational-numbers-distributivity', 'y8-ncert-rational-distributivity', 2],
-  ['c8-rational-numbers-strategy', 'y8-ncert-rational-strategy', 2],
-  ['c8-rational-numbers-between', 'y8-ncert-rational-between', 2]
-]);
-
-export const NCERT_CLASS8_RATIONAL_GENERATOR_IDS = Object.freeze(SKILLS.map(([id]) => id));
-
-export const NCERT_CLASS8_RATIONAL_COVERS = Object.freeze(
-  SKILLS.map(([gen, , dp]) => Object.freeze({ gen, dp: [dp], diff: [1, 2, 3, 4] }))
-);
+// The product dot points and routing live in the syllabus layer; these explicit
+// exports take precedence over the source module's own fine-grained ones above.
+export { NCERT_CLASS8_RATIONAL_DOTPOINTS, NCERT_CLASS8_RATIONAL_GENERATOR_IDS, NCERT_CLASS8_RATIONAL_COVERS };
 
 export const NCERT_CLASS8_RATIONAL_GENERATORS = Object.freeze(Object.fromEntries(
-  SKILLS.map(([id, sourceId]) => [id, SOURCE_GENERATORS[sourceId]])
+  NCERT_CLASS8_RATIONAL_SKILLS.map(([id, sourceId]) => [id, SOURCE_GENERATORS[sourceId]])
 ));
 
 // The user-provided answer-key crop confirms four answers. The uploaded NCERT
