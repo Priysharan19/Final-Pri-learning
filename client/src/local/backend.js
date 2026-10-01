@@ -30,12 +30,14 @@ import { IN_CHAPTERS, OLYMPIAD_TOPICS } from '../engine/curriculum-in.js';
 import { generateQuestion } from '../engine/generators/index.js';
 import { checkAnswer, stepCheck, methodMarks } from '../engine/checker.js';
 import { authoredRegion, formatRegion, formatMatrix, formatVector } from '../engine/answer-forms.js';
-import { stepTrapKey } from '../engine/diagnose.js';
+import {
+  misconceptionIdForTrap, misconceptionIdForDiagnosis, misconceptionById, confirmCloudMisconception
+} from '../engine/misconceptions.js';
 import {
   START_RATING, updateRating, masteryOf, masteryBand, pickDifficulty, pickNext, pickNextAmong,
   predictMark, priorities, prioritiesAmong, xpFor, levelFromXp, bandFor,
   pickDotpoint, scheduleReview, migrateReview, gradeFor,
-  retrievability, misconceptionKey, misconceptionLabel, activeTraps, trapPressureOf,
+  retrievability, misconceptionLabel, activeTraps, trapPressureOf,
   TRAP_ACTIVE_AT, TRAP_CREDIT_FORGET
 } from '../engine/adaptive.js';
 import { BADGES, checkBadges } from './badges.js';
@@ -256,15 +258,16 @@ const trapProbesOf = q => [
 ];
 
 /**
- * The misconception keys a question gave the student a real chance to repeat —
+ * The misconception IDs a question gave the student a real chance to repeat —
  * the only misconceptions a clean answer to it can be evidence against. Keyed
- * by the same owner and the same rule `recordTrap` uses, so the key a slip was
- * recorded under is the key its repair opportunity carries.
+ * by the same owner and the same rule `recordTrap` uses (the ontology ID where
+ * the trap maps to one, its derived `<owner>.t<hash>` otherwise), so the key a
+ * slip was recorded under is the key its repair opportunity carries.
  */
 function repairOpportunitiesOf(q, owner) {
   const keys = new Set();
   for (const t of trapProbesOf(q)) {
-    const key = t && t.why ? misconceptionKey(owner, t.why) : null;
+    const key = t && t.why ? misconceptionIdForTrap(owner, t.why) : null;
     if (key) keys.add(key);
   }
   return keys;
@@ -291,7 +294,15 @@ async function recordTrap(pid, row, q, feedback) {
   const hit = trapHitBy(q, feedback);
   if (!hit) return null;
   const owner = evidenceKeyOf(row, q);
-  const key = misconceptionKey(owner, hit.why);
+  return recordMisconception(pid, row, q, owner, misconceptionIdForTrap(owner, hit.why), misconceptionLabel(hit.why));
+}
+
+/**
+ * Write one occurrence of a misconception into the owner's ledger under its
+ * ontology ID (or derived ID), once per question. The label is display text
+ * only — the authored sentence or the diagnosis title — and never the key.
+ */
+async function recordMisconception(pid, row, q, owner, key, label) {
   if (!key) return null;
   const now = Date.now();
   const st = (await getRating(pid, owner)) || { rating: START_RATING, attempts: 0, correct: 0, last_at: null };
@@ -299,7 +310,7 @@ async function recordTrap(pid, row, q, feedback) {
   const prev = traps[key] || { n: 0, credit: 0, firstAt: now };
   traps[key] = {
     n: Math.min(9, (prev.n || 0) + 1), credit: 0, firstAt: prev.firstAt || now, lastAt: now,
-    label: safeLabel(misconceptionLabel(hit.why), 140),
+    label: safeLabel(label, 140),
     dotpoint: indiaDpKeyOf(row) || (row.india ? null : q.dotpoint) || prev.dotpoint || null
   };
   await putRating(pid, owner, { ...st, traps: trimTraps(traps) });
@@ -321,20 +332,7 @@ async function recordStepTrap(pid, row, q, diagnosis) {
   if (row.mode === 'rush' || row.mode === 'match') return null;
   if (diagnosis.confidence !== 'high' || diagnosis.code === 'counterexample') return null;
   const owner = evidenceKeyOf(row, q);
-  const key = stepTrapKey(owner, diagnosis.code);
-  if (!key) return null;
-  const now = Date.now();
-  const st = (await getRating(pid, owner)) || { rating: START_RATING, attempts: 0, correct: 0, last_at: null };
-  const traps = { ...(st.traps || {}) };
-  const prev = traps[key] || { n: 0, credit: 0, firstAt: now };
-  traps[key] = {
-    n: Math.min(9, (prev.n || 0) + 1), credit: 0, firstAt: prev.firstAt || now, lastAt: now,
-    label: safeLabel(diagnosis.title, 140),
-    dotpoint: indiaDpKeyOf(row) || (row.india ? null : q.dotpoint) || prev.dotpoint || null
-  };
-  await putRating(pid, owner, { ...st, traps: trimTraps(traps) });
-  row.trapKey = key;
-  return key;
+  return recordMisconception(pid, row, q, owner, misconceptionIdForDiagnosis(diagnosis), diagnosis.title);
 }
 
 /**
@@ -348,7 +346,7 @@ async function namedTrap(pid, subtopicId, key) {
   const st = await getRating(pid, subtopicId);
   const t = st?.traps?.[key];
   if (!t || t.n < TRAP_ACTIVE_AT) return null;
-  return { key, label: t.label, count: t.n };
+  return { key, id: misconceptionById(key)?.id || null, label: t.label, count: t.n };
 }
 
 /**
@@ -390,7 +388,8 @@ function namedWeaknesses(ratings, nowMs = Date.now(), limit = 6, { india = false
     for (const t of activeTraps(st.traps, nowMs)) {
       const dp = named ? indiaNameOf(t.dotpoint) : dotpointOf(subtopic, t.dotpoint);
       out.push({
-        key: t.key, subtopic, subtopicName: named ? named.name : sub.name, strand: named ? named.strand : sub.strand,
+        key: t.key, id: misconceptionById(t.key)?.id || null,
+        subtopic, subtopicName: named ? named.name : sub.name, strand: named ? named.strand : sub.strand,
         year: named ? named.year : sub.year,
         label: t.label, count: t.n, lastAt: t.lastAt,
         dotpoint: named ? (dp && dp.dotpoint != null ? dp.dotpoint : null) : (dp ? dp.id : null),
@@ -853,7 +852,7 @@ async function createIndiaQuestion(pid, chapter, target, mode, trackId, examId =
     if (!trapKey) break;
     const probes = (Array.isArray(cand.traps) ? cand.traps : [])
       .concat(Object.values(cand.answer?.optionTraps || {}).map(why => ({ why })));
-    if (probes.some(t => misconceptionKey(chapter.id, t.why) === trapKey)) { q = cand; delivered = trapKey; break; }
+    if (probes.some(t => misconceptionIdForTrap(chapter.id, t.why) === trapKey)) { q = cand; delivered = trapKey; break; }
   }
   const row = {
     id: uuid(), pid, subtopic: q.subtopic, difficulty: q.difficulty || target.difficulty, payload: q,
@@ -1451,7 +1450,7 @@ function generateFocused(subtopic, difficulty, { dotpointId = null, trapKey = nu
     if (!first) first = q;
     const probes = (Array.isArray(q.traps) ? q.traps : [])
       .concat(Object.values(q.answer?.optionTraps || {}).map(why => ({ why })));
-    if (probes.some(t => misconceptionKey(subtopic, t.why) === trapKey)) {
+    if (probes.some(t => misconceptionIdForTrap(subtopic, t.why) === trapKey)) {
       return { q, dotpoint: delivered(q), trapKey };
     }
   }
@@ -2615,6 +2614,45 @@ const routes = {
     row.hintsUsed = used;
     await put('questions', row);
     return { hint: hints[used - 1], level: used, remaining: hints.length - used };
+  },
+
+  // A misconception the cloud working checker PROPOSED for a wrong answer the
+  // on-device Step Check could not place. ADR-0001: the model proposes, the
+  // engine decides. It is written into learner state only when the
+  // deterministic diagnoser, run here on the same line, names the same
+  // ontology ID and no on-device break sits elsewhere; anything else comes
+  // back as 'possible' and changes nothing.
+  'POST /practice/:id/misconception': async (body, params) => {
+    const p = await requireProfile();
+    const row = await get('questions', params.id);
+    if (!row || row.pid !== p.id) throw Object.assign(new Error('Question not found'), { status: 404 });
+    assertPracticeRow(row);
+    if (!row.answered) throw Object.assign(new Error('Answer the question first'), { status: 409 });
+    const q = row.payload;
+    const lines = (Array.isArray(body?.lines) ? body.lines : [])
+      .slice(0, 40).map(l => sanitizeText(l, 400)).filter(Boolean);
+    const firstBreak = Number.isInteger(body?.firstBreak) ? body.firstBreak : -1;
+    const meta = stepMetaFor(q);
+    let localFirstBreak = -1;
+    if (meta && lines.length) {
+      try { localFirstBreak = stepCheck(meta, lines.join('\n'))?.firstBreak ?? -1; } catch { localFirstBreak = -1; }
+    }
+    const verdict = confirmCloudMisconception({
+      proposedId: body?.misconceptionId, firstBreak, lines, meta,
+      confident: body?.confident === true, localFirstBreak
+    });
+    if (!verdict) return { status: null, id: null, line: null, recorded: false, misconception: null };
+    const owner = evidenceKeyOf(row, q);
+    let recorded = null;
+    if (verdict.status === 'confirmed' && row.resolution && row.resolution.correct === false
+      && !row.trapKey && !q.custom && q.subtopic && row.mode !== 'rush' && row.mode !== 'match') {
+      recorded = await recordMisconception(p.id, row, q, owner, verdict.id, verdict.title);
+      if (recorded) await put('questions', row);
+    }
+    return {
+      status: verdict.status, id: verdict.id, line: verdict.line, recorded: !!recorded,
+      misconception: recorded ? await namedTrap(p.id, owner, recorded) : null
+    };
   },
 
   'POST /practice/:id/submit': async (body, params) => {
