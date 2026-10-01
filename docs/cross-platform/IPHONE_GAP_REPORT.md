@@ -120,3 +120,34 @@ The rows below update §2 and §3 with what is implemented and automatically che
 - The journey asserts hardware-correct ink facts. Finger *touch* input itself is not exercised by injected strokes; it remains a physical gate.
 
 **Scope note:** `docs/release/PRI_V1_RELEASE_SCOPE.md` makes V1 iPad-only, and the release policy ships only an exact `main` SHA. So `main` itself declares **iPad only**, which closes V1 hard blocker #1 in code, and `--check-v1` runs in CI. iPhone engineering builds a scratch copy that adds the iPhone family: `node scripts/apple-shipping-target.mjs --engineering-package <dir>`. That copy is used for simulator CI and is never archived. A public iPhone release needs the V1 scope-change procedure, then a reviewed change to `main`, **and** the §4 physical gates.
+
+## 6. CP-05 — iPhone automated certification
+
+`node scripts/iphone-journey.mjs --family iphone --cloud --dynamic-type --lifecycle --a11y` drives the real app in the real WKWebView on an iPhone simulator. The cloud steps run against a **real Pri server** (`scripts/cloud-fixture-server.mjs`: the real `server/index.js` on a throwaway database, fixture accounts only). Every step writes a machine-readable record (SHA, simulator, runtime, workflow, timestamp, per-step result) labelled `SYNTHETIC_SIMULATOR` with `physicalDevice: false`. CI (`native-ink.yml`) uploads the records as `native-simulator-evidence`.
+
+| Spec item | Result (SYNTHETIC / SIMULATOR) |
+|---|---|
+| Account signup | ✅ `cloudSignUp`: Settings → Create account (adult) against the real server |
+| Login | ✅ `cloudLogin` (new account), `cloudSignIn` (fixture account) |
+| Session persistence | ✅ `cloudSessionKept` after terminating and relaunching the app |
+| Logout | ✅ `cloudDisconnect` (server logout + native cookie removal) |
+| Account deletion | ✅ `cloudDeleteAccount` (password + typed DELETE). Then `serverDeletedAccountRefused`: the server refuses that account's login (401) |
+| Typed answer, submission, feedback, next | ✅ `typedAttempt`, `feedback`, `nextQuestion` |
+| Finger handwriting | 🟡 `nativeInk`: the native PencilKit surface with finger-default facts (`stylus=false fingerDefault=true`) returns a reading from programmatic strokes. Real finger touch input is a **physical** gate. |
+| Photo path | 🟡 `nativePhoto`: native Vision reads a rendered line of maths ("…11"). The camera itself is **physical**. |
+| Progress | ✅ `progress` |
+| Offline | ✅ `offlinePractice` + `offlineSyncSafe`: with the server unreachable, practice works, the account reads "Linked · offline" with a reassurance note, and Sync is not offered |
+| Reconnect | ✅ `cloudReconnectSync`: the same server comes back, the session is still valid and Sync completes |
+| Background → foreground | ✅ `backgroundDraftKept`: switching to Settings and back raises lifecycle events, and an unsent typed answer is kept |
+| Relaunch persistence | ✅ `relaunchProfile`, `relaunchMarker` (process terminated between launches) |
+| Accessibility automation | 🟡 `a11yAudit`: a DOM-level smoke check in the real web view (accessible names, labels, `lang`, headings, no positive tabindex, 44 px targets) on four screens. An XCUITest `performAccessibilityAudit` is **not possible** here: the app is a SwiftPM app package with no UI-test target. VoiceOver is **physical**. |
+| Dynamic Type | ✅ `dynamicTypeZoom` + `dynamicTypeNoOverflow` at the largest accessibility size: the page is scaled (CSS width 360 on a 402 pt screen) with no sideways overflow on four screens |
+| StoreKit Testing, restore, transaction updates | **BLOCKED (tooling/external).** A local `.storekit` configuration only applies when Xcode launches the app with that scheme option. A headless `simctl` launch cannot use it, and sandbox purchases need App Store Connect products and a sandbox tester (**BLOCKED_EXTERNAL**). The JS ↔ Swift ↔ server contract is covered by `client/test/native-storekit-boundary-check.mjs` and `server/test/apple-billing-check.mjs`; StoreKit itself is not exercised. |
+
+**Bugs found by this certification and fixed in CP-05:**
+1. **Dynamic Type clipped the page on iPhone.** CP-04 applied the text size with `WKWebView.pageZoom`, which magnifies without reflowing. At the largest size the page was laid out 402 CSS px wide with 360 visible, and the right edge and the bottom navigation were cut off (screenshot-verified). The text size is now applied through the viewport (`width = view width ÷ scale`), so WebKit reflows. Native ink placement uses the effective scale (`pageZoom × scrollView.zoomScale`); the bridge self-check passes 8/8 on iPhone and iPad. Width rules that used `vw` now use `%`.
+2. **An unreachable server read as "sign-in required".** It now reads "Linked · offline", with a note that work is saved on the device. "Linked · checking…" shows until the session is known.
+
+**Physical gates (DEFERRED, unchanged):** small, standard and large iPhones; finger writing feel; camera; keyboard; VoiceOver; Dynamic Type on hardware; StoreKit sandbox; background process death under real memory pressure; real launch performance.
+
+**Status:** `SOFTWARE IMPLEMENTATION: COMPLETE` / `PHYSICAL DEVICE VALIDATION: DEFERRED`. Not "physically certified".

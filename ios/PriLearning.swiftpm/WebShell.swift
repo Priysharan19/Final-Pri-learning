@@ -203,8 +203,15 @@ struct WebShell: UIViewRepresentable {
         }
 
         /// Dynamic Type: the page is laid out in CSS pixels, so the system text
-        /// size is applied as page zoom. It is capped so the CSS viewport never
+        /// size scales the whole page. It is capped so the CSS viewport never
         /// drops below 360px wide (the narrowest layout the product is tested at).
+        ///
+        /// The scale is applied through the viewport (`width = view width ÷
+        /// scale`), not `pageZoom`: WKWebView's page zoom magnifies without
+        /// reflowing the layout width, so at large text the page was laid out at
+        /// the full width and clipped on the right (found by the CP-05
+        /// largest-text journey). A narrower viewport makes WebKit reflow the
+        /// page to the narrower CSS width and scale it to fit the screen.
         func applyTextSize() {
             guard let webView = shellWebView else { return }
             let scale: CGFloat
@@ -219,9 +226,16 @@ struct WebShell: UIViewRepresentable {
             }
             let width = max(webView.bounds.width, 1)
             let capped = max(1.0, min(scale, width / 360))
-            if abs(webView.pageZoom - capped) > 0.01 {
-                webView.pageZoom = capped
-                ink.webViewDidResize() // re-place the native ink surface at the new zoom
+            if abs(webView.pageZoom - 1) > 0.001 { webView.pageZoom = 1 }
+            let cssWidth = Int((width / capped).rounded(.down))
+            let content = capped > 1.0
+                ? "width=\(cssWidth), viewport-fit=cover"
+                : "width=device-width, initial-scale=1.0, viewport-fit=cover"
+            webView.evaluateJavaScript(
+                "(function(c){var m=document.querySelector('meta[name=viewport]');if(!m){m=document.createElement('meta');m.name='viewport';document.head.appendChild(m);}if(m.getAttribute('content')!==c)m.setAttribute('content',c);})('\(content)')"
+            ) { [weak self] _, _ in
+                // Re-place the native ink surface once WebKit has applied the new scale.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { self?.ink.webViewDidResize() }
             }
         }
 
