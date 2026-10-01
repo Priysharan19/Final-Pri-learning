@@ -230,6 +230,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const [busy, setBusy] = useState(false);
   const [selfMarks, setSelfMarks] = useState({});
   const [selfSaved, setSelfSaved] = useState(false);
+  const [selfOpen, setSelfOpen] = useState(false);
   const [photo, setPhoto] = useState(null);
   const [photoOCR, setPhotoOCR] = useState({ phase: 'idle', text: '', confidence: 0, error: '', engine: null });
   const [elapsed, setElapsed] = useState(0);
@@ -259,7 +260,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     setAnswer(draft?.typed || ''); setMcqSel(null); setInkResult(null); setHints([]); setHintsLeft(question.hintsAvailable);
     setWorking(draft?.working || ''); setShowWorking(!!draft?.working);
     setState({ phase: 'answering' }); setBusy(false);
-    setSelfMarks({}); setSelfSaved(false); setPhoto(null); setBookmarked(false); setElapsed(0);
+    setSelfMarks({}); setSelfSaved(false); setSelfOpen(false); setPhoto(null); setBookmarked(false); setElapsed(0);
     setPhotoOCR({ phase: 'idle', text: '', confidence: 0, error: '', engine: null });
     setChecking(false); setVouched(null);
     setSaveState(draft?.typed || draft?.working || question.inkDraft?.length ? 'saved' : null);
@@ -1341,15 +1342,19 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
             ))}
 
             {res.solution?.criteria && boardAward && !verdictGood && (
-              <details className="criteria-self">
-                <summary>{t('verdict.markItYourself')}</summary>
-                <CriteriaTable
-                  criteria={res.solution.criteria}
-                  correct={verdictGood}
-                  selfMarks={selfMarks} setSelfMarks={setSelfMarks}
-                  selfSaved={selfSaved} setSelfSaved={setSelfSaved}
-                />
-              </details>
+              <div className="criteria-self">
+                <button type="button" className="btn btn-quiet btn-sm" aria-expanded={selfOpen} onClick={() => setSelfOpen(o => !o)}>
+                  {t('verdict.markItYourself')}
+                </button>
+                {selfOpen && (
+                  <CriteriaTable
+                    criteria={res.solution.criteria}
+                    correct={verdictGood}
+                    selfMarks={selfMarks} setSelfMarks={setSelfMarks}
+                    selfSaved={selfSaved} setSelfSaved={setSelfSaved}
+                  />
+                )}
+              </div>
             )}
             {res.solution?.criteria && !boardAward && (
               <CriteriaTable
