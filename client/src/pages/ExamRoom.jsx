@@ -29,6 +29,7 @@ import { useApp } from '../App.jsx';
 import { clearDraft, queueDraft, readDraft } from '../components/drafts.js';
 import ExamAnalysis from '../components/ExamAnalysis.jsx';
 import { compactStrokes, expandStrokes } from '../local/examSession.js';
+import { tLater, useT, useTx } from '../i18n/index.js';
 
 const SAVE_DEBOUNCE_MS = 600;
 const INK_POINTS_PER_SAVE = 9000;
@@ -58,10 +59,14 @@ function newSubmissionKey() {
   return `sub-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
+/** A response key: `qid`, `qid::or`, `qid::a`, `qid::a::or` — the backend's own shape. */
+const OR = 'or';
+const answerKey = (...parts) => parts.join('::');
+
 /** Every answer key a question owns: the question, its OR choice, its parts and their OR choices. */
 function keysOf(q) {
-  if (q.multipart) return (q.parts || []).flatMap(pt => [`${q.id}::${pt.key}`, ...(pt.alt ? [`${q.id}::${pt.key}::or`] : [])]);
-  return [q.id, ...(q.choice ? [`${q.id}::or`] : [])];
+  if (q.multipart) return (q.parts || []).flatMap(pt => [answerKey(q.id, pt.key), ...(pt.alt ? [answerKey(q.id, pt.key, OR)] : [])]);
+  return [q.id, ...(q.choice ? [answerKey(q.id, OR)] : [])];
 }
 
 const writtenItem = item => item && !OBJECTIVE.has(item.answerType);
@@ -78,6 +83,8 @@ export default function ExamRoom() {
   const { id } = useParams();
   const { celebrate, refreshUser } = useApp();
   const nav = useNavigate();
+  const t = useT();
+  const tx = useTx();
   const [exam, setExam] = useState(null);
   const [answers, setAnswers] = useState({});
   const [workings, setWorkings] = useState({});
@@ -228,7 +235,7 @@ export default function ExamRoom() {
     scheduleSave();
     queueDraft('exam', id, { answers, workings, cur }, {
       label: exam.title,
-      note: `${answeredCount} of ${exam.questions.length} answered`,
+      note: t('examRoom.draftNote', { answered: answeredCount, total: exam.questions.length }),
       path: `/exams/${id}`
     });
   }, [answers, workings, inks, modes, cur]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -269,10 +276,10 @@ export default function ExamRoom() {
 
   useEffect(() => {
     if (secondsLeft === null || phase !== 'sitting') return;
-    for (const [mark, text] of [[300, 'Five minutes left.'], [60, 'One minute left.']]) {
+    for (const [mark, key] of [[300, 'examRoom.fiveMinutesLeft'], [60, 'examRoom.oneMinuteLeft']]) {
       if (secondsLeft <= mark && secondsLeft > 0 && !warned.current.has(mark)) {
         warned.current.add(mark);
-        setAnnounce(text);
+        setAnnounce(tLater(key));
       }
     }
     // The clock submits once. If that submit fails, the student is offered a
@@ -290,7 +297,7 @@ export default function ExamRoom() {
     setSubmitError('');
     if (saveTimer.current) { clearTimeout(saveTimer.current); saveTimer.current = null; }
     accrue();
-    if (reason === 'deadline') setAnnounce('Time is up. Your paper is being marked.');
+    if (reason === 'deadline') setAnnounce(tLater('examRoom.timeUp'));
     // Any autosave still in flight lands first, so the submit is the last write.
     await saveChain.current.catch(() => {});
     const snap = latest.current;
@@ -319,7 +326,7 @@ export default function ExamRoom() {
           }
         } catch { /* fall through to the retry message */ }
       }
-      setSubmitError(err?.message || 'The paper could not be marked. Your answers are saved — try again.');
+      setSubmitError(err?.message || tLater('examRoom.submitFailed'));
       setPhaseBoth('sitting');
       setNow(Date.now());
     }
@@ -399,25 +406,25 @@ export default function ExamRoom() {
     const shownPct = Math.round(pct);
     return (
       <div className="grid" style={{ gap: 18, maxWidth: 860, margin: '0 auto' }}>
-        <h1 className="sr-only">{exam.title} — marked</h1>
+        <h1 className="sr-only">{t('examRoom.markedHeading', { title: exam.title })}</h1>
         <div className="card" style={{ textAlign: 'center', padding: 34 }}>
           <div className="card-title">{exam.title}</div>
           {/* the big number is tinted good / neutral / bad; the tint is spelled out */}
           <div className="hero-num" style={{ color: shownPct >= 80 ? 'var(--good)' : shownPct >= 50 ? 'var(--ink)' : 'var(--bad)' }}>
-            {shownPct}%<span className="sr-only"> of the paper's marks — {shownPct >= 80 ? 'a strong result' : shownPct >= 50 ? 'a fair result' : 'below half'}</span>
+            {shownPct}%<span className="sr-only"> {t(shownPct >= 80 ? 'examRoom.pctSrStrong' : shownPct >= 50 ? 'examRoom.pctSrFair' : 'examRoom.pctSrLow')}</span>
           </div>
-          <p className="sub" style={{ marginTop: 6 }}>{result.score} of {result.total} marks · {
-            shownPct >= 90 ? 'Outstanding — this is board-topper territory.' :
-              shownPct >= 80 ? 'Excellent work — exam ready.' :
-                shownPct >= 65 ? 'Solid — a few areas to tighten up.' :
-                  shownPct >= 50 ? 'A fair base — the review below shows exactly where the marks went.' :
-                    'Every mark lost below is a mark you can win back. Review each solution.'}</p>
+          <p className="sub" style={{ marginTop: 6 }}>{t('examRoom.scoreOf', { count: result.total, score: result.score, total: result.total })} · {t(
+            shownPct >= 90 ? 'examRoom.verdictOutstanding' :
+              shownPct >= 80 ? 'examRoom.verdictExcellent' :
+                shownPct >= 65 ? 'examRoom.verdictSolid' :
+                  shownPct >= 50 ? 'examRoom.verdictFair' :
+                    'examRoom.verdictLow')}</p>
           {result.final?.finalisedBy === 'deadline' && (
-            <p className="muted" style={{ marginTop: 4, fontSize: 13 }}>Submitted when time ran out{result.final.late ? ' — marked on the answers saved before the deadline' : ''}.</p>
+            <p className="muted" style={{ marginTop: 4, fontSize: 13 }}>{t(result.final.late ? 'examRoom.finalisedLate' : 'examRoom.finalisedByDeadline')}</p>
           )}
           <div className="row" style={{ justifyContent: 'center', marginTop: 16 }}>
-            <button className="btn btn-primary" onClick={() => nav('/exams')}>New paper</button>
-            <button className="btn btn-ghost" onClick={() => nav('/stats')}>See insights</button>
+            <button className="btn btn-primary" onClick={() => nav('/exams')}>{t('examRoom.newPaper')}</button>
+            <button className="btn btn-ghost" onClick={() => nav('/stats')}>{t('examRoom.seeInsights')}</button>
           </div>
         </div>
 
@@ -426,12 +433,12 @@ export default function ExamRoom() {
         {result.detail.map((d, i) => d.multipart ? (
           <div className="card" key={d.id}>
             <div className="q-meta">
-              <span className="tag">Q{i + 1}</span>
+              <span className="tag">{t('examRoom.qNumber', { n: i + 1 })}</span>
               <span className="tag">{d.title}</span>
-              <span className="tag tag-brand">Structured</span>
+              <span className="tag tag-brand">{t('examRoom.structured')}</span>
               <span className="tag" style={{ color: d.awarded === d.marks ? 'var(--good)' : d.awarded > 0 ? 'var(--warn)' : 'var(--bad)' }}>
-                {d.awarded}/{d.marks} marks
-                <span className="sr-only"> — {d.awarded === d.marks ? 'all earned' : d.awarded > 0 ? 'partly earned' : 'none earned'}</span>
+                {t('examRoom.awardedMarks', { awarded: d.awarded, n: d.marks })}
+                <span className="sr-only"> — {t(d.awarded === d.marks ? 'examRoom.allEarned' : d.awarded > 0 ? 'examRoom.partlyEarned' : 'examRoom.noneEarned')}</span>
               </span>
             </div>
             <MathText block className="q-prompt" style={{ fontSize: 16 }} text={d.stem} />
@@ -442,16 +449,16 @@ export default function ExamRoom() {
                   <b>({pt.key})</b>
                   <span style={{ flex: 1 }}><MathText text={pt.prompt} /></span>
                   <span className="tag" style={{ color: pt.correct ? 'var(--good)' : 'var(--bad)' }}>
-                    {pt.awarded}/{pt.marks}<span className="sr-only"> marks — {pt.correct ? 'correct' : 'incorrect'}</span>
+                    {pt.awarded}/{pt.marks}<span className="sr-only"> {t(pt.correct ? 'examRoom.srMarksCorrect' : 'examRoom.srMarksIncorrect')}</span>
                   </span>
                 </div>
                 <div className="row" style={{ flexWrap: 'wrap', gap: 16, fontSize: 14, marginTop: 4 }}>
-                  <span>Yours: <b>{pt.answerType === 'mcq' ? (pt.given !== '' && pt.given != null ? 'ABCD'[Number(pt.given)] ?? '—' : '—') : (pt.given || '—')}</b></span>
-                  <span>Correct: <b><MathText text={pt.answerText} /></b></span>
+                  <span>{tx('examRoom.yours', { answer: <b>{pt.answerType === 'mcq' ? (pt.given !== '' && pt.given != null ? 'ABCD'[Number(pt.given)] ?? '—' : '—') : (pt.given || '—')}</b> })}</span>
+                  <span>{tx('examRoom.correctShort', { answer: <b><MathText text={pt.answerText} /></b> })}</span>
                 </div>
                 {!pt.correct && pt.steps && (
                   <details style={{ marginTop: 6 }}>
-                    <summary style={{ cursor: 'pointer', color: 'var(--brand-1)', fontWeight: 600, fontSize: 13 }}>Worked solution</summary>
+                    <summary style={{ cursor: 'pointer', color: 'var(--brand-1)', fontWeight: 600, fontSize: 13 }}>{t('verdict.workedSolution')}</summary>
                     <div className="steps">
                       {pt.steps.map((s, j) => (
                         <div className="step" key={j}>
@@ -471,25 +478,27 @@ export default function ExamRoom() {
         ) : (
           <div className="card" key={d.id}>
             <div className="q-meta">
-              <span className="tag">Q{i + 1}</span>
-              {d.sectionLabel && <span className="tag">{d.sectionLabel}</span>}
-              <span className="tag">{d.subtopicName}</span>
-              <span className="tag">D{d.difficulty}</span>
+              <span className="tag">{t('examRoom.qNumber', { n: i + 1 })}</span>
+              {d.sectionLabel && <span className="tag" lang="en">{d.sectionLabel}</span>}
+              <span className="tag" lang="en">{d.subtopicName}</span>
+              <span className="tag">{t('examRoom.difficultyTag', { n: d.difficulty })}</span>
               <span className="tag" style={{ color: d.correct ? 'var(--good)' : d.awarded > 0 ? 'var(--warn)' : 'var(--bad)' }}>
-                {d.correct ? `✔ ${d.awarded}/${d.marks} marks` : d.awarded > 0 ? `◐ ${d.awarded}/${d.marks} marks` : d.awarded < 0 ? `✖ −${-d.awarded} (negative mark) of ${d.marks}` : `✖ 0/${d.marks} marks`}
-                {d.unanswered && <span> · not attempted</span>}
+                {d.awarded < 0
+                  ? t('examRoom.tagNegative', { lost: -d.awarded, n: d.marks })
+                  : t(d.correct ? 'examRoom.tagCorrect' : d.awarded > 0 ? 'examRoom.tagPartial' : 'examRoom.tagWrong', { awarded: d.awarded, n: d.marks })}
+                {d.unanswered && <span> {t('examRoom.notAttempted')}</span>}
               </span>
             </div>
             <MathText block className="q-prompt" style={{ fontSize: 16 }} text={d.prompt} />
             {d.figure && <div className="q-figure" dangerouslySetInnerHTML={{ __html: d.figure }} />}
             {OBJECTIVE.has(d.answerType) && d.mcqOptions && (
               <div className="muted" style={{ marginBottom: 8 }}>
-                Options: {d.mcqOptions.map((o, j) => <span key={j} style={{ marginRight: 12 }}>{'ABCD'[j]}. <MathText text={o} /></span>)}
+                {t('examRoom.options')} {d.mcqOptions.map((o, j) => <span key={j} style={{ marginRight: 12 }}>{'ABCD'[j]}. <MathText text={o} /></span>)}
               </div>
             )}
             <div className="row" style={{ flexWrap: 'wrap', gap: 16, fontSize: 14 }}>
-              <span>Your answer: <b>{givenText(d)}</b></span>
-              <span>Correct answer: <b><MathText text={d.solution.answerText} /></b></span>
+              <span>{t('history.yourAnswerWas')} <b>{givenText(d)}</b></span>
+              <span>{t('history.correctAnswerWas')} <b><MathText text={d.solution.answerText} /></b></span>
             </div>
             {d.partial && (
               <div className="verdict" style={{ marginTop: 8, background: 'var(--brand-soft)', border: '1px solid var(--brand-1)' }}>
@@ -499,10 +508,12 @@ export default function ExamRoom() {
             )}
             {!d.correct && (
               <details style={{ marginTop: 10 }}>
-                <summary style={{ cursor: 'pointer', color: 'var(--brand-1)', fontWeight: 600, fontSize: 14 }}>Show worked solution & marking criteria</summary>
+                <summary style={{ cursor: 'pointer', color: 'var(--brand-1)', fontWeight: 600, fontSize: 14 }}>{t('examRoom.showSolutionCriteria')}</summary>
                 {d.solution.criteria && (
                   <ul style={{ margin: '8px 0 0', paddingLeft: 18, fontSize: 13.5 }}>
-                    {d.solution.criteria.map((c, j) => <li key={j}>{c.mark ?? 1} mark{(c.mark ?? 1) === 1 ? '' : 's'} — <MathText text={c.text} /></li>)}
+                    {d.solution.criteria.map((c, j) => <li key={j}>{(c.mark ?? 1) === 1
+                      ? tx('examRoom.oneMarkCriterion', { text: <MathText text={c.text} /> })
+                      : tx('examRoom.marksCriterion', { n: c.mark, text: <MathText text={c.text} /> })}</li>)}
                   </ul>
                 )}
                 <div className="steps">
@@ -537,8 +548,8 @@ export default function ExamRoom() {
     const set = v => setAnswers(a => ({ ...a, [key]: v }));
     const matchList = item.matchList ? (
       <div className="grid cols-2" style={{ gap: 10, margin: '6px 0 12px', fontSize: 14 }}>
-        <div><b>List-I</b>{item.matchList.left.map(r => <div key={r.key} style={{ marginTop: 4 }}>{r.key}. <MathText text={r.text} /></div>)}</div>
-        <div><b>List-II</b>{item.matchList.right.map(r => <div key={r.key} style={{ marginTop: 4 }}>{r.key}. <MathText text={r.text} /></div>)}</div>
+        <div><b>{t('examRoom.listOne')}</b>{item.matchList.left.map(r => <div key={r.key} style={{ marginTop: 4 }}>{r.key}. <MathText text={r.text} /></div>)}</div>
+        <div><b>{t('examRoom.listTwo')}</b>{item.matchList.right.map(r => <div key={r.key} style={{ marginTop: 4 }}>{r.key}. <MathText text={r.text} /></div>)}</div>
       </div>
     ) : null;
 
@@ -546,7 +557,7 @@ export default function ExamRoom() {
       return (
         <>
           {matchList}
-          <div className="mcq" role="group" aria-label={`Options for ${label}`}>
+          <div className="mcq" role="group" aria-label={t('examRoom.optionsFor', { label })}>
             {item.mcqOptions.map((opt, j) => (
               <button key={j} type="button" disabled={locked}
                 className={`mcq-opt ${value === String(j) ? 'sel' : ''}`}
@@ -570,8 +581,8 @@ export default function ExamRoom() {
       return (
         <>
           {matchList}
-          <p className="muted" style={{ fontSize: 12.5, margin: '0 0 6px' }}>One or more options may be correct. Choose every one you are sure of — a wrong choice costs marks.</p>
-          <div className="mcq" role="group" aria-label={`Options for ${label} — choose one or more`}>
+          <p className="muted" style={{ fontSize: 12.5, margin: '0 0 6px' }}>{t('examRoom.multiNote')}</p>
+          <div className="mcq" role="group" aria-label={t('examRoom.optionsForMulti', { label })}>
             {item.mcqOptions.map((opt, j) => (
               <button key={j} type="button" disabled={locked}
                 className={`mcq-opt ${chosen.has(String(j)) ? 'sel' : ''}`}
@@ -589,16 +600,19 @@ export default function ExamRoom() {
     const mode = modeFor(key, item);
     const isWorking = item.answerType === 'working';
     const typed = isWorking ? (
-      <textarea className="input working-input" rows={6} disabled={locked}
-        aria-label={`Your working for ${label} — one line per row, every line earns marks`}
-        placeholder={item.inputHint || 'Show every line of your working — each line earns marks.'}
-        value={value} onChange={e => set(e.target.value)} />
+      <>
+        <textarea className="input working-input" rows={6} disabled={locked}
+          aria-label={t('examRoom.workingAriaFor', { label })}
+          placeholder={item.inputHint || t('examRoom.workingPlaceholder')}
+          value={value} onChange={e => set(e.target.value)} />
+        <div className="muted" style={{ marginTop: 6, fontSize: 12.5 }}>{t('examRoom.workingNote')}</div>
+      </>
     ) : (
       <div className="answer-row">
         {item.answerPrefix && <span className="answer-prefix"><MathText text={item.answerPrefix} /></span>}
         <input className="input answer-input" inputMode="text" enterKeyHint="done" autoCapitalize="none" autoCorrect="off" spellCheck={false} disabled={locked}
-          placeholder={item.inputHint || 'Your answer…'}
-          aria-label={mode === 'ink' ? `Your answer to ${label}, as read from your writing — correct it if the reading is wrong` : `Your answer to ${label}`}
+          placeholder={item.inputHint || t('verdict.answerPlaceholder')}
+          aria-label={t(mode === 'ink' ? 'examRoom.answerAriaInk' : 'examRoom.answerAriaFor', { label })}
           value={value} onChange={e => set(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter' && cur < exam.questions.length - 1) setCur(c => c + 1); }} />
         {item.answerSuffix && <span className="answer-suffix">{item.answerSuffix}</span>}
@@ -608,11 +622,11 @@ export default function ExamRoom() {
     return (
       <div className="exam-answer" data-answer-key={key}>
         {matchList}
-        <div className="row" role="group" aria-label={`How you answer ${label}`} style={{ gap: 6, marginBottom: 8 }}>
+        <div className="row" role="group" aria-label={t('examRoom.modeGroup', { label })} style={{ gap: 6, marginBottom: 8 }}>
           <button type="button" className={`btn btn-sm ${mode === 'ink' ? 'btn-primary' : 'btn-ghost'}`} aria-pressed={mode === 'ink'} disabled={locked}
-            onClick={() => setMode(key, 'ink')}>✍ Write by hand</button>
+            onClick={() => setMode(key, 'ink')}>{t('examRoom.writeByHand')}</button>
           <button type="button" className={`btn btn-sm ${mode === 'type' ? 'btn-primary' : 'btn-ghost'}`} aria-pressed={mode === 'type'} disabled={locked}
-            onClick={() => setMode(key, 'type')}>⌨ Type</button>
+            onClick={() => setMode(key, 'type')}>{t('examRoom.typeMode')}</button>
         </div>
         {mode === 'ink' ? (
           <>
@@ -625,19 +639,19 @@ export default function ExamRoom() {
                   onRecognized={r => onInk(key, item, r)} />
               ) : inkPhase === 'failed' ? (
                 <div role="alert" className="muted" style={{ fontSize: 13 }}>
-                  The handwriting engine could not load. Type your answer instead — it is saved the same way.
+                  {t('examRoom.inkFailed')}
                 </div>
               ) : (
-                <div className="skeleton" style={{ height: 200 }} role="status" aria-label="Opening the writing space" />
+                <div className="skeleton" style={{ height: 200 }} role="status" aria-label={t('examRoom.inkOpening')} />
               )
             ) : (
               <button type="button" className="btn btn-ghost btn-sm" disabled={locked} onClick={() => setInkOpenKey(key)}>
-                {saved?.strokes?.length ? 'Open your writing' : 'Open the writing space'}
+                {t(saved?.strokes?.length ? 'examRoom.openWriting' : 'examRoom.openWritingSpace')}
               </button>
             )}
             <div style={{ marginTop: 8 }}>
               <div className="muted" style={{ fontSize: 12.5, marginBottom: 4 }}>
-                {isWorking ? 'Your working, as read from your writing — this is what is marked:' : 'Your answer, as read from your writing — this is what is marked:'}
+                {t(isWorking ? 'examRoom.readWorking' : 'examRoom.readAnswer')}
               </div>
               {typed}
             </div>
@@ -646,16 +660,16 @@ export default function ExamRoom() {
         {mode === 'type' && !isWorking && item.supportsSteps && (
           <div style={{ marginTop: 12 }}>
             <button type="button" className="btn btn-quiet btn-sm" aria-expanded={!!showWk[key]} onClick={() => setShowWk(w => ({ ...w, [key]: !w[key] }))}>
-              {showWk[key] ? '▾' : '▸'} Show working for partial credit
+              {showWk[key] ? '▾' : '▸'} {t('examRoom.showWorking')}
             </button>
             {showWk[key] && (
               <>
                 <textarea className="input" style={{ marginTop: 8 }} rows={4} disabled={locked}
-                  aria-label={`Your working for ${label} — one step per line`}
-                  placeholder={'One step per line — if your final answer is wrong,\ncorrect working lines still earn marks.'}
+                  aria-label={t('examRoom.workingStepsAria', { label })}
+                  placeholder={t('examRoom.partialPlaceholder')}
                   value={workings[key] || ''}
                   onChange={e => setWorkings(w => ({ ...w, [key]: e.target.value }))} />
-                <div className="muted" style={{ marginTop: 4, fontSize: 12 }}>Marked like a real paper: a wrong answer with sound working still collects method marks.</div>
+                <div className="muted" style={{ marginTop: 4, fontSize: 12 }}>{t('examRoom.methodMarksNote')}</div>
               </>
             )}
           </div>
@@ -665,7 +679,7 @@ export default function ExamRoom() {
   }
 
   const answeredQ = qq => keysOf(qq).some(k => !blank(answers[k]));
-  const saveLabel = saveState === 'saving' ? 'Saving…' : saveState === 'saved' ? 'Saved on this device' : saveState === 'error' ? 'Not saved yet — retrying' : '';
+  const saveLabel = saveState === 'saving' ? t('examRoom.saving') : saveState === 'saved' ? t('examRoom.saved') : saveState === 'error' ? t('examRoom.saveError') : '';
 
   return (
     <div className="grid" style={{ gap: 16, maxWidth: 860, margin: '0 auto' }}>
@@ -674,17 +688,17 @@ export default function ExamRoom() {
         <div>
           <b>{exam.title}</b>
           <div className="muted" style={{ fontSize: 12.5 }}>
-            {answeredCount}/{exam.questions.length} answered
-            {resumed && ' · picked up where you left off'}
+            {t('examRoom.answeredProgress', { answered: answeredCount, total: exam.questions.length })}
+            {resumed && ` ${t('examRoom.resumedNote')}`}
             {saveLabel && <> · <span className="exam-save" data-state={saveState}>{saveLabel}</span></>}
           </div>
         </div>
         <span className={`exam-timer ${left < 120 ? 'low' : ''}`} style={{ marginLeft: 'auto' }} data-deadline={deadlineAt || undefined}>
           ⏱ {mmss(left)}
-          <span className="sr-only"> left{left < 120 ? ' — under two minutes' : ''}</span>
+          <span className="sr-only"> {t(left < 120 ? 'examRoom.timeLeftLow' : 'examRoom.timeLeft')}</span>
         </span>
         <button className="btn btn-primary" onClick={() => finalise('student')} disabled={locked}>
-          {phase === 'finalising' ? 'Marking…' : 'Submit paper'}
+          {phase === 'finalising' ? t('verdict.marking') : t('examRoom.submitPaper')}
         </button>
       </div>
       <div className="sr-only" role="status" aria-live="polite">{announce}</div>
@@ -692,7 +706,7 @@ export default function ExamRoom() {
         <div className="card" role="alert">
           {submitError}
           {phase === 'sitting' && left <= 0 && (
-            <button className="btn btn-primary btn-sm" style={{ marginLeft: 12 }} onClick={() => finalise('deadline')}>Try again</button>
+            <button className="btn btn-primary btn-sm" style={{ marginLeft: 12 }} onClick={() => finalise('deadline')}>{t('common.tryAgain')}</button>
           )}
         </div>
       )}
@@ -701,7 +715,7 @@ export default function ExamRoom() {
         {exam.questions.map((qq, i) => (
           <button key={qq.id}
             className={`exam-dot ${i === cur ? 'cur' : ''} ${answeredQ(qq) ? 'done' : ''}`}
-            aria-label={`Question ${i + 1}${answeredQ(qq) ? ', answered' : ', not answered yet'}`}
+            aria-label={t(answeredQ(qq) ? 'examRoom.dotAnswered' : 'examRoom.dotNotAnswered', { n: i + 1 })}
             aria-current={i === cur ? 'true' : undefined}
             onClick={() => setCur(i)}>{i + 1}</button>
         ))}
@@ -709,15 +723,17 @@ export default function ExamRoom() {
 
       <div className="card">
         <div className="q-meta">
-          <span className="tag">Question {qNumber} of {exam.questions.length}</span>
-          {q.sectionLabel && <span className="tag">{q.sectionLabel}</span>}
-          <span className="tag">{q.subtopicName}</span>
-          <span className="tag">{q.multipart ? `${q.marks} marks` : q.negativeMarks ? `+${q.marks} correct · −${q.negativeMarks} wrong` : q.section ? `${q.marks} mark${q.marks === 1 ? '' : 's'}` : q.diffLabel}</span>
-          {q.multipart && <span className="tag tag-brand">Structured — parts (a)–({q.parts[q.parts.length - 1].key})</span>}
+          <span className="tag">{t('examRoom.questionOf', { n: qNumber, total: exam.questions.length })}</span>
+          {q.sectionLabel && <span className="tag" lang="en">{q.sectionLabel}</span>}
+          <span className="tag" lang="en">{q.subtopicName}</span>
+          <span className="tag">{q.negativeMarks && !q.multipart
+            ? t('examRoom.negativeTag', { marks: q.marks, neg: q.negativeMarks })
+            : (q.multipart || q.section) ? t('examRoom.marksCount', { count: q.marks, n: q.marks }) : q.diffLabel}</span>
+          {q.multipart && <span className="tag tag-brand">{t('examRoom.structuredParts', { last: q.parts[q.parts.length - 1].key })}</span>}
           {/* A question that was actually set in an exam says which one. Every
               other question in the paper is authored practice, and a student
               is entitled to tell them apart while they are sitting it. */}
-          {q.pyq && <span className="tag tag-brand" title={q.pyqSource || 'Previous year question'}>PYQ · {q.pyqSource || 'previous year question'}</span>}
+          {q.pyq && <span className="tag tag-brand" title={q.pyqSource || t('examRoom.pyqTitle')}>{q.pyqSource ? t('examRoom.pyqTag', { source: q.pyqSource }) : t('examRoom.pyqTagNoSource')}</span>}
         </div>
         {q.multipart ? (
           <>
@@ -728,15 +744,15 @@ export default function ExamRoom() {
                 <div className="row" style={{ gap: 8, alignItems: 'baseline', marginBottom: 8 }}>
                   <b style={{ fontSize: 16 }}>({pt.key})</b>
                   <span style={{ flex: 1 }}><MathText text={pt.prompt} /></span>
-                  <span className="tag">{pt.marks} mark{pt.marks === 1 ? '' : 's'}</span>
+                  <span className="tag">{t('examRoom.marksCount', { count: pt.marks, n: pt.marks })}</span>
                 </div>
                 {pt.figure && <div className="q-figure" dangerouslySetInnerHTML={{ __html: pt.figure }} />}
-                {answerControl(`${q.id}::${pt.key}`, pt, `part (${pt.key})`)}
+                {answerControl(answerKey(q.id, pt.key), pt, t('examRoom.labelPart', { key: pt.key }))}
                 {pt.alt && (
                   <div style={{ marginTop: 10 }}>
-                    <div className="muted" style={{ fontWeight: 600, margin: '6px 0' }}>OR</div>
+                    <div className="muted" style={{ fontWeight: 600, margin: '6px 0' }}>{t('examRoom.orLabel')}</div>
                     <MathText block text={pt.alt.prompt} />
-                    {answerControl(`${q.id}::${pt.key}::or`, pt.alt, `part (${pt.key}), the other choice`)}
+                    {answerControl(answerKey(q.id, pt.key, OR), pt.alt, t('examRoom.labelPartOr', { key: pt.key }))}
                   </div>
                 )}
               </div>
@@ -746,28 +762,26 @@ export default function ExamRoom() {
           <>
             <MathText block className="q-prompt" text={q.prompt} />
             {q.figure && <div className="q-figure" dangerouslySetInnerHTML={{ __html: q.figure }} />}
-            {answerControl(q.id, q, `question ${qNumber}`)}
+            {answerControl(q.id, q, t('examRoom.labelQuestion', { n: qNumber }))}
             {q.choice && (
               <div style={{ marginTop: 16, paddingTop: 12, borderTop: '1px solid var(--hairline)' }}>
-                <div className="muted" style={{ fontWeight: 600, marginBottom: 6 }}>OR — answer one of the two. If both are answered, the first is marked.</div>
+                <div className="muted" style={{ fontWeight: 600, marginBottom: 6 }}>{t('examRoom.orChoiceNote')}</div>
                 <MathText block className="q-prompt" text={q.choice.prompt} />
                 {q.choice.figure && <div className="q-figure" dangerouslySetInnerHTML={{ __html: q.choice.figure }} />}
-                {answerControl(`${q.id}::or`, q.choice, `question ${qNumber}, the other choice`)}
+                {answerControl(answerKey(q.id, OR), q.choice, t('examRoom.labelQuestionOr', { n: qNumber }))}
               </div>
             )}
           </>
         )}
 
         <div className="spread" style={{ marginTop: 20 }}>
-          <button className="btn btn-ghost" disabled={cur === 0} onClick={() => setCur(c => c - 1)}>← Previous</button>
+          <button className="btn btn-ghost" disabled={cur === 0} onClick={() => setCur(c => c - 1)}>{t('examRoom.previous')}</button>
           {cur < exam.questions.length - 1
-            ? <button className="btn btn-ghost" onClick={() => setCur(c => c + 1)}>Next →</button>
-            : <button className="btn btn-primary" onClick={() => finalise('student')} disabled={locked}>Finish & submit</button>}
+            ? <button className="btn btn-ghost" onClick={() => setCur(c => c + 1)}>{t('examRoom.next')}</button>
+            : <button className="btn btn-primary" onClick={() => finalise('student')} disabled={locked}>{t('examRoom.finishSubmit')}</button>}
         </div>
       </div>
-      <p className="muted" style={{ textAlign: 'center' }}>
-        Exam conditions: no hints, no retries, no feedback on your writing. Handwriting is only read, never marked, until you submit — worked solutions unlock then.
-      </p>
+      <p className="muted" style={{ textAlign: 'center' }}>{t('examRoom.conditionsNote')}</p>
     </div>
   );
 }

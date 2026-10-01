@@ -177,7 +177,7 @@ export const flow = {
     await check('the analysis states what was attempted', /Attempted 2 of 25/.test(text), text.slice(0, 200));
     const rows = await analysis.locator('tbody tr th').allInnerTexts();
     await check('the analysis has Section A and Section B', rows.length === 2 && /Section A/i.test(rows[0]) && /Section B/i.test(rows[1]), JSON.stringify(rows));
-    await check('the analysis explains negative marking', /Negative marking\./.test(text), text.slice(0, 300));
+    await check('the analysis explains negative marking', /Negative marking/.test(text), text.slice(0, 300));
     const scoreLine = (await page.locator('.card').first().innerText()).replace(/\s+/g, ' ');
     const scored = /(-?\d+) of (\d+) marks/.exec(scoreLine);
     const net = /net (-?\d+)/.exec(text);

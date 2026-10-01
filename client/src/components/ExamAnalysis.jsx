@@ -6,6 +6,7 @@
 // and the table scrolls sideways on a phone rather than squeezing.
 // ─────────────────────────────────────────────────────────────────────────────
 import React from 'react';
+import { useT } from '../i18n/index.js';
 
 const pctText = v => (v === null || v === undefined ? '—' : `${v}%`);
 const signed = n => (n > 0 ? `+${n}` : String(n));
@@ -19,47 +20,54 @@ function minutes(ms) {
 }
 
 export default function ExamAnalysis({ analysis }) {
+  const t = useT();
   if (!analysis || !Array.isArray(analysis.sections) || !analysis.sections.length) return null;
   const { pattern, totals, sections, timed, weakChapters = [] } = analysis;
   const jee = pattern === 'jee-main' || pattern === 'jee-advanced';
   const cbse = pattern === 'cbse';
+  const partialCol = cbse || pattern === 'jee-advanced';
+  const summaryVars = { attempted: totals.attempted, questions: totals.questions, full: totals.full, wrong: totals.wrong, accuracy: pctText(totals.accuracy) };
 
   return (
     <section className="card exam-analysis" aria-labelledby="exam-analysis-title">
-      <h2 className="card-title" id="exam-analysis-title">Section analysis</h2>
-      <p className="sub" style={{ marginBottom: 12 }}>
-        Attempted <b>{totals.attempted}</b> of {totals.questions} · fully correct <b>{totals.full}</b>
-        {totals.partial ? <> · part-credit <b>{totals.partial}</b></> : null}
-        {' '}· wrong <b>{totals.wrong}</b> · accuracy on attempted <b>{pctText(totals.accuracy)}</b>
-        {jee && <> · <b>{signed(totals.positive)}</b> earned, <b>−{totals.negative}</b> lost, net <b>{totals.awarded}</b></>}
+      <h2 className="card-title" id="exam-analysis-title">{t('examAnalysis.title')}</h2>
+      <p className="sub" style={{ marginBottom: 4 }}>
+        {totals.partial
+          ? t('examAnalysis.summaryWithPartial', { ...summaryVars, partial: totals.partial })
+          : t('examAnalysis.summary', summaryVars)}
       </p>
+      {jee && (
+        <p className="sub" style={{ marginBottom: 12 }}>
+          {t('examAnalysis.jeeNet', { positive: signed(totals.positive), negative: totals.negative, net: totals.awarded })}
+        </p>
+      )}
 
-      <div className="table-scroll">
+      <div className="table-scroll" style={{ marginTop: jee ? 0 : 8 }}>
         <table className="table">
-          <caption className="sr-only">Marks by section</caption>
+          <caption className="sr-only">{t('examAnalysis.caption')}</caption>
           <thead>
             <tr>
-              <th scope="col">Section</th>
-              <th scope="col">Marks</th>
-              <th scope="col">Attempted</th>
-              <th scope="col">Correct</th>
-              {(cbse || pattern === 'jee-advanced') && <th scope="col">Part-credit</th>}
-              <th scope="col">Wrong</th>
-              <th scope="col">Unattempted</th>
-              <th scope="col">Accuracy</th>
-              {jee && <th scope="col">Negative</th>}
-              {cbse && <th scope="col">Step marks lost</th>}
-              {timed && <th scope="col">Time</th>}
+              <th scope="col">{t('examAnalysis.colSection')}</th>
+              <th scope="col">{t('examAnalysis.colMarks')}</th>
+              <th scope="col">{t('examAnalysis.colAttempted')}</th>
+              <th scope="col">{t('examAnalysis.colCorrect')}</th>
+              {partialCol && <th scope="col">{t('examAnalysis.colPartial')}</th>}
+              <th scope="col">{t('examAnalysis.colWrong')}</th>
+              <th scope="col">{t('examAnalysis.colUnattempted')}</th>
+              <th scope="col">{t('examAnalysis.colAccuracy')}</th>
+              {jee && <th scope="col">{t('examAnalysis.colNegative')}</th>}
+              {cbse && <th scope="col">{t('examAnalysis.colStepLost')}</th>}
+              {timed && <th scope="col">{t('examAnalysis.colTime')}</th>}
             </tr>
           </thead>
           <tbody>
             {sections.map(s => (
               <tr key={s.id}>
-                <th scope="row" style={{ fontWeight: 600, textAlign: 'left' }}>{s.label}</th>
+                <th scope="row" lang="en" style={{ fontWeight: 600, textAlign: 'left' }}>{s.label}</th>
                 <td>{s.awarded} / {s.marks}</td>
                 <td>{s.attempted} / {s.questions}</td>
                 <td>{s.full}</td>
-                {(cbse || pattern === 'jee-advanced') && <td>{s.partial}</td>}
+                {partialCol && <td>{s.partial}</td>}
                 <td>{s.wrong}</td>
                 <td>{s.unattempted}</td>
                 <td>{pctText(s.accuracy)}</td>
@@ -74,42 +82,39 @@ export default function ExamAnalysis({ analysis }) {
 
       {cbse && analysis.stepMarks && (
         <p style={{ marginTop: 12, fontSize: 14 }}>
-          <b>Step marks.</b> {analysis.stepMarks.questions
-            ? <>Method marks earned on {analysis.stepMarks.questions} question{analysis.stepMarks.questions === 1 ? '' : 's'} ({analysis.stepMarks.earned} marks); {analysis.stepMarks.lost} more were lost on those same questions.</>
-            : <>No question earned part-credit for working.</>}
-          {' '}On attempted questions {analysis.stepMarks.lostOnAttempted} mark{analysis.stepMarks.lostOnAttempted === 1 ? ' was' : 's were'} lost; {analysis.stepMarks.unattemptedMarks} were left on unattempted questions.
+          {analysis.stepMarks.questions
+            ? t('examAnalysis.stepMarks', { count: analysis.stepMarks.questions, earned: analysis.stepMarks.earned, lost: analysis.stepMarks.lost, lostOnAttempted: analysis.stepMarks.lostOnAttempted, unattempted: analysis.stepMarks.unattemptedMarks })
+            : t('examAnalysis.stepMarksNone', { lostOnAttempted: analysis.stepMarks.lostOnAttempted, unattempted: analysis.stepMarks.unattemptedMarks })}
         </p>
       )}
 
       {jee && analysis.negativeMarking && (
         <p style={{ marginTop: 12, fontSize: 14 }}>
-          <b>Negative marking.</b> {analysis.negativeMarking.wrong} wrong answer{analysis.negativeMarking.wrong === 1 ? '' : 's'} cost {analysis.negativeMarking.marksLost} mark{analysis.negativeMarking.marksLost === 1 ? '' : 's'}.
-          {' '}Leaving {analysis.negativeMarking.wrong === 1 ? 'it' : 'them'} blank would have scored {analysis.negativeMarking.netIfWrongLeftBlank} instead of {analysis.negativeMarking.net}.
+          {t('examAnalysis.negative', { wrong: analysis.negativeMarking.wrong, lost: analysis.negativeMarking.marksLost, blank: analysis.negativeMarking.netIfWrongLeftBlank, net: analysis.negativeMarking.net })}
         </p>
       )}
 
       {pattern === 'jee-advanced' && analysis.partialMarking && (
         <p style={{ marginTop: 8, fontSize: 14 }}>
-          <b>Partial marking.</b> {analysis.partialMarking.questions
-            ? <>{analysis.partialMarking.questions} multiple-correct answer{analysis.partialMarking.questions === 1 ? '' : 's'} earned partial credit worth {analysis.partialMarking.marks} mark{analysis.partialMarking.marks === 1 ? '' : 's'}, leaving {analysis.partialMarking.left} on the table.</>
-            : <>No answer earned partial credit.</>}
+          {analysis.partialMarking.questions
+            ? t('examAnalysis.partial', { questions: analysis.partialMarking.questions, marks: analysis.partialMarking.marks, left: analysis.partialMarking.left })
+            : t('examAnalysis.partialNone')}
         </p>
       )}
 
       {weakChapters.length > 0 && (
         <div style={{ marginTop: 12 }}>
-          <h3 className="sc-label" style={{ fontSize: 13, margin: '0 0 6px' }}>Chapters to work on next</h3>
+          <h3 className="sc-label" style={{ fontSize: 13, margin: '0 0 6px' }}>{t('examAnalysis.weakTitle')}</h3>
           <ul style={{ margin: 0, paddingLeft: 18, fontSize: 14 }}>
             {weakChapters.map(c => (
               <li key={c.id}>
-                <b>{c.label}</b> — {c.awarded} of {c.marks} marks ({c.lost} lost
-                {c.wrong ? `, ${c.wrong} wrong` : ''}{c.unattempted ? `, ${c.unattempted} unattempted` : ''})
+                {t('examAnalysis.weakItem', { label: c.label, awarded: c.awarded, marks: c.marks, lost: c.lost, wrong: c.wrong, unattempted: c.unattempted })}
               </li>
             ))}
           </ul>
         </div>
       )}
-      {!timed && <p className="muted" style={{ marginTop: 10, fontSize: 12.5 }}>Time per section was not measured for this paper.</p>}
+      {!timed && <p className="muted" style={{ marginTop: 10, fontSize: 12.5 }}>{t('examAnalysis.untimed')}</p>}
     </section>
   );
 }
