@@ -167,3 +167,36 @@ export function workingNote(check) {
       : `Line ${firstBreak + 1} is where it goes wrong${why}.${hint}`
   };
 }
+
+/**
+ * What to ask the deterministic engine about a misconception the cloud check
+ * proposed, or null when it proposed none.
+ *
+ * The check indexes every ink line, blank ones included; Step Check and the
+ * diagnoser index only the written ones. The proposal is re-expressed in the
+ * engine's index space, and the line shown to the student stays the one the
+ * check named. Whether the ID is recorded, or only shown as "possibly", is
+ * decided by the backend's deterministic agreement rule — never here.
+ */
+export function misconceptionProposal(check, lines) {
+  if (!check || check.error || typeof check.misconceptionId !== 'string' || !check.misconceptionId) return null;
+  if (!Number.isInteger(check.firstBreak) || check.firstBreak < 0) return null;
+  const compact = [];
+  let breakAt = -1;
+  (lines || []).forEach((line, i) => {
+    const text = String(line ?? '').trim();
+    if (!text) return;
+    if (i === check.firstBreak) breakAt = compact.length;
+    compact.push(text);
+  });
+  if (breakAt < 0) return null;
+  return {
+    displayLine: check.firstBreak + 1,
+    body: {
+      lines: compact.slice(0, 40),
+      firstBreak: breakAt,
+      misconceptionId: check.misconceptionId,
+      confident: check.needsConfirmation !== true
+    }
+  };
+}
