@@ -1,0 +1,302 @@
+# Postgres cutover: Supabase (Mumbai) behind the Railway `/v1` server
+
+Status: **procedure only — nothing here has been run against Supabase or Railway.**
+Authority: ADR-0001 (`docs/architecture/adr-0001-online-first-runtime.md`). Every step that
+touches a hosted system needs the owner's explicit go-ahead at the time it is run; production
+steps additionally need the backup in §6 to exist first.
+
+The order is fixed: **staging first, then production, never both at once.** Staging is the
+Supabase project `orudxrckgxyyraopyzmn` (region `ap-south-1`, Mumbai) and the Railway
+*staging* environment. Production repeats §2–§5 against the production project and the
+Railway *production* environment only after staging has run cleanly (§5.4).
+
+---
+
+## 1. What the server requires of the database
+
+The `/v1` server selects Postgres when `PRI_DATABASE_URL` is set and then refuses to start
+unless all of the following hold (each failure is a coded error on stderr; the URL is never
+printed):
+
+| Requirement | Enforced by | Error code |
+|---|---|---|
+| URL is `postgres://` / `postgresql://` with a host | `config.js` | `PLATFORM_DB_URL_INVALID` |
+| **Production:** `sslmode=verify-full` (preferred) or `sslmode=require` | `config.js postgresConnectionSettings` | `PLATFORM_DB_TLS_REQUIRED` |
+| No `sslrootcert`/`sslcert`/`sslkey`/`ssl=` in the URL (CA goes in `PRI_DATABASE_SSL_ROOT_CERT`) | same | `PLATFORM_DB_TLS_INVALID` |
+| Reachable, migrated (`platform_meta.schema_version` present) | `store.js createPostgresStore` | `PLATFORM_DB_UNAVAILABLE` / `PLATFORM_DB_NOT_MIGRATED` |
+| `schema_version` = 6 and `billing_schema_version` = 3 exactly (`server/platform/schemaVersions.js`) | `store.js assertSchemaVersions` | `PLATFORM_DB_SCHEMA_MISMATCH` |
+| `pri.sync_cursor_seq` exists (migration `20261002000000`) | same | `PLATFORM_DB_SCHEMA_MISMATCH` |
+| Timeouts/pool size parse as whole numbers in range | `config.js postgresSessionLimits` | `PLATFORM_DB_CONFIG_INVALID` |
+
+### Connection: session mode only
+
+The server holds one connection per transaction, takes **session-level advisory locks**
+(per-account sync lock), runs **SERIALIZABLE / REPEATABLE READ** transactions across several
+statements and issues **`SET`** for `search_path`, `statement_timeout` and
+`idle_in_transaction_session_timeout` once per connection. All of that needs a real session.
+
+* Use the **direct connection** (`db.<ref>.supabase.co:5432`) if Railway can reach it (Supabase
+  direct connections are IPv6 unless the IPv4 add-on is enabled), **or** the Supavisor
+  **session-mode** pooler (`aws-0-ap-south-1.pooler.supabase.com`, **port 5432**, user
+  `<role>.<ref>`).
+* **Never** the transaction-mode pooler (port **6543**): advisory locks and `SET` would leak
+  between clients and the per-account cursor ordering guarantee would not hold.
+
+### TLS
+
+`sslmode` in `PRI_DATABASE_URL` is read by the server, removed from the string handed to `pg`,
+and turned into an explicit `ssl` option:
+
+| `sslmode` | Production | Encrypted | Certificate verified |
+|---|---|---|---|
+| `verify-full` | allowed (**use this**) | yes | yes — chain and host name; against `PRI_DATABASE_SSL_ROOT_CERT` if set, else the system trust store |
+| `require` | allowed | yes | only if `PRI_DATABASE_SSL_ROOT_CERT` is set; otherwise **not verified** (libpq semantics) |
+| absent / `disable` / `allow` / `prefer` | **refused** | — | — |
+| `verify-ca` | refused everywhere | — | — |
+
+Set `PRI_DATABASE_SSL_ROOT_CERT` to the **PEM text** of Supabase's server root certificate
+(Dashboard → Project Settings → Database → SSL Configuration → *Download certificate*). Railway
+variables are text, so paste the PEM itself (newlines included), not a file path.
+
+> **To confirm on staging (§4.3), not assumed:** that `verify-full` with that CA succeeds
+> against the host name actually used (direct host vs. pooler host). If it does not, record the
+> exact TLS error in the cutover log. `sslmode=require` with `PRI_DATABASE_SSL_ROOT_CERT` set
+> still verifies the chain and host name; `require` *without* the CA is encrypted but
+> unauthenticated (open to an active man-in-the-middle) and must not go to production without
+> an explicit, written owner decision.
+
+Also turn on **Enforce SSL on incoming connections** in the Supabase database settings so the
+server side refuses plaintext as well.
+
+### Session limits and pool size (Railway variables)
+
+| Variable | Default | Range | Meaning |
+|---|---|---|---|
+| `PRI_DATABASE_STATEMENT_TIMEOUT_MS` | 15000 | 1000–600000 | Any statement, **including a wait for a row or advisory lock**, is cancelled after this. Answered as `503 PLATFORM_DB_TIMEOUT` + `Retry-After: 2`. |
+| `PRI_DATABASE_IDLE_TX_TIMEOUT_MS` | 30000 | 1000–3600000 | A session idle inside an open transaction is ended by Postgres; the request gets `503 PLATFORM_DB_TIMEOUT`, the connection is discarded. |
+| `PRI_DATABASE_POOL_MAX` | 10 | 1–50 | Connections per server replica. `POOL_MAX × replicas` must stay **below** the session-mode pool size (or `max_connections` minus Supabase's reserved/dashboard connections for a direct connection). |
+
+Exhausted serialization retries and a pool that cannot hand out a connection within 10 s are
+answered `503 PLATFORM_DB_BUSY` + `Retry-After: 1`. None of these is ever a 500.
+
+---
+
+## 2. Apply the migrations to staging
+
+Prerequisites: a repository checkout at the commit being deployed, Node 24, the Supabase CLI via
+`npx supabase@latest` (no global install), and an owner logged in to Supabase.
+
+```bash
+# 2.1  Authenticate the CLI (opens a browser; the token stays in the CLI's own store).
+npx supabase@latest login
+
+# 2.2  Link this checkout to STAGING. Prompts for the database password of the
+#      `postgres` role — type it; never put it on the command line or in a file.
+npx supabase@latest link --project-ref orudxrckgxyyraopyzmn
+
+# 2.3  See what would be applied. Expect exactly the files in supabase/migrations/
+#      that are not yet in the remote history, in filename order:
+#        20261001000000_platform_schema.sql
+#        20261002000000_sync_cursor_sequence.sql
+npx supabase@latest migration list
+npx supabase@latest db push --dry-run
+
+# 2.4  Apply. Each migration runs in its own transaction; a failure stops at that file.
+npx supabase@latest db push
+```
+
+`db push` reads `supabase/migrations/` from the linked checkout. The migrations create schema
+`pri`, the `NOLOGIN` role `pri_server`, every table with RLS on and a single
+`pri_server`-only policy, revoke everything from `anon`/`authenticated`, and seed
+`platform_meta` and `sync_cursors`. They never touch `public`, `auth` or `storage`.
+
+---
+
+## 3. Create the login role the server uses
+
+`pri_server` is `NOLOGIN` by design. The server logs in as a separate role that is a **member**
+of `pri_server` and nothing else. Create it with `psql` connected to staging as `postgres`
+(Dashboard → Connect → session pooler string; type the `postgres` password at the prompt), so
+the new role's password is set with `\password`: psql hashes it (SCRAM) on the operator's
+machine, and the plaintext never reaches the server, its statement log or the SQL editor's
+saved history — which a `CREATE ROLE … PASSWORD '…'` statement would.
+
+```sql
+-- 3.1  The role, without a password yet.
+create role pri_app_staging login connection limit 20;
+grant pri_server to pri_app_staging;          -- INHERIT (the default) is required
+```
+
+```text
+-- 3.2  Generate the password on the operator's machine, e.g.
+--        openssl rand -base64 48 | tr -d '/+=\n' | cut -c1-48
+--      and enter it twice at this prompt. It goes here and into the Railway
+--      variable (§4) — nowhere else: not a file, the repository, chat or a ticket.
+\password pri_app_staging
+```
+
+```sql
+-- 3.3  Check: member of pri_server, not superuser, cannot bypass RLS.
+select r.rolname, r.rolsuper, r.rolbypassrls, pg_has_role(r.rolname, 'pri_server', 'MEMBER') as member
+from pg_roles r where r.rolname = 'pri_app_staging';
+-- expect: rolsuper = false, rolbypassrls = false, member = true
+```
+
+`connection limit` should be at least `PRI_DATABASE_POOL_MAX × replicas` plus a small margin.
+
+---
+
+## 4. Point Railway staging at it
+
+### 4.1 Variables (Railway → project → **staging** environment → `/v1` service → Variables)
+
+| Variable | Value |
+|---|---|
+| `PRI_DATABASE_URL` | `postgresql://pri_app_staging.orudxrckgxyyraopyzmn:<password>@aws-0-ap-south-1.pooler.supabase.com:5432/postgres?sslmode=verify-full` (session-mode pooler) — or the direct host `db.orudxrckgxyyraopyzmn.supabase.co:5432` with user `pri_app_staging` |
+| `PRI_DATABASE_SSL_ROOT_CERT` | the Supabase root certificate PEM (§1, TLS) |
+| `PRI_DATABASE_STATEMENT_TIMEOUT_MS` | `15000` (or leave unset) |
+| `PRI_DATABASE_IDLE_TX_TIMEOUT_MS` | `30000` (or leave unset) |
+| `PRI_DATABASE_POOL_MAX` | `10` (see §1 sizing) |
+
+Mark `PRI_DATABASE_URL` as **sealed**. Remove `PRI_PLATFORM_DB` from the staging service: with
+`PRI_DATABASE_URL` set it is ignored, and leaving it invites confusion during rollback.
+
+### 4.2 Verify the target before the service uses it
+
+From the operator's checkout (not from the container — the tool reads the SQLite schema from
+the source tree), with the **same** values as the Railway variables, entered at a prompt rather
+than typed into the command line so they stay out of shell history:
+
+```bash
+read -rs PRI_DATABASE_URL && export PRI_DATABASE_URL
+export PRI_DATABASE_SSL_ROOT_CERT="$(cat ~/Downloads/prod-ca-2021.crt)"   # the downloaded Supabase CA
+NODE_ENV=production npm run verify:platform:pg-target
+unset PRI_DATABASE_URL PRI_DATABASE_SSL_ROOT_CERT
+```
+
+`server/tools/postgres-target-check.mjs` connects exactly as the server does and changes nothing
+that persists. It must print `POSTGRES TARGET: PASS` with every line ticked:
+
+* boot checks (TLS policy, `schema_version` 6 / `billing_schema_version` 3, cursor sequence);
+* TLS negotiated (`pg_stat_ssl`), `statement_timeout` / `idle_in_transaction_session_timeout` applied;
+* login role is a `pri_server` member, not superuser, not BYPASSRLS;
+* the live schema gate — every table, column type, key, CHECK expression, index, RLS policy
+  (`FOR ALL`, permissive, `true`/`true`), every privilege of `pri_server`, `anon` and
+  `authenticated`, the cursor sequence at `CACHE 1`;
+* a write smoke inside a transaction that is rolled back.
+
+### 4.3 What `npm run test:platform:pg` is — and is not — for
+
+`npm run test:platform:pg` is the **pre-merge** gate: it runs every migration and all 21
+engine-agnostic `/v1` suites on a throwaway Postgres (local `initdb`, or CI's `postgres:17`
+service). It needs a superuser, creates and drops scratch databases and a passwordless login
+role, and therefore **cannot and must not be pointed at Supabase**. Run it on the exact commit
+being deployed and keep the output:
+
+```bash
+npm run test:platform:pg   # expect: PLATFORM ON POSTGRES: PASS — 24/24 suites
+```
+
+Against staging itself, the equivalent evidence is §4.2 plus §4.4.
+
+### 4.4 Deploy and smoke
+
+1. Redeploy the staging service. The boot log must show `platform_db_open { engine: 'postgres' }`;
+   any `platform_db_unavailable {"code":…}` line means the variables or migrations are wrong —
+   fix and redeploy, nothing has been written.
+2. `GET /v1/health` → `database.engine = "postgres"`, `schemaVersion = "6"`.
+3. Exercise the staging app end to end with **test accounts only**: register, verify email,
+   sign in, sync from two devices (push from one, pull on the other), a teacher class and
+   assignment, account export and deletion. Record what was done and the result in the cutover
+   log. Synthetic/test evidence only — it is not student evidence.
+4. Watch the service logs for `platform_error` with `PLATFORM_DB_BUSY` / `PLATFORM_DB_TIMEOUT`
+   and Supabase's *Database → Query performance* for long waits on `pg_advisory_lock`.
+
+### 4.5 Staging is clean when
+
+All of §4.2 and §4.4 pass, and staging has run for at least 24 hours of normal test traffic
+with no `500` from `/v1`, no `platform_db_pool_error`, and no unexplained 503s.
+
+---
+
+## 5. Rollback and forward-fix
+
+### 5.1 Before any data matters (staging, or production before launch)
+
+Rollback is configuration only: remove `PRI_DATABASE_URL` from the Railway service (restoring
+`PRI_PLATFORM_DB` if that environment used SQLite) and redeploy. The server goes back to the
+SQLite file it used before; nothing in Postgres is read. The Supabase schema can stay as it is.
+
+### 5.2 Once Postgres holds real data
+
+There is **no automatic migration back** from Postgres to SQLite. Writes made on Postgres after
+cutover do not exist in the SQLite file. So after real traffic:
+
+* **Prefer forward-fix.** A code bug: deploy the fixed build. A schema mistake: add a *new*
+  migration (never edit an applied one — `supabase db push` tracks applied files by name and
+  will not re-run it), prove it with `npm run test:platform:pg`, apply it to staging, verify
+  (§4.2), then production.
+* **Schema-version mismatch at boot** (`PLATFORM_DB_SCHEMA_MISMATCH`): the database and the
+  build disagree. Deploy the build that matches the database, or apply the missing migration —
+  do not edit `platform_meta` by hand to make the error go away.
+* **Rolling back the application build** is safe only to a build with the same
+  `SCHEMA_VERSION` / `BILLING_SCHEMA_VERSION`; an older build refuses to boot (by design).
+* **Restoring data** means restoring the Supabase backup (§6) or PITR to a point before the
+  incident — a destructive, owner-approved operation that discards later writes.
+
+### 5.3 Undoing migration `20261002000000_sync_cursor_sequence`
+
+Only if a build that predates it must run against the database: that build allocates from
+`pri.sync_cursors`, so first move the row above every cursor already handed out:
+
+```sql
+update pri.sync_cursors
+   set value = greatest(value, (select coalesce(last_value, 0) from pri.sync_cursor_seq))
+ where id = 1;
+```
+
+Leave the sequence in place; the older build ignores it. (Forward again: the newer build reads
+the sequence, and the migration's `setval` logic can be re-run by hand to lift the sequence above
+the row's value if the older build issued cursors in between.)
+
+### 5.4 Production
+
+Repeat §2–§4 against the production Supabase project and the Railway production environment
+with a **separate** login role (`pri_app_production`) and password — never the staging ones —
+only after: staging is clean (§4.5), the backup in §6 exists and has been restore-tested, and
+the owner has approved the window. The migrations are additive; the first production `db push`
+runs against an empty `pri` schema.
+
+---
+
+## 6. Backups before production
+
+1. Confirm the production project's plan includes daily backups, and enable **Point-in-Time
+   Recovery** before launch (ADR-0001 requires a restore drill before real student data).
+2. Immediately before the production `db push`, take a logical backup from the operator's
+   machine and store it encrypted outside the repository:
+
+   ```bash
+   npx supabase@latest db dump --linked --schema pri -f pri-preflight-schema.sql
+   npx supabase@latest db dump --linked --schema pri --data-only -f pri-preflight-data.sql
+   ```
+
+3. **Restore drill:** restore that dump (or a PITR point) into a scratch Supabase project, run
+   §4.2 against it, and record the result. A backup that has not been restored is not a backup.
+4. If SQLite held real data before cutover, keep the final SQLite file
+   (`server/tools/backup.mjs`) as the authoritative pre-cutover copy; importing it into Postgres
+   is a separate, reviewed data migration and is **not** part of this procedure.
+
+---
+
+## 7. Cutover log (fill in; do not commit secrets)
+
+| Step | Environment | Commit | Who | When | Result / evidence |
+|---|---|---|---|---|---|
+| 2.4 `db push` | staging | | | | |
+| 3 login role created | staging | | | | (role name only) |
+| 4.2 target check | staging | | | | `POSTGRES TARGET: PASS — n/n` |
+| 4.3 `test:platform:pg` | local/CI | | | | `24/24 suites` |
+| 4.4 smoke | staging | | | | |
+| 6 backup + restore drill | production | | | | |
+| 2–4 | production | | | | |
