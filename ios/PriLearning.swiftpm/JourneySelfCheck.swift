@@ -42,25 +42,27 @@ enum JourneySelfCheck {
       link.click();
     }
     const steps = {};
+    let at = '';
     async function step(name, fn) {
+      at = '';
       try { const detail = await fn(); steps[name] = { ok: true, detail: detail === undefined ? '' : String(detail).slice(0, 120) }; }
-      catch (e) { steps[name] = { ok: false, detail: String(e && e.message || e).slice(0, 120) }; }
+      catch (e) { steps[name] = { ok: false, detail: (String(e && e.message || e) + ' at ' + at + ' · ' + (document.body.innerText || '').replace(/\\s+/g, ' ').slice(0, 90)).slice(0, 220) }; }
     }
     """
 
     private static let firstLaunch = helpers + """
     await step('launch', async () => { await waitFor(() => q('.auth-card') || q('.home-greet') || byLabel('Get Started')); return location.href; });
     await step('onboarding', async () => {
-      (await waitFor(() => byLabel('Get Started'))).click();
-      await waitFor(() => q('[data-onboarding-step="1"]'));
-      byLabel('Student').click(); q('.auth-card .btn-primary').click();
-      await waitFor(() => q('[data-onboarding-step="2"]'));
-      setValue(q('#signup-track'), '10'); await sleep(150); q('.auth-card .btn-primary').click();
-      await waitFor(() => q('[data-onboarding-step="3"]'));
-      setValue(q('#signup-name'), 'Journey Student'); await sleep(150); q('.auth-card .btn-primary').click();
-      await waitFor(() => q('[data-onboarding-step="4"]')); q('.auth-card .btn-primary').click();
-      await waitFor(() => q('[data-onboarding-step="5"]')); q('.auth-card .btn-primary').click();
-      await waitFor(() => q('.home-greet'));
+      at = 'get-started'; (await waitFor(() => byLabel('Get Started'))).click();
+      at = 'step1'; await waitFor(() => q('[data-onboarding-step="1"]'));
+      at = 'student'; (await waitFor(() => byLabel('Student'))).click(); await sleep(150); q('.auth-card .btn-primary').click();
+      at = 'step2'; await waitFor(() => q('[data-onboarding-step="2"]'));
+      at = 'track'; setValue(await waitFor(() => q('#signup-track')), '10'); await sleep(200); q('.auth-card .btn-primary').click();
+      at = 'step3'; await waitFor(() => q('[data-onboarding-step="3"]'));
+      at = 'name'; setValue(await waitFor(() => q('#signup-name')), 'Journey Student'); await sleep(200); q('.auth-card .btn-primary').click();
+      at = 'step4'; await waitFor(() => q('[data-onboarding-step="4"]')); await sleep(150); q('.auth-card .btn-primary').click();
+      at = 'step5'; await waitFor(() => q('[data-onboarding-step="5"]')); await sleep(150); q('.auth-card .btn-primary').click();
+      at = 'home'; await waitFor(() => q('.home-greet'));
       return document.documentElement.dataset.ff || '';
     });
     await step('practice', async () => { await nav('/practice'); await waitFor(() => q('.q-prompt')); return 'question shown'; });
@@ -74,7 +76,9 @@ enum JourneySelfCheck {
           const submit = [...document.querySelectorAll('.editor-foot .btn-primary')].find(b => b.offsetParent && !b.disabled);
           if (submit) {
             submit.click();
-            await waitFor(() => ![...document.querySelectorAll('.editor-foot .btn-primary')].some(b => b.offsetParent && /Submit/i.test(b.textContent)));
+            // Marked: a first wrong answer shows a verdict and offers one more
+            // go; a resolved answer shows the redo chip and evaluation.
+            await waitFor(() => q('.verdict') || q('.redo-chip') || q('.your-answer'));
             return 'marked after ' + (i + 1) + ' question(s)';
           }
         }
@@ -83,8 +87,8 @@ enum JourneySelfCheck {
       throw new Error('no typed question found');
     });
     await step('feedback', async () => {
-      await waitFor(() => byLabel('Show solution') || q('.verdict') || q('[class*="verdict"]'));
-      return 'feedback visible';
+      const v = await waitFor(() => q('.verdict') || q('.your-answer'));
+      return (v.innerText || '').replace(/\\s+/g, ' ').slice(0, 80);
     });
     await step('nextQuestion', async () => {
       const before = q('.q-prompt')?.textContent || '';

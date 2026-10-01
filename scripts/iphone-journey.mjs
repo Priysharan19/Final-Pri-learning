@@ -27,6 +27,8 @@ const PACKAGE = join(ROOT, 'ios/PriLearning.swiftpm');
 const FIRST = ['launch', 'onboarding', 'practice', 'typedAttempt', 'feedback', 'nextQuestion', 'nativeInk', 'progress', 'persistenceMarker'];
 const RELAUNCH = ['relaunchProfile', 'relaunchMarker'];
 
+// `log show --start` takes LOCAL time; a UTC stamp would re-read hours of old runs.
+const localStamp = d => { const p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`; };
 const argOf = name => { const i = process.argv.indexOf(`--${name}`); return i > 0 ? process.argv[i + 1] : null; };
 const run = (cmd, args, opts = {}) =>
   execFileSync(cmd, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 64 * 1024 * 1024, ...opts });
@@ -62,7 +64,7 @@ function builtApp(derived) {
 }
 
 function launchAndRead(udid, bundleId, flag, phase) {
-  const started = new Date(Date.now() - 2000).toISOString().replace('T', ' ').slice(0, 19);
+  const started = localStamp(new Date(Date.now() - 2000));
   run('xcrun', ['simctl', 'launch', udid, bundleId, flag]);
   let lines = [];
   for (let i = 0; i < 75; i++) {
@@ -70,6 +72,9 @@ function launchAndRead(udid, bundleId, flag, phase) {
     const log = run('xcrun', ['simctl', 'spawn', udid, 'log', 'show', '--start', started,
       '--predicate', 'eventMessage CONTAINS "PRIJOURNEY"', '--style', 'compact']);
     lines = log.split('\n').filter(l => l.includes('PRIJOURNEY') && !l.includes("'log'")).map(l => l.slice(l.indexOf('PRIJOURNEY')));
+    // Only this launch: everything after its own "started <phase>" line.
+    const start = lines.lastIndexOf(`PRIJOURNEY started ${phase}`);
+    lines = start >= 0 ? lines.slice(start) : [];
     if (lines.some(l => l.startsWith(`PRIJOURNEY summary ${phase}`)) || lines.some(l => l.startsWith('PRIJOURNEY FAIL script'))) break;
   }
   try { run('xcrun', ['simctl', 'terminate', udid, bundleId]); } catch { /* already gone */ }

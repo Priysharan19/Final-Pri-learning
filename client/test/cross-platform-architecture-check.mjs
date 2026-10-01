@@ -241,6 +241,20 @@ const route = shellCode.indexOf('didReceive message: WKScriptMessage)');
 const guardAt = shellCode.indexOf('guard Coordinator.isTrustedSender(message, expected: shellWebView) else { return }', route);
 const firstRoute = shellCode.indexOf('message.name ==', route);
 ok(route > 0 && guardAt > route && guardAt < firstRoute, 'every bridge message passes the sender gate before it is routed');
+// CP-04: Apple Pencil is never required. Where no Pencil can exist (iPhone) the
+// native surface writes with a finger by default; iPad stays Pencil-first, and
+// the host tells the page so through capability facts, not OS identity.
+const surface = stripComments(read(`${IOS}/Ink/InkSurface.swift`));
+ok(/var fingerDrawingEnabled = UIDevice\.current\.userInterfaceIdiom != \.pad/.test(surface),
+  'native ink writes with a finger by default where no Apple Pencil can exist');
+const hostBridge = stripComments(read(`${IOS}/NativeHostBridge.swift`));
+ok(/"stylus": stylusCapable/.test(hostBridge) && /"fingerDefault": !stylusCapable/.test(hostBridge),
+  'the host reports stylus and finger-default ink as capability facts');
+ok(/\.landscapeRight\(\.when\(deviceFamilies: \[\.pad\]\)\)/.test(stripComments(pkg)) && /\.landscapeLeft\(\.when\(deviceFamilies: \[\.pad\]\)\)/.test(stripComments(pkg)),
+  'iPhone is portrait-only (landscape is iPad-only)');
+const inkAnswerSrc = read('client/src/ink/InkAnswer.jsx');
+ok(/useState\(\(\) => priNative\.ink\.facts\(\)\?\.fingerDefault === true\)/.test(inkAnswerSrc),
+  'the page mirrors the host finger-default fact');
 for (const copy of ['ios/PriLearning 2.swiftpm/WebShell.swift', 'ios/PriLearning 2.swiftpm/NativeHostBridge.swift', 'ios/PriLearning 2.swiftpm/Package.swift']) {
   if (existsSync(at(copy))) ok(read(copy) === read(copy.replace('PriLearning 2.swiftpm', 'PriLearning.swiftpm')),
     `${copy} matches the canonical package`);
