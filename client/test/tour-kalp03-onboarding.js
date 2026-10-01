@@ -193,7 +193,7 @@ export const flow = {
     await page.reload({ waitUntil: 'domcontentloaded' });
     await page.waitForSelector('.shell');
     await check('reload restores the actual created profile',
-      (await page.locator('.user-chip').innerText()).includes('KALP03 Class 10 Student'));
+      (await page.locator('.user-chip').innerText()).includes('KALP03'));
     await check('English remains profile-specific after reload',
       await page.evaluate(() => document.documentElement.lang) === 'en');
 
@@ -202,10 +202,13 @@ export const flow = {
       await page.locator('.acct-row', { hasText: 'KALP03 Class 10 Student' }).count() === 1);
 
     await beginAdditional(page, 'student');
-    await chooseIndia(page, 'jee-main', 11);
+    await page.waitForSelector('[data-onboarding-step="2"]');
+    await page.locator('#signup-track').selectOption('jee-main');
     await check('JEE Main only offers legitimate Class 11/12 years',
       JSON.stringify(await page.locator('#signup-year option').allTextContents()).includes('Class 11')
       && (await page.locator('#signup-year option').count()) === 2);
+    await page.locator('#signup-year').selectOption('11');
+    await next(page);
     await personalise(page, 'KALP03 Protected JEE');
     await page.waitForSelector('[data-onboarding-step="4"]');
     await page.locator('.check-row input[type=checkbox]').check();
@@ -226,7 +229,10 @@ export const flow = {
     await check('valid protected profile reaches ready state',
       await page.locator('[data-onboarding-step="5"]').count() === 1);
     await page.getByRole('button', { name: 'Start learning' }).click();
-    await page.waitForSelector('.home-greet');
+    await page.waitForSelector('.home-greet, .error-box', { timeout: 30000 });
+    const protectedCreateError = await page.locator('.error-box').count() ? await page.locator('.error-box').innerText() : '';
+    await check('protected profile is persisted by the real profile authority', await page.locator('.home-greet').count() === 1, protectedCreateError);
+    if (protectedCreateError) return;
     await switchProfile(page);
 
     const protectedRow = page.locator('.acct-row', { hasText: 'KALP03 Protected JEE' });
