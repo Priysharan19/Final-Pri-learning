@@ -60,14 +60,31 @@ export function validateRequestBody(body) {
 export function createHandwritingRouter(db, {
   transcribe = transcribeHandwriting,
   probe = probeHandwritingProvider,
+  releaseIdentity = serverReleaseIdentity,
   env = process.env
 } = {}) {
   const router = Router();
 
+  // One provider probe at a time per router. Concurrent /status requests share
+  // the in-flight promise rather than each spending a probe against the
+  // provider with the server's key.
+  let inFlightProbe = null;
+  const sharedProbe = () => {
+    if (!inFlightProbe) {
+      inFlightProbe = Promise.resolve()
+        .then(() => probe({ env }))
+        .finally(() => { inFlightProbe = null; });
+    }
+    return inFlightProbe;
+  };
+
   // This is an operational readiness endpoint, not a credential-presence check.
   // A student must never be offered cloud handwriting when the key exists but
   // the model, endpoint, budget guard or provider is unusable.
-  router.get('/status', requireSession(db), async (req, res) => {
+  router.get('/status',
+    requireSession(db),
+    rateLimit(db, 'handwriting-status', { limit: 120, windowMs: 10 * 60 * 1000 }),
+    async (req, res) => {
     const staticStatus = providerStaticStatus(env);
     const missingBudget = spendCeilingMissing(env);
     let providerStatus = {
@@ -85,7 +102,7 @@ export function createHandwritingRouter(db, {
 
     if (staticStatus.configured && staticStatus.configValid && missingBudget.length === 0) {
       try {
-        providerStatus = await probe({ env });
+        providerStatus = await sharedProbe();
       } catch {
         providerStatus = {
           ...providerStatus,
@@ -107,15 +124,14 @@ export function createHandwritingRouter(db, {
         ? (degraded ? 'degraded' : 'ready')
         : (degraded ? 'degraded' : 'unavailable');
 
+    // The same resolver /v1/health uses, so the two can never disagree (a raw
+    // PRI_RELEASE_SHA may be a stale manual-candidate value that the resolver
+    // correctly outranks with Railway's own Git SHA).
     let releaseSha = null;
-    const explicitSha = String(env.PRI_RELEASE_SHA || '').trim();
-    if (/^[0-9a-f]{40}$/.test(explicitSha)) releaseSha = explicitSha;
-    else {
-      try {
-        const candidate = serverReleaseIdentity()?.releaseSha;
-        if (/^[0-9a-f]{40}$/.test(String(candidate || ''))) releaseSha = candidate;
-      } catch { /* diagnostics must never make readiness itself fail */ }
-    }
+    try {
+      const candidate = releaseIdentity()?.releaseSha;
+      if (/^[0-9a-f]{40}$/.test(String(candidate || ''))) releaseSha = candidate;
+    } catch { /* diagnostics must never make readiness itself fail */ }
 
     res.set('Cache-Control', 'no-store');
     res.json({
@@ -133,7 +149,7 @@ export function createHandwritingRouter(db, {
       lastLatencyMs: providerStatus.latencyMs ?? handwritingProviderDiagnostics().lastLatencyMs ?? null,
       releaseSha
     });
-  });
+    });
 
   router.post('/transcribe',
     requireSession(db),
@@ -156,7 +172,12 @@ export function createHandwritingRouter(db, {
       if (overBudget) return refusePaidCall(res, overBudget);
 
       try {
-        const result = await transcribe(req.body.image, { env });
+        // The fallback model is a second paid call and is counted as one, before
+        // it is sent, so a request can never spend past the ceiling.
+        const result = await transcribe(req.body.image, {
+          env,
+          authorizeFallback: () => consumePaidCall(db, { env })
+        });
         res.json({
           transcription: {
             engine: result.engine,
@@ -171,6 +192,7 @@ export function createHandwritingRouter(db, {
           }
         });
       } catch (error) {
+        if (error?.paidCallVerdict) return refusePaidCall(res, error.paidCallVerdict);
         if (error instanceof HandwritingProviderError) {
           return res.status(error.status).json({ error: { code: error.code, message: error.message, retryable: !!error.retryable } });
         }

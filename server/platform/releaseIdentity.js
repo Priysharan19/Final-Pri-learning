@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { assertReleaseIdentity, resolveReleaseIdentity } from '../../release/release-identity.mjs';
+import { applyDeploymentPrecedence, assertReleaseIdentity, resolveReleaseIdentity } from '../../release/release-identity.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const BUILT_CLIENT_RELEASE = join(HERE, '..', '..', 'client', 'dist', 'release.json');
@@ -14,29 +14,22 @@ function readBuiltClientRelease() {
   }
 }
 
-export function serverReleaseIdentity() {
-  const production = process.env.NODE_ENV === 'production';
-  if (!production) return resolveReleaseIdentity({ production: false });
+export function serverReleaseIdentity({ env: sourceEnv = process.env, readBuilt = readBuiltClientRelease } = {}) {
+  const production = sourceEnv.NODE_ENV === 'production';
+  if (!production) return resolveReleaseIdentity({ production: false, env: sourceEnv });
 
-  const railwayGitSha = String(process.env.RAILWAY_GIT_COMMIT_SHA || '').trim();
-  const railwayRuntime = Boolean(process.env.RAILWAY_DEPLOYMENT_ID);
-  const env = { ...process.env };
-
-  // A normal Railway GitHub deployment is authoritative to Railway's own
-  // exact commit SHA. This deliberately outranks any temporary manual-candidate
-  // PRI_RELEASE_SHA/PRI_BUILD_TIMESTAMP values left on the service.
-  if (railwayGitSha) {
-    env.PRI_RELEASE_SHA = railwayGitSha;
-    delete env.PRI_BUILD_TIMESTAMP;
-    delete env.SOURCE_DATE_EPOCH;
-  }
+  const railwayRuntime = Boolean(sourceEnv.RAILWAY_DEPLOYMENT_ID);
+  // The same precedence the client build applied (release/release-identity.mjs):
+  // Railway's own Git SHA outranks a stale manual-candidate PRI_RELEASE_SHA, and
+  // a timestamp that belonged to that stale SHA is dropped with it.
+  const env = applyDeploymentPrecedence(sourceEnv);
 
   let identity;
   try {
     identity = resolveReleaseIdentity({ production: true, env });
   } catch (error) {
     if (!String(error?.message || '').includes('Production build timestamp is missing')) throw error;
-    const built = readBuiltClientRelease();
+    const built = readBuilt();
     if (!built) throw new Error('Production build timestamp is missing and built client release identity is unavailable');
     assertReleaseIdentity(built, { production: true });
     env.PRI_BUILD_TIMESTAMP = built.buildTimestamp;
@@ -47,7 +40,7 @@ export function serverReleaseIdentity() {
   // production client build, for both Git-triggered and explicit exact-commit
   // candidate deployments.
   if (railwayRuntime) {
-    const built = readBuiltClientRelease();
+    const built = readBuilt();
     if (!built) throw new Error('Railway runtime is missing built client release identity');
     assertReleaseIdentity(built, { production: true });
     for (const key of ['repository', 'branch', 'productVersion', 'curriculumVersion', 'releaseSha', 'buildTimestamp']) {

@@ -1,8 +1,15 @@
 FROM node:24-bookworm-slim AS client-build
+# Every variable release/release-identity.mjs (DEPLOYMENT_IDENTITY_ENV) reads
+# must be declared here: Docker and Railway expose a build-time variable only
+# to a stage that declares it as an ARG. Without RAILWAY_GIT_COMMIT_SHA the
+# client would bake a different SHA from the one the server reports at run
+# time, and /v1/health would fail closed on the mismatch.
+ARG RAILWAY_GIT_COMMIT_SHA
 ARG PRI_RELEASE_SHA
+ARG GITHUB_SHA
+ARG VERCEL_GIT_COMMIT_SHA
 ARG PRI_BUILD_TIMESTAMP
-ENV PRI_RELEASE_SHA=${PRI_RELEASE_SHA} \
-    PRI_BUILD_TIMESTAMP=${PRI_BUILD_TIMESTAMP}
+ARG SOURCE_DATE_EPOCH
 WORKDIR /app
 COPY client/package.json client/package-lock.json ./client/
 RUN npm ci --prefix client
@@ -12,11 +19,9 @@ COPY release ./release
 # Legal.jsx renders docs/legal/*.md), so they are part of the build context.
 # Without them the image's client build fails with "Module not found".
 COPY docs/legal ./docs/legal
-# GitHub CI supplies PRI_RELEASE_SHA/PRI_BUILD_TIMESTAMP explicitly. Railway
-# supplies RAILWAY_GIT_COMMIT_SHA automatically; when no explicit timestamp is
-# supplied, stamp this exact image build once and bake that same identity into
-# client/dist/release.json for the server to verify at runtime.
-RUN set -eu;     release_sha="${RAILWAY_GIT_COMMIT_SHA:-${PRI_RELEASE_SHA:-}}";     if [ -n "${RAILWAY_GIT_COMMIT_SHA:-}" ]; then       build_timestamp="$(date -u +%Y-%m-%dT%H:%M:%SZ)";     else       build_timestamp="${PRI_BUILD_TIMESTAMP:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}";     fi;     PRI_RELEASE_SHA="$release_sha" PRI_BUILD_TIMESTAMP="$build_timestamp" npm run build --prefix client
+# Precedence (RAILWAY_GIT_COMMIT_SHA > PRI_RELEASE_SHA) and build stamping are
+# applied in one place, shared with the server's run-time resolver.
+RUN node release/docker-build-identity.mjs
 
 FROM node:24-bookworm-slim AS server-deps
 WORKDIR /app

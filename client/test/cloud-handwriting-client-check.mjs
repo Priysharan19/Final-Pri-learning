@@ -14,7 +14,7 @@
 // The canvas is a recording stub, so this runs in bare Node with no browser.
 // ─────────────────────────────────────────────────────────────────────────────
 import { inkBounds, rasterScale, paintInk, rasterizeInk, MAX_IMAGE_BYTES } from '../src/ink/cloudRaster.js';
-import { cloudHandwritingReadiness, cloudReadingEnabled, handwritingDiagnostics, readWithCloud, recordLocalHandwritingDiagnostics, shouldSupersede, toReading } from '../src/ink/cloudReader.js';
+import { UNAVAILABLE_READINESS_TTL_MS, cloudHandwritingReadiness, cloudReadingEnabled, handwritingDiagnostics, readWithCloud, recordLocalHandwritingDiagnostics, shouldSupersede, toReading } from '../src/ink/cloudReader.js';
 
 let pass = 0;
 const failures = [];
@@ -140,6 +140,33 @@ const offlineReady = await cloudHandwritingReadiness({
 });
 ok(offlineReady.usable === false && offlineReady.lastFailureCode === 'HANDWRITING_STATUS_UNREACHABLE',
   'offline status failure is coded and fails closed');
+
+// An "unavailable" answer must not be reused after the deployment recovers.
+// Times are far in the future so no earlier cached answer can interfere.
+let recoveringCalls = 0;
+const recoveringTransport = {
+  handwritingStatus: async () => {
+    recoveringCalls += 1;
+    return recoveringCalls === 1
+      ? { available: false, configured: true, usable: false, degraded: true, state: 'degraded', lastFailureCode: 'HANDWRITING_PROVIDER_5XX' }
+      : { available: true, configured: true, usable: true, degraded: false, state: 'ready', lastFailureCode: null, releaseSha: READY_SHA };
+  }
+};
+const T0 = 9_000_000_000_000;
+const firstOutage = await cloudHandwritingReadiness({ user: { cloudHandwriting: true }, transport: recoveringTransport, available: there, now: T0 });
+ok(firstOutage.usable === false, 'readiness reports the outage');
+await cloudHandwritingReadiness({ user: { cloudHandwriting: true }, transport: recoveringTransport, available: there, now: T0 + 1_000 });
+eq(recoveringCalls, 1, 'a just-seen outage is briefly cached rather than re-asked on every stroke');
+ok(UNAVAILABLE_READINESS_TTL_MS <= 15_000, `a non-ready answer is short-lived (${UNAVAILABLE_READINESS_TTL_MS} ms)`);
+const recovered = await cloudHandwritingReadiness({ user: { cloudHandwriting: true }, transport: recoveringTransport, available: there, now: T0 + UNAVAILABLE_READINESS_TTL_MS + 1 });
+ok(recovered.usable === true && recoveringCalls === 2, 'once the short TTL passes readiness is re-checked and recovery is seen');
+await cloudHandwritingReadiness({ user: { cloudHandwriting: true }, transport: recoveringTransport, available: there, now: T0 + UNAVAILABLE_READINESS_TTL_MS + 30_000 });
+eq(recoveringCalls, 2, 'a ready answer keeps its normal cache lifetime');
+let throwingCalls = 0;
+const throwingTransport = { handwritingStatus: async () => { throwingCalls += 1; throw new TypeError('offline'); } };
+await cloudHandwritingReadiness({ user: { cloudHandwriting: true }, transport: throwingTransport, available: there, now: T0 * 2 });
+await cloudHandwritingReadiness({ user: { cloudHandwriting: true }, transport: throwingTransport, available: there, now: T0 * 2 + 1 });
+eq(throwingCalls, 2, 'a status request that failed outright is never cached');
 
 recordLocalHandwritingDiagnostics({ nativeAvailable: true, engine: 'pri-foundation', releaseSha: READY_SHA });
 const localDiag = handwritingDiagnostics();

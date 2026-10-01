@@ -132,6 +132,7 @@ export function providerStaticStatus(env = process.env) {
       const raw = Number(env.PRI_HANDWRITING_TIMEOUT_MS);
       if (!Number.isFinite(raw) || raw < 2_000 || raw > 60_000) problems.push('timeout-invalid');
     }
+    if (String(env.PRI_HANDWRITING_PROBE_ENDPOINT || '').trim() && !probeOverrideUrl(env, config)) problems.push('probe-endpoint-invalid');
     if (String(env.PRI_HANDWRITING_CONFIDENCE_FLOOR || '').trim()) {
       const raw = Number(env.PRI_HANDWRITING_CONFIDENCE_FLOOR);
       if (!Number.isFinite(raw) || raw < 0.5 || raw > 0.99) problems.push('confidence-floor-invalid');
@@ -151,14 +152,29 @@ export function providerStaticStatus(env = process.env) {
   });
 }
 
-function modelProbeUrl(env, config, model) {
+/**
+ * The probe sends the server's bearer key, so an override may only point at a
+ * host that already receives it: HTTPS, and either the configured transcription
+ * endpoint's host or api.openai.com. Anything else is refused, never probed.
+ */
+function probeOverrideUrl(env, config) {
   const override = String(env.PRI_HANDWRITING_PROBE_ENDPOINT || '').trim();
-  if (override) {
-    try {
-      const url = new URL(override);
-      url.searchParams.set('model', model);
-      return url.toString();
-    } catch { return null; }
+  if (!override) return null;
+  let url;
+  try { url = new URL(override); } catch { return null; }
+  if (url.protocol !== 'https:' || url.username || url.password) return null;
+  const configured = safeEndpointParts(config.endpoint).url;
+  const allowedHosts = new Set(['api.openai.com']);
+  if (configured?.protocol === 'https:') allowedHosts.add(configured.host);
+  return allowedHosts.has(url.host) ? url : null;
+}
+
+function modelProbeUrl(env, config, model) {
+  if (String(env.PRI_HANDWRITING_PROBE_ENDPOINT || '').trim()) {
+    const url = probeOverrideUrl(env, config);
+    if (!url) return null;
+    url.searchParams.set('model', model);
+    return url.toString();
   }
   const parts = safeEndpointParts(config.endpoint);
   if (!parts.url || parts.url.host !== 'api.openai.com' || parts.url.pathname !== '/v1/responses') return null;
@@ -407,7 +423,11 @@ async function callModel({ model, imageDataUrl, config, fetchImpl, signal }) {
 export async function transcribeHandwriting(imageDataUrl, {
   env = process.env,
   fetchImpl = globalThis.fetch,
-  signal = null
+  signal = null,
+  // Called before the fallback model is sent. Returns null to allow it, or a
+  // spend-ceiling verdict to refuse it; a refusal is thrown with the verdict so
+  // the route answers with the coded budget error and nothing more is spent.
+  authorizeFallback = () => null
 } = {}) {
   const config = providerConfig(env);
   const staticStatus = providerStaticStatus(env);
@@ -433,6 +453,21 @@ export async function transcribeHandwriting(imageDataUrl, {
         lastFallbackFailureCode: null
       });
       return { ...first, escalated: false, fallbackAttempted: false, fallbackFailureCode: null, latencyMs: Date.now() - started };
+    }
+
+    const verdict = await authorizeFallback();
+    if (verdict) {
+      recordProviderDiagnostics({
+        lastFailureCode: verdict.code || 'PAID_CAPACITY_REACHED',
+        lastLatencyMs: Date.now() - started,
+        lastFallbackAttempted: false,
+        lastFallbackFailureCode: verdict.code || 'PAID_CAPACITY_REACHED'
+      });
+      const refusal = new HandwritingProviderError(verdict.message || 'Server reading has reached its limit.', {
+        code: verdict.code || 'PAID_CAPACITY_REACHED', status: verdict.status || 503, retryable: !!verdict.retryable
+      });
+      refusal.paidCallVerdict = verdict;
+      throw refusal;
     }
 
     try {

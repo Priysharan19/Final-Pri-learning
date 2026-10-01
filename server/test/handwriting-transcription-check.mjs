@@ -26,6 +26,7 @@ import {
   validateImage, HandwritingProviderError
 } from '../platform/handwritingProvider.js';
 import { SESSION_COOKIE, sha256 } from '../platform/security.js';
+import { serverReleaseIdentity } from '../platform/releaseIdentity.js';
 
 let pass = 0;
 const failures = [];
@@ -245,6 +246,67 @@ ok(fallbackFailure.fallbackAttempted === true
   && fallbackFailure.escalated === false,
   'a failed fallback is preserved in safe diagnostics while the primary low-confidence read survives');
 
+// ── 8b · The fallback model is its own paid call ────────────────────────────
+let budgetedFetches = 0;
+const alwaysUnsure = async (_url, init) => {
+  budgetedFetches += 1;
+  return {
+    ok: true, status: 200,
+    json: async () => ({ output_text: JSON.stringify({ lines: [{ text: 'x = ?', confidence: 0.4 }], confidence: 0.4, needs_confirmation: true }) })
+  };
+};
+let fallbackRefused = null;
+let authorizeCalls = 0;
+try {
+  await transcribeHandwriting(PNG, {
+    env,
+    fetchImpl: alwaysUnsure,
+    authorizeFallback: () => { authorizeCalls += 1; return { status: 503, code: 'PAID_CAPACITY_REACHED', message: 'limit', retryable: true, resetAt: Date.now() + 1000 }; }
+  });
+} catch (e) { fallbackRefused = e; }
+eq([budgetedFetches, authorizeCalls], [1, 1], 'a refused fallback is never sent: one provider call, one budget check');
+ok(fallbackRefused?.code === 'PAID_CAPACITY_REACHED' && fallbackRefused?.paidCallVerdict?.code === 'PAID_CAPACITY_REACHED',
+  'and the refusal carries the coded budget verdict');
+budgetedFetches = 0;
+authorizeCalls = 0;
+await transcribeHandwriting(PNG, { env, fetchImpl: alwaysUnsure, authorizeFallback: () => { authorizeCalls += 1; return null; } });
+eq([budgetedFetches, authorizeCalls], [2, 1], 'an authorised fallback is counted once and sent once');
+budgetedFetches = 0;
+authorizeCalls = 0;
+await transcribeHandwriting(PNG, { env, fetchImpl: recordingFetch, authorizeFallback: () => { authorizeCalls += 1; return null; } });
+eq(authorizeCalls, 0, 'a confident first read never asks the budget for a fallback');
+
+// ── 8c · The probe override can never carry the key to a foreign host ───────
+for (const [override, label] of [
+  ['http://api.openai.com/v1/models', 'plain HTTP'],
+  ['https://attacker.example/v1/models', 'a foreign host'],
+  ['https://user:pw@api.openai.com/v1/models', 'embedded credentials'],
+  ['not a url', 'a malformed URL']
+]) {
+  const st = providerStaticStatus({ ...env, PRI_HANDWRITING_PROBE_ENDPOINT: override });
+  ok(!st.configValid && st.problems.includes('probe-endpoint-invalid'), `a probe override to ${label} is invalid configuration`);
+  const urls = [];
+  const probed = await probeHandwritingProvider({
+    env: { ...env, PRI_HANDWRITING_PROBE_ENDPOINT: override },
+    cache: false,
+    fetchImpl: async (url) => { urls.push(url); return { ok: true, status: 200 }; }
+  });
+  ok(urls.length === 0 && probed.usable === false, `and no request (and no key) is sent to ${label}`);
+}
+const customEnv = { ...env, PRI_HANDWRITING_ENDPOINT: 'https://vision.example/v1/read' };
+const sameHostProbeUrls = [];
+const sameHost = await probeHandwritingProvider({
+  env: { ...customEnv, PRI_HANDWRITING_PROBE_ENDPOINT: 'https://vision.example/v1/health' },
+  cache: false,
+  fetchImpl: async (url) => { sameHostProbeUrls.push(url); return { ok: true, status: 200 }; }
+});
+ok(sameHost.usable === true && sameHostProbeUrls.every(u => new URL(u).host === 'vision.example'),
+  'an HTTPS probe override on the configured provider host is allowed');
+const openAiProbe = providerStaticStatus({ ...customEnv, PRI_HANDWRITING_PROBE_ENDPOINT: 'https://api.openai.com/v1/models' });
+ok(openAiProbe.configValid, 'an HTTPS probe override on api.openai.com is allowed');
+ok(!providerStaticStatus({ ...customEnv, PRI_HANDWRITING_PROBE_ENDPOINT: 'https://other.example/v1/health' }).configValid,
+  'a probe override on any other host is refused even with a custom provider');
+
 // ── 9 · The route: signed in, verified, rate limited ─────────────────────────
 const db = createPlatformDb(':memory:');
 const now = Date.now();
@@ -252,7 +314,11 @@ db.prepare('INSERT INTO accounts(id,email,name,role,created_at,updated_at,email_
   .run('acct-verified', 'v@example.test', 'Verified', 'student', now, now, now);
 db.prepare('INSERT INTO accounts(id,email,name,role,created_at,updated_at) VALUES (?,?,?,?,?,?)')
   .run('acct-unverified', 'u@example.test', 'Unverified', 'student', now, now);
-for (const id of ['acct-verified', 'acct-unverified']) {
+for (const id of ['acct-status-limit', 'acct-status-misc']) {
+  db.prepare('INSERT INTO accounts(id,email,name,role,created_at,updated_at,email_verified_at) VALUES (?,?,?,?,?,?,?)')
+    .run(id, `${id}@example.test`, id, 'student', now, now, now);
+}
+for (const id of ['acct-verified', 'acct-unverified', 'acct-status-limit', 'acct-status-misc']) {
   db.prepare(`INSERT INTO account_sessions(id,account_id,token_hash,device_id,user_agent_hash,created_at,last_seen_at,expires_at)
     VALUES (?,?,?,?,?,?,?,?)`).run(`ses-${id}`, id, sha256(`raw-${id}`), 'ipad', null, now, now, now + 86400000);
 }
@@ -273,7 +339,53 @@ app.use('/handwriting-unbudgeted', createHandwritingRouter(db, {
   probe: async () => { noBudgetProbeCalls += 1; return { ...providerStaticStatus(noBudgetEnv), usable: true }; },
   env: noBudgetEnv
 }));
+const staleShaEnv = { ...env, PRI_RELEASE_SHA: 'f'.repeat(40) };
+app.use('/handwriting-stale-sha', createHandwritingRouter(db, {
+  probe: async () => ({ ...providerStaticStatus(env), usable: true, degraded: false, failureCode: null, latencyMs: 7, fallbackUsable: true }),
+  env: staleShaEnv
+}));
+app.use('/handwriting-injected-sha', createHandwritingRouter(db, {
+  probe: async () => ({ ...providerStaticStatus(env), usable: true, degraded: false, failureCode: null, latencyMs: 7, fallbackUsable: true }),
+  releaseIdentity: () => ({ releaseSha: '2'.repeat(40) }),
+  env: staleShaEnv
+}));
+app.use('/handwriting-probe-throws', createHandwritingRouter(db, {
+  probe: async () => { throw new Error('provider exploded'); },
+  env
+}));
+let slowProbeCalls = 0;
+app.use('/handwriting-slow-probe', createHandwritingRouter(db, {
+  probe: async () => {
+    slowProbeCalls += 1;
+    await new Promise(resolve => setTimeout(resolve, 150));
+    return { ...providerStaticStatus(env), usable: true, degraded: false, failureCode: null, latencyMs: 150, fallbackUsable: true };
+  },
+  env
+}));
+
+// A separate deployment database for the spend ceiling, so the fallback's own
+// paid call is counted against a ceiling nothing else has touched.
+const budgetDb = createPlatformDb(':memory:');
+budgetDb.prepare('INSERT INTO accounts(id,email,name,role,created_at,updated_at,email_verified_at) VALUES (?,?,?,?,?,?,?)')
+  .run('acct-budget', 'b@example.test', 'Budget', 'student', now, now, now);
+budgetDb.prepare(`INSERT INTO account_sessions(id,account_id,token_hash,device_id,user_agent_hash,created_at,last_seen_at,expires_at)
+  VALUES (?,?,?,?,?,?,?,?)`).run('ses-acct-budget', 'acct-budget', sha256('raw-acct-budget'), 'ipad', null, now, now, now + 86400000);
+const ceilingEnv = { ...env, PRI_PAID_CALLS_PER_HOUR: '3', PRI_PAID_CALLS_PER_DAY: '100' };
+let ceilingFetches = 0;
+const budgetApp = express();
+budgetApp.use(express.json({ limit: '2mb' }));
+budgetApp.use(cookieParser());
+budgetApp.use('/handwriting', createHandwritingRouter(budgetDb, {
+  transcribe: (image, options) => transcribeHandwriting(image, {
+    ...options,
+    fetchImpl: async (...args) => { ceilingFetches += 1; return alwaysUnsure(...args); }
+  }),
+  env: ceilingEnv
+}));
+
 const server = await new Promise(resolve => { const s = app.listen(0, '127.0.0.1', () => resolve(s)); });
+const budgetServer = await new Promise(resolve => { const s = budgetApp.listen(0, '127.0.0.1', () => resolve(s)); });
+const budgetBase = `http://127.0.0.1:${budgetServer.address().port}`;
 const base = `http://127.0.0.1:${server.address().port}`;
 const call = async (who, body) => {
   const res = await fetch(`${base}/handwriting/transcribe`, {
@@ -306,7 +418,53 @@ try {
   const statusBody = await status.json();
   ok(statusBody.available === true && statusBody.usable === true && statusBody.state === 'ready' && statusBody.model === 'test-primary',
     'status says ready only when the configured provider is actually usable');
-  eq(statusBody.releaseSha, env.PRI_RELEASE_SHA, 'status identifies the release serving the handwriting path');
+  eq(statusBody.releaseSha, serverReleaseIdentity().releaseSha, 'status identifies the release with the same resolver /v1/health uses');
+  ok(status.headers.get('ratelimit-remaining') !== null, 'status is rate limited per account');
+
+  const statusAs = (path, who = 'acct-status-misc') => fetch(`${base}${path}/status`, { headers: { cookie: `${SESSION_COOKIE}=raw-${who}` } });
+  const staleBody = await (await statusAs('/handwriting-stale-sha')).json();
+  ok(staleBody.releaseSha !== 'f'.repeat(40) && staleBody.releaseSha === serverReleaseIdentity().releaseSha,
+    'a stale PRI_RELEASE_SHA in the route env never outranks the /v1/health identity');
+  const injectedBody = await (await statusAs('/handwriting-injected-sha')).json();
+  eq(injectedBody.releaseSha, '2'.repeat(40), 'status reports exactly what the release resolver reports, not the raw env value');
+
+  const throwsBody = await (await statusAs('/handwriting-probe-throws')).json();
+  ok(throwsBody.usable === false && throwsBody.available === false && throwsBody.state === 'degraded'
+    && throwsBody.lastFailureCode === 'HANDWRITING_PROVIDER_PROBE_FAILED',
+    'a probe that throws is reported as PROBE_FAILED, never as ready');
+
+  const concurrent = await Promise.all(Array.from({ length: 6 }, () => statusAs('/handwriting-slow-probe').then(r => r.json())));
+  eq(slowProbeCalls, 1, 'concurrent status requests share one in-flight provider probe');
+  ok(concurrent.every(body => body.state === 'ready'), 'and every caller gets that probe result');
+  await statusAs('/handwriting-slow-probe');
+  eq(slowProbeCalls, 2, 'once the probe settles, the next status request probes again (the provider cache governs reuse)');
+
+  let statusLimited = null;
+  for (let i = 0; i < 125; i += 1) {
+    const res = await statusAs('/handwriting', 'acct-status-limit');
+    if (res.status === 429) { statusLimited = { i, body: await res.json() }; break; }
+    await res.arrayBuffer();
+  }
+  ok(statusLimited?.body?.error?.code === 'RATE_LIMITED' && statusLimited.i === 120,
+    `status refuses past its per-account limit (${statusLimited?.i})`);
+
+  const budgetCall = async () => {
+    const res = await fetch(`${budgetBase}/handwriting/transcribe`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie: `${SESSION_COOKIE}=raw-acct-budget` },
+      body: JSON.stringify({ image: PNG })
+    });
+    return { status: res.status, json: await res.json().catch(() => null) };
+  };
+  const firstBudgeted = await budgetCall();
+  ok(firstBudgeted.status === 200 && firstBudgeted.json.transcription.fallbackAttempted === true && ceilingFetches === 2,
+    'with headroom, primary and fallback are both sent and both counted');
+  const secondBudgeted = await budgetCall();
+  eq([secondBudgeted.status, secondBudgeted.json?.error?.code, ceilingFetches], [503, 'PAID_CAPACITY_REACHED', 3],
+    'with one call left, the primary is sent and the fallback is refused with the coded budget error');
+  const thirdBudgeted = await budgetCall();
+  eq([thirdBudgeted.status, thirdBudgeted.json?.error?.code, ceilingFetches], [503, 'PAID_CAPACITY_REACHED', 3],
+    'with the ceiling spent, nothing is sent: spend never exceeds the ceiling');
   ok(statusBody.configured === true && statusBody.fallbackUsable === true && statusBody.lastLatencyMs === 7,
     'status exposes only safe operational readiness diagnostics');
 
@@ -327,6 +485,7 @@ try {
   ok(limited === 1, 'the route is rate limited per account');
 } finally {
   server.close();
+  budgetServer.close();
 }
 
 console.log(failures.length

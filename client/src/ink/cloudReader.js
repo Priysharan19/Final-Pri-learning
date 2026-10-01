@@ -27,6 +27,10 @@ import { preparePhoto } from './photoRaster.js';
 export const CLOUD_ENGINE_PREFIX = 'cloud';
 
 const READINESS_TTL_MS = 60_000;
+// A non-ready answer is remembered only briefly: an outage, a missing ceiling
+// or a 429 must not keep cloud reading off for a full minute (or longer) after
+// the deployment has recovered. Errors are never cached at all.
+export const UNAVAILABLE_READINESS_TTL_MS = 15_000;
 let readinessCache = { expiresAt: 0, value: null };
 const diagnosticState = {
   localNativeAvailable: null,
@@ -142,7 +146,10 @@ export async function cloudHandwritingReadiness({
       releaseSha: safeReleaseSha(status?.releaseSha)
     });
     recordCloudDiagnostics({ available: value.usable, latencyMs: value.lastLatencyMs, failureCode: value.lastFailureCode, releaseSha: value.releaseSha });
-    if (cache) readinessCache = { expiresAt: now + READINESS_TTL_MS, value };
+    if (cache) {
+      const ttl = value.usable && value.state === 'ready' ? READINESS_TTL_MS : UNAVAILABLE_READINESS_TTL_MS;
+      readinessCache = { expiresAt: now + ttl, value };
+    }
     return value;
   } catch (error) {
     const code = error?.name === 'AbortError'
