@@ -986,10 +986,10 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         <div className="ws-tools no-print">
           {!isMcq && (
             <div className="mode-tabs seg" role="group" aria-label={t('verdict.answerModes')}>
-              <button type="button" className={`mode-tab ${mode === 'write' ? 'on' : ''}`} aria-pressed={mode === 'write'} title={t('verdict.modeWriteTitle')}
-                aria-label={t('verdict.modeWriteLabel')} onClick={() => flipMode('write')}><Icon name="pen" size={16} />{t('verdict.modeWrite')}</button>
               <button type="button" className={`mode-tab ${mode === 'type' ? 'on' : ''}`} aria-pressed={mode === 'type'} title={t('verdict.modeTypeTitle')}
                 aria-label={t('verdict.modeTypeLabel')} onClick={() => flipMode('type')}><Icon name="type" size={16} />{t('verdict.modeType')}</button>
+              <button type="button" className={`mode-tab ${mode === 'write' ? 'on' : ''}`} aria-pressed={mode === 'write'} title={t('verdict.modeWriteTitle')}
+                aria-label={t('verdict.modeWriteLabel')} onClick={() => flipMode('write')}><Icon name="pen" size={16} />{t('verdict.modeWrite')}</button>
               <button type="button" className={`mode-tab ${mode === 'photo' ? 'on' : ''}`} aria-pressed={mode === 'photo'} title={t('verdict.modePhotoTitle')}
                 aria-label={t('verdict.modePhotoLabel')} onClick={() => flipMode('photo')}><Icon name="photo" size={16} />{t('verdict.modePhoto')}</button>
             </div>

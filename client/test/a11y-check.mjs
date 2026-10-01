@@ -689,7 +689,7 @@ async function run() {
     });
 
     await step('practice · scribble pad', '/practice', async () => {
-      await click(page, '.q-rail-btn', { text: '✎' });
+      await click(page, '.q-rail-btn[aria-label="Scratch"]');
     });
 
     await step('practice · handwriting mode', '/practice', async () => {

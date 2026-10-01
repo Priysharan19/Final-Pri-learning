@@ -112,8 +112,8 @@
   --m1: #c9d9d6;
   --m2: #9bbfba;
   --m3: #6aa39c;
-  --m4: #33857d;
-  --m5: #0b6e69;
+  --m4: #2a7a72;
+  --m5: #084c49;
   --series-1: var(--accent);
   --plot-grid: var(--grid);
   --plot-axis: var(--axis);
@@ -197,7 +197,7 @@
   --m2: #2f6660;
   --m3: #3e8a81;
   --m4: #4fa59b;
-  --m5: #5db8ad;
+  --m5: #8fd0c7;
   --grid: rgba(237, 235, 228, 0.07);
   --axis: rgba(237, 235, 228, 0.24);
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
