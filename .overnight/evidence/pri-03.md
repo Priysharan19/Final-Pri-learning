@@ -127,6 +127,22 @@
 - Secret scans PASS for tracked source, client/dist, both generated native Web resources, and workflow files.
 - No provider credential or secret-like `sk-` value is present in client/native artifacts; only server-side configuration owns the credential boundary.
 
+## Checkpoint 5 — production / Railway
+- Railway project `profound-spontaneity`, service `Final-Pri-learning`, environment `production` re-verified.
+- Service source still points to `Priysharan19/Final-Pri-learning` branch `main`; live main remains `dd5a1da68b971c797845eb6ed28dd9ae72221160`.
+- Provider credential remains absent. `PRI_PAID_CALLS_PER_HOUR` and `PRI_PAID_CALLS_PER_DAY` also remain absent; no values were invented.
+- Added only architecture-established non-secret variables: endpoint `https://api.openai.com/v1/responses`, primary model `gpt-5.6-terra`, fallback model `gpt-5.6-sol`, timeout `20000`, confidence floor `0.82`.
+- Historic active deployment failure was diagnosed from Railway build logs: the image build could not resolve `docs/legal/*.md` during the client build. Current main already contains the repository-side Dockerfile repair (`COPY docs/legal ./docs/legal`).
+- The existing Railway GitHub service has not created a deployment from current main; the safe variable update also did not produce a new deployment. Railway's available redeploy action explicitly reuses an existing commit, so it was not used to risk restoring stale production code.
+- Public production probes currently return HTTP 404 `Application not found` for both `/v1/health` and `/v1/handwriting/status`.
+- Result: `PROVIDER_CREDENTIAL_BLOCKED_EXTERNAL`; paid ceilings require owner budget values; current-production deployment activation is `BLOCKED_EXTERNAL` after diagnosis because the connected service is not deploying latest GitHub main and the available safe connector action cannot deploy a specified current commit without creating/replacing a service.
+
+## Checkpoint 6 — physical iPad
+- CoreDevice now sees the paired physical iPad Pro 11-inch (4th generation), iPadOS 26.6.1, but an actual Release destination build fails before compilation because development services require the device to be unlocked.
+- Xcode error: the iPad `needs to be unlocked to enable development services`.
+- Result remains `PHYSICAL_IPAD_BLOCKED_EXTERNAL`.
+- Remaining physical procedure: unlock the paired iPad, keep it attached/available for development, build/install the Release-equivalent PriLearning target, then exercise PencilKit capture → bridge → local/cloud route → production endpoint → provider → returned transcription. Provider-end verification additionally requires the owner-authorized provider credential and paid-call ceilings.
+
 
 ## Current-main reconciliation
 - Recovered uncommitted Checkpoint-2 provider/status work was preserved first in commit ce0f4cfefe370a7e0ec2c6d04cc7573e81ff1e13 and pushed before history changes.
