@@ -1131,3 +1131,85 @@ For every source used to justify a Pri change, record:
 - exact architectural decision affected.
 
 If those fields cannot be answered, the source may be background but should not carry release authority.
+
+
+---
+
+# AL. V7 mathematics learning mechanisms
+
+## Spacing and retrieval practice for mathematics — meta-analysis 2025
+Class: mathematics-specific meta-analysis.
+Evidence: 27 spacing studies / 53 effect sizes; overall spaced-vs-massed effect g≈0.28. Course-embedded effect smaller than isolated-learning effect. Retrieval-vs-restudy evidence involved seven studies / 32 effect sizes; mean around g≈0.18 but confidence interval crossed zero.
+Use: spacing is a strong default prior; mathematics-specific retrieval advantage is less certain than generic testing-effect rhetoric suggests.
+https://doi.org/10.1007/s10648-025-10035-1
+
+## Worked examples in mathematics — meta-analysis 2023
+Class: mathematics-specific meta-analysis; 43 articles / 55 studies / 181 effect sizes.
+Evidence: average worked-example effect g≈0.48.
+Use: strong acquisition/scaffolding prior, especially before stable schemas exist.
+Limitation: average across many contexts; does not justify permanent full solutions or one example dose.
+https://doi.org/10.1007/s10648-023-09745-1
+
+## Expertise reversal — meta-analysis 2025
+Class: meta-analysis; 60 experiments / 176 effect sizes / 5,924 participants.
+Evidence: lower-prior-knowledge learners benefited from greater assistance on average; higher-prior-knowledge learners benefited from lower assistance, with moderation by educational status and domain.
+Use: direct rationale for evidence-based fading rather than static support.
+Limitation: does not define Pri's thresholds or action policy.
+https://doi.org/10.1016/j.learninstruc.2025.102142
+
+## Interleaved mathematics practice — cluster RCT
+Class: preregistered classroom cluster-randomized trial; 787 Grade 7 students / 54 classes.
+Use: same practice problems with changed ordering; strong evidence for testing strategy discrimination through interleaving rather than treating blocking as neutral.
+https://doi.org/10.1037/edu0000367
+https://ies.ed.gov/use-work/awards/efficacy-study-interleaved-mathematics-practice
+
+## Productive Failure in learning mathematics
+Class: randomized mathematics experiments.
+Use: problem solving before instruction can improve conceptual understanding/transfer under deliberately designed conditions.
+Limitation: does not support generic unguided discovery or leaving learners stuck.
+https://doi.org/10.1111/cogs.12107
+
+## Problem solving before instruction — meta-analysis 2021
+Class: meta-analysis; 53 studies / 166 comparisons.
+Evidence: average advantage for problem-solving-before-instruction g≈0.36, with larger effects under higher-fidelity Productive Failure designs.
+Use: supports testing structured preparatory problem solving as a mechanism.
+https://doi.org/10.3102/00346543211019105
+
+## Erroneous examples — systematic review 2025
+Class: systematic review; 40 studies across disciplines, majority mathematics.
+Use: erroneous/contrasting examples can improve learning, but benefit depends on prompt design, feedback, prior knowledge, complexity and cognitive load; several benefits emerge only at follow-up.
+https://doi.org/10.1007/s10648-025-10071-x
+
+## Feedback timing in computer-assisted learning — meta-analysis 2026
+Class: preregistered meta-analysis; 51 studies / 160 effect sizes.
+Evidence: no significant overall immediate-vs-delayed advantage; g≈0.03, 95% CI spanning zero.
+Use: rejects universal “feedback must always be immediate” rule; timing should match mechanism and be experimentally tested.
+https://doi.org/10.1007/s10648-026-10117-8
+
+## Faded worked examples in Grade 6 geometry — 2026
+Class: randomized study; N=114; ASSISTments.
+Use: fading produced the largest pre-to-post effect sizes among studied conditions; prior knowledge remained important.
+Limitation: small/bounded study; no universal fading schedule follows.
+https://doi.org/10.1111/bjep.12781
+
+## Variability × retrieval/worked examples — 2026
+Class: two controlled experiments on rule generalization.
+Use: effect of retrieval vs worked examples changed with prior instruction and repeated-vs-varied items; supports mechanism-aware rather than slogan-driven task selection.
+Limitation: artificial-rule tasks/adult participants; not direct school-product efficacy.
+https://doi.org/10.1007/s10648-026-10169-w
+
+---
+
+# AM. Additional V7 risk/evaluation sources
+
+## PA-CDM — position-aware HMER evaluation (September 2026)
+Class: recent arXiv evaluation-method research.
+Use: demonstrates that position-blind token/render metrics can assign similar error to mathematically very different structural failures; proposes position-aware scoring and controlled structural perturbations.
+Limitation: preprint/evaluation method; not Pri model evidence.
+https://arxiv.org/abs/2609.12917
+
+## When LLMs Hallucinate — mathematics feedback RCT 2025
+Class: preregistered randomized controlled study; N=252.
+Use: deliberate erroneous LLM feedback increased confusion and reduced perceived accuracy/usefulness as hallucination rate rose. Learning patterns were nontrivial, emphasizing the need for empirical learner outcomes rather than assuming every error has the same observed effect.
+Critical policy: the surprising learning result is not a justification for intentionally false Pri feedback; math correctness remains a safety invariant.
+https://doi.org/10.1145/3698205.3729555
