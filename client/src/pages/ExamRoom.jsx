@@ -31,6 +31,7 @@ import ExamAnalysis from '../components/ExamAnalysis.jsx';
 import { compactStrokes, expandStrokes } from '../local/examSession.js';
 
 const SAVE_DEBOUNCE_MS = 600;
+const INK_POINTS_PER_SAVE = 9000;
 const OBJECTIVE = new Set(['mcq', 'multi-mcq']);
 const NUMERIC_SINGLE_GLYPH_ALPHABET = Array.from({ length: 10 }, (_, i) => String(i));
 
@@ -177,7 +178,17 @@ export default function ExamRoom() {
     if (phaseRef.current !== 'sitting') return saveChain.current;
     accrue();
     const snap = latest.current;
-    const sent = [...dirtyInk.current];
+    // One request carries at most ~9,000 points of handwriting, which keeps it
+    // inside the API gateway's value budget; any further changed pages go in
+    // the next save, scheduled as soon as this one lands.
+    const sent = [];
+    let points = 0;
+    for (const k of dirtyInk.current) {
+      const n = (snap.inks[k]?.strokes || []).reduce((m, s) => m + (s.points?.length || 0), 0);
+      if (sent.length && points + n > INK_POINTS_PER_SAVE) break;
+      sent.push(k);
+      points += n;
+    }
     const body = {
       answers: snap.answers, workings: snap.workings, times: timesRef.current, modes: snap.modes, cur: snap.cur,
       inks: Object.fromEntries(sent.map(k => [k, snap.inks[k] || { strokes: [], lines: [] }]))
@@ -185,7 +196,11 @@ export default function ExamRoom() {
     setSaveState('saving');
     saveChain.current = saveChain.current.catch(() => {}).then(() => api.post(`/exams/${id}/responses`, body)).then(() => {
       for (const k of sent) if (latest.current.inks[k] === snap.inks[k]) dirtyInk.current.delete(k);
-      setSaveState('saved');
+      setSaveState(dirtyInk.current.size ? 'saving' : 'saved');
+      if (dirtyInk.current.size && phaseRef.current === 'sitting') {
+        if (saveTimer.current) clearTimeout(saveTimer.current);
+        saveTimer.current = setTimeout(save, 50);
+      }
     }, err => {
       setSaveState('error');
       if (err?.code === 'EXAM_DEADLINE_PASSED') setNow(Date.now());
