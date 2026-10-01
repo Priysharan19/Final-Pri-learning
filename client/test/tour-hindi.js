@@ -82,7 +82,10 @@ function leaksOnPage({ english, keys }) {
   let node;
   while ((node = walker.nextNode())) {
     const parent = node.parentElement;
-    if (!parent || parent.closest('.katex, script, style, noscript, [aria-hidden="true"] .katex')) continue;
+    if (!parent || parent.closest('.katex, script, style, noscript')) continue;
+    // Content the app marks as English on purpose (curriculum names, engine
+    // text) carries lang="en"; it is declared, not a fallback.
+    if (parent.closest('[lang]')?.getAttribute('lang') === 'en' && parent.closest('[lang]') !== document.documentElement) continue;
     if (!visible(parent)) continue;
     consider(node.nodeValue, parent.tagName.toLowerCase());
   }

@@ -154,7 +154,9 @@ export default function IndiaProgress() {
                   <tr key={row.id || row.name}>
                     <td style={{ textAlign: 'left' }}>
                       <div style={{ fontWeight: 640 }}><TermGloss text={row.name || row.title} /></div>
-                      {row.strand && <div className="muted" style={{ fontSize: 12 }}><TermGloss text={row.strand} /></div>}
+                      {/* Syllabus unit names are curriculum data and stay English by design;
+                          lang="en" lets a screen reader on a Hindi page voice them in English. */}
+                      {row.strand && <div className="muted" lang="en" style={{ fontSize: 12 }}><TermGloss text={row.strand} /></div>}
                     </td>
                     <td>{evidence.attempts}</td>
                     <td>{evidence.correct}</td>

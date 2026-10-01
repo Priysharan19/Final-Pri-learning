@@ -16,7 +16,7 @@ import { cloudReadingEnabled, readPhotoWithCloud } from '../ink/cloudReader.js';
 import { MAX_PDF_PAGES, renderPdfPages } from '../ink/pdfPage.js';
 import PriPlot from './PriPlot.jsx';
 import { plotSpecFor } from '../engine/plotSpec.js';
-import { awardStepMarks, marksSentence } from '../engine/cbseMarking.js';
+import { awardStepMarks, marksSentenceKey } from '../engine/cbseMarking.js';
 import { checkWorkingWithCloud, mergeVerdicts, shouldCheckWorking, workingNote } from '../ink/cloudWorking.js';
 import { translate, useT, useTx } from '../i18n/index.js';
 import TermGloss from './TermGloss.jsx';
@@ -1142,15 +1142,18 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                         <span aria-hidden="true" style={{ marginRight: 7, color: row.earned === row.outOf ? 'var(--good, #1a8f4c)' : 'var(--bad, #c0392b)' }}>
                           {row.earned === row.outOf ? '✓' : '✗'}
                         </span>
-                        {row.label}
-                        {row.why && <span className="muted" style={{ display: 'block', fontSize: 11.5, marginTop: 2, marginLeft: 20 }}>{row.why}</span>}
+                        {row.labelKey ? t(row.labelKey) : row.label}
+                        {row.why && <span className="muted" style={{ display: 'block', fontSize: 11.5, marginTop: 2, marginLeft: 20 }}>{row.whyKey ? t(row.whyKey, { unit: row.whyVars?.unit ?? '' }) : row.why}</span>}
                       </span>
                       <span className="set-v" style={{ fontVariantNumeric: 'tabular-nums' }}>
                         <span className="sr-only">{t('verdict.rowMarks', { earned: row.earned, total: row.outOf })} </span>{row.earned}/{row.outOf}
                       </span>
                     </div>
                   ))}
-                  <p style={{ marginTop: 8, fontSize: 13 }}>{marksSentence(boardAward)}</p>
+                  <p style={{ marginTop: 8, fontSize: 13 }}>{(() => {
+                    const line = marksSentenceKey(boardAward);
+                    return line ? t(line.key, { awarded: line.vars.awarded, total: line.vars.total, count: line.vars.count, n: line.vars.n }) : null;
+                  })()}</p>
                   <p className="muted" style={{ fontSize: 11.5, marginTop: 6 }}>
                     {t('verdict.boardStyleNote')}
                   </p>

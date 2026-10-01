@@ -1790,5 +1790,21 @@ export default {
   'exams.bp.ioqmNote': 'IOQM 2024-25 format. The authored olympiad bank reaches the IOQM (single-integer-answer) end of the ladder; RMO/INMO proof papers are not simulated.',
   'exams.claim.none': 'No source-versioned examination blueprint is published for this selection.',
   'exams.claim.officialSection': 'Official mathematics-section structure; not the complete multi-subject paper.',
-  'exams.claim.officialStructure': 'Official high-level structure only; paper-specific question and marking instructions remain dynamic.'
+  'exams.claim.officialStructure': 'Official high-level structure only; paper-specific question and marking instructions remain dynamic.',
+
+  // ── Board-style step marking (engine/cbseMarking.js renders these) ──────────
+  'board.labelMethod': 'Correct formula or method',
+  'board.labelSubstitution': 'Correct substitution',
+  'board.labelComputation': 'Correct simplification',
+  'board.labelAnswer': 'Final answer',
+  'board.labelAnswerUnits': 'Final answer, with units',
+  'board.whyNoWorking': 'no working was shown, so this mark could not be awarded',
+  'board.whyNotReached': 'the working did not reach this point',
+  'board.whyUnitMissing': 'the value is right but the unit ({unit}) is missing — a board examiner withholds this mark',
+  'board.whyAnswerWrong': 'the final answer is not correct',
+  'board.sentenceNoWorking': { one: '{awarded}/{total}. You wrote only the answer, so {n} step mark was not available. In a board exam those are marks you had already earned and did not claim — show the working.', other: '{awarded}/{total}. You wrote only the answer, so {n} step marks were not available. In a board exam those are marks you had already earned and did not claim — show the working.' },
+  'board.sentenceUnitsMissing': '{awarded}/{total}. The value is right; the unit is missing, and an examiner withholds that mark.',
+  'board.sentenceFull': '{awarded}/{total}. Full marks, and the working would earn them in a board exam.',
+  'board.sentenceNone': '{awarded}/{total}. Nothing here could be credited yet — write the formula you are using as your first line, and the method mark is available even when the answer is wrong.',
+  'board.sentenceMethod': '{awarded}/{total}. The answer is not right, but the method is, and a board examiner awards that.'
 };
