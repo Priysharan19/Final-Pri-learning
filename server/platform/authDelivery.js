@@ -1,5 +1,5 @@
 import { decryptDeliveryToken } from './deliveryCrypto.js';
-import { asStore, sqliteHandle } from './store.js';
+import { asStore, assertNoOpenTransaction, sqliteHandle } from './store.js';
 
 const MAX_ATTEMPTS = 8;
 const DEFAULT_BATCH = 20;
@@ -118,6 +118,7 @@ export function createResendAuthEmailTransport({
   if (!key || !sender || typeof fetchImpl !== 'function') return null;
 
   return async ({ outboxId, to, kind, actionUrl }) => {
+    assertNoOpenTransaction('Sending an auth email');
     const message = authEmailMessage(kind, actionUrl);
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(new Error('Auth email provider timed out')), REQUEST_TIMEOUT_MS);
