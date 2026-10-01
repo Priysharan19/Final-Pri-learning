@@ -90,8 +90,13 @@
    }
   },
   "backend": {
-   "paths": 853,
-   "passed": 853
+   "paths": 3229,
+   "passed": 3229
+  },
+  "repeatWindow": {
+   "probes": 3,
+   "passed": 3,
+   "window": 20
   },
   "generatorCells": {
    "cells": 552,

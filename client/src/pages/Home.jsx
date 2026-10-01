@@ -7,6 +7,7 @@ import { useApp } from '../App.jsx';
 import { dotpointAvailable, practiceTargetAvailable, topicAvailability } from '../engine/curriculumAvailability.js';
 import { dayKey, formatWeekday } from '../lib/locale.js';
 import { useT, useTx } from '../i18n/index.js';
+import { practiceHref } from '../lib/practiceLinks.js';
 import { textMatches, useGlossary } from '../i18n/glossary.js';
 import TermGloss from '../components/TermGloss.jsx';
 
@@ -191,12 +192,7 @@ export default function Home() {
 
   const generate = () => {
     if (impossibleTarget) return;
-    const p = new URLSearchParams();
-    if (subtopic) p.set('subtopic', subtopic);
-    if (subtopic && dotpoint != null) p.set('dotpoint', String(dotpoint));
-    if (difficulty != null) p.set('difficulty', String(difficulty));
-    if (section?.track) p.set('track', section.track);
-    nav(`/practice${p.toString() ? `?${p}` : ''}`);
+    nav(practiceHref({ subtopic, dotpoint, difficulty, track: section?.track || null }));
   };
 
   const resetAll = () => { setSectionKey(null); setSubtopic(null); setDotpoint(null); setDifficulty(null); setYear(user.year); };

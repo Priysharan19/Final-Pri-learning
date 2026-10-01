@@ -488,72 +488,181 @@ async function premiumProfile(spec) {
   return created.user;
 }
 
+/** The rungs a request may legitimately be served at: the nearest authored ones. */
+function nearestRungs(p, difficulty) {
+  const chapter = chapterById(p.chapterId);
+  const covers = p.dotpoint == null ? (chapter?.covers || []) : (chapter?.covers || []).filter(c => c.dp.includes(p.dotpoint));
+  const rungs = new Set(covers.flatMap(c => c.diff || []));
+  if (p.dotpoint == null) for (const cell of pyqCellsFor(p.track, p.chapterId)) rungs.add(cell.difficulty);
+  if (!rungs.size) return new Set();
+  const gap = Math.min(...[...rungs].map(r => Math.abs(r - difficulty)));
+  return new Set([...rungs].filter(r => Math.abs(r - difficulty) === gap));
+}
+
 /**
- * Every advertised path requested the way the Practice page requests it —
- * POST /practice/next on a profile of that track and class — so the resolver,
- * entitlement gate, repeat window, row write and the sanitised reply are all in
- * the loop. A refusal, a reply the card cannot render, or a stored row without
- * content identity fails the path.
+ * Every advertised path requested the way a button requests it — the link is
+ * built by the same builder the surface uses (lib/practiceLinks.js), read back
+ * by the same reader Practice uses, and sent as POST /practice/next on a
+ * profile of that track and class — once without a difficulty and once per
+ * difficulty of the window. The resolver, entitlement gate, repeat window, row
+ * write and the sanitised reply are all in the loop. A refusal, a reply the
+ * card cannot render, a stored row without content identity, a question from
+ * another chapter, or one served at a rung that is not the nearest authored
+ * rung to the one asked for fails the request.
+ *
+ * Then every other surface that builds a practice link: the Class X NCERT
+ * library's D1–D4 buttons and India Progress's per-chapter button, plus smart
+ * practice per track and class with and without the past-papers filter.
  */
-export async function certifyBackend(paths) {
+export async function certifyBackend(paths, { surfaces = true } = {}) {
   const { installBrowserEnv } = await import('./backend-check.mjs');
   installBrowserEnv();
   const { dispatch } = await import('../src/local/backend.js');
   const idb = await import('../src/local/idb.js');
+  const { practiceHref, practiceRequestFromQuery, class10LibraryPracticeHref, indiaProgressPracticeHref } = await import('../src/lib/practiceLinks.js');
   const profiles = new Map();
+  let current = null;
+  const use = async (track, grade) => {
+    const key = `${track}/${grade}`;
+    if (!profiles.has(key)) profiles.set(key, await premiumProfile({ name: `Cert ${key}`, course: 'in', indiaTrack: track, year: grade }));
+    else if (current !== key) await dispatch('POST', '/profiles/select', { id: profiles.get(key).id });
+    current = key;
+  };
   const rows = [];
-  for (const p of paths.filter(x => x.advertised)) {
-    const key = `${p.track}/${p.grade}`;
-    if (!profiles.has(key)) profiles.set(key, await premiumProfile({ name: `Cert ${key}`, course: 'in', indiaTrack: p.track, year: p.grade }));
-    const row = { id: p.id, ok: false, problem: null };
+  const send = async (id, href, expect = {}) => {
+    const row = { id, href, ok: false, problem: null };
     try {
-      const body = { mode: 'topic', subtopic: p.chapterId, track: p.track, ...(p.dotpoint != null ? { dotpoint: p.dotpoint } : {}), ...(p.pyqOnly ? { pyqOnly: true } : {}) };
+      const body = practiceRequestFromQuery(new URL(href, 'https://pri.invalid').searchParams);
       const r = await dispatch('POST', '/practice/next', body);
       const q = r?.question;
+      const stored = q?.id ? await idb.get('questions', q.id) : null;
+      const payload = stored?.payload;
       if (!q?.id || !(q.prompt || q.stem)) row.problem = 'reply carries no renderable question';
-      else {
-        const stored = await idb.get('questions', q.id);
-        const payload = stored?.payload;
-        if (!payload?.contentId || !payload?.contentVersion || payload.contentHash !== contentHashOf(payload)) row.problem = 'stored question has no valid content identity';
-        else if (stored.india?.chapterId !== p.chapterId) row.problem = `served under ${stored.india?.chapterId}, not the requested chapter`;
-        else if (p.pyqOnly && !payload.pyq) row.problem = 'past-papers-only served an authored question';
-        else row.ok = true;
-        await dispatch('POST', `/practice/${q.id}/discard`, {}).catch(() => {});
-      }
+      else if (!payload?.contentId || !payload?.contentVersion || payload.contentHash !== contentHashOf(payload)) row.problem = 'stored question has no valid content identity';
+      else if (expect.chapterId && stored.india?.chapterId !== expect.chapterId) row.problem = `served under ${stored.india?.chapterId}, not ${expect.chapterId}`;
+      else if (expect.pyq && !payload.pyq) row.problem = 'past-papers-only served an authored question';
+      else if (expect.rungs && !payload.pyq && !expect.rungs.has(Number(stored.difficulty))) row.problem = `asked for D${expect.difficulty}, served D${stored.difficulty} (nearest authored: ${[...expect.rungs].join('/')})`;
+      else if (expect.rungs && Number(q.difficulty) !== Number(stored.difficulty)) row.problem = 'the card shows a different difficulty from the stored question';
+      else row.ok = true;
+      if (q?.id) await dispatch('POST', `/practice/${q.id}/discard`, {}).catch(() => {});
     } catch (err) {
-      row.problem = `refused: ${err.code || err.status || ''} ${err.message}`.slice(0, 200);
+      if (expect.refusal && err.code === expect.refusal) row.ok = true;
+      else row.problem = `refused: ${err.code || err.status || ''} ${err.message}`.slice(0, 200);
     }
     rows.push(row);
+    return row;
+  };
+
+  for (const p of paths.filter(x => x.advertised)) {
+    await use(p.track, p.grade);
+    const base = { subtopic: p.chapterId, dotpoint: p.dotpoint, track: p.track, pyq: p.pyqOnly };
+    await send(p.id, practiceHref(base), { chapterId: p.chapterId, pyq: p.pyqOnly });
+    for (const d of p.difficulties) {
+      await send(`${p.id}@D${d}`, practiceHref({ ...base, difficulty: d }), { chapterId: p.chapterId, pyq: p.pyqOnly, difficulty: d, rungs: p.pyqOnly ? null : nearestRungs(p, d) });
+    }
   }
-  // Smart practice for every V1 track and class — with and without the
-  // past-papers filter. Under the filter, a class whose archive is empty must
-  // say so (INDIA_PYQ_UNAVAILABLE, rendered with its "turn the filter off"
-  // action); a class with archive coverage must serve a past paper.
+  if (!surfaces) return rows;
+
+  // The Class X NCERT library (Classes page): D1–D4 per chapter.
+  const { NCERT_CLASS10_CONTENT } = await import('../src/engine/ncert/class10-content.js');
+  await use('cbse', 10);
+  for (const chapter of NCERT_CLASS10_CONTENT) {
+    for (const d of [1, 2, 3, 4]) {
+      const p = { chapterId: chapter.id, dotpoint: null, track: 'cbse' };
+      await send(`surface/class10-library/${chapter.id}@D${d}`, class10LibraryPracticeHref(chapter, d), { chapterId: chapter.id, difficulty: d, rungs: nearestRungs(p, d) });
+    }
+  }
+  // India Progress: one Practise button per chapter of the student's scope.
   const scopes = [...new Set(paths.map(p => `${p.track}/${p.grade}`))];
   for (const key of scopes) {
     const [track, gradeText] = key.split('/');
     const grade = Number(gradeText);
-    if (!profiles.has(key)) profiles.set(key, await premiumProfile({ name: `Cert ${key}`, course: 'in', indiaTrack: track, year: grade }));
+    await use(track, grade);
+    for (const chapter of indiaScope(track, grade)) {
+      await send(`surface/india-progress/${key}/${chapter.id}`, indiaProgressPracticeHref(chapter, track), { chapterId: chapter.id });
+    }
+    // Smart practice with and without the past-papers filter. Under the
+    // filter, a class whose archive is empty must say so with
+    // INDIA_PYQ_UNAVAILABLE (rendered with its "turn the filter off" action).
     const archived = paths.some(p => p.track === track && p.grade === grade && p.pyqOnly);
-    for (const pyqOnly of [false, true]) {
+    for (const pyq of [false, true]) {
       for (let i = 0; i < 3; i++) {
-        const row = { id: `${key}/smart${pyqOnly ? '?pyq' : ''}#${i + 1}`, ok: false, problem: null };
-        try {
-          const r = await dispatch('POST', '/practice/next', { mode: 'smart', track, ...(pyqOnly ? { pyqOnly: true } : {}) });
-          const q = r?.question;
-          const stored = q?.id ? await idb.get('questions', q.id) : null;
-          if (!q?.id || !(q.prompt || q.stem)) row.problem = 'reply carries no renderable question';
-          else if (!stored?.payload?.contentId) row.problem = 'stored question has no content identity';
-          else if (pyqOnly && !stored.payload.pyq) row.problem = 'past-papers-only served an authored question';
-          else row.ok = true;
-          if (q?.id) await dispatch('POST', `/practice/${q.id}/discard`, {}).catch(() => {});
-        } catch (err) {
-          if (pyqOnly && !archived && err.code === 'INDIA_PYQ_UNAVAILABLE') row.ok = true;
-          else row.problem = `refused: ${err.code || err.status || ''} ${err.message}`.slice(0, 200);
-        }
-        rows.push(row);
+        await send(`${key}/smart${pyq ? '?pyq' : ''}#${i + 1}`, practiceHref({ track, pyq }), { pyq, refusal: pyq && !archived ? 'INDIA_PYQ_UNAVAILABLE' : null });
       }
     }
+  }
+  return rows;
+}
+
+// ── Repeat-window probe ─────────────────────────────────────────────────────
+
+/**
+ * Cells whose pool is small enough that 20 draws WITHOUT a repeat window almost
+ * surely repeat (the probe is sensitive) but at least 1.5× the window, so the
+ * window can always find a fresh item. One generator at one rung behind one
+ * CBSE dot point, so the backend cannot dilute the probe by switching forms.
+ */
+export function repeatProbes(paths, { limit = 3 } = {}) {
+  const out = [];
+  for (const p of paths) {
+    if (p.track !== 'cbse' || p.dotpoint == null || !p.advertised) continue;
+    const chapter = chapterById(p.chapterId);
+    for (const d of p.difficulties) {
+      const cells = (chapter.covers || []).filter(c => c.dp.includes(p.dotpoint) && (c.diff || []).includes(d));
+      if (cells.length !== 1) continue;
+      const others = (chapter.covers || []).filter(c => c.dp.includes(p.dotpoint)).flatMap(c => c.diff || []);
+      if (others.some(x => x !== d && Math.abs(x - d) === 0)) continue;
+      const gen = cells[0].gen;
+      const seen = new Set();
+      for (let i = 0; i < 1500; i++) seen.add(generateQuestion(gen, d, seedFor(`probe:${gen}:${d}`, i)).contentHash);
+      const pool = seen.size;
+      if (pool < 1.5 * REPEAT_WINDOW || pool > 3 * REPEAT_WINDOW) continue;
+      // Sensitivity: the same 20 seeded draws without the window must repeat.
+      const raw = new Set();
+      for (let i = 0; i < REPEAT_WINDOW; i++) raw.add(generateQuestion(gen, d, seedFor(`probe-raw:${gen}:${d}`, i)).contentHash);
+      if (raw.size === REPEAT_WINDOW) continue;
+      out.push({ path: p, difficulty: d, generator: gen, pool });
+      if (out.length >= limit) return out;
+    }
+  }
+  return out;
+}
+
+/**
+ * Serve REPEAT_WINDOW questions in a row on each probe and require them all
+ * distinct and none flagged as a repeat. `serve(probe)` returns the next
+ * question; by default it is the real backend through POST /practice/next.
+ */
+export async function certifyRepeatWindow(probes, { serve = null } = {}) {
+  let next = serve;
+  if (!next) {
+    const { installBrowserEnv } = await import('./backend-check.mjs');
+    installBrowserEnv();
+    const { dispatch } = await import('../src/local/backend.js');
+    const idb = await import('../src/local/idb.js');
+    const { practiceHref, practiceRequestFromQuery } = await import('../src/lib/practiceLinks.js');
+    const made = new Map();
+    next = async probe => {
+      const key = `${probe.path.id}@${probe.difficulty}`;
+      if (!made.has(key)) { made.set(key, true); await premiumProfile({ name: `Probe ${made.size}`, course: 'in', indiaTrack: 'cbse', year: probe.path.grade }); }
+      const href = practiceHref({ subtopic: probe.path.chapterId, dotpoint: probe.path.dotpoint, difficulty: probe.difficulty, track: 'cbse' });
+      const r = await dispatch('POST', '/practice/next', practiceRequestFromQuery(new URL(href, 'https://pri.invalid').searchParams));
+      const stored = await idb.get('questions', r.question.id);
+      await dispatch('POST', `/practice/${r.question.id}/discard`, {}).catch(() => {});
+      return { hash: stored.payload.contentHash, repeat: !!r.repeat };
+    };
+  }
+  const rows = [];
+  for (const probe of probes) {
+    const hashes = [];
+    let flagged = 0;
+    for (let i = 0; i < REPEAT_WINDOW; i++) {
+      const got = await next(probe, i);
+      hashes.push(got.hash);
+      if (got.repeat) flagged++;
+    }
+    const distinct = new Set(hashes).size;
+    rows.push({ id: `${probe.path.id}@D${probe.difficulty}`, pool: probe.pool, distinct, flagged, ok: distinct === REPEAT_WINDOW && flagged === 0 });
   }
   return rows;
 }
@@ -655,7 +764,8 @@ function markdown(report) {
   lines.push(`- Difficulty: ${s.difficultyMismatch} questions served at a rung other than the one the resolver chose. Every difficulty of the track window is requested on every path, so a dot point authored at fewer rungs is served at its nearest authored rung: ${s.difficultySnapped} such snapped requests, ${s.difficultyBelowWindow} of them outside the track window and disclosed to the student as such`);
   lines.push(`- Repeats in a ${REPEAT_WINDOW}-question window: ${s.repeatsAvoidable} avoidable (pool of ${2 * REPEAT_WINDOW}+ distinct items met and still repeated); ${s.repeatsExhausted} from smaller pools, each flagged to the student as a repeat`);
   lines.push(`- Low-variety paths (≤2 distinct items across the sample): ${s.lowVarietyPaths}`);
-  lines.push(`- End to end through the local backend (POST /practice/next as the Practice page sends it): ${s.backend.passed}/${s.backend.paths} advertised paths and smart-practice requests served a renderable, versioned question (or, under the past-papers filter on a class with no archive, the declared refusal)`);
+  lines.push(`- End to end through the local backend (POST /practice/next as the Practice page sends it): ${s.backend.passed}/${s.backend.paths} requests served a renderable, versioned question from the requested chapter at the nearest authored rung to the difficulty asked for — every advertised path with and without each window difficulty, the Class X NCERT library's D1–D4 buttons, India Progress's chapter buttons, and smart practice with and without the past-papers filter (where a class has no archive, the declared refusal)`);
+  lines.push(`- Repeat window (live backend): ${s.repeatWindow.passed}/${s.repeatWindow.probes} probes served ${REPEAT_WINDOW} distinct questions in a row from pools small enough that the same draws without the window repeat`);
   lines.push(`- Generator cells (every V1 generator at all four rungs, ${s.generatorCells.drawsPerCell} draws each): ${s.generatorCells.passed}/${s.generatorCells.cells} pass, ${s.generatorCells.questions} questions`);
   lines.push(`- Exam papers: ${s.exams.passed}/${s.exams.selections} selections pass; ${s.exams.papers} papers, ${s.exams.questions} items, ${s.exams.failed} failed, ${s.exams.duplicatesInPaper} in-paper duplicates`);
   lines.push('');
@@ -707,6 +817,8 @@ export async function run(argv = process.argv.slice(2)) {
   const rows = paths.map(p => certifyPath(p, n));
   const exams = await certifyExams(examSeeds);
   const e2e = await certifyBackend(paths);
+  const probes = repeatProbes(paths);
+  const repeatRows = await certifyRepeatWindow(probes);
   const cells = certifyGeneratorCells(new Set(rows.flatMap(r => r.generators)), full ? 60 : 8);
 
   // Versioning gate: generator output under a fixed seed may not change while
@@ -718,6 +830,7 @@ export async function run(argv = process.argv.slice(2)) {
 
   const summary = summarise(rows, exams, { mode: full ? 'full' : 'fast', n, examSeeds });
   summary.backend = { paths: e2e.length, passed: e2e.filter(r => r.ok).length };
+  summary.repeatWindow = { probes: repeatRows.length, passed: repeatRows.filter(r => r.ok).length, window: REPEAT_WINDOW };
   summary.generatorCells = { cells: cells.length, passed: cells.filter(c => c.pass).length, questions: cells.reduce((a, c) => a + c.served, 0), drawsPerCell: full ? 60 : 8 };
   const report = { summary, exams, generatorCells: cells.filter(c => !c.pass), backend: e2e.filter(r => !r.ok), paths: rows };
 
@@ -752,6 +865,8 @@ export async function run(argv = process.argv.slice(2)) {
     for (const f of Object.values(r.failures).slice(0, 3)) console.log(`   ${f.count}× ${f.example} (seed ${f.seed})`);
   }
   for (const r of e2e.filter(x => !x.ok).slice(0, 20)) console.log(`FAIL backend ${r.id} — ${r.problem}`);
+  for (const r of repeatRows.filter(x => !x.ok)) console.log(`FAIL repeat window ${r.id} — ${r.distinct}/${REPEAT_WINDOW} distinct, ${r.flagged} flagged as repeats (pool ${r.pool})`);
+  if (!repeatRows.length) console.log('FAIL repeat window — no sensitive probe cell found; the repeat window is unmeasured');
   for (const c of cells.filter(x => !x.pass).slice(0, 20)) {
     console.log(`FAIL generator cell ${c.id} — ${c.failed}/${c.served} failed`);
     for (const f of Object.values(c.failures).slice(0, 3)) console.log(`   ${f.count}× ${f.example} (seed ${f.seed})`);
@@ -766,9 +881,9 @@ export async function run(argv = process.argv.slice(2)) {
 
   const s = summary;
   const secs = ((Date.now() - started) / 1000).toFixed(1);
-  const ok = !failingPaths.length && exams.every(e => e.pass) && cells.every(c => c.pass) && e2e.every(r => r.ok) && !!committed && cmp.ok;
+  const ok = !failingPaths.length && exams.every(e => e.pass) && cells.every(c => c.pass) && e2e.every(r => r.ok) && repeatRows.length > 0 && repeatRows.every(r => r.ok) && !!committed && cmp.ok;
   const g = summary.generatorCells;
-  console.log(`CONTENT CERTIFICATION (${s.mode}, ${n}/path/difficulty): ${ok ? 'PASS' : 'FAIL'} — ${s.passed}/${s.paths} launch paths, ${s.questionsServed} questions validated, ${s.backend.passed}/${s.backend.paths} served end to end, ${g.passed}/${g.cells} generator cells, ${s.exams.passed}/${s.exams.selections} exam selections (${s.exams.questions} paper items), contentVersion ${CONTENT_VERSION} — ${secs}s`);
+  console.log(`CONTENT CERTIFICATION (${s.mode}, ${n}/path/difficulty): ${ok ? 'PASS' : 'FAIL'} — ${s.passed}/${s.paths} launch paths, ${s.questionsServed} questions validated, ${s.backend.passed}/${s.backend.paths} served end to end, ${s.repeatWindow.passed}/${s.repeatWindow.probes} repeat-window probes, ${g.passed}/${g.cells} generator cells, ${s.exams.passed}/${s.exams.selections} exam selections (${s.exams.questions} paper items), contentVersion ${CONTENT_VERSION} — ${secs}s`);
   return ok ? 0 : 1;
 }
 

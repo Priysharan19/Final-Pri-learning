@@ -21,7 +21,7 @@ import {
   cleanIndiaTrack, indiaTrack, indiaCourseLabel, indiaScope, indiaChapter,
   indiaChapterGrade, indiaDotpointIndex, resolveIndiaTarget, indiaProductSections,
   indiaDotpointKey, indiaNameOf, indiaDifficultyWindow, clampToIndiaWindow,
-  indiaPracticeScope, indiaAheadUnlocked, indiaDotpointsInWindow
+  indiaPracticeScope, indiaAheadUnlocked, indiaDotpointsInWindow, indiaChaptersForGenerator
 } from '../engine/indiaProduct.js';
 import { indiaReasonLabel } from '../engine/indiaProgress.js';
 import { indiaExamBlueprint } from '../engine/indiaExams.js';
@@ -1037,8 +1037,29 @@ function indiaPick(p, trackId, ratings, reviews, now, { chapter = null, dotpoint
   // "past papers only" request to a dot point the student never named sent
   // every such request to the dot-point branch, so the filter refused even the
   // chapters whose archive does hold questions (content certification, §06).
+  // A difficulty the student named on a chapter they chose (the Class X
+  // library's D1–D4 buttons, a ?difficulty= link) is honoured — at the nearest
+  // authored rung, disclosed when it sits outside the track window — rather
+  // than clamped silently into the window.
+  const namedDifficulty = choice.explicit && difficulty != null && difficulty !== '' && Number.isFinite(Number(difficulty));
+  const namedRung = namedDifficulty ? Math.max(1, Math.min(4, Math.round(Number(difficulty)))) : null;
   if (asked == null && !pyqOnly) {
-    const dpPool = indiaDotpointStates(c, chapterRow, trackId, grade, ratings, now);
+    let dpPool = indiaDotpointStates(c, chapterRow, trackId, grade, ratings, now);
+    // With a named difficulty, the dot point is chosen among those authored at
+    // that rung, so "this chapter at D3" is not answered with a D1 question
+    // because the picker landed on a dot point that has no D3 form.
+    if (namedRung != null) {
+      // Nearest authored rung per dot point; keep the dot points that get
+      // closest to the rung asked for (exactly it, when any has it).
+      const gapOf = i => Math.min(Infinity, ...(c.covers || []).filter(cv => cv.dp.includes(i)).flatMap(cv => cv.diff || []).map(r => Math.abs(r - namedRung)));
+      const gaps = c.dotpoints.map((_, i) => gapOf(i));
+      const best = Math.min(...gaps);
+      const atRung = c.dotpoints.map((_, i) => i).filter(i => Number.isFinite(best) && gaps[i] === best).map(ordinal => {
+        const key = indiaDotpointKey(c.id, ordinal);
+        return { id: key, index: ordinal, text: c.dotpoints[ordinal], ...indiaDotpointState(c, ordinal, chapterRow, ratings, now), traps: trapsForDotpoint(chapterRow?.traps, key) };
+      });
+      if (atRung.length) dpPool = atRung;
+    }
     // A misconception lives on a dot point: when one is being hunted, that dot
     // point is the place to hunt it.
     const preferred = choice.trap?.dotpoint ? dpPool.find(d => d.id === choice.trap.dotpoint) : null;
@@ -1056,12 +1077,12 @@ function indiaPick(p, trackId, ratings, reviews, now, { chapter = null, dotpoint
       state: { ...basis, trapPressure: trapPressureOf(st.traps, now), recentWrong: recentWrongOf(st) }, nowMs: now, rand
     });
   } else want = choice.difficulty;
-  want = clampToIndiaWindow(want, trackId, grade);
+  want = namedDifficulty ? Math.max(1, Math.min(4, Math.round(want))) : clampToIndiaWindow(want, trackId, grade);
   // "Past papers only" is a filter on what may be served, not a preference:
   // when the archive has nothing for the chapter the request is refused with a
   // reason, because serving an authored question under that filter would be
   // telling the student it came from a real paper.
-  const target = resolveIndiaTarget(c, { dotpoint: ordinal, difficulty: want, track: trackId, grade, pyqOnly });
+  const target = resolveIndiaTarget(c, { dotpoint: ordinal, difficulty: want, track: trackId, grade, pyqOnly, honourDifficulty: namedDifficulty });
   if (!target && pyqOnly) {
     throw Object.assign(
       new Error(`Pri's previous-year archive has no ${trackName} past-paper question for ${c.name} yet. Turn the past-papers-only filter off to practise authored questions on this chapter.`),
@@ -1074,13 +1095,37 @@ function indiaPick(p, trackId, ratings, reviews, now, { chapter = null, dotpoint
   let why = INDIA_WHY[choice.reason](c, choice.trap, trackName);
   if (target.pyq) why += ' This one is a real previous-year question.';
   if (target.dotpointIndex != null) why += ` Dot point: ${c.dotpoints[target.dotpointIndex]}`;
-  if (target.windowed === false) why += ` (Served at D${target.difficulty} — this dot point has no authored form at ${trackName} depth yet.)`;
+  if (target.windowed === false) {
+    const { floor, ceiling } = indiaDifficultyWindow(trackId, grade);
+    why += namedDifficulty && (want < floor || want > ceiling)
+      ? ` (Served at D${target.difficulty}, the level you chose — outside the usual ${trackName} range of D${floor}–D${ceiling}.)`
+      : ` (Served at D${target.difficulty} — this dot point has no authored form at ${trackName} depth yet.)`;
+  }
   return {
     chapter: c, target, dotpointKey: target.dotpointIndex != null ? indiaDotpointKey(c.id, target.dotpointIndex) : null,
-    retarget: sameTerms(target, () => resolveIndiaTarget(c, { dotpoint: ordinal, difficulty: want, track: trackId, grade, pyqOnly })),
+    retarget: sameTerms(target, () => resolveIndiaTarget(c, { dotpoint: ordinal, difficulty: want, track: trackId, grade, pyqOnly, honourDifficulty: namedDifficulty })),
     reason: choice.reason, reasonTag: choice.reasonTag, why, nextUp: choice.nextUp, trap: choice.trap,
     successTarget: choice.target, mastery: st.mastery || 0, explicit: choice.explicit, aheadUnlocked
   };
+}
+
+/**
+ * The India chapter a practice request names. A chapter id is taken as is. A
+ * generator id — what the Class X NCERT library's practice buttons and older
+ * bookmarks send — resolves to the chapter that draws on that generator,
+ * preferring one in the student's own track scope and class; before this,
+ * 8 of the library's 14 chapters answered INDIA_TOPIC_NOT_FOUND.
+ */
+function indiaChapterForRequest(subtopic, trackId, grade) {
+  const direct = indiaChapter(subtopic);
+  if (direct) return direct;
+  const users = indiaChaptersForGenerator(subtopic);
+  if (!users.length) return null;
+  const scope = new Set(indiaScope(trackId, grade).map(c => c.id));
+  return users.find(c => scope.has(c.id) && indiaChapterGrade(c) === Number(grade))
+    || users.find(c => scope.has(c.id))
+    || users.find(c => indiaChapterGrade(c) === Number(grade))
+    || users[0];
 }
 
 /**
@@ -2602,7 +2647,7 @@ const routes = {
     if (p.course === 'in' && !taskId) {
       const trackId = cleanIndiaTrack(track || p.indiaTrack, p.year);
       const ratings = await ratingsFor(p.id);
-      const chapter = subtopic ? indiaChapter(subtopic) : null;
+      const chapter = subtopic ? indiaChapterForRequest(subtopic, trackId, p.year) : null;
       if (subtopic && !chapter) throw Object.assign(new Error('That topic is not part of the India syllabus.'), { status: 404, code: 'INDIA_TOPIC_NOT_FOUND' });
       const reviews = await byIndex('reviews', 'pid', p.id);
       const pick = indiaPick(p, trackId, ratings, reviews, now, {

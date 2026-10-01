@@ -11,6 +11,7 @@ import PriExplain from '../components/PriExplain.jsx';
 import FreeCapNotice from '../components/FreeCapNotice.jsx';
 import { tLater, useT } from '../i18n/index.js';
 import { isContentEmpty, servable, contentEmptySignal } from '../lib/contentServe.js';
+import { practiceRequestFromQuery } from '../lib/practiceLinks.js';
 import { queueTelemetry } from '../platform/telemetry.js';
 
 const EMPTY_SESSION = Object.freeze({ answered: 0, correct: 0, xp: 0 });
@@ -171,8 +172,7 @@ export default function Practice() {
               mode: 'smart', track: assignmentTrack || undefined,
               difficulty: assignmentDifficulty ?? undefined
             }
-          : subtopic ? { mode: 'topic', subtopic, track: track || undefined, dotpoint: dotpoint != null ? Number(dotpoint) : undefined, difficulty: difficulty != null ? Number(difficulty) : undefined, pyqOnly: pyqOnly || undefined }
-            : { mode: 'smart', track: track || undefined, difficulty: difficulty != null ? Number(difficulty) : undefined, pyqOnly: pyqOnly || undefined };
+          : practiceRequestFromQuery(params);
       // Real local practice resumes the exact unresolved question after reload,
       // background termination or a duplicate Next request. Cloud assignments
       // manage their own session contract and are intentionally left alone.

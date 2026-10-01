@@ -305,6 +305,68 @@ const student = await premiumProfile({ name: 'Cert Student', course: 'in', india
   eq(none?.error?.code, 'INDIA_PYQ_UNAVAILABLE', 'a class with no archive says so under the filter instead of serving authored practice');
 }
 
+{
+  // Regression (e): the Class X NCERT library's D1–D4 buttons sent a generator
+  // id as the subtopic; 8 of 14 chapters answered INDIA_TOPIC_NOT_FOUND. They
+  // now name the chapter, every press serves that chapter at the nearest
+  // authored rung to the one pressed, and a stale generator-id link resolves to
+  // its chapter instead of refusing.
+  const { NCERT_CLASS10_CONTENT } = await import('../src/engine/ncert/class10-content.js');
+  const { class10LibraryPracticeHref, practiceRequestFromQuery, practiceHref } = await import('../src/lib/practiceLinks.js');
+  await premiumProfile({ name: 'Cert Library', course: 'in', indiaTrack: 'cbse', year: 10 });
+  const refused = [], offChapter = [], offRung = [];
+  for (const chapter of NCERT_CLASS10_CONTENT) {
+    const rungs = new Set((IN_CHAPTER_BY_ID[chapter.id]?.covers || []).flatMap(c => c.diff || []));
+    for (const d of [1, 2, 3, 4]) {
+      const href = class10LibraryPracticeHref(chapter, d);
+      const r = await dispatch('POST', '/practice/next', practiceRequestFromQuery(new URL(href, 'https://x.invalid').searchParams)).catch(e => ({ error: e }));
+      if (r.error) { refused.push(`${chapter.id}@D${d} ${r.error.code}`); continue; }
+      const row = await idb.get('questions', r.question.id);
+      if (row.india?.chapterId !== chapter.id) offChapter.push(`${chapter.id}@D${d}`);
+      const gap = Math.min(...[...rungs].map(x => Math.abs(x - d)));
+      if (Math.abs(row.difficulty - d) !== gap) offRung.push(`${chapter.id}@D${d}→D${row.difficulty}`);
+      await dispatch('POST', `/practice/${r.question.id}/discard`, {});
+    }
+  }
+  eq(refused.length, 0, `every Class X library button serves a question (refused: ${refused.slice(0, 4).join(', ')})`);
+  eq(offChapter.length, 0, `every Class X library button serves its own chapter (${offChapter.slice(0, 4).join(', ')})`);
+  eq(offRung.length, 0, `every Class X library button serves the nearest authored rung to the one pressed (${offRung.slice(0, 4).join(', ')})`);
+  for (const [gen, chapterId] of [['c10-polynomial-zeroes', 'c10-polynomials'], ['c10-linear-graphs', 'c10-pair-linear-equations'], ['c10-triangles-current', 'c10-triangles'], ['c10-surface-area-combo', 'c10-surface-volume']]) {
+    const r = await dispatch('POST', '/practice/next', { mode: 'topic', subtopic: gen, track: 'cbse', difficulty: 2 }).catch(e => ({ error: e }));
+    const row = r.question ? await idb.get('questions', r.question.id) : null;
+    eq(row?.india?.chapterId, chapterId, `a stale generator-id link (${gen}) resolves to its chapter instead of INDIA_TOPIC_NOT_FOUND`);
+    if (r.question) await dispatch('POST', `/practice/${r.question.id}/discard`, {});
+  }
+  {
+    const r = await dispatch('POST', '/practice/next', { mode: 'topic', subtopic: 'c10-polynomials', track: 'cbse', difficulty: 4 });
+    const row = await idb.get('questions', r.question.id);
+    eq(row.difficulty, 4, 'a named D4 on a CBSE chapter authored at D4 is served at D4, not clamped to D3');
+    ok(r.windowed === false && /level you chose/.test(r.why), 'and the reply discloses it sits outside the CBSE range');
+    await dispatch('POST', `/practice/${r.question.id}/discard`, {});
+  }
+  // The link reader sends exactly what Practice always sent.
+  const body = practiceRequestFromQuery(new URL(practiceHref({ subtopic: 'c10-polynomials', dotpoint: 1, difficulty: 3, track: 'cbse', pyq: true }), 'https://x.invalid').searchParams);
+  eq(JSON.stringify(body), JSON.stringify({ mode: 'topic', subtopic: 'c10-polynomials', track: 'cbse', dotpoint: 1, difficulty: 3, pyqOnly: true }), 'a topic link reads back to the same request body');
+  eq(JSON.stringify(practiceRequestFromQuery(new URLSearchParams(''))), JSON.stringify({ mode: 'smart' }), 'a bare /practice link is smart practice');
+  const page = src('../src/pages/PracticeBase.jsx');
+  ok(page.includes('practiceRequestFromQuery(params)'), 'Practice reads its topic/smart request through the shared reader');
+  for (const [file, call] of [['../src/pages/Home.jsx', 'practiceHref('], ['../src/pages/IndiaProgress.jsx', 'indiaProgressPracticeHref('], ['../src/components/Class10NCERTLibrary.jsx', 'class10LibraryPracticeHref(']]) {
+    ok(src(file).includes(call), `${file.split('/').pop()} builds its practice link through lib/practiceLinks.js`);
+  }
+}
+{
+  // Low #3: the repeat-window probe is sensitive. A server with the window
+  // switched off fails it; the real backend passes it.
+  const probes = cert.repeatProbes(enumeratePaths());
+  ok(probes.length >= 1, `sensitive repeat-window probes exist (${probes.length})`);
+  const off = await cert.certifyRepeatWindow(probes, {
+    serve: async (probe, i) => ({ hash: generateQuestion(probe.generator, probe.difficulty, 9000 + i * 7919).contentHash, repeat: false })
+  });
+  ok(off.some(r => !r.ok), 'a server with no repeat window fails the probe');
+  const live = await cert.certifyRepeatWindow(probes);
+  ok(live.every(r => r.ok), `the live backend's repeat window passes the probe (${live.map(r => `${r.distinct}/${REPEAT_WINDOW}`).join(', ')})`);
+}
+
 // ── 5. Versioning gate ──────────────────────────────────────────────────────
 
 {
