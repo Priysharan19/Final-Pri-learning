@@ -784,25 +784,6 @@ async function run() {
       await click(page, 'button.btn-primary', { text: 'Set myself a task' });
     });
 
-    await step('teacher studio', '/teach', async () => {
-      await goTo(page, BASE, '/teach');
-      await wait(page, 700);
-    });
-
-    // a class of its own, so the roll, the analytics and the assign-a-task form
-    // are all on screen rather than behind an empty state
-    await step('teacher studio · a class with a task form', '/teach', async () => {
-      await goTo(page, BASE, '/teach');
-      await page.locator('input.input').first().fill('10MaA');
-      await click(page, 'button.btn-primary', { text: 'Create' });
-      await page.waitForSelector('.prio-item', { timeout: 20000 });
-      await wait(page, 900);
-    });
-
-    await step('teacher studio · question builder', '/teach', async () => {
-      await click(page, 'button.btn-ghost', { text: 'Write a question' });
-    });
-
     await step('exams', '/exams', async () => { await goTo(page, BASE, '/exams'); });
 
     await step('exam room · sitting a paper', '/exams/:id', async () => {
@@ -846,10 +827,22 @@ async function run() {
       await wait(page, 700);
     });
 
-    await step('favorites · empty', '/favorites', async () => { await goTo(page, BASE, '/favorites'); });
+    await step('review · mistakes', '/review', async () => {
+      await goTo(page, BASE, '/review?filter=wrong');
+      await page.waitForSelector('.hist-row, .muted', { timeout: 20000 });
+      await wait(page, 600);
+    });
+
+    await step('mistakes · compatibility redirect', '/mistakes', async () => {
+      await goTo(page, BASE, '/mistakes');
+      await page.waitForSelector('.hist-row, .muted', { timeout: 20000 });
+      await wait(page, 600);
+    });
+
+    await step('favorites · compatibility redirect', '/favorites', async () => { await goTo(page, BASE, '/favorites'); });
 
     await step('favorites · saved questions', '/favorites', async () => {
-      await goTo(page, BASE, '/history');
+      await goTo(page, BASE, '/review');
       await click(page, '.hist-star');
       await goTo(page, BASE, '/favorites');
       await page.waitForSelector('.hist-row', { timeout: 20000 });
@@ -858,7 +851,7 @@ async function run() {
 
     await step('classes', '/classes', async () => { await goTo(page, BASE, '/classes'); });
 
-    await step('history', '/history', async () => {
+    await step('history · compatibility redirect', '/history', async () => {
       await goTo(page, BASE, '/history');
       await page.waitForSelector('.hist-row, .muted', { timeout: 20000 });
       await wait(page, 600);
@@ -937,6 +930,33 @@ async function run() {
     } catch (err) {
       selfTest = { error: String(err.message || err) };
     }
+
+    // ── teacher-only workspace, exercised under a real teacher profile ──────
+    await step('teacher studio', '/teach', async () => {
+      await goTo(page, BASE, '/');
+      await click(page, '.user-chip');
+      await click(page, '[role="menuitem"]', { text: 'Switch profile' });
+      await page.waitForSelector('.auth-wrap', { timeout: 15000 });
+      await click(page, 'button.btn-ghost', { text: 'Add another profile' });
+      await click(page, 'button.sso-btn', { text: 'Continue without an email' });
+      await page.locator('#signup-name').fill('Accessibility Teacher');
+      await page.getByRole('button', { name: 'Teacher', exact: true }).click();
+      await page.getByRole('button', { name: 'Start learning' }).click();
+      await page.waitForSelector('.teacher-workspace-head', { timeout: 30000 });
+      await wait(page, 700);
+    });
+
+    await step('teacher studio · a class with a task form', '/teach', async () => {
+      await goTo(page, BASE, '/teach');
+      await page.locator('input.input').first().fill('10MaA');
+      await click(page, 'button.btn-primary', { text: 'Create' });
+      await page.waitForSelector('.prio-item', { timeout: 20000 });
+      await wait(page, 900);
+    });
+
+    await step('teacher studio · question builder', '/teach', async () => {
+      await click(page, 'button.btn-ghost', { text: 'Write a question' });
+    });
 
     // ── verdicts ─────────────────────────────────────────────────────────────
 
