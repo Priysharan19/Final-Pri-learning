@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { createHmac } from 'node:crypto';
-import { createPlatformDb } from '../platform/db.js';
+import { openTestStore } from './support/engine.mjs';
 import { ensureBillingSchema } from '../platform/billingSchema.js';
 import { applyVerifiedEntitlement } from '../platform/entitlements.js';
 import { createRazorpayBilling, razorpayConfigStatus } from '../platform/razorpay.js';
@@ -23,13 +23,15 @@ process.env.PRI_RAZORPAY_ANNUAL_TOTAL_COUNT = '10';
 process.env.PRI_DISPLAY_TRIAL_DAYS = '7';
 process.env.PRI_WEB_GRACE_DAYS = '3';
 
-const db = createPlatformDb(':memory:');
+// SQLite by default; `--engine=postgres` runs it on a migrated Postgres.
+const testStore = await openTestStore(undefined, { label: 'razorpay' });
+const db = testStore.store;
 ensureBillingSchema(db);
 const now = Date.now();
-db.prepare(`INSERT INTO accounts(id,email,name,password_hash,role,created_at,updated_at)
-  VALUES ('acct-billing','billing@example.test','Billing Student','hash','student',?,?)`).run(now, now);
-db.prepare(`INSERT INTO entitlement_snapshots(account_id,plan,status,provider,source_version,updated_at)
-  VALUES ('acct-billing','free','free','none',0,?)`).run(now);
+await db.run(`INSERT INTO accounts(id,email,name,password_hash,role,created_at,updated_at)
+  VALUES ('acct-billing','billing@example.test','Billing Student','hash','student',?,?)`, [now, now]);
+await db.run(`INSERT INTO entitlement_snapshots(account_id,plan,status,provider,source_version,updated_at)
+  VALUES ('acct-billing','free','free','none',0,?)`, [now]);
 
 let createCount = 0;
 let getSubscription = null;
@@ -126,8 +128,8 @@ try {
 
   const second = await provider.checkout.web.create({ accountId: 'acct-billing', cadence: 'annual' });
   assert.equal(second.trialApplied, false, 'one account must never mint a second introductory trial');
-  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM billing_trial_claims WHERE account_id=?').get('acct-billing').n, 1);
-  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM billing_subscriptions WHERE account_id=?').get('acct-billing').n, 2);
+  assert.equal((await db.get('SELECT COUNT(*) AS n FROM billing_trial_claims WHERE account_id=?', ['acct-billing'])).n, 1);
+  assert.equal((await db.get('SELECT COUNT(*) AS n FROM billing_subscriptions WHERE account_id=?', ['acct-billing'])).n, 2);
 
   const nowSec = Math.floor(Date.now() / 1000);
   const activePayload = event(subscriptionEntity(), 'subscription.activated', nowSec - 100);
@@ -143,7 +145,7 @@ try {
 
   const replay = await applyVerifiedEntitlement(db, activeVerified);
   assert.equal(replay.replayed, true, 'same x-razorpay-event-id must be idempotent');
-  assert.equal(db.prepare(`SELECT COUNT(*) AS n FROM billing_events WHERE provider='web' AND event_id='evt-active-1'`).get().n, 1);
+  assert.equal((await db.get(`SELECT COUNT(*) AS n FROM billing_events WHERE provider='web' AND event_id='evt-active-1'`)).n, 1);
 
   const cancelledPayload = event(subscriptionEntity({ status: 'cancelled' }), 'subscription.cancelled', nowSec - 50);
   const cancelled = await provider.verifiers.web.webhook({ request: signedRequest(cancelledPayload, 'evt-cancel-1') });
@@ -186,9 +188,11 @@ try {
   assert.equal(restoreApplied.snapshot.plan, 'premium');
   assert.equal(restoreApplied.snapshot.provider, 'web');
 
+  console.log(`engine: ${testStore.engine}`);
+
   console.log('PASS — Razorpay checkout is server-bound; raw-body signatures, duplicate delivery, out-of-order events, trials and authoritative restore are enforced.');
 } finally {
-  db.close();
+  await testStore.close();
   for (const name of envNames) {
     if (previous[name] === undefined) delete process.env[name];
     else process.env[name] = previous[name];

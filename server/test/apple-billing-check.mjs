@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { X509Certificate, createPrivateKey, sign } from 'node:crypto';
-import { createPlatformDb } from '../platform/db.js';
+import { openTestStore } from './support/engine.mjs';
 import { ensureBillingSchema } from '../platform/billingSchema.js';
 import { createAppleBilling } from '../platform/appleBilling.js';
 import { applyVerifiedEntitlement } from '../platform/entitlements.js';
@@ -108,14 +108,16 @@ function notificationPayload({
   };
 }
 
-const db = createPlatformDb(':memory:');
+// SQLite by default; `--engine=postgres` runs it on a migrated Postgres.
+const testStore = await openTestStore(undefined, { label: 'apple' });
+const db = testStore.store;
 ensureBillingSchema(db);
 const now = Date.now();
 for (const [id, email] of [['acct-apple-a', 'apple-a@example.test'], ['acct-apple-b', 'apple-b@example.test']]) {
-  db.prepare(`INSERT INTO accounts(id,email,name,password_hash,role,created_at,updated_at)
-    VALUES (?,?,?,'hash','student',?,?)`).run(id, email, id, now, now);
-  db.prepare(`INSERT INTO entitlement_snapshots(account_id,plan,status,provider,source_version,updated_at)
-    VALUES (?,'free','free','none',0,?)`).run(id, now);
+  await db.run(`INSERT INTO accounts(id,email,name,password_hash,role,created_at,updated_at)
+    VALUES (?,?,?,'hash','student',?,?)`, [id, email, id, now, now]);
+  await db.run(`INSERT INTO entitlement_snapshots(account_id,plan,status,provider,source_version,updated_at)
+    VALUES (?,'free','free','none',0,?)`, [id, now]);
 }
 
 try {
@@ -264,9 +266,11 @@ try {
   assert.deepEqual((await createAppleBilling(db).native.apple.bootstrap({ accountId: 'acct-apple-a' })).environments, ['Production'],
     'only the literal true opts in');
 
+  console.log(`engine: ${testStore.engine}`);
+
   console.log('PASS — Apple ES256/x5c verification, appAccountToken binding, device transaction, restore, notification replay, stale-event suppression and the explicit Sandbox opt-in are enforced.');
 } finally {
-  db.close();
+  await testStore.close();
   rmSync(dir, { recursive: true, force: true });
   for (const name of envNames) {
     if (previous[name] === undefined) delete process.env[name];

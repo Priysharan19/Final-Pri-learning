@@ -14,7 +14,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import express from 'express';
 import cookieParser from 'cookie-parser';
-import { createPlatformDb } from '../platform/db.js';
+import { openTestStore } from './support/engine.mjs';
 import { ensureBillingSchema } from '../platform/billingSchema.js';
 import { createEntitlementRouter, supportGrantEventId } from '../platform/entitlements.js';
 import { csrfForSession, CSRF_COOKIE, SESSION_COOKIE, opaqueToken, sha256 } from '../platform/security.js';
@@ -26,26 +26,26 @@ const eq = (actual, expected, label) => ok(actual === expected, `${label} — ex
 
 const FROZEN = 1_800_000_000_000;
 const realNow = Date.now;
-const db = createPlatformDb(':memory:');
+// SQLite by default; `--engine=postgres` runs it on a migrated Postgres.
+const testStore = await openTestStore(undefined, { label: 'entitlement_grant' });
+const db = testStore.store;
 ensureBillingSchema(db);
 
-function account(id, role = 'student') {
-  db.prepare('INSERT INTO accounts(id,email,name,role,email_verified_at,created_at,updated_at) VALUES (?,?,?,?,?,?,?)')
-    .run(id, `${id}@example.test`, id, role, FROZEN, FROZEN, FROZEN);
+async function account(id, role = 'student') {
+  await db.run('INSERT INTO accounts(id,email,name,role,email_verified_at,created_at,updated_at) VALUES (?,?,?,?,?,?,?)', [id, `${id}@example.test`, id, role, FROZEN, FROZEN, FROZEN]);
   return id;
 }
 
-function session(accountId) {
+async function session(accountId) {
   const raw = opaqueToken(32);
-  db.prepare(`INSERT INTO account_sessions(id,account_id,token_hash,device_id,created_at,last_seen_at,expires_at)
-    VALUES (?,?,?,?,?,?,?)`)
-    .run(`ses_${accountId}`, accountId, sha256(raw), 'contract', FROZEN, FROZEN, FROZEN + 3_600_000);
+  await db.run(`INSERT INTO account_sessions(id,account_id,token_hash,device_id,created_at,last_seen_at,expires_at)
+    VALUES (?,?,?,?,?,?,?)`, [`ses_${accountId}`, accountId, sha256(raw), 'contract', FROZEN, FROZEN, FROZEN + 3_600_000]);
   return { [SESSION_COOKIE]: raw, [CSRF_COOKIE]: csrfForSession(raw) };
 }
 
-const admin = account('acct_admin', 'admin');
-const targets = [account('acct_alpha'), account('acct_beta'), account('acct_gamma')];
-const cookies = session(admin);
+const admin = await account('acct_admin', 'admin');
+const targets = [await account('acct_alpha'), await account('acct_beta'), await account('acct_gamma')];
+const cookies = await session(admin);
 
 // A fixed event id, so the replay branch can be reached at all now that a real
 // grant id carries a random tail.
@@ -83,31 +83,31 @@ try {
     eq(result.status, 200, `${target} is granted Premium`);
     eq(result.data?.replayed, false, `${target} is not mistaken for a replay`);
     eq(result.data?.snapshot?.plan, 'premium', `${target} receives a premium snapshot in the response`);
-    const snapshot = db.prepare('SELECT plan,status,provider FROM entitlement_snapshots WHERE account_id=?').get(target);
+    const snapshot = (await db.get('SELECT plan,status,provider FROM entitlement_snapshots WHERE account_id=?', [target]));
     eq(snapshot?.plan, 'premium', `${target} holds a premium entitlement in the database`);
     eq(snapshot?.status, 'active', `${target} is active`);
   }
-  const events = db.prepare("SELECT event_id,account_id FROM billing_events WHERE provider='admin'").all();
+  const events = (await db.all("SELECT event_id,account_id FROM billing_events WHERE provider='admin'"));
   eq(events.length, 3, 'the ledger holds one event per grant');
   eq(new Set(events.map(row => row.event_id)).size, 3, 'and the ids are distinct despite one clock reading');
   eq(new Set(events.map(row => row.account_id)).size, 3, 'each naming its own target');
   for (const target of targets) {
     ok(events.some(row => row.event_id.includes(target)), `the event id for ${target} names the account it granted`);
   }
-  eq(db.prepare("SELECT COUNT(*) AS n FROM audit_log WHERE action='entitlement.grant'").get().n, 3,
+  eq((await db.get("SELECT COUNT(*) AS n FROM audit_log WHERE action='entitlement.grant'")).n, 3,
     'the audit log records exactly the grants that happened');
 
   // ── 2 · A genuine replay is refused, and is not audited ───────────────────
   fixedEventId = `admin-${admin}-replayed-${FROZEN}`;
-  const fresh = account('acct_delta');
+  const fresh = await account('acct_delta');
   const firstDelta = await grant(fresh);
   eq(firstDelta.status, 200, 'the first grant under a fixed id applies');
   const replayed = await grant('acct_alpha');
   eq(replayed.status, 409, 'a grant whose event was already applied is refused');
   eq(replayed.data.error.code, 'ENTITLEMENT_GRANT_REPLAYED', 'and says so');
-  eq(db.prepare("SELECT COUNT(*) AS n FROM audit_log WHERE action='entitlement.grant'").get().n, 4,
+  eq((await db.get("SELECT COUNT(*) AS n FROM audit_log WHERE action='entitlement.grant'")).n, 4,
     'the refused grant is not written to the audit log as a grant');
-  eq(db.prepare('SELECT plan FROM entitlement_snapshots WHERE account_id=?').get(fresh)?.plan, 'premium',
+  eq((await db.get('SELECT plan FROM entitlement_snapshots WHERE account_id=?', [fresh]))?.plan, 'premium',
     'the grant that did apply is intact');
 
   // ── 3 · The id is unique per grant, not per millisecond ──────────────────
@@ -119,9 +119,10 @@ try {
 } finally {
   Date.now = realNow;
   server.close();
-  db.close();
+  await testStore.close();
 }
 
+console.log(`engine: ${testStore.engine}`);
 console.log(failures.length
   ? `ENTITLEMENT ADMIN GRANT: FAIL — ${failures.length} of ${pass + failures.length} checks failed\n  · ${failures.join('\n  · ')}`
   : `ENTITLEMENT ADMIN GRANT: PASS — ${pass}/${pass} checks — grants in the same millisecond do not collide, a replay is refused rather than audited, and every audit row is a grant that happened.`);

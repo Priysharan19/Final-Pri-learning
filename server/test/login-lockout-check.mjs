@@ -8,15 +8,17 @@
 import { performance } from 'node:perf_hooks';
 
 const { startApp, registerAccount, checks } = await import('./support/app-harness.mjs');
+const { requestedEngine } = await import('./support/engine.mjs');
 const {
   LOCKOUT_LOCK_MS, LOCKOUT_MAX_FAILURES, LOCKOUT_WINDOW_MS,
   loginAttemptKey, loginLockStatus, recordLoginFailure
 } = await import('../platform/loginLockout.js');
 
 const c = checks();
-const h = await startApp();
+// SQLite by default; `--engine=postgres` runs it on a migrated Postgres.
+const h = await startApp({ engine: requestedEngine() });
 const db = h.db;
-const clearLoginRate = () => db.prepare("DELETE FROM rate_limits WHERE bucket LIKE 'login:%'").run();
+const clearLoginRate = () => db.run("DELETE FROM rate_limits WHERE bucket LIKE 'login:%'");
 const login = (email, password) => h.request('/v1/account/login', { method: 'POST', body: { email, password, deviceId: 'ipad-lock' } });
 const median = values => [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)];
 
@@ -42,22 +44,22 @@ try {
   c.eq(known[LOCKOUT_MAX_FAILURES].data?.error?.code, 'ACCOUNT_LOCKED', 'lock is named');
   const retryAfter = Number(known[LOCKOUT_MAX_FAILURES].retryAfter);
   c.ok(retryAfter >= 1 && retryAfter <= LOCKOUT_LOCK_MS / 1000, `Retry-After is within the lock window (${retryAfter}s)`);
-  const row = db.prepare('SELECT * FROM login_attempts WHERE email_hash = ?').get(loginAttemptKey(KNOWN));
+  const row = (await db.get('SELECT * FROM login_attempts WHERE email_hash = ?', [loginAttemptKey(KNOWN)]));
   c.ok(row && row.failures === LOCKOUT_MAX_FAILURES && row.locked_until > Date.now(), 'lock persisted per account');
   c.ok(!Object.values(row).includes(KNOWN), 'the lockout table stores only an email hash');
 
-  clearLoginRate();
+  await clearLoginRate();
   const lockedCorrect = await login(KNOWN, 'right-password-123');
   c.eq(lockedCorrect.status, 429, 'the correct password does not bypass an active lock');
   c.eq(lockedCorrect.data?.error?.code, 'ACCOUNT_LOCKED', 'locked response is the same for the right password');
 
   // 2. An unknown email gets exactly the same sequence.
-  clearLoginRate();
+  await clearLoginRate();
   const unknown = await failureSequence('nobody.here@example.test');
   c.deq(unknown.map(r => [r.status, r.data]), known.map(r => [r.status, r.data]), 'unknown email is indistinguishable from a registered one (status + body)');
 
   // 3. Timing: one bcrypt comparison runs on every path.
-  clearLoginRate();
+  await clearLoginRate();
   const KNOWN2 = 'timing.student@example.test';
   await registerAccount(h, { email: KNOWN2, password: 'another-right-password' });
   const knownMs = [];
@@ -76,21 +78,21 @@ try {
   c.ok(u >= k * 0.5 && u <= k * 2, `unknown-email failure timing is within 2x of a registered account (known ${k.toFixed(0)}ms, unknown ${u.toFixed(0)}ms)`);
 
   // 4. When the lock expires, the correct password signs in and clears the record.
-  db.prepare('UPDATE login_attempts SET locked_until = ?, last_failed_at = ? WHERE email_hash = ?').run(Date.now() - 1, Date.now() - LOCKOUT_WINDOW_MS - 1, loginAttemptKey(KNOWN));
-  clearLoginRate();
+  await db.run('UPDATE login_attempts SET locked_until = ?, last_failed_at = ? WHERE email_hash = ?', [Date.now() - 1, Date.now() - LOCKOUT_WINDOW_MS - 1, loginAttemptKey(KNOWN)]);
+  await clearLoginRate();
   const afterLock = await login(KNOWN, 'right-password-123');
   c.eq(afterLock.status, 200, 'sign-in succeeds once the lock has expired');
-  c.eq(db.prepare('SELECT 1 FROM login_attempts WHERE email_hash = ?').get(loginAttemptKey(KNOWN)), undefined, 'success clears the failure record');
+  c.eq((await db.get('SELECT 1 FROM login_attempts WHERE email_hash = ?', [loginAttemptKey(KNOWN)])), undefined, 'success clears the failure record');
 
   // 5. A few failures followed by success also clear the counter.
   // Step 3's timing probe left failures on KNOWN2 inside the same sliding
   // window, so start from a clean record to count exactly three.
-  clearLoginRate();
-  db.prepare('DELETE FROM login_attempts WHERE email_hash = ?').run(loginAttemptKey(KNOWN2));
+  await clearLoginRate();
+  await db.run('DELETE FROM login_attempts WHERE email_hash = ?', [loginAttemptKey(KNOWN2)]);
   for (let i = 0; i < 3; i++) await login(KNOWN2, 'wrong-password-y');
-  c.eq(db.prepare('SELECT failures FROM login_attempts WHERE email_hash = ?').get(loginAttemptKey(KNOWN2))?.failures, 3, 'failures accumulate');
+  c.eq((await db.get('SELECT failures FROM login_attempts WHERE email_hash = ?', [loginAttemptKey(KNOWN2)]))?.failures, 3, 'failures accumulate');
   c.eq((await login(KNOWN2, 'another-right-password')).status, 200, 'correct password after three failures signs in');
-  c.eq(db.prepare('SELECT 1 FROM login_attempts WHERE email_hash = ?').get(loginAttemptKey(KNOWN2)), undefined, 'counter cleared by success');
+  c.eq((await db.get('SELECT 1 FROM login_attempts WHERE email_hash = ?', [loginAttemptKey(KNOWN2)])), undefined, 'counter cleared by success');
 
   // 6. Sliding window semantics with a controlled clock: the window follows
   // the most recent failure, so slow guessing that stays inside 15-minute
@@ -112,10 +114,10 @@ try {
   c.eq(reset.locked, false, 'and does not lock');
 
   // 7. The per-IP login rate limit is unchanged (12 per 15 minutes).
-  clearLoginRate();
+  await clearLoginRate();
   const RATE = 'rate.student@example.test';
   await registerAccount(h, { email: RATE, password: 'rate-limit-password' });
-  clearLoginRate();
+  await clearLoginRate();
   const statuses = [];
   for (let i = 0; i < 13; i++) statuses.push(await login(RATE, 'rate-limit-password'));
   c.ok(statuses.slice(0, 12).every(r => r.status === 200), 'twelve sign-ins in the window succeed');
@@ -123,7 +125,7 @@ try {
   c.eq(statuses[12].data?.error?.code, 'RATE_LIMITED', 'rate limit keeps its own code, distinct from lockout');
 } finally {
   await h.close();
-  db.close();
 }
 
+console.log(`engine: ${h.engine}`);
 console.log(`LOGIN LOCKOUT — PASS — ${c.count()}/${c.count()} checks`);
