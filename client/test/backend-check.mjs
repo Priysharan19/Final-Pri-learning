@@ -976,12 +976,41 @@ async function run() {
     await rejects('a discarded question cannot later be submitted',
       POST(`/practice/${discardTarget.question.id}/submit`, { answer: '1' }), { status: 409 });
 
+    // Handwriting in progress survives a reload: the unfinished page is kept on
+    // the question's own row, comes back with the resumed question, is never an
+    // attempt, and is gone the moment the question resolves.
+    const inkTarget = await nextQuestion({ mode: 'topic', subtopic: topicId });
+    const strokes = [{ points: [[10, 12], [40, 18], [80, 20]] }, { points: [[12, 60], [70, 64]] }];
+    const savedInk = await POST(`/practice/${inkTarget.question.id}/ink-draft`, { strokes });
+    eq('an ink draft is saved on the open question', savedInk.strokes, 2);
+    eq('saving an ink draft writes no attempt',
+      (await idb.byIndex('attempts', 'pid', ada.id)).filter(a => a.questionId === inkTarget.question.id).length, 0);
+    const resumedInk = await POST('/practice/next', { mode: 'topic', subtopic: topicId, resume: true });
+    eq('resuming returns the same unfinished question', resumedInk.question.id, inkTarget.question.id);
+    eq('the resumed question carries the student’s unfinished ink',
+      JSON.stringify(resumedInk.question.inkDraft?.[0]?.points?.[1]), JSON.stringify({ x: 40, y: 18 }));
+    const resumeSummary = await GET('/practice/resume');
+    eq('the Home resume summary names the unfinished question', resumeSummary.resume?.questionId, inkTarget.question.id);
+    ok('the Home resume summary carries no question content',
+      !('prompt' in (resumeSummary.resume || {})) && !('inkDraft' in (resumeSummary.resume || {})), show(resumeSummary.resume));
+    await POST(`/practice/${inkTarget.question.id}/ink-draft`, { strokes: [] });
+    eq('an emptied page clears the ink draft',
+      (await POST('/practice/next', { mode: 'topic', subtopic: topicId, resume: true })).question.inkDraft, null);
+    await POST(`/practice/${inkTarget.question.id}/ink-draft`, { strokes });
+    await POST(`/practice/${inkTarget.question.id}/reveal`, { ms: 1000 });
+    eq('resolution drops the ink draft from the stored row',
+      (await idb.get('questions', inkTarget.question.id))?.inkDraft ?? null, null);
+    await rejects('a resolved question takes no further ink draft',
+      POST(`/practice/${inkTarget.question.id}/ink-draft`, { strokes }), { status: 409 });
+
     const strangerQ = await nextQuestion({});
     await POST('/profiles/select', { id: grace.id, password: 'punch-cards-9' });
     await rejects('another profile cannot answer your question',
       POST(`/practice/${strangerQ.question.id}/submit`, { answer: '1' }), { status: 404 });
     await rejects('another profile cannot hint at your question',
       POST(`/practice/${strangerQ.question.id}/hint`, {}), { status: 404 });
+    await rejects('another profile cannot read or write your unfinished ink',
+      POST(`/practice/${strangerQ.question.id}/ink-draft`, { strokes: [{ points: [[1, 1], [2, 2]] }] }), { status: 404 });
     await POST('/profiles/select', { id: ada.id });
 
     const stats = await GET('/stats');

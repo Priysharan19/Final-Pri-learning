@@ -384,17 +384,17 @@ function actionCopy(action, user, t, topicName, resume) {
   const adaptiveTopic = action.kind === 'adaptive' ? (d.topic || null) : null;
   const title = action.kind === 'exam' ? (d.title || t('home.next.exam'))
     : action.kind === 'assignment' || action.kind === 'task' ? d.title
-      : action.kind === 'task-resume' ? (d.title ? t('home.next.continueTopic', { topic: d.title }) : t('home.next.resumePractice'))
-        : action.kind === 'practice-resume' ? (resumeTopic ? t('home.next.continueTopic', { topic: resumeTopic }) : t('home.next.resumePractice'))
+      : action.kind === 'task-resume' ? (d.title || t('home.next.resumePractice'))
+        : action.kind === 'practice-resume' ? (resumeTopic || t('home.next.resumePractice'))
           : action.kind === 'reviews' ? t('home.next.reviews', d)
             : action.kind === 'daily-goal' ? t('home.goalRemaining', d)
               : action.kind === 'first-practice' ? t(india ? 'home.next.firstIndia' : 'home.next.firstNsw', d)
-                : adaptiveTopic ? t('home.next.practiseTopic', { topic: adaptiveTopic })
+                : adaptiveTopic ? adaptiveTopic
                   : t('home.next.smart');
   const reason = action.kind === 'exam' ? 'home.reason.examInProgress'
     : action.kind === 'assignment' || action.kind === 'task' ? WORK_REASONS[d.status] || 'home.reason.ready'
       : action.kind.endsWith('resume') ? 'home.reason.resume'
-        : action.kind === 'reviews' ? 'home.reason.reviews'
+        : action.kind === 'reviews' ? 'home.reviewDue'
           : action.kind === 'daily-goal' ? 'home.reason.dailyGoal'
             : action.kind === 'adaptive' ? 'home.reason.adaptive'
               : action.kind === 'first-practice' ? 'home.reason.first'

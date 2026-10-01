@@ -544,14 +544,14 @@ function AccountMenu({ user, onSwitch }) {
         aria-haspopup="menu" aria-expanded={open}
         onClick={() => (open ? shut(false) : openAt(0))} onKeyDown={onButtonKey}
         style={{ background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>
-        <span className="user-avatar">{user.avatar && user.avatar !== '🙂' ? user.avatar : initials(user.name)}</span>
+        <span className="user-avatar" aria-hidden="true">{initials(user.name)}</span>
         {user.name.split(' ')[0]}
         <Icon name="chevronDown" size={14} />
       </button>
       {open && (
         <div className="acct-menu">
           <div className="acct-menu-head">
-            <span className="acct-avatar">{user.avatar || '🙂'}</span>
+            <span className="acct-avatar" aria-hidden="true">{initials(user.name)}</span>
             <span style={{ minWidth: 0 }}>
               <span className="acct-name" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 {user.name}

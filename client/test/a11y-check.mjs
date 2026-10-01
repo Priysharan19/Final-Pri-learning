@@ -803,7 +803,9 @@ async function run() {
     });
 
     await step('exam room · marked paper', '/exams/:id', async () => {
-      await click(page, 'button.btn-primary', { text: 'Submit paper' });
+      await click(page, '.exam-head .btn', { text: 'Review and submit' });
+      await page.waitForSelector('[role="dialog"]', { timeout: 10000 });
+      await click(page, '[role="dialog"] button.btn-primary', { text: 'Submit paper' });
       await page.waitForSelector('.hero-num', { timeout: 60000 });
       await wait(page, 900);
     });

@@ -116,9 +116,6 @@ const SAME_IN_BOTH = new Map([
   ['common.percent', 'a number and a percent sign; there is nothing in it to translate'],
   ['common.none', 'an em dash standing in for "no value"'],
   ['home.difficultyChip', 'D1–D4 is the app’s own shorthand and is read as a code, not a word'],
-  ['home.recentVerdict', 'two slots and a dash; both slots are themselves translated'],
-  ['verdict.modeTypeGlyph', 'the letter drawn on the type-mode tab; ट is a different letter, not a translation'],
-  ['verdict.enterKey', 'the legend printed on the physical key, which says Enter in India too'],
 ]);
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -211,7 +208,11 @@ const CONVERTED = [
   // wrong: the DPDP Act gives a reader the right to the notice in their own
   // language, and chrome in English over a Hindi notice takes part of that back.
   'src/pages/Legal.jsx',
-  'src/components/QuestionCard.jsx'
+  'src/components/QuestionCard.jsx',
+  // The formal exam room and the handwriting surface joined with the
+  // paper/instrument redesign: both are read by Hindi-medium students mid-task.
+  'src/pages/ExamRoom.jsx',
+  'src/ink/InkAnswer.jsx'
 ];
 
 // Attributes a person reads or hears. `className`, `style`, `role`, `id` and

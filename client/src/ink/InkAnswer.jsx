@@ -409,7 +409,7 @@ export default function InkAnswer({
         <span className="ink-sep" aria-hidden="true" />
         <button type="button" className="ink-tool" onClick={act('undo')} title={t('ink.undo')} aria-label={t('ink.undoLabel')}><Icon name="undo" /></button>
         <button type="button" className="ink-tool" onClick={act('redo')} title={t('ink.redo')} aria-label={t('ink.redoLabel')}><Icon name="redo" /></button>
-        <button type="button" className="ink-tool" onClick={act('clear')} title="Clear" aria-label={t('ink.clearLabel')}><Icon name="clear" /></button>
+        <button type="button" className="ink-tool" onClick={act('clear')} title={t('ink.clear')} aria-label={t('ink.clearLabel')}><Icon name="clear" /></button>
         <span className="ink-sep" aria-hidden="true" />
         <button type="button" className="ink-tool" disabled={pages >= MAX_PAGES}
           aria-label={t('ink.addPageLabel', { n: pages + 1 })} title={t('ink.addPage')}
@@ -517,10 +517,10 @@ export default function InkAnswer({
           {engineNote && <div className="ink-dev">{engineNote}</div>}
           {engineNote && rec.disagreement && Array.isArray(rec.candidateReadings) && rec.candidateReadings.length > 1 && (
             <details style={{ margin: '8px 14px 2px', fontSize: 11.5 }} className="muted">
-              <summary style={{ cursor: 'pointer' }}>Recognition evidence</summary>
+              <summary style={{ cursor: 'pointer' }}>{t('ink.evidence')}</summary>
               {rec.candidateReadings.map((candidate, index) => (
                 <div key={`${candidate.engine}-${index}`} style={{ marginTop: 5, overflowWrap: 'anywhere' }}>
-                  <b>{candidate.engine}</b> → {candidate.text || candidate.failure || 'no reading'}
+                  <b>{candidate.engine}</b> → {candidate.text || candidate.failure || t('ink.noReading')}
                 </div>
               ))}
             </details>
@@ -531,7 +531,7 @@ export default function InkAnswer({
               {lineVerdicts && lineVerdicts[li] && ['ok', 'break', 'wrong'].includes(lineVerdicts[li].status) && (
                 <span className={`ink-line-verdict ${lineVerdicts[li].status === 'ok' ? 'good' : 'bad'}`}>
                   {lineVerdicts[li].status === 'ok' ? <Icon name="check" size={15} /> : <Icon name="correction" size={15} />}
-                  <span className="sr-only">{t(lineVerdicts[li].status === 'ok' ? 'ink.lineOkSpoken' : 'ink.lineBreaksSpoken', { n: li + 1 })} </span>
+                  <span className="sr-only">{lineVerdicts[li].status === 'ok' ? t('ink.lineOkSpoken', { n: li + 1 }) : t('ink.lineBreaksSpoken', { n: li + 1 })} </span>
                 </span>
               )}
               <span className="ink-line-math"><MathText text={`$${exprToLatex(line.text) || '\\;'}$`} /></span>
@@ -545,7 +545,7 @@ export default function InkAnswer({
                     key={s.id}
                     className={`ink-sym ${s.conf < 0.45 ? 'shaky' : ''} ${s.id === focusSymbol ? 'is-focus' : ''}`}
                     title={s.id === focusSymbol ? t('ink.checkThisOne') : t('ink.tapToCorrect')}
-                    aria-label={t(s.conf < 0.45 ? 'ink.symbolShakyLabel' : 'ink.symbolLabel', { n: li + 1, sym: showSym(s.sym) })}
+                    aria-label={s.conf < 0.45 ? t('ink.symbolShakyLabel', { n: li + 1, sym: showSym(s.sym) }) : t('ink.symbolLabel', { n: li + 1, sym: showSym(s.sym) })}
                     aria-expanded={picker?.id === s.id}
                     onClick={() => setPicker(picker?.id === s.id ? null : { id: s.id, alts: s.alts || [] })}
                   >{showSym(s.sym)}</button>
