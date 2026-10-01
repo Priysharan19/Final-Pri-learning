@@ -1059,6 +1059,78 @@ async function run() {
     await rejects('an unknown exam is a 404', GET('/exams/not-a-real-id'), { status: 404 });
   } catch (err) { crashed(err); }
 
+  // ── Exam boundary (issue #230) ─────────────────────────────────────────────
+  // Exam questions share the `questions` store with practice. The ExamRoom UI
+  // never offers hints or solutions mid-paper, but that is not the authority:
+  // these checks call the practice and history routes directly with the ids of
+  // an active paper's questions, and every one must fail closed without
+  // touching the row, the student's attempts or their review schedule.
+  section('exam boundary');
+  try {
+    const me = (await GET('/me')).user.id;
+    const active = (await POST('/exams', { length: 10, minutes: 30 })).exam;
+    const stored = await idb.get('exams', active.id);
+    const rows = [];
+    for (const qid of stored.questionIds) rows.push(await idb.get('questions', qid));
+    const single = rows.find(r => r && !r.payload.multipart);
+    const multi = rows.find(r => r && r.payload.multipart);
+    ok('the active paper has a single-answer question to probe', !!single);
+    ok('the active paper has a multipart question to probe', !!multi);
+
+    const attemptsBefore = (await idb.byIndex('attempts', 'pid', me)).length;
+    const reviewsBefore = JSON.stringify(await idb.byIndex('reviews', 'pid', me));
+
+    const locked = async (name, promise) => {
+      const err = await rejects(name, promise, { status: 403 });
+      eq(`${name} — with the exam-lock code`, err?.code, 'EXAM_QUESTION_LOCKED');
+      const leaked = err && ['solution', 'hint', 'answerText', 'steps'].filter(k => k in err);
+      eq(`${name} — and nothing of the solution rides on the error`, leaked || [], []);
+    };
+
+    for (const [label, row] of [['single', single], ['multipart', multi]]) {
+      if (!row) continue;
+      const id = row.id;
+      await locked(`a ${label} active exam question cannot take a practice hint`, POST(`/practice/${id}/hint`, {}));
+      await locked(`a ${label} active exam question cannot be revealed through practice`, POST(`/practice/${id}/reveal`, { ms: 1000 }));
+      await locked(`a ${label} active exam question cannot be marked through practice`,
+        POST(`/practice/${id}/submit`, { answer: row.payload.multipart ? '0' : (canonicalInput(row.payload) ?? '0'), ms: 1000 }));
+      await locked(`a ${label} active exam question cannot be skipped through practice`, POST(`/practice/${id}/discard`, {}));
+      await locked(`a ${label} active exam question has no history detail yet`, GET(`/history/${id}/detail`));
+      await locked(`a ${label} active exam question cannot be retried as practice`, POST(`/history/${id}/retry`, { variant: 'same' }));
+      const after = await idb.get('questions', id);
+      eq(`the ${label} exam row is untouched by every refused call`,
+        { hintsUsed: after.hintsUsed, answered: after.answered, tries: after.tries, discardedAt: after.discardedAt ?? null, mode: after.mode },
+        { hintsUsed: 0, answered: 0, tries: 0, discardedAt: null, mode: 'exam' });
+    }
+    eq('no attempt was recorded from an active exam question', (await idb.byIndex('attempts', 'pid', me)).length, attemptsBefore);
+    eq('no review schedule moved from an active exam question', JSON.stringify(await idb.byIndex('reviews', 'pid', me)), reviewsBefore);
+
+    // A row that says it is an exam question but whose paper cannot be found is
+    // not "finished": review stays shut rather than defaulting open.
+    if (single) {
+      const orphan = { ...single, id: `${single.id}-orphan`, examId: 'no-such-exam' };
+      await idb.put('questions', orphan);
+      await locked('an exam question whose paper is missing stays locked', GET(`/history/${orphan.id}/detail`));
+      await locked('an orphaned exam question still refuses practice hints', POST(`/practice/${orphan.id}/hint`, {}));
+      await idb.del('questions', orphan.id);
+    }
+
+    // The exam's own contract still works, and finishing it is what opens review.
+    const done = await POST(`/exams/${active.id}/submit`, { answers: {}, ms: 60000 });
+    ok('the paper is still marked through the exam route', done.total > 0, `total ${done.total}`);
+    if (single) {
+      const detail = await GET(`/history/${single.id}/detail`);
+      ok('after submission the worked solution opens in review', !!detail.solution?.answerText, show(detail.solution));
+      await locked('after submission the practice hint route still refuses an exam question', POST(`/practice/${single.id}/hint`, {}));
+      await locked('after submission the practice marker still refuses an exam question',
+        POST(`/practice/${single.id}/submit`, { answer: canonicalInput(single.payload) ?? '0', ms: 1000 }));
+    }
+    if (multi) {
+      const detail = await GET(`/history/${multi.id}/detail`);
+      ok('after submission a multipart solution opens in review', Array.isArray(detail.solution?.parts) && detail.solution.parts.length > 0, show(detail.solution));
+    }
+  } catch (err) { crashed(err); }
+
   // ── History ────────────────────────────────────────────────────────────────
   section('history');
   try {

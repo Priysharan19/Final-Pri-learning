@@ -2569,6 +2569,7 @@ const routes = {
     const p = await requireProfile();
     const row = await get('questions', params.id);
     if (!row || row.pid !== p.id) throw Object.assign(new Error('Question not found'), { status: 404 });
+    assertPracticeRow(row);
     if (row.answered) throw Object.assign(new Error('Already answered'), { status: 409 });
     if (!row.discardedAt) {
       row.discardedAt = Date.now();
@@ -2581,6 +2582,7 @@ const routes = {
     const p = await requireProfile();
     const row = await get('questions', params.id);
     if (!row || row.pid !== p.id) throw Object.assign(new Error('Question not found'), { status: 404 });
+    assertPracticeRow(row);
     if (row.discardedAt) throw Object.assign(new Error('Question was skipped'), { status: 409, code: 'QUESTION_DISCARDED' });
     const q = row.payload;
     const hints = q.hints || [];
@@ -2595,6 +2597,7 @@ const routes = {
     const p = await requireProfile();
     const row = await get('questions', params.id);
     if (!row || row.pid !== p.id) throw Object.assign(new Error('Question not found'), { status: 404 });
+    assertPracticeRow(row);
     if (row.answered) throw Object.assign(new Error('Already answered'), { status: 409 });
     if (row.discardedAt) throw Object.assign(new Error('Question was skipped'), { status: 409, code: 'QUESTION_DISCARDED' });
     const q = row.payload;
@@ -2670,6 +2673,7 @@ const routes = {
     const p = await requireProfile();
     const row = await get('questions', params.id);
     if (!row || row.pid !== p.id) throw Object.assign(new Error('Question not found'), { status: 404 });
+    assertPracticeRow(row);
     if (row.answered) throw Object.assign(new Error('Already answered'), { status: 409 });
     if (row.discardedAt) throw Object.assign(new Error('Question was skipped'), { status: 409, code: 'QUESTION_DISCARDED' });
     const q = row.payload;
@@ -3312,6 +3316,7 @@ const routes = {
     const p = await requireProfile();
     const row = await get('questions', params.id);
     if (!row || row.pid !== p.id) throw Object.assign(new Error('Question not found'), { status: 404 });
+    await assertReviewableRow(row);
     const q = row.payload;
     if (q.custom) throw Object.assign(new Error('Custom questions can’t be regenerated'), { status: 400 });
     if (q.multipart) throw Object.assign(new Error('Structured exam questions live in exam review'), { status: 400 });
@@ -3332,6 +3337,7 @@ const routes = {
     const p = await requireProfile();
     const row = await get('questions', params.id);
     if (!row || row.pid !== p.id) throw Object.assign(new Error('Question not found'), { status: 404 });
+    await assertReviewableRow(row);
     const q = row.payload;
     const ink = await get('inks', params.id);
     return {
@@ -3523,6 +3529,34 @@ const routes = {
     };
   }
 };
+
+// ── Assessment boundary ──────────────────────────────────────────────────────
+// Exam questions live in the same `questions` store as practice, so a route
+// that takes a question id must decide from the stored row — not from which
+// page called it — what that row may be used for. An exam row is answered only
+// through POST /exams/:id/submit; the practice help and marking routes (hints,
+// reveal, two-try submit, skip) never touch it, before or after the paper is
+// finished. Review routes (history detail, retry) may open an exam row only
+// once its paper has been submitted. Anything that cannot prove the paper is
+// finished — a missing exam record included — fails closed.
+
+const isExamRow = row => row?.mode === 'exam' || !!row?.examId;
+
+function examQuestionLocked(message) {
+  return Object.assign(new Error(message), { status: 403, code: 'EXAM_QUESTION_LOCKED' });
+}
+
+function assertPracticeRow(row) {
+  if (isExamRow(row)) throw examQuestionLocked('This question belongs to an exam paper — answer it in the exam room.');
+}
+
+async function assertReviewableRow(row) {
+  if (!isExamRow(row)) return;
+  const exam = row.examId ? await get('exams', row.examId).catch(() => null) : null;
+  if (!exam || exam.pid !== row.pid || !exam.finishedAt) {
+    throw examQuestionLocked('Solutions for this exam question open once the paper is submitted.');
+  }
+}
 
 async function examFor(pid, examId) {
   const e = await get('exams', examId);
