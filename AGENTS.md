@@ -29,6 +29,7 @@ For any mission that changes learning behavior, learner-state inference, mathema
 5. If the implementation deliberately departs from accepted research architecture, record the new evidence and decision rationale rather than silently diverging.
 6. For R3/R4 learning-authority work involving tutoring policy, learner modelling, mathematical truth/first-break, handwriting authority, multilingual mathematical help, adaptive sequencing or experiments, read the relevant V7 deep-dive route in `docs/research/README.md`. Major cross-domain decisions must also check `V7_DEEP_RESEARCH_SYNTHESIS_AND_DECISION_ARCHITECTURE.md` and the claim/falsifier ledger.
 7. Never convert a literature result into a production threshold or efficacy claim without preserving its population, comparator, outcome, delay, independence and transportability limits.
+8. Before selecting a new research-derived learning-intelligence mission, check `docs/research/RESEARCH_TO_BUILD_V7.md` for dependency gates; do not implement late-stage causal personalization, adaptive authority or efficacy claims ahead of the measurement/experimentation prerequisites.
 
 Research is not proof that a capability exists, works, or improves learning. Never weaken deterministic safety, marking, privacy, curriculum, offline or release invariants merely to match a paper or research proposal.
 
