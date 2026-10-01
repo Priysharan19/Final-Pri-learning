@@ -53,6 +53,7 @@
     "test:a11y": "node client/test/a11y-gate.mjs",
     "sync:ios": "node scripts/sync-ios.mjs",
     "release:matrix": "node scripts/release-matrix.mjs",
+    "release:store": "node scripts/store-readiness-check.mjs",
     "check:ios": "node scripts/sync-ios.mjs --check",
     "serve:lan": "node scripts/serve-lan.mjs",
     "test:ipad:native": "node scripts/test-ipad-native.mjs",
