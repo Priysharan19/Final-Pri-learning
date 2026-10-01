@@ -992,6 +992,115 @@ async function run() {
     eq('today’s activity is recorded', (await GET('/me')).user.today.questions, stats.totals.attempts);
   } catch (err) { crashed(err); }
 
+  // ── Misconception repair is opportunity-specific (issue #232) ──────────────
+  // A clean correct answer is evidence against a misconception only when the
+  // question carried that misconception's designed trap or distractor. Before
+  // the fix every clean answer credited every trap in the subtopic, so four
+  // unrelated correct answers deleted an active misconception outright.
+  section('misconception repair');
+  try {
+    const { getRating, putRating } = await import(`${SRC}local/store.js`);
+    const { misconceptionKey, START_RATING, TRAP_ACTIVE_AT } = await import(`${SRC}engine/adaptive.js`);
+    const { cloudLinkRowId } = await import(`${SRC}platform/cloudAccount.js`);
+
+    const noether = (await POST('/profiles', { name: 'Emmy Noether', year: 10 })).user;
+    eq('a fresh learner is selected for this group', (await GET('/me')).user.id, noether.id);
+    // This group serves dozens of questions; the free daily cap is the subject
+    // of entitlement-enforcement-check.mjs, so it is lifted here.
+    {
+      const nowMs = Date.now();
+      await idb.put('device', {
+        id: cloudLinkRowId(noether.id), accountId: `acct-${noether.id}`, role: 'student',
+        emailVerified: true, linkedAt: nowMs, lastVerifiedAt: nowMs, lastSyncAt: null,
+        entitlement: {
+          plan: 'premium', status: 'active', provider: 'web',
+          currentPeriodEnd: nowMs + 30 * 86400000, offlineUntil: nowMs + 7 * 86400000,
+          issuedAt: nowMs, sourceVersion: 1
+        }
+      });
+    }
+
+    const probeKeys = (q, owner) => new Set([
+      ...(Array.isArray(q.traps) ? q.traps : []),
+      ...Object.values(q.answer?.optionTraps || {}).map(why => ({ why }))
+    ].filter(t => t && t.why).map(t => misconceptionKey(owner, t.why)).filter(Boolean));
+
+    /** A served, correctly answerable question that does (or does not) carry a designed slip. */
+    async function servedWhere(subtopics, accept, perTopic = 6) {
+      for (const sub of subtopics) {
+        for (let i = 0; i < perTopic; i++) {
+          const s = await nextQuestion({ mode: 'topic', subtopic: sub });
+          const right = canonicalInput(s.payload);
+          if (right !== null && checkAnswer(s.payload, right).correct && accept(s, sub)) return { ...s, right, sub };
+          await POST(`/practice/${s.question.id}/discard`, {});
+        }
+      }
+      return null;
+    }
+
+    /** Write an active misconception onto a subtopic's ledger, as recordTrap would leave it. */
+    async function seedTrap(sub, key, label) {
+      const st = (await getRating(noether.id, sub)) || { rating: START_RATING, attempts: 0, correct: 0, last_at: null };
+      const now = Date.now();
+      await putRating(noether.id, sub, {
+        ...st, traps: { ...(st.traps || {}), [key]: { n: 3, credit: 0, firstAt: now, lastAt: now, label, dotpoint: null } }
+      });
+    }
+    const ledger = async (sub) => (await getRating(noether.id, sub))?.traps || {};
+
+    const year10 = subtopicsForYear(10).map(s => s.id);
+    const targeted = await servedWhere(year10, (s, sub) => probeKeys(s.payload, sub).size > 0);
+    if (!ok('a Year 10 question carrying a designed slip was served', !!targeted)) throw new Error('no trap-carrying question');
+    const S = targeted.sub;
+    const K = [...probeKeys(targeted.payload, S)][0];
+    // A misconception no question in this subtopic can spring: the evidence
+    // the student produces below is unrelated to it by construction.
+    const A = misconceptionKey(S, 'Regression probe for issue 232: a slip that no authored question describes.');
+    ok('the unrelated misconception is not an opportunity on the targeted question', !probeKeys(targeted.payload, S).has(A));
+    await seedTrap(S, A, 'Unrelated slip');
+    await seedTrap(S, K, 'Targeted slip');
+
+    // A targeted, clean, unaided correct answer banks repair credit — for the
+    // slip it could have shown, and for nothing else.
+    const r1 = await POST(`/practice/${targeted.question.id}/submit`, { answer: targeted.right, ms: 9000 });
+    eq('the targeted question was answered cleanly', [r1.correct, r1.resolved], [true, true]);
+    let book = await ledger(S);
+    eq('a clean targeted answer banks one repair credit on its own slip', book[K]?.credit, 1);
+    eq('…and none on an unrelated slip in the same subtopic', book[A]?.credit, 0);
+
+    // Four unrelated clean answers in the same subtopic cannot erase A.
+    let unrelated = 0;
+    for (let i = 0; i < 4; i++) {
+      const s = await servedWhere([S], (q, sub) => !probeKeys(q.payload, sub).has(A), 10);
+      if (!s) break;
+      const r = await POST(`/practice/${s.question.id}/submit`, { answer: s.right, ms: 9000 });
+      if (r.correct && r.resolved) unrelated++;
+    }
+    eq('four unrelated questions were answered cleanly', unrelated, 4);
+    book = await ledger(S);
+    ok('four unrelated clean answers do not delete the misconception', !!book[A], show(Object.keys(book)));
+    eq('…bank it no repair credit', book[A]?.credit, 0);
+    eq('…and leave its count untouched', book[A]?.n, 3);
+    const named = (await GET('/stats')).misconceptions.find(m => m.key === A);
+    ok('the misconception is still named on /stats', !!named && named.count >= TRAP_ACTIVE_AT, show((await GET('/stats')).misconceptions));
+
+    // A hinted correct answer on a targeted question is support, not
+    // independent repair: it banks nothing.
+    const hintable = await servedWhere(year10,
+      (s, sub) => probeKeys(s.payload, sub).size > 0 && Array.isArray(s.payload.hints) && s.payload.hints.length > 0);
+    if (ok('a trap-carrying question with a hint was served', !!hintable)) {
+      const H = [...probeKeys(hintable.payload, hintable.sub)][0];
+      await seedTrap(hintable.sub, H, 'Hinted slip');
+      const before = (await ledger(hintable.sub))[H]?.credit;
+      await POST(`/practice/${hintable.question.id}/hint`, {});
+      const r = await POST(`/practice/${hintable.question.id}/submit`, { answer: hintable.right, ms: 9000 });
+      eq('the hinted targeted question was answered correctly', r.correct, true);
+      eq('a hinted targeted answer banks no repair credit', (await ledger(hintable.sub))[H]?.credit, before);
+    }
+
+    await POST('/profiles/select', { id: ada.id });
+  } catch (err) { crashed(err); }
+
   // ── Exams ──────────────────────────────────────────────────────────────────
   section('exams');
   try {
