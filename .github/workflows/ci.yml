@@ -208,6 +208,8 @@ jobs:
           node server/test/security-production-mode-check.mjs
       - name: Commercial platform schema contract
         run: node server/test/platform-schema-check.mjs
+      - name: Supabase migrations are self-contained transactions (supabase db push)
+        run: node server/test/migration-transaction-check.mjs
       - name: Supabase schema parity (migration text)
         run: node server/test/postgres-schema-parity-check.mjs
       - name: Platform store, concurrency, sync burst, connection config and fail-closed startup (SQLite)

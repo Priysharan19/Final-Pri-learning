@@ -112,7 +112,9 @@ npx supabase@latest link --project-ref orudxrckgxyyraopyzmn
 npx supabase@latest migration list
 npx supabase@latest db push --dry-run
 
-# 2.4  Apply. Each migration runs in its own transaction; a failure stops at that file.
+# 2.4  Apply. The CLI does NOT wrap a file in a transaction; every migration here
+#      opens and commits its own (begin; … commit;), so a failure part-way leaves
+#      that file unapplied and stops the push there.
 npx supabase@latest db push
 ```
 
