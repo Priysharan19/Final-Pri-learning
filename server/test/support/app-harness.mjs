@@ -95,7 +95,8 @@ export async function startApp({
     return raw.exec(sql);
   }
 
-  return { app, db, server, origin, request, close, adminExec, engine: testStore?.engine || 'sqlite' };
+  // url: the pri_server-member connection URL on Postgres (null on SQLite).
+  return { app, db, server, origin, request, close, adminExec, engine: testStore?.engine || 'sqlite', url: testStore?.url || null };
 }
 
 export async function registerAccount(harness, {

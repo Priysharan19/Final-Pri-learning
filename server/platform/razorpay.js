@@ -1,6 +1,6 @@
 import { createHash, createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
 import { applyVerifiedEntitlement } from './entitlements.js';
-import { asStore } from './store.js';
+import { asStore, assertNoOpenTransaction } from './store.js';
 
 const API_ORIGIN = 'https://api.razorpay.com';
 const API_PATH = '/v1/subscriptions';
@@ -191,6 +191,9 @@ function accountBindingFromNotes(subscription) {
 }
 
 async function providerRequest(cfg, path, { method = 'GET', body, fetchImpl = globalThis.fetch } = {}) {
+  // Never inside a database transaction: a webhook verifier runs inside one
+  // (billing.js) and may be re-run on a serialization retry.
+  assertNoOpenTransaction('A Razorpay API call');
   if (typeof fetchImpl !== 'function') throw configError('No HTTP implementation is available for Razorpay verification.');
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 12_000);

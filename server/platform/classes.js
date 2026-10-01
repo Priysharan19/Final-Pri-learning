@@ -1,5 +1,5 @@
 import { asyncRouter } from './asyncRouter.js';
-import { asStore } from './store.js';
+import { asStore, isDatabaseOverload } from './store.js';
 import { sanitizeAssignmentSummary } from './assignmentProgress.js';
 import { classAnalytics, validateAssignmentSpecification } from './assignmentTargets.js';
 import { id, opaqueToken, rateLimit, requireRole, requireSession, requireVerifiedEmail, sha256 } from './security.js';
@@ -362,6 +362,7 @@ export function createClassRouter(db) {
       const result = await writeStudentSubmission(db, { assignmentId, studentId, state, summary: req.body?.summary || {} });
       res.json({ ok: true, ...result });
     } catch (error) {
+      if (isDatabaseOverload(error)) throw error;
       res.status(error.status || 400).json({ error: { code: error.code || 'SUBMISSION_INVALID', message: error.message } });
     }
   });
@@ -381,6 +382,7 @@ export function createClassRouter(db) {
       });
       res.json({ ok: true, ...result });
     } catch (error) {
+      if (isDatabaseOverload(error)) throw error;
       res.status(error.status || 400).json({ error: { code: error.code || 'FEEDBACK_INVALID', message: error.message } });
     }
   });

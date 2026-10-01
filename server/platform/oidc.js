@@ -1,4 +1,5 @@
 import { createHash, createPublicKey, verify as verifySignature } from 'node:crypto';
+import { assertNoOpenTransaction } from './store.js';
 
 const PROVIDERS = Object.freeze({
   google: Object.freeze({
@@ -28,6 +29,7 @@ function configuredAudiences(provider) {
 async function jwksFor(provider, now = Date.now()) {
   const prior = cache.get(provider);
   if (prior && prior.expiresAt > now) return prior.keys;
+  assertNoOpenTransaction('Fetching identity-provider keys');
   const response = await fetch(PROVIDERS[provider].jwks, { headers: { Accept: 'application/json' }, redirect: 'error', signal: AbortSignal.timeout(8000) });
   if (!response.ok) throw Object.assign(new Error('Identity provider keys are unavailable.'), { code: 'OIDC_KEYS_UNAVAILABLE' });
   const body = await response.json();

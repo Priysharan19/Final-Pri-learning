@@ -1,5 +1,5 @@
 import { asyncRouter } from './asyncRouter.js';
-import { asStore, isUniqueViolation, sqliteHandle } from './store.js';
+import { asStore, isDatabaseOverload, isUniqueViolation, sqliteHandle } from './store.js';
 import bcrypt from 'bcryptjs';
 import {
   clearSessionCookies, createSession, id, opaqueToken, rateLimit, requireSession,
@@ -443,6 +443,7 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
       clearSessionCookies(res);
       res.json({ deleted: true });
     } catch (error) {
+      if (isDatabaseOverload(error)) return next(error);
       if (error?.status) return res.status(error.status).json({ error: { code: error.code || 'REAUTH_REQUIRED', message: error.message } });
       next(error);
     }
