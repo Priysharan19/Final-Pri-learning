@@ -166,9 +166,9 @@ try {
   eq((await call('GET', '/classes/class-1/analytics', 'teacher-2')).status, 404, 'another teacher cannot read this class');
 
   // The pure function agrees with the route and honours its thresholds.
-  const direct = classAnalytics(db, 'class-1', now);
+  const direct = await classAnalytics(db, 'class-1', now);
   eq(direct.studentRows.map(s => s.flags.map(f => f.code)), a.studentRows.map(s => s.flags.map(f => f.code)), 'the route serves the aggregation function unchanged');
-  eq(classAnalytics(db, 'class-1', now - 8 * DAY).studentRows[1].flags.map(f => f.code), ['overdue'].filter(() => false).concat([]), `one idle day short of ${INACTIVE_DAYS} is not inactive`);
+  eq((await classAnalytics(db, 'class-1', now - 8 * DAY)).studentRows[1].flags.map(f => f.code), ['overdue'].filter(() => false).concat([]), `one idle day short of ${INACTIVE_DAYS} is not inactive`);
   ok(DROP_POINTS === 15 && INACTIVE_DAYS === 7, 'thresholds are the ones the product states: 15 points, 7 days');
 } finally {
   server.close();

@@ -136,18 +136,18 @@ try {
   assert.equal(activeVerified.provider, 'web');
   assert.equal(activeVerified.accountId, 'acct-billing');
   assert.equal(activeVerified.status, 'active');
-  const activeApplied = applyVerifiedEntitlement(db, activeVerified);
+  const activeApplied = await applyVerifiedEntitlement(db, activeVerified);
   assert.equal(activeApplied.replayed, false);
   assert.equal(activeApplied.stale, false);
   assert.equal(activeApplied.snapshot.plan, 'premium');
 
-  const replay = applyVerifiedEntitlement(db, activeVerified);
+  const replay = await applyVerifiedEntitlement(db, activeVerified);
   assert.equal(replay.replayed, true, 'same x-razorpay-event-id must be idempotent');
   assert.equal(db.prepare(`SELECT COUNT(*) AS n FROM billing_events WHERE provider='web' AND event_id='evt-active-1'`).get().n, 1);
 
   const cancelledPayload = event(subscriptionEntity({ status: 'cancelled' }), 'subscription.cancelled', nowSec - 50);
   const cancelled = await provider.verifiers.web.webhook({ request: signedRequest(cancelledPayload, 'evt-cancel-1') });
-  const cancelledApplied = applyVerifiedEntitlement(db, cancelled);
+  const cancelledApplied = await applyVerifiedEntitlement(db, cancelled);
   assert.equal(cancelledApplied.snapshot.status, 'expired');
   assert.equal(cancelledApplied.snapshot.plan, 'free');
 
@@ -155,7 +155,7 @@ try {
   // active event must therefore be recorded but never resurrect Premium.
   const oldActivePayload = event(subscriptionEntity(), 'subscription.charged', nowSec - 80);
   const oldActive = await provider.verifiers.web.webhook({ request: signedRequest(oldActivePayload, 'evt-active-old') });
-  const stale = applyVerifiedEntitlement(db, oldActive);
+  const stale = await applyVerifiedEntitlement(db, oldActive);
   assert.equal(stale.stale, true);
   assert.equal(stale.snapshot.status, 'expired');
   assert.equal(stale.snapshot.plan, 'free');
@@ -181,7 +181,7 @@ try {
   assert.equal(restored.verified, true);
   assert.equal(restored.eventType, 'subscription.restore');
   assert.equal(restored.providerSubscriptionId, 'sub_Second1234567');
-  const restoreApplied = applyVerifiedEntitlement(db, restored);
+  const restoreApplied = await applyVerifiedEntitlement(db, restored);
   assert.equal(restoreApplied.stale, false);
   assert.equal(restoreApplied.snapshot.plan, 'premium');
   assert.equal(restoreApplied.snapshot.provider, 'web');

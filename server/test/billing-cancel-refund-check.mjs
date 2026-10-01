@@ -136,7 +136,7 @@ async function subscribe(accountId, tag, createdAt = sec(now) - 100) {
   const subscriptionId = checkout.subscriptionId;
   const payment = paymentEntity(`pay_${tag}00000001`, { subscriptionId, createdAt });
   const verified = await deliver('subscription.charged', { subscription: subscriptionEntity(subscriptionId, accountId), payment }, `evt-${tag}-charged`, createdAt);
-  const applied = applyVerifiedEntitlement(db, verified);
+  const applied = await applyVerifiedEntitlement(db, verified);
   return { subscriptionId, payment, applied };
 }
 
@@ -146,9 +146,9 @@ try {
   check(cycle.applied.snapshot.plan === 'premium', 'subscription.charged activates Premium');
   const recorded = db.prepare(`SELECT amount,account_id,provider_subscription_id FROM billing_payments WHERE provider='web' AND payment_id=?`).get(cycle.payment.id);
   check(recorded?.amount === 99900 && recorded.account_id === 'acct-cycle' && recorded.provider_subscription_id === cycle.subscriptionId, 'subscription.charged records the period payment for refund mapping');
-  const manageBefore = webSubscriptionManageState(db, 'acct-cycle', { adapterAvailable: true });
+  const manageBefore = await webSubscriptionManageState(db, 'acct-cycle', { adapterAvailable: true });
   check(manageBefore.cancellable === true && manageBefore.status === 'active' && manageBefore.cancelling === false, 'a live web subscription is cancellable');
-  check(webSubscriptionManageState(db, 'acct-cycle', { adapterAvailable: false }).cancellable === false, 'without an adapter nothing is cancellable');
+  check((await webSubscriptionManageState(db, 'acct-cycle', { adapterAvailable: false })).cancellable === false, 'without an adapter nothing is cancellable');
 
   const cancelled = await provider.lifecycle.web.cancel({ accountId: 'acct-cycle', atCycleEnd: true, reason: 'user' });
   check(cancelled.status === 'cancelling', `cycle-end cancel status ${cancelled.status}`);
@@ -159,7 +159,7 @@ try {
   const cycleBinding = binding(cycle.subscriptionId);
   check(cycleBinding.cancel_requested_at > 0 && cycleBinding.cancel_mode === 'cycle-end' && cycleBinding.cancel_reason === 'user', 'binding carries the cancellation state');
   check(auditActions(cycle.subscriptionId).includes('billing.cancel'), 'cancellation is audited');
-  const manageDuring = webSubscriptionManageState(db, 'acct-cycle', { adapterAvailable: true });
+  const manageDuring = await webSubscriptionManageState(db, 'acct-cycle', { adapterAvailable: true });
   check(manageDuring.cancellable === false && manageDuring.cancelling === true && manageDuring.currentPeriodEnd === periodEnd * 1000, 'manage state reports the pending cancellation');
 
   const replay = await provider.lifecycle.web.cancel({ accountId: 'acct-cycle', atCycleEnd: true });
@@ -167,9 +167,9 @@ try {
   check(cancelCalls(cycle.subscriptionId).length === 1, 'replay does not call the provider again');
 
   const ended = await deliver('subscription.cancelled', { subscription: subscriptionEntity(cycle.subscriptionId, 'acct-cycle', 'cancelled') }, 'evt-Cycle-cancelled', sec(now) - 50);
-  const endedApplied = applyVerifiedEntitlement(db, ended);
+  const endedApplied = await applyVerifiedEntitlement(db, ended);
   check(endedApplied.snapshot.status === 'expired' && endedApplied.snapshot.plan === 'free', 'the cycle-boundary webhook expires the entitlement');
-  check(webSubscriptionManageState(db, 'acct-cycle', { adapterAvailable: true }).status === 'none', 'nothing is cancellable after expiry');
+  check((await webSubscriptionManageState(db, 'acct-cycle', { adapterAvailable: true })).status === 'none', 'nothing is cancellable after expiry');
   check((await provider.lifecycle.web.cancel({ accountId: 'acct-cycle', atCycleEnd: true })).status === 'none', 'cancel after expiry reports none');
   check((await provider.lifecycle.web.cancel({ accountId: 'acct-none', atCycleEnd: true })).status === 'none', 'an account with no web subscription has nothing to cancel');
 
@@ -188,12 +188,12 @@ try {
   const remainder = await deliver('refund.processed', { refund: refundEntity('rfnd_Rest000000001', refund.payment.id, 89900), payment: refund.payment }, 'evt-Refund-full', sec(now) - 30);
   check(remainder?.verified === true && remainder.status === 'revoked' && remainder.plan === 'free' && remainder.eventRank === 100, 'a full refund of the current period revokes Premium');
   check(remainder.accountId === 'acct-refund' && remainder.providerSubscriptionId === refund.subscriptionId, 'the refund is mapped back to the bound account and subscription');
-  const revoked = applyVerifiedEntitlement(db, remainder);
+  const revoked = await applyVerifiedEntitlement(db, remainder);
   check(revoked.snapshot.status === 'revoked' && revoked.snapshot.plan === 'free', 'revocation is applied to the snapshot');
   check(auditActions(refund.subscriptionId).filter(a => a === 'billing.refund').length === 2, 'each refund decision is audited once');
 
   const late = await deliver('subscription.charged', { subscription: subscriptionEntity(refund.subscriptionId, 'acct-refund'), payment: refund.payment }, 'evt-Refund-late', sec(now) - 35);
-  const lateApplied = applyVerifiedEntitlement(db, late);
+  const lateApplied = await applyVerifiedEntitlement(db, late);
   check(lateApplied.stale === true && snapshot('acct-refund').status === 'revoked', 'an older charged event cannot resurrect a refunded subscription');
 
   const failed = await deliver('refund.failed', { refund: refundEntity('rfnd_Failed00000001', refund.payment.id, 99900, 'failed'), payment: refund.payment }, 'evt-Refund-failed', sec(now) - 20);

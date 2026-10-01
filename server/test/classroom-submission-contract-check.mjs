@@ -27,23 +27,23 @@ assert.equal(studentSubmissionTransitionAllowed('submitted', 'started'), false);
 assert.equal(studentSubmissionTransitionAllowed('returned', 'started'), true);
 assert.equal(studentSubmissionTransitionAllowed('returned', 'submitted'), true);
 
-const started = writeStudentSubmission(db, {
+const started = await writeStudentSubmission(db, {
   assignmentId: 'assignment-1', studentId: 'student-1', state: 'started',
   summary: { kind: 'practice', questionsAnswered: 2, correct: 1, xp: 10, targetQuestions: 10 }, now: now + 10
 });
 assert.equal(started.state, 'started');
-const submitted = writeStudentSubmission(db, {
+const submitted = await writeStudentSubmission(db, {
   assignmentId: 'assignment-1', studentId: 'student-1', state: 'submitted',
   summary: { kind: 'practice', questionsAnswered: 10, correct: 8, xp: 80, targetQuestions: 10 }, now: now + 20
 });
 assert.equal(submitted.state, 'submitted');
 
-assert.throws(() => writeStudentSubmission(db, {
+await assert.rejects(async () => writeStudentSubmission(db, {
   assignmentId: 'assignment-1', studentId: 'student-1', state: 'started',
   summary: {}, now: now + 30
 }), error => error?.code === 'SUBMISSION_TRANSITION_INVALID');
 
-const returned = returnStudentSubmission(db, {
+const returned = await returnStudentSubmission(db, {
   assignmentId: 'assignment-1', studentId: 'student-1', teacherId: 'teacher-1',
   feedback: { note: 'Rework factorisation in question 4.' }, now: now + 40
 });
@@ -55,18 +55,18 @@ assert.equal(feedback.teacher_account_id, 'teacher-1');
 assert.equal(JSON.parse(feedback.feedback_json).note, 'Rework factorisation in question 4.');
 assert.equal(feedback.returned_at, now + 40);
 
-const revised = writeStudentSubmission(db, {
+const revised = await writeStudentSubmission(db, {
   assignmentId: 'assignment-1', studentId: 'student-1', state: 'started',
   summary: { kind: 'practice', questionsAnswered: 0, correct: 0, xp: 0, targetQuestions: 10 }, now: now + 50
 });
 assert.equal(revised.state, 'started');
-const resubmitted = writeStudentSubmission(db, {
+const resubmitted = await writeStudentSubmission(db, {
   assignmentId: 'assignment-1', studentId: 'student-1', state: 'submitted',
   summary: { kind: 'practice', questionsAnswered: 10, correct: 9, xp: 90, targetQuestions: 10 }, now: now + 60
 });
 assert.equal(resubmitted.submittedAt, now + 60);
 
-assert.throws(() => returnStudentSubmission(db, {
+await assert.rejects(async () => returnStudentSubmission(db, {
   assignmentId: 'assignment-1', studentId: 'student-1', teacherId: 'teacher-1',
   feedback: { blob: 'x'.repeat(40 * 1024) }, now: now + 70
 }), error => error?.code === 'FEEDBACK_TOO_LARGE');

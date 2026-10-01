@@ -29,7 +29,7 @@ const db = h.db;
 
 try {
   c.eq(HOUSEKEEPING_INTERVAL_MS, 6 * 60 * 60 * 1000, 'housekeeping interval is six hours');
-  c.deq(housekeepingStatus(db), { lastRunAt: null, lastRun: null }, 'health reports no run before the first pass');
+  c.deq(await housekeepingStatus(db), { lastRunAt: null, lastRun: null }, 'health reports no run before the first pass');
 
   // ── Session idle timeout that slides ──────────────────────────────────
   const reg = await registerAccount(h, { email: 'sliding.student@example.test', deviceId: 'ipad-slide' });
@@ -85,18 +85,18 @@ try {
   db.prepare('INSERT INTO rate_limits(bucket,window_start,count) VALUES (?,?,1)').run('old:bucket', now - 25 * 60 * 60 * 1000);
   db.prepare('INSERT INTO rate_limits(bucket,window_start,count) VALUES (?,?,1)').run('recent:bucket', now - 60 * 60 * 1000);
 
-  const liveNonce = issueOidcNonce(db, now);
-  const expiredNonce = issueOidcNonce(db, now - 11 * 60 * 1000);
-  const consumedNonce = issueOidcNonce(db, now);
-  consumeOidcNonce(db, consumedNonce.nonce, now);
-  recordLoginFailure(db, 'stale.guesser@example.test', now - 2 * DAY);
-  recordLoginFailure(db, 'fresh.guesser@example.test', now - 60_000);
+  const liveNonce = await issueOidcNonce(db, now);
+  const expiredNonce = await issueOidcNonce(db, now - 11 * 60 * 1000);
+  const consumedNonce = await issueOidcNonce(db, now);
+  await consumeOidcNonce(db, consumedNonce.nonce, now);
+  await recordLoginFailure(db, 'stale.guesser@example.test', now - 2 * DAY);
+  await recordLoginFailure(db, 'fresh.guesser@example.test', now - 60_000);
 
   const rowsBefore = {
     sessions: db.prepare('SELECT COUNT(*) AS n FROM account_sessions').get().n,
     tokens: db.prepare('SELECT COUNT(*) AS n FROM account_tokens').get().n
   };
-  const record = runHousekeeping(db, now);
+  const record = await runHousekeeping(db, now);
   c.deq({
     sessions: record.sessions, tokens: record.tokens, idempotencyKeys: record.idempotencyKeys,
     rateBuckets: record.rateBuckets, oidcNonces: record.oidcNonces, loginAttempts: record.loginAttempts
@@ -113,11 +113,11 @@ try {
   c.deq(db.prepare('SELECT key FROM idempotency_keys ORDER BY key').all().map(r => r.key), ['k-live'], 'only the live idempotency key remains');
   c.ok(db.prepare("SELECT 1 FROM rate_limits WHERE bucket='recent:bucket'").get() && !db.prepare("SELECT 1 FROM rate_limits WHERE bucket='old:bucket'").get(), 'day-old rate bucket purged, recent kept');
   c.eq(db.prepare('SELECT COUNT(*) AS n FROM oidc_nonces').get().n, 1, 'only the live nonce remains');
-  c.eq(consumeOidcNonce(db, liveNonce.nonce, now), true, 'the surviving nonce is still usable');
-  c.eq(consumeOidcNonce(db, expiredNonce.nonce, now), false, 'the expired nonce is gone');
+  c.eq(await consumeOidcNonce(db, liveNonce.nonce, now), true, 'the surviving nonce is still usable');
+  c.eq(await consumeOidcNonce(db, expiredNonce.nonce, now), false, 'the expired nonce is gone');
   c.eq(db.prepare('SELECT COUNT(*) AS n FROM login_attempts').get().n, 1, 'only the fresh login-attempt record remains');
 
-  const status = housekeepingStatus(db);
+  const status = await housekeepingStatus(db);
   c.eq(status.lastRunAt, now, 'status exposes the last run time');
   const health = await h.request('/v1/health');
   c.eq(health.status, 200, 'health responds');
@@ -125,7 +125,8 @@ try {
   c.eq(health.data.housekeeping.lastRun.sessions, 2, '/v1/health includes the purge summary');
 
   const started = startHousekeeping(db, { intervalMs: 60_000, log: () => {} });
-  c.ok(started.first && started.first.ranAt >= now, 'startHousekeeping runs a pass immediately');
+  const first = await started.first;
+  c.ok(first && first.ranAt >= now, 'startHousekeeping runs a pass immediately');
   c.eq(typeof started.stop, 'function', 'and can be stopped');
   started.stop();
 } finally {
@@ -152,7 +153,7 @@ try {
     const summary = JSON.parse(run.stdout.trim());
     c.eq(summary.sessions, 1, 'CLI purged the expired session');
     c.eq(fileDb.prepare('SELECT COUNT(*) AS n FROM account_sessions').get().n, 1, 'live session kept on disk');
-    c.eq(housekeepingStatus(fileDb).lastRunAt, summary.ranAt, 'CLI run is recorded for health');
+    c.eq((await housekeepingStatus(fileDb)).lastRunAt, summary.ranAt, 'CLI run is recorded for health');
   } finally {
     fileDb.close();
     rmSync(dir, { recursive: true, force: true });

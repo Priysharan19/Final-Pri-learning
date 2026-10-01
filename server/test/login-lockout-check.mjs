@@ -97,17 +97,17 @@ try {
   // gaps still locks, while a 15-minute pause resets the count.
   const t0 = 1_800_000_000_000;
   const SLOW = 'slow.guesser@example.test';
-  for (let i = 0; i < LOCKOUT_MAX_FAILURES - 1; i++) recordLoginFailure(db, SLOW, t0 + i * 60_000);
+  for (let i = 0; i < LOCKOUT_MAX_FAILURES - 1; i++) await recordLoginFailure(db, SLOW, t0 + i * 60_000);
   const lastSlow = t0 + (LOCKOUT_MAX_FAILURES - 2) * 60_000;
-  c.eq(loginLockStatus(db, SLOW, lastSlow + 1).locked, false, 'nine failures do not lock');
-  const tenth = recordLoginFailure(db, SLOW, lastSlow + LOCKOUT_WINDOW_MS - 60_000);
+  c.eq((await loginLockStatus(db, SLOW, lastSlow + 1)).locked, false, 'nine failures do not lock');
+  const tenth = await recordLoginFailure(db, SLOW, lastSlow + LOCKOUT_WINDOW_MS - 60_000);
   c.eq(tenth.locked, true, 'a tenth failure 14 minutes after the ninth (22 minutes after the first) locks — the window slides');
-  c.eq(loginLockStatus(db, SLOW, lastSlow + LOCKOUT_WINDOW_MS).retryAfterMs > 0, true, 'lock reports a retry delay');
-  c.eq(loginLockStatus(db, SLOW, lastSlow + LOCKOUT_WINDOW_MS - 60_000 + LOCKOUT_LOCK_MS + 1).locked, false, 'lock lifts after LOCKOUT_LOCK_MS');
+  c.eq((await loginLockStatus(db, SLOW, lastSlow + LOCKOUT_WINDOW_MS)).retryAfterMs > 0, true, 'lock reports a retry delay');
+  c.eq((await loginLockStatus(db, SLOW, lastSlow + LOCKOUT_WINDOW_MS - 60_000 + LOCKOUT_LOCK_MS + 1)).locked, false, 'lock lifts after LOCKOUT_LOCK_MS');
 
   const PAUSED = 'paused.guesser@example.test';
-  for (let i = 0; i < LOCKOUT_MAX_FAILURES - 1; i++) recordLoginFailure(db, PAUSED, t0 + i * 1000);
-  const reset = recordLoginFailure(db, PAUSED, t0 + (LOCKOUT_MAX_FAILURES - 2) * 1000 + LOCKOUT_WINDOW_MS + 1);
+  for (let i = 0; i < LOCKOUT_MAX_FAILURES - 1; i++) await recordLoginFailure(db, PAUSED, t0 + i * 1000);
+  const reset = await recordLoginFailure(db, PAUSED, t0 + (LOCKOUT_MAX_FAILURES - 2) * 1000 + LOCKOUT_WINDOW_MS + 1);
   c.eq(reset.failures, 1, 'a failure more than 15 minutes after the last one starts a fresh window');
   c.eq(reset.locked, false, 'and does not lock');
 

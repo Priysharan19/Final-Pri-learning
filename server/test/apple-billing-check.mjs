@@ -122,27 +122,27 @@ try {
   const apple = createAppleBilling(db);
   assert.equal(apple.configured, true);
 
-  const bootstrap = apple.native.apple.bootstrap({ accountId: 'acct-apple-a' });
-  const bootstrapAgain = apple.native.apple.bootstrap({ accountId: 'acct-apple-a' });
+  const bootstrap = await apple.native.apple.bootstrap({ accountId: 'acct-apple-a' });
+  const bootstrapAgain = await apple.native.apple.bootstrap({ accountId: 'acct-apple-a' });
   assert.match(bootstrap.appAccountToken, /^[0-9a-f-]{36}$/i);
   assert.equal(bootstrapAgain.appAccountToken, bootstrap.appAccountToken, 'appAccountToken must be stable per Pri account');
   assert.equal(bootstrap.products.monthly, process.env.PRI_APPLE_MONTHLY_PRODUCT_ID);
 
   const activePayload = transactionPayload({ appAccountToken: bootstrap.appAccountToken, signedDate: now + 100 });
   const activeJws = jws(activePayload);
-  const verified = apple.native.apple.transaction({ accountId: 'acct-apple-a', body: { signedTransaction: activeJws } });
+  const verified = await apple.native.apple.transaction({ accountId: 'acct-apple-a', body: { signedTransaction: activeJws } });
   assert.equal(verified.verified, true);
   assert.equal(verified.provider, 'apple');
   assert.equal(verified.accountId, 'acct-apple-a');
   assert.equal(verified.status, 'active');
   assert.equal(verified.providerSubscriptionId, activePayload.originalTransactionId);
 
-  const applied = applyVerifiedEntitlement(db, verified);
+  const applied = await applyVerifiedEntitlement(db, verified);
   assert.equal(applied.replayed, false);
   assert.equal(applied.stale, false);
   assert.equal(applied.snapshot.plan, 'premium');
   assert.equal(applied.snapshot.provider, 'apple');
-  assert.equal(applyVerifiedEntitlement(db, verified).replayed, true, 'same Apple transaction must be idempotent');
+  assert.equal((await applyVerifiedEntitlement(db, verified)).replayed, true, 'same Apple transaction must be idempotent');
 
   await assert.rejects(async () => apple.native.apple.transaction({
     accountId: 'acct-apple-b', body: { signedTransaction: activeJws }
@@ -165,7 +165,7 @@ try {
     accountId: 'acct-apple-a', body: { signedTransaction: tampered }
   }), error => error?.code === 'APPLE_JWS_SIGNATURE_INVALID');
 
-  const restored = apple.verifiers.apple.restore({ accountId: 'acct-apple-a', body: { transactions: [activeJws] } });
+  const restored = await apple.verifiers.apple.restore({ accountId: 'acct-apple-a', body: { transactions: [activeJws] } });
   assert.equal(restored.verified, true);
   assert.equal(restored.eventType, 'transaction.restore');
   assert.equal(restored.accountId, 'acct-apple-a');
@@ -184,13 +184,13 @@ try {
     signedTransactionInfo: renewalTx, notificationUUID: renewalUuid,
     notificationType: 'DID_RENEW', signedDate: renewalTime
   }));
-  const renewal = apple.verifiers.apple.webhook({ body: { signedPayload: renewalOuter } });
+  const renewal = await apple.verifiers.apple.webhook({ body: { signedPayload: renewalOuter } });
   assert.equal(renewal.eventId, renewalUuid);
   assert.equal(renewal.status, 'active');
-  const renewalApplied = applyVerifiedEntitlement(db, renewal);
+  const renewalApplied = await applyVerifiedEntitlement(db, renewal);
   assert.equal(renewalApplied.stale, false);
   assert.equal(renewalApplied.snapshot.plan, 'premium');
-  assert.equal(applyVerifiedEntitlement(db, renewal).replayed, true, 'notificationUUID must de-duplicate delivery');
+  assert.equal((await applyVerifiedEntitlement(db, renewal)).replayed, true, 'notificationUUID must de-duplicate delivery');
 
   const refundTime = now + 10_000;
   const refundTx = jws(transactionPayload({
@@ -201,23 +201,23 @@ try {
     revocationDate: refundTime,
     expiresDate: now + 60 * 24 * 60 * 60 * 1000
   }));
-  const refund = apple.verifiers.apple.webhook({ body: { signedPayload: jws(notificationPayload({
+  const refund = await apple.verifiers.apple.webhook({ body: { signedPayload: jws(notificationPayload({
     signedTransactionInfo: refundTx,
     notificationUUID: '22222222-2222-4222-8222-222222222222',
     notificationType: 'REFUND', signedDate: refundTime
   })) } });
-  const refundApplied = applyVerifiedEntitlement(db, refund);
+  const refundApplied = await applyVerifiedEntitlement(db, refund);
   assert.equal(refundApplied.snapshot.status, 'revoked');
   assert.equal(refundApplied.snapshot.plan, 'free');
 
   // A delayed older renewal after a newer refund is valid Apple-signed data, but
   // must be recorded as stale rather than resurrecting Premium.
-  const lateOld = apple.verifiers.apple.webhook({ body: { signedPayload: jws(notificationPayload({
+  const lateOld = await apple.verifiers.apple.webhook({ body: { signedPayload: jws(notificationPayload({
     signedTransactionInfo: renewalTx,
     notificationUUID: '33333333-3333-4333-8333-333333333333',
     notificationType: 'DID_RENEW', signedDate: renewalTime
   })) } });
-  const stale = applyVerifiedEntitlement(db, lateOld);
+  const stale = await applyVerifiedEntitlement(db, lateOld);
   assert.equal(stale.stale, true);
   assert.equal(stale.snapshot.status, 'revoked');
   assert.equal(stale.snapshot.plan, 'free');
@@ -246,7 +246,7 @@ try {
   // lists Sandbox (it has all along in this contract).
   delete process.env.PRI_APPLE_ALLOW_SANDBOX;
   const productionOnly = createAppleBilling(db);
-  assert.deepEqual(productionOnly.native.apple.bootstrap({ accountId: 'acct-apple-a' }).environments, ['Production'],
+  assert.deepEqual((await productionOnly.native.apple.bootstrap({ accountId: 'acct-apple-a' })).environments, ['Production'],
     'Sandbox must be filtered out of the accepted environments by default');
   const sandboxTx = jws(transactionPayload({
     appAccountToken: bootstrap.appAccountToken, transactionId: '200000000000020',
@@ -256,12 +256,12 @@ try {
     error => error?.code === 'APPLE_ENVIRONMENT_MISMATCH', 'a Sandbox transaction must be refused by default');
   process.env.PRI_APPLE_ALLOW_SANDBOX = 'true';
   const sandboxAllowed = createAppleBilling(db);
-  assert.ok(sandboxAllowed.native.apple.bootstrap({ accountId: 'acct-apple-a' }).environments.includes('Sandbox'),
+  assert.ok((await sandboxAllowed.native.apple.bootstrap({ accountId: 'acct-apple-a' })).environments.includes('Sandbox'),
     'PRI_APPLE_ALLOW_SANDBOX=true admits Sandbox');
-  const sandboxVerified = sandboxAllowed.native.apple.transaction({ accountId: 'acct-apple-a', body: { signedTransaction: sandboxTx } });
+  const sandboxVerified = await sandboxAllowed.native.apple.transaction({ accountId: 'acct-apple-a', body: { signedTransaction: sandboxTx } });
   assert.equal(sandboxVerified.verified, true, 'the same Sandbox transaction verifies once explicitly allowed');
   process.env.PRI_APPLE_ALLOW_SANDBOX = 'yes';
-  assert.deepEqual(createAppleBilling(db).native.apple.bootstrap({ accountId: 'acct-apple-a' }).environments, ['Production'],
+  assert.deepEqual((await createAppleBilling(db).native.apple.bootstrap({ accountId: 'acct-apple-a' })).environments, ['Production'],
     'only the literal true opts in');
 
   console.log('PASS — Apple ES256/x5c verification, appAccountToken binding, device transaction, restore, notification replay, stale-event suppression and the explicit Sandbox opt-in are enforced.');

@@ -51,7 +51,7 @@ db.prepare(`INSERT INTO assignment_submissions(assignment_id,student_account_id,
   solution: 'must never surface'
 }), now + 10, now + 20);
 
-const studentList = listAssignmentsForAccount(db, 'student-1', 'student');
+const studentList = await listAssignmentsForAccount(db, 'student-1', 'student');
 assert.equal(studentList.length, 1);
 assert.equal(studentList[0].id, 'assignment-1');
 assert.equal(studentList[0].className, 'Class 10 A');
@@ -61,28 +61,28 @@ assert.deepEqual(studentList[0].submission.summary, {
   kind: 'practice', questionsAnswered: 3, correct: 2, xp: 25
 });
 
-assert.equal(assignmentForAccount(db, 'student-1', 'student', 'class-2', 'assignment-2'), null,
+assert.equal(await assignmentForAccount(db, 'student-1', 'student', 'class-2', 'assignment-2'), null,
   'a student must not read an assignment from a class they did not join');
-assert.equal(assignmentForAccount(db, 'teacher-2', 'teacher', 'class-1', 'assignment-1'), null,
+assert.equal(await assignmentForAccount(db, 'teacher-2', 'teacher', 'class-1', 'assignment-1'), null,
   'a teacher must not read another teacher’s assignment');
-assert.equal(assignmentForAccount(db, 'teacher-1', 'teacher', 'class-1', 'assignment-1')?.id, 'assignment-1');
-assert.equal(assignmentForAccount(db, 'admin-1', 'admin', 'class-1', 'assignment-1')?.id, 'assignment-1');
+assert.equal((await assignmentForAccount(db, 'teacher-1', 'teacher', 'class-1', 'assignment-1'))?.id, 'assignment-1');
+assert.equal((await assignmentForAccount(db, 'admin-1', 'admin', 'class-1', 'assignment-1'))?.id, 'assignment-1');
 
-const teacherList = listAssignmentsForAccount(db, 'teacher-1', 'teacher');
+const teacherList = await listAssignmentsForAccount(db, 'teacher-1', 'teacher');
 assert.deepEqual(teacherList.map(x => x.id), ['assignment-1']);
-const adminList = listAssignmentsForAccount(db, 'admin-1', 'admin');
+const adminList = await listAssignmentsForAccount(db, 'admin-1', 'admin');
 assert.deepEqual(new Set(adminList.map(x => x.id)), new Set(['assignment-1', 'assignment-2']));
 
-const review = assignmentSubmissionsForStaff(db, 'teacher-1', 'teacher', 'class-1', 'assignment-1');
+const review = await assignmentSubmissionsForStaff(db, 'teacher-1', 'teacher', 'class-1', 'assignment-1');
 assert.equal(review.assignment.id, 'assignment-1');
 assert.equal(review.submissions.length, 1);
 assert.equal(review.submissions[0].student.id, 'student-1');
 assert.deepEqual(review.submissions[0].summary, {
   kind: 'practice', questionsAnswered: 3, correct: 2, xp: 25
 });
-assert.equal(assignmentSubmissionsForStaff(db, 'teacher-2', 'teacher', 'class-1', 'assignment-1'), null,
+assert.equal(await assignmentSubmissionsForStaff(db, 'teacher-2', 'teacher', 'class-1', 'assignment-1'), null,
   'another teacher must not review a class submission');
-assert.equal(assignmentSubmissionsForStaff(db, 'student-1', 'student', 'class-1', 'assignment-1'), null,
+assert.equal(await assignmentSubmissionsForStaff(db, 'student-1', 'student', 'class-1', 'assignment-1'), null,
   'students must not enumerate classmate submission summaries');
 
 assert.deepEqual(sanitizeAssignmentSummary({
@@ -94,7 +94,7 @@ assert.deepEqual(sanitizeAssignmentSummary({
 
 // The writer sanitises: whatever a caller hands it, only aggregate metrics
 // reach the row. No route, spelling of a route or future caller can pass this.
-writeStudentSubmission(db, {
+await writeStudentSubmission(db, {
   assignmentId: 'assignment-1', studentId: 'student-1', state: 'submitted',
   summary: { questionsAnswered: 4, correct: 3, xp: 40, targetQuestions: 8, rawInk: 'secret', answers: ['secret'] },
   now: now + 30
