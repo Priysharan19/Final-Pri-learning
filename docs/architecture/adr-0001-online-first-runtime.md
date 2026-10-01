@@ -9,12 +9,13 @@
 Pri Learning was built local-first: the learning engine, marking and progress run in the browser
 against IndexedDB, and the `/v1` server is an optional control plane on a single SQLite volume.
 
-The product goal is now to be the strongest maths-practice product for Indian students
+The product goal is now an excellent maths-practice product for Indian students
 (NCERT 7–12, CBSE boards, JEE Main/Advanced, olympiad). The owner has chosen an online-first
-product and has provisioned:
+product on the following providers. The owner reports having accounts with them; this ADR does not
+verify any provisioned resource, deployment or production state.
 
 - **Railway Pro** — application hosting for the `/v1` server and web client.
-- **Supabase, Mumbai region** — managed Postgres, auth, storage and realtime, with student data
+- **Supabase, Mumbai region (`ap-south-1`)** — managed Postgres, auth, storage and realtime, with student data
   resident in India.
 - **OpenAI API** — vision handwriting transcription, working-step review, tutoring and
   explanation, photo-to-question and language features.
@@ -27,7 +28,8 @@ The server-side OpenAI providers already exist (`server/platform/handwritingProv
 1. **Online-first.** The canonical student experience assumes a signed-in, connected account.
    AI-assisted features (vision handwriting, tutor, explanations, photo-to-question, language)
    are first-class product paths, not experiments.
-2. **Hosting.** The `/v1` server and the built web client are deployed on Railway.
+2. **Hosting.** The `/v1` server and the built web client are to be deployed on Railway Pro
+   (ADR-0001 phase 4). Nothing in this ADR claims that deployment exists yet.
 3. **Data authority.** Supabase Postgres (Mumbai) becomes the authoritative store for accounts and
    learning records as each migration phase lands. Until a phase lands, the current authority for
    that data is unchanged. IndexedDB becomes a device cache, not the system of record.
@@ -40,10 +42,13 @@ The server-side OpenAI providers already exist (`server/platform/handwritingProv
    resilience path, not a marketed offline mode.
 6. **Answer-blind handwriting is unchanged.** Vision transcription receives the ink image only —
    never the question's expected answer, solution or marks.
-7. **Secrets live only on the server.** `OPENAI_API_KEY` and Supabase service-role credentials are
-   Railway environment variables. The client receives only the Supabase anon key and URL, and every
+7. **Secrets live only on the server.** `OPENAI_API_KEY` and Supabase service-role credentials live
+   only in Railway environment variables — never in the client, the repository, CI logs or chat. The client receives only the Supabase anon key and URL, and every
    table it can reach is protected by Row-Level Security.
-8. **Cost control is a product requirement.** Every model call is metered per account and plan,
+8. **Database changes go to staging first.** Every schema, Row-Level Security or data change is
+   applied to a Supabase staging project and verified there before it is applied to production.
+   Production application of an irreversible migration needs explicit owner approval at the time.
+9. **Cost control is a product requirement.** Every model call is metered per account and plan,
    rate-limited, cached where the input is identical, and fails closed to the deterministic path
    when a budget is exhausted.
 

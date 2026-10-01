@@ -4,7 +4,7 @@ This document is the concise production architecture authority for `Priysharan19
 
 ## Learning runtime
 
-Pri Learning is online-first (see [ADR-0001](adr-0001-online-first-runtime.md)). The canonical student experience is a signed-in account served by the `/v1` server on Railway, with Supabase Postgres in the Mumbai region and server-side OpenAI providers for vision handwriting, working review, tutoring and explanation.
+Pri Learning is online-first (see [ADR-0001](adr-0001-online-first-runtime.md)). The target student experience is a signed-in account served by the `/v1` server hosted on Railway, with Supabase Postgres in the Mumbai region (`ap-south-1`) and server-side OpenAI providers for vision handwriting, working review, tutoring and explanation. Each part becomes current authority only when its ADR-0001 migration phase lands; this document does not assert that any of it is deployed today.
 
 The deterministic learning engine under `client/src/local/` and `client/src/engine/` stays bundled in the client. It decides every mark (AI proposes, the deterministic engine decides), gives an instant result while a cloud call is in flight, and keeps practice usable when the connection drops. It is a resilience path, not a marketed offline mode.
 
@@ -12,7 +12,7 @@ The deterministic learning engine under `client/src/local/` and `client/src/engi
 
 ## Cloud control plane
 
-`server/index.js` starts the production service and `server/app.js` mounts the `/v1` platform router. `/v1` is the primary product backend for identity, sync, classrooms, content, entitlements/billing, reports and AI-assisted services. It is deployed on Railway. Model-provider and Supabase service-role credentials exist only as server environment variables; the client never receives them.
+`server/index.js` starts the production service and `server/app.js` mounts the `/v1` platform router. `/v1` is the primary product backend for identity, sync, classrooms, content, entitlements/billing, reports and AI-assisted services. Its target host is Railway (ADR-0001 phase 4). Model-provider and Supabase service-role credentials exist only as server environment variables (Railway variables once hosted there); the client never receives them.
 
 The old `/api` routes are development-only reference code. They are not mounted in the production runtime image; production requests to the legacy surface are deliberately refused. The production container static-hosts `client/dist` and runs `server/index.js`.
 
