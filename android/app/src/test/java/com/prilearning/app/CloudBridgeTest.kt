@@ -237,18 +237,18 @@ class CloudBridgeTest {
 
     @Test fun whatIsOnDiskAlwaysMatchesTheJarEvenWhenLogoutRacesARefresh() {
         val jar = CookieJar()
-        @Volatile var lastWritten = ""
-        val cloud = NativeCloud(origin(), jar, persist = { lastWritten = it }, executor = java.util.concurrent.Executors.newFixedThreadPool(4))
+        val lastWritten = java.util.concurrent.atomic.AtomicReference("")
+        val cloud = NativeCloud(origin(), jar, persist = { lastWritten.set(it) }, executor = java.util.concurrent.Executors.newFixedThreadPool(4))
         repeat(25) { round ->
             val latch = CountDownLatch(2)
             cloud.request("r$round", JSONObject("""{"path":"/v1/refresh","method":"GET"}""")) { latch.countDown() }
             cloud.request("l$round", JSONObject("""{"path":"/v1/account/logout","method":"POST","body":"{}"}""")) { latch.countDown() }
             assertTrue(latch.await(10, TimeUnit.SECONDS))
-            assertEquals("round $round: the persisted jar is exactly the jar in memory", jar.serialize(), lastWritten)
+            assertEquals("round $round: the persisted jar is exactly the jar in memory", jar.serialize(), lastWritten.get())
         }
         cloud.forgetSession()
         assertTrue(jar.isEmpty())
-        assertFalse("forgetSession persists the empty jar", lastWritten.contains("pri_cloud_session"))
+        assertFalse("forgetSession persists the empty jar", lastWritten.get().contains("pri_cloud_session"))
         cloud.shutdown()
         var answered: NativeCloud.Outcome? = null
         cloud.request("after", JSONObject("""{"path":"/v1/health","method":"GET"}""")) { answered = it }
