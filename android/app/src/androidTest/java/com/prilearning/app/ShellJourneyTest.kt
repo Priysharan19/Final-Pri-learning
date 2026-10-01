@@ -213,6 +213,15 @@ class ShellJourneyTest {
             waitFor(s, "(function(){var b=[].slice.call(document.querySelectorAll('.editor-foot .btn-primary')).find(function(x){return x.offsetParent&&!x.disabled});if(!b)return false;b.click();return true;})()")
             val feedback = waitFor(s, "(function(){var v=document.querySelector('.verdict')||document.querySelector('.your-answer');return v?(v.innerText||'marked').slice(0,60):false;})()")
             assertTrue("the attempt was marked with feedback: $feedback", feedback.length > 2)
+            // A first wrong answer offers one more go; the attempt is resolved (and
+            // counted in Progress) once it is answered again.
+            for (i in 0 until 3) {
+                if (eval(s, "!!document.querySelector('.your-answer') || !!document.querySelector('.redo-chip')") == "true") break
+                eval(s, "(function(){var b=[].slice.call(document.querySelectorAll('.editor-foot .btn-primary')).find(function(x){return x.offsetParent&&!x.disabled});if(b)b.click();return true;})()")
+                Thread.sleep(1500)
+            }
+            assertEquals("the attempt is resolved with an evaluation", "true",
+                waitFor(s, "!!document.querySelector('.your-answer') || !!document.querySelector('.redo-chip') || false"))
             // Next: the same element is replaced by a new question (by identity of
             // the rendered node, not prompt text, which can repeat).
             assertEquals("a Next control is offered", "true", eval(s, "!!document.querySelector('.ctx-next')"))
