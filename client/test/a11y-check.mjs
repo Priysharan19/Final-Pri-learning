@@ -453,27 +453,31 @@ async function click(page, selector, { text = null, timeout = 5000 } = {}) {
 
 async function signInToDemo(page, base) {
   await page.goto(base, { waitUntil: 'domcontentloaded' });
-  await page.waitForSelector('.auth-wrap', { timeout: 20000 });
+  await page.waitForSelector('.auth-wrap, .shell', { timeout: 20000 });
   await wait(page, 500);
+  if (await page.locator('.shell').count()) return;
+
   const started = page.getByRole('button', { name: 'Get Started' });
-  if (await started.count()) { await started.click(); await wait(page, 400); }
-  // By the time the audit reaches here a profile may already exist, so the
-  // welcome screen opens on the profile picker rather than the sign-up
-  // methods. Step forward to the methods either way.
+  if (await started.count()) { await started.click(); await wait(page, 300); }
   const addAnother = page.getByRole('button', { name: /Add another profile/ });
-  if (await addAnother.count()) { await addAnother.click(); await wait(page, 400); }
-  // These groups audit the Australian screens — the Home generator's course,
-  // topic and dot-point pickers, and the NSW Progress board with its
-  // priorities and knowledge map. The Indian screens are driven end to end by
-  // tour-india.js; auditing their accessibility here is still to do.
-  const withoutEmail = page.getByRole('button', { name: /Continue without an email/ });
-  if (await withoutEmail.count()) { await withoutEmail.click(); await wait(page, 500); }
-  const australia = page.getByRole('button', { name: /Studying in Australia/ });
-  if (await australia.count()) { await australia.click(); await wait(page, 500); }
-  const demo = page.getByRole('button', { name: /try the (australian )?demo/i }).first();
-  await demo.waitFor({ state: 'visible', timeout: 10000 });
-  await demo.click();
-  await page.waitForSelector('.shell', { timeout: 120000 });
+  if (await addAnother.count()) { await addAnother.click(); await wait(page, 300); }
+
+  await page.waitForSelector('[data-onboarding-step="1"]', { timeout: 10000 });
+  await page.getByRole('button', { name: 'Student', exact: true }).click();
+  await click(page, '.auth-card .btn-primary');
+  await page.waitForSelector('[data-onboarding-step="2"]');
+  await page.getByRole('button', { name: /Studying in Australia/ }).click();
+  await page.locator('#signup-course').selectOption('nsw');
+  await page.locator('#signup-year').selectOption('10');
+  await click(page, '.auth-card .btn-primary');
+  await page.waitForSelector('[data-onboarding-step="3"]');
+  await page.locator('#signup-name').fill('Accessibility Student');
+  await click(page, '.auth-card .btn-primary');
+  await page.waitForSelector('[data-onboarding-step="4"]');
+  await click(page, '.auth-card .btn-primary');
+  await page.waitForSelector('[data-onboarding-step="5"]');
+  await page.getByRole('button', { name: 'Start learning' }).click();
+  await page.waitForSelector('.shell', { timeout: 30000 });
   await wait(page, 900);
 }
 
@@ -624,19 +628,22 @@ async function run() {
       await wait(page, 500);
     });
 
-    await step('login · sign-in method', '/', async () => {
+    await step('login · onboarding role', '/', async () => {
       await click(page, 'button.btn-ghost', { text: 'Add another profile' });
     });
 
-    await step('login · create profile (with email)', '/', async () => {
-      await click(page, 'button.sso-btn', { text: 'Continue with email' });
-      await page.getByRole('checkbox').first().check();      // password fields + strength meter
-      await wait(page, SETTLE);
+    await step('login · onboarding curriculum', '/', async () => {
+      await page.getByRole('button', { name: 'Student', exact: true }).click();
+      await click(page, '.auth-card .btn-primary');
     });
 
-    await step('login · create profile (no email)', '/', async () => {
-      await click(page, 'button.btn-quiet', { text: 'Back' });
-      await click(page, 'button.sso-btn', { text: 'Continue without an email' });
+    await step('login · onboarding protection', '/', async () => {
+      await page.locator('#signup-track').selectOption('10');
+      await click(page, '.auth-card .btn-primary');
+      await page.locator('#signup-name').fill('Accessibility Draft');
+      await click(page, '.auth-card .btn-primary');
+      await page.getByRole('checkbox').first().check();
+      await wait(page, SETTLE);
     });
 
     // ── signed in ────────────────────────────────────────────────────────────
@@ -938,10 +945,15 @@ async function run() {
       await click(page, '[role="menuitem"]', { text: 'Switch profile' });
       await page.waitForSelector('.auth-wrap', { timeout: 15000 });
       await click(page, 'button.btn-ghost', { text: 'Add another profile' });
-      await click(page, 'button.sso-btn', { text: 'Continue without an email' });
-      await page.locator('#signup-name').fill('Accessibility Teacher');
       await page.getByRole('button', { name: 'Teacher', exact: true }).click();
-      await page.getByRole('button', { name: 'Start learning' }).click();
+      await click(page, '.auth-card .btn-primary');
+      await page.locator('#signup-track').selectOption('10');
+      await click(page, '.auth-card .btn-primary');
+      await page.locator('#signup-name').fill('Accessibility Teacher');
+      await click(page, '.auth-card .btn-primary');
+      await click(page, '.auth-card .btn-primary');
+      await page.waitForSelector('[data-onboarding-step="5"]');
+      await page.getByRole('button', { name: 'Open Teacher Workspace' }).click();
       await page.waitForSelector('.teacher-workspace-head', { timeout: 30000 });
       await wait(page, 700);
     });

@@ -2094,10 +2094,39 @@ const routes = {
     };
   },
   'POST /profiles': async (body) => {
+    // Profile creation is an authority boundary, not just a form handler. Reject
+    // contradictory explicit identity before anything is written rather than
+    // silently cleaning a JEE/Class mismatch into a different learner.
+    const requestedYear = body.year === undefined ? 9 : Number(body.year);
+    if (!Number.isInteger(requestedYear) || requestedYear < 7 || requestedYear > 12) {
+      throw Object.assign(new Error('Choose a supported class or year from 7 to 12.'), { status: 400 });
+    }
+    if (body.course !== undefined && !COURSES[body.course]) {
+      throw Object.assign(new Error('Choose a supported curriculum.'), { status: 400 });
+    }
+    if (body.role !== undefined && !['student', 'teacher'].includes(body.role)) {
+      throw Object.assign(new Error('Choose Student or Teacher.'), { status: 400 });
+    }
+    const requestedCourse = COURSES[body.course] ? body.course : 'nsw';
+    const explicitTrack = body.indiaTrack !== undefined && body.indiaTrack !== null && body.indiaTrack !== '';
+    const allowedIndiaTracks = new Set(['cbse', 'jee-main', 'jee-advanced', 'olympiad']);
+    if (requestedCourse === 'in' && explicitTrack && !allowedIndiaTracks.has(body.indiaTrack)) {
+      throw Object.assign(new Error('Choose a supported India maths track.'), { status: 400 });
+    }
+    if (requestedCourse === 'in' && ['jee-main', 'jee-advanced'].includes(body.indiaTrack) && requestedYear < 11) {
+      throw Object.assign(new Error('JEE Main and JEE Advanced profiles must use Class 11 or 12.'), { status: 400 });
+    }
+    if (requestedCourse !== 'in' && explicitTrack) {
+      throw Object.assign(new Error('An India maths track can only be used with the India curriculum.'), { status: 400 });
+    }
+    if (requestedCourse === 'nsw' && body.pathway === 'ext2' && requestedYear !== 12) {
+      throw Object.assign(new Error('Mathematics Extension 2 is only supported for Year 12.'), { status: 400 });
+    }
+
     const p = {
       id: uuid(), name: String(body.name || 'Student').trim().slice(0, 40) || 'Student',
-      year: Math.min(12, Math.max(7, Number(body.year) || 9)),
-      course: COURSES[body.course] ? body.course : 'nsw',
+      year: requestedYear,
+      course: requestedCourse,
       role: body.role === 'teacher' ? 'teacher' : 'student',
       avatar: body.avatar || '🙂', theme: 'dark', dailyGoal: 10, xp: 0,
       // The language the sign-up screen was being read in. Somebody who chose

@@ -232,37 +232,57 @@ function helpers(page, base, flowId) {
   };
 
   /**
-   * Make a profile the way a student makes one — through the hero, the method
-   * stage and the create form — and land on Home. Every flow but the login flow
-   * needs a signed-in profile before it can start, and none of them should be
-   * reaching into storage to fake one.
+   * Make a real local profile through KALP-03's staged first-run flow. No test
+   * reaches into IndexedDB: the same UI and /profiles authority a learner uses
+   * must create the identity that powers the rest of the journey.
    */
-  const createProfile = async ({ name = 'E2E Student', year = 9, email = null, password = null, course = 'nsw', track = null } = {}) => {
+  const createProfile = async ({
+    name = 'E2E Student', year = 9, email = null, password = null,
+    course = 'nsw', track = null, role = 'student', language = 'en',
+    avatar = null, cloud = false
+  } = {}) => {
     await page.getByRole('button', { name: 'Get Started' }).click();
-    await page.waitForSelector('.sso-btn', { timeout: 15000 });
-    await page.getByRole('button', { name: email ? /Continue with email/ : /Continue without an email/ }).click();
-    await page.waitForSelector('.auth-card input.input', { timeout: 15000 });
-    await page.getByPlaceholder('e.g. Priysharan').fill(name);
-    if (email) await page.locator('.auth-card input[type=email]').fill(email);
+    await page.waitForSelector('[data-onboarding-step="1"]', { timeout: 15000 });
+    await page.getByRole('button', { name: role === 'teacher' ? 'Teacher' : 'Student', exact: true }).click();
+    await page.locator('.auth-card .btn-primary').click();
+
+    await page.waitForSelector('[data-onboarding-step="2"]', { timeout: 15000 });
     if (course === 'in') {
-      // The form opens on India: the first control is the class / track
-      // picker. A JEE or olympiad track puts its own class select beneath it.
       await page.locator('#signup-track').selectOption(track || String(year));
       if (track) await page.locator('#signup-year').selectOption(String(year));
     } else {
-      // The Australian syllabuses the legacy flows exercise (the NSW paper,
-      // the HSC marker) are a step away, folded up behind one link.
-      await page.getByRole('button', { name: /Studying in Australia/ }).click();
+      await page.getByRole('button', { name: role === 'teacher' ? /Teaching in Australia/ : /Studying in Australia/ }).click();
       await page.locator('#signup-course').selectOption(course);
       await page.locator('#signup-year').selectOption(String(year));
     }
+    await page.locator('.auth-card .btn-primary').click();
+
+    await page.waitForSelector('[data-onboarding-step="3"]', { timeout: 15000 });
+    await page.locator('#signup-name').fill(name);
+    if (language !== 'en') await page.locator('.auth-card button[lang="' + language + '"]').click();
+    if (avatar) await page.locator('.avatar-pick').filter({ hasText: avatar }).click();
+    await page.locator('.auth-card .btn-primary').click();
+
+    await page.waitForSelector('[data-onboarding-step="4"]', { timeout: 15000 });
+    if (email) await page.locator('#signup-email').fill(email);
     if (password) {
       await page.locator('.check-row input[type=checkbox]').check();
       await page.getByLabel('Password', { exact: true }).fill(password);
       await page.getByLabel('Repeat password').fill(password);
     }
-    await page.getByRole('button', { name: 'Start learning' }).click();
-    await page.waitForSelector('.home-greet', { timeout: 30000 });
+    if (cloud) await page.getByRole('button', { name: /Connect a Pri cloud account next/i }).click();
+    await page.locator('.auth-card .btn-primary').click();
+
+    await page.waitForSelector('[data-onboarding-step="5"]', { timeout: 15000 });
+    await page.locator('.auth-card .btn-primary').click();
+    if (cloud) {
+      await page.waitForSelector('#cloud-account-title', { timeout: 30000 });
+    } else if (role === 'teacher') {
+      await page.waitForURL(/\/teach(?:#.*)?$/, { timeout: 30000 });
+      await page.waitForSelector('.shell', { timeout: 30000 });
+    } else {
+      await page.waitForSelector('.home-greet', { timeout: 30000 });
+    }
   };
 
   return { shot, check, mathText, goto, createProfile, settle: () => page.waitForTimeout(SETTLE) };
