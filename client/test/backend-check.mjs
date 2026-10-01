@@ -917,6 +917,11 @@ async function run() {
     ok('the picker explains itself', typeof first.why === 'string' && first.why.length > 0, show(first.why));
     ok('marking criteria come with it', Array.isArray(first.question.criteria) && first.question.criteria.length >= 1, show(first.question.criteria));
 
+    const resumeView = await GET('/practice/resume');
+    eq('Home continuity reports the exact unfinished Practice row', resumeView.resume?.questionId, first.question.id);
+    eq('Home continuity labels ordinary Practice honestly', resumeView.resume?.kind, 'practice');
+    eq('Home continuity points ordinary Practice back to its real route', resumeView.resume?.destination, '/practice');
+
     const hinted = await POST(`/practice/${first.question.id}/hint`, {});
     ok('a hint comes back as text', typeof hinted.hint === 'string' && hinted.hint.length > 0, show(hinted.hint));
     eq('the first hint is level 1', hinted.level, first.payload.hints?.length ? 1 : 0);
@@ -1349,6 +1354,22 @@ async function run() {
     const multi = rows.find(r => r && r.payload.multipart);
     ok('the active paper has a single-answer question to probe', !!single);
     ok('the active paper has a multipart question to probe', !!multi);
+
+    // Home continuity must never offer an active exam's question as practice to
+    // resume — even when it is the newest unanswered row, and even a row that
+    // is marked exam only by mode (KALP-04 × #230).
+    const paperIds = new Set(stored.questionIds);
+    const resumeDuringExam = await GET('/practice/resume');
+    ok('Home continuity never offers an active exam question as practice to resume',
+      !paperIds.has(resumeDuringExam.resume?.questionId), show(resumeDuringExam.resume));
+    if (single) {
+      const modeOnly = { ...single, id: `${single.id}-modeonly`, examId: null, mode: 'exam', createdAt: Date.now() + 60000 };
+      await idb.put('questions', modeOnly);
+      const resumeModeOnly = await GET('/practice/resume');
+      ok('a row marked exam only by its mode is not offered for resume either',
+        resumeModeOnly.resume?.questionId !== modeOnly.id, show(resumeModeOnly.resume));
+      await idb.del('questions', modeOnly.id);
+    }
 
     const attemptsBefore = (await idb.byIndex('attempts', 'pid', me)).length;
     const reviewsBefore = JSON.stringify(await idb.byIndex('reviews', 'pid', me));
