@@ -5,7 +5,7 @@
   "taskStartMainSha": "da6a50e05b5f3dc9f52929a0a8c284e940087bc1",
   "workingBranch": "task/pri-03-handwriting-production-wiring",
   "pullRequest": null,
-  "checkpoint": 6,
+  "checkpoint": 7,
   "serverProviderStatus": "pass",
   "clientCloudWiring": "pass",
   "failureMatrix": "pass",
@@ -21,8 +21,11 @@
   "productionProvider": "absent",
   "productionDeployment": "blocked_external",
   "paidCallCeilings": "absent",
-  "exactHeadCi": "not_started",
+  "exactHeadCi": "pending_pr_creation",
   "currentMainSha": "dd5a1da68b971c797845eb6ed28dd9ae72221160",
   "mainReconciled": true,
-  "recoveredWorkCommit": "ce0f4cfefe370a7e0ec2c6d04cc7573e81ff1e13"
+  "recoveredWorkCommit": "ce0f4cfefe370a7e0ec2c6d04cc7573e81ff1e13",
+  "cleanClone": "pass_except_native_selfcheck_local_baseline",
+  "nativeInkSelfCheck": "local_baseline_fail",
+  "railwayCliAuth": "blocked_external_timeout"
 }

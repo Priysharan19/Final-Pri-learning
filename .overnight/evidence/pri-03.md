@@ -150,3 +150,25 @@
 - Reconciled live main dd5a1da68b971c797845eb6ed28dd9ae72221160 into the PRI-03 branch with a normal merge; no conflicts.
 - Post-merge focused sanity: npm run test:platform:handwriting PASS, 53/53 checks.
 
+## Checkpoint 7 — fresh exact-candidate verification
+
+- Re-verified live GitHub before final work: main remains dd5a1da68b971c797845eb6ed28dd9ae72221160; PRI-03 remote head at verification start was fc7fccf4112ebf6564ebb850c10a52daa84529a3; branch remains 0 commits behind main.
+- Created a genuinely fresh checkout at exact candidate fc7fccf4112ebf6564ebb850c10a52daa84529a3 with no inherited node_modules or client/dist.
+- Repository root intentionally has no package-lock.json; root npm ci therefore fails by design. Fresh dependencies were instead installed from the tracked lockfiles with npm ci --prefix server and npm ci --prefix client.
+- Fresh-checkout focused verification:
+  - npm run test:platform:handwriting — PASS, 70/70.
+  - npm run test:handwriting:cloud — PASS, 52/52.
+  - npm run build — PASS.
+  - npm run check:ios — PASS, both native web bundles match client/dist at 157 files.
+  - npm run test:release-authority — PASS; server release identity exactly fc7fccf4112ebf6564ebb850c10a52daa84529a3.
+  - node tools/check-client-network-boundary.mjs — PASS, 203 source files scanned and one audited network-opening source.
+  - npm run test:ink:bridge — PASS.
+  - client/dist/native/workflow secret-artifact scan — PASS: 0 secret-like sk- values, 0 PRI_HANDWRITING_API_KEY, 0 OPENAI_API_KEY in those scopes.
+- Local native synthetic self-check is not green on this Mac/Xcode runtime:
+  - M5 iPad simulator: 6/10 exact, 93.8% character accuracy.
+  - M4 iPad simulator: same 6/10 exact, 93.8% character accuracy.
+  - The PRI-03 diff contains no .swift, Package.swift, or Info.plist changes versus main.
+  - Exact current main dd5a1da68b971c797845eb6ed28dd9ae72221160 also fails the native self-check path on this Mac/runtime, so this is not evidence of a PRI-03 native-source regression. The protected Native Ink GitHub workflow runs independently on macos-15 and must adjudicate the exact PR head.
+- Physical iPad was re-checked: CoreDevice reports the paired iPad Pro 11-inch (4th generation) available, but an actual Release destination build still fails because the device is locked and Xcode cannot enable development services. PHYSICAL_IPAD_BLOCKED_EXTERNAL remains accurate.
+- Railway production remains stale/unhealthy and still has no provider credential or paid-call ceilings. An official Railway CLI login was attempted on the Mac to enable exact-candidate upload into the existing service; the browser OAuth flow received no callback and timed out. No stale deployment, replacement service, secret, or invented budget value was created.
+- Production /v1/handwriting/status therefore remains unverified against the candidate because production has not been activated.
