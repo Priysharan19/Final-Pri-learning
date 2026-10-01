@@ -172,8 +172,10 @@ export const flow = {
     const summary = await page.locator('.auth-card').innerText();
     await check('ready state carries the real chosen identity',
       /Student/.test(summary) && /Class 10/.test(summary) && /English/.test(summary));
-    await check('ready state does not invent a diagnostic',
-      /does not currently have a separate placement diagnostic/i.test(summary));
+    // Onboarding still creates no score: the placement check is offered
+    // afterwards, optional, and labelled as diagnostic evidence, not mastery.
+    await check('ready state does not invent a diagnostic score',
+      /optional placement check/i.test(summary) && /diagnostic evidence, not mastery/i.test(summary));
     await snap(page, '05-ready-student');
 
     const finalButton = page.locator('.auth-card .btn-primary');
