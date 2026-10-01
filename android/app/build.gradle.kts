@@ -11,12 +11,11 @@ plugins {
 val webDist = rootProject.layout.projectDirectory.dir("../client/dist")
 val generatedWeb = layout.buildDirectory.dir("generated/priWeb")
 
-val syncPriWeb by tasks.registering(Sync::class) {
-    description = "Copies the shared Pri web build into the Android assets (assets/web)."
-    from(webDist)
-    into(generatedWeb.map { it.dir("web") })
-    exclude("**/.DS_Store")
-    doFirst {
+// A task with no inputs is never skipped as NO-SOURCE (a Sync whose source
+// directory is missing would be, silently building an app with no web assets).
+val verifyPriWeb by tasks.registering {
+    description = "Fails the build unless client/dist holds a web build with a valid release identity."
+    doLast {
         val release = webDist.file("release.json").asFile
         require(webDist.asFile.resolve("index.html").isFile) {
             "client/dist is missing — run `npm run build` at the repository root first"
@@ -30,6 +29,26 @@ val syncPriWeb by tasks.registering(Sync::class) {
     }
 }
 
+val syncPriWeb by tasks.registering(Sync::class) {
+    description = "Copies the shared Pri web build into the Android assets (assets/web)."
+    dependsOn(verifyPriWeb)
+    from(webDist)
+    into(generatedWeb.map { it.dir("web") })
+    exclude("**/.DS_Store")
+}
+
+// The production cloud origin: empty (cloud off, fails closed) or one HTTPS
+// origin with no path. Validated here so nothing unescaped reaches BuildConfig.
+val cloudOrigin = (project.findProperty("pri.cloudOrigin") as String?)?.trim().orEmpty()
+require(cloudOrigin.isEmpty() || Regex("^https://[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+(:[0-9]{1,5})?$").matches(cloudOrigin)) {
+    "pri.cloudOrigin must be empty or an https origin with no path (got '$cloudOrigin')"
+}
+val releaseRequested = gradle.startParameter.taskNames.any { t -> val n = t.substringAfterLast(":"); n.contains("Release", ignoreCase = true) || n.startsWith("bundle") || n == "assemble" || n == "build" }
+val versionCodeProperty = (project.findProperty("pri.versionCode") as String?)?.toIntOrNull()
+require(!releaseRequested || (versionCodeProperty != null && versionCodeProperty > 0)) {
+    "release builds need -Ppri.versionCode=<positive integer> (Play rejects reused version codes)"
+}
+
 android {
     namespace = "com.prilearning.app"
     compileSdk = 36
@@ -38,11 +57,11 @@ android {
         applicationId = "com.prilearning.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = (project.findProperty("pri.versionCode") as String?)?.toInt() ?: 1
+        versionCode = versionCodeProperty ?: 1
         versionName = "4.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // The only production cloud origin source (HTTPS); empty fails closed.
-        buildConfigField("String", "PRI_CLOUD_ORIGIN", "\"${project.findProperty("pri.cloudOrigin") ?: ""}\"")
+        buildConfigField("String", "PRI_CLOUD_ORIGIN", "\"$cloudOrigin\"")
     }
 
     buildFeatures { buildConfig = true }
@@ -72,7 +91,7 @@ kotlin {
     compilerOptions { jvmTarget.set(JvmTarget.JVM_17) }
 }
 
-tasks.named("preBuild") { dependsOn(syncPriWeb) }
+tasks.named("preBuild") { dependsOn(verifyPriWeb, syncPriWeb) }
 
 dependencies {
     implementation(libs.androidx.webkit)

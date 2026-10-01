@@ -37,7 +37,7 @@ class ShellLogicTest {
     }
 
     @Test fun traversalAndUnknownTypesAreLocal404s() {
-        for (p in listOf("/../secrets.txt", "/assets/../../x.js", "/./index.html", "/a\\b.js", "/file.exe", "/data.bin")) {
+        for (p in listOf("/v1/health", "/v1/auth/session", "/v1", "/../secrets.txt", "/assets/../../x.js", "/./index.html", "/a\\b.js", "/file.exe", "/data.bin")) {
             assertEquals(p, AssetOrigin.Resolved.NotFound, asset(p))
         }
     }
@@ -45,8 +45,14 @@ class ShellLogicTest {
     @Test fun onlyTheBundledOriginLoadsInApp() {
         assertEquals(NavigationPolicy.Decision.LOAD_IN_APP, NavigationPolicy.decide("https", "appassets.androidplatform.net"))
         assertEquals(NavigationPolicy.Decision.OPEN_EXTERNALLY, NavigationPolicy.decide("https", "example.com"))
-        assertEquals(NavigationPolicy.Decision.OPEN_EXTERNALLY, NavigationPolicy.decide("http", "appassets.androidplatform.net"))
         assertEquals(NavigationPolicy.Decision.OPEN_EXTERNALLY, NavigationPolicy.decide("mailto", null))
+        // Any other form of the bundled host would reach the real network host.
+        assertEquals(NavigationPolicy.Decision.BLOCK, NavigationPolicy.decide("http", "appassets.androidplatform.net"))
+        assertEquals(NavigationPolicy.Decision.BLOCK, NavigationPolicy.decide("https", "appassets.androidplatform.net", port = 8443))
+        assertEquals(NavigationPolicy.Decision.BLOCK, NavigationPolicy.decide("https", "APPASSETS.androidplatform.net", userInfo = "u:p"))
+        // Only a main-frame navigation the person started may launch another app.
+        assertEquals(NavigationPolicy.Decision.BLOCK, NavigationPolicy.decide("https", "example.com", mainFrame = false))
+        assertEquals(NavigationPolicy.Decision.BLOCK, NavigationPolicy.decide("mailto", null, gesture = false))
         for (s in listOf("javascript", "file", "content", "intent", "data", null)) {
             assertEquals("$s", NavigationPolicy.Decision.BLOCK, NavigationPolicy.decide(s, "appassets.androidplatform.net"))
         }
