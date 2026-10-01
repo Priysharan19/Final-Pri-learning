@@ -65,7 +65,7 @@ check('teacher Classes anchor exists', has(teach, 'id="teacher-classes"'));
 check('teacher Assignments anchor exists', has(teach, 'id="teacher-assignments"'));
 check('teacher Analytics anchor exists', has(teach, 'id="teacher-analytics"'));
 check('teacher Questions anchor exists', has(teach, 'id="teacher-questions"'));
-check('teacher workspace has visible identity', has(teach, 'Teacher workspace'));
+check('teacher workspace has visible identity', has(teach, "t('nav.teacherWorkspace')") && has(en, "'nav.teacherWorkspace': 'Teacher workspace'"));
 
 for (const [label, source] of [['English', en], ['Hindi', hi]]) {
   check(`${label} Review label resolves`, has(source, "'nav.review':"));

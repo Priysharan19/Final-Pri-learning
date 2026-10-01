@@ -1006,6 +1006,7 @@ async function run() {
   try {
     const { getRating, putRating } = await import(`${SRC}local/store.js`);
     const { misconceptionKey, START_RATING, TRAP_ACTIVE_AT } = await import(`${SRC}engine/adaptive.js`);
+    const { misconceptionIdForTrap, mappedIdForTrap, AUTHORED_TRAP_SHAPES } = await import(`${SRC}engine/misconceptions.js`);
     const { cloudLinkRowId } = await import(`${SRC}platform/cloudAccount.js`);
 
     const noether = (await POST('/profiles', { name: 'Emmy Noether', year: 10 })).user;
@@ -1028,7 +1029,7 @@ async function run() {
     const probeKeys = (q, owner) => new Set([
       ...(Array.isArray(q.traps) ? q.traps : []),
       ...Object.values(q.answer?.optionTraps || {}).map(why => ({ why }))
-    ].filter(t => t && t.why).map(t => misconceptionKey(owner, t.why)).filter(Boolean));
+    ].filter(t => t && t.why).map(t => misconceptionIdForTrap(owner, t.why)).filter(Boolean));
 
     /** A served, correctly answerable question that does (or does not) carry a designed slip. */
     async function servedWhere(subtopics, accept, perTopic = 6) {
@@ -1101,6 +1102,142 @@ async function run() {
       const r = await POST(`/practice/${hintable.question.id}/submit`, { answer: hintable.right, ms: 9000 });
       eq('the hinted targeted question was answered correctly', r.correct, true);
       eq('a hinted targeted answer banks no repair credit', (await ledger(hintable.sub))[H]?.credit, before);
+    }
+
+    // ── The same guarantees, keyed by misconception ontology ID ────────────
+    // An ontology ID is shared across subtopics and detectors, so it is the
+    // case most at risk of being "repaired" by evidence that never offered
+    // the student the slip. It must not be.
+    const mappedProbes = (q) => new Set([
+      ...(Array.isArray(q.traps) ? q.traps : []),
+      ...Object.values(q.answer?.optionTraps || {}).map(why => ({ why }))
+    ].filter(t => t && t.why).map(t => mappedIdForTrap(t.why)).filter(Boolean));
+    // An active misconception steers topic practice towards questions that
+    // carry it, so seeding the ID first also proves that targeting reads IDs.
+    const MS = 'y10-quadratics';
+    const M = 'root-sign-from-factor';
+    await seedTrap(MS, M, 'Targeted named slip');
+    const mapped = await servedWhere([MS], (s) => mappedProbes(s.payload).has(M), 40);
+    if (ok('an active ontology-ID misconception steers practice to a question carrying it', !!mapped)) {
+      ok('its repair opportunity is the ontology ID itself, not a text hash', probeKeys(mapped.payload, MS).has(M), show([...probeKeys(mapped.payload, MS)]));
+      // An ontology ID no question in this subtopic carries.
+      const U = ['lost-root', 'divided-by-variable', 'negative-squared', 'function-of-sum']
+        .find(id => !probeKeys(mapped.payload, MS).has(id));
+      await seedTrap(MS, U, 'Unrelated named slip');
+      const rm = await POST(`/practice/${mapped.question.id}/submit`, { answer: mapped.right, ms: 9000 });
+      eq('the mapped question was answered cleanly', [rm.correct, rm.resolved], [true, true]);
+      let named = await ledger(MS);
+      eq('a clean answer carrying the mapped trap banks one credit on that ontology ID', named[M]?.credit, 1);
+      eq('…and none on an unrelated ontology ID', named[U]?.credit, 0);
+      let cleanUnrelated = 0;
+      for (let i = 0; i < 4; i++) {
+        const s = await servedWhere([MS], (q, sub) => !probeKeys(q.payload, sub).has(U), 10);
+        if (!s) break;
+        const r = await POST(`/practice/${s.question.id}/submit`, { answer: s.right, ms: 9000 });
+        if (r.correct && r.resolved) cleanUnrelated++;
+      }
+      eq('four unrelated questions were answered cleanly', cleanUnrelated, 4);
+      named = await ledger(MS);
+      ok('an unrelated correct answer cannot erase an ontology-ID misconception', !!named[U], show(Object.keys(named)));
+      eq('…banks it no credit', named[U]?.credit, 0);
+      eq('…and leaves its count untouched', named[U]?.n, 3);
+      const listed = (await GET('/stats')).misconceptions.find(m => m.key === U);
+      eq('/stats names it by its ontology ID', listed?.id, U);
+    }
+
+    // ── The ledger migration: text-derived keys become ontology IDs ─────────
+    // A device that recorded slips before the ontology holds `<owner>.t<hash>`
+    // and `<owner>.step-<code>` keys. Reading the row converts them, merging
+    // two records of one misconception without losing an occurrence and
+    // without making it look more repaired than either record said.
+    {
+      const MIG = 'y10-quadratics';
+      const shape = AUTHORED_TRAP_SHAPES.find(r => r.id === 'sign-on-transfer').shape;
+      const legacyText = misconceptionKey(MIG, shape.replace(/#/g, '4'));
+      ok('the legacy text key is the old hash form', /\.t[0-9a-z]+$/.test(legacyText), show(legacyText));
+      eq('and its sentence maps to the ontology', mappedIdForTrap(shape.replace(/#/g, '4')), 'sign-on-transfer');
+      const unmapped = misconceptionKey(MIG, 'A designed slip with no ontology entry, kept under its derived id.');
+      const st0 = (await getRating(noether.id, MIG)) || { rating: START_RATING, attempts: 0, correct: 0, last_at: null };
+      await idb.put('ratings', {
+        ...st0, key: `${noether.id}:${MIG}`, pid: noether.id, subtopic: MIG,
+        traps: {
+          [`${MIG}.step-sign-on-transfer`]: { n: 2, credit: 1, firstAt: 1000, lastAt: 5000, label: 'step title', dotpoint: null },
+          [legacyText]: { n: 3, credit: 0, firstAt: 2000, lastAt: 9000, label: 'authored sentence', dotpoint: null },
+          [unmapped]: { n: 2, credit: 1, firstAt: 3000, lastAt: 4000, label: 'unmapped', dotpoint: null }
+        }
+      });
+      const migrated = await ledger(MIG);
+      eq('both legacy keys of one misconception land on one ontology ID', Object.keys(migrated).sort(), [unmapped, 'sign-on-transfer'].sort());
+      eq('occurrences are summed', migrated['sign-on-transfer']?.n, 5);
+      eq('the lower repair credit is kept', migrated['sign-on-transfer']?.credit, 0);
+      eq('the latest sighting is kept', migrated['sign-on-transfer']?.lastAt, 9000);
+      eq('the earliest first sighting is kept', migrated['sign-on-transfer']?.firstAt, 1000);
+      eq('the label is the most recent display text', migrated['sign-on-transfer']?.label, 'authored sentence');
+      eq('an unmapped trap keeps its derived ID and its record', migrated[unmapped], { n: 2, credit: 1, firstAt: 3000, lastAt: 4000, label: 'unmapped', dotpoint: null });
+      const stM = await getRating(noether.id, MIG);
+      await putRating(noether.id, MIG, stM);
+      eq('the migration is idempotent once written back', await ledger(MIG), migrated);
+    }
+
+    // ── A cloud-proposed misconception: AI proposes, the engine decides ──────
+    // Lines a student might write; the deterministic diagnoser names line 2 as
+    // `distribute-partial` with high confidence. The question is chosen with no
+    // Step Check meta of its own, so the diagnosis rests on the lines alone.
+    {
+      const noMeta = (q) => !q.stepcheck && !q.multipart && ['numeric', 'mcq'].includes(q.answerType)
+        && !(q.answerType === 'numeric' && /^([a-z])\s*=$/i.test(q.answerPrefix || ''));
+      let target = null;
+      for (let i = 0; i < 40 && !target; i++) {
+        const s = await nextQuestion({ mode: 'topic', subtopic: year10[i % year10.length] });
+        const wrong = wrongInput(s.payload);
+        if (!noMeta(s.payload) || wrong === null || checkAnswer(s.payload, wrong).correct
+          || (s.payload.answerType === 'mcq' && s.payload.answer.optionTraps?.[Number(wrong)])) {
+          await POST(`/practice/${s.question.id}/discard`, {});
+          continue;
+        }
+        target = { ...s, wrong };
+      }
+      if (ok('a question without Step Check meta was served for the cloud-proposal check', !!target)) {
+        const { diagnoseStep } = await import(`${SRC}engine/diagnose.js`);
+        const lines = ['2(x + 3) = 10', '2x + 3 = 10', 'x = 3.5'];
+        eq('the fixture is a high-confidence diagnosis', diagnoseStep({ prevText: lines[0], brokenText: lines[1] })?.confidence, 'high');
+        const ID = 'distribute-partial';
+        const propose = (extra) => POST(`/practice/${target.question.id}/misconception`, { lines, firstBreak: 1, misconceptionId: ID, confident: true, ...extra });
+        await rejects('a proposal before the question is answered is refused', propose({}), { status: 409 });
+        await POST(`/practice/${target.question.id}/submit`, { answer: target.wrong, ms: 4000 });
+        const finalWrong = await POST(`/practice/${target.question.id}/submit`, { answer: target.wrong, ms: 4000 });
+        eq('the question resolved wrong', [finalWrong.correct, finalWrong.resolved], [false, true]);
+        const stored = await idb.get('questions', target.question.id);
+        ok('no designed trap already claimed this question', !stored.trapKey, show(stored.trapKey));
+        const owner = stored.india?.chapterId || stored.payload.subtopic;
+        const before = (await ledger(owner))[ID]?.n || 0;
+        const beforeMedium = (await ledger(owner))['sign-on-transfer']?.n || 0;
+
+        const unsure = await propose({ confident: false });
+        eq('an unconfident proposal is only possible', [unsure.status, unsure.recorded], ['possible', false]);
+        const disagree = await propose({ misconceptionId: 'fraction-across' });
+        eq('a proposal the diagnoser does not reproduce is only possible', [disagree.status, disagree.recorded], ['possible', false]);
+        const wrongLine = await propose({ firstBreak: 2 });
+        eq('a proposal on a line the diagnoser does not name is only possible', [wrongLine.status, wrongLine.recorded], ['possible', false]);
+        const other = await propose({ misconceptionId: 'other' });
+        eq('"other" names nothing', [other.status, other.recorded], [null, false]);
+        // -(x + 3) = 5 → -x + 3 = 5: several slips reproduce it, so the engine
+        // is only 'medium' sure; a model agreeing with its top guess must not
+        // turn that guess into a record.
+        const medium = await propose({ lines: ['-(x + 3) = 5', '-x + 3 = 5'], misconceptionId: 'sign-on-transfer' });
+        eq('a proposal agreeing with a medium-confidence diagnosis is only possible', [medium.status, medium.recorded], ['possible', false]);
+        eq('none of those moved the learner state', [(await ledger(owner))[ID]?.n || 0, (await ledger(owner))['sign-on-transfer']?.n || 0], [before, beforeMedium]);
+
+        // Two deliveries of the same confirmed proposal at once count once.
+        const [agreed, doubled] = await Promise.all([propose({}), propose({})]);
+        eq('an agreed, confident, high-confidence proposal is confirmed', [agreed.status, agreed.id, agreed.line], ['confirmed', ID, 1]);
+        eq('a doubled delivery records it exactly once', [agreed.recorded, doubled.recorded].filter(Boolean).length, 1);
+        eq('it lands under the ontology ID', (await ledger(owner))[ID]?.n, before + 1);
+        eq('and the question is marked as counted in the same write', (await idb.get('questions', target.question.id)).trapKey, ID);
+        const again = await propose({});
+        eq('a question records one misconception at most', [again.status, again.recorded], ['confirmed', false]);
+        eq('…so a retried proposal does not double count', (await ledger(owner))[ID]?.n, before + 1);
+      }
     }
 
     await POST('/profiles/select', { id: ada.id });
