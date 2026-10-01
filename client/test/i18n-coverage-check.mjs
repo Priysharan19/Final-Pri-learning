@@ -68,7 +68,7 @@ const eq = (a, b, label) => ok(JSON.stringify(a) === JSON.stringify(b), `${label
 
 // ── Which files ──────────────────────────────────────────────────────────────
 const jsxIn = dir => readdirSync(join(ROOT, dir)).filter(f => f.endsWith('.jsx')).map(f => `${dir}/${f}`);
-export const SCANNED = ['src/App.jsx', ...jsxIn('src/pages'), ...jsxIn('src/components')];
+export const SCANNED = ['src/App.jsx', ...jsxIn('src/pages'), ...jsxIn('src/components'), ...jsxIn('src/ink')];
 
 // ── What reads as prose ──────────────────────────────────────────────────────
 // A capitalised word followed by at least one more token, or a phrase with a
@@ -264,7 +264,7 @@ for (const rel of SCANNED) {
   scanned++;
   for (const h of findingsIn(rel, problems)) leftInEnglish.push(`${rel}: ${h.kind} “${h.text.slice(0, 80)}”`);
 }
-ok(scanned >= 35, `the scan covers every page and component (${scanned} files)`);
+ok(scanned >= 45, `the scan covers every page, component and handwriting surface (${scanned} files)`);
 eq(problems, [], 'every i18n-exempt region is well-formed and states its reason');
 eq(leftInEnglish, [], 'no page or component draws a hard-coded English string');
 

@@ -7,8 +7,8 @@
 // before the Hindi chunk arrived, a label computed once at module load, a
 // string that comes back from a helper in English. This flow is that proof. It
 // makes an Indian profile in Hindi through the real onboarding, then walks the
-// screens the student uses — Home, Practice, Exams, an exam room, Progress and
-// the Pri Explain player — and on every one asserts:
+// screens the student uses — Home, Practice (typed and handwritten), Exams, an
+// exam room, Progress and the Pri Explain player — and on every one asserts:
 //
 //   - <html lang="hi">, so a screen reader reads it with a Hindi voice;
 //   - the screen is actually written in Devanagari, not merely tagged hi;
@@ -106,7 +106,7 @@ function devanagariOnPage() {
 
 export const flow = {
   id: 'hindi',
-  name: 'Hindi · Practice, Exams, exam room, Progress, Explain',
+  name: 'Hindi · Practice, handwriting, Exams, exam room, Progress, Explain',
 
   async run({ page, base, check, goto, createProfile, settle }) {
     const audit = async (screen) => {
@@ -130,6 +130,59 @@ export const flow = {
     await page.goto(`${base}/practice`, { waitUntil: 'domcontentloaded' });
     await page.waitForSelector('.q-prompt', { timeout: 30000 });
     await audit('Practice');
+
+    // ── Handwriting: the ink toolbar, the reading panel and a symbol correction ──
+    const writeTab = page.getByRole('button', { name: hi['verdict.modeWriteLabel'] });
+    for (let skips = 0; skips < 20 && !await writeTab.count(); skips++) {
+      await page.locator('.ctx-next').click();
+      await page.waitForSelector('.q-prompt', { timeout: 30000 });
+      await settle();
+    }
+    if (await check('Handwriting: a question that can be answered by hand was served', await writeTab.count() > 0)) {
+      await writeTab.first().click();
+      await page.waitForSelector('.ink-canvas-live', { timeout: 30000 });
+      await settle();
+      const toolbar = page.locator('.ink-toolbar');
+      const toolbarText = await toolbar.innerText();
+      for (const key of ['ink.pen', 'ink.eraser', 'ink.spaceShort', 'ink.finger', 'ink.hintEachLine']) {
+        await check(`Handwriting: the toolbar shows ${key} in Hindi`, toolbarText.includes(hi[key]), JSON.stringify(toolbarText));
+      }
+      const titles = await toolbar.locator('button').evaluateAll(els => els.map(el => [el.getAttribute('title'), el.getAttribute('aria-label')]));
+      for (const [titleKey, ariaKey] of [['ink.undo', 'ink.undoAria'], ['ink.redo', 'ink.redoAria'], ['ink.clear', 'ink.clearAria'],
+        ['ink.moreSpace', 'ink.moreSpaceAria'], ['ink.fingerTitle', 'ink.fingerAria']]) {
+        await check(`Handwriting: the ${titleKey} control is titled and labelled in Hindi`,
+          titles.some(([title, aria]) => title === hi[titleKey] && aria === hi[ariaKey]), JSON.stringify(titles));
+      }
+      await check('Handwriting: the writing surface is labelled in Hindi',
+        await page.locator('.ink-stage [role="img"]').first().getAttribute('aria-label') === hi['ink.answerSpaceAria']);
+      await check('Handwriting: no developer engine diagnostics are shown to the student',
+        await page.locator('.ink-answer [role="note"]').count() === 0);
+
+      // One stroke, so the reading panel and the tap-to-correct symbols appear.
+      const box = await page.locator('.ink-canvas-live').boundingBox();
+      await page.mouse.move(box.x + 60, box.y + 30);
+      await page.mouse.down();
+      for (let i = 1; i <= 12; i++) await page.mouse.move(box.x + 60 + i * 0.4, box.y + 30 + i * 6);
+      await page.mouse.up();
+      await page.waitForSelector('.ink-preview .ink-sym', { timeout: 15000 }).catch(() => {});
+      if (await check('Handwriting: the stroke was read', await page.locator('.ink-preview .ink-sym').count() > 0)) {
+        await check('Handwriting: the reading panel is headed in Hindi',
+          (await page.locator('.ink-preview-title').innerText()).includes(hi['ink.reading']),
+          JSON.stringify(await page.locator('.ink-preview-title').innerText()));
+        const sym = page.locator('.ink-preview .ink-sym').first();
+        const symLabel = await sym.getAttribute('aria-label');
+        await check('Handwriting: a read symbol is labelled in Hindi',
+          symLabel.startsWith(hi['ink.symbolAria'].split('{n}')[0]) && DEVANAGARI.test(symLabel), JSON.stringify(symLabel));
+        await check('Handwriting: a read symbol is titled in Hindi', await sym.getAttribute('title') === hi['ink.tapToCorrect']);
+        await sym.click();
+        await page.waitForSelector('.ink-picker', { timeout: 5000 }).catch(() => {});
+        await check('Handwriting: the symbol picker is labelled in Hindi',
+          await page.locator('.ink-picker').getAttribute('aria-label') === hi['ink.changeSymbol']);
+        await audit('Practice handwriting');
+      }
+      await page.locator(`.ink-tool[title="${hi['ink.clear']}"]`).click();
+      await settle();
+    }
 
     const answerBox = page.locator('.editor-body input.answer-input');
     const typeTab = page.getByRole('button', { name: hi['verdict.modeTypeLabel'] });
