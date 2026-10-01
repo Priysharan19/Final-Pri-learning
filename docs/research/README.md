@@ -234,6 +234,31 @@ Mathematics formative-assessment synthesis, feedback types/timing/dose, directiv
 ### AI_LITERACY_EPISTEMIC_AGENCY_AUDIT_THE_AI_V7.md
 OECD/EU school AI-literacy framework, secondary critical-questioning evidence, mathematical GenAI error-analysis evidence, calibrated reliance, challenge/disagreement flows, epistemic-status UI and controlled Audit-the-AI experiments including an ordinary-error-analysis comparator.
 
+
+### AI_ERA_ASSESSMENT_INTEGRITY_PROCESS_EVIDENCE_V7.md
+AI-detector limitations, explicit assessment modes, process evidence, independence-confidence classes, supervision boundaries, non-invasive integrity design and “evidence downgrade rather than accusation” policy.
+
+### LEARNING_EFFICIENCY_COST_LATENCY_ECONOMICS_V7.md
+Learning-per-minute and causal cost-effectiveness, task-level AI cost ownership, deterministic/on-device/cloud routing, classroom concurrency, tail latency, budget degradation and cost-per-independent-recovery research.
+
+### LONG_HORIZON_LEARNER_MEMORY_DATA_GOVERNANCE_V7.md
+Semantic educational memory vs raw-data exhaust, data classes, replayable derived state, deletion/lineage, child data agency, evidence-based minimization, research-data separation and long-horizon retention experiments.
+
+### CONTENT_RIGHTS_PROVENANCE_SOURCE_SIMILARITY_V7.md
+NCERT commercial-use restrictions, rights-state taxonomy, asset-level manifests, source-vs-rights separation, generated near-copy/similarity control, exam/past-paper provenance, offline-pack rights and CI/legal review gates.
+
+### EXPERIMENTATION_REPRODUCIBILITY_STATISTICAL_GOVERNANCE_V7.md
+A/A, sample-ratio mismatch, cluster randomization, carryover, ITT vs exposure, attrition, preregistration, multiple outcomes, sequential testing, power, dataset/version reproducibility and replication.
+
+### MODEL_SUPPLY_CHAIN_PROMPT_INJECTION_AGENT_SECURITY_V7.md
+Student/retrieved content as untrusted data, prompt injection, RAG poisoning, least privilege, excessive agency, tool authorization, model-version supply chain, denial-of-wallet and adversarial security benchmarks.
+
+### ACCESSIBLE_MATHEMATICS_SEMANTICS_INPUT_GRAPHICS_V7.md
+MathML 4, structural navigation/editing, braille/speech/input pathways, graph sonification/tactile semantics, geometry, assessment leakage, co-design and real-user accessibility evidence levels.
+
+### MISCONCEPTION_ERROR_ONTOLOGY_DIAGNOSTIC_EVIDENCE_V7.md
+Error taxonomy, misconception-as-hypothesis, opportunity-specific evidence, slip/gap/strategy/perception alternatives, external Eedi graph as candidate prior, diagnostic information gain and misconception-specific causal tests.
+
 ### V7_EMPIRICAL_SCIENCE_AND_BENCHMARK_PROGRAMME.md
 Execution-grade science programme: semantic instrumentation → adjudicated gold assets → benchmark laboratory → randomized mechanism experiments → India/classroom field evidence, with evidence grades and release claims.
 
@@ -264,6 +289,14 @@ Execution-grade science programme: semantic instrumentation → adjudicated gold
 | step validity, first break, SafeMath, formal proof, method marks | MATH_TRUTH_FIRST_BREAK_FORMAL_VERIFICATION_DEEP_DIVE.md |
 | Hindi/Hinglish, bilingual explanations, translation/terminology | MULTILINGUAL_MATH_INDIA_DEEP_DIVE.md |
 | benchmark construction, randomized research, evidence-grade claims | V7_EMPIRICAL_SCIENCE_AND_BENCHMARK_PROGRAMME.md |
+| AI-era assessment integrity, authorship/process evidence, proctoring | AI_ERA_ASSESSMENT_INTEGRITY_PROCESS_EVIDENCE_V7.md |
+| AI cost, inference latency, learning efficiency, model economics | LEARNING_EFFICIENCY_COST_LATENCY_ECONOMICS_V7.md |
+| learner memory, data retention/deletion, long-horizon governance | LONG_HORIZON_LEARNER_MEMORY_DATA_GOVERNANCE_V7.md |
+| NCERT/exam/source copyright, rights, provenance, similarity | CONTENT_RIGHTS_PROVENANCE_SOURCE_SIMILARITY_V7.md |
+| A/A, RCT quality, SRM, power, reproducibility, attrition | EXPERIMENTATION_REPRODUCIBILITY_STATISTICAL_GOVERNANCE_V7.md |
+| prompt injection, RAG poisoning, model/tool security, agent privileges | MODEL_SUPPLY_CHAIN_PROMPT_INJECTION_AGENT_SECURITY_V7.md |
+| deep accessible math semantics, equation/graph/input accessibility | ACCESSIBLE_MATHEMATICS_SEMANTICS_INPUT_GRAPHICS_V7.md |
+| misconception ontology, slips/gaps/errors, diagnostic evidence | MISCONCEPTION_ERROR_ONTOLOGY_DIAGNOSTIC_EVIDENCE_V7.md |
 | assessment validity, IRT/CAT, DIF, exposure, adaptive testing | ASSESSMENT_VALIDITY_FAIRNESS_PSYCHOMETRICS_DEEP_DIVE_V7.md |
 | prerequisite graph, knowledge graph, learning progression edges | KNOWLEDGE_GRAPH_PREREQUISITE_CAUSALITY_DEEP_DIVE_V7.md |
 | teacher AI, action cards, teacher decision support/corrections | TEACHER_AI_AUGMENTATION_DECISION_SCIENCE_V7.md |
