@@ -98,6 +98,36 @@ const MUTATIONS = [
     expect: /sync_cursors holds exactly the row \(1, 0\)/
   },
   {
+    label: 'accounts.role CHECK widened to also allow owner',
+    migrations: mutateBase("  role text not null default 'student' check (role in ('student','teacher','support','admin')),", "  role text not null default 'student' check (role in ('student','teacher','support','admin','owner')),"),
+    expect: /accounts CHECK expressions: Postgres has extra role in \{'admin','owner','student','support','teacher'\}/
+  },
+  {
+    label: 'a later migration narrows a pri_server policy to SELECT',
+    migrations: laterMigration('drop policy pri_server_all on pri.accounts;\ncreate policy pri_server_all on pri.accounts as permissive for select to pri_server using (true);'),
+    expect: /accounts: policy pri_server_all is for SELECT, not ALL/
+  },
+  {
+    label: 'the sync cursor sequence is given a per-session cache',
+    migrations: laterMigration('alter sequence pri.sync_cursor_seq cache 20;'),
+    expect: /sync_cursor_seq has CACHE 1/
+  },
+  {
+    label: 'a later migration gives pri_server back UPDATE on sync_cursors',
+    migrations: laterMigration('grant update on pri.sync_cursors to pri_server;'),
+    expect: /pri_server can UPDATE sync_cursors, which must be read-only to it/
+  },
+  {
+    label: 'schema_version left at 6 by the sequence migration',
+    migrations: [...original.slice(0, -1), { ...original[original.length - 1], sql: replaceOnce(original[original.length - 1].sql, "update pri.platform_meta set value = '7' where key = 'schema_version';", '') }],
+    expect: /platform_meta\.schema_version is 7/
+  },
+  {
+    label: 'the sync cursor sequence is dropped',
+    migrations: laterMigration('drop sequence pri.sync_cursor_seq;'),
+    expect: /sync_cursor_seq exists/
+  },
+  {
     label: 'learning_events.server_cursor made a GENERATED ALWAYS identity',
     migrations: laterMigration('alter table pri.learning_events alter column server_cursor add generated always as identity;'),
     expect: /learning_events\.server_cursor: identity is ALWAYS, expected none/

@@ -5,8 +5,9 @@
 //   (= node scripts/with-postgres.mjs node server/test/run-platform-postgres.mjs)
 //
 // Needs PRI_TEST_PG_ADMIN_URL (scripts/with-postgres.mjs provides it). Runs:
-//   1. the migrations on a real Postgres against the SQLite schema, and the
-//      mutation proof that this gate fails on real migration mistakes;
+//   1. the migrations on a real Postgres against the SQLite schema, the
+//      mutation proof that this gate fails on real migration mistakes, and the
+//      cutover verification tool (server/tools/postgres-target-check.mjs);
 //   2. every engine-agnostic platform suite with --engine=postgres. Each gets
 //      its own freshly migrated scratch database and connects as a member of
 //      pri_server, so a missing grant fails here rather than in production.
@@ -23,11 +24,12 @@ if (!process.env.PRI_TEST_PG_ADMIN_URL) {
   process.exit(1);
 }
 
-const SCHEMA = ['postgres-schema-live-check.mjs', 'postgres-schema-mutation-check.mjs'];
+const SCHEMA = ['postgres-schema-live-check.mjs', 'postgres-schema-mutation-check.mjs', 'postgres-target-tool-check.mjs'];
 // Engine-agnostic suites: SQLite by default (npm run test:platform), Postgres here.
 export const ENGINE_SUITES = [
   'platform-store-check.mjs',
   'platform-concurrency-check.mjs',
+  'platform-sync-burst-check.mjs',
   'platform-startup-check.mjs',
   'platform-http-journeys-check.mjs',
   'sync-idempotency-contract-check.mjs',

@@ -7,7 +7,9 @@ import { asStore, platformDatabaseUrl } from './store.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_PATH = join(here, '..', 'data', 'pri-learning-platform.db');
-export const SCHEMA_VERSION = 6;
+import { SCHEMA_VERSION } from './schemaVersions.js';
+
+export { SCHEMA_VERSION };
 
 
 /**
@@ -514,24 +516,65 @@ function rawSqlite(db) {
   return null;
 }
 
+/** The lock a sync write holds for one account (see nextSyncCursor). */
+export function syncLockKey(accountId) {
+  return `pri.sync:${String(accountId)}`;
+}
+
 /**
- * Allocate the next global sync cursor.
+ * Allocate the next sync cursor for a row of `accountId`.
  *
- * One row, incremented in place with UPDATE … RETURNING, inside the caller's
- * transaction (or a transaction of its own). On SQLite the single writer makes
- * that serial. On Postgres the UPDATE takes the row lock and holds it until the
- * pushing transaction commits, so cursors are handed out in commit order: a
- * puller that has seen cursor N can never later find a newly committed row
- * below N. Concurrent pushers queue on the lock; under SERIALIZABLE the loser
- * gets 40001 and the store re-runs its whole push.
+ * THE GUARANTEE pull pagination needs (sync.js syncPullPage pages one account by
+ * `server_cursor > ?`): for any one account, cursors are handed out in COMMIT
+ * order. A device that has seen cursor N for its account can never later find a
+ * newly committed row of that account below N — that row would be skipped
+ * forever.
+ *
+ * HOW. The caller must be inside a transaction that holds
+ * syncLockKey(accountId) (store.transaction(fn, { lock })); this function
+ * refuses otherwise (SYNC_CURSOR_UNLOCKED). Within one account, the lock makes
+ * writers strictly sequential — the next holder cannot allocate until the
+ * previous one has committed or rolled back — so allocation order is commit
+ * order for that account. Across accounts nothing is promised or needed: pulls
+ * never compare one account's cursors with another's.
+ *
+ *   · Postgres: nextval() on pri.sync_cursor_seq (CACHE 1, so values are
+ *     increasing across sessions, not just within one). nextval takes no row
+ *     lock and causes no serialization conflict, so pushes for different
+ *     accounts no longer contend on one hot row (the previous single-row
+ *     UPDATE made every concurrent push a SERIALIZABLE conflict, and a burst
+ *     of 120 exhausted the retry budget and answered 500). Values taken by a
+ *     transaction that rolls back are skipped; gaps are harmless.
+ *   · SQLite: the single sync_cursors row, as before. One connection already
+ *     serialises every transaction, so the lock is only recorded — but it is
+ *     still required, so a caller that forgets it fails on SQLite too.
  */
-export async function nextSyncCursor(db) {
+export async function nextSyncCursor(db, accountId) {
   const store = asStore(db);
-  return store.transaction(async tx => {
-    const row = await tx.get('UPDATE sync_cursors SET value = value + 1 WHERE id = 1 RETURNING value');
-    if (!row) throw Object.assign(new Error('sync_cursors is not initialised.'), { code: 'SYNC_CURSOR_MISSING' });
+  if (!accountId || store.heldLock() !== syncLockKey(accountId)) {
+    throw Object.assign(new Error('A sync cursor may only be allocated inside a transaction holding that account\'s sync lock.'), { code: 'SYNC_CURSOR_UNLOCKED' });
+  }
+  if (store.dialect === 'postgres') {
+    const row = await store.get("SELECT nextval('sync_cursor_seq') AS value");
     return Number(row.value);
-  });
+  }
+  const row = await store.get('UPDATE sync_cursors SET value = value + 1 WHERE id = 1 RETURNING value');
+  if (!row) throw Object.assign(new Error('sync_cursors is not initialised.'), { code: 'SYNC_CURSOR_MISSING' });
+  return Number(row.value);
+}
+
+/**
+ * The highest sync cursor handed out so far, across all accounts (operators'
+ * health view only — never shown to an account). On Postgres the sequence is read
+ * without consuming a value.
+ */
+export async function currentSyncCursor(db) {
+  const store = asStore(db);
+  if (store.dialect === 'postgres') {
+    const row = await store.get('SELECT CASE WHEN is_called THEN last_value ELSE last_value - 1 END AS value FROM sync_cursor_seq');
+    return Number(row?.value || 0);
+  }
+  return Number((await store.get('SELECT value FROM sync_cursors WHERE id=1'))?.value || 0);
 }
 
 // SQLite is opened at import, exactly as before, so production still validates

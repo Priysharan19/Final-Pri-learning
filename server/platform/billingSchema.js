@@ -1,6 +1,7 @@
 import { sqliteHandle } from './store.js';
+import { BILLING_SCHEMA_VERSION } from './schemaVersions.js';
 
-export const BILLING_SCHEMA_VERSION = 3;
+export { BILLING_SCHEMA_VERSION };
 
 function addColumnIfMissing(db, table, column, ddl) {
   const columns = new Set(db.pragma(`table_info('${table}')`).map(row => row.name));
