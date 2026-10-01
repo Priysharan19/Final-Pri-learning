@@ -236,6 +236,7 @@ class ShellJourneyTest {
             assertTrue("Progress counts the attempt just marked ($answeredAfter answered)", answeredAfter >= 1)
             eval(s, "(function(){history.back();return true;})()")
             waitFor(s, "location.pathname === '/practice'")
+            awaitBackWanted(s, true)
             pressBack()
             waitFor(s, "location.pathname === '/'")
 
