@@ -587,6 +587,27 @@ same('(-x)^(1/3)', '-x^(1/3)', strict, 'odd root of a negated variable, strict')
 ok(exprEquivalent('x/x', '1', isolated) === false && exprEquivalent('x/x', '1', isolated) === false, 'domain: cached verdict is stable');
 ok(exprEquivalent('tan(2x)', '2tan(x)/(1-tan(x)^2)', isolated) === true, 'domain: cached acceptance is stable');
 
+// ── 17. Endpoints of an interval domain (third review of PR #243) ─────────────
+// Sides that differ only at an endpoint of their common domain — both undefined
+// just beyond it — are an interval difference: accepted by default, refused
+// where the question authors strictDomain. (sin⁻¹ is written asin/arcsin: the
+// parser reads sin⁻¹x as (sin x)⁻¹, and has no inverse cotangent.)
+const endpoints = [
+  ['x/sqrt(x)', 'sqrt(x)'],
+  ['asin(x)', 'atan(x/sqrt(1-x^2))'],
+  ['arcsin(x)', 'arctan(x/sqrt(1-x^2))']
+];
+for (const [a, b] of endpoints) {
+  same(a, b, isolated, 'endpoint difference accepted by default');
+  same(b, a, isolated, 'endpoint difference accepted by default, either order');
+  ok(finalMark(b, a) === true, `marker: ${a} is accepted for ${b} by default`);
+  differ(a, b, strict, 'endpoint difference refused under strictDomain');
+  ok(finalMark(b, a, { strictDomain: true }) === false, `marker: ${a} is refused for ${b} when the question sets strictDomain`);
+}
+// A hole inside the common domain is still isolated, and still refused.
+differ('(x+1)/(x^2-1)', '1/(x-1)', isolated, 'interior hole at -1 refused by default');
+ok(finalMark('1/(x-1)', '(x+1)/(x^2-1)') === false, 'marker: (x+1)/(x²−1) is refused for 1/(x−1)');
+
 console.log(failures.length
   ? `NCERT ANSWER FORMS: FAIL — ${failures.length} of ${pass + failures.length} checks failed\n  · ${failures.join('\n  · ')}`
   : `NCERT ANSWER FORMS: PASS — ${pass}/${pass} checks — solution sets, inequality/interval equivalence, matrices, vectors, the n!/nCr/nPr/sec/cosec/cot vocabulary, rupees and paise, fraction form only where the question asks for it, blank answers, exact integers, the percent sign, unit-named variables and domain-aware final answers.`);

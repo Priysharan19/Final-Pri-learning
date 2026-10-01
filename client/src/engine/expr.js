@@ -537,8 +537,8 @@ const SAMPLE_SETS = [
 //
 // POLICY (owner-delegated default for #231). Each difference is classified:
 //
-// · ISOLATED — the sides differ only at the point itself and agree on both
-//   sides of it: x/x vs 1, (x² − 1)/(x − 1) vs x + 1, (xy)/y vs x, x⁰ vs 1,
+// · ISOLATED — the sides differ only at the point itself, inside their common
+//   domain (both are defined on both sides of it): x/x vs 1, (x² − 1)/(x − 1) vs x + 1, (xy)/y vs x, x⁰ vs 1,
 //   sec²x − tan²x vs 1. This is the #231 defect class and is refused under
 //   `isolatedDomain` (the marker's default for final answers). One leniency:
 //   when the hole comes only from a trigonometric (non-polynomial) guard AND
@@ -548,8 +548,12 @@ const SAMPLE_SETS = [
 //   — and are accepted. A hole from a polynomial guard is always refused, and
 //   so is a trigonometric hole in an expression with no poles (sec²x − tan²x
 //   vs 1).
-// · INTERVAL — one side is undefined on an open interval beside the point:
-//   ln x + ln y vs ln xy, ln x² vs 2 ln x, √x·√x vs x, ln x vs ln|x|. NCERT
+// · INTERVAL — one side is undefined on an open interval beside the point
+//   (ln x + ln y vs ln xy, ln x² vs 2 ln x, √x·√x vs x, ln x vs ln|x|), or the
+//   sides differ only at an ENDPOINT of their common domain, where both are
+//   undefined just beyond it (x/√x vs √x at 0; sin⁻¹x vs tan⁻¹(x/√(1 − x²))
+//   at ±1, the standard NCERT conversion). An isolated hole is one inside the
+//   common domain, with both sides defined either side of it. NCERT
 //   treats these as equal under implied positivity, and marking a correct
 //   CBSE answer wrong is worse than the leniency, so they behave as on main
 //   (values compared where both are defined) unless the question authors
@@ -779,8 +783,11 @@ function domainDiffers(astA, astB, names, integers, baseEnvs, range, positiveOnl
         }
         const a0 = sideDefinedAt(astA, guardsA, env, name, p);
         if (a0 === sideDefinedAt(astB, guardsB, env, name, p)) continue;
-        // isolated: exactly one side has a hole at p and they agree around it
         if (strict) return true;
+        // an endpoint (both sides undefined just beyond p, as at 0 for x/√x vs
+        // √x or ±1 for sin⁻¹x vs tan⁻¹(x/√(1−x²))) is an interval difference
+        if (![p - delta, p + delta].every(x => x >= lo && x <= hi && fin(fA(x)))) continue;
+        // isolated: exactly one side has a hole inside the common domain
         const [holeGuards, fullAst, fullGuards] = a0 ? [guardsB, astA, guardsA] : [guardsA, astB, guardsB];
         const causes = holeGuards.filter(gd => vanishesNear(along(gd.g, env, name), p));
         const trigonometric = causes.length > 0 && !causes.some(isPoly);
