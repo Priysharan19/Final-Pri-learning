@@ -409,13 +409,21 @@ function HomeAction({ action, nav, primary }) {
   const t = useT();
   if (!action) return null;
   const copy = actionCopy(action, user, t);
-  if (!primary) return (
-    <article className="home-card">
-      <strong>{copy.title}</strong>
-      <p>{copy.reason}</p>
-      <button className="btn btn-ghost btn-sm" onClick={() => nav(action.destination)}>{copy.cta}</button>
-    </article>
-  );
+  if (!primary) {
+    // Alternatives share CTA words ("Continue", "Practice"), so each button is
+    // named by its own card title and described by its own reason.
+    const key = String(action.id || action.destination || copy.title).replace(/[^A-Za-z0-9_-]/g, '-');
+    const titleId = `home-alt-title-${key}`;
+    const reasonId = `home-alt-reason-${key}`;
+    return (
+      <article className="home-card" aria-labelledby={titleId}>
+        <strong id={titleId}>{copy.title}</strong>
+        <p id={reasonId}>{copy.reason}</p>
+        <button className="btn btn-ghost btn-sm" aria-labelledby={`${titleId}-cta ${titleId}`} aria-describedby={reasonId}
+          onClick={() => nav(action.destination)}><span id={`${titleId}-cta`}>{copy.cta}</span></button>
+      </article>
+    );
+  }
   const reasonId = 'home-primary-reason';
   return (
     <section className="card home-command" data-home-primary aria-labelledby="home-next-title">

@@ -2441,7 +2441,7 @@ const routes = {
   'GET /practice/resume': async () => {
     const p = await requireProfile();
     const row = (await byIndex('questions', 'pid', p.id))
-      .filter(r => r && !r.answered && !r.discardedAt && !r.examId && r.mode !== 'rush' && r.mode !== 'match')
+      .filter(r => r && !r.answered && !r.discardedAt && !isExamRow(r) && r.mode !== 'rush' && r.mode !== 'match')
       .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))[0];
     if (!row) return { resume: null };
     const task = row.taskId ? await get('tasks', row.taskId) : null;

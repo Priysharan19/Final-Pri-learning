@@ -1218,6 +1218,22 @@ async function run() {
     ok('the active paper has a single-answer question to probe', !!single);
     ok('the active paper has a multipart question to probe', !!multi);
 
+    // Home continuity must never offer an active exam's question as practice to
+    // resume — even when it is the newest unanswered row, and even a row that
+    // is marked exam only by mode (KALP-04 × #230).
+    const paperIds = new Set(stored.questionIds);
+    const resumeDuringExam = await GET('/practice/resume');
+    ok('Home continuity never offers an active exam question as practice to resume',
+      !paperIds.has(resumeDuringExam.resume?.questionId), show(resumeDuringExam.resume));
+    if (single) {
+      const modeOnly = { ...single, id: `${single.id}-modeonly`, examId: null, mode: 'exam', createdAt: Date.now() + 60000 };
+      await idb.put('questions', modeOnly);
+      const resumeModeOnly = await GET('/practice/resume');
+      ok('a row marked exam only by its mode is not offered for resume either',
+        resumeModeOnly.resume?.questionId !== modeOnly.id, show(resumeModeOnly.resume));
+      await idb.del('questions', modeOnly.id);
+    }
+
     const attemptsBefore = (await idb.byIndex('attempts', 'pid', me)).length;
     const reviewsBefore = JSON.stringify(await idb.byIndex('reviews', 'pid', me));
 
