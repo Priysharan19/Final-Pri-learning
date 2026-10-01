@@ -191,7 +191,7 @@ export const flow = {
     await reachRealFeedback(page, check);
 
     await page.reload({ waitUntil: 'domcontentloaded' });
-    await page.waitForSelector('.home-greet');
+    await page.waitForSelector('.shell');
     await check('reload restores the actual created profile',
       (await page.locator('.user-chip').innerText()).includes('KALP03 Class 10 Student'));
     await check('English remains profile-specific after reload',
