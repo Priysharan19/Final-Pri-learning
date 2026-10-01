@@ -391,7 +391,7 @@ function actionCopy(action, user, t) {
     'first-practice': user.course === 'in' ? 'home.next.firstIndia' : 'home.next.firstNsw',
     adaptive: 'nav.practice', 'smart-practice': 'nav.practice'
   }[action.kind];
-  const title = (action.kind === 'task-resume' ? t('common.continue') + ' · ' : '') + (d.title || t(genericTitle, d));
+  const title = (action.kind === 'task-resume' ? t('common.continue') + ': ' : '') + (d.title || t(genericTitle, d));
   let reason = action.kind === 'exam' ? 'home.reason.examInProgress'
     : action.kind === 'assignment' || action.kind === 'task' ? WORK_REASONS[d.status]
       : action.kind.endsWith('resume') ? 'home.reason.resume'
