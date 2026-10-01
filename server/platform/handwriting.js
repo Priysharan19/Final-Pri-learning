@@ -16,8 +16,12 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { Router } from 'express';
 import { rateLimit, requireSession, requireVerifiedEmail } from './security.js';
-import { consumePaidCall, refusePaidCall } from './spendCeiling.js';
-import { HandwritingProviderError, providerConfig, transcribeHandwriting, validateImage } from './handwritingProvider.js';
+import { consumePaidCall, refusePaidCall, spendCeilingMissing } from './spendCeiling.js';
+import { serverReleaseIdentity } from './releaseIdentity.js';
+import {
+  HandwritingProviderError, handwritingProviderDiagnostics, probeHandwritingProvider,
+  providerStaticStatus, transcribeHandwriting, validateImage
+} from './handwritingProvider.js';
 
 /** Fields that must never be sent to a transcriber. */
 export const FORBIDDEN_FIELDS = Object.freeze([
@@ -55,18 +59,79 @@ export function validateRequestBody(body) {
 
 export function createHandwritingRouter(db, {
   transcribe = transcribeHandwriting,
+  probe = probeHandwritingProvider,
   env = process.env
 } = {}) {
   const router = Router();
 
-  // Whether this deployment can read handwriting at all, so the app can hide
-  // the setting rather than offer something that will fail.
-  router.get('/status', requireSession(db), (req, res) => {
-    const config = providerConfig(env);
+  // This is an operational readiness endpoint, not a credential-presence check.
+  // A student must never be offered cloud handwriting when the key exists but
+  // the model, endpoint, budget guard or provider is unusable.
+  router.get('/status', requireSession(db), async (req, res) => {
+    const staticStatus = providerStaticStatus(env);
+    const missingBudget = spendCeilingMissing(env);
+    let providerStatus = {
+      ...staticStatus,
+      usable: false,
+      degraded: false,
+      failureCode: !staticStatus.configured
+        ? 'HANDWRITING_NOT_CONFIGURED'
+        : !staticStatus.configValid
+          ? 'HANDWRITING_PROVIDER_CONFIG_INVALID'
+          : null,
+      latencyMs: null,
+      fallbackUsable: false
+    };
+
+    if (staticStatus.configured && staticStatus.configValid && missingBudget.length === 0) {
+      try {
+        providerStatus = await probe({ env });
+      } catch {
+        providerStatus = {
+          ...providerStatus,
+          degraded: true,
+          failureCode: 'HANDWRITING_PROVIDER_PROBE_FAILED'
+        };
+      }
+    }
+
+    const budgetConfigured = missingBudget.length === 0;
+    const usable = budgetConfigured && providerStatus.usable === true;
+    const degraded = budgetConfigured && providerStatus.degraded === true;
+    const failureCode = !budgetConfigured
+      ? 'PAID_CAPACITY_NOT_CONFIGURED'
+      : providerStatus.failureCode || handwritingProviderDiagnostics().lastFailureCode || null;
+    const state = !staticStatus.configured || !staticStatus.configValid || !budgetConfigured
+      ? 'unavailable'
+      : usable
+        ? (degraded ? 'degraded' : 'ready')
+        : (degraded ? 'degraded' : 'unavailable');
+
+    let releaseSha = null;
+    const explicitSha = String(env.PRI_RELEASE_SHA || '').trim();
+    if (/^[0-9a-f]{40}$/.test(explicitSha)) releaseSha = explicitSha;
+    else {
+      try {
+        const candidate = serverReleaseIdentity()?.releaseSha;
+        if (/^[0-9a-f]{40}$/.test(String(candidate || ''))) releaseSha = candidate;
+      } catch { /* diagnostics must never make readiness itself fail */ }
+    }
+
+    res.set('Cache-Control', 'no-store');
     res.json({
-      available: config.configured,
-      model: config.configured ? config.primaryModel : null,
-      confidenceFloor: config.confidenceFloor
+      available: usable,
+      configured: staticStatus.configured,
+      usable,
+      degraded,
+      state,
+      model: staticStatus.configured ? staticStatus.primaryModel : null,
+      fallbackModel: staticStatus.configured ? staticStatus.fallbackModel : null,
+      confidenceFloor: staticStatus.confidenceFloor,
+      timeoutMs: staticStatus.timeoutMs,
+      fallbackUsable: providerStatus.fallbackUsable === true,
+      lastFailureCode: failureCode,
+      lastLatencyMs: providerStatus.latencyMs ?? handwritingProviderDiagnostics().lastLatencyMs ?? null,
+      releaseSha
     });
   });
 
@@ -99,7 +164,10 @@ export function createHandwritingRouter(db, {
             text: result.text,
             confidence: result.confidence,
             needsConfirmation: result.needsConfirmation,
-            escalated: !!result.escalated
+            escalated: !!result.escalated,
+            fallbackAttempted: !!result.fallbackAttempted,
+            fallbackFailureCode: result.fallbackFailureCode || null,
+            latencyMs: Number.isFinite(result.latencyMs) ? result.latencyMs : null
           }
         });
       } catch (error) {

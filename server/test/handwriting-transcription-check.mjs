@@ -22,7 +22,8 @@ import { createPlatformDb } from '../platform/db.js';
 import { createHandwritingRouter, validateRequestBody, FORBIDDEN_FIELDS } from '../platform/handwriting.js';
 import {
   SYSTEM_INSTRUCTIONS, TRANSCRIPTION_SCHEMA, normalizeResult, providerConfig,
-  transcribeHandwriting, validateImage, HandwritingProviderError
+  providerStaticStatus, probeHandwritingProvider, transcribeHandwriting,
+  validateImage, HandwritingProviderError
 } from '../platform/handwritingProvider.js';
 import { SESSION_COOKIE, sha256 } from '../platform/security.js';
 
@@ -92,7 +93,7 @@ const recordingFetch = async (url, init) => {
     json: async () => ({ output_text: JSON.stringify({ lines: [{ text: '-1, 0, 1, 2, 4', confidence: 0.95 }], confidence: 0.95, needs_confirmation: false }) })
   };
 };
-const env = { PRI_HANDWRITING_API_KEY: 'test-key-not-real', PRI_HANDWRITING_MODEL: 'test-primary', PRI_HANDWRITING_FALLBACK_MODEL: 'test-fallback', PRI_PAID_CALLS_PER_HOUR: '10000', PRI_PAID_CALLS_PER_DAY: '100000' };
+const env = { PRI_HANDWRITING_API_KEY: 'test-key-not-real', PRI_HANDWRITING_MODEL: 'test-primary', PRI_HANDWRITING_FALLBACK_MODEL: 'test-fallback', PRI_PAID_CALLS_PER_HOUR: '10000', PRI_PAID_CALLS_PER_DAY: '100000', PRI_RELEASE_SHA: '1111111111111111111111111111111111111111' };
 const result = await transcribeHandwriting(PNG, { env, fetchImpl: recordingFetch });
 
 eq(result.text, '-1, 0, 1, 2, 4', 'the transcription comes back, commas and all');
@@ -134,7 +135,104 @@ let upstream = null;
 try { await transcribeHandwriting(PNG, { env, fetchImpl: failing }); } catch (error) { upstream = error; }
 ok(upstream?.retryable === true && upstream.status === 503, 'a provider outage is reported as retryable');
 
-// ── 8 · The route: signed in, verified, rate limited ─────────────────────────
+// ── 8 · Provider configuration, readiness and failure taxonomy ──────────────
+const invalidEndpoint = providerStaticStatus({
+  ...env,
+  NODE_ENV: 'production',
+  PRI_HANDWRITING_ENDPOINT: 'http://api.openai.com/v1/responses'
+});
+ok(invalidEndpoint.configured && !invalidEndpoint.configValid && invalidEndpoint.problems.includes('endpoint-not-https'),
+  'production refuses a configured non-HTTPS handwriting endpoint');
+
+const invalidModel = providerStaticStatus({ ...env, PRI_HANDWRITING_MODEL: 'bad model with spaces' });
+ok(!invalidModel.configValid && invalidModel.problems.includes('primary-model-invalid'),
+  'an invalid model identifier does not count as usable configuration');
+
+const probeReady = await probeHandwritingProvider({
+  env,
+  cache: false,
+  fetchImpl: async () => ({ ok: true, status: 200 })
+});
+ok(probeReady.usable === true && probeReady.degraded === false && probeReady.fallbackUsable === true,
+  'readiness probes both configured models without sending student ink');
+
+let probeCalls = 0;
+const probeLimited = await probeHandwritingProvider({
+  env,
+  cache: false,
+  fetchImpl: async () => {
+    probeCalls += 1;
+    return probeCalls === 1 ? { ok: false, status: 429 } : { ok: true, status: 200 };
+  }
+});
+ok(probeLimited.usable === false && probeLimited.degraded === true && probeLimited.failureCode === 'HANDWRITING_PROVIDER_429',
+  'a provider 429 is degraded, not falsely ready');
+
+const providerFailure = async (status) => ({ ok: false, status, json: async () => ({}) });
+for (const [statusCode, expectedCode] of [[401, 'HANDWRITING_PROVIDER_AUTH'], [429, 'HANDWRITING_PROVIDER_429'], [500, 'HANDWRITING_PROVIDER_5XX']]) {
+  let error = null;
+  try { await transcribeHandwriting(PNG, { env, fetchImpl: () => providerFailure(statusCode) }); } catch (e) { error = e; }
+  eq(error?.code, expectedCode, `provider HTTP ${statusCode} keeps its own coded failure`);
+}
+
+let unreachable = null;
+try { await transcribeHandwriting(PNG, { env, fetchImpl: async () => { throw new Error('network down'); } }); }
+catch (e) { unreachable = e; }
+eq(unreachable?.code, 'HANDWRITING_UNREACHABLE', 'a transport failure is distinct from provider HTTP failures');
+
+let malformedEnvelope = null;
+try {
+  await transcribeHandwriting(PNG, {
+    env,
+    fetchImpl: async () => ({ ok: true, status: 200, json: async () => { throw new SyntaxError('bad json'); } })
+  });
+} catch (e) { malformedEnvelope = e; }
+eq(malformedEnvelope?.code, 'HANDWRITING_PROVIDER_MALFORMED_RESPONSE', 'malformed provider JSON is coded');
+
+let emptyEnvelope = null;
+try {
+  await transcribeHandwriting(PNG, {
+    env,
+    fetchImpl: async () => ({ ok: true, status: 200, json: async () => ({}) })
+  });
+} catch (e) { emptyEnvelope = e; }
+eq(emptyEnvelope?.code, 'HANDWRITING_EMPTY', 'an empty provider envelope is coded');
+
+const alreadyCancelled = new AbortController();
+alreadyCancelled.abort();
+let cancelled = null;
+try {
+  await transcribeHandwriting(PNG, {
+    env,
+    signal: alreadyCancelled.signal,
+    fetchImpl: async (_url, init) => {
+      if (init.signal.aborted) throw new DOMException('Aborted', 'AbortError');
+      return recordingFetch(_url, init);
+    }
+  });
+} catch (e) { cancelled = e; }
+eq(cancelled?.code, 'HANDWRITING_CANCELLED', 'cancellation is distinct from timeout and outage');
+
+let fallbackCalls = 0;
+const fallbackFailureFetch = async (_url, init) => {
+  fallbackCalls += 1;
+  if (fallbackCalls === 2) return { ok: false, status: 500, json: async () => ({}) };
+  return {
+    ok: true, status: 200,
+    json: async () => ({ output_text: JSON.stringify({
+      lines: [{ text: 'x = ?', confidence: 0.4 }],
+      confidence: 0.4,
+      needs_confirmation: true
+    }) })
+  };
+};
+const fallbackFailure = await transcribeHandwriting(PNG, { env, fetchImpl: fallbackFailureFetch });
+ok(fallbackFailure.fallbackAttempted === true
+  && fallbackFailure.fallbackFailureCode === 'HANDWRITING_PROVIDER_5XX'
+  && fallbackFailure.escalated === false,
+  'a failed fallback is preserved in safe diagnostics while the primary low-confidence read survives');
+
+// ── 9 · The route: signed in, verified, rate limited ─────────────────────────
 const db = createPlatformDb(':memory:');
 const now = Date.now();
 db.prepare('INSERT INTO accounts(id,email,name,role,created_at,updated_at,email_verified_at) VALUES (?,?,?,?,?,?,?)')
@@ -150,8 +248,17 @@ const app = express();
 app.use(express.json({ limit: '2mb' }));
 app.use(cookieParser());
 app.use('/handwriting', createHandwritingRouter(db, {
-  transcribe: async () => ({ engine: 'cloud-test', lines: [{ text: '-1, 0, 1, 2, 4', confidence: 0.95 }], text: '-1, 0, 1, 2, 4', confidence: 0.95, needsConfirmation: false, escalated: false }),
+  transcribe: async () => ({ engine: 'cloud-test', lines: [{ text: '-1, 0, 1, 2, 4', confidence: 0.95 }], text: '-1, 0, 1, 2, 4', confidence: 0.95, needsConfirmation: false, escalated: false, fallbackAttempted: false, fallbackFailureCode: null, latencyMs: 17 }),
+  probe: async () => ({ ...providerStaticStatus(env), usable: true, degraded: false, failureCode: null, latencyMs: 7, fallbackUsable: true }),
   env
+}));
+const noBudgetEnv = { ...env };
+delete noBudgetEnv.PRI_PAID_CALLS_PER_HOUR;
+delete noBudgetEnv.PRI_PAID_CALLS_PER_DAY;
+let noBudgetProbeCalls = 0;
+app.use('/handwriting-unbudgeted', createHandwritingRouter(db, {
+  probe: async () => { noBudgetProbeCalls += 1; return { ...providerStaticStatus(noBudgetEnv), usable: true }; },
+  env: noBudgetEnv
 }));
 const server = await new Promise(resolve => { const s = app.listen(0, '127.0.0.1', () => resolve(s)); });
 const base = `http://127.0.0.1:${server.address().port}`;
@@ -184,8 +291,18 @@ try {
 
   const status = await fetch(`${base}/handwriting/status`, { headers: { cookie: `${SESSION_COOKIE}=raw-acct-verified` } });
   const statusBody = await status.json();
-  ok(statusBody.available === true && statusBody.model === 'test-primary',
-    'the app can ask whether this deployment can read handwriting at all');
+  ok(statusBody.available === true && statusBody.usable === true && statusBody.state === 'ready' && statusBody.model === 'test-primary',
+    'status says ready only when the configured provider is actually usable');
+  eq(statusBody.releaseSha, env.PRI_RELEASE_SHA, 'status identifies the release serving the handwriting path');
+  ok(statusBody.configured === true && statusBody.fallbackUsable === true && statusBody.lastLatencyMs === 7,
+    'status exposes only safe operational readiness diagnostics');
+
+  const noBudgetStatus = await fetch(`${base}/handwriting-unbudgeted/status`, { headers: { cookie: `${SESSION_COOKIE}=raw-acct-verified` } });
+  const noBudgetBody = await noBudgetStatus.json();
+  ok(noBudgetBody.configured === true && noBudgetBody.usable === false && noBudgetBody.state === 'unavailable'
+    && noBudgetBody.lastFailureCode === 'PAID_CAPACITY_NOT_CONFIGURED',
+    'a key without paid-call ceilings is explicitly unavailable, never ready');
+  eq(noBudgetProbeCalls, 0, 'status refuses missing spend ceilings before touching the provider');
 
   // The limit is per account and per hour; exhausting it must refuse rather
   // than keep spending.

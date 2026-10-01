@@ -99,6 +99,17 @@
 - Extend deterministic server/client/native contracts for failure taxonomy, cancellation, fallback and status truthfulness.
 - Keep hybrid arbitration/accuracy redesign out of PRI-03.
 
+## Checkpoint 2 — server/provider/status repair
+- Status no longer equates credential presence with readiness.
+- Static provider validation covers endpoint scheme/path, model identifiers, timeout and confidence configuration.
+- Operational readiness performs a bounded, cached provider/model probe and reports configured/usable/degraded/unavailable without exposing credentials or student data.
+- Missing global paid-call hour/day ceilings force status unavailable before provider probing.
+- Status includes safe model/fallback/confidence/timeout/failure/latency/release-SHA diagnostics.
+- Provider HTTP auth, 429 and 5xx failures are distinct; transport unreachable, cancellation, malformed response and empty response remain coded.
+- Low-confidence fallback failure is preserved in the returned safe diagnostics rather than silently discarded.
+- Focused verification: npm run test:platform:handwriting PASS — 69/69 checks.
+
+
 ## Current-main reconciliation
 - Recovered uncommitted Checkpoint-2 provider/status work was preserved first in commit ce0f4cfefe370a7e0ec2c6d04cc7573e81ff1e13 and pushed before history changes.
 - Fetched live production main explicitly because this crash-recovery clone originally had a single-branch fetchspec.

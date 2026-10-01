@@ -122,8 +122,9 @@ export function providerStaticStatus(env = process.env) {
   const problems = [];
   const endpoint = safeEndpointParts(config.endpoint);
   if (config.configured) {
-    if (!endpoint.url) problems.push('endpoint-invalid');
+    if (!endpoint.url || !['http:', 'https:'].includes(endpoint.url.protocol)) problems.push('endpoint-invalid');
     else if (endpoint.url.protocol !== 'https:' && String(env.NODE_ENV || '') === 'production') problems.push('endpoint-not-https');
+    else if (endpoint.url.host === 'api.openai.com' && endpoint.url.pathname !== '/v1/responses') problems.push('endpoint-path-invalid');
     const model = /^[A-Za-z0-9._:-]{1,160}$/;
     if (!model.test(config.primaryModel)) problems.push('primary-model-invalid');
     if (!model.test(config.fallbackModel)) problems.push('fallback-model-invalid');
@@ -174,7 +175,8 @@ async function probeModel(model, { env, config, fetchImpl, signal }) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
   const onAbort = () => controller.abort();
-  signal?.addEventListener?.('abort', onAbort, { once: true });
+  if (signal?.aborted) controller.abort();
+  else signal?.addEventListener?.('abort', onAbort, { once: true });
   const started = Date.now();
   try {
     const response = await fetchImpl(url, {
@@ -308,7 +310,8 @@ async function callModel({ model, imageDataUrl, config, fetchImpl, signal }) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), config.timeoutMs);
   const onAbort = () => controller.abort();
-  signal?.addEventListener?.('abort', onAbort, { once: true });
+  if (signal?.aborted) controller.abort();
+  else signal?.addEventListener?.('abort', onAbort, { once: true });
 
   let response;
   try {
@@ -353,6 +356,16 @@ async function callModel({ model, imageDataUrl, config, fetchImpl, signal }) {
   }
 
   if (!response.ok) {
+    if (response.status === 401 || response.status === 403) {
+      throw new HandwritingProviderError('The transcription provider rejected its server credential.', {
+        code: 'HANDWRITING_PROVIDER_AUTH', status: 503, retryable: false
+      });
+    }
+    if (response.status === 404) {
+      throw new HandwritingProviderError('The configured handwriting model or endpoint is unavailable.', {
+        code: 'HANDWRITING_MODEL_UNAVAILABLE', status: 503, retryable: false
+      });
+    }
     if (response.status === 429) {
       throw new HandwritingProviderError('The transcription provider is rate limited.', {
         code: 'HANDWRITING_PROVIDER_429', status: 503, retryable: true
@@ -419,7 +432,7 @@ export async function transcribeHandwriting(imageDataUrl, {
         lastFallbackAttempted: false,
         lastFallbackFailureCode: null
       });
-      return { ...first, escalated: false, fallbackAttempted: false, fallbackFailureCode: null };
+      return { ...first, escalated: false, fallbackAttempted: false, fallbackFailureCode: null, latencyMs: Date.now() - started };
     }
 
     try {
@@ -434,7 +447,7 @@ export async function transcribeHandwriting(imageDataUrl, {
         lastFallbackAttempted: true,
         lastFallbackFailureCode: null
       });
-      return { ...best, escalated: true, fallbackAttempted: true, fallbackFailureCode: null };
+      return { ...best, escalated: true, fallbackAttempted: true, fallbackFailureCode: null, latencyMs: Date.now() - started };
     } catch (error) {
       const code = error?.code || 'HANDWRITING_FALLBACK_FAILED';
       recordProviderDiagnostics({
@@ -443,7 +456,7 @@ export async function transcribeHandwriting(imageDataUrl, {
         lastFallbackAttempted: true,
         lastFallbackFailureCode: code
       });
-      return { ...first, escalated: false, fallbackAttempted: true, fallbackFailureCode: code };
+      return { ...first, escalated: false, fallbackAttempted: true, fallbackFailureCode: code, latencyMs: Date.now() - started };
     }
   } catch (error) {
     recordProviderDiagnostics({
