@@ -171,6 +171,17 @@ const BODY_RULES = [
   [/^POST \/practice\/[A-Za-z0-9._-]+\/(?:hint|reveal)$/, body => {
     requireObject(body, 'practice action'); optionalNumber(body, 'ms');
   }],
+  // A cloud-proposed misconception: the student's own working lines, the
+  // proposed ontology ID and where the cloud check placed the break. The
+  // backend re-decides it deterministically; this only bounds its shape.
+  [/^POST \/practice\/[A-Za-z0-9._-]+\/misconception$/, body => {
+    requireObject(body, 'practice misconception'); optionalString(body, 'misconceptionId', 64);
+    optionalNumber(body, 'firstBreak'); optionalBoolean(body, 'confident');
+    if (body.lines !== undefined && (!Array.isArray(body.lines) || body.lines.length > 40
+      || body.lines.some(l => typeof l !== 'string' || l.length > 400))) {
+      throw apiError('lines must be at most 40 lines of working.', 400, 'INVALID_FIELD');
+    }
+  }],
   [/^POST \/practice\/[A-Za-z0-9._-]+\/submit$/, body => {
     requireObject(body, 'practice submit'); optionalNumber(body, 'ms'); optionalBoolean(body, 'viaInk');
     if (body.steps !== undefined && typeof body.steps !== 'string' && !Array.isArray(body.steps)) throw apiError('steps must be text or an array.', 400, 'INVALID_FIELD');
