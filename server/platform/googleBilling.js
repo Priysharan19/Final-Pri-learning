@@ -337,10 +337,12 @@ export function createGoogleBilling(db, { client = null, env = process.env, now 
     requireConfigured(cfg);
     if (!PURCHASE_TOKEN.test(String(purchaseToken || ''))) throw billingError('GOOGLE_PURCHASE_INVALID', 'The Google Play purchase token is invalid.');
     const issued = (await db.get('SELECT obfuscated_account_id FROM billing_google_accounts WHERE account_id=?', [accountId]))?.obfuscated_account_id;
+    // An account that never bootstrapped cannot own a purchase: no need to ask Google.
+    if (!issued) throw billingError('GOOGLE_ACCOUNT_MISMATCH', 'This Google Play purchase was not made for this Pri Learning account.', 409);
     const sub = await api().getSubscription(purchaseToken);
     assertOurs(sub);
     const claimed = String(sub?.externalAccountIdentifiers?.obfuscatedExternalAccountId || '');
-    if (!issued || !constantTimeEqual(claimed, issued)) {
+    if (!constantTimeEqual(claimed, issued)) {
       throw billingError('GOOGLE_ACCOUNT_MISMATCH', 'This Google Play purchase was not made for this Pri Learning account.', 409);
     }
     const { superseded } = await bind(sub, purchaseToken, accountId);

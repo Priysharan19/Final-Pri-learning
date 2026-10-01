@@ -25,6 +25,13 @@ function mutateBase(from, to) {
   return [{ name: base.name, sql: replaceOnce(base.sql, from, to) }, ...original.slice(1)];
 }
 
+/** Mutate one named migration (not "the last one": later migrations follow). */
+function mutateNamed(suffix, from, to) {
+  const target = original.find(m => m.name.endsWith(suffix));
+  if (!target) throw new Error(`migration not found: ${suffix}`);
+  return original.map(m => (m === target ? { name: m.name, sql: replaceOnce(m.sql, from, to) } : m));
+}
+
 function laterMigration(sql) {
   return [...original, { name: '99999999999999_mutation.sql', sql }];
 }
@@ -119,8 +126,18 @@ const MUTATIONS = [
   },
   {
     label: 'schema_version left at 6 by the sequence migration',
-    migrations: [...original.slice(0, -1), { ...original[original.length - 1], sql: replaceOnce(original[original.length - 1].sql, "update pri.platform_meta set value = '7' where key = 'schema_version';", '') }],
+    migrations: mutateNamed('_sync_cursor_sequence.sql', "update pri.platform_meta set value = '7' where key = 'schema_version';", ''),
     expect: /platform_meta\.schema_version is 7/
+  },
+  {
+    label: 'billing_schema_version left at 3 by the Google Play migration',
+    migrations: mutateNamed('_google_play_billing.sql', "update pri.platform_meta set value = '4' where key = 'billing_schema_version';", ''),
+    expect: /platform_meta\.billing_schema_version is 4/
+  },
+  {
+    label: 'UNIQUE dropped from billing_google_accounts.obfuscated_account_id',
+    migrations: mutateNamed('_google_play_billing.sql', '  obfuscated_account_id text not null unique,', '  obfuscated_account_id text not null,'),
+    expect: /billing_google_accounts unique keys: Postgres is missing obfuscated_account_id/
   },
   {
     label: 'the sync cursor sequence is dropped',
