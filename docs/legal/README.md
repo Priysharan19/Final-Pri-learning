@@ -70,7 +70,14 @@ on. If the code changes, the notice is wrong until it is changed too.
 - A cloud account is optional. Without one, nothing leaves the device except
   files the person exports themselves.
 - With an account, what syncs is listed in `client/src/platform/syncContract.js`.
-- Handwriting strokes are not uploaded by the shipped app.
+- Handwriting strokes stay on the device. Only when a student switches on
+  server reading is a picture rasterised from them (or a photo of paper
+  working) sent through the server to the reading provider; the server keeps
+  no copy, and `store: false` is not zero retention at the provider
+  (`docs/privacy/data-retention.md` §4).
+- Account deletion is immediate; what survives it, unlinked, is listed in
+  `docs/privacy/data-retention.md` §2 and enforced by
+  `server/test/account-lifecycle-journey-check.mjs`.
 - Telemetry is allow-listed and retained for 90 days
   (`server/platform/telemetry.js`).
 - Password-protected profiles are encrypted at rest on the device; profiles

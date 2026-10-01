@@ -9,4 +9,7 @@
 //    no longer write pri.sync_cursors (supabase/migrations/20261002000000).
 //    No SQLite structural change: SQLite still allocates from sync_cursors.
 export const SCHEMA_VERSION = 7;
-export const BILLING_SCHEMA_VERSION = 3;
+// Billing 4: billing_payments keeps its row when the account is deleted
+//    (ON DELETE SET NULL, account_id nullable) — the payment ledger is retained
+//    pseudonymously (supabase/migrations/20261003000000, billingSchema.js).
+export const BILLING_SCHEMA_VERSION = 4;

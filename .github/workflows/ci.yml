@@ -207,7 +207,8 @@ jobs:
         run: |
           set -o pipefail
           node scripts/with-postgres.mjs node server/test/run-platform-postgres.mjs 2>&1 | tee platform-postgres.log
-          grep -Fq 'PLATFORM ON POSTGRES: PASS — 24/24 suites' platform-postgres.log
+          grep -Fq 'PLATFORM ON POSTGRES: PASS — 25/25 suites' platform-postgres.log
+          grep -Fq 'ACCOUNT LIFECYCLE JOURNEY: PASS' platform-postgres.log
           grep -Fq 'POSTGRES SCHEMA MUTATIONS: PASS — 21/21' platform-postgres.log
           grep -Fq 'PLATFORM SYNC BURST: PASS' platform-postgres.log
       - name: Platform migration contract
@@ -220,6 +221,8 @@ jobs:
         run: node server/test/production-db-bootstrap-check.mjs
       - name: Account lifecycle and session rotation
         run: node server/test/account-lifecycle-contract-check.mjs
+      - name: Account lifecycle journey, deletion against the retention table (SQLite)
+        run: node server/test/account-lifecycle-journey-check.mjs
       - name: Encrypted verification/reset email worker
         run: node server/test/auth-delivery-worker-check.mjs
       - name: Production email delivery configuration

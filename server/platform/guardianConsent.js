@@ -33,7 +33,9 @@ import { asStore } from './store.js';
  * notice changes in a way that alters what a guardian is agreeing to, so an old
  * consent is visibly an old consent rather than silently carried forward.
  */
-export const CONSENT_NOTICE_VERSION = '2026-09-07';
+// 2026-10-02: the notice's Children section now describes this flow (it said
+// no consent was recorded), and its retention section changed.
+export const CONSENT_NOTICE_VERSION = '2026-10-02';
 
 /** What was established. Deliberately not the words "verifiable consent". */
 export const CONSENT_METHOD = 'guardian-email-confirmation';

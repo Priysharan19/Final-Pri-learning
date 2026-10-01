@@ -172,27 +172,36 @@ ok(/does not predict a percentile, a rank or an admission/i.test(terms),
 ok(/parts of a paper you\s+have actually practised/i.test(terms),
   'and describing the estimate it genuinely gives');
 
-// ── The notice may never run ahead of the code ──────────────────────────────
-// It described a guardian-consent flow in detail — a name and contact captured
-// at profile creation, a confirmation email before a cloud account could sync —
-// and none of it existed. A privacy notice that misdescribes the processing is
-// worse than a thin one: a parent reads it and believes a protection is there.
-// README.md said the opposite in the same repository.
-const guardianClaims = [
-  [/asks for a parent or guardian's name/i, 'claims it collects a guardian name'],
-  [/records their consent/i, 'claims it records guardian consent'],
-  [/email the guardian a link/i, 'claims it emails a guardian for confirmation']
-];
-for (const [pattern, what] of guardianClaims) {
-  ok(!pattern.test(privacy), `the notice no longer ${what} — nothing in client/src or server/ implements it`);
-}
+// ── The notice may never run ahead of the code — or fall behind it ─────────
+// It once described a guardian-consent flow that did not exist; #210 then
+// built one (server/platform/guardianConsent.js) and the notice went on saying
+// no consent was recorded, while the server collected a guardian's name and
+// email it did not disclose. Both directions mislead a parent. The notice now
+// has to describe what the code does, and exactly as much as it proves.
+const consentCode = readFileSync(join(ROOT, 'server/platform/guardianConsent.js'), 'utf8');
+ok(/CONSENT_METHOD = 'guardian-email-confirmation'/.test(consentCode),
+  'the server records guardian consent as an email confirmation (the fact the notice must state)');
 ok(/it does not ask for your age/i.test(privacy),
-  'and says plainly that no age is collected');
-ok(/does not ask for or record a parent's consent/i.test(privacy),
-  'and that no parental consent is recorded');
+  'the notice says plainly that no age is collected');
+ok(/asks for a parent\s+or guardian's name and email address/i.test(privacy),
+  'the notice discloses that a guardian name and email are collected for an under-18 account');
+ok(/parent or guardian's name and email address\*\*, only for an account of\s+someone under 18/i.test(privacy),
+  'and lists them among what the server receives');
+ok(/does not show that they are\s+an adult, or that they are your parent or guardian/i.test(privacy),
+  'and says what the confirmation does not prove');
+ok(/not the verifiable\s+parental consent/i.test(privacy) && !/we (obtain|have) verifiable parental consent/i.test(privacy),
+  'and never calls it verifiable parental consent');
+ok(!/does not ask for or record a parent's consent/i.test(privacy),
+  'the notice no longer denies the consent record the server keeps');
 
 ok(!/handwriting strokes are not uploaded/i.test(privacy),
   'and no longer makes the unconditional claim the optional setting would break');
+// store:false is not zero retention at the provider; the notice may not say
+// the picture "is not kept" without saying who might keep it.
+ok(!/is not kept after that/i.test(privacy) && /may hold a copy for a limited time/i.test(privacy),
+  'the notice does not promise the reading service keeps nothing');
+ok(/deleted at once/i.test(privacy) && /record of any payment you made/i.test(privacy),
+  'the notice states immediate deletion and the one financial record that survives it');
 // The second optional setting sends different data and gets its own paragraph.
 ok(/sends the lines of\s+working you wrote/i.test(privacy),
   'the notice describes the optional working check and what it sends');
