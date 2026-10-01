@@ -179,6 +179,9 @@ Canonical integration of V7 into twelve explicit decision authorities: perceptio
 ### V7_RESEARCH_CLAIM_AND_FALSIFIER_LEDGER.md
 Twenty major research claims with evidence class, supporting sources, what each claim does **not** establish, product consequence and explicit falsifier/reconsideration trigger. Use this to prevent research claims from silently becoming dogma.
 
+### LEARNING_MECHANISMS_MATHEMATICS_DEEP_DIVE_V7.md
+Mathematics-specific synthesis of spacing, retrieval, interleaving, worked examples, fading, expertise reversal, Productive Failure, erroneous examples, feedback timing and variability. Converts each mechanism into explicit Pri policy boundaries and experiments rather than universal “best practice.”
+
 ### ITS_HISTORY_AND_AI_TUTOR_EVIDENCE_DEEP_DIVE.md
 Historical ITS meta-analyses, Cognitive Tutor/MATHia, ASSISTments, ALEKS and Eedi mechanisms, then direct comparison with current GPT/Khanmigo/NUMI evidence. Defines which classical tutoring mechanics Pri should preserve and where LLMs actually add value.
 
@@ -222,6 +225,7 @@ Execution-grade science programme: semantic instrumentation → adjudicated gold
 | India device/offline/shared-device/language field assumptions | INDIA_FIELD_OPERATING_REALITY_2026.md |
 | sequencing research-derived engineering work | RESEARCH_TO_BUILD_V6.md + RESEARCH_COMPLETENESS_AUDIT_V6_2026-10-01.md |
 | cross-domain research decision / major learning architecture change | V7_DEEP_RESEARCH_SYNTHESIS_AND_DECISION_ARCHITECTURE.md + V7_RESEARCH_CLAIM_AND_FALSIFIER_LEDGER.md |
+| spacing, retrieval, interleaving, worked examples, fading, productive failure | LEARNING_MECHANISMS_MATHEMATICS_DEEP_DIVE_V7.md |
 | classical ITS evidence, tutoring-system mechanism choice | ITS_HISTORY_AND_AI_TUTOR_EVIDENCE_DEEP_DIVE.md + FRONTIER_TUTORING_SYSTEMS_MECHANISM_MATRIX_V7.md |
 | mastery model, KT, IRT, CDM, calibration, abstention | LEARNER_MODELING_KT_CDM_IRT_DEEP_DIVE.md |
 | adaptive sequencing, bandits, treatment selection, causal personalization | ADAPTIVE_POLICY_CAUSAL_PERSONALIZATION_DEEP_DIVE.md |
