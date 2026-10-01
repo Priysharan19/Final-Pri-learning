@@ -137,14 +137,42 @@ ASER/UDISE+/DIKSHA/GSMA operating-context evidence, shared-device/offline conseq
 ### RESEARCH_TO_BUILD_V6.md
 Dependency-ordered programme from semantic identities and event replay through transfer banks, benchmark laboratory, Experimentation OS, PMR, teacher orchestration and only then causal personalization.
 
+
+### COGNITIVE_SOVEREIGNTY_AND_AI_DEPENDENCE.md
+Operationalizes the requirement that Pri improve what learners can do **after AI is removed**, grounded in direct high-school mathematics RCT evidence. Defines assistance withdrawal, performance-illusion guardrails and recovery obligations.
+
+### QUESTION_FAMILY_AND_ITEM_ADMISSION_PROTOCOL.md
+Stable family/variant/item identities, generated-item lifecycle, structural verification, alternative routes, distractor/misconception opportunity semantics, psychometric pilots, fairness, exposure and versioned repair.
+
+### DELAYED_TRANSFER_MEASUREMENT_PROTOCOL.md
+Time × structural-distance outcome model, protected transfer banks, leakage classes, independent-outcome semantics and default efficacy measurement.
+
+### HUMAN_ADJUDICATION_AND_GOLD_STANDARD.md
+Independent review, reviewer qualification, disagreement preservation, label classes, first-break/rubric adjudication and benchmark correction governance.
+
+### LOCAL_CLOUD_MODEL_ROUTING.md
+Task-based placement across deterministic local, statistical local, on-device generative, governed cloud and human authority; data minimization, cost/latency, offline degradation and provider/model admission.
+
+### ACCESSIBLE_MATHEMATICS_INTERACTION.md
+One semantic math object rendered through MathML, speech, braille, keyboard, visual, tactile and sonification pathways; assessment-leakage and real assistive-technology evidence levels.
+
+### GUARDIAN_HOME_SUPPORT_AUTONOMY.md
+Guardian visibility/consent separation, supportive-vs-intrusive homework evidence, autonomy-preserving digest design, shared-device privacy and guardian-intervention evaluation.
+
 ### V6 agent routing
 
 | Mission surface | Additional V6 module |
 | --- | --- |
-| hints, explanations, tutoring escalation/fading, recovery | PRODUCTIVE_MISTAKE_REPAIR_PROTOCOL.md |
+| hints, explanations, tutoring escalation/fading, recovery | PRODUCTIVE_MISTAKE_REPAIR_PROTOCOL.md + COGNITIVE_SOVEREIGNTY_AND_AI_DEPENDENCE.md |
 | streaks, rewards, motivation, confidence, reflection, self-regulation | MOTIVATION_METACOGNITION_ENGAGEMENT.md |
+| question generation, item families, assessment-bank admission | QUESTION_FAMILY_AND_ITEM_ADMISSION_PROTOCOL.md |
+| mastery evidence, transfer, delayed outcomes, efficacy measures | DELAYED_TRANSFER_MEASUREMENT_PROTOCOL.md |
+| gold labels, human review, first-break/rubric benchmark construction | HUMAN_ADJUDICATION_AND_GOLD_STANDARD.md |
 | teacher dashboards, class grouping, alerts, teacher interventions | TEACHER_CLASSROOM_ORCHESTRATION.md |
+| guardian dashboards, home support, learner visibility/autonomy | GUARDIAN_HOME_SUPPORT_AUTONOMY.md |
 | any ML/LLM admission, benchmark, model update, RAG/tool use | EVALUATION_BENCHMARKS_AND_MODEL_RISK.md |
+| deciding local vs on-device model vs cloud intelligence placement | LOCAL_CLOUD_MODEL_ROUTING.md |
+| accessible equations, graphs, diagrams or input/output modes | ACCESSIBLE_MATHEMATICS_INTERACTION.md |
 | India device/offline/shared-device/language field assumptions | INDIA_FIELD_OPERATING_REALITY_2026.md |
 | sequencing research-derived engineering work | RESEARCH_TO_BUILD_V6.md |
 
