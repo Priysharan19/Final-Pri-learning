@@ -43,6 +43,7 @@ create table pri.billing_google_notifications (
   message_id text primary key,
   purchase_token text not null,
   kind text not null check (kind in ('subscription','voided')),
+  order_id text,
   event_at bigint not null,
   received_at bigint not null,
   attempts integer not null default 0,

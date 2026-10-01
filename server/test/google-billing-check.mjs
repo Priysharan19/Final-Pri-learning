@@ -222,9 +222,18 @@ await rejects(deliver(push(rtdn(token(10)), { bearer: oidcToken({ email_verified
 await rejects(deliver(push(rtdn(token(10)), { bearer: oidcToken({ exp: Math.floor(Date.now() / 1000) - 600 }) })), 'GOOGLE_NOTIFICATION_UNAUTHENTICATED', 'an expired token is refused');
 await rejects(deliver(push(rtdn(token(10)), { bearer: oidcToken({ iss: 'https://evil.example' }) })), 'GOOGLE_NOTIFICATION_UNAUTHENTICATED', 'a token from another issuer is refused');
 await rejects(deliver(push(rtdn(token(10)), { bearer: oidcToken({}, { alg: 'HS256' }) })), 'GOOGLE_NOTIFICATION_UNAUTHENTICATED', 'a non-RS256 token is refused');
-const fetchesBefore = certFetches;
 await rejects(deliver(push(rtdn(token(10)), { bearer: oidcToken({}, { kid: 'unknown-key' }) })), 'GOOGLE_NOTIFICATION_UNAUTHENTICATED', 'a token for an unknown key is refused');
-check(certFetches === fetchesBefore + 1, 'an unknown key id refetches Google\'s keys once (rotation), then fails closed');
+{
+  let clock = Date.now();
+  let fetches = 0;
+  const verifier = createGoogleOidcVerifier({ now: () => clock, fetchImpl: async () => { fetches += 1; return new Response(JSON.stringify(JWKS), { status: 200 }); } });
+  await verifier(oidcToken(), { audience: ENV.PRI_GOOGLE_RTDN_AUDIENCE });
+  await rejects(verifier(oidcToken({}, { kid: 'rotated' }), { audience: ENV.PRI_GOOGLE_RTDN_AUDIENCE }), 'GOOGLE_NOTIFICATION_UNAUTHENTICATED', 'an unknown key id fails closed');
+  check(fetches === 1, 'unknown key ids cannot force a key fetch more than once a minute (no fetch amplification)');
+  clock += 61_000;
+  await rejects(verifier(oidcToken({}, { kid: 'rotated' }), { audience: ENV.PRI_GOOGLE_RTDN_AUDIENCE }), 'GOOGLE_NOTIFICATION_UNAUTHENTICATED', 'still unknown after a refetch');
+  check(fetches === 2, 'after the floor, an unknown key id refetches Google\'s keys once (key rotation)');
+}
 await rejects(db.transaction(() => google.verifiers.google.webhook({ body: push(rtdn(token(10))).body, request: {} })), 'GOOGLE_NOTIFICATION_UNAUTHENTICATED',
   'the in-transaction verifier refuses a push authenticate() never saw');
 const coldVerifier = createGoogleOidcVerifier({ fetchImpl: certsFetch });
@@ -254,14 +263,87 @@ check(appliedEvents.at(-1).status === 'revoked' && appliedEvents.at(-1).eventRan
 purchases.set(token(20), sub({ obfuscated: 'nobody-issued-this-id-000000' }));
 await deliver(push(rtdn(token(20)), { id: 'm-unbound' }));
 await drain();
-const parked = await db.get('SELECT processed_at,last_error,attempts FROM billing_google_notifications WHERE message_id=?', ['m-unbound']);
-check(parked.processed_at > 0 && parked.last_error === 'GOOGLE_ACCOUNT_UNBOUND', 'a purchase no account has claimed is parked, not retried forever');
+const waitingRow = await db.get('SELECT processed_at,last_error,next_attempt_at FROM billing_google_notifications WHERE message_id=?', ['m-unbound']);
+check(waitingRow.processed_at === null && waitingRow.last_error === 'GOOGLE_ACCOUNT_UNBOUND' && waitingRow.next_attempt_at - Date.now() > 5 * 60 * 60_000,
+  'a purchase no account has claimed yet is retried every six hours (the device usually reports it soon)');
+const weekLater = createGoogleBilling(db, { client: fake, env: ENV, now: () => Date.now() + 8 * DAY, verifyOidc: createGoogleOidcVerifier({ fetchImpl: certsFetch }) });
+await db.run('UPDATE billing_google_notifications SET next_attempt_at=0 WHERE message_id=?', ['m-unbound']);
+await weekLater.drainNotifications({ apply: () => assert.fail('nothing to apply') });
+check((await db.get('SELECT processed_at FROM billing_google_notifications WHERE message_id=?', ['m-unbound'])).processed_at > 0,
+  '…and parked after a week unclaimed (Play has refunded an unacknowledged purchase long before)');
 await deliver(push(rtdn(token(10), 4), { id: 'm-flaky' }));
 failNext = Object.assign(new Error('down'), { code: 'GOOGLE_PLAY_UNAVAILABLE', status: 503 });
 await drain();
 const flaky = await db.get('SELECT processed_at,last_error,attempts,next_attempt_at FROM billing_google_notifications WHERE message_id=?', ['m-flaky']);
 check(flaky.processed_at === null && flaky.attempts === 1 && flaky.next_attempt_at > Date.now() && flaky.last_error === 'GOOGLE_PLAY_UNAVAILABLE',
   'a Google outage is retried later with backoff');
+
+// exhausted retries back off to daily — never silently dropped
+await db.run('UPDATE billing_google_notifications SET attempts=8,next_attempt_at=0 WHERE message_id=?', ['m-flaky']);
+failNext = Object.assign(new Error('down'), { code: 'GOOGLE_PLAY_UNAVAILABLE', status: 503 });
+await drain();
+const exhausted = await db.get('SELECT processed_at,attempts,next_attempt_at FROM billing_google_notifications WHERE message_id=?', ['m-flaky']);
+check(exhausted.processed_at === null && exhausted.attempts === 9 && exhausted.next_attempt_at - Date.now() > 23 * 60 * 60_000,
+  'after repeated failures a notification retries daily instead of being dropped (a lost refund must not stand)');
+const { googleNotificationBacklog } = await import('../platform/googleBilling.js');
+const backlog = await googleNotificationBacklog(db);
+check(backlog.queued >= 1 && backlog.failing >= 1, `health can see the backlog (${JSON.stringify(backlog)})`);
+
+// ── lifecycle recovery and renewals are never mistaken for stale replays ─────
+for (const [id, email] of [['acct-g-d', 'g-d@example.test'], ['acct-g-e', 'g-e@example.test']]) {
+  await db.run(`INSERT INTO accounts(id,email,name,password_hash,role,created_at,updated_at) VALUES (?,?,?,'hash','student',?,?)`, [id, email, id, T0, T0]);
+  await db.run(`INSERT INTO entitlement_snapshots(account_id,plan,status,provider,source_version,updated_at) VALUES (?,'free','free','none',0,?)`, [id, T0]);
+}
+const D = (await google.native.google.bootstrap({ accountId: 'acct-g-d' })).obfuscatedAccountId;
+const report = async (tok, account = 'acct-g-d') => {
+  const r = await google.native.google.purchase({ accountId: account, body: { purchaseToken: tok } });
+  return r.normalized ? applyVerifiedEntitlement(db, r.normalized) : r;
+};
+const snapshot = async account => db.get('SELECT plan,status,current_period_end FROM entitlement_snapshots WHERE account_id=?', [account]);
+purchases.set(token(40), sub({ obfuscated: D, order: 'GPA.40-0' }));
+await report(token(40));
+check((await snapshot('acct-g-d')).plan === 'premium', 'D subscribes');
+purchases.set(token(40), sub({ obfuscated: D, state: 'SUBSCRIPTION_STATE_ON_HOLD', order: 'GPA.40-0' }));
+await report(token(40));
+check((await snapshot('acct-g-d')).status === 'past_due', 'a failed renewal puts D on hold');
+purchases.set(token(40), sub({ obfuscated: D, order: 'GPA.40-1', expiry: T0 + 60 * DAY }));
+const recovered = await report(token(40));
+check(recovered.stale === false && (await snapshot('acct-g-d')).plan === 'premium', 'fixing the card brings D back to Premium (a recovery is not "stale")');
+const noOrder = s0 => { const x = structuredClone(s0); delete x.latestOrderId; return x; };
+purchases.set(token(40), noOrder(sub({ obfuscated: D, expiry: T0 + 90 * DAY })));
+const renewed = await report(token(40));
+check(renewed.replayed === false && Number((await snapshot('acct-g-d')).current_period_end) === Date.parse(iso(T0 + 90 * DAY)),
+  'a renewal without the deprecated latestOrderId is a new event, and the period end advances');
+check((await report(token(40))).replayed === true, '…while re-reporting the same state is a replay');
+// Restore keeps working after notifications have been applied.
+await deliver(push(rtdn(token(40)), { id: 'm-d-renew' }));
+await drain();
+purchases.set(token(40), noOrder(sub({ obfuscated: D, expiry: T0 + 120 * DAY })));
+const restoredLater = await google.verifiers.google.restore({ accountId: 'acct-g-d', body: { purchaseTokens: [token(40)] } });
+check((await applyVerifiedEntitlement(db, restoredLater)).stale === false, 'Restore after a notification still applies Google\'s newer state');
+
+// A voided past renewal does not revoke a live subscription; voiding the current order does.
+purchases.set(token(40), noOrder({ ...sub({ obfuscated: D, expiry: T0 + 120 * DAY }), lineItems: [{ ...sub({ obfuscated: D }).lineItems[0], expiryTime: iso(T0 + 120 * DAY), latestSuccessfulOrderId: 'GPA.40-3' }] }));
+await deliver(push({ version: '1.0', packageName: 'com.prilearning.app', eventTimeMillis: String(Date.now()), voidedPurchaseNotification: { purchaseToken: token(40), orderId: 'GPA.40-1', productType: 1, refundType: 1 } }, { id: 'm-void-past' }));
+await drain();
+check((await snapshot('acct-g-d')).plan === 'premium', 'refunding a past renewal leaves the current, paid period alone');
+await deliver(push({ version: '1.0', packageName: 'com.prilearning.app', eventTimeMillis: String(Date.now()), voidedPurchaseNotification: { purchaseToken: token(40), orderId: 'GPA.40-3', productType: 1, refundType: 1 } }, { id: 'm-void-current' }));
+await drain();
+check((await snapshot('acct-g-d')).status === 'revoked', 'refunding the order that pays for the current period revokes');
+
+// An old subscription cannot take Premium from a newer one.
+const E = (await google.native.google.bootstrap({ accountId: 'acct-g-e' })).obfuscatedAccountId;
+purchases.set(token(50), sub({ obfuscated: E, order: 'GPA.50' }));
+await report(token(50), 'acct-g-e');
+await new Promise(r => setTimeout(r, 5));
+purchases.set(token(51), sub({ obfuscated: E, basePlanId: 'annual', order: 'GPA.51', expiry: T0 + 365 * DAY }));
+await report(token(51), 'acct-g-e');
+purchases.set(token(50), sub({ obfuscated: E, state: 'SUBSCRIPTION_STATE_EXPIRED', order: 'GPA.50', expiry: T0 - DAY }));
+const old = await google.native.google.purchase({ accountId: 'acct-g-e', body: { purchaseToken: token(50) } });
+check(old.shadowed === true && old.normalized === null, 'the old token\'s expiry is not applied while a newer subscription exists');
+await deliver(push(rtdn(token(50), 13), { id: 'm-e-old-expired' }));
+await drain();
+check((await snapshot('acct-g-e')).plan === 'premium', 'E keeps the newer subscription\'s Premium through a late notification for the old one');
 
 // ── restore: Play's own list, filtered to this account ───────────────────────
 purchases.set(token(30), sub({ obfuscated: A, basePlanId: 'annual', expiry: T0 + 300 * DAY, ack: 'ACKNOWLEDGEMENT_STATE_ACKNOWLEDGED', order: 'GPA.3030' }));

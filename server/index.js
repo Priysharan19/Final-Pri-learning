@@ -69,6 +69,7 @@ function shutdown(signal) {
   shuttingDown = true;
   console.log('platform_shutdown', { signal, deadlineMs: SHUTDOWN_DEADLINE_MS });
   deliveryWorker.stop();
+  googleWorker.stop();
   let finished = false;
   const finish = reason => {
     if (finished) return;

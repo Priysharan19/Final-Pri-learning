@@ -38,7 +38,10 @@ const BASE_PLAN = /^[a-z0-9][a-z0-9-]{0,62}$/;
 const PACKAGE = /^[a-zA-Z][a-zA-Z0-9_]*(\.[a-zA-Z][a-zA-Z0-9_]*)+$/;
 const OBFUSCATED = /^[A-Za-z0-9_-]{22,64}$/;
 const MESSAGE_ID = /^[A-Za-z0-9._:-]{1,180}$/;
-const MAX_ATTEMPTS = 8;
+const MAX_ATTEMPTS = 8; // after this many failures a notification retries once a day, never silently dropped
+const UNBOUND_RETRY_MS = 6 * 60 * 60_000;
+const UNBOUND_PATIENCE_MS = 7 * 24 * 60 * 60_000;
+const KEY_REFETCH_FLOOR_MS = 60_000;
 
 function billingError(code, message, status = 400) {
   return Object.assign(new Error(message), { code, status });
@@ -127,6 +130,25 @@ export function cadenceForLineItem(cfg, item) {
   return null;
 }
 
+/**
+ * What makes one fetched lifecycle state different from another: state, order
+ * ids and each of our line items' expiry. Used in event ids, so a renewal (new
+ * expiry/order) is a new event while re-reporting the same state is a replay —
+ * even when Google omits the deprecated latestOrderId.
+ */
+export function lifecycleFingerprint(cfg, sub) {
+  const items = (Array.isArray(sub?.lineItems) ? sub.lineItems : []).filter(item => cadenceForLineItem(cfg, item))
+    .map(item => [item.productId, item.offerDetails?.basePlanId || '', item.expiryTime || '', item.latestSuccessfulOrderId || '']);
+  return sha256(JSON.stringify([sub?.subscriptionState || '', sub?.latestOrderId || '', items])).slice(0, 32);
+}
+
+function currentOrderIds(sub) {
+  const ids = new Set();
+  if (sub?.latestOrderId) ids.add(String(sub.latestOrderId));
+  for (const item of Array.isArray(sub?.lineItems) ? sub.lineItems : []) if (item?.latestSuccessfulOrderId) ids.add(String(item.latestSuccessfulOrderId));
+  return ids;
+}
+
 const b64url = value => Buffer.from(value).toString('base64url');
 
 /** The Play Developer API, authenticated with the service account (JWT bearer). */
@@ -199,8 +221,10 @@ export function createGooglePlayClient({ cfg, fetchImpl = globalThis.fetch, now 
  */
 export function createGoogleOidcVerifier({ fetchImpl = globalThis.fetch, now = () => Date.now() } = {}) {
   let cached = null;
+  let lastFetch = 0;
   async function keys(force = false) {
-    if (!force && cached && cached.expiresAt > now()) return cached.keys;
+    if (cached && cached.expiresAt > now() && (!force || now() - lastFetch < KEY_REFETCH_FLOOR_MS)) return cached.keys;
+    lastFetch = now();
     assertNoOpenTransaction('Fetching Google signing keys');
     let res;
     try { res = await fetchImpl(GOOGLE_CERTS, { headers: { Accept: 'application/json' }, redirect: 'error', signal: AbortSignal.timeout(8000) }); }
@@ -282,7 +306,10 @@ export function normalizeGoogleSubscription(cfg, sub, {
     currentPeriodEnd: expires,
     graceUntil,
     payloadDigest,
-    effectiveAt: Number(effectiveAt) || millis(sub?.startTime) || now,
+    // Every event here comes from a fresh fetch of Google's record, so it is
+    // timed when it was fetched: a later fetch is a later truth. (startTime
+    // never changes across renewals, and made recoveries look stale.)
+    effectiveAt: Number(effectiveAt) || now,
     eventRank: rank
   };
 }
@@ -300,6 +327,11 @@ export function createGoogleBilling(db, { client = null, env = process.env, now 
   // Requests whose Pub/Sub OIDC token authenticate() verified. The webhook
   // verifier (inside the transaction) refuses any request not in this set.
   const authenticated = new WeakSet();
+  // Fresh fetches are ordered by when they were made. Two in the same
+  // millisecond would tie, and the rank tie-break would then prefer "on hold"
+  // over "active"; a strictly increasing stamp keeps the later fetch later.
+  let lastStamp = 0;
+  const stamp = () => (lastStamp = Math.max(now(), lastStamp + 1));
   let defaultClient = null;
   const api = () => client || (defaultClient ||= createGooglePlayClient({ cfg: requireConfigured(cfg) }));
 
@@ -404,17 +436,40 @@ export function createGoogleBilling(db, { client = null, env = process.env, now 
     const normalized = normalizeGoogleSubscription(cfg, sub, {
       accountId,
       purchaseToken,
-      eventId: `token:${sha256(purchaseToken).slice(0, 32)}:${String(sub.latestOrderId || sub.subscriptionState || 'state').slice(0, 64)}:${String(sub.subscriptionState || '')}`,
+      eventId: `token:${sha256(purchaseToken).slice(0, 24)}:${lifecycleFingerprint(cfg, sub)}`,
       eventType,
       payloadDigest: sha256(JSON.stringify(sub)),
+      effectiveAt: stamp(),
       now: now()
     });
-    return { sub, normalized: superseded ? null : normalized, superseded, pending: normalized === null && !superseded };
+    const shadowed = !superseded && await shadowedDowngrade(accountId, purchaseToken, normalized);
+    return {
+      sub,
+      normalized: superseded || shadowed ? null : normalized,
+      superseded,
+      shadowed,
+      pending: normalized === null && !superseded
+    };
+  }
+
+  /**
+   * An old subscription must not take Premium away from a newer one: a
+   * non-Premium state for a token is not applied while the account holds a
+   * newer, non-superseded Google purchase (a resubscription after a lapse gets a
+   * new token, and Google does not always link them).
+   */
+  async function shadowedDowngrade(accountId, purchaseToken, normalized) {
+    if (!normalized || normalized.plan === 'premium') return false;
+    const self = await db.get('SELECT created_at FROM billing_google_purchases WHERE purchase_token=?', [purchaseToken]);
+    if (!self) return false;
+    const newer = await db.get(`SELECT purchase_token FROM billing_google_purchases
+      WHERE account_id=? AND purchase_token<>? AND superseded_by IS NULL AND created_at>? LIMIT 1`, [accountId, purchaseToken, self.created_at]);
+    return !!newer;
   }
 
   async function purchase({ accountId, body }) {
-    const { sub, normalized, superseded, pending } = await verifyPurchaseToken({ accountId, purchaseToken: String(body?.purchaseToken || ''), eventType: 'purchase.device' });
-    return { sub, normalized, superseded, pending, purchaseToken: String(body.purchaseToken), acknowledge: () => acknowledgeIfNeeded(sub, String(body.purchaseToken), normalized) };
+    const { sub, normalized, superseded, shadowed, pending } = await verifyPurchaseToken({ accountId, purchaseToken: String(body?.purchaseToken || ''), eventType: 'purchase.device' });
+    return { sub, normalized, superseded, shadowed, pending, purchaseToken: String(body.purchaseToken), acknowledge: () => acknowledgeIfNeeded(sub, String(body.purchaseToken), normalized) };
   }
 
   /** Restore: the device lists the tokens Play still holds for it. */
@@ -475,11 +530,13 @@ export function createGoogleBilling(db, { client = null, env = process.env, now 
     else if (data.voidedPurchaseNotification) { kind = 'voided'; token = String(data.voidedPurchaseNotification.purchaseToken || ''); }
     else if (data.testNotification) { kind = 'test'; token = null; }
     if (!kind || kind === 'test') return [];
+    const orderId = kind === 'voided' && /^[A-Za-z0-9._:-]{1,120}$/.test(String(data.voidedPurchaseNotification?.orderId || ''))
+      ? String(data.voidedPurchaseNotification.orderId) : null;
     if (!PURCHASE_TOKEN.test(token)) throw billingError('GOOGLE_NOTIFICATION_INVALID', 'Google Play notification has no usable purchase token.');
     const t = now();
     const eventAt = Number(data.eventTimeMillis) || t;
-    await db.run(`INSERT INTO billing_google_notifications(message_id,purchase_token,kind,event_at,received_at,attempts,next_attempt_at,processed_at,last_error)
-      VALUES (?,?,?,?,?,0,?,NULL,NULL) ON CONFLICT(message_id) DO NOTHING`, [messageId, token, kind, eventAt, t, t]);
+    await db.run(`INSERT INTO billing_google_notifications(message_id,purchase_token,kind,order_id,event_at,received_at,attempts,next_attempt_at,processed_at,last_error)
+      VALUES (?,?,?,?,?,?,0,?,NULL,NULL) ON CONFLICT(message_id) DO NOTHING`, [messageId, token, kind, orderId, eventAt, t, t]);
     return [];
   }
 
@@ -487,8 +544,10 @@ export function createGoogleBilling(db, { client = null, env = process.env, now 
   async function drainNotifications({ apply, batchSize = 20 } = {}) {
     requireConfigured(cfg);
     const t = now();
+    // No attempt cap in the query: an exhausted row backs off to daily retries
+    // instead of being silently dropped (a lost refund must not stand).
     const rows = await db.all(`SELECT * FROM billing_google_notifications
-      WHERE processed_at IS NULL AND attempts < ? AND next_attempt_at <= ? ORDER BY event_at, received_at LIMIT ?`, [MAX_ATTEMPTS, t, batchSize]);
+      WHERE processed_at IS NULL AND next_attempt_at <= ? ORDER BY event_at, received_at LIMIT ?`, [t, batchSize]);
     let applied = 0;
     let failed = 0;
     for (const row of rows) {
@@ -496,16 +555,29 @@ export function createGoogleBilling(db, { client = null, env = process.env, now 
         const sub = await api().getSubscription(row.purchase_token);
         assertOurs(sub);
         const { accountId, superseded } = await bind(sub, row.purchase_token);
-        const normalized = superseded ? null : normalizeGoogleSubscription(cfg, sub, {
+        let normalized = superseded ? null : normalizeGoogleSubscription(cfg, sub, {
           accountId,
           purchaseToken: row.purchase_token,
           eventId: `rtdn:${row.message_id}`,
           eventType: `rtdn:${row.kind}:${String(sub.subscriptionState || '')}`,
           payloadDigest: sha256(JSON.stringify(sub)),
-          effectiveAt: row.event_at,
-          forcedStatus: row.kind === 'voided' ? 'revoked' : null,
+          effectiveAt: stamp(),
           now: now()
         });
+        if (row.kind === 'voided' && !superseded) {
+          // A voided order revokes only when it is the order that pays for the
+          // current period, or Google no longer entitles the subscription at
+          // all. A refunded *past* renewal leaves a live subscription alone.
+          const voidsCurrent = !!row.order_id && currentOrderIds(sub).has(String(row.order_id));
+          if (!normalized || normalized.plan !== 'premium' || voidsCurrent) {
+            normalized = normalizeGoogleSubscription(cfg, sub, {
+              accountId, purchaseToken: row.purchase_token, eventId: `rtdn:${row.message_id}`,
+              eventType: `rtdn:voided:${String(sub.subscriptionState || '')}`, payloadDigest: sha256(JSON.stringify(sub)),
+              forcedStatus: 'revoked', effectiveAt: stamp(), now: now()
+            });
+          }
+        }
+        if (normalized && await shadowedDowngrade(accountId, row.purchase_token, normalized)) normalized = null;
         if (normalized) {
           await apply(normalized);
           await acknowledgeIfNeeded(sub, row.purchase_token, normalized).catch(() => false);
@@ -515,14 +587,23 @@ export function createGoogleBilling(db, { client = null, env = process.env, now 
       } catch (err) {
         failed += 1;
         const code = String(err?.code || 'ERROR').slice(0, 60);
-        // A purchase nobody has claimed yet, or one Google does not know, will
-        // not change by retrying soon; the device binds it when it reports it.
-        const terminal = ['GOOGLE_ACCOUNT_UNBOUND', 'GOOGLE_PURCHASE_NOT_FOUND', 'BILLING_PRODUCT_UNKNOWN', 'GOOGLE_TEST_PURCHASE_REJECTED', 'BILLING_ACCOUNT_MISMATCH'].includes(code);
         const attempts = Number(row.attempts) + 1;
+        // Google does not know it, it is not ours, or it is a refused test buy:
+        // retrying cannot change that.
+        const terminal = ['GOOGLE_PURCHASE_NOT_FOUND', 'BILLING_PRODUCT_UNKNOWN', 'GOOGLE_TEST_PURCHASE_REJECTED', 'BILLING_ACCOUNT_MISMATCH'].includes(code);
+        // Nobody has claimed this purchase yet: the device usually reports it
+        // shortly; keep looking every six hours for a week, then park it.
+        const unbound = code === 'GOOGLE_ACCOUNT_UNBOUND';
+        const parked = terminal || (unbound && now() - Number(row.received_at) > UNBOUND_PATIENCE_MS);
+        const delay = unbound ? UNBOUND_RETRY_MS
+          : attempts >= MAX_ATTEMPTS ? 24 * 60 * 60_000
+            : Math.min(6 * 60 * 60_000, 60_000 * 2 ** Math.min(8, attempts));
         await db.run(`UPDATE billing_google_notifications SET attempts=?,next_attempt_at=?,last_error=?,processed_at=? WHERE message_id=?`,
-          [attempts, now() + Math.min(6 * 60 * 60_000, 60_000 * 2 ** Math.min(8, attempts)), code, terminal ? now() : null, row.message_id]);
+          [attempts, now() + delay, code, parked ? now() : null, row.message_id]);
       }
     }
+    // Processed notifications carry nothing worth keeping after a month.
+    await db.run('DELETE FROM billing_google_notifications WHERE processed_at IS NOT NULL AND processed_at < ?', [now() - 30 * 24 * 60 * 60_000]);
     return { applied, failed, scanned: rows.length };
   }
 
@@ -532,6 +613,16 @@ export function createGoogleBilling(db, { client = null, env = process.env, now 
     verifiers: Object.freeze({ google: Object.freeze({ restore, authenticate, webhook }) }),
     drainNotifications
   });
+}
+
+/** Notification backlog for /v1/health: queued and repeatedly failing rows. */
+export async function googleNotificationBacklog(db) {
+  db = asStore(db);
+  const row = await db.get(`SELECT
+      SUM(CASE WHEN processed_at IS NULL THEN 1 ELSE 0 END) AS queued,
+      SUM(CASE WHEN processed_at IS NULL AND attempts >= ? THEN 1 ELSE 0 END) AS failing
+    FROM billing_google_notifications`, [MAX_ATTEMPTS]);
+  return { queued: Number(row?.queued) || 0, failing: Number(row?.failing) || 0 };
 }
 
 /**

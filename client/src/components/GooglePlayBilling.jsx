@@ -12,7 +12,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { cloud } from '../platform/cloudTransport.js';
 import { refreshCloudEntitlement } from '../platform/cloudAccount.js';
 import {
-  getNativeProducts, onNativeBillingUpdate, purchaseGoogleSubscription, restoreNativePurchases
+  getNativeProducts, onNativeBillingUpdate, purchaseGoogleSubscription, restoreNativePurchases, unfinishedNativeTransactions
 } from '../platform/nativeBilling.js';
 
 function matchPlan(products, plan) {
@@ -43,6 +43,12 @@ export default function GooglePlayBilling({ user, canSync, premium, onChanged })
       setBootstrap(google);
       setPlans(found);
       setStoreError(found.monthly || found.annual ? '' : 'The Pri Learning subscription is not available in this Google Play country.');
+      // A purchase from an earlier session the server never saw (the app was
+      // killed, offline, or the sheet outlived the wait) is reported now, so
+      // the server verifies and acknowledges it inside Play's three days.
+      for (const t of await unfinishedNativeTransactions(ids).catch(() => [])) {
+        if (live && t?.purchaseToken && (!t.state || t.state === 'purchased')) await submit(t.purchaseToken, { quiet: true }).catch(() => {});
+      }
     })().catch(err => {
       if (!live) return;
       setBootstrap(null);

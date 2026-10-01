@@ -280,8 +280,15 @@ export function platformConfigStatus() {
   const appleBillingProviderConfigured = appleProducts && appleTrustConfigured() &&
     (!production || nonEmpty('PRI_APPLE_APP_ID'));
   // Google Play: product ids alone are not a provider. It is configured only
-  // with a parseable Play Developer API service account (googleBilling.js).
+  // with a parseable Play Developer API service account (googleBilling.js), and
+  // in production also with real-time notifications: without them renewals,
+  // holds and refunds would never reach the server.
   const googleBilling = googleBillingConfigStatus();
+  const googleProducts = nonEmpty('PRI_GOOGLE_MONTHLY_PRODUCT_ID') || nonEmpty('PRI_GOOGLE_ANNUAL_PRODUCT_ID');
+  if (production && googleProducts) {
+    if (!googleBilling.credentialsConfigured) missing.push('PRI_GOOGLE_SERVICE_ACCOUNT_JSON or PRI_GOOGLE_SERVICE_ACCOUNT_FILE');
+    if (!googleBilling.notificationsConfigured) missing.push('PRI_GOOGLE_RTDN_AUDIENCE and PRI_GOOGLE_RTDN_SERVICE_ACCOUNT');
+  }
 
   const uniqueMissing = [...new Set(missing)];
   return Object.freeze({
@@ -297,7 +304,7 @@ export function platformConfigStatus() {
     appleBillingProductsConfigured: appleProducts,
     appleBillingProviderConfigured,
     googleBillingProductsConfigured: nonEmpty('PRI_GOOGLE_MONTHLY_PRODUCT_ID') || nonEmpty('PRI_GOOGLE_ANNUAL_PRODUCT_ID'),
-    googleBillingProviderConfigured: googleBilling.configured,
+    googleBillingProviderConfigured: googleBilling.configured && (googleBilling.notificationsConfigured || !production),
     googleBillingNotificationsConfigured: googleBilling.configured && googleBilling.notificationsConfigured,
     webBillingProductsConfigured: webProducts,
     webBillingProviderConfigured

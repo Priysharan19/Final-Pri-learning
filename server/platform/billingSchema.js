@@ -124,6 +124,7 @@ export function ensureBillingSchema(db) {
       message_id TEXT PRIMARY KEY,
       purchase_token TEXT NOT NULL,
       kind TEXT NOT NULL CHECK(kind IN ('subscription','voided')),
+      order_id TEXT,
       event_at INTEGER NOT NULL,
       received_at INTEGER NOT NULL,
       attempts INTEGER NOT NULL DEFAULT 0,

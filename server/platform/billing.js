@@ -171,6 +171,7 @@ export function createBillingRouter(db, { verifiers = {}, checkout = {}, native 
     try {
       const result = await verify({ accountId: req.platformSession.account_id, body: req.body || {}, request: req });
       if (result.superseded) return res.json({ accepted: false, superseded: true });
+      if (result.shadowed) return res.json({ accepted: false, shadowed: true });
       if (result.pending || !result.normalized) return res.status(202).json({ accepted: false, pending: true });
       const event = validateVerifiedResult(result.normalized, 'google');
       if (event.accountId !== req.platformSession.account_id) throw new Error('Google purchase account binding mismatch');

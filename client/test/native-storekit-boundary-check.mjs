@@ -75,6 +75,9 @@ assert.ok(gAuthority >= 0 && gRefresh > gAuthority, 'Premium is refreshed from t
 assert.equal(/set(?:Premium|Entitlement)\s*\(|acknowledge/i.test(google.replace(/\/\/.*$/gm, '')), false,
   'the Google flow never sets Premium and never acknowledges (the server does)');
 assert.match(transport, /\/v1\/billing\/google\/purchase/, 'cloud transport exposes server-side Google purchase verification');
+assert.match(google, /unfinishedNativeTransactions\(ids\)/, 'purchases the server never saw are swept and reported on load');
+const bridgeSrc = readFileSync(new URL('../src/platform/native/bridge.js', import.meta.url), 'utf8');
+assert.match(bridgeSrc, /result\.status === 'verified' \|\| result\.status === 'purchased'/, 'a late Google Play purchase is recovered like a late StoreKit one');
 assert.equal(/fetch\(|cloudRequest\(/.test(google), false, 'the Google flow uses only the audited cloud transport');
 assert.equal(/set(?:Premium|Entitlement)\s*\(/.test(native), false,
   'native bridge must never contain a client-side Premium mutation');
