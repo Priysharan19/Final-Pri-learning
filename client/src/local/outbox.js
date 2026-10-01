@@ -61,7 +61,15 @@ export function classifyMutation(method, path, result = null, body = null) {
   if (key === 'POST /profiles/password' || key === 'POST /profiles/select' || key === 'POST /auth/logout' || key === 'POST /profiles/demo') return null;
 
   let m = key.match(/^POST \/practice\/([A-Za-z0-9._-]+)\/(submit|reveal)$/);
-  if (m) return { kind: 'practice-progress', entityId: safeId(m[1]), operation: 'upsert' };
+  if (m) {
+    // A practice-progress entry stands for exactly one recorded attempt (§09).
+    // A first wrong try or an unreadable answer records none, and an
+    // idempotent replay returns an attempt that was already queued; queueing
+    // either made the sync worker publish the same attempt twice under two
+    // event ids, or wedge an entry that had no attempt behind it.
+    if (result?.resolved === false || result?.replayed === true) return null;
+    return { kind: 'practice-progress', entityId: safeId(m[1]), operation: 'upsert' };
+  }
 
   if (key === 'POST /exams') return { kind: 'exam', entityId: safeId(result?.exam?.id), operation: 'upsert' };
   m = key.match(/^POST \/exams\/([A-Za-z0-9._-]+)\/submit$/);
