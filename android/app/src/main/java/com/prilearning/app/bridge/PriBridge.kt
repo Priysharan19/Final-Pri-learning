@@ -18,6 +18,7 @@ import androidx.webkit.JavaScriptReplyProxy
 import androidx.webkit.WebMessageCompat
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
+import com.prilearning.app.billing.PlayBilling
 import com.prilearning.app.cloud.NativeCloud
 import com.prilearning.app.io.FileExchange
 import com.prilearning.app.shell.AssetOrigin
@@ -30,6 +31,7 @@ class PriBridge(
     private val onBackWantedChanged: (Boolean) -> Unit = {},
     private val cloud: NativeCloud? = null,
     private val files: FileExchange? = null,
+    private val billing: PlayBilling? = null,
 ) {
     private companion object { const val TAG = "PriBridge" }
     private var reply: JavaScriptReplyProxy? = null
@@ -103,9 +105,32 @@ class PriBridge(
                 f.print(webView) { r -> answerLater(proxy, fileReply(req.id, r)) }
                 null
             }
+            "billing.products", "billing.purchase", "billing.unfinished", "billing.restore", "billing.finish" -> {
+                val b = billing ?: return send(proxy, Envelope.fail(req.id, "UNSUPPORTED", "Billing is not supported by this app version."))
+                val answer: (PlayBilling.Result) -> Unit = { r -> answerLater(proxy, billingReply(req.id, r)) }
+                when (req.op) {
+                    "products" -> b.products(req.payload, answer)
+                    "purchase" -> b.purchase(req.payload, answer)
+                    "unfinished" -> b.unfinished(answer)
+                    "restore" -> b.restore(answer)
+                    // The server acknowledges verified purchases; there is nothing to finish here.
+                    else -> answer(PlayBilling.Result.Ok(JSONObject()))
+                }
+                null
+            }
             else -> if (req.op == "cancel") null else Envelope.fail(req.id, "UNSUPPORTED", "${req.cap}.${req.op} is not supported by this app version.")
         }
         if (out != null) send(proxy, out)
+    }
+
+    private fun billingReply(id: String, r: PlayBilling.Result): String = when (r) {
+        is PlayBilling.Result.Ok -> Envelope.ok(id, r.result)
+        is PlayBilling.Result.Failed -> Envelope.fail(id, r.code, r.message, r.providerCode)
+    }
+
+    /** A one-way event to the current document (e.g. billing.transactionUpdated). */
+    fun emitEvent(name: String, payload: JSONObject) {
+        webView.post { reply?.let { send(it, Envelope.event(name, seq++, payload)) } }
     }
 
     private fun cloudReply(id: String, outcome: NativeCloud.Outcome): String = when (outcome) {
