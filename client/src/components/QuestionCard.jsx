@@ -795,7 +795,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         {/* The topic chip is where a student meets the name of what they are
             being asked, so it is the first place worth pairing. The question
             itself below is untouched: it will be in English in the exam hall. */}
-        <span className="tag"><TermGloss text={question.subtopicName} /></span>
+        <span className="tag" lang="en"><TermGloss text={question.subtopicName} /></span>
         <span className={`tag ${DIFF_CLASS[question.difficulty] || ''}`}>{question.diffLabel}</span>
         {reasonTag && REASON_TAG_KEY[reasonTag] && <span className="tag tag-brand" data-reason-tag={reasonTag}>{t(REASON_TAG_KEY[reasonTag])}</span>}
         {!reasonTag && reason === 'review' && <span className="tag tag-brand">{t('verdict.spacedReview')}</span>}

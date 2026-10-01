@@ -136,7 +136,7 @@ export default function History() {
                   {item.correct ? '✔' : item.correct === false ? '✖' : '·'}
                   <span className="sr-only">{item.correct ? t('app.correct') : item.correct === false ? t('app.incorrect') : t('history.notMarked')}</span>
                 </span>
-                <span className="hist-name"><TermGloss text={item.subtopicName} /></span>
+                <span className="hist-name" lang="en"><TermGloss text={item.subtopicName} /></span>
                 <span className="tag">{`D${item.difficulty}`}</span>
                 <span className="tag">{MODE_KEY[item.mode] ? t(MODE_KEY[item.mode]) : item.mode}</span>
                 {item.viaInk && <span className="tag" title={t('history.viaInk')}>✍️<span className="sr-only">{t('history.viaInkSpoken')}</span></span>}

@@ -172,7 +172,7 @@ export default function ExamRoom() {
           <div className="card" key={d.id}>
             <div className="q-meta">
               <span className="tag">{t('examRoom.qNumber', { n: i + 1 })}</span>
-              <span className="tag">{d.subtopicName}</span>
+              <span className="tag" lang="en">{d.subtopicName}</span>
               <span className="tag">{t('examRoom.difficultyTag', { n: d.difficulty })}</span>
               <span className="tag" style={{ color: d.correct ? 'var(--good)' : d.awarded > 0 ? 'var(--warn)' : 'var(--bad)' }}>
                 {t(d.correct ? 'examRoom.tagCorrect' : d.awarded > 0 ? 'examRoom.tagPartial' : 'examRoom.tagWrong', { awarded: d.awarded, n: d.marks })}
@@ -259,7 +259,7 @@ export default function ExamRoom() {
       <div className="card">
         <div className="q-meta">
           <span className="tag">{t('examRoom.questionOf', { n: cur + 1, total: exam.questions.length })}</span>
-          <span className="tag">{q.subtopicName}</span>
+          <span className="tag" lang="en">{q.subtopicName}</span>
           <span className="tag">{q.multipart ? t('examRoom.marksCount', { count: q.marks, n: q.marks }) : q.diffLabel}</span>
           {q.multipart && <span className="tag tag-brand">{t('examRoom.structuredParts', { last: q.parts[q.parts.length - 1].key })}</span>}
           {/* A question that was actually set in an exam says which one. Every

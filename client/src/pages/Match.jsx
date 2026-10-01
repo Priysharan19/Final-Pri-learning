@@ -246,7 +246,7 @@ export default function Match() {
         </div>
         <div className={`card ${flash === 'good' ? 'rush-flash-good' : flash === 'bad' ? 'rush-flash-bad' : ''}`} style={{ padding: 16 }}>
           <div className="q-meta">
-            <span className="tag">{q.subtopicName}</span>
+            <span className="tag" lang="en">{q.subtopicName}</span>
             <span className="tag">{t('rush.questionNumber', { n: idx + 1 })}</span>
           </div>
           <MathText block className="q-prompt" text={q.prompt} />
