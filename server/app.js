@@ -85,8 +85,8 @@ export async function createServerApp(db, {
     }
   }));
   app.use(cookieParser());
-  // NUL and lone surrogates never reach a handler (platform/text.js): Postgres
-  // TEXT cannot hold the first and silently rewrites the second.
+  // A NUL never reaches a handler (platform/text.js): Postgres TEXT cannot hold
+  // one, so it used to surface as a 500 on the production engine.
   app.use('/v1', rejectUnsafeText({ exemptBody: [/^\/sync\/push\/?$/] }));
 
   ensureBillingSchema(db);

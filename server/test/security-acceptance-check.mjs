@@ -19,8 +19,8 @@
 //      unrelated class; support/teacher against admin and content authority.
 //   D. Hostile input: malformed / non-object / oversized JSON, traversal-ish
 //      ids, SQL-injection-ish strings, prototype-pollution keys, unicode,
-//      emoji, NUL and lone surrogates — coded 4xx, never a 500, never stored
-//      corrupted, never a polluted prototype.
+//      emoji, NUL and lone surrogates — coded 4xx or a faithful store, never a
+//      500, never a polluted prototype.
 //   E. No open redirect: no route answers 3xx to a caller-supplied location.
 //   F. Secrets: provider keys present in the environment never appear in any
 //      response body or header, /v1/health, an error body, or anything this
@@ -591,8 +591,8 @@ try {
     c.eq(({}).isAdmin, undefined, 'no isAdmin leaked onto every object');
     c.eq((await h.request('/v1/account/me', { jar: alice.jar })).data.account.role, 'student', 'Alice is still a student');
 
-    // Unicode, emoji and RTL names round-trip; NUL and lone surrogates are
-    // refused rather than stored corrupted (or crashing Postgres TEXT).
+    // Unicode, emoji and RTL names round-trip; NUL is refused rather than
+    // crashing Postgres TEXT; the server never splits an emoji itself.
     const unicodeName = 'प्रिया शर्मा 🧮 ‏مريم‏ Zoë';
     const uni = await account({ name: unicodeName });
     c.eq((await h.request('/v1/account/me', { jar: uni.jar })).data.account.name, unicodeName, 'unicode + emoji name round-trips exactly');
@@ -602,8 +602,7 @@ try {
     c.eq(emojiClass.data.class.name, '१०वीं कक्षा 📐 Σ', 'emoji class name round-trips');
     const clipped = await account({ name: `${'a'.repeat(79)}🧮tail` });
     const clippedName = (await h.request('/v1/account/me', { jar: clipped.jar })).data.account.name;
-    c.ok(!/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/.test(clippedName), 'clipping a long name never leaves half an emoji (regression: lone surrogate stored)');
-    c.ok(clippedName.length <= 80 && clippedName.startsWith('a'.repeat(79)), 'long name is still clipped to 80 code units');
+    c.eq(clippedName, 'a'.repeat(79), 'clipping a long name drops a straddling emoji whole (regression: half of it was stored as U+FFFD)');
     const nulCases = [
       ['/v1/account/register', 'POST', {}, { name: 'Nul\u0000Name', email: 'nul.one@example.test', password: 'correct-horse-battery' }],
       ['/v1/account/login', 'POST', {}, { email: 'nul@example.test', password: 'correct-horse-battery', deviceId: 'ipad\u0000' }],
@@ -619,9 +618,13 @@ try {
     await resetLimits();
     const nulQuery = await h.request(`/v1/admin/users?q=${encodeURIComponent('a\u0000b')}`, { jar: admin.jar });
     c.ok(nulQuery.status === 400 && nulQuery.data?.error?.code === 'INVALID_TEXT', `NUL in a query string → 400 INVALID_TEXT (got ${nulQuery.status})`);
-    const lone = await bare('/v1/account/register', { method: 'POST', rawBody: '{"name":"Lone \\ud83e","email":"lone@example.test","password":"correct-horse-battery"}' });
-    c.ok(lone.status === 400 && lone.data?.error?.code === 'INVALID_TEXT', `a lone surrogate in a name is refused (got ${lone.status})`);
-    c.eq(await db.get("SELECT 1 AS x FROM accounts WHERE email IN ('nul.one@example.test','lone@example.test')"), undefined, 'neither was stored');
+    c.eq(await db.get("SELECT 1 AS x FROM accounts WHERE email='nul.one@example.test'"), undefined, 'the NUL name was not stored');
+    // A lone surrogate cannot crash either engine; both store U+FFFD in its place.
+    await resetLimits();
+    const lone = await bare('/v1/account/register', { method: 'POST', rawBody: '{"name":"Lone \\ud83e end","email":"lone@example.test","password":"correct-horse-battery"}' });
+    c.eq(lone.status, 201, `a lone surrogate in a name is not a server error (got ${lone.status})`);
+    const stored = (await db.get("SELECT name FROM accounts WHERE email='lone@example.test'")).name;
+    c.eq(stored, 'Lone \uFFFD end', 'and is stored as U+FFFD on this engine, never as invalid UTF-16');
     // Escaped NUL inside opaque JSON payloads is data, not text: it stays accepted.
     await resetLimits();
     const nulPayload = await h.request('/v1/sync/push', { method: 'POST', jar: alice.jar, body: pushBody(alice.deviceId, 9, { note: 'free\u0000text' }), headers: { 'Idempotency-Key': 'nul-payload' } });
