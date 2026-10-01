@@ -202,7 +202,16 @@ export const ON_DEMAND = [
   //     Settings.jsx asks for it only once the signed-in cloud account reports
   //     a support or admin role, and the server authorises every call it makes
   //     regardless.
-  [/(^|\/)(Teach|StaffOperationsPanel)-[^/]*\.js$/, 'staff-only screen']
+  [/(^|\/)(Teach|StaffOperationsPanel)-[^/]*\.js$/, 'staff-only screen'],
+
+  // The placement check: its page, the adaptive engine and the Pri-authored
+  // prerequisite graph. A student opens it once after onboarding and perhaps
+  // again for a retake, so it is fetched on that first open (the page and the
+  // engine are both behind import()) and kept by the runtime rule from then on.
+  // ADR-0001 makes the product online-first, and the one case this shows — a
+  // first open with no connection — is reported by api.js as a chapter that has
+  // not been downloaded yet; practice, which needs none of it, is unaffected.
+  [/(^|\/)(Placement|placement|prerequisites)-[^/]*\.js$/, 'placement check']
 ];
 
 // The faces the first screens genuinely paint in: the Latin Inter subset for

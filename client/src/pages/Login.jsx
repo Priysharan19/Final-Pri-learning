@@ -755,7 +755,7 @@ export default function Login() {
                   <p className="sub" style={{ marginTop: 14 }}>
                     {t(form.role === 'teacher' ? 'login.readyTeacher' : 'login.readyStudent')}
                   </p>
-                  <p className="muted" style={{ fontSize: 12.5 }}>{t('login.noFakeDiagnostic')}</p>
+                  <p className="muted" style={{ fontSize: 12.5 }}>{t('login.placementOffer')}</p>
                 </>
               )}
 

@@ -56,6 +56,13 @@ export default function Home() {
 
   useEffect(() => { api.get('/stats').then(setStats).catch(() => { }); }, []);
   useEffect(() => { api.get('/curriculum').then(setCurriculum).catch(() => { }); }, []);
+  // The placement check is offered to Indian students from the first visit
+  // after onboarding until they take it or say not now.
+  const [placement, setPlacement] = useState(null);
+  useEffect(() => {
+    if (user.course !== 'in' || user.role === 'teacher') return;
+    api.get('/placement').then(setPlacement).catch(() => { });
+  }, [user.course, user.role]);
   useEffect(() => {
     localStorage.setItem('pri-gen-filters', JSON.stringify({ year, sectionKey, subtopic, dotpoint, difficulty }));
   }, [year, sectionKey, subtopic, dotpoint, difficulty]);
@@ -301,6 +308,8 @@ export default function Home() {
 
       {/* ── Bottom cards ── */}
       <div className="home-cards">
+        <PlacementCard placement={placement} onGo={path => nav(path)}
+          onSkip={() => { setPlacement(p => ({ ...p, status: 'skipped' })); api.post('/placement/skip', {}).catch(() => { }); }} />
         <GoalCard user={user} activity={stats?.activity || []} onGo={() => nav('/practice')} />
         <div className="home-card" style={{ maxWidth: 380 }}>
           <div className="spread">
@@ -325,6 +334,40 @@ export default function Home() {
               </button>
             </div>
           </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function PlacementCard({ placement, onGo, onSkip }) {
+  const t = useT();
+  if (!placement?.available || placement.status === 'skipped' || placement.status === 'unavailable') return null;
+  const root = placement.result?.rootGaps?.[0] || null;
+  const rootChapter = root ? (placement.chapters || []).find(c => c.id === root.chapterId) : null;
+  const asked = placement.progress?.asked || 0;
+  return (
+    <div className="home-card" data-placement-card={placement.status}>
+      <span className="sc-label" style={{ margin: 0 }}>{t('placement.title')}</span>
+      <p style={{ fontSize: 17, lineHeight: 1.4, margin: '8px 0 12px', maxWidth: 420 }}>
+        {placement.status === 'active' ? t('placement.homeActive', { count: asked, n: asked })
+          : placement.status === 'finished'
+            ? (rootChapter ? t('placement.homeDone', { chapter: rootChapter.name, grade: rootChapter.grade }) : t('placement.homeDoneClean'))
+            : t('placement.homeOffer')}
+      </p>
+      <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+        {placement.status === 'none' && (
+          <>
+            <button className="btn btn-primary" onClick={() => onGo('/placement?go=1')}>{t('placement.start')}</button>
+            <button className="btn btn-quiet" onClick={onSkip}>{t('placement.notNow')}</button>
+          </>
+        )}
+        {placement.status === 'active' && <button className="btn btn-primary" onClick={() => onGo('/placement')}>{t('placement.resume')}</button>}
+        {placement.status === 'finished' && (
+          <>
+            {rootChapter && <button className="btn btn-primary" onClick={() => onGo(`/practice?subtopic=${encodeURIComponent(rootChapter.id)}&track=cbse`)}>{t('placement.practiseRoot', { chapter: rootChapter.name })}</button>}
+            <button className="btn btn-ghost" onClick={() => onGo('/placement')}>{t('placement.seeResult')}</button>
+          </>
         )}
       </div>
     </div>

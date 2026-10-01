@@ -211,7 +211,8 @@ const CONVERTED = [
   // wrong: the DPDP Act gives a reader the right to the notice in their own
   // language, and chrome in English over a Hindi notice takes part of that back.
   'src/pages/Legal.jsx',
-  'src/components/QuestionCard.jsx'
+  'src/components/QuestionCard.jsx',
+  'src/pages/Placement.jsx'
 ];
 
 // Attributes a person reads or hears. `className`, `style`, `role`, `id` and
@@ -366,7 +367,7 @@ for (const [text, reason] of LITERAL_ALLOWLIST) {
 // used it for the one sentence with a link inside it, and a key reached only
 // through tx() looked to this suite like a dead string.
 const CALL = /\btx?\(\s*'([a-z][A-Za-z0-9.]*)'/g;
-const KEY_IN_TABLE = /'((?:nav|app|common|difficulty|home|progress|history|favorites|tasks|classes|practice|verdict|settings|login|lang|pw|time|sym|assignment|gloss)\.[A-Za-z0-9.]+)'/g;
+const KEY_IN_TABLE = /'((?:nav|app|common|difficulty|home|progress|history|favorites|tasks|classes|practice|verdict|settings|login|lang|pw|time|sym|assignment|gloss|placement)\.[A-Za-z0-9.]+)'/g;
 
 function sourceFiles(dir) {
   return readdirSync(dir, { withFileTypes: true }).flatMap(entry => {

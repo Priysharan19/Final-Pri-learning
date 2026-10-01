@@ -78,6 +78,16 @@ export default function IndiaProgress() {
         <p className="muted" style={{ marginTop: 12, maxWidth: 820 }}>{t('progress.honesty')}</p>
       </div>
 
+      <div className="card" data-placement-entry>
+        <div className="spread" style={{ gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+          <div style={{ maxWidth: 640 }}>
+            <div className="card-title" style={{ marginBottom: 4 }}>{t('placement.progressTitle')}</div>
+            <p className="muted" style={{ margin: 0 }}>{t('placement.progressBody')}</p>
+          </div>
+          <button className="btn btn-ghost" onClick={() => nav('/placement')}>{t('placement.seeResult')}</button>
+        </div>
+      </div>
+
       {prediction && (
         <div className="card">
           <div className="spread" style={{ alignItems: 'flex-start', gap: 16 }}>
