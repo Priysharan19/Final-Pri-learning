@@ -997,6 +997,115 @@ async function run() {
     eq('today’s activity is recorded', (await GET('/me')).user.today.questions, stats.totals.attempts);
   } catch (err) { crashed(err); }
 
+  // ── Misconception repair is opportunity-specific (issue #232) ──────────────
+  // A clean correct answer is evidence against a misconception only when the
+  // question carried that misconception's designed trap or distractor. Before
+  // the fix every clean answer credited every trap in the subtopic, so four
+  // unrelated correct answers deleted an active misconception outright.
+  section('misconception repair');
+  try {
+    const { getRating, putRating } = await import(`${SRC}local/store.js`);
+    const { misconceptionKey, START_RATING, TRAP_ACTIVE_AT } = await import(`${SRC}engine/adaptive.js`);
+    const { cloudLinkRowId } = await import(`${SRC}platform/cloudAccount.js`);
+
+    const noether = (await POST('/profiles', { name: 'Emmy Noether', year: 10 })).user;
+    eq('a fresh learner is selected for this group', (await GET('/me')).user.id, noether.id);
+    // This group serves dozens of questions; the free daily cap is the subject
+    // of entitlement-enforcement-check.mjs, so it is lifted here.
+    {
+      const nowMs = Date.now();
+      await idb.put('device', {
+        id: cloudLinkRowId(noether.id), accountId: `acct-${noether.id}`, role: 'student',
+        emailVerified: true, linkedAt: nowMs, lastVerifiedAt: nowMs, lastSyncAt: null,
+        entitlement: {
+          plan: 'premium', status: 'active', provider: 'web',
+          currentPeriodEnd: nowMs + 30 * 86400000, offlineUntil: nowMs + 7 * 86400000,
+          issuedAt: nowMs, sourceVersion: 1
+        }
+      });
+    }
+
+    const probeKeys = (q, owner) => new Set([
+      ...(Array.isArray(q.traps) ? q.traps : []),
+      ...Object.values(q.answer?.optionTraps || {}).map(why => ({ why }))
+    ].filter(t => t && t.why).map(t => misconceptionKey(owner, t.why)).filter(Boolean));
+
+    /** A served, correctly answerable question that does (or does not) carry a designed slip. */
+    async function servedWhere(subtopics, accept, perTopic = 6) {
+      for (const sub of subtopics) {
+        for (let i = 0; i < perTopic; i++) {
+          const s = await nextQuestion({ mode: 'topic', subtopic: sub });
+          const right = canonicalInput(s.payload);
+          if (right !== null && checkAnswer(s.payload, right).correct && accept(s, sub)) return { ...s, right, sub };
+          await POST(`/practice/${s.question.id}/discard`, {});
+        }
+      }
+      return null;
+    }
+
+    /** Write an active misconception onto a subtopic's ledger, as recordTrap would leave it. */
+    async function seedTrap(sub, key, label) {
+      const st = (await getRating(noether.id, sub)) || { rating: START_RATING, attempts: 0, correct: 0, last_at: null };
+      const now = Date.now();
+      await putRating(noether.id, sub, {
+        ...st, traps: { ...(st.traps || {}), [key]: { n: 3, credit: 0, firstAt: now, lastAt: now, label, dotpoint: null } }
+      });
+    }
+    const ledger = async (sub) => (await getRating(noether.id, sub))?.traps || {};
+
+    const year10 = subtopicsForYear(10).map(s => s.id);
+    const targeted = await servedWhere(year10, (s, sub) => probeKeys(s.payload, sub).size > 0);
+    if (!ok('a Year 10 question carrying a designed slip was served', !!targeted)) throw new Error('no trap-carrying question');
+    const S = targeted.sub;
+    const K = [...probeKeys(targeted.payload, S)][0];
+    // A misconception no question in this subtopic can spring: the evidence
+    // the student produces below is unrelated to it by construction.
+    const A = misconceptionKey(S, 'Regression probe for issue 232: a slip that no authored question describes.');
+    ok('the unrelated misconception is not an opportunity on the targeted question', !probeKeys(targeted.payload, S).has(A));
+    await seedTrap(S, A, 'Unrelated slip');
+    await seedTrap(S, K, 'Targeted slip');
+
+    // A targeted, clean, unaided correct answer banks repair credit — for the
+    // slip it could have shown, and for nothing else.
+    const r1 = await POST(`/practice/${targeted.question.id}/submit`, { answer: targeted.right, ms: 9000 });
+    eq('the targeted question was answered cleanly', [r1.correct, r1.resolved], [true, true]);
+    let book = await ledger(S);
+    eq('a clean targeted answer banks one repair credit on its own slip', book[K]?.credit, 1);
+    eq('…and none on an unrelated slip in the same subtopic', book[A]?.credit, 0);
+
+    // Four unrelated clean answers in the same subtopic cannot erase A.
+    let unrelated = 0;
+    for (let i = 0; i < 4; i++) {
+      const s = await servedWhere([S], (q, sub) => !probeKeys(q.payload, sub).has(A), 10);
+      if (!s) break;
+      const r = await POST(`/practice/${s.question.id}/submit`, { answer: s.right, ms: 9000 });
+      if (r.correct && r.resolved) unrelated++;
+    }
+    eq('four unrelated questions were answered cleanly', unrelated, 4);
+    book = await ledger(S);
+    ok('four unrelated clean answers do not delete the misconception', !!book[A], show(Object.keys(book)));
+    eq('…bank it no repair credit', book[A]?.credit, 0);
+    eq('…and leave its count untouched', book[A]?.n, 3);
+    const named = (await GET('/stats')).misconceptions.find(m => m.key === A);
+    ok('the misconception is still named on /stats', !!named && named.count >= TRAP_ACTIVE_AT, show((await GET('/stats')).misconceptions));
+
+    // A hinted correct answer on a targeted question is support, not
+    // independent repair: it banks nothing.
+    const hintable = await servedWhere(year10,
+      (s, sub) => probeKeys(s.payload, sub).size > 0 && Array.isArray(s.payload.hints) && s.payload.hints.length > 0);
+    if (ok('a trap-carrying question with a hint was served', !!hintable)) {
+      const H = [...probeKeys(hintable.payload, hintable.sub)][0];
+      await seedTrap(hintable.sub, H, 'Hinted slip');
+      const before = (await ledger(hintable.sub))[H]?.credit;
+      await POST(`/practice/${hintable.question.id}/hint`, {});
+      const r = await POST(`/practice/${hintable.question.id}/submit`, { answer: hintable.right, ms: 9000 });
+      eq('the hinted targeted question was answered correctly', r.correct, true);
+      eq('a hinted targeted answer banks no repair credit', (await ledger(hintable.sub))[H]?.credit, before);
+    }
+
+    await POST('/profiles/select', { id: ada.id });
+  } catch (err) { crashed(err); }
+
   // ── Exams ──────────────────────────────────────────────────────────────────
   section('exams');
   try {
@@ -1028,7 +1137,7 @@ async function run() {
 
     const paper = await GET(`/exams/${created.id}/paper`);
     eq('the printable paper has every question', paper.questions.length, created.questions.length);
-    eq('the paper carries a model answer for each', paper.questions.filter(q => q.answerText === undefined && !q.multipart).length, 0);
+    eq('the paper of an unsubmitted exam withholds model answers (#230)', paper.questions.filter(q => q.answerText !== undefined).length, 0);
     eq('the paper names the course', paper.course, 'Year 10 · Stage 5');
 
     // Answer the whole paper correctly, straight from the stored payloads.
@@ -1044,6 +1153,33 @@ async function run() {
     ok('the paper is worth what its criteria say', marked.total > 0, `total ${marked.total}`);
     eq('the marked detail covers every question', marked.detail.length, created.questions.length);
     eq('every marked question is correct', marked.detail.filter(d => !d.correct).length, 0);
+    const markedPaper = await GET(`/exams/${created.id}/paper`);
+    eq('once submitted, the paper carries a model answer for each', markedPaper.questions.filter(q => q.answerText === undefined && !q.multipart).length, 0);
+    // What the printed sheet tells a student is the answer must be what the
+    // marker accepts: each printed single answer, typed back in the way a
+    // student would (without the prefix/unit the answer row already shows),
+    // is marked correct against its own stored question.
+    {
+      const { checkAnswer } = await import(new URL('engine/checker.js', SRC).href);
+      const payloads = [];
+      for (const qid of (await idb.get('exams', created.id)).questionIds) {
+        const row = await idb.get('questions', qid);
+        if (row?.payload) payloads.push(row.payload);
+      }
+      const refused = [];
+      markedPaper.questions.forEach((pq, i) => {
+        const q = payloads[i];
+        if (pq.multipart || !q || q.multipart) return;
+        let typed = String(pq.answerText ?? '');
+        if (q.answerType === 'mcq') typed = String((q.mcqOptions || []).indexOf(typed));
+        else {
+          if (q.answerPrefix && typed.startsWith(q.answerPrefix)) typed = typed.slice(q.answerPrefix.length).trim();
+          if (q.answerSuffix && typed.endsWith(q.answerSuffix)) typed = typed.slice(0, -q.answerSuffix.length).trim();
+        }
+        if (!checkAnswer(q, typed)?.correct) refused.push(`Q${i + 1} ${q.answerType} ${JSON.stringify(pq.answerText)}`);
+      });
+      eq('every printed single answer is accepted by the marker for its own question', refused, []);
+    }
     await rejects('a submitted exam cannot be resubmitted',
       POST(`/exams/${created.id}/submit`, { answers: perfect }), { status: 409 });
 
@@ -1062,6 +1198,93 @@ async function run() {
     eq('both exams are listed', examList.length, 2);
     eq('the list carries the scores', examList.filter(e => e.finished_at && e.total > 0).length, 2);
     await rejects('an unknown exam is a 404', GET('/exams/not-a-real-id'), { status: 404 });
+  } catch (err) { crashed(err); }
+
+  // ── Exam boundary (issue #230) ─────────────────────────────────────────────
+  // Exam questions share the `questions` store with practice. The ExamRoom UI
+  // never offers hints or solutions mid-paper, but that is not the authority:
+  // these checks call the practice and history routes directly with the ids of
+  // an active paper's questions, and every one must fail closed without
+  // touching the row, the student's attempts or their review schedule.
+  section('exam boundary');
+  try {
+    const me = (await GET('/me')).user.id;
+    const active = (await POST('/exams', { length: 10, minutes: 30 })).exam;
+    const stored = await idb.get('exams', active.id);
+    const rows = [];
+    for (const qid of stored.questionIds) rows.push(await idb.get('questions', qid));
+    const single = rows.find(r => r && !r.payload.multipart);
+    const multi = rows.find(r => r && r.payload.multipart);
+    ok('the active paper has a single-answer question to probe', !!single);
+    ok('the active paper has a multipart question to probe', !!multi);
+
+    const attemptsBefore = (await idb.byIndex('attempts', 'pid', me)).length;
+    const reviewsBefore = JSON.stringify(await idb.byIndex('reviews', 'pid', me));
+
+    const locked = async (name, promise) => {
+      const err = await rejects(name, promise, { status: 403 });
+      eq(`${name} — with the exam-lock code`, err?.code, 'EXAM_QUESTION_LOCKED');
+      const leaked = err && ['solution', 'hint', 'answerText', 'steps'].filter(k => k in err);
+      eq(`${name} — and nothing of the solution rides on the error`, leaked || [], []);
+    };
+
+    for (const [label, row] of [['single', single], ['multipart', multi]]) {
+      if (!row) continue;
+      const id = row.id;
+      await locked(`a ${label} active exam question cannot take a practice hint`, POST(`/practice/${id}/hint`, {}));
+      await locked(`a ${label} active exam question cannot be revealed through practice`, POST(`/practice/${id}/reveal`, { ms: 1000 }));
+      await locked(`a ${label} active exam question cannot be marked through practice`,
+        POST(`/practice/${id}/submit`, { answer: row.payload.multipart ? '0' : (canonicalInput(row.payload) ?? '0'), ms: 1000 }));
+      await locked(`a ${label} active exam question cannot be skipped through practice`, POST(`/practice/${id}/discard`, {}));
+      await locked(`a ${label} active exam question has no history detail yet`, GET(`/history/${id}/detail`));
+      await locked(`a ${label} active exam question cannot be retried as practice`, POST(`/history/${id}/retry`, { variant: 'same' }));
+      const after = await idb.get('questions', id);
+      eq(`the ${label} exam row is untouched by every refused call`,
+        { hintsUsed: after.hintsUsed, answered: after.answered, tries: after.tries, discardedAt: after.discardedAt ?? null, mode: after.mode },
+        { hintsUsed: 0, answered: 0, tries: 0, discardedAt: null, mode: 'exam' });
+    }
+    eq('no attempt was recorded from an active exam question', (await idb.byIndex('attempts', 'pid', me)).length, attemptsBefore);
+    eq('no review schedule moved from an active exam question', JSON.stringify(await idb.byIndex('reviews', 'pid', me)), reviewsBefore);
+
+    // A row that says it is an exam question but whose paper cannot be found is
+    // not "finished": review stays shut rather than defaulting open.
+    if (single) {
+      const orphan = { ...single, id: `${single.id}-orphan`, examId: 'no-such-exam' };
+      await idb.put('questions', orphan);
+      await locked('an exam question whose paper is missing stays locked', GET(`/history/${orphan.id}/detail`));
+      await locked('an orphaned exam question still refuses practice hints', POST(`/practice/${orphan.id}/hint`, {}));
+      await idb.del('questions', orphan.id);
+    }
+
+    // The printable paper of a paper still being sat is a question paper only:
+    // no answers, worked steps or marking criteria for any question or part.
+    const solutionKeys = o => ['answerText', 'steps', 'criteria'].filter(k => o && o[k] !== undefined);
+    const openPaper = await GET(`/exams/${active.id}/paper`);
+    eq('the printable paper of an active exam says solutions are not available', openPaper.solutionsAvailable, false);
+    eq('the printable paper of an active exam carries no answers, steps or criteria',
+      openPaper.questions.flatMap((q, i) => [...solutionKeys(q).map(k => `Q${i + 1}.${k}`),
+        ...(q.parts || []).flatMap(pt => solutionKeys(pt).map(k => `Q${i + 1}(${pt.key}).${k}`))]), []);
+    ok('the printable paper of an active exam still shows every question with its marks',
+      openPaper.questions.length === stored.questionIds.length && openPaper.questions.every(q => q.multipart ? q.parts.every(pt => pt.marks > 0) : q.marks > 0));
+
+    // The exam's own contract still works, and finishing it is what opens review.
+    const done = await POST(`/exams/${active.id}/submit`, { answers: {}, ms: 60000 });
+    ok('the paper is still marked through the exam route', done.total > 0, `total ${done.total}`);
+    if (single) {
+      const detail = await GET(`/history/${single.id}/detail`);
+      ok('after submission the worked solution opens in review', !!detail.solution?.answerText, show(detail.solution));
+      await locked('after submission the practice hint route still refuses an exam question', POST(`/practice/${single.id}/hint`, {}));
+      await locked('after submission the practice marker still refuses an exam question',
+        POST(`/practice/${single.id}/submit`, { answer: canonicalInput(single.payload) ?? '0', ms: 1000 }));
+    }
+    const donePaper = await GET(`/exams/${active.id}/paper`);
+    eq('after submission the printable paper offers solutions', donePaper.solutionsAvailable, true);
+    ok('after submission the printable paper carries the worked answers',
+      donePaper.questions.every(q => q.multipart ? q.parts.every(pt => pt.answerText !== undefined && Array.isArray(q.criteria)) : (q.answerText !== undefined && Array.isArray(q.criteria))));
+    if (multi) {
+      const detail = await GET(`/history/${multi.id}/detail`);
+      ok('after submission a multipart solution opens in review', Array.isArray(detail.solution?.parts) && detail.solution.parts.length > 0, show(detail.solution));
+    }
   } catch (err) { crashed(err); }
 
   // ── History ────────────────────────────────────────────────────────────────

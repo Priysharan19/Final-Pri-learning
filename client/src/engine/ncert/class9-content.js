@@ -2,6 +2,7 @@
 // The eight uploaded PDFs contain 200 pages. No separate Grade 9 answer-key PDF
 // accompanied the current upload, so formal exercise answers are independently
 // derived and cross-checked; the product UI states that fact explicitly.
+import { NCERT_CLASS9_SYLLABUS_BY_ID } from './class9-syllabus.js';
 
 const basis = 'Independent Pri Learning derivation from the uploaded chapter, cross-checked against current 2026–27 Ganita Manjari worked-solution references. No separate Grade 9 answer-key PDF was present in the current eight-file upload.';
 const note = 'Every formal exercise prompt is checked against the exact source wording, diagram conditions and stated approximation rules. Construction, proof and open-response items are verified by required method and conclusion rather than forced into a scalar answer.';
@@ -14,8 +15,8 @@ const M = (section,pages,coverage) => ({section,pages,coverage});
 
 export const NCERT_CLASS9_CONTENT = Object.freeze([
 {
- id:'c9-coordinate-geometry',num:1,title:'Orienting Yourself: The Use of Coordinates',pages:15,strand:'Coordinate Geometry',weight:12,
- dotpoints:['Use ordered pairs, axes, signs and quadrants to locate and interpret points in the Cartesian plane','Find horizontal, vertical and general distances between two points using coordinate differences and the Baudhāyana–Pythagoras theorem','Model real layouts and geometric shapes with coordinates, extracting lengths, dimensions and spatial conclusions'],
+ id:'c9-coordinate-geometry',num:1,title:NCERT_CLASS9_SYLLABUS_BY_ID['c9-coordinate-geometry'].title,pages:15,strand:NCERT_CLASS9_SYLLABUS_BY_ID['c9-coordinate-geometry'].strand,weight:NCERT_CLASS9_SYLLABUS_BY_ID['c9-coordinate-geometry'].weight,
+ dotpoints:NCERT_CLASS9_SYLLABUS_BY_ID['c9-coordinate-geometry'].dotpoints,
  skills:['Cartesian plane, origin and axes','Ordered pairs and quadrant sign patterns','Points on axes','Coordinate interpretation in room plans','Horizontal and vertical distance','General distance via Pythagoras','Rectangles and practical coordinate modelling'],
  sourceMap:[M('Historical orientation and coordinate thinking','1–2','Grid-based location, Indian and global coordinate history, and the chapter’s accessibility-centred room-map context.'),M('Axes, origin, ordered pairs and quadrants','3–7','2-D Cartesian system, points on axes, sign conventions, quadrants, Exercise Sets 1.1 and 1.2 diagrams.'),M('Distance between points','8–11','Coordinate differences, right-triangle construction and the distance relation derived from Baudhāyana–Pythagoras.'),M('End-of-chapter mastery, application and summary','12–15','All end-of-chapter coordinate questions, map/grid applications, chapter summary and closing material.')],
  notes:[
@@ -34,8 +35,8 @@ export const NCERT_CLASS9_CONTENT = Object.freeze([
  exercises:[['1.1',4],['1.2',4],['End-of-Chapter',16]],method:'Read the ordered pair/diagram first; use sign conventions or coordinate differences, and use Pythagoras only when the joining segment is not axis-parallel.',gen:'c9-coordinate-geometry-ncert-mastery'
 },
 {
- id:'c9-linear-polynomials',num:2,title:'Introduction to Linear Polynomials',pages:25,strand:'Algebra',weight:13,
- dotpoints:['Identify terms, coefficients, variables, degree and values of one-variable polynomials, with special focus on linear polynomials','Model constant-rate patterns, linear growth and linear decay with expressions of the form $ax+b$','Build, graph and interpret linear relationships from tables or contexts, including slope, intercept and parallel lines'],
+ id:'c9-linear-polynomials',num:2,title:NCERT_CLASS9_SYLLABUS_BY_ID['c9-linear-polynomials'].title,pages:25,strand:NCERT_CLASS9_SYLLABUS_BY_ID['c9-linear-polynomials'].strand,weight:NCERT_CLASS9_SYLLABUS_BY_ID['c9-linear-polynomials'].weight,
+ dotpoints:NCERT_CLASS9_SYLLABUS_BY_ID['c9-linear-polynomials'].dotpoints,
  skills:['Polynomial vocabulary and degree','Evaluation and input-output functions','Linear equations from contexts','Linear patterns','Growth and decay','Tables and linear relationships','Graphs of $y=ax+b$','Slope, intercept and parallelism'],
  sourceMap:[M('Polynomial foundations','1–5','Expressions, variables, coefficients, univariate polynomials, degree, linear polynomial examples and Exercise 2.1.'),M('Evaluation and linear patterns','6–10','Evaluation, equations, tile patterns, pocket-money/fare models, Exercises 2.2–2.4.'),M('Linear relationships and graph meaning','11–20','Constant rate, tables, slope/intercept ideas, graph construction and interpretation.'),M('Visualising $y=ax+b$ and end-of-chapter mastery','21–25','Exercise 2.6, end-of-chapter problems, graph-based applications and summary material.')],
  notes:[
@@ -54,8 +55,8 @@ export const NCERT_CLASS9_CONTENT = Object.freeze([
  exercises:[['2.1',5],['2.2',7],['2.3',5],['2.4',4],['2.5',3],['2.6',1],['End-of-Chapter',14]],method:'Identify the polynomial/linear structure first; evaluate by substitution, solve linearly where required, and for graph questions build a value table before interpreting slope and intercept.',gen:'c9-linear-polynomials-ncert-mastery'
 },
 {
- id:'c9-number-systems',num:3,title:'The World of Numbers',pages:27,strand:'Number & Arithmetic',weight:13,
- dotpoints:['Understand the nested real-number system and operate accurately with integers and rational numbers','Represent rational and irrational numbers on the number line and reason about density, irrationality and geometric constructions','Classify terminating, repeating and non-repeating decimals and convert rational decimals to fractions'],
+ id:'c9-number-systems',num:3,title:NCERT_CLASS9_SYLLABUS_BY_ID['c9-number-systems'].title,pages:27,strand:NCERT_CLASS9_SYLLABUS_BY_ID['c9-number-systems'].strand,weight:NCERT_CLASS9_SYLLABUS_BY_ID['c9-number-systems'].weight,
+ dotpoints:NCERT_CLASS9_SYLLABUS_BY_ID['c9-number-systems'].dotpoints,
  skills:['Natural/whole/integer/rational hierarchy','Zero and signed arithmetic','Rational arithmetic and closure','Density','Irrationality of $\\sqrt2$','Irrational constructions','Real numbers','Decimal expansions and cyclic patterns'],
  sourceMap:[M('Counting, zero and integers','1–6','Historical number development, zero, integer laws and Exercise 3.1–3.2.'),M('Rational numbers and density','7–12','Definition, equivalent forms, operations, closure, number-line representation, density and Exercises 3.3–3.4.'),M('Irrational and real numbers','13–23','Proof of irrationality, construction of $\\sqrt2$, $\\pi$, decimal patterns, cyclic numbers and Exercise 3.5.'),M('End-of-chapter mastery and summary','24–27','All formal end-of-chapter questions, real-number synthesis and chapter summary.')],
  notes:[
@@ -74,8 +75,8 @@ export const NCERT_CLASS9_CONTENT = Object.freeze([
  exercises:[['3.1',4],['3.2',4],['3.3',8],['3.4',6],['3.5',5],['End-of-Chapter',16]],method:'Classify the number set first, reduce rational fractions, use exact arithmetic/number-line reasoning, and classify decimals from the prime factors of the reduced denominator.',gen:'c9-number-systems-ncert-mastery'
 },
 {
- id:'c9-algebraic-identities',num:4,title:'Exploring Algebraic Identities',pages:24,strand:'Algebra',weight:13,
- dotpoints:['Expand and use square, difference-of-squares, three-term and cubic algebraic identities with exact sign control','Factor algebraic expressions using identities, algebra tiles, common factors and splitting the middle term','Discover and apply higher identities to numerical calculation and rational-expression simplification'],
+ id:'c9-algebraic-identities',num:4,title:NCERT_CLASS9_SYLLABUS_BY_ID['c9-algebraic-identities'].title,pages:24,strand:NCERT_CLASS9_SYLLABUS_BY_ID['c9-algebraic-identities'].strand,weight:NCERT_CLASS9_SYLLABUS_BY_ID['c9-algebraic-identities'].weight,
+ dotpoints:NCERT_CLASS9_SYLLABUS_BY_ID['c9-algebraic-identities'].dotpoints,
  skills:['Identity versus equation','Geometric visualisation','$(a\\pm b)^2$','Difference of squares','Three-term square','Algebra tiles','Middle-term splitting','Cubic identities','Rational expressions'],
  sourceMap:[M('Square identities and visual proof','1–7','Visualisation and algebraic proof of $(a+b)^2$, $(a-b)^2$, Exercises 4.1–4.2 and identity-based factorisation.'),M('More identities and factorisation','8–14','Three-term square, additional identities, algebra tiles, middle-term splitting and Exercises 4.3–4.4.'),M('New identities and rational expressions','15–20','Deriving identities including cubic forms and simplifying rational expressions, Exercise 4.5.'),M('End-of-chapter mastery','21–24','All end-of-chapter identity/factorisation/application problems and summary material.')],
  notes:[
@@ -94,8 +95,8 @@ export const NCERT_CLASS9_CONTENT = Object.freeze([
  exercises:[['4.1',2],['4.2',2],['4.3',4],['4.4',3],['4.5',1],['End-of-Chapter',13]],method:'Identify the identity pattern before expanding; for factorisation verify square roots/sum-product conditions, and simplify rational expressions by factoring before cancellation.',gen:'c9-algebraic-identities-ncert-mastery'
 },
 {
- id:'c9-circles',num:5,title:"I’m Up and Down, and Round and Round",pages:26,strand:'Geometry',weight:13,
- dotpoints:['Use the definition, symmetry and circumcircle construction of a circle, including the unique circle through three non-collinear points','Prove and apply chord theorems involving central angles, perpendicular bisectors and distance from the centre','Use arc-angle theorems, concyclicity and cyclic-quadrilateral properties in multi-step geometric proofs'],
+ id:'c9-circles',num:5,title:NCERT_CLASS9_SYLLABUS_BY_ID['c9-circles'].title,pages:26,strand:NCERT_CLASS9_SYLLABUS_BY_ID['c9-circles'].strand,weight:NCERT_CLASS9_SYLLABUS_BY_ID['c9-circles'].weight,
+ dotpoints:NCERT_CLASS9_SYLLABUS_BY_ID['c9-circles'].dotpoints,
  skills:['Circle as locus','Chord/diameter/radius','Symmetry','Circumcircle/circumcentre','Equal chords and central angles','Perpendicular bisector of chord','Chord distance','Arc angles','Cyclic quadrilaterals'],
  sourceMap:[M('Definitions, symmetry and circumcircles','1–7','Circle as a locus, reflection/rotation symmetry, circles through points, unique circumcircle and Exercise 5.1.'),M('Chord structure','8–14','Equal-chord/central-angle converses, midpoint/perpendicular-bisector theorems, chord-distance results and Exercises 5.2–5.5.'),M('Arc angles and concyclicity','15–22','Central/inscribed angle theorem, same-segment angles, semicircle angle, cyclic quadrilaterals and Exercise 5.6.'),M('End-of-chapter proof mastery','23–26','All proof/construction end-of-chapter questions, theorem synthesis and chapter summary.')],
  notes:[
@@ -114,8 +115,8 @@ export const NCERT_CLASS9_CONTENT = Object.freeze([
  exercises:[['5.1',4],['5.2',2],['5.3',3],['5.4',3],['5.5',3],['5.6',3],['End-of-Chapter',25]],method:'Translate the diagram into radii/equal chords/right triangles first, cite the relevant theorem, then use congruence or angle relations with the exact arc/chord named.',gen:'c9-circles-ncert-mastery'
 },
 {
- id:'c9-perimeter-area',num:6,title:'Measuring Space: Perimeter and Area',pages:37,strand:'Mensuration',weight:14,
- dotpoints:['Calculate perimeter, circumference and arc length with disciplined use of $\\pi$ and stated approximations','Derive and apply area formulae for rectangles, parallelograms, triangles, circles, sectors and segments, including Heron’s formula','Solve composite and proof-style mensuration problems involving equivalent areas, tracks, sectors and geometric decomposition'],
+ id:'c9-perimeter-area',num:6,title:NCERT_CLASS9_SYLLABUS_BY_ID['c9-perimeter-area'].title,pages:37,strand:NCERT_CLASS9_SYLLABUS_BY_ID['c9-perimeter-area'].strand,weight:NCERT_CLASS9_SYLLABUS_BY_ID['c9-perimeter-area'].weight,
+ dotpoints:NCERT_CLASS9_SYLLABUS_BY_ID['c9-perimeter-area'].dotpoints,
  skills:['Perimeter','Circumference and $\\pi$','Irrationality/approximations of $\\pi$','Arc length','Track stagger','Area of rectangle/parallelogram/triangle','Median area','Heron','Equivalent-area transformations','Circle/sector/segment area'],
  sourceMap:[M('Perimeter, $\\pi$ and arc length','1–12','Perimeter, circumference-to-diameter ratio, history/irrationality of pi, arcs, track stagger, puzzles and Exercise 6.1.'),M('Polygonal area and Heron','13–25','Rectangle, parallelogram and triangle area, median property, Heron’s formula, equivalent-area constructions and Exercise 6.2.'),M('Circle, sector and segment area','26–31','Area of circle, sectors, segments and Exercise 6.3 with source-stated pi approximations.'),M('End-of-chapter mastery and summary','32–37','All composite/proof/application end-of-chapter questions and chapter summary.')],
  notes:[
@@ -134,8 +135,8 @@ export const NCERT_CLASS9_CONTENT = Object.freeze([
  exercises:[['6.1',8],['6.2',11],['6.3',10],['End-of-Chapter',27]],method:'Draw and label the required boundary/region, select circumference/arc/area/Heron/sector formula, preserve the question’s stated pi approximation, and include units at the end.',gen:'c9-perimeter-area-ncert-mastery'
 },
 {
- id:'c9-probability',num:7,title:'The Mathematics of Maybe: Introduction to Probability',pages:19,strand:'Statistics & Probability',weight:11,
- dotpoints:['Interpret randomness and locate events on the probability scale from impossible to certain','Calculate and compare experimental, statistical and theoretical probabilities, including sampling and long-run behaviour','Construct sample spaces and use events and tree diagrams to solve one-step and multi-stage probability problems'],
+ id:'c9-probability',num:7,title:NCERT_CLASS9_SYLLABUS_BY_ID['c9-probability'].title,pages:19,strand:NCERT_CLASS9_SYLLABUS_BY_ID['c9-probability'].strand,weight:NCERT_CLASS9_SYLLABUS_BY_ID['c9-probability'].weight,
+ dotpoints:NCERT_CLASS9_SYLLABUS_BY_ID['c9-probability'].dotpoints,
  skills:['Randomness','Probability scale','Experimental probability','Theoretical probability','Statistical probability/sampling','Law of Large Numbers','Gambler’s fallacy','Sample spaces/events','Tree diagrams'],
  sourceMap:[M('Randomness and probability scale','1–5','Subjective/objective likelihood, randomness, probability scale and Exercise 7.1.'),M('Objective probability','6–11','Experimental, theoretical and statistical probability, sampling, Law of Large Numbers, gambler’s fallacy and Exercise 7.2.'),M('Sample spaces, events and trees','12–14','Formal sample spaces/events and tree-diagram construction, Exercise 7.3.'),M('Multi-stage mastery and summary','15–19','Exercise 7.4, end-of-chapter probability problems and chapter summary.')],
  notes:[
@@ -154,8 +155,8 @@ export const NCERT_CLASS9_CONTENT = Object.freeze([
  exercises:[['7.1',1],['7.2',6],['7.3',3],['7.4',2],['End-of-Chapter',16]],method:'Define the experiment and sample space first, identify whether evidence-based or equally-likely reasoning applies, then use relative frequency or favourable/total counting; for trees multiply along paths and add successful paths.',gen:'c9-probability-ncert-mastery'
 },
 {
- id:'c9-sequences-progressions',num:8,title:'Predicting What Comes Next: Exploring Sequences and Progressions',pages:27,strand:'Algebra',weight:11,
- dotpoints:['Describe sequences using term notation and explicit or recursive rules, including Virahānka–Fibonacci style recurrences','Analyse arithmetic progressions using first term, common difference, nth-term formula and sum formula','Analyse geometric progressions using common ratio and nth-term reasoning, connecting growth/decay with visual and fractal patterns'],
+ id:'c9-sequences-progressions',num:8,title:NCERT_CLASS9_SYLLABUS_BY_ID['c9-sequences-progressions'].title,pages:27,strand:NCERT_CLASS9_SYLLABUS_BY_ID['c9-sequences-progressions'].strand,weight:NCERT_CLASS9_SYLLABUS_BY_ID['c9-sequences-progressions'].weight,
+ dotpoints:NCERT_CLASS9_SYLLABUS_BY_ID['c9-sequences-progressions'].dotpoints,
  skills:['Sequence notation','Explicit rules','Recursive rules','Virahānka–Fibonacci sequence','Arithmetic progressions','AP nth term','AP sum','Geometric progressions','GP nth term','Fractal/visual GP patterns'],
  sourceMap:[M('Sequence language and rules','1–6','Patterns, term notation, explicit rules, recursive rules, Virahānka–Fibonacci recurrence and Exercise 8.1.'),M('Arithmetic progressions and sums','7–12','AP definition, visualisation, nth term, sum of natural numbers/APs and Exercise 8.2.'),M('Geometric progressions','13–20','GP definition, ratio, nth term, growth/decay, fractals/visualisation and Exercise 8.3.'),M('End-of-chapter mastery and summary','21–27','All end-of-chapter sequence/AP/GP problems, summary and closing material.')],
  notes:[

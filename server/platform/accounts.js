@@ -1,4 +1,5 @@
-import { Router } from 'express';
+import { asyncRouter } from './asyncRouter.js';
+import { asStore, isUniqueViolation, sqliteHandle } from './store.js';
 import bcrypt from 'bcryptjs';
 import {
   clearSessionCookies, createSession, id, opaqueToken, rateLimit, requireSession,
@@ -22,9 +23,8 @@ const BCRYPT_COST = 12;
 // Not a secret: nothing is ever authenticated against it.
 const DUMMY_PASSWORD_HASH = '$2a$12$Vat.Y0eTJ6drWz5OyiVI1u8VH0sr/2wWJbDx2DmV44ZNEkyWFW0d2';
 
-function audit(db, actor, action, targetKind, targetId, metadata = {}, now = Date.now()) {
-  db.prepare('INSERT INTO audit_log(actor_account_id,action,target_kind,target_id,metadata_json,created_at) VALUES (?,?,?,?,?,?)')
-    .run(actor, action, targetKind, targetId, JSON.stringify(metadata), now);
+async function audit(db, actor, action, targetKind, targetId, metadata = {}, now = Date.now()) {
+  await db.run('INSERT INTO audit_log(actor_account_id,action,target_kind,target_id,metadata_json,created_at) VALUES (?,?,?,?,?,?)', [actor, action, targetKind, targetId, JSON.stringify(metadata), now]);
 }
 
 function email(value) {
@@ -61,7 +61,10 @@ function maskEmail(value) {
 }
 
 function ensureDeliveryTable(db) {
-  db.exec(`CREATE TABLE IF NOT EXISTS auth_delivery_outbox (
+  // SQLite builds its schema at boot; Postgres is migrated (supabase/migrations).
+  const raw = sqliteHandle(db);
+  if (!raw) return;
+  raw.exec(`CREATE TABLE IF NOT EXISTS auth_delivery_outbox (
     id TEXT PRIMARY KEY,
     account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
     kind TEXT NOT NULL CHECK(kind IN ('verify-email','reset-password','guardian-consent')),
@@ -73,29 +76,39 @@ function ensureDeliveryTable(db) {
   );`);
 }
 
-function queueAccountToken(db, accountId, destination, purpose, now = Date.now()) {
+async function queueAccountToken(db, accountId, destination, purpose, now = Date.now()) {
   // Only a one-way token hash is used for verification. The delivery worker gets
   // an AES-GCM envelope bound to this token id; raw tokens are never persisted.
   const raw = opaqueToken(32);
   const tokenId = id('tok');
   const ciphertext = encryptDeliveryToken(raw, `${accountId}:${purpose}:${tokenId}`);
   const expiresAt = now + TOKEN_MS;
-  db.prepare(`INSERT INTO account_tokens(id, account_id, purpose, token_hash, created_at, expires_at)
-    VALUES (?, ?, ?, ?, ?, ?)`).run(tokenId, accountId, purpose, sha256(raw), now, expiresAt);
-  db.prepare(`INSERT INTO auth_delivery_outbox(id, account_id, kind, destination, token_id, token_ciphertext, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?)`).run(id('mail'), accountId, purpose, destination, tokenId, ciphertext, now);
+  await db.run(`INSERT INTO account_tokens(id, account_id, purpose, token_hash, created_at, expires_at)
+    VALUES (?, ?, ?, ?, ?, ?)`, [tokenId, accountId, purpose, sha256(raw), now, expiresAt]);
+  await db.run(`INSERT INTO auth_delivery_outbox(id, account_id, kind, destination, token_id, token_ciphertext, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?)`, [id('mail'), accountId, purpose, destination, tokenId, ciphertext, now]);
   return tokenId;
 }
 
-function invalidatePendingTokens(db, accountId, purpose, now = Date.now()) {
-  db.prepare('DELETE FROM auth_delivery_outbox WHERE account_id = ? AND kind = ? AND delivered_at IS NULL').run(accountId, purpose);
-  db.prepare(`UPDATE account_tokens SET consumed_at = ?
-    WHERE account_id = ? AND purpose = ? AND consumed_at IS NULL`).run(now, accountId, purpose);
+async function invalidatePendingTokens(db, accountId, purpose, now = Date.now()) {
+  await db.run('DELETE FROM auth_delivery_outbox WHERE account_id = ? AND kind = ? AND delivered_at IS NULL', [accountId, purpose]);
+  await db.run(`UPDATE account_tokens SET consumed_at = ?
+    WHERE account_id = ? AND purpose = ? AND consumed_at IS NULL`, [now, accountId, purpose]);
 }
 
-function revokeSession(db, req, now = Date.now()) {
-  const session = sessionFromRequest(db, req, now);
-  if (session) db.prepare('UPDATE account_sessions SET revoked_at = ? WHERE id = ?').run(now, session.id);
+async function revokeSession(db, req, now = Date.now()) {
+  const session = await sessionFromRequest(db, req, now);
+  if (session) await db.run('UPDATE account_sessions SET revoked_at = ? WHERE id = ?', [now, session.id]);
+}
+
+/**
+ * Spend a one-time token. The SELECT that found it ran before any await, so
+ * a concurrent request may have found it too: only the request whose UPDATE
+ * flips consumed_at owns it. The caller's transaction rolls back otherwise.
+ */
+async function spendToken(db, tokenId, now) {
+  const info = await db.run('UPDATE account_tokens SET consumed_at = ? WHERE id = ? AND consumed_at IS NULL', [now, tokenId]);
+  if (info.changes !== 1) throw Object.assign(new Error('Token already used.'), { code: 'TOKEN_ALREADY_USED' });
 }
 
 function reauthError(code, message, status = 401) {
@@ -107,7 +120,8 @@ function reauthError(code, message, status = 401) {
  * authentication method. A long-lived session cookie is not enough on its own.
  */
 export async function authorizeAccountDeletion(db, accountId, body = {}, identityVerifier = verifyIdentityToken) {
-  const row = db.prepare('SELECT password_hash FROM accounts WHERE id = ? AND deleted_at IS NULL').get(accountId);
+  db = asStore(db);
+  const row = await db.get('SELECT password_hash FROM accounts WHERE id = ? AND deleted_at IS NULL', [accountId]);
   if (!row) throw reauthError('ACCOUNT_NOT_FOUND', 'Account not found.', 404);
 
   if (row.password_hash) {
@@ -134,15 +148,16 @@ export async function authorizeAccountDeletion(db, accountId, body = {}, identit
     if (error?.code === 'OIDC_PROVIDER_NOT_CONFIGURED') throw reauthError(error.code, error.message, 503);
     throw reauthError(error?.code || 'SOCIAL_REAUTH_FAILED', error?.message || 'Identity confirmation failed.');
   }
-  const linked = db.prepare(`SELECT 1 FROM account_identities
-    WHERE provider=? AND provider_subject=? AND account_id=?`).get(provider, identity.subject, accountId);
+  const linked = await db.get(`SELECT 1 FROM account_identities
+    WHERE provider=? AND provider_subject=? AND account_id=?`, [provider, identity.subject, accountId]);
   if (!linked) throw reauthError('SOCIAL_IDENTITY_MISMATCH', 'The confirmed identity is not linked to this Pri Learning account.');
   return { method: provider, subject: identity.subject };
 }
 
 export function createAccountRouter(db, { beforeDelete = null } = {}) {
+  db = asStore(db);
   ensureDeliveryTable(db);
-  const router = Router();
+  const router = asyncRouter();
 
   router.post('/register', rateLimit(db, 'register', { limit: 8, windowMs: 60 * 60 * 1000 }), async (req, res, next) => {
     try {
@@ -164,37 +179,37 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
       const now = Date.now();
       const inviteCode = req.body?.teacherInviteCode == null ? '' : String(req.body.teacherInviteCode).trim().slice(0, 64);
       const inviteInvalid = () => res.status(400).json({ error: { code: 'TEACHER_INVITE_INVALID', message: 'Teacher invite code is invalid, expired or already used.' } });
-      if (inviteCode && !findLiveTeacherInvite(db, inviteCode, now)) return inviteInvalid();
+      if (inviteCode && !(await findLiveTeacherInvite(db, inviteCode, now))) return inviteInvalid();
       const role = inviteCode ? 'teacher' : 'student';
       const accountId = id('acct');
       const passwordHash = await bcrypt.hash(password, BCRYPT_COST);
       try {
-        db.transaction(() => {
-          db.prepare(`INSERT INTO accounts(id,email,name,password_hash,role,created_at,updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)`).run(accountId, em, name, passwordHash, role, now, now);
-          db.prepare(`INSERT INTO account_identities(provider,provider_subject,account_id,email_at_link,linked_at)
-            VALUES ('password', ?, ?, ?, ?)`).run(em, accountId, em, now);
-          db.prepare(`INSERT INTO entitlement_snapshots(account_id,plan,status,provider,source_version,updated_at)
-            VALUES (?, 'free', 'free', 'none', 0, ?)`).run(accountId, now);
-          queueAccountToken(db, accountId, em, 'verify-email', now);
+        await db.transaction(async () => {
+          await db.run(`INSERT INTO accounts(id,email,name,password_hash,role,created_at,updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)`, [accountId, em, name, passwordHash, role, now, now]);
+          await db.run(`INSERT INTO account_identities(provider,provider_subject,account_id,email_at_link,linked_at)
+            VALUES ('password', ?, ?, ?, ?)`, [em, accountId, em, now]);
+          await db.run(`INSERT INTO entitlement_snapshots(account_id,plan,status,provider,source_version,updated_at)
+            VALUES (?, 'free', 'free', 'none', 0, ?)`, [accountId, now]);
+          await queueAccountToken(db, accountId, em, 'verify-email', now);
           if (guardian) {
-            const tokenId = queueAccountToken(db, accountId, guardian.email, 'guardian-consent', now);
-            recordConsentRequest(db, { accountId, name: guardian.name, email: guardian.email, tokenHash: tokenId, now });
+            const tokenId = await queueAccountToken(db, accountId, guardian.email, 'guardian-consent', now);
+            await recordConsentRequest(db, { accountId, name: guardian.name, email: guardian.email, tokenHash: tokenId, now });
           }
           if (inviteCode) {
-            if (!consumeTeacherInvite(db, inviteCode, accountId, now)) {
+            if (!(await consumeTeacherInvite(db, inviteCode, accountId, now))) {
               throw Object.assign(new Error('Teacher invite code is invalid, expired or already used.'), { code: 'TEACHER_INVITE_INVALID' });
             }
-            audit(db, accountId, 'teacher-invite.redeem', 'account', accountId, { role }, now);
+            await audit(db, accountId, 'teacher-invite.redeem', 'account', accountId, { role }, now);
           }
-        })();
+        });
       } catch (err) {
         if (err?.code === 'TEACHER_INVITE_INVALID') return inviteInvalid();
-        if (/unique/i.test(String(err?.message))) return res.status(409).json({ error: { code: 'EMAIL_EXISTS', message: 'An account already exists for this email.' } });
+        if (isUniqueViolation(err)) return res.status(409).json({ error: { code: 'EMAIL_EXISTS', message: 'An account already exists for this email.' } });
         throw err;
       }
-      createSession(db, res, accountId, deviceId, req.get('user-agent') || '', now);
-      const row = db.prepare('SELECT * FROM accounts WHERE id = ?').get(accountId);
+      await createSession(db, res, accountId, deviceId, req.get('user-agent') || '', now);
+      const row = await db.get('SELECT * FROM accounts WHERE id = ?', [accountId]);
       res.status(201).json({ account: publicAccount(row), verificationRequired: true });
     } catch (err) { next(err); }
   });
@@ -205,21 +220,21 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
       const password = String(req.body?.password || '');
       const submitted = String(req.body?.email || '').trim().toLowerCase().slice(0, 254);
       const now = Date.now();
-      const lock = loginLockStatus(db, submitted, now);
+      const lock = await loginLockStatus(db, submitted, now);
       if (lock.locked) {
         res.set('Retry-After', String(Math.max(1, Math.ceil(lock.retryAfterMs / 1000))));
         return res.status(429).json({ error: { code: 'ACCOUNT_LOCKED', message: 'Too many failed sign-in attempts. Try again later.' } });
       }
-      const row = em ? db.prepare('SELECT * FROM accounts WHERE email = ? AND deleted_at IS NULL').get(em) : null;
+      const row = em ? await db.get(`SELECT * FROM accounts WHERE ${db.emailEquals('email')} AND deleted_at IS NULL`, [em]) : null;
       const matched = await bcrypt.compare(password, row?.password_hash || DUMMY_PASSWORD_HASH);
       if (!row || !row.password_hash || !matched) {
-        recordLoginFailure(db, submitted, now);
+        await recordLoginFailure(db, submitted, now);
         return res.status(401).json({ error: { code: 'BAD_CREDENTIALS', message: 'Incorrect email or password.' } });
       }
-      clearLoginFailures(db, submitted);
-      maybeBootstrapAdmin(db, row.id, now);
-      createSession(db, res, row.id, String(req.body?.deviceId || 'web').slice(0, 160), req.get('user-agent') || '', now);
-      const account = db.prepare('SELECT * FROM accounts WHERE id = ?').get(row.id);
+      await clearLoginFailures(db, submitted);
+      await maybeBootstrapAdmin(db, row.id, now);
+      await createSession(db, res, row.id, String(req.body?.deviceId || 'web').slice(0, 160), req.get('user-agent') || '', now);
+      const account = await db.get('SELECT * FROM accounts WHERE id = ?', [row.id]);
       res.json({ account: publicAccount(account) });
     } catch (err) { next(err); }
   });
@@ -229,36 +244,41 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
     res.json({ account: publicAccount(req.platformSession) });
   });
 
-  router.post('/logout', (req, res) => {
-    revokeSession(db, req);
+  router.post('/logout', async (req, res) => {
+    await revokeSession(db, req);
     clearSessionCookies(res);
     res.json({ ok: true });
   });
 
-  router.post('/email/verification-request', requireSession(db), rateLimit(db, 'verify-email-request', { limit: 5, windowMs: 60 * 60 * 1000 }), (req, res) => {
-    const account = db.prepare('SELECT id,email,email_verified_at FROM accounts WHERE id = ? AND deleted_at IS NULL').get(req.platformSession.account_id);
+  router.post('/email/verification-request', requireSession(db), rateLimit(db, 'verify-email-request', { limit: 5, windowMs: 60 * 60 * 1000 }), async (req, res) => {
+    const account = await db.get('SELECT id,email,email_verified_at FROM accounts WHERE id = ? AND deleted_at IS NULL', [req.platformSession.account_id]);
     if (!account) return res.status(404).json({ error: { code: 'ACCOUNT_NOT_FOUND', message: 'Account not found.' } });
     if (account.email_verified_at) return res.json({ ok: true, alreadyVerified: true });
     const now = Date.now();
-    db.transaction(() => {
-      invalidatePendingTokens(db, account.id, 'verify-email', now);
-      queueAccountToken(db, account.id, account.email, 'verify-email', now);
-    })();
+    await db.transaction(async () => {
+      await invalidatePendingTokens(db, account.id, 'verify-email', now);
+      await queueAccountToken(db, account.id, account.email, 'verify-email', now);
+    });
     res.json({ ok: true, alreadyVerified: false });
   });
 
-  router.post('/email/verify', rateLimit(db, 'verify-email', { limit: 20, windowMs: 60 * 60 * 1000 }), (req, res) => {
+  router.post('/email/verify', rateLimit(db, 'verify-email', { limit: 20, windowMs: 60 * 60 * 1000 }), async (req, res) => {
     const raw = String(req.body?.token || '');
     const now = Date.now();
-    const token = raw ? db.prepare(`SELECT * FROM account_tokens
-      WHERE token_hash = ? AND purpose = 'verify-email' AND consumed_at IS NULL AND expires_at > ?`).get(sha256(raw), now) : null;
+    const token = raw ? await db.get(`SELECT * FROM account_tokens
+      WHERE token_hash = ? AND purpose = 'verify-email' AND consumed_at IS NULL AND expires_at > ?`, [sha256(raw), now]) : null;
     if (!token) return res.status(400).json({ error: { code: 'TOKEN_INVALID', message: 'Verification link is invalid or expired.' } });
-    db.transaction(() => {
-      db.prepare('UPDATE account_tokens SET consumed_at = ? WHERE id = ?').run(now, token.id);
-      db.prepare('UPDATE accounts SET email_verified_at = COALESCE(email_verified_at, ?), updated_at = ? WHERE id = ?').run(now, now, token.account_id);
-      db.prepare('DELETE FROM auth_delivery_outbox WHERE token_id = ?').run(token.id);
-    })();
-    maybeBootstrapAdmin(db, token.account_id, now);
+    try {
+      await db.transaction(async () => {
+        await spendToken(db, token.id, now);
+        await db.run('UPDATE accounts SET email_verified_at = COALESCE(email_verified_at, ?), updated_at = ? WHERE id = ?', [now, now, token.account_id]);
+        await db.run('DELETE FROM auth_delivery_outbox WHERE token_id = ?', [token.id]);
+      });
+    } catch (err) {
+      if (err?.code === 'TOKEN_ALREADY_USED') return res.status(400).json({ error: { code: 'TOKEN_INVALID', message: 'Verification link is invalid or expired.' } });
+      throw err;
+    }
+    await maybeBootstrapAdmin(db, token.account_id, now);
     res.json({ ok: true });
   });
 
@@ -266,37 +286,42 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
   // windows. A confirmation can only elevate sync permission for one hour and is
   // single-use. The same guardian-held bearer remains valid after consumption
   // only for the fail-closed withdrawal route, which can never grant permission.
-  router.post('/guardian/confirm', rateLimit(db, 'guardian-confirm', { limit: 20, windowMs: 60 * 60 * 1000 }), (req, res) => {
+  router.post('/guardian/confirm', rateLimit(db, 'guardian-confirm', { limit: 20, windowMs: 60 * 60 * 1000 }), async (req, res) => {
     const raw = String(req.body?.token || '');
     const now = Date.now();
-    const token = raw ? db.prepare(`SELECT * FROM account_tokens
+    const token = raw ? await db.get(`SELECT * FROM account_tokens
       WHERE token_hash = ? AND purpose = 'guardian-consent' AND consumed_at IS NULL
-        AND created_at > ?`).get(sha256(raw), now - TOKEN_MS) : null;
+        AND created_at > ?`, [sha256(raw), now - TOKEN_MS]) : null;
     if (!token) return res.status(400).json({ error: { code: 'TOKEN_INVALID', message: 'This confirmation link is invalid or has expired.' } });
     let confirmed = false;
-    db.transaction(() => {
-      db.prepare('UPDATE account_tokens SET consumed_at = ? WHERE id = ?').run(now, token.id);
-      db.prepare('DELETE FROM auth_delivery_outbox WHERE token_id = ?').run(token.id);
-      confirmed = confirmConsent(db, token.account_id, now);
-    })();
+    try {
+      await db.transaction(async () => {
+        await spendToken(db, token.id, now);
+        await db.run('DELETE FROM auth_delivery_outbox WHERE token_id = ?', [token.id]);
+        confirmed = await confirmConsent(db, token.account_id, now);
+      });
+    } catch (err) {
+      if (err?.code === 'TOKEN_ALREADY_USED') return res.status(400).json({ error: { code: 'TOKEN_INVALID', message: 'This confirmation link is invalid or has expired.' } });
+      throw err;
+    }
     res.json({ ok: true, confirmed });
   });
 
-  router.post('/guardian/withdraw', rateLimit(db, 'guardian-withdraw', { limit: 20, windowMs: 60 * 60 * 1000 }), (req, res) => {
+  router.post('/guardian/withdraw', rateLimit(db, 'guardian-withdraw', { limit: 20, windowMs: 60 * 60 * 1000 }), async (req, res) => {
     const raw = String(req.body?.token || '');
     const now = Date.now();
     // consumed_at is deliberately ignored: after confirmation this bearer has
     // only permission-reducing authority. The account FK deletes it with the
     // account, and purpose+hash prevent it crossing accounts or action types.
-    const token = raw ? db.prepare(`SELECT * FROM account_tokens
-      WHERE token_hash = ? AND purpose = 'guardian-consent'`).get(sha256(raw)) : null;
+    const token = raw ? await db.get(`SELECT * FROM account_tokens
+      WHERE token_hash = ? AND purpose = 'guardian-consent'`, [sha256(raw)]) : null;
     if (!token) return res.status(400).json({ error: { code: 'TOKEN_INVALID', message: 'This withdrawal link is invalid.' } });
-    const withdrawn = withdrawConsent(db, token.account_id, now);
+    const withdrawn = await withdrawConsent(db, token.account_id, now);
     res.json({ ok: true, withdrawn });
   });
 
-  router.get('/guardian/state', requireSession(db), (req, res) => {
-    const state = consentState(db, req.platformSession.account_id);
+  router.get('/guardian/state', requireSession(db), async (req, res) => {
+    const state = await consentState(db, req.platformSession.account_id);
     res.json({
       required: state.required,
       state: state.state,
@@ -306,15 +331,15 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
     });
   });
 
-  router.post('/password/reset-request', rateLimit(db, 'reset-request', { limit: 6, windowMs: 60 * 60 * 1000 }), (req, res) => {
+  router.post('/password/reset-request', rateLimit(db, 'reset-request', { limit: 6, windowMs: 60 * 60 * 1000 }), async (req, res) => {
     const em = email(req.body?.email);
-    const row = em ? db.prepare('SELECT id,email FROM accounts WHERE email = ? AND deleted_at IS NULL').get(em) : null;
+    const row = em ? await db.get(`SELECT id,email FROM accounts WHERE ${db.emailEquals('email')} AND deleted_at IS NULL`, [em]) : null;
     if (row) {
       const now = Date.now();
-      db.transaction(() => {
-        invalidatePendingTokens(db, row.id, 'reset-password', now);
-        queueAccountToken(db, row.id, row.email, 'reset-password', now);
-      })();
+      await db.transaction(async () => {
+        await invalidatePendingTokens(db, row.id, 'reset-password', now);
+        await queueAccountToken(db, row.id, row.email, 'reset-password', now);
+      });
     }
     res.json({ ok: true });
   });
@@ -325,16 +350,23 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
       const password = String(req.body?.password || '');
       if (!strongPassword(password)) return res.status(400).json({ error: { code: 'WEAK_PASSWORD', message: 'Password must be at least 10 characters.' } });
       const now = Date.now();
-      const token = raw ? db.prepare(`SELECT * FROM account_tokens
-        WHERE token_hash = ? AND purpose = 'reset-password' AND consumed_at IS NULL AND expires_at > ?`).get(sha256(raw), now) : null;
+      const token = raw ? await db.get(`SELECT * FROM account_tokens
+        WHERE token_hash = ? AND purpose = 'reset-password' AND consumed_at IS NULL AND expires_at > ?`, [sha256(raw), now]) : null;
       if (!token) return res.status(400).json({ error: { code: 'TOKEN_INVALID', message: 'Reset link is invalid or expired.' } });
       const passwordHash = await bcrypt.hash(password, BCRYPT_COST);
-      db.transaction(() => {
-        db.prepare('UPDATE accounts SET password_hash = ?, updated_at = ? WHERE id = ?').run(passwordHash, now, token.account_id);
-        db.prepare('UPDATE account_tokens SET consumed_at = ? WHERE id = ?').run(now, token.id);
-        db.prepare('UPDATE account_sessions SET revoked_at = ? WHERE account_id = ? AND revoked_at IS NULL').run(now, token.account_id);
-        db.prepare('DELETE FROM auth_delivery_outbox WHERE token_id = ?').run(token.id);
-      })();
+      try {
+        await db.transaction(async () => {
+          // Spent first: of two concurrent resets with one link, exactly one
+          // sets the password; the other changes nothing.
+          await spendToken(db, token.id, now);
+          await db.run('UPDATE accounts SET password_hash = ?, updated_at = ? WHERE id = ?', [passwordHash, now, token.account_id]);
+          await db.run('UPDATE account_sessions SET revoked_at = ? WHERE account_id = ? AND revoked_at IS NULL', [now, token.account_id]);
+          await db.run('DELETE FROM auth_delivery_outbox WHERE token_id = ?', [token.id]);
+        });
+      } catch (err) {
+        if (err?.code === 'TOKEN_ALREADY_USED') return res.status(400).json({ error: { code: 'TOKEN_INVALID', message: 'Reset link is invalid or expired.' } });
+        throw err;
+      }
       clearSessionCookies(res);
       res.json({ ok: true, signInRequired: true });
     } catch (err) { next(err); }
@@ -345,7 +377,7 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
       const currentPassword = String(req.body?.currentPassword || '');
       const newPassword = String(req.body?.newPassword || '');
       if (!strongPassword(newPassword)) return res.status(400).json({ error: { code: 'WEAK_PASSWORD', message: 'New password must be at least 10 characters.' } });
-      const account = db.prepare('SELECT * FROM accounts WHERE id = ? AND deleted_at IS NULL').get(req.platformSession.account_id);
+      const account = await db.get('SELECT * FROM accounts WHERE id = ? AND deleted_at IS NULL', [req.platformSession.account_id]);
       if (!account?.password_hash) return res.status(409).json({ error: { code: 'PASSWORD_NOT_CONFIGURED', message: 'This account uses a linked identity provider and has no password to change.' } });
       if (!(await bcrypt.compare(currentPassword, account.password_hash))) {
         return res.status(401).json({ error: { code: 'REAUTH_REQUIRED', message: 'Current password is incorrect.' } });
@@ -357,18 +389,18 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
       const now = Date.now();
       const deviceId = req.platformSession.device_id;
       const passwordHash = await bcrypt.hash(newPassword, BCRYPT_COST);
-      db.transaction(() => {
-        db.prepare('UPDATE accounts SET password_hash = ?, updated_at = ? WHERE id = ?').run(passwordHash, now, account.id);
-        db.prepare('UPDATE account_sessions SET revoked_at = ? WHERE account_id = ? AND revoked_at IS NULL').run(now, account.id);
-      })();
-      createSession(db, res, account.id, deviceId, req.get('user-agent') || '', now);
+      await db.transaction(async () => {
+        await db.run('UPDATE accounts SET password_hash = ?, updated_at = ? WHERE id = ?', [passwordHash, now, account.id]);
+        await db.run('UPDATE account_sessions SET revoked_at = ? WHERE account_id = ? AND revoked_at IS NULL', [now, account.id]);
+      });
+      await createSession(db, res, account.id, deviceId, req.get('user-agent') || '', now);
       res.json({ ok: true, account: publicAccount(account), sessionsRotated: true });
     } catch (err) { next(err); }
   });
 
-  router.get('/devices', requireSession(db), (req, res) => {
-    const rows = db.prepare(`SELECT id,device_id,created_at,last_seen_at,expires_at FROM account_sessions
-      WHERE account_id = ? AND revoked_at IS NULL AND expires_at > ? ORDER BY last_seen_at DESC`).all(req.platformSession.account_id, Date.now());
+  router.get('/devices', requireSession(db), async (req, res) => {
+    const rows = await db.all(`SELECT id,device_id,created_at,last_seen_at,expires_at FROM account_sessions
+      WHERE account_id = ? AND revoked_at IS NULL AND expires_at > ? ORDER BY last_seen_at DESC`, [req.platformSession.account_id, Date.now()]);
     res.json({ devices: rows.map(row => ({
       id: row.id,
       deviceId: row.device_id,
@@ -379,22 +411,21 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
     })) });
   });
 
-  router.delete('/devices/:sessionId', requireSession(db), (req, res) => {
+  router.delete('/devices/:sessionId', requireSession(db), async (req, res) => {
     const sessionId = String(req.params.sessionId || '');
     const current = sessionId === req.platformSession.id;
-    const info = db.prepare('UPDATE account_sessions SET revoked_at = ? WHERE id = ? AND account_id = ? AND revoked_at IS NULL')
-      .run(Date.now(), sessionId, req.platformSession.account_id);
+    const info = await db.run('UPDATE account_sessions SET revoked_at = ? WHERE id = ? AND account_id = ? AND revoked_at IS NULL', [Date.now(), sessionId, req.platformSession.account_id]);
     if (current && info.changes === 1) clearSessionCookies(res);
     res.json({ revoked: info.changes === 1, current });
   });
 
-  router.get('/export', requireSession(db), (req, res) => {
+  router.get('/export', requireSession(db), async (req, res) => {
     const accountId = req.platformSession.account_id;
-    const account = db.prepare('SELECT id,email,name,role,email_verified_at,created_at,updated_at FROM accounts WHERE id = ?').get(accountId);
-    const events = db.prepare('SELECT id,device_id,device_seq,kind,entity_id,occurred_at,payload_json,created_at FROM learning_events WHERE account_id = ? ORDER BY server_cursor').all(accountId);
-    const entities = db.prepare('SELECT kind,entity_id,version,body_json,tombstone,updated_at FROM sync_entities WHERE account_id = ?').all(accountId);
-    const classes = db.prepare(`SELECT c.id,c.name,cm.joined_at FROM class_members cm JOIN classes c ON c.id=cm.class_id
-      WHERE cm.student_account_id=? AND cm.removed_at IS NULL`).all(accountId);
+    const account = await db.get('SELECT id,email,name,role,email_verified_at,created_at,updated_at FROM accounts WHERE id = ?', [accountId]);
+    const events = await db.all('SELECT id,device_id,device_seq,kind,entity_id,occurred_at,payload_json,created_at FROM learning_events WHERE account_id = ? ORDER BY server_cursor', [accountId]);
+    const entities = await db.all('SELECT kind,entity_id,version,body_json,tombstone,updated_at FROM sync_entities WHERE account_id = ?', [accountId]);
+    const classes = await db.all(`SELECT c.id,c.name,cm.joined_at FROM class_members cm JOIN classes c ON c.id=cm.class_id
+      WHERE cm.student_account_id=? AND cm.removed_at IS NULL`, [accountId]);
     res.set('Cache-Control', 'no-store');
     res.json({ format: 'pri-account-export-v1', exportedAt: Date.now(), account, learningEvents: events, entities, classes });
   });
@@ -402,13 +433,13 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
   router.delete('/', requireSession(db), rateLimit(db, 'account-delete', { limit: 3, windowMs: 24 * 60 * 60 * 1000 }), async (req, res, next) => {
     try {
       const body = req.body || {};
-      if (body.provider && !consumeOidcNonce(db, body.nonce)) {
+      if (body.provider && !(await consumeOidcNonce(db, body.nonce))) {
         return res.status(401).json({ error: { code: 'OIDC_NONCE_INVALID', message: 'Request a fresh sign-in nonce before confirming your identity.' } });
       }
       await authorizeAccountDeletion(db, req.platformSession.account_id, body);
       const accountId = req.platformSession.account_id;
       if (typeof beforeDelete === 'function') await beforeDelete({ accountId, request: req });
-      db.prepare('DELETE FROM accounts WHERE id = ?').run(accountId);
+      await db.run('DELETE FROM accounts WHERE id = ?', [accountId]);
       clearSessionCookies(res);
       res.json({ deleted: true });
     } catch (error) {

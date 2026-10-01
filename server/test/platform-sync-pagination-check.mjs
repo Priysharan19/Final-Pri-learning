@@ -10,16 +10,16 @@ function addAccount(id, email) {
     VALUES (?, ?, ?, 'student', ?, ?)`).run(id, email, id, now, now);
 }
 
-function addEvent(accountId, id, deviceId, deviceSeq) {
-  const cursor = nextSyncCursor(db);
+async function addEvent(accountId, id, deviceId, deviceSeq) {
+  const cursor = await nextSyncCursor(db);
   db.prepare(`INSERT INTO learning_events(server_cursor,id,account_id,device_id,device_seq,kind,entity_id,occurred_at,payload_json,created_at)
     VALUES (?,?,?,?,?,'practice-progress',NULL,?, '{}',?)`)
     .run(cursor, id, accountId, deviceId, deviceSeq, now, now);
   return cursor;
 }
 
-function addEntity(accountId, entityId, version = 1) {
-  const cursor = nextSyncCursor(db);
+async function addEntity(accountId, entityId, version = 1) {
+  const cursor = await nextSyncCursor(db);
   db.prepare(`INSERT INTO sync_entities(account_id,kind,entity_id,version,server_cursor,body_json,tombstone,updated_at)
     VALUES (?,'bookmark',?,?,?,'{"present":true}',0,?)`)
     .run(accountId, entityId, version, cursor, now);
@@ -29,12 +29,12 @@ function addEntity(accountId, entityId, version = 1) {
 addAccount('acct-a', 'a@example.test');
 addAccount('acct-b', 'b@example.test');
 
-const a1 = addEvent('acct-a', 'evt-a-1', 'device-a', 1);
-const b1 = addEvent('acct-b', 'evt-b-1', 'device-b', 1);
+const a1 = await addEvent('acct-a', 'evt-a-1', 'device-a', 1);
+const b1 = await addEvent('acct-b', 'evt-b-1', 'device-b', 1);
 
 // Regression: another account advancing the global sync cursor must not make
 // acct-a believe it has another page forever.
-const isolated = syncPullPage(db, 'acct-a', 0);
+const isolated = await syncPullPage(db, 'acct-a', 0);
 assert.equal(isolated.cursor, a1);
 assert.equal(isolated.hasMore, false);
 assert.deepEqual(isolated.events.map(event => event.id), ['evt-a-1']);
@@ -43,23 +43,23 @@ assert.ok(b1 > isolated.cursor, 'fixture must advance the global cursor with ano
 
 // Account-scoped pagination must continue across gaps created by other users,
 // then stop exactly when this account has no remaining rows.
-const a2 = addEntity('acct-a', 'question-1');
-addEvent('acct-b', 'evt-b-2', 'device-b', 2);
-const a3 = addEvent('acct-a', 'evt-a-2', 'device-a', 2);
+const a2 = await addEntity('acct-a', 'question-1');
+await addEvent('acct-b', 'evt-b-2', 'device-b', 2);
+const a3 = await addEvent('acct-a', 'evt-a-2', 'device-a', 2);
 
-const page1 = syncPullPage(db, 'acct-a', a1, 1);
+const page1 = await syncPullPage(db, 'acct-a', a1, 1);
 assert.equal(page1.cursor, a2);
 assert.equal(page1.hasMore, true);
 assert.equal(page1.events.length, 0);
 assert.deepEqual(page1.entities.map(entity => entity.entityId), ['question-1']);
 
-const page2 = syncPullPage(db, 'acct-a', page1.cursor, 1);
+const page2 = await syncPullPage(db, 'acct-a', page1.cursor, 1);
 assert.equal(page2.cursor, a3);
 assert.equal(page2.hasMore, false);
 assert.deepEqual(page2.events.map(event => event.id), ['evt-a-2']);
 assert.equal(page2.entities.length, 0);
 
-const empty = syncPullPage(db, 'acct-a', page2.cursor, 1);
+const empty = await syncPullPage(db, 'acct-a', page2.cursor, 1);
 assert.equal(empty.cursor, a3);
 assert.equal(empty.hasMore, false);
 assert.equal(empty.events.length, 0);

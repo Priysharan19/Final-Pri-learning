@@ -16,6 +16,37 @@ function productionDbPathValid() {
 }
 
 /**
+ * PRI_DATABASE_URL selects the Postgres driver (ADR-0001). When it is set it
+ * is the platform database, and PRI_PLATFORM_DB is neither required nor used.
+ */
+export function platformDatabaseUrl(env = process.env) {
+  const value = String(env.PRI_DATABASE_URL || '').trim();
+  return value || null;
+}
+
+export function validPostgresUrl(value) {
+  try {
+    const url = new URL(String(value || ''));
+    return (url.protocol === 'postgres:' || url.protocol === 'postgresql:') && !!url.hostname;
+  } catch {
+    return false;
+  }
+}
+
+function postgresSelected() {
+  return !!platformDatabaseUrl();
+}
+
+function postgresValid() {
+  return validPostgresUrl(platformDatabaseUrl());
+}
+
+/** Persistent storage is either a valid Postgres URL or an absolute SQLite path. */
+function productionStorageValid() {
+  return postgresSelected() ? postgresValid() : productionDbPathValid();
+}
+
+/**
  * Resolve the platform database path at process startup.
  *
  * Development and focused contracts may use the repository-local default or an
@@ -27,6 +58,8 @@ function productionDbPathValid() {
 export function platformDatabasePath() {
   const path = configuredDbPath();
   if (process.env.NODE_ENV !== 'production') return path;
+  // Postgres is the platform database; no SQLite file is opened.
+  if (postgresSelected()) return null;
   if (!path) {
     throw Object.assign(new Error('PRI_PLATFORM_DB is required in production and must point to persistent storage.'), {
       code: 'PLATFORM_DB_NOT_CONFIGURED'
@@ -100,7 +133,7 @@ export function platformConfigStatus() {
   if (production && !nonEmpty('PRI_PUBLIC_ORIGIN')) missing.push('PRI_PUBLIC_ORIGIN');
   if (production && !nonEmpty('PRI_CSRF_SECRET')) missing.push('PRI_CSRF_SECRET');
   if (production && !nonEmpty('PRI_AUTH_DELIVERY_KEY')) missing.push('PRI_AUTH_DELIVERY_KEY');
-  if (production && !configuredDbPath()) missing.push('PRI_PLATFORM_DB');
+  if (production && !postgresSelected() && !configuredDbPath()) missing.push('PRI_PLATFORM_DB');
   // A configured provider key is a licence to spend real money on every request
   // that reaches it. Per-account limits bound one student; only these bound the
   // bill. No default: too low kills the feature quietly under load and too high
@@ -136,8 +169,10 @@ export function platformConfigStatus() {
   return Object.freeze({
     production,
     missing: Object.freeze(uniqueMissing),
-    ok: uniqueMissing.length === 0 && (!production || productionDbPathValid()),
-    persistentDatabaseConfigured: production ? productionDbPathValid() : !!configuredDbPath(),
+    ok: uniqueMissing.length === 0 && (!production || productionStorageValid()),
+    persistentDatabaseConfigured: postgresSelected()
+      ? postgresValid()
+      : (production ? productionDbPathValid() : !!configuredDbPath()),
     googleConfigured: nonEmpty('PRI_GOOGLE_CLIENT_IDS'),
     appleConfigured: nonEmpty('PRI_APPLE_CLIENT_IDS'),
     authEmailProviderConfigured: authEmailConfigured(),
@@ -152,7 +187,10 @@ export function platformConfigStatus() {
 export function assertPlatformConfig() {
   const status = platformConfigStatus();
   if (!status.ok) {
-    if (status.production && configuredDbPath() && !productionDbPathValid()) {
+    if (status.production && postgresSelected() && !postgresValid()) {
+      throw new Error('Pri Learning production platform configuration is incomplete: PRI_DATABASE_URL must be a postgres:// URL');
+    }
+    if (status.production && !postgresSelected() && configuredDbPath() && !productionDbPathValid()) {
       throw new Error('Pri Learning production platform configuration is incomplete: PRI_PLATFORM_DB must be an absolute persistent path');
     }
     throw new Error(`Pri Learning production platform configuration is incomplete: ${status.missing.join(', ')}`);

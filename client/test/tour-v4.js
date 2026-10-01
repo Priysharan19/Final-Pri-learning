@@ -6,12 +6,14 @@
 // answers for eleven questions across a clock, and then marks the lot in a
 // single pass. Nothing outside a browser can drive that.
 //
-// HOW A CORRECT EXAM ANSWER IS KNOWN. The app already publishes it: every paper
-// can be printed with its marking criteria and worked solutions behind it, and
-// that sheet is a real feature students use. So this flow prints the paper it
-// was just given, reads the stated answers off the sheet, types them back into
-// the room, and requires them to be marked right — which is exactly the claim
-// the printed sheet makes. One question is answered with nonsense on purpose,
+// HOW A CORRECT EXAM ANSWER IS KNOWN. A paper still being sat prints as a
+// question paper only — no answers, steps or criteria until it is submitted
+// (#230, assessment integrity) — so the flow first proves the in-progress sheet
+// states nothing. The answers come instead from the stored question payloads,
+// the same canonical form backend-check and selfcheck use. They are typed into
+// the room and must be marked right; after submission the printed sheet must
+// state an answer for every question, and must agree with what the marker
+// accepted for each one it was given. One question is answered with nonsense on purpose,
 // so the flow proves the marker can say no as well as yes, and the arithmetic
 // of the final score is checked against the per-question marks rather than
 // taken on trust.
@@ -23,7 +25,7 @@ import { pathToFileURL } from 'node:url';
 const YEAR = 9;
 const LENGTH = 10;
 const NONSENSE = 'zzz-not-an-answer';
-const ANSWER_WITH_SOLUTION = 6;   // how many questions to answer from the printed sheet
+const ANSWER_WITH_SOLUTION = 6;   // how many questions to answer from the stored solutions
 
 // Every route in the sidebar, with the title the shell is supposed to set for
 // it. A page that renders the wrong route still renders; the title is what says
@@ -61,6 +63,34 @@ const paperAnswers = (page) => page.evaluate(() => {
   }
   return [...best.entries()];
 });
+
+/**
+ * The canonical typed answer for each stored question on a paper, keyed by
+ * question number — read from the device's own question store. The API never
+ * hands answers back mid-paper, so this is the test's oracle, as in
+ * backend-check.mjs (numeric/expression/set/point/ratio answers only).
+ */
+const storedAnswers = (page, examId) => page.evaluate(async (examId) => {
+  const db = await new Promise((ok, no) => { const r = indexedDB.open('pri-learning'); r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error); });
+  const get = (store, key) => new Promise((ok, no) => { const r = db.transaction(store).objectStore(store).get(key); r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error); });
+  const exam = await get('exams', examId);
+  const out = [];
+  for (const [i, qid] of (exam?.questionIds || []).entries()) {
+    const q = (await get('questions', qid))?.payload;
+    const a = q?.answer;
+    if (!q || !a || q.multipart) continue;
+    let typed = null;
+    if (a.canonicalInput !== undefined) typed = String(a.canonicalInput);
+    else if (q.answerType === 'numeric') typed = a.surdForm ? `${a.surdForm.k === 1 ? '' : a.surdForm.k === -1 ? '-' : a.surdForm.k}sqrt(${a.surdForm.r})` : a.simplestFraction ? `${a.simplestFraction.n}/${a.simplestFraction.d}` : a.requireExact ? null : String(a.value);
+    else if (q.answerType === 'expression') typed = a.expr;
+    else if (q.answerType === 'set') typed = a.values.join(', ');
+    else if (q.answerType === 'point') typed = `(${a.x}, ${a.y})`;
+    else if (q.answerType === 'ratio') typed = `${a.a}:${a.b}`;
+    if (typed) out.push([i + 1, typed]);
+  }
+  db.close();
+  return out;
+}, examId);
 
 /** The printed answer, less whatever the answer row already prints around the box. */
 async function stripFurniture(page, mathText, stated) {
@@ -145,17 +175,22 @@ export const flow = {
       /\b0\/\d+ answered/.test(await page.locator('.exam-head').innerText()),
       `head reads ${JSON.stringify(await page.locator('.exam-head').innerText())}`);
 
-    // ── 3 · the paper prints with its own solutions ──────────────────────────
+    // ── 3 · an unfinished paper prints as a question paper only ──────────────
     await page.goto(`${base}/exams`, { waitUntil: 'domcontentloaded' });
     await page.waitForSelector('.prio-item', { timeout: 30000 });
     await check('an unfinished paper is listed as in progress',
       (await page.locator('.prio-item').first().innerText()).includes('In progress'));
     await page.locator('.prio-item button[title*="printable"]').first().click();
     await page.waitForSelector('.paper-sheet', { timeout: 30000 });
-    const stated = new Map(await paperAnswers(page));
-    await check('the printed paper states an answer for every single question',
-      stated.size === LENGTH, `${stated.size} stated answers for ${LENGTH} single questions`);
+    const leaked = new Map(await paperAnswers(page));
+    await check('the printed paper of an unfinished exam states no answers (#230)',
+      leaked.size === 0, `${leaked.size} answers printed while the paper is still being sat`);
+    await check('the printed paper of an unfinished exam has no worked solutions section',
+      !/Marking criteria & worked solutions/.test(await page.locator('.paper-sheet').innerText()));
     await page.getByRole('button', { name: 'Close' }).click();
+    const stated = new Map(await storedAnswers(page, examId));
+    await check('the stored paper yields a typed answer for enough single questions',
+      stated.size >= ANSWER_WITH_SOLUTION, `${stated.size} stored answers for ${LENGTH} single questions`);
 
     // ── 4 · the paper is sat ─────────────────────────────────────────────────
     await page.goto(`${base}/exams/${examId}`, { waitUntil: 'domcontentloaded' });
@@ -173,11 +208,10 @@ export const flow = {
       const n = i + 1;
       const say = stated.get(n);
       if (!say) continue;
-      // The printed sheet states the whole answer — "θ = 29 °", "6 % p.a." —
-      // but the room already prints the prefix and the unit either side of the
-      // box, so what a student types into it is the part in between. Typing the
-      // unit back in as well is a different question (whether the checker
-      // tolerates it) and not the one this flow is asking.
+      // The stored canonical answer is the bare value; the room already prints
+      // any prefix and unit either side of the box, so strip them in case the
+      // canonical form carries them. Typing the unit back in as well is a
+      // different question (whether the checker tolerates it).
       const typed = await stripFurniture(page, mathText, say);
       await answerBox.fill(typed);
       answered.push({ n, typed });
@@ -192,9 +226,9 @@ export const flow = {
       nonsenseAt = i + 1;
     }
 
-    if (!await check(`${ANSWER_WITH_SOLUTION} questions were answered from the printed solutions`,
+    if (!await check(`${ANSWER_WITH_SOLUTION} questions were answered from the stored solutions`,
       answered.length === ANSWER_WITH_SOLUTION,
-      `only ${answered.length} of the ${dots} questions took a typed answer the sheet had stated`)) return;
+      `only ${answered.length} of the ${dots} questions took a typed stored answer`)) return;
     if (!await check('one question was answered with nonsense on purpose', nonsenseAt !== null)) return;
 
     await check('the paper counts what has been answered',
@@ -221,7 +255,7 @@ export const flow = {
     // ── 6 · the marking is right, question by question ───────────────────────
     for (const { n, typed } of answered) {
       const row = rows.find(r => r.n === n);
-      await check(`Q${n} answered from the paper's own solution (${JSON.stringify(typed)}) is marked correct`,
+      await check(`Q${n} answered from the paper's own stored solution (${JSON.stringify(typed)}) is marked correct`,
         !!row && row.awarded === row.marks && row.marks >= 1,
         row ? `awarded ${row.awarded} of ${row.marks} marks` : 'no review row for that question');
     }
@@ -256,6 +290,20 @@ export const flow = {
     await check('the finished paper is filed with its score',
       (await page.locator('.prio-item').first().innerText()).includes(`${score}/${total}`),
       `row reads ${JSON.stringify((await page.locator('.prio-item').first().innerText()).replace(/\s+/g, ' '))}`);
+
+    // ── 9 · once submitted, the paper prints with its own solutions ──────────
+    await page.locator('.prio-item button[title*="printable"]').first().click();
+    await page.waitForSelector('.paper-sheet', { timeout: 30000 });
+    const printed = new Map(await paperAnswers(page));
+    await check('the printed paper of a submitted exam states an answer for every single question',
+      printed.size === LENGTH, `${printed.size} stated answers for ${LENGTH} single questions`);
+    for (const { n } of answered) {
+      const row = rows.find(r => r.n === n);
+      await check(`Q${n} has a printed answer on the submitted paper, and it was marked correct`,
+        !!printed.get(n) && !!row && row.awarded === row.marks,
+        `printed ${JSON.stringify(printed.get(n))}, awarded ${row?.awarded} of ${row?.marks}`);
+    }
+    await page.getByRole('button', { name: 'Close' }).click();
   }
 };
 

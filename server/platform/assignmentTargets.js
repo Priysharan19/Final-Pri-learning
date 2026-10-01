@@ -14,6 +14,7 @@
 // No answer, prompt, working or handwriting ever exists in this data.
 import { IN_CHAPTER_BY_ID, IN_TRACKS } from './india-syllabus.generated.js';
 import { sanitizeAssignmentSummary } from './assignmentProgress.js';
+import { asStore } from './store.js';
 
 const ID = /^[A-Za-z0-9._-]{1,80}$/;
 const MAX_TARGET_CHAPTERS = 20;
@@ -196,17 +197,21 @@ function studentFlags({ joinedAt, assignments, submissions, now }) {
 }
 
 /** Aggregated analytics for one class: students, assignments, chapters, attention. */
-export function classAnalytics(db, classId, now = Date.now()) {
-  const members = db.prepare(`SELECT a.id,a.name,cm.joined_at FROM class_members cm JOIN accounts a ON a.id=cm.student_account_id
-    WHERE cm.class_id=? AND cm.removed_at IS NULL AND a.deleted_at IS NULL ORDER BY a.name COLLATE NOCASE,a.id`).all(classId);
-  const assignmentRowsRaw = db.prepare(`SELECT id,title,specification_json,due_at,created_at FROM assignments
-    WHERE class_id=? AND archived_at IS NULL ORDER BY created_at,id`).all(classId);
-  const submissionsRaw = db.prepare(`SELECT s.assignment_id,s.student_account_id,s.state,s.summary_json,s.started_at,s.submitted_at,s.updated_at,
+export async function classAnalytics(db, classId, now = Date.now()) {
+  db = asStore(db);
+  // One snapshot: members, assignments and submissions read together.
+  const { members, assignmentRowsRaw, submissionsRaw } = await db.transaction(async () => ({
+    members: await db.all(`SELECT a.id,a.name,cm.joined_at FROM class_members cm JOIN accounts a ON a.id=cm.student_account_id
+    WHERE cm.class_id=? AND cm.removed_at IS NULL AND a.deleted_at IS NULL ORDER BY ${db.nocaseOrder('a.name')},${db.binaryText('a.id')}`, [classId]),
+    assignmentRowsRaw: await db.all(`SELECT id,title,specification_json,due_at,created_at FROM assignments
+    WHERE class_id=? AND archived_at IS NULL ORDER BY created_at,${db.binaryText('id')}`, [classId]),
+    submissionsRaw: await db.all(`SELECT s.assignment_id,s.student_account_id,s.state,s.summary_json,s.started_at,s.submitted_at,s.updated_at,
       f.feedback_json,f.returned_at
     FROM assignment_submissions s
     JOIN assignments a ON a.id=s.assignment_id
     LEFT JOIN assignment_feedback f ON f.assignment_id=s.assignment_id AND f.student_account_id=s.student_account_id
-    WHERE a.class_id=? AND a.archived_at IS NULL`).all(classId);
+    WHERE a.class_id=? AND a.archived_at IS NULL`, [classId])
+  }), { readOnly: true });
 
   const assignments = assignmentRowsRaw.map(row => ({
     id: row.id, title: row.title, dueAt: row.due_at || null, createdAt: row.created_at,
