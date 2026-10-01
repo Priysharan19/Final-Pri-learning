@@ -272,7 +272,7 @@ export default {
   'history.filterAll': 'सभी',
   'history.filterWrong': 'गलत',
   'history.filterCorrect': 'सही',
-  'history.filterBookmarked': 'सहेजे गए',
+  'history.filterBookmarked': 'बुकमार्क',
   'history.filterInk': 'हाथ से लिखे',
   'history.filterGroup': 'अपना इतिहास छाँटें',
   'history.modePractice': 'अभ्यास',
