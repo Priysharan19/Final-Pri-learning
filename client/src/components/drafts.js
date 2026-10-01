@@ -10,6 +10,7 @@
 // Keys: pri.draft.<profileId>.<scope>.<id>
 // ─────────────────────────────────────────────────────────────────────────────
 import { currentPid } from '../local/store.js';
+import { priNative } from '../platform/native/index.js';
 
 const PREFIX = 'pri.draft.';
 const VERSION = 1;
@@ -85,6 +86,12 @@ function hookFlush() {
   window.addEventListener('pagehide', flushDrafts);
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') flushDrafts();
+  });
+  // Native shells also report app state (CP-02). iOS/Android may suspend and
+  // then kill a backgrounded app without a pagehide, so flush on the shell's
+  // own `inactive`/`background` signal too. Browsers keep the hooks above.
+  priNative.lifecycle.on(state => {
+    if (state === 'background' || state === 'inactive') flushDrafts();
   });
 }
 

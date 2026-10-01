@@ -1,17 +1,16 @@
 // Pri Learning · audited cloud transport boundary
 //
 // This is the only client module permitted to open production HTTP connections.
-// In a browser it uses fetch. In the bundled iOS shell it delegates the same
-// bounded request contract to NativeCloudBridge, which owns HTTPS cookies/CSRF
-// outside the `prilearning://` WKWebView. All learning UI remains offline-first.
+// In a browser it uses fetch. Inside a native shell it delegates the same
+// bounded request contract to the shell's cloud capability through priNative
+// (CP-02) — on Apple that is NativeCloudBridge, which owns HTTPS cookies/CSRF
+// outside the `prilearning://` WKWebView. JavaScript never sees those cookies.
+import { priNative } from './native/index.js';
 
 const DEFAULT_TIMEOUT_MS = 12_000;
 const MAX_RESPONSE_BYTES = 2 * 1024 * 1024;
 const PATH = /^\/v1\/[A-Za-z0-9/_-]{1,180}$/;
 const SAFE_ID = /^[A-Za-z0-9._:-]{1,160}$/;
-const NATIVE_RESPONSE_EVENT = 'pri:native-cloud-response';
-const nativePending = new Map();
-let nativeListenerInstalled = false;
 
 // Cloud origin discovery, in order of authority:
 //   1. the origin that served this page, when it is the Pri platform server
@@ -114,14 +113,10 @@ export function normalizeCloudOrigin(raw = envOrigin()) {
   return url.origin;
 }
 
-function nativeCloudHandler() {
-  return globalThis?.webkit?.messageHandlers?.priCloud || null;
-}
-
+// Fails closed: the shell advertises `cloud` only with `configured: true` when
+// its signed release metadata names an HTTPS cloud origin.
 export function nativeCloudAvailable() {
-  return globalThis.__PRI_NATIVE_CLOUD__ === true &&
-    globalThis.__PRI_NATIVE_CLOUD_CONFIGURED__ === true &&
-    typeof nativeCloudHandler()?.postMessage === 'function';
+  return priNative.cloud.available();
 }
 
 export function cloudAvailable() {
@@ -161,80 +156,35 @@ function parseJson(text) {
   }
 }
 
-function installNativeListener() {
-  if (nativeListenerInstalled || typeof window === 'undefined') return;
-  nativeListenerInstalled = true;
-  window.addEventListener(NATIVE_RESPONSE_EVENT, event => {
-    const detail = event?.detail;
-    const id = String(detail?.id || '');
-    const waiting = nativePending.get(id);
-    if (!waiting) return;
-    nativePending.delete(id);
-    clearTimeout(waiting.timer);
-    if (waiting.signal) waiting.signal.removeEventListener('abort', waiting.abort);
-    if (detail?.error) {
-      const err = new Error(detail.error.message || 'Native cloud request failed.');
-      err.code = detail.error.code || 'NATIVE_CLOUD_ERROR';
-      waiting.reject(err);
-      return;
-    }
-    waiting.resolve(detail || {});
-  });
+// Native errors arrive in the closed priNative model; keep this module's
+// long-standing contract for callers: DOMException TimeoutError/AbortError for
+// timeouts and aborts, and CLOUD_* / provider codes on everything else.
+function nativeFailure(error, signal) {
+  if (error?.code === 'TIMEOUT') return new DOMException('Timed out', 'TimeoutError');
+  if (error?.code === 'CANCELLED') return signal?.reason instanceof Error ? signal.reason : new DOMException('Aborted', 'AbortError');
+  const err = new Error(error?.message || 'Native cloud request failed.');
+  err.code = error?.code === 'UNAVAILABLE' && !error?.detail?.providerCode
+    ? 'CLOUD_DISABLED'
+    : (error?.detail?.providerCode || 'NATIVE_CLOUD_ERROR');
+  return err;
 }
 
-function nativeRequest(path, {
+async function nativeRequest(path, {
   method, payload, idempotencyKey, timeoutMs, signal, serverRequestId
 }) {
-  const bridge = nativeCloudHandler();
-  if (!nativeCloudAvailable() || !bridge) {
+  if (!nativeCloudAvailable()) {
     const err = new Error('Native Pri cloud transport is not configured. Offline learning remains available.');
     err.code = 'CLOUD_DISABLED';
-    return Promise.reject(err);
+    throw err;
   }
-  installNativeListener();
-  const id = `native-${requestId()}`.slice(0, 120);
-  return new Promise((resolve, reject) => {
-    const timeout = Math.max(1000, Math.min(60_000, Number(timeoutMs) || DEFAULT_TIMEOUT_MS));
-    const abort = () => {
-      if (!nativePending.has(id)) return;
-      nativePending.delete(id);
-      clearTimeout(timer);
-      try { bridge.postMessage({ id, action: 'cancel' }); } catch {}
-      const err = signal?.reason instanceof Error ? signal.reason : new DOMException('Aborted', 'AbortError');
-      reject(err);
-    };
-    const timer = setTimeout(() => {
-      if (!nativePending.has(id)) return;
-      nativePending.delete(id);
-      try { bridge.postMessage({ id, action: 'cancel' }); } catch {}
-      const err = new DOMException('Timed out', 'TimeoutError');
-      reject(err);
-    }, timeout);
-    nativePending.set(id, { resolve, reject, timer, signal, abort });
-    if (signal) {
-      if (signal.aborted) {
-        abort();
-        return;
-      }
-      signal.addEventListener('abort', abort, { once: true });
-    }
-    try {
-      bridge.postMessage({
-        id,
-        action: 'request',
-        path,
-        method,
-        requestId: serverRequestId,
-        ...(idempotencyKey ? { idempotencyKey: String(idempotencyKey).slice(0, 160) } : {}),
-        ...(payload === undefined ? {} : { body: payload })
-      });
-    } catch (error) {
-      nativePending.delete(id);
-      clearTimeout(timer);
-      if (signal) signal.removeEventListener('abort', abort);
-      reject(error);
-    }
-  });
+  try {
+    return await priNative.cloud.request(
+      { path, method, body: payload, requestId: serverRequestId, idempotencyKey: idempotencyKey || undefined },
+      { timeoutMs: Math.max(1000, Math.min(60_000, Number(timeoutMs) || DEFAULT_TIMEOUT_MS)), signal }
+    );
+  } catch (error) {
+    throw nativeFailure(error, signal);
+  }
 }
 
 export async function cloudRequest(path, {

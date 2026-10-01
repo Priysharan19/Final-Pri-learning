@@ -4,23 +4,43 @@
 // files — AirDrop, USB, email, LMS upload — no server needed, ever.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Download a JS object as a pretty-printed .json file. */
-export function downloadJSON(obj, filename) {
-  // Inside the native iPad app, hand the file to Swift — it opens the iOS
-  // share sheet (AirDrop, Files, Mail…), which is the native way to export.
-  const native = window.webkit?.messageHandlers?.priShare;
-  if (window.__PRI_NATIVE__ && native) {
-    native.postMessage({ filename, content: JSON.stringify(obj, null, 2) });
-    return;
+import { priNative } from '../platform/native/index.js';
+
+/**
+ * Save or share a text file. Inside a native shell the file goes to the
+ * platform share sheet (AirDrop, Files, Mail…; Android's chooser) through
+ * priNative; in a browser it downloads. The blob URL outlives the click so the
+ * browser (or WKDownload) can finish reading it before it is revoked.
+ */
+export function saveTextFile(text, filename, mimeType = 'application/json') {
+  if (priNative.share.available()) {
+    // Fall back only when sharing is unusable — never after a TIMEOUT, which
+    // means a share sheet may still be open (a second one would appear).
+    return priNative.share.file({ filename, mimeType, text }).catch(error => {
+      if (['UNSUPPORTED', 'UNAVAILABLE', 'TOO_LARGE'].includes(error?.code)) return downloadText(text, filename, mimeType);
+      throw error;
+    });
   }
-  const blob = new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' });
+  return Promise.resolve(downloadText(text, filename, mimeType));
+}
+
+function downloadText(text, filename, mimeType) {
+  if (typeof document === 'undefined') return { completed: false };
+  const blob = new Blob([text], { type: mimeType });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = filename;
+  a.rel = 'noopener';
   document.body.appendChild(a);
   a.click();
   a.remove();
-  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  setTimeout(() => URL.revokeObjectURL(a.href), 30_000);
+  return { completed: true };
+}
+
+/** Download/share a JS object as a pretty-printed .json file. */
+export function downloadJSON(obj, filename) {
+  return saveTextFile(JSON.stringify(obj, null, 2), filename, 'application/json');
 }
 
 /** Read a picked File as parsed JSON (rejects with a friendly message). */
