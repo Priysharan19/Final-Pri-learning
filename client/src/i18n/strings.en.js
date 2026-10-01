@@ -436,6 +436,7 @@ export default {
   'verdict.thisLooksLikeTitle': 'This looks like: {title}',
   'verdict.readingWork': 'Reading your handwriting…',
   'verdict.readOnServer': 'Read on the server',
+  'ink.hintEachLine': 'Write each step on its own line · stylus or finger',
   'verdict.removeAttachment': 'Remove attachment',
   'verdict.readingWithVision': 'Reading your handwriting on-device with Apple Vision…',
   'verdict.decodedOnDevice': 'Decoded on-device',
@@ -592,8 +593,8 @@ export default {
   'settings.passwordNote': 'At least {min} characters. Stored as a salted PBKDF2 hash in this device’s storage — it locks your profile on this device, and is never uploaded anywhere.',
 
   'settings.handwriting': '✒ Handwriting',
-  'settings.handwritingNative': 'The native iPad app captures Apple Pencil ink with PencilKit. Pri uses the bundled foundation model only when that build permits the model metadata; otherwise it falls back to the local recogniser. Corrections still learn your hand and stay on this iPad.',
-  'settings.handwritingBrowser': 'This browser build uses Pri’s legacy JavaScript handwriting fallback. It is useful for testing the web UI, not for judging the native PencilKit/Core ML handwriting experience. Corrections still stay local to this device.',
+  'settings.handwritingNative': 'This app captures your writing with the device’s own ink surface, using a stylus or your finger. Pri reads it on this device unless you turn on server reading below, learns from your corrections, and keeps those corrections on this device.',
+  'settings.handwritingBrowser': 'Write with your finger, a stylus or a mouse. Pri reads your handwriting on this device, and the corrections you make help it learn your writing. Your corrections stay on this device.',
   'settings.templatesLearned': 'Personal templates learned',
   'settings.templatesNone': 'None yet',
   'settings.templatesCount': '{total} across {symbols} symbols',
@@ -644,7 +645,7 @@ export default {
   'settings.helpSafety': '? Help & Safety',
   'settings.helpBodyIndia': 'Every chapter tracks a skill rating that moves with each answer — harder questions move it more. Smart Practice targets ~70% success and weaves in spaced reviews before topics fade. The mark estimate covers only the parts of the paper you have practised, and it never converts that into a CBSE percentage, a JEE percentile or a rank — none of those can be honestly derived from practice at home. Handwritten answers are recognised on this device — strokes → symbols → maths — then marked by the same engine as typed answers, line by line. Hints and retries still earn credit, just a little less.',
   'settings.helpBody': 'Every subtopic tracks a skill rating that moves with each answer — harder questions move it more. Smart Practice targets ~70% success, weaves in spaced reviews before topics fade, and the mark predictor weighs mastery across the syllabus by exam weight. Handwritten answers are recognised entirely on-device — strokes → symbols → maths — then marked by the same engine as typed answers, line by line. Hints and retries still earn credit, just a little less.',
-  'settings.addToHomeScreen': ' For the full-screen iPad experience: Share → Add to Home Screen.',
+  'settings.addToHomeScreen': ' For a full-screen app: use your browser’s “Add to Home Screen”.',
 
   // ── Sign-in and onboarding ─────────────────────────────────────────────────
   // "Get Started" and "Start learning" are what the browser suites click by

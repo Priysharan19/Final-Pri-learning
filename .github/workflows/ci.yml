@@ -246,9 +246,9 @@ jobs:
           cache-dependency-path: client/package-lock.json
       - name: Install client dependencies
         run: npm ci --prefix client
-      - name: Install Chromium
+      - name: Install Chromium and WebKit
         working-directory: client
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install --with-deps chromium webkit
       - name: End-to-end suite
         run: |
           set -o pipefail
@@ -256,6 +256,10 @@ jobs:
           node client/test/tour-cloud-platform.js --no-build 2>&1 | tee -a browser.log
           node client/test/tour-admin-cms-platform.js --no-build 2>&1 | tee -a browser.log
           node client/test/tour-admin-independent-review.js --no-build 2>&1 | tee -a browser.log
+          # CP-03: the responsive product matrix in both engines (WebKit is the
+          # engine behind every Apple web view).
+          node client/test/tour-responsive-matrix.js --no-build 2>&1 | tee -a browser.log
+          node client/test/tour-responsive-matrix.js --no-build --browser=webkit 2>&1 | tee -a browser.log
       - name: Accessibility suite
         if: always()
         run: |
@@ -277,6 +281,9 @@ jobs:
           grep -Fq 'Cloud admin · independent-review rejection' browser.log
           grep -Eq 'E2E SUITE.*8/8.*1 flows' browser.log
           grep -Eq 'ACCESSIBILITY SUITE.*38/38.*12 groups' browser.log
+          grep -Fq 'E2E BROWSER: webkit' browser.log
+          test "$(grep -c 'Responsive matrix · 6 viewports, critical routes, write/type, actions' browser.log)" -ge 2
+          test "$(grep -Ec 'E2E SUITE PASSED — 145/145 checks across 1 flows' browser.log)" -eq 2
           if grep -Fq 'not measured:' browser.log; then
             echo 'A browser suite reported skipped coverage.' >&2
             exit 1
