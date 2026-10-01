@@ -1553,7 +1553,11 @@ async function resolve(profile, row, q, correct, answerGiven, ms, mode, viaInk =
   }
 
   const xp = isRush ? (correct ? 6 : 0) : xpFor(q.difficulty, correct, 0, effHints);
-  const profileNext = { ...profile, xp: (profile.xp || 0) + xp };
+  // The profile row this request read may be stale by now: a placement answer,
+  // a settings change or another tab can have written it while this request
+  // awaited. XP is therefore added to the row as it is at write time below
+  // (`profileNext`), so neither side's write can roll the other back.
+  let profileNext = { ...profile, xp: (profile.xp || 0) + xp };
   const tz = timezoneOf(profile);
   const date = dayKey(now, tz);
   const activityKey = `${pid}:${date}`;
@@ -1608,16 +1612,19 @@ async function resolve(profile, row, q, correct, answerGiven, ms, mode, viaInk =
   };
 
   try {
-    await atomicBatch([
-      // `add`, not `put`: collision means another delivery already won.
-      { type: 'add', store: 'attempts', value: attempt },
-      ...(ratingNext ? [{ type: 'put', store: 'ratings', value: ratingNext }] : []),
-      ...(reviewNext ? [{ type: 'put', store: 'reviews', value: reviewNext }] : []),
-      { type: 'put', store: 'profiles', value: profileNext },
-      { type: 'put', store: 'activity', value: activityNext },
-      { type: 'put', store: 'questions', value: questionNext },
-      ...(taskProgressNext ? [{ type: 'put', store: 'taskProgress', value: taskProgressNext }] : [])
-    ]);
+    await withProfileRow(pid, async freshProfile => {
+      if (freshProfile) profileNext = { ...freshProfile, xp: (freshProfile.xp || 0) + xp };
+      await atomicBatch([
+        // `add`, not `put`: collision means another delivery already won.
+        { type: 'add', store: 'attempts', value: attempt },
+        ...(ratingNext ? [{ type: 'put', store: 'ratings', value: ratingNext }] : []),
+        ...(reviewNext ? [{ type: 'put', store: 'reviews', value: reviewNext }] : []),
+        { type: 'put', store: 'profiles', value: profileNext },
+        { type: 'put', store: 'activity', value: activityNext },
+        { type: 'put', store: 'questions', value: questionNext },
+        ...(taskProgressNext ? [{ type: 'put', store: 'taskProgress', value: taskProgressNext }] : [])
+      ]);
+    });
   } catch (err) {
     // The attempt key is the authoritative exactly-once claim. A collision on
     // that key means another delivery already committed this same resolution;
@@ -1633,6 +1640,8 @@ async function resolve(profile, row, q, correct, answerGiven, ms, mode, viaInk =
 
   // Only now is it safe to update the object the caller is still holding.
   profile.xp = profileNext.xp;
+  coreMeta.totalXp = profileNext.xp;
+  coreMeta.level = levelFromXp(profileNext.xp);
 
   // Badges are derived, fixed-key and idempotent. They are intentionally after
   // the learning transaction: a badge may be recomputed after a crash, while
@@ -2300,6 +2309,7 @@ const routes = {
   'GET /me': async () => ({ user: await publicUser(await requireProfile()) }),
   'PATCH /me': async (body) => {
     const p = await requireProfile();
+    const original = { ...p };
     if (body.name !== undefined) p.name = String(body.name).trim().slice(0, 40) || p.name;
     if (body.year !== undefined) p.year = Math.min(12, Math.max(7, Number(body.year) || p.year));
     if (body.pathway !== undefined && p.course === 'nsw') p.pathway = cleanPathway(body.pathway, p.year) || (p.year >= 11 ? 'advanced' : null);
@@ -2340,8 +2350,19 @@ const routes = {
       }
       await setProfileEmail(p, email);
     }
-    await put('profiles', p);
-    return { user: await publicUser(p) };
+    // Only the fields this request changed are written, onto the row as it is
+    // now: XP from a practice answer or a placement step that landed while this
+    // request awaited (the email check above) is kept rather than rolled back.
+    const changed = {};
+    for (const k of new Set([...Object.keys(original), ...Object.keys(p)])) {
+      if (p[k] !== original[k]) changed[k] = p[k];
+    }
+    const next = await withProfileRow(p.id, async fresh => {
+      const merged = { ...(fresh || original), ...changed };
+      await put('profiles', merged);
+      return merged;
+    });
+    return { user: await publicUser(next) };
   },
 
   // ---- curriculum ----
@@ -3592,13 +3613,13 @@ const routes = {
     // yet throws here, the API layer fetches it and re-runs this route.
     const current = buildPlacementQuestion(cfg, probe, 0);
     const now = Date.now();
-    p.placement = {
+    const placement = {
       v: 1, id: uuid(), config: { ...cfg }, status: 'active', startedAt: now, finishedAt: null,
       // A retake keeps the last finished result visible until it is replaced.
       items: [], current, result: pl?.result || null, previous: Array.isArray(pl?.previous) ? pl.previous : []
     };
-    await put('profiles', p);
-    return { question: placementQuestionView(current), progress: placementProgress(p.placement), resumed: false };
+    await writePlacement(p.id, { placement });
+    return { question: placementQuestionView(current), progress: placementProgress(placement), resumed: false };
   },
 
   'POST /placement/:id/answer': async (body, params) => {
@@ -3652,18 +3673,18 @@ const routes = {
     const done = replay.done || items.length >= PLACEMENT_MAX;
     const next = done ? null : buildPlacementQuestion(cfg, replay.probe, items.length);
     const result = done ? { ...summarisePlacement(cfg, items), finishedAt: now } : null;
-    p.placement = {
+    const placement = {
       ...pl, items, current: next,
       status: done ? 'finished' : 'active',
       finishedAt: done ? now : null,
       result: done ? result : pl.result || null,
       previous: done ? placementHistoryOf(pl) : (pl.previous || [])
     };
-    await put('profiles', p);
+    await writePlacement(p.id, { placement });
     return {
       correct, resolved: true, skipped, feedback, stepReport, diagnosis: stepReport?.diagnosis || null,
       solution: { steps: q.steps, answerText: displayAnswer(q), criteria: criteriaFor(q), solutionText: q.solutionText },
-      progress: placementProgress(p.placement), done,
+      progress: placementProgress(placement), done,
       next: next ? placementQuestionView(next) : null,
       result
     };
@@ -3671,8 +3692,7 @@ const routes = {
 
   'POST /placement/skip': async () => {
     const p = await requireProfile();
-    p.placementSkippedAt = Date.now();
-    await put('profiles', p);
+    await writePlacement(p.id, { placementSkippedAt: Date.now() });
     return { skipped: true };
   }
 };
@@ -3695,6 +3715,32 @@ const routes = {
 // practice offers first (see indiaPick).
 
 const loadPlacementEngine = () => import('../engine/placement.js');
+
+/**
+ * Write only the placement fields onto the profile row as it is NOW. Every
+ * placement route awaits the engine import and question generation between
+ * reading the profile and writing it, and in that gap PATCH /me, a practice
+ * answer's XP or a settings change may have written the same row. Writing back
+ * the copy read at the start would silently undo them; re-reading and merging
+ * only these fields does not. Placement routes are serialised among themselves
+ * by the placement lock, so the placement fields have one writer.
+ */
+async function writePlacement(pid, fields) {
+  await withProfileRow(pid, async fresh => {
+    if (!fresh) throw Object.assign(new Error('No profile selected'), { status: 401 });
+    await put('profiles', { ...fresh, ...fields });
+  });
+}
+
+/**
+ * Read-merge-write of one profile row, serialised per profile. Every writer
+ * that merges onto the row as it is now — placement steps, the XP an answer
+ * earns, a settings change — goes through here, so two of them can never both
+ * read the same row and each write back a copy missing the other's change.
+ */
+function withProfileRow(pid, work) {
+  return withMutationLock(`profile-row:${pid}`, async () => work(await get('profiles', pid).catch(() => null)));
+}
 
 function requirePlacementCourse(p) {
   if (p.course !== 'in') {

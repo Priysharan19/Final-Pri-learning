@@ -19,6 +19,7 @@ import QuestionCard from '../components/QuestionCard.jsx';
 import TermGloss from '../components/TermGloss.jsx';
 import { useT } from '../i18n/index.js';
 import { MAP_STRANDS, PREREQ_GRAPH_VERSION, mapStrandOf } from '../engine/prerequisites.js';
+import { PREREQ_SKILLS_HI } from '../engine/prerequisiteSkillsHi.js';
 
 const GRADES = [7, 8, 9, 10, 11, 12];
 const PHASE_KEY = {
@@ -31,8 +32,12 @@ const STRAND_KEY = {
 };
 const OUTCOME_KEY = {
   'root-gap': 'placement.legendRoot', gap: 'placement.legendGap', 'inferred-gap': 'placement.legendInferred',
-  secure: 'placement.legendSecure', practised: 'placement.legendPractised', untested: 'placement.legendUntested'
+  secure: 'placement.legendSecure', practised: 'placement.legendPractised', untested: 'placement.legendUntested',
+  mixed: 'placement.legendMixed'
 };
+// Practice evidence strong enough that a single placement miss must not be
+// shown as if it overrode it: five or more attempts at 'strong' mastery.
+const STRONG_PRACTICE = { attempts: 5, mastery: 65 };
 
 export default function Placement() {
   const { user } = useApp();
@@ -176,6 +181,9 @@ function PlacementResult({ view, user, busy, onRetake, error }) {
   const [focus, setFocus] = useState(r.rootGaps?.[0]?.chapterId || null);
   const focusChain = useMemo(() => new Set((r.rootGaps || []).find(g => g.chapterId === focus)?.chain.map(c => c.chapterId) || []), [r, focus]);
   const finished = r.finishedAt ? new Date(r.finishedAt).toLocaleDateString(user?.locale || undefined) : '';
+  // Edge skills are authored in English beside the graph; a Hindi reader gets
+  // the reviewed Hindi label, never a blank.
+  const skillText = skill => (user?.language === 'hi' && PREREQ_SKILLS_HI[skill]) || skill;
 
   return (
     <div className="grid" style={{ gap: 18 }}>
@@ -215,15 +223,18 @@ function PlacementResult({ view, user, busy, onRetake, error }) {
                         <TermGloss text={nameOf(c.chapterId)} />
                         <span className="muted"> · {t('common.classNumber', { n: c.grade })}</span>
                         {c.tested
-                          ? <span className="pm-mark" aria-hidden="true">{c.correct ? ' ✓' : ' ✗'}</span>
+                          ? <>
+                            <span className="pm-mark" aria-hidden="true">{c.correct ? ' ✓' : ' ✗'}</span>
+                            <span className="sr-only">{t(c.correct ? 'placement.linkRight' : 'placement.linkWrong')}</span>
+                          </>
                           : <span className="muted" style={{ fontSize: 12 }}> ({t('placement.untested')})</span>}
                       </span>
-                      {c.skill && <span className="muted pm-skill">{c.skill}</span>}
+                      {c.skill && <span className="muted pm-skill">{skillText(c.skill)}</span>}
                     </li>
                   ))}
                 </ol>
                 {g.sameChapter && <p className="muted" style={{ margin: '6px 0 0', fontSize: 13 }}>{t('placement.sameChapter')}</p>}
-                {!g.resolved && <p className="muted" style={{ margin: '6px 0 0', fontSize: 13 }}>{t('placement.unresolved')}</p>}
+                {!g.resolved && <p className="muted" style={{ margin: '6px 0 0', fontSize: 13 }} data-stopped-by={g.stoppedBy || 'budget'}>{t(g.stoppedBy === 'trace-cap' ? 'placement.unresolvedCap' : 'placement.unresolvedBudget')}</p>}
                 {g.belowFloor && <p className="muted" style={{ margin: '6px 0 0', fontSize: 13 }}>{t('placement.belowFloor')}</p>}
                 {g.contradicted && <p className="muted" style={{ margin: '6px 0 0', fontSize: 13 }}>{t('placement.contradicted')}</p>}
                 <button className="btn btn-ghost btn-sm" style={{ marginTop: 10 }}
@@ -296,6 +307,10 @@ function MasteryMap({ view, result, chain }) {
 
   const statusOf = ch => {
     const diag = result.chapters?.[ch.id];
+    const strong = ch.attempts >= STRONG_PRACTICE.attempts && ch.mastery >= STRONG_PRACTICE.mastery;
+    // One missed placement question does not outweigh substantial practice:
+    // where they disagree, the chip says both.
+    if (diag && strong && diag.outcome !== 'secure') return 'mixed';
     if (diag) return diag.outcome;
     if (ch.attempts > 0) return 'practised';
     return 'untested';
@@ -320,7 +335,7 @@ function MasteryMap({ view, result, chain }) {
       <div className="card-title" style={{ marginBottom: 4 }}>{t('placement.mapTitle')}</div>
       <p className="muted" style={{ marginTop: 0 }}>{t('placement.mapSub')}</p>
       <ul className="pm-legend" aria-label={t('placement.mapTitle')}>
-        {['root-gap', 'gap', 'inferred-gap', 'secure', 'practised', 'untested'].map(s => (
+        {['root-gap', 'gap', 'inferred-gap', 'secure', 'mixed', 'practised', 'untested'].map(s => (
           <li key={s} className={`pm-chip pm-${s}`}>{t(OUTCOME_KEY[s])}</li>
         ))}
       </ul>

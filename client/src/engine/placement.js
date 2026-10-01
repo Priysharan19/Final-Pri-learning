@@ -86,10 +86,11 @@ function* placementProcess(cfg, state) {
     let spent = 0;
     let stoppedForBudget = false;
     let belowFloor = false;
-    const canAsk = () => spent < TRACE_CAP && asked() < PLACEMENT_MAX - reserve;
+    let stoppedBy = null;            // 'trace-cap' | 'budget' when the walk was cut short
     function* outcome(id) {
       if (known.has(id)) return known.get(id);
-      if (!canAsk()) return null;
+      if (spent >= TRACE_CAP) { stoppedBy = 'trace-cap'; return null; }
+      if (asked() >= PLACEMENT_MAX - reserve) { stoppedBy = 'budget'; return null; }
       spent++;
       return yield* ask({ chapterId: id, grade: gradeOf(id), difficulty: CORE_DIFFICULTY, phase: 'trace', from: anchorId });
     }
@@ -123,6 +124,7 @@ function* placementProcess(cfg, state) {
       chain: path,
       root: path[path.length - 1],
       resolved: !stoppedForBudget,
+      stoppedBy: stoppedForBudget ? stoppedBy : null,
       // Nothing below the root in this product to test: the gap may predate
       // Class 7.
       belowFloor: !stoppedForBudget && belowFloor
@@ -142,7 +144,11 @@ function* placementProcess(cfg, state) {
   function* climb(anchorId, reserve) {
     let node = anchorId;
     let spent = 0;
-    const room = () => spent < CLIMB_CAP && asked() < PLACEMENT_TARGET - reserve;
+    // A fair share of what is left inside the target, so an early clean answer
+    // cannot spend the questions a later anchor's downward trace will need.
+    const share = Math.floor((PLACEMENT_TARGET - asked() - reserve) / (reserve + 1));
+    const cap = Math.min(CLIMB_CAP, Math.max(0, share));
+    const room = () => spent < cap && asked() < PLACEMENT_TARGET - reserve;
     while (room()) {
       const g = gradeOf(node);
       const next = g < 12 ? upFrom(node) : null;
@@ -251,6 +257,9 @@ export function summarisePlacement(config, items = []) {
       from: traces.map(t => t.from),
       chain,
       resolved,
+      // Why an unresolved trace stopped: this trace's own question limit, or
+      // the diagnostic's overall budget of twelve.
+      stoppedBy: resolved ? null : (traces.find(t => !t.resolved)?.stoppedBy || 'budget'),
       corroborated,
       contradicted,
       belowFloor: traces.some(t => t.belowFloor),

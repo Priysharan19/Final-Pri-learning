@@ -180,7 +180,8 @@ const EDGES = [
   ['c10-trigonometry', [
     ['c8-squares-roots', 'right-triangle sides through squares and roots'],
     ['c8-proportions', 'ratios of sides'],
-    ['c9-number-systems', 'exact surd values']
+    ['c9-number-systems', 'exact surd values'],
+    ['c10-triangles', 'similar right triangles share their side ratios']
   ]],
   ['c10-trig-applications', [['c10-trigonometry', 'ratios at 30°, 45° and 60°']]],
   ['c10-circles', [
@@ -223,9 +224,12 @@ const EDGES = [
     ['c8-linear-equations', 'solving a linear equation'],
     ['c10-pair-linear-equations', 'lines in two variables']
   ]],
+  // Counting comes before probability, not after it: the permutations chapter
+  // rests on multiplication and regrouping of products, and probability then
+  // uses counting (see c11-probability below).
   ['c11-permutations-combinations', [
-    ['c10-probability', 'listing outcomes'],
-    ['c7-arithmetic-expressions-current', 'evaluating products efficiently']
+    ['c7-arithmetic-expressions-current', 'products and the multiplication principle'],
+    ['c7-large-numbers-current', 'factoring and regrouping products']
   ]],
   ['c11-binomial-theorem', [
     ['c11-permutations-combinations', 'nCr values'],
@@ -250,7 +254,8 @@ const EDGES = [
   ['c11-limits-derivatives', [
     ['c9-algebraic-identities', 'factorising to cancel a 0/0 form'],
     ['c11-relations-functions', 'function notation'],
-    ['c10-polynomials', 'evaluating polynomials']
+    ['c10-polynomials', 'evaluating polynomials'],
+    ['c11-trig-functions', 'standard trigonometric limits']
   ]],
   ['c11-statistics', [
     ['c10-statistics', 'grouped mean and median'],
@@ -258,7 +263,8 @@ const EDGES = [
   ]],
   ['c11-probability', [
     ['c11-sets', 'events as sets: union and intersection'],
-    ['c10-probability', 'classical probability']
+    ['c10-probability', 'classical probability'],
+    ['c11-permutations-combinations', 'counting outcomes']
   ]],
 
   // ── Class 12 ───────────────────────────────────────────────────────────────
@@ -280,7 +286,8 @@ const EDGES = [
   ]],
   ['c12-continuity-differentiability', [
     ['c11-limits-derivatives', 'limits and derivatives'],
-    ['c11-trig-functions', 'trigonometric functions']
+    ['c11-trig-functions', 'trigonometric functions'],
+    ['c12-inverse-trigonometric', 'derivatives of inverse trigonometric functions']
   ]],
   ['c12-applications-derivatives', [
     ['c12-continuity-differentiability', 'differentiation rules'],
@@ -288,7 +295,8 @@ const EDGES = [
   ]],
   ['c12-integrals', [
     ['c12-continuity-differentiability', 'derivatives to reverse'],
-    ['c9-algebraic-identities', 'algebraic manipulation']
+    ['c9-algebraic-identities', 'algebraic manipulation'],
+    ['c11-trig-functions', 'integrating trigonometric functions']
   ]],
   ['c12-applications-integrals', [
     ['c12-integrals', 'definite integrals'],
@@ -321,7 +329,7 @@ export const PLACEMENT_ANCHORS = Object.freeze({
   8: Object.freeze(['c8-linear-equations', 'c8-factorisation', 'c8-exponents', 'c8-quadrilaterals', 'c8-comparing-quantities']),
   9: Object.freeze(['c9-algebraic-identities', 'c9-linear-polynomials', 'c9-coordinate-geometry', 'c9-number-systems', 'c9-perimeter-area']),
   10: Object.freeze(['c10-quadratic-equations', 'c10-trigonometry', 'c10-coordinate-geometry', 'c10-pair-linear-equations', 'c10-statistics']),
-  11: Object.freeze(['c11-limits-derivatives', 'c11-complex-numbers', 'c11-straight-lines', 'c11-trig-functions', 'c11-probability']),
+  11: Object.freeze(['c11-limits-derivatives', 'c11-complex-numbers', 'c11-trig-functions', 'c11-probability', 'c11-straight-lines']),
   12: Object.freeze(['c12-integrals', 'c12-matrices', 'c12-vector-algebra', 'c12-probability', 'c12-applications-derivatives'])
 });
 

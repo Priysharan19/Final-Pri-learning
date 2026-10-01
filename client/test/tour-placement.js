@@ -97,6 +97,11 @@ export const flow = {
     await check('the result says it is diagnostic evidence, not mastery', /diagnostic evidence/.test(body) && /not a mastery score/.test(body));
     await check('the graph\'s provenance is stated, not claimed as official', /not an NCERT or CBSE publication/.test(body));
     await check('confidence is never shown as high', !/High confidence/i.test(body));
+    await check('the map is called an evidence map, not a mastery map', /Evidence map/.test(body) && !/Mastery map/i.test(body));
+    await check('the legend can show practice and the check disagreeing', /Practised well · missed in the check/.test(await page.locator('.pm-legend').innerText()));
+    await check('the result says it reorders smart practice', /reorder smart practice/.test(body));
+    const cut = page.locator('[data-stopped-by]');
+    if (await cut.count()) await check('a trace cut short says why it stopped', /question limit|12-question limit/.test(await cut.first().innerText()));
     const headers = await page.locator('.pm-map thead th').allInnerTexts();
     await check('the map runs Class 7 → 12 and then JEE', headers.join('|').includes('Class 7') && headers.join('|').includes('Class 12') && /JEE/.test(headers.at(-1) || ''), headers.join('|'));
     await check('the map has a row per strand', await page.locator('.pm-map tbody tr').count() === 7);

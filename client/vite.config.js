@@ -211,7 +211,7 @@ export const ON_DEMAND = [
   // ADR-0001 makes the product online-first, and the one case this shows — a
   // first open with no connection — is reported by api.js as a chapter that has
   // not been downloaded yet; practice, which needs none of it, is unaffected.
-  [/(^|\/)(Placement|placement|prerequisites)-[^/]*\.js$/, 'placement check']
+  [/(^|\/)(Placement|placement|prerequisites|prerequisiteSkillsHi)-[^/]*\.js$/, 'placement check']
 ];
 
 // The faces the first screens genuinely paint in: the Latin Inter subset for
