@@ -319,6 +319,10 @@ export default function App() {
 
   const switchProfile = async () => {
     try { await api.post('/auth/logout'); } catch { }
+    // A role-specific route belongs to the profile that just signed out.
+    // Neutralise it before showing the picker so selecting a different role
+    // cannot inherit a stale /teach (or other guarded) redirect.
+    nav('/', { replace: true });
     setUser(null);
   };
 
