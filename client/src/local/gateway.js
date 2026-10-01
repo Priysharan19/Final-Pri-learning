@@ -195,6 +195,17 @@ const BODY_RULES = [
   [/^POST \/exams\/[A-Za-z0-9._-]+\/submit$/, body => {
     requireObject(body, 'exam submit'); boundedMap(body, 'answers', 120); boundedMap(body, 'workings', 120); optionalNumber(body, 'ms');
     boundedMap(body, 'times', 120);   // WP india-exams: time spent per question
+    // A submission names itself so a retried request is a replay, not a second
+    // mark; `reason` says whether the student or the clock ended the paper.
+    optionalString(body, 'submissionKey', 100); optionalString(body, 'reason', 20);
+  }],
+  // The exam room's autosave: the paper's answers, working, per-question time
+  // and handwriting for the questions whose ink changed. The session module
+  // decides what may be saved (nothing after the deadline or finalisation);
+  // this only bounds the shape.
+  [/^POST \/exams\/[A-Za-z0-9._-]+\/responses$/, body => {
+    requireObject(body, 'exam responses'); boundedMap(body, 'answers', 120); boundedMap(body, 'workings', 120);
+    boundedMap(body, 'times', 120); boundedMap(body, 'modes', 120); boundedMap(body, 'inks', 12); optionalNumber(body, 'cur');
   }],
   [/^POST \/rush\/answer$/, body => {
     requireObject(body, 'POST /rush/answer'); requiredId(body);

@@ -25,9 +25,14 @@ import {
   markMultiCorrect
 } from '../engine/indiaExams.js';
 import { composeIndiaPaper, composerNotes, answerText } from '../engine/indiaExamComposer.js';
-import { examStepMeta, recordIndiaExamEvidence, finishIndiaExamEvidence } from './backend.js';
+import { examStepMeta, recordIndiaExamEvidence, finishIndiaExamEvidence, withExamLock } from './backend.js';
 import { assertExamAllowed, examAllowance, recordExamSimulation, requireCapability } from './entitlementGate.js';
 import { ENTITLEMENTS } from '../platform/entitlements.js';
+import {
+  startExamClock, ensureExamClock, saveExamResponses, examMarkingInputs,
+  paperFingerprint, freezeExam, isReplayOf, examSessionView
+} from './examSession.js';
+import { analyseExam } from './examAnalysis.js';
 
 function error(message, status = 400, code = 'INDIA_EXAM_ERROR') {
   return Object.assign(new Error(message), { status, code });
@@ -176,6 +181,7 @@ async function createIndiaExam(profile, body = {}) {
   const examId = uuid();
   const questionIds = [];
   const created = [];
+  const rows = [];
   const now = Date.now();
   try {
     for (const q of paper.questions) {
@@ -189,6 +195,7 @@ async function createIndiaExam(profile, body = {}) {
       await put('questions', row);
       created.push(row.id);
       questionIds.push(row.id);
+      rows.push(row);
     }
   } catch (err) {
     // Exam generation is atomic from the student's perspective: never leave a
@@ -243,8 +250,13 @@ async function createIndiaExam(profile, body = {}) {
       reducedPattern: paper.reducedPattern,
       composerNotes: composerNotes(spec),
       sources: (spec.sources || []).map(s => ({ authority: s.authority, title: s.title, url: s.url }))
-    }
+    },
+    // The paper as composed, fingerprinted once, so finalisation can record
+    // exactly which version of it was marked.
+    paperVersion: paperFingerprint(rows)
   };
+  // The clock starts when the paper exists: the room opens straight onto it.
+  startExamClock(exam, Date.now());
   await put('exams', exam);
   return { exam: await examView(profile, exam.id) };
 }
@@ -259,6 +271,9 @@ async function requireExam(profile, id) {
 
 async function examView(profile, id) {
   const exam = await requireExam(profile, id);
+  // A paper stored before the deadline was recorded gets one now, from when it
+  // was created, and keeps it.
+  if (ensureExamClock(exam)) await put('exams', exam);
   const questions = [];
   for (const qid of exam.questionIds || []) {
     const row = await get('questions', qid);
@@ -276,6 +291,8 @@ async function examView(profile, id) {
     questions,
     detail: exam.detail || null,
     summary: exam.summary || null,
+    analysis: exam.finishedAt && exam.detail ? analyseExam({ detail: exam.detail, indiaExam: exam.indiaExam }) : null,
+    session: examSessionView(exam),
     indiaExam: exam.indiaExam
   };
 }
@@ -364,15 +381,42 @@ function solutionFor(q, marks, marking) {
   return { steps: q.steps || [], answerText: answerText(q), criteria: criteriaFor(q, marks, marking) };
 }
 
+function finalResult(exam, extra = {}) {
+  const pct = Math.round(1000 * exam.score / Math.max(1, exam.total)) / 10;
+  return {
+    score: exam.score, total: exam.total, pct, detail: exam.detail, summary: exam.summary,
+    analysis: analyseExam({ detail: exam.detail, indiaExam: exam.indiaExam }),
+    final: { submittedAt: exam.final?.submittedAt ?? exam.finishedAt, finalisedBy: exam.final?.finalisedBy ?? null, late: !!exam.final?.late, paperVersion: exam.final?.paperVersion ?? null },
+    indiaExam: exam.indiaExam,
+    ...extra
+  };
+}
+
+async function saveResponses(profile, id, body = {}) {
+  const exam = await requireExam(profile, id);
+  if (exam.finishedAt) throw error('This paper has been submitted — it can no longer change.', 409, 'INDIA_EXAM_ALREADY_SUBMITTED');
+  const saved = saveExamResponses(exam, body);
+  await put('exams', exam);
+  return { saved: true, ...saved };
+}
+
 async function submitExam(profile, id, body = {}) {
   const exam = await requireExam(profile, id);
+  // The same submission arriving twice — a retried request, a second tap that
+  // raced the first — gets the frozen result back rather than a second mark.
+  if (isReplayOf(exam, body)) return finalResult(exam, { replayed: true, newBadges: [] });
   if (exam.finishedAt) throw error('Exam already submitted.', 409, 'INDIA_EXAM_ALREADY_SUBMITTED');
-  const answers = body.answers || {};
-  const workings = body.workings || {};
-  const times = body.times || {};
-  const totalMs = Math.max(0, Number(body.ms) || 0);
-  const nQ = Math.max(1, (exam.questionIds || []).length);
   const now = Date.now();
+  // What is marked is decided by the clock, not by the request: after the
+  // deadline only the responses saved before it count.
+  const inputs = examMarkingInputs(exam, body, now);
+  const answers = inputs.answers;
+  const workings = inputs.workings;
+  const times = inputs.times;
+  const totalMs = Math.max(0, Number(inputs.ms) || 0);
+  const nQ = Math.max(1, (exam.questionIds || []).length);
+  const timedPaper = Object.keys(times).length > 0;
+  const markedRows = [];
 
   let score = 0;
   let total = 0;
@@ -396,11 +440,16 @@ async function submitExam(profile, id, body = {}) {
     const q = row.payload;
     const marking = row.examMarking || { correct: 1, incorrect: 0, unanswered: 0 };
     const chapter = indiaChapter(row.india?.chapterId);
-    const ms = Math.max(0, Number(times[qid]) || 0) || Math.round(totalMs / nQ);
+    markedRows.push(row);
+    // When the room measured time per question, that measurement is the time —
+    // zero for a question never opened. Otherwise the paper's total is split
+    // evenly for the evidence record, and the detail says it was not measured.
+    const timed = timedPaper;
+    const ms = timedPaper ? Math.max(0, Number(times[qid]) || 0) : Math.round(totalMs / nQ);
     const base = {
       id: qid, order: row.examOrder, section: row.indiaExamSection, sectionLabel: row.indiaExamSectionLabel || `Section ${row.indiaExamSection}`,
       item: row.indiaExamItem, chapterId: chapter?.id || null, subtopic: chapter?.id || q.subtopic, subtopicName: chapter?.name || q.subtopic,
-      difficulty: q.difficulty || row.difficulty || 2, ms, sourceKind: row.sourceKind
+      difficulty: q.difficulty || row.difficulty || 2, ms, timed, sourceKind: row.sourceKind
     };
 
     let out;
@@ -483,9 +532,10 @@ async function submitExam(profile, id, body = {}) {
   exam.total = total;
   exam.detail = detail;
   exam.summary = summary;
+  freezeExam(exam, { inputs, paperVersion: paperFingerprint(markedRows), submissionKey: body.submissionKey, now });
   await put('exams', exam);
   const newBadges = await finishIndiaExamEvidence(Math.max(0, pct));
-  return { score, total, pct, detail, summary, newBadges, indiaExam: exam.indiaExam };
+  return { ...finalResult(exam), pct, newBadges };
 }
 
 // ── Printable paper ─────────────────────────────────────────────────────────
@@ -538,7 +588,7 @@ async function paper(profile, id) {
 
 export function indiaExamRoute(method, path) {
   if (path === '/exams' && (method === 'GET' || method === 'POST')) return true;
-  return /^\/exams\/[^/]+(?:\/paper|\/submit)?$/.test(path) && (method === 'GET' || method === 'POST');
+  return /^\/exams\/[^/]+(?:\/paper|\/submit|\/responses)?$/.test(path) && (method === 'GET' || method === 'POST');
 }
 
 export async function dispatchIndiaExam(profile, method, path, body = {}) {
@@ -562,12 +612,13 @@ export async function dispatchIndiaExam(profile, method, path, body = {}) {
     return { ...created, allowance: await examAllowance(profile) };
   }
 
-  const m = path.match(/^\/exams\/([^/]+)(?:\/(paper|submit))?$/);
+  const m = path.match(/^\/exams\/([^/]+)(?:\/(paper|submit|responses))?$/);
   if (!m) throw error('India exam route not found.', 404, 'INDIA_EXAM_ROUTE_NOT_FOUND');
   const [, id, action] = m;
   if (!action && method === 'GET') return getExam(profile, id);
   if (action === 'paper' && method === 'GET') return paper(profile, id);
-  if (action === 'submit' && method === 'POST') return submitExam(profile, id, body || {});
+  if (action === 'submit' && method === 'POST') return withExamLock(id, () => submitExam(profile, id, body || {}));
+  if (action === 'responses' && method === 'POST') return withExamLock(id, () => saveResponses(profile, id, body || {}));
   throw error('India exam method is not allowed.', 405, 'INDIA_EXAM_METHOD_NOT_ALLOWED');
 }
 

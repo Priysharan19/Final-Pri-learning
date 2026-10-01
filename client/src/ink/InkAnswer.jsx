@@ -111,8 +111,11 @@ function readingConfidence(result) {
  * ✓/✗ overlay on the ink itself and as badges in the reading panel.
  * focusSymbol: id of a glyph the caller wants checked.
  * recognitionContext: optional safe question context consumed by recognize().
+ * initialStrokes: optional strokes to put back on the page when it mounts —
+ *   the exam room restores a student's saved writing after a reload. They are
+ *   re-read by the same answer-blind recognition path as fresh ink.
  */
-export default function InkAnswer({ onRecognized, height = 300, disabled, lineVerdicts = null, focusSymbol = null, recognitionContext = null }) {
+export default function InkAnswer({ onRecognized, height = 300, disabled, lineVerdicts = null, focusSymbol = null, recognitionContext = null, initialStrokes = null }) {
   const [NATIVE_INK] = useState(nativeInkAvailable);
   const Surface = NATIVE_INK ? NativeInkCanvas : InkCanvas;
   const canvasRef = useRef(null);
@@ -311,6 +314,12 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
   }, [overrides, runRecognition]);
 
   useEffect(() => { ensurePersonalLoaded(); }, []);
+  // Saved writing goes back on the page once, on mount. setStrokes notifies the
+  // surface's onStrokesChange, so the restored page is read exactly as if it
+  // had just been written.
+  useEffect(() => {
+    if (Array.isArray(initialStrokes) && initialStrokes.length) canvasRef.current?.setStrokes?.(initialStrokes);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => () => {
     readSeqRef.current += 1;
     if (timerRef.current) clearTimeout(timerRef.current);

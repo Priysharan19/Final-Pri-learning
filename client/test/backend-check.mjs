@@ -1330,6 +1330,11 @@ async function run() {
     ok('an unanswered paper is still worth marks', blank.total > 0, `total ${blank.total}`);
     eq('an unanswered paper is 0%', blank.pct, 0);
     eq('every unanswered question is marked wrong', blank.detail.filter(d => d.correct).length, 0);
+    // The exam room's autosave is refused once a paper is finalised: nothing
+    // written after the submit can reach the marked paper (exam-session-check
+    // drives the whole clock; this proves the legacy route shares the rule).
+    await rejects('a finalised paper refuses an autosave',
+      POST(`/exams/${blankExam.id}/responses`, { answers: { [blankExam.questions[0].id]: '1' } }), { status: 409 });
 
     const examList = (await GET('/exams')).exams;
     eq('both exams are listed', examList.length, 2);

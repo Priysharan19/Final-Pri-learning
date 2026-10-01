@@ -112,7 +112,8 @@ function IndiaExams({ user, exams, blueprint, busy, error, start, openPaper, nav
             Suggested maths-section timer: 60 minutes. The official Paper 1 timer is 180 minutes for Mathematics, Physics and Chemistry together; NTA does not publish a separate official Mathematics timer.
           </p>
           <p className="muted" style={{ marginBottom: 16 }}>
-            Exam mode draws only from Pri Learning's reviewed JEE previous-year-question archive. If the reviewed bank cannot fill all 25 required slots without breaking the official section structure, generation fails instead of substituting school questions.
+            Questions come from Pri Learning's reviewed JEE previous-year-question archive where it has them; every other slot is an authored practice question in the official format, and each question says which it is.
+            The paper is timed from the moment it starts, saves as you go, and can be answered by hand. Solutions and a section-by-section analysis open once it is submitted.
           </p>
           <button className="btn btn-primary btn-lg" style={{ width: '100%' }} onClick={start} disabled={busy}>
             {busy ? 'Building reviewed JEE section…' : 'Start JEE Main Mathematics simulation'}

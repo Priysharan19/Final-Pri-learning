@@ -47,6 +47,10 @@ import {
 } from './auth.js';
 import { sanitizeFigure, sanitizeText } from '../lib/sanitize.js';
 import {
+  startExamClock, ensureExamClock, saveExamResponses, examMarkingInputs,
+  paperFingerprint, freezeExam, isReplayOf, examSessionView
+} from './examSession.js';
+import {
   assertExamAllowed, assertPracticeAllowed, examAllowance, practiceAllowance,
   planView, recordExamSimulation, recordPracticeServed, requireCapability, usageView
 } from './entitlementGate.js';
@@ -2861,6 +2865,10 @@ const routes = {
     const count = (await byIndex('exams', 'pid', p.id)).length;
     const pwLabel = examPw && examPw !== 'advanced' ? ` ${PATHWAYS[examPw].short}` : '';
     const exam = { id: examId, pid: p.id, year, pathway: examPw, title: `Year ${year}${pwLabel} Practice Paper ${count + 1}`, durationMin: minutes, questionIds: qids, createdAt: Date.now(), finishedAt: null, score: null, total: null, detail: null };
+    const rows = [];
+    for (const qid of qids) rows.push(await get('questions', qid));
+    exam.paperVersion = paperFingerprint(rows.filter(Boolean));
+    startExamClock(exam, exam.createdAt);
     await put('exams', exam);
     return { exam: await examFor(p.id, examId) };
   },
@@ -2916,15 +2924,29 @@ const routes = {
     }
     return { title: e.title, year: e.year, durationMin: e.durationMin, course: courseLabel(p.course || 'nsw', e.year, e.pathway), questions, solutionsAvailable: finished };
   },
+  'POST /exams/:id/responses': async (body, params) => {
+    const p = await requireProfile();
+    const e = await get('exams', params.id);
+    if (!e || e.pid !== p.id) throw Object.assign(new Error('Exam not found'), { status: 404 });
+    const saved = saveExamResponses(e, body || {});
+    await put('exams', e);
+    return { saved: true, ...saved };
+  },
   'POST /exams/:id/submit': async (body, params) => {
     const p = await requireProfile();
     const e = await get('exams', params.id);
     if (!e || e.pid !== p.id) throw Object.assign(new Error('Exam not found'), { status: 404 });
+    if (isReplayOf(e, body || {})) {
+      return { score: e.score, total: e.total, pct: Math.round(100 * e.score / Math.max(1, e.total)), detail: e.detail, newBadges: [], replayed: true };
+    }
     if (e.finishedAt) throw Object.assign(new Error('Exam already submitted'), { status: 409 });
-    const answers = body?.answers || {};
-    const workings = body?.workings || {};
-    const totalMs = Number(body?.ms) || 0;
     const now = Date.now();
+    // After the deadline only what was autosaved before it is marked.
+    const inputs = examMarkingInputs(e, body || {}, now);
+    const answers = inputs.answers;
+    const workings = inputs.workings;
+    const totalMs = Number(inputs.ms) || 0;
+    const markedRows = [];
     const nQ = e.questionIds.length;
     let marksAwarded = 0, totalMarks = 0;
     const detail = [];
@@ -2934,6 +2956,7 @@ const routes = {
       // as wrong either: it contributes neither marks awarded nor marks
       // available, so the score is out of what was actually there to answer.
       if (!row?.payload) continue;
+      markedRows.push(row);
       const q = row.payload;
 
       // ── Structured multipart question: mark each part on its own marks ──
@@ -3013,6 +3036,7 @@ const routes = {
     }
     const pct = Math.round(100 * marksAwarded / Math.max(1, totalMarks));
     Object.assign(e, { finishedAt: now, score: marksAwarded, total: totalMarks, detail });
+    freezeExam(e, { inputs, paperVersion: paperFingerprint(markedRows), submissionKey: body?.submissionKey, now });
     await put('exams', e);
     const newBadges = await checkBadges(p.id, { type: 'exam', pct }, now, timezoneOf(p));
     return { score: marksAwarded, total: totalMarks, pct, detail, newBadges };
@@ -3682,13 +3706,14 @@ async function assertReviewableRow(row) {
 async function examFor(pid, examId) {
   const e = await get('exams', examId);
   if (!e || e.pid !== pid) return null;
+  if (ensureExamClock(e)) await put('exams', e);
   const questions = [];
   for (const qid of e.questionIds) {
     const row = await get('questions', qid);
     if (!row) continue;
     questions.push(sanitize(row.payload, row));
   }
-  return { id: e.id, title: e.title, year: e.year, durationMin: e.durationMin, createdAt: e.createdAt, finishedAt: e.finishedAt, score: e.score, total: e.total, questions, detail: e.detail || null };
+  return { id: e.id, title: e.title, year: e.year, durationMin: e.durationMin, createdAt: e.createdAt, finishedAt: e.finishedAt, score: e.score, total: e.total, questions, detail: e.detail || null, session: examSessionView(e) };
 }
 
 // ── Dispatcher (same contract as the old fetch layer) ────────────────────────
@@ -3861,7 +3886,18 @@ async function runGated(method, pattern, handler, body, params) {
   if (key === 'POST /practice/next') {
     return withMutationLock(`next:${currentPid() || 'none'}`, work);
   }
+  // An autosave and the final submit both rewrite the paper's row; serialised,
+  // a save that read the paper before it was finalised can never write it back
+  // over the finalised copy.
+  if (params?.id && (key === 'POST /exams/:id/submit' || key === 'POST /exams/:id/responses')) {
+    return withMutationLock(`exam:${params.id}`, work);
+  }
   return work();
+}
+
+/** The same per-paper lock, for the India exam backend's own routes. */
+export function withExamLock(examId, work) {
+  return withMutationLock(`exam:${examId}`, work);
 }
 
 export async function dispatch(method, path, body) {
