@@ -129,7 +129,7 @@ function StudentReport({ analytics, student, onClose }) {
       {student.misconceptions?.length > 0 && (
         <>
           <h3 style={{ margin: '20px 0 6px', color: '#111' }}>{t('teach.repeatedMistakes')}</h3>
-          <ul style={{ margin: 0, paddingLeft: 18 }}>{student.misconceptions.map(m => <li key={m.key}>{t('teach.mistakeLine', { label: m.label, count: m.count, subtopic: m.subtopicName })}</li>)}</ul>
+          <ul style={{ margin: 0, paddingLeft: 18 }}>{student.misconceptions.map(m => <li key={`${m.subtopic}:${m.key}`}>{t('teach.mistakeLine', { label: m.label, count: m.count, subtopic: m.subtopicName })}</li>)}</ul>
         </>
       )}
       {tasks.length > 0 && (
