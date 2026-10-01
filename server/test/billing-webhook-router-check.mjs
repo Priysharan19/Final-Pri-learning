@@ -30,13 +30,17 @@ const [
   { default: cookieParser },
   { createPlatformDb },
   { ensureBillingSchema },
-  { createPlatformRouter }
+  { createPlatformRouter },
+  { createResendAuthEmailTransport },
+  { asStore }
 ] = await Promise.all([
   import('express'),
   import('cookie-parser'),
   import('../platform/db.js'),
   import('../platform/billingSchema.js'),
-  import('../platform/router.js')
+  import('../platform/router.js'),
+  import('../platform/authDelivery.js'),
+  import('../platform/store.js')
 ]);
 
 let checks = 0;
@@ -54,7 +58,21 @@ db.prepare(`INSERT INTO entitlement_snapshots(account_id,plan,status,provider,so
   VALUES ('acct-hook','free','free','none',0,?)`).run(now);
 
 let verifierCalls = 0;
+// A verifier that breaks the contract: it writes, then makes an outbound call.
+let outboundSent = 0;
+const sendMail = createResendAuthEmailTransport({
+  apiKey: 'test-key-never-sent', from: 'auth@pri.example',
+  fetchImpl: async () => { outboundSent++; return new Response('{}', { status: 200 }); }
+});
 const billingVerifiers = {
+  apple: {
+    async webhook() {
+      await asStore(db).run(`INSERT INTO audit_log(actor_account_id,action,target_kind,target_id,metadata_json,created_at)
+        VALUES (NULL,'test.verifier-side-effect','test','x','{}',?)`, [Date.now()]);
+      await sendMail({ outboxId: 'o1', to: 'someone@example.test', kind: 'verify-email', actionUrl: 'https://app.pri.example/verify' });
+      return [];
+    }
+  },
   web: {
     async webhook({ request }) {
       verifierCalls++;
@@ -114,6 +132,17 @@ try {
   });
   check(unrelated.status === 200, `unrelated webhook status ${unrelated.status}`);
   check((await unrelated.json()).applied === 0, 'unrelated event applies nothing');
+
+  // The verifier contract is enforced: a verifier that makes an outbound call
+  // inside the webhook transaction fails closed, sends nothing and keeps nothing.
+  const impure = await fetch(`${origin}/v1/billing/webhook/apple`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ signedPayload: 'x' })
+  });
+  check(impure.status === 500, `a verifier making an outbound call inside the transaction fails closed (${impure.status})`);
+  check(outboundSent === 0, 'and nothing left the process');
+  check(db.prepare(`SELECT COUNT(*) AS n FROM audit_log WHERE action='test.verifier-side-effect'`).get().n === 0, 'and its database write was rolled back');
 
   // The exception is deliberately path-specific. A browser checkout mutation
   // without the configured app Origin is still rejected before authentication.
