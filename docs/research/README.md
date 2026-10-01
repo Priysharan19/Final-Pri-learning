@@ -259,6 +259,9 @@ MathML 4, structural navigation/editing, braille/speech/input pathways, graph so
 ### MISCONCEPTION_ERROR_ONTOLOGY_DIAGNOSTIC_EVIDENCE_V7.md
 Error taxonomy, misconception-as-hypothesis, opportunity-specific evidence, slip/gap/strategy/perception alternatives, external Eedi graph as candidate prior, diagnostic information gain and misconception-specific causal tests.
 
+### RESEARCH_TO_BUILD_V7.md
+Canonical dependency-ordered build/science programme with 59 missions from semantic identities, event replay and gold evidence through PMR, multilingual, teacher/guardian, accessibility, Worlds/PairLab, cost routing, causal personalization and external efficacy. Use this for sequencing; implementation status still comes from current main/task evidence.
+
 ### V7_EMPIRICAL_SCIENCE_AND_BENCHMARK_PROGRAMME.md
 Execution-grade science programme: semantic instrumentation → adjudicated gold assets → benchmark laboratory → randomized mechanism experiments → India/classroom field evidence, with evidence grades and release claims.
 
@@ -280,6 +283,7 @@ Execution-grade science programme: semantic instrumentation → adjudicated gold
 | peer tutoring, group work, pairing, collaborative canvas | PAIRLAB_COLLABORATIVE_LEARNING.md |
 | India device/offline/shared-device/language field assumptions | INDIA_FIELD_OPERATING_REALITY_2026.md |
 | sequencing research-derived engineering work | RESEARCH_TO_BUILD_V6.md + RESEARCH_COMPLETENESS_AUDIT_V6_2026-10-01.md |
+| dependency order / selecting next V7 research-derived engineering mission | RESEARCH_TO_BUILD_V7.md |
 | cross-domain research decision / major learning architecture change | V7_DEEP_RESEARCH_SYNTHESIS_AND_DECISION_ARCHITECTURE.md + V7_RESEARCH_CLAIM_AND_FALSIFIER_LEDGER.md |
 | spacing, retrieval, interleaving, worked examples, fading, productive failure | LEARNING_MECHANISMS_MATHEMATICS_DEEP_DIVE_V7.md |
 | classical ITS evidence, tutoring-system mechanism choice | ITS_HISTORY_AND_AI_TUTOR_EVIDENCE_DEEP_DIVE.md + FRONTIER_TUTORING_SYSTEMS_MECHANISM_MATRIX_V7.md |
