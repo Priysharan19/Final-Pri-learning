@@ -2,7 +2,7 @@
 
 Status: **implementation-to-research bridge**.
 
-Snapshot authority inspected: `main` at `dd5a1da68b971c797845eb6ed28dd9ae72221160`.
+Snapshot authority inspected initially at `dd5a1da68b971c797845eb6ed28dd9ae72221160`; research branch reconciled with current `main` at `449be4203341a1228c590fada2604f9456b69b50` after KALP-03 onboarding/profile merged.
 
 This file is a dated audit, not permanent implementation authority. Current `main`, tests, release evidence and later audited documents always override this snapshot.
 
@@ -651,3 +651,33 @@ Re-run this audit whenever:
 - current `main` makes this snapshot materially stale.
 
 Update the date and inspected SHA. Never edit this file to imply an unimplemented research capability exists.
+
+
+## 21. Post-audit product delta — KALP-03
+
+During this research pass, `main` advanced through KALP-03 onboarding/profile creation and the research branch was reconciled with exact main SHA:
+
+`449be4203341a1228c590fada2604f9456b69b50`.
+
+The new product work adds/stabilizes:
+
+- staged Student/Teacher role choice;
+- curriculum/class selection during onboarding;
+- local profile personalization/protection;
+- explicit separation of local profile identity from optional cloud account identity;
+- role-aware post-onboarding destination;
+- profile-switch route neutralization;
+- expanded browser/accessibility/onboarding regression evidence.
+
+Research consequence:
+
+This strengthens the identity/profile substrate assumed by the research corpus, especially for:
+
+- shared-device isolation;
+- teacher/student role authority;
+- guest/local-first progression;
+- India account/device reality.
+
+It does **not** change the main research gaps around semantic learning identity, event replay, transfer measurement, experimentation, learner-state calibration or causal intervention policy.
+
+This section records product drift only. It does not reclassify research architecture as implemented.
