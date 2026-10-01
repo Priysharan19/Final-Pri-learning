@@ -149,7 +149,7 @@ export const flow = {
         }
       }
       await check(`${tag}: synthetic strokes land on the writing area`, drew);
-      if (vp.id === 'tablet-portrait' && drew) {
+      if (vp.id === 'phone' && drew) {
         // Ink near the foot of the sheet is what widening could push off it.
         const low = await canvas.boundingBox();
         await page.mouse.move(low.x + low.width * 0.2, low.y + low.height * 0.9);
@@ -157,21 +157,22 @@ export const flow = {
         for (let i = 1; i <= 8; i++) await page.mouse.move(low.x + low.width * (0.2 + 0.3 * i / 8), low.y + low.height * 0.9);
         await page.mouse.up();
         await page.waitForTimeout(150);
-        await page.setViewportSize({ width: 1180, height: 820 });
+        // Phone → tablet roughly doubles the sheet's width: the widening case.
+        await page.setViewportSize({ width: 820, height: 1180 });
         await page.waitForTimeout(400);
         const rotated = await inkBox();
-        await check(`${tag}: rotating to landscape keeps every stroke on the sheet`,
+        await check(`${tag}: widening to a tablet keeps every stroke on the sheet`,
           !!rotated && !rotated.empty && rotated.maxY < rotated.h - 1, JSON.stringify(rotated));
-        await page.setViewportSize({ width: 390, height: 844 });
+        await page.setViewportSize({ width: 360, height: 640 });
         await page.waitForTimeout(400);
         const narrowed = await inkBox();
-        await check(`${tag}: narrowing to a phone keeps every stroke on the sheet`,
+        await check(`${tag}: narrowing to a small phone keeps every stroke on the sheet`,
           !!narrowed && !narrowed.empty && narrowed.maxX < narrowed.w - 1 && narrowed.maxY < narrowed.h - 1, JSON.stringify(narrowed));
         await page.setViewportSize({ width: vp.width, height: vp.height });
         await page.waitForTimeout(400);
       } else {
-        await check(`${tag}: (rotation with ink is exercised on tablet portrait)`, vp.id !== 'tablet-portrait' || drew);
-        await check(`${tag}: (narrowing with ink is exercised on tablet portrait)`, vp.id !== 'tablet-portrait' || drew);
+        await check(`${tag}: (widening with ink is exercised on the phone viewport)`, vp.id !== 'phone' || drew);
+        await check(`${tag}: (narrowing with ink is exercised on the phone viewport)`, vp.id !== 'phone' || drew);
       }
       const devCopy = await page.evaluate(() => /legacy JS fallback|not native PencilKit|legacy JavaScript handwriting/i.test(document.body.innerText));
       await check(`${tag}: no developer-only handwriting copy is shown to students`, !devCopy);
