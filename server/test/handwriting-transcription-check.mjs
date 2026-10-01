@@ -180,6 +180,19 @@ try { await transcribeHandwriting(PNG, { env, fetchImpl: async () => { throw new
 catch (e) { unreachable = e; }
 eq(unreachable?.code, 'HANDWRITING_UNREACHABLE', 'a transport failure is distinct from provider HTTP failures');
 
+let timedOut = null;
+try {
+  await transcribeHandwriting(PNG, {
+    env: { ...env, PRI_HANDWRITING_TIMEOUT_MS: '2000' },
+    fetchImpl: async (_url, init) => new Promise((_resolve, reject) => {
+      const fail = () => reject(new DOMException('Aborted', 'AbortError'));
+      if (init.signal.aborted) fail();
+      else init.signal.addEventListener('abort', fail, { once: true });
+    })
+  });
+} catch (e) { timedOut = e; }
+eq(timedOut?.code, 'HANDWRITING_TIMEOUT', 'provider timeout is distinct from cancellation and unreachable transport');
+
 let malformedEnvelope = null;
 try {
   await transcribeHandwriting(PNG, {
