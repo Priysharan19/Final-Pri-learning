@@ -419,7 +419,114 @@ https://support.apple.com/guide/ipad/use-math-notes-ipad3b2b4fe7/ipados
 
 ---
 
-# M. Source-governance rules
+# M. Psychometrics and adaptive measurement
+
+## Evidence-Centred Design — ETS
+Class: foundational assessment-design framework.
+Use: separate student model, evidence model and task model before attaching an inference to an item.
+Limitation: framework, not a Pri learner-model efficacy result.
+https://www.ets.org/research/policy_research_reports/publications/report/2003/hsgs.html
+
+## Statistical Applications to Cognitive Diagnostic Testing
+Class: peer-reviewed Annual Review.
+Use: diagnostic classification models for fine-grained mastery; establishes the role of latent attributes and diagnostic testing.
+https://doi.org/10.1146/annurev-statistics-033021-111803
+
+## Review of cognitive diagnostic models — Wang (2026)
+Class: peer-reviewed methodological review.
+Use: current practical challenges, including model/Q-matrix misspecification and fit/validation.
+Key caution: an incorrect Q-matrix can corrupt diagnostic classifications even when estimation code is correct.
+https://doi.org/10.1111/bmsp.70066
+
+## CAT exposure-control comparison (2026)
+Class: simulation study using an operational 2PL-calibrated item bank.
+Use: demonstrates that adaptive selection must balance measurement precision, item exposure and bank utilization rather than maximize information alone.
+Limitation: abstract-reasoning CAT simulation, not Pri learning efficacy.
+https://doi.org/10.3389/feduc.2026.1769909
+
+## IXL Real-Time Diagnostic design principles
+Class: official product capability / vendor design description.
+Use: example of separating an IRT-based adaptive diagnostic from ordinary practice.
+Limitation: establishes stated architecture, not independent evidence that IXL's measurement model is optimal for Pri.
+https://www.ixl.com/materials/us/research/IXL_Design_Principles.pdf
+
+---
+
+# N. Experimentation and causal learning policy
+
+## ASSISTments E-TRIALS
+Class: official research-infrastructure capability.
+Use: precedent for embedding randomized learning-science experiments into authentic mathematics practice.
+Limitation: platform capability; each experiment requires its own causal interpretation.
+https://www.assistments.org/e-trials
+https://www.assistments.org/research
+
+## What Works Clearinghouse Procedures and Standards v5
+Class: official U.S. education evidence-review standard.
+Use: randomized/quasi-experimental design, attrition, clustering and causal-evidence discipline.
+https://ies.ed.gov/ncee/wwc/handbooks
+
+## Learning to Optimize Feedback for One Million Students
+Class: large-scale tutoring-policy research / preprint (2025).
+Use: 1M-student feedback-policy evidence; compares multi-armed and contextual bandits, reward trade-offs and offline policy evaluation.
+Key caution: contextual personalization often added little beyond a strong non-contextual policy when treatment-effect heterogeneity was weak.
+Limitation: not Pri and not proof that bandits improve delayed mathematics transfer.
+https://arxiv.org/abs/2508.00270
+
+## Making AI Tutoring Productive — NBER w35621
+Class: randomized field experiment, >6,000 middle-school mathematics students.
+Use: bounded post-error support/mechanism evidence and delayed-assessment discipline.
+https://www.nber.org/papers/w35621
+
+## One Click Away — NBER w35620
+Class: two-year cluster-randomized school experiment in 18 middle schools.
+Use: distinguishes assignment/access, actual AI-tutor use and learning effect; warns that AI availability alone does not create substantive tutoring interaction.
+https://www.nber.org/papers/w35620
+
+---
+
+# O. Competitive/frontier capability sources
+
+These sources are used for architectural reverse-engineering. Unless an independent trial is separately cited, treat them as capability descriptions rather than efficacy proof.
+
+## ALEKS
+Class: official product/theory description.
+Use: Knowledge Space Theory, knowledge-state/readiness framing and adaptive assessment.
+https://www.aleks.com/about_aleks/knowledge_space_theory
+https://www.aleks.com/about_aleks/HowALEKSWorks_TextDescription
+
+## Carnegie Learning MATHia
+Class: official product/support documentation.
+Use: step-level skill estimates, independent attempt/hint workflow and scaffolding/fading patterns.
+https://support.carnegielearning.com/help-center/math/mathia/mathia-faqs/article/when-and-why-do-skills-move/
+https://support.carnegielearning.com/help-center/math/educators/mathia/teaching-strategies-mathia/article/scaffolding-support-in-mathia/
+
+## Duolingo Birdbrain
+Class: official product engineering description.
+Use: explicit separation of learner proficiency, exercise difficulty and session-generation policy; A/B testing culture.
+Limitation: language domain and vendor-reported outcomes; mechanism transport to mathematics must be tested.
+https://blog.duolingo.com/learning-how-to-help-you-learn-introducing-birdbrain/
+
+## ASSISTments
+Class: official product/research-platform documentation.
+Use: practice + experimentation infrastructure.
+https://www.assistments.org/
+
+## OpenAI Study Mode
+Class: official product capability.
+Use: example of pedagogically instructed generative dialogue using active participation, cognitive-load and metacognitive principles.
+Limitation: general-purpose conversational system; official documentation acknowledges inconsistency/mistakes; not math-truth authority.
+https://openai.com/index/chatgpt-study-mode/
+
+## Khan Academy / Khanmigo
+Class: official capability sources; independent 2026 field evidence is listed in section A/N.
+Use: generative tutoring layered over structured practice.
+https://www.khanmigo.ai/
+https://www.khanacademy.org/
+
+---
+
+# P. Source-governance rules
 
 1. Official law/platform/curriculum source beats secondary summary for requirements.
 2. A meta-analysis does not make every included implementation equivalent.
