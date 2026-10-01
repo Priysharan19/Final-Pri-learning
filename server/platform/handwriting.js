@@ -17,7 +17,7 @@
 import { asyncRouter } from './asyncRouter.js';
 import { asStore } from './store.js';
 import { rateLimit, requireSession, requireVerifiedEmail } from './security.js';
-import { consumeAiAllowance, refuseAiAllowance } from './aiAllowance.js';
+import { consumeAiAllowance, refundAiAllowance, refuseAiAllowance } from './aiAllowance.js';
 import { consumePaidCall, refusePaidCall, spendCeilingMissing } from './spendCeiling.js';
 import { serverReleaseIdentity } from './releaseIdentity.js';
 import {
@@ -178,7 +178,7 @@ export function createHandwritingRouter(db, {
       // before anything is sent, so a malformed request cannot spend from a
       // budget shared by every student on this deployment.
       const overBudget = await consumePaidCall(db, { env });
-      if (overBudget) return refusePaidCall(res, overBudget);
+      if (overBudget) { await refundAiAllowance(db, allowance); return refusePaidCall(res, overBudget); }
 
       try {
         // The fallback model is a second paid call and is counted as one, before
@@ -202,6 +202,7 @@ export function createHandwritingRouter(db, {
         });
       } catch (error) {
         if (error?.paidCallVerdict) return refusePaidCall(res, error.paidCallVerdict);
+        if (/NOT_CONFIGURED|CONFIG_INVALID/.test(String(error?.code || ''))) await refundAiAllowance(db, allowance);
         if (error instanceof HandwritingProviderError) {
           return res.status(error.status).json({ error: { code: error.code, message: error.message, retryable: !!error.retryable } });
         }

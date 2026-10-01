@@ -207,6 +207,7 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
     readWithCloud(strokes, { user, signal: controller?.signal }).then(outcome => {
       // Newer writing has already replaced this read.
       if (seq !== readSeqRef.current) return;
+      if (outcome?.reason === 'allowance') { setCloudState('allowance'); setCloudOffer(null); return; }
       if (!outcome || outcome.reason) { setCloudState(null); setCloudOffer(null); return; }
       if (outcome.error) { setCloudState('failed'); setCloudOffer(null); return; }
 
@@ -481,6 +482,9 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
             I'm reading:{shownEngineNote && <span className="muted" style={{ marginLeft: 10, textTransform: 'none', letterSpacing: 0 }}>{shownEngineNote}</span>}
             {cloudState === 'reading' && (
               <span className="muted" style={{ marginLeft: 10, textTransform: 'none', letterSpacing: 0 }}>· checking this reading</span>
+            )}
+            {cloudState === 'allowance' && (
+              <span className="muted" style={{ marginLeft: 10, textTransform: 'none', letterSpacing: 0 }}>· {t('ink.cloudAllowanceUsed')}</span>
             )}
             {cloudState === 'failed' && (
               <span className="muted" style={{ marginLeft: 10, textTransform: 'none', letterSpacing: 0 }}>· couldn’t reach the reader — this is the on-device reading</span>

@@ -1,4 +1,5 @@
 import { isAbsolute } from 'node:path';
+import { aiAllowanceConfigProblems } from './aiAllowance.js';
 import { spendCeilingMissing } from './spendCeiling.js';
 
 function nonEmpty(name) {
@@ -278,6 +279,8 @@ export function platformConfigStatus() {
     (!webAnnual || nonEmpty('PRI_RAZORPAY_ANNUAL_TOTAL_COUNT'));
   const appleBillingProviderConfigured = appleProducts && appleTrustConfigured() &&
     (!production || nonEmpty('PRI_APPLE_APP_ID'));
+
+  if (production) missing.push(...aiAllowanceConfigProblems());
 
   const uniqueMissing = [...new Set(missing)];
   return Object.freeze({

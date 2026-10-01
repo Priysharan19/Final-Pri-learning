@@ -294,6 +294,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     const lastLine = t => String(t || '').split(/\n+/).map(x => x.trim()).filter(Boolean).at(-1) || '';
     if (cloudReadingEnabled(user)) {
       const outcome = await readPhotoWithCloud(dataURL, { user });
+      if (outcome?.reason === 'allowance' && !nativePhotoAvailable()) return { allowance: true };
       if (outcome && !outcome.error && !outcome.reason) {
         const text = String(outcome.transcription.text || '').trim();
         if (text) return { text, markable: lastLine(text), confidence: outcome.transcription.confidence, engine: outcome.transcription.engine };
@@ -320,6 +321,13 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     }
     setPhotoOCR({ phase: 'reading', text: '', confidence: 0, error: '', engine: null });
     const page = await readOnePage(dataURL);
+    if (page?.allowance) {
+      setPhotoOCR({
+        phase: 'failed', text: '', confidence: 0, engine: null,
+        error: t('photo.cloudAllowanceUsed')
+      });
+      return;
+    }
     if (!page) {
       setPhotoOCR({
         phase: 'failed', text: '', confidence: 0, engine: null,
@@ -330,7 +338,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     if (isWorking && page.text) { setWorking(page.text); setShowWorking(true); }
     if (page.markable) setAnswer(page.markable);
     setPhotoOCR({ phase: 'done', text: page.text, confidence: Number(page.confidence || 0), error: '', engine: page.engine });
-  }, [isWorking, user, readOnePage]);
+  }, [isWorking, user, readOnePage, t]);
 
   // A scanned PDF becomes pages, and the pages become the same thing a photo
   // already is. More than one page of working is joined in order, because a

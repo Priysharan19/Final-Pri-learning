@@ -213,6 +213,7 @@ export async function cloudRequest(path, {
       const err = new Error(data?.error?.message || data?.error || `Cloud request failed (${status || 'native'})`);
       err.status = status || undefined;
       err.code = data?.error?.code || 'CLOUD_REQUEST_FAILED';
+      if (Number.isFinite(Number(data?.error?.resetAt))) err.resetAt = Number(data.error.resetAt);
       err.requestId = result?.requestId || rid;
       throw err;
     }
@@ -257,6 +258,7 @@ export async function cloudRequest(path, {
       const err = new Error(data?.error?.message || data?.error || `Cloud request failed (${response.status})`);
       err.status = response.status;
       err.code = data?.error?.code || 'CLOUD_REQUEST_FAILED';
+      if (Number.isFinite(Number(data?.error?.resetAt))) err.resetAt = Number(data.error.resetAt);
       err.requestId = response.headers.get('x-pri-request-id') || rid;
       throw err;
     }

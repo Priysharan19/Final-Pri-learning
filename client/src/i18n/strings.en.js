@@ -436,6 +436,8 @@ export default {
   'verdict.thisLooksLikeTitle': 'This looks like: {title}',
   'verdict.readingWork': 'Reading your handwriting…',
   'verdict.readOnServer': 'Read on the server',
+  'ink.cloudAllowanceUsed': 'today’s cloud reading allowance is used — this is the on-device reading',
+  'photo.cloudAllowanceUsed': 'Today’s cloud reading allowance is used, so this photo can’t be read right now. Type your working, or try again later.',
   'ink.hintEachLine': 'Write each step on its own line · stylus or finger',
   'verdict.removeAttachment': 'Remove attachment',
   'verdict.readingWithVision': 'Reading your handwriting on-device with Apple Vision…',

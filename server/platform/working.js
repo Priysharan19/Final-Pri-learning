@@ -19,7 +19,7 @@
 import { asyncRouter } from './asyncRouter.js';
 import { asStore } from './store.js';
 import { rateLimit, requireSession, requireVerifiedEmail } from './security.js';
-import { consumeAiAllowance, refuseAiAllowance } from './aiAllowance.js';
+import { consumeAiAllowance, refundAiAllowance, refuseAiAllowance } from './aiAllowance.js';
 import { consumePaidCall, refusePaidCall } from './spendCeiling.js';
 import {
   MAX_LINES,
@@ -110,7 +110,7 @@ export function createWorkingRouter(db, {
       // before anything is sent, so a malformed request cannot spend from a
       // budget shared by every student on this deployment.
       const overBudget = await consumePaidCall(db, { env });
-      if (overBudget) return refusePaidCall(res, overBudget);
+      if (overBudget) { await refundAiAllowance(db, allowance); return refusePaidCall(res, overBudget); }
 
       try {
         const result = await check(req.body.prompt || '', lines, { env });
@@ -126,6 +126,7 @@ export function createWorkingRouter(db, {
           }
         });
       } catch (error) {
+        if (/NOT_CONFIGURED|CONFIG_INVALID/.test(String(error?.code || ''))) await refundAiAllowance(db, allowance);
         if (error instanceof WorkingProviderError) {
           return res.status(error.status).json({ error: { code: error.code, message: error.message, retryable: !!error.retryable } });
         }
