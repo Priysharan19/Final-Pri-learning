@@ -153,11 +153,76 @@ check('tie-break prefers earlier real deadline', () => {
   assert.equal(row.id, 'earlier');
 });
 
-const backend = await read('src/local/backend.js');
+check('assignment without a due date is not falsely urgent', () => {
+  const row = selected({
+    assignments: [{ id: 'undated', classId: 'c', title: 'Undated' }],
+    reviews: { due: [{ subtopic: 'x' }] }
+  });
+  assert.equal(row.kind, 'reviews');
+});
+
+check('unfinished task question keeps resume priority', () => {
+  const row = selected({
+    tasks: [{ id: 'task-resume', title: 'Task', count: 10, done: 1, finished: false }],
+    resume: { kind: 'task', taskId: 'task-resume', questionId: 'q9', title: 'Task', destination: '/practice?task=task-resume' },
+    user: { ...student, today: { questions: 4 } }
+  });
+  assert.equal(row.kind, 'task-resume');
+  assert.equal(row.destination, '/practice?task=task-resume');
+});
+
+const [backend, home, app, en, hi, theme] = await Promise.all([
+  read('src/local/backend.js'),
+  read('src/pages/Home.jsx'),
+  read('src/App.jsx'),
+  read('src/i18n/strings.en.js'),
+  read('src/i18n/strings.hi.js'),
+  read('src/theme.css')
+]);
+
 check('backend exposes read-only practice resume summary', () => {
   assert.match(backend, /'GET \/practice\/resume'/);
   assert.match(backend, /questionId: row\.id/);
   assert.match(backend, /never question content/i);
+});
+
+check('Home consumes one central recommendation resolver', () => {
+  assert.match(home, /resolveHomeRecommendation/);
+  assert.match(home, /api\.get\('\/practice\/resume'\)/);
+  assert.match(home, /cloud\.assignments\(\)/);
+});
+
+check('Home exposes exactly one semantic primary recommendation region and CTA', () => {
+  assert.equal((home.match(/data-home-primary(?!-)/g) || []).length, 1);
+  assert.equal((home.match(/data-home-primary-cta/g) || []).length, 1);
+  assert.match(home, /aria-describedby=\{reasonId\}/);
+});
+
+check('primary recommendation appears before manual generator in source order', () => {
+  assert.ok(home.indexOf('<PrimaryAction') < home.indexOf('className="genbar"'));
+});
+
+check('cloud failure is bounded and local learning remains rendered', () => {
+  assert.match(home, /cloudState === 'offline' \|\| cloudState === 'error'/);
+  assert.match(home, /home\.cloudError/);
+});
+
+check('teacher routing remains outside student Home', () => {
+  assert.match(app, /user\.role === 'teacher' \? <Navigate to="\/teach"/);
+});
+
+check('English and Hindi include command-centre copy', () => {
+  for (const source of [en, hi]) {
+    assert.match(source, /'home\.nextUp'/);
+    assert.match(source, /'home\.cta\.startFirstPractice'/);
+    assert.match(source, /'home\.reason\.smartPracticeOffline'/);
+  }
+});
+
+check('KALP-04 command-centre CSS has responsive and reduced-motion rules', () => {
+  assert.match(theme, /\.home-command \{/);
+  assert.match(theme, /@media \(max-width: 640px\)/);
+  assert.match(theme, /prefers-reduced-motion: reduce/);
 });
 
 console.log('');

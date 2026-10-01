@@ -31,8 +31,8 @@ function assignmentAction(row, now) {
 
   let priority = 58;
   if (state === 'returned') priority = 96;
-  else if (state === 'started' && (overdue || remainingMs <= 48 * HOUR)) priority = 95;
-  else if (overdue || remainingMs <= 24 * HOUR) priority = 94;
+  else if (state === 'started' && (overdue || (remainingMs != null && remainingMs <= 48 * HOUR))) priority = 95;
+  else if (overdue || (remainingMs != null && remainingMs <= 24 * HOUR)) priority = 94;
   else if (state === 'started') priority = 90;
   else if (remainingMs != null && remainingMs <= 7 * DAY) priority = 76;
 
@@ -145,7 +145,7 @@ export function resolveHomeRecommendation({
   candidates.push(...taskCandidates);
 
   const resumed = resumeAction(resume);
-  if (resumed && !taskCandidates.some(t => resume?.taskId && String(t.id) === String(resume.taskId))) candidates.push(resumed);
+  if (resumed) candidates.push(resumed);
 
   const due = Array.isArray(reviews?.due) ? reviews.due : [];
   if (due.length) {
@@ -153,8 +153,8 @@ export function resolveHomeRecommendation({
       id: 'reviews',
       titleKey: 'home.next.reviews',
       titleVars: { count: due.length },
-      reasonKey: 'home.reason.reviews',
-      reasonVars: { count: due.length },
+      reasonKey: 'home.reviewDue',
+      reasonVars: { count: due.length, n: due.length },
       ctaKey: 'home.cta.startReviews',
       destination: '/practice',
       metadata: { source: 'local-reviews', count: due.length }

@@ -1,6 +1,9 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
+import { cloud, cloudAvailable } from '../platform/cloudTransport.js';
+import { onCloudSessionChange } from '../platform/cloudSession.js';
+import { resolveHomeRecommendation } from '../home/recommendation.js';
 import { useApp } from '../App.jsx';
 import { dotpointAvailable, practiceTargetAvailable, topicAvailability } from '../engine/curriculumAvailability.js';
 import { dayKey, formatWeekday } from '../lib/locale.js';
@@ -31,12 +34,19 @@ function loadSaved() {
 }
 
 export default function Home() {
-  const { user, dueCount } = useApp();
+  const { user } = useApp();
   const nav = useNavigate();
   const t = useT();
   const tx = useTx();
   const [stats, setStats] = useState(null);
   const [curriculum, setCurriculum] = useState(null);
+  const [reviews, setReviews] = useState(null);
+  const [tasks, setTasks] = useState([]);
+  const [exams, setExams] = useState([]);
+  const [resume, setResume] = useState(null);
+  const [assignments, setAssignments] = useState([]);
+  const [cloudState, setCloudState] = useState('unavailable');
+  const [online, setOnline] = useState(() => typeof navigator === 'undefined' ? true : navigator.onLine !== false);
   const [open, setOpen] = useState(false);
   const [cat, setCat] = useState('year');
   const saved = useRef(loadSaved());
@@ -45,7 +55,6 @@ export default function Home() {
   const [subtopic, setSubtopic] = useState(saved.current.subtopic ?? null);
   const [dotpoint, setDotpoint] = useState(saved.current.dotpoint ?? null);
   const [difficulty, setDifficulty] = useState(saved.current.difficulty ?? null);
-  const [promoGone, setPromoGone] = useState(localStorage.getItem('pri-home-promo') === 'off');
   // Typed into the topic filter. Kept out of the saved filter set on purpose:
   // it is how you find a topic, not part of what you asked for.
   const [topicQuery, setTopicQuery] = useState('');
@@ -54,8 +63,70 @@ export default function Home() {
   // gets a working English filter, because textMatches falls back to the label.
   useGlossary(user?.mathsGloss === true);
 
-  useEffect(() => { api.get('/stats').then(setStats).catch(() => { }); }, []);
-  useEffect(() => { api.get('/curriculum').then(setCurriculum).catch(() => { }); }, []);
+  const refreshLocal = useCallback(async () => {
+    const [statsR, curriculumR, reviewsR, tasksR, examsR, resumeR] = await Promise.allSettled([
+      api.get('/stats'),
+      api.get('/curriculum'),
+      api.get('/reviews'),
+      api.get('/tasks'),
+      api.get('/exams'),
+      api.get('/practice/resume')
+    ]);
+    if (statsR.status === 'fulfilled') setStats(statsR.value);
+    if (curriculumR.status === 'fulfilled') setCurriculum(curriculumR.value);
+    setReviews(reviewsR.status === 'fulfilled' ? reviewsR.value : { due: [], upcoming: [] });
+    setTasks(tasksR.status === 'fulfilled' ? (tasksR.value.tasks || []) : []);
+    setExams(examsR.status === 'fulfilled' ? (examsR.value.exams || []) : []);
+    setResume(resumeR.status === 'fulfilled' ? (resumeR.value.resume || null) : null);
+  }, [user.id]);
+
+  useEffect(() => { refreshLocal(); }, [refreshLocal]);
+
+  useEffect(() => {
+    const update = () => setOnline(navigator.onLine !== false);
+    window.addEventListener('online', update);
+    window.addEventListener('offline', update);
+    return () => {
+      window.removeEventListener('online', update);
+      window.removeEventListener('offline', update);
+    };
+  }, []);
+
+  useEffect(() => {
+    let live = true;
+    const enabled = cloudAvailable();
+    let stop = () => {};
+
+    const load = async () => {
+      if (!enabled) {
+        if (live) { setAssignments([]); setCloudState('unavailable'); }
+        return;
+      }
+      if (!online) {
+        if (live) { setAssignments([]); setCloudState('offline'); }
+        return;
+      }
+      try {
+        const [me, result] = await Promise.all([cloud.me(), cloud.assignments()]);
+        if (!live) return;
+        if (me?.account?.role !== 'student') {
+          setAssignments([]);
+          setCloudState('unavailable');
+          return;
+        }
+        setAssignments(Array.isArray(result?.assignments) ? result.assignments : []);
+        setCloudState('ready');
+      } catch (err) {
+        if (!live) return;
+        setAssignments([]);
+        setCloudState(err?.status === 401 ? 'unavailable' : 'error');
+      }
+    };
+
+    load();
+    if (enabled) stop = onCloudSessionChange(load);
+    return () => { live = false; stop(); };
+  }, [online, user.id]);
   useEffect(() => {
     localStorage.setItem('pri-gen-filters', JSON.stringify({ year, sectionKey, subtopic, dotpoint, difficulty }));
   }, [year, sectionKey, subtopic, dotpoint, difficulty]);
@@ -150,12 +221,45 @@ export default function Home() {
 
   const resetAll = () => { setSectionKey(null); setSubtopic(null); setDotpoint(null); setDifficulty(null); setYear(user.year); };
 
+  const homeDecision = useMemo(() => resolveHomeRecommendation({
+    user,
+    stats,
+    reviews,
+    tasks,
+    exams,
+    resume,
+    assignments,
+    online,
+    cloudState
+  }), [user, stats, reviews, tasks, exams, resume, assignments, online, cloudState]);
+
   return (
     <div className="home-wrap">
       <h1 className="home-greet">{tx('home.greeting', { greeting, name: <b>{firstName}</b> })}</h1>
       <Tagline />
 
-      {/* ── The question generator ── */}
+      <PrimaryAction action={homeDecision.primary} nav={nav} />
+      {(cloudState === 'offline' || cloudState === 'error') && (
+        <div className="home-cloud-note" role="status">
+          {t(cloudState === 'offline' ? 'home.cloudOffline' : 'home.cloudError')}
+        </div>
+      )}
+
+      <div className="home-support-grid" aria-label={t('home.supportingActions')}>
+        <GoalCard user={user} activity={stats?.activity || []} onGo={() => nav('/practice')} compact />
+        {homeDecision.alternatives.slice(0, 2).map(item => (
+          <SupportingAction key={item.kind + ':' + item.id} action={item} nav={nav} />
+        ))}
+      </div>
+
+      <section className="home-manual" aria-labelledby="home-manual-title">
+        <div>
+          <h2 id="home-manual-title">{t('home.choosePractice')}</h2>
+          <p>{t('home.choosePracticeSub')}</p>
+        </div>
+      </section>
+
+      {/* ── Manual practice configuration is deliberately secondary ── */}
       <div className="genbar">
         <div className={`genbar-head ${open ? 'open' : ''}`}>
           <button className="genbar-toggle" onClick={() => setOpen(o => !o)}
@@ -299,35 +403,40 @@ export default function Home() {
         )}
       </div>
 
-      {/* ── Bottom cards ── */}
-      <div className="home-cards">
-        <GoalCard user={user} activity={stats?.activity || []} onGo={() => nav('/practice')} />
-        <div className="home-card" style={{ maxWidth: 380 }}>
-          <div className="spread">
-            <span className="sc-label" style={{ margin: 0 }}>{t('home.questionsCompleted')}</span>
-            {stats && stats.recent?.some(a => a.correct) && <span className="sc-label" style={{ margin: 0, color: 'var(--good)' }}>{t('home.gettingStronger')}</span>}
-          </div>
-          <DiamondTrack recent={stats?.recent || []} />
-        </div>
-        {!promoGone && (
-          <div className="home-card">
-            <button className="home-card-x" aria-label={t('home.dismissAdaptive')}
-              onClick={() => { setPromoGone(true); localStorage.setItem('pri-home-promo', 'off'); }}>✕</button>
-            <span className="sc-label" style={{ margin: 0 }}>{t('home.adaptiveEngine')}</span>
-            <div className="spread" style={{ marginTop: 8, flexWrap: 'wrap', gap: 14 }}>
-              <div style={{ fontSize: 21, lineHeight: 1.35, maxWidth: 300 }}>
-                {dueCount > 0
-                  ? tx('home.reviewDue', { count: dueCount, n: <b>{dueCount}</b> })
-                  : t('home.adaptiveOn')}
-              </div>
-              <button className="btn btn-primary" onClick={() => nav('/practice')}>
-                {dueCount > 0 ? t('home.startReviewing') : t('home.smartPractice')}
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
     </div>
+  );
+}
+
+function PrimaryAction({ action, nav }) {
+  const t = useT();
+  if (!action) return null;
+  const reasonId = 'home-primary-reason';
+  return (
+    <section className="home-command" data-home-primary aria-labelledby="home-next-title">
+      <div className="home-command-copy">
+        <div className="home-command-kicker">{t('home.nextUp')}</div>
+        <h2 id="home-next-title">{t(action.titleKey, action.titleVars || {})}</h2>
+        <p id={reasonId}>{t(action.reasonKey, action.reasonVars || {})}</p>
+      </div>
+      <button type="button" className="btn btn-primary home-command-cta" data-home-primary-cta
+        aria-describedby={reasonId} onClick={() => nav(action.destination)}>
+        {t(action.ctaKey)}
+      </button>
+    </section>
+  );
+}
+
+function SupportingAction({ action, nav }) {
+  const t = useT();
+  return (
+    <article className="home-support-action">
+      <div className="sc-label">{t('home.alsoAvailable')}</div>
+      <strong>{t(action.titleKey, action.titleVars || {})}</strong>
+      <p>{t(action.reasonKey, action.reasonVars || {})}</p>
+      <button type="button" className="btn btn-ghost btn-sm" onClick={() => nav(action.destination)}>
+        {t(action.ctaKey)}
+      </button>
+    </article>
   );
 }
 
@@ -359,7 +468,7 @@ function Tagline() {
   );
 }
 
-function GoalCard({ user, activity, onGo }) {
+function GoalCard({ user, activity, onGo, compact = false }) {
   const t = useT();
   const done = user.today?.questions || 0;
   const goal = user.dailyGoal || 10;
@@ -378,7 +487,7 @@ function GoalCard({ user, activity, onGo }) {
     };
   });
   return (
-    <div className="home-card goal-card" style={{ maxWidth: 420 }}>
+    <div className={`home-card goal-card${compact ? " compact" : ""}`} style={{ maxWidth: 420 }}>
       <div className="goal-ring" role="img" aria-label={t('home.goalRing', { done, goal })}>
         <svg width="92" height="92" viewBox="0 0 92 92">
           <circle className="goal-ring-track" cx="46" cy="46" r={R} fill="none" strokeWidth="7" />
