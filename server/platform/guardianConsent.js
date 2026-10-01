@@ -27,6 +27,8 @@
 import { sessionFromRequest, sha256 } from './security.js';
 import { asyncHandler } from './asyncRouter.js';
 import { asStore } from './store.js';
+import { tagPolicy } from './routePolicy.js';
+import { clipText } from './text.js';
 
 /**
  * The version of the notice a guardian agreed to. Bump it whenever the privacy
@@ -43,7 +45,7 @@ export const CONSENT_METHOD = 'guardian-email-confirmation';
 /** The classes whose students are children by definition. */
 const CHILD_CLASS = /^(7|8|9|10|11|12)$/;
 
-const clean = (value, max) => String(value ?? '').trim().slice(0, max);
+const clean = (value, max) => clipText(String(value ?? '').trim(), max);
 
 /** Is this learner a child, on what they told us at signup? */
 export function learnerIsChild({ isAdult, year } = {}) {
@@ -128,7 +130,7 @@ export async function withdrawConsent(db, accountId, now = Date.now()) {
  */
 export function requireGuardianConsent(db) {
   db = asStore(db);
-  return asyncHandler(async (req, res, next) => {
+  return tagPolicy(asyncHandler(async (req, res, next) => {
     // The session is resolved here rather than read off the request, because
     // each sub-router establishes its own session INSIDE itself — so a gate
     // mounted in front of one runs before req.platformSession exists, and
@@ -151,7 +153,7 @@ export function requireGuardianConsent(db) {
     }
     return refuse(res, 'GUARDIAN_CONSENT_WITHDRAWN',
       'A parent or guardian has withdrawn permission for this account to sync. Your work stays on this device.');
-  });
+  }), { guardianConsent: true });
 }
 
 function refuse(res, code, message) {

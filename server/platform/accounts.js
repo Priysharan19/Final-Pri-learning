@@ -2,7 +2,7 @@ import { asyncRouter } from './asyncRouter.js';
 import { asStore, isDatabaseOverload, isUniqueViolation, sqliteHandle } from './store.js';
 import bcrypt from 'bcryptjs';
 import {
-  clearSessionCookies, createSession, id, opaqueToken, rateLimit, requireSession,
+  clearSessionCookies, consumeRateLimit, createSession, id, opaqueToken, rateLimit, requireSession,
   sessionFromRequest, setSessionCookies, sha256
 } from './security.js';
 import { encryptDeliveryToken } from './deliveryCrypto.js';
@@ -15,9 +15,16 @@ import { consumeTeacherInvite, findLiveTeacherInvite } from './teacherInvites.js
 import { maybeBootstrapAdmin } from './bootstrapAdmin.js';
 import { consumeOidcNonce } from './oidcNonce.js';
 import { publicEntitlement } from './entitlements.js';
+import { clipText } from './text.js';
 
 const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const TOKEN_MS = 1000 * 60 * 60;
+/**
+ * Reset emails one mailbox may receive per hour, however many addresses ask.
+ * The per-IP limit on the route bounds one caller; this bounds one victim, so a
+ * botnet cannot turn the reset form into a mail bomb aimed at a student.
+ */
+export const RESET_MAILBOX_LIMIT = { limit: 3, windowMs: 60 * 60 * 1000 };
 const BCRYPT_COST = 12;
 // Compared against when no account (or no password) matches the submitted
 // email, so an unknown address costs the same bcrypt work as a wrong password.
@@ -163,7 +170,7 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
   router.post('/register', rateLimit(db, 'register', { limit: 8, windowMs: 60 * 60 * 1000 }), async (req, res, next) => {
     try {
       const em = email(req.body?.email);
-      const name = String(req.body?.name || '').trim().slice(0, 80);
+      const name = clipText(String(req.body?.name || '').trim(), 80);
       const password = String(req.body?.password || '');
       const deviceId = String(req.body?.deviceId || 'web').slice(0, 160);
       if (!em || !name || !strongPassword(password)) {
@@ -346,7 +353,10 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
   router.post('/password/reset-request', rateLimit(db, 'reset-request', { limit: 6, windowMs: 60 * 60 * 1000 }), async (req, res) => {
     const em = email(req.body?.email);
     const row = em ? await db.get(`SELECT id,email FROM accounts WHERE ${db.emailEquals('email')} AND deleted_at IS NULL`, [em]) : null;
-    if (row) {
+    // Over the mailbox cap the answer is still a plain ok: what the caller sees
+    // must not depend on whether the address exists or how often it was asked.
+    const mailbox = row ? await consumeRateLimit(db, `reset-mailbox:${sha256(row.id).slice(0, 24)}`, RESET_MAILBOX_LIMIT) : null;
+    if (row && mailbox.allowed) {
       const now = Date.now();
       await db.transaction(async () => {
         await invalidatePendingTokens(db, row.id, 'reset-password', now);
@@ -436,7 +446,9 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
   // person's (a guardian's address is masked exactly as /guardian/state masks it;
   // a class shows its name, never its teacher or classmates). See
   // docs/privacy/data-retention.md for the table-by-table account.
-  router.get('/export', requireSession(db), async (req, res) => {
+  // Bounded so a stolen session cannot be used to pull the whole learning
+  // history over and over, and one account cannot monopolise the database.
+  router.get('/export', requireSession(db), rateLimit(db, 'account-export', { limit: 10, windowMs: 60 * 60 * 1000 }), async (req, res) => {
     const accountId = req.platformSession.account_id;
     const account = await db.get('SELECT id,email,name,role,email_verified_at,created_at,updated_at FROM accounts WHERE id = ?', [accountId]);
     const identities = await db.all('SELECT provider,linked_at FROM account_identities WHERE account_id = ? ORDER BY linked_at', [accountId]);

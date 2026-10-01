@@ -211,7 +211,7 @@ role, and therefore **cannot and must not be pointed at Supabase**. Run it on th
 being deployed and keep the output:
 
 ```bash
-npm run test:platform:pg   # expect: PLATFORM ON POSTGRES: PASS — 25/25 suites
+npm run test:platform:pg   # expect: PLATFORM ON POSTGRES: PASS — 27/27 suites
 ```
 
 Against staging itself, the equivalent evidence is §4.2 plus §4.4.
@@ -358,7 +358,7 @@ runs against an empty `pri` schema.
 | 2.4 `db push` | staging | | | | |
 | 3 login role created | staging | | | | (role name only) |
 | 4.2 target check | staging | | | | `POSTGRES TARGET: PASS — n/n` |
-| 4.3 `test:platform:pg` | local/CI | | | | `25/25 suites` |
+| 4.3 `test:platform:pg` | local/CI | | | | `27/27 suites` |
 | 4.4 smoke | staging | | | | |
 | 6 backup + restore drill | production | | | | |
 | 2–4 | production | | | | |

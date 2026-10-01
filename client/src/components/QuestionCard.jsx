@@ -17,7 +17,8 @@ import { MAX_PDF_PAGES, renderPdfPages } from '../ink/pdfPage.js';
 import PriPlot from './PriPlot.jsx';
 import { plotSpecFor } from '../engine/plotSpec.js';
 import { awardStepMarks, marksSentence } from '../engine/cbseMarking.js';
-import { checkWorkingWithCloud, mergeVerdicts, shouldCheckWorking, workingNote } from '../ink/cloudWorking.js';
+import { checkWorkingWithCloud, mergeVerdicts, misconceptionProposal, shouldCheckWorking, workingNote } from '../ink/cloudWorking.js';
+import { misconceptionById } from '../engine/misconceptions.js';
 import { useT, useTx } from '../i18n/index.js';
 import TermGloss from './TermGloss.jsx';
 
@@ -693,6 +694,24 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   );
   const cloudWorkingNote = useMemo(() => workingNote(cloudCheck), [cloudCheck]);
 
+  // The misconception the cloud check proposed, as the deterministic engine
+  // judged it: 'confirmed' (recorded in learner state) or 'possible' (shown,
+  // hedged, never recorded). The backend decides; this only displays.
+  const [cloudMisconception, setCloudMisconception] = useState(null);
+  useEffect(() => { setCloudMisconception(null); }, [question?.id]);
+  useEffect(() => {
+    const proposal = misconceptionProposal(cloudCheck, inkResult?.lines || []);
+    if (!proposal || !question?.id) return;
+    let live = true;
+    api.post(`/practice/${question.id}/misconception`, proposal.body)
+      .then(r => {
+        const named = r?.status ? misconceptionById(r.id) : null;
+        if (live && named) setCloudMisconception({ status: r.status, named, line: proposal.displayLine });
+      })
+      .catch(() => { });
+    return () => { live = false; };
+  }, [cloudCheck, inkResult, question?.id]);
+
   // ── The board's own arithmetic ─────────────────────────────────────────────
   // CBSE marks per step: formula, substitution, final answer with units. A
   // student whose method is sound and whose arithmetic slipped keeps most of
@@ -926,6 +945,10 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                       onChange={e => editAnswer(e.target.value)}
                       onKeyDown={e => { if (e.key === 'Enter') submit(); }}
                       autoCapitalize="none" autoCorrect="off" spellCheck={false}
+                      // Answers are expressions as often as numbers (x², 3/4, √2),
+                      // so a numeric keypad would block them: keep the full
+                      // keyboard and label its Enter key as the submit action.
+                      inputMode="text" enterKeyHint="go"
                     />
                     {question.answerSuffix && <span className="answer-suffix">{question.answerSuffix}</span>}
                   </div>
@@ -1049,6 +1072,13 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                         {t(cloudWorkingNote.tone === 'break' ? 'verdict.whereItBreaks' : cloudWorkingNote.tone === 'maybe' ? 'verdict.possibly' : 'verdict.yourAlgebra')}
                       </div>
                       {cloudWorkingNote.text}
+                      {cloudMisconception && (
+                        <div className="diagnosis-named" data-misconception={cloudMisconception.named.id} data-status={cloudMisconception.status}>
+                          <b>{t(cloudMisconception.status === 'confirmed' ? 'verdict.lineMisconception' : 'verdict.possibleMisconception',
+                            { n: cloudMisconception.line, name: t(cloudMisconception.named.name) })}</b>
+                          <div>{t(cloudMisconception.named.explain)}</div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </aside>
@@ -1286,7 +1316,7 @@ function StepReport({ report }) {
             {l.status === 'break' && <b style={{ fontFamily: 'var(--font)', fontSize: 12.5, whiteSpace: 'nowrap' }}>{t('verdict.mistakeIsHere')}</b>}
             {l.note && !l.diagnosis && <span style={{ fontFamily: 'var(--font)', fontWeight: 400, fontSize: 12.5 }}> — {l.note}</span>}
           </div>
-          {l.diagnosis && <Diagnosis d={l.diagnosis} />}
+          {l.diagnosis && <Diagnosis d={l.diagnosis} line={i + 1} />}
         </React.Fragment>
       ))}
     </div>
@@ -1298,18 +1328,30 @@ function StepReport({ report }) {
  * this card says which move was made, and the rule that move breaks — so the
  * student leaves with something to change rather than something to re-read.
  */
-function Diagnosis({ d }) {
+function Diagnosis({ d, line }) {
+  // `t` was once read here without being declared, so the first diagnosis
+  // card a student earned threw a ReferenceError instead of rendering.
+  const t = useT();
   if (!d) return null;
   // A diagnosis the engine could pin to exactly one move is stated; one where
   // more than one move reproduces the line, or that rests on a counterexample
   // alone, is hedged — the student should weigh it, not obey it.
   const hedged = d.confidence !== 'high';
+  // The misconception by its stable ontology name, in the student's language:
+  // "Line 3: Sign not changed when a term crossed the =". The engine's own
+  // sentence about this line's numbers stays underneath it.
+  const named = misconceptionById(d.code);
+  const nameLine = named && named.recordable && Number.isInteger(line)
+    ? t(hedged ? 'verdict.possibleMisconception' : 'verdict.lineMisconception', { n: line, name: t(named.name) })
+    : null;
   return (
-    <div className="diagnosis-card" data-confidence={d.confidence || 'medium'}>
+    <div className="diagnosis-card" data-confidence={d.confidence || 'medium'} data-misconception={nameLine ? named.id : undefined}>
       <div className="diagnosis-label">{t(d.code === 'counterexample' ? 'verdict.whyItFails' : hedged ? 'verdict.thisLooksLike' : 'verdict.whatWentWrong')}</div>
-      <div className="diagnosis-title">{hedged && d.code !== 'counterexample' ? t('verdict.thisLooksLikeTitle', { title: d.title }) : d.title}</div>
+      {nameLine
+        ? <div className="diagnosis-title">{nameLine}</div>
+        : <div className="diagnosis-title">{hedged && d.code !== 'counterexample' ? t('verdict.thisLooksLikeTitle', { title: d.title }) : d.title}</div>}
       <div className="diagnosis-body">{d.message}</div>
-      {d.fix && <div className="diagnosis-fix">{d.fix}</div>}
+      {nameLine ? <div className="diagnosis-fix">{t(named.explain)}</div> : (d.fix && <div className="diagnosis-fix">{d.fix}</div>)}
     </div>
   );
 }
