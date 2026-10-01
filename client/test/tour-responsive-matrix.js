@@ -161,8 +161,11 @@ export const flow = {
         await page.setViewportSize({ width: 820, height: 1180 });
         await page.waitForTimeout(400);
         const rotated = await inkBox();
+        // Ink scaled past the foot is simply not painted, so "still visible" is
+        // the test: the lowest stroke (drawn at 90% height) must still show
+        // near the foot of the wider sheet.
         await check(`${tag}: widening to a tablet keeps every stroke on the sheet`,
-          !!rotated && !rotated.empty && rotated.maxY < rotated.h - 1, JSON.stringify(rotated));
+          !!rotated && !rotated.empty && rotated.maxY >= rotated.h * 0.85 && rotated.maxY < rotated.h - 1, JSON.stringify(rotated));
         await page.setViewportSize({ width: 360, height: 640 });
         await page.waitForTimeout(400);
         const narrowed = await inkBox();
