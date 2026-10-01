@@ -201,6 +201,18 @@ class ShellJourneyTest {
             assertEquals("\"x+7\"", eval(s, "(document.querySelector('.editor-body input.answer-input')||{}).value"))
             s.onActivity { it.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT }
             Thread.sleep(1500)
+
+            Log.i("PRITEST", "a typed attempt is submitted and marked, feedback shown, next question, progress")
+            waitFor(s, "(function(){var b=[].slice.call(document.querySelectorAll('.editor-foot .btn-primary')).find(function(x){return x.offsetParent&&!x.disabled});if(!b)return false;b.click();return true;})()")
+            val feedback = waitFor(s, "(function(){var v=document.querySelector('.verdict')||document.querySelector('.your-answer');return v?(v.innerText||'marked').slice(0,60):false;})()")
+            assertTrue("the attempt was marked with feedback: $feedback", feedback.length > 2)
+            val prompt = eval(s, "(document.querySelector('.q-prompt')||{}).textContent||''")
+            eval(s, "(function(){var n=document.querySelector('.ctx-next');if(n)n.click();return true;})()")
+            waitFor(s, "(document.querySelector('.q-prompt')||{}).textContent && (document.querySelector('.q-prompt').textContent !== $prompt)")
+            eval(s, "(function(){history.pushState({},'','/progress');dispatchEvent(new PopStateEvent('popstate'));return true;})()")
+            waitFor(s, "location.pathname === '/progress' && document.querySelector('main') && document.querySelector('main').innerText.length > 40")
+            eval(s, "(function(){history.back();return true;})()")
+            waitFor(s, "location.pathname === '/practice'")
             pressBack()
             waitFor(s, "location.pathname === '/'")
 

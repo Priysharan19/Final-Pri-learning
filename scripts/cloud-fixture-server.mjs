@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // ─────────────────────────────────────────────────────────────────────────────
-// Pri Learning · real Pri server for the Android cloud journey (CP-07)
+// Pri Learning · real Pri server for the native cloud journeys (CP-05 iPhone, CP-07 Android)
 //
 // TEST HARNESS ONLY — never part of the server or the app. Starts the real
 // server (server/index.js) on a throwaway SQLite database, creates one adult
@@ -9,7 +9,11 @@
 // only ever delivered by email, which a CI runner cannot read). Prints the
 // instrumentation arguments for android/scripts/run-instrumented.sh.
 //
-//   node android/scripts/cloud-fixture-server.mjs [--port 4310] [--out fixture.env]
+//   node scripts/cloud-fixture-server.mjs [--port 4310] [--host 10.0.2.2|127.0.0.1] [--out fixture.env]
+// --host is how the device reaches this machine: 10.0.2.2 from the Android
+// emulator (the default), 127.0.0.1 from an iOS simulator.
+// --db <file> --restart starts the server again on an existing fixture
+// database (offline → reconnect journeys) without creating anything.
 // The server keeps running (detached); its log is written next to the DB.
 // ─────────────────────────────────────────────────────────────────────────────
 import { spawn } from 'node:child_process';
@@ -19,11 +23,15 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomBytes } from 'node:crypto';
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../..');
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const arg = name => { const i = process.argv.indexOf(`--${name}`); return i > 0 ? process.argv[i + 1] : null; };
 const port = Number(arg('port') || 4310);
-const dir = mkdtempSync(join(tmpdir(), 'pri-android-cloud-'));
-const dbPath = join(dir, 'platform.db');
+const deviceHost = arg('host') || '10.0.2.2';
+if (!['10.0.2.2', '127.0.0.1', 'localhost'].includes(deviceHost)) { console.error('--host must be 10.0.2.2, 127.0.0.1 or localhost'); process.exit(2); }
+const restart = process.argv.includes('--restart');
+const dbPath = arg('db') || join(mkdtempSync(join(tmpdir(), 'pri-native-cloud-')), 'platform.db');
+const dir = dirname(dbPath);
+if (restart && !arg('db')) { console.error('--restart needs --db <file>'); process.exit(2); }
 const log = openSync(join(dir, 'server.log'), 'a');
 
 const child = spawn(process.execPath, [join(ROOT, 'server/index.js')], {
@@ -41,7 +49,14 @@ for (let i = 0; ; i++) {
   await new Promise(r => setTimeout(r, 500));
 }
 
-const email = `android-${Date.now()}@example.test`;
+if (restart) {
+  console.log(`Real Pri server restarted on ${base} (pid ${child.pid}) with ${dbPath}. SYNTHETIC TEST FIXTURE.`);
+  const out = arg('out');
+  if (out) writeFileSync(out, `PRI_CLOUD_SERVER_PID=${child.pid}\n`);
+  process.exit(0);
+}
+
+const email = `native-${Date.now()}@example.test`;
 const password = `Fixture-${randomBytes(9).toString('base64url')}`;
 const res = await fetch(`${base}/v1/account/register`, {
   method: 'POST',
@@ -56,8 +71,11 @@ const changed = db.prepare('UPDATE accounts SET email_verified_at = ? WHERE emai
 db.close();
 if (changed !== 1) { console.error('could not mark the fixture account verified'); process.exit(1); }
 
-// 10.0.2.2 is the emulator's alias for the host's loopback.
-const env = `PRI_CLOUD_ORIGIN=http://10.0.2.2:${port}\nPRI_CLOUD_EMAIL=${email}\nPRI_CLOUD_PASSWORD=${password}\nPRI_CLOUD_SERVER_PID=${child.pid}\nPRI_CLOUD_SERVER_LOG=${join(dir, 'server.log')}\n`;
+// 10.0.2.2 is the Android emulator's alias for this machine's loopback.
+// A second, never-registered credential for sign-up journeys.
+const newEmail = `native-new-${Date.now()}@example.test`;
+const newPassword = `Fixture-${randomBytes(9).toString('base64url')}`;
+const env = `PRI_CLOUD_ORIGIN=http://${deviceHost}:${port}\nPRI_CLOUD_EMAIL=${email}\nPRI_CLOUD_PASSWORD=${password}\nPRI_CLOUD_NEW_EMAIL=${newEmail}\nPRI_CLOUD_NEW_PASSWORD=${newPassword}\nPRI_CLOUD_DB=${dbPath}\nPRI_CLOUD_PORT=${port}\nPRI_CLOUD_SERVER_PID=${child.pid}\nPRI_CLOUD_SERVER_LOG=${join(dir, 'server.log')}\n`;
 const out = arg('out');
 if (out) writeFileSync(out, env);
 console.log(`Real Pri server on ${base} (pid ${child.pid}); fixture account ${email} (verified). SYNTHETIC TEST FIXTURE.`);

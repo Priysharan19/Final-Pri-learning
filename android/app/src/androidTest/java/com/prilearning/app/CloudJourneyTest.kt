@@ -2,7 +2,7 @@
 // Pri Learning · Android cloud journey against the real Pri server (CP-07)
 //
 // Run by android/scripts/run-instrumented.sh after the shell journey, with a
-// real server started by android/scripts/cloud-fixture-server.mjs (emulator →
+// real server started by scripts/cloud-fixture-server.mjs (emulator →
 // host at 10.0.2.2). Two runs with `am force-stop` between them:
 //   1. cloudSignInAndSync — the real Settings UI signs in through the native
 //      bridge (page → priBridge → HttpURLConnection → server), Sync now pushes
@@ -110,6 +110,63 @@ class CloudJourneyTest {
 
     private fun jarOnDisk(): CookieJar = CookieJar().apply { load(SecureStore(context).read()) }
 
+    /** Sign up through Settings, sign in, then permanently delete the account. */
+    @Test
+    fun cloudSignUpThenDeleteAccount() {
+        val email = args.getString("priCloudNewEmail", "")
+        val password = args.getString("priCloudNewPassword", "")
+        assertTrue("a never-registered fixture credential is given", email.isNotEmpty() && password.isNotEmpty())
+        ActivityScenario.launch(MainActivity::class.java).use { s ->
+            reachHome(s)
+            openSettings(s)
+            assertEquals("\"Not connected\"", waitFor(s, stateTag))
+            eval(s, "($byText)('Create account').click()")
+            setValue(s, "#cloud-name", "Android Adult")
+            setValue(s, "#cloud-email", email)
+            setValue(s, "#cloud-password", password)
+            eval(s, "(function(){[].slice.call(document.querySelector('#cloud-email').form.querySelectorAll('input[type=checkbox]')).forEach(function(b){if(!b.checked)b.click();});return true;})()")
+            Thread.sleep(300)
+            eval(s, "document.querySelector('#cloud-email').form.querySelector('button[type=submit]').click()")
+            val linked = waitFor(s, "/^Connected$|sign-in required|offline/.test($stateTag) && $stateTag")
+            if (linked != "\"Connected\"") {
+                eval(s, "($byText)('Disconnect').click()")
+                waitFor(s, "$stateTag === 'Not connected'")
+                eval(s, "($byText)('Sign in').click()")
+                setValue(s, "#cloud-email", email)
+                setValue(s, "#cloud-password", password)
+                eval(s, "document.querySelector('#cloud-email').form.querySelector('button[type=submit]').click()")
+                waitFor(s, "$stateTag === 'Connected'")
+            }
+            setValue(s, "#cloud-delete-password", password)
+            setValue(s, "#cloud-delete-phrase", "DELETE")
+            Thread.sleep(300)
+            eval(s, "document.querySelector('#cloud-delete-phrase').form.querySelector('button[type=submit]').click()")
+            waitFor(s, "/Cloud account deleted/.test(document.body.innerText) && $stateTag === 'Not connected'")
+            // Server-side proof: the deleted account can no longer sign in.
+            val conn = java.net.URL("$origin/v1/account/login").openConnection() as java.net.HttpURLConnection
+            conn.requestMethod = "POST"; conn.doOutput = true
+            conn.setRequestProperty("Content-Type", "application/json"); conn.setRequestProperty("X-Pri-Client", "android-native-v1")
+            conn.outputStream.use { it.write(org.json.JSONObject().put("email", email).put("password", password).toString().toByteArray()) }
+            assertEquals("the server refuses the deleted account", 401, conn.responseCode)
+            conn.disconnect()
+        }
+    }
+
+    /** Runs while the cloud server is unreachable. */
+    @Test
+    fun offlineLearningContinuesAndSyncIsNotOffered() {
+        ActivityScenario.launch(MainActivity::class.java).use { s ->
+            reachHome(s)
+            eval(s, "(function(){history.pushState({},'','/practice');dispatchEvent(new PopStateEvent('popstate'));return true;})()")
+            waitFor(s, "document.querySelector('.q-prompt')")
+            openSettings(s)
+            waitFor(s, "$stateTag === 'Linked · offline'", 60_000)
+            assertEquals("true", waitFor(s, "!!document.querySelector('[data-cloud-offline]')"))
+            assertEquals("Sync is not offered while offline", "true",
+                eval(s, "(function(){var b=($byText)('Sync now');return !b||b.disabled;})()"))
+        }
+    }
+
     @Test
     fun cloudSignInAndSync() {
         val email = args.getString("priCloudEmail", "")
@@ -130,6 +187,14 @@ class CloudJourneyTest {
             eval(s, "($byText)('Sync now').click()")
             val synced = waitFor(s, "(function(){var t=document.querySelector('section[aria-labelledby=\"cloud-account-title\"]').innerText;var m=t.match(/Sync complete[^\\n]*/);return m?m[0]:false;})()", 60_000)
             assertTrue("the local profile synced to the real server: $synced", synced.contains("Sync complete"))
+
+            // Google Play billing on an image without the Play Store, against a
+            // server with no Google configuration: it answers in the closed error
+            // model and never crashes (the server decides entitlement either way).
+            eval(s, "(function(){window.__b=null;priBridge.addEventListener('message',function(e){try{var x=JSON.parse(e.data);if(x.id==='t-billing')window.__b=x;}catch(_){}});priBridge.postMessage(JSON.stringify({v:1,id:'t-billing',cap:'billing',op:'products',payload:{productIds:['pri_premium']}}));return true;})()")
+            val billing = waitFor(s, "window.__b && (window.__b.ok ? 'ok' : window.__b.error.code)", 30_000)
+            assertTrue("billing answers in the closed priNative model: $billing",
+                billing == "\"ok\"" || billing in setOf("\"UNSUPPORTED\"", "\"UNAVAILABLE\"", "\"PROVIDER_ERROR\""))
 
             // The session is native-only: persisted encrypted, never plaintext.
             val raw = SecureStore(context).rawForTest()
@@ -160,6 +225,9 @@ class CloudJourneyTest {
             reachHome(s)
             openSettings(s)
             waitFor(s, "$stateTag === 'Connected'")
+            // Reconnected (the same server came back): sync works again.
+            eval(s, "($byText)('Sync now').click()")
+            waitFor(s, "(function(){var t=document.querySelector('section[aria-labelledby=\"cloud-account-title\"]').innerText;return /Sync complete/.test(t);})()", 60_000)
             eval(s, "($byText)('Disconnect').click()")
             waitFor(s, "$stateTag === 'Not connected'")
             val end = System.currentTimeMillis() + 5_000
