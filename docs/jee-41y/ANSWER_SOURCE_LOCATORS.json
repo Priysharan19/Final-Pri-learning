@@ -1,0 +1,268 @@
+{
+  "inventorySha256": "351271cb135ff22e1998657921a409f176815f5ca012a3ab4219fa1d60fe359b",
+  "regions": [
+    {
+      "chapter": 1,
+      "chapterTitle": "Complex Numbers",
+      "kind": "chapter",
+      "pageClass": "answer-key+solutions",
+      "pdfPage": 17,
+      "printedPage": 8,
+      "regionBasis": "reconciled-answer-page"
+    },
+    {
+      "chapter": 2,
+      "chapterTitle": "Theory of Equations",
+      "kind": "chapter",
+      "pageClass": "questions+answer-key",
+      "pdfPage": 41,
+      "printedPage": 32,
+      "regionBasis": "reconciled-answer-page"
+    },
+    {
+      "chapter": 3,
+      "chapterTitle": "Sequences and Series",
+      "kind": "chapter",
+      "pageClass": "questions+answer-key+solutions",
+      "pdfPage": 63,
+      "printedPage": 54,
+      "regionBasis": "reconciled-answer-page"
+    },
+    {
+      "chapter": 4,
+      "chapterTitle": "Permutations and Combinations",
+      "kind": "chapter",
+      "pageClass": "questions+answer-key+solutions",
+      "pdfPage": 85,
+      "printedPage": 76,
+      "regionBasis": "reconciled-answer-page"
+    },
+    {
+      "chapter": 5,
+      "chapterTitle": "Binomial Theorem",
+      "kind": "chapter",
+      "pageClass": "answer-key+solutions",
+      "pdfPage": 96,
+      "printedPage": 87,
+      "regionBasis": "reconciled-answer-page"
+    },
+    {
+      "chapter": 6,
+      "chapterTitle": "Probability",
+      "kind": "chapter",
+      "pageClass": "questions+answer-key",
+      "pdfPage": 115,
+      "printedPage": 106,
+      "regionBasis": "reconciled-answer-page"
+    },
+    {
+      "chapter": 7,
+      "chapterTitle": "Matrices and Determinants",
+      "kind": "chapter",
+      "pageClass": "questions+answer-key",
+      "pdfPage": 144,
+      "printedPage": 135,
+      "regionBasis": "reconciled-answer-page"
+    },
+    {
+      "chapter": 8,
+      "chapterTitle": "Functions",
+      "kind": "chapter",
+      "pageClass": "answer-key+solutions",
+      "pdfPage": 174,
+      "printedPage": 165,
+      "regionBasis": "reconciled-answer-page"
+    },
+    {
+      "chapter": 9,
+      "chapterTitle": "Limit, Continuity and Differentiability",
+      "kind": "chapter",
+      "pageClass": "questions+answer-key",
+      "pdfPage": 197,
+      "printedPage": 188,
+      "regionBasis": "reconciled-answer-page"
+    },
+    {
+      "chapter": 10,
+      "chapterTitle": "Application of Derivatives",
+      "kind": "chapter",
+      "pageClass": "questions+answer-key",
+      "pdfPage": 241,
+      "printedPage": 232,
+      "regionBasis": "reconciled-answer-page"
+    },
+    {
+      "chapter": 11,
+      "chapterTitle": "Indefinite Integration",
+      "kind": "chapter",
+      "pageClass": "questions+answer-key",
+      "pdfPage": 275,
+      "printedPage": 266,
+      "regionBasis": "reconciled-answer-page"
+    },
+    {
+      "chapter": 12,
+      "chapterTitle": "Definite Integration",
+      "kind": "chapter",
+      "pageClass": "questions+answer-key",
+      "pdfPage": 294,
+      "printedPage": 285,
+      "regionBasis": "reconciled-answer-page"
+    },
+    {
+      "chapter": 13,
+      "chapterTitle": "Area",
+      "kind": "chapter",
+      "pageClass": "answer-key+solutions",
+      "pdfPage": 324,
+      "printedPage": 315,
+      "regionBasis": "reconciled-answer-page"
+    },
+    {
+      "chapter": 14,
+      "chapterTitle": "Differential Equations",
+      "kind": "chapter",
+      "pageClass": "questions+answer-key+solutions",
+      "pdfPage": 349,
+      "printedPage": 340,
+      "regionBasis": "reconciled-answer-page"
+    },
+    {
+      "chapter": 15,
+      "chapterTitle": "Straight Line and Pair of Straight Lines",
+      "kind": "chapter",
+      "pageClass": "questions+answer-key+solutions",
+      "pdfPage": 373,
+      "printedPage": 364,
+      "regionBasis": "reconciled-answer-page"
+    },
+    {
+      "chapter": 16,
+      "chapterTitle": "Circle",
+      "kind": "chapter",
+      "pageClass": "questions+answer-key",
+      "pdfPage": 399,
+      "printedPage": 390,
+      "regionBasis": "reconciled-answer-page"
+    },
+    {
+      "chapter": 17,
+      "chapterTitle": "Parabola",
+      "kind": "chapter",
+      "pageClass": "questions+answer-key+solutions",
+      "pdfPage": 430,
+      "printedPage": 421,
+      "regionBasis": "reconciled-answer-page"
+    },
+    {
+      "chapter": 18,
+      "chapterTitle": "Ellipse",
+      "kind": "chapter",
+      "pageClass": "questions+answer-key+solutions",
+      "pdfPage": 447,
+      "printedPage": 438,
+      "regionBasis": "reconciled-answer-page"
+    },
+    {
+      "chapter": 19,
+      "chapterTitle": "Hyperbola",
+      "kind": "chapter",
+      "pageClass": "answer-key+solutions",
+      "pdfPage": 462,
+      "printedPage": 453,
+      "regionBasis": "reconciled-answer-page"
+    },
+    {
+      "chapter": 20,
+      "chapterTitle": "Trigonometrical Ratios and Identities",
+      "kind": "chapter",
+      "pageClass": "questions+answer-key+solutions",
+      "pdfPage": 473,
+      "printedPage": 464,
+      "regionBasis": "reconciled-answer-page"
+    },
+    {
+      "chapter": 21,
+      "chapterTitle": "Trigonometrical Equations",
+      "kind": "chapter",
+      "pageClass": "questions+answer-key+solutions",
+      "pdfPage": 486,
+      "printedPage": 477,
+      "regionBasis": "reconciled-answer-page"
+    },
+    {
+      "chapter": 22,
+      "chapterTitle": "Inverse Circular Functions",
+      "kind": "chapter",
+      "pageClass": "questions+answer-key",
+      "pdfPage": 499,
+      "printedPage": 490,
+      "regionBasis": "reconciled-answer-page"
+    },
+    {
+      "chapter": 23,
+      "chapterTitle": "Properties of Triangles",
+      "kind": "chapter",
+      "pageClass": "answer-key+solutions",
+      "pdfPage": 511,
+      "printedPage": 502,
+      "regionBasis": "reconciled-answer-page"
+    },
+    {
+      "chapter": 24,
+      "chapterTitle": "Vectors",
+      "kind": "chapter",
+      "pageClass": "questions+answer-key",
+      "pdfPage": 536,
+      "printedPage": 527,
+      "regionBasis": "reconciled-answer-page"
+    },
+    {
+      "chapter": 25,
+      "chapterTitle": "3D Geometry",
+      "kind": "chapter",
+      "pageClass": "questions+answer-key",
+      "pdfPage": 563,
+      "printedPage": 554,
+      "regionBasis": "reconciled-answer-page"
+    },
+    {
+      "chapter": 26,
+      "chapterTitle": "Miscellaneous",
+      "kind": "chapter",
+      "pageClass": "questions+answer-key",
+      "pdfPage": 590,
+      "printedPage": 581,
+      "regionBasis": "reconciled-answer-page"
+    },
+    {
+      "appendixId": "jee-advanced-2019-solved-paper",
+      "kind": "appendix",
+      "pageClasses": [
+        "appendix-questions+solutions",
+        "appendix-solutions",
+        "appendix-solutions",
+        "appendix-solutions",
+        "appendix-solutions",
+        "appendix-solutions",
+        "appendix-solutions",
+        "appendix-solutions",
+        "appendix-solutions",
+        "appendix-solutions",
+        "appendix-solutions",
+        "appendix-solutions"
+      ],
+      "pdfPageEnd": 625,
+      "pdfPageStart": 614,
+      "regionBasis": "reconciled-appendix-solution-range"
+    }
+  ],
+  "rights": {
+    "bulkAnswerTextIncluded": false,
+    "rawSourceCommitted": false,
+    "restrictedAnswerDataset": "tools/jee-question-department/work/answer-links.jsonl"
+  },
+  "schemaVersion": 1,
+  "sourcePdfSha256": "5e3cc002a44d1848886be07cc4fbd40165ed3e6a780665db5ca8b23cb190de3b",
+  "stage": "ANSWER_KEY_LINKING"
+}
