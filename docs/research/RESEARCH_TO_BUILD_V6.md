@@ -351,6 +351,55 @@ Admission criteria:
 
 A contextual model must beat a strong non-contextual policy prospectively.
 
+
+### V6-11 — Pri Worlds
+
+Dependencies:
+- semantic math objects;
+- accessibility semantics;
+- benchmark laboratory;
+- model-risk sandboxing.
+
+Deliverables:
+- typed WorldSpec;
+- renderer;
+- invariant/solvability checker;
+- multi-representation binding;
+- accessibility views;
+- sandbox and rights/provenance;
+- teacher-authoring candidate path.
+
+Acceptance:
+- generated UI cannot invent mathematical truth;
+- property/seed tests preserve invariants;
+- worlds remain solvable;
+- assessment mode prevents answer leakage;
+- accessible nonvisual path exists for admitted world classes;
+- learning benefit is tested against a strong static/ordinary-practice comparator before efficacy claims.
+
+### V6-12 — PairLab
+
+Dependencies:
+- individual semantic event ledger;
+- AssistanceEnvelope;
+- privacy/child-safety policy;
+- teacher/classroom authority.
+
+Deliverables:
+- rotating collaboration-role protocol;
+- author-attributed shared math canvas;
+- peer/AI AssistanceEnvelope;
+- private prediction and exit task;
+- classroom grouping controls;
+- teacher moderation/escalation.
+
+Acceptance:
+- group performance cannot promote individual mastery;
+- private exit evidence remains individual;
+- cross-user/profile privacy proven;
+- bounded child-safety communication rules enforced;
+- field experiment measures delayed individual outcomes.
+
 ## 5. Dependency graph
 
 ```text
