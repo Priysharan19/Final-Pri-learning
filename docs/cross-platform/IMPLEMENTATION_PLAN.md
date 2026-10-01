@@ -1,6 +1,6 @@
 # Cross-Platform Implementation Plan (CP-02 → CP-12)
 
-Initial audit baseline `main` @ `421f1ff1`; revalidated against `main` @ `83bde98a`.
+Initial audit baseline `main` @ `421f1ff1`; revalidated against `main` @ `7f4a0559`.
 
 Every task follows the `AGENTS.md` control plane (branch + PR, independent review, required CI, no direct `main` updates). Risk classes are the minimum; the diff-derived risk from `node scripts/pri-fleet.mjs risk` is authoritative.
 

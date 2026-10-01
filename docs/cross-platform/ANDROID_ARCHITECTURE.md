@@ -1,6 +1,6 @@
 # Android Architecture (CP-01)
 
-- **Status:** design only. As of `main` @ `421f1ff1` (initial audit) and again at `83bde98a` (revalidation), the repository contains **no** Android code, no `android/` directory, and no `android/**` ownership rule in `.pri-os/fleet.json`. The fleet does have an `android` agent ("Prepare shared product logic for Android without weakening iPad quality or splitting learning engines").
+- **Status:** design only. As of `main` @ `421f1ff1` (initial audit) and again at `7f4a0559` (revalidation), the repository contains **no** Android code, no `android/` directory, and no `android/**` ownership rule in `.pri-os/fleet.json`. The fleet does have an `android` agent ("Prepare shared product logic for Android without weakening iPad quality or splitting learning engines").
 - **Direction:** a Kotlin native shell, using AndroidX WebKit `WebView`, the **same** bundled `client/dist`, and platform bridges that implement the contract in [CROSS_PLATFORM_ARCHITECTURE.md](CROSS_PLATFORM_ARCHITECTURE.md) section 4. No React Native or Flutter. No Kotlin port of any learning logic.
 
 Repository evidence supports the WebView direction:
@@ -98,8 +98,8 @@ WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG)
 | `lifecycle` | `onPause`/`onResume`/`onStop`/`onTrimMemory`, sent as a `lifecycle.state` event; `webView.onPause()`/`onResume()`. | JS flushes drafts on `background`. |
 | Back | `OnBackPressedDispatcher` sends a `lifecycle.backRequested` **native→JS request** (with an envelope id; see [CROSS_PLATFORM_ARCHITECTURE.md](CROSS_PLATFORM_ARCHITECTURE.md) §4.3). JS replies `{handled}` within 300 ms; no reply means unhandled. If not handled and `webView.canGoBack()`, go back; otherwise `finish()`. Predictive back enabled (`enableOnBackInvokedCallback`). | JS must close sheets and dialogs first and must never lose an in-progress attempt. |
 | `ink` | **No native ink in v1.** The shared `client/src/ink/InkCanvas.jsx` handles finger and stylus via PointerEvents (`pointerType: 'pen'` for S Pen/USI, pressure, tilt; palm rejection once a pen is seen). `__PRI_HOST__.capabilities.ink` is **absent**, so `client/src/ink/InkAnswer.jsx` picks the canvas automatically. | A low-latency `androidx.ink` front-buffer surface is CP-09 scope **only** if latency is measured unacceptable on target tablets. It would capture strokes only; recognition stays shared. |
-| `device` | Reports `stylus` (any `InputDevice` with `SOURCE_STYLUS`) and `backButton: true`. | No OS or model sniffing exposed for layout. |
-| Release identity | Read `assets/web/release.json` and expose it as `__PRI_NATIVE_RELEASE_IDENTITY__` (or `__PRI_HOST__.release`), matching `ios/PriLearning.swiftpm/ReleaseIdentity.swift`. | `versionCode` comes from the CI build number. |
+| `device` | Reports `stylusSeen` (any `InputDevice` with `SOURCE_STYLUS`) and `safeAreaApplied`; `lifecycle.backButton: true`. | No OS or model sniffing exposed for layout. |
+| Release identity | Read `assets/web/release.json` and expose it as `__PRI_NATIVE_RELEASE_IDENTITY__` and `__PRI_HOST__.release`, matching `ios/PriLearning.swiftpm/ReleaseIdentity.swift`. | `versionCode` comes from the CI build number. |
 
 ## 6. Google Play Billing (CP-08)
 
@@ -114,7 +114,7 @@ The client and server flow mirrors the existing Apple flow (`server/platform/app
    - Upgrades and re-subscriptions follow `linkedPurchaseToken`, superseding the old token's entitlement so one payment never yields two grants.
 5. **Acknowledgement:** done by the server (`purchases.subscriptions.acknowledge`), or by the shell only after the server returns success, and always within Play's 3-day window. The shell **never** grants anything itself.
 6. Real-time developer notifications: Pub/Sub push to the existing `POST /v1/billing/webhook/google` route (which today returns `BILLING_PROVIDER_NOT_CONFIGURED`). Verify the Pub/Sub OIDC token, then re-fetch the purchase from the Play API before changing entitlement. Never trust the notification body alone.
-7. Restore: `queryPurchasesAsync(SUBS)`, then each token goes to `/v1/billing/restore/google` for server re-verification.
+7. Restore: `queryPurchasesAsync(SUBS)`, then each token goes to `/v1/billing/restore/google` for server re-verification. **Pending-purchase recovery:** the shell also calls `queryPurchasesAsync(SUBS)` on every launch and `onResume`, and re-submits unacknowledged tokens to the server. Play does not replay purchases on its own, and refunds any purchase left unacknowledged for 3 days.
 8. `/v1/health` reports `google: true` only when the verifier is configured (today it is hard-coded `false` in `server/platform/router.js`).
 9. **UI:** the paywall chooses the store button from `__PRI_HOST__.capabilities.billing.store === 'play'`. Razorpay web checkout stays disabled inside any native shell. That rule already exists in `client/src/components/CloudAccountPanel.jsx` and is required by Play policy for digital goods.
 

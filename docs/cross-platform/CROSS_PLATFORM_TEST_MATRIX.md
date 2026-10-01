@@ -1,6 +1,6 @@
 # Cross-Platform Test Matrix (CP-01)
 
-Initial audit baseline `main` @ `421f1ff1`; revalidated against `main` @ `83bde98a`.
+Initial audit baseline `main` @ `421f1ff1`; revalidated against `main` @ `7f4a0559`.
 
 Evidence classes are kept strictly separate, per `AGENTS.md`. A result from one class must never be reported as another.
 

@@ -3,7 +3,7 @@
 - **Status:** Authoritative plan for iPad, iPhone, Android phone and Android tablet.
 - **Evidence identity:**
   - Initial audit baseline: `main` @ `421f1ff1bbea6ed8014a2ad8f6fa2b24a149c73a` (2026-10-01 UTC).
-  - Revalidated against `main` @ `83bde98a6fde5dd595c52c0f201ad339147a8dcd` (async store / Supabase Postgres, PRs #244 and #247); every cited fact still holds.
+  - Revalidated against `main` @ `7f4a05593d61901e59b52898744d561fa8513e00` (after PRs #244 and #247, async store / Supabase Postgres, and #248, client bundle split); every cited fact still holds.
   - Final CP-01 candidate: the head of PR #250 at merge.
 - **Scope:** the audit and the architecture decision. It does not implement CP-02 onward. See [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md).
 - **Subordinate to:** [authoritative-architecture.md](../architecture/authoritative-architecture.md) and [ADR-0001](../architecture/adr-0001-online-first-runtime.md). Where this document talks about runtime authority (data, hosting, AI providers), those documents govern.
@@ -117,10 +117,13 @@ priNative.device      // form-factor hints the CSS cannot know (stylus present, 
 
 ### 4.2 Handshake and capability detection
 
-The shell injects one non-writable object at document start, main frame only. On Apple this is a `WKUserScript` with `forMainFrameOnly: true`. On Android it is `WebViewCompat.addDocumentStartJavaScript` with the origin rule, gated on `WebViewFeature.DOCUMENT_START_SCRIPT`. If that feature is unsupported, the shell fails closed and offers no native capabilities.
+The shell injects one non-configurable, **deep-frozen** object (every nested object is recursively `Object.freeze`d) at document start.
+- **Apple:** a `WKUserScript` with `forMainFrameOnly: true`.
+- **Android:** `WebViewCompat.addDocumentStartJavaScript` with the origin rule, gated on `WebViewFeature.DOCUMENT_START_SCRIPT`. If that feature is unsupported, the shell fails closed and offers no native capabilities.
+- **Android has no main-frame-only option.** The script reaches every frame of a matching origin, so the shell rejects any message where `isMainFrame == false` in `onPostMessage`, and the bundle never embeds same-origin iframes.
 
 ```js
-Object.defineProperty(window, '__PRI_HOST__', { writable: false, configurable: false, value: Object.freeze({
+Object.defineProperty(window, '__PRI_HOST__', { writable: false, configurable: false, value: deepFreeze({
   protocol: 1,                       // envelope protocol (integer; bumped only on a breaking envelope change)
   // NO `platform` key: OS identity is available only through the `host.diagnostics` op,
   // for logs and support, so product code cannot branch on it.
@@ -189,11 +192,17 @@ One transport and one dispatcher per host:
 - **Not cancellable once committed:** `billing.purchase` cannot be cancelled after the store sheet is shown, and a cloud request cannot be cancelled after it has been sent. For these, cancellation only stops JavaScript waiting.
 - The per-op defaults match today's values: ink read 8 s / 14 s, photo 12 s, cloud 12 s (25 s for handwriting, 35 s for working), billing 30 s to 5 min.
 - **Late replies are never silently lost when they carry value.**
-  - A late `billing.purchase` / `billing.restore` result is re-emitted as a `billing.transactionUpdated` event. Native never finishes or acknowledges a transaction until the server has accepted it. A paid transaction therefore survives a JavaScript timeout and is replayed by the store on next launch.
-  - Every cloud mutation carries an `Idempotency-Key` on both shells, as the Apple bridge already sends. Retrying after a timeout is therefore safe, even if the late reply was dropped.
+  - A late `billing.purchase` / `billing.restore` result is re-emitted as a `billing.transactionUpdated` event. Native never finishes or acknowledges a transaction until the server has accepted it. A paid transaction therefore survives a JavaScript timeout:
+    - **Apple:** it is re-delivered through the `Transaction.updates` listener plus the `Transaction.unfinished` sweep, which `ios/PriLearning.swiftpm/StoreKitBillingBridge.swift` already has.
+    - **Android:** Play does not replay. The shell calls `queryPurchasesAsync(SUBS)` on every launch and `onResume`, and re-submits unacknowledged tokens. These must be server-accepted inside Play's 3-day acknowledgement window, or Play refunds them.
+  - **Idempotency, today and target.**
+    - Today only `/v1/sync/push` uses an `Idempotency-Key` that the server enforces (`server/platform/sync.js`). `/v1/reports` sends one too. The Apple bridge forwards a key only when JavaScript supplies one.
+    - CP-02/CP-07 extend server-enforced idempotency keys to every non-auth mutation.
+    - Until a mutation has one, a request that timed out is **not** retried automatically; the user retries explicitly.
   - Other late replies (reads, ink, photo) are dropped.
-- **Duplicates and limits.**
+- **Duplicates, id spaces and limits.**
   - A request whose `id` is already in flight is `BAD_REQUEST`.
+  - Native-originated request ids carry an `n:` prefix and JavaScript ids never do. Each side accepts a reply only if its `id` is in that side's own pending table.
   - At most 32 in-flight requests per capability; beyond that, `UNAVAILABLE` with `retryable: true`.
   - Envelopes are capped at 1 MB (8 MB for `photo` payloads), otherwise `TOO_LARGE`. The cloud bridge keeps its own 1 MB / 2 MB caps.
 - **Ink is the exception that never rejects.** `ink.recognize` keeps today's "resolve with an empty reading tagged with the failure reason" semantics, because `client/src/ink/InkAnswer.jsx` consensus depends on it. The failure is reported in `reading.error.code`, which uses the same closed error set.
@@ -208,7 +217,7 @@ One transport and one dispatcher per host:
 
 ### 4.4 Security boundaries (non-negotiable)
 
-1. **Origin and frame pinning.** Native handlers accept messages only from the main frame of the bundled origin: `prilearning://app` on Apple, `https://appassets.androidplatform.net` on Android. Apple checks `message.frameInfo.isMainFrame` and `securityOrigin`. Android passes the origin rule to `addWebMessageListener` and **never** uses `addJavascriptInterface`.
+1. **Origin and frame pinning.** Native handlers accept messages only from the main frame of the bundled origin: `prilearning://app` on Apple, `https://appassets.androidplatform.net` on Android. Apple checks `message.frameInfo.isMainFrame` and `securityOrigin`. Android passes the origin rule to `addWebMessageListener`, rejects `isMainFrame == false` in `onPostMessage`, and **never** uses `addJavascriptInterface`.
 2. **Navigation lockdown.** Remote `http(s)` navigation leaves the web view for the system browser, as the Apple shell already does. No remote page can ever reach `priBridge`.
 3. **Cloud bridge allowlist** (as `ios/PriLearning.swiftpm/NativeCloudBridge.swift` already enforces): `/v1/` paths only, at most 200 characters, no `..`, `?` or `#`. Methods GET, POST, PATCH and DELETE. Requests capped at 1 MB and responses at 2 MB. HTTPS only in release builds. The cloud origin comes from build configuration, never from the page.
 4. **Cookies never cross into JavaScript.** The native jar holds `pri_cloud_session`. Native code copies `pri_csrf` into `X-Pri-CSRF`. On Android the jar is persisted in app-private storage, encrypted with an Android Keystore key.

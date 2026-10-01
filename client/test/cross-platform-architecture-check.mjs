@@ -47,7 +47,14 @@ function walk(dir, keep, out = []) {
 // Comments are stripped before pattern scans: a comment that mentions a
 // forbidden API is not a use of it, and a leftover comment must not keep an
 // allowlisted file looking "in use" (that would defeat the shrink-only ratchet).
-const stripComments = s => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:\\])\/\/.*$/gm, '$1');
+// Quote-aware: string literals are kept verbatim, so text like accept="image/*"
+// cannot open a pseudo-comment that hides real code from the scans.
+const stripComments = s => s.replace(/(["'`])(?:\\[\s\S]|(?!\1)[^\\\n])*\1|\/\*[\s\S]*?\*\/|\/\/[^\n]*/g,
+  m => (/^["'`]/.test(m) ? m : ''));
+ok(/messageHandlers/.test(stripComments("const a = 'image/*'; window.webkit.messageHandlers.x; // b */")),
+  'comment stripping never hides code that follows a "/*" inside a string');
+ok(!/messageHandlers/.test(stripComments('/* messageHandlers */ // messageHandlers')),
+  'and still removes real comments');
 
 const DOCS = 'docs/cross-platform';
 const REQUIRED_DOCS = [

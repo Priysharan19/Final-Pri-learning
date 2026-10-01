@@ -3,7 +3,7 @@
 CP-01 audit and architecture.
 
 - Initial audit baseline: `main` @ `421f1ff1`.
-- Revalidated against `main` @ `83bde98a`.
+- Revalidated against `main` @ `7f4a0559`.
 - Final CP-01 candidate: the head of PR #250 at merge.
 
 Read in this order:

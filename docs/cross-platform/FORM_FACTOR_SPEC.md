@@ -1,6 +1,6 @@
 # Form-Factor Specification (CP-01)
 
-Initial audit baseline `main` @ `421f1ff1`; revalidated against `main` @ `83bde98a`. Active stylesheets are `client/src/theme.css` and `client/src/theme-state.css`, both imported by `client/src/main.jsx`. `client/src/theme-legacy.css` is not imported anywhere and is dead code; CP-03 deletes it.
+Initial audit baseline `main` @ `421f1ff1`; revalidated against `main` @ `7f4a0559`. Active stylesheets are `client/src/theme.css` and `client/src/theme-state.css`, both imported by `client/src/main.jsx`. `client/src/theme-legacy.css` is not imported anywhere and is dead code; CP-03 deletes it.
 
 ## 1. Current state (audit)
 

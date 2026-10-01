@@ -1,6 +1,6 @@
 # iPhone Gap Report (CP-01)
 
-Initial audit baseline `main` @ `421f1ff1` (2026-10-01 UTC); revalidated against `main` @ `83bde98a`.
+Initial audit baseline `main` @ `421f1ff1` (2026-10-01 UTC); revalidated against `main` @ `7f4a0559`.
 
 **Bottom line:** Pri Learning is **not yet an iPhone product**. The Apple package already *declares* iPhone support and *compiles and launches* on an iPhone simulator. The web client already has a phone navigation shell with a browser E2E flow at phone widths. But native ink defaults to Apple Pencil only, nothing in CI builds or tests an iPhone destination, several surfaces are unverified or broken at compact width, and **there is no physical-iPhone evidence of any kind**.
 

@@ -1,6 +1,6 @@
 # Capability Matrix (CP-01)
 
-Initial audit baseline `main` @ `421f1ff1`; revalidated against `main` @ `83bde98a`. Owners are agent ids from `.pri-os/fleet.json`. A "Status" entry describes repository evidence only. **None** of these rows claims physical-device verification.
+Initial audit baseline `main` @ `421f1ff1`; revalidated against `main` @ `7f4a0559`. Owners are agent ids from `.pri-os/fleet.json`. A "Status" entry describes repository evidence only. **None** of these rows claims physical-device verification.
 
 **Legend:**
 - ✅ implemented on `main`
