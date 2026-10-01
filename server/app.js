@@ -17,6 +17,7 @@ import { createRazorpayBilling } from './platform/razorpay.js';
 import { createPlatformRouter } from './platform/router.js';
 import { trustedProxyHops } from './platform/config.js';
 import { securityHeaders } from './platform/headers.js';
+import { rejectUnsafeText } from './platform/text.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 export const DEFAULT_DIST = join(here, '..', 'client', 'dist');
@@ -28,6 +29,14 @@ const REQUEST_ID = /^[A-Za-z0-9._:-]{1,80}$/;
  */
 export const JSON_BODY_LIMIT = '1mb';
 export const JSON_BODY_LIMIT_BYTES = 1024 * 1024;
+
+const BODY_PARSER_ERRORS = Object.freeze({
+  'entity.parse.failed': { status: 400, code: 'MALFORMED_JSON', message: 'The request body is not a valid JSON object or array.' },
+  'charset.unsupported': { status: 415, code: 'UNSUPPORTED_CHARSET', message: 'The request body charset is not supported. Send UTF-8 JSON.' },
+  'encoding.unsupported': { status: 415, code: 'UNSUPPORTED_ENCODING', message: 'The request body content encoding is not supported.' },
+  'request.aborted': { status: 400, code: 'REQUEST_ABORTED', message: 'The request body was not received completely.' },
+  'request.size.invalid': { status: 400, code: 'REQUEST_SIZE_INVALID', message: 'The request body length does not match its Content-Length.' }
+});
 
 export function requestLogger(log = line => console.log(JSON.stringify(line))) {
   return (req, res, next) => {
@@ -76,6 +85,9 @@ export async function createServerApp(db, {
     }
   }));
   app.use(cookieParser());
+  // NUL and lone surrogates never reach a handler (platform/text.js): Postgres
+  // TEXT cannot hold the first and silently rewrites the second.
+  app.use('/v1', rejectUnsafeText({ exemptBody: [/^\/sync\/push\/?$/] }));
 
   ensureBillingSchema(db);
   const webBilling = createRazorpayBilling(db);
@@ -99,7 +111,7 @@ export async function createServerApp(db, {
   }
 
   app.use((err, req, res, next) => {
-    console.error('server_error', { method: req.method, path: req.path, status: err?.status || 500, code: err?.code || 'INTERNAL' });
+    console.error('server_error', { method: req.method, path: req.path, status: err?.status || 500, code: BODY_PARSER_ERRORS[err?.type]?.code || err?.code || 'INTERNAL' });
     if (res.headersSent) return next(err);
     // An over-large body dies in the parser before any route sees it, so this is
     // the only place that can say so. It gets a real code: "shrink the picture
@@ -110,6 +122,11 @@ export async function createServerApp(db, {
         error: { code: 'REQUEST_BODY_TOO_LARGE', message: `The request body is larger than the ${JSON_BODY_LIMIT} limit.` }
       });
     }
+    // The other body-parser refusals are client mistakes with a definite fix,
+    // so they get codes too rather than the uncoded server-error string below
+    // (which they used to share, under a 4xx status).
+    const bodyError = BODY_PARSER_ERRORS[err?.type];
+    if (bodyError) return res.status(bodyError.status).json({ error: { code: bodyError.code, message: bodyError.message } });
     res.status(err?.status || 500).json({ error: 'Something went wrong on the server.' });
   });
 
