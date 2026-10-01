@@ -38,9 +38,11 @@ class PriBridge(
     private var seq = 0
     var backWanted = false
         private set
-    /** A stylus input device exists, or a stylus/eraser pointer has been seen. */
+    /** A stylus or eraser pointer has actually been seen in this process. */
     @Volatile var stylusSeen = false
         private set
+    /** An input device advertises stylus input (some panels do with no pen attached). */
+    @Volatile var stylusCapable = false
 
     fun noteStylus() { stylusSeen = true }
     var state = "active"
@@ -88,7 +90,7 @@ class PriBridge(
                 .put("os", Build.VERSION.SDK_INT.toString())
                 .put("model", if (webView.resources.configuration.smallestScreenWidthDp >= 600) "tablet" else "phone"))
             "storage.status" -> Envelope.ok(req.id, JSONObject().put("durable", true))
-            "device.facts" -> Envelope.ok(req.id, JSONObject().put("safeAreaApplied", true).put("stylusSeen", stylusSeen))
+            "device.facts" -> Envelope.ok(req.id, JSONObject().put("safeAreaApplied", true).put("stylusSeen", stylusSeen).put("stylusCapable", stylusCapable))
             "lifecycle.state" -> Envelope.ok(req.id, JSONObject().put("state", state))
             "lifecycle.setBackHandled" -> {
                 setBackWanted(req.payload.optBoolean("handled", false))
