@@ -383,7 +383,9 @@ select.input {
 .type-caret { display: inline-block; width: 1px; height: 1.05em; background: var(--ink-2); vertical-align: -0.18em; margin-left: 1px; animation: caretBlink 1s steps(1) infinite; }
 @keyframes caretBlink { 50% { opacity: 0; } }
 
-.genbar { width: min(690px, 94vw); margin-top: 9vh; position: relative; z-index: 20; }
+/* Percentages, not vw: WKWebView page zoom (Dynamic Type) does not scale
+   viewport units, so 94vw overflowed the screen at large text (CP-05). */
+.genbar { width: min(690px, 94%); margin-top: 9vh; position: relative; z-index: 20; }
 .genbar-head {
   display: flex; align-items: center; gap: 10px; padding: 10px 12px;
   background: var(--surface); border: 1px solid var(--hairline-strong); border-radius: 5px;
@@ -420,7 +422,7 @@ select.input {
 .gen-opt small { color: var(--ink-3); }
 .gen-sub-head { font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-3); margin: 4px 0 10px; }
 
-.home-cards { display: flex; gap: 0; width: min(990px, 94vw); margin-top: 7vh; border: 1px solid var(--hairline); border-radius: var(--radius); overflow: hidden; }
+.home-cards { display: flex; gap: 0; width: min(990px, 94%); margin-top: 7vh; border: 1px solid var(--hairline); border-radius: var(--radius); overflow: hidden; }
 .home-card { padding: 18px 22px; flex: 1; background: var(--surface); position: relative; }
 .home-card + .home-card { border-left: 1px solid var(--hairline); background: var(--surface-2); }
 .home-card-x { position: absolute; top: 10px; right: 12px; border: none; background: none; color: var(--ink-3); cursor: pointer; font-size: 13px; }
@@ -712,7 +714,7 @@ select.input {
 .node-code { display: inline-block; margin-left: 6px; padding: 0 5px; border-radius: 2px; font-size: 10px; letter-spacing: 0.04em; color: var(--ink-3); background: var(--surface-2); border: 1px solid var(--hairline); vertical-align: middle; }
 .drawer { position: fixed; inset: 0; background: rgba(2, 2, 1, 0.6); z-index: 90; display: flex; justify-content: flex-end; backdrop-filter: blur(2px); }
 .drawer-panel {
-  width: 440px; max-width: 92vw; background: var(--surface); height: 100%;
+  width: 440px; max-width: 92%; background: var(--surface); height: 100%;
   border-left: 1px solid var(--hairline-strong); padding: 26px; overflow-y: auto;
   animation: slideIn 0.22s cubic-bezier(0.2, 0.9, 0.3, 1);
 }
@@ -1597,7 +1599,7 @@ h3 { font-size: 17px; line-height: 1.3; }
 .home-greet b { color: var(--brand-1); }
 .home-tagline { color: var(--ink-2); }
 .type-caret { background: var(--brand-1); }
-.genbar { width: min(760px, 96vw); margin-top: clamp(44px, 7vh, 76px); }
+.genbar { width: min(760px, 96%); margin-top: clamp(44px, 7vh, 76px); }
 .genbar-head {
   min-height: 58px;
   border-radius: 15px;
@@ -1610,7 +1612,7 @@ h3 { font-size: 17px; line-height: 1.3; }
 .gen-cat.on { background: var(--brand-soft); color: var(--ink); }
 .gen-cat-dot { background: var(--brand-2); border-radius: 50%; }
 .home-cards {
-  width: min(1040px, 96vw);
+  width: min(1040px, 96%);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
 }
