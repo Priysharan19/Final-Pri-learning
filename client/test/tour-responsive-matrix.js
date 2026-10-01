@@ -150,6 +150,13 @@ export const flow = {
       }
       await check(`${tag}: synthetic strokes land on the writing area`, drew);
       if (vp.id === 'tablet-portrait' && drew) {
+        // Ink near the foot of the sheet is what widening could push off it.
+        const low = await canvas.boundingBox();
+        await page.mouse.move(low.x + low.width * 0.2, low.y + low.height * 0.9);
+        await page.mouse.down();
+        for (let i = 1; i <= 8; i++) await page.mouse.move(low.x + low.width * (0.2 + 0.3 * i / 8), low.y + low.height * 0.9);
+        await page.mouse.up();
+        await page.waitForTimeout(150);
         await page.setViewportSize({ width: 1180, height: 820 });
         await page.waitForTimeout(400);
         const rotated = await inkBox();
