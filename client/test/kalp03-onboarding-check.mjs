@@ -47,6 +47,7 @@ check('email remains explicitly local', login.includes('login.localCloudHonesty'
 check('cloud route remains canonical', login.includes("'/settings#cloud-account-title'"));
 check('final create uses real profiles API', login.includes("go('/profiles', {"));
 check('double submit is guarded', login.includes('createPendingRef.current'));
+check('new profiles get a role-safe landing', login.includes("nav(form.role === 'teacher' ? '/teach' : '/', { replace: true })"));
 check('role is persisted', login.includes('role: form.role'));
 check('course is persisted', login.includes('course: form.course'));
 check('India track is persisted', login.includes("indiaTrack: form.course === 'in' ? form.indiaTrack"));

@@ -405,7 +405,7 @@ export default function Login() {
     }
     createPendingRef.current = true;
     try {
-      await go('/profiles', {
+      const created = await go('/profiles', {
         name: form.name.trim(), year: Number(form.year), avatar: form.avatar, role: form.role,
         language: signInLanguage(),
         course: form.course,
@@ -414,6 +414,9 @@ export default function Login() {
         email: form.email.trim() || undefined,
         password: form.protect ? form.password : undefined
       });
+      // A brand-new profile must not inherit the route of whoever opened the
+      // picker. Start the new identity at its role-safe product landing.
+      if (created && !cloudIntent) nav(form.role === 'teacher' ? '/teach' : '/', { replace: true });
     } finally {
       createPendingRef.current = false;
     }
