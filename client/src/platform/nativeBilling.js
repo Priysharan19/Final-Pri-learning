@@ -1,67 +1,21 @@
-// Pri Learning · native StoreKit bridge client
+// Pri Learning · native store billing client (via priNative, CP-02)
 //
 // This module never grants Premium and never opens a network connection. It is
-// only the typed message boundary between the React UI and the iOS StoreKit 2
-// bridge. Apple-signed transaction JWS values are handed to cloudTransport.js;
-// the server is the sole entitlement authority.
-
-const RESPONSE_EVENT = 'pri:native-billing-response';
-const UPDATE_EVENT = 'pri:native-billing-update';
-const pending = new Map();
-let listening = false;
-
-function handler() {
-  return globalThis?.webkit?.messageHandlers?.priBilling || null;
-}
+// only the typed boundary between the React UI and the shell's store bridge
+// (StoreKit 2 on Apple today). Store-signed proofs (Apple JWS) are handed to
+// cloudTransport.js; the server is the sole entitlement authority.
+//
+// Late results are never lost: a purchase or restore that answers after the UI
+// stopped waiting is re-emitted through onNativeBillingUpdate() by priNative,
+// and StoreKit itself re-delivers unfinished transactions on the next launch.
+import { priNative } from './native/index.js';
 
 export function nativeBillingAvailable() {
-  return globalThis.__PRI_NATIVE_BILLING__ === true && typeof handler()?.postMessage === 'function';
-}
-
-function installListener() {
-  if (listening || typeof window === 'undefined') return;
-  listening = true;
-  window.addEventListener(RESPONSE_EVENT, event => {
-    const detail = event?.detail;
-    const id = String(detail?.id || '');
-    const waiting = pending.get(id);
-    if (!waiting) return;
-    pending.delete(id);
-    clearTimeout(waiting.timer);
-    if (detail?.ok === true) {
-      waiting.resolve(detail.result || {});
-      return;
-    }
-    const err = new Error(detail?.error?.message || 'Native billing request failed.');
-    err.code = detail?.error?.code || 'NATIVE_BILLING_ERROR';
-    waiting.reject(err);
-  });
+  return priNative.billing.available();
 }
 
 function request(action, body = {}, timeoutMs = 30_000) {
-  if (!nativeBillingAvailable()) {
-    const err = new Error('App Store billing is not available in this build.');
-    err.code = 'NATIVE_BILLING_UNAVAILABLE';
-    return Promise.reject(err);
-  }
-  installListener();
-  const id = globalThis.crypto?.randomUUID?.() || `billing-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => {
-      pending.delete(id);
-      const err = new Error('App Store billing did not respond in time.');
-      err.code = 'NATIVE_BILLING_TIMEOUT';
-      reject(err);
-    }, Math.max(1_000, Math.min(5 * 60_000, Number(timeoutMs) || 30_000)));
-    pending.set(id, { resolve, reject, timer });
-    try {
-      handler().postMessage({ id, action, ...body });
-    } catch (error) {
-      clearTimeout(timer);
-      pending.delete(id);
-      reject(error);
-    }
-  });
+  return priNative.billing.request(action, body, { timeoutMs });
 }
 
 function ids(values) {
@@ -71,20 +25,24 @@ function ids(values) {
 }
 
 function replayUnfinished(productIds) {
+  // StoreKit's Transaction.updates observer starts before React. Sweep the
+  // unfinished queue after bootstrap so an update emitted during page startup
+  // is replayed through the normal server-verification handler, not lost.
   request('unfinished', { productIds }, 60_000).then(result => {
-    if (typeof window === 'undefined') return;
     for (const transaction of Array.isArray(result.transactions) ? result.transactions : []) {
-      window.dispatchEvent(new CustomEvent(UPDATE_EVENT, { detail: { status: 'verified', ...transaction } }));
+      replayToListeners({ status: 'verified', ...transaction });
     }
   }).catch(() => {});
+}
+
+const localListeners = new Set();
+function replayToListeners(transaction) {
+  for (const fn of [...localListeners]) { try { fn(transaction); } catch { /* isolate */ } }
 }
 
 export async function getNativeProducts(productIds) {
   const wanted = ids(productIds);
   const result = await request('products', { productIds: wanted }, 30_000);
-  // The native Transaction.updates observer starts before React. Sweep Apple's
-  // unfinished queue after bootstrap so an update emitted during page startup
-  // is replayed through the normal server-verification handler rather than lost.
   replayUnfinished(wanted);
   return Array.isArray(result.products) ? result.products : [];
 }
@@ -111,14 +69,14 @@ export function finishNativeTransaction(transactionId) {
 }
 
 /**
- * Unfinished StoreKit transactions are replayed here after purchase or on a
- * later launch. Callers must submit the JWS to the server and finish only after
- * the server accepts it. Returning an unsubscribe function keeps component
- * lifetimes explicit.
+ * Store transactions that need server verification: external updates, replays
+ * of unfinished transactions, and late purchase/restore results. Callers must
+ * submit the signed proof to the server and finish only after it accepts.
+ * Returns an unsubscribe function so component lifetimes stay explicit.
  */
 export function onNativeBillingUpdate(listener) {
-  if (typeof window === 'undefined' || typeof listener !== 'function') return () => {};
-  const wrapped = event => listener(event?.detail || {});
-  window.addEventListener(UPDATE_EVENT, wrapped);
-  return () => window.removeEventListener(UPDATE_EVENT, wrapped);
+  if (typeof listener !== 'function') return () => {};
+  localListeners.add(listener);
+  const off = priNative.billing.onTransactionUpdate(listener);
+  return () => { localListeners.delete(listener); off(); };
 }

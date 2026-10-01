@@ -12,6 +12,7 @@ import {
   onNativeBillingUpdate, purchaseNativeProduct, restoreNativePurchases
 } from '../platform/nativeBilling.js';
 import CloudAccountSecurity from './CloudAccountSecurity.jsx';
+import { priNative } from '../platform/native/index.js';
 
 function when(value) {
   if (!value) return 'Never';
@@ -44,7 +45,7 @@ function pricingText(config) {
 export default function CloudAccountPanel() {
   const { user } = useApp();
   const enabled = cloudAvailable();
-  const nativeShell = typeof window !== 'undefined' && !!window.__PRI_NATIVE__;
+  const nativeShell = priNative.isNativeShell();
   const nativeStoreKit = nativeBillingAvailable();
   const [link, setLink] = useState(null);
   const [status, setStatus] = useState(null);
