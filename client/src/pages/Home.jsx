@@ -416,10 +416,11 @@ function HomeAction({ action, nav, primary }) {
     const titleId = `home-alt-title-${key}`;
     const reasonId = `home-alt-reason-${key}`;
     return (
-      <article className="home-card" aria-labelledby={titleId}>
+      <article className="home-card" data-home-alt aria-labelledby={titleId}>
         <strong id={titleId}>{copy.title}</strong>
         <p id={reasonId}>{copy.reason}</p>
-        <button className="btn btn-ghost btn-sm" aria-labelledby={`${titleId}-cta ${titleId}`} aria-describedby={reasonId}
+        <button className="btn btn-ghost btn-sm" aria-describedby={reasonId}
+          aria-labelledby={`${titleId}-cta ${copy.title === copy.cta ? reasonId : titleId}`}
           onClick={() => nav(action.destination)}><span id={`${titleId}-cta`}>{copy.cta}</span></button>
       </article>
     );

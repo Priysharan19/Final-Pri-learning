@@ -189,14 +189,14 @@ export const flow = {
     await snap(page, '10-reviews-due-returning');
     // Alternatives share CTA words, so each alternative button must carry its
     // own accessible name (CTA + card title) and a description (its reason).
-    const altNames = await page.locator('.home-card button').evaluateAll(buttons => buttons.map(b => {
+    const altNames = await page.locator('[data-home-alt] button').evaluateAll(buttons => buttons.map(b => {
       const text = id => (document.getElementById(id)?.textContent || '').trim();
       const name = (b.getAttribute('aria-labelledby') || '').split(/\s+/).filter(Boolean).map(text).join(' ') || b.textContent.trim();
       const description = (b.getAttribute('aria-describedby') || '').split(/\s+/).filter(Boolean).map(text).join(' ');
       return { name, description };
     }));
     await check('every alternative action has a distinct accessible name and a reason',
-      altNames.length >= 1 && (new Set(altNames.map(a => a.name)).size === altNames.length && altNames.every(a => a.description.length > 0)),
+      altNames.length >= 1 && (new Set(altNames.map(a => a.name)).size === altNames.length && altNames.every(a => a.description.length > 0 && !/^(\S+) \1$/.test(a.name))),
       JSON.stringify(altNames));
 
     // Profile isolation: switch back to the first profile. Its unresolved task
