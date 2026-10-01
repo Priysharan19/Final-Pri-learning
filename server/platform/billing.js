@@ -220,6 +220,10 @@ export function createBillingRouter(db, { verifiers = {}, checkout = {}, native 
     const verifier = verifiers[provider]?.webhook;
     if (typeof verifier !== 'function') return res.status(503).json({ error: { code: 'BILLING_PROVIDER_NOT_CONFIGURED', message: `${provider} webhook verification is not configured on this deployment.` } });
     try {
+      // A provider whose push authentication needs network I/O (Google's
+      // Pub/Sub OIDC keys) authenticates first, outside the transaction below.
+      const authenticate = verifiers[provider]?.authenticate;
+      if (typeof authenticate === 'function') await authenticate({ headers: req.headers, request: req });
       // A webhook verifier only checks a signature and reads/writes this
       // database (no provider call), so verification and application share one
       // transaction: two deliveries of one event id apply, ledger and audit it

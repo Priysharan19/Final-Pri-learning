@@ -18,11 +18,11 @@
 //     endpoint, never follows redirects and refuses to run inside a transaction.
 // ─────────────────────────────────────────────────────────────────────────────
 import assert from 'node:assert/strict';
-import { generateKeyPairSync, verify } from 'node:crypto';
+import { createSign, generateKeyPairSync, verify } from 'node:crypto';
 import { openTestStore } from './support/engine.mjs';
 import { ensureBillingSchema } from '../platform/billingSchema.js';
 import {
-  createGoogleBilling, createGooglePlayClient, googleBillingConfigStatus, normalizeGoogleSubscription, readGoogleBillingConfig
+  createGoogleBilling, createGoogleOidcVerifier, createGooglePlayClient, googleBillingConfigStatus, normalizeGoogleSubscription, readGoogleBillingConfig
 } from '../platform/googleBilling.js';
 import { applyVerifiedEntitlement } from '../platform/entitlements.js';
 
@@ -45,8 +45,24 @@ const ENV = {
   PRI_GOOGLE_MONTHLY_PRODUCT_ID: 'pri_premium:monthly',
   PRI_GOOGLE_ANNUAL_PRODUCT_ID: 'pri_premium:annual',
   PRI_GOOGLE_SERVICE_ACCOUNT_JSON: serviceAccount,
-  PRI_GOOGLE_RTDN_TOKEN: 'rtdn-secret-0123456789abcdef0123456789',
+  PRI_GOOGLE_RTDN_AUDIENCE: 'https://api.prilearning.test/v1/billing/webhook/google',
+  PRI_GOOGLE_RTDN_SERVICE_ACCOUNT: 'rtdn-push@pri-test.iam.gserviceaccount.com',
 };
+
+// ── a stand-in for Google's OIDC signing keys (Pub/Sub push authentication) ──
+const signer = generateKeyPairSync('rsa', { modulusLength: 2048 });
+const stranger = generateKeyPairSync('rsa', { modulusLength: 2048 });
+const JWKS = { keys: [{ ...signer.publicKey.export({ format: 'jwk' }), kid: 'google-key-1', alg: 'RS256', use: 'sig' }] };
+let certFetches = 0;
+const certsFetch = async url => { certFetches += 1; assert.equal(url, 'https://www.googleapis.com/oauth2/v3/certs'); return new Response(JSON.stringify(JWKS), { status: 200 }); };
+const b64 = v => Buffer.from(JSON.stringify(v)).toString('base64url');
+function oidcToken(overrides = {}, { key = signer.privateKey, kid = 'google-key-1', alg = 'RS256' } = {}) {
+  const t = Math.floor(Date.now() / 1000);
+  const head = b64({ alg, kid, typ: 'JWT' });
+  const body = b64({ iss: 'https://accounts.google.com', aud: ENV.PRI_GOOGLE_RTDN_AUDIENCE, email: ENV.PRI_GOOGLE_RTDN_SERVICE_ACCOUNT,
+    email_verified: true, iat: t, exp: t + 3600, sub: '1234', ...overrides });
+  return `${head}.${body}.${createSign('RSA-SHA256').update(`${head}.${body}`).sign(key).toString('base64url')}`;
+}
 
 // ── configuration fails closed ───────────────────────────────────────────────
 check(googleBillingConfigStatus(ENV).configured === true, 'a complete deployment is configured');
@@ -55,7 +71,8 @@ check(googleBillingConfigStatus({ ...ENV, PRI_GOOGLE_SERVICE_ACCOUNT_JSON: JSON.
   'a service account that is not a Google service account with a usable key → not configured');
 check(googleBillingConfigStatus({ ...ENV, PRI_GOOGLE_MONTHLY_PRODUCT_ID: '', PRI_GOOGLE_ANNUAL_PRODUCT_ID: '' }).configured === false, 'no product → not configured');
 check(googleBillingConfigStatus({ ...ENV, PRI_GOOGLE_MONTHLY_PRODUCT_ID: 'Bad Product!', PRI_GOOGLE_ANNUAL_PRODUCT_ID: '' }).configured === false, 'a malformed product id is ignored');
-check(googleBillingConfigStatus({ ...ENV, PRI_GOOGLE_RTDN_TOKEN: 'short' }).notificationsConfigured === false, 'a short RTDN token does not enable notifications');
+check(googleBillingConfigStatus({ ...ENV, PRI_GOOGLE_RTDN_SERVICE_ACCOUNT: '' }).notificationsConfigured === false, 'notifications need the push service account');
+check(googleBillingConfigStatus({ ...ENV, PRI_GOOGLE_RTDN_AUDIENCE: '' }).notificationsConfigured === false, 'notifications need the OIDC audience');
 check(readGoogleBillingConfig(ENV).monthly.basePlanId === 'monthly', '"product:basePlan" configuration is understood');
 
 // ── a store with three accounts ──────────────────────────────────────────────
@@ -94,7 +111,7 @@ function sub({ obfuscated, state = 'SUBSCRIPTION_STATE_ACTIVE', productId = 'pri
 }
 const token = n => `tok_${String(n).padStart(4, '0')}.${'x'.repeat(40)}`;
 
-const google = createGoogleBilling(db, { client: fake, env: ENV });
+const google = createGoogleBilling(db, { client: fake, env: ENV, verifyOidc: createGoogleOidcVerifier({ fetchImpl: certsFetch }) });
 const unconfigured = createGoogleBilling(db, { client: fake, env: { ...ENV, PRI_GOOGLE_SERVICE_ACCOUNT_JSON: '' } });
 await rejects(unconfigured.native.google.bootstrap({ accountId: 'acct-g-a' }), 'BILLING_PROVIDER_NOT_CONFIGURED', 'an unconfigured deployment refuses bootstrap');
 
@@ -186,18 +203,38 @@ await rejects(google.native.google.purchase({ accountId: 'acct-g-b', body: { pur
   'a token cannot be linked across accounts');
 
 // ── RTDN: authenticate, check, queue — no network, no entitlement change ─────
-const push = (data, { id = `m-${Math.random().toString(36).slice(2)}`, token: q = ENV.PRI_GOOGLE_RTDN_TOKEN } = {}) => ({
+const push = (data, { id = `m-${Math.random().toString(36).slice(2)}`, bearer = oidcToken() } = {}) => ({
   body: { message: { messageId: id, data: Buffer.from(JSON.stringify(data)).toString('base64') }, subscription: 'projects/p/subscriptions/s' },
-  request: { query: { token: q } },
+  headers: bearer === null ? {} : { authorization: `Bearer ${bearer}` },
+  request: {},
 });
+/** What the webhook route does: authenticate (outside), then verify inside the transaction. */
+async function deliver(p) {
+  await google.verifiers.google.authenticate({ headers: p.headers, request: p.request });
+  return db.transaction(() => google.verifiers.google.webhook({ body: p.body, request: p.request }));
+}
 const rtdn = (purchaseToken, type = 2, extra = {}) => ({ version: '1.0', packageName: 'com.prilearning.app', eventTimeMillis: String(T0 + 5000), subscriptionNotification: { version: '1.0', notificationType: type, purchaseToken, subscriptionId: 'pri_premium' }, ...extra });
-await rejects(db.transaction(() => google.verifiers.google.webhook(push(rtdn(token(10)), { token: 'wrong-token-0123456789abcdef01234567' }))), 'GOOGLE_NOTIFICATION_UNAUTHENTICATED', 'a push without the shared secret is refused');
-await rejects(db.transaction(() => google.verifiers.google.webhook(push({ ...rtdn(token(10)), packageName: 'com.evil.app' }))), 'GOOGLE_NOTIFICATION_MISMATCH', 'a push for another package is refused');
-await rejects(db.transaction(() => google.verifiers.google.webhook({ body: { message: { messageId: 'm-x', data: '!!!' } }, request: { query: { token: ENV.PRI_GOOGLE_RTDN_TOKEN } } })), 'GOOGLE_NOTIFICATION_INVALID', 'an unreadable push is refused');
-check((await db.transaction(() => google.verifiers.google.webhook(push({ version: '1.0', packageName: 'com.prilearning.app', testNotification: { version: '1.0' } })))).length === 0, 'a test notification is accepted and changes nothing');
+await rejects(deliver(push(rtdn(token(10)), { bearer: null })), 'GOOGLE_NOTIFICATION_UNAUTHENTICATED', 'a push without a bearer token is refused');
+await rejects(deliver(push(rtdn(token(10)), { bearer: oidcToken({}, { key: stranger.privateKey }) })), 'GOOGLE_NOTIFICATION_UNAUTHENTICATED', 'a token not signed by Google is refused');
+await rejects(deliver(push(rtdn(token(10)), { bearer: oidcToken({ aud: 'https://elsewhere.example/hook' }) })), 'GOOGLE_NOTIFICATION_UNAUTHENTICATED', 'a token for another audience is refused');
+await rejects(deliver(push(rtdn(token(10)), { bearer: oidcToken({ email: 'someone@evil.iam.gserviceaccount.com' }) })), 'GOOGLE_NOTIFICATION_UNAUTHENTICATED', 'a token from another service account is refused');
+await rejects(deliver(push(rtdn(token(10)), { bearer: oidcToken({ email_verified: false }) })), 'GOOGLE_NOTIFICATION_UNAUTHENTICATED', 'an unverified email is refused');
+await rejects(deliver(push(rtdn(token(10)), { bearer: oidcToken({ exp: Math.floor(Date.now() / 1000) - 600 }) })), 'GOOGLE_NOTIFICATION_UNAUTHENTICATED', 'an expired token is refused');
+await rejects(deliver(push(rtdn(token(10)), { bearer: oidcToken({ iss: 'https://evil.example' }) })), 'GOOGLE_NOTIFICATION_UNAUTHENTICATED', 'a token from another issuer is refused');
+await rejects(deliver(push(rtdn(token(10)), { bearer: oidcToken({}, { alg: 'HS256' }) })), 'GOOGLE_NOTIFICATION_UNAUTHENTICATED', 'a non-RS256 token is refused');
+const fetchesBefore = certFetches;
+await rejects(deliver(push(rtdn(token(10)), { bearer: oidcToken({}, { kid: 'unknown-key' }) })), 'GOOGLE_NOTIFICATION_UNAUTHENTICATED', 'a token for an unknown key is refused');
+check(certFetches === fetchesBefore + 1, 'an unknown key id refetches Google\'s keys once (rotation), then fails closed');
+await rejects(db.transaction(() => google.verifiers.google.webhook({ body: push(rtdn(token(10))).body, request: {} })), 'GOOGLE_NOTIFICATION_UNAUTHENTICATED',
+  'the in-transaction verifier refuses a push authenticate() never saw');
+const coldVerifier = createGoogleOidcVerifier({ fetchImpl: certsFetch });
+await rejects(db.transaction(() => coldVerifier(oidcToken(), { audience: ENV.PRI_GOOGLE_RTDN_AUDIENCE })), 'STORE_EXTERNAL_IO_IN_TRANSACTION', 'Google\'s keys are never fetched inside a transaction');
+await rejects(deliver(push({ ...rtdn(token(10)), packageName: 'com.evil.app' })), 'GOOGLE_NOTIFICATION_MISMATCH', 'an authenticated push for another package is refused');
+await rejects(deliver({ ...push(rtdn(token(10))), body: { message: { messageId: 'm-x', data: '!!!' } } }), 'GOOGLE_NOTIFICATION_INVALID', 'an unreadable push is refused');
+check((await deliver(push({ version: '1.0', packageName: 'com.prilearning.app', testNotification: { version: '1.0' } }))).length === 0, 'a test notification is accepted and changes nothing');
 const before = (await db.get('SELECT source_version FROM entitlement_snapshots WHERE account_id=?', ['acct-g-a'])).source_version;
-check((await db.transaction(() => google.verifiers.google.webhook(push(rtdn(token(10)), { id: 'm-renew-1' })))).length === 0, 'a subscription push applies nothing inside the webhook transaction');
-await db.transaction(() => google.verifiers.google.webhook(push(rtdn(token(10)), { id: 'm-renew-1' })));
+check((await deliver(push(rtdn(token(10)), { id: 'm-renew-1' }))).length === 0, 'a subscription push applies nothing inside the webhook transaction');
+await deliver(push(rtdn(token(10)), { id: 'm-renew-1' }));
 check((await db.all('SELECT * FROM billing_google_notifications WHERE message_id=?', ['m-renew-1'])).length === 1, 'a redelivered push is queued once');
 check((await db.get('SELECT source_version FROM entitlement_snapshots WHERE account_id=?', ['acct-g-a'])).source_version === before, 'the entitlement is untouched until the worker re-fetches');
 
@@ -210,16 +247,16 @@ check(d1.applied === 1 && appliedEvents[0].status === 'past_due' && appliedEvent
 check((await db.get('SELECT plan FROM entitlement_snapshots WHERE account_id=?', ['acct-g-a'])).plan === 'free', 'A loses Premium while the payment is on hold');
 check((await db.get('SELECT processed_at FROM billing_google_notifications WHERE message_id=?', ['m-renew-1'])).processed_at > 0, 'the notification is marked processed');
 // voided purchase → revoked
-await db.transaction(() => google.verifiers.google.webhook(push({ version: '1.0', packageName: 'com.prilearning.app', eventTimeMillis: String(T0 + 9000), voidedPurchaseNotification: { purchaseToken: token(10), orderId: 'GPA.9999', productType: 1, refundType: 1 } }, { id: 'm-void-1' })));
+await deliver(push({ version: '1.0', packageName: 'com.prilearning.app', eventTimeMillis: String(T0 + 9000), voidedPurchaseNotification: { purchaseToken: token(10), orderId: 'GPA.9999', productType: 1, refundType: 1 } }, { id: 'm-void-1' }));
 await drain();
 check(appliedEvents.at(-1).status === 'revoked' && appliedEvents.at(-1).eventRank === 100, 'a voided purchase (refund) revokes');
 // an unclaimed token is parked, a transient failure retries with backoff
 purchases.set(token(20), sub({ obfuscated: 'nobody-issued-this-id-000000' }));
-await db.transaction(() => google.verifiers.google.webhook(push(rtdn(token(20)), { id: 'm-unbound' })));
+await deliver(push(rtdn(token(20)), { id: 'm-unbound' }));
 await drain();
 const parked = await db.get('SELECT processed_at,last_error,attempts FROM billing_google_notifications WHERE message_id=?', ['m-unbound']);
 check(parked.processed_at > 0 && parked.last_error === 'GOOGLE_ACCOUNT_UNBOUND', 'a purchase no account has claimed is parked, not retried forever');
-await db.transaction(() => google.verifiers.google.webhook(push(rtdn(token(10), 4), { id: 'm-flaky' })));
+await deliver(push(rtdn(token(10), 4), { id: 'm-flaky' }));
 failNext = Object.assign(new Error('down'), { code: 'GOOGLE_PLAY_UNAVAILABLE', status: 503 });
 await drain();
 const flaky = await db.get('SELECT processed_at,last_error,attempts,next_attempt_at FROM billing_google_notifications WHERE message_id=?', ['m-flaky']);
@@ -271,4 +308,4 @@ await rejects(refused.getSubscription('any-token-0000000000'), 'GOOGLE_PLAY_AUTH
 const engine = testStore.engine;
 await testStore.close();
 console.log(`engine: ${engine}`);
-console.log(`GOOGLE BILLING: PASS — ${checks}/${checks} checks — Premium only from Google's own record for this account's opaque id, one token per account, linked tokens superseded, pending grants nothing, RTDN queued then re-fetched outside transactions, and a pinned, redirect-free Play client.`);
+console.log(`GOOGLE BILLING: PASS — ${checks}/${checks} checks — Premium only from Google's own record for this account's opaque id, one token per account, linked tokens superseded, pending grants nothing, RTDN authenticated by Google's OIDC token, queued, then re-fetched outside transactions, and a pinned, redirect-free Play client.`);

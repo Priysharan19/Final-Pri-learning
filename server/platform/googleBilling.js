@@ -14,17 +14,22 @@
 //     supersedes the old one;
 //   · test (license-tester) purchases only when the deployment allows them.
 // Real-time developer notifications (RTDN, via Pub/Sub push) carry no signed
-// purchase data, so they are only authenticated and queued; a worker re-fetches
-// each token outside any database transaction and applies Google's answer.
+// purchase data. Each push is authenticated by its Google-signed OIDC token
+// (before the webhook transaction: key fetches are network I/O), then only
+// queued; a worker re-fetches each token outside any database transaction and
+// applies Google's answer.
 // The server acknowledges a verified purchase (Google refunds unacknowledged
 // purchases after three days), never the device.
 // ─────────────────────────────────────────────────────────────────────────────
-import { createPrivateKey, createSign, randomBytes, timingSafeEqual } from 'node:crypto';
+import { createPrivateKey, createPublicKey, createSign, createVerify, randomBytes, timingSafeEqual } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { sha256 } from './security.js';
 import { asStore, assertNoOpenTransaction } from './store.js';
 
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
+const GOOGLE_CERTS = 'https://www.googleapis.com/oauth2/v3/certs';
+const GOOGLE_ISSUERS = new Set(['https://accounts.google.com', 'accounts.google.com']);
+const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const API = 'https://androidpublisher.googleapis.com/androidpublisher/v3';
 const SCOPE = 'https://www.googleapis.com/auth/androidpublisher';
 const PURCHASE_TOKEN = /^[A-Za-z0-9._:-]{16,1024}$/;
@@ -79,7 +84,11 @@ export function readGoogleBillingConfig(env = process.env) {
     monthly: parseProduct(env.PRI_GOOGLE_MONTHLY_PRODUCT_ID),
     annual: parseProduct(env.PRI_GOOGLE_ANNUAL_PRODUCT_ID),
     serviceAccount: readServiceAccount(env),
-    rtdnToken: nonEmpty(env.PRI_GOOGLE_RTDN_TOKEN).length >= 32 ? nonEmpty(env.PRI_GOOGLE_RTDN_TOKEN) : null,
+    // Pub/Sub push authentication: the push subscription's OIDC audience and the
+    // service account it signs as. Both are required for notifications.
+    rtdn: nonEmpty(env.PRI_GOOGLE_RTDN_AUDIENCE) && EMAIL.test(nonEmpty(env.PRI_GOOGLE_RTDN_SERVICE_ACCOUNT))
+      ? Object.freeze({ audience: nonEmpty(env.PRI_GOOGLE_RTDN_AUDIENCE), serviceAccount: nonEmpty(env.PRI_GOOGLE_RTDN_SERVICE_ACCOUNT).toLowerCase() })
+      : null,
     allowTestPurchases: nonEmpty(env.PRI_GOOGLE_ALLOW_TEST_PURCHASES).toLowerCase() === 'true'
   });
 }
@@ -92,7 +101,7 @@ export function googleBillingConfigStatus(env = process.env) {
     productConfigured,
     credentialsConfigured,
     packageConfigured: !!cfg.packageName,
-    notificationsConfigured: !!cfg.rtdnToken,
+    notificationsConfigured: !!cfg.rtdn,
     testPurchasesAllowed: cfg.allowTestPurchases,
     configured: productConfigured && credentialsConfigured && !!cfg.packageName
   });
@@ -182,6 +191,48 @@ export function createGooglePlayClient({ cfg, fetchImpl = globalThis.fetch, now 
   return Object.freeze({ getSubscription, acknowledge });
 }
 
+/**
+ * Verify a Google-signed OIDC token (Pub/Sub push authentication): RS256 over
+ * Google's published keys, Google issuer, exact audience, unexpired. Keys are
+ * cached for an hour and refetched once for an unknown key id. Network I/O, so
+ * never inside a transaction.
+ */
+export function createGoogleOidcVerifier({ fetchImpl = globalThis.fetch, now = () => Date.now() } = {}) {
+  let cached = null;
+  async function keys(force = false) {
+    if (!force && cached && cached.expiresAt > now()) return cached.keys;
+    assertNoOpenTransaction('Fetching Google signing keys');
+    let res;
+    try { res = await fetchImpl(GOOGLE_CERTS, { headers: { Accept: 'application/json' }, redirect: 'error', signal: AbortSignal.timeout(8000) }); }
+    catch { throw billingError('GOOGLE_KEYS_UNAVAILABLE', 'Google signing keys could not be fetched.', 503); }
+    const body = await res.json().catch(() => null);
+    if (!res.ok || !Array.isArray(body?.keys)) throw billingError('GOOGLE_KEYS_UNAVAILABLE', 'Google signing keys are unavailable.', 503);
+    cached = { keys: body.keys, expiresAt: now() + 60 * 60_000 };
+    return cached.keys;
+  }
+  return async function verifyOidc(token, { audience }) {
+    const parts = String(token || '').split('.');
+    if (parts.length !== 3) throw billingError('GOOGLE_NOTIFICATION_UNAUTHENTICATED', 'Google Play notification is not authenticated.', 401);
+    let header, claims;
+    try {
+      header = JSON.parse(Buffer.from(parts[0], 'base64url').toString('utf8'));
+      claims = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
+    } catch { throw billingError('GOOGLE_NOTIFICATION_UNAUTHENTICATED', 'Google Play notification is not authenticated.', 401); }
+    if (header?.alg !== 'RS256' || typeof header?.kid !== 'string') throw billingError('GOOGLE_NOTIFICATION_UNAUTHENTICATED', 'Google Play notification is not authenticated.', 401);
+    let jwk = (await keys()).find(k => k.kid === header.kid);
+    if (!jwk) jwk = (await keys(true)).find(k => k.kid === header.kid);
+    if (!jwk || (jwk.alg && jwk.alg !== 'RS256') || jwk.kty !== 'RSA') throw billingError('GOOGLE_NOTIFICATION_UNAUTHENTICATED', 'Google Play notification is not authenticated.', 401);
+    const valid = createVerify('RSA-SHA256').update(`${parts[0]}.${parts[1]}`)
+      .verify(createPublicKey({ key: jwk, format: 'jwk' }), Buffer.from(parts[2], 'base64url'));
+    const t = Math.floor(now() / 1000);
+    if (!valid || !GOOGLE_ISSUERS.has(claims?.iss) || claims?.aud !== audience ||
+        !(Number(claims?.exp) > t - 60) || !(Number(claims?.iat) <= t + 60)) {
+      throw billingError('GOOGLE_NOTIFICATION_UNAUTHENTICATED', 'Google Play notification is not authenticated.', 401);
+    }
+    return claims;
+  };
+}
+
 function millis(value) {
   const t = Date.parse(String(value || ''));
   return Number.isFinite(t) ? t : null;
@@ -242,9 +293,13 @@ function constantTimeEqual(a, b) {
   return x.length === y.length && timingSafeEqual(x, y);
 }
 
-export function createGoogleBilling(db, { client = null, env = process.env, now = () => Date.now() } = {}) {
+export function createGoogleBilling(db, { client = null, env = process.env, now = () => Date.now(), verifyOidc = null } = {}) {
   db = asStore(db);
   const cfg = readGoogleBillingConfig(env);
+  const oidc = verifyOidc || createGoogleOidcVerifier({ now });
+  // Requests whose Pub/Sub OIDC token authenticate() verified. The webhook
+  // verifier (inside the transaction) refuses any request not in this set.
+  const authenticated = new WeakSet();
   let defaultClient = null;
   const api = () => client || (defaultClient ||= createGooglePlayClient({ cfg: requireConfigured(cfg) }));
 
@@ -383,12 +438,28 @@ export function createGoogleBilling(db, { client = null, env = process.env, now 
   }
 
   /**
-   * RTDN push (inside the webhook transaction): authenticate, check the
-   * package, queue the token. No network, no entitlement change here.
+   * RTDN push, BEFORE the webhook transaction: the Authorization bearer must be
+   * a Google-signed OIDC token for the configured audience, issued to the
+   * configured push service account with a verified email.
+   */
+  async function authenticate({ headers, request }) {
+    if (!cfg.rtdn) throw billingError('BILLING_PROVIDER_NOT_CONFIGURED', 'Google Play notifications are not configured on this deployment.', 503);
+    const match = /^Bearer ([A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)$/.exec(String(headers?.authorization || ''));
+    if (!match) throw billingError('GOOGLE_NOTIFICATION_UNAUTHENTICATED', 'Google Play notification is not authenticated.', 401);
+    const claims = await oidc(match[1], { audience: cfg.rtdn.audience });
+    if (String(claims?.email || '').toLowerCase() !== cfg.rtdn.serviceAccount || claims?.email_verified !== true) {
+      throw billingError('GOOGLE_NOTIFICATION_UNAUTHENTICATED', 'Google Play notification is not from the configured push account.', 401);
+    }
+    if (request && typeof request === 'object') authenticated.add(request);
+  }
+
+  /**
+   * RTDN push (inside the webhook transaction): only after authenticate(),
+   * check the package and queue the token. No network, no entitlement change.
    */
   async function webhook({ body, request }) {
-    if (!cfg.rtdnToken) throw billingError('BILLING_PROVIDER_NOT_CONFIGURED', 'Google Play notifications are not configured on this deployment.', 503);
-    if (!constantTimeEqual(String(request?.query?.token || ''), cfg.rtdnToken)) {
+    if (!cfg.rtdn) throw billingError('BILLING_PROVIDER_NOT_CONFIGURED', 'Google Play notifications are not configured on this deployment.', 503);
+    if (!request || !authenticated.has(request)) {
       throw billingError('GOOGLE_NOTIFICATION_UNAUTHENTICATED', 'Google Play notification is not authenticated.', 401);
     }
     const message = body?.message;
@@ -458,7 +529,7 @@ export function createGoogleBilling(db, { client = null, env = process.env, now 
   return Object.freeze({
     configured: googleBillingConfigStatus(env).configured,
     native: Object.freeze({ google: Object.freeze({ bootstrap, purchase }) }),
-    verifiers: Object.freeze({ google: Object.freeze({ restore, webhook }) }),
+    verifiers: Object.freeze({ google: Object.freeze({ restore, authenticate, webhook }) }),
     drainNotifications
   });
 }
