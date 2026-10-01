@@ -1833,5 +1833,26 @@ export default {
   'verdict.imageUnopenable': 'वह तस्वीर खोली नहीं जा सकी। पेज की फ़ोटो फिर से लें, या पहले उसे JPEG के रूप में सहेजें।',
   'practice.assignmentSyncFailed': 'आपका गणित का काम इस डिवाइस पर सुरक्षित है, लेकिन असाइनमेंट की प्रगति सिंक नहीं हो सकी: {reason}',
   'practice.cloudUnavailable': 'क्लाउड उपलब्ध नहीं है',
-  'login.olympiadTrack': 'ओलंपियाड (IOQM · RMO · INMO)'
+  'login.olympiadTrack': 'ओलंपियाड (IOQM · RMO · INMO)',
+
+  // ── Exam blueprints (the English must equal client/src/engine/indiaExams.js) ──
+  'exams.bp.cbseXStandard': 'CBSE कक्षा X गणित मानक (Standard) · संदर्भ पैटर्न',
+  'exams.bp.cbseXStandardNote': 'जब तक 2026-27 का कक्षा X गणित मानक (Standard) सैंपल पेपर पैटर्न स्रोत से जाँचकर Pri Learning में प्रकाशित नहीं होता, तब तक इसे केवल अभ्यास/संदर्भ के लिए उपयोग करें।',
+  'exams.bp.cbseXBasic': 'CBSE कक्षा X गणित बेसिक (Basic) · संदर्भ पैटर्न',
+  'exams.bp.cbseXBasicNote': '2025-26 के सैंपल पेपर से लिया गया बेसिक (241) संदर्भ पैटर्न; कठिनाई दो आसान स्तरों तक सीमित है। यह 2026-27 के प्रामाणिक प्रश्नपत्र होने का दावा नहीं है।',
+  'exams.bp.cbseXII': 'CBSE कक्षा XII गणित · संदर्भ पैटर्न',
+  'exams.bp.cbseXIINote': '2025-26 के सैंपल पेपर और 2025-26 के इकाई-भार (unit weightage) से लिया गया कक्षा XII संदर्भ पैटर्न। यह 2026-27 के प्रामाणिक प्रश्नपत्र होने का दावा नहीं है।',
+  'exams.bp.cbseXI': 'कक्षा XI गणित वार्षिक परीक्षा · विद्यालय-शैली पैटर्न',
+  'exams.bp.cbseXINote': 'CBSE कक्षा XI का कोई बोर्ड प्रश्नपत्र नहीं बनाता। यह विद्यालय-शैली का वार्षिक पैटर्न है: कक्षा XI के 2025-26 इकाई-भार पर कक्षा XII सैंपल पेपर के खंड।',
+  'exams.bp.jeeMain': 'JEE Main 2026 · गणित खंड सिमुलेशन',
+  'exams.bp.jeeMainNote': 'यह Paper 1 का आधिकारिक गणित भाग है। इसे कभी भी पूरा JEE Main Paper 1 नहीं कहा जाना चाहिए, क्योंकि Pri Learning भौतिकी और रसायन विज्ञान उपलब्ध नहीं कराता।',
+  'exams.bp.jeeAdvanced': 'JEE Advanced 2026 · गणित अभ्यास',
+  'exams.bp.jeeAdvancedNote': 'प्रश्नों की संख्या, प्रकार और ऋणात्मक अंकन किसी जाँचे गए प्रश्नपत्र-विवरण से ही आने चाहिए। Pri Learning को JEE Advanced के लिए एक ही सार्वभौमिक अंकन-योजना तय नहीं करनी चाहिए।',
+  'exams.bp.jeeAdvanced2024': 'JEE Advanced · Paper 1 गणित भाग (2024 संदर्भ पैटर्न)',
+  'exams.bp.jeeAdvanced2024Note': 'एक प्रकाशित JEE Advanced प्रश्नपत्र (2024, Paper 1) का गणित भाग। 2026 के प्रश्नपत्र में संख्या, प्रकार और अंकन बदल सकते हैं; यह पैटर्न केवल संदर्भ है, 2026 की योजना नहीं।',
+  'exams.bp.ioqm': 'IOQM · Indian Olympiad Qualifier in Mathematics (2024-25 संदर्भ पैटर्न)',
+  'exams.bp.ioqmNote': 'IOQM 2024-25 प्रारूप। Pri का ओलंपियाड प्रश्न-बैंक IOQM (एक पूर्णांक उत्तर वाले प्रश्न) स्तर तक पहुँचता है; RMO/INMO के उपपत्ति वाले प्रश्नपत्रों का सिमुलेशन नहीं किया जाता।',
+  'exams.claim.none': 'इस चयन के लिए स्रोत-संस्करण वाला कोई परीक्षा ढाँचा (blueprint) प्रकाशित नहीं है।',
+  'exams.claim.officialSection': 'आधिकारिक गणित-खंड संरचना; यह कई विषयों वाला पूरा प्रश्नपत्र नहीं है।',
+  'exams.claim.officialStructure': 'केवल आधिकारिक मोटी संरचना; हर प्रश्नपत्र के प्रश्न और अंकन के निर्देश अलग-अलग हो सकते हैं।'
 };

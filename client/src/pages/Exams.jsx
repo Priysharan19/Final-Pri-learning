@@ -6,6 +6,25 @@ import { MathText } from '../lib/latex.jsx';
 import { indiaExamBlueprint, indiaExamClaim } from '../engine/indiaExams.js';
 import { useT, useTx } from '../i18n/index.js';
 
+// The India blueprints and their claims are engine data with an English source
+// of truth in engine/indiaExams.js; these are their catalogue keys, so the page
+// can show them in the student's language. i18n-coverage-check holds the English
+// catalogue values equal to the engine's, so the two cannot drift.
+const BLUEPRINT_KEYS = {
+  'cbse-x-standard-041-2025-26-reference': ['exams.bp.cbseXStandard', 'exams.bp.cbseXStandardNote'],
+  'cbse-x-basic-241-2025-26-reference': ['exams.bp.cbseXBasic', 'exams.bp.cbseXBasicNote'],
+  'cbse-xii-041-2025-26-reference': ['exams.bp.cbseXII', 'exams.bp.cbseXIINote'],
+  'cbse-xi-annual-2025-26-school-pattern': ['exams.bp.cbseXI', 'exams.bp.cbseXINote'],
+  'jee-main-paper1-mathematics-2026': ['exams.bp.jeeMain', 'exams.bp.jeeMainNote'],
+  'jee-advanced-2026-structure': ['exams.bp.jeeAdvanced', 'exams.bp.jeeAdvancedNote'],
+  'jee-advanced-paper1-mathematics-2024-reference': ['exams.bp.jeeAdvanced2024', 'exams.bp.jeeAdvanced2024Note'],
+  'ioqm-2024-25-reference': ['exams.bp.ioqm', 'exams.bp.ioqmNote'],
+};
+const CLAIM_KEYS = {
+  'official-mathematics-section': 'exams.claim.officialSection',
+  'official-structure-dynamic-marking': 'exams.claim.officialStructure',
+};
+
 export default function Exams() {
   const { user } = useApp();
   const t = useT();
@@ -101,7 +120,7 @@ function IndiaExams({ user, exams, blueprint, busy, error, start, openPaper, nav
     <div className="grid cols-2" style={{ alignItems: 'start' }}>
       {!paper && <h1 className="sr-only">{t('exams.indiaHeading')}</h1>}
       <div className="card">
-        <div className="card-title">{blueprint?.label || t('exams.classPractice', { n: user.year })}</div>
+        <div className="card-title">{blueprint ? (BLUEPRINT_KEYS[blueprint.id] ? t(BLUEPRINT_KEYS[blueprint.id][0]) : blueprint.label) : t('exams.classPractice', { n: user.year })}</div>
         {jeeMainReady ? <>
           <p className="sub" style={{ marginBottom: 16 }}>
             {tx('exams.jeeMainIntro', { section: <b>{t('exams.jeeMainSection')}</b> })}
@@ -120,7 +139,9 @@ function IndiaExams({ user, exams, blueprint, busy, error, start, openPaper, nav
             {busy ? t('exams.buildingJee') : t('exams.startJee')}
           </button>
         </> : <>
-          <p className="sub" style={{ marginBottom: 14 }}>{claim.reason}</p>
+          <p className="sub" style={{ marginBottom: 14 }}>{!blueprint ? t('exams.claim.none')
+            : CLAIM_KEYS[blueprint.authenticity] ? t(CLAIM_KEYS[blueprint.authenticity])
+              : BLUEPRINT_KEYS[blueprint.id] ? t(BLUEPRINT_KEYS[blueprint.id][1]) : claim.reason}</p>
           {track === 'cbse' && user.year === 10 && <p className="muted">
             {t('exams.cbseClass10Note')}
           </p>}

@@ -308,6 +308,34 @@ for (const lang of LANGUAGES) {
   eq(keys.filter(k => !(k in en)), [], `${lang.english} has no key English lacks`);
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// 4 · Engine copy shown through the catalogue cannot drift from the engine
+//
+// The India exam blueprints' labels and release notes, and the exam claim
+// reasons, have their English source of truth in engine/indiaExams.js (other
+// suites hold those sentences to strict wording about authenticity). Exams.jsx
+// shows them through catalogue keys so they can be read in Hindi; the English
+// catalogue must say exactly what the engine says.
+// ─────────────────────────────────────────────────────────────────────────────
+const exams = await import('../src/engine/indiaExams.js');
+const examsPage = read('src/pages/Exams.jsx');
+const blueprintKeys = Object.fromEntries([...examsPage.matchAll(/'([a-z0-9-]+)': \['(exams\.bp\.\w+)', '(exams\.bp\.\w+)'\]/g)].map(m => [m[1], [m[2], m[3]]]));
+const blueprints = Object.values(exams).filter(v => v && typeof v === 'object' && typeof v.id === 'string' && typeof v.label === 'string' && 'releaseNote' in v);
+ok(blueprints.length >= 8, `the engine's exam blueprints were found (${blueprints.length})`);
+for (const bp of blueprints) {
+  const keys = blueprintKeys[bp.id];
+  ok(Boolean(keys), `Exams.jsx has catalogue keys for blueprint ${bp.id}`);
+  if (!keys) continue;
+  eq(en[keys[0]], bp.label, `the English label of ${bp.id} matches the engine`);
+  eq(en[keys[1]], bp.releaseNote, `the English release note of ${bp.id} matches the engine`);
+}
+eq(en['exams.claim.none'], exams.indiaExamClaim(null).reason, 'the no-blueprint claim matches the engine');
+for (const [authenticity, key] of [['official-mathematics-section', 'exams.claim.officialSection'], ['official-structure-dynamic-marking', 'exams.claim.officialStructure']]) {
+  const bp = blueprints.find(b => b.authenticity === authenticity);
+  ok(Boolean(bp), `a blueprint with ${authenticity} exists`);
+  if (bp) eq(en[key], exams.indiaExamClaim(bp).reason, `the ${authenticity} claim matches the engine`);
+}
+
 const total = pass + failures.length;
 if (failures.length) {
   console.error(`I18N COVERAGE: FAIL — ${failures.length}/${total} checks failed`);

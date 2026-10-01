@@ -1769,5 +1769,26 @@ export default {
   'verdict.imageUnopenable': 'That image could not be opened. Try photographing the page again, or save it as a JPEG first.',
   'practice.assignmentSyncFailed': 'Your maths work is safe on this device, but assignment progress could not sync: {reason}',
   'practice.cloudUnavailable': 'cloud unavailable',
-  'login.olympiadTrack': 'Olympiad (IOQM · RMO · INMO)'
+  'login.olympiadTrack': 'Olympiad (IOQM · RMO · INMO)',
+
+  // ── Exam blueprints (the English must equal client/src/engine/indiaExams.js) ──
+  'exams.bp.cbseXStandard': 'CBSE Class X Mathematics Standard · reference pattern',
+  'exams.bp.cbseXStandardNote': 'Use for practice/reference only until a 2026-27 Class X Mathematics Standard sample-paper pattern is source-checked and published in Pri Learning.',
+  'exams.bp.cbseXBasic': 'CBSE Class X Mathematics Basic · reference pattern',
+  'exams.bp.cbseXBasicNote': 'Basic (241) reference pattern from the 2025-26 sample paper; depth is capped at the two easier authored difficulties. Not a 2026-27 authenticity claim.',
+  'exams.bp.cbseXII': 'CBSE Class XII Mathematics · reference pattern',
+  'exams.bp.cbseXIINote': 'Class XII reference pattern from the 2025-26 sample paper and the 2025-26 unit weightage. Not a 2026-27 authenticity claim.',
+  'exams.bp.cbseXI': 'Class XI Mathematics annual examination · school-style pattern',
+  'exams.bp.cbseXINote': 'CBSE sets no Class XI board paper. This is a school-style annual pattern: Class XII sample-paper sections over the Class XI 2025-26 unit weightage.',
+  'exams.bp.jeeMain': 'JEE Main 2026 · Mathematics section simulation',
+  'exams.bp.jeeMainNote': 'This is the official Mathematics slice of Paper 1. It must never be labelled a complete JEE Main Paper 1 because Pri Learning does not supply Physics and Chemistry.',
+  'exams.bp.jeeAdvanced': 'JEE Advanced 2026 · mathematics practice',
+  'exams.bp.jeeAdvancedNote': 'Question count, question types and negative marking must come from a reviewed paper specification. Pri Learning must not hard-code one universal JEE Advanced marking scheme.',
+  'exams.bp.jeeAdvanced2024': 'JEE Advanced · Paper 1 Mathematics part (2024 reference pattern)',
+  'exams.bp.jeeAdvanced2024Note': 'Mathematics part of one published JEE Advanced paper (2024, Paper 1). The 2026 paper may change counts, types and marking; this pattern is a reference, not the 2026 scheme.',
+  'exams.bp.ioqm': 'IOQM · Indian Olympiad Qualifier in Mathematics (2024-25 reference pattern)',
+  'exams.bp.ioqmNote': 'IOQM 2024-25 format. The authored olympiad bank reaches the IOQM (single-integer-answer) end of the ladder; RMO/INMO proof papers are not simulated.',
+  'exams.claim.none': 'No source-versioned examination blueprint is published for this selection.',
+  'exams.claim.officialSection': 'Official mathematics-section structure; not the complete multi-subject paper.',
+  'exams.claim.officialStructure': 'Official high-level structure only; paper-specific question and marking instructions remain dynamic.'
 };

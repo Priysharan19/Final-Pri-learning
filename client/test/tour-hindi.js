@@ -27,7 +27,9 @@ import { pathToFileURL } from 'node:url';
 import en from '../src/i18n/strings.en.js';
 import hi from '../src/i18n/strings.hi.js';
 
-const STUDENT = { name: 'Ananya Gupta', year: 10, course: 'in', language: 'hi' };
+// JEE Main is the India track whose exam is released (a source-checked
+// Mathematics-section paper), so the exam room can be entered and audited.
+const STUDENT = { name: 'Ananya Gupta', year: 12, course: 'in', track: 'jee-main', language: 'hi' };
 const DEVANAGARI = /[ऀ-ॿ]/;
 
 // Every English interface string whose Hindi is different — i.e. every string
