@@ -19,17 +19,27 @@
 //   4. Cache before spend. An identical request in the last 24 hours is
 //      answered from tutor_cache without a model call.
 //   5. One unit of the deployment-wide paid-call ceiling per model call.
-//   6. The reply is checked against the verified solution (tutorGuard.js). A
+//   6. A per-account daily allowance (PRI_TUTOR_CALLS_PER_ACCOUNT_DAY, higher
+//      for premium via PRI_TUTOR_CALLS_PER_ACCOUNT_DAY_PREMIUM), so one account
+//      cannot drain the shared ceiling, and maths-only content limits, so the
+//      route cannot be used as a general model proxy.
+//   7. The reply is checked against the verified solution (tutorGuard.js). A
 //      leaked answer is regenerated once; a second leak falls back to the
-//      question's own authored hint. Captions that carry any mathematics not in
-//      the solution are replaced by the deterministic caption.
+//      question's own authored hint, or a generic deterministic nudge. Captions
+//      may only reword: their maths must be verbatim spans of the verified step.
+//
+// What it cannot see: whether the question is in an active exam. The client
+// tells it (`context`), and the local backend refuses exam rows before calling;
+// a modified client could misreport. The daily allowance bounds that misuse,
+// and the replies never contain the answer whatever the context.
 // ─────────────────────────────────────────────────────────────────────────────
 import { createHash } from 'node:crypto';
+import { publicEntitlement } from './entitlements.js';
 import { asyncRouter } from './asyncRouter.js';
 import { asStore, sqliteHandle } from './store.js';
-import { rateLimit, requireSession, requireVerifiedEmail } from './security.js';
+import { consumeRateLimit, rateLimit, requireSession, requireVerifiedEmail, sha256 } from './security.js';
 import { consumePaidCall, refusePaidCall } from './spendCeiling.js';
-import { captionMathOk, forbiddenExpressions, leakedExpressions, solutionCorpus } from './tutorGuard.js';
+import { buildGuard, captionWordingOk, leakedExpressions, solutionSpans } from './tutorGuard.js';
 import {
   MAX_CAPTION_CHARS, TUTOR_LEVELS, TUTOR_LOCALES, TutorProviderError, askTutorModel, providerConfig
 } from './tutorProvider.js';
@@ -39,8 +49,31 @@ export const MAX_TUTOR_BODY_BYTES = 48 * 1024;
 export const TUTOR_RATE_LIMIT = Object.freeze({ limit: 60, windowMs: 60 * 60 * 1000 });
 
 const LIMITS = Object.freeze({
-  prompt: 2_000, steps: 24, stepHeading: 300, stepDetail: 700, answer: 300,
-  hints: 6, hint: 500, lines: 40, line: 400, typed: 300, captions: 24, caption: 700
+  prompt: 2_000, steps: 24, stepHeading: 300, stepDetail: 700, solution: 8_000, answer: 300,
+  hints: 6, hint: 500, lines: 40, line: 400, work: 4_000, typed: 300, captions: 24, caption: 700
+});
+export const TUTOR_DAILY_DEFAULTS = Object.freeze({ free: 40, premium: 120 });
+
+// A maths token: a digit, an operator, a relation, a $…$ span or a KaTeX
+// command. The tutor is for mathematics; text with none of these is not a
+// question it should be asked about, and refusing it keeps the route from
+// being a general-purpose model proxy.
+const MATHS = /[0-9०-९=+\-−×÷*/^<>≤≥√π$∫∑%]|\\[a-z]+/i;
+const hasMaths = value => MATHS.test(String(value ?? ''));
+const notMaths = message => invalid(message, 'TUTOR_NOT_MATHS');
+
+/** Generic deterministic help, for a guarded reply on a question with no authored hint. */
+export const GENERIC_HELP = Object.freeze({
+  en: Object.freeze({
+    nudge: 'Look again at what the question gives you, and decide which part of it to deal with first.',
+    socratic: 'What is the very next thing you could do that keeps both sides balanced, and why?',
+    walkthrough: 'Follow the verified solution one step at a time.'
+  }),
+  hi: Object.freeze({
+    nudge: 'प्रश्न में दी गई जानकारी फिर से देखें, और तय करें कि पहले किस हिस्से पर काम करना है।',
+    socratic: 'अगला कौन-सा क़दम है जिससे दोनों पक्ष संतुलित रहें, और क्यों?',
+    walkthrough: 'जाँचे हुए हल को एक-एक क़दम करके देखें।'
+  })
 });
 
 function ensureTable(db) {
@@ -80,7 +113,7 @@ export function validateTutorRequest(body) {
   if (!TUTOR_LEVELS.includes(body.level)) return invalid(`level must be one of ${TUTOR_LEVELS.join(', ')}.`);
   const locale = body.locale === undefined ? 'en' : body.locale;
   if (!TUTOR_LOCALES.includes(locale)) return invalid(`locale must be one of ${TUTOR_LOCALES.join(', ')}.`);
-  if (!isText(body.questionId, 120, { required: true })) return invalid('questionId is required.');
+  if (!(typeof body.questionId === 'string' && /^[A-Za-z0-9._:-]{1,120}$/.test(body.questionId))) return invalid('questionId is required and is an opaque id.');
   if (!isText(body.questionVersion, 60)) return invalid('questionVersion must be a short string.');
 
   const q = body.question;
@@ -97,18 +130,34 @@ export function validateTutorRequest(body) {
     }
   }
   if (!isText(q.answer, LIMITS.answer, { required: true })) return invalid('question.answer is required: the guard checks every reply against it.', 'TUTOR_UNGROUNDED');
+  // Maths only: a question, a solution and an answer that carry mathematics.
+  if (!hasMaths(q.prompt)) return notMaths('The tutor helps with mathematics questions only.');
+  const solutionChars = q.steps.reduce((n, step) => n + String(step.h || '').length + String(step.d || '').length, 0);
+  if (solutionChars > LIMITS.solution) return invalid(`The verified solution is at most ${LIMITS.solution} characters.`, 'TUTOR_REQUEST_TOO_LARGE', 413);
+  if (q.steps.filter(step => hasMaths(step.h) || hasMaths(step.d)).length < Math.ceil(q.steps.length / 2)) {
+    return notMaths('A verified solution is mostly mathematics.');
+  }
+  if (!hasMaths(q.answer) && q.answer.length > 60) return notMaths('The answer is a mathematical result.');
   if (q.hints !== undefined && (!Array.isArray(q.hints) || q.hints.length > LIMITS.hints || !q.hints.every(h => typeof h === 'string' && h.length <= LIMITS.hint))) {
     return invalid('question.hints must be a short list of authored hints.');
   }
 
   const work = body.studentWork === undefined ? {} : body.studentWork;
   if (!plain(work)) return invalid('studentWork must be an object.');
-  const wUnknown = closed(work, ['lines', 'typedAnswer', 'firstBreak', 'misconception']);
+  const wUnknown = closed(work, ['lines', 'typedAnswer', 'firstBreak', 'verifiedLines', 'misconception']);
   if (wUnknown.length) return invalid(`Unexpected studentWork field: ${wUnknown.join(', ')}.`);
   if (work.lines !== undefined && (!Array.isArray(work.lines) || work.lines.length > LIMITS.lines || !work.lines.every(l => typeof l === 'string' && l.length <= LIMITS.line))) {
     return invalid(`studentWork.lines must be at most ${LIMITS.lines} lines of at most ${LIMITS.line} characters.`);
   }
+  if ((work.lines || []).reduce((n, l) => n + l.length, 0) > LIMITS.work) {
+    return invalid(`studentWork is at most ${LIMITS.work} characters.`, 'TUTOR_REQUEST_TOO_LARGE', 413);
+  }
+  if ((work.lines || []).some(l => l.length > 80 && !hasMaths(l))) return notMaths('Working lines are mathematics.');
   if (!isText(work.typedAnswer, LIMITS.typed)) return invalid('studentWork.typedAnswer is bounded.');
+  if (work.typedAnswer && work.typedAnswer.length > 60 && !hasMaths(work.typedAnswer)) return notMaths('An answer is mathematics.');
+  if (work.verifiedLines !== undefined && (!Number.isInteger(work.verifiedLines) || work.verifiedLines < 0 || work.verifiedLines > LIMITS.lines)) {
+    return invalid('studentWork.verifiedLines counts the lines the deterministic checker verified.');
+  }
   if (work.firstBreak !== undefined && (!Number.isInteger(work.firstBreak) || work.firstBreak < -1 || work.firstBreak >= LIMITS.lines)) {
     return invalid('studentWork.firstBreak must be a line index or -1.');
   }
@@ -149,6 +198,7 @@ export function validateTutorRequest(body) {
         lines,
         typedAnswer: work.typedAnswer ? work.typedAnswer.trim() : '',
         firstBreak: Number.isInteger(work.firstBreak) ? work.firstBreak : -1,
+        verifiedLines: Number.isInteger(work.verifiedLines) ? Math.min(work.verifiedLines, lines.length) : 0,
         misconception: work.misconception || null
       },
       captions
@@ -160,18 +210,33 @@ export function validateTutorRequest(body) {
 export function tutorCacheKey(request) {
   const material = JSON.stringify([
     'pri-tutor-v1', request.level, request.locale, request.questionId, request.questionVersion,
-    request.question.prompt, request.question.steps, request.question.answer,
+    request.question.prompt, request.question.steps, request.question.answer, request.question.hints,
     request.studentWork.lines, request.studentWork.typedAnswer, request.studentWork.firstBreak,
-    request.studentWork.misconception, request.captions
+    request.studentWork.verifiedLines, request.studentWork.misconception, request.captions
   ]);
   return createHash('sha256').update(material).digest('hex');
 }
 
-/** The authored, deterministic hint for this level, or null if the question has none. */
-function authoredHint(request) {
+/** The authored, deterministic hint for this level, or the generic one when the question has none. */
+function deterministicHelp(request) {
   const hints = request.question.hints;
-  if (!hints.length) return null;
-  return hints[Math.min(TUTOR_LEVELS.indexOf(request.level), hints.length - 1)];
+  if (hints.length) return hints[Math.min(TUTOR_LEVELS.indexOf(request.level), hints.length - 1)];
+  return (GENERIC_HELP[request.locale] || GENERIC_HELP.en)[request.level];
+}
+
+const positiveInt = value => { const n = Number(value); return Number.isInteger(n) && n > 0 ? n : null; };
+
+/**
+ * How many tutor requests this account may send to the model in a day. The
+ * plan is read from the server's own entitlement snapshot; a premium plan
+ * ('additional-ai-usage') gets the larger allowance.
+ */
+export async function tutorDailyLimit(db, accountId, env = process.env) {
+  const row = await db.get('SELECT * FROM entitlement_snapshots WHERE account_id = ?', [accountId]);
+  const plan = row ? publicEntitlement(row).plan : 'free';
+  return plan === 'premium'
+    ? positiveInt(env.PRI_TUTOR_CALLS_PER_ACCOUNT_DAY_PREMIUM) || TUTOR_DAILY_DEFAULTS.premium
+    : positiveInt(env.PRI_TUTOR_CALLS_PER_ACCOUNT_DAY) || TUTOR_DAILY_DEFAULTS.free;
 }
 
 export function createTutorRouter(db, {
@@ -207,8 +272,11 @@ export function createTutorRouter(db, {
   }
 
   async function help(request) {
-    const forbidden = forbiddenExpressions(request.question, {
-      studentLines: [...request.studentWork.lines, request.studentWork.typedAnswer]
+    // The typed answer counts as the student's final line only when there is no
+    // working; it is never verified, so it never excuses anything.
+    const guard = buildGuard(request.question, {
+      studentLines: request.studentWork.lines,
+      verifiedLines: request.studentWork.verifiedLines
     });
     let model = null;
     for (let attempt = 0; attempt < 2; attempt += 1) {
@@ -220,7 +288,7 @@ export function createTutorRouter(db, {
       }
       const reply = await ask(request, { env });
       model = reply.model || model;
-      const leaked = leakedExpressions(reply.message, forbidden, { prompt: request.question.prompt });
+      const leaked = leakedExpressions(reply.message, guard, { prompt: request.question.prompt });
       if (reply.message && !reply.revealsAnswer && !leaked.length) {
         return {
           tutor: {
@@ -233,7 +301,7 @@ export function createTutorRouter(db, {
     // Two strikes: the authored hint, which a person wrote and reviewed.
     return {
       tutor: {
-        level: request.level, message: authoredHint(request), referencesStepIndex: -1,
+        level: request.level, message: deterministicHelp(request), referencesStepIndex: -1,
         source: 'fallback', guarded: true, reason: 'TUTOR_ANSWER_GUARD', model
       }
     };
@@ -243,11 +311,11 @@ export function createTutorRouter(db, {
     const overBudget = await consumePaidCall(db, { env });
     if (overBudget) return { refusal: overBudget };
     const reply = await ask(request, { env });
-    const corpus = solutionCorpus(request.question);
+    const spans = solutionSpans(request.question);
     let rejected = 0;
     const captions = request.captions.map((caption, index) => {
       const proposed = reply.captions?.get?.(index);
-      if (proposed && proposed.length <= MAX_CAPTION_CHARS && captionMathOk(proposed, corpus)) {
+      if (proposed && proposed.length <= MAX_CAPTION_CHARS && captionWordingOk(proposed, caption.text, spans)) {
         return { id: caption.id, text: proposed, source: 'model' };
       }
       if (proposed) rejected += 1;
@@ -282,6 +350,15 @@ export function createTutorRouter(db, {
 
       if (!providerConfig(env).configured) {
         return res.status(503).json({ error: { code: 'TUTOR_NOT_CONFIGURED', message: 'The AI tutor is not available on this deployment.' } });
+      }
+
+      // Per-account daily allowance, counted per request that reaches the model.
+      const accountId = req.platformSession.account_id;
+      const daily = await consumeRateLimit(db, `tutor-day:${sha256(accountId).slice(0, 24)}`,
+        { limit: await tutorDailyLimit(db, accountId, env), windowMs: 24 * 60 * 60 * 1000 }, at);
+      if (!daily.allowed) {
+        res.set('RateLimit-Reset', String(Math.ceil(daily.resetAt / 1000)));
+        return res.status(429).json({ error: { code: 'TUTOR_DAILY_LIMIT', message: "You have used today's tutor help. The question's own hints still work.", retryable: true } });
       }
 
       try {

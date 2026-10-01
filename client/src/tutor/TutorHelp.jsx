@@ -20,7 +20,7 @@ import { api } from '../api.js';
 import { MathText } from '../lib/latex.jsx';
 import { useT } from '../i18n/index.js';
 import { buildDeterministicStoryboard } from '../explain/visualEngine.js';
-import { verifiedMath } from '../explain/storyboard.js';
+import { safeCaptions } from './captionRule.js';
 import './TutorHelp.css';
 
 export const TUTOR_LEVELS = Object.freeze([1, 2, 3]);
@@ -34,21 +34,9 @@ function levelText(t) {
   };
 }
 
-const SPAN = /\$([^$]+)\$/g;
+export { safeCaptions };
 
-/** Captions the device will show: only those whose maths is all in the verified solution. */
-export function safeCaptions(captions, solution) {
-  const evidence = verifiedMath(solution);
-  const out = {};
-  for (const c of Array.isArray(captions) ? captions : []) {
-    if (c?.source !== 'tutor' || typeof c.text !== 'string' || !c.id) continue;
-    const spans = [...c.text.matchAll(SPAN)].map(m => m[1].trim()).filter(Boolean);
-    if (spans.every(s => evidence.has(s))) out[c.id] = c.text;
-  }
-  return out;
-}
-
-export default function TutorHelp({ question, work, locale, onUsed, onClose }) {
+export default function TutorHelp({ question, work, locale, onUsed, onResolved, onClose, startedAt }) {
   const t = useT();
   const text = levelText(t);
   const headingId = useId();
@@ -72,9 +60,10 @@ export default function TutorHelp({ question, work, locale, onUsed, onClose }) {
       .map(scene => ({ id: String(scene.id).slice(0, 40), text: String(scene.narration || '').slice(0, 700) }))
       .filter(c => c.id && c.text).slice(0, 24);
     if (!captions.length) return;
+    const sources = new Map(captions.map(c => [c.id, c.text]));
     api.post(`/practice/${question.id}/tutor/captions`, { captions, locale, work })
       .then(r => {
-        const map = safeCaptions(r?.captions, solution);
+        const map = safeCaptions(r?.captions, solution, sources);
         if (Object.keys(map).length) {
           window.dispatchEvent(new CustomEvent('pri:tutor-captions', { detail: { questionId: question.id, captions: map } }));
         }
@@ -86,7 +75,9 @@ export default function TutorHelp({ question, work, locale, onUsed, onClose }) {
     if (busy || level > used + 1) return;
     setBusy(level);
     try {
-      const r = await api.post(`/practice/${question.id}/tutor`, { level, locale, work });
+      const r = await api.post(`/practice/${question.id}/tutor`, {
+        level, locale, work, ...(level === 3 && startedAt ? { ms: Date.now() - startedAt } : {})
+      });
       const reached = Math.max(used, Number(r?.tutorLevel) || level);
       setUsed(reached);
       onUsed?.(reached);
@@ -95,6 +86,9 @@ export default function TutorHelp({ question, work, locale, onUsed, onClose }) {
         openWalkthrough(solution);
         // No verified steps means no walkthrough to open: say so plainly.
         note(3, { text: solution?.steps?.length ? t('tutor.walkthroughReady') : null, source: 'deterministic' });
+        // The walkthrough shows the answer, so the question is now resolved
+        // exactly as Reveal resolves it; the card shows that outcome.
+        if (r?.resolved) onResolved?.(r);
       } else {
         note(level, {
           text: r?.message || null,

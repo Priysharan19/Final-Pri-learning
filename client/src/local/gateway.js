@@ -184,7 +184,7 @@ const BODY_RULES = [
   // AI tutor: a level and the student's own working, nothing else. The
   // backend adds the verified solution itself — the UI never supplies one.
   [/^POST \/practice\/[A-Za-z0-9._-]+\/tutor$/, body => {
-    requireObject(body, 'tutor help'); optionalNumber(body, 'level'); optionalString(body, 'locale', 5);
+    requireObject(body, 'tutor help'); optionalNumber(body, 'level'); optionalString(body, 'locale', 5); optionalNumber(body, 'ms');
     tutorWorkRule(body);
   }],
   [/^POST \/practice\/[A-Za-z0-9._-]+\/tutor\/captions$/, body => {

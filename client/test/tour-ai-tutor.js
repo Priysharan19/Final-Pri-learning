@@ -13,8 +13,9 @@
 //   · level 1 shows the tutor's words, and what was sent is grounded practice
 //     help with no student identifiers;
 //   · a tutor outage at level 2 falls back to the question's own hint, no crash;
-//   · level 3 opens the deterministic walkthrough, with a rephrased caption
-//     shown beside — never instead of — the verified step;
+//   · level 3 opens the deterministic walkthrough, with a reworded caption
+//     shown beside — never instead of — the verified step — and, because it
+//     shows the answer, closes the question exactly as Reveal does;
 //   · opened levels lower the credit shown on the card.
 //
 // Run on its own:  node client/test/tour-ai-tutor.js
@@ -122,10 +123,13 @@ export const flow = {
     await check('the caption request carried only deterministic captions to rephrase',
       Array.isArray(walkSent.captions) && walkSent.captions.length > 0 && walkSent.captions.every(c => /^[a-z0-9_-]+$/i.test(c.id)));
     await page.keyboard.press('Escape');
-    await check('three opened levels lower the credit to the floor of 55%',
-      /55%/.test(await page.locator('.q-credit').innerText().catch(() => '')),
-      await page.locator('.q-topmeta').innerText());
-    await check('the card says how much help was used', /3 levels of help used/.test(await page.locator('.tutor-launch-row').innerText()));
+    // Level 3 shows the whole solution, so the question ends as Reveal ends it.
+    await page.waitForSelector('.eval-card', { timeout: 15000 }).catch(() => {});
+    await check('level 3 ends the question exactly like Reveal', /Solution revealed/i.test(await page.locator('.qpage').innerText()),
+      (await page.locator('.qpage').innerText()).slice(0, 300));
+    await check('the answer box is gone — the watched answer cannot be submitted for credit',
+      await page.getByRole('button', { name: 'Submit Answer' }).count() === 0);
+    await check('and no more help is offered on a closed question', await page.locator('[data-tutor-launch]').count() === 0);
   }
 };
 

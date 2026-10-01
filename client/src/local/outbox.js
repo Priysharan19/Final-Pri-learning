@@ -62,6 +62,11 @@ export function classifyMutation(method, path, result = null, body = null) {
 
   let m = key.match(/^POST \/practice\/([A-Za-z0-9._-]+)\/(submit|reveal)$/);
   if (m) return { kind: 'practice-progress', entityId: safeId(m[1]), operation: 'upsert' };
+  // Tutor level 3 shows the whole verified solution and so resolves the
+  // question exactly as Reveal does; levels 1–2 change nothing that syncs until
+  // the answer is submitted.
+  m = key.match(/^POST \/practice\/([A-Za-z0-9._-]+)\/tutor$/);
+  if (m) return result?.resolved ? { kind: 'practice-progress', entityId: safeId(m[1]), operation: 'upsert' } : null;
 
   if (key === 'POST /exams') return { kind: 'exam', entityId: safeId(result?.exam?.id), operation: 'upsert' };
   m = key.match(/^POST \/exams\/([A-Za-z0-9._-]+)\/submit$/);

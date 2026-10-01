@@ -2661,9 +2661,22 @@ const routes = {
 
     if (level === 3) {
       // The walkthrough is the deterministic Pri Explain storyboard of the
-      // verified solution. Its captions may be rephrased afterwards through
-      // /tutor/captions; its mathematics never changes.
-      return { level, tutorLevel, source: 'deterministic', walkthrough: { solution } };
+      // verified solution — the whole solution, final answer included. Showing
+      // it therefore ends the question exactly as Reveal does: resolved, marked
+      // not correct, with the same rating, review, XP and task consequences.
+      // A student cannot watch the answer and then submit it for credit.
+      // Captions may be reworded afterwards through /tutor/captions; the
+      // mathematics never changes.
+      const meta = await resolve(p, row, q, false, 'revealed', Math.max(0, Number(body?.ms) || 0), row.mode);
+      // `level` in the reply is the XP level from resolve(), as on Reveal; the
+      // help level is `tutorLevel`.
+      return {
+        tutorLevel, source: 'deterministic',
+        correct: false, resolved: true, revealed: true,
+        walkthrough: { solution },
+        solution: { steps: q.steps, answerText: displayAnswer(q), criteria: criteriaFor(q), solutionText: q.solutionText },
+        ...meta
+      };
     }
 
     const work = tutorWork(q, body?.work);
@@ -3678,6 +3691,7 @@ function tutorWork(q, raw) {
     .map(l => sanitizeText(l, 400)).filter(Boolean).slice(0, 40);
   const typedAnswer = sanitizeText(raw?.typed, 300) || '';
   let firstBreak = -1;
+  let verifiedLines = 0;
   let misconception;
   const meta = stepMetaFor(q);
   if (meta && lines.length) {
@@ -3685,11 +3699,15 @@ function tutorWork(q, raw) {
       const report = stepCheck(meta, lines.join('\n'));
       const at = (report?.lines || []).findIndex(l => l?.status === 'break');
       if (at >= 0 && at < 40) firstBreak = at;
+      // How many leading lines the deterministic checker verified. The server
+      // excuses a result only when it is the final line and ALL lines are here.
+      const judged = report?.lines || [];
+      while (verifiedLines < judged.length && verifiedLines < lines.length && judged[verifiedLines]?.status === 'ok') verifiedLines += 1;
       const code = report?.diagnosis?.code;
       if (typeof code === 'string' && /^[a-z0-9._:-]{1,80}$/i.test(code)) misconception = code;
     } catch { /* the checker's silence is not an error here */ }
   }
-  return { lines, typedAnswer, firstBreak, ...(misconception ? { misconception } : {}) };
+  return { lines, typedAnswer, firstBreak, verifiedLines, ...(misconception ? { misconception } : {}) };
 }
 
 /** The /v1/tutor/help body for a practice row, or null when there is no verified solution to ground it. */

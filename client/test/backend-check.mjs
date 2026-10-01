@@ -1137,6 +1137,7 @@ async function run() {
     eq('the tutor is asked as practice, at the nudge level', [sent.context, sent.level, sent.locale], ['practice', 'nudge', 'en']);
     ok('grounded in the verified solution and its answer', sent.question?.steps?.length === target.payload.steps.length && typeof sent.question?.answer === 'string' && sent.question.answer.length > 0, show(sent.question));
     eq('with the student’s own lines', sent.studentWork?.lines, ['first line of working']);
+    ok('and how many of them the deterministic checker verified', Number.isInteger(sent.studentWork?.verifiedLines), show(sent.studentWork));
     ok('and nothing that identifies the student', !/Ada|Lovelace|ada\.lovelace|"pid"|"email"|"name"/.test(JSON.stringify(sent)), JSON.stringify(sent).slice(0, 200));
 
     reply = () => ({ error: { code: 'TUTOR_UNAVAILABLE', status: 503 } });
@@ -1150,14 +1151,53 @@ async function run() {
     eq('a server-guarded fallback is shown as deterministic help', [again2.source, again2.code], ['deterministic', 'TUTOR_ANSWER_GUARD']);
     eq('asking for a used level again costs nothing more', (await idb.get('questions', id)).tutorLevel, 2);
 
+    // Levels 1–2 leave the question open: a correct answer still counts, as
+    // supported evidence with the credit of two hints.
+    const right = await POST(`/practice/${id}/submit`, { answer: target.right, ms: 9000 });
+    eq('a nudged question can still be answered correctly', right.correct, true);
+    const attempt = (await idb.byIndex('attempts', 'pid', ada.id)).find(a => a.questionId === id);
+    eq('the attempt records how much tutor help was used', attempt?.tutorLevel, 2);
+    eq('and counts the success as supported, not independent', attempt?.support, 'supported');
+    const { xpFor } = await import(`${SRC}engine/adaptive.js`);
+    eq('the nudged success is charged like two hints', right.xp, xpFor(target.payload.difficulty, true, 0, 2));
+    await rejects('an answered question takes no more help', POST(`/practice/${id}/tutor`, { level: 3 }), { status: 409 });
+
+    // Level 3 shows the whole solution, so it resolves the question exactly as
+    // Reveal does — and an assignment counts it as not correct.
+    let walk = null;
+    for (let i = 0; i < 40 && !walk; i += 1) {
+      const q = await answerableQuestion({ mode: 'topic', subtopic: topicId });
+      if (q && q.payload.steps?.length) walk = q;
+    }
+    if (!ok('a second question with a worked solution was served', !!walk)) throw new Error('ai tutor group cannot continue');
+    const wid = walk.question.id;
+    const TASK = 'task-tutor-walkthrough';
+    await idb.put('tasks', { id: TASK, pid: ada.id, title: 'Tutor walkthrough task', count: 5, createdAt: Date.now() });
+    await idb.put('questions', { ...(await idb.get('questions', wid)), taskId: TASK });
+    const ratingBefore = (await idb.get('ratings', `${ada.id}:${topicId}`))?.rating;
+    await POST(`/practice/${wid}/tutor`, { level: 1 });
+    await POST(`/practice/${wid}/tutor`, { level: 2 });
     const callsBefore3 = tutorCalls.length;
-    const l3 = await POST(`/practice/${id}/tutor`, { level: 3 });
-    eq('level 3 is the deterministic walkthrough', [l3.level, l3.source], [3, 'deterministic']);
-    eq('of the verified solution', l3.walkthrough?.solution?.steps?.length, target.payload.steps.length);
+    const l3 = await POST(`/practice/${wid}/tutor`, { level: 3, ms: 4000 });
+    eq('level 3 is the deterministic walkthrough', [l3.tutorLevel, l3.source], [3, 'deterministic']);
+    eq('of the verified solution', l3.walkthrough?.solution?.steps?.length, walk.payload.steps.length);
     eq('without asking the model for any maths', tutorCalls.length, callsBefore3);
+    eq('and it resolves the question like Reveal: not correct', [l3.resolved, l3.revealed, l3.correct], [true, true, false]);
+    const resolvedRow = await idb.get('questions', wid);
+    eq('the row is answered and its resolution is not correct', [resolvedRow.answered, resolvedRow.resolution?.correct], [1, false]);
+    const submitted = await rejects('the answer cannot be submitted after watching it', POST(`/practice/${wid}/submit`, { answer: walk.right, ms: 1000 }), { status: 409 });
+    ok('— refused as already answered', /already answered/i.test(String(submitted?.message)), show(submitted?.message));
+    const walkAttempts = (await idb.byIndex('attempts', 'pid', ada.id)).filter(a => a.questionId === wid);
+    eq('exactly one attempt is recorded for it', walkAttempts.length, 1);
+    eq('and it is not correct, with all three levels recorded', [walkAttempts[0]?.correct, walkAttempts[0]?.answerGiven, walkAttempts[0]?.tutorLevel, walkAttempts[0]?.support],
+      [0, 'revealed', 3, 'supported']);
+    const progress = await idb.get('taskProgress', `${TASK}:${ada.id}`);
+    eq('the assignment counts it as done and not correct', [progress?.done, progress?.correct], [1, 0]);
+    const ratingAfter = (await idb.get('ratings', `${ada.id}:${topicId}`))?.rating;
+    ok('the rating does not rise from watching the answer', ratingAfter <= ratingBefore, `${ratingBefore} → ${ratingAfter}`);
 
     reply = body => ({ tutor: { source: 'model', captions: body.captions.map((c, i) => ({ id: c.id, text: i === 0 ? 'Rephrased.' : c.text, source: i === 0 ? 'model' : 'deterministic' })) } });
-    const caps = await POST(`/practice/${id}/tutor/captions`, { captions: [{ id: 'solution-0', text: 'Step one' }, { id: 'solution-1', text: 'Step two' }] });
+    const caps = await POST(`/practice/${wid}/tutor/captions`, { captions: [{ id: 'solution-0', text: 'Step one' }, { id: 'solution-1', text: 'Step two' }] });
     eq('rephrased captions come back by id, the rest deterministic', caps.captions.map(c => [c.id, c.source]), [['solution-0', 'tutor'], ['solution-1', 'deterministic']]);
     eq('the walkthrough request carries the captions', tutorCalls.at(-1)?.level, 'walkthrough');
 
@@ -1169,19 +1209,10 @@ async function run() {
     eq('with its text', offline.message, (hintOnly.payload.hints || [])[0] ?? null);
     setTutorTransportForTests(async (body) => { tutorCalls.push(body); return reply(body); });
 
-    const right = await POST(`/practice/${id}/submit`, { answer: target.right, ms: 9000 });
-    eq('a tutored question can still be answered correctly', right.correct, true);
-    const attempt = (await idb.byIndex('attempts', 'pid', ada.id)).find(a => a.questionId === id);
-    eq('the attempt records how much tutor help was used', attempt?.tutorLevel, 3);
-    eq('and counts the success as supported, not independent', attempt?.support, 'supported');
-    await rejects('an answered question takes no more help', POST(`/practice/${id}/tutor`, { level: 3 }), { status: 409 });
-
     const clean = await answerableQuestion({ mode: 'topic', subtopic: topicId });
     await POST(`/practice/${clean.question.id}/submit`, { answer: clean.right, ms: 9000 });
     const cleanAttempt = (await idb.byIndex('attempts', 'pid', ada.id)).find(a => a.questionId === clean.question.id);
     eq('an unaided first-try success is independent evidence', [cleanAttempt?.tutorLevel, cleanAttempt?.support], [0, 'independent']);
-    const { xpFor } = await import(`${SRC}engine/adaptive.js`);
-    eq('the tutored success is charged like three hints', right.xp, xpFor(target.payload.difficulty, true, 0, 3));
   } catch (err) { crashed(err); }
   finally { setTutorTransportForTests(null); }
 

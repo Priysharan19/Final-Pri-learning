@@ -1118,6 +1118,13 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
               }}
               locale={language === 'hi' ? 'hi' : 'en'}
               onUsed={level => setTutorUsed(u => Math.max(u, level))}
+              startedAt={startRef.current}
+              onResolved={r => {
+                // Level 3 ends the question like Reveal: same state, same refreshes.
+                setState({ phase: 'resolved', res: r });
+                celebrate(r); refreshUser(); refreshDue(); refreshRecent?.();
+                onResolved?.(r);
+              }}
               onClose={() => setShowTutor(false)}
             />
           </React.Suspense>
