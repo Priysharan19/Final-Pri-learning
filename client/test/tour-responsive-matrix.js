@@ -165,7 +165,9 @@ export const flow = {
         // the test: the lowest stroke (drawn at 90% height) must still show
         // near the foot of the wider sheet.
         await check(`${tag}: widening to a tablet keeps every stroke on the sheet`,
-          !!rotated && !rotated.empty && rotated.maxY >= rotated.h * 0.85 && rotated.maxY < rotated.h - 1, JSON.stringify(rotated));
+          !!rotated && !rotated.empty && rotated.maxY >= rotated.h * 0.85 && rotated.maxY <= rotated.h - 4, JSON.stringify(rotated));
+        // (Ink pushed past the foot is painted up to the very edge and cut off;
+        //  the clamp leaves the lowest point 8px above it.)
         await page.setViewportSize({ width: 360, height: 640 });
         await page.waitForTimeout(400);
         const narrowed = await inkBox();
