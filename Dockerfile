@@ -1,8 +1,15 @@
 FROM node:24-bookworm-slim AS client-build
+# Every variable release/release-identity.mjs (DEPLOYMENT_IDENTITY_ENV) reads
+# must be declared here: Docker and Railway expose a build-time variable only
+# to a stage that declares it as an ARG. Without RAILWAY_GIT_COMMIT_SHA the
+# client would bake a different SHA from the one the server reports at run
+# time, and /v1/health would fail closed on the mismatch.
+ARG RAILWAY_GIT_COMMIT_SHA
 ARG PRI_RELEASE_SHA
+ARG GITHUB_SHA
+ARG VERCEL_GIT_COMMIT_SHA
 ARG PRI_BUILD_TIMESTAMP
-ENV PRI_RELEASE_SHA=${PRI_RELEASE_SHA} \
-    PRI_BUILD_TIMESTAMP=${PRI_BUILD_TIMESTAMP}
+ARG SOURCE_DATE_EPOCH
 WORKDIR /app
 COPY client/package.json client/package-lock.json ./client/
 RUN npm ci --prefix client
@@ -12,7 +19,9 @@ COPY release ./release
 # Legal.jsx renders docs/legal/*.md), so they are part of the build context.
 # Without them the image's client build fails with "Module not found".
 COPY docs/legal ./docs/legal
-RUN npm run build --prefix client
+# Precedence (RAILWAY_GIT_COMMIT_SHA > PRI_RELEASE_SHA) and build stamping are
+# applied in one place, shared with the server's run-time resolver.
+RUN node release/docker-build-identity.mjs
 
 FROM node:24-bookworm-slim AS server-deps
 WORKDIR /app

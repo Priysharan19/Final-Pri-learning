@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react';
 import { createHash } from 'node:crypto';
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { resolveReleaseIdentity } from '../release/release-identity.mjs';
+import { applyDeploymentPrecedence, resolveReleaseIdentity } from '../release/release-identity.mjs';
 import { LANGUAGES, DEFAULT_LANGUAGE } from './src/i18n/languages.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -327,7 +327,7 @@ function releaseIdentityManifest(identity) {
 }
 
 export default defineConfig(({ command }) => {
-  const releaseIdentity = resolveReleaseIdentity({ production: command === 'build' });
+  const releaseIdentity = resolveReleaseIdentity({ production: command === 'build', env: applyDeploymentPrecedence(process.env) });
   return {
     plugins: [react(), releaseIdentityManifest(releaseIdentity), precache()],
     server: { port: 5173 },
