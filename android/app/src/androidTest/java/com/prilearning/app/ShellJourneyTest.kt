@@ -217,6 +217,9 @@ class ShellJourneyTest {
             // counted in Progress) once it is answered again.
             for (i in 0 until 3) {
                 if (eval(s, "!!document.querySelector('.your-answer') || !!document.querySelector('.redo-chip')") == "true") break
+                // One more go needs a changed answer before it can be submitted.
+                setValue(s, ".editor-body input.answer-input", "x+${8 + i}")
+                Thread.sleep(300)
                 eval(s, "(function(){var b=[].slice.call(document.querySelectorAll('.editor-foot .btn-primary')).find(function(x){return x.offsetParent&&!x.disabled});if(b)b.click();return true;})()")
                 Thread.sleep(1500)
             }
