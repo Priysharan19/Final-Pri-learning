@@ -114,6 +114,40 @@ Research-question discipline, source hierarchy, transportability, outcome/compar
 Dated bridge from live main to research architecture: what is implemented, what is a transparent prior, what evidence is missing, which current strengths must be preserved, and the dependency order for the next intelligence layers.
 
 
+
+## V6 operationalization layer — 1 October 2026
+
+V5 established the master research architecture. The following modules deepen the highest-value gaps into implementation-grade protocols and evidence gates; they do **not** supersede V5 and do not imply implementation:
+
+### PRODUCTIVE_MISTAKE_REPAIR_PROTOCOL.md
+Explicit A0–A6 assistance ladder, first-break uncertainty handling, AssistanceEnvelope, escalation/fading rules, opportunity-specific misconception repair, benchmark plan and bounded efficacy experiment.
+
+### MOTIVATION_METACOGNITION_ENGAGEMENT.md
+Healthy-engagement objective, mathematics-anxiety boundary, gamification evidence, metacognitive calibration, help-seeking, streak/reward/leaderboard guardrails and experiment priorities.
+
+### TEACHER_CLASSROOM_ORCHESTRATION.md
+Teacher Action Card contract, evidence-before-label principle, grouping/alert constraints, teacher correction events, classroom modes, shadow evaluation and field-trial outcomes.
+
+### EVALUATION_BENCHMARKS_AND_MODEL_RISK.md
+Authority-specific benchmark matrix, decision-risk classes, learner/perception/math/tutor evaluation, model supply-chain admission, prompt-injection/tool-risk controls, canary/rollback and evidence levels.
+
+### INDIA_FIELD_OPERATING_REALITY_2026.md
+ASER/UDISE+/DIKSHA/GSMA operating-context evidence, shared-device/offline consequences, low-end-device measurements, India field-study sequence and evidence matrix.
+
+### RESEARCH_TO_BUILD_V6.md
+Dependency-ordered programme from semantic identities and event replay through transfer banks, benchmark laboratory, Experimentation OS, PMR, teacher orchestration and only then causal personalization.
+
+### V6 agent routing
+
+| Mission surface | Additional V6 module |
+| --- | --- |
+| hints, explanations, tutoring escalation/fading, recovery | PRODUCTIVE_MISTAKE_REPAIR_PROTOCOL.md |
+| streaks, rewards, motivation, confidence, reflection, self-regulation | MOTIVATION_METACOGNITION_ENGAGEMENT.md |
+| teacher dashboards, class grouping, alerts, teacher interventions | TEACHER_CLASSROOM_ORCHESTRATION.md |
+| any ML/LLM admission, benchmark, model update, RAG/tool use | EVALUATION_BENCHMARKS_AND_MODEL_RISK.md |
+| India device/offline/shared-device/language field assumptions | INDIA_FIELD_OPERATING_REALITY_2026.md |
+| sequencing research-derived engineering work | RESEARCH_TO_BUILD_V6.md |
+
 ## Domain routing for agents
 
 Read these modules in addition to the architecture when the mission touches the corresponding surface:
