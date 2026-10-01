@@ -281,7 +281,7 @@ export default function Login() {
       // the authenticated shell. Move the cloud handoff first so the destination
       // cannot be lost during that identity transition. The local profile is
       // already authoritative here because the POST completed successfully.
-      if (cloudIntent) nav(CLOUD_ACCOUNT_ROUTE, { replace: true });
+      if (cloudIntent) nav(CLOUD_ACCOUNT_ROUTE, { replace: true, flushSync: true });
       setUser(r.user);
       refreshDue();
       return r;
