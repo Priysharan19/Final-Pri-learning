@@ -296,8 +296,8 @@ jobs:
           grep -Eq 'E2E SUITE.*17/17.*1 flows' browser.log
           grep -Fq 'Cloud admin · independent-review rejection' browser.log
           grep -Eq 'E2E SUITE.*8/8.*1 flows' browser.log
-          grep -Fq 'Hindi · Practice, Exams, exam room, Progress, Explain' browser.log
-          grep -Eq 'E2E SUITE.*36/36.*1 flows' browser.log
+          grep -Fq 'Hindi · Practice, handwriting, Exams, exam room, Progress, Explain' browser.log
+          grep -Eq 'E2E SUITE.*57/57.*1 flows' browser.log
           grep -Eq 'ACCESSIBILITY SUITE.*38/38.*12 groups' browser.log
           grep -Fq 'E2E BROWSER: webkit' browser.log
           test "$(grep -c 'Responsive matrix · 6 viewports, critical routes, write/type, actions' browser.log)" -ge 2
