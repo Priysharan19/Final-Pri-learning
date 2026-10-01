@@ -179,6 +179,9 @@ Canonical integration of V7 into twelve explicit decision authorities: perceptio
 ### V7_RESEARCH_CLAIM_AND_FALSIFIER_LEDGER.md
 Twenty major research claims with evidence class, supporting sources, what each claim does **not** establish, product consequence and explicit falsifier/reconsideration trigger. Use this to prevent research claims from silently becoming dogma.
 
+### V7_EVIDENCE_CONTRADICTIONS_BOUNDARY_CONDITIONS.md
+Canonical counterevidence register pairing major positive findings with their strongest null, harmful, population-specific or measurement-limited evidence. Required when a research claim appears one-sided; covers ITS effect heterogeneity, AI tutoring dependence, retrieval, spacing, worked examples, feedback timing, gamification, learner modelling, generated assessment, handwriting, formal verification, multilingual support, teacher AI, AI literacy, child safety, privacy and personalization.
+
 ### LEARNING_MECHANISMS_MATHEMATICS_DEEP_DIVE_V7.md
 Mathematics-specific synthesis of spacing, retrieval, interleaving, worked examples, fading, expertise reversal, Productive Failure, erroneous examples, feedback timing and variability. Converts each mechanism into explicit Pri policy boundaries and experiments rather than universal “best practice.”
 
@@ -285,6 +288,7 @@ Execution-grade science programme: semantic instrumentation → adjudicated gold
 | sequencing research-derived engineering work | RESEARCH_TO_BUILD_V6.md + RESEARCH_COMPLETENESS_AUDIT_V6_2026-10-01.md |
 | dependency order / selecting next V7 research-derived engineering mission | RESEARCH_TO_BUILD_V7.md |
 | cross-domain research decision / major learning architecture change | V7_DEEP_RESEARCH_SYNTHESIS_AND_DECISION_ARCHITECTURE.md + V7_RESEARCH_CLAIM_AND_FALSIFIER_LEDGER.md |
+| research contradiction, boundary condition, counterevidence audit | V7_EVIDENCE_CONTRADICTIONS_BOUNDARY_CONDITIONS.md |
 | spacing, retrieval, interleaving, worked examples, fading, productive failure | LEARNING_MECHANISMS_MATHEMATICS_DEEP_DIVE_V7.md |
 | classical ITS evidence, tutoring-system mechanism choice | ITS_HISTORY_AND_AI_TUTOR_EVIDENCE_DEEP_DIVE.md + FRONTIER_TUTORING_SYSTEMS_MECHANISM_MATRIX_V7.md |
 | mastery model, KT, IRT, CDM, calibration, abstention | LEARNER_MODELING_KT_CDM_IRT_DEEP_DIVE.md |
