@@ -231,6 +231,9 @@ T0–T7 transfer taxonomy, variability, analogical comparison, strategy recognit
 ### FORMATIVE_ASSESSMENT_FEEDBACK_DEEP_DIVE_V7.md
 Mathematics formative-assessment synthesis, feedback types/timing/dose, directive-vs-metacognitive evidence, actionability, feedback burden, teacher/student uncertainty and closed evidence-to-action evaluation.
 
+### AI_LITERACY_EPISTEMIC_AGENCY_AUDIT_THE_AI_V7.md
+OECD/EU school AI-literacy framework, secondary critical-questioning evidence, mathematical GenAI error-analysis evidence, calibrated reliance, challenge/disagreement flows, epistemic-status UI and controlled Audit-the-AI experiments including an ordinary-error-analysis comparator.
+
 ### V7_EMPIRICAL_SCIENCE_AND_BENCHMARK_PROGRAMME.md
 Execution-grade science programme: semantic instrumentation → adjudicated gold assets → benchmark laboratory → randomized mechanism experiments → India/classroom field evidence, with evidence grades and release claims.
 
@@ -266,6 +269,7 @@ Execution-grade science programme: semantic instrumentation → adjudicated gold
 | teacher AI, action cards, teacher decision support/corrections | TEACHER_AI_AUGMENTATION_DECISION_SCIENCE_V7.md |
 | child AI, relational safety, India child-data privacy | CHILD_AI_SAFETY_PRIVACY_RELATIONAL_BOUNDARIES_V7.md |
 | metacognition, confidence, self-regulation, help-seeking | METACOGNITION_SRL_HELP_SEEKING_DEEP_DIVE_V7.md |
+| AI literacy, critical questioning, Audit-the-AI, AI reliance | AI_LITERACY_EPISTEMIC_AGENCY_AUDIT_THE_AI_V7.md |
 | streaks, leaderboards, rewards, motivation, math anxiety | MOTIVATION_GAMIFICATION_MATH_ANXIETY_DEEP_DIVE_V7.md |
 | current CBSE/NCERT syllabus, exam policy, SQP/MS authority | CBSE_NCERT_CURRICULUM_ASSESSMENT_AUTHORITY_V7.md |
 | transfer, analogy, generalization, protected outcome banks | TRANSFER_GENERALISATION_ANALOGY_DEEP_DIVE_V7.md |
