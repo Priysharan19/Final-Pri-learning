@@ -6,7 +6,7 @@ import { platformDatabasePath } from './config.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_PATH = join(here, '..', 'data', 'pri-learning-platform.db');
-const SCHEMA_VERSION = 6;
+export const SCHEMA_VERSION = 6;
 
 
 /**

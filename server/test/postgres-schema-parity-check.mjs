@@ -41,7 +41,7 @@ assert.ok(files.length > 0, 'supabase/migrations has at least one migration');
 const sql = files.map(f => readFileSync(join(migrationsDir, f), 'utf8')).join('\n')
   .replace(/--[^\n]*/g, '');
 const pg = new Map();
-for (const m of sql.matchAll(/create table (\w+) \(([\s\S]*?)\n\);/gi)) {
+for (const m of sql.matchAll(/create table pri\.(\w+) \(([\s\S]*?)\n\);/gi)) {
   const [, table, body] = m;
   const cols = new Map();
   let tablePk = [];
@@ -75,11 +75,15 @@ for (const [table, cols] of sqlite) {
 }
 for (const table of pg.keys()) check(sqlite.has(table), `table ${table} exists only in Postgres`);
 
-// Every table is closed to the client API roles.
+// Every table is closed to the client API roles. (The live suite,
+// postgres-schema-live-check, proves all of this against a real database.)
 check(/enable row level security/i.test(sql) && /for t in select tablename from pg_tables where schemaname = 'pri'/i.test(sql),
   'every pri table has Row-Level Security enabled');
 check(/revoke all on all tables in schema pri from anon, authenticated/i.test(sql), 'anon and authenticated roles are revoked');
-check(!/create policy/i.test(sql), 'no RLS policy opens a table to a client role');
+check(/alter default privileges in schema pri revoke all on tables from anon, authenticated/i.test(sql), 'default privileges are revoked from the client API roles');
+const policies = [...sql.matchAll(/create policy[\s\S]*?;/gi)].map(m => m[0]);
+check(policies.length > 0 && policies.every(p => /\bto pri_server\b/i.test(p)), 'every RLS policy names pri_server and no other role');
+check(!/\bset search_path\b/i.test(sql), 'migrations never change the session search_path; every object is schema-qualified');
 check(/lower\(email\)/i.test(sql), 'account email stays case-insensitively unique');
 
 if (failures.length) {
