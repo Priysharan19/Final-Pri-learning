@@ -105,7 +105,7 @@
     "syllabus:server": "node tools/generate-server-syllabus.mjs",
     "test:platform:contracts": "node server/test/account-lifecycle-contract-check.mjs && node server/test/apple-billing-check.mjs && node server/test/auth-delivery-config-check.mjs && node server/test/auth-delivery-worker-check.mjs && node server/test/platform-migration-check.mjs && node server/test/platform-schema-check.mjs && node server/test/platform-sync-pagination-check.mjs && node server/test/production-db-bootstrap-check.mjs && node server/test/production-storage-config-check.mjs && node server/test/razorpay-billing-check.mjs",
     "test:platform:hardening": "node server/test/proxy-identity-contract-check.mjs && node server/test/sync-idempotency-contract-check.mjs && node server/test/entitlement-admin-grant-check.mjs && node server/test/request-size-contract-check.mjs && node server/test/content-index-exposure-check.mjs",
-    "test:platform:pg-schema": "node server/test/postgres-schema-parity-check.mjs",
+    "test:platform:pg-schema": "node server/test/migration-transaction-check.mjs && node server/test/postgres-schema-parity-check.mjs",
     "test:platform:pg-live": "node scripts/with-postgres.mjs sh -c \"node server/test/postgres-schema-live-check.mjs && node server/test/postgres-schema-mutation-check.mjs\"",
     "test:platform:driver": "node server/test/platform-store-check.mjs && node server/test/platform-concurrency-check.mjs && node server/test/platform-startup-check.mjs && node server/test/postgres-connection-config-check.mjs && node server/test/platform-sync-burst-check.mjs",
     "test:platform:pg": "node scripts/with-postgres.mjs node server/test/run-platform-postgres.mjs",
