@@ -201,7 +201,9 @@ export default function Home() {
     if (selectedDotpoint && !dotpointAvailable(selectedDotpoint)) setDotpoint(null);
   }, [curriculum, subtopic, selSub, selectedDotpoint]);
 
-  const india = curriculum?.country === 'in';
+  // The profile is already authoritative for region; do not flash Australian
+  // “Year” copy while the asynchronous curriculum response is still loading.
+  const india = user.course === 'in';
   const chips = [];
   if (year != null) chips.push({ k: 'year', label: t(india ? 'common.classNumber' : 'common.yearNumber', { n: year }), clear: () => { setYear(user.year); setSectionKey(null); setSubtopic(null); setDotpoint(null); } });
   if (section) chips.push({ k: 'course', label: section.label, clear: () => { setSectionKey(null); setSubtopic(null); setDotpoint(null); } });

@@ -192,6 +192,11 @@ check('Home consumes one central recommendation resolver', () => {
   assert.match(home, /cloud\.assignments\(\)/);
 });
 
+check('Home uses profile authority for India copy before curriculum loads', () => {
+  assert.match(home, /const india = user\.course === 'in';/);
+  assert.doesNotMatch(home, /const india = curriculum\?\.country === 'in';/);
+});
+
 check('Home exposes exactly one semantic primary recommendation region and CTA', () => {
   assert.equal((home.match(/data-home-primary(?!-)/g) || []).length, 1);
   assert.equal((home.match(/data-home-primary-cta/g) || []).length, 1);
