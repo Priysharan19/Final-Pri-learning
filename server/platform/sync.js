@@ -1,6 +1,6 @@
 import { asyncRouter } from './asyncRouter.js';
-import { asStore } from './store.js';
-import { nextSyncCursor } from './db.js';
+import { asStore, isDatabaseOverload } from './store.js';
+import { currentSyncCursor, nextSyncCursor, syncLockKey } from './db.js';
 import { id, rateLimit, requireSession, requireVerifiedEmail, sha256 } from './security.js';
 
 const SCHEMA = 1;
@@ -184,7 +184,7 @@ export function createSyncRouter(db) {
           if (priorId) {
             throw Object.assign(new Error(`Event id ${event.id} was already stored for this account at sequence ${priorId.device_seq}.`), { status: 409, code: 'SYNC_EVENT_ID_CONFLICT' });
           }
-          const cursor = await nextSyncCursor(db);
+          const cursor = await nextSyncCursor(db, accountId);
           await db.run(`INSERT INTO learning_events(server_cursor,id,account_id,device_id,device_seq,kind,entity_id,occurred_at,payload_json,created_at)
             VALUES (?,?,?,?,?,?,?,?,?,?)`, [cursor, event.id, accountId, deviceId, event.deviceSeq, event.kind, event.entityId, event.occurredAt, event.payload, Date.now()]);
           acceptedEvents.push({ id: event.id, serverCursor: cursor, replayed: false });
@@ -196,7 +196,7 @@ export function createSyncRouter(db) {
           if (currentVersion !== entity.baseVersion) {
             throw Object.assign(new Error(`Sync conflict for ${entity.kind}:${entity.entityId}.`), { status: 409, code: 'SYNC_ENTITY_CONFLICT', conflict: conflictPayload(current) });
           }
-          const cursor = await nextSyncCursor(db);
+          const cursor = await nextSyncCursor(db, accountId);
           const version = currentVersion + 1;
           await db.run(`INSERT INTO sync_entities(account_id,kind,entity_id,version,server_cursor,body_json,tombstone,updated_at)
             VALUES (?,?,?,?,?,?,?,?)
@@ -204,14 +204,28 @@ export function createSyncRouter(db) {
           acceptedEntities.push({ kind: entity.kind, entityId: entity.entityId, version, serverCursor: cursor });
         }
 
-        const cursor = (await db.get('SELECT value FROM sync_cursors WHERE id=1'))?.value || 0;
+        const cursor = await currentSyncCursor(db);
         const out = { schemaVersion: SCHEMA, cursor, acceptedEvents, acceptedEntities, fullRescanAccepted: !!body.fullRescan };
         await db.run(`INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at)
           VALUES (?,'sync-push',?,?,?,?,?)`, [accountId, idem, JSON.stringify(out), digest, Date.now(), Date.now() + 24 * 60 * 60 * 1000]);
         return out;
-      });
+        // The account's sync lock: pushes for one account run one after another,
+        // each starting from a snapshot that includes the previous one's commit,
+        // so its cursors are allocated in commit order (see nextSyncCursor).
+        //
+        // Snapshot isolation is enough here, and SERIALIZABLE was costing ~7
+        // aborted attempts per push in a 150-push burst on a 40-connection pool: every row this
+        // transaction reads or writes — idempotency_keys, learning_events and
+        // sync_entities of THIS account — is written only by pushes for this
+        // account, which the lock already runs serially. (The only other writers
+        // are account deletion, whose cascade a concurrent insert meets as an FK
+        // conflict, never an orphan; and housekeeping, which deletes only expired
+        // keys this transaction ignores.) What SERIALIZABLE added was false
+        // conflicts between DIFFERENT accounts that share a b-tree page.
+      }, { lock: syncLockKey(accountId), isolation: 'repeatable read' });
       res.json(response);
     } catch (err) {
+      if (isDatabaseOverload(err)) throw err; // 503 + Retry-After from the /v1 error handler
       if (err?.status) return res.status(err.status).json({ error: { code: err.code || 'SYNC_FAILED', message: err.message, conflict: err.conflict || undefined } });
       throw err;
     }

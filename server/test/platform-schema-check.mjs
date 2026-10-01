@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import { createPlatformDb, nextSyncCursor } from '../platform/db.js';
+import { createPlatformDb, nextSyncCursor, syncLockKey } from '../platform/db.js';
+import { asStore } from '../platform/store.js';
 import { ensureAuthDeliverySchema } from '../platform/authDelivery.js';
 
 const db = createPlatformDb(':memory:');
@@ -56,7 +57,12 @@ try {
   assert.equal(db.prepare("SELECT COUNT(*) AS n FROM learning_events WHERE id='evt_shared'").get().n, 2,
     'the same device-local event id must be legal in two different accounts');
 
-  const c1 = await nextSyncCursor(db), c2 = await nextSyncCursor(db);
+  await assert.rejects(() => nextSyncCursor(db, 'acct_1'), error => error.code === 'SYNC_CURSOR_UNLOCKED',
+    'a sync cursor cannot be allocated outside a transaction holding the account\'s sync lock');
+  await assert.rejects(() => asStore(db).transaction(() => nextSyncCursor(db, 'acct_1'), { lock: syncLockKey('acct_2') }),
+    error => error.code === 'SYNC_CURSOR_UNLOCKED', 'nor under another account\'s lock');
+  const [c1, c2] = await asStore(db).transaction(async () => [await nextSyncCursor(db, 'acct_1'), await nextSyncCursor(db, 'acct_1')],
+    { lock: syncLockKey('acct_1') });
   assert.equal(c2, c1 + 1, 'server sync cursor must be canonical and monotonic');
 
   db.prepare(`INSERT INTO sync_entities(account_id,kind,entity_id,version,server_cursor,body_json,tombstone,updated_at)

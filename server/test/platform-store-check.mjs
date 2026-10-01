@@ -15,7 +15,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import assert from 'node:assert/strict';
 import {
-  PostgresStore, isUniqueViolation, postgresTypes, retryDelayMs, toPostgresPlaceholders
+  PostgresStore, assertNoOpenTransaction, createPostgresStore, databaseOverload, inStoreTransaction, isDatabaseOverload,
+  isUniqueViolation, postgresTypes, retryDelayMs, toPostgresPlaceholders
 } from '../platform/store.js';
 import { openTestStore, requestedEngine } from './support/engine.mjs';
 
@@ -86,13 +87,98 @@ const pgError = code => Object.assign(new Error(`fake ${code}`), { code });
     'isUniqueViolation recognises both engines');
 }
 {
-  // Retries are bounded: persistent contention surfaces as 40001.
+  // Retries are bounded, and persistent contention is a retryable 503 — never
+  // a bare driver error that the /v1 error handler would answer as 500.
   const pool = fakePool(sql => (sql === 'COMMIT' ? pgError('40001') : undefined));
   const store = new PostgresStore(pool, { ownsPool: false, maxAttempts: 3 });
   let runs = 0;
-  await rejects(() => store.transaction(async () => { runs++; }), error => error.code === '40001', 'exhausted retries surface the serialization failure');
+  await rejects(() => store.transaction(async () => { runs++; }),
+    error => error.code === 'PLATFORM_DB_BUSY' && error.status === 503 && error.retryAfter === 1 && error.retryable === true && error.dbCode === '40001',
+    'exhausted serialization retries surface as PLATFORM_DB_BUSY: 503, Retry-After 1, retryable, driver code kept for the log');
   eq(runs, 3, 'retries stop at maxAttempts');
   eq(pool.released + pool.destroyed, 3, 'every attempt returns its client to the pool');
+}
+{
+  // Overload mapping: which driver errors become which retryable 503.
+  const mapped = code => databaseOverload(pgError(code));
+  ok(['40001', '40P01', '55P03'].every(code => mapped(code).code === 'PLATFORM_DB_BUSY' && mapped(code).status === 503),
+    'serialization failure, deadlock and lock-not-available map to PLATFORM_DB_BUSY 503');
+  ok(['57014', '25P03'].every(code => mapped(code).code === 'PLATFORM_DB_TIMEOUT' && mapped(code).retryAfter === 2),
+    'statement timeout and idle-in-transaction termination map to PLATFORM_DB_TIMEOUT 503, Retry-After 2');
+  const poolTimeout = databaseOverload(new Error('timeout exceeded when trying to connect'));
+  ok(poolTimeout.code === 'PLATFORM_DB_BUSY' && poolTimeout.status === 503, 'no pooled connection in time is PLATFORM_DB_BUSY 503');
+  ok(['23505', '22P02', '42P01'].every(code => mapped(code).code === code && !mapped(code).status), 'real answers and bugs are not disguised as overload');
+  const answered = Object.assign(new Error('conflict'), { status: 409, code: 'SYNC_ENTITY_CONFLICT' });
+  ok(databaseOverload(answered) === answered && isDatabaseOverload(mapped('40001')) && !isDatabaseOverload(answered), 'a composed answer passes through untouched');
+
+  // A statement timeout inside a transaction is not retried; it is answered.
+  const timeoutPool = fakePool(sql => (sql.startsWith('SELECT slow') ? pgError('57014') : undefined));
+  const timeoutStore = new PostgresStore(timeoutPool, { ownsPool: false });
+  let timeoutRuns = 0;
+  await rejects(() => timeoutStore.transaction(async tx => { timeoutRuns++; await tx.get('SELECT slow'); }),
+    error => error.code === 'PLATFORM_DB_TIMEOUT' && error.status === 503, 'a statement timeout in a transaction is PLATFORM_DB_TIMEOUT');
+  eq(timeoutRuns, 1, 'and is not retried');
+
+  // So is one outside a transaction, and a pool that cannot hand out a client.
+  await rejects(() => timeoutStore.get('SELECT slow'), error => error.code === 'PLATFORM_DB_TIMEOUT', 'a statement timeout outside a transaction is PLATFORM_DB_TIMEOUT');
+  const starved = new PostgresStore({ async connect() { throw new Error('timeout exceeded when trying to connect'); }, async end() {} }, { ownsPool: false });
+  await rejects(() => starved.get('SELECT 1'), error => error.code === 'PLATFORM_DB_BUSY' && error.status === 503, 'pool exhaustion is PLATFORM_DB_BUSY');
+}
+{
+  // Every pooled session gets search_path and both timeouts before its first statement.
+  const pool = fakePool(() => undefined);
+  const store = new PostgresStore(pool, { ownsPool: false, statementTimeoutMs: 15000, idleInTransactionTimeoutMs: 30000 });
+  await store.get('SELECT 1');
+  eq(pool.log[0], 'SET search_path TO pri; SET statement_timeout = 15000; SET idle_in_transaction_session_timeout = 30000',
+    'session setup sets search_path, statement_timeout and idle_in_transaction_session_timeout');
+  eq(pool.log.filter(sql => sql.startsWith('SET ')).length, 1, 'once per connection, not per statement');
+  await rejects(async () => new PostgresStore(pool, { statementTimeoutMs: '15s; DROP TABLE x' }), error => error.code === 'STORE_SESSION_INVALID', 'a non-integer timeout is refused, so nothing but a number reaches SET');
+}
+{
+  // A named lock is taken before BEGIN and released after COMMIT, on the same client.
+  const pool = fakePool(sql => (sql.startsWith('SELECT pg_advisory_unlock') ? { rows: [{ released: true }], rowCount: 1 } : undefined));
+  const store = new PostgresStore(pool, { ownsPool: false });
+  let held;
+  await store.transaction(async () => { held = store.heldLock(); await store.get('SELECT inside'); }, { lock: 'pri.sync:acct-1' });
+  const order = pool.log.filter(sql => /pg_advisory|^BEGIN|^COMMIT|SELECT inside/.test(sql));
+  eq(order, ['SELECT pg_advisory_lock(hashtextextended($1, 0))', 'BEGIN ISOLATION LEVEL SERIALIZABLE', 'SELECT inside', 'COMMIT', 'SELECT pg_advisory_unlock(hashtextextended($1, 0)) AS released'],
+    'lock → BEGIN → work → COMMIT → unlock: the snapshot is taken after the lock');
+  eq(held, 'pri.sync:acct-1', 'heldLock() names the lock inside the transaction');
+  eq(store.heldLock(), null, 'and nothing outside it');
+  eq([pool.released, pool.destroyed], [1, 0], 'a cleanly unlocked client goes back to the pool');
+
+  // A client that cannot prove it released the lock is destroyed.
+  const lost = fakePool(sql => (sql.startsWith('SELECT pg_advisory_unlock') ? { rows: [{ released: false }], rowCount: 1 } : undefined));
+  await new PostgresStore(lost, { ownsPool: false }).transaction(async () => {}, { lock: 'k' });
+  eq(lost.destroyed, 1, 'an unlock that reports false destroys the client (ending the session frees the lock)');
+
+  // A lock wait that times out is answered 503 and the client is destroyed.
+  const stuck = fakePool(sql => (sql.startsWith('SELECT pg_advisory_lock') ? pgError('57014') : undefined));
+  await rejects(() => new PostgresStore(stuck, { ownsPool: false }).transaction(async () => {}, { lock: 'k' }),
+    error => error.code === 'PLATFORM_DB_TIMEOUT' && error.status === 503, 'a lock wait past statement_timeout is PLATFORM_DB_TIMEOUT');
+  ok(stuck.destroyed === 1 && !stuck.log.some(sql => sql.startsWith('BEGIN')), 'no transaction was begun and the session was ended');
+
+  // Snapshot isolation only with a lock; never by accident.
+  const iso = fakePool(sql => (sql.startsWith('SELECT pg_advisory_unlock') ? { rows: [{ released: true }], rowCount: 1 } : undefined));
+  const isoStore = new PostgresStore(iso, { ownsPool: false });
+  await rejects(() => isoStore.transaction(async () => {}, { isolation: 'repeatable read' }), error => error.code === 'STORE_ISOLATION_REQUIRES_LOCK',
+    "a writable 'repeatable read' transaction without a lock is refused");
+  await rejects(() => isoStore.transaction(async () => {}, { isolation: 'read committed' }), error => error.code === 'STORE_ISOLATION_INVALID', 'other isolation levels are refused');
+  await isoStore.transaction(async () => {}, { lock: 'k', isolation: 'repeatable read' });
+  ok(iso.log.includes('BEGIN ISOLATION LEVEL REPEATABLE READ'), "with a lock, 'repeatable read' begins a snapshot-isolation transaction");
+  await rejects(() => isoStore.transaction(async () => isoStore.transaction(async () => {}, { lock: 'other' }), { lock: 'k' }),
+    error => error.code === 'STORE_LOCK_NESTED', 'a nested transaction cannot take a different lock');
+}
+{
+  // No outbound I/O while a transaction is open (the webhook verifier contract).
+  const pool = fakePool(() => undefined);
+  const store = new PostgresStore(pool, { ownsPool: false });
+  let spawned;
+  await rejects(() => store.transaction(async () => {
+    spawned = new Promise(resolve => setTimeout(() => resolve(inStoreTransaction()), 5));
+    assertNoOpenTransaction('A test call');
+  }), error => error.code === 'STORE_EXTERNAL_IO_IN_TRANSACTION', 'an outbound call inside a transaction is refused');
+  ok(!inStoreTransaction() && (await spawned) === false, 'outside it — including a task spawned inside it that runs after it ended — it is allowed');
 }
 {
   // Backoff grows and is capped; the default budget outlasts a burst of
@@ -140,7 +226,7 @@ eq(toPostgresPlaceholders("SELECT '?' AS q, \"a?\" FROM t WHERE a = ? AND b = ? 
 
 // ── Part 2 · the same contract on a real engine ─────────────────────────────
 const engine = requestedEngine();
-const { store, close } = await openTestStore(engine, { label: 'store', max: 12 });
+const { store, close, url } = await openTestStore(engine, { label: 'store', max: 12 });
 const now = Date.now();
 try {
   eq(store.dialect, engine, `the store reports its engine (${engine})`);
@@ -224,8 +310,58 @@ try {
       error => error.code === '25006', 'a readOnly transaction refuses writes');
   }
 
+  // A named lock is visible to code inside the transaction on both engines.
+  eq(await store.transaction(async () => store.heldLock(), { lock: 'pri.sync:acct-store' }), 'pri.sync:acct-store', 'heldLock() inside a locked transaction');
+
+  if (engine === 'sqlite') {
+    // A COMMIT that throws must not leave the transaction open behind the lock.
+    const raw = store.raw;
+    const realExec = raw.exec.bind(raw);
+    let failCommit = true;
+    raw.exec = sql => {
+      if (sql === 'COMMIT' && failCommit) { failCommit = false; throw Object.assign(new Error('injected COMMIT failure'), { code: 'SQLITE_IOERR' }); }
+      return realExec(sql);
+    };
+    try {
+      await rejects(() => store.transaction(async tx => { await tx.run("UPDATE accounts SET name='never-committed' WHERE id=?", ['acct-store']); }),
+        error => error.code === 'SQLITE_IOERR', 'a failing COMMIT rejects with its own error');
+      ok(!raw.inTransaction, 'and the transaction was rolled back before the lock was released');
+      eq((await store.get('SELECT name FROM accounts WHERE id=?', ['acct-store'])).name, 'Zed', 'its write is gone');
+      await store.transaction(async tx => { await tx.run("UPDATE accounts SET name='next' WHERE id=?", ['acct-store']); });
+      eq((await store.get('SELECT name FROM accounts WHERE id=?', ['acct-store'])).name, 'next', 'the next transaction begins and commits normally');
+      await store.run("UPDATE accounts SET name='Zed' WHERE id=?", ['acct-store']);
+    } finally {
+      raw.exec = realExec;
+    }
+  }
+
+  if (engine === 'postgres') {
+    // Session limits are applied to every connection, from the environment.
+    eq((await store.get('SHOW statement_timeout')).statement_timeout, '15s', 'default statement_timeout is 15 s on every connection');
+    eq((await store.get('SHOW idle_in_transaction_session_timeout')).idle_in_transaction_session_timeout, '30s', 'default idle_in_transaction_session_timeout is 30 s');
+    const tight = await createPostgresStore(url, { env: {
+      ...process.env, PRI_DATABASE_STATEMENT_TIMEOUT_MS: '1200', PRI_DATABASE_IDLE_TX_TIMEOUT_MS: '1000', PRI_DATABASE_POOL_MAX: '3'
+    } });
+    try {
+      eq(tight.pool.options.max, 3, 'PRI_DATABASE_POOL_MAX sizes the pool');
+      eq((await tight.get('SHOW statement_timeout')).statement_timeout, '1200ms', 'PRI_DATABASE_STATEMENT_TIMEOUT_MS is applied');
+      eq((await tight.get('SHOW idle_in_transaction_session_timeout')).idle_in_transaction_session_timeout, '1s', 'PRI_DATABASE_IDLE_TX_TIMEOUT_MS is applied');
+      await rejects(() => tight.get('SELECT pg_sleep(3)'), error => error.code === 'PLATFORM_DB_TIMEOUT' && error.status === 503 && error.dbCode === '57014',
+        'a statement past statement_timeout is cancelled and answered PLATFORM_DB_TIMEOUT 503');
+      await rejects(() => tight.transaction(async tx => {
+        await tx.get('SELECT 1');
+        await new Promise(resolve => setTimeout(resolve, 1600));
+        await tx.get('SELECT 2');
+      }), error => error.code === 'PLATFORM_DB_TIMEOUT' && error.dbCode === '25P03',
+      'a transaction left idle past the limit is ended by the server, answered PLATFORM_DB_TIMEOUT, and does not crash the process');
+      eq(Number((await tight.get('SELECT 3 AS n')).n), 3, 'and the pool carries on with a fresh connection');
+    } finally {
+      await tight.close();
+    }
+  }
+
   console.log(`engine: ${engine}`);
-  console.log(`PLATFORM STORE: PASS — ${checks}/${checks} checks — retry on 40001/40P01 only and bounded, savepoints, joined helpers, no lost updates under concurrency and identical dialect answers on ${engine}.`);
+  console.log(`PLATFORM STORE: PASS — ${checks}/${checks} checks — retry on 40001/40P01 only and bounded, overload as a coded 503, locks before BEGIN, session timeouts, savepoints, joined helpers, no lost updates under concurrency and identical dialect answers on ${engine}.`);
 } finally {
   await close();
 }

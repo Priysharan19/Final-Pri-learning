@@ -123,6 +123,12 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
     const code = declaredStatus ? (err?.code || 'INTERNAL') : 'INTERNAL';
     console.error('platform_error', { requestId, path: req.path, method: req.method, code: err?.code || 'INTERNAL', status });
     if (res.headersSent) return next(err);
+    // Database overload (store.js databaseOverload) is the one 5xx the client
+    // should simply resend: say so, and say when.
+    if (status === 503 && err?.retryable && Number.isSafeInteger(err.retryAfter) && err.retryAfter > 0) {
+      res.set('Retry-After', String(err.retryAfter));
+      return res.status(503).json({ error: { code, message: err.message, retryable: true }, requestId });
+    }
     res.status(status).json({ error: { code, message: status < 500 ? err.message : 'Something went wrong.' }, requestId });
   });
 

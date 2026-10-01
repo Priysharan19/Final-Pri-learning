@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import { createPlatformDb, nextSyncCursor } from '../platform/db.js';
+import { createPlatformDb, nextSyncCursor, syncLockKey } from '../platform/db.js';
+import { asStore } from '../platform/store.js';
 import { syncPullPage } from '../platform/sync.js';
 
 const db = createPlatformDb(':memory:');
@@ -10,20 +11,28 @@ function addAccount(id, email) {
     VALUES (?, ?, ?, 'student', ?, ?)`).run(id, email, id, now, now);
 }
 
+// Rows are written the way the push writes them: cursor and row in one
+// transaction holding the account's sync lock.
+const locked = (accountId, fn) => asStore(db).transaction(fn, { lock: syncLockKey(accountId) });
+
 async function addEvent(accountId, id, deviceId, deviceSeq) {
-  const cursor = await nextSyncCursor(db);
+  return locked(accountId, async () => {
+  const cursor = await nextSyncCursor(db, accountId);
   db.prepare(`INSERT INTO learning_events(server_cursor,id,account_id,device_id,device_seq,kind,entity_id,occurred_at,payload_json,created_at)
     VALUES (?,?,?,?,?,'practice-progress',NULL,?, '{}',?)`)
     .run(cursor, id, accountId, deviceId, deviceSeq, now, now);
   return cursor;
+  });
 }
 
 async function addEntity(accountId, entityId, version = 1) {
-  const cursor = await nextSyncCursor(db);
+  return locked(accountId, async () => {
+  const cursor = await nextSyncCursor(db, accountId);
   db.prepare(`INSERT INTO sync_entities(account_id,kind,entity_id,version,server_cursor,body_json,tombstone,updated_at)
     VALUES (?,'bookmark',?,?,?,'{"present":true}',0,?)`)
     .run(accountId, entityId, version, cursor, now);
   return cursor;
+  });
 }
 
 addAccount('acct-a', 'a@example.test');

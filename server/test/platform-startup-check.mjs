@@ -84,15 +84,34 @@ try {
   }
   ok(!existsSync(sqliteFile), 'and never falls back to opening a SQLite file');
 
+  // ── 1b · No TLS in production ─────────────────────────────────────────────
+  for (const mode of ['', '?sslmode=disable', '?sslmode=prefer']) {
+    const plain = await run(productionEnv({ PRI_DATABASE_URL: `postgres://pri_app:${SECRET}@db.internal:5432/pri${mode}` }));
+    eq(plain.code, 1, `production refuses a PRI_DATABASE_URL without TLS (${mode || 'no sslmode'})`);
+    ok(/platform_db_unavailable \{"code":"PLATFORM_DB_TLS_REQUIRED"\}/.test(plain.stderr), `with the coded error PLATFORM_DB_TLS_REQUIRED (${plain.stderr.trim().slice(0, 120)})`);
+    eq(leaks(plain.stdout + plain.stderr, SECRET, 'db.internal').length, 0, 'and prints nothing of the URL');
+    ok(!/running on port/.test(plain.stdout), 'it never listens');
+  }
+
   // ── 2 · Unreachable database ──────────────────────────────────────────────
   const closedPort = await freePort();
-  const unreachable = await run(productionEnv({ PRI_DATABASE_URL: `postgres://pri_app:${SECRET}@127.0.0.1:${closedPort}/pri` }));
+  const unreachable = await run(productionEnv({ PRI_DATABASE_URL: `postgres://pri_app:${SECRET}@127.0.0.1:${closedPort}/pri?sslmode=require` }));
   eq(unreachable.code, 1, 'an unreachable Postgres stops the process');
   ok(/platform_db_unavailable \{"code":"PLATFORM_DB_UNAVAILABLE"\}/.test(unreachable.stderr), `with the coded error PLATFORM_DB_UNAVAILABLE (${unreachable.stderr.trim().slice(0, 120)})`);
   eq(leaks(unreachable.stdout + unreachable.stderr, SECRET, 'pri_app', String(closedPort)).length, 0, 'and prints neither the password, the user nor the address');
 
   if (engine === 'postgres') {
     const { pgModule, adminUrl, scratchDatabase, serverRoleUrl } = await import('./support/postgres.mjs');
+
+    // The throwaway cluster has no TLS, and production now refuses a database
+    // without it (case 1b). The schema checks below are not production-specific,
+    // so they boot with NODE_ENV unset.
+    const devEnv = (url) => {
+      const env = { ...process.env, PORT: '0', PRI_DATABASE_URL: url, PRI_AUTH_DELIVERY_KEY: '55'.repeat(32) };
+      delete env.NODE_ENV;
+      delete env.PRI_PLATFORM_DB;
+      return env;
+    };
 
     // ── 3 · Reachable but not migrated ─────────────────────────────────────
     const pg = await pgModule();
@@ -103,12 +122,32 @@ try {
     try {
       const emptyUrl = new URL(adminUrl());
       emptyUrl.pathname = `/${empty}`;
-      const unmigrated = await run(productionEnv({ PRI_DATABASE_URL: emptyUrl.toString() }));
+      const unmigrated = await run(devEnv(emptyUrl.toString()));
       eq(unmigrated.code, 1, 'a reachable but unmigrated Postgres stops the process');
       ok(/platform_db_unavailable \{"code":"PLATFORM_DB_NOT_MIGRATED"\}/.test(unmigrated.stderr), `with the coded error PLATFORM_DB_NOT_MIGRATED (${unmigrated.stderr.trim().slice(0, 120)})`);
     } finally {
       await admin.query(`DROP DATABASE IF EXISTS ${empty} WITH (FORCE)`);
       await admin.end();
+    }
+
+    // ── 3b · Migrated, but not to the schema this build needs ──────────────
+    for (const [label, sql] of [
+      ['schema_version is older than the server', "UPDATE pri.platform_meta SET value='5' WHERE key='schema_version'"],
+      ['schema_version is newer than the server', "UPDATE pri.platform_meta SET value='7' WHERE key='schema_version'"],
+      ['billing_schema_version differs', "UPDATE pri.platform_meta SET value='2' WHERE key='billing_schema_version'"],
+      ['billing_schema_version is missing', "DELETE FROM pri.platform_meta WHERE key='billing_schema_version'"],
+      ['the sync cursor sequence migration is missing', 'DROP SEQUENCE pri.sync_cursor_seq']
+    ]) {
+      const drifted = await scratchDatabase('startup_drift');
+      try {
+        await drifted.client.query(sql);
+        const refused = await run(devEnv(await serverRoleUrl(drifted.name)));
+        eq(refused.code, 1, `the server refuses to start when ${label}`);
+        ok(/platform_db_unavailable \{"code":"PLATFORM_DB_SCHEMA_MISMATCH"\}/.test(refused.stderr), `with PLATFORM_DB_SCHEMA_MISMATCH (${refused.stderr.trim().slice(0, 120)})`);
+        ok(!/running on port/.test(refused.stdout), 'and never listens');
+      } finally {
+        await drifted.drop();
+      }
     }
 
     // ── 4 · Migrated: boots, reports only the engine, shuts down cleanly ────
@@ -146,7 +185,7 @@ try {
   }
 
   console.log(`engine: ${engine}`);
-  console.log(`PLATFORM STARTUP: PASS — ${checks}/${checks} checks — a malformed, unreachable${engine === 'postgres' ? ' or unmigrated' : ''} PRI_DATABASE_URL fails closed with a coded error and leaks nothing${engine === 'postgres' ? '; a migrated Postgres boots, reports only its engine and drains on SIGTERM' : ''}.`);
+  console.log(`PLATFORM STARTUP: PASS — ${checks}/${checks} checks — a malformed, unreachable${engine === 'postgres' ? ' or unmigrated' : ''} PRI_DATABASE_URL fails closed with a coded error and leaks nothing; production refuses a database URL without TLS${engine === 'postgres' ? '; a schema_version/billing_schema_version mismatch or a missing migration fails closed with PLATFORM_DB_SCHEMA_MISMATCH; a migrated Postgres boots, reports only its engine and drains on SIGTERM' : ''}.`);
 } finally {
   rmSync(dirname(sqliteFile), { recursive: true, force: true });
 }

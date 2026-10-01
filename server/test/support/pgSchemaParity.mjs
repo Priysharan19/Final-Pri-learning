@@ -7,10 +7,12 @@
 //
 // Compared, per table: column set and types, NOT NULL, primary key (ordered),
 // every UNIQUE key, every foreign key with its target and ON DELETE action,
-// which columns carry a CHECK, and every secondary index. Then the access
-// model: RLS on for every table, exactly one policy per table and only for
-// pri_server, pri_server holds exactly DML, and the client API roles hold
-// nothing — on tables, sequences, functions, the schema, or by default.
+// which columns carry a CHECK and what each CHECK actually allows (the SQLite
+// CHECK text and pg_get_constraintdef, both reduced to one canonical form), and
+// every secondary index. Then the access model: RLS on for every table, exactly
+// one policy per table, only for pri_server, permissive, FOR ALL commands with
+// USING/WITH CHECK true; pri_server holds exactly DML, and the client API roles
+// hold nothing — on tables, sequences, functions, the schema, or by default.
 
 import { createPlatformDb } from '../../platform/db.js';
 import { createPlatformRouter } from '../../platform/router.js';
@@ -30,6 +32,9 @@ const POSTGRES_INTEGER = new Set([
 // Constraints Postgres carries that SQLite expresses another way. Each is
 // required on Postgres, not merely tolerated.
 const POSTGRES_ONLY_CHECKS = new Set(['accounts.email']); // email = lower(email): SQLite folds with COLLATE NOCASE
+// …and exactly what each of them says.
+const POSTGRES_ONLY_CHECK_EXPRESSIONS = new Map([['accounts', ['email=loweremail']]]);
+const POLICY_COMMANDS = { r: 'SELECT', a: 'INSERT', w: 'UPDATE', d: 'DELETE', '*': 'ALL' };
 
 // The only identity column. learning_events.server_cursor is AUTOINCREMENT on
 // SQLite but the server assigns it from sync_cursors, so on Postgres it must be
@@ -39,6 +44,67 @@ const POSTGRES_IDENTITY = new Map([['audit_log.id', 'BY DEFAULT']]);
 const IDENTITY = { a: 'ALWAYS', d: 'BY DEFAULT', '': 'none' };
 
 const ON_DELETE = { a: 'NO ACTION', r: 'RESTRICT', c: 'CASCADE', n: 'SET NULL', d: 'SET DEFAULT' };
+
+/** The text inside the parentheses that open at `open` (balanced, quote-aware). */
+function balanced(text, open) {
+  let depth = 0;
+  let quote = null;
+  for (let i = open; i < text.length; i++) {
+    const ch = text[i];
+    if (quote) { if (ch === quote) quote = null; continue; }
+    if (ch === "'" || ch === '"') { quote = ch; continue; }
+    if (ch === '(') depth++;
+    if (ch === ')' && --depth === 0) return text.slice(open + 1, i);
+  }
+  return null;
+}
+
+/** Every CHECK(...) expression in a column or table constraint definition. */
+function checkExpressions(definition) {
+  const out = [];
+  for (const match of definition.matchAll(/\bCHECK\s*\(/gi)) {
+    const inner = balanced(definition, match.index + match[0].length - 1);
+    if (inner !== null) out.push(inner);
+  }
+  return out;
+}
+
+function canonicalValues(list) {
+  return list.split(',').map(value => value.trim().replace(/::[a-z ]+$/i, '')).filter(Boolean).sort().join(',');
+}
+
+/**
+ * One canonical form for a CHECK expression from either engine, so the gate
+ * compares what a constraint allows rather than how each engine prints it:
+ *
+ *   SQLite  role IN ('student','teacher')            ┐
+ *   Postgres ((role = ANY (ARRAY['student'::text,     ├→ role in {'student','teacher'}
+ *            'teacher'::text])))                      ┘
+ *   … OR x IS NULL                                    → … or null
+ *   id = 1 / ((id = 1))                               → id in {1}
+ *
+ * Anything else falls back to its text with casts, parentheses and spacing
+ * removed, lower-cased — still compared, just less forgivingly.
+ */
+export function canonicalCheck(expression) {
+  const text = String(expression).replace(/\s+/g, ' ').trim();
+  const squeeze = value => value.replace(/::[a-z ]+/gi, '').replace(/[()\s]/g, '').toLowerCase();
+  // The set form only applies when nothing else follows it except an
+  // `OR <column> IS NULL`; any other remainder is compared as text.
+  const setForm = (column, values, rest) => {
+    const tail = squeeze(rest);
+    if (tail === '') return `${column} in {${canonicalValues(values)}}`;
+    if (tail === `or${column.toLowerCase()}isnull`) return `${column} in {${canonicalValues(values)}} or null`;
+    return null;
+  };
+  let m = text.match(/^\(*\s*(\w+)\s*=\s*ANY\s*\(\s*ARRAY\s*\[(.*?)\]\s*\)(.*)$/i);
+  if (m) { const form = setForm(m[1], m[2], m[3]); if (form) return form; }
+  m = text.match(/^\(*\s*(\w+)\s+IN\s*\(([^()]*)\)(.*)$/i);
+  if (m) { const form = setForm(m[1], m[2], m[3]); if (form) return form; }
+  m = text.match(/^\(*\s*(\w+)\s*=\s*('[^']*'|-?\d+)(::[a-z ]+)?\s*\)*$/i);
+  if (m) return `${m[1]} in {${m[2]}}`;
+  return squeeze(text);
+}
 
 /** Split a CREATE TABLE body on top-level commas. */
 function topLevelParts(body) {
@@ -71,11 +137,17 @@ export function sqliteSchema() {
     }
     const body = sql.slice(sql.indexOf('(') + 1, sql.lastIndexOf(')'));
     const checks = new Set();
+    const checkExprs = new Set();
     const nocase = new Set();
     for (const part of topLevelParts(body)) {
       const [first] = part.split(/\s+/);
+      // Table-level CHECK constraints are compared by expression too.
+      if (/^(CONSTRAINT\s+\w+\s+)?CHECK\s*\(/i.test(part)) { for (const e of checkExpressions(part)) checkExprs.add(canonicalCheck(e)); continue; }
       if (!columns.has(first)) continue;
-      if (/\bCHECK\s*\(/i.test(part)) checks.add(first);
+      if (/\bCHECK\s*\(/i.test(part)) {
+        checks.add(first);
+        for (const e of checkExpressions(part)) checkExprs.add(canonicalCheck(e));
+      }
       if (/COLLATE\s+NOCASE/i.test(part)) nocase.add(first);
     }
     const pk = [...columns].filter(([, c]) => c.pk > 0).sort((a, b) => a[1].pk - b[1].pk).map(([n]) => n);
@@ -89,7 +161,7 @@ export function sqliteSchema() {
     }
     const foreignKeys = new Set(db.prepare(`PRAGMA foreign_key_list('${name}')`).all()
       .map(fk => `${fk.from}->${fk.table}.${fk.to} ON DELETE ${String(fk.on_delete).toUpperCase()}`));
-    tables.set(name, { columns, pk, uniques, indexes, foreignKeys, checks });
+    tables.set(name, { columns, pk, uniques, indexes, foreignKeys, checks, checkExprs });
   }
   db.close();
   return tables;
@@ -127,12 +199,14 @@ export async function postgresSchema(client, schema = 'pri') {
     pk.forEach((name, i) => { const c = columns.get(name); if (c) c.pk = i + 1; });
     const foreignKeys = new Set();
     const checks = new Set();
+    const checkExprs = new Set();
     for (const con of (await client.query(`SELECT con.contype, con.conkey::int2[] AS conkey, con.confkey::int2[] AS confkey, con.confdeltype,
-        ft.relname AS ftable, con.confrelid
+        ft.relname AS ftable, con.confrelid, pg_get_constraintdef(con.oid) AS def
       FROM pg_constraint con LEFT JOIN pg_class ft ON ft.oid = con.confrelid
       WHERE con.conrelid = $1 AND con.contype IN ('f','c')`, [t.oid])).rows) {
       if (con.contype === 'c') {
         for (const k of con.conkey || []) checks.add(attnames.get(Number(k)));
+        for (const e of checkExpressions(con.def)) checkExprs.add(canonicalCheck(e));
         continue;
       }
       const targetCols = (await client.query('SELECT attnum, attname FROM pg_attribute WHERE attrelid = $1 AND attnum > 0', [con.confrelid])).rows;
@@ -144,7 +218,7 @@ export async function postgresSchema(client, schema = 'pri') {
     const policies = (await client.query(`SELECT p.polname, p.polcmd, p.polpermissive, ARRAY(SELECT rolname::text FROM pg_roles WHERE oid = ANY(p.polroles))::text[] AS roles,
         pg_get_expr(p.polqual, p.polrelid) AS qual, pg_get_expr(p.polwithcheck, p.polrelid) AS withcheck
       FROM pg_policy p WHERE p.polrelid = $1`, [t.oid])).rows;
-    tables.set(t.relname, { columns, pk, uniques, indexes, foreignKeys, checks, rls: t.relrowsecurity, forceRls: t.relforcerowsecurity, policies });
+    tables.set(t.relname, { columns, pk, uniques, indexes, foreignKeys, checks, checkExprs, rls: t.relrowsecurity, forceRls: t.relforcerowsecurity, policies });
   }
   return tables;
 }
@@ -184,11 +258,20 @@ export function compareSchemas(sqlite, postgres) {
     sameSet(s.foreignKeys, p.foreignKeys, `${table} foreign keys`);
     const expectedChecks = new Set([...s.checks, ...[...POSTGRES_ONLY_CHECKS].filter(k => k.startsWith(`${table}.`)).map(k => k.split('.')[1])]);
     sameSet(expectedChecks, p.checks, `${table} CHECK constraints`);
+    const expectedExprs = new Set([...s.checkExprs, ...(POSTGRES_ONLY_CHECK_EXPRESSIONS.get(table) || [])]);
+    sameSet(expectedExprs, p.checkExprs, `${table} CHECK expressions`);
 
     check(p.rls === true, `${table}: row-level security is not enabled`);
     check(p.policies.length === 1, `${table}: expected exactly one RLS policy, found ${p.policies.length}`);
     for (const policy of p.policies) {
       check(policy.roles.length === 1 && policy.roles[0] === 'pri_server', `${table}: policy ${policy.polname} applies to ${policy.roles.join(',') || 'PUBLIC'}, not only pri_server`);
+      // The server reads AND writes every table: a policy narrowed to SELECT
+      // (or any single command) silently turns its writes into zero-row no-ops
+      // or RLS errors in production.
+      const command = POLICY_COMMANDS[policy.polcmd] || `unknown (${policy.polcmd})`;
+      check(command === 'ALL', `${table}: policy ${policy.polname} is for ${command}, not ALL`);
+      check(policy.polpermissive === true, `${table}: policy ${policy.polname} is RESTRICTIVE, not PERMISSIVE`);
+      check(String(policy.qual) === 'true' && String(policy.withcheck) === 'true', `${table}: policy ${policy.polname} is not USING (true) WITH CHECK (true)`);
     }
   }
   for (const table of postgres.keys()) check(sqlite.has(table), `table ${table} exists only in Postgres`);
@@ -252,6 +335,15 @@ export async function compareSeeds(client, schema = 'pri') {
   const check = (cond, label) => { checks++; if (!cond) failures.push(label); };
   const cursor = (await client.query(`SELECT id, value FROM ${schema}.sync_cursors`)).rows;
   check(cursor.length === 1 && Number(cursor[0].id) === 1 && Number(cursor[0].value) === 0, 'sync_cursors holds exactly the row (1, 0)');
+  // The Postgres sync cursor allocator (db.js nextSyncCursor). CACHE 1 is what
+  // makes nextval() increase across sessions; a cache would let a later commit
+  // receive a lower cursor and a pulling device skip it.
+  const sequence = (await client.query(`SELECT cache_size, increment_by, cycle, last_value FROM pg_sequences
+    WHERE schemaname = $1 AND sequencename = 'sync_cursor_seq'`, [schema])).rows;
+  check(sequence.length === 1, 'sync_cursor_seq exists');
+  check(sequence.length === 1 && Number(sequence[0].cache_size) === 1, 'sync_cursor_seq has CACHE 1');
+  check(sequence.length === 1 && Number(sequence[0].increment_by) === 1 && sequence[0].cycle === false, 'sync_cursor_seq increments by 1 and never cycles');
+  check(sequence.length === 1 && sequence[0].last_value === null, 'sync_cursor_seq has handed out nothing on a fresh database');
   const meta = new Map((await client.query(`SELECT key, value FROM ${schema}.platform_meta`)).rows.map(r => [r.key, r.value]));
   const { SCHEMA_VERSION } = await import('../../platform/db.js');
   const { BILLING_SCHEMA_VERSION } = await import('../../platform/billingSchema.js');

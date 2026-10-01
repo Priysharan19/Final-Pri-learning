@@ -196,16 +196,20 @@ jobs:
         run: node server/test/platform-schema-check.mjs
       - name: Supabase schema parity (migration text)
         run: node server/test/postgres-schema-parity-check.mjs
-      - name: Platform store, concurrency and fail-closed startup (SQLite)
+      - name: Platform store, concurrency, sync burst, connection config and fail-closed startup (SQLite)
         run: |
           node server/test/platform-store-check.mjs
           node server/test/platform-concurrency-check.mjs
+          node server/test/platform-sync-burst-check.mjs
+          node server/test/postgres-connection-config-check.mjs
           node server/test/platform-startup-check.mjs
       - name: Supabase migrations and every engine-agnostic platform suite on real Postgres
         run: |
           set -o pipefail
           node scripts/with-postgres.mjs node server/test/run-platform-postgres.mjs 2>&1 | tee platform-postgres.log
-          grep -Fq 'PLATFORM ON POSTGRES: PASS' platform-postgres.log
+          grep -Fq 'PLATFORM ON POSTGRES: PASS — 24/24 suites' platform-postgres.log
+          grep -Fq 'POSTGRES SCHEMA MUTATIONS: PASS — 19/19' platform-postgres.log
+          grep -Fq 'PLATFORM SYNC BURST: PASS' platform-postgres.log
       - name: Platform migration contract
         run: node server/test/platform-migration-check.mjs
       - name: Cross-account sync pagination regression
