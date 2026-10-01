@@ -105,7 +105,7 @@ export const CHUNK_GROUPS = [
 
 // Exported so client/test/install-budget-check.mjs can hold the build to these
 // exact rules rather than to a second copy of them that would drift.
-export const PRECACHE_SKIP = /(^|\/)sw\.js$|(^|\/)release\.json$|(^|\/)\.DS_Store$|\.map$|\.woff$|\.ttf$/;
+export const PRECACHE_SKIP = /(^|\/)sw\.js$|(^|\/)release\.json$|(^|\/)features\.json$|(^|\/)\.DS_Store$|\.map$|\.woff$|\.ttf$/;
 
 export const ON_DEMAND = [
   // ~2.7 MB of renderer and worker, for the student who attaches a scanned PDF.
@@ -319,16 +319,33 @@ function releaseIdentityManifest(identity) {
 // Build-time feature flags (client/src/platform/features.js). A production
 // build is OFF unless its environment says PRI_FEATURE_<NAME>=1; development
 // (`vite` serve) is ON. Test harnesses that build set the variable themselves.
-export function featureDefines(command, env = process.env) {
+export const FEATURE_FLAGS = Object.freeze(['PLACEMENT', 'TUTOR']);
+export function featureStates(command, env = process.env) {
   const on = name => (command === 'build' ? env[`PRI_FEATURE_${name}`] === '1' : env[`PRI_FEATURE_${name}`] !== '0');
-  return { __PRI_FEATURE_PLACEMENT__: JSON.stringify(on('PLACEMENT')) };
+  return Object.fromEntries(FEATURE_FLAGS.map(name => [name.toLowerCase(), on(name)]));
+}
+export function featureDefines(command, env = process.env) {
+  return { __PRI_FEATURE_PLACEMENT__: JSON.stringify(featureStates(command, env).placement) };
+}
+
+// The flags a build was made with, written beside it as features.json so the
+// tracked iPad bundles can be checked for a flag-on test build committed by
+// mistake (client/test/ios-bundle-features-check.mjs). Records every known
+// PRI_FEATURE_* flag, including ones whose code lives on other branches.
+function featureManifest(states) {
+  return {
+    name: 'pri-feature-manifest',
+    generateBundle() {
+      this.emitFile({ type: 'asset', fileName: 'features.json', source: `${JSON.stringify(states, null, 2)}\n` });
+    }
+  };
 }
 
 export default defineConfig(({ command }) => {
   const releaseIdentity = resolveReleaseIdentity({ production: command === 'build', env: applyDeploymentPrecedence(process.env) });
   return {
     define: featureDefines(command),
-    plugins: [react(), releaseIdentityManifest(releaseIdentity), precache()],
+    plugins: [react(), releaseIdentityManifest(releaseIdentity), featureManifest(featureStates(command)), precache()],
     server: { port: 5173 },
     build: {
       outDir: 'dist',
