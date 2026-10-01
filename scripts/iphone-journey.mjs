@@ -51,6 +51,23 @@ const argOf = name => { const i = process.argv.indexOf(`--${name}`); return i > 
 const run = (cmd, args, opts = {}) =>
   execFileSync(cmd, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 64 * 1024 * 1024, ...opts });
 
+// A freshly booted simulator can refuse a launch until SpringBoard is ready
+// ("denied by service delegate (SBMainWorkspace)"). Wait for the boot to finish,
+// then retry that specific refusal a few times; any other error is real.
+function launchApp(device, bundleId, args = [], opts = {}) {
+  try { run('xcrun', ['simctl', 'bootstatus', device, '-b']); } catch { /* best effort */ }
+  for (let attempt = 1; ; attempt++) {
+    try { return run('xcrun', ['simctl', 'launch', device, bundleId, ...args], opts); }
+    catch (error) {
+      const text = String(error?.stderr || error?.message || '');
+      if (attempt >= 5 || !/SBMainWorkspace|FBSOpenApplicationServiceErrorDomain/.test(text)) throw error;
+      console.log(`  (simulator not ready to launch yet; retry ${attempt})`);
+      execSync('sleep 6');
+    }
+  }
+}
+
+
 function pickDevice() {
   const named = argOf('device');
   const family = (argOf('family') || 'iphone').toLowerCase();
@@ -87,7 +104,7 @@ function launchAndRead(udid, bundleId, flag, phase, childEnv = {}, { during = nu
   // origin override and the journey's fixture account from it).
   const env = { ...process.env };
   for (const [k, v] of Object.entries(childEnv)) env[`SIMCTL_CHILD_${k}`] = v;
-  run('xcrun', ['simctl', 'launch', udid, bundleId, flag], { env });
+  launchApp(udid, bundleId, [flag], { env });
   let lines = [];
   const t0 = Date.now();
   let duringDone = !during;
@@ -248,6 +265,7 @@ const steps = Object.fromEntries([
     ...SIGNUP.map(n => [n, result(signupLines, n)]), ['serverDeletedAccountRefused', result(signupLines, 'serverDeletedAccountRefused')],
     ...CLOUD.map(n => [n, result(cloudLines, n)]), ...OFFLINE.map(n => [n, result(offlineLines, n)]),
     ...CLOUD_RELAUNCH.map(n => [n, result(cloudRelaunchLines, n)]),
+    ['serverLogoutRecorded', result(cloudRelaunchLines, 'serverLogoutRecorded')],
   ] : []),
   ...(WANT_DYNAMIC ? DYNAMIC.map(n => [n, result(dynamicLines, n)]) : []),
   ...(WANT_LIFECYCLE ? BACKGROUND.map(n => [n, result(backgroundLines, n)]) : []),
