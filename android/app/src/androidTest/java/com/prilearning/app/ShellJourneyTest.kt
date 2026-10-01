@@ -12,6 +12,7 @@ package com.prilearning.app
 
 import android.content.pm.ActivityInfo
 import android.util.Log
+import androidx.test.platform.app.InstrumentationRegistry
 import android.webkit.WebView
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -67,6 +68,23 @@ class ShellJourneyTest {
     @Test
     fun theSharedProductRunsInTheShellWithPersistentLocalState() {
         // connectedAndroidTest installs the app fresh, so this is a first launch.
+        // Below the WebView floor (e.g. an Android 8 image with its factory
+        // WebView) the correct behaviour is the fail-closed update screen, not a
+        // half-working app. Assert that branch honestly and stop.
+        var floorBlocked = false
+        ActivityScenario.launch(MainActivity::class.java).use { probe ->
+            probe.onActivity { act -> floorBlocked = act.webView == null }
+        }
+        if (floorBlocked) {
+            val pkg = androidx.webkit.WebViewCompat.getCurrentWebViewPackage(
+                InstrumentationRegistry.getInstrumentation().targetContext)
+            assertTrue("update screen shown only when the WebView is genuinely below the floor or lacks features: ${pkg?.versionName}",
+                !com.prilearning.app.shell.WebViewFloor.isSupported(pkg?.versionName) ||
+                    !androidx.webkit.WebViewFeature.isFeatureSupported(androidx.webkit.WebViewFeature.WEB_MESSAGE_LISTENER))
+            Log.i("PRITEST", "WebView below floor (${pkg?.versionName}): fail-closed update screen verified")
+            return
+        }
+
         ActivityScenario.launch(MainActivity::class.java).use { s ->
             // ── boot on the stable origin with the capability handshake ───────────
             Log.i("PRITEST", "boot on the stable origin with the capability handshake")

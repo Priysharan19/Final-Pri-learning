@@ -18,7 +18,8 @@ import java.io.IOException
 
 object AssetOrigin {
     const val DOMAIN = "appassets.androidplatform.net"
-    const val ORIGIN = "https://$DOMAIN"
+    // Spelled out (not interpolated) so the architecture guard can pin it.
+    const val ORIGIN = "https://appassets.androidplatform.net"
     const val START_URL = "$ORIGIN/"
     const val WEB_ROOT = "web"
 
