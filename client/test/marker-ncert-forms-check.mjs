@@ -608,6 +608,19 @@ for (const [a, b] of endpoints) {
 differ('(x+1)/(x^2-1)', '1/(x-1)', isolated, 'interior hole at -1 refused by default');
 ok(finalMark('1/(x-1)', '(x+1)/(x^2-1)') === false, 'marker: (x+1)/(x²−1) is refused for 1/(x−1)');
 
+// Endpoint review fixes: an endpoint is one of the natural domain, judged on
+// the real line at every scale — not an authored bound, and not a hole that
+// merely sits close to a natural boundary.
+const authored = (expr, domain, input) => checkAnswer({ answerType: 'expression', answer: { expr, domain }, prompt: 'Simplify' }, input).correct;
+ok(authored('1', [0, 5], 'x/x') === false, 'marker: x/x is refused for 1 when the authored domain is [0, 5] (hole at the bound)');
+ok(authored('1', [-5, 0], 'x/x') === false, 'marker: x/x is refused for 1 when the authored domain is [-5, 0] (hole at the bound)');
+ok(authored('x+1', [1, 5], '(x^2-1)/(x-1)') === false, 'marker: (x²−1)/(x−1) is refused for x+1 when the authored domain is [1, 5]');
+differ('sqrt(x)*(x-0.00005)/(x-0.00005)', 'sqrt(x)', isolated, 'hole at 0.00005 beside √x\'s boundary is still a hole');
+differ('sqrt(x)*(x-0.0000001)/(x-0.0000001)', 'sqrt(x)', isolated, 'hole at 10⁻⁷ beside √x\'s boundary is still a hole');
+differ('sqrt(x)*(x-0.0002)/(x-0.0002)', 'sqrt(x)', isolated, 'hole at 0.0002 beside √x\'s boundary is still a hole');
+same('x/sqrt(x)', 'sqrt(x)', isolated, 'natural endpoint at 0 still accepted');
+same('asin(x)', 'atan(x/sqrt(1-x^2))', isolated, 'natural endpoints at ±1 still accepted');
+
 console.log(failures.length
   ? `NCERT ANSWER FORMS: FAIL — ${failures.length} of ${pass + failures.length} checks failed\n  · ${failures.join('\n  · ')}`
   : `NCERT ANSWER FORMS: PASS — ${pass}/${pass} checks — solution sets, inequality/interval equivalence, matrices, vectors, the n!/nCr/nPr/sec/cosec/cot vocabulary, rupees and paise, fraction form only where the question asks for it, blank answers, exact integers, the percent sign, unit-named variables and domain-aware final answers.`);
