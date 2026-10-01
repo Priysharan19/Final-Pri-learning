@@ -79,21 +79,26 @@ This is the durable ledger for CP-02 → CP-12 and SEC-COMM-01. Each CP's own PR
 
 **Delivered:**
 - `client/src/platform/formFactor.js`: COMPACT/MEDIUM/EXPANDED + SHORT from viewport and pointer only, plus `data-ff`/`data-short`/`data-pointer` on `<html>`.
-- A fitted handwriting area. EXPANDED and tall MEDIUM windows keep 380 px, so iPad is unchanged. Compact gets `height − 330`, never below 240.
-- Strokes are rescaled when the canvas width changes.
+- A fitted handwriting area. EXPANDED and tall MEDIUM windows keep the 380 px writing area. Compact gets `height − 330`, never below 240. Sizing uses the layout viewport in 40 px steps, so toolbar collapse and pinch-zoom don't make it jitter, and a keyboard opened while typing doesn't shrink a tablet canvas.
+- Strokes are rescaled when the canvas width changes. Widening is clamped so the lowest point stays 8 px above the foot of the sheet. Points are copied, not mutated, and a marked (disabled) answer is never re-read.
 - Diagnostics-only engine and fallback labels. "Read on the server" stays visible to students for privacy.
 - Student-appropriate copy in English and Hindi.
 - `inputMode="text"` + `enterKeyHint` on answer boxes. A numeric keypad would block expression answers.
 - The Settings menu is static once the grid collapses.
-- The Explain launcher is lifted clear of the Next pill, and the content gets bottom room for the pill.
+- The Explain launcher is a full-width bar above the pill at ≤760 px. Above that it stays a compact corner button, raised to `bottom: 112px` so it clears the pill whatever the pill's height. The content gets bottom room for the pill.
+- The sidebar's sticky offset includes the top-bar inset, so the two line up in an installed web app.
 - 44 px coarse-pointer targets, including `.btn`.
 - Toasts span the screen width on phones.
 - The top bar's height includes the status-bar inset.
 - `dvh` for full-height surfaces, a SHORT layout for auth, and hover-only effects neutralised on touch.
 - `client/test/e2e.mjs --browser=webkit`.
 
+**What tablets (EXPANDED/MEDIUM) see differently:** the layout and the 380 px writing area are unchanged. Two small, intentional changes do apply:
+- Primary buttons are 44 px on touch screens, the size the original "iPad & touch" rule intended. They were 42 px.
+- Pri Explain's corner launcher sits at `bottom: 112px` instead of 82/88 px, because it could overlap a tall Next pill.
+
 **Tests (S1, synthetic browser evidence):**
-- `client/test/tour-responsive-matrix.js`: **121/121 in Chromium and 121/121 in WebKit**, across 360×640, 390×844, 430×932, 820×1180, 1180×820 and 844×390. It covers:
+- `client/test/tour-responsive-matrix.js`: **145/145 in Chromium and 145/145 in WebKit**, across 360×640, 390×844, 430×932, 820×1180, 1180×820 and 844×390. It covers:
   - overflow on 7 routes;
   - classification and navigation;
   - a question that offers handwriting and typing;
@@ -103,10 +108,25 @@ This is the durable ledger for CP-02 → CP-12 and SEC-COMM-01. Each CP's own PR
   - keyboard attributes;
   - submit reachable;
   - Next uncovered after answering;
-  - the launcher clear of Next;
+  - Pri Explain offered after a forced worked solution, its launcher clear of Next and placed correctly for the width (full-width bar on phones, corner button above 760 px);
+  - the sidebar starting below the top bar;
+  - synthetic strokes landing inside the stroke box on the editor's own canvas (empty before);
+  - phone → tablet widening keeping the lowest stroke visible and unclipped, and phone → small-phone narrowing keeping ink on the sheet;
   - 44 px targets;
   - Settings controls uncovered.
-- Run against the CP-02 build, the same matrix **fails 28 checks**, which shows it detects every defect fixed here.
+- Run against the CP-02 build, an earlier 121-check version of the matrix failed 28 checks.
+- Mutation tests against the final matrix:
+  - Re-scoping the full-width launcher to 820 px fails the tablet-portrait placement check.
+  - Removing the widening clamp fails the widening check.
+- Independent review returned "request changes". All of it is fixed:
+  - widening clipped ink;
+  - a re-read after marking;
+  - the launcher reached iPad portrait;
+  - `visualViewport`-driven jitter and keyboard shrink;
+  - sidebar/inset misalignment;
+  - vacuous matrix checks;
+  - hard-coded English;
+  - unknown `--browser` values were accepted.
 - `client/test/form-factor-check.mjs`: 27/27.
 - Existing phone and KALP tours pass unchanged: phone 53/53, KALP-01 24/24, KALP-02 68/68, KALP-03 53/53.
 
