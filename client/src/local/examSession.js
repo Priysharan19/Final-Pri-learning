@@ -21,9 +21,15 @@
 //     deadline has passed or the paper is finalised, so nothing a student does
 //     after time is up can reach the paper.
 //
+//   · THE CLOCK ONLY MOVES FORWARD. Every read, save and submit records the
+//     latest time it has seen on the row (`latestSeenAt`). A device clock that
+//     is wound back reads as that latest time instead, so rolling the clock
+//     back can neither reopen an expired paper nor buy more time; the frozen
+//     record notes that a rollback was seen.
+//
 //   · THE MARK INPUTS ARE DECIDED HERE. A submit that arrives inside the
-//     deadline (plus a few seconds for the request itself to land) marks what
-//     it carries. A submit that arrives later — the app relaunched an hour
+//     deadline, or within SUBMIT_GRACE_MS (5 seconds) after it — the time the
+//     deadline's own automatic submit needs to land — marks what it carries. A submit that arrives later — the app relaunched an hour
 //     after time ran out, or a late request — marks only what was autosaved
 //     before the deadline, never what it carries.
 //
@@ -57,12 +63,31 @@ const finite = v => typeof v === 'number' && Number.isFinite(v);
 const durationMs = exam => Math.max(1, Number(exam?.durationMin) || 60) * 60000;
 
 /**
- * Give an exam row its start and deadline if it does not have them yet.
- * Returns true when the row changed and needs writing back.
+ * The time this paper is at: the device's "now", never earlier than the latest
+ * time the paper has already seen. A clock wound back is recorded, and read as
+ * the latest time seen, so it cannot reopen an expired paper or add time.
+ */
+export function observeClock(exam, now = Date.now()) {
+  const seen = finite(exam?.latestSeenAt) ? exam.latestSeenAt : null;
+  if (seen !== null && now < seen) {
+    exam.clockRollbacks = (Number(exam.clockRollbacks) || 0) + 1;
+    return seen;
+  }
+  exam.latestSeenAt = now;
+  return now;
+}
+
+/**
+ * Give an exam row its start and deadline if it does not have them yet, and
+ * move its latest-seen time forward. Returns true when the row changed and
+ * needs writing back.
  */
 export function ensureExamClock(exam, now = Date.now()) {
   if (!exam) return false;
-  let changed = false;
+  // A finalised paper's clock is history; reading it changes nothing.
+  const before = `${exam.latestSeenAt}:${exam.clockRollbacks}`;
+  if (!exam.finishedAt) now = observeClock(exam, now);
+  let changed = before !== `${exam.latestSeenAt}:${exam.clockRollbacks}`;
   if (!finite(exam.startedAt)) {
     exam.startedAt = finite(exam.createdAt) ? exam.createdAt : now;
     changed = true;
@@ -76,6 +101,7 @@ export function ensureExamClock(exam, now = Date.now()) {
 
 /** Start a brand-new paper's clock at `now`. */
 export function startExamClock(exam, now = Date.now()) {
+  exam.latestSeenAt = now;
   exam.startedAt = now;
   exam.deadlineAt = now + durationMs(exam);
   return exam;
@@ -179,6 +205,7 @@ function cleanInk(value) {
 export function saveExamResponses(exam, body = {}, now = Date.now()) {
   if (exam.finishedAt) throw examError('This paper has been submitted — it can no longer change.', 409, 'EXAM_FINALISED');
   ensureExamClock(exam, now);
+  now = exam.latestSeenAt;
   if (deadlinePassed(exam, now)) throw examError('Time is up on this paper — nothing more can be saved to it.', 409, 'EXAM_DEADLINE_PASSED');
   const allowed = allowedKeys(exam);
   const prior = exam.responses || {};
@@ -217,7 +244,9 @@ export function saveExamResponses(exam, body = {}, now = Date.now()) {
  * it did not carry; after it, only the autosave written before the deadline.
  */
 export function examMarkingInputs(exam, body = {}, now = Date.now()) {
+  const deviceNow = now;
   ensureExamClock(exam, now);
+  now = exam.latestSeenAt;
   const allowed = allowedKeys(exam);
   const saved = exam.responses || {};
   const inTime = now <= exam.deadlineAt + SUBMIT_GRACE_MS;
@@ -232,6 +261,7 @@ export function examMarkingInputs(exam, body = {}, now = Date.now()) {
   return {
     answers, workings, times, ms,
     source: inTime ? 'submission' : 'autosave-before-deadline',
+    clockRolledBack: deviceNow < now || (Number(exam.clockRollbacks) || 0) > 0,
     late: !inTime,
     finalisedBy: inTime ? (body.reason === 'deadline' ? 'deadline' : 'student') : 'deadline'
   };
@@ -264,12 +294,14 @@ export function paperFingerprint(rows) {
 
 /** Write the frozen record of a finalised paper onto its row. */
 export function freezeExam(exam, { inputs, paperVersion, submissionKey = null, now = Date.now() }) {
+  now = observeClock(exam, now);
   const inks = exam.responses?.inks || {};
   exam.final = {
     submittedAt: now,
     finalisedBy: inputs.finalisedBy,
     late: inputs.late,
     inputSource: inputs.source,
+    clockRolledBack: !!inputs.clockRolledBack,
     submissionKey: typeof submissionKey === 'string' ? submissionKey.slice(0, 100) : null,
     paperVersion,
     startedPaperVersion: exam.paperVersion || null,
@@ -295,6 +327,7 @@ export function isReplayOf(exam, body = {}) {
 /** The clock and saved responses the room reads back. */
 export function examSessionView(exam, now = Date.now()) {
   ensureExamClock(exam, now);
+  if (!exam.finishedAt && finite(exam.latestSeenAt)) now = exam.latestSeenAt;
   const finished = !!exam.finishedAt;
   return {
     startedAt: exam.startedAt,

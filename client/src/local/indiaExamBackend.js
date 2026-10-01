@@ -410,6 +410,8 @@ async function submitExam(profile, id, body = {}) {
   // What is marked is decided by the clock, not by the request: after the
   // deadline only the responses saved before it count.
   const inputs = examMarkingInputs(exam, body, now);
+  // Never earlier than the paper has already seen (see observeClock).
+  const at = Math.max(now, Number(exam.latestSeenAt) || 0);
   const answers = inputs.answers;
   const workings = inputs.workings;
   const times = inputs.times;
@@ -527,12 +529,12 @@ async function submitExam(profile, id, body = {}) {
     totalMs: totalMs || detail.reduce((n, d) => n + (d.ms || 0), 0),
     markingSchemes: schemes
   };
-  exam.finishedAt = now;
+  exam.finishedAt = at;
   exam.score = score;
   exam.total = total;
   exam.detail = detail;
   exam.summary = summary;
-  freezeExam(exam, { inputs, paperVersion: paperFingerprint(markedRows), submissionKey: body.submissionKey, now });
+  freezeExam(exam, { inputs, paperVersion: paperFingerprint(markedRows), submissionKey: body.submissionKey, now: at });
   await put('exams', exam);
   const newBadges = await finishIndiaExamEvidence(Math.max(0, pct));
   return { ...finalResult(exam), pct, newBadges };

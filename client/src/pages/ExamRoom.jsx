@@ -115,6 +115,11 @@ export default function ExamRoom() {
   const saveChain = useRef(Promise.resolve());
   const warned = useRef(new Set());
   const deadlineFired = useRef(false);
+  // The backend's clock only moves forward (examSession observeClock). If the
+  // device clock reads earlier than the time the paper has already seen, the
+  // room counts from the paper's time, not the wound-back one.
+  const skewRef = useRef(0);
+  const clockNow = () => Date.now() + skewRef.current;
 
   const setPhaseBoth = p => { phaseRef.current = p; setPhase(p); };
   latest.current = { answers, workings, inks, modes, cur, exam };
@@ -169,7 +174,8 @@ export default function ExamRoom() {
       // "now", which would turn a crash into extra time.
       setDeadlineAt(session.deadlineAt || ((e.createdAt || Date.now()) + e.durationMin * 60000));
       setExam(e);
-      setNow(Date.now());
+      skewRef.current = Math.max(0, (Number(session.now) || 0) - Date.now());
+      setNow(clockNow());
       setPhaseBoth('sitting');
     }).catch(() => nav('/exams'));
     return () => { live = false; };
@@ -210,7 +216,7 @@ export default function ExamRoom() {
       }
     }, err => {
       setSaveState('error');
-      if (err?.code === 'EXAM_DEADLINE_PASSED') setNow(Date.now());
+      if (err?.code === 'EXAM_DEADLINE_PASSED') setNow(clockNow());
     });
     return saveChain.current;
   }, [id, accrue]);
@@ -270,8 +276,8 @@ export default function ExamRoom() {
   // ── The clock ──────────────────────────────────────────────────────────────
   useEffect(() => {
     if (phase !== 'sitting') return;
-    const t = setInterval(() => setNow(Date.now()), 500);
-    return () => clearInterval(t);
+    const timer = setInterval(() => setNow(clockNow()), 500);
+    return () => clearInterval(timer);
   }, [phase]);
 
   useEffect(() => {
@@ -328,7 +334,7 @@ export default function ExamRoom() {
       }
       setSubmitError(err?.message || tLater('examRoom.submitFailed'));
       setPhaseBoth('sitting');
-      setNow(Date.now());
+      setNow(clockNow());
     }
   }
 

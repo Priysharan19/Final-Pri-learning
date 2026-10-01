@@ -253,6 +253,42 @@ eq(legacyLate.detail.find(d => d.id === first.id)?.given, 'saved-answer', 'a lat
 eq((await dispatch('POST', `/exams/${paper.id}/submit`, { submissionKey: 'legacy' })).replayed, true, 'a legacy replay returns the frozen result');
 await rejectsWith(dispatch('POST', `/exams/${paper.id}/submit`, {}), 409, 'a legacy resubmission is still refused');
 
+// ── 10 · winding the device clock back buys nothing ─────────────────────────
+// A paper's clock only moves forward: every read, save and submit records the
+// latest time seen, and an earlier "now" is read as that time.
+offset = 0;
+const rb = (await call('POST', '/exams', { seed: 990 })).exam;
+const rbMcq = rb.questions.filter(q => q.answerType === 'mcq');
+const rbRight = String((await payloadOf(rbMcq[0].id)).answer.correctIndex);
+const rbWrong = String((Number(rbRight) + 1) % 4);
+await call('POST', `/exams/${rb.id}/responses`, { answers: { [rbMcq[0].id]: rbWrong } });
+
+// (a) halfway through, the clock is wound back 25 minutes: no time is gained
+offset = 30 * MIN;
+const mid = (await call('GET', `/exams/${rb.id}`)).exam.session;
+offset = 5 * MIN;
+const wound = (await call('GET', `/exams/${rb.id}`)).exam.session;
+ok(wound.remainingMs <= mid.remainingMs, `a clock wound back mid-paper adds no time (${mid.remainingMs} ms before, ${wound.remainingMs} ms after)`);
+eq(wound.now, mid.now, 'the paper reads a wound-back clock as the latest time it has seen');
+
+// (b) past the deadline, then wound back to before it: still expired
+offset = rb.durationMin * MIN + 2 * MIN;
+const expiredRb = (await call('GET', `/exams/${rb.id}`)).exam.session;
+eq(expiredRb.expired, true, 'the paper expires once its deadline is seen');
+offset = 10 * MIN;   // the clock is wound back to well inside the hour
+const reopened = (await call('GET', `/exams/${rb.id}`)).exam.session;
+eq([reopened.expired, reopened.remainingMs], [true, 0], 'winding the clock back does not reopen an expired paper');
+await rejectsWith(call('POST', `/exams/${rb.id}/responses`, { answers: { [rbMcq[0].id]: rbRight } }), 'EXAM_DEADLINE_PASSED', 'an autosave under a wound-back clock is still refused');
+eq((await idb.get('exams', rb.id)).responses.answers[rbMcq[0].id], rbWrong, 'the refused autosave left the saved answer as it was');
+
+// (c) an "on-time" submit under the wound-back clock is not taken as new answers
+const rbMarked = await call('POST', `/exams/${rb.id}/submit`, { answers: { [rbMcq[0].id]: rbRight }, submissionKey: 'rollback' });
+eq(rbMarked.detail.find(d => d.id === rbMcq[0].id)?.given, rbWrong, 'a submit under a wound-back clock marks the answer saved before the deadline, not the new one');
+eq([rbMarked.final.late, rbMarked.final.finalisedBy], [true, 'deadline'], 'and it is recorded as finalised late, by the deadline');
+const rbRow = await idb.get('exams', rb.id);
+ok(rbRow.final.clockRolledBack === true && rbRow.clockRollbacks >= 1, 'the frozen record notes that the clock was wound back');
+ok(rbRow.finishedAt >= rbRow.deadlineAt, 'the finalisation time is never earlier than a time the paper had already seen');
+
 Date.now = realNow;
 console.log(failures.length
   ? `EXAM SESSION: FAIL — ${failures.length} of ${pass + failures.length} checks failed\n  · ${failures.join('\n  · ')}`

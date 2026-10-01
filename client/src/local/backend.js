@@ -2943,6 +2943,7 @@ const routes = {
     const now = Date.now();
     // After the deadline only what was autosaved before it is marked.
     const inputs = examMarkingInputs(e, body || {}, now);
+    const at = Math.max(now, Number(e.latestSeenAt) || 0);
     const answers = inputs.answers;
     const workings = inputs.workings;
     const totalMs = Number(inputs.ms) || 0;
@@ -3035,8 +3036,8 @@ const routes = {
       });
     }
     const pct = Math.round(100 * marksAwarded / Math.max(1, totalMarks));
-    Object.assign(e, { finishedAt: now, score: marksAwarded, total: totalMarks, detail });
-    freezeExam(e, { inputs, paperVersion: paperFingerprint(markedRows), submissionKey: body?.submissionKey, now });
+    Object.assign(e, { finishedAt: at, score: marksAwarded, total: totalMarks, detail });
+    freezeExam(e, { inputs, paperVersion: paperFingerprint(markedRows), submissionKey: body?.submissionKey, now: at });
     await put('exams', e);
     const newBadges = await checkBadges(p.id, { type: 'exam', pct }, now, timezoneOf(p));
     return { score: marksAwarded, total: totalMarks, pct, detail, newBadges };
