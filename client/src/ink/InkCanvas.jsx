@@ -22,6 +22,7 @@
 //   · stroke eraser, undo/redo, clear; serialisable strokes preserve
 //     {x,y,w,t,p,azimuth,altitude} when the browser exposes Pencil dynamics.
 // ─────────────────────────────────────────────────────────────────────────────
+import { strokeStarted, strokeMoved, strokeEnded, touchRejected } from './inputMetrics.js';
 import React, { useEffect, useImperativeHandle, useRef, useState, forwardRef, useCallback } from 'react';
 import { makePenFilter } from './smooth.js';
 
@@ -283,7 +284,11 @@ const InkCanvas = forwardRef(function InkCanvas({
 
     const mayDraw = (e) => {
       if (e.pointerType === 'pen') { penSeenRef.current = true; return true; }
-      if (e.pointerType === 'touch') return fingerRef.current === 'finger' || !penSeenRef.current;
+      if (e.pointerType === 'touch') {
+        const allowed = fingerRef.current === 'finger' || !penSeenRef.current;
+        if (!allowed) touchRejected();
+        return allowed;
+      }
       return true;   // mouse / trackpad
     };
 
@@ -327,6 +332,7 @@ const InkCanvas = forwardRef(function InkCanvas({
       };
       redoRef.current = [];
       predictedRef.current = [];
+      strokeStarted(e);
       clearLive();
       dirtyRef.current = true;
       scheduleFrame();
@@ -344,6 +350,7 @@ const InkCanvas = forwardRef(function InkCanvas({
       // being dropped on the floor.
       const coalesced = e.getCoalescedEvents ? e.getCoalescedEvents() : null;
       const events = coalesced && coalesced.length ? coalesced : [e];
+      strokeMoved(e, events);
       for (const ev of events) {
         const raw = local(ev);
         const pt = cur.filter(raw.x, raw.y, ev.timeStamp || 0);
@@ -389,6 +396,7 @@ const InkCanvas = forwardRef(function InkCanvas({
       if (toolRef.current !== 'eraser' && currentRef.current) {
         const { points } = currentRef.current;
         currentRef.current = null;
+        strokeEnded(e, { cancelled: e.type === 'pointercancel', kept: points.length });
         if (points.length) {
           strokesRef.current = [...strokesRef.current, { points }];
           paintStroke(ctxRef.current.base, points, inkRef.current);
