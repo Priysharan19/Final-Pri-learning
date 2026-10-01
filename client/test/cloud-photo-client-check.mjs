@@ -18,6 +18,7 @@ const ok = (cond, label) => { if (cond) pass++; else failures.push(label); };
 const eq = (a, b, label) => ok(JSON.stringify(a) === JSON.stringify(b), `${label} — expected ${JSON.stringify(b)}, got ${JSON.stringify(a)}`);
 
 const there = () => true;
+const ready = async () => ({ usable: true, available: true, state: 'ready', releaseSha: '3333333333333333333333333333333333333333' });
 const PHOTO = 'data:image/jpeg;base64,' + 'A'.repeat(4000);
 
 // ── 1 · What counts as a photo ───────────────────────────────────────────────
@@ -85,7 +86,7 @@ const off = await readPhotoWithCloud(PHOTO, { user: { cloudHandwriting: false },
 eq(called, 0, 'a photo is not sent unless the student turned server reading on');
 eq(off.reason, 'disabled', 'and the caller is told that is why, so it can fall back rather than report a failure');
 
-const outcome = await readPhotoWithCloud(PHOTO, { user: { cloudHandwriting: true }, transport: spy, prepare, available: there });
+const outcome = await readPhotoWithCloud(PHOTO, { user: { cloudHandwriting: true }, transport: spy, prepare, available: there, readiness: ready });
 ok(sent?.image?.startsWith('data:image/'), 'with it on, the prepared photo is sent');
 ok(sent.image !== PHOTO, 'and it is the re-encoded one, not the raw camera file');
 eq(Object.keys(sent.opts || {}), ['signal'], 'nothing travels beside it but the cancel signal');
@@ -93,9 +94,9 @@ eq(outcome.transcription.text.split('\n').length, 2, 'every line of the page com
 ok(outcome.photo.bytes > 0, 'and the result reports what was actually sent');
 
 const failing = { transcribeHandwriting: async () => { const e = new Error('down'); e.code = 'HANDWRITING_UNAVAILABLE'; throw e; } };
-const failed = await readPhotoWithCloud(PHOTO, { user: { cloudHandwriting: true }, transport: failing, prepare, available: there });
+const failed = await readPhotoWithCloud(PHOTO, { user: { cloudHandwriting: true }, transport: failing, prepare, available: there, readiness: ready });
 ok(failed?.error?.code === 'HANDWRITING_UNAVAILABLE', 'a refusal is reported so the caller can fall back to the on-device reader');
-const undecodable = await readPhotoWithCloud(PHOTO, { user: { cloudHandwriting: true }, transport: spy, prepare: async () => null, available: there });
+const undecodable = await readPhotoWithCloud(PHOTO, { user: { cloudHandwriting: true }, transport: spy, prepare: async () => null, available: there, readiness: ready });
 eq(undecodable.reason, 'unreadable', 'a photo that could not be prepared is never sent, and says why — a HEIC on Android lands here');
 
 console.log(failures.length
