@@ -63,6 +63,11 @@ const { nativeInk, nativeInkAvailable } = await import('../src/ink/native.js');
 console.log('Native ink bridge contract\n');
 
 check('shell is detected', nativeInkAvailable() === true);
+const savedInkHandler = window.webkit.messageHandlers.priInk;
+delete window.webkit.messageHandlers.priInk;
+check('missing native bridge fails closed as unavailable', nativeInkAvailable() === false);
+window.webkit.messageHandlers.priInk = savedInkHandler;
+check('restored native bridge becomes available again', nativeInkAvailable() === true);
 
 // ── geometry ─────────────────────────────────────────────────────────────────
 posted.length = 0;

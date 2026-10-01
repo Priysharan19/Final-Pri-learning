@@ -12,7 +12,7 @@ import { nativeInk, nativeInkAvailable, inferredNotationContext } from './native
 import { chooseNativeConsensus, hasReading, normalizedReadingText } from './nativeConsensus.js';
 import { recognizeWithStructuralDev } from '../../dev/devStructural.js';
 import { recognize, exprToLatex } from './recognizer.js';
-import { cloudReadingEnabled, readWithCloud, shouldSupersede, toReading } from './cloudReader.js';
+import { cloudReadingEnabled, readWithCloud, recordLocalHandwritingDiagnostics, shouldSupersede, toReading } from './cloudReader.js';
 import { useApp } from '../App.jsx';
 import { recognizeWithoutDetachedSideWork } from './runtimeSpatial.js';
 import { feedbackGeometry } from './feedbackGeometry.js';
@@ -20,6 +20,7 @@ import { ALPHABET } from './templates.js';
 import { classOfSymbol } from './classes.js';
 import { ensurePersonalLoaded, addPersonal } from './personal.js';
 import { MathText } from '../lib/latex.jsx';
+import { currentReleaseIdentity } from '../platform/releaseIdentity.js';
 
 const NICE = { pi: 'π', theta: 'θ', sqrt: '√', percent: '%' };
 const showSym = s => NICE[s] || s;
@@ -141,8 +142,15 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
   const focusedRef = useRef(null);
 
   useEffect(() => { overridesRef.current = overrides; }, [overrides]);
+  useEffect(() => {
+    recordLocalHandwritingDiagnostics({
+      nativeAvailable: NATIVE_INK,
+      releaseSha: currentReleaseIdentity()?.releaseSha || null
+    });
+  }, []);
 
   const publish = useCallback((r, strokes) => {
+    recordLocalHandwritingDiagnostics({ engine: r?.engine || null });
     setRec(r);
     // A server reading has no per-glyph symbols, so readingConfidence would
     // find an empty list and report a perfect 1/1 — which walked straight past
