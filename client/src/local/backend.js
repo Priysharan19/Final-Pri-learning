@@ -1038,11 +1038,11 @@ function indiaPick(p, trackId, ratings, reviews, now, { chapter = null, dotpoint
   // every such request to the dot-point branch, so the filter refused even the
   // chapters whose archive does hold questions (content certification, §06).
   // A difficulty the student named on a chapter they chose (the Class X
-  // library's D1–D4 buttons, a ?difficulty= link) is honoured — at the nearest
-  // authored rung, disclosed when it sits outside the track window — rather
-  // than clamped silently into the window.
+  // library's D1–D4 buttons, a ?difficulty= link) is held to the track window
+  // like every other request (adaptive-08) — and said so when it had to move —
+  // and the dot point is then chosen among those authored closest to it.
   const namedDifficulty = choice.explicit && difficulty != null && difficulty !== '' && Number.isFinite(Number(difficulty));
-  const namedRung = namedDifficulty ? Math.max(1, Math.min(4, Math.round(Number(difficulty)))) : null;
+  const namedRung = namedDifficulty ? clampToIndiaWindow(Number(difficulty), trackId, grade) : null;
   if (asked == null && !pyqOnly) {
     let dpPool = indiaDotpointStates(c, chapterRow, trackId, grade, ratings, now);
     // With a named difficulty, the dot point is chosen among those authored at
@@ -1077,12 +1077,12 @@ function indiaPick(p, trackId, ratings, reviews, now, { chapter = null, dotpoint
       state: { ...basis, trapPressure: trapPressureOf(st.traps, now), recentWrong: recentWrongOf(st) }, nowMs: now, rand
     });
   } else want = choice.difficulty;
-  want = namedDifficulty ? Math.max(1, Math.min(4, Math.round(want))) : clampToIndiaWindow(want, trackId, grade);
+  want = clampToIndiaWindow(want, trackId, grade);
   // "Past papers only" is a filter on what may be served, not a preference:
   // when the archive has nothing for the chapter the request is refused with a
   // reason, because serving an authored question under that filter would be
   // telling the student it came from a real paper.
-  const target = resolveIndiaTarget(c, { dotpoint: ordinal, difficulty: want, track: trackId, grade, pyqOnly, honourDifficulty: namedDifficulty });
+  const target = resolveIndiaTarget(c, { dotpoint: ordinal, difficulty: want, track: trackId, grade, pyqOnly });
   if (!target && pyqOnly) {
     throw Object.assign(
       new Error(`Pri's previous-year archive has no ${trackName} past-paper question for ${c.name} yet. Turn the past-papers-only filter off to practise authored questions on this chapter.`),
@@ -1095,15 +1095,14 @@ function indiaPick(p, trackId, ratings, reviews, now, { chapter = null, dotpoint
   let why = INDIA_WHY[choice.reason](c, choice.trap, trackName);
   if (target.pyq) why += ' This one is a real previous-year question.';
   if (target.dotpointIndex != null) why += ` Dot point: ${c.dotpoints[target.dotpointIndex]}`;
-  if (target.windowed === false) {
+  if (target.windowed === false) why += ` (Served at D${target.difficulty} — this dot point has no authored form at ${trackName} depth yet.)`;
+  if (namedDifficulty && Math.round(Number(difficulty)) !== namedRung) {
     const { floor, ceiling } = indiaDifficultyWindow(trackId, grade);
-    why += namedDifficulty && (want < floor || want > ceiling)
-      ? ` (Served at D${target.difficulty}, the level you chose — outside the usual ${trackName} range of D${floor}–D${ceiling}.)`
-      : ` (Served at D${target.difficulty} — this dot point has no authored form at ${trackName} depth yet.)`;
+    why += ` (You asked for D${Math.round(Number(difficulty))}; ${trackName} practice is held to D${floor}–D${ceiling}.)`;
   }
   return {
     chapter: c, target, dotpointKey: target.dotpointIndex != null ? indiaDotpointKey(c.id, target.dotpointIndex) : null,
-    retarget: sameTerms(target, () => resolveIndiaTarget(c, { dotpoint: ordinal, difficulty: want, track: trackId, grade, pyqOnly, honourDifficulty: namedDifficulty })),
+    retarget: sameTerms(target, () => resolveIndiaTarget(c, { dotpoint: ordinal, difficulty: want, track: trackId, grade, pyqOnly })),
     reason: choice.reason, reasonTag: choice.reasonTag, why, nextUp: choice.nextUp, trap: choice.trap,
     successTarget: choice.target, mastery: st.mastery || 0, explicit: choice.explicit, aheadUnlocked
   };

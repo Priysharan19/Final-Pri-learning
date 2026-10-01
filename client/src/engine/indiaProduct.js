@@ -236,25 +236,18 @@ export function resolveIndiaTarget(chapter, {
   track: rawTrack = 'cbse',
   grade = indiaChapterGrade(chapter) || 12,
   pyqOnly = false,
-  random = Math.random,
-  // A difficulty the student named explicitly (a "D4" button) is honoured at
-  // the nearest authored rung even outside the track window, and disclosed with
-  // `windowed: false`, instead of being clamped silently into the window.
-  honourDifficulty = false
+  random = Math.random
 } = {}) {
   if (!chapter) return null;
   const track = indiaTrack(rawTrack, grade);
   const ordinal = indiaDotpointIndex(chapter, dotpoint);
   const { floor, ceiling } = indiaDifficultyWindow(track.id, grade);
-  const explicit = honourDifficulty && difficulty != null && Number.isFinite(Number(difficulty));
-  const want = difficulty == null ? Math.max(floor, Math.min(2, ceiling))
-    : explicit ? Math.max(1, Math.min(4, Math.round(Number(difficulty))))
-      : Math.max(floor, Math.min(ceiling, Number(difficulty) || 2));
+  const want = difficulty == null ? Math.max(floor, Math.min(2, ceiling)) : Math.max(floor, Math.min(ceiling, Number(difficulty) || 2));
 
   if (ordinal == null && (track.id === 'jee-main' || track.id === 'jee-advanced')) {
     const pyqGenerator = `${track.id}-${chapter.id}`;
     if (hasJeePyqGenerator(pyqGenerator)) {
-      return { generator: pyqGenerator, difficulty: want, dotpointIndex: null, pyq: true, pyqArchive: 'jee-question-department', windowed: want >= floor && want <= ceiling };
+      return { generator: pyqGenerator, difficulty: want, dotpointIndex: null, pyq: true, pyqArchive: 'jee-question-department', windowed: true };
     }
   }
 
@@ -293,7 +286,7 @@ export function resolveIndiaTarget(chapter, {
   // response advertises it as generated, and refusing it turned an advertised,
   // selectable dot point into an INDIA_TARGET_UNCOVERED dead end (content
   // certification, doc §06).
-  const pool = explicit ? [...choices, ...below, ...above] : choices.length ? choices : below.length ? below : above;
+  const pool = choices.length ? choices : below.length ? below : above;
   if (!pool.length) return null;
   const gap = Math.min(...pool.map(c => Math.abs(c.difficulty - want)));
   return drawFrom(pool.filter(c => Math.abs(c.difficulty - want) === gap), random);

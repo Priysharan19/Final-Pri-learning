@@ -323,14 +323,15 @@ const student = await premiumProfile({ name: 'Cert Student', course: 'in', india
       if (r.error) { refused.push(`${chapter.id}@D${d} ${r.error.code}`); continue; }
       const row = await idb.get('questions', r.question.id);
       if (row.india?.chapterId !== chapter.id) offChapter.push(`${chapter.id}@D${d}`);
-      const gap = Math.min(...[...rungs].map(x => Math.abs(x - d)));
-      if (Math.abs(row.difficulty - d) !== gap) offRung.push(`${chapter.id}@D${d}→D${row.difficulty}`);
+      const held = Math.min(3, d); // CBSE practice is held to D1–D3 (adaptive-08)
+      const gap = Math.min(...[...rungs].map(x => Math.abs(x - held)));
+      if (Math.abs(row.difficulty - held) !== gap) offRung.push(`${chapter.id}@D${d}→D${row.difficulty}`);
       await dispatch('POST', `/practice/${r.question.id}/discard`, {});
     }
   }
   eq(refused.length, 0, `every Class X library button serves a question (refused: ${refused.slice(0, 4).join(', ')})`);
   eq(offChapter.length, 0, `every Class X library button serves its own chapter (${offChapter.slice(0, 4).join(', ')})`);
-  eq(offRung.length, 0, `every Class X library button serves the nearest authored rung to the one pressed (${offRung.slice(0, 4).join(', ')})`);
+  eq(offRung.length, 0, `every Class X library button serves the nearest authored rung to the one pressed, held to the CBSE window (${offRung.slice(0, 4).join(', ')})`);
   for (const [gen, chapterId] of [['c10-polynomial-zeroes', 'c10-polynomials'], ['c10-linear-graphs', 'c10-pair-linear-equations'], ['c10-triangles-current', 'c10-triangles'], ['c10-surface-area-combo', 'c10-surface-volume']]) {
     const r = await dispatch('POST', '/practice/next', { mode: 'topic', subtopic: gen, track: 'cbse', difficulty: 2 }).catch(e => ({ error: e }));
     const row = r.question ? await idb.get('questions', r.question.id) : null;
@@ -340,8 +341,8 @@ const student = await premiumProfile({ name: 'Cert Student', course: 'in', india
   {
     const r = await dispatch('POST', '/practice/next', { mode: 'topic', subtopic: 'c10-polynomials', track: 'cbse', difficulty: 4 });
     const row = await idb.get('questions', r.question.id);
-    eq(row.difficulty, 4, 'a named D4 on a CBSE chapter authored at D4 is served at D4, not clamped to D3');
-    ok(r.windowed === false && /level you chose/.test(r.why), 'and the reply discloses it sits outside the CBSE range');
+    eq(row.difficulty, 3, 'a named D4 on a CBSE chapter is held to the CBSE window (adaptive-08)');
+    ok(/You asked for D4; CBSE \/ NCERT practice is held to D1–D3/.test(r.why), `and the reply says so instead of moving it silently (${r.why})`);
     await dispatch('POST', `/practice/${r.question.id}/discard`, {});
   }
   // The link reader sends exactly what Practice always sent.

@@ -489,14 +489,22 @@ async function premiumProfile(spec) {
 }
 
 /** The rungs a request may legitimately be served at: the nearest authored ones. */
-function nearestRungs(p, difficulty) {
+function nearestRungs(p, asked) {
+  // Every request is held to the track window first (adaptive-08), then served
+  // at the nearest authored rung to that.
+  const { floor, ceiling } = indiaDifficultyWindow(p.track, p.grade ?? 10);
+  const difficulty = Math.max(floor, Math.min(ceiling, asked));
   const chapter = chapterById(p.chapterId);
   const covers = p.dotpoint == null ? (chapter?.covers || []) : (chapter?.covers || []).filter(c => c.dp.includes(p.dotpoint));
   const rungs = new Set(covers.flatMap(c => c.diff || []));
   if (p.dotpoint == null) for (const cell of pyqCellsFor(p.track, p.chapterId)) rungs.add(cell.difficulty);
   if (!rungs.size) return new Set();
-  const gap = Math.min(...[...rungs].map(r => Math.abs(r - difficulty)));
-  return new Set([...rungs].filter(r => Math.abs(r - difficulty) === gap));
+  // The resolver's preference: rungs inside the window, else below the floor,
+  // else above the ceiling — nearest to the held difficulty within that tier.
+  const all = [...rungs];
+  const tier = [all.filter(r => r >= floor && r <= ceiling), all.filter(r => r < floor), all.filter(r => r > ceiling)].find(t => t.length);
+  const gap = Math.min(...tier.map(r => Math.abs(r - difficulty)));
+  return new Set(tier.filter(r => Math.abs(r - difficulty) === gap));
 }
 
 /**
@@ -568,7 +576,7 @@ export async function certifyBackend(paths, { surfaces = true } = {}) {
   await use('cbse', 10);
   for (const chapter of NCERT_CLASS10_CONTENT) {
     for (const d of [1, 2, 3, 4]) {
-      const p = { chapterId: chapter.id, dotpoint: null, track: 'cbse' };
+      const p = { chapterId: chapter.id, dotpoint: null, track: 'cbse', grade: 10 };
       await send(`surface/class10-library/${chapter.id}@D${d}`, class10LibraryPracticeHref(chapter, d), { chapterId: chapter.id, difficulty: d, rungs: nearestRungs(p, d) });
     }
   }
