@@ -252,16 +252,19 @@ async function run() {
     const hero = login.slice(heroStart, splitStart);
     ok('the Login hero source carries no HSC or NSW copy', heroStart > 0 && splitStart > heroStart && !/HSC|NSW|NESA/.test(hero));
     ok('the sign-up form opens on the India course', /course: 'in'/.test(login) && /STUDY_DEFAULT/.test(login));
-    // The copy for this control moved into the translation catalogue when the
-    // app became bilingual, so the check follows it there rather than dropping
-    // the half it can no longer see in the page: the control is still rendered
-    // (by its key), its English words are still those words, and the Australian
-    // form is still behind the collapsed flag.
+    // Australia remains an explicit secondary path off the India-first course
+    // step. KALP-03 made the link role-aware, so prove the full student/teacher
+    // translation contract rather than requiring the removed student-only call.
     const enStrings = readFileSync(`${CLIENT}src/i18n/strings.en.js`, 'utf8');
+    const hiStrings = readFileSync(`${CLIENT}src/i18n/strings.hi.js`, 'utf8');
     ok('the Australian option is a secondary, collapsed control',
-      /t\('login\.studyingInAustralia'\)/.test(login)
+      /createStep === 1 && !australia && \(/.test(login)
+      && /t\(form\.role === 'teacher' \? 'login\.teachingInAustralia' : 'login\.studyingInAustralia'\)/.test(login)
+      && /createStep === 1 && australia && \(/.test(login)
       && /'login\.studyingInAustralia': 'Studying in Australia\?/.test(enStrings)
-      && /australia && \(/.test(login));
+      && /'login\.teachingInAustralia': 'Teaching in Australia\?/.test(enStrings)
+      && /'login\.studyingInAustralia':/.test(hiStrings)
+      && /'login\.teachingInAustralia':/.test(hiStrings));
     ok('the cloud sign-in routes to the cloud account panel', /CLOUD_ACCOUNT_ROUTE = '\/settings#cloud-account-title'/.test(login));
 
     for (const page of ['Home.jsx', 'History.jsx', 'Favorites.jsx', 'Progress.jsx']) {

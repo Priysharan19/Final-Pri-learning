@@ -90,14 +90,7 @@ export const flow = {
     await page.locator('.user-chip').click();
     await page.getByRole('menuitem', { name: 'Switch profile' }).click();
     await page.waitForSelector('.acct-list', { timeout: 30000 });
-    await page.getByRole('button', { name: 'Add another profile' }).click();
-    await page.waitForSelector('.sso-btn', { timeout: 30000 });
-    await page.getByRole('button', { name: 'Continue without an email' }).click();
-    await page.waitForSelector('.auth-card input.input', { timeout: 30000 });
-    await page.getByPlaceholder('e.g. Priysharan').fill('Maryam Mirzakhani');
-    await page.getByRole('button', { name: 'Start learning' }).click();
-    // Switching profiles keeps the route it was done from, so it is the account
-    // chip that says who is signed in now, not the Home greeting.
+    await createProfile({ name: 'Maryam Mirzakhani', year: 10, fromPicker: true });
     await page.waitForSelector('.user-chip:has-text("Maryam")', { timeout: 30000 });
     await page.goto(`${base}/settings`, { waitUntil: 'domcontentloaded' });
     await page.waitForSelector('.card:has-text("Personal templates learned")', { timeout: 30000 });

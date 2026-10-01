@@ -22,11 +22,19 @@ async function visibleSidebarLabels(page) {
 
 async function createTeacher(page) {
   await page.getByRole('button', { name: /Add another/i }).click();
-  await page.getByRole('button', { name: /Continue without an email/i }).click();
-  await page.waitForSelector('#signup-name');
-  await page.locator('#signup-name').fill('KALP02 Teacher');
+  await page.waitForSelector('[data-onboarding-step="1"]');
   await page.getByRole('button', { name: 'Teacher', exact: true }).click();
-  await page.getByRole('button', { name: 'Start learning' }).click();
+  await page.locator('.auth-card .btn-primary').click();
+  await page.waitForSelector('[data-onboarding-step="2"]');
+  await page.locator('#signup-track').selectOption('10');
+  await page.locator('.auth-card .btn-primary').click();
+  await page.waitForSelector('[data-onboarding-step="3"]');
+  await page.locator('#signup-name').fill('KALP02 Teacher');
+  await page.locator('.auth-card .btn-primary').click();
+  await page.waitForSelector('[data-onboarding-step="4"]');
+  await page.locator('.auth-card .btn-primary').click();
+  await page.waitForSelector('[data-onboarding-step="5"]');
+  await page.getByRole('button', { name: 'Open Teacher Workspace' }).click();
 }
 export const flow = {
   id: 'kalp02-navigation',
