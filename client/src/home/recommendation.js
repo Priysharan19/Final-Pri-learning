@@ -14,7 +14,6 @@ const item = (kind, priority, id, data = {}, destination = '/practice', dueAt = 
 const byPriority = (a, b) =>
   b.priority - a.priority
   || (a.dueAt ?? Infinity) - (b.dueAt ?? Infinity)
-  || String(a.kind).localeCompare(String(b.kind))
   || String(a.id || '').localeCompare(String(b.id || ''));
 
 function assignment(row, now) {
@@ -59,21 +58,21 @@ function task(row, now) {
 
 export function resolveHomeRecommendation({
   user, stats = null, dueCount = 0, tasks = [], exams = [], resume = null,
-  assignments = [], online = true, cloudState = 'unavailable', now = Date.now()
+  assignments = [], online = true, cloudReady = true, now = Date.now()
 } = {}) {
   if (!user || user.role === 'teacher') return { primary: null, alternatives: [] };
   const rows = [];
 
-  const exam = (Array.isArray(exams) ? exams : []).filter(x => !x?.finished_at)
+  const exam = exams.filter(x => !x?.finished_at)
     .sort((a, b) => (Number(b?.created_at) || 0) - (Number(a?.created_at) || 0))[0];
   if (exam) rows.push(item('exam', 100, exam.id, { title: exam.title || 'Practice exam' }, exam.id ? '/exams/' + encodeURIComponent(exam.id) : '/exams'));
 
-  if (online && cloudState === 'ready') for (const row of Array.isArray(assignments) ? assignments : []) {
+  if (online && cloudReady) for (const row of assignments) {
     const item = assignment(row, now);
     if (item) rows.push(item);
   }
 
-  for (const row of Array.isArray(tasks) ? tasks : []) {
+  for (const row of tasks) {
     const item = task(row, now);
     if (item) rows.push(item);
   }
@@ -92,18 +91,17 @@ export function resolveHomeRecommendation({
   const done = Math.max(0, Number(user?.today?.questions) || 0);
   const goal = Math.max(1, Number(user?.dailyGoal) || 10);
   const hasHistory = Math.max(0, Number(stats?.totals?.attempts) || 0) > 0 || done > 0;
-  if (done > 0 && done < goal) rows.push(item('daily-goal', 70, 'daily-goal', { done, goal, remaining: goal - done }));
+  if (done > 0 && done < goal) { const n = goal - done; rows.push(item('daily-goal', 70, 'daily-goal', { done, goal, remaining: n, n, count: n })); }
 
   const adaptive = stats?.recommendation || stats?.priorities?.[0];
   if (adaptive && hasHistory) rows.push(item('adaptive', 60, adaptive.subtopic || adaptive.id || 'adaptive', { topic: adaptive.name || '' }));
 
   if (!hasHistory) rows.push(item('first-practice', 55, 'first-practice', { year: user.year }, '/practice', null, !online));
 
-  rows.push(item('smart-practice', 50, 'smart-practice'));
+  rows.push(item('smart-practice', 50, 'smart-practice', {}, '/practice', null, !online));
   rows.sort(byPriority);
   const primary = rows[0] || null;
-  const alternatives = rows.filter((row, i) => i && rows.findIndex(x => x.kind === row.kind && x.id === row.id) === i).slice(0, 2);
-  return { primary, alternatives };
+  return { primary, alternatives: rows.slice(1, 3) };
 }
 
 export const HOME_RECOMMENDATION_POLICY = {

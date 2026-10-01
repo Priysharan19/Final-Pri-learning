@@ -18,7 +18,7 @@ const base = {
   user: student,
   stats: { totals: { attempts: 12 }, priorities: [{ id: 'algebra', name: 'Algebra' }] },
   dueCount: 0, tasks: [], exams: [], resume: null,
-  assignments: [], online: true, cloudState: 'ready', now
+  assignments: [], online: true, cloudReady: true, now
 };
 
 let passed = 0;
@@ -109,7 +109,7 @@ check('cloud assignments are excluded while offline', () => {
 
 check('cloud failure leaves local recommendation usable', () => {
   const decision = resolveHomeRecommendation({
-    ...base, cloudState: 'error',
+    ...base, cloudReady: false,
     assignments: [{ id: 'a4', classId: 'c1', title: 'Unavailable', dueAt: now - 1000 }]
   });
   assert.ok(decision.primary);
@@ -202,11 +202,11 @@ check('Home exposes exactly one semantic primary recommendation region and CTA',
 });
 
 check('primary recommendation appears before manual generator in source order', () => {
-  assert.ok(home.indexOf('<PrimaryAction') < home.indexOf('className="genbar"'));
+  assert.ok(home.indexOf('<HomeAction primary') < home.indexOf('className="genbar"'));
 });
 
 check('cloud failure is bounded and local learning remains rendered', () => {
-  assert.match(home, /cloudData\.state === 'offline' \|\| cloudData\.state === 'error'/);
+  assert.match(home, /assignments === false/);
   assert.match(home, /home\.cloudUnavailable/);
 });
 
@@ -216,9 +216,8 @@ check('teacher routing remains outside student Home', () => {
 
 check('English and Hindi include command-centre copy', () => {
   for (const source of [en, hi]) {
-    assert.match(source, /'home\.nextUp'/);
     assert.match(source, /'home\.next\.firstIndia'/);
-    assert.match(source, /'home\.reason\.smartPracticeOffline'/);
+    assert.match(source, /'home\.reason\.practiceOffline'/);
   }
 });
 

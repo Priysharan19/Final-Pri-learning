@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
-import { cloud, cloudAvailable } from '../platform/cloudTransport.js';
+import { cloud } from '../platform/cloudTransport.js';
 import { resolveHomeRecommendation } from '../home/recommendation.js';
 import { useApp } from '../App.jsx';
 import { dotpointAvailable, practiceTargetAvailable, topicAvailability } from '../engine/curriculumAvailability.js';
@@ -39,7 +39,7 @@ export default function Home() {
   const tx = useTx();
   const [local, setLocal] = useState(null);
   const [curriculum, setCurriculum] = useState(null);
-  const [cloudData, setCloudData] = useState({ assignments: [], state: 'unavailable' });
+  const [assignments, setAssignments] = useState(null);
   const stats = local?.stats || null;
   const [online, setOnline] = useState(() => typeof navigator === 'undefined' ? true : navigator.onLine !== false);
   const [open, setOpen] = useState(false);
@@ -88,27 +88,18 @@ export default function Home() {
 
   useEffect(() => {
     let live = true;
-    const enabled = cloudAvailable();
     const load = async () => {
-      if (!enabled) {
-        if (live) setCloudData({ assignments: [], state: 'unavailable' });
-        return;
-      }
       if (!online) {
-        if (live) setCloudData({ assignments: [], state: 'offline' });
+        if (live) setAssignments(false);
         return;
       }
       try {
         const [me, result] = await Promise.all([cloud.me(), cloud.assignments()]);
         if (!live) return;
-        const student = me?.account?.role === 'student';
-        setCloudData({
-          assignments: student && Array.isArray(result?.assignments) ? result.assignments : [],
-          state: student ? 'ready' : 'unavailable'
-        });
+        setAssignments(me?.account?.role === 'student' && Array.isArray(result?.assignments) ? result.assignments : null);
       } catch (err) {
         if (!live) return;
-        setCloudData({ assignments: [], state: err?.status === 401 ? 'unavailable' : 'error' });
+        setAssignments(err?.status === 401 || err?.code === 'CLOUD_DISABLED' ? null : false);
       }
     };
 
@@ -213,29 +204,29 @@ export default function Home() {
 
   const homeDecision = useMemo(() => local ? resolveHomeRecommendation({
     user, stats, dueCount, tasks: local.tasks, exams: local.exams, resume: local.resume,
-    assignments: cloudData.assignments, online, cloudState: cloudData.state
-  }) : { primary: null, alternatives: [] }, [local, user, stats, dueCount, cloudData, online]);
+    assignments: Array.isArray(assignments) ? assignments : [], online, cloudReady: Array.isArray(assignments)
+  }) : { primary: null, alternatives: [] }, [local, user, stats, dueCount, assignments, online]);
 
   return (
     <div className="home-wrap">
       <h1 className="home-greet">{tx('home.greeting', { greeting, name: <b>{firstName}</b> })}</h1>
       <Tagline />
 
-      <PrimaryAction action={homeDecision.primary} nav={nav} />
-      {(cloudData.state === 'offline' || cloudData.state === 'error') && (
+      <HomeAction primary action={homeDecision.primary} nav={nav} />
+      {assignments === false && (
         <div className="card home-cloud-note" role="status">
           {t('home.cloudUnavailable')}
         </div>
       )}
 
-      <div className="home-cards home-support-grid" aria-label={t('nav.practice')}>
+      <div className="home-cards home-support-grid">
         <GoalCard user={user} activity={stats?.activity || []} onGo={() => nav('/practice')} />
         {homeDecision.alternatives.map(item => (
-          <SupportingAction key={item.kind + ':' + item.id} action={item} nav={nav} />
+          <HomeAction key={item.kind + ':' + item.id} action={item} nav={nav} />
         ))}
       </div>
 
-      <section className="home-manual" aria-labelledby="home-manual-title">
+      <section className="home-manual">
         <h2 id="home-manual-title">{t('nav.practice')}</h2>
       </section>
 
@@ -395,8 +386,8 @@ const WORK_REASONS = {
 function actionCopy(action, user, t) {
   const d = action.data || {};
   const genericTitle = {
-    'practice-resume': 'home.next.resumePractice', reviews: 'home.next.reviews',
-    'daily-goal': 'home.next.dailyGoal',
+    'practice-resume': 'home.next.resumePractice', reviews: 'nav.review',
+    'daily-goal': 'home.goalRemaining',
     'first-practice': user.course === 'in' ? 'home.next.firstIndia' : 'home.next.firstNsw',
     adaptive: 'nav.practice', 'smart-practice': 'nav.practice'
   }[action.kind];
@@ -405,44 +396,37 @@ function actionCopy(action, user, t) {
     : action.kind === 'assignment' || action.kind === 'task' ? WORK_REASONS[d.status]
       : action.kind.endsWith('resume') ? 'home.reason.resume'
       : action.kind === 'reviews' ? 'home.reviewDue'
-      : action.kind === 'daily-goal' ? 'home.reason.dailyGoal'
+      : action.kind === 'daily-goal' ? 'home.goalTarget'
       : action.kind === 'adaptive' ? 'home.reason.adaptive'
-      : action.kind === 'first-practice' ? (action.offlineCaveat ? 'home.reason.firstPracticeOffline' : 'home.reason.firstPractice')
-      : action.offlineCaveat ? 'home.reason.smartPracticeOffline' : 'home.reason.smartPractice';
+      : action.offlineCaveat ? 'home.reason.practiceOffline' : 'home.reason.practice';
   const cta = action.kind === 'reviews' ? 'nav.review'
     : ['exam', 'assignment', 'task', 'task-resume', 'practice-resume'].includes(action.kind) ? 'common.continue' : 'nav.practice';
   return { title, reason: t(reason, { ...d, date: action.dueAt ? new Date(action.dueAt).toLocaleDateString() : '' }), cta: t(cta) };
 }
 
-function PrimaryAction({ action, nav }) {
+function HomeAction({ action, nav, primary }) {
   const { user } = useApp();
   const t = useT();
   if (!action) return null;
   const copy = actionCopy(action, user, t);
+  if (!primary) return (
+    <article className="home-card">
+      <strong>{copy.title}</strong>
+      <p>{copy.reason}</p>
+      <button className="btn btn-ghost btn-sm" onClick={() => nav(action.destination)}>{copy.cta}</button>
+    </article>
+  );
   const reasonId = 'home-primary-reason';
   return (
     <section className="card home-command" data-home-primary aria-labelledby="home-next-title">
       <div className="home-command-copy">
-        <div className="home-command-kicker">{t('home.nextUp')}</div>
+        <div className="home-command-kicker">{t('nav.practice')}</div>
         <h2 id="home-next-title">{copy.title}</h2>
         <p id={reasonId}>{copy.reason}</p>
       </div>
-      <button type="button" className="btn btn-primary home-command-cta" data-home-primary-cta
+      <button className="btn btn-primary home-command-cta" data-home-primary-cta
         aria-describedby={reasonId} onClick={() => nav(action.destination)}>{copy.cta}</button>
     </section>
-  );
-}
-
-function SupportingAction({ action, nav }) {
-  const { user } = useApp();
-  const t = useT();
-  const copy = actionCopy(action, user, t);
-  return (
-    <article className="home-card home-support-action">
-      <strong>{copy.title}</strong>
-      <p>{copy.reason}</p>
-      <button type="button" className="btn btn-ghost btn-sm" onClick={() => nav(action.destination)}>{copy.cta}</button>
-    </article>
   );
 }
 

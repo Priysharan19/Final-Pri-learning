@@ -2413,42 +2413,24 @@ const routes = {
   },
 
   // ---- practice ----
-  // KALP-04 read-only continuity summary. Home needs to know whether there is
-  // real unfinished local Practice without calling /practice/next, because that
-  // write-oriented route may legitimately create a new question when none is
-  // resumable. This returns identifiers/context only — never question content.
+  // KALP-04 continuity summary: identifiers/context only — never question content.
   'GET /practice/resume': async () => {
     const p = await requireProfile();
-    const rows = await byIndex('questions', 'pid', p.id);
-    const row = rows
+    const row = (await byIndex('questions', 'pid', p.id))
       .filter(r => r && !r.answered && !r.discardedAt && !r.examId && r.mode !== 'rush' && r.mode !== 'match')
-      .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))[0] || null;
+      .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))[0];
     if (!row) return { resume: null };
-
-    if (row.taskId) {
-      const task = await get('tasks', row.taskId);
-      return {
-        resume: {
-          kind: 'task',
-          questionId: row.id,
-          taskId: row.taskId,
-          title: task?.title || 'Practice task',
-          createdAt: row.createdAt || null,
-          destination: '/practice?task=' + encodeURIComponent(row.taskId)
-        }
-      };
-    }
-
-    return {
-      resume: {
-        kind: 'practice',
-        questionId: row.id,
-        subtopic: row.india?.chapterId || row.payload?.subtopic || row.subtopic || null,
-        difficulty: row.difficulty || null,
-        createdAt: row.createdAt || null,
-        destination: '/practice'
-      }
-    };
+    const task = row.taskId ? await get('tasks', row.taskId) : null;
+    return { resume: {
+      kind: row.taskId ? 'task' : 'practice',
+      questionId: row.id,
+      taskId: row.taskId || null,
+      title: task?.title || '',
+      subtopic: row.india?.chapterId || row.payload?.subtopic || row.subtopic || null,
+      difficulty: row.difficulty || null,
+      createdAt: row.createdAt || null,
+      destination: row.taskId ? '/practice?task=' + encodeURIComponent(row.taskId) : '/practice'
+    } };
   },
 
   'POST /practice/next': async (body) => {
