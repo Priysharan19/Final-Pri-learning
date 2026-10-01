@@ -76,6 +76,18 @@ Learner Evidence Graph, calibration/abstention, prerequisite/misconception state
 ### MATH_TRUTH_HANDWRITING_ASSESSMENT.md
 Multimodal own-work understanding, answer-blind recognition, mathematical truth stack, first-break authority, rubric/ECF/alternative routes, proof authority, generated-question admission and psychometrics.
 
+### PSYCHOMETRICS_AND_ADAPTIVE_MEASUREMENT.md
+Evidence-centred measurement, construct separation, IRT/CDM/KT model ladder, Q-matrix validation, question-family calibration, uncertainty, information gain, adaptive-testing constraints and family-held-out validation.
+
+### SEMANTIC_LEARNING_DATA_CONTRACTS.md
+Implementable identities and event semantics for knowledge components, curriculum objectives, question families, misconception opportunities, assistance provenance, transfer tiers, replayable learner state, corrections and experiments.
+
+### EXPERIMENTATION_AND_EFFICACY.md
+Causal evidence ladder, randomized experiment design, delayed independent outcomes, held-out transfer, cluster/carryover handling, guardrails, bandits, off-policy logging, heterogeneous effects and external efficacy.
+
+### COMPETITIVE_AND_FRONTIER_SYSTEMS.md
+Reverse-engineering of useful patterns from ALEKS, MATHia/Cognitive Tutor, IXL, ASSISTments, Duolingo, Khan/Khanmigo, Study Mode and research frontiers, with vendor-capability evidence separated from independent efficacy.
+
 ### INDIA_MULTILINGUAL_OFFLINE_RIGHTS.md
 Multilingual mathematics, curriculum/version authority, India offline/shared-device conditions, guest continuity, sync/content packs, NCERT/CBSE rights and India efficacy constraints.
 
@@ -90,6 +102,23 @@ Unresolved empirical questions, priority benchmark/experiment sequence and resea
 
 ### SOURCE_REGISTER.md
 Evidence map with source class, use and limitations.
+
+
+## Domain routing for agents
+
+Read these modules in addition to the architecture when the mission touches the corresponding surface:
+
+| Mission surface | Mandatory research module |
+| --- | --- |
+| mastery, adaptive difficulty, diagnostic assessment, next-question ranking | PSYCHOMETRICS_AND_ADAPTIVE_MEASUREMENT.md |
+| attempts/events/storage semantics, learner-model migration, knowledge graph, question identity | SEMANTIC_LEARNING_DATA_CONTRACTS.md |
+| A/B tests, experimentation, intervention policy, bandits, learning-effect claims | EXPERIMENTATION_AND_EFFICACY.md |
+| new AI-learning feature justified by another product/paper | COMPETITIVE_AND_FRONTIER_SYSTEMS.md |
+| tutoring dialogue, hints, worked examples, mistake repair | AI_TUTORING_AND_INTERVENTIONS.md |
+| retention, prerequisites, misconceptions, transfer, learner state | LEARNER_STATE_RETENTION_CAUSALITY.md |
+| grading, handwriting, proof, generated assessment | MATH_TRUTH_HANDWRITING_ASSESSMENT.md |
+
+When several surfaces overlap, read all relevant modules. Do not let one research file override a stricter current implementation/test invariant.
 
 ## Live source modules
 
@@ -141,7 +170,9 @@ Check #178 before relying on any decision because it can be superseded.
 
 ## Broad research status
 
-As of 1 October 2026, broad speculative feature/literature discovery is saturated.
+As of 1 October 2026, **generic feature ideation is saturated; scientific operationalization is not**.
+
+The architectural search has converged enough that another list of futuristic features has low value. The research programme has therefore deepened into psychometrics, semantic learning-data contracts, causal experimentation and competitor/frontier mechanism analysis.
 
 That does not mean “research is finished forever.”
 
@@ -155,9 +186,14 @@ It means the highest-value next work is now:
 - randomized mechanism experiments;
 - teacher/guardian field trials;
 - India device/connectivity evidence;
-- fresh external evidence that materially changes a decision.
+- fresh external evidence that materially changes a decision;
+- psychometric calibration and Q-matrix/knowledge-graph validation;
+- event-ledger/replay validation before learner-model replacement;
+- item-family calibration, exposure and held-out family generalization;
+- causal policy evidence before personalized intervention learning;
+- competitive/frontier monitoring only when it reveals a mechanism or failure mode that can change Pri.
 
-Do not restart generic “dream app feature” research unless new evidence can change an authority boundary, safety rule, evaluation method, regulatory obligation or accepted mechanism.
+Do not restart generic “dream app feature” research unless new evidence can change an authority boundary, safety rule, measurement model, semantic contract, evaluation method, regulatory obligation or accepted mechanism.
 
 ## Core agent test
 
