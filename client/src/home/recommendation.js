@@ -180,7 +180,7 @@ export function resolveHomeRecommendation({
   }
 
   const adaptive = stats?.recommendation || stats?.priorities?.[0] || null;
-  if (adaptive) {
+  if (adaptive && hasHistory) {
     candidates.push(action('adaptive', 60, {
       id: adaptive.subtopic || adaptive.id || 'adaptive',
       titleKey: 'home.next.adaptive',

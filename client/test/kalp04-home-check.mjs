@@ -81,7 +81,7 @@ check('partial daily goal beats generic adaptive work', () => {
 
 check('new student receives a real first practice action', () => {
   const row = selected({
-    stats: { totals: { attempts: 0 } },
+    stats: { totals: { attempts: 0 }, priorities: [{ id: 'zero-history', name: 'Algebra' }] },
     user: { ...student, today: { questions: 0 } }
   });
   assert.equal(row.kind, 'first-practice');
