@@ -28,7 +28,7 @@ function sourceFiles(base, dir = base, out = new Map()) {
     if (name === '.DS_Store' || rel === 'Resources/Web' || rel.startsWith('Resources/Web/')) continue;
     const stat = statSync(full);
     if (stat.isDirectory()) sourceFiles(base, full, out);
-    else if (name.endsWith('.swift') || rel === 'Package.swift' || rel === 'Info.plist' ||
+    else if (name.endsWith('.swift') || rel === 'Package.swift' || rel === 'Info.plist' || rel === 'PrivacyInfo.xcprivacy' ||
       rel.startsWith('Resources/Models/') || rel.startsWith('Assets.xcassets/')) out.set(rel, readFileSync(full));
   }
   return out;

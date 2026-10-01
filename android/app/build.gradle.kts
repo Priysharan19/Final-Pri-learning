@@ -73,10 +73,25 @@ android {
 
     sourceSets["main"].assets.srcDir(generatedWeb)
 
+    // Upload-key signing for release builds comes only from the CI environment
+    // (Play App Signing holds the app signing key). Nothing secret is in the repo;
+    // without these variables a release build is simply unsigned.
+    val keystore = System.getenv("PRI_ANDROID_UPLOAD_KEYSTORE")
+    signingConfigs {
+        if (!keystore.isNullOrBlank()) {
+            create("upload") {
+                storeFile = file(keystore)
+                storePassword = System.getenv("PRI_ANDROID_UPLOAD_STORE_PASSWORD")
+                keyAlias = System.getenv("PRI_ANDROID_UPLOAD_KEY_ALIAS")
+                keyPassword = System.getenv("PRI_ANDROID_UPLOAD_KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
-            // Signing comes from CI secrets / Play App Signing, never the repo.
+            if (!keystore.isNullOrBlank()) signingConfig = signingConfigs.getByName("upload")
         }
     }
 
