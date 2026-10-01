@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { MathText } from '../lib/latex.jsx';
+import { useT, useTx } from '../i18n/index.js';
 import {
   NCERT_CLASS8_LINEAR_CONTENT,
   NCERT_CLASS8_LINEAR_TOPPER_NOTES,
@@ -9,13 +10,27 @@ import {
   NCERT_CLASS8_LINEAR_EXERCISE_ANSWER_AUDIT
 } from '../engine/ncert/class8-linear-production.js';
 
+// Tab ids with the catalogue key (and its values) for each label.
 const TABS = Object.freeze({
-  notes: 'Topper notes',
-  examples: 'Worked examples',
-  ex21: 'Exercise 2.1',
-  ex22: 'Exercise 2.2',
-  coverage: 'Source coverage'
+  notes: ['ncert.topperNotes'],
+  examples: ['ncert.workedExamples'],
+  ex21: ['ncert.exercise', { n: '2.1' }],
+  ex22: ['ncert.exercise', { n: '2.2' }],
+  coverage: ['ncert.sourceCoverage']
 });
+
+// i18n-exempt-start: the 60-second final check is a list of linear-equation solving rules — maths content that stays English by design
+const FINAL_CHECK = [
+  'Equation means equality; expression does not contain =.',
+  'Linear here means one variable with highest power 1.',
+  'Transposition is shorthand for doing the same operation to both sides.',
+  'Clear fractions with the LCM before solving when it simplifies the equation.',
+  'Expand every term in a bracket before combining like terms.',
+  'For decimals, scale the whole equation by 10, 100, … or convert exactly to fractions.',
+  'Collect variable terms on one side and constants on the other.',
+  'Finish by checking the original LHS and RHS by substitution.'
+];
+// i18n-exempt-end
 
 function Text({ children }) {
   return <MathText text={String(children ?? '')} />;
@@ -27,6 +42,8 @@ function Answer({ item }) {
 }
 
 function VerificationStrip() {
+  const t = useT();
+  const tx = useTx();
   const audit = NCERT_CLASS8_LINEAR_EXERCISE_ANSWER_AUDIT;
   const ex21 = audit.confirmed.filter(x => x.source.includes('2.1'));
   const ex22 = audit.confirmed.filter(x => x.source.includes('2.2'));
@@ -34,16 +51,16 @@ function VerificationStrip() {
     <div className="card" style={{ padding: 16, marginBottom: 14 }}>
       <div className="spread" style={{ gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' }}>
         <div>
-          <div className="sc-label" style={{ margin: 0 }}>ATTACHED ANSWER KEY · INDEPENDENTLY VERIFIED</div>
-          <h3 style={{ margin: '5px 0 3px' }}>20 / 20 answers agree with the uploaded NCERT equations</h3>
-          <div className="muted">Pri Learning stores the PDF equation as source-of-truth and the supplied image as an independent answer-key check.</div>
+          <div className="sc-label" style={{ margin: 0 }}>{t('ncert.leKeyEyebrow')}</div>
+          <h3 style={{ margin: '5px 0 3px' }}>{t('ncert.leKeyTitle')}</h3>
+          <div className="muted">{t('ncert.leKeyBody')}</div>
         </div>
-        <span className="tag tag-brand">0 mismatches</span>
+        <span className="tag tag-brand">{t('ncert.leMismatches')}</span>
       </div>
       <div className="grid cols-2" style={{ gap: 12, marginTop: 12 }}>
-        {[['Exercise 2.1', ex21], ['Exercise 2.2', ex22]].map(([title, rows]) => (
+        {[['2.1', ex21], ['2.2', ex22]].map(([title, rows]) => (
           <div key={title} style={{ padding: 12, border: '1px solid var(--line)', borderRadius: 12 }}>
-            <b>{title}</b>
+            <b>{t('ncert.exercise', { n: title })}</b>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,minmax(0,1fr))', gap: 6, marginTop: 8 }}>
               {rows.map((row, i) => (
                 <div key={row.source} style={{ fontSize: 12 }}>
@@ -55,13 +72,17 @@ function VerificationStrip() {
         ))}
       </div>
       <div className="muted" style={{ marginTop: 10 }}>
-        In particular, Exercise 2.2 Q3 is read from the PDF as <Text>{'$x+7-\\frac{8x}{3}=\\frac{17}{6}-\\frac{5x}{2}$'}</Text>, which gives <Text>{'$x=-5$'}</Text> and matches the supplied answer image.
+        {tx('ncert.leQ3Note', {
+          equation: <Text>{'$x+7-\\frac{8x}{3}=\\frac{17}{6}-\\frac{5x}{2}$'}</Text>,
+          solution: <Text>{'$x=-5$'}</Text>
+        })}
       </div>
     </div>
   );
 }
 
 function Notes() {
+  const t = useT();
   return (
     <div style={{ display: 'grid', gap: 10 }}>
       {NCERT_CLASS8_LINEAR_TOPPER_NOTES.map((note, i) => (
@@ -80,25 +101,16 @@ function Notes() {
               </div>
             )}
             <div style={{ marginTop: 11 }}>
-              <span className="tag tag-brand">Topper edge</span>
+              <span className="tag tag-brand">{t('ncert.topperEdge')}</span>
               <div style={{ marginTop: 6 }}><Text>{note.edge}</Text></div>
             </div>
           </div>
         </details>
       ))}
       <div className="card" style={{ padding: 15 }}>
-        <div className="sc-label" style={{ margin: 0 }}>60-SECOND FINAL CHECK</div>
+        <div className="sc-label" style={{ margin: 0 }}>{t('ncert.leFinalCheck')}</div>
         <div className="grid cols-2" style={{ marginTop: 9, gap: 7 }}>
-          {[
-            'Equation means equality; expression does not contain =.',
-            'Linear here means one variable with highest power 1.',
-            'Transposition is shorthand for doing the same operation to both sides.',
-            'Clear fractions with the LCM before solving when it simplifies the equation.',
-            'Expand every term in a bracket before combining like terms.',
-            'For decimals, scale the whole equation by 10, 100, … or convert exactly to fractions.',
-            'Collect variable terms on one side and constants on the other.',
-            'Finish by checking the original LHS and RHS by substitution.'
-          ].map((x, i) => <div key={x}><b>{i + 1}.</b> <Text>{x}</Text></div>)}
+          {FINAL_CHECK.map((x, i) => <div key={x}><b>{i + 1}.</b> <Text>{x}</Text></div>)}
         </div>
       </div>
     </div>
@@ -106,9 +118,10 @@ function Notes() {
 }
 
 function WorkedExamples() {
+  const t = useT();
   return (
     <div>
-      <div className="sc-label" style={{ margin: '0 0 9px' }}>ALL WORKED EXAMPLES PRESENT IN THE UPLOADED PDF</div>
+      <div className="sc-label" style={{ margin: '0 0 9px' }}>{t('ncert.leWorkedEyebrow')}</div>
       <div style={{ display: 'grid', gap: 11 }}>
         {NCERT_CLASS8_LINEAR_WORKED_EXAMPLES.map((ex, i) => (
           <details key={ex.id} className="card" open={i === 0} style={{ padding: '13px 15px' }}>
@@ -125,8 +138,8 @@ function WorkedExamples() {
               ))}
             </div>
             <div className="spread" style={{ marginTop: 11, gap: 12, flexWrap: 'wrap' }}>
-              <div><b>Final answer:</b> <Text>{ex.answer}</Text></div>
-              <span className="tag tag-brand">Pri topper method</span>
+              <div><b>{t('ncert.finalAnswer')}</b> <Text>{ex.answer}</Text></div>
+              <span className="tag tag-brand">{t('ncert.lePriTopperMethod')}</span>
             </div>
             <div className="muted" style={{ marginTop: 7 }}><Text>{ex.topper}</Text></div>
           </details>
@@ -137,20 +150,21 @@ function WorkedExamples() {
 }
 
 function Exercise({ title, items }) {
+  const t = useT();
   return (
     <div>
       <div className="spread" style={{ marginBottom: 10, gap: 12, flexWrap: 'wrap' }}>
         <div>
-          <div className="sc-label" style={{ margin: 0 }}>NCERT {title} · FULLY WORKED</div>
-          <div className="muted" style={{ marginTop: 4 }}>Each equation is retained as a source check and the generated bank serves additional variants of the same skills.</div>
+          <div className="sc-label" style={{ margin: 0 }}>{t('ncert.leExerciseEyebrow', { title })}</div>
+          <div className="muted" style={{ marginTop: 4 }}>{t('ncert.leExerciseBody')}</div>
         </div>
-        <span className="tag">{items.length} / {items.length} solved</span>
+        <span className="tag">{t('ncert.leSolved', { solved: items.length, total: items.length })}</span>
       </div>
       <div style={{ display: 'grid', gap: 9 }}>
         {items.map((item, i) => (
           <details key={`${item.exercise}-${item.q}`} className="card" open={i === 0} style={{ padding: '12px 14px' }}>
             <summary style={{ cursor: 'pointer' }}>
-              <b>Q{item.q}</b>
+              <b>{t('ncert.questionShort', { n: item.q })}</b>
               <div style={{ marginTop: 4, fontSize: 17 }}><Text>{item.prompt}</Text></div>
             </summary>
             <div className="steps" style={{ marginTop: 12 }}>
@@ -162,7 +176,7 @@ function Exercise({ title, items }) {
               ))}
             </div>
             <div style={{ marginTop: 10, borderTop: '1px solid var(--line)', paddingTop: 9 }}>
-              <span className="tag tag-brand">Verified answer</span>{' '}
+              <span className="tag tag-brand">{t('ncert.leVerifiedAnswer')}</span>{' '}
               <b><Answer item={item} /></b>
             </div>
           </details>
@@ -173,22 +187,23 @@ function Exercise({ title, items }) {
 }
 
 function Coverage() {
+  const t = useT();
   const qb = NCERT_CLASS8_LINEAR_CONTENT.questionBank;
   return (
     <div>
       <div className="grid cols-2" style={{ gap: 12, marginBottom: 14 }}>
         <div className="card" style={{ padding: 14 }}>
-          <div className="sc-label" style={{ margin: 0 }}>QUESTION-BANK DEPTH</div>
+          <div className="sc-label" style={{ margin: 0 }}>{t('ncert.leBankDepth')}</div>
           <div style={{ fontSize: 26, fontWeight: 800, marginTop: 5 }}>{qb.authoredCells}</div>
-          <div className="muted">7 source skills × 4 Pri difficulty levels, plus 20 exact NCERT source questions</div>
+          <div className="muted">{t('ncert.leBankDepthBody')}</div>
         </div>
         <div className="card" style={{ padding: 14 }}>
-          <div className="sc-label" style={{ margin: 0 }}>ANSWER EXPERIENCE</div>
-          <div style={{ fontWeight: 750, marginTop: 7 }}>Type · AI handwriting · Photo OCR</div>
+          <div className="sc-label" style={{ margin: 0 }}>{t('ncert.leAnswerExperience')}</div>
+          <div style={{ fontWeight: 750, marginTop: 7 }}>{t('ncert.typeHandwritingPhoto')}</div>
           <div className="muted" style={{ marginTop: 4 }}>{qb.solutionSupport}</div>
         </div>
       </div>
-      <div className="sc-label" style={{ margin: '0 0 9px' }}>PAGE-BY-PAGE SOURCE AUDIT</div>
+      <div className="sc-label" style={{ margin: '0 0 9px' }}>{t('ncert.pageByPageAudit')}</div>
       <div style={{ display: 'grid', gap: 8 }}>
         {NCERT_CLASS8_LINEAR_CONTENT.sourceMap.map((row, i) => (
           <div className="card" key={i} style={{ padding: '11px 13px' }}>
@@ -197,60 +212,61 @@ function Coverage() {
                 <b>{row.section}</b>
                 <div className="muted" style={{ marginTop: 4 }}>{row.coverage}</div>
               </div>
-              <span className="tag">p. {row.pages}</span>
+              <span className="tag">{t('ncert.pageShort', { pages: row.pages })}</span>
             </div>
           </div>
         ))}
       </div>
       <p className="muted" style={{ marginTop: 10 }}>
-        Uploaded page 6 is intentionally audited as a blank learner Notes page. No mathematical content is silently invented to fill it.
+        {t('ncert.lePage6')}
       </p>
     </div>
   );
 }
 
 export default function LinearEquationsTopperSectionProduction() {
+  const t = useT();
   const [open, setOpen] = useState(true);
   const [tab, setTab] = useState('notes');
   return (
-    <section className="qpage" aria-label="NCERT Linear Equations topper learning section" style={{ paddingBottom: 4 }}>
+    <section className="qpage" aria-label={t('ncert.leSectionAria')} style={{ paddingBottom: 4 }}>
       <div className="card" style={{ padding: 0, overflow: 'hidden', marginBottom: 14 }}>
         <div style={{ padding: '20px 22px 18px' }}>
           <div className="spread" style={{ gap: 18, alignItems: 'flex-start' }}>
             <div style={{ minWidth: 0 }}>
               <div className="row" style={{ gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
-                <span className="tag tag-brand">NCERT · Class 8 · Chapter 2</span>
-                <span className="tag">Topper Learning Layer</span>
-                <span className="tag">{NCERT_CLASS8_LINEAR_CONTENT.questionBank.authoredCells} authored cells + 20 source questions</span>
+                <span className="tag tag-brand">{t('ncert.classChapterTag', { cls: 8, n: 2 })}</span>
+                <span className="tag">{t('ncert.topperLearningLayer')}</span>
+                <span className="tag">{t('ncert.leAuthoredCells', { n: NCERT_CLASS8_LINEAR_CONTENT.questionBank.authoredCells })}</span>
               </div>
-              <h2 style={{ margin: 0 }}>Linear Equations in One Variable · Topper Notes + Complete Chapter Bank</h2>
+              <h2 style={{ margin: 0 }}>{t('ncert.leTitle')}</h2>
               <p className="muted" style={{ margin: '7px 0 0', maxWidth: 900 }}>
-                Source-audited from all six uploaded PDF pages: Introduction, balance/solution checks, Section 2.2, Examples 1–2, Exercise 2.1, Section 2.3, Examples 16–17, Exercise 2.2, chapter summary and the blank Notes page.
+                {t('ncert.leIntro')}
               </p>
             </div>
             <button className="btn btn-quiet btn-sm" onClick={() => setOpen(v => !v)} aria-expanded={open}>
-              {open ? 'Hide chapter layer' : 'Open topper notes'}
+              {open ? t('ncert.leHideLayer') : t('ncert.openTopperNotes')}
             </button>
           </div>
         </div>
         {open && (
           <div style={{ borderTop: '1px solid var(--line)', padding: '14px 18px 18px' }}>
             <VerificationStrip />
-            <div className="row" role="tablist" aria-label="Linear equations learning tabs" style={{ gap: 7, flexWrap: 'wrap', marginBottom: 14 }}>
-              {Object.entries(TABS).map(([key, label]) => (
+            <div className="row" role="tablist" aria-label={t('ncert.leTabsAria')} style={{ gap: 7, flexWrap: 'wrap', marginBottom: 14 }}>
+              {Object.entries(TABS).map(([key, [labelKey, vars]]) => (
                 <button
                   key={key}
                   className={`btn btn-sm ${tab === key ? 'btn-primary' : 'btn-quiet'}`}
                   onClick={() => setTab(key)}
                   role="tab"
                   aria-selected={tab === key}
-                >{label}</button>
+                >{t(labelKey, vars)}</button>
               ))}
             </div>
             {tab === 'notes' && <Notes />}
             {tab === 'examples' && <WorkedExamples />}
-            {tab === 'ex21' && <Exercise title="Exercise 2.1" items={NCERT_CLASS8_LINEAR_EXERCISE_21} />}
-            {tab === 'ex22' && <Exercise title="Exercise 2.2" items={NCERT_CLASS8_LINEAR_EXERCISE_22} />}
+            {tab === 'ex21' && <Exercise title={t('ncert.exercise', { n: '2.1' })} items={NCERT_CLASS8_LINEAR_EXERCISE_21} />}
+            {tab === 'ex22' && <Exercise title={t('ncert.exercise', { n: '2.2' })} items={NCERT_CLASS8_LINEAR_EXERCISE_22} />}
             {tab === 'coverage' && <Coverage />}
           </div>
         )}

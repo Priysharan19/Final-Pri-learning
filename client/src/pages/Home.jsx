@@ -11,20 +11,19 @@ import { textMatches, useGlossary } from '../i18n/glossary.js';
 import TermGloss from '../components/TermGloss.jsx';
 import { featureEnabled } from '../platform/features.js';
 
-// Deliberately English in every language. These are jokes that live entirely
-// in the English idiom of a maths classroom — "The proof is left as an exercise
+// Jokes in the idiom of a maths classroom — "The proof is left as an exercise
 // for you", "Integrate practice. Differentiate yourself." A translated pun is
-// not the same joke, and a limp one on the home screen is worse than an English
-// one a Hindi-medium student will read perfectly well. If they are ever
-// rewritten for Hindi it should be as new jokes, not as translations of these.
-const TAGLINES = [
-  'The rest is algebra.',
-  'The proof is left as an exercise for you.',
-  'This should simplify nicely.',
-  'Assume nothing. Prove everything.',
-  'Every mark is one dot point away.',
-  'Integrate practice. Differentiate yourself.',
-  'Q.E.D. before dinner.',
+// not the same joke, so the Hindi catalogue carries a tagline written for a
+// Hindi-medium classroom under each key (उपपत्ति…, इति सिद्धम्), translated in
+// spirit rather than pun for pun.
+const TAGLINE_KEYS = [
+  'home.tagline1',
+  'home.tagline2',
+  'home.tagline3',
+  'home.tagline4',
+  'home.tagline5',
+  'home.tagline6',
+  'home.tagline7',
 ];
 
 const DIFF_KEYS = { 1: 'difficulty.1', 2: 'difficulty.2', 3: 'difficulty.3', 4: 'difficulty.4' };
@@ -373,7 +372,7 @@ export default function Home() {
                     {[1, 2, 3, 4].filter(d => !section?.difficultyCeiling || d <= section.difficultyCeiling).map(d => (
                       <button key={d} className={`gen-opt ${difficulty === d ? 'on' : ''}`}
                         onClick={() => setDifficulty(difficulty === d ? null : d)}>
-                        D{d} · {t(DIFF_KEYS[d])}
+                        {`D${d}`} · {t(DIFF_KEYS[d])}
                       </button>
                     ))}
                   </div>
@@ -483,28 +482,29 @@ function HomeAction({ action, nav, primary }) {
 }
 
 function Tagline() {
-  const [idx, setIdx] = useState(() => Math.floor(Math.random() * TAGLINES.length));
+  const t = useT();
+  const [idx, setIdx] = useState(() => Math.floor(Math.random() * TAGLINE_KEYS.length));
   const [len, setLen] = useState(0);
   const [phase, setPhase] = useState('typing'); // typing | holding | deleting
 
   useEffect(() => {
-    const text = TAGLINES[idx];
-    let t;
+    const text = t(TAGLINE_KEYS[idx]);
+    let timer;
     if (phase === 'typing') {
-      if (len < text.length) t = setTimeout(() => setLen(l => l + 1), 34);
-      else t = setTimeout(() => setPhase('holding'), 4200);
+      if (len < text.length) timer = setTimeout(() => setLen(l => l + 1), 34);
+      else timer = setTimeout(() => setPhase('holding'), 4200);
     } else if (phase === 'holding') {
-      t = setTimeout(() => setPhase('deleting'), 2600);
+      timer = setTimeout(() => setPhase('deleting'), 2600);
     } else {
-      if (len > 0) t = setTimeout(() => setLen(l => l - 1), 13);
-      else { setIdx(i => (i + 1) % TAGLINES.length); setPhase('typing'); }
+      if (len > 0) timer = setTimeout(() => setLen(l => l - 1), 13);
+      else { setIdx(i => (i + 1) % TAGLINE_KEYS.length); setPhase('typing'); }
     }
-    return () => clearTimeout(t);
-  }, [phase, len, idx]);
+    return () => clearTimeout(timer);
+  }, [phase, len, idx, t]);
 
   return (
     <div className="home-tagline">
-      {TAGLINES[idx].slice(0, len)}
+      {t(TAGLINE_KEYS[idx]).slice(0, len)}
       <span className="type-caret" />
     </div>
   );
