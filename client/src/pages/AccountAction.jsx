@@ -6,7 +6,7 @@ function Shell({ children }) {
     <div className="auth-wrap">
       <div className="card" style={{ width: 'min(520px, calc(100vw - 32px))', margin: 'auto', padding: 28 }}>
         <div className="logo logo-lg" aria-label="Pri Learning">
-          <span className="logo-bb">P</span><span className="logo-name">ri Learning<span className="logo-dot">.</span></span>
+          <span className="logo-bb" aria-hidden="true">P</span><span className="logo-name">Pri Learning</span>
         </div>
         <div style={{ marginTop: 24 }}>{children}</div>
       </div>

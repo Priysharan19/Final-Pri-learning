@@ -725,7 +725,7 @@ async function publicUser(p, nowMs = Date.now()) {
   const tz = timezoneOf(p);
   const today = (await get('activity', `${p.id}:${dayKey(nowMs, tz)}`)) || { questions: 0, correct: 0, xp: 0 };
   return {
-    id: p.id, name: p.name, year: p.year, theme: p.theme || 'dark',
+    id: p.id, name: p.name, year: p.year, theme: p.theme === 'dark' ? 'dark' : 'light',
     // The language the interface is drawn in. `locale` above is a different
     // thing and stays as it is: it decides how a date, a number and a price are
     // written for this student's region, and a Hindi-medium student in India
@@ -1419,6 +1419,7 @@ function sanitize(q, row) {
     triesLeft: 2 - (row.tries || 0),
     supportsSteps: !!stepMetaFor(q),
     criteria: criteriaFor(q),
+    inkDraft: !row.answered && Array.isArray(row.inkDraft) && row.inkDraft.length ? row.inkDraft : null,
     taskId: row.taskId || null
   };
 }
@@ -1699,7 +1700,7 @@ function packQuestion(cq) {
 const exportProfile = p => ({
   name: p.name, year: p.year, course: p.course || 'nsw', indiaTrack: p.indiaTrack || null, role: p.role || 'student',
   timezone: timezoneOf(p),
-  avatar: p.avatar || '🙂', theme: p.theme || 'dark', language: cleanLanguage(p.language),
+  avatar: p.avatar || '🙂', theme: p.theme === 'dark' ? 'dark' : 'light', language: cleanLanguage(p.language),
   mathsGloss: p.mathsGloss === true, dailyGoal: p.dailyGoal || 10,
   xp: p.xp || 0, pathway: p.pathway ?? null, provider: p.provider || null,
   handwriting: p.handwriting !== false, isDemo: false,
@@ -1715,7 +1716,7 @@ function importProfile(src, id) {
     timezone: cleanTimezone(src.timezone) || defaultTimezone(COURSES[src.course] ? src.course : 'nsw'),
     role: src.role === 'teacher' ? 'teacher' : 'student',
     avatar: safeLabel(src.avatar, 4) || '🙂',
-    theme: src.theme === 'light' ? 'light' : 'dark',
+    theme: src.theme === 'dark' ? 'dark' : 'light',
     language: cleanLanguage(src.language),
     mathsGloss: src.mathsGloss === true,
     dailyGoal: safeInt(src.dailyGoal, 3, 60, 10),
@@ -2152,7 +2153,7 @@ const routes = {
       year: requestedYear,
       course: requestedCourse,
       role: body.role === 'teacher' ? 'teacher' : 'student',
-      avatar: body.avatar || '🙂', theme: 'dark', dailyGoal: 10, xp: 0,
+      avatar: body.avatar || '🙂', theme: 'light', dailyGoal: 10, xp: 0,
       // The language the sign-up screen was being read in. Somebody who chose
       // Hindi and then filled this form in Hindi has already told us what they
       // read; making them find the setting afterwards to say it a second time
@@ -2437,6 +2438,46 @@ const routes = {
   },
 
   // ---- practice ----
+  // KALP-04 continuity summary: identifiers/context only — never question content.
+  'GET /practice/resume': async () => {
+    const p = await requireProfile();
+    const row = (await byIndex('questions', 'pid', p.id))
+      .filter(r => r && !r.answered && !r.discardedAt && !isExamRow(r) && r.mode !== 'rush' && r.mode !== 'match')
+      .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))[0];
+    if (!row) return { resume: null };
+    const task = row.taskId ? await get('tasks', row.taskId) : null;
+    return { resume: {
+      kind: row.taskId ? 'task' : 'practice',
+      questionId: row.id,
+      taskId: row.taskId || null,
+      title: task?.title || '',
+      subtopic: row.india?.chapterId || row.payload?.subtopic || row.subtopic || null,
+      difficulty: row.difficulty || null,
+      createdAt: row.createdAt || null,
+      destination: row.taskId ? '/practice?task=' + encodeURIComponent(row.taskId) : '/practice'
+    } };
+  },
+
+  // Handwriting in progress. Typed answers are mirrored to the draft store as
+  // they are typed, but ink is too large for that store's contract, so an
+  // unfinished page lives on the question's own row instead: sealed with the
+  // rest of the profile, wiped with it, and restored when the same unresolved
+  // question is resumed. It is never marked — submit carries its own strokes —
+  // and it is dropped the moment the question resolves.
+  'POST /practice/:id/ink-draft': async (body, params) => {
+    const p = await requireProfile();
+    const row = await get('questions', params.id);
+    if (!row || row.pid !== p.id) throw Object.assign(new Error('Question not found'), { status: 404 });
+    assertPracticeRow(row);
+    if (row.answered) throw Object.assign(new Error('Already answered'), { status: 409 });
+    if (row.discardedAt) throw Object.assign(new Error('Question was skipped'), { status: 409, code: 'QUESTION_DISCARDED' });
+    const strokes = safeStrokes(body?.strokes, 4000).filter(st => st.points.length);
+    row.inkDraft = strokes.length ? strokes : null;
+    row.inkDraftAt = strokes.length ? Date.now() : null;
+    await put('questions', row);
+    return { saved: true, id: row.id, strokes: strokes.length, savedAt: row.inkDraftAt };
+  },
+
   'POST /practice/next': async (body) => {
     const p = await requireProfile();
     const unfinished = await resumableQuestion(p, body);
@@ -2683,6 +2724,8 @@ const routes = {
     if (result.invalid && !isFast) {
       return { correct: false, resolved: false, triesLeft: Math.max(0, 1 - (row.tries || 0)), invalid: true, feedback, stepReport };
     }
+    row.inkDraft = null;
+    row.inkDraftAt = null;
     const meta = await resolve(p, row, q, result.correct, answer, ms, row.mode, !!viaInk);
     return {
       correct: result.correct, resolved: true, feedback, stepReport, partial,
@@ -2701,6 +2744,8 @@ const routes = {
     if (row.answered) throw Object.assign(new Error('Already answered'), { status: 409 });
     if (row.discardedAt) throw Object.assign(new Error('Question was skipped'), { status: 409, code: 'QUESTION_DISCARDED' });
     const q = row.payload;
+    row.inkDraft = null;
+    row.inkDraftAt = null;
     const meta = await resolve(p, row, q, false, 'revealed', body?.ms || 0, row.mode);
     return { correct: false, resolved: true, revealed: true, solution: { steps: q.steps, answerText: displayAnswer(q), criteria: criteriaFor(q), solutionText: q.solutionText }, ...meta };
   },
@@ -3187,7 +3232,7 @@ const routes = {
         const course = COURSES[raw?.course] ? raw.course : rowTrack ? 'in' : defaultCourse;
         prof = {
           id: uuid(), name, year, course, role: 'student',
-          avatar: safeLabel(raw?.avatar, 4) || '🙂', theme: 'dark', dailyGoal: 10, xp: 0,
+          avatar: safeLabel(raw?.avatar, 4) || '🙂', theme: 'light', dailyGoal: 10, xp: 0,
           pathway: course === 'nsw' ? (year >= 11 ? 'advanced' : null) : null,
           indiaTrack: course === 'in' ? cleanIndiaTrack(raw?.track ?? raw?.indiaTrack, year) : null,
           rosteredBy: teacher.id, createdAt: now, lastActiveAt: now
@@ -3766,6 +3811,7 @@ async function runGated(method, pattern, handler, body, params) {
     || key === 'POST /practice/:id/reveal'
     || key === 'POST /practice/:id/hint'
     || key === 'POST /practice/:id/discard'
+    || key === 'POST /practice/:id/ink-draft'
   )) return withMutationLock(`question:${params.id}`, work);
 
   if (key === 'POST /practice/next') {

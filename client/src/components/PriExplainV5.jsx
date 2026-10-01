@@ -372,7 +372,7 @@ export default function PriExplainV5({ questionId, questionPrompt, questionFigur
       <button ref={launchRef} className="pri-explain-launch no-print" type="button"
         onClick={() => { setOpen(true); setBeat(0); setCheckpointPassed(false); setPlaying(!reduceMotion); }} aria-haspopup="dialog">
         <span className="pri-explain-play" aria-hidden="true">▶</span>
-        <span><b>Watch explanation</b><small>{teaching.label} · {visualKinds.length ? 'teacher-synchronised visual working' : 'animated worked solution'}</small></span>
+        <span><b>Watch explanation</b><small>{visualKinds.length ? 'Step by step, with the working drawn' : 'Step by step'}</small></span>
       </button>
 
       {open && (

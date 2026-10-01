@@ -41,37 +41,9 @@ function freshProfileDraft() {
 const AU_COURSES = [['nsw', 'NSW · HSC'], ['vic', 'VIC · VCE'], ['qld', 'QLD · QCE'], ['wa', 'WA · WACE'], ['sa', 'SA · SACE'], ['ib', 'IB']];
 // Where the cloud account UI lives. The panel is Settings' own; this screen only links to it.
 export const CLOUD_ACCOUNT_ROUTE = '/settings#cloud-account-title';
-const GLYPHS = ['∑', '∫', '∬', 'π', 'θ', 'Ω', 'Δ', 'Γ', 'Φ', 'λ', 'ε', 'δ', 'η', 'ρ', 'ξ', 'ζ', 'χ', 'ψ', '√', '∞', '≈', '≠', '≤', '≥', '±', '÷', '∈', '∉', '∀', '∃', '⊂', '∪', '∩', 'ℵ', 'ℝ', 'ℤ', 'ℚ', 'ℂ', 'ℕ', '∂', '∇', '↦', '⇌', '∘', 'ϕ', '⊕', '≡', '⟨', '⟩', '4', '2', 'e', 'i', 'x', 'dx'];
-
-function hash01(str) {
-  let h = 2166136261;
-  for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
-  return ((h >>> 0) % 100000) / 100000;
-}
-
-/** The signature backdrop — a quiet field of mathematical symbols. */
-export function MathField({ n = 90 }) {
-  const glyphs = useMemo(() => Array.from({ length: n }, (_, i) => {
-    const g = GLYPHS[Math.floor(hash01(`g${i}`) * GLYPHS.length)];
-    return {
-      g,
-      left: hash01(`x${i}`) * 100,
-      top: hash01(`y${i}`) * 100,
-      size: 11 + hash01(`s${i}`) * 15,
-      op: 0.05 + hash01(`o${i}`) * 0.16,
-      rot: (hash01(`r${i}`) - 0.5) * 40,
-    };
-  }), [n]);
-  return (
-    <div className="mathfield" aria-hidden="true">
-      {glyphs.map((s, i) => (
-        <span key={i} style={{
-          left: `${s.left}%`, top: `${s.top}%`, fontSize: s.size,
-          opacity: s.op, transform: `rotate(${s.rot}deg)`
-        }}>{s.g}</span>
-      ))}
-    </div>
-  );
+/** The signature backdrop: a sheet of ruled notebook paper, nothing more. */
+export function MathField() {
+  return <div className="mathfield" aria-hidden="true" />;
 }
 
 /* ── in-house marks: this device, and the lock that keeps a profile shut ── */
@@ -451,7 +423,7 @@ export default function Login() {
           })}</h1>
           <p className="hero-sub">{t('login.heroSub')}</p>
           <div className="row" style={{ marginTop: 34 }}>
-            <button className="btn btn-primary btn-lg btn-glow" onClick={enter}>{t('login.getStarted')}</button>
+            <button className="btn btn-primary btn-lg" onClick={enter}>{t('login.getStarted')}</button>
           </div>
           <p className="muted" style={{ marginTop: 26, textAlign: 'center' }}>{t('login.heroPrivacy')}</p>
           <div style={{ textAlign: 'center', marginTop: 10 }}>
@@ -472,7 +444,7 @@ export default function Login() {
   /* ── split layout: brand panel + auth panel ── */
   return (
     <div className="auth-wrap">
-      <MathField n={70} />
+      <MathField />
       <div className="auth-split fade-in">
         <div className="auth-brand">
           {/* The whole panel used to navigate from an onClick on a <div>: a

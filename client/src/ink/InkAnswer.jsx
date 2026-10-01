@@ -21,6 +21,8 @@ import { classOfSymbol } from './classes.js';
 import { ensurePersonalLoaded, addPersonal } from './personal.js';
 import { MathText } from '../lib/latex.jsx';
 import { currentReleaseIdentity } from '../platform/releaseIdentity.js';
+import Icon from '../components/Icon.jsx';
+import { useT } from '../i18n/index.js';
 
 const NICE = { pi: 'π', theta: 'θ', sqrt: '√', percent: '%' };
 const showSym = s => NICE[s] || s;
@@ -41,6 +43,14 @@ const Surface = NATIVE_INK ? NativeInkCanvas : InkCanvas;
 const CLOUD_SETTLE_MS = 1800;
 
 const EMPTY_READING = { lines: [], text: '', symbols: [], minConf: 1, margin: 1, weakest: null };
+// Engine provenance is evidence for whoever is testing recognition, not
+// something a student needs to read while solving. It is always on the element
+// as data-engine; it is spelled out on screen only in a developer session.
+const showEngineNotes = () => typeof window !== 'undefined'
+  && (window.__PRI_LAN_DEV__ === true || /[?&]inkDebug=1\b/.test(window.location?.search || ''));
+/** One page of paper. More pages extend the same sheet, so recognition, the
+ *  stored strokes and History replay all keep one coordinate space. */
+const MAX_PAGES = 4;
 const structuralLanExpected = () => !NATIVE_INK && typeof window !== 'undefined' && window.__PRI_LAN_DEV__ === true;
 
 /**
@@ -112,7 +122,11 @@ function readingConfidence(result) {
  * focusSymbol: id of a glyph the caller wants checked.
  * recognitionContext: optional safe question context consumed by recognize().
  */
-export default function InkAnswer({ onRecognized, height = 300, disabled, lineVerdicts = null, focusSymbol = null, recognitionContext = null }) {
+export default function InkAnswer({
+  onRecognized, height = 300, disabled, lineVerdicts = null, focusSymbol = null, recognitionContext = null,
+  initialStrokes = null, onStrokes = null
+}) {
+  const t = useT();
   const canvasRef = useRef(null);
   // The signed-in profile carries the server-reading opt-in, which is off
   // unless the student turned it on.
@@ -122,7 +136,15 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
   const [rec, setRec] = useState({ lines: [], text: '' });
   const [overrides, setOverrides] = useState({});
   const [picker, setPicker] = useState(null);
-  const [extraHeight, setExtraHeight] = useState(0);
+  // Restored work arrives with its own extent: a page that already reaches past
+  // the first sheet opens with enough sheets to show all of it.
+  const [pages, setPages] = useState(() => {
+    const bottom = Math.max(0, ...(initialStrokes || []).flatMap(st => (st?.points || []).map(p => Number(p?.y) || 0)));
+    return Math.min(MAX_PAGES, Math.max(1, Math.ceil((bottom + 24) / height)));
+  });
+  const restoredRef = useRef(false);
+  const onStrokesRef = useRef(onStrokes);
+  useEffect(() => { onStrokesRef.current = onStrokes; }, [onStrokes]);
   const timerRef = useRef(null);
   const readSeqRef = useRef(0);
   const cloudAbortRef = useRef(null);
@@ -299,6 +321,7 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
 
   const onStrokesChange = useCallback((strokes) => {
     strokesRef.current = strokes;
+    onStrokesRef.current?.(strokes);
     if (timerRef.current) clearTimeout(timerRef.current);
     // Native whole-page recognition is intentionally a quiet-window operation.
     // A 240 ms debounce caused a recognition job after normal pauses between
@@ -309,6 +332,13 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
   }, [overrides, runRecognition]);
 
   useEffect(() => { ensurePersonalLoaded(); }, []);
+  // Put an unfinished page back exactly as it was left. Runs once: a later
+  // prop change must never overwrite what the student has written since.
+  useEffect(() => {
+    if (restoredRef.current) return;
+    restoredRef.current = true;
+    if (Array.isArray(initialStrokes) && initialStrokes.length) canvasRef.current?.setStrokes?.(initialStrokes);
+  }, [initialStrokes]);
   useEffect(() => () => {
     readSeqRef.current += 1;
     if (timerRef.current) clearTimeout(timerRef.current);
@@ -354,7 +384,7 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
   // previously labelled "Native recognition path" on iPad and given no label at
   // all in the browser — cloudReader tags a reading `cloud` precisely so that
   // History and the student can tell the two apart.
-  const engineNote = rec.cloud === true
+  const engineNote = !showEngineNotes() ? null : rec.cloud === true
     ? `Read on the server · ${rec.engine || 'cloud'}`
     : rec.engine === 'pri-structural-v4-dev-lan'
       ? 'Structural V4 research · Mac LAN · not production'
@@ -364,46 +394,54 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
           ? 'Legacy JS V3 fallback · not native PencilKit/Core ML'
           : rec.disagreement
             ? `Native engines disagree · confirmation required · ${rec.engine}`
-            : NATIVE_INK && rec.engine
-              ? `Native recognition path · ${rec.engine}`
-              : null;
+            : rec.engine ? `Native recognition path · ${rec.engine}` : null;
+  const pageHeight = height;
 
   return (
-    <div className={`ink-answer ${disabled ? 'ink-disabled' : ''}`}>
-      {!NATIVE_INK && (
-        <div role="note" style={{ padding: '9px 12px', marginBottom: 8, border: '1px solid var(--warn)', borderRadius: 10, fontSize: 12.5 }}>
-          Browser handwriting = legacy JS fallback. For handwriting quality testing, run the native iPad package with PencilKit; this web fallback is not the production acceptance path.
-        </div>
-      )}
-      <div className="ink-toolbar">
-        <button type="button" className={`ink-tool ${tool === 'pen' ? 'on' : ''}`} aria-pressed={tool === 'pen'} onClick={() => setTool('pen')} title="Pen">✒️ Pen</button>
-        <button type="button" className={`ink-tool ${tool === 'eraser' ? 'on' : ''}`} aria-pressed={tool === 'eraser'} onClick={() => setTool('eraser')} title="Eraser">◻️ Eraser</button>
-        <span className="ink-sep" />
-        <button type="button" className="ink-tool" onClick={act('undo')} title="Undo" aria-label="Undo last stroke">↩︎</button>
-        <button type="button" className="ink-tool" onClick={act('redo')} title="Redo" aria-label="Redo last stroke">↪︎</button>
-        <button type="button" className="ink-tool" onClick={act('clear')} title="Clear" aria-label="Clear all handwriting">🗑</button>
-        <span className="ink-sep" />
-        <button type="button" className="ink-tool" aria-label="Add more writing space"
-          onClick={() => setExtraHeight(h => Math.min(400, h + 120))} title="More space">＋ space</button>
-        <span className="ink-sep" />
-        <button type="button" className={`ink-tool ${finger ? 'on' : ''}`} title="Draw with a finger too (otherwise fingers scroll once a Pencil is seen)"
-          aria-label="Draw with a finger as well as a Pencil" aria-pressed={finger}
-          onClick={() => setFinger(f => !f)}>☝ Finger</button>
-        <span className="ink-hint">
-          Write each step on its own line · {NATIVE_INK ? 'Apple Pencil' : 'Pencil or finger'}
-        </span>
+    <div className={`ink-answer ${disabled ? 'ink-disabled' : ''}`} data-engine={rec.engine || undefined}>
+      <div className="ink-toolbar" role="toolbar" aria-label={t('ink.toolbar')}>
+        <button type="button" className={`ink-tool ${tool === 'pen' ? 'on' : ''}`} aria-pressed={tool === 'pen'} onClick={() => setTool('pen')} title={t('ink.pen')}>
+          <Icon name="pen" /><span className="ink-tool-label">{t('ink.pen')}</span>
+        </button>
+        <button type="button" className={`ink-tool ${tool === 'eraser' ? 'on' : ''}`} aria-pressed={tool === 'eraser'} onClick={() => setTool('eraser')} title={t('ink.eraser')}>
+          <Icon name="eraser" /><span className="ink-tool-label">{t('ink.eraser')}</span>
+        </button>
+        <span className="ink-sep" aria-hidden="true" />
+        <button type="button" className="ink-tool" onClick={act('undo')} title={t('ink.undo')} aria-label={t('ink.undoLabel')}><Icon name="undo" /></button>
+        <button type="button" className="ink-tool" onClick={act('redo')} title={t('ink.redo')} aria-label={t('ink.redoLabel')}><Icon name="redo" /></button>
+        <button type="button" className="ink-tool" onClick={act('clear')} title="Clear" aria-label={t('ink.clearLabel')}><Icon name="clear" /></button>
+        <span className="ink-sep" aria-hidden="true" />
+        <button type="button" className="ink-tool" disabled={pages >= MAX_PAGES}
+          aria-label={t('ink.addPageLabel', { n: pages + 1 })} title={t('ink.addPage')}
+          onClick={() => setPages(n => Math.min(MAX_PAGES, n + 1))}>
+          <Icon name="pageAdd" /><span className="ink-tool-label">{t('ink.addPage')}</span>
+        </button>
+        <span className="ink-pages" aria-live="polite">{t('ink.pageCount', { count: pages, n: pages })}</span>
+        {!NATIVE_INK && (
+          <button type="button" className={`ink-tool ${finger ? 'on' : ''}`} title={t('ink.fingerTitle')}
+            aria-label={t('ink.fingerLabel')} aria-pressed={finger}
+            onClick={() => setFinger(f => !f)}>
+            <Icon name="finger" /><span className="ink-tool-label">{t('ink.finger')}</span>
+          </button>
+        )}
+        <span className="ink-hint">{t('ink.hint')}</span>
       </div>
 
       <div className="ink-stage">
         <Surface
           ref={canvasRef}
-          height={height + extraHeight}
+          height={pageHeight * pages}
           tool={tool}
           fingerMode={finger ? 'finger' : 'auto'}
           disabled={disabled}
           onStrokesChange={onStrokesChange}
-          ariaLabel="Handwriting answer space"
+          ariaLabel={t('ink.surfaceLabel')}
         />
+        {Array.from({ length: pages - 1 }, (_, i) => (
+          <div key={i} className="ink-page-break" style={{ top: pageHeight * (i + 1) }} aria-hidden="true">
+            <span>{t('ink.pageLabel', { n: i + 2 })}</span>
+          </div>
+        ))}
         {lineVerdicts && rec.lines.length > 0 && (
           <div className="ink-verdict-layer" aria-hidden="true">
             {(() => {
@@ -431,8 +469,8 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
                     <span
                       className={`ink-verdict ${good ? 'good' : 'bad'}`}
                       style={{ top: b.y + b.h / 2 - 14, left: b.x + b.w + 16 }}
-                      title={v.note || (good ? 'This line checks out' : 'The maths breaks on this line')}
-                    >{good ? '✓' : '✗'}</span>
+                      title={v.note || (good ? t('ink.lineOk') : t('ink.lineBreaks'))}
+                    >{good ? <Icon name="check" size={18} /> : <Icon name="correction" size={18} />}</span>
                     {bad && boxes.map((gb, gi) => (
                       <span
                         key={`underline-${gi}`}
@@ -442,7 +480,7 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
                     ))}
                     {showNote && (
                       <span className="ink-note" style={{ left: Math.max(4, b.x - 2), top: b.y + b.h + 16 }}>
-                        <b>✗ the mistake is here</b>{v.note ? <> — {v.note}</> : null}
+                        <b>{t('ink.lookHere')}</b>{v.note ? <> — {v.note}</> : null}
                       </span>
                     )}
                   </React.Fragment>
@@ -456,31 +494,28 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
       {rec.lines.length > 0 && (
         <div className="ink-preview">
           <div className="ink-preview-title" id="ink-reading">
-            I'm reading:{engineNote && <span className="muted" style={{ marginLeft: 10, textTransform: 'none', letterSpacing: 0 }}>{engineNote}</span>}
-            {cloudState === 'reading' && (
-              <span className="muted" style={{ marginLeft: 10, textTransform: 'none', letterSpacing: 0 }}>· checking this reading</span>
-            )}
-            {cloudState === 'failed' && (
-              <span className="muted" style={{ marginLeft: 10, textTransform: 'none', letterSpacing: 0 }}>· couldn’t reach the reader — this is the on-device reading</span>
-            )}
+            {t('ink.reading')}
+            {cloudState === 'reading' && <span className="ink-status muted">{t('ink.readingAgain')}</span>}
+            {cloudState === 'failed' && <span className="ink-status muted">{t('ink.readerUnreachable')}</span>}
           </div>
           {cloudOffer && (
             <div className="ink-cloud-offer" style={{ margin: '6px 14px 2px', fontSize: 12.5 }}>
-              <div className="muted" style={{ marginBottom: 4 }}>Another reading of the same ink — use it if it is closer to what you wrote:</div>
+              <div className="muted" style={{ marginBottom: 4 }}>{t('ink.otherReading')}</div>
               <div className="row" style={{ alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 <span className="ink-line-math"><MathText text={`$${exprToLatex(cloudOffer.reading.text) || '\\;'}$`} /></span>
                 <button type="button" className="btn btn-quiet btn-sm"
                   onClick={() => { publish(cloudOffer.reading, cloudOffer.strokes); setCloudOffer(null); setCloudState(null); }}>
-                  Use this reading
+                  {t('ink.useReading')}
                 </button>
                 <button type="button" className="btn btn-quiet btn-sm"
                   onClick={() => { setCloudOffer(null); setCloudState(null); }}>
-                  Keep mine
+                  {t('ink.keepMine')}
                 </button>
               </div>
             </div>
           )}
-          {rec.disagreement && Array.isArray(rec.candidateReadings) && rec.candidateReadings.length > 1 && (
+          {engineNote && <div className="ink-dev">{engineNote}</div>}
+          {engineNote && rec.disagreement && Array.isArray(rec.candidateReadings) && rec.candidateReadings.length > 1 && (
             <details style={{ margin: '8px 14px 2px', fontSize: 11.5 }} className="muted">
               <summary style={{ cursor: 'pointer' }}>Recognition evidence</summary>
               {rec.candidateReadings.map((candidate, index) => (
@@ -495,8 +530,8 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
               <span className="ink-line-n" aria-hidden="true">{li + 1}</span>
               {lineVerdicts && lineVerdicts[li] && ['ok', 'break', 'wrong'].includes(lineVerdicts[li].status) && (
                 <span className={`ink-line-verdict ${lineVerdicts[li].status === 'ok' ? 'good' : 'bad'}`}>
-                  {lineVerdicts[li].status === 'ok' ? '✓' : '✗'}
-                  <span className="sr-only">Line {li + 1} {lineVerdicts[li].status === 'ok' ? 'checks out' : 'is where the maths breaks'}. </span>
+                  {lineVerdicts[li].status === 'ok' ? <Icon name="check" size={15} /> : <Icon name="correction" size={15} />}
+                  <span className="sr-only">{t(lineVerdicts[li].status === 'ok' ? 'ink.lineOkSpoken' : 'ink.lineBreaksSpoken', { n: li + 1 })} </span>
                 </span>
               )}
               <span className="ink-line-math"><MathText text={`$${exprToLatex(line.text) || '\\;'}$`} /></span>
@@ -508,12 +543,9 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
                   <button
                     type="button"
                     key={s.id}
-                    className={`ink-sym ${s.conf < 0.45 ? 'shaky' : ''}`}
-                    style={s.id === focusSymbol
-                      ? { outline: '2px solid var(--brand-1)', outlineOffset: 2, borderRadius: 4 }
-                      : undefined}
-                    title={s.id === focusSymbol ? 'Check this one' : 'Tap to correct'}
-                    aria-label={`Line ${li + 1}, symbol read as “${showSym(s.sym)}”${s.conf < 0.45 ? ', a shaky reading' : ''} — change it`}
+                    className={`ink-sym ${s.conf < 0.45 ? 'shaky' : ''} ${s.id === focusSymbol ? 'is-focus' : ''}`}
+                    title={s.id === focusSymbol ? t('ink.checkThisOne') : t('ink.tapToCorrect')}
+                    aria-label={t(s.conf < 0.45 ? 'ink.symbolShakyLabel' : 'ink.symbolLabel', { n: li + 1, sym: showSym(s.sym) })}
                     aria-expanded={picker?.id === s.id}
                     onClick={() => setPicker(picker?.id === s.id ? null : { id: s.id, alts: s.alts || [] })}
                   >{showSym(s.sym)}</button>
@@ -522,19 +554,19 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
             </div>
           ))}
           {picker && (
-            <div className="ink-picker" ref={pickerRef} role="group" aria-label="Change this symbol">
+            <div className="ink-picker" ref={pickerRef} role="group" aria-label={t('ink.changeSymbol')}>
               <div className="ink-picker-row">
                 {(picker.alts || []).map(a => (
                   <button type="button" key={a.sym} className="ink-pick"
-                    aria-label={`Change it to “${showSym(a.sym)}” — ${Math.round(a.conf * 100)}% sure`}
+                    aria-label={t('ink.changeTo', { sym: showSym(a.sym) })}
                     onClick={() => applyOverride(picker.id, a.sym)}>
-                    {showSym(a.sym)} <small>{Math.round(a.conf * 100)}%</small>
+                    {showSym(a.sym)}
                   </button>
                 ))}
               </div>
               <div className="ink-picker-all">
                 {ALPHABET.map(s => (
-                  <button type="button" key={s} className="ink-pick tiny" aria-label={`Change it to “${showSym(s)}”`}
+                  <button type="button" key={s} className="ink-pick tiny" aria-label={t('ink.changeTo', { sym: showSym(s) })}
                     onClick={() => applyOverride(picker.id, s)}>{showSym(s)}</button>
                 ))}
               </div>

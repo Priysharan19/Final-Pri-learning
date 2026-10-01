@@ -9,6 +9,7 @@ import Login from './pages/Login.jsx';
 import Home from './pages/Home.jsx';
 import Practice from './pages/Practice.jsx';
 import Legal from './pages/Legal.jsx';
+import Icon from './components/Icon.jsx';
 
 // ── Routes nobody has opened yet ─────────────────────────────────────────────
 // Login, Home, Practice and Legal are the screens a first run reaches: the
@@ -36,19 +37,12 @@ const Settings = React.lazy(() => import('./pages/Settings.jsx'));
 const AppCtx = createContext(null);
 export const useApp = () => useContext(AppCtx);
 
-/* Pri Learning navigation marks: restrained, legible line icons for the shared app shell. */
+/* Navigation marks come from the one Pri icon family (components/Icon.jsx). */
 const I = {
-  home: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M3 10.5 12 3l9 7.5" /><path d="M5.5 9.5V21h13V9.5" /><path d="M9.5 21v-6h5v6" /></svg>,
-  tasks: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M12 5.5C10 4 7.5 3.5 4 3.8V19c3.5-.3 6 .3 8 1.7 2-1.4 4.5-2 8-1.7V3.8c-3.5-.3-6 .2-8 1.7Z" /><path d="M12 5.5v15.2" /></svg>,
-  match: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M3.5 3.5h3.2L19 15.8v3.2h-3.2L3.5 6.7V3.5Z" /><path d="M20.5 3.5h-3.2L13 7.8m-2 8.4-4.3 4.3H3.5v-3.2L7.8 13" /><path d="m16 16 3 3M8 16l-3 3" /></svg>,
-  progress: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><circle cx="12" cy="12" r="9" /><path d="m8 12.5 2.5 2.5L16 9.5" /></svg>,
-  exams: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><circle cx="12" cy="13" r="8" /><path d="M12 9v4.5l3 1.8" /><path d="M9.5 2.5h5" /></svg>,
-  classes: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="m2.5 9 9.5-5 9.5 5-9.5 5-9.5-5Z" /><path d="M6.5 11.5V16c0 1.4 2.5 2.8 5.5 2.8s5.5-1.4 5.5-2.8v-4.5" /><path d="M21.5 9v5" /></svg>,
-  settings: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><circle cx="12" cy="12" r="3.2" /><path d="M19 12a7 7 0 0 0-.15-1.4l2.1-1.6-2-3.4-2.45 1a7 7 0 0 0-2.4-1.4L13.7 2.6h-3.9l-.4 2.6a7 7 0 0 0-2.4 1.4l-2.45-1-2 3.4 2.1 1.6A7 7 0 0 0 4.5 12c0 .5.05.9.15 1.4l-2.1 1.6 2 3.4 2.45-1a7 7 0 0 0 2.4 1.4l.4 2.6h3.9l.4-2.6a7 7 0 0 0 2.4-1.4l2.45 1 2-3.4-2.1-1.6c.1-.5.15-.9.15-1.4Z" /></svg>,
-  practice: <span aria-hidden="true">✎</span>,
-  review: <span aria-hidden="true">↺</span>,
-  rush: <span aria-hidden="true">⚡</span>,
-  teacher: <span aria-hidden="true">▣</span>,
+  home: <Icon name="home" />, tasks: <Icon name="tasks" />, match: <Icon name="match" />,
+  progress: <Icon name="progress" />, exams: <Icon name="exams" />, classes: <Icon name="classes" />,
+  settings: <Icon name="settings" />, practice: <Icon name="practice" />, review: <Icon name="review" />,
+  rush: <Icon name="rush" />, teacher: <Icon name="teacher" />,
 };
 
 const STUDENT_NAV = [
@@ -110,8 +104,8 @@ export function Logo({ large = false, onClick }) {
     : {};
   return (
     <Tag className={`logo ${large ? 'logo-lg' : ''}${onClick ? ' logo-btn' : ''}`} {...controlProps}>
-      <span className="logo-bb">P</span>
-      <span className="logo-name">ri Learning<span className="logo-dot">.</span></span>
+      <span className="logo-bb" aria-hidden="true">P</span>
+      <span className="logo-name">Pri Learning</span>
     </Tag>
   );
 }
@@ -178,7 +172,7 @@ export default function App() {
   }, [user?.id]);
 
   useEffect(() => {
-    document.documentElement.dataset.theme = user?.theme === 'light' ? 'light' : 'dark';
+    document.documentElement.dataset.theme = user?.theme === 'dark' ? 'dark' : 'light';
   }, [user?.theme]);
 
   const pageTitle = useMemo(
@@ -257,11 +251,9 @@ export default function App() {
     setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), ms);
   }, []);
 
-  const celebrate = useCallback((res) => {
-    for (const b of res?.newBadges || []) {
-      toast(<><span className="badge-ico">{b.icon}</span><div><div className="badge-name">{t('app.badgeUnlocked', { name: b.name })}</div><div className="badge-desc">{b.desc}</div></div></>, 5200, 'gold');
-    }
-  }, [toast, t]);
+  // Badges are still earned and kept on Progress, but they never interrupt a
+  // student mid-question: no pop-ups, no emoji, nothing between them and the maths.
+  const celebrate = useCallback(() => { }, []);
 
   const ctx = useMemo(() => ({ user, setUser, refreshUser, toast, celebrate, dueCount, refreshDue, refreshRecent }),
     [user, refreshUser, toast, celebrate, dueCount, refreshDue, refreshRecent]);
@@ -326,14 +318,18 @@ export default function App() {
     setUser(null);
   };
 
+  // Thinking mode: while a question or a paper is open the shell steps back —
+  // no rail, no bottom bar, no account furniture. The page keeps its own way out.
+  const focusMode = user.role !== 'teacher'
+    && (loc.pathname === '/practice' || /^\/exams\/[^/]+/.test(loc.pathname));
+
   return (
     <AppCtx.Provider value={ctx}>
-      <div className="shell">
+      <div className={`shell${focusMode ? ' is-focus' : ''}`}>
         <a className="skip-link" href="#main" onClick={skipToMain}>{t('app.skipToMain')}</a>
         <header className="topbar">
           <Logo onClick={() => nav('/')} />
           <div className="top-stats">
-            {user.streak > 0 && <span className="chip" title={t('app.dayStreak')}><span className="flame">▲</span><b>{user.streak}</b></span>}
             <ThemeToggle />
             <AccountMenu user={user} onSwitch={switchProfile} />
           </div>
@@ -413,7 +409,7 @@ export default function App() {
           aria-controls="mobile-more"
           onClick={() => (moreOpen ? closeMore(false) : setMoreOpen(true))}
         >
-          <span className="nav-ico" aria-hidden="true">☰</span><span>{t('nav.more')}</span>
+          <span className="nav-ico" aria-hidden="true"><Icon name="more" /></span><span>{t('nav.more')}</span>
         </button>
       </nav>
 
@@ -461,7 +457,7 @@ function SidebarHistory({ recent }) {
               <span className="hist-mini-name">{it.subtopicName}</span>
               <span className={`hist-mini-pct ${cls}`}
                 aria-label={it.correct === true ? t('app.correct') : it.correct === false ? t('app.incorrect') : t('app.notMarkedYet')}>
-                {it.correct === true ? '100% ✓' : it.correct === false ? '0.0% ✗' : '—'}
+                {it.correct === true ? <Icon name="check" size={14} /> : it.correct === false ? <Icon name="correction" size={14} /> : '—'}
               </span>
             </div>
             <div className="hist-mini-preview">{stripTex(it.prompt)}</div>
@@ -550,7 +546,7 @@ function AccountMenu({ user, onSwitch }) {
         style={{ background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>
         <span className="user-avatar">{user.avatar && user.avatar !== '🙂' ? user.avatar : initials(user.name)}</span>
         {user.name.split(' ')[0]}
-        <span style={{ fontSize: 10, color: 'var(--ink-3)', marginLeft: 2 }}>▾</span>
+        <Icon name="chevronDown" size={14} />
       </button>
       {open && (
         <div className="acct-menu">
@@ -589,15 +585,15 @@ function ThemeToggle() {
   const { user, setUser } = useApp();
   const t = useT();
   const flip = async () => {
-    const theme = user.theme === 'light' ? 'dark' : 'light';
+    const theme = user.theme === 'dark' ? 'light' : 'dark';
     setUser({ ...user, theme });
     try { await api.patch('/me', { theme }); } catch { }
   };
   return (
     <button className="btn btn-quiet btn-sm" onClick={flip}
-      aria-label={user.theme === 'light' ? t('app.themeToDark') : t('app.themeToLight')}
+      aria-label={user.theme === 'dark' ? t('app.themeToLight') : t('app.themeToDark')}
       style={{ padding: '6px 9px' }}>
-      <span aria-hidden="true">{user.theme === 'light' ? '☾' : '☼'}</span>
+      <Icon name={user.theme === 'dark' ? 'sun' : 'moon'} size={17} />
     </button>
   );
 }
