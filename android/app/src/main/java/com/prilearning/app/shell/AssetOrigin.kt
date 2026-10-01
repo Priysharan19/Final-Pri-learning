@@ -41,12 +41,18 @@ object AssetOrigin {
         val path = rawPath.substringBefore('?').substringBefore('#').trimStart('/')
         if (path.split('/').any { it == ".." || it == "." } || path.contains('\\') || path.contains('\u0000')) return Resolved.NotFound
         if (path.isEmpty()) return Resolved.Asset("$WEB_ROOT/index.html", "text/html")
+        // The cloud API never lives on the bundled origin: answer it 404 rather
+        // than the SPA page, so cloud discovery cannot mistake one for the other.
+        if (path == "v1" || path.startsWith("v1/")) return Resolved.NotFound
         val last = path.substringAfterLast('/')
         if (!last.contains('.')) return Resolved.Asset("$WEB_ROOT/index.html", "text/html") // SPA route
         val ext = last.substringAfterLast('.').lowercase()
         val mime = MIME[ext] ?: return Resolved.NotFound
         return Resolved.Asset("$WEB_ROOT/$path", mime)
     }
+
+    fun notFound() = WebResourceResponse("text/plain", "utf-8", 404, "Not Found", emptyMap(),
+        ByteArrayInputStream("not in the Pri bundle".toByteArray()))
 
     private class BundledWeb(private val assets: AssetManager) : WebViewAssetLoader.PathHandler {
         override fun handle(path: String): WebResourceResponse {
@@ -62,8 +68,6 @@ object AssetOrigin {
                 Resolved.NotFound -> notFound()
             }
         }
-        private fun notFound() = WebResourceResponse("text/plain", "utf-8", 404, "Not Found", emptyMap(),
-            ByteArrayInputStream("not in the Pri bundle".toByteArray()))
     }
 
     fun loader(assets: AssetManager): WebViewAssetLoader = WebViewAssetLoader.Builder()

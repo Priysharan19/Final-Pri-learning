@@ -3,11 +3,13 @@
 //
 // On a host with a Back button (Android) the page keeps the shell told whether
 // it wants the next Back press: when a sheet or dialog is visibly open, or when
-// it is away from the home route. The shell then decides synchronously — page
-// Back or leave the app — so a slow device can never do both. When the page
-// gets Back it closes the open sheet/dialog (through the Escape handling each
-// already has) or goes back in its own history. It never discards an attempt:
-// drafts persist independently (components/drafts.js).
+// it has its own in-app history to go back through. The role landing page
+// (`/` for students, `/teach` for teachers, a restored deep entry) is the first
+// history entry, so Back there leaves the app. The shell decides synchronously
+// from the declared state — no timeout race in which a slow device does both.
+// A press that finds a dialog open only closes it (through the Escape handling
+// each dialog already has) and never also navigates; the next press decides
+// again. Drafts persist independently (components/drafts.js).
 // ─────────────────────────────────────────────────────────────────────────────
 import { priNative } from './native/index.js';
 
@@ -19,25 +21,27 @@ export function openDialog(doc = globalThis.document) {
   return [...(doc?.querySelectorAll?.('[role="dialog"]') || [])].find(visible) || null;
 }
 
+/** How many in-app entries sit behind the current one. The router stamps
+ * `history.state.idx` (0 for the entry the app was opened on; replace keeps it),
+ * and the browser restores it with the entry, so it survives reloads. */
+export function historyDepth(hist = globalThis.history) {
+  const idx = hist?.state?.idx;
+  return Number.isInteger(idx) && idx > 0 ? idx : 0;
+}
+
 /** Does the page want the next Back press? */
-export function wantsBack({ doc = globalThis.document, loc = globalThis.location } = {}) {
-  return !!openDialog(doc) || (!!loc && loc.pathname !== '/');
+export function wantsBack({ doc = globalThis.document, hist = globalThis.history } = {}) {
+  return !!openDialog(doc) || historyDepth(hist) > 0;
 }
 
 /** Act on a Back press the shell handed to the page. Returns what it did. */
-export async function performBack({
-  doc = globalThis.document,
-  loc = globalThis.location,
-  hist = globalThis.history,
-  wait = ms => new Promise(r => setTimeout(r, ms)),
-} = {}) {
+export function performBack({ doc = globalThis.document, hist = globalThis.history } = {}) {
   const open = openDialog(doc);
   if (open) {
     open.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
-    await wait(80);
-    if (!doc.contains(open) || !visible(open)) return 'closed-dialog';
+    return 'dialog-escape-sent';
   }
-  if (loc && loc.pathname !== '/' && hist) { hist.back(); return 'history-back'; }
+  if (historyDepth(hist) > 0) { hist.back(); return 'history-back'; }
   return 'nothing';
 }
 
@@ -47,7 +51,7 @@ export function installBackNavigation(win = typeof window === 'undefined' ? null
   let scheduled = false;
   const sync = () => {
     scheduled = false;
-    const wanted = wantsBack({ doc: win.document, loc: win.location });
+    const wanted = wantsBack({ doc: win.document, hist: win.history });
     if (wanted === last) return;
     last = wanted;
     priNative.lifecycle.declareBack(wanted).catch(() => { last = null; });
@@ -60,10 +64,13 @@ export function installBackNavigation(win = typeof window === 'undefined' ? null
     win.history[method] = (...args) => { const r = original(...args); soon(); return r; };
   }
   win.addEventListener('popstate', soon);
+  // Dialogs and sheets mount/unmount (childList) or toggle `hidden`; class
+  // changes are deliberately not observed — they fire on every animation and
+  // ink stroke, and each sync forces layout on low-end phones.
   if (typeof win.MutationObserver === 'function' && win.document.body) {
-    new win.MutationObserver(soon).observe(win.document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden', 'class', 'role'] });
+    new win.MutationObserver(soon).observe(win.document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden', 'role'] });
   }
-  const off = priNative.lifecycle.onBack(() => { performBack({ doc: win.document, loc: win.location, hist: win.history }).finally(soon); });
+  const off = priNative.lifecycle.onBack(() => { performBack({ doc: win.document, hist: win.history }); soon(); });
   sync();
   return off;
 }

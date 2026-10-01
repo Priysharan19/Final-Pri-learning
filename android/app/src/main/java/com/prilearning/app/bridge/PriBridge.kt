@@ -21,11 +21,17 @@ import androidx.webkit.WebViewFeature
 import com.prilearning.app.shell.AssetOrigin
 import org.json.JSONObject
 
-class PriBridge(private val webView: WebView, private val descriptor: JSONObject) {
+class PriBridge(
+    private val webView: WebView,
+    private val descriptor: JSONObject,
+    /** Called on the UI thread whenever the page's declared Back state changes. */
+    private val onBackWantedChanged: (Boolean) -> Unit = {},
+) {
     private companion object { const val TAG = "PriBridge" }
     private var reply: JavaScriptReplyProxy? = null
     private var seq = 0
-    private var backWanted = false
+    var backWanted = false
+        private set
     var state = "active"
         private set
 
@@ -42,16 +48,18 @@ class PriBridge(private val webView: WebView, private val descriptor: JSONObject
         return true
     }
 
-    /** A new main-frame document starts its own event sequence and reply channel. */
-    fun documentStarted() {
-        seq = 0
-        reply = null
-        backWanted = false
-    }
-
     private fun onMessage(message: WebMessageCompat, sourceOrigin: Uri, isMainFrame: Boolean, proxy: JavaScriptReplyProxy) {
         if (!isMainFrame || sourceOrigin.toString().trimEnd('/') != AssetOrigin.ORIGIN) return
-        reply = proxy
+        // Each main-frame document has its own reply proxy. The first message on
+        // a new one starts that document's event sequence and Back state; doing
+        // it here (not in onPageStarted, whose timing relative to the new
+        // document's first messages is not guaranteed) can never lose a
+        // declaration the new document already made.
+        if (proxy !== reply) {
+            reply = proxy
+            seq = 0
+            setBackWanted(false)
+        }
         when (val inbound = Envelope.parse(message.data)) {
             is Envelope.Inbound.FromPage -> handle(inbound.request, proxy)
             is Envelope.Inbound.AnswerToNative -> Unit // no native→JS requests are in flight on Android today
@@ -70,12 +78,18 @@ class PriBridge(private val webView: WebView, private val descriptor: JSONObject
             "device.facts" -> Envelope.ok(req.id, JSONObject().put("safeAreaApplied", true).put("stylusSeen", false))
             "lifecycle.state" -> Envelope.ok(req.id, JSONObject().put("state", state))
             "lifecycle.setBackHandled" -> {
-                backWanted = req.payload.optBoolean("handled", false)
+                setBackWanted(req.payload.optBoolean("handled", false))
                 Envelope.ok(req.id)
             }
             else -> if (req.op == "cancel") null else Envelope.fail(req.id, "UNSUPPORTED", "${req.cap}.${req.op} is not supported by this app version.")
         }
         if (out != null) send(proxy, out)
+    }
+
+    private fun setBackWanted(wanted: Boolean) {
+        if (wanted == backWanted) return
+        backWanted = wanted
+        onBackWantedChanged(wanted)
     }
 
     fun setLifecycle(next: String) {
@@ -85,20 +99,19 @@ class PriBridge(private val webView: WebView, private val descriptor: JSONObject
     }
 
     /**
-     * Android Back. The page keeps the shell told whether it wants Back
-     * (`lifecycle.setBackHandled`: a sheet/dialog is open, or it is away from
-     * home), so the decision here is synchronous — no timeout race in which the
-     * shell exits while the page is still navigating. If the page wants it, a
-     * one-way `lifecycle.back` event lets it close the sheet or go back.
+     * Android Back, delivered only while the page has declared it wants Back
+     * (`lifecycle.setBackHandled`: a sheet/dialog is open, or it has in-app
+     * history). The activity keeps its Back callback enabled exactly while that
+     * is true, so otherwise the system default runs (predictive back-to-home,
+     * task moved to the background). Returns false when there is no live
+     * channel to hand it to, so the caller can fall back to the default.
      */
-    fun requestBack(unhandled: () -> Unit) {
+    fun deliverBack(): Boolean {
         val proxy = reply
         Log.i(TAG, "back: pageWants=$backWanted channel=${proxy != null}")
-        if (backWanted && proxy != null) {
-            send(proxy, Envelope.event("lifecycle.back", seq++, JSONObject()))
-        } else {
-            unhandled()
-        }
+        if (!backWanted || proxy == null) return false
+        send(proxy, Envelope.event("lifecycle.back", seq++, JSONObject()))
+        return true
     }
 
     /** Every reply/event goes through here; a proxy only exists after the

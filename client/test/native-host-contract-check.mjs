@@ -407,22 +407,31 @@ ok(normalizeCode('SOMETHING_NEW_FROM_A_SHELL') === 'INTERNAL', 'unknown codes be
   ok(listeners.length === 1, 'priNative listens for Android WebMessage replies exactly once');
   ok(typeof sent[0] === 'object' && sent[0].cap === 'host' && sent[0].op === 'ready', 'and posts envelopes to priBridge as JSON strings');
   // A native → JS Back question answered through the same channel.
-  const { wantsBack, performBack } = await import('../src/platform/backNavigation.js');
+  const { wantsBack, performBack, historyDepth } = await import('../src/platform/backNavigation.js');
   globalThis.KeyboardEvent ??= class { constructor(type, init) { this.type = type; Object.assign(this, init); } };
-  const noop = async () => {};
+  const atLanding = { state: { idx: 0 }, back() { throw new Error('must not navigate from the landing entry'); } };
   let closed = false;
   const sheet = { hidden: false, getClientRects: () => (closed ? [] : [1]), dispatchEvent: e => { if (e.key === 'Escape') closed = true; return true; } };
   const docWithSheet = { querySelector: s => (s === '.mnav-sheet' ? sheet : null), querySelectorAll: () => [], contains: () => true };
-  ok(wantsBack({ doc: docWithSheet, loc: { pathname: '/' } }) === true, 'an open sheet means the page wants Back, even at home');
-  ok(await performBack({ doc: docWithSheet, loc: { pathname: '/practice' }, hist: { back() { throw new Error('must not navigate'); } }, wait: noop }) === 'closed-dialog',
-    'Back closes the open sheet (and does not also navigate)');
+  ok(wantsBack({ doc: docWithSheet, hist: atLanding }) === true, 'an open sheet means the page wants Back, even on the landing entry');
+  ok(performBack({ doc: docWithSheet, hist: { state: { idx: 3 }, back() { throw new Error('must not navigate'); } } }) === 'dialog-escape-sent' && closed,
+    'Back closes the open sheet and does not also navigate');
+  const stubborn = { hidden: false, getClientRects: () => [1], dispatchEvent: () => true }; // ignores Escape (e.g. a confirmation)
+  const docStubborn = { querySelector: () => null, querySelectorAll: () => [stubborn], contains: () => true };
+  ok(performBack({ doc: docStubborn, hist: { state: { idx: 2 }, back() { throw new Error('must not navigate'); } } }) === 'dialog-escape-sent',
+    'a dialog that stays visible after Escape never lets the same press navigate');
   const hiddenDialog = { hidden: false, getClientRects: () => [] };
   const route = { querySelector: () => null, querySelectorAll: () => [hiddenDialog], contains: () => true };
   let wentBack = false;
-  ok(wantsBack({ doc: route, loc: { pathname: '/practice' } }) === true && wantsBack({ doc: route, loc: { pathname: '/' } }) === false,
-    'away from home the page wants Back; at home with nothing visibly open it does not (an invisible dialog is ignored)');
-  ok(await performBack({ doc: route, loc: { pathname: '/practice' }, hist: { back() { wentBack = true; } }, wait: noop }) === 'history-back' && wentBack,
+  ok(wantsBack({ doc: route, hist: { state: { idx: 1 } } }) === true && wantsBack({ doc: route, hist: atLanding }) === false,
+    'with in-app history the page wants Back; on the landing entry with nothing visibly open it does not (an invisible dialog is ignored)');
+  ok(wantsBack({ doc: route, hist: { state: { idx: 0 } } }) === false && wantsBack({ doc: route, hist: { state: null } }) === false,
+    'a teacher landing on /teach (replace keeps idx 0) or a restored deep entry can leave the app with Back');
+  ok(historyDepth({ state: { idx: -1 } }) === 0 && historyDepth({ state: { idx: '2' } }) === 0 && historyDepth({ state: { idx: 4 } }) === 4,
+    'only a non-negative integer router index counts as history depth');
+  ok(performBack({ doc: route, hist: { state: { idx: 1 }, back() { wentBack = true; } } }) === 'history-back' && wentBack,
     'with no sheet open, Back goes back in the page history');
+  ok(performBack({ doc: route, hist: atLanding }) === 'nothing', 'on the landing entry the page does nothing (the shell had already let the system handle it)');
   const sentBefore = sent.length;
   priNative.lifecycle.declareBack(true).catch(() => {}); // the fake shell does not answer
   await tick(5);
