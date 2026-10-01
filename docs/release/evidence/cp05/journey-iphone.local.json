@@ -1,0 +1,125 @@
+{
+  "schemaVersion": 1,
+  "evidenceClass": "SYNTHETIC_SIMULATOR",
+  "physicalDevice": false,
+  "sha": "34fbdb5d30147287dc9796059960e410ceeba3c1",
+  "simulator": {
+    "name": "iPhone 18 Pro",
+    "udid": "9BC565C4-0073-4759-BB56-FB53A475BB93",
+    "runtime": "iOS 27.0 (27.0 - 24A434) - com.apple.CoreSimulator.SimRuntime.iOS-27-0"
+  },
+  "workflow": "local",
+  "run": null,
+  "timestamp": "2026-10-01T23:02:50.410Z",
+  "steps": {
+    "launch": {
+      "ok": true,
+      "detail": "prilearning://app/"
+    },
+    "onboarding": {
+      "ok": true,
+      "detail": "compact"
+    },
+    "practice": {
+      "ok": true,
+      "detail": "question shown"
+    },
+    "typedAttempt": {
+      "ok": true,
+      "detail": "marked after 2 question(s)"
+    },
+    "feedback": {
+      "ok": true,
+      "detail": "✗ Not quite. Not quite — check your working and try once more."
+    },
+    "nextQuestion": {
+      "ok": true,
+      "detail": "advanced"
+    },
+    "nativeInk": {
+      "ok": true,
+      "detail": "stylus=false fingerDefault=true engine=native-rescue text=\"?+\""
+    },
+    "nativePhoto": {
+      "ok": true,
+      "detail": "engine=apple-vision-photo-v1 text=\"2x+3=11\""
+    },
+    "progress": {
+      "ok": true,
+      "detail": "progress shown"
+    },
+    "persistenceMarker": {
+      "ok": true,
+      "detail": "written"
+    },
+    "relaunchProfile": {
+      "ok": true,
+      "detail": "profile survived"
+    },
+    "relaunchMarker": {
+      "ok": true,
+      "detail": "prilearning://app"
+    },
+    "cloudSignUp": {
+      "ok": true,
+      "detail": "Connected"
+    },
+    "cloudLogin": {
+      "ok": true,
+      "detail": "connected as the new account"
+    },
+    "cloudDeleteAccount": {
+      "ok": true,
+      "detail": "deleted; offline profile kept"
+    },
+    "serverDeletedAccountRefused": {
+      "ok": true,
+      "detail": "login 401"
+    },
+    "cloudSignIn": {
+      "ok": true,
+      "detail": "connected"
+    },
+    "cloudSync": {
+      "ok": true,
+      "detail": "Sync complete: 0 learning event(s), 1 record(s) pushed; 0 event(s), 1 record(s) received."
+    },
+    "offlinePractice": {
+      "ok": true,
+      "detail": "practice works offline"
+    },
+    "offlineSyncSafe": {
+      "ok": true,
+      "detail": "Linked · offline · Pri Learning can’t reach the cloud right now. Practice keeps"
+    },
+    "cloudSessionKept": {
+      "ok": true,
+      "detail": "connected after relaunch"
+    },
+    "cloudReconnectSync": {
+      "ok": true,
+      "detail": "Sync complete: 0 learning event(s), 0 record(s) pushed; 0 event(s), 0 record(s) received."
+    },
+    "cloudDisconnect": {
+      "ok": true,
+      "detail": "disconnected"
+    },
+    "dynamicTypeZoom": {
+      "ok": true,
+      "detail": "cssWidth=360 screen=402 rootFont=16"
+    },
+    "dynamicTypeNoOverflow": {
+      "ok": true,
+      "detail": "/:0 /practice:0 /progress:0 /settings:0"
+    },
+    "backgroundDraftKept": {
+      "ok": true,
+      "detail": "lifecycle inactive>hidden>hidden>visible>inactive>visible, draft kept"
+    },
+    "a11yAudit": {
+      "ok": true,
+      "detail": "4 screens: names, labels, lang, headings, tab order, 44px targets"
+    }
+  },
+  "result": "PASS"
+}
