@@ -49,6 +49,10 @@ sleep 2
 if adb shell pidof com.prilearning.app >/dev/null 2>&1; then echo "the app process survived force-stop" >&2; exit 1; fi
 run relaunchAfterProcessDeath "$@"
 summary="journey, process death, relaunch"
+if [ "$EXPECT" != "floor" ]; then
+  run "com.prilearning.app.FileExchangeTest#shareFilePickerCameraAndPrint" "$@"
+  summary="$summary, share/picker/camera/print"
+fi
 
 if [ -n "${PRI_CLOUD_ORIGIN:-}" ] && [ "$EXPECT" != "floor" ]; then
   CLOUD="com.prilearning.app.CloudJourneyTest"

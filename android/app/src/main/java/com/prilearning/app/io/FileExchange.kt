@@ -17,6 +17,9 @@ package com.prilearning.app.io
 import android.app.Activity
 import android.content.ClipData
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Handler
+import android.os.Looper
 import android.net.Uri
 import android.print.PrintAttributes
 import android.print.PrintManager
@@ -30,6 +33,8 @@ import androidx.activity.result.ActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.FileProvider
 import java.io.File
+import java.util.UUID
+import java.util.concurrent.Executors
 
 class FileExchange(private val activity: ComponentActivity) {
     sealed class Result {
@@ -41,6 +46,20 @@ class FileExchange(private val activity: ComponentActivity) {
     private var shareDone: ((Result) -> Unit)? = null
     private var chooserCallback: ValueCallback<Array<Uri>>? = null
     private var cameraUri: Uri? = null
+    private val cameraGrants = mutableListOf<String>()
+    private val io = Executors.newSingleThreadExecutor()
+    private val main = Handler(Looper.getMainLooper())
+
+    init {
+        // Exports and photos of student work do not linger: anything older than
+        // an hour from a previous session is removed.
+        io.execute { for (dir in listOf("share", "capture")) pruneOlderThan(File(activity.cacheDir, dir), 60 * 60_000L) }
+    }
+
+    private fun pruneOlderThan(dir: File, ageMs: Long) {
+        val cutoff = System.currentTimeMillis() - ageMs
+        dir.listFiles()?.forEach { if (it.lastModified() < cutoff) it.deleteRecursively() }
+    }
 
     // Registered in the constructor, which MainActivity runs in onCreate (before STARTED).
     private val shareLauncher = activity.registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { r: ActivityResult ->
@@ -56,6 +75,7 @@ class FileExchange(private val activity: ComponentActivity) {
         chooserCallback = null
         val camera = cameraUri
         cameraUri = null
+        revokeCameraGrants(camera)
         if (callback == null) return@registerForActivityResult
         if (r.resultCode != Activity.RESULT_OK) { callback.onReceiveValue(null); return@registerForActivityResult }
         val data = r.data
@@ -73,19 +93,37 @@ class FileExchange(private val activity: ComponentActivity) {
 
     fun share(payload: org.json.JSONObject, done: (Result) -> Unit) {
         if (shareDone != null) return done(Result.Failed("UNAVAILABLE", "A share sheet is already open."))
+        shareDone = done // reserved now: one sheet at a time, even while the file is being written
         val name = FileRules.safeFilename(payload.optString("filename", ""))
         val mime = FileRules.safeMime(payload.optString("mimeType", ""))
+        // Decoding and writing up to 6 MB happens off the UI thread.
+        io.execute {
+            val prepared: Any = try { prepare(payload, name) } catch (e: Exception) { Result.Failed("PROVIDER_ERROR", "Could not prepare the file.") }
+            main.post {
+                if (prepared is Result.Failed) { shareDone = null; done(prepared); return@post }
+                launchShare(prepared as Uri, name, mime, done)
+            }
+        }
+    }
+
+    /** Writes the file into its own folder under cache/share; returns its content:// URI or a failure. */
+    private fun prepare(payload: org.json.JSONObject, name: String): Any {
         val bytes: ByteArray = when {
             payload.has("text") -> payload.optString("text").toByteArray(Charsets.UTF_8)
             payload.has("base64") -> try { Base64.decode(payload.optString("base64"), Base64.DEFAULT) }
-                catch (_: IllegalArgumentException) { return done(Result.Failed("BAD_REQUEST", "The file content is not valid base64.")) }
-            else -> return done(Result.Failed("BAD_REQUEST", "share.file needs text or base64 content."))
+                catch (_: IllegalArgumentException) { return Result.Failed("BAD_REQUEST", "The file content is not valid base64.") }
+            else -> return Result.Failed("BAD_REQUEST", "share.file needs text or base64 content.")
         }
-        if (bytes.size > FileRules.MAX_SHARE_BYTES) return done(Result.Failed("TOO_LARGE", "That file is too large to share."))
-        val dir = File(activity.cacheDir, "share").apply { deleteRecursively(); mkdirs() }
+        if (bytes.size > FileRules.MAX_SHARE_BYTES) return Result.Failed("TOO_LARGE", "That file is too large to share.")
+        val root = File(activity.cacheDir, "share")
+        pruneOlderThan(root, 60 * 60_000L) // never the folder an app may still be reading
+        val dir = File(root, UUID.randomUUID().toString()).apply { mkdirs() }
         val file = File(dir, name)
-        try { file.writeBytes(bytes) } catch (_: Exception) { return done(Result.Failed("PROVIDER_ERROR", "Could not prepare the file.")) }
-        val uri = FileProvider.getUriForFile(activity, authority, file)
+        file.writeBytes(bytes)
+        return FileProvider.getUriForFile(activity, authority, file)
+    }
+
+    private fun launchShare(uri: Uri, name: String, mime: String, done: (Result) -> Unit) {
         val send = Intent(Intent.ACTION_SEND).apply {
             type = mime
             putExtra(Intent.EXTRA_STREAM, uri)
@@ -93,7 +131,6 @@ class FileExchange(private val activity: ComponentActivity) {
             clipData = ClipData.newRawUri(name, uri)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
-        shareDone = done
         try {
             shareLauncher.launch(Intent.createChooser(send, name))
         } catch (_: Exception) {
@@ -137,25 +174,45 @@ class FileExchange(private val activity: ComponentActivity) {
             true
         } catch (_: Exception) {
             chooserCallback = null
+            revokeCameraGrants(cameraUri)
             cameraUri = null
             callback.onReceiveValue(null)
             true
         }
     }
 
+    fun dispose() { io.shutdown() }
+
     private fun cameraFile() = File(File(activity.cacheDir, "capture").apply { mkdirs() }, "photo.jpg")
     private fun cameraFileHasContent() = cameraFile().let { it.isFile && it.length() > 0 }
 
     private fun cameraIntent(): Intent? {
         val capture = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
-        if (capture.resolveActivity(activity.packageManager) == null) return null
+        @Suppress("DEPRECATION")
+        val cameras = activity.packageManager.queryIntentActivities(capture, PackageManager.MATCH_DEFAULT_ONLY)
+        if (cameras.isEmpty()) return null
         val file = cameraFile().apply { delete() }
         val uri = FileProvider.getUriForFile(activity, authority, file)
         cameraUri = uri
+        // A capture intent offered inside a chooser may not carry its grant
+        // flags through, so each camera app is granted write access to this one
+        // URI explicitly, and the grants are revoked when the picker returns.
+        val flags = Intent.FLAG_GRANT_WRITE_URI_PERMISSION or Intent.FLAG_GRANT_READ_URI_PERMISSION
+        for (info in cameras) {
+            val pkg = info.activityInfo.packageName
+            activity.grantUriPermission(pkg, uri, flags)
+            cameraGrants += pkg
+        }
         return capture.apply {
             putExtra(MediaStore.EXTRA_OUTPUT, uri)
             clipData = ClipData.newRawUri("photo", uri)
-            addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION or Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            addFlags(flags)
         }
+    }
+
+    private fun revokeCameraGrants(uri: Uri?) {
+        if (uri == null) return
+        activity.revokeUriPermission(uri, Intent.FLAG_GRANT_WRITE_URI_PERMISSION or Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        cameraGrants.clear()
     }
 }

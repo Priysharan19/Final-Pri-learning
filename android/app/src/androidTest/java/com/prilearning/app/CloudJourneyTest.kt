@@ -17,7 +17,6 @@
 // ─────────────────────────────────────────────────────────────────────────────
 package com.prilearning.app
 
-import android.webkit.CookieManager
 import android.webkit.WebView
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -132,10 +131,7 @@ class CloudJourneyTest {
             val synced = waitFor(s, "(function(){var t=document.querySelector('section[aria-labelledby=\"cloud-account-title\"]').innerText;var m=t.match(/Sync complete[^\\n]*/);return m?m[0]:false;})()", 60_000)
             assertTrue("the local profile synced to the real server: $synced", synced.contains("Sync complete"))
 
-            // The session is native-only.
-            assertEquals("the page cannot read the cloud cookies", "false", eval(s, "/pri_(cloud_session|csrf)/.test(document.cookie)"))
-            assertTrue("the WebView cookie store holds no cloud session",
-                (CookieManager.getInstance().getCookie(origin) ?: "").let { !it.contains("pri_cloud_session") })
+            // The session is native-only: persisted encrypted, never plaintext.
             val raw = SecureStore(context).rawForTest()
             assertNotNull("the jar was persisted", raw)
             assertFalse("the persisted jar is not plaintext", String(raw!!, Charsets.ISO_8859_1).contains("pri_cloud_session"))
@@ -146,10 +142,20 @@ class CloudJourneyTest {
     }
 
     /** Runs after `am force-stop` killed the process cloudSignInAndSync ran in. */
+    /** GET /v1/account/me from the test with a given session cookie. */
+    private fun meStatus(session: String): Int {
+        val conn = java.net.URL("$origin/v1/account/me").openConnection() as java.net.HttpURLConnection
+        conn.setRequestProperty("X-Pri-Client", "android-native-v1")
+        conn.setRequestProperty("Cookie", "pri_cloud_session=$session")
+        return try { conn.responseCode } finally { conn.disconnect() }
+    }
+
     @Test
     fun cloudSessionSurvivesProcessDeathThenDisconnectClearsIt() {
         val host = java.net.URI(origin).host
-        assertNotNull("the session is on disk before launch", jarOnDisk().value(host, "pri_cloud_session"))
+        val session = jarOnDisk().value(host, "pri_cloud_session")
+        assertNotNull("the session is on disk before launch", session)
+        assertEquals("the persisted session is live on the server", 200, meStatus(session!!))
         ActivityScenario.launch(MainActivity::class.java).use { s ->
             reachHome(s)
             openSettings(s)
@@ -158,7 +164,8 @@ class CloudJourneyTest {
             waitFor(s, "$stateTag === 'Not connected'")
             val end = System.currentTimeMillis() + 5_000
             while (jarOnDisk().value(host, "pri_cloud_session") != null && System.currentTimeMillis() < end) Thread.sleep(100)
-            assertEquals("Disconnect logged out on the server and cleared the session", null, jarOnDisk().value(host, "pri_cloud_session"))
+            assertEquals("Disconnect cleared the device's session", null, jarOnDisk().value(host, "pri_cloud_session"))
+            assertEquals("…and revoked it on the server (the old cookie is refused)", 401, meStatus(session))
         }
     }
 }

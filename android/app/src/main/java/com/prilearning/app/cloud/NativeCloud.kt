@@ -46,6 +46,10 @@ class NativeCloud(
     }
 
     private val calls = ConcurrentHashMap<String, Call>()
+    // Applying Set-Cookie and writing the jar happen under one lock, in order:
+    // a logout that lands while another response refreshes the session can never
+    // be overwritten on disk by the older snapshot.
+    private val persistLock = Any()
     val configured: Boolean get() = origin != null
     val inFlight: Int get() = calls.size
 
@@ -80,10 +84,15 @@ class NativeCloud(
         val idempotency = payload.optString("idempotencyKey", "").takeIf { CloudConfig.safeHeader(it) }
         val call = Call()
         calls.put(id, call)?.let { previous -> previous.cancelled = true; previous.connection?.disconnect() }
-        call.future = executor.submit {
-            val outcome = perform(base, path, method, body, requestId, idempotency, call)
+        call.future = try {
+            executor.submit {
+                val outcome = perform(base, path, method, body, requestId, idempotency, call)
+                calls.remove(id, call)
+                if (!call.cancelled) done(outcome)
+            }
+        } catch (_: java.util.concurrent.RejectedExecutionException) {
             calls.remove(id, call)
-            if (!call.cancelled) done(outcome)
+            return done(Outcome.Failure("UNAVAILABLE", "CLOUD_SHUTDOWN", "The cloud transport is shutting down."))
         }
     }
 
@@ -117,8 +126,10 @@ class NativeCloud(
             val status = conn.responseCode
             val setCookies = conn.headerFields.entries.filter { it.key.equals("Set-Cookie", ignoreCase = true) }.flatMap { it.value }
             if (setCookies.isNotEmpty()) {
-                jar.store(host, setCookies)
-                persist(jar.serialize())
+                synchronized(persistLock) {
+                    jar.store(host, setCookies)
+                    persist(jar.serialize())
+                }
             }
             val stream: InputStream? = if (status >= 400) conn.errorStream else conn.inputStream
             val bytes = stream?.use { readCapped(it, CloudConfig.MAX_RESPONSE_BYTES) } ?: ByteArray(0)
@@ -161,10 +172,13 @@ class NativeCloud(
         for (id in calls.keys.toList()) cancel(id)
     }
 
-    /** Sign this device out locally (used when the jar cannot be trusted). */
+    /** Forget the session on this device (Disconnect), whether or not the
+     *  server logout succeeded — e.g. while offline. */
     fun forgetSession() {
-        jar.clear()
-        persist(jar.serialize())
+        synchronized(persistLock) {
+            jar.clear()
+            persist(jar.serialize())
+        }
     }
 
     fun shutdown() {

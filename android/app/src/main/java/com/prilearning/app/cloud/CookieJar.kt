@@ -30,6 +30,8 @@ class CookieJar(private val now: () -> Long = System::currentTimeMillis) {
         const val MAX_COOKIES = 40
         const val MAX_VALUE = 4096
         val NAME = Regex("^[A-Za-z0-9!#$%&'*+.^_`|~-]{1,64}$")
+        // RFC 6265 cookie-octet: nothing that could break or split a Cookie header.
+        val VALUE = Regex("^[\\x21\\x23-\\x2B\\x2D-\\x3A\\x3C-\\x5B\\x5D-\\x7E]*$")
     }
 
     private val cookies = LinkedHashMap<String, Cookie>()
@@ -77,7 +79,7 @@ class CookieJar(private val now: () -> Long = System::currentTimeMillis) {
         val h = host.lowercase()
         for (header in setCookieHeaders) {
             val c = parse(header) ?: continue
-            if (!NAME.matches(c.name) || c.value.length > MAX_VALUE) continue
+            if (!NAME.matches(c.name) || c.value.length > MAX_VALUE || !VALUE.matches(c.value)) continue
             // Host-only: a Domain attribute is honoured only when it names this host.
             val domain = c.domain?.trimStart('.')?.lowercase()
             if (!domain.isNullOrEmpty() && domain != h) continue
@@ -149,7 +151,7 @@ class CookieJar(private val now: () -> Long = System::currentTimeMillis) {
         for (i in 0 until minOf(list.length(), MAX_COOKIES)) {
             val o = list.optJSONObject(i) ?: continue
             val name = o.optString("n"); val value = o.optString("v")
-            if (!NAME.matches(name) || value.length > MAX_VALUE) continue
+            if (!NAME.matches(name) || value.length > MAX_VALUE || !VALUE.matches(value)) continue
             val c = Cookie(name, value, o.optString("h").lowercase(), o.optString("p", "/"), o.optLong("e"), o.optBoolean("s"))
             cookies["${c.host}|${c.path}|${c.name}"] = c
         }

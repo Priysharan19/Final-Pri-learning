@@ -18,7 +18,18 @@ object FileRules {
     fun safeFilename(raw: String?): String {
         val cleaned = (raw ?: "").replace(Regex("[\\\\/:*?\"<>|\\u0000-\\u001f]"), "-")
             .trim().trimStart('.').take(120).trim()
-        return cleaned.ifEmpty { "pri-export" }
+        // Filesystems limit names in bytes: keep at most 120 UTF-8 bytes, cut on a
+        // character boundary, so a long Hindi or CJK name still saves.
+        val sb = StringBuilder()
+        var bytes = 0
+        var i = 0
+        while (i < cleaned.length) {
+            val cp = cleaned.codePointAt(i)
+            val n = String(Character.toChars(cp)).toByteArray(Charsets.UTF_8).size
+            if (bytes + n > 120) break
+            sb.appendCodePoint(cp); bytes += n; i += Character.charCount(cp)
+        }
+        return sb.toString().trim().ifEmpty { "pri-export" }
     }
 
     fun safeMime(raw: String?): String = raw?.takeIf { MIME.matches(it) }?.lowercase() ?: "application/octet-stream"

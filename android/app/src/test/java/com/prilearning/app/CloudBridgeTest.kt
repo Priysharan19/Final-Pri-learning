@@ -80,6 +80,10 @@ class CloudBridgeTest {
         // A corrupt or foreign persisted jar loads as empty.
         assertTrue(CookieJar().apply { load("{nope") }.isEmpty())
         assertTrue(CookieJar().apply { load("""{"v":9,"cookies":[]}""") }.isEmpty())
+        // A value that could break or split the Cookie header is never stored.
+        val strict = CookieJar { now }
+        strict.store("api.example", listOf("pri_csrf=a\u0001b; Max-Age=60", "x=a,b; Max-Age=60", "y=a\\b; Max-Age=60", "ok=fine-value_1; Max-Age=60"))
+        assertEquals("ok=fine-value_1", strict.header("api.example", "/", https = true))
     }
 
     @Test fun fileRulesSanitiseNamesAndMapAcceptTypes() {
@@ -88,6 +92,9 @@ class CloudBridgeTest {
         assertEquals("pri-export", FileRules.safeFilename("..."))
         assertEquals("a-b-c.json", FileRules.safeFilename("a/b\\c.json"))
         assertEquals(120, FileRules.safeFilename("x".repeat(500)).length)
+        val hindi = FileRules.safeFilename("गणित".repeat(60) + ".json")
+        assertTrue("names are capped at 120 UTF-8 bytes (${hindi.toByteArray().size})", hindi.toByteArray(Charsets.UTF_8).size in 100..120)
+        assertTrue("…cut on a character boundary", hindi.all { it.code != 0xFFFD })
         assertEquals("application/json", FileRules.safeMime("application/json"))
         assertEquals("application/octet-stream", FileRules.safeMime("text/html; charset=utf-8\r\nX: y"))
         assertArrayEquals(arrayOf("application/json", "application/octet-stream", "text/plain"), FileRules.pickerMimeTypes(arrayOf(".json,application/json")))
@@ -134,6 +141,9 @@ class CloudBridgeTest {
             "/v1/account/logout" -> respond(socket, 200, "{}", listOf(
                 "Set-Cookie" to "pri_cloud_session=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT",
                 "Set-Cookie" to "pri_csrf=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT"))
+            "/v1/refresh" -> respond(socket, 200, "{}", listOf(
+                "Set-Cookie" to "pri_cloud_session=sess2; Path=/; Max-Age=3600; HttpOnly; SameSite=Lax",
+                "Set-Cookie" to "pri_csrf=tok2; Path=/; Max-Age=3600; SameSite=Lax"))
             "/v1/redirect" -> respond(socket, 302, "", listOf("Location" to "http://127.0.0.1:${server.localPort}/steal"))
             "/v1/huge" -> respond(socket, 200, "x".repeat(CloudConfig.MAX_RESPONSE_BYTES + 10))
             "/v1/slow" -> { gate.await(10, TimeUnit.SECONDS); try { respond(socket, 200, "{}") } catch (_: Exception) {} }
@@ -223,6 +233,26 @@ class CloudBridgeTest {
         assertFalse("a cancelled request never answers", answered)
         assertEquals(0, cloud.inFlight)
         cloud.shutdown()
+    }
+
+    @Test fun whatIsOnDiskAlwaysMatchesTheJarEvenWhenLogoutRacesARefresh() {
+        val jar = CookieJar()
+        @Volatile var lastWritten = ""
+        val cloud = NativeCloud(origin(), jar, persist = { lastWritten = it }, executor = java.util.concurrent.Executors.newFixedThreadPool(4))
+        repeat(25) { round ->
+            val latch = CountDownLatch(2)
+            cloud.request("r$round", JSONObject("""{"path":"/v1/refresh","method":"GET"}""")) { latch.countDown() }
+            cloud.request("l$round", JSONObject("""{"path":"/v1/account/logout","method":"POST","body":"{}"}""")) { latch.countDown() }
+            assertTrue(latch.await(10, TimeUnit.SECONDS))
+            assertEquals("round $round: the persisted jar is exactly the jar in memory", jar.serialize(), lastWritten)
+        }
+        cloud.forgetSession()
+        assertTrue(jar.isEmpty())
+        assertFalse("forgetSession persists the empty jar", lastWritten.contains("pri_cloud_session"))
+        cloud.shutdown()
+        var answered: NativeCloud.Outcome? = null
+        cloud.request("after", JSONObject("""{"path":"/v1/health","method":"GET"}""")) { answered = it }
+        assertEquals("a request after shutdown answers instead of throwing", "UNAVAILABLE", (answered as NativeCloud.Outcome.Failure).code)
     }
 
     @Test fun anUnconfiguredBuildFailsClosedWithoutTouchingTheNetwork() {

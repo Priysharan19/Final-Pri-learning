@@ -93,6 +93,12 @@ class PriBridge(
                 null
             }
             "cloud.cancel" -> { cloud?.cancel(req.payload.optString("target", "")); null }
+            "cloud.forgetSession" -> {
+                val c = cloud ?: return send(proxy, Envelope.fail(req.id, "UNSUPPORTED", "cloud.forgetSession is not supported by this app version."))
+                c.cancelAll()
+                c.forgetSession()
+                Envelope.ok(req.id)
+            }
             "share.file" -> {
                 val f = files ?: return send(proxy, Envelope.fail(req.id, "UNSUPPORTED", "share.file is not supported by this app version."))
                 f.share(req.payload) { r -> answerLater(proxy, fileReply(req.id, r)) }

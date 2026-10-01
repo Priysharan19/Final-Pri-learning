@@ -14,7 +14,10 @@ import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Log
 import java.io.File
+import android.security.keystore.KeyPermanentlyInvalidatedException
 import java.security.KeyStore
+import java.security.UnrecoverableKeyException
+import javax.crypto.AEADBadTagException
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
@@ -28,10 +31,14 @@ class SecureStore(context: Context, name: String = "pri-cloud-jar.bin") {
         const val IV_BYTES = 12
         const val TAG_BITS = 128
         const val MAX_FILE = 256 * 1024
+        // One lock for the process: an activity recreated while the previous
+        // one's requests are still finishing must not interleave writes.
+        private val lock = Any()
     }
 
+    private class Corrupt : Exception()
+
     private val file = File(context.noBackupFilesDir, name)
-    private val lock = Any()
 
     private fun key(): SecretKey {
         val ks = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
@@ -49,13 +56,19 @@ class SecureStore(context: Context, name: String = "pri-cloud-jar.bin") {
         if (!file.isFile) return null
         try {
             val bytes = file.readBytes()
-            require(bytes.size in (IV_BYTES + 16)..MAX_FILE)
+            if (bytes.size !in (IV_BYTES + 16)..MAX_FILE) throw Corrupt()
             val cipher = Cipher.getInstance(TRANSFORMATION)
             cipher.init(Cipher.DECRYPT_MODE, key(), GCMParameterSpec(TAG_BITS, bytes, 0, IV_BYTES))
             String(cipher.doFinal(bytes, IV_BYTES, bytes.size - IV_BYTES), Charsets.UTF_8)
         } catch (e: Exception) {
-            Log.w(TAG, "cookie jar unreadable; signing this device out (${e.javaClass.simpleName})")
-            file.delete()
+            // Only a file that can never be read again is deleted (tampered,
+            // truncated, or its key is gone). A transient Keystore failure —
+            // "busy" right after boot, OEM flakiness — keeps the file: this
+            // process runs signed out and the next launch reads it normally.
+            val permanent = e is Corrupt || e is AEADBadTagException || e is UnrecoverableKeyException ||
+                e is KeyPermanentlyInvalidatedException
+            Log.w(TAG, "cookie jar unreadable (${e.javaClass.simpleName}); ${if (permanent) "signing this device out" else "keeping it for the next launch"}")
+            if (permanent) file.delete()
             null
         }
     }
@@ -65,7 +78,7 @@ class SecureStore(context: Context, name: String = "pri-cloud-jar.bin") {
             val cipher = Cipher.getInstance(TRANSFORMATION)
             cipher.init(Cipher.ENCRYPT_MODE, key())
             val sealed = cipher.iv + cipher.doFinal(text.toByteArray(Charsets.UTF_8))
-            val tmp = File(file.parentFile, "${file.name}.tmp")
+            val tmp = File(file.parentFile, "${file.name}.${System.nanoTime()}.tmp")
             tmp.writeBytes(sealed)
             if (!tmp.renameTo(file)) { file.delete(); tmp.renameTo(file) }
         } catch (e: Exception) {
