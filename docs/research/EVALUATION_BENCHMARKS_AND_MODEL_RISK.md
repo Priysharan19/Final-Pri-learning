@@ -441,7 +441,7 @@ https://csrc.nist.gov/pubs/ai/100/2/e2025/final
 NIST's 2026 work on AI-agent security highlights risks created by systems that can consume untrusted information and take actions.
 
 Source:
-https://www.nist.gov/caisi/ai-agent-security
+https://www.nist.gov/publications/summary-analysis-responses-request-information-regarding-security-considerations-ai
 
 OWASP's LLM/GenAI guidance is useful for implementation threat classes such as prompt injection, improper output handling, vector/embedding weaknesses and excessive agency.
 
