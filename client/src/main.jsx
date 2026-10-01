@@ -21,7 +21,8 @@ priNative.start();
 // data-ff / data-short / data-pointer on <html>: semantic form factor (CP-03).
 installFormFactorAttributes(window);
 // Android Back asks the page first: open sheets/dialogs close (CP-06).
-installBackNavigation();
+// (after first paint the body exists for the dialog observer)
+queueMicrotask(() => installBackNavigation(window));
 installReleaseIdentityDiagnostics(window);
 
 // Account verification/password-reset links carry their secret only in the URL

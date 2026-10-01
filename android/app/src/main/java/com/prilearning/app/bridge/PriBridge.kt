@@ -12,8 +12,6 @@ package com.prilearning.app.bridge
 
 import android.net.Uri
 import android.os.Build
-import android.os.Handler
-import android.os.Looper
 import android.util.Log
 import android.webkit.WebView
 import androidx.webkit.JavaScriptReplyProxy
@@ -25,11 +23,9 @@ import org.json.JSONObject
 
 class PriBridge(private val webView: WebView, private val descriptor: JSONObject) {
     private companion object { const val TAG = "PriBridge" }
-    private val main = Handler(Looper.getMainLooper())
     private var reply: JavaScriptReplyProxy? = null
     private var seq = 0
-    private var nextNativeId = 0
-    private val pendingNative = HashMap<String, (Envelope.Reply?) -> Unit>()
+    private var backWanted = false
     var state = "active"
         private set
 
@@ -50,9 +46,7 @@ class PriBridge(private val webView: WebView, private val descriptor: JSONObject
     fun documentStarted() {
         seq = 0
         reply = null
-        val waiting = pendingNative.values.toList()
-        pendingNative.clear()
-        waiting.forEach { it(null) }
+        backWanted = false
     }
 
     private fun onMessage(message: WebMessageCompat, sourceOrigin: Uri, isMainFrame: Boolean, proxy: JavaScriptReplyProxy) {
@@ -60,7 +54,7 @@ class PriBridge(private val webView: WebView, private val descriptor: JSONObject
         reply = proxy
         when (val inbound = Envelope.parse(message.data)) {
             is Envelope.Inbound.FromPage -> handle(inbound.request, proxy)
-            is Envelope.Inbound.AnswerToNative -> pendingNative.remove(inbound.reply.id)?.invoke(inbound.reply)
+            is Envelope.Inbound.AnswerToNative -> Unit // no native→JS requests are in flight on Android today
             Envelope.Inbound.Invalid -> Unit
         }
     }
@@ -75,6 +69,10 @@ class PriBridge(private val webView: WebView, private val descriptor: JSONObject
             "storage.status" -> Envelope.ok(req.id, JSONObject().put("durable", true))
             "device.facts" -> Envelope.ok(req.id, JSONObject().put("safeAreaApplied", true).put("stylusSeen", false))
             "lifecycle.state" -> Envelope.ok(req.id, JSONObject().put("state", state))
+            "lifecycle.setBackHandled" -> {
+                backWanted = req.payload.optBoolean("handled", false)
+                Envelope.ok(req.id)
+            }
             else -> if (req.op == "cancel") null else Envelope.fail(req.id, "UNSUPPORTED", "${req.cap}.${req.op} is not supported by this app version.")
         }
         if (out != null) send(proxy, out)
@@ -87,24 +85,20 @@ class PriBridge(private val webView: WebView, private val descriptor: JSONObject
     }
 
     /**
-     * Android Back: ask the page first (it closes sheets/dialogs), with a 300 ms
-     * answer window; no page, no answer or "not handled" means the shell decides.
+     * Android Back. The page keeps the shell told whether it wants Back
+     * (`lifecycle.setBackHandled`: a sheet/dialog is open, or it is away from
+     * home), so the decision here is synchronous — no timeout race in which the
+     * shell exits while the page is still navigating. If the page wants it, a
+     * one-way `lifecycle.back` event lets it close the sheet or go back.
      */
     fun requestBack(unhandled: () -> Unit) {
-        val proxy = reply ?: run { Log.i(TAG, "back: no page channel"); return unhandled() }
-        val id = "${Envelope.NATIVE_ID_PREFIX}${++nextNativeId}"
-        var settled = false
-        val finish: (Envelope.Reply?) -> Unit = { answer ->
-            if (!settled) {
-                settled = true
-                val handled = answer?.ok == true && answer.result?.optBoolean("handled", false) == true
-                Log.i(TAG, "back: answered=${answer != null} handled=$handled")
-                if (!handled) unhandled()
-            }
+        val proxy = reply
+        Log.i(TAG, "back: pageWants=$backWanted channel=${proxy != null}")
+        if (backWanted && proxy != null) {
+            send(proxy, Envelope.event("lifecycle.back", seq++, JSONObject()))
+        } else {
+            unhandled()
         }
-        pendingNative[id] = finish
-        send(proxy, Envelope.nativeRequest(id, "lifecycle.backRequested"))
-        main.postDelayed({ pendingNative.remove(id); finish(null) }, 300)
     }
 
     /** Every reply/event goes through here; a proxy only exists after the

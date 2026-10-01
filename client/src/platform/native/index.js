@@ -278,6 +278,20 @@ const lifecycle = Object.freeze({
     });
     return off;
   },
+  /** True when the host has a hardware/gesture Back button (Android). */
+  hasBackButton: () => capOf('lifecycle')?.backButton === true,
+  /** Tell the shell whether the page wants the next Back (sheet open, or away
+   * from home). The shell decides synchronously from this — no timeout race. */
+  declareBack(wanted) {
+    const c = capOf('lifecycle');
+    if (!c || c.backButton !== true || c.transport === 'legacy') return Promise.resolve(false);
+    return viaBridge('lifecycle', 'setBackHandled', { handled: wanted === true }, { timeoutMs: 5_000 }).then(() => true);
+  },
+  /** The shell passed Back to the page (it declared it wanted it). */
+  onBack(fn) {
+    if (typeof fn !== 'function') return () => {};
+    return getRuntime().bus.on('lifecycle.back', () => fn());
+  },
   /** Native → JS question, e.g. Android Back: handler returns { handled }. */
   onBackRequested(fn) {
     return getRuntime().bridge.onRequest('lifecycle.backRequested', async payload => {

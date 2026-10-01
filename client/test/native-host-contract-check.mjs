@@ -407,24 +407,31 @@ ok(normalizeCode('SOMETHING_NEW_FROM_A_SHELL') === 'INTERNAL', 'unknown codes be
   ok(listeners.length === 1, 'priNative listens for Android WebMessage replies exactly once');
   ok(typeof sent[0] === 'object' && sent[0].cap === 'host' && sent[0].op === 'ready', 'and posts envelopes to priBridge as JSON strings');
   // A native → JS Back question answered through the same channel.
-  const { handleBack } = await import('../src/platform/backNavigation.js');
+  const { wantsBack, performBack } = await import('../src/platform/backNavigation.js');
   globalThis.KeyboardEvent ??= class { constructor(type, init) { this.type = type; Object.assign(this, init); } };
   const noop = async () => {};
   let closed = false;
   const sheet = { hidden: false, getClientRects: () => (closed ? [] : [1]), dispatchEvent: e => { if (e.key === 'Escape') closed = true; return true; } };
   const docWithSheet = { querySelector: s => (s === '.mnav-sheet' ? sheet : null), querySelectorAll: () => [], contains: () => true };
-  ok(await handleBack({ doc: docWithSheet, loc: { pathname: '/practice' }, hist: { length: 3, back() { throw new Error('must not navigate'); } }, wait: noop }) === true,
-    'Back closes an open sheet (and does not also navigate)');
+  ok(wantsBack({ doc: docWithSheet, loc: { pathname: '/' } }) === true, 'an open sheet means the page wants Back, even at home');
+  ok(await performBack({ doc: docWithSheet, loc: { pathname: '/practice' }, hist: { back() { throw new Error('must not navigate'); } }, wait: noop }) === 'closed-dialog',
+    'Back closes the open sheet (and does not also navigate)');
   const hiddenDialog = { hidden: false, getClientRects: () => [] };
-  let wentBack = false;
   const route = { querySelector: () => null, querySelectorAll: () => [hiddenDialog], contains: () => true };
-  ok(await handleBack({ doc: route, loc: { pathname: '/practice' }, hist: { length: 3, back() { wentBack = true; } }, wait: noop }) === true && wentBack,
-    'with nothing visibly open, Back away from home goes back in the page history (an invisible dialog is ignored)');
-  ok(await handleBack({ doc: route, loc: { pathname: '/' }, hist: { length: 3, back() { throw new Error('no'); } }, wait: noop }) === false,
-    'at home with nothing open, Back is left to the shell (leave the app)');
-  const stubborn = { hidden: false, getClientRects: () => [1], dispatchEvent: () => true };
-  ok(await handleBack({ doc: { querySelector: () => stubborn, querySelectorAll: () => [], contains: () => true }, loc: { pathname: '/' }, hist: { length: 1, back() {} }, wait: noop }) === false,
-    'a dialog that does not close is not reported as handled');
+  let wentBack = false;
+  ok(wantsBack({ doc: route, loc: { pathname: '/practice' } }) === true && wantsBack({ doc: route, loc: { pathname: '/' } }) === false,
+    'away from home the page wants Back; at home with nothing visibly open it does not (an invisible dialog is ignored)');
+  ok(await performBack({ doc: route, loc: { pathname: '/practice' }, hist: { back() { wentBack = true; } }, wait: noop }) === 'history-back' && wentBack,
+    'with no sheet open, Back goes back in the page history');
+  const sentBefore = sent.length;
+  priNative.lifecycle.declareBack(true).catch(() => {}); // the fake shell does not answer
+  await tick(5);
+  const declared = sent.slice(sentBefore).find(m => m.cap === 'lifecycle' && m.op === 'setBackHandled');
+  ok(declared?.payload?.handled === true, 'the page declares its Back state to the shell (no timed round trip)');
+  let gotBack = 0;
+  priNative.lifecycle.onBack(() => { gotBack += 1; });
+  listeners[0]({ data: JSON.stringify({ v: 1, event: 'lifecycle.back', seq: 50, payload: {} }) });
+  ok(gotBack === 1, 'the shell hands Back to the page as a one-way event');
   priNative.lifecycle.onBackRequested(() => true);
   listeners[0]({ data: JSON.stringify({ v: 1, id: 'n:9', req: 'lifecycle.backRequested', payload: {} }) });
   await tick(10);
