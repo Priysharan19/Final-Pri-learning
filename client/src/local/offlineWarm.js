@@ -29,6 +29,8 @@
 // the browser calls 2G or 3G, means no.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { discoverHost } from '../platform/native/host.js';
+
 /** Wait for the browser to be idle, or a short beat where it has no such idea. */
 function whenIdle(run) {
   if (typeof requestIdleCallback === 'function') requestIdleCallback(run, { timeout: 4000 });
@@ -44,7 +46,7 @@ function whenIdle(run) {
  * data pack real money.
  */
 export function optionalWarmAllowed(scope = typeof window === 'undefined' ? {} : window) {
-  if (scope.__PRI_NATIVE__) return true;
+  if (discoverHost(scope).bundledAssets) return true;
   const link = scope.navigator?.connection;
   if (!link || link.saveData) return false;
   return link.effectiveType === '4g';

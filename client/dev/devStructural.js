@@ -11,12 +11,14 @@
 // Everywhere else the hook is absent and every call settles to null after
 // one cheap check.
 
+import { priNative } from '../src/platform/native/index.js';
+
 let capability = 'unknown'; // unknown | available | unavailable
 
 export const structuralDevAvailable = () => capability === 'available';
 
 export async function recognizeWithStructuralDev(strokes) {
-  if (typeof window === 'undefined' || window.__PRI_NATIVE_INK__) return null;
+  if (typeof window === 'undefined' || priNative.ink.available()) return null;
   if (window.__PRI_LAN_DEV__ !== true) return null;
   if (capability === 'unavailable') return null;
   if (!Array.isArray(strokes) || !strokes.length) return null;

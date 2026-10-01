@@ -1,1 +1,0 @@
-import{s as e}from"./ink-personal-BudlgchY.js";export{e as setPersonalProfile};

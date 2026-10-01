@@ -24,9 +24,8 @@ const PROMPTS = [
   ['t', 't'], ['a', 'a'], ['e', 'e'], ['l', 'l'], ['g', 'g'],
 ];
 
-const Surface = nativeInkAvailable() ? NativeInkCanvas : InkCanvas;
-
 export default function Calibrate({ onDone, toast }) {
+  const [Surface] = useState(() => (nativeInkAvailable() ? NativeInkCanvas : InkCanvas));
   const canvasRef = useRef(null);
   const [idx, setIdx] = useState(0);
   const [saved, setSaved] = useState(0);
