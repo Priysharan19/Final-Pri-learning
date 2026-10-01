@@ -398,7 +398,7 @@ function actionCopy(action, user, t, topicName, resume) {
         : action.kind === 'reviews' ? 'home.reviewDue'
           : action.kind === 'daily-goal' ? 'home.reason.dailyGoal'
             : action.kind === 'adaptive' ? 'home.reason.adaptive'
-              : action.kind === 'first-practice' ? 'home.reason.first'
+              : action.kind === 'first-practice' ? (action.offlineCaveat ? 'home.reason.practiceOffline' : 'home.reason.first')
                 : action.offlineCaveat ? 'home.reason.practiceOffline' : 'home.reason.practice';
   const kicker = action.kind === 'exam' ? 'home.kicker.exam'
     : action.kind === 'assignment' || action.kind === 'task' ? 'home.kicker.assigned'
