@@ -10,18 +10,34 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import React from 'react';
 import { listDrafts, flushDrafts } from './drafts.js';
+import { translate } from '../i18n/index.js';
 
 let uid = 0;
 
+// This is a class (hooks cannot catch render errors), so it reads strings with
+// translate() at render time. translate() never throws for a missing catalogue:
+// a Hindi chunk that failed to arrive leaves the English in force, so the crash
+// card still renders in English when i18n itself is what went wrong.
 function agoLabel(ms) {
   const s = Math.max(0, Math.round((Date.now() - ms) / 1000));
-  if (s < 60) return `${s} second${s === 1 ? '' : 's'} ago`;
+  if (s < 60) return translate('errorScreen.secondsAgo', { count: s, n: s });
   const m = Math.round(s / 60);
-  if (m < 60) return `${m} minute${m === 1 ? '' : 's'} ago`;
+  if (m < 60) return translate('errorScreen.minutesAgo', { count: m, n: m });
   const h = Math.round(m / 60);
-  if (h < 24) return `${h} hour${h === 1 ? '' : 's'} ago`;
+  if (h < 24) return translate('errorScreen.hoursAgo', { count: h, n: h });
   const d = Math.round(h / 24);
-  return `${d} day${d === 1 ? '' : 's'} ago`;
+  return translate('errorScreen.daysAgo', { count: d, n: d });
+}
+
+/**
+ * translate() for a sentence with one emphasised word inside it. The word is a
+ * placeholder in the catalogue, so a translation can put it wherever its own
+ * word order needs it.
+ */
+function withEmphasis(key, slot, word) {
+  const MARK = '\u0000';
+  const [before = '', after = ''] = translate(key, { [slot]: MARK }).split(MARK);
+  return <>{before}<b>{word}</b>{after}</>;
 }
 
 export default class ErrorBoundary extends React.Component {
@@ -89,41 +105,40 @@ export default class ErrorBoundary extends React.Component {
 
     const root = this.props.scope !== 'route';
     const stuck = attempts >= 2;
-    const message = (error && (error.message || String(error))) || 'Unknown error';
+    const message = (error && (error.message || String(error))) || translate('errorScreen.unknownError');
 
     return (
       <div className={root ? 'crash-wrap' : 'crash-wrap crash-inline'}>
         <section className="card crash-card" role="alert" tabIndex={-1} ref={this.cardRef}
           aria-labelledby={this.titleId}>
-          <div className="card-title">Something went wrong</div>
+          <div className="card-title">{translate('errorScreen.title')}</div>
           <h1 className="crash-title" id={this.titleId}>
-            {root ? 'Pri Learning stopped mid-render.' : 'This page stopped mid-render.'}
+            {root ? translate('errorScreen.appStopped') : translate('errorScreen.pageStopped')}
           </h1>
 
           <p className="sub crash-copy">
-            Your saved work is on this iPad and a render crash cannot touch it: profiles, submitted
-            answers, marks, ratings, exam results, bookmarks and your handwriting model all live in
-            this device's database, which was never opened for writing here.
+            {translate('errorScreen.savedWorkSafe')}
           </p>
           <p className="sub crash-copy">
-            What a crash <b>does</b> lose is whatever a screen was still holding in memory. Unsubmitted
-            answers survive only where the screen saved a draft:
+            {withEmphasis('errorScreen.crashLoses', 'does', translate('errorScreen.crashLosesEmphasis'))}
           </p>
 
           {drafts.length ? (
             <div className="crash-drafts">
-              <div className="sc-label">Drafts found on this device</div>
+              <div className="sc-label">{translate('errorScreen.draftsFound')}</div>
               {drafts.map(d => (
                 <div className="crash-draft" key={`${d.scope}:${d.id}`}>
                   <span className="crash-draft-main">
                     <span className="crash-draft-name">{d.label || `${d.scope} · ${d.id}`}</span>
                     <span className="crash-draft-sub">
-                      {d.note ? `${d.note} · ` : ''}saved {agoLabel(d.savedAt)}
+                      {d.note
+                        ? translate('errorScreen.noteSavedAgo', { note: d.note, ago: agoLabel(d.savedAt) })
+                        : translate('errorScreen.savedAgo', { ago: agoLabel(d.savedAt) })}
                     </span>
                   </span>
                   {d.path && (
                     <button className="btn btn-ghost btn-sm" onClick={() => this.reopen(d.path)}>
-                      Reopen
+                      {translate('errorScreen.reopen')}
                     </button>
                   )}
                 </div>
@@ -131,36 +146,35 @@ export default class ErrorBoundary extends React.Component {
             </div>
           ) : (
             <div className="crash-drafts">
-              <div className="sc-label">Drafts found on this device</div>
+              <div className="sc-label">{translate('errorScreen.draftsFound')}</div>
               <p className="muted crash-copy">
-                None. Nothing had been written to the draft store, so anything typed on this screen
-                since your last submit is gone. Everything you had already submitted is unaffected.
+                {translate('errorScreen.noDrafts')}
               </p>
             </div>
           )}
 
           <div className="row crash-actions">
             {stuck ? (
-              <button className="btn btn-primary" onClick={this.reload}>Reload Pri Learning</button>
+              <button className="btn btn-primary" onClick={this.reload}>{translate('errorScreen.reload')}</button>
             ) : (
               <>
                 <button className="btn btn-primary" onClick={this.retry}>
-                  {root ? 'Try again' : 'Try this page again'}
+                  {root ? translate('common.tryAgain') : translate('errorScreen.tryPageAgain')}
                 </button>
-                <button className="btn btn-ghost" onClick={this.reload}>Reload Pri Learning</button>
+                <button className="btn btn-ghost" onClick={this.reload}>{translate('errorScreen.reload')}</button>
               </>
             )}
-            <button className="btn btn-quiet" onClick={this.home}>Back to Home</button>
+            <button className="btn btn-quiet" onClick={this.home}>{translate('errorScreen.backHome')}</button>
           </div>
 
           <p className="muted crash-copy">
             {stuck
-              ? 'Trying again did not clear it, so the fault is in code that is already loaded — a reload is the only reset left. Reloading keeps every profile and everything saved.'
-              : 'Reloading is safe: it re-reads the app from this device and keeps every profile and everything saved. It works with no internet connection.'}
+              ? translate('errorScreen.stuckNote')
+              : translate('errorScreen.reloadSafe')}
           </p>
 
           <details className="crash-tech">
-            <summary>Technical details</summary>
+            <summary>{translate('errorScreen.technicalDetails')}</summary>
             <pre className="crash-pre">{message}{stack ? `\n${stack}` : ''}</pre>
           </details>
         </section>
