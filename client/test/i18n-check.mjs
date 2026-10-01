@@ -176,6 +176,15 @@ for (const [key, reason] of SAME_IN_BOTH) {
   ok(key in en, `the allowlist does not name a key that no longer exists: ${key}`);
   ok(reason.length > 20, `the allowlist entry for ${key} states a reason`);
 }
+// KALP-04 Home command centre: every recommendation title/reason reaches a
+// Hindi reader in Hindi, and keeps the slots its English source fills in.
+const commandCentreKeys = enKeys.filter(k => /^home\.(next|reason)\./.test(k) || k === 'home.cloudUnavailable');
+const slots = value => [...flat(value).matchAll(/\{(\w+)\}/g)].map(m => m[1]).sort();
+ok(commandCentreKeys.length >= 10 && commandCentreKeys.every(k => hi[k] !== undefined && DEVANAGARI.test(flat(hi[k]))),
+  `every Home command-centre string is translated into Devanagari (${commandCentreKeys.filter(k => hi[k] === undefined || !DEVANAGARI.test(flat(hi[k]))).join(', ') || commandCentreKeys.length + ' keys'})`);
+ok(commandCentreKeys.every(k => JSON.stringify(slots(en[k])) === JSON.stringify(slots(hi[k]))),
+  `every Home command-centre Hindi string keeps its English placeholders (${commandCentreKeys.filter(k => JSON.stringify(slots(en[k])) !== JSON.stringify(slots(hi[k]))).join(', ') || 'all match'})`);
+
 ok(SAME_IN_BOTH.size <= 8,
   `the allowlist stays small enough to read (${SAME_IN_BOTH.size} entries) — it is an exception list, not a backlog`);
 

@@ -210,8 +210,8 @@ export default function Home() {
         </div>
       )}
 
-      <section className="home-section" aria-labelledby="home-else-title">
-        <h2 className="home-section-title" id="home-else-title">{t('home.chooseElse')}</h2>
+      <section className="home-section" aria-labelledby="home-manual-title">
+        <h2 className="home-section-title" id="home-manual-title">{t('home.chooseElse')}</h2>
         {alternatives.length > 0 && (
           <ul className="home-alts">
             {alternatives.map(item => (
@@ -437,7 +437,7 @@ function HomeAction({ action, nav, primary, topicName, resume }) {
   if (!primary) {
     const key = String(action.kind + '-' + action.id).replace(/[^A-Za-z0-9_-]/g, '-');
     return (
-      <li className="home-alt">
+      <li className="home-alt" data-home-alt>
         <button type="button" onClick={() => nav(action.destination)} aria-describedby={`home-alt-${key}`}>
           <span className="home-alt-title">{copy.title}</span>
           <span className="home-alt-reason" id={`home-alt-${key}`}>{copy.reason}</span>
