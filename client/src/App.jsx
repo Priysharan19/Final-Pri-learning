@@ -213,15 +213,15 @@ export default function App() {
     if (!loc.hash) return;
     const id = decodeURIComponent(loc.hash.slice(1));
     let tries = 0;
-    const t = setInterval(() => {
+    const timer = setInterval(() => {
       const el = document.getElementById(id);
       if (el) {
         el.scrollIntoView({ block: 'start' });
         if (el.matches('[tabindex]')) el.focus({ preventScroll: true });
-        clearInterval(t);
-      } else if (++tries > 20) clearInterval(t);
+        clearInterval(timer);
+      } else if (++tries > 20) clearInterval(timer);
     }, 80);
-    return () => clearInterval(t);
+    return () => clearInterval(timer);
   }, [loc.pathname, loc.hash]);
 
   const closeMore = useCallback((restoreFocus = false) => {

@@ -497,6 +497,9 @@ export default function InkAnswer({
         <div className="ink-preview">
           <div className="ink-preview-title" id="ink-reading">
             {t('ink.reading')}
+            {/* The browser reader is a fallback, never production handwriting
+                evidence; it says so quietly rather than not at all. */}
+            {!NATIVE_INK && rec.cloud !== true && <span className="ink-status muted">{t('ink.webReader')}</span>}
             {cloudState === 'reading' && <span className="ink-status muted">{t('ink.readingAgain')}</span>}
             {cloudState === 'failed' && <span className="ink-status muted">{t('ink.readerUnreachable')}</span>}
           </div>

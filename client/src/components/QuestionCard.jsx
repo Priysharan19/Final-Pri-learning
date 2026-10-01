@@ -253,6 +253,9 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const [peekOpen, setPeekOpen] = useState(false);
   const inkSaveTimer = useRef(null);
   const inkPending = useRef(null);
+  // The newest strokes on the page. Leaving write mode unmounts the canvas;
+  // coming back must restore this, never the draft the question was served with.
+  const latestInk = useRef(null);
   const typedSaveTimer = useRef(null);
 
   useEffect(() => {
@@ -264,6 +267,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     setPhotoOCR({ phase: 'idle', text: '', confidence: 0, error: '', engine: null });
     setChecking(false); setVouched(null);
     setSaveState(draft?.typed || draft?.working || question.inkDraft?.length ? 'saved' : null);
+    latestInk.current = null;
     setPeekOpen(false);
     startRef.current = Date.now();
     if (mode === 'type') setTimeout(() => inputRef.current?.focus(), 60);
@@ -274,8 +278,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
 
   useEffect(() => {
     if (resolved) return;
-    const t = setInterval(() => setElapsed(Math.floor((Date.now() - startRef.current) / 1000)), 1000);
-    return () => clearInterval(t);
+    const timer = setInterval(() => setElapsed(Math.floor((Date.now() - startRef.current) / 1000)), 1000);
+    return () => clearInterval(timer);
   }, [resolved, question.id]);
 
   const isMcq = question.answerType === 'mcq';
@@ -524,6 +528,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   }, [question.id]);
   const onInkStrokes = useCallback((strokes) => {
     if (resolved) return;
+    latestInk.current = strokes;
     inkPending.current = strokes;
     setSaveState('saving');
     if (inkSaveTimer.current) clearTimeout(inkSaveTimer.current);
@@ -655,8 +660,10 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       steps = (showWorking || mode === 'photo') && working.trim() ? working : undefined;
     }
     setBusy(true);
-    if (inkSaveTimer.current) { clearTimeout(inkSaveTimer.current); inkSaveTimer.current = null; }
-    inkPending.current = null;
+    // Write the page as it stands before marking. Both requests take the same
+    // per-question lock, so the draft lands first and a resolving submit then
+    // clears it; a submit that does not resolve leaves the newest ink saved.
+    flushInk();
     try {
       const scribbleStrokes = scribbleRef.current && !scribbleRef.current.isEmpty()
         ? compactInkStrokes(scribbleRef.current.getStrokes())
@@ -674,8 +681,10 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       }
     } catch (e) {
       // Not a marking outcome: the submission itself did not go through. The
-      // work is still on screen and still in its draft.
-      setState({ phase: 'retry', res: { feedback: e.message, invalid: true, technical: true } });
+      // work is still on screen and still in its draft. A 409 is different:
+      // the question was already finished (another tab, a skipped question),
+      // and asking the student to submit again would be untrue.
+      setState({ phase: 'retry', res: { feedback: e.message, invalid: true, technical: true, conflict: e?.status === 409 } });
     } finally { setBusy(false); }
   }
 
@@ -881,7 +890,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
               : (writeMode && !isMcq ? t('verdict.statusWriteHint') : '');
 
   // ── The one dominant next move ─────────────────────────────────────────────
-  const primary = resolved
+  const primary = resolved || state.res?.conflict
     ? { label: t('practice.nextQuestion'), run: () => onNext?.(), disabled: false }
     : needsCheck && checking
       ? { label: t('verdict.confirmReading'), run: acceptReading, disabled: busy }
@@ -1149,7 +1158,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
               {InkAnswer && (
                 <InkAnswer onRecognized={setInkResult} height={inkPageHeight} lineVerdicts={lineVerdicts}
                   disabled={resolved} focusSymbol={checkFocus} recognitionContext={recognitionContext}
-                  initialStrokes={question.inkDraft || null} onStrokes={onInkStrokes} />
+                  initialStrokes={latestInk.current || question.inkDraft || null} onStrokes={onInkStrokes} />
               )}
               {inkPhase === 'failed' && (
                 <div className="editor-body">
@@ -1219,15 +1228,17 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
           <div className={`verdict ${technicalRetry ? 'verdict-technical' : invalidRetry ? 'verdict-bad verdict-unsure' : 'verdict-bad'}`}>
             <span className="verdict-ico"><Icon name={technicalRetry ? 'alert' : invalidRetry ? 'uncertain' : 'correction'} /></span>
             <div>
-              <div className="verdict-title">{t(technicalRetry ? 'verdict.notSubmittedTitle' : invalidRetry ? 'verdict.unreadable' : 'verdict.notQuite')}</div>
+              <div className="verdict-title">{state.res?.conflict ? t('verdict.alreadyFinishedTitle') : t(technicalRetry ? 'verdict.notSubmittedTitle' : invalidRetry ? 'verdict.unreadable' : 'verdict.notQuite')}</div>
               <div className="verdict-body">
-                {technicalRetry
+                {state.res?.conflict
+                  ? <span className="muted">{state.res.feedback}</span>
+                  : technicalRetry
                   ? <>{t('verdict.workIsSafe')} <span className="muted">{state.res.feedback}</span></>
                   : <MathText text={state.res.feedback || t('verdict.oneMoreGo')} />}
               </div>
               {state.res.partial && <div className="muted" style={{ marginTop: 6, fontSize: 13.5 }}>{state.res.partial.note}</div>}
               {state.res.stepReport && <StepReport report={state.res.stepReport} />}
-              <div className="verdict-next">{t(technicalRetry ? 'verdict.nextTechnical' : invalidRetry ? 'verdict.nextUnreadable'
+              <div className="verdict-next">{state.res?.conflict ? t('verdict.nextAfterConflict') : t(technicalRetry ? 'verdict.nextTechnical' : invalidRetry ? 'verdict.nextUnreadable'
                 : (state.res.stepReport?.lines?.some(l => l.status === 'break') || firstBad) ? 'verdict.nextFix' : 'verdict.nextTryAgain')}</div>
             </div>
           </div>

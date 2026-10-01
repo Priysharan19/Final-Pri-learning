@@ -71,8 +71,10 @@ export default function ExamRoom() {
     if (left <= 0) { submit(); return; }
     // Time warnings are words, announced once, never colour alone.
     if (left === 600 || left === 300 || left === 60) setTimeNote(t('exam.timeLeftNote', { count: Math.round(left / 60), n: Math.round(left / 60) }));
-    const t = setTimeout(() => setLeft(l => l - 1), 1000);
-    return () => clearTimeout(t);
+    // Not `t`: that name is the translator, and shadowing it here made the
+    // warning ticks throw and the paper never auto-submit (tour-exam-timer.js).
+    const tickTimer = setTimeout(() => setLeft(l => l - 1), 1000);
+    return () => clearTimeout(tickTimer);
   }, [left, result]); // eslint-disable-line
 
   const answeredCount = useMemo(() => {

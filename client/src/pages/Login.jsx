@@ -218,8 +218,8 @@ export default function Login() {
 
   useEffect(() => {
     if (!lock) return;
-    const t = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(t);
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
   }, [lock]);
 
   useEffect(() => { if (lock && lock.until <= now) { setLock(null); setError(''); } }, [lock, now]);

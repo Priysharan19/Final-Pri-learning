@@ -2637,8 +2637,11 @@ const routes = {
     if (!row || row.pid !== p.id) throw Object.assign(new Error('Question not found'), { status: 404 });
     assertPracticeRow(row);
     if (row.answered) throw Object.assign(new Error('Already answered'), { status: 409 });
-    if (!row.discardedAt) {
-      row.discardedAt = Date.now();
+    if (!row.discardedAt || row.inkDraft) {
+      row.discardedAt = row.discardedAt || Date.now();
+      // A skipped question keeps no unfinished handwriting behind it.
+      row.inkDraft = null;
+      row.inkDraftAt = null;
       await put('questions', row);
     }
     return { discarded: true, id: row.id };

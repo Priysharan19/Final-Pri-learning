@@ -226,7 +226,7 @@ check('handwriting drafts persist on the question row and are restored, never ma
   assert.match(backend, /'POST \/practice\/:id\/ink-draft'/);
   assert.match(backend, /key === 'POST \/practice\/:id\/ink-draft'/);
   assert.match(backend, /inkDraft: !row\.answered/);
-  assert.match(card, /initialStrokes=\{question\.inkDraft \|\| null\}/);
+  assert.match(card, /initialStrokes=\{latestInk\.current \|\| question\.inkDraft \|\| null\}/);
   assert.match(ink, /canvasRef\.current\?\.setStrokes\?\.\(initialStrokes\)/);
 });
 
@@ -262,6 +262,12 @@ check('formal assessment: no hints, confirmed submission, flags and a spoken tim
   assert.match(exam, /setFlagged/);
   assert.match(exam, /left === 600 \|\| left === 300 \|\| left === 60/);
   assert.match(exam, /role="timer"/);
+});
+
+check('no effect shadows the translator it calls (the exam-timer crash)', () => {
+  for (const [file, text] of [['ExamRoom.jsx', exam], ['QuestionCard.jsx', card], ['InkAnswer.jsx', ink], ['PracticeBase.jsx', practicePage], ['Home.jsx', home]]) {
+    assert.doesNotMatch(text, /\bconst t = set(?:Timeout|Interval)\(/, `${file} declares a local \`t\` that is not the translator`);
+  }
 });
 
 console.log('');

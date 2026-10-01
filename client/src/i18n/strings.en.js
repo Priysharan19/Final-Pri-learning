@@ -943,4 +943,9 @@ export default {
 
   // Formal assessment — structured
   'exam.structuredParts': "Structured — parts (a)–({last})",
+
+  // Review follow-ups
+  'verdict.alreadyFinishedTitle': "This question is already finished",
+  'verdict.nextAfterConflict': "It was finished elsewhere, perhaps in another tab. Go to the next question.",
+  'ink.webReader': "read in this browser (fallback reader)",
 };

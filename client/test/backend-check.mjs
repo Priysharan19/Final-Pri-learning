@@ -1007,6 +1007,11 @@ async function run() {
       (await idb.get('questions', inkTarget.question.id))?.inkDraft ?? null, null);
     await rejects('a resolved question takes no further ink draft',
       POST(`/practice/${inkTarget.question.id}/ink-draft`, { strokes }), { status: 409 });
+    const skipTarget = await nextQuestion({ mode: 'topic', subtopic: topicId });
+    await POST(`/practice/${skipTarget.question.id}/ink-draft`, { strokes });
+    await POST(`/practice/${skipTarget.question.id}/discard`, {});
+    eq('a skipped question keeps no unfinished handwriting',
+      (await idb.get('questions', skipTarget.question.id))?.inkDraft ?? null, null);
 
     const strangerQ = await nextQuestion({});
     await POST('/profiles/select', { id: grace.id, password: 'punch-cards-9' });

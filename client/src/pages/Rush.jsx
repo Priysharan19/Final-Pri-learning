@@ -23,8 +23,8 @@ export default function Rush() {
   useEffect(() => {
     if (phase !== 'running') return;
     if (left <= 0) { finish(); return; }
-    const t = setTimeout(() => setLeft(l => l - 1), 1000);
-    return () => clearTimeout(t);
+    const tickTimer = setTimeout(() => setLeft(l => l - 1), 1000);
+    return () => clearTimeout(tickTimer);
   }, [phase, left]); // eslint-disable-line
 
   async function start() {
