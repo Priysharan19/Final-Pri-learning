@@ -110,8 +110,7 @@ A historical README claimed 2,242 source-reconciled records with answers/solutio
 
 ## UNCERTAIN
 
-- historical 2,242-record claim
-- exact number of question-bearing pages
+- exact reason the historical 2,242-record claim differs from the 2,248 source-occurrence reconciliation
 - exact answer/solution completeness in historical work
 - whether all recoverable process-only count experiments can be reconstructed exactly
 
@@ -145,10 +144,12 @@ Extractor repair:
 - answer pages are now scanned only above the exact `Answers` boundary
 - printed page headers are rejected from the question-number gutter
 - recovered draft queue increased from 1,968 to 2,086 records
-- 2,080 unique chapter/topic/question identities are represented
-- 132 chapter occurrences remain unrepresented
+- 2,080 unique extracted chapter/topic/question identities exist
+- 2,077 of those identities match the 2,212 reconciled chapter source identities
+- 3 extracted identities are extraneous to the reconciled source ranges: `(10,3,3)`, `(25,1,5)`, `(25,1,6)`
+- 135 expected chapter identities remain unrepresented
 - all 36 appendix questions remain unprocessed by the chapter extractor
-- total source occurrences not yet represented in the draft queue: 168
+- total expected source occurrences not yet represented in the draft queue: 171
 - manual-review records: 747
 - low-extraction-confidence records: 11
 - approved records: 0
