@@ -83,6 +83,7 @@
     {"pattern":"client/src/pages/India**","primary":"india-curriculum","reviewers":["student-experience","qa-release"],"risk":"R2"},
     {"pattern":"client/src/engine/**","primary":"math-reasoning","reviewers":["adaptive-learning","security","qa-release"],"risk":"R4"},
     {"pattern":"server/platform/**","primary":"platform","reviewers":["security","reliability","qa-release"],"risk":"R4"},
+    {"pattern":"supabase/**","primary":"platform","reviewers":["security","reliability","qa-release"],"risk":"R4"},
     {"pattern":"server/**","primary":"math-reasoning","reviewers":["platform","security","reliability","qa-release"],"risk":"R4"},
     {"pattern":"client/src/platform/**","primary":"platform","reviewers":["commercial","security","reliability","qa-release"],"risk":"R4"},
     {"pattern":"client/src/local/**","primary":"platform","reviewers":["adaptive-learning","security","reliability","qa-release"],"risk":"R3"},
