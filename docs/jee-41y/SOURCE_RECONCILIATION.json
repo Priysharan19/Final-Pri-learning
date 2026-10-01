@@ -17,26 +17,31 @@
     "pagesAccountedFor": 625,
     "unaccountedPages": [],
     "pageClasses": {
-      "answer-key": 12,
-      "answer-key+solutions": 14,
-      "appendix-questions": 7,
+      "answer-key+solutions": 6,
+      "appendix-questions": 6,
+      "appendix-questions+solutions": 1,
       "appendix-solutions": 11,
       "front-matter": 9,
       "questions": 141,
+      "questions+answer-key": 12,
+      "questions+answer-key+solutions": 8,
       "solutions": 431
     },
     "chapters": 26,
-    "draftRecords": 1968,
+    "chapterQuestionOccurrences": 2212,
+    "appendixQuestionOccurrences": 36,
+    "sourceQuestionOccurrences": 2248,
+    "draftRecords": 2086,
     "approvedRecords": 0,
     "recordsWithAnswers": 0,
     "recordsWithWorkedSteps": 0,
     "tracks": {
-      "jee-main": 588,
-      "jee-advanced": 1205,
-      "unresolved": 175
+      "jee-main": 604,
+      "jee-advanced": 1295,
+      "unresolved": 187
     },
     "answerTypes": {
-      "selfcheck": 1968
+      "selfcheck": 2086
     }
   },
   "chapters": [
@@ -57,6 +62,22 @@
       "solutionBookPageStart": 8,
       "extractedDraftRecords": 109,
       "extractedTopics": 5,
+      "structuralQuestionCounts": {
+        "1": 10,
+        "2": 48,
+        "3": 12,
+        "4": 19,
+        "5": 21
+      },
+      "reconciledQuestionCounts": {
+        "1": 10,
+        "2": 48,
+        "3": 12,
+        "4": 19,
+        "5": 21
+      },
+      "expectedQuestionOccurrences": 110,
+      "countOverrides": [],
       "candidateQuestionPages": [
         10,
         11,
@@ -76,19 +97,37 @@
         37,
         38,
         39,
-        40
+        40,
+        41
       ],
-      "questionPageCount": 5,
+      "questionPageCount": 6,
       "answerBookPage": 32,
       "solutionBookPageStart": 33,
-      "extractedDraftRecords": 88,
+      "extractedDraftRecords": 93,
       "extractedTopics": 5,
+      "structuralQuestionCounts": {
+        "1": 58,
+        "2": 5,
+        "3": 3,
+        "4": 12,
+        "5": 18
+      },
+      "reconciledQuestionCounts": {
+        "1": 58,
+        "2": 5,
+        "3": 3,
+        "4": 12,
+        "5": 18
+      },
+      "expectedQuestionOccurrences": 96,
+      "countOverrides": [],
       "candidateQuestionPages": [
         36,
         37,
         38,
         39,
-        40
+        40,
+        41
       ],
       "questionPagesWithoutCurrentCandidate": []
     },
@@ -101,20 +140,47 @@
         59,
         60,
         61,
-        62
+        62,
+        63
       ],
-      "questionPageCount": 6,
+      "questionPageCount": 7,
       "answerBookPage": 54,
       "solutionBookPageStart": 54,
-      "extractedDraftRecords": 99,
+      "extractedDraftRecords": 101,
       "extractedTopics": 6,
+      "structuralQuestionCounts": {
+        "1": 7,
+        "2": 24,
+        "3": 16,
+        "4": 14,
+        "5": 9,
+        "6": 34
+      },
+      "reconciledQuestionCounts": {
+        "1": 7,
+        "2": 24,
+        "3": 16,
+        "4": 14,
+        "5": 12,
+        "6": 34
+      },
+      "expectedQuestionOccurrences": 107,
+      "countOverrides": [
+        {
+          "chapter": 3,
+          "topic": 5,
+          "count": 12,
+          "evidence": "answer key on PDF page 63 explicitly reaches question 12"
+        }
+      ],
       "candidateQuestionPages": [
         57,
         58,
         59,
         60,
         61,
-        62
+        62,
+        63
       ],
       "questionPagesWithoutCurrentCandidate": []
     },
@@ -125,18 +191,43 @@
         81,
         82,
         83,
-        84
+        84,
+        85
       ],
-      "questionPageCount": 4,
+      "questionPageCount": 5,
       "answerBookPage": 76,
       "solutionBookPageStart": 76,
-      "extractedDraftRecords": 55,
-      "extractedTopics": 4,
+      "extractedDraftRecords": 59,
+      "extractedTopics": 5,
+      "structuralQuestionCounts": {
+        "1": 7,
+        "2": 25,
+        "3": 14,
+        "4": 7,
+        "5": 2
+      },
+      "reconciledQuestionCounts": {
+        "1": 12,
+        "2": 25,
+        "3": 14,
+        "4": 7,
+        "5": 2
+      },
+      "expectedQuestionOccurrences": 60,
+      "countOverrides": [
+        {
+          "chapter": 4,
+          "topic": 1,
+          "count": 12,
+          "evidence": "answer key on PDF page 85 explicitly reaches question 12"
+        }
+      ],
       "candidateQuestionPages": [
         81,
         82,
         83,
-        84
+        84,
+        85
       ],
       "questionPagesWithoutCurrentCandidate": []
     },
@@ -151,8 +242,18 @@
       "questionPageCount": 3,
       "answerBookPage": 87,
       "solutionBookPageStart": 87,
-      "extractedDraftRecords": 57,
+      "extractedDraftRecords": 56,
       "extractedTopics": 2,
+      "structuralQuestionCounts": {
+        "1": 38,
+        "2": 20
+      },
+      "reconciledQuestionCounts": {
+        "1": 38,
+        "2": 20
+      },
+      "expectedQuestionOccurrences": 58,
+      "countOverrides": [],
       "candidateQuestionPages": [
         93,
         94,
@@ -172,13 +273,30 @@
         111,
         112,
         113,
-        114
+        114,
+        115
       ],
-      "questionPageCount": 9,
+      "questionPageCount": 10,
       "answerBookPage": 106,
       "solutionBookPageStart": 107,
-      "extractedDraftRecords": 122,
+      "extractedDraftRecords": 124,
       "extractedTopics": 5,
+      "structuralQuestionCounts": {
+        "1": 29,
+        "2": 17,
+        "3": 47,
+        "4": 26,
+        "5": 18
+      },
+      "reconciledQuestionCounts": {
+        "1": 29,
+        "2": 17,
+        "3": 47,
+        "4": 26,
+        "5": 18
+      },
+      "expectedQuestionOccurrences": 137,
+      "countOverrides": [],
       "candidateQuestionPages": [
         106,
         107,
@@ -188,7 +306,8 @@
         111,
         112,
         113,
-        114
+        114,
+        115
       ],
       "questionPagesWithoutCurrentCandidate": []
     },
@@ -203,13 +322,28 @@
         140,
         141,
         142,
-        143
+        143,
+        144
       ],
-      "questionPageCount": 8,
+      "questionPageCount": 9,
       "answerBookPage": 135,
       "solutionBookPageStart": 136,
-      "extractedDraftRecords": 100,
+      "extractedDraftRecords": 104,
       "extractedTopics": 4,
+      "structuralQuestionCounts": {
+        "1": 21,
+        "2": 48,
+        "3": 16,
+        "4": 35
+      },
+      "reconciledQuestionCounts": {
+        "1": 21,
+        "2": 48,
+        "3": 16,
+        "4": 35
+      },
+      "expectedQuestionOccurrences": 120,
+      "countOverrides": [],
       "candidateQuestionPages": [
         136,
         137,
@@ -218,7 +352,8 @@
         140,
         141,
         142,
-        143
+        143,
+        144
       ],
       "questionPagesWithoutCurrentCandidate": []
     },
@@ -237,6 +372,20 @@
       "solutionBookPageStart": 165,
       "extractedDraftRecords": 64,
       "extractedTopics": 4,
+      "structuralQuestionCounts": {
+        "1": 17,
+        "2": 19,
+        "3": 19,
+        "4": 11
+      },
+      "reconciledQuestionCounts": {
+        "1": 17,
+        "2": 19,
+        "3": 19,
+        "4": 11
+      },
+      "expectedQuestionOccurrences": 66,
+      "countOverrides": [],
       "candidateQuestionPages": [
         169,
         170,
@@ -261,13 +410,36 @@
         193,
         194,
         195,
-        196
+        196,
+        197
       ],
-      "questionPageCount": 12,
+      "questionPageCount": 13,
       "answerBookPage": 188,
       "solutionBookPageStart": 189,
-      "extractedDraftRecords": 159,
+      "extractedDraftRecords": 166,
       "extractedTopics": 8,
+      "structuralQuestionCounts": {
+        "1": 36,
+        "2": 17,
+        "3": 6,
+        "4": 16,
+        "5": 11,
+        "6": 5,
+        "7": 64,
+        "8": 37
+      },
+      "reconciledQuestionCounts": {
+        "1": 36,
+        "2": 17,
+        "3": 6,
+        "4": 16,
+        "5": 11,
+        "6": 5,
+        "7": 64,
+        "8": 37
+      },
+      "expectedQuestionOccurrences": 192,
+      "countOverrides": [],
       "candidateQuestionPages": [
         185,
         186,
@@ -280,7 +452,8 @@
         193,
         194,
         195,
-        196
+        196,
+        197
       ],
       "questionPagesWithoutCurrentCandidate": []
     },
@@ -294,13 +467,28 @@
         237,
         238,
         239,
-        240
+        240,
+        241
       ],
-      "questionPageCount": 7,
+      "questionPageCount": 8,
       "answerBookPage": 232,
       "solutionBookPageStart": 233,
-      "extractedDraftRecords": 110,
+      "extractedDraftRecords": 126,
       "extractedTopics": 4,
+      "structuralQuestionCounts": {
+        "1": 22,
+        "2": 32,
+        "3": 2,
+        "4": 69
+      },
+      "reconciledQuestionCounts": {
+        "1": 22,
+        "2": 32,
+        "3": 2,
+        "4": 69
+      },
+      "expectedQuestionOccurrences": 125,
+      "countOverrides": [],
       "candidateQuestionPages": [
         234,
         235,
@@ -308,7 +496,8 @@
         237,
         238,
         239,
-        240
+        240,
+        241
       ],
       "questionPagesWithoutCurrentCandidate": []
     },
@@ -318,17 +507,33 @@
       "questionPdfPages": [
         272,
         273,
-        274
+        274,
+        275
       ],
-      "questionPageCount": 3,
+      "questionPageCount": 4,
       "answerBookPage": 266,
       "solutionBookPageStart": 267,
-      "extractedDraftRecords": 38,
-      "extractedTopics": 3,
+      "extractedDraftRecords": 47,
+      "extractedTopics": 4,
+      "structuralQuestionCounts": {
+        "1": 29,
+        "2": 6,
+        "3": 11,
+        "4": 4
+      },
+      "reconciledQuestionCounts": {
+        "1": 29,
+        "2": 6,
+        "3": 11,
+        "4": 4
+      },
+      "expectedQuestionOccurrences": 50,
+      "countOverrides": [],
       "candidateQuestionPages": [
         272,
         273,
-        274
+        274,
+        275
       ],
       "questionPagesWithoutCurrentCandidate": []
     },
@@ -342,13 +547,28 @@
         290,
         291,
         292,
-        293
+        293,
+        294
       ],
-      "questionPageCount": 7,
+      "questionPageCount": 8,
       "answerBookPage": 285,
       "solutionBookPageStart": 286,
-      "extractedDraftRecords": 113,
-      "extractedTopics": 3,
+      "extractedDraftRecords": 116,
+      "extractedTopics": 4,
+      "structuralQuestionCounts": {
+        "1": 91,
+        "2": 6,
+        "3": 22,
+        "4": 6
+      },
+      "reconciledQuestionCounts": {
+        "1": 91,
+        "2": 6,
+        "3": 22,
+        "4": 6
+      },
+      "expectedQuestionOccurrences": 125,
+      "countOverrides": [],
       "candidateQuestionPages": [
         287,
         288,
@@ -356,7 +576,8 @@
         290,
         291,
         292,
-        293
+        293,
+        294
       ],
       "questionPagesWithoutCurrentCandidate": []
     },
@@ -374,6 +595,23 @@
       "solutionBookPageStart": 315,
       "extractedDraftRecords": 63,
       "extractedTopics": 2,
+      "structuralQuestionCounts": {
+        "1": 10,
+        "2": 55
+      },
+      "reconciledQuestionCounts": {
+        "1": 15,
+        "2": 55
+      },
+      "expectedQuestionOccurrences": 70,
+      "countOverrides": [
+        {
+          "chapter": 13,
+          "topic": 1,
+          "count": 15,
+          "evidence": "answer key on PDF page 324 explicitly reaches question 15"
+        }
+      ],
       "candidateQuestionPages": [
         320,
         321,
@@ -390,19 +628,33 @@
         345,
         346,
         347,
-        348
+        348,
+        349
       ],
-      "questionPageCount": 5,
+      "questionPageCount": 6,
       "answerBookPage": 340,
       "solutionBookPageStart": 340,
-      "extractedDraftRecords": 63,
+      "extractedDraftRecords": 64,
       "extractedTopics": 3,
+      "structuralQuestionCounts": {
+        "1": 23,
+        "2": 25,
+        "3": 16
+      },
+      "reconciledQuestionCounts": {
+        "1": 23,
+        "2": 25,
+        "3": 16
+      },
+      "expectedQuestionOccurrences": 64,
+      "countOverrides": [],
       "candidateQuestionPages": [
         344,
         345,
         346,
         347,
-        348
+        348,
+        349
       ],
       "questionPagesWithoutCurrentCandidate": []
     },
@@ -415,20 +667,38 @@
         369,
         370,
         371,
-        372
+        372,
+        373
       ],
-      "questionPageCount": 6,
+      "questionPageCount": 7,
       "answerBookPage": 364,
       "solutionBookPageStart": 364,
-      "extractedDraftRecords": 94,
-      "extractedTopics": 4,
+      "extractedDraftRecords": 95,
+      "extractedTopics": 5,
+      "structuralQuestionCounts": {
+        "1": 70,
+        "2": 8,
+        "3": 14,
+        "4": 3,
+        "5": 3
+      },
+      "reconciledQuestionCounts": {
+        "1": 70,
+        "2": 8,
+        "3": 14,
+        "4": 3,
+        "5": 3
+      },
+      "expectedQuestionOccurrences": 98,
+      "countOverrides": [],
       "candidateQuestionPages": [
         367,
         368,
         369,
         370,
         371,
-        372
+        372,
+        373
       ],
       "questionPagesWithoutCurrentCandidate": []
     },
@@ -442,13 +712,30 @@
         395,
         396,
         397,
-        398
+        398,
+        399
       ],
-      "questionPageCount": 7,
+      "questionPageCount": 8,
       "answerBookPage": 390,
       "solutionBookPageStart": 391,
-      "extractedDraftRecords": 110,
+      "extractedDraftRecords": 118,
       "extractedTopics": 5,
+      "structuralQuestionCounts": {
+        "1": 25,
+        "2": 23,
+        "3": 23,
+        "4": 23,
+        "5": 24
+      },
+      "reconciledQuestionCounts": {
+        "1": 25,
+        "2": 23,
+        "3": 23,
+        "4": 23,
+        "5": 24
+      },
+      "expectedQuestionOccurrences": 118,
+      "countOverrides": [],
       "candidateQuestionPages": [
         392,
         393,
@@ -456,7 +743,8 @@
         395,
         396,
         397,
-        398
+        398,
+        399
       ],
       "questionPagesWithoutCurrentCandidate": []
     },
@@ -467,18 +755,34 @@
         426,
         427,
         428,
-        429
+        429,
+        430
       ],
-      "questionPageCount": 4,
+      "questionPageCount": 5,
       "answerBookPage": 421,
       "solutionBookPageStart": 421,
-      "extractedDraftRecords": 46,
+      "extractedDraftRecords": 51,
       "extractedTopics": 4,
+      "structuralQuestionCounts": {
+        "1": 14,
+        "2": 21,
+        "3": 12,
+        "4": 11
+      },
+      "reconciledQuestionCounts": {
+        "1": 14,
+        "2": 21,
+        "3": 12,
+        "4": 11
+      },
+      "expectedQuestionOccurrences": 58,
+      "countOverrides": [],
       "candidateQuestionPages": [
         426,
         427,
         428,
-        429
+        429,
+        430
       ],
       "questionPagesWithoutCurrentCandidate": []
     },
@@ -488,17 +792,31 @@
       "questionPdfPages": [
         444,
         445,
-        446
+        446,
+        447
       ],
-      "questionPageCount": 3,
+      "questionPageCount": 4,
       "answerBookPage": 438,
       "solutionBookPageStart": 438,
-      "extractedDraftRecords": 35,
-      "extractedTopics": 2,
+      "extractedDraftRecords": 38,
+      "extractedTopics": 3,
+      "structuralQuestionCounts": {
+        "1": 14,
+        "2": 23,
+        "3": 3
+      },
+      "reconciledQuestionCounts": {
+        "1": 14,
+        "2": 23,
+        "3": 3
+      },
+      "expectedQuestionOccurrences": 40,
+      "countOverrides": [],
       "candidateQuestionPages": [
         444,
         445,
-        446
+        446,
+        447
       ],
       "questionPagesWithoutCurrentCandidate": []
     },
@@ -515,6 +833,18 @@
       "solutionBookPageStart": 453,
       "extractedDraftRecords": 33,
       "extractedTopics": 3,
+      "structuralQuestionCounts": {
+        "1": 18,
+        "2": 15,
+        "3": 4
+      },
+      "reconciledQuestionCounts": {
+        "1": 18,
+        "2": 15,
+        "3": 4
+      },
+      "expectedQuestionOccurrences": 37,
+      "countOverrides": [],
       "candidateQuestionPages": [
         459,
         460,
@@ -528,17 +858,33 @@
       "questionPdfPages": [
         470,
         471,
-        472
+        472,
+        473
       ],
-      "questionPageCount": 3,
+      "questionPageCount": 4,
       "answerBookPage": 464,
       "solutionBookPageStart": 464,
-      "extractedDraftRecords": 37,
+      "extractedDraftRecords": 44,
       "extractedTopics": 4,
+      "structuralQuestionCounts": {
+        "1": 29,
+        "2": 9,
+        "3": 4,
+        "4": 10
+      },
+      "reconciledQuestionCounts": {
+        "1": 29,
+        "2": 9,
+        "3": 4,
+        "4": 10
+      },
+      "expectedQuestionOccurrences": 52,
+      "countOverrides": [],
       "candidateQuestionPages": [
         470,
         471,
-        472
+        472,
+        473
       ],
       "questionPagesWithoutCurrentCandidate": []
     },
@@ -548,17 +894,31 @@
       "questionPdfPages": [
         483,
         484,
-        485
+        485,
+        486
       ],
-      "questionPageCount": 3,
+      "questionPageCount": 4,
       "answerBookPage": 477,
       "solutionBookPageStart": 477,
-      "extractedDraftRecords": 45,
+      "extractedDraftRecords": 55,
       "extractedTopics": 3,
+      "structuralQuestionCounts": {
+        "1": 30,
+        "2": 4,
+        "3": 21
+      },
+      "reconciledQuestionCounts": {
+        "1": 30,
+        "2": 4,
+        "3": 21
+      },
+      "expectedQuestionOccurrences": 55,
+      "countOverrides": [],
       "candidateQuestionPages": [
         483,
         484,
-        485
+        485,
+        486
       ],
       "questionPagesWithoutCurrentCandidate": []
     },
@@ -567,16 +927,30 @@
       "title": "Inverse Circular Functions",
       "questionPdfPages": [
         497,
-        498
+        498,
+        499
       ],
-      "questionPageCount": 2,
+      "questionPageCount": 3,
       "answerBookPage": 490,
       "solutionBookPageStart": 491,
-      "extractedDraftRecords": 16,
-      "extractedTopics": 2,
+      "extractedDraftRecords": 28,
+      "extractedTopics": 3,
+      "structuralQuestionCounts": {
+        "1": 2,
+        "2": 15,
+        "3": 12
+      },
+      "reconciledQuestionCounts": {
+        "1": 2,
+        "2": 15,
+        "3": 12
+      },
+      "expectedQuestionOccurrences": 29,
+      "countOverrides": [],
       "candidateQuestionPages": [
         497,
-        498
+        498,
+        499
       ],
       "questionPagesWithoutCurrentCandidate": []
     },
@@ -594,6 +968,18 @@
       "solutionBookPageStart": 502,
       "extractedDraftRecords": 60,
       "extractedTopics": 3,
+      "structuralQuestionCounts": {
+        "1": 24,
+        "2": 17,
+        "3": 20
+      },
+      "reconciledQuestionCounts": {
+        "1": 24,
+        "2": 17,
+        "3": 20
+      },
+      "expectedQuestionOccurrences": 61,
+      "countOverrides": [],
       "candidateQuestionPages": [
         507,
         508,
@@ -613,13 +999,30 @@
         532,
         533,
         534,
-        535
+        535,
+        536
       ],
-      "questionPageCount": 8,
+      "questionPageCount": 9,
       "answerBookPage": 527,
       "solutionBookPageStart": 528,
-      "extractedDraftRecords": 103,
+      "extractedDraftRecords": 109,
       "extractedTopics": 5,
+      "structuralQuestionCounts": {
+        "1": 33,
+        "2": 24,
+        "3": 30,
+        "4": 16,
+        "5": 16
+      },
+      "reconciledQuestionCounts": {
+        "1": 33,
+        "2": 24,
+        "3": 30,
+        "4": 16,
+        "5": 16
+      },
+      "expectedQuestionOccurrences": 119,
+      "countOverrides": [],
       "candidateQuestionPages": [
         528,
         529,
@@ -628,7 +1031,8 @@
         532,
         533,
         534,
-        535
+        535,
+        536
       ],
       "questionPagesWithoutCurrentCandidate": []
     },
@@ -640,19 +1044,46 @@
         559,
         560,
         561,
-        562
+        562,
+        563
       ],
-      "questionPageCount": 5,
+      "questionPageCount": 6,
       "answerBookPage": 554,
       "solutionBookPageStart": 555,
-      "extractedDraftRecords": 69,
+      "extractedDraftRecords": 75,
       "extractedTopics": 3,
+      "structuralQuestionCounts": {
+        "1": 1,
+        "2": 5,
+        "3": 8
+      },
+      "reconciledQuestionCounts": {
+        "1": 1,
+        "2": 9,
+        "3": 67
+      },
+      "expectedQuestionOccurrences": 77,
+      "countOverrides": [
+        {
+          "chapter": 25,
+          "topic": 2,
+          "count": 9,
+          "evidence": "answer key on PDF page 563 explicitly reaches question 9"
+        },
+        {
+          "chapter": 25,
+          "topic": 3,
+          "count": 67,
+          "evidence": "answer key on PDF page 563 explicitly reaches question 67"
+        }
+      ],
       "candidateQuestionPages": [
         558,
         559,
         560,
         561,
-        562
+        562,
+        563
       ],
       "questionPagesWithoutCurrentCandidate": []
     },
@@ -667,13 +1098,22 @@
         586,
         587,
         588,
-        589
+        589,
+        590
       ],
-      "questionPageCount": 8,
+      "questionPageCount": 9,
       "answerBookPage": 581,
       "solutionBookPageStart": 582,
-      "extractedDraftRecords": 80,
+      "extractedDraftRecords": 88,
       "extractedTopics": 1,
+      "structuralQuestionCounts": {
+        "1": 88
+      },
+      "reconciledQuestionCounts": {
+        "1": 88
+      },
+      "expectedQuestionOccurrences": 88,
+      "countOverrides": [],
       "candidateQuestionPages": [
         582,
         583,
@@ -682,7 +1122,8 @@
         586,
         587,
         588,
-        589
+        589,
+        590
       ],
       "questionPagesWithoutCurrentCandidate": []
     }
@@ -944,7 +1385,7 @@
     {
       "pdfPage": 41,
       "bookPage": 32,
-      "class": "answer-key",
+      "class": "questions+answer-key",
       "sourceChapterNumber": 2,
       "sourceChapter": "Theory of Equations"
     },
@@ -1098,7 +1539,7 @@
     {
       "pdfPage": 63,
       "bookPage": 54,
-      "class": "answer-key+solutions",
+      "class": "questions+answer-key+solutions",
       "sourceChapterNumber": 3,
       "sourceChapter": "Sequences and Series"
     },
@@ -1252,7 +1693,7 @@
     {
       "pdfPage": 85,
       "bookPage": 76,
-      "class": "answer-key+solutions",
+      "class": "questions+answer-key+solutions",
       "sourceChapterNumber": 4,
       "sourceChapter": "Permutations and Combinations"
     },
@@ -1462,7 +1903,7 @@
     {
       "pdfPage": 115,
       "bookPage": 106,
-      "class": "answer-key",
+      "class": "questions+answer-key",
       "sourceChapterNumber": 6,
       "sourceChapter": "Probability"
     },
@@ -1665,7 +2106,7 @@
     {
       "pdfPage": 144,
       "bookPage": 135,
-      "class": "answer-key",
+      "class": "questions+answer-key",
       "sourceChapterNumber": 7,
       "sourceChapter": "Matrices and Determinants"
     },
@@ -2036,7 +2477,7 @@
     {
       "pdfPage": 197,
       "bookPage": 188,
-      "class": "answer-key",
+      "class": "questions+answer-key",
       "sourceChapterNumber": 9,
       "sourceChapter": "Limit, Continuity and Differentiability"
     },
@@ -2344,7 +2785,7 @@
     {
       "pdfPage": 241,
       "bookPage": 232,
-      "class": "answer-key",
+      "class": "questions+answer-key",
       "sourceChapterNumber": 10,
       "sourceChapter": "Application of Derivatives"
     },
@@ -2582,7 +3023,7 @@
     {
       "pdfPage": 275,
       "bookPage": 266,
-      "class": "answer-key",
+      "class": "questions+answer-key",
       "sourceChapterNumber": 11,
       "sourceChapter": "Indefinite Integration"
     },
@@ -2715,7 +3156,7 @@
     {
       "pdfPage": 294,
       "bookPage": 285,
-      "class": "answer-key",
+      "class": "questions+answer-key",
       "sourceChapterNumber": 12,
       "sourceChapter": "Definite Integration"
     },
@@ -3100,7 +3541,7 @@
     {
       "pdfPage": 349,
       "bookPage": 340,
-      "class": "answer-key+solutions",
+      "class": "questions+answer-key+solutions",
       "sourceChapterNumber": 14,
       "sourceChapter": "Differential Equations"
     },
@@ -3268,7 +3709,7 @@
     {
       "pdfPage": 373,
       "bookPage": 364,
-      "class": "answer-key+solutions",
+      "class": "questions+answer-key+solutions",
       "sourceChapterNumber": 15,
       "sourceChapter": "Straight Line and Pair of Straight Lines"
     },
@@ -3450,7 +3891,7 @@
     {
       "pdfPage": 399,
       "bookPage": 390,
-      "class": "answer-key",
+      "class": "questions+answer-key",
       "sourceChapterNumber": 16,
       "sourceChapter": "Circle"
     },
@@ -3667,7 +4108,7 @@
     {
       "pdfPage": 430,
       "bookPage": 421,
-      "class": "answer-key+solutions",
+      "class": "questions+answer-key+solutions",
       "sourceChapterNumber": 17,
       "sourceChapter": "Parabola"
     },
@@ -3786,7 +4227,7 @@
     {
       "pdfPage": 447,
       "bookPage": 438,
-      "class": "answer-key+solutions",
+      "class": "questions+answer-key+solutions",
       "sourceChapterNumber": 18,
       "sourceChapter": "Ellipse"
     },
@@ -3968,7 +4409,7 @@
     {
       "pdfPage": 473,
       "bookPage": 464,
-      "class": "answer-key+solutions",
+      "class": "questions+answer-key+solutions",
       "sourceChapterNumber": 20,
       "sourceChapter": "Trigonometrical Ratios and Identities"
     },
@@ -4059,7 +4500,7 @@
     {
       "pdfPage": 486,
       "bookPage": 477,
-      "class": "answer-key+solutions",
+      "class": "questions+answer-key+solutions",
       "sourceChapterNumber": 21,
       "sourceChapter": "Trigonometrical Equations"
     },
@@ -4150,7 +4591,7 @@
     {
       "pdfPage": 499,
       "bookPage": 490,
-      "class": "answer-key",
+      "class": "questions+answer-key",
       "sourceChapterNumber": 22,
       "sourceChapter": "Inverse Circular Functions"
     },
@@ -4409,7 +4850,7 @@
     {
       "pdfPage": 536,
       "bookPage": 527,
-      "class": "answer-key",
+      "class": "questions+answer-key",
       "sourceChapterNumber": 24,
       "sourceChapter": "Vectors"
     },
@@ -4598,7 +5039,7 @@
     {
       "pdfPage": 563,
       "bookPage": 554,
-      "class": "answer-key",
+      "class": "questions+answer-key",
       "sourceChapterNumber": 25,
       "sourceChapter": "3D Geometry"
     },
@@ -4787,7 +5228,7 @@
     {
       "pdfPage": 590,
       "bookPage": 581,
-      "class": "answer-key",
+      "class": "questions+answer-key",
       "sourceChapterNumber": 26,
       "sourceChapter": "Miscellaneous"
     },
@@ -4942,7 +5383,7 @@
     },
     {
       "pdfPage": 614,
-      "class": "appendix-questions",
+      "class": "appendix-questions+solutions",
       "appendix": "jee-advanced-2019-solved-paper"
     },
     {
@@ -5002,8 +5443,8 @@
     }
   ],
   "queue": {
-    "path": "/Users/priysharantripathi/PriLearningWork/jee-41-years-question-import/tools/jee-question-department/work/review-queue.jsonl",
-    "sha256": "e1d39baffd8ca7b4732fdbf5a641ae2f20fe7e480deb6b41086fc7eab5455f4e",
+    "path": "tools/jee-question-department/work/review-queue-recovered-v2.jsonl",
+    "sha256": "bed66a81214a281fad3042d3da4d30b5c74fb0b26943c6b304c342beaa932a43",
     "note": "Queue path is local/ignored; report contains metadata only."
   }
 }

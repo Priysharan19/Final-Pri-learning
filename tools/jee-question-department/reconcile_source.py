@@ -14,6 +14,8 @@ import re
 from collections import Counter, defaultdict
 from pathlib import Path
 
+from extract import answer_heading_y, line_groups, question_candidates
+
 try:
     import fitz  # PyMuPDF
 except ImportError as exc:
@@ -55,6 +57,63 @@ def load_queue(path: Path) -> list[dict]:
     return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
 
 
+def structural_question_counts(pdf, manifest: dict, chapter: dict) -> dict[int, int]:
+    """Count contiguous printed question numbers per topic before Answers."""
+    off = int(manifest["source"]["bookPageOffset"])
+    heads, pages = [], []
+    for book_page in range(int(chapter["bookPageStart"]), int(chapter["bookPageEnd"]) + 1):
+        page = pdf[book_page + off - 1]
+        cutoff = answer_heading_y(page)
+        limit = cutoff if cutoff is not None else float("inf")
+        pages.append((book_page, page, limit))
+        for words in line_groups(page.get_text("words")).values():
+            tokens = [str(w[4]) for w in words]
+            for i, token in enumerate(tokens[:-1]):
+                if token.lower() == "topic" and tokens[i + 1].isdigit() and float(words[i][1]) < limit:
+                    heads.append((book_page, float(words[i][1]), int(tokens[i + 1])))
+        if cutoff is not None:
+            break
+    if not heads:
+        heads = [(int(chapter["bookPageStart"]), 0.0, 1)]
+    heads.sort()
+
+    seen = defaultdict(lambda: defaultdict(list))
+    for book_page, page, limit in pages:
+        width, height = float(page.rect.width), float(page.rect.height)
+        for words in line_groups(page.get_text("words")).values():
+            halves = ([w for w in words if w[0] < width / 2], [w for w in words if w[0] >= width / 2])
+            for side, half in enumerate(halves):
+                if not half:
+                    continue
+                word = half[0]
+                y = float(word[1])
+                if y >= limit or y < height * 0.10:
+                    continue
+                match = re.fullmatch(r"(\d{1,3})(\.*)", str(word[4]).strip())
+                if not match:
+                    continue
+                x = float(word[0]) / width
+                if not ((0.07 <= x <= 0.20) if side == 0 else (0.48 <= x <= 0.62)):
+                    continue
+                eligible = [h for h in heads if (h[0], h[1]) <= (book_page, y)]
+                if eligible:
+                    seen[eligible[-1][2]][int(match.group(1))].append((book_page, side, y))
+
+    result = {}
+    for topic, numbers in sorted(seen.items()):
+        states = list(numbers.get(1, []))
+        if not states:
+            continue
+        ceiling = 1
+        for number in range(2, 151):
+            nxt = [cur for cur in numbers.get(number, []) if any(prev < cur for prev in states)]
+            if not nxt:
+                break
+            states, ceiling = nxt, number
+        result[topic] = ceiling
+    return result
+
+
 def chapter_page_plan(pdf, manifest: dict, chapter: dict) -> tuple[list[dict], int | None]:
     off = int(manifest["source"]["bookPageOffset"])
     answer = int(chapter["answerPage"])
@@ -77,6 +136,14 @@ def chapter_page_plan(pdf, manifest: dict, chapter: dict) -> tuple[list[dict], i
             kind = "answer-key+solutions"
         else:
             kind = "solutions"
+        if book_page == answer:
+            cutoff = answer_heading_y(page)
+            has_questions = cutoff is not None and any(
+                c["score"] >= 4 and c["y"] < cutoff - 2.0
+                for c in question_candidates(page, book_page)
+            )
+            if has_questions:
+                kind = "questions+" + kind
         out.append({"pdfPage": pdf_page, "bookPage": book_page, "class": kind})
     return out, solution_start
 
@@ -104,9 +171,31 @@ def main() -> None:
         number = (row.get("source") or {}).get("sourceChapterNumber")
         rows_by_chapter[number].append(row)
 
+    reconciliation = manifest.get("reconciliation") or {}
+    overrides = {
+        (int(item["chapter"]), int(item["topic"])): item
+        for item in reconciliation.get("verifiedQuestionCountOverrides", [])
+    }
     chapters = []
+    chapter_question_occurrences = 0
     for chapter in manifest["chapters"]:
         plan, solution_start = chapter_page_plan(pdf, manifest, chapter)
+        structural_counts = structural_question_counts(pdf, manifest, chapter)
+        reconciled_counts = dict(structural_counts)
+        applied_overrides = []
+        for (ch_num, topic_num), item in overrides.items():
+            if ch_num != int(chapter["number"]):
+                continue
+            observed = reconciled_counts.get(topic_num, 0)
+            if int(item["count"]) < observed:
+                raise SystemExit(
+                    f"verified count override c{ch_num} t{topic_num}={item['count']} "
+                    f"is below structural count {observed}"
+                )
+            reconciled_counts[topic_num] = int(item["count"])
+            applied_overrides.append(item)
+        expected_occurrences = sum(reconciled_counts.values())
+        chapter_question_occurrences += expected_occurrences
         for entry in plan:
             if entry["pdfPage"] in page_map:
                 raise SystemExit(f"page {entry['pdfPage']} assigned twice")
@@ -122,7 +211,7 @@ def main() -> None:
             for r in qrows
             if isinstance((r.get("source") or {}).get("sourcePdfPage"), int)
         })
-        question_pages = [p["pdfPage"] for p in plan if p["class"] == "questions"]
+        question_pages = [p["pdfPage"] for p in plan if "questions" in p["class"]]
         topics = sorted({
             (r.get("source") or {}).get("sourceTopicNumber")
             for r in qrows
@@ -137,6 +226,10 @@ def main() -> None:
             "solutionBookPageStart": solution_start,
             "extractedDraftRecords": len(qrows),
             "extractedTopics": len(topics),
+            "structuralQuestionCounts": {str(k): v for k, v in sorted(structural_counts.items())},
+            "reconciledQuestionCounts": {str(k): v for k, v in sorted(reconciled_counts.items())},
+            "expectedQuestionOccurrences": expected_occurrences,
+            "countOverrides": applied_overrides,
             "candidateQuestionPages": extracted_pages,
             "questionPagesWithoutCurrentCandidate": sorted(set(question_pages) - set(extracted_pages)),
         })
@@ -146,9 +239,13 @@ def main() -> None:
         q_end = appendix.get("questionPdfPageEnd")
         s_start = appendix.get("solutionPdfPageStart")
         for pdf_page in range(int(appendix["pdfPageStart"]), int(appendix["pdfPageEnd"]) + 1):
-            if q_end is not None and int(q_start) <= pdf_page <= int(q_end):
+            is_question = q_end is not None and int(q_start) <= pdf_page <= int(q_end)
+            is_solution = s_start is not None and pdf_page >= int(s_start)
+            if is_question and is_solution:
+                kind = "appendix-questions+solutions"
+            elif is_question:
                 kind = "appendix-questions"
-            elif s_start is not None and pdf_page >= int(s_start):
+            elif is_solution:
                 kind = "appendix-solutions"
             else:
                 kind = "appendix-unresolved"
@@ -158,6 +255,12 @@ def main() -> None:
 
     unaccounted = sorted(set(range(1, expected_pages + 1)) - set(page_map))
     class_counts = Counter(entry["class"] for entry in page_map.values())
+    appendix_question_occurrences = sum(int(a.get("questionOccurrences") or 0) for a in manifest.get("appendices", []))
+    source_question_occurrences = chapter_question_occurrences + appendix_question_occurrences
+    if reconciliation.get("chapterQuestionOccurrences") != chapter_question_occurrences:
+        raise SystemExit("manifest chapterQuestionOccurrences does not match structural reconciliation")
+    if reconciliation.get("sourceQuestionOccurrences") != source_question_occurrences:
+        raise SystemExit("manifest sourceQuestionOccurrences does not match structural reconciliation")
     source = manifest["source"]
     report = {
         "schemaVersion": 1,
@@ -179,6 +282,9 @@ def main() -> None:
             "unaccountedPages": unaccounted,
             "pageClasses": dict(sorted(class_counts.items())),
             "chapters": len(manifest["chapters"]),
+            "chapterQuestionOccurrences": chapter_question_occurrences,
+            "appendixQuestionOccurrences": appendix_question_occurrences,
+            "sourceQuestionOccurrences": source_question_occurrences,
             "draftRecords": len(rows),
             "approvedRecords": sum(r.get("status") == "approved" for r in rows),
             "recordsWithAnswers": sum(r.get("answer") is not None for r in rows),

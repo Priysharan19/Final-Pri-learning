@@ -43,7 +43,20 @@
     {"number":25,"title":"3D Geometry","bookPageStart":549,"bookPageEnd":572,"answerPage":554,"part":"trig-vector","targets":["c11-3d-introduction","c12-3d-geometry"],"ambiguousTarget":true},
     {"number":26,"title":"Miscellaneous","bookPageStart":573,"bookPageEnd":598,"answerPage":581,"part":"mixed","targets":["c11-complex-numbers","c11-sequences-series","c11-permutations-combinations","c11-binomial-theorem","c11-relations-functions","c11-probability","c11-straight-lines","c11-conic-sections","c11-trig-functions","c11-limits-derivatives","c12-probability","c12-matrices","c12-determinants","c12-relations-functions","c12-continuity-differentiability","c12-applications-derivatives","c12-integrals","c12-applications-integrals","c12-differential-equations","c12-inverse-trigonometric","c12-vector-algebra","c12-3d-geometry"],"ambiguousTarget":true}
   ],
+  "reconciliation": {
+    "questionCountMethod": "contiguous printed question-number walk per topic up to the exact Answers boundary, with independently verified answer-key overrides where layout breaks the walk",
+    "verifiedQuestionCountOverrides": [
+      {"chapter":3,"topic":5,"count":12,"evidence":"answer key on PDF page 63 explicitly reaches question 12"},
+      {"chapter":4,"topic":1,"count":12,"evidence":"answer key on PDF page 85 explicitly reaches question 12"},
+      {"chapter":13,"topic":1,"count":15,"evidence":"answer key on PDF page 324 explicitly reaches question 15"},
+      {"chapter":25,"topic":2,"count":9,"evidence":"answer key on PDF page 563 explicitly reaches question 9"},
+      {"chapter":25,"topic":3,"count":67,"evidence":"answer key on PDF page 563 explicitly reaches question 67"}
+    ],
+    "chapterQuestionOccurrences": 2212,
+    "appendixQuestionOccurrences": 36,
+    "sourceQuestionOccurrences": 2248
+  },
   "appendices": [
-    {"id":"jee-advanced-2019-solved-paper","title":"JEE Advanced Solved Paper 2019","pdfPageStart":608,"pdfPageEnd":625,"questionPdfPageStart":608,"questionPdfPageEnd":614,"solutionPdfPageStart":615,"solutionPdfPageEnd":625,"boundaryEvidence":"direct source-page inspection during crash recovery","part":"mixed","ambiguousTarget":true}
+    {"id":"jee-advanced-2019-solved-paper","title":"JEE Advanced Solved Paper 2019","pdfPageStart":608,"pdfPageEnd":625,"questionPdfPageStart":608,"questionPdfPageEnd":614,"solutionPdfPageStart":614,"solutionPdfPageEnd":625,"boundaryEvidence":"direct source-page inspection during crash recovery; PDF 614 contains questions 17-18 followed by Paper 1 answer explanations","paperQuestionCounts":[18,18],"questionOccurrences":36,"part":"mixed","ambiguousTarget":true}
   ]
 }

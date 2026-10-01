@@ -120,3 +120,50 @@ A historical README claimed 2,242 source-reconciled records with answers/solutio
 Continue from this checkpoint using bounded, resumable stages. After every meaningful stage, commit and push metadata/code/reports before running expensive validation.
 
 Do not commit the raw source PDF or the unreviewed full source-derived corpus to this public repository. Preserve provenance and separate technical ingestion from public redistribution rights.
+
+## Recovery progress after the first checkpoint
+
+The recovery branch now contains a reproducible source reconciliation tool and a
+625-page metadata-only reconciliation report.
+
+Verified source structure:
+
+- 625 / 625 PDF pages accounted for
+- 168 pages contain source questions (including mixed boundary pages and the solved-paper appendix)
+- 26 chapters
+- 97 chapter/topic pairs represented by the recovered extractor
+- 2,212 reconciled chapter question occurrences
+- 36 JEE Advanced 2019 appendix question occurrences
+- 2,248 total source question occurrences
+
+The old historical 2,242-record README claim is not being used as authority; it
+does not match the source-structural reconciliation and its backing data shards
+did not survive durably.
+
+Extractor repair:
+
+- answer pages are now scanned only above the exact `Answers` boundary
+- printed page headers are rejected from the question-number gutter
+- recovered draft queue increased from 1,968 to 2,086 records
+- 2,080 unique chapter/topic/question identities are represented
+- 132 chapter occurrences remain unrepresented
+- all 36 appendix questions remain unprocessed by the chapter extractor
+- total source occurrences not yet represented in the draft queue: 168
+- manual-review records: 747
+- low-extraction-confidence records: 11
+- approved records: 0
+- linked answers: 0
+- linked worked solutions: 0
+
+Database/runtime verification:
+
+- no repository SQLite database contains this JEE bank
+- no JEE SQL seed/migration was found for this corpus
+- the app consumes only the generated reviewed archive under
+  `client/src/engine/generators/jee-pyq-data/`
+- its current generated catalog still contains zero published records
+
+Therefore the statement “all JEE questions were added to the database” is
+false as a production-completion statement. The durable state is a recovered,
+partially extracted review queue plus source-count/page reconciliation, not a
+student-ready question bank.
