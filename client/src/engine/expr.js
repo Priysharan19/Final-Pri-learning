@@ -564,18 +564,17 @@ const SAMPLE_SETS = [
 // only roots lie beyond |x| = 20 and are not whole numbers or sign changes on
 // the whole-number grid (a tangency far out) is not seen.
 
+// short local names: this section ships in the install bundle
+const fin = Number.isFinite, abs = Math.abs;
 const LOG_FNS = new Set(['ln', 'log', 'log10', 'log2']);
 const POLE_FNS = { sec: 'cos', cosec: 'sin', csc: 'sin', cot: 'sin' };
-/** Names the probe treats as constants, never as variables to search over. */
-const DOMAIN_CONSTANTS = new Set(['e', 'pi']);
 const DOMAIN_EVAL = { realOddRoots: true };
 const domainEval = (ast, env) => evaluate(ast, env, DOMAIN_EVAL);
 /** The sample env as the domain probe reads it: e and π are never variables. */
-function domainEnv(env) {
-  const out = { ...env };
-  for (const n of DOMAIN_CONSTANTS) delete out[n];
-  return out;
-}
+// eslint-disable-next-line no-unused-vars
+const domainEnv = ({ e, pi, ...env }) => env;
+/** Do two sampled values differ beyond rounding? */
+const apart = (u, v) => abs(u - v) > 1e-6 * Math.max(1, abs(u), abs(v));
 
 // Guard kinds, one letter each because they ship in the install bundle:
 // 'z' must be nonzero (a denominator, a tan/sec/cosec/cot pole), 'p' must be
@@ -616,22 +615,22 @@ function along(ast, env, name) {
  * compared to a fixed tolerance.
  */
 function vanishesNear(at, p) {
-  const g0 = at(p), s = Math.max(1, Math.abs(p)), fin = Number.isFinite;
+  const g0 = at(p), s = Math.max(1, abs(p));
   if (g0 === 0) return true;
   if (!fin(g0)) return false;
   const sl = at(p - 1e-6 * s), sr = at(p + 1e-6 * s);
   if (fin(sl) && fin(sr) && (Math.sign(sl) !== Math.sign(g0) || Math.sign(sr) !== Math.sign(g0))) return true;
   let a = p - 1e-3 * s, b = p + 1e-3 * s;
-  const m = Math.max(Math.abs(at(a)), Math.abs(at(b)));
-  if (!(Math.abs(g0) <= 1e-3 * m)) return false;       // no dip at p (or an edge is undefined)
-  return Math.abs(at(ternaryMin(at, a, b))) <= 1e-7 * m;
+  const m = Math.max(abs(at(a)), abs(at(b)));
+  if (!(abs(g0) <= 1e-3 * m)) return false;       // no dip at p (or an edge is undefined)
+  return abs(at(ternaryMin(at, a, b))) <= 1e-7 * m;
 }
 
 /** Where |f| is smallest on [a, b], by ternary search. */
 function ternaryMin(f, a, b) {
   for (let k = 0; k < 80; k++) {
     const m1 = a + (b - a) / 3, m2 = b - (b - a) / 3;
-    if (Math.abs(f(m1)) < Math.abs(f(m2))) b = m2; else a = m1;
+    if (abs(f(m1)) < abs(f(m2))) b = m2; else a = m1;
   }
   return (a + b) / 2;
 }
@@ -651,14 +650,14 @@ function sideDefinedAt(ast, guards, env, name, p) {
       continue;                                       // √0 and 0^(1/3) are fine
     }
     const v = at(p);
-    if (!Number.isFinite(v) || (k === 'p' && v <= 0) || (k === 'n' && v < 0)) return false;
+    if (!fin(v) || (k === 'p' && v <= 0) || (k === 'n' && v < 0)) return false;
   }
   const self = along(ast, env, name);
-  if (Number.isFinite(self(p))) return true;
+  if (fin(self(p))) return true;
   // just off a root where the side is defined (√ of −10⁻¹⁷): judge by the
   // immediate neighbourhood instead
-  const es = 1e-6 * Math.max(1, Math.abs(p));
-  return near && (Number.isFinite(self(p - es)) || Number.isFinite(self(p + es)));
+  const es = 1e-6 * Math.max(1, abs(p));
+  return near && (fin(self(p - es)) || fin(self(p + es)));
 }
 
 /**
@@ -669,7 +668,7 @@ function sideDefinedAt(ast, guards, env, name, p) {
  */
 function polynomialOf(at) {
   const d = [];
-  for (let i = 0; i < 7; i++) { d.push(at(i)); if (!Number.isFinite(d[i])) return null; }
+  for (let i = 0; i < 7; i++) { d.push(at(i)); if (!fin(d[i])) return null; }
   for (let k = 1; k < 7; k++) for (let i = 6; i >= k; i--) d[i] = (d[i] - d[i - 1]) / k;
   // p(x) = d0 + x(d1 + (x − 1)(d2 + …)), expanded from the innermost term out
   let c = [d[6]];
@@ -680,10 +679,10 @@ function polynomialOf(at) {
     c = next;
   }
   const scale = Math.max(1, ...c.map(Math.abs));
-  c = c.map(v => Math.abs(v - Math.round(v)) < 1e-9 * scale ? Math.round(v) : Math.abs(v) < 1e-10 * scale ? 0 : v);
+  c = c.map(v => abs(v - Math.round(v)) < 1e-9 * scale ? Math.round(v) : abs(v) < 1e-10 * scale ? 0 : v);
   for (const x of [-1.37, 0.43, 2.71, -7.9, 11.3]) {
     const v = at(x), p = c.reduce((s, ck, k) => s + ck * x ** k, 0);
-    if (!(Math.abs(v - p) <= 1e-7 * Math.max(1, Math.abs(v), Math.abs(p)))) return null;
+    if (!(abs(v - p) <= 1e-7 * Math.max(1, abs(v), abs(p)))) return null;
   }
   while (c.length > 1 && !c[c.length - 1]) c.pop();
   return c;
@@ -703,7 +702,7 @@ function gridRoots(at, lo, hi, N, skip) {
   if (!skip && hi - lo <= 200) for (let k = Math.ceil(lo * 2); k <= hi * 2; k++) if (at(k / 2) === 0) roots.push(k / 2);
   for (let i = 0; i < N && roots.length < cap; i++) {
     const y0 = ys[i], y1 = ys[i + 1];
-    if (!Number.isFinite(y0) || !Number.isFinite(y1) || (skip && xs[i] >= skip[0] && xs[i + 1] <= skip[1])) continue;
+    if (!fin(y0) || !fin(y1) || (skip && xs[i] >= skip[0] && xs[i + 1] <= skip[1])) continue;
     if (y0 === 0) { roots.push(xs[i]); continue; }
     const crosses = Math.sign(y0) !== Math.sign(y1) && y1 !== 0;
     if (crosses) {
@@ -714,9 +713,9 @@ function gridRoots(at, lo, hi, N, skip) {
     // a double root (x² in a denominator) touches zero without crossing; a
     // dip beside a sign change is that simple root, already bisected
     if (!skip && i > 0 && !crosses && !(Math.sign(ys[i - 1]) !== Math.sign(y0)) &&
-        Math.abs(y0) < Math.abs(ys[i - 1]) && Math.abs(y0) <= Math.abs(y1)) {
+        abs(y0) < abs(ys[i - 1]) && abs(y0) <= abs(y1)) {
       const m = ternaryMin(at, xs[i - 1], xs[i + 1]);
-      if (Math.abs(at(m)) <= 1e-7) roots.push(m);
+      if (abs(at(m)) <= 1e-7) roots.push(m);
     }
   }
   if (ys[N] === 0) roots.push(xs[N]);
@@ -735,7 +734,7 @@ function rootsOf(g, name, env, lo, hi) {
     if (d === 0) return [];
     if (d === 1) return [-coef[0] / coef[1]].filter(x => x >= lo && x <= hi);
     // every real root lies within the Cauchy bound
-    const B = 1 + Math.max(...coef.slice(0, -1).map(c => Math.abs(c / coef[d])));
+    const B = 1 + Math.max(...coef.slice(0, -1).map(c => abs(c / coef[d])));
     const a = Math.max(lo, -B), b = Math.min(hi, B);
     return b > a ? gridRoots(at, a, b, Math.min(4000, Math.max(800, Math.ceil((b - a) / 0.05)))) : [];
   }
@@ -770,11 +769,11 @@ function domainDiffers(astA, astB, names, integers, baseEnvs, range, positiveOnl
       const isPoly = gd => once(gd, () => polynomialOf(along(gd.g, env, name)) !== null);
       const fA = along(astA, env, name), fB = along(astB, env, name);
       const points = unique.flatMap(gd => rootsOf(gd.g, name, env, lo, hi)).sort((x, y) => x - y)
-        .filter((p, i, all) => i === 0 || Math.abs(p - all[i - 1]) > 1e-9 * Math.max(1, Math.abs(p)));
+        .filter((p, i, all) => i === 0 || abs(p - all[i - 1]) > 1e-9 * Math.max(1, abs(p)));
       for (const p of points) {
-        const delta = Math.max(1e-4, Math.abs(p) * 1e-6);
+        const delta = Math.max(1e-4, abs(p) * 1e-6);
         // interval: the sides disagree beside the point
-        if ([p - delta, p + delta].some(x => x >= lo && x <= hi && Number.isFinite(fA(x)) !== Number.isFinite(fB(x)))) {
+        if ([p - delta, p + delta].some(x => x >= lo && x <= hi && fin(fA(x)) !== fin(fB(x)))) {
           if (strict) return true;
           continue;
         }
@@ -797,7 +796,6 @@ function domainDiffers(astA, astB, names, integers, baseEnvs, range, positiveOnl
 }
 
 const EQUIV_CACHE = new Map();
-const EQUIV_CACHE_MAX = 2000;
 
 /**
  * Are two expressions equivalent as functions of their variables?
@@ -811,18 +809,14 @@ const EQUIV_CACHE_MAX = 2000;
  * valid step, and the line after it is meant to lose the hole.
  */
 export function exprEquivalent(a, b, opts = {}) {
-  const cacheable = typeof a === 'string' && typeof b === 'string' && (opts.strictDomain || opts.isolatedDomain);
-  let key;
-  if (cacheable) {
-    key = `${a}\u0001${b}\u0001${JSON.stringify(opts)}`;
-    if (EQUIV_CACHE.has(key)) return EQUIV_CACHE.get(key);
+  // final-answer verdicts are cached per (answer, key): the domain probe is the costly part
+  if (!(opts.strictDomain || opts.isolatedDomain) || typeof a + typeof b !== 'stringstring') return exprEquivalentUncached(a, b, opts);
+  const key = JSON.stringify([a, b, opts]);
+  if (!EQUIV_CACHE.has(key)) {
+    if (EQUIV_CACHE.size > 2000) EQUIV_CACHE.clear();
+    EQUIV_CACHE.set(key, exprEquivalentUncached(a, b, opts));
   }
-  const result = exprEquivalentUncached(a, b, opts);
-  if (cacheable) {
-    if (EQUIV_CACHE.size >= EQUIV_CACHE_MAX) EQUIV_CACHE.clear();
-    EQUIV_CACHE.set(key, result);
-  }
-  return result;
+  return EQUIV_CACHE.get(key);
 }
 
 function exprEquivalentUncached(a, b, opts) {
@@ -847,7 +841,7 @@ function exprEquivalentUncached(a, b, opts) {
         const raw = base[(s + idx * 3) % base.length];
         if (integers.has(n)) { env[n] = 1 + Math.floor(((raw + 3.5) / 7) * 8); return; }   // 1‥8
         env[n] = domain[0] + ((raw + 3.5) / 7) * (domain[1] - domain[0]);
-        if (opts.positiveOnly) env[n] = Math.abs(env[n]) + 0.3;
+        if (opts.positiveOnly) env[n] = abs(env[n]) + 0.3;
       });
       const va = evaluate(astA, env);
       const vb = evaluate(astB, env);
@@ -856,23 +850,19 @@ function exprEquivalentUncached(a, b, opts) {
         // definedness is judged with e as Euler's number and odd roots real
         const denv = domainEnv(env);
         const da = domainEval(astA, denv), db = domainEval(astB, denv);
-        if (opts.strictDomain && Number.isFinite(da) !== Number.isFinite(db)) return false;
+        if (opts.strictDomain && fin(da) !== fin(db)) return false;
         // where an odd root makes both sides real, they must also agree there:
         // (x²)^(1/6) is |x|^(1/3), not x^(1/3)
-        if (Number.isFinite(da) && Number.isFinite(db)) {
-          if (Math.abs(da - db) > 1e-6 * Math.max(1, Math.abs(da), Math.abs(db))) return false;
+        if (fin(da) && fin(db)) {
+          if (apart(da, db)) return false;
           domainValid = true;
         }
         envs.push(denv);
       }
-      if (!Number.isFinite(va) || !Number.isFinite(vb)) {
-        // (−x)^(1/3) and −x^(1/3) are only both real under the odd-root reading
-        if (domainValid) { valid++; matches++; }
-        continue;
-      }
+      // (−x)^(1/3) and −x^(1/3) are only both real under the odd-root reading
+      if (!fin(va) || !fin(vb)) { if (domainValid) { valid++; matches++; } continue; }
       valid++;
-      const scale = Math.max(1, Math.abs(va), Math.abs(vb));
-      if (Math.abs(va - vb) > 1e-6 * scale) return false;
+      if (apart(va, vb)) return false;
       matches++;
     }
   }
@@ -881,7 +871,8 @@ function exprEquivalentUncached(a, b, opts) {
     // Without an authored domain, look along the whole real line: a hole at
     // x = 25 is as real as one at x = 1.
     const range = opts.domain || [-Infinity, Infinity];
-    const domainNames = names.filter(n => !DOMAIN_CONSTANTS.has(n));
+    // the probe never searches over e or π
+    const domainNames = names.filter(n => n !== 'e' && n !== 'pi');
     // one base point is enough for one variable; two cover the others' values
     const bases = envs.slice(0, domainNames.length > 1 ? 2 : 1);
     if (domainDiffers(astA, astB, domainNames, integers, bases, range, opts.positiveOnly, Boolean(opts.strictDomain))) return false;
