@@ -46,6 +46,10 @@ const SAMPLE = {
 };
 const concrete = path => path.replace(/:([A-Za-z]+)(\([^)]*\))?/g, (_, name) => SAMPLE[name] ?? 'x');
 const MUTATION = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+// A limiter keyed by account and placed after requireSession on a route that
+// ends the caller's own sessions: each attempt needs a live session, so the
+// actor signs in again before every call (login has its own IP bucket).
+const SESSION_ENDING = new Set(['logout-all']);
 
 try {
   // ── Every declared limiter bucket, exercised to its edge ─────────────────
@@ -71,6 +75,13 @@ try {
       const body = route.path === '/v1/account/login'
         ? { email: `nobody.${key}.${i}@example.test`, password: 'wrong-password' }
         : MUTATION.has(route.method) ? {} : undefined;
+      if (SESSION_ENDING.has(key)) {
+        actors[`ending:${key}`] ||= await account();
+        const fresh = {};
+        const signedIn = await h.request('/v1/account/login', { method: 'POST', jar: fresh, body: { email: actors[`ending:${key}`].email, password: actors[`ending:${key}`].password, deviceId: `ending-${i}` } });
+        if (signedIn.status !== 200) throw new Error(`re-login for ${key}: ${signedIn.status}`);
+        jar = fresh;
+      }
       const r = await h.request(concrete(route.path), { method: route.method, jar: { ...jar }, body });
       lastResponse = r;
       if (r.status === 429 && r.data?.error?.code === 'RATE_LIMITED') { firstLimited = i; break; }
