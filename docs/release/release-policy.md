@@ -36,3 +36,19 @@ Container builds receive `PRI_RELEASE_SHA` and `PRI_BUILD_TIMESTAMP` as build ar
 ## Version changes
 
 Product/package/native marketing versions are one release decision. Update `release/metadata.json`, JS package manifests/locks and both native `Package.swift` files in the same reviewed change. App Store `bundleVersion` remains its separate monotonically increasing build number.
+
+## Cross-platform release matrix and compatibility (CP-11)
+
+**One product, one identity.** A release candidate is one exact `main` SHA. Its shared web build carries `release.json` (`releaseSha`, product and curriculum version). `node scripts/release-matrix.mjs` (`npm run release:matrix`) verifies, and fails on any mismatch:
+- both Apple bundles (`--require-native-apple`, after `npm run sync:ios`) and the Android assets (`--require-native-android`, after the Gradle build) embed exactly that `releaseSha`;
+- the shell versions (Apple `displayVersion`, Android `versionName`) equal `release/metadata.json` `productVersion`. Build numbers (`bundleVersion`, `versionCode`) increase per store upload;
+- the data origins have not moved: Apple `prilearning://app`, Android `https://appassets.androidplatform.net`. Every student's IndexedDB and localStorage is keyed to them, so changing either orphans local data, and it fails CI (release matrix plus the architecture guard);
+- the priNative envelope protocol is the same number in JS, Swift and Kotlin, and the native client ids (`ios-native-v1`, `android-native-v1`) agree between the shells and the server.
+
+It runs in `ci.yml` (required: S0 + S1 + Apple bundle identity) and `android-shell.yml` (Android assets). S2 evidence comes from `native-ink.yml` (iOS simulator) and `android-shell.yml` (Android emulator). **P (physical) evidence is never inferred** from any of these.
+
+**Compatibility policy:**
+- **Server compatibility window.** The server must keep working with every shell build at or above the floor. Server changes are backward compatible with the oldest supported shell; a breaking `/v1` change needs a new route or field, never a silent change.
+- **Floor.** `PRI_MIN_IOS_BUILD` / `PRI_MIN_ANDROID_BUILD`, unset by default. A shell below the floor, or one that sends no build, gets `426 CLIENT_UPGRADE_REQUIRED {platform, minBuild, build}` on cloud routes. Health, logout, account export and account deletion stay reachable, so nobody is trapped with their data. Learning on the device is never affected. A malformed floor stops a production boot.
+- **Shell ↔ web protocol.** The page negotiates per-capability versions with the host descriptor. A host advertising a newer envelope protocol than the page understands is treated as a browser (fail closed), and an older one is offered only the capabilities both understand (`client/src/platform/native/host.js`).
+- **Staged rollout.** Deploy the server first. Then roll the shell out in stages (Play staged rollout, App Store phased release). Raise the floor only after the new build has reached 100% of users and been out for long enough that stragglers have updated (start with 14 days), and only for a real incompatibility or security reason.
