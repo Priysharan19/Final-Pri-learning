@@ -1611,6 +1611,111 @@ function displayAnswer(q) {
   }
 }
 
+// ── Submission identity (§09) ────────────────────────────────────────────────
+// A practice submission carries a client idempotency key: one per tap of
+// Submit, reused unchanged when the same submission is retried after a timeout
+// or replayed after the app was killed mid-submit. The key is bound to the
+// content it was minted for by a digest, so a key can only ever answer the
+// request it first answered.
+
+const SUBMISSION_ID = /^[A-Za-z0-9_-]{8,80}$/;
+
+/** The request's idempotency key, or null when it carries none (or a malformed one). */
+export function submissionIdOf(body) {
+  const id = body?.submissionId;
+  return typeof id === 'string' && SUBMISSION_ID.test(id) ? id : null;
+}
+
+/** A stable digest of what a submission asked to be marked. Not a security hash. */
+export function submissionDigest(answer, steps) {
+  const text = JSON.stringify([String(answer ?? ''), steps === undefined || steps === null ? '' : String(steps)]);
+  let h1 = 0x811c9dc5;
+  let h2 = 0x01000193;
+  for (let i = 0; i < text.length; i += 1) {
+    const c = text.charCodeAt(i);
+    h1 = Math.imul(h1 ^ c, 0x01000193) >>> 0;
+    h2 = Math.imul(h2 + c, 0x85ebca6b) >>> 0;
+  }
+  return `${h1.toString(36)}${h2.toString(36)}`;
+}
+
+/**
+ * The deterministic marking of one practice answer, with no side effects. The
+ * live submit and an idempotent replay share it, so a replay explains the
+ * answer with exactly the feedback the first delivery gave.
+ */
+function markSubmission(q, answer, steps) {
+  const result = checkAnswer(q, answer);
+  let feedback = result.feedback;
+  if (!result.correct && q.answerType === 'mcq' && q.answer.optionTraps) {
+    feedback = q.answer.optionTraps[Number(answer)] || feedback;
+  }
+  let stepReport = null;
+  const meta0 = stepMetaFor(q);
+  if (steps && meta0) {
+    try { stepReport = stepCheck(meta0, steps); } catch { stepReport = null; }
+  }
+  // Working-type questions mark every submitted line — surface that report
+  if (!stepReport && result.stepReport) stepReport = result.stepReport;
+  // Method marks under the exam rule: a wrong answer with working that moves
+  // the solution on earns marks for those lines; restating the question does
+  // not. Practice and exams share methodMarks() so the two never disagree.
+  let partial = null;
+  if (!result.correct && !result.invalid && steps && String(steps).trim() && meta0) {
+    try {
+      const mm = methodMarks({ meta: meta0, working: String(steps), marks: criteriaFor(q).length, prompt: q.prompt, report: stepReport });
+      if (mm) partial = { okLines: mm.okLines, awarded: mm.awarded, note: mm.note };
+    } catch { partial = null; }
+  }
+  return { result, feedback, stepReport, partial, meta0 };
+}
+
+function solutionOf(q) {
+  return { steps: q.steps, answerText: displayAnswer(q), criteria: criteriaFor(q), solutionText: q.solutionText };
+}
+
+/**
+ * The recorded outcome of a submission this question has already taken, or
+ * null when `submissionId` is new to it. The verdict comes from what was
+ * recorded, never from marking again: an engine that changed between the
+ * first delivery and the replay cannot move a mark that already stands.
+ */
+async function replaySubmission(p, row, q, submissionId, requestDigest, answer, steps) {
+  const recorded = row.answered ? row.resolution : null;
+  const tried = !row.answered ? row.lastTry : null;
+  const match = recorded?.submissionId === submissionId ? recorded
+    : tried?.submissionId === submissionId ? tried : null;
+  if (!match) return null;
+  const digest = match === recorded ? recorded.requestDigest : tried.digest;
+  if (digest !== requestDigest) {
+    throw Object.assign(new Error('This submission id already answered a different answer.'), { status: 409, code: 'SUBMISSION_ID_REUSED' });
+  }
+  const owner = evidenceKeyOf(row, q);
+  const { feedback, stepReport, partial } = markSubmission(q, answer, steps);
+  if (match === tried) {
+    return {
+      correct: false, resolved: false, triesLeft: 1,
+      feedback: feedback || 'Not quite — check your working and try once more.', stepReport, partial,
+      diagnosis: stepReport?.diagnosis || null,
+      misconception: await namedTrap(p.id, owner, tried.trapHit || null),
+      submissionId, replayed: true
+    };
+  }
+  let streak = 0;
+  try { streak = await streakFor(p.id, Date.now(), timezoneOf(p)); } catch { }
+  const correct = !!recorded.correct;
+  return {
+    correct, resolved: true, feedback, stepReport, partial: correct ? null : partial,
+    diagnosis: stepReport?.diagnosis || null,
+    misconception: await namedTrap(p.id, owner, recorded.trapHit || null),
+    solution: solutionOf(q),
+    xp: recorded.xp ?? 0, totalXp: recorded.totalXp ?? p.xp ?? 0, level: recorded.level ?? levelFromXp(p.xp || 0),
+    ratingDelta: recorded.ratingDelta ?? 0, mastery: recorded.mastery ?? 0, band: recorded.band ?? null,
+    predicted: recorded.predicted ?? null, streak, newBadges: [],
+    submissionId, replayed: true
+  };
+}
+
 async function resolve(profile, row, q, correct, answerGiven, ms, mode, viaInk = false, resolution = {}) {
   const pid = profile.id;
   const now = Date.now();
@@ -1714,9 +1819,21 @@ async function resolve(profile, row, q, correct, answerGiven, ms, mode, viaInk =
     ratingDelta: ratingAfter - st.rating, mastery, band: masteryBand(mastery / 100),
     predicted: profile.course === 'in' ? null : pred
   };
+  // The submission that resolved this question is recorded with the verdict,
+  // in the same transaction, so a replay of it can never find one without the
+  // other (§09).
+  const submission = resolution?.submission?.submissionId ? resolution.submission : null;
+  const { lastTry: _spentTry, ...settledRow } = row;
   const questionNext = {
-    ...row, answered: 1, resolvedAt: now,
-    resolution: { correct: !!correct, at: now, ...coreMeta }
+    ...settledRow, answered: 1, resolvedAt: now,
+    resolution: {
+      correct: !!correct, at: now, ...coreMeta,
+      ...(submission ? {
+        submissionId: submission.submissionId,
+        requestDigest: submission.requestDigest,
+        trapHit: submission.trapHit || null
+      } : {})
+    }
   };
 
   try {
@@ -2788,6 +2905,13 @@ const routes = {
     if (!row || row.pid !== p.id) throw Object.assign(new Error('Question not found'), { status: 404 });
     assertPracticeRow(row);
     if (!row.answered) throw Object.assign(new Error('Answer the question first'), { status: 409 });
+    // A proposal is about one submission's working. One that names a different
+    // submission from the one that resolved this question arrived late, from
+    // working that is no longer the answer of record, and changes nothing.
+    const proposedFor = submissionIdOf(body);
+    if (proposedFor && row.resolution?.submissionId && row.resolution.submissionId !== proposedFor) {
+      return { status: null, id: null, line: null, recorded: false, misconception: null, stale: true };
+    }
     const q = row.payload;
     const lines = (Array.isArray(body?.lines) ? body.lines : [])
       .slice(0, 40).map(l => sanitizeText(l, 400)).filter(Boolean);
@@ -2835,33 +2959,25 @@ const routes = {
     const row = await get('questions', params.id);
     if (!row || row.pid !== p.id) throw Object.assign(new Error('Question not found'), { status: 404 });
     assertPracticeRow(row);
-    if (row.answered) throw Object.assign(new Error('Already answered'), { status: 409 });
-    if (row.discardedAt) throw Object.assign(new Error('Question was skipped'), { status: 409, code: 'QUESTION_DISCARDED' });
     const q = row.payload;
     const { answer, ms, steps, viaInk, ink, photo, scribble } = body || {};
+    // One tap is one submission (§09). The card names each submission with a
+    // client idempotency key and sends that same key again when it retries
+    // after a timeout or replays after a relaunch. A key this question already
+    // answered gets that answer back, rebuilt from what was recorded — it is
+    // never marked a second time, never spends the second try, and never adds
+    // an attempt. The same key over different content is refused: replaying an
+    // old verdict for a new answer would hide the new answer.
+    const submissionId = submissionIdOf(body);
+    const requestDigest = submissionId ? submissionDigest(answer, steps) : null;
+    if (submissionId) {
+      const replay = await replaySubmission(p, row, q, submissionId, requestDigest, answer, steps);
+      if (replay) return replay;
+    }
+    if (row.answered) throw Object.assign(new Error('Already answered'), { status: 409 });
+    if (row.discardedAt) throw Object.assign(new Error('Question was skipped'), { status: 409, code: 'QUESTION_DISCARDED' });
 
-    const result = checkAnswer(q, answer);
-    let feedback = result.feedback;
-    if (!result.correct && q.answerType === 'mcq' && q.answer.optionTraps) {
-      feedback = q.answer.optionTraps[Number(answer)] || feedback;
-    }
-    let stepReport = null;
-    const meta0 = stepMetaFor(q);
-    if (steps && meta0) {
-      try { stepReport = stepCheck(meta0, steps); } catch { stepReport = null; }
-    }
-    // Working-type questions mark every submitted line — surface that report
-    if (!stepReport && result.stepReport) stepReport = result.stepReport;
-    // Method marks under the exam rule: a wrong answer with working that moves
-    // the solution on earns marks for those lines; restating the question does
-    // not. Practice and exams share methodMarks() so the two never disagree.
-    let partial = null;
-    if (!result.correct && !result.invalid && steps && String(steps).trim() && meta0) {
-      try {
-        const mm = methodMarks({ meta: meta0, working: String(steps), marks: criteriaFor(q).length, prompt: q.prompt, report: stepReport });
-        if (mm) partial = { okLines: mm.okLines, awarded: mm.awarded, note: mm.note };
-      } catch { partial = null; }
-    }
+    const { result, feedback, stepReport, partial, meta0 } = markSubmission(q, answer, steps);
     // A wrong answer that landed on a designed distractor is not a random miss:
     // the trap names the misconception behind it. Counted here, before the
     // two-try branch below, because the first attempt is the honest evidence.
@@ -2890,19 +3006,24 @@ const routes = {
     const isFast = row.mode === 'rush' || row.mode === 'match';
     if (!result.correct && !result.invalid && !isFast && (row.tries || 0) < 1) {
       row.tries = (row.tries || 0) + 1;
+      // The spent try remembers which submission spent it, in the same write.
+      row.lastTry = submissionId ? { submissionId, digest: requestDigest, trapHit: trapHit || null } : null;
       await put('questions', row);
-      return { correct: false, resolved: false, triesLeft: 1, feedback: feedback || 'Not quite — check your working and try once more.', stepReport, partial, diagnosis: stepReport?.diagnosis || null, misconception: await namedTrap(p.id, evidenceKeyOf(row, q), trapHit) };
+      return { correct: false, resolved: false, triesLeft: 1, feedback: feedback || 'Not quite — check your working and try once more.', stepReport, partial, diagnosis: stepReport?.diagnosis || null, misconception: await namedTrap(p.id, evidenceKeyOf(row, q), trapHit), ...(submissionId ? { submissionId } : {}) };
     }
     if (result.invalid && !isFast) {
       return { correct: false, resolved: false, triesLeft: Math.max(0, 1 - (row.tries || 0)), invalid: true, feedback, stepReport };
     }
-    const meta = await resolve(p, row, q, result.correct, answer, ms, row.mode, !!viaInk);
+    const meta = await resolve(p, row, q, result.correct, answer, ms, row.mode, !!viaInk, {
+      submission: submissionId ? { submissionId, requestDigest, trapHit: trapHit || null } : null
+    });
     return {
       correct: result.correct, resolved: true, feedback, stepReport, partial,
       diagnosis: stepReport?.diagnosis || null,
       misconception: await namedTrap(p.id, evidenceKeyOf(row, q), trapHit),
-      solution: { steps: q.steps, answerText: displayAnswer(q), criteria: criteriaFor(q), solutionText: q.solutionText },
-      ...meta
+      solution: solutionOf(q),
+      ...meta,
+      ...(submissionId ? { submissionId } : {})
     };
   },
 
@@ -3859,6 +3980,16 @@ export async function finishIndiaExamEvidence(pct) {
  */
 async function resumableQuestion(profile, body = {}) {
   if (body?.resume !== true) return null;
+  // A submission that was in flight when the app went away names its question.
+  // That question comes back first — answered or not — so the card can replay
+  // the submission under its idempotency key and show the student the one
+  // verdict it produced, rather than leaving them to wonder whether it went
+  // (§09). Only this profile's own practice rows qualify; a skipped one does not.
+  if (body.pendingQuestionId) {
+    const pending = await get('questions', String(body.pendingQuestionId)).catch(() => null);
+    if (pending && pending.pid === profile.id && !pending.discardedAt && !pending.examId && !isExamRow(pending)
+      && pending.mode !== 'rush' && pending.mode !== 'match') return pending;
+  }
   const rows = await byIndex('questions', 'pid', profile.id);
   const taskId = body.taskId ? String(body.taskId) : null;
   const subtopic = body.subtopic ? String(body.subtopic) : null;
