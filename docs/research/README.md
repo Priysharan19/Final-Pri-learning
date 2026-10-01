@@ -159,6 +159,13 @@ One semantic math object rendered through MathML, speech, braille, keyboard, vis
 ### GUARDIAN_HOME_SUPPORT_AUTONOMY.md
 Guardian visibility/consent separation, supportive-vs-intrusive homework evidence, autonomy-preserving digest design, shared-device privacy and guardian-intervention evaluation.
 
+
+### PRI_WORLDS_GENERATIVE_INTERACTIVES.md
+Typed WorldSpec architecture for verified generative mathematical interactives, solvability/invariant testing, representation linking, accessibility, sandboxing, assessment boundaries and learning-efficacy evaluation.
+
+### PAIRLAB_COLLABORATIVE_LEARNING.md
+Structured peer collaboration with rotating cognitive roles, private prediction/exit tasks, group-vs-individual evidence separation, AI mediation boundaries, child-safety controls and delayed individual evaluation.
+
 ### V6 agent routing
 
 | Mission surface | Additional V6 module |
@@ -173,6 +180,8 @@ Guardian visibility/consent separation, supportive-vs-intrusive homework evidenc
 | any ML/LLM admission, benchmark, model update, RAG/tool use | EVALUATION_BENCHMARKS_AND_MODEL_RISK.md |
 | deciding local vs on-device model vs cloud intelligence placement | LOCAL_CLOUD_MODEL_ROUTING.md |
 | accessible equations, graphs, diagrams or input/output modes | ACCESSIBLE_MATHEMATICS_INTERACTION.md |
+| generated simulations, manipulatives, multi-representation interactives | PRI_WORLDS_GENERATIVE_INTERACTIVES.md |
+| peer tutoring, group work, pairing, collaborative canvas | PAIRLAB_COLLABORATIVE_LEARNING.md |
 | India device/offline/shared-device/language field assumptions | INDIA_FIELD_OPERATING_REALITY_2026.md |
 | sequencing research-derived engineering work | RESEARCH_TO_BUILD_V6.md |
 
