@@ -1448,6 +1448,26 @@ h3 { font-size: 17px; line-height: 1.3; }
   border-color: var(--brand-ring);
   color: var(--brand-1);
 }
+.nav-section { display: grid; gap: 4px; }
+.nav-section + .nav-section { margin-top: 5px; }
+.nav-section-label {
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  padding: 0 12px;
+  color: var(--ink-3);
+  font-size: 10px;
+  font-weight: 760;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  transition: opacity var(--motion-fast) var(--ease-standard), max-height var(--motion-fast) var(--ease-standard);
+}
+.sidebar:hover .nav-section-label {
+  max-height: 22px;
+  opacity: 1;
+  padding-top: 5px;
+}
 
 .content {
   max-width: 1240px;
@@ -1671,6 +1691,37 @@ h3 { font-size: 17px; line-height: 1.3; }
   color: var(--ink-3);
 }
 .mnav-item.active { color: var(--brand-1); }
+.mnav-sheet-title {
+  padding: 4px 10px 10px;
+  color: var(--ink-3);
+  font-size: 11px;
+  font-weight: 760;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.mnav-sheet-item.active {
+  color: var(--brand-1);
+  background: var(--brand-soft);
+}
+.teacher-workspace-head {
+  display: grid;
+  gap: 6px;
+  padding: 4px 2px 8px;
+}
+.teacher-workspace-head h1 {
+  font-family: var(--font-display);
+  letter-spacing: -0.035em;
+}
+.teacher-anchor {
+  scroll-margin-top: 84px;
+}
+.teacher-anchor:focus {
+  outline: none;
+}
+.teacher-anchor:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 4px;
+}
 
 .skeleton {
   background: linear-gradient(100deg, var(--surface-2) 38%, var(--surface-3) 50%, var(--surface-2) 62%);
@@ -1692,6 +1743,11 @@ h3 { font-size: 17px; line-height: 1.3; }
   }
   .sidebar:hover .sidebar-inner { width: 178px; box-shadow: none; }
   .nav-label, .nav-badge, .sidebar:hover .nav-label, .sidebar:hover .nav-badge { opacity: 1; }
+  .nav-section-label, .sidebar:hover .nav-section-label {
+    max-height: 22px;
+    opacity: 1;
+    padding: 5px 12px 0;
+  }
   .nav-item { min-height: 48px; padding: 11px 12px; }
   .nav-hist { display: none; }
   .content { padding: 28px 24px 88px; }

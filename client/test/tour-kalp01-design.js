@@ -51,13 +51,12 @@ async function contrast(page) {
   });
 }
 
-async function createTeacherThroughUI(page, settle) {
+async function createStudentThroughUI(page, settle) {
   await page.getByRole('button', { name: 'Get Started' }).click();
   await page.waitForSelector('.sso-btn', { timeout: 15000 });
   await page.getByRole('button', { name: /Continue without an email/i }).click();
   await page.waitForSelector('#signup-name', { timeout: 15000 });
   await page.locator('#signup-name').fill('KALP Demo Teacher');
-  await page.getByRole('button', { name: 'Teacher', exact: true }).click();
   await page.getByRole('button', { name: 'Start learning' }).click();
   await page.waitForSelector('.home-greet', { timeout: 30000 });
   await settle();
@@ -114,8 +113,8 @@ export const flow = {
     await check('the real first-entry hero renders', await page.locator('.hero-title').isVisible());
     await snap(page, '01-login-tablet-dark');
 
-    await createTeacherThroughUI(page, settle);
-    await check('a teacher profile created through the product reaches Home', await page.locator('.home-greet').isVisible());
+    await createStudentThroughUI(page, settle);
+    await check('a student profile created through the product reaches Home', await page.locator('.home-greet').isVisible());
     await snap(page, '02-home-tablet-dark');
 
     const tabletNav = await page.evaluate(() => {
