@@ -109,12 +109,14 @@ The rows below update §2 and §3 with what is implemented and automatically che
 | 14. Lifecycle | **Fixed** (CP-02): `lifecycle.state` with a background grace period, and drafts flush on `inactive`/`background`. |
 | 15. Deep links | **Implemented but dormant.** Only `https://<signed cloud host>/account-action#…` is routed into the app, and the token fragment is never logged. It needs the Associated Domains entitlement plus `apple-app-site-association` on the production origin (**BLOCKED_EXTERNAL**, owner/Apple account). |
 | 16. Account export | **Fixed** (CP-02): the explicit `share.file` path. |
-| 18. Accessibility | **Partly fixed.** Dynamic Type is applied as page zoom (up to 1.5×), capped so the CSS viewport never drops below 360 px. VoiceOver remains a physical gate. |
+| 2. Finger draw vs scroll | **Partly fixed.** On iPhone, fingers write on the canvas and scroll the page everywhere else. The canvas fits the screen (CP-03), so scrolling while writing is rarely needed. Two-finger scrolling over the canvas is **not** implemented (open). Real finger feel is a physical gate. |
+| 18. Accessibility | **Partly fixed.** Dynamic Type is applied as page zoom, capped so the CSS viewport never drops below 360 px: up to 1.5× on iPad, and about 1.08× (390 pt wide) to 1.22× (440 pt) on iPhone. The native ink surface is placed zoom-aware: it keeps CSS-pixel bounds and is scaled by the zoom, and the bridge self-check verifies the zoom 1 and 1.5× cases. VoiceOver remains a physical gate. |
 | Stale artefacts | `PriLearning.swiftpm.zip` removed. The package drift gate now covers `Info.plist`, assets and models. |
 
-**Simulator evidence (synthetic):**
+**Simulator evidence (synthetic):** the evidence records come from the CI artefact `native-simulator-evidence` (workflow "Native Ink"). The local runs on 2026-10-01 UTC were:
 - `node scripts/iphone-journey.mjs --family iphone` gives **11/11** on an iPhone 18 Pro simulator (iOS 27.0): launch, onboarding, practice, a typed attempt marked with feedback ("Not quite…"), next question, native ink (`stylus=false fingerDefault=true`, a native reading returned), progress, a persistence marker, and the profile and marker surviving a relaunch.
 - The same journey gives 11/11 on an iPad Pro 13-inch (M5) simulator (`stylus=true fingerDefault=false`).
-- The bridge self-check is 7/7 on both.
+- The bridge self-check is 8/8 on both, including zoom-aware ink placement.
+- The journey asserts hardware-correct ink facts. Finger *touch* input itself is not exercised by injected strokes; it remains a physical gate.
 
-**Scope note:** `docs/release/PRI_V1_RELEASE_SCOPE.md` makes V1 iPad-only. `main` keeps iPhone engineering. The V1 shipping target is applied with `node scripts/apple-shipping-target.mjs --apply-v1` and verified with `--check-v1`; the iPad-only variant compiles and produces `UIDeviceFamily = [2]`. A public iPhone release needs the V1 scope-change procedure **and** the §4 physical gates.
+**Scope note:** `docs/release/PRI_V1_RELEASE_SCOPE.md` makes V1 iPad-only, and the release policy ships only an exact `main` SHA. So `main` itself declares **iPad only**, which closes V1 hard blocker #1 in code, and `--check-v1` runs in CI. iPhone engineering builds a scratch copy that adds the iPhone family: `node scripts/apple-shipping-target.mjs --engineering-package <dir>`. That copy is used for simulator CI and is never archived. A public iPhone release needs the V1 scope-change procedure, then a reviewed change to `main`, **and** the §4 physical gates.
