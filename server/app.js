@@ -21,6 +21,7 @@ import { asStore } from './platform/store.js';
 import { logEvent, requestContext, routeTemplate, safeCode, safeLogFields } from './platform/observability.js';
 import { recordHttpResponse } from './platform/metrics.js';
 import { releaseShaForLogs } from './platform/releaseIdentity.js';
+import { rejectUnsafeText } from './platform/text.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 export const DEFAULT_DIST = join(here, '..', 'client', 'dist');
@@ -31,6 +32,14 @@ export const DEFAULT_DIST = join(here, '..', 'client', 'dist');
  */
 export const JSON_BODY_LIMIT = '1mb';
 export const JSON_BODY_LIMIT_BYTES = 1024 * 1024;
+
+const BODY_PARSER_ERRORS = Object.freeze({
+  'entity.parse.failed': { status: 400, code: 'MALFORMED_JSON', message: 'The request body is not a valid JSON object or array.' },
+  'charset.unsupported': { status: 415, code: 'UNSUPPORTED_CHARSET', message: 'The request body charset is not supported. Send UTF-8 JSON.' },
+  'encoding.unsupported': { status: 415, code: 'UNSUPPORTED_ENCODING', message: 'The request body content encoding is not supported.' },
+  'request.aborted': { status: 400, code: 'REQUEST_ABORTED', message: 'The request body was not received completely.' },
+  'request.size.invalid': { status: 400, code: 'REQUEST_SIZE_INVALID', message: 'The request body length does not match its Content-Length.' }
+});
 
 /**
  * One structured JSON line per request (platform/observability.js): request
@@ -96,6 +105,14 @@ export async function createServerApp(db, {
     }
   }));
   app.use(cookieParser());
+  // A NUL never reaches a handler (platform/text.js): Postgres TEXT cannot hold
+  // one, so it used to surface as a 500 on the production engine. Two bodies are
+  // exempt. Sync push payloads are stored JSON-escaped, and refusing one would
+  // wedge a device's outbox. Signed provider webhooks are verified over the raw
+  // bytes and store only provider ids, statuses and digests; a 400 for a NUL in
+  // a customer-controlled field (subscription notes) would make the provider
+  // retry until it gives up, losing the entitlement change.
+  app.use('/v1', rejectUnsafeText({ exemptBody: [/^\/sync\/push\/?$/, /^\/billing\/webhook\/[^/]+\/?$/] }));
 
   ensureBillingSchema(db);
   const webBilling = createRazorpayBilling(db);
@@ -119,10 +136,12 @@ export async function createServerApp(db, {
   }
 
   app.use((err, req, res, next) => {
-    const status = Number.isInteger(err?.status) && err.status >= 400 && err.status <= 599 ? err.status : 500;
+    const bodyError = BODY_PARSER_ERRORS[err?.type];
+    const status = bodyError ? bodyError.status
+      : Number.isInteger(err?.status) && err.status >= 400 && err.status <= 599 ? err.status : 500;
+    const code = err?.type === 'entity.too.large' ? 'REQUEST_BODY_TOO_LARGE' : bodyError ? bodyError.code : safeCode(err?.code);
     logEvent(status >= 500 ? 'error' : 'warn', 'server_error', {
-      requestId: req.requestId, method: req.method, route: routeTemplate(req), status,
-      code: err?.type === 'entity.too.large' ? 'REQUEST_BODY_TOO_LARGE' : err?.type === 'entity.parse.failed' ? 'REQUEST_BODY_INVALID' : safeCode(err?.code)
+      requestId: req.requestId, method: req.method, route: routeTemplate(req), status, code
     });
     if (res.headersSent) return next(err);
     // An over-large body dies in the parser before any route sees it, so this is
@@ -134,6 +153,13 @@ export async function createServerApp(db, {
         error: { code: 'REQUEST_BODY_TOO_LARGE', message: `The request body is larger than the ${JSON_BODY_LIMIT} limit.` },
         requestId: req.requestId
       });
+    }
+    // The other body-parser refusals are client mistakes with a definite fix,
+    // so they get codes too rather than the uncoded server-error string below
+    // (which they used to share, under a 4xx status).
+    if (bodyError) {
+      res.locals.errorCode = bodyError.code;
+      return res.status(bodyError.status).json({ error: { code: bodyError.code, message: bodyError.message }, requestId: req.requestId });
     }
     res.locals.errorCode = status >= 500 ? 'INTERNAL' : safeCode(err?.code, 'REQUEST_FAILED');
     res.status(status).json({ error: 'Something went wrong on the server.', requestId: req.requestId });

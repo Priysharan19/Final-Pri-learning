@@ -17,6 +17,9 @@ export function asyncHandler(fn) {
     return undefined;
   };
   Object.defineProperty(wrapped, '__priAsync', { value: true });
+  // The access-control tag (routePolicy.js) must survive wrapping, or the route
+  // inventory would stop seeing the guard it describes.
+  if (fn.priPolicy) Object.defineProperty(wrapped, 'priPolicy', { value: fn.priPolicy, configurable: true });
   return wrapped;
 }
 

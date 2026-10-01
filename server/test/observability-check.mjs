@@ -348,6 +348,10 @@ try {
   c.eq(leaks(granted.text).length, 0, 'metrics carry no secret, email or path');
   c.ok(!/\/v1\/account\/devices\/sess/.test(granted.text), 'and no request paths');
   delete process.env.PRI_METRICS_TOKEN;
+  const { mountedRoutes } = await import('./support/route-inventory.mjs');
+  const routes = mountedRoutes();
+  c.eq(routes.find(route => route.path === '/v1/metrics')?.policy.operatorToken, true, 'the route inventory sees the operator-token gate on /v1/metrics');
+  c.eq(routes.find(route => route.path === '/v1/ready')?.policy.operatorToken, false, 'and /v1/ready as public');
 
   const fakeReq = (authorization, remoteAddress = '203.0.113.9') => ({ get: name => (name.toLowerCase() === 'authorization' ? authorization : undefined), socket: { remoteAddress } });
   const prodToken = 'p'.repeat(40);

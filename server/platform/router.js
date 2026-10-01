@@ -19,11 +19,23 @@ import { csrfGuard, originGuard } from './security.js';
 import { housekeepingStatus } from './housekeeping.js';
 import { cachedServerReleaseIdentity, releaseShaForLogs } from './releaseIdentity.js';
 import { readinessReport } from './readiness.js';
+import { tagPolicy } from './routePolicy.js';
 import { metrics, metricsAccess, recordDatabaseError } from './metrics.js';
 import { logEvent, routeTemplate, safeCode } from './observability.js';
 
 /** /v1/health's own bound on its database reads (liveness must answer fast). */
 export const HEALTH_DB_TIMEOUT_MS = 1_500;
+
+/**
+ * The operator-token gate in front of /v1/metrics (metrics.js metricsAccess),
+ * tagged so the route inventory (routePolicy.js) sees it as `operator-token`.
+ */
+const requireOperatorToken = tagPolicy((req, res, next) => {
+  const access = metricsAccess(req);
+  if (access.ok) return next();
+  if (access.status === 401) res.set('WWW-Authenticate', 'Bearer realm="pri-metrics"');
+  return res.status(access.status).json({ error: { code: access.code, message: access.code === 'METRICS_NOT_CONFIGURED' ? 'Metrics are not configured on this deployment.' : 'An operator metrics token is required.' } });
+}, { operatorToken: true });
 
 const SERVER_WEBHOOK = /^\/billing\/webhook\/(?:apple|google|web)$/;
 
@@ -110,12 +122,7 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
 
   // OPERATIONAL SIGNALS. Counters, latency and evaluated alert rules for an
   // operator holding PRI_METRICS_TOKEN; closed in production without one.
-  router.get('/metrics', (req, res) => {
-    const access = metricsAccess(req);
-    if (!access.ok) {
-      if (access.status === 401) res.set('WWW-Authenticate', 'Bearer realm="pri-metrics"');
-      return res.status(access.status).json({ error: { code: access.code, message: access.code === 'METRICS_NOT_CONFIGURED' ? 'Metrics are not configured on this deployment.' : 'An operator metrics token is required.' } });
-    }
+  router.get('/metrics', requireOperatorToken, (req, res) => {
     res.json({
       service: 'pri-learning-platform',
       releaseSha: releaseShaForLogs(),

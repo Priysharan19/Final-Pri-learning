@@ -200,6 +200,20 @@ jobs:
           node server/test/failure-drills-check.mjs 2>&1 | tee -a ops.log
           grep -Fq 'OBSERVABILITY: PASS' ops.log
           grep -Fq 'FAILURE DRILLS: PASS' ops.log
+      # V1 blocker #14: every /v1 route is in the reviewed inventory with the
+      # guards really mounted on it; every object-level route fails closed for
+      # no session, revoked sessions, wrong account, wrong role, unverified
+      # email, pending consent and bad CSRF; hostile input is a coded 4xx; every
+      # declared rate limit holds; the production browser boundary (Origin,
+      # CORS, cookie flags, HSTS/CSP, redirects) holds; no secret leaks into a
+      # response or a log. The two engine-agnostic suites also run on Postgres below.
+      - name: Security acceptance (route inventory, BOLA/authz negatives, abuse limits, production boundary)
+        run: |
+          node server/test/route-inventory-check.mjs
+          node server/test/sql-parameterisation-check.mjs
+          node server/test/security-acceptance-check.mjs
+          node server/test/abuse-limits-check.mjs
+          node server/test/security-production-mode-check.mjs
       - name: Commercial platform schema contract
         run: node server/test/platform-schema-check.mjs
       - name: Supabase migrations are self-contained transactions (supabase db push)
@@ -217,7 +231,9 @@ jobs:
         run: |
           set -o pipefail
           node scripts/with-postgres.mjs node server/test/run-platform-postgres.mjs 2>&1 | tee platform-postgres.log
-          grep -Fq 'PLATFORM ON POSTGRES: PASS — 25/25 suites' platform-postgres.log
+          grep -Fq 'PLATFORM ON POSTGRES: PASS — 27/27 suites' platform-postgres.log
+          grep -Fq '✓ security-acceptance-check.mjs' platform-postgres.log
+          grep -Fq '✓ abuse-limits-check.mjs' platform-postgres.log
           grep -Fq 'POSTGRES SCHEMA MUTATIONS: PASS — 21/21' platform-postgres.log
           grep -Fq 'PLATFORM SYNC BURST: PASS' platform-postgres.log
           grep -Fq '✓ failure-drills-check.mjs' platform-postgres.log
@@ -327,6 +343,12 @@ jobs:
         run: npm run sync:ios
       - name: Verify exact native release identity
         run: npm run verify:release:native
+      # After the build and the iOS bundle sync, so the scan reads the bytes
+      # that ship: every tracked file (iOS bundles included) and client/dist.
+      - name: Secret scan (tracked files, iOS bundles, built client)
+        run: |
+          node tools/secret-scan.test.mjs
+          node tools/secret-scan.mjs
       - name: Built client loads no remote presentation assets
         run: |
           set -euo pipefail
