@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
+import en from '../src/i18n/strings.en.js';
 
 const component=await readFile(new URL('../src/components/Class10NCERTLibrary.jsx',import.meta.url),'utf8');
 const classes=await readFile(new URL('../src/pages/Classes.jsx',import.meta.url),'utf8');
@@ -11,13 +12,21 @@ assert.match(classes,/Number\(user\.year\) === 10/,'library is scoped to Class 1
 assert.match(component,/class10-content\.js/,'library consumes bundled source content');
 assert.doesNotMatch(component,/fetch\s*\(|https?:\/\//,'NCERT library has no network dependency');
 assert.match(component,/\/practice\?subtopic=/,'D1-D4 buttons hand off to normal Practice');
-assert.match(component,/Topper Notes/);
-assert.match(component,/Worked Examples/);
-assert.match(component,/Exercises/);
-assert.match(component,/Source Coverage/);
-assert.match(component,/Answers\/Hints appendix/);
-assert.match(component,/Apple Pencil handwriting/);
-assert.match(component,/offline/);
+// The library's copy lives in the string catalogue, so the component must reach
+// for each key and the English catalogue must still say the right thing.
+const catalogue=en;
+const copy=(key,re,label)=>{
+  assert.match(component,new RegExp(`'${key.replace(/\./g,'\\.')}'`),`${label}: the library uses ${key}`);
+  assert.match(String(catalogue[key]??''),re,`${label}: ${key} says it in English`);
+};
+copy('ncert.c10TabTopperNotes',/Topper Notes/,'Topper Notes tab');
+copy('ncert.c10TabWorkedExamples',/Worked Examples/,'Worked Examples tab');
+copy('ncert.c10TabExercises',/Exercises/,'Exercises tab');
+copy('ncert.c10TabSourceCoverage',/Source Coverage/,'Source Coverage tab');
+copy('ncert.c10AppendixNote',/Answers\/Hints appendix/,'appendix authority note');
+copy('ncert.c10Intro',/Apple Pencil handwriting/,'handwriting promise');
+copy('ncert.c10Intro',/offline/,'offline promise');
+copy('ncert.c10ChapterCount',/offline/,'offline chapter badge');
 
 // NCERT must reuse Pri's mature handwriting path instead of shipping a fork.
 assert.match(question,/mode.*'type'.*'write'.*'photo'/s,'QuestionCard retains Type/Write/Photo modes');
