@@ -33,9 +33,9 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { Fragment, createElement, useMemo, useSyncExternalStore } from 'react';
 import en from './strings.en.js';
-import { DEFAULT_LANGUAGE, cleanLanguage, htmlLangOf, pluralCategory } from './languages.js';
+import { DEFAULT_LANGUAGE, LANGUAGES, cleanLanguage, htmlLangOf, pluralCategory } from './languages.js';
 
-export { LANGUAGES, DEFAULT_LANGUAGE, cleanLanguage, pluralCategory } from './languages.js';
+export { LANGUAGES, DEFAULT_LANGUAGE, cleanLanguage, pluralCategory, speechTagsOf } from './languages.js';
 
 // ── The store ────────────────────────────────────────────────────────────────
 
@@ -43,15 +43,16 @@ export { LANGUAGES, DEFAULT_LANGUAGE, cleanLanguage, pluralCategory } from './la
 const catalogues = { en };
 
 /**
- * How a catalogue is fetched. Only `hi` has one to fetch; English is already
- * here. The `import()` is written out per language rather than built from a
- * template string because a bundler can only split what it can see statically —
- * `import(\`./strings.${id}.js\`)` would make Vite emit every match as a chunk
- * and, worse, hide from the reader which chunks exist.
+ * How a catalogue is fetched: each registered language's own `load`, from the
+ * table in languages.js. That table is the one place a language is added, and
+ * each `load` is a literal `import('./strings.<id>.js')` there rather than a
+ * template string here, because a bundler can only split what it can see
+ * statically — `import(\`./strings.${id}.js\`)` would make Vite emit every
+ * match as a chunk and hide from the reader which chunks exist.
  */
-const LOADERS = {
-  hi: () => import('./strings.hi.js').then(m => m.default)
-};
+const LOADERS = Object.fromEntries(
+  LANGUAGES.filter(l => typeof l.load === 'function').map(l => [l.id, l.load])
+);
 
 // useSyncExternalStore compares snapshots by identity, so the snapshot is
 // replaced wholesale on every change and never mutated in place.
@@ -94,7 +95,9 @@ export function setLanguage(raw) {
   // Record the request now so the settings switch reflects the tap, and leave
   // the strings alone until there are new ones to show.
   publish({ ...snapshot, chosen });
-  return LOADERS[chosen]()
+  const load = LOADERS[chosen];
+  if (!load) return Promise.resolve(snapshot.language);
+  return load()
     .then(strings => {
       catalogues[chosen] = strings;
       // A student who tapped Hindi and then tapped back to English before the
@@ -151,6 +154,14 @@ const lookup = (strings, key, vars, language) => fill(select(strings, key, vars,
  * the places where there is no component to be inside.
  */
 export const translate = (key, vars) => lookup(snapshot.strings, key, vars, snapshot.language);
+
+/**
+ * The English for a key, whatever language is on screen. For the one place
+ * that must fall back to English mid-sentence: narration on a device with no
+ * voice for the student's language speaks the English caption with an English
+ * voice, rather than Hindi text through an English voice.
+ */
+export const translateEnglish = (key, vars) => lookup(en, key, vars, 'en');
 
 // ── Hooks ────────────────────────────────────────────────────────────────────
 
@@ -219,6 +230,25 @@ export function useTx() {
     return createElement(Fragment, null, ...parts);
   }, [store]);
 }
+
+// ── Messages kept in state ───────────────────────────────────────────────────
+
+// useTx rather than useT, so a variable may itself be a tLater() element
+// ("Returned to {name}" with a translated fallback name) and still render.
+function LaterText({ k, vars }) {
+  const tx = useTx();
+  return tx(k, vars);
+}
+
+/**
+ * A translated message to keep in component state — "Saved", "That link has
+ * expired" — that stays in the student's language if they switch it while the
+ * message is on screen. `t()` would freeze the string in whatever language was
+ * active when it was set; this stores a tiny element that looks the key up
+ * each time it renders. Render it as a child (`{message}`), never as an
+ * attribute or in string arithmetic.
+ */
+export const tLater = (key, vars) => createElement(LaterText, { k: key, vars });
 
 // ── The sign-in screen ───────────────────────────────────────────────────────
 

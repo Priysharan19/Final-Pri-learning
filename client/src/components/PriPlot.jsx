@@ -11,6 +11,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import React, { useMemo } from 'react';
 import { buildPlot } from '../engine/plot.js';
+import { useT } from '../i18n/index.js';
 
 const SERIES = ['var(--plot-a, #7aa2f7)', 'var(--plot-b, #e0af68)', 'var(--plot-c, #9ece6a)'];
 
@@ -27,9 +28,10 @@ function dash(length, revealed) {
 }
 
 export default function PriPlot({ spec, progress = 1, reduceMotion = false, title, describedBy }) {
+  const t = useT();
   const plot = useMemo(() => {
-    try { return buildPlot(spec); } catch (error) { return { error: error?.message || 'This graph could not be drawn.' }; }
-  }, [spec]);
+    try { return buildPlot(spec); } catch (error) { return { error: error?.message || t('charts.plotFailed') }; }
+  }, [spec, t]);
 
   if (plot.error) {
     // Never a blank pair of axes: a student must not read "no graph" as "no
@@ -139,8 +141,8 @@ export default function PriPlot({ spec, progress = 1, reduceMotion = false, titl
 
       <figcaption className="muted" style={{ fontSize: 12, marginTop: 6 }}>
         {curves.map(c => c.label).join(' · ')}
-        {tangent ? ` · tangent gradient ${fmt(tangent.gradient)}` : ''}
-        {area ? ` · area ${fmt(area.value)}` : ''}
+        {tangent ? ` · ${t('charts.tangentGradient', { value: fmt(tangent.gradient) })}` : ''}
+        {area ? ` · ${t('charts.area', { value: fmt(area.value) })}` : ''}
       </figcaption>
     </figure>
   );
