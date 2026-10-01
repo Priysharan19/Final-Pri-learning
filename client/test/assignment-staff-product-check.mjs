@@ -125,8 +125,16 @@ assert.ok(fs.readFileSync(new URL('../src/i18n/strings.en.js', import.meta.url),
 
 const classroom = fs.readFileSync(new URL('../src/components/ClassroomPanel.jsx', import.meta.url), 'utf8');
 assert.match(classroom, /assignmentSubmissions\(/);
-assert.match(classroom, /Review submissions/);
-assert.match(classroom, /Return for revision/);
-assert.match(classroom, /Student answers and handwriting/);
+// The copy lives in the string catalogues; the panel has to reach for the keys
+// and the English catalogue has to still say it. Both halves are checked.
+assert.match(classroom, /t\('classroom\.reviewSubmissions'\)/);
+assert.match(classroom, /t\('classroom\.returnForRevision'\)/);
+assert.match(classroom, /t\('classroom\.reviewPrivacy'\)/);
+{
+  const enCatalogue = (await import('../src/i18n/strings.en.js')).default;
+  assert.equal(enCatalogue['classroom.reviewSubmissions'], 'Review submissions');
+  assert.equal(enCatalogue['classroom.returnForRevision'], 'Return for revision');
+  assert.match(enCatalogue['classroom.reviewPrivacy'] || '', /Student answers and handwriting/);
+}
 
 console.log('PASS — assignments resume safely, staff can review/return aggregate submissions, Classes exposes the inbox, and handwriting/answers stay outside classroom sync.');

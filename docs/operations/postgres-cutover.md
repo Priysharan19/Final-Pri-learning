@@ -112,7 +112,9 @@ npx supabase@latest link --project-ref orudxrckgxyyraopyzmn
 npx supabase@latest migration list
 npx supabase@latest db push --dry-run
 
-# 2.4  Apply. Each migration runs in its own transaction; a failure stops at that file.
+# 2.4  Apply. The CLI does NOT wrap a file in a transaction; every migration here
+#      opens and commits its own (begin; … commit;), so a failure part-way leaves
+#      that file unapplied and stops the push there.
 npx supabase@latest db push
 ```
 
@@ -208,7 +210,7 @@ role, and therefore **cannot and must not be pointed at Supabase**. Run it on th
 being deployed and keep the output:
 
 ```bash
-npm run test:platform:pg   # expect: PLATFORM ON POSTGRES: PASS — 24/24 suites
+npm run test:platform:pg   # expect: PLATFORM ON POSTGRES: PASS — 26/26 suites
 ```
 
 Against staging itself, the equivalent evidence is §4.2 plus §4.4.
@@ -342,7 +344,7 @@ runs against an empty `pri` schema.
 | 2.4 `db push` | staging | | | | |
 | 3 login role created | staging | | | | (role name only) |
 | 4.2 target check | staging | | | | `POSTGRES TARGET: PASS — n/n` |
-| 4.3 `test:platform:pg` | local/CI | | | | `24/24 suites` |
+| 4.3 `test:platform:pg` | local/CI | | | | `26/26 suites` |
 | 4.4 smoke | staging | | | | |
 | 6 backup + restore drill | production | | | | |
 | 2–4 | production | | | | |

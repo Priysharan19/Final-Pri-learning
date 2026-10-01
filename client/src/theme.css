@@ -425,10 +425,6 @@ select.input {
 .home-cards { display: flex; gap: 0; width: min(990px, 94%); margin-top: 7vh; border: 1px solid var(--hairline); border-radius: var(--radius); overflow: hidden; }
 .home-card { padding: 18px 22px; flex: 1; background: var(--surface); position: relative; }
 .home-card + .home-card { border-left: 1px solid var(--hairline); background: var(--surface-2); }
-.home-card-x { position: absolute; top: 10px; right: 12px; border: none; background: none; color: var(--ink-3); cursor: pointer; font-size: 13px; }
-.diamond-track { display: flex; align-items: center; margin-top: 22px; }
-.diamond { width: 11px; height: 11px; transform: rotate(45deg); border-radius: 2px; flex-shrink: 0; }
-.diamond-link { height: 2px; flex: 1; max-width: 64px; }
 
 /* ── Question page ─────────────────────────────────────────────────────── */
 .qpage { max-width: 1040px; margin: 0 auto; position: relative; }
@@ -601,6 +597,8 @@ select.input {
   font-family: var(--font); font-size: 12.5px; line-height: 1.5; color: var(--ink-3);
   margin-top: 7px; padding-top: 7px; border-top: 1px solid var(--hairline);
 }
+.diagnosis-named { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--hairline); font-size: 13px; line-height: 1.5; }
+.diagnosis-named b { display: block; font-weight: 600; margin-bottom: 2px; }
 
 .redo-chip {
   display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--hairline-strong); border-radius: 4px;
@@ -1328,12 +1326,8 @@ body { overscroll-behavior-y: none; }
   .pill-opt, .set-menu-item, .acct-menu-item, .editor-tool, .ink-tool, .user-chip { min-height: 44px; }
   .editor-tool, .ink-tool { padding: 0 12px; }
 
-  /* .home-card-x is already absolutely positioned, so it is its own containing
-     block; the other two need to become one. All three need to be raised, or
-     the hit area is painted under the text that follows them in the card. */
-  .chip-x, .genbar-toggle { position: relative; }
-  .chip-x, .home-card-x, .genbar-toggle { z-index: 1; }
-  .chip-x::after, .home-card-x::after, .genbar-toggle::after {
+  .chip-x, .genbar-toggle { position: relative; z-index: 1; }
+  .chip-x::after, .genbar-toggle::after {
     content: ''; position: absolute; left: 50%; top: 50%;
     width: 44px; height: 44px; transform: translate(-50%, -50%);
   }
@@ -1797,6 +1791,14 @@ h3 { font-size: 17px; line-height: 1.3; }
     transition-duration: 0.001ms !important;
   }
 }
+
+/* ── KALP-04 · Home daily learning command centre ───────────────────────── */
+.home-command {width:min(780px,100%);margin-top:40px;display:flex;align-items:flex-end;gap:24px}
+.home-command h2{font-size:clamp(27px,3.6vw,42px)}.home-command-copy{flex:1}.home-command-cta{flex:none}
+.home-cloud-note,.home-manual{width:min(760px,100%);margin-top:12px}.home-support-grid{margin-top:16px}.home-manual+.genbar{margin-top:12px}
+@media (max-width: 640px){.home-command{align-items:stretch;flex-direction:column}.home-command-cta{width:100%}}
+@media (prefers-reduced-motion: reduce){.home-command{transition:none}}
+
 /* ── CP-03 · Responsive product foundation ─────────────────────────────────
    Semantic form factors (docs/cross-platform/FORM_FACTOR_SPEC.md): COMPACT
    < 600px, MEDIUM 600–839px, EXPANDED ≥ 840px (the iPad baseline, unchanged),
