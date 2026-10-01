@@ -58,11 +58,13 @@ jobs:
           grep -Fq 'INDIA EXAM WEIGHT: PASS — 628/628 checks' suites.log
           grep -Fq 'PLOTTING: PASS — 78/78 checks' suites.log
           grep -Fq 'README TRUTH: PASS — 16/16 checks' suites.log
-          grep -Fq 'LEGAL PAGES: PASS — 228/228 checks' suites.log
+          grep -Fq 'LEGAL PAGES: PASS — 229/229 checks' suites.log
           grep -Fq 'CLOUD HANDWRITING CLIENT: PASS — 58/58 checks' suites.log
           grep -Fq 'CLOUD WORKING CLIENT: PASS — 47/47 checks' suites.log
           grep -Fq 'CLOUD PHOTO CLIENT: PASS — 28/28 checks' suites.log
-          grep -Fq 'I18N: PASS — 187/187 checks' suites.log
+          grep -Fq 'I18N: PASS — 188/188 checks' suites.log
+          grep -Fq 'I18N COVERAGE: PASS — 88/88 checks — 41 files scanned, 0 hard-coded strings' suites.log
+          grep -Fq 'I18N VOICE: PASS — 92/92 checks' suites.log
           grep -Fq 'MISCONCEPTION ONTOLOGY: PASS — 99/99 checks' suites.log
           grep -Fq 'CLOUD HANDWRITING CLIENT: PASS — 58/58 checks' suites.log
           grep -Fq 'CLOUD WORKING CLIENT: PASS — 47/47 checks' suites.log
@@ -294,6 +296,8 @@ jobs:
           grep -Eq 'E2E SUITE.*17/17.*1 flows' browser.log
           grep -Fq 'Cloud admin · independent-review rejection' browser.log
           grep -Eq 'E2E SUITE.*8/8.*1 flows' browser.log
+          grep -Fq 'Hindi · Practice, Exams, exam room, Progress, Explain' browser.log
+          grep -Eq 'E2E SUITE.*36/36.*1 flows' browser.log
           grep -Eq 'ACCESSIBILITY SUITE.*38/38.*12 groups' browser.log
           grep -Fq 'E2E BROWSER: webkit' browser.log
           test "$(grep -c 'Responsive matrix · 6 viewports, critical routes, write/type, actions' browser.log)" -ge 2

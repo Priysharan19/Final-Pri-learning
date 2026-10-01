@@ -290,7 +290,7 @@ export default function Legal() {
 
       {unfilled.length > 0 && (
         <div className="notice error" role="alert" style={{ marginBottom: 18 }} data-legal-draft="true">
-          <b>{t('legal.draftTitle')}</b> {t('legal.draftBody', { n: unfilled.length })}
+          <b>{t('legal.draftTitle')}</b> {t('legal.draftBody', { count: unfilled.length, n: unfilled.length })}
         </div>
       )}
 

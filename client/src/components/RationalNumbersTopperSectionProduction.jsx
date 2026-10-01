@@ -1,5 +1,6 @@
 import React from 'react';
 import RationalNumbersTopperSection from './RationalNumbersTopperSection.jsx';
+import { useT } from '../i18n/index.js';
 import { NCERT_CLASS8_RATIONAL_EXERCISE_ANSWER_AUDIT } from '../engine/ncert/class8-rational-production.js';
 
 const styles = {
@@ -54,20 +55,21 @@ const styles = {
  * of silently renumbering either source.
  */
 export default function RationalNumbersTopperSectionProduction() {
+  const t = useT();
   const audit = NCERT_CLASS8_RATIONAL_EXERCISE_ANSWER_AUDIT;
 
   return (
     <>
       <section style={styles.shell} aria-labelledby="ncert-exercise-key-title">
-        <p style={styles.eyebrow}>Verified against attached answer key</p>
-        <h2 id="ncert-exercise-key-title" style={styles.title}>Exercise 1.1 · answer verification</h2>
+        <p style={styles.eyebrow}>{t('ncert.rnAnswerKeyEyebrow')}</p>
+        <h2 id="ncert-exercise-key-title" style={styles.title}>{t('ncert.rnAnswerKeyTitle')}</h2>
         <p style={styles.intro}>
-          Pri Learning keeps the uploaded NCERT exercise as the source of truth and records exactly what the attached answer-key crop confirms.
+          {t('ncert.rnAnswerKeyIntro')}
         </p>
         <div style={styles.grid}>
           {audit.attachedKeyConfirmed.map(item => (
             <div key={`${item.source}-${item.answer}`} style={styles.answer}>
-              <span style={styles.source}>{item.source}{item.attachedLabel ? ` · key labels this ${item.attachedLabel}` : ''}</span>
+              <span style={styles.source}>{item.source}{item.attachedLabel ? ` · ${t('ncert.rnKeyLabels', { label: item.attachedLabel })}` : ''}</span>
               <strong style={styles.value}>✓ {item.answer}</strong>
             </div>
           ))}
