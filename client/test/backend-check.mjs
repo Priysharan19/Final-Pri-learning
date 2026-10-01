@@ -1150,6 +1150,31 @@ async function run() {
     eq('every marked question is correct', marked.detail.filter(d => !d.correct).length, 0);
     const markedPaper = await GET(`/exams/${created.id}/paper`);
     eq('once submitted, the paper carries a model answer for each', markedPaper.questions.filter(q => q.answerText === undefined && !q.multipart).length, 0);
+    // What the printed sheet tells a student is the answer must be what the
+    // marker accepts: each printed single answer, typed back in the way a
+    // student would (without the prefix/unit the answer row already shows),
+    // is marked correct against its own stored question.
+    {
+      const { checkAnswer } = await import(new URL('engine/checker.js', SRC).href);
+      const payloads = [];
+      for (const qid of (await idb.get('exams', created.id)).questionIds) {
+        const row = await idb.get('questions', qid);
+        if (row?.payload) payloads.push(row.payload);
+      }
+      const refused = [];
+      markedPaper.questions.forEach((pq, i) => {
+        const q = payloads[i];
+        if (pq.multipart || !q || q.multipart) return;
+        let typed = String(pq.answerText ?? '');
+        if (q.answerType === 'mcq') typed = String((q.mcqOptions || []).indexOf(typed));
+        else {
+          if (q.answerPrefix && typed.startsWith(q.answerPrefix)) typed = typed.slice(q.answerPrefix.length).trim();
+          if (q.answerSuffix && typed.endsWith(q.answerSuffix)) typed = typed.slice(0, -q.answerSuffix.length).trim();
+        }
+        if (!checkAnswer(q, typed)?.correct) refused.push(`Q${i + 1} ${q.answerType} ${JSON.stringify(pq.answerText)}`);
+      });
+      eq('every printed single answer is accepted by the marker for its own question', refused, []);
+    }
     await rejects('a submitted exam cannot be resubmitted',
       POST(`/exams/${created.id}/submit`, { answers: perfect }), { status: 409 });
 

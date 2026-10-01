@@ -299,7 +299,7 @@ export const flow = {
       printed.size === LENGTH, `${printed.size} stated answers for ${LENGTH} single questions`);
     for (const { n } of answered) {
       const row = rows.find(r => r.n === n);
-      await check(`Q${n}'s printed answer is the one the marker accepted`,
+      await check(`Q${n} has a printed answer on the submitted paper, and it was marked correct`,
         !!printed.get(n) && !!row && row.awarded === row.marks,
         `printed ${JSON.stringify(printed.get(n))}, awarded ${row?.awarded} of ${row?.marks}`);
     }
