@@ -9,7 +9,9 @@
 -- No account id, name, email or profile is stored: the key is a SHA-256 digest
 -- of the request and the value is the guarded tutor reply only.
 --
--- Additive only. Same access model as 20261001000000_platform_schema.sql:
+-- Additive only; schema_version moves to 8 so a server build that expects this
+-- table refuses to boot against a database that does not have it, rather than
+-- failing every tutor request at runtime. Same access model as 20261001000000_platform_schema.sql:
 -- Row-Level Security on, one policy for pri_server, DML only for pri_server,
 -- nothing for the Supabase client API roles.
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -34,3 +36,5 @@ end $$;
 
 alter table pri.tutor_cache enable row level security;
 create policy pri_server_all on pri.tutor_cache as permissive for all to pri_server using (true) with check (true);
+
+update pri.platform_meta set value = '8' where key = 'schema_version';
