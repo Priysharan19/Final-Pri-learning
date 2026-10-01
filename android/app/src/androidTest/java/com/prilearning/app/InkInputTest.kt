@@ -163,9 +163,17 @@ class InkInputTest {
             assertTrue("after a pen, a finger touch is rejected (palm) and draws nothing",
                 m.getJSONObject("rejected").getInt("touchAfterPen") >= 1 && m.getJSONArray("strokes").length() == strokesBefore && inkPixels(s) == pixelsBefore)
             eval(s, "[].slice.call(document.querySelectorAll('button.ink-tool')).find(function(b){return /Finger/.test(b.textContent)}).click()")
-            Thread.sleep(300)
+            Thread.sleep(600)
+            val afterToggle = inkPixels(s)
+            assertTrue("turning Finger on keeps the ink on the sheet ($afterToggle px)", afterToggle > 0)
             stroke(s, MotionEvent.TOOL_TYPE_FINGER, 0.8f)
-            assertTrue("with Finger on, a finger writes again", inkPixels(s) > pixelsBefore)
+            m = metrics(s)
+            // (The sheet may narrow as the reading panel appears; CP-03 then scales
+            // every stroke uniformly, so a pixel count is not a measure of ink.)
+            val last = m.getJSONArray("strokes").getJSONObject(m.getJSONArray("strokes").length() - 1)
+            assertTrue("with Finger on, a finger writes again (strokes ${m.getJSONArray("strokes").length()} vs $strokesBefore, kept ${last.optInt("keptPoints")})",
+                m.getJSONArray("strokes").length() == strokesBefore + 1 && last.getString("pointerType") == "touch" &&
+                    last.getInt("keptPoints") >= 12 && inkPixels(s) > 0)
 
             // ── rotation keeps the ink ───────────────────────────────────────
             val beforeRotation = inkPixels(s)
