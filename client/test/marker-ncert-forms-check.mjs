@@ -466,6 +466,58 @@ const working = {
 const verdict = checkAnswer(working, '(x^2 - 16)/(x - 4)\n((x + 4)(x - 4))/(x - 4)\nx + 4');
 ok(verdict.correct === true, `marker: factorise-then-cancel working is correct (${verdict.feedback || ''})`);
 
+// ── 15. Domain probe review fixes (PR #243 review) ────────────────────────────
+// e is Euler's number, never a variable to search for holes over.
+same('-e^(-x)', '-1/e^x', strict, 'e is a constant: negative exponent');
+same('1/e^x', 'e^(-x)', strict, 'e is a constant: reciprocal');
+same('x*e^(-x)', 'x/e^x', strict, 'e is a constant: product and quotient');
+same('e^x/(1+e^x)', '1/(1+e^(-x))', strict, 'e is a constant: logistic forms');
+same('1/(e^x+e^(-x))', 'e^x/(e^(2x)+1)', strict, 'e is a constant: hyperbolic forms');
+differ('(x-e)/(x-e)', '1', strict, 'a hole at x = e is still a hole');
+differ('(x-pi)/(x-pi)', '1', strict, 'a hole at x = π is still a hole');
+
+// An odd-denominator power is the real odd root, as cbrt is.
+same('cbrt(x)', 'x^(1/3)', strict, 'real cube root, two notations');
+same('(1/3)x^(-2/3)', '1/(3cbrt(x^2))', strict, 'derivative of the cube root');
+same('x^(2/3)', 'cbrt(x^2)', strict, 'two-thirds power as root of the square');
+same('x^(2/3)', 'cbrt(x)^2', strict, 'two-thirds power as square of the root');
+differ('(x^2)^(1/6)', 'x^(1/3)', strict, '(x²)^(1/6) is |x|^(1/3), negative for no x');
+
+// The reviewer's must-refuse set, including holes outside the sampling window.
+differ('x/x', '1', strict, 'review: hole at 0');
+differ('(x^2-1)/(x-1)', 'x+1', strict, 'review: hole at 1');
+differ('sqrt(x^2)', 'x', strict, 'review: √(x²) is |x|');
+differ('ln(x^2)', '2ln(x)', strict, 'review: log of a square');
+differ('(x-25)/(x-25)', '1', strict, 'hole at 25, outside [-20, 20]');
+differ('(x-1000)/(x-1000)', '1', strict, 'hole at 1000');
+differ('(x-5000)/(x-5000)', '1', strict, 'hole at 5000: linear guard solved exactly');
+differ('(0.001x-5)/(0.001x-5)', '1', strict, 'hole at 5000 with a decimal coefficient');
+differ('(x^2-50)/(x^2-50)', '1', strict, 'holes at ±√50: quadratic guard solved exactly');
+differ('(x-25)^2/(x-25)^2', '1', strict, 'double root at 25');
+differ('(x^3-27)/(x^3-27)', '1', strict, 'cubic guard searched inside its root bound');
+differ('(x-1/3)/(x-1/3)', '1', strict, 'hole at a third');
+differ('sqrt(x+30)^2', 'x+30', strict, 'root guard changes sign at -30');
+differ('(sqrt(x)-5.5)/(sqrt(x)-5.5)', '1', strict, 'non-polynomial guard, hole at 30.25');
+// Residual limitation, pinned so a future fix has to update it on purpose: a
+// non-polynomial guard that only touches zero (no sign change) beyond |x| = 20
+// and off the whole numbers is not located. cos(x/100) + 1 vanishes at 100π.
+ok(exprEquivalent('(cos(x/100)+1)/(cos(x/100)+1)', '1', strict) === true,
+  'domain: KNOWN LIMITATION: a far tangential hole of a non-polynomial guard (x = 100π) is not located');
+
+// through the real marker
+const marks = (expr, input) => checkAnswer({ answerType: 'expression', answer: { expr }, prompt: 'Differentiate' }, input).correct;
+ok(marks('-e^(-x)', '-1/e^x') === true, 'marker: -1/e^x is accepted for -e^(-x)');
+ok(marks('x*e^(-x)', 'x/e^x') === true, 'marker: x/e^x is accepted for x e^(-x)');
+ok(marks('e^x/(1+e^x)', '1/(1+e^(-x))') === true, 'marker: logistic forms are accepted');
+ok(marks('(1/3)x^(-2/3)', '1/(3cbrt(x^2))') === true, 'marker: the cube-root derivative is accepted');
+ok(marks('x^(1/3)', 'cbrt(x)') === true, 'marker: cbrt(x) is accepted for x^(1/3)');
+ok(marks('1', '(x-25)/(x-25)') === false, 'marker: (x-25)/(x-25) is not accepted as 1');
+
+// Policy (owner decision, recorded in PR #243): 0^0 and the poles of sec/tan
+// are domain restrictions, so x^0 is not 1 and sec²x − tan²x is not 1 here.
+differ('x^0', '1', strict, 'policy: x^0 is undefined at 0');
+differ('sec(x)^2-tan(x)^2', '1', strict, 'policy: sec²x − tan²x is undefined at odd multiples of π/2');
+
 console.log(failures.length
   ? `NCERT ANSWER FORMS: FAIL — ${failures.length} of ${pass + failures.length} checks failed\n  · ${failures.join('\n  · ')}`
   : `NCERT ANSWER FORMS: PASS — ${pass}/${pass} checks — solution sets, inequality/interval equivalence, matrices, vectors, the n!/nCr/nPr/sec/cosec/cot vocabulary, rupees and paise, fraction form only where the question asks for it, blank answers, exact integers, the percent sign, unit-named variables and domain-aware final answers.`);
