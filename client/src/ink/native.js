@@ -123,11 +123,15 @@ if (typeof window !== 'undefined') priNative.ink.onMessage(receiveInk);
 
 const post = message => priNative.ink.post(message);
 
+// Readings never reject (the recognition consensus must always continue), but
+// the failure still carries a code from the closed priNative error set.
+const FAILURE_CODES = { 'bridge-unavailable': 'UNAVAILABLE', timeout: 'TIMEOUT' };
 function failedReading(op, failure) {
   const base = op === 'foundationRecognize' ? 'pri-foundation' : 'native-rescue';
+  const code = FAILURE_CODES[failure] || (String(failure).startsWith('surface-') ? 'CANCELLED' : 'INTERNAL');
   return {
     type: 'reading', lines: [], text: '', symbols: [], minConf: 0, margin: 0,
-    weakest: null, engine: `${base}-${failure}`, failure
+    weakest: null, engine: `${base}-${failure}`, failure, error: { code }
   };
 }
 

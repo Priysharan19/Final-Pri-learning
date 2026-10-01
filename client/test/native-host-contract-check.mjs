@@ -305,11 +305,88 @@ ok(normalizeCode('SOMETHING_NEW_FROM_A_SHELL') === 'INTERNAL', 'unknown codes be
   ok(priNative.ink.post({ op: 'recognize', reqId: 1, overrides: {} }) === true, 'a normal ink request is posted');
   ok(priNative.ink.post({ op: 'recognize', reqId: 2, overrides: {}, expectedAnswer: '42' }) === false,
     'an ink message carrying any non-allowlisted field (an expected answer) is refused');
-  ok(priNative.ink.post({ op: 'recognize', reqId: 3, overrides: { s1: 'x'.repeat(200) } }) === false, 'overrides are bounded symbol corrections only');
+  const longHybrid = `h3_${Array.from({ length: 12 }, (_, i) => 101 + i).join('_')}`; // a real 12-stroke group id
+  ok(longHybrid.length > 40 && priNative.ink.post({ op: 'recognize', reqId: 3, overrides: { [longHybrid]: 'theta', bad: 'x'.repeat(200), 'no spaces': 'y' } }) === true,
+    'a long real stroke-group override is kept and the request still goes (native recognition never silently switches off)');
+  const posted3 = posts.priInk[posts.priInk.length - 1];
+  ok(posted3.overrides[longHybrid] === 'theta' && !('bad' in posted3.overrides) && !('no spaces' in posted3.overrides),
+    'malformed override entries are dropped individually');
   ok(!JSON.stringify(posts.priInk).includes('42'), 'no expected answer ever reached the native recogniser');
 
   priNative.dispose();
   for (const k of ['__PRI_NATIVE__', '__PRI_NATIVE_INK__', '__PRI_NATIVE_BILLING__', 'webkit', 'addEventListener', 'removeEventListener', 'dispatchEvent']) delete globalThis[k];
+}
+
+// ── 12b · cloudTransport keeps its error contract over priNative ────────────
+{
+  const listeners = new Map();
+  const cloudPosts = [];
+  globalThis.window = {
+    __PRI_NATIVE__: true, __PRI_NATIVE_CLOUD__: true, __PRI_NATIVE_CLOUD_CONFIGURED__: true,
+    webkit: { messageHandlers: { priCloud: { postMessage: m => cloudPosts.push(m) }, priShare: { postMessage: m => cloudPosts.push({ share: m }) } } },
+    addEventListener: (n, fn) => listeners.set(n, [...(listeners.get(n) || []), fn]),
+    removeEventListener: () => {},
+  };
+  const answer = detail => (listeners.get('pri:native-cloud-response') || []).forEach(fn => fn({ detail }));
+  priNative.dispose();
+  const { cloudRequest } = await import(`../src/platform/cloudTransport.js?map=${Date.now()}`);
+
+  const slow = cloudRequest('/v1/me', { timeoutMs: 1000 });
+  try { await slow; ok(false, 'timeout resolved'); } catch (e) { ok(e instanceof DOMException && e.name === 'TimeoutError', `a native timeout is still a TimeoutError (${e?.name})`); }
+  ok(cloudPosts.some(m => m.action === 'cancel'), 'and cancels the URLSession task');
+
+  const ctrl = new AbortController();
+  const aborted = cloudRequest('/v1/me', { signal: ctrl.signal });
+  ctrl.abort();
+  try { await aborted; ok(false, 'abort resolved'); } catch (e) { ok(e?.name === 'AbortError', `an abort is still an AbortError (${e?.name})`); }
+
+  const failed = cloudRequest('/v1/me');
+  answer({ id: cloudPosts.filter(m => m.action === 'request').at(-1).id, error: { code: 'CLOUD_NETWORK_ERROR', message: 'offline' } });
+  try { await failed; ok(false, 'failure resolved'); } catch (e) { ok(e.code === 'CLOUD_NETWORK_ERROR', `the provider code survives (${e.code})`); }
+
+  const http = cloudRequest('/v1/me');
+  answer({ id: cloudPosts.filter(m => m.action === 'request').at(-1).id, status: 403, body: JSON.stringify({ error: { code: 'ORIGIN_REJECTED', message: 'no' } }) });
+  try { await http; ok(false, 'http error resolved'); } catch (e) { ok(e.status === 403 && e.code === 'ORIGIN_REJECTED', 'HTTP errors keep status and server code'); }
+
+  globalThis.window.__PRI_NATIVE_CLOUD_CONFIGURED__ = false;
+  priNative.dispose();
+  try { await cloudRequest('/v1/me'); ok(false, 'unconfigured resolved'); } catch (e) { ok(e.code === 'CLOUD_DISABLED', `an unconfigured native cloud fails closed as CLOUD_DISABLED (${e.code})`); }
+
+  // legacy share: text goes to the share sheet, binary is refused
+  priNative.dispose();
+  const shared = await priNative.share.file({ filename: '../../evil.json', text: '{}' });
+  const sharePost = cloudPosts.find(m => m.share)?.share;
+  ok(shared.presented === true && sharePost?.content === '{}' && /evil\.json$/.test(sharePost?.filename || '') && !String(sharePost?.filename).startsWith('.'),
+    'legacy share sends the text file under a sanitised name');
+  ok(!String(sharePost?.filename).includes('/'), 'a shared filename can never carry a path separator');
+  await rejects(priNative.share.file({ filename: 'a.bin', bytes: new Uint8Array([1]) }), 'UNSUPPORTED', 'the legacy share handler refuses binary files');
+  priNative.dispose();
+  delete globalThis.window;
+}
+
+// ── 12c · saveTextFile falls back only when native sharing is unusable ───────
+{
+  const host = createFakeHost({ capabilities: { share: { versions: [1], binary: true } }, handlers: {
+    'host.ready': () => ({}), 'share.file': (_p, _e, tools) => tools.SILENT,
+  } });
+  const anchors = [];
+  globalThis.document = { createElement: () => { const a = { click() { anchors.push(a); }, remove() {} }; return a; }, body: { appendChild() {} } };
+  globalThis.URL.createObjectURL = () => 'blob:x';
+  const { saveTextFile } = await import(`../src/lib/files.js?save=${Date.now()}`);
+  priNative.dispose();
+  const pending = saveTextFile('{}', 'a.json');
+  await tick(5);
+  ok(host.lastRequest('share', 'file') && anchors.length === 0, 'with a share sheet open, no second download is started');
+  priNative.dispose();
+  await pending.catch(() => {});
+  host.uninstall();
+  const unsupportedHost = createFakeHost({ capabilities: { share: { versions: [1] } }, handlers: { 'host.ready': () => ({}) } });
+  priNative.dispose();
+  await saveTextFile('{}', 'b.json');
+  ok(anchors.length === 1, 'an UNSUPPORTED share falls back to a download');
+  priNative.dispose();
+  unsupportedHost.uninstall();
+  delete globalThis.document;
 }
 
 // ── 13 · Answer-blind ink through the real ink module ────────────────────────

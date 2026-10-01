@@ -14,7 +14,12 @@ import { priNative } from '../platform/native/index.js';
  */
 export function saveTextFile(text, filename, mimeType = 'application/json') {
   if (priNative.share.available()) {
-    return priNative.share.file({ filename, mimeType, text }).catch(() => downloadText(text, filename, mimeType));
+    // Fall back only when sharing is unusable — never after a TIMEOUT, which
+    // means a share sheet may still be open (a second one would appear).
+    return priNative.share.file({ filename, mimeType, text }).catch(error => {
+      if (['UNSUPPORTED', 'UNAVAILABLE', 'TOO_LARGE'].includes(error?.code)) return downloadText(text, filename, mimeType);
+      throw error;
+    });
   }
   return Promise.resolve(downloadText(text, filename, mimeType));
 }

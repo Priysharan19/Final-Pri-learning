@@ -40,7 +40,8 @@ export function createEventBus({ onListenerError } = {}) {
   let lastSeq = -1;
 
   function deliver(event, payload) {
-    latest.set(event, payload);
+    // Billing payloads carry signed store proofs; never retain them as "latest".
+    if (!BUFFERED_EVENT(event)) latest.set(event, payload);
     const set = listeners.get(event);
     if (!set || set.size === 0) {
       if (BUFFERED_EVENT(event)) {
@@ -123,6 +124,8 @@ export function createBridge({ post, events: sharedEvents = null, now = () => Da
   }
 
   function abandon(entry, code) {
+    const t = now();
+    for (const [id, record] of late) if (record.expires < t) late.delete(id);
     if (RECOVERABLE.has(`${entry.cap}.${entry.op}`)) {
       late.set(entry.id, { key: `${entry.cap}.${entry.op}`, expires: now() + LATE_RECOVERY_MS });
     }

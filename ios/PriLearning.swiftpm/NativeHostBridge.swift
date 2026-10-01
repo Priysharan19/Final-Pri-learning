@@ -114,12 +114,19 @@ final class NativeHostBridge: NSObject {
     // MARK: Requests
 
     func handle(_ body: Any) {
-        guard let envelope = body as? [String: Any],
+        // `try?` cannot catch NSInvalidArgumentException: refuse anything that is
+        // not plain JSON (e.g. a Date or NaN) before serialising it.
+        guard JSONSerialization.isValidJSONObject(body),
+              let envelope = body as? [String: Any],
               envelope["v"] as? Int == Self.protocolVersion,
-              let id = envelope["id"] as? String, !id.isEmpty, id.count <= 120, !id.hasPrefix("n:"),
+              let id = envelope["id"] as? String, !id.isEmpty, id.count <= 120,
               let cap = envelope["cap"] as? String, let op = envelope["op"] as? String else {
             return // malformed: nothing to answer
         }
+        // `n:` ids are replies to native → JS requests. The Apple shell sends no
+        // such requests yet (Android Back is the first, CP-06); until it does,
+        // there is no pending native request a reply could belong to.
+        if id.hasPrefix("n:") { return }
         if let data = try? JSONSerialization.data(withJSONObject: envelope), data.count > Self.maxEnvelopeBytes {
             return fail(id, "TOO_LARGE", "Request is too large.")
         }
@@ -174,6 +181,11 @@ final class NativeHostBridge: NSObject {
             return fail(id, "PROVIDER_ERROR", "Could not prepare the file.")
         }
         guard let presenter = Self.topViewController() else { return fail(id, "UNAVAILABLE", "No window to present from.") }
+        // One sheet at a time: a second request while a share sheet (or any
+        // transition) is on screen is refused rather than silently dropped.
+        if presenter is UIActivityViewController || presenter.isBeingPresented || presenter.isBeingDismissed {
+            return fail(id, "UNAVAILABLE", "A share sheet is already open.")
+        }
         let activity = UIActivityViewController(activityItems: [url], applicationActivities: nil)
         activity.completionWithItemsHandler = { [weak self] _, completed, _, _ in
             self?.reply(id, ["completed": completed])
@@ -213,7 +225,8 @@ final class NativeHostBridge: NSObject {
     }
 
     private func deliver(_ message: [String: Any], completion: (() -> Void)? = nil) {
-        guard let data = try? JSONSerialization.data(withJSONObject: message),
+        guard JSONSerialization.isValidJSONObject(message),
+              let data = try? JSONSerialization.data(withJSONObject: message),
               let json = String(data: data, encoding: .utf8) else { completion?(); return }
         let safe = json
             .replacingOccurrences(of: "\u{2028}", with: "\\u2028")

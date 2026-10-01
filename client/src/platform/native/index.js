@@ -28,7 +28,7 @@ function scopeOf() { return typeof window !== 'undefined' && window ? window : g
 function bridgePoster(scope) {
   return envelope => {
     const apple = scope?.webkit?.messageHandlers?.priBridge;
-    if (apple && typeof apple.postMessage === 'function') { apple.postMessage(envelope); return true; }
+    if (apple && typeof apple.postMessage === 'function') { apple.postMessage(JSON.parse(JSON.stringify(envelope))); return true; }
     const android = scope?.priBridge;
     if (android && typeof android.postMessage === 'function') { android.postMessage(JSON.stringify(envelope)); return true; }
     return false;
@@ -60,7 +60,18 @@ function getRuntime() {
 
 // Starting the runtime is idempotent: on an envelope host it installs the
 // receiver and announces host.ready the first time anything asks.
-const capOf = cap => { getRuntime(); return discoverHost(scopeOf()).capabilities[cap] || null; };
+// Envelope hosts inject one immutable descriptor, so its negotiation can be
+// cached per object; legacy flag hosts are re-read (flags are plain globals).
+let cachedHost = null;
+function hostNow() {
+  const scope = scopeOf();
+  const raw = scope?.__PRI_HOST__;
+  if (raw && typeof raw === 'object' && cachedHost?.raw === raw && cachedHost.scope === scope) return cachedHost.host;
+  const host = discoverHost(scope);
+  cachedHost = raw && typeof raw === 'object' ? { raw, scope, host } : null;
+  return host;
+}
+const capOf = cap => { getRuntime(); return hostNow().capabilities[cap] || null; };
 const unsupported = (cap, what = '') => Promise.reject(new PriNativeError('UNSUPPORTED', `${cap}${what ? `.${what}` : ''} is not available on this host`));
 
 function viaBridge(cap, op, payload, opts) {
@@ -74,16 +85,27 @@ function viaBridge(cap, op, payload, opts) {
 // metadata cannot be posted, whatever a caller passes (docs §4.4 item 7).
 const INK_OPS = new Set(['mount', 'layout', 'unmount', 'appearance', 'tool', 'enabled', 'undo', 'redo', 'clear', 'setStrokes', 'foundationRecognize', 'recognize']);
 const INK_KEYS = new Set(['op', 'reqId', 'frame', 'clip', 'scrollX', 'scrollY', 'ink', 'penWidth', 'tool', 'finger', 'enabled', 'strokes', 'overrides']);
-function inkMessageAllowed(message) {
-  if (!message || typeof message !== 'object' || !INK_OPS.has(message.op)) return false;
-  if (!Object.keys(message).every(key => INK_KEYS.has(key))) return false;
-  const overrides = message.overrides;
-  if (overrides !== undefined) {
-    if (!overrides || typeof overrides !== 'object' || Array.isArray(overrides)) return false;
-    // Overrides are the student's own symbol corrections: short strings only.
-    if (!Object.entries(overrides).every(([k, v]) => typeof v === 'string' && k.length <= 40 && v.length <= 16)) return false;
+// Overrides are the student's own symbol corrections, keyed by stroke-group id
+// (e.g. `h3_101_102_103`, `w0_s12`). Validate each entry by shape and drop a
+// malformed one rather than refusing the whole message: refusing would silently
+// switch native recognition off for the rest of the sheet.
+const OVERRIDE_KEY = /^[A-Za-z0-9_]{1,256}$/;
+const MAX_OVERRIDES = 512;
+function sanitizeOverrides(overrides) {
+  if (!overrides || typeof overrides !== 'object' || Array.isArray(overrides)) return {};
+  const out = {};
+  let n = 0;
+  for (const [key, value] of Object.entries(overrides)) {
+    if (n >= MAX_OVERRIDES) break;
+    if (OVERRIDE_KEY.test(key) && typeof value === 'string' && value.length <= 32) { out[key] = value; n += 1; }
   }
-  return true;
+  return out;
+}
+/** Returns the message to post, or null when it may not be posted at all. */
+function answerBlindInkMessage(message) {
+  if (!message || typeof message !== 'object' || !INK_OPS.has(message.op)) return null;
+  if (!Object.keys(message).every(key => INK_KEYS.has(key))) return null;
+  return message.overrides === undefined ? message : { ...message, overrides: sanitizeOverrides(message.overrides) };
 }
 
 const ink = Object.freeze({
@@ -100,8 +122,9 @@ const ink = Object.freeze({
   post(message) {
     const c = capOf('ink');
     if (!c || c.transport !== 'legacy') return false;
-    if (!inkMessageAllowed(message)) return false;
-    return getRuntime().legacy.ink.post(message);
+    const safe = answerBlindInkMessage(message);
+    if (!safe) return false;
+    return getRuntime().legacy.ink.post(safe);
   },
   onMessage(fn) {
     return getRuntime().legacy.ink.onMessage(fn);
