@@ -20,6 +20,7 @@ import { PriNativeError } from './errors.js';
 export { PriNativeError, CODES, isPriNativeError } from './errors.js';
 
 let runtime = null;
+const listenedBridges = new WeakSet();
 const LIFECYCLE_STATES = new Set(['active', 'inactive', 'background']);
 
 // In browsers and WebViews `window === globalThis`; Node tests stub `window`.
@@ -49,6 +50,12 @@ function getRuntime() {
   const host = discoverHost(scope);
   if (host.native && !host.legacy && scope && typeof scope === 'object') {
     scope.__priNativeReceive = raw => runtime?.bridge.receive(raw);
+    // Android WebMessageListener: replies arrive as `message` events on the
+    // injected priBridge object (JavaScriptReplyProxy.postMessage).
+    if (typeof scope.priBridge?.addEventListener === 'function' && !listenedBridges.has(scope.priBridge)) {
+      listenedBridges.add(scope.priBridge);
+      scope.priBridge.addEventListener('message', event => runtime?.bridge.receive(event?.data));
+    }
     runtime.readySent = true;
     // host.ready lets the shell flush buffered billing events; our own bus
     // buffers them again until a subscriber appears.

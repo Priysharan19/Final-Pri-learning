@@ -10,7 +10,6 @@
 // ─────────────────────────────────────────────────────────────────────────────
 package com.prilearning.app.bridge
 
-import android.content.res.Configuration
 import android.net.Uri
 import android.os.Build
 import android.os.Handler
@@ -76,13 +75,13 @@ class PriBridge(private val webView: WebView, private val descriptor: JSONObject
             "lifecycle.state" -> Envelope.ok(req.id, JSONObject().put("state", state))
             else -> if (req.op == "cancel") null else Envelope.fail(req.id, "UNSUPPORTED", "${req.cap}.${req.op} is not supported by this app version.")
         }
-        if (out != null) proxy.postMessage(out)
+        if (out != null) send(proxy, out)
     }
 
     fun setLifecycle(next: String) {
         if (next == state) return
         state = next
-        reply?.postMessage(Envelope.event("lifecycle.state", seq++, JSONObject().put("state", next)))
+        reply?.let { send(it, Envelope.event("lifecycle.state", seq++, JSONObject().put("state", next))) }
     }
 
     /**
@@ -101,10 +100,13 @@ class PriBridge(private val webView: WebView, private val descriptor: JSONObject
             }
         }
         pendingNative[id] = finish
-        proxy.postMessage(Envelope.nativeRequest(id, "lifecycle.backRequested"))
+        send(proxy, Envelope.nativeRequest(id, "lifecycle.backRequested"))
         main.postDelayed({ pendingNative.remove(id); finish(null) }, 300)
     }
 
-    @Suppress("unused")
-    fun onConfigurationChanged(config: Configuration) = Unit
+    /** Every reply/event goes through here; a proxy only exists after the
+     *  WEB_MESSAGE_LISTENER feature check in install() succeeded. */
+    private fun send(proxy: JavaScriptReplyProxy, json: String) {
+        if (WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) proxy.postMessage(json)
+    }
 }

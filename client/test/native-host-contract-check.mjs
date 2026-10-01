@@ -391,6 +391,42 @@ ok(normalizeCode('SOMETHING_NEW_FROM_A_SHELL') === 'INTERNAL', 'unknown codes be
   delete globalThis.document;
 }
 
+// ── 12d · Android delivery: JSON strings out, `message` events back ──────────
+{
+  const listeners = [];
+  const sent = [];
+  globalThis.priBridge = {
+    postMessage: json => sent.push(JSON.parse(json)),
+    addEventListener: (type, fn) => { if (type === 'message') listeners.push(fn); },
+  };
+  Object.defineProperty(globalThis, '__PRI_HOST__', { configurable: true, writable: false,
+    value: Object.freeze({ protocol: 1, capabilities: Object.freeze({ storage: Object.freeze({ versions: [1], durable: true }), lifecycle: Object.freeze({ versions: [1], backButton: true }) }) }) });
+  priNative.dispose();
+  priNative.start();
+  await tick(5);
+  ok(listeners.length === 1, 'priNative listens for Android WebMessage replies exactly once');
+  ok(typeof sent[0] === 'object' && sent[0].cap === 'host' && sent[0].op === 'ready', 'and posts envelopes to priBridge as JSON strings');
+  // A native → JS Back question answered through the same channel.
+  const { handleBack } = await import('../src/platform/backNavigation.js');
+  let closed = false;
+  const sheet = { hidden: false, dispatchEvent: e => { if (e.key === 'Escape') closed = true; return true; } };
+  const fakeDoc = { querySelector: () => (closed ? null : sheet), contains: () => !closed };
+  globalThis.KeyboardEvent ??= class { constructor(type, init) { this.type = type; Object.assign(this, init); } };
+  ok(await handleBack(fakeDoc, async () => {}) === true, 'Back closes an open sheet and reports it handled');
+  ok(await handleBack({ querySelector: () => null }, async () => {}) === false, 'with nothing open, Back is left to the shell');
+  const stubborn = { hidden: false, dispatchEvent: () => true };
+  ok(await handleBack({ querySelector: () => stubborn, contains: () => true }, async () => {}) === false,
+    'a dialog that does not close is not reported as handled');
+  priNative.lifecycle.onBackRequested(() => true);
+  listeners[0]({ data: JSON.stringify({ v: 1, id: 'n:9', req: 'lifecycle.backRequested', payload: {} }) });
+  await tick(10);
+  const answer = sent.find(m => m.id === 'n:9');
+  ok(answer?.ok === true && answer.result.handled === true, 'a native Back request arriving as a message event gets its reply');
+  priNative.dispose();
+  delete globalThis.priBridge;
+  delete globalThis.__PRI_HOST__;
+}
+
 // ── 13 · Answer-blind ink through the real ink module ────────────────────────
 {
   const posted = [];
