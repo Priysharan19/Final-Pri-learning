@@ -223,6 +223,18 @@ struct WebShell: UIViewRepresentable {
                 webView.pageZoom = capped
                 ink.webViewDidResize() // re-place the native ink surface at the new zoom
             }
+            // Page zoom shrinks the visible CSS width, but `width=device-width`
+            // keeps the layout viewport at the unzoomed width, so the page was
+            // laid out wider than the screen and clipped on the right (found by
+            // the CP-05 largest-text journey). Pin the layout viewport to the
+            // zoomed CSS width so the page reflows instead.
+            let cssWidth = capped > 1.0 ? Int((width / capped).rounded(.down)) : 0
+            let content = cssWidth > 0
+                ? "width=\(cssWidth), initial-scale=1.0, viewport-fit=cover"
+                : "width=device-width, initial-scale=1.0, viewport-fit=cover"
+            webView.evaluateJavaScript(
+                "(function(c){var m=document.querySelector('meta[name=viewport]');if(!m){m=document.createElement('meta');m.name='viewport';document.head.appendChild(m);}if(m.getAttribute('content')!==c)m.setAttribute('content',c);})('\(content)')",
+                completionHandler: nil)
         }
 
         func detachHost() {

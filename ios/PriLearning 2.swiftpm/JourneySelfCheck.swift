@@ -220,7 +220,7 @@ enum JourneySelfCheck {
       const boxes = [...q('#cloud-email').form.querySelectorAll('input[type=checkbox]')];
       for (const b of boxes) if (!b.checked) { b.click(); await sleep(120); }
       q('#cloud-email').form.querySelector('button[type=submit]').click();
-      at = 'linked'; await waitFor(() => /Linked|Connected/.test(stateTag()), 30000);
+      at = 'linked'; await waitFor(() => /^Connected$|sign-in required|offline/.test(stateTag()), 30000);
       return stateTag();
     });
     await step('cloudLogin', async () => {

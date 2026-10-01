@@ -394,7 +394,8 @@ export default function CloudAccountPanel() {
     if (!enabled) return 'Linked locally · cloud endpoint unavailable';
     // Only the server saying "signed out" (401) means sign in again; an
     // unreachable server is offline, and the student's work is safe locally.
-    if (!session?.connected) return session?.reason === 'signed-out' || session?.reason === 'not-verified' ? 'Linked · sign-in required' : 'Linked · offline';
+    if (!session) return 'Linked · checking…';
+    if (!session.connected) return session.reason === 'signed-out' || session.reason === 'not-verified' ? 'Linked · sign-in required' : 'Linked · offline';
     return 'Connected';
   }, [link, enabled, session]);
 
