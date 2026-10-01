@@ -1341,28 +1341,21 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
               </section>
             ))}
 
-            {res.solution?.criteria && boardAward && !verdictGood && (
+            {res.solution?.criteria && (
               <div className="criteria-self">
-                <button type="button" className="btn btn-quiet btn-sm" aria-expanded={selfOpen} onClick={() => setSelfOpen(o => !o)}>
-                  {t('verdict.markItYourself')}
-                </button>
-                {selfOpen && (
-                  <CriteriaTable
-                    criteria={res.solution.criteria}
-                    correct={verdictGood}
-                    selfMarks={selfMarks} setSelfMarks={setSelfMarks}
-                    selfSaved={selfSaved} setSelfSaved={setSelfSaved}
-                  />
+                <CriteriaTable
+                  criteria={res.solution.criteria}
+                  correct={verdictGood}
+                  selfMarking={!boardAward || selfOpen}
+                  selfMarks={selfMarks} setSelfMarks={setSelfMarks}
+                  selfSaved={selfSaved} setSelfSaved={setSelfSaved}
+                />
+                {boardAward && !verdictGood && !selfSaved && !selfOpen && (
+                  <button type="button" className="btn btn-quiet btn-sm" style={{ marginTop: 8 }} onClick={() => setSelfOpen(true)}>
+                    {t('verdict.markItYourself')}
+                  </button>
                 )}
               </div>
-            )}
-            {res.solution?.criteria && !boardAward && (
-              <CriteriaTable
-                criteria={res.solution.criteria}
-                correct={verdictGood}
-                selfMarks={selfMarks} setSelfMarks={setSelfMarks}
-                selfSaved={selfSaved} setSelfSaved={setSelfSaved}
-              />
             )}
           </>
         )}
@@ -1399,7 +1392,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   );
 }
 
-function CriteriaTable({ criteria, correct, selfMarks, setSelfMarks, selfSaved, setSelfSaved }) {
+function CriteriaTable({ criteria, correct, selfMarking = true, selfMarks, setSelfMarks, selfSaved, setSelfSaved }) {
   const t = useT();
   const marked = i => correct || !!selfMarks[i];
   const missed = i => selfSaved && !marked(i);
@@ -1414,7 +1407,7 @@ function CriteriaTable({ criteria, correct, selfMarks, setSelfMarks, selfSaved, 
           {criteria.map((c, i) => (
             <tr key={i} className={missed(i) ? 'criteria-row-missed' : earned(i) ? 'criteria-row-earned' : ''}>
               <td>
-                {!correct && !selfSaved ? (
+                {!correct && !selfSaved && selfMarking ? (
                   <label className="selfmark-row" style={{ padding: 0 }}>
                     <input type="checkbox" checked={!!selfMarks[i]}
                       onChange={e => setSelfMarks(m => ({ ...m, [i]: e.target.checked }))} />
@@ -1429,7 +1422,7 @@ function CriteriaTable({ criteria, correct, selfMarks, setSelfMarks, selfSaved, 
           ))}
         </tbody>
       </table>
-      {!correct && (
+      {!correct && (selfMarking || selfSaved) && (
         <div className="row" style={{ marginTop: 10 }}>
           {!selfSaved
             ? <>
