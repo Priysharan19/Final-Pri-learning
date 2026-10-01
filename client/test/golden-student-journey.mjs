@@ -32,12 +32,20 @@ async function waitApp(page) {
 async function createFreshStudent(page, origin) {
   await page.goto(origin, { waitUntil: 'domcontentloaded' });
   await page.getByRole('button', { name: 'Get Started' }).click();
-  await page.waitForSelector('.sso-btn');
-  await page.getByRole('button', { name: /Continue without an email/ }).click();
-  await page.getByPlaceholder('e.g. Priysharan').fill('PRI-02 Golden Student');
+  await page.waitForSelector('[data-onboarding-step="1"]');
+  await page.getByRole('button', { name: 'Student', exact: true }).click();
+  await page.locator('.auth-card .btn-primary').click();
+  await page.waitForSelector('[data-onboarding-step="2"]');
   await page.getByRole('button', { name: /Studying in Australia/ }).click();
   await page.locator('#signup-course').selectOption('nsw');
   await page.locator('#signup-year').selectOption('7');
+  await page.locator('.auth-card .btn-primary').click();
+  await page.waitForSelector('[data-onboarding-step="3"]');
+  await page.locator('#signup-name').fill('PRI-02 Golden Student');
+  await page.locator('.auth-card .btn-primary').click();
+  await page.waitForSelector('[data-onboarding-step="4"]');
+  await page.locator('.auth-card .btn-primary').click();
+  await page.waitForSelector('[data-onboarding-step="5"]');
   await page.getByRole('button', { name: 'Start learning' }).click();
   await page.waitForSelector('.home-greet');
 }

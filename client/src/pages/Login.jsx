@@ -6,7 +6,7 @@
 // Settings: this screen only offers the way there, and never passes a local
 // profile off as a cloud sign-in.
 // ─────────────────────────────────────────────────────────────────────────────
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
 import { useApp, Logo } from '../App.jsx';
@@ -26,6 +26,17 @@ const STUDY = [
   { key: 'olympiad', label: 'Olympiad (IOQM · RMO · INMO)', year: 10, track: 'olympiad' }
 ];
 const STUDY_DEFAULT = STUDY.find(o => o.key === '10');
+const ONBOARDING_STEPS = 5;
+const LOCAL_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function freshProfileDraft() {
+  return {
+    name: '', email: '', password: '', password2: '', study: '', year: STUDY_DEFAULT.year,
+    avatar: '🚀', role: '', course: 'in', pathway: 'advanced', indiaTrack: STUDY_DEFAULT.track,
+    protect: false
+  };
+}
+
 // The Australian syllabuses stay selectable, folded away behind one link.
 const AU_COURSES = [['nsw', 'NSW · HSC'], ['vic', 'VIC · VCE'], ['qld', 'QLD · QCE'], ['wa', 'WA · WACE'], ['sa', 'SA · SACE'], ['ib', 'IB']];
 // Where the cloud account UI lives. The panel is Settings' own; this screen only links to it.
@@ -211,17 +222,19 @@ export default function Login() {
   const t = useT();
   const tx = useTx();
   const [profiles, setProfiles] = useState(null);
-  const [stage, setStage] = useState('hero');   // hero | pick | method | create
-  const [withEmail, setWithEmail] = useState(true);
-  const [form, setForm] = useState({ name: '', email: '', password: '', password2: '', study: STUDY_DEFAULT.key, year: STUDY_DEFAULT.year, avatar: '🚀', role: 'student', course: 'in', pathway: 'advanced', indiaTrack: STUDY_DEFAULT.track, protect: false });
-  const [australia, setAustralia] = useState(false);     // the secondary, collapsed Australian option
-  const [cloudIntent, setCloudIntent] = useState(false); // came here to sign in to a Pri cloud account
-  const [unlockId, setUnlockId] = useState(null);   // profile awaiting its password
+  const [stage, setStage] = useState('hero');   // hero | pick | create
+  const [createStep, setCreateStep] = useState(0);
+  const [form, setForm] = useState(freshProfileDraft);
+  const [australia, setAustralia] = useState(false);
+  const [cloudIntent, setCloudIntent] = useState(false);
+  const [unlockId, setUnlockId] = useState(null);
   const [unlockPw, setUnlockPw] = useState('');
-  const [lock, setLock] = useState(null);           // { id, until } while a profile is shut out
+  const [lock, setLock] = useState(null);
   const [now, setNow] = useState(Date.now());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const stepHeadingRef = useRef(null);
+  const createPendingRef = useRef(false);
 
   const load = () => api.get('/profiles').then(r => setProfiles(r.profiles)).catch(() => setProfiles([]));
   useEffect(() => { load(); }, []);
@@ -239,21 +252,39 @@ export default function Login() {
 
   useEffect(() => { if (lock && lock.until <= now) { setLock(null); setError(''); } }, [lock, now]);
 
+  useEffect(() => {
+    if (stage !== 'create') return;
+    stepHeadingRef.current?.focus({ preventScroll: true });
+  }, [stage, createStep]);
+
   const lockedFor = lock && lock.until > now ? lock.until - now : 0;
   const pwVerdict = useMemo(
-    () => passwordVerdict(form.password, { name: form.name, email: withEmail ? form.email : '' }),
-    [form.password, form.name, form.email, withEmail]
+    () => passwordVerdict(form.password, { name: form.name, email: form.email }),
+    [form.password, form.name, form.email]
   );
+  const selectedStudy = STUDY.find(o => o.key === form.study) || null;
+  const selectedLanguage = LANGUAGES.find(l => l.id === signInLanguage()) || LANGUAGES[0];
+  const selectedCourse = AU_COURSES.find(([id]) => id === form.course);
+  const studyLabel = form.course === 'in'
+    ? (selectedStudy?.track === 'cbse'
+        ? t('common.classNumber', { n: form.year })
+        : selectedStudy
+          ? selectedStudy.label + ' · ' + t('common.classNumber', { n: form.year })
+          : t('login.notChosen'))
+    : (selectedCourse?.[1] || form.course.toUpperCase()) + ' · ' + t('common.yearNumber', { n: form.year });
 
   async function go(path, body) {
     setBusy(true); setError('');
     try {
       const r = await api.post(path, body);
-      // Somebody who came for the cloud account is taken straight to it. The
-      // panel itself lives in Settings and is the only cloud sign-in there is —
-      // a local profile is never passed off as one.
-      if (cloudIntent) nav(CLOUD_ACCOUNT_ROUTE);
-      setUser(r.user); refreshDue();
+      // Login owns this navigation hook and unmounts as soon as setUser exposes
+      // the authenticated shell. Move the cloud handoff first so the destination
+      // cannot be lost during that identity transition. The local profile is
+      // already authoritative here because the POST completed successfully.
+      if (cloudIntent) nav(CLOUD_ACCOUNT_ROUTE, { replace: true, flushSync: true });
+      setUser(r.user);
+      refreshDue();
+      return r;
     } catch (e) {
       setError(e.message);
       if (e.needsPassword && body?.id) setUnlockId(body.id);
@@ -266,52 +297,131 @@ export default function Login() {
     finally { setBusy(false); }
   }
 
-  const enter = () => { localStorage.setItem('pri-seen-hero', '1'); setStage(profiles?.length ? 'pick' : 'method'); };
+  const beginCreate = (wantCloud = false) => {
+    setForm(freshProfileDraft());
+    setAustralia(false);
+    setCreateStep(0);
+    setCloudIntent(!!wantCloud);
+    setUnlockId(null);
+    setUnlockPw('');
+    setError('');
+    setStage('create');
+  };
 
-  /** The way to the cloud account: open (or make) the device profile it will sync, then land in Settings. */
+  const enter = () => {
+    localStorage.setItem('pri-seen-hero', '1');
+    if (profiles?.length) setStage('pick');
+    else beginCreate(false);
+  };
+
+  /** Open/select the local profile first, then hand it to the real cloud account panel. */
   const cloudSignIn = () => {
     localStorage.setItem('pri-seen-hero', '1');
-    setCloudIntent(true); setError('');
-    setStage(profiles?.length ? 'pick' : 'method');
+    setCloudIntent(true);
+    setError('');
+    if (profiles?.length) setStage('pick');
+    else beginCreate(true);
   };
 
   const pickProfile = (p) => {
     setError('');
-    if (p.hasPassword) { setUnlockId(unlockId === p.id ? null : p.id); setUnlockPw(''); }
-    else go('/profiles/select', { id: p.id });
+    if (p.hasPassword) {
+      setUnlockId(unlockId === p.id ? null : p.id);
+      setUnlockPw('');
+    } else {
+      void go('/profiles/select', { id: p.id });
+    }
   };
 
-  const startCreate = (useEmail) => {
-    setWithEmail(useEmail); setError('');
-    setForm(f => ({ ...f, password: '', password2: '', protect: false }));
-    setStage('create');
-  };
-
-  /** What the student is studying: a class on the CBSE / NCERT track, or a JEE / olympiad track with its own class. */
+  /** What this local profile studies or teaches: an India class/track or an Australian syllabus. */
   const chooseStudy = (key) => {
-    const opt = STUDY.find(o => o.key === key) || STUDY_DEFAULT;
+    const opt = STUDY.find(o => o.key === key);
+    if (!opt) {
+      setForm(f => ({ ...f, study: '', course: 'in', indiaTrack: 'cbse', year: STUDY_DEFAULT.year }));
+      return;
+    }
     setForm(f => ({
       ...f, study: opt.key, course: 'in', indiaTrack: opt.track,
-      year: opt.track === 'cbse' ? opt.year : opt.track === 'olympiad' ? f.year : (f.year >= 11 ? f.year : opt.year)
+      year: opt.track === 'cbse'
+        ? opt.year
+        : opt.track === 'olympiad'
+          ? Math.min(12, Math.max(7, f.year || opt.year))
+          : (f.year >= 11 ? f.year : opt.year)
     }));
   };
-  const openAustralia = () => { setAustralia(true); setForm(f => ({ ...f, course: 'nsw', indiaTrack: 'cbse' })); };
-  const closeAustralia = () => { setAustralia(false); chooseStudy(form.study); };
 
-  const create = () => {
-    if (form.protect) {
-      if (!pwVerdict.ok) { setError(t(pwVerdict.noteKey, pwVerdict.noteVars)); return; }
-      if (form.password !== form.password2) { setError(t('settings.passwordsDontMatch')); return; }
+  const openAustralia = () => {
+    setAustralia(true);
+    setForm(f => ({ ...f, study: '', course: 'nsw', year: 10, pathway: 'advanced', indiaTrack: 'cbse' }));
+    setError('');
+  };
+
+  const closeAustralia = () => {
+    setAustralia(false);
+    setForm(f => ({ ...f, study: '', course: 'in', year: STUDY_DEFAULT.year, pathway: 'advanced', indiaTrack: 'cbse' }));
+    setError('');
+  };
+
+  const courseChoiceValid = () => {
+    if (form.course === 'in') {
+      if (!selectedStudy) return false;
+      if ((form.indiaTrack === 'jee-main' || form.indiaTrack === 'jee-advanced') && ![11, 12].includes(Number(form.year))) return false;
+      return Number(form.year) >= 7 && Number(form.year) <= 12;
     }
-    go('/profiles', {
-      name: form.name, year: form.year, avatar: form.avatar, role: form.role,
-      // The new profile keeps the language this screen was read in, so a
-      // student who chose Hindi to sign up does not land on a Home in English.
-      language: signInLanguage(),
-      course: form.course, pathway: form.course === 'nsw' ? form.pathway : undefined, indiaTrack: form.course === 'in' ? form.indiaTrack : undefined,
-      email: withEmail && form.email ? form.email : undefined,
-      password: form.protect ? form.password : undefined
-    });
+    if (!AU_COURSES.some(([id]) => id === form.course)) return false;
+    if (Number(form.year) < 7 || Number(form.year) > 12) return false;
+    return !(form.course === 'nsw' && form.pathway === 'ext2' && Number(form.year) !== 12);
+  };
+
+  const validateStep = (step = createStep) => {
+    let message = '';
+    if (step === 0 && !['student', 'teacher'].includes(form.role)) message = t('login.roleRequired');
+    if (step === 1 && !courseChoiceValid()) message = t('login.courseRequired');
+    if (step === 2 && !form.name.trim()) message = t('login.nameRequired');
+    if (step === 3) {
+      if (form.email && !LOCAL_EMAIL_RE.test(form.email.trim())) message = t('login.emailInvalid');
+      else if (form.protect && !pwVerdict.ok) message = t(pwVerdict.noteKey, pwVerdict.noteVars);
+      else if (form.protect && form.password !== form.password2) message = t('settings.passwordsDontMatch');
+    }
+    setError(message);
+    return !message;
+  };
+
+  const nextStep = () => {
+    if (!validateStep()) return;
+    setError('');
+    setCreateStep(step => Math.min(ONBOARDING_STEPS - 1, step + 1));
+  };
+
+  const previousStep = () => {
+    setError('');
+    if (createStep > 0) setCreateStep(step => step - 1);
+    else setStage(profiles?.length ? 'pick' : 'hero');
+  };
+
+  const create = async () => {
+    if (createPendingRef.current || busy) return;
+    if (!validateStep(3)) {
+      setCreateStep(3);
+      return;
+    }
+    createPendingRef.current = true;
+    try {
+      const created = await go('/profiles', {
+        name: form.name.trim(), year: Number(form.year), avatar: form.avatar, role: form.role,
+        language: signInLanguage(),
+        course: form.course,
+        pathway: form.course === 'nsw' ? form.pathway : undefined,
+        indiaTrack: form.course === 'in' ? form.indiaTrack : undefined,
+        email: form.email.trim() || undefined,
+        password: form.protect ? form.password : undefined
+      });
+      // A brand-new profile must not inherit the route of whoever opened the
+      // picker. Start the new identity at its role-safe product landing.
+      if (created && !cloudIntent) nav(form.role === 'teacher' ? '/teach' : '/', { replace: true });
+    } finally {
+      createPendingRef.current = false;
+    }
   };
 
   const cloudNote = cloudIntent && (
@@ -380,21 +490,16 @@ export default function Login() {
             <div className="auth-point"><span className="auth-tick">✓</span>{t('login.point3')}</div>
             <div className="auth-point"><span className="auth-tick">✓</span>{t('login.point4')}</div>
           </div>
-          <LanguagePicker />
+          {stage !== 'create' && <LanguagePicker />}
         </div>
 
         <div className="auth-panel">
-          {/* Each stage draws its own title as an <h2> sized for its card, so the
-              page's one heading is spoken rather than drawn. */}
-          <h1 className="sr-only">
-            {t(stage === 'pick' ? 'login.h1Pick' : stage === 'method' ? 'login.h1Method' : 'login.h1Create')}
-          </h1>
           {stage === 'pick' && (
             <div className="card auth-card slide-up">
-              <h2 style={{ marginBottom: 4 }}>{t('login.whosPractising')}</h2>
+              <h1 style={{ marginBottom: 4 }}>{t('login.whosPractising')}</h1>
               <p className="sub" style={{ marginBottom: 16 }}>{t('login.pickToContinue')}</p>
               {cloudNote}
-              {error && <div className="error-box" style={{ marginBottom: 12 }}>{error}</div>}
+              {error && <div className="error-box" id="profile-picker-error" role="alert" style={{ marginBottom: 12 }}>{error}</div>}
               <div className="acct-list">
                 {(profiles || []).map(p => {
                   const shut = lock?.id === p.id && lockedFor > 0;
@@ -414,9 +519,10 @@ export default function Login() {
                       </button>
                       {unlockId === p.id && p.hasPassword && (
                         <>
-                          <form className="acct-unlock" onSubmit={e => { e.preventDefault(); if (!shut) go('/profiles/select', { id: p.id, password: unlockPw }); }}>
+                          <form className="acct-unlock" onSubmit={e => { e.preventDefault(); if (!shut) void go('/profiles/select', { id: p.id, password: unlockPw }); }}>
                             <input className="input" type="password" placeholder={t('login.password')} autoFocus value={unlockPw} disabled={shut}
-                              aria-label={t('login.passwordFor', { name: p.name })} onChange={e => setUnlockPw(e.target.value)} />
+                              aria-label={t('login.passwordFor', { name: p.name })} aria-describedby={error ? 'profile-picker-error' : undefined}
+                              onChange={e => setUnlockPw(e.target.value)} />
                             <button className="btn btn-primary btn-sm" disabled={busy || shut || !unlockPw} type="submit">{t('login.unlock')}</button>
                           </form>
                           {shut && (
@@ -430,11 +536,12 @@ export default function Login() {
                   );
                 })}
               </div>
-              <button className="btn btn-ghost" style={{ width: '100%', marginTop: 14 }} disabled={busy} onClick={() => { setError(''); setStage('method'); }}>
+              <button className="btn btn-ghost" type="button" style={{ width: '100%', marginTop: 14 }} disabled={busy}
+                onClick={() => beginCreate(cloudIntent)}>
                 {t('login.addAnother')}
               </button>
               <div style={{ textAlign: 'center', marginTop: 10 }}>
-                <button className="linklike" disabled={busy} onClick={() => go('/profiles/demo', {})}>
+                <button className="linklike" type="button" disabled={busy} onClick={() => void go('/profiles/demo', {})}>
                   {t('login.tryDemoIndia')}
                 </button>
               </div>
@@ -442,109 +549,93 @@ export default function Login() {
             </div>
           )}
 
-          {stage === 'method' && (
-            <div className="card auth-card slide-up">
-              <div className="row" style={{ gap: 10, marginBottom: 6 }}>
-                <span className="prov-badge lg">{Marks.device}</span>
-                <h2 style={{ margin: 0 }}>{t('login.privateProfile')}</h2>
-              </div>
-              <p className="sub" style={{ marginBottom: 18 }}>{t('login.methodSub')}</p>
-              {cloudNote}
-              {error && <div className="error-box" style={{ marginBottom: 12 }}>{error}</div>}
-              <button className="sso-btn sso-email" disabled={busy} onClick={() => startCreate(true)}>
-                <span>{t('login.continueWithEmail')}</span>
-              </button>
-              <div className="sso-or"><i />{t('login.or')}<i /></div>
-              <button className="sso-btn sso-email" disabled={busy} onClick={() => startCreate(false)}>
-                <span>{t('login.continueWithoutEmail')}</span>
-              </button>
-              <p className="auth-note">{t('login.methodNote')}</p>
-              {profiles?.length > 0 && (
-                <button className="btn btn-quiet btn-sm" style={{ width: '100%', marginTop: 6 }} onClick={() => { setError(''); setStage('pick'); }}>{t('login.backToProfiles')}</button>
-              )}
-              {!profiles?.length && (
-                <div style={{ textAlign: 'center', marginTop: 12 }}>
-                  {/* A visitor who has opened the Australian syllabuses should
-                      see the Australian demo, not an NCERT one. */}
-                  <button className="linklike" disabled={busy} onClick={() => go('/profiles/demo', australia ? { course: 'nsw' } : {})}>
-                    {t(australia ? 'login.orTryDemoAustralia' : 'login.orTryDemoIndia')}
-                  </button>
-                </div>
-              )}
-              {cloudLink}
-            </div>
-          )}
-
           {stage === 'create' && (
-            <div className="card auth-card slide-up">
-              <div className="row" style={{ gap: 10, marginBottom: 6 }}>
+            <div className="card auth-card slide-up" data-onboarding-step={createStep + 1}>
+              <div className="spread" style={{ alignItems: 'center', gap: 12, marginBottom: 8 }}>
                 <span className="prov-badge lg">{Marks.device}</span>
-                <h2 style={{ margin: 0 }}>{t('login.privateProfile')}</h2>
+                <span className="sc-label" role="status" aria-live="polite">
+                  {t('login.stepOf', { current: createStep + 1, total: ONBOARDING_STEPS })}
+                </span>
               </div>
-              <p className="sub" style={{ marginBottom: 14 }}>{t('login.createSub')}</p>
-              {cloudNote}
-              {error && <div className="error-box" style={{ marginBottom: 12 }}>{error}</div>}
-
-              <div className="field">
-                <label className="label" htmlFor="signup-name">{t('settings.name')}</label>
-                <input className="input" id="signup-name" value={form.name} autoFocus placeholder={t('login.namePlaceholder')}
-                  onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
+              <div className="goalbar" aria-hidden="true" style={{ marginBottom: 18 }}>
+                <i style={{ width: `${((createStep + 1) / ONBOARDING_STEPS) * 100}%` }} />
               </div>
-              {withEmail && (
-                <div className="field">
-                  <label className="label" htmlFor="signup-email">{t('settings.email')} <span className="muted">{t('login.optional')}</span></label>
-                  <input className="input" id="signup-email" type="email" value={form.email} placeholder="you@example.com"
-                    onChange={e => setForm(f => ({ ...f, email: e.target.value }))} />
-                  <p className="muted" style={{ marginTop: 6, fontSize: 12.5 }}>
-                    {t('login.emailNote')}
-                  </p>
-                </div>
-              )}
+              <h1 ref={stepHeadingRef} tabIndex={-1} style={{ marginBottom: 6 }}>
+                {t(['login.stepRoleTitle', 'login.stepCourseTitle', 'login.stepPersonalTitle', 'login.stepProtectTitle', 'login.stepReadyTitle'][createStep])}
+              </h1>
+              <p className="sub" style={{ marginBottom: 16 }}>
+                {t(['login.stepRoleSub', 'login.stepCourseSub', 'login.stepPersonalSub', 'login.stepProtectSub', 'login.stepReadySub'][createStep])}
+              </p>
+              {error && <div className="error-box" id="onboarding-error" role="alert" style={{ marginBottom: 14 }}>{error}</div>}
 
-              <div className="field">
-                <div className="label" id="signup-role">{t('login.iAmA')}</div>
-                <div className="pill-select" role="group" aria-labelledby="signup-role">
-                  <button className={`pill-opt ${form.role === 'student' ? 'on' : ''}`} onClick={() => setForm(f => ({ ...f, role: 'student' }))}>{t('login.student')}</button>
-                  <button className={`pill-opt ${form.role === 'teacher' ? 'on' : ''}`} onClick={() => setForm(f => ({ ...f, role: 'teacher' }))}>{t('login.teacher')}</button>
-                </div>
-              </div>
-
-              {/* The first thing a student chooses is what they are studying:
-                  a class on the CBSE / NCERT track, or JEE / olympiad. The
-                  Australian syllabuses are a step away, folded up. */}
-              {form.role === 'student' && !australia && (
-                <div className="field">
-                  <label className="label" htmlFor="signup-track">{t('login.imStudying')}</label>
-                  <select className="input" id="signup-track" value={form.study} onChange={e => chooseStudy(e.target.value)}>
-                    {STUDY.map(o => <option key={o.key} value={o.key}>{o.label || t('common.classNumber', { n: o.classOf })}</option>)}
-                  </select>
-                  {form.indiaTrack !== 'cbse' && (
-                    <div style={{ marginTop: 10 }}>
-                      <label className="label" htmlFor="signup-year">{t('common.class')}</label>
-                      <select className="input" id="signup-year" value={form.year} onChange={e => setForm(f => ({ ...f, year: Number(e.target.value) }))}>
-                        {(form.indiaTrack === 'olympiad' ? [7, 8, 9, 10, 11, 12] : [11, 12]).map(y => <option key={y} value={y}>{t('common.classNumber', { n: y })}</option>)}
-                      </select>
+              {createStep === 0 && (
+                <>
+                  <div className="field">
+                    <div className="label" id="signup-role">{t('login.iAmA')}</div>
+                    <div className="pill-select" role="group" aria-labelledby="signup-role">
+                      <button type="button" className={`pill-opt ${form.role === 'student' ? 'on' : ''}`}
+                        aria-pressed={form.role === 'student'}
+                        onClick={() => { setForm(f => ({ ...f, role: 'student' })); setError(''); }}>
+                        {t('login.student')}
+                      </button>
+                      <button type="button" className={`pill-opt ${form.role === 'teacher' ? 'on' : ''}`}
+                        aria-pressed={form.role === 'teacher'}
+                        onClick={() => { setForm(f => ({ ...f, role: 'teacher' })); setError(''); }}>
+                        {t('login.teacher')}
+                      </button>
                     </div>
-                  )}
-                </div>
+                  </div>
+                  <p className="muted" style={{ fontSize: 12.5, marginTop: 12 }}>
+                    {t(form.role === 'teacher' ? 'login.teacherRoleNote' : 'login.studentRoleNote')}
+                  </p>
+                </>
               )}
-              {form.role === 'student' && !australia && (
-                <div className="field" style={{ marginTop: -4 }}>
-                  <button type="button" className="linklike" onClick={openAustralia}>{t('login.studyingInAustralia')}</button>
-                </div>
+
+              {createStep === 1 && !australia && (
+                <>
+                  <div className="field">
+                    <label className="label" htmlFor="signup-track">
+                      {t(form.role === 'teacher' ? 'login.imTeaching' : 'login.imStudying')}
+                    </label>
+                    <select className="input" id="signup-track" value={form.study}
+                      aria-describedby={error ? 'onboarding-error' : undefined}
+                      onChange={e => { chooseStudy(e.target.value); setError(''); }}>
+                      <option value="">{t('login.chooseClassTrack')}</option>
+                      {STUDY.map(o => <option key={o.key} value={o.key}>{o.label || t('common.classNumber', { n: o.classOf })}</option>)}
+                    </select>
+                    {selectedStudy && form.indiaTrack !== 'cbse' && (
+                      <div style={{ marginTop: 10 }}>
+                        <label className="label" htmlFor="signup-year">{t('common.class')}</label>
+                        <select className="input" id="signup-year" value={form.year}
+                          onChange={e => { setForm(f => ({ ...f, year: Number(e.target.value) })); setError(''); }}>
+                          {(form.indiaTrack === 'olympiad' ? [7, 8, 9, 10, 11, 12] : [11, 12])
+                            .map(y => <option key={y} value={y}>{t('common.classNumber', { n: y })}</option>)}
+                        </select>
+                      </div>
+                    )}
+                  </div>
+                  <div className="field" style={{ marginTop: -4 }}>
+                    <button type="button" className="linklike" onClick={openAustralia}>
+                      {t(form.role === 'teacher' ? 'login.teachingInAustralia' : 'login.studyingInAustralia')}
+                    </button>
+                  </div>
+                </>
               )}
-              {form.role === 'student' && australia && (
+
+              {createStep === 1 && australia && (
                 <>
                   <div className="grid cols-2" style={{ gap: 12 }}>
                     <div className="field">
                       <label className="label" htmlFor="signup-year">{t('settings.schoolYear')}</label>
-                      <select className="input" id="signup-year" value={form.year} onChange={e => setForm(f => ({ ...f, year: Number(e.target.value) }))}>
+                      <select className="input" id="signup-year" value={form.year}
+                        onChange={e => { setForm(f => ({ ...f, year: Number(e.target.value) })); setError(''); }}>
                         {[7, 8, 9, 10, 11, 12].map(y => <option key={y} value={y}>{t('common.yearNumber', { n: y })}</option>)}
                       </select>
                     </div>
                     <div className="field">
                       <label className="label" htmlFor="signup-course">{t('settings.syllabus')}</label>
-                      <select className="input" id="signup-course" value={form.course} onChange={e => setForm(f => ({ ...f, course: e.target.value }))}>
+                      <select className="input" id="signup-course" value={form.course}
+                        onChange={e => { setForm(f => ({ ...f, course: e.target.value })); setError(''); }}>
                         {AU_COURSES.map(([k, name]) => <option key={k} value={k}>{name}</option>)}
                       </select>
                     </div>
@@ -557,7 +648,8 @@ export default function Login() {
                           .filter(([k]) => k !== 'ext2' || form.year === 12)
                           .map(([k, name]) => (
                             <button key={k} type="button" className={`pathway-pick ${form.pathway === k ? 'on' : ''}`}
-                              onClick={() => setForm(f => ({ ...f, pathway: k }))}>
+                              aria-pressed={form.pathway === k}
+                              onClick={() => { setForm(f => ({ ...f, pathway: k })); setError(''); }}>
                               <b>{name}</b>
                             </button>
                           ))}
@@ -566,53 +658,125 @@ export default function Login() {
                   )}
                   <div className="field" style={{ marginTop: -4 }}>
                     <button type="button" className="linklike" onClick={closeAustralia}>{t('login.backToIndian')}</button>
-                    {/* A visitor who has chosen an Australian syllabus should be
-                        able to try the Australian demo, not an NCERT one. */}
-                    <div style={{ marginTop: 8 }}>
-                      <button type="button" className="linklike" disabled={busy} onClick={() => go('/profiles/demo', { course: 'nsw' })}>
-                        {t('login.tryAustralianDemo')}
-                      </button>
+                  </div>
+                </>
+              )}
+
+              {createStep === 2 && (
+                <>
+                  <div className="field">
+                    <label className="label" htmlFor="signup-name">{t('settings.name')}</label>
+                    <input className="input" id="signup-name" value={form.name} autoComplete="name"
+                      placeholder={t('login.namePlaceholder')} aria-invalid={!!error && !form.name.trim()}
+                      aria-describedby={error ? 'onboarding-error' : undefined}
+                      onChange={e => { setForm(f => ({ ...f, name: e.target.value })); setError(''); }} />
+                  </div>
+                  <div className="field">
+                    <div className="label">{t('login.chooseLanguage')}</div>
+                    <LanguagePicker />
+                  </div>
+                  <div className="field">
+                    <div className="label" id="signup-avatar">{t('settings.avatar')}</div>
+                    <div className="avatar-row" role="group" aria-labelledby="signup-avatar">
+                      {AVATARS.map(a => (
+                        <button key={a} type="button" className={`avatar-pick ${form.avatar === a ? 'on' : ''}`}
+                          aria-pressed={form.avatar === a} aria-label={t('settings.avatarPick', { emoji: a })}
+                          onClick={() => setForm(f => ({ ...f, avatar: a }))}>{a}</button>
+                      ))}
                     </div>
                   </div>
                 </>
               )}
-              <div className="field">
-                <div className="label" id="signup-avatar">{t('settings.avatar')}</div>
-                <div className="avatar-row" role="group" aria-labelledby="signup-avatar">
-                  {AVATARS.map(a => (
-                    <button key={a} className={`avatar-pick ${form.avatar === a ? 'on' : ''}`} aria-label={t('settings.avatarPick', { emoji: a })} onClick={() => setForm(f => ({ ...f, avatar: a }))}>{a}</button>
-                  ))}
-                </div>
-              </div>
 
-              <div className="field">
-                <label className="check-row">
-                  <input type="checkbox" checked={form.protect} onChange={e => setForm(f => ({ ...f, protect: e.target.checked }))} />
-                  <span>{t('login.protectWithPassword')}</span>
-                </label>
-                {form.protect && (
-                  <>
-                    <div className="grid cols-2" style={{ gap: 12, marginTop: 10 }}>
-                      <input className="input" id="signup-password" type="password" placeholder={t('login.password')} value={form.password} aria-label={t('login.password')}
-                        onChange={e => setForm(f => ({ ...f, password: e.target.value }))} />
-                      <input className="input" id="signup-password2" type="password" placeholder={t('login.repeatPassword')} value={form.password2} aria-label={t('login.repeatPassword')}
-                        onChange={e => setForm(f => ({ ...f, password2: e.target.value }))} />
+              {createStep === 3 && (
+                <>
+                  <div className="field">
+                    <label className="label" htmlFor="signup-email">
+                      {t('settings.email')} <span className="muted">{t('login.optional')}</span>
+                    </label>
+                    <input className="input" id="signup-email" type="email" autoComplete="email" value={form.email}
+                      placeholder="you@example.com" aria-invalid={!!error && !!form.email && !LOCAL_EMAIL_RE.test(form.email.trim())}
+                      aria-describedby={error ? 'onboarding-error' : 'local-email-note'}
+                      onChange={e => { setForm(f => ({ ...f, email: e.target.value })); setError(''); }} />
+                    <p className="muted" id="local-email-note" style={{ marginTop: 6, fontSize: 12.5 }}>
+                      {t('login.emailNote')}
+                    </p>
+                  </div>
+
+                  <div className="field">
+                    <label className="check-row">
+                      <input type="checkbox" checked={form.protect}
+                        onChange={e => { setForm(f => ({ ...f, protect: e.target.checked })); setError(''); }} />
+                      <span>{t('login.protectWithPassword')}</span>
+                    </label>
+                    {form.protect && (
+                      <>
+                        <div className="grid cols-2" style={{ gap: 12, marginTop: 10 }}>
+                          <input className="input" id="signup-password" type="password" autoComplete="new-password"
+                            placeholder={t('login.password')} value={form.password} aria-label={t('login.password')}
+                            aria-describedby={error ? 'onboarding-error' : undefined}
+                            onChange={e => { setForm(f => ({ ...f, password: e.target.value })); setError(''); }} />
+                          <input className="input" id="signup-password2" type="password" autoComplete="new-password"
+                            placeholder={t('login.repeatPassword')} value={form.password2} aria-label={t('login.repeatPassword')}
+                            aria-describedby={error ? 'onboarding-error' : undefined}
+                            onChange={e => { setForm(f => ({ ...f, password2: e.target.value })); setError(''); }} />
+                        </div>
+                        <PasswordMeter verdict={pwVerdict} />
+                      </>
+                    )}
+                  </div>
+
+                  <div className="field">
+                    <div className="label" id="signup-cloud-choice">{t('login.cloudChoice')}</div>
+                    <div className="pathway-row" role="group" aria-labelledby="signup-cloud-choice">
+                      <button type="button" className={`pathway-pick ${!cloudIntent ? 'on' : ''}`}
+                        aria-pressed={!cloudIntent} onClick={() => setCloudIntent(false)}>
+                        <b>{t('login.localOnly')}</b><span>{t('login.localOnlySub')}</span>
+                      </button>
+                      <button type="button" className={`pathway-pick ${cloudIntent ? 'on' : ''}`}
+                        aria-pressed={cloudIntent} onClick={() => setCloudIntent(true)}>
+                        <b>{t('login.connectCloudNext')}</b><span>{t('login.connectCloudNextSub')}</span>
+                      </button>
                     </div>
-                    <PasswordMeter verdict={pwVerdict} />
-                  </>
+                  </div>
+                  <p className="auth-note">{t('login.localCloudHonesty')}</p>
+                </>
+              )}
+
+              {createStep === 4 && (
+                <>
+                  <div className="card" style={{ boxShadow: 'none', padding: 16 }}>
+                    <div className="spread" style={{ gap: 12 }}><span className="muted">{t('login.summaryRole')}</span><b>{t(form.role === 'teacher' ? 'login.teacher' : 'login.student')}</b></div>
+                    <div className="spread" style={{ gap: 12, marginTop: 8 }}><span className="muted">{t('login.summaryCourse')}</span><b>{studyLabel}</b></div>
+                    <div className="spread" style={{ gap: 12, marginTop: 8 }}><span className="muted">{t('login.summaryLanguage')}</span><b>{selectedLanguage.label}</b></div>
+                    <div className="spread" style={{ gap: 12, marginTop: 8 }}><span className="muted">{t('login.summaryProtection')}</span><b>{t(form.protect ? 'login.protectionOn' : 'login.protectionOff')}</b></div>
+                    <div className="spread" style={{ gap: 12, marginTop: 8 }}><span className="muted">{t('login.summaryCloud')}</span><b>{t(cloudIntent ? 'login.cloudNext' : 'login.cloudLater')}</b></div>
+                  </div>
+                  <p className="sub" style={{ marginTop: 14 }}>
+                    {t(form.role === 'teacher' ? 'login.readyTeacher' : 'login.readyStudent')}
+                  </p>
+                  <p className="muted" style={{ fontSize: 12.5 }}>{t('login.noFakeDiagnostic')}</p>
+                </>
+              )}
+
+              <div className="row" style={{ marginTop: 18, gap: 10 }}>
+                <button className="btn btn-quiet" type="button" disabled={busy} onClick={previousStep}>
+                  {t('login.back')}
+                </button>
+                {createStep < ONBOARDING_STEPS - 1 ? (
+                  <button className="btn btn-primary btn-lg" type="button" style={{ flex: 1 }} disabled={busy} onClick={nextStep}>
+                    {t('login.continue')}
+                  </button>
+                ) : (
+                  <button className="btn btn-primary btn-lg" type="button" style={{ flex: 1 }} disabled={busy} onClick={create}>
+                    {t(busy ? 'login.oneMoment'
+                      : cloudIntent ? 'login.createAndOpenCloud'
+                        : form.role === 'teacher' ? 'login.openTeacherWorkspace'
+                          : 'login.startLearning')}
+                  </button>
                 )}
               </div>
-
-              <div className="row" style={{ marginTop: 18 }}>
-                <button className="btn btn-primary btn-lg" style={{ flex: 1 }}
-                  disabled={busy || !form.name.trim() || (form.protect && !pwVerdict.ok)}
-                  onClick={create}>
-                  {t(busy ? 'login.oneMoment' : 'login.startLearning')}
-                </button>
-                <button className="btn btn-quiet" onClick={() => { setError(''); setStage('method'); }}>{t('login.back')}</button>
-              </div>
-
-              <p className="auth-note">{t('login.createNote')}</p>
+              <p className="auth-note" style={{ marginTop: 14 }}>{t('login.createNote')}</p>
             </div>
           )}
 

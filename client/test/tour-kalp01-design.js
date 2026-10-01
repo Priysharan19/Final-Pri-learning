@@ -53,10 +53,18 @@ async function contrast(page) {
 
 async function createStudentThroughUI(page, settle) {
   await page.getByRole('button', { name: 'Get Started' }).click();
-  await page.waitForSelector('.sso-btn', { timeout: 15000 });
-  await page.getByRole('button', { name: /Continue without an email/i }).click();
-  await page.waitForSelector('#signup-name', { timeout: 15000 });
-  await page.locator('#signup-name').fill('KALP Demo Teacher');
+  await page.waitForSelector('[data-onboarding-step="1"]', { timeout: 15000 });
+  await page.getByRole('button', { name: 'Student', exact: true }).click();
+  await page.locator('.auth-card .btn-primary').click();
+  await page.waitForSelector('[data-onboarding-step="2"]');
+  await page.locator('#signup-track').selectOption('10');
+  await page.locator('.auth-card .btn-primary').click();
+  await page.waitForSelector('[data-onboarding-step="3"]');
+  await page.locator('#signup-name').fill('KALP Demo Student');
+  await page.locator('.auth-card .btn-primary').click();
+  await page.waitForSelector('[data-onboarding-step="4"]');
+  await page.locator('.auth-card .btn-primary').click();
+  await page.waitForSelector('[data-onboarding-step="5"]');
   await page.getByRole('button', { name: 'Start learning' }).click();
   await page.waitForSelector('.home-greet', { timeout: 30000 });
   await settle();
