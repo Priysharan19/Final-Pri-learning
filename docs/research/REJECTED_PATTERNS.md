@@ -15,6 +15,13 @@ These are explicitly rejected by the current research architecture unless materi
 ## Learner intelligence
 
 - One scalar mastery value as canonical learner truth.
+- Unvalidated Q-matrix or prerequisite edge treated as mathematical ground truth.
+- Expert/LLM-authored knowledge-component mappings made irreversible or provenance-free.
+- Same generator family's numeric variants counted as independent transfer evidence.
+- Elo rating or four difficulty rungs described as a calibrated psychometric scale without calibration.
+- Predictive AUC/next-response accuracy used as the sole learner-model admission criterion.
+- Response speed treated as fluency without rapid-guess/disengagement checks.
+- Model uncertainty discarded before pedagogical policy sees the state.
 - One universal mastery threshold for all decisions.
 - Prediction treated as prescription.
 - “Personalization” meaning only easier/harder questions.
@@ -49,6 +56,10 @@ These are explicitly rejected by the current research architecture unless materi
 ## Content/assessment
 
 - “Publicly downloadable” interpreted as commercial reuse permission.
+- "Unlimited generated questions" treated as unlimited independent psychometric evidence.
+- Item information maximized without content balance, exposure or evidence-diversity constraints.
+- Same-family holdout used to claim structural transfer.
+- Item difficulty/discrimination estimated from sparse data and displayed without uncertainty.
 - Vectorizing/retrieving every available textbook without rights review.
 - Generated mathematical correctness treated as psychometric validity.
 - Difficulty label trusted because an LLM predicted it.
@@ -68,6 +79,16 @@ These are explicitly rejected by the current research architecture unless materi
 ## Governance/evidence
 
 - Simulation/offline replay presented as learning efficacy.
+- Immediate retry success presented as durable learning.
+- Voluntary feature users compared with non-users and the difference called a causal treatment effect.
+- Classroom-randomized study analyzed as independent question/learner observations without cluster handling.
+- Primary outcome changed after inspecting results.
+- Missing/abandoned outcomes silently dropped.
+- Repeated dashboard peeking with ordinary fixed-horizon significance thresholds.
+- Contextual/personalized policy deployed before a strong non-contextual baseline and heterogeneity evidence.
+- Off-policy causal estimate reported when logged behavior has no support for the alternative action.
+- Bandit reward silently defined as engagement/session completion and called learning.
+- Competitor marketing/capability page treated as independent efficacy evidence.
 - Observational analytics presented as causal improvement.
 - Vendor case study presented as independent superiority evidence.
 - Null results discarded.
