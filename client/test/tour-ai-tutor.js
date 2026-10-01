@@ -26,6 +26,42 @@ const TOPIC = 'y7-equations';
 const NUDGE = 'Look at what is being added to the unknown, and undo it first.';
 const CAPTION = 'Tutor note: undo the operation furthest from the unknown first.';
 
+// ── Flag off: the production default ─────────────────────────────────────────
+// The frozen V1 scope ships no public beta surface, so a production build made
+// without PRI_FEATURE_TUTOR=1 must show no tutor and send nothing to /v1/tutor.
+export const flowOff = {
+  id: 'tutor-off',
+  name: 'AI tutor · dark by default in a production build',
+
+  async run({ page, ctx, base, check, goto, createProfile, settle }) {
+    const tutorRequests = [];
+    await page.addInitScript(origin => {
+      window.__PRI_CLOUD_ORIGIN__ = origin;
+      // A production build ignores every runtime override; prove it.
+      try { localStorage.setItem('pri-feature-tutor', '1'); } catch { /* storage may be unavailable */ }
+      window.__PRI_TUTOR_OVERRIDE__ = true;
+    }, base);
+    await ctx.route('**/v1/**', route => {
+      if (new URL(route.request().url()).pathname.startsWith('/v1/tutor')) tutorRequests.push(route.request().url());
+      return route.fulfill({ status: 401, contentType: 'application/json', body: JSON.stringify({ error: { code: 'AUTH_REQUIRED', message: 'Sign in is required.' } }) });
+    });
+    const chunkRequests = [];
+    page.on('request', r => { if (/TutorHelp-[^/]*\.js$/.test(r.url())) chunkRequests.push(r.url()); });
+
+    await goto('/');
+    await createProfile({ name: 'Dark Tutor Student', year: 7 });
+    await page.goto(`${base}/practice?subtopic=${TOPIC}`, { waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('.q-prompt', { timeout: 30000 });
+    await settle();
+    await check('a production build offers no Help control', await page.locator('[data-tutor-launch]').count() === 0);
+    await check('even with every runtime override set', await page.evaluate(() => window.__PRI_TUTOR_OVERRIDE__ === true));
+    await check('the deterministic hints are still there', await page.locator('.q-prompt').count() === 1);
+    await check('the tutor chunk is never fetched', chunkRequests.length === 0, JSON.stringify(chunkRequests));
+    await check('and nothing is sent to /v1/tutor', tutorRequests.length === 0, JSON.stringify(tutorRequests));
+  }
+};
+
+// ── Flag on: staging (PRI_FEATURE_TUTOR=1) ───────────────────────────────────
 export const flow = {
   id: 'tutor',
   name: 'AI tutor · three levels, in order, with fallback',
@@ -133,7 +169,20 @@ export const flow = {
   }
 };
 
+// Standalone: build without the flag and prove it is dark, then build with
+// PRI_FEATURE_TUTOR=1 (as staging does) and drive the three levels. Each state
+// gets its own build because the flag is a build-time constant. Ends with the
+// flag-off build back in client/dist, so later suites see the production default.
 if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {
   const { runOne } = await import('./e2e.mjs');
-  process.exit(await runOne(flow) ? 1 : 0);
+  const prior = process.env.PRI_FEATURE_TUTOR;
+  process.env.PRI_FEATURE_TUTOR = '0';
+  await runOne(flowOff, []);
+  process.env.PRI_FEATURE_TUTOR = '1';
+  const failed = await runOne(flow, []);
+  process.env.PRI_FEATURE_TUTOR = '0';
+  const { ensureBuild } = await import('./e2e.mjs');
+  ensureBuild(true);
+  if (prior === undefined) delete process.env.PRI_FEATURE_TUTOR; else process.env.PRI_FEATURE_TUTOR = prior;
+  process.exit(failed ? 1 : 0);
 }

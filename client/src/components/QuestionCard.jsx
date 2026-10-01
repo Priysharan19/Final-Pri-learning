@@ -20,6 +20,7 @@ import { awardStepMarks, marksSentence } from '../engine/cbseMarking.js';
 import { checkWorkingWithCloud, mergeVerdicts, shouldCheckWorking, workingNote } from '../ink/cloudWorking.js';
 import { useLanguage, useT, useTx } from '../i18n/index.js';
 import TermGloss from './TermGloss.jsx';
+import { tutorFeatureEnabled } from '../tutor/flag.js';
 
 const DIFF_CLASS = { 1: 'tag-d1', 2: 'tag-d2', 3: 'tag-d3', 4: 'tag-d4' };
 // Four ways of saying "right", picked by question id so one question always
@@ -242,6 +243,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const [showTutor, setShowTutor] = useState(false);
   const [tutorUsed, setTutorUsed] = useState(question.tutorLevel || 0);
   const { language } = useLanguage();
+  // Dark by default (src/tutor/flag.js): off, the card offers only the hints.
+  const tutorEnabled = useMemo(() => tutorFeatureEnabled(), []);
   const [working, setWorking] = useState('');
   const [showWorking, setShowWorking] = useState(false);
   const [showScribble, setShowScribble] = useState(false);
@@ -1097,7 +1100,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       )}
 
       {/* AI tutor: three levels of help, lazy-loaded on first use */}
-      {!resolved && (
+      {!resolved && tutorEnabled && (
         <div className="tutor-launch-row no-print">
           <button type="button" className={`btn btn-ghost btn-sm tutor-launch ${showTutor ? 'on' : ''}`}
             aria-expanded={showTutor} aria-label={t('tutor.helpLabel')} data-tutor-launch
@@ -1107,7 +1110,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
           {tutorUsed > 0 && <span className="muted" style={{ marginLeft: 8, fontSize: 13 }}>{t('tutor.helpUsed', { count: tutorUsed, n: tutorUsed })}</span>}
         </div>
       )}
-      {showTutor && !resolved && (
+      {showTutor && !resolved && tutorEnabled && (
         <TutorBoundary fallback={t('tutor.unavailable')}>
           <React.Suspense fallback={<div className="hintbox" role="status">{t('tutor.asking')}</div>}>
             <TutorHelp

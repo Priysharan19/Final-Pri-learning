@@ -216,7 +216,7 @@ const stubAsk = async (req) => {
   return { model: 'stub-model', ...next };
 };
 let clock = now;
-const env = { PRI_HANDWRITING_API_KEY: 'k-test', PRI_PAID_CALLS_PER_HOUR: '10000', PRI_PAID_CALLS_PER_DAY: '100000', PRI_TUTOR_CALLS_PER_ACCOUNT_DAY: '1000' };
+const env = { PRI_FEATURE_TUTOR: '1', PRI_HANDWRITING_API_KEY: 'k-test', PRI_PAID_CALLS_PER_HOUR: '10000', PRI_PAID_CALLS_PER_DAY: '100000', PRI_TUTOR_CALLS_PER_ACCOUNT_DAY: '1000' };
 const paidCalls = async () => Number((await db.get("SELECT count FROM rate_limits WHERE bucket = 'paid-provider:hour'"))?.count || 0);
 
 const servers = [];
@@ -239,6 +239,16 @@ async function mount(options) {
 }
 
 try {
+  // Dark by default: without PRI_FEATURE_TUTOR=1 the route does not exist.
+  const dark = await mount({ ask: stubAsk, env: { ...env, PRI_FEATURE_TUTOR: undefined } });
+  const darkAnon = await dark(null, body());
+  const darkSigned = await dark('acct-verified', body());
+  eq([darkAnon.status, darkAnon.json?.error?.code, darkSigned.status, darkSigned.json?.error?.code], [404, 'NOT_FOUND', 404, 'NOT_FOUND'],
+    'with the feature off the tutor route is the ordinary 404, signed in or not');
+  const darkZero = await mount({ ask: stubAsk, env: { ...env, PRI_FEATURE_TUTOR: '0' } });
+  eq((await darkZero('acct-verified', body())).status, 404, 'and PRI_FEATURE_TUTOR=0 is off too');
+  eq(calls.length, 0, 'a dark tutor never reaches the model');
+
   const call = await mount({ ask: stubAsk, env, now: () => clock });
 
   eq((await call(null, body())).status, 401, 'the tutor is never anonymous');
@@ -340,7 +350,7 @@ try {
   ok(!JSON.stringify(boom.json).includes('2x+3'), 'and echoes nothing of the request');
 
   // Not configured.
-  const bare = await mount({ ask: stubAsk, env: {} });
+  const bare = await mount({ ask: stubAsk, env: { PRI_FEATURE_TUTOR: '1' } });
   const off = await bare('acct-verified', body({ studentWork: { lines: ['fresh'] } }));
   eq([off.status, off.json?.error?.code], [503, 'TUTOR_NOT_CONFIGURED'], 'with no key the tutor says it is unavailable');
 

@@ -50,6 +50,7 @@ import {
 } from './entitlementGate.js';
 import { ENTITLEMENTS } from '../platform/entitlements.js';
 import { requestTutorHelp } from './tutorBridge.js';
+import { tutorDisabledError, tutorFeatureEnabled } from '../tutor/flag.js';
 import { priNative } from '../platform/native/index.js';
 
 export const COURSES = {
@@ -2639,6 +2640,7 @@ const routes = {
   // resolve() charges it like a hint. assertPracticeRow runs before anything
   // else, so an exam question is refused here and never reaches the network.
   'POST /practice/:id/tutor': async (body, params) => {
+    if (!tutorFeatureEnabled()) throw tutorDisabledError();
     const p = await requireProfile();
     const row = await get('questions', params.id);
     if (!row || row.pid !== p.id) throw Object.assign(new Error('Question not found'), { status: 404 });
@@ -2696,6 +2698,7 @@ const routes = {
   },
 
   'POST /practice/:id/tutor/captions': async (body, params) => {
+    if (!tutorFeatureEnabled()) throw tutorDisabledError();
     const p = await requireProfile();
     const row = await get('questions', params.id);
     if (!row || row.pid !== p.id) throw Object.assign(new Error('Question not found'), { status: 404 });

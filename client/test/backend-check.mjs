@@ -1107,10 +1107,24 @@ async function run() {
   // back to the question's own authored hint; a tutored success is supported
   // evidence, never independent.
   section('ai tutor');
-  const { setTutorTransportForTests } = await import(`${SRC}local/tutorBridge.js`);
+  const { setTutorTransportForTests, requestTutorHelp } = await import(`${SRC}local/tutorBridge.js`);
   const tutorCalls = [];
   try {
     await POST('/profiles/select', { id: ada.id });
+
+    // Dark by default (src/tutor/flag.js): with the feature off the routes
+    // refuse before anything else and nothing reaches the transport.
+    globalThis.__PRI_TUTOR_OVERRIDE__ = false;
+    setTutorTransportForTests(async (body) => { tutorCalls.push(body); return { tutor: { source: 'model', message: 'should not be asked' } }; });
+    const dark = await nextQuestion({});
+    const darkErr = await rejects('with the tutor off, a help request is refused', POST(`/practice/${dark.question.id}/tutor`, { level: 1 }), { status: 404 });
+    eq('— as disabled', darkErr?.code, 'TUTOR_DISABLED');
+    await rejects('and so are captions', POST(`/practice/${dark.question.id}/tutor/captions`, { captions: [{ id: 'solution-0', text: 'x' }] }), { status: 404 });
+    eq('the bridge itself refuses to call out', (await requestTutorHelp({ level: 'nudge' })).error?.code, 'TUTOR_DISABLED');
+    eq('nothing reached /v1/tutor', tutorCalls.length, 0);
+    eq('and nothing was charged to the question', (await idb.get('questions', dark.question.id)).tutorLevel || 0, 0);
+    // On, as in development, staging and the suites that exercise it.
+    globalThis.__PRI_TUTOR_OVERRIDE__ = true;
     let reply = () => ({ tutor: { source: 'model', message: 'Look at the operation in the first step.', referencesStepIndex: 0 } });
     setTutorTransportForTests(async (body) => { tutorCalls.push(body); return reply(body); });
 

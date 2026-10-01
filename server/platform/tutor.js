@@ -239,6 +239,11 @@ export async function tutorDailyLimit(db, accountId, env = process.env) {
     : positiveInt(env.PRI_TUTOR_CALLS_PER_ACCOUNT_DAY) || TUTOR_DAILY_DEFAULTS.free;
 }
 
+/** The tutor ships dark: the route exists only where PRI_FEATURE_TUTOR=1. */
+export function tutorFeatureEnabled(env = process.env) {
+  return String(env.PRI_FEATURE_TUTOR || '').trim() === '1';
+}
+
 export function createTutorRouter(db, {
   ask = askTutorModel,
   env = process.env,
@@ -247,6 +252,13 @@ export function createTutorRouter(db, {
   db = asStore(db);
   ensureTable(db);
   const router = asyncRouter();
+
+  // Off: every tutor path is the platform's ordinary 404, before any session
+  // lookup, so a dark deployment does not even reveal that the route exists.
+  router.use((req, res, next) => {
+    if (tutorFeatureEnabled(env)) return next();
+    res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Platform endpoint not found.' } });
+  });
 
   router.get('/status', requireSession(db), async (req, res) => {
     const config = providerConfig(env);

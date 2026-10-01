@@ -10,6 +10,7 @@
 // Nothing about the student is sent but their own work lines and typed answer.
 // ─────────────────────────────────────────────────────────────────────────────
 import { cloud, cloudAvailable } from '../platform/cloudTransport.js';
+import { tutorFeatureEnabled } from '../tutor/flag.js';
 
 const TIMEOUT_MS = 25_000;
 
@@ -22,6 +23,8 @@ export function setTutorTransportForTests(fn) {
 
 /** Ask /v1/tutor/help. Resolves to { tutor } or { error: { code } }; never rejects. */
 export async function requestTutorHelp(body, { signal = null } = {}) {
+  // Dark by default: with the feature off nothing is sent to /v1/tutor.
+  if (!tutorFeatureEnabled()) return { error: { code: 'TUTOR_DISABLED' } };
   try {
     if (override) return await override(body, { signal });
     if (!cloudAvailable()) return { error: { code: 'TUTOR_OFFLINE' } };
