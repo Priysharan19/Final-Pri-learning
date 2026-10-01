@@ -160,13 +160,13 @@ function PaperHistory({ exams, openPaper, nav, india = false }) {
               </span>
               : <span className="tag tag-brand">In progress</span>}
             <button className="btn btn-quiet btn-sm" title="Open printable paper"
-              aria-label={`Open “${e.title}” as a printable paper`} onClick={() => openPaper(e.id)}>🖨</button>
+              aria-label={`Open “${e.title}” as a printable paper`} onClick={() => openPaper(e.id)}>Print</button>
             <button className="btn btn-ghost btn-sm" onClick={() => nav(`/exams/${e.id}`)}>{e.finished_at ? 'Review' : 'Resume'}</button>
           </div>
         );
       })}
       <p className="muted" style={{ marginTop: 10 }}>
-        🖨 opens the question paper for printing. Worked solutions are added once the paper is submitted.
+        Print opens the question paper for printing. Worked solutions are added once the paper is submitted.
       </p>
     </div>
   );
@@ -183,7 +183,7 @@ export function PrintPaper({ paper, onClose }) {
   return (
     <div className="paper-overlay">
       <div className="row no-print" style={{ padding: 14, justifyContent: 'flex-end', gap: 10 }}>
-        <button className="btn btn-primary" onClick={() => window.print()}>🖨 Print / Save as PDF</button>
+        <button className="btn btn-primary" onClick={() => window.print()}>Print or save as PDF</button>
         <button className="btn btn-ghost" onClick={onClose}>Close</button>
       </div>
       <div className="paper-sheet">

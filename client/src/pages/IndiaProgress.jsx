@@ -101,9 +101,9 @@ export default function IndiaProgress() {
               against the whole, so an impressive number over a quarter of the
               paper cannot be mistaken for an impressive number over all of it. */}
           <div style={{ marginTop: 10 }}>
-            <div style={{ height: 8, borderRadius: 999, background: 'var(--line, rgba(128,128,128,.2))', overflow: 'hidden' }}
+            <div style={{ height: 8, borderRadius: 999, background: 'var(--hairline)', overflow: 'hidden' }}
               role="img" aria-label={t('progress.marksPractised', { covered: prediction.coveredMarks, total: prediction.totalMarks })}>
-              <div style={{ width: `${Math.round(prediction.coverage * 100)}%`, height: '100%', background: 'var(--brand, #4f7cff)' }} />
+              <div style={{ width: `${Math.round(prediction.coverage * 100)}%`, height: '100%', background: 'var(--accent)' }} />
             </div>
             <div className="muted" style={{ fontSize: 12, marginTop: 5 }}>
               {t('progress.marksPractised', { covered: prediction.coveredMarks, total: prediction.totalMarks })}

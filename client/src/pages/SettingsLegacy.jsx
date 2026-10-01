@@ -69,7 +69,7 @@ function CloudOptInRow({ field, user, setUser, toast, ask, label, copy, unavaila
   }
 
   return (
-    <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--line, rgba(128,128,128,.25))' }}>
+    <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--hairline)' }}>
       <div className="set-row">
         <span className="set-k">
           {label}

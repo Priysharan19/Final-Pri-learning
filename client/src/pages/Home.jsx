@@ -188,7 +188,8 @@ export default function Home() {
   // A generic "practice" alternative under a practice recommendation says the
   // same thing twice; the manual chooser below already covers it.
   const alternatives = homeDecision.alternatives.filter(item =>
-    !(item.kind === 'smart-practice' && ['first-practice', 'adaptive', 'smart-practice', 'daily-goal'].includes(homeDecision.primary?.kind)));
+    item.kind !== 'daily-goal'
+    && !(item.kind === 'smart-practice' && ['first-practice', 'adaptive', 'smart-practice', 'daily-goal'].includes(homeDecision.primary?.kind)));
 
   const topicName = useMemo(() => {
     const names = new Map();

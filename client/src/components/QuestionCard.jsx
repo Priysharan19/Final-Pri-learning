@@ -935,7 +935,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
           {!reasonTag && reason === 'weak-spot' && <span className="tag tag-brand">{t('verdict.weakSpot')}</span>}
           {!reasonTag && reason === 'new-ground' && <span className="tag tag-brand">{t('verdict.newGround')}</span>}
           {reason === 'task' && <span className="tag tag-brand">{t('verdict.task')}</span>}
-          <span className="q-timer" aria-label={t('verdict.timeOnQuestion', { time: fmtTime(elapsed) })}>{fmtTime(elapsed)}</span>
+          {/* Practice is untimed on screen: time on task is still measured for the
+              marker, but a running clock is pressure, not information. */}
         </div>
         {hintsUsed > 0 && !resolved && (
           <p className="q-credit">{t('verdict.creditAvailable', { percent: Math.round(credit * 100), marks: Math.round(totalMarks * credit * 10) / 10 })}</p>
