@@ -275,3 +275,93 @@ It converts the next phase from speculative product ideation into measurable eng
 ## 11. Core rule
 
 > **When external research no longer changes the architecture, stop reading and make Pri produce evidence.**
+
+
+## 12. V7 post-deep-dive update — 1 October 2026
+
+The subsequent V7 research pass materially deepened the evidence base without changing the central completeness conclusion.
+
+New architecture-level depth now exists for:
+
+- historical ITS mechanisms versus modern LLM tutoring;
+- mathematics learning mechanisms and boundary conditions;
+- BKT/PFA/IRT/CDM/deep-KT learner-model admission;
+- causal personalization and experiment logging;
+- authentic handwritten-math perception;
+- mathematical truth / first-break / formal verification;
+- multilingual mathematics;
+- assessment validity / DIF / CAT;
+- prerequisite-graph causality;
+- teacher AI augmentation;
+- child AI relational/privacy safety;
+- metacognition / help seeking;
+- motivation / gamification / mathematics anxiety;
+- live CBSE/NCERT assessment authority;
+- transfer / analogy / generalisation;
+- formative feedback;
+- AI literacy / Audit-the-AI;
+- assessment integrity in the GenAI era;
+- learning efficiency / cost / latency;
+- long-horizon learner-memory governance;
+- content rights / provenance / similarity;
+- experiment reproducibility;
+- model supply-chain / prompt-injection security;
+- deep accessible-mathematics semantics;
+- misconception/error ontology.
+
+### What this changes
+
+It strengthens the confidence that the **architecture questions are largely answered well enough to build measurement infrastructure**.
+
+It does **not** remove the most important empirical blockers.
+
+The following remain PRI-DATA-BLOCKED:
+
+1. real writer × device handwriting generalization;
+2. expert-adjudicated first-break / ECF / alternative-route accuracy;
+3. stable QuestionFamily and MisconceptionOpportunity semantics in real content;
+4. protected transfer-bank validity;
+5. learner-model prospective calibration / false-mastery decisions;
+6. A/A instrumentation correctness;
+7. PMR and fading causal learning effects;
+8. bilingual support effect on later assessment-language performance;
+9. teacher Action Card decision/student effects;
+10. accessibility task completion by real assistive-technology users;
+11. India target-cohort device/connectivity/shared-device measurements;
+12. causal heterogeneity sufficient for personalization.
+
+The following remain LIVE EXTERNAL AUTHORITY:
+
+- current CBSE/NCERT syllabus and exam policy;
+- content rights/licences;
+- child/privacy law and effective dates;
+- model/provider capabilities and pricing;
+- accessibility platform behavior.
+
+### V7 stopping rule
+
+A domain should not receive another broad literature pass merely because more papers exist.
+
+Continue external research only when a source can plausibly alter:
+
+- an authority boundary;
+- a semantic contract;
+- a benchmark;
+- a safety rule;
+- an experiment;
+- a falsifier;
+- an implementation dependency.
+
+Otherwise the correct next action is to generate Pri-specific evidence through `RESEARCH_TO_BUILD_V7.md`.
+
+### Current highest-value research-engineering frontier
+
+The next compounding asset is not another literature document.
+
+It is the linked foundation:
+
+`KnowledgeComponent + QuestionFamily + MisconceptionOpportunity + AssistanceEnvelope + Learning Event Ledger + protected transfer + benchmark registry + A/A`.
+
+Once this exists, Pri can turn its real usage into scientifically useful longitudinal evidence.
+
+Until it exists, many “smart” models would mainly create opaque predictions over weak semantics.
