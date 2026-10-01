@@ -582,3 +582,130 @@ https://learningcommons.org/resources/inside-knowledge-graph/
 8. Immediate correctness is not delayed independent transfer.
 9. A research source never proves Pri currently implements the capability.
 10. New high-quality contradictory evidence should update #176 and #178 rather than being silently ignored.
+
+
+---
+
+# R. Productive mistake repair / worked examples / metacognition
+
+## Making AI Tutoring Productive — NBER w35621 (2026)
+Class: randomized middle-school mathematics field experiment, >6,000 students.
+Use: supports the post-error moment as an intervention target and requires separating immediate recovery, time cost and delayed assessment.
+Limitation: one implementation/context; does not prove Pri's PMR protocol.
+https://www.nber.org/papers/w35621
+
+## A Meta-analysis of the Worked Examples Effect on Mathematics Performance — 2023
+Class: mathematics meta-analysis; 43 articles, 55 studies, 181 effect sizes.
+Use: worked examples have a medium average mathematics-performance effect (g≈0.48) and are a legitimate high-dose support; implementation/moderators matter.
+Limitation: does not establish one universal hint/escalation sequence.
+https://doi.org/10.1007/s10648-023-09745-1
+https://eric.ed.gov/?id=EJ1364058
+
+## Metacognition and mathematics achievement meta-analysis — 2024
+Class: meta-analysis; 147 studies, 338 independent samples, n=698,096.
+Use: metacognition is positively associated with mathematics achievement; supports calibration/self-monitoring as a research target.
+Limitation: correlation does not prove that arbitrary reflection prompts cause learning.
+https://doi.org/10.1016/j.actpsy.2024.104486
+
+## Online/blended self-regulated learning meta-analysis — 2025
+Class: meta-analysis; 42 studies, 115 effects, 11,014 learners.
+Use: SRL strategies have a small positive association with academic performance; supports targeted SRL mechanisms while cautioning against inflated causal claims.
+https://doi.org/10.1016/j.compedu.2025.105279
+
+---
+
+# S. Motivation / mathematics anxiety / healthy engagement
+
+## Mathematics gamification systematic review and meta-analysis — 2026
+Class: systematic review of 45 studies; meta-analysis of 11 studies.
+Use: small-to-moderate positive average motivation effect (g=0.383) with substantial heterogeneity; negative effects appeared in some competition/social-comparison/external-reward/poorly adapted designs.
+Limitation: secondary + higher education, limited meta-analytic study count, engagement could not be pooled.
+https://doi.org/10.1007/s10648-025-10108-1
+
+## Gamification and intrinsic motivation meta-analysis — 2024
+Class: 35 independent interventions, 2,500 participants.
+Use: small average intrinsic-motivation effect; stronger autonomy/relatedness findings than competence; supports mechanism-specific rather than generic gamification.
+Limitation: not mathematics-specific overall.
+https://doi.org/10.1007/s11423-023-10337-7
+
+## Skill-based and therapeutic interventions for math anxiety — 2023
+Class: K-12 meta-analysis; 17 studies, 1,786 students.
+Use: therapeutic interventions showed larger raw anxiety reduction while math-skill interventions showed larger raw achievement effects.
+Important limitation: after accounting for study quality, treatment-type differences were not significant; do not turn the raw subgroup estimates into a universal prescription.
+https://doi.org/10.1016/j.jsp.2023.101229
+
+---
+
+# T. Teacher / learning-analytics orchestration
+
+## Teacher-facing learning analytics dashboard systematic review — 2023
+Class: systematic review; 1,968 records screened, 50 articles included.
+Use: dashboards commonly increase teacher awareness but often provide limited actionable intervention insight; teacher involvement frequently drops after early design stages.
+https://doi.org/10.1186/s41239-023-00394-6
+
+## AI-powered learning analytics dashboard systematic review — 2025
+Class: PRISMA systematic review; 21 studies published across 2013–2024.
+Use: predictive/SRL/teacher-facing use cases, plus evidence that prescriptive/XAI/real-time adaptation and rigorous evaluation remain limited.
+Limitation: literature is heterogeneous and does not establish causal classroom benefit.
+https://doi.org/10.1007/s44217-025-00964-y
+
+---
+
+# U. India operating context
+
+## ASER 2024 Rural — national findings
+Class: large rural household survey; >650,000 children, >600 districts, 26 states, 2 UTs.
+Use: among rural 14–16-year-olds, household smartphone access is near 90%; 82.2% report being able to use a smartphone; among those, 57% reported educational and 76% social-media use in the previous week; own-device access is materially lower and gendered.
+Limitation: rural survey and self-report for several measures; not Pri's user distribution.
+https://asercentre.org/wp-content/uploads/2022/12/ASER-2024-National-findings.pdf
+
+## UDISE+ 2024–25
+Class: official Indian school administrative statistics.
+Use: national school infrastructure baseline. Total schools 1,471,473; 933,987 report internet facility (63.5%); computer and functional-pedagogical-computer availability remain below universal coverage.
+Limitation: facility availability does not establish reliability, bandwidth, device-to-student ratio or actual pedagogical use.
+https://dashboard.udiseplus.gov.in/report2025/static/media/UDISE%2B2024_25_Booklet_existing.118ba29d4773e6372f72.pdf
+
+## DIKSHA mobile-app documentation
+Class: official national education-platform capability.
+Use: guest/anonymous operation, online/offline consumption, downloaded-content search, textbook QR, 12 supported languages and Android support provide direct operating-context evidence.
+Limitation: capability precedent, not Pri user research or efficacy.
+https://diksha.gov.in/help/getting-started/diksha-mobile-app/index.html
+
+## GSMA India handset-affordability analysis — May 2026
+Class: industry connectivity/device-access analysis.
+Use: distinguishes near-universal network coverage from internet-enabled-device ownership; reports about 423M people without an internet-enabled device and large gender/device gaps.
+Limitation: industry source/population estimates; use as context, not Pri cohort truth.
+https://www.gsma.com/solutions-and-impact/connectivity-for-good/mobile-for-development/blog/how-jio-is-improving-handset-affordability-and-access-for-the-underserved-in-india/
+
+---
+
+# V. AI / model / agent risk
+
+## NIST AI RMF Generative AI Profile — NIST AI 600-1
+Class: official U.S. risk-management guidance; published 2024, updated 2026.
+Use: lifecycle governance/map/measure/manage framing for generative-AI risks.
+https://doi.org/10.6028/NIST.AI.600-1
+https://www.nist.gov/publications/artificial-intelligence-risk-management-framework-generative-artificial-intelligence
+
+## NIST Adversarial Machine Learning taxonomy — AI 100-2e2025
+Class: official technical taxonomy.
+Use: lifecycle attack terminology covering poisoning, evasion, privacy/misuse and mitigations; supports adversarial benchmark design.
+https://doi.org/10.6028/NIST.AI.100-2e2025
+https://csrc.nist.gov/pubs/ai/100/2/e2025/final
+
+## NIST AI-agent security RFI response synthesis — 2026
+Class: official synthesis of stakeholder responses, NIST 800-5.
+Use: agent systems introduce security concerns requiring adaptation of ordinary cybersecurity practice and explicit constraints/evaluation.
+Limitation: response synthesis rather than a controlled empirical security benchmark.
+https://www.nist.gov/publications/summary-analysis-responses-request-information-regarding-security-considerations-ai
+
+## NIST large-scale AI-agent red-team analysis — March 2026
+Class: government research summary of >250,000 attack attempts by >400 participants against 13 frontier models.
+Use: indirect prompt injection/agent hijacking remains a real evolving threat; security evaluation must adapt to target systems.
+https://www.nist.gov/blogs/caisi-research-blog/insights-ai-agent-security-large-scale-red-teaming-competition
+
+## OWASP Top 10 for LLM/GenAI applications — 2025
+Class: application-security guidance.
+Use: prompt injection, sensitive-information disclosure, supply-chain, poisoning, improper output handling, excessive agency and related threat classes.
+https://genai.owasp.org/llm-top-10/
+https://genai.owasp.org/llmrisk/llm062025-excessive-agency/
