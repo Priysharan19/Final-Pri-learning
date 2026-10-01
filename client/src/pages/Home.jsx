@@ -44,6 +44,7 @@ export default function Home() {
   const [tasks, setTasks] = useState([]);
   const [exams, setExams] = useState([]);
   const [resume, setResume] = useState(null);
+  const [localReady, setLocalReady] = useState(false);
   const [assignments, setAssignments] = useState([]);
   const [cloudState, setCloudState] = useState('unavailable');
   const [online, setOnline] = useState(() => typeof navigator === 'undefined' ? true : navigator.onLine !== false);
@@ -64,6 +65,7 @@ export default function Home() {
   useGlossary(user?.mathsGloss === true);
 
   const refreshLocal = useCallback(async () => {
+    setLocalReady(false);
     const [statsR, curriculumR, reviewsR, tasksR, examsR, resumeR] = await Promise.allSettled([
       api.get('/stats'),
       api.get('/curriculum'),
@@ -78,6 +80,7 @@ export default function Home() {
     setTasks(tasksR.status === 'fulfilled' ? (tasksR.value.tasks || []) : []);
     setExams(examsR.status === 'fulfilled' ? (examsR.value.exams || []) : []);
     setResume(resumeR.status === 'fulfilled' ? (resumeR.value.resume || null) : null);
+    setLocalReady(true);
   }, [user.id]);
 
   useEffect(() => { refreshLocal(); }, [refreshLocal]);
@@ -223,7 +226,7 @@ export default function Home() {
 
   const resetAll = () => { setSectionKey(null); setSubtopic(null); setDotpoint(null); setDifficulty(null); setYear(user.year); };
 
-  const homeDecision = useMemo(() => resolveHomeRecommendation({
+  const homeDecision = useMemo(() => localReady ? resolveHomeRecommendation({
     user,
     stats,
     reviews,
@@ -233,7 +236,7 @@ export default function Home() {
     assignments,
     online,
     cloudState
-  }), [user, stats, reviews, tasks, exams, resume, assignments, online, cloudState]);
+  }) : { primary: null, alternatives: [] }, [localReady, user, stats, reviews, tasks, exams, resume, assignments, online, cloudState]);
 
   return (
     <div className="home-wrap">

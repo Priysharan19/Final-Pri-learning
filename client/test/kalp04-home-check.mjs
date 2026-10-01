@@ -190,6 +190,7 @@ check('Home consumes one central recommendation resolver', () => {
   assert.match(home, /resolveHomeRecommendation/);
   assert.match(home, /api\.get\('\/practice\/resume'\)/);
   assert.match(home, /cloud\.assignments\(\)/);
+  assert.match(home, /localReady \? resolveHomeRecommendation/);
 });
 
 check('Home uses profile authority for India copy before curriculum loads', () => {
