@@ -16,7 +16,7 @@ import {
   parseIntervalInput, parseMatrixInput, parseVectorInput,
   sameRegion, sameMatrix, sameVector, formatRegion, formatVector, formatMatrix
 } from '../src/engine/answer-forms.js';
-import { evalNumeric } from '../src/engine/expr.js';
+import { evalNumeric, exprEquivalent } from '../src/engine/expr.js';
 
 let pass = 0;
 const failures = [];
@@ -404,7 +404,69 @@ wrong(solutionSet, '= -4', 'decoration: an equals sign does not complete a parti
 const restated = checkAnswer({ answer: { type: 'numeric', value: 12 }, prompt: 'Solve 2x + 4 = 28' }, '2x + 4 = 28');
 ok(restated.correct === false, 'partial credit: restating the question is not a correct answer');
 
+
+// ── 14. Domain-aware final answers (issue #231) ──────────────────────────────
+// exprEquivalent() compared fixed sample points and skipped undefined ones, so
+// x/x passed for 1 and (x²−1)/(x−1) passed for x+1. A final answer has to be
+// defined where the answer is (`strictDomain`); a line of working does not,
+// because cancelling a common factor is a valid step that loses the hole.
+const strict = { strictDomain: true };
+function same(a, b, opts, label) { ok(exprEquivalent(a, b, opts) === true, `domain: ${label}: ${a} ≡ ${b} should hold`); }
+function differ(a, b, opts, label) { ok(exprEquivalent(a, b, opts) === false, `domain: ${label}: ${a} ≡ ${b} must be refused`); }
+
+// holes from the issue
+differ('x/x', '1', strict, 'hole at 0');
+differ('(x^2)/(x)', 'x', strict, 'hole at 0');
+differ('(x^2-1)/(x-1)', 'x+1', strict, 'hole at 1');
+differ('x+1', '(x^2-1)/(x-1)', strict, 'hole at 1, either order');
+differ('(x-5)/(x-5)', '1', strict, 'hole outside the sampling window');
+differ('(x^2-2)/(x^2-2)', '1', strict, 'irrational holes at ±√2');
+differ('(x*y)/y', 'x', strict, 'hole along y = 0 with two variables');
+
+// Radical, log and trigonometric restrictions
+differ('sqrt(x)^2', 'x', strict, 'square root defined only for x ≥ 0');
+differ('ln(x^2)', '2*ln(x)', strict, 'log of a square is defined for negative x');
+same('ln(x^2)', '2*ln(x)', { ...strict, positiveOnly: true }, 'positive-only question');
+same('sin(x)/cos(x)', 'tan(x)', strict, 'same poles at odd multiples of π/2');
+
+// An authored domain that excludes the hole accepts the cancelled form
+same('(x^2-1)/(x-1)', 'x+1', { ...strict, domain: [2, 5] }, 'authored domain excludes x = 1');
+
+// No false regression on ordinary equivalence
+same('(x+1)^2', 'x^2+2x+1', strict, 'polynomial expansion');
+same('2x+3y', '3y+2x', strict, 'commutativity');
+same('sin(2x)', '2sin(x)cos(x)', strict, 'double angle');
+same('1/(x^2)', 'x^(-2)', strict, 'same hole at 0, two notations');
+same('x^2/x^3', '1/x', strict, 'same hole at 0 after cancelling');
+same('(x^2-9)/(x-3)', '(x+3)(x-3)/(x-3)', strict, 'same hole kept on both sides');
+differ('x^2+1', 'x^2+2', strict, 'genuinely different values');
+
+// Without strictDomain, the cancellation convention is unchanged
+same('(x^2-1)/(x-1)', 'x+1', {}, 'working-line comparison keeps the cancellation convention');
+
+// through the real marker
+const simplify = { answerType: 'expression', answer: { expr: 'x+3' }, prompt: 'Simplify (x^2-9)/(x-3)' };
+ok(checkAnswer(simplify, 'x+3').correct === true, 'marker: the simplified answer is correct');
+ok(checkAnswer(simplify, '(x^2-9)/(x-3)').correct === false, 'marker: copying the unsimplified expression back is not the answer x+3');
+
+const reciprocal = { answerType: 'expression', answer: { expr: '1' }, prompt: 'Write x/x for x ≠ 0 in simplest form' };
+ok(checkAnswer(reciprocal, '1').correct === true, 'marker: 1 is accepted');
+ok(checkAnswer(reciprocal, 'x/x').correct === false, 'marker: x/x is not accepted as 1');
+
+// Step Check: factorise-then-cancel working must still be correct end to end.
+const working = {
+  answerType: 'working',
+  prompt: 'Simplify (x^2 - 16)/(x - 4), showing each line of your working.',
+  answer: {
+    stepMeta: { kind: 'expression', canonical: '(x^2 - 16)/(x - 4)' },
+    minLines: 2,
+    final: { kind: 'expr', expr: 'x + 4' }
+  }
+};
+const verdict = checkAnswer(working, '(x^2 - 16)/(x - 4)\n((x + 4)(x - 4))/(x - 4)\nx + 4');
+ok(verdict.correct === true, `marker: factorise-then-cancel working is correct (${verdict.feedback || ''})`);
+
 console.log(failures.length
   ? `NCERT ANSWER FORMS: FAIL — ${failures.length} of ${pass + failures.length} checks failed\n  · ${failures.join('\n  · ')}`
-  : `NCERT ANSWER FORMS: PASS — ${pass}/${pass} checks — solution sets, inequality/interval equivalence, matrices, vectors, the n!/nCr/nPr/sec/cosec/cot vocabulary, rupees and paise, fraction form only where the question asks for it, blank answers, exact integers, the percent sign and unit-named variables.`);
+  : `NCERT ANSWER FORMS: PASS — ${pass}/${pass} checks — solution sets, inequality/interval equivalence, matrices, vectors, the n!/nCr/nPr/sec/cosec/cot vocabulary, rupees and paise, fraction form only where the question asks for it, blank answers, exact integers, the percent sign, unit-named variables and domain-aware final answers.`);
 process.exit(failures.length ? 1 : 0);

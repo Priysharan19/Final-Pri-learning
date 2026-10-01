@@ -486,9 +486,125 @@ const SAMPLE_SETS = [
   [1.9, -0.9, 0.15, 2.8, -3.1, 1.1, -1.35, 0.55]
 ];
 
+// ── Domain probing ───────────────────────────────────────────────────────────
+//
+// Sampling at fixed points cannot see a removable hole: x/x and 1 agree at every
+// sample, but only one of them is defined at 0. A final answer is a claim about
+// a function, so where `strictDomain` is set the two sides must also agree on
+// where they are defined. The points that can differ are the ones where a
+// denominator vanishes or a log/root argument leaves its domain, so those
+// "guard" subexpressions are collected from both sides and their real roots
+// located directly — by exact zeros on a grid, sign changes and minima of |g| —
+// rather than hoping a sample happens to land on them.
+
+const LOG_FNS = new Set(['ln', 'log', 'log10', 'log2']);
+const POLE_FNS = { sec: 'cos', cosec: 'sin', csc: 'sin', cot: 'sin' };
+
+/** Subexpressions whose zeros (or sign) bound where an expression is defined. */
+function guardsOf(ast, acc = []) {
+  if (!ast || typeof ast !== 'object') return acc;
+  if (ast.t === 'bin' && ast.op === '/') acc.push({ kind: 'nonzero', g: ast.r });
+  if (ast.t === 'bin' && ast.op === '^') acc.push({ kind: 'base', g: ast.l, e: ast.r });
+  if (ast.t === 'call' && !Array.isArray(ast.args)) {
+    if (LOG_FNS.has(ast.fn)) acc.push({ kind: 'positive', g: ast.arg });
+    if (ast.fn === 'sqrt') acc.push({ kind: 'nonnegative', g: ast.arg });
+    if (ast.fn === 'tan') acc.push({ kind: 'nonzero', g: { t: 'call', fn: 'cos', arg: ast.arg } });
+    if (POLE_FNS[ast.fn]) acc.push({ kind: 'nonzero', g: { t: 'call', fn: POLE_FNS[ast.fn], arg: ast.arg } });
+  }
+  if (Array.isArray(ast.args)) { if (ast.fn !== 'sum') for (const a of ast.args) guardsOf(a, acc); return acc; }
+  for (const key of ['l', 'r', 'v', 'arg']) if (ast[key] && typeof ast[key] === 'object') guardsOf(ast[key], acc);
+  return acc;
+}
+
+const NEAR_ZERO = 1e-9;
+
+/**
+ * Is the expression defined at env? Exact evaluation decides wherever it can;
+ * the guard tolerance only matters at a located root such as √2, where floating
+ * point leaves a denominator at 1e-16 rather than 0.
+ */
+function definedAt(ast, guards, env) {
+  if (!Number.isFinite(evaluate(ast, env))) return false;
+  for (const { kind, g, e } of guards) {
+    const v = evaluate(g, env);
+    if (!Number.isFinite(v)) return false;
+    if (kind === 'nonzero' && Math.abs(v) <= NEAR_ZERO) return false;
+    if (kind === 'positive' && v <= NEAR_ZERO) return false;
+    if (kind === 'nonnegative' && v < -NEAR_ZERO) return false;
+    if (kind === 'base' && Math.abs(v) <= NEAR_ZERO) {
+      const ev = evaluate(e, env);
+      if (!(ev > 0)) return false;          // 0^0 and 0^negative are undefined
+    }
+  }
+  return true;
+}
+
+/** Real roots of g(name) on [lo, hi], with the other variables fixed by env. */
+function rootsOf(g, name, env, lo, hi) {
+  const at = x => evaluate(g, { ...env, [name]: x });
+  const roots = [];
+  const N = 800;
+  const xs = [], ys = [];
+  for (let i = 0; i <= N; i++) { const x = lo + (i / N) * (hi - lo); xs.push(x); ys.push(at(x)); }
+  // whole numbers and halves are where authored questions put their holes
+  for (let k = Math.ceil(lo * 2); k <= hi * 2; k++) if (at(k / 2) === 0) roots.push(k / 2);
+  for (let i = 0; i < N; i++) {
+    const [y0, y1] = [ys[i], ys[i + 1]];
+    if (!Number.isFinite(y0) || !Number.isFinite(y1)) continue;
+    if (y0 === 0) { roots.push(xs[i]); continue; }
+    if (Math.sign(y0) !== Math.sign(y1) && y1 !== 0) {
+      let a = xs[i], b = xs[i + 1], fa = y0;
+      for (let k = 0; k < 80; k++) { const m = (a + b) / 2, fm = at(m); if (Math.sign(fm) === Math.sign(fa)) { a = m; fa = fm; } else b = m; }
+      roots.push((a + b) / 2);
+    }
+    // a double root (x² in a denominator) touches zero without crossing
+    if (i > 0 && Math.abs(y0) < Math.abs(ys[i - 1]) && Math.abs(y0) <= Math.abs(y1)) {
+      let a = xs[i - 1], b = xs[i + 1];
+      for (let k = 0; k < 100; k++) {
+        const m1 = a + (b - a) / 3, m2 = b - (b - a) / 3;
+        if (Math.abs(at(m1)) < Math.abs(at(m2))) b = m2; else a = m1;
+      }
+      const m = (a + b) / 2;
+      if (Math.abs(at(m)) <= 1e-7) roots.push(m);
+    }
+  }
+  return roots;
+}
+
+/**
+ * Do a and b fail to be defined at the same places? Returns true on the first
+ * point where exactly one side is defined. `range` bounds where to look, so an
+ * authored domain that excludes a hole accepts the cancelled form.
+ */
+function definednessDiffers(astA, astB, names, integers, baseEnvs, range, positiveOnly) {
+  const guardsA = guardsOf(astA), guardsB = guardsOf(astB);
+  const all = [...guardsA, ...guardsB];
+  if (!all.length) return false;
+  const [lo, hi] = positiveOnly ? [Math.max(range[0], 1e-6), range[1]] : range;
+  if (!(hi > lo)) return false;
+  for (const env of baseEnvs) {
+    for (const name of names) {
+      if (integers.has(name)) continue;
+      const points = [];
+      for (const { g } of all) points.push(...rootsOf(g, name, env, lo, hi));
+      for (const p of points) {
+        const at = { ...env, [name]: p };
+        if (definedAt(astA, guardsA, at) !== definedAt(astB, guardsB, at)) return true;
+      }
+    }
+  }
+  return false;
+}
+
 /**
  * Are two expressions equivalent as functions of their variables?
  * Samples both over shared variable assignments and compares.
+ *
+ * `strictDomain` additionally requires the two to be defined at the same
+ * points (see Domain probing above). Use it where the expression is the
+ * student's final answer. Leave it off for a line of working compared with the
+ * expression the working started from: cancelling a common factor is a valid
+ * step, and the line after it is meant to lose the hole.
  */
 export function exprEquivalent(a, b, opts = {}) {
   let astA, astB;
@@ -502,6 +618,7 @@ export function exprEquivalent(a, b, opts = {}) {
   const domain = opts.domain || [-3.5, 3.5];
   const needed = opts.samples || 8;
   let matches = 0, valid = 0;
+  const envs = [];
 
   for (const base of SAMPLE_SETS) {
     for (let s = 0; s < base.length && valid < needed; s++) {
@@ -514,14 +631,23 @@ export function exprEquivalent(a, b, opts = {}) {
       });
       const va = evaluate(astA, env);
       const vb = evaluate(astB, env);
+      if (opts.strictDomain && Number.isFinite(va) !== Number.isFinite(vb)) return false;
       if (!Number.isFinite(va) || !Number.isFinite(vb)) continue;
       valid++;
+      envs.push(env);
       const scale = Math.max(1, Math.abs(va), Math.abs(vb));
       if (Math.abs(va - vb) > 1e-6 * scale) return false;
       matches++;
     }
   }
-  return valid >= Math.min(3, needed) && matches === valid;
+  if (!(valid >= Math.min(3, needed) && matches === valid)) return false;
+  if (opts.strictDomain) {
+    // Without an authored domain, look well beyond the sampling window: a hole
+    // at x = 5 is as real as one at x = 1.
+    const range = opts.domain || [-20, 20];
+    if (definednessDiffers(astA, astB, names, integers, envs.slice(0, 2), range, opts.positiveOnly)) return false;
+  }
+  return true;
 }
 
 /**
