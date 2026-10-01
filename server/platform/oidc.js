@@ -1,4 +1,5 @@
 import { createHash, createPublicKey, verify as verifySignature } from 'node:crypto';
+import { storableText } from './text.js';
 import { assertNoOpenTransaction } from './store.js';
 
 const PROVIDERS = Object.freeze({
@@ -94,7 +95,7 @@ export async function verifyIdentityToken(provider, token, { nonce = null, now =
     subject: String(claims.sub),
     email,
     emailVerified,
-    name: claims.name ? String(claims.name).trim().slice(0, 80) : null,
+    name: claims.name ? (storableText(claims.name, 80) || null) : null,
     claims: Object.freeze({ issuer: claims.iss, audience: claims.aud, issuedAt: claims.iat || null, expiresAt: claims.exp })
   });
 }
