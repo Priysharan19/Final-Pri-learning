@@ -373,8 +373,11 @@ for (const [text, reason] of LITERAL_ALLOWLIST) {
 // `tx()` counts as much as `t()`. It was missed here until the legal pages
 // used it for the one sentence with a link inside it, and a key reached only
 // through tx() looked to this suite like a dead string.
-const CALL = /\btx?\(\s*'([a-z][A-Za-z0-9.]*)'/g;
-const KEY_IN_TABLE = /'((?:nav|app|common|difficulty|home|progress|history|favorites|tasks|classes|practice|verdict|settings|login|lang|pw|time|sym|assignment|gloss|misconception)\.[A-Za-z0-9.]+)'/g;
+const CALL = /\b(?:tx?|tLater)\(\s*'([a-z][A-Za-z0-9.]*)'/g;
+// Any key-shaped literal that names a real key counts: a namespace list here
+// had to be edited every time a screen gained a namespace, and forgetting it
+// reported a live string as dead.
+const KEY_IN_TABLE = /'([a-z][A-Za-z0-9]*\.[A-Za-z0-9.]+)'/g;
 
 function sourceFiles(dir) {
   return readdirSync(dir, { withFileTypes: true }).flatMap(entry => {
@@ -409,7 +412,7 @@ eq(badKeys, [], 'every t() call names a key the English catalogue actually has')
 // ReferenceError the moment a student pressed it. A grep for the call site
 // would have passed too — it was there. Only the missing import was not.
 const I18N_EXPORTS = [
-  'useT', 'useTx', 'useLanguage', 'setLanguage', 'signInLanguage',
+  'useT', 'useTx', 'tLater', 'useLanguage', 'setLanguage', 'signInLanguage',
   'rememberSignInLanguage', 'translate', 'LANGUAGES', 'DEFAULT_LANGUAGE',
   'cleanLanguage', 'pluralCategory'
 ];
@@ -502,8 +505,14 @@ for (const file of sourceFiles(join(ROOT, 'src'))) {
   }
 }
 eq(staticImports, [], 'nothing statically imports the Hindi catalogue — it is reached by import() alone');
-ok(/import\('\.\/strings\.hi\.js'\)/.test(read('src/i18n/index.js')),
-  'and the runtime does reach it, by a literal import() a bundler can see');
+// The literal import() lives in the registration table now, so adding a
+// language is a catalogue plus one entry; the runtime builds its loaders from
+// that table and must not grow a template-string import() of its own.
+ok(/import\('\.\/strings\.hi\.js'\)/.test(read('src/i18n/languages.js')),
+  'and the runtime does reach it, by a literal import() a bundler can see, in the registration table');
+ok(/LANGUAGES\.filter\(l => typeof l\.load === 'function'\)/.test(read('src/i18n/index.js'))
+  && !/import\(`/.test(read('src/i18n/index.js')),
+  'the runtime takes its loaders from that table and builds no import() path from a template');
 
 // The catalogue itself must import nothing, or the chunk stops being only strings.
 ok(!/^\s*import\s/m.test(read('src/i18n/strings.hi.js')),
