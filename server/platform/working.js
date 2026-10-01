@@ -19,6 +19,7 @@
 import { asyncRouter } from './asyncRouter.js';
 import { asStore } from './store.js';
 import { rateLimit, requireSession, requireVerifiedEmail } from './security.js';
+import { consumeAiAllowance, refuseAiAllowance } from './aiAllowance.js';
 import { consumePaidCall, refusePaidCall } from './spendCeiling.js';
 import {
   MAX_LINES,
@@ -98,6 +99,12 @@ export function createWorkingRouter(db, {
       } catch (error) {
         return res.status(error.status || 400).json({ error: { code: error.code, message: error.message } });
       }
+
+      // This account's daily allowance, from the SERVER's entitlement record
+      // only (SEC-COMM-01): Premium's additional-ai-usage raises it; nothing
+      // the device claims does.
+      const allowance = await consumeAiAllowance(db, { accountId: req.platformSession.account_id, kind: 'working', env });
+      if (!allowance.allowed) return refuseAiAllowance(res, allowance);
 
       // Counted here, after the request has been shown to be a real one and
       // before anything is sent, so a malformed request cannot spend from a

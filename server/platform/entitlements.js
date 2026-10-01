@@ -12,6 +12,19 @@ export const PREMIUM_CAPABILITIES = Object.freeze([
   'jee-advanced-content', 'advanced-analytics', 'additional-ai-usage'
 ]);
 
+/**
+ * The Premium capabilities the SERVER grants this account right now, from its
+ * own entitlement record only. Unlike publicEntitlement (which also applies the
+ * device's 7-day offline window for client snapshots), this is the authority
+ * for server-paid operations: paid plan, paying status, unexpired period.
+ */
+export function serverEntitlementCapabilities(row, now = Date.now()) {
+  const status = STATUS.has(row?.status) ? row.status : 'free';
+  const lifecycleEnd = status === 'grace' ? Number(row?.grace_until) || null : Number(row?.current_period_end) || null;
+  const paid = row?.plan === 'premium' && PAID.has(status) && lifecycleEnd != null && lifecycleEnd >= now;
+  return paid ? PREMIUM_CAPABILITIES : [];
+}
+
 export function publicEntitlement(row, now = Date.now()) {
   const status = STATUS.has(row?.status) ? row.status : 'free';
   const plan = row?.plan === 'premium' ? 'premium' : 'free';

@@ -231,6 +231,8 @@ jobs:
         run: node server/test/razorpay-billing-check.mjs
       - name: Apple billing lifecycle
         run: node server/test/apple-billing-check.mjs
+      - name: Server-paid operations obey the server's entitlement (SEC-COMM-01)
+        run: node server/test/premium-authority-check.mjs
 
   browser:
     name: Browser suites (end-to-end and accessibility)
