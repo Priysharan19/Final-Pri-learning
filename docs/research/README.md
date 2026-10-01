@@ -32,10 +32,11 @@ Before changing tutoring, learner state, assessment, handwriting, question gener
 
 1. Read this README.
 2. Read DREAM_PRI_V5_ARCHITECTURE.md.
-3. Read the domain file(s) relevant to the mission.
-4. Check issue #178 for the latest ACCEPTED / EXPERIMENTAL / REJECTED / SUPERSEDED decision state.
-5. Inspect current main, relevant tests and the mission issue.
-6. If implementation intentionally departs from accepted research architecture, record why and what evidence changed.
+3. Read RESEARCH_METHOD_AND_CLAIM_STANDARD.md when making or evaluating a substantive research/efficacy claim.
+4. Read the domain file(s) relevant to the mission and the latest dated CURRENT_SYSTEM_RESEARCH_GAP_AUDIT when implementation state matters.
+5. Check issue #178 for the latest ACCEPTED / EXPERIMENTAL / REJECTED / SUPERSEDED decision state.
+6. Inspect current main, relevant tests and the mission issue.
+7. If implementation intentionally departs from accepted research architecture, record why and what evidence changed.
 
 Current code/test authority always wins over stale prose. Research must be updated rather than silently ignored.
 
@@ -102,6 +103,12 @@ Unresolved empirical questions, priority benchmark/experiment sequence and resea
 
 ### SOURCE_REGISTER.md
 Evidence map with source class, use and limitations.
+
+### RESEARCH_METHOD_AND_CLAIM_STANDARD.md
+Research-question discipline, source hierarchy, transportability, outcome/comparator rules, contradiction handling, red-team/admission rules, benchmark design and source-integrity requirements.
+
+### CURRENT_SYSTEM_RESEARCH_GAP_AUDIT_2026-10-01.md
+Dated bridge from live main to research architecture: what is implemented, what is a transparent prior, what evidence is missing, which current strengths must be preserved, and the dependency order for the next intelligence layers.
 
 
 ## Domain routing for agents
