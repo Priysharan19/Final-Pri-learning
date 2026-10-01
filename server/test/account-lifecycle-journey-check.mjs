@@ -279,7 +279,18 @@ try {
   check((await login(jars.a3, 'ipad-a3', PASSWORD_1)).status === 200 && (await login(jars.a4, 'phone-a4', PASSWORD_1)).status === 200, 'login on two devices');
   const devices = await call('/account/devices', { jar: jars.a3 });
   check(devices.data.devices.length === 2 && devices.data.devices.map(d => d.deviceId).sort().join() === 'ipad-a3,phone-a4', 'both devices are listed');
+  // Negatives first: a forged CSRF header and a foreign Origin revoke nothing.
+  const forgedCsrf = await call('/account/logout-all', { method: 'POST', jar: { ...jars.a3, pri_csrf: '' }, headers: { 'x-pri-csrf': 'forged' }, body: {} });
+  check(forgedCsrf.status === 403 && code(forgedCsrf) === 'CSRF_REJECTED', 'logout-all with a forged CSRF token is refused');
+  process.env.PRI_PUBLIC_ORIGIN = 'https://learn.pri.example';
+  let foreignOrigin;
+  try {
+    foreignOrigin = await call('/account/logout-all', { method: 'POST', jar: jars.a3, headers: { Origin: 'https://evil.example' }, body: {} });
+  } finally { delete process.env.PRI_PUBLIC_ORIGIN; }
+  check(foreignOrigin.status === 403 && code(foreignOrigin) === 'ORIGIN_REJECTED', 'logout-all from a foreign Origin is refused');
+  check(await liveSessions(A) === 3, 'the refused attempts revoked nothing (two devices plus the expired session)');
   const everywhere = await call('/account/logout-all', { method: 'POST', jar: jars.a3, body: {} });
+  check(everywhere.headers.get('ratelimit-remaining') !== null, 'logout-all is rate limited');
   // Three rows: both devices, plus the expired-but-unrevoked session from step 4.
   check(everywhere.status === 200 && everywhere.data.revoked === 3, 'logout-all revokes both live sessions (and the expired one)');
   const a3Dead = await call('/account/me', { jar: { pri_cloud_session: jars.a3.pri_cloud_session || 'x' } });
@@ -287,6 +298,7 @@ try {
   check((await call('/account/me', { jar: jars.a4 })).status === 401, 'the other device is signed out');
   check(await liveSessions(A) === 0, 'no live session remains in the database');
   check((await call('/account/logout-all', { method: 'POST', jar: {}, body: {} })).status === 401, 'logout-all needs a session');
+  check((await call('/account/me', { jar: jars.other })).status === 200, 'another account’s session is untouched by logout-all');
 
   // ── 6. Forgot password → reset ───────────────────────────────────────────
   check((await login(jars.a5, 'ipad-a5', PASSWORD_1)).status === 200, 'a device is signed in before the reset');
@@ -353,6 +365,9 @@ try {
   check(ex.entities.map(e => `${e.kind}:${e.entity_id}`).sort().join() === 'bookmark:bm-1,profile:self', 'export carries exactly this account’s sync entities');
   check(ex.classes.length === 1 && ex.classes[0].id === classId && ex.assignmentSubmissions.length === 1, 'export carries class membership and the submission');
   check(ex.issueReports.length === 1 && ex.issueReports[0].note.includes(NAME), 'export carries the account’s own issue report');
+  check(ex.assignmentFeedback.length === 1 && JSON.parse(ex.assignmentFeedback[0].feedback_json).note === 'Good work.' && !('teacher_account_id' in ex.assignmentFeedback[0]),
+    'export carries teacher feedback on the account’s work, without the teacher’s id');
+  check(ex.telemetry.length === 1 && ex.telemetry[0].event_type === 'feature-used', 'export carries the account’s own telemetry');
   check(ex.entitlement.plan === 'premium' && ex.entitlement.provider === 'web', 'export carries the entitlement summary');
   check(ex.identities.length === 1 && ex.identities[0].provider === 'password' && !('provider_subject' in ex.identities[0]), 'export lists sign-in methods without provider subjects');
   check(ex.guardianConsent === null, 'an adult account has no guardian-consent section');

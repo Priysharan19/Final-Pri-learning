@@ -255,7 +255,7 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
   // stops authenticating at once — including the one making the request. The
   // per-device route above revokes one; password change and reset revoke all
   // but are not something a student whose iPad was lost should have to invent.
-  router.post('/logout-all', requireSession(db), async (req, res) => {
+  router.post('/logout-all', requireSession(db), rateLimit(db, 'logout-all', { limit: 10, windowMs: 60 * 60 * 1000 }), async (req, res) => {
     const info = await db.run('UPDATE account_sessions SET revoked_at = ? WHERE account_id = ? AND revoked_at IS NULL',
       [Date.now(), req.platformSession.account_id]);
     clearSessionCookies(res);
@@ -448,6 +448,16 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
       FROM assignment_submissions WHERE student_account_id=? ORDER BY started_at`, [accountId]);
     const reports = await db.all(`SELECT id,category,content_id,question_id,note,status,created_at,resolved_at
       FROM issue_reports WHERE account_id=? ORDER BY created_at`, [accountId]);
+    // Feedback a teacher wrote on this student's work is about them, so it is
+    // theirs to see; the teacher's account id is not.
+    const feedback = await db.all(`SELECT assignment_id,feedback_json,returned_at,updated_at
+      FROM assignment_feedback WHERE student_account_id=? ORDER BY returned_at`, [accountId]);
+    // On SQLite the telemetry router creates its table lazily; a deployment
+    // that never mounted it has no telemetry to export. Postgres is migrated.
+    const raw = sqliteHandle(db);
+    const telemetryTable = !raw || !!raw.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='operational_events'").get();
+    const telemetry = telemetryTable ? await db.all(`SELECT event_type,surface,metadata_json,created_at
+      FROM operational_events WHERE account_id=? ORDER BY created_at`, [accountId]) : [];
     const entitlementRow = await db.get('SELECT * FROM entitlement_snapshots WHERE account_id=?', [accountId]);
     const entitlement = publicEntitlement(entitlementRow || { plan: 'free', status: 'free', provider: 'none' });
     const consent = await consentState(db, accountId);
@@ -461,6 +471,8 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
       entities,
       classes,
       assignmentSubmissions: submissions,
+      assignmentFeedback: feedback,
+      telemetry,
       issueReports: reports,
       entitlement: {
         plan: entitlement.plan,

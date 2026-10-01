@@ -41,7 +41,7 @@ Apple ID settings (residual risk, §6).
 | Login / register | New opaque 32-byte token; only its SHA-256 is stored. |
 | Use | Sliding expiry: at most once a minute, `expires_at` moves to now + 30 days and the cookie is re-issued with the full lifetime. The token itself is not rotated on use. |
 | Logout | That session's row is revoked; cookies cleared. |
-| Logout-all (`POST /v1/account/logout-all`) | Every unrevoked session of the account is revoked, including the caller's. |
+| Logout-all (`POST /v1/account/logout-all`) | Every unrevoked session of the account is revoked, including the caller's. Needs a session, the CSRF pair and an allowed Origin; rate limited to 10 an hour per account; never touches another account's sessions. |
 | Password change | Every session revoked; the requesting device gets a fresh token. |
 | Password reset | Every session revoked; no session is issued (sign in again). |
 | Deletion | Rows deleted (cascade). |
@@ -132,7 +132,8 @@ its backups, and uses no Supabase Storage, S3 or similar.
 `GET /v1/account/export` (`pri-account-export-v1`, `Cache-Control: no-store`) returns: the profile
 (id, email, name, role, verification and timestamps), sign-in methods (provider + link time,
 never the provider subject), learning events, sync entities, current class memberships,
-assignment submissions, the account's own issue reports, an entitlement summary (plan, status,
+assignment submissions, teacher feedback on the account's work (without the teacher's id), the
+account's own allow-listed telemetry, the account's own issue reports, an entitlement summary (plan, status,
 provider, period end) and, for an under-18 account, the consent state with the guardian address
 masked. It never contains password, token or user-agent hashes, delivery envelopes, the session
 cookie, or anything of another account (teacher, classmates, guardian in full) — asserted on both
@@ -201,6 +202,14 @@ The confirmation shows only that someone with access to the guardian's mailbox f
 under DPDP Rule 10 (commencing 14 May 2027) and must not be described as such. The consent notice
 version was bumped to `2026-10-02` with this change, so consents given against the earlier notice
 are distinguishable.
+
+**Notice-version policy.** `guardian_consents.notice_version` records which notice a guardian
+confirmed against; it is evidence, not a gate. A consent given under an earlier version **stays
+valid** and no re-consent is requested — the server never compares versions (`requireGuardianConsent`
+checks only confirmed/withdrawn). That is acceptable for `2026-10-02` because the change describes
+the existing flow more accurately and adds no new processing. A future notice change that adds a
+purpose or a recipient must instead ship a re-consent flow (a new request and token; confirmation
+can never clear a withdrawal) before the new processing starts; that is not built.
 
 ---
 

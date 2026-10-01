@@ -215,6 +215,8 @@ jobs:
           grep -Fq 'PLATFORM SYNC BURST: PASS' platform-postgres.log
       - name: Platform migration contract
         run: node server/test/platform-migration-check.mjs
+      - name: Billing v3 to v4 payment-retention rebuild on a populated SQLite database
+        run: node server/test/billing-payment-retention-migration-check.mjs
       - name: Cross-account sync pagination regression
         run: node server/test/platform-sync-pagination-check.mjs
       - name: Production persistent-storage contract
