@@ -196,7 +196,7 @@ export const flow = {
       return { name, description };
     }));
     await check('every alternative action has a distinct accessible name and a reason',
-      altNames.length === 0 || (new Set(altNames.map(a => a.name)).size === altNames.length && altNames.every(a => a.description.length > 0)),
+      altNames.length >= 1 && (new Set(altNames.map(a => a.name)).size === altNames.length && altNames.every(a => a.description.length > 0)),
       JSON.stringify(altNames));
 
     // Profile isolation: switch back to the first profile. Its unresolved task
