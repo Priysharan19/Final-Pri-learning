@@ -4,7 +4,7 @@ import { api } from '../api.js';
 import { useApp } from '../App.jsx';
 import { MathText } from '../lib/latex.jsx';
 import { indiaExamBlueprint, indiaExamClaim } from '../engine/indiaExams.js';
-import { useT, useTx } from '../i18n/index.js';
+import { tLater, useT, useTx } from '../i18n/index.js';
 
 // The India blueprints and their claims are engine data with an English source
 // of truth in engine/indiaExams.js; these are their catalogue keys, so the page
@@ -43,7 +43,7 @@ export default function Exams() {
     try {
       const p = await api.get(`/exams/${id}/paper`);
       setPaper(p);
-    } catch (err) { setError(err.message || t('exams.openFailed')); }
+    } catch (err) { setError(err.message || tLater('exams.openFailed')); }
   }
 
   useEffect(() => { api.get('/exams').then(r => setExams(r.exams)).catch(() => setExams([])); }, []);
@@ -56,7 +56,7 @@ export default function Exams() {
       const r = await api.post('/exams', body);
       nav(`/exams/${r.exam.id}`);
     } catch (err) {
-      setError(err.message || t('exams.formatNotReady'));
+      setError(err.message || tLater('exams.formatNotReady'));
     } finally { setBusy(false); }
   }
 

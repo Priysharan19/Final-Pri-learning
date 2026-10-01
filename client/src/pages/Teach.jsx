@@ -14,7 +14,7 @@ import { MathText } from '../lib/latex.jsx';
 import { CURRICULUM } from '../engine/curriculum.js';
 import { assignmentSections, describeTaskTargets, sectionKeyForChapter } from '../platform/assignmentTarget.js';
 import ClassroomPanel from '../components/ClassroomPanel.jsx';
-import { translate, useT, useTx } from '../i18n/index.js';
+import { tLater, translate, useT, useTx } from '../i18n/index.js';
 
 // Resolved at render time through translate(), so it follows the current language.
 const yearLabel = s => (s?.year ? translate(s.course === 'in' ? 'common.classNumber' : 'common.yearNumber', { n: s.year }) : '—');
@@ -489,7 +489,7 @@ export default function Teach() {
                   try {
                     const data = await readJSONFile(f);
                     const r = await api.post(`/classes/${selClass}/import-progress`, data);
-                    setMsg(t('teach.importedProgressFor', { student: r.student }));
+                    setMsg(tLater('teach.importedProgressFor', { student: r.student }));
                     refreshAnalytics();
                   } catch (err) { setMsg(`⚠️ ${err.message}`); }
                 }} />
@@ -569,7 +569,7 @@ export default function Teach() {
                       try {
                         const pack = await api.get(`/tasks/${task.id}/pack`);
                         downloadJSON(pack, `pri-task-${task.title.replace(/\s+/g, '-').toLowerCase()}-${dateStamp()}.json`);
-                        setMsg(t('teach.packExported'));
+                        setMsg(tLater('teach.packExported'));
                       } catch (err) { setMsg(`⚠️ ${err.message}`); }
                     }}>{t('teach.pack')}</button>
                   <button className="btn btn-quiet btn-sm" onClick={async () => { await api.post(`/tasks/${task.id}/delete`); refreshAnalytics(); }}>{t('teach.delete')}</button>

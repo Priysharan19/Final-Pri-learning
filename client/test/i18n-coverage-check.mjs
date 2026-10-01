@@ -78,11 +78,18 @@ const PROSE = (raw) => {
   const v = String(raw).trim();
   return /^[A-Z][a-z’']*[a-z]\b[^\n]*\s\S/.test(v) || (/\s/.test(v) && /[a-z]{2}[.!?…]$/.test(v));
 };
+// Inside a drawn position (a JSX child expression or a spoken attribute) a
+// reader sees the string as-is, so a lower-case phrase counts, and so does a
+// single capitalised word: {busy ? 'Saving' : 'Submit'} is a button label.
+const DRAWN_WORDS = (raw) => {
+  const v = String(raw).trim();
+  return (/\s/.test(v) && /[A-Za-z]{2}/.test(v)) || /^[A-Z][a-z’']+[.!?…:]?$/.test(v);
+};
 const HAS_WORD = /[A-Za-z]{2,}|[A-Za-z](?=\s|$)/;
 const MACHINERY_ATTRS = new Set(['className', 'style', 'id', 'role', 'href', 'to', 'type', 'name', 'key', 'htmlFor',
   'data-testid', 'inputMode', 'autoComplete', 'pattern', 'lang', 'rel', 'target', 'method', 'action', 'accept', 'src', 'd', 'viewBox']);
 const SPOKEN = new Set(['aria-label', 'aria-description', 'aria-placeholder', 'aria-roledescription', 'title', 'placeholder', 'alt', 'label']);
-const SILENT_CALLS = new Set(['t', 'tx', 'console.log', 'console.warn', 'console.error', 'console.info', 'console.debug']);
+const SILENT_CALLS = new Set(['t', 'tx', 'tLater', 'console.log', 'console.warn', 'console.error', 'console.info', 'console.debug']);
 
 function exemptRegions(source, rel, problems) {
   const regions = [];
@@ -105,7 +112,10 @@ function exemptRegions(source, rel, problems) {
 
 /** Every hard-coded user-visible string in one file, as `{ kind, text }`. */
 export function findingsIn(rel, problems = []) {
-  const source = read(rel);
+  return findingsInSource(read(rel), rel, problems);
+}
+
+function findingsInSource(source, rel, problems = []) {
   const regions = exemptRegions(source, rel, problems);
   const exempt = node => regions.some(([a, b]) => node.start >= a && node.end <= b);
   const literals = ALLOW.literals || {};
@@ -164,12 +174,12 @@ export function findingsIn(rel, problems = []) {
         if (HAS_WORD.test(n.value.replace(/&[a-z]+;/gi, ' '))) push('text', n.value, n);
         return;
       case 'Literal':
-        if (typeof n.value === 'string' && (PROSE(n.value) || (drawn && /\s/.test(n.value.trim()) && /[A-Za-z]{2}/.test(n.value)))) push('string', n.value, n);
+        if (typeof n.value === 'string' && (PROSE(n.value) || (drawn && DRAWN_WORDS(n.value)))) push('string', n.value, n);
         return;
       case 'TemplateLiteral': {
         const joined = n.quasis.map(q => q.value.cooked).join('{}');
         const plain = joined.replace(/\{\}/g, 'X');
-        if (PROSE(plain) || (drawn && /\s/.test(plain.trim()) && /[A-Za-z]{2}/.test(joined))) push('template', joined, n);
+        if (PROSE(plain) || (drawn && DRAWN_WORDS(joined.replace(/\{\}/g, ' ')))) push('template', joined, n);
         n.expressions.forEach(e => visit(e, n, drawn));
         return;
       }
@@ -198,7 +208,7 @@ function callsIn(rel) {
   const visit = n => {
     if (!n || typeof n !== 'object') return;
     if (Array.isArray(n)) { n.forEach(visit); return; }
-    if (n.type === 'CallExpression' && ['t', 'tx', 'translate'].includes(n.callee?.name)) {
+    if (n.type === 'CallExpression' && ['t', 'tx', 'translate', 'tLater', 'translateEnglish'].includes(n.callee?.name)) {
       const [k, v] = n.arguments;
       if (k?.type === 'Literal' && typeof k.value === 'string') {
         let passed = null;   // null = cannot know statically (a variable, a spread)
@@ -257,6 +267,32 @@ for (const rel of SCANNED) {
 ok(scanned >= 35, `the scan covers every page and component (${scanned} files)`);
 eq(problems, [], 'every i18n-exempt region is well-formed and states its reason');
 eq(leftInEnglish, [], 'no page or component draws a hard-coded English string');
+
+// The scanner itself, on fixtures: each of these is English a reader would
+// see, and each must be caught; the machinery beside them must not be.
+const FIXTURE = `
+export function F({ busy, on }) {
+  const label = on ? 'Paused' : 'Playing now';
+  return (
+    <div className={busy ? 'btn btn-primary' : 'btn'} data-state="ready-now">
+      <button title={busy ? 'Saving' : 'Submit'}>{busy ? 'Saving' : 'Submit'}</button>
+      <span>{done ? 'replay complete' : 'replaying'}</span>
+      <p>Hello there</p>
+      {mode === 'Exam' && <i aria-label={\`Step \${1} of \${2}\`} />}
+      {label}
+    </div>
+  );
+}`;
+const caught = findingsInSource(FIXTURE, 'fixture.jsx').map(h => h.text);
+// Known limit: a single word parked in a variable away from JSX ('Paused'
+// above) reads exactly like an identifier, so only multi-word prose is caught
+// there; a single word is caught wherever it is drawn.
+for (const text of ['Saving', 'Submit', 'replay complete', 'Hello there', 'Playing now', 'Step {} of {}']) {
+  ok(caught.includes(text), `the scanner catches “${text}”`);
+}
+for (const text of ['btn btn-primary', 'ready-now', 'Exam', 'replaying']) {
+  ok(!caught.includes(text), `the scanner leaves “${text}” alone (machinery, a comparison operand, or one lower-case word)`);
+}
 
 for (const [file, reason] of Object.entries(ALLOW.files || {})) {
   ok(existsSync(join(ROOT, file)), `the file allowlist does not name a file that is gone: ${file}`);
@@ -335,6 +371,53 @@ for (const [authenticity, key] of [['official-mathematics-section', 'exams.claim
   ok(Boolean(bp), `a blueprint with ${authenticity} exists`);
   if (bp) eq(en[key], exams.indiaExamClaim(bp).reason, `the ${authenticity} claim matches the engine`);
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 5 · A message kept in state follows a language switch
+//
+// A success or error message set with t() is frozen in the language that was
+// active when it was set; switch language while it is on screen and it stays
+// English on a Hindi page. Such messages are stored with tLater(), which
+// looks the key up again at every render. Driven here through a real render.
+// ─────────────────────────────────────────────────────────────────────────────
+{
+  const { renderToStaticMarkup } = await import('react-dom/server');
+  const hadDocument = 'document' in globalThis;
+  if (!hadDocument) globalThis.document = { documentElement: { lang: 'en' } };
+  const i18n = await import('../src/i18n/index.js');
+  const hi = (await import('../src/i18n/strings.hi.js')).default;
+  const message = i18n.tLater('classroom.returnedForRevision', { name: i18n.tLater('login.student') });
+  await i18n.setLanguage('en');
+  eq(renderToStaticMarkup(message), en['classroom.returnedForRevision'].replace('{name}', en['login.student']),
+    'a stored message renders in English while English is on');
+  await i18n.setLanguage('hi');
+  eq(renderToStaticMarkup(message), hi['classroom.returnedForRevision'].replace('{name}', hi['login.student']),
+    'and the SAME stored message renders in Hindi after the switch, nested translation included');
+  await i18n.setLanguage('en');
+  if (!hadDocument) delete globalThis.document;
+}
+// And the screens that keep messages in state store them this way.
+const frozen = [];
+for (const rel of SCANNED) {
+  const walkSet = (n, setter) => {
+    if (!n || typeof n !== 'object') return;
+    if (Array.isArray(n)) { n.forEach(c => walkSet(c, setter)); return; }
+    if (n.type === 'CallExpression' && /^set[A-Z]/.test(n.callee?.name || '')) {
+      n.arguments.forEach(a => walkSet(a, n.callee.name));
+      return;
+    }
+    // A functional update (setX(prev => …)) computes rather than stores a message.
+    if (setter && (n.type === 'ArrowFunctionExpression' || n.type === 'FunctionExpression')) setter = null;
+    if (setter && n.type === 'CallExpression' && n.callee?.name === 't') frozen.push(`${rel}: ${setter}(… t(…) …)`);
+    for (const k of Object.keys(n)) {
+      if (k === 'type') continue;
+      const c = n[k];
+      if (c && typeof c === 'object') walkSet(c, setter);
+    }
+  };
+  walkSet(parseAst(read(rel), { lang: 'jsx' }), null);
+}
+eq(frozen, [], 'no message held in state is a string frozen by t() — tLater() keeps it live');
 
 const total = pass + failures.length;
 if (failures.length) {

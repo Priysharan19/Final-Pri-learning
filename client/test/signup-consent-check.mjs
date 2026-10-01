@@ -15,11 +15,12 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import en from '../src/i18n/strings.en.js';
 
-// The interface copy lives in the i18n catalogue. Resolve every catalogue key a
-// source file names to its English, so these assertions read what an English
-// reader of that screen actually sees.
+// The interface copy lives in the i18n catalogue. Resolve every key a source
+// file RENDERS — passes to t(), tx() or tLater() — to its English, so these
+// assertions read what an English reader of that screen sees. A key merely
+// mentioned in a comment or an unused table does not count.
 const catalogue = en;
-const englishOf = src => [...src.matchAll(/'([a-z][A-Za-z]*\.[A-Za-z0-9]+)'/g)]
+const englishOf = src => [...src.matchAll(/\b(?:tx?|tLater)\(\s*'([a-z][A-Za-z]*\.[A-Za-z0-9]+)'/g)]
   .map(m => catalogue[m[1]]).filter(Boolean)
   .flatMap(v => (typeof v === 'string' ? [v] : Object.values(v))).join('\n');
 
@@ -41,6 +42,13 @@ ok(/disabled=\{!!busy \|\| \(mode === 'register' && !agreed\)\}/.test(panel),
 
 // ── 2 · The age declaration is asked, not inferred ───────────────────────────
 ok(/I am 18 or older/.test(panelCopy), 'the form asks whether the account holder is an adult');
+// And it is asked AT the point of consent: the adult question is the label of
+// the checkbox inside the register form, and the guardian explanation renders
+// exactly when that box is unticked, before the account exists.
+ok(/\{mode === 'register' && \([\s\S]{0,1500}<input type="checkbox" checked=\{form\.isAdult\}[\s\S]{0,200}?\/>\s*<span>\{t\('cloud\.isAdult'\)\}<\/span>/.test(panel),
+  'the adult question is the checkbox label inside the register form');
+ok(/\{!form\.isAdult && \([\s\S]{0,300}tx\('cloud\.under18'/.test(panel),
+  'and the under-18 explanation renders exactly when the box is unticked');
 ok(/isAdult/.test(panel) && /guardianName/.test(panel) && /guardianEmail/.test(panel),
   'and collects a guardian when they are not');
 // Read the whole <input> element rather than a fixed window after its id: the

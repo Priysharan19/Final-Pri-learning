@@ -18,7 +18,7 @@ import PriPlot from './PriPlot.jsx';
 import { plotSpecFor } from '../engine/plotSpec.js';
 import { awardStepMarks, marksSentenceKey } from '../engine/cbseMarking.js';
 import { checkWorkingWithCloud, mergeVerdicts, shouldCheckWorking, workingNote } from '../ink/cloudWorking.js';
-import { translate, useT, useTx } from '../i18n/index.js';
+import { tLater, translate, useT, useTx } from '../i18n/index.js';
 import TermGloss from './TermGloss.jsx';
 
 const DIFF_CLASS = { 1: 'tag-d1', 2: 'tag-d2', 3: 'tag-d3', 4: 'tag-d4' };
@@ -313,7 +313,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     if (!cloudReadingEnabled(user) && !nativePhotoAvailable()) {
       setPhotoOCR({
         phase: 'unavailable', text: '', confidence: 0, engine: null,
-        error: t('verdict.photoReadingUnavailable')
+        error: tLater('verdict.photoReadingUnavailable')
       });
       return;
     }
@@ -322,7 +322,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     if (!page) {
       setPhotoOCR({
         phase: 'failed', text: '', confidence: 0, engine: null,
-        error: t('verdict.photoUnreadable')
+        error: tLater('verdict.photoUnreadable')
       });
       return;
     }
@@ -344,8 +344,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       setPhotoOCR({
         phase: 'failed', text: '', confidence: 0, engine: null,
         error: result.reason === 'renderer-unavailable'
-          ? t('verdict.pdfRendererMissing')
-          : t('verdict.pdfUnopenable')
+          ? tLater('verdict.pdfRendererMissing')
+          : tLater('verdict.pdfUnopenable')
       });
       return;
     }
@@ -369,7 +369,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     if (!texts.length) {
       setPhotoOCR({
         phase: 'failed', text: '', confidence: 0, engine: null,
-        error: t('verdict.pdfNothingRead')
+        error: tLater('verdict.pdfNothingRead')
       });
       return;
     }

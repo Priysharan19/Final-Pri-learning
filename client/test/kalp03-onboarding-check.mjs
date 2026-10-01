@@ -21,7 +21,7 @@ const [login, backend, app, cloud, en, hi, e2e] = await Promise.all([
 // panel names to their English so the checks below read what an English
 // reader of the panel sees.
 const cloudCatalogue = (await import(join(ROOT, 'src/i18n/strings.en.js'))).default;
-const cloudCopy = [...cloud.matchAll(/'([a-z][A-Za-z]*\.[A-Za-z0-9]+)'/g)]
+const cloudCopy = [...cloud.matchAll(/\b(?:tx?|tLater)\(\s*'([a-z][A-Za-z]*\.[A-Za-z0-9]+)'/g)]
   .map(m => cloudCatalogue[m[1]]).filter(v => typeof v === 'string').join('\n');
 
 let passed = 0;

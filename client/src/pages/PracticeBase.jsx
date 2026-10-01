@@ -9,7 +9,7 @@ import {
 import QuestionCard, { SR_ONLY } from '../components/QuestionCard.jsx';
 import PriExplain from '../components/PriExplain.jsx';
 import FreeCapNotice from '../components/FreeCapNotice.jsx';
-import { useT } from '../i18n/index.js';
+import { tLater, useT } from '../i18n/index.js';
 
 const EMPTY_SESSION = Object.freeze({ answered: 0, correct: 0, xp: 0 });
 
@@ -63,7 +63,7 @@ export default function Practice() {
     replaceSession(EMPTY_SESSION);
     if (!assignmentMode) return () => { live = false; };
     if (!cloudAvailable()) {
-      setAssignmentError(t('assignment.needsCloud'));
+      setAssignmentError(tLater('assignment.needsCloud'));
       return () => { live = false; };
     }
 
@@ -108,7 +108,7 @@ export default function Practice() {
       setAssignmentContext(nextAssignment);
     })().catch(err => {
       if (!live) return;
-      setAssignmentError(err.message || t('assignment.couldNotOpen'));
+      setAssignmentError(err.message || tLater('assignment.couldNotOpen'));
     });
     return () => { live = false; };
   }, [assignmentMode, assignmentClassId, assignmentId, replaceSession]);
@@ -220,7 +220,7 @@ export default function Practice() {
         setAssignmentError('');
       })
       .catch(err => {
-        setAssignmentError(t('practice.assignmentSyncFailed', { reason: err.message || t('practice.cloudUnavailable') }));
+        setAssignmentError(tLater('practice.assignmentSyncFailed', { reason: err.message || tLater('practice.cloudUnavailable') }));
       });
     return assignmentSync.current;
   }, [assignmentMode, assignmentContext, assignmentClassId, assignmentId, assignmentTarget, t]);

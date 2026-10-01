@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { cloud } from '../platform/cloudTransport.js';
-import { useT, useTx } from '../i18n/index.js';
+import { tLater, useT, useTx } from '../i18n/index.js';
 
 function Shell({ children }) {
   return (
@@ -36,13 +36,13 @@ export default function AccountAction({ actionData }) {
     void cloud.verifyEmail({ token }).then(() => {
       if (!alive) return;
       setState('done');
-      setMessage(t('accountAction.emailVerified'));
+      setMessage(tLater('accountAction.emailVerified'));
     }).catch(error => {
       if (!alive) return;
       setState('error');
       setMessage(error?.code === 'TOKEN_INVALID'
-        ? t('accountAction.verifyInvalid')
-        : t('accountAction.verifyFailed'));
+        ? tLater('accountAction.verifyInvalid')
+        : tLater('accountAction.verifyFailed'));
     });
     return () => { alive = false; };
   }, [action, token]);
@@ -71,13 +71,13 @@ export default function AccountAction({ actionData }) {
         else await cloud.guardianWithdraw(token);
         setState('done');
         setMessage(choice === 'confirm'
-          ? t('accountAction.guardianConfirmed')
-          : t('accountAction.guardianWithdrawn'));
+          ? tLater('accountAction.guardianConfirmed')
+          : tLater('accountAction.guardianWithdrawn'));
       } catch (error) {
         setState('error');
         setMessage(error?.code === 'TOKEN_INVALID'
-          ? t('accountAction.guardianInvalid')
-          : t('accountAction.guardianFailed'));
+          ? tLater('accountAction.guardianInvalid')
+          : tLater('accountAction.guardianFailed'));
       }
     };
     return (
@@ -129,12 +129,12 @@ export default function AccountAction({ actionData }) {
     setMessage('');
     if (password.length < 10) {
       setState('error');
-      setMessage(t('accountAction.passwordTooShort'));
+      setMessage(tLater('accountAction.passwordTooShort'));
       return;
     }
     if (password !== confirm) {
       setState('error');
-      setMessage(t('accountAction.passwordMismatch'));
+      setMessage(tLater('accountAction.passwordMismatch'));
       return;
     }
     setState('working');
@@ -143,14 +143,14 @@ export default function AccountAction({ actionData }) {
       setPassword('');
       setConfirm('');
       setState('done');
-      setMessage(t('accountAction.resetDone'));
+      setMessage(tLater('accountAction.resetDone'));
     } catch (error) {
       setState('error');
       setMessage(error?.code === 'TOKEN_INVALID'
-        ? t('accountAction.resetInvalid')
+        ? tLater('accountAction.resetInvalid')
         : error?.code === 'WEAK_PASSWORD'
-          ? t('accountAction.weakPassword')
-          : t('accountAction.resetFailed'));
+          ? tLater('accountAction.weakPassword')
+          : tLater('accountAction.resetFailed'));
     }
   };
 

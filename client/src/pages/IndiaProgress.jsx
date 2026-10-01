@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
 import { useApp } from '../App.jsx';
 import { predictionSentence } from '../engine/markPredictor.js';
-import { useT } from '../i18n/index.js';
+import { tLater, useT } from '../i18n/index.js';
 import TermGloss from '../components/TermGloss.jsx';
 
 function pct(correct, attempts) {
@@ -42,7 +42,7 @@ export default function IndiaProgress() {
   useEffect(() => {
     Promise.all([api.get('/curriculum'), api.get('/stats')])
       .then(([c, s]) => { setCurriculum(c); setStats(s); })
-      .catch(err => setError(err.message || t('progress.couldNotLoad')));
+      .catch(err => setError(err.message || tLater('progress.couldNotLoad')));
   }, [t]);
 
   const scope = useMemo(() => scopeFor(curriculum, user), [curriculum, user]);

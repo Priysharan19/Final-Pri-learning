@@ -155,6 +155,14 @@ const lookup = (strings, key, vars, language) => fill(select(strings, key, vars,
  */
 export const translate = (key, vars) => lookup(snapshot.strings, key, vars, snapshot.language);
 
+/**
+ * The English for a key, whatever language is on screen. For the one place
+ * that must fall back to English mid-sentence: narration on a device with no
+ * voice for the student's language speaks the English caption with an English
+ * voice, rather than Hindi text through an English voice.
+ */
+export const translateEnglish = (key, vars) => lookup(en, key, vars, 'en');
+
 // ── Hooks ────────────────────────────────────────────────────────────────────
 
 /**
@@ -222,6 +230,25 @@ export function useTx() {
     return createElement(Fragment, null, ...parts);
   }, [store]);
 }
+
+// ── Messages kept in state ───────────────────────────────────────────────────
+
+// useTx rather than useT, so a variable may itself be a tLater() element
+// ("Returned to {name}" with a translated fallback name) and still render.
+function LaterText({ k, vars }) {
+  const tx = useTx();
+  return tx(k, vars);
+}
+
+/**
+ * A translated message to keep in component state — "Saved", "That link has
+ * expired" — that stays in the student's language if they switch it while the
+ * message is on screen. `t()` would freeze the string in whatever language was
+ * active when it was set; this stores a tiny element that looks the key up
+ * each time it renders. Render it as a child (`{message}`), never as an
+ * attribute or in string arithmetic.
+ */
+export const tLater = (key, vars) => createElement(LaterText, { k: key, vars });
 
 // ── The sign-in screen ───────────────────────────────────────────────────────
 

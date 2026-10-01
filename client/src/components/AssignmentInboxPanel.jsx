@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { cloud, cloudAvailable } from '../platform/cloudTransport.js';
 import { onCloudSessionChange } from '../platform/cloudSession.js';
-import { useT } from '../i18n/index.js';
+import { tLater, useT } from '../i18n/index.js';
 
 function dueText(t, value) {
   if (!value) return t('classroom.noDueDate');
@@ -43,7 +43,7 @@ export default function AssignmentInboxPanel() {
           setError('');
           return;
         }
-        setError(err.message || t('inbox.loadFailed'));
+        setError(err.message || tLater('inbox.loadFailed'));
       }
     };
 

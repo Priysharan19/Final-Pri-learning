@@ -139,12 +139,15 @@ const panel = readFileSync(join(ROOT, 'client/src/components/CloudAccountPanel.j
 // The panel's copy is in the i18n catalogue; read the English of every key the
 // panel names, which is what a student sees.
 const cloudCatalogue = en;
-const panelCopy = [...panel.matchAll(/'([a-z][A-Za-z]*\.[A-Za-z0-9]+)'/g)]
+const panelCopy = [...panel.matchAll(/\b(?:tx?|tLater)\(\s*'([a-z][A-Za-z]*\.[A-Za-z0-9]+)'/g)]
   .map(m => cloudCatalogue[m[1]]).filter(v => typeof v === 'string').join('\n');
 if (/cancel a website subscription at any time from/i.test(refunds)) {
   ok(/cloud\.cancelWebBilling\(/.test(panel),
     'the app has the cancel control the refund policy promises');
   ok(/^Cancel subscription$/m.test(panelCopy), 'and a student can find it by that name');
+  ok(/onClick=\{cancelWebSubscription\}>\s*\{busy === 'cancel-web' \? t\('cloud\.cancelling'\) : t\('cloud\.cancelSubscription'\)\}/.test(panel)
+    && /async function cancelWebSubscription\(\)[\s\S]{0,600}cloud\.cancelWebBilling\(\)/.test(panel),
+    'and that name is rendered by the panel that calls the cancel endpoint');
   ok(/end of the period you have already paid for/i.test(panelCopy),
     'and is told when it takes effect, which is what the policy says');
 }

@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { cloud, cloudAvailable } from '../platform/cloudTransport.js';
 import { assignmentSubmissions } from '../platform/assignmentReview.js';
 import { onCloudSessionChange } from '../platform/cloudSession.js';
-import { useT } from '../i18n/index.js';
+import { tLater, useT } from '../i18n/index.js';
 
 function niceDate(t, value) {
   if (!value) return t('classroom.noDueDate');
@@ -81,7 +81,7 @@ export default function ClassroomPanel() {
       }
       setFeedbackDraft(drafts);
     } catch (err) {
-      setError(err.message || t('classroom.loadSubmissionsFailed'));
+      setError(err.message || tLater('classroom.loadSubmissionsFailed'));
       setReview(null);
     } finally { setBusy(''); }
   }
@@ -106,7 +106,7 @@ export default function ClassroomPanel() {
           setError('');
           return;
         }
-        setError(err.message || t('classroom.loadClassesFailed'));
+        setError(err.message || tLater('classroom.loadClassesFailed'));
       }
     };
 
@@ -123,7 +123,7 @@ export default function ClassroomPanel() {
       setStudents([]);
       return;
     }
-    loadDetail(selectedId, account.role).catch(err => setError(err.message || t('classroom.loadDetailFailed')));
+    loadDetail(selectedId, account.role).catch(err => setError(err.message || tLater('classroom.loadDetailFailed')));
   }, [selectedId, account?.role]);
 
   async function createClass(e) {
@@ -137,8 +137,8 @@ export default function ClassroomPanel() {
       setJoinCode(result?.joinCode || '');
       await loadClasses({ keepSelection: false });
       if (result?.class?.id) setSelectedId(result.class.id);
-      setMessage(t('classroom.classCreated'));
-    } catch (err) { setError(err.message || t('classroom.createClassFailed')); }
+      setMessage(tLater('classroom.classCreated'));
+    } catch (err) { setError(err.message || tLater('classroom.createClassFailed')); }
     finally { setBusy(''); }
   }
 
@@ -152,8 +152,8 @@ export default function ClassroomPanel() {
       setJoinCode('');
       await loadClasses({ keepSelection: false });
       if (result?.class?.id) setSelectedId(result.class.id);
-      setMessage(t('classroom.classJoined'));
-    } catch (err) { setError(err.message || t('classroom.joinClassFailed')); }
+      setMessage(tLater('classroom.classJoined'));
+    } catch (err) { setError(err.message || tLater('classroom.joinClassFailed')); }
     finally { setBusy(''); }
   }
 
@@ -163,7 +163,7 @@ export default function ClassroomPanel() {
     const title = assignment.title.trim();
     const instructions = assignment.instructions.trim();
     if (!title || !instructions) {
-      setError(t('classroom.assignmentNeedsTitle'));
+      setError(tLater('classroom.assignmentNeedsTitle'));
       return;
     }
     const questionCount = Math.max(1, Math.min(50, Number(assignment.questions) || 10));
@@ -177,19 +177,19 @@ export default function ClassroomPanel() {
       });
       setAssignment({ title: '', instructions: '', questions: 10, due: '' });
       await loadDetail(selectedId, account?.role);
-      setMessage(t('classroom.assignmentPublished'));
-    } catch (err) { setError(err.message || t('classroom.createAssignmentFailed')); }
+      setMessage(tLater('classroom.assignmentPublished'));
+    } catch (err) { setError(err.message || tLater('classroom.createAssignmentFailed')); }
     finally { setBusy(''); }
   }
 
   async function returnForRevision(row) {
     const note = String(feedbackDraft[row.student.id] || '').trim();
     if (!note) {
-      setError(t('classroom.feedbackRequired'));
+      setError(tLater('classroom.feedbackRequired'));
       return;
     }
     if (note.length > 4000) {
-      setError(t('classroom.feedbackTooLong'));
+      setError(tLater('classroom.feedbackTooLong'));
       return;
     }
     setBusy(`return:${row.student.id}`); setError(''); setMessage('');
@@ -197,8 +197,8 @@ export default function ClassroomPanel() {
       await cloud.returnSubmission(selectedId, review.assignment.id, row.student.id, { note });
       await loadReview(review.assignment.id);
       await loadDetail(selectedId, account?.role);
-      setMessage(t('classroom.returnedForRevision', { name: row.student.name || t('login.student') }));
-    } catch (err) { setError(err.message || t('classroom.returnFailed')); }
+      setMessage(tLater('classroom.returnedForRevision', { name: row.student.name || tLater('login.student') }));
+    } catch (err) { setError(err.message || tLater('classroom.returnFailed')); }
     finally { setBusy(''); }
   }
 

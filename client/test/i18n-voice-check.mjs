@@ -20,7 +20,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
-import { pickVoice, speechText } from '../src/explain/speech.js';
+import { narrationPlan, pickVoice, speechText } from '../src/explain/speech.js';
 import { LANGUAGES, DEFAULT_LANGUAGE, speechTagsOf, pluralCategory } from '../src/i18n/languages.js';
 import { CHUNK_GROUPS, ON_DEMAND } from '../vite.config.js';
 
@@ -72,8 +72,18 @@ const SAID = [
   ['x^{5}', 'x to the power of 5', 'x की घात 5'],
   ['(x+1)^3', '(x plus 1) cubed', '(x धन 1) का घन'],
   ['πr²', 'pi r squared', 'पाई r का वर्ग'],
-  ['a ≤ b', 'a less than or equal to b', 'a से कम या बराबर b'],
-  ['x − 3 ≠ 0', 'x minus 3 not equal to 0', 'x ऋण 3 बराबर नहीं 0'],
+  // Hindi relations are postpositional and follow the right-hand side:
+  // "x < -1" is "x, ऋण 1 से कम है". Read infix ("x से कम ऋण 1") it would
+  // state -1 < x — the opposite inequality.
+  ['x < -1', 'x less than minus 1', 'x, ऋण 1 से कम है'],
+  ['x > 3', 'x greater than 3', 'x, 3 से अधिक है'],
+  ['a ≤ b', 'a less than or equal to b', 'a, b से कम या बराबर है'],
+  ['x \\geq 0', 'x greater than or equal to 0', 'x, 0 से अधिक या बराबर है'],
+  ['x − 3 ≠ 0', 'x minus 3 not equal to 0', 'x ऋण 3, 0 के बराबर नहीं है'],
+  ['-2 < x \\le 5', 'minus 2 less than x less than or equal to 5', 'ऋण 2, x से कम है और x, 5 से कम या बराबर है'],
+  ['a < x ≤ b', 'a less than x less than or equal to b', 'a, x से कम है और x, b से कम या बराबर है'],
+  ['so x−3 ≥ 0, hence', 'so x minus 3 greater than or equal to 0, hence', 'so x ऋण 3, 0 से अधिक या बराबर है, hence'],
+  ['$-\\frac{1}{2} > -1$', 'minus 1 divided by 2 greater than minus 1', 'ऋण 1 बटा 2, ऋण 1 से अधिक है'],
   ['2 \\times 3 \\div 6', '2 times 3 divided by 6', '2 गुणा 3 भाग 6'],
   ['$y = -4$', 'y equals minus 4', 'y बराबर ऋण 4'],
   ['∠A = 60°', '∠A equals 60 degrees', '∠A बराबर 60 डिग्री']
@@ -87,13 +97,32 @@ eq(speechText('a two-step method and/or a check', 'en'), 'a two-step method and/
 eq(speechText('', 'hi'), '', 'nothing to say is nothing said');
 eq(speechText('x^2', 'zz'), 'x squared', 'an unknown language speaks maths in English');
 
+// No Hindi voice on the device: the English voice must be given English words.
+const noHindiPlan = narrationPlan([voice('en-IN'), voice('en-US')], 'hi', { region: 'IN' });
+eq([noHindiPlan.fallback, noHindiPlan.spoken, noHindiPlan.lang], ['english', 'en', 'en-IN'],
+  'with no Hindi voice, narration speaks English words with the English voice — never Hindi text through it');
+eq(narrationPlan(DEVICE, 'hi').spoken, 'hi', 'with a Hindi voice it speaks Hindi');
+eq(narrationPlan([], 'hi').spoken, 'hi', 'and before voices are listed it still asks for Hindi');
+
+// The region follows the course: an Indian student hears Indian English, an
+// Australian (NSW) student Australian English, each with the rest as fallback.
+eq(speechTagsOf('en', 'IN')[0], 'en-IN', 'an Indian course narrates in en-IN first');
+eq(speechTagsOf('en', 'AU'), ['en-AU', 'en-IN', 'en-GB', 'en-US'], 'an Australian course narrates in en-AU first, keeping the rest as fallbacks');
+eq(speechTagsOf('hi', 'AU'), ['hi-IN'], 'a region the language has no voice for changes nothing');
+eq(pickVoice(DEVICE, 'en', { region: 'AU' }).voice?.lang, 'en-AU', 'the Australian branch picks the en-AU voice when it exists');
+eq(pickVoice([voice('en-US'), voice('en-IN')], 'en', { region: 'AU' }).voice?.lang, 'en-IN',
+  'and falls back through the registered order when it does not');
+eq(pickVoice(DEVICE, 'en', { region: 'IN' }).voice?.lang, 'en-IN', 'the India course picks en-IN');
+
 // The player must speak through this module, in the student's language, and
 // must not have kept a voice of its own.
 const player = read('src/components/PriExplainV5.jsx');
-ok(!/en-AU/.test(player), 'Pri Explain no longer hard-codes an Australian voice');
-ok(/pickVoice\(window\.speechSynthesis\.getVoices\?\.\(\) \|\| \[\], language\)/.test(player),
-  'the player chooses its voice for the interface language');
-ok(/speechText\(value, language\)/.test(player), 'and speaks maths in that language');
+ok(!/['"]en-AU['"]/.test(player), 'Pri Explain no longer hard-codes an Australian voice');
+ok(/narrationPlan\(window\.speechSynthesis\.getVoices\?\.\(\) \|\| \[\], language, \{ region \}\)/.test(player),
+  'the player chooses its voice for the interface language and the course region');
+ok(/speechText\(textFor\(choice\.spoken\), choice\.spoken\)/.test(player),
+  'and speaks the words, maths included, in the language of the voice it actually got');
+ok(/localeOf\(app\.user\)/.test(player), 'the region comes from the student\'s course');
 ok(/const \{ t, language \} = useLanguage\(\)/.test(player), 'and reads the language from the i18n store');
 ok(!/function speechText/.test(player), 'the player has no second, English-only copy of the maths-speech rules');
 // The board itself is never rewritten: lines are rendered from the scene (or

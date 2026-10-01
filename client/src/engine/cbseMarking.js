@@ -262,8 +262,11 @@ export function awardStepMarks({
   });
 }
 
-/** One sentence for the student, in the register a teacher would use. */
-/** The catalogue key and variables for the one-line verdict under the marks. */
+/**
+ * The one-line verdict under the marks — in the register a teacher would use —
+ * as a catalogue key and its variables, so the card renders it in the
+ * student's language. marksSentence() is the same line in English.
+ */
 export function marksSentenceKey(award) {
   if (!award) return null;
   const { awarded, total } = award;

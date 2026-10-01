@@ -12,7 +12,7 @@ import {
   onNativeBillingUpdate, purchaseNativeProduct, restoreNativePurchases
 } from '../platform/nativeBilling.js';
 import CloudAccountSecurity from './CloudAccountSecurity.jsx';
-import { useT, useTx } from '../i18n/index.js';
+import { tLater, useT, useTx } from '../i18n/index.js';
 
 function when(value, t) {
   if (!value) return t('cloud.never');
@@ -154,12 +154,12 @@ export default function CloudAccountPanel() {
       if (!live) return;
       setAppleBootstrap(bootstrap);
       setAppleProducts(products);
-      setAppleStoreError(products.length ? '' : t('cloud.storefrontMissing'));
+      setAppleStoreError(products.length ? '' : tLater('cloud.storefrontMissing'));
     })().catch(err => {
       if (!live) return;
       setAppleBootstrap(null);
       setAppleProducts([]);
-      setAppleStoreError(err.message || t('cloud.appleUnavailable'));
+      setAppleStoreError(err.message || tLater('cloud.appleUnavailable'));
     });
     return () => { live = false; };
   }, [canSync, nativeStoreKit, link?.accountId]);
@@ -179,7 +179,7 @@ export default function CloudAccountPanel() {
       await finishNativeTransaction(transactionId);
       await refreshCloudEntitlement(user.id);
       await reload({ verify: false });
-      if (!quiet) setMessage(t('cloud.appleVerified'));
+      if (!quiet) setMessage(tLater('cloud.appleVerified'));
       return true;
     } finally {
       appleInFlight.current.delete(transactionId);
@@ -193,7 +193,7 @@ export default function CloudAccountPanel() {
     if (!canSync || !nativeStoreKit) return undefined;
     return onNativeBillingUpdate(detail => {
       acceptAppleTransaction(detail, { quiet: true }).catch(err => {
-        setError(err.message || t('cloud.applePendingVerification'));
+        setError(err.message || tLater('cloud.applePendingVerification'));
       });
     });
   }, [canSync, nativeStoreKit, user?.id]);
@@ -211,21 +211,21 @@ export default function CloudAccountPanel() {
           year: user?.year, isAdult: form.isAdult,
           guardianName: form.guardianName, guardianEmail: form.guardianEmail
         });
-        setMessage(t('cloud.created'));
+        setMessage(tLater('cloud.created'));
       } else {
         await loginCloudAccount(user.id, { email: form.email, password: form.password });
-        setMessage(t('cloud.connected'));
+        setMessage(tLater('cloud.connected'));
       }
       setForm(v => ({ ...v, password: '' }));
       await reload();
-    } catch (err) { setError(err.message || t('cloud.connectFailed')); }
+    } catch (err) { setError(err.message || tLater('cloud.connectFailed')); }
     finally { setBusy(''); }
   }
 
   async function requestReset() {
     if (!enabled) return;
     if (!form.email.trim()) {
-      setError(t('cloud.enterEmailFirst'));
+      setError(tLater('cloud.enterEmailFirst'));
       return;
     }
     setBusy('reset');
@@ -235,8 +235,8 @@ export default function CloudAccountPanel() {
       await cloud.requestPasswordReset({ email: form.email });
       // The server deliberately gives the same response whether or not an account
       // exists, so the UI must preserve that enumeration-safe contract.
-      setMessage(t('cloud.resetQueued'));
-    } catch (err) { setError(err.message || t('cloud.resetFailed')); }
+      setMessage(tLater('cloud.resetQueued'));
+    } catch (err) { setError(err.message || tLater('cloud.resetFailed')); }
     finally { setBusy(''); }
   }
 
@@ -246,12 +246,12 @@ export default function CloudAccountPanel() {
     setMessage('');
     try {
       const result = await syncNow(user.id);
-      setMessage(t('cloud.syncComplete', {
+      setMessage(tLater('cloud.syncComplete', {
         pushedEvents: result.pushedEvents || 0, pushedEntities: result.pushedEntities || 0,
         pulledEvents: result.pulledEvents || 0, pulledEntities: result.pulledEntities || 0
       }));
       await reload({ verify: false });
-    } catch (err) { setError(err.message || t('cloud.syncFailed')); }
+    } catch (err) { setError(err.message || tLater('cloud.syncFailed')); }
     finally { setBusy(''); }
   }
 
@@ -275,7 +275,7 @@ export default function CloudAccountPanel() {
       // the only entitlement authority.
       window.location.assign(destination.toString());
     } catch (err) {
-      setError(err.message || t('cloud.checkoutFailed'));
+      setError(err.message || tLater('cloud.checkoutFailed'));
       setBusy('');
     }
   }
@@ -289,8 +289,8 @@ export default function CloudAccountPanel() {
       await cloud.restoreBilling('web', {});
       await refreshCloudEntitlement(user.id);
       await reload({ verify: false });
-      setMessage(t('cloud.webRestored'));
-    } catch (err) { setError(err.message || t('cloud.webRestoreFailed')); }
+      setMessage(tLater('cloud.webRestored'));
+    } catch (err) { setError(err.message || tLater('cloud.webRestoreFailed')); }
     finally { setBusy(''); }
   }
 
@@ -314,11 +314,11 @@ export default function CloudAccountPanel() {
       await cloud.cancelWebBilling();
       await refreshCloudEntitlement(user.id);
       await reload({ verify: false });
-      setMessage(t('cloud.cancelled'));
+      setMessage(tLater('cloud.cancelled'));
     } catch (err) {
       setError(err?.code === 'BILLING_SUBSCRIPTION_NOT_CANCELLABLE'
-        ? t('cloud.nothingToCancel')
-        : err.message || t('cloud.cancelFailed'));
+        ? tLater('cloud.nothingToCancel')
+        : err.message || tLater('cloud.cancelFailed'));
     } finally { setBusy(''); }
   }
 
@@ -330,16 +330,16 @@ export default function CloudAccountPanel() {
     try {
       const result = await purchaseNativeProduct(product.id, appleBootstrap.appAccountToken);
       if (result?.status === 'cancelled') {
-        setMessage(t('cloud.appleCancelled'));
+        setMessage(tLater('cloud.appleCancelled'));
         return;
       }
       if (result?.status === 'pending') {
-        setMessage(t('cloud.applePending'));
+        setMessage(tLater('cloud.applePending'));
         return;
       }
       if (result?.status !== 'verified') throw new Error('The App Store did not return a verified transaction.');
       await acceptAppleTransaction(result);
-    } catch (err) { setError(err.message || t('cloud.applePurchaseFailed')); }
+    } catch (err) { setError(err.message || tLater('cloud.applePurchaseFailed')); }
     finally { setBusy(''); }
   }
 
@@ -352,7 +352,7 @@ export default function CloudAccountPanel() {
       const productIds = [appleBootstrap?.products?.monthly, appleBootstrap?.products?.annual].filter(Boolean);
       const transactions = await restoreNativePurchases(productIds);
       if (!transactions.length) {
-        setMessage(t('cloud.appleNoneFound'));
+        setMessage(tLater('cloud.appleNoneFound'));
         return;
       }
       let accepted = 0;
@@ -360,8 +360,8 @@ export default function CloudAccountPanel() {
         if (await acceptAppleTransaction(transaction, { quiet: true })) accepted++;
       }
       if (!accepted) throw new Error('No App Store transaction could be verified for this Pri Learning account.');
-      setMessage(t('cloud.appleRestored', { count: accepted, n: accepted }));
-    } catch (err) { setError(err.message || t('cloud.appleRestoreFailed')); }
+      setMessage(tLater('cloud.appleRestored', { count: accepted, n: accepted }));
+    } catch (err) { setError(err.message || tLater('cloud.appleRestoreFailed')); }
     finally { setBusy(''); }
   }
 
@@ -372,8 +372,8 @@ export default function CloudAccountPanel() {
       await disconnectCloudAccount(user.id);
       setLink(null); setStatus(null); setSession(null);
       setAppleBootstrap(null); setAppleProducts([]);
-      setMessage(t('cloud.disconnected'));
-    } catch (err) { setError(err.message || t('cloud.disconnectFailed')); }
+      setMessage(tLater('cloud.disconnected'));
+    } catch (err) { setError(err.message || tLater('cloud.disconnectFailed')); }
     finally { setBusy(''); }
   }
 
@@ -384,8 +384,8 @@ export default function CloudAccountPanel() {
     setAppleBootstrap(null);
     setAppleProducts([]);
     setMessage(cloudDeleted
-      ? t('cloud.deletedOffline')
-      : t('cloud.sessionEnded'));
+      ? tLater('cloud.deletedOffline')
+      : tLater('cloud.sessionEnded'));
   }
 
   const stateLabel = useMemo(() => {

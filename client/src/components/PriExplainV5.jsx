@@ -3,8 +3,10 @@ import { MathText } from '../lib/latex.jsx';
 import { buildVisualTimeline, visualSummary } from '../explain/visualEngine.js';
 import { visualCuePlan, visualCueState, visualProgressForCue } from '../explain/choreography.js';
 import { adaptiveCheckpointKey, buildTeachingProfile, teachingTimingScale, whyThisStepKey } from '../explain/adaptiveTeaching.js';
-import { pickVoice, speechText } from '../explain/speech.js';
-import { useLanguage } from '../i18n/index.js';
+import { narrationPlan, speechText } from '../explain/speech.js';
+import { translateEnglish, useLanguage } from '../i18n/index.js';
+import { useApp } from '../App.jsx';
+import { localeOf } from '../lib/locale.js';
 import { VisualBlock } from './PriExplainVisuals.jsx';
 import './PriExplainV5.css';
 import './PriExplainV7.css';
@@ -24,22 +26,29 @@ function cancelSpeech() {
   if (canSpeak()) window.speechSynthesis.cancel();
 }
 
-function speakBeat(value, speed, language, onDone) {
-  const text = speechText(value, language);
-  if (!text || !canSpeak()) {
+function speakBeat(textFor, speed, language, region, onDone) {
+  if (!canSpeak()) {
+    onDone?.();
+    return () => {};
+  }
+  // Narration follows the interface language: en-IN for an Indian English
+  // reader (en-AU on the Australian branch), hi-IN for Hindi, degrading to
+  // another voice of that language and then to English — see explain/speech.js.
+  // When it has had to fall back to an English voice, it speaks the English
+  // caption too: Hindi text read by an English voice is noise, not teaching.
+  const choice = narrationPlan(window.speechSynthesis.getVoices?.() || [], language, { region });
+  const text = speechText(textFor(choice.spoken), choice.spoken);
+  if (!text) {
     onDone?.();
     return () => {};
   }
 
   cancelSpeech();
   const utterance = new SpeechSynthesisUtterance(text);
-  // Narration follows the interface language: en-IN for English, hi-IN for
-  // Hindi, degrading to another voice of that language and then to English —
-  // see explain/speech.js. The tag is set even with no voice listed, so the
-  // platform can still choose one for the language.
-  const { voice, lang } = pickVoice(window.speechSynthesis.getVoices?.() || [], language);
-  utterance.lang = lang;
-  if (voice) utterance.voice = voice;
+  // The tag is set even with no voice listed, so the platform can still
+  // choose one for the language.
+  utterance.lang = choice.lang;
+  if (choice.voice) utterance.voice = choice.voice;
   utterance.rate = Math.max(0.75, Math.min(1.4, 0.96 * speed));
   utterance.pitch = 1;
   let active = true;
@@ -91,12 +100,16 @@ const CONCEPT_KEYS = {
 
 export default function PriExplainV5({ questionId, questionPrompt, questionFigure, studentContext = {}, onTrySimilar }) {
   const { t, language } = useLanguage();
+  const app = useApp();
+  const region = app?.user ? localeOf(app.user).split('-')[1] : undefined;
   const visualName = kind => (VISUAL_NAME_KEYS[kind] ? t(VISUAL_NAME_KEYS[kind]) : kind);
   // Pri's own captions carry a catalogue key and are shown and spoken in the
   // student's language; a heading or line that came from the verified solution
   // has none and is shown exactly as the engine wrote it.
-  const headingOf = scene => (scene?.headingKey ? t(scene.headingKey, { n: scene.headingVars?.n ?? '' }) : scene?.heading || '');
-  const lineOf = (scene, i) => (scene?.lineKeys?.[i] ? t(scene.lineKeys[i]) : scene?.lines?.[i] || '');
+  const headingIn = (scene, tr) => (scene?.headingKey ? tr(scene.headingKey, { n: scene.headingVars?.n ?? '' }) : scene?.heading || '');
+  const lineIn = (scene, i, tr) => (scene?.lineKeys?.[i] ? tr(scene.lineKeys[i]) : scene?.lines?.[i] || '');
+  const headingOf = scene => headingIn(scene, t);
+  const lineOf = (scene, i) => lineIn(scene, i, t);
   const [payload, setPayload] = useState(null);
   const [open, setOpen] = useState(false);
   const [index, setIndex] = useState(0);
@@ -282,11 +295,13 @@ export default function PriExplainV5({ questionId, questionPrompt, questionFigur
     };
 
     if (voice && canSpeak()) {
-      const source = beat === 0
-        ? headingOf(current)
-        : lineOf(current, Math.min(beat - 1, Math.max(0, lineCount - 1))) || headingOf(current);
+      const lineIndex = Math.min(beat - 1, Math.max(0, lineCount - 1));
+      const textFor = spoken => {
+        const tr = spoken === language ? t : translateEnglish;
+        return beat === 0 ? headingIn(current, tr) : lineIn(current, lineIndex, tr) || headingIn(current, tr);
+      };
       setNarrating(true);
-      speechCancelRef.current = speakBeat(source, speed * teaching.voiceRate, language, advanceAfterNarration);
+      speechCancelRef.current = speakBeat(textFor, speed * teaching.voiceRate, language, region, advanceAfterNarration);
       return () => {
         speechCancelRef.current?.();
         speechCancelRef.current = null;
@@ -315,7 +330,7 @@ export default function PriExplainV5({ questionId, questionPrompt, questionFigur
 
     timerRef.current = setTimeout(() => goScene(index + 1, false), holdDelay(current) * timingScale / speed);
     return () => clearTimeout(timerRef.current);
-  }, [open, playing, current, atEnd, checkpointPending, index, beat, lineCount, speed, reduceMotion, voice, timingScale, teaching.voiceRate, language]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [open, playing, current, atEnd, checkpointPending, index, beat, lineCount, speed, reduceMotion, voice, timingScale, teaching.voiceRate, language, region]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!open) return undefined;

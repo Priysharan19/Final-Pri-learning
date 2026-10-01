@@ -116,8 +116,18 @@ export function pluralCategory(count, language = DEFAULT_LANGUAGE) {
   }
 }
 
-/** Narration tags for a language, best first — never empty. */
-export const speechTagsOf = raw => {
-  const tags = languageOf(raw).speech;
-  return Array.isArray(tags) && tags.length ? tags : [languageOf(raw).htmlLang];
+/**
+ * Narration tags for a language, best first — never empty. With a `region`
+ * (the student's country, e.g. 'IN' or 'AU'), that region's tag moves to the
+ * front when the language registers one: English for an Indian course is
+ * en-IN first, for an Australian course en-AU first, and the rest of the list
+ * stays behind it as the fallback order.
+ */
+export const speechTagsOf = (raw, region) => {
+  const registered = languageOf(raw).speech;
+  const tags = Array.isArray(registered) && registered.length ? [...registered] : [languageOf(raw).htmlLang];
+  const wanted = typeof region === 'string' ? `${tags[0].split('-')[0]}-${region.toUpperCase()}` : null;
+  const at = wanted ? tags.indexOf(wanted) : -1;
+  if (at > 0) tags.unshift(...tags.splice(at, 1));
+  return tags;
 };

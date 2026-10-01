@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { cloud } from '../platform/cloudTransport.js';
 import { disconnectCloudAccount } from '../platform/cloudAccount.js';
-import { useT } from '../i18n/index.js';
+import { tLater, useT } from '../i18n/index.js';
 
 function when(value, t) {
   if (!value) return t('cloud.unknown');
@@ -64,26 +64,26 @@ export default function CloudAccountSecurity({ pid, account, onChanged, onDelete
     start('verify');
     try {
       const result = await cloud.requestEmailVerification();
-      setMessage(result?.alreadyVerified ? t('cloudSecurity.alreadyVerified') : t('cloudSecurity.verificationQueued'));
+      setMessage(result?.alreadyVerified ? tLater('cloudSecurity.alreadyVerified') : tLater('cloudSecurity.verificationQueued'));
       await onChanged?.();
-    } catch (err) { setError(err.message || t('cloudSecurity.verificationFailed')); }
+    } catch (err) { setError(err.message || tLater('cloudSecurity.verificationFailed')); }
     finally { setBusy(''); }
   }
 
   async function changePassword(e) {
     e.preventDefault();
     if (password.next !== password.confirm) {
-      setError(t('cloudSecurity.passwordMismatch'));
+      setError(tLater('cloudSecurity.passwordMismatch'));
       return;
     }
     start('password');
     try {
       await cloud.changePassword({ currentPassword: password.current, newPassword: password.next });
       setPassword({ current: '', next: '', confirm: '' });
-      setMessage(t('cloudSecurity.passwordChanged'));
+      setMessage(tLater('cloudSecurity.passwordChanged'));
       await reload();
       await onChanged?.();
-    } catch (err) { setError(err.message || t('cloudSecurity.passwordChangeFailed')); }
+    } catch (err) { setError(err.message || tLater('cloudSecurity.passwordChangeFailed')); }
     finally { setBusy(''); }
   }
 
@@ -93,13 +93,13 @@ export default function CloudAccountSecurity({ pid, account, onChanged, onDelete
       const result = await cloud.revokeDevice(session.id);
       if (result?.current) {
         await disconnectCloudAccount(pid);
-        setMessage(t('cloudSecurity.currentRevoked'));
+        setMessage(tLater('cloudSecurity.currentRevoked'));
         await onDeleted?.({ cloudDeleted: false, sessionRevoked: true });
         return;
       }
-      setMessage(result?.revoked ? t('cloudSecurity.revoked') : t('cloudSecurity.alreadyInactive'));
+      setMessage(result?.revoked ? tLater('cloudSecurity.revoked') : tLater('cloudSecurity.alreadyInactive'));
       await reload();
-    } catch (err) { setError(err.message || t('cloudSecurity.revokeFailed')); }
+    } catch (err) { setError(err.message || tLater('cloudSecurity.revokeFailed')); }
     finally { setBusy(''); }
   }
 
@@ -109,8 +109,8 @@ export default function CloudAccountSecurity({ pid, account, onChanged, onDelete
       const result = await cloud.exportAccount();
       const suffix = new Date().toISOString().slice(0, 10);
       downloadJson(`pri-learning-account-export-${suffix}.json`, result);
-      setMessage(t('cloudSecurity.exported'));
-    } catch (err) { setError(err.message || t('cloudSecurity.exportFailed')); }
+      setMessage(tLater('cloudSecurity.exported'));
+    } catch (err) { setError(err.message || tLater('cloudSecurity.exportFailed')); }
     finally { setBusy(''); }
   }
 
@@ -123,9 +123,9 @@ export default function CloudAccountSecurity({ pid, account, onChanged, onDelete
       await disconnectCloudAccount(pid);
       setDeletePassword('');
       setDeletePhrase('');
-      setMessage(t('cloudSecurity.deleted'));
+      setMessage(tLater('cloudSecurity.deleted'));
       await onDeleted?.({ cloudDeleted: true });
-    } catch (err) { setError(err.message || t('cloudSecurity.deleteFailed')); }
+    } catch (err) { setError(err.message || tLater('cloudSecurity.deleteFailed')); }
     finally { setBusy(''); }
   }
 
