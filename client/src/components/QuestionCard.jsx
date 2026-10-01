@@ -11,6 +11,10 @@ import { useApp } from '../App.jsx';
 import InkCanvas from '../ink/InkCanvas.jsx';
 import { sanitizeFigure } from '../lib/sanitize.js';
 import { clearDraft, queueDraft, readDraft } from './drafts.js';
+import {
+  clearInkDraft, clearPendingSubmission, newSubmissionId, readInkDraft, readPendingSubmission,
+  saveInkDraft, savePendingSubmission, submissionContentKey
+} from './practiceRecovery.js';
 import { nativePhotoAvailable, recognizePhoto } from '../native/photo.js';
 import { cloudReadingEnabled, readPhotoWithCloud } from '../ink/cloudReader.js';
 import { MAX_PDF_PAGES, renderPdfPages } from '../ink/pdfPage.js';
@@ -219,7 +223,9 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const tx = useTx();
   const [answer, setAnswer] = useState('');
   const [mcqSel, setMcqSel] = useState(null);
-  const [mode, setMode] = useState(preferMode());       // 'type' | 'write' | 'photo'
+  // Handwriting kept from before a reload brings the card back to the pen.
+  const [restoredInk] = useState(() => readInkDraft(question.id));
+  const [mode, setMode] = useState(() => (restoredInk ? 'write' : preferMode()));       // 'type' | 'write' | 'photo'
   const [inkResult, setInkResult] = useState(null);
   const [hints, setHints] = useState([]);
   const [hintsLeft, setHintsLeft] = useState(question.hintsAvailable);
@@ -242,6 +248,24 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const [checking, setChecking] = useState(false);
   const [vouched, setVouched] = useState(null);     // the exact reading the student stood behind
   const startRef = useRef(Date.now());
+  // ── One tap, one submission (§09) ──────────────────────────────────────────
+  // `busy` is React state and lands a render late, so two taps inside one frame
+  // both saw it false and both posted. The ref is set synchronously.
+  const inFlightRef = useRef(false);
+  // A submission that has not had a definitive answer: an identical retry
+  // reuses its idempotency key, so a timeout followed by a second tap is still
+  // one attempt.
+  const pendingRef = useRef(null);
+  // The submission whose verdict is on screen, and the ink lines it carried.
+  // Every late, asynchronous result (cloud working check, misconception
+  // proposal) is bound to it and dropped if it names anything else.
+  const attemptRef = useRef(null);
+  const [attempt, setAttempt] = useState(null);
+  // The reading a submission was made from is frozen while it is marked and
+  // after it is resolved: a reading that settles late cannot rewrite it.
+  const inkFrozenRef = useRef(false);
+  const mountedRef = useRef(true);
+  useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; }; }, []);
   const inputRef = useRef(null);
   const scribbleRef = useRef(null);
   const photoInputRef = useRef(null);
@@ -544,9 +568,9 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   // Every submit control leads here, so the confirmation step cannot be walked
   // around: a reading in doubt turns the press into the question instead.
   async function submit(vouchedNow) {
-    if (busy || resolved) return;
+    if (inFlightRef.current || busy || resolved) return;
     if (needsCheck && vouchedNow !== reading) { setChecking(true); return; }
-    let given, steps, viaInk = false, ink;
+    let given, steps, viaInk = false, ink, lines = null;
     if (isMcq) {
       given = mcqSel;
       if (given === null) return;
@@ -555,6 +579,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         if (!inkResult?.lines?.length) return;
         given = inkResult.lines.join('\n');
         viaInk = true;
+        lines = inkResult.lines.slice();
         ink = { strokes: compactInkStrokes(inkResult.strokes), recognized: inkResult.text, engine: inkResult.engine || null };
       } else {
         given = working;
@@ -565,32 +590,107 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       given = inkResult.answerLine;
       steps = inkResult.lines.length > 1 ? inkResult.lines.join('\n') : undefined;
       viaInk = true;
+      lines = inkResult.lines.slice();
       ink = { strokes: compactInkStrokes(inkResult.strokes), recognized: inkResult.text, engine: inkResult.engine || null };
     } else {
       given = answer;
       if (String(given).trim() === '') return;
       steps = (showWorking || mode === 'photo') && working.trim() ? working : undefined;
     }
+    const contentKey = submissionContentKey(given, steps);
+    const submissionId = pendingRef.current?.contentKey === contentKey
+      ? pendingRef.current.submissionId
+      : newSubmissionId();
+    pendingRef.current = { submissionId, contentKey };
+    const ms = Date.now() - startRef.current;
+    // On disk before the request leaves: a relaunch replays it under this key.
+    savePendingSubmission(question.id, { submissionId, answer: String(given), steps, viaInk, ms, lines }, { label: question.subtopicName });
+    const scribbleStrokes = scribbleRef.current && !scribbleRef.current.isEmpty()
+      ? compactInkStrokes(scribbleRef.current.getStrokes())
+      : undefined;
+    await deliver({ answer: String(given), ms, steps, viaInk, ink, photo, scribble: scribbleStrokes, submissionId }, { lines });
+  }
+
+  /**
+   * Send one submission and settle the card on its definitive answer. Used by
+   * a tap and by relaunch recovery alike, so both take the same path.
+   */
+  async function deliver(body, { lines = null, recovering = false } = {}) {
+    inFlightRef.current = true;
+    inkFrozenRef.current = !recovering || inkFrozenRef.current;
     setBusy(true);
     try {
-      const scribbleStrokes = scribbleRef.current && !scribbleRef.current.isEmpty()
-        ? compactInkStrokes(scribbleRef.current.getStrokes())
-        : undefined;
-      const r = await api.post(`/practice/${question.id}/submit`, {
-        answer: String(given), ms: Date.now() - startRef.current, steps, viaInk, ink, photo, scribble: scribbleStrokes
-      });
+      const r = await api.post(`/practice/${question.id}/submit`, body);
+      pendingRef.current = null;
+      clearPendingSubmission(question.id);
+      const live = mountedRef.current;
       if (r.resolved) {
-        setState({ phase: 'resolved', res: r });
-        celebrate(r); refreshUser(); refreshDue(); refreshRecent?.();
-        toast(<div><b>{t('verdict.outcomeUpdated')}</b><div className="badge-desc">{t('verdict.outcomeBasis', { topic: question.subtopicName })}</div></div>, 4200);
+        clearInkDraft(question.id);
+        const bound = { submissionId: r.submissionId || body.submissionId, lines: Array.isArray(lines) ? lines : null };
+        attemptRef.current = bound;
+        if (live) {
+          setAttempt(bound);
+          setState({ phase: 'resolved', res: r });
+          if (!r.replayed) celebrate(r);
+          refreshUser(); refreshDue(); refreshRecent?.();
+          toast(<div><b>{t('verdict.outcomeUpdated')}</b><div className="badge-desc">{t('verdict.outcomeBasis', { topic: question.subtopicName })}</div></div>, 4200);
+        }
+        // The attempt is recorded whether or not this card is still on screen,
+        // so the session still counts it — exactly once, because the pending
+        // record that could replay it is already gone.
         onResolved?.(r);
       } else {
-        setState({ phase: 'retry', res: r });
+        inkFrozenRef.current = false;
+        if (live) setState({ phase: 'retry', res: r });
       }
     } catch (e) {
-      setState({ phase: 'retry', res: { feedback: e.message, invalid: true } });
-    } finally { setBusy(false); }
+      // A refusal (4xx) is a definitive answer. Anything else — a fault, a
+      // timeout — is not: the pending record stays, so an identical retry or a
+      // relaunch reuses the same key and still lands as one attempt.
+      if (e?.status >= 400 && e?.status < 500) { pendingRef.current = null; clearPendingSubmission(question.id); }
+      inkFrozenRef.current = false;
+      if (recovering && e?.status === 409 && e?.code !== 'QUESTION_DISCARDED') {
+        // Answered elsewhere under another submission: nothing here to recover.
+        if (mountedRef.current) onNext?.();
+        return;
+      }
+      if (mountedRef.current) setState({ phase: 'retry', res: { feedback: e.message, invalid: true } });
+    } finally {
+      inFlightRef.current = false;
+      if (mountedRef.current) setBusy(false);
+    }
   }
+
+  // ── Relaunch recovery ──────────────────────────────────────────────────────
+  // A submission still marked in flight when this question mounts was cut off
+  // by the app going away. It is replayed under its own key: the backend hands
+  // back the verdict it already recorded, or marks it now if the first delivery
+  // never landed. One attempt either way, and the student sees which.
+  useEffect(() => {
+    const pending = readPendingSubmission(question.id);
+    if (!pending) return;
+    pendingRef.current = { submissionId: pending.submissionId, contentKey: submissionContentKey(pending.answer, pending.steps) };
+    const kept = pending.viaInk ? readInkDraft(question.id) : null;
+    deliver({
+      answer: pending.answer, ms: pending.ms, steps: pending.steps, viaInk: pending.viaInk,
+      ink: kept ? { strokes: compactInkStrokes(kept), recognized: (pending.lines || []).join('\n') || null, engine: null } : undefined,
+      submissionId: pending.submissionId
+    }, { lines: pending.lines, recovering: true });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /** The ink surface reports here. Frozen while marking and after the verdict. */
+  const onInkRecognized = useCallback((r) => {
+    if (inkFrozenRef.current) return;
+    setInkResult(r);
+    // Recovery: the page restored after a relaunch is read once, for display
+    // beside the verdict, and then frozen like any submitted reading.
+    if (inFlightRef.current || attemptRef.current) inkFrozenRef.current = true;
+  }, []);
+
+  const onInkStrokes = useCallback((strokes) => {
+    if (inFlightRef.current || attemptRef.current) return;
+    saveInkDraft(question.id, strokes, { label: question.subtopicName });
+  }, [question.id, question.subtopicName]);
 
   async function getHint() {
     if (hintsLeft <= 0 || resolved) return;
@@ -602,14 +702,30 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   }
 
   async function reveal() {
-    if (busy || resolved) return;
+    if (inFlightRef.current || busy || resolved) return;
+    inFlightRef.current = true;
+    inkFrozenRef.current = true;
     setBusy(true);
     try {
       const r = await api.post(`/practice/${question.id}/reveal`, { ms: Date.now() - startRef.current });
-      setState({ phase: 'resolved', res: r });
-      celebrate(r); refreshUser(); refreshDue(); refreshRecent?.();
+      // Revealing settles the question, so nothing kept for it may replay.
+      pendingRef.current = null;
+      clearPendingSubmission(question.id);
+      clearInkDraft(question.id);
+      attemptRef.current = { submissionId: null, lines: null, revealed: true };
+      if (mountedRef.current) {
+        setAttempt(attemptRef.current);
+        setState({ phase: 'resolved', res: r });
+        celebrate(r); refreshUser(); refreshDue(); refreshRecent?.();
+      }
       onResolved?.(r);
-    } finally { setBusy(false); }
+    } catch (e) {
+      inkFrozenRef.current = false;
+      throw e;
+    } finally {
+      inFlightRef.current = false;
+      if (mountedRef.current) setBusy(false);
+    }
   }
 
   async function toggleBookmark() {
@@ -662,19 +778,23 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   //
   // It is feedback, not marking. The mark above has already been decided by the
   // deterministic engine and does not move when this arrives.
-  const [cloudCheck, setCloudCheck] = useState(null);
+  const [cloudCheckFor, setCloudCheckFor] = useState(null);   // { submissionId, result }
   const cloudCheckRef = useRef(null);
-  useEffect(() => { setCloudCheck(null); }, [question?.id]);
+  useEffect(() => { setCloudCheckFor(null); }, [question?.id]);
   useEffect(() => {
     if (!writeMode || !resolved) return;
-    const lines = inkResult?.lines || [];
+    // The lines checked are the lines that were submitted and marked — not
+    // whatever the ink surface reads now.
+    const bound = attempt;
+    const lines = bound?.lines || [];
+    if (!bound?.submissionId || !lines.length) return;
     if (!shouldCheckWorking({
       correct: res?.correct, invalid: res?.invalid, revealed: res?.revealed,
       lines, localReport: activeReport
     })) return;
 
-    const key = `${question?.id}:${lines.join('|')}`;
-    if (cloudCheckRef.current === key) return;              // already asked for this page
+    const key = `${question?.id}:${bound.submissionId}`;
+    if (cloudCheckRef.current === key) return;              // already asked for this attempt
     cloudCheckRef.current = key;
 
     let live = true;
@@ -683,10 +803,17 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       user,
       prompt: question?.prompt || '',
       signal: controller?.signal
-    }).then(result => { if (live && result && !result.error) setCloudCheck(result); })
-      .catch(() => { });
+    }).then(result => {
+      // Dropped unless it still describes the attempt on screen.
+      if (!live || !result || result.error) return;
+      if (attemptRef.current?.submissionId !== bound.submissionId) return;
+      setCloudCheckFor({ submissionId: bound.submissionId, result });
+    }).catch(() => { });
     return () => { live = false; controller?.abort?.(); };
-  }, [writeMode, resolved, res?.correct, res?.invalid, res?.revealed, inkResult, activeReport, user, question?.id, question?.prompt]);
+  }, [writeMode, resolved, res?.correct, res?.invalid, res?.revealed, attempt, activeReport, user, question?.id, question?.prompt]);
+
+  const cloudCheck = cloudCheckFor && attempt?.submissionId && cloudCheckFor.submissionId === attempt.submissionId
+    ? cloudCheckFor.result : null;
 
   const lineVerdicts = useMemo(
     () => mergeVerdicts(localLineVerdicts, cloudCheck, { lineCount: inkResult?.lines?.length || 0 }),
@@ -696,21 +823,27 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
 
   // The misconception the cloud check proposed, as the deterministic engine
   // judged it: 'confirmed' (recorded in learner state) or 'possible' (shown,
-  // hedged, never recorded). The backend decides; this only displays.
+  // hedged, never recorded). The backend decides; this only displays. The
+  // proposal names the submission it came from, and the backend ignores one
+  // that is not the submission of record.
   const [cloudMisconception, setCloudMisconception] = useState(null);
   useEffect(() => { setCloudMisconception(null); }, [question?.id]);
   useEffect(() => {
-    const proposal = misconceptionProposal(cloudCheck, inkResult?.lines || []);
-    if (!proposal || !question?.id) return;
+    const sid = cloudCheckFor?.submissionId;
+    if (!cloudCheck || !sid || attemptRef.current?.submissionId !== sid || !question?.id) return;
+    const proposal = misconceptionProposal(cloudCheck, attemptRef.current?.lines || []);
+    if (!proposal) return;
     let live = true;
-    api.post(`/practice/${question.id}/misconception`, proposal.body)
+    api.post(`/practice/${question.id}/misconception`, { ...proposal.body, submissionId: sid })
       .then(r => {
         const named = r?.status ? misconceptionById(r.id) : null;
-        if (live && named) setCloudMisconception({ status: r.status, named, line: proposal.displayLine });
+        if (live && named && attemptRef.current?.submissionId === sid) {
+          setCloudMisconception({ status: r.status, named, line: proposal.displayLine });
+        }
       })
       .catch(() => { });
     return () => { live = false; };
-  }, [cloudCheck, inkResult, question?.id]);
+  }, [cloudCheck, cloudCheckFor, question?.id]);
 
   // ── The board's own arithmetic ─────────────────────────────────────────────
   // CBSE marks per step: formula, substitution, final answer with units. A
@@ -982,8 +1115,9 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
             <div className="ink-row">
               <div className="editor-shell" style={{ flex: 1, minWidth: 0 }}>
                 {InkAnswer && (
-                  <InkAnswer onRecognized={setInkResult} height={380} lineVerdicts={lineVerdicts}
-                    disabled={resolved} focusSymbol={checkFocus} recognitionContext={recognitionContext} />
+                  <InkAnswer onRecognized={onInkRecognized} onStrokes={onInkStrokes} initialStrokes={restoredInk}
+                    height={380} lineVerdicts={lineVerdicts}
+                    disabled={resolved || busy} focusSymbol={checkFocus} recognitionContext={recognitionContext} />
                 )}
                 {inkPhase === 'failed' && (
                   <div className="editor-body">

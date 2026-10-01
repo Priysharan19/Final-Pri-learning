@@ -290,7 +290,7 @@ function helpers(page, base, flowId) {
 
 // ── Flow runner ──────────────────────────────────────────────────────────────
 
-const FLOWS = ['./tour-login.js', './tour-india.js', './tour-phone.js', './tour-v3.js', './tour-ink.js', './tour-v4.js', './cal-smoke.mjs'];
+const FLOWS = ['./tour-login.js', './tour-india.js', './tour-phone.js', './tour-v3.js', './tour-ink.js', './tour-v4.js', './cal-smoke.mjs', './tour-submit-lifecycle.js'];
 
 async function loadFlows() {
   const loaded = [];
