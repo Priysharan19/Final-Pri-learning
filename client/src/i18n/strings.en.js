@@ -432,6 +432,7 @@ export default {
   'verdict.thisLooksLikeTitle': 'This looks like: {title}',
   'verdict.readingWork': 'Reading your handwriting…',
   'verdict.readOnServer': 'Read on the server',
+  'ink.hintEachLine': 'Write each step on its own line · stylus or finger',
   'verdict.removeAttachment': 'Remove attachment',
   'verdict.readingWithVision': 'Reading your handwriting on-device with Apple Vision…',
   'verdict.decodedOnDevice': 'Decoded on-device',
@@ -588,7 +589,7 @@ export default {
   'settings.passwordNote': 'At least {min} characters. Stored as a salted PBKDF2 hash in this device’s storage — it locks your profile on this device, and is never uploaded anywhere.',
 
   'settings.handwriting': '✒ Handwriting',
-  'settings.handwritingNative': 'This app captures your writing with the device’s own ink surface, using a stylus or your finger. Pri reads it on this device, learns from your corrections, and keeps those corrections on this device.',
+  'settings.handwritingNative': 'This app captures your writing with the device’s own ink surface, using a stylus or your finger. Pri reads it on this device unless you turn on server reading below, learns from your corrections, and keeps those corrections on this device.',
   'settings.handwritingBrowser': 'Write with your finger, a stylus or a mouse. Pri reads your handwriting on this device, and the corrections you make help it learn your writing. Your corrections stay on this device.',
   'settings.templatesLearned': 'Personal templates learned',
   'settings.templatesNone': 'None yet',

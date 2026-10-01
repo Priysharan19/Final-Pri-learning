@@ -116,11 +116,24 @@ export const flow = {
         const limit = Math.max(240, vp.height - 300);
         await check(`${tag}: the writing area fits the screen (≤ ${limit}px, ≥ 240px)`, !!ink && ink.h <= limit && ink.h >= 240, JSON.stringify(ink));
       }
+      // The editor's own committed-ink canvas: empty before, ink inside the
+      // stroke box after. No other canvas on the page can satisfy this.
+      const inkBox = () => page.evaluate(() => {
+        const c = document.querySelector('.editor-shell .ink-canvas-base') || document.querySelector('.ink-canvas-base');
+        if (!c || !c.width) return null;
+        const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+        let minY = Infinity, maxY = -1, minX = Infinity, maxX = -1;
+        for (let y = 0; y < c.height; y++) for (let x = 0; x < c.width; x++) {
+          if (d[(y * c.width + x) * 4 + 3] > 0) { if (y < minY) minY = y; if (y > maxY) maxY = y; if (x < minX) minX = x; if (x > maxX) maxX = x; }
+        }
+        return { empty: maxY < 0, minX, maxX, minY, maxY, w: c.width, h: c.height };
+      });
       let drew = false;
       if (ink) {
         await canvas.scrollIntoViewIfNeeded();
+        const before = await inkBox();
         const box = await canvas.boundingBox();
-        if (box) {
+        if (box && before?.empty) {
           for (const [y, x0, x1] of [[0.35, 0.2, 0.5], [0.6, 0.25, 0.6]]) {
             await page.mouse.move(box.x + box.width * x0, box.y + box.height * y);
             await page.mouse.down();
@@ -128,20 +141,31 @@ export const flow = {
             await page.mouse.up();
           }
           await page.waitForTimeout(150);
-          drew = await page.evaluate(() => {
-            const base = [...document.querySelectorAll('.ink-canvas, canvas')].find(c => c.width > 0 && c.getContext);
-            const all = [...document.querySelectorAll('canvas')];
-            return all.some(c => {
-              try {
-                const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
-                for (let i = 3; i < d.length; i += 4) if (d[i] > 0) return true;
-              } catch { /* not a 2d canvas */ }
-              return false;
-            }) || !!base && false;
-          });
+          const after = await inkBox();
+          const sx = after ? after.w / box.width : 1;
+          drew = !!after && !after.empty &&
+            after.minX >= box.width * 0.15 * sx && after.maxX <= box.width * 0.65 * sx &&
+            after.minY >= box.height * 0.25 * sx && after.maxY <= box.height * 0.72 * sx;
         }
       }
       await check(`${tag}: synthetic strokes land on the writing area`, drew);
+      if (vp.id === 'tablet-portrait' && drew) {
+        await page.setViewportSize({ width: 1180, height: 820 });
+        await page.waitForTimeout(400);
+        const rotated = await inkBox();
+        await check(`${tag}: rotating to landscape keeps every stroke on the sheet`,
+          !!rotated && !rotated.empty && rotated.maxY < rotated.h - 1, JSON.stringify(rotated));
+        await page.setViewportSize({ width: 390, height: 844 });
+        await page.waitForTimeout(400);
+        const narrowed = await inkBox();
+        await check(`${tag}: narrowing to a phone keeps every stroke on the sheet`,
+          !!narrowed && !narrowed.empty && narrowed.maxX < narrowed.w - 1 && narrowed.maxY < narrowed.h - 1, JSON.stringify(narrowed));
+        await page.setViewportSize({ width: vp.width, height: vp.height });
+        await page.waitForTimeout(400);
+      } else {
+        await check(`${tag}: (rotation with ink is exercised on tablet portrait)`, vp.id !== 'tablet-portrait' || drew);
+        await check(`${tag}: (narrowing with ink is exercised on tablet portrait)`, vp.id !== 'tablet-portrait' || drew);
+      }
       const devCopy = await page.evaluate(() => /legacy JS fallback|not native PencilKit|legacy JavaScript handwriting/i.test(document.body.innerText));
       await check(`${tag}: no developer-only handwriting copy is shown to students`, !devCopy);
 
@@ -150,9 +174,8 @@ export const flow = {
       if (await typeTab.count()) { await typeTab.click(); await settle(); }
       const input = page.locator('.editor-body input.answer-input').first();
       const attrs = await input.count() ? await input.evaluate(e => ({ m: e.inputMode, k: e.enterKeyHint })) : null;
-      await check(`${tag}: the answer box opens a full keyboard with a Go key`, attrs === null || (attrs.m === 'text' && attrs.k === 'go'),
+      await check(`${tag}: the answer box opens a full keyboard with a Go key`, attrs !== null && attrs.m === 'text' && attrs.k === 'go',
         JSON.stringify(attrs));
-      if (attrs === null) note(`${tag}: this question has no typed answer box`);
       if (await input.count()) await input.fill('12345');
       const submit = await page.evaluate(() => {
         const b = [...document.querySelectorAll('.editor-foot .btn-primary')].find(x => x.offsetParent);
@@ -166,15 +189,35 @@ export const flow = {
 
       const after = await reachable(page, '.ctx-next');
       await check(`${tag}: after answering, Next is visible and not covered`, after.ok, JSON.stringify(after));
+      // A worked solution is what offers Pri Explain; ask for it so the launcher
+      // check always has something to measure.
+      const show = page.getByRole('button', { name: 'Show solution' });
+      if (await show.count()) { await show.first().click({ timeout: 5000 }).catch(() => {}); await page.waitForTimeout(1200); }
       const launcher = await page.evaluate(() => {
         const l = document.querySelector('.pri-explain-launch');
         const n = document.querySelector('.ctx-next');
-        if (!l) return { present: false, ok: true };
+        if (!l) return { present: false };
         const a = l.getBoundingClientRect(), b = n?.getBoundingClientRect();
-        const overlap = b && !(a.right <= b.left || a.left >= b.right || a.bottom <= b.top || a.top >= b.bottom);
-        return { present: true, ok: !overlap && a.left >= -1 && a.right <= innerWidth + 1 && a.bottom <= innerHeight + 1 };
+        const overlap = !!b && !(a.right <= b.left || a.left >= b.right || a.bottom <= b.top || a.top >= b.bottom);
+        return { present: true, overlap, inside: a.left >= -1 && a.right <= innerWidth + 1 && a.bottom <= innerHeight + 1, widthShare: a.width / innerWidth };
       });
-      await check(`${tag}: Pri Explain's launcher, when offered, sits clear of Next and inside the screen`, launcher.ok, JSON.stringify(launcher));
+      await check(`${tag}: Pri Explain is offered once a worked solution exists`, launcher.present, JSON.stringify(launcher));
+      const compactPlacement = vp.width <= 760;
+      await check(`${tag}: its launcher sits clear of Next, inside the screen, ${compactPlacement ? 'as a full-width bar above the pill' : 'as a compact corner button'}`,
+        launcher.present && !launcher.overlap && launcher.inside && (compactPlacement ? launcher.widthShare > 0.85 : launcher.widthShare < 0.6),
+        JSON.stringify(launcher));
+
+      // ── iPad composition: the top bar and sidebar line up ─────────────────
+      if (vp.width > 760) {
+        const align = await page.evaluate(() => {
+          const t = document.querySelector('.topbar')?.getBoundingClientRect();
+          const sb = document.querySelector('.sidebar')?.getBoundingClientRect();
+          return t && sb ? { topbarBottom: Math.round(t.bottom), sidebarTop: Math.round(sb.top) } : null;
+        });
+        await check(`${tag}: the sidebar starts below the top bar`, !!align && align.sidebarTop >= align.topbarBottom - 1, JSON.stringify(align));
+      } else {
+        await check(`${tag}: (sidebar alignment applies above 760px)`, true);
+      }
 
       // ── 5 · touch targets on a phone ─────────────────────────────────────
       if (vp.width <= 760) {

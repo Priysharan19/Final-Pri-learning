@@ -23,11 +23,20 @@ export function classify(width, height, coarse = false) {
   return Object.freeze({ formFactor, short: h > 0 && h <= BREAKPOINTS.shortMaxHeight, coarse: !!coarse, width: w, height: h });
 }
 
+// Sizing uses the layout viewport only. The visual viewport follows pinch-zoom
+// and browser-toolbar collapse frame by frame; following it made the writing
+// area jitter and, when zoomed, wrongly shrink the iPad canvas.
+const HEIGHT_STEP = 40;
 function viewport(win) {
-  const vv = win.visualViewport;
-  // The layout viewport decides the form factor; the visual viewport (which
-  // shrinks under an on-screen keyboard) decides SHORT.
-  return { width: win.innerWidth, height: Math.round(vv?.height || win.innerHeight) };
+  return { width: win.innerWidth, height: Math.floor((win.innerHeight || 0) / HEIGHT_STEP) * HEIGHT_STEP || win.innerHeight };
+}
+
+// An on-screen keyboard that shortens the window while the student types
+// somewhere else must not reclassify a tablet as SHORT and shrink its canvas.
+function typingInEditable(win) {
+  const el = win.document?.activeElement;
+  if (!el) return false;
+  return el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName || '');
 }
 
 export function currentFormFactor(win = typeof window === 'undefined' ? null : window) {
@@ -35,7 +44,9 @@ export function currentFormFactor(win = typeof window === 'undefined' ? null : w
   const { width, height } = viewport(win);
   let coarse = false;
   try { coarse = !!win.matchMedia?.('(pointer: coarse)').matches; } catch { coarse = false; }
-  return classify(width, height, coarse);
+  const c = classify(width, height, coarse);
+  if (c.short && c.formFactor !== 'compact' && typingInEditable(win)) return Object.freeze({ ...c, short: false });
+  return c;
 }
 
 let installed = false;
@@ -52,7 +63,6 @@ export function installFormFactorAttributes(win = typeof window === 'undefined' 
   };
   apply();
   win.addEventListener('resize', apply, { passive: true });
-  win.visualViewport?.addEventListener('resize', apply, { passive: true });
 }
 
 /** React hook: the current form factor, updated on resize/keyboard changes. */
@@ -66,11 +76,7 @@ export function useFormFactor() {
         prev.coarse === next.coarse && prev.height === next.height && prev.width === next.width ? prev : next;
     });
     window.addEventListener('resize', update, { passive: true });
-    window.visualViewport?.addEventListener('resize', update, { passive: true });
-    return () => {
-      window.removeEventListener('resize', update);
-      window.visualViewport?.removeEventListener('resize', update);
-    };
+    return () => window.removeEventListener('resize', update);
   }, []);
   return ff;
 }

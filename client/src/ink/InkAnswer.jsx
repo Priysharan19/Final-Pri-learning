@@ -22,6 +22,7 @@ import { ensurePersonalLoaded, addPersonal } from './personal.js';
 import { MathText } from '../lib/latex.jsx';
 import { currentReleaseIdentity } from '../platform/releaseIdentity.js';
 import { inkCanvasHeight, useFormFactor } from '../platform/formFactor.js';
+import { useT } from '../i18n/index.js';
 
 const NICE = { pi: 'π', theta: 'θ', sqrt: '√', percent: '%' };
 const showSym = s => NICE[s] || s;
@@ -128,6 +129,7 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
   const [diagnostics] = useState(inkDiagnosticsVisible);
   // EXPANDED (the iPad baseline) keeps the requested height; smaller windows get
   // a writing area that fits the screen (CP-03, FORM_FACTOR_SPEC.md §3).
+  const t = useT();
   const formFactor = useFormFactor();
   const fittedHeight = inkCanvasHeight(height, formFactor);
   const canvasRef = useRef(null);
@@ -386,7 +388,7 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
               : null;
   // Students always learn when their writing was read on the server (privacy);
   // engine identifiers and fallback labels are diagnostics only.
-  const shownEngineNote = diagnostics ? engineNote : (rec.cloud === true ? 'Read on the server' : null);
+  const shownEngineNote = diagnostics ? engineNote : (rec.cloud === true ? t('verdict.readOnServer') : null);
 
   return (
     <div className={`ink-answer ${disabled ? 'ink-disabled' : ''}`}>
@@ -410,7 +412,7 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
           aria-label="Draw with a finger as well as a Pencil" aria-pressed={finger}
           onClick={() => setFinger(f => !f)}>☝ Finger</button>
         <span className="ink-hint">
-          Write each step on its own line · stylus or finger
+          {t('ink.hintEachLine')}
         </span>
       </div>
 

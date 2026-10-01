@@ -1813,7 +1813,10 @@ h3 { font-size: 17px; line-height: 1.3; }
    out of it, so an installed web app on a notched phone keeps a full-height
    bar. Insets are 0 inside the native shells and on desktop: no change there. */
 .topbar { height: auto; min-height: calc(54px + var(--pri-inset-top)); }
-@media (min-width: 761px) { .topbar { min-height: calc(64px + var(--pri-inset-top)); } }
+@media (min-width: 761px) {
+  .topbar { min-height: calc(64px + var(--pri-inset-top)); }
+  .sidebar { top: calc(64px + var(--pri-inset-top)); height: calc(100vh - 64px - var(--pri-inset-top)); height: calc(100dvh - 64px - var(--pri-inset-top)); }
+}
 @media (max-width: 760px) { .topbar { height: auto; min-height: calc(58px + var(--pri-inset-top)); } }
 
 /* Full-height surfaces follow the dynamic viewport (browser toolbars, keyboard). */
@@ -1847,7 +1850,9 @@ h3 { font-size: 17px; line-height: 1.3; }
 }
 
 /* A later base rule (.btn min-height 42px) silently beat the earlier coarse
-   rule, so primary buttons were 42px on touch screens. Restate it last. */
+   rule, so primary buttons were 42px on touch screens. Restate it last. This
+   intentionally applies to touch tablets too (iPad buttons become 44px, the
+   size the original "iPad & touch" rule asked for). */
 @media (pointer: coarse) {
   .btn { min-height: var(--tap-min); }
 }

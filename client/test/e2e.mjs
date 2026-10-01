@@ -49,7 +49,10 @@ function parseArgs(argv) {
     if (arg === '--no-build') opts.build = false;
     else if (arg === '--headed') opts.headed = true;
     else if (arg === '--bail') opts.bail = true;
-    else if (arg.startsWith('--browser=')) opts.browser = arg.slice(10) === 'webkit' ? 'webkit' : 'chromium';
+    else if (arg.startsWith('--browser=')) {
+      opts.browser = arg.slice(10);
+      if (!['chromium', 'webkit'].includes(opts.browser)) throw new Error(`unknown --browser=${opts.browser} (chromium or webkit)`);
+    }
     else if (arg.startsWith('--only=')) opts.only = arg.slice(7).split(',').map(s => s.trim() === 'v3' ? 'practice' : s.trim()).filter(Boolean);
   }
   return opts;
