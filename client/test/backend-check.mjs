@@ -917,6 +917,11 @@ async function run() {
     ok('the picker explains itself', typeof first.why === 'string' && first.why.length > 0, show(first.why));
     ok('marking criteria come with it', Array.isArray(first.question.criteria) && first.question.criteria.length >= 1, show(first.question.criteria));
 
+    const resumeView = await GET('/practice/resume');
+    eq('Home continuity reports the exact unfinished Practice row', resumeView.resume?.questionId, first.question.id);
+    eq('Home continuity labels ordinary Practice honestly', resumeView.resume?.kind, 'practice');
+    eq('Home continuity points ordinary Practice back to its real route', resumeView.resume?.destination, '/practice');
+
     const hinted = await POST(`/practice/${first.question.id}/hint`, {});
     ok('a hint comes back as text', typeof hinted.hint === 'string' && hinted.hint.length > 0, show(hinted.hint));
     eq('the first hint is level 1', hinted.level, first.payload.hints?.length ? 1 : 0);
