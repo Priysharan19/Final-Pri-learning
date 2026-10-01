@@ -810,7 +810,6 @@ export default {
   'verdict.statusMarked': "इस डिवाइस पर जाँचा गया",
   'verdict.statusWriteHint': "हर चरण अलग पंक्ति में लिखें",
   'verdict.confirmReading': "पढ़ाई की पुष्टि करें",
-  'verdict.submitAgain': "फिर से जमा करें",
   'verdict.questionRegion': "प्रश्न",
   'verdict.workRegion': "आपका हल",
   'verdict.anotherMethod': "दूसरी विधि देखें",
@@ -1002,4 +1001,7 @@ export default {
   'ink.clear': "मिटाएँ",
   'ink.evidence': "पहचान के प्रमाण",
   'ink.noReading': "कोई पढ़ाई नहीं",
+
+  // Formal assessment — structured
+  'exam.structuredParts': "संरचित — भाग (a)–({last})",
 };

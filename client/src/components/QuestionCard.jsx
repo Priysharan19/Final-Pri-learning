@@ -887,7 +887,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       : needsCheck
         ? { label: t('verdict.checkReadingFirst'), run: () => submit(), disabled: busy || !canSubmit }
         : {
-          label: t(busy ? 'verdict.marking' : state.phase === 'retry' && !technicalRetry ? 'verdict.submitAgain' : 'verdict.submit'),
+          label: t(busy ? 'verdict.marking' : 'verdict.submit'),
           run: () => submit(), disabled: busy || !canSubmit
         };
 

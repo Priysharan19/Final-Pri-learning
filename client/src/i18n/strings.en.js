@@ -749,7 +749,6 @@ export default {
   'verdict.statusMarked': "Marked on this device",
   'verdict.statusWriteHint': "Write each step on its own line",
   'verdict.confirmReading': "Confirm reading",
-  'verdict.submitAgain': "Submit again",
   'verdict.questionRegion': "Question",
   'verdict.workRegion': "Your working",
   'verdict.anotherMethod': "See another method",
@@ -941,4 +940,7 @@ export default {
   'ink.clear': "Clear",
   'ink.evidence': "Recognition evidence",
   'ink.noReading': "no reading",
+
+  // Formal assessment — structured
+  'exam.structuredParts': "Structured — parts (a)–({last})",
 };

@@ -43,8 +43,10 @@ export const flow = {
     await check('the card names the topic it came from',
       (await page.locator('.q-topmeta').innerText()).includes('Linear Equations'),
       `topmeta reads ${JSON.stringify(await page.locator('.q-topmeta').innerText())}`);
-    await check('the question is on the clock',
-      /\d+:\d\d/.test(await page.locator('.q-timer').innerText()));
+    // Practice is deliberately untimed on screen: time on task is still
+    // recorded with the attempt, but a running clock is pressure, not help.
+    await check('practice shows no running clock',
+      await page.locator('.q-timer').count() === 0);
 
     // ── 2 · find one that takes a typed answer ───────────────────────────────
     // The card opens in handwriting mode on a touch device, so typing is asked

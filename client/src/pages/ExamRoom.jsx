@@ -300,6 +300,7 @@ export default function ExamRoom() {
             <b id="exam-q-title">{t('exam.questionOf', { n: cur + 1, total: exam.questions.length })}</b>
             <span>{q.multipart ? t('exam.marksN', { count: q.marks, n: q.marks }) : q.diffLabel}</span>
             <span>{q.subtopicName}</span>
+            {q.multipart && <span>{t('exam.structuredParts', { last: q.parts[q.parts.length - 1].key })}</span>}
             {/* A question that was actually set in an exam says which one. Every
                 other question in the paper is authored practice, and a student
                 is entitled to tell them apart while they are sitting it. */}
