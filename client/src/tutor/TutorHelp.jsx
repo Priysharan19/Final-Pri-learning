@@ -91,8 +91,10 @@ export default function TutorHelp({ question, work, locale, onUsed, onClose }) {
       setUsed(reached);
       onUsed?.(reached);
       if (level === 3) {
-        openWalkthrough(r?.walkthrough?.solution);
-        note(3, { text: t('tutor.walkthroughReady'), source: 'deterministic' });
+        const solution = r?.walkthrough?.solution;
+        openWalkthrough(solution);
+        // No verified steps means no walkthrough to open: say so plainly.
+        note(3, { text: solution?.steps?.length ? t('tutor.walkthroughReady') : null, source: 'deterministic' });
       } else {
         note(level, {
           text: r?.message || null,

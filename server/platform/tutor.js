@@ -97,7 +97,7 @@ export function validateTutorRequest(body) {
     }
   }
   if (!isText(q.answer, LIMITS.answer, { required: true })) return invalid('question.answer is required: the guard checks every reply against it.', 'TUTOR_UNGROUNDED');
-  if (q.hints !== undefined && (!Array.isArray(q.hints) || q.hints.length > LIMITS.hints || !q.hints.every(h => isText(h, LIMITS.hint)))) {
+  if (q.hints !== undefined && (!Array.isArray(q.hints) || q.hints.length > LIMITS.hints || !q.hints.every(h => typeof h === 'string' && h.length <= LIMITS.hint))) {
     return invalid('question.hints must be a short list of authored hints.');
   }
 
@@ -105,7 +105,7 @@ export function validateTutorRequest(body) {
   if (!plain(work)) return invalid('studentWork must be an object.');
   const wUnknown = closed(work, ['lines', 'typedAnswer', 'firstBreak', 'misconception']);
   if (wUnknown.length) return invalid(`Unexpected studentWork field: ${wUnknown.join(', ')}.`);
-  if (work.lines !== undefined && (!Array.isArray(work.lines) || work.lines.length > LIMITS.lines || !work.lines.every(l => isText(l, LIMITS.line)))) {
+  if (work.lines !== undefined && (!Array.isArray(work.lines) || work.lines.length > LIMITS.lines || !work.lines.every(l => typeof l === 'string' && l.length <= LIMITS.line))) {
     return invalid(`studentWork.lines must be at most ${LIMITS.lines} lines of at most ${LIMITS.line} characters.`);
   }
   if (!isText(work.typedAnswer, LIMITS.typed)) return invalid('studentWork.typedAnswer is bounded.');
