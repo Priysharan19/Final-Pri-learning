@@ -1,6 +1,7 @@
 import { createHash, createHmac, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import { asyncHandler } from './asyncRouter.js';
 import { asStore } from './store.js';
+import { tagPolicy } from './routePolicy.js';
 
 export const SESSION_COOKIE = 'pri_cloud_session';
 export const CSRF_COOKIE = 'pri_csrf';
@@ -76,14 +77,14 @@ export async function sessionFromRequest(db, req, now = Date.now()) {
 
 export function requireSession(db) {
   db = asStore(db);
-  return asyncHandler(async (req, res, next) => {
+  return tagPolicy(asyncHandler(async (req, res, next) => {
     const session = await sessionFromRequest(db, req);
     if (!session) return res.status(401).json({ error: { code: 'AUTH_REQUIRED', message: 'Sign in is required.' } });
     // Keep the browser/native cookie lifetime in step with the slid server row.
     if (session.slid) setSessionCookies(res, session.rawToken, SESSION_MS);
     req.platformSession = session;
     next();
-  });
+  }), { session: true });
 }
 
 export function requireVerifiedEmail(req, res, next) {
@@ -92,14 +93,15 @@ export function requireVerifiedEmail(req, res, next) {
   }
   next();
 }
+tagPolicy(requireVerifiedEmail, { verifiedEmail: true });
 
 export function requireRole(...roles) {
   const allowed = new Set(roles);
-  return (req, res, next) => {
+  return tagPolicy((req, res, next) => {
     const role = req.platformSession?.role;
     if (!role || !allowed.has(role)) return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'You do not have permission for this action.' } });
     next();
-  };
+  }, { roles: [...allowed] });
 }
 
 export function csrfGuard(req, res, next) {
@@ -114,6 +116,7 @@ export function csrfGuard(req, res, next) {
   }
   next();
 }
+tagPolicy(csrfGuard, { csrf: true });
 
 function nativeNonBrowserRequest(req) {
   // URLSession does not have a browser Origin or Fetch Metadata context. A web
@@ -160,12 +163,12 @@ export async function consumeRateLimit(db, bucket, { limit, windowMs }, now = Da
 
 export function rateLimit(db, key, options) {
   db = asStore(db);
-  return asyncHandler(async (req, res, next) => {
+  return tagPolicy(asyncHandler(async (req, res, next) => {
     const identity = req.platformSession?.account_id || req.ip || 'unknown';
     const verdict = await consumeRateLimit(db, `${key}:${sha256(identity).slice(0, 24)}`, options);
     res.set('RateLimit-Remaining', String(verdict.remaining));
     res.set('RateLimit-Reset', String(Math.ceil(verdict.resetAt / 1000)));
     if (!verdict.allowed) return res.status(429).json({ error: { code: 'RATE_LIMITED', message: 'Too many requests. Try again later.' } });
     next();
-  });
+  }), { rateLimit: { key, limit: options.limit, windowMs: options.windowMs } });
 }
