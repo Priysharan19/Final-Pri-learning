@@ -186,3 +186,32 @@
 - Consequently `/v1/health` and `/v1/handwriting/status` cannot yet be verified on the candidate, and the bounded live provider route cannot be exercised despite the handwriting credential and ceilings now being configured.
 - Physical iPad re-check: iPad Pro (11-inch) (4th generation), iPadOS 26.6.1, Developer Mode enabled, paired/connected. The actual Release destination build still fails because Xcode requires the device to be unlocked to enable development services. This remains `PHYSICAL_IPAD_BLOCKED_EXTERNAL`.
 - Final finishing state: software work is complete, but production acceptance is blocked externally by missing production auth-email configuration and the locked physical iPad. PRI-03 is not VERIFIED and PR #239 must not be merged yet.
+
+## Final software repair — install/warm budget
+
+- Exact failing head measured: `4d0dae4208037c1ce6232313b94f030b91919180`.
+- Budget before repair:
+  - install raw: `1,294,978` bytes.
+  - first-visit raw (PRECACHE + WARM): `2,150,101` bytes.
+  - first-visit gzip: `817,919` bytes.
+  - configured first-visit raw ceiling: `2,150,000` bytes.
+  - exact overage: `101` bytes.
+- Exact current-main comparison at `449be4203341a1228c590fada2604f9456b69b50`: first-visit raw `2,144,493` bytes. The PRI-03 head was therefore `5,608` bytes larger than current main on the first-visit raw path.
+- Asset isolation showed the dominant PRI-03 growth in the warm `cloudReader` chunk (`5,388 -> 10,407`, +`5,019` raw bytes), with a new shared `releaseIdentity` chunk of `1,246` raw bytes. The latter was not new functionality: `main.jsx` already installs release identity onto the runtime global at boot. The extra static import from `InkAnswer.jsx` made the bundler extract that already-bootstrapped helper into a shared first-visit chunk.
+- Repair: removed the redundant `InkAnswer.jsx -> platform/releaseIdentity.js` static edge and read the already-installed `__PRI_RELEASE_IDENTITY__` / native release-identity runtime global when recording local handwriting diagnostics. Validation still passes the release SHA through `recordLocalHandwritingDiagnostics`, and cloud readiness continues to record the server release SHA.
+- Budget ceiling changed: **NO**.
+- Budget after repair:
+  - install raw: `1,294,495` bytes.
+  - first-visit raw: `2,149,569` bytes.
+  - first-visit gzip: `817,622` bytes.
+  - headroom below the unchanged raw ceiling: `431` bytes.
+  - `npm run test:budget` — PASS, 44/44.
+- Focused validation after the repair:
+  - `npm run test:handwriting:cloud` — PASS, 52/52.
+  - `npm run test:platform:handwriting` — PASS, 70/70.
+  - `npm run build` — PASS.
+  - `npm run sync:ios` — PASS; both tracked native web bundles regenerated from the repaired client build.
+  - `npm run check:ios` — PASS; both native bundles match `client/dist` at 156 files.
+  - `node tools/check-client-network-boundary.mjs` — PASS; 203 source files scanned, one audited network-opening source.
+  - generated client/native/workflow artifact credential scan — PASS across 516 files: 0 `PRI_HANDWRITING_API_KEY`, 0 `OPENAI_API_KEY`, 0 secret-like `sk-` values.
+- The repair does not remove handwriting diagnostics, readiness/failure handling, answer-blind enforcement, offline coverage, or any budget assertion.
