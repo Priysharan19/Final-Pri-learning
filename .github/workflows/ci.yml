@@ -253,7 +253,9 @@ jobs:
 
   build:
     name: Client build and offline-first boundary
-    runs-on: ubuntu-latest
+    # The tracked iOS web payload is generated and validated on Apple's build
+    # platform; Rolldown's native chunk hashes are not stable across OSes.
+    runs-on: macos-15
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
