@@ -219,7 +219,10 @@ struct WebShell: UIViewRepresentable {
             }
             let width = max(webView.bounds.width, 1)
             let capped = max(1.0, min(scale, width / 360))
-            if abs(webView.pageZoom - capped) > 0.01 { webView.pageZoom = capped }
+            if abs(webView.pageZoom - capped) > 0.01 {
+                webView.pageZoom = capped
+                ink.webViewDidResize() // re-place the native ink surface at the new zoom
+            }
         }
 
         func detachHost() {
@@ -289,6 +292,7 @@ struct WebShell: UIViewRepresentable {
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
             // Simulator/CI only: prove the bridge contract inside real WebKit.
             applyTextSize()
+            #if DEBUG
             guard !bridgeSelfCheckRan else { return }
             if BridgeSelfCheck.requested {
                 bridgeSelfCheckRan = true
@@ -297,6 +301,7 @@ struct WebShell: UIViewRepresentable {
                 bridgeSelfCheckRan = true
                 DispatchQueue.main.asyncAfter(deadline: .now() + 2) { JourneySelfCheck.run(in: webView) }
             }
+            #endif
         }
 
         // ── Navigation policy ──

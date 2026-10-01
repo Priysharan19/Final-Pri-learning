@@ -12,6 +12,8 @@
 //   the unchanged prilearning://app origin).
 // Synthetic simulator evidence. It never stands in for a physical device.
 // ─────────────────────────────────────────────────────────────────────────────
+#if DEBUG
+// Debug/simulator builds only: never compiled into a Release (App Store) build.
 import WebKit
 
 enum JourneySelfCheck {
@@ -160,3 +162,5 @@ enum JourneySelfCheck {
         }
     }
 }
+
+#endif

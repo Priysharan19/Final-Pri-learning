@@ -75,21 +75,33 @@ jobs:
       - name: priNative bridge self-check (iPad simulator)
         run: node scripts/native-bridge-selfcheck.mjs --family ipad
 
-      # CP-04: the same shell on an iPhone simulator, and the native student
-      # journey on iPhone and iPad (onboarding → typed attempt marked →
-      # feedback → next → native ink reading → progress → relaunch
-      # persistence). SYNTHETIC / SIMULATOR evidence records are uploaded.
+      # CP-04: main is the iPad-only V1 shipping target (PRI_V1_RELEASE_SCOPE).
+      - name: Apple shipping target is iPad-only (V1)
+        run: node scripts/apple-shipping-target.mjs --check-v1
+
+      # iPhone engineering: one simulator build of a scratch copy that adds the
+      # iPhone family (never archived), reused by every step below.
+      - name: Build the simulator app (iPad + iPhone engineering copy)
+        run: |
+          set -euo pipefail
+          ENG="$(node scripts/apple-shipping-target.mjs --engineering-package "$RUNNER_TEMP/eng")"
+          (cd "$ENG" && xcodebuild -scheme PriLearning -destination 'generic/platform=iOS Simulator' -derivedDataPath "$RUNNER_TEMP/dd" build -quiet)
+          APP="$(find "$RUNNER_TEMP/dd/Build/Products" -maxdepth 2 -name '*.app' -path '*iphonesimulator*' | head -1)"
+          test -n "$APP"
+          echo "PRI_SIM_APP=$APP" >> "$GITHUB_ENV"
+
+      # The same shell on an iPhone simulator, and the native student journey
+      # on iPhone and iPad (onboarding → typed attempt marked → feedback → next
+      # → native ink reading with hardware-correct ink facts → progress →
+      # relaunch persistence). SYNTHETIC / SIMULATOR evidence records uploaded.
       - name: priNative bridge self-check (iPhone simulator)
-        run: node scripts/native-bridge-selfcheck.mjs --family iphone
+        run: node scripts/native-bridge-selfcheck.mjs --family iphone --app "$PRI_SIM_APP"
 
       - name: Native student journey (iPhone simulator)
-        run: node scripts/iphone-journey.mjs --family iphone --evidence journey-iphone.json
+        run: node scripts/iphone-journey.mjs --family iphone --app "$PRI_SIM_APP" --evidence journey-iphone.json
 
       - name: Native student journey (iPad simulator)
-        run: node scripts/iphone-journey.mjs --family ipad --evidence journey-ipad.json
-
-      - name: Apple shipping target (V1 is iPad-only; main keeps iPhone engineering)
-        run: node scripts/apple-shipping-target.mjs --status
+        run: node scripts/iphone-journey.mjs --family ipad --app "$PRI_SIM_APP" --evidence journey-ipad.json
 
       - name: Simulator evidence records
         if: always()

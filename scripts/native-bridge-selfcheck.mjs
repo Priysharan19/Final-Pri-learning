@@ -19,10 +19,11 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { existsSync, mkdtempSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
+import { engineeringPackage } from './apple-shipping-target.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PACKAGE = join(HERE, '../ios/PriLearning.swiftpm');
-const EXPECTED = ['hostPresent', 'deepFrozen', 'notReplaceable', 'noOsIdentity', 'mainRoundTrip', 'subframeRefused', 'subframeHasNoHost'];
+const EXPECTED = ['hostPresent', 'deepFrozen', 'notReplaceable', 'noOsIdentity', 'mainRoundTrip', 'subframeRefused', 'subframeHasNoHost', 'inkPlacementZoom'];
 
 // `log show --start` takes LOCAL time; a UTC stamp would re-read hours of old runs.
 const localStamp = d => { const p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`; };
@@ -65,13 +66,20 @@ function builtApp(derived) {
 
 const sim = pickDevice();
 const device = sim.udid;
+const udid = device;
 console.log(`priNative bridge self-check on ${sim.name} (${sim.udid}) (synthetic simulator evidence)\n`);
 ensureBooted(sim);
-const derived = mkdtempSync(join(tmpdir(), 'pri-bridge-'));
-console.log('Building…');
-run('xcodebuild', ['-scheme', 'PriLearning', '-destination', `platform=iOS Simulator,id=${device}`,
-  '-derivedDataPath', derived, 'build'], { cwd: PACKAGE });
-const app = builtApp(derived);
+// `main` is iPad-only (the V1 shipping target); an iPhone simulator run builds
+// the engineering copy that adds the iPhone family. --app reuses a prebuilt
+// simulator .app (CI builds once and runs every step against it).
+let app = argOf('app');
+if (!app) {
+  const derived = mkdtempSync(join(tmpdir(), 'pri-sim-'));
+  const pkg = /iPhone/.test(sim.name) ? engineeringPackage(join(derived, 'pkg')) : PACKAGE;
+  console.log(`Building ${pkg === PACKAGE ? 'the canonical package' : 'the iPhone engineering copy'}…`);
+  run('xcodebuild', ['-scheme', 'PriLearning', '-destination', `platform=iOS Simulator,id=${udid}`, '-derivedDataPath', derived, 'build'], { cwd: pkg });
+  app = builtApp(derived);
+}
 const bundleId = run('/usr/bin/plutil', ['-extract', 'CFBundleIdentifier', 'raw', '-o', '-', join(app, 'Info.plist')]).trim();
 try { run('xcrun', ['simctl', 'terminate', device, bundleId]); } catch { /* not running */ }
 run('xcrun', ['simctl', 'install', device, app]);

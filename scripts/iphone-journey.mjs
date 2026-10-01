@@ -20,6 +20,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { existsSync, mkdtempSync, readdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
+import { engineeringPackage } from './apple-shipping-target.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, '..');
@@ -75,7 +76,8 @@ function launchAndRead(udid, bundleId, flag, phase) {
     // Only this launch: everything after its own "started <phase>" line.
     const start = lines.lastIndexOf(`PRIJOURNEY started ${phase}`);
     lines = start >= 0 ? lines.slice(start) : [];
-    if (lines.some(l => l.startsWith(`PRIJOURNEY summary ${phase}`)) || lines.some(l => l.startsWith('PRIJOURNEY FAIL script'))) break;
+    if (lines.some(l => l.startsWith(`PRIJOURNEY summary ${phase}`))) { execSync('sleep 3'); break; } // let WebKit flush storage
+    if (lines.some(l => /^PRIJOURNEY FAIL (script|unreadable)/.test(l))) break;
   }
   try { run('xcrun', ['simctl', 'terminate', udid, bundleId]); } catch { /* already gone */ }
   return lines;
@@ -85,10 +87,17 @@ const sim = pickDevice();
 const udid = sim.udid;
 console.log(`Native student journey on ${sim.name} (${udid}) — SYNTHETIC / SIMULATOR evidence\n`);
 ensureBooted(sim);
-const derived = mkdtempSync(join(tmpdir(), 'pri-journey-'));
-console.log('Building…');
-run('xcodebuild', ['-scheme', 'PriLearning', '-destination', `platform=iOS Simulator,id=${udid}`, '-derivedDataPath', derived, 'build'], { cwd: PACKAGE });
-const app = builtApp(derived);
+// `main` is iPad-only (the V1 shipping target); an iPhone simulator run builds
+// the engineering copy that adds the iPhone family. --app reuses a prebuilt
+// simulator .app (CI builds once and runs every step against it).
+let app = argOf('app');
+if (!app) {
+  const derived = mkdtempSync(join(tmpdir(), 'pri-sim-'));
+  const pkg = /iPhone/.test(sim.name) ? engineeringPackage(join(derived, 'pkg')) : PACKAGE;
+  console.log(`Building ${pkg === PACKAGE ? 'the canonical package' : 'the iPhone engineering copy'}…`);
+  run('xcodebuild', ['-scheme', 'PriLearning', '-destination', `platform=iOS Simulator,id=${udid}`, '-derivedDataPath', derived, 'build'], { cwd: pkg });
+  app = builtApp(derived);
+}
 const bundleId = run('/usr/bin/plutil', ['-extract', 'CFBundleIdentifier', 'raw', '-o', '-', join(app, 'Info.plist')]).trim();
 try { run('xcrun', ['simctl', 'terminate', udid, bundleId]); } catch { /* not running */ }
 try { run('xcrun', ['simctl', 'uninstall', udid, bundleId]); } catch { /* not installed */ }
@@ -104,6 +113,13 @@ const result = (lines, name) => {
   return hit ? { ok: hit.startsWith('PRIJOURNEY ok'), detail: hit.replace(/^PRIJOURNEY (ok|FAIL) \S+\s*/, '') } : { ok: false, detail: 'not reported' };
 };
 const steps = Object.fromEntries([...FIRST.map(n => [n, result(first, n)]), ...RELAUNCH.map(n => [n, result(second, n)])]);
+// The ink facts must match the hardware: iPhone writes with a finger by default
+// and has no stylus; iPad is stylus-first. (Finger *touch* input itself remains
+// a physical-device gate: injected strokes bypass the drawing policy.)
+const wantFacts = /iPhone/.test(sim.name) ? 'stylus=false fingerDefault=true' : 'stylus=true fingerDefault=false';
+if (steps.nativeInk.ok && !steps.nativeInk.detail.startsWith(wantFacts)) {
+  steps.nativeInk = { ok: false, detail: `expected ${wantFacts}; got ${steps.nativeInk.detail}` };
+}
 const passed = Object.values(steps).filter(s => s.ok).length;
 const total = FIRST.length + RELAUNCH.length;
 let os = '';

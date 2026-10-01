@@ -20,9 +20,11 @@ let package = Package(
             bundleVersion: "2",
             appIcon: .asset("AppIcon"),
             accentColor: .presetColor(.orange),
+            // V1 ships iPad-only (docs/release/PRI_V1_RELEASE_SCOPE.md, hard
+            // blocker #1). iPhone engineering builds add .phone in a scratch
+            // copy: node scripts/apple-shipping-target.mjs --engineering-package <dir>
             supportedDeviceFamilies: [
-                .pad,
-                .phone
+                .pad
             ],
             supportedInterfaceOrientations: [
                 // iPhone is portrait-only (CP-01/CP-04 decision); iPad keeps all four.
