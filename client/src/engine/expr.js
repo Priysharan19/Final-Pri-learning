@@ -516,11 +516,10 @@ const SAMPLE_SETS = [
 //
 // Sampling at fixed points cannot see a removable hole: x/x and 1 agree at every
 // sample, but only one of them is defined at 0. A final answer is a claim about
-// a function, so where `strictDomain` is set the two sides must also agree on
-// where they are defined. The points that can differ are the ones where a
-// denominator vanishes or a log/root argument leaves its domain, so those
-// "guard" subexpressions are collected from both sides and their real roots
-// located directly rather than hoping a sample happens to land on them:
+// a function, so the marker also asks where the two sides are defined. The
+// points that can differ are the ones where a denominator vanishes or a
+// log/root argument leaves its domain, so those "guard" subexpressions are
+// collected from both sides and their real roots located directly:
 //
 // · a guard that is a polynomial in the variable (x − 25, x² − 50, 0.001x − 5)
 //   has its coefficients recovered exactly, linear and quadratic roots are
@@ -529,9 +528,34 @@ const SAMPLE_SETS = [
 // · any other guard (eˣ − e, cos x, √x − 5.5) is searched finely on [−20, 20]
 //   and coarsely, by whole numbers and sign changes, on [−1000, 1000].
 //
-// Each root is probed at the root and just either side of it, since a sign
-// guard (√(x + 30), ln(x − 30)) changes definedness across its root rather than
-// at it.
+// Definedness at a located root never depends on how exactly the root was
+// located: a guard counts as vanishing there if it changes sign within a
+// relative 10⁻⁶ of the point, or if its |value| dips to (numerically) zero
+// inside a relative 10⁻³ window. So (x − √2)² and (x − √2), located a few
+// ulps apart, are judged to vanish at the same point, and 1/(x − √2)² and
+// (x − √2)^(−2) are the same function.
+//
+// POLICY (owner-delegated default for #231). Each difference is classified:
+//
+// · ISOLATED — the sides differ only at the point itself and agree on both
+//   sides of it: x/x vs 1, (x² − 1)/(x − 1) vs x + 1, (xy)/y vs x, x⁰ vs 1,
+//   sec²x − tan²x vs 1. This is the #231 defect class and is refused under
+//   `isolatedDomain` (the marker's default for final answers). One leniency:
+//   when the hole comes only from a trigonometric (non-polynomial) guard AND
+//   the side that is defined there has poles of its own, the two are standard
+//   trigonometric identities that differ only at scattered points among
+//   singularities — tan 2x vs 2tan x/(1 − tan²x), (1 − cos x)/sin x vs tan(x/2)
+//   — and are accepted. A hole from a polynomial guard is always refused, and
+//   so is a trigonometric hole in an expression with no poles (sec²x − tan²x
+//   vs 1).
+// · INTERVAL — one side is undefined on an open interval beside the point:
+//   ln x + ln y vs ln xy, ln x² vs 2 ln x, √x·√x vs x, ln x vs ln|x|. NCERT
+//   treats these as equal under implied positivity, and marking a correct
+//   CBSE answer wrong is worse than the leniency, so they behave as on main
+//   (values compared where both are defined) unless the question authors
+//   `answer.strictDomain: true`, which the marker passes as `strictDomain`.
+//
+// `strictDomain` refuses every difference of either kind, with no leniency.
 //
 // The probe never reads e or π as a variable (e is Euler's number here even
 // though the tokenizer spells it as a one-letter name), and it reads a negative
@@ -569,27 +593,67 @@ function guardsOf(ast, acc = []) {
   return acc;
 }
 
-const NEAR_ZERO = 1e-9;
+/** A stable text for a guard, so two guard sets can be compared structurally. */
+function guardKey({ kind, g, e }) {
+  return `${kind}:${JSON.stringify(g)}${e ? `^${JSON.stringify(e)}` : ''}`;
+}
 
 /**
- * Is the expression defined at env? Exact evaluation decides wherever it can;
- * the guard tolerance only matters at a located root such as √2, where floating
- * point leaves a denominator at 1e-16 rather than 0.
+ * Does g vanish at p, allowing for p being a few ulps off the true root? It
+ * does if it changes sign within a relative 10⁻⁶ of p, or if |g| dips to
+ * (numerically) zero inside a relative 10⁻³ window — a double root such as
+ * (x − √2)² touches zero without crossing, and its smallest value at a
+ * slightly-off p is ~10⁻¹⁶ while a simple root's is ~10⁻⁸; neither is
+ * compared to a fixed tolerance.
  */
-function definedAt(ast, guards, env) {
-  if (!Number.isFinite(domainEval(ast, env))) return false;
-  for (const { kind, g, e } of guards) {
-    const v = domainEval(g, env);
-    if (!Number.isFinite(v)) return false;
-    if (kind === 'nonzero' && Math.abs(v) <= NEAR_ZERO) return false;
-    if (kind === 'positive' && v <= NEAR_ZERO) return false;
-    if (kind === 'nonnegative' && v < -NEAR_ZERO) return false;
-    if (kind === 'base' && Math.abs(v) <= NEAR_ZERO) {
-      const ev = domainEval(e, env);
-      if (!(ev > 0)) return false;          // 0^0 and 0^negative are undefined
-    }
+function vanishesNear(at, p) {
+  const g0 = at(p);
+  if (g0 === 0) return true;
+  if (!Number.isFinite(g0)) return false;
+  const es = 1e-6 * Math.max(1, Math.abs(p));
+  const sl = at(p - es), sr = at(p + es);
+  if (Number.isFinite(sl) && Number.isFinite(sr) && (Math.sign(sl) !== Math.sign(g0) || Math.sign(sr) !== Math.sign(g0))) return true;
+  const et = 1e-3 * Math.max(1, Math.abs(p));
+  const gl = at(p - et), gr = at(p + et);
+  if (!Number.isFinite(gl) || !Number.isFinite(gr)) return false;
+  const m = Math.max(Math.abs(gl), Math.abs(gr));
+  if (!(Math.abs(g0) <= 1e-3 * m)) return false;       // no dip at p
+  let a = p - et, b = p + et;
+  for (let k = 0; k < 80; k++) {
+    const m1 = a + (b - a) / 3, m2 = b - (b - a) / 3;
+    if (Math.abs(at(m1)) < Math.abs(at(m2))) b = m2; else a = m1;
   }
-  return true;
+  return Math.abs(at((a + b) / 2)) <= 1e-7 * m;
+}
+
+/**
+ * Is a side defined at the located root p of some guard? Decided from its
+ * guards (a vanishing denominator or log argument, 0 to a non-positive power)
+ * rather than by evaluating at p, because p carries the root-finder's error.
+ */
+function sideDefinedAt(ast, guards, env, name, p) {
+  const envAt = x => ({ ...env, [name]: x });
+  let near = false;
+  for (const { kind, g, e } of guards) {
+    const at = along(g, env, name);
+    if (vanishesNear(at, p)) {
+      near = true;
+      if (kind === 'nonzero' || kind === 'positive') return false;
+      if (kind === 'base' && !(domainEval(e, envAt(p)) > 0)) return false;   // 0^0, 0^negative
+      continue;                                                                // √0, 0^(1/3) are fine
+    }
+    const v = at(p);
+    if (!Number.isFinite(v)) return false;
+    if (kind === 'positive' && v <= 0) return false;
+    if (kind === 'nonnegative' && v < 0) return false;
+  }
+  const self = along(ast, env, name);
+  if (Number.isFinite(self(p))) return true;
+  if (!near) return false;
+  // just off a root where the side is defined (√ of −10⁻¹⁷): judge by the
+  // immediate neighbourhood instead
+  const es = 1e-6 * Math.max(1, Math.abs(p));
+  return Number.isFinite(self(p - es)) || Number.isFinite(self(p + es));
 }
 
 const POLY_MAX_DEGREE = 6;
@@ -653,13 +717,16 @@ function gridRoots(at, lo, hi, N, { halves = true, tangencies = true, skip = nul
     // `skip` is an interval already searched more finely
     if (skip && xs[i] >= skip[0] && xs[i + 1] <= skip[1]) continue;
     if (y0 === 0) { roots.push(xs[i]); continue; }
-    if (Math.sign(y0) !== Math.sign(y1) && y1 !== 0) {
+    const crosses = Math.sign(y0) !== Math.sign(y1) && y1 !== 0;
+    if (crosses) {
       let a = xs[i], b = xs[i + 1], fa = y0;
-      for (let k = 0; k < 80; k++) { const m = (a + b) / 2, fm = at(m); if (Math.sign(fm) === Math.sign(fa)) { a = m; fa = fm; } else b = m; }
+      for (let k = 0; k < 64; k++) { const m = (a + b) / 2, fm = at(m); if (Math.sign(fm) === Math.sign(fa)) { a = m; fa = fm; } else b = m; }
       roots.push((a + b) / 2);
     }
     // a double root (x² in a denominator) touches zero without crossing
-    if (tangencies && i > 0 && Math.abs(y0) < Math.abs(ys[i - 1]) && Math.abs(y0) <= Math.abs(y1)) {
+    // (a dip beside a sign change is that simple root, already bisected)
+    const besideCrossing = crosses || (Number.isFinite(ys[i - 1]) && Math.sign(ys[i - 1]) !== Math.sign(y0));
+    if (tangencies && i > 0 && !besideCrossing && Math.abs(y0) < Math.abs(ys[i - 1]) && Math.abs(y0) <= Math.abs(y1)) {
       let a = xs[i - 1], b = xs[i + 1];
       for (let k = 0; k < 100; k++) {
         const m1 = a + (b - a) / 3, m2 = b - (b - a) / 3;
@@ -681,8 +748,14 @@ const FAR_ROOT_CAP = 16;
  * Real roots of g as a function of `name` (other variables fixed by env),
  * within [lo, hi] — which is ±∞ when no domain was authored.
  */
+/** x ↦ ast evaluated with `name` = x and the other variables from env (one reused env object). */
+function along(ast, env, name) {
+  const scratch = { ...env };
+  return x => { scratch[name] = x; return domainEval(ast, scratch); };
+}
+
 function rootsOf(g, name, env, lo, hi) {
-  const at = x => domainEval(g, { ...env, [name]: x });
+  const at = along(g, env, name);
   const inside = x => x >= lo && x <= hi;
   const coef = polynomialOf(at);
   if (coef) {
@@ -691,7 +764,9 @@ function rootsOf(g, name, env, lo, hi) {
     if (d === 1) return [-coef[0] / coef[1]].filter(inside);
     if (d === 2) {
       const [c, b, a] = coef;
-      const disc = b * b - 4 * a * c;
+      let disc = b * b - 4 * a * c;
+      // (x − √2)² expands with rounding, so a double root can leave disc at −10⁻¹⁶
+      if (disc < 0 && -disc <= 1e-12 * Math.max(b * b, Math.abs(4 * a * c))) disc = 0;
       if (disc < 0) return [];
       // the stable form avoids cancellation when b² ≫ 4ac
       const q = -(b + (b >= 0 ? 1 : -1) * Math.sqrt(disc)) / 2;
@@ -723,55 +798,122 @@ function rootsOf(g, name, env, lo, hi) {
 }
 
 /**
- * Do a and b fail to be defined at the same places? Returns true on the first
- * point where exactly one side is defined. `range` bounds where to look (the
- * whole real line when none is authored), so an authored domain that excludes
- * a hole accepts the cancelled form.
+ * Where do a and b differ in definedness? Returns null, or
+ * { kind: 'isolated' | 'interval', lenient } for the first difference that the
+ * policy refuses (see Domain probing). `range` bounds where to look (the whole
+ * real line when none is authored), so an authored domain that excludes a
+ * hole accepts the cancelled form.
  */
-function definednessDiffers(astA, astB, names, integers, baseEnvs, range, positiveOnly) {
+function domainDifference(astA, astB, names, integers, baseEnvs, range, positiveOnly, strict) {
   const guardsA = guardsOf(astA), guardsB = guardsOf(astB);
-  const all = [...guardsA, ...guardsB];
-  if (!all.length) return false;
+  const keysA = new Set(guardsA.map(guardKey)), keysB = new Set(guardsB.map(guardKey));
+  // Pre-filter: the same guards on both sides restrict both sides alike.
+  if (keysA.size === keysB.size && [...keysA].every(k => keysB.has(k))) return null;
+  const unique = new Map();
+  for (const gd of [...guardsA, ...guardsB]) if (!unique.has(guardKey(gd))) unique.set(guardKey(gd), gd);
   const [lo, hi] = positiveOnly ? [Math.max(range[0], 1e-6), range[1]] : range;
-  if (!(hi > lo)) return false;
+  if (!(hi > lo)) return null;
+
   for (const env of baseEnvs) {
     for (const name of names) {
       if (integers.has(name)) continue;
+      const envAt = x => ({ ...env, [name]: x });
+      const polyCache = new Map();
+      const isPoly = gd => {
+        const k = guardKey(gd);
+        if (!polyCache.has(k)) polyCache.set(k, polynomialOf(along(gd.g, env, name)) !== null);
+        return polyCache.get(k);
+      };
       const points = [];
-      for (const { g } of all) points.push(...rootsOf(g, name, env, lo, hi));
-      for (const p of points) {
+      const rootsByGuard = new Map();
+      for (const [k, gd] of unique) {
+        const rs = rootsOf(gd.g, name, env, lo, hi);
+        rootsByGuard.set(k, rs);
+        points.push(...rs);
+      }
+      points.sort((x, y) => x - y);
+      const distinct = points.filter((p, i) => i === 0 || Math.abs(p - points[i - 1]) > 1e-9 * Math.max(1, Math.abs(p)));
+
+      // Does a side have poles of its own (a non-polynomial denominator that
+      // vanishes where the side is undefined)? Computed once per side.
+      const polesMemo = new Map();
+      const hasOwnPoles = (ast, guards) => {
+        if (polesMemo.has(ast)) return polesMemo.get(ast);
+        let found = false;
+        for (const gd of guards) {
+          if (gd.kind !== 'nonzero' || isPoly(gd)) continue;
+          for (const r of rootsByGuard.get(guardKey(gd)) || []) {
+            if (!sideDefinedAt(ast, guards, env, name, r)) { found = true; break; }
+          }
+          if (found) break;
+        }
+        polesMemo.set(ast, found);
+        return found;
+      };
+
+      for (const p of distinct) {
+        const a0 = sideDefinedAt(astA, guardsA, env, name, p);
+        const b0 = sideDefinedAt(astB, guardsB, env, name, p);
         const delta = Math.max(1e-4, Math.abs(p) * 1e-6);
-        const at = { ...env, [name]: p };
-        if (definedAt(astA, guardsA, at) !== definedAt(astB, guardsB, at)) return true;
-        // beside the root nothing is near zero, so exact evaluation decides
-        // there; the guard tolerance would misread x³ at x = 10⁻⁴ as a pole
+        let interval = false;
         for (const x of [p - delta, p + delta]) {
           if (x < lo || x > hi) continue;
-          const side = { ...env, [name]: x };
-          if (Number.isFinite(domainEval(astA, side)) !== Number.isFinite(domainEval(astB, side))) return true;
+          if (Number.isFinite(domainEval(astA, envAt(x))) !== Number.isFinite(domainEval(astB, envAt(x)))) interval = true;
         }
+        if (interval) {
+          if (strict) return { kind: 'interval', at: p };
+          continue;
+        }
+        if (a0 === b0) continue;
+        // isolated: exactly one side has a hole at p and they agree around it
+        if (strict) return { kind: 'isolated', at: p };
+        const [holeAst, holeGuards, fullAst, fullGuards] = a0 ? [astB, guardsB, astA, guardsA] : [astA, guardsA, astB, guardsB];
+        const causes = holeGuards.filter(gd => vanishesNear(along(gd.g, env, name), p));
+        const trigonometric = causes.length > 0 && causes.every(gd => !isPoly(gd));
+        if (trigonometric && hasOwnPoles(fullAst, fullGuards)) continue;      // identity among poles
+        return { kind: 'isolated', at: p };
       }
     }
   }
-  return false;
+  return null;
 }
+
+const EQUIV_CACHE = new Map();
+const EQUIV_CACHE_MAX = 2000;
 
 /**
  * Are two expressions equivalent as functions of their variables?
  * Samples both over shared variable assignments and compares.
  *
- * `strictDomain` additionally requires the two to be defined at the same
- * points (see Domain probing above). Use it where the expression is the
- * student's final answer. Leave it off for a line of working compared with the
- * expression the working started from: cancelling a common factor is a valid
- * step, and the line after it is meant to lose the hole.
+ * Final answers add a domain comparison (see Domain probing above):
+ * `isolatedDomain` refuses an isolated removable-point difference (the #231
+ * class: x/x vs 1), and `strictDomain` refuses every definedness difference,
+ * interval ones included. Leave both off for a line of working compared with
+ * the expression the working started from: cancelling a common factor is a
+ * valid step, and the line after it is meant to lose the hole.
  */
 export function exprEquivalent(a, b, opts = {}) {
+  const cacheable = typeof a === 'string' && typeof b === 'string' && (opts.strictDomain || opts.isolatedDomain);
+  let key;
+  if (cacheable) {
+    key = `${a}\u0001${b}\u0001${JSON.stringify(opts)}`;
+    if (EQUIV_CACHE.has(key)) return EQUIV_CACHE.get(key);
+  }
+  const result = exprEquivalentUncached(a, b, opts);
+  if (cacheable) {
+    if (EQUIV_CACHE.size >= EQUIV_CACHE_MAX) EQUIV_CACHE.clear();
+    EQUIV_CACHE.set(key, result);
+  }
+  return result;
+}
+
+function exprEquivalentUncached(a, b, opts) {
   let astA, astB;
   try { astA = typeof a === 'string' ? parse(a) : a; astB = typeof b === 'string' ? parse(b) : b; }
   catch { return false; }
   if (astA.t === 'equation' || astB.t === 'equation') return false;
 
+  const finalAnswer = Boolean(opts.strictDomain || opts.isolatedDomain);
   const vars = new Set([...variablesOf(astA), ...variablesOf(astB)]);
   const names = [...vars];
   const integers = new Set([...integerVarsOf(astA), ...integerVarsOf(astB)]);
@@ -791,17 +933,25 @@ export function exprEquivalent(a, b, opts = {}) {
       });
       const va = evaluate(astA, env);
       const vb = evaluate(astB, env);
-      if (opts.strictDomain) {
+      let domainValid = false;
+      if (finalAnswer) {
         // definedness is judged with e as Euler's number and odd roots real
         const denv = domainEnv(env);
         const da = domainEval(astA, denv), db = domainEval(astB, denv);
-        if (Number.isFinite(da) !== Number.isFinite(db)) return false;
+        if (opts.strictDomain && Number.isFinite(da) !== Number.isFinite(db)) return false;
         // where an odd root makes both sides real, they must also agree there:
         // (x²)^(1/6) is |x|^(1/3), not x^(1/3)
-        if (Number.isFinite(da) && Math.abs(da - db) > 1e-6 * Math.max(1, Math.abs(da), Math.abs(db))) return false;
+        if (Number.isFinite(da) && Number.isFinite(db)) {
+          if (Math.abs(da - db) > 1e-6 * Math.max(1, Math.abs(da), Math.abs(db))) return false;
+          domainValid = true;
+        }
         envs.push(denv);
       }
-      if (!Number.isFinite(va) || !Number.isFinite(vb)) continue;
+      if (!Number.isFinite(va) || !Number.isFinite(vb)) {
+        // (−x)^(1/3) and −x^(1/3) are only both real under the odd-root reading
+        if (domainValid) { valid++; matches++; }
+        continue;
+      }
       valid++;
       const scale = Math.max(1, Math.abs(va), Math.abs(vb));
       if (Math.abs(va - vb) > 1e-6 * scale) return false;
@@ -809,13 +959,14 @@ export function exprEquivalent(a, b, opts = {}) {
     }
   }
   if (!(valid >= Math.min(3, needed) && matches === valid)) return false;
-  if (opts.strictDomain) {
+  if (finalAnswer) {
     // Without an authored domain, look along the whole real line: a hole at
     // x = 25 is as real as one at x = 1.
     const range = opts.domain || [-Infinity, Infinity];
     const domainNames = names.filter(n => !DOMAIN_CONSTANTS.has(n));
-    const bases = envs.filter(env => domainNames.every(n => Number.isFinite(env[n]))).slice(0, 2);
-    if (definednessDiffers(astA, astB, domainNames, integers, bases, range, opts.positiveOnly)) return false;
+    // one base point is enough for one variable; two cover the others' values
+    const bases = envs.slice(0, domainNames.length > 1 ? 2 : 1);
+    if (domainDifference(astA, astB, domainNames, integers, bases, range, opts.positiveOnly, Boolean(opts.strictDomain))) return false;
   }
   return true;
 }

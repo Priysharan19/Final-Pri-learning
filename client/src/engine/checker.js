@@ -216,7 +216,7 @@ export function checkWorking(q, workingText) {
       const cleaned = normalize(lastLine.text).replace(/^∴\s*/, '');
       if (ans.final?.kind === 'expr') {
         const cand = cleaned.includes('=') ? cleaned.split('=').pop() : cleaned;
-        reached = exprEquivalent(cand, ans.final.expr, { positiveOnly: ans.final.positiveOnly, strictDomain: true });
+        reached = exprEquivalent(cand, ans.final.expr, { positiveOnly: ans.final.positiveOnly, isolatedDomain: true, strictDomain: ans.final.strictDomain === true });
       } else if (meta.kind === 'equation') {
         const re = new RegExp(`${meta.variable}\\s*=`);
         if (re.test(cleaned)) {

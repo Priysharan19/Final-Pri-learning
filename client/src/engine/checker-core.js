@@ -275,8 +275,10 @@ export function checkAnswer(question, rawInput) {
         // is a variable the student named, not a unit they appended.
         let student = cleanInput(rawInput, { stripUnits: false });
         if (ans.stripC) student = student.replace(/[+\-]\s*c\s*$/i, '').trim();
-        // A final answer is a function: it must also be defined where the answer is.
-        const opts = { domain: ans.domain, positiveOnly: ans.positiveOnly, strictDomain: true };
+        // A final answer is a function: it must not add or remove an isolated
+        // hole (x/x is not 1). Interval differences (ln x² vs 2 ln x) are only
+        // refused where the question authors `strictDomain: true`.
+        const opts = { domain: ans.domain, positiveOnly: ans.positiveOnly, isolatedDomain: true, strictDomain: ans.strictDomain === true };
         const candidates = [ans.expr, ...(ans.anyOf || [])];
         for (const cand of candidates) {
           if (exprEquivalent(student, cand, opts)) {
@@ -468,7 +470,7 @@ export function checkWorking(q, workingText) {
     const cleaned = normalize(lastLine.text).replace(/^∴\s*/, '');
     if (ans.final?.kind === 'expr') {
       const cand = cleaned.includes('=') ? cleaned.split('=').pop() : cleaned;
-      reached = exprEquivalent(cand, ans.final.expr, { positiveOnly: ans.final.positiveOnly, strictDomain: true });
+      reached = exprEquivalent(cand, ans.final.expr, { positiveOnly: ans.final.positiveOnly, isolatedDomain: true, strictDomain: ans.final.strictDomain === true });
     } else if (meta.kind === 'equation') {
       // must pin the variable to a solution: "x = 3" (or list all solutions)
       const re = new RegExp(`${meta.variable}\\s*=`);

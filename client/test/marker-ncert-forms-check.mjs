@@ -518,6 +518,75 @@ ok(marks('1', '(x-25)/(x-25)') === false, 'marker: (x-25)/(x-25) is not accepted
 differ('x^0', '1', strict, 'policy: x^0 is undefined at 0');
 differ('sec(x)^2-tan(x)^2', '1', strict, 'policy: sec²x − tan²x is undefined at odd multiples of π/2');
 
+// ── 16. Second review of PR #243: touching roots and the domain policy ────────
+// The marker's default for a final answer is `isolatedDomain`: an isolated
+// removable-point difference is refused (the #231 class), an interval
+// difference is not unless the question authors `strictDomain: true`.
+const isolated = { isolatedDomain: true };
+const finalMark = (expr, input, extra = {}) =>
+  checkAnswer({ answerType: 'expression', answer: { expr, ...extra }, prompt: 'Simplify' }, input).correct;
+
+// Touching roots: one side squares the factor the other side leaves unsquared.
+// Definedness at the root must not depend on where the root-finder put it.
+const touching = [
+  ['ln(abs(sec(x)+tan(x)))', 'ln(abs(tan(pi/4+x/2)))'],
+  ['ln(abs(sec(x)+tan(x)))', '-ln(abs(sec(x)-tan(x)))'],
+  ['ln(abs(cosec(x)-cot(x)))', 'ln(abs(tan(x/2)))'],
+  ['sin(x)/(1+cos(x))', 'tan(x/2)'],
+  ['1/(x-sqrt(2))^2', '(x-sqrt(2))^(-2)'],
+  ['1/(x-1/3)^2', '(x-1/3)^(-2)'],
+  ['1/(x-sqrt(2))^2', '1/(x-sqrt(2))/(x-sqrt(2))'],
+  ['ln((x-sqrt(2))^2)', '2*ln(abs(x-sqrt(2)))']
+];
+for (const [a, b] of touching) {
+  same(a, b, isolated, 'touching root, default policy');
+  same(b, a, isolated, 'touching root, default policy, either order');
+  same(a, b, strict, 'touching root, strict domain');
+  ok(finalMark(b, a) === true, `marker: ${a} is accepted for ${b}`);
+}
+
+// Interval differences behave as on main by default (NCERT's implied positivity)…
+const intervals = [
+  ['ln(x)+ln(y)', 'ln(x*y)'],
+  ['ln(x^2)', '2*ln(x)'],
+  ['sqrt(x)*sqrt(x)', 'x'],
+  ['ln(x)', 'ln(abs(x))'],
+  ['sqrt(x)^2', 'x']
+];
+for (const [a, b] of intervals) {
+  same(a, b, isolated, 'interval difference accepted by default');
+  ok(finalMark(b, a) === true, `marker: ${a} is accepted for ${b} by default`);
+  // …and are refused where the question authors a strict domain.
+  differ(a, b, strict, 'interval difference refused under strictDomain');
+  ok(finalMark(b, a, { strictDomain: true }) === false, `marker: ${a} is refused for ${b} when the question sets strictDomain`);
+}
+
+// The #231 class, isolated removable points, is refused by default.
+const holes = [
+  ['x/x', '1'], ['(x^2-1)/(x-1)', 'x+1'], ['(x*y)/y', 'x'], ['x^0', '1'],
+  ['sec(x)^2-tan(x)^2', '1'], ['(x-25)/(x-25)', '1'], ['(e^x-1)/(e^x-1)', '1']
+];
+for (const [a, b] of holes) {
+  differ(a, b, isolated, 'isolated hole refused by default');
+  ok(finalMark(b, a) === false, `marker: ${a} is refused for ${b}`);
+}
+
+// Trigonometric identities that differ only at scattered points among poles of
+// both sides are accepted by default and refused under strictDomain.
+for (const [a, b] of [['tan(2x)', '2tan(x)/(1-tan(x)^2)'], ['(1-cos(x))/sin(x)', 'tan(x/2)']]) {
+  same(a, b, isolated, 'trigonometric identity among poles, default policy');
+  ok(finalMark(a, b) === true, `marker: ${b} is accepted for ${a}`);
+  differ(a, b, strict, 'trigonometric identity refused under strictDomain');
+}
+
+// The odd-root reading also compares values: (−x)^(1/3) is −x^(1/3).
+same('(-x)^(1/3)', '-x^(1/3)', isolated, 'odd root of a negated variable');
+same('(-x)^(1/3)', '-x^(1/3)', strict, 'odd root of a negated variable, strict');
+
+// A repeated (key, answer) pair is answered from the cache with the same verdict.
+ok(exprEquivalent('x/x', '1', isolated) === false && exprEquivalent('x/x', '1', isolated) === false, 'domain: cached verdict is stable');
+ok(exprEquivalent('tan(2x)', '2tan(x)/(1-tan(x)^2)', isolated) === true, 'domain: cached acceptance is stable');
+
 console.log(failures.length
   ? `NCERT ANSWER FORMS: FAIL — ${failures.length} of ${pass + failures.length} checks failed\n  · ${failures.join('\n  · ')}`
   : `NCERT ANSWER FORMS: PASS — ${pass}/${pass} checks — solution sets, inequality/interval equivalence, matrices, vectors, the n!/nCr/nPr/sec/cosec/cot vocabulary, rupees and paise, fraction form only where the question asks for it, blank answers, exact integers, the percent sign, unit-named variables and domain-aware final answers.`);
