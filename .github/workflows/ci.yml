@@ -121,6 +121,23 @@ jobs:
     name: Production account, sync and commercial schema
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # A throwaway Postgres for the Supabase schema gates (ADR-0001). It lives
+    # only for this job, trusts loopback connections and holds no credential;
+    # the suites create, migrate and drop their own scratch databases in it.
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      PRI_TEST_PG_ADMIN_URL: postgres://postgres@localhost:5432/postgres
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -177,6 +194,18 @@ jobs:
           node server/test/content-index-exposure-check.mjs
       - name: Commercial platform schema contract
         run: node server/test/platform-schema-check.mjs
+      - name: Supabase schema parity (migration text)
+        run: node server/test/postgres-schema-parity-check.mjs
+      - name: Platform store, concurrency and fail-closed startup (SQLite)
+        run: |
+          node server/test/platform-store-check.mjs
+          node server/test/platform-concurrency-check.mjs
+          node server/test/platform-startup-check.mjs
+      - name: Supabase migrations and every engine-agnostic platform suite on real Postgres
+        run: |
+          set -o pipefail
+          node scripts/with-postgres.mjs node server/test/run-platform-postgres.mjs 2>&1 | tee platform-postgres.log
+          grep -Fq 'PLATFORM ON POSTGRES: PASS' platform-postgres.log
       - name: Platform migration contract
         run: node server/test/platform-migration-check.mjs
       - name: Cross-account sync pagination regression

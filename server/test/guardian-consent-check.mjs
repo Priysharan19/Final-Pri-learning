@@ -60,17 +60,17 @@ for (const id of ['acct-child', 'acct-adult']) {
     VALUES (?,?,?,?,?,?,?,?)`).run(`ses-${id}`, id, sha256(`raw-${id}`), 'ipad', null, now, now, now + 86400000);
 }
 
-eq(consentState(db, 'acct-adult').state, 'not-required', 'an account with no consent row needs none — that is what "no row" means');
-recordConsentRequest(db, { accountId: 'acct-child', name: 'Meera Rao', email: 'meera@example.test', tokenHash: 'tok', now });
-eq(consentState(db, 'acct-child').state, 'pending', 'a child starts pending');
-eq(consentState(db, 'acct-child').row.notice_version, CONSENT_NOTICE_VERSION, 'and records which notice was agreed to');
-eq(consentState(db, 'acct-child').row.method, CONSENT_METHOD, 'and how, so no later reader mistakes it for more');
-ok(confirmConsent(db, 'acct-child', now), 'a guardian confirms');
-eq(consentState(db, 'acct-child').state, 'given', 'and the account is permitted');
-ok(!confirmConsent(db, 'acct-child', now), 'confirming twice changes nothing');
-ok(withdrawConsent(db, 'acct-child', now + 1), 'a guardian withdraws');
-eq(consentState(db, 'acct-child').state, 'withdrawn', 'and the account is not permitted again');
-ok(consentState(db, 'acct-child').row.requested_at > 0 && consentState(db, 'acct-child').row.confirmed_at > 0,
+eq((await consentState(db, 'acct-adult')).state, 'not-required', 'an account with no consent row needs none — that is what "no row" means');
+await recordConsentRequest(db, { accountId: 'acct-child', name: 'Meera Rao', email: 'meera@example.test', tokenHash: 'tok', now });
+eq((await consentState(db, 'acct-child')).state, 'pending', 'a child starts pending');
+eq((await consentState(db, 'acct-child')).row.notice_version, CONSENT_NOTICE_VERSION, 'and records which notice was agreed to');
+eq((await consentState(db, 'acct-child')).row.method, CONSENT_METHOD, 'and how, so no later reader mistakes it for more');
+ok(await confirmConsent(db, 'acct-child', now), 'a guardian confirms');
+eq((await consentState(db, 'acct-child')).state, 'given', 'and the account is permitted');
+ok(!(await confirmConsent(db, 'acct-child', now)), 'confirming twice changes nothing');
+ok(await withdrawConsent(db, 'acct-child', now + 1), 'a guardian withdraws');
+eq((await consentState(db, 'acct-child')).state, 'withdrawn', 'and the account is not permitted again');
+ok((await consentState(db, 'acct-child')).row.requested_at > 0 && (await consentState(db, 'acct-child')).row.confirmed_at > 0,
   'the record keeps that it was asked and given, rather than being deleted — a guardian may need that shown back');
 
 // ── 4 · The gate, over HTTP ──────────────────────────────────────────────────
@@ -96,7 +96,7 @@ try {
   ok(/stays on this device/i.test(pending.json?.error?.message || ''),
     'and the student is told their work is safe, because it is — nothing has been lost, it simply has not synced');
 
-  confirmConsent(db, 'acct-child', now);
+  await confirmConsent(db, 'acct-child', now);
   eq((await call('acct-child')).status, 200, 'once confirmed, it passes');
 } finally {
   server.close();

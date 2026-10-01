@@ -13,6 +13,7 @@ process.env.PRI_GOOGLE_CLIENT_IDS = 'pri-google-client,pri-google-client-ios';
 process.env.PRI_APPLE_CLIENT_IDS = 'com.prilearning.app';
 
 const { startApp, registerAccount, checks } = await import('./support/app-harness.mjs');
+const { requestedEngine } = await import('./support/engine.mjs');
 const { verifyIdentityToken, clearOidcKeyCacheForTests } = await import('../platform/oidc.js');
 const { sha256 } = await import('../platform/security.js');
 
@@ -99,7 +100,8 @@ const code = error => error?.code;
 }
 
 // ── identities.js over HTTP ───────────────────────────────────────────────
-const h = await startApp();
+// SQLite by default; `--engine=postgres` runs it on a migrated Postgres.
+const h = await startApp({ engine: requestedEngine() });
 const db = h.db;
 const issueNonce = async () => {
   const r = await h.request('/v1/account/identity/nonce', { method: 'POST', body: {} });
@@ -116,12 +118,12 @@ try {
   const madeUp = await signIn('google', { idToken: mintToken({ claims: { nonce: 'client-picked' } }), nonce: 'client-picked' });
   c.eq(madeUp.status, 401, 'a client-picked nonce the server never issued is refused');
   c.eq(madeUp.data.error.code, 'OIDC_NONCE_INVALID', 'named OIDC_NONCE_INVALID');
-  c.eq(db.prepare('SELECT COUNT(*) AS n FROM accounts').get().n, 0, 'no account created');
+  c.eq((await db.get('SELECT COUNT(*) AS n FROM accounts')).n, 0, 'no account created');
 
   const issued = await issueNonce();
   c.match(issued.nonce, /^[A-Za-z0-9_-]{24,}$/, 'server issues an opaque nonce');
   c.ok(issued.expiresAt > Date.now() + 5 * 60 * 1000, 'nonce carries an expiry');
-  const nonceRow = db.prepare('SELECT * FROM oidc_nonces WHERE nonce_hash=?').get(sha256(issued.nonce));
+  const nonceRow = (await db.get('SELECT * FROM oidc_nonces WHERE nonce_hash=?', [sha256(issued.nonce)]));
   c.ok(nonceRow && nonceRow.consumed_at === null, 'nonce stored as a hash, unconsumed');
   c.ok(!Object.values(nonceRow).includes(issued.nonce), 'the raw nonce is not stored');
 
@@ -131,7 +133,7 @@ try {
   c.eq(created.data.account.emailVerified, true, 'provider-vouched email counts as verified');
   c.eq(created.data.account.role, 'student', 'social accounts are students');
   c.ok(created.jar.pri_cloud_session && created.jar.pri_csrf, 'session + CSRF cookies issued');
-  c.ok(db.prepare('SELECT consumed_at FROM oidc_nonces WHERE nonce_hash=?').get(sha256(issued.nonce)).consumed_at, 'nonce consumed');
+  c.ok((await db.get('SELECT consumed_at FROM oidc_nonces WHERE nonce_hash=?', [sha256(issued.nonce)])).consumed_at, 'nonce consumed');
   c.eq((await h.request('/v1/account/me', { jar: created.jar })).data.account.id, created.data.account.id, 'session is live');
 
   const replay = await signIn('google', { idToken: mintToken({ claims: { nonce: issued.nonce } }), nonce: issued.nonce });
@@ -144,7 +146,7 @@ try {
   c.eq(linkedSignIn.data.created, false, 'not created twice');
 
   const expired = await issueNonce();
-  db.prepare('UPDATE oidc_nonces SET expires_at=? WHERE nonce_hash=?').run(Date.now() - 1, sha256(expired.nonce));
+  await db.run('UPDATE oidc_nonces SET expires_at=? WHERE nonce_hash=?', [Date.now() - 1, sha256(expired.nonce)]);
   c.eq((await signIn('google', { idToken: mintToken({ claims: { nonce: expired.nonce } }), nonce: expired.nonce })).data.error.code, 'OIDC_NONCE_INVALID', 'an expired nonce is refused');
 
   const badToken = await issueNonce();
@@ -177,18 +179,18 @@ try {
   const noReauthNonce = await h.request('/v1/account', { method: 'DELETE', jar: created.jar, body: { provider: 'google', idToken: mintToken({ claims: { nonce: 'stale' } }), nonce: 'stale' } });
   c.eq(noReauthNonce.status, 401, 'deletion with an unissued nonce is refused');
   c.eq(noReauthNonce.data.error.code, 'OIDC_NONCE_INVALID', 'named as a nonce failure');
-  c.ok(db.prepare('SELECT 1 FROM accounts WHERE id=?').get(created.data.account.id), 'account survives the refused deletion');
+  c.ok((await db.get('SELECT 1 FROM accounts WHERE id=?', [created.data.account.id])), 'account survives the refused deletion');
   const reauth = await issueNonce();
   const deleted = await h.request('/v1/account', { method: 'DELETE', jar: created.jar, body: { provider: 'google', idToken: mintToken({ claims: { nonce: reauth.nonce } }), nonce: reauth.nonce } });
   c.eq(deleted.status, 200, 'deletion with a fresh server-issued nonce and matching token succeeds');
   c.deq(deleted.data, { deleted: true }, 'deleted');
-  c.eq(db.prepare('SELECT 1 FROM accounts WHERE id=?').get(created.data.account.id), undefined, 'account row gone');
+  c.eq((await db.get('SELECT 1 FROM accounts WHERE id=?', [created.data.account.id])), undefined, 'account row gone');
 
   c.eq((await signIn('facebook', { idToken: 'x', nonce: 'y' })).status, 404, 'unsupported provider over HTTP is 404');
 } finally {
   await h.close();
-  db.close();
   globalThis.fetch = realFetch;
 }
 
+console.log(`engine: ${h.engine}`);
 console.log(`OIDC VERIFICATION — PASS — ${c.count()}/${c.count()} checks`);

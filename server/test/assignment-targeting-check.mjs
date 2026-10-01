@@ -12,7 +12,7 @@
 import assert from 'node:assert/strict';
 import express from 'express';
 import cookieParser from 'cookie-parser';
-import { createPlatformDb } from '../platform/db.js';
+import { openTestStore } from './support/engine.mjs';
 import { createClassRouter } from '../platform/classes.js';
 import { classAnalytics, validateAssignmentSpecification, DROP_POINTS, INACTIVE_DAYS } from '../platform/assignmentTargets.js';
 import { SESSION_COOKIE, sha256 } from '../platform/security.js';
@@ -63,7 +63,9 @@ ok(/object/.test(bad('nope')), 'a non-object spec is refused');
 ok(/at most 20/.test(bad({ subtopics: new Array(21).fill('c10-polynomials') })), 'the chapter list is bounded');
 
 // ── 2 · the real router, seeded ──────────────────────────────────────────────
-const db = createPlatformDb(':memory:');
+// SQLite by default; `--engine=postgres` runs it on a migrated Postgres.
+const testStore = await openTestStore(undefined, { label: 'assignment_targeting' });
+const db = testStore.store;
 for (const [id, email, name, role] of [
   ['teacher-1', 'teacher@example.test', 'Ms Rao', 'teacher'],
   ['teacher-2', 'teacher2@example.test', 'Mr Iyer', 'teacher'],
@@ -71,29 +73,29 @@ for (const [id, email, name, role] of [
   ['student-2', 'bharat@example.test', 'Bharat', 'student'],
   ['student-3', 'chitra@example.test', 'Chitra', 'student']
 ]) {
-  db.prepare(`INSERT INTO accounts(id,email,name,role,created_at,updated_at) VALUES (?,?,?,?,?,?)`).run(id, email, name, role, now - 40 * DAY, now - 40 * DAY);
-  db.prepare(`INSERT INTO account_sessions(id,account_id,token_hash,device_id,user_agent_hash,created_at,last_seen_at,expires_at)
-    VALUES (?,?,?,?,?,?,?,?)`).run(`ses-${id}`, id, sha256(`raw-${id}`), 'test', null, now, now, now + 30 * DAY);
+  await db.run(`INSERT INTO accounts(id,email,name,role,created_at,updated_at) VALUES (?,?,?,?,?,?)`, [id, email, name, role, now - 40 * DAY, now - 40 * DAY]);
+  await db.run(`INSERT INTO account_sessions(id,account_id,token_hash,device_id,user_agent_hash,created_at,last_seen_at,expires_at)
+    VALUES (?,?,?,?,?,?,?,?)`, [`ses-${id}`, id, sha256(`raw-${id}`), 'test', null, now, now, now + 30 * DAY]);
 }
-db.prepare(`INSERT INTO classes(id,teacher_account_id,name,join_code_hash,created_at) VALUES ('class-1','teacher-1','Class 10 A','hash-a',?)`).run(now - 30 * DAY);
-db.prepare(`INSERT INTO classes(id,teacher_account_id,name,join_code_hash,created_at) VALUES ('class-2','teacher-2','Class 10 B','hash-b',?)`).run(now - 30 * DAY);
-db.prepare(`INSERT INTO class_members(class_id,student_account_id,joined_at) VALUES ('class-1','student-1',?)`).run(now - 30 * DAY);
-db.prepare(`INSERT INTO class_members(class_id,student_account_id,joined_at) VALUES ('class-1','student-2',?)`).run(now - 30 * DAY);
-db.prepare(`INSERT INTO class_members(class_id,student_account_id,joined_at) VALUES ('class-1','student-3',?)`).run(now - 10 * DAY);
+await db.run(`INSERT INTO classes(id,teacher_account_id,name,join_code_hash,created_at) VALUES ('class-1','teacher-1','Class 10 A','hash-a',?)`, [now - 30 * DAY]);
+await db.run(`INSERT INTO classes(id,teacher_account_id,name,join_code_hash,created_at) VALUES ('class-2','teacher-2','Class 10 B','hash-b',?)`, [now - 30 * DAY]);
+await db.run(`INSERT INTO class_members(class_id,student_account_id,joined_at) VALUES ('class-1','student-1',?)`, [now - 30 * DAY]);
+await db.run(`INSERT INTO class_members(class_id,student_account_id,joined_at) VALUES ('class-1','student-2',?)`, [now - 30 * DAY]);
+await db.run(`INSERT INTO class_members(class_id,student_account_id,joined_at) VALUES ('class-1','student-3',?)`, [now - 10 * DAY]);
 
-const insertAssignment = (id, title, spec, dueAt, createdAt) => db.prepare(`INSERT INTO assignments(id,class_id,teacher_account_id,title,specification_json,due_at,created_at)
-  VALUES (?,?,?,?,?,?,?)`).run(id, 'class-1', 'teacher-1', title, JSON.stringify(spec), dueAt, createdAt);
-insertAssignment('a1', 'Quadratics', { kind: 'practice', questionCount: 20, track: 'cbse', subtopics: ['c10-quadratic-equations'], subtopic: 'c10-quadratic-equations' }, now - 3 * DAY, now - 20 * DAY);
-insertAssignment('a2', 'AP and polynomials', { kind: 'practice', questionCount: 20, track: 'cbse', subtopics: ['c10-arithmetic-progressions', 'c10-polynomials'] }, now + 5 * DAY, now - 10 * DAY);
-insertAssignment('a3', 'Real numbers', { kind: 'practice', questionCount: 10, track: 'cbse', subtopics: ['c10-real-numbers'], subtopic: 'c10-real-numbers' }, null, now - 8 * DAY);
+const insertAssignment = (id, title, spec, dueAt, createdAt) => (db.run(`INSERT INTO assignments(id,class_id,teacher_account_id,title,specification_json,due_at,created_at)
+  VALUES (?,?,?,?,?,?,?)`, [id, 'class-1', 'teacher-1', title, JSON.stringify(spec), dueAt, createdAt]));
+await insertAssignment('a1', 'Quadratics', { kind: 'practice', questionCount: 20, track: 'cbse', subtopics: ['c10-quadratic-equations'], subtopic: 'c10-quadratic-equations' }, now - 3 * DAY, now - 20 * DAY);
+await insertAssignment('a2', 'AP and polynomials', { kind: 'practice', questionCount: 20, track: 'cbse', subtopics: ['c10-arithmetic-progressions', 'c10-polynomials'] }, now + 5 * DAY, now - 10 * DAY);
+await insertAssignment('a3', 'Real numbers', { kind: 'practice', questionCount: 10, track: 'cbse', subtopics: ['c10-real-numbers'], subtopic: 'c10-real-numbers' }, null, now - 8 * DAY);
 
-const insertSubmission = (assignmentId, studentId, state, summary, startedAt, submittedAt, updatedAt) => db.prepare(`INSERT INTO assignment_submissions(assignment_id,student_account_id,state,summary_json,started_at,submitted_at,updated_at)
-  VALUES (?,?,?,?,?,?,?)`).run(assignmentId, studentId, state, JSON.stringify(summary), startedAt, submittedAt, updatedAt);
-insertSubmission('a1', 'student-1', 'submitted', { questionsAnswered: 20, correct: 18, xp: 180, targetQuestions: 20 }, now - 16 * DAY, now - 15 * DAY, now - 15 * DAY);
-insertSubmission('a2', 'student-1', 'submitted', { questionsAnswered: 20, correct: 8, xp: 80, targetQuestions: 20 }, now - 3 * DAY, now - 2 * DAY, now - 2 * DAY);
-insertSubmission('a1', 'student-2', 'started', { questionsAnswered: 10, correct: 7, xp: 70, targetQuestions: 20 }, now - 9 * DAY, null, now - 9 * DAY);
+const insertSubmission = (assignmentId, studentId, state, summary, startedAt, submittedAt, updatedAt) => (db.run(`INSERT INTO assignment_submissions(assignment_id,student_account_id,state,summary_json,started_at,submitted_at,updated_at)
+  VALUES (?,?,?,?,?,?,?)`, [assignmentId, studentId, state, JSON.stringify(summary), startedAt, submittedAt, updatedAt]));
+await insertSubmission('a1', 'student-1', 'submitted', { questionsAnswered: 20, correct: 18, xp: 180, targetQuestions: 20 }, now - 16 * DAY, now - 15 * DAY, now - 15 * DAY);
+await insertSubmission('a2', 'student-1', 'submitted', { questionsAnswered: 20, correct: 8, xp: 80, targetQuestions: 20 }, now - 3 * DAY, now - 2 * DAY, now - 2 * DAY);
+await insertSubmission('a1', 'student-2', 'started', { questionsAnswered: 10, correct: 7, xp: 70, targetQuestions: 20 }, now - 9 * DAY, null, now - 9 * DAY);
 // A legacy row carrying keys the write guard would have stripped: the read path must not echo them.
-insertSubmission('a3', 'student-2', 'started', { questionsAnswered: 4, correct: 2, xp: 20, rawInk: [{ x: 1 }], answers: ['secret'] }, now - 9 * DAY, null, now - 9 * DAY);
+await insertSubmission('a3', 'student-2', 'started', { questionsAnswered: 4, correct: 2, xp: 20, rawInk: [{ x: 1 }], answers: ['secret'] }, now - 9 * DAY, null, now - 9 * DAY);
 
 const app = express();
 app.use(express.json());
@@ -124,7 +126,7 @@ try {
   eq(created.status, 201, 'a valid India target is accepted');
   eq(created.json.assignment.specification, { kind: 'practice', instructions: 'Use b² − 4ac.', questionCount: 5, track: 'cbse', subtopics: ['c10-quadratic-equations'], subtopic: 'c10-quadratic-equations', dotpoint: 2, difficulty: 2 },
     'the stored specification is the normalised one');
-  const storedSpec = db.prepare('SELECT specification_json FROM assignments WHERE id=?').get(created.json.assignment.id).specification_json;
+  const storedSpec = (await db.get('SELECT specification_json FROM assignments WHERE id=?', [created.json.assignment.id])).specification_json;
   ok(!/answers|strokes|leak/.test(storedSpec), 'unknown keys never reach storage');
 
   eq((await call('POST', '/classes/class-1/assignments', 'teacher-2', { title: 'Not mine', specification: { questionCount: 5 } })).status, 404, 'another teacher cannot publish into this class');
@@ -166,13 +168,15 @@ try {
   eq((await call('GET', '/classes/class-1/analytics', 'teacher-2')).status, 404, 'another teacher cannot read this class');
 
   // The pure function agrees with the route and honours its thresholds.
-  const direct = classAnalytics(db, 'class-1', now);
+  const direct = await classAnalytics(db, 'class-1', now);
   eq(direct.studentRows.map(s => s.flags.map(f => f.code)), a.studentRows.map(s => s.flags.map(f => f.code)), 'the route serves the aggregation function unchanged');
-  eq(classAnalytics(db, 'class-1', now - 8 * DAY).studentRows[1].flags.map(f => f.code), ['overdue'].filter(() => false).concat([]), `one idle day short of ${INACTIVE_DAYS} is not inactive`);
+  eq((await classAnalytics(db, 'class-1', now - 8 * DAY)).studentRows[1].flags.map(f => f.code), ['overdue'].filter(() => false).concat([]), `one idle day short of ${INACTIVE_DAYS} is not inactive`);
   ok(DROP_POINTS === 15 && INACTIVE_DAYS === 7, 'thresholds are the ones the product states: 15 points, 7 days');
 } finally {
   server.close();
-  db.close();
+  await testStore.close();
 }
+
+console.log(`engine: ${testStore.engine}`);
 
 console.log(`ASSIGNMENT TARGETING: PASS — ${checks}/${checks} checks (validator against the India curriculum, real class router over HTTP, aggregated analytics with flags)`);
