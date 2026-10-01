@@ -1,9 +1,13 @@
-import { Router } from 'express';
+import { asyncRouter } from './asyncRouter.js';
+import { asStore, sqliteHandle } from './store.js';
 import { rateLimit, requireRole, requireSession } from './security.js';
 import { INVITE_MAX_TTL_DAYS, inviteTtlDays, listTeacherInvites, mintTeacherInvite } from './teacherInvites.js';
 
 function ensureAdminTables(db) {
-  db.exec(`
+  // SQLite builds its schema at boot; Postgres is migrated (supabase/migrations).
+  const raw = sqliteHandle(db);
+  if (!raw) return;
+  raw.exec(`
     CREATE TABLE IF NOT EXISTS feature_flags (
       key TEXT PRIMARY KEY,
       enabled INTEGER NOT NULL DEFAULT 0,
@@ -15,45 +19,45 @@ function ensureAdminTables(db) {
   `);
 }
 
-function audit(db, actor, action, targetKind, targetId, metadata = {}, now = Date.now()) {
-  db.prepare(`INSERT INTO audit_log(actor_account_id,action,target_kind,target_id,metadata_json,created_at) VALUES (?,?,?,?,?,?)`)
-    .run(actor, action, targetKind, targetId, JSON.stringify(metadata), now);
+async function audit(db, actor, action, targetKind, targetId, metadata = {}, now = Date.now()) {
+  await db.run(`INSERT INTO audit_log(actor_account_id,action,target_kind,target_id,metadata_json,created_at) VALUES (?,?,?,?,?,?)`, [actor, action, targetKind, targetId, JSON.stringify(metadata), now]);
 }
 
 export function createAdminRouter(db) {
+  db = asStore(db);
   ensureAdminTables(db);
-  const router = Router();
+  const router = asyncRouter();
   router.use(requireSession(db));
   router.use(requireRole('admin'));
   router.use(rateLimit(db, 'admin', { limit: 300, windowMs: 60 * 1000 }));
 
-  router.get('/health', (req, res) => {
-    const one = sql => Number(db.prepare(sql).get()?.n || 0);
-    const cursor = Number(db.prepare('SELECT value FROM sync_cursors WHERE id=1').get()?.value || 0);
+  router.get('/health', async (req, res) => {
+    const one = async sql => Number((await db.get(sql))?.n || 0);
+    const cursor = Number((await db.get('SELECT value FROM sync_cursors WHERE id=1'))?.value || 0);
     res.json({
       ok: true,
-      schemaVersion: db.prepare("SELECT value FROM platform_meta WHERE key='schema_version'").get()?.value || null,
-      accounts: one('SELECT COUNT(*) AS n FROM accounts WHERE deleted_at IS NULL'),
-      activeSessions: Number(db.prepare('SELECT COUNT(*) AS n FROM account_sessions WHERE revoked_at IS NULL AND expires_at>?').get(Date.now())?.n || 0),
-      classes: one('SELECT COUNT(*) AS n FROM classes WHERE archived_at IS NULL'),
-      openReports: one("SELECT COUNT(*) AS n FROM issue_reports WHERE status='open'"),
-      publishedContent: one("SELECT COUNT(*) AS n FROM content_revisions WHERE status='published'"),
-      pendingDelivery: one('SELECT COUNT(*) AS n FROM auth_delivery_outbox WHERE delivered_at IS NULL'),
+      schemaVersion: (await db.get("SELECT value FROM platform_meta WHERE key='schema_version'"))?.value || null,
+      accounts: await one('SELECT COUNT(*) AS n FROM accounts WHERE deleted_at IS NULL'),
+      activeSessions: Number((await db.get('SELECT COUNT(*) AS n FROM account_sessions WHERE revoked_at IS NULL AND expires_at>?', [Date.now()]))?.n || 0),
+      classes: await one('SELECT COUNT(*) AS n FROM classes WHERE archived_at IS NULL'),
+      openReports: await one("SELECT COUNT(*) AS n FROM issue_reports WHERE status='open'"),
+      publishedContent: await one("SELECT COUNT(*) AS n FROM content_revisions WHERE status='published'"),
+      pendingDelivery: await one('SELECT COUNT(*) AS n FROM auth_delivery_outbox WHERE delivered_at IS NULL'),
       syncCursor: cursor,
       checkedAt: Date.now()
     });
   });
 
-  router.get('/users', (req, res) => {
+  router.get('/users', async (req, res) => {
     const q = String(req.query?.q || '').trim().toLowerCase().slice(0, 120);
     const rows = q
-      ? db.prepare(`SELECT a.id,a.email,a.name,a.role,a.email_verified_at,a.created_at,a.updated_at,e.plan,e.status,e.provider,e.current_period_end
+      ? await db.all(`SELECT a.id,a.email,a.name,a.role,a.email_verified_at,a.created_at,a.updated_at,e.plan,e.status,e.provider,e.current_period_end
           FROM accounts a LEFT JOIN entitlement_snapshots e ON e.account_id=a.id
-          WHERE a.deleted_at IS NULL AND (LOWER(a.email) LIKE ? OR LOWER(a.name) LIKE ? OR a.id=?)
-          ORDER BY a.created_at DESC LIMIT 100`).all(`%${q}%`, `%${q}%`, q)
-      : db.prepare(`SELECT a.id,a.email,a.name,a.role,a.email_verified_at,a.created_at,a.updated_at,e.plan,e.status,e.provider,e.current_period_end
+          WHERE a.deleted_at IS NULL AND (LOWER(a.email) LIKE ?${db.likeEscape()} OR LOWER(a.name) LIKE ?${db.likeEscape()} OR a.id=?)
+          ORDER BY a.created_at DESC LIMIT 100`, [`%${q}%`, `%${q}%`, q])
+      : await db.all(`SELECT a.id,a.email,a.name,a.role,a.email_verified_at,a.created_at,a.updated_at,e.plan,e.status,e.provider,e.current_period_end
           FROM accounts a LEFT JOIN entitlement_snapshots e ON e.account_id=a.id WHERE a.deleted_at IS NULL
-          ORDER BY a.created_at DESC LIMIT 100`).all();
+          ORDER BY a.created_at DESC LIMIT 100`);
     res.json({ users: rows.map(row => ({
       id: row.id, email: row.email, name: row.name, role: row.role, emailVerified: !!row.email_verified_at,
       createdAt: row.created_at, updatedAt: row.updated_at,
@@ -61,40 +65,40 @@ export function createAdminRouter(db) {
     })) });
   });
 
-  router.patch('/users/:accountId/role', (req, res) => {
+  router.patch('/users/:accountId/role', async (req, res) => {
     const accountId = String(req.params.accountId || '');
     const role = String(req.body?.role || '');
     if (!['student', 'teacher', 'support', 'admin'].includes(role)) return res.status(400).json({ error: { code: 'ROLE_INVALID', message: 'Role is invalid.' } });
     if (accountId === req.platformSession.account_id && role !== 'admin') return res.status(409).json({ error: { code: 'SELF_DEMOTION_BLOCKED', message: 'Administrators cannot remove their own admin role.' } });
     const now = Date.now();
-    const info = db.prepare('UPDATE accounts SET role=?,updated_at=? WHERE id=? AND deleted_at IS NULL').run(role, now, accountId);
+    const info = await db.run('UPDATE accounts SET role=?,updated_at=? WHERE id=? AND deleted_at IS NULL', [role, now, accountId]);
     if (!info.changes) return res.status(404).json({ error: { code: 'ACCOUNT_NOT_FOUND', message: 'Account not found.' } });
-    audit(db, req.platformSession.account_id, 'account.role', 'account', accountId, { role }, now);
+    await audit(db, req.platformSession.account_id, 'account.role', 'account', accountId, { role }, now);
     res.json({ accountId, role, updatedAt: now });
   });
 
   // Teacher onboarding: an admin mints a single-use, expiring invite code and
   // hands it to the teacher out of band; registration with the code creates the
   // account with role 'teacher'. Only the hash and a display prefix are kept.
-  router.post('/teacher-invites', (req, res) => {
+  router.post('/teacher-invites', async (req, res) => {
     const ttlDays = inviteTtlDays(req.body?.ttlDays);
     if (ttlDays === null) return res.status(400).json({ error: { code: 'INVITE_TTL_INVALID', message: `ttlDays must be a whole number from 1 to ${INVITE_MAX_TTL_DAYS}.` } });
     const now = Date.now();
-    const invite = mintTeacherInvite(db, { createdBy: req.platformSession.account_id, ttlDays, now });
-    audit(db, req.platformSession.account_id, 'teacher-invite.mint', 'teacher-invite', invite.id, { ttlDays, codePrefix: invite.code.slice(0, 8) }, now);
+    const invite = await mintTeacherInvite(db, { createdBy: req.platformSession.account_id, ttlDays, now });
+    await audit(db, req.platformSession.account_id, 'teacher-invite.mint', 'teacher-invite', invite.id, { ttlDays, codePrefix: invite.code.slice(0, 8) }, now);
     res.status(201).json({ code: invite.code, expiresAt: invite.expiresAt });
   });
 
-  router.get('/teacher-invites', (req, res) => {
-    res.json({ invites: listTeacherInvites(db) });
+  router.get('/teacher-invites', async (req, res) => {
+    res.json({ invites: await listTeacherInvites(db) });
   });
 
-  router.get('/feature-flags', (req, res) => {
-    const rows = db.prepare('SELECT key,enabled,audience,config_json,updated_by,updated_at FROM feature_flags ORDER BY key').all();
+  router.get('/feature-flags', async (req, res) => {
+    const rows = await db.all(`SELECT key,enabled,audience,config_json,updated_by,updated_at FROM feature_flags ORDER BY ${db.binaryText('key')}`);
     res.json({ flags: rows.map(row => ({ key: row.key, enabled: !!row.enabled, audience: row.audience, config: JSON.parse(row.config_json || '{}'), updatedBy: row.updated_by, updatedAt: row.updated_at })) });
   });
 
-  router.put('/feature-flags/:key', (req, res) => {
+  router.put('/feature-flags/:key', async (req, res) => {
     const key = String(req.params.key || '');
     if (!/^[a-z0-9._-]{2,80}$/.test(key)) return res.status(400).json({ error: { code: 'FLAG_KEY_INVALID', message: 'Feature flag key is invalid.' } });
     const audience = ['all', 'staff', 'teachers', 'students', 'premium'].includes(req.body?.audience) ? req.body.audience : 'all';
@@ -103,16 +107,15 @@ export function createAdminRouter(db) {
     const configJson = JSON.stringify(config);
     if (Buffer.byteLength(configJson) > 32 * 1024) return res.status(413).json({ error: { code: 'FLAG_CONFIG_TOO_LARGE', message: 'Feature flag configuration is too large.' } });
     const now = Date.now();
-    db.prepare(`INSERT INTO feature_flags(key,enabled,audience,config_json,updated_by,updated_at) VALUES (?,?,?,?,?,?)
-      ON CONFLICT(key) DO UPDATE SET enabled=excluded.enabled,audience=excluded.audience,config_json=excluded.config_json,updated_by=excluded.updated_by,updated_at=excluded.updated_at`)
-      .run(key, enabled ? 1 : 0, audience, configJson, req.platformSession.account_id, now);
-    audit(db, req.platformSession.account_id, 'feature-flag.update', 'feature-flag', key, { enabled, audience }, now);
+    await db.run(`INSERT INTO feature_flags(key,enabled,audience,config_json,updated_by,updated_at) VALUES (?,?,?,?,?,?)
+      ON CONFLICT(key) DO UPDATE SET enabled=excluded.enabled,audience=excluded.audience,config_json=excluded.config_json,updated_by=excluded.updated_by,updated_at=excluded.updated_at`, [key, enabled ? 1 : 0, audience, configJson, req.platformSession.account_id, now]);
+    await audit(db, req.platformSession.account_id, 'feature-flag.update', 'feature-flag', key, { enabled, audience }, now);
     res.json({ key, enabled, audience, config, updatedAt: now });
   });
 
-  router.get('/audit', (req, res) => {
-    const rows = db.prepare(`SELECT id,actor_account_id,action,target_kind,target_id,metadata_json,created_at
-      FROM audit_log ORDER BY id DESC LIMIT 250`).all();
+  router.get('/audit', async (req, res) => {
+    const rows = await db.all(`SELECT id,actor_account_id,action,target_kind,target_id,metadata_json,created_at
+      FROM audit_log ORDER BY id DESC LIMIT 250`);
     res.json({ entries: rows.map(row => ({ id: row.id, actorAccountId: row.actor_account_id, action: row.action, targetKind: row.target_kind, targetId: row.target_id, metadata: JSON.parse(row.metadata_json || '{}'), createdAt: row.created_at })) });
   });
 

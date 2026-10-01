@@ -1,4 +1,5 @@
-import { Router } from 'express';
+import { asyncRouter } from './asyncRouter.js';
+import { asStore, sqliteHandle } from './store.js';
 import { id, rateLimit, requireSession } from './security.js';
 
 const EVENTS = new Set([
@@ -14,7 +15,10 @@ const MAX_BATCH = 30;
 const RETENTION_MS = 90 * 24 * 60 * 60 * 1000;
 
 function ensureTable(db) {
-  db.exec(`CREATE TABLE IF NOT EXISTS operational_events (
+  // SQLite builds its schema at boot; Postgres is migrated (supabase/migrations).
+  const raw = sqliteHandle(db);
+  if (!raw) return;
+  raw.exec(`CREATE TABLE IF NOT EXISTS operational_events (
     id TEXT PRIMARY KEY,
     account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
     event_type TEXT NOT NULL,
@@ -55,24 +59,25 @@ function cleanEvent(raw, now) {
 }
 
 export function createTelemetryRouter(db) {
+  db = asStore(db);
   ensureTable(db);
-  const router = Router();
+  const router = asyncRouter();
   router.use(requireSession(db));
 
-  router.post('/', rateLimit(db, 'telemetry', { limit: 120, windowMs: 60 * 1000 }), (req, res) => {
+  router.post('/', rateLimit(db, 'telemetry', { limit: 120, windowMs: 60 * 1000 }), async (req, res) => {
     const list = Array.isArray(req.body?.events) ? req.body.events : [req.body?.event].filter(Boolean);
     if (!list.length || list.length > MAX_BATCH) return res.status(400).json({ error: { code: 'TELEMETRY_BATCH_INVALID', message: `Send between 1 and ${MAX_BATCH} events.` } });
     const now = Date.now();
     const events = list.map(raw => cleanEvent(raw, now));
-    db.transaction(() => {
-      const insert = db.prepare(`INSERT INTO operational_events(id,account_id,event_type,surface,metadata_json,created_at) VALUES (?,?,?,?,?,?)`);
+    await db.transaction(async () => {
       for (const event of events) {
-        insert.run(event.id, req.platformSession.account_id, event.type, event.surface, JSON.stringify(event.metadata), event.at);
+        await db.run(`INSERT INTO operational_events(id,account_id,event_type,surface,metadata_json,created_at) VALUES (?,?,?,?,?,?)`,
+          [event.id, req.platformSession.account_id, event.type, event.surface, JSON.stringify(event.metadata), event.at]);
       }
       // Retention is enforced continuously rather than relying on an external
       // cron job that may never be configured on a small deployment.
-      db.prepare('DELETE FROM operational_events WHERE created_at < ?').run(now - RETENTION_MS);
-    })();
+      await db.run('DELETE FROM operational_events WHERE created_at < ?', [now - RETENTION_MS]);
+    });
     res.status(202).json({ accepted: events.length });
   });
 
