@@ -9,31 +9,21 @@ import {
   NCERT_CLASS8_LINEAR_GENERATORS as SOURCE_GENERATORS,
   NCERT_CLASS8_LINEAR_EXERCISES
 } from './class8-linear-equations.js';
+import {
+  NCERT_CLASS8_LINEAR_SKILLS,
+  NCERT_CLASS8_LINEAR_DOTPOINTS,
+  NCERT_CLASS8_LINEAR_GENERATOR_IDS,
+  NCERT_CLASS8_LINEAR_COVERS
+} from './class8-linear-syllabus.js';
 
 export * from './class8-linear-equations.js';
 
-export const NCERT_CLASS8_LINEAR_DOTPOINTS = Object.freeze([
-  'Identify linear equations in one variable and solve equations with the variable on both sides using balanced operations and equivalent transposition',
-  'Reduce and solve equations involving fractions, brackets and decimal coefficients by clearing denominators, expanding and combining like terms',
-  'Check solutions by substitution, diagnose common algebra errors and master the complete NCERT Exercise 2.1 and 2.2 equation styles'
-]);
+// The product dot points and routing live in the syllabus layer; these explicit
+// exports take precedence over the source module's own fine-grained ones above.
+export { NCERT_CLASS8_LINEAR_DOTPOINTS, NCERT_CLASS8_LINEAR_GENERATOR_IDS, NCERT_CLASS8_LINEAR_COVERS };
 
-const SKILLS = Object.freeze([
-  ['c8-linear-equations-foundations', 'y8-ncert-linear-foundations', 0],
-  ['c8-linear-equations-both-sides', 'y8-ncert-linear-both-sides', 0],
-  ['c8-linear-equations-fractions', 'y8-ncert-linear-fractions', 1],
-  ['c8-linear-equations-brackets', 'y8-ncert-linear-brackets', 1],
-  ['c8-linear-equations-decimals', 'y8-ncert-linear-decimals', 1],
-  ['c8-linear-equations-verification', 'y8-ncert-linear-verification', 2],
-  ['c8-linear-equations-source-mastery', 'y8-ncert-linear-source-mastery', 2]
-]);
-
-export const NCERT_CLASS8_LINEAR_GENERATOR_IDS = Object.freeze(SKILLS.map(([id]) => id));
-export const NCERT_CLASS8_LINEAR_COVERS = Object.freeze(
-  SKILLS.map(([gen, , dp]) => Object.freeze({ gen, dp: [dp], diff: [1, 2, 3, 4] }))
-);
 export const NCERT_CLASS8_LINEAR_GENERATORS = Object.freeze(Object.fromEntries(
-  SKILLS.map(([id, sourceId]) => [id, SOURCE_GENERATORS[sourceId]])
+  NCERT_CLASS8_LINEAR_SKILLS.map(([id, sourceId]) => [id, SOURCE_GENERATORS[sourceId]])
 ));
 
 const attachedKey = Object.freeze({
