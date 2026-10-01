@@ -577,16 +577,21 @@ function domainEnv(env) {
   return out;
 }
 
+// Guard kinds, one letter each because they ship in the install bundle:
+// 'z' must be nonzero (a denominator, a tan/sec/cosec/cot pole), 'p' must be
+// positive (a log argument), 'n' must be nonnegative (a square-root argument),
+// 'b' is a power's base (0 to a non-positive power is undefined).
+
 /** Subexpressions whose zeros (or sign) bound where an expression is defined. */
 function guardsOf(ast, acc = []) {
   if (!ast || typeof ast !== 'object') return acc;
-  if (ast.t === 'bin' && ast.op === '/') acc.push({ kind: 'nonzero', g: ast.r });
-  if (ast.t === 'bin' && ast.op === '^') acc.push({ kind: 'base', g: ast.l, e: ast.r });
+  if (ast.t === 'bin' && ast.op === '/') acc.push({ k: 'z', g: ast.r });
+  if (ast.t === 'bin' && ast.op === '^') acc.push({ k: 'b', g: ast.l, e: ast.r });
   if (ast.t === 'call' && !Array.isArray(ast.args)) {
-    if (LOG_FNS.has(ast.fn)) acc.push({ kind: 'positive', g: ast.arg });
-    if (ast.fn === 'sqrt') acc.push({ kind: 'nonnegative', g: ast.arg });
-    if (ast.fn === 'tan') acc.push({ kind: 'nonzero', g: { t: 'call', fn: 'cos', arg: ast.arg } });
-    if (POLE_FNS[ast.fn]) acc.push({ kind: 'nonzero', g: { t: 'call', fn: POLE_FNS[ast.fn], arg: ast.arg } });
+    if (LOG_FNS.has(ast.fn)) acc.push({ k: 'p', g: ast.arg });
+    if (ast.fn === 'sqrt') acc.push({ k: 'n', g: ast.arg });
+    const pole = ast.fn === 'tan' ? 'cos' : POLE_FNS[ast.fn];
+    if (pole) acc.push({ k: 'z', g: { t: 'call', fn: pole, arg: ast.arg } });
   }
   if (Array.isArray(ast.args)) { if (ast.fn !== 'sum') for (const a of ast.args) guardsOf(a, acc); return acc; }
   for (const key of ['l', 'r', 'v', 'arg']) if (ast[key] && typeof ast[key] === 'object') guardsOf(ast[key], acc);
@@ -594,8 +599,12 @@ function guardsOf(ast, acc = []) {
 }
 
 /** A stable text for a guard, so two guard sets can be compared structurally. */
-function guardKey({ kind, g, e }) {
-  return `${kind}:${JSON.stringify(g)}${e ? `^${JSON.stringify(e)}` : ''}`;
+const guardKey = ({ k, g, e }) => k + JSON.stringify([g, e]);
+
+/** x ↦ ast evaluated with `name` = x and the other variables from env (one reused env object). */
+function along(ast, env, name) {
+  const scratch = { ...env };
+  return x => { scratch[name] = x; return domainEval(ast, scratch); };
 }
 
 /**
@@ -607,23 +616,24 @@ function guardKey({ kind, g, e }) {
  * compared to a fixed tolerance.
  */
 function vanishesNear(at, p) {
-  const g0 = at(p);
+  const g0 = at(p), s = Math.max(1, Math.abs(p)), fin = Number.isFinite;
   if (g0 === 0) return true;
-  if (!Number.isFinite(g0)) return false;
-  const es = 1e-6 * Math.max(1, Math.abs(p));
-  const sl = at(p - es), sr = at(p + es);
-  if (Number.isFinite(sl) && Number.isFinite(sr) && (Math.sign(sl) !== Math.sign(g0) || Math.sign(sr) !== Math.sign(g0))) return true;
-  const et = 1e-3 * Math.max(1, Math.abs(p));
-  const gl = at(p - et), gr = at(p + et);
-  if (!Number.isFinite(gl) || !Number.isFinite(gr)) return false;
-  const m = Math.max(Math.abs(gl), Math.abs(gr));
-  if (!(Math.abs(g0) <= 1e-3 * m)) return false;       // no dip at p
-  let a = p - et, b = p + et;
+  if (!fin(g0)) return false;
+  const sl = at(p - 1e-6 * s), sr = at(p + 1e-6 * s);
+  if (fin(sl) && fin(sr) && (Math.sign(sl) !== Math.sign(g0) || Math.sign(sr) !== Math.sign(g0))) return true;
+  let a = p - 1e-3 * s, b = p + 1e-3 * s;
+  const m = Math.max(Math.abs(at(a)), Math.abs(at(b)));
+  if (!(Math.abs(g0) <= 1e-3 * m)) return false;       // no dip at p (or an edge is undefined)
+  return Math.abs(at(ternaryMin(at, a, b))) <= 1e-7 * m;
+}
+
+/** Where |f| is smallest on [a, b], by ternary search. */
+function ternaryMin(f, a, b) {
   for (let k = 0; k < 80; k++) {
     const m1 = a + (b - a) / 3, m2 = b - (b - a) / 3;
-    if (Math.abs(at(m1)) < Math.abs(at(m2))) b = m2; else a = m1;
+    if (Math.abs(f(m1)) < Math.abs(f(m2))) b = m2; else a = m1;
   }
-  return Math.abs(at((a + b) / 2)) <= 1e-7 * m;
+  return (a + b) / 2;
 }
 
 /**
@@ -632,107 +642,80 @@ function vanishesNear(at, p) {
  * rather than by evaluating at p, because p carries the root-finder's error.
  */
 function sideDefinedAt(ast, guards, env, name, p) {
-  const envAt = x => ({ ...env, [name]: x });
   let near = false;
-  for (const { kind, g, e } of guards) {
+  for (const { k, g, e } of guards) {
     const at = along(g, env, name);
     if (vanishesNear(at, p)) {
       near = true;
-      if (kind === 'nonzero' || kind === 'positive') return false;
-      if (kind === 'base' && !(domainEval(e, envAt(p)) > 0)) return false;   // 0^0, 0^negative
-      continue;                                                                // √0, 0^(1/3) are fine
+      if (k === 'z' || k === 'p' || (k === 'b' && !(along(e, env, name)(p) > 0))) return false;
+      continue;                                       // √0 and 0^(1/3) are fine
     }
     const v = at(p);
-    if (!Number.isFinite(v)) return false;
-    if (kind === 'positive' && v <= 0) return false;
-    if (kind === 'nonnegative' && v < 0) return false;
+    if (!Number.isFinite(v) || (k === 'p' && v <= 0) || (k === 'n' && v < 0)) return false;
   }
   const self = along(ast, env, name);
   if (Number.isFinite(self(p))) return true;
-  if (!near) return false;
   // just off a root where the side is defined (√ of −10⁻¹⁷): judge by the
   // immediate neighbourhood instead
   const es = 1e-6 * Math.max(1, Math.abs(p));
-  return Number.isFinite(self(p - es)) || Number.isFinite(self(p + es));
+  return near && (Number.isFinite(self(p - es)) || Number.isFinite(self(p + es)));
 }
-
-const POLY_MAX_DEGREE = 6;
 
 /**
  * If x ↦ g(x) is a polynomial of degree ≤ 6, its coefficients [c0, c1, …]
- * (trailing zeros trimmed); otherwise null. Fitted exactly through x = 0‥6 and
- * confirmed at off-grid points, so √x, eˣ and 1/x are rejected.
+ * (trailing zeros trimmed); otherwise null. Newton's divided differences
+ * through x = 0‥6, expanded to powers of x and confirmed at off-grid points,
+ * so √x, eˣ and 1/x are rejected.
  */
 function polynomialOf(at) {
-  const n = POLY_MAX_DEGREE + 1;
-  const A = [], y = [];
-  for (let i = 0; i < n; i++) {
-    const v = at(i);
-    if (!Number.isFinite(v)) return null;
-    A.push(Array.from({ length: n }, (_, k) => i ** k));
-    y.push(v);
+  const d = [];
+  for (let i = 0; i < 7; i++) { d.push(at(i)); if (!Number.isFinite(d[i])) return null; }
+  for (let k = 1; k < 7; k++) for (let i = 6; i >= k; i--) d[i] = (d[i] - d[i - 1]) / k;
+  // p(x) = d0 + x(d1 + (x − 1)(d2 + …)), expanded from the innermost term out
+  let c = [d[6]];
+  for (let k = 5; k >= 0; k--) {
+    const next = [0, ...c];
+    for (let j = 0; j < c.length; j++) next[j] -= k * c[j];
+    next[0] += d[k];
+    c = next;
   }
-  // Gaussian elimination with partial pivoting on the 7×7 Vandermonde system
-  for (let c = 0; c < n; c++) {
-    let p = c;
-    for (let r = c + 1; r < n; r++) if (Math.abs(A[r][c]) > Math.abs(A[p][c])) p = r;
-    [A[c], A[p]] = [A[p], A[c]]; [y[c], y[p]] = [y[p], y[c]];
-    for (let r = c + 1; r < n; r++) {
-      const f = A[r][c] / A[c][c];
-      for (let k = c; k < n; k++) A[r][k] -= f * A[c][k];
-      y[r] -= f * y[c];
-    }
-  }
-  const coef = new Array(n).fill(0);
-  for (let r = n - 1; r >= 0; r--) {
-    let s = y[r];
-    for (let k = r + 1; k < n; k++) s -= A[r][k] * coef[k];
-    coef[r] = s / A[r][r];
-  }
-  const scale = Math.max(1, ...coef.map(Math.abs));
-  for (let k = 0; k < n; k++) {
-    const nearest = Math.round(coef[k]);
-    if (Math.abs(coef[k] - nearest) < 1e-9 * scale) coef[k] = nearest;
-    if (Math.abs(coef[k]) < 1e-10 * scale) coef[k] = 0;
-  }
-  const poly = x => coef.reduce((s, c, k) => s + c * x ** k, 0);
+  const scale = Math.max(1, ...c.map(Math.abs));
+  c = c.map(v => Math.abs(v - Math.round(v)) < 1e-9 * scale ? Math.round(v) : Math.abs(v) < 1e-10 * scale ? 0 : v);
   for (const x of [-1.37, 0.43, 2.71, -7.9, 11.3]) {
-    const v = at(x), p = poly(x);
-    if (!Number.isFinite(v) || Math.abs(v - p) > 1e-7 * Math.max(1, Math.abs(v), Math.abs(p))) return null;
+    const v = at(x), p = c.reduce((s, ck, k) => s + ck * x ** k, 0);
+    if (!(Math.abs(v - p) <= 1e-7 * Math.max(1, Math.abs(v), Math.abs(p)))) return null;
   }
-  while (coef.length > 1 && coef[coef.length - 1] === 0) coef.pop();
-  return coef;
+  while (c.length > 1 && !c[c.length - 1]) c.pop();
+  return c;
 }
 
-/** Real roots of g(name) on [lo, hi] by a grid of N steps, with the other variables fixed by env. */
-function gridRoots(at, lo, hi, N, { halves = true, tangencies = true, skip = null, cap = Infinity } = {}) {
-  const roots = [];
-  const xs = [], ys = [];
+/**
+ * Real roots of `at` on [lo, hi] by a grid of N steps: exact zeros, bisected
+ * sign changes and (with no `skip`) tangencies and zeros at whole numbers and
+ * halves. Passing `skip`, an interval already searched finely, makes it the
+ * coarse far scan, which stops after 16 roots: it exists to catch an isolated
+ * far hole, and a periodic guard is already represented on the fine grid.
+ */
+function gridRoots(at, lo, hi, N, skip) {
+  const roots = [], xs = [], ys = [], cap = skip ? 16 : Infinity;
   for (let i = 0; i <= N; i++) { const x = lo + (i / N) * (hi - lo); xs.push(x); ys.push(at(x)); }
   // whole numbers and halves are where authored questions put their holes
-  if (halves && hi - lo <= 200) for (let k = Math.ceil(lo * 2); k <= hi * 2; k++) if (at(k / 2) === 0) roots.push(k / 2);
+  if (!skip && hi - lo <= 200) for (let k = Math.ceil(lo * 2); k <= hi * 2; k++) if (at(k / 2) === 0) roots.push(k / 2);
   for (let i = 0; i < N && roots.length < cap; i++) {
-    const [y0, y1] = [ys[i], ys[i + 1]];
-    if (!Number.isFinite(y0) || !Number.isFinite(y1)) continue;
-    // `skip` is an interval already searched more finely
-    if (skip && xs[i] >= skip[0] && xs[i + 1] <= skip[1]) continue;
+    const y0 = ys[i], y1 = ys[i + 1];
+    if (!Number.isFinite(y0) || !Number.isFinite(y1) || (skip && xs[i] >= skip[0] && xs[i + 1] <= skip[1])) continue;
     if (y0 === 0) { roots.push(xs[i]); continue; }
     const crosses = Math.sign(y0) !== Math.sign(y1) && y1 !== 0;
     if (crosses) {
-      let a = xs[i], b = xs[i + 1], fa = y0;
-      for (let k = 0; k < 64; k++) { const m = (a + b) / 2, fm = at(m); if (Math.sign(fm) === Math.sign(fa)) { a = m; fa = fm; } else b = m; }
+      let a = xs[i], b = xs[i + 1];
+      for (let k = 0; k < 64; k++) { const m = (a + b) / 2; if (Math.sign(at(m)) === Math.sign(y0)) a = m; else b = m; }
       roots.push((a + b) / 2);
     }
-    // a double root (x² in a denominator) touches zero without crossing
-    // (a dip beside a sign change is that simple root, already bisected)
-    const besideCrossing = crosses || (Number.isFinite(ys[i - 1]) && Math.sign(ys[i - 1]) !== Math.sign(y0));
-    if (tangencies && i > 0 && !besideCrossing && Math.abs(y0) < Math.abs(ys[i - 1]) && Math.abs(y0) <= Math.abs(y1)) {
-      let a = xs[i - 1], b = xs[i + 1];
-      for (let k = 0; k < 100; k++) {
-        const m1 = a + (b - a) / 3, m2 = b - (b - a) / 3;
-        if (Math.abs(at(m1)) < Math.abs(at(m2))) b = m2; else a = m1;
-      }
-      const m = (a + b) / 2;
+    // a double root (x² in a denominator) touches zero without crossing; a
+    // dip beside a sign change is that simple root, already bisected
+    if (!skip && i > 0 && !crosses && !(Math.sign(ys[i - 1]) !== Math.sign(y0)) &&
+        Math.abs(y0) < Math.abs(ys[i - 1]) && Math.abs(y0) <= Math.abs(y1)) {
+      const m = ternaryMin(at, xs[i - 1], xs[i + 1]);
       if (Math.abs(at(m)) <= 1e-7) roots.push(m);
     }
   }
@@ -740,142 +723,77 @@ function gridRoots(at, lo, hi, N, { halves = true, tangencies = true, skip = nul
   return roots;
 }
 
-const NEAR_RANGE = [-20, 20];
-const FAR_RANGE = [-1000, 1000];
-const FAR_ROOT_CAP = 16;
-
 /**
  * Real roots of g as a function of `name` (other variables fixed by env),
  * within [lo, hi] — which is ±∞ when no domain was authored.
  */
-/** x ↦ ast evaluated with `name` = x and the other variables from env (one reused env object). */
-function along(ast, env, name) {
-  const scratch = { ...env };
-  return x => { scratch[name] = x; return domainEval(ast, scratch); };
-}
-
 function rootsOf(g, name, env, lo, hi) {
   const at = along(g, env, name);
-  const inside = x => x >= lo && x <= hi;
   const coef = polynomialOf(at);
   if (coef) {
     const d = coef.length - 1;
     if (d === 0) return [];
-    if (d === 1) return [-coef[0] / coef[1]].filter(inside);
-    if (d === 2) {
-      const [c, b, a] = coef;
-      let disc = b * b - 4 * a * c;
-      // (x − √2)² expands with rounding, so a double root can leave disc at −10⁻¹⁶
-      if (disc < 0 && -disc <= 1e-12 * Math.max(b * b, Math.abs(4 * a * c))) disc = 0;
-      if (disc < 0) return [];
-      // the stable form avoids cancellation when b² ≫ 4ac
-      const q = -(b + (b >= 0 ? 1 : -1) * Math.sqrt(disc)) / 2;
-      const rs = [q / a];
-      if (q !== 0) rs.push(c / q);
-      return rs.filter(inside);
-    }
+    if (d === 1) return [-coef[0] / coef[1]].filter(x => x >= lo && x <= hi);
     // every real root lies within the Cauchy bound
     const B = 1 + Math.max(...coef.slice(0, -1).map(c => Math.abs(c / coef[d])));
-    const [a, b] = [Math.max(lo, -B), Math.min(hi, B)];
-    if (!(b > a)) return [];
-    return gridRoots(at, a, b, Math.min(4000, Math.max(800, Math.ceil((b - a) / 0.05))));
+    const a = Math.max(lo, -B), b = Math.min(hi, B);
+    return b > a ? gridRoots(at, a, b, Math.min(4000, Math.max(800, Math.ceil((b - a) / 0.05)))) : [];
   }
   const roots = [];
-  const [na, nb] = [Math.max(lo, NEAR_RANGE[0]), Math.min(hi, NEAR_RANGE[1])];
+  const na = Math.max(lo, -20), nb = Math.min(hi, 20);
   if (nb > na) roots.push(...gridRoots(at, na, nb, 800));
-  const [fa, fb] = [Math.max(lo, FAR_RANGE[0]), Math.min(hi, FAR_RANGE[1])];
-  if (fb > fa && (fa < na || fb > nb)) {
-    const a = Math.ceil(fa), b = Math.floor(fb);
-    if (b > a) {
-      // a periodic guard is already represented on the fine grid, so the far
-      // scan stops after a few roots: it exists to catch an isolated far hole
-      roots.push(...gridRoots(at, a, b, b - a, {
-        halves: false, tangencies: false, skip: nb > na ? [na, nb] : null, cap: FAR_ROOT_CAP
-      }));
-    }
-  }
+  const fa = Math.ceil(Math.max(lo, -1000)), fb = Math.floor(Math.min(hi, 1000));
+  if (fb > fa && (fa < na || fb > nb)) roots.push(...gridRoots(at, fa, fb, fb - fa, nb > na ? [na, nb] : [NaN]));
   return roots;
 }
 
 /**
- * Where do a and b differ in definedness? Returns null, or
- * { kind: 'isolated' | 'interval', lenient } for the first difference that the
- * policy refuses (see Domain probing). `range` bounds where to look (the whole
- * real line when none is authored), so an authored domain that excludes a
- * hole accepts the cancelled form.
+ * Do a and b differ in definedness in a way the policy refuses (see Domain
+ * probing)? `range` bounds where to look (the whole real line when none is
+ * authored), so an authored domain that excludes a hole accepts the
+ * cancelled form.
  */
-function domainDifference(astA, astB, names, integers, baseEnvs, range, positiveOnly, strict) {
+function domainDiffers(astA, astB, names, integers, baseEnvs, range, positiveOnly, strict) {
   const guardsA = guardsOf(astA), guardsB = guardsOf(astB);
   const keysA = new Set(guardsA.map(guardKey)), keysB = new Set(guardsB.map(guardKey));
   // Pre-filter: the same guards on both sides restrict both sides alike.
-  if (keysA.size === keysB.size && [...keysA].every(k => keysB.has(k))) return null;
-  const unique = new Map();
-  for (const gd of [...guardsA, ...guardsB]) if (!unique.has(guardKey(gd))) unique.set(guardKey(gd), gd);
-  const [lo, hi] = positiveOnly ? [Math.max(range[0], 1e-6), range[1]] : range;
-  if (!(hi > lo)) return null;
+  if (keysA.size === keysB.size && [...keysA].every(k => keysB.has(k))) return false;
+  const unique = [...new Map([...guardsA, ...guardsB].map(gd => [guardKey(gd), gd])).values()];
+  const lo = positiveOnly ? Math.max(range[0], 1e-6) : range[0], hi = range[1];
+  if (!(hi > lo)) return false;
 
   for (const env of baseEnvs) {
     for (const name of names) {
       if (integers.has(name)) continue;
-      const envAt = x => ({ ...env, [name]: x });
-      const polyCache = new Map();
-      const isPoly = gd => {
-        const k = guardKey(gd);
-        if (!polyCache.has(k)) polyCache.set(k, polynomialOf(along(gd.g, env, name)) !== null);
-        return polyCache.get(k);
-      };
-      const points = [];
-      const rootsByGuard = new Map();
-      for (const [k, gd] of unique) {
-        const rs = rootsOf(gd.g, name, env, lo, hi);
-        rootsByGuard.set(k, rs);
-        points.push(...rs);
-      }
-      points.sort((x, y) => x - y);
-      const distinct = points.filter((p, i) => i === 0 || Math.abs(p - points[i - 1]) > 1e-9 * Math.max(1, Math.abs(p)));
-
-      // Does a side have poles of its own (a non-polynomial denominator that
-      // vanishes where the side is undefined)? Computed once per side.
-      const polesMemo = new Map();
-      const hasOwnPoles = (ast, guards) => {
-        if (polesMemo.has(ast)) return polesMemo.get(ast);
-        let found = false;
-        for (const gd of guards) {
-          if (gd.kind !== 'nonzero' || isPoly(gd)) continue;
-          for (const r of rootsByGuard.get(guardKey(gd)) || []) {
-            if (!sideDefinedAt(ast, guards, env, name, r)) { found = true; break; }
-          }
-          if (found) break;
-        }
-        polesMemo.set(ast, found);
-        return found;
-      };
-
-      for (const p of distinct) {
-        const a0 = sideDefinedAt(astA, guardsA, env, name, p);
-        const b0 = sideDefinedAt(astB, guardsB, env, name, p);
+      const memo = new Map();
+      const once = (key, f) => (memo.has(key) ? memo : memo.set(key, f())).get(key);
+      const isPoly = gd => once(gd, () => polynomialOf(along(gd.g, env, name)) !== null);
+      const fA = along(astA, env, name), fB = along(astB, env, name);
+      const points = unique.flatMap(gd => rootsOf(gd.g, name, env, lo, hi)).sort((x, y) => x - y)
+        .filter((p, i, all) => i === 0 || Math.abs(p - all[i - 1]) > 1e-9 * Math.max(1, Math.abs(p)));
+      for (const p of points) {
         const delta = Math.max(1e-4, Math.abs(p) * 1e-6);
-        let interval = false;
-        for (const x of [p - delta, p + delta]) {
-          if (x < lo || x > hi) continue;
-          if (Number.isFinite(domainEval(astA, envAt(x))) !== Number.isFinite(domainEval(astB, envAt(x)))) interval = true;
-        }
-        if (interval) {
-          if (strict) return { kind: 'interval', at: p };
+        // interval: the sides disagree beside the point
+        if ([p - delta, p + delta].some(x => x >= lo && x <= hi && Number.isFinite(fA(x)) !== Number.isFinite(fB(x)))) {
+          if (strict) return true;
           continue;
         }
-        if (a0 === b0) continue;
+        const a0 = sideDefinedAt(astA, guardsA, env, name, p);
+        if (a0 === sideDefinedAt(astB, guardsB, env, name, p)) continue;
         // isolated: exactly one side has a hole at p and they agree around it
-        if (strict) return { kind: 'isolated', at: p };
-        const [holeAst, holeGuards, fullAst, fullGuards] = a0 ? [astB, guardsB, astA, guardsA] : [astA, guardsA, astB, guardsB];
+        if (strict) return true;
+        const [holeGuards, fullAst, fullGuards] = a0 ? [guardsB, astA, guardsA] : [guardsA, astB, guardsB];
         const causes = holeGuards.filter(gd => vanishesNear(along(gd.g, env, name), p));
-        const trigonometric = causes.length > 0 && causes.every(gd => !isPoly(gd));
-        if (trigonometric && hasOwnPoles(fullAst, fullGuards)) continue;      // identity among poles
-        return { kind: 'isolated', at: p };
+        const trigonometric = causes.length > 0 && !causes.some(isPoly);
+        // does the defined side have poles of its own (a non-polynomial
+        // denominator vanishing where that side is undefined)?
+        const ownPoles = trigonometric && once(fullAst, () => fullGuards.some(gd => gd.k === 'z' && !isPoly(gd) &&
+          rootsOf(gd.g, name, env, lo, hi).some(r => !sideDefinedAt(fullAst, fullGuards, env, name, r))));
+        if (!ownPoles) return true;
       }
     }
   }
-  return null;
+  return false;
 }
 
 const EQUIV_CACHE = new Map();
@@ -966,7 +884,7 @@ function exprEquivalentUncached(a, b, opts) {
     const domainNames = names.filter(n => !DOMAIN_CONSTANTS.has(n));
     // one base point is enough for one variable; two cover the others' values
     const bases = envs.slice(0, domainNames.length > 1 ? 2 : 1);
-    if (domainDifference(astA, astB, domainNames, integers, bases, range, opts.positiveOnly, Boolean(opts.strictDomain))) return false;
+    if (domainDiffers(astA, astB, domainNames, integers, bases, range, opts.positiveOnly, Boolean(opts.strictDomain))) return false;
   }
   return true;
 }
