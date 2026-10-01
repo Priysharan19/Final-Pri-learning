@@ -134,8 +134,15 @@ export const flow = {
       await page.locator('.exam-head').innerText());
 
     // ── 4 · autosave, then a reload mid-paper ────────────────────────────────
+    // Saved means the device store holds the handwritten answer, not merely
+    // that the indicator once said so.
+    let saved = null;
+    for (let i = 0; i < 60; i++) {
+      saved = await storedExam(page, examId);
+      if (saved?.answers && Object.values(saved.answers).includes('42') && saved.inkKeys?.length) break;
+      await page.waitForTimeout(250);
+    }
     await check('the paper autosaves to the device', await waitSaved(page), 'the save indicator never said saved');
-    const saved = await storedExam(page, examId);
     await check('the saved paper holds both answers', !!saved?.answers && Object.values(saved.answers).includes('42') && Object.keys(saved.answers).length === 2,
       JSON.stringify(saved?.answers));
     await check('the saved paper holds the handwriting strokes', saved?.inkKeys?.length === 1 && saved.inkPoints > 10,

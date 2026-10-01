@@ -211,6 +211,8 @@ export default function ExamRoom() {
   const scheduleSave = useCallback(() => {
     if (phaseRef.current !== 'sitting') return;
     if (saveTimer.current) clearTimeout(saveTimer.current);
+    // An unsaved change is never shown as saved, even for the debounce window.
+    setSaveState('saving');
     saveTimer.current = setTimeout(save, SAVE_DEBOUNCE_MS);
   }, [save]);
 
