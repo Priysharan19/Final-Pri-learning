@@ -1,6 +1,6 @@
 # Form-Factor Specification (CP-01)
 
-Baseline: `main` @ `421f1ff1`. Active stylesheets are `client/src/theme.css` and `client/src/theme-state.css`, both imported by `client/src/main.jsx`. `client/src/theme-legacy.css` is not imported anywhere and is dead code; CP-03 deletes it.
+Initial audit baseline `main` @ `421f1ff1`; revalidated against `main` @ `83bde98a`. Active stylesheets are `client/src/theme.css` and `client/src/theme-state.css`, both imported by `client/src/main.jsx`. `client/src/theme-legacy.css` is not imported anywhere and is dead code; CP-03 deletes it.
 
 ## 1. Current state (audit)
 
@@ -59,17 +59,17 @@ The 600/840 split matches Android's window-size classes and keeps every current 
 | Handwriting/working area (`client/src/ink/InkAnswer.jsx`, `client/src/ink/InkCanvas.jsx`) | **Poor:** fixed 380 px canvas, `touch-action:none` blocks scrolling, developer notice shown to students, 7-button toolbar wraps to 3 rows, strokes not rescaled on resize | Canvas height = available height minus action bar (min 240, grows with "+ space"); explicit scroll/draw mode (two-finger scroll), compact toolbar (pen/eraser/undo/clear + overflow), no developer copy, strokes stored in a normalised space or rescaled on resize | Same, larger | PencilKit (native) or canvas; unchanged |
 | Answer entry | Partial: no `inputMode`/`enterKeyHint`; Σ palette keys 30 px | `inputMode="decimal"` for numeric answers, `"text"` for expressions; `enterKeyHint="done"`; palette keys ≥ 44 px in a scrollable row above the keyboard | Same | Current |
 | AI feedback (Pri Explain, working comments) | Likely OK; dialog uses `97vh` | Full-screen sheet using `100dvh`, close button in thumb reach, comments stacked under the canvas | Sheet | Side panel |
-| Progress (`client/src/pages/Progress.jsx`) | India: likely OK. Non-India `client/src/pages/ProgressLegacy.jsx`: **overflows** (`1fr 330px` inline grid); knowledge map is mouse-only | Single column; knowledge map becomes a list with drill-down; touch pan/zoom if the map stays | 2 columns | Current |
+| Progress (`client/src/pages/Progress.jsx`) | India: likely OK. Non-India `client/src/pages/ProgressLegacy.jsx`: **suspected overflow** (inferred from the `1fr 330px` inline grid, not measured); knowledge map is mouse-only | Single column; knowledge map becomes a list with drill-down; touch pan/zoom if the map stays | 2 columns | Current |
 | Exams (`client/src/pages/Exams.jsx`, `client/src/pages/ExamRoom.jsx`) | List OK; exam room unknown (40 px question dots); print sheet keeps 52 px padding | Question navigator as a sheet; timer in the top bar; print disabled or bridged | Same | Current |
 | Assignments/tasks (`client/src/pages/Tasks.jsx`, `client/src/components/AssignmentInboxPanel.jsx`) | Likely OK | Card list, due date first | Same | Current |
-| Profile/settings (`client/src/pages/Settings.jsx`) | Likely OK, except the inline email editor row overflows (`client/src/pages/SettingsLegacy.jsx`) | Settings list → detail pages; editors stack vertically | List + detail | Current grid |
+| Profile/settings (`client/src/pages/Settings.jsx`) | Likely OK, except the inline email editor row is **suspected** to overflow (a non-wrapping flex row with a 220 px input in `client/src/pages/SettingsLegacy.jsx`, not measured) | Settings list → detail pages; editors stack vertically | List + detail | Current grid |
 | Subscription/paywall (`client/src/components/FreeCapNotice.jsx`, `client/src/components/CloudAccountPanel.jsx`) | Likely OK (inline card, wrapping buttons) | Plan cards stacked; store-specific button (App Store / Play) chosen by `billing.store` capability, never by OS sniffing | Same | Current |
 | Teacher (`client/src/pages/Teach.jsx`) | Unknown; tables scroll; not phone-tested | **Supported but secondary:** read/triage on phone (class list, assignment status); authoring recommended at MEDIUM+ with an explicit note | Full | Current |
 | Guardian (`client/src/pages/AccountAction.jsx`) | Likely OK | Unchanged | — | — |
 
 ## 4. Rules that apply everywhere
 
-1. **No device sniffing for layout.** `navigator.userAgent`, `__PRI_HOST__.platform` and "isIPad"-style checks are forbidden in layout code. The architecture check enforces that `navigator.userAgent` stays out of `client/src`.
+1. **No device sniffing for layout.** `navigator.userAgent`, `__PRI_HOST__.platform` and "isIPad"-style checks are forbidden in layout code. The architecture check enforces this today for `navigator.userAgent`/`userAgentData`/`platform`/`vendor` across `client/src`, `client/dev` and `client/public`. CP-02 extends it to OS identity from `host.diagnostics`.
 2. **Never scale the tablet UI down.** COMPACT is a distinct composition, not a zoomed EXPANDED.
 3. **Touch targets** must be ≥ 44×44 CSS px at COMPACT/MEDIUM with a coarse pointer. Today's exceptions to remove: `.btn-sm` 36, `.sym-key` 30, `.ink-sym` 30, `.exam-dot` 40, photo-thumb remove 22.
 4. **Dynamic viewport units:** use `dvh` with a `vh` fallback for full-height layouts and sheets.

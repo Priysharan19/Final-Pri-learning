@@ -1,5 +1,7 @@
 # Cross-Platform Test Matrix (CP-01)
 
+Initial audit baseline `main` @ `421f1ff1`; revalidated against `main` @ `83bde98a`.
+
 Evidence classes are kept strictly separate, per `AGENTS.md`. A result from one class must never be reported as another.
 
 | Class | Meaning | Examples |
@@ -61,6 +63,11 @@ The S1 browser matrix is a single Playwright helper (CP-03) that iterates these 
 ## 3. Physical-device-only gates (explicitly not automatable here)
 
 These require a human with hardware. They are recorded as **P** evidence with device model, OS version, build SHA, date and operator. They must never be simulated, inferred from S1/S2, or written into documentation as done before they happen.
+
+**Owner decision (CP-01): physical validation is deferred.**
+- A task whose automated gates are green, but whose physical gates are outstanding, reports `SOFTWARE IMPLEMENTATION COMPLETE` + `PHYSICAL DEVICE VALIDATION DEFERRED`.
+- A deferred gate is recorded and open. It is never waived, weakened, simulated, or replaced by S1/S2 evidence.
+- While any physical gate for a platform is deferred, nothing may claim that platform is supported or certified, and no store release may ship.
 
 1. Real finger handwriting quality, latency and the scroll-versus-draw conflict on the smallest iPhone and Android phone.
 2. Apple Pencil (iPad baseline regression) and S Pen/USI stylus (Android tablets): latency, palm rejection, pressure.

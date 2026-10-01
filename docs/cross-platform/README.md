@@ -1,6 +1,12 @@
 # Cross-Platform (iPad · iPhone · Android phone · Android tablet)
 
-CP-01 audit and architecture, baseline `main` @ `421f1ff1` (2026-10-02). Read in this order:
+CP-01 audit and architecture.
+
+- Initial audit baseline: `main` @ `421f1ff1`.
+- Revalidated against `main` @ `83bde98a`.
+- Final CP-01 candidate: the head of PR #250 at merge.
+
+Read in this order:
 
 1. [CROSS_PLATFORM_ARCHITECTURE.md](CROSS_PLATFORM_ARCHITECTURE.md): the decision (one shared product + thin shells), the verified current architecture, and the platform-neutral `priNative` contract.
 2. [CAPABILITY_MATRIX.md](CAPABILITY_MATRIX.md): every capability across shared core, Apple, Android and browser, with status, risk and owner.
@@ -16,3 +22,5 @@ CP-01 audit and architecture, baseline `main` @ `421f1ff1` (2026-10-02). Read in
 - Android does not exist yet.
 
 The machine check `client/test/cross-platform-architecture-check.mjs` keeps these documents honest. It verifies that every cited path exists. It also ratchets the iPad data origin, direct WebKit bridge access, device sniffing and native-shell secrets.
+
+**Completion vocabulary:** physical-device validation is deferred by owner decision. A future task can be `SOFTWARE IMPLEMENTATION COMPLETE` while also `PHYSICAL DEVICE VALIDATION DEFERRED`. Deferred gates stay open and are never waived; see [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md).

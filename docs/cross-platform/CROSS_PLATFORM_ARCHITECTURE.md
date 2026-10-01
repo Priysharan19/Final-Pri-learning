@@ -1,6 +1,10 @@
 # Cross-Platform Architecture (CP-01)
 
-- **Status:** Authoritative plan for iPad, iPhone, Android phone and Android tablet. Audit baseline `main` @ `421f1ff1bbea6ed8014a2ad8f6fa2b24a149c73a` (2026-10-02).
+- **Status:** Authoritative plan for iPad, iPhone, Android phone and Android tablet.
+- **Evidence identity:**
+  - Initial audit baseline: `main` @ `421f1ff1bbea6ed8014a2ad8f6fa2b24a149c73a` (2026-10-01 UTC).
+  - Revalidated against `main` @ `83bde98a6fde5dd595c52c0f201ad339147a8dcd` (async store / Supabase Postgres, PRs #244 and #247); every cited fact still holds.
+  - Final CP-01 candidate: the head of PR #250 at merge.
 - **Scope:** the audit and the architecture decision. It does not implement CP-02 onward. See [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md).
 - **Subordinate to:** [authoritative-architecture.md](../architecture/authoritative-architecture.md) and [ADR-0001](../architecture/adr-0001-online-first-runtime.md). Where this document talks about runtime authority (data, hosting, AI providers), those documents govern.
 - **Machine check:** `client/test/cross-platform-architecture-check.mjs` (wired into `npm run test:contracts`).
@@ -46,7 +50,7 @@ What this means in practice:
 | The product client is React/Vite | Yes | `client/package.json` (react 18, vite 8, react-router-dom 7), `client/vite.config.js` |
 | The native Apple package lives under `ios/` | Yes | `ios/PriLearning.swiftpm` is canonical. `ios/PriLearning 2.swiftpm` is a compatibility copy whose Swift, `Package.swift` and `Resources/Web` are identical (only `RELEASE.md` differs). `ios/PriLearning.swiftpm.zip` is a **stale** 2026-08-23 snapshot without the cloud, billing or photo bridges. |
 | The Apple shell hosts the bundled client in WKWebView | Yes | `ios/PriLearning.swiftpm/WebShell.swift` loads `prilearning://app/` through `LocalSchemeHandler.swift`, using the persistent `WKWebsiteDataStore.default()` |
-| `Package.swift` declares `.pad` and `.phone` | Yes | `ios/PriLearning.swiftpm/Package.swift`, `supportedDeviceFamilies: [.pad, .phone]`. The built `Info.plist` contains `UIDeviceFamily = [1, 2]`. iOS 16.0 minimum. |
+| `Package.swift` declares `.pad` and `.phone` | Yes | `ios/PriLearning.swiftpm/Package.swift`, `supportedDeviceFamilies: [.pad, .phone]`, iOS 16.0 minimum. The CP-01 audit's one-off simulator build produced an `Info.plist` with `UIDeviceFamily = [1, 2]`; that is synthetic evidence, not in CI, and the source `Info.plist` does not set the key. |
 | Native bridges | Yes, five | `priInk` (PencilKit and the on-device recogniser), `priPhoto` (Vision OCR), `priBilling` (StoreKit 2), `priCloud` (URLSession `/v1` with a native cookie jar), `priShare` (UIActivityViewController). In addition, `<a download>`/blob navigations become a `WKDownload`, are written to a temp file and are opened in the share sheet (`WebShell.swift` download delegate). There are **no** lifecycle, storage, haptics or deep-link bridges. |
 | React holds Apple/WebKit assumptions | Yes | Detection is scattered across 10+ modules (section 3) |
 | The cloud backend is reusable by every client | **Partly** | The `/v1` auth, sync, AI and entitlements are client-agnostic. The **origin guard only exempts `X-Pri-Client: ios-native-v1`** (`server/platform/security.js`). There is **no Google Play verifier** (`server/platform/billing.js` returns `BILLING_PROVIDER_NOT_CONFIGURED`), and `/v1/health` hard-codes `google: false` (`server/platform/router.js`). |
@@ -55,7 +59,7 @@ What this means in practice:
 
 1. **The shell** (Swift, 6,995 lines across 26 tracked files). Most of it is the on-device ink recogniser stack under `ios/PriLearning.swiftpm/Ink/`. The shell itself is `WebShell.swift`, `LocalSchemeHandler.swift`, `NativeCloudBridge.swift`, `StoreKitBillingBridge.swift`, `PhotoOCR.swift` and `ReleaseIdentity.swift`.
 2. **The web runtime** is `client/dist`, served from the custom origin `prilearning://app`. React Router uses `BrowserRouter`. It works only because the scheme handler returns `index.html` for extensionless paths.
-3. **The local learning backend** (`client/src/api.js` → `client/src/local/gateway.js` → `client/src/local/backend.js`) runs in process against IndexedDB `pri-learning` v4 (18 object stores, AES-sealed per-profile stores) plus a second database, `pri-ink-personal` v1 (`client/src/ink/personal.js`). **Both are keyed to the bundled origin.** It never touches the network.
+3. **The local learning backend** (`client/src/api.js` → `client/src/local/gateway.js` → `client/src/local/backend.js`) runs in process against IndexedDB `pri-learning` v4 (18 object stores, AES-sealed per-profile stores; `client/src/local/idb.js`) plus a second database, `pri-ink-personal` v1 (`client/src/ink/personal.js`). **Both are keyed to the bundled origin.** It never touches the network.
 4. **The cloud client** (`client/src/platform/cloudTransport.js`) is the only module allowed to perform network I/O. That rule is enforced by `tools/check-client-network-boundary.mjs`. Browsers use `fetch` with cookies and a CSRF header. The Apple shell uses the `priCloud` bridge, so cookies never reach JavaScript.
 5. **The server** (`server/app.js` → `/v1` `server/platform/router.js`) uses cookie sessions only (no bearer tokens) and double-submit CSRF. It has a single allowed browser origin and **no CORS**. OpenAI keys stay on the server only.
 
@@ -76,7 +80,8 @@ None of the bridges carries a protocol version. Detection happens once at module
 
 | Location | Assumption |
 |---|---|
-| `client/src/ink/native.js`, `client/src/ink/personal.js`, `client/dev/devStructural.js` | `window.webkit.messageHandlers.priInk` and `__PRI_NATIVE_INK__` |
+| `client/src/ink/native.js` | `window.webkit.messageHandlers.priInk` and `__PRI_NATIVE_INK__` |
+| `client/src/ink/personal.js`, `client/dev/devStructural.js` | `__PRI_NATIVE_INK__` flag only |
 | `client/src/native/photo.js` | `messageHandlers.priPhoto` and `__PRI_NATIVE_PHOTO__` |
 | `client/src/platform/nativeBilling.js` | `messageHandlers.priBilling`. StoreKit-shaped: `appAccountToken`, "App Store" copy |
 | `client/src/platform/cloudTransport.js` | `messageHandlers.priCloud`, `__PRI_NATIVE_CLOUD__` and `__PRI_NATIVE_CLOUD_CONFIGURED__` |
@@ -96,12 +101,12 @@ None of the bridges carries a protocol version. Detection happens once at module
 The contract lives at `client/src/platform/native/` (CP-02 creates it). The evidence for this placement: `client/src/platform/` already owns cloud transport, billing and entitlements. The five existing bridges map one to one onto capabilities, so the names stay close to the brief:
 
 ```
-priNative.host        // handshake: protocol, platform, shell version, capability table
+priNative.host        // handshake: protocol, shell version, release, capability table; host.diagnostics (OS identity, logs only)
 priNative.ink         // stylus/finger native ink surface + on-device recognition
 priNative.photo       // pick/capture image → bytes; optional on-device OCR
 priNative.billing     // store products, purchase, restore, finish (opaque signed proofs)
 priNative.cloud       // /v1 HTTPS with native cookie jar
-priNative.share       // share/export a file (text or binary)
+priNative.share       // share/export a file (text or binary); share.print → system print
 priNative.files       // import a file (picker) — browser keeps <input type=file>
 priNative.lifecycle   // foreground/background/memory-warning/back-button events
 priNative.storage     // persistence status + export of diagnostics (no learning data)
@@ -112,32 +117,41 @@ priNative.device      // form-factor hints the CSS cannot know (stylus present, 
 
 ### 4.2 Handshake and capability detection
 
-The shell injects one frozen object at document start, main frame only:
+The shell injects one non-writable object at document start, main frame only. On Apple this is a `WKUserScript` with `forMainFrameOnly: true`. On Android it is `WebViewCompat.addDocumentStartJavaScript` with the origin rule, gated on `WebViewFeature.DOCUMENT_START_SCRIPT`. If that feature is unsupported, the shell fails closed and offers no native capabilities.
 
 ```js
-window.__PRI_HOST__ = Object.freeze({
-  protocol: 1,                       // envelope version (integer, bumped on breaking change)
-  platform: 'ios' | 'android',       // diagnostics/analytics ONLY — product code must not branch on it
+Object.defineProperty(window, '__PRI_HOST__', { writable: false, configurable: false, value: Object.freeze({
+  protocol: 1,                       // envelope protocol (integer; bumped only on a breaking envelope change)
+  // NO `platform` key: OS identity is available only through the `host.diagnostics` op,
+  // for logs and support, so product code cannot branch on it.
   shell: { version: '4.0', build: '2', id: 'com.prilearning.app' },
+  release: { /* the bundled release.json (schemaVersion 1), same object as __PRI_NATIVE_RELEASE_IDENTITY__ */ },
   capabilities: {                    // absent key ⇒ unsupported
-    ink:       { v: 1, stylus: true, finger: true, recognizer: 'pri-foundation' },
-    photo:     { v: 1, capture: true, library: true, ocr: true },
-    billing:   { v: 1, store: 'app-store' | 'play' },
-    cloud:     { v: 1, configured: true },
-    share:     { v: 1, binary: true },
-    files:     { v: 1 },
-    lifecycle: { v: 1, backButton: false },
-    storage:   { v: 1, durable: true },
+    ink:       { versions: [1], stylus: true, finger: true, recognizer: 'pri-foundation' },
+    photo:     { versions: [1], capture: true, library: true, ocr: true },
+    billing:   { versions: [1], store: 'app-store' | 'play' }, // selects store copy/SDK flow only, never layout or logic
+    cloud:     { versions: [1], configured: true },
+    share:     { versions: [1], binary: true, print: true },
+    files:     { versions: [1] },
+    lifecycle: { versions: [1], backButton: false },
+    storage:   { versions: [1], durable: true },
+    device:    { versions: [1], stylusSeen: false, safeAreaApplied: true },
   },
-});
+}) });
 ```
 
 Rules:
 
-- `priNative.has('billing')` reads only `__PRI_HOST__.capabilities`. It is evaluated lazily on every call, never cached at module scope, which fixes the import-time `NATIVE_INK` constant.
-- When `__PRI_HOST__` is absent, `priNative` is a browser host and every capability resolves to its web fallback, or to `UNSUPPORTED`.
-- **Version negotiation:** JavaScript accepts any `protocol` ≤ its own `MAX_PROTOCOL`. A capability whose `v` is higher than JavaScript understands is treated as unsupported, which is never a crash. The shell never removes a capability without bumping `protocol`. Because `client/dist` is bundled inside the shell, the two always ship together. The negotiation exists for staged rollouts, the LAN dev server and future over-the-air web updates.
-- **Migration:** during CP-02 the Apple shell keeps injecting the legacy `__PRI_NATIVE_*__` flags *and* `__PRI_HOST__`. The JavaScript adapter prefers `__PRI_HOST__`. Legacy flags are deleted only after one released Apple build has shipped `__PRI_HOST__`.
+- **Capabilities, not OS identity.** `priNative.has('billing')` reads only `__PRI_HOST__.capabilities`. It is evaluated lazily on every call, never cached at module scope, which fixes the import-time `NATIVE_INK` constant. From CP-02, the architecture check fails any read of `host.diagnostics` / OS identity outside `client/src/platform/native/`.
+- **No host.** When `__PRI_HOST__` is absent, `priNative` is a browser host and every capability resolves to its web fallback, or to `UNSUPPORTED`.
+- **Protocol negotiation.** JavaScript accepts a host whose `protocol` ≤ its own `MAX_PROTOCOL`. If `protocol > MAX_PROTOCOL`, JavaScript treats the host as a browser host (no native capabilities) and records `PROTOCOL_UNSUPPORTED` in diagnostics. It never crashes and never guesses. Every envelope's `v` must equal the negotiated `protocol`; a mismatch is `BAD_REQUEST`.
+- **Capability negotiation.** Each capability advertises every version it still serves (`versions: [1, 2]`). JavaScript uses the highest version common to both sides; if there is none, the capability is unsupported. A shell can add v2 while still serving v1, so it never has to remove a capability to evolve it. Because `client/dist` is bundled inside the shell they normally ship together. Negotiation exists for staged rollouts, the LAN dev server and any future over-the-air web update.
+- **Hints, not authority.** Page script can read, but cannot replace, `__PRI_HOST__`. Even so, its flags are *hints* for UI. Native code independently rejects any request for a capability or version it did not advertise (`UNSUPPORTED`), and validates every request on its own. No capability flag grants entitlement, identity or access.
+- **Migration from the legacy bridges.**
+  - During CP-02 the Apple shell keeps injecting the legacy `__PRI_NATIVE_*__` flags *and* `__PRI_HOST__`.
+  - For each capability, the adapter uses **exactly one** transport: `priBridge` when the capability is advertised in `__PRI_HOST__`, otherwise the legacy handler, never both. A purchase or cloud mutation therefore cannot be sent twice.
+  - The legacy handlers get the same main-frame and origin checks in CP-02.
+  - Legacy flags and handlers are deleted only after one released Apple build has shipped `__PRI_HOST__`.
 
 ### 4.3 Envelope
 
@@ -149,27 +163,48 @@ One transport and one dispatcher per host:
 | native → JS | `evaluateJavaScript("window.__priNativeReceive(…)")` | `JavaScriptReplyProxy.postMessage(JSON)`, routed to the same `__priNativeReceive` |
 
 ```ts
-// request
+// JS → native request
 { v: 1, id: string /* uuid, ≤120 */, cap: 'billing', op: 'purchase', payload: {...}, timeoutMs?: number }
-// response (exactly one per request unless cancelled)
+// native → JS response (exactly one per request, unless the request was cancelled and native drops it)
 { v: 1, id, ok: true,  result: {...} }
 { v: 1, id, ok: false, error: { code: PriNativeErrorCode, message: string, retryable: boolean, detail?: { providerCode?: string } } }
-// cancel (best effort; native must not reply after acknowledging cancel)
+// JS → native cancel (gets no response of its own)
 { v: 1, id: newId, cap, op: 'cancel', payload: { target: id } }
-// event (unsolicited)
-{ v: 1, event: 'billing.transactionUpdated' | 'ink.strokes' | 'lifecycle.state' | ..., payload: {...} }
+// native → JS request (native asks JS something and needs an answer, e.g. Android Back)
+{ v: 1, id, req: 'lifecycle.backRequested', payload: {} }     // JS answers with { v, id, ok: true, result: { handled } }
+// native → JS event (one-way)
+{ v: 1, event: 'billing.transactionUpdated' | 'ink.strokes' | 'lifecycle.state' | ..., seq: number, payload: {...} }
 ```
 
-**Error codes (closed set):** `UNSUPPORTED`, `BAD_REQUEST`, `TIMEOUT`, `CANCELLED`, `USER_CANCELLED`, `PERMISSION_DENIED`, `UNAVAILABLE` (offline, store unavailable, cloud not configured), `TOO_LARGE`, `PROVIDER_ERROR`, `UNVERIFIED`, `INTERNAL`. Existing provider codes such as `STOREKIT_TRANSACTION_UNVERIFIED` and `CLOUD_NETWORK_ERROR` are kept in `detail.providerCode`, so current tests and telemetry keep their meaning.
+**Error codes (closed set):** `UNSUPPORTED`, `BAD_REQUEST`, `TIMEOUT`, `CANCELLED`, `USER_CANCELLED`, `PERMISSION_DENIED`, `UNAVAILABLE` (offline, store unavailable, cloud not configured), `TOO_LARGE`, `PROVIDER_ERROR`, `UNVERIFIED`, `INTERNAL`.
+- JavaScript maps any code outside this set to `INTERNAL`.
+- Existing provider codes such as `STOREKIT_TRANSACTION_UNVERIFIED` and `CLOUD_NETWORK_ERROR` are kept in `detail.providerCode`, so current tests and telemetry keep their meaning.
 
 **Async, timeout and cancellation:**
 
 - Every call returns a Promise and accepts `{ signal: AbortSignal, timeoutMs }`.
-- JavaScript owns the timeout. On timeout or abort, JavaScript rejects with `TIMEOUT` or `CANCELLED`, sends `cancel`, and drops any late reply.
+- **JavaScript owns the timeout.** On timeout or abort, JavaScript rejects with `TIMEOUT` or `CANCELLED` and sends `cancel`.
+- **Native clamps** `timeoutMs` to a per-op maximum and never times out *before* JavaScript. A native-side timeout replies `TIMEOUT`.
+- On `cancel`, native either replies to the *target* with `CANCELLED` or drops it; `cancel` itself gets no response.
+- **Not cancellable once committed:** `billing.purchase` cannot be cancelled after the store sheet is shown, and a cloud request cannot be cancelled after it has been sent. For these, cancellation only stops JavaScript waiting.
 - The per-op defaults match today's values: ink read 8 s / 14 s, photo 12 s, cloud 12 s (25 s for handwriting, 35 s for working), billing 30 s to 5 min.
-- **Ink is the exception that never rejects.** `ink.recognize` keeps today's "resolve with an empty reading tagged with the failure reason" semantics, because `client/src/ink/InkAnswer.jsx` consensus depends on it.
+- **Late replies are never silently lost when they carry value.**
+  - A late `billing.purchase` / `billing.restore` result is re-emitted as a `billing.transactionUpdated` event. Native never finishes or acknowledges a transaction until the server has accepted it. A paid transaction therefore survives a JavaScript timeout and is replayed by the store on next launch.
+  - Every cloud mutation carries an `Idempotency-Key` on both shells, as the Apple bridge already sends. Retrying after a timeout is therefore safe, even if the late reply was dropped.
+  - Other late replies (reads, ink, photo) are dropped.
+- **Duplicates and limits.**
+  - A request whose `id` is already in flight is `BAD_REQUEST`.
+  - At most 32 in-flight requests per capability; beyond that, `UNAVAILABLE` with `retryable: true`.
+  - Envelopes are capped at 1 MB (8 MB for `photo` payloads), otherwise `TOO_LARGE`. The cloud bridge keeps its own 1 MB / 2 MB caps.
+- **Ink is the exception that never rejects.** `ink.recognize` keeps today's "resolve with an empty reading tagged with the failure reason" semantics, because `client/src/ink/InkAnswer.jsx` consensus depends on it. The failure is reported in `reading.error.code`, which uses the same closed error set.
 
-**Events:** delivered through `priNative.on(event, fn) → unsubscribe`. The ink stroke stream, billing transaction updates and lifecycle state are events, not responses. A lifecycle `state` event (`active` | `inactive` | `background`) supplements, and never replaces, `visibilitychange`. The drafts flush in `client/src/components/drafts.js` keeps working in browsers.
+**Events and reloads:**
+
+- **Subscribing.** Events are delivered through `priNative.on(event, fn) → unsubscribe`. The ink stroke stream, billing transaction updates and lifecycle state are events, not responses. Each event carries a per-document monotonically increasing `seq`.
+- **`host.ready`.** JavaScript sends `host.ready` once its subscribers are installed. Native buffers `billing.*` events until then and delivers them in order. Ephemeral events (`ink.strokes`, `lifecycle.state`) are not buffered; their latest state can be re-queried.
+- **Reloads.** Any main-frame navigation or reload cancels every in-flight native request: native drops their replies. After the new document's `host.ready`, native re-delivers undelivered `billing.*` events.
+- **Lifecycle state.** A lifecycle `state` event (`active` | `inactive` | `background`) supplements, and never replaces, `visibilitychange`. The drafts flush in `client/src/components/drafts.js` keeps working in browsers.
+- **Native questions to JavaScript** (Android Back) use the native → JS *request* form above. If JavaScript does not reply within 300 ms, native treats the request as unhandled.
 
 ### 4.4 Security boundaries (non-negotiable)
 
@@ -177,10 +212,16 @@ One transport and one dispatcher per host:
 2. **Navigation lockdown.** Remote `http(s)` navigation leaves the web view for the system browser, as the Apple shell already does. No remote page can ever reach `priBridge`.
 3. **Cloud bridge allowlist** (as `ios/PriLearning.swiftpm/NativeCloudBridge.swift` already enforces): `/v1/` paths only, at most 200 characters, no `..`, `?` or `#`. Methods GET, POST, PATCH and DELETE. Requests capped at 1 MB and responses at 2 MB. HTTPS only in release builds. The cloud origin comes from build configuration, never from the page.
 4. **Cookies never cross into JavaScript.** The native jar holds `pri_cloud_session`. Native code copies `pri_csrf` into `X-Pri-CSRF`. On Android the jar is persisted in app-private storage, encrypted with an Android Keystore key.
-5. **No secrets in any shell.** OpenAI, Supabase service-role, Razorpay, Apple root and Play service-account credentials live only in server environment variables. The machine check scans `ios/` and (once it exists) `android/` for secret patterns.
-6. **Entitlement authority stays server-side.** The shells return *opaque signed proofs* (an Apple JWS `signedTransaction`, a Play `purchaseToken`). JavaScript forwards them to `/v1/billing/*`. Only the server verifies them and grants entitlement. Shells finish or acknowledge a transaction **only after** the server accepts it, which is the current Apple behaviour and also the Play behaviour.
-7. **Answer-blind handwriting.** Ink and photo payloads sent to native recognisers or the cloud never include expected answers or solutions. This is unchanged from `client/src/ink/cloudWorking.js` / `client/src/ink/cloudReader.js`.
-8. **Payload validation in both directions.** Native code validates types and sizes before acting. JavaScript validates native replies before trusting them, because a compromised or outdated shell is still untrusted input to the marker.
+5. **No secrets in any shell.** OpenAI, Supabase service-role, Razorpay, Apple root and Play service-account credentials live only in server environment variables. The machine check scans `ios/` (including the shipped web bundle) and, once it exists, `android/` for secret patterns.
+6. **Entitlement authority stays server-side.** The shells return *opaque signed proofs* (an Apple JWS `signedTransaction`, a Play `purchaseToken`). JavaScript forwards them to `/v1/billing/*`. Only the server verifies them and grants entitlement. Shells finish or acknowledge a transaction **only after** the server accepts it, which is the current Apple behaviour and also the Play behaviour. (Local *enforcement* of Premium is a separate open issue; see §5 risk 5.)
+7. **Answer-blind handwriting.** Ink and photo payloads sent to native recognisers or the cloud never include expected answers or solutions.
+   - This is unchanged from `client/src/ink/cloudWorking.js` / `client/src/ink/cloudReader.js`.
+   - From CP-02, `ink.*` and `photo.*` payloads use a **schema allowlist**: strokes, image bytes, and context derived only from the public prompt text.
+   - A contract test fails if any payload key or value contains the question's expected answer, solution or mark.
+8. **Payload validation in both directions.**
+   - Native validates types and sizes before acting.
+   - JavaScript validates every reply against a per-op reply schema (`client/src/platform/native/envelope.js`, CP-02). A non-conforming reply becomes `INTERNAL`, and readings are clamped to expected types and lengths.
+   - A compromised or outdated shell is still untrusted input to the marker, and the deterministic engine remains the only mark authority.
 
 ### 4.5 Testability
 

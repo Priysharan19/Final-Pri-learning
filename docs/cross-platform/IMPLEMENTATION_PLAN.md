@@ -1,6 +1,6 @@
 # Cross-Platform Implementation Plan (CP-02 → CP-12)
 
-Baseline: `main` @ `421f1ff1`.
+Initial audit baseline `main` @ `421f1ff1`; revalidated against `main` @ `83bde98a`.
 
 Every task follows the `AGENTS.md` control plane (branch + PR, independent review, required CI, no direct `main` updates). Risk classes are the minimum; the diff-derived risk from `node scripts/pri-fleet.mjs risk` is authoritative.
 
@@ -8,13 +8,22 @@ Every task follows the `AGENTS.md` control plane (branch + PR, independent revie
 - **The iPad is a regression-protected baseline.** No task may silently replace PencilKit with web ink on iPad, weaken StoreKit/server verification, bypass the native cloud bridge, remove offline behaviour, orphan existing IndexedDB data, change grading, curriculum or account semantics, or regress accessibility.
 - The suites listed in [CROSS_PLATFORM_TEST_MATRIX.md](CROSS_PLATFORM_TEST_MATRIX.md) §4 stay green for every task.
 
+**Completion states (owner decision at CP-01: physical validation is deferred):**
+- A task is **`SOFTWARE IMPLEMENTATION COMPLETE`** when its scope is merged and every *automated* gate is green.
+- While any of its physical-device gates is outstanding, it also reports **`PHYSICAL DEVICE VALIDATION DEFERRED`**, listing each open gate.
+- A deferred physical gate is recorded and stays open. It is never waived, weakened, simulated, or satisfied by S1/S2 evidence.
+- Fully **`DONE`** means software complete *and* every physical gate recorded as P evidence.
+- Downstream tasks may start once their dependencies are `SOFTWARE IMPLEMENTATION COMPLETE`.
+- While any physical gate for a platform is deferred, nothing may say that platform is "supported" or "certified", and no store release may ship.
+
 ## Sequence and lanes
 
 ```
 CP-02 Bridge Foundation ──┬──> CP-03 Responsive Foundation ──> CP-04 iPhone Product ──> CP-05 iPhone Certification ─┐
                           │                                                                                         ├─> CP-11 Release Matrix ──> CP-12 Store Readiness
                           └──> CP-06 Android Shell ──> CP-07 Android Bridges ──┬─> CP-08 Play Billing ──┐            │
-                                     (needs CP-03 for UI QA)                   └─> CP-09 Handwriting ───┴─> CP-10 Android QA ┘
+                                                                               └─> CP-09 Handwriting ───┴─> CP-10 Android QA ┘
+Additional edges: CP-03 ──> CP-09 (compact canvas) and CP-03 ──> CP-10 (UI QA). CP-06 itself does not need CP-03.
 ```
 
 CP-03 and CP-06 can run in parallel after CP-02, with different owners. Under the single-writer lease they are still *sequenced* missions; the diagram shows dependencies, not concurrency.
@@ -44,7 +53,7 @@ CP-03 and CP-06 can run in parallel after CP-02, with different owners. Under th
 - **Automated gates:** `npm test`, `npm run test:browser`, `npm run check:ios`, `npm run test:ink:native` (iPad sim), the architecture check with direct `messageHandlers` access allowed **only** in `client/src/platform/native/`.
 - **Physical-device gates:** iPad + Apple Pencil smoke (write → recognise → submit, purchase restore in sandbox), because Swift bridge code changed.
 - **Rollback criteria:** any iPad ink, billing or cloud regression. Rollback is a revert: legacy flags and handlers remain until one release ships `__PRI_HOST__`.
-- **Done when:** zero direct `webkit.messageHandlers` references outside the contract module, every capability has fake-host coverage, and an iPad build ships with both protocols and no behaviour change. **Risk: R4** (touches the billing and cloud auth path).
+- **Done when:** zero direct `webkit.messageHandlers` references outside the contract module, every capability has fake-host coverage, and an iPad build ships with both protocols and no behaviour change. Without the iPad + Pencil smoke, the state is `SOFTWARE IMPLEMENTATION COMPLETE` / `PHYSICAL DEVICE VALIDATION DEFERRED`, and no iPad release containing the Swift change may ship until it is done. **Risk: R4** (touches the billing and cloud auth path).
 
 ## CP-03 — Responsive Product Foundation
 
@@ -88,7 +97,7 @@ CP-03 and CP-06 can run in parallel after CP-02, with different owners. Under th
 - **Automated gates:** `native-ink.yml` (iPad + iPhone), `npm run check:ios`, the package drift gate including `Info.plist`, `npm test`, `npm run test:browser`.
 - **Physical-device gates:** iPad Pencil regression check (ink path changed).
 - **Rollback criteria:** any iPad Pencil policy change, ink accuracy regression in `--ink-selfcheck`, or StoreKit/cloud bridge regression.
-- **Done when:** an iPhone simulator student completes the critical journey with finger and typed input, and all iPad gates are unchanged. **Risk: R4** (handwriting authority path).
+- **Done when:** an iPhone simulator student completes the critical journey with finger and typed input, and all iPad gates are unchanged. That is `SOFTWARE IMPLEMENTATION COMPLETE`. Until the iPad Pencil regression check is recorded, it is also `PHYSICAL DEVICE VALIDATION DEFERRED`. **Risk: R4** (handwriting authority path).
 
 ## CP-05 — iPhone Certification
 
@@ -101,7 +110,7 @@ CP-03 and CP-06 can run in parallel after CP-02, with different owners. Under th
 - **Automated gates:** S2 iPhone journey workflow (macOS runner, per `.github/workflows/native-ink.yml` conventions).
 - **Physical-device gates:** **all** of [IPHONE_GAP_REPORT.md](IPHONE_GAP_REPORT.md) §4 on SE-class, standard and Pro Max-class iPhones.
 - **Rollback criteria:** none (evidence task). Failures reopen CP-03/CP-04 defects.
-- **Done when:** every iPhone gate has S2 evidence plus P evidence, with no synthetic result presented as physical. Only then may docs/marketing say "iPhone supported". **Risk: R1–R2.**
+- **Done when:** every iPhone gate has S2 evidence plus P evidence, with no synthetic result presented as physical. Only then may docs/marketing say "iPhone supported". With S2 complete and P outstanding: `SOFTWARE IMPLEMENTATION COMPLETE` / `PHYSICAL DEVICE VALIDATION DEFERRED`, and no "supported" claim. **Risk: R1–R2.**
 
 ## CP-06 — Android Shell
 
@@ -151,7 +160,7 @@ CP-03 and CP-06 can run in parallel after CP-02, with different owners. Under th
 - **Automated gates:** `ci.yml` platform job, `android-shell.yml` instrumented billing tests with Play Billing test doubles.
 - **Physical-device gates:** **Play license testers on a real device:** purchase, renewal (accelerated test cycle), cancel, refund/revoke, restore on a second device. External prerequisites ⚑: a Play Console app, subscription products, a service account with least privilege, and a Pub/Sub topic. These are owner actions; record them as `BLOCKED_EXTERNAL` until done.
 - **Rollback criteria:** any Apple/Razorpay regression; any path where a client-supplied value grants entitlement without server verification.
-- **Done when:** server tests are green, emulator flows are green, physical license-tester evidence is recorded, and `google: true` appears only when configured. **Risk: R4** (billing).
+- **Done when:** server tests are green, emulator flows are green, physical license-tester evidence is recorded, and `google: true` appears only when configured. Without license-tester evidence: `SOFTWARE IMPLEMENTATION COMPLETE` / `PHYSICAL DEVICE VALIDATION DEFERRED` (plus `BLOCKED_EXTERNAL` for Play Console prerequisites), and Play billing must not be enabled in production. **Risk: R4** (billing).
 
 ## CP-09 — Android Handwriting/Input
 
@@ -164,7 +173,7 @@ CP-03 and CP-06 can run in parallel after CP-02, with different owners. Under th
 - **Automated gates:** `npm run test:ink*` suites, an instrumented WebView stroke test.
 - **Physical-device gates:** **required for any claim:** finger on a low-end phone, S Pen tablet, USI stylus tablet. Latency and quality recorded as P evidence.
 - **Rollback criteria:** any shared ink change that regresses the browser/iPad suites.
-- **Done when:** a documented, evidenced statement of Android handwriting quality exists, kept explicitly separate from iPad PencilKit claims. **Risk: R4** (handwriting authority).
+- **Done when:** a documented, evidenced statement of Android handwriting quality exists, kept explicitly separate from iPad PencilKit claims. Without P evidence: `SOFTWARE IMPLEMENTATION COMPLETE` / `PHYSICAL DEVICE VALIDATION DEFERRED`, and no Android handwriting-quality statement is made. **Risk: R4** (handwriting authority).
 
 ## CP-10 — Android Product QA
 
@@ -177,7 +186,7 @@ CP-03 and CP-06 can run in parallel after CP-02, with different owners. Under th
 - **Automated gates:** emulator matrix (API 26, API 36, tablet, foldable).
 - **Physical-device gates:** D1–D5 physical runs (and D7 for stylus).
 - **Rollback criteria:** n/a (evidence task).
-- **Done when:** S2 + P evidence for every Android gate exists. Only then may anything say "Android supported". **Risk: R1–R2.**
+- **Done when:** S2 + P evidence for every Android gate exists. Only then may anything say "Android supported". With S2 complete and P outstanding: `SOFTWARE IMPLEMENTATION COMPLETE` / `PHYSICAL DEVICE VALIDATION DEFERRED`. **Risk: R1–R2.**
 
 ## CP-11 — Cross-Platform Release Matrix
 
@@ -190,7 +199,7 @@ CP-03 and CP-06 can run in parallel after CP-02, with different owners. Under th
   - An **origin-immutability check** (`prilearning://app` and `https://appassets.androidplatform.net` must never change).
   - The required-CI matrix: S0, S1, S2 iOS, S2 Android.
 - **Non-goals:** store submission.
-- **Dependencies:** CP-05, CP-10.
+- **Dependencies:** CP-05, CP-10 (each at least `SOFTWARE IMPLEMENTATION COMPLETE`; CP-11 needs no physical evidence).
 - **Acceptance tests:** a release candidate produces identical `release.json` SHA in web, both iOS bundles and Android assets; an old-client header receives a structured upgrade response; origin constants are guarded by a test.
 - **Automated gates:** `ci.yml` (required), `native-ink.yml`, `android-shell.yml`.
 - **Physical-device gates:** none new.
@@ -210,4 +219,4 @@ CP-03 and CP-06 can run in parallel after CP-02, with different owners. Under th
 - **Automated gates:** all required CI.
 - **Physical-device gates:** final smoke on one device per platform/form factor using the release-signed build.
 - **Rollback criteria:** n/a.
-- **Done when:** the owner can submit. Items requiring external authority (store accounts, legal/privacy sign-off, payment-provider setup, publishing) are listed as `BLOCKED_EXTERNAL` with exact next steps. **Risk: R4** (release/signing configuration).
+- **Done when:** the owner can submit. Submission additionally requires every deferred physical gate for the submitted platform to be closed. Items requiring external authority (store accounts, legal/privacy sign-off, payment-provider setup, publishing) are listed as `BLOCKED_EXTERNAL` with exact next steps. **Risk: R4** (release/signing configuration).

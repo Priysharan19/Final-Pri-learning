@@ -44,6 +44,11 @@ function walk(dir, keep, out = []) {
   return out;
 }
 
+// Comments are stripped before pattern scans: a comment that mentions a
+// forbidden API is not a use of it, and a leftover comment must not keep an
+// allowlisted file looking "in use" (that would defeat the shrink-only ratchet).
+const stripComments = s => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:\\])\/\/.*$/gm, '$1');
+
 const DOCS = 'docs/cross-platform';
 const REQUIRED_DOCS = [
   'README.md',
@@ -86,7 +91,8 @@ for (const cap of REQUIRED_CAPABILITIES) {
   const row = matrixRows.get(cap);
   ok(!!row, `the capability matrix has a row for "${cap}"`);
   // Shared core, Apple, Android, browser, status, risks, owner — none left blank.
-  if (row) ok(row.slice(2, 9).every(c => c.length > 0), `the "${cap}" row fills every column`);
+  if (row) ok(row.slice(2, 9).every(c => c.length > 0 && !/^(tbd|todo|tba|n\/a\??|-+|\?+)$/i.test(c)),
+    `the "${cap}" row fills every column with real content`);
 }
 
 // ── 3 · The plan covers CP-02 … CP-12 with every required field ──────────────
@@ -101,7 +107,7 @@ for (let n = 2; n <= 12; n++) {
   const next = plan.indexOf('\n## ', start + 4);
   const section = plan.slice(start, next < 0 ? undefined : next);
   for (const field of FIELDS) {
-    ok(new RegExp(`\\*\\*${field.replace('-', '\\-')}[^*]*:\\*\\*`).test(section), `${id} states its ${field.toLowerCase()}`);
+    ok(new RegExp(`\\*\\*${field.replace('-', '\\-')}[^*]*:\\*\\*\\s*(?!(?:tbd|todo|tba)\\b)\\S[^\\n]{2,}`, 'i').test(section), `${id} states its ${field.toLowerCase()}`);
   }
 }
 
@@ -112,6 +118,13 @@ ok(/never be simulated, inferred/.test(tm), 'and says physical evidence is never
 for (const id of ['A1', 'A2', 'A3', 'A4', 'A5', 'D1', 'D2', 'D3', 'D4', 'D5']) {
   ok(new RegExp(`^\\| ${id} \\|`, 'm').test(tm), `the device matrix includes row ${id}`);
 }
+for (const name of ['IMPLEMENTATION_PLAN.md', 'CROSS_PLATFORM_TEST_MATRIX.md']) {
+  ok(/SOFTWARE IMPLEMENTATION COMPLETE/.test(docs[name]) && /PHYSICAL DEVICE VALIDATION DEFERRED/.test(docs[name]) && /never waived/.test(docs[name]),
+    `${name} keeps "software complete" apart from "physical validation deferred", and deferred gates are never waived`);
+}
+const handshake = (docs['CROSS_PLATFORM_ARCHITECTURE.md'].match(/### 4\.2[\s\S]*?```js([\s\S]*?)```/) || [])[1] || '';
+ok(handshake.includes('capabilities') && !/^\s*platform\s*:/m.test(handshake),
+  'the __PRI_HOST__ handshake advertises capabilities and carries no OS identity for product code to branch on');
 ok(/no physical-iPhone evidence/i.test(docs['IPHONE_GAP_REPORT.md']),
   'the iPhone report does not claim physical-iPhone evidence that does not exist');
 
@@ -125,13 +138,22 @@ const PLANNED = [
 ];
 // Build outputs that are gitignored, so a fresh CI checkout does not have them.
 const GENERATED = ['client/dist'];
+// A planned path is only a plan if the implementation plan actually schedules it.
+for (const p of PLANNED) ok(plan.includes(p), `planned path ${p} is scheduled in IMPLEMENTATION_PLAN.md`);
 const CITABLE = /^(client|ios|server|scripts|tools|release|docs|\.github|\.pri-os)\//;
 const cited = new Set();
 for (const text of Object.values(docs)) {
   for (const m of text.matchAll(/`([^`\s]+)`/g)) {
-    let p = m[1].replace(/:\d+$/, '');
+    let p = m[1].replace(/:\d+(-\d+)?$/, '');
     if (!CITABLE.test(p) || /[*{}<>…]/.test(p)) continue;
     cited.add(p);
+  }
+}
+for (const [name, text] of Object.entries(docs)) {
+  for (const m of text.matchAll(/\]\(((?:\.\.\/)+[^)#\s]+)\)/g)) {
+    const resolved = posix(relative(ROOT, join(at(DOCS), m[1])));
+    if (CITABLE.test(resolved)) cited.add(resolved);
+    else ok(existsSync(join(at(DOCS), m[1])), `${name} links to an existing file: ${m[1]}`);
   }
 }
 const missing = [...cited].filter(p => !PLANNED.some(pre => p.startsWith(pre)) &&
@@ -167,10 +189,12 @@ const NATIVE_FLAG_ALLOWED = new Set([
   'client/src/platform/releaseIdentity.js',
 ]);
 const isContract = rel => rel.startsWith('client/src/platform/native/');
-const sources = [...walk(at('client/src'), n => /\.(jsx?|mjs)$/.test(n)), ...walk(at('client/dev'), n => /\.(jsx?|mjs)$/.test(n))]
-  .map(f => [posix(relative(ROOT, f)), readFileSync(f, 'utf8')]);
+const SRC = n => /\.(jsx?|mjs|cjs|tsx?)$/.test(n);
+const sources = [...walk(at('client/src'), SRC), ...walk(at('client/dev'), SRC), ...walk(at('client/public'), SRC), at('client/index.html')]
+  .filter(f => existsSync(f))
+  .map(f => [posix(relative(ROOT, f)), stripComments(readFileSync(f, 'utf8'))]);
 
-const webkitUsers = sources.filter(([, s]) => /(?<![-\w])webkit\s*\??\.\s*messageHandlers|\[\s*['"`]webkit['"`]\s*\]|\bmessageHandlers\b/.test(s)).map(([r]) => r);
+const webkitUsers = sources.filter(([, s]) => /(?<![-\w])webkit\s*\??\.\s*messageHandlers|\bmessageHandlers\b|\b(?:self|globalThis|window|top|parent|frames)\s*\??\.\s*webkit\b|['"`]webkit['"`]/.test(s)).map(([r]) => r);
 const strayWebkit = webkitUsers.filter(r => !WEBKIT_BRIDGE_ALLOWED.has(r) && !isContract(r));
 ok(strayWebkit.length === 0,
   `no new file calls window.webkit.messageHandlers directly (use the platform contract) — found: ${strayWebkit.join(', ')}`);
@@ -187,7 +211,7 @@ ok(staleFlags.length === 0,
   `the native-flag allowlist has no stale entries; tighten it — stale: ${staleFlags.join(', ')}`);
 
 // ── 7 · Layout does not sniff the device ─────────────────────────────────────
-const sniffers = sources.filter(([, s]) => /navigator\s*\.\s*(userAgent|platform|vendor)\b/.test(s)).map(([r]) => r);
+const sniffers = sources.filter(([, s]) => /navigator\s*(?:\??\.\s*|\[\s*['"`])(?:userAgent(?:Data)?|platform|vendor)\b|\{[^}]*\b(?:userAgent(?:Data)?|platform|vendor)\b[^}]*\}\s*=\s*(?:window\s*\.\s*|globalThis\s*\.\s*)?navigator\b/.test(s)).map(([r]) => r);
 ok(sniffers.length === 0, `no shared client code sniffs navigator.userAgent/platform — found: ${sniffers.join(', ')}`);
 
 // ── 8 · The iPad baseline and its data origin stay put ───────────────────────
@@ -197,9 +221,12 @@ ok(/supportedDeviceFamilies:\s*\[[^\]]*\.pad/.test(pkg), 'the Apple package stil
 ok(/supportedDeviceFamilies:\s*\[[^\]]*\.phone/.test(pkg), 'and iPhone, which the iPhone plan builds on');
 const shell = read(`${IOS}/WebShell.swift`);
 ok(/forURLScheme:\s*"prilearning"/.test(shell), 'the shell still serves the app from the prilearning:// scheme');
-ok(/prilearning:\/\/app\//.test(shell),
+const shellCode = stripComments(shell);
+ok(/URLRequest\(url:\s*URL\(string:\s*"prilearning:\/\/app\/"\)/.test(shellCode),
   'at the prilearning://app origin — changing it would orphan every student\'s IndexedDB data');
-ok(/WKWebsiteDataStore\.default\(\)/.test(shell), 'with the persistent website data store');
+const stores = [...shellCode.matchAll(/websiteDataStore\s*=\s*([^\n]+)/g)].map(m => m[1].trim());
+ok(stores.length === 1 && stores[0] === 'WKWebsiteDataStore.default()' && !/nonPersistent/.test(shellCode),
+  `with exactly one, persistent website data store — found: ${stores.join(' | ') || 'none'}`);
 ok(/index\.html/.test(read(`${IOS}/LocalSchemeHandler.swift`)),
   'and the scheme handler keeps its index.html fallback that BrowserRouter routes depend on');
 for (const copy of ['ios/PriLearning 2.swiftpm/WebShell.swift', 'ios/PriLearning 2.swiftpm/Package.swift']) {
@@ -209,27 +236,34 @@ for (const copy of ['ios/PriLearning 2.swiftpm/WebShell.swift', 'ios/PriLearning
 
 // Android, once it exists, must use an origin-scoped bridge and a stable origin.
 if (existsSync(at('android'))) {
-  const kotlin = walk(at('android'), n => /\.(kt|java)$/.test(n)).map(f => readFileSync(f, 'utf8')).join('\n');
+  const kotlin = walk(at('android'), n => /\.(kt|kts|java)$/.test(n)).map(f => stripComments(readFileSync(f, 'utf8'))).join('\n');
   ok(!/addJavascriptInterface\s*\(/.test(kotlin), 'the Android shell never uses addJavascriptInterface');
-  ok(/appassets\.androidplatform\.net/.test(kotlin), 'the Android shell serves the app from appassets.androidplatform.net');
+  ok(!/(allowUniversalAccessFromFileURLs|allowFileAccessFromFileURLs|setAllowUniversalAccessFromFileURLs|setAllowFileAccessFromFileURLs)\s*(=|\()\s*true/.test(kotlin),
+    'nor grants file:// pages universal or file access');
+  if (/\bWebView\b/.test(kotlin)) {
+    ok(/["']https:\/\/appassets\.androidplatform\.net/.test(kotlin), 'the Android shell serves the app from appassets.androidplatform.net');
+  }
 }
 
 // ── 9 · No shell carries a server secret ─────────────────────────────────────
 const SECRET = [
-  /sk-[A-Za-z0-9_-]{20,}/, /OPENAI_API_KEY/, /PRI_HANDWRITING_API_KEY/, /SUPABASE_SERVICE_ROLE/i,
+  /(?<![A-Za-z0-9])sk-[A-Za-z0-9_-]{20,}/, /OPENAI_API_KEY/, /PRI_HANDWRITING_API_KEY/, /SUPABASE_SERVICE_ROLE/i,
   /service_role/, /-----BEGIN [A-Z ]*PRIVATE KEY-----/, /AIza[0-9A-Za-z_-]{35}/, /rzp_live_[A-Za-z0-9]+/,
   /PRI_CSRF_SECRET/, /RAZORPAY_KEY_SECRET/,
 ];
 const shellFiles = [
-  ...walk(at('ios'), n => /\.(swift|plist|entitlements|json|xcconfig)$/.test(n))
-    .filter(f => !posix(f).includes('/Resources/Web/')),
+  // The tracked web bundle under Resources/Web ships inside the app, so it is scanned too.
+  ...walk(at('ios'), n => /\.(swift|plist|entitlements|json|xcconfig|m|mm|h|strings|js|html|webmanifest)$/.test(n)),
   ...walk(at('android'), n => /\.(kt|java|xml|gradle|kts|properties|json)$/.test(n)),
 ];
-const leaking = shellFiles.filter(f => { const s = readFileSync(f, 'utf8'); return SECRET.some(re => re.test(s)); })
+// A Supabase service-role key is a JWT whose payload says so; match the value, not just the env name.
+const serviceRoleJwt = s => [...s.matchAll(/eyJ[\w-]{8,}\.(eyJ[\w-]{8,})\.[\w-]*/g)]
+  .some(m => { try { return /service_role/.test(Buffer.from(m[1], 'base64url').toString()); } catch { return false; } });
+const leaking = shellFiles.filter(f => { const s = readFileSync(f, 'utf8'); return SECRET.some(re => re.test(s)) || serviceRoleJwt(s); })
   .map(f => posix(relative(ROOT, f)));
 ok(shellFiles.length > 20, `the secret scan covers the native shells (${shellFiles.length} files)`);
 ok(leaking.length === 0, `no native shell file contains a server secret — found in: ${leaking.join(', ')}`);
-const clientLeaks = sources.filter(([, s]) => /PRI_HANDWRITING_API_KEY|SUPABASE_SERVICE_ROLE|OPENAI_API_KEY|sk-[A-Za-z0-9_-]{20,}/.test(s)).map(([r]) => r);
+const clientLeaks = sources.filter(([, s]) => /PRI_HANDWRITING_API_KEY|SUPABASE_SERVICE_ROLE|OPENAI_API_KEY|(?<![A-Za-z0-9])sk-[A-Za-z0-9_-]{20,}|import\.meta\.env\.VITE_[A-Z0-9_]*(SECRET|SERVICE|OPENAI|PRIVATE)/.test(s) || serviceRoleJwt(s)).map(([r]) => r);
 ok(clientLeaks.length === 0, `no shared client file names a server-only secret — found: ${clientLeaks.join(', ')}`);
 
 // ── 10 · The server's native-client exemption is a closed list ───────────────
@@ -249,7 +283,20 @@ if (exemption) {
   ok(/!req\.get\('origin'\)/.test(body) && /!req\.get\('sec-fetch-site'\)/.test(body) && /!req\.get\('sec-fetch-mode'\)/.test(body),
     'and it still refuses any request carrying Origin or Fetch Metadata, so a web page cannot use it as a CSRF bypass');
   ok(!/\|\|/.test(body), 'with no OR branch that could widen it');
+  // Pin the exact reviewed predicate. CP-07 must change this pin together with
+  // the regression test in server/test/native-origin-csrf-check.mjs.
+  const norm = t => t.replace(/\s+/g, ' ').trim();
+  ok(norm(body) === "return req.get('x-pri-client') === 'ios-native-v1' && !req.get('origin') && !req.get('sec-fetch-site') && !req.get('sec-fetch-mode');",
+    'and it is exactly the reviewed predicate');
 }
+const callSites = [...security.matchAll(/nativeNonBrowserRequest\(/g)].length;
+ok(callSites === 2 && /if \(nativeNonBrowserRequest\(req\)\) return next\(\);/.test(security),
+  'the exemption has one unmodified call site');
+const headerReaders = walk(at('server'), n => /\.(m?js)$/.test(n))
+  .filter(f => !posix(f).includes('/test/') && /x-pri-client/i.test(readFileSync(f, 'utf8')))
+  .map(f => posix(relative(ROOT, f)));
+ok(headerReaders.length === 1 && headerReaders[0] === 'server/platform/security.js',
+  `only server/platform/security.js reads X-Pri-Client — found: ${headerReaders.join(', ')}`);
 
 console.log(failures.length
   ? `CROSS-PLATFORM ARCHITECTURE: FAIL — ${failures.length} of ${pass + failures.length} checks failed\n  · ${failures.join('\n  · ')}`

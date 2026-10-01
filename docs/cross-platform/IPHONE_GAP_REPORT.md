@@ -1,6 +1,6 @@
 # iPhone Gap Report (CP-01)
 
-Baseline: `main` @ `421f1ff1`, audited 2026-10-02.
+Initial audit baseline `main` @ `421f1ff1` (2026-10-01 UTC); revalidated against `main` @ `83bde98a`.
 
 **Bottom line:** Pri Learning is **not yet an iPhone product**. The Apple package already *declares* iPhone support and *compiles and launches* on an iPhone simulator. The web client already has a phone navigation shell with a browser E2E flow at phone widths. But native ink defaults to Apple Pencil only, nothing in CI builds or tests an iPhone destination, several surfaces are unverified or broken at compact width, and **there is no physical-iPhone evidence of any kind**.
 
@@ -35,7 +35,7 @@ Baseline: `main` @ `421f1ff1`, audited 2026-10-02.
 
 6. **Handwriting area:** fixed 380 px canvas, 7-button toolbar wrapping to 3 rows, strokes not rescaled on rotation, verdict overlays clipped by `overflow:hidden`. See [FORM_FACTOR_SPEC.md](FORM_FACTOR_SPEC.md).
 7. **Post-answer action collision (suspected, unverified):** the fixed Pri Explain launcher (`client/src/components/PriExplainV5.css`, bottom-right, z-index 72) likely overlaps the Next context pill (`client/src/theme.css` `.ctx-pill`, full-width at phone sizes, z-index 50). `client/test/tour-phone.js` checks Next only *before* answering.
-8. **Overflow:** the non-India progress page `client/src/pages/ProgressLegacy.jsx` uses an inline `1fr 330px` grid; the settings email editor row in `client/src/pages/SettingsLegacy.jsx` does not wrap.
+8. **Suspected overflow (inferred from code, not measured):** the non-India progress page `client/src/pages/ProgressLegacy.jsx` uses an inline `1fr 330px` grid, and the settings email editor row in `client/src/pages/SettingsLegacy.jsx` does not wrap. `client/test/tour-phone.js` visits neither state.
 9. **Phone landscape** (wider than 760 px with a coarse pointer) gets the tablet sidebar. Decide between supporting landscape properly at MEDIUM/SHORT and locking iPhone to portrait for v1. **Recommendation:** portrait-only for the iPhone v1 release (remove the iPhone landscape orientations from `Package.swift`), revisit at CP-05+. iPad keeps all four orientations.
 10. **Safe area:** the shell letterboxes the web view inside the safe area. That is acceptable for v1 and avoids the top-bar inset bug. Edge-to-edge is a later polish and must fix the fixed-height top bar first.
 11. **Keyboard:** no `visualViewport` handling; SwiftUI keyboard avoidance resizes the web view (inferred, unverified). The answer box and its primary action must stay visible with the keyboard open on a 375×667 viewport.

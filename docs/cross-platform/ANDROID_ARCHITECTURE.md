@@ -1,6 +1,6 @@
 # Android Architecture (CP-01)
 
-- **Status:** design only. As of `main` @ `421f1ff1` the repository contains **no** Android code, no `android/` directory, and no `android/**` ownership rule in `.pri-os/fleet.json`. The fleet does have an `android` agent ("Prepare shared product logic for Android without weakening iPad quality or splitting learning engines").
+- **Status:** design only. As of `main` @ `421f1ff1` (initial audit) and again at `83bde98a` (revalidation), the repository contains **no** Android code, no `android/` directory, and no `android/**` ownership rule in `.pri-os/fleet.json`. The fleet does have an `android` agent ("Prepare shared product logic for Android without weakening iPad quality or splitting learning engines").
 - **Direction:** a Kotlin native shell, using AndroidX WebKit `WebView`, the **same** bundled `client/dist`, and platform bridges that implement the contract in [CROSS_PLATFORM_ARCHITECTURE.md](CROSS_PLATFORM_ARCHITECTURE.md) section 4. No React Native or Flutter. No Kotlin port of any learning logic.
 
 Repository evidence supports the WebView direction:
@@ -40,7 +40,7 @@ android/                                 # NEW (CP-06); fleet rule android/** �
       shell/NavigationPolicy.kt          # external links → Custom Tabs / browser
       shell/WebViewFloor.kt              # runtime WebView version gate
       bridge/PriBridge.kt                # envelope router: origin/frame check, size limits, validation, timeouts
-      bridge/HostHandshake.kt            # injects window.__PRI_HOST__ at document start
+      bridge/HostHandshake.kt            # injects window.__PRI_HOST__ via WebViewCompat.addDocumentStartJavaScript (origin rule; requires DOCUMENT_START_SCRIPT, fails closed otherwise)
       bridge/cloud/CloudBridge.kt        # OkHttp /v1 transport, X-Pri-Client: android-native-v1
       bridge/cloud/EncryptedCookieJar.kt # Keystore-backed persistent cookie jar
       bridge/billing/PlayBillingBridge.kt
@@ -96,7 +96,7 @@ WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG)
 | `print` | `PrintManager` + `webView.createPrintDocumentAdapter` via `share.print`. | Today `window.print()` would silently do nothing in WebView. |
 | `billing` | Play Billing Library, current major version. See section 6. | |
 | `lifecycle` | `onPause`/`onResume`/`onStop`/`onTrimMemory`, sent as a `lifecycle.state` event; `webView.onPause()`/`onResume()`. | JS flushes drafts on `background`. |
-| Back | `OnBackPressedDispatcher` sends a `lifecycle.backRequested` event. JS replies `{handled}` within 300 ms. If not handled and `webView.canGoBack()`, go back; otherwise `finish()`. Predictive back enabled (`enableOnBackInvokedCallback`). | JS must close sheets and dialogs first and must never lose an in-progress attempt. |
+| Back | `OnBackPressedDispatcher` sends a `lifecycle.backRequested` **native→JS request** (with an envelope id; see [CROSS_PLATFORM_ARCHITECTURE.md](CROSS_PLATFORM_ARCHITECTURE.md) §4.3). JS replies `{handled}` within 300 ms; no reply means unhandled. If not handled and `webView.canGoBack()`, go back; otherwise `finish()`. Predictive back enabled (`enableOnBackInvokedCallback`). | JS must close sheets and dialogs first and must never lose an in-progress attempt. |
 | `ink` | **No native ink in v1.** The shared `client/src/ink/InkCanvas.jsx` handles finger and stylus via PointerEvents (`pointerType: 'pen'` for S Pen/USI, pressure, tilt; palm rejection once a pen is seen). `__PRI_HOST__.capabilities.ink` is **absent**, so `client/src/ink/InkAnswer.jsx` picks the canvas automatically. | A low-latency `androidx.ink` front-buffer surface is CP-09 scope **only** if latency is measured unacceptable on target tablets. It would capture strokes only; recognition stays shared. |
 | `device` | Reports `stylus` (any `InputDevice` with `SOURCE_STYLUS`) and `backButton: true`. | No OS or model sniffing exposed for layout. |
 | Release identity | Read `assets/web/release.json` and expose it as `__PRI_NATIVE_RELEASE_IDENTITY__` (or `__PRI_HOST__.release`), matching `ios/PriLearning.swiftpm/ReleaseIdentity.swift`. | `versionCode` comes from the CI build number. |
