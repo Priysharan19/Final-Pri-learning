@@ -1213,3 +1213,238 @@ Class: preregistered randomized controlled study; N=252.
 Use: deliberate erroneous LLM feedback increased confusion and reduced perceived accuracy/usefulness as hallucination rate rose. Learning patterns were nontrivial, emphasizing the need for empirical learner outcomes rather than assuming every error has the same observed effect.
 Critical policy: the surprising learning result is not a justification for intentionally false Pri feedback; math correctness remains a safety invariant.
 https://doi.org/10.1145/3698205.3729555
+
+
+---
+
+# AN. V7 assessment validity and psychometrics
+
+## AI-generated exams large-scale field study — AAAI 2026
+Class: empirical field study; 91 classes, nearly 1,700 post-secondary students across multiple subjects including mathematics.
+Use: after iterative LLM critique/revision, generated items were psychometrically comparable to expert-created standardized-exam-style items on studied IRT measures.
+Limitation: post-secondary, multi-domain, specific generation/refinement pipeline; does not establish school-math assessment authority or fairness.
+https://doi.org/10.1609/aaai.v40i45.41205
+
+## Psychometrics Behind Computerized Adaptive Testing — 2025
+Class: psychometric review.
+Use: CAT design requires more than maximum information; content constraints, item exposure, stopping rules, pool management and model assumptions are core operational concerns.
+https://www.cambridge.org/core/journals/psychometrika/article/psychometrics-behind-computerized-adaptive-testing/D11F0FA1BC6559E573B0006B2A415BE6
+
+## Human–chatbot Differential Item Functioning — 2026 preprint
+Class: frontier psychometric/assessment-design preprint.
+Use: demonstrates a principled way to locate items that function differently for humans and chatbots; useful for AI-era assessment-vulnerability research.
+Limitation: preprint and not Pri mathematics evidence.
+https://arxiv.org/abs/2603.23682
+
+---
+
+# AO. V7 knowledge-graph / prerequisite evidence
+
+## ProPRL — prerequisite relation learning, 2026 preprint
+Class: frontier educational-knowledge-graph model.
+Use: combines content/resource and directed learning-behaviour evidence with anti-symmetry for candidate prerequisite edges.
+Limitation: predictive edge recovery is not causal proof that remediating A improves B.
+https://arxiv.org/abs/2608.03006
+
+## Multi-criteria prerequisite inference — 2025 preprint
+Class: unsupervised EduKG prerequisite-inference research.
+Use: candidate-edge discovery from textual/graph/external-resource signals.
+Limitation: inference precision does not establish pedagogical causality.
+https://arxiv.org/abs/2509.05393
+
+---
+
+# AP. V7 teacher AI and decision support
+
+## Tutor CoPilot — randomized field trial
+Class: preregistered K–12 human-AI tutoring RCT.
+Use: AI support to human tutors increased immediate topic mastery by about 4 percentage points overall and about 9 points for students of lower-rated tutors; changed tutor pedagogy toward more guiding questions and less answer-giving.
+Important limitation: outcome was immediate exit-ticket/topic mastery; study was not designed to establish statewide end-of-year effects.
+https://doi.org/10.26300/81nh-8262
+https://www.povertyactionlab.org/evaluation/human-ai-cooperation-improve-tutoring-united-states
+
+## Teacher-facing learning analytics dashboard review
+Class: systematic review; 50 studies.
+Use: many dashboards increase awareness but lack actionable intervention support.
+https://doi.org/10.1186/s41239-023-00394-6
+
+## AI-powered learning analytics dashboards — 2025 review
+Class: systematic review; 21 studies.
+Use: documents limited causal evidence, small deployments, weak educator-centered evaluation, and bias/explainability gaps.
+https://doi.org/10.1007/s44217-025-00964-y
+
+---
+
+# AQ. V7 child AI safety and privacy
+
+## UNICEF Guidance on AI and Children v3.0 — December 2025
+Class: international child-rights policy guidance.
+Use: ten requirements covering safety, privacy, fairness, transparency, development, inclusion, accountability and child-centred AI.
+https://www.unicef.org/innocenti/reports/policy-guidance-ai-children
+
+## UNICEF — When AI becomes a friend, June 2026
+Class: child-rights policy brief on chatbots/companions.
+Use: supports explicit relational-safety boundary for conversational systems used by children.
+https://www.unicef.org/documents/when-ai-becomes-friend-child-rights-risks
+
+## OECD Digital Education Outlook 2026
+Class: international evidence synthesis.
+Use: general GenAI can improve task performance without learning; pedagogical intent, human relationships, safety/privacy and independent thinking remain central.
+https://doi.org/10.1787/062a7394-en
+
+## OECD/European Commission AI Literacy Framework — 2026
+Class: primary/secondary AI-literacy competency framework.
+Use: critical evaluation, ethical/creative AI use and understanding of AI outputs; supports Audit-the-AI.
+https://doi.org/10.1787/65cd27d4-en
+
+## India Digital Personal Data Protection Act 2023 — child provisions
+Class: official law.
+Use: verifiable parental consent requirement and statutory restrictions around detrimental child processing, tracking/behavioural monitoring and targeted advertising, subject to law/rules/exemptions.
+https://www.meity.gov.in/static/uploads/2024/02/Digital-Personal-Data-Protection-Act-2023.pdf
+
+## India Digital Personal Data Protection Rules 2025
+Class: official final rules, published 14 November 2025.
+Use: Rule 10 verifiable parental-consent process and identity/age due-diligence architecture; current release requires exact effective-date/legal review.
+https://www.meity.gov.in/documents/act-and-policies/digital-personal-data-protection-rules-2025-gDOxUjMtQWa
+https://www.meity.gov.in/static/uploads/2025/11/53450e6e5dc0bfa85ebd78686cadad39.pdf
+
+---
+
+# AR. V7 metacognition / self-regulation / help-seeking
+
+## Metacognition and mathematics achievement — meta-analysis
+Class: 147 studies / 338 independent samples / N=698,096.
+Evidence: metacognition correlated with mathematics achievement at about r=.32; age, domain and culture moderated the relationship; mathematics-specific metacognition related more strongly than general metacognition.
+Limitation: predominantly correlational relationship, not intervention effect.
+https://doi.org/10.1016/j.actpsy.2024.104486
+
+## SRL in online/blended learning — 2025 meta-analysis
+Class: 42 studies / 115 effects / N=11,014.
+Evidence: overall SRL-achievement correlation r≈.14; several specific regulation strategies were significantly associated.
+https://doi.org/10.1016/j.compedu.2025.105279
+
+## GenAI support for school SRL — 2026 RCT
+Class: randomized controlled trial; 371 Grade 7–9 students, six sessions.
+Use: utility-value prompting improved perceived utility value, but neither tested intervention clearly improved domain knowledge, effort or elaboration strategy use over standard ChatGPT.
+https://doi.org/10.1007/s10648-026-10133-8
+
+## Help seeking/help abuse in an interactive learning environment — 2025
+Class: empirical ILE study; N=322.
+Use: step-by-step hint use/help abuse was negatively associated with learning while strategic help did not show the same pattern; supports strategic-help-first policy.
+https://doi.org/10.1016/j.caeo.2025.100247
+
+---
+
+# AS. V7 motivation / games / mathematics anxiety
+
+## Mathematics gamification motivation meta-analysis — 2026
+Class: 45-study systematic review / 11-study meta-analysis.
+Evidence: motivation g≈.383 with substantial heterogeneity; competition/social comparison/external rewards featured in negative cases.
+https://doi.org/10.1007/s10648-025-10108-1
+
+## Gamified mathematics second-order meta-analysis — 2026
+Class: 20 meta-analyses / 688 primary studies.
+Evidence: overall g≈.407; cognitive outcomes more robust than affective; lower-quality studies overestimated effects.
+https://doi.org/10.1002/berj.70144
+
+## Mathematics game-based learning second-order meta-analysis — 2026
+Class: nine first-order meta-analyses.
+Evidence: overall positive but heterogeneous effect around .45; cognitive outcomes more stable than affective outcomes.
+https://doi.org/10.1016/j.edurev.2026.100816
+
+## Gamification and intrinsic motivation / SDT — 2024
+Class: meta-analysis of 35 interventions / N≈2,500.
+Use: small intrinsic-motivation effect; positive autonomy/relatedness effects; limited competence effect.
+https://doi.org/10.1007/s11423-023-10337-7
+
+## Mathematics anxiety interventions — 2026
+Class: systematic review/meta-analysis; 51 studies / N=7,673.
+Use: anxiety- and combined interventions can reduce mathematics anxiety; mathematics-skills-oriented interventions were the only category improving mathematics performance in reviewed outcomes.
+https://doi.org/10.1037/edu0000992
+
+---
+
+# AT. V7 live CBSE / NCERT authority
+
+## CBSE Curriculum 2026–27
+Class: official live curriculum authority.
+Use: exact academic-year/grade/subject versioning.
+https://cbseacademic.nic.in/curriculum_2027.html
+
+## CBSE Class IX Mathematics 2026–27
+Class: official curriculum document.
+Use: explicit current emphasis on conceptual understanding, reasoning, problem solving, visualisation, modelling, communication, computational thinking/data analytics and competency-based outcomes.
+https://cbseacademic.nic.in/web_material/CurriculumMain27/SecPart1/Maths_SecP1IX_2026-27.pdf
+
+## NCF School Education 2023
+Class: official national curriculum framework.
+Use: competency/learning-outcome assessment, developmental/formative intent, stage appropriateness and diversity accommodation.
+https://www.education.gov.in/sites/upload_files/mhrd/files/ncf_2023.pdf
+
+## CBSE CBE assessment + learning framework
+Class: official competency-based education resources.
+Use: competency-aligned items, learning ladders, assessment objectives/specifications and teacher materials.
+https://cbseacademic.nic.in/cbe/assessment.html
+https://cbseacademic.nic.in/cbe/learning-framework.html
+
+## CBSE SAFAL
+Class: official diagnostic competency assessment.
+Use: key example that diagnostic competency evidence need not be promotion authority.
+https://cbseacademic.nic.in/safal/index.html
+
+## CBSE Class X 2026–27 Sample Papers / Marking Schemes
+Class: official current assessment-form authority.
+Use: exact exam-blueprint/track source; includes Mathematics Basic and Mathematics Standard.
+https://cbseacademic.nic.in/SQP_CLASSX_2026-27.html
+
+## CBSE Two Board Examinations Class X from 2026
+Class: official examination-policy authority.
+Use: main + improvement/second-examination planning; eligibility must follow exact current notice.
+https://www.cbse.gov.in/cbsenew/documents/Notification_Two_Board_Examinations_Class_X_2026_25062025.pdf
+https://www.cbse.gov.in/cbsenew/documents/Notification_Two_Board_Examinations_Class_X_14022026.pdf
+
+---
+
+# AU. V7 transfer / generalisation
+
+## Teaching for near transfer in mathematics — 2025
+Class: observational TIMSS analysis, roughly 280,000 learners.
+Use: null/weak association between selected reported abstraction/schema practices and unfamiliar-item performance reinforces the need to measure transfer directly.
+Limitation: observational and dependent on proxy measures.
+https://doi.org/10.1016/j.lindif.2024.102609
+
+## Variability × retrieval/worked examples — 2026
+Class: controlled experiments.
+Use: variability and prior instruction interact with retrieval/worked-example effects on generalisation.
+https://doi.org/10.1007/s10648-026-10169-w
+
+## Worked-example comparison in algebra — 2024
+Class: mathematics instructional study.
+Use: analogical comparison as a candidate mechanism for extracting shared structure and flexible strategy use.
+https://doi.org/10.1007/s11251-024-09668-6
+
+## Grounded conceptual structure and trigonometry transfer — 2025
+Class: experimental study.
+Use: supports testing grounded representations as a transfer mechanism rather than decorative visualization.
+https://doi.org/10.3389/fpsyg.2025.1507670
+
+## Analogy in mathematical modelling — 2025
+Class: small qualitative Grade 5/6 study in Japan/Australia.
+Use: contextual/mathematical analogy can support transfer across structurally related modelling tasks.
+https://doi.org/10.1007/s11858-025-01675-2
+
+---
+
+# AV. V7 formative assessment and feedback
+
+## Formative Assessment in Mathematics Education — systematic review 2025
+Class: systematic review; 45 studies from 2015–2023.
+Use: mixed overall evidence; stronger patterns around content-specific intentions, sustained implementation, interactive computer-based assessment and adaptive use of evidence.
+https://doi.org/10.1007/s11858-025-01696-x
+
+## Directive vs metacognitive vs hybrid AI feedback — 2026 RCT
+Class: semester-long randomized trial; N=329, university design/programming.
+Use: hybrid feedback increased revisions relative to directive/metacognitive conditions; confidence/final quality broadly similar.
+Limitation: not school mathematics and revision is not delayed learning.
+https://doi.org/10.1016/j.caeai.2026.100553
+
