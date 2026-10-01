@@ -785,6 +785,15 @@ async function run() {
       await wait(page, 500);
     });
 
+    // This walk's profile is Australian, so the placement route renders its
+    // India-only notice; the India intro, question and map views are driven by
+    // tour-placement.js in the end-to-end suite.
+    await step('placement', '/placement', async () => {
+      await goTo(page, BASE, '/placement');
+      await page.waitForSelector('.card', { timeout: 20000 });
+      await wait(page, 400);
+    });
+
     await step('tasks', '/tasks', async () => { await goTo(page, BASE, '/tasks'); });
 
     await step('tasks · new task', '/tasks', async () => {
