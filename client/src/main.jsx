@@ -12,7 +12,10 @@ import { discoverCloudOrigin } from './platform/cloudTransport.js';
 import { scheduleOfflineWarm } from './local/offlineWarm.js';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 import { installReleaseIdentityDiagnostics } from './platform/releaseIdentity.js';
+import { priNative } from './platform/native/index.js';
 
+// Listen for the native shell (if any) before anything else can emit events.
+priNative.start();
 installReleaseIdentityDiagnostics(window);
 
 // Account verification/password-reset links carry their secret only in the URL
@@ -93,7 +96,7 @@ if (ACCOUNT_ACTION_MODE) {
 // without ever becoming controlled. `ready` is observed so activation/claiming
 // is allowed to finish, but it never blocks rendering or sign-in. LAN research
 // mode is deliberately excluded so every reload measures the current bundle.
-if ('serviceWorker' in navigator && import.meta.env.PROD && !window.__PRI_NATIVE__ && !window.__PRI_LAN_DEV__) {
+if ('serviceWorker' in navigator && import.meta.env.PROD && !priNative.bundledAssets() && !window.__PRI_LAN_DEV__) {
   void (async () => {
     try {
       await navigator.serviceWorker.register('/sw.js');

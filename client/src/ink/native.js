@@ -15,12 +15,13 @@
 import { fuseNativeStrokeReading } from './hybrid.js';
 import { inferSetContextFromPrompt, mergeRecognitionContext } from './setNotation.js';
 import { inferTrigContextFromPrompt } from './trigNotation.js';
+import { priNative } from '../platform/native/index.js';
 
-const handler = () =>
-  (typeof window !== 'undefined' && window.__PRI_NATIVE_INK__ &&
-    window.webkit?.messageHandlers?.priInk) || null;
-
-export const nativeInkAvailable = () => !!handler();
+// The writing surface is a platform capability (CP-02): priNative decides which
+// transport carries it. This module keeps the ink-specific semantics — geometry,
+// stroke snapshots, and readings that resolve (never reject) with a tagged
+// failure so the recognition consensus in InkAnswer.jsx can always continue.
+export const nativeInkAvailable = () => priNative.ink.available();
 
 let nextRequestId = 1;
 const pending = new Map();       // reqId → {resolve, context, overrides, strokes, surfaceEpoch}
@@ -81,8 +82,7 @@ function invalidatePending(reason) {
   }
 }
 
-if (typeof window !== 'undefined') {
-  window.__priInkReceive = (payload) => {
+function receiveInk(payload) {
     if (!payload || typeof payload !== 'object') return;
     if (payload.type === 'strokes') {
       // JSON messages are immutable snapshots from the native bridge. Replace
@@ -117,25 +117,21 @@ if (typeof window !== 'undefined') {
         entry.resolve(reading);
       }
     }
-  };
 }
 
-function post(message) {
-  const target = handler();
-  if (!target) return false;
-  try {
-    target.postMessage(message);
-    return true;
-  } catch {
-    return false;
-  }
-}
+if (typeof window !== 'undefined') priNative.ink.onMessage(receiveInk);
 
+const post = message => priNative.ink.post(message);
+
+// Readings never reject (the recognition consensus must always continue), but
+// the failure still carries a code from the closed priNative error set.
+const FAILURE_CODES = { 'bridge-unavailable': 'UNAVAILABLE', timeout: 'TIMEOUT' };
 function failedReading(op, failure) {
   const base = op === 'foundationRecognize' ? 'pri-foundation' : 'native-rescue';
+  const code = FAILURE_CODES[failure] || (String(failure).startsWith('surface-') ? 'CANCELLED' : 'INTERNAL');
   return {
     type: 'reading', lines: [], text: '', symbols: [], minConf: 0, margin: 0,
-    weakest: null, engine: `${base}-${failure}`, failure
+    weakest: null, engine: `${base}-${failure}`, failure, error: { code }
   };
 }
 
