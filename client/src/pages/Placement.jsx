@@ -17,7 +17,7 @@ import { api } from '../api.js';
 import { useApp } from '../App.jsx';
 import QuestionCard from '../components/QuestionCard.jsx';
 import TermGloss from '../components/TermGloss.jsx';
-import { useT } from '../i18n/index.js';
+import { tLater, useT } from '../i18n/index.js';
 import { MAP_STRANDS, PREREQ_GRAPH_VERSION, mapStrandOf } from '../engine/prerequisites.js';
 import { PREREQ_SKILLS_HI } from '../engine/prerequisiteSkillsHi.js';
 
@@ -60,7 +60,7 @@ export default function Placement() {
       setProgress(v.progress || null);
       setAnswered(null);
       setError('');
-    } catch (err) { setError(err.message || t('placement.couldNotLoad')); }
+    } catch (err) { setError(err.message || tLater('placement.couldNotLoad')); }
   }, [t]);
 
   useEffect(() => { refresh(); }, [refresh]);
@@ -83,7 +83,7 @@ export default function Placement() {
       setProgress(r.progress);
       setAnswered(null);
       setError('');
-    } catch (err) { setError(err.message || t('placement.couldNotLoad')); }
+    } catch (err) { setError(err.message || tLater('placement.couldNotLoad')); }
     finally { setBusy(false); }
   };
 
