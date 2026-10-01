@@ -25,9 +25,10 @@ let package = Package(
                 .phone
             ],
             supportedInterfaceOrientations: [
+                // iPhone is portrait-only (CP-01/CP-04 decision); iPad keeps all four.
                 .portrait,
-                .landscapeRight,
-                .landscapeLeft,
+                .landscapeRight(.when(deviceFamilies: [.pad])),
+                .landscapeLeft(.when(deviceFamilies: [.pad])),
                 .portraitUpsideDown(.when(deviceFamilies: [.pad]))
             ],
             capabilities: [
