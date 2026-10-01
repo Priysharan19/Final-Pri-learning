@@ -103,3 +103,74 @@ jobs:
           assert.deepEqual(web, health.releaseIdentity);
           NODE
           test -s "$RUNNER_TEMP/pri-platform-data/pri-learning-platform.db"
+
+  railway-identity:
+    name: Railway build-arg identity agrees with runtime
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image the way Railway does (RAILWAY_GIT_COMMIT_SHA, stale PRI_*)
+        run: |
+          set -euo pipefail
+          # Railway passes service variables as build args; a stale manual
+          # candidate PRI_RELEASE_SHA/PRI_BUILD_TIMESTAMP must lose to
+          # Railway's own Git SHA in the client build exactly as at run time.
+          docker build --pull \
+            --build-arg RAILWAY_GIT_COMMIT_SHA="$GITHUB_SHA" \
+            --build-arg PRI_RELEASE_SHA=ffffffffffffffffffffffffffffffffffffffff \
+            --build-arg PRI_BUILD_TIMESTAMP=2020-01-01T00:00:00Z \
+            -t pri-learning:railway-ci .
+      - name: Run with Railway runtime variables and prove /v1/health
+        run: |
+          set -euo pipefail
+          docker rm -f pri-learning-railway-ci >/dev/null 2>&1 || true
+          docker run -d \
+            --name pri-learning-railway-ci \
+            -p 127.0.0.1:4011:4000 \
+            -e NODE_ENV=production \
+            -e PORT=4000 \
+            -e RAILWAY_GIT_COMMIT_SHA="$GITHUB_SHA" \
+            -e RAILWAY_DEPLOYMENT_ID=ci-railway-identity \
+            -e PRI_RELEASE_SHA=ffffffffffffffffffffffffffffffffffffffff \
+            -e PRI_BUILD_TIMESTAMP=2020-01-01T00:00:00Z \
+            -e PRI_PUBLIC_ORIGIN=https://learn.pri.example \
+            -e PRI_CSRF_SECRET=ci-csrf-secret-not-for-production \
+            -e PRI_AUTH_DELIVERY_KEY=3333333333333333333333333333333333333333333333333333333333333333 \
+            -e PRI_PLATFORM_DB=/tmp/pri-learning-platform.db \
+            -e PRI_TRUSTED_PROXY_HOPS=0 \
+            -e PRI_AUTH_EMAIL_PROVIDER=resend \
+            -e PRI_RESEND_API_KEY=ci-resend-key \
+            -e 'PRI_AUTH_EMAIL_FROM=Pri Learning <noreply@pri.example>' \
+            pri-learning:railway-ci
+
+          cleanup() {
+            docker logs pri-learning-railway-ci || true
+            docker rm -f pri-learning-railway-ci >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+
+          ok=0
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:4011/v1/health > health.json; then
+              ok=1
+              break
+            fi
+            if [ "$(docker inspect pri-learning-railway-ci --format '{{.State.Running}}' 2>/dev/null || echo false)" != "true" ]; then
+              echo 'Production container exited before becoming healthy.' >&2
+              break
+            fi
+            sleep 1
+          done
+          test "$ok" -eq 1
+          curl -fsS http://127.0.0.1:4011/release.json > release.json
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import { readFileSync } from 'node:fs';
+          const health = JSON.parse(readFileSync('health.json', 'utf8'));
+          const web = JSON.parse(readFileSync('release.json', 'utf8'));
+          assert.equal(health.ok, true);
+          assert.equal(health.releaseIdentity?.releaseSha, process.env.GITHUB_SHA);
+          assert.notEqual(health.releaseIdentity?.buildTimestamp, '2020-01-01T00:00:00.000Z');
+          assert.deepEqual(web, health.releaseIdentity);
+          NODE

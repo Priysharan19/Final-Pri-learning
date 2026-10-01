@@ -339,7 +339,8 @@ export const cloud = Object.freeze({
   exportAccount: () => cloudRequest('/v1/account/export'),
   // Server-side handwriting reading. The body carries the student's own ink as
   // a picture and nothing else: no question, no expected answer, no profile.
-  handwritingStatus: () => cloudRequest('/v1/handwriting/status'),
+  handwritingStatus: ({ signal = null, timeoutMs = 7000 } = {}) =>
+    cloudRequest('/v1/handwriting/status', { signal, timeoutMs }),
   transcribeHandwriting: (image, { signal = null, timeoutMs = 25000 } = {}) =>
     cloudRequest('/v1/handwriting/transcribe', { method: 'POST', body: { image }, signal, timeoutMs }),
   workingStatus: () => cloudRequest('/v1/working/status'),
