@@ -24,6 +24,7 @@
 // The provider is a stub except in §4, which drives the real request builder
 // against a recording fetch. No network call, no API key, no spend.
 // ─────────────────────────────────────────────────────────────────────────────
+import { readFileSync } from 'node:fs';
 import express from 'express';
 import cookieParser from 'cookie-parser';
 import { SESSION_COOKIE, sha256 } from '../platform/security.js';
@@ -149,6 +150,13 @@ eq(await codeOf(recording({ captions: [] })), ['TUTOR_MALFORMED', 502, true], 'a
 let unconfigured = null;
 try { await askTutorModel(request, { env: {} }); } catch (e) { unconfigured = e; }
 ok(unconfigured instanceof TutorProviderError && unconfigured.code === 'TUTOR_NOT_CONFIGURED', 'with no key it says so');
+
+// ── 4b · Mounted where a child's work may leave the device ───────────────────
+const routerSource = readFileSync(new URL('../platform/router.js', import.meta.url), 'utf8');
+ok(/router\.use\('\/tutor', requireGuardianConsent\(db\), createTutorRouter\(db, tutor\)\)/.test(routerSource),
+  '/v1/tutor sits behind the guardian-consent gate, like /v1/working');
+const handwritingSource = readFileSync(new URL('../platform/handwriting.js', import.meta.url), 'utf8');
+ok(!/tutor/i.test(handwritingSource), 'and the answer-blind handwriting route shares nothing with the tutor');
 
 // ── 5 · The route, on the engine under test ──────────────────────────────────
 const engine = requestedEngine();
