@@ -11,7 +11,8 @@ Every cycle uses:
 The canonical definitions are:
 
 - `docs/architecture/repository-authority.md` — production repository/branch authority and predecessor classification.
-- `docs/architecture/authoritative-architecture.md` — current local-first/web/server/native runtime authority.
+- `docs/architecture/authoritative-architecture.md` — current online-first web/server/native runtime authority.
+- `docs/architecture/adr-0001-online-first-runtime.md` — online-first decision (Railway, Supabase Mumbai, OpenAI) and its migration phases.
 - `docs/release/release-policy.md` — reviewed integration, required CI and release identity policy.
 - `.pri-os/fleet.json` — agents, specificity-resolved primary ownership, reviewer overlays, typed gates and risk classes.
 - `.pri-os/mission-control.json` — persistent GitHub-Issue mission ledger, state machine, writer lease, retry ceiling and deterministic priority policy.
@@ -91,7 +92,9 @@ The diff-derived risk is authoritative. A PR may declare a higher risk, never a 
 - Never fabricate physical iPad, Apple Pencil, student, teacher, benchmark, learning-outcome, App Store, payment-provider or human-review evidence.
 - Synthetic/simulator evidence stays explicitly separate from real-human/physical evidence.
 - Handwriting recognition remains answer-blind. Never use hidden expected answers/solutions/marks to improve transcription.
-- Preserve offline-first operation and profile/data isolation.
+- AI proposes, the deterministic engine decides: a model output never sets a mark. Keep the deterministic engine bundled in the client as the instant and connection-loss fallback.
+- Preserve profile/data isolation: Row-Level Security plus server authorization on every client-reachable record.
+- Model-provider and database service credentials live only in server environment variables, never in the client, the repo or chat.
 - Security regressions are release-blocking.
 - Add a deterministic regression test for every production bug when feasible.
 - Do not make unsupported competitor-superiority, accuracy, syllabus-complete or production-ready claims.
