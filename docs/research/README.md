@@ -173,6 +173,12 @@ Domain-by-domain audit of what is architecture-saturated versus Pri-data-blocked
 
 V7 does not add another product vision. It interrogates the mechanisms underneath V5/V6 and connects decades of intelligent-tutoring/psychometric research to the current 2025–26 generative-AI frontier.
 
+### V7_DEEP_RESEARCH_SYNTHESIS_AND_DECISION_ARCHITECTURE.md
+Canonical integration of V7 into twelve explicit decision authorities: perception, mathematical truth, first break, rubric, learner evidence, selection, intervention, rendering, scheduling, transfer, experimentation and causal personalization. Defines authority, fallback and release evidence for each.
+
+### V7_RESEARCH_CLAIM_AND_FALSIFIER_LEDGER.md
+Twenty major research claims with evidence class, supporting sources, what each claim does **not** establish, product consequence and explicit falsifier/reconsideration trigger. Use this to prevent research claims from silently becoming dogma.
+
 ### ITS_HISTORY_AND_AI_TUTOR_EVIDENCE_DEEP_DIVE.md
 Historical ITS meta-analyses, Cognitive Tutor/MATHia, ASSISTments, ALEKS and Eedi mechanisms, then direct comparison with current GPT/Khanmigo/NUMI evidence. Defines which classical tutoring mechanics Pri should preserve and where LLMs actually add value.
 
@@ -215,6 +221,7 @@ Execution-grade science programme: semantic instrumentation → adjudicated gold
 | peer tutoring, group work, pairing, collaborative canvas | PAIRLAB_COLLABORATIVE_LEARNING.md |
 | India device/offline/shared-device/language field assumptions | INDIA_FIELD_OPERATING_REALITY_2026.md |
 | sequencing research-derived engineering work | RESEARCH_TO_BUILD_V6.md + RESEARCH_COMPLETENESS_AUDIT_V6_2026-10-01.md |
+| cross-domain research decision / major learning architecture change | V7_DEEP_RESEARCH_SYNTHESIS_AND_DECISION_ARCHITECTURE.md + V7_RESEARCH_CLAIM_AND_FALSIFIER_LEDGER.md |
 | classical ITS evidence, tutoring-system mechanism choice | ITS_HISTORY_AND_AI_TUTOR_EVIDENCE_DEEP_DIVE.md + FRONTIER_TUTORING_SYSTEMS_MECHANISM_MATRIX_V7.md |
 | mastery model, KT, IRT, CDM, calibration, abstention | LEARNER_MODELING_KT_CDM_IRT_DEEP_DIVE.md |
 | adaptive sequencing, bandits, treatment selection, causal personalization | ADAPTIVE_POLICY_CAUSAL_PERSONALIZATION_DEEP_DIVE.md |
