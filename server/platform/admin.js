@@ -1,5 +1,6 @@
 import { asyncRouter } from './asyncRouter.js';
 import { asStore, sqliteHandle } from './store.js';
+import { currentSyncCursor } from './db.js';
 import { rateLimit, requireRole, requireSession } from './security.js';
 import { INVITE_MAX_TTL_DAYS, inviteTtlDays, listTeacherInvites, mintTeacherInvite } from './teacherInvites.js';
 
@@ -33,7 +34,7 @@ export function createAdminRouter(db) {
 
   router.get('/health', async (req, res) => {
     const one = async sql => Number((await db.get(sql))?.n || 0);
-    const cursor = Number((await db.get('SELECT value FROM sync_cursors WHERE id=1'))?.value || 0);
+    const cursor = await currentSyncCursor(db);
     res.json({
       ok: true,
       schemaVersion: (await db.get("SELECT value FROM platform_meta WHERE key='schema_version'"))?.value || null,

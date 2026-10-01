@@ -192,6 +192,18 @@ export function createBillingRouter(db, { verifiers = {}, checkout = {}, native 
       // database (no provider call), so verification and application share one
       // transaction: two deliveries of one event id apply, ledger and audit it
       // exactly once, however their requests interleave.
+      //
+      // THE VERIFIER CONTRACT. Inside this transaction a verifier may compute
+      // (signature, JWS, JSON) and read/write this database through the store,
+      // and nothing else: on Postgres a serialization conflict rolls the
+      // transaction back and runs the verifier AGAIN, so any effect outside the
+      // database would happen twice, and a network wait would hold a pooled
+      // connection and its locks. It is async only because store reads are.
+      // Enforced, not just stated: every outbound call in the platform
+      // (Razorpay API, auth email, OIDC keys) refuses to run while a
+      // transaction is open (store.js assertNoOpenTransaction), so a verifier
+      // that tried one fails closed — rolled back, nothing applied, 500 — and the
+      // provider redelivers.
       const results = await db.transaction(async () => {
         const events = await verifier({ body: req.body, headers: req.headers, request: req });
         const list = Array.isArray(events) ? events : [events];

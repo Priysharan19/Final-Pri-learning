@@ -188,6 +188,18 @@ try {
   assert.equal(restoreApplied.snapshot.plan, 'premium');
   assert.equal(restoreApplied.snapshot.provider, 'web');
 
+  // The webhook verifier contract (billing.js): inside a database transaction a
+  // provider call is refused before anything is sent — on Postgres the
+  // transaction may be re-run, and the call would be repeated.
+  const sentBefore = requests.length;
+  await assert.rejects(
+    () => db.transaction(() => provider.verifiers.web.restore({ accountId: 'acct-billing', body: {} })),
+    error => error?.code === 'STORE_EXTERNAL_IO_IN_TRANSACTION'
+  );
+  assert.equal(requests.length, sentBefore, 'no Razorpay request leaves while a transaction is open');
+  assert.equal((await provider.verifiers.web.restore({ accountId: 'acct-billing', body: {} })).verified, true,
+    'the same call outside a transaction still works');
+
   console.log(`engine: ${testStore.engine}`);
 
   console.log('PASS — Razorpay checkout is server-bound; raw-body signatures, duplicate delivery, out-of-order events, trials and authoritative restore are enforced.');
