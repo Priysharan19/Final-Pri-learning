@@ -24,7 +24,7 @@ Then Pri must replace broad assumptions with measured target-cohort evidence.
 ASER 2024 is a large rural household survey covering more than 650,000 children across more than 600 districts, 26 states and 2 Union Territories.
 
 Official source:
-https://asercentre.org/aser-2024/
+https://asercentre.org/wp-content/uploads/2022/12/ASER-2024-National-findings.pdf
 
 For rural 14–16-year-olds, ASER 2024 reports approximately:
 
@@ -52,7 +52,7 @@ UDISE+ 2024–25 official statistics report, nationally:
 - schools with internet facility: 933,987.
 
 Official source:
-https://dashboard.udiseplus.gov.in/udiseplus-archive/assets/images/pdf/UDISE+2024_25_Booklet.pdf
+https://dashboard.udiseplus.gov.in/report2025/static/media/UDISE%2B2024_25_Booklet_existing.118ba29d4773e6372f72.pdf
 
 These correspond to roughly:
 
@@ -71,7 +71,7 @@ Do not architect classroom dependency around guaranteed school connectivity.
 GSMA reporting in 2026 highlights the distinction between mobile-network coverage and actual internet-enabled-device ownership/use. Its India analysis estimates hundreds of millions of people still lack an internet-enabled device and identifies handset affordability as a persistent barrier.
 
 Source:
-https://www.gsma.com/solutions-and-impact/connectivity-for-good/mobile-for-development/blog/indias-device-affordability-gap-a-barrier-to-digital-inclusion/
+https://www.gsma.com/solutions-and-impact/connectivity-for-good/mobile-for-development/blog/how-jio-is-improving-handset-affordability-and-access-for-the-underserved-in-india/
 
 Use with caution:
 
@@ -90,7 +90,7 @@ India's official DIKSHA platform supports patterns consistent with this environm
 - multilingual access.
 
 Official:
-https://diksha.gov.in/
+https://diksha.gov.in/help/getting-started/diksha-mobile-app/index.html
 
 This does not prove Pri should clone DIKSHA.
 
