@@ -290,9 +290,10 @@ export const flow = {
     await page.getByRole('button', { name: /Create profile & open Account/ }).click();
     await page.waitForSelector('#cloud-account-title', { timeout: 30000 });
     await check('cloud intent reaches the real Account & cross-device sync panel',
-      /Account & cross-device sync/.test(await page.locator('#cloud-account-title').innerText()));
+      /Account & cross-device sync/i.test(await page.locator('#cloud-account-title').innerText()));
     await check('new local profile is not falsely shown as cloud-connected',
-      /Not connected|no Pri cloud origin configured/i.test(await page.locator('#cloud-account-title').locator('..').innerText()));
+      /Not connected|no Pri cloud origin configured/i.test(
+        await page.locator('section[aria-labelledby="cloud-account-title"]').innerText()));
 
     await switchProfile(page);
     await beginAdditional(page, 'student');
@@ -300,6 +301,7 @@ export const flow = {
     await page.waitForSelector('[data-onboarding-step="3"]');
     await page.locator('#signup-name').fill('हिंदी विद्यार्थी');
     await page.locator('.auth-card button[lang="hi"]').click();
+    await page.waitForFunction(() => document.documentElement.lang === 'hi', null, { timeout: 10000 });
     await check('Hindi can be selected before profile creation',
       await page.evaluate(() => document.documentElement.lang) === 'hi');
     await page.locator('.auth-card .btn-primary').click();
@@ -314,9 +316,13 @@ export const flow = {
       await page.evaluate(() => document.documentElement.lang) === 'hi');
     await page.reload({ waitUntil: 'domcontentloaded' });
     await page.waitForSelector('.shell');
+    await page.waitForFunction(() => document.documentElement.lang === 'hi', null, { timeout: 10000 });
+    await page.locator('.user-chip').click();
+    await page.waitForSelector('.acct-menu-head');
     await check('Hindi persists for the returning profile after reload',
       await page.evaluate(() => document.documentElement.lang) === 'hi'
-      && (await page.locator('.user-chip').innerText()).includes('हिंदी विद्यार्थी'));
+      && (await page.locator('.acct-menu-head .acct-name').innerText()).trim() === 'हिंदी विद्यार्थी');
+    await page.locator('.user-chip').click();
 
     await page.setViewportSize(IPAD_PORTRAIT);
     await check('final iPad portrait app has no horizontal clipping',
