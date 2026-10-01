@@ -50,14 +50,18 @@ jobs:
       - name: Install Chromium
         working-directory: client
         run: npx playwright install --with-deps chromium
+      # Accessibility performs its own source build and release-identity check.
+      # Run it before screenshot-producing browser journeys create untracked
+      # evidence under artifacts/, which would correctly make the source tree
+      # dirty for a subsequent production build.
+      - name: Accessibility regression
+        run: npm run test:a11y
+
       - name: KALP-02 real navigation journey
         run: node client/test/tour-kalp02-navigation.js --no-build
 
       - name: Existing browser regression
         run: node client/test/e2e.mjs --only=login,india,phone,v3 --no-build
-
-      - name: Accessibility regression
-        run: npm run test:a11y
 
       - name: KALP-01 tablet visual regression
         run: node client/test/tour-kalp01-design.js --no-build
