@@ -709,3 +709,152 @@ Class: application-security guidance.
 Use: prompt injection, sensitive-information disclosure, supply-chain, poisoning, improper output handling, excessive agency and related threat classes.
 https://genai.owasp.org/llm-top-10/
 https://genai.owasp.org/llmrisk/llm062025-excessive-agency/
+
+
+---
+
+# W. Cognitive sovereignty / AI dependence
+
+## Generative AI without guardrails can harm learning — PNAS 2025
+Class: randomized field experiment, nearly 1,000 high-school mathematics students.
+Use: directly demonstrates that assisted performance can rise while subsequent unassisted mathematics performance worsens; unrestricted GPT access produced ~17% lower unassisted exam performance than control, while a safeguarded teacher-informed tutor largely mitigated the harm.
+Limitation: one school/context and specific tutor designs; safeguarded tutor did not establish a clear positive unassisted effect.
+https://doi.org/10.1073/pnas.2422633122
+https://pmc.ncbi.nlm.nih.gov/articles/PMC12232635/
+
+## The dependency trap — systematic review, 2026
+Class: systematic review of GenAI over-reliance in higher education.
+Use: distinguishes AI as learning support from substitution of learner judgement, verification, effort, practice and self-regulation.
+Limitation: higher-education evidence; not direct school-mathematics causal evidence.
+https://doi.org/10.1057/s41599-026-08959-2
+
+---
+
+# X. Question-family / item-generation admission
+
+## Cognitive Item Models for theory-grounded automatic math item generation — 2025
+Class: large-scale psychometric mathematics AIG study; 48 cognitive item models, 612 items, N=35,058.
+Use: predefined cognitive factors can drive item difficulty; contextual/cultural factors can still alter functioning; supports explicit family/radical semantics plus empirical fairness checks.
+https://doi.org/10.1080/08957347.2025.2563889
+
+## Automatic item generation systematic review — 2025
+Class: systematic review of 71 AIG studies (2010–2024).
+Use: AIG evaluation remains heterogeneous and disproportionately focused on MCQs / computer and medical education; supports stronger theoretical + empirical admission evidence.
+https://doi.org/10.1080/10494820.2025.2482588
+
+## LLM vs human exam-item systematic review/meta-analysis — 2026
+Class: systematic review/meta-analysis of 12 health-education studies.
+Use: no clear pooled difference in difficulty/discrimination, but high heterogeneity and weak equity evidence; supports staged expert-gated use rather than autonomous assessment authority.
+Limitation: medical/health education and largely MCQs; not direct school-math evidence.
+https://doi.org/10.1080/0142159X.2026.2691072
+
+---
+
+# Y. Transfer / feedback / fading
+
+## Feedback timing meta-analysis in computer-assisted learning — 2026
+Class: meta-analysis of 51 studies / 160 effect sizes.
+Use: no significant average learning difference between immediate and delayed feedback overall; argues against a universal timing rule.
+https://doi.org/10.1007/s10648-026-10117-8
+
+## Fading and mathematics performance — 2025
+Class: randomized ASSISTments study, Grade 6 geometry, N=114.
+Use: fading produced the largest pre-to-post effect sizes among tested worked-example/problem-solving conditions; prior knowledge moderated effects.
+Limitation: bounded topic/sample; not a universal fading schedule.
+https://doi.org/10.1111/bjep.12781
+
+## Spacing × worked examples for lasting mathematics learning — 2025
+Class: controlled mathematics-learning study.
+Use: null effects under studied conditions caution against assuming that combining individually plausible learning mechanisms always improves lasting learning.
+https://doi.org/10.1016/j.learninstruc.2025.102103
+
+---
+
+# Z. Human adjudication / AI grading
+
+## AI grading on real handwritten mathematics — ICML 2026
+Class: large-scale benchmark-oriented study on handwritten single-variable calculus work from nearly 800 university students.
+Use: rubric-guided OCR+LLM grading evaluated against TA grades, student judgments and independent review; useful precedent for multi-source adjudication where no perfect single label exists.
+Limitation: university calculus / study-specific rubrics; not Pri school-math marking authority.
+https://proceedings.mlr.press/v306/yu26ac.html
+
+## GenAI versus human assessment — 2026
+Class: empirical university assignment-grading comparison.
+Use: AI showed generosity and poor element-level agreement on nuanced criteria; supports criterion-level evaluation and human authority for subjective/high-impact marking.
+https://doi.org/10.1080/14703297.2026.2699254
+
+## Rubric-guided LLM scoring vs humans across courses — 2026
+Class: empirical co-grading study.
+Use: supports conservative human–AI co-grading under fixed local rubrics rather than unsupervised replacement.
+https://doi.org/10.3390/app16125902
+
+---
+
+# AA. Local / cloud model placement
+
+## Apple Intelligence Foundation Language Models Tech Report — 2025
+Class: official platform/model technical report.
+Use: evidence that ~3B-parameter on-device generative models with guided generation/tool calling are practical on supported Apple hardware.
+Limitation: platform capability, not Pri task reliability or educational efficacy.
+https://machinelearning.apple.com/research/apple-foundation-models-tech-report-2025
+
+## Third-generation Apple Foundation Models — 2026
+Class: official platform capability.
+Use: on-device + server model family shows continuing edge/cloud capability differentiation.
+https://machinelearning.apple.com/research/introducing-third-generation-of-apple-foundation-models
+
+## Apple Private Cloud Compute expansion — 2026
+Class: official security architecture.
+Use: architectural precedent for privacy-governed escalation of workloads too complex for on-device execution.
+Limitation: platform design reference; does not establish Pri's legal/policy sufficiency.
+https://security.apple.com/blog/expanding-pcc/
+
+---
+
+# AB. Accessible mathematics
+
+## MathML 4 — W3C Working Draft, June 2026
+Class: web standard in development.
+Use: structured mathematical notation/content plus `intent` annotations designed to improve assistive speech/braille interpretation.
+https://www.w3.org/TR/mathml4/
+
+## W3C Math Working Group 2026 charter
+Class: standards roadmap.
+Use: screen-reader implementation, intent vocabulary, accessibility notes and MathML Core implementation/test direction.
+https://www.w3.org/Math/Documents/Charter2026.html
+
+## Accessible Mathematics for Students who are Blind or have Low Vision — Australia
+Class: 2025–2028 ARC Linkage project / capability research.
+Use: single mathematical workbook with braille, LaTeX, HTML+MathML, speech, tactile, sonification and visual views; strong precedent for one semantic object with multiple representations.
+https://www.accessiblemaths.org/
+
+## Sonification and haptic feedback for graph accessibility — 2025
+Class: technical research synthesis.
+Use: maps sonification/haptic state of the art for mathematical function graphs.
+https://doi.org/10.5445/IR/1000186056
+
+## Adaptive sonification of mathematical function graphs — 2026
+Class: user-study research with people with visual impairment.
+Use: demonstrates that graph sonification parameters affect usability and excessive auditory density can reduce clarity.
+https://www.mdpi.com/2076-3417/16/14/7137
+
+---
+
+# AC. Guardian / home support
+
+## Parental homework involvement and mathematics achievement — 2023
+Class: mathematics-specific meta-analysis; 20 studies / 41 effects / N=16,338.
+Use: supportive involvement has a small positive association, intrusive involvement a negative association; autonomy support shows the strongest positive supportive subtype.
+Limitation: predominantly correlational evidence.
+https://doi.org/10.3389/fpsyg.2023.1218534
+
+## Parental homework involvement and achievement — three-level meta-analysis
+Class: broader meta-analysis.
+Use: autonomy support was the homework-involvement dimension most consistently positively associated with achievement.
+https://pubmed.ncbi.nlm.nih.gov/38227295/
+
+## Intrusive homework support and mathematics achievement
+Class: longitudinal multi-study evidence.
+Use: uninvited/intrusive support predicted worse achievement patterns, especially for some learner mindset profiles.
+Limitation: observational/longitudinal; not a Pri guardian-feature experiment.
+https://pubmed.ncbi.nlm.nih.gov/37166869/
