@@ -47,7 +47,9 @@ export const ENGINE_SUITES = [
   'assignment-targeting-check.mjs',
   'billing-cancel-refund-check.mjs',
   'razorpay-billing-check.mjs',
-  'apple-billing-check.mjs'
+  'apple-billing-check.mjs',
+  'security-acceptance-check.mjs',
+  'abuse-limits-check.mjs'
 ];
 
 let failed = 0;
