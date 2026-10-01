@@ -41,6 +41,25 @@ async function reachable(page, selector) {
   }, selector);
 }
 
+// Practice draws questions at random, and some take only a multiple-choice or
+// working answer. A check that moves with the draw cannot be gated on, so step
+// through questions (Next) until one offers both handwriting and typing.
+async function writableQuestion(page, settle) {
+  for (let i = 0; i < 12; i++) {
+    const ready = await page.evaluate(() => {
+      const tabs = [...document.querySelectorAll('.mode-tab')].map(t => t.getAttribute('aria-label') || '');
+      return tabs.includes('Answer by handwriting') && tabs.includes('Answer by typing');
+    });
+    if (ready) return true;
+    const next = page.locator('.ctx-next');
+    if (!(await next.count())) return false;
+    await next.click({ timeout: 5000 }).catch(() => {});
+    await page.waitForSelector('.q-prompt', { timeout: 30000 }).catch(() => null);
+    await settle();
+  }
+  return false;
+}
+
 export const flow = {
   id: 'responsive-matrix',
   name: 'Responsive matrix · 6 viewports, critical routes, write/type, actions',
@@ -79,6 +98,7 @@ export const flow = {
       await check(`${tag}: ${phoneNav ? 'bottom bar, no sidebar' : 'sidebar, no bottom bar'}`,
         phoneNav ? shell.bar && !shell.side : shell.side && !shell.bar, JSON.stringify(shell));
       await check(`${tag}: a question renders`, await page.locator('.q-prompt').count() === 1);
+      await check(`${tag}: a question with handwriting and typing is available`, await writableQuestion(page, settle));
 
       // ── 3 · writing: fits the screen, takes strokes, no developer copy ───
       const writeTab = page.getByRole('button', { name: 'Answer by handwriting' });
@@ -91,7 +111,9 @@ export const flow = {
       if (vp.ff === 'expanded' && !vp.short || vp.id === 'tablet-portrait') {
         await check(`${tag}: the writing area keeps the iPad height (${BASE_INK_HEIGHT}px)`, ink?.h === BASE_INK_HEIGHT, JSON.stringify(ink));
       } else {
-        const limit = Math.max(240, vp.height - 200);
+        // Room must remain for the top bar, toolbar and the bottom bars: the
+        // pre-CP-03 fixed 380px canvas fails this on a 640px-tall phone.
+        const limit = Math.max(240, vp.height - 300);
         await check(`${tag}: the writing area fits the screen (≤ ${limit}px, ≥ 240px)`, !!ink && ink.h <= limit && ink.h >= 240, JSON.stringify(ink));
       }
       let drew = false;
