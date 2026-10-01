@@ -1,4 +1,5 @@
 import { isAbsolute } from 'node:path';
+import { googleBillingConfigStatus } from './googleBilling.js';
 import { spendCeilingMissing } from './spendCeiling.js';
 
 function nonEmpty(name) {
@@ -278,6 +279,9 @@ export function platformConfigStatus() {
     (!webAnnual || nonEmpty('PRI_RAZORPAY_ANNUAL_TOTAL_COUNT'));
   const appleBillingProviderConfigured = appleProducts && appleTrustConfigured() &&
     (!production || nonEmpty('PRI_APPLE_APP_ID'));
+  // Google Play: product ids alone are not a provider. It is configured only
+  // with a parseable Play Developer API service account (googleBilling.js).
+  const googleBilling = googleBillingConfigStatus();
 
   const uniqueMissing = [...new Set(missing)];
   return Object.freeze({
@@ -293,6 +297,8 @@ export function platformConfigStatus() {
     appleBillingProductsConfigured: appleProducts,
     appleBillingProviderConfigured,
     googleBillingProductsConfigured: nonEmpty('PRI_GOOGLE_MONTHLY_PRODUCT_ID') || nonEmpty('PRI_GOOGLE_ANNUAL_PRODUCT_ID'),
+    googleBillingProviderConfigured: googleBilling.configured,
+    googleBillingNotificationsConfigured: googleBilling.configured && googleBilling.notificationsConfigured,
     webBillingProductsConfigured: webProducts,
     webBillingProviderConfigured
   });

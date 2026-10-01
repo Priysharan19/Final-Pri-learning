@@ -9,4 +9,6 @@
 //    no longer write pri.sync_cursors (supabase/migrations/20261002000000).
 //    No SQLite structural change: SQLite still allocates from sync_cursors.
 export const SCHEMA_VERSION = 7;
-export const BILLING_SCHEMA_VERSION = 3;
+// Billing 4: Google Play tables (billing_google_accounts, billing_google_purchases,
+//    billing_google_notifications) — supabase/migrations/20261003000000.
+export const BILLING_SCHEMA_VERSION = 4;

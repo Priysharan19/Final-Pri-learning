@@ -50,7 +50,7 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
       billingProviders: {
         web: config.webBillingProviderConfigured,
         apple: config.appleBillingProviderConfigured,
-        google: false
+        google: config.googleBillingProviderConfigured
       },
       housekeeping: await housekeepingStatus(db),
       checkedAt: Date.now()
