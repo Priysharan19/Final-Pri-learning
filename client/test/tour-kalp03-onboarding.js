@@ -246,14 +246,20 @@ export const flow = {
     await page.locator('.acct-unlock input').fill('brass-monkey-42');
     await page.getByRole('button', { name: 'Unlock' }).click();
     await page.waitForSelector('.home-greet');
+    await page.locator('.user-chip').click();
+    await page.waitForSelector('.acct-menu-head');
     await check('correct password genuinely unlocks the vault',
-      (await page.locator('.user-chip').innerText()).includes('KALP03 Protected JEE'));
+      (await page.locator('.acct-menu-head .acct-name').innerText()).trim() === 'KALP03 Protected JEE');
+    await page.locator('.user-chip').click();
 
     await switchProfile(page);
-    await beginAdditional(page, 'teacher');
+    await page.getByRole('button', { name: /Add another profile/i }).click();
+    await page.waitForSelector('[data-onboarding-step="1"]');
+    await page.getByRole('button', { name: 'Teacher', exact: true }).click();
     await check('teacher onboarding explains local UX role without privileged cloud authority',
       /local UX role/i.test(await page.locator('.auth-card').innerText())
       && /does not grant/i.test(await page.locator('.auth-card').innerText()));
+    await next(page);
     await chooseIndia(page, '10');
     await personalise(page, 'KALP03 Teacher', { avatarIndex: 2 });
     await finishLocal(page);

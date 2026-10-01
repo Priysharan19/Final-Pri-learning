@@ -277,11 +277,13 @@ export default function Login() {
     setBusy(true); setError('');
     try {
       const r = await api.post(path, body);
+      // Login owns this navigation hook and unmounts as soon as setUser exposes
+      // the authenticated shell. Move the cloud handoff first so the destination
+      // cannot be lost during that identity transition. The local profile is
+      // already authoritative here because the POST completed successfully.
+      if (cloudIntent) nav(CLOUD_ACCOUNT_ROUTE, { replace: true });
       setUser(r.user);
       refreshDue();
-      // The Settings panel remains the only real cloud-account authority.
-      // KALP-03 only hands the selected local profile to that panel.
-      if (cloudIntent) nav(CLOUD_ACCOUNT_ROUTE);
       return r;
     } catch (e) {
       setError(e.message);
