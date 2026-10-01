@@ -6,7 +6,8 @@
 # Installs the debug app + test APKs once (no uninstall between runs, unlike
 # connectedAndroidTest), runs ShellJourneyTest#journey, kills the app process
 # with `am force-stop`, then runs ShellJourneyTest#relaunchAfterProcessDeath
-# against the data the first run left. With PRI_CLOUD_ORIGIN/EMAIL/PASSWORD set
+# against the data the first run left. Regenerate the fixture for every run
+# (the run stops its servers). With PRI_CLOUD_ORIGIN/EMAIL/PASSWORD set
 # (scripts/cloud-fixture-server.mjs), it then runs the cloud journey
 # against that real server the same way: sign in + sync, force-stop, then the
 # session survives and Disconnect clears it. SYNTHETIC / EMULATOR evidence.
@@ -53,6 +54,7 @@ if [ "$EXPECT" != "floor" ]; then
   run "com.prilearning.app.FileExchangeTest#shareFilePickerCameraAndPrint" "$@"
   run "com.prilearning.app.InkInputTest#fingerAndStylusWriteThroughTheSharedCanvas" "$@"
   run "com.prilearning.app.WebViewAccessibilityTest#theProductPassesTheAccessibilitySmokeInTheShell" "$@"
+  run "com.prilearning.app.WebViewAccessibilityTest#theSystemFontScaleReachesThePage" "$@"
   summary="$summary, share/picker/camera/print, finger + stylus ink, accessibility smoke"
 fi
 
@@ -64,15 +66,17 @@ if [ -n "${PRI_CLOUD_ORIGIN:-}" ] && [ "$EXPECT" != "floor" ]; then
   run "$CLOUD#cloudSignInAndSync" "${cloud_args[@]}" "$@"
   summary="$summary, sign-up + delete and sign-in + sync against the real server"
   if [ -n "${PRI_CLOUD_DB:-}" ] && [ -n "${PRI_CLOUD_SERVER_PID:-}" ]; then
+    RESTARTED_PID=""
+    # Installed before the restart, so a server that half-started is still stopped.
+    trap '[ -n "${RESTARTED_PID:-}" ] && kill "$RESTARTED_PID" 2>/dev/null || true' EXIT
     # Offline: the cloud server goes away.
     kill "$PRI_CLOUD_SERVER_PID" 2>/dev/null || true
     sleep 2
-    run "$CLOUD#offlineLearningContinuesAndSyncIsNotOffered" "${cloud_args[@]}" "$@"
+    run "$CLOUD#offlineLearningContinuesAndSyncIsNotOffered" "${cloud_args[@]}" -e priCloudOffline true "$@"
     # Reconnect: the same server and database come back.
     node "$HERE/../scripts/cloud-fixture-server.mjs" --port "$PRI_CLOUD_PORT" --db "$PRI_CLOUD_DB" --restart --out "$OUT/restart.env"
     RESTARTED_PID="$(sed -n 's/^PRI_CLOUD_SERVER_PID=//p' "$OUT/restart.env")"
-    trap '[ -n "${RESTARTED_PID:-}" ] && kill "$RESTARTED_PID" 2>/dev/null' EXIT
-    summary="$summary, offline"
+    summary="$summary, offline attempt"
   fi
   adb shell am force-stop com.prilearning.app
   sleep 2

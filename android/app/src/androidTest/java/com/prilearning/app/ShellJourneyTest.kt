@@ -81,6 +81,8 @@ class ShellJourneyTest {
             el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}));return true;})()""")
     }
 
+    private val ANSWERED = """(function(){var c=[].slice.call(document.querySelectorAll('.card')).find(function(x){var l=x.querySelector('.sc-label');return l&&/questions answered/i.test(l.textContent);});if(!c)return false;return String(parseInt((c.querySelector('.big')||{}).textContent||'NaN',10));})()"""
+
     private val byLabel = "function(l){return [].slice.call(document.querySelectorAll('button')).find(function(b){return (b.getAttribute('aria-label')||b.textContent.trim())===l;});}"
 
     private val instrumentation: Instrumentation get() = InstrumentationRegistry.getInstrumentation()
@@ -166,6 +168,11 @@ class ShellJourneyTest {
             waitFor(s, "document.querySelector('[data-onboarding-step=\"5\"]')"); click(s, "document.querySelector('.auth-card .btn-primary')")
             waitFor(s, "document.querySelector('.home-greet')")
             eval(s, "localStorage.setItem('pri-android-marker','kept')")
+            // Progress before any attempt: nothing answered yet.
+            eval(s, "(function(){history.pushState({},'','/progress');dispatchEvent(new PopStateEvent('popstate'));return true;})()")
+            assertEquals("a new profile has answered nothing", "\"0\"", waitFor(s, ANSWERED))
+            eval(s, "(function(){history.back();return true;})()")
+            waitFor(s, "location.pathname === '/' && document.querySelector('.home-greet')")
 
             Log.i("PRITEST", "SPA routing through the bundled origin, and history Back")
             val landingDepth = eval(s, "(history.state && history.state.idx) || 0")
@@ -206,11 +213,14 @@ class ShellJourneyTest {
             waitFor(s, "(function(){var b=[].slice.call(document.querySelectorAll('.editor-foot .btn-primary')).find(function(x){return x.offsetParent&&!x.disabled});if(!b)return false;b.click();return true;})()")
             val feedback = waitFor(s, "(function(){var v=document.querySelector('.verdict')||document.querySelector('.your-answer');return v?(v.innerText||'marked').slice(0,60):false;})()")
             assertTrue("the attempt was marked with feedback: $feedback", feedback.length > 2)
-            val prompt = eval(s, "(document.querySelector('.q-prompt')||{}).textContent||''")
-            eval(s, "(function(){var n=document.querySelector('.ctx-next');if(n)n.click();return true;})()")
-            waitFor(s, "(document.querySelector('.q-prompt')||{}).textContent && (document.querySelector('.q-prompt').textContent !== $prompt)")
+            // Next: the same element is replaced by a new question (by identity of
+            // the rendered node, not prompt text, which can repeat).
+            assertEquals("a Next control is offered", "true", eval(s, "!!document.querySelector('.ctx-next')"))
+            eval(s, "(function(){window.__q=document.querySelector('.q-prompt');document.querySelector('.ctx-next').click();return true;})()")
+            waitFor(s, "document.querySelector('.q-prompt') && document.querySelector('.q-prompt') !== window.__q && !document.querySelector('.verdict')")
             eval(s, "(function(){history.pushState({},'','/progress');dispatchEvent(new PopStateEvent('popstate'));return true;})()")
-            waitFor(s, "location.pathname === '/progress' && document.querySelector('main') && document.querySelector('main').innerText.length > 40")
+            val answeredAfter = waitFor(s, ANSWERED).trim('"').toIntOrNull() ?: 0
+            assertTrue("Progress counts the attempt just marked ($answeredAfter answered)", answeredAfter >= 1)
             eval(s, "(function(){history.back();return true;})()")
             waitFor(s, "location.pathname === '/practice'")
             pressBack()

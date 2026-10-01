@@ -5,8 +5,9 @@
 // shell: every visible control has an accessible name, every field a label, the
 // document a language, each screen a heading, no positive tabindex, primary
 // targets at least 44 CSS px — on Home, Practice, Progress and Settings, at the
-// device's own size. Also: the system font scale reaches the page (textZoom is
-// left at its default). TalkBack itself stays a physical/manual gate.
+// device's own size, each audited once its own landmark has rendered. And the
+// system font size reaches the page: text is measurably larger at 1.3×.
+// TalkBack itself stays a physical/manual gate.
 // SYNTHETIC / EMULATOR evidence.
 // ─────────────────────────────────────────────────────────────────────────────
 package com.prilearning.app
@@ -70,17 +71,49 @@ class WebViewAccessibilityTest {
         ActivityScenario.launch(MainActivity::class.java).use { s ->
             s.onActivity { supported = it.webView != null }
             assumeTrue("the WebView is below the floor on this image", supported)
-            s.onActivity { assertEquals("the system font scale reaches the page", 100, it.webView!!.settings.textZoom) }
             val state = waitFor(s, """(function(){if(document.querySelector('.home-greet'))return 'home';
                 var b=[].slice.call(document.querySelectorAll('.auth-card button')).find(function(x){return /Android Student/.test(x.textContent);});
                 if(b){b.click();return 'picker';}return false;})()""")
             assertTrue(state, state == "\"home\"" || state == "\"picker\"")
             waitFor(s, "document.querySelector('.home-greet')")
-            for (path in listOf("/", "/practice", "/progress", "/settings")) {
+            // Each screen is audited only once its own landmark has rendered.
+            for ((path, landmark) in listOf("/" to ".home-greet", "/practice" to ".q-prompt", "/progress" to ".card .sc-label", "/settings" to "#cloud-account-title")) {
                 eval(s, "(function(){history.pushState({},'','$path');dispatchEvent(new PopStateEvent('popstate'));return true;})()")
-                Thread.sleep(1500)
+                waitFor(s, "location.pathname === '$path' && !!document.querySelector('$landmark')")
+                Thread.sleep(400)
                 assertEquals("accessibility smoke on $path", "\"clean\"", eval(s, "$audit('$path')"))
             }
+        }
+    }
+
+    /** The system font size reaches the page: at 1.3× the same text is measurably larger. */
+    @Test
+    fun theSystemFontScaleReachesThePage() {
+        val ui = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().uiAutomation
+        fun fontScale(v: String) { ui.executeShellCommand("settings put system font_scale $v").close(); Thread.sleep(1500) }
+        fun greetHeight(): Float {
+            var h = -1f
+            ActivityScenario.launch(MainActivity::class.java).use { s ->
+                var ok = false
+                s.onActivity { ok = it.webView != null }
+                assumeTrue("the WebView is below the floor on this image", ok)
+                val state = waitFor(s, """(function(){if(document.querySelector('.home-greet'))return 'home';
+                    var b=[].slice.call(document.querySelectorAll('.auth-card button')).find(function(x){return /Android Student/.test(x.textContent);});
+                    if(b){b.click();return 'picker';}return false;})()""")
+                assertTrue(state, state == "\"home\"" || state == "\"picker\"")
+                // A paragraph of fixed text, measured in CSS px.
+                h = waitFor(s, "(function(){var p=document.createElement('p');p.id='pri-fs';p.style.cssText='position:absolute;left:0;top:0;width:200px;margin:0';p.textContent='Pri Learning measures the system font size here.';document.body.appendChild(p);var r=p.getBoundingClientRect().height;p.remove();return String(r);})()").trim('"').toFloat()
+            }
+            return h
+        }
+        try {
+            fontScale("1.0")
+            val base = greetHeight()
+            fontScale("1.3")
+            val large = greetHeight()
+            assertTrue("text at system font scale 1.3 is larger than at 1.0 ($large vs $base CSS px)", large > base * 1.15)
+        } finally {
+            fontScale("1.0")
         }
     }
 }
