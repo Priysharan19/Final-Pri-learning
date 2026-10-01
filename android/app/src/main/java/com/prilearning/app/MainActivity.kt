@@ -266,6 +266,7 @@ class MainActivity : ComponentActivity() {
         webView = null
         cloud?.shutdown()
         cloud = null
+        if (::files.isInitialized) files.dispose()
         billing?.dispose()
         billing = null
         super.onDestroy()

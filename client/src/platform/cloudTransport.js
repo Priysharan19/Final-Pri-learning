@@ -115,6 +115,12 @@ export function normalizeCloudOrigin(raw = envOrigin()) {
 
 // Fails closed: the shell advertises `cloud` only with `configured: true` when
 // its signed release metadata names an HTTPS cloud origin.
+/** Disconnect: drop the session the native shell holds (no-op in a browser,
+ * where the HttpOnly session cookie belongs to the browser and logout clears it). */
+export function forgetNativeCloudSession() {
+  return priNative.isNativeShell() ? priNative.cloud.forgetSession() : Promise.resolve(false);
+}
+
 export function nativeCloudAvailable() {
   return priNative.cloud.available();
 }

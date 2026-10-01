@@ -304,6 +304,9 @@ if (existsSync(at('android'))) {
     ok(!/networkSecurityConfig|cleartextTrafficPermitted="true"/.test(read('android/app/src/main/AndroidManifest.xml')) &&
       /android:usesCleartextTraffic="false"/.test(read('android/app/src/main/AndroidManifest.xml')),
       'release Android builds refuse cleartext (the local-server allowance exists only in src/debug)');
+    ok(/if \(BuildConfig\.DEBUG\) CloudConfig\.debugOverride \?: BuildConfig\.PRI_CLOUD_ORIGIN else BuildConfig\.PRI_CLOUD_ORIGIN/.test(read('android/app/src/main/java/com/prilearning/app/MainActivity.kt')) &&
+      /debug = BuildConfig\.DEBUG/.test(read('android/app/src/main/java/com/prilearning/app/MainActivity.kt')),
+      'the test cloud override is honoured only in debug builds (release reads the signed BuildConfig origin alone)');
     ok(/android:exported="false"/.test(read('android/app/src/main/AndroidManifest.xml').split('<provider')[1] || '') &&
       !/<(external|root|files)-path/.test(read('android/app/src/main/res/xml/file_paths.xml')),
       'the FileProvider is private and exposes only two cache subdirectories');

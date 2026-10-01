@@ -192,6 +192,16 @@ const cloud = Object.freeze({
     if (c.transport === 'legacy') return getRuntime().legacy.cloud.request(req, { timeoutMs, signal });
     return viaBridge('cloud', 'request', req, { timeoutMs, signal });
   },
+  /** Forget the cloud session held by the shell's native jar (Disconnect),
+   * whether or not the server logout succeeded. Resolves true/false; never throws. */
+  forgetSession() {
+    const c = capOf('cloud');
+    if (!c) return Promise.resolve(false);
+    const done = c.transport === 'legacy'
+      ? getRuntime().legacy.cloud.forget()
+      : viaBridge('cloud', 'forgetSession', {}, { timeoutMs: 5_000 }).then(() => true);
+    return done.catch(() => false);
+  },
 });
 
 const MAX_SHARE_BYTES = 6 * 1024 * 1024;
