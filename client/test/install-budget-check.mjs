@@ -64,6 +64,10 @@ const BANNED_FROM_INSTALL = [
   [/(^|\/)year(7|8|9|10|11|12)-/, 'a whole year of question bank'],
   [/(^|\/)streams-(standard|ext)-/, 'a senior stream question bank'],
   [/(^|\/)india-(algebra|calculus|class10|coordinate|foundation|junior-overlay|olympiad|senior)-/, 'an Indian question bank'],
+  // These rode in every install for as long as the curriculum spine read its
+  // chapter list out of the same modules as the generators: 228 kB of Class 7–9
+  // bank paid by a Class 12 student. The spine now reads the syllabus layers.
+  [/(^|\/)class(7|8|9)-[a-z0-9-]+-production-/, 'an NCERT Class 7–9 production bank'],
   [/(^|\/)inter-(cyrillic|greek|vietnamese)/, 'an Inter subset for a script this app never paints'],
   [/(^|\/)KaTeX_(Fraktur|Script|Caligraphic|Typewriter|SansSerif)-/, 'a KaTeX face no generator here emits']
 ];
@@ -153,6 +157,17 @@ for (const [pattern, what] of BANNED_FROM_INSTALL) {
 ok(OPTIONAL.some(url => /ink-model-/.test(url)), 'the handwriting model is in the optional tier, not simply dropped');
 ok(OPTIONAL.some(url => /ink-engine-/.test(url)), 'and so is the recogniser that reads it');
 ok(!OPTIONAL.some(url => /(^|\/)pdf/.test(url)), 'the PDF renderer stays fully on demand — nothing warms 2.7 MB speculatively');
+
+// Staff-only screens and a second language's legal notices are fetched by the
+// people who open them. Warming them would charge every student for a teacher
+// workspace, an admin console and Hindi notices the student never reads.
+const staffOrHindi = firstVisit.filter(url => /(^|\/)(Teach|StaffOperationsPanel|legalHindi)-/.test(url));
+eq(staffOrHindi.length, 0, `staff-only screens and the Hindi notices are neither installed nor warmed (${JSON.stringify(staffOrHindi)})`);
+
+// The curriculum spine still has the chapter lists it renders from: the
+// syllabus layer the banks were split away from is in the install itself.
+ok(PRECACHE.some(url => /(^|\/)ncert-syllabus-/.test(url)),
+  'the NCERT syllabus layer the curriculum spine reads at boot is installed');
 
 // ── 3 · The install can still paint the app ──────────────────────────────────
 // A student whose link dies right after install must get a working first
