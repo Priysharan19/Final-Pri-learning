@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { printPage } from '../lib/files.js';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../api.js';
 import { useApp } from '../App.jsx';
@@ -246,7 +247,7 @@ function ReportCard({ user }) {
     <div className="card">
       <div className="spread no-print">
         <div className="card-title" style={{ marginBottom: 0 }}>Progress report — {report.student.course || `Year ${report.student.year}`}</div>
-        <button className="btn btn-ghost btn-sm" onClick={() => window.print()}>Print / save PDF</button>
+        <button className="btn btn-ghost btn-sm" onClick={() => { printPage().catch(() => {}); }}>Print / save PDF</button>
       </div>
       <p className="sub" style={{ margin: '10px 0 4px' }}>
         {report.student.name} · Year {report.student.year} · predicted {report.predicted.mark}/100 ·

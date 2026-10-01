@@ -391,6 +391,31 @@ ok(normalizeCode('SOMETHING_NEW_FROM_A_SHELL') === 'INTERNAL', 'unknown codes be
   delete globalThis.document;
 }
 
+// ── 12c′ · Print goes to the native print dialog inside a shell ─────────────
+{
+  let printed = 0;
+  globalThis.window = globalThis;
+  globalThis.print = () => { printed += 1; };
+  const { printPage } = await import(`../src/lib/files.js?print=${Date.now()}`);
+  const host = createFakeHost({ capabilities: { share: { versions: [1], print: true } }, handlers: {
+    'host.ready': () => ({}), 'share.print': () => ({ completed: true }),
+  } });
+  priNative.dispose();
+  const result = await printPage();
+  ok(host.lastRequest('share', 'print') && result?.completed === true && printed === 0,
+    'inside a shell that can print, Print opens the native print dialog (window.print() is a no-op in Android WebView)');
+  priNative.dispose();
+  host.uninstall();
+  const noPrint = createFakeHost({ capabilities: { share: { versions: [1] } }, handlers: { 'host.ready': () => ({}) } });
+  priNative.dispose();
+  await printPage();
+  ok(printed === 1 && !noPrint.lastRequest('share', 'print'), 'a host without print (and every browser) uses window.print()');
+  priNative.dispose();
+  noPrint.uninstall();
+  delete globalThis.print;
+  delete globalThis.window;
+}
+
 // ── 12d · Android delivery: JSON strings out, `message` events back ──────────
 {
   const listeners = [];
