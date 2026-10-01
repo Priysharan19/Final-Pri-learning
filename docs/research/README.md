@@ -83,6 +83,9 @@ Evidence-centred measurement, construct separation, IRT/CDM/KT model ladder, Q-m
 ### SEMANTIC_LEARNING_DATA_CONTRACTS.md
 Implementable identities and event semantics for knowledge components, curriculum objectives, question families, misconception opportunities, assistance provenance, transfer tiers, replayable learner state, corrections and experiments.
 
+### MATHEMATICAL_KNOWLEDGE_GRAPH_AND_CURRICULUM_ONTOLOGY.md
+Curriculum-independent mathematical ontology, typed/conditional prerequisite and progression relations, representation/strategy/confusion graphs, cross-curriculum mappings, graph evidence levels, validation, versioning and shadow-mode rollout.
+
 ### EXPERIMENTATION_AND_EFFICACY.md
 Causal evidence ladder, randomized experiment design, delayed independent outcomes, held-out transfer, cluster/carryover handling, guardrails, bandits, off-policy logging, heterogeneous effects and external efficacy.
 
@@ -118,7 +121,8 @@ Read these modules in addition to the architecture when the mission touches the 
 | Mission surface | Mandatory research module |
 | --- | --- |
 | mastery, adaptive difficulty, diagnostic assessment, next-question ranking | PSYCHOMETRICS_AND_ADAPTIVE_MEASUREMENT.md |
-| attempts/events/storage semantics, learner-model migration, knowledge graph, question identity | SEMANTIC_LEARNING_DATA_CONTRACTS.md |
+| attempts/events/storage semantics, learner-model migration, question identity | SEMANTIC_LEARNING_DATA_CONTRACTS.md |
+| curriculum ontology, knowledge components, prerequisites, learning progression, cross-curriculum mapping | MATHEMATICAL_KNOWLEDGE_GRAPH_AND_CURRICULUM_ONTOLOGY.md |
 | A/B tests, experimentation, intervention policy, bandits, learning-effect claims | EXPERIMENTATION_AND_EFFICACY.md |
 | new AI-learning feature justified by another product/paper | COMPETITIVE_AND_FRONTIER_SYSTEMS.md |
 | tutoring dialogue, hints, worked examples, mistake repair | AI_TUTORING_AND_INTERVENTIONS.md |
