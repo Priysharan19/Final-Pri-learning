@@ -17,7 +17,7 @@ const student = {
 const base = {
   user: student,
   stats: { totals: { attempts: 12 }, priorities: [{ id: 'algebra', name: 'Algebra' }] },
-  reviews: { due: [] }, tasks: [], exams: [], resume: null,
+  dueCount: 0, tasks: [], exams: [], resume: null,
   assignments: [], online: true, cloudState: 'ready', now
 };
 
@@ -32,7 +32,7 @@ const selected = overrides => resolveHomeRecommendation({ ...base, ...overrides 
 check('active exam outranks ordinary work', () => {
   const row = selected({
     exams: [{ id: 'exam-1', title: 'Paper', created_at: now - 1000, finished_at: null }],
-    reviews: { due: [{ subtopic: 'x' }] },
+    dueCount: 1,
     resume: { kind: 'practice', questionId: 'q1', destination: '/practice' }
   });
   assert.equal(row.kind, 'exam');
@@ -60,7 +60,7 @@ check('teacher assignment due soon outranks ordinary resume', () => {
 check('active local resume outranks due reviews', () => {
   const row = selected({
     resume: { kind: 'practice', questionId: 'q1', destination: '/practice' },
-    reviews: { due: [{ subtopic: 'x' }, { subtopic: 'y' }] }
+    dueCount: 2
   });
   assert.equal(row.kind, 'practice-resume');
 });
@@ -68,7 +68,7 @@ check('active local resume outranks due reviews', () => {
 check('due reviews outrank daily goal', () => {
   const row = selected({
     user: { ...student, today: { questions: 4 } },
-    reviews: { due: [{ subtopic: 'x' }] }
+    dueCount: 1
   });
   assert.equal(row.kind, 'reviews');
 });
@@ -76,7 +76,7 @@ check('due reviews outrank daily goal', () => {
 check('partial daily goal beats generic adaptive work', () => {
   const row = selected({ user: { ...student, today: { questions: 6 } } });
   assert.equal(row.kind, 'daily-goal');
-  assert.equal(row.reasonVars.remaining, 4);
+  assert.equal(row.data.remaining, 4);
 });
 
 check('new student receives a real first practice action', () => {
@@ -95,15 +95,14 @@ check('new offline student receives honest caveat', () => {
     online: false, cloudState: 'offline'
   });
   assert.equal(row.kind, 'first-practice');
-  assert.equal(row.metadata.offlineCaveat, true);
-  assert.equal(row.reasonKey, 'home.reason.firstPracticeOffline');
+  assert.equal(row.offlineCaveat, true);
 });
 
 check('cloud assignments are excluded while offline', () => {
   const row = selected({
     online: false, cloudState: 'offline',
     assignments: [{ id: 'a3', classId: 'c1', title: 'Cloud only', dueAt: now - 1000 }],
-    reviews: { due: [{ subtopic: 'x' }] }
+    dueCount: 1
   });
   assert.equal(row.kind, 'reviews');
 });
@@ -115,7 +114,6 @@ check('cloud failure leaves local recommendation usable', () => {
   });
   assert.ok(decision.primary);
   assert.notEqual(decision.primary.kind, 'assignment');
-  assert.equal(decision.context.cloudAssignmentsConsidered, false);
 });
 
 check('unfinished local class task preserves task context', () => {
@@ -137,11 +135,10 @@ check('submitted cloud assignment is never primary', () => {
 check('teacher role receives no student recommendation', () => {
   const decision = resolveHomeRecommendation({ ...base, user: { ...student, role: 'teacher' } });
   assert.equal(decision.primary, null);
-  assert.equal(decision.context.roleSafe, true);
 });
 
 check('policy is deterministic under identical inputs', () => {
-  const input = { ...base, reviews: { due: [{ subtopic: 'x' }] }, tasks: [{ id: 't4', title: 'Task', count: 10, done: 0, finished: false }] };
+  const input = { ...base, dueCount: 1, tasks: [{ id: 't4', title: 'Task', count: 10, done: 0, finished: false }] };
   assert.deepEqual(resolveHomeRecommendation(input), resolveHomeRecommendation(input));
 });
 
@@ -156,7 +153,7 @@ check('tie-break prefers earlier real deadline', () => {
 check('assignment without a due date is not falsely urgent', () => {
   const row = selected({
     assignments: [{ id: 'undated', classId: 'c', title: 'Undated' }],
-    reviews: { due: [{ subtopic: 'x' }] }
+    dueCount: 1
   });
   assert.equal(row.kind, 'reviews');
 });
@@ -190,7 +187,7 @@ check('Home consumes one central recommendation resolver', () => {
   assert.match(home, /resolveHomeRecommendation/);
   assert.match(home, /api\.get\('\/practice\/resume'\)/);
   assert.match(home, /cloud\.assignments\(\)/);
-  assert.match(home, /localReady \? resolveHomeRecommendation/);
+  assert.match(home, /local \? resolveHomeRecommendation/);
 });
 
 check('Home uses profile authority for India copy before curriculum loads', () => {
@@ -209,8 +206,8 @@ check('primary recommendation appears before manual generator in source order', 
 });
 
 check('cloud failure is bounded and local learning remains rendered', () => {
-  assert.match(home, /cloudState === 'offline' \|\| cloudState === 'error'/);
-  assert.match(home, /home\.cloudError/);
+  assert.match(home, /cloudData\.state === 'offline' \|\| cloudData\.state === 'error'/);
+  assert.match(home, /home\.cloudUnavailable/);
 });
 
 check('teacher routing remains outside student Home', () => {
@@ -220,7 +217,7 @@ check('teacher routing remains outside student Home', () => {
 check('English and Hindi include command-centre copy', () => {
   for (const source of [en, hi]) {
     assert.match(source, /'home\.nextUp'/);
-    assert.match(source, /'home\.cta\.startFirstPractice'/);
+    assert.match(source, /'home\.next\.firstIndia'/);
     assert.match(source, /'home\.reason\.smartPracticeOffline'/);
   }
 });

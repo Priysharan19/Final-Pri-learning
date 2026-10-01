@@ -1,8 +1,7 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
 import { cloud, cloudAvailable } from '../platform/cloudTransport.js';
-import { onCloudSessionChange } from '../platform/cloudSession.js';
 import { resolveHomeRecommendation } from '../home/recommendation.js';
 import { useApp } from '../App.jsx';
 import { dotpointAvailable, practiceTargetAvailable, topicAvailability } from '../engine/curriculumAvailability.js';
@@ -34,19 +33,14 @@ function loadSaved() {
 }
 
 export default function Home() {
-  const { user } = useApp();
+  const { user, dueCount } = useApp();
   const nav = useNavigate();
   const t = useT();
   const tx = useTx();
-  const [stats, setStats] = useState(null);
+  const [local, setLocal] = useState(null);
   const [curriculum, setCurriculum] = useState(null);
-  const [reviews, setReviews] = useState(null);
-  const [tasks, setTasks] = useState([]);
-  const [exams, setExams] = useState([]);
-  const [resume, setResume] = useState(null);
-  const [localReady, setLocalReady] = useState(false);
-  const [assignments, setAssignments] = useState([]);
-  const [cloudState, setCloudState] = useState('unavailable');
+  const [cloudData, setCloudData] = useState({ assignments: [], state: 'unavailable' });
+  const stats = local?.stats || null;
   const [online, setOnline] = useState(() => typeof navigator === 'undefined' ? true : navigator.onLine !== false);
   const [open, setOpen] = useState(false);
   const [cat, setCat] = useState('year');
@@ -64,26 +58,23 @@ export default function Home() {
   // gets a working English filter, because textMatches falls back to the label.
   useGlossary(user?.mathsGloss === true);
 
-  const refreshLocal = useCallback(async () => {
-    setLocalReady(false);
-    const [statsR, curriculumR, reviewsR, tasksR, examsR, resumeR] = await Promise.allSettled([
-      api.get('/stats'),
-      api.get('/curriculum'),
-      api.get('/reviews'),
-      api.get('/tasks'),
-      api.get('/exams'),
-      api.get('/practice/resume')
-    ]);
-    if (statsR.status === 'fulfilled') setStats(statsR.value);
-    if (curriculumR.status === 'fulfilled') setCurriculum(curriculumR.value);
-    setReviews(reviewsR.status === 'fulfilled' ? reviewsR.value : { due: [], upcoming: [] });
-    setTasks(tasksR.status === 'fulfilled' ? (tasksR.value.tasks || []) : []);
-    setExams(examsR.status === 'fulfilled' ? (examsR.value.exams || []) : []);
-    setResume(resumeR.status === 'fulfilled' ? (resumeR.value.resume || null) : null);
-    setLocalReady(true);
+  useEffect(() => {
+    let live = true;
+    Promise.allSettled([
+      api.get('/stats'), api.get('/curriculum'), api.get('/tasks'),
+      api.get('/exams'), api.get('/practice/resume')
+    ]).then(([statsR, curriculumR, tasksR, examsR, resumeR]) => {
+      if (!live) return;
+      if (curriculumR.status === 'fulfilled') setCurriculum(curriculumR.value);
+      setLocal({
+        stats: statsR.status === 'fulfilled' ? statsR.value : null,
+        tasks: tasksR.status === 'fulfilled' ? (tasksR.value.tasks || []) : [],
+        exams: examsR.status === 'fulfilled' ? (examsR.value.exams || []) : [],
+        resume: resumeR.status === 'fulfilled' ? (resumeR.value.resume || null) : null
+      });
+    });
+    return () => { live = false; };
   }, [user.id]);
-
-  useEffect(() => { refreshLocal(); }, [refreshLocal]);
 
   useEffect(() => {
     const update = () => setOnline(navigator.onLine !== false);
@@ -98,37 +89,31 @@ export default function Home() {
   useEffect(() => {
     let live = true;
     const enabled = cloudAvailable();
-    let stop = () => {};
-
     const load = async () => {
       if (!enabled) {
-        if (live) { setAssignments([]); setCloudState('unavailable'); }
+        if (live) setCloudData({ assignments: [], state: 'unavailable' });
         return;
       }
       if (!online) {
-        if (live) { setAssignments([]); setCloudState('offline'); }
+        if (live) setCloudData({ assignments: [], state: 'offline' });
         return;
       }
       try {
         const [me, result] = await Promise.all([cloud.me(), cloud.assignments()]);
         if (!live) return;
-        if (me?.account?.role !== 'student') {
-          setAssignments([]);
-          setCloudState('unavailable');
-          return;
-        }
-        setAssignments(Array.isArray(result?.assignments) ? result.assignments : []);
-        setCloudState('ready');
+        const student = me?.account?.role === 'student';
+        setCloudData({
+          assignments: student && Array.isArray(result?.assignments) ? result.assignments : [],
+          state: student ? 'ready' : 'unavailable'
+        });
       } catch (err) {
         if (!live) return;
-        setAssignments([]);
-        setCloudState(err?.status === 401 ? 'unavailable' : 'error');
+        setCloudData({ assignments: [], state: err?.status === 401 ? 'unavailable' : 'error' });
       }
     };
 
     load();
-    if (enabled) stop = onCloudSessionChange(load);
-    return () => { live = false; stop(); };
+    return () => { live = false; };
   }, [online, user.id]);
   useEffect(() => {
     localStorage.setItem('pri-gen-filters', JSON.stringify({ year, sectionKey, subtopic, dotpoint, difficulty }));
@@ -226,17 +211,10 @@ export default function Home() {
 
   const resetAll = () => { setSectionKey(null); setSubtopic(null); setDotpoint(null); setDifficulty(null); setYear(user.year); };
 
-  const homeDecision = useMemo(() => localReady ? resolveHomeRecommendation({
-    user,
-    stats,
-    reviews,
-    tasks,
-    exams,
-    resume,
-    assignments,
-    online,
-    cloudState
-  }) : { primary: null, alternatives: [] }, [localReady, user, stats, reviews, tasks, exams, resume, assignments, online, cloudState]);
+  const homeDecision = useMemo(() => local ? resolveHomeRecommendation({
+    user, stats, dueCount, tasks: local.tasks, exams: local.exams, resume: local.resume,
+    assignments: cloudData.assignments, online, cloudState: cloudData.state
+  }) : { primary: null, alternatives: [] }, [local, user, stats, dueCount, cloudData, online]);
 
   return (
     <div className="home-wrap">
@@ -244,24 +222,21 @@ export default function Home() {
       <Tagline />
 
       <PrimaryAction action={homeDecision.primary} nav={nav} />
-      {(cloudState === 'offline' || cloudState === 'error') && (
-        <div className="home-cloud-note" role="status">
-          {t(cloudState === 'offline' ? 'home.cloudOffline' : 'home.cloudError')}
+      {(cloudData.state === 'offline' || cloudData.state === 'error') && (
+        <div className="card home-cloud-note" role="status">
+          {t('home.cloudUnavailable')}
         </div>
       )}
 
-      <div className="home-support-grid" aria-label={t('home.supportingActions')}>
-        <GoalCard user={user} activity={stats?.activity || []} onGo={() => nav('/practice')} compact />
-        {homeDecision.alternatives.slice(0, 2).map(item => (
+      <div className="home-cards home-support-grid" aria-label={t('nav.practice')}>
+        <GoalCard user={user} activity={stats?.activity || []} onGo={() => nav('/practice')} />
+        {homeDecision.alternatives.map(item => (
           <SupportingAction key={item.kind + ':' + item.id} action={item} nav={nav} />
         ))}
       </div>
 
       <section className="home-manual" aria-labelledby="home-manual-title">
-        <div>
-          <h2 id="home-manual-title">{t('home.choosePractice')}</h2>
-          <p>{t('home.choosePracticeSub')}</p>
-        </div>
+        <h2 id="home-manual-title">{t('nav.practice')}</h2>
       </section>
 
       {/* ── Manual practice configuration is deliberately secondary ── */}
@@ -412,35 +387,61 @@ export default function Home() {
   );
 }
 
+const WORK_REASONS = {
+  overdue: 'home.reason.overdue', due: 'home.reason.due', started: 'home.reason.started',
+  returned: 'home.reason.returned', ready: 'home.reason.ready'
+};
+
+function actionCopy(action, user, t) {
+  const d = action.data || {};
+  const genericTitle = {
+    'practice-resume': 'home.next.resumePractice', reviews: 'home.next.reviews',
+    'daily-goal': 'home.next.dailyGoal',
+    'first-practice': user.course === 'in' ? 'home.next.firstIndia' : 'home.next.firstNsw',
+    adaptive: 'nav.practice', 'smart-practice': 'nav.practice'
+  }[action.kind];
+  const title = d.title || t(genericTitle, d);
+  let reason = action.kind === 'exam' ? 'home.reason.examInProgress'
+    : action.kind === 'assignment' || action.kind === 'task' ? WORK_REASONS[d.status]
+      : action.kind.endsWith('resume') ? 'home.reason.resume'
+      : action.kind === 'reviews' ? 'home.reviewDue'
+      : action.kind === 'daily-goal' ? 'home.reason.dailyGoal'
+      : action.kind === 'adaptive' ? 'home.reason.adaptive'
+      : action.kind === 'first-practice' ? (action.offlineCaveat ? 'home.reason.firstPracticeOffline' : 'home.reason.firstPractice')
+      : action.offlineCaveat ? 'home.reason.smartPracticeOffline' : 'home.reason.smartPractice';
+  const cta = action.kind === 'reviews' ? 'nav.review'
+    : ['exam', 'assignment', 'task', 'task-resume', 'practice-resume'].includes(action.kind) ? 'common.continue' : 'nav.practice';
+  return { title, reason: t(reason, { ...d, date: action.dueAt ? new Date(action.dueAt).toLocaleDateString() : '' }), cta: t(cta) };
+}
+
 function PrimaryAction({ action, nav }) {
+  const { user } = useApp();
   const t = useT();
   if (!action) return null;
+  const copy = actionCopy(action, user, t);
   const reasonId = 'home-primary-reason';
   return (
-    <section className="home-command" data-home-primary aria-labelledby="home-next-title">
+    <section className="card home-command" data-home-primary aria-labelledby="home-next-title">
       <div className="home-command-copy">
         <div className="home-command-kicker">{t('home.nextUp')}</div>
-        <h2 id="home-next-title">{t(action.titleKey, action.titleVars || {})}</h2>
-        <p id={reasonId}>{t(action.reasonKey, action.reasonVars || {})}</p>
+        <h2 id="home-next-title">{copy.title}</h2>
+        <p id={reasonId}>{copy.reason}</p>
       </div>
       <button type="button" className="btn btn-primary home-command-cta" data-home-primary-cta
-        aria-describedby={reasonId} onClick={() => nav(action.destination)}>
-        {t(action.ctaKey)}
-      </button>
+        aria-describedby={reasonId} onClick={() => nav(action.destination)}>{copy.cta}</button>
     </section>
   );
 }
 
 function SupportingAction({ action, nav }) {
+  const { user } = useApp();
   const t = useT();
+  const copy = actionCopy(action, user, t);
   return (
-    <article className="home-support-action">
-      <div className="sc-label">{t('home.alsoAvailable')}</div>
-      <strong>{t(action.titleKey, action.titleVars || {})}</strong>
-      <p>{t(action.reasonKey, action.reasonVars || {})}</p>
-      <button type="button" className="btn btn-ghost btn-sm" onClick={() => nav(action.destination)}>
-        {t(action.ctaKey)}
-      </button>
+    <article className="home-card home-support-action">
+      <strong>{copy.title}</strong>
+      <p>{copy.reason}</p>
+      <button type="button" className="btn btn-ghost btn-sm" onClick={() => nav(action.destination)}>{copy.cta}</button>
     </article>
   );
 }
@@ -473,7 +474,7 @@ function Tagline() {
   );
 }
 
-function GoalCard({ user, activity, onGo, compact = false }) {
+function GoalCard({ user, activity, onGo }) {
   const t = useT();
   const done = user.today?.questions || 0;
   const goal = user.dailyGoal || 10;
@@ -492,7 +493,7 @@ function GoalCard({ user, activity, onGo, compact = false }) {
     };
   });
   return (
-    <div className={`home-card goal-card${compact ? " compact" : ""}`} style={{ maxWidth: 420 }}>
+    <div className="home-card goal-card" style={{ maxWidth: 420 }}>
       <div className="goal-ring" role="img" aria-label={t('home.goalRing', { done, goal })}>
         <svg width="92" height="92" viewBox="0 0 92 92">
           <circle className="goal-ring-track" cx="46" cy="46" r={R} fill="none" strokeWidth="7" />
@@ -531,33 +532,6 @@ function GoalCard({ user, activity, onGo, compact = false }) {
           </button>
         )}
       </div>
-    </div>
-  );
-}
-
-function DiamondTrack({ recent }) {
-  const t = useT();
-  const items = recent.slice(0, 7).reverse();
-  if (!items.length) {
-    return <div className="muted" style={{ marginTop: 20 }}>{t('home.firstQuestions')}</div>;
-  }
-  const color = a => a.correct ? 'var(--m5)' : 'var(--m1)';
-  // Right and wrong were a red diamond and a green one, and a tooltip: nothing
-  // a screen reader or a colour-blind student could read. The verdict is spelled
-  // out beside each mark, off-screen, and the joining bars are decoration.
-  return (
-    <div className="diamond-track" role="group" aria-label={t('home.recentQuestions')}>
-      {items.map((a, i) => {
-        const verdict = t('home.recentVerdict', { topic: a.name, verdict: t(a.correct ? 'app.correct' : 'app.incorrect') });
-        return (
-        <React.Fragment key={i}>
-          {i > 0 && <span className="diamond-link" aria-hidden="true" style={{ background: `linear-gradient(90deg, ${color(items[i - 1])}, ${color(a)})` }} />}
-          <span className="diamond" style={{ background: color(a) }} title={verdict}>
-            <span className="sr-only">{verdict}</span>
-          </span>
-        </React.Fragment>
-        );
-      })}
     </div>
   );
 }

@@ -423,10 +423,6 @@ select.input {
 .home-cards { display: flex; gap: 0; width: min(990px, 94vw); margin-top: 7vh; border: 1px solid var(--hairline); border-radius: var(--radius); overflow: hidden; }
 .home-card { padding: 18px 22px; flex: 1; background: var(--surface); position: relative; }
 .home-card + .home-card { border-left: 1px solid var(--hairline); background: var(--surface-2); }
-.home-card-x { position: absolute; top: 10px; right: 12px; border: none; background: none; color: var(--ink-3); cursor: pointer; font-size: 13px; }
-.diamond-track { display: flex; align-items: center; margin-top: 22px; }
-.diamond { width: 11px; height: 11px; transform: rotate(45deg); border-radius: 2px; flex-shrink: 0; }
-.diamond-link { height: 2px; flex: 1; max-width: 64px; }
 
 /* ── Question page ─────────────────────────────────────────────────────── */
 .qpage { max-width: 1040px; margin: 0 auto; position: relative; }
@@ -1326,12 +1322,8 @@ body { overscroll-behavior-y: none; }
   .pill-opt, .set-menu-item, .acct-menu-item, .editor-tool, .ink-tool, .user-chip { min-height: 44px; }
   .editor-tool, .ink-tool { padding: 0 12px; }
 
-  /* .home-card-x is already absolutely positioned, so it is its own containing
-     block; the other two need to become one. All three need to be raised, or
-     the hit area is painted under the text that follows them in the card. */
-  .chip-x, .genbar-toggle { position: relative; }
-  .chip-x, .home-card-x, .genbar-toggle { z-index: 1; }
-  .chip-x::after, .home-card-x::after, .genbar-toggle::after {
+  .chip-x, .genbar-toggle { position: relative; z-index: 1; }
+  .chip-x::after, .genbar-toggle::after {
     content: ''; position: absolute; left: 50%; top: 50%;
     width: 44px; height: 44px; transform: translate(-50%, -50%);
   }
@@ -1797,154 +1789,10 @@ h3 { font-size: 17px; line-height: 1.3; }
 }
 
 /* ── KALP-04 · Home daily learning command centre ───────────────────────── */
-.home-command {
-  width: min(780px, 100%);
-  margin-top: clamp(28px, 4.5vh, 48px);
-  padding: clamp(22px, 3.4vw, 34px);
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: clamp(20px, 4vw, 42px);
-  border: 1px solid var(--hairline);
-  border-radius: 22px;
-  background: linear-gradient(145deg, color-mix(in srgb, var(--surface) 92%, var(--brand) 8%), var(--surface));
-  box-shadow: 0 18px 50px color-mix(in srgb, var(--ink) 8%, transparent);
-}
-.home-command-copy { min-width: 0; max-width: 590px; }
-.home-command-kicker {
-  margin-bottom: 9px;
-  color: var(--brand);
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: .12em;
-  text-transform: uppercase;
-}
-.home-command h2 {
-  margin: 0;
-  max-width: 18ch;
-  font-size: clamp(27px, 3.6vw, 42px);
-  line-height: 1.05;
-  letter-spacing: -.035em;
-}
-.home-command p {
-  margin: 13px 0 0;
-  max-width: 62ch;
-  color: var(--ink-2);
-  font-size: 14.5px;
-  line-height: 1.55;
-}
-.home-command-cta {
-  flex: 0 0 auto;
-  min-height: 48px;
-  padding-inline: 22px;
-  font-size: 15px;
-}
-.home-cloud-note {
-  width: min(780px, 100%);
-  margin-top: 10px;
-  padding: 9px 13px;
-  border: 1px solid var(--hairline);
-  border-radius: 10px;
-  color: var(--ink-2);
-  font-size: 12.5px;
-  line-height: 1.45;
-  background: var(--surface);
-}
-.home-support-grid {
-  width: min(960px, 100%);
-  margin-top: 16px;
-  display: grid;
-  grid-template-columns: minmax(0, 1.2fr) repeat(2, minmax(0, .9fr));
-  gap: 12px;
-  align-items: stretch;
-}
-.home-support-grid > .home-card,
-.home-support-action {
-  max-width: none !important;
-  min-width: 0;
-  padding: 16px;
-  border: 1px solid var(--hairline);
-  border-radius: 15px;
-  background: var(--surface);
-}
-.home-support-grid .goal-card.compact {
-  border-right: 1px solid var(--hairline);
-}
-.home-support-grid .goal-card.compact .goal-ring {
-  transform: scale(.88);
-  transform-origin: center;
-}
-.home-support-action {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-}
-.home-support-action strong {
-  display: block;
-  margin-top: 6px;
-  font-size: 15px;
-  line-height: 1.35;
-}
-.home-support-action p {
-  flex: 1;
-  margin: 7px 0 13px;
-  color: var(--ink-2);
-  font-size: 12.5px;
-  line-height: 1.45;
-}
-.home-manual {
-  width: min(760px, 100%);
-  margin-top: clamp(34px, 5vh, 54px);
-  text-align: left;
-}
-.home-manual h2 {
-  margin: 0;
-  font-size: clamp(18px, 2vw, 22px);
-  letter-spacing: -.015em;
-}
-.home-manual p {
-  margin: 5px 0 0;
-  color: var(--ink-3);
-  font-size: 13px;
-  line-height: 1.45;
-}
-.home-manual + .genbar {
-  width: min(760px, 100%);
-  margin-top: 12px;
-}
-@media (max-width: 920px) {
-  .home-command {
-    align-items: stretch;
-    flex-direction: column;
-    gap: 18px;
-  }
-  .home-command h2 { max-width: 24ch; }
-  .home-command-cta { align-self: flex-start; }
-  .home-support-grid {
-    grid-template-columns: 1fr 1fr;
-  }
-  .home-support-grid > :first-child { grid-column: 1 / -1; }
-}
-@media (max-width: 640px) {
-  .home-wrap { padding-top: 20px; }
-  .home-tagline { min-height: 22px; }
-  .home-command {
-    margin-top: 22px;
-    padding: 20px;
-    border-radius: 18px;
-  }
-  .home-command h2 { font-size: clamp(25px, 8vw, 34px); }
-  .home-command-cta { width: 100%; }
-  .home-support-grid { grid-template-columns: 1fr; }
-  .home-support-grid > :first-child { grid-column: auto; }
-  .home-manual { margin-top: 32px; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .home-command,
-  .home-support-action,
-  .home-command-cta {
-    scroll-behavior: auto;
-    transition: none !important;
-    animation: none !important;
-  }
-}
+.home-command {width:min(780px,100%);margin-top:clamp(28px,4.5vh,48px);display:flex;align-items:flex-end;justify-content:space-between;gap:28px}
+.home-command-kicker{margin-bottom:9px;color:var(--brand);font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase}
+.home-command h2{max-width:18ch;font-size:clamp(27px,3.6vw,42px);line-height:1.05}.home-command p{margin:13px 0 0;color:var(--ink-2);font-size:14.5px}.home-command-cta{flex:none;min-height:48px}
+.home-cloud-note{width:min(780px,100%);margin-top:10px;font-size:12.5px}.home-support-grid{margin-top:16px}
+.home-manual{width:min(760px,100%);margin-top:clamp(34px,5vh,54px);text-align:left}.home-manual h2{font-size:clamp(18px,2vw,22px)}.home-manual+.genbar{margin-top:12px}
+@media (max-width: 640px){.home-command{align-items:stretch;flex-direction:column}.home-command-cta{width:100%}.home-manual{margin-top:32px}}
+@media (prefers-reduced-motion: reduce){.home-command{transition:none!important;animation:none!important}}

@@ -116,7 +116,6 @@ const SAME_IN_BOTH = new Map([
   ['common.percent', 'a number and a percent sign; there is nothing in it to translate'],
   ['common.none', 'an em dash standing in for "no value"'],
   ['home.difficultyChip', 'D1–D4 is the app’s own shorthand and is read as a code, not a word'],
-  ['home.recentVerdict', 'two slots and a dash; both slots are themselves translated'],
   ['verdict.modeTypeGlyph', 'the letter drawn on the type-mode tab; ट is a different letter, not a translation'],
   ['verdict.enterKey', 'the legend printed on the physical key, which says Enter in India too'],
 ]);
