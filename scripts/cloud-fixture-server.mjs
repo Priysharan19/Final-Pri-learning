@@ -12,6 +12,8 @@
 //   node scripts/cloud-fixture-server.mjs [--port 4310] [--host 10.0.2.2|127.0.0.1] [--out fixture.env]
 // --host is how the device reaches this machine: 10.0.2.2 from the Android
 // emulator (the default), 127.0.0.1 from an iOS simulator.
+// --db <file> --restart starts the server again on an existing fixture
+// database (offline → reconnect journeys) without creating anything.
 // The server keeps running (detached); its log is written next to the DB.
 // ─────────────────────────────────────────────────────────────────────────────
 import { spawn } from 'node:child_process';
@@ -26,8 +28,10 @@ const arg = name => { const i = process.argv.indexOf(`--${name}`); return i > 0 
 const port = Number(arg('port') || 4310);
 const deviceHost = arg('host') || '10.0.2.2';
 if (!['10.0.2.2', '127.0.0.1', 'localhost'].includes(deviceHost)) { console.error('--host must be 10.0.2.2, 127.0.0.1 or localhost'); process.exit(2); }
-const dir = mkdtempSync(join(tmpdir(), 'pri-android-cloud-'));
-const dbPath = join(dir, 'platform.db');
+const restart = process.argv.includes('--restart');
+const dbPath = arg('db') || join(mkdtempSync(join(tmpdir(), 'pri-native-cloud-')), 'platform.db');
+const dir = dirname(dbPath);
+if (restart && !arg('db')) { console.error('--restart needs --db <file>'); process.exit(2); }
 const log = openSync(join(dir, 'server.log'), 'a');
 
 const child = spawn(process.execPath, [join(ROOT, 'server/index.js')], {
@@ -45,7 +49,14 @@ for (let i = 0; ; i++) {
   await new Promise(r => setTimeout(r, 500));
 }
 
-const email = `android-${Date.now()}@example.test`;
+if (restart) {
+  console.log(`Real Pri server restarted on ${base} (pid ${child.pid}) with ${dbPath}. SYNTHETIC TEST FIXTURE.`);
+  const out = arg('out');
+  if (out) writeFileSync(out, `PRI_CLOUD_SERVER_PID=${child.pid}\n`);
+  process.exit(0);
+}
+
+const email = `native-${Date.now()}@example.test`;
 const password = `Fixture-${randomBytes(9).toString('base64url')}`;
 const res = await fetch(`${base}/v1/account/register`, {
   method: 'POST',
@@ -61,7 +72,10 @@ db.close();
 if (changed !== 1) { console.error('could not mark the fixture account verified'); process.exit(1); }
 
 // 10.0.2.2 is the Android emulator's alias for this machine's loopback.
-const env = `PRI_CLOUD_ORIGIN=http://${deviceHost}:${port}\nPRI_CLOUD_EMAIL=${email}\nPRI_CLOUD_PASSWORD=${password}\nPRI_CLOUD_SERVER_PID=${child.pid}\nPRI_CLOUD_SERVER_LOG=${join(dir, 'server.log')}\n`;
+// A second, never-registered credential for sign-up journeys.
+const newEmail = `native-new-${Date.now()}@example.test`;
+const newPassword = `Fixture-${randomBytes(9).toString('base64url')}`;
+const env = `PRI_CLOUD_ORIGIN=http://${deviceHost}:${port}\nPRI_CLOUD_EMAIL=${email}\nPRI_CLOUD_PASSWORD=${password}\nPRI_CLOUD_NEW_EMAIL=${newEmail}\nPRI_CLOUD_NEW_PASSWORD=${newPassword}\nPRI_CLOUD_DB=${dbPath}\nPRI_CLOUD_PORT=${port}\nPRI_CLOUD_SERVER_PID=${child.pid}\nPRI_CLOUD_SERVER_LOG=${join(dir, 'server.log')}\n`;
 const out = arg('out');
 if (out) writeFileSync(out, env);
 console.log(`Real Pri server on ${base} (pid ${child.pid}); fixture account ${email} (verified). SYNTHETIC TEST FIXTURE.`);

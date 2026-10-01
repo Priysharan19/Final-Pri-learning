@@ -19,6 +19,10 @@ import WebKit
 enum JourneySelfCheck {
     static var phase: String? {
         let args = ProcessInfo.processInfo.arguments
+        if args.contains("--journey-cloud-signup") { return "cloudSignUp" }
+        if args.contains("--journey-offline") { return "offline" }
+        if args.contains("--journey-background") { return "background" }
+        if args.contains("--journey-a11y") { return "a11y" }
         if args.contains("--journey-cloud-relaunch") { return "cloudRelaunch" }
         if args.contains("--journey-cloud") { return "cloud" }
         if args.contains("--journey-dynamic-type") { return "dynamicType" }
@@ -199,13 +203,154 @@ enum JourneySelfCheck {
     return JSON.stringify(steps);
     """
 
-    // After a relaunch the session (URLSession cookie storage) is still there;
-    // Disconnect logs out and forgets it.
+    // Sign up through Settings, sign in, then permanently delete the account
+    // (password + typed DELETE). Uses a fresh, never-registered email.
+    private static let cloudSignUp = cloudHelpers + """
+    const signIn = async (e, p) => {
+      byText('Sign in')?.click();
+      setValue(await waitFor(() => q('#cloud-email')), e); setValue(q('#cloud-password'), p); await sleep(150);
+      q('#cloud-email').form.querySelector('button[type=submit]').click();
+    };
+    await step('cloudSignUp', async () => {
+      at = 'home'; await home(); await settings();
+      at = 'state'; await waitFor(() => stateTag() === 'Not connected');
+      (await waitFor(() => byText('Create account'))).click();
+      setValue(await waitFor(() => q('#cloud-name')), 'Journey Adult');
+      setValue(q('#cloud-email'), newEmail); setValue(q('#cloud-password'), newPassword);
+      const boxes = [...q('#cloud-email').form.querySelectorAll('input[type=checkbox]')];
+      for (const b of boxes) if (!b.checked) { b.click(); await sleep(120); }
+      q('#cloud-email').form.querySelector('button[type=submit]').click();
+      at = 'linked'; await waitFor(() => /Linked|Connected/.test(stateTag()), 30000);
+      return stateTag();
+    });
+    await step('cloudLogin', async () => {
+      if (stateTag() !== 'Connected') {
+        (await waitFor(() => byText('Disconnect'))).click();
+        await waitFor(() => stateTag() === 'Not connected', 20000);
+        await signIn(newEmail, newPassword);
+        await waitFor(() => stateTag() === 'Connected', 30000);
+      }
+      return 'connected as the new account';
+    });
+    await step('cloudDeleteAccount', async () => {
+      setValue(await waitFor(() => q('#cloud-delete-password')), newPassword);
+      setValue(q('#cloud-delete-phrase'), 'DELETE'); await sleep(150);
+      q('#cloud-delete-phrase').form.querySelector('button[type=submit]').click();
+      await waitFor(() => /Cloud account deleted/.test(document.body.innerText) && stateTag() === 'Not connected', 30000);
+      return 'deleted; offline profile kept';
+    });
+    return JSON.stringify(steps);
+    """
+
+    // The cloud server is unreachable: learning still works and Sync fails
+    // safely, keeping the local work.
+    private static let offline = cloudHelpers + """
+    await step('offlinePractice', async () => {
+      await home();
+      history.pushState({}, '', '/practice'); dispatchEvent(new PopStateEvent('popstate'));
+      await waitFor(() => q('.q-prompt'));
+      return 'practice works offline';
+    });
+    await step('offlineSyncSafe', async () => {
+      await settings();
+      // Unreachable is "offline", not "sign in again", and work stays local.
+      await waitFor(() => stateTag() === 'Linked · offline', 60000);
+      const note = await waitFor(() => q('[data-cloud-offline]'));
+      const sync = byText('Sync now');
+      if (sync && !sync.disabled) throw new Error('Sync offered while offline');
+      return stateTag() + ' · ' + (note.innerText || '').slice(0, 60);
+    });
+    return JSON.stringify(steps);
+    """
+
+    // Backgrounded by another app and brought back: the page saw the
+    // lifecycle and an unsent typed answer is still there.
+    private static let background = cloudHelpers + """
+    await step('backgroundDraftKept', async () => {
+      await home();
+      const log = [];
+      document.addEventListener('visibilitychange', () => log.push(document.visibilityState));
+      // The shell's own lifecycle events (priBridge envelope), alongside the
+      // page's visibility — either proves the app went away and came back.
+      const prior = window.__priNativeReceive;
+      window.__priNativeReceive = m => {
+        try { if (m && m.event === 'lifecycle.state') log.push(m.payload?.state === 'background' ? 'hidden' : m.payload?.state === 'active' ? 'visible' : 'inactive'); } catch (e) {}
+        if (prior) prior(m);
+      };
+      history.pushState({}, '', '/practice'); dispatchEvent(new PopStateEvent('popstate'));
+      await waitFor(() => q('.q-prompt'));
+      let input = null;
+      for (let i = 0; i < 12 && !input; i++) {
+        const t = byLabel('Answer by typing'); if (t) { t.click(); await sleep(250); }
+        input = q('.editor-body input.answer-input');
+        if (!input) { q('.ctx-next')?.click(); await sleep(900); }
+      }
+      if (!input) throw new Error('no typed question');
+      setValue(input, 'x+42');
+      // The runner now switches to another app and back (it allows ~20 s for setup).
+      try { await waitFor(() => log.includes('hidden') && log[log.length - 1] === 'visible', 90000); }
+      finally { window.__priNativeReceive = prior; }
+      const kept = (q('.editor-body input.answer-input') || {}).value;
+      if (kept !== 'x+42') throw new Error('draft lost: ' + kept);
+      return 'lifecycle ' + log.join('>') + ', draft kept';
+    });
+    return JSON.stringify(steps);
+    """
+
+    // DOM-level accessibility smoke inside the real WKWebView: names, labels,
+    // language, headings, tab order and touch-target size. VoiceOver itself
+    // remains a physical gate.
+    private static let a11y = cloudHelpers + """
+    const visible = el => !!(el.offsetParent || el.getClientRects().length) && getComputedStyle(el).visibility !== 'hidden';
+    const nameOf = el => (el.getAttribute('aria-label') || el.getAttribute('title') || el.textContent || el.getAttribute('alt') || el.value || '').trim()
+      || (el.getAttribute('aria-labelledby') || '').split(/\\s+/).map(id => document.getElementById(id)?.textContent || '').join(' ').trim();
+    function audit(where) {
+      const problems = [];
+      if (!document.documentElement.lang) problems.push('no lang');
+      for (const el of document.querySelectorAll('button, a[href], [role=button]')) {
+        if (visible(el) && !nameOf(el)) problems.push(where + ': unnamed ' + el.tagName + '.' + el.className);
+      }
+      for (const el of document.querySelectorAll('input:not([type=hidden]), select, textarea')) {
+        if (!visible(el)) continue;
+        const labelled = el.getAttribute('aria-label') || el.getAttribute('aria-labelledby') || (el.id && document.querySelector('label[for="' + el.id + '"]')) || el.closest('label');
+        if (!labelled) problems.push(where + ': unlabelled ' + (el.id || el.name || el.type));
+      }
+      for (const el of document.querySelectorAll('[tabindex]')) if (Number(el.getAttribute('tabindex')) > 0) problems.push(where + ': positive tabindex');
+      for (const el of document.querySelectorAll('img')) if (visible(el) && !el.hasAttribute('alt')) problems.push(where + ': img without alt');
+      if (!document.querySelector('h1, h2, [role=heading]')) problems.push(where + ': no heading');
+      for (const el of document.querySelectorAll('.btn, .mobilenav button, .mobilenav a')) {
+        if (!visible(el)) continue;
+        const r = el.getBoundingClientRect();
+        if (r.height < 43.5 && r.width > 0) problems.push(where + ': small target ' + Math.round(r.height) + 'px ' + nameOf(el).slice(0, 20));
+      }
+      return problems;
+    }
+    await step('a11yAudit', async () => {
+      await home();
+      const all = [];
+      for (const path of ['/', '/practice', '/progress', '/settings']) {
+        history.pushState({}, '', path); dispatchEvent(new PopStateEvent('popstate'));
+        await sleep(1000);
+        all.push(...audit(path));
+      }
+      if (all.length) throw new Error(all.slice(0, 6).join(' | '));
+      return '4 screens: names, labels, lang, headings, tab order, 44px targets';
+    });
+    return JSON.stringify(steps);
+    """
+
+    // After a relaunch (and the server coming back) the session is still
+    // there and syncs again; Disconnect logs out and forgets it.
     private static let cloudRelaunch = cloudHelpers + """
     await step('cloudSessionKept', async () => {
       await home(); await settings();
       await waitFor(() => stateTag() === 'Connected', 30000);
       return 'connected after relaunch';
+    });
+    await step('cloudReconnectSync', async () => {
+      (await waitFor(() => byText('Sync now'))).click();
+      const done = await waitFor(() => { const t = q('section[aria-labelledby="cloud-account-title"]').innerText; const m = t.match(/Sync complete[^\\n]*/); return m && m[0]; }, 60000);
+      return done;
     });
     await step('cloudDisconnect', async () => {
       (await waitFor(() => byText('Disconnect'))).click();
@@ -231,7 +376,14 @@ enum JourneySelfCheck {
         await sleep(900);
         const o = overflow();
         seen.push(path + ':' + o);
-        if (o > 1) throw new Error('horizontal overflow ' + seen.join(' '));
+        if (o > 1) {
+          // Name the widest offenders so the failure is actionable.
+          const wide = [...document.querySelectorAll('body *')].map(el => [el, el.getBoundingClientRect()])
+            .filter(([el, r]) => r.right > window.innerWidth + 1 && r.width > 0)
+            .sort((a, b) => b[1].right - a[1].right).slice(0, 4)
+            .map(([el, r]) => el.tagName.toLowerCase() + '.' + String(el.className || '').split(' ').slice(0, 2).join('.') + '@' + Math.round(r.right));
+          throw new Error('horizontal overflow ' + seen.join(' ') + ' offenders ' + wide.join(' '));
+        }
       }
       return seen.join(' ');
     });
@@ -248,12 +400,18 @@ enum JourneySelfCheck {
         case "cloud": script = cloud
         case "cloudRelaunch": script = cloudRelaunch
         case "dynamicType": script = dynamicType
+        case "cloudSignUp": script = cloudSignUp
+        case "offline": script = offline
+        case "background": script = background
+        case "a11y": script = a11y
         default: script = firstLaunch
         }
         let env = ProcessInfo.processInfo.environment
         let arguments: [String: Any] = [
             "email": env["PRI_JOURNEY_EMAIL"] ?? "",
-            "password": env["PRI_JOURNEY_PASSWORD"] ?? ""
+            "password": env["PRI_JOURNEY_PASSWORD"] ?? "",
+            "newEmail": env["PRI_JOURNEY_NEW_EMAIL"] ?? "",
+            "newPassword": env["PRI_JOURNEY_NEW_PASSWORD"] ?? ""
         ]
         webView.callAsyncJavaScript(script, arguments: arguments, in: nil, in: .page) { result in
             switch result {

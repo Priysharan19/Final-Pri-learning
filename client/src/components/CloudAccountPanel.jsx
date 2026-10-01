@@ -392,7 +392,9 @@ export default function CloudAccountPanel() {
   const stateLabel = useMemo(() => {
     if (!link?.accountId) return 'Not connected';
     if (!enabled) return 'Linked locally · cloud endpoint unavailable';
-    if (!session?.connected) return 'Linked · sign-in required';
+    // Only the server saying "signed out" (401) means sign in again; an
+    // unreachable server is offline, and the student's work is safe locally.
+    if (!session?.connected) return session?.reason === 'signed-out' || session?.reason === 'not-verified' ? 'Linked · sign-in required' : 'Linked · offline';
     return 'Connected';
   }, [link, enabled, session]);
 
@@ -427,6 +429,11 @@ export default function CloudAccountPanel() {
           email we sent them, and the <a href="/privacy" target="_blank" rel="noreferrer">privacy notice</a> sets
           out what an account sends.
         </p>
+      )}
+      {enabled && link?.accountId && stateLabel === 'Linked · offline' && (
+        <div role="status" className="muted" data-cloud-offline style={{ marginTop: 12, fontSize: 13 }}>
+          Pri Learning can’t reach the cloud right now. Practice keeps working, everything is saved on this device, and it syncs when you’re back online.
+        </div>
       )}
       {enabled && !link?.accountId && <form onSubmit={submit} style={{ marginTop: 16 }}>
         <div className="row" style={{ gap: 8, marginBottom: 12 }}>
