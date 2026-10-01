@@ -1,0 +1,116 @@
+{
+  "schemaVersion": 1,
+  "startingDurableState": {
+    "chapterQuestionOccurrences": 2212,
+    "appendixQuestionOccurrences": 36,
+    "sourceQuestionOccurrences": 2248,
+    "missingChapterIdentities": 135,
+    "appendixOutsideChapterExtractor": 36,
+    "totalUnrepresentedOccurrences": 171
+  },
+  "finalState": {
+    "chapterQuestionOccurrences": 2206,
+    "appendixQuestionOccurrences": 36,
+    "sourceQuestionOccurrences": 2242,
+    "completelyUnlocatedOccurrences": 0
+  },
+  "previous171GapsResolved": {
+    "chapterRecoveredCandidates": 128,
+    "chapterStructuralCountArtefacts": 7,
+    "appendixLocatedPendingTranscription": 36,
+    "total": 171
+  },
+  "structuralCountArtefacts": [
+    [
+      2,
+      3,
+      3
+    ],
+    [
+      3,
+      5,
+      10
+    ],
+    [
+      3,
+      5,
+      11
+    ],
+    [
+      3,
+      5,
+      12
+    ],
+    [
+      15,
+      5,
+      2
+    ],
+    [
+      15,
+      5,
+      3
+    ],
+    [
+      19,
+      3,
+      4
+    ]
+  ],
+  "resolvedExtraneousIdentities": [
+    {
+      "identity": [
+        10,
+        3,
+        3
+      ],
+      "resolution": "legitimate-source-question-structural-undercount",
+      "canonicalIdentity": [
+        10,
+        3,
+        3
+      ],
+      "sourcePdfPage": 237
+    },
+    {
+      "identity": [
+        25,
+        1,
+        5
+      ],
+      "resolution": "incorrect-topic-assignment",
+      "canonicalIdentity": [
+        25,
+        2,
+        5
+      ],
+      "sameSourceCrop": true,
+      "samePromptSha256": true,
+      "sourcePdfPage": 558
+    },
+    {
+      "identity": [
+        25,
+        1,
+        6
+      ],
+      "resolution": "incorrect-topic-assignment",
+      "canonicalIdentity": [
+        25,
+        2,
+        6
+      ],
+      "sameSourceCrop": true,
+      "samePromptSha256": true,
+      "sourcePdfPage": 558
+    }
+  ],
+  "appendixLocatorArtifact": "docs/jee-41y/APPENDIX_2019_LOCATORS.json",
+  "questionInventorySha256": "351271cb135ff22e1998657921a409f176815f5ca012a3ab4219fa1d60fe359b",
+  "deterministicGapRecovery": true,
+  "idempotentRerun": true,
+  "rights": {
+    "rawQuestionTextIncluded": false,
+    "rawSourceCommitted": false
+  }
+}

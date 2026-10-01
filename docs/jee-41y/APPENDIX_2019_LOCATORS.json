@@ -1,0 +1,735 @@
+{
+  "schemaVersion": 1,
+  "appendixId": "jee-advanced-2019-solved-paper",
+  "questionOccurrences": 36,
+  "paperQuestionCounts": [
+    18,
+    18
+  ],
+  "locators": [
+    {
+      "appendixId": "jee-advanced-2019-solved-paper",
+      "paper": 1,
+      "question": 1,
+      "pdfPage": 608,
+      "printedPage": null,
+      "side": "left",
+      "marker": {
+        "token": "1.",
+        "bbox": [
+          71.26658630371094,
+          411.1053161621094,
+          79.6849136352539,
+          421.1053161621094
+        ]
+      },
+      "sourceTextNeighbourhoodSha256": "131b6802e33ff1ae8346e2da214c1b00256c11a9a1df191df412eedfd01bd1bf",
+      "reason": "appendix-outside-chapter-extractor",
+      "reviewStatus": "GAP_LOCATED_PENDING_TRANSCRIPTION"
+    },
+    {
+      "appendixId": "jee-advanced-2019-solved-paper",
+      "paper": 1,
+      "question": 2,
+      "pdfPage": 608,
+      "printedPage": null,
+      "side": "left",
+      "marker": {
+        "token": "2.",
+        "bbox": [
+          71.2659912109375,
+          543.001953125,
+          79.68431854248047,
+          553.001953125
+        ]
+      },
+      "sourceTextNeighbourhoodSha256": "1b3c8fd0627604a06d0b8fc1132c213e0646dec4a4e9be8e35f19ab6c2f4d44e",
+      "reason": "appendix-outside-chapter-extractor",
+      "reviewStatus": "GAP_LOCATED_PENDING_TRANSCRIPTION"
+    },
+    {
+      "appendixId": "jee-advanced-2019-solved-paper",
+      "paper": 1,
+      "question": 3,
+      "pdfPage": 608,
+      "printedPage": null,
+      "side": "right",
+      "marker": {
+        "token": "3.",
+        "bbox": [
+          341.2671203613281,
+          456.6421203613281,
+          349.6854553222656,
+          466.6421203613281
+        ]
+      },
+      "sourceTextNeighbourhoodSha256": "fc07c68cf3117276d70ad84f22e41ceabe57e615cb27df7f97f120d10d9b6055",
+      "reason": "appendix-outside-chapter-extractor",
+      "reviewStatus": "GAP_LOCATED_PENDING_TRANSCRIPTION"
+    },
+    {
+      "appendixId": "jee-advanced-2019-solved-paper",
+      "paper": 1,
+      "question": 4,
+      "pdfPage": 608,
+      "printedPage": null,
+      "side": "right",
+      "marker": {
+        "token": "4.",
+        "bbox": [
+          341.26727294921875,
+          546.1107788085938,
+          349.68560791015625,
+          556.1107788085938
+        ]
+      },
+      "sourceTextNeighbourhoodSha256": "66e675e79963e93406cefed83f76de598dba8dab5ab6e006d9600dbe0e24df9e",
+      "reason": "appendix-outside-chapter-extractor",
+      "reviewStatus": "GAP_LOCATED_PENDING_TRANSCRIPTION"
+    },
+    {
+      "appendixId": "jee-advanced-2019-solved-paper",
+      "paper": 1,
+      "question": 5,
+      "pdfPage": 609,
+      "printedPage": null,
+      "side": "left",
+      "marker": {
+        "token": "5.",
+        "bbox": [
+          71.26658630371094,
+          403.7264404296875,
+          79.68482971191406,
+          413.726318359375
+        ]
+      },
+      "sourceTextNeighbourhoodSha256": "a64c9a73cb36fa5aa575150f587e77dc4ea67f2d394d63cce0914c83257d3a6d",
+      "reason": "appendix-outside-chapter-extractor",
+      "reviewStatus": "GAP_LOCATED_PENDING_TRANSCRIPTION"
+    },
+    {
+      "appendixId": "jee-advanced-2019-solved-paper",
+      "paper": 1,
+      "question": 6,
+      "pdfPage": 609,
+      "printedPage": null,
+      "side": "left",
+      "marker": {
+        "token": "6.",
+        "bbox": [
+          71.26667785644531,
+          570.3287353515625,
+          79.68492126464844,
+          580.32861328125
+        ]
+      },
+      "sourceTextNeighbourhoodSha256": "26f7aeba3007827ed74bae44aa914be54a289c7fecb59e8931db779bf484ee7a",
+      "reason": "appendix-outside-chapter-extractor",
+      "reviewStatus": "GAP_LOCATED_PENDING_TRANSCRIPTION"
+    },
+    {
+      "appendixId": "jee-advanced-2019-solved-paper",
+      "paper": 1,
+      "question": 7,
+      "pdfPage": 609,
+      "printedPage": null,
+      "side": "right",
+      "marker": {
+        "token": "7.",
+        "bbox": [
+          341.2668762207031,
+          481.97515869140625,
+          349.68511962890625,
+          491.97503662109375
+        ]
+      },
+      "sourceTextNeighbourhoodSha256": "62529d0fc80c205f3cb54aed5034a12672a8a6c727d0cd6862b6f9f7a6f002fa",
+      "reason": "appendix-outside-chapter-extractor",
+      "reviewStatus": "GAP_LOCATED_PENDING_TRANSCRIPTION"
+    },
+    {
+      "appendixId": "jee-advanced-2019-solved-paper",
+      "paper": 1,
+      "question": 8,
+      "pdfPage": 609,
+      "printedPage": null,
+      "side": "right",
+      "marker": {
+        "token": "8.",
+        "bbox": [
+          341.2657165527344,
+          667.0662841796875,
+          349.6839599609375,
+          677.066162109375
+        ]
+      },
+      "sourceTextNeighbourhoodSha256": "2f97ec4b1e95678e0c5bcc21147821e2ed5cf702fbe7bde1401a1d09d5a32144",
+      "reason": "appendix-outside-chapter-extractor",
+      "reviewStatus": "GAP_LOCATED_PENDING_TRANSCRIPTION"
+    },
+    {
+      "appendixId": "jee-advanced-2019-solved-paper",
+      "paper": 1,
+      "question": 9,
+      "pdfPage": 610,
+      "printedPage": null,
+      "side": "left",
+      "marker": {
+        "token": "9.",
+        "bbox": [
+          71.26681518554688,
+          203.95457458496094,
+          79.68505859375,
+          213.9544677734375
+        ]
+      },
+      "sourceTextNeighbourhoodSha256": "5eb4cc4ea52d93c901229985bf38188617ab38e39f499a79fae56a6e186a309c",
+      "reason": "appendix-outside-chapter-extractor",
+      "reviewStatus": "GAP_LOCATED_PENDING_TRANSCRIPTION"
+    },
+    {
+      "appendixId": "jee-advanced-2019-solved-paper",
+      "paper": 1,
+      "question": 10,
+      "pdfPage": 610,
+      "printedPage": null,
+      "side": "left",
+      "marker": {
+        "token": "10.",
+        "bbox": [
+          65.6988296508789,
+          382.0660400390625,
+          79.68488311767578,
+          392.0659484863281
+        ]
+      },
+      "sourceTextNeighbourhoodSha256": "530348cef553135fd5fe95177b6fc5595c38a753136669aa4946a1930bf52f44",
+      "reason": "appendix-outside-chapter-extractor",
+      "reviewStatus": "GAP_LOCATED_PENDING_TRANSCRIPTION"
+    },
+    {
+      "appendixId": "jee-advanced-2019-solved-paper",
+      "paper": 1,
+      "question": 11,
+      "pdfPage": 610,
+      "printedPage": null,
+      "side": "right",
+      "marker": {
+        "token": "11.",
+        "bbox": [
+          335.698486328125,
+          214.40660095214844,
+          349.68408203125,
+          224.406494140625
+        ]
+      },
+      "sourceTextNeighbourhoodSha256": "82e40ef5f1138d9bf4250ae24873f235f6d25dff9e85cee090f7d9efb2700ddd",
+      "reason": "appendix-outside-chapter-extractor",
+      "reviewStatus": "GAP_LOCATED_PENDING_TRANSCRIPTION"
+    },
+    {
+      "appendixId": "jee-advanced-2019-solved-paper",
+      "paper": 1,
+      "question": 12,
+      "pdfPage": 610,
+      "printedPage": null,
+      "side": "right",
+      "marker": {
+        "token": "12.",
+        "bbox": [
+          335.69873046875,
+          359.95904541015625,
+          349.684326171875,
+          369.95892333984375
+        ]
+      },
+      "sourceTextNeighbourhoodSha256": "e482fd018db1b33f59406e5f6e78ba83423919eb66e40e9bb5c59a3c9d32699e",
+      "reason": "appendix-outside-chapter-extractor",
+      "reviewStatus": "GAP_LOCATED_PENDING_TRANSCRIPTION"
+    },
+    {
+      "appendixId": "jee-advanced-2019-solved-paper",
+      "paper": 1,
+      "question": 13,
+      "pdfPage": 610,
+      "printedPage": null,
+      "side": "left",
+      "marker": {
+        "token": "13.",
+        "bbox": [
+          65.69783020019531,
+          643.7764892578125,
+          79.68389129638672,
+          653.7763671875
+        ]
+      },
+      "sourceTextNeighbourhoodSha256": "d928f82741ad9a47c7e612c9a823ea354da66f3e59979ff5273d44427608e600",
+      "reason": "appendix-outside-chapter-extractor",
+      "reviewStatus": "GAP_LOCATED_PENDING_TRANSCRIPTION"
+    },
+    {
+      "appendixId": "jee-advanced-2019-solved-paper",
+      "paper": 1,
+      "question": 14,
+      "pdfPage": 610,
+      "printedPage": null,
+      "side": "right",
+      "marker": {
+        "token": "14.",
+        "bbox": [
+          335.6988830566406,
+          643.7771606445312,
+          349.6844787597656,
+          653.7770385742188
+        ]
+      },
+      "sourceTextNeighbourhoodSha256": "d55fb666f000f6d42a065d2bedb994e3b4f6ea12caa5a0f1b265d8905e15824b",
+      "reason": "appendix-outside-chapter-extractor",
+      "reviewStatus": "GAP_LOCATED_PENDING_TRANSCRIPTION"
+    },
+    {
+      "appendixId": "jee-advanced-2019-solved-paper",
+      "paper": 1,
+      "question": 15,
+      "pdfPage": 611,
+      "printedPage": null,
+      "side": "left",
+      "marker": {
+        "token": "15.",
+        "bbox": [
+          65.69868469238281,
+          100.59757995605469,
+          79.68474578857422,
+          110.59747314453125
+        ]
+      },
+      "sourceTextNeighbourhoodSha256": "940d66ea2c75b9c7e4462213573fb9d985c354d67e2e0e4d5973c10d41a307a4",
+      "reason": "appendix-outside-chapter-extractor",
+      "reviewStatus": "GAP_LOCATED_PENDING_TRANSCRIPTION"
+    },
+    {
+      "appendixId": "jee-advanced-2019-solved-paper",
+      "paper": 1,
+      "question": 16,
+      "pdfPage": 611,
+      "printedPage": null,
+      "side": "left",
+      "marker": {
+        "token": "16.",
+        "bbox": [
+          65.69904327392578,
+          149.7310028076172,
+          79.68509674072266,
+          159.73089599609375
+        ]
+      },
+      "sourceTextNeighbourhoodSha256": "4a80decaa743dd4b82aeace3133175e27c010d1449a045b56b939174182f319a",
+      "reason": "appendix-outside-chapter-extractor",
+      "reviewStatus": "GAP_LOCATED_PENDING_TRANSCRIPTION"
+    },
+    {
+      "appendixId": "jee-advanced-2019-solved-paper",
+      "paper": 1,
+      "question": 17,
+      "pdfPage": 611,
+      "printedPage": null,
+      "side": "left",
+      "marker": {
+        "token": "17.",
+        "bbox": [
+          65.69878387451172,
+          198.11717224121094,
+          79.6848373413086,
+          208.1170654296875
+        ]
+      },
+      "sourceTextNeighbourhoodSha256": "80906cfa8f3db0eb5cc8cffb9bbcb4c818c080d7e180344c20eb359522aee459",
+      "reason": "appendix-outside-chapter-extractor",
+      "reviewStatus": "GAP_LOCATED_PENDING_TRANSCRIPTION"
+    },
+    {
+      "appendixId": "jee-advanced-2019-solved-paper",
+      "paper": 1,
+      "question": 18,
+      "pdfPage": 611,
+      "printedPage": null,
+      "side": "right",
+      "marker": {
+        "token": "18.",
+        "bbox": [
+          335.6983642578125,
+          173.5641326904297,
+          349.6839599609375,
+          183.56402587890625
+        ]
+      },
+      "sourceTextNeighbourhoodSha256": "0a3e2d1d1e7d9ec3f26dc705d58cc4855e7b6e5983508085ea6ef09aee1f8de6",
+      "reason": "appendix-outside-chapter-extractor",
+      "reviewStatus": "GAP_LOCATED_PENDING_TRANSCRIPTION"
+    },
+    {
+      "appendixId": "jee-advanced-2019-solved-paper",
+      "paper": 2,
+      "question": 1,
+      "pdfPage": 611,
+      "printedPage": null,
+      "side": "left",
+      "marker": {
+        "token": "1.",
+        "bbox": [
+          71.26658630371094,
+          549.998291015625,
+          79.68482971191406,
+          559.9981689453125
+        ]
+      },
+      "sourceTextNeighbourhoodSha256": "f9db12834a8921423492817a225e93f8c094d256f424950150e47b48f76211c5",
+      "reason": "appendix-outside-chapter-extractor",
+      "reviewStatus": "GAP_LOCATED_PENDING_TRANSCRIPTION"
+    },
+    {
+      "appendixId": "jee-advanced-2019-solved-paper",
+      "paper": 2,
+      "question": 2,
+      "pdfPage": 611,
+      "printedPage": null,
+      "side": "left",
+      "marker": {
+        "token": "2.",
+        "bbox": [
+          71.26661682128906,
+          732.5386962890625,
+          79.68486785888672,
+          742.53857421875
+        ]
+      },
+      "sourceTextNeighbourhoodSha256": "cf15f49a0527730176bf823dfbafa6e210983e2f24db43156f9696247e743454",
+      "reason": "appendix-outside-chapter-extractor",
+      "reviewStatus": "GAP_LOCATED_PENDING_TRANSCRIPTION"
+    },
+    {
+      "appendixId": "jee-advanced-2019-solved-paper",
+      "paper": 2,
+      "question": 3,
+      "pdfPage": 611,
+      "printedPage": null,
+      "side": "right",
+      "marker": {
+        "token": "3.",
+        "bbox": [
+          341.265869140625,
+          641.3530883789062,
+          349.6841125488281,
+          651.3529663085938
+        ]
+      },
+      "sourceTextNeighbourhoodSha256": "9cb455fceea00401991de6b08708745e0b54491f0390163ce03ba1e9f61b2181",
+      "reason": "appendix-outside-chapter-extractor",
+      "reviewStatus": "GAP_LOCATED_PENDING_TRANSCRIPTION"
+    },
+    {
+      "appendixId": "jee-advanced-2019-solved-paper",
+      "paper": 2,
+      "question": 4,
+      "pdfPage": 612,
+      "printedPage": null,
+      "side": "left",
+      "marker": {
+        "token": "4.",
+        "bbox": [
+          71.26664733886719,
+          120.39707946777344,
+          79.68489074707031,
+          130.39697265625
+        ]
+      },
+      "sourceTextNeighbourhoodSha256": "7497cb59cbcd0d7f5c6f69d290d14abc0d94a5d8a76e75f704f1ca032d577ed0",
+      "reason": "appendix-outside-chapter-extractor",
+      "reviewStatus": "GAP_LOCATED_PENDING_TRANSCRIPTION"
+    },
+    {
+      "appendixId": "jee-advanced-2019-solved-paper",
+      "paper": 2,
+      "question": 5,
+      "pdfPage": 612,
+      "printedPage": null,
+      "side": "left",
+      "marker": {
+        "token": "5.",
+        "bbox": [
+          71.26622009277344,
+          220.82212829589844,
+          79.68446350097656,
+          230.822021484375
+        ]
+      },
+      "sourceTextNeighbourhoodSha256": "58a2e0aa8181b74b81d5b14c86e057f4b05dd6d9c02d06bddfc23033deb3694c",
+      "reason": "appendix-outside-chapter-extractor",
+      "reviewStatus": "GAP_LOCATED_PENDING_TRANSCRIPTION"
+    },
+    {
+      "appendixId": "jee-advanced-2019-solved-paper",
+      "paper": 2,
+      "question": 6,
+      "pdfPage": 612,
+      "printedPage": null,
+      "side": "left",
+      "marker": {
+        "token": "6.",
+        "bbox": [
+          71.26618957519531,
+          327.05108642578125,
+          79.68443298339844,
+          337.05096435546875
+        ]
+      },
+      "sourceTextNeighbourhoodSha256": "c90add100e05ba3763d3444a77ff973da8f2313290da5afbbf6b81112b710b79",
+      "reason": "appendix-outside-chapter-extractor",
+      "reviewStatus": "GAP_LOCATED_PENDING_TRANSCRIPTION"
+    },
+    {
+      "appendixId": "jee-advanced-2019-solved-paper",
+      "paper": 2,
+      "question": 7,
+      "pdfPage": 612,
+      "printedPage": null,
+      "side": "left",
+      "marker": {
+        "token": "7.",
+        "bbox": [
+          71.26670837402344,
+          460.4962158203125,
+          79.6849594116211,
+          470.4961242675781
+        ]
+      },
+      "sourceTextNeighbourhoodSha256": "74c031c10efa33ba7d2225b0f5f77fd1dadb826c0ca3c6afed6ea54e9a644374",
+      "reason": "appendix-outside-chapter-extractor",
+      "reviewStatus": "GAP_LOCATED_PENDING_TRANSCRIPTION"
+    },
+    {
+      "appendixId": "jee-advanced-2019-solved-paper",
+      "paper": 2,
+      "question": 8,
+      "pdfPage": 612,
+      "printedPage": null,
+      "side": "right",
+      "marker": {
+        "token": "8.",
+        "bbox": [
+          341.267333984375,
+          259.624267578125,
+          349.6855773925781,
+          269.6241455078125
+        ]
+      },
+      "sourceTextNeighbourhoodSha256": "b7d5867f8f4e869d3286c4efc3be3fdc2709cbe9ab13411b3c88c372b6492325",
+      "reason": "appendix-outside-chapter-extractor",
+      "reviewStatus": "GAP_LOCATED_PENDING_TRANSCRIPTION"
+    },
+    {
+      "appendixId": "jee-advanced-2019-solved-paper",
+      "paper": 2,
+      "question": 9,
+      "pdfPage": 612,
+      "printedPage": null,
+      "side": "left",
+      "marker": {
+        "token": "9.",
+        "bbox": [
+          71.26597595214844,
+          679.04931640625,
+          79.68421936035156,
+          689.0491943359375
+        ]
+      },
+      "sourceTextNeighbourhoodSha256": "c1bac3625c5343c88a6694706b5a40a974185065c5615cf0244783a0c78a0e13",
+      "reason": "appendix-outside-chapter-extractor",
+      "reviewStatus": "GAP_LOCATED_PENDING_TRANSCRIPTION"
+    },
+    {
+      "appendixId": "jee-advanced-2019-solved-paper",
+      "paper": 2,
+      "question": 10,
+      "pdfPage": 612,
+      "printedPage": null,
+      "side": "right",
+      "marker": {
+        "token": "10.",
+        "bbox": [
+          335.6985778808594,
+          679.0479125976562,
+          349.6841735839844,
+          689.0477905273438
+        ]
+      },
+      "sourceTextNeighbourhoodSha256": "3e433ffb3d6958d88d0d5cef70800ea1938e4154578cd4ca7de5f2dcaef35772",
+      "reason": "appendix-outside-chapter-extractor",
+      "reviewStatus": "GAP_LOCATED_PENDING_TRANSCRIPTION"
+    },
+    {
+      "appendixId": "jee-advanced-2019-solved-paper",
+      "paper": 2,
+      "question": 11,
+      "pdfPage": 613,
+      "printedPage": null,
+      "side": "left",
+      "marker": {
+        "token": "11.",
+        "bbox": [
+          65.69868469238281,
+          120.72056579589844,
+          79.68474578857422,
+          130.720458984375
+        ]
+      },
+      "sourceTextNeighbourhoodSha256": "7ed289d1d4e90e7aafa227030b91653c94af3cb96c7ad2a48526ebbae279d7f2",
+      "reason": "appendix-outside-chapter-extractor",
+      "reviewStatus": "GAP_LOCATED_PENDING_TRANSCRIPTION"
+    },
+    {
+      "appendixId": "jee-advanced-2019-solved-paper",
+      "paper": 2,
+      "question": 12,
+      "pdfPage": 613,
+      "printedPage": null,
+      "side": "left",
+      "marker": {
+        "token": "12.",
+        "bbox": [
+          65.69798278808594,
+          189.99034118652344,
+          79.68404388427734,
+          199.990234375
+        ]
+      },
+      "sourceTextNeighbourhoodSha256": "78a2b1fff16c2a8996e16ac9c0b88bca38b37716ef7f4c6c9b2d318e254554f4",
+      "reason": "appendix-outside-chapter-extractor",
+      "reviewStatus": "GAP_LOCATED_PENDING_TRANSCRIPTION"
+    },
+    {
+      "appendixId": "jee-advanced-2019-solved-paper",
+      "paper": 2,
+      "question": 13,
+      "pdfPage": 613,
+      "printedPage": null,
+      "side": "right",
+      "marker": {
+        "token": "13.",
+        "bbox": [
+          335.69854736328125,
+          100.59739685058594,
+          349.68414306640625,
+          110.5972900390625
+        ]
+      },
+      "sourceTextNeighbourhoodSha256": "aba90df7d7a2a8b9dc523387b24614db39e15bb9be445b5a4ff58a13ea4870b0",
+      "reason": "appendix-outside-chapter-extractor",
+      "reviewStatus": "GAP_LOCATED_PENDING_TRANSCRIPTION"
+    },
+    {
+      "appendixId": "jee-advanced-2019-solved-paper",
+      "paper": 2,
+      "question": 14,
+      "pdfPage": 613,
+      "printedPage": null,
+      "side": "right",
+      "marker": {
+        "token": "14.",
+        "bbox": [
+          335.6991882324219,
+          154.17137145996094,
+          349.6847839355469,
+          164.1712646484375
+        ]
+      },
+      "sourceTextNeighbourhoodSha256": "d95c6867cd07535dbb2e80be30dc268ea5467b1dc976c59ed4ee3997f6503e5e",
+      "reason": "appendix-outside-chapter-extractor",
+      "reviewStatus": "GAP_LOCATED_PENDING_TRANSCRIPTION"
+    },
+    {
+      "appendixId": "jee-advanced-2019-solved-paper",
+      "paper": 2,
+      "question": 15,
+      "pdfPage": 613,
+      "printedPage": null,
+      "side": "left",
+      "marker": {
+        "token": "15.",
+        "bbox": [
+          65.69910430908203,
+          474.69708251953125,
+          79.6851577758789,
+          484.6969909667969
+        ]
+      },
+      "sourceTextNeighbourhoodSha256": "b94d54c2817aa1803be4a22bc9f3c40f65134f7128268f14f7830fee8c3aa9d1",
+      "reason": "appendix-outside-chapter-extractor",
+      "reviewStatus": "GAP_LOCATED_PENDING_TRANSCRIPTION"
+    },
+    {
+      "appendixId": "jee-advanced-2019-solved-paper",
+      "paper": 2,
+      "question": 16,
+      "pdfPage": 613,
+      "printedPage": null,
+      "side": "right",
+      "marker": {
+        "token": "16.",
+        "bbox": [
+          335.6988830566406,
+          448.69732666015625,
+          349.6844787597656,
+          458.69720458984375
+        ]
+      },
+      "sourceTextNeighbourhoodSha256": "63e4fbcbebe39ec48a99bfba7d8b3cb7371e8eb9080f6a52ce81ec9f1dae4426",
+      "reason": "appendix-outside-chapter-extractor",
+      "reviewStatus": "GAP_LOCATED_PENDING_TRANSCRIPTION"
+    },
+    {
+      "appendixId": "jee-advanced-2019-solved-paper",
+      "paper": 2,
+      "question": 17,
+      "pdfPage": 614,
+      "printedPage": null,
+      "side": "left",
+      "marker": {
+        "token": "17.",
+        "bbox": [
+          65.69868469238281,
+          100.59757995605469,
+          79.68474578857422,
+          110.59747314453125
+        ]
+      },
+      "sourceTextNeighbourhoodSha256": "30b20947a09d3f28de750fdb449b15c7a26a046205f68385009eeb298b7dc68b",
+      "reason": "appendix-outside-chapter-extractor",
+      "reviewStatus": "GAP_LOCATED_PENDING_TRANSCRIPTION"
+    },
+    {
+      "appendixId": "jee-advanced-2019-solved-paper",
+      "paper": 2,
+      "question": 18,
+      "pdfPage": 614,
+      "printedPage": null,
+      "side": "right",
+      "marker": {
+        "token": "18.",
+        "bbox": [
+          335.6988830566406,
+          100.59745788574219,
+          349.6844787597656,
+          110.59735107421875
+        ]
+      },
+      "sourceTextNeighbourhoodSha256": "2c932a5bbd1a8cb51ee9ee482cbf772487746740c71dafb9173a9b246f89ceee",
+      "reason": "appendix-outside-chapter-extractor",
+      "reviewStatus": "GAP_LOCATED_PENDING_TRANSCRIPTION"
+    }
+  ],
+  "rights": {
+    "rawQuestionTextIncluded": false,
+    "rawSourceCommitted": false
+  }
+}

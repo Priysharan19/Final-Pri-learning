@@ -28,20 +28,20 @@
       "solutions": 431
     },
     "chapters": 26,
-    "chapterQuestionOccurrences": 2212,
+    "chapterQuestionOccurrences": 2206,
     "appendixQuestionOccurrences": 36,
-    "sourceQuestionOccurrences": 2248,
-    "draftRecords": 2086,
+    "sourceQuestionOccurrences": 2242,
+    "draftRecords": 2206,
     "approvedRecords": 0,
     "recordsWithAnswers": 0,
     "recordsWithWorkedSteps": 0,
     "tracks": {
-      "jee-main": 604,
-      "jee-advanced": 1295,
-      "unresolved": 187
+      "jee-main": 632,
+      "jee-advanced": 1378,
+      "unresolved": 196
     },
     "answerTypes": {
-      "selfcheck": 2086
+      "selfcheck": 2206
     }
   },
   "chapters": [
@@ -60,7 +60,7 @@
       "questionPageCount": 7,
       "answerBookPage": 8,
       "solutionBookPageStart": 8,
-      "extractedDraftRecords": 109,
+      "extractedDraftRecords": 110,
       "extractedTopics": 5,
       "structuralQuestionCounts": {
         "1": 10,
@@ -103,7 +103,7 @@
       "questionPageCount": 6,
       "answerBookPage": 32,
       "solutionBookPageStart": 33,
-      "extractedDraftRecords": 93,
+      "extractedDraftRecords": 95,
       "extractedTopics": 5,
       "structuralQuestionCounts": {
         "1": 58,
@@ -115,12 +115,19 @@
       "reconciledQuestionCounts": {
         "1": 58,
         "2": 5,
-        "3": 3,
+        "3": 2,
         "4": 12,
         "5": 18
       },
-      "expectedQuestionOccurrences": 96,
-      "countOverrides": [],
+      "expectedQuestionOccurrences": 95,
+      "countOverrides": [
+        {
+          "chapter": 2,
+          "topic": 3,
+          "count": 2,
+          "evidence": "source PDF page 39 shows Topic 3 questions 1-2 only; answer key PDF page 41 confirms 1-2"
+        }
+      ],
       "candidateQuestionPages": [
         36,
         37,
@@ -146,7 +153,7 @@
       "questionPageCount": 7,
       "answerBookPage": 54,
       "solutionBookPageStart": 54,
-      "extractedDraftRecords": 101,
+      "extractedDraftRecords": 104,
       "extractedTopics": 6,
       "structuralQuestionCounts": {
         "1": 7,
@@ -161,16 +168,16 @@
         "2": 24,
         "3": 16,
         "4": 14,
-        "5": 12,
+        "5": 9,
         "6": 34
       },
-      "expectedQuestionOccurrences": 107,
+      "expectedQuestionOccurrences": 104,
       "countOverrides": [
         {
           "chapter": 3,
           "topic": 5,
-          "count": 12,
-          "evidence": "answer key on PDF page 63 explicitly reaches question 12"
+          "count": 9,
+          "evidence": "source PDF pages 60-61 show Topic 5 questions 1-9 before Topic 6 begins; prior answer-key-based count 12 was a layout misread"
         }
       ],
       "candidateQuestionPages": [
@@ -197,7 +204,7 @@
       "questionPageCount": 5,
       "answerBookPage": 76,
       "solutionBookPageStart": 76,
-      "extractedDraftRecords": 59,
+      "extractedDraftRecords": 60,
       "extractedTopics": 5,
       "structuralQuestionCounts": {
         "1": 7,
@@ -242,7 +249,7 @@
       "questionPageCount": 3,
       "answerBookPage": 87,
       "solutionBookPageStart": 87,
-      "extractedDraftRecords": 56,
+      "extractedDraftRecords": 58,
       "extractedTopics": 2,
       "structuralQuestionCounts": {
         "1": 38,
@@ -279,7 +286,7 @@
       "questionPageCount": 10,
       "answerBookPage": 106,
       "solutionBookPageStart": 107,
-      "extractedDraftRecords": 124,
+      "extractedDraftRecords": 137,
       "extractedTopics": 5,
       "structuralQuestionCounts": {
         "1": 29,
@@ -328,7 +335,7 @@
       "questionPageCount": 9,
       "answerBookPage": 135,
       "solutionBookPageStart": 136,
-      "extractedDraftRecords": 104,
+      "extractedDraftRecords": 120,
       "extractedTopics": 4,
       "structuralQuestionCounts": {
         "1": 21,
@@ -370,7 +377,7 @@
       "questionPageCount": 5,
       "answerBookPage": 165,
       "solutionBookPageStart": 165,
-      "extractedDraftRecords": 64,
+      "extractedDraftRecords": 66,
       "extractedTopics": 4,
       "structuralQuestionCounts": {
         "1": 17,
@@ -416,7 +423,7 @@
       "questionPageCount": 13,
       "answerBookPage": 188,
       "solutionBookPageStart": 189,
-      "extractedDraftRecords": 166,
+      "extractedDraftRecords": 192,
       "extractedTopics": 8,
       "structuralQuestionCounts": {
         "1": 36,
@@ -484,11 +491,18 @@
       "reconciledQuestionCounts": {
         "1": 22,
         "2": 32,
-        "3": 2,
+        "3": 3,
         "4": 69
       },
-      "expectedQuestionOccurrences": 125,
-      "countOverrides": [],
+      "expectedQuestionOccurrences": 126,
+      "countOverrides": [
+        {
+          "chapter": 10,
+          "topic": 3,
+          "count": 3,
+          "evidence": "source PDF page 237 shows Topic 3 questions 1-3; question 3 is the Analytical & Descriptive question before Topic 4"
+        }
+      ],
       "candidateQuestionPages": [
         234,
         235,
@@ -513,7 +527,7 @@
       "questionPageCount": 4,
       "answerBookPage": 266,
       "solutionBookPageStart": 267,
-      "extractedDraftRecords": 47,
+      "extractedDraftRecords": 50,
       "extractedTopics": 4,
       "structuralQuestionCounts": {
         "1": 29,
@@ -553,7 +567,7 @@
       "questionPageCount": 8,
       "answerBookPage": 285,
       "solutionBookPageStart": 286,
-      "extractedDraftRecords": 116,
+      "extractedDraftRecords": 125,
       "extractedTopics": 4,
       "structuralQuestionCounts": {
         "1": 91,
@@ -593,7 +607,7 @@
       "questionPageCount": 4,
       "answerBookPage": 315,
       "solutionBookPageStart": 315,
-      "extractedDraftRecords": 63,
+      "extractedDraftRecords": 70,
       "extractedTopics": 2,
       "structuralQuestionCounts": {
         "1": 10,
@@ -609,7 +623,7 @@
           "chapter": 13,
           "topic": 1,
           "count": 15,
-          "evidence": "answer key on PDF page 324 explicitly reaches question 15"
+          "evidence": "source PDF pages 320-321 and answer key PDF page 324 explicitly reach question 15"
         }
       ],
       "candidateQuestionPages": [
@@ -673,7 +687,7 @@
       "questionPageCount": 7,
       "answerBookPage": 364,
       "solutionBookPageStart": 364,
-      "extractedDraftRecords": 95,
+      "extractedDraftRecords": 96,
       "extractedTopics": 5,
       "structuralQuestionCounts": {
         "1": 70,
@@ -687,10 +701,17 @@
         "2": 8,
         "3": 14,
         "4": 3,
-        "5": 3
+        "5": 1
       },
-      "expectedQuestionOccurrences": 98,
-      "countOverrides": [],
+      "expectedQuestionOccurrences": 96,
+      "countOverrides": [
+        {
+          "chapter": 15,
+          "topic": 5,
+          "count": 1,
+          "evidence": "source/answer boundary PDF page 373 shows Topic 5 question 1 only; answer key confirms question 1 only"
+        }
+      ],
       "candidateQuestionPages": [
         367,
         368,
@@ -761,7 +782,7 @@
       "questionPageCount": 5,
       "answerBookPage": 421,
       "solutionBookPageStart": 421,
-      "extractedDraftRecords": 51,
+      "extractedDraftRecords": 58,
       "extractedTopics": 4,
       "structuralQuestionCounts": {
         "1": 14,
@@ -798,7 +819,7 @@
       "questionPageCount": 4,
       "answerBookPage": 438,
       "solutionBookPageStart": 438,
-      "extractedDraftRecords": 38,
+      "extractedDraftRecords": 40,
       "extractedTopics": 3,
       "structuralQuestionCounts": {
         "1": 14,
@@ -831,7 +852,7 @@
       "questionPageCount": 3,
       "answerBookPage": 453,
       "solutionBookPageStart": 453,
-      "extractedDraftRecords": 33,
+      "extractedDraftRecords": 36,
       "extractedTopics": 3,
       "structuralQuestionCounts": {
         "1": 18,
@@ -841,10 +862,17 @@
       "reconciledQuestionCounts": {
         "1": 18,
         "2": 15,
-        "3": 4
+        "3": 3
       },
-      "expectedQuestionOccurrences": 37,
-      "countOverrides": [],
+      "expectedQuestionOccurrences": 36,
+      "countOverrides": [
+        {
+          "chapter": 19,
+          "topic": 3,
+          "count": 3,
+          "evidence": "source PDF page 461 shows Topic 3 questions 1-3 only; answer key PDF page 462 confirms 1-3"
+        }
+      ],
       "candidateQuestionPages": [
         459,
         460,
@@ -864,7 +892,7 @@
       "questionPageCount": 4,
       "answerBookPage": 464,
       "solutionBookPageStart": 464,
-      "extractedDraftRecords": 44,
+      "extractedDraftRecords": 52,
       "extractedTopics": 4,
       "structuralQuestionCounts": {
         "1": 29,
@@ -933,7 +961,7 @@
       "questionPageCount": 3,
       "answerBookPage": 490,
       "solutionBookPageStart": 491,
-      "extractedDraftRecords": 28,
+      "extractedDraftRecords": 29,
       "extractedTopics": 3,
       "structuralQuestionCounts": {
         "1": 2,
@@ -966,7 +994,7 @@
       "questionPageCount": 4,
       "answerBookPage": 502,
       "solutionBookPageStart": 502,
-      "extractedDraftRecords": 60,
+      "extractedDraftRecords": 61,
       "extractedTopics": 3,
       "structuralQuestionCounts": {
         "1": 24,
@@ -1005,7 +1033,7 @@
       "questionPageCount": 9,
       "answerBookPage": 527,
       "solutionBookPageStart": 528,
-      "extractedDraftRecords": 109,
+      "extractedDraftRecords": 119,
       "extractedTopics": 5,
       "structuralQuestionCounts": {
         "1": 33,
@@ -1050,7 +1078,7 @@
       "questionPageCount": 6,
       "answerBookPage": 554,
       "solutionBookPageStart": 555,
-      "extractedDraftRecords": 75,
+      "extractedDraftRecords": 77,
       "extractedTopics": 3,
       "structuralQuestionCounts": {
         "1": 1,
@@ -1068,13 +1096,13 @@
           "chapter": 25,
           "topic": 2,
           "count": 9,
-          "evidence": "answer key on PDF page 563 explicitly reaches question 9"
+          "evidence": "source PDF page 558 shows Topic 2 questions 1-9 across columns; answer key PDF page 563 confirms 1-9"
         },
         {
           "chapter": 25,
           "topic": 3,
           "count": 67,
-          "evidence": "answer key on PDF page 563 explicitly reaches question 67"
+          "evidence": "source PDF pages 559-563 and answer key PDF page 563 reach question 67"
         }
       ],
       "candidateQuestionPages": [
@@ -5443,8 +5471,8 @@
     }
   ],
   "queue": {
-    "path": "tools/jee-question-department/work/review-queue-recovered-v2.jsonl",
-    "sha256": "bed66a81214a281fad3042d3da4d30b5c74fb0b26943c6b304c342beaa932a43",
+    "path": "tools/jee-question-department/work/question-inventory-final.jsonl",
+    "sha256": "351271cb135ff22e1998657921a409f176815f5ca012a3ab4219fa1d60fe359b",
     "note": "Queue path is local/ignored; report contains metadata only."
   }
 }
