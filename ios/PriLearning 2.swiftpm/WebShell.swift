@@ -235,6 +235,14 @@ struct WebShell: UIViewRepresentable {
             host.documentDidStart()
         }
 
+        private var bridgeSelfCheckRan = false
+        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+            // Simulator/CI only: prove the bridge contract inside real WebKit.
+            guard BridgeSelfCheck.requested, !bridgeSelfCheckRan else { return }
+            bridgeSelfCheckRan = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) { BridgeSelfCheck.run(in: webView) }
+        }
+
         // ── Navigation policy ──
         func webView(_ webView: WKWebView,
                      decidePolicyFor navigationAction: WKNavigationAction,
