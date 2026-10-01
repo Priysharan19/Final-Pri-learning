@@ -18,7 +18,8 @@ This is the durable ledger for CP-02 → CP-12 and SEC-COMM-01. Each CP's own PR
 | CP | Status | Starting `main` | Final candidate | PR | Merge SHA | Physical |
 |---|---|---|---|---|---|---|
 | CP-01 Architecture audit | COMPLETE | `421f1ff1` | `1291d4bd` | [#250](https://github.com/Priysharan19/Final-Pri-learning/pull/250) | `fa1c44df` | n/a (audit) |
-| CP-02 Platform Bridge Foundation | SOFTWARE IMPLEMENTATION: COMPLETE once merged (see notes) | `fa1c44df` | recorded by CP-03 | this PR | recorded by CP-03 | DEFERRED |
+| CP-02 Platform Bridge Foundation | SOFTWARE IMPLEMENTATION: COMPLETE | `fa1c44df` | `f089d550` | [#253](https://github.com/Priysharan19/Final-Pri-learning/pull/253) | `2261f03b` | DEFERRED |
+| CP-03 Responsive Product Foundation | SOFTWARE IMPLEMENTATION: COMPLETE once merged | `2261f03b` | recorded by CP-04 | this PR | recorded by CP-04 | DEFERRED |
 
 ## CP-02 — Platform Bridge Foundation
 
@@ -53,3 +54,60 @@ This is the durable ledger for CP-02 → CP-12 and SEC-COMM-01. Each CP's own PR
 **Deferred (physical):** iPad + Apple Pencil smoke (write → recognise → submit; StoreKit sandbox restore), because Swift bridge code changed. No iPad release containing this Swift change ships until that smoke is recorded.
 
 **Not in CP-02 scope (by design):** ink, photo, billing and cloud stay on their legacy Apple handlers during the migration window. The contract defines their envelope ops for Android (CP-07/CP-08). Apple-specific user copy ("Apple Pencil") moves to capability-driven copy in CP-04.
+
+**CP-02 exact-head evidence (recorded by CP-03):**
+- Candidate `f089d550` (after merging `main` @ `487cfac0`).
+- Clean-worktree `npm test`: exit 0 across 70 suites. That includes the engine 1704000/1704000, the architecture guard 268/268, the native host contract 76/76 and the install budget 47/47. The `test:hard` handwriting suite passed at 14/15 scenes; the one failing scene, which was already failing before CP-02, is within its threshold.
+- Also passing: fleet and mission-control validation, native package sync, the network boundary, the cloud account boundary, the native cloud/StoreKit boundaries, and the server native-origin CSRF check.
+- `check:ios`: asset parity 160/160 in both bundles. The local `release.json` difference came from a rebuild at a newer commit; the file is gitignored, and CI's build job passed `check:ios`.
+- GitHub CI on `f089d550`: 23 checks pass. That includes the macOS "Swift build, native benchmark and bridge smoke test" job, which runs the iPad simulator `--bridge-selfcheck`.
+- Merged as `2261f03b`. Verified on `main`: `client/src/platform/native/` is present, the guard passes, and there is no `android/` directory.
+
+## CP-03 — Responsive Product Foundation
+
+**Re-validated before implementing** (Chromium and WebKit, on the post-CP-02 code):
+
+| Finding | Result |
+|---|---|
+| Fixed 380 px writing area on a 360×640 phone | Confirmed |
+| Developer handwriting copy shown to students | Confirmed: the "legacy JS fallback" note, engine labels, and the Settings handwriting text |
+| No `inputMode`/`enterKeyHint` on answer boxes | Confirmed |
+| Settings menu overlay (mobile) | Confirmed. The single-column menu stayed `position: sticky` and covered controls, such as email edit. |
+| Next obstructed after answering | Confirmed and root-caused. At ≤820 px, Pri Explain's launcher grew to full width at `bottom: 82px`, over the Next pill at `bottom: 74px`. It only appears once a worked solution exists, which is why it was intermittent. |
+| Primary buttons too small for touch | Found by the matrix: `.btn` was 42 px on touch screens, because a later base rule beat the coarse-pointer rule |
+| Non-India progress overflow | **Not reproduced** (0 px at 360/390/430). Not changed. |
+
+**Delivered:**
+- `client/src/platform/formFactor.js`: COMPACT/MEDIUM/EXPANDED + SHORT from viewport and pointer only, plus `data-ff`/`data-short`/`data-pointer` on `<html>`.
+- A fitted handwriting area. EXPANDED and tall MEDIUM windows keep 380 px, so iPad is unchanged. Compact gets `height − 330`, never below 240.
+- Strokes are rescaled when the canvas width changes.
+- Diagnostics-only engine and fallback labels. "Read on the server" stays visible to students for privacy.
+- Student-appropriate copy in English and Hindi.
+- `inputMode="text"` + `enterKeyHint` on answer boxes. A numeric keypad would block expression answers.
+- The Settings menu is static once the grid collapses.
+- The Explain launcher is lifted clear of the Next pill, and the content gets bottom room for the pill.
+- 44 px coarse-pointer targets, including `.btn`.
+- Toasts span the screen width on phones.
+- The top bar's height includes the status-bar inset.
+- `dvh` for full-height surfaces, a SHORT layout for auth, and hover-only effects neutralised on touch.
+- `client/test/e2e.mjs --browser=webkit`.
+
+**Tests (S1, synthetic browser evidence):**
+- `client/test/tour-responsive-matrix.js`: **121/121 in Chromium and 121/121 in WebKit**, across 360×640, 390×844, 430×932, 820×1180, 1180×820 and 844×390. It covers:
+  - overflow on 7 routes;
+  - classification and navigation;
+  - a question that offers handwriting and typing;
+  - the writing area fitting (or keeping 380 px on iPad);
+  - synthetic strokes;
+  - no developer copy;
+  - keyboard attributes;
+  - submit reachable;
+  - Next uncovered after answering;
+  - the launcher clear of Next;
+  - 44 px targets;
+  - Settings controls uncovered.
+- Run against the CP-02 build, the same matrix **fails 28 checks**, which shows it detects every defect fixed here.
+- `client/test/form-factor-check.mjs`: 27/27.
+- Existing phone and KALP tours pass unchanged: phone 53/53, KALP-01 24/24, KALP-02 68/68, KALP-03 53/53.
+
+**Deferred (physical):** real-device keyboard behaviour, notch/safe-area rendering in an installed web app, and touch feel on small phones.
