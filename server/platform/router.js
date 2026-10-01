@@ -1,4 +1,5 @@
 import { asyncRouter } from './asyncRouter.js';
+import { clientCompatibility } from './clientCompatibility.js';
 import { googleNotificationBacklog } from './googleBilling.js';
 import { asStore } from './store.js';
 import { createAccountRouter } from './accounts.js';
@@ -34,6 +35,9 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
     res.set('X-Frame-Options', 'DENY');
     next();
   });
+
+  // Old native shells get a structured upgrade answer, not odd failures (CP-11).
+  router.use(clientCompatibility());
 
   router.get('/health', async (req, res) => {
     const config = platformConfigStatus();

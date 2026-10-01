@@ -57,6 +57,8 @@ jobs:
         run: ./gradlew --no-daemon assembleDebug lintDebug testDebugUnitTest
       - name: Embedded web is exactly the shared build
         run: node scripts/sync-android.mjs --check
+      - name: Cross-platform release matrix (CP-11)
+        run: node scripts/release-matrix.mjs --require-native-android
       - uses: actions/upload-artifact@v4
         if: always()
         with:

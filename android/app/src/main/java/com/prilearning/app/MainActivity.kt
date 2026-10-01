@@ -112,7 +112,7 @@ class MainActivity : ComponentActivity() {
         )
         val store = SecureStore(this)
         val jar = CookieJar().apply { load(store.read()) }
-        val nativeCloud = NativeCloud(origin, jar, persist = { store.write(it) })
+        val nativeCloud = NativeCloud(origin, jar, persist = { store.write(it) }, shellBuild = BuildConfig.VERSION_CODE.toString())
         cloud = nativeCloud
         val descriptor = HostDescriptor.json(
             HostDescriptor.Shell(BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE.toString(), BuildConfig.APPLICATION_ID),

@@ -99,6 +99,10 @@ final class NativeCloudBridge {
         request.httpShouldHandleCookies = true
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.setValue("ios-native-v1", forHTTPHeaderField: "X-Pri-Client")
+        // The server's compatibility floor (CP-11) compares this build number.
+        if let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String, Self.safeHeader(build) {
+            request.setValue(build, forHTTPHeaderField: "X-Pri-Shell-Build")
+        }
 
         if let rid = body["requestId"] as? String, Self.safeHeader(rid) {
             request.setValue(rid, forHTTPHeaderField: "X-Pri-Request-Id")

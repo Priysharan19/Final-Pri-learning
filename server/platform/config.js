@@ -1,4 +1,5 @@
 import { isAbsolute } from 'node:path';
+import { compatibilityConfigProblems } from './clientCompatibility.js';
 import { googleBillingConfigStatus } from './googleBilling.js';
 import { spendCeilingMissing } from './spendCeiling.js';
 
@@ -289,6 +290,8 @@ export function platformConfigStatus() {
     if (!googleBilling.credentialsConfigured) missing.push('PRI_GOOGLE_SERVICE_ACCOUNT_JSON or PRI_GOOGLE_SERVICE_ACCOUNT_FILE');
     if (!googleBilling.notificationsConfigured) missing.push('PRI_GOOGLE_RTDN_AUDIENCE and PRI_GOOGLE_RTDN_SERVICE_ACCOUNT');
   }
+
+  if (production) missing.push(...compatibilityConfigProblems());
 
   const uniqueMissing = [...new Set(missing)];
   return Object.freeze({

@@ -34,6 +34,8 @@ class NativeCloud(
     private val persist: (String) -> Unit,
     private val executor: ExecutorService = Executors.newFixedThreadPool(4),
     private val open: (URL) -> HttpURLConnection = { it.openConnection() as HttpURLConnection },
+    /** versionCode, sent so the server's compatibility floor can ask for an update (CP-11). */
+    private val shellBuild: String? = null,
 ) {
     /** What a request produced, delivered on the executor thread. */
     sealed class Outcome {
@@ -113,6 +115,7 @@ class NativeCloud(
             conn.requestMethod = method
             conn.setRequestProperty("Accept", "application/json")
             conn.setRequestProperty("X-Pri-Client", CloudConfig.CLIENT_ID)
+            shellBuild?.takeIf { CloudConfig.safeHeader(it) }?.let { conn.setRequestProperty("X-Pri-Shell-Build", it) }
             jar.header(host, path, https)?.let { conn.setRequestProperty("Cookie", it) }
             if (method != "GET") jar.value(host, "pri_csrf")?.let { conn.setRequestProperty("X-Pri-CSRF", it) }
             requestId?.let { conn.setRequestProperty("X-Pri-Request-Id", it) }
