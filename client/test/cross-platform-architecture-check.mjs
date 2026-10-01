@@ -285,6 +285,29 @@ if (existsSync(at('android'))) {
     ok(/allowFileAccess = false/.test(kotlin) && /allowContentAccess = false/.test(kotlin) && /MIXED_CONTENT_NEVER_ALLOW/.test(kotlin),
       'the Android WebView is hardened (no file/content access, no mixed content)');
   }
+  // CP-07: the Android cloud transport keeps the session native and narrow.
+  const cloudPath = 'android/app/src/main/java/com/prilearning/app/cloud/NativeCloud.kt';
+  if (existsSync(at(cloudPath))) {
+    const cloudKt = read(cloudPath);
+    const cfg = read('android/app/src/main/java/com/prilearning/app/cloud/CloudConfig.kt');
+    ok(/const val CLIENT_ID = "android-native-v1"/.test(cfg) && /setRequestProperty\("X-Pri-Client", CloudConfig\.CLIENT_ID\)/.test(cloudKt),
+      'the Android cloud transport identifies itself as android-native-v1 (never as iOS)');
+    ok(!/ios-native-v1/.test(kotlin), 'no Android production code ever claims the iOS identity');
+    ok(/instanceFollowRedirects = false/.test(cloudKt), 'the Android cloud transport never follows a redirect (the session cannot be bounced to another host)');
+    ok(/private val PATH = Regex\("\^\/v1\/\[A-Za-z0-9\/_-\]\{1,180\}\$"\)/.test(cfg),
+      'Android accepts exactly the web transport\'s /v1 path rule — JavaScript never names a host');
+    ok(!/setRequestProperty\("(Origin|Sec-Fetch-[A-Za-z]+)"/.test(cloudKt), 'the Android cloud transport never sends Origin/Fetch Metadata');
+    ok(/if \(method != "GET"\) jar\.value\(host, "pri_csrf"\)/.test(cloudKt), 'every Android mutation carries the server-issued CSRF token');
+    ok(/AndroidKeyStore/.test(read('android/app/src/main/java/com/prilearning/app/cloud/SecureStore.kt')) &&
+      /noBackupFilesDir/.test(read('android/app/src/main/java/com/prilearning/app/cloud/SecureStore.kt')),
+      'the Android cookie jar is Keystore-encrypted in no-backup storage');
+    ok(!/networkSecurityConfig|cleartextTrafficPermitted="true"/.test(read('android/app/src/main/AndroidManifest.xml')) &&
+      /android:usesCleartextTraffic="false"/.test(read('android/app/src/main/AndroidManifest.xml')),
+      'release Android builds refuse cleartext (the local-server allowance exists only in src/debug)');
+    ok(/android:exported="false"/.test(read('android/app/src/main/AndroidManifest.xml').split('<provider')[1] || '') &&
+      !/<(external|root|files)-path/.test(read('android/app/src/main/res/xml/file_paths.xml')),
+      'the FileProvider is private and exposes only two cache subdirectories');
+  }
 }
 
 // ── 9 · No shell carries a server secret ─────────────────────────────────────

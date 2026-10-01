@@ -60,4 +60,5 @@ if [ -n "${PRI_CLOUD_ORIGIN:-}" ] && [ "$EXPECT" != "floor" ]; then
   summary="$summary, cloud sign-in + sync against the real server, session after process death, disconnect"
 fi
 adb logcat -d -s PRITEST > "$OUT/logcat.txt" || true
+[ -n "${PRI_CLOUD_SERVER_LOG:-}" ] && cp "$PRI_CLOUD_SERVER_LOG" "$OUT/server.log" 2>/dev/null || true
 echo "INSTRUMENTED: PASS — $summary (expect=$EXPECT)"
