@@ -207,7 +207,7 @@ for (const mod of ['index.js', 'host.js', 'bridge.js', 'envelope.js', 'errors.js
   ok(existsSync(at(`client/src/platform/native/${mod}`)), `the platform contract module ${mod} exists`);
 }
 const nativeIndex = existsSync(at('client/src/platform/native/index.js')) ? read('client/src/platform/native/index.js') : '';
-ok(/const INK_KEYS = new Set\(/.test(nativeIndex) && /if \(!inkMessageAllowed\(message\)\) return false;/.test(nativeIndex),
+ok(/const INK_KEYS = new Set\(/.test(nativeIndex) && /const safe = answerBlindInkMessage\(message\);\s*if \(!safe\) return false;\s*return getRuntime\(\)\.legacy\.ink\.post\(safe\);/.test(nativeIndex),
   'native ink messages pass an answer-blind key allowlist before they are posted');
 
 // ── 7 · Layout does not sniff the device ─────────────────────────────────────
