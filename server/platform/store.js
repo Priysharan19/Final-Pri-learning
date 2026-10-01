@@ -140,6 +140,8 @@ export class SqliteStore {
     this.raw = db;
     this.statements = new Map();
     this.active = null;
+    // Same shape as PostgresStore.stats; one connection never needs a retry.
+    this.stats = { transactions: 0, retries: 0 };
   }
 
   get open() { return !!this.raw.open; }
@@ -222,6 +224,7 @@ export class SqliteStore {
     while (this.active) await this.active.done;
     let release;
     this.active = { done: new Promise(resolve => { release = resolve; }) };
+    this.stats.transactions++;
     const tx = new SqliteTx(this, 0);
     try {
       this.raw.exec('BEGIN');
@@ -372,9 +375,12 @@ class PostgresTx {
 Object.assign(PostgresTx.prototype, dialectHelpers);
 
 export class PostgresStore {
-  constructor(pool, { schema = 'pri', ownsPool = true } = {}) {
+  constructor(pool, { schema = 'pri', ownsPool = true, maxAttempts = MAX_ATTEMPTS } = {}) {
     if (!SAFE_IDENTIFIER.test(String(schema))) throw storeError('STORE_SCHEMA_INVALID', 'Postgres schema name is invalid.');
     this.dialect = 'postgres';
+    this.maxAttempts = Math.max(1, Math.floor(Number(maxAttempts) || MAX_ATTEMPTS));
+    /** Counters for operators and tests: transactions begun, and re-runs after 40001/40P01. */
+    this.stats = { transactions: 0, retries: 0 };
     this.pool = pool;
     this.schema = schema;
     this.ownsPool = ownsPool;
@@ -388,8 +394,37 @@ export class PostgresStore {
     return context?.store === this ? context.tx : null;
   }
 
+  /**
+   * A pooled client whose session is ready: search_path set once, on first
+   * use, and awaited before any statement runs on it. (Setting it from the
+   * pool's 'connect' event raced the first query on the same client.)
+   */
+  async _client() {
+    const client = await this.pool.connect();
+    if (!client.__priSchema) {
+      try {
+        await client.query(`SET search_path TO ${this.schema}`);
+      } catch (error) {
+        client.release(error);
+        throw error;
+      }
+      client.__priSchema = this.schema;
+    }
+    return client;
+  }
+
   async #query(sql, params) {
-    return this.pool.query(toPostgresPlaceholders(sql), asParams(params));
+    const client = await this._client();
+    let broken;
+    try {
+      return await client.query(toPostgresPlaceholders(sql), asParams(params));
+    } catch (error) {
+      // A statement error leaves the session usable; a lost connection does not.
+      if (!error?.code || String(error.code).startsWith('08') || error.code === '57P01') broken = error;
+      throw error;
+    } finally {
+      client.release(broken);
+    }
   }
 
   async get(sql, params) {
@@ -413,14 +448,17 @@ export class PostgresStore {
   async exec(sql) {
     const tx = this.#joined();
     if (tx) return tx.exec(sql);
-    await this.pool.query(sql);
+    const client = await this._client();
+    try { await client.query(sql); } finally { client.release(); }
   }
 
   async transaction(fn, { readOnly = false } = {}) {
     const joined = this.#joined();
     if (joined) return joined.transaction(fn);
     for (let attempt = 1; ; attempt++) {
-      const client = await this.pool.connect();
+      if (attempt > 1) this.stats.retries++;
+      this.stats.transactions++;
+      const client = await this._client();
       const tx = new PostgresTx(this, client, 0, readOnly);
       let broken;
       try {
@@ -436,7 +474,7 @@ export class PostgresStore {
         // A client whose ROLLBACK fails is in an unknown state: destroy it
         // rather than hand it to the next request.
         try { await client.query('ROLLBACK'); } catch (rollbackError) { broken = rollbackError; }
-        if (!RETRYABLE.has(String(error?.code || '')) || attempt >= MAX_ATTEMPTS) throw error;
+        if (!RETRYABLE.has(String(error?.code || '')) || attempt >= this.maxAttempts) throw error;
       } finally {
         tx.closed = true;
         client.release(broken);
@@ -456,8 +494,8 @@ Object.assign(PostgresStore.prototype, dialectHelpers);
 export { platformDatabaseUrl, validPostgresUrl };
 
 /**
- * A pg Pool that sets search_path on every new connection and parses int8 as
- * Number. Use a direct or session-mode connection string: SERIALIZABLE
+ * A pg Pool that parses int8 as Number (PostgresStore sets each client's
+ * search_path before first use). Use a direct or session-mode connection string: SERIALIZABLE
  * transactions and the per-connection search_path both need a real session,
  * which a transaction-mode pooler does not give.
  */
@@ -472,10 +510,6 @@ export async function createPostgresPool(connectionString, { schema = 'pri', max
     connectionTimeoutMillis: 10_000,
     types: postgresTypes(pg.types),
     application_name: 'pri-learning-v1'
-  });
-  pool.on('connect', client => {
-    // Queued ahead of any query the pool hands this client to.
-    client.query(`SET search_path TO ${schema}`).catch(() => {});
   });
   // An idle client dropped by the server must not crash the process; the pool
   // discards it and the next query opens a fresh connection.
