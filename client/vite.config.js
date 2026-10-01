@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto';
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { resolveReleaseIdentity } from '../release/release-identity.mjs';
+import { LANGUAGES, DEFAULT_LANGUAGE } from './src/i18n/languages.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Chunking
@@ -49,6 +50,22 @@ import { resolveReleaseIdentity } from '../release/release-identity.mjs';
 // are over it, and raising the bar past them would only hide that.
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Every language other than English is a chunk of its own and stays out of
+// the install, by the argument made at the ON_DEMAND rule below. Both are
+// derived from the registration table, so adding a language is a catalogue and
+// one entry in i18n/languages.js — never a third edit here that could be
+// forgotten and quietly put a whole language back into every install.
+const TRANSLATED = LANGUAGES.filter(l => l.id !== DEFAULT_LANGUAGE);
+const TRANSLATION_CHUNKS = TRANSLATED.map(l => ({
+  name: `i18n-${l.id}`,
+  test: new RegExp(`/src/i18n/strings\\.${l.id}\\.js$`),
+  priority: 40
+}));
+const TRANSLATION_ON_DEMAND = TRANSLATED.map(l => [
+  new RegExp(`(^|/)i18n-${l.id}-[^/]*\\.js$`),
+  `${l.english} string catalogue`
+]);
+
 // Exported so client/test/i18n-check.mjs can assert against the rules the
 // build actually uses, rather than a second copy that would drift.
 export const CHUNK_GROUPS = [
@@ -62,7 +79,9 @@ export const CHUNK_GROUPS = [
   // them by name and leave them out of the install, and so the i18n contract
   // suite can assert that it did. Only the data is split — i18n/index.js stays
   // in the entry, because the runtime has to be there to decide a language.
-  { name: 'i18n-hi', test: /\/src\/i18n\/strings\.hi\.js$/, priority: 40 },
+  // One group per registered language (see TRANSLATION_CHUNKS below), so a
+  // language added to i18n/languages.js is split and named without an edit here.
+  ...TRANSLATION_CHUNKS,
   { name: 'i18n-terms', test: /\/src\/i18n\/ncertTerms\.js$/, priority: 40 },
   // The NCERT syllabus layers — chapter lists, dot points and coverage split
   // out of the Class 7–9 production banks so the curriculum spine can read them
@@ -178,7 +197,7 @@ export const ON_DEMAND = [
   // done it: the strings do not arrive, the app stays in English, and the
   // choice is remembered so the next connected boot lands in Hindi — which
   // i18n/index.js spells out where setLanguage swallows the failure.
-  [/(^|\/)i18n-hi-[^/]*\.js$/, 'Hindi string catalogue'],
+  ...TRANSLATION_ON_DEMAND,
 
   // The NCERT term glossary is reached only when the term bridge is switched
   // on, and is worth nothing to the install of a student who never does.

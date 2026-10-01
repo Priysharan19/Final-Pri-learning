@@ -12,6 +12,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { useT, useTx } from '../i18n/index.js';
 
 function whenItResets(resetsAt, timeZone) {
   if (!Number.isFinite(resetsAt)) return null;
@@ -29,6 +30,8 @@ function whenItResets(resetsAt, timeZone) {
  * resetsAt, nextAt, timeZone, capability, refreshRequired }.
  */
 export default function FreeCapNotice({ gate, onRetry }) {
+  const t = useT();
+  const tx = useTx();
   if (!gate) return null;
   const isExam = gate.code === 'FREE_EXAM_CAP_REACHED' || gate.capability === 'premium-exams';
   const resets = whenItResets(gate.resetsAt ?? gate.nextAt, gate.timeZone);
@@ -37,43 +40,41 @@ export default function FreeCapNotice({ gate, onRetry }) {
     <div className="qpage">
       <section className="card" role="status" aria-live="polite" style={{ maxWidth: 560 }}>
         <div className="sc-label" style={{ marginBottom: 8 }}>
-          {isExam ? 'Free exam simulations' : "Today's free questions"}
+          {isExam ? t('freeCap.examTitle') : t('freeCap.questionsTitle')}
         </div>
 
         <p style={{ marginTop: 0 }}>
           {isExam
-            ? 'The free plan includes one full exam simulation every 30 days, and you have used this one.'
-            : `You have used all ${gate.limit ?? 20} free practice questions for today.`}
+            ? t('freeCap.examUsed')
+            : t('freeCap.questionsUsed', { count: gate.limit ?? 20, n: gate.limit ?? 20 })}
         </p>
 
         {resets && (
           <p className="muted">
-            {isExam ? 'Your next free simulation unlocks ' : 'They come back at midnight, '}
-            <b>{resets}</b>
-            {gate.timeZone ? ` (${gate.timeZone.replace('_', ' ')})` : ''}.
+            {tx(isExam ? 'freeCap.examUnlocks' : 'freeCap.questionsReturn', {
+              when: <><b>{resets}</b>{gate.timeZone ? ` (${gate.timeZone.replace('_', ' ')})` : ''}</>
+            })}
           </p>
         )}
 
         {gate.refreshRequired && (
           <p className="muted">
-            Your Premium access was last confirmed more than a week ago. Reconnect once and it
-            continues.
+            {t('freeCap.refreshRequired')}
           </p>
         )}
 
         <p className="muted">
-          Everything you have already done stays available offline: your history, your worked
-          solutions, your progress and your handwriting.
+          {t('freeCap.offlineKept')}
         </p>
 
         <div className="row" style={{ gap: 10, marginTop: 14, flexWrap: 'wrap' }}>
           <Link className="btn btn-primary" to="/settings#cloud-account-title">
-            {gate.refreshRequired ? 'Reconnect my account' : 'See Premium'}
+            {gate.refreshRequired ? t('freeCap.reconnect') : t('freeCap.seePremium')}
           </Link>
           {onRetry && (
-            <button className="btn btn-quiet" onClick={onRetry}>Try again</button>
+            <button className="btn btn-quiet" onClick={onRetry}>{t('common.tryAgain')}</button>
           )}
-          <Link className="btn btn-quiet" to="/review">Review what I have done</Link>
+          <Link className="btn btn-quiet" to="/review">{t('freeCap.reviewDone')}</Link>
         </div>
       </section>
     </div>

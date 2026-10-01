@@ -12,10 +12,11 @@ import {
   onNativeBillingUpdate, purchaseNativeProduct, restoreNativePurchases
 } from '../platform/nativeBilling.js';
 import CloudAccountSecurity from './CloudAccountSecurity.jsx';
+import { useT, useTx } from '../i18n/index.js';
 
-function when(value) {
-  if (!value) return 'Never';
-  try { return new Date(value).toLocaleString(); } catch { return 'Unknown'; }
+function when(value, t) {
+  if (!value) return t('cloud.never');
+  try { return new Date(value).toLocaleString(); } catch { return t('cloud.unknown'); }
 }
 
 function price(value, currency) {
@@ -29,20 +30,23 @@ function price(value, currency) {
   }
 }
 
-function pricingText(config) {
-  if (!config) return 'Storefront pricing is not available while the cloud service is offline.';
+function pricingText(config, t) {
+  if (!config) return t('cloud.pricingOffline');
   const monthly = price(config.monthly, config.currency);
   const annual = price(config.annual, config.currency);
-  const pieces = [];
-  if (monthly) pieces.push(`${monthly}/month`);
-  if (annual) pieces.push(`${annual}/year`);
-  if (!pieces.length) return 'Public pricing has not been configured for this deployment yet. Store/provider pricing remains authoritative.';
-  const trial = config.trialDays ? ` with a ${config.trialDays}-day trial when eligible` : '';
-  return `${pieces.join(' or ')}${trial}. Display pricing is advisory; checkout/storefront pricing and server entitlements remain authoritative.`;
+  if (!monthly && !annual) return t('cloud.pricingUnset');
+  const prices = monthly && annual
+    ? t('cloud.priceBoth', { monthly, annual })
+    : monthly ? t('cloud.priceMonthly', { price: monthly }) : t('cloud.priceAnnual', { price: annual });
+  return config.trialDays
+    ? t('cloud.pricingSummaryTrial', { prices, days: config.trialDays })
+    : t('cloud.pricingSummary', { prices });
 }
 
 export default function CloudAccountPanel() {
   const { user } = useApp();
+  const t = useT();
+  const tx = useTx();
   const enabled = cloudAvailable();
   const nativeShell = typeof window !== 'undefined' && !!window.__PRI_NATIVE__;
   const nativeStoreKit = nativeBillingAvailable();
@@ -150,12 +154,12 @@ export default function CloudAccountPanel() {
       if (!live) return;
       setAppleBootstrap(bootstrap);
       setAppleProducts(products);
-      setAppleStoreError(products.length ? '' : 'The configured Pri Learning subscription is not available in this App Store storefront.');
+      setAppleStoreError(products.length ? '' : t('cloud.storefrontMissing'));
     })().catch(err => {
       if (!live) return;
       setAppleBootstrap(null);
       setAppleProducts([]);
-      setAppleStoreError(err.message || 'App Store subscriptions are unavailable.');
+      setAppleStoreError(err.message || t('cloud.appleUnavailable'));
     });
     return () => { live = false; };
   }, [canSync, nativeStoreKit, link?.accountId]);
@@ -175,7 +179,7 @@ export default function CloudAccountPanel() {
       await finishNativeTransaction(transactionId);
       await refreshCloudEntitlement(user.id);
       await reload({ verify: false });
-      if (!quiet) setMessage('App Store purchase verified. Premium status has been refreshed from the server.');
+      if (!quiet) setMessage(t('cloud.appleVerified'));
       return true;
     } finally {
       appleInFlight.current.delete(transactionId);
@@ -189,7 +193,7 @@ export default function CloudAccountPanel() {
     if (!canSync || !nativeStoreKit) return undefined;
     return onNativeBillingUpdate(detail => {
       acceptAppleTransaction(detail, { quiet: true }).catch(err => {
-        setError(err.message || 'An App Store purchase is waiting for server verification.');
+        setError(err.message || t('cloud.applePendingVerification'));
       });
     });
   }, [canSync, nativeStoreKit, user?.id]);
@@ -207,21 +211,21 @@ export default function CloudAccountPanel() {
           year: user?.year, isAdult: form.isAdult,
           guardianName: form.guardianName, guardianEmail: form.guardianEmail
         });
-        setMessage('Cloud account created and linked to this local profile. Your local profile still works offline.');
+        setMessage(t('cloud.created'));
       } else {
         await loginCloudAccount(user.id, { email: form.email, password: form.password });
-        setMessage('Cloud account connected.');
+        setMessage(t('cloud.connected'));
       }
       setForm(v => ({ ...v, password: '' }));
       await reload();
-    } catch (err) { setError(err.message || 'Could not connect this account.'); }
+    } catch (err) { setError(err.message || t('cloud.connectFailed')); }
     finally { setBusy(''); }
   }
 
   async function requestReset() {
     if (!enabled) return;
     if (!form.email.trim()) {
-      setError('Enter your email first.');
+      setError(t('cloud.enterEmailFirst'));
       return;
     }
     setBusy('reset');
@@ -231,8 +235,8 @@ export default function CloudAccountPanel() {
       await cloud.requestPasswordReset({ email: form.email });
       // The server deliberately gives the same response whether or not an account
       // exists, so the UI must preserve that enumeration-safe contract.
-      setMessage('If a Pri Learning account exists for that email, a password-reset email has been queued.');
-    } catch (err) { setError(err.message || 'Could not request password recovery.'); }
+      setMessage(t('cloud.resetQueued'));
+    } catch (err) { setError(err.message || t('cloud.resetFailed')); }
     finally { setBusy(''); }
   }
 
@@ -242,9 +246,12 @@ export default function CloudAccountPanel() {
     setMessage('');
     try {
       const result = await syncNow(user.id);
-      setMessage(`Sync complete: ${result.pushedEvents || 0} learning event(s), ${result.pushedEntities || 0} record(s) pushed; ${result.pulledEvents || 0} event(s), ${result.pulledEntities || 0} record(s) received.`);
+      setMessage(t('cloud.syncComplete', {
+        pushedEvents: result.pushedEvents || 0, pushedEntities: result.pushedEntities || 0,
+        pulledEvents: result.pulledEvents || 0, pulledEntities: result.pulledEntities || 0
+      }));
       await reload({ verify: false });
-    } catch (err) { setError(err.message || 'Sync could not complete. Your local work is still safe on this device.'); }
+    } catch (err) { setError(err.message || t('cloud.syncFailed')); }
     finally { setBusy(''); }
   }
 
@@ -268,7 +275,7 @@ export default function CloudAccountPanel() {
       // the only entitlement authority.
       window.location.assign(destination.toString());
     } catch (err) {
-      setError(err.message || 'Could not start subscription checkout.');
+      setError(err.message || t('cloud.checkoutFailed'));
       setBusy('');
     }
   }
@@ -282,8 +289,8 @@ export default function CloudAccountPanel() {
       await cloud.restoreBilling('web', {});
       await refreshCloudEntitlement(user.id);
       await reload({ verify: false });
-      setMessage('Subscription status restored from the payment provider.');
-    } catch (err) { setError(err.message || 'Could not restore the web subscription.'); }
+      setMessage(t('cloud.webRestored'));
+    } catch (err) { setError(err.message || t('cloud.webRestoreFailed')); }
     finally { setBusy(''); }
   }
 
@@ -299,7 +306,7 @@ export default function CloudAccountPanel() {
   async function cancelWebSubscription() {
     if (!canUseWebBilling) return;
     // Ending a subscription is not something to do on a mis-tap.
-    if (!window.confirm('Cancel your Pri Learning subscription? Premium stays active until the end of the period you have already paid for.')) return;
+    if (!window.confirm(t('cloud.cancelConfirm'))) return;
     setBusy('cancel-web');
     setError('');
     setMessage('');
@@ -307,11 +314,11 @@ export default function CloudAccountPanel() {
       await cloud.cancelWebBilling();
       await refreshCloudEntitlement(user.id);
       await reload({ verify: false });
-      setMessage('Your subscription is cancelled. Premium stays active until the end of the period you have already paid for.');
+      setMessage(t('cloud.cancelled'));
     } catch (err) {
       setError(err?.code === 'BILLING_SUBSCRIPTION_NOT_CANCELLABLE'
-        ? 'There is no active website subscription on this account to cancel.'
-        : err.message || 'Could not cancel the subscription just now.');
+        ? t('cloud.nothingToCancel')
+        : err.message || t('cloud.cancelFailed'));
     } finally { setBusy(''); }
   }
 
@@ -323,16 +330,16 @@ export default function CloudAccountPanel() {
     try {
       const result = await purchaseNativeProduct(product.id, appleBootstrap.appAccountToken);
       if (result?.status === 'cancelled') {
-        setMessage('App Store purchase cancelled. No subscription change was made.');
+        setMessage(t('cloud.appleCancelled'));
         return;
       }
       if (result?.status === 'pending') {
-        setMessage('The App Store purchase is pending approval. Premium will activate only after Apple verifies the transaction and the server accepts it.');
+        setMessage(t('cloud.applePending'));
         return;
       }
       if (result?.status !== 'verified') throw new Error('The App Store did not return a verified transaction.');
       await acceptAppleTransaction(result);
-    } catch (err) { setError(err.message || 'Could not complete the App Store purchase.'); }
+    } catch (err) { setError(err.message || t('cloud.applePurchaseFailed')); }
     finally { setBusy(''); }
   }
 
@@ -345,7 +352,7 @@ export default function CloudAccountPanel() {
       const productIds = [appleBootstrap?.products?.monthly, appleBootstrap?.products?.annual].filter(Boolean);
       const transactions = await restoreNativePurchases(productIds);
       if (!transactions.length) {
-        setMessage('No current Pri Learning subscription was found for this App Store account.');
+        setMessage(t('cloud.appleNoneFound'));
         return;
       }
       let accepted = 0;
@@ -353,8 +360,8 @@ export default function CloudAccountPanel() {
         if (await acceptAppleTransaction(transaction, { quiet: true })) accepted++;
       }
       if (!accepted) throw new Error('No App Store transaction could be verified for this Pri Learning account.');
-      setMessage(`Restored ${accepted} verified App Store subscription transaction${accepted === 1 ? '' : 's'} and refreshed Premium.`);
-    } catch (err) { setError(err.message || 'Could not restore App Store purchases.'); }
+      setMessage(t('cloud.appleRestored', { count: accepted, n: accepted }));
+    } catch (err) { setError(err.message || t('cloud.appleRestoreFailed')); }
     finally { setBusy(''); }
   }
 
@@ -365,8 +372,8 @@ export default function CloudAccountPanel() {
       await disconnectCloudAccount(user.id);
       setLink(null); setStatus(null); setSession(null);
       setAppleBootstrap(null); setAppleProducts([]);
-      setMessage('Cloud account disconnected from this local profile. Local learning data was not deleted.');
-    } catch (err) { setError(err.message || 'Could not disconnect.'); }
+      setMessage(t('cloud.disconnected'));
+    } catch (err) { setError(err.message || t('cloud.disconnectFailed')); }
     finally { setBusy(''); }
   }
 
@@ -377,65 +384,63 @@ export default function CloudAccountPanel() {
     setAppleBootstrap(null);
     setAppleProducts([]);
     setMessage(cloudDeleted
-      ? 'Cloud account deleted. This device’s separate offline profile remains available.'
-      : 'Cloud session ended. This device’s separate offline profile remains available.');
+      ? t('cloud.deletedOffline')
+      : t('cloud.sessionEnded'));
   }
 
   const stateLabel = useMemo(() => {
-    if (!link?.accountId) return 'Not connected';
-    if (!enabled) return 'Linked locally · cloud endpoint unavailable';
-    if (!session?.connected) return 'Linked · sign-in required';
-    return 'Connected';
-  }, [link, enabled, session]);
+    if (!link?.accountId) return t('cloud.stateNotConnected');
+    if (!enabled) return t('cloud.stateLinkedLocal');
+    if (!session?.connected) return t('cloud.stateSignInRequired');
+    return t('cloud.stateConnected');
+  }, [link, enabled, session, t]);
 
   return (
     <section className="card" aria-labelledby="cloud-account-title" style={{ marginTop: 18 }}>
       <div className="spread" style={{ alignItems: 'flex-start', gap: 16 }}>
         <div>
-          <div className="card-title" id="cloud-account-title" style={{ marginBottom: 4 }}>Account & cross-device sync</div>
+          <div className="card-title" id="cloud-account-title" style={{ marginBottom: 4 }}>{t('cloud.title')}</div>
           <p className="sub" style={{ margin: 0, maxWidth: 720 }}>
-            Your local profile remains available offline. Connecting a Pri Learning account adds authenticated cross-device sync and server-authorised Premium entitlements; it does not replace the local profile or its encryption keys.
+            {t('cloud.intro')}
           </p>
         </div>
         <span className={`tag ${session?.connected ? 'tag-brand' : ''}`}>{stateLabel}</span>
       </div>
 
       {!enabled && <div style={{ marginTop: 14 }} className="muted">
-        This build has no Pri cloud origin configured, so account and sync controls are disabled. Offline practice continues normally.
+        {t('cloud.disabled')}
       </div>}
 
       {guardian?.required && guardian.state !== 'given' && (
         <div role="status" style={{ marginTop: 14, padding: '10px 12px', border: '1px solid var(--warn)', borderRadius: 10, fontSize: 13 }}>
           {guardian.state === 'pending'
-            ? <>Waiting for a parent or guardian to confirm this account{guardian.guardianEmail ? <> at <b>{guardian.guardianEmail}</b></> : null}.
-                Until they do, nothing syncs — <b>your work is safe on this device</b> and nothing has been lost.</>
-            : <>A parent or guardian has asked that this account does not sync. Everything still works here on this
-                device, and nothing of yours leaves it.</>}
+            ? (guardian.guardianEmail
+              ? tx('cloud.guardianPendingAt', { email: <b>{guardian.guardianEmail}</b>, safe: <b>{t('cloud.guardianPendingSafe')}</b> })
+              : tx('cloud.guardianPending', { safe: <b>{t('cloud.guardianPendingSafe')}</b> }))
+            : t('cloud.guardianDeclined')}
         </div>
       )}
       {guardian?.required && guardian.state === 'given' && (
         <p className="muted" style={{ marginTop: 12, fontSize: 12.5 }}>
-          A parent or guardian confirmed this account. They can change that at any time from the link in the
-          email we sent them, and the <a href="/privacy" target="_blank" rel="noreferrer">privacy notice</a> sets
-          out what an account sends.
+          {tx('cloud.guardianGiven', { privacy: <a href="/privacy" target="_blank" rel="noreferrer">{t('cloud.privacyNotice')}</a> })}
         </p>
       )}
       {enabled && !link?.accountId && <form onSubmit={submit} style={{ marginTop: 16 }}>
         <div className="row" style={{ gap: 8, marginBottom: 12 }}>
-          <button type="button" className={`btn btn-sm ${mode === 'login' ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setMode('login')}>Sign in</button>
-          <button type="button" className={`btn btn-sm ${mode === 'register' ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setMode('register')}>Create account</button>
+          <button type="button" className={`btn btn-sm ${mode === 'login' ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setMode('login')}>{t('cloud.signIn')}</button>
+          <button type="button" className={`btn btn-sm ${mode === 'register' ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setMode('register')}>{t('cloud.createAccount')}</button>
         </div>
         <div className="grid cols-2" style={{ gap: 12 }}>
           {mode === 'register' && <div className="field">
-            <label className="label" htmlFor="cloud-name">Your name</label>
+            <label className="label" htmlFor="cloud-name">{t('cloud.yourName')}</label>
             <input className="input" id="cloud-name" autoComplete="name" maxLength={80} value={form.name} onChange={e => setForm(v => ({ ...v, name: e.target.value }))} required />
           </div>}
           <div className="field">
-            <label className="label" htmlFor="cloud-email">Your email</label>
+            <label className="label" htmlFor="cloud-email">{t('cloud.yourEmail')}</label>
             <input className="input" id="cloud-email" type="email" autoComplete="email" maxLength={254} value={form.email} onChange={e => setForm(v => ({ ...v, email: e.target.value }))} required />
           </div>
           <div className="field">
-            <label className="label" htmlFor="cloud-password">Password</label>
+            <label className="label" htmlFor="cloud-password">{t('login.password')}</label>
             <input className="input" id="cloud-password" type="password" autoComplete={mode === 'register' ? 'new-password' : 'current-password'} minLength={10} maxLength={200} value={form.password} onChange={e => setForm(v => ({ ...v, password: e.target.value }))} required />
           </div>
         </div>
@@ -448,25 +453,22 @@ export default function CloudAccountPanel() {
                 student understands and one that looks like a fault. */}
             <label className="row" style={{ gap: 8, alignItems: 'flex-start', cursor: 'pointer' }}>
               <input type="checkbox" checked={form.isAdult} onChange={e => setForm(v => ({ ...v, isAdult: e.target.checked }))} />
-              <span>I am 18 or older</span>
+              <span>{t('cloud.isAdult')}</span>
             </label>
 
             {!form.isAdult && (
               <div style={{ marginTop: 10 }}>
                 <p className="muted" style={{ fontSize: 12.5, marginTop: 0, maxWidth: 520 }}>
-                  You are under 18, so a parent or guardian has to confirm this account before your
-                  progress can sync. We will email them a link. <b>Everything in the app keeps working
-                  in the meantime</b> — questions, marking and handwriting all run on this device and
-                  nothing is lost while you wait.
+                  {tx('cloud.under18', { keepsWorking: <b>{t('cloud.under18KeepsWorking')}</b> })}
                 </p>
                 <div className="grid cols-2" style={{ gap: 12 }}>
                   <div className="field">
-                    <label className="label" htmlFor="cloud-guardian-name">Parent or guardian’s name</label>
+                    <label className="label" htmlFor="cloud-guardian-name">{t('cloud.guardianName')}</label>
                     <input className="input" id="cloud-guardian-name" maxLength={80} value={form.guardianName}
                       onChange={e => setForm(v => ({ ...v, guardianName: e.target.value }))} required />
                   </div>
                   <div className="field">
-                    <label className="label" htmlFor="cloud-guardian-email">Their email</label>
+                    <label className="label" htmlFor="cloud-guardian-email">{t('cloud.guardianEmail')}</label>
                     <input className="input" id="cloud-guardian-email" type="email" maxLength={160} value={form.guardianEmail}
                       onChange={e => setForm(v => ({ ...v, guardianEmail: e.target.value }))} required />
                   </div>
@@ -479,9 +481,10 @@ export default function CloudAccountPanel() {
             <label className="row" style={{ gap: 8, alignItems: 'flex-start', marginTop: 12, cursor: 'pointer' }}>
               <input type="checkbox" checked={agreed} onChange={e => setAgreed(e.target.checked)} required />
               <span style={{ fontSize: 13 }}>
-                I have read the <a href="/privacy" target="_blank" rel="noreferrer">privacy notice</a> and
-                the <a href="/terms" target="_blank" rel="noreferrer">terms</a>, and I agree to what an
-                account sends.
+                {tx('cloud.consent', {
+                  privacy: <a href="/privacy" target="_blank" rel="noreferrer">{t('cloud.privacyNotice')}</a>,
+                  terms: <a href="/terms" target="_blank" rel="noreferrer">{t('cloud.terms')}</a>
+                })}
               </span>
             </label>
           </div>
@@ -489,69 +492,69 @@ export default function CloudAccountPanel() {
 
         <div className="row" style={{ gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
           <button className="btn btn-primary" type="submit" disabled={!!busy || (mode === 'register' && !agreed)}>
-            {busy === mode ? 'Connecting…' : mode === 'register' ? 'Create and connect account' : 'Connect account'}
+            {busy === mode ? t('cloud.connecting') : mode === 'register' ? t('cloud.createAndConnect') : t('cloud.connectAccount')}
           </button>
           {mode === 'login' && <button className="btn btn-quiet" type="button" onClick={requestReset} disabled={!!busy}>
-            {busy === 'reset' ? 'Requesting…' : 'Forgot password?'}
+            {busy === 'reset' ? t('cloud.requesting') : t('cloud.forgotPassword')}
           </button>}
         </div>
       </form>}
 
       {link?.accountId && <div className="grid cols-2" style={{ gap: 14, marginTop: 16 }}>
         <div className="card" style={{ boxShadow: 'none' }}>
-          <div className="sc-label">Cloud identity</div>
+          <div className="sc-label">{t('cloud.identity')}</div>
           <div style={{ fontWeight: 680, marginTop: 4 }}>{liveAccount?.name || user.name}</div>
-          <div className="muted" style={{ fontSize: 13 }}>{liveAccount?.email || 'Account details available after sign-in'}</div>
+          <div className="muted" style={{ fontSize: 13 }}>{liveAccount?.email || t('cloud.detailsAfterSignIn')}</div>
           <div className="row" style={{ gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
             <span className="tag">{liveAccount?.role || link.role}</span>
-            <span className="tag">{(liveAccount?.emailVerified ?? link.emailVerified) ? 'Email verified' : 'Email verification pending'}</span>
+            <span className="tag">{(liveAccount?.emailVerified ?? link.emailVerified) ? t('cloud.emailVerified') : t('cloud.emailPending')}</span>
           </div>
         </div>
         <div className="card" style={{ boxShadow: 'none' }}>
-          <div className="sc-label">Premium authority</div>
-          <div style={{ fontWeight: 680, marginTop: 4 }}>{premium ? 'Premium active' : 'Free'}</div>
+          <div className="sc-label">{t('cloud.premiumAuthority')}</div>
+          <div style={{ fontWeight: 680, marginTop: 4 }}>{premium ? t('cloud.premiumActive') : t('cloud.free')}</div>
           <div className="muted" style={{ fontSize: 13 }}>
-            {premium ? `${entitlement.status} · ${entitlement.provider}` : entitlement?.stale ? 'Paid cache expired; reconnect to refresh.' : 'No active paid entitlement.'}
+            {premium ? `${entitlement.status} · ${entitlement.provider}` : entitlement?.stale ? t('cloud.cacheExpired') : t('cloud.noEntitlement')}
           </div>
-          {entitlement?.offlineUntil && <div className="muted" style={{ fontSize: 12, marginTop: 6 }}>Offline entitlement valid until {when(entitlement.offlineUntil)}</div>}
+          {entitlement?.offlineUntil && <div className="muted" style={{ fontSize: 12, marginTop: 6 }}>{t('cloud.offlineUntil', { when: when(entitlement.offlineUntil, t) })}</div>}
 
           {canUseWebBilling && <div className="row" style={{ gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
             {!premium && pricing?.monthly && <button className="btn btn-sm btn-primary" type="button" disabled={!!busy} onClick={() => startWebCheckout('monthly')}>
-              {busy === 'checkout-monthly' ? 'Opening…' : `Monthly ${price(pricing.monthly, pricing.currency)}`}
+              {busy === 'checkout-monthly' ? t('cloud.opening') : t('cloud.monthlyPrice', { price: price(pricing.monthly, pricing.currency) })}
             </button>}
             {!premium && pricing?.annual && <button className="btn btn-sm btn-ghost" type="button" disabled={!!busy} onClick={() => startWebCheckout('annual')}>
-              {busy === 'checkout-annual' ? 'Opening…' : `Annual ${price(pricing.annual, pricing.currency)}`}
+              {busy === 'checkout-annual' ? t('cloud.opening') : t('cloud.annualPrice', { price: price(pricing.annual, pricing.currency) })}
             </button>}
             <button className="btn btn-sm btn-quiet" type="button" disabled={!!busy} onClick={restoreWebBilling}>
-              {busy === 'restore-web' ? 'Restoring…' : 'Restore web subscription'}
+              {busy === 'restore-web' ? t('cloud.restoring') : t('cloud.restoreWeb')}
             </button>
             {premium && entitlement?.provider === 'web' && (
               <button className="btn btn-sm btn-quiet" type="button" disabled={!!busy} onClick={cancelWebSubscription}>
-                {busy === 'cancel-web' ? 'Cancelling…' : 'Cancel subscription'}
+                {busy === 'cancel-web' ? t('cloud.cancelling') : t('cloud.cancelSubscription')}
               </button>
             )}
           </div>}
 
           {nativeShell && nativeStoreKit && <div style={{ marginTop: 12 }}>
             <div className="muted" style={{ fontSize: 12, marginBottom: 8 }}>
-              App Store pricing below is loaded directly from StoreKit. Pri Learning unlocks Premium only after the server verifies Apple’s signed transaction.
+              {t('cloud.storeKitNote')}
             </div>
             <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
               {!premium && appleMonthly && <button className="btn btn-sm btn-primary" type="button" disabled={!canUseAppleBilling || !!busy} onClick={() => startApplePurchase(appleMonthly)}>
-                {busy === `apple-${appleMonthly.id}` ? 'Purchasing…' : `Monthly ${appleMonthly.displayPrice}`}
+                {busy === `apple-${appleMonthly.id}` ? t('cloud.purchasing') : t('cloud.monthlyPrice', { price: appleMonthly.displayPrice })}
               </button>}
               {!premium && appleAnnual && <button className="btn btn-sm btn-ghost" type="button" disabled={!canUseAppleBilling || !!busy} onClick={() => startApplePurchase(appleAnnual)}>
-                {busy === `apple-${appleAnnual.id}` ? 'Purchasing…' : `Annual ${appleAnnual.displayPrice}`}
+                {busy === `apple-${appleAnnual.id}` ? t('cloud.purchasing') : t('cloud.annualPrice', { price: appleAnnual.displayPrice })}
               </button>}
               <button className="btn btn-sm btn-quiet" type="button" disabled={!canUseAppleBilling || !!busy} onClick={restoreAppleBilling}>
-                {busy === 'restore-apple' ? 'Restoring…' : 'Restore App Store purchases'}
+                {busy === 'restore-apple' ? t('cloud.restoring') : t('cloud.restoreApple')}
               </button>
             </div>
             {appleStoreError && <div style={{ color: 'var(--bad)', fontSize: 12, marginTop: 7 }}>{appleStoreError}</div>}
           </div>}
 
           {nativeShell && !nativeStoreKit && <div className="muted" style={{ fontSize: 12, marginTop: 8 }}>
-            This native build does not include the StoreKit billing bridge. Web checkout is intentionally unavailable inside the iOS app.
+            {t('cloud.noStoreKit')}
           </div>}
         </div>
       </div>}
@@ -559,15 +562,15 @@ export default function CloudAccountPanel() {
       {link?.accountId && <div className="card" style={{ boxShadow: 'none', marginTop: 14 }}>
         <div className="spread" style={{ gap: 12, flexWrap: 'wrap' }}>
           <div>
-            <div className="sc-label">Sync status</div>
-            <div style={{ fontWeight: 650, marginTop: 3 }}>{pending ? `${pending} local change${pending === 1 ? '' : 's'} waiting` : 'Local outbox clear'}</div>
-            <div className="muted" style={{ fontSize: 12 }}>Last successful sync: {when(status?.lastSyncAt)}</div>
-            {status?.lastError && <div style={{ color: 'var(--bad)', fontSize: 12 }}>Last error: {status.lastError}</div>}
+            <div className="sc-label">{t('cloud.syncStatus')}</div>
+            <div style={{ fontWeight: 650, marginTop: 3 }}>{pending ? t('cloud.pendingChanges', { count: pending, n: pending }) : t('cloud.outboxClear')}</div>
+            <div className="muted" style={{ fontSize: 12 }}>{t('cloud.lastSync', { when: when(status?.lastSyncAt, t) })}</div>
+            {status?.lastError && <div style={{ color: 'var(--bad)', fontSize: 12 }}>{t('cloud.lastError', { error: status.lastError })}</div>}
           </div>
           <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
-            <button className="btn btn-primary" type="button" onClick={doSync} disabled={!canSync || !!busy}>{busy === 'sync' ? 'Syncing…' : 'Sync now'}</button>
-            <button className="btn btn-ghost" type="button" onClick={() => refreshCloudEntitlement(user.id).then(() => reload({ verify: false })).catch(err => setError(err.message))} disabled={!canSync || !!busy}>Refresh Premium</button>
-            <button className="btn btn-quiet" type="button" onClick={disconnect} disabled={!!busy}>Disconnect</button>
+            <button className="btn btn-primary" type="button" onClick={doSync} disabled={!canSync || !!busy}>{busy === 'sync' ? t('cloud.syncing') : t('cloud.syncNow')}</button>
+            <button className="btn btn-ghost" type="button" onClick={() => refreshCloudEntitlement(user.id).then(() => reload({ verify: false })).catch(err => setError(err.message))} disabled={!canSync || !!busy}>{t('cloud.refreshPremium')}</button>
+            <button className="btn btn-quiet" type="button" onClick={disconnect} disabled={!!busy}>{t('cloud.disconnect')}</button>
           </div>
         </div>
       </div>}
@@ -581,8 +584,8 @@ export default function CloudAccountPanel() {
 
       <div className="muted" style={{ marginTop: 14, fontSize: 12.5 }}>
         {nativeStoreKit && appleProducts.length
-          ? 'App Store prices are storefront-authoritative. Subscription state is server-authoritative and is also maintained by verified App Store Server Notifications.'
-          : pricingText(pricing)}
+          ? t('cloud.appleAuthorityNote')
+          : pricingText(pricing, t)}
       </div>
 
       {message && <div role="status" style={{ marginTop: 12, color: 'var(--good)' }}>{message}</div>}

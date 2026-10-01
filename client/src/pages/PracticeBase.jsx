@@ -220,10 +220,10 @@ export default function Practice() {
         setAssignmentError('');
       })
       .catch(err => {
-        setAssignmentError(`Your maths work is safe on this device, but assignment progress could not sync: ${err.message || 'cloud unavailable'}`);
+        setAssignmentError(t('practice.assignmentSyncFailed', { reason: err.message || t('practice.cloudUnavailable') }));
       });
     return assignmentSync.current;
-  }, [assignmentMode, assignmentContext, assignmentClassId, assignmentId, assignmentTarget]);
+  }, [assignmentMode, assignmentContext, assignmentClassId, assignmentId, assignmentTarget, t]);
 
   const onResolved = res => {
     const current = sessionRef.current;

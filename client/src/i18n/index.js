@@ -33,9 +33,9 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { Fragment, createElement, useMemo, useSyncExternalStore } from 'react';
 import en from './strings.en.js';
-import { DEFAULT_LANGUAGE, cleanLanguage, htmlLangOf, pluralCategory } from './languages.js';
+import { DEFAULT_LANGUAGE, LANGUAGES, cleanLanguage, htmlLangOf, pluralCategory } from './languages.js';
 
-export { LANGUAGES, DEFAULT_LANGUAGE, cleanLanguage, pluralCategory } from './languages.js';
+export { LANGUAGES, DEFAULT_LANGUAGE, cleanLanguage, pluralCategory, speechTagsOf } from './languages.js';
 
 // ── The store ────────────────────────────────────────────────────────────────
 
@@ -43,15 +43,16 @@ export { LANGUAGES, DEFAULT_LANGUAGE, cleanLanguage, pluralCategory } from './la
 const catalogues = { en };
 
 /**
- * How a catalogue is fetched. Only `hi` has one to fetch; English is already
- * here. The `import()` is written out per language rather than built from a
- * template string because a bundler can only split what it can see statically —
- * `import(\`./strings.${id}.js\`)` would make Vite emit every match as a chunk
- * and, worse, hide from the reader which chunks exist.
+ * How a catalogue is fetched: each registered language's own `load`, from the
+ * table in languages.js. That table is the one place a language is added, and
+ * each `load` is a literal `import('./strings.<id>.js')` there rather than a
+ * template string here, because a bundler can only split what it can see
+ * statically — `import(\`./strings.${id}.js\`)` would make Vite emit every
+ * match as a chunk and hide from the reader which chunks exist.
  */
-const LOADERS = {
-  hi: () => import('./strings.hi.js').then(m => m.default)
-};
+const LOADERS = Object.fromEntries(
+  LANGUAGES.filter(l => typeof l.load === 'function').map(l => [l.id, l.load])
+);
 
 // useSyncExternalStore compares snapshots by identity, so the snapshot is
 // replaced wholesale on every change and never mutated in place.
@@ -94,7 +95,9 @@ export function setLanguage(raw) {
   // Record the request now so the settings switch reflects the tap, and leave
   // the strings alone until there are new ones to show.
   publish({ ...snapshot, chosen });
-  return LOADERS[chosen]()
+  const load = LOADERS[chosen];
+  if (!load) return Promise.resolve(snapshot.language);
+  return load()
     .then(strings => {
       catalogues[chosen] = strings;
       // A student who tapped Hindi and then tapped back to English before the

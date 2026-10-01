@@ -18,7 +18,7 @@ import PriPlot from './PriPlot.jsx';
 import { plotSpecFor } from '../engine/plotSpec.js';
 import { awardStepMarks, marksSentence } from '../engine/cbseMarking.js';
 import { checkWorkingWithCloud, mergeVerdicts, shouldCheckWorking, workingNote } from '../ink/cloudWorking.js';
-import { useT, useTx } from '../i18n/index.js';
+import { translate, useT, useTx } from '../i18n/index.js';
 import TermGloss from './TermGloss.jsx';
 
 const DIFF_CLASS = { 1: 'tag-d1', 2: 'tag-d2', 3: 'tag-d3', 4: 'tag-d4' };
@@ -313,7 +313,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     if (!cloudReadingEnabled(user) && !nativePhotoAvailable()) {
       setPhotoOCR({
         phase: 'unavailable', text: '', confidence: 0, engine: null,
-        error: 'Reading photos is not available here. Turn on server reading in Settings, or type your working instead.'
+        error: t('verdict.photoReadingUnavailable')
       });
       return;
     }
@@ -322,14 +322,14 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     if (!page) {
       setPhotoOCR({
         phase: 'failed', text: '', confidence: 0, engine: null,
-        error: 'That photo could not be read. Try a straighter, better-lit shot, or type your working.'
+        error: t('verdict.photoUnreadable')
       });
       return;
     }
     if (isWorking && page.text) { setWorking(page.text); setShowWorking(true); }
     if (page.markable) setAnswer(page.markable);
     setPhotoOCR({ phase: 'done', text: page.text, confidence: Number(page.confidence || 0), error: '', engine: page.engine });
-  }, [isWorking, user, readOnePage]);
+  }, [isWorking, user, readOnePage, t]);
 
   // A scanned PDF becomes pages, and the pages become the same thing a photo
   // already is. More than one page of working is joined in order, because a
@@ -344,8 +344,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       setPhotoOCR({
         phase: 'failed', text: '', confidence: 0, engine: null,
         error: result.reason === 'renderer-unavailable'
-          ? 'Reading PDFs needs a one-off download that has not happened on this device yet. Connect to the internet once and try again, or photograph the page instead — photos work offline.'
-          : 'That PDF could not be opened. If it is password-protected or was made by a scanner that locks it, photograph the page instead.'
+          ? t('verdict.pdfRendererMissing')
+          : t('verdict.pdfUnopenable')
       });
       return;
     }
@@ -369,7 +369,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     if (!texts.length) {
       setPhotoOCR({
         phase: 'failed', text: '', confidence: 0, engine: null,
-        error: 'Nothing could be read from that PDF. Try photographing the page instead.'
+        error: t('verdict.pdfNothingRead')
       });
       return;
     }
@@ -383,7 +383,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     const last = joined.split(/\n+/).map(x => x.trim()).filter(Boolean).at(-1) || '';
     if (last) setAnswer(last);
     setPhotoOCR({ phase: 'done', text: joined, confidence: worst, error: '', engine: engine || 'cloud-pdf' });
-  }, [decodePhoto, isWorking, user]);
+  }, [decodePhoto, isWorking, user, t]);
 
   // Paste a photo straight in. On a laptop this is how a student moves a shot
   // from their phone: AirDrop or a screenshot, then ⌘V.
@@ -481,7 +481,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     if (resolved) return;
     if (!String(typed).trim() && !String(wk).trim()) { clearDraft('question', question.id); return; }
     queueDraft('question', question.id, { typed, working: wk }, {
-      label: question.subtopicName, note: 'Answer in progress', path: '/practice'
+      label: question.subtopicName, note: t('verdict.answerInProgress'), path: '/practice'
     });
   };
   const editAnswer = (v) => { setAnswer(v); stash(v, working); };
@@ -505,17 +505,17 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     if (!doubt) return '';
     const nice = s => ({ pi: 'π', theta: 'θ', sqrt: '√', percent: '%' })[s] || s;
     if (doubt.why === 'shape') {
-      return 'That doesn’t quite come out as finished maths, so a symbol may have come through wrong. Tap any symbol below to change it.';
+      return t('verdict.checkShape');
     }
     // Name a runner-up only when it is genuinely close and genuinely different:
     // offering "1 or l?" on a number is a question with no useful answer.
     const w = doubt.weakest;
     const rival = w?.rival || w?.alts?.find(a => a.sym !== w.sym) || null;
     const contested = rival && rival.conf >= w.conf - CONFIRM_MARGIN;
-    if (w && contested) return `I read one symbol as “${nice(w.sym)}”, but “${nice(rival.sym)}” was close behind. Tap the right one below.`;
-    if (w) return `One symbol was a close call — I read it as “${nice(w.sym)}”. Tap it below if that isn’t it.`;
-    return 'One symbol was a close call. Tap it below if I read it wrong.';
-  }, [doubt]);
+    if (w && contested) return t('verdict.checkContested', { read: nice(w.sym), rival: nice(rival.sym) });
+    if (w) return t('verdict.checkCloseCall', { read: nice(w.sym) });
+    return t('verdict.checkCloseCallPlain');
+  }, [doubt, t]);
 
   const flipMode = (m) => {
     setMode(m);
@@ -615,8 +615,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     try {
       const r = await api.post(`/history/${question.id}/bookmark`, {});
       setBookmarked(r.bookmarked);
-      toast(r.bookmarked ? 'Saved to Favorites' : 'Removed from Favorites', 2200);
-    } catch { toast('Answer the question first, then favorite it from History.', 3200); }
+      toast(r.bookmarked ? t('verdict.savedToFavorites') : t('verdict.removedFromFavorites'), 2200);
+    } catch { toast(t('verdict.favoriteNeedsAnswer'), 3200); }
   }
 
   const verdictGood = resolved && res.correct;
@@ -724,14 +724,14 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       if (v.status === 'ok') {
         cards.push({
           kind: 'good', line: i + 1,
-          text: v.note || (i === 0 ? 'A valid starting point.' : 'Checks out — follows correctly from the line above.')
+          text: v.note || (i === 0 ? t('verdict.lineValidStart') : t('verdict.lineChecksOut'))
         });
       } else if (v.status === 'break' || v.status === 'wrong') {
-        cards.push({ kind: 'bad', line: i + 1, text: v.note || 'The maths breaks on this line.' });
+        cards.push({ kind: 'bad', line: i + 1, text: v.note || t('verdict.lineBreaks') });
       }
     });
     return cards.length ? cards : null;
-  }, [writeMode, lineVerdicts, inkResult]);
+  }, [writeMode, lineVerdicts, inkResult, t]);
   const canSubmit = isMcq ? mcqSel !== null : isWorking ? (writeMode ? !!inkResult?.lines?.length : !!working.trim()) : writeMode ? !!inkResult?.answerLine : !!answer.trim();
 
   const earnedMarks = resolved
@@ -1342,7 +1342,7 @@ function attachPhoto(e, setPhoto, onReady, onPdf, onFailed) {
     URL.revokeObjectURL(url);
     // Previously a silent no-op: the student picked a file and the UI did not
     // move. A HEIC from an iPhone opened on Android lands here.
-    onFailed?.('That image could not be opened. Try photographing the page again, or save it as a JPEG first.');
+    onFailed?.(translate('verdict.imageUnopenable'));
   };
   img.src = url;
   e.target.value = '';

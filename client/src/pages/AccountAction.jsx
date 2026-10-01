@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { cloud } from '../platform/cloudTransport.js';
+import { useT, useTx } from '../i18n/index.js';
 
 function Shell({ children }) {
   return (
@@ -19,6 +20,8 @@ function Status({ kind = '', children }) {
 }
 
 export default function AccountAction({ actionData }) {
+  const t = useT();
+  const tx = useTx();
   const action = actionData?.action || null;
   const token = actionData?.token || '';
   const [state, setState] = useState(action === 'verify-email' ? 'working' : 'ready');
@@ -33,13 +36,13 @@ export default function AccountAction({ actionData }) {
     void cloud.verifyEmail({ token }).then(() => {
       if (!alive) return;
       setState('done');
-      setMessage('Your Pri Learning email is verified.');
+      setMessage(t('accountAction.emailVerified'));
     }).catch(error => {
       if (!alive) return;
       setState('error');
       setMessage(error?.code === 'TOKEN_INVALID'
-        ? 'This verification link is invalid or has expired.'
-        : 'Pri Learning could not verify this email right now.');
+        ? t('accountAction.verifyInvalid')
+        : t('accountAction.verifyFailed'));
     });
     return () => { alive = false; };
   }, [action, token]);
@@ -47,9 +50,9 @@ export default function AccountAction({ actionData }) {
   if (!action || !token) {
     return (
       <Shell>
-        <h1 style={{ marginTop: 0 }}>Link unavailable</h1>
-        <Status kind="error">This account link is missing, invalid, or has already been removed from the address bar.</Status>
-        <a className="btn primary" href="/">Open Pri Learning</a>
+        <h1 style={{ marginTop: 0 }}>{t('accountAction.linkUnavailable')}</h1>
+        <Status kind="error">{t('accountAction.linkMissing')}</Status>
+        <a className="btn primary" href="/">{t('accountAction.openApp')}</a>
       </Shell>
     );
   }
@@ -68,44 +71,41 @@ export default function AccountAction({ actionData }) {
         else await cloud.guardianWithdraw(token);
         setState('done');
         setMessage(choice === 'confirm'
-          ? 'Thank you. Their progress can now sync between their devices and be backed up.'
-          : 'Noted. Nothing of theirs will sync, and their work stays on their own device.');
+          ? t('accountAction.guardianConfirmed')
+          : t('accountAction.guardianWithdrawn'));
       } catch (error) {
         setState('error');
         setMessage(error?.code === 'TOKEN_INVALID'
-          ? 'This link is invalid or has expired. Ask them to create the account again and a new link will be sent.'
-          : 'Pri Learning could not record that right now. Please try the link again in a moment.');
+          ? t('accountAction.guardianInvalid')
+          : t('accountAction.guardianFailed'));
       }
     };
     return (
       <Shell>
-        <h1 style={{ marginTop: 0 }}>Confirm your child’s account</h1>
+        <h1 style={{ marginTop: 0 }}>{t('accountAction.guardianTitle')}</h1>
         {state !== 'done' && (
           <>
             <p className="muted" style={{ marginTop: 0 }}>
-              Pri Learning is a maths app. Everything in it — the questions, the marking and the
-              handwriting — already works on their device without an account. Confirming lets their
-              progress sync between devices and be backed up. If you would rather it did not, say no
-              and nothing of theirs will leave their device.
+              {t('accountAction.guardianIntro')}
             </p>
             <p className="muted" style={{ fontSize: 12.5 }}>
-              You can change this later from this same link. The{' '}
-              <a href="/privacy" target="_blank" rel="noreferrer">privacy notice</a> sets out exactly what an
-              account sends.
+              {tx('accountAction.guardianChangeLater', {
+                privacy: <a href="/privacy" target="_blank" rel="noreferrer">{t('cloud.privacyNotice')}</a>
+              })}
             </p>
           </>
         )}
-        {state === 'working' && <Status>Recording your answer…</Status>}
+        {state === 'working' && <Status>{t('accountAction.recording')}</Status>}
         {state === 'error' && <Status kind="error">{message}</Status>}
         {state === 'done'
-          ? <><Status>{message}</Status><a className="btn primary" href="/">Open Pri Learning</a></>
+          ? <><Status>{message}</Status><a className="btn primary" href="/">{t('accountAction.openApp')}</a></>
           : (
             <div className="row" style={{ gap: 10, marginTop: 16, flexWrap: 'wrap' }}>
               <button className="btn primary" type="button" disabled={state === 'working'} onClick={() => answer('confirm')}>
-                Yes, allow syncing
+                {t('accountAction.allowSync')}
               </button>
               <button className="btn" type="button" disabled={state === 'working'} onClick={() => answer('withdraw')}>
-                No, keep it on their device
+                {t('accountAction.keepOnDevice')}
               </button>
             </div>
           )}
@@ -116,10 +116,10 @@ export default function AccountAction({ actionData }) {
   if (action === 'verify-email') {
     return (
       <Shell>
-        <h1 style={{ marginTop: 0 }}>Verify email</h1>
-        {state === 'working' && <Status>Checking your secure verification link…</Status>}
-        {state === 'done' && <><Status>{message}</Status><a className="btn primary" href="/">Open Pri Learning</a></>}
-        {state === 'error' && <><Status kind="error">{message}</Status><a className="btn" href="/">Return to Pri Learning</a></>}
+        <h1 style={{ marginTop: 0 }}>{t('accountAction.verifyTitle')}</h1>
+        {state === 'working' && <Status>{t('accountAction.checking')}</Status>}
+        {state === 'done' && <><Status>{message}</Status><a className="btn primary" href="/">{t('accountAction.openApp')}</a></>}
+        {state === 'error' && <><Status kind="error">{message}</Status><a className="btn" href="/">{t('accountAction.returnToApp')}</a></>}
       </Shell>
     );
   }
@@ -129,12 +129,12 @@ export default function AccountAction({ actionData }) {
     setMessage('');
     if (password.length < 10) {
       setState('error');
-      setMessage('Use a new password of at least 10 characters.');
+      setMessage(t('accountAction.passwordTooShort'));
       return;
     }
     if (password !== confirm) {
       setState('error');
-      setMessage('The two password entries do not match.');
+      setMessage(t('accountAction.passwordMismatch'));
       return;
     }
     setState('working');
@@ -143,41 +143,41 @@ export default function AccountAction({ actionData }) {
       setPassword('');
       setConfirm('');
       setState('done');
-      setMessage('Your password has been reset. Sign in again on your devices with the new password.');
+      setMessage(t('accountAction.resetDone'));
     } catch (error) {
       setState('error');
       setMessage(error?.code === 'TOKEN_INVALID'
-        ? 'This reset link is invalid or has expired.'
+        ? t('accountAction.resetInvalid')
         : error?.code === 'WEAK_PASSWORD'
-          ? 'Use a stronger password of at least 10 characters.'
-          : 'Pri Learning could not reset the password right now.');
+          ? t('accountAction.weakPassword')
+          : t('accountAction.resetFailed'));
     }
   };
 
   return (
     <Shell>
-      <h1 style={{ marginTop: 0 }}>Reset password</h1>
+      <h1 style={{ marginTop: 0 }}>{t('accountAction.resetTitle')}</h1>
       {state === 'done' ? (
         <>
           <Status>{message}</Status>
-          <a className="btn primary" href="/">Open Pri Learning</a>
+          <a className="btn primary" href="/">{t('accountAction.openApp')}</a>
         </>
       ) : (
         <form onSubmit={submit}>
-          <p className="muted">Choose a new cloud-account password. Resetting it signs out existing cloud sessions.</p>
+          <p className="muted">{t('accountAction.resetHelp')}</p>
           <label className="field">
-            <span>New password</span>
+            <span>{t('settings.newPassword')}</span>
             <input type="password" autoComplete="new-password" value={password}
               onChange={event => setPassword(event.target.value)} minLength={10} maxLength={200} required />
           </label>
           <label className="field" style={{ marginTop: 12 }}>
-            <span>Confirm new password</span>
+            <span>{t('cloudSecurity.confirmNewPassword')}</span>
             <input type="password" autoComplete="new-password" value={confirm}
               onChange={event => setConfirm(event.target.value)} minLength={10} maxLength={200} required />
           </label>
           {message && <Status kind={state === 'error' ? 'error' : ''}>{message}</Status>}
           <button className="btn primary" type="submit" disabled={state === 'working'}>
-            {state === 'working' ? 'Resetting…' : 'Reset password'}
+            {state === 'working' ? t('accountAction.resetting') : t('accountAction.resetTitle')}
           </button>
         </form>
       )}

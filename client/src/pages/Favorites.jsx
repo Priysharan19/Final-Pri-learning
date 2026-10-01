@@ -59,7 +59,7 @@ export default function Favorites() {
                   {it.correct ? '✓' : '✗'}<span className="sr-only">{t(it.correct ? 'app.correct' : 'app.incorrect')}</span>
                 </span>
                 <span className="hist-name"><TermGloss text={it.subtopicName} /></span>
-                <span className="tag">D{it.difficulty}</span>
+                <span className="tag">{`D${it.difficulty}`}</span>
                 {it.mode !== 'practice' && <span className="tag">{it.mode}</span>}
               </div>
               <div className="hist-prompt"><MathText text={it.prompt} /></div>

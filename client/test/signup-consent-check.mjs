@@ -13,6 +13,15 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import en from '../src/i18n/strings.en.js';
+
+// The interface copy lives in the i18n catalogue. Resolve every catalogue key a
+// source file names to its English, so these assertions read what an English
+// reader of that screen actually sees.
+const catalogue = en;
+const englishOf = src => [...src.matchAll(/'([a-z][A-Za-z]*\.[A-Za-z0-9]+)'/g)]
+  .map(m => catalogue[m[1]]).filter(Boolean)
+  .flatMap(v => (typeof v === 'string' ? [v] : Object.values(v))).join('\n');
 
 let pass = 0;
 const failures = [];
@@ -21,6 +30,7 @@ const ok = (cond, label) => { if (cond) pass++; else failures.push(label); };
 const read = rel => readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8');
 const panel = read('../src/components/CloudAccountPanel.jsx');
 const account = read('../src/platform/cloudAccount.js');
+const panelCopy = englishOf(panel);
 
 // ── 1 · The notice is at the point of consent ────────────────────────────────
 ok(/href="\/privacy"/.test(panel), 'the registration form links the privacy notice');
@@ -30,7 +40,7 @@ ok(/disabled=\{!!busy \|\| \(mode === 'register' && !agreed\)\}/.test(panel),
   'the account cannot be created until that action is taken');
 
 // ── 2 · The age declaration is asked, not inferred ───────────────────────────
-ok(/I am 18 or older/.test(panel), 'the form asks whether the account holder is an adult');
+ok(/I am 18 or older/.test(panelCopy), 'the form asks whether the account holder is an adult');
 ok(/isAdult/.test(panel) && /guardianName/.test(panel) && /guardianEmail/.test(panel),
   'and collects a guardian when they are not');
 // Read the whole <input> element rather than a fixed window after its id: the
@@ -53,12 +63,12 @@ ok(/cloud\.register\(\{[^)]*guardianEmail/.test(account),
   'and cloudAccount.js forwards every one of them to the server rather than dropping them');
 
 // ── 4 · The student is told what waiting costs them, which is nothing ─────────
-ok(/keeps working/i.test(panel) && /nothing is lost/i.test(panel),
+ok(/keeps working/i.test(panelCopy) && /nothing is lost/i.test(panelCopy),
   'the student is told the app keeps working while a guardian is asked — because it does');
-ok(/email them a link/i.test(panel), 'and what will actually happen');
+ok(/email them a link/i.test(panelCopy), 'and what will actually happen');
 
 // ── 5 · It never overstates what the confirmation establishes ────────────────
-ok(!/verifiable parental consent/i.test(panel),
+ok(!/verifiable parental consent/i.test(panel) && !/verifiable parental consent/i.test(panelCopy),
   'the form does not call this verifiable parental consent — it is a confirmation from a mailbox');
 
 // ── 6 · The guardian's link has somewhere to land ────────────────────────────
@@ -69,18 +79,19 @@ ok(!/verifiable parental consent/i.test(panel),
 const parser = read('../src/platform/accountAction.js');
 ok(/'guardian-consent'/.test(parser), 'the account-action parser admits the guardian link');
 const page = read('../src/pages/AccountAction.jsx');
+const pageCopy = englishOf(page);
 ok(/action === 'guardian-consent'/.test(page), 'and the page has a branch for it');
 ok(/guardianConfirm/.test(page) && /guardianWithdraw/.test(page),
   'offering both answers on the one screen, so saying no is as easy as saying yes');
-ok(/works on their device without an account|already works on their device/i.test(page),
+ok(/works on their device without an account|already works on their device/i.test(pageCopy),
   'and telling the parent the app works without the account, so consent is not extracted by false urgency');
 ok(/href="\/privacy"/.test(page), 'with the notice reachable from the decision');
 
 // ── 7 · The student can see where their account stands ───────────────────────
 ok(/guardianState\(\)/.test(panel), 'the account panel asks the server for the consent state');
-ok(/Waiting for a parent or guardian/i.test(panel),
+ok(/Waiting for a parent or guardian/i.test(panelCopy),
   'and a pending account reads as waiting for a parent rather than as a fault');
-ok(/work is safe on this device/i.test(panel), 'and says the work is safe, because it is');
+ok(/work is safe on this device/i.test(panelCopy), 'and says the work is safe, because it is');
 
 console.log(failures.length
   ? `SIGNUP CONSENT: FAIL — ${failures.length} of ${pass + failures.length} checks failed\n  · ${failures.join('\n  · ')}`

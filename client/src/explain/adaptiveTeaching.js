@@ -3,6 +3,17 @@
 // This file controls teaching presentation only. It consumes evidence already
 // produced by Pri's marker/student model and the verified Pri Explain timeline.
 // It must never infer a new mathematical diagnosis, equation, answer or claim.
+//
+// Every sentence it can produce is a catalogue key (explain.* in
+// i18n/strings.en.js). The profile carries the key alongside the English, so
+// the player renders it in the student's language with t(); the English-
+// returning functions below resolve the same keys against the English
+// catalogue, so there is exactly one copy of each sentence.
+import en from '../i18n/strings.en.js';
+
+const english = (key, vars) => (key
+  ? String(en[key] ?? key).replace(/\{(\w+)\}/g, (whole, name) => (vars && name in vars ? String(vars[name]) : whole))
+  : '');
 
 export const TEACHING_MODES = Object.freeze({
   RAPID: 'rapid',
@@ -13,26 +24,26 @@ export const TEACHING_MODES = Object.freeze({
 
 const MODE_META = Object.freeze({
   rapid: {
-    label: 'Quick review',
-    reason: 'You are moving confidently, so Pri keeps the explanation concise.',
+    labelKey: 'explain.mode.rapid',
+    reasonKey: 'explain.reason.rapid',
     timingScale: 0.82,
     voiceRate: 1.08,
   },
   guided: {
-    label: 'Guided walkthrough',
-    reason: 'Pri is keeping each verified move visible long enough to connect the reasoning.',
+    labelKey: 'explain.mode.guided',
+    reasonKey: 'explain.reason.guided',
     timingScale: 1,
     voiceRate: 1,
   },
   scaffolded: {
-    label: 'Extra scaffolding',
-    reason: 'Pri is slowing the transitions and giving structural visuals more teaching time.',
+    labelKey: 'explain.mode.scaffolded',
+    reasonKey: 'explain.reason.scaffolded',
     timingScale: 1.18,
     voiceRate: 0.94,
   },
   recovery: {
-    label: 'Targeted recovery',
-    reason: 'Pri is rebuilding the solution around evidence from your actual attempt.',
+    labelKey: 'explain.mode.recovery',
+    reasonKey: 'explain.reason.recovery',
     timingScale: 1.3,
     voiceRate: 0.9,
   },
@@ -64,7 +75,8 @@ function evidenceFocus(payload = {}) {
   if (diagnosis && (diagnosis.title || diagnosis.message || diagnosis.fix)) {
     return {
       kind: 'diagnosis',
-      label: String(diagnosis.title || 'Step diagnosis'),
+      label: String(diagnosis.title || english('explain.focus.stepDiagnosis')),
+      labelKey: diagnosis.title ? null : 'explain.focus.stepDiagnosis',
       message: String(diagnosis.message || ''),
       fix: String(diagnosis.fix || ''),
       confidence: diagnosis.confidence || null,
@@ -75,7 +87,9 @@ function evidenceFocus(payload = {}) {
     return {
       kind: 'misconception',
       label: String(misconception.label),
-      message: misconception.count > 1 ? `This pattern has appeared ${misconception.count} times.` : '',
+      message: misconception.count > 1 ? english('explain.focus.patternCount', { n: misconception.count }) : '',
+      messageKey: misconception.count > 1 ? 'explain.focus.patternCount' : null,
+      messageVars: { n: misconception.count },
       fix: '',
       confidence: 'marker-ledger',
     };
@@ -83,7 +97,8 @@ function evidenceFocus(payload = {}) {
   if (payload?.hadWrongAttempt || payload?.wrongAttempt) {
     return {
       kind: 'attempt',
-      label: 'Compare your first attempt with the verified path',
+      label: english('explain.focus.compareAttempt'),
+      labelKey: 'explain.focus.compareAttempt',
       message: '',
       fix: '',
       confidence: 'attempt-evidence',
@@ -142,20 +157,22 @@ export function buildTeachingProfile({ payload = {}, studentContext = {}, timeli
 
   const meta = MODE_META[mode];
   const importantSceneIndex = importantTeachingScene(timeline, mode);
-  const reason = focus?.kind === 'diagnosis'
-    ? 'Pri is centring the explanation on the mistake identified in your working.'
+  const reasonKey = focus?.kind === 'diagnosis'
+    ? 'explain.reason.diagnosis'
     : focus?.kind === 'misconception'
-      ? 'Pri is giving extra attention to a misconception already confirmed by your learning history.'
+      ? 'explain.reason.misconception'
       : focus?.kind === 'attempt'
-        ? 'Pri is comparing your first attempt with the verified solution path.'
+        ? 'explain.reason.attempt'
         : payload?.revealed
-          ? 'Pri is slowing the walkthrough because you chose to reveal the verified solution.'
-          : meta.reason;
+          ? 'explain.reason.revealed'
+          : meta.reasonKey;
 
   return {
     mode,
-    label: meta.label,
-    reason,
+    label: english(meta.labelKey),
+    labelKey: meta.labelKey,
+    reason: english(reasonKey),
+    reasonKey,
     timingScale: meta.timingScale,
     voiceRate: meta.voiceRate,
     focus,
@@ -173,39 +190,31 @@ export function teachingTimingScale(profile, sceneIndex) {
     : base;
 }
 
-export function whyThisStep(scene, profile, sceneIndex) {
+/** The catalogue key for why the key teaching step matters, or '' for any other step. */
+export function whyThisStepKey(scene, profile, sceneIndex) {
   if (!scene || sceneIndex !== profile?.importantSceneIndex) return '';
-  if (scene.kind === 'diagnosis' || scene.concept === 'diagnosis') {
-    return 'This is the comparison point between your attempt and the verified solution path.';
-  }
-  if ((scene.visuals || []).some(visual => visual.kind === 'transform')) {
-    return 'Track the terms that change between these two verified lines.';
-  }
-  if ((scene.visuals || []).some(visual => visual.kind === 'figure')) {
-    return 'Watch the verified construction before connecting it to the next reasoning line.';
-  }
-  if ((scene.visuals || []).some(visual => visual.kind === 'ink' || visual.kind === 'attempt')) {
-    return 'Keep your submitted working visible while Pri connects it to the verified reasoning.';
-  }
-  return 'Connect this reasoning line to the verified step immediately before it.';
+  if (scene.kind === 'diagnosis' || scene.concept === 'diagnosis') return 'explain.why.diagnosis';
+  if ((scene.visuals || []).some(visual => visual.kind === 'transform')) return 'explain.why.transform';
+  if ((scene.visuals || []).some(visual => visual.kind === 'figure')) return 'explain.why.figure';
+  if ((scene.visuals || []).some(visual => visual.kind === 'ink' || visual.kind === 'attempt')) return 'explain.why.attempt';
+  return 'explain.why.generic';
+}
+
+export function whyThisStep(scene, profile, sceneIndex) {
+  return english(whyThisStepKey(scene, profile, sceneIndex));
+}
+
+/** The catalogue key for the retrieval prompt at the key step, or '' when there is none. */
+export function adaptiveCheckpointKey(scene, profile, sceneIndex) {
+  if (!profile?.pauseAtKeyStep || sceneIndex !== profile?.importantSceneIndex || !scene) return '';
+  if (profile.focus?.kind === 'diagnosis' || scene.kind === 'diagnosis' || scene.concept === 'diagnosis') return 'explain.check.diagnosis';
+  if (profile.focus?.kind === 'misconception') return 'explain.check.misconception';
+  if ((scene.visuals || []).some(visual => visual.kind === 'transform')) return 'explain.check.transform';
+  if ((scene.visuals || []).some(visual => visual.kind === 'figure')) return 'explain.check.figure';
+  if (profile.focus?.kind === 'attempt') return 'explain.check.attempt';
+  return 'explain.check.generic';
 }
 
 export function adaptiveCheckpointPrompt(scene, profile, sceneIndex) {
-  if (!profile?.pauseAtKeyStep || sceneIndex !== profile?.importantSceneIndex || !scene) return '';
-  if (profile.focus?.kind === 'diagnosis' || scene.kind === 'diagnosis' || scene.concept === 'diagnosis') {
-    return 'Before continuing, say what you would change in your original attempt.';
-  }
-  if (profile.focus?.kind === 'misconception') {
-    return 'Before continuing, name the pattern you want to avoid when you try this again.';
-  }
-  if ((scene.visuals || []).some(visual => visual.kind === 'transform')) {
-    return 'Before continuing, describe what changed between the two verified lines.';
-  }
-  if ((scene.visuals || []).some(visual => visual.kind === 'figure')) {
-    return 'Before continuing, explain which part of the verified construction matters to this step.';
-  }
-  if (profile.focus?.kind === 'attempt') {
-    return 'Before continuing, compare this verified step with what you tried first.';
-  }
-  return 'Before continuing, explain this verified move in your own words.';
+  return english(adaptiveCheckpointKey(scene, profile, sceneIndex));
 }
