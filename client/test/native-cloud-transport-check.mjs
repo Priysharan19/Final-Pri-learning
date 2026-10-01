@@ -4,6 +4,11 @@ import { readFileSync } from 'node:fs';
 const swift = readFileSync(new URL('../../ios/PriLearning.swiftpm/NativeCloudBridge.swift', import.meta.url), 'utf8');
 const shell = readFileSync(new URL('../../ios/PriLearning.swiftpm/WebShell.swift', import.meta.url), 'utf8');
 const transport = readFileSync(new URL('../src/platform/cloudTransport.js', import.meta.url), 'utf8');
+// CP-02: the WebKit wire protocol lives behind priNative. cloudTransport keeps
+// the bounded request contract; the adapter owns the handler and its events.
+const legacy = readFileSync(new URL('../src/platform/native/legacyApple.js', import.meta.url), 'utf8');
+const nativeIndex = readFileSync(new URL('../src/platform/native/index.js', import.meta.url), 'utf8');
+const host = readFileSync(new URL('../src/platform/native/host.js', import.meta.url), 'utf8');
 
 assert.match(shell, /__PRI_NATIVE_CLOUD__\s*=\s*true/, 'native shell must advertise the native cloud bridge');
 assert.match(shell, /__PRI_NATIVE_CLOUD_CONFIGURED__\s*=\s*\\\(cloudConfigured\)/,
@@ -37,17 +42,27 @@ assert.doesNotMatch(swift, /body\["origin"\]/,
 assert.doesNotMatch(swift, /Set-Cookie/i,
   'native bridge must not expose cookie headers back to JavaScript');
 
-assert.match(transport, /messageHandlers\?\.priCloud/, 'audited client transport must target only the native cloud handler');
-assert.match(transport, /pri:native-cloud-response/, 'client transport must consume native response events');
-assert.match(transport, /bridge\.postMessage\(\{ id, action: 'cancel' \}\)/,
+assert.match(legacy, /handler\('priCloud'\)/, 'the native adapter must target only the dedicated priCloud handler');
+assert.match(legacy, /scope\?\.webkit\?\.messageHandlers/, 'the adapter reads WebKit handlers from the page scope only');
+assert.match(legacy, /pri:native-cloud-response/, 'the adapter must consume native cloud response events');
+assert.match(legacy, /bridge\.postMessage\(\{ id, action: 'cancel' \}\)/,
   'abort and timeout must cancel the underlying native URLSession request');
+assert.match(transport, /priNative\.cloud\.request\(/, 'cloudRequest must reach native cloud only through priNative');
+assert.equal(/webkit|messageHandlers/.test(transport), false, 'cloudTransport must not talk to WebKit directly');
 const requestBody = transport.slice(transport.indexOf('export async function cloudRequest'));
 const nativeBranch = requestBody.indexOf('if (nativeCloudAvailable())');
 const webOrigin = requestBody.indexOf('const origin = normalizeCloudOrigin()');
 const webFetch = requestBody.indexOf('await fetch(');
 assert.ok(nativeBranch >= 0 && webOrigin > nativeBranch && webFetch > webOrigin,
   'cloudRequest must choose native transport before resolving a web origin or calling fetch');
-assert.match(transport, /globalThis\.__PRI_NATIVE_CLOUD_CONFIGURED__\s*===\s*true/,
-  'native cloud availability must fail closed when the release origin is absent');
+assert.match(host, /scope\.__PRI_NATIVE_CLOUD_CONFIGURED__ === true/,
+  'legacy native cloud availability must fail closed when the release origin is absent');
+assert.match(nativeIndex, /if \(!c \|\| c\.configured !== true\) return false;/,
+  'priNative.cloud must fail closed unless the host reports a configured cloud origin');
+const hostBridge = readFileSync(new URL('../../ios/PriLearning.swiftpm/NativeHostBridge.swift', import.meta.url), 'utf8');
+assert.match(hostBridge, /"cloud": \["versions": \[1\], "transport": "legacy", "configured": cloudConfigured\]/,
+  'the Apple host descriptor must advertise cloud with the deployment-configured flag');
+assert.match(shell, /NativeHostBridge\.hostScript\(cloudConfigured: NativeCloudBridge\.isConfigured\)/,
+  'the host descriptor and the legacy flag must come from the same configuration check');
 
 console.log('PASS — iOS cloud traffic is bounded to NativeCloudBridge, keeps cookies/CSRF native, pins release origin to signed metadata, rejects JS-selected origins, and preserves the web transport fallback.');

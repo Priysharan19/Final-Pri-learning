@@ -1,23 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { cloud } from '../platform/cloudTransport.js';
 import { disconnectCloudAccount } from '../platform/cloudAccount.js';
+import { downloadJSON } from '../lib/files.js';
 
 function when(value) {
   if (!value) return 'Unknown';
   try { return new Date(value).toLocaleString(); } catch { return 'Unknown'; }
-}
-
-function downloadJson(filename, value) {
-  const blob = new Blob([JSON.stringify(value, null, 2)], { type: 'application/json' });
-  const href = URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
-  anchor.href = href;
-  anchor.download = filename;
-  anchor.rel = 'noopener';
-  document.body.appendChild(anchor);
-  anchor.click();
-  anchor.remove();
-  setTimeout(() => URL.revokeObjectURL(href), 0);
 }
 
 export default function CloudAccountSecurity({ pid, account, onChanged, onDeleted }) {
@@ -106,7 +94,7 @@ export default function CloudAccountSecurity({ pid, account, onChanged, onDelete
     try {
       const result = await cloud.exportAccount();
       const suffix = new Date().toISOString().slice(0, 10);
-      downloadJson(`pri-learning-account-export-${suffix}.json`, result);
+      await downloadJSON(result, `pri-learning-account-export-${suffix}.json`);
       setMessage('Cloud account export created on this device.');
     } catch (err) { setError(err.message || 'Could not export this account.'); }
     finally { setBusy(''); }
