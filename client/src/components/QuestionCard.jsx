@@ -1286,6 +1286,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                 </span>
                 <span className="eval-marks">
                   {t('verdict.marksOutOf', { earned: verdictGood ? shownMarks : earnedMarks, total: totalMarks })}
+                  {' '}<small>({verdictGood ? pct : (selfSaved ? Math.round(100 * earnedMarks / totalMarks) : 0)}%)</small>
                   {hintsUsed > 0 && <small> · {t('verdict.afterHints', { count: hintsUsed, n: hintsUsed })}</small>}
                 </span>
               </div>

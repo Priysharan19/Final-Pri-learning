@@ -136,7 +136,8 @@ export const flow = {
     await check('every resolved question is in History', rows === 2, `${rows} rows, expected 2`);
     const scores = await page.locator('.hist-row').allInnerTexts();
     await check('History remembers which one was right',
-      scores.some(t => t.includes('✔')) && scores.some(t => t.includes('✖')),
+      // The verdict is an icon plus its spoken word, so the words are what a row says.
+      scores.some(t => /\bCorrect\b/.test(t)) && scores.some(t => /\bIncorrect\b/.test(t)),
       `rows read ${JSON.stringify(scores.map(t => t.replace(/\s+/g, ' ').slice(0, 60)))}`);
     await check('both attempts are on the same question',
       scores.every(t => t.includes('Linear Equations')),

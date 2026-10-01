@@ -208,7 +208,7 @@ export default {
   'history.filterAll': 'All',
   'history.filterWrong': 'Incorrect',
   'history.filterCorrect': 'Correct',
-  'history.filterBookmarked': 'Saved',
+  'history.filterBookmarked': 'Bookmarked',
   'history.filterInk': 'Handwritten',
   'history.filterGroup': 'Filter your history',
   'history.modePractice': 'Practice',

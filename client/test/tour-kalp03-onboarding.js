@@ -192,6 +192,10 @@ export const flow = {
 
     await page.reload({ waitUntil: 'domcontentloaded' });
     await page.waitForSelector('.shell');
+    // Practice is a thinking-mode route with no account furniture; its one way
+    // out is the workspace bar's Home control.
+    await page.locator('.ws-exit').click();
+    await page.waitForSelector('.home-greet');
     await check('reload restores the actual created profile',
       (await page.locator('.user-chip').innerText()).includes('KALP03'));
     await check('English remains profile-specific after reload',
