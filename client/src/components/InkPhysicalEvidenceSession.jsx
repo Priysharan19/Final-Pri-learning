@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import InkAnswer from '../ink/InkAnswer.jsx';
 import { nativeInk, nativeInkAvailable } from '../ink/native.js';
+import { downloadJSON } from '../lib/files.js';
 import {
   REAL_PENCIL_PROMPTS,
   assignedEvidenceSplit,
@@ -30,19 +31,7 @@ function cloneStrokes(strokes) {
 }
 
 function shareJson(filename, value) {
-  const content = JSON.stringify(value, null, 2);
-  const nativeShare = window.webkit?.messageHandlers?.priShare;
-  if (nativeShare) {
-    nativeShare.postMessage({ filename, content });
-    return;
-  }
-  const blob = new Blob([content], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = filename;
-  link.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1500);
+  return downloadJSON(value, filename);
 }
 
 export default function InkPhysicalEvidenceSession() {

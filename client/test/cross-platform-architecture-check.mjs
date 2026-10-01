@@ -138,9 +138,9 @@ ok(/no physical-iPhone evidence/i.test(docs['IPHONE_GAP_REPORT.md']),
 // ── 5 · Docs cite only files that exist (or are explicitly planned) ──────────
 // Paths a CP task will create. Citing them is a plan, not a claim.
 const PLANNED = [
-  'client/src/platform/native/', 'android/', 'scripts/sync-android.mjs',
+  'android/', 'scripts/sync-android.mjs',
   'client/test/fixtures/native-envelope/', 'client/test/responsive-matrix.mjs',
-  'client/test/native-host-contract-check.mjs', 'server/platform/googleBilling.js',
+  'server/platform/googleBilling.js',
   'server/test/google-billing-check.mjs', '.github/workflows/android-shell.yml', 'scripts/iphone-journey.mjs',
 ];
 // Build outputs that are gitignored, so a fresh CI checkout does not have them.
@@ -168,33 +168,13 @@ const missing = [...cited].filter(p => !PLANNED.some(pre => p.startsWith(pre)) &
 ok(cited.size > 40, `the docs cite real repository evidence (${cited.size} paths)`);
 ok(missing.length === 0, `every cited path exists or is declared planned — missing: ${missing.join(', ')}`);
 
-// ── 6 · Direct WebKit bridge access may only shrink (ratchet) ────────────────
-// CP-02 replaces these with client/src/platform/native/ and must shrink this
-// list to that module alone. Adding a file here is an architecture regression.
-const WEBKIT_BRIDGE_ALLOWED = new Set([
-  'client/src/ink/native.js',
-  'client/src/native/photo.js',
-  'client/src/platform/nativeBilling.js',
-  'client/src/platform/cloudTransport.js',
-  'client/src/lib/files.js',
-  'client/src/components/InkPhysicalEvidenceSession.jsx',
-]);
-// Readers of the legacy injected `__PRI_NATIVE*__` flags (same ratchet).
-const NATIVE_FLAG_ALLOWED = new Set([
-  'client/dev/devStructural.js',
-  'client/src/components/CloudAccountPanel.jsx',
-  'client/src/ink/native.js',
-  'client/src/ink/personal.js',
-  'client/src/lib/files.js',
-  'client/src/local/backend.js',
-  'client/src/local/offlineWarm.js',
-  'client/src/main.jsx',
-  'client/src/native/photo.js',
-  'client/src/pages/SettingsLegacy.jsx',
-  'client/src/platform/cloudTransport.js',
-  'client/src/platform/nativeBilling.js',
-  'client/src/platform/releaseIdentity.js',
-]);
+// ── 6 · Only the platform contract talks to native shells (CP-02) ──────────
+// CP-02 moved every WebKit call and every injected-global read behind
+// client/src/platform/native/. The allowlists below are now empty and may stay
+// empty: a product module that reaches for window.webkit or a `__PRI_NATIVE*__`
+// flag is an architecture regression.
+const WEBKIT_BRIDGE_ALLOWED = new Set([]);
+const NATIVE_FLAG_ALLOWED = new Set([]);
 const isContract = rel => rel.startsWith('client/src/platform/native/');
 const SRC = n => /\.(jsx?|mjs|cjs|tsx?)$/.test(n);
 const sources = [...walk(at('client/src'), SRC), ...walk(at('client/dev'), SRC), ...walk(at('client/public'), SRC), at('client/index.html')]
@@ -217,6 +197,19 @@ const staleFlags = [...NATIVE_FLAG_ALLOWED].filter(r => !flagUsers.includes(r));
 ok(staleFlags.length === 0,
   `the native-flag allowlist has no stale entries; tighten it — stale: ${staleFlags.join(', ')}`);
 
+// The shell's receivers, events and host descriptor are contract internals too.
+const internals = sources
+  .filter(([r, s]) => !isContract(r) && /__priInkReceive|__priPhotoReceive|__priNativeReceive|pri:native-[a-z-]+|__PRI_HOST__|['"`]host\.diagnostics['"`]/.test(s))
+  .map(([r]) => r);
+ok(internals.length === 0,
+  `no product module touches native receivers, native events, __PRI_HOST__ or host.diagnostics — found: ${internals.join(', ')}`);
+for (const mod of ['index.js', 'host.js', 'bridge.js', 'envelope.js', 'errors.js', 'legacyApple.js', 'fakeHost.js']) {
+  ok(existsSync(at(`client/src/platform/native/${mod}`)), `the platform contract module ${mod} exists`);
+}
+const nativeIndex = existsSync(at('client/src/platform/native/index.js')) ? read('client/src/platform/native/index.js') : '';
+ok(/const INK_KEYS = new Set\(/.test(nativeIndex) && /const safe = answerBlindInkMessage\(message\);\s*if \(!safe\) return false;\s*return getRuntime\(\)\.legacy\.ink\.post\(safe\);/.test(nativeIndex),
+  'native ink messages pass an answer-blind key allowlist before they are posted');
+
 // ── 7 · Layout does not sniff the device ─────────────────────────────────────
 const sniffers = sources.filter(([, s]) => /navigator\s*(?:\??\.\s*|\[\s*['"`])(?:userAgent(?:Data)?|platform|vendor)\b|\{[^}]*\b(?:userAgent(?:Data)?|platform|vendor)\b[^}]*\}\s*=\s*(?:window\s*\.\s*|globalThis\s*\.\s*)?navigator\b/.test(s)).map(([r]) => r);
 ok(sniffers.length === 0, `no shared client code sniffs navigator.userAgent/platform — found: ${sniffers.join(', ')}`);
@@ -236,7 +229,19 @@ ok(stores.length === 1 && stores[0] === 'WKWebsiteDataStore.default()' && !/nonP
   `with exactly one, persistent website data store — found: ${stores.join(' | ') || 'none'}`);
 ok(/index\.html/.test(read(`${IOS}/LocalSchemeHandler.swift`)),
   'and the scheme handler keeps its index.html fallback that BrowserRouter routes depend on');
-for (const copy of ['ios/PriLearning 2.swiftpm/WebShell.swift', 'ios/PriLearning 2.swiftpm/Package.swift']) {
+// CP-02: privileged messages only from the main frame of prilearning://app, and
+// the host descriptor/flags reach the main frame only.
+ok(/forMainFrameOnly:\s*true/.test(shellCode) && !/forMainFrameOnly:\s*false/.test(shellCode),
+  'native capability globals are injected into the main frame only');
+const gate = shellCode.match(/static func isTrustedSender\(([\s\S]*?)\n {8}\}/);
+ok(!!gate && /message\.webView === webView/.test(gate[1]) && /message\.frameInfo\.isMainFrame/.test(gate[1]) &&
+  /origin\.protocol == "prilearning"/.test(gate[1]) && /origin\.host == "app"/.test(gate[1]),
+  'the shell trusts only its own web view, main frame, prilearning://app');
+const route = shellCode.indexOf('didReceive message: WKScriptMessage)');
+const guardAt = shellCode.indexOf('guard Coordinator.isTrustedSender(message, expected: shellWebView) else { return }', route);
+const firstRoute = shellCode.indexOf('message.name ==', route);
+ok(route > 0 && guardAt > route && guardAt < firstRoute, 'every bridge message passes the sender gate before it is routed');
+for (const copy of ['ios/PriLearning 2.swiftpm/WebShell.swift', 'ios/PriLearning 2.swiftpm/NativeHostBridge.swift', 'ios/PriLearning 2.swiftpm/Package.swift']) {
   if (existsSync(at(copy))) ok(read(copy) === read(copy.replace('PriLearning 2.swiftpm', 'PriLearning.swiftpm')),
     `${copy} matches the canonical package`);
 }
@@ -307,5 +312,5 @@ ok(headerReaders.length === 1 && headerReaders[0] === 'server/platform/security.
 
 console.log(failures.length
   ? `CROSS-PLATFORM ARCHITECTURE: FAIL — ${failures.length} of ${pass + failures.length} checks failed\n  · ${failures.join('\n  · ')}`
-  : `CROSS-PLATFORM ARCHITECTURE: PASS — ${pass}/${pass} checks — one shared product, WebKit bridge access confined to ${WEBKIT_BRIDGE_ALLOWED.size} files, the iPad data origin unchanged, no secrets in any shell.`);
+  : `CROSS-PLATFORM ARCHITECTURE: PASS — ${pass}/${pass} checks — one shared product, WebKit access only inside the platform contract, the iPad data origin unchanged, no secrets in any shell.`);
 process.exit(failures.length ? 1 : 0);

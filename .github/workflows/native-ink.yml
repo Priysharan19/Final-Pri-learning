@@ -10,7 +10,9 @@ on:
       - 'ios/PriLearning.swiftpm/**'
       - 'ios/PriLearning 2.swiftpm/**'
       - 'client/src/ink/native.js'
+      - 'client/src/platform/native/**'
       - 'client/test/native-ink-check.mjs'
+      - 'scripts/native-bridge-selfcheck.mjs'
       - 'scripts/ink-native-check.mjs'
       - 'scripts/check-native-package-sync.mjs'
       - 'handwriting/v12/**'
@@ -20,7 +22,9 @@ on:
       - 'ios/PriLearning.swiftpm/**'
       - 'ios/PriLearning 2.swiftpm/**'
       - 'client/src/ink/native.js'
+      - 'client/src/platform/native/**'
       - 'client/test/native-ink-check.mjs'
+      - 'scripts/native-bridge-selfcheck.mjs'
       - 'scripts/ink-native-check.mjs'
       - 'scripts/check-native-package-sync.mjs'
       - 'handwriting/v12/**'
@@ -60,3 +64,9 @@ jobs:
 
       - name: Native PencilKit + Vision self-check
         run: npm run test:ink:native
+
+      # CP-02: the priNative contract inside real WebKit — deep-frozen host
+      # descriptor, no OS identity, main-frame envelope round trip, and a
+      # same-origin subframe refused by the sender gate. Simulator evidence.
+      - name: priNative bridge self-check (iPad simulator)
+        run: node scripts/native-bridge-selfcheck.mjs --family ipad

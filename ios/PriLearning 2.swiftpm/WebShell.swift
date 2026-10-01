@@ -7,8 +7,9 @@
 //     handwriting recognition behind it (Ink/) — see InkBridge
 //   • StoreKit 2 purchase/restore bridge; Premium remains server-authoritative
 //   • native HTTPS cloud bridge that owns account cookies/CSRF outside WebKit
-//   • priShare message handler → iOS share sheet for backups / task packs /
-//     progress files (AirDrop, Files, Mail…)
+//   • priBridge: the platform-neutral priNative envelope (NativeHostBridge) —
+//     handshake, share/print, storage/device facts, app lifecycle events
+//   • priShare message handler → iOS share sheet (legacy, migration window)
 //   • WKDownload for any blob downloads → share sheet
 //   • external http(s) links open in Safari
 //   • camera/file inputs work natively for photo attach and imports
@@ -42,17 +43,20 @@ struct WebShell: UIViewRepresentable {
         config.allowsInlineMediaPlayback = true
         config.defaultWebpagePreferences.allowsContentJavaScript = true
 
-        // Tell the web app it is running inside the native shell. Billing and
-        // cloud transport have independent capability flags so each can fail
-        // closed when its native/deployment prerequisite is missing.
+        // Describe the shell to the web app: the deep-frozen priNative host
+        // descriptor (capabilities, no OS identity) plus the legacy flags kept
+        // for the migration window. Main frame only — a subframe never learns
+        // that native capabilities exist. Billing and cloud fail closed
+        // independently when their prerequisite is missing.
         let cloudConfigured = NativeCloudBridge.isConfigured ? "true" : "false"
         let nativeReleaseIdentity = NativeReleaseIdentity.javaScriptLiteral
         let nativeFlag = WKUserScript(
-            source: "window.__PRI_NATIVE__ = true; window.__PRI_NATIVE_INK__ = true; window.__PRI_NATIVE_PHOTO__ = true; window.__PRI_NATIVE_BILLING__ = true; window.__PRI_NATIVE_CLOUD__ = true; window.__PRI_NATIVE_CLOUD_CONFIGURED__ = \(cloudConfigured); window.__PRI_NATIVE_RELEASE_IDENTITY__ = \(nativeReleaseIdentity);",
+            source: NativeHostBridge.hostScript(cloudConfigured: NativeCloudBridge.isConfigured) + " window.__PRI_NATIVE__ = true; window.__PRI_NATIVE_INK__ = true; window.__PRI_NATIVE_PHOTO__ = true; window.__PRI_NATIVE_BILLING__ = true; window.__PRI_NATIVE_CLOUD__ = true; window.__PRI_NATIVE_CLOUD_CONFIGURED__ = \(cloudConfigured); window.__PRI_NATIVE_RELEASE_IDENTITY__ = \(nativeReleaseIdentity);",
             injectionTime: .atDocumentStart,
-            forMainFrameOnly: false
+            forMainFrameOnly: true
         )
         config.userContentController.addUserScript(nativeFlag)
+        config.userContentController.add(context.coordinator, name: "priBridge")
         config.userContentController.add(context.coordinator, name: "priShare")
         config.userContentController.add(context.coordinator, name: "priInk")
         config.userContentController.add(context.coordinator, name: "priPhoto")
@@ -85,6 +89,7 @@ struct WebShell: UIViewRepresentable {
         context.coordinator.attachInk(to: webView, in: container)
         context.coordinator.attachBilling(to: webView)
         context.coordinator.attachCloud(to: webView)
+        context.coordinator.attachHost(to: webView)
         container.onLayout = { [weak coordinator = context.coordinator] in
             coordinator?.ink.webViewDidResize()
         }
@@ -106,6 +111,7 @@ struct WebShell: UIViewRepresentable {
         coordinator.detachInk()
         coordinator.detachBilling()
         coordinator.detachCloud()
+        coordinator.detachHost()
     }
 
     // MARK: - Coordinator
@@ -116,6 +122,7 @@ struct WebShell: UIViewRepresentable {
         private let photoOCR = PhotoOCRBridge()
         private let billing = StoreKitBillingBridge()
         private let cloud = NativeCloudBridge()
+        private let host = NativeHostBridge()
 
         // ── Native ink ──
         let ink = InkBridge()
@@ -165,8 +172,31 @@ struct WebShell: UIViewRepresentable {
             cloud.detach()
         }
 
+        func attachHost(to webView: WKWebView) {
+            host.attach(to: webView)
+        }
+
+        func detachHost() {
+            host.detach()
+        }
+
+        /// Privileged messages are accepted only from this shell's own web view,
+        /// its main frame, and the bundled prilearning://app origin. A subframe,
+        /// a remote page or any other origin can never drive ink, StoreKit, the
+        /// native cookie jar or the share sheet.
+        static func isTrustedSender(_ message: WKScriptMessage, expected webView: WKWebView?) -> Bool {
+            guard let webView, message.webView === webView, message.frameInfo.isMainFrame else { return false }
+            let origin = message.frameInfo.securityOrigin
+            return origin.protocol == "prilearning" && origin.host == "app" && origin.port == 0
+        }
+
         // ── Bridges from the page ──
         func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+            guard Coordinator.isTrustedSender(message, expected: shellWebView) else { return }
+            if message.name == "priBridge" {
+                host.handle(message.body)
+                return
+            }
             if message.name == "priInk" {
                 ink.handle(message.body)
                 return
@@ -198,6 +228,19 @@ struct WebShell: UIViewRepresentable {
                 // Nothing sensible to do beyond not crashing — the web side
                 // falls back to its own download path on the next attempt.
             }
+        }
+
+        // A new main-frame document starts its own priNative event sequence.
+        func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
+            host.documentDidStart()
+        }
+
+        private var bridgeSelfCheckRan = false
+        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+            // Simulator/CI only: prove the bridge contract inside real WebKit.
+            guard BridgeSelfCheck.requested, !bridgeSelfCheckRan else { return }
+            bridgeSelfCheckRan = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) { BridgeSelfCheck.run(in: webView) }
         }
 
         // ── Navigation policy ──
