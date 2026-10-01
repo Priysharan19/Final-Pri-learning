@@ -568,7 +568,9 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     .replace(/\s+/g, ' ').trim(), [question.prompt]);
   // A page of paper sized to the device: a phone gets a shorter first sheet so
   // the action bar and the question are never pushed off-screen.
-  const inkPageHeight = typeof window !== 'undefined' && window.innerWidth <= 760 ? 340 : 420;
+  const inkPageHeight = typeof window === 'undefined' ? 420
+    : window.innerWidth <= 760 ? 340
+      : window.innerHeight > window.innerWidth ? Math.min(640, Math.round(window.innerHeight * 0.48)) : 420;
 
   // Only handwriting is gated: typing and photo carry no reading to doubt.
   const doubt = useMemo(

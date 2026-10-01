@@ -339,7 +339,7 @@ export default function Practice() {
             </button>
           )}
           {(subtopic || taskId || difficulty || pyqOnly || assignmentMode) && (
-            <button className="icon-btn" title={t(assignmentMode ? 'assignment.leaveShort' : 'practice.clearFilters')}
+            <button className="icon-btn ws-clear" title={t(assignmentMode ? 'assignment.leaveShort' : 'practice.clearFilters')}
               aria-label={t(assignmentMode ? 'assignment.leaveShort' : 'practice.clearFilters')} onClick={() => setParams({})}><Icon name="close" /></button>
           )}
           {!assignmentCompleteLocally && (
@@ -384,6 +384,17 @@ export default function Practice() {
             study ritual, so the filter stays one tap away in the bar; on, every
             question served is a real question from a published paper, and a
             chapter the archive cannot serve says so. */}
+        {user.course === 'in' && !assignmentMode && !taskId && (
+          <div className="row ws-filter-inline" style={{ gap: 8 }}>
+            <button type="button" className="icon-btn ws-filter" aria-pressed={pyqOnly}
+              title={t('practice.pyqOnlyTitle')} onClick={() => setPyqOnly(!pyqOnly)}>
+              {t(pyqOnly ? 'practice.pyqOnlyLabelOn' : 'practice.pyqOnlyLabel')}
+            </button>
+            {(subtopic || difficulty || pyqOnly) && (
+              <button type="button" className="icon-btn" onClick={() => setParams({})}>{t('practice.clearFilters')}</button>
+            )}
+          </div>
+        )}
         {pyqOnly && <p className="muted">{t('practice.pyqOnlyNote')}</p>}
 
         {capped && <FreeCapNotice gate={capped} onRetry={load} />}

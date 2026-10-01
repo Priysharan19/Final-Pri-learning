@@ -563,9 +563,9 @@ export default function Teach() {
                       try {
                         const pack = await api.get(`/tasks/${t.id}/pack`);
                         downloadJSON(pack, `pri-task-${t.title.replace(/\s+/g, '-').toLowerCase()}-${dateStamp()}.json`);
-                        setMsg('📦 Task pack exported — students import it from their Tasks page');
+                        setMsg('Task pack exported — students import it from their Tasks page');
                       } catch (err) { setMsg(`⚠️ ${err.message}`); }
-                    }}>📦 Pack</button>
+                    }}>Export pack</button>
                   <button className="btn btn-quiet btn-sm" onClick={async () => { await api.post(`/tasks/${t.id}/delete`); refreshAnalytics(); }}>Delete</button>
                 </div>
               ))}

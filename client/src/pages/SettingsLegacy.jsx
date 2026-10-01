@@ -125,7 +125,7 @@ function LanguageSection() {
 
   return (
     <div className="card">
-      <h2 style={{ marginBottom: 12 }}>◍ {t('lang.label')}</h2>
+      <h2 style={{ marginBottom: 12 }}>{t('lang.label')}</h2>
       <div className="row" role="group" aria-label={t('lang.label')}>
         {LANGUAGES.map(l => (
           <button key={l.id} type="button" className={`gen-opt ${chosen === l.id ? 'on' : ''}`}
@@ -250,7 +250,7 @@ const SECTIONS = [
   ['handwriting', '✒', 'settings.secHandwriting'],
   ['language', '◍', 'settings.secLanguage'],
   ['appearance', '◐', 'settings.secAppearance'],
-  ['courses', '📖', 'settings.secCourses'],
+  ['courses', '', 'settings.secCourses'],
   ['data', '⇅', 'settings.secData'],
   ['help', '?', 'settings.secHelp'],
 ];
@@ -291,7 +291,7 @@ function SecuritySection({ toast }) {
 
   return (
     <div className="card">
-      <h2 style={{ marginBottom: 8 }}>⚿ {t('settings.secSecurity')}</h2>
+      <h2 style={{ marginBottom: 8 }}>{t('settings.secSecurity')}</h2>
       <div className="set-row">
         <span className="set-k">{t('settings.accountType')}</span>
         <span className="set-v">{t('settings.accountTypeValue')}</span>
@@ -464,9 +464,9 @@ export default function Settings() {
       <h1 style={{ marginBottom: 24 }}>{t('settings.title')}</h1>
       <div className="settings-grid">
         <div className="set-menu no-print">
-          {SECTIONS.map(([k, ico, key]) => (
+          {SECTIONS.map(([k, , key]) => (
             <button key={k} className={`set-menu-item ${active === k ? 'on' : ''}`} onClick={() => goto(k)}>
-              <span style={{ width: 18, textAlign: 'center' }}>{ico}</span>{t(key)}
+              {t(key)}
             </button>
           ))}
         </div>
