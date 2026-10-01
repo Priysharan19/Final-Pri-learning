@@ -276,3 +276,56 @@ TARGETED QUESTION
 
 Do not return to:
 MORE FEATURES -> MORE RESEARCH -> MORE FEATURES.
+
+
+## W. V7 mechanistic validation
+
+The V7 deep dives narrow the next research questions from broad architecture into falsifiable mechanism tests.
+
+### W1. Tutor architecture
+- How much incremental delayed learning comes from generative language after controlling for question quality, deterministic feedback and teacher evidence?
+- Which Productive Mistake Repair actions beat a concise verified explanation on held-out transfer?
+- When do erroneous examples improve delayed self-verification despite lower immediate preference?
+
+### W2. Learner-model admission
+- Does PFA/logistic prediction match or beat BKT/deep KT on time-forward Pri data?
+- Which model is best calibrated for actual progression decisions rather than only next-response AUC?
+- What abstention rule minimizes false mastery promotion?
+- How much apparent model gain disappears under family-held-out evaluation?
+
+### W3. Causal policy
+- Which treatment effects replicate prospectively?
+- Is learner-specific heterogeneity large enough to justify departure from a population-best policy?
+- Can off-policy estimates reproduce later randomized estimates?
+- What exploration budget is safe and educationally worthwhile?
+
+### W4. Handwriting
+- What proportion of false mathematical judgments are caused by perception rather than reasoning verification?
+- Does online-stroke + image hybrid recognition materially beat either modality alone on writer × device holdout?
+- What is the value of selective learner confirmation versus automatic recognition?
+- Can first-break-focused recognition reduce required transcription while improving tutoring safety?
+
+### W5. Mathematical truth
+- For which school-math domains can SafeMath achieve an acceptably low false-correct rate?
+- What fraction of valid student methods fall outside the current rule catalogue?
+- Which proof families are worth formalizing?
+- What is the unresolved rate after symbolic, rule-engine, counterexample and formal checks?
+
+### W6. Multilingual mathematics
+- Does bilingual support improve delayed English-assessment transfer for learners who prefer Hindi/Hinglish explanation?
+- Which mathematical terms should remain bilingual rather than translated?
+- What is the semantic-drift rate of each admitted language/model route?
+- Does code-switched explanation improve comprehension without increasing assessment-language dependence?
+
+### W7. Benchmark science
+- How stable are benchmark conclusions across writer, family, school, language and device?
+- Which release thresholds correspond to meaningful downstream harm?
+- How much benchmark performance predicts real-user performance?
+- Does human adjudication disagreement concentrate in particular constructs?
+
+Canonical execution plan:
+`V7_EMPIRICAL_SCIENCE_AND_BENCHMARK_PROGRAMME.md`.
+
+The V7 rule is:
+
+> Broad literature search is complete for a mechanism when new sources stop changing the architecture, benchmark, experiment or falsifier. At that point, Pri must collect its own evidence.
