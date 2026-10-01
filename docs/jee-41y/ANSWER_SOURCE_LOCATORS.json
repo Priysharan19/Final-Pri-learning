@@ -101858,6 +101858,1098 @@
         "topic": 1
       },
       "sourceAnswerSha256": "4b227777d4dd1fc61c6f884f48641d02b4d121d3fd328cb08b5531fcacdabf8a"
+    },
+    {
+      "answerLinkingState": "ANSWER_LINKED_HIGH_CONFIDENCE",
+      "answerType": "SINGLE_CORRECT_OPTION",
+      "canonicalQuestionId": "arihant41-jee-advanced-2019-solved-paper-p01-q001",
+      "solutionLocator": {
+        "bbox": [
+          71.24,
+          542.65,
+          228.89,
+          554.51
+        ],
+        "pdfPage": 614,
+        "solutionStartTextSha256": "bc45a3cf3d32b62189f1ffdaf540cadec46248cb091f3569266d3ab88cedf11d"
+      },
+      "source": {
+        "answerBBox": [
+          71.24,
+          542.65,
+          228.89,
+          554.51
+        ],
+        "answerRepresentation": "solution-leading-option-only",
+        "pdfPage": 614,
+        "questionMarkerBBox": [
+          71.26658630371094,
+          411.1053161621094,
+          79.6849136352539,
+          421.1053161621094
+        ],
+        "questionPdfPage": 608
+      },
+      "sourceAnswerSha256": "be0b40ece2d098d9277f0f1945e6f9b92358ce7b649703e7d0f909b626e145ec"
+    },
+    {
+      "answerLinkingState": "ANSWER_LINKED_HIGH_CONFIDENCE",
+      "answerType": "SINGLE_CORRECT_OPTION",
+      "canonicalQuestionId": "arihant41-jee-advanced-2019-solved-paper-p01-q002",
+      "solutionLocator": {
+        "bbox": [
+          341.24,
+          657.01,
+          453.69,
+          668.73
+        ],
+        "pdfPage": 614,
+        "solutionStartTextSha256": "dfaa3b27f01e9e3f78c2f2c89e654db95d3f4429e91bd3744ba17438f15ac36e"
+      },
+      "source": {
+        "answerBBox": [
+          341.24,
+          657.01,
+          453.69,
+          668.73
+        ],
+        "answerRepresentation": "solution-leading-option-only",
+        "pdfPage": 614,
+        "questionMarkerBBox": [
+          71.2659912109375,
+          543.001953125,
+          79.68431854248047,
+          553.001953125
+        ],
+        "questionPdfPage": 608
+      },
+      "sourceAnswerSha256": "77cabbc309c46f7e2566a5f5f08dcedfa929a25a035379353cd33328580f940b"
+    },
+    {
+      "answerLinkingState": "ANSWER_LINKED_HIGH_CONFIDENCE",
+      "answerType": "SINGLE_CORRECT_OPTION",
+      "canonicalQuestionId": "arihant41-jee-advanced-2019-solved-paper-p01-q003",
+      "solutionLocator": {
+        "bbox": [
+          71.64,
+          344.91,
+          305.28,
+          357.17
+        ],
+        "pdfPage": 615,
+        "solutionStartTextSha256": "e29ca642595f84dbb4d9a8eb2faf32d5d76023d46b9073a41095676276b0dacc"
+      },
+      "source": {
+        "answerBBox": [
+          71.64,
+          344.91,
+          305.28,
+          357.17
+        ],
+        "answerRepresentation": "solution-leading-option-only",
+        "pdfPage": 615,
+        "questionMarkerBBox": [
+          341.2671203613281,
+          456.6421203613281,
+          349.6854553222656,
+          466.6421203613281
+        ],
+        "questionPdfPage": 608
+      },
+      "sourceAnswerSha256": "77cabbc309c46f7e2566a5f5f08dcedfa929a25a035379353cd33328580f940b"
+    },
+    {
+      "answerLinkingState": "ANSWER_LINKED_HIGH_CONFIDENCE",
+      "answerType": "SINGLE_CORRECT_OPTION",
+      "canonicalQuestionId": "arihant41-jee-advanced-2019-solved-paper-p01-q004",
+      "solutionLocator": {
+        "bbox": [
+          341.24,
+          100.47,
+          460.63,
+          112.34
+        ],
+        "pdfPage": 615,
+        "solutionStartTextSha256": "0ac50da33666f16accc0678865a9312fc8b59f9db243e0a6e3731c27946a5f13"
+      },
+      "source": {
+        "answerBBox": [
+          341.24,
+          100.47,
+          460.63,
+          112.34
+        ],
+        "answerRepresentation": "solution-leading-option-only",
+        "pdfPage": 615,
+        "questionMarkerBBox": [
+          341.26727294921875,
+          546.1107788085938,
+          349.68560791015625,
+          556.1107788085938
+        ],
+        "questionPdfPage": 608
+      },
+      "sourceAnswerSha256": "be0b40ece2d098d9277f0f1945e6f9b92358ce7b649703e7d0f909b626e145ec"
+    },
+    {
+      "answerLinkingState": "ANSWER_LINKED_HIGH_CONFIDENCE",
+      "answerType": "MULTIPLE_CORRECT_OPTIONS",
+      "canonicalQuestionId": "arihant41-jee-advanced-2019-solved-paper-p01-q005",
+      "solutionLocator": {
+        "bbox": [
+          341.24,
+          390.88,
+          440.19,
+          402.74
+        ],
+        "pdfPage": 615,
+        "solutionStartTextSha256": "70f8b18d4da0020d579ae118250868090fb7772ecd88a8da0db2ed763135a832"
+      },
+      "source": {
+        "answerBBox": [
+          341.24,
+          390.88,
+          440.19,
+          402.74
+        ],
+        "answerRepresentation": "solution-leading-option-only",
+        "pdfPage": 615,
+        "questionMarkerBBox": [
+          71.26658630371094,
+          403.7264404296875,
+          79.68482971191406,
+          413.726318359375
+        ],
+        "questionPdfPage": 609
+      },
+      "sourceAnswerSha256": "ac44a994a774071fb080ebe9803bfb3cc48dd7d97d7596e23f1a250ea7d296ee"
+    },
+    {
+      "answerLinkingState": "ANSWER_LINKED_HIGH_CONFIDENCE",
+      "answerType": "MULTIPLE_CORRECT_OPTIONS",
+      "canonicalQuestionId": "arihant41-jee-advanced-2019-solved-paper-p01-q006",
+      "solutionLocator": {
+        "bbox": [
+          71.24,
+          268.53,
+          201.81,
+          280.31
+        ],
+        "pdfPage": 616,
+        "solutionStartTextSha256": "223154dea6a827839873f559054051791356f47e02d08029f33fafd78036bf2a"
+      },
+      "source": {
+        "answerBBox": [
+          71.24,
+          268.53,
+          201.81,
+          280.31
+        ],
+        "answerRepresentation": "solution-leading-option-only",
+        "pdfPage": 616,
+        "questionMarkerBBox": [
+          71.26667785644531,
+          570.3287353515625,
+          79.68492126464844,
+          580.32861328125
+        ],
+        "questionPdfPage": 609
+      },
+      "sourceAnswerSha256": "bf7f1be56d1ad991b0e416a306c865f7dee85f2f5d86a434f6ac8c4749486935"
+    },
+    {
+      "answerLinkingState": "ANSWER_LINKED_HIGH_CONFIDENCE",
+      "answerType": "MULTIPLE_CORRECT_OPTIONS",
+      "canonicalQuestionId": "arihant41-jee-advanced-2019-solved-paper-p01-q007",
+      "solutionLocator": {
+        "bbox": [
+          341.24,
+          379.38,
+          496.61,
+          391.73
+        ],
+        "pdfPage": 616,
+        "solutionStartTextSha256": "41b3188906e5d2ae2f6449cf00d7409757572b55fb2f6c4ccccdd946793f1a13"
+      },
+      "source": {
+        "answerBBox": [
+          341.24,
+          379.38,
+          496.61,
+          391.73
+        ],
+        "answerRepresentation": "solution-leading-option-only",
+        "pdfPage": 616,
+        "questionMarkerBBox": [
+          341.2668762207031,
+          481.97515869140625,
+          349.68511962890625,
+          491.97503662109375
+        ],
+        "questionPdfPage": 609
+      },
+      "sourceAnswerSha256": "a24c7404e304a1f1f0fae4edf76cf8545458bd27c794954b1119e7f439b3b52b"
+    },
+    {
+      "answerLinkingState": "ANSWER_LINKED_HIGH_CONFIDENCE",
+      "answerType": "MULTIPLE_CORRECT_OPTIONS",
+      "canonicalQuestionId": "arihant41-jee-advanced-2019-solved-paper-p01-q008",
+      "solutionLocator": {
+        "bbox": [
+          71.24,
+          324.68,
+          216.47,
+          336.54
+        ],
+        "pdfPage": 617,
+        "solutionStartTextSha256": "b6de613ee79799fdc80da07964800c918c8853d07a794b6855a04428f2462278"
+      },
+      "source": {
+        "answerBBox": [
+          71.24,
+          324.68,
+          216.47,
+          336.54
+        ],
+        "answerRepresentation": "solution-leading-option-only",
+        "pdfPage": 617,
+        "questionMarkerBBox": [
+          341.2657165527344,
+          667.0662841796875,
+          349.6839599609375,
+          677.066162109375
+        ],
+        "questionPdfPage": 609
+      },
+      "sourceAnswerSha256": "71801cfef267d397c7556b692df176fccba769c3d2d7d6f551bde05811fc8791"
+    },
+    {
+      "answerLinkingState": "ANSWER_LINKED_HIGH_CONFIDENCE",
+      "answerType": "MULTIPLE_CORRECT_OPTIONS",
+      "canonicalQuestionId": "arihant41-jee-advanced-2019-solved-paper-p01-q009",
+      "solutionLocator": {
+        "bbox": [
+          341.24,
+          420.84,
+          428.45,
+          432.62
+        ],
+        "pdfPage": 617,
+        "solutionStartTextSha256": "a72f786155709ac1e08d733c04642a38c276eadaceaab04e685ca5759ad21a91"
+      },
+      "source": {
+        "answerBBox": [
+          341.24,
+          420.84,
+          428.45,
+          432.62
+        ],
+        "answerRepresentation": "solution-leading-option-only",
+        "pdfPage": 617,
+        "questionMarkerBBox": [
+          71.26681518554688,
+          203.95457458496094,
+          79.68505859375,
+          213.9544677734375
+        ],
+        "questionPdfPage": 610
+      },
+      "sourceAnswerSha256": "3013d9bb5b29f0259778b7a94ccf29ff90e530ea39e92cf923a4074225b39d60"
+    },
+    {
+      "answerLinkingState": "ANSWER_LINKED_HIGH_CONFIDENCE",
+      "answerType": "MULTIPLE_CORRECT_OPTIONS",
+      "canonicalQuestionId": "arihant41-jee-advanced-2019-solved-paper-p01-q010",
+      "solutionLocator": {
+        "bbox": [
+          65.65,
+          100.47,
+          254.16,
+          112.25
+        ],
+        "pdfPage": 618,
+        "solutionStartTextSha256": "101585c2b998bbeb456bf4ce304663ba6a0e3aa04374e7fa62cfe63db1f186b7"
+      },
+      "source": {
+        "answerBBox": [
+          65.65,
+          100.47,
+          254.16,
+          112.25
+        ],
+        "answerRepresentation": "solution-leading-option-only",
+        "pdfPage": 618,
+        "questionMarkerBBox": [
+          65.6988296508789,
+          382.0660400390625,
+          79.68488311767578,
+          392.0659484863281
+        ],
+        "questionPdfPage": 610
+      },
+      "sourceAnswerSha256": "ac44a994a774071fb080ebe9803bfb3cc48dd7d97d7596e23f1a250ea7d296ee"
+    },
+    {
+      "answerLinkingState": "ANSWER_LINKED_HIGH_CONFIDENCE",
+      "answerType": "MULTIPLE_CORRECT_OPTIONS",
+      "canonicalQuestionId": "arihant41-jee-advanced-2019-solved-paper-p01-q011",
+      "solutionLocator": {
+        "bbox": [
+          65.65,
+          550.04,
+          203.27,
+          561.89
+        ],
+        "pdfPage": 618,
+        "solutionStartTextSha256": "63589dffe31338ca07868dec7f80a764ae53de922e8552deccd7e0ea11067871"
+      },
+      "source": {
+        "answerBBox": [
+          65.65,
+          550.04,
+          203.27,
+          561.89
+        ],
+        "answerRepresentation": "solution-leading-option-only",
+        "pdfPage": 618,
+        "questionMarkerBBox": [
+          335.698486328125,
+          214.40660095214844,
+          349.68408203125,
+          224.406494140625
+        ],
+        "questionPdfPage": 610
+      },
+      "sourceAnswerSha256": "71801cfef267d397c7556b692df176fccba769c3d2d7d6f551bde05811fc8791"
+    },
+    {
+      "answerLinkingState": "ANSWER_LINKED_HIGH_CONFIDENCE",
+      "answerType": "MULTIPLE_CORRECT_OPTIONS",
+      "canonicalQuestionId": "arihant41-jee-advanced-2019-solved-paper-p01-q012",
+      "solutionLocator": {
+        "bbox": [
+          335.65,
+          433.14,
+          459.5,
+          445.0
+        ],
+        "pdfPage": 618,
+        "solutionStartTextSha256": "a1921f4708adbe40187e9a942b793aff3b295ecd4409a95f3895dcb7499fab04"
+      },
+      "source": {
+        "answerBBox": [
+          335.65,
+          433.14,
+          459.5,
+          445.0
+        ],
+        "answerRepresentation": "solution-leading-option-only",
+        "pdfPage": 618,
+        "questionMarkerBBox": [
+          335.69873046875,
+          359.95904541015625,
+          349.684326171875,
+          369.95892333984375
+        ],
+        "questionPdfPage": 610
+      },
+      "sourceAnswerSha256": "71801cfef267d397c7556b692df176fccba769c3d2d7d6f551bde05811fc8791"
+    },
+    {
+      "answerLinkingState": "SOLUTION_ONLY",
+      "answerType": "NUMERICAL_VALUE",
+      "canonicalQuestionId": "arihant41-jee-advanced-2019-solved-paper-p01-q013",
+      "solutionLocator": {
+        "bbox": [
+          335.65,
+          686.74,
+          495.27,
+          698.6
+        ],
+        "pdfPage": 618,
+        "solutionStartTextSha256": "56bffb629cd7ecc5f6b4d908e5da398dade17411bfe1464e979d53c8385515ff"
+      },
+      "source": {
+        "questionMarkerBBox": [
+          65.69783020019531,
+          643.7764892578125,
+          79.68389129638672,
+          653.7763671875
+        ],
+        "questionPdfPage": 610
+      },
+      "sourceAnswerSha256": null
+    },
+    {
+      "answerLinkingState": "SOLUTION_ONLY",
+      "answerType": "NUMERICAL_VALUE",
+      "canonicalQuestionId": "arihant41-jee-advanced-2019-solved-paper-p01-q014",
+      "solutionLocator": {
+        "bbox": [
+          65.65,
+          234.52,
+          282.59,
+          246.3
+        ],
+        "pdfPage": 619,
+        "solutionStartTextSha256": "78f47643f09368582543bc77f06e667a3a38e78e354f371cb497a18b029101a7"
+      },
+      "source": {
+        "questionMarkerBBox": [
+          335.6988830566406,
+          643.7771606445312,
+          349.6844787597656,
+          653.7770385742188
+        ],
+        "questionPdfPage": 610
+      },
+      "sourceAnswerSha256": null
+    },
+    {
+      "answerLinkingState": "SOLUTION_ONLY",
+      "answerType": "NUMERICAL_VALUE",
+      "canonicalQuestionId": "arihant41-jee-advanced-2019-solved-paper-p01-q015",
+      "solutionLocator": {
+        "bbox": [
+          65.65,
+          566.31,
+          262.21,
+          578.65
+        ],
+        "pdfPage": 619,
+        "solutionStartTextSha256": "03c0f9eb5fd70a3c78f6c5f0dc85f9a4bec471e08399be317da6677b4e39a6cf"
+      },
+      "source": {
+        "questionMarkerBBox": [
+          65.69868469238281,
+          100.59757995605469,
+          79.68474578857422,
+          110.59747314453125
+        ],
+        "questionPdfPage": 611
+      },
+      "sourceAnswerSha256": null
+    },
+    {
+      "answerLinkingState": "SOLUTION_ONLY",
+      "answerType": "NUMERICAL_VALUE",
+      "canonicalQuestionId": "arihant41-jee-advanced-2019-solved-paper-p01-q016",
+      "solutionLocator": {
+        "bbox": [
+          335.65,
+          148.01,
+          409.18,
+          159.88
+        ],
+        "pdfPage": 619,
+        "solutionStartTextSha256": "813fde6f31108151eea0fc6eb0065bf12ef5cb26d6632471038be64e048f12ff"
+      },
+      "source": {
+        "questionMarkerBBox": [
+          65.69904327392578,
+          149.7310028076172,
+          79.68509674072266,
+          159.73089599609375
+        ],
+        "questionPdfPage": 611
+      },
+      "sourceAnswerSha256": null
+    },
+    {
+      "answerLinkingState": "SOLUTION_ONLY",
+      "answerType": "NUMERICAL_VALUE",
+      "canonicalQuestionId": "arihant41-jee-advanced-2019-solved-paper-p01-q017",
+      "solutionLocator": {
+        "bbox": [
+          335.65,
+          397.81,
+          444.98,
+          409.59
+        ],
+        "pdfPage": 619,
+        "solutionStartTextSha256": "ec01856b4bf7c78a50b79977f0f800c22fe1cdd764094177826483d2a06a4572"
+      },
+      "source": {
+        "questionMarkerBBox": [
+          65.69878387451172,
+          198.11717224121094,
+          79.6848373413086,
+          208.1170654296875
+        ],
+        "questionPdfPage": 611
+      },
+      "sourceAnswerSha256": null
+    },
+    {
+      "answerLinkingState": "SOLUTION_ONLY",
+      "answerType": "NUMERICAL_VALUE",
+      "canonicalQuestionId": "arihant41-jee-advanced-2019-solved-paper-p01-q018",
+      "solutionLocator": {
+        "bbox": [
+          65.65,
+          100.47,
+          192.25,
+          112.34
+        ],
+        "pdfPage": 620,
+        "solutionStartTextSha256": "e49e5bd6fb52ad824745c2a7e2ef5ee65509a14a359ae66f2e0b5231e47dd418"
+      },
+      "source": {
+        "questionMarkerBBox": [
+          335.6983642578125,
+          173.5641326904297,
+          349.6839599609375,
+          183.56402587890625
+        ],
+        "questionPdfPage": 611
+      },
+      "sourceAnswerSha256": null
+    },
+    {
+      "answerLinkingState": "ANSWER_LINKED_HIGH_CONFIDENCE",
+      "answerType": "MULTIPLE_CORRECT_OPTIONS",
+      "canonicalQuestionId": "arihant41-jee-advanced-2019-solved-paper-p02-q001",
+      "solutionLocator": {
+        "bbox": [
+          71.24,
+          246.49,
+          287.39,
+          258.35
+        ],
+        "pdfPage": 620,
+        "solutionStartTextSha256": "4b116675871b37b5b5f82f7e0f546d00422f22a652edb9bbe456c8aea06083d0"
+      },
+      "source": {
+        "answerBBox": [
+          71.24,
+          246.49,
+          287.39,
+          258.35
+        ],
+        "answerRepresentation": "solution-leading-option-only",
+        "pdfPage": 620,
+        "questionMarkerBBox": [
+          71.26658630371094,
+          549.998291015625,
+          79.68482971191406,
+          559.9981689453125
+        ],
+        "questionPdfPage": 611
+      },
+      "sourceAnswerSha256": "ece1821cd6a4324fe27ac2311f9fb8575da29424d465cf2a0a939b73b856ed98"
+    },
+    {
+      "answerLinkingState": "ANSWER_LINKED_HIGH_CONFIDENCE",
+      "answerType": "MULTIPLE_CORRECT_OPTIONS",
+      "canonicalQuestionId": "arihant41-jee-advanced-2019-solved-paper-p02-q002",
+      "solutionLocator": {
+        "bbox": [
+          341.24,
+          648.33,
+          431.7,
+          660.19
+        ],
+        "pdfPage": 620,
+        "solutionStartTextSha256": "2fa36eba3335473d3f0ad3faaa479586c6ae67596b1ee22e89455efaf103baca"
+      },
+      "source": {
+        "answerBBox": [
+          341.24,
+          648.33,
+          431.7,
+          660.19
+        ],
+        "answerRepresentation": "solution-leading-option-only",
+        "pdfPage": 620,
+        "questionMarkerBBox": [
+          71.26661682128906,
+          732.5386962890625,
+          79.68486785888672,
+          742.53857421875
+        ],
+        "questionPdfPage": 611
+      },
+      "sourceAnswerSha256": "d5524dab8c2b54311ab8a1f0b1282f02df4cc27a00e20937e15fc39456bae7db"
+    },
+    {
+      "answerLinkingState": "ANSWER_LINKED_HIGH_CONFIDENCE",
+      "answerType": "MULTIPLE_CORRECT_OPTIONS",
+      "canonicalQuestionId": "arihant41-jee-advanced-2019-solved-paper-p02-q003",
+      "solutionLocator": {
+        "bbox": [
+          71.24,
+          272.52,
+          157.59,
+          284.39
+        ],
+        "pdfPage": 621,
+        "solutionStartTextSha256": "37298795be06ccc43dac8fe7a787bfca146e655ff87f7b930ea7d7079e035758"
+      },
+      "source": {
+        "answerBBox": [
+          71.24,
+          272.52,
+          157.59,
+          284.39
+        ],
+        "answerRepresentation": "solution-leading-option-only",
+        "pdfPage": 621,
+        "questionMarkerBBox": [
+          341.265869140625,
+          641.3530883789062,
+          349.6841125488281,
+          651.3529663085938
+        ],
+        "questionPdfPage": 611
+      },
+      "sourceAnswerSha256": "d5524dab8c2b54311ab8a1f0b1282f02df4cc27a00e20937e15fc39456bae7db"
+    },
+    {
+      "answerLinkingState": "ANSWER_LINKED_HIGH_CONFIDENCE",
+      "answerType": "MULTIPLE_CORRECT_OPTIONS",
+      "canonicalQuestionId": "arihant41-jee-advanced-2019-solved-paper-p02-q004",
+      "solutionLocator": {
+        "bbox": [
+          341.24,
+          163.58,
+          540.57,
+          175.97
+        ],
+        "pdfPage": 621,
+        "solutionStartTextSha256": "5f56f4433446ae225aceddce7bafd0e5b4dfc77ef416d8e146d13fd20a60143a"
+      },
+      "source": {
+        "answerBBox": [
+          341.24,
+          163.58,
+          540.57,
+          175.97
+        ],
+        "answerRepresentation": "solution-leading-option-only",
+        "pdfPage": 621,
+        "questionMarkerBBox": [
+          71.26664733886719,
+          120.39707946777344,
+          79.68489074707031,
+          130.39697265625
+        ],
+        "questionPdfPage": 612
+      },
+      "sourceAnswerSha256": "ce6d309778da4a237c7e750f1acee04154cc9c7d78c68d14708aa6c7384deae8"
+    },
+    {
+      "answerLinkingState": "ANSWER_LINKED_HIGH_CONFIDENCE",
+      "answerType": "MULTIPLE_CORRECT_OPTIONS",
+      "canonicalQuestionId": "arihant41-jee-advanced-2019-solved-paper-p02-q005",
+      "solutionLocator": {
+        "bbox": [
+          341.24,
+          412.38,
+          401.79,
+          424.09
+        ],
+        "pdfPage": 621,
+        "solutionStartTextSha256": "227b06c554ced646796eb44a09250eae60d1ba6df47bbda358ef9ed4599d2bb1"
+      },
+      "source": {
+        "answerBBox": [
+          341.24,
+          412.38,
+          401.79,
+          424.09
+        ],
+        "answerRepresentation": "solution-leading-option-only",
+        "pdfPage": 621,
+        "questionMarkerBBox": [
+          71.26622009277344,
+          220.82212829589844,
+          79.68446350097656,
+          230.822021484375
+        ],
+        "questionPdfPage": 612
+      },
+      "sourceAnswerSha256": "ce6d309778da4a237c7e750f1acee04154cc9c7d78c68d14708aa6c7384deae8"
+    },
+    {
+      "answerLinkingState": "ANSWER_LINKED_HIGH_CONFIDENCE",
+      "answerType": "MULTIPLE_CORRECT_OPTIONS",
+      "canonicalQuestionId": "arihant41-jee-advanced-2019-solved-paper-p02-q006",
+      "solutionLocator": {
+        "bbox": [
+          71.24,
+          100.47,
+          182.59,
+          112.34
+        ],
+        "pdfPage": 622,
+        "solutionStartTextSha256": "efa8d5aa8401a2a3d3459104e02a59e4fc3f11c6d3723c50e527c407448ad768"
+      },
+      "source": {
+        "answerBBox": [
+          71.24,
+          100.47,
+          182.59,
+          112.34
+        ],
+        "answerRepresentation": "solution-leading-option-only",
+        "pdfPage": 622,
+        "questionMarkerBBox": [
+          71.26618957519531,
+          327.05108642578125,
+          79.68443298339844,
+          337.05096435546875
+        ],
+        "questionPdfPage": 612
+      },
+      "sourceAnswerSha256": "cc6bc527ea7c1927d22e40b80fa9f0995ad5314e5a73a2979b52fc911589e49e"
+    },
+    {
+      "answerLinkingState": "ANSWER_LINKED_HIGH_CONFIDENCE",
+      "answerType": "MULTIPLE_CORRECT_OPTIONS",
+      "canonicalQuestionId": "arihant41-jee-advanced-2019-solved-paper-p02-q007",
+      "solutionLocator": {
+        "bbox": [
+          71.24,
+          370.34,
+          201.38,
+          382.06
+        ],
+        "pdfPage": 622,
+        "solutionStartTextSha256": "0bfea7ae904847fb79c0b8ced8db3257a3839049520d30e544dbcaf3d60a224a"
+      },
+      "source": {
+        "answerBBox": [
+          71.24,
+          370.34,
+          201.38,
+          382.06
+        ],
+        "answerRepresentation": "solution-leading-option-only",
+        "pdfPage": 622,
+        "questionMarkerBBox": [
+          71.26670837402344,
+          460.4962158203125,
+          79.6849594116211,
+          470.4961242675781
+        ],
+        "questionPdfPage": 612
+      },
+      "sourceAnswerSha256": "0f45044912a0f663b20fcf5c6151b618dafb1eb75bd30a845048a1364ce8f909"
+    },
+    {
+      "answerLinkingState": "ANSWER_LINKED_HIGH_CONFIDENCE",
+      "answerType": "MULTIPLE_CORRECT_OPTIONS",
+      "canonicalQuestionId": "arihant41-jee-advanced-2019-solved-paper-p02-q008",
+      "solutionLocator": {
+        "bbox": [
+          71.24,
+          100.47,
+          179.12,
+          112.19
+        ],
+        "pdfPage": 623,
+        "solutionStartTextSha256": "1efecd541d9aa345816973550b7fd0ca04f54785115e6b5b6b9720cc068b60ae"
+      },
+      "source": {
+        "answerBBox": [
+          71.24,
+          100.47,
+          179.12,
+          112.19
+        ],
+        "answerRepresentation": "solution-leading-option-only",
+        "pdfPage": 623,
+        "questionMarkerBBox": [
+          341.267333984375,
+          259.624267578125,
+          349.6855773925781,
+          269.6241455078125
+        ],
+        "questionPdfPage": 612
+      },
+      "sourceAnswerSha256": "d5524dab8c2b54311ab8a1f0b1282f02df4cc27a00e20937e15fc39456bae7db"
+    },
+    {
+      "answerLinkingState": "SOLUTION_ONLY",
+      "answerType": "NUMERICAL_VALUE",
+      "canonicalQuestionId": "arihant41-jee-advanced-2019-solved-paper-p02-q009",
+      "solutionLocator": {
+        "bbox": [
+          71.24,
+          724.84,
+          163.15,
+          736.69
+        ],
+        "pdfPage": 623,
+        "solutionStartTextSha256": "0a2b270e3811c3f9b0ba310908c61568f686c817c37ff8c91c3614c24855c389"
+      },
+      "source": {
+        "questionMarkerBBox": [
+          71.26597595214844,
+          679.04931640625,
+          79.68421936035156,
+          689.0491943359375
+        ],
+        "questionPdfPage": 612
+      },
+      "sourceAnswerSha256": null
+    },
+    {
+      "answerLinkingState": "SOLUTION_ONLY",
+      "answerType": "NUMERICAL_VALUE",
+      "canonicalQuestionId": "arihant41-jee-advanced-2019-solved-paper-p02-q010",
+      "solutionLocator": {
+        "bbox": [
+          335.65,
+          344.57,
+          581.7,
+          356.91
+        ],
+        "pdfPage": 623,
+        "solutionStartTextSha256": "637a3ce9e4dd14aec36523e5aad393e8f1fba191581b353eefc3fccbcd91381f"
+      },
+      "source": {
+        "questionMarkerBBox": [
+          335.6985778808594,
+          679.0479125976562,
+          349.6841735839844,
+          689.0477905273438
+        ],
+        "questionPdfPage": 612
+      },
+      "sourceAnswerSha256": null
+    },
+    {
+      "answerLinkingState": "SOLUTION_ONLY",
+      "answerType": "NUMERICAL_VALUE",
+      "canonicalQuestionId": "arihant41-jee-advanced-2019-solved-paper-p02-q011",
+      "solutionLocator": {
+        "bbox": [
+          335.65,
+          508.01,
+          436.0,
+          519.73
+        ],
+        "pdfPage": 623,
+        "solutionStartTextSha256": "dbe1fb50e61debcde58476015239ce342a57ee7575520fd3dff2c1b458bd54c5"
+      },
+      "source": {
+        "questionMarkerBBox": [
+          65.69868469238281,
+          120.72056579589844,
+          79.68474578857422,
+          130.720458984375
+        ],
+        "questionPdfPage": 613
+      },
+      "sourceAnswerSha256": null
+    },
+    {
+      "answerLinkingState": "SOLUTION_ONLY",
+      "answerType": "NUMERICAL_VALUE",
+      "canonicalQuestionId": "arihant41-jee-advanced-2019-solved-paper-p02-q012",
+      "solutionLocator": {
+        "bbox": [
+          65.65,
+          100.47,
+          305.79,
+          112.19
+        ],
+        "pdfPage": 624,
+        "solutionStartTextSha256": "7d0be89202fafa3dd8e2139b2c43ffa18e26349aaba76af9f55c300f98c084be"
+      },
+      "source": {
+        "questionMarkerBBox": [
+          65.69798278808594,
+          189.99034118652344,
+          79.68404388427734,
+          199.990234375
+        ],
+        "questionPdfPage": 613
+      },
+      "sourceAnswerSha256": null
+    },
+    {
+      "answerLinkingState": "SOLUTION_ONLY",
+      "answerType": "NUMERICAL_VALUE",
+      "canonicalQuestionId": "arihant41-jee-advanced-2019-solved-paper-p02-q013",
+      "solutionLocator": {
+        "bbox": [
+          65.65,
+          232.88,
+          103.93,
+          244.46
+        ],
+        "pdfPage": 624,
+        "solutionStartTextSha256": "cf7efb57e505a6204c7bd11cb1777ec2852a7ec96ed612b9327c6e4cdd9764fe"
+      },
+      "source": {
+        "questionMarkerBBox": [
+          335.69854736328125,
+          100.59739685058594,
+          349.68414306640625,
+          110.5972900390625
+        ],
+        "questionPdfPage": 613
+      },
+      "sourceAnswerSha256": null
+    },
+    {
+      "answerLinkingState": "SOLUTION_ONLY",
+      "answerType": "NUMERICAL_VALUE",
+      "canonicalQuestionId": "arihant41-jee-advanced-2019-solved-paper-p02-q014",
+      "solutionLocator": {
+        "bbox": [
+          65.65,
+          560.79,
+          104.64,
+          572.37
+        ],
+        "pdfPage": 624,
+        "solutionStartTextSha256": "ba685fac62ab25891b642032682c0e90fd7b703ce531541bf6347f10dffbbbe2"
+      },
+      "source": {
+        "questionMarkerBBox": [
+          335.6991882324219,
+          154.17137145996094,
+          349.6847839355469,
+          164.1712646484375
+        ],
+        "questionPdfPage": 613
+      },
+      "sourceAnswerSha256": null
+    },
+    {
+      "answerLinkingState": "ANSWER_LINKED_HIGH_CONFIDENCE",
+      "answerType": "SINGLE_CORRECT_OPTION",
+      "canonicalQuestionId": "arihant41-jee-advanced-2019-solved-paper-p02-q015",
+      "solutionLocator": {
+        "bbox": [
+          335.65,
+          401.6,
+          389.24,
+          413.46
+        ],
+        "pdfPage": 624,
+        "solutionStartTextSha256": "868fb8b67a7ac66a19113eb347fce448b060317940f1c25f2fe825c824597c28"
+      },
+      "source": {
+        "answerBBox": [
+          335.65,
+          401.6,
+          389.24,
+          413.46
+        ],
+        "answerRepresentation": "solution-leading-option-only",
+        "pdfPage": 624,
+        "questionMarkerBBox": [
+          65.69910430908203,
+          474.69708251953125,
+          79.6851577758789,
+          484.6969909667969
+        ],
+        "questionPdfPage": 613
+      },
+      "sourceAnswerSha256": "f89bf797c3b1dda4ee48380783e5e979067686a6a9540c5a40e8d75ae5f3d199"
+    },
+    {
+      "answerLinkingState": "ANSWER_LINKED_HIGH_CONFIDENCE",
+      "answerType": "SINGLE_CORRECT_OPTION",
+      "canonicalQuestionId": "arihant41-jee-advanced-2019-solved-paper-p02-q016",
+      "solutionLocator": {
+        "bbox": [
+          335.65,
+          675.54,
+          399.6,
+          687.89
+        ],
+        "pdfPage": 624,
+        "solutionStartTextSha256": "76ac1638fdf6ceb92acdeaa96159d3d8b9a4b47dd8a7b79bb7f925248b18fded"
+      },
+      "source": {
+        "answerBBox": [
+          335.65,
+          675.54,
+          399.6,
+          687.89
+        ],
+        "answerRepresentation": "solution-leading-option-only",
+        "pdfPage": 624,
+        "questionMarkerBBox": [
+          335.6988830566406,
+          448.69732666015625,
+          349.6844787597656,
+          458.69720458984375
+        ],
+        "questionPdfPage": 613
+      },
+      "sourceAnswerSha256": "f89bf797c3b1dda4ee48380783e5e979067686a6a9540c5a40e8d75ae5f3d199"
+    },
+    {
+      "answerLinkingState": "ANSWER_LINKED_HIGH_CONFIDENCE",
+      "answerType": "SINGLE_CORRECT_OPTION",
+      "canonicalQuestionId": "arihant41-jee-advanced-2019-solved-paper-p02-q017",
+      "solutionLocator": {
+        "bbox": [
+          65.65,
+          287.89,
+          254.04,
+          299.75
+        ],
+        "pdfPage": 625,
+        "solutionStartTextSha256": "69bd901642b7d106eb1e5f6839843c0c9b195a0d500f887c5d794e2fe8bbee3d"
+      },
+      "source": {
+        "answerBBox": [
+          65.65,
+          287.89,
+          254.04,
+          299.75
+        ],
+        "answerRepresentation": "solution-leading-option-only",
+        "pdfPage": 625,
+        "questionMarkerBBox": [
+          65.69868469238281,
+          100.59757995605469,
+          79.68474578857422,
+          110.59747314453125
+        ],
+        "questionPdfPage": 614
+      },
+      "sourceAnswerSha256": "8cca9bdc836007edec9df387444bbca0513dcdc3c3b8317206b9c53d045554f2"
+    },
+    {
+      "answerLinkingState": "ANSWER_LINKED_HIGH_CONFIDENCE",
+      "answerType": "SINGLE_CORRECT_OPTION",
+      "canonicalQuestionId": "arihant41-jee-advanced-2019-solved-paper-p02-q018",
+      "solutionLocator": {
+        "bbox": [
+          335.65,
+          681.64,
+          418.15,
+          694.98
+        ],
+        "pdfPage": 625,
+        "solutionStartTextSha256": "65e3d2911da6a19ed759dcf6e09d4866c4f18fa68520135be301e587f0346936"
+      },
+      "source": {
+        "answerBBox": [
+          335.65,
+          681.64,
+          418.15,
+          694.98
+        ],
+        "answerRepresentation": "solution-leading-option-only",
+        "pdfPage": 625,
+        "questionMarkerBBox": [
+          335.6988830566406,
+          100.59745788574219,
+          349.6844787597656,
+          110.59735107421875
+        ],
+        "questionPdfPage": 614
+      },
+      "sourceAnswerSha256": "be0b40ece2d098d9277f0f1945e6f9b92358ce7b649703e7d0f909b626e145ec"
     }
   ],
   "regions": [
@@ -102465,7 +103557,7 @@
     "bulkAnswerTextIncluded": false,
     "rawSourceCommitted": false,
     "restrictedAnswerDataset": "tools/jee-question-department/work/answer-links.jsonl",
-    "restrictedAnswerDatasetSha256": "01bbe67361466c4ea8b5eb0fee4c15357c65897c3d4334acc8f4990bac1860ab"
+    "restrictedAnswerDatasetSha256": "bdd2cd6aae89239ae083a0076ea8edb7f5b0fd19961b05d2d648671d5cbbbed6"
   },
   "schemaVersion": 2,
   "sourcePdfSha256": "5e3cc002a44d1848886be07cc4fbd40165ed3e6a780665db5ca8b23cb190de3b",
