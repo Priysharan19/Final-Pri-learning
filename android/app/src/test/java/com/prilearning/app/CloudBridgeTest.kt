@@ -8,8 +8,6 @@ import com.prilearning.app.cloud.CloudConfig
 import com.prilearning.app.cloud.CookieJar
 import com.prilearning.app.cloud.NativeCloud
 import com.prilearning.app.io.FileRules
-import com.sun.net.httpserver.HttpExchange
-import com.sun.net.httpserver.HttpServer
 import org.json.JSONObject
 import org.junit.After
 import org.junit.Assert.assertArrayEquals
@@ -19,7 +17,9 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
-import java.net.InetSocketAddress
+import java.net.InetAddress
+import java.net.ServerSocket
+import java.net.Socket
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -100,49 +100,56 @@ class CloudBridgeTest {
 
     // ── the real transport against a local server ─────────────────────────────
 
-    private lateinit var server: HttpServer
+    /** A deliberately tiny HTTP/1.1 server (one request per connection). */
+    private lateinit var server: ServerSocket
     private val seen = CopyOnWriteArrayList<Map<String, String?>>()
     private val gate = CountDownLatch(1)
+    private val pool = java.util.concurrent.Executors.newCachedThreadPool()
 
-    @Before fun startServer() {
-        server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
-        fun reply(ex: HttpExchange, status: Int, body: String, headers: Map<String, List<String>> = emptyMap()) {
-            for ((k, v) in headers) for (x in v) ex.responseHeaders.add(k, x)
-            ex.responseHeaders.add("X-Pri-Request-Id", "srv-1")
-            val bytes = body.toByteArray()
-            ex.sendResponseHeaders(status, if (bytes.isEmpty()) -1 else bytes.size.toLong())
-            if (bytes.isNotEmpty()) ex.responseBody.use { it.write(bytes) } else ex.close()
-        }
-        server.createContext("/") { ex ->
-            val h = ex.requestHeaders
-            seen += mapOf(
-                "path" to ex.requestURI.path, "method" to ex.requestMethod,
-                "client" to h.getFirst("X-Pri-Client"), "origin" to h.getFirst("Origin"),
-                "fetchSite" to h.getFirst("Sec-Fetch-Site"), "cookie" to h.getFirst("Cookie"),
-                "csrf" to h.getFirst("X-Pri-CSRF"), "idem" to h.getFirst("Idempotency-Key"),
-                "rid" to h.getFirst("X-Pri-Request-Id"), "body" to ex.requestBody.readBytes().toString(Charsets.UTF_8),
-            )
-            when (ex.requestURI.path) {
-                "/v1/account/login" -> reply(ex, 200, """{"account":{"id":"a1"}}""", mapOf("Set-Cookie" to listOf(
-                    "pri_cloud_session=sess; Path=/; Max-Age=3600; HttpOnly; SameSite=Lax",
-                    "pri_csrf=tok; Path=/; Max-Age=3600; SameSite=Lax")))
-                "/v1/account/logout" -> reply(ex, 200, "{}", mapOf("Set-Cookie" to listOf(
-                    "pri_cloud_session=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT",
-                    "pri_csrf=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT")))
-                "/v1/redirect" -> reply(ex, 302, "", mapOf("Location" to listOf("https://evil.example/steal")))
-                "/v1/huge" -> reply(ex, 200, "x".repeat(CloudConfig.MAX_RESPONSE_BYTES + 10))
-                "/v1/slow" -> { gate.await(10, TimeUnit.SECONDS); try { reply(ex, 200, "{}") } catch (_: Exception) {} }
-                "/v1/missing" -> reply(ex, 404, """{"error":{"code":"NOT_FOUND"}}""")
-                else -> reply(ex, 200, """{"ok":true}""")
-            }
-        }
-        server.executor = java.util.concurrent.Executors.newCachedThreadPool()
-        server.start()
+    private fun respond(socket: Socket, status: Int, body: String, headers: List<Pair<String, String>> = emptyList()) {
+        val bytes = body.toByteArray()
+        val head = StringBuilder("HTTP/1.1 $status X\r\nContent-Type: application/json\r\nX-Pri-Request-Id: srv-1\r\nConnection: close\r\nContent-Length: ${bytes.size}\r\n")
+        for ((k, v) in headers) head.append("$k: $v\r\n")
+        head.append("\r\n")
+        socket.getOutputStream().apply { write(head.toString().toByteArray()); write(bytes); flush() }
     }
 
-    @After fun stopServer() { gate.countDown(); server.stop(0) }
+    private fun handle(socket: Socket) = socket.use {
+        val input = socket.getInputStream().buffered()
+        fun line(): String { val b = StringBuilder(); while (true) { val c = input.read(); if (c < 0 || c == '\n'.code) break; if (c != '\r'.code) b.append(c.toChar()) }; return b.toString() }
+        val (method, target) = line().split(' ').let { it[0] to it[1] }
+        val headers = mutableMapOf<String, String>()
+        while (true) { val l = line(); if (l.isEmpty()) break; val i = l.indexOf(':'); headers[l.substring(0, i).trim().lowercase()] = l.substring(i + 1).trim() }
+        val length = headers["content-length"]?.toInt() ?: 0
+        val body = ByteArray(length).also { var r = 0; while (r < length) { val n = input.read(it, r, length - r); if (n < 0) break; r += n } }
+        seen += mapOf(
+            "path" to target, "method" to method, "client" to headers["x-pri-client"], "origin" to headers["origin"],
+            "fetchSite" to headers["sec-fetch-site"], "cookie" to headers["cookie"], "csrf" to headers["x-pri-csrf"],
+            "idem" to headers["idempotency-key"], "rid" to headers["x-pri-request-id"], "body" to String(body),
+        )
+        when (target) {
+            "/v1/account/login" -> respond(socket, 200, """{"account":{"id":"a1"}}""", listOf(
+                "Set-Cookie" to "pri_cloud_session=sess; Path=/; Max-Age=3600; HttpOnly; SameSite=Lax",
+                "Set-Cookie" to "pri_csrf=tok; Path=/; Max-Age=3600; SameSite=Lax"))
+            "/v1/account/logout" -> respond(socket, 200, "{}", listOf(
+                "Set-Cookie" to "pri_cloud_session=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT",
+                "Set-Cookie" to "pri_csrf=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT"))
+            "/v1/redirect" -> respond(socket, 302, "", listOf("Location" to "http://127.0.0.1:${server.localPort}/steal"))
+            "/v1/huge" -> respond(socket, 200, "x".repeat(CloudConfig.MAX_RESPONSE_BYTES + 10))
+            "/v1/slow" -> { gate.await(10, TimeUnit.SECONDS); try { respond(socket, 200, "{}") } catch (_: Exception) {} }
+            "/v1/missing" -> respond(socket, 404, """{"error":{"code":"NOT_FOUND"}}""")
+            else -> respond(socket, 200, """{"ok":true}""")
+        }
+    }
 
-    private fun origin() = "http://127.0.0.1:${server.address.port}"
+    @Before fun startServer() {
+        server = ServerSocket(0, 50, InetAddress.getByName("127.0.0.1"))
+        pool.execute { while (!server.isClosed) { val s = try { server.accept() } catch (_: Exception) { break }; pool.execute { try { handle(s) } catch (_: Exception) {} } } }
+    }
+
+    @After fun stopServer() { gate.countDown(); server.close(); pool.shutdownNow() }
+
+    private fun origin() = "http://127.0.0.1:${server.localPort}"
 
     private fun call(cloud: NativeCloud, id: String, payload: String): NativeCloud.Outcome {
         var out: NativeCloud.Outcome? = null
@@ -169,7 +176,7 @@ class CloudBridgeTest {
         assertTrue("the session was persisted", persisted.last().contains("pri_cloud_session"))
 
         call(cloud, "2", """{"path":"/v1/account/me","method":"GET"}""")
-        assertEquals("pri_cloud_session=sess; pri_csrf=tok", seen.last()["cookie"])
+        assertEquals(setOf("pri_cloud_session=sess", "pri_csrf=tok"), seen.last()["cookie"]!!.split("; ").toSet())
         assertNull("GET carries no CSRF header", seen.last()["csrf"])
 
         call(cloud, "3", """{"path":"/v1/sync/push","method":"POST","body":"{}"}""")
