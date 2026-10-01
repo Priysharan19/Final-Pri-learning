@@ -9,6 +9,19 @@
 // mounted on the same path — and reports, for every method + path, the policy
 // that is really in front of the handler.
 //
+// What the walk does and does not establish:
+//   · ORDER. Each rate limit records whether a session was established before
+//     it ran: `identity: 'account'` (requireSession earlier in the chain, so the
+//     bucket is per account) or `identity: 'ip'` (no session yet, so the bucket
+//     is per client address). A role or verified-email gate that runs before
+//     requireSession is reported in `outOfOrder`. Any other ordering — e.g. a
+//     consent gate relative to a rate limit — is not checked.
+//   · SCOPE. A path-scoped, non-router middleware (`router.use('/sync', gate)`)
+//     is attributed only to a router mounted at exactly the same path. A gate
+//     mounted on a prefix that a differently-mounted router also matches would
+//     not be attributed to that router's routes. router.js mounts every gate
+//     next to its own router, which is what makes this sufficient today.
+//
 // docs/security/route-inventory.json is the reviewed statement of what that
 // policy should be. server/test/route-inventory-check.mjs compares the two, so
 // a route added without an inventory entry, or a guard removed from one, fails
@@ -47,16 +60,22 @@ export function derivePolicy(method, chain) {
     verifiedEmail: false,
     guardianConsent: false,
     rateLimits: [],
-    csrf: false
+    csrf: false,
+    outOfOrder: []
   };
   for (const fn of chain) {
     const tag = fn?.priPolicy;
     if (!tag) continue;
+    if ((tag.verifiedEmail || Array.isArray(tag.roles)) && !policy.session) {
+      policy.outOfOrder.push(tag.verifiedEmail ? 'verifiedEmail-before-session' : 'role-before-session');
+    }
     if (tag.session) policy.session = true;
     if (tag.verifiedEmail) policy.verifiedEmail = true;
     if (tag.guardianConsent) policy.guardianConsent = true;
     if (tag.csrf && MUTATION.has(method)) policy.csrf = true;
-    if (tag.rateLimit) policy.rateLimits.push({ ...tag.rateLimit });
+    // rateLimit() keys on the session account when one was established before
+    // it, otherwise on req.ip — so its position decides who shares a bucket.
+    if (tag.rateLimit) policy.rateLimits.push({ ...tag.rateLimit, identity: policy.session ? 'account' : 'ip' });
     if (Array.isArray(tag.roles)) {
       // Successive role gates narrow: a request must pass every one of them.
       policy.roles = policy.roles === null

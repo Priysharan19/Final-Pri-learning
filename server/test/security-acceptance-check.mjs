@@ -273,7 +273,9 @@ try {
     c.eq((await h.request('/v1/account/me', { jar: second })).status, 401, 'revoked device is signed out');
     c.eq((await h.request('/v1/account/me', { jar: b.jar })).status, 200, 'revoking another device keeps this one');
 
-    // Sign out everywhere: revoking every listed device, including the current one.
+    // Revoke each device in turn, including the current one. (A single
+    // sign-out-everywhere endpoint, POST /v1/account/logout-all, arrives with
+    // PR #263; its negatives join this section when it merges.)
     const everywhere = await account();
     await resetLimits();
     const tablet = {};
@@ -282,8 +284,8 @@ try {
     for (const device of (await h.request('/v1/account/devices', { jar: everywhere.jar })).data.devices.sort((x, y) => Number(x.current) - Number(y.current))) {
       await h.request(`/v1/account/devices/${device.id}`, { method: 'DELETE', jar: everywhere.jar });
     }
-    c.eq((await h.request('/v1/account/me', { jar: tablet })).status, 401, 'sign-out-everywhere: other device dead');
-    c.eq((await h.request('/v1/account/me', { jar: everyCopy })).status, 401, 'sign-out-everywhere: this device dead');
+    c.eq((await h.request('/v1/account/me', { jar: tablet })).status, 401, 'revoke each device: other device dead');
+    c.eq((await h.request('/v1/account/me', { jar: everyCopy })).status, 401, 'revoke each device: this device dead');
 
     // Password change revokes every other session.
     const p = await account();
@@ -375,10 +377,36 @@ try {
     const aliceDevices = (await h.request('/v1/account/devices', { jar: alice.jar })).data.devices;
     c.ok(aliceDevices.every(d => !bobDevices.some(b => b.id === d.id)), 'Alice\'s device list has none of Bob\'s sessions');
 
+    // Give both accounts something in every export section (events, entities,
+    // classes) so a section that forgot its account filter cannot pass empty.
+    await resetLimits();
+    const entityPush = (who, entityId, secret, key) => h.request('/v1/sync/push', { method: 'POST', jar: who.jar, headers: { 'Idempotency-Key': key }, body: {
+      schemaVersion: 1, deviceId: who.deviceId, events: [],
+      entities: [{ kind: 'bookmark', entityId, operation: 'upsert', baseVersion: 0, body: { secret } }]
+    } });
+    c.eq((await entityPush(bob, 'bob-bookmark', 'bob-entity-secret', 'bob-entity-1')).status, 200, 'Bob stores a sync entity');
+    c.eq((await entityPush(alice, 'alice-bookmark', 'alice-entity-secret', 'alice-entity-1')).status, 200, 'Alice stores a sync entity');
+    const stamp = Date.now();
+    await db.run('INSERT INTO classes(id,teacher_account_id,name,join_code_hash,created_at) VALUES (?,?,?,?,?)', ['cls_export_bob', teacherOne.id, 'Bob Only Class', 'hash-export-bob', stamp]);
+    await db.run('INSERT INTO classes(id,teacher_account_id,name,join_code_hash,created_at) VALUES (?,?,?,?,?)', ['cls_export_alice', teacherOne.id, 'Alice Only Class', 'hash-export-alice', stamp]);
+    await db.run('INSERT INTO class_members(class_id,student_account_id,joined_at) VALUES (?,?,?)', ['cls_export_bob', bob.id, stamp]);
+    await db.run('INSERT INTO class_members(class_id,student_account_id,joined_at) VALUES (?,?,?)', ['cls_export_alice', alice.id, stamp]);
+
     const exported = await h.request('/v1/account/export', { jar: alice.jar });
     c.eq(exported.status, 200, 'Alice exports');
     c.eq(exported.data.account.id, alice.id, 'export is Alice\'s account');
     c.ok(!exported.text.includes(bob.id) && !exported.text.includes(bob.email) && !exported.text.includes('bob-private-answer'), 'export contains nothing of Bob\'s');
+    // Section by section, exactly the caller's rows — no more (leak), no fewer.
+    const ownEvents = (await db.all('SELECT id FROM learning_events WHERE account_id=?', [alice.id])).map(row => row.id).sort();
+    c.deq(exported.data.learningEvents.map(row => row.id).sort(), ownEvents, 'export learningEvents are exactly Alice\'s');
+    c.deq(exported.data.entities.map(row => row.entity_id).sort(), ['alice-bookmark'], 'export entities are exactly Alice\'s (none of Bob\'s)');
+    c.ok(!exported.text.includes('bob-entity-secret') && !exported.text.includes('bob-bookmark'), 'no entity body of Bob\'s appears anywhere in the export');
+    const ownClasses = (await db.all('SELECT class_id FROM class_members WHERE student_account_id=? AND removed_at IS NULL', [alice.id])).map(row => row.class_id).sort();
+    c.deq(exported.data.classes.map(row => row.id).sort(), ownClasses, 'export classes are exactly Alice\'s memberships');
+    c.ok(!exported.text.includes('cls_export_bob') && !exported.text.includes('Bob Only Class'), 'Bob\'s class membership is not in Alice\'s export');
+    c.deq(Object.keys(exported.data).sort(), ['account', 'classes', 'entities', 'exportedAt', 'format', 'learningEvents'], 'the export has exactly the sections checked above');
+    await db.run("DELETE FROM class_members WHERE class_id IN ('cls_export_bob','cls_export_alice')");
+    await db.run("DELETE FROM classes WHERE id IN ('cls_export_bob','cls_export_alice')");
     c.eq((await h.request(`/v1/account/export?accountId=${bob.id}`, { jar: alice.jar })).data.account.id, alice.id, 'an accountId query parameter is ignored');
 
     await db.run("UPDATE entitlement_snapshots SET plan='premium',status='active',provider='web' WHERE account_id=?", [bob.id]);
@@ -673,6 +701,54 @@ try {
     c.ok(!/sk-(?:proj-)?[A-Za-z0-9]{20,}|rzp_(?:live|test)_[A-Za-z0-9]{10,}|re_[A-Za-z0-9]{20,}|-----BEGIN [A-Z ]*PRIVATE KEY-----/.test(haystack), 'nothing secret-shaped appears in responses or logs');
     c.ok(!/pri_cloud_session=[A-Za-z0-9_-]{20}/.test(captured.join('')), 'no session cookie value was logged');
     c.ok(responses.length > 500, `${responses.length} responses searched`);
+  }
+
+  // ══ G. A signed provider webhook is never refused for its contents ════════
+  // A NUL in a customer-controlled field (subscription notes) must not turn a
+  // genuine, signed event into a 400 the provider retries until it gives up.
+  {
+    const razorpayEnv = {
+      PRI_RAZORPAY_KEY_ID: 'rzp_test_acceptance', PRI_RAZORPAY_MONTHLY_PLAN_ID: 'plan_AcceptMonthly1', PRI_RAZORPAY_ANNUAL_PLAN_ID: 'plan_AcceptAnnual12',
+      PRI_RAZORPAY_MONTHLY_TOTAL_COUNT: '120', PRI_RAZORPAY_ANNUAL_TOTAL_COUNT: '10'
+    };
+    Object.assign(process.env, razorpayEnv);
+    const billed = await startApp({ engine: requestedEngine(), log: () => {} });
+    try {
+      const buyer = await registerAccount(billed, { email: 'webhook.buyer@example.test', deviceId: 'ipad-buyer', password: 'webhook-buyer-pw-1' });
+      // The binding a server-side checkout would have stored for this subscription.
+      await billed.db.run(`INSERT INTO billing_subscriptions
+        (provider,provider_subscription_id,account_id,product_id,cadence,trial_claimed,created_at,updated_at,last_effective_at,last_event_rank,last_event_id)
+        VALUES ('web',?,?,?,?,0,?,?,0,0,NULL)`, ['sub_AcceptNul123456', buyer.account.id, razorpayEnv.PRI_RAZORPAY_MONTHLY_PLAN_ID, 'monthly', Date.now(), Date.now()]);
+      const nowSec = Math.floor(Date.now() / 1000);
+      const payload = {
+        entity: 'event', event: 'subscription.activated', contains: ['subscription'], created_at: nowSec - 10,
+        payload: { subscription: { entity: {
+          id: 'sub_AcceptNul123456', entity: 'subscription', plan_id: razorpayEnv.PRI_RAZORPAY_MONTHLY_PLAN_ID, status: 'active',
+          current_start: nowSec, current_end: nowSec + 30 * 86400, ended_at: null, start_at: nowSec,
+          notes: { pri_account_id: buyer.account.id, pri_cadence: 'monthly', customer_note: 'gift from\u0000grandma' }
+        } } }
+      };
+      const raw = JSON.stringify(payload);
+      c.ok(raw.includes('\\u0000'), 'the signed event really carries an escaped NUL');
+      const { createHmac } = await import('node:crypto');
+      const signature = createHmac('sha256', SECRETS.PRI_RAZORPAY_WEBHOOK_SECRET).update(raw).digest('hex');
+      const delivered = await fetch(`${billed.origin}/v1/billing/webhook/web`, {
+        method: 'POST', body: raw,
+        headers: { 'Content-Type': 'application/json', 'x-razorpay-signature': signature, 'x-razorpay-event-id': 'evt_accept_nul_1' }
+      });
+      const deliveredBody = await delivered.text();
+      c.ok(!deliveredBody.includes('INVALID_TEXT'), `a signed webhook with a NUL in its notes is not refused by the text gate (${delivered.status} ${deliveredBody.slice(0, 120)})`);
+      c.eq(delivered.status, 200, 'the signed webhook is applied');
+      c.eq((await billed.db.get('SELECT plan FROM entitlement_snapshots WHERE account_id=?', [buyer.account.id])).plan, 'premium', 'and the entitlement change is not lost');
+      // The exemption is the body only, and only for the webhook path.
+      const nulUrl = await fetch(`${billed.origin}/v1/billing/webhook/web?x=%00`, { method: 'POST', body: raw, headers: { 'Content-Type': 'application/json', 'x-razorpay-signature': signature } });
+      c.eq(nulUrl.status, 400, 'a NUL in the webhook URL is still refused');
+      const nulElsewhere = await billed.request('/v1/reports/', { method: 'POST', jar: buyer.jar, body: { category: 'other', note: 'a\u0000b' } });
+      c.eq(nulElsewhere.data?.error?.code, 'INVALID_TEXT', 'other bodies are still checked');
+    } finally {
+      await billed.close();
+      for (const name of Object.keys(razorpayEnv)) delete process.env[name];
+    }
   }
 } finally {
   await h.close();

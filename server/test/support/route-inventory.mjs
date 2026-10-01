@@ -48,6 +48,11 @@ export function compareInventory(mounted, inventory) {
     if (entry.verifiedEmail !== p.verifiedEmail) problems.push(`${k}: inventory verifiedEmail=${entry.verifiedEmail} but mounted ${p.verifiedEmail}`);
     if (entry.guardianConsent !== p.guardianConsent) problems.push(`${k}: inventory guardianConsent=${entry.guardianConsent} but mounted ${p.guardianConsent}`);
     if (JSON.stringify(entry.rateLimits) !== JSON.stringify(p.rateLimits)) problems.push(`${k}: inventory rateLimits ${JSON.stringify(entry.rateLimits)} but mounted ${JSON.stringify(p.rateLimits)}`);
+    for (const problem of p.outOfOrder || []) problems.push(`${k}: guard order — ${problem} (it would answer 403 where 401 is due, or read no session)`);
+    // A limit on a signed-in route that runs before requireSession is keyed by
+    // IP: every account behind one school NAT shares it, and one account can
+    // spread across addresses. Only anonymous routes may be IP-keyed.
+    if (entry.auth === 'session' && p.rateLimits.some(limit => limit.identity !== 'account')) problems.push(`${k}: rate limit runs before requireSession, so it is keyed by IP instead of by account`);
     const csrf = p.csrf ? 'double-submit-when-session-cookie' : 'not-applicable';
     if (entry.csrf !== csrf) problems.push(`${k}: inventory csrf=${entry.csrf} but mounted ${csrf}`);
   }

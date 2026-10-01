@@ -69,6 +69,23 @@ c.ok(mounted.filter(route => route.path === '/v1/handwriting/transcribe' || rout
     : route);
   c.ok(compareInventory(unguarded, inventory).some(line => line.includes('/v1/sync/push') && line.includes('requireSession')), 'self-test: a removed requireSession fails the check');
 
+  // Guard order: a session route whose limiter runs before requireSession is
+  // reported as IP-keyed; a role gate before requireSession is out of order.
+  const misordered = asyncRouter();
+  misordered.post('/ip-keyed', rateLimit(db, 'misordered', { limit: 1, windowMs: 1000 }), requireSession(db), (req, res) => res.json({}));
+  misordered.post('/role-first', requireRole('admin'), requireSession(db), (req, res) => res.json({}));
+  const [ipKeyed, roleFirst] = listRoutes(misordered, '/v1/test');
+  c.eq(ipKeyed.policy.rateLimits[0].identity, 'ip', 'self-test: a limiter before requireSession is reported as IP-keyed');
+  c.deq(roleFirst.policy.outOfOrder, ['role-before-session'], 'self-test: a role gate before requireSession is reported');
+  const orderInventory = { transportBodyLimit: '1mb', routes: [
+    { method: 'POST', path: '/v1/test/ip-keyed', auth: 'session', roles: null, verifiedEmail: false, guardianConsent: false, ownership: 'self-test route only', rateLimits: [{ key: 'misordered', limit: 1, windowMs: 1000, identity: 'ip' }], csrf: 'not-applicable', origin: 'enforced', bodyLimit: '1mb' },
+    { method: 'POST', path: '/v1/test/role-first', auth: 'session', roles: ['admin'], verifiedEmail: false, guardianConsent: false, ownership: 'self-test route only', rateLimits: [], csrf: 'not-applicable', origin: 'enforced', bodyLimit: '1mb' }
+  ] };
+  const orderProblems = compareInventory([ipKeyed, roleFirst], orderInventory);
+  c.ok(orderProblems.some(line => line.includes('/ip-keyed') && line.includes('keyed by IP')), 'self-test: an IP-keyed limit on a session route fails the check even when the inventory agrees');
+  c.ok(orderProblems.some(line => line.includes('/role-first') && line.includes('role-before-session')), 'self-test: a role gate before the session fails the check');
+  c.ok(mounted.every(route => route.policy.rateLimits.every(limit => limit.identity === (route.policy.session ? 'account' : 'ip'))), 'every mounted limit is keyed by account on session routes and by IP only on anonymous ones');
+
   // The tags the walk reads are present on the real guard factories.
   c.ok(requireSession(db).priPolicy?.session === true, 'requireSession carries its policy tag');
   c.deq([...requireRole('teacher').priPolicy.roles], ['teacher'], 'requireRole carries its roles');

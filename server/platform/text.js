@@ -6,10 +6,12 @@
 // title, device id, report note — or an id in the URL — carrying one turned a
 // sign-up, a sign-in or a lookup into a 500 on the production engine while
 // SQLite quietly stored it. Requests carrying a NUL anywhere in the URL, query
-// or JSON body are refused with a coded 400 before any handler runs. The one
-// exemption is sync push: its free-text fields are opaque JSON payloads that
-// are stored JSON-escaped (so they are safe), and refusing them would wedge a
-// device's outbox on a batch it can never change.
+// or JSON body are refused with a coded 400 before any handler runs. Two
+// bodies are exempt (server/app.js): sync push, whose free-text fields are
+// opaque JSON payloads stored JSON-escaped — refusing them would wedge a
+// device's outbox on a batch it can never change — and signed provider
+// webhooks, whose customer-controlled fields are never stored as text and whose
+// refusal would make the provider retry until the entitlement change is lost.
 //
 // A lone UTF-16 surrogate (half an emoji) is different: it cannot crash either
 // engine — both drivers store U+FFFD in its place — and clients that clip

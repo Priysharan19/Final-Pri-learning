@@ -28,7 +28,8 @@
         {
           "key": "register",
           "limit": 8,
-          "windowMs": 3600000
+          "windowMs": 3600000,
+          "identity": "ip"
         }
       ],
       "csrf": "double-submit-when-session-cookie",
@@ -47,7 +48,8 @@
         {
           "key": "login",
           "limit": 12,
-          "windowMs": 900000
+          "windowMs": 900000,
+          "identity": "ip"
         }
       ],
       "csrf": "double-submit-when-session-cookie",
@@ -92,7 +94,8 @@
         {
           "key": "verify-email-request",
           "limit": 5,
-          "windowMs": 3600000
+          "windowMs": 3600000,
+          "identity": "account"
         }
       ],
       "csrf": "double-submit-when-session-cookie",
@@ -111,7 +114,8 @@
         {
           "key": "verify-email",
           "limit": 20,
-          "windowMs": 3600000
+          "windowMs": 3600000,
+          "identity": "ip"
         }
       ],
       "csrf": "double-submit-when-session-cookie",
@@ -130,7 +134,8 @@
         {
           "key": "guardian-confirm",
           "limit": 20,
-          "windowMs": 3600000
+          "windowMs": 3600000,
+          "identity": "ip"
         }
       ],
       "csrf": "double-submit-when-session-cookie",
@@ -149,7 +154,8 @@
         {
           "key": "guardian-withdraw",
           "limit": 20,
-          "windowMs": 3600000
+          "windowMs": 3600000,
+          "identity": "ip"
         }
       ],
       "csrf": "double-submit-when-session-cookie",
@@ -181,7 +187,8 @@
         {
           "key": "reset-request",
           "limit": 6,
-          "windowMs": 3600000
+          "windowMs": 3600000,
+          "identity": "ip"
         }
       ],
       "csrf": "double-submit-when-session-cookie",
@@ -200,7 +207,8 @@
         {
           "key": "reset",
           "limit": 10,
-          "windowMs": 3600000
+          "windowMs": 3600000,
+          "identity": "ip"
         }
       ],
       "csrf": "double-submit-when-session-cookie",
@@ -219,7 +227,8 @@
         {
           "key": "password-change",
           "limit": 5,
-          "windowMs": 3600000
+          "windowMs": 3600000,
+          "identity": "account"
         }
       ],
       "csrf": "double-submit-when-session-cookie",
@@ -264,7 +273,8 @@
         {
           "key": "account-export",
           "limit": 10,
-          "windowMs": 3600000
+          "windowMs": 3600000,
+          "identity": "account"
         }
       ],
       "csrf": "not-applicable",
@@ -283,7 +293,8 @@
         {
           "key": "account-delete",
           "limit": 3,
-          "windowMs": 86400000
+          "windowMs": 86400000,
+          "identity": "account"
         }
       ],
       "csrf": "double-submit-when-session-cookie",
@@ -315,7 +326,8 @@
         {
           "key": "oidc-nonce",
           "limit": 30,
-          "windowMs": 900000
+          "windowMs": 900000,
+          "identity": "ip"
         }
       ],
       "csrf": "double-submit-when-session-cookie",
@@ -334,7 +346,8 @@
         {
           "key": "oidc-signin",
           "limit": 20,
-          "windowMs": 900000
+          "windowMs": 900000,
+          "identity": "ip"
         }
       ],
       "csrf": "double-submit-when-session-cookie",
@@ -353,7 +366,8 @@
         {
           "key": "oidc-link",
           "limit": 12,
-          "windowMs": 3600000
+          "windowMs": 3600000,
+          "identity": "account"
         }
       ],
       "csrf": "double-submit-when-session-cookie",
@@ -372,7 +386,8 @@
         {
           "key": "sync-push",
           "limit": 120,
-          "windowMs": 60000
+          "windowMs": 60000,
+          "identity": "account"
         }
       ],
       "csrf": "double-submit-when-session-cookie",
@@ -392,7 +407,8 @@
         {
           "key": "sync-pull",
           "limit": 180,
-          "windowMs": 60000
+          "windowMs": 60000,
+          "identity": "account"
         }
       ],
       "csrf": "not-applicable",
@@ -411,7 +427,8 @@
         {
           "key": "entitlements",
           "limit": 120,
-          "windowMs": 60000
+          "windowMs": 60000,
+          "identity": "account"
         }
       ],
       "csrf": "not-applicable",
@@ -432,7 +449,8 @@
         {
           "key": "entitlement-admin",
           "limit": 30,
-          "windowMs": 60000
+          "windowMs": 60000,
+          "identity": "account"
         }
       ],
       "csrf": "double-submit-when-session-cookie",
@@ -477,7 +495,8 @@
         {
           "key": "billing-cancel-web",
           "limit": 6,
-          "windowMs": 3600000
+          "windowMs": 3600000,
+          "identity": "account"
         }
       ],
       "csrf": "double-submit-when-session-cookie",
@@ -509,7 +528,8 @@
         {
           "key": "billing-apple-bootstrap",
           "limit": 60,
-          "windowMs": 3600000
+          "windowMs": 3600000,
+          "identity": "account"
         }
       ],
       "csrf": "not-applicable",
@@ -528,7 +548,8 @@
         {
           "key": "billing-apple-transaction",
           "limit": 30,
-          "windowMs": 3600000
+          "windowMs": 3600000,
+          "identity": "account"
         }
       ],
       "csrf": "double-submit-when-session-cookie",
@@ -547,7 +568,8 @@
         {
           "key": "billing-checkout-web",
           "limit": 8,
-          "windowMs": 3600000
+          "windowMs": 3600000,
+          "identity": "account"
         }
       ],
       "csrf": "double-submit-when-session-cookie",
@@ -566,7 +588,8 @@
         {
           "key": "billing-restore",
           "limit": 12,
-          "windowMs": 3600000
+          "windowMs": 3600000,
+          "identity": "account"
         }
       ],
       "csrf": "double-submit-when-session-cookie",
@@ -585,7 +608,8 @@
         {
           "key": "billing-webhook",
           "limit": 600,
-          "windowMs": 60000
+          "windowMs": 60000,
+          "identity": "ip"
         }
       ],
       "csrf": "double-submit-when-session-cookie",
@@ -620,7 +644,8 @@
         {
           "key": "class-create",
           "limit": 20,
-          "windowMs": 3600000
+          "windowMs": 3600000,
+          "identity": "account"
         }
       ],
       "csrf": "double-submit-when-session-cookie",
@@ -658,7 +683,8 @@
         {
           "key": "class-code-rotate",
           "limit": 30,
-          "windowMs": 3600000
+          "windowMs": 3600000,
+          "identity": "account"
         }
       ],
       "csrf": "double-submit-when-session-cookie",
@@ -710,7 +736,8 @@
         {
           "key": "class-join",
           "limit": 20,
-          "windowMs": 3600000
+          "windowMs": 3600000,
+          "identity": "account"
         }
       ],
       "csrf": "double-submit-when-session-cookie",
@@ -794,7 +821,8 @@
         {
           "key": "assignment-create",
           "limit": 100,
-          "windowMs": 3600000
+          "windowMs": 3600000,
+          "identity": "account"
         }
       ],
       "csrf": "double-submit-when-session-cookie",
@@ -915,7 +943,8 @@
         {
           "key": "content-index",
           "limit": 60,
-          "windowMs": 60000
+          "windowMs": 60000,
+          "identity": "ip"
         }
       ],
       "csrf": "not-applicable",
@@ -937,7 +966,8 @@
         {
           "key": "content-draft",
           "limit": 120,
-          "windowMs": 3600000
+          "windowMs": 3600000,
+          "identity": "account"
         }
       ],
       "csrf": "double-submit-when-session-cookie",
@@ -1052,7 +1082,8 @@
         {
           "key": "issue-report",
           "limit": 30,
-          "windowMs": 3600000
+          "windowMs": 3600000,
+          "identity": "account"
         }
       ],
       "csrf": "double-submit-when-session-cookie",
@@ -1117,7 +1148,8 @@
         {
           "key": "handwriting-status",
           "limit": 120,
-          "windowMs": 600000
+          "windowMs": 600000,
+          "identity": "account"
         }
       ],
       "csrf": "not-applicable",
@@ -1136,7 +1168,8 @@
         {
           "key": "handwriting-transcribe",
           "limit": 240,
-          "windowMs": 3600000
+          "windowMs": 3600000,
+          "identity": "account"
         }
       ],
       "csrf": "double-submit-when-session-cookie",
@@ -1169,7 +1202,8 @@
         {
           "key": "working-check",
           "limit": 120,
-          "windowMs": 3600000
+          "windowMs": 3600000,
+          "identity": "account"
         }
       ],
       "csrf": "double-submit-when-session-cookie",
@@ -1188,7 +1222,8 @@
         {
           "key": "telemetry",
           "limit": 120,
-          "windowMs": 60000
+          "windowMs": 60000,
+          "identity": "account"
         }
       ],
       "csrf": "double-submit-when-session-cookie",
@@ -1210,7 +1245,8 @@
         {
           "key": "admin",
           "limit": 300,
-          "windowMs": 60000
+          "windowMs": 60000,
+          "identity": "account"
         }
       ],
       "csrf": "not-applicable",
@@ -1231,7 +1267,8 @@
         {
           "key": "admin",
           "limit": 300,
-          "windowMs": 60000
+          "windowMs": 60000,
+          "identity": "account"
         }
       ],
       "csrf": "not-applicable",
@@ -1252,7 +1289,8 @@
         {
           "key": "admin",
           "limit": 300,
-          "windowMs": 60000
+          "windowMs": 60000,
+          "identity": "account"
         }
       ],
       "csrf": "double-submit-when-session-cookie",
@@ -1273,7 +1311,8 @@
         {
           "key": "admin",
           "limit": 300,
-          "windowMs": 60000
+          "windowMs": 60000,
+          "identity": "account"
         }
       ],
       "csrf": "double-submit-when-session-cookie",
@@ -1294,7 +1333,8 @@
         {
           "key": "admin",
           "limit": 300,
-          "windowMs": 60000
+          "windowMs": 60000,
+          "identity": "account"
         }
       ],
       "csrf": "not-applicable",
@@ -1315,7 +1355,8 @@
         {
           "key": "admin",
           "limit": 300,
-          "windowMs": 60000
+          "windowMs": 60000,
+          "identity": "account"
         }
       ],
       "csrf": "not-applicable",
@@ -1336,7 +1377,8 @@
         {
           "key": "admin",
           "limit": 300,
-          "windowMs": 60000
+          "windowMs": 60000,
+          "identity": "account"
         }
       ],
       "csrf": "double-submit-when-session-cookie",
@@ -1358,7 +1400,8 @@
         {
           "key": "admin",
           "limit": 300,
-          "windowMs": 60000
+          "windowMs": 60000,
+          "identity": "account"
         }
       ],
       "csrf": "not-applicable",

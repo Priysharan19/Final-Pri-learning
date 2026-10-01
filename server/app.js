@@ -86,8 +86,13 @@ export async function createServerApp(db, {
   }));
   app.use(cookieParser());
   // A NUL never reaches a handler (platform/text.js): Postgres TEXT cannot hold
-  // one, so it used to surface as a 500 on the production engine.
-  app.use('/v1', rejectUnsafeText({ exemptBody: [/^\/sync\/push\/?$/] }));
+  // one, so it used to surface as a 500 on the production engine. Two bodies are
+  // exempt. Sync push payloads are stored JSON-escaped, and refusing one would
+  // wedge a device's outbox. Signed provider webhooks are verified over the raw
+  // bytes and store only provider ids, statuses and digests; a 400 for a NUL in
+  // a customer-controlled field (subscription notes) would make the provider
+  // retry until it gives up, losing the entitlement change.
+  app.use('/v1', rejectUnsafeText({ exemptBody: [/^\/sync\/push\/?$/, /^\/billing\/webhook\/[^/]+\/?$/] }));
 
   ensureBillingSchema(db);
   const webBilling = createRazorpayBilling(db);
