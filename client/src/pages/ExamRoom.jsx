@@ -130,7 +130,7 @@ export default function ExamRoom() {
               <span className="tag">{d.title}</span>
               <span className="tag tag-brand">{t('examRoom.structured')}</span>
               <span className="tag" style={{ color: d.awarded === d.marks ? 'var(--good)' : d.awarded > 0 ? 'var(--warn)' : 'var(--bad)' }}>
-                {t('examRoom.awardedMarks', { count: d.marks, awarded: d.awarded, n: d.marks })}
+                {t('examRoom.awardedMarks', { awarded: d.awarded, n: d.marks })}
                 <span className="sr-only"> — {t(d.awarded === d.marks ? 'examRoom.allEarned' : d.awarded > 0 ? 'examRoom.partlyEarned' : 'examRoom.noneEarned')}</span>
               </span>
             </div>
@@ -175,7 +175,7 @@ export default function ExamRoom() {
               <span className="tag">{d.subtopicName}</span>
               <span className="tag">{t('examRoom.difficultyTag', { n: d.difficulty })}</span>
               <span className="tag" style={{ color: d.correct ? 'var(--good)' : d.awarded > 0 ? 'var(--warn)' : 'var(--bad)' }}>
-                {t(d.correct ? 'examRoom.tagCorrect' : d.awarded > 0 ? 'examRoom.tagPartial' : 'examRoom.tagWrong', { count: d.marks, awarded: d.awarded, n: d.marks })}
+                {t(d.correct ? 'examRoom.tagCorrect' : d.awarded > 0 ? 'examRoom.tagPartial' : 'examRoom.tagWrong', { awarded: d.awarded, n: d.marks })}
               </span>
             </div>
             <MathText block className="q-prompt" style={{ fontSize: 16 }} text={d.prompt} />
