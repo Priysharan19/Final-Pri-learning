@@ -139,7 +139,7 @@ ok(/no physical-iPhone evidence/i.test(docs['IPHONE_GAP_REPORT.md']),
 // Paths a CP task will create. Citing them is a plan, not a claim.
 const PLANNED = [
   'android/', 'scripts/sync-android.mjs',
-  'client/test/fixtures/native-envelope/', 'client/test/responsive-matrix.mjs',
+  'client/test/fixtures/native-envelope/',
   'server/platform/googleBilling.js',
   'server/test/google-billing-check.mjs', '.github/workflows/android-shell.yml', 'scripts/iphone-journey.mjs',
 ];
