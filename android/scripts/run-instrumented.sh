@@ -70,8 +70,8 @@ if [ -n "${PRI_CLOUD_ORIGIN:-}" ] && [ "$EXPECT" != "floor" ]; then
     run "$CLOUD#offlineLearningContinuesAndSyncIsNotOffered" "${cloud_args[@]}" "$@"
     # Reconnect: the same server and database come back.
     node "$HERE/../scripts/cloud-fixture-server.mjs" --port "$PRI_CLOUD_PORT" --db "$PRI_CLOUD_DB" --restart --out "$OUT/restart.env"
-    PRI_CLOUD_SERVER_PID="$(sed -n 's/^PRI_CLOUD_SERVER_PID=//p' "$OUT/restart.env")"
-    export PRI_CLOUD_SERVER_PID
+    RESTARTED_PID="$(sed -n 's/^PRI_CLOUD_SERVER_PID=//p' "$OUT/restart.env")"
+    trap '[ -n "${RESTARTED_PID:-}" ] && kill "$RESTARTED_PID" 2>/dev/null' EXIT
     summary="$summary, offline"
   fi
   adb shell am force-stop com.prilearning.app

@@ -82,3 +82,24 @@ These require a human with hardware. They are recorded as **P** evidence with de
 ## 4. Regression baseline (iPad)
 
 Every CP task from CP-02 onward must keep these green, unchanged: `npm test`, `npm run test:browser`, `npm run check:ios`, `npm run test:ink:bridge`, the iPad simulator `npm run test:ink:native`, the KALP iPad portrait/landscape tours, and the existing iPad physical-evidence workflows. Any change to `ios/PriLearning.swiftpm/Ink/**` also needs the iPad Pencil physical check before release.
+
+## 5. Android automated certification status (CP-10)
+
+`android/scripts/run-instrumented.sh` (CI: `android-shell.yml`) runs on API 33 phone, API 36 phone, API 36 tablet and API 36 foldable (`pixel_fold`). API 26 asserts the fail-closed WebView-floor screen. The cloud steps run against the **real Pri server** (`scripts/cloud-fixture-server.mjs`). Real process death (`am force-stop`) happens between runs. Evidence is SYNTHETIC / EMULATOR.
+
+| Spec item | Automated (S2) | Where |
+|---|---|---|
+| Cold launch, onboarding, local profile, Home | ✅ | `ShellJourneyTest#journey` |
+| Question loading, typed attempt, submission, feedback, next, progress | ✅ | `ShellJourneyTest#journey` |
+| Handwriting attempt, recognition | ✅ finger + stylus MotionEvents through the shared canvas; the shared recognizer marks the attempt | `InkInputTest` (CP-09) |
+| Photo | ✅ picker and camera offer with URI grants; the photo reaches the page | `FileExchangeTest` |
+| Share/export, print | ✅ | `FileExchangeTest` |
+| Signup, login, session persistence, logout, account deletion | ✅ against the real server; the deleted account's login is refused (401); a revoked session cookie is refused (401) | `CloudJourneyTest` |
+| Offline, reconnect | ✅ the server is stopped ("Linked · offline", practice works, Sync not offered), then restarted on the same database (the session is still valid, Sync completes) | `CloudJourneyTest` + runner |
+| Process recreation, rotation, Back | ✅ real process death; rotation keeps a typed answer and ink; Back closes sheets, walks history, and leaves the app from the landing page | `ShellJourneyTest`, `InkInputTest` |
+| Billing test doubles | ✅ Google billing answers in the closed error model on an image without the Play Store; the server side is covered by `google-billing-check` (100 checks with a fake Play Developer API) | `CloudJourneyTest`, `server/test` |
+| Accessibility | 🟡 a DOM-level smoke check in the real WebView on four screens, and the system font scale reaches the page. The Android Accessibility Test Framework does not inspect WebView DOM content. **TalkBack is a physical/manual gate.** | `WebViewAccessibilityTest` |
+| Low memory / process death | 🟡 real process death between runs; renderer-crash recovery is rate-limited (CP-06). Real low-memory killing on low-end hardware is **physical**. | runner, `MainActivity` |
+| Foldable / multi-window | 🟡 the foldable profile runs the whole suite; posture changes and multi-window resizing are not automated | matrix |
+
+**Not claimed (physical, DEFERRED):** real camera, S Pen / USI quality, a TalkBack walkthrough, a real Play purchase, low-end phone performance, OEM WebView variants.
