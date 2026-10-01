@@ -21,7 +21,7 @@ The product objective is therefore:
 A 2026 mathematics-specific systematic review/meta-analysis found positive average effects on motivation, but also substantial heterogeneity and documented negative experiences around competition, social comparison, external rewards and poor adaptation.
 
 Source:
-https://link.springer.com/article/10.1007/s10648-026-10116-6
+https://doi.org/10.1007/s10648-025-10108-1
 
 Broader gamification meta-analyses similarly report positive average learning/motivation effects but non-trivial implementation dependence.
 
