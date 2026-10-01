@@ -11,8 +11,12 @@
 //     last, with no other top-level transaction control in between;
 //   · avoid statements that cannot run inside a transaction (CONCURRENTLY,
 //     VACUUM, CREATE/DROP DATABASE, ALTER SYSTEM).
-// The Postgres test harness applies each file as-is (no wrapper), so a file that
-// relies on an outer transaction fails there too.
+// The Postgres test harness applies each file as-is (no wrapper) but as ONE
+// simple query, which Postgres runs in an implicit transaction — so the harness
+// alone would NOT reproduce the staging error. This static check is the gate.
+// The tokenizer is conservative: unusual quoting (E'' escapes, digit dollar
+// tags, quoted identifiers containing ; or ') can produce a false FAIL, never a
+// false pass.
 //
 // Run: node server/test/migration-transaction-check.mjs
 // ─────────────────────────────────────────────────────────────────────────────

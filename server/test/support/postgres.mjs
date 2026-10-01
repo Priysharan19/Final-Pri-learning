@@ -83,8 +83,11 @@ export async function scratchDatabase(label, { migrations = migrationFiles() } =
   try {
     for (const migration of migrations) {
       // No wrapper: the Supabase CLI does not wrap a migration in a
-      // transaction, so each file carries its own begin/commit (see
-      // migration-transaction-check.mjs) and is applied here exactly as-is.
+      // transaction, so each file carries its own begin/commit (enforced by
+      // migration-transaction-check.mjs). Sent as one simple query, a file
+      // still runs in an implicit transaction here, so this harness cannot
+      // reproduce the CLI's statement-by-statement behaviour — the static
+      // check is the gate for that.
       try {
         await client.query(migration.sql);
       } catch (error) {
