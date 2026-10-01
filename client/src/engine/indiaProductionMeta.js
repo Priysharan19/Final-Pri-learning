@@ -7,8 +7,8 @@
 // into "NCERT source-reviewed" by accident.
 
 import { IN_CURRICULUM, uncoveredDotpoints } from './curriculum-in.js';
-import { NCERT_CLASS7_2026_27_IDS, NCERT_CLASS7_2026_27_SOURCE } from './ncert/class7-2026-27-production.js';
-import { NCERT_CLASS7_PART2_2026_27_IDS, NCERT_CLASS7_PART2_2026_27_SOURCE } from './ncert/class7-part2-2026-27-production.js';
+import { NCERT_CLASS7_2026_27_IDS, NCERT_CLASS7_2026_27_SOURCE } from './ncert/class7-2026-27-syllabus.js';
+import { NCERT_CLASS7_PART2_2026_27_IDS, NCERT_CLASS7_PART2_2026_27_SOURCE } from './ncert/class7-part2-2026-27-syllabus.js';
 import {
   CBSE_CLASS10_2026_27_REVIEWED_IDS,
   CBSE_CLASS10_2026_27_SOURCE
