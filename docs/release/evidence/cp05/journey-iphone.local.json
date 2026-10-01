@@ -2,15 +2,16 @@
   "schemaVersion": 1,
   "evidenceClass": "SYNTHETIC_SIMULATOR",
   "physicalDevice": false,
-  "sha": "34fbdb5d30147287dc9796059960e410ceeba3c1",
+  "sha": "bf73ad23a2b68fb31335d1559fdc0835658746fa",
+  "dirtyWorkingTree": false,
   "simulator": {
     "name": "iPhone 18 Pro",
     "udid": "9BC565C4-0073-4759-BB56-FB53A475BB93",
-    "runtime": "iOS 27.0 (27.0 - 24A434) - com.apple.CoreSimulator.SimRuntime.iOS-27-0"
+    "runtime": "iOS-27-0"
   },
   "workflow": "local",
   "run": null,
-  "timestamp": "2026-10-01T23:02:50.410Z",
+  "timestamp": "2026-10-01T23:37:48.885Z",
   "steps": {
     "launch": {
       "ok": true,
@@ -26,7 +27,7 @@
     },
     "typedAttempt": {
       "ok": true,
-      "detail": "marked after 2 question(s)"
+      "detail": "marked after 1 question(s)"
     },
     "feedback": {
       "ok": true,
@@ -66,7 +67,7 @@
     },
     "cloudLogin": {
       "ok": true,
-      "detail": "connected as the new account"
+      "detail": "signed back in as the new account"
     },
     "cloudDeleteAccount": {
       "ok": true,
@@ -104,9 +105,13 @@
       "ok": true,
       "detail": "disconnected"
     },
+    "serverLogoutRecorded": {
+      "ok": true,
+      "detail": "1 logout(s) answered 200"
+    },
     "dynamicTypeZoom": {
       "ok": true,
-      "detail": "cssWidth=360 screen=402 rootFont=16"
+      "detail": "cssWidth=360 expected=360 scale=1.117 view=402pt"
     },
     "dynamicTypeNoOverflow": {
       "ok": true,
