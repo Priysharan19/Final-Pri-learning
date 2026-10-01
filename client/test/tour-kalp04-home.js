@@ -46,12 +46,16 @@ async function answerCurrentQuestion(page) {
 
   await enter();
   await submit();
-  if (await page.locator('.ctx-next:visible').count()) return;
 
-  // Normal practice permits one retry. Resolve the same real question rather
-  // than manufacturing progress through test-only storage writes.
-  await enter().catch(() => {});
-  await submit().catch(() => {});
+  // A wrong first attempt is still real learning. If the question is not yet
+  // resolved, the real product keeps "Show solution" visible; use that action
+  // to close the same row. Do not infer resolution from the contextual Next
+  // button because that control can exist outside the verdict state.
+  const reveal = page.getByRole('button', { name: /Show solution/i }).first();
+  if (await reveal.isVisible().catch(() => false)) {
+    await reveal.click();
+    await page.waitForTimeout(220);
+  }
 }
 
 export const flow = {
@@ -106,10 +110,12 @@ export const flow = {
     // Appearance evidence uses the real Settings control.
     await goto('/settings');
     await page.getByRole('button', { name: 'Light — paper', exact: true }).click();
+    await page.waitForFunction(() => document.documentElement.dataset.theme === 'light', { timeout: 5000 });
+    await page.waitForTimeout(120);
     await goto('/');
     await page.waitForSelector('[data-home-primary]');
     await check('light appearance persists back to Home',
-      await page.evaluate(() => document.documentElement.dataset.theme === 'light' || document.body.classList.contains('light') || getComputedStyle(document.documentElement).colorScheme.includes('light')));
+      await page.evaluate(() => document.documentElement.dataset.theme === 'light'));
     await snap(page, '05-new-student-desktop-light');
 
     await goto('/settings');
@@ -151,7 +157,8 @@ export const flow = {
     await page.waitForSelector('[data-home-primary]');
     const afterLearning = await page.locator('#home-next-title').innerText();
     await check('Home refreshes after real learning without app reload',
-      !/first Class 10 practice/i.test(afterLearning) && !/Resume where you left off/i.test(afterLearning));
+      !/first Class 10 practice/i.test(afterLearning) && !/Resume where you left off/i.test(afterLearning),
+      'selected: ' + afterLearning);
     await snap(page, '08-returning-after-learning');
 
     // A real personal task, created through the product, becomes resumable when
