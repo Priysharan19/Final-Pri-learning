@@ -858,3 +858,26 @@ Class: longitudinal multi-study evidence.
 Use: uninvited/intrusive support predicted worse achievement patterns, especially for some learner mindset profiles.
 Limitation: observational/longitudinal; not a Pri guardian-feature experiment.
 https://pubmed.ncbi.nlm.nih.gov/37166869/
+
+
+---
+
+# AD. Pri Worlds / generated interactives
+
+## Learn Your Way experimental evaluation — 2026
+Class: randomized small experimental study; 60 US students aged 15–18.
+Use: AI-powered multimodal learning improved studied outcomes and learning experience versus a digital textbook.
+Limitation: small sample, one content domain, vendor-affiliated and not Pri mathematics evidence.
+https://doi.org/10.3389/frai.2026.1783117
+
+## Google Research generative UI learning interactives — 2026
+Class: frontier research/prototype and teacher pilot.
+Use: generated guided STEM simulations with learning-design guardrails; architectural precedent for verified Pri Worlds.
+Limitation: capability/prototype evidence, not Pri efficacy.
+https://www.research.google/blog/the-future-of-practice-enabling-teachers-to-create-learning-interactives-with-generative-ui/
+
+## Digital game-based elementary mathematics meta-analysis — 2026
+Class: meta-analysis of 30 studies from 2015–2025.
+Use: positive mathematics-achievement effect with substantial moderation; simulation-oriented designs performed strongly in included evidence.
+Limitation: elementary focus and heterogeneous implementations.
+https://doi.org/10.1002/jcal.70295
