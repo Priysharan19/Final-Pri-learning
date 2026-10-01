@@ -63,7 +63,7 @@ jobs:
           grep -Fq 'CLOUD WORKING CLIENT: PASS — 47/47 checks' suites.log
           grep -Fq 'CLOUD PHOTO CLIENT: PASS — 28/28 checks' suites.log
           grep -Fq 'I18N: PASS — 187/187 checks' suites.log
-          grep -Fq 'MISCONCEPTION ONTOLOGY: PASS — 94/94 checks' suites.log
+          grep -Fq 'MISCONCEPTION ONTOLOGY: PASS — 99/99 checks' suites.log
           grep -Fq 'CLOUD HANDWRITING CLIENT: PASS — 58/58 checks' suites.log
           grep -Fq 'CLOUD WORKING CLIENT: PASS — 47/47 checks' suites.log
           grep -Fq 'CLOUD PHOTO CLIENT: PASS — 28/28 checks' suites.log

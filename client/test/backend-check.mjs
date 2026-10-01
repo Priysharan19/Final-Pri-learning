@@ -1176,8 +1176,8 @@ async function run() {
 
     // ── A cloud-proposed misconception: AI proposes, the engine decides ──────
     // Lines a student might write; the deterministic diagnoser names line 2 as
-    // `sign-on-transfer`. The question is chosen with no Step Check meta of its
-    // own, so the diagnosis rests on the two lines alone.
+    // `distribute-partial` with high confidence. The question is chosen with no
+    // Step Check meta of its own, so the diagnosis rests on the lines alone.
     {
       const noMeta = (q) => !q.stepcheck && !q.multipart && ['numeric', 'mcq'].includes(q.answerType)
         && !(q.answerType === 'numeric' && /^([a-z])\s*=$/i.test(q.answerPrefix || ''));
@@ -1193,8 +1193,11 @@ async function run() {
         target = { ...s, wrong };
       }
       if (ok('a question without Step Check meta was served for the cloud-proposal check', !!target)) {
-        const lines = ['3x + 5 = 20', '3x = 20 + 5', 'x = 25/3'];
-        const propose = (extra) => POST(`/practice/${target.question.id}/misconception`, { lines, firstBreak: 1, misconceptionId: 'sign-on-transfer', confident: true, ...extra });
+        const { diagnoseStep } = await import(`${SRC}engine/diagnose.js`);
+        const lines = ['2(x + 3) = 10', '2x + 3 = 10', 'x = 3.5'];
+        eq('the fixture is a high-confidence diagnosis', diagnoseStep({ prevText: lines[0], brokenText: lines[1] })?.confidence, 'high');
+        const ID = 'distribute-partial';
+        const propose = (extra) => POST(`/practice/${target.question.id}/misconception`, { lines, firstBreak: 1, misconceptionId: ID, confident: true, ...extra });
         await rejects('a proposal before the question is answered is refused', propose({}), { status: 409 });
         await POST(`/practice/${target.question.id}/submit`, { answer: target.wrong, ms: 4000 });
         const finalWrong = await POST(`/practice/${target.question.id}/submit`, { answer: target.wrong, ms: 4000 });
@@ -1202,7 +1205,8 @@ async function run() {
         const stored = await idb.get('questions', target.question.id);
         ok('no designed trap already claimed this question', !stored.trapKey, show(stored.trapKey));
         const owner = stored.india?.chapterId || stored.payload.subtopic;
-        const before = (await ledger(owner))['sign-on-transfer']?.n || 0;
+        const before = (await ledger(owner))[ID]?.n || 0;
+        const beforeMedium = (await ledger(owner))['sign-on-transfer']?.n || 0;
 
         const unsure = await propose({ confident: false });
         eq('an unconfident proposal is only possible', [unsure.status, unsure.recorded], ['possible', false]);
@@ -1212,14 +1216,22 @@ async function run() {
         eq('a proposal on a line the diagnoser does not name is only possible', [wrongLine.status, wrongLine.recorded], ['possible', false]);
         const other = await propose({ misconceptionId: 'other' });
         eq('"other" names nothing', [other.status, other.recorded], [null, false]);
-        eq('none of those moved the learner state', (await ledger(owner))['sign-on-transfer']?.n || 0, before);
+        // -(x + 3) = 5 → -x + 3 = 5: several slips reproduce it, so the engine
+        // is only 'medium' sure; a model agreeing with its top guess must not
+        // turn that guess into a record.
+        const medium = await propose({ lines: ['-(x + 3) = 5', '-x + 3 = 5'], misconceptionId: 'sign-on-transfer' });
+        eq('a proposal agreeing with a medium-confidence diagnosis is only possible', [medium.status, medium.recorded], ['possible', false]);
+        eq('none of those moved the learner state', [(await ledger(owner))[ID]?.n || 0, (await ledger(owner))['sign-on-transfer']?.n || 0], [before, beforeMedium]);
 
-        const agreed = await propose({});
-        eq('an agreed, confident proposal is confirmed and recorded', [agreed.status, agreed.id, agreed.line, agreed.recorded], ['confirmed', 'sign-on-transfer', 1, true]);
-        eq('it lands under the ontology ID', (await ledger(owner))['sign-on-transfer']?.n, before + 1);
+        // Two deliveries of the same confirmed proposal at once count once.
+        const [agreed, doubled] = await Promise.all([propose({}), propose({})]);
+        eq('an agreed, confident, high-confidence proposal is confirmed', [agreed.status, agreed.id, agreed.line], ['confirmed', ID, 1]);
+        eq('a doubled delivery records it exactly once', [agreed.recorded, doubled.recorded].filter(Boolean).length, 1);
+        eq('it lands under the ontology ID', (await ledger(owner))[ID]?.n, before + 1);
+        eq('and the question is marked as counted in the same write', (await idb.get('questions', target.question.id)).trapKey, ID);
         const again = await propose({});
         eq('a question records one misconception at most', [again.status, again.recorded], ['confirmed', false]);
-        eq('…so a repeated proposal does not double count', (await ledger(owner))['sign-on-transfer']?.n, before + 1);
+        eq('…so a retried proposal does not double count', (await ledger(owner))[ID]?.n, before + 1);
       }
     }
 

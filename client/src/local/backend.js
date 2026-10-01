@@ -304,6 +304,14 @@ async function recordTrap(pid, row, q, feedback) {
  */
 async function recordMisconception(pid, row, q, owner, key, label) {
   if (!key) return null;
+  const st = await ratingWithOccurrence(pid, row, q, owner, key, label);
+  await putRating(pid, owner, st);
+  row.trapKey = key;
+  return key;
+}
+
+/** The owner's rating row with one more occurrence of `key` in its ledger — not yet written. */
+async function ratingWithOccurrence(pid, row, q, owner, key, label) {
   const now = Date.now();
   const st = (await getRating(pid, owner)) || { rating: START_RATING, attempts: 0, correct: 0, last_at: null };
   const traps = { ...(st.traps || {}) };
@@ -313,10 +321,14 @@ async function recordMisconception(pid, row, q, owner, key, label) {
     label: safeLabel(label, 140),
     dotpoint: indiaDpKeyOf(row) || (row.india ? null : q.dotpoint) || prev.dotpoint || null
   };
-  await putRating(pid, owner, { ...st, traps: trimTraps(traps) });
-  row.trapKey = key;
-  return key;
+  return { ...st, traps: trimTraps(traps) };
 }
+
+// Questions whose cloud-proposed misconception is being written right now. The
+// local backend runs in one JS context, so this closes the window between
+// reading `trapKey` and writing it: a retried or doubled request cannot count
+// the same question twice.
+const recordingMisconception = new Set();
 
 /**
  * A misstep Step Check could name is the same kind of evidence a designed
@@ -357,9 +369,13 @@ async function namedTrap(pid, subtopicId, key) {
  * right says nothing about the misconception (issue #232). Two credits stop a
  * trap being surfaced or steering the queue; four and it is forgotten. A hinted
  * or second-try answer banks nothing — it is not evidence the student can do it
- * unaided. A Step Check misstep has no authored opportunity on a question, so
- * no single answer repairs it; it leaves the active set through the recency
- * window and the ledger cap instead.
+ * unaided. Opportunities are ontology IDs, so a misconception Step Check
+ * named in the student's working (say `distribute-sign`) is repaired by a clean
+ * answer to a question whose designed trap maps to that same ID — that
+ * question really did offer the slip. A Step Check misconception no authored
+ * trap maps to has no opportunity on any question, so no single answer
+ * repairs it; it leaves the active set through the recency window and the
+ * ledger cap instead.
  */
 function decayTraps(traps, opportunities) {
   const out = {};
@@ -2644,10 +2660,25 @@ const routes = {
     if (!verdict) return { status: null, id: null, line: null, recorded: false, misconception: null };
     const owner = evidenceKeyOf(row, q);
     let recorded = null;
-    if (verdict.status === 'confirmed' && row.resolution && row.resolution.correct === false
-      && !row.trapKey && !q.custom && q.subtopic && row.mode !== 'rush' && row.mode !== 'match') {
-      recorded = await recordMisconception(p.id, row, q, owner, verdict.id, verdict.title);
-      if (recorded) await put('questions', row);
+    if (verdict.status === 'confirmed' && !recordingMisconception.has(row.id)) {
+      recordingMisconception.add(row.id);
+      try {
+        // Re-read under the guard: the check-and-set is on the stored row.
+        const fresh = await get('questions', row.id);
+        if (fresh && fresh.resolution && fresh.resolution.correct === false
+          && !fresh.trapKey && !q.custom && q.subtopic && fresh.mode !== 'rush' && fresh.mode !== 'match') {
+          const ratingNext = await ratingWithOccurrence(p.id, fresh, q, owner, verdict.id, verdict.title);
+          // The occurrence and the question's "already counted" mark land in
+          // one transaction, so neither can exist without the other.
+          await atomicBatch([
+            { type: 'put', store: 'ratings', value: { ...ratingNext, key: `${p.id}:${owner}`, pid: p.id, subtopic: owner } },
+            { type: 'put', store: 'questions', value: { ...fresh, trapKey: verdict.id } }
+          ]);
+          recorded = verdict.id;
+        }
+      } finally {
+        recordingMisconception.delete(row.id);
+      }
     }
     return {
       status: verdict.status, id: verdict.id, line: verdict.line, recorded: !!recorded,

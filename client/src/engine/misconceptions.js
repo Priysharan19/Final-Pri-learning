@@ -233,8 +233,6 @@ export const AUTHORED_TRAP_SHAPES = Object.freeze([
   ['you can t just add tops and bottoms first rewrite both fractions with a common denominator', 'fraction-across'],
 
   ['both numerator terms must be divided by gx', 'cancel-over-sum'],
-  ['b # is only the first term of the numerator the whole numerator is still divided by #a #', 'cancel-over-sum'],
-  ['the formula is x b b # #ac#a the b is only the first part of the numerator and the whole numerator is divided by #a', 'cancel-over-sum'],
 
   ['gradient is rise over run y# y# x# x# it looks like the fraction is upside down', 'reciprocal-flip'],
   ['the fraction is the wrong way up from mx p the root is p m', 'reciprocal-flip'],
@@ -365,9 +363,14 @@ export function migrateRatingRow(row) {
  * Decide what a cloud-proposed misconception is worth.
  *
  *   'confirmed'  the deterministic diagnoser, on the same first-break line and
- *                the line before it, names the same ontology ID, the check was
- *                confident, and no on-device Step Check break sits elsewhere.
- *                Only this may be written into learner state.
+ *                the line before it, names the same ontology ID with HIGH
+ *                confidence (exactly one hypothesis reproduces the line — the
+ *                same bar the on-device Step Check uses before it records),
+ *                the check was confident, and no on-device Step Check break
+ *                sits elsewhere. Only this may be written into learner state.
+ *                A 'medium' diagnosis means several slips reproduce the line;
+ *                letting the model's proposal pick one of them would be the
+ *                model deciding, so it stays 'possible'.
  *   'possible'   anything else that names a real ID. Shown, hedged; never
  *                recorded.
  *   null         no usable proposal (no break, "other", unknown ID).
@@ -389,7 +392,7 @@ export function confirmCloudMisconception({ proposedId, firstBreak, lines, meta 
       meta
     });
   } catch { diagnosis = null; }
-  return misconceptionIdForDiagnosis(diagnosis) === id
+  return diagnosis && diagnosis.confidence === 'high' && misconceptionIdForDiagnosis(diagnosis) === id
     ? { id, line: firstBreak, status: 'confirmed', title: diagnosis.title }
     : possible;
 }

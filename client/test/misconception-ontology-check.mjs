@@ -135,6 +135,15 @@ const unreachable = MISCONCEPTIONS.filter(m => m.detectors.includes('authored') 
 eq(unreachable, [], 'every entry marked authored has at least one mapped trap');
 ok(AUTHORED_TRAP_SHAPES.every(r => mappedIdForTrap(r.shape.replace(/#/g, '7')) === r.id), 'a sentence of each shape maps to its ID whatever its numbers');
 eq(mappedIdForTrap('An explanation nobody mapped.'), null, 'an unmapped sentence maps to nothing');
+// Mapping audit: sentences that LOOK like a named misconception but describe
+// a different slip must stay on their derived IDs. These two quadratic-formula
+// traps fire when the student answers plain −b — the ±√ part was dropped and
+// nothing was divided — which is not cancelling one term of a sum.
+const MUST_STAY_UNMAPPED = [
+  'The formula is $x = \\dfrac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}$ — the $-b$ is only the first part of the numerator, and the whole numerator is divided by $2a$.',
+  '$-b = 7$ is only the first term of the numerator; the whole numerator is still divided by $2a = 4$.'
+];
+eq(MUST_STAY_UNMAPPED.map(why => mappedIdForTrap(why)), [null, null], 'mapping audit: the quadratic-formula "−b only" traps keep derived IDs, not cancel-over-sum');
 eq(misconceptionIdForTrap('y8-algebra', 'An explanation nobody mapped.'), misconceptionKey('y8-algebra', 'An explanation nobody mapped.'),
   'an unmapped trap keeps the derived ID it always had — nothing is lost');
 
@@ -232,11 +241,22 @@ ok(migrateRatingRow(migratedRow) === migratedRow, 'and a migrated row reads back
 ok(migrateRatingRow(undefined) === undefined, 'a missing row stays missing');
 
 // ── 5 · The cloud agreement rule ─────────────────────────────────────────────
-const lines = ['3x + 5 = 20', '3x = 20 + 5', 'x = 25/3'];
-const base = { proposedId: 'sign-on-transfer', firstBreak: 1, lines, confident: true };
+const lines = ['2(x + 3) = 10', '2x + 3 = 10', 'x = 3.5'];
+eq(diagnoseStep({ prevText: lines[0], brokenText: lines[1] })?.confidence, 'high', 'the agreement fixture is a genuinely high-confidence diagnosis');
+const base = { proposedId: 'distribute-partial', firstBreak: 1, lines, confident: true };
 eq(confirmCloudMisconception(base)?.status, 'confirmed', 'agreement on the same line with a confident check is confirmed');
 eq(confirmCloudMisconception({ ...base, confident: false })?.status, 'possible', 'an unconfident check is only possible');
 eq(confirmCloudMisconception({ ...base, proposedId: 'fraction-across' })?.status, 'possible', 'a different misconception on the same line is only possible');
+// When several slips reproduce the line the diagnoser is only 'medium' sure,
+// and a model proposing one of them must not get to choose which is recorded.
+// -(x + 3) = 5 → -x + 3 = 5 is really a distributed minus; the engine's top
+// medium guess is sign-on-transfer.
+const ambiguous = diagnoseStep({ prevText: '-(x + 3) = 5', brokenText: '-x + 3 = 5' });
+eq(ambiguous?.confidence, 'medium', 'the ambiguous fixture is a medium-confidence diagnosis');
+eq(confirmCloudMisconception({ proposedId: misconceptionIdForDiagnosis(ambiguous), firstBreak: 1, lines: ['-(x + 3) = 5', '-x + 3 = 5'], confident: true })?.status, 'possible',
+  'a proposal agreeing with a medium diagnosis is only possible — the model does not pick among the engine’s hypotheses');
+eq(confirmCloudMisconception({ proposedId: 'sign-on-transfer', firstBreak: 1, lines: ['3x + 5 = 20', '3x = 20 + 5'], confident: true })?.status, 'possible',
+  'nor does any other medium diagnosis become a record');
 eq(confirmCloudMisconception({ ...base, firstBreak: 2 })?.status, 'possible', 'the same misconception on another line is only possible');
 eq(confirmCloudMisconception({ ...base, localFirstBreak: 0 })?.status, 'possible', 'an on-device break on another line outranks the proposal');
 eq(confirmCloudMisconception({ ...base, localFirstBreak: 1 })?.status, 'confirmed', 'an on-device break on the same line agrees with it');
@@ -247,14 +267,14 @@ eq(confirmCloudMisconception({ ...base, firstBreak: 9 }), null, 'a break past th
 eq(confirmCloudMisconception({ ...base, lines: ['3x + 5 = 20', '3x + 5 = 20'] })?.status, 'possible', 'a line that still holds cannot be confirmed as a mistake');
 // The real Step Check agrees with itself: where it finds the break, the same
 // misconception proposed on that line is confirmed.
-const meta = { kind: 'equation', variable: 'x', solutions: [5] };
+const meta = { kind: 'equation', variable: 'x', solutions: [2] };
 const local = stepCheck(meta, lines.join('\n'));
 eq(local.firstBreak, 1, 'Step Check places this break on line 2');
 eq(confirmCloudMisconception({ ...base, meta, localFirstBreak: local.firstBreak })?.status, 'confirmed', 'and agrees with a proposal of the misconception it names there');
 
 // The client re-expresses a proposal in the engine's index space.
-const proposal = misconceptionProposal({ misconceptionId: 'sign-on-transfer', firstBreak: 3, needsConfirmation: false, lines: [] }, ['3x + 5 = 20', '', ' ', '3x = 20 + 5']);
-eq(proposal?.body, { lines: ['3x + 5 = 20', '3x = 20 + 5'], firstBreak: 1, misconceptionId: 'sign-on-transfer', confident: true }, 'blank ink lines are dropped and the break index follows');
+const proposal = misconceptionProposal({ misconceptionId: 'distribute-partial', firstBreak: 3, needsConfirmation: false, lines: [] }, ['2(x + 3) = 10', '', ' ', '2x + 3 = 10']);
+eq(proposal?.body, { lines: ['2(x + 3) = 10', '2x + 3 = 10'], firstBreak: 1, misconceptionId: 'distribute-partial', confident: true }, 'blank ink lines are dropped and the break index follows');
 eq(proposal?.displayLine, 4, 'while the student is still shown the line number on their page');
 eq(misconceptionProposal({ misconceptionId: null, firstBreak: 1 }, lines), null, 'no proposal, nothing to ask');
 eq(misconceptionProposal({ misconceptionId: 'sign-on-transfer', firstBreak: 1, needsConfirmation: true }, lines)?.body.confident, false, 'an unsure check is sent as unsure');
