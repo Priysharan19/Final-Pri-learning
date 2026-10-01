@@ -19,6 +19,9 @@ import WebKit
 enum JourneySelfCheck {
     static var phase: String? {
         let args = ProcessInfo.processInfo.arguments
+        if args.contains("--journey-cloud-relaunch") { return "cloudRelaunch" }
+        if args.contains("--journey-cloud") { return "cloud" }
+        if args.contains("--journey-dynamic-type") { return "dynamicType" }
         if args.contains("--journey-relaunch") { return "relaunch" }
         if args.contains("--journey-selfcheck") { return "first" }
         return nil
@@ -113,6 +116,25 @@ enum JourneySelfCheck {
       try { await waitFor(() => reading, 20000); } finally { window.__priInkReceive = original; handler.postMessage({ op: 'unmount' }); }
       return facts + ' engine=' + (reading.engine || '') + ' text=' + JSON.stringify(reading.text || '');
     });
+    await step('nativePhoto', async () => {
+      // Native, offline photo reading (Vision) on a rendered line of maths. The
+      // reader is answer-blind: it only ever sees the picture.
+      const handler = window.webkit.messageHandlers.priPhoto;
+      if (!handler) throw new Error('no native photo reader');
+      const c = document.createElement('canvas'); c.width = 900; c.height = 220;
+      const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height);
+      g.fillStyle = '#000'; g.font = 'bold 96px Helvetica, Arial, sans-serif'; g.fillText('2x + 3 = 11', 40, 145);
+      const original = window.__priPhotoReceive;
+      let got = null;
+      window.__priPhotoReceive = p => { if (p && p.reqId === 777001) got = p; if (original) original(p); };
+      try {
+        handler.postMessage({ reqId: 777001, dataURL: c.toDataURL('image/png') });
+        await waitFor(() => got, 20000);
+      } finally { window.__priPhotoReceive = original; }
+      if (!got.ok) throw new Error('reader failed: ' + (got.error || ''));
+      if (!/11/.test(got.text || '')) throw new Error('read ' + JSON.stringify(got.text || ''));
+      return 'engine=' + got.engine + ' text=' + JSON.stringify(got.text);
+    });
     await step('progress', async () => { await nav('/progress'); await waitFor(() => location.pathname === '/progress' && q('main')); return 'progress shown'; });
     await step('persistenceMarker', async () => { localStorage.setItem('pri-journey-marker', 'kept'); return 'written'; });
     return JSON.stringify(steps);
@@ -136,12 +158,104 @@ enum JourneySelfCheck {
     return JSON.stringify(steps);
     """
 
+    // Shared by the cloud phases: Home with the journey's profile, then Settings.
+    private static let cloudHelpers = helpers + """
+    async function home() {
+      await waitFor(() => q('.home-greet') || q('.auth-card'));
+      if (!q('.home-greet')) {
+        const picker = [...document.querySelectorAll('.auth-card button')].find(b => /Journey Student/.test(b.textContent));
+        if (!picker) throw new Error('profile not found');
+        picker.click(); await waitFor(() => q('.home-greet'));
+      }
+    }
+    async function settings() {
+      history.pushState({}, '', '/settings'); dispatchEvent(new PopStateEvent('popstate'));
+      await waitFor(() => q('#cloud-account-title'));
+    }
+    const stateTag = () => (q('section[aria-labelledby="cloud-account-title"] .tag') || {}).textContent?.trim() || '';
+    const byText = t => [...document.querySelectorAll('button')].find(b => b.offsetParent && b.textContent.trim() === t);
+    """
+
+    // Sign in through the real Settings UI against a real Pri server (the
+    // DEBUG-only PRI_CLOUD_ORIGIN override), then Sync now.
+    private static let cloud = cloudHelpers + """
+    await step('cloudSignIn', async () => {
+      at = 'home'; await home();
+      at = 'settings'; await settings();
+      at = 'state'; await waitFor(() => stateTag() === 'Not connected');
+      byText('Sign in')?.click();
+      setValue(await waitFor(() => q('#cloud-email')), email);
+      setValue(q('#cloud-password'), password);
+      await sleep(150);
+      q('#cloud-email').form.querySelector('button[type=submit]').click();
+      at = 'connected'; await waitFor(() => stateTag() === 'Connected', 30000);
+      return 'connected';
+    });
+    await step('cloudSync', async () => {
+      (await waitFor(() => byText('Sync now'))).click();
+      const done = await waitFor(() => { const t = q('section[aria-labelledby="cloud-account-title"]').innerText; const m = t.match(/Sync complete[^\\n]*/); return m && m[0]; }, 60000);
+      return done;
+    });
+    return JSON.stringify(steps);
+    """
+
+    // After a relaunch the session (URLSession cookie storage) is still there;
+    // Disconnect logs out and forgets it.
+    private static let cloudRelaunch = cloudHelpers + """
+    await step('cloudSessionKept', async () => {
+      await home(); await settings();
+      await waitFor(() => stateTag() === 'Connected', 30000);
+      return 'connected after relaunch';
+    });
+    await step('cloudDisconnect', async () => {
+      (await waitFor(() => byText('Disconnect'))).click();
+      await waitFor(() => stateTag() === 'Not connected', 20000);
+      return 'disconnected';
+    });
+    return JSON.stringify(steps);
+    """
+
+    // Run with the largest accessibility text size set on the simulator: the
+    // shell scales the page (pageZoom) and nothing may scroll sideways.
+    private static let dynamicType = cloudHelpers + """
+    const overflow = () => Math.max(0, document.scrollingElement.scrollWidth - window.innerWidth);
+    await step('dynamicTypeZoom', async () => {
+      await home();
+      const base = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+      return 'cssWidth=' + window.innerWidth + ' screen=' + screen.width + ' rootFont=' + base;
+    });
+    await step('dynamicTypeNoOverflow', async () => {
+      const seen = [];
+      for (const path of ['/', '/practice', '/progress', '/settings']) {
+        history.pushState({}, '', path); dispatchEvent(new PopStateEvent('popstate'));
+        await sleep(900);
+        const o = overflow();
+        seen.push(path + ':' + o);
+        if (o > 1) throw new Error('horizontal overflow ' + seen.join(' '));
+      }
+      return seen.join(' ');
+    });
+    return JSON.stringify(steps);
+    """
+
     @MainActor
     static func run(in webView: WKWebView) {
         guard let phase else { return }
         NSLog("PRIJOURNEY started %@", phase)
-        let script = phase == "relaunch" ? relaunch : firstLaunch
-        webView.callAsyncJavaScript(script, arguments: [:], in: nil, in: .page) { result in
+        let script: String
+        switch phase {
+        case "relaunch": script = relaunch
+        case "cloud": script = cloud
+        case "cloudRelaunch": script = cloudRelaunch
+        case "dynamicType": script = dynamicType
+        default: script = firstLaunch
+        }
+        let env = ProcessInfo.processInfo.environment
+        let arguments: [String: Any] = [
+            "email": env["PRI_JOURNEY_EMAIL"] ?? "",
+            "password": env["PRI_JOURNEY_PASSWORD"] ?? ""
+        ]
+        webView.callAsyncJavaScript(script, arguments: arguments, in: nil, in: .page) { result in
             switch result {
             case .success(let value):
                 guard let text = value as? String, let data = text.data(using: .utf8),

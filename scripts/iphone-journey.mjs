@@ -10,23 +10,34 @@
 //      survived the relaunch.
 // Writes a machine-readable evidence record (exact SHA, simulator, OS, steps)
 // with --evidence <file>. Labelled SYNTHETIC / SIMULATOR — never physical.
+// CP-05 adds, on the same install:
+//   --cloud         a real Pri server (scripts/cloud-fixture-server.mjs, or the
+//                   PRI_CLOUD_* environment) — sign in through Settings, Sync
+//                   now, relaunch keeps the session, Disconnect;
+//   --dynamic-type  the largest accessibility text size: the page is scaled
+//                   and no screen scrolls sideways (the setting is restored).
 //
 //   node scripts/iphone-journey.mjs                 # an iPhone simulator
 //   node scripts/iphone-journey.mjs --family ipad
-//   node scripts/iphone-journey.mjs --device "iPhone 17e" --evidence out.json
+//   node scripts/iphone-journey.mjs --cloud --dynamic-type --evidence out.json
 // ─────────────────────────────────────────────────────────────────────────────
 import { execFileSync, execSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { existsSync, mkdtempSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { engineeringPackage } from './apple-shipping-target.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, '..');
 const PACKAGE = join(ROOT, 'ios/PriLearning.swiftpm');
-const FIRST = ['launch', 'onboarding', 'practice', 'typedAttempt', 'feedback', 'nextQuestion', 'nativeInk', 'progress', 'persistenceMarker'];
+const FIRST = ['launch', 'onboarding', 'practice', 'typedAttempt', 'feedback', 'nextQuestion', 'nativeInk', 'nativePhoto', 'progress', 'persistenceMarker'];
 const RELAUNCH = ['relaunchProfile', 'relaunchMarker'];
+const CLOUD = ['cloudSignIn', 'cloudSync'];
+const CLOUD_RELAUNCH = ['cloudSessionKept', 'cloudDisconnect'];
+const DYNAMIC = ['dynamicTypeZoom', 'dynamicTypeNoOverflow'];
+const WANT_CLOUD = process.argv.includes('--cloud');
+const WANT_DYNAMIC = process.argv.includes('--dynamic-type');
 
 // `log show --start` takes LOCAL time; a UTC stamp would re-read hours of old runs.
 const localStamp = d => { const p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`; };
@@ -64,9 +75,13 @@ function builtApp(derived) {
   return join(products, apps[0]);
 }
 
-function launchAndRead(udid, bundleId, flag, phase) {
+function launchAndRead(udid, bundleId, flag, phase, childEnv = {}) {
   const started = localStamp(new Date(Date.now() - 2000));
-  run('xcrun', ['simctl', 'launch', udid, bundleId, flag]);
+  // SIMCTL_CHILD_* reaches the app's environment (DEBUG builds read the cloud
+  // origin override and the journey's fixture account from it).
+  const env = { ...process.env };
+  for (const [k, v] of Object.entries(childEnv)) env[`SIMCTL_CHILD_${k}`] = v;
+  run('xcrun', ['simctl', 'launch', udid, bundleId, flag], { env });
   let lines = [];
   for (let i = 0; i < 75; i++) {
     execSync('sleep 2');
@@ -108,11 +123,46 @@ for (const line of first) console.log(`  ${line.replace(/^PRIJOURNEY\s*/, '')}`)
 const second = launchAndRead(udid, bundleId, '--journey-relaunch', 'relaunch');
 for (const line of second) console.log(`  ${line.replace(/^PRIJOURNEY\s*/, '')}`);
 
+let cloudLines = [];
+let cloudRelaunchLines = [];
+let cloudServer = null;
+if (WANT_CLOUD) {
+  let fixture = process.env.PRI_CLOUD_ORIGIN ? {
+    PRI_CLOUD_ORIGIN: process.env.PRI_CLOUD_ORIGIN, PRI_CLOUD_EMAIL: process.env.PRI_CLOUD_EMAIL, PRI_CLOUD_PASSWORD: process.env.PRI_CLOUD_PASSWORD,
+  } : null;
+  if (!fixture) {
+    const out = join(mkdtempSync(join(tmpdir(), 'pri-fixture-')), 'fixture.env');
+    execFileSync(process.execPath, [join(HERE, 'cloud-fixture-server.mjs'), '--port', '4331', '--host', '127.0.0.1', '--out', out], { stdio: 'inherit' });
+    fixture = Object.fromEntries(readFileSync(out, 'utf8').trim().split('\n').map(l => [l.slice(0, l.indexOf('=')), l.slice(l.indexOf('=') + 1)]));
+    cloudServer = fixture;
+  }
+  const childEnv = { PRI_CLOUD_ORIGIN: fixture.PRI_CLOUD_ORIGIN, PRI_JOURNEY_EMAIL: fixture.PRI_CLOUD_EMAIL, PRI_JOURNEY_PASSWORD: fixture.PRI_CLOUD_PASSWORD };
+  console.log(`\nCloud journey against ${fixture.PRI_CLOUD_ORIGIN} (real Pri server, fixture account) …`);
+  cloudLines = launchAndRead(udid, bundleId, '--journey-cloud', 'cloud', childEnv);
+  for (const line of cloudLines) console.log(`  ${line.replace(/^PRIJOURNEY\s*/, '')}`);
+  cloudRelaunchLines = launchAndRead(udid, bundleId, '--journey-cloud-relaunch', 'cloudRelaunch', childEnv);
+  for (const line of cloudRelaunchLines) console.log(`  ${line.replace(/^PRIJOURNEY\s*/, '')}`);
+  if (cloudServer?.PRI_CLOUD_SERVER_PID) { try { process.kill(Number(cloudServer.PRI_CLOUD_SERVER_PID)); } catch { /* already gone */ } }
+}
+
+let dynamicLines = [];
+if (WANT_DYNAMIC) {
+  console.log('\nLargest accessibility text size …');
+  run('xcrun', ['simctl', 'ui', udid, 'content_size', 'accessibility-extra-extra-extra-large']);
+  try { dynamicLines = launchAndRead(udid, bundleId, '--journey-dynamic-type', 'dynamicType'); }
+  finally { try { run('xcrun', ['simctl', 'ui', udid, 'content_size', 'large']); } catch { /* best effort */ } }
+  for (const line of dynamicLines) console.log(`  ${line.replace(/^PRIJOURNEY\s*/, '')}`);
+}
+
 const result = (lines, name) => {
   const hit = lines.find(l => l.startsWith(`PRIJOURNEY ok ${name}`) || l.startsWith(`PRIJOURNEY FAIL ${name}`));
   return hit ? { ok: hit.startsWith('PRIJOURNEY ok'), detail: hit.replace(/^PRIJOURNEY (ok|FAIL) \S+\s*/, '') } : { ok: false, detail: 'not reported' };
 };
-const steps = Object.fromEntries([...FIRST.map(n => [n, result(first, n)]), ...RELAUNCH.map(n => [n, result(second, n)])]);
+const steps = Object.fromEntries([
+  ...FIRST.map(n => [n, result(first, n)]), ...RELAUNCH.map(n => [n, result(second, n)]),
+  ...(WANT_CLOUD ? [...CLOUD.map(n => [n, result(cloudLines, n)]), ...CLOUD_RELAUNCH.map(n => [n, result(cloudRelaunchLines, n)])] : []),
+  ...(WANT_DYNAMIC ? DYNAMIC.map(n => [n, result(dynamicLines, n)]) : []),
+]);
 // The ink facts must match the hardware: iPhone writes with a finger by default
 // and has no stylus; iPad is stylus-first. (Finger *touch* input itself remains
 // a physical-device gate: injected strokes bypass the drawing policy.)
@@ -121,7 +171,7 @@ if (steps.nativeInk.ok && !steps.nativeInk.detail.startsWith(wantFacts)) {
   steps.nativeInk = { ok: false, detail: `expected ${wantFacts}; got ${steps.nativeInk.detail}` };
 }
 const passed = Object.values(steps).filter(s => s.ok).length;
-const total = FIRST.length + RELAUNCH.length;
+const total = Object.keys(steps).length;
 let os = '';
 try { os = run('xcrun', ['simctl', 'list', 'runtimes']).split('\n').find(l => /iOS/.test(l))?.trim() || ''; } catch { /* informational */ }
 let sha = '';
