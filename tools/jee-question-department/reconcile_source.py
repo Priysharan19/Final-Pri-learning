@@ -186,13 +186,17 @@ def main() -> None:
         for (ch_num, topic_num), item in overrides.items():
             if ch_num != int(chapter["number"]):
                 continue
-            observed = reconciled_counts.get(topic_num, 0)
-            if int(item["count"]) < observed:
+            count = int(item["count"])
+            evidence = str(item.get("evidence") or "").strip()
+            if count < 0:
                 raise SystemExit(
-                    f"verified count override c{ch_num} t{topic_num}={item['count']} "
-                    f"is below structural count {observed}"
+                    f"verified count override c{ch_num} t{topic_num} has negative count {count}"
                 )
-            reconciled_counts[topic_num] = int(item["count"])
+            if not evidence:
+                raise SystemExit(
+                    f"verified count override c{ch_num} t{topic_num} is missing source evidence"
+                )
+            reconciled_counts[topic_num] = count
             applied_overrides.append(item)
         expected_occurrences = sum(reconciled_counts.values())
         chapter_question_occurrences += expected_occurrences
