@@ -16,7 +16,8 @@
 //
 // Reasoning costs more than transcription, so the hourly allowance is lower.
 // ─────────────────────────────────────────────────────────────────────────────
-import { Router } from 'express';
+import { asyncRouter } from './asyncRouter.js';
+import { asStore } from './store.js';
 import { rateLimit, requireSession, requireVerifiedEmail } from './security.js';
 import { consumePaidCall, refusePaidCall } from './spendCeiling.js';
 import {
@@ -70,9 +71,10 @@ export function createWorkingRouter(db, {
   check = checkWorkingWithModel,
   env = process.env
 } = {}) {
-  const router = Router();
+  db = asStore(db);
+  const router = asyncRouter();
 
-  router.get('/status', requireSession(db), (req, res) => {
+  router.get('/status', requireSession(db), async (req, res) => {
     const config = providerConfig(env);
     res.json({
       available: config.configured,
@@ -100,7 +102,7 @@ export function createWorkingRouter(db, {
       // Counted here, after the request has been shown to be a real one and
       // before anything is sent, so a malformed request cannot spend from a
       // budget shared by every student on this deployment.
-      const overBudget = consumePaidCall(db, { env });
+      const overBudget = await consumePaidCall(db, { env });
       if (overBudget) return refusePaidCall(res, overBudget);
 
       try {

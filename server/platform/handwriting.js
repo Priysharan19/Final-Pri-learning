@@ -14,7 +14,8 @@
 // Reading is billed per request, so it is rate limited per account and requires
 // a verified email. It is never anonymous.
 // ─────────────────────────────────────────────────────────────────────────────
-import { Router } from 'express';
+import { asyncRouter } from './asyncRouter.js';
+import { asStore } from './store.js';
 import { rateLimit, requireSession, requireVerifiedEmail } from './security.js';
 import { consumePaidCall, refusePaidCall } from './spendCeiling.js';
 import { HandwritingProviderError, providerConfig, transcribeHandwriting, validateImage } from './handwritingProvider.js';
@@ -57,11 +58,12 @@ export function createHandwritingRouter(db, {
   transcribe = transcribeHandwriting,
   env = process.env
 } = {}) {
-  const router = Router();
+  db = asStore(db);
+  const router = asyncRouter();
 
   // Whether this deployment can read handwriting at all, so the app can hide
   // the setting rather than offer something that will fail.
-  router.get('/status', requireSession(db), (req, res) => {
+  router.get('/status', requireSession(db), async (req, res) => {
     const config = providerConfig(env);
     res.json({
       available: config.configured,
@@ -87,7 +89,7 @@ export function createHandwritingRouter(db, {
       // Counted here, after the request has been shown to be a real one and
       // before anything is sent, so a malformed request cannot spend from a
       // budget shared by every student on this deployment.
-      const overBudget = consumePaidCall(db, { env });
+      const overBudget = await consumePaidCall(db, { env });
       if (overBudget) return refusePaidCall(res, overBudget);
 
       try {

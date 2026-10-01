@@ -1,4 +1,6 @@
 import { createHash, createHmac, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
+import { asyncHandler } from './asyncRouter.js';
+import { asStore } from './store.js';
 
 export const SESSION_COOKIE = 'pri_cloud_session';
 export const CSRF_COOKIE = 'pri_csrf';
@@ -42,28 +44,29 @@ export function clearSessionCookies(res) {
   res.clearCookie(CSRF_COOKIE, { httpOnly: false, secure, sameSite: 'lax', path: '/' });
 }
 
-export function createSession(db, res, accountId, deviceId = 'web', userAgent = '', now = Date.now()) {
+export async function createSession(db, res, accountId, deviceId = 'web', userAgent = '', now = Date.now()) {
+  db = asStore(db);
   const raw = opaqueToken(32);
   const sessionId = id('ses');
-  db.prepare(`INSERT INTO account_sessions
+  await db.run(`INSERT INTO account_sessions
     (id, account_id, token_hash, device_id, user_agent_hash, created_at, last_seen_at, expires_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
-    .run(sessionId, accountId, sha256(raw), String(deviceId).slice(0, 160), userAgent ? sha256(userAgent) : null, now, now, now + SESSION_MS);
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, [sessionId, accountId, sha256(raw), String(deviceId).slice(0, 160), userAgent ? sha256(userAgent) : null, now, now, now + SESSION_MS]);
   setSessionCookies(res, raw, SESSION_MS);
   return sessionId;
 }
 
-export function sessionFromRequest(db, req, now = Date.now()) {
+export async function sessionFromRequest(db, req, now = Date.now()) {
   const raw = req.cookies?.[SESSION_COOKIE];
   if (!raw || String(raw).length > 256) return null;
-  const row = db.prepare(`SELECT s.*, a.email, a.name, a.role, a.email_verified_at, a.deleted_at
+  db = asStore(db);
+  const row = await db.get(`SELECT s.*, a.email, a.name, a.role, a.email_verified_at, a.deleted_at
     FROM account_sessions s JOIN accounts a ON a.id = s.account_id
-    WHERE s.token_hash = ? AND s.revoked_at IS NULL AND s.expires_at > ? AND a.deleted_at IS NULL`).get(sha256(raw), now);
+    WHERE s.token_hash = ? AND s.revoked_at IS NULL AND s.expires_at > ? AND a.deleted_at IS NULL`, [sha256(raw), now]);
   if (!row) return null;
   let slid = false;
   if (now - row.last_seen_at >= SESSION_SLIDE_MIN_MS) {
     const expiresAt = now + SESSION_MS;
-    db.prepare('UPDATE account_sessions SET last_seen_at = ?, expires_at = ? WHERE id = ?').run(now, expiresAt, row.id);
+    await db.run('UPDATE account_sessions SET last_seen_at = ?, expires_at = ? WHERE id = ?', [now, expiresAt, row.id]);
     row.last_seen_at = now;
     row.expires_at = expiresAt;
     slid = true;
@@ -72,14 +75,15 @@ export function sessionFromRequest(db, req, now = Date.now()) {
 }
 
 export function requireSession(db) {
-  return (req, res, next) => {
-    const session = sessionFromRequest(db, req);
+  db = asStore(db);
+  return asyncHandler(async (req, res, next) => {
+    const session = await sessionFromRequest(db, req);
     if (!session) return res.status(401).json({ error: { code: 'AUTH_REQUIRED', message: 'Sign in is required.' } });
     // Keep the browser/native cookie lifetime in step with the slid server row.
     if (session.slid) setSessionCookies(res, session.rawToken, SESSION_MS);
     req.platformSession = session;
     next();
-  };
+  });
 }
 
 export function requireVerifiedEmail(req, res, next) {
@@ -137,26 +141,31 @@ export function originGuard(req, res, next) {
   next();
 }
 
-export function consumeRateLimit(db, bucket, { limit, windowMs }, now = Date.now()) {
-  return db.transaction(() => {
-    const row = db.prepare('SELECT window_start, count FROM rate_limits WHERE bucket = ?').get(bucket);
+export async function consumeRateLimit(db, bucket, { limit, windowMs }, now = Date.now()) {
+  db = asStore(db);
+  return db.transaction(async () => {
+    const row = await db.get('SELECT window_start, count FROM rate_limits WHERE bucket = ?', [bucket]);
     if (!row || now - row.window_start >= windowMs) {
-      db.prepare('INSERT OR REPLACE INTO rate_limits(bucket, window_start, count) VALUES (?, ?, 1)').run(bucket, now);
+      // rate_limits has no dependants, so this upsert is exactly the old
+      // INSERT OR REPLACE, written in the form both engines accept.
+      await db.run(`INSERT INTO rate_limits(bucket, window_start, count) VALUES (?, ?, 1)
+        ON CONFLICT(bucket) DO UPDATE SET window_start = excluded.window_start, count = excluded.count`, [bucket, now]);
       return { allowed: true, remaining: Math.max(0, limit - 1), resetAt: now + windowMs };
     }
     if (row.count >= limit) return { allowed: false, remaining: 0, resetAt: row.window_start + windowMs };
-    db.prepare('UPDATE rate_limits SET count = count + 1 WHERE bucket = ?').run(bucket);
+    await db.run('UPDATE rate_limits SET count = count + 1 WHERE bucket = ?', [bucket]);
     return { allowed: true, remaining: Math.max(0, limit - row.count - 1), resetAt: row.window_start + windowMs };
-  })();
+  });
 }
 
 export function rateLimit(db, key, options) {
-  return (req, res, next) => {
+  db = asStore(db);
+  return asyncHandler(async (req, res, next) => {
     const identity = req.platformSession?.account_id || req.ip || 'unknown';
-    const verdict = consumeRateLimit(db, `${key}:${sha256(identity).slice(0, 24)}`, options);
+    const verdict = await consumeRateLimit(db, `${key}:${sha256(identity).slice(0, 24)}`, options);
     res.set('RateLimit-Remaining', String(verdict.remaining));
     res.set('RateLimit-Reset', String(Math.ceil(verdict.resetAt / 1000)));
     if (!verdict.allowed) return res.status(429).json({ error: { code: 'RATE_LIMITED', message: 'Too many requests. Try again later.' } });
     next();
-  };
+  });
 }

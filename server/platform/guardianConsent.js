@@ -25,6 +25,8 @@
 // and withdrawing stops sync at once.
 // ─────────────────────────────────────────────────────────────────────────────
 import { sessionFromRequest, sha256 } from './security.js';
+import { asyncHandler } from './asyncRouter.js';
+import { asStore } from './store.js';
 
 /**
  * The version of the notice a guardian agreed to. Bump it whenever the privacy
@@ -66,8 +68,9 @@ export function validateGuardian({ guardianName, guardianEmail } = {}) {
  * Record that a guardian has been asked. The token is stored only as a hash,
  * the same as every other account action here.
  */
-export function recordConsentRequest(db, { accountId, name, email, tokenHash, now = Date.now() }) {
-  db.prepare(`INSERT INTO guardian_consents
+export async function recordConsentRequest(db, { accountId, name, email, tokenHash, now = Date.now() }) {
+  db = asStore(db);
+  await db.run(`INSERT INTO guardian_consents
       (account_id, guardian_name, guardian_email, notice_version, requested_at, confirmed_at, withdrawn_at, method)
     VALUES (?, ?, ?, ?, ?, NULL, NULL, ?)
     ON CONFLICT(account_id) DO UPDATE SET
@@ -76,14 +79,14 @@ export function recordConsentRequest(db, { accountId, name, email, tokenHash, no
       notice_version = excluded.notice_version,
       requested_at = excluded.requested_at,
       confirmed_at = NULL,
-      withdrawn_at = NULL`)
-    .run(accountId, name, email, CONSENT_NOTICE_VERSION, now, CONSENT_METHOD);
+      withdrawn_at = NULL`, [accountId, name, email, CONSENT_NOTICE_VERSION, now, CONSENT_METHOD]);
   return { accountId, tokenHash };
 }
 
 /** The consent state of one account. */
-export function consentState(db, accountId) {
-  const row = db.prepare('SELECT * FROM guardian_consents WHERE account_id = ?').get(accountId);
+export async function consentState(db, accountId) {
+  db = asStore(db);
+  const row = await db.get('SELECT * FROM guardian_consents WHERE account_id = ?', [accountId]);
   if (!row) return { required: false, state: 'not-required' };
   if (row.withdrawn_at) return { required: true, state: 'withdrawn', row };
   if (row.confirmed_at) return { required: true, state: 'given', row };
@@ -91,12 +94,13 @@ export function consentState(db, accountId) {
 }
 
 /** Mark a guardian's confirmation. Returns false when there was nothing to confirm. */
-export function confirmConsent(db, accountId, now = Date.now()) {
+export async function confirmConsent(db, accountId, now = Date.now()) {
+  db = asStore(db);
   // Withdrawal is terminal for the current consent ceremony. Confirmation must
   // never clear a withdrawal or re-grant sync permission from the same bearer;
   // a future re-consent flow must create a new request/authority explicitly.
-  const changed = db.prepare(`UPDATE guardian_consents SET confirmed_at = ?
-    WHERE account_id = ? AND confirmed_at IS NULL AND withdrawn_at IS NULL`).run(now, accountId).changes;
+  const changed = (await db.run(`UPDATE guardian_consents SET confirmed_at = ?
+    WHERE account_id = ? AND confirmed_at IS NULL AND withdrawn_at IS NULL`, [now, accountId])).changes;
   return changed > 0;
 }
 
@@ -105,9 +109,10 @@ export function confirmConsent(db, accountId, now = Date.now()) {
  * given and then withdrawn is itself the thing a guardian may need shown back
  * to them — and because deleting the row would read as "never asked".
  */
-export function withdrawConsent(db, accountId, now = Date.now()) {
-  const changed = db.prepare(`UPDATE guardian_consents SET withdrawn_at = ?
-    WHERE account_id = ? AND withdrawn_at IS NULL`).run(now, accountId).changes;
+export async function withdrawConsent(db, accountId, now = Date.now()) {
+  db = asStore(db);
+  const changed = (await db.run(`UPDATE guardian_consents SET withdrawn_at = ?
+    WHERE account_id = ? AND withdrawn_at IS NULL`, [now, accountId])).changes;
   return changed > 0;
 }
 
@@ -120,7 +125,8 @@ export function withdrawConsent(db, accountId, now = Date.now()) {
  * precisely so that "no row" is unambiguous.
  */
 export function requireGuardianConsent(db) {
-  return (req, res, next) => {
+  db = asStore(db);
+  return asyncHandler(async (req, res, next) => {
     // The session is resolved here rather than read off the request, because
     // each sub-router establishes its own session INSIDE itself — so a gate
     // mounted in front of one runs before req.platformSession exists, and
@@ -128,13 +134,13 @@ export function requireGuardianConsent(db) {
     // what this did until a test caught it.
     let accountId = req.platformSession?.account_id;
     if (!accountId) {
-      try { accountId = sessionFromRequest(db, req)?.account_id; } catch { accountId = null; }
+      try { accountId = (await sessionFromRequest(db, req))?.account_id; } catch { accountId = null; }
     }
     // No session at all: the sub-router's own requireSession will answer 401.
     // This gate is about consent, not authentication.
     if (!accountId) return next();
     let state;
-    try { state = consentState(db, accountId); }
+    try { state = await consentState(db, accountId); }
     catch { return refuse(res, 'GUARDIAN_CONSENT_UNAVAILABLE', 'This account cannot sync right now.'); }
     if (!state.required || state.state === 'given') return next();
     if (state.state === 'pending') {
@@ -143,7 +149,7 @@ export function requireGuardianConsent(db) {
     }
     return refuse(res, 'GUARDIAN_CONSENT_WITHDRAWN',
       'A parent or guardian has withdrawn permission for this account to sync. Your work stays on this device.');
-  };
+  });
 }
 
 function refuse(res, code, message) {

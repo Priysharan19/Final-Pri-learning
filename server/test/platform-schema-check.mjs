@@ -56,7 +56,7 @@ try {
   assert.equal(db.prepare("SELECT COUNT(*) AS n FROM learning_events WHERE id='evt_shared'").get().n, 2,
     'the same device-local event id must be legal in two different accounts');
 
-  const c1 = nextSyncCursor(db), c2 = nextSyncCursor(db);
+  const c1 = await nextSyncCursor(db), c2 = await nextSyncCursor(db);
   assert.equal(c2, c1 + 1, 'server sync cursor must be canonical and monotonic');
 
   db.prepare(`INSERT INTO sync_entities(account_id,kind,entity_id,version,server_cursor,body_json,tombstone,updated_at)
