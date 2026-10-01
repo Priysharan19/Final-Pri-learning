@@ -318,6 +318,10 @@ export const cloud = Object.freeze({
   submitAppleTransaction: signedTransaction => cloudRequest('/v1/billing/apple/transaction', {
     method: 'POST', body: { signedTransaction: String(signedTransaction || '') }
   }),
+  googleBillingBootstrap: () => cloudRequest('/v1/billing/google/bootstrap'),
+  submitGooglePurchase: purchaseToken => cloudRequest('/v1/billing/google/purchase', {
+    method: 'POST', body: { purchaseToken: String(purchaseToken || '') }
+  }),
   restoreBilling: (provider, body = {}) => cloudRequest(`/v1/billing/restore/${pathId(provider, 'provider')}`, { method: 'POST', body }),
   // Cancel/manage contract (server: wp/server-commerce-classes). Web cancels at
   // the end of the paid cycle; Apple subscriptions are managed in the App Store.

@@ -8,9 +8,10 @@ import {
 import { cloudSyncStatus, syncNow } from '../platform/syncWorker.js';
 import { normalizeCommercialDisplay } from '../platform/entitlements.js';
 import {
-  finishNativeTransaction, getNativeProducts, nativeBillingAvailable,
+  finishNativeTransaction, getNativeProducts, nativeBillingStore,
   onNativeBillingUpdate, purchaseNativeProduct, restoreNativePurchases
 } from '../platform/nativeBilling.js';
+import GooglePlayBilling from './GooglePlayBilling.jsx';
 import CloudAccountSecurity from './CloudAccountSecurity.jsx';
 import { priNative } from '../platform/native/index.js';
 
@@ -46,7 +47,11 @@ export default function CloudAccountPanel() {
   const { user } = useApp();
   const enabled = cloudAvailable();
   const nativeShell = priNative.isNativeShell();
-  const nativeStoreKit = nativeBillingAvailable();
+  // The shell's store selects the purchase flow (StoreKit or Google Play); the
+  // server alone decides Premium either way.
+  const nativeStore = nativeBillingStore();
+  const nativeStoreKit = nativeStore === 'app-store';
+  const googlePlay = nativeStore === 'google-play';
   const [link, setLink] = useState(null);
   const [status, setStatus] = useState(null);
   const [session, setSession] = useState(null);
@@ -558,8 +563,11 @@ export default function CloudAccountPanel() {
             {appleStoreError && <div style={{ color: 'var(--bad)', fontSize: 12, marginTop: 7 }}>{appleStoreError}</div>}
           </div>}
 
-          {nativeShell && !nativeStoreKit && <div className="muted" style={{ fontSize: 12, marginTop: 8 }}>
-            This native build does not include the StoreKit billing bridge. Web checkout is intentionally unavailable inside the iOS app.
+          {nativeShell && googlePlay && <GooglePlayBilling user={user} canSync={canSync} premium={premium}
+            onChanged={() => reload({ verify: false })} />}
+
+          {nativeShell && !nativeStore && <div className="muted" style={{ fontSize: 12, marginTop: 8 }}>
+            This app build has no store billing bridge. Web checkout is intentionally unavailable inside the native app.
           </div>}
         </div>
       </div>}
