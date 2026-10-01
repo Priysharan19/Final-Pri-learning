@@ -26,14 +26,134 @@ import { preparePhoto } from './photoRaster.js';
 /** How the returned reading is labelled, so History and evidence can tell. */
 export const CLOUD_ENGINE_PREFIX = 'cloud';
 
+const READINESS_TTL_MS = 60_000;
+let readinessCache = { expiresAt: 0, value: null };
+const diagnosticState = {
+  localNativeAvailable: null,
+  cloudAvailable: false,
+  selectedEngine: null,
+  lastLatencyMs: null,
+  lastFailureCode: null,
+  fallbackOccurred: false,
+  releaseSha: null
+};
+
+function safeFailureCode(value, fallback = null) {
+  const code = String(value || '');
+  return /^[A-Z0-9_:-]{1,96}$/.test(code) ? code : fallback;
+}
+
+function safeReleaseSha(value) {
+  const sha = String(value || '');
+  return /^[0-9a-f]{40}$/.test(sha) ? sha : null;
+}
+
+function publishDiagnostics() {
+  const value = Object.freeze({ ...diagnosticState });
+  try { globalThis.__PRI_HANDWRITING_DIAGNOSTICS__ = value; } catch { /* support diagnostics are best-effort */ }
+  return value;
+}
+
+export function handwritingDiagnostics() {
+  return Object.freeze({ ...diagnosticState });
+}
+
+export function recordLocalHandwritingDiagnostics({ nativeAvailable, engine = null, releaseSha = null } = {}) {
+  if (typeof nativeAvailable === 'boolean') diagnosticState.localNativeAvailable = nativeAvailable;
+  if (engine) diagnosticState.selectedEngine = String(engine).slice(0, 160);
+  const sha = safeReleaseSha(releaseSha);
+  if (sha) diagnosticState.releaseSha = sha;
+  return publishDiagnostics();
+}
+
+function recordCloudDiagnostics({
+  available,
+  engine = null,
+  latencyMs = null,
+  failureCode = null,
+  fallbackOccurred = false,
+  releaseSha = null
+} = {}) {
+  if (typeof available === 'boolean') diagnosticState.cloudAvailable = available;
+  if (engine) diagnosticState.selectedEngine = String(engine).slice(0, 160);
+  diagnosticState.lastLatencyMs = Number.isFinite(Number(latencyMs)) ? Math.max(0, Math.round(Number(latencyMs))) : null;
+  diagnosticState.lastFailureCode = safeFailureCode(failureCode);
+  diagnosticState.fallbackOccurred = fallbackOccurred === true;
+  const sha = safeReleaseSha(releaseSha);
+  if (sha) diagnosticState.releaseSha = sha;
+  return publishDiagnostics();
+}
+
 /**
  * Two separate conditions, kept separate on purpose: the student opted in, and
  * this deployment actually has somewhere to send it. `available` is injectable
  * so the contract can be tested without a configured origin.
  */
-export function cloudReadingEnabled(user, { available = cloudAvailable } = {}) {
+export function cloudReadingEnabled(user, { available = cloudAvailable, readiness = null } = {}) {
   if (user?.cloudHandwriting !== true) return false;
-  try { return available() === true; } catch { return false; }
+  try {
+    if (available() !== true) return false;
+    return readiness == null ? true : readiness?.usable === true;
+  } catch { return false; }
+}
+
+export async function cloudHandwritingReadiness({
+  user,
+  transport = cloud,
+  available = cloudAvailable,
+  signal = null,
+  now = Date.now(),
+  cache = true
+} = {}) {
+  if (user?.cloudHandwriting !== true) {
+    return { usable: false, state: 'disabled', lastFailureCode: null, releaseSha: null };
+  }
+  try {
+    if (available() !== true) {
+      recordCloudDiagnostics({ available: false, failureCode: 'CLOUD_DISABLED' });
+      return { usable: false, state: 'unavailable', lastFailureCode: 'CLOUD_DISABLED', releaseSha: null };
+    }
+  } catch {
+    recordCloudDiagnostics({ available: false, failureCode: 'CLOUD_DISABLED' });
+    return { usable: false, state: 'unavailable', lastFailureCode: 'CLOUD_DISABLED', releaseSha: null };
+  }
+
+  if (cache && readinessCache.value && readinessCache.expiresAt > now) return readinessCache.value;
+  if (typeof transport?.handwritingStatus !== 'function') {
+    const value = Object.freeze({ usable: false, state: 'unavailable', lastFailureCode: 'HANDWRITING_STATUS_UNAVAILABLE', releaseSha: null });
+    recordCloudDiagnostics({ available: false, failureCode: value.lastFailureCode });
+    return value;
+  }
+
+  try {
+    const status = await transport.handwritingStatus({ signal });
+    const state = ['ready', 'degraded', 'unavailable'].includes(status?.state) ? status.state : 'unavailable';
+    const value = Object.freeze({
+      configured: status?.configured === true,
+      usable: status?.usable === true && status?.available === true,
+      degraded: status?.degraded === true,
+      state,
+      model: typeof status?.model === 'string' ? status.model.slice(0, 160) : null,
+      fallbackModel: typeof status?.fallbackModel === 'string' ? status.fallbackModel.slice(0, 160) : null,
+      confidenceFloor: Number.isFinite(Number(status?.confidenceFloor)) ? Number(status.confidenceFloor) : null,
+      timeoutMs: Number.isFinite(Number(status?.timeoutMs)) ? Number(status.timeoutMs) : null,
+      lastFailureCode: safeFailureCode(status?.lastFailureCode),
+      lastLatencyMs: Number.isFinite(Number(status?.lastLatencyMs)) ? Number(status.lastLatencyMs) : null,
+      releaseSha: safeReleaseSha(status?.releaseSha)
+    });
+    recordCloudDiagnostics({ available: value.usable, latencyMs: value.lastLatencyMs, failureCode: value.lastFailureCode, releaseSha: value.releaseSha });
+    if (cache) readinessCache = { expiresAt: now + READINESS_TTL_MS, value };
+    return value;
+  } catch (error) {
+    const code = error?.name === 'AbortError'
+      ? 'HANDWRITING_CANCELLED'
+      : error?.name === 'TimeoutError'
+        ? 'HANDWRITING_STATUS_TIMEOUT'
+        : safeFailureCode(error?.code, 'HANDWRITING_STATUS_UNREACHABLE');
+    const value = Object.freeze({ usable: false, state: 'unavailable', lastFailureCode: code, releaseSha: null });
+    recordCloudDiagnostics({ available: false, failureCode: code });
+    return value;
+  }
 }
 
 /**
@@ -76,26 +196,69 @@ export async function readWithCloud(strokes, {
   signal = null,
   transport = cloud,
   rasterize = rasterizeInk,
-  available = cloudAvailable
+  available = cloudAvailable,
+  readiness = cloudHandwritingReadiness
 } = {}) {
   if (!cloudReadingEnabled(user, { available })) return { reason: 'disabled' };
 
+  const ready = await readiness({ user, transport, available, signal });
+  if (!cloudReadingEnabled(user, { available, readiness: ready })) {
+    return { reason: ready?.lastFailureCode === 'HANDWRITING_CANCELLED' ? 'cancelled' : 'unavailable', readiness: ready };
+  }
+
   let raster = null;
-  try { raster = rasterize(strokes); } catch { return { reason: 'unrenderable' }; }
+  try { raster = rasterize(strokes); }
+  catch {
+    recordCloudDiagnostics({ available: true, failureCode: 'HANDWRITING_RASTER_FAILED', releaseSha: ready?.releaseSha });
+    return { reason: 'unrenderable', readiness: ready };
+  }
   // Null here means the ink could not be drawn small enough to send. That is a
   // different answer from "switched off", and the caller can only say something
   // useful if it can tell them apart.
-  if (!raster?.dataUrl) return { reason: 'too-large' };
+  if (!raster?.dataUrl) {
+    recordCloudDiagnostics({ available: true, failureCode: 'HANDWRITING_IMAGE_TOO_LARGE', releaseSha: ready?.releaseSha });
+    return { reason: 'too-large', readiness: ready };
+  }
 
+  const started = Date.now();
   try {
     const response = await transport.transcribeHandwriting(raster.dataUrl, { signal });
     const transcription = response?.transcription;
-    if (!transcription?.lines?.length) return { reason: 'empty' };
-    return { transcription, raster: { width: raster.width, height: raster.height, bytes: raster.bytes } };
+    recordCloudDiagnostics({
+      available: true,
+      engine: transcription?.engine || null,
+      latencyMs: transcription?.latencyMs ?? (Date.now() - started),
+      failureCode: transcription?.fallbackFailureCode || null,
+      fallbackOccurred: transcription?.fallbackAttempted === true || transcription?.escalated === true,
+      releaseSha: ready?.releaseSha
+    });
+    if (!transcription?.lines?.length) {
+      recordCloudDiagnostics({
+        available: true,
+        engine: transcription?.engine || null,
+        latencyMs: transcription?.latencyMs ?? (Date.now() - started),
+        failureCode: transcription?.fallbackFailureCode || 'HANDWRITING_EMPTY_RESPONSE',
+        fallbackOccurred: transcription?.fallbackAttempted === true || transcription?.escalated === true,
+        releaseSha: ready?.releaseSha
+      });
+      return { reason: 'empty', readiness: ready, diagnostics: handwritingDiagnostics() };
+    }
+    return {
+      transcription,
+      raster: { width: raster.width, height: raster.height, bytes: raster.bytes },
+      readiness: ready,
+      diagnostics: handwritingDiagnostics()
+    };
   } catch (error) {
     // A refusal is information for the setting screen, not an error the student
     // should meet mid-question: the local reading is already on screen.
-    return { error: { code: error?.code || 'HANDWRITING_FAILED', message: error?.message || '' } };
+    const code = error?.name === 'AbortError'
+      ? 'HANDWRITING_CANCELLED'
+      : error?.name === 'TimeoutError'
+        ? 'HANDWRITING_TIMEOUT'
+        : safeFailureCode(error?.code, 'HANDWRITING_FAILED');
+    recordCloudDiagnostics({ available: true, latencyMs: Date.now() - started, failureCode: code, releaseSha: ready?.releaseSha });
+    return { error: { code, message: error?.message || '' }, readiness: ready, diagnostics: handwritingDiagnostics() };
   }
 }
 
@@ -137,26 +300,55 @@ export async function readPhotoWithCloud(dataUrl, {
   signal = null,
   transport = cloud,
   prepare = preparePhoto,
-  available = cloudAvailable
+  available = cloudAvailable,
+  readiness = cloudHandwritingReadiness
 } = {}) {
   if (!cloudReadingEnabled(user, { available })) return { reason: 'disabled' };
+  const ready = await readiness({ user, transport, available, signal });
+  if (!cloudReadingEnabled(user, { available, readiness: ready })) {
+    return { reason: ready?.lastFailureCode === 'HANDWRITING_CANCELLED' ? 'cancelled' : 'unavailable', readiness: ready };
+  }
 
   let prepared = null;
-  try { prepared = await prepare(dataUrl); } catch { return { reason: 'unreadable' }; }
+  try { prepared = await prepare(dataUrl); }
+  catch {
+    recordCloudDiagnostics({ available: true, failureCode: 'HANDWRITING_PHOTO_UNREADABLE', releaseSha: ready?.releaseSha });
+    return { reason: 'unreadable', readiness: ready };
+  }
   // A photo the browser cannot decode — a HEIC on Android, say — or one that
   // never compresses under the budget. Both are the student's to act on, and
   // neither is "server reading is off".
-  if (!prepared?.dataUrl) return { reason: 'unreadable' };
+  if (!prepared?.dataUrl) {
+    recordCloudDiagnostics({ available: true, failureCode: 'HANDWRITING_PHOTO_UNREADABLE', releaseSha: ready?.releaseSha });
+    return { reason: 'unreadable', readiness: ready };
+  }
 
+  const started = Date.now();
   try {
     const response = await transport.transcribeHandwriting(prepared.dataUrl, { signal });
     const transcription = response?.transcription;
-    if (!transcription?.lines?.length) return { reason: 'empty' };
+    recordCloudDiagnostics({
+      available: true,
+      engine: transcription?.engine || null,
+      latencyMs: transcription?.latencyMs ?? (Date.now() - started),
+      failureCode: transcription?.fallbackFailureCode || null,
+      fallbackOccurred: transcription?.fallbackAttempted === true || transcription?.escalated === true,
+      releaseSha: ready?.releaseSha
+    });
+    if (!transcription?.lines?.length) return { reason: 'empty', readiness: ready, diagnostics: handwritingDiagnostics() };
     return {
       transcription,
-      photo: { width: prepared.width, height: prepared.height, bytes: prepared.bytes, quality: prepared.quality }
+      photo: { width: prepared.width, height: prepared.height, bytes: prepared.bytes, quality: prepared.quality },
+      readiness: ready,
+      diagnostics: handwritingDiagnostics()
     };
   } catch (error) {
-    return { error: { code: error?.code || 'HANDWRITING_FAILED', message: error?.message || '' } };
+    const code = error?.name === 'AbortError'
+      ? 'HANDWRITING_CANCELLED'
+      : error?.name === 'TimeoutError'
+        ? 'HANDWRITING_TIMEOUT'
+        : safeFailureCode(error?.code, 'HANDWRITING_FAILED');
+    recordCloudDiagnostics({ available: true, latencyMs: Date.now() - started, failureCode: code, releaseSha: ready?.releaseSha });
+    return { error: { code, message: error?.message || '' }, readiness: ready, diagnostics: handwritingDiagnostics() };
   }
 }

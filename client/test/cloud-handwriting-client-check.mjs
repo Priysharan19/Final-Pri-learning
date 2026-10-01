@@ -14,7 +14,7 @@
 // The canvas is a recording stub, so this runs in bare Node with no browser.
 // ─────────────────────────────────────────────────────────────────────────────
 import { inkBounds, rasterScale, paintInk, rasterizeInk, MAX_IMAGE_BYTES } from '../src/ink/cloudRaster.js';
-import { cloudReadingEnabled, readWithCloud, shouldSupersede, toReading } from '../src/ink/cloudReader.js';
+import { cloudHandwritingReadiness, cloudReadingEnabled, handwritingDiagnostics, readWithCloud, recordLocalHandwritingDiagnostics, shouldSupersede, toReading } from '../src/ink/cloudReader.js';
 
 let pass = 0;
 const failures = [];
@@ -94,11 +94,59 @@ ok(rasterizeInk(STROKES, { createCanvas: () => recordingCanvas(4_000_000).canvas
 
 // ── 4 · Off unless the student turned it on ──────────────────────────────────
 const there = () => true;
+const READY_SHA = '2222222222222222222222222222222222222222';
+const ready = async () => ({ usable: true, available: true, state: 'ready', releaseSha: READY_SHA });
 ok(cloudReadingEnabled({ cloudHandwriting: undefined }, { available: there }) === false, 'off for a profile that predates the setting');
 ok(cloudReadingEnabled({ cloudHandwriting: false }, { available: there }) === false, 'off when declined');
 ok(cloudReadingEnabled({}, { available: there }) === false, 'off by default');
 ok(cloudReadingEnabled(null, { available: there }) === false, 'off with no profile at all');
 ok(cloudReadingEnabled({ cloudHandwriting: true }, { available: () => false }) === false, 'and off where the deployment has nowhere to send it');
+ok(cloudReadingEnabled({ cloudHandwriting: true }, { available: there, readiness: { usable: false } }) === false,
+  'and off when generic cloud transport exists but handwriting itself is not usable');
+
+let statusCalls = 0;
+const statusTransport = {
+  handwritingStatus: async () => {
+    statusCalls += 1;
+    return {
+      available: true, configured: true, usable: true, degraded: false, state: 'ready',
+      model: 'test-primary', fallbackModel: 'test-fallback',
+      confidenceFloor: 0.82, timeoutMs: 20000, lastLatencyMs: 9,
+      lastFailureCode: null, releaseSha: READY_SHA
+    };
+  }
+};
+const statusReady = await cloudHandwritingReadiness({
+  user: { cloudHandwriting: true }, transport: statusTransport, available: there, cache: false
+});
+ok(statusReady.usable === true && statusReady.state === 'ready' && statusReady.releaseSha === READY_SHA,
+  'the client checks handwriting-specific readiness, not only generic cloud transport');
+eq(statusCalls, 1, 'readiness makes one bounded status request');
+
+let unavailableTranscribes = 0;
+const unavailableOutcome = await readWithCloud(STROKES, {
+  user: { cloudHandwriting: true }, rasterize: () => ({ dataUrl: 'data:image/png;base64,AAAA', width: 10, height: 10, bytes: 3 }), available: there,
+  transport: { transcribeHandwriting: async () => { unavailableTranscribes += 1; } },
+  readiness: async () => ({ usable: false, state: 'unavailable', lastFailureCode: 'HANDWRITING_NOT_CONFIGURED', releaseSha: READY_SHA })
+});
+eq(unavailableOutcome.reason, 'unavailable', 'a deployment with generic cloud but no usable handwriting stays local');
+eq(unavailableTranscribes, 0, 'unavailable handwriting is rejected before ink is sent');
+
+const offlineReady = await cloudHandwritingReadiness({
+  user: { cloudHandwriting: true },
+  available: there,
+  cache: false,
+  transport: { handwritingStatus: async () => { throw new TypeError('offline'); } }
+});
+ok(offlineReady.usable === false && offlineReady.lastFailureCode === 'HANDWRITING_STATUS_UNREACHABLE',
+  'offline status failure is coded and fails closed');
+
+recordLocalHandwritingDiagnostics({ nativeAvailable: true, engine: 'pri-foundation', releaseSha: READY_SHA });
+const localDiag = handwritingDiagnostics();
+ok(localDiag.localNativeAvailable === true && localDiag.selectedEngine === 'pri-foundation' && localDiag.releaseSha === READY_SHA,
+  'safe diagnostics can identify local/native availability, active engine and release');
+ok(!JSON.stringify(localDiag).includes('data:image') && !('strokes' in localDiag),
+  'diagnostics contain no raw ink payload');
 
 let called = 0;
 const transport = { transcribeHandwriting: async () => { called += 1; return { transcription: { lines: [{ text: 'x = 4', confidence: 0.9 }], text: 'x = 4', confidence: 0.9, needsConfirmation: false, engine: 'cloud-test' } }; } };
@@ -110,26 +158,36 @@ eq(called, 0, 'with the setting off, nothing is sent');
 // that could not be drawn, and a server that read nothing — so the caller could
 // only ever offer one generic message.
 eq(offOutcome.reason, 'disabled', 'and the caller is told it was switched off, not that something failed');
-const unrenderable = await readWithCloud(STROKES, { user: { cloudHandwriting: true }, transport, rasterize: () => null, available: there });
+const unrenderable = await readWithCloud(STROKES, { user: { cloudHandwriting: true }, transport, rasterize: () => null, available: there, readiness: ready });
 eq(unrenderable.reason, 'too-large', 'a page that could not be drawn small enough says so');
 const nothingRead = await readWithCloud(STROKES, {
-  user: { cloudHandwriting: true }, rasterize, available: there,
+  user: { cloudHandwriting: true }, rasterize, available: there, readiness: ready,
   transport: { transcribeHandwriting: async () => ({ transcription: { lines: [] } }) }
 });
 eq(nothingRead.reason, 'empty', 'and a server that read nothing says that instead');
 
 // ── 5 · Turning it on sends the ink, and only the ink ────────────────────────
 let sentArgs = null;
-const spy = { transcribeHandwriting: async (image, opts) => { sentArgs = { image, opts }; return { transcription: { lines: [{ text: '-1, 0, 1, 2, 4', confidence: 0.94 }], text: '-1, 0, 1, 2, 4', confidence: 0.94, needsConfirmation: false, engine: 'cloud-test' } }; } };
-const outcome = await readWithCloud(STROKES, { user: { cloudHandwriting: true, id: 'p1', name: 'Asha' }, transport: spy, rasterize, available: there });
+const spy = { transcribeHandwriting: async (image, opts) => { sentArgs = { image, opts }; return { transcription: { lines: [{ text: '-1, 0, 1, 2, 4', confidence: 0.94 }], text: '-1, 0, 1, 2, 4', confidence: 0.94, needsConfirmation: false, engine: 'cloud-test', latencyMs: 23, fallbackAttempted: true, fallbackFailureCode: 'HANDWRITING_PROVIDER_5XX' } }; } };
+const outcome = await readWithCloud(STROKES, { user: { cloudHandwriting: true, id: 'p1', name: 'Asha' }, transport: spy, rasterize, available: there, readiness: ready });
 ok(sentArgs !== null, 'with the setting on, the ink is sent');
 ok(typeof sentArgs.image === 'string' && sentArgs.image.startsWith('data:image/'), 'what is sent is an image');
 eq(Object.keys(sentArgs.opts || {}), ['signal'], 'and nothing else travels beside it but the cancel signal');
 eq(outcome.transcription.text, '-1, 0, 1, 2, 4', 'the transcription comes back with the comma the local reader has no class for');
+const cloudDiag = handwritingDiagnostics();
+ok(cloudDiag.cloudAvailable === true && cloudDiag.selectedEngine === 'cloud-test' && cloudDiag.lastLatencyMs === 23
+  && cloudDiag.lastFailureCode === 'HANDWRITING_PROVIDER_5XX' && cloudDiag.fallbackOccurred === true && cloudDiag.releaseSha === READY_SHA,
+  'safe diagnostics retain cloud engine, latency, coded fallback failure, fallback occurrence and release');
 
 const failing = { transcribeHandwriting: async () => { const e = new Error('nope'); e.code = 'HANDWRITING_UNAVAILABLE'; throw e; } };
-const failed = await readWithCloud(STROKES, { user: { cloudHandwriting: true }, transport: failing, rasterize, available: there });
+const failed = await readWithCloud(STROKES, { user: { cloudHandwriting: true }, transport: failing, rasterize, available: there, readiness: ready });
 ok(failed?.error?.code === 'HANDWRITING_UNAVAILABLE', 'a refusal is reported, not thrown at the student mid-question');
+
+const cancelledTransport = { transcribeHandwriting: async () => { throw new DOMException('Aborted', 'AbortError'); } };
+const cancelledOutcome = await readWithCloud(STROKES, {
+  user: { cloudHandwriting: true }, transport: cancelledTransport, rasterize, available: there, readiness: ready
+});
+eq(cancelledOutcome?.error?.code, 'HANDWRITING_CANCELLED', 'client cancellation stays distinct from provider failure');
 
 // ── 6 · Turning a transcription into a reading ───────────────────────────────
 const local = { lines: [{ text: '-1/0/1/2)4', box: { x: 1, y: 2 } }], text: '-1/0/1/2)4' };

@@ -109,6 +109,16 @@
 - Low-confidence fallback failure is preserved in the returned safe diagnostics rather than silently discarded.
 - Focused verification: npm run test:platform:handwriting PASS — 69/69 checks.
 
+## Checkpoint 3 — client/diagnostics/cloud-wiring repair
+- Cloud handwriting now performs a bounded /v1/handwriting/status readiness check before rasterising or transmitting student ink.
+- Generic cloud transport availability is no longer sufficient to permit handwriting transmission.
+- Status failures/offline behavior fail closed to the existing local/native recogniser.
+- Payload-free runtime diagnostics expose only native availability, cloud usability, selected engine, last latency, coded failure, fallback occurrence and release SHA.
+- Raw strokes/images are never written to diagnostics.
+- Existing native/local path, answer-blind image-only request shape and conservative cloud arbitration remain intact.
+- Focused verification: cloud handwriting PASS 52/52; cloud photo PASS 28/28; native bridge PASS.
+- Production build was intentionally deferred until after this checkpoint commit because the release identity gate correctly rejects dirty source trees.
+
 
 ## Current-main reconciliation
 - Recovered uncommitted Checkpoint-2 provider/status work was preserved first in commit ce0f4cfefe370a7e0ec2c6d04cc7573e81ff1e13 and pushed before history changes.
