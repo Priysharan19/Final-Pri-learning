@@ -143,8 +143,9 @@ export const flow = {
 
     await goto('/');
     await page.waitForSelector('[data-home-primary]');
+    // The card is titled with the unfinished topic itself; the kind is the contract.
     await check('unfinished Practice becomes the next action',
-      /Resume where you left off/i.test(await page.locator('#home-next-title').innerText()));
+      await page.locator('[data-home-primary]').getAttribute('data-kind') === 'practice-resume');
     await snap(page, '07-resumable-practice');
 
     await page.locator('[data-home-primary-cta]').click();
@@ -172,7 +173,7 @@ export const flow = {
     await page.waitForSelector('.q-prompt', { timeout: 30000 });
     await goto('/');
     await check('unfinished task context becomes the primary resume action',
-      /Continue|task/i.test(await page.locator('#home-next-title').innerText()));
+      ['task-resume', 'task'].includes(await page.locator('[data-home-primary]').getAttribute('data-kind')));
     await check('task primary CTA preserves the task query context',
       await page.locator('[data-home-primary-cta]').evaluate(el => el.textContent.length > 0));
     await snap(page, '09-task-resume-state');
@@ -207,7 +208,7 @@ export const flow = {
     await check('profile switch recomputes the recommendation',
       !/review/i.test(await page.locator('#home-next-title').innerText()));
     await check('profile A restores its own unfinished task context',
-      /Continue|task/i.test(await page.locator('#home-next-title').innerText()));
+      ['task-resume', 'task'].includes(await page.locator('[data-home-primary]').getAttribute('data-kind')));
 
     // A real teacher profile must never enter student Home.
     await switchProfile(page);
