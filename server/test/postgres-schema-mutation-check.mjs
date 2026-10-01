@@ -32,6 +32,16 @@ function mutateNamed(fragment, from, to) {
   return original.map((m, i) => (i === index ? { ...m, sql: replaceOnce(m.sql, from, to) } : m));
 }
 
+/** The last migration that sets schema_version, and the statement that does it. */
+const LAST_SCHEMA_BUMP = (() => {
+  const pattern = /update pri\.platform_meta set value = '(\d+)' where key = 'schema_version';/;
+  for (const m of [...original].reverse()) {
+    const hit = m.sql.match(pattern);
+    if (hit) return { name: m.name, statement: hit[0], version: hit[1] };
+  }
+  throw new Error('no migration bumps schema_version');
+})();
+
 function laterMigration(sql) {
   return [...original, { name: '99999999999999_mutation.sql', sql }];
 }
@@ -125,9 +135,11 @@ const MUTATIONS = [
     expect: /pri_server can UPDATE sync_cursors, which must be read-only to it/
   },
   {
-    label: 'schema_version left at 6 by the sequence migration',
-    migrations: mutateNamed('_sync_cursor_sequence', "update pri.platform_meta set value = '7' where key = 'schema_version';", ''),
-    expect: /platform_meta\.schema_version is 7/
+    // Always the LAST migration that moves schema_version, whichever that is,
+    // so a later migration (tutor cache: 8) cannot make this mutation vacuous.
+    label: `schema_version left behind by its last bump (${LAST_SCHEMA_BUMP.name})`,
+    migrations: mutateNamed(LAST_SCHEMA_BUMP.name, LAST_SCHEMA_BUMP.statement, ''),
+    expect: new RegExp(`platform_meta\\.schema_version is ${LAST_SCHEMA_BUMP.version}\\b`)
   },
   {
     label: 'billing_payments still deletes the payment ledger with the account',
