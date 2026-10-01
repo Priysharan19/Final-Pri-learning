@@ -704,6 +704,7 @@ export default {
   'login.cloudLater': 'Not connected yet',
   'login.readyStudent': 'Your student profile will open the real Home experience. From there, Practice serves questions from the curriculum you chose.',
   'login.readyTeacher': 'Your teacher profile will open the real Teacher Workspace with teacher navigation and the curriculum context you chose.',
+  'login.noFakeDiagnostic': 'Pri Learning does not currently have a separate placement diagnostic, so onboarding does not invent one. Your real learning state starts with the questions you actually attempt.',
   'login.placementOffer': 'India-curriculum students are offered an optional placement check of about 10 questions on the home screen. It is skippable, and its result is labelled as diagnostic evidence, not mastery — your learning record still starts with the questions you actually practise.',
   'login.continue': 'Continue',
   'login.createAndOpenCloud': 'Create profile & open Account',

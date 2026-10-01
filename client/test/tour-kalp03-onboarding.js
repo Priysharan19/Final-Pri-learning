@@ -174,8 +174,11 @@ export const flow = {
       /Student/.test(summary) && /Class 10/.test(summary) && /English/.test(summary));
     // Onboarding still creates no score: the placement check is offered
     // afterwards, optional, and labelled as diagnostic evidence, not mastery.
+    const placementOn = await page.evaluate(() => window.__PRI_BUILD_FEATURES__?.placement === true);
     await check('ready state does not invent a diagnostic score',
-      /optional placement check/i.test(summary) && /diagnostic evidence, not mastery/i.test(summary));
+      placementOn
+        ? /optional placement check/i.test(summary) && /diagnostic evidence, not mastery/i.test(summary)
+        : /does not currently have a separate placement diagnostic/i.test(summary));
     await snap(page, '05-ready-student');
 
     const finalButton = page.locator('.auth-card .btn-primary');

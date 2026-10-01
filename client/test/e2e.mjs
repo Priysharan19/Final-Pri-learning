@@ -165,8 +165,12 @@ export function ensureBuild(build) {
     return { built: false };
   }
   const started = Date.now();
+  // A test build: flagged features outside the V1 scope are switched on so
+  // their flows are exercised. The tracked production build leaves them off,
+  // and tour-placement.js asserts that state when it meets such a build.
   const run = spawnSync('npm', ['run', 'build', '--prefix', 'client'], {
-    cwd: ROOT, encoding: 'utf8', shell: process.platform === 'win32'
+    cwd: ROOT, encoding: 'utf8', shell: process.platform === 'win32',
+    env: { ...process.env, PRI_FEATURE_PLACEMENT: '1' }
   });
   if (run.status !== 0) {
     const tail = `${run.stdout || ''}${run.stderr || ''}`.trim().split('\n').slice(-12).join('\n      ');

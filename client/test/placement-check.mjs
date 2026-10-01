@@ -443,6 +443,37 @@ async function run() {
     ok('and the second placement answer was recorded too', placed2.resolved === true && after.placement.items.length === before + 2, show({ items: after.placement.items.length, before }));
   }
 
+  section('feature flag');
+  {
+    const { featureDefines } = await import('../vite.config.js');
+    eq('a production build is off without PRI_FEATURE_PLACEMENT', featureDefines('build', {}).__PRI_FEATURE_PLACEMENT__, 'false');
+    eq('a production build is on only with PRI_FEATURE_PLACEMENT=1', featureDefines('build', { PRI_FEATURE_PLACEMENT: '1' }).__PRI_FEATURE_PLACEMENT__, 'true');
+    eq('development is on', featureDefines('serve', {}).__PRI_FEATURE_PLACEMENT__, 'true');
+    const { featureEnabled } = await import(`${SRC}platform/features.js`);
+    ok('outside Vite (these suites) the feature defaults on', featureEnabled('placement') === true);
+    ok('an unknown feature is off', featureEnabled('no-such-feature') === false);
+
+    // Off: no routes, no view, no seeding — even with a finished result stored.
+    await POST('/profiles/select', { id: asha.id });
+    globalThis.__PRI_FEATURE_OVERRIDES__ = { placement: false };
+    try {
+      ok('off: the stored result is still there (nothing is deleted)', !!storedProfile(asha.id).placement?.result);
+      eq('off: the view reports the feature disabled', (await GET('/placement')).status, 'disabled');
+      eq('off: start is refused', await expectError(() => POST('/placement/start', {}), 'FEATURE_DISABLED'), 'FEATURE_DISABLED');
+      eq('off: skip is refused', await expectError(() => POST('/placement/skip', {}), 'FEATURE_DISABLED'), 'FEATURE_DISABLED');
+      const whys = [];
+      for (let i = 0; i < 6; i++) {
+        const smart = await POST('/practice/next', {});
+        whys.push(smart.why);
+        await POST(`/practice/${smart.question.id}/discard`, {});
+      }
+      ok('off: smart practice is never seeded by the stored diagnostic', whys.every(w => !/placement check/.test(w)), show(whys.filter(w => /placement check/.test(w))));
+    } finally {
+      delete globalThis.__PRI_FEATURE_OVERRIDES__;
+    }
+    eq('on again: the view returns', (await GET('/placement')).status, 'finished');
+  }
+
   // ── Verdict ────────────────────────────────────────────────────────────────
   for (const m of measured) console.log(`  measured · ${m}`);
   const total = pass + failures.length;

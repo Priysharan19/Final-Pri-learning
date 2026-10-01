@@ -68,7 +68,8 @@ check('teacher role still lands on /teach', app.includes("roleLanding = user.rol
 check('cloud panel names local profile boundary', cloud.toLowerCase().includes('local profile'));
 check('cloud panel names authenticated Pri Learning account', cloud.includes('Pri Learning account') && cloud.includes('authenticated cross-device sync'));
 check('no passkey UI was invented', !login.toLowerCase().includes('passkey') && !login.toLowerCase().includes('webauthn'));
-check('ready state names the optional placement check truthfully', login.includes('login.placementOffer'));
+check('ready state keeps the no-diagnostic copy when placement is off', login.includes("featureEnabled('placement') ? 'login.placementOffer' : 'login.noFakeDiagnostic'"));
+check('ready state names the optional placement check truthfully when it is on', login.includes('login.placementOffer'));
 check('English has staged onboarding copy', en.includes("'login.stepRoleTitle'"));
 check('Hindi has staged onboarding copy', hi.includes("'login.stepRoleTitle'"));
 check('English has local cloud honesty copy', en.includes("'login.localCloudHonesty'"));

@@ -49,6 +49,7 @@ import {
   planView, recordExamSimulation, recordPracticeServed, requireCapability, usageView
 } from './entitlementGate.js';
 import { ENTITLEMENTS } from '../platform/entitlements.js';
+import { featureEnabled } from '../platform/features.js';
 import { priNative } from '../platform/native/index.js';
 
 export const COURSES = {
@@ -3693,6 +3694,7 @@ const routes = {
 
   'POST /placement/skip': async () => {
     const p = await requireProfile();
+    requirePlacementCourse(p);
     await writePlacement(p.id, { placementSkippedAt: Date.now() });
     return { skipped: true };
   }
@@ -3744,6 +3746,11 @@ function withProfileRow(pid, work) {
 }
 
 function requirePlacementCourse(p) {
+  // Outside the frozen V1 scope: a build without the flag has no placement
+  // check at all, so its routes refuse rather than half-work.
+  if (!featureEnabled('placement')) {
+    throw Object.assign(new Error('The placement check is not available in this build.'), { status: 404, code: 'FEATURE_DISABLED' });
+  }
   if (p.course !== 'in') {
     throw Object.assign(new Error('The placement check covers the India curriculum (NCERT Class 7–12) only.'), { status: 409, code: 'PLACEMENT_UNAVAILABLE' });
   }
@@ -3813,6 +3820,9 @@ function placementHistoryOf(pl) {
 
 /** The diagnostic's priors, read only from a finished result. */
 function placementPriorsOf(p) {
+  // No flag, no learner-state seeding — even from a result stored by a build
+  // that had it.
+  if (!featureEnabled('placement')) return {};
   const r = p?.course === 'in' ? p?.placement?.result : null;
   if (!r || r.kind !== 'diagnostic' || !r.priors || typeof r.priors !== 'object') return {};
   const out = {};
@@ -3826,6 +3836,7 @@ function placementPriorsOf(p) {
 const IN_CHAPTER_IDS = new Set(IN_CHAPTERS.map(ch => ch.id));
 
 function placementView(p, ratings, now = Date.now()) {
+  if (!featureEnabled('placement')) return { available: false, status: 'disabled' };
   if (p.course !== 'in') return { available: false, status: 'unavailable' };
   const pl = p.placement || null;
   const status = pl?.status === 'active' && pl.current ? 'active'

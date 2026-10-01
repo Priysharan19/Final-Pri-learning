@@ -126,7 +126,8 @@ function buildApp() {
   const vite = join(CLIENT, 'node_modules', 'vite', 'bin', 'vite.js');
   if (!existsSync(vite)) throw new Error(`vite is not installed at ${vite}`);
   const r = spawnSync(process.execPath, [vite, 'build', '--outDir', out, '--emptyOutDir', '--logLevel', 'error'],
-    { cwd: CLIENT, encoding: 'utf8' });
+    // A test build: flagged non-V1 screens are on so they are audited too.
+    { cwd: CLIENT, encoding: 'utf8', env: { ...process.env, PRI_FEATURE_PLACEMENT: '1' } });
   if (r.status !== 0) throw new Error(`the build failed:\n${r.stdout || ''}${r.stderr || ''}`);
   if (!existsSync(join(out, 'index.html'))) throw new Error('the build emitted no index.html');
   return out;

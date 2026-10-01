@@ -316,9 +316,18 @@ function releaseIdentityManifest(identity) {
   };
 }
 
+// Build-time feature flags (client/src/platform/features.js). A production
+// build is OFF unless its environment says PRI_FEATURE_<NAME>=1; development
+// (`vite` serve) is ON. Test harnesses that build set the variable themselves.
+export function featureDefines(command, env = process.env) {
+  const on = name => (command === 'build' ? env[`PRI_FEATURE_${name}`] === '1' : env[`PRI_FEATURE_${name}`] !== '0');
+  return { __PRI_FEATURE_PLACEMENT__: JSON.stringify(on('PLACEMENT')) };
+}
+
 export default defineConfig(({ command }) => {
   const releaseIdentity = resolveReleaseIdentity({ production: command === 'build', env: applyDeploymentPrecedence(process.env) });
   return {
+    define: featureDefines(command),
     plugins: [react(), releaseIdentityManifest(releaseIdentity), precache()],
     server: { port: 5173 },
     build: {

@@ -7,6 +7,7 @@ import { dayKey, formatWeekday } from '../lib/locale.js';
 import { useT, useTx } from '../i18n/index.js';
 import { textMatches, useGlossary } from '../i18n/glossary.js';
 import TermGloss from '../components/TermGloss.jsx';
+import { featureEnabled } from '../platform/features.js';
 
 // Deliberately English in every language. These are jokes that live entirely
 // in the English idiom of a maths classroom — "The proof is left as an exercise
@@ -60,7 +61,7 @@ export default function Home() {
   // after onboarding until they take it or say not now.
   const [placement, setPlacement] = useState(null);
   useEffect(() => {
-    if (user.course !== 'in' || user.role === 'teacher') return;
+    if (!featureEnabled('placement') || user.course !== 'in' || user.role === 'teacher') return;
     api.get('/placement').then(setPlacement).catch(() => { });
   }, [user.course, user.role]);
   useEffect(() => {

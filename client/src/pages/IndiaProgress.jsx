@@ -5,6 +5,7 @@ import { useApp } from '../App.jsx';
 import { predictionSentence } from '../engine/markPredictor.js';
 import { useT } from '../i18n/index.js';
 import TermGloss from '../components/TermGloss.jsx';
+import { featureEnabled } from '../platform/features.js';
 
 function pct(correct, attempts) {
   const a = Number(attempts || 0);
@@ -78,7 +79,7 @@ export default function IndiaProgress() {
         <p className="muted" style={{ marginTop: 12, maxWidth: 820 }}>{t('progress.honesty')}</p>
       </div>
 
-      <div className="card" data-placement-entry>
+      {featureEnabled('placement') && <div className="card" data-placement-entry>
         <div className="spread" style={{ gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
           <div style={{ maxWidth: 640 }}>
             <div className="card-title" style={{ marginBottom: 4 }}>{t('placement.progressTitle')}</div>
@@ -86,7 +87,7 @@ export default function IndiaProgress() {
           </div>
           <button className="btn btn-ghost" onClick={() => nav('/placement')}>{t('placement.seeResult')}</button>
         </div>
-      </div>
+      </div>}
 
       {prediction && (
         <div className="card">

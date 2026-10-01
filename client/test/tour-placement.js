@@ -23,6 +23,35 @@ export const flow = {
     // Type mode is the deterministic way to drive the card from a script; the
     // write tab is the same card and has its own flow.
     await page.evaluate(() => localStorage.setItem('pri-input-mode', 'type'));
+    const enabled = await page.evaluate(() => window.__PRI_BUILD_FEATURES__?.placement === true);
+    if (!enabled) {
+      // A production build without PRI_FEATURE_PLACEMENT: outside the frozen
+      // V1 scope, so there must be no placement surface anywhere.
+      await page.getByRole('button', { name: 'Get Started' }).click();
+      await page.waitForSelector('[data-onboarding-step="1"]', { timeout: 15000 });
+      await page.getByRole('button', { name: 'Student', exact: true }).click();
+      await page.locator('.auth-card .btn-primary').click();
+      await page.locator('#signup-track').selectOption('11');
+      await page.locator('.auth-card .btn-primary').click();
+      await page.locator('#signup-name').fill('Nisha Rao');
+      await page.locator('.auth-card .btn-primary').click();
+      await page.locator('.auth-card .btn-primary').click();
+      await page.waitForSelector('[data-onboarding-step="5"]', { timeout: 15000 });
+      await check('flag off: onboarding keeps the no-diagnostic copy',
+        /does not currently have a separate placement diagnostic/.test(await page.locator('.auth-card').innerText()));
+      await page.locator('.auth-card .btn-primary').click();
+      await page.waitForSelector('.home-greet', { timeout: 30000 });
+      await settle();
+      await check('flag off: Home offers no placement check', await page.locator('[data-placement-card]').count() === 0);
+      await goto('/placement');
+      await settle();
+      await check('flag off: /placement is not a route', !/\/placement/.test(new URL(page.url()).pathname) && await page.locator('.pm-map, [data-placement-start]').count() === 0, page.url());
+      await goto('/progress');
+      await page.waitForSelector('.card', { timeout: 30000 }).catch(() => { });
+      await check('flag off: Progress has no placement entry', await page.locator('[data-placement-entry]').count() === 0);
+      return;
+    }
+    await check('this is a test build with the placement flag on', enabled);
     await createProfile({ name: 'Nisha Rao', year: 11, course: 'in' });
 
     // ── 1 · Home offers the check after onboarding ───────────────────────────
