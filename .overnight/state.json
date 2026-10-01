@@ -1,45 +1,36 @@
 {
   "schemaVersion": 1,
-  "task": "PRI-01",
-  "status": "final_ci_in_progress",
-  "taskStartMainSha": "33e7b6c9bb06b65f00a9f38f88a678a333eec80f",
-  "workingBranch": "task/pri-01-repository-authority",
-  "pullRequest": 223,
-  "recovery": {
-    "launcherClonePreserved": true,
-    "recoveredClone": "~/Projects/Pri-Learning-PRI01",
-    "recoveredCommits": [
-      "3f35009fecd3607969e63e94854b796eef81dcf8",
-      "f3e6a1175374f87ccfac0a65bb23cf618e960fd2",
-      "bd9e77a0c6b2fd351282a1906ca194a9920c9d45",
-      "659db5012a686df65679e24e6275e06685076ae2"
-    ],
-    "recoveredUncommittedBranch": "recovery/pri-01-crash-uncommitted",
-    "recoveredUncommittedCommits": [
-      "33dceed",
-      "930dfd0"
-    ],
-    "releaseTransportRecoveryImported": true,
-    "unrelatedLiveLanRecoveryPreservedOnly": false,
-    "liveLanRecoveryImportedAfterStrictIdentityFailure": true
+  "task": "PRI-03",
+  "status": "software_complete_blocked_external",
+  "taskStartMainSha": "da6a50e05b5f3dc9f52929a0a8c284e940087bc1",
+  "workingBranch": "task/pri-03-handwriting-production-wiring",
+  "pullRequest": 239,
+  "checkpoint": 8,
+  "serverProviderStatus": "pass",
+  "clientCloudWiring": "pass",
+  "failureMatrix": "pass",
+  "secretAudit": "pass",
+  "evidence": ".overnight/evidence/pri-03.md",
+  "crashResistance": {
+    "branchPushed": true,
+    "evidenceInitialized": true,
+    "commitEveryCoherentPhase": true,
+    "largeLogsRedirectedToFiles": true
   },
-  "mainProtectionConfigured": true,
-  "requiredChecks": [
-    "Suites, coverage and accuracy gates",
-    "Production account, sync and commercial schema",
-    "Browser suites (end-to-end and accessibility)",
-    "Client build and offline-first boundary"
-  ],
-  "evidenceRule": "Tracked evidence records the verified pre-evidence code candidate; exact final PR-head SHA and final CI are recorded durably on PR #223 after this evidence commit because a Git commit cannot self-contain its own SHA.",
-  "verificationCandidateBeforeEvidenceCommit": "6cb410a012d578281a4a30c2ea026ca4ea7a4ca3",
-  "staleGovernanceIssueClosed": 75,
-  "preExistingNativeInkFailure": {
-    "taskStartMainSha": "33e7b6c9bb06b65f00a9f38f88a678a333eec80f",
-    "candidateExact": "6/10",
-    "candidateCharacterAccuracy": "93.8%",
-    "baselineExact": "6/10",
-    "baselineCharacterAccuracy": "93.8%",
-    "classification": "pre-existing out-of-scope handwriting-quality defect; threshold unchanged"
-  },
-  "localA11y": "38/38 across 12 groups"
+  "physicalIpad": "blocked_external_locked",
+  "productionProvider": "configured_unverified_runtime_blocked",
+  "productionDeployment": "candidate_image_pass_runtime_blocked_auth_email",
+  "paidCallCeilings": "configured",
+  "exactHeadCi": "running",
+  "currentMainSha": "449be4203341a1228c590fada2604f9456b69b50",
+  "mainReconciled": true,
+  "recoveredWorkCommit": "ce0f4cfefe370a7e0ec2c6d04cc7573e81ff1e13",
+  "cleanClone": "pass_except_native_selfcheck_local_baseline",
+  "nativeInkSelfCheck": "local_baseline_fail",
+  "railwayCliAuth": "superseded_by_connected_authority",
+  "productionReleaseSha": "972443836f21dac587ea51a93693def41eb747c4",
+  "providerCredential": "present_nonempty",
+  "railwayAuthorization": "pass",
+  "productionHandwritingStatus": "blocked_external_auth_email_config",
+  "physicalProductionTranscription": "blocked_external_locked"
 }

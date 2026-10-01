@@ -39,6 +39,39 @@ function normalizeTimestamp(value) {
   return Number.isFinite(millis) ? new Date(millis).toISOString() : null;
 }
 
+/**
+ * The environment variables that decide a deployment's release identity, in
+ * precedence order. Build time (the Docker client-build stage, via
+ * release/docker-build-identity.mjs and client/vite.config.js) and run time
+ * (server/platform/releaseIdentity.js) both go through
+ * applyDeploymentPrecedence(), so the SHA baked into client/dist/release.json
+ * and the SHA the server reports are chosen by the same rule from the same
+ * variables. Every name here must be declared as an ARG in the Dockerfile
+ * stage that builds the client, because Docker (and Railway) only expose a
+ * build-time variable to a stage that declares it.
+ */
+export const DEPLOYMENT_IDENTITY_ENV = Object.freeze([
+  'RAILWAY_GIT_COMMIT_SHA', 'PRI_RELEASE_SHA', 'GITHUB_SHA', 'VERCEL_GIT_COMMIT_SHA', 'PRI_BUILD_TIMESTAMP', 'SOURCE_DATE_EPOCH'
+]);
+
+/**
+ * Railway's own Git SHA outranks PRI_RELEASE_SHA. When the two disagree, the
+ * PRI_* pair is a stale manual-candidate value left on the service, so its
+ * timestamp is dropped with it rather than being paired with a different
+ * commit. Idempotent: applying it twice gives the same result, so the build
+ * wrapper and vite.config.js may both apply it.
+ */
+export function applyDeploymentPrecedence(env = process.env) {
+  const next = { ...env };
+  const railwaySha = normalizeSha(env.RAILWAY_GIT_COMMIT_SHA);
+  if (railwaySha && normalizeSha(env.PRI_RELEASE_SHA) !== railwaySha) {
+    next.PRI_RELEASE_SHA = railwaySha;
+    delete next.PRI_BUILD_TIMESTAMP;
+    delete next.SOURCE_DATE_EPOCH;
+  }
+  return next;
+}
+
 export function resolveReleaseIdentity({ root = DEFAULT_ROOT, env = process.env, production = false, verifySource = production } = {}) {
   const metadata = readReleaseMetadata(root);
   const gitSha = normalizeSha(git(root, ['rev-parse', 'HEAD']));
