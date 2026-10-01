@@ -1101,6 +1101,90 @@ async function run() {
     await POST('/profiles/select', { id: ada.id });
   } catch (err) { crashed(err); }
 
+  // ── AI tutor (vision item 3) ───────────────────────────────────────────────
+  // Three levels, strictly in order, each charged like a hint; the server is
+  // asked only for words and only about a practice row; every failure falls
+  // back to the question's own authored hint; a tutored success is supported
+  // evidence, never independent.
+  section('ai tutor');
+  const { setTutorTransportForTests } = await import(`${SRC}local/tutorBridge.js`);
+  const tutorCalls = [];
+  try {
+    await POST('/profiles/select', { id: ada.id });
+    let reply = () => ({ tutor: { source: 'model', message: 'Look at the operation in the first step.', referencesStepIndex: 0 } });
+    setTutorTransportForTests(async (body) => { tutorCalls.push(body); return reply(body); });
+
+    let target = null;
+    for (let i = 0; i < 40 && !target; i += 1) {
+      const q = await answerableQuestion({ mode: 'topic', subtopic: topicId });
+      if (q && q.payload.steps?.length && (q.payload.hints || []).length >= 2) target = q;
+    }
+    if (!ok('a practice question with a worked solution and two authored hints was served', !!target)) throw new Error('ai tutor group cannot continue');
+    const id = target.question.id;
+    eq('a served question starts with no tutor help used', target.question.tutorLevel, 0);
+
+    const skip = await rejects('level 2 cannot be asked for before level 1', POST(`/practice/${id}/tutor`, { level: 2 }), { status: 409 });
+    eq('— with the ordering code', skip?.code, 'TUTOR_LEVEL_ORDER');
+    await rejects('level 3 cannot be asked for first either', POST(`/practice/${id}/tutor`, { level: 3 }), { status: 409 });
+    await rejects('captions cannot be asked for before the walkthrough', POST(`/practice/${id}/tutor/captions`, { captions: [{ id: 'solution-0', text: 'x' }] }), { status: 409 });
+    await rejects('an unknown level is refused', POST(`/practice/${id}/tutor`, { level: 4 }), { status: 400 });
+    eq('no refused request reached the tutor', tutorCalls.length, 0);
+
+    const l1 = await POST(`/practice/${id}/tutor`, { level: 1, work: { lines: ['first line of working'], typed: '' }, locale: 'en' });
+    eq('level 1 is a nudge from the tutor', [l1.level, l1.source, l1.message], [1, 'tutor', 'Look at the operation in the first step.']);
+    eq('and is recorded on the question', (await idb.get('questions', id)).tutorLevel, 1);
+    const sent = tutorCalls[0] || {};
+    eq('the tutor is asked as practice, at the nudge level', [sent.context, sent.level, sent.locale], ['practice', 'nudge', 'en']);
+    ok('grounded in the verified solution and its answer', sent.question?.steps?.length === target.payload.steps.length && typeof sent.question?.answer === 'string' && sent.question.answer.length > 0, show(sent.question));
+    eq('with the student’s own lines', sent.studentWork?.lines, ['first line of working']);
+    ok('and nothing that identifies the student', !/Ada|Lovelace|ada\.lovelace|"pid"|"email"|"name"/.test(JSON.stringify(sent)), JSON.stringify(sent).slice(0, 200));
+
+    reply = () => ({ error: { code: 'TUTOR_UNAVAILABLE', status: 503 } });
+    const l2 = await POST(`/practice/${id}/tutor`, { level: 2 });
+    eq('a tutor outage falls back to the authored hint for that level', [l2.level, l2.source, l2.message], [2, 'deterministic', target.payload.hints[1]]);
+    eq('and says why with a code', l2.code, 'TUTOR_UNAVAILABLE');
+    eq('the level is still recorded — the help was shown', (await idb.get('questions', id)).tutorLevel, 2);
+
+    reply = () => ({ tutor: { source: 'fallback', message: target.payload.hints[1], reason: 'TUTOR_ANSWER_GUARD' } });
+    const again2 = await POST(`/practice/${id}/tutor`, { level: 2 });
+    eq('a server-guarded fallback is shown as deterministic help', [again2.source, again2.code], ['deterministic', 'TUTOR_ANSWER_GUARD']);
+    eq('asking for a used level again costs nothing more', (await idb.get('questions', id)).tutorLevel, 2);
+
+    const callsBefore3 = tutorCalls.length;
+    const l3 = await POST(`/practice/${id}/tutor`, { level: 3 });
+    eq('level 3 is the deterministic walkthrough', [l3.level, l3.source], [3, 'deterministic']);
+    eq('of the verified solution', l3.walkthrough?.solution?.steps?.length, target.payload.steps.length);
+    eq('without asking the model for any maths', tutorCalls.length, callsBefore3);
+
+    reply = body => ({ tutor: { source: 'model', captions: body.captions.map((c, i) => ({ id: c.id, text: i === 0 ? 'Rephrased.' : c.text, source: i === 0 ? 'model' : 'deterministic' })) } });
+    const caps = await POST(`/practice/${id}/tutor/captions`, { captions: [{ id: 'solution-0', text: 'Step one' }, { id: 'solution-1', text: 'Step two' }] });
+    eq('rephrased captions come back by id, the rest deterministic', caps.captions.map(c => [c.id, c.source]), [['solution-0', 'tutor'], ['solution-1', 'deterministic']]);
+    eq('the walkthrough request carries the captions', tutorCalls.at(-1)?.level, 'walkthrough');
+
+    // Offline: the real bridge with no cloud configured.
+    setTutorTransportForTests(null);
+    const hintOnly = await answerableQuestion({ mode: 'topic', subtopic: topicId });
+    const offline = await POST(`/practice/${hintOnly.question.id}/tutor`, { level: 1 });
+    eq('offline, level 1 is the first authored hint', [offline.source, offline.code], ['deterministic', 'TUTOR_OFFLINE']);
+    eq('with its text', offline.message, (hintOnly.payload.hints || [])[0] ?? null);
+    setTutorTransportForTests(async (body) => { tutorCalls.push(body); return reply(body); });
+
+    const right = await POST(`/practice/${id}/submit`, { answer: target.right, ms: 9000 });
+    eq('a tutored question can still be answered correctly', right.correct, true);
+    const attempt = (await idb.byIndex('attempts', 'pid', ada.id)).find(a => a.questionId === id);
+    eq('the attempt records how much tutor help was used', attempt?.tutorLevel, 3);
+    eq('and counts the success as supported, not independent', attempt?.support, 'supported');
+    await rejects('an answered question takes no more help', POST(`/practice/${id}/tutor`, { level: 3 }), { status: 409 });
+
+    const clean = await answerableQuestion({ mode: 'topic', subtopic: topicId });
+    await POST(`/practice/${clean.question.id}/submit`, { answer: clean.right, ms: 9000 });
+    const cleanAttempt = (await idb.byIndex('attempts', 'pid', ada.id)).find(a => a.questionId === clean.question.id);
+    eq('an unaided first-try success is independent evidence', [cleanAttempt?.tutorLevel, cleanAttempt?.support], [0, 'independent']);
+    const { xpFor } = await import(`${SRC}engine/adaptive.js`);
+    eq('the tutored success is charged like three hints', right.xp, xpFor(target.payload.difficulty, true, 0, 3));
+  } catch (err) { crashed(err); }
+  finally { setTutorTransportForTests(null); }
+
   // ── Exams ──────────────────────────────────────────────────────────────────
   section('exams');
   try {
@@ -1223,10 +1307,15 @@ async function run() {
       eq(`${name} — and nothing of the solution rides on the error`, leaked || [], []);
     };
 
+    const { setTutorTransportForTests: setExamTutor } = await import(`${SRC}local/tutorBridge.js`);
+    const examTutorCalls = [];
+    setExamTutor(async body => { examTutorCalls.push(body); return { tutor: { source: 'model', message: 'leak' } }; });
     for (const [label, row] of [['single', single], ['multipart', multi]]) {
       if (!row) continue;
       const id = row.id;
       await locked(`a ${label} active exam question cannot take a practice hint`, POST(`/practice/${id}/hint`, {}));
+      await locked(`a ${label} active exam question cannot take AI tutor help`, POST(`/practice/${id}/tutor`, { level: 1 }));
+      await locked(`a ${label} active exam question cannot take a tutor walkthrough caption`, POST(`/practice/${id}/tutor/captions`, { captions: [{ id: 'solution-0', text: 'x' }] }));
       await locked(`a ${label} active exam question cannot be revealed through practice`, POST(`/practice/${id}/reveal`, { ms: 1000 }));
       await locked(`a ${label} active exam question cannot be marked through practice`,
         POST(`/practice/${id}/submit`, { answer: row.payload.multipart ? '0' : (canonicalInput(row.payload) ?? '0'), ms: 1000 }));
@@ -1235,9 +1324,11 @@ async function run() {
       await locked(`a ${label} active exam question cannot be retried as practice`, POST(`/history/${id}/retry`, { variant: 'same' }));
       const after = await idb.get('questions', id);
       eq(`the ${label} exam row is untouched by every refused call`,
-        { hintsUsed: after.hintsUsed, answered: after.answered, tries: after.tries, discardedAt: after.discardedAt ?? null, mode: after.mode },
-        { hintsUsed: 0, answered: 0, tries: 0, discardedAt: null, mode: 'exam' });
+        { hintsUsed: after.hintsUsed, tutorLevel: after.tutorLevel || 0, answered: after.answered, tries: after.tries, discardedAt: after.discardedAt ?? null, mode: after.mode },
+        { hintsUsed: 0, tutorLevel: 0, answered: 0, tries: 0, discardedAt: null, mode: 'exam' });
     }
+    setExamTutor(null);
+    eq('the AI tutor was never called for an active exam question — refused locally, before any network', examTutorCalls.length, 0);
     eq('no attempt was recorded from an active exam question', (await idb.byIndex('attempts', 'pid', me)).length, attemptsBefore);
     eq('no review schedule moved from an active exam question', JSON.stringify(await idb.byIndex('reviews', 'pid', me)), reviewsBefore);
 

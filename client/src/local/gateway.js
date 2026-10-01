@@ -126,6 +126,16 @@ function optionalRosterRows(body, key, max = 200) {
   }
 }
 
+/** The working a tutor request may carry: bounded lines and a typed answer. */
+function tutorWorkRule(body) {
+  if (body.work === undefined || body.work === null) return;
+  if (!plainObject(body.work)) throw apiError('work must be an object.', 400, 'INVALID_FIELD');
+  optionalString(body.work, 'typed', 300);
+  if (body.work.lines !== undefined && (!Array.isArray(body.work.lines) || body.work.lines.length > 40 || body.work.lines.some(l => typeof l !== 'string' || l.length > 400))) {
+    throw apiError('work.lines must be at most 40 lines of text.', 400, 'INVALID_FIELD');
+  }
+}
+
 // Only routes where the body is security- or storage-significant need an
 // explicit contract here. Routes not listed still receive the universal deep
 // validation below, and backend.js remains responsible for their domain rules.
@@ -170,6 +180,21 @@ const BODY_RULES = [
   }],
   [/^POST \/practice\/[A-Za-z0-9._-]+\/(?:hint|reveal)$/, body => {
     requireObject(body, 'practice action'); optionalNumber(body, 'ms');
+  }],
+  // AI tutor: a level and the student's own working, nothing else. The
+  // backend adds the verified solution itself — the UI never supplies one.
+  [/^POST \/practice\/[A-Za-z0-9._-]+\/tutor$/, body => {
+    requireObject(body, 'tutor help'); optionalNumber(body, 'level'); optionalString(body, 'locale', 5);
+    tutorWorkRule(body);
+  }],
+  [/^POST \/practice\/[A-Za-z0-9._-]+\/tutor\/captions$/, body => {
+    requireObject(body, 'tutor captions'); optionalString(body, 'locale', 5);
+    tutorWorkRule(body);
+    if (body.captions !== undefined && (!Array.isArray(body.captions) || body.captions.length > 24)) throw apiError('captions must be at most 24 entries.', 400, 'INVALID_FIELD');
+    for (const c of body.captions || []) {
+      if (!plainObject(c)) throw apiError('captions must be objects.', 400, 'INVALID_FIELD');
+      optionalString(c, 'id', 40); optionalString(c, 'text', 700);
+    }
   }],
   [/^POST \/practice\/[A-Za-z0-9._-]+\/submit$/, body => {
     requireObject(body, 'practice submit'); optionalNumber(body, 'ms'); optionalBoolean(body, 'viaInk');

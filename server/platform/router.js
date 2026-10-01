@@ -12,6 +12,7 @@ import { createReportRouter } from './reports.js';
 import { createSyncRouter } from './sync.js';
 import { createHandwritingRouter } from './handwriting.js';
 import { createWorkingRouter } from './working.js';
+import { createTutorRouter } from './tutor.js';
 import { requireGuardianConsent } from './guardianConsent.js';
 import { createTelemetryRouter } from './telemetry.js';
 import { assertPlatformConfig, platformConfigStatus } from './config.js';
@@ -21,7 +22,7 @@ import { serverReleaseIdentity } from './releaseIdentity.js';
 
 const SERVER_WEBHOOK = /^\/billing\/webhook\/(?:apple|google|web)$/;
 
-export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckout = {}, billingNative = {}, billingLifecycle = {} } = {}) {
+export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckout = {}, billingNative = {}, billingLifecycle = {}, tutor = {} } = {}) {
   assertPlatformConfig();
   db = asStore(db);
   const router = asyncRouter();
@@ -103,6 +104,9 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
   router.use('/reports', createReportRouter(db));
   router.use('/handwriting', requireGuardianConsent(db), createHandwritingRouter(db));
   router.use('/working', requireGuardianConsent(db), createWorkingRouter(db));
+  // The tutor sends a student's own work lines to the model provider, so it
+  // sits behind the same guardian gate as the working check.
+  router.use('/tutor', requireGuardianConsent(db), createTutorRouter(db, tutor));
   router.use('/telemetry', createTelemetryRouter(db));
   router.use('/admin', createAdminRouter(db));
 

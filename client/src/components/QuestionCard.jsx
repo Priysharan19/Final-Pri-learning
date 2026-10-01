@@ -18,7 +18,7 @@ import PriPlot from './PriPlot.jsx';
 import { plotSpecFor } from '../engine/plotSpec.js';
 import { awardStepMarks, marksSentence } from '../engine/cbseMarking.js';
 import { checkWorkingWithCloud, mergeVerdicts, shouldCheckWorking, workingNote } from '../ink/cloudWorking.js';
-import { useT, useTx } from '../i18n/index.js';
+import { useLanguage, useT, useTx } from '../i18n/index.js';
 import TermGloss from './TermGloss.jsx';
 
 const DIFF_CLASS = { 1: 'tag-d1', 2: 'tag-d2', 3: 'tag-d3', 4: 'tag-d4' };
@@ -69,6 +69,23 @@ export const SR_ONLY = {
 // spelled out one per line because a bundler emits a chunk only for a specifier
 // it can see; four specifiers is four real attempts, and once they are spent
 // only a reload has anything new to try.
+// ── The AI tutor panel, fetched only when a student asks for help ─────────────
+// A lazy chunk of its own: most questions are answered without it, so nobody
+// pays for it at install. If the chunk cannot be fetched the boundary below
+// says so and the hint bulbs keep working.
+const TutorHelp = React.lazy(() => import('../tutor/TutorHelp.jsx'));
+
+class TutorBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { failed: false }; }
+  static getDerivedStateFromError() { return { failed: true }; }
+  componentDidCatch() { /* nothing about the question or the student is logged */ }
+  render() {
+    return this.state.failed
+      ? <div className="hintbox" role="status">{this.props.fallback}</div>
+      : this.props.children;
+  }
+}
+
 const INK_SOURCES = [
   () => import('../ink/InkAnswer.jsx'),
   () => import('../ink/InkAnswer.jsx?retry=1'),
@@ -222,6 +239,9 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const [inkResult, setInkResult] = useState(null);
   const [hints, setHints] = useState([]);
   const [hintsLeft, setHintsLeft] = useState(question.hintsAvailable);
+  const [showTutor, setShowTutor] = useState(false);
+  const [tutorUsed, setTutorUsed] = useState(question.tutorLevel || 0);
+  const { language } = useLanguage();
   const [working, setWorking] = useState('');
   const [showWorking, setShowWorking] = useState(false);
   const [showScribble, setShowScribble] = useState(false);
@@ -248,6 +268,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   useEffect(() => {
     const draft = readDraft('question', question.id);
     setAnswer(draft?.typed || ''); setMcqSel(null); setInkResult(null); setHints([]); setHintsLeft(question.hintsAvailable);
+    setShowTutor(false); setTutorUsed(question.tutorLevel || 0);
     setWorking(draft?.working || ''); setShowWorking(!!draft?.working);
     setState({ phase: 'answering' }); setBusy(false);
     setSelfMarks({}); setSelfSaved(false); setPhoto(null); setBookmarked(false); setElapsed(0);
@@ -270,7 +291,9 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const isWorking = question.answerType === 'working';
   const totalMarks = question.criteria?.length || 1;
   const hintsUsed = hints.length;
-  const credit = Math.max(0.55, 1 - 0.15 * hintsUsed);
+  // Each opened tutor level is charged like a hint (backend resolve()).
+  const helpUsed = hintsUsed + tutorUsed;
+  const credit = Math.max(0.55, 1 - 0.15 * helpUsed);
   const writeMode = mode === 'write';
   const recognitionContext = useMemo(
     () => recognitionContextForQuestion(question),
@@ -789,7 +812,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
 
       <div className="q-topmeta">
         <span>{t('verdict.marksAvailable', { count: totalMarks, n: totalMarks })}</span>
-        {hintsUsed > 0 && !resolved && (
+        {helpUsed > 0 && !resolved && (
           <span className="q-credit"><span className="dot">•</span> {t('verdict.creditAvailable', { percent: Math.round(credit * 100), marks: Math.round(totalMarks * credit * 10) / 10 })} <span className="dot">•</span></span>
         )}
         {/* The topic chip is where a student meets the name of what they are
@@ -1071,6 +1094,34 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
           </div>
           <InkCanvas ref={scribbleRef} height={200} guides={false} ariaLabel={t('verdict.scribblePad')} />
         </div>
+      )}
+
+      {/* AI tutor: three levels of help, lazy-loaded on first use */}
+      {!resolved && (
+        <div className="tutor-launch-row no-print">
+          <button type="button" className={`btn btn-ghost btn-sm tutor-launch ${showTutor ? 'on' : ''}`}
+            aria-expanded={showTutor} aria-label={t('tutor.helpLabel')} data-tutor-launch
+            onClick={() => setShowTutor(v => !v)}>
+            {t('tutor.help')}
+          </button>
+          {tutorUsed > 0 && <span className="muted" style={{ marginLeft: 8, fontSize: 13 }}>{t('tutor.helpUsed', { count: tutorUsed, n: tutorUsed })}</span>}
+        </div>
+      )}
+      {showTutor && !resolved && (
+        <TutorBoundary fallback={t('tutor.unavailable')}>
+          <React.Suspense fallback={<div className="hintbox" role="status">{t('tutor.asking')}</div>}>
+            <TutorHelp
+              question={{ ...question, tutorLevel: tutorUsed }}
+              work={{
+                lines: (isWorking || showWorking) && working ? working.split('\n').map(l => l.trim()).filter(Boolean).slice(0, 40).map(l => l.slice(0, 400)) : [],
+                typed: isMcq ? '' : String(answer || '').slice(0, 300)
+              }}
+              locale={language === 'hi' ? 'hi' : 'en'}
+              onUsed={level => setTutorUsed(u => Math.max(u, level))}
+              onClose={() => setShowTutor(false)}
+            />
+          </React.Suspense>
+        </TutorBoundary>
       )}
 
       {/* hints shown */}

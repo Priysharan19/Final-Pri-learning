@@ -49,6 +49,7 @@ import {
   planView, recordExamSimulation, recordPracticeServed, requireCapability, usageView
 } from './entitlementGate.js';
 import { ENTITLEMENTS } from '../platform/entitlements.js';
+import { requestTutorHelp } from './tutorBridge.js';
 
 export const COURSES = {
   nsw: { name: 'NSW · HSC', junior: y => `Year ${y} · Stage ${y <= 8 ? 4 : 5}`, senior: y => y === 11 ? 'Year 11 · Mathematics Advanced' : 'Year 12 · Mathematics Advanced (HSC)' },
@@ -1416,6 +1417,7 @@ function sanitize(q, row) {
     pyqArchive: q.archive || null,
     inputHint: q.inputHint, answerPrefix: q.answerPrefix, answerSuffix: q.answerSuffix,
     hintsAvailable: (q.hints || []).length, hintsUsed: row.hintsUsed || 0,
+    tutorLevel: row.tutorLevel || 0,
     triesLeft: 2 - (row.tries || 0),
     supportsSteps: !!stepMetaFor(q),
     criteria: criteriaFor(q),
@@ -1501,7 +1503,12 @@ async function resolve(profile, row, q, correct, answerGiven, ms, mode, viaInk =
   // an NSW one — never on the generator that happened to author the form.
   const owner = evidenceKeyOf(row, q);
   const st = (await getRating(pid, owner)) || { rating: START_RATING, attempts: 0, correct: 0, last_at: null };
-  const effHints = (row.hintsUsed || 0) + Math.max(0, (row.tries || 0) - (correct ? 1 : 0));
+  // Every level of tutor help counts as one hint: the same 15% a hint bulb
+  // costs, under the same floor (adaptive.js), so a tutored success is credited
+  // less than an independent one and never more than a hinted one.
+  const tutorLevel = Math.max(0, Math.min(3, Number(row.tutorLevel) || 0));
+  const helpUsed = (row.hintsUsed || 0) + tutorLevel;
+  const effHints = helpUsed + Math.max(0, (row.tries || 0) - (correct ? 1 : 0));
   let ratingAfter = st.rating;
   const isRush = mode === 'rush' || mode === 'match';
   const isCustom = q.custom;
@@ -1520,7 +1527,7 @@ async function resolve(profile, row, q, correct, answerGiven, ms, mode, viaInk =
         last_at: now
       };
     }
-    const clean = correct && !(row.hintsUsed || 0) && !(row.tries || 0);
+    const clean = correct && !helpUsed && !(row.tries || 0);
     const traps = clean ? decayTraps(st.traps, repairOpportunitiesOf(q, owner)) : (st.traps || {});
     const recent = [correct ? 1 : 0, ...(Array.isArray(st.recent) ? st.recent : [])].slice(0, RECENT_WINDOW);
     ratingNext = {
@@ -1536,7 +1543,7 @@ async function resolve(profile, row, q, correct, answerGiven, ms, mode, viaInk =
     const key = `${pid}:${owner}`;
     const rev = await get('reviews', key);
     const grade = gradeFor({
-      correct, hintsUsed: row.hintsUsed || 0, tries: row.tries || 0,
+      correct, hintsUsed: helpUsed, tries: row.tries || 0,
       ms: ms || 0, difficulty: q.difficulty || 2
     });
     if (rev) reviewNext = { ...rev, subtopic: owner, ...scheduleReview(rev, grade, now) };
@@ -1582,6 +1589,10 @@ async function resolve(profile, row, q, correct, answerGiven, ms, mode, viaInk =
     pid, questionId: row.id, subtopic: owner, generator: q.subtopic, difficulty: q.difficulty || 2,
     correct: correct ? 1 : 0, answerGiven: String(answerGiven ?? '').slice(0, 300),
     ms: ms || 0, hintsUsed: row.hintsUsed || 0, mode, viaInk,
+    // Learner-state evidence (§12): a success with hints, tutor help or a
+    // second try is supported evidence, never independent mastery.
+    tutorLevel,
+    support: helpUsed || (row.tries || 0) ? 'supported' : 'independent',
     evidenceKey,
     ratingBefore: st.rating, ratingAfter, createdAt: now
   };
@@ -1632,7 +1643,7 @@ async function resolve(profile, row, q, correct, answerGiven, ms, mode, viaInk =
   try {
     newBadges = await checkBadges(pid, {
       type: 'attempt', difficulty: q.difficulty, correct,
-      hintsUsed: row.hintsUsed, year: profile.year, xp: profileNext.xp
+      hintsUsed: helpUsed, year: profile.year, xp: profileNext.xp
     }, now, tz);
   } catch { /* core learning result is already durable */ }
 
@@ -1930,6 +1941,8 @@ const IMPORT_ROWS = {
     difficulty: safeInt(r.difficulty, 1, 4, 2), correct: r.correct ? 1 : 0,
     answerGiven: sanitizeText(r.answerGiven, 300), ms: safeInt(r.ms, 0, 1e9, 0),
     hintsUsed: safeInt(r.hintsUsed, 0, 20, 0), mode: sanitizeText(r.mode, 20) || 'practice',
+    tutorLevel: safeInt(r.tutorLevel, 0, 3, 0),
+    support: r.support === 'independent' ? 'independent' : (r.support === 'supported' ? 'supported' : undefined),
     viaInk: !!r.viaInk, ratingBefore: safeNum(r.ratingBefore, 0), ratingAfter: safeNum(r.ratingAfter, 0),
     createdAt: safeTime(r.createdAt) || Date.now()
   }),
@@ -1962,6 +1975,7 @@ const IMPORT_ROWS = {
       payload, mode: sanitizeText(r.mode, 20) || 'practice',
       examId: ids.exam(r.examId), taskId: safeId(r.taskId),
       answered: r.answered ? 1 : 0, tries: safeInt(r.tries, 0, 9, 0), hintsUsed: safeInt(r.hintsUsed, 0, 20, 0),
+      tutorLevel: safeInt(r.tutorLevel, 0, 3, 0),
       createdAt: safeTime(r.createdAt) || Date.now(),
       // WP india-exams: an India question is filed under its NCERT chapter and
       // marked on its section's own grid. Dropping these fields on the way back
@@ -2615,6 +2629,83 @@ const routes = {
     row.hintsUsed = used;
     await put('questions', row);
     return { hint: hints[used - 1], level: used, remaining: hints.length - used };
+  },
+
+  // ---- AI tutor (vision item 3) ----
+  // Three levels, strictly in order: 1 nudge → 2 Socratic question → 3 narrated
+  // walkthrough of the verified solution. The level is recorded on the row the
+  // moment it is asked for — the help is on screen whatever answered it — and
+  // resolve() charges it like a hint. assertPracticeRow runs before anything
+  // else, so an exam question is refused here and never reaches the network.
+  'POST /practice/:id/tutor': async (body, params) => {
+    const p = await requireProfile();
+    const row = await get('questions', params.id);
+    if (!row || row.pid !== p.id) throw Object.assign(new Error('Question not found'), { status: 404 });
+    assertPracticeRow(row);
+    if (row.discardedAt) throw Object.assign(new Error('Question was skipped'), { status: 409, code: 'QUESTION_DISCARDED' });
+    if (row.answered) throw Object.assign(new Error('Already answered'), { status: 409, code: 'ALREADY_RESOLVED' });
+    const level = Number(body?.level);
+    if (![1, 2, 3].includes(level)) throw Object.assign(new Error('Choose help level 1, 2 or 3.'), { status: 400, code: 'TUTOR_LEVEL_INVALID' });
+    const used = Math.max(0, Math.min(3, Number(row.tutorLevel) || 0));
+    if (level > used + 1) {
+      throw Object.assign(new Error('Ask for the help levels in order.'), { status: 409, code: 'TUTOR_LEVEL_ORDER', next: used + 1 });
+    }
+    const q = row.payload;
+    if (level > used) {
+      row.tutorLevel = level;
+      await put('questions', row);
+    }
+    const tutorLevel = Math.max(used, level);
+    const solution = { steps: q.steps || [], answerText: displayAnswer(q), solutionText: q.solutionText };
+
+    if (level === 3) {
+      // The walkthrough is the deterministic Pri Explain storyboard of the
+      // verified solution. Its captions may be rephrased afterwards through
+      // /tutor/captions; its mathematics never changes.
+      return { level, tutorLevel, source: 'deterministic', walkthrough: { solution } };
+    }
+
+    const work = tutorWork(q, body?.work);
+    const request = tutorRequest(p, row, q, solution, { level: level === 1 ? 'nudge' : 'socratic', locale: body?.locale, work });
+    const outcome = request ? await requestTutorHelp(request) : { error: { code: 'TUTOR_UNGROUNDED' } };
+    const hints = Array.isArray(q.hints) ? q.hints : [];
+    const authored = hints.length ? hints[Math.min(level - 1, hints.length - 1)] : null;
+    const fromModel = outcome?.tutor?.source === 'model' && typeof outcome.tutor.message === 'string' && outcome.tutor.message.trim();
+    return {
+      level, tutorLevel,
+      message: fromModel ? sanitizeText(outcome.tutor.message, 600) : (sanitizeText(outcome?.tutor?.message, 600) || authored),
+      source: fromModel ? 'tutor' : 'deterministic',
+      // Why the deterministic text is showing, as a code the UI can name — never
+      // the server's own message, which is not written for a student.
+      code: fromModel ? null : (outcome?.error?.code || outcome?.tutor?.reason || null)
+    };
+  },
+
+  'POST /practice/:id/tutor/captions': async (body, params) => {
+    const p = await requireProfile();
+    const row = await get('questions', params.id);
+    if (!row || row.pid !== p.id) throw Object.assign(new Error('Question not found'), { status: 404 });
+    assertPracticeRow(row);
+    if ((Number(row.tutorLevel) || 0) < 3) {
+      throw Object.assign(new Error('Captions follow the walkthrough.'), { status: 409, code: 'TUTOR_LEVEL_ORDER', next: (Number(row.tutorLevel) || 0) + 1 });
+    }
+    const q = row.payload;
+    const captions = (Array.isArray(body?.captions) ? body.captions : []).slice(0, 24)
+      .map(c => ({ id: String(c?.id || '').replace(/[^a-z0-9_-]/gi, '').slice(0, 40), text: sanitizeText(c?.text, 700) }))
+      .filter(c => c.id && c.text);
+    if (!captions.length) return { captions: [], source: 'deterministic', code: 'TUTOR_NO_CAPTIONS' };
+    const solution = { steps: q.steps || [], answerText: displayAnswer(q), solutionText: q.solutionText };
+    const request = tutorRequest(p, row, q, solution, { level: 'walkthrough', locale: body?.locale, work: tutorWork(q, body?.work), captions });
+    const outcome = request ? await requestTutorHelp(request) : { error: { code: 'TUTOR_UNGROUNDED' } };
+    const returned = Array.isArray(outcome?.tutor?.captions) ? outcome.tutor.captions : [];
+    return {
+      captions: captions.map(c => {
+        const hit = returned.find(r => r?.id === c.id && r?.source === 'model' && typeof r.text === 'string');
+        return hit ? { id: c.id, text: sanitizeText(hit.text, 400), source: 'tutor' } : { ...c, source: 'deterministic' };
+      }),
+      source: returned.some(r => r?.source === 'model') ? 'tutor' : 'deterministic',
+      code: outcome?.error?.code || null
+    };
   },
 
   'POST /practice/:id/submit': async (body, params) => {
@@ -3577,6 +3668,54 @@ function examQuestionLocked(message) {
   return Object.assign(new Error(message), { status: 403, code: 'EXAM_QUESTION_LOCKED' });
 }
 
+/**
+ * What the tutor may see of the student's attempt: their own lines and typed
+ * answer, bounded, plus where the deterministic checker says it broke.
+ */
+function tutorWork(q, raw) {
+  const lines = (Array.isArray(raw?.lines) ? raw.lines : [])
+    .map(l => sanitizeText(l, 400)).filter(Boolean).slice(0, 40);
+  const typedAnswer = sanitizeText(raw?.typed, 300) || '';
+  let firstBreak = -1;
+  let misconception;
+  const meta = stepMetaFor(q);
+  if (meta && lines.length) {
+    try {
+      const report = stepCheck(meta, lines.join('\n'));
+      const at = (report?.lines || []).findIndex(l => l?.status === 'break');
+      if (at >= 0 && at < 40) firstBreak = at;
+      const code = report?.diagnosis?.code;
+      if (typeof code === 'string' && /^[a-z0-9._:-]{1,80}$/i.test(code)) misconception = code;
+    } catch { /* the checker's silence is not an error here */ }
+  }
+  return { lines, typedAnswer, firstBreak, ...(misconception ? { misconception } : {}) };
+}
+
+/** The /v1/tutor/help body for a practice row, or null when there is no verified solution to ground it. */
+function tutorRequest(p, row, q, solution, { level, locale, work, captions }) {
+  const steps = (solution.steps || []).slice(0, 24)
+    .map(s => ({ h: String(s?.h ?? '').slice(0, 300), d: String(s?.d ?? '').slice(0, 700) }))
+    .filter(s => s.h || s.d);
+  const answer = String(solution.answerText ?? '').slice(0, 300).trim();
+  if (!steps.length || !answer || !q.prompt) return null;
+  const lang = locale === 'hi' || locale === 'en' ? locale : cleanLanguage(p.language);
+  return {
+    context: 'practice',
+    level,
+    locale: lang === 'hi' ? 'hi' : 'en',
+    questionId: String(row.id).slice(0, 120),
+    questionVersion: String(q.version || q.contentVersion || 1).slice(0, 60),
+    question: {
+      prompt: String(q.prompt).slice(0, 2000),
+      steps,
+      answer,
+      hints: (Array.isArray(q.hints) ? q.hints : []).slice(0, 6).map(h => String(h).slice(0, 500))
+    },
+    studentWork: work,
+    ...(captions ? { captions } : {})
+  };
+}
+
 function assertPracticeRow(row) {
   if (isExamRow(row)) throw examQuestionLocked('This question belongs to an exam paper — answer it in the exam room.');
 }
@@ -3765,6 +3904,7 @@ async function runGated(method, pattern, handler, body, params) {
     key === 'POST /practice/:id/submit'
     || key === 'POST /practice/:id/reveal'
     || key === 'POST /practice/:id/hint'
+    || key === 'POST /practice/:id/tutor'
     || key === 'POST /practice/:id/discard'
   )) return withMutationLock(`question:${params.id}`, work);
 
