@@ -526,7 +526,51 @@ https://www.khanacademy.org/
 
 ---
 
-# P. Source-governance rules
+# P. Mathematical knowledge graphs and learning progressions
+
+## Educational knowledge-graph systematic review (2024)
+Class: systematic literature review; 120 included education-KG papers.
+Use: maps construction methods and applications across personalized learning, curriculum design, concept mapping, semantic search and related domains.
+Limitation: heterogeneous education applications; does not validate one canonical Pri ontology.
+https://doi.org/10.1016/j.heliyon.2024.e25383
+
+## Mathematics diagnostic-classification systematic review (2026)
+Class: systematic review of diagnostic classification modelling implications for mathematics cognitive models.
+Use: distinguishes rigid hierarchical skill models from empirically explored learning trajectories; supports validating rather than freezing prerequisite structure.
+https://doi.org/10.3102/00346543261480692
+
+## Number-sense learning progression using diagnostic modelling
+Class: empirical cognitive-diagnostic learning-progression study; 1,207 primary students.
+Use: expert/literature hierarchy was tested and modified using observed student response patterns.
+Limitation: number sense / Chinese primary-school context; architectural precedent rather than direct Pri hierarchy.
+https://doi.org/10.1080/01443410.2016.1239817
+
+## ACE — AI-assisted educational KG construction with prerequisite relations
+Class: educational-data-mining methodology.
+Use: machine-learning assistance plus expert knowledge can reduce prerequisite-graph authoring burden.
+Limitation: candidate construction does not justify automatic promotion of AI-produced edges to authority.
+https://jedm.educationaldatamining.org/index.php/JEDM/article/view/737
+
+## Student Knowledge Graph across heterogeneous learning systems
+Class: peer-reviewed educational-KG architecture/application study.
+Use: separates student performance history, knowledge components across systems, and a shared knowledge layer; useful precedent for keeping learner evidence separate from domain ontology.
+Limitation: university/computer-science application rather than school mathematics.
+https://doi.org/10.1007/s40593-024-00434-w
+
+## Personalized Learning Path Recommendation Based on Knowledge Graphs (2026)
+Class: survey/review.
+Use: compares learner-feature, graph/path-generation and path-evaluation paradigms; reinforces that "learning path" is not one standardized algorithm.
+https://www.mdpi.com/2079-9292/15/1/238
+
+## Learning Commons standards crosswalk / progression data
+Class: public capability/data-model documentation.
+Use: example of relating jurisdictional standards through underlying learning components and progression relationships rather than text similarity alone.
+Limitation: capability/reference model, not independent learning-efficacy evidence.
+https://learningcommons.org/resources/inside-knowledge-graph/
+
+---
+
+# Q. Source-governance rules
 
 1. Official law/platform/curriculum source beats secondary summary for requirements.
 2. A meta-analysis does not make every included implementation equivalent.
