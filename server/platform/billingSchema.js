@@ -1,3 +1,5 @@
+import { sqliteHandle } from './store.js';
+
 export const BILLING_SCHEMA_VERSION = 3;
 
 function addColumnIfMissing(db, table, column, ddl) {
@@ -13,6 +15,10 @@ function addColumnIfMissing(db, table, column, ddl) {
  * idempotent and runs before any provider adapter is constructed.
  */
 export function ensureBillingSchema(db) {
+  // Postgres: supabase/migrations owns the billing tables and seeds
+  // billing_schema_version; this process never creates tables there.
+  db = sqliteHandle(db);
+  if (!db) return BILLING_SCHEMA_VERSION;
   db.exec(`
     CREATE TABLE IF NOT EXISTS billing_subscriptions (
       provider TEXT NOT NULL CHECK(provider IN ('apple','google','web')),
@@ -92,7 +98,6 @@ export function ensureBillingSchema(db) {
     CREATE INDEX IF NOT EXISTS idx_billing_refunds_payment ON billing_refunds(provider, payment_id);
   `);
 
-  db.prepare("INSERT OR REPLACE INTO platform_meta(key,value) VALUES ('billing_schema_version',?)")
-    .run(String(BILLING_SCHEMA_VERSION));
+  db.prepare("INSERT OR REPLACE INTO platform_meta(key,value) VALUES ('billing_schema_version',?)").run(String(BILLING_SCHEMA_VERSION));
   return BILLING_SCHEMA_VERSION;
 }

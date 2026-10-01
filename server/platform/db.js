@@ -3,6 +3,7 @@ import { mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { platformDatabasePath } from './config.js';
+import { asStore, platformDatabaseUrl } from './store.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_PATH = join(here, '..', 'data', 'pri-learning-platform.db');
@@ -472,32 +473,70 @@ export function createPlatformDb(path = DEFAULT_PATH) {
 /**
  * Flush the write-ahead log into the main database file. TRUNCATE leaves the
  * WAL empty so the main file alone is a complete, consistent snapshot for
- * backup tooling. Returns SQLite's checkpoint counters.
+ * backup tooling. Returns SQLite's checkpoint counters. SQLite only: on
+ * Postgres, durability and backups belong to the database service.
  */
 export function checkpointPlatformDb(db) {
-  const [row] = db.pragma('wal_checkpoint(TRUNCATE)');
+  const raw = rawSqlite(db);
+  if (!raw) return null;
+  const [row] = raw.pragma('wal_checkpoint(TRUNCATE)');
   return { busy: Number(row?.busy || 0), log: Number(row?.log || 0), checkpointed: Number(row?.checkpointed || 0) };
 }
 
 /**
  * Graceful shutdown: checkpoint, then close so the last connection removes the
  * -wal/-shm sidecars and no committed transaction is left only in the WAL.
+ * Accepts the raw SQLite handle or a SQLite store. A Postgres store is closed
+ * with closePlatformStore().
  */
 export function closePlatformDb(db) {
-  if (!db || !db.open) return { closed: false, checkpoint: null };
+  const raw = rawSqlite(db);
+  if (!raw || !raw.open) return { closed: false, checkpoint: null };
   let checkpoint = null;
-  try { checkpoint = checkpointPlatformDb(db); } finally { db.close(); }
+  try { checkpoint = checkpointPlatformDb(raw); } finally { raw.close(); }
   return { closed: true, checkpoint };
 }
 
-export function nextSyncCursor(db) {
-  return db.transaction(() => {
-    const row = db.prepare('SELECT value FROM sync_cursors WHERE id = 1').get();
-    const next = Number(row?.value || 0) + 1;
-    db.prepare('UPDATE sync_cursors SET value = ? WHERE id = 1').run(next);
-    return next;
-  })();
+/** Close either driver: SQLite checkpoints and closes; Postgres drains its pool. */
+export async function closePlatformStore(store) {
+  if (store?.dialect === 'postgres') {
+    const wasOpen = store.open;
+    await store.close();
+    return { closed: wasOpen, checkpoint: null, driver: 'postgres' };
+  }
+  return { ...closePlatformDb(store), driver: 'sqlite' };
 }
 
-const configuredPlatformPath = platformDatabasePath();
-export const platformDb = createPlatformDb(configuredPlatformPath || DEFAULT_PATH);
+function rawSqlite(db) {
+  if (!db) return null;
+  if (db.dialect === 'sqlite' && db.raw) return db.raw;
+  if (typeof db.pragma === 'function') return db;
+  return null;
+}
+
+/**
+ * Allocate the next global sync cursor.
+ *
+ * One row, incremented in place with UPDATE … RETURNING, inside the caller's
+ * transaction (or a transaction of its own). On SQLite the single writer makes
+ * that serial. On Postgres the UPDATE takes the row lock and holds it until the
+ * pushing transaction commits, so cursors are handed out in commit order: a
+ * puller that has seen cursor N can never later find a newly committed row
+ * below N. Concurrent pushers queue on the lock; under SERIALIZABLE the loser
+ * gets 40001 and the store re-runs its whole push.
+ */
+export async function nextSyncCursor(db) {
+  const store = asStore(db);
+  return store.transaction(async tx => {
+    const row = await tx.get('UPDATE sync_cursors SET value = value + 1 WHERE id = 1 RETURNING value');
+    if (!row) throw Object.assign(new Error('sync_cursors is not initialised.'), { code: 'SYNC_CURSOR_MISSING' });
+    return Number(row.value);
+  });
+}
+
+// SQLite is opened at import, exactly as before, so production still validates
+// PRI_PLATFORM_DB before a file can be created. When PRI_DATABASE_URL selects
+// Postgres no SQLite file is opened at all (see store.js openPlatformStore).
+export const platformDb = platformDatabaseUrl()
+  ? null
+  : createPlatformDb(platformDatabasePath() || DEFAULT_PATH);

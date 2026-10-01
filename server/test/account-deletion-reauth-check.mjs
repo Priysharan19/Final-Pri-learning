@@ -1,19 +1,21 @@
 import assert from 'node:assert/strict';
 import bcrypt from 'bcryptjs';
-import { createPlatformDb } from '../platform/db.js';
+import { openTestStore } from './support/engine.mjs';
 import { authorizeAccountDeletion } from '../platform/accounts.js';
 
-const db = createPlatformDb(':memory:');
+// SQLite by default; `--engine=postgres` runs it on a migrated Postgres.
+const testStore = await openTestStore(undefined, { label: 'account_deletion' });
+const db = testStore.store;
 const now = Date.now();
 
-function addAccount(id, email, passwordHash = null) {
-  db.prepare(`INSERT INTO accounts(id,email,name,password_hash,role,created_at,updated_at)
-    VALUES (?,?,?,?, 'student', ?, ?)`).run(id, email, id, passwordHash, now, now);
-  db.prepare(`INSERT INTO entitlement_snapshots(account_id,plan,status,provider,source_version,updated_at)
-    VALUES (?,'free','free','none',0,?)`).run(id, now);
+async function addAccount(id, email, passwordHash = null) {
+  await db.run(`INSERT INTO accounts(id,email,name,password_hash,role,created_at,updated_at)
+    VALUES (?,?,?,?, 'student', ?, ?)`, [id, email, id, passwordHash, now, now]);
+  await db.run(`INSERT INTO entitlement_snapshots(account_id,plan,status,provider,source_version,updated_at)
+    VALUES (?,'free','free','none',0,?)`, [id, now]);
 }
 
-addAccount('acct-password', 'password@example.test', bcrypt.hashSync('correct-password', 4));
+await addAccount('acct-password', 'password@example.test', bcrypt.hashSync('correct-password', 4));
 await assert.rejects(
   () => authorizeAccountDeletion(db, 'acct-password', { password: 'wrong-password' }),
   error => error?.code === 'REAUTH_REQUIRED'
@@ -23,9 +25,9 @@ assert.deepEqual(
   { method: 'password' }
 );
 
-addAccount('acct-social', 'social@example.test');
-db.prepare(`INSERT INTO account_identities(provider,provider_subject,account_id,email_at_link,linked_at)
-  VALUES ('google','google-subject-good','acct-social','social@example.test',?)`).run(now);
+await addAccount('acct-social', 'social@example.test');
+await db.run(`INSERT INTO account_identities(provider,provider_subject,account_id,email_at_link,linked_at)
+  VALUES ('google','google-subject-good','acct-social','social@example.test',?)`, [now]);
 
 await assert.rejects(
   () => authorizeAccountDeletion(db, 'acct-social', {}),
@@ -47,9 +49,9 @@ assert.deepEqual(
   { method: 'google', subject: 'google-subject-good' }
 );
 
-addAccount('acct-apple', 'apple@example.test');
-db.prepare(`INSERT INTO account_identities(provider,provider_subject,account_id,email_at_link,linked_at)
-  VALUES ('apple','apple-subject','acct-apple','apple@example.test',?)`).run(now);
+await addAccount('acct-apple', 'apple@example.test');
+await db.run(`INSERT INTO account_identities(provider,provider_subject,account_id,email_at_link,linked_at)
+  VALUES ('apple','apple-subject','acct-apple','apple@example.test',?)`, [now]);
 assert.deepEqual(
   await authorizeAccountDeletion(db, 'acct-apple', { provider: 'apple', idToken: 'fresh-apple-token' },
     async () => ({ provider: 'apple', subject: 'apple-subject' })),
@@ -61,5 +63,6 @@ await assert.rejects(
   error => error?.code === 'ACCOUNT_NOT_FOUND' && error?.status === 404
 );
 
-db.close();
+await testStore.close();
+console.log(`engine: ${testStore.engine}`);
 console.log('PASS — account deletion always requires fresh password or linked Apple/Google identity proof.');
