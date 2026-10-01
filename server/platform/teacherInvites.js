@@ -5,6 +5,7 @@
 
 import { randomBytes } from 'node:crypto';
 import { id, sha256 } from './security.js';
+import { asStore } from './store.js';
 
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const GROUPS = 4;
@@ -38,20 +39,22 @@ export function inviteTtlDays(value) {
   return days;
 }
 
-export function mintTeacherInvite(db, { createdBy, ttlDays = INVITE_DEFAULT_TTL_DAYS, now = Date.now() } = {}) {
+export async function mintTeacherInvite(db, { createdBy, ttlDays = INVITE_DEFAULT_TTL_DAYS, now = Date.now() } = {}) {
+  db = asStore(db);
   const groups = [];
   for (let i = 0; i < GROUPS; i++) groups.push(randomGroup());
   const code = `PRI-${groups.join('-')}`;
   const inviteId = id('inv');
   const expiresAt = now + ttlDays * DAY_MS;
-  db.prepare(`INSERT INTO teacher_invites(id, code_hash, code_prefix, created_by, created_at, expires_at)
-    VALUES (?, ?, ?, ?, ?, ?)`).run(inviteId, sha256(code), code.slice(0, 8), createdBy || null, now, expiresAt);
+  await db.run(`INSERT INTO teacher_invites(id, code_hash, code_prefix, created_by, created_at, expires_at)
+    VALUES (?, ?, ?, ?, ?, ?)`, [inviteId, sha256(code), code.slice(0, 8), createdBy || null, now, expiresAt]);
   return { id: inviteId, code, expiresAt };
 }
 
-export function listTeacherInvites(db, limit = 200) {
-  return db.prepare(`SELECT id, code_prefix, created_at, expires_at, used_by, used_at FROM teacher_invites
-    ORDER BY created_at DESC LIMIT ?`).all(limit).map(row => {
+export async function listTeacherInvites(db, limit = 200) {
+  db = asStore(db);
+  return (await db.all(`SELECT id, code_prefix, created_at, expires_at, used_by, used_at FROM teacher_invites
+    ORDER BY created_at DESC LIMIT ?`, [limit])).map(row => {
     const item = { id: row.id, code_prefix: row.code_prefix, createdAt: row.created_at, expiresAt: row.expires_at };
     if (row.used_at) {
       item.usedAt = row.used_at;
@@ -62,11 +65,11 @@ export function listTeacherInvites(db, limit = 200) {
 }
 
 /** Look up a live (unused, unexpired) invite without consuming it. */
-export function findLiveTeacherInvite(db, code, now = Date.now()) {
+export async function findLiveTeacherInvite(db, code, now = Date.now()) {
+  db = asStore(db);
   const normalized = normalizeInviteCode(code);
   if (!normalized) return null;
-  return db.prepare('SELECT id, expires_at FROM teacher_invites WHERE code_hash = ? AND used_at IS NULL AND expires_at > ?')
-    .get(sha256(normalized), now) || null;
+  return await db.get('SELECT id, expires_at FROM teacher_invites WHERE code_hash = ? AND used_at IS NULL AND expires_at > ?', [sha256(normalized), now]) || null;
 }
 
 /**
@@ -74,10 +77,11 @@ export function findLiveTeacherInvite(db, code, now = Date.now()) {
  * call was the one that used it; false when it was invalid, expired or already
  * used. Intended to run inside the registration transaction.
  */
-export function consumeTeacherInvite(db, code, accountId, now = Date.now()) {
+export async function consumeTeacherInvite(db, code, accountId, now = Date.now()) {
+  db = asStore(db);
   const normalized = normalizeInviteCode(code);
   if (!normalized) return false;
-  const info = db.prepare(`UPDATE teacher_invites SET used_by = ?, used_at = ?
-    WHERE code_hash = ? AND used_at IS NULL AND expires_at > ?`).run(accountId, now, sha256(normalized), now);
+  const info = await db.run(`UPDATE teacher_invites SET used_by = ?, used_at = ?
+    WHERE code_hash = ? AND used_at IS NULL AND expires_at > ?`, [accountId, now, sha256(normalized), now]);
   return info.changes === 1;
 }

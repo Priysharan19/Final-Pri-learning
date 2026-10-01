@@ -25,27 +25,28 @@ process.env.PRI_AUTH_DELIVERY_KEY = '88'.repeat(32);
 delete process.env.PRI_PUBLIC_ORIGIN;
 
 const { startApp, checks } = await import('./support/app-harness.mjs');
-const { createPlatformDb } = await import('../platform/db.js');
+const { requestedEngine } = await import('./support/engine.mjs');
 
 const c = checks();
-const db = createPlatformDb(':memory:');
-const app = await startApp({ db });
+// SQLite by default; `--engine=postgres` runs it on a migrated Postgres.
+const app = await startApp({ engine: requestedEngine() });
+const db = app.db;
 const PUBLISHED = 120;
 const now = Date.now();
 
 try {
   // Seeded directly: this contract is about what the read exposes, and the
   // review lifecycle it went through is content-review-contract-check's job.
-  const insert = db.prepare(`INSERT INTO content_revisions
+  const insert = (...values) => db.run(`INSERT INTO content_revisions
     (id,content_key,curriculum_version,status,author_account_id,reviewer_account_id,source_json,body_json,revision,created_at,published_at)
-    VALUES (?,?,?,'published',NULL,NULL,?,?,1,?,?)`);
+    VALUES (?,?,?,'published',NULL,NULL,?,?,1,?,?)`, values);
   const source = JSON.stringify({ reviewerNotes: 'N'.repeat(100_000) });
   const body = JSON.stringify({ questions: ['Q'.repeat(1_000)] });
-  db.transaction(() => {
+  await db.transaction(async () => {
     for (let i = 0; i < PUBLISHED; i += 1) {
-      insert.run(`content_${i}`, `pack/${String(i).padStart(3, '0')}`, 'in-2026', source, body, now, now);
+      await insert(`content_${i}`, `pack/${String(i).padStart(3, '0')}`, 'in-2026', source, body, now, now);
     }
-  })();
+  });
 
   // ── 1 · One page, keys only ───────────────────────────────────────────────
   const first = await app.request('/v1/content/published-index');
@@ -86,7 +87,6 @@ try {
   c.ok(limited > 0, `the index is rate limited (refused after ${limited} requests in the window)`);
 } finally {
   await app.close();
-  db.close();
   rmSync(scratch, { recursive: true, force: true });
   for (const name of names) {
     if (prior[name] === undefined) delete process.env[name];
@@ -94,4 +94,5 @@ try {
   }
 }
 
+console.log(`engine: ${app.engine}`);
 console.log(`CONTENT INDEX EXPOSURE — PASS — ${c.count()}/${c.count()} checks — the anonymous catalogue is paginated, carries no revision source or body, and is rate limited.`);
