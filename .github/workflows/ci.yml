@@ -208,7 +208,7 @@ jobs:
         run: |
           set -o pipefail
           node scripts/with-postgres.mjs node server/test/run-platform-postgres.mjs 2>&1 | tee platform-postgres.log
-          grep -Fq 'PLATFORM ON POSTGRES: PASS — 24/24 suites' platform-postgres.log
+          grep -Fq 'PLATFORM ON POSTGRES: PASS — 25/25 suites' platform-postgres.log
           grep -Fq 'POSTGRES SCHEMA MUTATIONS: PASS — 21/21' platform-postgres.log
           grep -Fq 'PLATFORM SYNC BURST: PASS' platform-postgres.log
       - name: Platform migration contract
