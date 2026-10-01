@@ -1132,7 +1132,7 @@ async function run() {
 
     const paper = await GET(`/exams/${created.id}/paper`);
     eq('the printable paper has every question', paper.questions.length, created.questions.length);
-    eq('the paper carries a model answer for each', paper.questions.filter(q => q.answerText === undefined && !q.multipart).length, 0);
+    eq('the paper of an unsubmitted exam withholds model answers (#230)', paper.questions.filter(q => q.answerText !== undefined).length, 0);
     eq('the paper names the course', paper.course, 'Year 10 · Stage 5');
 
     // Answer the whole paper correctly, straight from the stored payloads.
@@ -1148,6 +1148,33 @@ async function run() {
     ok('the paper is worth what its criteria say', marked.total > 0, `total ${marked.total}`);
     eq('the marked detail covers every question', marked.detail.length, created.questions.length);
     eq('every marked question is correct', marked.detail.filter(d => !d.correct).length, 0);
+    const markedPaper = await GET(`/exams/${created.id}/paper`);
+    eq('once submitted, the paper carries a model answer for each', markedPaper.questions.filter(q => q.answerText === undefined && !q.multipart).length, 0);
+    // What the printed sheet tells a student is the answer must be what the
+    // marker accepts: each printed single answer, typed back in the way a
+    // student would (without the prefix/unit the answer row already shows),
+    // is marked correct against its own stored question.
+    {
+      const { checkAnswer } = await import(new URL('engine/checker.js', SRC).href);
+      const payloads = [];
+      for (const qid of (await idb.get('exams', created.id)).questionIds) {
+        const row = await idb.get('questions', qid);
+        if (row?.payload) payloads.push(row.payload);
+      }
+      const refused = [];
+      markedPaper.questions.forEach((pq, i) => {
+        const q = payloads[i];
+        if (pq.multipart || !q || q.multipart) return;
+        let typed = String(pq.answerText ?? '');
+        if (q.answerType === 'mcq') typed = String((q.mcqOptions || []).indexOf(typed));
+        else {
+          if (q.answerPrefix && typed.startsWith(q.answerPrefix)) typed = typed.slice(q.answerPrefix.length).trim();
+          if (q.answerSuffix && typed.endsWith(q.answerSuffix)) typed = typed.slice(0, -q.answerSuffix.length).trim();
+        }
+        if (!checkAnswer(q, typed)?.correct) refused.push(`Q${i + 1} ${q.answerType} ${JSON.stringify(pq.answerText)}`);
+      });
+      eq('every printed single answer is accepted by the marker for its own question', refused, []);
+    }
     await rejects('a submitted exam cannot be resubmitted',
       POST(`/exams/${created.id}/submit`, { answers: perfect }), { status: 409 });
 
@@ -1166,6 +1193,93 @@ async function run() {
     eq('both exams are listed', examList.length, 2);
     eq('the list carries the scores', examList.filter(e => e.finished_at && e.total > 0).length, 2);
     await rejects('an unknown exam is a 404', GET('/exams/not-a-real-id'), { status: 404 });
+  } catch (err) { crashed(err); }
+
+  // ── Exam boundary (issue #230) ─────────────────────────────────────────────
+  // Exam questions share the `questions` store with practice. The ExamRoom UI
+  // never offers hints or solutions mid-paper, but that is not the authority:
+  // these checks call the practice and history routes directly with the ids of
+  // an active paper's questions, and every one must fail closed without
+  // touching the row, the student's attempts or their review schedule.
+  section('exam boundary');
+  try {
+    const me = (await GET('/me')).user.id;
+    const active = (await POST('/exams', { length: 10, minutes: 30 })).exam;
+    const stored = await idb.get('exams', active.id);
+    const rows = [];
+    for (const qid of stored.questionIds) rows.push(await idb.get('questions', qid));
+    const single = rows.find(r => r && !r.payload.multipart);
+    const multi = rows.find(r => r && r.payload.multipart);
+    ok('the active paper has a single-answer question to probe', !!single);
+    ok('the active paper has a multipart question to probe', !!multi);
+
+    const attemptsBefore = (await idb.byIndex('attempts', 'pid', me)).length;
+    const reviewsBefore = JSON.stringify(await idb.byIndex('reviews', 'pid', me));
+
+    const locked = async (name, promise) => {
+      const err = await rejects(name, promise, { status: 403 });
+      eq(`${name} — with the exam-lock code`, err?.code, 'EXAM_QUESTION_LOCKED');
+      const leaked = err && ['solution', 'hint', 'answerText', 'steps'].filter(k => k in err);
+      eq(`${name} — and nothing of the solution rides on the error`, leaked || [], []);
+    };
+
+    for (const [label, row] of [['single', single], ['multipart', multi]]) {
+      if (!row) continue;
+      const id = row.id;
+      await locked(`a ${label} active exam question cannot take a practice hint`, POST(`/practice/${id}/hint`, {}));
+      await locked(`a ${label} active exam question cannot be revealed through practice`, POST(`/practice/${id}/reveal`, { ms: 1000 }));
+      await locked(`a ${label} active exam question cannot be marked through practice`,
+        POST(`/practice/${id}/submit`, { answer: row.payload.multipart ? '0' : (canonicalInput(row.payload) ?? '0'), ms: 1000 }));
+      await locked(`a ${label} active exam question cannot be skipped through practice`, POST(`/practice/${id}/discard`, {}));
+      await locked(`a ${label} active exam question has no history detail yet`, GET(`/history/${id}/detail`));
+      await locked(`a ${label} active exam question cannot be retried as practice`, POST(`/history/${id}/retry`, { variant: 'same' }));
+      const after = await idb.get('questions', id);
+      eq(`the ${label} exam row is untouched by every refused call`,
+        { hintsUsed: after.hintsUsed, answered: after.answered, tries: after.tries, discardedAt: after.discardedAt ?? null, mode: after.mode },
+        { hintsUsed: 0, answered: 0, tries: 0, discardedAt: null, mode: 'exam' });
+    }
+    eq('no attempt was recorded from an active exam question', (await idb.byIndex('attempts', 'pid', me)).length, attemptsBefore);
+    eq('no review schedule moved from an active exam question', JSON.stringify(await idb.byIndex('reviews', 'pid', me)), reviewsBefore);
+
+    // A row that says it is an exam question but whose paper cannot be found is
+    // not "finished": review stays shut rather than defaulting open.
+    if (single) {
+      const orphan = { ...single, id: `${single.id}-orphan`, examId: 'no-such-exam' };
+      await idb.put('questions', orphan);
+      await locked('an exam question whose paper is missing stays locked', GET(`/history/${orphan.id}/detail`));
+      await locked('an orphaned exam question still refuses practice hints', POST(`/practice/${orphan.id}/hint`, {}));
+      await idb.del('questions', orphan.id);
+    }
+
+    // The printable paper of a paper still being sat is a question paper only:
+    // no answers, worked steps or marking criteria for any question or part.
+    const solutionKeys = o => ['answerText', 'steps', 'criteria'].filter(k => o && o[k] !== undefined);
+    const openPaper = await GET(`/exams/${active.id}/paper`);
+    eq('the printable paper of an active exam says solutions are not available', openPaper.solutionsAvailable, false);
+    eq('the printable paper of an active exam carries no answers, steps or criteria',
+      openPaper.questions.flatMap((q, i) => [...solutionKeys(q).map(k => `Q${i + 1}.${k}`),
+        ...(q.parts || []).flatMap(pt => solutionKeys(pt).map(k => `Q${i + 1}(${pt.key}).${k}`))]), []);
+    ok('the printable paper of an active exam still shows every question with its marks',
+      openPaper.questions.length === stored.questionIds.length && openPaper.questions.every(q => q.multipart ? q.parts.every(pt => pt.marks > 0) : q.marks > 0));
+
+    // The exam's own contract still works, and finishing it is what opens review.
+    const done = await POST(`/exams/${active.id}/submit`, { answers: {}, ms: 60000 });
+    ok('the paper is still marked through the exam route', done.total > 0, `total ${done.total}`);
+    if (single) {
+      const detail = await GET(`/history/${single.id}/detail`);
+      ok('after submission the worked solution opens in review', !!detail.solution?.answerText, show(detail.solution));
+      await locked('after submission the practice hint route still refuses an exam question', POST(`/practice/${single.id}/hint`, {}));
+      await locked('after submission the practice marker still refuses an exam question',
+        POST(`/practice/${single.id}/submit`, { answer: canonicalInput(single.payload) ?? '0', ms: 1000 }));
+    }
+    const donePaper = await GET(`/exams/${active.id}/paper`);
+    eq('after submission the printable paper offers solutions', donePaper.solutionsAvailable, true);
+    ok('after submission the printable paper carries the worked answers',
+      donePaper.questions.every(q => q.multipart ? q.parts.every(pt => pt.answerText !== undefined && Array.isArray(q.criteria)) : (q.answerText !== undefined && Array.isArray(q.criteria))));
+    if (multi) {
+      const detail = await GET(`/history/${multi.id}/detail`);
+      ok('after submission a multipart solution opens in review', Array.isArray(detail.solution?.parts) && detail.solution.parts.length > 0, show(detail.solution));
+    }
   } catch (err) { crashed(err); }
 
   // ── History ────────────────────────────────────────────────────────────────
