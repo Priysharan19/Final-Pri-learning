@@ -594,7 +594,7 @@ export default function ExamRoom() {
     ) : (
       <div className="answer-row">
         {item.answerPrefix && <span className="answer-prefix"><MathText text={item.answerPrefix} /></span>}
-        <input className="input answer-input" disabled={locked}
+        <input className="input answer-input" inputMode="text" enterKeyHint="done" autoCapitalize="none" autoCorrect="off" spellCheck={false} disabled={locked}
           placeholder={item.inputHint || 'Your answer…'}
           aria-label={mode === 'ink' ? `Your answer to ${label}, as read from your writing — correct it if the reading is wrong` : `Your answer to ${label}`}
           value={value} onChange={e => set(e.target.value)}
