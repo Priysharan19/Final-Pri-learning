@@ -11,8 +11,8 @@ The common failure mode of learning analytics is to stop at awareness.
 Systematic reviews of teacher-facing learning analytics dashboards find that many systems help teachers see activity/performance but provide less support for translating evidence into specific pedagogical action. Recent AI-dashboard reviews also identify limited classroom evaluation, weak causal linkage from prediction to intervention, and persistent privacy/bias/explainability concerns.
 
 Representative sources:
-https://doi.org/10.1080/10494820.2023.2266972
-https://doi.org/10.1007/s40593-025-00480-2
+https://doi.org/10.1186/s41239-023-00394-6
+https://doi.org/10.1007/s44217-025-00964-y
 
 Pri's goal should therefore be:
 
