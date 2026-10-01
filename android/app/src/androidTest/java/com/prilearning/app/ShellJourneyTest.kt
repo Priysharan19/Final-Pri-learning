@@ -202,10 +202,10 @@ class ShellJourneyTest {
                 Thread.sleep(900)
             }
             assertTrue("a question with a typed answer was found", typed)
-            setValue(s, ".editor-body input.answer-input", "x+7")
+            setValue(s, ".editor-body input.answer-input", "7")
             s.onActivity { it.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE }
             Thread.sleep(2500)
-            assertEquals("\"x+7\"", eval(s, "(document.querySelector('.editor-body input.answer-input')||{}).value"))
+            assertEquals("\"7\"", eval(s, "(document.querySelector('.editor-body input.answer-input')||{}).value"))
             s.onActivity { it.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT }
             Thread.sleep(1500)
 
@@ -216,15 +216,16 @@ class ShellJourneyTest {
             // A first wrong answer offers one more go; the attempt is resolved (and
             // counted in Progress) once it is answered again.
             for (i in 0 until 3) {
-                if (eval(s, "!!document.querySelector('.your-answer') || !!document.querySelector('.redo-chip')") == "true") break
+                if (eval(s, "!!document.querySelector('.eval-card')") == "true") break
                 // One more go needs a changed answer before it can be submitted.
-                setValue(s, ".editor-body input.answer-input", "x+${8 + i}")
+                setValue(s, ".editor-body input.answer-input", "${8 + i}")
                 Thread.sleep(300)
                 eval(s, "(function(){var b=[].slice.call(document.querySelectorAll('.editor-foot .btn-primary')).find(function(x){return x.offsetParent&&!x.disabled});if(b)b.click();return true;})()")
                 Thread.sleep(1500)
             }
+            Log.i("PRITEST", "after retries: " + eval(s, "(function(){var v=document.querySelector('.verdict');return (v?v.innerText:'no verdict').slice(0,120)+' · input='+((document.querySelector('.editor-body input.answer-input')||{}).value)+' · submit='+[].slice.call(document.querySelectorAll('.editor-foot .btn-primary')).map(function(b){return b.disabled?'off':'on'}).join(',');})()"))
             assertEquals("the attempt is resolved with an evaluation", "true",
-                waitFor(s, "!!document.querySelector('.your-answer') || !!document.querySelector('.redo-chip') || false"))
+                waitFor(s, "!!document.querySelector('.eval-card') || false"))
             // Next: the same element is replaced by a new question (by identity of
             // the rendered node, not prompt text, which can repeat).
             assertEquals("a Next control is offered", "true", eval(s, "!!document.querySelector('.ctx-next')"))

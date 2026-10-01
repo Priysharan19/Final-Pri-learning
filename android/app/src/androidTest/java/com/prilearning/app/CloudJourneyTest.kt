@@ -175,14 +175,14 @@ class CloudJourneyTest {
                     waitFor(s, "document.querySelector('.verdict')||document.querySelector('.your-answer')")
                     // Resolve it (a first wrong answer offers one more go), so it is a learning event to sync.
                     for (k in 0 until 3) {
-                        if (eval(s, "!!document.querySelector('.your-answer') || !!document.querySelector('.redo-chip')") == "true") break
+                        if (eval(s, "!!document.querySelector('.eval-card')") == "true") break
                         // One more go needs a changed answer before it can be submitted.
                         setValue(s, ".editor-body input.answer-input", "${8 + k}")
                         Thread.sleep(300)
                         eval(s, "(function(){var b=[].slice.call(document.querySelectorAll('.editor-foot .btn-primary')).find(function(x){return x.offsetParent&&!x.disabled});if(b)b.click();return true;})()")
                         Thread.sleep(1500)
                     }
-                    waitFor(s, "!!document.querySelector('.your-answer') || !!document.querySelector('.redo-chip') || false")
+                    waitFor(s, "!!document.querySelector('.eval-card') || false")
                     marked = true
                     break
                 }
