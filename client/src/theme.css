@@ -383,8 +383,8 @@ select.input {
 .type-caret { display: inline-block; width: 1px; height: 1.05em; background: var(--ink-2); vertical-align: -0.18em; margin-left: 1px; animation: caretBlink 1s steps(1) infinite; }
 @keyframes caretBlink { 50% { opacity: 0; } }
 
-/* Percentages, not vw: WKWebView page zoom (Dynamic Type) does not scale
-   viewport units, so 94vw overflowed the screen at large text (CP-05). */
+/* Percentages of the content column, not vw: robust under any page scaling
+   (the iOS shell's Dynamic Type) and never wider than the main column. */
 .genbar { width: min(690px, 94%); margin-top: 9vh; position: relative; z-index: 20; }
 .genbar-head {
   display: flex; align-items: center; gap: 10px; padding: 10px 12px;

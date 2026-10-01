@@ -99,16 +99,24 @@ export default function CloudAccountPanel() {
     setLink(saved);
     setStatus(sync);
     if (enabled && verify && saved?.accountId) {
-      const verified = await verifyCloudSession(user.id).catch(err => ({ connected: false, reason: err.code || 'unavailable' }));
+      // No HTTP status means the server was not reached (offline, timeout);
+      // a status other than 401 means it answered but cannot serve right now.
+      const verified = await verifyCloudSession(user.id).catch(err => ({ connected: false, reason: err?.status ? 'unavailable' : 'offline' }));
       setSession(verified);
       if (verified.connected) {
         const nextEntitlement = await refreshCloudEntitlement(user.id).catch(() => null);
         if (nextEntitlement) setLink(await cloudAccountLink(user.id));
       }
-    } else setSession(saved?.accountId ? { connected: false, reason: enabled ? 'not-verified' : 'cloud-disabled' } : null);
+    } else if (!saved?.accountId) setSession(null);
+    // A reload without re-verifying (after Sync, a purchase or a refresh) keeps
+    // the session it already verified; it must not drop a connected account
+    // back to "sign in" (CP-05 review).
+    else setSession(prev => (prev?.connected ? prev : { connected: false, reason: enabled ? 'not-verified' : 'cloud-disabled' }));
   }
 
-  useEffect(() => { reload().catch(() => {}); }, [user?.id, enabled]);
+  useEffect(() => {
+    reload().catch(() => setSession(prev => prev || { connected: false, reason: 'unavailable' }));
+  }, [user?.id, enabled]);
 
   useEffect(() => {
     let live = true;
@@ -394,8 +402,12 @@ export default function CloudAccountPanel() {
     if (!enabled) return 'Linked locally · cloud endpoint unavailable';
     // Only the server saying "signed out" (401) means sign in again; an
     // unreachable server is offline, and the student's work is safe locally.
-    if (!session) return 'Linked · checking…';
-    if (!session.connected) return session.reason === 'signed-out' || session.reason === 'not-verified' ? 'Linked · sign-in required' : 'Linked · offline';
+    if (!session || session.reason === 'not-verified') return 'Linked · checking…';
+    if (!session.connected) {
+      if (session.reason === 'signed-out') return 'Linked · sign-in required';
+      if (session.reason === 'offline') return 'Linked · offline';
+      return 'Linked · cloud unavailable';
+    }
     return 'Connected';
   }, [link, enabled, session]);
 

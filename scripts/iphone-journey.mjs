@@ -132,6 +132,14 @@ for (const line of first) console.log(`  ${line.replace(/^PRIJOURNEY\s*/, '')}`)
 const second = launchAndRead(udid, bundleId, '--journey-relaunch', 'relaunch');
 for (const line of second) console.log(`  ${line.replace(/^PRIJOURNEY\s*/, '')}`);
 
+// Successful logouts in the fixture server's request log (null when unknown).
+function serverLogouts(fixture) {
+  try {
+    const log = readFileSync(fixture.PRI_CLOUD_SERVER_LOG, 'utf8');
+    return (log.match(/"path":"\/v1\/account\/logout","status":200/g) || []).length;
+  } catch { return null; }
+}
+
 let signupLines = [];
 let cloudLines = [];
 let offlineLines = [];
@@ -145,7 +153,7 @@ const localPost = (port, path, body) => new Promise(resolve => {
     req.on('error', () => resolve(0)); req.end(JSON.stringify(body));
   });
 });
-if (WANT_CLOUD) {
+if (WANT_CLOUD) try {
   let fixture = process.env.PRI_CLOUD_ORIGIN ? {
     PRI_CLOUD_ORIGIN: process.env.PRI_CLOUD_ORIGIN, PRI_CLOUD_EMAIL: process.env.PRI_CLOUD_EMAIL, PRI_CLOUD_PASSWORD: process.env.PRI_CLOUD_PASSWORD,
   } : null;
@@ -155,6 +163,7 @@ if (WANT_CLOUD) {
     fixture = Object.fromEntries(readFileSync(out, 'utf8').trim().split('\n').map(l => [l.slice(0, l.indexOf('=')), l.slice(l.indexOf('=') + 1)]));
     cloudServer = fixture;
   }
+  if (!cloudServer && process.env.PRI_CLOUD_SERVER_LOG) fixture.PRI_CLOUD_SERVER_LOG = process.env.PRI_CLOUD_SERVER_LOG;
   const childEnv = {
     PRI_CLOUD_ORIGIN: fixture.PRI_CLOUD_ORIGIN, PRI_JOURNEY_EMAIL: fixture.PRI_CLOUD_EMAIL, PRI_JOURNEY_PASSWORD: fixture.PRI_CLOUD_PASSWORD,
     PRI_JOURNEY_NEW_EMAIL: fixture.PRI_CLOUD_NEW_EMAIL || '', PRI_JOURNEY_NEW_PASSWORD: fixture.PRI_CLOUD_NEW_PASSWORD || '',
@@ -179,13 +188,23 @@ if (WANT_CLOUD) {
     execFileSync(process.execPath, [join(HERE, 'cloud-fixture-server.mjs'), '--port', String(port), '--host', '127.0.0.1', '--db', fixture.PRI_CLOUD_DB, '--restart', '--out', out], { stdio: 'inherit' });
     cloudServer.PRI_CLOUD_SERVER_PID = readFileSync(out, 'utf8').match(/PRI_CLOUD_SERVER_PID=(\d+)/)[1];
   }
+  const logoutsBefore = serverLogouts(fixture);
   cloudRelaunchLines = launchAndRead(udid, bundleId, '--journey-cloud-relaunch', 'cloudRelaunch', childEnv);
   show(cloudRelaunchLines);
+  // Server-side proof that Disconnect logged the session out (not only that the label changed).
+  const logoutsAfter = serverLogouts(fixture);
+  if (logoutsBefore !== null) {
+    cloudRelaunchLines.push(logoutsAfter > logoutsBefore
+      ? `PRIJOURNEY ok serverLogoutRecorded ${logoutsAfter - logoutsBefore} logout(s) answered 200`
+      : `PRIJOURNEY FAIL serverLogoutRecorded no successful logout reached the server`);
+  }
   // Server-side proof: the deleted account can no longer sign in.
   if (childEnv.PRI_JOURNEY_NEW_EMAIL) {
     const status = await localPost(port, '/v1/account/login', { email: childEnv.PRI_JOURNEY_NEW_EMAIL, password: childEnv.PRI_JOURNEY_NEW_PASSWORD });
     signupLines.push(status === 401 ? `PRIJOURNEY ok serverDeletedAccountRefused login ${status}` : `PRIJOURNEY FAIL serverDeletedAccountRefused login ${status}`);
   }
+} finally {
+  // Never leave a fixture server behind, whatever failed.
   if (cloudServer?.PRI_CLOUD_SERVER_PID) { try { process.kill(Number(cloudServer.PRI_CLOUD_SERVER_PID)); } catch { /* already gone */ } }
 }
 
@@ -246,13 +265,21 @@ const total = Object.keys(steps).length;
 let os = '';
 try { os = run('xcrun', ['simctl', 'list', 'runtimes']).split('\n').find(l => /iOS/.test(l))?.trim() || ''; } catch { /* informational */ }
 let sha = '';
+let dirty = null;
 try { sha = run('git', ['rev-parse', 'HEAD'], { cwd: ROOT }).trim(); } catch { /* not a checkout */ }
+try { dirty = run('git', ['status', '--porcelain', '--untracked-files=no'], { cwd: ROOT }).trim().length > 0; } catch { /* not a checkout */ }
+// The device's own runtime, not the first one installed.
+try {
+  const devices = JSON.parse(run('xcrun', ['simctl', 'list', 'devices', '-j'])).devices;
+  for (const [runtime, list] of Object.entries(devices)) if (list.some(d => d.udid === udid)) os = runtime.replace(/^com\.apple\.CoreSimulator\.SimRuntime\./, '');
+} catch { /* informational */ }
 
 const evidence = {
   schemaVersion: 1,
   evidenceClass: 'SYNTHETIC_SIMULATOR',
   physicalDevice: false,
   sha,
+  dirtyWorkingTree: dirty,
   simulator: { name: sim.name, udid, runtime: os },
   workflow: process.env.GITHUB_WORKFLOW || 'local',
   run: process.env.GITHUB_RUN_ID || null,
