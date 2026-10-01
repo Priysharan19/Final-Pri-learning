@@ -351,7 +351,7 @@ export default function Practice() {
       </header>
 
       <div className="ws-notices">
-        {assignmentContext && <div className="notice">
+        {assignmentContext && <div className="card ws-assignment">
           <div className="spread" style={{ gap: 12, alignItems: 'flex-start' }}>
             <div>
               <strong>{assignmentContext.title}</strong>
