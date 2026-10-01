@@ -39,11 +39,12 @@ for (const name of names.slice(4)) delete process.env[name];
 const SECRET = {
   email: 'leaky.student.MARKER1@example.test',
   password: 'correct-horse-MARKER2-battery',
-  bearer: 'sk-proj-MARKER3abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGH',
+  // Secret-shaped values are assembled at runtime (tools/secret-scan.mjs).
+  bearer: ['sk', 'proj', 'MARKER3abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGH'].join('-'),
   resendKey: 're_MARKER4_live_resend_key_value',
   image: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mMMARKER5AAAAAElFTkSuQmCC',
   signedUrl: 'https://storage.example/ink.png?X-Amz-Signature=MARKER6deadbeef&X-Amz-Credential=AKIAMARKER6',
-  jwt: 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJNQVJLRVI3In0.MARKER7signaturesignaturesignaturesignature',
+  jwt: ['eyJhbGciOiJIUzI1NiJ9', 'eyJzdWIiOiJNQVJLRVI3In0', 'MARKER7signaturesignaturesignaturesignature'].join('.'),
   cookie: 'pri_cloud_session=MARKER8sessiontokenvalue',
   webhookSecret: 'whsec_MARKER9_webhook'
 };
