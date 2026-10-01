@@ -375,7 +375,7 @@ for (const [text, reason] of LITERAL_ALLOWLIST) {
 // used it for the one sentence with a link inside it, and a key reached only
 // through tx() looked to this suite like a dead string.
 const CALL = /\btx?\(\s*'([a-z][A-Za-z0-9.]*)'/g;
-const KEY_IN_TABLE = /'((?:nav|app|common|difficulty|home|progress|history|favorites|tasks|classes|practice|verdict|settings|login|lang|pw|time|sym|assignment|gloss|placement)\.[A-Za-z0-9.]+)'/g;
+const KEY_IN_TABLE = /'((?:nav|app|common|difficulty|home|progress|history|favorites|tasks|classes|practice|verdict|settings|login|lang|pw|time|sym|assignment|gloss|misconception|placement)\.[A-Za-z0-9.]+)'/g;
 
 function sourceFiles(dir) {
   return readdirSync(dir, { withFileTypes: true }).flatMap(entry => {
