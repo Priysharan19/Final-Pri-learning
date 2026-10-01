@@ -122,7 +122,8 @@ export function contentRefOf(row) {
 
 /**
  * Draw a question that is not in the recent window. `draw(i)` makes the i-th
- * candidate; `accept(q)` may narrow what counts (a misconception hunt). Bounded:
+ * candidate; `accept(q)` may narrow what counts (a misconception hunt), and
+ * outranks freshness when both cannot be had. Bounded:
  * a pool too small to avoid a repeat returns the best candidate with
  * `repeat: true` instead of spinning.
  */
@@ -139,7 +140,10 @@ export function drawDistinct(draw, recentHashes = [], { tries = 8, accept = null
     if (ok && !firstAccepted) firstAccepted = q;
     if (fresh && ok) return { q, repeat: false, accepted: true };
   }
+  // Nothing both fresh and accepted. What `accept` asks for (a misconception
+  // being repaired) outranks freshness: a repeat that can spring the slip is
+  // served, flagged as a repeat, rather than a fresh question that cannot.
+  if (accept && firstAccepted) return { q: firstAccepted, repeat: true, accepted: true };
   if (firstFresh) return { q: firstFresh, repeat: false, accepted: !accept };
-  const q = firstAccepted || first;
-  return { q, repeat: !!q, accepted: !!(accept && firstAccepted) };
+  return { q: first, repeat: !!first, accepted: false };
 }

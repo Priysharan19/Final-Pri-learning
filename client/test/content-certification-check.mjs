@@ -368,6 +368,19 @@ const student = await premiumProfile({ name: 'Cert Student', course: 'in', india
   ok(live.every(r => r.ok), `the live backend's repeat window passes the probe (${live.map(r => `${r.distinct}/${REPEAT_WINDOW}`).join(', ')})`);
 }
 
+{
+  // drawDistinct precedence: fresh-and-accepted, then accepted (a repeat that
+  // can spring the misconception being repaired), then fresh, then anything.
+  const mk = (id, trap) => ({ prompt: `q${id}`, answerType: 'numeric', answer: { value: id }, trap });
+  const seenHash = contentHashOf(mk(1, true));
+  const r1 = drawDistinct(i => [mk(1, true), mk(2, false)][i % 2], [seenHash], { tries: 4, accept: q => q.trap });
+  ok(r1.q.prompt === 'q1' && r1.accepted && r1.repeat, 'a misconception hunt keeps the only question that springs it, flagged as a repeat');
+  const r2 = drawDistinct(i => mk(1 + i, i === 2), [], { tries: 4, accept: q => q.trap });
+  ok(r2.q.prompt === 'q3' && !r2.repeat, 'a fresh question that springs it wins outright');
+  const r3 = drawDistinct(() => mk(1, false), [seenHash], { tries: 3 });
+  ok(r3.repeat && r3.q.prompt === 'q1', 'an exhausted pool returns a flagged repeat instead of spinning');
+}
+
 // ── 5. Versioning gate ──────────────────────────────────────────────────────
 
 {
