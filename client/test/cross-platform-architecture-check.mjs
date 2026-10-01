@@ -328,8 +328,10 @@ if (exemption) {
   // Pin the exact reviewed predicate. CP-07 must change this pin together with
   // the regression test in server/test/native-origin-csrf-check.mjs.
   const norm = t => t.replace(/\s+/g, ' ').trim();
-  ok(norm(body) === "return req.get('x-pri-client') === 'ios-native-v1' && !req.get('origin') && !req.get('sec-fetch-site') && !req.get('sec-fetch-mode');",
+  ok(norm(body) === "return NATIVE_CLIENTS.has(req.get('x-pri-client')) && !req.get('origin') && !req.get('sec-fetch-site') && !req.get('sec-fetch-mode');",
     'and it is exactly the reviewed predicate');
+  ok(/const NATIVE_CLIENTS = new Set\(\['ios-native-v1', 'android-native-v1'\]\);/.test(security),
+    'the native identities are exactly iOS and Android (CP-07), as a closed exact-match set');
 }
 const callSites = [...security.matchAll(/nativeNonBrowserRequest\(/g)].length;
 ok(callSites === 2 && /if \(nativeNonBrowserRequest\(req\)\) return next\(\);/.test(security),
