@@ -1078,6 +1078,10 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                       onChange={e => editAnswer(e.target.value)}
                       onKeyDown={e => { if (e.key === 'Enter') submit(); }}
                       autoCapitalize="none" autoCorrect="off" spellCheck={false}
+                      // Answers are expressions as often as numbers (x², 3/4, √2),
+                      // so a numeric keypad would block them: keep the full
+                      // keyboard and label its Enter key as the submit action.
+                      inputMode="text" enterKeyHint="go"
                     />
                     {question.answerSuffix && <span className="answer-suffix">{question.answerSuffix}</span>}
                   </div>
