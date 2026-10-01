@@ -2413,6 +2413,44 @@ const routes = {
   },
 
   // ---- practice ----
+  // KALP-04 read-only continuity summary. Home needs to know whether there is
+  // real unfinished local Practice without calling /practice/next, because that
+  // write-oriented route may legitimately create a new question when none is
+  // resumable. This returns identifiers/context only — never question content.
+  'GET /practice/resume': async () => {
+    const p = await requireProfile();
+    const rows = await byIndex('questions', 'pid', p.id);
+    const row = rows
+      .filter(r => r && !r.answered && !r.discardedAt && !r.examId && r.mode !== 'rush' && r.mode !== 'match')
+      .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))[0] || null;
+    if (!row) return { resume: null };
+
+    if (row.taskId) {
+      const task = await get('tasks', row.taskId);
+      return {
+        resume: {
+          kind: 'task',
+          questionId: row.id,
+          taskId: row.taskId,
+          title: task?.title || 'Practice task',
+          createdAt: row.createdAt || null,
+          destination: '/practice?task=' + encodeURIComponent(row.taskId)
+        }
+      };
+    }
+
+    return {
+      resume: {
+        kind: 'practice',
+        questionId: row.id,
+        subtopic: row.india?.chapterId || row.payload?.subtopic || row.subtopic || null,
+        difficulty: row.difficulty || null,
+        createdAt: row.createdAt || null,
+        destination: '/practice'
+      }
+    };
+  },
+
   'POST /practice/next': async (body) => {
     const p = await requireProfile();
     const unfinished = await resumableQuestion(p, body);
