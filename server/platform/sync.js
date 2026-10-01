@@ -1,6 +1,6 @@
 import { asyncRouter } from './asyncRouter.js';
 import { asStore, isDatabaseOverload } from './store.js';
-import { currentSyncCursor, nextSyncCursor, syncLockKey } from './db.js';
+import { nextSyncCursor, syncLockKey } from './db.js';
 import { id, rateLimit, requireSession, requireVerifiedEmail, sha256 } from './security.js';
 
 const SCHEMA = 1;
@@ -204,7 +204,12 @@ export function createSyncRouter(db) {
           acceptedEntities.push({ kind: entity.kind, entityId: entity.entityId, version, serverCursor: cursor });
         }
 
-        const cursor = await currentSyncCursor(db);
+        // This push's own high-water mark: the highest cursor it was given (or,
+        // for replayed events, was given before), 0 when it carried nothing. Not
+        // the global allocator — that would tell every account how much every
+        // other account is syncing. (The client does not read it; pulls page by
+        // their own cursor.)
+        const cursor = Math.max(0, ...acceptedEvents.map(row => Number(row.serverCursor) || 0), ...acceptedEntities.map(row => Number(row.serverCursor) || 0));
         const out = { schemaVersion: SCHEMA, cursor, acceptedEvents, acceptedEntities, fullRescanAccepted: !!body.fullRescan };
         await db.run(`INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at)
           VALUES (?,'sync-push',?,?,?,?,?)`, [accountId, idem, JSON.stringify(out), digest, Date.now(), Date.now() + 24 * 60 * 60 * 1000]);

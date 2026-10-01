@@ -93,9 +93,15 @@ try {
     ok(!/running on port/.test(plain.stdout), 'it never listens');
   }
 
+  // ── 1c · TLS that is not verified, in production ───────────────────────────
+  const unverified = await run(productionEnv({ PRI_DATABASE_URL: `postgres://pri_app:${SECRET}@db.internal:5432/pri?sslmode=require` }));
+  eq(unverified.code, 1, 'production refuses sslmode=require without a CA certificate');
+  ok(/platform_db_unavailable \{"code":"PLATFORM_DB_TLS_UNVERIFIED"\}/.test(unverified.stderr), `with the coded error PLATFORM_DB_TLS_UNVERIFIED (${unverified.stderr.trim().slice(0, 120)})`);
+  eq(leaks(unverified.stdout + unverified.stderr, SECRET, 'db.internal').length, 0, 'and prints nothing of the URL');
+
   // ── 2 · Unreachable database ──────────────────────────────────────────────
   const closedPort = await freePort();
-  const unreachable = await run(productionEnv({ PRI_DATABASE_URL: `postgres://pri_app:${SECRET}@127.0.0.1:${closedPort}/pri?sslmode=require` }));
+  const unreachable = await run(productionEnv({ PRI_DATABASE_URL: `postgres://pri_app:${SECRET}@127.0.0.1:${closedPort}/pri?sslmode=verify-full` }));
   eq(unreachable.code, 1, 'an unreachable Postgres stops the process');
   ok(/platform_db_unavailable \{"code":"PLATFORM_DB_UNAVAILABLE"\}/.test(unreachable.stderr), `with the coded error PLATFORM_DB_UNAVAILABLE (${unreachable.stderr.trim().slice(0, 120)})`);
   eq(leaks(unreachable.stdout + unreachable.stderr, SECRET, 'pri_app', String(closedPort)).length, 0, 'and prints neither the password, the user nor the address');
@@ -132,8 +138,8 @@ try {
 
     // ── 3b · Migrated, but not to the schema this build needs ──────────────
     for (const [label, sql] of [
-      ['schema_version is older than the server', "UPDATE pri.platform_meta SET value='5' WHERE key='schema_version'"],
-      ['schema_version is newer than the server', "UPDATE pri.platform_meta SET value='7' WHERE key='schema_version'"],
+      ['schema_version is older than the server', "UPDATE pri.platform_meta SET value='6' WHERE key='schema_version'"],
+      ['schema_version is newer than the server', "UPDATE pri.platform_meta SET value='8' WHERE key='schema_version'"],
       ['billing_schema_version differs', "UPDATE pri.platform_meta SET value='2' WHERE key='billing_schema_version'"],
       ['billing_schema_version is missing', "DELETE FROM pri.platform_meta WHERE key='billing_schema_version'"],
       ['the sync cursor sequence migration is missing', 'DROP SEQUENCE pri.sync_cursor_seq']
@@ -166,7 +172,7 @@ try {
         const health = JSON.parse(text);
         eq(response.status, 200, 'health responds');
         eq(health.database?.engine, 'postgres', '/v1/health reports database.engine = postgres');
-        eq(health.schemaVersion, '6', 'and the migrated schema version');
+        eq(health.schemaVersion, '7', 'and the migrated schema version');
         eq(leaks(text, parsed.username, parsed.hostname + ':' + parsed.port, scratch.name, 'postgres://').length, 0, 'health names no user, host, port, database or URL');
         ok(/platform_db_open \{ engine: 'postgres' \}/.test(booted.stdout), 'the boot log names only the engine');
         eq(leaks(booted.stdout + booted.stderr, parsed.username, scratch.name, 'postgres://').length, 0, 'and the logs carry nothing of the URL');

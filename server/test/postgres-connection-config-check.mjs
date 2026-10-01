@@ -3,8 +3,9 @@
 //
 //   node server/test/postgres-connection-config-check.mjs   (no database needed)
 //
-// TLS: in production PRI_DATABASE_URL must say sslmode=verify-full or
-// sslmode=require, or the process refuses to start (PLATFORM_DB_TLS_REQUIRED).
+// TLS: in production PRI_DATABASE_URL must say sslmode=verify-full, or
+// sslmode=require together with PRI_DATABASE_SSL_ROOT_CERT, or the process
+// refuses to start (PLATFORM_DB_TLS_REQUIRED / PLATFORM_DB_TLS_UNVERIFIED).
 // The `ssl` option handed to pg is built from one explicit table, never from
 // pg's own (release-dependent) reading of sslmode, and the CA certificate comes
 // from PRI_DATABASE_SSL_ROOT_CERT. Limits: statement_timeout,
@@ -52,13 +53,18 @@ for (const url of [BASE, `${BASE}?sslmode=disable`, `${BASE}?sslmode=allow`, `${
   eq(settings.ssl, { rejectUnauthorized: true }, 'verify-full without a CA verifies against the system trust store');
 }
 {
-  const settings = postgresConnectionSettings(`${BASE}?sslmode=require`, prod());
-  eq(settings.ssl, { rejectUnauthorized: false }, 'require without a CA: encrypted, not verified (libpq semantics)');
-  eq(settings.certificateVerified, false, 'and reported as not verified');
-  eq(postgresConnectionSettings(`${BASE}?sslmode=require`, prod({ PRI_DATABASE_SSL_ROOT_CERT: CA })).ssl, { rejectUnauthorized: true, ca: CA },
-    'require with a CA verifies, as libpq does when a root certificate is present');
+  // require without a CA is encrypted but unauthenticated: an active MITM can
+  // read every query. Production refuses it.
+  throwsCode(() => postgresConnectionSettings(`${BASE}?sslmode=require`, prod()), 'PLATFORM_DB_TLS_UNVERIFIED',
+    'production refuses sslmode=require without PRI_DATABASE_SSL_ROOT_CERT');
+  const verified = postgresConnectionSettings(`${BASE}?sslmode=require`, prod({ PRI_DATABASE_SSL_ROOT_CERT: CA }));
+  eq(verified.ssl, { rejectUnauthorized: true, ca: CA }, 'require with a CA verifies chain and host name, as libpq does when a root certificate is present');
+  eq(verified.certificateVerified, true, 'and is reported as verified');
+  const unverified = postgresConnectionSettings(`${BASE}?sslmode=require`, dev());
+  eq(unverified.ssl, { rejectUnauthorized: false }, 'outside production, require without a CA is encrypted, not verified (libpq semantics)');
+  eq(unverified.certificateVerified, false, 'and reported as not verified');
 }
-eq(postgresConnectionSettings(`${BASE}?sslmode=REQUIRE`, prod()).tlsMode, 'require', 'sslmode is case-insensitive');
+eq(postgresConnectionSettings(`${BASE}?sslmode=REQUIRE`, prod({ PRI_DATABASE_SSL_ROOT_CERT: CA })).tlsMode, 'require', 'sslmode is case-insensitive');
 eq(postgresConnectionSettings(`${BASE}?application_name=pri&sslmode=verify-full`, prod()).connectionString.includes('application_name=pri'), true,
   'other URL parameters are kept');
 
@@ -81,14 +87,14 @@ eq(postgresConnectionSettings('postgres://pri_app_test@127.0.0.1:5432/pri', {}).
 eq(postgresConnectionSettings(`${BASE}?sslmode=verify-full`, dev()).ssl, { rejectUnauthorized: true }, 'and TLS stated outside production is honoured');
 
 // ── Per-connection limits and pool size ─────────────────────────────────────
-eq({ ...postgresSessionLimits({}) }, { statementTimeoutMs: 15000, idleInTransactionTimeoutMs: 30000, poolMax: 10 },
-  'defaults: statement_timeout 15 s, idle_in_transaction_session_timeout 30 s, pool of 10');
-eq({ ...postgresSessionLimits({ PRI_DATABASE_STATEMENT_TIMEOUT_MS: '5000', PRI_DATABASE_IDLE_TX_TIMEOUT_MS: '60000', PRI_DATABASE_POOL_MAX: '20' }) },
-  { statementTimeoutMs: 5000, idleInTransactionTimeoutMs: 60000, poolMax: 20 }, 'each is configurable');
+eq({ ...postgresSessionLimits({}) }, { statementTimeoutMs: 15000, idleInTransactionTimeoutMs: 30000, poolMax: 10, lockWaitMs: 5000 },
+  'defaults: statement_timeout 15 s, idle_in_transaction_session_timeout 30 s, pool of 10, lock wait 5 s');
+eq({ ...postgresSessionLimits({ PRI_DATABASE_STATEMENT_TIMEOUT_MS: '5000', PRI_DATABASE_IDLE_TX_TIMEOUT_MS: '60000', PRI_DATABASE_POOL_MAX: '20', PRI_DATABASE_LOCK_WAIT_MS: '2500' }) },
+  { statementTimeoutMs: 5000, idleInTransactionTimeoutMs: 60000, poolMax: 20, lockWaitMs: 2500 }, 'each is configurable');
 for (const [name, value] of [
   ['PRI_DATABASE_STATEMENT_TIMEOUT_MS', 'abc'], ['PRI_DATABASE_STATEMENT_TIMEOUT_MS', '0'], ['PRI_DATABASE_STATEMENT_TIMEOUT_MS', '1.5'],
   ['PRI_DATABASE_STATEMENT_TIMEOUT_MS', '999999999'], ['PRI_DATABASE_IDLE_TX_TIMEOUT_MS', '-1'], ['PRI_DATABASE_POOL_MAX', '0'],
-  ['PRI_DATABASE_POOL_MAX', '51'], ['PRI_DATABASE_POOL_MAX', '10; DROP']
+  ['PRI_DATABASE_POOL_MAX', '51'], ['PRI_DATABASE_POOL_MAX', '10; DROP'], ['PRI_DATABASE_LOCK_WAIT_MS', '50'], ['PRI_DATABASE_LOCK_WAIT_MS', '600000']
 ]) {
   throwsCode(() => postgresSessionLimits({ [name]: value }), 'PLATFORM_DB_CONFIG_INVALID', `${name}=${value} stops the boot instead of being guessed at`);
 }
@@ -123,4 +129,4 @@ for (const [name, value] of [
   }
 }
 
-console.log(`POSTGRES CONNECTION CONFIG: PASS — ${checks}/${checks} checks — production requires sslmode=verify-full or require, TLS is built explicitly from sslmode + PRI_DATABASE_SSL_ROOT_CERT, timeouts and pool size are validated, and no error leaks the URL.`);
+console.log(`POSTGRES CONNECTION CONFIG: PASS — ${checks}/${checks} checks — production requires verified TLS (sslmode=verify-full, or require + CA), TLS is built explicitly from sslmode + PRI_DATABASE_SSL_ROOT_CERT, timeouts and pool size are validated, and no error leaks the URL.`);

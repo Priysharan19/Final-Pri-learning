@@ -18,11 +18,27 @@
 -- cursor than an earlier one. The live schema gate checks it.
 --
 -- pri.sync_cursors stays: SQLite still allocates from it, and the two schemas
--- keep the same tables. On Postgres it is no longer written.
+-- keep the same tables. On Postgres it is no longer written — and can no
+-- longer BE written by the server: pri_server keeps only SELECT on it.
 --
--- Additive and idempotent in effect: a database that already served pushes
--- with the row allocator continues above every cursor already handed out.
+-- WHY THE REVOKE. A server build from before this migration allocates from the
+-- sync_cursors row and checks only that schema_version exists. Left able to
+-- write, such a build running against this database — in the gap between `db
+-- push` and the deploy, during an overlapping deploy, or after an application
+-- rollback — would hand out cursors from a row that stopped at, say, 42 while
+-- the sequence had issued up to 78: a pulling device that has seen 78 never
+-- sees the new rows at 43…78 (server_cursor is not unique across the two
+-- tables). Without UPDATE its pushes fail closed (42501, nothing written)
+-- instead. schema_version moves to 7 so a build that DOES check the version
+-- (this one and later) refuses a database without this migration.
+--
+-- Continuation: the sequence starts above every cursor already handed out —
+-- under an EXCLUSIVE lock on sync_cursors, so an old build's push that is
+-- mid-flight finishes (and is counted) or waits and then fails on the revoke.
 -- ─────────────────────────────────────────────────────────────────────────────
+
+-- Blocks any concurrent UPDATE of the row until this migration commits.
+lock table pri.sync_cursors in exclusive mode;
 
 create sequence pri.sync_cursor_seq as bigint
   increment by 1 minvalue 1 no maxvalue start with 1 cache 1 no cycle;
@@ -44,6 +60,12 @@ begin
     perform setval('pri.sync_cursor_seq', high, true);
   end if;
 end $$;
+
+-- ── The row allocator is closed to the server (see WHY THE REVOKE) ──────────
+revoke insert, update, delete, truncate on pri.sync_cursors from pri_server;
+
+-- ── This build's schema version (server/platform/schemaVersions.js) ─────────
+update pri.platform_meta set value = '7' where key = 'schema_version';
 
 -- ── Privileges: the server may draw from it; client API roles may not see it ──
 revoke all on sequence pri.sync_cursor_seq from public;

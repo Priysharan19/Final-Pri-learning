@@ -517,8 +517,54 @@ Object.assign(PostgresTx.prototype, dialectHelpers);
 // A session advisory lock, keyed by a 64-bit hash of the lock name. Distinct
 // names that collide only serialise more than necessary; they never deadlock,
 // because a transaction takes at most one such lock.
-const ADVISORY_LOCK = 'SELECT pg_advisory_lock(hashtextextended($1, 0))';
+//
+// Never a blocking pg_advisory_lock: a waiter blocked inside Postgres holds a
+// pooled connection for as long as it waits, so ten concurrent pushes from ONE
+// account (the rate limit allows 120/min) would take a 10-connection pool and
+// starve every other request. Instead (PostgresStore.transaction):
+//   1. waiters for the same key queue IN THIS PROCESS, holding no connection —
+//      one connection per lock key per server instance at most;
+//   2. the queue head checks out a connection and takes the database lock with
+//      pg_try_advisory_lock, retrying briefly — that wait only happens when
+//      ANOTHER instance holds the key;
+//   3. both waits share one bounded budget (lockWaitMs); past it the request
+//      is a retryable 503 PLATFORM_DB_BUSY, not a pool starved for 15 s.
+const ADVISORY_TRY_LOCK = 'SELECT pg_try_advisory_lock(hashtextextended($1, 0)) AS acquired';
 const ADVISORY_UNLOCK = 'SELECT pg_advisory_unlock(hashtextextended($1, 0)) AS released';
+export const DEFAULT_LOCK_WAIT_MS = 5000;
+
+/** FIFO mutexes by key, with a deadline per waiter. In-process only. */
+export class KeyedMutex {
+  constructor() { this.queues = new Map(); }
+  /** Resolves to a release function, or rejects with PLATFORM_DB_BUSY at the deadline. */
+  acquire(key, timeoutMs) {
+    let queue = this.queues.get(key);
+    if (!queue) { queue = { held: false, waiters: [] }; this.queues.set(key, queue); }
+    const release = () => {
+      const next = queue.waiters.shift();
+      if (next) { clearTimeout(next.timer); next.resolve(release); return; }
+      queue.held = false;
+      this.queues.delete(key);
+    };
+    if (!queue.held) { queue.held = true; return Promise.resolve(once(release)); }
+    return new Promise((resolve, reject) => {
+      const waiter = { resolve: r => resolve(once(r)), timer: null };
+      waiter.timer = setTimeout(() => {
+        const at = queue.waiters.indexOf(waiter);
+        if (at !== -1) queue.waiters.splice(at, 1);
+        reject(overloaded('PLATFORM_DB_BUSY', 1, { code: 'LOCK_QUEUE_TIMEOUT' }));
+      }, Math.max(0, timeoutMs));
+      queue.waiters.push(waiter);
+    });
+  }
+  /** Waiters queued behind the holder of `key` (tests, operators). */
+  waiting(key) { return this.queues.get(key)?.waiters.length || 0; }
+}
+
+function once(fn) {
+  let done = false;
+  return () => { if (!done) { done = true; fn(); } };
+}
 
 function sessionMillis(value, name) {
   if (value === undefined || value === null) return null;
@@ -528,7 +574,7 @@ function sessionMillis(value, name) {
 }
 
 export class PostgresStore {
-  constructor(pool, { schema = 'pri', ownsPool = true, maxAttempts = MAX_ATTEMPTS, statementTimeoutMs, idleInTransactionTimeoutMs } = {}) {
+  constructor(pool, { schema = 'pri', ownsPool = true, maxAttempts = MAX_ATTEMPTS, statementTimeoutMs, idleInTransactionTimeoutMs, lockWaitMs = DEFAULT_LOCK_WAIT_MS } = {}) {
     if (!SAFE_IDENTIFIER.test(String(schema))) throw storeError('STORE_SCHEMA_INVALID', 'Postgres schema name is invalid.');
     this.dialect = 'postgres';
     // Applied to every pooled connection before its first statement.
@@ -537,6 +583,9 @@ export class PostgresStore {
       idleInTransactionTimeoutMs: sessionMillis(idleInTransactionTimeoutMs, 'idleInTransactionTimeoutMs')
     });
     this.maxAttempts = Math.max(1, Math.floor(Number(maxAttempts) || MAX_ATTEMPTS));
+    /** How long a transaction may wait for its named lock (in process + in Postgres) before a 503. */
+    this.lockWaitMs = sessionMillis(lockWaitMs, 'lockWaitMs') ?? DEFAULT_LOCK_WAIT_MS;
+    this.localLocks = new KeyedMutex();
     /** Counters for operators and tests: transactions begun, and re-runs after 40001/40P01. */
     this.stats = { transactions: 0, retries: 0 };
     this.pool = pool;
@@ -653,7 +702,16 @@ export class PostgresStore {
     for (let attempt = 1; ; attempt++) {
       if (attempt > 1) this.stats.retries++;
       this.stats.transactions++;
-      const client = await this._client();
+      // Queue for the lock in this process BEFORE taking a pooled connection.
+      const deadline = Date.now() + this.lockWaitMs;
+      const releaseLocal = lock ? await this.localLocks.acquire(lock, this.lockWaitMs) : null;
+      let client;
+      try {
+        client = await this._client();
+      } catch (error) {
+        releaseLocal?.();
+        throw error;
+      }
       const tx = new PostgresTx(this, client, 0, readOnly, lock);
       let broken;
       let locked = false;
@@ -663,14 +721,14 @@ export class PostgresStore {
         // taken after the previous holder committed and includes its writes.
         if (lock) {
           try {
-            await client.query(ADVISORY_LOCK, [lock]);
+            locked = await this.#tryLock(client, lock, deadline);
           } catch (lockError) {
-            // A lock wait that failed (statement_timeout) must not leave any
-            // doubt about a session lock on a pooled connection: end the session.
+            // A failed lock statement must not leave any doubt about a session
+            // lock on a pooled connection: end the session.
             broken = lockError;
             throw lockError;
           }
-          locked = true;
+          if (!locked) throw overloaded('PLATFORM_DB_BUSY', 1, { code: 'LOCK_WAIT_TIMEOUT' });
         }
         await client.query(readOnly
           ? 'BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY'
@@ -706,8 +764,21 @@ export class PostgresStore {
           }
         }
         client.release(broken);
+        releaseLocal?.();
       }
       await pause(retryDelayMs(attempt));
+    }
+  }
+
+  /** pg_try_advisory_lock until acquired or the deadline; true when held. */
+  async #tryLock(client, lock, deadline) {
+    for (let round = 0; ; round++) {
+      const result = await client.query(ADVISORY_TRY_LOCK, [lock]);
+      if (result?.rows?.[0]?.acquired === true) return true;
+      const left = deadline - Date.now();
+      if (left <= 0) return false;
+      // Another instance holds it: short, jittered waits, capped at 50 ms.
+      await pause(Math.min(left, Math.floor(Math.random() * Math.min(50, 5 * 2 ** Math.min(round, 4))) + 1));
     }
   }
 
@@ -773,7 +844,8 @@ export async function createPostgresStore(connectionString, { schema = 'pri', ma
   const store = new PostgresStore(pool, {
     schema,
     statementTimeoutMs: settings.statementTimeoutMs,
-    idleInTransactionTimeoutMs: settings.idleInTransactionTimeoutMs
+    idleInTransactionTimeoutMs: settings.idleInTransactionTimeoutMs,
+    lockWaitMs: settings.lockWaitMs
   });
   // Fail at boot, not on the first student request: the database must be
   // reachable and the schema already migrated (supabase/migrations) — this

@@ -55,14 +55,18 @@ function configError(code, message) {
 // "verify-full"). So the URL's TLS parameters are removed here and the `ssl`
 // option is built from one explicit table, identical on every pg release:
 //
-//   sslmode       production   TLS   certificate chain   host name
-//   ─────────────  ──────────   ───   ─────────────────   ─────────
-//   verify-full   allowed      yes   verified            verified    ← preferred
-//   require       allowed      yes   verified only when  verified    (libpq semantics
-//                                    PRI_DATABASE_SSL_    with CA     otherwise: encrypt,
-//                                    ROOT_CERT is set                 don't verify)
+//   sslmode       production            TLS   certificate chain + host name
+//   ─────────────  ───────────────────   ───   ─────────────────────────────
+//   verify-full   allowed               yes   verified (against the CA below
+//                                             if set, else the system store)
+//   require       allowed ONLY with     yes   verified against that CA
+//                 PRI_DATABASE_SSL_ROOT_CERT
+//   require       REFUSED without a CA  yes   NOT verified (libpq semantics:
+//                 (PLATFORM_DB_TLS_           encrypt, don't authenticate —
+//                 UNVERIFIED)                 open to an active MITM); allowed
+//                                             outside production only
 //   (absent), disable, allow, prefer
-//                 REFUSED      no    —                   —
+//                 REFUSED               no    —
 //   verify-ca     refused everywhere: Node has no "chain but not host" mode.
 //
 // The CA bundle comes from PRI_DATABASE_SSL_ROOT_CERT (PEM text — Supabase's
@@ -94,7 +98,10 @@ export function postgresSessionLimits(env = process.env) {
     // something that is not the database) is terminated by the server, so it
     // cannot hold row locks and a pooled connection indefinitely.
     idleInTransactionTimeoutMs: boundedInteger(env, 'PRI_DATABASE_IDLE_TX_TIMEOUT_MS', 30_000, 1_000, 3_600_000),
-    poolMax: boundedInteger(env, 'PRI_DATABASE_POOL_MAX', 10, 1, 50)
+    poolMax: boundedInteger(env, 'PRI_DATABASE_POOL_MAX', 10, 1, 50),
+    // How long a request may wait for a per-account lock (queued in process,
+    // then pg_try_advisory_lock across instances) before a retryable 503.
+    lockWaitMs: boundedInteger(env, 'PRI_DATABASE_LOCK_WAIT_MS', 5_000, 100, 60_000)
   });
 }
 
@@ -122,12 +129,16 @@ export function postgresConnectionSettings(connectionString, env = process.env) 
   if (!TLS_MODES.has(tlsMode)) throw configError('PLATFORM_DB_TLS_INVALID', `PRI_DATABASE_URL sslmode=${tlsMode.slice(0, 20)} is not supported; use verify-full or require.`);
   const production = String(env.NODE_ENV || '') === 'production';
   if (production && !PRODUCTION_TLS_MODES.has(tlsMode)) {
-    throw configError('PLATFORM_DB_TLS_REQUIRED', 'In production PRI_DATABASE_URL must use TLS: sslmode=verify-full (preferred) or sslmode=require.');
+    throw configError('PLATFORM_DB_TLS_REQUIRED', 'In production PRI_DATABASE_URL must use verified TLS: sslmode=verify-full, or sslmode=require with PRI_DATABASE_SSL_ROOT_CERT.');
   }
   url.searchParams.delete('sslmode');
   const ca = String(env.PRI_DATABASE_SSL_ROOT_CERT || '').trim();
   if (ca && !/-----BEGIN CERTIFICATE-----/.test(ca)) {
     throw configError('PLATFORM_DB_TLS_INVALID', 'PRI_DATABASE_SSL_ROOT_CERT must be PEM certificate text.');
+  }
+  if (production && tlsMode === 'require' && !ca) {
+    throw configError('PLATFORM_DB_TLS_UNVERIFIED',
+      'In production sslmode=require needs PRI_DATABASE_SSL_ROOT_CERT so the server certificate is verified; otherwise use sslmode=verify-full.');
   }
   let ssl = false;
   if (tlsMode === 'verify-full' || (tlsMode === 'require' && ca)) {

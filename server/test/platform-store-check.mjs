@@ -136,30 +136,74 @@ const pgError = code => Object.assign(new Error(`fake ${code}`), { code });
 }
 {
   // A named lock is taken before BEGIN and released after COMMIT, on the same client.
-  const pool = fakePool(sql => (sql.startsWith('SELECT pg_advisory_unlock') ? { rows: [{ released: true }], rowCount: 1 } : undefined));
+  const lockScript = (acquired = () => true) => sql => {
+    if (sql.startsWith('SELECT pg_try_advisory_lock')) return { rows: [{ acquired: acquired() }], rowCount: 1 };
+    if (sql.startsWith('SELECT pg_advisory_unlock')) return { rows: [{ released: true }], rowCount: 1 };
+    return undefined;
+  };
+  const pool = fakePool(lockScript());
   const store = new PostgresStore(pool, { ownsPool: false });
   let held;
   await store.transaction(async () => { held = store.heldLock(); await store.get('SELECT inside'); }, { lock: 'pri.sync:acct-1' });
-  const order = pool.log.filter(sql => /pg_advisory|^BEGIN|^COMMIT|SELECT inside/.test(sql));
-  eq(order, ['SELECT pg_advisory_lock(hashtextextended($1, 0))', 'BEGIN ISOLATION LEVEL SERIALIZABLE', 'SELECT inside', 'COMMIT', 'SELECT pg_advisory_unlock(hashtextextended($1, 0)) AS released'],
+  const order = pool.log.filter(sql => /pg_advisory|pg_try_advisory|^BEGIN|^COMMIT|SELECT inside/.test(sql));
+  eq(order, ['SELECT pg_try_advisory_lock(hashtextextended($1, 0)) AS acquired', 'BEGIN ISOLATION LEVEL SERIALIZABLE', 'SELECT inside', 'COMMIT', 'SELECT pg_advisory_unlock(hashtextextended($1, 0)) AS released'],
     'lock → BEGIN → work → COMMIT → unlock: the snapshot is taken after the lock');
+  ok(!pool.log.some(sql => sql.startsWith('SELECT pg_advisory_lock')), 'never a blocking pg_advisory_lock, which would hold a pooled connection while it waits');
   eq(held, 'pri.sync:acct-1', 'heldLock() names the lock inside the transaction');
   eq(store.heldLock(), null, 'and nothing outside it');
   eq([pool.released, pool.destroyed], [1, 0], 'a cleanly unlocked client goes back to the pool');
 
   // A client that cannot prove it released the lock is destroyed.
-  const lost = fakePool(sql => (sql.startsWith('SELECT pg_advisory_unlock') ? { rows: [{ released: false }], rowCount: 1 } : undefined));
+  const lost = fakePool(sql => (sql.startsWith('SELECT pg_try_advisory_lock') ? { rows: [{ acquired: true }] } : sql.startsWith('SELECT pg_advisory_unlock') ? { rows: [{ released: false }], rowCount: 1 } : undefined));
   await new PostgresStore(lost, { ownsPool: false }).transaction(async () => {}, { lock: 'k' });
   eq(lost.destroyed, 1, 'an unlock that reports false destroys the client (ending the session frees the lock)');
 
-  // A lock wait that times out is answered 503 and the client is destroyed.
-  const stuck = fakePool(sql => (sql.startsWith('SELECT pg_advisory_lock') ? pgError('57014') : undefined));
-  await rejects(() => new PostgresStore(stuck, { ownsPool: false }).transaction(async () => {}, { lock: 'k' }),
-    error => error.code === 'PLATFORM_DB_TIMEOUT' && error.status === 503, 'a lock wait past statement_timeout is PLATFORM_DB_TIMEOUT');
-  ok(stuck.destroyed === 1 && !stuck.log.some(sql => sql.startsWith('BEGIN')), 'no transaction was begun and the session was ended');
+  // Another instance holds the lock: retried until it frees up, within the budget…
+  let busyRounds = 3;
+  const contended = fakePool(lockScript(() => busyRounds-- <= 0));
+  await new PostgresStore(contended, { ownsPool: false, lockWaitMs: 1000 }).transaction(async () => {}, { lock: 'k' });
+  eq(contended.log.filter(sql => sql.startsWith('SELECT pg_try_advisory_lock')).length, 4, 'a lock held elsewhere is retried with pg_try_advisory_lock until it frees');
+  // …and past it, a retryable 503 with nothing begun and a reusable client.
+  const stuck = fakePool(lockScript(() => false));
+  const startedStuck = Date.now();
+  await rejects(() => new PostgresStore(stuck, { ownsPool: false, lockWaitMs: 120 }).transaction(async () => {}, { lock: 'k' }),
+    error => error.code === 'PLATFORM_DB_BUSY' && error.status === 503 && error.retryAfter === 1, 'a lock not obtained within lockWaitMs is PLATFORM_DB_BUSY 503');
+  ok(Date.now() - startedStuck < 1000, 'and the wait is bounded by lockWaitMs, not statement_timeout');
+  ok(!stuck.log.some(sql => sql.startsWith('BEGIN')) && stuck.released === 1 && stuck.destroyed === 0, 'no transaction was begun; the client holds no lock and goes back to the pool');
+  // A lock statement that errors ends the session (no doubt left about a held lock).
+  const failing = fakePool(sql => (sql.startsWith('SELECT pg_try_advisory_lock') ? pgError('57014') : undefined));
+  await rejects(() => new PostgresStore(failing, { ownsPool: false }).transaction(async () => {}, { lock: 'k' }),
+    error => error.code === 'PLATFORM_DB_TIMEOUT', 'a lock statement that times out is PLATFORM_DB_TIMEOUT');
+  eq(failing.destroyed, 1, 'and its session is ended');
+
+  // Waiters for one key queue in this process and take NO pooled connection.
+  let connects = 0;
+  let open = 0;
+  let maxOpen = 0;
+  const queued = fakePool(lockScript());
+  const counting = { ...queued, async connect() { connects++; open++; maxOpen = Math.max(maxOpen, open); const client = await queued.connect(); return { ...client, query: client.query, release(error) { open--; client.release(error); } }; } };
+  const queuedStore = new PostgresStore(counting, { ownsPool: false });
+  const order2 = [];
+  await Promise.all(Array.from({ length: 8 }, (_, i) => queuedStore.transaction(async () => {
+    order2.push(i);
+    await new Promise(resolve => setTimeout(resolve, 5));
+  }, { lock: 'one-account' })));
+  eq(maxOpen, 1, 'eight concurrent transactions for one lock key never hold more than ONE pooled connection');
+  eq(order2, [0, 1, 2, 3, 4, 5, 6, 7], 'and run first come, first served');
+  eq(connects, 8, 'each takes its connection only when it reaches the head of the queue');
+  // A queued waiter past the budget leaves the queue with a 503.
+  const slowStore = new PostgresStore(fakePool(lockScript()), { ownsPool: false, lockWaitMs: 40 });
+  const holder = slowStore.transaction(async () => { await new Promise(resolve => setTimeout(resolve, 150)); }, { lock: 'q' });
+  await new Promise(resolve => setTimeout(resolve, 5));
+  await rejects(() => slowStore.transaction(async () => {}, { lock: 'q' }), error => error.code === 'PLATFORM_DB_BUSY' && error.dbCode === 'LOCK_QUEUE_TIMEOUT',
+    'a waiter queued past lockWaitMs gets PLATFORM_DB_BUSY');
+  await holder;
+  eq(slowStore.localLocks.waiting('q'), 0, 'and is removed from the queue');
+  await slowStore.transaction(async () => {}, { lock: 'q' });
+  ok(slowStore.localLocks.waiting('q') === 0 && !slowStore.localLocks.queues.has('q'), 'the key is free again afterwards');
 
   // Snapshot isolation only with a lock; never by accident.
-  const iso = fakePool(sql => (sql.startsWith('SELECT pg_advisory_unlock') ? { rows: [{ released: true }], rowCount: 1 } : undefined));
+  const iso = fakePool(lockScript());
   const isoStore = new PostgresStore(iso, { ownsPool: false });
   await rejects(() => isoStore.transaction(async () => {}, { isolation: 'repeatable read' }), error => error.code === 'STORE_ISOLATION_REQUIRES_LOCK',
     "a writable 'repeatable read' transaction without a lock is refused");
@@ -303,9 +347,21 @@ try {
   const created = (await store.get('SELECT created_at FROM accounts WHERE id=?', ['acct-store'])).created_at;
   ok(typeof created === 'number' && created === now, 'epoch-ms BIGINT columns round-trip as Number');
   // RETURNING works through run() and get() on both engines.
-  const bumped = await store.get(`UPDATE sync_cursors SET value = value + 1 WHERE id = 1 RETURNING value`);
-  ok(typeof bumped.value === 'number' && bumped.value >= 1, 'UPDATE … RETURNING returns the new row');
+  const bumped = await store.get(`UPDATE rate_limits SET count = count + 1 WHERE bucket = 'counter' RETURNING count`);
+  ok(typeof bumped.count === 'number' && bumped.count === WRITERS + 1, 'UPDATE … RETURNING returns the new row');
   if (engine === 'postgres') {
+    // The pre-sequence allocator, as a build from before migration
+    // 20261002000000 would run it as pri_server: refused, so such a build fails
+    // closed instead of handing out stale cursors.
+    await rejects(() => store.get('UPDATE sync_cursors SET value = value + 1 WHERE id = 1 RETURNING value'),
+      error => error.code === '42501', 'an old-style sync_cursors allocation is refused to pri_server (42501) after the migration');
+    await rejects(() => store.transaction(async tx => {
+      await tx.run(`INSERT INTO learning_events(server_cursor,id,account_id,device_id,device_seq,kind,payload_json,created_at)
+        VALUES (999999,'old-build-evt','acct-store','old-device',1,'practice-attempt','{}',?)`, [now]);
+      await tx.get('UPDATE sync_cursors SET value = value + 1 WHERE id = 1 RETURNING value');
+    }), error => error.code === '42501', 'an old build\'s whole push transaction fails');
+    eq(Number((await store.get(`SELECT COUNT(*) AS n FROM learning_events WHERE id='old-build-evt'`)).n), 0, 'and writes nothing');
+    eq(Number((await store.get('SELECT value FROM sync_cursors WHERE id=1')).value), 0, 'the row stays readable and untouched');
     await rejects(() => store.transaction(async tx => tx.run("UPDATE accounts SET name='x' WHERE id=?", ['acct-store']), { readOnly: true }),
       error => error.code === '25006', 'a readOnly transaction refuses writes');
   }
@@ -339,6 +395,35 @@ try {
     // Session limits are applied to every connection, from the environment.
     eq((await store.get('SHOW statement_timeout')).statement_timeout, '15s', 'default statement_timeout is 15 s on every connection');
     eq((await store.get('SHOW idle_in_transaction_session_timeout')).idle_in_transaction_session_timeout, '30s', 'default idle_in_transaction_session_timeout is 30 s');
+    // One lock key cannot take the pool. 20 transactions for one account, each
+    // holding its lock for 40 ms (≥ 800 ms in all), on a 3-connection pool:
+    // transactions for other accounts, started meanwhile, finish long before
+    // that queue drains — the queue waits in process, holding one connection.
+    const small = await createPostgresStore(url, { env: { ...process.env, PRI_DATABASE_POOL_MAX: '3' } });
+    try {
+      const startedAt = Date.now();
+      let hotOpen = 0;
+      let hotMaxOpen = 0;
+      const hot = Array.from({ length: 20 }, () => small.transaction(async tx => {
+        hotOpen++; hotMaxOpen = Math.max(hotMaxOpen, hotOpen);
+        await tx.get('SELECT 1');
+        await new Promise(resolve => setTimeout(resolve, 40));
+        hotOpen--;
+      }, { lock: 'pri.sync:hot-account', isolation: 'repeatable read' }).then(() => Date.now() - startedAt));
+      await new Promise(resolve => setTimeout(resolve, 20));
+      const cool = Array.from({ length: 5 }, (_, i) => small.transaction(async tx => tx.get('SELECT ? AS i', [i]), { lock: `pri.sync:cool-${i}`, isolation: 'repeatable read' })
+        .then(() => Date.now() - startedAt));
+      const plain = small.get('SELECT 1 AS n').then(() => Date.now() - startedAt);
+      const [hotTimes, coolTimes, plainTime] = await Promise.all([Promise.all(hot), Promise.all(cool), plain]);
+      const hotLast = Math.max(...hotTimes);
+      const coolLast = Math.max(...coolTimes, plainTime);
+      ok(hotLast >= 800, `the one account's 20 transactions ran one at a time (${hotLast} ms)`);
+      ok(coolLast < 400 && coolLast < hotLast / 2, `other accounts and plain queries are not starved behind them (done by ${coolLast} ms of ${hotLast} ms)`);
+      eq(hotMaxOpen, 1, 'and the account never had two transactions open at once');
+    } finally {
+      await small.close();
+    }
+
     const tight = await createPostgresStore(url, { env: {
       ...process.env, PRI_DATABASE_STATEMENT_TIMEOUT_MS: '1200', PRI_DATABASE_IDLE_TX_TIMEOUT_MS: '1000', PRI_DATABASE_POOL_MAX: '3'
     } });

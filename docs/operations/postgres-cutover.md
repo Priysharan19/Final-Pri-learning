@@ -21,17 +21,18 @@ printed):
 | Requirement | Enforced by | Error code |
 |---|---|---|
 | URL is `postgres://` / `postgresql://` with a host | `config.js` | `PLATFORM_DB_URL_INVALID` |
-| **Production:** `sslmode=verify-full` (preferred) or `sslmode=require` | `config.js postgresConnectionSettings` | `PLATFORM_DB_TLS_REQUIRED` |
+| **Production:** verified TLS — `sslmode=verify-full` (preferred), or `sslmode=require` **with** `PRI_DATABASE_SSL_ROOT_CERT` | `config.js postgresConnectionSettings` | `PLATFORM_DB_TLS_REQUIRED` (no/weak sslmode) / `PLATFORM_DB_TLS_UNVERIFIED` (`require` without the CA) |
 | No `sslrootcert`/`sslcert`/`sslkey`/`ssl=` in the URL (CA goes in `PRI_DATABASE_SSL_ROOT_CERT`) | same | `PLATFORM_DB_TLS_INVALID` |
 | Reachable, migrated (`platform_meta.schema_version` present) | `store.js createPostgresStore` | `PLATFORM_DB_UNAVAILABLE` / `PLATFORM_DB_NOT_MIGRATED` |
-| `schema_version` = 6 and `billing_schema_version` = 3 exactly (`server/platform/schemaVersions.js`) | `store.js assertSchemaVersions` | `PLATFORM_DB_SCHEMA_MISMATCH` |
+| `schema_version` = 7 and `billing_schema_version` = 3 exactly (`server/platform/schemaVersions.js`) | `store.js assertSchemaVersions` | `PLATFORM_DB_SCHEMA_MISMATCH` |
 | `pri.sync_cursor_seq` exists (migration `20261002000000`) | same | `PLATFORM_DB_SCHEMA_MISMATCH` |
-| Timeouts/pool size parse as whole numbers in range | `config.js postgresSessionLimits` | `PLATFORM_DB_CONFIG_INVALID` |
+| Timeouts, lock wait and pool size parse as whole numbers in range | `config.js postgresSessionLimits` | `PLATFORM_DB_CONFIG_INVALID` |
 
 ### Connection: session mode only
 
 The server holds one connection per transaction, takes **session-level advisory locks**
-(per-account sync lock), runs **SERIALIZABLE / REPEATABLE READ** transactions across several
+(per-account sync lock, with `pg_try_advisory_lock`; waiters for the same account queue inside
+the server process without holding a connection), runs **SERIALIZABLE / REPEATABLE READ** transactions across several
 statements and issues **`SET`** for `search_path`, `statement_timeout` and
 `idle_in_transaction_session_timeout` once per connection. All of that needs a real session.
 
@@ -50,20 +51,29 @@ and turned into an explicit `ssl` option:
 | `sslmode` | Production | Encrypted | Certificate verified |
 |---|---|---|---|
 | `verify-full` | allowed (**use this**) | yes | yes — chain and host name; against `PRI_DATABASE_SSL_ROOT_CERT` if set, else the system trust store |
-| `require` | allowed | yes | only if `PRI_DATABASE_SSL_ROOT_CERT` is set; otherwise **not verified** (libpq semantics) |
+| `require` + `PRI_DATABASE_SSL_ROOT_CERT` | allowed | yes | yes — chain and host name against that CA |
+| `require` without the CA | **refused** (`PLATFORM_DB_TLS_UNVERIFIED`); allowed outside production only | yes | **no** — encrypted but unauthenticated (libpq semantics), open to an active man-in-the-middle |
 | absent / `disable` / `allow` / `prefer` | **refused** | — | — |
 | `verify-ca` | refused everywhere | — | — |
 
-Set `PRI_DATABASE_SSL_ROOT_CERT` to the **PEM text** of Supabase's server root certificate
-(Dashboard → Project Settings → Database → SSL Configuration → *Download certificate*). Railway
-variables are text, so paste the PEM itself (newlines included), not a file path.
+**Getting the Supabase CA certificate.** In the Supabase dashboard for the project: *Project
+Settings → Database → SSL Configuration → Download certificate*. The file (named like
+`prod-ca-2021.crt`) is a PEM certificate: it starts with `-----BEGIN CERTIFICATE-----`. Check it
+before use, on the operator's machine:
+
+```bash
+openssl x509 -in ~/Downloads/prod-ca-2021.crt -noout -subject -issuer -enddate
+```
+
+Set `PRI_DATABASE_SSL_ROOT_CERT` to the **PEM text** of that file. Railway variables are text, so
+paste the whole PEM (BEGIN/END lines and newlines included), not a file path. It is a public
+certificate, not a secret, but it is what makes the connection authenticated: without it (or
+`verify-full` against the system store) production will not boot.
 
 > **To confirm on staging (§4.3), not assumed:** that `verify-full` with that CA succeeds
 > against the host name actually used (direct host vs. pooler host). If it does not, record the
-> exact TLS error in the cutover log. `sslmode=require` with `PRI_DATABASE_SSL_ROOT_CERT` set
-> still verifies the chain and host name; `require` *without* the CA is encrypted but
-> unauthenticated (open to an active man-in-the-middle) and must not go to production without
-> an explicit, written owner decision.
+> exact TLS error in the cutover log and stop; do not fall back to unverified TLS — production
+> refuses it (`PLATFORM_DB_TLS_UNVERIFIED`).
 
 Also turn on **Enforce SSL on incoming connections** in the Supabase database settings so the
 server side refuses plaintext as well.
@@ -74,6 +84,7 @@ server side refuses plaintext as well.
 |---|---|---|---|
 | `PRI_DATABASE_STATEMENT_TIMEOUT_MS` | 15000 | 1000–600000 | Any statement, **including a wait for a row or advisory lock**, is cancelled after this. Answered as `503 PLATFORM_DB_TIMEOUT` + `Retry-After: 2`. |
 | `PRI_DATABASE_IDLE_TX_TIMEOUT_MS` | 30000 | 1000–3600000 | A session idle inside an open transaction is ended by Postgres; the request gets `503 PLATFORM_DB_TIMEOUT`, the connection is discarded. |
+| `PRI_DATABASE_LOCK_WAIT_MS` | 5000 | 100–60000 | How long a push may wait for its account's lock (queued in process, then `pg_try_advisory_lock` if another instance holds it) before `503 PLATFORM_DB_BUSY` + `Retry-After: 1`. One account's burst holds at most one connection per instance. |
 | `PRI_DATABASE_POOL_MAX` | 10 | 1–50 | Connections per server replica. `POOL_MAX × replicas` must stay **below** the session-mode pool size (or `max_connections` minus Supabase's reserved/dashboard connections for a direct connection). |
 
 Exhausted serialization retries and a pool that cannot hand out a connection within 10 s are
@@ -156,6 +167,7 @@ from pg_roles r where r.rolname = 'pri_app_staging';
 | `PRI_DATABASE_SSL_ROOT_CERT` | the Supabase root certificate PEM (§1, TLS) |
 | `PRI_DATABASE_STATEMENT_TIMEOUT_MS` | `15000` (or leave unset) |
 | `PRI_DATABASE_IDLE_TX_TIMEOUT_MS` | `30000` (or leave unset) |
+| `PRI_DATABASE_LOCK_WAIT_MS` | `5000` (or leave unset) |
 | `PRI_DATABASE_POOL_MAX` | `10` (see §1 sizing) |
 
 Mark `PRI_DATABASE_URL` as **sealed**. Remove `PRI_PLATFORM_DB` from the staging service: with
@@ -177,12 +189,14 @@ unset PRI_DATABASE_URL PRI_DATABASE_SSL_ROOT_CERT
 `server/tools/postgres-target-check.mjs` connects exactly as the server does and changes nothing
 that persists. It must print `POSTGRES TARGET: PASS` with every line ticked:
 
-* boot checks (TLS policy, `schema_version` 6 / `billing_schema_version` 3, cursor sequence);
+* boot checks (TLS policy, `schema_version` 7 / `billing_schema_version` 3, cursor sequence);
 * TLS negotiated (`pg_stat_ssl`), `statement_timeout` / `idle_in_transaction_session_timeout` applied;
 * login role is a `pri_server` member, not superuser, not BYPASSRLS;
 * the live schema gate — every table, column type, key, CHECK expression, index, RLS policy
   (`FOR ALL`, permissive, `true`/`true`), every privilege of `pri_server`, `anon` and
-  `authenticated`, the cursor sequence at `CACHE 1`;
+  `authenticated` (including that `pri_server` can only **read** `sync_cursors`), the cursor
+  sequence at `CACHE 1`;
+* the cursor sequence is at or above every cursor already in the database;
 * a write smoke inside a transaction that is rolled back.
 
 ### 4.3 What `npm run test:platform:pg` is — and is not — for
@@ -199,18 +213,37 @@ npm run test:platform:pg   # expect: PLATFORM ON POSTGRES: PASS — 24/24 suites
 
 Against staging itself, the equivalent evidence is §4.2 plus §4.4.
 
-### 4.4 Deploy and smoke
+### 4.4 Deploy and smoke — in this order
 
+0. **Order matters.** `db push` (§2) first, then the deploy, then the cursor lift below. From the
+   moment migration `20261002000000` commits, a server build from before it (if one is serving
+   this database) can no longer write `sync_cursors`: its pushes fail closed (500, nothing
+   written) instead of handing out stale cursors. Keep that window short.
 1. Redeploy the staging service. The boot log must show `platform_db_open { engine: 'postgres' }`;
    any `platform_db_unavailable {"code":…}` line means the variables or migrations are wrong —
    fix and redeploy, nothing has been written.
-2. `GET /v1/health` → `database.engine = "postgres"`, `schemaVersion = "6"`.
-3. Exercise the staging app end to end with **test accounts only**: register, verify email,
+2. `GET /v1/health` → `database.engine = "postgres"`, `schemaVersion = "7"`.
+3. **Once no instance of an older build is left** (after any overlapping deploy has drained),
+   re-run the cursor lift. It only ever raises the sequence, so it is safe to repeat, and it
+   covers a cursor an older build issued between its last read of `sync_cursors` and the
+   migration:
+
+   ```sql
+   select setval('pri.sync_cursor_seq', greatest(
+     (select case when is_called then last_value else last_value - 1 end from pri.sync_cursor_seq),
+     (select value from pri.sync_cursors where id = 1),
+     coalesce((select max(server_cursor) from pri.learning_events), 0),
+     coalesce((select max(server_cursor) from pri.sync_entities), 0),
+     1), true);
+   ```
+
+   Then re-run §4.2: its "sequence at or above every cursor" line must be ticked.
+4. Exercise the staging app end to end with **test accounts only**: register, verify email,
    sign in, sync from two devices (push from one, pull on the other), a teacher class and
    assignment, account export and deletion. Record what was done and the result in the cutover
    log. Synthetic/test evidence only — it is not student evidence.
-4. Watch the service logs for `platform_error` with `PLATFORM_DB_BUSY` / `PLATFORM_DB_TIMEOUT`
-   and Supabase's *Database → Query performance* for long waits on `pg_advisory_lock`.
+5. Watch the service logs for `platform_error` with `PLATFORM_DB_BUSY` / `PLATFORM_DB_TIMEOUT`
+   and Supabase's *Database → Query performance* for slow statements.
 
 ### 4.5 Staging is clean when
 
@@ -240,24 +273,37 @@ cutover do not exist in the SQLite file. So after real traffic:
   build disagree. Deploy the build that matches the database, or apply the missing migration —
   do not edit `platform_meta` by hand to make the error go away.
 * **Rolling back the application build** is safe only to a build with the same
-  `SCHEMA_VERSION` / `BILLING_SCHEMA_VERSION`; an older build refuses to boot (by design).
+  `SCHEMA_VERSION` / `BILLING_SCHEMA_VERSION` (7 / 3). Builds with the version check refuse a
+  database at any other version. Builds from **before** that check (the #247-era driver) only
+  check that a `schema_version` exists, so they **do boot** against this database — but they
+  allocate sync cursors from `pri.sync_cursors`, on which `pri_server` no longer has `UPDATE`:
+  every sync push they attempt fails (500, nothing written). Do not roll back to such a build;
+  it is not a working rollback target. If one ran anyway, re-run the cursor lift (§4.4 step 3)
+  after the newer build is back.
 * **Restoring data** means restoring the Supabase backup (§6) or PITR to a point before the
   incident — a destructive, owner-approved operation that discards later writes.
 
 ### 5.3 Undoing migration `20261002000000_sync_cursor_sequence`
 
-Only if a build that predates it must run against the database: that build allocates from
-`pri.sync_cursors`, so first move the row above every cursor already handed out:
+Only if a build that predates it must serve the database again — an owner-approved, deliberate
+step, because it reopens the row allocator. In one transaction, as `postgres`, with **no**
+current build running (otherwise both allocators would issue cursors):
 
 ```sql
+begin;
+lock table pri.sync_cursors in exclusive mode;
 update pri.sync_cursors
-   set value = greatest(value, (select coalesce(last_value, 0) from pri.sync_cursor_seq))
+   set value = greatest(value,
+         (select case when is_called then last_value else last_value - 1 end from pri.sync_cursor_seq))
  where id = 1;
+grant update on pri.sync_cursors to pri_server;
+update pri.platform_meta set value = '6' where key = 'schema_version';
+commit;
 ```
 
-Leave the sequence in place; the older build ignores it. (Forward again: the newer build reads
-the sequence, and the migration's `setval` logic can be re-run by hand to lift the sequence above
-the row's value if the older build issued cursors in between.)
+Leave the sequence in place; the older build ignores it. Going forward again is a new migration
+(never an edit of `20261002000000`) that repeats its lock / lift / revoke / `schema_version = 7`
+steps, followed by the cursor lift in §4.4 step 3.
 
 ### 5.4 Production
 

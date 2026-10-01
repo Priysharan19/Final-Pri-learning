@@ -65,6 +65,14 @@ try {
     record(failures.length === 0, `live schema gate: ${schema.checks + access.checks - failures.length}/${schema.checks + access.checks} catalog checks${failures.length ? `\n      · ${failures.slice(0, 20).join('\n      · ')}` : ''}`);
     const sequence = (await client.query(`SELECT cache_size, increment_by, cycle FROM pg_sequences WHERE schemaname = 'pri' AND sequencename = 'sync_cursor_seq'`)).rows[0];
     record(sequence && Number(sequence.cache_size) === 1 && Number(sequence.increment_by) === 1 && sequence.cycle === false, 'sync_cursor_seq is CACHE 1, INCREMENT 1, NO CYCLE');
+    // No cursor at or above the sequence may already exist: one issued by a
+    // build that still allocated from sync_cursors would be skipped by pulls.
+    const high = (await client.query(`SELECT
+        (SELECT CASE WHEN is_called THEN last_value ELSE last_value - 1 END FROM pri.sync_cursor_seq) AS issued,
+        GREATEST((SELECT value FROM pri.sync_cursors WHERE id = 1),
+                 COALESCE((SELECT MAX(server_cursor) FROM pri.learning_events), 0),
+                 COALESCE((SELECT MAX(server_cursor) FROM pri.sync_entities), 0)) AS seen`)).rows[0];
+    record(Number(high.issued) >= Number(high.seen), `sync_cursor_seq is at or above every cursor already in the database (sequence ${high.issued}, highest seen ${high.seen})`);
   } finally {
     client.release();
   }

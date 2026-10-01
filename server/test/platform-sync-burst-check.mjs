@@ -23,14 +23,20 @@
 //      cursor. A transaction for another account is not held up. And the
 //      control: the same interleaving WITHOUT the lock really does make a pull
 //      skip a row — the hazard the lock exists for.
-//   4. OVERLOAD IS A 503 (Postgres). A push stuck behind its account's lock past
-//      statement_timeout answers 503 + Retry-After + PLATFORM_DB_TIMEOUT, not 500.
+//   4. OVERLOAD IS A 503 (Postgres). A push whose account lock is held by
+//      another instance past PRI_DATABASE_LOCK_WAIT_MS answers 503 +
+//      Retry-After + PLATFORM_DB_BUSY, not 500, and well before statement_timeout.
+//   5. ONE ACCOUNT CANNOT STARVE THE POOL. 20 concurrent pushes from one account
+//      on the default 10-connection pool, while other accounts push and pull:
+//      everyone is answered, and the other accounts are not held behind it.
+//   6. THE PUSH ACKNOWLEDGEMENT TELLS AN ACCOUNT ONLY ABOUT ITSELF: its cursor is
+//      that push's own highest cursor, never the global allocator.
 // ─────────────────────────────────────────────────────────────────────────────
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-const envNames = ['NODE_ENV', 'PRI_PUBLIC_ORIGIN', 'PRI_PLATFORM_DB', 'PRI_AUTH_DELIVERY_KEY', 'PRI_DATABASE_STATEMENT_TIMEOUT_MS', 'PRI_DATABASE_POOL_MAX'];
+const envNames = ['NODE_ENV', 'PRI_PUBLIC_ORIGIN', 'PRI_PLATFORM_DB', 'PRI_AUTH_DELIVERY_KEY', 'PRI_DATABASE_STATEMENT_TIMEOUT_MS', 'PRI_DATABASE_POOL_MAX', 'PRI_DATABASE_LOCK_WAIT_MS'];
 const prior = Object.fromEntries(envNames.map(name => [name, process.env[name]]));
 const scratch = mkdtempSync(join(tmpdir(), 'pri-sync-burst-'));
 process.env.NODE_ENV = 'test';
@@ -256,7 +262,7 @@ try {
 
 // ── 4 · Overload is a 503 with Retry-After, never a 500 (Postgres) ──────────
 if (engine === 'postgres') {
-  process.env.PRI_DATABASE_STATEMENT_TIMEOUT_MS = '1500';
+  process.env.PRI_DATABASE_LOCK_WAIT_MS = '1500';
   const slowApp = await startApp({ engine });
   try {
     const account = await registerVerified(slowApp, 0, 'stuck');
@@ -266,12 +272,15 @@ if (engine === 'postgres') {
     await holder.connect();
     try {
       await holder.query('SELECT pg_advisory_lock(hashtextextended($1, 0))', [syncLockKey(account.id)]);
+      const t0 = Date.now();
       const stuck = await slowApp.request('/v1/sync/push', {
         method: 'POST', jar: account.jar, headers: { 'Idempotency-Key': 'stuck-1' }, body: pushBody(account, 0)
       });
-      c.eq(stuck.status, 503, `a push that cannot get its account's lock within statement_timeout answers 503 (${stuck.status} ${stuck.text.slice(0, 120)})`);
-      c.eq(stuck.headers.get('retry-after'), '2', 'with Retry-After');
-      c.eq(stuck.data?.error?.code, 'PLATFORM_DB_TIMEOUT', 'and the coded error PLATFORM_DB_TIMEOUT');
+      const waited = Date.now() - t0;
+      c.eq(stuck.status, 503, `a push whose account lock another instance holds answers 503 (${stuck.status} ${stuck.text.slice(0, 120)})`);
+      c.ok(waited >= 1400 && waited < 5000, `after the bounded lock wait, not statement_timeout (${waited} ms)`);
+      c.eq(stuck.headers.get('retry-after'), '1', 'with Retry-After');
+      c.eq(stuck.data?.error?.code, 'PLATFORM_DB_BUSY', 'and the coded error PLATFORM_DB_BUSY');
       c.eq(stuck.data?.error?.retryable, true, 'marked retryable');
       await holder.query('SELECT pg_advisory_unlock(hashtextextended($1, 0))', [syncLockKey(account.id)]);
       const resent = await slowApp.request('/v1/sync/push', {
@@ -287,10 +296,59 @@ if (engine === 'postgres') {
   }
 }
 
+// ── 5 · One account's burst does not starve the pool ───────────────────────
+// ── 6 · The push acknowledgement is account-scoped ─────────────────────────
+delete process.env.PRI_DATABASE_LOCK_WAIT_MS;
+process.env.PRI_DATABASE_POOL_MAX = '10';
+{
+  const app = await startApp({ engine });
+  try {
+    const hot = await registerVerified(app, 0, 'hot');
+    const others = [];
+    for (let i = 0; i < 6; i++) others.push(await registerVerified(app, i, 'cool'));
+    await app.db.run('DELETE FROM rate_limits');
+    const HOT = 20;
+    const timeOf = async fn => { const t = Date.now(); const r = await fn(); return { r, ms: Date.now() - t, end: Date.now() }; };
+    const hotJobs = Array.from({ length: HOT }, (_, p) => timeOf(() => send(app, '/v1/sync/push', {
+      method: 'POST', jar: hot.jar, headers: { 'Idempotency-Key': `hot-${p}` }, body: pushBody(hot, p)
+    })));
+    await sleep(10);
+    const otherJobs = others.flatMap((account, i) => [
+      timeOf(() => send(app, '/v1/sync/push', { method: 'POST', jar: account.jar, headers: { 'Idempotency-Key': `cool-${i}` }, body: pushBody(account, 0) })),
+      timeOf(() => send(app, '/v1/sync/pull/0', { jar: account.jar }))
+    ]);
+    const [hotDone, otherDone] = await Promise.all([Promise.all(hotJobs), Promise.all(otherJobs)]);
+    c.ok(hotDone.every(x => x.r.status === 200), `all ${HOT} concurrent pushes from one account succeed on a 10-connection pool (${hotDone.map(x => x.r.status).filter(s => s !== 200).join(',') || 'all 200'})`);
+    c.ok(otherDone.every(x => x.r.status === 200), 'every other account\'s push and pull, sent meanwhile, succeeds');
+    const hotEnd = Math.max(...hotDone.map(x => x.end));
+    const otherEnd = Math.max(...otherDone.map(x => x.end));
+    if (engine === 'postgres') {
+      c.ok(otherEnd < hotEnd, `other accounts finish before the one account's queue drains (others ${Math.max(...otherDone.map(x => x.ms))} ms, hot account ${Math.max(...hotDone.map(x => x.ms))} ms)`);
+    }
+    c.eq(Number((await app.db.get('SELECT COUNT(*) AS n FROM learning_events WHERE account_id=?', [hot.id])).n), HOT * EVENTS_PER_PUSH, 'every one of the hot account\'s events is stored once');
+
+    // 6 · Its acknowledgement names its own cursor only.
+    const own = hotDone.map(x => x.r.data);
+    c.ok(own.every(ack => ack.cursor === Math.max(...ack.acceptedEvents.map(e => e.serverCursor), ...ack.acceptedEntities.map(e => e.serverCursor))),
+      'each push acknowledgement carries that push\'s own highest cursor');
+    const first = pushBody(others[0], 0);
+    const replay = await send(app, '/v1/sync/push', { method: 'POST', jar: others[0].jar, headers: { 'Idempotency-Key': 'cool-replay' }, body: { ...first, entities: [] } });
+    const replayedCursors = replay.data.acceptedEvents.map(e => e.serverCursor);
+    const globalHigh = Number((await app.db.get(`SELECT MAX(c) AS c FROM (SELECT server_cursor AS c FROM learning_events UNION ALL SELECT server_cursor AS c FROM sync_entities) t`)).c);
+    c.ok(replay.status === 200 && replay.data.acceptedEvents.every(e => e.replayed) && replay.data.cursor === Math.max(...replayedCursors),
+      'a push of already-committed events acknowledges their own cursors');
+    c.ok(replay.data.cursor < globalHigh, `and does not reveal how far other accounts have synced (${replay.data.cursor} < global ${globalHigh})`);
+    const empty = await send(app, '/v1/sync/push', { method: 'POST', jar: others[1].jar, headers: { 'Idempotency-Key': 'cool-empty' }, body: { schemaVersion: 1, deviceId: others[1].deviceId, events: [], entities: [] } });
+    c.ok(empty.status === 200 && empty.data.cursor === 0, 'an empty push acknowledges cursor 0, not the global allocator');
+  } finally {
+    await app.close();
+  }
+}
+
 for (const name of envNames) {
   if (prior[name] === undefined) delete process.env[name];
   else process.env[name] = prior[name];
 }
 rmSync(scratch, { recursive: true, force: true });
 console.log(`engine: ${engine}`);
-console.log(`PLATFORM SYNC BURST: PASS — ${c.count()}/${c.count()} checks — ${ACCOUNTS * PUSHES_PER_ACCOUNT} concurrent pushes: no 500s, every overload a coded 503 with Retry-After, every change stored once and seen by devices pulling mid-burst; per-account cursors follow commit order on ${engine}.`);
+console.log(`PLATFORM SYNC BURST: PASS — ${c.count()}/${c.count()} checks — ${ACCOUNTS * PUSHES_PER_ACCOUNT} concurrent pushes: no 500s, every overload a coded 503 with Retry-After, every change stored once and seen by devices pulling mid-burst; per-account cursors follow commit order; one account cannot starve the pool; acknowledgements are account-scoped on ${engine}.`);

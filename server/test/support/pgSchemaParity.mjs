@@ -34,6 +34,8 @@ const POSTGRES_INTEGER = new Set([
 const POSTGRES_ONLY_CHECKS = new Set(['accounts.email']); // email = lower(email): SQLite folds with COLLATE NOCASE
 // …and exactly what each of them says.
 const POSTGRES_ONLY_CHECK_EXPRESSIONS = new Map([['accounts', ['email=loweremail']]]);
+// Tables the server may read but never write on Postgres.
+const SERVER_READ_ONLY = new Set(['sync_cursors']);
 const POLICY_COMMANDS = { r: 'SELECT', a: 'INSERT', w: 'UPDATE', d: 'DELETE', '*': 'ALL' };
 
 // The only identity column. learning_events.server_cursor is AUTOINCREMENT on
@@ -317,7 +319,12 @@ export async function compareAccess(client, schema = 'pri') {
     check(!(await has('SELECT has_schema_privilege($1, $2, \'CREATE\') AS ok', ['pri_server', schema])), 'pri_server cannot CREATE in the schema');
     for (const table of tables) {
       for (const privilege of ['SELECT', 'INSERT', 'UPDATE', 'DELETE']) {
-        check(await has('SELECT has_table_privilege($1, $2, $3) AS ok', ['pri_server', `${schema}.${table}`, privilege]), `pri_server lacks ${privilege} on ${table}`);
+        const held = await has('SELECT has_table_privilege($1, $2, $3) AS ok', ['pri_server', `${schema}.${table}`, privilege]);
+        // sync_cursors is read-only to the server on Postgres: a build that
+        // still allocates from it must fail closed, not issue stale cursors
+        // (supabase/migrations/20261002000000_sync_cursor_sequence.sql).
+        if (SERVER_READ_ONLY.has(table) && privilege !== 'SELECT') check(!held, `pri_server can ${privilege} ${table}, which must be read-only to it`);
+        else check(held, `pri_server lacks ${privilege} on ${table}`);
       }
       check(!(await has('SELECT has_table_privilege($1, $2, \'TRUNCATE\') AS ok', ['pri_server', `${schema}.${table}`])), `pri_server has TRUNCATE on ${table}`);
     }

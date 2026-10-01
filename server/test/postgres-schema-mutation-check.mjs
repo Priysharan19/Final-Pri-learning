@@ -113,6 +113,16 @@ const MUTATIONS = [
     expect: /sync_cursor_seq has CACHE 1/
   },
   {
+    label: 'a later migration gives pri_server back UPDATE on sync_cursors',
+    migrations: laterMigration('grant update on pri.sync_cursors to pri_server;'),
+    expect: /pri_server can UPDATE sync_cursors, which must be read-only to it/
+  },
+  {
+    label: 'schema_version left at 6 by the sequence migration',
+    migrations: [...original.slice(0, -1), { ...original[original.length - 1], sql: replaceOnce(original[original.length - 1].sql, "update pri.platform_meta set value = '7' where key = 'schema_version';", '') }],
+    expect: /platform_meta\.schema_version is 7/
+  },
+  {
     label: 'the sync cursor sequence is dropped',
     migrations: laterMigration('drop sequence pri.sync_cursor_seq;'),
     expect: /sync_cursor_seq exists/

@@ -565,7 +565,7 @@ export async function nextSyncCursor(db, accountId) {
 
 /**
  * The highest sync cursor handed out so far, across all accounts (operators'
- * health view and the push acknowledgement). On Postgres the sequence is read
+ * health view only — never shown to an account). On Postgres the sequence is read
  * without consuming a value.
  */
 export async function currentSyncCursor(db) {
