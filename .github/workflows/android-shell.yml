@@ -82,6 +82,8 @@ jobs:
           - { api: 33, profile: pixel_6, expect: product }
           - { api: 36, profile: pixel_6, expect: product }
           - { api: 36, profile: pixel_tablet, expect: product }
+          # A foldable (inner display): MEDIUM/EXPANDED widths on a phone-class device.
+          - { api: 36, profile: pixel_fold, expect: product }
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
