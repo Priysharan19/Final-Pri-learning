@@ -20,7 +20,9 @@ This is the durable ledger for CP-02 → CP-12 and SEC-COMM-01. Each CP's own PR
 | CP-01 Architecture audit | COMPLETE | `421f1ff1` | `1291d4bd` | [#250](https://github.com/Priysharan19/Final-Pri-learning/pull/250) | `fa1c44df` | n/a (audit) |
 | CP-02 Platform Bridge Foundation | SOFTWARE IMPLEMENTATION: COMPLETE | `fa1c44df` | `f089d550` | [#253](https://github.com/Priysharan19/Final-Pri-learning/pull/253) | `2261f03b` | DEFERRED |
 | CP-03 Responsive Product Foundation | SOFTWARE IMPLEMENTATION: COMPLETE | `2261f03b` | `6b9235a0` | [#261](https://github.com/Priysharan19/Final-Pri-learning/pull/261) | `003cc053` | DEFERRED |
-| CP-04 iPhone Product | SOFTWARE IMPLEMENTATION: COMPLETE once merged | `003cc053` | recorded by the next CP | this PR | recorded by the next CP | DEFERRED |
+| CP-04 iPhone Product | SOFTWARE IMPLEMENTATION: COMPLETE | `003cc053` | `09d868b6` | [#266](https://github.com/Priysharan19/Final-Pri-learning/pull/266) | `3ed4f9c4` | DEFERRED |
+| CP-05 iPhone Automated Certification | SOFTWARE IMPLEMENTATION: COMPLETE | `3ed4f9c4` | `1820d32c` | [#273](https://github.com/Priysharan19/Final-Pri-learning/pull/273) | `247f12c2` | DEFERRED |
+| CP-06 Android Shell | SOFTWARE IMPLEMENTATION: COMPLETE once merged | `247f12c2` | recorded by the next CP | this PR | recorded by the next CP | DEFERRED |
 
 ## CP-02 — Platform Bridge Foundation
 
@@ -160,3 +162,82 @@ This is the durable ledger for CP-02 → CP-12 and SEC-COMM-01. Each CP's own PR
 
 **Deferred (physical):** finger writing feel on a real iPhone, VoiceOver, and real Dynamic Type sizes on hardware. Also an iPad + Apple Pencil smoke test, because the Swift ink and shell code changed.
 
+**CP-04 exact-head evidence (recorded by CP-05):**
+- Candidate `09d868b6`. `main` was merged in three times during review because parallel work kept landing. Only the generated iOS bundles conflicted; they were rebuilt from the committed tree and resynced.
+- GitHub CI on the candidate: all four required checks pass. 25 checks passed, 3 were skipped (path-filtered), and the Swift job (not required) was still running at merge time.
+- **Swift build, native benchmark and bridge smoke test** (macOS runner, not a required check) failed on the earlier CP-04 heads in both trigger runs, from the simulator rather than a product assertion:
+  - the pull-request run: `simctl launch` → `FBSOpenApplicationServiceErrorDomain code=1`;
+  - the push run: the app launched, but the bridge self-check logged no summary within its window.
+  - It was re-run once, which is the infrastructure allowance. CP-05 adds a launch retry to both harnesses, and **CP-05's own CI must show that job green**. It is not waived.
+- Merged as `3ed4f9c4` with `--match-head-commit`.
+
+## CP-05 — iPhone Automated Certification
+
+**Delivered:** the full results are in [IPHONE_GAP_REPORT.md](IPHONE_GAP_REPORT.md) §6. In summary:
+- `scripts/iphone-journey.mjs --cloud --dynamic-type --lifecycle --a11y` drives the real app in the real WKWebView. The cloud phases run against the **real server** on a throwaway database, through `scripts/cloud-fixture-server.mjs` (fixture accounts only; the credentials pass through `SIMCTL_CHILD_` environment variables and are never logged). Steps covered:
+  - sign-up, then login;
+  - sign-in, sync, then session kept across a relaunch;
+  - logout, with server-side proof from the fixture server's log;
+  - account deletion, with the server refusing that account afterwards;
+  - typed attempt → feedback → next;
+  - finger-default native ink and native photo OCR, both programmatic;
+  - offline practice, with sync not offered;
+  - reconnect sync;
+  - background → foreground keeps a draft;
+  - relaunch persistence;
+  - a DOM-level accessibility smoke check;
+  - Dynamic Type at the largest accessibility size with no sideways overflow.
+- Every run writes a `SYNTHETIC_SIMULATOR` evidence record with `physicalDevice: false`. `native-ink.yml` runs the full journey and uploads the records.
+- **Product bugs found and fixed:**
+  1. CP-04's Dynamic Type used `pageZoom`, which magnifies without reflowing and clipped the iPhone page. It now goes through the viewport (width ÷ capped scale) at document start. Ink placement uses `pageZoom × zoomScale` and is re-placed on zoom changes. Width rules that used `vw` now use `%`.
+  2. The account label read "sign-in required" when the server was simply unreachable. It now distinguishes `Linked · offline`, `Linked · cloud unavailable`, `Linked · sign-in required` (401 only) and `Linked · checking…`.
+  3. Every successful Sync or refresh dropped a connected account back to "sign-in required" (pre-existing). It now stays connected.
+- Both harnesses retry the launch when the simulator's SpringBoard is not ready.
+
+**Simulator evidence (S2, synthetic, 2026-10-02 local):** iPhone 18 Pro, iOS 27.0: **28/28** journey steps. iPad Pro 13-inch (M5): **16/16**. Bridge self-check 8/8 on both. The records are `docs/release/evidence/cp05/journey-{iphone,ipad}.local.json`.
+
+**Not automated (stated, not hidden):**
+- StoreKit Testing / restore: `SKTestSession` needs an XCTest target, which the SwiftPM app package does not have. That is a tooling gap. Sandbox purchases are **BLOCKED_EXTERNAL**.
+- XCUITest `performAccessibilityAudit`: same reason.
+- Live ink placement at large text sizes.
+
+**Deferred (physical):** small, standard and large iPhones; finger writing feel; camera; keyboard; VoiceOver; Dynamic Type on hardware; StoreKit sandbox; process death under real memory pressure; launch performance.
+
+**CP-05 exact-head evidence (recorded by CP-06):**
+- Candidate `1820d32c`, after merging `main` (#262 observability and others). The account-state strings were moved into i18n (en + hi) during that merge.
+- Local: `npm test` exit 0 on the merged tree.
+- GitHub CI on `1820d32c`: all four required checks pass, with 19 checks passing in total.
+- Merged as `247f12c2` with `--match-head-commit`. The merge automation waits only for the required checks, so it merged while **Swift build, native benchmark and bridge smoke test** (macOS simulator, not required) was still running. Its result is recorded by CP-07. If it fails, it is fixed in a follow-up and not waived.
+
+
+## CP-06 — Android Shell
+
+**Delivered:** `android/`, a Kotlin shell around one WebView serving the **same** shared web build. [ANDROID_ARCHITECTURE.md](ANDROID_ARCHITECTURE.md) is the authority.
+- **Stable origin:** `https://appassets.androidplatform.net` through `WebViewAssetLoader` (HTTP disabled), with an SPA fallback and local 404s. `/v1/*` never maps to the SPA. Any other form of the bundled host (another port, userinfo, http) is answered locally, never by the network.
+- **Hardened WebView:** no file/content access, no mixed content, Safe Browsing, no multiple windows, no geolocation, debugging only in DEBUG, algorithmic darkening off. Fails closed below Chromium 91, or without `WEB_MESSAGE_LISTENER` / `DOCUMENT_START_SCRIPT`.
+- **Bridge:** `priBridge` is an origin-scoped `addWebMessageListener` with a main-frame check, never `addJavascriptInterface`. The deep-frozen, non-configurable `__PRI_HOST__` is installed at document start for the bundled origin only. It carries capabilities, never OS identity.
+- **Navigation:** only the exact bundled origin loads in-app. http(s)/mailto leave the app only for a main-frame navigation the person started; everything else is blocked.
+- **Back:** the page declares whether it wants Back: a visible sheet/dialog, or in-app history (`history.state.idx > 0`). The callback is enabled exactly then; otherwise the system default runs (predictive back-to-home). A press that finds a dialog open never also navigates. The role landing (`/`, `/teach`) is the first entry, so Back there leaves the app.
+- **Lifecycle and layout:** edge-to-edge letterbox insets with light bar icons. Rotation, fold and multi-window are handled without recreation. Lifecycle events go to the page.
+- **Renderer crashes:** recovery destroys the dead WebView, is rate-limited, and shows a native screen after repeated crashes.
+- **Dialogs and release identity:** `alert`/`confirm` get real native dialogs. The bundled release identity is exposed.
+- **Build:** Gradle 9.3.1 (pinned SHA-256), AGP 8.12.3, Kotlin 2.1.20, webkit 1.17.1, JDK 17. Release builds require `-Ppri.versionCode`. `pri.cloudOrigin` is validated at build time. `verifyPriWeb` cannot be skipped as NO-SOURCE.
+- **Embedded web:** `scripts/sync-android.mjs --check` proves the embedded web is exactly `client/dist`.
+
+**Evidence (S0/S2, synthetic):**
+- JVM: `ShellLogicTest` 10/10 (origin, SPA mapping, traversal, navigation policy incl. port/userinfo/gesture, WebView floor, envelope, descriptor).
+- Instrumented journey (`android/scripts/run-instrumented.sh`), with a **real process death** (`am force-stop`) between two runs. Covered:
+  - boot and handshake;
+  - onboarding into a local profile;
+  - SPA routing and history Back;
+  - Back closing the More sheet before navigating;
+  - rotation keeping a typed answer;
+  - blocked schemes;
+  - a tapped external link leaving the app while a scripted redirect launches nothing;
+  - Back on the landing entry leaving the app;
+  - after process death, the profile (IndexedDB) and localStorage survived.
+- Local: passed on the API 36 phone emulator (2026-10-02).
+- CI matrix (`android-shell.yml`): API 26 asserts the fail-closed floor screen (its factory WebView is below Chromium 91). API 33 and API 36 phone, and API 36 tablet, run the product journey.
+- Independent review requested changes; all were applied: the Back trap at `/teach`; the double action on a stubborn dialog; the skippable web check; API 26 evidence that overstated what it proved; process death not proven; renderer-crash loop; reset race; system Back; bar icons; navigation-policy gaps; observer cost.
+
+**Deferred (physical):** a low-end phone boot smoke test, real Back gestures and predictive animation, OEM WebView variants, and foldable posture changes.

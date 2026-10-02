@@ -264,12 +264,26 @@ for (const copy of ['ios/PriLearning 2.swiftpm/WebShell.swift', 'ios/PriLearning
 
 // Android, once it exists, must use an origin-scoped bridge and a stable origin.
 if (existsSync(at('android'))) {
-  const kotlin = walk(at('android'), n => /\.(kt|kts|java)$/.test(n)).map(f => stripComments(readFileSync(f, 'utf8'))).join('\n');
+  // Production sources only: test code may mention anything.
+  const kotlin = walk(at('android'), n => /\.(kt|kts|java)$/.test(n))
+    .filter(f => !/\/src\/(test|androidTest)\//.test(posix(f)))
+    .map(f => stripComments(readFileSync(f, 'utf8'))).join('\n');
   ok(!/addJavascriptInterface\s*\(/.test(kotlin), 'the Android shell never uses addJavascriptInterface');
   ok(!/(allowUniversalAccessFromFileURLs|allowFileAccessFromFileURLs|setAllowUniversalAccessFromFileURLs|setAllowFileAccessFromFileURLs)\s*(=|\()\s*true/.test(kotlin),
     'nor grants file:// pages universal or file access');
   if (/\bWebView\b/.test(kotlin)) {
     ok(/["']https:\/\/appassets\.androidplatform\.net/.test(kotlin), 'the Android shell serves the app from appassets.androidplatform.net');
+  }
+  const assetOriginPath = 'android/app/src/main/java/com/prilearning/app/shell/AssetOrigin.kt';
+  if (existsSync(at(assetOriginPath))) {
+    const assetOrigin = stripComments(read(assetOriginPath));
+    ok(/const val DOMAIN = "appassets\.androidplatform\.net"/.test(assetOrigin) &&
+      /const val ORIGIN = "https:\/\/appassets\.androidplatform\.net"/.test(assetOrigin),
+      'the Android data origin is pinned — changing it would orphan every student\'s IndexedDB data');
+    ok(/addWebMessageListener\(webView, "priBridge", origins\)/.test(kotlin) && /if \(!isMainFrame \|\| sourceOrigin/.test(kotlin),
+      'the Android bridge is origin-scoped and refuses non-main-frame senders');
+    ok(/allowFileAccess = false/.test(kotlin) && /allowContentAccess = false/.test(kotlin) && /MIXED_CONTENT_NEVER_ALLOW/.test(kotlin),
+      'the Android WebView is hardened (no file/content access, no mixed content)');
   }
 }
 
