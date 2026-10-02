@@ -304,6 +304,11 @@ export const cloud = Object.freeze({
   // a body that carries one.
   checkWorking: (prompt, lines, { signal = null, timeoutMs = 35000 } = {}) =>
     cloudRequest('/v1/working/check', { method: 'POST', body: { prompt, lines }, signal, timeoutMs }),
+  // The AI tutor is sent the verified solution it must stay grounded in — it
+  // is not a reader, and /v1/handwriting never receives one. Exam rows never
+  // reach here: the local backend refuses them first.
+  tutorHelp: (body, { signal = null, timeoutMs = 25000 } = {}) =>
+    cloudRequest('/v1/tutor/help', { method: 'POST', body, signal, timeoutMs }),
   deleteAccount: body => cloudRequest('/v1/account', { method: 'DELETE', body }),
   identities: () => cloudRequest('/v1/account/identity'),
   socialSignIn: (provider, body) => cloudRequest(`/v1/account/identity/${pathId(provider, 'provider')}/sign-in`, { method: 'POST', body }),
@@ -313,10 +318,19 @@ export const cloud = Object.freeze({
   entitlements: () => cloudRequest('/v1/entitlements'),
   billingConfig: () => cloudRequest('/v1/billing/config'),
   billingStatus: () => cloudRequest('/v1/billing/status'),
-  createWebBillingCheckout: cadence => cloudRequest('/v1/billing/checkout/web', { method: 'POST', body: { cadence } }),
+  // Web (Razorpay) checkout is never opened from a native shell: there the
+  // App Store is the only purchase path (PRI_V1_RELEASE_SCOPE §12). The server
+  // refuses it for native clients as well.
+  createWebBillingCheckout: cadence => (priNative.isNativeShell()
+    ? Promise.reject(Object.assign(new Error('Purchases in the app use the App Store.'), { code: 'BILLING_WEB_CHECKOUT_NATIVE_REFUSED' }))
+    : cloudRequest('/v1/billing/checkout/web', { method: 'POST', body: { cadence } })),
   appleBillingBootstrap: () => cloudRequest('/v1/billing/apple/bootstrap'),
   submitAppleTransaction: signedTransaction => cloudRequest('/v1/billing/apple/transaction', {
     method: 'POST', body: { signedTransaction: String(signedTransaction || '') }
+  }),
+  googleBillingBootstrap: () => cloudRequest('/v1/billing/google/bootstrap'),
+  submitGooglePurchase: purchaseToken => cloudRequest('/v1/billing/google/purchase', {
+    method: 'POST', body: { purchaseToken: String(purchaseToken || '') }
   }),
   restoreBilling: (provider, body = {}) => cloudRequest(`/v1/billing/restore/${pathId(provider, 'provider')}`, { method: 'POST', body }),
   // Cancel/manage contract (server: wp/server-commerce-classes). Web cancels at

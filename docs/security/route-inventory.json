@@ -110,6 +110,26 @@
     },
     {
       "method": "POST",
+      "path": "/v1/account/logout-all",
+      "auth": "session",
+      "roles": null,
+      "verifiedEmail": false,
+      "guardianConsent": false,
+      "ownership": "own account only: revokes every unrevoked session whose account id is the session account id, including the caller's; no id is taken from the request; another account's sessions are never touched",
+      "rateLimits": [
+        {
+          "key": "logout-all",
+          "limit": 10,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "POST",
       "path": "/v1/account/email/verification-request",
       "auth": "session",
       "roles": null,
@@ -583,13 +603,53 @@
       "bodyLimit": "1mb"
     },
     {
+      "method": "GET",
+      "path": "/v1/billing/google/bootstrap",
+      "auth": "session",
+      "roles": null,
+      "verifiedEmail": false,
+      "guardianConsent": true,
+      "ownership": "own account only: every query is keyed by the session account id; no id is taken from the request; obfuscatedAccountId is an opaque per-account value derived server-side",
+      "rateLimits": [
+        {
+          "key": "billing-google-bootstrap",
+          "limit": 60,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/billing/google/purchase",
+      "auth": "session",
+      "roles": null,
+      "verifiedEmail": false,
+      "guardianConsent": true,
+      "ownership": "own account only: every query is keyed by the session account id; the purchase token is re-fetched from Google and must carry this account's obfuscated id; a token bound to another account is refused",
+      "rateLimits": [
+        {
+          "key": "billing-google-purchase",
+          "limit": 30,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
       "method": "POST",
       "path": "/v1/billing/checkout/web",
       "auth": "session",
       "roles": null,
       "verifiedEmail": true,
       "guardianConsent": true,
-      "ownership": "own account only: every query is keyed by the session account id; no id is taken from the request",
+      "ownership": "own account only: every query is keyed by the session account id; no id is taken from the request; refused (403 BILLING_WEB_CHECKOUT_NATIVE_REFUSED) for a native-shell client (X-Pri-Client ios-native-v1 / android-native-v1): web purchase is never reachable in the iPad app",
       "rateLimits": [
         {
           "key": "billing-checkout-web",
@@ -648,7 +708,7 @@
       "auth": "session",
       "roles": null,
       "verifiedEmail": false,
-      "guardianConsent": false,
+      "guardianConsent": true,
       "ownership": "own account only: every query is keyed by the session account id; no id is taken from the request (teacher: classes they own; student: classes they are an active member of)",
       "rateLimits": [],
       "csrf": "not-applicable",
@@ -664,7 +724,7 @@
         "teacher"
       ],
       "verifiedEmail": true,
-      "guardianConsent": false,
+      "guardianConsent": true,
       "ownership": "class is owned by the creating teacher",
       "rateLimits": [
         {
@@ -687,7 +747,7 @@
         "teacher"
       ],
       "verifiedEmail": false,
-      "guardianConsent": false,
+      "guardianConsent": true,
       "ownership": "class owner (teacher) or admin; otherwise 404",
       "rateLimits": [],
       "csrf": "not-applicable",
@@ -703,7 +763,7 @@
         "teacher"
       ],
       "verifiedEmail": false,
-      "guardianConsent": false,
+      "guardianConsent": true,
       "ownership": "class owner (teacher) or admin; otherwise 404",
       "rateLimits": [
         {
@@ -726,7 +786,7 @@
         "teacher"
       ],
       "verifiedEmail": false,
-      "guardianConsent": false,
+      "guardianConsent": true,
       "ownership": "class owner (teacher) or admin; otherwise 404",
       "rateLimits": [],
       "csrf": "double-submit-when-session-cookie",
@@ -741,7 +801,7 @@
         "student"
       ],
       "verifiedEmail": false,
-      "guardianConsent": false,
+      "guardianConsent": true,
       "ownership": "student's own active membership only; otherwise 404",
       "rateLimits": [],
       "csrf": "double-submit-when-session-cookie",
@@ -756,7 +816,7 @@
         "student"
       ],
       "verifiedEmail": true,
-      "guardianConsent": false,
+      "guardianConsent": true,
       "ownership": "join code selects the class; membership written for the session student",
       "rateLimits": [
         {
@@ -776,7 +836,7 @@
       "auth": "session",
       "roles": null,
       "verifiedEmail": false,
-      "guardianConsent": false,
+      "guardianConsent": true,
       "ownership": "class owner, active member or admin; otherwise 404; a student sees only their own submission/feedback",
       "rateLimits": [],
       "csrf": "not-applicable",
@@ -792,7 +852,7 @@
         "teacher"
       ],
       "verifiedEmail": false,
-      "guardianConsent": false,
+      "guardianConsent": true,
       "ownership": "class owner (teacher) or admin; otherwise 404",
       "rateLimits": [],
       "csrf": "not-applicable",
@@ -808,7 +868,7 @@
         "teacher"
       ],
       "verifiedEmail": false,
-      "guardianConsent": false,
+      "guardianConsent": true,
       "ownership": "class owner (teacher) or admin; otherwise 404",
       "rateLimits": [],
       "csrf": "double-submit-when-session-cookie",
@@ -824,7 +884,7 @@
         "teacher"
       ],
       "verifiedEmail": false,
-      "guardianConsent": false,
+      "guardianConsent": true,
       "ownership": "class owner (teacher) or admin and assignment in that class; otherwise 404",
       "rateLimits": [],
       "csrf": "double-submit-when-session-cookie",
@@ -841,7 +901,7 @@
         "teacher"
       ],
       "verifiedEmail": false,
-      "guardianConsent": false,
+      "guardianConsent": true,
       "ownership": "class owner (teacher) or admin; otherwise 404",
       "rateLimits": [
         {
@@ -864,7 +924,7 @@
         "student"
       ],
       "verifiedEmail": false,
-      "guardianConsent": false,
+      "guardianConsent": true,
       "ownership": "active member of the class and assignment in that class; writes only the session student's row",
       "rateLimits": [],
       "csrf": "double-submit-when-session-cookie",
@@ -881,7 +941,7 @@
         "teacher"
       ],
       "verifiedEmail": false,
-      "guardianConsent": false,
+      "guardianConsent": true,
       "ownership": "class owner (teacher) or admin; student must be an active member; otherwise 404",
       "rateLimits": [],
       "csrf": "double-submit-when-session-cookie",
@@ -898,7 +958,7 @@
         "teacher"
       ],
       "verifiedEmail": false,
-      "guardianConsent": false,
+      "guardianConsent": true,
       "ownership": "class owner (teacher) or admin; otherwise 404",
       "rateLimits": [],
       "csrf": "not-applicable",
@@ -911,7 +971,7 @@
       "auth": "session",
       "roles": null,
       "verifiedEmail": false,
-      "guardianConsent": false,
+      "guardianConsent": true,
       "ownership": "own account only: every query is keyed by the session account id; no id is taken from the request (student: assignments of active memberships; teacher: own classes)",
       "rateLimits": [],
       "csrf": "not-applicable",
@@ -924,7 +984,7 @@
       "auth": "session",
       "roles": null,
       "verifiedEmail": false,
-      "guardianConsent": false,
+      "guardianConsent": true,
       "ownership": "class owner (teacher) or admin; otherwise 404",
       "rateLimits": [],
       "csrf": "not-applicable",
@@ -937,7 +997,7 @@
       "auth": "session",
       "roles": null,
       "verifiedEmail": false,
-      "guardianConsent": false,
+      "guardianConsent": true,
       "ownership": "class owner, active member or admin; student sees only their own submission",
       "rateLimits": [],
       "csrf": "not-applicable",
@@ -1102,7 +1162,7 @@
       "auth": "session",
       "roles": null,
       "verifiedEmail": false,
-      "guardianConsent": false,
+      "guardianConsent": true,
       "ownership": "report owned by the session account; forbidden context keys dropped",
       "rateLimits": [
         {
@@ -1123,7 +1183,7 @@
       "auth": "session",
       "roles": null,
       "verifiedEmail": false,
-      "guardianConsent": false,
+      "guardianConsent": true,
       "ownership": "own account only: every query is keyed by the session account id; no id is taken from the request",
       "rateLimits": [],
       "csrf": "not-applicable",
@@ -1139,7 +1199,7 @@
         "support"
       ],
       "verifiedEmail": false,
-      "guardianConsent": false,
+      "guardianConsent": true,
       "ownership": "support/admin",
       "rateLimits": [],
       "csrf": "not-applicable",
@@ -1155,7 +1215,7 @@
         "support"
       ],
       "verifiedEmail": false,
-      "guardianConsent": false,
+      "guardianConsent": true,
       "ownership": "support/admin; audited",
       "rateLimits": [],
       "csrf": "double-submit-when-session-cookie",
@@ -1237,12 +1297,45 @@
       "bodyLimit": "1mb"
     },
     {
+      "method": "GET",
+      "path": "/v1/tutor/status",
+      "auth": "session",
+      "roles": null,
+      "verifiedEmail": false,
+      "guardianConsent": true,
+      "ownership": "no per-account data; readiness only. 404 for every caller unless PRI_FEATURE_TUTOR=1 (ships dark, frozen V1 scope)",
+      "rateLimits": [],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/tutor/help",
+      "auth": "session",
+      "roles": null,
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "ownership": "stateless per account; replies cached by a SHA-256 of the request content only (no account id), so an account can read back only a reply to an identical request. 404 unless PRI_FEATURE_TUTOR=1; practice context only (TUTOR_EXAM_LOCKED); closed body ≤48 kB, maths-only (TUTOR_NOT_MATHS); per-account daily allowance (PRI_TUTOR_CALLS_PER_ACCOUNT_DAY, plan-aware) and one unit of the deployment paid-call ceiling per model call",
+      "rateLimits": [
+        {
+          "key": "tutor-help",
+          "limit": 60,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
       "method": "POST",
       "path": "/v1/telemetry/",
       "auth": "session",
       "roles": null,
       "verifiedEmail": false,
-      "guardianConsent": false,
+      "guardianConsent": true,
       "ownership": "events owned by the session account; allow-listed types and metadata keys",
       "rateLimits": [
         {

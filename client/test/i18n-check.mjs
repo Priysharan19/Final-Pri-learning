@@ -221,7 +221,8 @@ const CONVERTED = [
   // The formal exam room and the handwriting surface joined with the
   // paper/instrument redesign: both are read by Hindi-medium students mid-task.
   'src/pages/ExamRoom.jsx',
-  'src/ink/InkAnswer.jsx'
+  'src/ink/InkAnswer.jsx',
+  'src/pages/Placement.jsx'
 ];
 
 // Attributes a person reads or hears. `className`, `style`, `role`, `id` and

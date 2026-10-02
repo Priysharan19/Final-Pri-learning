@@ -42,6 +42,7 @@ import androidx.webkit.WebViewAssetLoader
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
 import android.webkit.ValueCallback
+import com.prilearning.app.billing.PlayBilling
 import com.prilearning.app.bridge.HostDescriptor
 import com.prilearning.app.cloud.CloudConfig
 import com.prilearning.app.cloud.CookieJar
@@ -72,6 +73,7 @@ class MainActivity : ComponentActivity() {
     internal var cloud: NativeCloud? = null
         private set
     private lateinit var files: FileExchange
+    private var billing: PlayBilling? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // The shell paints a fixed dark background behind the bars, so the bar
@@ -126,7 +128,9 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
-        val priBridge = PriBridge(view, descriptor, { wanted -> backCallback.isEnabled = wanted }, nativeCloud, files)
+        val playBilling = PlayBilling(this) { event, payload -> bridge?.emitEvent(event, payload) }
+        billing = playBilling
+        val priBridge = PriBridge(view, descriptor, { wanted -> backCallback.isEnabled = wanted }, nativeCloud, files, playBilling)
         if (!priBridge.install()) {
             // Fail closed: without origin-scoped messaging the shell offers no
             // native capabilities, so it does not load the app half-working.
@@ -263,6 +267,8 @@ class MainActivity : ComponentActivity() {
         cloud?.shutdown()
         cloud = null
         if (::files.isInitialized) files.dispose()
+        billing?.dispose()
+        billing = null
         super.onDestroy()
     }
 

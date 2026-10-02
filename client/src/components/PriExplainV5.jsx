@@ -17,6 +17,11 @@ import Icon from './Icon.jsx';
 
 const SOLUTION_EVENT = 'pri:worked-solution';
 const ATTEMPT_EVENT = 'pri:attempt-feedback';
+// The AI tutor's level 3 may rephrase scene captions for the student's
+// misconception. They arrive already checked (server and TutorHelp) against
+// the verified solution, are shown beside the deterministic scene — never in
+// place of its mathematics — and are spoken in place of the heading.
+const TUTOR_CAPTIONS_EVENT = 'pri:tutor-captions';
 const SPEEDS = [0.8, 1, 1.2, 1.4];
 
 function canSpeak() {
@@ -123,6 +128,7 @@ export default function PriExplainV5({ questionId, questionPrompt, questionFigur
   const [voice, setVoice] = useState(false);
   const [narrating, setNarrating] = useState(false);
   const [reduceMotion, setReduceMotion] = useState(initialReduceMotion);
+  const [tutorCaptions, setTutorCaptions] = useState({});
   const timerRef = useRef(null);
   const speechCancelRef = useRef(null);
   const dialogRef = useRef(null);
@@ -227,6 +233,7 @@ export default function PriExplainV5({ questionId, questionPrompt, questionFigur
   useEffect(() => {
     wrongRef.current = null;
     setPayload(null);
+    setTutorCaptions({});
     setOpen(false);
     setIndex(0);
     setBeat(0);
@@ -258,14 +265,31 @@ export default function PriExplainV5({ questionId, questionPrompt, questionFigur
       setIndex(0);
       setBeat(0);
       setCheckpointPassed(false);
-      setPlaying(false);
       stopNarration();
+      // The tutor's walkthrough is asked for explicitly: open straight away.
+      if (detail.tutorWalkthrough) {
+        setOpen(true);
+        setPlaying(!reduceMotion);
+      } else {
+        setPlaying(false);
+      }
+    };
+    const receiveCaptions = event => {
+      const detail = event?.detail;
+      if (String(detail?.questionId) !== String(questionId) || !detail?.captions || typeof detail.captions !== 'object') return;
+      const clean = {};
+      for (const [id, text] of Object.entries(detail.captions)) {
+        if (typeof text === 'string' && text.trim()) clean[String(id).slice(0, 40)] = text.slice(0, 400);
+      }
+      setTutorCaptions(clean);
     };
     window.addEventListener(ATTEMPT_EVENT, receiveAttempt);
     window.addEventListener(SOLUTION_EVENT, receiveSolution);
+    window.addEventListener(TUTOR_CAPTIONS_EVENT, receiveCaptions);
     return () => {
       window.removeEventListener(ATTEMPT_EVENT, receiveAttempt);
       window.removeEventListener(SOLUTION_EVENT, receiveSolution);
+      window.removeEventListener(TUTOR_CAPTIONS_EVENT, receiveCaptions);
     };
   }, [questionId]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -301,7 +325,7 @@ export default function PriExplainV5({ questionId, questionPrompt, questionFigur
       const lineIndex = Math.min(beat - 1, Math.max(0, lineCount - 1));
       const textFor = spoken => {
         const tr = spoken === language ? t : translateEnglish;
-        return beat === 0 ? headingIn(current, tr) : lineIn(current, lineIndex, tr) || headingIn(current, tr);
+        return beat === 0 ? ((spoken === language && tutorCaptions[current.id]) || headingIn(current, tr)) : lineIn(current, lineIndex, tr) || headingIn(current, tr);
       };
       setNarrating(true);
       speechCancelRef.current = speakBeat(textFor, speed * teaching.voiceRate, language, region, advanceAfterNarration);
@@ -448,6 +472,9 @@ export default function PriExplainV5({ questionId, questionPrompt, questionFigur
                     {keyTeachingStep && <span className="pri-explain-key-badge">{t('explain.keyStep')}</span>}
                   </div>
                   <h3><MathText text={headingOf(current)} /></h3>
+                  {tutorCaptions[current.id] && (
+                    <p className="pri-explain-tutor-caption" data-tutor-caption><MathText text={tutorCaptions[current.id]} /></p>
+                  )}
                   {whyStep && <div className="pri-explain-why-step"><b>{t('explain.whyMatters')}</b>{whyStep}</div>}
 
                   <div className="pri-explain-board">

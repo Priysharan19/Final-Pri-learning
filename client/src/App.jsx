@@ -1,3 +1,4 @@
+import { featureEnabled } from './platform/features.js';
 import React, { createContext, useContext, useEffect, useMemo, useState, useCallback, useRef, useSyncExternalStore } from 'react';
 import { Routes, Route, Link, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import { api } from './api.js';
@@ -34,6 +35,12 @@ const Teach = React.lazy(() => import('./pages/Teach.jsx'));
 const History = React.lazy(() => import('./pages/History.jsx'));
 const Classes = React.lazy(() => import('./pages/Classes.jsx'));
 const Settings = React.lazy(() => import('./pages/Settings.jsx'));
+// The placement check is opened once or twice per student, so it — and the
+// prerequisite graph and engine behind it — is an on-demand chunk (see
+// ON_DEMAND in vite.config.js), not part of the install or the warm set.
+const Placement = React.lazy(() => import('./pages/Placement.jsx'));
+// Outside the frozen V1 scope: the route exists only where the build flag is on.
+const PLACEMENT_ON = featureEnabled('placement');
 
 const AppCtx = createContext(null);
 export const useApp = () => useContext(AppCtx);
@@ -366,6 +373,7 @@ export default function App() {
                     <Route path="/" element={user.role === 'teacher' ? <Navigate to="/teach" replace /> : <Home />} />
                     <Route path="/practice" element={studentOnly(<Practice />)} />
                     <Route path="/progress" element={studentOnly(<Progress />, '/teach#teacher-analytics')} />
+                    {PLACEMENT_ON && <Route path="/placement" element={studentOnly(<Placement />)} />}
                     <Route path="/map" element={<Navigate to="/progress?tab=map" replace />} />
                     <Route path="/stats" element={<Navigate to="/progress" replace />} />
                     <Route path="/badges" element={<Navigate to="/progress" replace />} />

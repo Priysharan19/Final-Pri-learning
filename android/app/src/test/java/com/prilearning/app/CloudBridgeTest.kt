@@ -271,7 +271,9 @@ class CloudBridgeTest {
         assertEquals("bridge", caps.getJSONObject("cloud").getString("transport"))
         assertTrue(caps.getJSONObject("cloud").getBoolean("configured"))
         assertTrue(caps.getJSONObject("share").getBoolean("binary") && caps.getJSONObject("share").getBoolean("print"))
-        assertFalse("no billing until CP-08", caps.has("billing"))
+        assertEquals("billing presents Google Play's sheet over the bridge (CP-08); the server decides entitlement",
+            "google-play", caps.getJSONObject("billing").getString("store"))
+        assertEquals("bridge", caps.getJSONObject("billing").getString("transport"))
         assertFalse("no ink: Android writes on the shared web canvas", caps.has("ink"))
         val off = com.prilearning.app.bridge.HostDescriptor.json(
             com.prilearning.app.bridge.HostDescriptor.Shell("4.0", "7", "com.prilearning.app"), null)

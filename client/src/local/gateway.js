@@ -136,6 +136,16 @@ function optionalRosterRows(body, key, max = 200) {
   }
 }
 
+/** The working a tutor request may carry: bounded lines and a typed answer. */
+function tutorWorkRule(body) {
+  if (body.work === undefined || body.work === null) return;
+  if (!plainObject(body.work)) throw apiError('work must be an object.', 400, 'INVALID_FIELD');
+  optionalString(body.work, 'typed', 300);
+  if (body.work.lines !== undefined && (!Array.isArray(body.work.lines) || body.work.lines.length > 40 || body.work.lines.some(l => typeof l !== 'string' || l.length > 400))) {
+    throw apiError('work.lines must be at most 40 lines of text.', 400, 'INVALID_FIELD');
+  }
+}
+
 // Only routes where the body is security- or storage-significant need an
 // explicit contract here. Routes not listed still receive the universal deep
 // validation below, and backend.js remains responsible for their domain rules.
@@ -183,6 +193,21 @@ const BODY_RULES = [
   [/^POST \/practice\/[A-Za-z0-9._-]+\/(?:hint|reveal)$/, body => {
     requireObject(body, 'practice action'); optionalNumber(body, 'ms');
   }],
+  // AI tutor: a level and the student's own working, nothing else. The
+  // backend adds the verified solution itself — the UI never supplies one.
+  [/^POST \/practice\/[A-Za-z0-9._-]+\/tutor$/, body => {
+    requireObject(body, 'tutor help'); optionalNumber(body, 'level'); optionalString(body, 'locale', 5); optionalNumber(body, 'ms');
+    tutorWorkRule(body);
+  }],
+  [/^POST \/practice\/[A-Za-z0-9._-]+\/tutor\/captions$/, body => {
+    requireObject(body, 'tutor captions'); optionalString(body, 'locale', 5);
+    tutorWorkRule(body);
+    if (body.captions !== undefined && (!Array.isArray(body.captions) || body.captions.length > 24)) throw apiError('captions must be at most 24 entries.', 400, 'INVALID_FIELD');
+    for (const c of body.captions || []) {
+      if (!plainObject(c)) throw apiError('captions must be objects.', 400, 'INVALID_FIELD');
+      optionalString(c, 'id', 40); optionalString(c, 'text', 700);
+    }
+  }],
   // A cloud-proposed misconception: the student's own working lines, the
   // proposed ontology ID and where the cloud check placed the break. The
   // backend re-decides it deterministically; this only bounds its shape.
@@ -201,6 +226,15 @@ const BODY_RULES = [
     if (body.steps !== undefined && typeof body.steps !== 'string' && !Array.isArray(body.steps)) throw apiError('steps must be text or an array.', 400, 'INVALID_FIELD');
     if (body.ink !== undefined && body.ink !== null && !plainObject(body.ink)) throw apiError('ink must be an object.', 400, 'INVALID_FIELD');
   }],
+  [/^POST \/placement\/start$/, body => {
+    requireObject(body, 'POST /placement/start'); optionalBoolean(body, 'restart');
+  }],
+  [/^POST \/placement\/[A-Za-z0-9._-]+\/answer$/, body => {
+    requireObject(body, 'placement answer'); optionalNumber(body, 'ms'); optionalBoolean(body, 'viaInk'); optionalBoolean(body, 'skip');
+    if (body.answer !== undefined && body.answer !== null && typeof body.answer !== 'string' && typeof body.answer !== 'number') throw apiError('answer must be text.', 400, 'INVALID_FIELD');
+    if (typeof body.answer === 'string' && body.answer.length > 4000) throw apiError('answer is too long.', 413, 'FIELD_TOO_LARGE');
+    if (body.steps !== undefined && typeof body.steps !== 'string' && !Array.isArray(body.steps)) throw apiError('steps must be text or an array.', 400, 'INVALID_FIELD');
+  }],
   [/^POST \/exams$/, body => {
     requireObject(body, 'POST /exams'); optionalNumber(body, 'length'); optionalNumber(body, 'minutes'); optionalNumber(body, 'year');
     // WP india-exams: CBSE Class X Standard/Basic variant and a reproducible paper seed.
@@ -209,6 +243,17 @@ const BODY_RULES = [
   [/^POST \/exams\/[A-Za-z0-9._-]+\/submit$/, body => {
     requireObject(body, 'exam submit'); boundedMap(body, 'answers', 120); boundedMap(body, 'workings', 120); optionalNumber(body, 'ms');
     boundedMap(body, 'times', 120);   // WP india-exams: time spent per question
+    // A submission names itself so a retried request is a replay, not a second
+    // mark; `reason` says whether the student or the clock ended the paper.
+    optionalString(body, 'submissionKey', 100); optionalString(body, 'reason', 20);
+  }],
+  // The exam room's autosave: the paper's answers, working, per-question time
+  // and handwriting for the questions whose ink changed. The session module
+  // decides what may be saved (nothing after the deadline or finalisation);
+  // this only bounds the shape.
+  [/^POST \/exams\/[A-Za-z0-9._-]+\/responses$/, body => {
+    requireObject(body, 'exam responses'); boundedMap(body, 'answers', 120); boundedMap(body, 'workings', 120);
+    boundedMap(body, 'times', 120); boundedMap(body, 'modes', 120); boundedMap(body, 'inks', 12); optionalNumber(body, 'cur');
   }],
   [/^POST \/rush\/answer$/, body => {
     requireObject(body, 'POST /rush/answer'); requiredId(body);

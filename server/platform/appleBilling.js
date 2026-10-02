@@ -141,29 +141,31 @@ function verifyTransaction(cfg, signedTransaction) {
   return payload;
 }
 
+/**
+ * The lifecycle one Apple transaction states by itself (no notification).
+ *
+ * `advisory` marks a result that only says this transaction's own period is
+ * over — its expiresDate has passed, or Apple superseded it with an upgrade.
+ * That carries no renewal information, so it may not end a lifecycle the
+ * subscription last verified as paid (a billing-retry grace period, or the
+ * upgraded transaction): see applyVerifiedEntitlement.
+ */
+function transactionLifecycle(transaction, now) {
+  const expires = Number(transaction?.expiresDate) || null;
+  if (Number(transaction?.revocationDate)) return { status: 'revoked', rank: 100, advisory: false };
+  if (transaction?.isUpgraded === true) return { status: 'expired', rank: 90, advisory: true };
+  if (expires && expires >= now) return { status: 'active', rank: 50, advisory: false };
+  return { status: 'expired', rank: 90, advisory: true };
+}
+
 function normalizeTransaction(cfg, transaction, {
   accountId, eventId, eventType, payloadDigest, effectiveAt = null,
-  forcedStatus = null, graceUntil = null, eventRank = null
+  lifecycle, now
 }) {
-  const now = Date.now();
   const expires = Number(transaction?.expiresDate) || null;
   const revoked = Number(transaction?.revocationDate) || null;
-  const upgraded = transaction?.isUpgraded === true;
-  let plan = 'free';
-  let status = 'expired';
-  let rank = 90;
-  if (forcedStatus) {
-    status = forcedStatus;
-    if (forcedStatus === 'active' || forcedStatus === 'trialing' || forcedStatus === 'grace') plan = 'premium';
-    rank = eventRank ?? (forcedStatus === 'revoked' ? 100 : forcedStatus === 'expired' ? 90 : forcedStatus === 'grace' ? 75 : 50);
-  } else if (revoked) {
-    status = 'revoked';
-    rank = 100;
-  } else if (!upgraded && expires && expires >= now) {
-    plan = 'premium';
-    status = 'active';
-    rank = 50;
-  }
+  const status = lifecycle.status;
+  const plan = status === 'active' || status === 'trialing' || status === 'grace' ? 'premium' : 'free';
   const signedAt = Number(effectiveAt) || Number(transaction?.signedDate) || revoked || Number(transaction?.purchaseDate) || now;
   return {
     verified: true,
@@ -177,10 +179,12 @@ function normalizeTransaction(cfg, transaction, {
     plan,
     status,
     currentPeriodEnd: expires,
-    graceUntil: status === 'grace' ? Number(graceUntil) || null : null,
+    graceUntil: status === 'grace' ? Number(lifecycle.graceUntil) || null : null,
     payloadDigest,
     effectiveAt: signedAt,
-    eventRank: rank
+    eventRank: lifecycle.rank,
+    advisory: lifecycle.advisory === true,
+    now
   };
 }
 
@@ -207,18 +211,98 @@ function rankForNotification(type, subtype) {
   return 55;
 }
 
-function statusForNotification(type, subtype, transaction, renewal) {
-  if (type === 'REFUND' || type === 'REVOKE' || Number(transaction?.revocationDate)) return { status: 'revoked' };
-  if (type === 'EXPIRED' || type === 'GRACE_PERIOD_EXPIRED') return { status: 'expired' };
+function statusForNotification(type, subtype, transaction, renewal, now) {
+  const rank = rankForNotification(type, subtype);
+  if (type === 'REFUND' || type === 'REVOKE' || Number(transaction?.revocationDate)) return { status: 'revoked', rank, advisory: false };
+  if (type === 'EXPIRED' || type === 'GRACE_PERIOD_EXPIRED') return { status: 'expired', rank, advisory: false };
   if (type === 'DID_FAIL_TO_RENEW' && subtype === 'GRACE_PERIOD') {
     const until = Number(renewal?.gracePeriodExpiresDate) || null;
-    return until && until >= Date.now() ? { status: 'grace', graceUntil: until } : { status: 'past_due' };
+    return until && until >= now ? { status: 'grace', graceUntil: until, rank, advisory: false } : { status: 'past_due', rank, advisory: false };
   }
-  const expires = Number(transaction?.expiresDate) || 0;
-  return expires >= Date.now() && !transaction?.isUpgraded ? { status: 'active' } : { status: 'expired' };
+  if (type === 'DID_FAIL_TO_RENEW') return { status: 'past_due', rank, advisory: false };
+  // Every other type (SUBSCRIBED, DID_RENEW, DID_CHANGE_RENEWAL_STATUS,
+  // DID_CHANGE_RENEWAL_PREF, REFUND_REVERSED, OFFER_REDEEMED, …) reports the
+  // transaction it carries; its own dates decide, exactly as on the device.
+  const own = transactionLifecycle(transaction, now);
+  return { ...own, rank };
 }
 
-export function createAppleBilling(db) {
+/**
+ * Verify one App Store Server Notification v2 and everything signed inside it.
+ * Pure (no database): the webhook and the reconciliation tool interpret the
+ * same signed bytes the same way.
+ */
+export function interpretAppleNotification(cfg, signedPayload, now = Date.now()) {
+  const { payload: notification } = verifyAppleJWS(signedPayload, { roots: configuredAppleRoots() });
+  const eventId = String(notification?.notificationUUID || '');
+  if (!SAFE_EVENT_ID.test(eventId)) throw billingError('APPLE_NOTIFICATION_INVALID', 'Apple notification id is invalid.');
+  const data = notification?.data;
+  if (!data || typeof data !== 'object') return { eventId, notification, decoded: null };
+  assertApp(cfg, data, { notification: true });
+  const signedTransaction = String(data.signedTransactionInfo || '');
+  if (!signedTransaction) return { eventId, notification, decoded: null };
+  const decoded = verifyTransaction(cfg, signedTransaction);
+  if (decoded.environment !== data.environment || decoded.bundleId !== data.bundleId) {
+    throw billingError('APPLE_NOTIFICATION_MISMATCH', 'Apple notification and transaction metadata disagree.', 401);
+  }
+  let renewal = null;
+  if (data.signedRenewalInfo) {
+    renewal = verifyAppleJWS(String(data.signedRenewalInfo), { roots: configuredAppleRoots() }).payload;
+    assertEnvironment(cfg, renewal?.environment);
+    // Renewal info describes one subscription; it must be the one whose
+    // transaction this notification carries.
+    if (renewal?.originalTransactionId != null && String(renewal.originalTransactionId) !== String(decoded.originalTransactionId)) {
+      throw billingError('APPLE_NOTIFICATION_MISMATCH', 'Apple renewal info belongs to another subscription.', 401);
+    }
+  }
+  const type = String(notification.notificationType || 'UNKNOWN');
+  const subtype = String(notification.subtype || '');
+  return {
+    eventId, notification, decoded, renewal, type, subtype,
+    eventType: subtype ? `${type}:${subtype}` : type,
+    effectiveAt: Number(notification.signedDate) || Number(decoded.signedDate) || now,
+    lifecycle: statusForNotification(type, subtype, decoded, renewal, now)
+  };
+}
+
+/** The normalized entitlement event a stored, already-bound signed record states. */
+export function appleEventFromSigned(cfg, { kind, signedPayload, accountId, now = Date.now() }) {
+  if (kind === 'notification') {
+    const parsed = interpretAppleNotification(cfg, signedPayload, now);
+    if (!parsed.decoded) return null;
+    return normalizeTransaction(cfg, parsed.decoded, {
+      accountId, eventId: parsed.eventId, eventType: parsed.eventType,
+      payloadDigest: sha256(signedPayload), effectiveAt: parsed.effectiveAt, lifecycle: parsed.lifecycle, now
+    });
+  }
+  const decoded = verifyTransaction(cfg, signedPayload);
+  return normalizeTransaction(cfg, decoded, {
+    accountId, eventId: deviceEventId(decoded, signedPayload), eventType: 'transaction.device',
+    payloadDigest: sha256(signedPayload), lifecycle: transactionLifecycle(decoded, now), now
+  });
+}
+
+// A device transaction is identified by its signed bytes, not by its
+// transactionId alone: StoreKit re-signs the same transaction when its state
+// changes (a refund adds revocationDate), and keying on the id made that newer
+// signed statement a "replay" of the purchase that was silently ignored.
+function deviceEventId(decoded, signedTransaction) {
+  return `tx:${decoded.transactionId}:${sha256(signedTransaction).slice(0, 24)}`;
+}
+
+async function recordSigned(db, row) {
+  await db.run(`INSERT INTO billing_apple_signed_events
+    (event_id,kind,account_id,original_transaction_id,transaction_id,notification_type,environment,signed_date,signed_payload,received_at)
+    VALUES (?,?,?,?,?,?,?,?,?,?) ON CONFLICT(event_id) DO NOTHING`,
+  [row.eventId, row.kind, row.accountId, row.originalTransactionId, row.transactionId, row.notificationType || null,
+    row.environment, row.signedDate, row.signedPayload, row.receivedAt]);
+}
+
+export function appleBillingConfig() {
+  return readConfig();
+}
+
+export function createAppleBilling(db, { clock = () => Date.now() } = {}) {
   db = asStore(db);
   const cfg = readConfig();
   // Resolving which account a transaction belongs to and recording that
@@ -229,6 +313,35 @@ export function createAppleBilling(db) {
     await bindSubscription(db, { accountId, transaction: decoded, cfg });
     return accountId;
   });
+
+  async function boundToken(accountId) {
+    return (await db.get('SELECT app_account_token FROM billing_apple_accounts WHERE account_id=?', [accountId]))?.app_account_token || null;
+  }
+
+  async function deviceTransaction(accountId, signedTransaction, eventType, { strict }) {
+    const now = clock();
+    const decoded = verifyTransaction(cfg, signedTransaction);
+    const token = await boundToken(accountId);
+    // appAccountToken is the account binding. A transaction bought under
+    // another Pri account (the same Apple ID, a different student signed in on
+    // this iPad) never unlocks this account.
+    if (!token || String(decoded.appAccountToken || '').toLowerCase() !== String(token).toLowerCase()) {
+      if (strict) throw billingError('APPLE_ACCOUNT_TOKEN_MISMATCH', 'App Store purchase is not bound to this Pri Learning account.', 409);
+      return null;
+    }
+    const resolved = await resolveAndBind(decoded, accountId);
+    const eventId = deviceEventId(decoded, signedTransaction);
+    await recordSigned(db, {
+      eventId, kind: 'transaction', accountId: resolved,
+      originalTransactionId: String(decoded.originalTransactionId), transactionId: String(decoded.transactionId),
+      environment: String(decoded.environment), signedDate: Number(decoded.signedDate) || now,
+      signedPayload: signedTransaction, receivedAt: now
+    });
+    return normalizeTransaction(cfg, decoded, {
+      accountId: resolved, eventId, eventType,
+      payloadDigest: sha256(signedTransaction), lifecycle: transactionLifecycle(decoded, now), now
+    });
+  }
 
   async function bootstrap({ accountId }) {
     requireConfigured(cfg);
@@ -244,18 +357,7 @@ export function createAppleBilling(db) {
   async function transaction({ accountId, body }) {
     requireConfigured(cfg);
     const signedTransaction = String(body?.signedTransaction || '');
-    const decoded = verifyTransaction(cfg, signedTransaction);
-    const boundToken = (await db.get('SELECT app_account_token FROM billing_apple_accounts WHERE account_id=?', [accountId]))?.app_account_token;
-    if (!boundToken || String(decoded.appAccountToken || '').toLowerCase() !== String(boundToken).toLowerCase()) {
-      throw billingError('APPLE_ACCOUNT_TOKEN_MISMATCH', 'App Store purchase is not bound to this Pri Learning account.', 409);
-    }
-    const resolved = await resolveAndBind(decoded, accountId);
-    return normalizeTransaction(cfg, decoded, {
-      accountId: resolved,
-      eventId: `tx:${decoded.transactionId}`,
-      eventType: 'transaction.device',
-      payloadDigest: sha256(signedTransaction)
-    });
+    return deviceTransaction(accountId, signedTransaction, 'transaction.device', { strict: true });
   }
 
   async function restore({ accountId, body }) {
@@ -264,56 +366,52 @@ export function createAppleBilling(db) {
     if (!transactions.length) throw billingError('APPLE_NO_VERIFIED_ENTITLEMENT', 'No active App Store entitlement was supplied for restore.', 404);
     const normalized = [];
     for (const value of transactions) {
-      const signedTransaction = String(value || '');
-      const decoded = verifyTransaction(cfg, signedTransaction);
-      const boundToken = (await db.get('SELECT app_account_token FROM billing_apple_accounts WHERE account_id=?', [accountId]))?.app_account_token;
-      if (!boundToken || String(decoded.appAccountToken || '').toLowerCase() !== String(boundToken).toLowerCase()) continue;
-      const resolved = await resolveAndBind(decoded, accountId);
-      normalized.push(normalizeTransaction(cfg, decoded, {
-        accountId: resolved,
-        eventId: `tx:${decoded.transactionId}`,
-        eventType: 'transaction.restore',
-        payloadDigest: sha256(signedTransaction)
-      }));
+      const event = await deviceTransaction(accountId, String(value || ''), 'transaction.restore', { strict: false });
+      if (event) normalized.push(event);
     }
     if (!normalized.length) throw billingError('APPLE_NO_VERIFIED_ENTITLEMENT', 'No App Store entitlement matched this Pri Learning account.', 404);
-    normalized.sort((a, b) => (b.currentPeriodEnd || 0) - (a.currentPeriodEnd || 0) || b.effectiveAt - a.effectiveAt);
+    // A paid transaction is the restore answer whenever there is one; a
+    // revoked or lapsed transaction with a later expiresDate must not hide it.
+    const paid = event => (event.plan === 'premium' ? 1 : 0);
+    normalized.sort((a, b) => paid(b) - paid(a) || (b.currentPeriodEnd || 0) - (a.currentPeriodEnd || 0) || b.effectiveAt - a.effectiveAt);
     return normalized[0];
   }
 
   async function webhook({ body }) {
     requireConfigured(cfg);
+    const now = clock();
     const signedPayload = String(body?.signedPayload || '');
-    const { payload: notification } = verifyAppleJWS(signedPayload, { roots: configuredAppleRoots() });
-    const eventId = String(notification?.notificationUUID || '');
-    if (!SAFE_EVENT_ID.test(eventId)) throw billingError('APPLE_NOTIFICATION_INVALID', 'Apple notification id is invalid.');
-    const data = notification?.data;
-    if (!data || typeof data !== 'object') return [];
-    assertApp(cfg, data, { notification: true });
-    const signedTransaction = String(data.signedTransactionInfo || '');
-    if (!signedTransaction) return [];
-    const decoded = verifyTransaction(cfg, signedTransaction);
-    if (decoded.environment !== data.environment || decoded.bundleId !== data.bundleId) {
-      throw billingError('APPLE_NOTIFICATION_MISMATCH', 'Apple notification and transaction metadata disagree.', 401);
+    const parsed = interpretAppleNotification(cfg, signedPayload, now);
+    if (!parsed.decoded) return [];
+    const { decoded } = parsed;
+    const ledger = {
+      eventId: `n:${parsed.eventId}`, kind: 'notification',
+      originalTransactionId: String(decoded.originalTransactionId), transactionId: String(decoded.transactionId),
+      notificationType: parsed.eventType, environment: String(decoded.environment),
+      signedDate: parsed.effectiveAt, signedPayload, receivedAt: now
+    };
+    let accountId;
+    try {
+      accountId = await resolveAndBind(decoded);
+    } catch (error) {
+      // Apple-signed, for this app, but naming no Pri account: no
+      // appAccountToken (an offer code redeemed in the App Store) or a token
+      // whose account was deleted. Refusing it only makes Apple redeliver it
+      // for days. It is acknowledged, changes no entitlement, and is kept for
+      // the operator (billing-reconcile --unbound).
+      if (error?.code !== 'APPLE_ACCOUNT_UNBOUND') throw error;
+      await recordSigned(db, { ...ledger, accountId: null });
+      return [];
     }
-    let renewal = null;
-    if (data.signedRenewalInfo) {
-      renewal = verifyAppleJWS(String(data.signedRenewalInfo), { roots: configuredAppleRoots() }).payload;
-      assertEnvironment(cfg, renewal?.environment);
-    }
-    const accountId = await resolveAndBind(decoded);
-    const type = String(notification.notificationType || 'UNKNOWN');
-    const subtype = String(notification.subtype || '');
-    const lifecycle = statusForNotification(type, subtype, decoded, renewal);
+    await recordSigned(db, { ...ledger, accountId });
     return normalizeTransaction(cfg, decoded, {
       accountId,
-      eventId,
-      eventType: subtype ? `${type}:${subtype}` : type,
+      eventId: parsed.eventId,
+      eventType: parsed.eventType,
       payloadDigest: sha256(signedPayload),
-      effectiveAt: Number(notification.signedDate) || Number(decoded.signedDate) || Date.now(),
-      forcedStatus: lifecycle.status,
-      graceUntil: lifecycle.graceUntil,
-      eventRank: rankForNotification(type, subtype)
+      effectiveAt: parsed.effectiveAt,
+      lifecycle: parsed.lifecycle,
+      now
     });
   }
 

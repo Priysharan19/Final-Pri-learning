@@ -356,8 +356,9 @@ export default function InkAnswer({
     // symbols/lines; those jobs then queued behind Core ML/Vision and the newest
     // page timed out. Browser JS remains cheap enough for the old live cadence.
     const quietMs = NATIVE_INK ? (strokes.length > 24 ? 1600 : 1000) : 240;
-    timerRef.current = setTimeout(() => runRecognition(strokes, overrides), quietMs);
-  }, [overrides, runRecognition]);
+    // Read at fire time from the ref, never from this render's closure.
+    timerRef.current = setTimeout(() => runRecognition(strokes, overridesRef.current), quietMs);
+  }, [runRecognition]);
 
   useEffect(() => { ensurePersonalLoaded(); }, []);
 
@@ -412,6 +413,7 @@ export default function InkAnswer({
 
   const applyOverride = (id, sym) => {
     const next = { ...overrides, [id]: sym };
+    overridesRef.current = next;
     setOverrides(next);
     setPicker(null);
     // Corrections remain local training evidence regardless of which Pri model
@@ -444,16 +446,23 @@ export default function InkAnswer({
     // confidence. After undo or redo the glyph in that position can be a
     // different one, so every fix is dropped with the stroke change: a stale
     // "7" must never ride onto a new "3" and skip the reading check.
+    // Cleared in the ref first, synchronously: the canvas notifies before
+    // React re-renders, and the recognition it schedules must not read the
+    // old fixes (a corrected "3" would otherwise be applied to the "5" that
+    // undo just moved into its position, at full confidence).
+    overridesRef.current = {};
     setOverrides({});
     canvasRef.current?.[fn]();
   };
   const undoClear = () => {
     if (!cleared) return;
+    overridesRef.current = cleared.overrides;
     setOverrides(cleared.overrides);
     canvasRef.current?.setStrokes?.(cleared.strokes);
     setCleared(null);
   };
 
+  // i18n-exempt-start: engine identifiers and fallback warnings for developers and evaluators, drawn only when inkDiagnosticsVisible() (dev build, LAN research mode or ?inkdiag=1); a production student never sees them — the one student-facing note, read on the server, is t('verdict.readOnServer') below
   // Which engine actually produced what is on screen. A server reading was
   // previously labelled "Native recognition path" on iPad and given no label at
   // all in the browser — cloudReader tags a reading `cloud` precisely so that

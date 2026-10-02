@@ -270,7 +270,8 @@ check('formal assessment: no hints, confirmed submission, flags and a spoken tim
   assert.doesNotMatch(exam, /getHint|hintsAvailable|PriExplain/);
   assert.match(exam, /role="dialog"[\s\S]*exam\.confirmUnanswered/);
   assert.match(exam, /setFlagged/);
-  assert.match(exam, /left === 600 \|\| left === 300 \|\| left === 60/);
+  // The deadline clock announces the last five minutes and the last minute in words.
+  assert.match(exam, /examRoom\.fiveMinutesLeft[\s\S]*examRoom\.oneMinuteLeft/);
   assert.match(exam, /role="timer"/);
 });
 

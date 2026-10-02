@@ -169,8 +169,12 @@ export function ensureBuild(build) {
     return { built: false };
   }
   const started = Date.now();
+  // A test build: flagged features outside the V1 scope are switched on so
+  // their flows are exercised. The tracked production build leaves them off,
+  // and tour-placement.js asserts that state when it meets such a build.
   const run = spawnSync('npm', ['run', 'build', '--prefix', 'client'], {
-    cwd: ROOT, encoding: 'utf8', shell: process.platform === 'win32'
+    cwd: ROOT, encoding: 'utf8', shell: process.platform === 'win32',
+    env: { ...process.env, PRI_FEATURE_PLACEMENT: '1' }
   });
   if (run.status !== 0) {
     const tail = `${run.stdout || ''}${run.stderr || ''}`.trim().split('\n').slice(-12).join('\n      ');
@@ -294,7 +298,7 @@ function helpers(page, base, flowId) {
 
 // ── Flow runner ──────────────────────────────────────────────────────────────
 
-const FLOWS = ['./tour-login.js', './tour-india.js', './tour-phone.js', './tour-v3.js', './tour-ink.js', './tour-v4.js', './tour-exam-timer.js', './cal-smoke.mjs', './tour-submit-lifecycle.js'];
+const FLOWS = ['./tour-login.js', './tour-india.js', './tour-phone.js', './tour-v3.js', './tour-ink.js', './tour-v4.js', './tour-exam-india.js', './tour-exam-deadline.js', './cal-smoke.mjs', './tour-submit-lifecycle.js', './tour-stale-cloud.js', './tour-placement.js'];
 
 async function loadFlows() {
   const loaded = [];

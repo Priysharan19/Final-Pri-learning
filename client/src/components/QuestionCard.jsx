@@ -23,10 +23,11 @@ import { plotSpecFor } from '../engine/plotSpec.js';
 import { awardStepMarks, marksSentenceKey } from '../engine/cbseMarking.js';
 import { checkWorkingWithCloud, mergeVerdicts, misconceptionProposal, shouldCheckWorking, workingNote } from '../ink/cloudWorking.js';
 import { misconceptionById } from '../engine/misconceptions.js';
-import { tLater, translate, useT, useTx } from '../i18n/index.js';
+import { tLater, translate, useLanguage, useT, useTx } from '../i18n/index.js';
 import TermGloss from './TermGloss.jsx';
 import { useFormFactor } from '../platform/formFactor.js';
 import Icon from './Icon.jsx';
+import { tutorFeatureEnabled } from '../tutor/flag.js';
 
 const DIFF_CLASS = { 1: 'tag-d1', 2: 'tag-d2', 3: 'tag-d3', 4: 'tag-d4' };
 // Public question metadata may constrain what a single answer glyph can be,
@@ -72,6 +73,23 @@ export const SR_ONLY = {
 // spelled out one per line because a bundler emits a chunk only for a specifier
 // it can see; four specifiers is four real attempts, and once they are spent
 // only a reload has anything new to try.
+// ── The AI tutor panel, fetched only when a student asks for help ─────────────
+// A lazy chunk of its own: most questions are answered without it, so nobody
+// pays for it at install. If the chunk cannot be fetched the boundary below
+// says so and the hint bulbs keep working.
+const TutorHelp = React.lazy(() => import('../tutor/TutorHelp.jsx'));
+
+class TutorBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { failed: false }; }
+  static getDerivedStateFromError() { return { failed: true }; }
+  componentDidCatch() { /* nothing about the question or the student is logged */ }
+  render() {
+    return this.state.failed
+      ? <div className="hintbox" role="status">{this.props.fallback}</div>
+      : this.props.children;
+  }
+}
+
 const INK_SOURCES = [
   () => import('../ink/InkAnswer.jsx'),
   () => import('../ink/InkAnswer.jsx?retry=1'),
@@ -215,7 +233,11 @@ const REASON_TAG_KEY = {
   'new-ground': 'verdict.newGround', interleave: 'verdict.interleaving'
 };
 
-export default function QuestionCard({ question, why, reason, reasonTag = null, onResolved, onNext, onRedo, compact = false }) {
+// `diagnostic` turns the card into a placement-check item: the answer goes to
+// `diagnostic.submitPath`, it is marked once by the same deterministic marker,
+// and nothing that belongs to practice is offered — no hints, no favourite, no
+// reveal, no self-marking, no XP or mastery tags. `I don't know` records a miss.
+export default function QuestionCard({ question, why, reason, reasonTag = null, onResolved, onNext, onRedo, compact = false, diagnostic = null }) {
   const { celebrate, refreshUser, refreshDue, refreshRecent, toast, user } = useApp();
   const t = useT();
   const tx = useTx();
@@ -227,6 +249,11 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const [inkResult, setInkResult] = useState(null);
   const [hints, setHints] = useState([]);
   const [hintsLeft, setHintsLeft] = useState(question.hintsAvailable);
+  const [showTutor, setShowTutor] = useState(false);
+  const [tutorUsed, setTutorUsed] = useState(question.tutorLevel || 0);
+  const { language } = useLanguage();
+  // Dark by default (src/tutor/flag.js): off, the card offers only the hints.
+  const tutorEnabled = useMemo(() => tutorFeatureEnabled(), []);
   const [working, setWorking] = useState('');
   const [showWorking, setShowWorking] = useState(false);
   const [showScribble, setShowScribble] = useState(false);
@@ -286,6 +313,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   useEffect(() => {
     const draft = readDraft('question', question.id);
     setAnswer(draft?.typed || ''); setMcqSel(null); setInkResult(null); setHints([]); setHintsLeft(question.hintsAvailable);
+    setShowTutor(false); setTutorUsed(question.tutorLevel || 0);
     setWorking(draft?.working || ''); setShowWorking(!!draft?.working);
     setState({ phase: 'answering' }); setBusy(false);
     setSelfMarks({}); setSelfSaved(false); setSelfOpen(false); setPhoto(null); setBookmarked(false); setElapsed(0);
@@ -311,7 +339,9 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const isWorking = question.answerType === 'working';
   const totalMarks = question.criteria?.length || 1;
   const hintsUsed = hints.length;
-  const credit = Math.max(0.55, 1 - 0.15 * hintsUsed);
+  // Each opened tutor level is charged like a hint (backend resolve()).
+  const helpUsed = hintsUsed + tutorUsed;
+  const credit = Math.max(0.55, 1 - 0.15 * helpUsed);
   const writeMode = mode === 'write';
   const recognitionContext = useMemo(
     () => recognitionContextForQuestion(question),
@@ -523,7 +553,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     if (resolved) return;
     if (typedSaveTimer.current) clearTimeout(typedSaveTimer.current);
     if (!String(typed).trim() && !String(wk).trim()) { clearDraft('question', question.id); setSaveState(null); return; }
-    const meta = { label: question.subtopicName, note: t('verdict.answerInProgress'), path: '/practice' };
+    const meta = { label: question.subtopicName, note: t('verdict.answerInProgress'), path: diagnostic ? '/placement' : '/practice' };
     // queueDraft is the crash-safe path (flushed on pagehide); the timed
     // saveDraft below is the same write made synchronously so the status line
     // reports what the write actually returned rather than assuming it.
@@ -705,7 +735,9 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     pendingRef.current = { submissionId, contentKey };
     const ms = Date.now() - startRef.current;
     // On disk before the request leaves: a relaunch replays it under this key.
-    savePendingSubmission(question.id, { submissionId, answer: String(given), steps, viaInk, ms, lines }, { label: question.subtopicName });
+    // A placement answer is not replayed through practice on relaunch: the
+    // placement session itself resumes at this exact question.
+    if (!diagnostic) savePendingSubmission(question.id, { submissionId, answer: String(given), steps, viaInk, ms, lines }, { label: question.subtopicName });
     const scribbleStrokes = scribbleRef.current && !scribbleRef.current.isEmpty()
       ? compactInkStrokes(scribbleRef.current.getStrokes())
       : undefined;
@@ -721,7 +753,11 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     inkFrozenRef.current = !recovering || inkFrozenRef.current;
     setBusy(true);
     try {
-      const r = await api.post(`/practice/${question.id}/submit`, body);
+      const r = diagnostic
+        // A diagnostic keeps no ink, photo or scribble: only the reading the
+        // student submitted is marked, and only its outcome is stored.
+        ? await api.post(diagnostic.submitPath, { answer: body.answer, ms: body.ms, steps: body.steps, viaInk: body.viaInk })
+        : await api.post(`/practice/${question.id}/submit`, body);
       pendingRef.current = null;
       clearPendingSubmission(question.id);
       const live = mountedRef.current;
@@ -732,8 +768,10 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         if (live) {
           setAttempt(bound);
           setState({ phase: 'resolved', res: r });
-          if (!r.replayed) celebrate(r);
-          refreshUser(); refreshDue(); refreshRecent?.();
+          if (!diagnostic) {
+            if (!r.replayed) celebrate(r);
+            refreshUser(); refreshDue(); refreshRecent?.();
+          }
           setSaveState(null);
         }
         // The attempt is recorded whether or not this card is still on screen,
@@ -772,6 +810,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   // back the verdict it already recorded, or marks it now if the first delivery
   // never landed. One attempt either way, and the student sees which.
   useEffect(() => {
+    if (diagnostic) return;
     const pending = readPendingSubmission(question.id);
     if (!pending) return;
     pendingRef.current = { submissionId: pending.submissionId, contentKey: submissionContentKey(pending.answer, pending.steps) };
@@ -809,6 +848,18 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     const disarm = setTimeout(() => setRevealArmed(false), 5000);
     return () => clearTimeout(disarm);
   }, [revealArmed]);
+
+  async function dontKnow() {
+    if (busy || resolved || !diagnostic) return;
+    setBusy(true);
+    try {
+      const r = await api.post(diagnostic.submitPath, { skip: true, ms: Date.now() - startRef.current });
+      setState({ phase: 'resolved', res: r });
+      onResolved?.(r);
+    } catch (e) {
+      setState({ phase: 'retry', res: { feedback: e.message, invalid: true } });
+    } finally { setBusy(false); }
+  }
 
   async function reveal() {
     if (inFlightRef.current || busy || resolved) return;
@@ -893,7 +944,11 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const [cloudCheckFor, setCloudCheckFor] = useState(null);   // { submissionId, result }
   const [cloudPending, setCloudPending] = useState(false);
   const cloudCheckRef = useRef(null);
+  const cloudCheckAbortRef = useRef(null);
   useEffect(() => { setCloudCheckFor(null); setCloudPending(false); }, [question?.id]);
+  // The request belongs to the attempt, not to the render that sent it, so it
+  // is cancelled only when the card goes away.
+  useEffect(() => () => { cloudCheckAbortRef.current?.abort?.(); }, []);
   useEffect(() => {
     if (!writeMode || !resolved) return;
     // The lines checked are the lines that were submitted and marked — not
@@ -910,21 +965,27 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     if (cloudCheckRef.current === key) return;              // already asked for this attempt
     cloudCheckRef.current = key;
 
-    let live = true;
+    // No per-render cleanup here. Resolving refreshes the user, which re-runs
+    // this effect; a cleanup that aborted the request on that re-run, followed
+    // by the "already asked" guard above, meant the answer was thrown away and
+    // never asked for again — the working note almost never appeared.
     const controller = typeof AbortController === 'function' ? new AbortController() : null;
+    cloudCheckAbortRef.current = controller;
     checkWorkingWithCloud(lines, {
       user,
       prompt: question?.prompt || '',
       signal: controller?.signal
     }).then(result => {
-      // Dropped unless it still describes the attempt on screen.
-      if (!live || !result || result.error) return;
+      // Dropped unless the card is still up and still showing this attempt.
+      if (!mountedRef.current || controller?.signal?.aborted) return;
+      if (!result || result.error) return;
       if (attemptRef.current?.submissionId !== bound.submissionId) return;
       setCloudCheckFor({ submissionId: bound.submissionId, result });
     }).catch(() => { })
-      .finally(() => { if (live) setCloudPending(false); });
+      // The status line says "Looking at your method" only while this request
+      // is genuinely in flight for the attempt on screen.
+      .finally(() => { if (mountedRef.current && attemptRef.current?.submissionId === bound.submissionId) setCloudPending(false); });
     setCloudPending(cloudReadingEnabled(user));
-    return () => { live = false; setCloudPending(false); controller?.abort?.(); };
   }, [writeMode, resolved, res?.correct, res?.invalid, res?.revealed, attempt, activeReport, user, question?.id, question?.prompt]);
 
   const cloudCheck = cloudCheckFor && attempt?.submissionId && cloudCheckFor.submissionId === attempt.submissionId
@@ -1098,7 +1159,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const otherComments = (inkComments || []).filter(c => c !== firstBad && c.kind !== 'good');
 
   return (
-    <div className={`qpage ws ${split ? 'ws-split' : 'ws-single'}`} data-phase={state.phase} data-mode={isMcq ? 'mcq' : mode}>
+    <div className={`qpage ws ${split ? 'ws-split' : 'ws-single'}`} data-phase={state.phase} data-mode={isMcq ? 'mcq' : mode} data-question-id={question.id}>
       {/* ── The question: the page's reference object ── */}
       <section className="ws-context" aria-label={t('verdict.questionRegion')}>
         <div className="q-topmeta">
@@ -1171,7 +1232,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
             </div>
           )}
           <div className="ws-tools-end">
-            {!isMcq && question.hintsAvailable > 0 && !resolved && (
+            {!diagnostic && !isMcq && question.hintsAvailable > 0 && !resolved && (
               <button type="button" className="icon-btn hint-bulb" disabled={hintsLeft <= 0}
                 title={t('verdict.hintTitle', { n: hintsUsed + 1 })}
                 aria-label={hintsLeft > 0 ? t('verdict.hintLabel', { n: hintsUsed + 1, total: question.hintsAvailable }) : t('verdict.noHintsLeft')}
@@ -1188,8 +1249,10 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
               <button type="button" className={`icon-btn q-rail-btn ${showWhy ? 'on' : ''}`} aria-pressed={showWhy}
                 title={t('verdict.whyThis')} aria-label={t('verdict.whyThis')} onClick={() => setShowWhy(s => !s)}><Icon name="info" /></button>
             )}
-            <button type="button" className={`icon-btn q-rail-btn ${bookmarked ? 'on' : ''}`} aria-pressed={bookmarked}
-              title={t('verdict.favorite')} aria-label={t('verdict.favoriteThis')} onClick={toggleBookmark}><Icon name="bookmark" /></button>
+            {!diagnostic && (
+              <button type="button" className={`icon-btn q-rail-btn ${bookmarked ? 'on' : ''}`} aria-pressed={bookmarked}
+                title={t('verdict.favorite')} aria-label={t('verdict.favoriteThis')} onClick={toggleBookmark}><Icon name="bookmark" /></button>
+            )}
           </div>
         </div>
 
@@ -1397,6 +1460,42 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
           </div>
         )}
 
+        {/* AI tutor: three levels of help, lazy-loaded on first use. It sits with
+            the work it is about, and never during a placement check. */}
+        {!resolved && tutorEnabled && !diagnostic && (
+          <div className="tutor-launch-row no-print">
+            <button type="button" className={`btn btn-ghost btn-sm tutor-launch ${showTutor ? 'on' : ''}`}
+              aria-expanded={showTutor} aria-label={t('tutor.helpLabel')} data-tutor-launch
+              onClick={() => setShowTutor(v => !v)}>
+              {t('tutor.help')}
+            </button>
+            {tutorUsed > 0 && <span className="muted" style={{ marginLeft: 8, fontSize: 13 }}>{t('tutor.helpUsed', { count: tutorUsed, n: tutorUsed })}</span>}
+          </div>
+        )}
+        {showTutor && !resolved && tutorEnabled && !diagnostic && (
+          <TutorBoundary fallback={t('tutor.unavailable')}>
+            <React.Suspense fallback={<div className="hintbox" role="status">{t('tutor.asking')}</div>}>
+              <TutorHelp
+                question={{ ...question, tutorLevel: tutorUsed }}
+                work={{
+                  lines: (isWorking || showWorking) && working ? working.split('\n').map(l => l.trim()).filter(Boolean).slice(0, 40).map(l => l.slice(0, 400)) : [],
+                  typed: isMcq ? '' : String(answer || '').slice(0, 300)
+                }}
+                locale={language === 'hi' ? 'hi' : 'en'}
+                onUsed={level => setTutorUsed(u => Math.max(u, level))}
+                startedAt={startRef.current}
+                onResolved={r => {
+                  // Level 3 ends the question like Reveal: same state, same refreshes.
+                  setState({ phase: 'resolved', res: r });
+                  celebrate(r); refreshUser(); refreshDue(); refreshRecent?.();
+                  onResolved?.(r);
+                }}
+                onClose={() => setShowTutor(false)}
+              />
+            </React.Suspense>
+          </TutorBoundary>
+        )}
+
         <div style={SR_ONLY} role="status" aria-live="polite" aria-atomic="true">{verdictSpeech}</div>
 
         {/* ── Feedback, attached to the work ── */}
@@ -1531,6 +1630,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                   </div>
                 )}
               </div>
+              {diagnostic && <p className="muted" style={{ margin: '0 18px', fontSize: 12.5 }}>{t('placement.cardNote')}</p>}
               <div className="eval-disclaimer" style={{ paddingBottom: 12 }}>{t('verdict.markedOnDevice')}</div>
             </div>
 
@@ -1546,7 +1646,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
               </section>
             ))}
 
-            {res.solution?.criteria && (
+            {!diagnostic && res.solution?.criteria && (
               <div className="criteria-self">
                 <CriteriaTable
                   criteria={res.solution.criteria}
@@ -1574,12 +1674,15 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
               : statusText}
           </span>
           <div className="ws-actions-btns">
-            {!resolved && (
+            {!resolved && diagnostic && (
+              <button className="btn btn-quiet" onClick={dontKnow} disabled={busy}>{t('placement.dontKnow')}</button>
+            )}
+            {!resolved && !diagnostic && (
               <button className={`btn ${revealArmed ? 'btn-ghost' : 'btn-quiet'}`} onClick={reveal} disabled={busy} aria-live="polite">
                 {revealArmed ? t('verdict.showSolutionConfirm') : t('verdict.showSolution')}
               </button>
             )}
-            {resolved && <button className="btn btn-quiet redo-chip" onClick={() => onRedo ? onRedo() : onNext?.()}>{t('verdict.redoQuestion')}</button>}
+            {resolved && !diagnostic && <button className="btn btn-quiet redo-chip" onClick={() => onRedo ? onRedo() : onNext?.()}>{t('verdict.redoQuestion')}</button>}
             <button className="btn btn-primary" onClick={primary.run} disabled={primary.disabled} aria-busy={busy || undefined}>
               {primary.label}
             </button>
