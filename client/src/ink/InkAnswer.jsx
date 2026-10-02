@@ -23,6 +23,7 @@ import { MathText } from '../lib/latex.jsx';
 import { currentReleaseIdentity } from '../platform/releaseIdentity.js';
 import { inkCanvasHeight, useFormFactor } from '../platform/formFactor.js';
 import { useT } from '../i18n/index.js';
+import { priNative } from '../platform/native/index.js';
 
 const NICE = { pi: 'π', theta: 'θ', sqrt: '√', percent: '%' };
 const showSym = s => NICE[s] || s;
@@ -137,7 +138,9 @@ export default function InkAnswer({ onRecognized, onStrokes = null, initialStrok
   // unless the student turned it on.
   const { user } = useApp();
   const [tool, setTool] = useState('pen');
-  const [finger, setFinger] = useState(false);
+  // Where the host has no stylus (iPhone), finger writing is the default; the
+  // toolbar toggle still switches it either way (CP-04).
+  const [finger, setFinger] = useState(() => priNative.ink.facts()?.fingerDefault === true);
   const [rec, setRec] = useState({ lines: [], text: '' });
   const [overrides, setOverrides] = useState({});
   const [picker, setPicker] = useState(null);
@@ -449,8 +452,8 @@ export default function InkAnswer({ onRecognized, onStrokes = null, initialStrok
         <button type="button" className="ink-tool" aria-label="Add more writing space"
           onClick={() => setExtraHeight(h => Math.min(400, h + 120))} title="More space">＋ space</button>
         <span className="ink-sep" />
-        <button type="button" className={`ink-tool ${finger ? 'on' : ''}`} title="Draw with a finger too (otherwise fingers scroll once a Pencil is seen)"
-          aria-label="Draw with a finger as well as a Pencil" aria-pressed={finger}
+        <button type="button" className={`ink-tool ${finger ? 'on' : ''}`} title={t('ink.fingerToggleTitle')}
+          aria-label={t('ink.fingerToggleAria')} aria-pressed={finger}
           onClick={() => setFinger(f => !f)}>☝ Finger</button>
         <span className="ink-hint">
           {t('ink.hintEachLine')}

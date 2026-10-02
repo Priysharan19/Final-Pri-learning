@@ -461,6 +461,8 @@ export default {
   'verdict.readingWork': 'Reading your handwriting…',
   'verdict.readOnServer': 'Read on the server',
   'ink.hintEachLine': 'Write each step on its own line · stylus or finger',
+  'ink.fingerToggleTitle': 'Write with your finger (when off, a finger scrolls the page and only a stylus writes)',
+  'ink.fingerToggleAria': 'Write with a finger',
   'verdict.removeAttachment': 'Remove attachment',
   'verdict.readingWithVision': 'Reading your handwriting on-device with Apple Vision…',
   'verdict.decodedOnDevice': 'Decoded on-device',
