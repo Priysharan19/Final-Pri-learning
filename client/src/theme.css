@@ -75,6 +75,8 @@
 
   /* Pri teal — the only interaction colour */
   --accent: #0b6e69;
+  /* P-prime brand: red belongs to the prime only (brand.md). */
+  --brand-prime: #b8402a;
   --accent-hover: #095b57;
   --accent-pressed: #074845;
   --accent-ink: #ffffff;
@@ -217,6 +219,7 @@
   --ink-2: #bebaaf;
   --ink-3: #969286;
   --accent: #5db8ad;
+  --brand-prime: #d9604a;
   --accent-hover: #74c5bb;
   --accent-pressed: #8fd0c7;
   --accent-ink: #0a1f1d;
@@ -2159,7 +2162,8 @@ h3, h4 { font-family: var(--font); }
 .btn-primary:hover:not(:disabled) { background: var(--ink-2); border-color: var(--ink-2); }
 .btn-primary:disabled { background: var(--surface-3); border-color: var(--surface-3); color: var(--ink-3); }
 .hero-kicker, .eyebrow { font: var(--type-label); text-transform: uppercase; letter-spacing: var(--tracking-label); color: var(--ink-3); }
-.logo { display: inline-flex; align-items: center; gap: 9px; color: var(--ink); }
+.logo { display: inline-flex; align-items: center; color: var(--ink); }
+.brand-wordmark, .brand-mark { display: block; flex: none; color: var(--ink); }
 .logo-name { font-family: var(--font-math); font-size: 19px; font-weight: 400; letter-spacing: 0; color: var(--ink); }
 .logo.logo-lg { gap: 12px; }
 .logo.logo-lg .logo-name { font-size: clamp(32px, 4.4vw, 42px); }

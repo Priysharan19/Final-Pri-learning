@@ -12,7 +12,7 @@ import Home from './pages/Home.jsx';
 import Practice from './pages/Practice.jsx';
 import Legal from './pages/Legal.jsx';
 import Icon from './components/Icon.jsx';
-import { BrandMark } from './components/BrandMark.jsx';
+import { BrandWordmark } from './components/BrandMark.jsx';
 
 // ── Routes nobody has opened yet ─────────────────────────────────────────────
 // Login, Home, Practice and Legal are the screens a first run reaches: the
@@ -113,8 +113,7 @@ export function Logo({ large = false, onClick }) {
     : {};
   return (
     <Tag className={`logo ${large ? 'logo-lg' : ''}${onClick ? ' logo-btn' : ''}`} {...controlProps}>
-      <BrandMark large={large} />
-      <span className="logo-name">Pri Learning</span>
+      <BrandWordmark height={large ? 44 : 22} />
     </Tag>
   );
 }
