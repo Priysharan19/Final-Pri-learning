@@ -10,6 +10,8 @@
 //   · a same-origin SUBFRAME is refused (no reply, ever).
 // Synthetic simulator evidence only; it says nothing about physical devices.
 // ─────────────────────────────────────────────────────────────────────────────
+#if DEBUG
+// Debug/simulator builds only: never compiled into a Release (App Store) build.
 import WebKit
 
 enum BridgeSelfCheck {
@@ -61,6 +63,22 @@ enum BridgeSelfCheck {
                     if !ok { failures += 1 }
                     NSLog("PRIBRIDGE %@ %@", ok ? "ok" : "FAIL", key)
                 }
+                // Native ink placement under page zoom (Dynamic Type): zoom 1 must
+                // equal the pre-zoom layout; zoom 1.5 must scale every coordinate.
+                let frame = CGRect(x: 100, y: 200, width: 300, height: 150)
+                let clip = CGRect(x: 0, y: 50, width: 800, height: 600)
+                let one = InkBridge.placement(frame: frame, clip: clip, reportedOffset: CGPoint(x: 0, y: 40),
+                                              contentOffset: CGPoint(x: 0, y: 40), zoom: 1, viewBounds: .zero)
+                let zoomed = InkBridge.placement(frame: frame, clip: clip, reportedOffset: CGPoint(x: 0, y: 40),
+                                                 contentOffset: CGPoint(x: 0, y: 60), zoom: 1.5, viewBounds: .zero)
+                let placementOK =
+                    one.clipFrame == clip && one.surfaceCenter == CGPoint(x: 250, y: 225) && one.scale == 1 &&
+                    one.surfaceBounds.size == frame.size &&
+                    zoomed.clipFrame == CGRect(x: 0, y: 75, width: 1200, height: 900) &&
+                    zoomed.surfaceCenter == CGPoint(x: 375, y: 337.5) && zoomed.scale == 1.5 &&
+                    zoomed.surfaceBounds.size == frame.size
+                if !placementOK { failures += 1 }
+                NSLog("PRIBRIDGE %@ inkPlacementZoom", placementOK ? "ok" : "FAIL")
                 let subframeHost = out["subframeHasHost"] as? Bool == true
                 if subframeHost { failures += 1 }
                 NSLog("PRIBRIDGE %@ subframeHasNoHost", subframeHost ? "FAIL" : "ok")
@@ -72,3 +90,5 @@ enum BridgeSelfCheck {
         }
     }
 }
+
+#endif

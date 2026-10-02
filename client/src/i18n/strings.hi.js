@@ -504,6 +504,8 @@ export default {
   'verdict.readingWork': 'आपकी लिखावट पढ़ी जा रही है…',
   'verdict.readOnServer': 'सर्वर पर पढ़ा गया',
   'ink.hintEachLine': 'हर चरण अलग पंक्ति में लिखें · स्टाइलस या उंगली से',
+  'ink.fingerToggleTitle': 'उंगली से लिखें (बंद होने पर उंगली पेज स्क्रॉल करती है और सिर्फ़ स्टाइलस लिखता है)',
+  'ink.fingerToggleAria': 'उंगली से लिखें',
   'verdict.removeAttachment': 'अटैचमेंट हटाएँ',
   'verdict.readingWithVision': 'आपकी हैंडराइटिंग इसी डिवाइस पर Apple Vision से पढ़ी जा रही है…',
   'verdict.decodedOnDevice': 'इसी डिवाइस पर पढ़ा गया',
