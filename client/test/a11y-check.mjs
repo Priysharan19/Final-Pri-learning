@@ -841,6 +841,12 @@ async function run() {
       await wait(page, 400);
     });
 
+    await step('placement', '/placement', async () => {
+      await goTo(page, BASE, '/placement');
+      await page.waitForSelector('main h1, main .card, main .skeleton', { timeout: 30000 });
+      await wait(page, 500);
+    });
+
     await step('tasks', '/tasks', async () => { await goTo(page, BASE, '/tasks'); });
 
     await step('tasks · new task', '/tasks', async () => {
