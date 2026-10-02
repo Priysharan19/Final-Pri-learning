@@ -1297,6 +1297,27 @@
       "bodyLimit": "1mb"
     },
     {
+      "method": "POST",
+      "path": "/v1/question-photo/identify",
+      "auth": "session",
+      "roles": null,
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "ownership": "stateless; photo only (answer-blind); proposes a chapter/skill validated against the syllabus snapshot, never marks; counts against the account AI allowance and the deployment paid-call ceiling",
+      "rateLimits": [
+        {
+          "key": "question-photo-identify",
+          "limit": 60,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb",
+      "innerLimits": "image bounded by validateQuestionImage (750 kB); transport cap 1 MiB"
+    },
+    {
       "method": "GET",
       "path": "/v1/tutor/status",
       "auth": "session",

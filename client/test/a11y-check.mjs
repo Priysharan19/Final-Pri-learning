@@ -791,6 +791,14 @@ async function run() {
       await wait(page, 400);
     });
 
+    // "Practise this": the photo picker before any photo is chosen. The read
+    // result and failure states are driven by tour-photo-practise.js.
+    await step('practise this · photo', '/practise-photo', async () => {
+      await goTo(page, BASE, '/practise-photo');
+      await page.waitForSelector('[data-photo-practise]', { timeout: 20000 });
+      await wait(page, 300);
+    });
+
     await step('tasks', '/tasks', async () => { await goTo(page, BASE, '/tasks'); });
 
     await step('tasks · new task', '/tasks', async () => {
