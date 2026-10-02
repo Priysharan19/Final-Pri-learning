@@ -75,7 +75,14 @@ function attemptPayload(attempt, fallbackAt = Date.now()) {
     viaInk: !!attempt?.viaInk,
     ratingBefore: Number.isFinite(Number(attempt?.ratingBefore)) ? Number(attempt.ratingBefore) : null,
     ratingAfter: Number.isFinite(Number(attempt?.ratingAfter)) ? Number(attempt.ratingAfter) : null,
-    createdAt: Number(attempt?.createdAt) || fallbackAt
+    createdAt: Number(attempt?.createdAt) || fallbackAt,
+    // Content identity rides along only when the attempt has it, so a legacy
+    // attempt's event payload stays byte-identical across a retry.
+    ...(typeof attempt?.contentId === 'string' && attempt.contentId ? {
+      contentId: attempt.contentId.slice(0, 200),
+      contentVersion: String(attempt.contentVersion || '').slice(0, 40) || null,
+      contentHash: typeof attempt.contentHash === 'string' ? attempt.contentHash.slice(0, 32) : null
+    } : {})
   };
 }
 

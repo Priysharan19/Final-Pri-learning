@@ -85,6 +85,14 @@ jobs:
           grep -Fq 'PASS — §09 submission lifecycle: 13 groups' suites.log
           grep -Fq 'PASS — Grade 9 Ganita Manjari: 1280 seeded forms (1000 numeric handwriting-ready, 280 conceptual).' suites.log
           grep -Fq 'PASS — 8/8 chapters, 200/200 uploaded pages, 42/42 formal exercise sections and 293/293 formal exercise prompts represented and verified.' suites.log
+          # §06 content runtime certification: every V1 launch path (CBSE/NCERT
+          # 7–12, JEE Main, JEE Advanced) served, validated, versioned and
+          # end-to-end through the local backend; the path count may only grow.
+          grep -Fq 'CONTENT CERTIFICATION REGRESSIONS: PASS — 135/135 checks' suites.log
+          grep -Fq 'CONTENT CERTIFICATION (fast, 4/path/difficulty): PASS — ' suites.log
+          grep -Fq '8/8 exam selections' suites.log
+          paths=$(grep -Eo 'CONTENT CERTIFICATION [(]fast, 4/path/difficulty[)]: PASS — [0-9]+' suites.log | grep -Eo '[0-9]+$')
+          test "${paths:-0}" -ge 793
           if grep -Fq 'not measured:' suites.log; then
             echo 'A deterministic suite reported skipped coverage.' >&2
             exit 1
