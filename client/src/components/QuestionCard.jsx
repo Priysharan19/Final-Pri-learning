@@ -1716,7 +1716,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
               : statusText}
             {/* Handwriting is read only by the server reader (#316); say so where the work is submitted. */}
             {writeMode && !isMcq && (
-              <span className="ws-read-by muted">{String(inkResult?.engine || '').startsWith('cloud') ? t('verdict.inkReadByServer') : t('verdict.inkReadByServerPending')}</span>
+              <span className="ws-read-by">{String(inkResult?.engine || '').startsWith('cloud') ? t('verdict.inkReadByServer') : t('verdict.inkReadByServerPending')}</span>
             )}
           </span>
           <div className="ws-actions-btns">
