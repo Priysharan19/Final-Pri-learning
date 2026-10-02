@@ -88,7 +88,7 @@ jobs:
           # §06 content runtime certification: every V1 launch path (CBSE/NCERT
           # 7–12, JEE Main, JEE Advanced) served, validated, versioned and
           # end-to-end through the local backend; the path count may only grow.
-          grep -Fq 'CONTENT CERTIFICATION REGRESSIONS: PASS — 119/119 checks' suites.log
+          grep -Fq 'CONTENT CERTIFICATION REGRESSIONS: PASS — 135/135 checks' suites.log
           grep -Fq 'CONTENT CERTIFICATION (fast, 4/path/difficulty): PASS — ' suites.log
           grep -Fq '8/8 exam selections' suites.log
           paths=$(grep -Eo 'CONTENT CERTIFICATION [(]fast, 4/path/difficulty[)]: PASS — [0-9]+' suites.log | grep -Eo '[0-9]+$')

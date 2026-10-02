@@ -312,12 +312,12 @@ const student = await premiumProfile({ name: 'Cert Student', course: 'in', india
   // authored rung to the one pressed, and a stale generator-id link resolves to
   // its chapter instead of refusing.
   const { NCERT_CLASS10_CONTENT } = await import('../src/engine/ncert/class10-content.js');
-  const { class10LibraryPracticeHref, practiceRequestFromQuery, practiceHref } = await import('../src/lib/practiceLinks.js');
+  const { class10LibraryPracticeHref, practiceRequestFromQuery, practiceHref, practiceDifficulties } = await import('../src/lib/practiceLinks.js');
   await premiumProfile({ name: 'Cert Library', course: 'in', indiaTrack: 'cbse', year: 10 });
   const refused = [], offChapter = [], offRung = [];
   for (const chapter of NCERT_CLASS10_CONTENT) {
     const rungs = new Set((IN_CHAPTER_BY_ID[chapter.id]?.covers || []).flatMap(c => c.diff || []));
-    for (const d of [1, 2, 3, 4]) {
+    for (const d of practiceDifficulties({ track: 'cbse' })) {
       const href = class10LibraryPracticeHref(chapter, d);
       const r = await dispatch('POST', '/practice/next', practiceRequestFromQuery(new URL(href, 'https://x.invalid').searchParams)).catch(e => ({ error: e }));
       if (r.error) { refused.push(`${chapter.id}@D${d} ${r.error.code}`); continue; }
@@ -339,6 +339,8 @@ const student = await premiumProfile({ name: 'Cert Student', course: 'in', india
     if (r.question) await dispatch('POST', `/practice/${r.question.id}/discard`, {});
   }
   {
+    // Defence for links built before the D4 button was hidden (bookmarks,
+    // shared links): the backend still holds them to D3 and says so.
     const r = await dispatch('POST', '/practice/next', { mode: 'topic', subtopic: 'c10-polynomials', track: 'cbse', difficulty: 4 });
     const row = await idb.get('questions', r.question.id);
     eq(row.difficulty, 3, 'a named D4 on a CBSE chapter is held to the CBSE window (adaptive-08)');
@@ -379,6 +381,30 @@ const student = await premiumProfile({ name: 'Cert Student', course: 'in', india
   ok(r2.q.prompt === 'q3' && !r2.repeat, 'a fresh question that springs it wins outright');
   const r3 = drawDistinct(() => mk(1, false), [seenHash], { tries: 3 });
   ok(r3.repeat && r3.q.prompt === 'q1', 'an exhausted pool returns a flagged repeat instead of spinning');
+}
+
+{
+  // Coordinator decision: no CBSE surface offers D4; JEE tracks keep it.
+  const { practiceDifficulties, practiceHref, class10LibraryPracticeHref } = await import('../src/lib/practiceLinks.js');
+  const cbseContexts = [
+    { track: 'cbse' }, { course: 'in', track: 'cbse', grade: 12 }, { course: 'in', grade: 7 },
+    { course: 'in', track: 'jee-main', grade: 10 }, { course: 'in', track: 'cbse', grade: 10, ceiling: 3 }
+  ];
+  for (const ctx of cbseContexts) ok(!practiceDifficulties(ctx).includes(4), `no D4 offered to a CBSE context ${JSON.stringify(ctx)}`);
+  for (const track of ['jee-main', 'jee-advanced']) ok(practiceDifficulties({ course: 'in', track, grade: 12 }).includes(4), `${track} keeps D4`);
+  ok(practiceDifficulties({ course: 'au', track: null, grade: 10 }).includes(4), 'the NSW course keeps D4');
+  ok(!/difficulty=4/.test(practiceHref({ subtopic: 'c10-polynomials', track: 'cbse', difficulty: 4 })), 'the shared builder never emits a CBSE D4 link');
+  ok(/difficulty=4/.test(practiceHref({ subtopic: 'c12-integrals-methods', track: 'jee-advanced', difficulty: 4 })), 'a JEE D4 link is still built');
+  const { NCERT_CLASS10_CONTENT } = await import('../src/engine/ncert/class10-content.js');
+  const libLinks = NCERT_CLASS10_CONTENT.flatMap(c => practiceDifficulties({ track: 'cbse' }).map(d => class10LibraryPracticeHref(c, d)));
+  ok(libLinks.length === NCERT_CLASS10_CONTENT.length * 3 && libLinks.every(h => !/difficulty=4/.test(h)), 'the Class X library renders D1–D3 links only');
+  const library = src('../src/components/Class10NCERTLibrary.jsx');
+  ok(library.includes("practiceDifficulties({track:'cbse'}).map(") && !library.includes('[1,2,3,4].map'), 'the Class X library buttons come from the shared CBSE difficulty list');
+  const home = src('../src/pages/Home.jsx');
+  ok(home.includes('offeredDifficulties.map(') && !/\[1, 2, 3, 4\]\.filter/.test(home), 'Home\'s difficulty picker offers only practiceDifficulties for the context');
+  ok(home.includes('difficulty: chosenDifficulty'), 'a remembered D4 filter is not sent from a CBSE Home');
+  ok(src('../src/pages/Tasks.jsx').includes('section?.difficultyCeiling || 3'), 'the Tasks difficulty picker stays within the section ceiling (D1–D3 for CBSE)');
+  ok(!/difficulty/.test(src('../src/pages/IndiaProgress.jsx').match(/indiaProgressPracticeHref\([^)]*\)/)?.[0] || ''), 'India Progress links carry no difficulty');
 }
 
 // ── 5. Versioning gate ──────────────────────────────────────────────────────

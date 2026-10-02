@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MathText } from '../lib/latex.jsx';
 import { useT } from '../i18n/index.js';
-import { class10LibraryPracticeHref } from '../lib/practiceLinks.js';
+import { class10LibraryPracticeHref, practiceDifficulties } from '../lib/practiceLinks.js';
 import { NCERT_CLASS10_CONTENT, NCERT_CLASS10_RELEASE_AUDIT } from '../engine/ncert/class10-content.js';
 
 // Tab ids with the catalogue keys for their labels (Topper Notes, Worked Examples, Exercises, Source Coverage).
@@ -37,7 +37,7 @@ export default function Class10NCERTLibrary(){
       <div className="spread" style={{gap:12,alignItems:'flex-start'}}>
         <div><div className="sc-label">{t('ncert.c10ChapterNum',{n:chapter.num})}</div><h3 style={{margin:'3px 0'}}>{chapter.title}</h3><div className="muted">{t('ncert.c10ChapterMeta',{count:chapter.exercises.length,n:chapter.exercises.length,file:chapter.sourceFile,pages:chapter.pages})}</div></div>
         <div className="row" style={{flexWrap:'wrap',justifyContent:'flex-end'}}>
-          {[1,2,3,4].map(d=><button key={d} className="btn btn-primary btn-sm" onClick={()=>practice(d)}>{`D${d} ${t(DIFF[d])}`}</button>)}
+          {practiceDifficulties({track:'cbse'}).map(d=><button key={d} className="btn btn-primary btn-sm" onClick={()=>practice(d)}>{`D${d} ${t(DIFF[d])}`}</button>)}
         </div>
       </div>
 

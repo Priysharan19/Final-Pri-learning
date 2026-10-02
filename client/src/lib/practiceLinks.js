@@ -6,12 +6,30 @@
 // replay exactly what a button sends — a surface that builds a link the backend
 // cannot serve is then a failing certification path, not a broken button.
 
+// CBSE / NCERT practice is held to D1–D3 (adaptive-08), so no surface offers a
+// CBSE student a D4 button; the JEE tracks and the olympiad keep D4.
+export const CBSE_DIFFICULTIES = Object.freeze([1, 2, 3]);
+export const ALL_DIFFICULTIES = Object.freeze([1, 2, 3, 4]);
+
+/** The difficulty buttons a surface may offer in this context. */
+export function practiceDifficulties({ course = null, track = null, grade = null, ceiling = null } = {}) {
+  const india = course === 'in' || !!track;
+  const effective = track === 'jee-main' || track === 'jee-advanced'
+    ? (india && grade != null && Number(grade) < 11 ? 'cbse' : track)
+    : track || (india ? 'cbse' : null);
+  let list = effective === 'cbse' ? [...CBSE_DIFFICULTIES] : [...ALL_DIFFICULTIES];
+  if (ceiling) list = list.filter(d => d <= Number(ceiling));
+  return list;
+}
+
 /** `/practice?…` for a topic or smart request. */
 export function practiceHref({ subtopic = null, dotpoint = null, difficulty = null, track = null, pyq = false } = {}) {
   const p = new URLSearchParams();
   if (subtopic) p.set('subtopic', String(subtopic));
   if (subtopic && dotpoint != null && dotpoint !== '') p.set('dotpoint', String(dotpoint));
-  if (difficulty != null && difficulty !== '') p.set('difficulty', String(difficulty));
+  // Defence in depth: a CBSE link never carries D4 even if a caller asks.
+  const d = difficulty != null && difficulty !== '' && track === 'cbse' ? Math.min(3, Number(difficulty)) : difficulty;
+  if (d != null && d !== '') p.set('difficulty', String(d));
   if (track) p.set('track', String(track));
   if (pyq) p.set('pyq', '1');
   const q = p.toString();

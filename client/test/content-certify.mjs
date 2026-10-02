@@ -527,7 +527,7 @@ export async function certifyBackend(paths, { surfaces = true } = {}) {
   installBrowserEnv();
   const { dispatch } = await import('../src/local/backend.js');
   const idb = await import('../src/local/idb.js');
-  const { practiceHref, practiceRequestFromQuery, class10LibraryPracticeHref, indiaProgressPracticeHref } = await import('../src/lib/practiceLinks.js');
+  const { practiceHref, practiceRequestFromQuery, class10LibraryPracticeHref, indiaProgressPracticeHref, practiceDifficulties } = await import('../src/lib/practiceLinks.js');
   const profiles = new Map();
   let current = null;
   const use = async (track, grade) => {
@@ -571,11 +571,15 @@ export async function certifyBackend(paths, { surfaces = true } = {}) {
   }
   if (!surfaces) return rows;
 
-  // The Class X NCERT library (Classes page): D1–D4 per chapter.
+  // The Class X NCERT library (Classes page): one button per difficulty it
+  // offers a CBSE student — D1–D3, since CBSE practice is held to D1–D3.
   const { NCERT_CLASS10_CONTENT } = await import('../src/engine/ncert/class10-content.js');
   await use('cbse', 10);
+  const libraryRungs = practiceDifficulties({ track: 'cbse' });
+  const cbseWindow = indiaDifficultyWindow('cbse', 10);
+  rows.push({ id: 'surface/class10-library/offered-difficulties', ok: libraryRungs.every(d => d >= cbseWindow.floor && d <= cbseWindow.ceiling), problem: `offers D${libraryRungs.join('/D')} outside the CBSE window` });
   for (const chapter of NCERT_CLASS10_CONTENT) {
-    for (const d of [1, 2, 3, 4]) {
+    for (const d of libraryRungs) {
       const p = { chapterId: chapter.id, dotpoint: null, track: 'cbse', grade: 10 };
       await send(`surface/class10-library/${chapter.id}@D${d}`, class10LibraryPracticeHref(chapter, d), { chapterId: chapter.id, difficulty: d, rungs: nearestRungs(p, d) });
     }
