@@ -319,6 +319,8 @@ export const cloud = Object.freeze({
     cloudRequest('/v1/tutor/help', { method: 'POST', body, signal, timeoutMs }),
   deleteAccount: body => cloudRequest('/v1/account', { method: 'DELETE', body }),
   identities: () => cloudRequest('/v1/account/identity'),
+  identityProviders: () => cloudRequest('/v1/account/identity/providers'),
+  identityNonce: () => cloudRequest('/v1/account/identity/nonce', { method: 'POST', body: {} }),
   socialSignIn: (provider, body) => cloudRequest(`/v1/account/identity/${pathId(provider, 'provider')}/sign-in`, { method: 'POST', body }),
   linkIdentity: (provider, body) => cloudRequest(`/v1/account/identity/${pathId(provider, 'provider')}/link`, { method: 'POST', body }),
   syncPush: (body, idempotencyKey) => cloudRequest('/v1/sync/push', { method: 'POST', body, idempotencyKey }),

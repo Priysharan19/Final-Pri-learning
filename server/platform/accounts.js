@@ -84,7 +84,7 @@ function ensureDeliveryTable(db) {
   );`);
 }
 
-async function queueAccountToken(db, accountId, destination, purpose, now = Date.now()) {
+export async function queueAccountToken(db, accountId, destination, purpose, now = Date.now()) {
   // Only a one-way token hash is used for verification. The delivery worker gets
   // an AES-GCM envelope bound to this token id; raw tokens are never persisted.
   const raw = opaqueToken(32);
