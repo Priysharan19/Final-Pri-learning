@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { MathText } from '../lib/latex.jsx';
+import { useT, useTx } from '../i18n/index.js';
 import {
   NCERT_CLASS8_RATIONAL_CONTENT,
   NCERT_CLASS8_RATIONAL_TOPPER_NOTES,
@@ -7,12 +8,26 @@ import {
   NCERT_CLASS8_RATIONAL_SOURCE_CHECKS
 } from '../engine/ncert/class8-rational-numbers.js';
 
+// Tab ids with the catalogue keys for their labels.
 const TAB = {
-  notes: 'Topper notes',
-  examples: 'Worked examples',
-  checks: 'NCERT checks',
-  coverage: 'Source coverage'
+  notes: 'ncert.topperNotes',
+  examples: 'ncert.workedExamples',
+  checks: 'ncert.ncertChecks',
+  coverage: 'ncert.sourceCoverage'
 };
+
+// i18n-exempt-start: the 60-second final check is a list of rational-number facts — maths content that stays English by design
+const FINAL_CHECK = [
+  'Denominator can never be 0.',
+  'For rationals: +, − and × are closed; ÷ needs a non-zero divisor.',
+  '+ and × are commutative and associative; − and ÷ are neither.',
+  '0 is additive identity; 1 is multiplicative identity.',
+  'Additive inverse changes sign; multiplicative inverse reciprocates a non-zero number.',
+  '$a(b+c)=ab+ac$ and $a(b-c)=ab-ac$.',
+  'Cancel factors, not terms separated by + or −.',
+  'Between two different rationals lie infinitely many rationals.'
+];
+// i18n-exempt-end
 
 function Text({ children }) {
   return <MathText text={String(children ?? '')} />;
@@ -34,30 +49,30 @@ function PropertyTable({ rows }) {
 }
 
 export default function RationalNumbersTopperSection() {
+  const t = useT();
+  const tx = useTx();
   const [open, setOpen] = useState(true);
   const [tab, setTab] = useState('notes');
   const meta = NCERT_CLASS8_RATIONAL_CONTENT.source;
 
   return (
-    <section className="qpage" aria-label="NCERT Rational Numbers topper learning section" style={{ paddingBottom: 4 }}>
+    <section className="qpage" aria-label={t('ncert.rnSectionAria')} style={{ paddingBottom: 4 }}>
       <div className="card" style={{ padding: 0, overflow: 'hidden', marginBottom: 14 }}>
         <div style={{ padding: '20px 22px 18px' }}>
           <div className="spread" style={{ gap: 18, alignItems: 'flex-start' }}>
             <div style={{ minWidth: 0 }}>
               <div className="row" style={{ gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
-                <span className="tag tag-brand">NCERT · Class 8 · Chapter 1</span>
-                <span className="tag">Topper Learning Layer</span>
-                <span className="tag">{NCERT_CLASS8_RATIONAL_CONTENT.questionBank.authoredCells} authored question cells</span>
+                <span className="tag tag-brand">{t('ncert.classChapterTag', { cls: 8, n: 1 })}</span>
+                <span className="tag">{t('ncert.topperLearningLayer')}</span>
+                <span className="tag">{t('ncert.rnAuthoredCells', { n: NCERT_CLASS8_RATIONAL_CONTENT.questionBank.authoredCells })}</span>
               </div>
-              <h2 style={{ margin: 0 }}>Rational Numbers · Topper Notes + Complete Chapter Bank</h2>
+              <h2 style={{ margin: 0 }}>{t('ncert.rnTitle')}</h2>
               <p className="muted" style={{ margin: '7px 0 0', maxWidth: 900 }}>
-                Built from {meta.title}, {meta.edition}. The source chapter, its property tables, Try These,
-                Examples 1–3, Exercise 1.1 and the final density result are mapped below and connected to
-                Pri Learning practice.
+                {t('ncert.rnIntro', { title: meta.title, edition: meta.edition })}
               </p>
             </div>
             <button className="btn btn-quiet btn-sm" onClick={() => setOpen(v => !v)} aria-expanded={open}>
-              {open ? 'Hide notes' : 'Open topper notes'}
+              {open ? t('ncert.rnHideNotes') : t('ncert.openTopperNotes')}
             </button>
           </div>
 
@@ -65,11 +80,9 @@ export default function RationalNumbersTopperSection() {
             <div className="row" style={{ gap: 10, alignItems: 'flex-start' }}>
               <span aria-hidden="true" style={{ fontSize: 20 }}>✍️</span>
               <div>
-                <b>AI handwriting is live for the calculation bank.</b>
+                <b>{t('ncert.rnHandwritingLive')}</b>
                 <div className="muted" style={{ marginTop: 3 }}>
-                  Choose <b>Write</b> on a generated numeric question. Pri’s handwriting pipeline reads fractions,
-                  negative signs and multi-line working, confidence-checks uncertain recognition before marking,
-                  and then shows the same fully worked solution used by the answer engine.
+                  {tx('ncert.rnHandwritingBody', { write: <b>{t('ncert.writeMode')}</b> })}
                 </div>
               </div>
             </div>
@@ -78,12 +91,12 @@ export default function RationalNumbersTopperSection() {
 
         {open && (
           <div style={{ borderTop: '1px solid var(--line)', padding: '0 22px 22px' }}>
-            <div className="row" role="tablist" aria-label="Rational Numbers learning views"
+            <div className="row" role="tablist" aria-label={t('ncert.rnViewsAria')}
               style={{ gap: 8, flexWrap: 'wrap', padding: '14px 0 16px' }}>
               {Object.entries(TAB).map(([key, label]) => (
                 <button key={key} role="tab" aria-selected={tab === key}
                   className={`btn btn-sm ${tab === key ? 'btn-primary' : 'btn-quiet'}`}
-                  onClick={() => setTab(key)}>{label}</button>
+                  onClick={() => setTab(key)}>{t(label)}</button>
               ))}
             </div>
 
@@ -99,14 +112,15 @@ export default function RationalNumbersTopperSection() {
 }
 
 function TopperNotes() {
+  const t = useT();
   return (
     <div>
       <div className="spread" style={{ marginBottom: 10, gap: 12, flexWrap: 'wrap' }}>
         <div>
-          <div className="sc-label" style={{ margin: 0 }}>TOPPER-ONLY NOTES</div>
-          <div className="muted" style={{ marginTop: 4 }}>Definition precision, proof ideas, counterexamples and fast calculation structure.</div>
+          <div className="sc-label" style={{ margin: 0 }}>{t('ncert.rnTopperOnly')}</div>
+          <div className="muted" style={{ marginTop: 4 }}>{t('ncert.rnTopperOnlyBody')}</div>
         </div>
-        <span className="tag tag-brand">Exam traps included</span>
+        <span className="tag tag-brand">{t('ncert.rnExamTraps')}</span>
       </div>
 
       <div className="grid cols-2" style={{ gap: 12 }}>
@@ -125,12 +139,12 @@ function TopperNotes() {
               ))}
               {note.formula && (
                 <div className="card" style={{ padding: '10px 12px', marginTop: 10 }}>
-                  <b>Proof skeleton</b><div style={{ marginTop: 5 }}><Text>{note.formula}</Text></div>
+                  <b>{t('ncert.rnProofSkeleton')}</b><div style={{ marginTop: 5 }}><Text>{note.formula}</Text></div>
                 </div>
               )}
               <PropertyTable rows={note.table} />
               <div style={{ marginTop: 12 }}>
-                <span className="tag tag-brand">Topper edge</span>
+                <span className="tag tag-brand">{t('ncert.topperEdge')}</span>
                 <div style={{ marginTop: 6 }}><Text>{note.edge}</Text></div>
               </div>
             </div>
@@ -139,18 +153,9 @@ function TopperNotes() {
       </div>
 
       <div className="card" style={{ marginTop: 14, padding: 16 }}>
-        <div className="sc-label" style={{ margin: 0 }}>60-second final check</div>
+        <div className="sc-label" style={{ margin: 0 }}>{t('ncert.rnFinalCheck')}</div>
         <div className="grid cols-2" style={{ marginTop: 10, gap: 8 }}>
-          {[
-            'Denominator can never be 0.',
-            'For rationals: +, − and × are closed; ÷ needs a non-zero divisor.',
-            '+ and × are commutative and associative; − and ÷ are neither.',
-            '0 is additive identity; 1 is multiplicative identity.',
-            'Additive inverse changes sign; multiplicative inverse reciprocates a non-zero number.',
-            '$a(b+c)=ab+ac$ and $a(b-c)=ab-ac$.',
-            'Cancel factors, not terms separated by + or −.',
-            'Between two different rationals lie infinitely many rationals.'
-          ].map((x, i) => <div key={i}><b>{i + 1}.</b> <Text>{x}</Text></div>)}
+          {FINAL_CHECK.map((x, i) => <div key={i}><b>{i + 1}.</b> <Text>{x}</Text></div>)}
         </div>
       </div>
     </div>
@@ -158,9 +163,10 @@ function TopperNotes() {
 }
 
 function WorkedExamples() {
+  const t = useT();
   return (
     <div>
-      <div className="sc-label" style={{ margin: '0 0 10px' }}>NCERT WORKED EXAMPLES · FULL PRI-LEVEL SOLUTIONS</div>
+      <div className="sc-label" style={{ margin: '0 0 10px' }}>{t('ncert.rnWorkedEyebrow')}</div>
       <div style={{ display: 'grid', gap: 12 }}>
         {NCERT_CLASS8_RATIONAL_WORKED_EXAMPLES.map((ex, i) => (
           <details className="card" key={ex.id} open={i === 0} style={{ padding: '14px 16px' }}>
@@ -177,8 +183,8 @@ function WorkedExamples() {
               ))}
             </div>
             <div className="spread" style={{ marginTop: 12, gap: 12, flexWrap: 'wrap' }}>
-              <div><b>Final answer:</b> <Text>{ex.answer}</Text></div>
-              <span className="tag tag-brand">Topper method</span>
+              <div><b>{t('ncert.finalAnswer')}</b> <Text>{ex.answer}</Text></div>
+              <span className="tag tag-brand">{t('ncert.rnTopperMethod')}</span>
             </div>
             <div className="muted" style={{ marginTop: 7 }}><Text>{ex.topper}</Text></div>
           </details>
@@ -186,11 +192,9 @@ function WorkedExamples() {
       </div>
 
       <div className="card" style={{ marginTop: 14, padding: 16 }}>
-        <b>How Pri marks the same ideas</b>
+        <b>{t('ncert.rnHowPriMarks')}</b>
         <div className="muted" style={{ marginTop: 6 }}>
-          The generated bank contains four levels for each chapter skill. Numeric forms are handwriting-ready;
-          conceptual property questions use MCQ where handwriting recognition would add friction rather than mathematical value.
-          Every form carries progressive hints, misconception-specific feedback and a complete step sequence revealed after marking.
+          {t('ncert.rnHowPriMarksBody')}
         </div>
       </div>
     </div>
@@ -198,14 +202,15 @@ function WorkedExamples() {
 }
 
 function SourceChecks() {
+  const t = useT();
   return (
     <div>
       <div className="spread" style={{ marginBottom: 10, gap: 12, flexWrap: 'wrap' }}>
         <div>
-          <div className="sc-label" style={{ margin: 0 }}>TRY THESE + EXERCISE 1.1 · SOLVED</div>
-          <div className="muted" style={{ marginTop: 4 }}>Use these as a chapter audit after doing generated practice.</div>
+          <div className="sc-label" style={{ margin: 0 }}>{t('ncert.rnChecksEyebrow')}</div>
+          <div className="muted" style={{ marginTop: 4 }}>{t('ncert.rnChecksBody')}</div>
         </div>
-        <span className="tag">{NCERT_CLASS8_RATIONAL_SOURCE_CHECKS.length} source checks</span>
+        <span className="tag">{t('ncert.rnSourceChecks', { count: NCERT_CLASS8_RATIONAL_SOURCE_CHECKS.length, n: NCERT_CLASS8_RATIONAL_SOURCE_CHECKS.length })}</span>
       </div>
       <div style={{ display: 'grid', gap: 9 }}>
         {NCERT_CLASS8_RATIONAL_SOURCE_CHECKS.map((item, i) => (
@@ -215,7 +220,7 @@ function SourceChecks() {
               <div style={{ marginTop: 4 }}><Text>{item.prompt}</Text></div>
             </summary>
             <div style={{ marginTop: 10, borderTop: '1px solid var(--line)', paddingTop: 10 }}>
-              <span className="tag tag-brand">Worked answer</span>
+              <span className="tag tag-brand">{t('ncert.rnWorkedAnswer')}</span>
               <div style={{ marginTop: 7 }}><Text>{item.solution}</Text></div>
             </div>
           </details>
@@ -226,23 +231,24 @@ function SourceChecks() {
 }
 
 function Coverage() {
+  const t = useT();
   const qb = NCERT_CLASS8_RATIONAL_CONTENT.questionBank;
   return (
     <div>
       <div className="grid cols-2" style={{ gap: 12, marginBottom: 14 }}>
         <div className="card" style={{ padding: 14 }}>
-          <div className="sc-label" style={{ margin: 0 }}>Question-bank contract</div>
+          <div className="sc-label" style={{ margin: 0 }}>{t('ncert.rnBankContract')}</div>
           <div style={{ fontSize: 26, fontWeight: 800, marginTop: 6 }}>{qb.authoredCells}</div>
-          <div className="muted">8 exact skill generators × 4 Pri difficulty levels</div>
+          <div className="muted">{t('ncert.rnBankContractBody')}</div>
         </div>
         <div className="card" style={{ padding: 14 }}>
-          <div className="sc-label" style={{ margin: 0 }}>Answer experience</div>
-          <div style={{ fontWeight: 750, marginTop: 8 }}>Type · AI handwriting · Photo OCR</div>
+          <div className="sc-label" style={{ margin: 0 }}>{t('ncert.rnAnswerExperience')}</div>
+          <div style={{ fontWeight: 750, marginTop: 8 }}>{t('ncert.typeHandwritingPhoto')}</div>
           <div className="muted" style={{ marginTop: 4 }}>{qb.solutionSupport}</div>
         </div>
       </div>
 
-      <div className="sc-label" style={{ margin: '0 0 10px' }}>PAGE-BY-PAGE SOURCE AUDIT</div>
+      <div className="sc-label" style={{ margin: '0 0 10px' }}>{t('ncert.pageByPageAudit')}</div>
       <div style={{ display: 'grid', gap: 8 }}>
         {NCERT_CLASS8_RATIONAL_CONTENT.sourceMap.map((row, i) => (
           <div className="card" key={i} style={{ padding: '11px 13px' }}>
@@ -251,13 +257,13 @@ function Coverage() {
                 <b>{row.section}</b>
                 <div className="muted" style={{ marginTop: 4 }}>{row.coverage}</div>
               </div>
-              <span className="tag">p. {row.pages}</span>
+              <span className="tag">{t('ncert.pageShort', { pages: row.pages })}</span>
             </div>
           </div>
         ))}
       </div>
       <p className="muted" style={{ marginTop: 10 }}>
-        Page 14 is intentionally listed: it is the blank NCERT notes page, so the audit can distinguish “no mathematical content” from “content missed”.
+        {t('ncert.rnPage14')}
       </p>
     </div>
   );

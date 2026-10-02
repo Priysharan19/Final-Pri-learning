@@ -160,7 +160,9 @@ final class InkBridge: NSObject, InkSurfaceDelegate {
     private func applyLayout() {
         guard isMounted, let webView else { return }
         let p = Self.placement(frame: reportedFrame, clip: reportedClip, reportedOffset: reportedOffset,
-                               contentOffset: webView.scrollView.contentOffset, zoom: webView.pageZoom,
+                               contentOffset: webView.scrollView.contentOffset,
+                               // CSS px → points, whether the page is scaled by page zoom or the viewport.
+                               zoom: webView.pageZoom * webView.scrollView.zoomScale,
                                viewBounds: webView.bounds)
         clipView.frame = p.clipFrame
         // bounds + center (not frame) because the view carries a transform.

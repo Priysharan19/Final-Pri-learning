@@ -153,12 +153,35 @@ function cleanAction(raw, evidence, context) {
   return { ok: false, reason: 'invalid action', action: null };
 }
 
+// A caption key names one of Pri's own interface sentences (explain.* in the
+// string catalogue) so the player can show and speak it in the student's
+// language. Only that namespace is accepted, the variables are bare numbers,
+// and the English heading/lines are still required and still validated above:
+// a key changes which language the words are in, never what the scene says.
+const CAPTION_KEY = /^explain\.scene\.[A-Za-z]+$/;
+function captionKeys(raw, untitledIndex) {
+  const key = value => (typeof value === 'string' && CAPTION_KEY.test(value) ? value : null);
+  const out = {};
+  if (untitledIndex != null) {
+    out.headingKey = 'explain.scene.scene';
+    out.headingVars = { n: untitledIndex + 1 };
+  } else if (key(raw.headingKey)) {
+    out.headingKey = key(raw.headingKey);
+    const n = Number(raw.headingVars?.n);
+    if (Number.isFinite(n)) out.headingVars = { n };
+  }
+  if (Array.isArray(raw.lineKeys)) out.lineKeys = raw.lineKeys.slice(0, 6).map(key);
+  if (key(raw.narrationKey)) out.narrationKey = key(raw.narrationKey);
+  return out;
+}
+
 function cleanScene(raw, index, evidence, context, trustedText) {
   if (!raw || typeof raw !== 'object') {
     return { ok: false, reason: 'invalid scene', scene: null };
   }
 
   const heading = text(raw.heading, 180) || `Scene ${index + 1}`;
+  const caption = captionKeys(raw, heading === `Scene ${index + 1}` && !text(raw.heading, 180) ? index : null);
   const lines = Array.isArray(raw.lines)
     ? raw.lines.map(value => text(value, 360)).filter(Boolean).slice(0, 6)
     : [];
@@ -187,6 +210,7 @@ function cleanScene(raw, index, evidence, context, trustedText) {
       heading,
       lines,
       narration,
+      ...caption,
       concept: text(raw.concept, 80) || 'generic',
       actions,
     },
@@ -243,7 +267,7 @@ export function storyboardPromptContract(solution, context = {}) {
       'Use focus_math tokens only when the token occurs in the verified expression.',
       'Use checkpoint only to ask for a prediction; never supply its answer.',
       'Any $...$ maths in headings, lines, labels, narration or checkpoints must occur in verifiedMath.',
-      'Keep narration concise and suitable for spoken Australian English.',
+      'Keep narration concise and suitable for speaking aloud; Pri narrates in Indian English or Hindi.',
     ],
     allowedActions: ACTION_KINDS,
     verifiedMath: [...verifiedMath(solution)],

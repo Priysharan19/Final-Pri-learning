@@ -14,6 +14,7 @@ import { refreshCloudEntitlement } from '../platform/cloudAccount.js';
 import {
   getNativeProducts, onNativeBillingUpdate, purchaseGoogleSubscription, restoreNativePurchases, unfinishedNativeTransactions
 } from '../platform/nativeBilling.js';
+import { tLater, useT } from '../i18n/index.js';
 
 function matchPlan(products, plan) {
   if (!plan?.productId) return null;
@@ -28,6 +29,7 @@ export default function GooglePlayBilling({ user, canSync, premium, onChanged })
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const inFlight = useRef(new Set());
+  const t = useT();
 
   useEffect(() => {
     let live = true;
@@ -42,7 +44,7 @@ export default function GooglePlayBilling({ user, canSync, premium, onChanged })
       const found = { monthly: matchPlan(products, google.products.monthly), annual: matchPlan(products, google.products.annual) };
       setBootstrap(google);
       setPlans(found);
-      setStoreError(found.monthly || found.annual ? '' : 'The Pri Learning subscription is not available in this Google Play country.');
+      setStoreError(found.monthly || found.annual ? '' : tLater('cloud.googleNotInCountry'));
       // A purchase from an earlier session the server never saw (the app was
       // killed, offline, or the sheet outlived the wait) is reported now, so
       // the server verifies and acknowledges it inside Play's three days.
@@ -53,7 +55,7 @@ export default function GooglePlayBilling({ user, canSync, premium, onChanged })
       if (!live) return;
       setBootstrap(null);
       setPlans({ monthly: null, annual: null });
-      setStoreError(err.message || 'Google Play subscriptions are unavailable.');
+      setStoreError(err.message || tLater('cloud.googleUnavailable'));
     });
     return () => { live = false; };
   }, [canSync, user?.id]);
@@ -66,13 +68,13 @@ export default function GooglePlayBilling({ user, canSync, premium, onChanged })
     try {
       const result = await cloud.submitGooglePurchase(token);
       if (result?.pending) {
-        if (!quiet) setMessage('Google Play is still processing this payment. Premium unlocks once Google confirms it.');
+        if (!quiet) setMessage(tLater('cloud.googleProcessing'));
         return false;
       }
       if (result?.superseded) return false;
       await refreshCloudEntitlement(user.id);
       await onChanged?.();
-      if (!quiet) setMessage('Google Play purchase verified. Premium status has been refreshed from the server.');
+      if (!quiet) setMessage(tLater('cloud.googleVerified'));
       return true;
     } finally {
       inFlight.current.delete(token);
@@ -85,7 +87,7 @@ export default function GooglePlayBilling({ user, canSync, premium, onChanged })
     if (!canSync) return undefined;
     return onNativeBillingUpdate(detail => {
       if (!detail?.purchaseToken || (detail.state && detail.state !== 'purchased')) return;
-      submit(detail.purchaseToken, { quiet: true }).catch(err => setError(err.message || 'A Google Play purchase is waiting for server verification.'));
+      submit(detail.purchaseToken, { quiet: true }).catch(err => setError(err.message || tLater('cloud.googlePendingVerification')));
     });
   }, [canSync, user?.id]);
 
@@ -94,14 +96,14 @@ export default function GooglePlayBilling({ user, canSync, premium, onChanged })
     setBusy(`google-${plan.basePlanId}`); setError(''); setMessage('');
     try {
       const result = await purchaseGoogleSubscription({ productId: plan.id, basePlanId: plan.basePlanId, obfuscatedAccountId: bootstrap.obfuscatedAccountId });
-      if (result?.status === 'cancelled') { setMessage('Google Play purchase cancelled. No subscription change was made.'); return; }
+      if (result?.status === 'cancelled') { setMessage(tLater('cloud.googleCancelled')); return; }
       if (result?.status === 'pending' || result?.state === 'pending') {
-        setMessage('The Google Play payment is pending. Premium unlocks only after Google confirms it and the server verifies the purchase.');
+        setMessage(tLater('cloud.googlePending'));
         return;
       }
       if (!result?.purchaseToken) throw new Error('Google Play did not return a purchase.');
       await submit(result.purchaseToken);
-    } catch (err) { setError(err.message || 'Could not complete the Google Play purchase.'); }
+    } catch (err) { setError(err.message || tLater('cloud.googlePurchaseFailed')); }
     finally { setBusy(''); }
   }
 
@@ -112,12 +114,12 @@ export default function GooglePlayBilling({ user, canSync, premium, onChanged })
       const ids = [bootstrap.products?.monthly?.productId, bootstrap.products?.annual?.productId].filter(Boolean);
       const transactions = await restoreNativePurchases(ids);
       const tokens = transactions.map(t => t.purchaseToken).filter(Boolean);
-      if (!tokens.length) { setMessage('No Pri Learning subscription was found for this Google account.'); return; }
+      if (!tokens.length) { setMessage(tLater('cloud.googleNoneFound')); return; }
       await cloud.restoreBilling('google', { purchaseTokens: tokens });
       await refreshCloudEntitlement(user.id);
       await onChanged?.();
-      setMessage('Google Play subscription restored and verified by the server.');
-    } catch (err) { setError(err.message || 'Could not restore Google Play purchases.'); }
+      setMessage(tLater('cloud.googleRestored'));
+    } catch (err) { setError(err.message || tLater('cloud.googleRestoreFailed')); }
     finally { setBusy(''); }
   }
 
@@ -128,19 +130,19 @@ export default function GooglePlayBilling({ user, canSync, premium, onChanged })
   return (
     <div style={{ marginTop: 12 }} data-google-play-billing>
       <div className="muted" style={{ fontSize: 12, marginBottom: 8 }}>
-        Prices below come from Google Play. Pri Learning unlocks Premium only after the server verifies the purchase with Google.
+        {t('cloud.googleAuthorityNote')}
       </div>
       <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
         {!premium && plans.monthly && <button className="btn btn-sm btn-primary" type="button" disabled={!bootstrap || !!busy} onClick={() => buy(plans.monthly)}>
-          {busy === `google-${plans.monthly.basePlanId}` ? 'Purchasing…' : `Monthly ${plans.monthly.displayPrice}`}
+          {busy === `google-${plans.monthly.basePlanId}` ? t('cloud.purchasing') : t('cloud.monthlyPrice', { price: plans.monthly.displayPrice })}
         </button>}
         {!premium && plans.annual && <button className="btn btn-sm btn-ghost" type="button" disabled={!bootstrap || !!busy} onClick={() => buy(plans.annual)}>
-          {busy === `google-${plans.annual.basePlanId}` ? 'Purchasing…' : `Annual ${plans.annual.displayPrice}`}
+          {busy === `google-${plans.annual.basePlanId}` ? t('cloud.purchasing') : t('cloud.annualPrice', { price: plans.annual.displayPrice })}
         </button>}
         <button className="btn btn-sm btn-quiet" type="button" disabled={!bootstrap || !!busy} onClick={restore}>
-          {busy === 'restore-google' ? 'Restoring…' : 'Restore Google Play purchases'}
+          {busy === 'restore-google' ? t('cloud.restoring') : t('cloud.restoreGoogle')}
         </button>
-        <a className="btn btn-sm btn-quiet" href={manageUrl} target="_blank" rel="noreferrer">Manage in Google Play</a>
+        <a className="btn btn-sm btn-quiet" href={manageUrl} target="_blank" rel="noreferrer">{t('cloud.manageGoogle')}</a>
       </div>
       {storeError && <div style={{ color: 'var(--bad)', fontSize: 12, marginTop: 7 }}>{storeError}</div>}
       {error && <div style={{ color: 'var(--bad)', fontSize: 12, marginTop: 7 }} role="alert">{error}</div>}
