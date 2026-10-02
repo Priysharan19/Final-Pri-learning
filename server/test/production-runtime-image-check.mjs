@@ -266,8 +266,9 @@ try {
 }
 
 const jsonLines = railway.stdout.split('\n').map(line => { try { return JSON.parse(line); } catch { return null; } }).filter(Boolean);
-c.ok(jsonLines.some(line => line.method === 'GET' && line.path === '/v1/health' && line.status === 200 && typeof line.ms === 'number'), 'request log lines are JSON with method/path/status/ms');
-c.ok(jsonLines.some(line => line.path === '/api/auth/login' && line.status === 410), 'legacy refusals are logged');
+c.ok(jsonLines.some(line => line.event === 'http_request' && line.method === 'GET' && line.route === '/v1/health' && line.status === 200 && typeof line.ms === 'number'), 'request log lines are JSON with method/route/status/ms');
+c.ok(jsonLines.some(line => line.event === 'http_request' && line.route === '/v1/health' && line.release === testReleaseSha && line.db === 'sqlite' && typeof line.requestId === 'string'), 'request log lines name the request id, the release SHA and the database engine');
+c.ok(jsonLines.some(line => line.route === '/api/<unmatched>' && line.status === 410 && line.code === 'LEGACY_API_REMOVED'), 'legacy refusals are logged with their code');
 c.ok(!railway.stdout.includes('do-not-log') && !railway.stdout.includes('?'), 'query strings never reach the log');
 c.ok(!/cookie|user-agent|password/i.test(railway.stdout), 'no cookies, user agents or credentials in the log');
 c.eq(railway.stderr.trim(), '', `no errors on stderr during boot and requests (${railway.stderr.trim().slice(0, 200)})`);
