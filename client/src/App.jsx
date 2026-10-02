@@ -11,14 +11,12 @@ import { setLanguage, signInLanguage, useT } from './i18n/index.js';
 import Login from './pages/Login.jsx';
 import Home from './pages/Home.jsx';
 import Practice from './pages/Practice.jsx';
-import Legal from './pages/Legal.jsx';
 import Icon from './components/Icon.jsx';
 
 // ── Routes nobody has opened yet ─────────────────────────────────────────────
-// Login, Home, Practice and Legal are the screens a first run reaches: the
-// profile gate, the landing page behind it, the practice workspace the product
-// is for, and the policy pages a store reviewer opens without an account. Those
-// four are worth having in the shell.
+// Login, Home and Practice are the screens a first run reaches: the profile
+// gate, the landing page behind it and the practice workspace the product is
+// for. Those three are worth having in the shell (Legal: see below).
 //
 // The other eleven were too. Every student downloaded the exam room, the
 // teacher console, the classroom panels, the progress charts and the whole
@@ -41,6 +39,10 @@ const Settings = React.lazy(() => import('./pages/Settings.jsx'));
 // ON_DEMAND in vite.config.js), not part of the install or the warm set.
 const Placement = React.lazy(() => import('./pages/Placement.jsx'));
 // Notes: the page and each class's notes are chunks of their own (notes/notesIndex.js).
+// Legal carries the full policy documents (~19 kB). A reviewer who opens
+// /privacy is online, and the warm pass keeps it for offline, so it no longer
+// rides in the install every student downloads before the first screen.
+const Legal = React.lazy(() => import('./pages/Legal.jsx'));
 const Notes = React.lazy(() => import('./pages/Notes.jsx'));
 // Outside the frozen V1 scope: the route exists only where the build flag is on.
 const PLACEMENT_ON = featureEnabled('placement');
@@ -303,10 +305,10 @@ export default function App() {
         <Routes>
           {/* A store reviewer and a payment provider open these without an
               account, so they are reachable before the profile gate. */}
-          <Route path="/privacy" element={<Legal />} />
-          <Route path="/terms" element={<Legal />} />
-          <Route path="/refund-policy" element={<Legal />} />
-          <Route path="/grievance" element={<Legal />} />
+          <Route path="/privacy" element={<React.Suspense fallback={<RouteLoading />}><Legal /></React.Suspense>} />
+          <Route path="/terms" element={<React.Suspense fallback={<RouteLoading />}><Legal /></React.Suspense>} />
+          <Route path="/refund-policy" element={<React.Suspense fallback={<RouteLoading />}><Legal /></React.Suspense>} />
+          <Route path="/grievance" element={<React.Suspense fallback={<RouteLoading />}><Legal /></React.Suspense>} />
           <Route path="*" element={<Login />} />
         </Routes>
         <ToastLayer toasts={toasts} />
