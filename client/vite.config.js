@@ -248,7 +248,14 @@ export const ON_DEMAND = [
   // read once online is there offline from then on. The one case this shows,
   // opening Notes for the first time with no connection, Notes.jsx reports by
   // name and offers a retry; practice, which needs none of it, is unaffected.
-  [/(^|\/)(Notes|notes-class(7|8|9|10|11|12))-[A-Za-z0-9_-]+\.(js|css)$/, 'chapter notes']
+  [/(^|\/)(Notes|notes-class(7|8|9|10|11|12))-[A-Za-z0-9_-]+\.(js|css)$/, 'chapter notes'],
+
+  // "Practise this": photograph a question and practise its skill. The page
+  // cannot do anything without a connection — reading the photo is a server
+  // call — so installing it would only carry code that is useless offline. A
+  // first open with no connection shows the route's ordinary chunk-load
+  // failure; practice itself needs none of it.
+  [/(^|\/)(PractisePhoto|questionPhoto)-[^/]*\.js$/, '"Practise this" photo page']
 ];
 
 // The faces the first screens genuinely paint in: the Latin Inter subset for

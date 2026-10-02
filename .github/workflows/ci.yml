@@ -197,6 +197,7 @@ jobs:
         run: |
           node server/test/handwriting-transcription-check.mjs
           node server/test/working-check-check.mjs
+          node server/test/question-photo-check.mjs
           node server/test/tutor-help-check.mjs
           node server/test/spend-ceiling-check.mjs
           node server/test/guardian-consent-check.mjs
@@ -339,7 +340,7 @@ jobs:
         run: |
           set -euo pipefail
           test -s browser.log
-          grep -Eq 'E2E SUITE.*350/350.*12 flows' browser.log
+          grep -Eq 'E2E SUITE.*355/355.*13 flows' browser.log
           grep -Fq 'Submission · interruption recovery and one attempt' browser.log
           grep -Fq 'Cloud · late results never rewrite an attempt' browser.log
           grep -Fq 'India exam · JEE Main handwritten, reloaded, analysed' browser.log

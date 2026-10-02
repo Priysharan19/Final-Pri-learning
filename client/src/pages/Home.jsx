@@ -238,6 +238,10 @@ export default function Home() {
           </ul>
         )}
 
+        <button className="btn btn-ghost btn-sm home-photo-entry" data-home-photo-practise onClick={() => nav('/practise-photo')}>
+          {t('snap.entry')}
+        </button>
+
         {/* ── Manual practice configuration is deliberately secondary ── */}
         <div className="genbar">
           <div className={`genbar-head ${open ? 'open' : ''}`}>
