@@ -153,6 +153,7 @@ export const flow = {
         return { empty: maxY < 0, minX, maxX, minY, maxY, w: c.width, h: c.height };
       });
       let drew = false;
+      let inkDetail = '';
       if (ink) {
         await canvas.scrollIntoViewIfNeeded();
         // The committed-ink canvas is sized once the ink engine is up; on a slow
@@ -178,12 +179,13 @@ export const flow = {
             after = await inkBox();
           }
           const sx = after ? after.w / box.width : 1;
+          inkDetail = JSON.stringify({ box, before, after, scrollY: await page.evaluate(() => scrollY) });
           drew = !!after && !after.empty &&
             after.minX >= box.width * 0.15 * sx && after.maxX <= box.width * 0.65 * sx &&
             after.minY >= box.height * 0.25 * sx && after.maxY <= box.height * 0.72 * sx;
         }
       }
-      await check(`${tag}: synthetic strokes land on the writing area`, drew);
+      await check(`${tag}: synthetic strokes land on the writing area`, drew, inkDetail);
       if (vp.id === 'phone' && drew) {
         // Ink near the foot of the sheet is what widening could push off it.
         const low = await canvas.boundingBox();
