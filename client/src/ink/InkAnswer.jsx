@@ -120,7 +120,10 @@ export default function InkAnswer({ onRecognized, onStrokes = null, initialStrok
   const sendToReader = useCallback((strokes, seq) => {
     if (disabledRef.current) return;
     const who = userRef.current;
-    if (!cloudReadingEnabled(who)) {
+    // Offline is known before anything is sent: no doomed request, just the
+    // honest note, and the 'online' listener below reads the page later.
+    const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
+    if (offline || !cloudReadingEnabled(who)) {
       setStatus({ kind: 'waiting', key: inkReadingBlockedKey(who) });
       return;
     }
@@ -311,7 +314,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, initialStrok
             {t('ink.reading')}{shownEngineNote && <span className="muted" style={{ marginLeft: 10, textTransform: 'none', letterSpacing: 0 }}>{shownEngineNote}</span>}
           </div>
           {rec.lines.map((line, li) => (
-            <div className="ink-line" key={li}>
+            <div className="ink-line" key={li} data-text={line.text}>
               <span className="ink-line-n" aria-hidden="true">{li + 1}</span>
               {lineVerdicts && lineVerdicts[li] && ['ok', 'break', 'wrong'].includes(lineVerdicts[li].status) && (
                 <span className={`ink-line-verdict ${lineVerdicts[li].status === 'ok' ? 'good' : 'bad'}`}>
