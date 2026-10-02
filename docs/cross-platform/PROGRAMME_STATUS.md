@@ -26,7 +26,8 @@ This is the durable ledger for CP-02 → CP-12 and SEC-COMM-01. Each CP's own PR
 | CP-07 Android Native Bridges | SOFTWARE IMPLEMENTATION: COMPLETE | `a77f7369` | `b7c9ba0e` | [#277](https://github.com/Priysharan19/Final-Pri-learning/pull/277) | `a069b16f` | DEFERRED |
 | CP-08 Google Play Billing | SOFTWARE IMPLEMENTATION: COMPLETE | `a069b16f` | `7ebfc88c` | [#279](https://github.com/Priysharan19/Final-Pri-learning/pull/279) | `e1236678` | DEFERRED |
 | CP-09 Android Handwriting Input | SOFTWARE IMPLEMENTATION: COMPLETE | `e1236678` | `9729b8db` | [#287](https://github.com/Priysharan19/Final-Pri-learning/pull/287) | `59f62144` | DEFERRED |
-| CP-10 Android Automated Product QA | SOFTWARE IMPLEMENTATION: COMPLETE once merged | `59f62144` | recorded by the next CP | this PR | recorded by the next CP | DEFERRED |
+| CP-10 Android Automated Product QA | SOFTWARE IMPLEMENTATION: COMPLETE | `59f62144` | `061596f4` | [#294](https://github.com/Priysharan19/Final-Pri-learning/pull/294) | `c8835831` | DEFERRED |
+| SEC-COMM-01 Server-Enforced Premium Entitlement | SOFTWARE IMPLEMENTATION: COMPLETE once merged | `c8835831` | recorded by the next CP | this PR | recorded by the next CP | n/a (server) |
 
 ## CP-02 — Platform Bridge Foundation
 
@@ -450,3 +451,41 @@ Causes found:
 - The API 33 CI emulator still dies on GitHub's runners (also with 4 GB RAM and `guest` GPU). No API 33 **CI** evidence is claimed.
 
 **Not automated / deferred (physical):** real camera, S Pen / USI quality, a TalkBack walkthrough, a real Play purchase (**BLOCKED_EXTERNAL**: Play Console products and license testers), low-end performance, OEM WebView variants, and foldable posture changes.
+
+**CP-10 exact-head evidence (recorded by SEC-COMM-01):**
+- Candidate `061596f4`. All four required checks pass.
+- **Android Shell on CI (not required) did not pass** on that head, even though the same suite passes locally on API 36 phone, API 36 tablet and API 33:
+  - API 36 phone: the emulator process died about 70 s into the journey (adb exit 255), the death previously seen only on API 33. The log shows a Vulkan instance being created just before. A diagnostic run without Vulkan is in progress.
+  - API 36 tablet: `FileExchangeTest` "system chooser was never opened". A freshly inserted file input was tapped before layout; the tap now retries (bounded) until the chooser is asked for.
+  - `pixel_fold`: the CI emulator tooling has no such device profile, so the job never ran. It is removed from the matrix, and the test matrix records foldables as **not automated**.
+  - API 26 floor ✅; build/lint/unit ✅.
+- The CI fixes land as a separate follow-up PR. **No Android CI product-suite pass is claimed yet**; the Android product evidence is local emulator runs only.
+- Merged as `c8835831` with `--match-head-commit`.
+
+## SEC-COMM-01 — Server-Enforced Premium Entitlement Protection
+
+**Delivered:** see [PREMIUM_ENTITLEMENT_AUTHORITY.md](../security/PREMIUM_ENTITLEMENT_AUTHORITY.md).
+- Every server-paid AI call (`/v1/handwriting`, `/v1/working`) is allowed by the **server's own entitlement record**: `entitlement_snapshots` via `serverEntitlementCapabilities`.
+- Client claims, cached flags and store receipts the server has not verified grant nothing.
+- **Per-account daily allowance** (`server/platform/aiAllowance.js`):
+  - free 120 / Premium 1200 by default, configurable, and validated in production;
+  - `429 AI_ALLOWANCE_EXHAUSTED` with `resetAt`;
+  - refunded when the request is refused for spend ceiling or configuration before any provider call.
+- **Client:**
+  - the cloud reader remembers an exhausted allowance until `resetAt` or an entitlement change, and falls back to on-device reading;
+  - ink and photo show clear copy (en + hi, kept live across a language switch);
+  - no paid call is retried in a loop.
+
+**Evidence (S0):**
+- `server/test/premium-authority-check.mjs` 44/44, covering:
+  - forged, claimed and cached Premium refused;
+  - an expired Premium falls back to the free allowance;
+  - refunds;
+  - day rollover;
+  - production config validation.
+- `client/test/cloud-handwriting-client-check.mjs` 62/62.
+- `entitlement-enforcement-check` updated.
+- Independent review findings applied, including the refund on ceiling refusal and the stale-allowance listener.
+- When merged with `main`, the observability hooks (#262) and the allowance refund were combined on both routes.
+
+**Not in scope:** provider-side billing alerts and per-deployment budgets are an owner operation (**BLOCKED_EXTERNAL**). Physical: none needed.
