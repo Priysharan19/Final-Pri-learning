@@ -299,7 +299,9 @@ export const cloud = Object.freeze({
   // a picture and nothing else: no question, no expected answer, no profile.
   handwritingStatus: ({ signal = null, timeoutMs = 7000 } = {}) =>
     cloudRequest('/v1/handwriting/status', { signal, timeoutMs }),
-  transcribeHandwriting: (image, { signal = null, timeoutMs = 25000 } = {}) =>
+  // Longer than the server's own reading budget (PRI_HANDWRITING_TIMEOUT_MS,
+  // 45 s by default) so the server answers before the client gives up.
+  transcribeHandwriting: (image, { signal = null, timeoutMs = 55000 } = {}) =>
     cloudRequest('/v1/handwriting/transcribe', { method: 'POST', body: { image }, signal, timeoutMs }),
   workingStatus: () => cloudRequest('/v1/working/status'),
   // The question is sent; the expected answer never is, and the route refuses

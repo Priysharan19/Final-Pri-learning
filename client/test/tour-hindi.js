@@ -158,28 +158,21 @@ export const flow = {
       await check('Handwriting: no developer engine diagnostics are shown to the student',
         await page.locator('.ink-answer [role="note"]').count() === 0);
 
-      // One stroke, so the reading panel and the tap-to-correct symbols appear.
+      // One stroke. Handwriting is read only by the server reader (owner
+      // decision); this device has none, so nothing is read on the device and
+      // the student is told why — in Hindi.
       const box = await page.locator('.ink-canvas-live').boundingBox();
       await page.mouse.move(box.x + 60, box.y + 30);
       await page.mouse.down();
       for (let i = 1; i <= 12; i++) await page.mouse.move(box.x + 60 + i * 0.4, box.y + 30 + i * 6);
       await page.mouse.up();
-      await page.waitForSelector('.ink-preview .ink-sym', { timeout: 15000 }).catch(() => {});
-      if (await check('Handwriting: the stroke was read', await page.locator('.ink-preview .ink-sym').count() > 0)) {
-        await check('Handwriting: the reading panel is headed in Hindi',
-          (await page.locator('.ink-preview-title').innerText()).includes(hi['ink.reading']),
-          JSON.stringify(await page.locator('.ink-preview-title').innerText()));
-        const sym = page.locator('.ink-preview .ink-sym').first();
-        const symLabel = await sym.getAttribute('aria-label');
-        await check('Handwriting: a read symbol is labelled in Hindi',
-          symLabel.startsWith(hi['ink.symbolAria'].split('{n}')[0]) && DEVANAGARI.test(symLabel), JSON.stringify(symLabel));
-        await check('Handwriting: a read symbol is titled in Hindi', await sym.getAttribute('title') === hi['ink.tapToCorrect']);
-        await sym.click();
-        await page.waitForSelector('.ink-picker', { timeout: 5000 }).catch(() => {});
-        await check('Handwriting: the symbol picker is labelled in Hindi',
-          await page.locator('.ink-picker').getAttribute('aria-label') === hi['ink.changeSymbol']);
-        await audit('Practice handwriting');
-      }
+      await page.waitForSelector('.ink-status', { timeout: 15000 }).catch(() => {});
+      const inkStatus = (await page.locator('.ink-status').innerText().catch(() => '')) || '';
+      await check('Handwriting: nothing is read on the device without the server reader',
+        await page.locator('.ink-preview').count() === 0);
+      await check('Handwriting: the student is told why, in Hindi',
+        DEVANAGARI.test(inkStatus) && Object.keys(hi).some(k => k.startsWith('ink.waiting') && hi[k] === inkStatus), JSON.stringify(inkStatus));
+      await audit('Practice handwriting');
       await page.locator(`.ink-tool[title="${hi['ink.clear']}"]`).click();
       await settle();
     }

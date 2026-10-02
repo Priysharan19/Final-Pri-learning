@@ -48,6 +48,10 @@ jobs:
         run: node client/test/india-check.mjs
       - name: Audit and pack regression
         run: python tools/jee-question-department/test_pipeline.py
+      - name: Official-source intake regression (synthetic PDFs, no network)
+        run: |
+          python -m pip install -r tools/jee-question-department/requirements.txt
+          python tools/jee-question-department/test_official_pipeline.py
       - name: Python syntax gate
         run: >-
           python -m py_compile
@@ -55,6 +59,10 @@ jobs:
           tools/jee-question-department/audit.py
           tools/jee-question-department/pack.py
           tools/jee-question-department/test_pipeline.py
+          tools/jee-question-department/fetch_official.py
+          tools/jee-question-department/extract_official.py
+          tools/jee-question-department/review_official.py
+          tools/jee-question-department/test_official_pipeline.py
       - name: Build + iOS sync guarantee
         run: |
           npm ci --prefix client

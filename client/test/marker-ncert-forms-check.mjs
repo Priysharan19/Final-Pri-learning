@@ -411,6 +411,7 @@ ok(restated.correct === false, 'partial credit: restating the question is not a 
 // defined where the answer is (`strictDomain`); a line of working does not,
 // because cancelling a common factor is a valid step that loses the hole.
 const strict = { strictDomain: true };
+const isolatedEarly = { isolatedDomain: true };
 function same(a, b, opts, label) { ok(exprEquivalent(a, b, opts) === true, `domain: ${label}: ${a} ≡ ${b} should hold`); }
 function differ(a, b, opts, label) { ok(exprEquivalent(a, b, opts) === false, `domain: ${label}: ${a} ≡ ${b} must be refused`); }
 
@@ -498,11 +499,15 @@ differ('(x^3-27)/(x^3-27)', '1', strict, 'cubic guard searched inside its root b
 differ('(x-1/3)/(x-1/3)', '1', strict, 'hole at a third');
 differ('sqrt(x+30)^2', 'x+30', strict, 'root guard changes sign at -30');
 differ('(sqrt(x)-5.5)/(sqrt(x)-5.5)', '1', strict, 'non-polynomial guard, hole at 30.25');
-// Residual limitation, pinned so a future fix has to update it on purpose: a
-// non-polynomial guard that only touches zero (no sign change) beyond |x| = 20
-// and off the whole numbers is not located. cos(x/100) + 1 vanishes at 100π.
-ok(exprEquivalent('(cos(x/100)+1)/(cos(x/100)+1)', '1', strict) === true,
-  'domain: KNOWN LIMITATION: a far tangential hole of a non-polynomial guard (x = 100π) is not located');
+// Far tangential holes (formerly a pinned limitation): a non-polynomial guard
+// that only touches zero beyond |x| = 20, off the whole numbers.
+differ('(cos(x/100)+1)/(cos(x/100)+1)', '1', strict, 'far tangential hole at x = 100π');
+differ('(cos(x/100)+1)/(cos(x/100)+1)', '1', isolatedEarly, 'far tangential hole at x = 100π, default policy');
+differ('(cos(x/50)-1)/(cos(x/50)-1)', '1', strict, 'far tangential hole at x = 100π (touching from below)');
+differ('(sin(x/200)+1)/(sin(x/200)+1)', '1', strict, 'far tangential hole at x = −100π');
+// …without inventing holes where the guard only comes close to zero
+same('(cos(x/100)+1.001)/(cos(x/100)+1.001)', '1', strict, 'a far near-miss is not a hole');
+same('((x-300.3)^2+1)/((x-300.3)^2+1)', '1', strict, 'a far minimum above zero is not a hole');
 
 // through the real marker
 const marks = (expr, input) => checkAnswer({ answerType: 'expression', answer: { expr }, prompt: 'Differentiate' }, input).correct;
@@ -620,6 +625,31 @@ differ('sqrt(x)*(x-0.0000001)/(x-0.0000001)', 'sqrt(x)', isolated, 'hole at 10�
 differ('sqrt(x)*(x-0.0002)/(x-0.0002)', 'sqrt(x)', isolated, 'hole at 0.0002 beside √x\'s boundary is still a hole');
 same('x/sqrt(x)', 'sqrt(x)', isolated, 'natural endpoint at 0 still accepted');
 same('asin(x)', 'atan(x/sqrt(1-x^2))', isolated, 'natural endpoints at ±1 still accepted');
+
+// ── ln(eˣ) and e as Euler's number (§10 grading authority) ───────────────────
+// e was sampled as a variable, so ln(eˣ) vs x — even ln(e⁵) vs 5 — was marked
+// wrong. e is always Euler's number now; base-10 log of eˣ must still differ.
+for (const opts of [{}, isolatedEarly, strict]) {
+  same('ln(e^x)', 'x', opts, 'ln(eˣ) = x');
+  same('x', 'ln(e^x)', opts, 'x = ln(eˣ)');
+  same('ln(e^(2x))', '2x', opts, 'ln(e²ˣ) = 2x');
+  same('ln(e^(x+1))', 'x+1', opts, 'ln(eˣ⁺¹) = x + 1');
+  same('ln(e^(-x^2))', '-x^2', opts, 'ln(e^(−x²)) = −x², no underflow plateau taken for a hole');
+  same('ln(exp(x))', 'x', opts, 'ln(exp x) = x');
+  same('ln(e^5)', '5', opts, 'ln(e⁵) = 5');
+  same('e^x/e^x', '1', opts, 'eˣ/eˣ = 1');
+  differ('log(e^x)', 'x', opts, 'log₁₀(eˣ) is not x');
+  differ('ln(e^x)', 'x+1', opts, 'ln(eˣ) is not x + 1');
+  differ('ln(e^x)', '2x', opts, 'ln(eˣ) is not 2x');
+}
+differ('e^(ln(x))', 'x', strict, 'e^(ln x) is only x for x > 0');
+ok(marks('x', 'ln(e^x)') === true, 'marker: ln(e^x) is accepted for x');
+ok(marks('2x', 'ln(e^(2x))') === true, 'marker: ln(e^(2x)) is accepted for 2x');
+ok(marks('5', 'ln(e^5)') === true, 'marker: ln(e^5) is accepted for 5');
+ok(marks('x', 'log(e^x)') === false, 'marker: log(e^x) is not accepted for x');
+ok(marks('x', 'ln(e^(x+1))') === false, 'marker: ln(e^(x+1)) is not accepted for x');
+ok(marks('e*x', 'x*e') === true, 'marker: e·x commutes');
+ok(marks('e^2', '7.39') === false, 'marker: a rounded decimal is not e²');
 
 console.log(failures.length
   ? `NCERT ANSWER FORMS: FAIL — ${failures.length} of ${pass + failures.length} checks failed\n  · ${failures.join('\n  · ')}`
