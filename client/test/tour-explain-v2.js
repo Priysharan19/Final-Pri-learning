@@ -12,9 +12,9 @@ export const flow = {
   id: 'explain-v2',
   name: 'Pri Explain V8 · adaptive board-style reasoning playback',
 
-  async run({ page, base, check, goto, createProfile, settle }) {
+  async run({ page, base, check, goto, createLegacyProfile, settle }) {
     await goto('/');
-    await createProfile({ name: 'Emmy Noether', year: 7 });
+    await createLegacyProfile({ name: 'Emmy Noether', year: 7 });
     await page.goto(`${base}/practice?subtopic=${TOPIC}`, { waitUntil: 'domcontentloaded' });
     await page.waitForSelector('.q-prompt', { timeout: 30000 });
 
