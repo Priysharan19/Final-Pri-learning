@@ -10,7 +10,7 @@
 //     falls back rather than costing the student the reader on their device.
 // ─────────────────────────────────────────────────────────────────────────────
 import { MAX_PHOTO_BYTES, dataUrlBytes, isSupportedPhoto, photoDimensions, preparePhoto } from '../src/ink/photoRaster.js';
-import { readPhotoWithCloud } from '../src/ink/cloudReader.js';
+import { cloudReadingWanted, photoReadingBlockedKey, readPhotoWithCloud, takeCloudReadingNotice } from '../src/ink/cloudReader.js';
 
 let pass = 0;
 const failures = [];
@@ -98,6 +98,75 @@ const failed = await readPhotoWithCloud(PHOTO, { user: { cloudHandwriting: true 
 ok(failed?.error?.code === 'HANDWRITING_UNAVAILABLE', 'a refusal is reported so the caller can fall back to the on-device reader');
 const undecodable = await readPhotoWithCloud(PHOTO, { user: { cloudHandwriting: true }, transport: spy, prepare: async () => null, available: there, readiness: ready });
 eq(undecodable.reason, 'unreadable', 'a photo that could not be prepared is never sent, and says why — a HEIC on Android lands here');
+
+// ── 5 · On by default for a signed-in account (ADR-0001 online-first) ───────
+// A profile that never chose gets server reading once it is linked to a cloud
+// account and the server says reading is usable. An explicit off always wins,
+// an unlinked profile never sends, and a minor without a confirmed guardian is
+// refused /v1/handwriting/status by requireGuardianConsent, so it stays off.
+{
+  const SECRET_ANSWER = 'x = 4';
+  const linked = { cloudHandwriting: null, cloudLinked: true, expectedAnswer: SECRET_ANSWER, solution: 'subtract 3, divide by 2' };
+  let calls = [];
+  const recorder = {
+    transcribeHandwriting: async (...args) => {
+      calls.push(args);
+      return { transcription: { lines: [{ text: '2x = 8', confidence: 0.9 }], text: '2x = 8', confidence: 0.9, needsConfirmation: false, engine: 'cloud-test' } };
+    }
+  };
+  ok(cloudReadingWanted(linked), 'a signed-in profile that never chose wants server reading');
+  ok(!cloudReadingWanted({ cloudHandwriting: null }), 'a profile with no cloud account does not');
+  ok(!cloudReadingWanted({ cloudHandwriting: false, cloudLinked: true }), 'an explicit off is respected even when signed in');
+  ok(!cloudReadingWanted({ cloudLinked: true, isDemo: true }), 'and the demo profile is never defaulted on');
+
+  const read = await readPhotoWithCloud(PHOTO, { user: linked, transport: recorder, prepare, available: there, readiness: ready });
+  eq(calls.length, 1, 'default-on: the photo is read without the student visiting Settings');
+  eq(read.transcription.text, '2x = 8', 'and the reading comes back');
+  eq(calls[0].length, 2, 'the request carries the image and the options, nothing else');
+  eq(Object.keys(calls[0][1] || {}), ['signal'], 'the options are only the cancel signal');
+  ok(!JSON.stringify(calls[0]).includes(SECRET_ANSWER) && !JSON.stringify(calls[0]).includes('subtract 3'),
+    'answer-blind on the default path: no expected answer or solution travels with the photo');
+
+  calls = [];
+  const refused = async () => ({ usable: false, state: 'unavailable', lastFailureCode: 'GUARDIAN_CONSENT_PENDING', releaseSha: null });
+  const minor = await readPhotoWithCloud(PHOTO, { user: { cloudLinked: true }, transport: recorder, prepare, available: there, readiness: refused });
+  eq(calls.length, 0, 'a minor whose guardian has not confirmed is never sent by default');
+  eq(photoReadingBlockedKey({ cloudLinked: true }, { outcome: minor, online: () => true, available: there }), 'verdict.photoReadingGuardian',
+    'and is told a guardian has to confirm, not sent to Settings');
+
+  await readPhotoWithCloud(PHOTO, { user: { cloudHandwriting: false, cloudLinked: true }, transport: recorder, prepare, available: there, readiness: ready });
+  await readPhotoWithCloud(PHOTO, { user: { cloudHandwriting: null }, transport: recorder, prepare, available: there, readiness: ready });
+  eq(calls.length, 0, 'an explicit off, or no account, sends nothing');
+}
+
+// ── 6 · When it cannot read, it says the real reason ─────────────────────────
+{
+  const on = () => true, off = () => false;
+  eq(photoReadingBlockedKey({ cloudHandwriting: null }, { online: on, available: there }), 'verdict.photoReadingSignIn', 'not signed in → sign in');
+  eq(photoReadingBlockedKey({ cloudLinked: true }, { online: off, available: there }), 'verdict.photoReadingOffline', 'offline → offline');
+  eq(photoReadingBlockedKey({ cloudLinked: true }, { online: on, available: off }), 'verdict.photoReadingNotOnThisInstall', 'no server on this build → says so');
+  eq(photoReadingBlockedKey({ cloudHandwriting: false, cloudLinked: true }, { online: on, available: there }), 'verdict.photoReadingTurnedOff',
+    'only an explicit off points at Settings, because only there does Settings help');
+  eq(photoReadingBlockedKey({ cloudLinked: true }, { online: on, available: there, outcome: { error: { code: 'EMAIL_UNVERIFIED' } } }), 'verdict.photoReadingVerifyEmail', 'unverified email → verify');
+  eq(photoReadingBlockedKey({ cloudLinked: true }, { online: on, available: there, outcome: { error: { code: 'AUTH_REQUIRED' } } }), 'verdict.photoReadingSignIn', 'expired session → sign in');
+  eq(photoReadingBlockedKey({ cloudLinked: true }, { online: on, available: there, outcome: { error: { code: 'HANDWRITING_UNAVAILABLE' } } }), 'verdict.photoReadingServiceDown', 'provider down → try later');
+  const en = (await import('../src/i18n/strings.en.js')).default;
+  const hi = (await import('../src/i18n/strings.hi.js')).default;
+  for (const key of ['verdict.photoReadingTurnedOff', 'verdict.photoReadingNotOnThisInstall', 'verdict.photoReadingOffline', 'verdict.photoReadingSignIn',
+    'verdict.photoReadingGuardian', 'verdict.photoReadingVerifyEmail', 'verdict.photoReadingServiceDown', 'verdict.photoReadOnServerNotice']) {
+    ok(typeof en[key] === 'string' && typeof hi[key] === 'string', `${key} exists in every catalogue`);
+    if (key !== 'verdict.photoReadingTurnedOff') ok(!/Settings/.test(en[key]) || key === 'verdict.photoReadOnServerNotice', `${key} does not send the student to Settings`);
+  }
+}
+
+// ── 7 · The default is never silent: a one-time notice ──────────────────────
+{
+  const store = new Map();
+  const storage = { getItem: k => store.get(k) ?? null, setItem: (k, v) => store.set(k, v) };
+  ok(takeCloudReadingNotice({ cloudLinked: true }, storage), 'the first server-read photo under the default shows the notice');
+  ok(!takeCloudReadingNotice({ cloudLinked: true }, storage), 'and only once');
+  ok(!takeCloudReadingNotice({ cloudHandwriting: true }, { getItem: () => null, setItem: () => {} }), 'a student who chose it themselves is not told again');
+}
 
 console.log(failures.length
   ? `CLOUD PHOTO CLIENT: FAIL — ${failures.length} of ${pass + failures.length} checks failed\n  · ${failures.join('\n  · ')}`
