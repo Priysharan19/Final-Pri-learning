@@ -33,7 +33,9 @@ export const ENGINE_SUITES = [
   'platform-startup-check.mjs',
   'platform-http-journeys-check.mjs',
   'sync-idempotency-contract-check.mjs',
+  'practice-attempt-sync-check.mjs',
   'account-lifecycle-contract-check.mjs',
+  'account-lifecycle-journey-check.mjs',
   'account-deletion-reauth-check.mjs',
   'guardian-consent-lifecycle-check.mjs',
   'verification-enforcement-check.mjs',
@@ -48,6 +50,8 @@ export const ENGINE_SUITES = [
   'billing-cancel-refund-check.mjs',
   'razorpay-billing-check.mjs',
   'apple-billing-check.mjs',
+  'storekit-entitlement-state-machine-check.mjs',
+  'tutor-help-check.mjs',
   'failure-drills-check.mjs',
   'security-acceptance-check.mjs',
   'abuse-limits-check.mjs'

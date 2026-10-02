@@ -22,7 +22,8 @@ This is the durable ledger for CP-02 → CP-12 and SEC-COMM-01. Each CP's own PR
 | CP-03 Responsive Product Foundation | SOFTWARE IMPLEMENTATION: COMPLETE | `2261f03b` | `6b9235a0` | [#261](https://github.com/Priysharan19/Final-Pri-learning/pull/261) | `003cc053` | DEFERRED |
 | CP-04 iPhone Product | SOFTWARE IMPLEMENTATION: COMPLETE | `003cc053` | `09d868b6` | [#266](https://github.com/Priysharan19/Final-Pri-learning/pull/266) | `3ed4f9c4` | DEFERRED |
 | CP-05 iPhone Automated Certification | SOFTWARE IMPLEMENTATION: COMPLETE | `3ed4f9c4` | `1820d32c` | [#273](https://github.com/Priysharan19/Final-Pri-learning/pull/273) | `247f12c2` | DEFERRED |
-| CP-06 Android Shell | SOFTWARE IMPLEMENTATION: COMPLETE once merged | `247f12c2` | recorded by the next CP | this PR | recorded by the next CP | DEFERRED |
+| CP-06 Android Shell | SOFTWARE IMPLEMENTATION: COMPLETE | `247f12c2` | `353e3c2c` | [#275](https://github.com/Priysharan19/Final-Pri-learning/pull/275) | `a77f7369` | DEFERRED |
+| CP-07 Android Native Bridges | SOFTWARE IMPLEMENTATION: COMPLETE once merged | `a77f7369` | recorded by the next CP | this PR | recorded by the next CP | DEFERRED |
 
 ## CP-02 — Platform Bridge Foundation
 
@@ -241,3 +242,50 @@ This is the durable ledger for CP-02 → CP-12 and SEC-COMM-01. Each CP's own PR
 - Independent review requested changes; all were applied: the Back trap at `/teach`; the double action on a stubborn dialog; the skippable web check; API 26 evidence that overstated what it proved; process death not proven; renderer-crash loop; reset race; system Back; bar icons; navigation-policy gaps; observer cost.
 
 **Deferred (physical):** a low-end phone boot smoke test, real Back gestures and predictive animation, OEM WebView variants, and foldable posture changes.
+
+**CP-05 Swift job result (recorded by CP-07):** on CP-05's head, **Swift build, native benchmark and bridge smoke test** failed at the **iPhone** bridge self-check. The message was "0/8 on iPhone 16 Pro; no summary logged", the same signature as on CP-04's push run.
+- The iPad bridge self-check in the same job passed.
+- The iPhone self-check passes 8/8 locally (iPhone 18 Pro, iOS 27.0), but has **not yet passed on the CI runner's iPhone simulator**, so the iPhone CI lane has no green run yet. The iPhone journey steps after it did not run.
+- This is now treated as a real defect, not infrastructure. Branch `fix/cp-05-iphone-ci-selfcheck` adds a cold-simulator wait and failure diagnostics (process state, app log, crash report) to find the cause. The fix lands as its own PR.
+- No iPhone CI evidence is claimed until that lane is green.
+
+**CP-06 exact-head evidence (recorded by CP-07):**
+- Candidate `353e3c2c`. All four required checks pass.
+- **Android Shell** workflow (not required) on that head:
+  - Gradle build, lint, unit tests and web parity: ✅
+  - API 26 floor screen: ✅
+  - API 36 phone product journey: ✅
+  - API 36 tablet product journey: ✅
+  - **API 33 phone: ❌, infrastructure.** The emulator never accepted adb (`could not connect to TCP port 5554`). Re-run once under the infrastructure allowance; the result is recorded by CP-08.
+- Merged as `a77f7369` with `--match-head-commit`.
+
+
+## CP-07 — Android Native Bridges
+
+**Delivered** ([ANDROID_ARCHITECTURE.md](ANDROID_ARCHITECTURE.md) §5):
+- **Server:** `nativeNonBrowserRequest` accepts the closed exact-match set `{ios-native-v1, android-native-v1}` under the unchanged rule: no `Origin`, no `Sec-Fetch-Site/Mode`. CSRF is still required. Near-miss identities are browsers.
+- **Cloud transport:** `android/…/cloud/NativeCloud.kt` on `HttpURLConnection`. One build-time-validated HTTPS origin; the path rule is identical to `cloudTransport.js`; redirects are never followed; 1 MB / 2 MB caps; 32 in flight; cancellation; everything in flight is dropped on a new document.
+  - **Headers:** `X-Pri-Client: android-native-v1` and the CSRF token copied from the jar, never `Origin`.
+- **Session:** the cookie jar (`CookieJar.kt`: host-only, Secure only over HTTPS, strict cookie values, logout deletion) is persisted by `SecureStore.kt`: AES-256-GCM, Android Keystore, no-backup storage, process-wide lock, ordered writes. Transient Keystore errors keep the file.
+- **Disconnect:** forgets the native session even offline (`cloud.forgetSession`, Android and iOS).
+- **File exchange** (`io/FileExchange.kt`):
+  - share sheet via FileProvider, one folder per share, byte-capped names, written off the UI thread;
+  - `PrintManager` print (the Print / Save PDF buttons now use `printPage()`, because `window.print()` does nothing in a WebView);
+  - system document picker plus a camera offer with explicit per-camera URI grants, always answering the callback.
+- **Dialogs:** `alert`/`confirm` are real native dialogs.
+
+**Evidence (S0/S2, synthetic):**
+- JVM: 19 tests, including the transport against a local socket server (exact headers, CSRF copy, no redirects, caps, cancellation) and logout racing a refresh with disk and memory always equal.
+- Instrumented, on the emulator against the **real Pri server** (fixture harness, throwaway database):
+  - sign-in through the Settings UI, then Sync now;
+  - the session is only in the encrypted jar (not plaintext on disk);
+  - after `am force-stop` it is still valid on the server;
+  - Disconnect revokes it, and the old cookie gets 401 from the server.
+- `FileExchangeTest`:
+  - an export reaches the share sheet as a FileProvider URI holding the bytes;
+  - JSON and image inputs ask the picker for the right types;
+  - each camera app holds a write grant to exactly the capture URI;
+  - print opens.
+- Independent review approved. All five findings (jar persistence race, Keystore transient handling, camera grants, offline disconnect, vacuous assertions) and the low items are applied.
+
+**Deferred (physical):** a real camera capture, real share targets, a printer, a captive-portal network.

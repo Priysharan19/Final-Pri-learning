@@ -11,6 +11,51 @@ function addColumnIfMissing(db, table, column, ddl) {
 }
 
 /**
+ * Billing schema v4 — a payment outlives the account that made it.
+ *
+ * v3 deleted every billing_payments row with its account (ON DELETE CASCADE),
+ * so deleting an account destroyed the record of money actually taken: a
+ * refund arriving afterwards had no payment to match, and the business lost
+ * the ledger it must keep for tax and accounting. v4 keeps the row and drops
+ * only the link (ON DELETE SET NULL). What remains is the provider's own ids,
+ * an amount, a currency, a status and timestamps — pseudonymous, with no name,
+ * email or account id (docs/privacy/data-retention.md).
+ *
+ * SQLite cannot alter a foreign key, so a v3 table is rebuilt in one
+ * transaction with every row copied. No table references billing_payments, so
+ * the rebuild cannot cascade into anything else.
+ */
+function retainPaymentsAfterAccountDeletion(db) {
+  const link = db.pragma("foreign_key_list('billing_payments')").find(row => row.from === 'account_id' && row.table === 'accounts');
+  if (!link || String(link.on_delete).toUpperCase() === 'SET NULL') return false;
+  db.transaction(() => {
+    db.exec(`
+      DROP TABLE IF EXISTS billing_payments_v4;
+      CREATE TABLE billing_payments_v4 (
+        provider TEXT NOT NULL CHECK(provider IN ('apple','google','web')),
+        payment_id TEXT NOT NULL,
+        provider_subscription_id TEXT NOT NULL,
+        account_id TEXT REFERENCES accounts(id) ON DELETE SET NULL,
+        amount INTEGER NOT NULL DEFAULT 0,
+        currency TEXT,
+        status TEXT,
+        captured_at INTEGER NOT NULL,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        PRIMARY KEY(provider, payment_id)
+      );
+      INSERT INTO billing_payments_v4(provider,payment_id,provider_subscription_id,account_id,amount,currency,status,captured_at,created_at,updated_at)
+        SELECT provider,payment_id,provider_subscription_id,account_id,amount,currency,status,captured_at,created_at,updated_at FROM billing_payments;
+      DROP TABLE billing_payments;
+      ALTER TABLE billing_payments_v4 RENAME TO billing_payments;
+      CREATE INDEX IF NOT EXISTS idx_billing_payments_subscription
+        ON billing_payments(provider, provider_subscription_id, captured_at);
+    `);
+  })();
+  return true;
+}
+
+/**
  * Billing is an optional deployment subsystem, so its schema is versioned
  * independently from the core account/sync database. The migration is
  * idempotent and runs before any provider adapter is constructed.
@@ -74,7 +119,7 @@ export function ensureBillingSchema(db) {
       provider TEXT NOT NULL CHECK(provider IN ('apple','google','web')),
       payment_id TEXT NOT NULL,
       provider_subscription_id TEXT NOT NULL,
-      account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+      account_id TEXT REFERENCES accounts(id) ON DELETE SET NULL,
       amount INTEGER NOT NULL DEFAULT 0,
       currency TEXT,
       status TEXT,
@@ -97,6 +142,58 @@ export function ensureBillingSchema(db) {
       PRIMARY KEY(provider, refund_id)
     );
     CREATE INDEX IF NOT EXISTS idx_billing_refunds_payment ON billing_refunds(provider, payment_id);
+  `);
+
+  retainPaymentsAfterAccountDeletion(db);
+
+  // Billing schema v5 (§19 StoreKit entitlement state machine). Each provider
+  // subscription carries its own last-applied lifecycle so the account
+  // entitlement is derived from every subscription the account holds — an
+  // event for one subscription can no longer overwrite Premium that another,
+  // still-paid subscription (or a support grant) provides. The Apple signed
+  // data the server verified is kept verbatim so an operator can recompute
+  // the entitlement from Apple's own signatures and report drift
+  // (server/tools/billing-reconcile.mjs, docs/operations/billing-reconciliation.md).
+  addColumnIfMissing(db, 'billing_subscriptions', 'state_plan',
+    "state_plan TEXT CHECK(state_plan IN ('free','premium') OR state_plan IS NULL)");
+  addColumnIfMissing(db, 'billing_subscriptions', 'state_status', 'state_status TEXT');
+  addColumnIfMissing(db, 'billing_subscriptions', 'state_period_end', 'state_period_end INTEGER');
+  addColumnIfMissing(db, 'billing_subscriptions', 'state_grace_until', 'state_grace_until INTEGER');
+  db.exec(`
+    -- Apple-signed JWS the server verified: device transactions (purchase,
+    -- restore, Transaction.updates) and App Store Server Notifications v2.
+    -- account_id is NULL for a notification that names no Pri account (no or
+    -- an unknown appAccountToken): it is acknowledged and kept for an operator
+    -- rather than refused into Apple's retry loop.
+    CREATE TABLE IF NOT EXISTS billing_apple_signed_events (
+      event_id TEXT PRIMARY KEY,
+      kind TEXT NOT NULL CHECK(kind IN ('transaction','notification')),
+      account_id TEXT REFERENCES accounts(id) ON DELETE CASCADE,
+      original_transaction_id TEXT NOT NULL,
+      transaction_id TEXT NOT NULL,
+      notification_type TEXT,
+      environment TEXT NOT NULL,
+      signed_date INTEGER NOT NULL,
+      signed_payload TEXT NOT NULL,
+      received_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_billing_apple_signed_events_subscription
+      ON billing_apple_signed_events(original_transaction_id, signed_date);
+    CREATE INDEX IF NOT EXISTS idx_billing_apple_signed_events_account
+      ON billing_apple_signed_events(account_id, signed_date);
+
+    -- Audited support grants (POST /v1/entitlements/admin/grant) as their own
+    -- entitlement source. The snapshot is derived from every source; a grant
+    -- that lived only in the snapshot was erased by the next billing event.
+    CREATE TABLE IF NOT EXISTS entitlement_support_grants (
+      event_id TEXT PRIMARY KEY,
+      account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+      product_id TEXT,
+      period_end INTEGER NOT NULL,
+      created_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_entitlement_support_grants_account
+      ON entitlement_support_grants(account_id, period_end);
   `);
 
   db.prepare("INSERT OR REPLACE INTO platform_meta(key,value) VALUES ('billing_schema_version',?)").run(String(BILLING_SCHEMA_VERSION));

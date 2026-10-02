@@ -52,18 +52,24 @@ jobs:
           grep -Fq 'INDIA NATIVE BANKS: PASS — 313/313 checks — 19 chapters rewired onto 20 NCERT-native generators' suites.log
           grep -Fq 'NCERT ANSWER FORMS: PASS — 373/373 checks' suites.log
           grep -Fq 'INDIA EXAM FLOW: PASS — 129/129 checks' suites.log
+          grep -Fq 'EXAM SESSION: PASS — 88/88 checks' suites.log
+          grep -Fq 'EXAM ANALYSIS: PASS — 29/29 checks' suites.log
           grep -Fq 'INDIA PYQ: PASS — 1079/1079 checks — 45 source-cited previous-year questions' suites.log
           grep -Fq '✔ INDIA IDENTITY SUITE PASSED — 102/102 checks across 5 groups' suites.log
           grep -Fq 'INDIA ADAPTIVE: PASS — 302/302 checks' suites.log
+          grep -Fq 'ADAPTIVE SIMULATION: PASS — 77/77 checks' suites.log
+          grep -Fq 'PROGRESS TRUTH: PASS — 74/74 checks' suites.log
+          grep -Fq 'PLACEMENT: PASS — 268/268 checks' suites.log
+          grep -Fq 'IOS BUNDLE FEATURES: PASS — 16/16 checks' suites.log
           grep -Fq 'INDIA EXAM WEIGHT: PASS — 628/628 checks' suites.log
           grep -Fq 'PLOTTING: PASS — 78/78 checks' suites.log
           grep -Fq 'README TRUTH: PASS — 16/16 checks' suites.log
-          grep -Fq 'LEGAL PAGES: PASS — 229/229 checks' suites.log
+          grep -Fq 'LEGAL PAGES: PASS — 233/233 checks' suites.log
           grep -Fq 'CLOUD HANDWRITING CLIENT: PASS — 58/58 checks' suites.log
           grep -Fq 'CLOUD WORKING CLIENT: PASS — 47/47 checks' suites.log
           grep -Fq 'CLOUD PHOTO CLIENT: PASS — 28/28 checks' suites.log
-          grep -Fq 'I18N: PASS — 188/188 checks' suites.log
-          grep -Fq 'I18N COVERAGE: PASS — 88/88 checks — 41 files scanned, 0 hard-coded strings' suites.log
+          grep -Fq 'I18N: PASS — 189/189 checks' suites.log
+          grep -Fq 'I18N COVERAGE: PASS — 88/88 checks — 48 files scanned, 0 hard-coded strings' suites.log
           grep -Fq 'I18N VOICE: PASS — 92/92 checks' suites.log
           grep -Fq 'MISCONCEPTION ONTOLOGY: PASS — 99/99 checks' suites.log
           grep -Fq 'CLOUD HANDWRITING CLIENT: PASS — 58/58 checks' suites.log
@@ -83,8 +89,17 @@ jobs:
           grep -Fq 'BAD INPUT: PASS — 38/38 checks' suites.log
           grep -Fq 'CLOUD SYNC ACK: PASS — 44/44 checks' suites.log
           grep -Fq 'PASS — §09 submission lifecycle: 13 groups' suites.log
+          grep -Fq 'PASS — §22 submission sync durability: 6 groups' suites.log
           grep -Fq 'PASS — Grade 9 Ganita Manjari: 1280 seeded forms (1000 numeric handwriting-ready, 280 conceptual).' suites.log
           grep -Fq 'PASS — 8/8 chapters, 200/200 uploaded pages, 42/42 formal exercise sections and 293/293 formal exercise prompts represented and verified.' suites.log
+          # §06 content runtime certification: every V1 launch path (CBSE/NCERT
+          # 7–12, JEE Main, JEE Advanced) served, validated, versioned and
+          # end-to-end through the local backend; the path count may only grow.
+          grep -Fq 'CONTENT CERTIFICATION REGRESSIONS: PASS — 135/135 checks' suites.log
+          grep -Fq 'CONTENT CERTIFICATION (fast, 4/path/difficulty): PASS — ' suites.log
+          grep -Fq '8/8 exam selections' suites.log
+          paths=$(grep -Eo 'CONTENT CERTIFICATION [(]fast, 4/path/difficulty[)]: PASS — [0-9]+' suites.log | grep -Eo '[0-9]+$')
+          test "${paths:-0}" -ge 793
           if grep -Fq 'not measured:' suites.log; then
             echo 'A deterministic suite reported skipped coverage.' >&2
             exit 1
@@ -179,6 +194,7 @@ jobs:
         run: |
           node server/test/handwriting-transcription-check.mjs
           node server/test/working-check-check.mjs
+          node server/test/tutor-help-check.mjs
           node server/test/spend-ceiling-check.mjs
           node server/test/guardian-consent-check.mjs
       - name: Account, origin, CMS and classroom contracts
@@ -193,6 +209,7 @@ jobs:
         run: |
           node server/test/proxy-identity-contract-check.mjs
           node server/test/sync-idempotency-contract-check.mjs
+          node server/test/practice-attempt-sync-check.mjs
           node server/test/entitlement-admin-grant-check.mjs
           node server/test/request-size-contract-check.mjs
           node server/test/content-index-exposure-check.mjs
@@ -234,14 +251,19 @@ jobs:
         run: |
           set -o pipefail
           node scripts/with-postgres.mjs node server/test/run-platform-postgres.mjs 2>&1 | tee platform-postgres.log
-          grep -Fq 'PLATFORM ON POSTGRES: PASS — 27/27 suites' platform-postgres.log
+          grep -Fq 'PLATFORM ON POSTGRES: PASS — 31/31 suites' platform-postgres.log
           grep -Fq '✓ security-acceptance-check.mjs' platform-postgres.log
           grep -Fq '✓ abuse-limits-check.mjs' platform-postgres.log
-          grep -Fq 'POSTGRES SCHEMA MUTATIONS: PASS — 21/21' platform-postgres.log
+          grep -Fq '✓ practice-attempt-sync-check.mjs' platform-postgres.log
+          grep -Fq 'ACCOUNT LIFECYCLE JOURNEY: PASS' platform-postgres.log
+          grep -Fq 'POSTGRES SCHEMA MUTATIONS: PASS — 25/25' platform-postgres.log
           grep -Fq 'PLATFORM SYNC BURST: PASS' platform-postgres.log
           grep -Fq '✓ failure-drills-check.mjs' platform-postgres.log
+          grep -Fq '✓ storekit-entitlement-state-machine-check.mjs' platform-postgres.log
       - name: Platform migration contract
         run: node server/test/platform-migration-check.mjs
+      - name: Billing v3 to v4 payment-retention rebuild on a populated SQLite database
+        run: node server/test/billing-payment-retention-migration-check.mjs
       - name: Cross-account sync pagination regression
         run: node server/test/platform-sync-pagination-check.mjs
       - name: Production persistent-storage contract
@@ -250,6 +272,8 @@ jobs:
         run: node server/test/production-db-bootstrap-check.mjs
       - name: Account lifecycle and session rotation
         run: node server/test/account-lifecycle-contract-check.mjs
+      - name: Account lifecycle journey, deletion against the retention table (SQLite)
+        run: node server/test/account-lifecycle-journey-check.mjs
       - name: Encrypted verification/reset email worker
         run: node server/test/auth-delivery-worker-check.mjs
       - name: Production email delivery configuration
@@ -258,6 +282,15 @@ jobs:
         run: node server/test/razorpay-billing-check.mjs
       - name: Apple billing lifecycle
         run: node server/test/apple-billing-check.mjs
+      # §19 / V1 blocker #7 (code side): the StoreKit entitlement state machine
+      # across renewal, grace, cancellation, expiry, refund, upgrade, restore,
+      # account switch, duplicate/out-of-order/replayed/forged notifications,
+      # plus the operator reconciliation CLI. Also runs on Postgres above.
+      - name: StoreKit entitlement state machine and reconciliation
+        run: |
+          set -o pipefail
+          node server/test/storekit-entitlement-state-machine-check.mjs 2>&1 | tee storekit.log
+          grep -Fq 'STOREKIT ENTITLEMENT STATE MACHINE: PASS — 172/172 checks' storekit.log
 
   browser:
     name: Browser suites (end-to-end and accessibility)
@@ -296,8 +329,12 @@ jobs:
         run: |
           set -euo pipefail
           test -s browser.log
-          grep -Eq 'E2E SUITE.*247/247.*8 flows' browser.log
+          grep -Eq 'E2E SUITE.*341/341.*12 flows' browser.log
           grep -Fq 'Submission · interruption recovery and one attempt' browser.log
+          grep -Fq 'Cloud · late results never rewrite an attempt' browser.log
+          grep -Fq 'India exam · JEE Main handwritten, reloaded, analysed' browser.log
+          grep -Fq 'India exam · the clock runs out and the paper submits itself' browser.log
+          grep -Fq 'Placement · onboarding → diagnostic → evidence map' browser.log
           grep -Fq 'Phone · every destination reachable at 390px' browser.log
           grep -Fq 'India · onboarding, class labels, demo, cloud entry' browser.log
           grep -Fq 'Cloud · account, live Settings refresh, assignment hand-off' browser.log
@@ -306,8 +343,13 @@ jobs:
           grep -Eq 'E2E SUITE.*17/17.*1 flows' browser.log
           grep -Fq 'Cloud admin · independent-review rejection' browser.log
           grep -Eq 'E2E SUITE.*8/8.*1 flows' browser.log
-          grep -Fq 'Hindi · Practice, Exams, exam room, Progress, Explain' browser.log
-          grep -Eq 'E2E SUITE.*36/36.*1 flows' browser.log
+          grep -Fq 'AI tutor · dark by default in a production build' browser.log
+          grep -Fq 'AI tutor · three levels, in order, with fallback' browser.log
+          grep -Eq 'E2E SUITE.*32/32.*2 flows' browser.log
+          grep -Fq 'Hindi · Practice, handwriting, Exams, exam room, Progress, Explain' browser.log
+          grep -Eq 'E2E SUITE.*57/57.*1 flows' browser.log
+          grep -Fq 'Progress truth · rendered numbers = attempt ledger' browser.log
+          grep -Eq 'E2E SUITE.*20/20.*1 flows' browser.log
           grep -Eq 'ACCESSIBILITY SUITE.*38/38.*12 groups' browser.log
           grep -Fq 'E2E BROWSER: webkit' browser.log
           test "$(grep -c 'Responsive matrix · 6 viewports, critical routes, write/type, actions' browser.log)" -ge 2

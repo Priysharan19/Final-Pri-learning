@@ -2,10 +2,12 @@
 // Pri Learning · Android host descriptor (CP-06)
 //
 // The deep-frozen, non-configurable `window.__PRI_HOST__` installed at document
-// start for the bundled origin only. Capabilities, never OS identity. CP-06
-// advertises lifecycle (with a hardware Back button), durable storage and
-// device facts; cloud/photo/share/files arrive in CP-07 and billing in CP-08.
-// Ink is deliberately absent: Android writes on the shared web canvas.
+// start for the bundled origin only. Capabilities, never OS identity: lifecycle
+// (with a hardware Back button), durable storage and device facts (CP-06);
+// cloud (configured only when the build carries a cloud origin) and share
+// (files, binary, print) over the envelope bridge (CP-07). Billing arrives in
+// CP-08. Ink and photo OCR are deliberately absent: Android writes on the
+// shared web canvas, and photos are attached through the system file picker.
 // ─────────────────────────────────────────────────────────────────────────────
 package com.prilearning.app.bridge
 
@@ -19,11 +21,13 @@ object HostDescriptor {
         for ((k, v) in facts) put(k, v)
     }
 
-    fun json(shell: Shell, release: JSONObject?, extra: Map<String, JSONObject> = emptyMap()): JSONObject {
+    fun json(shell: Shell, release: JSONObject?, cloudConfigured: Boolean = false, extra: Map<String, JSONObject> = emptyMap()): JSONObject {
         val capabilities = JSONObject()
             .put("lifecycle", cap("backButton" to true))
             .put("storage", cap("durable" to true))
             .put("device", cap("safeAreaApplied" to true, "stylusSeen" to false))
+            .put("cloud", cap("transport" to "bridge", "configured" to cloudConfigured))
+            .put("share", cap("transport" to "bridge", "binary" to true, "print" to true))
         for ((name, value) in extra) capabilities.put(name, value)
         return JSONObject()
             .put("protocol", Envelope.PROTOCOL)
