@@ -52,6 +52,8 @@ jobs:
           grep -Fq 'INDIA NATIVE BANKS: PASS — 313/313 checks — 19 chapters rewired onto 20 NCERT-native generators' suites.log
           grep -Fq 'NCERT ANSWER FORMS: PASS — 373/373 checks' suites.log
           grep -Fq 'INDIA EXAM FLOW: PASS — 129/129 checks' suites.log
+          grep -Fq 'EXAM SESSION: PASS — 88/88 checks' suites.log
+          grep -Fq 'EXAM ANALYSIS: PASS — 29/29 checks' suites.log
           grep -Fq 'INDIA PYQ: PASS — 1079/1079 checks — 45 source-cited previous-year questions' suites.log
           grep -Fq '✔ INDIA IDENTITY SUITE PASSED — 102/102 checks across 5 groups' suites.log
           grep -Fq 'INDIA ADAPTIVE: PASS — 302/302 checks' suites.log
@@ -63,7 +65,7 @@ jobs:
           grep -Fq 'CLOUD WORKING CLIENT: PASS — 47/47 checks' suites.log
           grep -Fq 'CLOUD PHOTO CLIENT: PASS — 28/28 checks' suites.log
           grep -Fq 'I18N: PASS — 188/188 checks' suites.log
-          grep -Fq 'I18N COVERAGE: PASS — 88/88 checks — 46 files scanned, 0 hard-coded strings' suites.log
+          grep -Fq 'I18N COVERAGE: PASS — 88/88 checks — 47 files scanned, 0 hard-coded strings' suites.log
           grep -Fq 'I18N VOICE: PASS — 92/92 checks' suites.log
           grep -Fq 'MISCONCEPTION ONTOLOGY: PASS — 99/99 checks' suites.log
           grep -Fq 'CLOUD HANDWRITING CLIENT: PASS — 58/58 checks' suites.log
@@ -323,9 +325,11 @@ jobs:
         run: |
           set -euo pipefail
           test -s browser.log
-          grep -Eq 'E2E SUITE.*262/262.*9 flows' browser.log
+          grep -Eq 'E2E SUITE.*308/308.*11 flows' browser.log
           grep -Fq 'Submission · interruption recovery and one attempt' browser.log
           grep -Fq 'Cloud · late results never rewrite an attempt' browser.log
+          grep -Fq 'India exam · JEE Main handwritten, reloaded, analysed' browser.log
+          grep -Fq 'India exam · the clock runs out and the paper submits itself' browser.log
           grep -Fq 'Phone · every destination reachable at 390px' browser.log
           grep -Fq 'India · onboarding, class labels, demo, cloud entry' browser.log
           grep -Fq 'Cloud · account, live Settings refresh, assignment hand-off' browser.log
