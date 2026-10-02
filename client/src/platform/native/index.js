@@ -20,6 +20,7 @@ import { PriNativeError } from './errors.js';
 export { PriNativeError, CODES, isPriNativeError } from './errors.js';
 
 let runtime = null;
+const listenedBridges = new WeakSet();
 const LIFECYCLE_STATES = new Set(['active', 'inactive', 'background']);
 
 // In browsers and WebViews `window === globalThis`; Node tests stub `window`.
@@ -49,6 +50,12 @@ function getRuntime() {
   const host = discoverHost(scope);
   if (host.native && !host.legacy && scope && typeof scope === 'object') {
     scope.__priNativeReceive = raw => runtime?.bridge.receive(raw);
+    // Android WebMessageListener: replies arrive as `message` events on the
+    // injected priBridge object (JavaScriptReplyProxy.postMessage).
+    if (typeof scope.priBridge?.addEventListener === 'function' && !listenedBridges.has(scope.priBridge)) {
+      listenedBridges.add(scope.priBridge);
+      scope.priBridge.addEventListener('message', event => runtime?.bridge.receive(event?.data));
+    }
     runtime.readySent = true;
     // host.ready lets the shell flush buffered billing events; our own bus
     // buffers them again until a subscriber appears.
@@ -115,7 +122,7 @@ const ink = Object.freeze({
   },
   facts: () => {
     const c = capOf('ink');
-    return c ? { stylus: c.stylus === true, finger: c.finger === true } : null;
+    return c ? { stylus: c.stylus === true, finger: c.finger === true, fingerDefault: c.fingerDefault === true } : null;
   },
   /** Fire-and-forget surface message (mount/layout/tool/...). Ink v1 is only
    * defined over the legacy Apple transport; no envelope host advertises it. */
@@ -184,6 +191,16 @@ const cloud = Object.freeze({
     const req = { path, method, body, requestId, idempotencyKey };
     if (c.transport === 'legacy') return getRuntime().legacy.cloud.request(req, { timeoutMs, signal });
     return viaBridge('cloud', 'request', req, { timeoutMs, signal });
+  },
+  /** Forget the cloud session held by the shell's native jar (Disconnect),
+   * whether or not the server logout succeeded. Resolves true/false; never throws. */
+  forgetSession() {
+    const c = capOf('cloud');
+    if (!c) return Promise.resolve(false);
+    const done = c.transport === 'legacy'
+      ? getRuntime().legacy.cloud.forget()
+      : viaBridge('cloud', 'forgetSession', {}, { timeoutMs: 5_000 }).then(() => true);
+    return done.catch(() => false);
   },
 });
 
@@ -270,6 +287,20 @@ const lifecycle = Object.freeze({
       if (LIFECYCLE_STATES.has(payload?.state)) fn(payload.state);
     });
     return off;
+  },
+  /** True when the host has a hardware/gesture Back button (Android). */
+  hasBackButton: () => capOf('lifecycle')?.backButton === true,
+  /** Tell the shell whether the page wants the next Back (sheet open, or away
+   * from home). The shell decides synchronously from this — no timeout race. */
+  declareBack(wanted) {
+    const c = capOf('lifecycle');
+    if (!c || c.backButton !== true || c.transport === 'legacy') return Promise.resolve(false);
+    return viaBridge('lifecycle', 'setBackHandled', { handled: wanted === true }, { timeoutMs: 5_000 }).then(() => true);
+  },
+  /** The shell passed Back to the page (it declared it wanted it). */
+  onBack(fn) {
+    if (typeof fn !== 'function') return () => {};
+    return getRuntime().bus.on('lifecycle.back', () => fn());
   },
   /** Native → JS question, e.g. Android Back: handler returns { handled }. */
   onBackRequested(fn) {

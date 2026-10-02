@@ -242,6 +242,7 @@ ok(normalizeCode('SOMETHING_NEW_FROM_A_SHELL') === 'INTERNAL', 'unknown codes be
     },
   });
   ok(priNative.isNativeShell() && priNative.has('share') && !priNative.has('ink'), 'capabilities, not OS, describe the host');
+  ok(priNative.ink.facts() === null, 'with no ink capability there are no ink facts');
   ok(priNative.billing.store() === 'play', 'the store is a capability fact');
   await tick(5);
   ok(host.lastRequest('host', 'ready'), 'JS announces host.ready once it is listening');
@@ -303,6 +304,7 @@ ok(normalizeCode('SOMETHING_NEW_FROM_A_SHELL') === 'INTERNAL', 'unknown codes be
   ok(recovered.some(t => t.transactionId === 'late-1'), 'a late StoreKit result is recovered as a transaction update');
 
   ok(priNative.ink.post({ op: 'recognize', reqId: 1, overrides: {} }) === true, 'a normal ink request is posted');
+  ok(priNative.ink.facts()?.fingerDefault === false, 'a legacy (pre-CP-04) shell never claims finger-default ink');
   ok(priNative.ink.post({ op: 'recognize', reqId: 2, overrides: {}, expectedAnswer: '42' }) === false,
     'an ink message carrying any non-allowlisted field (an expected answer) is refused');
   const longHybrid = `h3_${Array.from({ length: 12 }, (_, i) => 101 + i).join('_')}`; // a real 12-stroke group id
@@ -348,6 +350,9 @@ ok(normalizeCode('SOMETHING_NEW_FROM_A_SHELL') === 'INTERNAL', 'unknown codes be
   answer({ id: cloudPosts.filter(m => m.action === 'request').at(-1).id, status: 403, body: JSON.stringify({ error: { code: 'ORIGIN_REJECTED', message: 'no' } }) });
   try { await http; ok(false, 'http error resolved'); } catch (e) { ok(e.status === 403 && e.code === 'ORIGIN_REJECTED', 'HTTP errors keep status and server code'); }
 
+  ok(await priNative.cloud.forgetSession() === true && cloudPosts.some(m => m.action === 'forget'),
+    'the legacy Apple cloud bridge is told to forget the session on Disconnect');
+
   globalThis.window.__PRI_NATIVE_CLOUD_CONFIGURED__ = false;
   priNative.dispose();
   try { await cloudRequest('/v1/me'); ok(false, 'unconfigured resolved'); } catch (e) { ok(e.code === 'CLOUD_DISABLED', `an unconfigured native cloud fails closed as CLOUD_DISABLED (${e.code})`); }
@@ -387,6 +392,109 @@ ok(normalizeCode('SOMETHING_NEW_FROM_A_SHELL') === 'INTERNAL', 'unknown codes be
   priNative.dispose();
   unsupportedHost.uninstall();
   delete globalThis.document;
+}
+
+// ── 12c′ · Print goes to the native print dialog inside a shell ─────────────
+{
+  let printed = 0;
+  globalThis.window = globalThis;
+  globalThis.print = () => { printed += 1; };
+  const { printPage } = await import(`../src/lib/files.js?print=${Date.now()}`);
+  const host = createFakeHost({ capabilities: { share: { versions: [1], print: true } }, handlers: {
+    'host.ready': () => ({}), 'share.print': () => ({ completed: true }),
+  } });
+  priNative.dispose();
+  const result = await printPage();
+  ok(host.lastRequest('share', 'print') && result?.completed === true && printed === 0,
+    'inside a shell that can print, Print opens the native print dialog (window.print() is a no-op in Android WebView)');
+  priNative.dispose();
+  host.uninstall();
+  const noPrint = createFakeHost({ capabilities: { share: { versions: [1] } }, handlers: { 'host.ready': () => ({}) } });
+  priNative.dispose();
+  await printPage();
+  ok(printed === 1 && !noPrint.lastRequest('share', 'print'), 'a host without print (and every browser) uses window.print()');
+  priNative.dispose();
+  noPrint.uninstall();
+  delete globalThis.print;
+  delete globalThis.window;
+}
+
+// ── 12c″ · Disconnect forgets the native session even offline ───────────────
+{
+  const host = createFakeHost({ capabilities: { cloud: { versions: [1], configured: true } }, handlers: {
+    'host.ready': () => ({}), 'cloud.forgetSession': () => ({}),
+  } });
+  priNative.dispose();
+  ok(await priNative.cloud.forgetSession() === true && !!host.lastRequest('cloud', 'forgetSession'),
+    'an envelope host is asked to forget the cloud session');
+  priNative.dispose();
+  host.uninstall();
+  const failing = createFakeHost({ capabilities: { cloud: { versions: [1], configured: true } }, handlers: { 'host.ready': () => ({}) } });
+  priNative.dispose();
+  ok(await priNative.cloud.forgetSession() === false, 'a host that cannot forget answers false, never throws');
+  priNative.dispose();
+  failing.uninstall();
+  ok(await priNative.cloud.forgetSession() === false, 'with no cloud capability (a browser) there is nothing to forget');
+}
+
+// ── 12d · Android delivery: JSON strings out, `message` events back ──────────
+{
+  const listeners = [];
+  const sent = [];
+  globalThis.priBridge = {
+    postMessage: json => sent.push(JSON.parse(json)),
+    addEventListener: (type, fn) => { if (type === 'message') listeners.push(fn); },
+  };
+  Object.defineProperty(globalThis, '__PRI_HOST__', { configurable: true, writable: false,
+    value: Object.freeze({ protocol: 1, capabilities: Object.freeze({ storage: Object.freeze({ versions: [1], durable: true }), lifecycle: Object.freeze({ versions: [1], backButton: true }) }) }) });
+  priNative.dispose();
+  priNative.start();
+  await tick(5);
+  ok(listeners.length === 1, 'priNative listens for Android WebMessage replies exactly once');
+  ok(typeof sent[0] === 'object' && sent[0].cap === 'host' && sent[0].op === 'ready', 'and posts envelopes to priBridge as JSON strings');
+  // A native → JS Back question answered through the same channel.
+  const { wantsBack, performBack, historyDepth } = await import('../src/platform/backNavigation.js');
+  globalThis.KeyboardEvent ??= class { constructor(type, init) { this.type = type; Object.assign(this, init); } };
+  const atLanding = { state: { idx: 0 }, back() { throw new Error('must not navigate from the landing entry'); } };
+  let closed = false;
+  const sheet = { hidden: false, getClientRects: () => (closed ? [] : [1]), dispatchEvent: e => { if (e.key === 'Escape') closed = true; return true; } };
+  const docWithSheet = { querySelector: s => (s === '.mnav-sheet' ? sheet : null), querySelectorAll: () => [], contains: () => true };
+  ok(wantsBack({ doc: docWithSheet, hist: atLanding }) === true, 'an open sheet means the page wants Back, even on the landing entry');
+  ok(performBack({ doc: docWithSheet, hist: { state: { idx: 3 }, back() { throw new Error('must not navigate'); } } }) === 'dialog-escape-sent' && closed,
+    'Back closes the open sheet and does not also navigate');
+  const stubborn = { hidden: false, getClientRects: () => [1], dispatchEvent: () => true }; // ignores Escape (e.g. a confirmation)
+  const docStubborn = { querySelector: () => null, querySelectorAll: () => [stubborn], contains: () => true };
+  ok(performBack({ doc: docStubborn, hist: { state: { idx: 2 }, back() { throw new Error('must not navigate'); } } }) === 'dialog-escape-sent',
+    'a dialog that stays visible after Escape never lets the same press navigate');
+  const hiddenDialog = { hidden: false, getClientRects: () => [] };
+  const route = { querySelector: () => null, querySelectorAll: () => [hiddenDialog], contains: () => true };
+  let wentBack = false;
+  ok(wantsBack({ doc: route, hist: { state: { idx: 1 } } }) === true && wantsBack({ doc: route, hist: atLanding }) === false,
+    'with in-app history the page wants Back; on the landing entry with nothing visibly open it does not (an invisible dialog is ignored)');
+  ok(wantsBack({ doc: route, hist: { state: { idx: 0 } } }) === false && wantsBack({ doc: route, hist: { state: null } }) === false,
+    'a teacher landing on /teach (replace keeps idx 0) or a restored deep entry can leave the app with Back');
+  ok(historyDepth({ state: { idx: -1 } }) === 0 && historyDepth({ state: { idx: '2' } }) === 0 && historyDepth({ state: { idx: 4 } }) === 4,
+    'only a non-negative integer router index counts as history depth');
+  ok(performBack({ doc: route, hist: { state: { idx: 1 }, back() { wentBack = true; } } }) === 'history-back' && wentBack,
+    'with no sheet open, Back goes back in the page history');
+  ok(performBack({ doc: route, hist: atLanding }) === 'nothing', 'on the landing entry the page does nothing (the shell had already let the system handle it)');
+  const sentBefore = sent.length;
+  priNative.lifecycle.declareBack(true).catch(() => {}); // the fake shell does not answer
+  await tick(5);
+  const declared = sent.slice(sentBefore).find(m => m.cap === 'lifecycle' && m.op === 'setBackHandled');
+  ok(declared?.payload?.handled === true, 'the page declares its Back state to the shell (no timed round trip)');
+  let gotBack = 0;
+  priNative.lifecycle.onBack(() => { gotBack += 1; });
+  listeners[0]({ data: JSON.stringify({ v: 1, event: 'lifecycle.back', seq: 50, payload: {} }) });
+  ok(gotBack === 1, 'the shell hands Back to the page as a one-way event');
+  priNative.lifecycle.onBackRequested(() => true);
+  listeners[0]({ data: JSON.stringify({ v: 1, id: 'n:9', req: 'lifecycle.backRequested', payload: {} }) });
+  await tick(10);
+  const answer = sent.find(m => m.id === 'n:9');
+  ok(answer?.ok === true && answer.result.handled === true, 'a native Back request arriving as a message event gets its reply');
+  priNative.dispose();
+  delete globalThis.priBridge;
+  delete globalThis.__PRI_HOST__;
 }
 
 // ── 13 · Answer-blind ink through the real ink module ────────────────────────

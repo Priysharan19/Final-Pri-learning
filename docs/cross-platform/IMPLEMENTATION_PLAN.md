@@ -83,7 +83,7 @@ CP-03 and CP-06 can run in parallel after CP-02, with different owners. Under th
   - `ios/PriLearning.swiftpm/WebShell.swift` (share anchor, Dynamic Type → CSS, safe-area decision).
   - `scripts/ink-native-check.mjs` (add an iPhone destination), `.github/workflows/native-ink.yml`.
   - `scripts/check-native-package-sync.mjs` (also gate `Info.plist`).
-  - Remove or refresh the stale `ios/PriLearning.swiftpm.zip`.
+  - Remove or refresh the stale `PriLearning.swiftpm.zip` archive (removed in CP-04).
   - Universal Links: `onOpenURL` → route bridge, plus `apple-app-site-association` served by `server/`.
 - **Scope:** finger ink default, compact-friendly native surfaces, iPhone simulator build+launch+bridge self-check in CI, deep links for `/account-action`, account export via `share.file`.
 - **Non-goals:** iPhone landscape layouts, a new recogniser, StoreKit changes, App Store submission.
@@ -124,11 +124,11 @@ CP-03 and CP-06 can run in parallel after CP-02, with different owners. Under th
 - **Dependencies:** CP-02. CP-03 is needed before product QA, not for the shell.
 - **Acceptance tests:**
   - JVM tests: SPA fallback mapping, navigation policy, envelope validation.
-  - Instrumented on API 26 + API 36 emulators: app boots to onboarding; a local profile created → force-stop → relaunch keeps it (IndexedDB persistence); Back closes the More sheet before exiting; rotation keeps the in-progress typed answer; external link opens outside the WebView.
+  - Instrumented: on API 26 (factory WebView below the Chromium 91 floor) the fail-closed update screen is asserted; on API 33 and API 36 (phone + tablet) the app boots to onboarding, a local profile is created → `am force-stop` (real process death) → relaunch keeps it (IndexedDB + localStorage); Back closes the More sheet before navigating, and leaves the app from the landing entry; rotation keeps the in-progress typed answer; a tapped external link opens outside the WebView while a scripted redirect launches nothing. *(Amended at CP-06 review: the plan originally listed API 26 for the product journey, which its factory WebView cannot run.)*
   - `scripts/sync-android.mjs --check` parity.
 - **Automated gates:** `android-shell.yml` (Gradle build, lint, JVM tests, emulator instrumented tests), `node scripts/pri-fleet.mjs validate`, `npm test`.
 - **Physical-device gates:** none for merge. One low-end phone boot smoke recommended.
-- **Rollback criteria:** isolated directory, so revert the PR. No shared-code changes except the fleet rule.
+- **Rollback criteria:** revert the PR. Shared-code changes are small and inert outside Android: `client/src/platform/backNavigation.js` (returns immediately without the `backButton` capability), its one-line install in `client/src/main.jsx`, the Android `message` listener and `lifecycle` Back helpers in `client/src/platform/native/index.js`, and the fleet rule.
 - **Done when:** emulator evidence that the shared product runs offline with persistent data on phone and tablet emulators. Not claimed as an Android product. **Risk: R3.**
 
 ## CP-07 — Android Native Bridges

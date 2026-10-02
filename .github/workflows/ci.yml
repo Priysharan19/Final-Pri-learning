@@ -58,12 +58,12 @@ jobs:
           grep -Fq 'INDIA EXAM WEIGHT: PASS — 628/628 checks' suites.log
           grep -Fq 'PLOTTING: PASS — 78/78 checks' suites.log
           grep -Fq 'README TRUTH: PASS — 16/16 checks' suites.log
-          grep -Fq 'LEGAL PAGES: PASS — 229/229 checks' suites.log
+          grep -Fq 'LEGAL PAGES: PASS — 233/233 checks' suites.log
           grep -Fq 'CLOUD HANDWRITING CLIENT: PASS — 58/58 checks' suites.log
           grep -Fq 'CLOUD WORKING CLIENT: PASS — 47/47 checks' suites.log
           grep -Fq 'CLOUD PHOTO CLIENT: PASS — 28/28 checks' suites.log
           grep -Fq 'I18N: PASS — 188/188 checks' suites.log
-          grep -Fq 'I18N COVERAGE: PASS — 88/88 checks — 41 files scanned, 0 hard-coded strings' suites.log
+          grep -Fq 'I18N COVERAGE: PASS — 88/88 checks — 42 files scanned, 0 hard-coded strings' suites.log
           grep -Fq 'I18N VOICE: PASS — 92/92 checks' suites.log
           grep -Fq 'MISCONCEPTION ONTOLOGY: PASS — 99/99 checks' suites.log
           grep -Fq 'CLOUD HANDWRITING CLIENT: PASS — 58/58 checks' suites.log
@@ -179,6 +179,7 @@ jobs:
         run: |
           node server/test/handwriting-transcription-check.mjs
           node server/test/working-check-check.mjs
+          node server/test/tutor-help-check.mjs
           node server/test/spend-ceiling-check.mjs
           node server/test/guardian-consent-check.mjs
       - name: Account, origin, CMS and classroom contracts
@@ -234,14 +235,17 @@ jobs:
         run: |
           set -o pipefail
           node scripts/with-postgres.mjs node server/test/run-platform-postgres.mjs 2>&1 | tee platform-postgres.log
-          grep -Fq 'PLATFORM ON POSTGRES: PASS — 27/27 suites' platform-postgres.log
+          grep -Fq 'PLATFORM ON POSTGRES: PASS — 29/29 suites' platform-postgres.log
           grep -Fq '✓ security-acceptance-check.mjs' platform-postgres.log
           grep -Fq '✓ abuse-limits-check.mjs' platform-postgres.log
-          grep -Fq 'POSTGRES SCHEMA MUTATIONS: PASS — 21/21' platform-postgres.log
+          grep -Fq 'ACCOUNT LIFECYCLE JOURNEY: PASS' platform-postgres.log
+          grep -Fq 'POSTGRES SCHEMA MUTATIONS: PASS — 23/23' platform-postgres.log
           grep -Fq 'PLATFORM SYNC BURST: PASS' platform-postgres.log
           grep -Fq '✓ failure-drills-check.mjs' platform-postgres.log
       - name: Platform migration contract
         run: node server/test/platform-migration-check.mjs
+      - name: Billing v3 to v4 payment-retention rebuild on a populated SQLite database
+        run: node server/test/billing-payment-retention-migration-check.mjs
       - name: Cross-account sync pagination regression
         run: node server/test/platform-sync-pagination-check.mjs
       - name: Production persistent-storage contract
@@ -250,6 +254,8 @@ jobs:
         run: node server/test/production-db-bootstrap-check.mjs
       - name: Account lifecycle and session rotation
         run: node server/test/account-lifecycle-contract-check.mjs
+      - name: Account lifecycle journey, deletion against the retention table (SQLite)
+        run: node server/test/account-lifecycle-journey-check.mjs
       - name: Encrypted verification/reset email worker
         run: node server/test/auth-delivery-worker-check.mjs
       - name: Production email delivery configuration
@@ -308,6 +314,9 @@ jobs:
           grep -Eq 'E2E SUITE.*17/17.*1 flows' browser.log
           grep -Fq 'Cloud admin · independent-review rejection' browser.log
           grep -Eq 'E2E SUITE.*8/8.*1 flows' browser.log
+          grep -Fq 'AI tutor · dark by default in a production build' browser.log
+          grep -Fq 'AI tutor · three levels, in order, with fallback' browser.log
+          grep -Eq 'E2E SUITE.*32/32.*2 flows' browser.log
           grep -Fq 'Hindi · Practice, Exams, exam room, Progress, Explain' browser.log
           grep -Eq 'E2E SUITE.*36/36.*1 flows' browser.log
           grep -Eq 'ACCESSIBILITY SUITE.*38/38.*12 groups' browser.log

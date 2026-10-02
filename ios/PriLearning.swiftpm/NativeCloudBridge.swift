@@ -13,6 +13,8 @@ import WebKit
 final class NativeCloudBridge {
     static let responseEvent = "pri:native-cloud-response"
     static var isConfigured: Bool { configuredOrigin != nil }
+    /// Host of the signed cloud origin; deep links are accepted only for it.
+    static var configuredHost: String? { configuredOrigin?.host?.lowercased() }
 
     private static let maxRequestBytes = 1 * 1024 * 1024
     private static let maxResponseBytes = 2 * 1024 * 1024
@@ -59,6 +61,10 @@ final class NativeCloudBridge {
 
         if action == "cancel" {
             cancel(requestId)
+            return
+        }
+        if action == "forget" {
+            forgetSession()
             return
         }
         guard action == "request" else {
@@ -144,6 +150,20 @@ final class NativeCloudBridge {
         }
         storeTask(task, id: requestId)
         task.resume()
+    }
+
+    /// Disconnect: drop the cloud cookies even when the server logout could not
+    /// be reached (offline). Cancels in-flight requests first so none re-adds them.
+    private func forgetSession() {
+        taskLock.lock()
+        let running = Array(tasks.values)
+        tasks.removeAll()
+        taskLock.unlock()
+        running.forEach { $0.cancel() }
+        guard let origin = Self.configuredOrigin else { return }
+        for cookie in cookieStorage.cookies(for: origin) ?? [] where cookie.name == "pri_csrf" || cookie.name == "pri_cloud_session" {
+            cookieStorage.deleteCookie(cookie)
+        }
     }
 
     private func csrfCookie(for origin: URL) -> String? {

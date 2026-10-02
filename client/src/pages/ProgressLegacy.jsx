@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { printPage } from '../lib/files.js';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../api.js';
 import { useApp } from '../App.jsx';
@@ -257,7 +258,7 @@ function ReportCard({ user }) {
     <div className="card">
       <div className="spread no-print">
         <div className="card-title" style={{ marginBottom: 0 }}>{t('progressAu.reportTitle', { course: report.student.course || t('common.yearNumber', { n: report.student.year }) })}</div>
-        <button className="btn btn-ghost btn-sm" onClick={() => window.print()}>{t('progressAu.printPdf')}</button>
+        <button className="btn btn-ghost btn-sm" onClick={() => { printPage().catch(() => {}); }}>{t('progressAu.printPdf')}</button>
       </div>
       <p className="sub" style={{ margin: '10px 0 4px' }}>
         {t('progressAu.reportLine', { name: report.student.name, year: report.student.year, mark: report.predicted.mark, streak: report.streak, attempts: report.totals.attempts, correct: report.totals.correct })}

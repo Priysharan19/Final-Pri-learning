@@ -328,7 +328,16 @@ function releaseIdentityManifest(identity) {
 
 export default defineConfig(({ command }) => {
   const releaseIdentity = resolveReleaseIdentity({ production: command === 'build', env: applyDeploymentPrecedence(process.env) });
+  // The AI tutor ships dark: off in every production build unless it was made
+  // with PRI_FEATURE_TUTOR=1 (staging), on for the development server. See
+  // src/tutor/flag.js and the frozen V1 scope (docs/release/PRI_V1_RELEASE_SCOPE.md).
+  const tutorFlag = String(process.env.PRI_FEATURE_TUTOR || '').trim();
+  const featureTutor = tutorFlag === '1' ? true : tutorFlag === '0' ? false : command !== 'build';
   return {
+    define: {
+      __PRI_FEATURE_TUTOR__: JSON.stringify(featureTutor),
+      __PRI_PRODUCTION_BUILD__: JSON.stringify(command === 'build')
+    },
     plugins: [react(), releaseIdentityManifest(releaseIdentity), precache()],
     server: { port: 5173 },
     build: {
