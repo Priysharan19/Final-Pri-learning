@@ -1380,7 +1380,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
 
           <div className="eval-card">
             <div className="eval-head">
-              <span className="logo-bb">P</span><span className="eval-title">ri Learning. <span style={{ color: 'var(--ink-2)' }}>{t('verdict.evaluation')}</span></span>
+              <span className="logo-bb" aria-hidden="true">P</span><span className="eval-title">Pri Learning. <span style={{ color: 'var(--ink-2)' }}>{t('verdict.evaluation')}</span></span>
               <span className="eval-marks">
                 {t('verdict.marksOutOf', { earned: verdictGood ? shownMarks : earnedMarks, total: totalMarks })}
                 {' '}<small>({verdictGood ? pct : (selfSaved ? Math.round(100 * earnedMarks / totalMarks) : 0)}%)</small>
