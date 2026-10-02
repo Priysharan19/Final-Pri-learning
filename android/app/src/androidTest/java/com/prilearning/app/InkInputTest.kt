@@ -202,7 +202,14 @@ class InkInputTest {
             // ── the shared recognizer reads it and the attempt is marked ─────
             val lines = waitFor(s, "document.querySelectorAll('.ink-preview .ink-line').length || false", 30_000)
             assertTrue("the shared recognizer produced a reading of the strokes ($lines line(s))", (lines.toIntOrNull() ?: 0) >= 1)
-            waitFor(s, "(function(){var b=[].slice.call(document.querySelectorAll('.editor-foot .btn-primary')).find(function(x){return x.offsetParent&&!x.disabled});if(!b)return false;b.click();return true;})()")
+            // Submit as a student would. When the shared recognizer doubts its own
+            // reading (it may, for synthetic strokes on a large tablet canvas), the
+            // submit control turns into "Check this reading first" and the student
+            // confirms it ("That's what I wrote") — the answer-blind confirmation step
+            // cannot be walked around, so the test goes through it too.
+            waitFor(s, "(function(){var b=[].slice.call(document.querySelectorAll('.editor-foot button.btn')).find(function(x){return x.offsetParent&&!x.disabled});if(!b)return false;b.click();return true;})()")
+            Thread.sleep(600)
+            eval(s, "(function(){var v=document.querySelector('.editor-body[role=status] .btn-primary');if(v&&!v.disabled)v.click();return !!v;})()")
             // The injected strokes are not a real answer: correct, incorrect or
             // unreadable are all honest outcomes; what matters is that it is marked.
             val marked = waitFor(s, "(function(){var v=document.querySelector('.verdict')||document.querySelector('.your-answer');return v?(v.innerText||'marked').slice(0,80):false;})()", 60_000)
