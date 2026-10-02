@@ -24,6 +24,7 @@ import {
   indiaPracticeScope, indiaAheadUnlocked, indiaDotpointsInWindow, indiaChaptersForGenerator
 } from '../engine/indiaProduct.js';
 import { indiaReasonLabel } from '../engine/indiaProgress.js';
+import { attemptTotals } from '../engine/progressTruth.js';
 import { indiaExamBlueprint } from '../engine/indiaExams.js';
 import { predictExamMark } from '../engine/markPredictor.js';
 import { IN_CHAPTERS, OLYMPIAD_TOPICS } from '../engine/curriculum-in.js';
@@ -48,10 +49,15 @@ import {
 } from './auth.js';
 import { sanitizeFigure, sanitizeText } from '../lib/sanitize.js';
 import {
+  startExamClock, ensureExamClock, saveExamResponses, examMarkingInputs,
+  paperFingerprint, freezeExam, isReplayOf, examSessionView
+} from './examSession.js';
+import {
   assertExamAllowed, assertPracticeAllowed, examAllowance, practiceAllowance,
   planView, recordExamSimulation, recordPracticeServed, requireCapability, usageView
 } from './entitlementGate.js';
 import { ENTITLEMENTS } from '../platform/entitlements.js';
+import { featureEnabled } from '../platform/features.js';
 import { stageAttemptProgress } from '../platform/profileOutbox.js';
 import { requestTutorHelp } from './tutorBridge.js';
 import { tutorDisabledError, tutorFeatureEnabled } from '../tutor/flag.js';
@@ -1019,8 +1025,11 @@ function indiaPick(p, trackId, ratings, reviews, now, { chapter = null, dotpoint
     if (!pool.length) throw Object.assign(new Error('No generated questions are available for this India track yet.'), { status: 409, code: 'INDIA_TRACK_UNCOVERED' });
     const poolIds = new Set(pool.map(c => c.id));
     const reviewsDue = reviews.filter(r => r.dueAt <= now && poolIds.has(r.subtopic)).sort((a, b) => a.dueAt - b.dueAt);
+    // A finished placement check nudges which untouched chapter comes first —
+    // a bounded prior that stops counting the moment the chapter has evidence.
+    const priors = placementPriorsOf(p);
     const picked = pickNextAmong({
-      candidates: pool.map(c => ({ id: c.id, weight: c.weight, own: !aheadIds.has(c.id) })),
+      candidates: pool.map(c => ({ id: c.id, weight: c.weight, own: !aheadIds.has(c.id), prior: priors[c.id] || 0 })),
       ratings: states, reviewsDue, rand, recent: recentlyServed(p.id), nowMs: now
     });
     const c = indiaChapter(picked.subtopic);
@@ -1080,6 +1089,11 @@ function indiaPick(p, trackId, ratings, reviews, now, { chapter = null, dotpoint
       state: { ...basis, trapPressure: trapPressureOf(st.traps, now), recentWrong: recentWrongOf(st) }, nowMs: now, rand
     });
   } else want = choice.difficulty;
+  // A chapter the placement check found a gap in, and that has no practice
+  // evidence yet, starts at the bottom of the track's window.
+  const placementPrior = placementPriorsOf(p)[c.id] || 0;
+  const diagnosticStart = !choice.explicit && !st.attempts && placementPrior > 0 && (difficulty == null || difficulty === '');
+  if (diagnosticStart) want = indiaDifficultyWindow(trackId, grade).floor;
   want = clampToIndiaWindow(want, trackId, grade);
   // "Past papers only" is a filter on what may be served, not a preference:
   // when the archive has nothing for the chapter the request is refused with a
@@ -1103,12 +1117,43 @@ function indiaPick(p, trackId, ratings, reviews, now, { chapter = null, dotpoint
     const { floor, ceiling } = indiaDifficultyWindow(trackId, grade);
     why += ` (You asked for D${Math.round(Number(difficulty))}; ${trackName} practice is held to D${floor}–D${ceiling}.)`;
   }
+  if (diagnosticStart) why += ' Your placement check suggested starting here — that was diagnostic evidence, not a mark.';
   return {
     chapter: c, target, dotpointKey: target.dotpointIndex != null ? indiaDotpointKey(c.id, target.dotpointIndex) : null,
     retarget: sameTerms(target, () => resolveIndiaTarget(c, { dotpoint: ordinal, difficulty: want, track: trackId, grade, pyqOnly })),
     reason: choice.reason, reasonTag: choice.reasonTag, why, nextUp: choice.nextUp, trap: choice.trap,
     successTarget: choice.target, mastery: st.mastery || 0, explicit: choice.explicit, aheadUnlocked
   };
+}
+
+/**
+ * A profile's attempt rows in the order they were answered.
+ *
+ * The attempts store is keyed by `${pid}:resolved:<digest>` — an exactly-once
+ * claim, not a sequence — so its natural order is the digest's order, which
+ * has nothing to do with time. "Recent" on Progress was the last fifteen rows
+ * in that order: fifteen answers from anywhere in the history, presented as
+ * the latest. Every consumer that means "most recent" reads through here.
+ * Ties (the parts of one exam question are resolved in the same millisecond)
+ * keep their store order, which is stable.
+ */
+async function attemptsInOrder(pid) {
+  const rows = await byIndex('attempts', 'pid', pid);
+  return rows.map((a, i) => [a, i])
+    .sort((x, y) => (Number(x[0].createdAt) || 0) - (Number(y[0].createdAt) || 0) || x[1] - y[1])
+    .map(([a]) => a);
+}
+
+/**
+ * The headline totals GET /stats serves, derived from the attempt rows and
+ * nothing else (engine/progressTruth.js; docs/product/progress-metrics.md).
+ * `attempts` and `correct` keep their old meaning — every marked answer, games
+ * included — and `evidence`/`accuracy` are the learning-evidence subset the
+ * progress page's accuracy is allowed to quote, gated below its sample floor.
+ */
+function statsTotals(attempts) {
+  const t = attemptTotals(attempts);
+  return { attempts: t.answered, correct: t.correct, ms: t.ms, evidence: t.evidence, accuracy: t.accuracy };
 }
 
 /**
@@ -1188,8 +1233,8 @@ async function indiaStats(p, ratings, now) {
     };
   } catch { recommendation = null; }
   const days = await activityFor(pid);
-  const attempts = await byIndex('attempts', 'pid', pid);
-  const totals = { attempts: attempts.length, correct: attempts.filter(a => a.correct).length, ms: attempts.reduce((s, a) => s + (a.ms || 0), 0) };
+  const attempts = await attemptsInOrder(pid);
+  const totals = statsTotals(attempts);
   const byDiff = [1, 2, 3, 4].map(d => {
     const rows = attempts.filter(a => a.difficulty === d);
     return { difficulty: d, n: rows.length, c: rows.filter(a => a.correct).length };
@@ -1759,7 +1804,14 @@ async function resolve(profile, row, q, correct, answerGiven, ms, mode, viaInk =
   // less than an independent one and never more than a hinted one.
   const tutorLevel = Math.max(0, Math.min(3, Number(row.tutorLevel) || 0));
   const helpUsed = (row.hintsUsed || 0) + tutorLevel;
-  const effHints = helpUsed + Math.max(0, (row.tries || 0) - (correct ? 1 : 0));
+  // `row.tries` counts the wrong tries this question has already spent — it is
+  // only ever bumped by a first answer that was wrong (POST /practice/:id/submit).
+  // Each one is help in the same sense a hint is: the student was told the
+  // first answer was wrong. Subtracting one for a correct answer — a holdover
+  // from when `tries` counted every submission — handed a second-try success
+  // the full unaided rating gain, while the same attempt was filed as
+  // `supported` and graded Hard. One rule, one weighting (§12, #246).
+  const effHints = helpUsed + Math.max(0, row.tries || 0);
   let ratingAfter = st.rating;
   const isRush = mode === 'rush' || mode === 'match';
   const isCustom = q.custom;
@@ -1802,7 +1854,11 @@ async function resolve(profile, row, q, correct, answerGiven, ms, mode, viaInk =
   }
 
   const xp = isRush ? (correct ? 6 : 0) : xpFor(q.difficulty, correct, 0, effHints);
-  const profileNext = { ...profile, xp: (profile.xp || 0) + xp };
+  // The profile row this request read may be stale by now: a placement answer,
+  // a settings change or another tab can have written it while this request
+  // awaited. XP is therefore added to the row as it is at write time below
+  // (`profileNext`), so neither side's write can roll the other back.
+  let profileNext = { ...profile, xp: (profile.xp || 0) + xp };
   const tz = timezoneOf(profile);
   const date = dayKey(now, tz);
   const activityKey = `${pid}:${date}`;
@@ -1890,14 +1946,21 @@ async function resolve(profile, row, q, correct, answerGiven, ms, mode, viaInk =
     ...(taskProgressNext ? [{ type: 'put', store: 'taskProgress', value: taskProgressNext }] : [])
   ];
   try {
-    // A practice attempt and its cloud queue entry are one write (§22): an app
-    // killed after the commit can no longer leave an attempt the cloud never
-    // hears about.
-    if (resolution?.syncQueue === true) {
-      await stageAttemptProgress(pid, row.id, attempt.id, queueOp => atomicBatch([...learningOps, queueOp]));
-    } else {
-      await atomicBatch(learningOps);
-    }
+    // XP is added to the profile row as it is at write time, under the
+    // per-profile row lock, so a concurrent placement step or settings change
+    // is never rolled back by this write (and vice versa).
+    await withProfileRow(pid, async freshProfile => {
+      if (freshProfile) profileNext = { ...freshProfile, xp: (freshProfile.xp || 0) + xp };
+      const ops = learningOps.map(op => (op.store === 'profiles' ? { ...op, value: profileNext } : op));
+      // A practice attempt and its cloud queue entry are one write (§22): an app
+      // killed after the commit can no longer leave an attempt the cloud never
+      // hears about.
+      if (resolution?.syncQueue === true) {
+        await stageAttemptProgress(pid, row.id, attempt.id, queueOp => atomicBatch([...ops, queueOp]));
+      } else {
+        await atomicBatch(ops);
+      }
+    });
   } catch (err) {
     // The attempt key is the authoritative exactly-once claim. A collision on
     // that key means another delivery already committed this same resolution;
@@ -1913,6 +1976,8 @@ async function resolve(profile, row, q, correct, answerGiven, ms, mode, viaInk =
 
   // Only now is it safe to update the object the caller is still holding.
   profile.xp = profileNext.xp;
+  coreMeta.totalXp = profileNext.xp;
+  coreMeta.level = levelFromXp(profileNext.xp);
 
   // Badges are derived, fixed-key and idempotent. They are intentionally after
   // the learning transaction: a badge may be recomputed after a crash, while
@@ -2600,6 +2665,7 @@ const routes = {
   'GET /me': async () => ({ user: await publicUser(await requireProfile()) }),
   'PATCH /me': async (body) => {
     const p = await requireProfile();
+    const original = { ...p };
     if (body.name !== undefined) p.name = String(body.name).trim().slice(0, 40) || p.name;
     if (body.year !== undefined) p.year = Math.min(12, Math.max(7, Number(body.year) || p.year));
     if (body.pathway !== undefined && p.course === 'nsw') p.pathway = cleanPathway(body.pathway, p.year) || (p.year >= 11 ? 'advanced' : null);
@@ -2640,8 +2706,19 @@ const routes = {
       }
       await setProfileEmail(p, email);
     }
-    await put('profiles', p);
-    return { user: await publicUser(p) };
+    // Only the fields this request changed are written, onto the row as it is
+    // now: XP from a practice answer or a placement step that landed while this
+    // request awaited (the email check above) is kept rather than rolled back.
+    const changed = {};
+    for (const k of new Set([...Object.keys(original), ...Object.keys(p)])) {
+      if (p[k] !== original[k]) changed[k] = p[k];
+    }
+    const next = await withProfileRow(p.id, async fresh => {
+      const merged = { ...(fresh || original), ...changed };
+      await put('profiles', merged);
+      return merged;
+    });
+    return { user: await publicUser(next) };
   },
 
   // ---- curriculum ----
@@ -3259,6 +3336,10 @@ const routes = {
     const count = (await byIndex('exams', 'pid', p.id)).length;
     const pwLabel = examPw && examPw !== 'advanced' ? ` ${PATHWAYS[examPw].short}` : '';
     const exam = { id: examId, pid: p.id, year, pathway: examPw, title: `Year ${year}${pwLabel} Practice Paper ${count + 1}`, durationMin: minutes, questionIds: qids, createdAt: Date.now(), finishedAt: null, score: null, total: null, detail: null };
+    const rows = [];
+    for (const qid of qids) rows.push(await get('questions', qid));
+    exam.paperVersion = paperFingerprint(rows.filter(Boolean));
+    startExamClock(exam, exam.createdAt);
     await put('exams', exam);
     return { exam: await examFor(p.id, examId) };
   },
@@ -3314,15 +3395,30 @@ const routes = {
     }
     return { title: e.title, year: e.year, durationMin: e.durationMin, course: courseLabel(p.course || 'nsw', e.year, e.pathway), questions, solutionsAvailable: finished };
   },
+  'POST /exams/:id/responses': async (body, params) => {
+    const p = await requireProfile();
+    const e = await get('exams', params.id);
+    if (!e || e.pid !== p.id) throw Object.assign(new Error('Exam not found'), { status: 404 });
+    const saved = saveExamResponses(e, body || {});
+    await put('exams', e);
+    return { saved: true, ...saved };
+  },
   'POST /exams/:id/submit': async (body, params) => {
     const p = await requireProfile();
     const e = await get('exams', params.id);
     if (!e || e.pid !== p.id) throw Object.assign(new Error('Exam not found'), { status: 404 });
+    if (isReplayOf(e, body || {})) {
+      return { score: e.score, total: e.total, pct: Math.round(100 * e.score / Math.max(1, e.total)), detail: e.detail, newBadges: [], replayed: true };
+    }
     if (e.finishedAt) throw Object.assign(new Error('Exam already submitted'), { status: 409 });
-    const answers = body?.answers || {};
-    const workings = body?.workings || {};
-    const totalMs = Number(body?.ms) || 0;
     const now = Date.now();
+    // After the deadline only what was autosaved before it is marked.
+    const inputs = examMarkingInputs(e, body || {}, now);
+    const at = Number(e.latestSeenAt) || now;   // the paper's time, after any rollback correction
+    const answers = inputs.answers;
+    const workings = inputs.workings;
+    const totalMs = Number(inputs.ms) || 0;
+    const markedRows = [];
     const nQ = e.questionIds.length;
     let marksAwarded = 0, totalMarks = 0;
     const detail = [];
@@ -3332,6 +3428,7 @@ const routes = {
       // as wrong either: it contributes neither marks awarded nor marks
       // available, so the score is out of what was actually there to answer.
       if (!row?.payload) continue;
+      markedRows.push(row);
       const q = row.payload;
 
       // ── Structured multipart question: mark each part on its own marks ──
@@ -3410,7 +3507,8 @@ const routes = {
       });
     }
     const pct = Math.round(100 * marksAwarded / Math.max(1, totalMarks));
-    Object.assign(e, { finishedAt: now, score: marksAwarded, total: totalMarks, detail });
+    Object.assign(e, { finishedAt: at, score: marksAwarded, total: totalMarks, detail });
+    freezeExam(e, { inputs, paperVersion: paperFingerprint(markedRows), submissionKey: body?.submissionKey, now: at });
     await put('exams', e);
     const newBadges = await checkBadges(p.id, { type: 'exam', pct }, now, timezoneOf(p));
     return { score: marksAwarded, total: totalMarks, pct, detail, newBadges };
@@ -3522,8 +3620,8 @@ const routes = {
       strandAgg[s.strand].sum += m; strandAgg[s.strand].n++;
     }
     const strands = Object.entries(strandAgg).map(([name, v]) => ({ name, mastery: Math.round(100 * v.sum / v.n) }));
-    const attempts = await byIndex('attempts', 'pid', pid);
-    const totals = { attempts: attempts.length, correct: attempts.filter(a => a.correct).length, ms: attempts.reduce((s, a) => s + (a.ms || 0), 0) };
+    const attempts = await attemptsInOrder(pid);
+    const totals = statsTotals(attempts);
     const byDiff = [1, 2, 3, 4].map(d => {
       const rows = attempts.filter(a => a.difficulty === d);
       return { difficulty: d, n: rows.length, c: rows.filter(a => a.correct).length };
@@ -3778,9 +3876,9 @@ const routes = {
     const p = await requireProfile();
     const { filter = 'all', page = 0, pageSize = 20 } = body || {};
     const rows = (await byIndex('questions', 'pid', p.id)).filter(r => r.answered);
-    const attempts = await byIndex('attempts', 'pid', p.id);
+    const attempts = await attemptsInOrder(p.id);
     const attemptByQ = {};
-    for (const a of attempts) attemptByQ[a.questionId] = a;   // latest wins (insertion order)
+    for (const a of attempts) attemptByQ[a.questionId] = a;   // latest wins (answer order)
     const marks = await byIndex('bookmarks', 'pid', p.id);
     const marked = new Set(marks.map(b => b.key.split(':').slice(1).join(':')));
     const inkRows = await byIndex('inks', 'pid', p.id);
@@ -4053,8 +4151,278 @@ const routes = {
         scribble: row.scribble || null, photo: safePhoto(row.photo), createdAt: row.createdAt
       }
     };
+  },
+
+  // ---- placement diagnostic ----
+  'GET /placement': async () => {
+    const p = await requireProfile();
+    return placementView(p, await ratingsFor(p.id));
+  },
+
+  'POST /placement/start': async (body) => {
+    const p = await requireProfile();
+    requirePlacementCourse(p);
+    const pl = p.placement || null;
+    if (pl?.status === 'active' && pl.current && body?.restart !== true) {
+      return { question: placementQuestionView(pl.current), progress: placementProgress(pl), resumed: true };
+    }
+    const { placementConfig, replayPlacement } = await loadPlacementEngine();
+    const cfg = placementConfig({
+      grade: p.year, track: cleanIndiaTrack(p.indiaTrack, p.year),
+      seed: Math.floor(Math.random() * 2 ** 31)
+    });
+    const { probe } = replayPlacement(cfg, []);
+    // Generated before anything is written: a question bank that is not loaded
+    // yet throws here, the API layer fetches it and re-runs this route.
+    const current = buildPlacementQuestion(cfg, probe, 0);
+    const now = Date.now();
+    const placement = {
+      v: 1, id: uuid(), config: { ...cfg }, status: 'active', startedAt: now, finishedAt: null,
+      // A retake keeps the last finished result visible until it is replaced.
+      items: [], current, result: pl?.result || null, previous: Array.isArray(pl?.previous) ? pl.previous : []
+    };
+    await writePlacement(p.id, { placement });
+    return { question: placementQuestionView(current), progress: placementProgress(placement), resumed: false };
+  },
+
+  'POST /placement/:id/answer': async (body, params) => {
+    const p = await requireProfile();
+    requirePlacementCourse(p);
+    const pl = p.placement || null;
+    if (!pl || pl.status !== 'active' || !pl.current) {
+      throw Object.assign(new Error('There is no placement check in progress.'), { status: 409, code: 'PLACEMENT_NOT_ACTIVE' });
+    }
+    if (pl.current.id !== params.id) {
+      const answered = (pl.items || []).some(it => it.questionId === params.id);
+      throw Object.assign(new Error(answered ? 'That placement question is already answered.' : 'That is not the current placement question.'),
+        { status: 409, code: answered ? 'PLACEMENT_ALREADY_ANSWERED' : 'PLACEMENT_STALE' });
+    }
+    const cur = pl.current;
+    const q = cur.payload;
+    const skipped = body?.skip === true;
+    let correct = false;
+    let feedback = '';
+    let stepReport = null;
+    if (!skipped) {
+      // The deterministic marker decides, exactly as in practice. Nothing a
+      // model says reaches this verdict.
+      const result = checkAnswer(q, body?.answer);
+      if (result.invalid) {
+        return { correct: false, resolved: false, invalid: true, triesLeft: 1, feedback: result.feedback || 'That answer could not be read — check it and submit again.' };
+      }
+      correct = !!result.correct;
+      feedback = result.feedback || '';
+      if (!correct && q.answerType === 'mcq' && q.answer?.optionTraps) feedback = q.answer.optionTraps[Number(body?.answer)] || feedback;
+      const meta = stepMetaFor(q);
+      if (body?.steps && meta) { try { stepReport = stepCheck(meta, body.steps); } catch { stepReport = null; } }
+      if (!stepReport && result.stepReport) stepReport = result.stepReport;
+    }
+    const now = Date.now();
+    const item = {
+      questionId: cur.id, chapterId: cur.probe.chapterId, grade: cur.probe.grade, phase: cur.probe.phase,
+      requested: cur.probe.difficulty, difficulty: cur.difficulty, answerType: q.answerType || null,
+      correct, skipped, viaInk: body?.viaInk === true, ms: Math.max(0, Math.min(36e5, Number(body?.ms) || 0)),
+      given: skipped ? '' : sanitizeText(String(body?.answer ?? ''), 120), answeredAt: now
+    };
+    const items = [...(pl.items || []), item];
+    const { replayPlacement, summarisePlacement, PLACEMENT_MAX } = await loadPlacementEngine();
+    const cfg = pl.config;
+    let replay;
+    try { replay = replayPlacement(cfg, items); }
+    catch (err) {
+      if (err?.code !== 'PLACEMENT_REPLAY_MISMATCH') throw err;
+      throw Object.assign(new Error('This placement check was started by an older version of Pri. Start it again.'), { status: 409, code: 'PLACEMENT_RESTART_REQUIRED' });
+    }
+    const done = replay.done || items.length >= PLACEMENT_MAX;
+    const next = done ? null : buildPlacementQuestion(cfg, replay.probe, items.length);
+    const result = done ? { ...summarisePlacement(cfg, items), finishedAt: now } : null;
+    const placement = {
+      ...pl, items, current: next,
+      status: done ? 'finished' : 'active',
+      finishedAt: done ? now : null,
+      result: done ? result : pl.result || null,
+      previous: done ? placementHistoryOf(pl) : (pl.previous || [])
+    };
+    await writePlacement(p.id, { placement });
+    return {
+      correct, resolved: true, skipped, feedback, stepReport, diagnosis: stepReport?.diagnosis || null,
+      solution: { steps: q.steps, answerText: displayAnswer(q), criteria: criteriaFor(q), solutionText: q.solutionText },
+      progress: placementProgress(placement), done,
+      next: next ? placementQuestionView(next) : null,
+      result
+    };
+  },
+
+  'POST /placement/skip': async () => {
+    const p = await requireProfile();
+    requirePlacementCourse(p);
+    await writePlacement(p.id, { placementSkippedAt: Date.now() });
+    return { skipped: true };
   }
 };
+
+// ── Placement diagnostic ─────────────────────────────────────────────────────
+// About ten questions that estimate where an Indian student is working and
+// trace a miss down the Pri-authored prerequisite graph to its plausible root.
+// The adaptive process and the summary live in engine/placement.js, which is
+// fetched only when a student opens the diagnostic: none of it is on the boot
+// path. Marking is the same deterministic checkAnswer() practice uses.
+//
+// Storage. The whole session — configuration, the outcome of every answered
+// question and the one question on screen, exactly as it was generated — lives
+// on the profile row, so it is profile-isolated, sealed with the rest of a
+// protected profile, removed with the profile, and resumable on relaunch at the
+// exact question. Nothing is written to the attempts, ratings, reviews or
+// activity stores: a placement result is diagnostic evidence, not mastery, and
+// it earns no XP and counts toward no streak or free-tier allowance. The only
+// thing it feeds is a small, bounded prior on which untouched chapter smart
+// practice offers first (see indiaPick).
+
+const loadPlacementEngine = () => import('../engine/placement.js');
+
+/**
+ * Write only the placement fields onto the profile row as it is NOW. Every
+ * placement route awaits the engine import and question generation between
+ * reading the profile and writing it, and in that gap PATCH /me, a practice
+ * answer's XP or a settings change may have written the same row. Writing back
+ * the copy read at the start would silently undo them; re-reading and merging
+ * only these fields does not. Placement routes are serialised among themselves
+ * by the placement lock, so the placement fields have one writer.
+ */
+async function writePlacement(pid, fields) {
+  await withProfileRow(pid, async fresh => {
+    if (!fresh) throw Object.assign(new Error('No profile selected'), { status: 401 });
+    await put('profiles', { ...fresh, ...fields });
+  });
+}
+
+/**
+ * Read-merge-write of one profile row, serialised per profile. Every writer
+ * that merges onto the row as it is now — placement steps, the XP an answer
+ * earns, a settings change — goes through here, so two of them can never both
+ * read the same row and each write back a copy missing the other's change.
+ */
+function withProfileRow(pid, work) {
+  return withMutationLock(`profile-row:${pid}`, async () => work(await get('profiles', pid).catch(() => null)));
+}
+
+function requirePlacementCourse(p) {
+  // Outside the frozen V1 scope: a build without the flag has no placement
+  // check at all, so its routes refuse rather than half-work.
+  if (!featureEnabled('placement')) {
+    throw Object.assign(new Error('The placement check is not available in this build.'), { status: 404, code: 'FEATURE_DISABLED' });
+  }
+  if (p.course !== 'in') {
+    throw Object.assign(new Error('The placement check covers the India curriculum (NCERT Class 7–12) only.'), { status: 409, code: 'PLACEMENT_UNAVAILABLE' });
+  }
+}
+
+function seededRandom(seed) {
+  let a = (Number(seed) >>> 0) || 1;
+  return () => {
+    a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/**
+ * The question for one probe, generated deterministically from the session
+ * seed and the probe's position. A handwritten answer is the point of the
+ * diagnostic and a multiple-choice item can be guessed, so a few variants are
+ * looked at and the first one with a written answer is preferred.
+ */
+function buildPlacementQuestion(cfg, probe, index) {
+  const chapter = indiaChapter(probe?.chapterId);
+  if (!chapter) throw Object.assign(new Error('The placement check asked for a chapter this app does not know.'), { status: 409, code: 'PLACEMENT_RESTART_REQUIRED' });
+  const grade = indiaChapterGrade(chapter);
+  const base = (Number(cfg.seed) + Math.imul(index + 1, 0x9E3779B1)) >>> 0;
+  const random = seededRandom(base);
+  const track = probe.difficulty >= 4 && grade >= 11 ? 'jee-main' : 'cbse';
+  const opts = { difficulty: probe.difficulty, track, grade, random };
+  // The first dot point is the chapter's core skill; a chapter-level target is
+  // the fallback when that dot point has no form near the asked difficulty.
+  const target = (chapter.dotpoints?.length ? resolveIndiaTarget(chapter, { ...opts, dotpoint: 0 }) : null)
+    || resolveIndiaTarget(chapter, opts);
+  if (!target?.generator) throw Object.assign(new Error(`${chapter.name} has no authored question form for the placement check.`), { status: 409, code: 'INDIA_TARGET_UNCOVERED' });
+  let q = null;
+  for (let k = 0; k < 6; k++) {
+    const cand = generateQuestion(target.generator, target.difficulty, (base + k * 104729) % 2147483647);
+    if (!q) q = cand;
+    if (cand.answerType !== 'mcq' && !cand.multipart) { q = cand; break; }
+  }
+  return {
+    id: uuid(), index, probe: { ...probe }, generator: target.generator,
+    difficulty: q.difficulty || target.difficulty, dotpointIndex: target.dotpointIndex ?? null,
+    payload: q, servedAt: Date.now()
+  };
+}
+
+/** What the question card is shown: the practice sanitiser, with no help on offer. */
+function placementQuestionView(cur) {
+  const row = { id: cur.id, india: { chapterId: cur.probe.chapterId, track: 'cbse', dotpointIndex: cur.dotpointIndex }, hintsUsed: 0, tries: 0 };
+  return { ...sanitize(cur.payload, row), hintsAvailable: 0, triesLeft: 1, placement: true, phase: cur.probe.phase };
+}
+
+function placementProgress(pl) {
+  return { asked: (pl?.items || []).length, target: 10, max: 12 };
+}
+
+function placementHistoryOf(pl) {
+  const prior = Array.isArray(pl?.previous) ? pl.previous : [];
+  if (!pl?.result) return prior.slice(0, 5);
+  const r = pl.result;
+  return [{
+    finishedAt: r.finishedAt || pl.finishedAt || null, grade: r.grade, track: r.track, asked: r.asked,
+    overallLevel: r.overallLevel ?? null, rootGaps: (r.rootGaps || []).map(g => g.chapterId)
+  }, ...prior].slice(0, 5);
+}
+
+/** The diagnostic's priors, read only from a finished result. */
+function placementPriorsOf(p) {
+  // No flag, no learner-state seeding — even from a result stored by a build
+  // that had it.
+  if (!featureEnabled('placement')) return {};
+  const r = p?.course === 'in' ? p?.placement?.result : null;
+  if (!r || r.kind !== 'diagnostic' || !r.priors || typeof r.priors !== 'object') return {};
+  const out = {};
+  for (const [id, v] of Object.entries(r.priors)) {
+    const n = Number(v);
+    if (IN_CHAPTER_IDS.has(id) && Number.isFinite(n)) out[id] = Math.max(-0.4, Math.min(0.4, n));
+  }
+  return out;
+}
+
+const IN_CHAPTER_IDS = new Set(IN_CHAPTERS.map(ch => ch.id));
+
+function placementView(p, ratings, now = Date.now()) {
+  if (!featureEnabled('placement')) return { available: false, status: 'disabled' };
+  if (p.course !== 'in') return { available: false, status: 'unavailable' };
+  const pl = p.placement || null;
+  const status = pl?.status === 'active' && pl.current ? 'active'
+    : pl?.result ? 'finished'
+      : p.placementSkippedAt ? 'skipped' : 'none';
+  // Practice evidence for every Class 7–12 chapter, so the map can show what
+  // was practised beside what the diagnostic found — kept as separate fields.
+  const chapters = IN_CHAPTERS.filter(ch => ch.grade >= 7 && ch.grade <= 12).map(ch => {
+    const st = indiaState(ch, ratings, now);
+    return {
+      id: ch.id, name: ch.name, grade: ch.grade, strand: ch.strand,
+      attempts: st.attempts, mastery: Math.round(100 * st.mastery),
+      band: st.attempts ? masteryBand(st.mastery) : 'unseen'
+    };
+  });
+  return {
+    available: true, status, grade: p.year, track: cleanIndiaTrack(p.indiaTrack, p.year),
+    skippedAt: p.placementSkippedAt || null,
+    progress: pl ? placementProgress(pl) : { asked: 0, target: 10, max: 12 },
+    question: status === 'active' ? placementQuestionView(pl.current) : null,
+    result: pl?.result || null,
+    previous: Array.isArray(pl?.previous) ? pl.previous : [],
+    chapters
+  };
+}
 
 // ── Assessment boundary ──────────────────────────────────────────────────────
 // Exam questions live in the same `questions` store as practice, so a route
@@ -4140,13 +4508,15 @@ async function assertReviewableRow(row) {
 async function examFor(pid, examId) {
   const e = await get('exams', examId);
   if (!e || e.pid !== pid) return null;
+  const viewedAt = Date.now();
+  if (ensureExamClock(e, viewedAt)) await put('exams', e);
   const questions = [];
   for (const qid of e.questionIds) {
     const row = await get('questions', qid);
     if (!row) continue;
     questions.push(sanitize(row.payload, row));
   }
-  return { id: e.id, title: e.title, year: e.year, durationMin: e.durationMin, createdAt: e.createdAt, finishedAt: e.finishedAt, score: e.score, total: e.total, questions, detail: e.detail || null };
+  return { id: e.id, title: e.title, year: e.year, durationMin: e.durationMin, createdAt: e.createdAt, finishedAt: e.finishedAt, score: e.score, total: e.total, questions, detail: e.detail || null, session: examSessionView(e, viewedAt) };
 }
 
 // ── Dispatcher (same contract as the old fetch layer) ────────────────────────
@@ -4334,7 +4704,23 @@ async function runGated(method, pattern, handler, body, params) {
   if (key === 'POST /practice/next') {
     return withMutationLock(`next:${currentPid() || 'none'}`, work);
   }
+  // One placement session per profile: start, answer and skip are serialised
+  // so a double tap cannot record one question twice or fork the session.
+  if (key.startsWith('POST /placement')) {
+    return withMutationLock(`placement:${currentPid() || 'none'}`, work);
+  }
+  // An autosave and the final submit both rewrite the paper's row; serialised,
+  // a save that read the paper before it was finalised can never write it back
+  // over the finalised copy.
+  if (params?.id && (key === 'POST /exams/:id/submit' || key === 'POST /exams/:id/responses')) {
+    return withMutationLock(`exam:${params.id}`, work);
+  }
   return work();
+}
+
+/** The same per-paper lock, for the India exam backend's own routes. */
+export function withExamLock(examId, work) {
+  return withMutationLock(`exam:${examId}`, work);
 }
 
 export async function dispatch(method, path, body) {

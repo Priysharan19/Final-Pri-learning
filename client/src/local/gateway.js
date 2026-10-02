@@ -226,6 +226,15 @@ const BODY_RULES = [
     if (body.steps !== undefined && typeof body.steps !== 'string' && !Array.isArray(body.steps)) throw apiError('steps must be text or an array.', 400, 'INVALID_FIELD');
     if (body.ink !== undefined && body.ink !== null && !plainObject(body.ink)) throw apiError('ink must be an object.', 400, 'INVALID_FIELD');
   }],
+  [/^POST \/placement\/start$/, body => {
+    requireObject(body, 'POST /placement/start'); optionalBoolean(body, 'restart');
+  }],
+  [/^POST \/placement\/[A-Za-z0-9._-]+\/answer$/, body => {
+    requireObject(body, 'placement answer'); optionalNumber(body, 'ms'); optionalBoolean(body, 'viaInk'); optionalBoolean(body, 'skip');
+    if (body.answer !== undefined && body.answer !== null && typeof body.answer !== 'string' && typeof body.answer !== 'number') throw apiError('answer must be text.', 400, 'INVALID_FIELD');
+    if (typeof body.answer === 'string' && body.answer.length > 4000) throw apiError('answer is too long.', 413, 'FIELD_TOO_LARGE');
+    if (body.steps !== undefined && typeof body.steps !== 'string' && !Array.isArray(body.steps)) throw apiError('steps must be text or an array.', 400, 'INVALID_FIELD');
+  }],
   [/^POST \/exams$/, body => {
     requireObject(body, 'POST /exams'); optionalNumber(body, 'length'); optionalNumber(body, 'minutes'); optionalNumber(body, 'year');
     // WP india-exams: CBSE Class X Standard/Basic variant and a reproducible paper seed.
@@ -234,6 +243,17 @@ const BODY_RULES = [
   [/^POST \/exams\/[A-Za-z0-9._-]+\/submit$/, body => {
     requireObject(body, 'exam submit'); boundedMap(body, 'answers', 120); boundedMap(body, 'workings', 120); optionalNumber(body, 'ms');
     boundedMap(body, 'times', 120);   // WP india-exams: time spent per question
+    // A submission names itself so a retried request is a replay, not a second
+    // mark; `reason` says whether the student or the clock ended the paper.
+    optionalString(body, 'submissionKey', 100); optionalString(body, 'reason', 20);
+  }],
+  // The exam room's autosave: the paper's answers, working, per-question time
+  // and handwriting for the questions whose ink changed. The session module
+  // decides what may be saved (nothing after the deadline or finalisation);
+  // this only bounds the shape.
+  [/^POST \/exams\/[A-Za-z0-9._-]+\/responses$/, body => {
+    requireObject(body, 'exam responses'); boundedMap(body, 'answers', 120); boundedMap(body, 'workings', 120);
+    boundedMap(body, 'times', 120); boundedMap(body, 'modes', 120); boundedMap(body, 'inks', 12); optionalNumber(body, 'cur');
   }],
   [/^POST \/rush\/answer$/, body => {
     requireObject(body, 'POST /rush/answer'); requiredId(body);

@@ -51,6 +51,7 @@ export const ENGINE_SUITES = [
   'razorpay-billing-check.mjs',
   'apple-billing-check.mjs',
   'google-billing-check.mjs',
+  'storekit-entitlement-state-machine-check.mjs',
   'tutor-help-check.mjs',
   'failure-drills-check.mjs',
   'security-acceptance-check.mjs',

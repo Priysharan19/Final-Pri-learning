@@ -5,12 +5,9 @@ import { useApp } from '../App.jsx';
 import { predictionSentence } from '../engine/markPredictor.js';
 import { tLater, useT } from '../i18n/index.js';
 import TermGloss from '../components/TermGloss.jsx';
+import { PROGRESS_THRESHOLDS, accuracyClaim } from '../engine/progressTruth.js';
 import { indiaProgressPracticeHref } from '../lib/practiceLinks.js';
-
-function pct(correct, attempts) {
-  const a = Number(attempts || 0);
-  return a > 0 ? Math.round(1000 * Number(correct || 0) / a) / 10 : null;
-}
+import { featureEnabled } from '../platform/features.js';
 
 function scopeFor(curriculum, user) {
   if (!curriculum) return null;
@@ -25,11 +22,14 @@ function rowsFor(scope) {
   return scope?.chapters || scope?.subtopics || [];
 }
 
+// A chapter's accuracy is printed only once it rests on enough answers
+// (engine/progressTruth.js, docs/product/progress-metrics.md): one right
+// answer in a chapter is one right answer, not "100%".
 function evidenceOf(row) {
   const attempts = Number(row.attempts || row.evidence?.attempts || 0);
   const correct = Number(row.correct || row.evidence?.correct || 0);
-  const accuracy = row.accuracy ?? row.evidence?.accuracy ?? pct(correct, attempts);
-  return { attempts, correct, accuracy };
+  const claim = accuracyClaim(correct, attempts, PROGRESS_THRESHOLDS.chapterAccuracy);
+  return { attempts, correct, accuracy: claim.value, enough: claim.enough };
 }
 
 export default function IndiaProgress() {
@@ -50,10 +50,13 @@ export default function IndiaProgress() {
   const rows = useMemo(() => rowsFor(scope), [scope]);
   const chapterEvidence = useMemo(() => rows.map(row => ({ row, evidence: evidenceOf(row) })), [rows]);
   const started = chapterEvidence.filter(x => x.evidence.attempts > 0).length;
-  const practiced = chapterEvidence.filter(x => x.evidence.attempts >= 5).length;
+  const practiced = chapterEvidence.filter(x => x.evidence.attempts >= PROGRESS_THRESHOLDS.chapterPractised).length;
   const totals = stats?.totals || {};
   const prediction = stats?.examPrediction || null;
-  const accuracy = pct(totals.correct, totals.attempts);
+  // Accuracy is over learning evidence only (games excluded), and withheld
+  // below the sample floor — the server computes it from the attempt rows.
+  const accuracy = totals.accuracy || accuracyClaim(totals.evidence?.correct, totals.evidence?.attempts, PROGRESS_THRESHOLDS.overallAccuracy);
+  const supportedCorrect = Number(totals.evidence?.supportedCorrect || 0);
   // "JEE Main" and "JEE Advanced" are the examining bodies' own names, printed
   // that way on the Hindi paper too, so they are not translated. The CBSE label
   // is built from a word that is, hence the catalogue key around the class.
@@ -78,6 +81,16 @@ export default function IndiaProgress() {
         </div>
         <p className="muted" style={{ marginTop: 12, maxWidth: 820 }}>{t('progress.honesty')}</p>
       </div>
+
+      {featureEnabled('placement') && <div className="card" data-placement-entry>
+        <div className="spread" style={{ gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+          <div style={{ maxWidth: 640 }}>
+            <div className="card-title" style={{ marginBottom: 4 }}>{t('placement.progressTitle')}</div>
+            <p className="muted" style={{ margin: 0 }}>{t('placement.progressBody')}</p>
+          </div>
+          <button className="btn btn-ghost" onClick={() => nav('/placement')}>{t('placement.seeResult')}</button>
+        </div>
+      </div>}
 
       {prediction && (
         <div className="card">
@@ -135,10 +148,21 @@ export default function IndiaProgress() {
       )}
 
       <div className="grid cols-4">
-        <div className="card"><div className="sc-label">{t('progress.chaptersStarted')}</div><div className="big">{started}<span className="muted">/{rows.length}</span></div></div>
-        <div className="card"><div className="sc-label">{t('progress.chaptersPractised')}</div><div className="big">{practiced}</div><div className="muted">{t('progress.fivePlusAttempts')}</div></div>
-        <div className="card"><div className="sc-label">{t('progress.questionsAnswered')}</div><div className="big">{Number(totals.attempts || 0).toLocaleString()}</div></div>
-        <div className="card"><div className="sc-label">{t('progress.demonstratedAccuracy')}</div><div className="big">{accuracy == null ? t('common.none') : t('common.percent', { n: accuracy })}</div><div className="muted">{t('progress.acrossAttempts')}</div></div>
+        <div className="card" data-metric="started"><div className="sc-label">{t('progress.chaptersStarted')}</div><div className="big" data-value={started}>{started}<span className="muted">/{rows.length}</span></div></div>
+        <div className="card" data-metric="practised"><div className="sc-label">{t('progress.chaptersPractised')}</div><div className="big" data-value={practiced}>{practiced}</div><div className="muted">{t('progress.fivePlusAttempts')}</div></div>
+        <div className="card" data-metric="answered"><div className="sc-label">{t('progress.questionsAnswered')}</div><div className="big" data-value={Number(totals.attempts || 0)}>{Number(totals.attempts || 0).toLocaleString()}</div></div>
+        <div className="card" data-metric="accuracy">
+          <div className="sc-label">{t('progress.demonstratedAccuracy')}</div>
+          {accuracy.enough
+            ? <div className="big" data-value={accuracy.value}>{t('common.percent', { n: accuracy.value })}</div>
+            : <div className="big" style={{ fontSize: '1.05rem', lineHeight: 1.3 }} data-value="">{t('progress.notEnoughEvidence')}</div>}
+          <div className="muted">
+            {accuracy.enough ? t('progress.acrossAttempts') : t('progress.accuracyNeeds', { count: accuracy.needed, n: accuracy.needed })}
+          </div>
+          {accuracy.enough && supportedCorrect > 0 && (
+            <div className="muted" style={{ fontSize: 12, marginTop: 4 }} data-metric="supported">{t('progress.withHelp', { count: supportedCorrect, n: supportedCorrect })}</div>
+          )}
+        </div>
       </div>
 
       <div className="card">
@@ -152,7 +176,7 @@ export default function IndiaProgress() {
               <thead><tr><th style={{ textAlign: 'left' }}>{t('progress.colChapter')}</th><th>{t('common.attempts')}</th><th>{t('progress.colCorrect')}</th><th>{t('common.accuracy')}</th><th><span className="sr-only">{t('progress.colAction')}</span></th></tr></thead>
               <tbody>
                 {chapterEvidence.map(({ row, evidence }) => (
-                  <tr key={row.id || row.name}>
+                  <tr key={row.id || row.name} data-chapter={row.id} data-attempts={evidence.attempts} data-correct={evidence.correct}>
                     <td style={{ textAlign: 'left' }}>
                       {/* Chapter and unit names are curriculum data and stay English by
                           design; lang="en" lets a screen reader on a Hindi page voice them
@@ -162,7 +186,7 @@ export default function IndiaProgress() {
                     </td>
                     <td>{evidence.attempts}</td>
                     <td>{evidence.correct}</td>
-                    <td>{evidence.accuracy == null ? t('common.none') : t('common.percent', { n: evidence.accuracy })}</td>
+                    <td>{evidence.attempts === 0 ? t('common.none') : evidence.enough ? t('common.percent', { n: evidence.accuracy }) : <span className="muted">{t('progress.tooFewAnswers')}</span>}</td>
                     <td>
                       <button className="btn btn-quiet btn-sm" onClick={() => nav(indiaProgressPracticeHref(row, user.indiaTrack))}>
                         {t('progress.practise')}

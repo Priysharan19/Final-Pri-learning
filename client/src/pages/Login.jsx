@@ -11,6 +11,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
 import { useApp, Logo } from '../App.jsx';
 import { LANGUAGES, rememberSignInLanguage, setLanguage, signInLanguage, useLanguage, useT, useTx } from '../i18n/index.js';
+import { featureEnabled } from '../platform/features.js';
 
 const AVATARS = ['🚀', '🦊', '🐨', '🦉', '🌟', '🐯', '🍀', '🎧', '🦄', '⚡', '🌊', '🧠'];
 // The first thing a student chooses: what they are studying. Classes 7–12 are
@@ -755,7 +756,7 @@ export default function Login() {
                   <p className="sub" style={{ marginTop: 14 }}>
                     {t(form.role === 'teacher' ? 'login.readyTeacher' : 'login.readyStudent')}
                   </p>
-                  <p className="muted" style={{ fontSize: 12.5 }}>{t('login.noFakeDiagnostic')}</p>
+                  <p className="muted" style={{ fontSize: 12.5 }}>{t(featureEnabled('placement') ? 'login.placementOffer' : 'login.noFakeDiagnostic')}</p>
                 </>
               )}
 
