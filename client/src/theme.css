@@ -1643,8 +1643,8 @@ h3 { font-size: 16.5px; line-height: 1.3; }
 .ws-qpeek.is-on { display: flex; }
 /* The bars stay over the page while working: anything scrolled into view —
    by focus, find or a script — lands below them, never under them
-   (WCAG 2.4.11). 52px bar + 40px peek + a little air. */
-:root:has(.shell.is-focus) { scroll-padding-top: 100px; }
+   (WCAG 2.4.11): 52px bar + 40px peek above, the action bar below. */
+:root:has(.shell.is-focus) { scroll-padding: 100px 0 88px; }
 .ws-qpeek-text { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* Answering surfaces */
