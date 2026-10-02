@@ -9,12 +9,14 @@
 //   · password-reset mail cap per mailbox (3/hour) on top of the per-IP limit,
 //     with no difference in the answer an outsider sees;
 //   · class join-code guessing stops at 20/hour;
-//   · paid AI routes (handwriting, working) limit per account, not globally;
+//   · paid AI routes (handwriting, working, tutor) limit per account, not globally;
 //   · verification resend and guardian links are bounded.
 //
 // SQLite by default; --engine=postgres runs it on a migrated Postgres.
 
 delete process.env.PRI_HANDWRITING_API_KEY;
+// The AI tutor ships dark (PRI_FEATURE_TUTOR); its declared limit is measured with it on.
+process.env.PRI_FEATURE_TUTOR = '1';
 
 const { startApp, registerAccount, verifyEmail, checks } = await import('./support/app-harness.mjs');
 const { requestedEngine } = await import('./support/engine.mjs');
@@ -145,11 +147,11 @@ try {
   }
 
   // ── Paid AI: per-account, not global ───────────────────────────────────────
-  for (const [path, limit] of [['/v1/handwriting/transcribe', 240], ['/v1/working/check', 120]]) {
+  for (const [path, limit] of [['/v1/handwriting/transcribe', 240], ['/v1/working/check', 120], ['/v1/tutor/help', 60]]) {
     await resetLimits();
     const heavy = await account();
     const light = await account();
-    await db.run(`DELETE FROM rate_limits WHERE bucket NOT LIKE '${path.includes('handwriting') ? 'handwriting' : 'working'}%'`);
+    await db.run(`DELETE FROM rate_limits WHERE bucket NOT LIKE '${path.includes('handwriting') ? 'handwriting' : path.includes('tutor') ? 'tutor' : 'working'}%'`);
     let limitedAt = null;
     for (let i = 1; i <= limit + 1 && !limitedAt; i += 1) {
       const r = await h.request(path, { method: 'POST', jar: heavy.jar, body: {} });

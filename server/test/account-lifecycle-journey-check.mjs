@@ -456,7 +456,8 @@ try {
     ['telemetry', call('/telemetry', { method: 'POST', jar: jars.child, body: { events: [{ type: 'feature-used' }] } })],
     ['checkout', call('/billing/checkout/web', { method: 'POST', jar: jars.child, body: { cadence: 'monthly' } })],
     ['server handwriting', call('/handwriting/transcribe', { method: 'POST', jar: jars.child, body: { image: 'data:image/png;base64,AAAA' } })],
-    ['working check', call('/working/check', { method: 'POST', jar: jars.child, body: {} })]
+    ['working check', call('/working/check', { method: 'POST', jar: jars.child, body: {} })],
+    ['AI tutor', call('/tutor/help', { method: 'POST', jar: jars.child, body: {} })]
   ];
   for (const [label, pending] of gated) {
     const r = await pending;

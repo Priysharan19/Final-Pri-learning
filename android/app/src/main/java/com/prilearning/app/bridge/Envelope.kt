@@ -45,9 +45,12 @@ object Envelope {
     fun ok(id: String, result: JSONObject = JSONObject()): String =
         JSONObject().put("v", PROTOCOL).put("id", id).put("ok", true).put("result", result).toString()
 
-    fun fail(id: String, code: String, message: String): String =
+    /** A failure in the closed priNative code set; a provider-specific code
+     *  (e.g. CLOUD_NETWORK_ERROR) travels as error.detail.providerCode. */
+    fun fail(id: String, code: String, message: String, providerCode: String? = null): String =
         JSONObject().put("v", PROTOCOL).put("id", id).put("ok", false)
-            .put("error", JSONObject().put("code", code).put("message", message).put("retryable", code == "UNAVAILABLE")).toString()
+            .put("error", JSONObject().put("code", code).put("message", message).put("retryable", code == "UNAVAILABLE" || code == "TIMEOUT")
+                .apply { if (providerCode != null) put("detail", JSONObject().put("providerCode", providerCode)) }).toString()
 
     fun event(event: String, seq: Int, payload: JSONObject): String =
         JSONObject().put("v", PROTOCOL).put("event", event).put("seq", seq).put("payload", payload).toString()

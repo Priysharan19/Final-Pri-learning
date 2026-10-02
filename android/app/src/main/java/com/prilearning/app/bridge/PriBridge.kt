@@ -18,6 +18,8 @@ import androidx.webkit.JavaScriptReplyProxy
 import androidx.webkit.WebMessageCompat
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
+import com.prilearning.app.cloud.NativeCloud
+import com.prilearning.app.io.FileExchange
 import com.prilearning.app.shell.AssetOrigin
 import org.json.JSONObject
 
@@ -26,6 +28,8 @@ class PriBridge(
     private val descriptor: JSONObject,
     /** Called on the UI thread whenever the page's declared Back state changes. */
     private val onBackWantedChanged: (Boolean) -> Unit = {},
+    private val cloud: NativeCloud? = null,
+    private val files: FileExchange? = null,
 ) {
     private companion object { const val TAG = "PriBridge" }
     private var reply: JavaScriptReplyProxy? = null
@@ -56,6 +60,8 @@ class PriBridge(
         // document's first messages is not guaranteed) can never lose a
         // declaration the new document already made.
         if (proxy !== reply) {
+            // Nothing in flight for the previous document may answer this one.
+            cloud?.cancelAll()
             reply = proxy
             seq = 0
             setBackWanted(false)
@@ -81,9 +87,47 @@ class PriBridge(
                 setBackWanted(req.payload.optBoolean("handled", false))
                 Envelope.ok(req.id)
             }
+            "cloud.request" -> {
+                val c = cloud ?: return send(proxy, Envelope.fail(req.id, "UNSUPPORTED", "cloud.request is not supported by this app version."))
+                c.request(req.id, req.payload) { outcome -> answerLater(proxy, cloudReply(req.id, outcome)) }
+                null
+            }
+            "cloud.cancel" -> { cloud?.cancel(req.payload.optString("target", "")); null }
+            "cloud.forgetSession" -> {
+                val c = cloud ?: return send(proxy, Envelope.fail(req.id, "UNSUPPORTED", "cloud.forgetSession is not supported by this app version."))
+                c.cancelAll()
+                c.forgetSession()
+                Envelope.ok(req.id)
+            }
+            "share.file" -> {
+                val f = files ?: return send(proxy, Envelope.fail(req.id, "UNSUPPORTED", "share.file is not supported by this app version."))
+                f.share(req.payload) { r -> answerLater(proxy, fileReply(req.id, r)) }
+                null
+            }
+            "share.print" -> {
+                val f = files ?: return send(proxy, Envelope.fail(req.id, "UNSUPPORTED", "share.print is not supported by this app version."))
+                f.print(webView) { r -> answerLater(proxy, fileReply(req.id, r)) }
+                null
+            }
             else -> if (req.op == "cancel") null else Envelope.fail(req.id, "UNSUPPORTED", "${req.cap}.${req.op} is not supported by this app version.")
         }
         if (out != null) send(proxy, out)
+    }
+
+    private fun cloudReply(id: String, outcome: NativeCloud.Outcome): String = when (outcome) {
+        is NativeCloud.Outcome.Response -> Envelope.ok(id, JSONObject().put("status", outcome.status).put("body", outcome.body)
+            .apply { if (outcome.requestId != null) put("requestId", outcome.requestId) })
+        is NativeCloud.Outcome.Failure -> Envelope.fail(id, outcome.code, outcome.message, outcome.providerCode)
+    }
+
+    private fun fileReply(id: String, r: FileExchange.Result): String = when (r) {
+        is FileExchange.Result.Done -> Envelope.ok(id, JSONObject().put("completed", r.completed))
+        is FileExchange.Result.Failed -> Envelope.fail(id, r.code, r.message)
+    }
+
+    /** Async answers hop to the UI thread and reach only the document that asked. */
+    private fun answerLater(proxy: JavaScriptReplyProxy, json: String) {
+        webView.post { if (proxy === reply) send(proxy, json) }
     }
 
     private fun setBackWanted(wanted: Boolean) {

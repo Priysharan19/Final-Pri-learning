@@ -24,6 +24,22 @@ export function saveTextFile(text, filename, mimeType = 'application/json') {
   return Promise.resolve(downloadText(text, filename, mimeType));
 }
 
+/**
+ * Print / save as PDF. Inside a native shell the platform print dialog opens
+ * through priNative (window.print() does nothing in an Android WebView, and
+ * WKWebView has no print UI of its own); in a browser it is window.print().
+ */
+export function printPage() {
+  if (priNative.share.printable()) {
+    return priNative.share.print().catch(error => {
+      if (['UNSUPPORTED', 'UNAVAILABLE'].includes(error?.code) && typeof window !== 'undefined') window.print();
+      else throw error;
+    });
+  }
+  if (typeof window !== 'undefined') window.print();
+  return Promise.resolve({ completed: true });
+}
+
 function downloadText(text, filename, mimeType) {
   if (typeof document === 'undefined') return { completed: false };
   const blob = new Blob([text], { type: mimeType });

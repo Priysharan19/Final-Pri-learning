@@ -8,7 +8,10 @@
 // 7: sync cursors on Postgres come from pri.sync_cursor_seq and the server can
 //    no longer write pri.sync_cursors (supabase/migrations/20261002000000).
 //    No SQLite structural change: SQLite still allocates from sync_cursors.
-export const SCHEMA_VERSION = 7;
+// 8: tutor_cache, the 24-hour AI tutor reply cache
+//    (supabase/migrations/20261002010000_tutor_cache.sql). SQLite creates the
+//    same table in tutor.js, as it does every lazily built table.
+export const SCHEMA_VERSION = 8;
 // Billing 4: billing_payments keeps its row when the account is deleted
 //    (ON DELETE SET NULL, account_id nullable) — the payment ledger is retained
 //    pseudonymously (supabase/migrations/20261003000000, billingSchema.js).
