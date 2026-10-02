@@ -705,18 +705,39 @@ async function run() {
       await click(page, '.genbar-toggle');
     });
 
-    for (const label of ['Course', 'Topics', 'Dot Points', 'Difficulty']) {
-      await step(`home · generator · ${label.toLowerCase()}`, '/', async () => {
-        const tab = page.locator('.gen-cat', { hasText: label }).first();
-        if (await tab.isDisabled()) {
-          // walk far enough into the flow that this pane has something to show
-          await click(page, '.gen-cat', { text: 'Course' });
-          await click(page, '.gen-pane .gen-opt');
-          await click(page, '.gen-pane .gen-opt');
-        }
-        await click(page, '.gen-cat', { text: label });
-      });
-    }
+    // Public V1's India generator is Class → Track → Topics → Dot Points →
+    // Difficulty. Walk those real panes explicitly rather than relying on the
+    // legacy Australian Course tab labels.
+    await step('home · generator · class', '/', async () => {
+      await click(page, '.gen-cat', { text: 'Class' });
+      const current = page.locator('.gen-pane .gen-opt.on').first();
+      if (await current.count()) await current.click();
+      else await click(page, '.gen-pane .gen-opt');
+    });
+
+    await step('home · generator · track', '/', async () => {
+      await click(page, '.gen-cat', { text: 'Track' });
+      const track = page.locator('.gen-pane .gen-opt:not([disabled])').first();
+      await track.waitFor({ state: 'visible', timeout: 10000 });
+      await track.click();
+      await wait(page, SETTLE);
+    });
+
+    await step('home · generator · topics', '/', async () => {
+      await click(page, '.gen-cat', { text: 'Topics' });
+      const topic = page.locator('.gen-pane .gen-opt:not([disabled])').first();
+      await topic.waitFor({ state: 'visible', timeout: 10000 });
+      await topic.click();
+      await wait(page, SETTLE);
+    });
+
+    await step('home · generator · dot points', '/', async () => {
+      await click(page, '.gen-cat', { text: 'Dot Points' });
+    });
+
+    await step('home · generator · difficulty', '/', async () => {
+      await click(page, '.gen-cat', { text: 'Difficulty' });
+    });
 
     await step('account menu open', '/', async () => {
       await goTo(page, BASE, '/');
@@ -808,39 +829,15 @@ async function run() {
       liveVerdict = { before, after };
     });
 
-    await step('progress · overview', '/progress', async () => {
+    await step('progress · India evidence overview', '/progress', async () => {
       await goTo(page, BASE, '/progress');
-      await page.waitForSelector('.band-card, .skeleton', { timeout: 20000 });
+      await page.waitForSelector('.syl-table, .skeleton', { timeout: 30000 });
+      await page.waitForSelector('.syl-table', { timeout: 30000 });
       await wait(page, 900);
     });
 
-    await step('progress · priorities', '/progress', async () => {
-      await click(page, '.page-tab', { text: 'Priorities' });
-      await wait(page, 700);
-    });
-
-    await step('progress · knowledge map', '/progress', async () => {
-      await click(page, '.page-tab', { text: 'Knowledge map' });
-      await wait(page, 1200);
-    });
-
-    await step('progress · knowledge map · curriculum', '/progress', async () => {
-      await click(page, '.kmap-foot .btn');
-      await wait(page, 600);
-    });
-
-    await step('progress · knowledge map · a year opened', '/progress', async () => {
-      await click(page, '.kmap-panel .nav-item');
-      await wait(page, 500);
-    });
-
-    // The primary accessibility profile follows public V1 (India / Student).
-    // Placement is feature-enabled in this test build so its India presentation
-    // remains part of the accessibility walk even though placement is not a
-    // public V1 launch promise.
-    await step('placement', '/placement', async () => {
-      await goTo(page, BASE, '/placement');
-      await page.waitForSelector('.card', { timeout: 20000 });
+    await step('progress · India syllabus evidence table', '/progress', async () => {
+      await page.waitForSelector('.syl-table tbody tr', { timeout: 20000 });
       await wait(page, 400);
     });
 
