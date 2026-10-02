@@ -867,7 +867,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       setState({ phase: 'resolved', res: r });
       onResolved?.(r);
     } catch (e) {
-      setState({ phase: 'retry', res: { feedback: e.message, invalid: true } });
+      setState({ phase: 'retry', res: { feedback: e.message, invalid: true, technical: true, conflict: e?.status === 409 } });
     } finally { setBusy(false); }
   }
 

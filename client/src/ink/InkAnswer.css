@@ -32,7 +32,7 @@
   position: absolute; max-width: 320px; z-index: 5; line-height: 1.4}
 .ink-verdict { position: absolute; line-height: 1; }
 .ink-line-verdict { font-weight: 700; font-size: 15px; margin-right: 2px; }
-@media (pointer: coarse) and (max-width: 760px) {
+@media (pointer: coarse) and (max-width: 760px), (hover: none) and (max-width: 760px) {
 .ink-tool { min-height: 44px; }
 .ink-tool { padding: 0 12px; }
 }
@@ -100,7 +100,7 @@
 .ink-verdict.bad { color: var(--correction); }
 .ink-line-verdict.good { color: var(--good); }
 .ink-line-verdict.bad { color: var(--correction); }
-@media (pointer: coarse) and (min-width: 761px) and (max-width: 1180px) {
+@media (pointer: coarse) and (min-width: 761px) and (max-width: 1180px), (hover: none) and (min-width: 761px) and (max-width: 1180px) {
 .ink-tool { min-height: 44px; }
 }
 @media (max-width: 760px) {
@@ -111,15 +111,15 @@
 @media (max-width: 760px) {
 .ink-pages { display: none; }
 }
-@media (pointer: coarse), (max-width: 760px) {
+@media (pointer: coarse), (max-width: 760px), (hover: none) {
 .ink-tool { min-height: 44px; min-width: 44px; }
 }
-@media (pointer: coarse) {
+@media (pointer: coarse), (hover: none) {
 .ink-sym, .ink-pick { min-width: 44px; min-height: 44px; }
 }
 @media (max-width: 599px) {
 .ink-hint { margin-left: 0; flex-basis: 100%; order: 10; font-size: 12px; }
 }
-@media (pointer: coarse) and (max-width: 760px) {
+@media (pointer: coarse) and (max-width: 760px), (hover: none) and (max-width: 760px) {
 .ink-sym { min-height: var(--tap-min); }
 }

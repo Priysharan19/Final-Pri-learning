@@ -11,7 +11,7 @@
 // handful of questions. The confidence it shows is the engine's, which is
 // never higher than 'moderate'.
 // ─────────────────────────────────────────────────────────────────────────────
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../api.js';
 import { useApp } from '../App.jsx';
@@ -50,6 +50,8 @@ export default function Placement() {
   const [question, setQuestion] = useState(null);
   const [progress, setProgress] = useState(null);
   const [answered, setAnswered] = useState(null);      // the reply for the question on screen
+  const [round, setRound] = useState(0);               // remounts the card when the same question returns
+  const nextRef = useRef(null);
   const [params, setParams] = useSearchParams();
   const autoStart = params.get('go') === '1';
 
@@ -93,6 +95,22 @@ export default function Placement() {
     nav('/', { replace: true });
   };
 
+  // The card's "Next question" after a refused answer (409). A stale or
+  // already-answered item reloads to the current one. If the server still
+  // offers the very question it just refused, its sitting cannot be replayed
+  // (begun by an older version), so it is started again rather than looping.
+  const recover = async () => {
+    const refused = question?.id;
+    try {
+      const v = await api.get('/placement');
+      if (v.status === 'active' && v.question?.id === refused) { await start(true); setRound(r => r + 1); return; }
+    } catch { /* refresh below reports a load failure */ }
+    refresh();
+  };
+
+  // The answered card drops its own button; keyboard focus moves to this one.
+  useEffect(() => { if (answered) nextRef.current?.focus(); }, [answered]);
+
   const advance = () => {
     if (!answered) return;
     if (answered.done) { refresh(); return; }
@@ -129,15 +147,15 @@ export default function Placement() {
         </div>
         {error && <div className="error-box" role="alert">{error}</div>}
         <QuestionCard
-          key={question.id}
+          key={`${question.id}:${round}`}
           question={question}
           diagnostic={{ submitPath: `/placement/${question.id}/answer` }}
           onResolved={setAnswered}
-          onNext={refresh}
+          onNext={recover}
         />
         {answered && (
           <div className="row" style={{ justifyContent: 'flex-end' }}>
-            <button className="btn btn-primary btn-lg" onClick={advance} data-placement-next>
+            <button ref={nextRef} className="btn btn-primary btn-lg" onClick={advance} data-placement-next>
               {t(answered.done ? 'placement.seeResult' : 'placement.next')}
             </button>
           </div>

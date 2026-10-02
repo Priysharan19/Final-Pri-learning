@@ -41,7 +41,7 @@
 .photo-thumb button { position: absolute; top: 2px; right: 2px; width: 22px; height: 22px; border-radius: 3px; border: none; cursor: pointer; font-size: 12px; line-height: 1; }
 .selfmark-row { display: flex; gap: 10px; align-items: flex-start; padding: 7px 0; font-size: 14.5px; cursor: pointer; }
 .selfmark-row input { width: 17px; height: 17px; accent-color: var(--gold); margin-top: 2px; }
-@media (pointer: coarse) {
+@media (pointer: coarse), (hover: none) {
 .exam-dot { width: 40px; height: 40px; }
 }
 @media (max-width: 760px) {
@@ -189,15 +189,15 @@
 .board-award .set-row .set-k { display: block; flex: 1; min-width: 0; }
 .board-award .set-k .muted { margin-left: 21px !important; }
 .board-award .set-row .set-v { white-space: nowrap; flex: none; }
-@media (pointer: coarse), (max-width: 760px) {
+@media (pointer: coarse), (max-width: 760px), (hover: none) {
 .exam-head .icon-btn, .exam-head .btn, .exam-dot { min-height: 44px; min-width: 44px; }
 }
-@media (pointer: coarse) {
+@media (pointer: coarse), (hover: none) {
 .sym-key { min-width: 44px; min-height: 44px; }
 .photo-thumb button { width: 32px; height: 32px; }
 }
 .photo-thumb { width: 96px; height: 96px; }
-@media (pointer: coarse) and (max-width: 760px) {
+@media (pointer: coarse) and (max-width: 760px), (hover: none) and (max-width: 760px) {
 .sym-key { min-width: var(--tap-min); height: var(--tap-min); }
 .exam-dot { width: var(--tap-min); height: var(--tap-min); }
 .photo-thumb button { width: 28px; height: 28px; }
