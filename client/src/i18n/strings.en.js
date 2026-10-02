@@ -212,7 +212,11 @@ export default {
   'progress.fivePlusAttempts': '5+ attempts',
   'progress.questionsAnswered': 'Questions answered',
   'progress.demonstratedAccuracy': 'Demonstrated accuracy',
-  'progress.acrossAttempts': 'Across recorded attempts',
+  'progress.acrossAttempts': 'Practice, reviews, assignments and exams. Timed games are not counted.',
+  'progress.notEnoughEvidence': 'Not enough evidence yet',
+  'progress.accuracyNeeds': { one: 'Shown after {n} more answer', other: 'Shown after {n} more answers' },
+  'progress.withHelp': { one: '{n} correct answer needed a hint, tutor help or a second try', other: '{n} correct answers needed a hint, tutor help or a second try' },
+  'progress.tooFewAnswers': 'Too few answers',
   'progress.syllabusEvidence': '{scope} syllabus evidence',
   'progress.rowCount': { one: '{n} chapter/topic', other: '{n} chapters/topics' },
   'progress.noRows': 'No released curriculum rows are available for this track yet.',
@@ -221,7 +225,7 @@ export default {
   'progress.colAction': 'Action',
   'progress.practise': 'Practise',
   'progress.howToRead': 'How to read this page',
-  'progress.howToReadBody': '“Started” means at least one recorded attempt. “Practised” is a simple product-display threshold of five attempts, not an adaptive-learning judgement. Accuracy is descriptive evidence only. Mastery decisions, review scheduling and Pri Explain remain owned by the learning-intelligence layer.',
+  'progress.howToReadBody': '“Started” means at least one recorded attempt. “Practised” is a simple product-display threshold of five attempts, not an adaptive-learning judgement. Accuracy is descriptive evidence only, and it is not shown until it rests on enough answers: ten overall, five in a chapter. A correct answer that needed a hint, tutor help or a second try still counts as correct, and is reported separately. Mastery decisions, review scheduling and Pri Explain remain owned by the learning-intelligence layer.',
 
   // ── History ────────────────────────────────────────────────────────────────
   'history.title': 'Review and mistakes',

@@ -24,6 +24,7 @@ import {
   indiaPracticeScope, indiaAheadUnlocked, indiaDotpointsInWindow
 } from '../engine/indiaProduct.js';
 import { indiaReasonLabel } from '../engine/indiaProgress.js';
+import { attemptTotals } from '../engine/progressTruth.js';
 import { indiaExamBlueprint } from '../engine/indiaExams.js';
 import { predictExamMark } from '../engine/markPredictor.js';
 import { IN_CHAPTERS, OLYMPIAD_TOPICS } from '../engine/curriculum-in.js';
@@ -1040,6 +1041,36 @@ function indiaPick(p, trackId, ratings, reviews, now, { chapter = null, dotpoint
   };
 }
 
+/**
+ * A profile's attempt rows in the order they were answered.
+ *
+ * The attempts store is keyed by `${pid}:resolved:<digest>` — an exactly-once
+ * claim, not a sequence — so its natural order is the digest's order, which
+ * has nothing to do with time. "Recent" on Progress was the last fifteen rows
+ * in that order: fifteen answers from anywhere in the history, presented as
+ * the latest. Every consumer that means "most recent" reads through here.
+ * Ties (the parts of one exam question are resolved in the same millisecond)
+ * keep their store order, which is stable.
+ */
+async function attemptsInOrder(pid) {
+  const rows = await byIndex('attempts', 'pid', pid);
+  return rows.map((a, i) => [a, i])
+    .sort((x, y) => (Number(x[0].createdAt) || 0) - (Number(y[0].createdAt) || 0) || x[1] - y[1])
+    .map(([a]) => a);
+}
+
+/**
+ * The headline totals GET /stats serves, derived from the attempt rows and
+ * nothing else (engine/progressTruth.js; docs/product/progress-metrics.md).
+ * `attempts` and `correct` keep their old meaning — every marked answer, games
+ * included — and `evidence`/`accuracy` are the learning-evidence subset the
+ * progress page's accuracy is allowed to quote, gated below its sample floor.
+ */
+function statsTotals(attempts) {
+  const t = attemptTotals(attempts);
+  return { attempts: t.answered, correct: t.correct, ms: t.ms, evidence: t.evidence, accuracy: t.accuracy };
+}
+
 /** GET /stats for an Indian profile: every surface named through the Indian spine. */
 async function indiaStats(p, ratings, now) {
   const pid = p.id;
@@ -1084,8 +1115,8 @@ async function indiaStats(p, ratings, now) {
     };
   } catch { recommendation = null; }
   const days = await activityFor(pid);
-  const attempts = await byIndex('attempts', 'pid', pid);
-  const totals = { attempts: attempts.length, correct: attempts.filter(a => a.correct).length, ms: attempts.reduce((s, a) => s + (a.ms || 0), 0) };
+  const attempts = await attemptsInOrder(pid);
+  const totals = statsTotals(attempts);
   const byDiff = [1, 2, 3, 4].map(d => {
     const rows = attempts.filter(a => a.difficulty === d);
     return { difficulty: d, n: rows.length, c: rows.filter(a => a.correct).length };
@@ -1630,7 +1661,14 @@ async function resolve(profile, row, q, correct, answerGiven, ms, mode, viaInk =
   // less than an independent one and never more than a hinted one.
   const tutorLevel = Math.max(0, Math.min(3, Number(row.tutorLevel) || 0));
   const helpUsed = (row.hintsUsed || 0) + tutorLevel;
-  const effHints = helpUsed + Math.max(0, (row.tries || 0) - (correct ? 1 : 0));
+  // `row.tries` counts the wrong tries this question has already spent — it is
+  // only ever bumped by a first answer that was wrong (POST /practice/:id/submit).
+  // Each one is help in the same sense a hint is: the student was told the
+  // first answer was wrong. Subtracting one for a correct answer — a holdover
+  // from when `tries` counted every submission — handed a second-try success
+  // the full unaided rating gain, while the same attempt was filed as
+  // `supported` and graded Hard. One rule, one weighting (§12, #246).
+  const effHints = helpUsed + Math.max(0, row.tries || 0);
   let ratingAfter = st.rating;
   const isRush = mode === 'rush' || mode === 'match';
   const isCustom = q.custom;
@@ -3352,8 +3390,8 @@ const routes = {
       strandAgg[s.strand].sum += m; strandAgg[s.strand].n++;
     }
     const strands = Object.entries(strandAgg).map(([name, v]) => ({ name, mastery: Math.round(100 * v.sum / v.n) }));
-    const attempts = await byIndex('attempts', 'pid', pid);
-    const totals = { attempts: attempts.length, correct: attempts.filter(a => a.correct).length, ms: attempts.reduce((s, a) => s + (a.ms || 0), 0) };
+    const attempts = await attemptsInOrder(pid);
+    const totals = statsTotals(attempts);
     const byDiff = [1, 2, 3, 4].map(d => {
       const rows = attempts.filter(a => a.difficulty === d);
       return { difficulty: d, n: rows.length, c: rows.filter(a => a.correct).length };
@@ -3608,9 +3646,9 @@ const routes = {
     const p = await requireProfile();
     const { filter = 'all', page = 0, pageSize = 20 } = body || {};
     const rows = (await byIndex('questions', 'pid', p.id)).filter(r => r.answered);
-    const attempts = await byIndex('attempts', 'pid', p.id);
+    const attempts = await attemptsInOrder(p.id);
     const attemptByQ = {};
-    for (const a of attempts) attemptByQ[a.questionId] = a;   // latest wins (insertion order)
+    for (const a of attempts) attemptByQ[a.questionId] = a;   // latest wins (answer order)
     const marks = await byIndex('bookmarks', 'pid', p.id);
     const marked = new Set(marks.map(b => b.key.split(':').slice(1).join(':')));
     const inkRows = await byIndex('inks', 'pid', p.id);
