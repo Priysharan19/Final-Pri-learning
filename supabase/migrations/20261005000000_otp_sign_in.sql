@@ -27,7 +27,7 @@ create table pri.otp_challenges (
   account_id text references pri.accounts(id) on delete cascade,
   code_hash text not null,
   provider text not null,
-  attempts integer not null default 0,
+  attempts bigint not null default 0,
   created_at bigint not null,
   expires_at bigint not null,
   consumed_at bigint
