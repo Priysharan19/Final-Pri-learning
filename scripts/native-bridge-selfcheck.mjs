@@ -34,6 +34,23 @@ const argOf = name => {
 const run = (cmd, args, opts = {}) =>
   execFileSync(cmd, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 64 * 1024 * 1024, ...opts });
 
+// A freshly booted simulator can refuse a launch until SpringBoard is ready
+// ("denied by service delegate (SBMainWorkspace)"). Wait for the boot to finish,
+// then retry that specific refusal a few times; any other error is real.
+function launchApp(device, bundleId, args = [], opts = {}) {
+  try { run('xcrun', ['simctl', 'bootstatus', device, '-b']); } catch { /* best effort */ }
+  for (let attempt = 1; ; attempt++) {
+    try { return run('xcrun', ['simctl', 'launch', device, bundleId, ...args], opts); }
+    catch (error) {
+      const text = String(error?.stderr || error?.message || '');
+      if (attempt >= 5 || !/SBMainWorkspace|FBSOpenApplicationServiceErrorDomain/.test(text)) throw error;
+      console.log(`  (simulator not ready to launch yet; retry ${attempt})`);
+      execSync('sleep 6');
+    }
+  }
+}
+
+
 function pickDevice() {
   const named = argOf('device');
   const family = (argOf('family') || 'ipad').toLowerCase();
@@ -84,7 +101,7 @@ const bundleId = run('/usr/bin/plutil', ['-extract', 'CFBundleIdentifier', 'raw'
 try { run('xcrun', ['simctl', 'terminate', device, bundleId]); } catch { /* not running */ }
 run('xcrun', ['simctl', 'install', device, app]);
 const started = localStamp(new Date(Date.now() - 2000));
-run('xcrun', ['simctl', 'launch', device, bundleId, '--bridge-selfcheck']);
+launchApp(device, bundleId, ['--bridge-selfcheck']);
 
 let lines = [];
 for (let i = 0; i < 45; i++) {
