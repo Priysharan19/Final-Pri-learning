@@ -22,6 +22,7 @@ import { ensurePersonalLoaded, addPersonal } from './personal.js';
 import { MathText } from '../lib/latex.jsx';
 import { currentReleaseIdentity } from '../platform/releaseIdentity.js';
 import Icon from '../components/Icon.jsx';
+import './InkAnswer.css';
 import { inkCanvasHeight, useFormFactor } from '../platform/formFactor.js';
 import { useT } from '../i18n/index.js';
 import { priNative } from '../platform/native/index.js';
