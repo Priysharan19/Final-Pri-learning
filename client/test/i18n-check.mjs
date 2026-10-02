@@ -238,9 +238,8 @@ const LITERAL_ALLOWLIST = new Map([
   ['Advanced', 'the proper name of an NSW course, shown only on the Australian branch'],
   ['Extension 1', 'the proper name of an NSW course, shown only on the Australian branch'],
   ['Extension 2', 'the proper name of an NSW course, shown only on the Australian branch'],
-  ['ri Learning', 'the wordmark, split around the drop-cap P and its full stop'],
-  ['ri Learning.', 'the wordmark, split around the drop-cap P'],
-  ['P', 'the drop-cap of the wordmark'],
+  ['Pri Learning.', 'the product’s name with the wordmark’s full stop'],
+  ['P', 'the letter on the brand tile, aria-hidden beside the full wordmark'],
   ['XP', 'the app’s own unit, written XP in every language'],
   ['D', 'the D1–D4 difficulty shorthand, read as a code'],
   ['Evaluation', 'inside the wordmark block, translated separately as verdict.evaluation'],
@@ -368,6 +367,10 @@ eq(leftInEnglish, [], 'no converted screen draws a literal English string a read
 for (const [text, reason] of LITERAL_ALLOWLIST) {
   ok(reason.length > 15, `the literal allowlist states a reason for “${text}”`);
 }
+// The wordmark is one literal, "Pri Learning": a split around the brand tile
+// read as "P ri Learning." on the standalone verify-email page.
+ok(!LITERAL_ALLOWLIST.has('ri Learning') && !LITERAL_ALLOWLIST.has('ri Learning.'),
+  'the wordmark is never allow-listed as a fragment split around the tile letter');
 
 // Every t('…') in the whole of src must name a key that exists, and every key
 // must be reached from somewhere. The first stops a typo shipping as a raw key

@@ -1,1 +1,0 @@
-import{s as e}from"./ink-personal-DYrlA-PZ.js";export{e as setPersonalProfile};
