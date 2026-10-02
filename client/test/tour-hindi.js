@@ -155,6 +155,11 @@ export const flow = {
         await check(`Handwriting: the ${titleKey} control is titled and labelled in Hindi`,
           titles.some(([title, aria]) => title === hi[titleKey] && aria === hi[ariaKey]), JSON.stringify(titles));
       }
+      // "More space" became Page: the control that adds a sheet is titled and
+      // labelled in Hindi (its label names the page number it will add).
+      await check('Handwriting: the ink.addPage control is titled and labelled in Hindi',
+        titles.some(([title, aria]) => title === hi['ink.addPage'] && !!aria && aria.startsWith(hi['ink.addPageLabel'].split('{n}')[0])),
+        JSON.stringify(titles));
       await check('Handwriting: the writing surface is labelled in Hindi',
         await page.locator('.ink-stage [role="img"]').first().getAttribute('aria-label') === hi['ink.surfaceLabel']);
       await check('Handwriting: no developer engine diagnostics are shown to the student',
