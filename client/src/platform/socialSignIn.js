@@ -3,10 +3,10 @@
 // No provider script is loaded: the page's Content-Security-Policy allows
 // scripts from this origin only, and a children's app has no business running
 // a third party's code. Instead a popup opens the provider's own authorize page
-// with a server-issued, single-use nonce and a random state. The provider sends
-// the student back to /auth/callback.html on this origin (Apple by way of the
-// server's form_post relay), and that page hands the identity token back over a
-// same-origin BroadcastChannel. The server verifies the token and decides which
+// with a server-issued, single-use nonce and a random state. Google sends the
+// student back to /auth/callback.html on this origin; Apple form-posts to a
+// server route that answers with the same kind of page. That page hands the
+// identity token back over a same-origin BroadcastChannel. The server verifies the token and decides which
 // account it is; nothing here does.
 //
 // The native shells are left out on purpose: their sign-in belongs to the OS

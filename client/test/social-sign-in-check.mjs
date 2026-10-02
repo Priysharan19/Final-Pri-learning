@@ -199,12 +199,13 @@ await put('profiles', { id: 'p1', name: 'Offline Student', year: 9, course: 'in'
   const page = readFileSync(new URL('../public/auth/callback.html', import.meta.url), 'utf8');
   ok('the callback page loads its script from this origin (CSP script-src self)', /<script src="\/auth\/callback\.js"><\/script>/.test(page) && !/<script>/.test(page));
   ok('the callback page sends no Referer', /<meta name="referrer" content="no-referrer">/.test(page));
-  const run = hash => {
+  const run = (hash, relayedMeta = null) => {
     const posted = [];
     const replaced = [];
     let closed = false;
     const context = {
-      location: { hash, pathname: '/auth/callback.html' },
+      location: { hash, pathname: relayedMeta == null ? '/auth/callback.html' : '/v1/account/identity/apple/callback' },
+      document: { querySelector: selector => (relayedMeta != null && selector === 'meta[name="pri-oidc-callback"]' ? { getAttribute: () => relayedMeta } : null) },
       history: { replaceState: (a, b, url) => replaced.push(url) },
       URLSearchParams,
       BroadcastChannel: class { constructor(name) { this.name = name; } postMessage(message) { posted.push({ name: this.name, message }); } close() {} },
@@ -218,9 +219,11 @@ await put('profiles', { id: 'p1', name: 'Offline Student', year: 9, course: 'in'
   same('the token goes out on the sign-in channel', google.posted, [{ name: CALLBACK_CHANNEL, message: { type: 'pri-oidc-callback', provider: 'google', state: 'abc', idToken: 'h.p.s', error: '' } }]);
   same('the fragment is cleared from the address bar and history', google.replaced, ['/auth/callback.html']);
   ok('and the window closes itself', google.closed);
-  const apple = run('#provider=apple&state=abc&error=user_cancelled_authorize');
+  const apple = run('', 'provider=apple&state=abc&error=user_cancelled_authorize');
   same('a provider error is passed on as an error', [apple.posted[0].message.provider, apple.posted[0].message.error, apple.posted[0].message.idToken], ['apple', 'user_cancelled_authorize', '']);
   same('an empty fragment is an invalid response', run('').posted[0].message.error, 'invalid_response');
+  const relayed = run('', 'provider=apple&state=xyz&id_token=a.b.c');
+  same('the Apple relay page\'s fields are read from its meta tag', [relayed.posted[0].message.provider, relayed.posted[0].message.state, relayed.posted[0].message.idToken], ['apple', 'xyz', 'a.b.c']);
 }
 
 // ── the service worker leaves the callback page alone ──────────────────────

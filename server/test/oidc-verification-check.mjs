@@ -242,23 +242,27 @@ try {
   delete process.env.PRI_APPLE_WEB_CLIENT_ID;
   process.env.PRI_APPLE_CLIENT_IDS = 'com.prilearning.app';
 
-  // ── Apple's form_post is relayed to the callback page as a fragment ──
+  // ── Apple's form_post is answered with the callback page, never a redirect ──
   const relayState = 'state_0123456789abcdef';
   const relayToken = mintToken({ provider: 'apple', claims: { nonce: 'n' } });
+  const relayFields = r => new URLSearchParams((/<meta name="pri-oidc-callback" content="([^"]*)">/.exec(r.text) || [])[1] || '');
   const form = new URLSearchParams({ state: relayState, code: 'c0de', id_token: relayToken, user: '{"name":{"firstName":"Meera"}}' }).toString();
   const relayed = await h.request('/v1/account/identity/apple/callback', { method: 'POST', rawBody: form, headers: { 'Content-Type': 'application/x-www-form-urlencoded', Origin: 'https://appleid.apple.com' } });
-  c.eq(relayed.status, 303, 'Apple callback answers with a redirect');
-  const location = relayed.headers.get('location') || '';
-  c.ok(location.startsWith('/auth/callback.html#'), 'to the same-origin callback page');
-  const relayedFragment = new URLSearchParams(location.split('#')[1]);
-  c.eq(relayedFragment.get('state'), relayState, 'state relayed');
-  c.eq(relayedFragment.get('id_token'), relayToken, 'identity token relayed in the fragment only');
-  c.ok(!location.split('#')[0].includes(relayToken), 'never in the path or query');
-  c.eq(relayedFragment.get('user'), null, 'nothing else from the post is relayed');
-  const junk = await h.request('/v1/account/identity/apple/callback', { method: 'POST', rawBody: new URLSearchParams({ state: relayState, id_token: 'x"><script>' }).toString(), headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
-  c.eq(new URLSearchParams(junk.headers.get('location').split('#')[1]).get('error'), 'invalid_response', 'a malformed token is replaced by an error');
+  c.eq(relayed.status, 200, 'Apple callback answers with a page, not a redirect');
+  c.eq(relayed.headers.get('location'), null, 'and no Location header');
+  c.ok(/text\/html/.test(relayed.headers.get('content-type') || ''), 'an HTML page');
+  c.ok(relayed.text.includes('<script src="/auth/callback.js"></script>') && !/<script>/.test(relayed.text), 'that loads the same-origin callback script and no inline script');
+  c.eq(relayed.headers.get('cache-control'), 'no-store', 'never cached');
+  const relayedFields = relayFields(relayed);
+  c.eq(relayedFields.get('provider'), 'apple', 'provider relayed');
+  c.eq(relayedFields.get('state'), relayState, 'state relayed');
+  c.eq(relayedFields.get('id_token'), relayToken, 'identity token relayed');
+  c.eq(relayedFields.get('user'), null, 'nothing else from the post is relayed');
+  const junk = await h.request('/v1/account/identity/apple/callback', { method: 'POST', rawBody: new URLSearchParams({ state: relayState, id_token: 'x"><script>alert(1)</script>' }).toString(), headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
+  c.eq(relayFields(junk).get('error'), 'invalid_response', 'a malformed token is replaced by an error');
+  c.ok(!junk.text.includes('alert(1)'), 'and none of it reaches the page');
   const denied = await h.request('/v1/account/identity/apple/callback', { method: 'POST', rawBody: new URLSearchParams({ state: relayState, error: 'user_cancelled_authorize' }).toString(), headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
-  c.eq(new URLSearchParams(denied.headers.get('location').split('#')[1]).get('error'), 'user_cancelled_authorize', 'a cancelled Apple sign-in is relayed as its error');
+  c.eq(relayFields(denied).get('error'), 'user_cancelled_authorize', 'a cancelled Apple sign-in is relayed as its error');
   c.eq((await db.get('SELECT COUNT(*) AS n FROM accounts WHERE email=?', ['apple.student@example.test'])).n, 1, 'the relay creates and changes nothing');
 } finally {
   await h.close();

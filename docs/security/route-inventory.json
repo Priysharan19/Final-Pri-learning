@@ -380,7 +380,7 @@
       "roles": null,
       "verifiedEmail": false,
       "guardianConsent": false,
-      "ownership": "stateless relay of Apple's form_post to the same-origin callback page fragment; reads no session, writes nothing",
+      "ownership": "stateless: answers Apple's form_post with the callback page (validated fields only, no redirect); reads no session, writes nothing",
       "rateLimits": [
         {
           "key": "oidc-callback",

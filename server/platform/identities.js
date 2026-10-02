@@ -47,16 +47,15 @@ export function webClientId(provider, env = process.env) {
   return clientId && audiences.includes(clientId) ? clientId : null;
 }
 
-// What Sign in with Apple form-posts back (response_mode=form_post) is relayed
-// to the same-origin callback page as a URL fragment, which never reaches a
-// server or a Referer. Nothing is verified or stored here: the relayed token is
-// worth nothing without the single-use nonce, and it is verified by sign-in.
+// What Sign in with Apple form-posts back (response_mode=form_post) is answered
+// with the same small page Google's redirect lands on, carrying the validated
+// fields in a meta tag for /auth/callback.js. It is a page, not a redirect: no
+// /v1 route redirects anywhere. Nothing is verified or stored here: the relayed
+// token is worth nothing without the single-use nonce, and sign-in verifies it.
 const RELAY_STATE = /^[A-Za-z0-9_-]{16,128}$/;
 const RELAY_TOKEN = /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/;
 const RELAY_ERROR = /^[a-z_]{1,64}$/;
-export const OIDC_CALLBACK_PAGE = '/auth/callback.html';
-
-export function appleCallbackLocation(body = {}) {
+export function appleCallbackParams(body = {}) {
   const state = String(body.state || '');
   const idToken = String(body.id_token || '');
   const error = String(body.error || '');
@@ -64,7 +63,28 @@ export function appleCallbackLocation(body = {}) {
   if (RELAY_STATE.test(state)) fragment.set('state', state);
   if (fragment.has('state') && !error && idToken.length <= 8192 && RELAY_TOKEN.test(idToken)) fragment.set('id_token', idToken);
   else fragment.set('error', RELAY_ERROR.test(error) ? error : 'invalid_response');
-  return `${OIDC_CALLBACK_PAGE}#${fragment.toString()}`;
+  return fragment.toString();
+}
+
+// Every value in `params` passed the patterns above ([A-Za-z0-9_.-] and the
+// URLSearchParams encoding of them), so it is safe inside an attribute.
+export function appleCallbackPage(body = {}) {
+  const params = appleCallbackParams(body);
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta name="pri-oidc-callback" content="${params}">
+<title>Pri Learning · signing in</title>
+</head>
+<body>
+<p>Signing you in to Pri Learning. You can close this window.</p>
+<script src="/auth/callback.js"></script>
+</body>
+</html>
+`;
 }
 
 export function createIdentityRouter(db) {
@@ -92,7 +112,7 @@ export function createIdentityRouter(db) {
     rateLimit(db, 'oidc-callback', { limit: 60, windowMs: 15 * 60 * 1000 }),
     express.urlencoded({ extended: false, limit: '16kb', parameterLimit: 8 }),
     async (req, res) => {
-      res.redirect(303, appleCallbackLocation(req.body || {}));
+      res.status(200).type('html').send(appleCallbackPage(req.body || {}));
     });
 
   // The nonce a provider token must carry is issued here, stored only as a
