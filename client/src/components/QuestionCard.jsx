@@ -1195,7 +1195,6 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                 )}
               </div>
               <div className="editor-foot no-print">
-                <span className="editor-brand">{t('verdict.inkEngine')}</span>
                 <span style={{ flex: 1 }} />
                 {!resolved && (
                   <button className={`btn btn-primary ${canSubmit ? 'btn-glow' : ''}`} onClick={() => submit()} disabled={busy || !canSubmit}>
@@ -1260,7 +1259,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                 )}
                 {InkAnswer && (
                   <div className="editor-foot no-print">
-                    <span className="editor-brand">{String(inkResult?.engine || '').startsWith('cloud') ? t('verdict.inkReadByServer') : t('verdict.inkEngine')}</span>
+                    <span className="editor-brand">{String(inkResult?.engine || '').startsWith('cloud') ? t('verdict.inkReadByServer') : t('verdict.inkReadByServerPending')}</span>
                     <span style={{ flex: 1 }} />
                     {inkResult?.answerLine && !needsCheck && (
                       <span className="muted" style={{ marginRight: 10 }}>

@@ -194,6 +194,49 @@ try {
 } catch (e) { timedOut = e; }
 eq(timedOut?.code, 'HANDWRITING_TIMEOUT', 'provider timeout is distinct from cancellation and unreachable transport');
 
+// ── Reading budget (browser run, 2026-10: a 20 s primary timeout failed a read
+// that succeeded on the automatic retry) ──────────────────────────────────────
+eq(providerConfig({ PRI_HANDWRITING_API_KEY: 'k' }).timeoutMs, 45000, 'the default reading budget is 45 s');
+eq(providerConfig({ PRI_HANDWRITING_API_KEY: 'k', PRI_HANDWRITING_TIMEOUT_MS: '90000' }).timeoutMs, 60000, 'and it is capped at 60 s');
+eq(providerConfig({ PRI_HANDWRITING_API_KEY: 'k' }).reasoningEffort, 'low', 'reasoning effort stays low unless a deployment opts in');
+eq(providerConfig({ PRI_HANDWRITING_API_KEY: 'k', PRI_HANDWRITING_REASONING_EFFORT: 'minimal' }).reasoningEffort, 'minimal', 'minimal reasoning effort can be opted into');
+ok(providerStaticStatus({ PRI_HANDWRITING_API_KEY: 'k', PRI_HANDWRITING_REASONING_EFFORT: 'turbo' }).problems.includes('reasoning-effort-invalid'),
+  'an unknown reasoning effort is a configuration problem, not silently sent');
+{
+  const seen = [];
+  const hangsThenAnswers = async (_url, init) => {
+    const body = JSON.parse(init.body);
+    seen.push({ model: body.model, effort: body.reasoning?.effort });
+    if (body.model === 'test-primary') {
+      return new Promise((_resolve, reject) => {
+        const fail = () => reject(new DOMException('Aborted', 'AbortError'));
+        if (init.signal.aborted) fail(); else init.signal.addEventListener('abort', fail, { once: true });
+      });
+    }
+    return { ok: true, status: 200, json: async () => ({ output_text: JSON.stringify({ lines: [{ text: 'x = 4', confidence: 0.97 }], confidence: 0.97, needs_confirmation: false }) }) };
+  };
+  const started = Date.now();
+  const rescued = await transcribeHandwriting(PNG, {
+    env: { ...env, PRI_HANDWRITING_TIMEOUT_MS: '2000', PRI_HANDWRITING_REASONING_EFFORT: 'minimal' },
+    fetchImpl: hangsThenAnswers
+  });
+  eq(seen.map(c => c.model), ['test-primary', 'test-fallback'], 'a primary timeout tries the fallback model once');
+  eq(seen.map(c => c.effort), ['minimal', 'minimal'], 'with the configured reasoning effort');
+  eq([rescued.text, rescued.model, rescued.primaryFailureCode], ['x = 4', 'test-fallback', 'HANDWRITING_TIMEOUT'], 'and its reading is returned');
+  ok(Date.now() - started < 2000 + 400, 'inside the one reading budget');
+
+  seen.length = 0;
+  let refusedTimeout = null;
+  try {
+    await transcribeHandwriting(PNG, {
+      env: { ...env, PRI_HANDWRITING_TIMEOUT_MS: '2000' },
+      fetchImpl: hangsThenAnswers,
+      authorizeFallback: () => ({ code: 'PAID_CAPACITY_REACHED' })
+    });
+  } catch (e) { refusedTimeout = e; }
+  eq([refusedTimeout?.code, seen.length], ['HANDWRITING_TIMEOUT', 1], 'a spend refusal stops the timeout fallback and nothing more is sent');
+}
+
 let malformedEnvelope = null;
 try {
   await transcribeHandwriting(PNG, {
