@@ -315,6 +315,13 @@ export default function Login() {
     else beginCreate(false);
   };
 
+  /** The README's "Try the demo": one tap from the welcome screen to a seeded
+      Class 10 student, without first creating a profile of your own. */
+  const tryDemo = () => {
+    localStorage.setItem('pri-seen-hero', '1');
+    void go('/profiles/demo', {});
+  };
+
   /** Open/select the local profile first, then hand it to the real cloud account panel. */
   const cloudSignIn = () => {
     localStorage.setItem('pri-seen-hero', '1');
@@ -454,6 +461,12 @@ export default function Login() {
           <div className="row" style={{ marginTop: 34 }}>
             <button className="btn btn-primary btn-lg btn-glow" onClick={enter}>{t('login.getStarted')}</button>
           </div>
+          <div style={{ textAlign: 'center', marginTop: 14 }}>
+            <button className="linklike" type="button" data-testid="hero-try-demo" disabled={busy} onClick={tryDemo}>
+              {t('login.tryDemoIndia')}
+            </button>
+          </div>
+          {error && <div className="error-box" role="alert" style={{ marginTop: 12 }}>{error}</div>}
           <p className="muted" style={{ marginTop: 26, textAlign: 'center' }}>{t('login.heroPrivacy')}</p>
           <div style={{ textAlign: 'center', marginTop: 10 }}>
             <button className="linklike" onClick={cloudSignIn}>{t('login.cloudSignIn')}</button>
