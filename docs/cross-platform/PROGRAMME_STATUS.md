@@ -24,7 +24,8 @@ This is the durable ledger for CP-02 → CP-12 and SEC-COMM-01. Each CP's own PR
 | CP-05 iPhone Automated Certification | SOFTWARE IMPLEMENTATION: COMPLETE | `3ed4f9c4` | `1820d32c` | [#273](https://github.com/Priysharan19/Final-Pri-learning/pull/273) | `247f12c2` | DEFERRED |
 | CP-06 Android Shell | SOFTWARE IMPLEMENTATION: COMPLETE | `247f12c2` | `353e3c2c` | [#275](https://github.com/Priysharan19/Final-Pri-learning/pull/275) | `a77f7369` | DEFERRED |
 | CP-07 Android Native Bridges | SOFTWARE IMPLEMENTATION: COMPLETE | `a77f7369` | `b7c9ba0e` | [#277](https://github.com/Priysharan19/Final-Pri-learning/pull/277) | `a069b16f` | DEFERRED |
-| CP-08 Google Play Billing | SOFTWARE IMPLEMENTATION: COMPLETE once merged | `a069b16f` | recorded by the next CP | this PR | recorded by the next CP | DEFERRED |
+| CP-08 Google Play Billing | SOFTWARE IMPLEMENTATION: COMPLETE | `a069b16f` | `7ebfc88c` | [#279](https://github.com/Priysharan19/Final-Pri-learning/pull/279) | `e1236678` | DEFERRED |
+| CP-09 Android Handwriting Input | SOFTWARE IMPLEMENTATION: COMPLETE once merged | `e1236678` | recorded by the next CP | this PR | recorded by the next CP | DEFERRED |
 
 ## CP-02 — Platform Bridge Foundation
 
@@ -341,3 +342,50 @@ No real Google Play purchase has been made.
 - Google Play billing copy moved into i18n (en + hi), and the generic "no store billing bridge" copy replaces the StoreKit-only string.
 - The two Google billing routes are added to the security route inventory (`docs/security/route-inventory.json`, 80 routes reviewed).
 - The Postgres gate is now 28/28 suites with 23/23 schema mutations, which include `google-billing-check` and `failure-drills-check`. Verified locally against real Postgres 17.
+
+**CP-08 exact-head evidence (recorded by CP-09):**
+- Candidate `7ebfc88c`. `main` moved under the PR many times: the tutor, payment retention, i18n surfaces, submission durability and StoreKit entitlements all merged while it waited. Each merge was resolved and re-verified locally before it was pushed.
+- **Real findings from integrating with `main`:**
+  1. **Schema numbering collided twice.** Payment retention took billing schema 4 at migration timestamp `20261003000000`, then StoreKit took 5. Google Play is now **billing schema 6** in `20261004000000_google_play_billing.sql`. The schema mutation test targets the **last** billing bump, so no later migration can make it vacuous.
+  2. **A superseded Google token kept Premium alive.** StoreKit's change derives the entitlement from every subscription row an account holds, so a replaced (`linkedPurchaseToken`) Google token's row still read Premium. A student on payment hold kept Premium. The replaced token's state is now cleared. Regression check: `google-billing-check` 101/101, and it fails without the fix.
+  3. **A webhook for an unconfigured provider is counted as rejected**, even when its verifier is installed, so it can never page an operator. This is `main`'s observability contract.
+  4. **CI count pins collided silently** each time both sides changed the same line: Postgres suites, i18n file count, mutations. Every pin was re-derived from a real run. Final values: Postgres 32/32 suites and 26/26 mutations (local Postgres 17); i18n coverage 49 files.
+- GitHub CI on `7ebfc88c`: all four required checks pass, 27 checks in total.
+- Android Shell (not required):
+  - API 36 phone failed in `ShellJourneyTest`: the activity closed on a Back press before the page re-declared Back. That is a test race, fixed in CP-10's PR.
+  - API 33 failed with the known emulator death (see CP-08 above).
+- Merged as `e1236678` with `--match-head-commit`.
+
+**CP-05 follow-up (merged during CP-08):** [#286](https://github.com/Priysharan19/Final-Pri-learning/pull/286) as `31c7f4eb`. The iPhone simulator lane is green on CI for the first time:
+- iPhone bridge self-check 8/8 (iPhone 17 Pro, iOS 26.2);
+- iPhone journey 28/28;
+- iPad journey 16/16.
+
+Causes found:
+- the device picker chose an older-runtime iPhone, whose first boot hung `simctl boot` for 49 minutes;
+- clicks landed on account-panel buttons while they were still disabled;
+- the server logout proof read the pre-#262 log key.
+
+## CP-09 — Android Handwriting Input
+
+**Delivered:** the details are in [ANDROID_HANDWRITING_EVIDENCE.md](../release/ANDROID_HANDWRITING_EVIDENCE.md).
+- Android writes on the **shared web canvas** and recognises through the **shared pipeline**. There is no Kotlin recogniser and no native drawing surface.
+- **Palm rejection:** once a pen is seen, finger touches scroll until **Finger** is on.
+- **Shell capability facts:** `device.stylusCapable` and `device.stylusSeen`. Never a model name.
+- `client/src/ink/inputMetrics.js` is opt-in, bounded and coordinate-free. It records only after a stroke commits, so it cannot cost a stroke. Per stroke it records pointer type, samples, kept points, largest gap, input-to-handler p50/p95 from the oldest coalesced sample, pressure variation and cancels. It also counts palm rejections.
+- **Native-surface escalation rule:** `androidx.ink` is built only if **physical** measurements show the web canvas misses latency or continuity.
+
+**Evidence (S0/S2, synthetic):**
+- `client/test/ink-input-metrics-check.mjs` 12/12.
+- `InkInputTest` on the API 36 phone emulator injects real finger and stylus `MotionEvent`s:
+  - pointer types, with pressure varying for the stylus;
+  - 24/24 samples kept;
+  - `stylusSeen` flips;
+  - palm rejection;
+  - Finger mode captures, with ink in the band where it was written;
+  - rotation keeps ink;
+  - the shared recognizer produces a reading, and the submitted attempt is marked.
+- Emulator latency numbers measure the injection harness and are **not evidence**.
+- Independent review requested changes; all were applied: metrics hardening, an honest latency definition, pixel-band assertions and the recognition check.
+
+**Deferred (physical):** the 4-device protocol (low-end finger phone, S Pen, USI 2.0, foldable): touch-to-ink latency against 50 ms with a high-speed camera, sample continuity, palm behaviour and real recognition accuracy. **No Android handwriting-quality claim is made.**
