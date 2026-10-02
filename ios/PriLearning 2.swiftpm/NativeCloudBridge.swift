@@ -13,6 +13,8 @@ import WebKit
 final class NativeCloudBridge {
     static let responseEvent = "pri:native-cloud-response"
     static var isConfigured: Bool { configuredOrigin != nil }
+    /// Host of the signed cloud origin; deep links are accepted only for it.
+    static var configuredHost: String? { configuredOrigin?.host?.lowercased() }
 
     private static let maxRequestBytes = 1 * 1024 * 1024
     private static let maxResponseBytes = 2 * 1024 * 1024

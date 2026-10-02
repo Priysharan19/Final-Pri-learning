@@ -242,6 +242,7 @@ ok(normalizeCode('SOMETHING_NEW_FROM_A_SHELL') === 'INTERNAL', 'unknown codes be
     },
   });
   ok(priNative.isNativeShell() && priNative.has('share') && !priNative.has('ink'), 'capabilities, not OS, describe the host');
+  ok(priNative.ink.facts() === null, 'with no ink capability there are no ink facts');
   ok(priNative.billing.store() === 'play', 'the store is a capability fact');
   await tick(5);
   ok(host.lastRequest('host', 'ready'), 'JS announces host.ready once it is listening');
@@ -303,6 +304,7 @@ ok(normalizeCode('SOMETHING_NEW_FROM_A_SHELL') === 'INTERNAL', 'unknown codes be
   ok(recovered.some(t => t.transactionId === 'late-1'), 'a late StoreKit result is recovered as a transaction update');
 
   ok(priNative.ink.post({ op: 'recognize', reqId: 1, overrides: {} }) === true, 'a normal ink request is posted');
+  ok(priNative.ink.facts()?.fingerDefault === false, 'a legacy (pre-CP-04) shell never claims finger-default ink');
   ok(priNative.ink.post({ op: 'recognize', reqId: 2, overrides: {}, expectedAnswer: '42' }) === false,
     'an ink message carrying any non-allowlisted field (an expected answer) is refused');
   const longHybrid = `h3_${Array.from({ length: 12 }, (_, i) => 101 + i).join('_')}`; // a real 12-stroke group id
