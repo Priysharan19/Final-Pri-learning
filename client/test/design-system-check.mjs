@@ -76,6 +76,18 @@ const selectors = [
 for (const selector of selectors) check(`core primitive ${selector} is adopted`, theme.includes(selector), selector);
 
 check('keyboard focus is visible', /:focus-visible\s*\{[^}]*outline:\s*3px\s+solid\s+var\(--focus\)/s.test(theme));
+// The motion system: every animated selector in it is switched off under
+// reduced motion, and it animates transform/opacity only.
+const motion = theme.slice(theme.indexOf("── Motion system"));
+check("the motion system exists", motion.length > 1000 && /--ease-spring:/.test(motion));
+const reduced = (motion.match(/prefers-reduced-motion:\s*reduce\)\s*\{([\s\S]*)\}\s*$/) || [])[1] || "";
+const animated = [...motion.slice(0, motion.indexOf("@media (prefers-reduced-motion")).matchAll(/([^{}\n]+)\{[^}]*\banimation:/g)]
+  .flatMap(m => m[1].split(",").map(x => x.trim().replace(/:nth-child\([^)]*\)/g, "")))
+  .filter(sel => !sel.startsWith("@"));
+const missing = [...new Set(animated)].filter(sel => !reduced.includes(sel.replace(/:not\([^)]*\)/g, "")));
+check("every motion-system animation stops under reduced motion", animated.length > 0 && missing.length === 0, missing.join(", "));
+const frames = [...motion.matchAll(/@keyframes [\w-]+ \{([^\n]*)\}/g)].map(m => m[1]);
+check("motion keyframes animate transform and opacity only", frames.length > 0 && frames.every(k => !/\b(width|height|top|left|margin|padding)\s*:/.test(k)));
 check('reduced motion is globally respected', /prefers-reduced-motion:\s*reduce[\s\S]*animation-duration:\s*0\.001ms\s*!important/s.test(theme));
 check('tablet has a persistent touch navigation contract',
   /pointer:\s*coarse[\s\S]*min-width:\s*761px[\s\S]*max-width:\s*1180px[\s\S]*\.sidebar\s*\{\s*width:\s*178px/s.test(theme));

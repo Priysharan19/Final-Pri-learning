@@ -2167,3 +2167,53 @@ h3, h4 { font-family: var(--font); }
 .logo-name { font-family: var(--font-math); font-size: 19px; font-weight: 400; letter-spacing: 0; color: var(--ink); }
 .logo.logo-lg { gap: 12px; }
 .logo.logo-lg .logo-name { font-size: clamp(32px, 4.4vw, 42px); }
+
+/* ── Motion system ────────────────────────────────────────────────────────
+   Purposeful and quiet: motion explains where something came from or that
+   something happened — never decoration. Transform and opacity only (no
+   layout properties), so it composites at 60fps on a mid-range tablet.
+   Every rule below is switched off under prefers-reduced-motion, delays
+   included, so nothing waits invisibly for an animation that will not run.
+   ───────────────────────────────────────────────────────────────────── */
+:root {
+  --ease-spring: cubic-bezier(0.2, 0.9, 0.25, 1.12);
+  --stagger: 45ms;
+  --motion-reveal: 320ms;
+}
+@keyframes pri-rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes pri-pop { 0% { opacity: 0; transform: scale(0.6); } 70% { opacity: 1; transform: scale(1.08); } 100% { transform: scale(1); } }
+@keyframes pri-nudge { 0%, 100% { transform: none; } 30% { transform: translateX(-3px); } 65% { transform: translateX(2px); } }
+@keyframes pri-fill { from { transform: scale(0.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+/* Page and list reveals: a screen's blocks arrive in reading order. */
+.home-wrap > *, .eval-card > * { animation: pri-rise var(--motion-reveal) var(--ease-emphasized) both; }
+.home-wrap > *:nth-child(2), .eval-card > *:nth-child(2) { animation-delay: calc(var(--stagger) * 1); }
+.home-wrap > *:nth-child(3), .eval-card > *:nth-child(3) { animation-delay: calc(var(--stagger) * 2); }
+.home-wrap > *:nth-child(4), .eval-card > *:nth-child(4) { animation-delay: calc(var(--stagger) * 3); }
+.home-wrap > *:nth-child(n+5), .eval-card > *:nth-child(n+5) { animation-delay: calc(var(--stagger) * 4); }
+
+/* Press physics: a short, firm give under the finger, released on a spring. */
+.btn { transition: background-color var(--motion-fast) var(--ease-standard), border-color var(--motion-fast) var(--ease-standard), color var(--motion-fast) var(--ease-standard), transform 220ms var(--ease-spring); }
+.btn:active:not(:disabled) { transform: scale(0.97); transition-duration: 60ms; }
+
+/* Feedback: the verdict rises into place; a correct mark pops once; a
+   mistake gets one small, kind nudge — never a shake. */
+.verdict { animation: pri-rise 260ms var(--ease-emphasized) both; }
+.verdict-good .verdict-ico { animation: pri-pop 360ms var(--ease-spring) 90ms both; }
+.verdict-bad:not(.verdict-unsure) { animation: pri-rise 260ms var(--ease-emphasized) both, pri-nudge 300ms var(--ease-standard) 260ms; }
+
+/* Progress: this week's studied days fill in, one after another. */
+.week-dot.hit { animation: pri-fill 300ms var(--ease-spring) both; }
+.week-day:nth-child(2) .week-dot.hit { animation-delay: 40ms; }
+.week-day:nth-child(3) .week-dot.hit { animation-delay: 80ms; }
+.week-day:nth-child(4) .week-dot.hit { animation-delay: 120ms; }
+.week-day:nth-child(5) .week-dot.hit { animation-delay: 160ms; }
+.week-day:nth-child(6) .week-dot.hit { animation-delay: 200ms; }
+.week-day:nth-child(7) .week-dot.hit { animation-delay: 240ms; }
+
+@media (prefers-reduced-motion: reduce) {
+  .home-wrap > *, .eval-card > *, .verdict, .verdict-good .verdict-ico, .verdict-bad, .week-dot.hit {
+    animation: none !important;
+  }
+  .btn, .btn:active:not(:disabled) { transform: none; transition: none; }
+}
