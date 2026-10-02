@@ -124,7 +124,7 @@ export const CHUNK_GROUPS = [
 
 // Exported so client/test/install-budget-check.mjs can hold the build to these
 // exact rules rather than to a second copy of them that would drift.
-export const PRECACHE_SKIP = /(^|\/)sw\.js$|(^|\/)release\.json$|(^|\/)\.DS_Store$|\.map$|\.woff$|\.ttf$/;
+export const PRECACHE_SKIP = /(^|\/)sw\.js$|(^|\/)release\.json$|(^|\/)features\.json$|(^|\/)\.DS_Store$|\.map$|\.woff$|\.ttf$/;
 
 export const ON_DEMAND = [
   // ~2.7 MB of renderer and worker, for the student who attaches a scanned PDF.
@@ -221,7 +221,16 @@ export const ON_DEMAND = [
   //     Settings.jsx asks for it only once the signed-in cloud account reports
   //     a support or admin role, and the server authorises every call it makes
   //     regardless.
-  [/(^|\/)(Teach|StaffOperationsPanel)-[^/]*\.js$/, 'staff-only screen']
+  [/(^|\/)(Teach|StaffOperationsPanel)-[^/]*\.js$/, 'staff-only screen'],
+
+  // The placement check: its page, the adaptive engine and the Pri-authored
+  // prerequisite graph. A student opens it once after onboarding and perhaps
+  // again for a retake, so it is fetched on that first open (the page and the
+  // engine are both behind import()) and kept by the runtime rule from then on.
+  // ADR-0001 makes the product online-first, and the one case this shows — a
+  // first open with no connection — is reported by api.js as a chapter that has
+  // not been downloaded yet; practice, which needs none of it, is unaffected.
+  [/(^|\/)(Placement|placement|prerequisites|prerequisiteSkillsHi)-[^/]*\.js$/, 'placement check']
 ];
 
 // The faces the first screens genuinely paint in: the Latin Inter subset for
@@ -326,10 +335,45 @@ function releaseIdentityManifest(identity) {
   };
 }
 
+// Build-time feature flags (client/src/platform/features.js). A production
+// build is OFF unless its environment says PRI_FEATURE_<NAME>=1; development
+// (`vite` serve) is ON. Test harnesses that build set the variable themselves.
+export const FEATURE_FLAGS = Object.freeze(['PLACEMENT', 'TUTOR']);
+export function featureStates(command, env = process.env) {
+  const on = name => (command === 'build' ? env[`PRI_FEATURE_${name}`] === '1' : env[`PRI_FEATURE_${name}`] !== '0');
+  return Object.fromEntries(FEATURE_FLAGS.map(name => [name.toLowerCase(), on(name)]));
+}
+export function featureDefines(command, env = process.env) {
+  return { __PRI_FEATURE_PLACEMENT__: JSON.stringify(featureStates(command, env).placement) };
+}
+
+// The flags a build was made with, written beside it as features.json so the
+// tracked iPad bundles can be checked for a flag-on test build committed by
+// mistake (client/test/ios-bundle-features-check.mjs). Records every known
+// PRI_FEATURE_* flag, including ones whose code lives on other branches.
+function featureManifest(states) {
+  return {
+    name: 'pri-feature-manifest',
+    generateBundle() {
+      this.emitFile({ type: 'asset', fileName: 'features.json', source: `${JSON.stringify(states, null, 2)}\n` });
+    }
+  };
+}
+
 export default defineConfig(({ command }) => {
   const releaseIdentity = resolveReleaseIdentity({ production: command === 'build', env: applyDeploymentPrecedence(process.env) });
+  // The AI tutor ships dark: off in every production build unless it was made
+  // with PRI_FEATURE_TUTOR=1 (staging), on for the development server. See
+  // src/tutor/flag.js and the frozen V1 scope (docs/release/PRI_V1_RELEASE_SCOPE.md).
+  const tutorFlag = String(process.env.PRI_FEATURE_TUTOR || '').trim();
+  const featureTutor = tutorFlag === '1' ? true : tutorFlag === '0' ? false : command !== 'build';
   return {
-    plugins: [react(), releaseIdentityManifest(releaseIdentity), precache()],
+    define: {
+      ...featureDefines(command),
+      __PRI_FEATURE_TUTOR__: JSON.stringify(featureTutor),
+      __PRI_PRODUCTION_BUILD__: JSON.stringify(command === 'build')
+    },
+    plugins: [react(), releaseIdentityManifest(releaseIdentity), featureManifest({ ...featureStates(command), tutor: featureTutor }), precache()],
     server: { port: 5173 },
     build: {
       outDir: 'dist',

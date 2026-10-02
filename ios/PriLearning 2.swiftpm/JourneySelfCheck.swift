@@ -178,6 +178,10 @@ enum JourneySelfCheck {
     }
     const stateTag = () => (q('section[aria-labelledby="cloud-account-title"] .tag') || {}).textContent?.trim() || '';
     const byText = t => [...document.querySelectorAll('button')].find(b => b.offsetParent && b.textContent.trim() === t);
+    // The account panel is briefly busy after sign-in or sync; a click on a
+    // disabled button is silently ignored, so wait until it is enabled.
+    const enabled = t => { const b = byText(t); return b && !b.disabled ? b : null; };
+    const submit = () => { const b = q('#cloud-email')?.form?.querySelector('button[type=submit]'); return b && !b.disabled ? b : null; };
     """
 
     // Sign in through the real Settings UI against a real Pri server (the
@@ -191,12 +195,12 @@ enum JourneySelfCheck {
       setValue(await waitFor(() => q('#cloud-email')), email);
       setValue(q('#cloud-password'), password);
       await sleep(150);
-      q('#cloud-email').form.querySelector('button[type=submit]').click();
-      at = 'connected'; await waitFor(() => stateTag() === 'Connected', 30000);
+      (await waitFor(submit)).click();
+      at = 'connected'; await waitFor(() => stateTag() === 'Connected', 60000);
       return 'connected';
     });
     await step('cloudSync', async () => {
-      (await waitFor(() => byText('Sync now'))).click();
+      (await waitFor(() => enabled('Sync now'), 60000)).click();
       const done = await waitFor(() => { const t = q('section[aria-labelledby="cloud-account-title"]').innerText; const m = t.match(/Sync complete[^\\n]*/); return m && m[0]; }, 60000);
       await sleep(800);
       // Syncing must not drop a connected account back to "sign in" or "checking".
@@ -212,26 +216,26 @@ enum JourneySelfCheck {
     const signIn = async (e, p) => {
       byText('Sign in')?.click();
       setValue(await waitFor(() => q('#cloud-email')), e); setValue(q('#cloud-password'), p); await sleep(150);
-      q('#cloud-email').form.querySelector('button[type=submit]').click();
+      (await waitFor(submit)).click();
     };
     await step('cloudSignUp', async () => {
       at = 'home'; await home(); await settings();
       at = 'state'; await waitFor(() => stateTag() === 'Not connected');
-      (await waitFor(() => byText('Create account'))).click();
+      (await waitFor(() => enabled('Create account'))).click();
       setValue(await waitFor(() => q('#cloud-name')), 'Journey Adult');
       setValue(q('#cloud-email'), newEmail); setValue(q('#cloud-password'), newPassword);
       const boxes = [...q('#cloud-email').form.querySelectorAll('input[type=checkbox]')];
       for (const b of boxes) if (!b.checked) { b.click(); await sleep(120); }
-      q('#cloud-email').form.querySelector('button[type=submit]').click();
-      at = 'connected'; await waitFor(() => stateTag() === 'Connected', 30000);
+      (await waitFor(submit)).click();
+      at = 'connected'; await waitFor(() => stateTag() === 'Connected', 60000);
       return stateTag();
     });
     await step('cloudLogin', async () => {
       // Log out and sign the new account back in through the form.
-      (await waitFor(() => byText('Disconnect'))).click();
+      (await waitFor(() => enabled('Disconnect'), 60000)).click();
       await waitFor(() => stateTag() === 'Not connected', 20000);
       await signIn(newEmail, newPassword);
-      await waitFor(() => stateTag() === 'Connected', 30000);
+      await waitFor(() => stateTag() === 'Connected', 60000);
       return 'signed back in as the new account';
     });
     await step('cloudDeleteAccount', async () => {
@@ -346,11 +350,11 @@ enum JourneySelfCheck {
     private static let cloudRelaunch = cloudHelpers + """
     await step('cloudSessionKept', async () => {
       await home(); await settings();
-      await waitFor(() => stateTag() === 'Connected', 30000);
+      await waitFor(() => stateTag() === 'Connected', 60000);
       return 'connected after relaunch';
     });
     await step('cloudReconnectSync', async () => {
-      (await waitFor(() => byText('Sync now'))).click();
+      (await waitFor(() => enabled('Sync now'), 60000)).click();
       const done = await waitFor(() => { const t = q('section[aria-labelledby="cloud-account-title"]').innerText; const m = t.match(/Sync complete[^\\n]*/); return m && m[0]; }, 60000);
       await sleep(800);
       // Syncing must not drop a connected account back to "sign in" or "checking".
@@ -358,7 +362,7 @@ enum JourneySelfCheck {
       return done;
     });
     await step('cloudDisconnect', async () => {
-      (await waitFor(() => byText('Disconnect'))).click();
+      (await waitFor(() => enabled('Disconnect'), 60000)).click();
       await waitFor(() => stateTag() === 'Not connected', 20000);
       return 'disconnected';
     });

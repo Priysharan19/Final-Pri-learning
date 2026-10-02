@@ -8,7 +8,16 @@
 // 7: sync cursors on Postgres come from pri.sync_cursor_seq and the server can
 //    no longer write pri.sync_cursors (supabase/migrations/20261002000000).
 //    No SQLite structural change: SQLite still allocates from sync_cursors.
-export const SCHEMA_VERSION = 7;
-// Billing 4: Google Play tables (billing_google_accounts, billing_google_purchases,
-//    billing_google_notifications) — supabase/migrations/20261003000000.
-export const BILLING_SCHEMA_VERSION = 4;
+// 8: tutor_cache, the 24-hour AI tutor reply cache
+//    (supabase/migrations/20261002010000_tutor_cache.sql). SQLite creates the
+//    same table in tutor.js, as it does every lazily built table.
+export const SCHEMA_VERSION = 8;
+// Billing 4: billing_payments keeps its row when the account is deleted
+//    (ON DELETE SET NULL, account_id nullable) — the payment ledger is retained
+//    pseudonymously (supabase/migrations/20261003000000, billingSchema.js).
+// Billing 5: per-subscription lifecycle state on billing_subscriptions and the
+//    verified Apple signed-data ledger billing_apple_signed_events
+//    (supabase/migrations/20261003010000_storekit_entitlement_state.sql).
+// Billing 6: Google Play tables (billing_google_accounts, billing_google_purchases,
+//    billing_google_notifications) — supabase/migrations/20261004000000.
+export const BILLING_SCHEMA_VERSION = 6;

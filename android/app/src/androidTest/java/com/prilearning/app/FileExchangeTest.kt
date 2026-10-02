@@ -167,7 +167,7 @@ class FileExchangeTest {
                 document.body.appendChild(i);return true;})()""")
             @Suppress("DEPRECATION")
             val cameras = context.packageManager.queryIntentActivities(Intent(MediaStore.ACTION_IMAGE_CAPTURE), PackageManager.MATCH_DEFAULT_ONLY)
-            var granted = mutableListOf<Boolean>()
+            val granted: MutableList<Boolean> = java.util.Collections.synchronizedList(mutableListOf())
             withChooser({ chooser ->
                 // Play the camera app: write the photo where the shell asked, then return OK.
                 @Suppress("DEPRECATION")
@@ -196,7 +196,11 @@ class FileExchangeTest {
                     assertEquals(MediaStore.ACTION_IMAGE_CAPTURE, capture.action)
                     val out = capture.extra<Uri>(MediaStore.EXTRA_OUTPUT)!!
                     assertEquals("${context.packageName}.files", out.authority)
-                    assertTrue("each camera app was granted write access to the capture URI: $granted", granted.isNotEmpty() && granted.all { it })
+                    // The monitor's result callback (which checks the grants) can run just
+                    // after the chooser is observed; wait for it rather than racing it.
+                    val until = System.currentTimeMillis() + 10_000
+                    while (granted.size < cameras.size && System.currentTimeMillis() < until) Thread.sleep(100)
+                    assertTrue("each camera app was granted write access to the capture URI: $granted", granted.size == cameras.size && granted.all { it })
                     assertEquals("\"photo.jpg|2048\"", waitFor(s, "window.__photo"))
                 }
             }

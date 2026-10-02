@@ -41,6 +41,9 @@ export function normalizeCommercialDisplay(raw) {
   });
 }
 
+/** The longest offline window a server-issued snapshot can carry. */
+export const MAX_OFFLINE_MS = 7 * 24 * 60 * 60 * 1000;
+
 function finiteMs(value) {
   const n = Number(value);
   return Number.isFinite(n) && n > 0 ? Math.floor(n) : null;
@@ -52,8 +55,14 @@ export function normalizeEntitlementSnapshot(raw, now = Date.now()) {
   const plan = source.plan === 'premium' ? 'premium' : 'free';
   const currentPeriodEnd = finiteMs(source.currentPeriodEnd);
   const graceUntil = finiteMs(source.graceUntil);
-  const offlineUntil = finiteMs(source.offlineUntil);
   const issuedAt = finiteMs(source.issuedAt);
+  // The server never issues more than seven days of offline authority
+  // (server/platform/entitlements.js MAX_OFFLINE_MS). A snapshot that claims
+  // more than that past its own issue time is held to the same bound here.
+  const claimedOffline = finiteMs(source.offlineUntil);
+  const offlineUntil = claimedOffline != null && issuedAt != null
+    ? Math.min(claimedOffline, issuedAt + MAX_OFFLINE_MS)
+    : claimedOffline;
   const sourceVersion = Math.max(0, Math.floor(Number(source.sourceVersion) || 0));
   const provider = ['apple', 'google', 'web', 'admin', 'none'].includes(source.provider) ? source.provider : 'none';
 

@@ -10,7 +10,7 @@
 // deployment configuration (PRI_MIN_IOS_BUILD, PRI_MIN_ANDROID_BUILD); unset
 // means no floor. The web app is always current and has none.
 //
-// Always allowed, whatever the build: health, and every route a student needs
+// Always allowed, whatever the build: health and readiness, and every route a student needs
 // to get back into their account and then leave or take their data — sign-in
 // (password or Apple/Google, including the nonce a social re-auth needs),
 // password recovery, email verification, the session check the account screen
@@ -26,6 +26,8 @@ const FLOOR = Object.freeze({ 'ios-native-v1': ['ios', 'PRI_MIN_IOS_BUILD'], 'an
 const EXEMPT = [
   ['GET', /^\/health\/?$/i],
   ['HEAD', /^\/health\/?$/i],
+  ['GET', /^\/ready\/?$/i],
+  ['HEAD', /^\/ready\/?$/i],
   ['POST', /^\/account\/login\/?$/i],
   ['GET', /^\/account\/me\/?$/i],
   ['POST', /^\/account\/logout\/?$/i],

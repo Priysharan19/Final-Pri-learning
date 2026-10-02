@@ -105,10 +105,15 @@ A passkey is a future Pri-owned capability, not a demo blocker.
 
 ## Baseline / diagnostic decision
 
-No learner placement/baseline diagnostic currently feeds authoritative mastery
-state. Handwriting calibration exists, but it is not a learner placement test.
-KALP-03 therefore creates no fake score. A new student enters real Home and then
-real Practice; actual attempts become the evidence that drives learner state.
+Onboarding itself still creates no score. Since the placement-diagnostic
+mission, an India-curriculum student is offered an optional, skippable placement
+check (about 10 questions, at most 12) from the Home screen after onboarding and
+from Progress (`/placement`). It is marked by the deterministic marker, traces
+misses down a Pri-authored prerequisite graph (`client/src/engine/prerequisites.js`,
+not an NCERT/CBSE publication), and its result is stored as diagnostic evidence on
+the profile — never as attempts, ratings or mastery. It only nudges which untouched
+chapter smart practice offers first. Actual practice attempts remain the evidence
+that drives learner state. Handwriting calibration is unrelated to it.
 
 ## Demo / guest / existing profiles
 

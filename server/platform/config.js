@@ -1,5 +1,6 @@
 import { isAbsolute } from 'node:path';
 import { compatibilityConfigProblems } from './clientCompatibility.js';
+import { aiAllowanceConfigProblems } from './aiAllowance.js';
 import { googleBillingConfigStatus } from './googleBilling.js';
 import { spendCeilingMissing } from './spendCeiling.js';
 
@@ -292,6 +293,7 @@ export function platformConfigStatus() {
   }
 
   if (production) missing.push(...compatibilityConfigProblems());
+  if (production) missing.push(...aiAllowanceConfigProblems());
 
   const uniqueMissing = [...new Set(missing)];
   return Object.freeze({

@@ -96,3 +96,21 @@ export function onNativeBillingUpdate(listener) {
   const off = priNative.billing.onTransactionUpdate(listener);
   return () => { localListeners.delete(listener); off(); };
 }
+
+/**
+ * Submit each restored store transaction for server verification, one at a
+ * time. One Apple ID can hold a purchase bound to another Pri account on this
+ * iPad (the server refuses it with APPLE_ACCOUNT_TOKEN_MISMATCH); that refusal
+ * must not stop this account's own transactions from being restored.
+ * Returns how many were accepted and the last refusal, if any.
+ */
+export async function acceptEachTransaction(transactions, accept) {
+  let accepted = 0;
+  let lastError = null;
+  for (const transaction of Array.isArray(transactions) ? transactions : []) {
+    try {
+      if (await accept(transaction)) accepted++;
+    } catch (error) { lastError = error; }
+  }
+  return { accepted, lastError };
+}
