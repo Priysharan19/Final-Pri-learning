@@ -361,6 +361,39 @@
       "bodyLimit": "no-body"
     },
     {
+      "method": "GET",
+      "path": "/v1/account/identity/providers",
+      "auth": "none",
+      "roles": null,
+      "verifiedEmail": false,
+      "guardianConsent": false,
+      "ownership": "public: the web client ids already visible in each provider's authorize URL; no account data",
+      "rateLimits": [],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/account/identity/apple/callback",
+      "auth": "none",
+      "roles": null,
+      "verifiedEmail": false,
+      "guardianConsent": false,
+      "ownership": "stateless: answers Apple's form_post with the callback page (validated fields only, no redirect); reads no session, writes nothing",
+      "rateLimits": [
+        {
+          "key": "oidc-callback",
+          "limit": 60,
+          "windowMs": 900000,
+          "identity": "ip"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "exempt-provider-callback",
+      "bodyLimit": "1mb"
+    },
+    {
       "method": "POST",
       "path": "/v1/account/identity/nonce",
       "auth": "none",
