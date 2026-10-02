@@ -139,7 +139,18 @@ enum JourneySelfCheck {
       if (!/11/.test(got.text || '')) throw new Error('read ' + JSON.stringify(got.text || ''));
       return 'engine=' + got.engine + ' text=' + JSON.stringify(got.text);
     });
-    await step('progress', async () => { await nav('/progress'); await waitFor(() => location.pathname === '/progress' && q('main')); return 'progress shown'; });
+    await step('progress', async () => {
+      // Practice is thinking mode: no navigation of its own. Leave it the way a
+      // student does (its Home control), then open Progress from the shell,
+      // through the compact "More" sheet when the bar has no Progress tab.
+      const exit = q('.ws-exit');
+      if (exit) { exit.click(); await waitFor(() => location.pathname === '/' && q('.home-greet')); }
+      const link = () => [...document.querySelectorAll('a[href="/progress"]')].find(a => a.offsetParent);
+      if (!link()) { q('.mobilenav button[aria-expanded]')?.click(); await waitFor(link); }
+      link().click();
+      await waitFor(() => location.pathname === '/progress' && q('main'));
+      return 'progress shown';
+    });
     await step('persistenceMarker', async () => { localStorage.setItem('pri-journey-marker', 'kept'); return 'written'; });
     return JSON.stringify(steps);
     """
