@@ -129,7 +129,7 @@ export async function signInWithApple({
   Object.assign(body, declarationBody(declaration));
   try {
     const result = await transport.socialSignIn('apple', body);
-    return { status: 'signed-in', account: result?.account || null, created: result?.created === true };
+    return { status: 'signed-in', account: result?.account || null, created: result?.created === true, guardianConsentRequired: result?.guardianConsentRequired === true };
   } catch (error) {
     if (error?.code === CONSENT_DECLARATION_REQUIRED) return { status: 'consent-required', error };
     throw error;

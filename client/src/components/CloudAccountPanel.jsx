@@ -19,6 +19,7 @@ import GooglePlayBilling from './GooglePlayBilling.jsx';
 import CloudAccountSecurity from './CloudAccountSecurity.jsx';
 import { tLater, useT, useTx } from '../i18n/index.js';
 import { priNative } from '../platform/native/index.js';
+import { cloudErrorCopy } from '../platform/cloudErrorCopy.js';
 
 function when(value, t) {
   if (!value) return t('cloud.never');
@@ -264,6 +265,8 @@ export default function CloudAccountPanel() {
       case 'OIDC_PROVIDER_NOT_CONFIGURED': return tLater('cloud.appleNotConfigured');
       case 'IDENTITY_EMAIL_MISMATCH': return tLater('cloud.appleEmailMismatch');
       case 'IDENTITY_ALREADY_LINKED': return tLater('cloud.appleAlreadyLinked');
+      case 'GUARDIAN_EMAIL_SAME_AS_STUDENT': return tLater('cloudError.guardianEmailSameAsStudent');
+      case 'CONSENT_DECLARATION_REQUIRED': return tLater('cloudError.consentDeclarationRequired');
       case 'CRYPTO_UNAVAILABLE': case 'IDENTITY_UNSUPPORTED': return tLater('cloud.appleUnavailableHere');
       default: return err?.message || tLater('cloud.appleSignInFailed');
     }
@@ -304,7 +307,7 @@ export default function CloudAccountPanel() {
       await refreshCloudEntitlement(user.id).catch(() => {});
       setAppleStep(null);
       setForm(v => ({ ...v, password: '' }));
-      setMessage(tLater(outcome.created ? 'cloud.created' : 'cloud.connected'));
+      setMessage(outcome.guardianConsentRequired ? tLater('cloud.guardianPending', { safe: tLater('cloud.guardianPendingSafe') }) : tLater(outcome.created ? 'cloud.created' : 'cloud.connected'));
       await reload();
     } catch (err) {
       setError(err?.code === 'CLOUD_SESSION_UNVERIFIED' ? tLater('cloud.connectFailed') : appleFailureText(err));
@@ -356,7 +359,7 @@ export default function CloudAccountPanel() {
       }
       setForm(v => ({ ...v, password: '' }));
       await reload();
-    } catch (err) { setError(err.message || tLater('cloud.connectFailed')); }
+    } catch (err) { const copy = cloudErrorCopy(err); setError(copy ? tLater(copy.key, copy.vars) : (err.message || tLater('cloud.connectFailed'))); }
     finally { setBusy(''); }
   }
 
@@ -394,7 +397,8 @@ export default function CloudAccountPanel() {
     } catch (err) {
       // CP-11: below the server's minimum shell build. Say what to do; the
       // outbox keeps every change on this device until the app is updated.
-      setError(err?.code === 'CLIENT_UPGRADE_REQUIRED' ? tLater('cloud.upgradeRequired') : (err.message || tLater('cloud.syncFailed')));
+      const copy = err?.code === 'CLIENT_UPGRADE_REQUIRED' ? null : cloudErrorCopy(err);
+      setError(err?.code === 'CLIENT_UPGRADE_REQUIRED' ? tLater('cloud.upgradeRequired') : copy ? tLater(copy.key, copy.vars) : (err.message || tLater('cloud.syncFailed')));
       await reload({ verify: false }).catch(() => {});
     }
     finally { setBusy(''); }
@@ -767,7 +771,9 @@ export default function CloudAccountPanel() {
             </div>
             {status?.lastError === 'CLIENT_UPGRADE_REQUIRED'
               ? <div role="status" data-cloud-upgrade style={{ color: 'var(--bad)', fontSize: 12 }}>{t('cloud.upgradeRequired')}</div>
-              : status?.lastError && <div style={{ color: 'var(--bad)', fontSize: 12 }}>{t('cloud.lastError', { error: status.lastError })}</div>}
+              : status?.lastError === 'SYNC_QUOTA_EXCEEDED'
+                ? <div role="status" style={{ color: 'var(--bad)', fontSize: 12 }}>{t('cloudError.syncQuota')}</div>
+                : status?.lastError && <div style={{ color: 'var(--bad)', fontSize: 12 }}>{t('cloud.lastError', { error: status.lastError })}</div>}
           </div>
           <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
             <button className="btn btn-primary" type="button" onClick={doSync} disabled={!canSync || !!busy}>{busy === 'sync' ? t('cloud.syncing') : t('cloud.syncNow')}</button>

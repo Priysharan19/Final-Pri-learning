@@ -229,7 +229,7 @@ export const ON_DEMAND = [
   //     Settings.jsx asks for it only once the signed-in cloud account reports
   //     a support or admin role, and the server authorises every call it makes
   //     regardless.
-  [/(^|\/)(Teach|StaffOperationsPanel)-[^/]*\.js$/, 'staff-only screen'],
+  [/(^|\/)(Teach|StaffOperationsPanel|MfaPanel)-[^/]*\.js$/, 'staff-only screen'],
 
   // The placement check: its page, the adaptive engine and the Pri-authored
   // prerequisite graph. A student opens it once after onboarding and perhaps

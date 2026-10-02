@@ -163,7 +163,7 @@ ok(!OPTIONAL.some(url => /(^|\/)pdf/.test(url)), 'the PDF renderer stays fully o
 // Staff-only screens and a second language's legal notices are fetched by the
 // people who open them. Warming them would charge every student for a teacher
 // workspace, an admin console and Hindi notices the student never reads.
-const staffOrHindi = firstVisit.filter(url => /(^|\/)(Teach|StaffOperationsPanel|legalHindi)-/.test(url));
+const staffOrHindi = firstVisit.filter(url => /(^|\/)(Teach|StaffOperationsPanel|MfaPanel|legalHindi)-/.test(url));
 eq(staffOrHindi.length, 0, `staff-only screens and the Hindi notices are neither installed nor warmed (${JSON.stringify(staffOrHindi)})`);
 
 // A feature the build reports off is not in the build. The AI tutor ships dark

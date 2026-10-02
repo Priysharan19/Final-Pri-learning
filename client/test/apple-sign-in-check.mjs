@@ -108,7 +108,7 @@ ok(await sha256Hex('raw-nonce-1') === sha('raw-nonce-1'), 'the nonce digest is S
   const transport = fakeTransport({
     signIn: body => {
       if (body.isAdult === undefined) {
-        throw Object.assign(new Error('Tell us about the account holder first.'), { code: CONSENT_DECLARATION_REQUIRED, status: 400 });
+        throw Object.assign(new Error('Tell us about the account holder first.'), { code: CONSENT_DECLARATION_REQUIRED, status: 428 });
       }
       return { account: { id: 'acct_1', email: 'student@example.test', name: 'Asha Rao', role: 'student', emailVerified: true }, created: true };
     }
@@ -130,6 +130,7 @@ ok(await sha256Hex('raw-nonce-1') === sha('raw-nonce-1'), 'the nonce digest is S
     declaration: { year: 10, isAdult: false, guardianName: 'Meena Rao', guardianEmail: 'meena@example.test' }
   });
   ok(second.status === 'signed-in' && second.created === true && second.account?.id === 'acct_1', 'the retry with the declaration creates the account and signs in');
+  ok(second.guardianConsentRequired === false, 'the field the server sets for a child account is surfaced (false for an adult)');
   ok(transport.calls.map(c => c[0]).join('>') === 'nonce>sign-in>nonce>sign-in', 'the retry asked for a fresh nonce (the first was spent) before the sheet');
   const sheets = host.sent.filter(e => e.cap === 'identity' && e.op === 'appleSignIn');
   ok(sheets.length === 2 && sheets[1].payload.nonce === sha('raw-nonce-2'), 'and opened the sheet again with the new digest');

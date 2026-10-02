@@ -220,6 +220,7 @@ export async function cloudRequest(path, {
       err.status = status || undefined;
       err.code = data?.error?.code || 'CLOUD_REQUEST_FAILED';
       if (Number.isFinite(Number(data?.error?.resetAt))) err.resetAt = Number(data.error.resetAt);
+      if (data?.error?.quota && typeof data.error.quota === 'object') err.quota = data.error.quota;
       err.requestId = result?.requestId || rid;
       throw err;
     }
@@ -265,6 +266,7 @@ export async function cloudRequest(path, {
       err.status = response.status;
       err.code = data?.error?.code || 'CLOUD_REQUEST_FAILED';
       if (Number.isFinite(Number(data?.error?.resetAt))) err.resetAt = Number(data.error.resetAt);
+      if (data?.error?.quota && typeof data.error.quota === 'object') err.quota = data.error.quota;
       err.requestId = response.headers.get('x-pri-request-id') || rid;
       throw err;
     }
@@ -365,6 +367,7 @@ export async function cloudStreamRequest(path, { body, onEvent, timeoutMs = 45_0
       err.status = response.status;
       err.code = data?.error?.code || 'CLOUD_REQUEST_FAILED';
       if (Number.isFinite(Number(data?.error?.resetAt))) err.resetAt = Number(data.error.resetAt);
+      if (data?.error?.quota && typeof data.error.quota === 'object') err.quota = data.error.quota;
       err.requestId = response.headers.get('x-pri-request-id') || rid;
       throw err;
     }
@@ -398,6 +401,12 @@ export const cloud = Object.freeze({
   guardianConfirm: token => cloudRequest('/v1/account/guardian/confirm', { method: 'POST', body: { token } }),
   guardianWithdraw: token => cloudRequest('/v1/account/guardian/withdraw', { method: 'POST', body: { token } }),
   guardianState: () => cloudRequest('/v1/account/guardian/state'),
+  // Staff second factor (server/platform/mfa.js). The secret and the recovery
+  // codes pass through here once, to the panel, and are never persisted.
+  mfaStatus: () => cloudRequest('/v1/account/mfa/status'),
+  mfaEnrol: () => cloudRequest('/v1/account/mfa/totp/enrol', { method: 'POST', body: {} }),
+  mfaConfirm: code => cloudRequest('/v1/account/mfa/totp/confirm', { method: 'POST', body: { code } }),
+  mfaVerify: body => cloudRequest('/v1/account/mfa/verify', { method: 'POST', body }),
   login: body => cloudRequest('/v1/account/login', { method: 'POST', body }),
   logout: () => cloudRequest('/v1/account/logout', { method: 'POST', body: {} }),
   requestEmailVerification: () => cloudRequest('/v1/account/email/verification-request', { method: 'POST', body: {} }),
