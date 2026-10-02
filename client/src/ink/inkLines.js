@@ -44,3 +44,29 @@ export function segmentInkLines(strokes) {
     strokeIdxs: l.strokeIdxs.sort((a, b) => a - b)
   }));
 }
+
+const tokens = text => String(text || '').replace(/\s+/g, '').length;
+
+/**
+ * Whether server line i can honestly be drawn on written line i. The counts
+ * must agree, and each line's share of the writing must roughly match its
+ * share of the reading: a line read as "x = 4" should not be the widest line
+ * on the page when another is read as "2x + 3 = 11". Lines are compared by
+ * width relative to the page (ink width per character is the student's own
+ * hand, so only proportions are trusted), within a factor of 3.
+ */
+export function plausibleLineMatch(readLines, segments) {
+  const read = Array.isArray(readLines) ? readLines : [];
+  const segs = Array.isArray(segments) ? segments : [];
+  if (!read.length || read.length !== segs.length) return false;
+  if (read.length === 1) return tokens(read[0]?.text) > 0;
+  const lens = read.map(l => tokens(l?.text));
+  if (lens.some(n => n === 0)) return false;
+  const widths = segs.map(sg => Math.max(1, sg.box?.w || 0));
+  const totalLen = lens.reduce((a, b) => a + b, 0);
+  const totalW = widths.reduce((a, b) => a + b, 0);
+  return lens.every((n, i) => {
+    const ratio = (widths[i] / totalW) / (n / totalLen);
+    return ratio >= 1 / 3 && ratio <= 3;
+  });
+}

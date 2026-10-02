@@ -24,10 +24,10 @@ import InkCanvas from './InkCanvas.jsx';
 import NativeInkCanvas from './NativeInkCanvas.jsx';
 import { nativeInkAvailable } from './native.js';
 import { exprToLatex } from './inkLatex.js';
-import { cloudReadingEnabled, inkReadingBlockedKey, readWithCloud, recordLocalHandwritingDiagnostics, toReading } from './cloudReader.js';
+import { cloudReadingEnabled, inkReadingBlockedKey, retryDelayMs, readWithCloud, recordLocalHandwritingDiagnostics, toReading } from './cloudReader.js';
 import { useApp } from '../App.jsx';
 import { feedbackGeometry } from './feedbackGeometry.js';
-import { segmentInkLines } from './inkLines.js';
+import { plausibleLineMatch, segmentInkLines } from './inkLines.js';
 import { MathText } from '../lib/latex.jsx';
 import { currentReleaseIdentity } from '../platform/releaseIdentity.js';
 import { onCloudSessionChange } from '../platform/cloudSession.js';
@@ -46,8 +46,7 @@ const inkDiagnosticsVisible = () => {
 /** How long the page must be still before it is worth sending. */
 const SETTLE_MS = 1100;
 /** A reader that did not answer is tried again on its own, a few times. */
-const RETRY_MS = 20_000;
-const MAX_RETRIES = 3;
+// A focus or a return to the tab also tries again at once (see below).
 
 const EMPTY_READING = { lines: [], text: '' };
 const strokeSignature = strokes => `${strokes.length}:${strokes.reduce((n, st) => n + (st?.points?.length || 0), 0)}`;
@@ -123,6 +122,16 @@ export default function InkAnswer({ onRecognized, onStrokes = null, initialStrok
 
   const clearRetry = () => { if (retryRef.current) { clearTimeout(retryRef.current); retryRef.current = null; } };
 
+  const scheduleRetry = (seq) => {
+    clearRetry();
+    const delay = retryDelayMs(retriesRef.current);
+    retriesRef.current += 1;
+    retryRef.current = setTimeout(() => {
+      if (seq === readSeqRef.current && !disabledRef.current) sendToReaderRef.current?.(strokesRef.current, seq);
+    }, delay);
+  };
+  const sendToReaderRef = useRef(null);
+
   /** Send the page to the server reader. Its reading is the only reading. */
   const sendToReader = useCallback((strokes, seq) => {
     if (disabledRef.current) return;
@@ -151,6 +160,9 @@ export default function InkAnswer({ onRecognized, onStrokes = null, initialStrok
       // the ✓/✗ can be drawn on the student's own lines when the counts agree.
       let geometry = null;
       try { geometry = { lines: segmentInkLines(strokes) }; } catch { geometry = null; }
+      // Only placed on the ink when each read line plausibly IS that written
+      // line; otherwise the ✓/✗ stay in the panel, never on a guessed line.
+      if (geometry && !plausibleLineMatch(outcome?.transcription?.lines, geometry.lines)) geometry = null;
       const reading = outcome?.transcription ? toReading(outcome.transcription, geometry) : null;
       if (reading) {
         retriesRef.current = 0;
@@ -165,20 +177,16 @@ export default function InkAnswer({ onRecognized, onStrokes = null, initialStrok
       sentRef.current = null;
       queuedRef.current = true;
       setStatus({ kind: 'waiting', key: inkReadingBlockedKey(who, { outcome }) });
-      clearRetry();
-      if (retriesRef.current < MAX_RETRIES) {
-        retriesRef.current += 1;
-        retryRef.current = setTimeout(() => {
-          if (seq === readSeqRef.current && !disabledRef.current) sendToReader(strokesRef.current, seq);
-        }, RETRY_MS);
-      }
+      scheduleRetry(seq);
     }).catch(() => {
       if (seq !== readSeqRef.current || disabledRef.current) return;
       sentRef.current = null;
       queuedRef.current = true;
       setStatus({ kind: 'waiting', key: inkReadingBlockedKey(who) });
+      scheduleRetry(seq);
     });
   }, [publish]);
+  sendToReaderRef.current = sendToReader;
 
   const scheduleRead = useCallback((strokes, { immediate = false } = {}) => {
     const seq = ++readSeqRef.current;
@@ -212,10 +220,19 @@ export default function InkAnswer({ onRecognized, onStrokes = null, initialStrok
     };
     const stopSession = onCloudSessionChange(retry);
     const onOnline = () => retry();
-    if (typeof window !== 'undefined') window.addEventListener?.('online', onOnline);
+    const onVisible = () => { if (typeof document === 'undefined' || document.visibilityState !== 'hidden') retry(); };
+    if (typeof window !== 'undefined') {
+      window.addEventListener?.('online', onOnline);
+      window.addEventListener?.('focus', onVisible);
+    }
+    if (typeof document !== 'undefined') document.addEventListener?.('visibilitychange', onVisible);
     return () => {
       try { stopSession(); } catch { /* gone */ }
-      if (typeof window !== 'undefined') window.removeEventListener?.('online', onOnline);
+      if (typeof window !== 'undefined') {
+        window.removeEventListener?.('online', onOnline);
+        window.removeEventListener?.('focus', onVisible);
+      }
+      if (typeof document !== 'undefined') document.removeEventListener?.('visibilitychange', onVisible);
     };
   }, [status, scheduleRead]);
 

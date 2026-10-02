@@ -743,10 +743,13 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const autoMarkedRef = useRef(null);
   useEffect(() => {
     if (!writeMode || !inkResult?.afterWait || !inkResult.readKey) return;
-    if (autoMarkedRef.current === inkResult.readKey || resolved || busy) return;
+    if (autoMarkedRef.current === inkResult.readKey || resolved) return;
+    // Busy (a submit or a hint in flight): wait — the effect runs again when
+    // the card is idle, and the reading is marked then, not dropped.
+    if (busy || inFlightRef.current) return;
     autoMarkedRef.current = inkResult.readKey;
     submit();
-  }, [inkResult]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [inkResult, busy]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const onInkStrokes = useCallback((strokes) => {
     if (inFlightRef.current || attemptRef.current) return;

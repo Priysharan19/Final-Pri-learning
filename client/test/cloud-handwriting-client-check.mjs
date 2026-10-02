@@ -16,7 +16,8 @@
 import { inkBounds, rasterScale, paintInk, rasterizeInk, MAX_IMAGE_BYTES } from '../src/ink/cloudRaster.js';
 import { cloudAllowanceExhausted, clearCloudAllowanceExhausted, inkReadingBlockedKey } from '../src/ink/cloudReader.js';
 import { readFileSync } from 'node:fs';
-import { segmentInkLines } from '../src/ink/inkLines.js';
+import { plausibleLineMatch, segmentInkLines } from '../src/ink/inkLines.js';
+import { retryDelayMs, RETRY_CAP_MS } from '../src/ink/cloudReader.js';
 import { announceEntitlementChange } from '../src/platform/cloudSession.js';
 import { UNAVAILABLE_READINESS_TTL_MS, cloudHandwritingReadiness, cloudReadingEnabled, handwritingDiagnostics, readWithCloud, recordLocalHandwritingDiagnostics, shouldSupersede, toReading } from '../src/ink/cloudReader.js';
 
@@ -321,6 +322,26 @@ ok(!shouldSupersede(null, local), 'no reading, no change');
   ok(/segmentInkLines\(strokes\)/.test(inkSrc) && /ink-linebox/.test(inkSrc) && /ink\.mistakeHere/.test(inkSrc), 'the ink surface draws line boxes and the mistake note again');
   const qc = readFileSync(new URL('../src/components/QuestionCard.jsx', import.meta.url), 'utf8');
   ok(/inkResult\?\.afterWait/.test(qc) && /autoMarkedRef\.current === inkResult\.readKey/.test(qc), 'ink read after waiting is marked once, by its reading key');
+}
+
+// ── Review follow-ups: plausible placement, unbounded backoff, deferred mark ─
+{
+  const box = (w) => ({ box: { x: 0, y: 0, w, h: 40 } });
+  const L = (...t) => t.map(text => ({ text }));
+  ok(plausibleLineMatch(L('2x+3=11', '2x=8', 'x=4'), [box(280), box(160), box(120)]), 'widths in proportion to the reading: drawn on the ink');
+  ok(!plausibleLineMatch(L('2x+3=11', 'x=4'), [box(40), box(400)]), 'a short read line on the widest ink line: panel only');
+  ok(!plausibleLineMatch(L('2x+3=11', 'x=4'), [box(200)]), 'counts differ: panel only');
+  ok(!plausibleLineMatch(L('', 'x=4'), [box(100), box(100)]), 'an empty read line is never placed');
+  ok(plausibleLineMatch(L('x=4'), [box(500)]), 'a single line is its own line');
+  eq([0, 1, 2, 3].map(retryDelayMs), [20000, 40000, 80000, 160000], 'retries back off by doubling');
+  ok(retryDelayMs(4) === RETRY_CAP_MS && retryDelayMs(50) === RETRY_CAP_MS, 'and keep going at the cap rather than stopping');
+  const ink = readFileSync(new URL('../src/ink/InkAnswer.jsx', import.meta.url), 'utf8');
+  ok(!/MAX_RETRIES/.test(ink) && /scheduleRetry\(seq\)/.test(ink), 'the ink surface has no retry ceiling');
+  ok(/'visibilitychange'/.test(ink) && /'focus'/.test(ink), 'and retries on focus and on a return to the tab');
+  ok(/plausibleLineMatch\(/.test(ink), 'and only places a reading on the ink when it plausibly matches');
+  const qc = readFileSync(new URL('../src/components/QuestionCard.jsx', import.meta.url), 'utf8');
+  ok(/if \(busy \|\| inFlightRef\.current\) return;\s*autoMarkedRef\.current = inkResult\.readKey;/.test(qc) && /\}, \[inkResult, busy\]\)/.test(qc),
+    'a waited-for reading that lands while the card is busy is marked when it is idle, not dropped');
 }
 
 console.log(failures.length

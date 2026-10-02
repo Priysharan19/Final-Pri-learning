@@ -153,6 +153,23 @@ export const flow = {
     await check('offline, nothing is read or offered for marking, and the student is told why',
       await page.locator('.ink-preview').count() === 0 && /needs a connection/.test(offlineNote),
       `status ${JSON.stringify(offlineNote)}; ${await page.locator('.ink-line').count()} lines shown`);
+    // The connection flaps before it settles: every return re-reads the kept
+    // page, but the answer must be submitted for marking exactly once.
+    const attemptCount = () => page.evaluate(() => new Promise(ok => {
+      const r = indexedDB.open('pri-learning');
+      r.onsuccess = () => { const db = r.result; const c = db.transaction('attempts').objectStore('attempts').count();
+        c.onsuccess = () => { db.close(); ok(c.result); }; c.onerror = () => { db.close(); ok(-1); }; };
+      r.onerror = () => ok(-1);
+    }));
+    const attemptsBefore = await attemptCount();
+    for (let flap = 0; flap < 4; flap++) {
+      await ctx.setOffline(false);
+      await page.evaluate(() => window.dispatchEvent(new Event('online')));
+      await page.waitForTimeout(40 + flap * 30);
+      await ctx.setOffline(true);
+      await page.evaluate(() => window.dispatchEvent(new Event('offline')));
+      await page.waitForTimeout(60);
+    }
     await ctx.setOffline(false);
     await page.evaluate(() => window.dispatchEvent(new Event('online')));
     await readingArrives(page);
@@ -182,6 +199,10 @@ export const flow = {
       }
     });
     await check('back online, the kept handwriting is marked without another tap', await page.locator('.eval-card').count() === 1);
+    await page.waitForTimeout(2500);   // anything still queued would land now
+    const attemptsAfter = await attemptCount();
+    await check('a flapping connection marks the kept answer exactly once',
+      attemptsBefore >= 0 && attemptsAfter - attemptsBefore === 1, `attempts ${attemptsBefore} → ${attemptsAfter}`);
     const marked = (await page.locator('.eval-card').innerText()).replace(/\s+/g, ' ');
     const marks = (await page.locator('.eval-marks').innerText()).replace(/\s+/g, ' ').trim();
     await check('the handwritten answer is marked correct — every mark awarded',
