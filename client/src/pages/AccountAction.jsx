@@ -36,7 +36,22 @@ export default function AccountAction({ actionData }) {
       if (!alive) return;
       setState('done');
       setMessage(tLater('accountAction.emailVerified'));
-    }).catch(error => {
+    }).catch(async error => {
+      // A spent link is answered 200 { alreadyVerified } by the server when its
+      // own account is verified (mail scanners open links first). If the link
+      // is refused anyway but this browser is signed in to a verified account,
+      // the person's email is verified: say so rather than show an error.
+      if (error?.code === 'TOKEN_INVALID') {
+        const signedInVerified = await cloud.me()
+          .then(data => data?.account?.emailVerified === true)
+          .catch(() => false);
+        if (!alive) return;
+        if (signedInVerified) {
+          setState('done');
+          setMessage(tLater('accountAction.emailVerified'));
+          return;
+        }
+      }
       if (!alive) return;
       setState('error');
       setMessage(error?.code === 'TOKEN_INVALID'

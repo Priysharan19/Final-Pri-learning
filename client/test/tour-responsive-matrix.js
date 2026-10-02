@@ -155,6 +155,12 @@ export const flow = {
       let drew = false;
       if (ink) {
         await canvas.scrollIntoViewIfNeeded();
+        // The committed-ink canvas is sized once the ink engine is up; on a slow
+        // runner that is after the tab switch settles. Wait for it, not a clock.
+        await page.waitForFunction(() => {
+          const c = document.querySelector('.editor-shell .ink-canvas-base') || document.querySelector('.ink-canvas-base');
+          return !!c && c.width > 0;
+        }, null, { timeout: 15000 }).catch(() => null);
         const before = await inkBox();
         const box = await canvas.boundingBox();
         if (box && before?.empty) {
@@ -164,8 +170,13 @@ export const flow = {
             for (let i = 1; i <= 8; i++) await page.mouse.move(box.x + box.width * (x0 + (x1 - x0) * i / 8), box.y + box.height * y + (i % 2 ? 6 : -6));
             await page.mouse.up();
           }
-          await page.waitForTimeout(150);
-          const after = await inkBox();
+          // Strokes commit to the base canvas asynchronously: poll until ink
+          // appears (or 5s pass), then assert where it landed — same bounds.
+          let after = await inkBox();
+          for (let waited = 0; after?.empty && waited < 5000; waited += 100) {
+            await page.waitForTimeout(100);
+            after = await inkBox();
+          }
           const sx = after ? after.w / box.width : 1;
           drew = !!after && !after.empty &&
             after.minX >= box.width * 0.15 * sx && after.maxX <= box.width * 0.65 * sx &&
