@@ -1,6 +1,7 @@
-# Android shell (CP-06): Gradle build, lint, JVM unit tests, embedded-web parity,
+# Android shell (CP-06/CP-07): Gradle build, lint, JVM unit tests, embedded-web parity,
 # the fail-closed floor screen on the minimum API, and the shell journey (with a
-# real process death) on a floor-meeting older API and the current API, phone + tablet.
+# real process death) on a floor-meeting older API and the current API, phone + tablet,
+# then the cloud journey through the real UI against a real Pri server (CP-07).
 # SYNTHETIC / EMULATOR evidence only — never a physical-device result.
 name: Android Shell
 
@@ -12,6 +13,11 @@ on:
       - 'client/src/platform/**'
       - 'client/src/main.jsx'
       - 'scripts/sync-android.mjs'
+      - 'server/platform/**'
+      - 'server/index.js'
+      - 'server/app.js'
+      - 'server/package-lock.json'
+      - 'client/src/lib/files.js'
       - '.github/workflows/android-shell.yml'
   push:
     branches: [main]
@@ -87,8 +93,8 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - name: Build the shared web product
-        run: npm ci --prefix client && npm run build
+      - name: Build the shared web product and install the server
+        run: npm ci --prefix client && npm run build && npm ci --prefix server
       - name: Build the app and the instrumented tests
         working-directory: android
         run: ./gradlew --no-daemon assembleDebug assembleDebugAndroidTest
@@ -97,7 +103,7 @@ jobs:
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
-      - name: Emulator journey with a real process death between runs
+      - name: Emulator journey (real process death) and cloud journey against the real Pri server
         # ReactiveCircus/android-emulator-runner v2.38.0, pinned to its commit.
         uses: ReactiveCircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d
         with:
@@ -108,7 +114,8 @@ jobs:
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
           working-directory: android
-          script: ./scripts/run-instrumented.sh ${{ matrix.expect }}
+          # One line: the runner executes each script line in its own shell.
+          script: node scripts/cloud-fixture-server.mjs --out /tmp/pri-cloud.env && set -a && . /tmp/pri-cloud.env && set +a && { ./scripts/run-instrumented.sh ${{ matrix.expect }}; rc=$?; kill "$PRI_CLOUD_SERVER_PID" 2>/dev/null; exit $rc; }
       - uses: actions/upload-artifact@v4
         if: always()
         with:
