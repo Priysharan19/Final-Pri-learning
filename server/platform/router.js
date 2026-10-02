@@ -163,11 +163,14 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
   }));
   router.use('/account/identity', createIdentityRouter(db));
   // ── Nothing of a child's leaves or arrives without their guardian ────────
-  // These four are the only routes that move a student's own work off the
-  // device or take money for it. Practice, marking and handwriting all keep
-  // working while consent is pending, because they never left the device in the
-  // first place — which is what makes this a gate on syncing rather than a wall
-  // in front of the app.
+  // Every route that moves a student's own data off the device, links them to
+  // another person (a class, a teacher), or takes money for it is gated. Until
+  // a guardian confirms, a child's account can sign in, verify, export, delete
+  // and read its own consent state — and nothing else. Practice, marking and
+  // on-device handwriting all keep working while consent is pending, because
+  // they never needed the server — which is what makes this a gate on the cloud
+  // rather than a wall in front of the app. Adult accounts have no consent row
+  // and pass straight through (guardianConsent.js requireGuardianConsent).
   router.use('/sync', requireGuardianConsent(db), createSyncRouter(db));
   router.use('/entitlements', createEntitlementRouter(db));
   router.use('/billing', requireGuardianConsent(db), createBillingRouter(db, {
@@ -176,16 +179,16 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
     native: billingNative,
     lifecycle: billingLifecycle
   }));
-  router.use('/classes', createClassRouter(db));
-  router.use('/assignments', createAssignmentExecutionRouter(db));
+  router.use('/classes', requireGuardianConsent(db), createClassRouter(db));
+  router.use('/assignments', requireGuardianConsent(db), createAssignmentExecutionRouter(db));
   router.use('/content', createContentRouter(db));
-  router.use('/reports', createReportRouter(db));
+  router.use('/reports', requireGuardianConsent(db), createReportRouter(db));
   router.use('/handwriting', requireGuardianConsent(db), createHandwritingRouter(db));
   router.use('/working', requireGuardianConsent(db), createWorkingRouter(db));
   // The tutor sends a student's own work lines to the model provider, so it
   // sits behind the same guardian gate as the working check.
   router.use('/tutor', requireGuardianConsent(db), createTutorRouter(db, tutor));
-  router.use('/telemetry', createTelemetryRouter(db));
+  router.use('/telemetry', requireGuardianConsent(db), createTelemetryRouter(db));
   router.use('/admin', createAdminRouter(db));
 
   router.use((req, res) => res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Platform endpoint not found.' } }));

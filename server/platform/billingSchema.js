@@ -11,6 +11,51 @@ function addColumnIfMissing(db, table, column, ddl) {
 }
 
 /**
+ * Billing schema v4 — a payment outlives the account that made it.
+ *
+ * v3 deleted every billing_payments row with its account (ON DELETE CASCADE),
+ * so deleting an account destroyed the record of money actually taken: a
+ * refund arriving afterwards had no payment to match, and the business lost
+ * the ledger it must keep for tax and accounting. v4 keeps the row and drops
+ * only the link (ON DELETE SET NULL). What remains is the provider's own ids,
+ * an amount, a currency, a status and timestamps — pseudonymous, with no name,
+ * email or account id (docs/privacy/data-retention.md).
+ *
+ * SQLite cannot alter a foreign key, so a v3 table is rebuilt in one
+ * transaction with every row copied. No table references billing_payments, so
+ * the rebuild cannot cascade into anything else.
+ */
+function retainPaymentsAfterAccountDeletion(db) {
+  const link = db.pragma("foreign_key_list('billing_payments')").find(row => row.from === 'account_id' && row.table === 'accounts');
+  if (!link || String(link.on_delete).toUpperCase() === 'SET NULL') return false;
+  db.transaction(() => {
+    db.exec(`
+      DROP TABLE IF EXISTS billing_payments_v4;
+      CREATE TABLE billing_payments_v4 (
+        provider TEXT NOT NULL CHECK(provider IN ('apple','google','web')),
+        payment_id TEXT NOT NULL,
+        provider_subscription_id TEXT NOT NULL,
+        account_id TEXT REFERENCES accounts(id) ON DELETE SET NULL,
+        amount INTEGER NOT NULL DEFAULT 0,
+        currency TEXT,
+        status TEXT,
+        captured_at INTEGER NOT NULL,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        PRIMARY KEY(provider, payment_id)
+      );
+      INSERT INTO billing_payments_v4(provider,payment_id,provider_subscription_id,account_id,amount,currency,status,captured_at,created_at,updated_at)
+        SELECT provider,payment_id,provider_subscription_id,account_id,amount,currency,status,captured_at,created_at,updated_at FROM billing_payments;
+      DROP TABLE billing_payments;
+      ALTER TABLE billing_payments_v4 RENAME TO billing_payments;
+      CREATE INDEX IF NOT EXISTS idx_billing_payments_subscription
+        ON billing_payments(provider, provider_subscription_id, captured_at);
+    `);
+  })();
+  return true;
+}
+
+/**
  * Billing is an optional deployment subsystem, so its schema is versioned
  * independently from the core account/sync database. The migration is
  * idempotent and runs before any provider adapter is constructed.
@@ -74,7 +119,7 @@ export function ensureBillingSchema(db) {
       provider TEXT NOT NULL CHECK(provider IN ('apple','google','web')),
       payment_id TEXT NOT NULL,
       provider_subscription_id TEXT NOT NULL,
-      account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+      account_id TEXT REFERENCES accounts(id) ON DELETE SET NULL,
       amount INTEGER NOT NULL DEFAULT 0,
       currency TEXT,
       status TEXT,
@@ -99,7 +144,9 @@ export function ensureBillingSchema(db) {
     CREATE INDEX IF NOT EXISTS idx_billing_refunds_payment ON billing_refunds(provider, payment_id);
   `);
 
-  // Billing schema v4 (CP-08): Google Play. The obfuscated account id is the
+  retainPaymentsAfterAccountDeletion(db);
+
+  // Billing schema v5 (CP-08): Google Play. The obfuscated account id is the
   // opaque join Play echoes back (never an email or Pri account id); purchase
   // tokens are bound to exactly one account, and a token replaced through
   // linkedPurchaseToken is marked superseded. RTDN pushes are queued and
