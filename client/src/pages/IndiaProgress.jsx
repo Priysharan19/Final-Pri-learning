@@ -115,11 +115,12 @@ export default function IndiaProgress() {
                     {unit.name}
                     <span className="muted" style={{ display: 'block', fontSize: 12, marginTop: 2 }}>
                       {unit.covered
-                        ? t('progress.unitCovered', { count: unit.attempts, n: unit.attempts, expected: unit.expected, marks: unit.marks })
+                        ? t('progress.unitCovered', { count: unit.attempts, n: unit.attempts, expected: Math.round(unit.expected), marks: unit.marks })
                         : t('progress.unitUntouched', { marks: unit.marks })}
                     </span>
                   </span>
-                  <span className="set-v">+{unit.atStake}</span>
+                  {/* Whole marks: a tenth of a mark is precision the evidence does not have. */}
+                  <span className="set-v">+{Math.round(unit.atStake)}</span>
                 </div>
               ))}
               <p className="muted" style={{ fontSize: 12, marginTop: 8 }}>{t('progress.rankedByMarks')}</p>

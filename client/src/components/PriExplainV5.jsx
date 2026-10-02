@@ -11,6 +11,9 @@ import { VisualBlock } from './PriExplainVisuals.jsx';
 import './PriExplainV5.css';
 import './PriExplainV7.css';
 import './PriExplainV8.css';
+// Loaded last: re-expresses the player in the product's one visual system.
+import './PriExplainInstrument.css';
+import Icon from './Icon.jsx';
 
 const SOLUTION_EVENT = 'pri:worked-solution';
 const ATTEMPT_EVENT = 'pri:attempt-feedback';
@@ -400,16 +403,13 @@ export default function PriExplainV5({ questionId, questionPrompt, questionFigur
 
       {open && (
         <div className="pri-explain-backdrop no-print" role="presentation" onMouseDown={event => event.target === event.currentTarget && close()}>
-          <section className="pri-explain-dialog" role="dialog" aria-modal="true" aria-label={t('explain.dialogLabel')} tabIndex={-1} ref={dialogRef}>
+          <section className="pri-explain-dialog" data-explain-engine="v8-adaptive" role="dialog" aria-modal="true" aria-label={t('explain.dialogLabel')} tabIndex={-1} ref={dialogRef}>
             <header className="pri-explain-head">
               <div>
                 <div className="pri-explain-kicker">{t('explain.kicker')}</div>
                 <h2>{t('explain.title')}</h2>
-                {!!visualKinds.length && <div className="pri-explain-capabilities" aria-label={t('explain.capabilities')}>
-                  {visualKinds.map(kind => <span key={kind}>{visualName(kind)}</span>)}
-                </div>}
               </div>
-              <button className="btn btn-quiet btn-sm" type="button" onClick={close} aria-label={t('explain.close')}>✕</button>
+              <button className="icon-btn" type="button" onClick={close} aria-label={t('explain.close')}><Icon name="close" /></button>
             </header>
 
             <div className="pri-explain-question">

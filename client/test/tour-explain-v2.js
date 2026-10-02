@@ -44,8 +44,10 @@ export const flow = {
     await page.waitForSelector('.pri-explain-dialog', { timeout: 10000 });
 
     await check('the V8 adaptive board player opens',
-      /V8 adaptive teacher/i.test(await page.locator('.pri-explain-kicker').innerText()),
-      `kicker reads ${JSON.stringify(await page.locator('.pri-explain-kicker').innerText())}`);
+      // The engine version is an attribute, not chrome a student has to read.
+      await page.locator('.pri-explain-dialog').getAttribute('data-explain-engine') === 'v8-adaptive'
+        && /Pri Explain/.test(await page.locator('.pri-explain-kicker').innerText()),
+      `engine ${await page.locator('.pri-explain-dialog').getAttribute('data-explain-engine')}, kicker reads ${JSON.stringify(await page.locator('.pri-explain-kicker').innerText())}`);
 
     const adaptive = page.locator('.pri-explain-adaptive');
     await check('a real wrong attempt switches the teaching plan to Targeted recovery',

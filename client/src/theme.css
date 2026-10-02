@@ -1861,6 +1861,7 @@ h3 { font-size: 16.5px; line-height: 1.3; }
 
 /* ── Progress: one reading column, one sheet ──────────────────────────────── */
 .pg { width: min(900px, 100%); margin: 0 auto; display: grid; gap: 36px; }
+.pg > * { min-width: 0; }
 .pg-head h1 { font: var(--type-title); letter-spacing: -0.015em; }
 .pg-head .sub { margin: 6px 0 0; max-width: var(--reading-width); }
 .pg-sheet { background: var(--surface); border: 1px solid var(--hairline); border-radius: var(--radius-lg); padding: 24px 26px; }
@@ -1871,7 +1872,8 @@ h3 { font-size: 16.5px; line-height: 1.3; }
 .pg-coverage-note { font-size: 12.5px; margin-top: 6px; font-variant-numeric: tabular-nums; }
 .pg-priorities { margin-top: 22px; }
 .pg-priorities .sc-label { margin-bottom: 2px; }
-.pg-priorities .set-v { font-variant-numeric: tabular-nums; color: var(--ink); }
+.pg-priorities .set-k { display: block; flex: 1; min-width: 0; }
+.pg-priorities .set-v { font-variant-numeric: tabular-nums; color: var(--ink); white-space: nowrap; }
 /* Facts, not metric cards: four figures on one ruled line. */
 .pg-facts { gap: 0; border-top: 1px solid var(--hairline); border-bottom: 1px solid var(--hairline); }
 .pg-facts .card { background: none; border: 0; border-radius: 0; box-shadow: none; padding: 16px 18px 16px 0; }
@@ -1894,6 +1896,14 @@ h3 { font-size: 16.5px; line-height: 1.3; }
   .pg-facts { grid-template-columns: 1fr 1fr; }
   .pg-facts .card:nth-child(3) { border-left: 0; padding-left: 0; }
   .pg-facts .card:nth-child(n+3) { border-top: 1px solid var(--hairline); }
+  .pg-facts .card { min-width: 0; }
+}
+/* On a phone the chapter name needs the width more than a second count does:
+   attempts and accuracy stay, the raw correct count yields. */
+@media (max-width: 599px) {
+  .pg-table th:nth-child(3), .pg-table td:nth-child(3) { display: none; }
+  .pg-table th, .pg-table td { padding-left: 4px; padding-right: 4px; }
+  .pg-table td:last-child .btn { padding-left: 6px; padding-right: 6px; }
 }
 
 /* ── The question workspace ──────────────────────────────────────────────── */
