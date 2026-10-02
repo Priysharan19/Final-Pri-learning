@@ -1,14 +1,16 @@
 // Pri Learning · Google/Apple sign-in callback.
 //
-// Google returns here directly with the identity token in the URL fragment;
-// Apple form-posts to /v1/account/identity/apple/callback, which redirects here
-// the same way. The fragment never reaches a server. It is read once, removed
-// from the address bar and history, and handed to the app window that started
+// Google returns to /auth/callback.html with the identity token in the URL
+// fragment, which never reaches a server. Apple form-posts to
+// /v1/account/identity/apple/callback, whose page carries the same fields in a
+// meta tag and loads this script too. They are read once, the fragment is
+// removed from the address bar and history, and they are handed to the window that started
 // the sign-in over a BroadcastChannel, which only same-origin pages can join.
 // The app accepts it only for the random state it is waiting on, and the
 // server accepts it only with the single-use nonce it issued.
 (function () {
-  var params = new URLSearchParams(String(location.hash || '').replace(/^#/, ''));
+  var relayed = document.querySelector('meta[name="pri-oidc-callback"]');
+  var params = new URLSearchParams(relayed ? String(relayed.getAttribute('content') || '') : String(location.hash || '').replace(/^#/, ''));
   try { history.replaceState(null, '', location.pathname); } catch (e) { /* best effort */ }
   var idToken = params.get('id_token') || '';
   var message = {
