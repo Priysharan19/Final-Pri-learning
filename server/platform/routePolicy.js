@@ -59,6 +59,7 @@ export function derivePolicy(method, chain) {
     roles: null,
     verifiedEmail: false,
     guardianConsent: false,
+    operatorToken: false,
     rateLimits: [],
     csrf: false,
     outOfOrder: []
@@ -72,6 +73,7 @@ export function derivePolicy(method, chain) {
     if (tag.session) policy.session = true;
     if (tag.verifiedEmail) policy.verifiedEmail = true;
     if (tag.guardianConsent) policy.guardianConsent = true;
+    if (tag.operatorToken) policy.operatorToken = true;
     if (tag.csrf && MUTATION.has(method)) policy.csrf = true;
     // rateLimit() keys on the session account when one was established before
     // it, otherwise on req.ip — so its position decides who shares a bucket.
