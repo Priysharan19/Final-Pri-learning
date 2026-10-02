@@ -4,9 +4,9 @@ This directory is the **publish output** of `tools/jee-question-department/pack.
 
 The committed `catalog.js` is intentionally empty until reviewed source records pass the strict publish audit. No extracted question is student-facing merely because a PDF parser found it.
 
-When approved records are packed, this directory receives gzip/base64 `.b64` shards plus a generated `catalog.js` containing only:
+When approved records are packed, this directory receives gzip/base64 shards as tiny ES modules (`<part>-NN.js`, `export default "<base64>"`) plus a generated `catalog.js` containing only:
 
-- lazy local `?raw` shard importers that Vite bundles and the offline cache can own without adding a network API;
+- lazy local dynamic-import shard loaders that Vite code-splits (and plain Node can load in tests) and the offline cache can own without adding a network API;
 - generator-id → shard-part coverage;
 - aggregate record/checksum metadata.
 

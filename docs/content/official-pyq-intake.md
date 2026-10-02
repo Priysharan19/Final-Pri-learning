@@ -36,7 +36,29 @@ Committed files: code, the manifest (URLs and hashes), tests and this note. PDFs
 
 - **Engine and runtime bug (fixed).** JEE Advanced publishes some numeric keys as accepted bands, for example `[2.35 to 2.45]`. The deterministic checker rejected the band edges because of floating-point tolerance: 2.35 − 2.4 is not exactly −0.05. Separately, `jee-pyq-runtime.js` dropped `tol` from numeric answers, so a banded question would have been marked to the default tolerance instead of the band. Both are fixed, and regression tests cover them.
 - **Key parser cross-check.** For the 17 JEE Advanced 2025/2026 Paper 1 questions in the hand-transcribed archive (`client/src/engine/pyq/records-jee-advanced.js`), the automatically paired keys agree with the archive's keys 17/17. Those 17 questions are excluded from this pipeline's publish set so they are not duplicated.
+- **The review is blind by construction.** JAB's answer documents print each answer next to its question. In the first pass, a reviewer pointed out that it could see those answers. Review crops now white out printed answer lines. Review batches carry no key, and code (not the reviewer) marks them blind. `decide` ignores a review unless:
+  - it came from a blind batch,
+  - the reviewer reported `answerVisible: false`,
+  - it was made against the exact transcription now on the row (checked by sha256).
+
+  All reviews from the non-blind first pass were discarded.
+- **Populated catalogs failed outside Vite (fixed).** Packed shards were `?raw` imports, which only Vite resolves. As soon as the catalog had records, plain-Node suites crashed loading a shard. Shards are now small ES modules exporting their base64 text. They are still lazy, local and network-free.
+- **Missing citations (fixed).** Official department records now carry `archive.citations` (the authority's paper and key URLs) and `stepsAuthorship`, the same shape the source-cited archive uses. A student can follow the link to the exam authority's own document.
+- **Possible key errors are held, never corrected.** Transcribers judged two official JEE Main 2026 keys wrong (8 Apr shift 2, Q4 and Q16). Both are held.
 - **Image-only documents.** These have no text layer. They are recorded as document-level drafts and need page-level transcription. They are not guessed.
+
+## Owner's Arihant copy (book used only as an index)
+
+- **Owner instruction (2026-10-02):** the owner supplied their copy of *41 Years IIT JEE Mathematics*. It is the 625-page edition `extract.py` targets. It may be used only as an index to the original IIT-JEE / JEE question statements and as a cross-check for answer keys. Arihant's solutions, explanations, chapter text and layout are never shipped. Provenance is the original exam (year/paper/question), and the book is a secondary locator only.
+- **Storage:** the PDF lives only in the gitignored `cache/book/`.
+- **Run on 2026-10-02:** `extract.py` produced **1,968** draft candidates covering 1978–2019 (JEE Advanced/IIT-JEE 1,205, JEE Main 588, unresolved 175).
+- **Outcome: none can use the automated tier, and all stay draft.**
+  - Automated tier condition (a) requires an *official* key, and the book's own answers are not one.
+  - For 1979–2018 there is no reachable official key in the manifest.
+  - The book's 2019 JEE Advanced entries carry no paper or question number, so they cannot be paired with JAB's 2019 key.
+  - The book's 2019 JEE Main entries carry only a shift label, and NTA no longer hosts 2019 keys.
+  - `audit.py` also still refuses the automated tier for book-sourced rows.
+- **Possible next step:** add archived NTA 2019–2025 final keys to the manifest, where an archived official copy exists, and pair book JEE Main entries by shift and question text. Each paired row would then go through the same transcription, blind review and engine path with our own worked solutions.
 
 ## Statistics
 

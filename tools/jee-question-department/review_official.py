@@ -70,6 +70,22 @@ def load_json_dir(directory: Path):
     return out
 
 
+def verify_pins(rows, cache: Path = HERE / "cache" / "official"):
+    """Stamp each row with its document's pinned sha256 — only after re-hashing the
+    cached file and finding it identical to the pin. A mismatch leaves the row unpinned."""
+    import hashlib
+    official = json.loads(OFFICIAL.read_text(encoding="utf-8"))
+    pins = {d["id"]: d.get("sha256") for d in official["documents"]}
+    seen = {}
+    for row in rows:
+        did = (row.get("source") or {}).get("documentId")
+        if did not in seen:
+            path = cache / f"{did}.pdf"
+            seen[did] = hashlib.sha256(path.read_bytes()).hexdigest() if path.exists() else None
+        if pins.get(did) and seen[did] == pins[did]:
+            row["source"]["sha256"] = pins[did]
+
+
 def hand_archive_ids():
     """Ids already served by the hand-transcribed archive (client/src/engine/pyq)."""
     import re
@@ -144,6 +160,13 @@ def render(rows, crops: Path, cache: Path, zoom: float = 2.2, blind: bool = Fals
 
 # ── batches for the AI passes ────────────────────────────────────────────────
 
+def transcription_sha(row):
+    import hashlib
+    t = row.get("transcription") or {}
+    core = {k: t.get(k) for k in ("prompt", "mcqOptions", "targetChapter", "difficulty", "hints", "steps")}
+    return hashlib.sha256(json.dumps(core, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()
+
+
 def batch_items(rows, *, with_key: bool):
     for row in rows:
         key = row["officialKey"]
@@ -161,6 +184,7 @@ def batch_items(rows, *, with_key: bool):
         else:  # the blind reviewer gets the transcription, never the key
             t = row.get("transcription") or {}
             item["transcription"] = {k: t.get(k) for k in ("prompt", "mcqOptions", "targetChapter", "difficulty", "hints", "steps")}
+            item["transcriptionSha"] = transcription_sha(row)
         yield item
 
 
@@ -441,10 +465,13 @@ def main(argv=None):
         print(json.dumps({"merged": n}))
     elif args.cmd == "decide":
         blind_ids = set()
+        current = {r["id"]: transcription_sha(r) for r in rows if r.get("transcription")}
         for path in (p for d in args.inputs for p in d.glob("*.json")):
             data = json.loads(path.read_text(encoding="utf-8"))
             if data.get("blind") is True:
-                blind_ids.update(item["id"] for item in data["items"])
+                # a review counts only for the exact transcription it was shown
+                blind_ids.update(item["id"] for item in data["items"]
+                                 if item.get("transcriptionSha") and item["transcriptionSha"] == current.get(item["id"]))
         reviews = {}
         for d in args.dir:
             reviews.update(load_json_dir(d))
@@ -460,6 +487,8 @@ def main(argv=None):
             args.out.write_text(text + "\n", encoding="utf-8")
         print(text)
     elif args.cmd == "publish-set":
+        verify_pins(rows)
+        write_jsonl(args.queue, rows)
         served = hand_archive_ids()
         approved = [r for r in rows if r.get("status") == "approved" and r["id"] not in served]
         _, errors, _ = audit(approved, manifest, publish=True)

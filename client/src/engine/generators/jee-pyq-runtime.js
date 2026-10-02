@@ -50,8 +50,24 @@ function sourceLabel(rec) {
 function officialArchiveMeta(rec) {
   const o = rec.official;
   const automated = rec.review?.tier === 'automated';
+  const label = officialLabel(rec);
+  const citations = [{
+    id: o.documentId, authority: o.authority || null, kind: 'official-question-paper',
+    title: `${label} · question paper`, url: o.url, archivedAt: o.archivedAt || null
+  }];
+  if (o.keyUrl && o.keyDocumentId !== o.documentId) {
+    citations.push({
+      id: o.keyDocumentId || `${o.documentId}-key`, authority: o.authority || null, kind: 'official-final-answer-key',
+      title: `${label.replace(/ · Q\d+$/, '')} · official answer key`, url: o.keyUrl, archivedAt: o.keyArchivedAt || null
+    });
+  }
+  const stepsAuthorship = automated
+    ? 'Question and answer key from the exam authority; transcription and worked solution checked by the automated key + engine + AI review tier, not by a person.'
+    : 'Question and answer key from the exam authority; transcription and worked solution reviewed by a named person.';
   return {
     id: rec.id,
+    citations,
+    stepsAuthorship,
     authority: o.authority || null,
     documentId: o.documentId,
     url: o.url,

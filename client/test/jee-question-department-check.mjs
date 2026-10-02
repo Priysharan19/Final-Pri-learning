@@ -100,6 +100,10 @@ assert.equal(op.archive.url, 'https://example.invalid/paper.pdf');
 assert.equal(op.archive.reviewTier, 'automated');
 assert.match(op.archive.solutionAuthorship, /not by a person/);
 assert.equal(op.archive.book, undefined);
+assert.equal(op.archive.citations.length, 2);
+assert.equal(op.archive.citations[0].url, 'https://example.invalid/paper.pdf');
+assert.equal(op.archive.citations[1].kind, 'official-final-answer-key');
+assert.match(op.archive.stepsAuthorship, /not by a person/);
 assert.equal(m.pyqReviewTier, 'human');
 
 assert.throws(() => asJeePyqPayload({ ...mcq, id: 'bad', steps: [] }), /no worked steps/i);
