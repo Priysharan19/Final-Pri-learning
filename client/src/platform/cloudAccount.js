@@ -134,6 +134,19 @@ export async function signInWithProvider(pid, provider, {
   return { link, created: !!result.created };
 }
 
+/**
+ * Link a local profile to an account the onboarding flow already signed in to
+ * (one-time code, Google or Apple). The session cookie is device-wide; this
+ * records which local profile it belongs to.
+ */
+export async function linkSignedInAccount(pid, account) {
+  await saveAccount(pid, account);
+  await refreshCloudEntitlement(pid).catch(() => {});
+  const link = await cloudAccountLink(pid);
+  announceLink(pid, link, true);
+  return link;
+}
+
 export async function verifyCloudSession(pid) {
   if (!cloudAvailable()) return { connected: false, reason: 'cloud-disabled', link: await cloudAccountLink(pid) };
   try {

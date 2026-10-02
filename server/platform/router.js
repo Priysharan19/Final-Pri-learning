@@ -10,6 +10,7 @@ import { createClassRouter } from './classes.js';
 import { createContentRouter } from './content.js';
 import { createEntitlementRouter } from './entitlements.js';
 import { createIdentityRouter } from './identities.js';
+import { createOtpRouter } from './otp.js';
 import { createReportRouter } from './reports.js';
 import { createSyncRouter } from './sync.js';
 import { createHandwritingRouter } from './handwriting.js';
@@ -172,6 +173,7 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
       : null
   }));
   router.use('/account/identity', createIdentityRouter(db));
+  router.use('/account/otp', createOtpRouter(db));
   // ── Nothing of a child's leaves or arrives without their guardian ────────
   // Every route that moves a student's own data off the device, links them to
   // another person (a class, a teacher), or takes money for it is gated. Until

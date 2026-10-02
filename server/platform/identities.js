@@ -5,7 +5,7 @@ import { createSession, id, rateLimit, requireSession } from './security.js';
 import { verifyIdentityToken } from './oidc.js';
 import { consumeOidcNonce, issueOidcNonce } from './oidcNonce.js';
 import { maybeBootstrapAdmin } from './bootstrapAdmin.js';
-import { learnerIsChild, recordConsentRequest, validateGuardian } from './guardianConsent.js';
+import { CONSENT_NOTICE_VERSION, learnerIsChild, recordConsentRequest, validateGuardian } from './guardianConsent.js';
 import { queueAccountToken } from './accounts.js';
 import { clipText } from './text.js';
 
@@ -134,7 +134,11 @@ export function createIdentityRouter(db) {
       // consent ever requested. Checked before the nonce is spent.
       const child = learnerIsChild({ isAdult: req.body?.isAdult, year: req.body?.year });
       let guardian = null;
-      if (mayCreate && child) {
+      // guardianLater: the onboarding flow asks for the parent on the next
+      // screen (otp.js /guardian/request). The account is then created with a
+      // pending consent row and stays gated until the parent approves.
+      const guardianLater = mayCreate && child && req.body?.guardianLater === true;
+      if (mayCreate && child && !guardianLater) {
         const checked = validateGuardian(req.body || {});
         if (!checked.ok) return res.status(400).json({ error: { code: checked.code, message: checked.message } });
         guardian = checked;
@@ -178,6 +182,10 @@ export function createIdentityRouter(db) {
           if (guardian) {
             const tokenId = await queueAccountToken(db, accountId, guardian.email, 'guardian-consent', now);
             await recordConsentRequest(db, { accountId, name: guardian.name, email: guardian.email, tokenHash: tokenId, now });
+          } else if (guardianLater) {
+            await db.run(`INSERT INTO guardian_consents
+                (account_id, guardian_name, guardian_email, notice_version, requested_at, confirmed_at, withdrawn_at, method)
+              VALUES (?, '', '', ?, ?, NULL, NULL, 'awaiting-guardian-contact')`, [accountId, CONSENT_NOTICE_VERSION, now]);
           }
         });
       } catch (err) {

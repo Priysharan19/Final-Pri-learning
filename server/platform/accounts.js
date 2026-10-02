@@ -16,6 +16,7 @@ import { maybeBootstrapAdmin } from './bootstrapAdmin.js';
 import { consumeOidcNonce } from './oidcNonce.js';
 import { publicEntitlement } from './entitlements.js';
 import { clipText } from './text.js';
+import { verifyReauthCode } from './otp.js';
 
 const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const TOKEN_MS = 1000 * 60 * 60;
@@ -51,12 +52,15 @@ function publicAccount(row) {
   // SESSION id; only `account_id` names the account. Account rows have `id` and
   // no `account_id`. Preferring account_id keeps /v1/account/me reporting a
   // stable account identity instead of one that changes with every sign-in.
+  // An account that signed up by phone carries an undeliverable placeholder
+  // address (otp.js); it is never shown as if it were the learner's email.
+  const synthetic = String(row.email || '').endsWith('@phone.invalid');
   return {
     id: row.account_id || row.id,
-    email: row.email,
+    email: synthetic ? null : row.email,
     name: row.name,
     role: row.role,
-    emailVerified: !!row.email_verified_at
+    emailVerified: !!row.email_verified_at && !synthetic
   };
 }
 
@@ -138,6 +142,13 @@ export async function authorizeAccountDeletion(db, accountId, body = {}, identit
       throw reauthError('REAUTH_REQUIRED', 'Confirm your password before deleting the account.');
     }
     return { method: 'password' };
+  }
+
+  // An account made with a one-time code has neither a password nor a linked
+  // provider: a fresh code sent to its own phone or email is its proof.
+  if (body?.otpChallengeId != null || body?.otpCode != null) {
+    if (await verifyReauthCode(db, accountId, { otpChallengeId: body.otpChallengeId, otpCode: body.otpCode })) return { method: 'otp' };
+    throw reauthError('OTP_REAUTH_FAILED', 'That code is not right, or it has expired. Ask for a new one.');
   }
 
   const provider = String(body?.provider || '');
