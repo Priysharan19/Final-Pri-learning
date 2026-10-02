@@ -235,6 +235,9 @@ export function createClassRouter(db) {
     const member = !!await db.get('SELECT 1 FROM class_members WHERE class_id=? AND student_account_id=? AND removed_at IS NULL', [classId, accountId]);
     if (!teacher && !member && req.platformSession.role !== 'admin') return res.status(404).json({ error: { code: 'CLASS_NOT_FOUND', message: 'Class not found.' } });
     const cls = await db.get('SELECT id,name,teacher_account_id,created_at,archived_at FROM classes WHERE id=?', [classId]);
+    // An admin passes the membership check for any id, including one that
+    // names no class: that is a 404, not a TypeError on cls.id and a 500.
+    if (!cls) return res.status(404).json({ error: { code: 'CLASS_NOT_FOUND', message: 'Class not found.' } });
     let assignments;
     if (member && !teacher && req.platformSession.role !== 'admin') {
       const rows = await db.all(`SELECT a.id,a.title,a.due_at,a.created_at,a.archived_at,

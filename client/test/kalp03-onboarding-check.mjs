@@ -17,6 +17,13 @@ const [login, backend, app, cloud, en, hi, e2e] = await Promise.all([
   read('test/e2e.mjs')
 ]);
 
+// The cloud panel's copy lives in the i18n catalogue. Resolve the keys the
+// panel names to their English so the checks below read what an English
+// reader of the panel sees.
+const cloudCatalogue = (await import(join(ROOT, 'src/i18n/strings.en.js'))).default;
+const cloudCopy = [...cloud.matchAll(/\b(?:tx?|tLater)\(\s*'([a-z][A-Za-z]*\.[A-Za-z0-9]+)'/g)]
+  .map(m => cloudCatalogue[m[1]]).filter(v => typeof v === 'string').join('\n');
+
 let passed = 0;
 const failures = [];
 function check(name, ok) {
@@ -65,8 +72,8 @@ check('backend rejects Year 11 Extension 2', backend.includes('Mathematics Exten
 check('backend still hashes passwords', backend.includes('p.auth = await hashPassword(pw)'));
 check('backend still creates encrypted vault', backend.includes('createVault(pw)'));
 check('teacher role still lands on /teach', app.includes("roleLanding = user.role === 'teacher' ? '/teach' : '/'"));
-check('cloud panel names local profile boundary', cloud.toLowerCase().includes('local profile'));
-check('cloud panel names authenticated Pri Learning account', cloud.includes('Pri Learning account') && cloud.includes('authenticated cross-device sync'));
+check('cloud panel names local profile boundary', cloudCopy.toLowerCase().includes('local profile'));
+check('cloud panel names authenticated Pri Learning account', cloudCopy.includes('Pri Learning account') && cloudCopy.includes('authenticated cross-device sync'));
 check('no passkey UI was invented', !login.toLowerCase().includes('passkey') && !login.toLowerCase().includes('webauthn'));
 check('ready state explains no fake diagnostic', login.includes('login.noFakeDiagnostic'));
 check('English has staged onboarding copy', en.includes("'login.stepRoleTitle'"));
