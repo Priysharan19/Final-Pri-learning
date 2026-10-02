@@ -1714,6 +1714,10 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
             {writeMode && shownAnswerLine && !needsCheck && !cloudPending && !(resolved && !boundLines)
               ? <span className="ws-answer-preview muted">{t('verdict.yourAnswerIs')} <MathText text={`$${texOf(shownAnswerLine)}$`} /></span>
               : statusText}
+            {/* Handwriting is read only by the server reader (#316); say so where the work is submitted. */}
+            {writeMode && String(inkResult?.engine || '').startsWith('cloud') && (
+              <span className="ws-read-by muted">{t('verdict.inkReadByServer')}</span>
+            )}
           </span>
           <div className="ws-actions-btns">
             {!resolved && diagnostic && (
