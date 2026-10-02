@@ -28,6 +28,10 @@ adb uninstall com.prilearning.app.test >/dev/null 2>&1 || true
 adb install -r -t "$APP" >/dev/null
 adb install -r -t "$TEST" >/dev/null
 adb logcat -c || true
+# DIAG: stream step markers to the host so an emulator death leaves a trace.
+( adb logcat -v time -s PRITEST:I PriBridge:I AndroidRuntime:E ActivityManager:W lowmemorykiller:I chromium:E > "$OUT/live.txt" 2>&1 & )
+( while sleep 5; do echo "mem $(date +%T) $(free -m | awk '/Mem/{print $3"/"$2"MB"}') load $(cut -d' ' -f1 /proc/loadavg)"; done > "$OUT/host.txt" 2>&1 & )
+trap 'echo "--- last live log lines ---"; tail -30 "$OUT/live.txt" 2>/dev/null; echo "--- host ---"; tail -8 "$OUT/host.txt"' EXIT
 
 run() {
   local target="$1" method="${1##*#}" log; shift
