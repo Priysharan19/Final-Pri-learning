@@ -1,14 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { cloud } from '../platform/cloudTransport.js';
+import { Wordmark } from '../components/BrandMark.jsx';
 import { tLater, useT, useTx } from '../i18n/index.js';
 
 function Shell({ children }) {
   return (
     <div className="auth-wrap">
       <div className="card" style={{ width: 'min(520px, calc(100% - 32px))', margin: 'auto', padding: 28 }}>
-        <div className="logo logo-lg" aria-label="Pri Learning">
-          <span className="logo-bb" aria-hidden="true">P</span><span className="logo-name">Pri Learning</span>
-        </div>
+        <Wordmark large />
         <div style={{ marginTop: 24 }}>{children}</div>
       </div>
     </div>
