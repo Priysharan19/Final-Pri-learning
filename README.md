@@ -616,10 +616,11 @@ what a reader would reasonably assume is here and is not. None of it is hidden a
   end, but nothing in the app is gated on them: there is no free-tier cap, no paywall, and no
   configured price. Settings still tells the student everything is unlocked.
 
-- **No age or guardian-consent capture.** India's Digital Personal Data Protection Act 2023 treats
-  children's data specially. The app asks for no age band and records no guardian consent, and
-  there are no privacy, terms or refund pages in the product — all of which a subscription store
-  and a payment provider will require.
+- **Guardian consent is an email confirmation, not verification.** India's Digital Personal Data
+  Protection Act 2023 treats everyone under 18 as a child. A cloud account for someone under 18
+  stays closed to every cloud route until a parent or guardian follows an emailed link — which
+  proves mailbox access, not parenthood, so it is not the verifiable consent the Act requires from
+  May 2027. The privacy, terms and refund pages exist but are not legally reviewed.
 
 - **The iPad app has no release pipeline.** The Swift package builds and now carries a real icon
   and a release audit, but there is no signing, archive or TestFlight path in the repository, and
