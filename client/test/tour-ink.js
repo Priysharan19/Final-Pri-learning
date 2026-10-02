@@ -63,9 +63,9 @@ export const flow = {
   id: 'ink',
   name: 'Ink · handwriting on the real canvas',
 
-  async run({ page, base, check, note, goto, createProfile, mathText, settle }) {
+  async run({ page, base, check, note, goto, createLegacyProfile, mathText, settle }) {
     await goto('/');
-    await createProfile({ name: 'Ada Byron', year: 7 });
+    await createLegacyProfile({ name: 'Ada Byron', year: 7 });
 
     // ── 1 · miss twice to learn the answer, on a question worth writing ──────
     // Only a short whole number is hand-written here. Every glyph the flow draws

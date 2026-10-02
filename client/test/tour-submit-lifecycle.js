@@ -77,9 +77,9 @@ export const flow = {
   id: 'submit-lifecycle',
   name: 'Submission · interruption recovery and one attempt',
 
-  async run({ page, base, check, goto, createProfile, mathText, settle }) {
+  async run({ page, base, check, goto, createLegacyProfile, mathText, settle }) {
     await goto('/');
-    await createProfile({ name: 'Rosalind Franklin', year: 7 });
+    await createLegacyProfile({ name: 'Rosalind Franklin', year: 7 });
     const practice = `${base}/practice?subtopic=${TOPIC}`;
     const reopen = async () => {
       await page.goto(practice, { waitUntil: 'domcontentloaded' });

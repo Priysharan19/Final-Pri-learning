@@ -286,7 +286,63 @@ function helpers(page, base, flowId) {
     }
   };
 
-  return { shot, check, mathText, goto, createProfile, settle: () => page.waitForTimeout(SETTLE) };
+
+  /**
+   * Legacy/private implementation fixture for browser regression coverage.
+   *
+   * Public V1 deliberately has no Australian/Teacher/Olympiad onboarding entry
+   * point. A few long-standing browser flows still exercise private legacy
+   * mechanics (Australian practice/exams) that remain in the repository. Those
+   * tests must not force a public back door merely so they can create a fixture,
+   * so they seed the same local profile row directly in the isolated test DB.
+   * This helper is test code only and is never bundled into the application.
+   */
+  const createLegacyProfile = async ({
+    name = 'E2E Legacy Student', year = 9, course = 'nsw', pathway = 'advanced',
+    avatar = '🙂', language = 'en'
+  } = {}) => {
+    const id = `e2e-legacy-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+    await page.evaluate(async profile => {
+      const db = await new Promise((resolve, reject) => {
+        const req = indexedDB.open('pri-learning');
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+      const now = Date.now();
+      const row = {
+        id: profile.id,
+        name: profile.name,
+        year: profile.year,
+        course: profile.course,
+        role: 'student',
+        avatar: profile.avatar,
+        theme: 'dark',
+        dailyGoal: 10,
+        xp: 0,
+        language: profile.language,
+        mathsGloss: false,
+        pathway: profile.course === 'nsw' ? profile.pathway : null,
+        indiaTrack: null,
+        timezone: profile.course === 'nsw' ? 'Australia/Sydney' : 'Asia/Kolkata',
+        createdAt: now,
+        lastActiveAt: now
+      };
+      await new Promise((resolve, reject) => {
+        const tx = db.transaction('profiles', 'readwrite');
+        tx.objectStore('profiles').put(row);
+        tx.oncomplete = resolve;
+        tx.onerror = () => reject(tx.error);
+        tx.onabort = () => reject(tx.error || new Error('profile seed aborted'));
+      });
+      db.close();
+      localStorage.setItem('pri-current-profile', profile.id);
+    }, { id, name, year, course, pathway, avatar, language });
+    await page.goto(base + '/', { waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('.home-greet', { timeout: 30000 });
+    return id;
+  };
+
+  return { shot, check, mathText, goto, createProfile, createLegacyProfile, settle: () => page.waitForTimeout(SETTLE) };
 }
 
 // ── Flow runner ──────────────────────────────────────────────────────────────
