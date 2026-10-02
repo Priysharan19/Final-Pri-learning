@@ -66,7 +66,7 @@ const app = await startApp({ db });
 try {
   const jar = {};
   const registration = await app.request('/v1/account/register', {
-    method: 'POST', jar, body: { email: 'ink.student@example.test', name: 'Ink', password: 'correct-horse-battery', deviceId: 'ipad-ink' }
+    method: 'POST', jar, body: { email: 'ink.student@example.test', name: 'Ink', password: 'correct-horse-battery', deviceId: 'ipad-ink', isAdult: true }
   });
   c.eq(registration.status, 201, 'a verified student is signed in');
   db.prepare('UPDATE accounts SET email_verified_at=? WHERE id=?').run(Date.now(), registration.data.account.id);

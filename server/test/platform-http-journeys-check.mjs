@@ -142,7 +142,7 @@ async function call(path, { method = 'GET', body, raw, jar = null, headers = {},
 const auditActions = async () => new Set((await db.all('SELECT action FROM audit_log')).map(row => row.action));
 const jars = { admin: {}, teacher: {}, support: {}, s1: {}, s2: {}, s3: {} };
 async function register(jar, name, email, deviceId, { verify = true } = {}) {
-  const response = await call('/account/register', { method: 'POST', jar, body: { name, email, password: 'journey-pass-123', deviceId } });
+  const response = await call('/account/register', { method: 'POST', jar, body: { name, email, password: 'journey-pass-123', deviceId, isAdult: true } });
   assert.equal(response.status, 201, JSON.stringify(response.data));
   const account = response.data.account;
   // Sync push, class create and join and paid checkout all require a verified
@@ -165,7 +165,7 @@ try {
 
   // ── Security floor on the real router ──────────────────────────────────
   const health = await call('/health');
-  check(health.status === 200 && health.data.ok === true && health.data.service === 'pri-learning-platform' && health.data.schemaVersion === '8', 'health reports the platform and schema version');
+  check(health.status === 200 && health.data.ok === true && health.data.service === 'pri-learning-platform' && health.data.schemaVersion === '9', 'health reports the platform and schema version');
   check(health.headers.get('x-content-type-options') === 'nosniff' && health.headers.get('cache-control') === 'no-store' && health.headers.get('x-frame-options') === 'DENY', 'security headers are applied to every /v1 response');
   check((await call('/does-not-exist')).status === 404 && (await call('/does-not-exist')).data.error.code === 'NOT_FOUND', 'unknown routes are a JSON 404');
   check((await call('/sync/pull/0')).status === 401 && (await call('/sync/pull/0')).data.error.code === 'AUTH_REQUIRED', 'session-gated routes reject anonymous callers');
