@@ -8,7 +8,7 @@ import { listRoutes } from '../../platform/routePolicy.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const INVENTORY_PATH = join(root, 'docs', 'security', 'route-inventory.json');
-const AUTH_KINDS = new Set(['none', 'session', 'credentials', 'bearer-token', 'oidc-token', 'provider-signature']);
+const AUTH_KINDS = new Set(['none', 'session', 'credentials', 'bearer-token', 'oidc-token', 'provider-signature', 'operator-token']);
 const ROLES = new Set(['student', 'teacher', 'support', 'admin']);
 const CSRF = new Set(['not-applicable', 'double-submit-when-session-cookie']);
 const ORIGIN = new Set(['not-applicable', 'enforced', 'exempt-provider-webhook']);
@@ -45,6 +45,9 @@ export function compareInventory(mounted, inventory) {
     const p = route.policy;
     if ((entry.auth === 'session') !== p.session) problems.push(`${k}: inventory auth=${entry.auth} but requireSession is ${p.session ? '' : 'not '}mounted`);
     if (JSON.stringify(sortedRoles(entry.roles)) !== JSON.stringify(sortedRoles(p.roles))) problems.push(`${k}: inventory roles ${JSON.stringify(entry.roles)} but mounted ${JSON.stringify(p.roles)}`);
+    // operator-token is machine-derived like session: the tagged gate in
+    // router.js (PRI_METRICS_TOKEN) must be mounted exactly where it is declared.
+    if ((entry.auth === 'operator-token') !== !!p.operatorToken) problems.push(`${k}: inventory auth=${entry.auth} but the operator-token gate is ${p.operatorToken ? '' : 'not '}mounted`);
     if (entry.verifiedEmail !== p.verifiedEmail) problems.push(`${k}: inventory verifiedEmail=${entry.verifiedEmail} but mounted ${p.verifiedEmail}`);
     if (entry.guardianConsent !== p.guardianConsent) problems.push(`${k}: inventory guardianConsent=${entry.guardianConsent} but mounted ${p.guardianConsent}`);
     if (JSON.stringify(entry.rateLimits) !== JSON.stringify(p.rateLimits)) problems.push(`${k}: inventory rateLimits ${JSON.stringify(entry.rateLimits)} but mounted ${JSON.stringify(p.rateLimits)}`);
