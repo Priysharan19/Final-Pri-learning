@@ -90,6 +90,7 @@ try {
   c.eq(r.data.account.email, 'new.student@example.test', 'with the proved email');
   c.ok(r.data.account.emailVerified, 'already verified: the code proved it');
   c.deq(r.data.guardianConsent, { required: true, state: 'pending' }, 'a Class 9 learner starts with consent pending');
+  c.eq(raw.prepare("SELECT age_basis FROM accounts WHERE email='new.student@example.test'").get().age_basis, 'child', 'the shared age decision is recorded as age_basis');
   r = await post('/verify', { channel: 'email', destination: 'new.student@example.test', signupTicket: ticket, profile: { name: 'Asha', year: '9', isAdult: false } });
   c.eq(r.data?.error?.code, 'OTP_INVALID', 'a sign-up ticket is single use');
 

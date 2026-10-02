@@ -31,7 +31,7 @@ const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
 export function ensureOtpSchema(db) {
   // SQLite builds its schema here; Postgres is migrated
-  // (supabase/migrations/20261005000000_otp_sign_in.sql).
+  // (supabase/migrations/20261006000000_otp_sign_in.sql).
   const raw = sqliteHandle(db);
   if (!raw) return;
   raw.exec(`CREATE TABLE IF NOT EXISTS otp_challenges (

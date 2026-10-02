@@ -43,7 +43,7 @@ What the recorded method means, stated plainly (as `guardianConsent.js` does for
 
 ## Database
 
-`supabase/migrations/20261005000000_otp_sign_in.sql` — additive only (two new tables, one nullable column), RLS on, `pri_server` only, `schema_version` → 9. Apply it to Supabase before deploying this server build; the server refuses to boot against schema 8 (`PLATFORM_DB_SCHEMA_MISMATCH`).
+`supabase/migrations/20261006000000_otp_sign_in.sql` — additive only (two new tables, one nullable column), RLS on, `pri_server` only, `schema_version` → 9. Apply it to Supabase before deploying this server build; the server refuses to boot against schema 8 (`PLATFORM_DB_SCHEMA_MISMATCH`).
 
 ## Owner steps (real-world, cannot be done from the repo)
 

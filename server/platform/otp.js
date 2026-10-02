@@ -24,7 +24,7 @@ import {
 } from './otpCore.js';
 import { createSmsProviderFromEnv } from './smsProvider.js';
 import { createOtpEmailSenderFromEnv } from './otpEmail.js';
-import { CONSENT_NOTICE_VERSION, confirmConsent, consentState, learnerIsChild, withdrawConsent } from './guardianConsent.js';
+import { CONSENT_NOTICE_VERSION, ageDecision, confirmConsent, consentState, withdrawConsent } from './guardianConsent.js';
 import { queueAccountToken } from './accounts.js';
 import { maybeBootstrapAdmin } from './bootstrapAdmin.js';
 import { clipText } from './text.js';
@@ -58,15 +58,14 @@ function profileFrom(body) {
   const profile = body && typeof body.profile === 'object' && body.profile ? body.profile : null;
   if (!profile) return null;
   const name = clipText(String(profile.name || '').trim(), 80);
-  if (!name) return { error: 'PROFILE_NAME_REQUIRED' };
-  // Fail closed: a new account must carry an explicit age declaration.
-  // Without one the server cannot tell an adult from a child, so it refuses
-  // rather than guess (the same stance PR #322 takes for /register).
-  if (profile.isAdult !== true && profile.isAdult !== false) return { error: 'AGE_DECLARATION_REQUIRED' };
-  const isAdult = profile.isAdult;
-  const year = profile.year == null ? '' : String(profile.year).trim().slice(0, 4);
-  const role = profile.role === 'parent' ? 'parent' : 'student';
-  return { name, isAdult, year, role };
+  if (!name) return { error: 'PROFILE_NAME_REQUIRED', message: 'Tell us your name.' };
+  const year = profile.year == null ? undefined : String(profile.year).trim().slice(0, 4);
+  // The one shared age rule (guardianConsent.js ageDecision, as /register and
+  // provider sign-up): an explicit declaration is required, fail closed. The
+  // parent is asked on the next screen, so guardianLater.
+  const decision = ageDecision({ isAdult: profile.isAdult, year }, { guardianLater: true });
+  if (!decision.ok) return { error: decision.code, message: decision.message };
+  return { name, basis: decision.basis };
 }
 
 export function createOtpRouter(db, {
@@ -154,8 +153,7 @@ export function createOtpRouter(db, {
         : await db.get(`SELECT a.* FROM account_phones p JOIN accounts a ON a.id = p.account_id
             WHERE p.phone_e164 = ? AND a.deleted_at IS NULL`, [destination]);
       const profile = existing ? null : profileFrom(req.body);
-      if (profile?.error === 'AGE_DECLARATION_REQUIRED') return bad(res, profile.error, 'Tell us whether you are under 18.');
-      if (profile?.error) return bad(res, profile.error, 'Tell us your name.');
+      if (profile?.error) return bad(res, profile.error, profile.message || 'Tell us your name.');
 
       if (!existing && !profile) {
         // Peek only: is the code right? Counted as an attempt like any other,
@@ -202,17 +200,15 @@ export function createOtpRouter(db, {
       }
 
       const accountId = id('acct');
-      // Same rule as /register and provider sign-up: only an explicit isAdult === true
-      // is an adult; anything else (including a claimed parent role) is a child.
-      const child = learnerIsChild({ isAdult: profile.isAdult, year: profile.year });
+      const child = profile.basis === 'child';
       const accountEmail = channel === 'email' ? destination : `${accountId}@${PHONE_ACCOUNT_EMAIL_DOMAIN}`;
       try {
         await db.transaction(async () => {
           // email_verified_at records that the account's primary contact was
           // proved by a code. For a phone account that contact is the phone;
           // the synthetic address is never shown and never deliverable.
-          await db.run(`INSERT INTO accounts(id,email,name,password_hash,email_verified_at,role,created_at,updated_at)
-            VALUES (?, ?, ?, NULL, ?, 'student', ?, ?)`, [accountId, accountEmail, profile.name, now, now, now]);
+          await db.run(`INSERT INTO accounts(id,email,name,password_hash,email_verified_at,role,age_basis,created_at,updated_at)
+            VALUES (?, ?, ?, NULL, ?, 'student', ?, ?, ?)`, [accountId, accountEmail, profile.name, now, profile.basis, now, now]);
           if (channel === 'sms') {
             await db.run('INSERT INTO account_phones(account_id,phone_e164,verified_at) VALUES (?,?,?)', [accountId, destination, now]);
           }

@@ -12,7 +12,7 @@
 --   guardian_consents.guardian_phone   a parent who approves by SMS code.
 --
 -- One transaction. Additive only: two new tables and one nullable column; no
--- existing row or constraint changes. schema_version moves to 9 so a server
+-- existing row or constraint changes. schema_version moves to 10 so a server
 -- build that expects these tables refuses to boot against a database that does
 -- not have them. Same access model as 20261001000000_platform_schema.sql.
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -59,6 +59,6 @@ create policy pri_server_all on pri.otp_challenges as permissive for all to pri_
 alter table pri.account_phones enable row level security;
 create policy pri_server_all on pri.account_phones as permissive for all to pri_server using (true) with check (true);
 
-update pri.platform_meta set value = '9' where key = 'schema_version';
+update pri.platform_meta set value = '10' where key = 'schema_version';
 
 commit;
