@@ -49,6 +49,7 @@ export const ENGINE_SUITES = [
   'billing-cancel-refund-check.mjs',
   'razorpay-billing-check.mjs',
   'apple-billing-check.mjs',
+  'failure-drills-check.mjs',
   'security-acceptance-check.mjs',
   'abuse-limits-check.mjs'
 ];

@@ -27,11 +27,33 @@ function wrapArgument(arg) {
   return Array.isArray(arg) ? arg.map(wrapArgument) : asyncHandler(arg);
 }
 
+/**
+ * Records the TEMPLATE of the route that matched (`/v1/classes/:classId`) on
+ * the request, at the moment it matches: req.baseUrl is the literal mount path
+ * here and req.route.path the declared pattern. The request log and the error
+ * log name requests by this, never by the raw path, which carries ids. It has
+ * to be taken here: by the time an error reaches the /v1 error handler Express
+ * has already restored baseUrl to '/v1' while req.route still points at the
+ * sub-router's route.
+ */
+function stampRouteTemplate(req, res, next) {
+  const path = req.route?.path;
+  if (typeof path === 'string') {
+    const base = typeof req.baseUrl === 'string' ? req.baseUrl : '';
+    req.routeTemplate = `${base}${path === '/' && base ? '' : path}` || '/';
+  }
+  next();
+}
+
 export function asyncRouter(options) {
   const router = Router(options);
   for (const method of METHODS) {
     const original = router[method].bind(router);
-    router[method] = (...args) => original(...args.map(wrapArgument));
+    router[method] = method === 'use'
+      ? (...args) => original(...args.map(wrapArgument))
+      : (path, ...handlers) => typeof path === 'function'
+        ? original(path, ...handlers.map(wrapArgument))
+        : original(path, stampRouteTemplate, ...handlers.map(wrapArgument));
   }
   return router;
 }
