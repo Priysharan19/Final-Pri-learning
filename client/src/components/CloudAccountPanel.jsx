@@ -372,10 +372,16 @@ export default function CloudAccountPanel() {
         return;
       }
       let accepted = 0;
+      let lastError = null;
       for (const transaction of transactions) {
-        if (await acceptAppleTransaction(transaction, { quiet: true })) accepted++;
+        // One Apple ID can hold a purchase bound to another Pri account on
+        // this iPad (APPLE_ACCOUNT_TOKEN_MISMATCH). That refusal must not stop
+        // this account's own transactions from being restored.
+        try {
+          if (await acceptAppleTransaction(transaction, { quiet: true })) accepted++;
+        } catch (err) { lastError = err; }
       }
-      if (!accepted) throw new Error('No App Store transaction could be verified for this Pri Learning account.');
+      if (!accepted) throw lastError || new Error('No App Store transaction could be verified for this Pri Learning account.');
       setMessage(tLater('cloud.appleRestored', { count: accepted, n: accepted }));
     } catch (err) { setError(err.message || tLater('cloud.appleRestoreFailed')); }
     finally { setBusy(''); }
