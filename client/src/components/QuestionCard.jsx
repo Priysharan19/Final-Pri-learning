@@ -348,7 +348,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     if (page?.allowance) {
       setPhotoOCR({
         phase: 'failed', text: '', confidence: 0, engine: null,
-        error: t('photo.cloudAllowanceUsed')
+        error: tLater('photo.cloudAllowanceUsed')
       });
       return;
     }
