@@ -131,11 +131,16 @@ export function buildDeterministicStoryboard(solution, context = {}) {
   const wrongAttempt = cleanAttempt(context.wrongAttempt || context.submission);
 
   if (!context.revealed && (context.correct === false || context.hadWrongAttempt || wrongAttempt) && (context.feedback || wrongAttempt)) {
-    const heading = context?.diagnosis?.message || context?.diagnosis?.note || 'Find the exact point the working changes direction';
+    const authoredHeading = context?.diagnosis?.message || context?.diagnosis?.note || '';
+    const heading = authoredHeading || 'Find the exact point the working changes direction';
     const lines = teachingBeats(context.feedback || 'Compare your working with the verified path before changing the next line.');
     scenes.push({
       id: 'diagnosis',
       heading,
+      // The fallbacks are Pri's own words, so they are translatable; a
+      // diagnosis or feedback from the marker is engine output and is not.
+      headingKey: authoredHeading ? null : 'explain.scene.diagnosisHeading',
+      lineKeys: context.feedback ? null : ['explain.scene.diagnosisLine'],
       lines,
       narration: narrationFor(heading, lines),
       concept: 'diagnosis',
@@ -160,6 +165,7 @@ export function buildDeterministicStoryboard(solution, context = {}) {
   let previous = null;
   for (const [stepIndex, step] of (solution?.steps || []).entries()) {
     const heading = String(step?.h || `Step ${stepIndex + 1}`);
+    const headingKey = step?.h ? null : 'explain.scene.step';
     const detail = String(step?.d || '');
     const lines = teachingBeats(detail);
     const maths = extractMath(detail);
@@ -186,6 +192,8 @@ export function buildDeterministicStoryboard(solution, context = {}) {
     scenes.push({
       id: `solution-${stepIndex}`,
       heading,
+      headingKey,
+      headingVars: headingKey ? { n: stepIndex + 1 } : null,
       lines,
       narration: narrationFor(heading, lines),
       concept,
@@ -198,8 +206,10 @@ export function buildDeterministicStoryboard(solution, context = {}) {
     scenes.push({
       id: 'result',
       heading: 'Work to the result',
+      headingKey: 'explain.scene.result',
       lines: [],
       narration: 'Work through the verified reasoning to the final result.',
+      narrationKey: 'explain.scene.resultNarration',
       concept: classify(prompt, !!figure),
       actions: [],
     });
@@ -254,8 +264,12 @@ export function compileStoryboard(storyboard, solution, context = {}, options = 
     const compiled = {
       kind: scene.concept === 'diagnosis' ? 'diagnosis' : 'solution',
       heading: scene.heading,
+      headingKey: scene.headingKey || null,
+      headingVars: scene.headingVars || null,
       lines: scene.lines || [],
+      lineKeys: scene.lineKeys || null,
       narration: scene.narration || narrationFor(scene.heading, scene.lines),
+      narrationKey: scene.narrationKey || null,
       visuals,
       concept: scene.concept || 'generic',
       id: scene.id || `story-${index}`,

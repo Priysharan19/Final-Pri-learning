@@ -11,15 +11,19 @@ import { useApp } from '../App.jsx';
 import InkCanvas from '../ink/InkCanvas.jsx';
 import { sanitizeFigure } from '../lib/sanitize.js';
 import { clearDraft, queueDraft, readDraft } from './drafts.js';
+import {
+  clearInkDraft, clearPendingSubmission, newSubmissionId, readInkDraft, readPendingSubmission,
+  saveInkDraft, savePendingSubmission, submissionContentKey
+} from './practiceRecovery.js';
 import { nativePhotoAvailable, recognizePhoto } from '../native/photo.js';
 import { cloudReadingEnabled, readPhotoWithCloud } from '../ink/cloudReader.js';
 import { MAX_PDF_PAGES, renderPdfPages } from '../ink/pdfPage.js';
 import PriPlot from './PriPlot.jsx';
 import { plotSpecFor } from '../engine/plotSpec.js';
-import { awardStepMarks, marksSentence } from '../engine/cbseMarking.js';
+import { awardStepMarks, marksSentenceKey } from '../engine/cbseMarking.js';
 import { checkWorkingWithCloud, mergeVerdicts, misconceptionProposal, shouldCheckWorking, workingNote } from '../ink/cloudWorking.js';
 import { misconceptionById } from '../engine/misconceptions.js';
-import { useT, useTx } from '../i18n/index.js';
+import { tLater, translate, useT, useTx } from '../i18n/index.js';
 import TermGloss from './TermGloss.jsx';
 
 const DIFF_CLASS = { 1: 'tag-d1', 2: 'tag-d2', 3: 'tag-d3', 4: 'tag-d4' };
@@ -219,7 +223,9 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const tx = useTx();
   const [answer, setAnswer] = useState('');
   const [mcqSel, setMcqSel] = useState(null);
-  const [mode, setMode] = useState(preferMode());       // 'type' | 'write' | 'photo'
+  // Handwriting kept from before a reload brings the card back to the pen.
+  const [restoredInk] = useState(() => readInkDraft(question.id));
+  const [mode, setMode] = useState(() => (restoredInk ? 'write' : preferMode()));       // 'type' | 'write' | 'photo'
   const [inkResult, setInkResult] = useState(null);
   const [hints, setHints] = useState([]);
   const [hintsLeft, setHintsLeft] = useState(question.hintsAvailable);
@@ -242,6 +248,24 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const [checking, setChecking] = useState(false);
   const [vouched, setVouched] = useState(null);     // the exact reading the student stood behind
   const startRef = useRef(Date.now());
+  // ── One tap, one submission (§09) ──────────────────────────────────────────
+  // `busy` is React state and lands a render late, so two taps inside one frame
+  // both saw it false and both posted. The ref is set synchronously.
+  const inFlightRef = useRef(false);
+  // A submission that has not had a definitive answer: an identical retry
+  // reuses its idempotency key, so a timeout followed by a second tap is still
+  // one attempt.
+  const pendingRef = useRef(null);
+  // The submission whose verdict is on screen, and the ink lines it carried.
+  // Every late, asynchronous result (cloud working check, misconception
+  // proposal) is bound to it and dropped if it names anything else.
+  const attemptRef = useRef(null);
+  const [attempt, setAttempt] = useState(null);
+  // The reading a submission was made from is frozen while it is marked and
+  // after it is resolved: a reading that settles late cannot rewrite it.
+  const inkFrozenRef = useRef(false);
+  const mountedRef = useRef(true);
+  useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; }; }, []);
   const inputRef = useRef(null);
   const scribbleRef = useRef(null);
   const photoInputRef = useRef(null);
@@ -315,7 +339,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     if (!cloudReadingEnabled(user) && !nativePhotoAvailable()) {
       setPhotoOCR({
         phase: 'unavailable', text: '', confidence: 0, engine: null,
-        error: 'Reading photos is not available here. Turn on server reading in Settings, or type your working instead.'
+        error: tLater('verdict.photoReadingUnavailable')
       });
       return;
     }
@@ -331,7 +355,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     if (!page) {
       setPhotoOCR({
         phase: 'failed', text: '', confidence: 0, engine: null,
-        error: 'That photo could not be read. Try a straighter, better-lit shot, or type your working.'
+        error: tLater('verdict.photoUnreadable')
       });
       return;
     }
@@ -353,8 +377,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       setPhotoOCR({
         phase: 'failed', text: '', confidence: 0, engine: null,
         error: result.reason === 'renderer-unavailable'
-          ? 'Reading PDFs needs a one-off download that has not happened on this device yet. Connect to the internet once and try again, or photograph the page instead — photos work offline.'
-          : 'That PDF could not be opened. If it is password-protected or was made by a scanner that locks it, photograph the page instead.'
+          ? tLater('verdict.pdfRendererMissing')
+          : tLater('verdict.pdfUnopenable')
       });
       return;
     }
@@ -378,7 +402,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     if (!texts.length) {
       setPhotoOCR({
         phase: 'failed', text: '', confidence: 0, engine: null,
-        error: 'Nothing could be read from that PDF. Try photographing the page instead.'
+        error: tLater('verdict.pdfNothingRead')
       });
       return;
     }
@@ -392,7 +416,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     const last = joined.split(/\n+/).map(x => x.trim()).filter(Boolean).at(-1) || '';
     if (last) setAnswer(last);
     setPhotoOCR({ phase: 'done', text: joined, confidence: worst, error: '', engine: engine || 'cloud-pdf' });
-  }, [decodePhoto, isWorking, user]);
+  }, [decodePhoto, isWorking, user, t]);
 
   // Paste a photo straight in. On a laptop this is how a student moves a shot
   // from their phone: AirDrop or a screenshot, then ⌘V.
@@ -490,7 +514,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     if (resolved) return;
     if (!String(typed).trim() && !String(wk).trim()) { clearDraft('question', question.id); return; }
     queueDraft('question', question.id, { typed, working: wk }, {
-      label: question.subtopicName, note: 'Answer in progress', path: '/practice'
+      label: question.subtopicName, note: t('verdict.answerInProgress'), path: '/practice'
     });
   };
   const editAnswer = (v) => { setAnswer(v); stash(v, working); };
@@ -514,17 +538,17 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     if (!doubt) return '';
     const nice = s => ({ pi: 'π', theta: 'θ', sqrt: '√', percent: '%' })[s] || s;
     if (doubt.why === 'shape') {
-      return 'That doesn’t quite come out as finished maths, so a symbol may have come through wrong. Tap any symbol below to change it.';
+      return t('verdict.checkShape');
     }
     // Name a runner-up only when it is genuinely close and genuinely different:
     // offering "1 or l?" on a number is a question with no useful answer.
     const w = doubt.weakest;
     const rival = w?.rival || w?.alts?.find(a => a.sym !== w.sym) || null;
     const contested = rival && rival.conf >= w.conf - CONFIRM_MARGIN;
-    if (w && contested) return `I read one symbol as “${nice(w.sym)}”, but “${nice(rival.sym)}” was close behind. Tap the right one below.`;
-    if (w) return `One symbol was a close call — I read it as “${nice(w.sym)}”. Tap it below if that isn’t it.`;
-    return 'One symbol was a close call. Tap it below if I read it wrong.';
-  }, [doubt]);
+    if (w && contested) return t('verdict.checkContested', { read: nice(w.sym), rival: nice(rival.sym) });
+    if (w) return t('verdict.checkCloseCall', { read: nice(w.sym) });
+    return t('verdict.checkCloseCallPlain');
+  }, [doubt, t]);
 
   const flipMode = (m) => {
     setMode(m);
@@ -552,9 +576,9 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   // Every submit control leads here, so the confirmation step cannot be walked
   // around: a reading in doubt turns the press into the question instead.
   async function submit(vouchedNow) {
-    if (busy || resolved) return;
+    if (inFlightRef.current || busy || resolved) return;
     if (needsCheck && vouchedNow !== reading) { setChecking(true); return; }
-    let given, steps, viaInk = false, ink;
+    let given, steps, viaInk = false, ink, lines = null;
     if (isMcq) {
       given = mcqSel;
       if (given === null) return;
@@ -563,6 +587,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         if (!inkResult?.lines?.length) return;
         given = inkResult.lines.join('\n');
         viaInk = true;
+        lines = inkResult.lines.slice();
         ink = { strokes: compactInkStrokes(inkResult.strokes), recognized: inkResult.text, engine: inkResult.engine || null };
       } else {
         given = working;
@@ -573,32 +598,107 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       given = inkResult.answerLine;
       steps = inkResult.lines.length > 1 ? inkResult.lines.join('\n') : undefined;
       viaInk = true;
+      lines = inkResult.lines.slice();
       ink = { strokes: compactInkStrokes(inkResult.strokes), recognized: inkResult.text, engine: inkResult.engine || null };
     } else {
       given = answer;
       if (String(given).trim() === '') return;
       steps = (showWorking || mode === 'photo') && working.trim() ? working : undefined;
     }
+    const contentKey = submissionContentKey(given, steps);
+    const submissionId = pendingRef.current?.contentKey === contentKey
+      ? pendingRef.current.submissionId
+      : newSubmissionId();
+    pendingRef.current = { submissionId, contentKey };
+    const ms = Date.now() - startRef.current;
+    // On disk before the request leaves: a relaunch replays it under this key.
+    savePendingSubmission(question.id, { submissionId, answer: String(given), steps, viaInk, ms, lines }, { label: question.subtopicName });
+    const scribbleStrokes = scribbleRef.current && !scribbleRef.current.isEmpty()
+      ? compactInkStrokes(scribbleRef.current.getStrokes())
+      : undefined;
+    await deliver({ answer: String(given), ms, steps, viaInk, ink, photo, scribble: scribbleStrokes, submissionId }, { lines });
+  }
+
+  /**
+   * Send one submission and settle the card on its definitive answer. Used by
+   * a tap and by relaunch recovery alike, so both take the same path.
+   */
+  async function deliver(body, { lines = null, recovering = false } = {}) {
+    inFlightRef.current = true;
+    inkFrozenRef.current = !recovering || inkFrozenRef.current;
     setBusy(true);
     try {
-      const scribbleStrokes = scribbleRef.current && !scribbleRef.current.isEmpty()
-        ? compactInkStrokes(scribbleRef.current.getStrokes())
-        : undefined;
-      const r = await api.post(`/practice/${question.id}/submit`, {
-        answer: String(given), ms: Date.now() - startRef.current, steps, viaInk, ink, photo, scribble: scribbleStrokes
-      });
+      const r = await api.post(`/practice/${question.id}/submit`, body);
+      pendingRef.current = null;
+      clearPendingSubmission(question.id);
+      const live = mountedRef.current;
       if (r.resolved) {
-        setState({ phase: 'resolved', res: r });
-        celebrate(r); refreshUser(); refreshDue(); refreshRecent?.();
-        toast(<div><b>{t('verdict.outcomeUpdated')}</b><div className="badge-desc">{t('verdict.outcomeBasis', { topic: question.subtopicName })}</div></div>, 4200);
+        clearInkDraft(question.id);
+        const bound = { submissionId: r.submissionId || body.submissionId, lines: Array.isArray(lines) ? lines : null };
+        attemptRef.current = bound;
+        if (live) {
+          setAttempt(bound);
+          setState({ phase: 'resolved', res: r });
+          if (!r.replayed) celebrate(r);
+          refreshUser(); refreshDue(); refreshRecent?.();
+          toast(<div><b>{t('verdict.outcomeUpdated')}</b><div className="badge-desc">{t('verdict.outcomeBasis', { topic: question.subtopicName })}</div></div>, 4200);
+        }
+        // The attempt is recorded whether or not this card is still on screen,
+        // so the session still counts it — exactly once, because the pending
+        // record that could replay it is already gone.
         onResolved?.(r);
       } else {
-        setState({ phase: 'retry', res: r });
+        inkFrozenRef.current = false;
+        if (live) setState({ phase: 'retry', res: r });
       }
     } catch (e) {
-      setState({ phase: 'retry', res: { feedback: e.message, invalid: true } });
-    } finally { setBusy(false); }
+      // A refusal (4xx) is a definitive answer. Anything else — a fault, a
+      // timeout — is not: the pending record stays, so an identical retry or a
+      // relaunch reuses the same key and still lands as one attempt.
+      if (e?.status >= 400 && e?.status < 500) { pendingRef.current = null; clearPendingSubmission(question.id); }
+      inkFrozenRef.current = false;
+      if (recovering && e?.status === 409 && e?.code !== 'QUESTION_DISCARDED') {
+        // Answered elsewhere under another submission: nothing here to recover.
+        if (mountedRef.current) onNext?.();
+        return;
+      }
+      if (mountedRef.current) setState({ phase: 'retry', res: { feedback: e.message, invalid: true } });
+    } finally {
+      inFlightRef.current = false;
+      if (mountedRef.current) setBusy(false);
+    }
   }
+
+  // ── Relaunch recovery ──────────────────────────────────────────────────────
+  // A submission still marked in flight when this question mounts was cut off
+  // by the app going away. It is replayed under its own key: the backend hands
+  // back the verdict it already recorded, or marks it now if the first delivery
+  // never landed. One attempt either way, and the student sees which.
+  useEffect(() => {
+    const pending = readPendingSubmission(question.id);
+    if (!pending) return;
+    pendingRef.current = { submissionId: pending.submissionId, contentKey: submissionContentKey(pending.answer, pending.steps) };
+    const kept = pending.viaInk ? readInkDraft(question.id) : null;
+    deliver({
+      answer: pending.answer, ms: pending.ms, steps: pending.steps, viaInk: pending.viaInk,
+      ink: kept ? { strokes: compactInkStrokes(kept), recognized: (pending.lines || []).join('\n') || null, engine: null } : undefined,
+      submissionId: pending.submissionId
+    }, { lines: pending.lines, recovering: true });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /** The ink surface reports here. Frozen while marking and after the verdict. */
+  const onInkRecognized = useCallback((r) => {
+    if (inkFrozenRef.current) return;
+    setInkResult(r);
+    // Recovery: the page restored after a relaunch is read once, for display
+    // beside the verdict, and then frozen like any submitted reading.
+    if (inFlightRef.current || attemptRef.current) inkFrozenRef.current = true;
+  }, []);
+
+  const onInkStrokes = useCallback((strokes) => {
+    if (inFlightRef.current || attemptRef.current) return;
+    saveInkDraft(question.id, strokes, { label: question.subtopicName });
+  }, [question.id, question.subtopicName]);
 
   async function getHint() {
     if (hintsLeft <= 0 || resolved) return;
@@ -610,22 +710,38 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   }
 
   async function reveal() {
-    if (busy || resolved) return;
+    if (inFlightRef.current || busy || resolved) return;
+    inFlightRef.current = true;
+    inkFrozenRef.current = true;
     setBusy(true);
     try {
       const r = await api.post(`/practice/${question.id}/reveal`, { ms: Date.now() - startRef.current });
-      setState({ phase: 'resolved', res: r });
-      celebrate(r); refreshUser(); refreshDue(); refreshRecent?.();
+      // Revealing settles the question, so nothing kept for it may replay.
+      pendingRef.current = null;
+      clearPendingSubmission(question.id);
+      clearInkDraft(question.id);
+      attemptRef.current = { submissionId: null, lines: null, revealed: true };
+      if (mountedRef.current) {
+        setAttempt(attemptRef.current);
+        setState({ phase: 'resolved', res: r });
+        celebrate(r); refreshUser(); refreshDue(); refreshRecent?.();
+      }
       onResolved?.(r);
-    } finally { setBusy(false); }
+    } catch (e) {
+      inkFrozenRef.current = false;
+      throw e;
+    } finally {
+      inFlightRef.current = false;
+      if (mountedRef.current) setBusy(false);
+    }
   }
 
   async function toggleBookmark() {
     try {
       const r = await api.post(`/history/${question.id}/bookmark`, {});
       setBookmarked(r.bookmarked);
-      toast(r.bookmarked ? 'Saved to Favorites' : 'Removed from Favorites', 2200);
-    } catch { toast('Answer the question first, then favorite it from History.', 3200); }
+      toast(r.bookmarked ? t('verdict.savedToFavorites') : t('verdict.removedFromFavorites'), 2200);
+    } catch { toast(t('verdict.favoriteNeedsAnswer'), 3200); }
   }
 
   const verdictGood = resolved && res.correct;
@@ -670,19 +786,23 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   //
   // It is feedback, not marking. The mark above has already been decided by the
   // deterministic engine and does not move when this arrives.
-  const [cloudCheck, setCloudCheck] = useState(null);
+  const [cloudCheckFor, setCloudCheckFor] = useState(null);   // { submissionId, result }
   const cloudCheckRef = useRef(null);
-  useEffect(() => { setCloudCheck(null); }, [question?.id]);
+  useEffect(() => { setCloudCheckFor(null); }, [question?.id]);
   useEffect(() => {
     if (!writeMode || !resolved) return;
-    const lines = inkResult?.lines || [];
+    // The lines checked are the lines that were submitted and marked — not
+    // whatever the ink surface reads now.
+    const bound = attempt;
+    const lines = bound?.lines || [];
+    if (!bound?.submissionId || !lines.length) return;
     if (!shouldCheckWorking({
       correct: res?.correct, invalid: res?.invalid, revealed: res?.revealed,
       lines, localReport: activeReport
     })) return;
 
-    const key = `${question?.id}:${lines.join('|')}`;
-    if (cloudCheckRef.current === key) return;              // already asked for this page
+    const key = `${question?.id}:${bound.submissionId}`;
+    if (cloudCheckRef.current === key) return;              // already asked for this attempt
     cloudCheckRef.current = key;
 
     let live = true;
@@ -691,10 +811,17 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       user,
       prompt: question?.prompt || '',
       signal: controller?.signal
-    }).then(result => { if (live && result && !result.error) setCloudCheck(result); })
-      .catch(() => { });
+    }).then(result => {
+      // Dropped unless it still describes the attempt on screen.
+      if (!live || !result || result.error) return;
+      if (attemptRef.current?.submissionId !== bound.submissionId) return;
+      setCloudCheckFor({ submissionId: bound.submissionId, result });
+    }).catch(() => { });
     return () => { live = false; controller?.abort?.(); };
-  }, [writeMode, resolved, res?.correct, res?.invalid, res?.revealed, inkResult, activeReport, user, question?.id, question?.prompt]);
+  }, [writeMode, resolved, res?.correct, res?.invalid, res?.revealed, attempt, activeReport, user, question?.id, question?.prompt]);
+
+  const cloudCheck = cloudCheckFor && attempt?.submissionId && cloudCheckFor.submissionId === attempt.submissionId
+    ? cloudCheckFor.result : null;
 
   const lineVerdicts = useMemo(
     () => mergeVerdicts(localLineVerdicts, cloudCheck, { lineCount: inkResult?.lines?.length || 0 }),
@@ -704,21 +831,27 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
 
   // The misconception the cloud check proposed, as the deterministic engine
   // judged it: 'confirmed' (recorded in learner state) or 'possible' (shown,
-  // hedged, never recorded). The backend decides; this only displays.
+  // hedged, never recorded). The backend decides; this only displays. The
+  // proposal names the submission it came from, and the backend ignores one
+  // that is not the submission of record.
   const [cloudMisconception, setCloudMisconception] = useState(null);
   useEffect(() => { setCloudMisconception(null); }, [question?.id]);
   useEffect(() => {
-    const proposal = misconceptionProposal(cloudCheck, inkResult?.lines || []);
-    if (!proposal || !question?.id) return;
+    const sid = cloudCheckFor?.submissionId;
+    if (!cloudCheck || !sid || attemptRef.current?.submissionId !== sid || !question?.id) return;
+    const proposal = misconceptionProposal(cloudCheck, attemptRef.current?.lines || []);
+    if (!proposal) return;
     let live = true;
-    api.post(`/practice/${question.id}/misconception`, proposal.body)
+    api.post(`/practice/${question.id}/misconception`, { ...proposal.body, submissionId: sid })
       .then(r => {
         const named = r?.status ? misconceptionById(r.id) : null;
-        if (live && named) setCloudMisconception({ status: r.status, named, line: proposal.displayLine });
+        if (live && named && attemptRef.current?.submissionId === sid) {
+          setCloudMisconception({ status: r.status, named, line: proposal.displayLine });
+        }
       })
       .catch(() => { });
     return () => { live = false; };
-  }, [cloudCheck, inkResult, question?.id]);
+  }, [cloudCheck, cloudCheckFor, question?.id]);
 
   // ── The board's own arithmetic ─────────────────────────────────────────────
   // CBSE marks per step: formula, substitution, final answer with units. A
@@ -751,14 +884,14 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       if (v.status === 'ok') {
         cards.push({
           kind: 'good', line: i + 1,
-          text: v.note || (i === 0 ? 'A valid starting point.' : 'Checks out — follows correctly from the line above.')
+          text: v.note || (i === 0 ? t('verdict.lineValidStart') : t('verdict.lineChecksOut'))
         });
       } else if (v.status === 'break' || v.status === 'wrong') {
-        cards.push({ kind: 'bad', line: i + 1, text: v.note || 'The maths breaks on this line.' });
+        cards.push({ kind: 'bad', line: i + 1, text: v.note || t('verdict.lineBreaks') });
       }
     });
     return cards.length ? cards : null;
-  }, [writeMode, lineVerdicts, inkResult]);
+  }, [writeMode, lineVerdicts, inkResult, t]);
   const canSubmit = isMcq ? mcqSel !== null : isWorking ? (writeMode ? !!inkResult?.lines?.length : !!working.trim()) : writeMode ? !!inkResult?.answerLine : !!answer.trim();
 
   const earnedMarks = resolved
@@ -822,7 +955,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         {/* The topic chip is where a student meets the name of what they are
             being asked, so it is the first place worth pairing. The question
             itself below is untouched: it will be in English in the exam hall. */}
-        <span className="tag"><TermGloss text={question.subtopicName} /></span>
+        <span className="tag" lang="en"><TermGloss text={question.subtopicName} /></span>
         <span className={`tag ${DIFF_CLASS[question.difficulty] || ''}`}>{question.diffLabel}</span>
         {reasonTag && REASON_TAG_KEY[reasonTag] && <span className="tag tag-brand" data-reason-tag={reasonTag}>{t(REASON_TAG_KEY[reasonTag])}</span>}
         {!reasonTag && reason === 'review' && <span className="tag tag-brand">{t('verdict.spacedReview')}</span>}
@@ -994,8 +1127,9 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
             <div className="ink-row">
               <div className="editor-shell" style={{ flex: 1, minWidth: 0 }}>
                 {InkAnswer && (
-                  <InkAnswer onRecognized={setInkResult} height={380} lineVerdicts={lineVerdicts}
-                    disabled={resolved} focusSymbol={checkFocus} recognitionContext={recognitionContext} />
+                  <InkAnswer onRecognized={onInkRecognized} onStrokes={onInkStrokes} initialStrokes={restoredInk}
+                    height={380} lineVerdicts={lineVerdicts}
+                    disabled={resolved || busy} focusSymbol={checkFocus} recognitionContext={recognitionContext} />
                 )}
                 {inkPhase === 'failed' && (
                   <div className="editor-body">
@@ -1180,15 +1314,18 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                         <span aria-hidden="true" style={{ marginRight: 7, color: row.earned === row.outOf ? 'var(--good, #1a8f4c)' : 'var(--bad, #c0392b)' }}>
                           {row.earned === row.outOf ? '✓' : '✗'}
                         </span>
-                        {row.label}
-                        {row.why && <span className="muted" style={{ display: 'block', fontSize: 11.5, marginTop: 2, marginLeft: 20 }}>{row.why}</span>}
+                        {row.labelKey ? t(row.labelKey) : row.label}
+                        {row.why && <span className="muted" style={{ display: 'block', fontSize: 11.5, marginTop: 2, marginLeft: 20 }}>{row.whyKey ? t(row.whyKey, { unit: row.whyVars?.unit ?? '' }) : row.why}</span>}
                       </span>
                       <span className="set-v" style={{ fontVariantNumeric: 'tabular-nums' }}>
                         <span className="sr-only">{t('verdict.rowMarks', { earned: row.earned, total: row.outOf })} </span>{row.earned}/{row.outOf}
                       </span>
                     </div>
                   ))}
-                  <p style={{ marginTop: 8, fontSize: 13 }}>{marksSentence(boardAward)}</p>
+                  <p style={{ marginTop: 8, fontSize: 13 }}>{(() => {
+                    const line = marksSentenceKey(boardAward);
+                    return line ? t(line.key, { awarded: line.vars.awarded, total: line.vars.total, count: line.vars.count, n: line.vars.n }) : null;
+                  })()}</p>
                   <p className="muted" style={{ fontSize: 11.5, marginTop: 6 }}>
                     {t('verdict.boardStyleNote')}
                   </p>
@@ -1392,7 +1529,7 @@ function attachPhoto(e, setPhoto, onReady, onPdf, onFailed) {
     URL.revokeObjectURL(url);
     // Previously a silent no-op: the student picked a file and the UI did not
     // move. A HEIC from an iPhone opened on Android lands here.
-    onFailed?.('That image could not be opened. Try photographing the page again, or save it as a JPEG first.');
+    onFailed?.(translate('verdict.imageUnopenable'));
   };
   img.src = url;
   e.target.value = '';

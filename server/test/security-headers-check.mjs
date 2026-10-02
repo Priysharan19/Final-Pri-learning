@@ -141,21 +141,25 @@ try {
   const csrf = setCookies.find(x => x.startsWith('pri_csrf='));
   c.ok(csrf && !/HttpOnly/i.test(csrf), 'CSRF cookie is readable by the client script');
 
-  // Request log: method, path, status, latency — never query strings, cookies,
-  // bodies, user agents or emails.
+  // Request log: one structured line per request — request id, method, route
+  // TEMPLATE, status, latency, release, engine — never query strings, raw
+  // paths, cookies, bodies, user agents or emails.
   await h.request('/v1/health?email=someone@example.test&token=abc');
   await h.request('/v1/health', { headers: { 'x-pri-request-id': 'req-abc.1' } });
   await h.request('/v1/health', { headers: { 'x-pri-request-id': '<script>alert(1)</script>' } });
   const serialized = JSON.stringify(logLines);
   c.ok(logLines.length >= 10, `request log has one line per request (${logLines.length})`);
-  c.ok(logLines.every(line => typeof line.method === 'string' && typeof line.path === 'string' && Number.isInteger(line.status) && typeof line.ms === 'number' && line.ms >= 0 && !Number.isNaN(Date.parse(line.ts))), 'every log line is {ts, method, path, status, ms}');
-  const allowedKeys = new Set(['ts', 'method', 'path', 'status', 'ms', 'requestId']);
+  c.ok(logLines.every(line => line.event === 'http_request' && typeof line.method === 'string' && typeof line.route === 'string' && Number.isInteger(line.status) && typeof line.ms === 'number' && line.ms >= 0 && !Number.isNaN(Date.parse(line.ts))), 'every log line is {ts, event, method, route, status, ms}');
+  c.ok(logLines.every(line => typeof line.requestId === 'string' && line.requestId.length > 0), 'every log line carries a request id (minted when the client sent none)');
+  c.ok(logLines.every(line => /^[0-9a-f]{40}$|^development-unknown$|^unknown$/.test(line.release) && line.db === 'sqlite'), 'every log line names the release SHA and the database engine');
+  const allowedKeys = new Set(['ts', 'level', 'event', 'requestId', 'method', 'route', 'status', 'ms', 'code', 'release', 'db']);
   c.ok(logLines.every(line => Object.keys(line).every(key => allowedKeys.has(key))), 'log lines carry no other fields');
   c.ok(!serialized.includes('someone@example.test') && !serialized.includes('token=abc') && !serialized.includes('?'), 'query strings never reach the log');
   c.ok(!serialized.includes('headers.student@example.test') && !serialized.includes('correct-horse-battery') && !/pri_cloud_session/.test(serialized), 'bodies and cookies never reach the log');
   c.ok(logLines.some(line => line.requestId === 'req-abc.1'), 'a well-formed X-Pri-Request-Id is echoed for correlation');
   c.ok(!serialized.includes('<script>'), 'a malformed request id is dropped, not logged');
-  const shellLine = logLines.find(line => line.path === '/' && line.status === 200);
+  c.ok(logLines.some(line => line.route === '/v1/health' && line.status === 200), 'API lines name the route template');
+  const shellLine = logLines.find(line => line.route === 'static' && line.status === 200);
   c.ok(shellLine, 'static responses are logged too');
 } finally {
   await h.close();

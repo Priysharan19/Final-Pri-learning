@@ -1,5 +1,7 @@
 import { decryptDeliveryToken } from './deliveryCrypto.js';
 import { asStore, assertNoOpenTransaction, sqliteHandle } from './store.js';
+import { recordAuthEmail } from './metrics.js';
+import { logEvent, safeCode as logCode } from './observability.js';
 
 const MAX_ATTEMPTS = 8;
 const DEFAULT_BATCH = 20;
@@ -239,10 +241,16 @@ export async function drainAuthDeliveryOutbox(db, {
         SET delivered_at=?, token_ciphertext='', provider_message_id=?, next_attempt_at=NULL, last_error_code=NULL
         WHERE id=? AND delivered_at IS NULL`, [now, String(result?.providerMessageId || '').slice(0, 160) || null, row.id]);
       sent += 1;
+      recordAuthEmail({ ok: true });
     } catch (error) {
       const terminal = attempt >= MAX_ATTEMPTS;
-      await db.run(`UPDATE auth_delivery_outbox SET last_error_code=?, next_attempt_at=? WHERE id=? AND delivered_at IS NULL`, [safeCode(error?.code), terminal ? null : now + retryDelay(attempt), row.id]);
+      const code = safeCode(error?.code);
+      await db.run(`UPDATE auth_delivery_outbox SET last_error_code=?, next_attempt_at=? WHERE id=? AND delivered_at IS NULL`, [code, terminal ? null : now + retryDelay(attempt), row.id]);
       failed += 1;
+      recordAuthEmail({ ok: false, code: logCode(code, 'DELIVERY_FAILED') });
+      // The destination, token and action URL never reach the log: only the
+      // coded failure, the attempt number and whether retries are exhausted.
+      logEvent(terminal ? 'error' : 'warn', 'auth_email_failed', { kind: row.kind, code: logCode(code, 'DELIVERY_FAILED'), attempt, state: terminal ? 'exhausted' : 'retrying' });
     } finally {
       rawToken = null;
     }
@@ -270,9 +278,9 @@ export function startAuthDeliveryWorker(db, {
     running = true;
     try {
       const result = await drainAuthDeliveryOutbox(db, { send, publicOrigin });
-      if (result.failed) console.error('auth_delivery_failed', { count: result.failed });
+      if (result.failed) logEvent('warn', 'auth_delivery_failed', { count: result.failed });
     } catch (error) {
-      console.error('auth_delivery_worker_error', { code: safeCode(error?.code, 'WORKER_ERROR') });
+      logEvent('error', 'auth_delivery_worker_error', { code: safeCode(error?.code, 'WORKER_ERROR') });
     } finally {
       running = false;
     }
