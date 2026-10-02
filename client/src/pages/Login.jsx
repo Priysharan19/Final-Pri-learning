@@ -274,7 +274,7 @@ export default function Login() {
           : t('login.notChosen'))
     : (selectedCourse?.[1] || form.course.toUpperCase()) + ' · ' + t('common.yearNumber', { n: form.year });
 
-  async function go(path, body) {
+  async function go(path, body, { cloud = cloudIntent } = {}) {
     setBusy(true); setError('');
     try {
       const r = await api.post(path, body);
@@ -282,7 +282,7 @@ export default function Login() {
       // the authenticated shell. Move the cloud handoff first so the destination
       // cannot be lost during that identity transition. The local profile is
       // already authoritative here because the POST completed successfully.
-      if (cloudIntent) nav(CLOUD_ACCOUNT_ROUTE, { replace: true, flushSync: true });
+      if (cloud) nav(CLOUD_ACCOUNT_ROUTE, { replace: true, flushSync: true });
       setUser(r.user);
       refreshDue();
       return r;
@@ -319,7 +319,10 @@ export default function Login() {
       Class 10 student, without first creating a profile of your own. */
   const tryDemo = () => {
     localStorage.setItem('pri-seen-hero', '1');
-    void go('/profiles/demo', {});
+    // A cloud sign-in started earlier and backed out of must not send the
+    // demo student to the account page.
+    setCloudIntent(false);
+    void go('/profiles/demo', {}, { cloud: false });
   };
 
   /** Open/select the local profile first, then hand it to the real cloud account panel. */
