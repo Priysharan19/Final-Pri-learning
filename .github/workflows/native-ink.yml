@@ -13,6 +13,9 @@ on:
       - 'client/src/platform/native/**'
       - 'client/test/native-ink-check.mjs'
       - 'scripts/native-bridge-selfcheck.mjs'
+      - 'scripts/iphone-journey.mjs'
+      - 'scripts/cloud-fixture-server.mjs'
+      - 'scripts/apple-shipping-target.mjs'
       - 'scripts/ink-native-check.mjs'
       - 'scripts/check-native-package-sync.mjs'
       - 'handwriting/v12/**'
@@ -25,6 +28,9 @@ on:
       - 'client/src/platform/native/**'
       - 'client/test/native-ink-check.mjs'
       - 'scripts/native-bridge-selfcheck.mjs'
+      - 'scripts/iphone-journey.mjs'
+      - 'scripts/cloud-fixture-server.mjs'
+      - 'scripts/apple-shipping-target.mjs'
       - 'scripts/ink-native-check.mjs'
       - 'scripts/check-native-package-sync.mjs'
       - 'handwriting/v12/**'
@@ -38,7 +44,7 @@ jobs:
   native-ink:
     name: Swift build, native benchmark and bridge smoke test
     runs-on: macos-15
-    timeout-minutes: 30
+    timeout-minutes: 60
 
     steps:
       - uses: actions/checkout@v4
@@ -70,3 +76,48 @@ jobs:
       # same-origin subframe refused by the sender gate. Simulator evidence.
       - name: priNative bridge self-check (iPad simulator)
         run: node scripts/native-bridge-selfcheck.mjs --family ipad
+
+      # CP-04: main is the iPad-only V1 shipping target (PRI_V1_RELEASE_SCOPE).
+      - name: Apple shipping target is iPad-only (V1)
+        run: node scripts/apple-shipping-target.mjs --check-v1
+
+      # iPhone engineering: one simulator build of a scratch copy that adds the
+      # iPhone family (never archived), reused by every step below.
+      - name: Build the simulator app (iPad + iPhone engineering copy)
+        run: |
+          set -euo pipefail
+          ENG="$(node scripts/apple-shipping-target.mjs --engineering-package "$RUNNER_TEMP/eng")"
+          (cd "$ENG" && xcodebuild -scheme PriLearning -destination 'generic/platform=iOS Simulator' -derivedDataPath "$RUNNER_TEMP/dd" build -quiet)
+          APP="$(find "$RUNNER_TEMP/dd/Build/Products" -maxdepth 2 -name '*.app' -path '*iphonesimulator*' | head -1)"
+          test -n "$APP"
+          echo "PRI_SIM_APP=$APP" >> "$GITHUB_ENV"
+
+      # The same shell on an iPhone simulator, and the native student journey
+      # on iPhone and iPad (onboarding → typed attempt marked → feedback → next
+      # → native ink reading with hardware-correct ink facts → progress →
+      # relaunch persistence). SYNTHETIC / SIMULATOR evidence records uploaded.
+      - name: priNative bridge self-check (iPhone simulator)
+        run: node scripts/native-bridge-selfcheck.mjs --family iphone --app "$PRI_SIM_APP"
+
+      # CP-05: the iPhone certification journey adds, on the same install, the
+      # cloud account against a REAL Pri server (scripts/cloud-fixture-server.mjs:
+      # sign up → sign in → delete; sign in → sync; offline with the server gone;
+      # reconnect after relaunch; disconnect), background → foreground with an
+      # unsent answer, an in-shell accessibility smoke, and the largest
+      # accessibility text size with no sideways overflow.
+      - name: Server dependencies for the cloud fixture
+        run: npm ci --prefix server
+
+      - name: iPhone certification journey (simulator)
+        run: node scripts/iphone-journey.mjs --family iphone --app "$PRI_SIM_APP" --cloud --dynamic-type --lifecycle --a11y --evidence journey-iphone.json
+
+      - name: iPad journey (simulator)
+        run: node scripts/iphone-journey.mjs --family ipad --app "$PRI_SIM_APP" --dynamic-type --lifecycle --a11y --evidence journey-ipad.json
+
+      - name: Simulator evidence records
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-simulator-evidence
+          path: journey-*.json
+          if-no-files-found: warn

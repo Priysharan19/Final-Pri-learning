@@ -19,7 +19,9 @@ This is the durable ledger for CP-02 → CP-12 and SEC-COMM-01. Each CP's own PR
 |---|---|---|---|---|---|---|
 | CP-01 Architecture audit | COMPLETE | `421f1ff1` | `1291d4bd` | [#250](https://github.com/Priysharan19/Final-Pri-learning/pull/250) | `fa1c44df` | n/a (audit) |
 | CP-02 Platform Bridge Foundation | SOFTWARE IMPLEMENTATION: COMPLETE | `fa1c44df` | `f089d550` | [#253](https://github.com/Priysharan19/Final-Pri-learning/pull/253) | `2261f03b` | DEFERRED |
-| CP-03 Responsive Product Foundation | SOFTWARE IMPLEMENTATION: COMPLETE once merged | `2261f03b` | recorded by CP-04 | this PR | recorded by CP-04 | DEFERRED |
+| CP-03 Responsive Product Foundation | SOFTWARE IMPLEMENTATION: COMPLETE | `2261f03b` | `6b9235a0` | [#261](https://github.com/Priysharan19/Final-Pri-learning/pull/261) | `003cc053` | DEFERRED |
+| CP-04 iPhone Product | SOFTWARE IMPLEMENTATION: COMPLETE | `003cc053` | `09d868b6` | [#266](https://github.com/Priysharan19/Final-Pri-learning/pull/266) | `3ed4f9c4` | DEFERRED |
+| CP-05 iPhone Automated Certification | SOFTWARE IMPLEMENTATION: COMPLETE once merged | `3ed4f9c4` | recorded by the next CP | this PR | recorded by the next CP | DEFERRED |
 
 ## CP-02 — Platform Bridge Foundation
 
@@ -131,3 +133,71 @@ This is the durable ledger for CP-02 → CP-12 and SEC-COMM-01. Each CP's own PR
 - Existing phone and KALP tours pass unchanged: phone 53/53, KALP-01 24/24, KALP-02 68/68, KALP-03 53/53.
 
 **Deferred (physical):** real-device keyboard behaviour, notch/safe-area rendering in an installed web app, and touch feel on small phones.
+
+**CP-03 exact-head evidence (recorded by CP-04):**
+- Candidate `6b9235a0`, after merging `main` twice during review (#259 migration CLI transactions, then #255 misconception ontology); only generated bundles conflicted, and they were rebuilt.
+- Clean-worktree local run on `6b9235a0`: `npm test` exit 0; e2e 235/235 across 7 flows; responsive matrix 145/145 in Chromium **and** WebKit; phone tour 53/53; KALP-04 26/26; accessibility gate exit 0.
+- GitHub CI on `6b9235a0`: 27 checks pass, 3 skipped (path-filtered mirror/iPad-shell jobs), 0 failing, including all four required checks.
+- Merged as `003cc053` with `--match-head-commit`. Verified on `main`: `client/src/platform/formFactor.js` present, form-factor check 27/27, architecture guard 267/267, native host contract 76/76, and still no `android/` directory.
+- One transient failure is recorded honestly: an earlier local accessibility run on the previous head exited 1 with "0/1 checks" in its metadata group while the host was under heavy parallel load. A re-run passed with no code change, and CI passed it on the exact head.
+
+## CP-04 — iPhone Product
+
+**Delivered:** the iPhone results are in [IPHONE_GAP_REPORT.md](IPHONE_GAP_REPORT.md) §5. In summary:
+- Finger-default native ink where no Apple Pencil can exist (`InkSurface.fingerDrawingEnabled`; host facts `ink.stylus` / `ink.fingerDefault`, mirrored by the page). iPad stays Pencil-first.
+- Dynamic Type as page zoom, capped so the CSS viewport never drops below 360 px, with zoom-aware native ink placement.
+- iPhone portrait-only; iPad keeps all orientations.
+- Account-action deep links routed only for the signed cloud host, with the token fragment never logged. Dormant until Associated Domains exist (**BLOCKED_EXTERNAL**).
+- `scripts/apple-shipping-target.mjs`: `main` declares **iPad only** (V1 hard blocker #1 closed in code; `--check-v1` in CI). iPhone engineering CI builds a scratch copy with the iPhone family that is never archived.
+- Simulator harnesses compiled only in DEBUG: `BridgeSelfCheck` (8 checks, including zoom-aware ink placement) and `JourneySelfCheck` (onboarding → practice → typed attempt marked → feedback → next → native ink → progress → persistence → relaunch).
+- The package drift gate widened to `Info.plist`, models and assets (36 files). The stale `PriLearning.swiftpm.zip` was removed.
+- `native-ink.yml` runs on the macOS runner: `--check-v1`, one engineering build, the iPhone bridge self-check, the iPhone and iPad journeys, and an uploaded evidence artefact.
+
+**V1 scope reconciliation:** `docs/release/PRI_V1_RELEASE_SCOPE.md` (owner, PR #257) makes V1 iPad-only. CP-04's iPhone work therefore ships only as engineering capability on `main`. A public iPhone release needs the V1 scope-change procedure (**BLOCKED_GOVERNANCE**) and the physical gates in [IPHONE_GAP_REPORT.md](IPHONE_GAP_REPORT.md) §4.
+
+**Simulator evidence (S2, synthetic):** local runs on 2026-10-01 UTC were 11/11 journey steps on an iPhone 18 Pro simulator and on an iPad Pro 13-inch (M5) simulator, both iOS 27.0, plus the bridge self-check 8/8 on both. CI repeats these on its own simulators and uploads the evidence records.
+
+**Environment note:** the local iPad `ink-native` benchmark run scored 93.8% and 6/10 below its floor. The same failure reproduces on untouched `main`, so it comes from the local iOS 27.0 Vision runtime and not from CP-04. The macOS CI benchmark passes. No threshold was changed.
+
+**Deferred (physical):** finger writing feel on a real iPhone, VoiceOver, and real Dynamic Type sizes on hardware. Also an iPad + Apple Pencil smoke test, because the Swift ink and shell code changed.
+
+**CP-04 exact-head evidence (recorded by CP-05):**
+- Candidate `09d868b6`. `main` was merged in three times during review because parallel work kept landing. Only the generated iOS bundles conflicted; they were rebuilt from the committed tree and resynced.
+- GitHub CI on the candidate: all four required checks pass. 25 checks passed, 3 were skipped (path-filtered), and the Swift job (not required) was still running at merge time.
+- **Swift build, native benchmark and bridge smoke test** (macOS runner, not a required check) failed on the earlier CP-04 heads in both trigger runs, from the simulator rather than a product assertion:
+  - the pull-request run: `simctl launch` → `FBSOpenApplicationServiceErrorDomain code=1`;
+  - the push run: the app launched, but the bridge self-check logged no summary within its window.
+  - It was re-run once, which is the infrastructure allowance. CP-05 adds a launch retry to both harnesses, and **CP-05's own CI must show that job green**. It is not waived.
+- Merged as `3ed4f9c4` with `--match-head-commit`.
+
+## CP-05 — iPhone Automated Certification
+
+**Delivered:** the full results are in [IPHONE_GAP_REPORT.md](IPHONE_GAP_REPORT.md) §6. In summary:
+- `scripts/iphone-journey.mjs --cloud --dynamic-type --lifecycle --a11y` drives the real app in the real WKWebView. The cloud phases run against the **real server** on a throwaway database, through `scripts/cloud-fixture-server.mjs` (fixture accounts only; the credentials pass through `SIMCTL_CHILD_` environment variables and are never logged). Steps covered:
+  - sign-up, then login;
+  - sign-in, sync, then session kept across a relaunch;
+  - logout, with server-side proof from the fixture server's log;
+  - account deletion, with the server refusing that account afterwards;
+  - typed attempt → feedback → next;
+  - finger-default native ink and native photo OCR, both programmatic;
+  - offline practice, with sync not offered;
+  - reconnect sync;
+  - background → foreground keeps a draft;
+  - relaunch persistence;
+  - a DOM-level accessibility smoke check;
+  - Dynamic Type at the largest accessibility size with no sideways overflow.
+- Every run writes a `SYNTHETIC_SIMULATOR` evidence record with `physicalDevice: false`. `native-ink.yml` runs the full journey and uploads the records.
+- **Product bugs found and fixed:**
+  1. CP-04's Dynamic Type used `pageZoom`, which magnifies without reflowing and clipped the iPhone page. It now goes through the viewport (width ÷ capped scale) at document start. Ink placement uses `pageZoom × zoomScale` and is re-placed on zoom changes. Width rules that used `vw` now use `%`.
+  2. The account label read "sign-in required" when the server was simply unreachable. It now distinguishes `Linked · offline`, `Linked · cloud unavailable`, `Linked · sign-in required` (401 only) and `Linked · checking…`.
+  3. Every successful Sync or refresh dropped a connected account back to "sign-in required" (pre-existing). It now stays connected.
+- Both harnesses retry the launch when the simulator's SpringBoard is not ready.
+
+**Simulator evidence (S2, synthetic, 2026-10-02 local):** iPhone 18 Pro, iOS 27.0: **28/28** journey steps. iPad Pro 13-inch (M5): **16/16**. Bridge self-check 8/8 on both. The records are `docs/release/evidence/cp05/journey-{iphone,ipad}.local.json`.
+
+**Not automated (stated, not hidden):**
+- StoreKit Testing / restore: `SKTestSession` needs an XCTest target, which the SwiftPM app package does not have. That is a tooling gap. Sandbox purchases are **BLOCKED_EXTERNAL**.
+- XCUITest `performAccessibilityAudit`: same reason.
+- Live ink placement at large text sizes.
+
+**Deferred (physical):** small, standard and large iPhones; finger writing feel; camera; keyboard; VoiceOver; Dynamic Type on hardware; StoreKit sandbox; process death under real memory pressure; launch performance.

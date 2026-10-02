@@ -19,17 +19,37 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { existsSync, mkdtempSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
+import { engineeringPackage } from './apple-shipping-target.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PACKAGE = join(HERE, '../ios/PriLearning.swiftpm');
-const EXPECTED = ['hostPresent', 'deepFrozen', 'notReplaceable', 'noOsIdentity', 'mainRoundTrip', 'subframeRefused', 'subframeHasNoHost'];
+const EXPECTED = ['hostPresent', 'deepFrozen', 'notReplaceable', 'noOsIdentity', 'mainRoundTrip', 'subframeRefused', 'subframeHasNoHost', 'inkPlacementZoom'];
 
+// `log show --start` takes LOCAL time; a UTC stamp would re-read hours of old runs.
+const localStamp = d => { const p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`; };
 const argOf = name => {
   const i = process.argv.indexOf(`--${name}`);
   return i > 0 ? process.argv[i + 1] : null;
 };
 const run = (cmd, args, opts = {}) =>
   execFileSync(cmd, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 64 * 1024 * 1024, ...opts });
+
+// A freshly booted simulator can refuse a launch until SpringBoard is ready
+// ("denied by service delegate (SBMainWorkspace)"). Wait for the boot to finish,
+// then retry that specific refusal a few times; any other error is real.
+function launchApp(device, bundleId, args = [], opts = {}) {
+  try { run('xcrun', ['simctl', 'bootstatus', device, '-b']); } catch { /* best effort */ }
+  for (let attempt = 1; ; attempt++) {
+    try { return run('xcrun', ['simctl', 'launch', device, bundleId, ...args], opts); }
+    catch (error) {
+      const text = String(error?.stderr || error?.message || '');
+      if (attempt >= 5 || !/SBMainWorkspace|FBSOpenApplicationServiceErrorDomain/.test(text)) throw error;
+      console.log(`  (simulator not ready to launch yet; retry ${attempt})`);
+      execSync('sleep 6');
+    }
+  }
+}
+
 
 function pickDevice() {
   const named = argOf('device');
@@ -63,18 +83,25 @@ function builtApp(derived) {
 
 const sim = pickDevice();
 const device = sim.udid;
+const udid = device;
 console.log(`priNative bridge self-check on ${sim.name} (${sim.udid}) (synthetic simulator evidence)\n`);
 ensureBooted(sim);
-const derived = mkdtempSync(join(tmpdir(), 'pri-bridge-'));
-console.log('Building…');
-run('xcodebuild', ['-scheme', 'PriLearning', '-destination', `platform=iOS Simulator,id=${device}`,
-  '-derivedDataPath', derived, 'build'], { cwd: PACKAGE });
-const app = builtApp(derived);
+// `main` is iPad-only (the V1 shipping target); an iPhone simulator run builds
+// the engineering copy that adds the iPhone family. --app reuses a prebuilt
+// simulator .app (CI builds once and runs every step against it).
+let app = argOf('app');
+if (!app) {
+  const derived = mkdtempSync(join(tmpdir(), 'pri-sim-'));
+  const pkg = /iPhone/.test(sim.name) ? engineeringPackage(join(derived, 'pkg')) : PACKAGE;
+  console.log(`Building ${pkg === PACKAGE ? 'the canonical package' : 'the iPhone engineering copy'}…`);
+  run('xcodebuild', ['-scheme', 'PriLearning', '-destination', `platform=iOS Simulator,id=${udid}`, '-derivedDataPath', derived, 'build'], { cwd: pkg });
+  app = builtApp(derived);
+}
 const bundleId = run('/usr/bin/plutil', ['-extract', 'CFBundleIdentifier', 'raw', '-o', '-', join(app, 'Info.plist')]).trim();
 try { run('xcrun', ['simctl', 'terminate', device, bundleId]); } catch { /* not running */ }
 run('xcrun', ['simctl', 'install', device, app]);
-const started = new Date(Date.now() - 2000).toISOString().replace('T', ' ').slice(0, 19);
-run('xcrun', ['simctl', 'launch', device, bundleId, '--bridge-selfcheck']);
+const started = localStamp(new Date(Date.now() - 2000));
+launchApp(device, bundleId, ['--bridge-selfcheck']);
 
 let lines = [];
 for (let i = 0; i < 45; i++) {
@@ -82,6 +109,8 @@ for (let i = 0; i < 45; i++) {
   const log = run('xcrun', ['simctl', 'spawn', device, 'log', 'show', '--start', started,
     '--predicate', 'eventMessage CONTAINS "PRIBRIDGE"', '--style', 'compact']);
   lines = log.split('\n').filter(l => l.includes('PRIBRIDGE') && !l.includes("'log'")).map(l => l.slice(l.indexOf('PRIBRIDGE')));
+  const startAt = lines.lastIndexOf('PRIBRIDGE bridge self-check started');
+  lines = startAt >= 0 ? lines.slice(startAt) : [];
   if (lines.some(l => l.startsWith('PRIBRIDGE summary'))) break;
 }
 try { run('xcrun', ['simctl', 'terminate', device, bundleId]); } catch { /* already gone */ }
