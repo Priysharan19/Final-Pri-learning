@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
+import { cloud } from '../platform/cloudTransport.js';
+import { resolveHomeRecommendation } from '../home/recommendation.js';
 import { useApp } from '../App.jsx';
 import { dotpointAvailable, practiceTargetAvailable, topicAvailability } from '../engine/curriculumAvailability.js';
 import { dayKey, formatWeekday } from '../lib/locale.js';
@@ -8,20 +10,19 @@ import { useT, useTx } from '../i18n/index.js';
 import { textMatches, useGlossary } from '../i18n/glossary.js';
 import TermGloss from '../components/TermGloss.jsx';
 
-// Deliberately English in every language. These are jokes that live entirely
-// in the English idiom of a maths classroom — "The proof is left as an exercise
+// Jokes in the idiom of a maths classroom — "The proof is left as an exercise
 // for you", "Integrate practice. Differentiate yourself." A translated pun is
-// not the same joke, and a limp one on the home screen is worse than an English
-// one a Hindi-medium student will read perfectly well. If they are ever
-// rewritten for Hindi it should be as new jokes, not as translations of these.
-const TAGLINES = [
-  'The rest is algebra.',
-  'The proof is left as an exercise for you.',
-  'This should simplify nicely.',
-  'Assume nothing. Prove everything.',
-  'Every mark is one dot point away.',
-  'Integrate practice. Differentiate yourself.',
-  'Q.E.D. before dinner.',
+// not the same joke, so the Hindi catalogue carries a tagline written for a
+// Hindi-medium classroom under each key (उपपत्ति…, इति सिद्धम्), translated in
+// spirit rather than pun for pun.
+const TAGLINE_KEYS = [
+  'home.tagline1',
+  'home.tagline2',
+  'home.tagline3',
+  'home.tagline4',
+  'home.tagline5',
+  'home.tagline6',
+  'home.tagline7',
 ];
 
 const DIFF_KEYS = { 1: 'difficulty.1', 2: 'difficulty.2', 3: 'difficulty.3', 4: 'difficulty.4' };
@@ -35,8 +36,11 @@ export default function Home() {
   const nav = useNavigate();
   const t = useT();
   const tx = useTx();
-  const [stats, setStats] = useState(null);
+  const [local, setLocal] = useState(null);
   const [curriculum, setCurriculum] = useState(null);
+  const [assignments, setAssignments] = useState(null);
+  const stats = local?.stats || null;
+  const [online, setOnline] = useState(() => typeof navigator === 'undefined' ? true : navigator.onLine !== false);
   const [open, setOpen] = useState(false);
   const [cat, setCat] = useState('year');
   const saved = useRef(loadSaved());
@@ -45,7 +49,6 @@ export default function Home() {
   const [subtopic, setSubtopic] = useState(saved.current.subtopic ?? null);
   const [dotpoint, setDotpoint] = useState(saved.current.dotpoint ?? null);
   const [difficulty, setDifficulty] = useState(saved.current.difficulty ?? null);
-  const [promoGone, setPromoGone] = useState(localStorage.getItem('pri-home-promo') === 'off');
   // Typed into the topic filter. Kept out of the saved filter set on purpose:
   // it is how you find a topic, not part of what you asked for.
   const [topicQuery, setTopicQuery] = useState('');
@@ -54,8 +57,54 @@ export default function Home() {
   // gets a working English filter, because textMatches falls back to the label.
   useGlossary(user?.mathsGloss === true);
 
-  useEffect(() => { api.get('/stats').then(setStats).catch(() => { }); }, []);
-  useEffect(() => { api.get('/curriculum').then(setCurriculum).catch(() => { }); }, []);
+  useEffect(() => {
+    let live = true;
+    Promise.allSettled([
+      api.get('/stats'), api.get('/curriculum'), api.get('/tasks'),
+      api.get('/exams'), api.get('/practice/resume')
+    ]).then(([statsR, curriculumR, tasksR, examsR, resumeR]) => {
+      if (!live) return;
+      if (curriculumR.status === 'fulfilled') setCurriculum(curriculumR.value);
+      setLocal({
+        stats: statsR.status === 'fulfilled' ? statsR.value : null,
+        tasks: tasksR.status === 'fulfilled' ? (tasksR.value.tasks || []) : [],
+        exams: examsR.status === 'fulfilled' ? (examsR.value.exams || []) : [],
+        resume: resumeR.status === 'fulfilled' ? (resumeR.value.resume || null) : null
+      });
+    });
+    return () => { live = false; };
+  }, [user.id]);
+
+  useEffect(() => {
+    const update = () => setOnline(navigator.onLine !== false);
+    window.addEventListener('online', update);
+    window.addEventListener('offline', update);
+    return () => {
+      window.removeEventListener('online', update);
+      window.removeEventListener('offline', update);
+    };
+  }, []);
+
+  useEffect(() => {
+    let live = true;
+    const load = async () => {
+      if (!online) {
+        if (live) setAssignments(false);
+        return;
+      }
+      try {
+        const [me, result] = await Promise.all([cloud.me(), cloud.assignments()]);
+        if (!live) return;
+        setAssignments(me?.account?.role === 'student' && Array.isArray(result?.assignments) ? result.assignments : null);
+      } catch (err) {
+        if (!live) return;
+        setAssignments(err?.status === 401 || err?.code === 'CLOUD_DISABLED' ? null : false);
+      }
+    };
+
+    load();
+    return () => { live = false; };
+  }, [online, user.id]);
   useEffect(() => {
     localStorage.setItem('pri-gen-filters', JSON.stringify({ year, sectionKey, subtopic, dotpoint, difficulty }));
   }, [year, sectionKey, subtopic, dotpoint, difficulty]);
@@ -130,7 +179,9 @@ export default function Home() {
     if (selectedDotpoint && !dotpointAvailable(selectedDotpoint)) setDotpoint(null);
   }, [curriculum, subtopic, selSub, selectedDotpoint]);
 
-  const india = curriculum?.country === 'in';
+  // The profile is already authoritative for region; do not flash Australian
+  // “Year” copy while the asynchronous curriculum response is still loading.
+  const india = user.course === 'in';
   const chips = [];
   if (year != null) chips.push({ k: 'year', label: t(india ? 'common.classNumber' : 'common.yearNumber', { n: year }), clear: () => { setYear(user.year); setSectionKey(null); setSubtopic(null); setDotpoint(null); } });
   if (section) chips.push({ k: 'course', label: section.label, clear: () => { setSectionKey(null); setSubtopic(null); setDotpoint(null); } });
@@ -150,12 +201,35 @@ export default function Home() {
 
   const resetAll = () => { setSectionKey(null); setSubtopic(null); setDotpoint(null); setDifficulty(null); setYear(user.year); };
 
+  const homeDecision = useMemo(() => local ? resolveHomeRecommendation({
+    user, stats, dueCount, tasks: local.tasks, exams: local.exams, resume: local.resume,
+    assignments: Array.isArray(assignments) ? assignments : [], online, cloudReady: Array.isArray(assignments)
+  }) : { primary: null, alternatives: [] }, [local, user, stats, dueCount, assignments, online]);
+
   return (
     <div className="home-wrap">
       <h1 className="home-greet">{tx('home.greeting', { greeting, name: <b>{firstName}</b> })}</h1>
       <Tagline />
 
-      {/* ── The question generator ── */}
+      <HomeAction primary action={homeDecision.primary} nav={nav} />
+      {assignments === false && (
+        <div className="card home-cloud-note" role="status">
+          {t('home.cloudUnavailable')}
+        </div>
+      )}
+
+      <div className="home-cards home-support-grid">
+        <GoalCard user={user} activity={stats?.activity || []} onGo={() => nav('/practice')} />
+        {homeDecision.alternatives.map(item => (
+          <HomeAction key={item.kind + ':' + item.id} action={item} nav={nav} />
+        ))}
+      </div>
+
+      <section className="home-manual">
+        <h2 id="home-manual-title">{t('nav.practice')}</h2>
+      </section>
+
+      {/* ── Manual practice configuration is deliberately secondary ── */}
       <div className="genbar">
         <div className={`genbar-head ${open ? 'open' : ''}`}>
           <button className="genbar-toggle" onClick={() => setOpen(o => !o)}
@@ -288,7 +362,7 @@ export default function Home() {
                     {[1, 2, 3, 4].filter(d => !section?.difficultyCeiling || d <= section.difficultyCeiling).map(d => (
                       <button key={d} className={`gen-opt ${difficulty === d ? 'on' : ''}`}
                         onClick={() => setDifficulty(difficulty === d ? null : d)}>
-                        D{d} · {t(DIFF_KEYS[d])}
+                        {`D${d}`} · {t(DIFF_KEYS[d])}
                       </button>
                     ))}
                   </div>
@@ -299,61 +373,95 @@ export default function Home() {
         )}
       </div>
 
-      {/* ── Bottom cards ── */}
-      <div className="home-cards">
-        <GoalCard user={user} activity={stats?.activity || []} onGo={() => nav('/practice')} />
-        <div className="home-card" style={{ maxWidth: 380 }}>
-          <div className="spread">
-            <span className="sc-label" style={{ margin: 0 }}>{t('home.questionsCompleted')}</span>
-            {stats && stats.recent?.some(a => a.correct) && <span className="sc-label" style={{ margin: 0, color: 'var(--good)' }}>{t('home.gettingStronger')}</span>}
-          </div>
-          <DiamondTrack recent={stats?.recent || []} />
-        </div>
-        {!promoGone && (
-          <div className="home-card">
-            <button className="home-card-x" aria-label={t('home.dismissAdaptive')}
-              onClick={() => { setPromoGone(true); localStorage.setItem('pri-home-promo', 'off'); }}>✕</button>
-            <span className="sc-label" style={{ margin: 0 }}>{t('home.adaptiveEngine')}</span>
-            <div className="spread" style={{ marginTop: 8, flexWrap: 'wrap', gap: 14 }}>
-              <div style={{ fontSize: 21, lineHeight: 1.35, maxWidth: 300 }}>
-                {dueCount > 0
-                  ? tx('home.reviewDue', { count: dueCount, n: <b>{dueCount}</b> })
-                  : t('home.adaptiveOn')}
-              </div>
-              <button className="btn btn-primary" onClick={() => nav('/practice')}>
-                {dueCount > 0 ? t('home.startReviewing') : t('home.smartPractice')}
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
     </div>
   );
 }
 
+const WORK_REASONS = {
+  overdue: 'home.reason.overdue', due: 'home.reason.due', started: 'home.reason.started',
+  returned: 'home.reason.returned', ready: 'home.reason.ready'
+};
+
+function actionCopy(action, user, t) {
+  const d = action.data || {};
+  const genericTitle = {
+    'practice-resume': 'home.next.resumePractice', reviews: 'nav.review',
+    'daily-goal': 'home.goalRemaining',
+    'first-practice': user.course === 'in' ? 'home.next.firstIndia' : 'home.next.firstNsw',
+    adaptive: 'nav.practice', 'smart-practice': 'nav.practice'
+  }[action.kind];
+  const title = (action.kind === 'task-resume' ? t('common.continue') + ': ' : '') + (d.title || t(genericTitle, d));
+  let reason = action.kind === 'exam' ? 'home.reason.examInProgress'
+    : action.kind === 'assignment' || action.kind === 'task' ? WORK_REASONS[d.status]
+      : action.kind.endsWith('resume') ? 'home.reason.resume'
+      : action.kind === 'reviews' ? 'home.reviewDue'
+      : action.kind === 'daily-goal' ? 'home.goalTarget'
+      : action.kind === 'adaptive' ? 'home.reason.adaptive'
+      : action.offlineCaveat ? 'home.reason.practiceOffline' : 'home.reason.practice';
+  const cta = action.kind === 'reviews' ? 'nav.review'
+    : ['exam', 'assignment', 'task', 'task-resume', 'practice-resume'].includes(action.kind) ? 'common.continue' : 'nav.practice';
+  return { title, reason: t(reason, { ...d, date: action.dueAt ? new Date(action.dueAt).toLocaleDateString() : '' }), cta: t(cta) };
+}
+
+function HomeAction({ action, nav, primary }) {
+  const { user } = useApp();
+  const t = useT();
+  if (!action) return null;
+  const copy = actionCopy(action, user, t);
+  if (!primary) {
+    // Alternatives share CTA words ("Continue", "Practice"), so each button is
+    // named by its own card title and described by its own reason.
+    const key = String(action.id || action.destination || copy.title).replace(/[^A-Za-z0-9_-]/g, '-');
+    const titleId = `home-alt-title-${key}`;
+    const reasonId = `home-alt-reason-${key}`;
+    return (
+      <article className="home-card" data-home-alt aria-labelledby={titleId}>
+        <strong id={titleId}>{copy.title}</strong>
+        <p id={reasonId}>{copy.reason}</p>
+        <button className="btn btn-ghost btn-sm" aria-describedby={reasonId}
+          aria-labelledby={`${titleId}-cta ${copy.title === copy.cta ? reasonId : titleId}`}
+          onClick={() => nav(action.destination)}><span id={`${titleId}-cta`}>{copy.cta}</span></button>
+      </article>
+    );
+  }
+  const reasonId = 'home-primary-reason';
+  return (
+    <section className="card home-command" data-home-primary aria-labelledby="home-next-title">
+      <div className="home-command-copy">
+        <div className="home-command-kicker">{t('nav.practice')}</div>
+        <h2 id="home-next-title">{copy.title}</h2>
+        <p id={reasonId}>{copy.reason}</p>
+      </div>
+      <button className="btn btn-primary home-command-cta" data-home-primary-cta
+        aria-describedby={reasonId} onClick={() => nav(action.destination)}>{copy.cta}</button>
+    </section>
+  );
+}
+
 function Tagline() {
-  const [idx, setIdx] = useState(() => Math.floor(Math.random() * TAGLINES.length));
+  const t = useT();
+  const [idx, setIdx] = useState(() => Math.floor(Math.random() * TAGLINE_KEYS.length));
   const [len, setLen] = useState(0);
   const [phase, setPhase] = useState('typing'); // typing | holding | deleting
 
   useEffect(() => {
-    const text = TAGLINES[idx];
-    let t;
+    const text = t(TAGLINE_KEYS[idx]);
+    let timer;
     if (phase === 'typing') {
-      if (len < text.length) t = setTimeout(() => setLen(l => l + 1), 34);
-      else t = setTimeout(() => setPhase('holding'), 4200);
+      if (len < text.length) timer = setTimeout(() => setLen(l => l + 1), 34);
+      else timer = setTimeout(() => setPhase('holding'), 4200);
     } else if (phase === 'holding') {
-      t = setTimeout(() => setPhase('deleting'), 2600);
+      timer = setTimeout(() => setPhase('deleting'), 2600);
     } else {
-      if (len > 0) t = setTimeout(() => setLen(l => l - 1), 13);
-      else { setIdx(i => (i + 1) % TAGLINES.length); setPhase('typing'); }
+      if (len > 0) timer = setTimeout(() => setLen(l => l - 1), 13);
+      else { setIdx(i => (i + 1) % TAGLINE_KEYS.length); setPhase('typing'); }
     }
-    return () => clearTimeout(t);
-  }, [phase, len, idx]);
+    return () => clearTimeout(timer);
+  }, [phase, len, idx, t]);
 
   return (
     <div className="home-tagline">
-      {TAGLINES[idx].slice(0, len)}
+      {t(TAGLINE_KEYS[idx]).slice(0, len)}
       <span className="type-caret" />
     </div>
   );
@@ -417,33 +525,6 @@ function GoalCard({ user, activity, onGo }) {
           </button>
         )}
       </div>
-    </div>
-  );
-}
-
-function DiamondTrack({ recent }) {
-  const t = useT();
-  const items = recent.slice(0, 7).reverse();
-  if (!items.length) {
-    return <div className="muted" style={{ marginTop: 20 }}>{t('home.firstQuestions')}</div>;
-  }
-  const color = a => a.correct ? 'var(--m5)' : 'var(--m1)';
-  // Right and wrong were a red diamond and a green one, and a tooltip: nothing
-  // a screen reader or a colour-blind student could read. The verdict is spelled
-  // out beside each mark, off-screen, and the joining bars are decoration.
-  return (
-    <div className="diamond-track" role="group" aria-label={t('home.recentQuestions')}>
-      {items.map((a, i) => {
-        const verdict = t('home.recentVerdict', { topic: a.name, verdict: t(a.correct ? 'app.correct' : 'app.incorrect') });
-        return (
-        <React.Fragment key={i}>
-          {i > 0 && <span className="diamond-link" aria-hidden="true" style={{ background: `linear-gradient(90deg, ${color(items[i - 1])}, ${color(a)})` }} />}
-          <span className="diamond" style={{ background: color(a) }} title={verdict}>
-            <span className="sr-only">{verdict}</span>
-          </span>
-        </React.Fragment>
-        );
-      })}
     </div>
   );
 }

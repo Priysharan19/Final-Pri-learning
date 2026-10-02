@@ -186,7 +186,9 @@ export const flow = {
       const typeTab = page.getByRole('button', { name: 'Answer by typing' });
       if (await typeTab.count()) { await typeTab.click(); await settle(); }
       const input = page.locator('.editor-body input.answer-input').first();
-      const attrs = await input.count() ? await input.evaluate(e => ({ m: e.inputMode, k: e.enterKeyHint })) : null;
+      // The markup is what the OS keyboard reads; not every engine exposes the
+      // enterKeyHint/inputMode DOM properties (Linux WebKit does not).
+      const attrs = await input.count() ? await input.evaluate(e => ({ m: e.getAttribute('inputmode'), k: e.getAttribute('enterkeyhint') })) : null;
       await check(`${tag}: the answer box opens a full keyboard with a Go key`, attrs !== null && attrs.m === 'text' && attrs.k === 'go',
         JSON.stringify(attrs));
       if (await input.count()) await input.fill('12345');

@@ -48,6 +48,9 @@ for (let i = 0; ; i++) {
   if (i > 60) { console.error(`server did not start (log: ${join(dir, 'server.log')})`); process.exit(1); }
   await new Promise(r => setTimeout(r, 500));
 }
+// The answer must come from OUR child, not a stale server left on the port.
+await new Promise(r => setTimeout(r, 400));
+if (child.exitCode !== null) { console.error(`port ${port} is taken by another server (log: ${join(dir, 'server.log')})`); process.exit(1); }
 
 if (restart) {
   console.log(`Real Pri server restarted on ${base} (pid ${child.pid}) with ${dbPath}. SYNTHETIC TEST FIXTURE.`);
@@ -60,8 +63,8 @@ const email = `native-${Date.now()}@example.test`;
 const password = `Fixture-${randomBytes(9).toString('base64url')}`;
 const res = await fetch(`${base}/v1/account/register`, {
   method: 'POST',
-  headers: { 'Content-Type': 'application/json', 'X-Pri-Client': 'android-native-v1' },
-  body: JSON.stringify({ email, name: 'Android Fixture', password, isAdult: true }),
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ email, name: 'Native Fixture', password, isAdult: true }),
 });
 if (res.status !== 201) { console.error(`register failed: ${res.status} ${await res.text()}`); process.exit(1); }
 
