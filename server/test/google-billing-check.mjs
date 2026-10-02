@@ -194,6 +194,8 @@ const upgraded = await google.native.google.purchase({ accountId: 'acct-g-a', bo
 await applyVerifiedEntitlement(db, upgraded.normalized);
 check((await db.get('SELECT superseded_by FROM billing_google_purchases WHERE purchase_token=?', [token(1)])).superseded_by === token(10),
   'an upgrade marks the replaced token superseded');
+check((await db.get("SELECT state_plan FROM billing_subscriptions WHERE provider='google' AND provider_subscription_id=?", [token(1)])).state_plan === null,
+  'the replaced token stops being an entitlement source (entitlements derive from every subscription row; a stale one must not keep Premium alive)');
 purchases.get(token(1)).subscriptionState = 'SUBSCRIPTION_STATE_EXPIRED';
 const stale = await google.native.google.purchase({ accountId: 'acct-g-a', body: { purchaseToken: token(1) } });
 check(stale.superseded === true && stale.normalized === null, 'a superseded token can no longer change the entitlement (no downgrade from the old plan)');
