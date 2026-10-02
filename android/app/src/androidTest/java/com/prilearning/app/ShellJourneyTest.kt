@@ -67,7 +67,8 @@ class ShellJourneyTest {
             if (last != "null" && last != "false" && last != "\"\"" && !last.startsWith("\"ERR")) return last
             Thread.sleep(250)
         }
-        throw AssertionError("timed out waiting for: $js (last=$last)")
+        val where = runCatching { eval(scenario, "location.pathname+' '+JSON.stringify(history.state)") }.getOrDefault("?")
+        throw AssertionError("timed out waiting for: $js (last=$last; page at $where)")
     }
 
     private fun click(scenario: ActivityScenario<MainActivity>, js: String) {
@@ -251,7 +252,10 @@ class ShellJourneyTest {
             // The real Back key walks the app's own history: Progress → Practice → Home.
             awaitBackWanted(s, true)
             pressBack()
-            waitFor(s, "location.pathname === '/practice'")
+            // Settle on Practice (its own history entry) before the next press, as
+            // a person's second Back comes after the first page has appeared.
+            waitFor(s, "location.pathname === '/practice' && !!history.state && history.state.idx > 0 && !!document.querySelector('.q-prompt')")
+            Thread.sleep(400)
             awaitBackWanted(s, true)
             pressBack()
             waitFor(s, "location.pathname === '/'")
