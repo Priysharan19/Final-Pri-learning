@@ -147,7 +147,7 @@ const nearestForm = (forms, want) => (forms || []).length
  * difficulty, because a dot point that cannot be reached there is not a choice,
  * it is a promise that would be broken on the next line.
  */
-function chooseDotpoint(subtopicId, ratingRow, { fixed = null, want = 2, prefer = null, nowMs = Date.now() } = {}) {
+function chooseDotpoint(subtopicId, ratingRow, { fixed = null, want = 2, prefer = null, trapKey = null, nowMs = Date.now() } = {}) {
   let pool = generatableDotpointStates(subtopicId, ratingRow);
   // A dot point is only reachable through the difficulties whose authored form
   // exercises it, and some are reachable at one rung only. That constraint is
@@ -161,12 +161,75 @@ function chooseDotpoint(subtopicId, ratingRow, { fixed = null, want = 2, prefer 
   // A misconception lives on a dot point. When one is being hunted, that dot
   // point is the place to hunt it, not wherever the ranking would have gone.
   const preferred = prefer ? pool.find(dp => dp.id === prefer) : null;
+  // A misconception with no dot point of its own still has to be offered, and
+  // only some cells of a subtopic can offer it: the trap seek inside
+  // generateFocused looks at one dot point and one difficulty, and is bounded.
+  // So the cell is chosen for the trap before the seek starts, rather than
+  // chosen blind and left to a seek that cannot succeed there.
+  if (trapKey && !preferred) {
+    const hunted = trapCell(subtopicId, pool, { fixed, want, trapKey, nowMs });
+    if (hunted) return hunted;
+  }
   const dp = preferred || pickDotpoint(pool, { rand: Math.random(), nowMs });
   if (!dp) return { dp: null, difficulty: fixed || want };
   if (fixed) return { dp, difficulty: fixed };
   const aimed = dp.attempts ? pickDifficulty(dp.rating, dp.attempts, { state: dp, nowMs }) : want;
   const d = nearestForm(dp.forms, aimed);
   return { dp, difficulty: Math.abs(d - want) <= DOTPOINT_DRIFT ? d : nearestForm(dp.forms, want) };
+}
+
+/** Does a generated question carry a designed slip that maps to `trapKey`? */
+const carriesTrap = (owner, q, trapKey) => (Array.isArray(q?.traps) ? q.traps : [])
+  .concat(Object.values(q?.answer?.optionTraps || {}).map(why => ({ why })))
+  .some(t => t && misconceptionIdForTrap(owner, t.why) === trapKey);
+
+// How often a cell (dot point × difficulty) yields a question carrying a trap,
+// measured once on fixed seeds and remembered: the bank is deterministic per
+// seed, so the figure is a property of the content, not of the sitting.
+const TRAP_PROBE_SEEDS = 48;
+const trapYieldCache = new Map();
+function trapYield(subtopicId, dotpointId, difficulty, trapKey) {
+  const k = `${subtopicId}|${dotpointId || ''}|${difficulty}|${trapKey}`;
+  if (trapYieldCache.has(k)) return trapYieldCache.get(k);
+  let hits = 0;
+  for (let i = 1; i <= TRAP_PROBE_SEEDS; i++) {
+    // A missing bank propagates: nothing is written yet, and the API layer
+    // loads the bank and re-runs the request.
+    const q = generateQuestion(subtopicId, difficulty, i * 104729, dotpointId || undefined);
+    if (carriesTrap(subtopicId, q, trapKey)) hits++;
+  }
+  const y = hits / TRAP_PROBE_SEEDS;
+  trapYieldCache.set(k, y);
+  return y;
+}
+
+/**
+ * The cell most likely to let the bounded trap seek find `trapKey`, inside the
+ * same difficulty limits chooseDotpoint keeps. Subtopic-level cells count:
+ * offering the slip outranks aiming at a dot point. Null when no reachable cell
+ * carries it — the caller then serves as before and honestly reports no trap.
+ */
+function trapCell(subtopicId, pool, { fixed, want, trapKey, nowMs }) {
+  const tries = Math.max(TRAP_SEEK_TRIES, CONTENT_DEDUP_TRIES);
+  const near = d => (fixed ? d === fixed : Math.abs(d - want) <= DOTPOINT_DRIFT);
+  const cells = [];
+  for (const dp of pool) {
+    for (const d of dp.forms.filter(near)) cells.push({ dp, d });
+  }
+  for (const d of [1, 2, 3, 4].filter(near)) cells.push({ dp: null, d });
+  const scored = cells
+    .map(c => ({ ...c, odds: 1 - (1 - trapYield(subtopicId, c.dp?.id, c.d, trapKey)) ** tries }))
+    .filter(c => c.odds > 0);
+  if (!scored.length) return null;
+  const best = Math.max(...scored.map(c => c.odds));
+  // Among equally good cells a dot point beats the subtopic level, the normal
+  // ranking picks the dot point, and the difficulty nearest the target wins.
+  const top = scored.filter(c => c.odds === best);
+  const dps = [...new Set(top.map(c => c.dp).filter(Boolean))];
+  const dp = dps.length ? pickDotpoint(dps, { rand: Math.random(), nowMs }) : null;
+  const cell = top.filter(c => c.dp === dp)
+    .reduce((a, c) => (Math.abs(c.d - want) < Math.abs(a.d - want) ? c : a));
+  return { dp, difficulty: cell.d };
 }
 
 /** The dot point of `subtopicId` named by an id, a slug key, or an ordinal. */
@@ -894,9 +957,7 @@ function indiaDotpointStates(chapter, chapterRow, trackId, grade, ratings, now =
  */
 async function createIndiaQuestion(pid, chapter, target, mode, trackId, examId = null, taskId = null, trapKey = null, retarget = null) {
   if (!chapter || !target) throw Object.assign(new Error('That India syllabus target has no authored question form yet.'), { status: 409, code: 'INDIA_TARGET_UNCOVERED' });
-  const springs = cand => (Array.isArray(cand.traps) ? cand.traps : [])
-    .concat(Object.values(cand.answer?.optionTraps || {}).map(why => ({ why })))
-    .some(t => misconceptionIdForTrap(chapter.id, t.why) === trapKey);
+  const springs = cand => carriesTrap(chapter.id, cand, trapKey);
   // Candidate 0 is the resolved target; later candidates re-resolve it when the
   // caller can, so a chapter-level request is not stuck on one small cell.
   const targetOf = new Map();
@@ -1617,9 +1678,7 @@ function generateFocused(subtopic, difficulty, { dotpointId = null, trapKey = nu
   // decide that a dot point was practised.
   const delivered = q => (want && q?.dotpointExact ? want : null);
   const gen = () => generateQuestion(subtopic, difficulty, undefined, want || undefined);
-  const springs = q => (Array.isArray(q.traps) ? q.traps : [])
-    .concat(Object.values(q.answer?.optionTraps || {}).map(why => ({ why })))
-    .some(t => misconceptionIdForTrap(subtopic, t.why) === trapKey);
+  const springs = q => carriesTrap(subtopic, q, trapKey);
   // Bounded either way: a trap the bank cannot produce, or a pool too small to
   // avoid the repeat window, ends in the best candidate rather than a spin.
   const picked = drawDistinct(gen, recent, {
@@ -2961,7 +3020,8 @@ const routes = {
       let auto = null;
       if (!asked) {
         const chosen = chooseDotpoint(subtopic, st, {
-          fixed: difficulty ? d : null, want: d, prefer: activeTraps(st?.traps, now)[0]?.dotpoint || null, nowMs: now
+          fixed: difficulty ? d : null, want: d, prefer: activeTraps(st?.traps, now)[0]?.dotpoint || null,
+          trapKey: activeTraps(st?.traps, now)[0]?.key || null, nowMs: now
         });
         auto = chosen.dp;
         d = chosen.difficulty;
@@ -2995,9 +3055,12 @@ const routes = {
       // but only ever at one the bank can really produce.
       const chosen = chooseDotpoint(choice.subtopic, ratings[choice.subtopic], {
         fixed: difficulty ? choice.difficulty : null, want: choice.difficulty,
-        prefer: choice.trap?.dotpoint || null, nowMs: now
+        prefer: choice.trap?.dotpoint || null, trapKey: choice.trap?.key || null, nowMs: now
       });
       choice.whyPlain = choice.why;
+      // A cell chosen for the trap may sit at subtopic level; its difficulty
+      // still applies (otherwise this is the difficulty already chosen).
+      choice.difficulty = chosen.difficulty;
       if (chosen.dp) {
         choice = { ...choice, dotpoint: chosen.dp.id, difficulty: chosen.difficulty, why: `${choice.why} Dot point: ${chosen.dp.text}` };
       }
