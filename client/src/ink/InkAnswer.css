@@ -123,3 +123,4 @@
 @media (pointer: coarse) and (max-width: 760px), (hover: none) and (max-width: 760px) {
 .ink-sym { min-height: var(--tap-min); }
 }
+.ink-status-line { margin: 8px 2px 0; font-size: 12.5px; }

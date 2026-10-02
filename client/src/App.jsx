@@ -11,15 +11,13 @@ import { setLanguage, signInLanguage, useT } from './i18n/index.js';
 import Login from './pages/Login.jsx';
 import Home from './pages/Home.jsx';
 import Practice from './pages/Practice.jsx';
-import Legal from './pages/Legal.jsx';
 import Icon from './components/Icon.jsx';
 import { BrandWordmark } from './components/BrandMark.jsx';
 
 // ── Routes nobody has opened yet ─────────────────────────────────────────────
-// Login, Home, Practice and Legal are the screens a first run reaches: the
-// profile gate, the landing page behind it, the practice workspace the product
-// is for, and the policy pages a store reviewer opens without an account. Those
-// four are worth having in the shell.
+// Login, Home and Practice are the screens a first run reaches: the profile
+// gate, the landing page behind it and the practice workspace the product is
+// for. Those three are worth having in the shell (Legal: see below).
 //
 // The other eleven were too. Every student downloaded the exam room, the
 // teacher console, the classroom panels, the progress charts and the whole
@@ -41,6 +39,12 @@ const Settings = React.lazy(() => import('./pages/Settings.jsx'));
 // prerequisite graph and engine behind it — is an on-demand chunk (see
 // ON_DEMAND in vite.config.js), not part of the install or the warm set.
 const Placement = React.lazy(() => import('./pages/Placement.jsx'));
+// Notes: the page and each class's notes are chunks of their own (notes/notesIndex.js).
+// Legal carries the full policy documents (~19 kB). A reviewer who opens
+// /privacy is online, and the warm pass keeps it for offline, so it no longer
+// rides in the install every student downloads before the first screen.
+const Legal = React.lazy(() => import('./pages/Legal.jsx'));
+const Notes = React.lazy(() => import('./pages/Notes.jsx'));
 // Outside the frozen V1 scope: the route exists only where the build flag is on.
 const PLACEMENT_ON = featureEnabled('placement');
 
@@ -52,11 +56,11 @@ const I = {
   home: <Icon name="home" />, tasks: <Icon name="tasks" />, match: <Icon name="match" />,
   progress: <Icon name="progress" />, exams: <Icon name="exams" />, classes: <Icon name="classes" />,
   settings: <Icon name="settings" />, practice: <Icon name="practice" />, review: <Icon name="review" />,
-  rush: <Icon name="rush" />, teacher: <Icon name="teacher" />,
+  rush: <Icon name="rush" />, notes: <Icon name="notes" />, teacher: <Icon name="teacher" />,
 };
 
 const STUDENT_NAV = [
-  { label: 'nav.groupLearn', items: [{ to: '/', key: 'nav.home', ico: I.home }, { to: '/practice', key: 'nav.practice', ico: I.practice }] },
+  { label: 'nav.groupLearn', items: [{ to: '/', key: 'nav.home', ico: I.home }, { to: '/practice', key: 'nav.practice', ico: I.practice }, { to: '/notes', key: 'nav.notes', ico: I.notes }] },
   { label: 'nav.groupWork', items: [{ to: '/tasks', key: 'nav.tasks', ico: I.tasks }, { to: '/exams', key: 'nav.exams', ico: I.exams }, { to: '/classes', key: 'nav.classes', ico: I.classes }] },
   { label: 'nav.groupUnderstand', items: [{ to: '/progress', key: 'nav.progress', ico: I.progress }, { to: '/review?filter=wrong', key: 'nav.review', ico: I.review }] },
   { label: 'nav.groupPlay', items: [{ to: '/rush', key: 'nav.rush', ico: I.rush }, { to: '/match', key: 'nav.match', ico: I.match }] },
@@ -93,7 +97,7 @@ function isDestinationActive(location, to) {
 const TITLE_KEYS = {
   '/': 'nav.home', '/practice': 'nav.practice', '/progress': 'nav.progress', '/tasks': 'nav.tasks',
   '/exams': 'nav.exams', '/rush': 'nav.rush', '/match': 'nav.match', '/teach': 'nav.teacherWorkspace',
-  '/review': 'nav.review', '/history': 'nav.review', '/favorites': 'nav.review', '/classes': 'nav.classes', '/settings': 'nav.settings'
+  '/notes': 'nav.notes', '/review': 'nav.review', '/history': 'nav.review', '/favorites': 'nav.review', '/classes': 'nav.classes', '/settings': 'nav.settings'
 };
 
 // Shown for the moment a route's own chunk is arriving. It is announced rather
@@ -203,7 +207,7 @@ export default function App() {
   }, [user?.id, user?.theme]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const pageTitle = useMemo(
-    () => (TITLE_KEYS[loc.pathname] ? t(TITLE_KEYS[loc.pathname]) : loc.pathname.startsWith('/exams') ? t('nav.exam') : null),
+    () => (TITLE_KEYS[loc.pathname] ? t(TITLE_KEYS[loc.pathname]) : loc.pathname.startsWith('/exams') ? t('nav.exam') : loc.pathname.startsWith('/notes/') ? t('nav.notes') : null),
     [loc.pathname, t]
   );
 
@@ -301,10 +305,10 @@ export default function App() {
         <Routes>
           {/* A store reviewer and a payment provider open these without an
               account, so they are reachable before the profile gate. */}
-          <Route path="/privacy" element={<Legal />} />
-          <Route path="/terms" element={<Legal />} />
-          <Route path="/refund-policy" element={<Legal />} />
-          <Route path="/grievance" element={<Legal />} />
+          <Route path="/privacy" element={<React.Suspense fallback={<RouteLoading />}><Legal /></React.Suspense>} />
+          <Route path="/terms" element={<React.Suspense fallback={<RouteLoading />}><Legal /></React.Suspense>} />
+          <Route path="/refund-policy" element={<React.Suspense fallback={<RouteLoading />}><Legal /></React.Suspense>} />
+          <Route path="/grievance" element={<React.Suspense fallback={<RouteLoading />}><Legal /></React.Suspense>} />
           <Route path="*" element={<Login />} />
         </Routes>
         <ToastLayer toasts={toasts} />
@@ -395,6 +399,8 @@ export default function App() {
                     <Route path="/teach" element={teacherOnly(<Teach />)} />
                     <Route path="/exams" element={studentOnly(<Exams />)} />
                     <Route path="/exams/:id" element={studentOnly(<ExamRoom />)} />
+                    <Route path="/notes" element={studentOnly(<Notes />)} />
+                    <Route path="/notes/:chapterId" element={studentOnly(<Notes />)} />
                     <Route path="/rush" element={studentOnly(<Rush />)} />
                     <Route path="/match" element={studentOnly(<Match />)} />
                     <Route path="/review" element={studentOnly(<History />)} />

@@ -22,6 +22,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { pathToFileURL } from 'node:url';
 import { TEMPLATES } from '../src/ink/templates.js';
+import { readLines, turnOnServerReading, useFakeServerReader } from './fakeServerReader.js';
 
 const GLYPH_W = 58;
 const GLYPH_H = 84;
@@ -44,8 +45,12 @@ async function handwrite(page, box, text, { x = 40, y = 34 } = {}) {
   await page.waitForTimeout(700);
 }
 
-const reading = (page) => page.locator('.ink-line .ink-syms').allInnerTexts()
-  .then(lines => lines.map(l => l.replace(/\s+/g, '')));
+// Handwriting is read only by the server reader (owner decision); the flow
+// brings a stand-in reader and the panel shows what it returned.
+const reading = async (page) => {
+  await page.waitForSelector('.ink-line', { timeout: 15000 }).catch(() => {});
+  return readLines(page);
+};
 
 const secondsOn = (text) => {
   const m = /(\d+):(\d\d)(?::(\d\d))?/.exec(text || '');
@@ -74,8 +79,11 @@ export const flow = {
   name: 'India exam · JEE Main handwritten, reloaded, analysed',
 
   async run({ page, base, check, note, goto, createProfile, settle }) {
+    const reader = await useFakeServerReader(page, base);
+    reader.text = '42';
     await goto('/');
     await createProfile({ name: 'Chitra Rao', year: 12, course: 'in', track: 'jee-main' });
+    await check('server reading can be turned on for this profile', await turnOnServerReading(page, base));
 
     // ── 1 · the paper starts, with a clock read off a stored deadline ────────
     await page.goto(`${base}/exams`, { waitUntil: 'domcontentloaded' });

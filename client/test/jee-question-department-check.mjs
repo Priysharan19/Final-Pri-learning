@@ -6,6 +6,7 @@ import {
   asJeePyqPayload,
   buildJeePyqBank,
   hasJeePyqGenerator,
+  hasJeePyqDifficulty,
   jeePyqCatalogSnapshot
 } from '../src/engine/generators/jee-pyq-runtime.js';
 import { bankOf } from '../src/engine/generators/index.js';
@@ -72,11 +73,39 @@ assert.match(mm.prompt, /separated by commas/i);
 const n = asJeePyqPayload(numeric);
 assert.equal(n.answerType, 'numeric');
 assert.equal(n.answer.value, 7);
+assert.equal(n.answer.tol, undefined);
+const banded = asJeePyqPayload({ ...numeric, id: 'fixture-band', answer: { value: 2.4, tol: 0.05 + 1e-9 } });
+assert.equal(banded.answer.tol, 0.05 + 1e-9);
 
 const proof = asJeePyqPayload(selfcheck);
 assert.equal(proof.custom, true);
 assert.equal(proof.answer.correctIndex, 0);
 assert.match(proof.mcqOptions[0], /self-check/i);
+
+// Official exam-authority records carry their own provenance and say plainly
+// which review tier checked them; an automated-tier record never names a person.
+const official = {
+  ...mcq, id: 'fixture-official', sourceChapter: null, sourceTopic: '', sourceTopicNumber: null,
+  sourceQuestionNumber: 12, sourcePage: 4, sourcePdfPage: 4, examYear: 2026,
+  official: {
+    authority: 'National Testing Agency · JEE (Main)', documentId: 'fixture-doc',
+    url: 'https://example.invalid/paper.pdf', keyUrl: 'https://example.invalid/key.pdf',
+    paper: '1 (B.E./B.Tech)', session: '2', shift: '2026-04-02 shift 1'
+  },
+  review: { reviewedBy: 'automated:key+engine+ai-review/model/2026-10-02', reviewedAt: '2026-10-02T00:00:00Z', tier: 'automated' }
+};
+const op = asJeePyqPayload(official);
+assert.equal(op.pyqSource, 'JEE Main 2026 · Session 2 · 2026-04-02 shift 1 · Q12');
+assert.equal(op.pyqReviewTier, 'automated');
+assert.equal(op.archive.url, 'https://example.invalid/paper.pdf');
+assert.equal(op.archive.reviewTier, 'automated');
+assert.match(op.archive.solutionAuthorship, /not by a person/);
+assert.equal(op.archive.book, undefined);
+assert.equal(op.archive.citations.length, 2);
+assert.equal(op.archive.citations[0].url, 'https://example.invalid/paper.pdf');
+assert.equal(op.archive.citations[1].kind, 'official-final-answer-key');
+assert.match(op.archive.stepsAuthorship, /not by a person/);
+assert.equal(m.pyqReviewTier, 'human');
 
 assert.throws(() => asJeePyqPayload({ ...mcq, id: 'bad', steps: [] }), /no worked steps/i);
 assert.throws(() => asJeePyqPayload({ ...mcq, id: 'bad2', answer: { correctIndex: 9 } }), /invalid answer/i);
@@ -116,7 +145,19 @@ assert.ok(chapter);
 const gid = 'jee-main-c11-complex-numbers';
 const chapterTarget = resolveIndiaTarget(chapter, { track: 'jee-main', difficulty: 3, random: () => 0 });
 assert.ok(chapterTarget);
-if (hasJeePyqGenerator(gid)) {
+// A department PYQ is offered only at a difficulty the reviewed bank really
+// holds; otherwise the bank would snap to another rung under a false label.
+for (const [g] of Object.entries(catalog.coverage)) {
+  const [track] = g.match(/^jee-(main|advanced)/);
+  const chId = g.replace(/^jee-(main|advanced)-/, '');
+  const ch = indiaChapter(chId);
+  if (!ch) continue;
+  for (const d of [1, 2, 3, 4]) {
+    const t = resolveIndiaTarget(ch, { track, difficulty: d, random: () => 0 });
+    if (t?.generator === g) assert.equal(hasJeePyqDifficulty(g, t.difficulty), true, `${g} offered at D${t.difficulty} it does not hold`);
+  }
+}
+if (hasJeePyqGenerator(gid) && hasJeePyqDifficulty(gid, chapterTarget.difficulty)) {
   assert.equal(chapterTarget.generator, gid);
   assert.equal(chapterTarget.pyq, true);
   assert.equal(chapterTarget.pyqArchive, 'jee-question-department');
