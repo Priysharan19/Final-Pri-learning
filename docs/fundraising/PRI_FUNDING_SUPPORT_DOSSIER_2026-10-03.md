@@ -1287,3 +1287,30 @@ The near-term objective is:
 That means a ₹15L grant + IIT research relationship + flagship school pilot can be strategically superior to an undifferentiated ₹50L angel round if it enables Pri to raise the next round with real evidence and better terms.
 
 The dossier should be re-audited before every application because deadlines, eligibility and team roles can change quickly.
+
+
+---
+
+# 22. Competition-adjusted success probabilities
+
+A separate competition model has now been added:
+
+`docs/fundraising/PRI_COMPETITION_ADJUSTED_SUCCESS_MODEL_2026-10-03.md`
+
+It triangulates observed programme selectivity, direct market competitors, Pri's current product maturity, missing external evidence, and eligibility gates.
+
+Key campaign-level estimates from that model:
+
+- **Any meaningful external support within 3–6 months:** 65–80% when cloud/research/incubator/pilot outcomes are included.
+- **At least one meaningful cash/seed award:** 25–40% if mandatory eligibility gates are satisfied.
+- **At least ₹10L non-dilutive/grant-like cash:** 20–35%.
+- **At least ₹25L combined non-dilutive cash:** 8–18%.
+- **At least one flagship school pilot:** 20–35% via cold outreach; 40–60% with strong warm introductions.
+- **Institutional VC term sheet before strong school/outcome evidence:** 5–10% across a broad targeted campaign.
+- **Institutional VC term sheet after two strong pilots + retention/outcome evidence:** 20–35%.
+
+These are internal planning estimates, not published acceptance probabilities.
+
+The main competitive change identified is the emergence of **ProLearn**, which raised ₹30 crore pre-seed in 2026 from BEENEXT, Eximius and Antler while building a closely adjacent K–12 AI tutor. This makes “personalised AI tutor” insufficient as Pri's investment moat. Pri's financing narrative should instead prove superiority in **understanding student mathematical working, method-aware grading, misconception diagnosis and measured learning outcomes**.
+
+The updated CSV tracker now contains observed competition baselines, Pri-specific estimated success ranges, post-proof estimates and confidence ratings for each target.
