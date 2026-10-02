@@ -24,14 +24,14 @@ async function startPlatform() {
 
 export const flow = {
   id: 'otp-onboarding',
-  name: 'Account · phone code sign-up, a parent approves by code, first question',
+  name: 'Account · phone code sign-up, a parent approves on their own page, first question',
 
   async run({ page, ctx, base, check, goto, shot }) {
     const { h, sms } = await startPlatform();
     try {
       await page.addInitScript(origin => { window.__PRI_CLOUD_ORIGIN__ = origin; }, base);
       const seen = [];
-      await ctx.route('**/v1/**', async route => {
+      const proxy = async route => {
         const request = route.request();
         const url = new URL(request.url());
         seen.push(`${request.method()} ${url.pathname}`);
@@ -49,7 +49,8 @@ export const flow = {
         const retry = response.headers.get('retry-after');
         if (retry) outHeaders['retry-after'] = retry;
         return route.fulfill({ status: response.status, headers: outHeaders, body: Buffer.from(await response.arrayBuffer()) });
-      });
+      };
+      await ctx.route('**/v1/**', proxy);
 
       await goto('/');
       await page.getByRole('button', { name: 'Create your account' }).click();
@@ -105,23 +106,47 @@ export const flow = {
       await page.locator('#signup-parent-name').fill('Meera');
       await page.locator('#signup-parent-destination').fill('99887 76655');
       await page.getByTestId('signup-parent-send').click();
-      await page.waitForSelector('[data-signup-step="parent-code"]');
-      await check('the parent sees what they are agreeing to before any code box is usable',
-        await page.getByRole('heading', { name: 'What you are agreeing to' }).isVisible() && await page.locator('#signup-parent-code-0').isDisabled());
+      await page.waitForSelector('[data-signup-step="parent-wait"]');
+      await check('the child’s screen only waits for the parent: no code box, no approve button',
+        await page.locator('[data-testid="signup-parent-waiting"]').isVisible() &&
+          await page.locator('input[autocomplete="one-time-code"]').count() === 0 &&
+          await page.getByRole('button', { name: 'Approve' }).count() === 0);
+      await check('and can ask for the code again once the cooldown ends', await page.getByTestId('signup-parent-resend').isDisabled());
       const parentSms = sms.readTestOutbox({ to: '+919988776655' }).at(-1);
-      await check('the parent’s phone got the consent code', parentSms?.purpose === 'guardian-consent' && /^\d{6}$/.test(parentSms.code));
-      await page.getByTestId('signup-parent-agree').check();
-      // A pasted code fills every box at once.
-      await page.locator('#signup-parent-code-0').focus();
-      await page.evaluate(code => {
-        const data = new DataTransfer(); data.setData('text', code);
-        document.activeElement.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }));
-      }, parentSms.code);
-      await check('pasting fills all six boxes',
-        (await page.locator('[data-testid="signup-parent-code-box"]').evaluateAll(els => els.map(e => e.value).join(''))) === parentSms.code);
-      await shot('parent-consent');
-      await page.getByTestId('signup-parent-approve').click();
+      await check('the parent’s phone got the consent code with the address of their own page',
+        parentSms?.purpose === 'guardian-consent' && /^\d{6}$/.test(parentSms.code) && parentSms.body.includes('/guardian/consent'));
 
+      // The parent, on their own device: a separate browser context, no profile,
+      // no session, nothing shared with the child's browser.
+      const parentCtx = await ctx.browser().newContext({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' });
+      try {
+        await parentCtx.addInitScript(origin => { window.__PRI_CLOUD_ORIGIN__ = origin; }, base);
+        await parentCtx.route('**/v1/**', proxy);
+        const parentPage = await parentCtx.newPage();
+        await parentPage.goto(`${base}/guardian/consent`, { waitUntil: 'domcontentloaded' });
+        await parentPage.getByRole('heading', { name: 'What you are agreeing to' }).waitFor({ timeout: 20000 });
+        await check('the parent page shows the notice before the code can be entered',
+          await parentPage.locator('#guardian-code-0').isDisabled());
+        await parentPage.locator('#guardian-destination').fill('99887 76655');
+        await parentPage.getByTestId('guardian-agree').check();
+        await parentPage.locator('#guardian-code-0').focus();
+        await parentPage.evaluate(code => {
+          const data = new DataTransfer(); data.setData('text', code);
+          document.activeElement.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }));
+        }, parentSms.code);
+        await check('pasting fills all six boxes',
+          (await parentPage.locator('[data-testid="guardian-code-box"]').evaluateAll(els => els.map(e => e.value).join(''))) === parentSms.code);
+        await shot('parent-wait');
+        await parentPage.getByTestId('guardian-approve').click();
+        await parentPage.getByText('Asha’s account is approved', { exact: false }).waitFor({ timeout: 15000 });
+        await check('the parent is told whose account they approved', true);
+        await check('the parent page never held a child session',
+          !(await parentCtx.cookies()).some(cookie => /session/i.test(cookie.name)));
+      } finally {
+        await parentCtx.close();
+      }
+
+      // The child's waiting screen notices on its own and opens the first question.
       await page.waitForURL(/\/practice/, { timeout: 30000 });
       await page.waitForSelector('.shell', { timeout: 30000 });
       await check('the student lands on practice, the first question', new URL(page.url()).pathname === '/practice');

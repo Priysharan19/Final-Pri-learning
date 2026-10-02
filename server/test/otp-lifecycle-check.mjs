@@ -55,6 +55,9 @@ try {
   try { createSmsProviderFromEnv({ PRI_SMS_PROVIDER: 'carrier-pigeon' }); } catch (e) { threw = e; }
   c.eq(threw?.code, 'SMS_PROVIDER_UNSUPPORTED', 'an unknown provider is a configuration error');
   c.match(smsOtpBody('123456', 'sign-in', 'https://pri.example.in'), /\n@pri\.example\.in #123456$/, 'SMS ends with the WebOTP origin line');
+  const { buildAuthActionUrl } = await import('../platform/authDelivery.js');
+  const parentLink = new URL(buildAuthActionUrl('https://pri.example.in', 'guardian-consent', 'tok'));
+  c.ok(parentLink.pathname === '/guardian/consent' && parentLink.search === '' && parentLink.hash.includes('token=tok'), 'the emailed parent link opens the parent’s own page, token in the fragment only');
 
   // Adapters speak the provider protocols (fetch stubbed; nothing leaves).
   const calls = [];
@@ -185,12 +188,21 @@ try {
   const parentChallenge = r.data.challengeId;
   const parentCode = lastCode('+919988776655');
   c.eq(readTestOutbox({ to: '+919988776655' }).at(-1).purpose, 'guardian-consent', 'the parent SMS is the consent message');
-  r = await post('/guardian/approve', { challengeId: parentChallenge, code: parentCode, approve: true, noticeVersion: 'old' }, kidJar);
+  c.ok(parentChallenge && readTestOutbox({ to: '+919988776655' }).at(-1).body.includes('http://localhost:5173/guardian/consent'), 'the parent SMS points to the parent’s own consent page');
+  // Approval happens on the parent's page: no session at all, the parent names
+  // their own number. The child's session plays no part.
+  const parentPost = (body) => post('/guardian/approve', { channel: 'sms', destination: '99887 76655', approve: true, noticeVersion: CONSENT_NOTICE_VERSION, ...body });
+  r = await parentPost({ code: parentCode, noticeVersion: 'old' });
   c.eq(r.data?.error?.code, 'GUARDIAN_NOTICE_REQUIRED', 'approval must name the current notice');
-  r = await post('/guardian/approve', { challengeId: parentChallenge, code: parentCode, approve: true, noticeVersion: CONSENT_NOTICE_VERSION }, signJar);
-  c.eq(r.data?.error?.code, 'OTP_INVALID', 'another account cannot use this parent code');
-  r = await post('/guardian/approve', { challengeId: parentChallenge, code: parentCode, approve: true, noticeVersion: CONSENT_NOTICE_VERSION }, kidJar);
-  c.eq(r.data?.state, 'given', 'the parent approves with the code');
+  r = await post('/guardian/approve', { channel: 'sms', destination: '9988776650', code: parentCode, approve: true, noticeVersion: CONSENT_NOTICE_VERSION });
+  c.eq(r.data?.error?.code, 'OTP_INVALID', 'the code only works with the parent’s own number');
+  r = await h.request('/v1/account/otp/guardian/approve', { method: 'POST', headers: { Origin: 'http://localhost:5173' }, jar: kidJar, body: { approve: true, noticeVersion: CONSENT_NOTICE_VERSION, code: parentCode } });
+  c.eq(r.data?.error?.code, 'OTP_INVALID', 'the child’s session alone cannot approve');
+  r = await parentPost({ code: parentCode });
+  c.eq(r.data?.confirmed, true, 'the parent approves with the code on their own page');
+  c.eq(r.data?.childName, 'Ravi', 'and is told whose account they approved');
+  r = await parentPost({ code: parentCode });
+  c.eq(r.data?.error?.code, 'OTP_INVALID', 'the parent code is single use');
   c.eq(raw.prepare("SELECT method FROM guardian_consents WHERE account_id=(SELECT account_id FROM account_phones WHERE phone_e164='+919123456780')").get().method, 'guardian-phone-otp', 'the method written is phone OTP, nothing grander');
   r = await h.request('/v1/sync/pull', { jar: kidJar });
   c.ok(r.status !== 403, 'sync opens once approved');
@@ -206,6 +218,41 @@ try {
   c.eq(r.data?.withdrawn, 1, 'the parent withdraws');
   r = await h.request('/v1/sync/pull', { jar: kidJar });
   c.eq(r.data?.error?.code, 'GUARDIAN_CONSENT_WITHDRAWN', 'and sync stops at once');
+  // Regression: the child cannot undo a withdrawal by naming a parent again.
+  resetLimits();
+  r = await post('/guardian/request', { guardianName: 'Someone', channel: 'sms', destination: '9811111111' }, kidJar);
+  c.eq(r.status, 409, 'after a withdrawal the child’s session cannot start a new consent request');
+  c.eq(r.data?.error?.code, 'GUARDIAN_CONSENT_WITHDRAWN', 'it says the guardian withdrew');
+  c.ok(raw.prepare("SELECT withdrawn_at FROM guardian_consents WHERE account_id=(SELECT account_id FROM account_phones WHERE phone_e164='+919123456780')").get().withdrawn_at > 0, 'and the withdrawal stands');
+  c.eq(readTestOutbox({ to: '+919811111111' }).length, 0, 'and nothing was sent to the new number');
+
+  // Withdraw-request: same timing floor for a number with and without consent.
+  resetLimits();
+  const { WITHDRAW_REQUEST_FLOOR_MS } = await import('../platform/otp.js');
+  let t0 = Date.now(); await post('/guardian/withdraw-request', { destination: '9000000002' }); const tNone = Date.now() - t0;
+  c.ok(tNone >= WITHDRAW_REQUEST_FLOOR_MS - 20, 'an unknown number waits out the same floor as a real one');
+
+  // ── pre-registration takeover ───────────────────────────────────────────
+  // An attacker registers the victim's address with a password (never
+  // verifying it) and keeps a session. The real owner then signs in by code.
+  resetLimits();
+  const attackerJar = {};
+  r = await h.request('/v1/account/register', { method: 'POST', headers: { Origin: 'http://localhost:5173' }, jar: attackerJar,
+    body: { name: 'Squatter', email: 'victim@example.test', password: 'attacker-password-1', deviceId: 'evil', isAdult: true } });
+  c.eq(r.status, 201, 'the squatter could register the unverified address');
+  r = await post('/request', { channel: 'email', destination: 'victim@example.test' });
+  const victimJar = {};
+  r = await post('/verify', { channel: 'email', destination: 'victim@example.test', challengeId: r.data.challengeId, code: lastCode('victim@example.test') }, victimJar);
+  c.eq(r.data?.status, 'signed-in', 'the mailbox owner signs in with the code');
+  r = await h.request('/v1/account/me', { jar: attackerJar });
+  c.eq(r.status, 401, 'the squatter’s session is dead');
+  r = await h.request('/v1/account/login', { method: 'POST', headers: { Origin: 'http://localhost:5173' }, body: { email: 'victim@example.test', password: 'attacker-password-1' } });
+  c.eq(r.status, 401, 'and the squatter’s password no longer signs in');
+  c.eq(raw.prepare("SELECT password_hash FROM accounts WHERE email='victim@example.test'").get().password_hash, null, 'the unproven password is cleared');
+  c.eq(raw.prepare("SELECT COUNT(*) n FROM account_tokens t JOIN accounts a ON a.id=t.account_id WHERE a.email='victim@example.test' AND t.consumed_at IS NULL").get().n, 0, 'every pending token is spent');
+  c.ok(raw.prepare("SELECT COUNT(*) n FROM audit_log WHERE action='account.first-verified-by-otp'").get().n >= 1, 'and it is recorded in the audit log');
+  r = await h.request('/v1/account/me', { jar: victimJar });
+  c.eq(r.status, 200, 'the owner’s new session works');
 
   // ── adults are not gated ─────────────────────────────────────────────────
   resetLimits();

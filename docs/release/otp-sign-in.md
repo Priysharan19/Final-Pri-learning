@@ -6,11 +6,21 @@ What shipped, how to switch it on in Railway, and what only the owner can do.
 
 - **Sign up / sign in with a 6-digit code** sent by SMS (+91 by default) or email. Same endpoint for both; an address with an account signs in, a new one signs up. `server/platform/otp.js`, `server/platform/otpCore.js`.
 - **Google / Apple** stay as in PR #296; the onboarding flow calls them with `guardianLater: true` so a child's parent is asked on the next screen.
-- **A parent's approval** (DPDP Act, under 18): the student enters the parent's phone or email; the parent gets a code, reads the notice on the student's screen, ticks agreement and enters the code. Email parents also get the existing confirm/withdraw link. Until approval the account is limited: every gated `/v1` route (sync, classes, handwriting, tutor, billing, reports, working) answers `GUARDIAN_CONSENT_PENDING`; practice and marking on the device keep working.
+- **A parent's approval** (DPDP Act, under 18): the student enters the parent's phone or email. The code (and, for email, the existing link) goes to the parent, and the parent approves **on their own page, `/guardian/consent`**, on their own device: it shows the plain-language notice, they tick agreement, name the phone/email the code went to, and enter the code. No child session is involved. The child's screen only says "waiting for your parent", can resend (rate-limited), and moves on by itself once the parent approves. Until approval the account is limited: every gated `/v1` route (sync, classes, handwriting, tutor, billing, reports, working) answers `GUARDIAN_CONSENT_PENDING`; practice and marking on the device keep working. Once a guardian withdraws, the child's session cannot start a new request (409 `GUARDIAN_CONSENT_WITHDRAWN`).
 - **Withdrawal**: the parent screen in the app (`I'm a parent` → Withdraw consent) sends a code to the approving phone; entering it withdraws every consent that phone gave and sync stops at once. Email parents keep the withdraw link.
 - **Account deletion** for a passwordless (code-only) account requires a fresh code sent to the account's own phone/email.
 
-What the recorded method means, stated plainly (as `guardianConsent.js` does for email): `guardian-phone-otp` records that someone holding that phone entered a code on the student's device after the notice was shown. It does not prove the person is an adult or this child's parent. It is not DigiLocker-grade verifiable parental consent, which Rule 10 will require from 14 May 2027.
+## What this consent is, and is not
+
+This is **parent-controlled-channel consent**: `guardian-phone-otp` / `guardian-email-otp` / `guardian-email-confirmation` record that someone holding the named phone or inbox read the notice on the parent page and approved. It does **not** verify identity or age: it is not DigiLocker-verified, and it does not prove the person is an adult or this child's parent.
+
+**Residual risk:** a child who controls a second phone number or inbox can enter it as the "parent" and approve themselves. The server refuses only the child's own phone/email; it cannot tell a parent's second number from a child's.
+
+**Follow-up (tracked):** DPDP Rule 10 requires verifiable parental consent from **14 May 2027** — verification against identity details already reliably held, or a DigiLocker token. That is not built; it must replace or sit on top of this flow before that date.
+
+## Account takeover by pre-registration
+
+If someone registered an address with a password and never verified it, the first one-time-code sign-in to that address proves the real owner. In one transaction it clears the unproven password, revokes every session, spends every pending verify/reset token and writes an `account.first-verified-by-otp` audit row. Password login for unverified accounts is otherwise unchanged (a candidate follow-up: refuse password sign-in for accounts left unverified past a deadline).
 
 ## Security properties (tested in `server/test/otp-lifecycle-check.mjs`)
 
@@ -21,7 +31,7 @@ What the recorded method means, stated plainly (as `guardianConsent.js` does for
 | 10-minute expiry, single use | conditional `UPDATE … WHERE consumed_at IS NULL` |
 | 5 attempts, race-safe | attempt counted atomically before the compare |
 | Constant-time compare | `crypto.timingSafeEqual` |
-| No enumeration | `/otp/request` and `/guardian/withdraw-request` answer identically for known and unknown addresses |
+| No enumeration | `/otp/request` and `/guardian/withdraw-request` answer identically for known and unknown addresses; withdraw-request also answers no sooner than a fixed 900 ms floor, sends nothing when no consent names the number, and never reports a delivery failure |
 | Rate limits | per IP (20/h request, 30/15 min verify), per destination (30 s cooldown, 5 codes/h) |
 | Test adapter cannot reach production | `PRI_SMS_PROVIDER=test` / `PRI_AUTH_EMAIL_PROVIDER=test` throw at boot when `NODE_ENV=production` unless `PRI_SMS_TEST_MODE_ALLOW_STAGING=1` |
 

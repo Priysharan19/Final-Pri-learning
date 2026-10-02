@@ -95,3 +95,8 @@
   .signup-step, .signup-step.signup-dir-back, .otp-box.otp-filled, .otp-invalid .otp-box { animation: none; }
   .signup-progress span, .signup-choice, .signup-seg, .otp-box { transition: none; }
 }
+
+.signup-wait-page { border: 1px solid var(--hairline-strong); border-radius: 12px; padding: var(--space-3) var(--space-4); margin: 0 0 var(--space-3); color: var(--ink-2); font-size: 14px; overflow-wrap: anywhere; }
+.signup-wait-page strong { color: var(--ink); font-weight: 600; }
+.guardian-page .signup-title { margin-top: 0; }
+.guardian-page .signup-notice h2 { font-size: 14px; font-weight: 600; margin: 0 0 var(--space-2); }

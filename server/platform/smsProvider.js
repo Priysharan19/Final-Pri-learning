@@ -43,9 +43,14 @@ export function webOtpLine(publicOrigin, code) {
   return host ? `@${host} #${code}` : '';
 }
 
+/** The parent's own consent page (never the child's device session). */
+export function consentPage(publicOrigin) {
+  try { return new URL('/guardian/consent', String(publicOrigin || '')).toString(); } catch { return 'the Pri Learning parent page'; }
+}
+
 export function smsOtpBody(code, purpose, publicOrigin) {
   const lead = purpose === 'guardian-consent'
-    ? `${code} is the code to approve your child's Pri Learning account. Read what you are agreeing to on their screen before you enter it. Valid 10 minutes.`
+    ? `${code} is the code to approve your child's Pri Learning account. On your own phone open ${consentPage(publicOrigin)}, read what you are agreeing to, then enter it. Valid 10 minutes.`
     : purpose === 'guardian-withdraw'
       ? `${code} is the code to withdraw consent for your child's Pri Learning account. Valid 10 minutes.`
       : `${code} is your Pri Learning code. Valid 10 minutes. Do not share it.`;

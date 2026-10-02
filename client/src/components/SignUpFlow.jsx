@@ -35,8 +35,8 @@ export const GUARDIAN_NOTICE_VERSION = '2026-10-02';
 
 function stepsFor({ mode, role, minor }) {
   if (role === 'parent') return ['role', 'parent-home'];
-  if (mode === 'signin') return ['method', 'code', 'age', 'class', ...(minor ? ['parent', 'parent-code'] : [])];
-  return ['role', 'age', 'class', 'method', 'code', ...(minor ? ['parent', 'parent-code'] : [])];
+  if (mode === 'signin') return ['method', 'code', 'age', 'class', ...(minor ? ['parent', 'parent-wait'] : [])];
+  return ['role', 'age', 'class', 'method', 'code', ...(minor ? ['parent', 'parent-wait'] : [])];
 }
 
 /** Read an SMS code through WebOTP where the browser offers it (Android Chrome). */
@@ -67,9 +67,6 @@ export default function SignUpFlow({ initialMode = 'signup', onCancel, onFinish,
   const [parentName, setParentName] = useState('');
   const [parentChannel, setParentChannel] = useState('sms');
   const [parentDestination, setParentDestination] = useState('');
-  const [parentChallenge, setParentChallenge] = useState(null);
-  const [parentCode, setParentCode] = useState('');
-  const [parentAgrees, setParentAgrees] = useState(false);
   const [resendAt, setResendAt] = useState(0);
   const [now, setNow] = useState(Date.now());
   const [busy, setBusy] = useState('');
@@ -100,10 +97,25 @@ export default function SignUpFlow({ initialMode = 'signup', onCancel, onFinish,
   // WebOTP: on the code steps for an SMS, offer the incoming code to the boxes.
   useEffect(() => {
     if (step === 'code' && channel === 'sms') return listenForSmsCode(c => { setCode(c); void verify(c); });
-    if (step === 'parent-code' && parentChannel === 'sms' && parentAgrees) return listenForSmsCode(c => setParentCode(c));
     return undefined;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step, channel, parentChannel, parentAgrees]);
+  }, [step, channel]);
+  // Waiting for the parent: they approve on their own page, so this screen
+  // only watches the account's consent state and moves on when it is given.
+  useEffect(() => {
+    if (step !== 'parent-wait') return undefined;
+    let live = true;
+    const poll = async () => {
+      try {
+        const state = await cloud.guardianState();
+        if (live && state?.state === 'given') { setConsent({ required: true, state: 'given' }); void finish(account); }
+      } catch { /* offline or signed out: keep waiting, the buttons still work */ }
+    };
+    const timer = setInterval(poll, 4000);
+    void poll();
+    return () => { live = false; clearInterval(timer); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step]);
 
   const go = (to) => {
     setError(''); setInvalid(false);
@@ -218,28 +230,11 @@ export default function SignUpFlow({ initialMode = 'signup', onCancel, onFinish,
     try {
       const sent = await cloud.guardianOtpRequest({ guardianName: parentName.trim(), channel: parentChannel, destination: parentDestination });
       if (sent.alreadyApproved) { setBusy(''); await finish(account); return; }
-      setParentChallenge(sent.challengeId);
-      setParentCode('');
       setResendAt(Date.now() + (sent.resendAfterMs || RESEND_SECONDS * 1000));
       setNow(Date.now());
       setBusy('');
-      if (step !== 'parent-code') go('parent-code');
+      if (step !== 'parent-wait') go('parent-wait');
     } catch (err) { fail(err); }
-  }
-
-  async function approve() {
-    if (busy || parentCode.length !== OTP_LENGTH || !parentAgrees) return;
-    setBusy('approve'); setError(''); setInvalid(false);
-    try {
-      const result = await cloud.guardianOtpApprove({ challengeId: parentChallenge, code: parentCode, approve: true, noticeVersion: GUARDIAN_NOTICE_VERSION });
-      setConsent({ required: true, state: result.state });
-      setBusy('');
-      await finish(account);
-    } catch (err) {
-      setInvalid(err?.code === 'OTP_INVALID');
-      setParentCode('');
-      fail(err);
-    }
   }
 
   async function finish(signedInAccount = account) {
@@ -412,37 +407,19 @@ export default function SignUpFlow({ initialMode = 'signup', onCancel, onFinish,
         </div>
       </>
     );
-  } else if (step === 'parent-code') {
+  } else if (step === 'parent-wait') {
+    const page = `${typeof window !== 'undefined' ? window.location.origin : ''}/guardian/consent`;
     body = (
       <>
-        {heading('signup.consentTitle')}
-        <p className="signup-lead">{t('signup.consentHandOver', { name: parentName.trim() })}</p>
-        <section className="signup-notice" aria-labelledby="signup-notice-title">
-          <h3 id="signup-notice-title">{t('signup.noticeHeading')}</h3>
-          <ul>
-            <li>{t('signup.noticeWhat')}</li>
-            <li>{t('signup.noticeWhy')}</li>
-            <li>{t('signup.noticeNot')}</li>
-            <li>{t('signup.noticeWithdraw')}</li>
-          </ul>
-          <p className="signup-notice-foot">{t('signup.noticeVersion', { v: GUARDIAN_NOTICE_VERSION })}</p>
-        </section>
-        <label className="signup-agree">
-          <input type="checkbox" checked={parentAgrees} onChange={e => setParentAgrees(e.target.checked)} data-testid="signup-parent-agree" />
-          <span>{t('signup.consentAgree')}</span>
-        </label>
-        <p className="signup-sublabel" id="signup-parent-code-label">{t(parentChannel === 'sms' ? 'signup.parentCodeSms' : 'signup.parentCodeEmail')}</p>
-        <OtpInput value={parentCode} onChange={c => { setParentCode(c); setInvalid(false); setError(''); }}
-          disabled={!parentAgrees || busy === 'approve'} invalid={invalid} autoFocus={false} idPrefix="signup-parent-code" labelledBy="signup-parent-code-label" />
-        <button type="button" className="btn btn-primary btn-lg signup-next" disabled={!parentAgrees || parentCode.length !== OTP_LENGTH || !!busy}
-          onClick={approve} data-testid="signup-parent-approve">
-          {busy === 'approve' ? t('signup.checking') : t('signup.consentApprove')}
-        </button>
+        {heading('signup.waitTitle')}
+        <p className="signup-lead">{t(parentChannel === 'sms' ? 'signup.waitLeadSms' : 'signup.waitLeadEmail', { name: parentName.trim() })}</p>
+        <p className="signup-wait-page"><span>{t('signup.waitPageLabel')}</span> <strong>{page}</strong></p>
+        <p className="signup-hint" role="status" data-testid="signup-parent-waiting">{t('signup.waitLimited')}</p>
         <div className="signup-alt">
-          <button type="button" className="linklike" disabled={waitSeconds > 0 || !!busy} onClick={askParent}>
+          <button type="button" className="linklike" disabled={waitSeconds > 0 || !!busy} onClick={askParent} data-testid="signup-parent-resend">
             {waitSeconds > 0 ? t('signup.resendIn', { n: waitSeconds }) : t('signup.resend')}
           </button>
-          <button type="button" className="linklike" onClick={() => finish()}>{t('signup.parentLater')}</button>
+          <button type="button" className="linklike" onClick={() => finish()} data-testid="signup-parent-continue">{t('signup.parentLater')}</button>
         </div>
       </>
     );

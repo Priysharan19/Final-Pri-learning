@@ -8,7 +8,7 @@
 // PRI_RESEND_API_KEY, PRI_AUTH_EMAIL_FROM). The raw code exists only in this
 // call; it is never stored or logged.
 // ─────────────────────────────────────────────────────────────────────────────
-import { recordTestMessage, testModeAllowed } from './smsProvider.js';
+import { consentPage, recordTestMessage, testModeAllowed } from './smsProvider.js';
 
 const REQUEST_TIMEOUT_MS = 10_000;
 const RESEND_ENDPOINT = 'https://api.resend.com/emails';
@@ -18,11 +18,11 @@ function escapeHtml(value) {
   return String(value).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]);
 }
 
-export function otpEmailMessage(code, purpose) {
+export function otpEmailMessage(code, purpose, origin = process.env.PRI_PUBLIC_ORIGIN) {
   const digits = escapeHtml(String(code));
   const big = `<p style="font-size:28px;letter-spacing:6px;font-family:monospace">${digits}</p>`;
   if (purpose === 'guardian-consent') {
-    const body = 'Your child is setting up Pri Learning and has asked you to approve their account. Read what you are agreeing to on their screen, then enter this code there.';
+    const body = `Your child is setting up Pri Learning and has asked you to approve their account. Open ${escapeHtml(consentPage(origin))} yourself, read what you are agreeing to, and enter this code there.`;
     const tail = 'The code is valid for 10 minutes. If you did not expect this, ignore this email and nothing will sync.';
     return {
       subject: `${code} is the code to approve your child’s Pri Learning account`,

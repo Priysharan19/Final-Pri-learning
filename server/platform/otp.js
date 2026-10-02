@@ -38,6 +38,8 @@ export const PHONE_ACCOUNT_EMAIL_DOMAIN = 'phone.invalid';
 export const GUARDIAN_PHONE_METHOD = 'guardian-phone-otp';
 export const GUARDIAN_EMAIL_OTP_METHOD = 'guardian-email-otp';
 export const GUARDIAN_AWAITING_METHOD = 'awaiting-guardian-contact';
+/** Every withdraw-request answers no sooner than this, match or not. */
+export const WITHDRAW_REQUEST_FLOOR_MS = 900;
 
 const invalidCode = (res, extra = {}) => res.status(400).json({ error: { code: 'OTP_INVALID', message: 'That code is not right, or it has expired. Check it, or ask for a new one.', ...extra } });
 const bad = (res, code, message, status = 400) => res.status(status).json({ error: { code, message } });
@@ -189,7 +191,20 @@ export function createOtpRouter(db, {
 
       if (existing) {
         if (channel === 'email' && !existing.email_verified_at) {
-          await db.run('UPDATE accounts SET email_verified_at = ?, updated_at = ? WHERE id = ?', [now, now, existing.id]);
+          // PRE-REGISTRATION TAKEOVER. Until now nobody had proved this mailbox:
+          // whoever registered it with a password may not own it. The code just
+          // proved ownership, so everything the unproven registrant set up goes:
+          // their password, every session and every pending token. The owner
+          // can set a password again later through reset.
+          await db.transaction(async () => {
+            await db.run('UPDATE accounts SET email_verified_at = ?, password_hash = NULL, updated_at = ? WHERE id = ?', [now, now, existing.id]);
+            await db.run('UPDATE account_sessions SET revoked_at = ? WHERE account_id = ? AND revoked_at IS NULL', [now, existing.id]);
+            await db.run('DELETE FROM auth_delivery_outbox WHERE account_id = ? AND delivered_at IS NULL', [existing.id]);
+            await db.run(`UPDATE account_tokens SET consumed_at = ? WHERE account_id = ? AND consumed_at IS NULL
+              AND purpose IN ('verify-email','reset-password')`, [now, existing.id]);
+            await db.run('INSERT INTO audit_log(actor_account_id,action,target_kind,target_id,metadata_json,created_at) VALUES (?,?,?,?,?,?)',
+              [existing.id, 'account.first-verified-by-otp', 'account', existing.id, JSON.stringify({ passwordCleared: !!existing.password_hash }), now]);
+          });
         }
         await maybeBootstrapAdmin(db, existing.id, now);
         await createSession(db, res, existing.id, deviceId, req.get('user-agent') || '', now);
@@ -262,6 +277,13 @@ export function createOtpRouter(db, {
       const state = await consentState(db, accountId);
       if (!state.required) return bad(res, 'GUARDIAN_CONSENT_NOT_REQUIRED', 'This account does not need a parent’s approval.', 409);
       if (state.state === 'given') return res.json({ ok: true, alreadyApproved: true });
+      // A withdrawal is the guardian's decision. The child's session must not be
+      // able to start a fresh ceremony that clears it (guardianConsent.js
+      // confirmConsent: withdrawal is terminal for the ceremony); only the
+      // guardian, through their own channel, can grant permission again.
+      if (state.state === 'withdrawn') {
+        return bad(res, 'GUARDIAN_CONSENT_WITHDRAWN', 'A parent or guardian withdrew permission. Only they can change that.', 409);
+      }
       const name = clipText(String(req.body?.guardianName || '').trim(), 80);
       if (!name) return bad(res, 'GUARDIAN_NAME_REQUIRED', 'Enter a parent or guardian’s name.');
       const channel = req.body?.channel === 'sms' ? 'sms' : req.body?.channel === 'email' ? 'email' : null;
@@ -284,8 +306,8 @@ export function createOtpRouter(db, {
       const method = channel === 'sms' ? GUARDIAN_PHONE_METHOD : GUARDIAN_EMAIL_OTP_METHOD;
       await db.transaction(async () => {
         await db.run(`UPDATE guardian_consents SET guardian_name = ?, guardian_email = ?, guardian_phone = ?,
-            notice_version = ?, requested_at = ?, confirmed_at = NULL, withdrawn_at = NULL, method = ?
-          WHERE account_id = ?`, [name, channel === 'email' ? destination : '', channel === 'sms' ? destination : null,
+            notice_version = ?, requested_at = ?, confirmed_at = NULL, method = ?
+          WHERE account_id = ? AND withdrawn_at IS NULL`, [name, channel === 'email' ? destination : '', channel === 'sms' ? destination : null,
           CONSENT_NOTICE_VERSION, now, method, accountId]);
         // Email parents also get the existing link, so they can approve (and
         // later withdraw) from their own inbox rather than the child's device.
@@ -299,22 +321,36 @@ export function createOtpRouter(db, {
     }
   });
 
-  router.post('/guardian/approve', requireSession(db), rateLimit(db, 'otp-guardian-approve', { limit: 20, windowMs: 60 * 60 * 1000 }), async (req, res) => {
-    const accountId = req.platformSession.account_id;
+  // The parent approves on their OWN page (/guardian/consent), never inside
+  // the child's session: no session is read here at all. The parent names the
+  // phone or email the code went to and enters it; the newest live
+  // guardian-consent challenge for that contact says which account it is for.
+  // What this establishes is a parent-controlled channel, nothing more (see
+  // docs/release/otp-sign-in.md).
+  router.post('/guardian/approve', rateLimit(db, 'otp-guardian-approve', { limit: 20, windowMs: 60 * 60 * 1000 }), async (req, res) => {
     if (req.body?.approve !== true || String(req.body?.noticeVersion || '') !== CONSENT_NOTICE_VERSION) {
-      return bad(res, 'GUARDIAN_NOTICE_REQUIRED', 'The parent must read and accept the current notice.');
+      return bad(res, 'GUARDIAN_NOTICE_REQUIRED', 'Read and accept the current notice first.');
     }
-    const row = await db.get('SELECT guardian_email, guardian_phone, method FROM guardian_consents WHERE account_id = ?', [accountId]);
-    if (!row || (row.method !== GUARDIAN_PHONE_METHOD && row.method !== GUARDIAN_EMAIL_OTP_METHOD)) return invalidCode(res);
-    const channel = row.method === GUARDIAN_PHONE_METHOD ? 'sms' : 'email';
-    const destination = channel === 'sms' ? row.guardian_phone : row.guardian_email;
+    const channel = req.body?.channel === 'sms' ? 'sms' : req.body?.channel === 'email' ? 'email' : null;
+    const destination = channel ? normalizeDestination(channel, req.body?.destination) : null;
+    if (!destination) return invalidCode(res);
+    const now = Date.now();
+    const live = await db.get(`SELECT id, account_id FROM otp_challenges
+      WHERE destination_hash = ? AND purpose = 'guardian-consent' AND channel = ? AND consumed_at IS NULL AND expires_at > ?
+      ORDER BY created_at DESC LIMIT 1`, [destinationHash(channel, destination), channel, now]);
+    if (!live?.account_id) return invalidCode(res);
     const check = await verifyChallenge(db, {
-      challengeId: String(req.body?.challengeId || ''), channel, purpose: 'guardian-consent', destination,
-      code: req.body?.code, accountId, delegatedCheck: delegatedCheck(channel)
+      challengeId: live.id, channel, purpose: 'guardian-consent', destination,
+      code: req.body?.code, accountId: live.account_id, delegatedCheck: delegatedCheck(channel), now
     });
     if (!check.ok) return invalidCode(res, check.attemptsRemaining != null ? { attemptsRemaining: check.attemptsRemaining } : {});
-    const confirmed = await confirmConsent(db, accountId, Date.now());
-    res.json({ ok: true, confirmed, state: (await consentState(db, accountId)).state });
+    // The consent row must still name this contact and still be open.
+    const row = await db.get('SELECT guardian_email, guardian_phone, withdrawn_at FROM guardian_consents WHERE account_id = ?', [live.account_id]);
+    const named = row && (channel === 'sms' ? row.guardian_phone === destination : normalizeEmail(row.guardian_email) === destination);
+    if (!named || row.withdrawn_at) return invalidCode(res);
+    const confirmed = await confirmConsent(db, live.account_id, now);
+    const child = await db.get('SELECT name FROM accounts WHERE id = ?', [live.account_id]);
+    res.json({ ok: true, confirmed, childName: child?.name || null });
   });
 
   // Withdrawal by phone, for a parent who approved by SMS. No session: the
@@ -328,16 +364,24 @@ export function createOtpRouter(db, {
       res.set('Retry-After', String(Math.ceil(limit.retryAfterMs / 1000)));
       return bad(res, 'OTP_RATE_LIMITED', 'Wait a moment before asking for another code.', 429);
     }
+    // Same body, same status and the same wall-clock time whether or not this
+    // number approved anything: a code is only SENT when a live consent names
+    // it, and a delivery failure is not reported (that would leak a match).
+    const started = Date.now();
     const match = await db.get(`SELECT 1 FROM guardian_consents WHERE guardian_phone = ? AND withdrawn_at IS NULL LIMIT 1`, [destination]);
-    if (!match) {
+    let challengeId;
+    if (match) {
+      try { challengeId = (await deliver({ channel: 'sms', destination, purpose: 'guardian-withdraw' })).challengeId; }
+      catch { challengeId = null; }
+    }
+    if (!challengeId) {
       const decoy = await createChallenge(db, { channel: 'sms', purpose: 'guardian-withdraw', destination, providerName: sms?.name || 'none' });
       await retireChallenge(db, decoy.challengeId);
-      return res.status(202).json({ ok: true, channel: 'sms', challengeId: decoy.challengeId, expiresInMs: OTP_TTL_MS, resendAfterMs: OTP_RESEND_COOLDOWN_MS });
+      challengeId = decoy.challengeId;
     }
-    try {
-      const sent = await deliver({ channel: 'sms', destination, purpose: 'guardian-withdraw' });
-      res.status(202).json({ ok: true, channel: 'sms', ...sent });
-    } catch (error) { return sendError(res, error); }
+    const wait = WITHDRAW_REQUEST_FLOOR_MS - (Date.now() - started);
+    if (wait > 0) await new Promise(resolve => setTimeout(resolve, wait));
+    res.status(202).json({ ok: true, channel: 'sms', challengeId, expiresInMs: OTP_TTL_MS, resendAfterMs: OTP_RESEND_COOLDOWN_MS });
   });
 
   router.post('/guardian/withdraw', rateLimit(db, 'otp-guardian-withdraw', { limit: 20, windowMs: 60 * 60 * 1000 }), async (req, res) => {
