@@ -3,6 +3,7 @@ import React, { createContext, useContext, useEffect, useMemo, useState, useCall
 import { Routes, Route, Link, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import { api } from './api.js';
 import { requestPersistentStorage } from './local/idb.js';
+import { onCloudSessionChange } from './platform/cloudSession.js';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 import { setDraftProfile } from './components/drafts.js';
 import { setLanguage, signInLanguage, useT } from './i18n/index.js';
@@ -37,6 +38,8 @@ const Settings = React.lazy(() => import('./pages/Settings.jsx'));
 // prerequisite graph and engine behind it — is an on-demand chunk (see
 // ON_DEMAND in vite.config.js), not part of the install or the warm set.
 const Placement = React.lazy(() => import('./pages/Placement.jsx'));
+// Notes: the page and each class's notes are chunks of their own (notes/notesIndex.js).
+const Notes = React.lazy(() => import('./pages/Notes.jsx'));
 // Outside the frozen V1 scope: the route exists only where the build flag is on.
 const PLACEMENT_ON = featureEnabled('placement');
 
@@ -52,6 +55,7 @@ const I = {
   exams: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><circle cx="12" cy="13" r="8" /><path d="M12 9v4.5l3 1.8" /><path d="M9.5 2.5h5" /></svg>,
   classes: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="m2.5 9 9.5-5 9.5 5-9.5 5-9.5-5Z" /><path d="M6.5 11.5V16c0 1.4 2.5 2.8 5.5 2.8s5.5-1.4 5.5-2.8v-4.5" /><path d="M21.5 9v5" /></svg>,
   settings: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><circle cx="12" cy="12" r="3.2" /><path d="M19 12a7 7 0 0 0-.15-1.4l2.1-1.6-2-3.4-2.45 1a7 7 0 0 0-2.4-1.4L13.7 2.6h-3.9l-.4 2.6a7 7 0 0 0-2.4 1.4l-2.45-1-2 3.4 2.1 1.6A7 7 0 0 0 4.5 12c0 .5.05.9.15 1.4l-2.1 1.6 2 3.4 2.45-1a7 7 0 0 0 2.4 1.4l.4 2.6h3.9l.4-2.6a7 7 0 0 0 2.4-1.4l2.45 1 2-3.4-2.1-1.6c.1-.5.15-.9.15-1.4Z" /></svg>,
+  notes: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M6 3.5h10.5L19 6v14.5H6z" /><path d="M9 8.5h7M9 12h7M9 15.5h4.5" /></svg>,
   practice: <span aria-hidden="true">✎</span>,
   review: <span aria-hidden="true">↺</span>,
   rush: <span aria-hidden="true">⚡</span>,
@@ -59,7 +63,7 @@ const I = {
 };
 
 const STUDENT_NAV = [
-  { label: 'nav.groupLearn', items: [{ to: '/', key: 'nav.home', ico: I.home }, { to: '/practice', key: 'nav.practice', ico: I.practice }] },
+  { label: 'nav.groupLearn', items: [{ to: '/', key: 'nav.home', ico: I.home }, { to: '/practice', key: 'nav.practice', ico: I.practice }, { to: '/notes', key: 'nav.notes', ico: I.notes }] },
   { label: 'nav.groupWork', items: [{ to: '/tasks', key: 'nav.tasks', ico: I.tasks }, { to: '/exams', key: 'nav.exams', ico: I.exams }, { to: '/classes', key: 'nav.classes', ico: I.classes }] },
   { label: 'nav.groupUnderstand', items: [{ to: '/progress', key: 'nav.progress', ico: I.progress }, { to: '/review?filter=wrong', key: 'nav.review', ico: I.review }] },
   { label: 'nav.groupPlay', items: [{ to: '/rush', key: 'nav.rush', ico: I.rush }, { to: '/match', key: 'nav.match', ico: I.match }] },
@@ -96,7 +100,7 @@ function isDestinationActive(location, to) {
 const TITLE_KEYS = {
   '/': 'nav.home', '/practice': 'nav.practice', '/progress': 'nav.progress', '/tasks': 'nav.tasks',
   '/exams': 'nav.exams', '/rush': 'nav.rush', '/match': 'nav.match', '/teach': 'nav.teacherWorkspace',
-  '/review': 'nav.review', '/history': 'nav.review', '/favorites': 'nav.review', '/classes': 'nav.classes', '/settings': 'nav.settings'
+  '/notes': 'nav.notes', '/review': 'nav.review', '/history': 'nav.review', '/favorites': 'nav.review', '/classes': 'nav.classes', '/settings': 'nav.settings'
 };
 
 // Shown for the moment a route's own chunk is arriving. It is announced rather
@@ -117,8 +121,8 @@ export function Logo({ large = false, onClick }) {
     : {};
   return (
     <Tag className={`logo ${large ? 'logo-lg' : ''}${onClick ? ' logo-btn' : ''}`} {...controlProps}>
-      <span className="logo-bb">P</span>
-      <span className="logo-name">ri Learning<span className="logo-dot">.</span></span>
+      <span className="logo-bb" aria-hidden="true">P</span>
+      <span className="logo-name">Pri Learning<span className="logo-dot">.</span></span>
     </Tag>
   );
 }
@@ -160,6 +164,19 @@ export default function App() {
     refreshUser().then(u => { if (u) { refreshDue(); refreshRecent(); } }).catch(() => { });
   }, [refreshUser, refreshDue, refreshRecent]);
 
+  // Signing in or out of a cloud account changes what the profile view reports
+  // (cloudLinked, which decides default server reading). A failed re-read here
+  // keeps the current profile rather than signing the student out.
+  useEffect(() => {
+    let stop = () => {};
+    try {
+      stop = onCloudSessionChange(() => {
+        api.get('/me').then(r => { if (r?.user) setUser(r.user); }).catch(() => { });
+      });
+    } catch { /* non-browser runtimes */ }
+    return () => { try { stop(); } catch { /* already gone */ } };
+  }, []);
+
   // Guard months of practice from storage eviction — ask the browser once per boot.
   useEffect(() => { requestPersistentStorage(); }, []);
 
@@ -189,7 +206,7 @@ export default function App() {
   }, [user?.theme]);
 
   const pageTitle = useMemo(
-    () => (TITLE_KEYS[loc.pathname] ? t(TITLE_KEYS[loc.pathname]) : loc.pathname.startsWith('/exams') ? t('nav.exam') : null),
+    () => (TITLE_KEYS[loc.pathname] ? t(TITLE_KEYS[loc.pathname]) : loc.pathname.startsWith('/exams') ? t('nav.exam') : loc.pathname.startsWith('/notes/') ? t('nav.notes') : null),
     [loc.pathname, t]
   );
 
@@ -379,6 +396,8 @@ export default function App() {
                     <Route path="/teach" element={teacherOnly(<Teach />)} />
                     <Route path="/exams" element={studentOnly(<Exams />)} />
                     <Route path="/exams/:id" element={studentOnly(<ExamRoom />)} />
+                    <Route path="/notes" element={studentOnly(<Notes />)} />
+                    <Route path="/notes/:chapterId" element={studentOnly(<Notes />)} />
                     <Route path="/rush" element={studentOnly(<Rush />)} />
                     <Route path="/match" element={studentOnly(<Match />)} />
                     <Route path="/review" element={studentOnly(<History />)} />

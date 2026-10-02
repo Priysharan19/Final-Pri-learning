@@ -1,0 +1,605 @@
+// i18n note: mathematics content, English by design.
+export default {
+  'c11-sets': {
+    summary: 'A set is a well-defined collection of objects. This chapter builds the language of sets: how to write them, compare them, combine them, and count their elements with the inclusion–exclusion rule.',
+    prereqs: [],
+    concepts: [
+      { title: 'Two ways to write a set', body: 'Roster form lists every element, as in $\\{2, 4, 6\\}$. Set-builder form states the rule, as in $\\{x : x \\text{ is an even natural number less than } 8\\}$. Order and repetition do not matter in roster form.' },
+      { title: 'Subsets and power sets', body: '$A \\subseteq B$ means every element of $A$ is also in $B$. The empty set is a subset of every set. The power set $P(A)$ collects every subset of $A$, so a set with $n$ elements has $2^n$ subsets.' },
+      { title: 'Combining sets', body: 'The union $A \\cup B$ keeps everything in either set; the intersection $A \\cap B$ keeps only what is common; the difference $A - B$ keeps what is in $A$ but not in $B$; the complement $A’$ keeps what is in the universal set $U$ but not in $A$.' },
+      { title: 'Counting with overlaps', body: 'Adding $n(A)$ and $n(B)$ counts the common part twice, so it is subtracted once. For three sets the pairwise overlaps are subtracted and the triple overlap added back.' }
+    ],
+    definitions: [
+      { term: 'Empty set', meaning: 'The set with no elements, written $\\varnothing$ or $\\{\\}$.' },
+      { term: 'Universal set', meaning: 'The set $U$ containing every element under discussion in a problem.' },
+      { term: 'Disjoint sets', meaning: 'Sets with no common element, so $A \\cap B = \\varnothing$.' },
+      { term: 'Proper subset', meaning: '$A \\subset B$ when $A \\subseteq B$ and $A \\ne B$.' }
+    ],
+    formulas: [
+      { label: 'Number of subsets', tex: 'n(P(A)) = 2^{n(A)}', note: 'Proper subsets: $2^n - 1$.' },
+      { label: 'Two sets', tex: 'n(A\\cup B) = n(A) + n(B) - n(A\\cap B)' },
+      { label: 'Three sets', tex: 'n(A\\cup B\\cup C) = \\sum n(A) - \\sum n(A\\cap B) + n(A\\cap B\\cap C)' },
+      { label: 'De Morgan’s laws', tex: '(A\\cup B)’ = A’\\cap B’,\\quad (A\\cap B)’ = A’\\cup B’' },
+      { label: 'Difference', tex: 'A - B = A \\cap B’' },
+      { label: 'Complement count', tex: 'n(A’) = n(U) - n(A)' }
+    ],
+    points: [
+      { front: 'Is $\\varnothing$ a subset of every set?', back: 'Yes, always. But $\\varnothing \\in A$ only if the empty set is literally listed as an element of $A$.' },
+      { front: '$\\in$ versus $\\subseteq$', back: '$\\in$ relates an element to a set; $\\subseteq$ relates a set to a set. $2 \\in \\{1,2\\}$ but $\\{2\\} \\subseteq \\{1,2\\}$.' },
+      { front: 'Subsets of a 4-element set', back: '$2^4 = 16$ subsets, of which 15 are proper.' },
+      { front: 'Disjoint sets and counting', back: 'If $A \\cap B = \\varnothing$ then $n(A\\cup B) = n(A) + n(B)$.' },
+      { front: '"Only A" region', back: '$n(A - B) = n(A) - n(A \\cap B)$. Venn diagrams make these regions easy to fill from the centre outward.' },
+      { front: 'Equal sets', back: 'Two sets are equal when each is a subset of the other; listing order is irrelevant.' }
+    ],
+    mistakes: [
+      { wrong: '$n(A\\cup B) = n(A) + n(B)$ for any two sets.', right: 'Subtract the overlap: $n(A\\cup B) = n(A) + n(B) - n(A\\cap B)$, unless the sets are disjoint.' },
+      { wrong: '$\\{a\\} \\in \\{a, b\\}$.', right: '$a \\in \\{a,b\\}$ and $\\{a\\} \\subseteq \\{a,b\\}$; the set $\\{a\\}$ is not an element.' },
+      { wrong: '$(A\\cup B)’ = A’ \\cup B’$.', right: 'Complement swaps union and intersection: $(A\\cup B)’ = A’\\cap B’$.' }
+    ],
+    examples: [
+      { question: 'In a class, 25 students take Maths, 18 take Physics and 10 take both. How many take at least one of the two?', steps: ['$n(M\\cup P) = n(M) + n(P) - n(M\\cap P)$', '$= 25 + 18 - 10$'], answer: '33', verify: { kind: 'value', expr: '25+18-10', answer: '33' } },
+      { question: 'How many subsets does $A = \\{1, 2, 3, 4, 5\\}$ have?', steps: ['$n(A) = 5$', 'Number of subsets $= 2^5$'], answer: '32', verify: { kind: 'value', expr: '2^5', answer: '32' } }
+    ]
+  },
+
+  'c11-relations-functions': {
+    summary: 'A relation pairs elements of one set with elements of another; a function is a relation where every input has exactly one output. This chapter covers Cartesian products, domain and range, and the standard real functions you should recognise on sight.',
+    prereqs: ['c11-sets'],
+    concepts: [
+      { title: 'Cartesian product', body: '$A \\times B$ is the set of all ordered pairs $(a, b)$ with $a \\in A$, $b \\in B$. Order matters, so $A\\times B \\ne B\\times A$ in general, and $n(A\\times B) = n(A)\\,n(B)$.' },
+      { title: 'Relations', body: 'A relation from $A$ to $B$ is any subset of $A \\times B$. Since $A\\times B$ has $pq$ pairs, there are $2^{pq}$ possible relations.' },
+      { title: 'Functions', body: 'A function from $A$ to $B$ assigns each element of $A$ exactly one image in $B$. Every element of the domain must be used, and none may have two images.' },
+      { title: 'Domain and range of real functions', body: 'For a formula, the domain is every real input that gives a real output: exclude zeros of denominators and negatives under even roots. The range is the set of outputs actually produced.' },
+      { title: 'Standard functions', body: 'Identity $y = x$, constant $y = c$, polynomial, rational, modulus $y = |x|$, signum (gives $-1, 0, 1$) and greatest integer $y = [x]$ (largest integer not exceeding $x$). Know their graphs, domains and ranges.' }
+    ],
+    definitions: [
+      { term: 'Ordered pair', meaning: '$(a, b)$ with a fixed first and second entry; $(a,b) = (c,d)$ only when $a=c$ and $b=d$.' },
+      { term: 'Domain', meaning: 'The set of first entries (inputs) of a relation or function.' },
+      { term: 'Range', meaning: 'The set of second entries (outputs) actually attained.' },
+      { term: 'Codomain', meaning: 'The target set $B$ of a function $f: A \\to B$; the range is a subset of it.' }
+    ],
+    formulas: [
+      { label: 'Size of a product', tex: 'n(A\\times B) = n(A)\\cdot n(B)' },
+      { label: 'Number of relations', tex: '2^{\\,n(A)\\,n(B)}' },
+      { label: 'Modulus function', tex: '|x| = \\begin{cases} x, & x \\ge 0 \\\\ -x, & x < 0 \\end{cases}' },
+      { label: 'Signum function', tex: '\\operatorname{sgn}(x) = \\begin{cases} 1, & x>0 \\\\ 0, & x=0 \\\\ -1, & x<0 \\end{cases}' },
+      { label: 'Algebra of functions', tex: '(f\\pm g)(x) = f(x)\\pm g(x),\\quad \\left(\\tfrac{f}{g}\\right)(x) = \\tfrac{f(x)}{g(x)},\\ g(x)\\ne 0' }
+    ],
+    points: [
+      { front: 'Vertical line test', back: 'A graph is a function of $x$ if no vertical line meets it more than once.' },
+      { front: 'Domain of $\\sqrt{g(x)}$', back: 'Solve $g(x) \\ge 0$.' },
+      { front: 'Domain of $1/g(x)$', back: 'All reals except where $g(x) = 0$.' },
+      { front: 'Greatest integer of a negative', back: '$[-2.3] = -3$, not $-2$: it rounds down towards $-\\infty$.' },
+      { front: 'Range of $x^2$', back: '$[0, \\infty)$ — every output is non-negative.' },
+      { front: 'JEE tip: range by inversion', back: 'For $y = f(x)$, solve for $x$ in terms of $y$ and find which $y$ give a valid $x$ in the domain.' }
+    ],
+    mistakes: [
+      { wrong: '$A\\times B = B\\times A$.', right: 'The pairs are ordered, so the products differ unless $A = B$ or one set is empty.' },
+      { wrong: 'The range of $f: A \\to B$ is always $B$.', right: '$B$ is the codomain; the range is only the outputs actually produced.' },
+      { wrong: '$[-1.5] = -1$.', right: '$[x]$ is the greatest integer $\\le x$, so $[-1.5] = -2$.' }
+    ],
+    examples: [
+      { question: 'If $n(A) = 3$ and $n(B) = 2$, how many relations are there from $A$ to $B$?', steps: ['$n(A\\times B) = 3 \\times 2 = 6$', 'Each relation is a subset of $A \\times B$, so there are $2^6$.'], answer: '64', verify: { kind: 'value', expr: '2^(3*2)', answer: '64' } },
+      { question: 'Find $f(3)$ for $f(x) = \\dfrac{x^2 + 1}{x - 1}$.', steps: ['Substitute $x = 3$: $\\dfrac{9 + 1}{2}$'], answer: '5', verify: { kind: 'value', expr: '(3^2+1)/(3-1)', answer: '5' } }
+    ]
+  },
+
+  'c11-trig-functions': {
+    summary: 'Trigonometric ratios are extended from acute angles to all real numbers using the unit circle and radian measure. The chapter collects the sign rules, compound and multiple angle identities, and the general solutions of trigonometric equations.',
+    prereqs: ['c10-trigonometry'],
+    concepts: [
+      { title: 'Radian measure', body: 'One radian is the angle subtended at the centre by an arc equal to the radius. A full turn is $2\\pi$ radians, so $\\pi \\text{ rad} = 180^\\circ$. Arc length is $l = r\\theta$ with $\\theta$ in radians.' },
+      { title: 'Unit circle definitions', body: 'For a point on the unit circle at angle $x$, $\\cos x$ is its $x$-coordinate and $\\sin x$ its $y$-coordinate. This defines the ratios for every real angle and makes sine and cosine periodic with period $2\\pi$.' },
+      { title: 'Signs by quadrant', body: 'All ratios are positive in the first quadrant, only sine (and cosec) in the second, only tangent (and cot) in the third, only cosine (and sec) in the fourth.' },
+      { title: 'Compound angles', body: 'The sum formulas for $\\sin(x\\pm y)$ and $\\cos(x \\pm y)$ generate everything else: double angles, triple angles and the product–sum conversions.' },
+      { title: 'General solutions', body: 'Because the functions repeat, an equation like $\\sin x = \\sin\\alpha$ has infinitely many solutions. The general solution describes all of them with an integer $n$.' }
+    ],
+    definitions: [
+      { term: 'Radian', meaning: 'The angle at the centre subtended by an arc of length equal to the radius.' },
+      { term: 'Principal solution', meaning: 'A solution lying in $[0, 2\\pi)$.' },
+      { term: 'General solution', meaning: 'An expression in an integer $n$ that gives every solution of a trigonometric equation.' },
+      { term: 'Period', meaning: 'The smallest positive $T$ with $f(x+T) = f(x)$ for all $x$: $2\\pi$ for sine and cosine, $\\pi$ for tangent.' }
+    ],
+    formulas: [
+      { label: 'Degree–radian conversion', tex: '\\theta_{\\text{rad}} = \\theta_{\\text{deg}}\\times\\frac{\\pi}{180}' },
+      { label: 'Arc length', tex: 'l = r\\theta' },
+      { label: 'Sum and difference', tex: '\\sin(x\\pm y) = \\sin x\\cos y \\pm \\cos x\\sin y,\\quad \\cos(x\\pm y) = \\cos x\\cos y \\mp \\sin x\\sin y' },
+      { label: 'Tangent of a sum', tex: '\\tan(x\\pm y) = \\frac{\\tan x \\pm \\tan y}{1 \\mp \\tan x\\tan y}' },
+      { label: 'Double angle', tex: '\\sin 2x = 2\\sin x\\cos x,\\quad \\cos 2x = \\cos^2 x - \\sin^2 x = 2\\cos^2 x - 1 = 1 - 2\\sin^2 x' },
+      { label: 'Double angle via tangent', tex: '\\tan 2x = \\frac{2\\tan x}{1-\\tan^2 x}' },
+      { label: 'Triple angle', tex: '\\sin 3x = 3\\sin x - 4\\sin^3 x,\\quad \\cos 3x = 4\\cos^3 x - 3\\cos x' },
+      { label: 'Sum to product', tex: '\\sin A + \\sin B = 2\\sin\\tfrac{A+B}{2}\\cos\\tfrac{A-B}{2},\\quad \\cos A + \\cos B = 2\\cos\\tfrac{A+B}{2}\\cos\\tfrac{A-B}{2}' },
+      { label: 'Difference to product', tex: '\\sin A - \\sin B = 2\\cos\\tfrac{A+B}{2}\\sin\\tfrac{A-B}{2},\\quad \\cos A - \\cos B = -2\\sin\\tfrac{A+B}{2}\\sin\\tfrac{A-B}{2}' },
+      { label: 'Product to sum', tex: '2\\sin x\\cos y = \\sin(x+y) + \\sin(x-y),\\quad 2\\cos x\\cos y = \\cos(x+y)+\\cos(x-y),\\quad 2\\sin x\\sin y = \\cos(x-y) - \\cos(x+y)' },
+      { label: 'General solutions', tex: '\\sin x = \\sin\\alpha \\Rightarrow x = n\\pi + (-1)^n\\alpha;\\ \\cos x = \\cos\\alpha \\Rightarrow x = 2n\\pi \\pm \\alpha;\\ \\tan x = \\tan\\alpha \\Rightarrow x = n\\pi + \\alpha', note: '$n \\in \\mathbb{Z}$.' },
+      { label: 'Zeros', tex: '\\sin x = 0 \\Leftrightarrow x = n\\pi,\\quad \\cos x = 0 \\Leftrightarrow x = (2n+1)\\tfrac{\\pi}{2}' }
+    ],
+    points: [
+      { front: 'Allied angles rule', back: 'For $\\tfrac{\\pi}{2}\\pm x$ or $\\tfrac{3\\pi}{2}\\pm x$ the ratio changes (sin ↔ cos, tan ↔ cot); for $\\pi \\pm x$ or $2\\pi \\pm x$ it stays. Treat $x$ as acute: the sign is the sign of the original ratio in the quadrant where the new angle lies.' },
+      { front: '$\\sin(-x)$ and $\\cos(-x)$', back: 'Sine is odd: $\\sin(-x) = -\\sin x$. Cosine is even: $\\cos(-x) = \\cos x$.' },
+      { front: 'Range of $a\\sin x + b\\cos x$', back: 'From $-\\sqrt{a^2+b^2}$ to $\\sqrt{a^2+b^2}$ — a frequent JEE shortcut.' },
+      { front: 'Value of $\\sin 15^\\circ$', back: '$\\sin(45^\\circ - 30^\\circ) = \\dfrac{\\sqrt6 - \\sqrt2}{4}$.' },
+      { front: 'Never divide by a trig function', back: 'Dividing an equation by $\\cos x$ loses the solutions where $\\cos x = 0$. Factorise instead.' },
+      { front: 'Half-angle forms', back: '$1 - \\cos 2x = 2\\sin^2 x$ and $1 + \\cos 2x = 2\\cos^2 x$ clear square roots quickly.' },
+      { front: 'Which unit do angles take in calculus and general solutions?', back: 'Radians. Results such as $\\frac{d}{dx}\\sin x = \\cos x$ hold only when $x$ is measured in radians, and general solutions are written in radians.' }
+    ],
+    mistakes: [
+      { wrong: '$\\sin(x + y) = \\sin x + \\sin y$.', right: 'Use $\\sin(x+y) = \\sin x\\cos y + \\cos x\\sin y$.', misconception: 'function-of-sum' },
+      { wrong: 'Dividing $\\sin x\\cos x = \\cos x$ by $\\cos x$ to get only $\\sin x = 1$.', right: 'Factorise: $\\cos x(\\sin x - 1) = 0$, so also $\\cos x = 0$.', misconception: 'divided-by-variable' },
+      { wrong: 'General solution of $\\cos x = \\cos\\alpha$ is $n\\pi + (-1)^n\\alpha$.', right: 'That form is for sine. For cosine use $x = 2n\\pi \\pm \\alpha$.' },
+      { wrong: 'Using degrees in $l = r\\theta$.', right: 'Convert the angle to radians first.' }
+    ],
+    examples: [
+      { question: 'Find the exact value of $\\cos 75^\\circ$.', steps: ['$\\cos(45^\\circ + 30^\\circ) = \\cos45^\\circ\\cos30^\\circ - \\sin45^\\circ\\sin30^\\circ$', '$= \\dfrac{1}{\\sqrt2}\\cdot\\dfrac{\\sqrt3}{2} - \\dfrac{1}{\\sqrt2}\\cdot\\dfrac12 = \\dfrac{\\sqrt3 - 1}{2\\sqrt2}$', 'Rationalise: $\\dfrac{\\sqrt6 - \\sqrt2}{4}$'], answer: '$\\dfrac{\\sqrt6-\\sqrt2}{4}$', verify: { kind: 'value', expr: 'cos(75*pi/180)', answer: '(sqrt(6)-sqrt(2))/4' } },
+      { question: 'An arc of a circle of radius 12 cm subtends $60^\\circ$ at the centre. Find its length.', steps: ['$60^\\circ = \\dfrac{\\pi}{3}$ rad', '$l = r\\theta = 12\\cdot\\dfrac{\\pi}{3}$'], answer: '$4\\pi$ cm', verify: { kind: 'value', expr: '12*60*pi/180', answer: '4pi' } }
+    ]
+  },
+
+  'c11-complex-numbers': {
+    summary: 'Complex numbers $a + ib$ with $i^2 = -1$ let every quadratic equation have roots. The chapter covers arithmetic, conjugate, modulus, the Argand plane, polar form with the argument, and quadratics with negative discriminant.',
+    prereqs: ['c10-quadratic-equations'],
+    concepts: [
+      { title: 'The imaginary unit', body: '$i$ is defined by $i^2 = -1$. Its powers cycle with period 4: $i, -1, -i, 1$. So $i^n$ depends only on the remainder of $n$ on division by 4.' },
+      { title: 'Arithmetic', body: 'Add and subtract real and imaginary parts separately. Multiply like binomials, replacing $i^2$ by $-1$. Divide by multiplying top and bottom by the conjugate of the denominator.' },
+      { title: 'Argand plane', body: '$z = a + ib$ is the point $(a, b)$. Its distance from the origin is the modulus $|z|$, and the angle from the positive real axis is the argument.' },
+      { title: 'Polar form', body: '$z = r(\\cos\\theta + i\\sin\\theta)$ with $r = |z|$ and $\\theta = \\arg z$. The principal argument lies in $(-\\pi, \\pi]$; find the reference angle from $\\tan\\alpha = |b/a|$ and then place it in the correct quadrant.' },
+      { title: 'Quadratics with $D < 0$', body: 'For real $a, b, c$ with $b^2 - 4ac < 0$, the roots are $\\dfrac{-b \\pm i\\sqrt{4ac - b^2}}{2a}$, a pair of complex conjugates.' }
+    ],
+    definitions: [
+      { term: 'Conjugate', meaning: '$\\bar z = a - ib$ for $z = a + ib$; the reflection in the real axis.' },
+      { term: 'Modulus', meaning: '$|z| = \\sqrt{a^2 + b^2}$.' },
+      { term: 'Principal argument', meaning: 'The unique $\\theta \\in (-\\pi, \\pi]$ with $\\cos\\theta = a/|z|$ and $\\sin\\theta = b/|z|$.' },
+      { term: 'Equality', meaning: '$a + ib = c + id$ exactly when $a = c$ and $b = d$.' }
+    ],
+    formulas: [
+      { label: 'Powers of $i$', tex: 'i^{4k} = 1,\\ i^{4k+1} = i,\\ i^{4k+2} = -1,\\ i^{4k+3} = -i' },
+      { label: 'Product', tex: '(a+ib)(c+id) = (ac - bd) + i(ad + bc)' },
+      { label: 'Multiplicative inverse', tex: 'z^{-1} = \\frac{\\bar z}{|z|^2}' },
+      { label: 'Modulus rules', tex: '|z_1 z_2| = |z_1||z_2|,\\quad \\left|\\frac{z_1}{z_2}\\right| = \\frac{|z_1|}{|z_2|},\\quad z\\bar z = |z|^2' },
+      { label: 'Conjugate rules', tex: '\\overline{z_1 \\pm z_2} = \\bar z_1 \\pm \\bar z_2,\\quad \\overline{z_1 z_2} = \\bar z_1\\,\\bar z_2' },
+      { label: 'Polar form', tex: 'z = r(\\cos\\theta + i\\sin\\theta),\\quad r = \\sqrt{a^2+b^2}' },
+      { label: 'Complex roots', tex: 'x = \\frac{-b \\pm i\\sqrt{4ac-b^2}}{2a},\\quad b^2 - 4ac < 0' }
+    ],
+    points: [
+      { front: 'Argument by quadrant', back: 'With $\\alpha = \\tan^{-1}|b/a|$: Q1 $\\alpha$; Q2 $\\pi - \\alpha$; Q3 $-(\\pi - \\alpha)$; Q4 $-\\alpha$.' },
+      { front: '$\\sqrt{a}\\sqrt{b} = \\sqrt{ab}$?', back: 'Not when both are negative: $\\sqrt{-4}\\sqrt{-9} = (2i)(3i) = -6$, not $6$.' },
+      { front: '$z + \\bar z$ and $z - \\bar z$', back: '$z + \\bar z = 2\\,\\text{Re}(z)$ and $z - \\bar z = 2i\\,\\text{Im}(z)$.' },
+      { front: 'Triangle inequality', back: '$|z_1 + z_2| \\le |z_1| + |z_2|$.' },
+      { front: 'Sum of four consecutive powers', back: '$i^n + i^{n+1} + i^{n+2} + i^{n+3} = 0$.' },
+      { front: 'JEE tip: argument of a product', back: '$\\arg(z_1z_2) = \\arg z_1 + \\arg z_2$, adjusted by $2\\pi$ to stay principal.' }
+    ],
+    mistakes: [
+      { wrong: 'Taking $\\arg(-1 - i) = \\pi/4$ because $\\tan^{-1}(1) = \\pi/4$.', right: 'The point is in the third quadrant, so the principal argument is $-3\\pi/4$.' },
+      { wrong: '$\\sqrt{-2}\\cdot\\sqrt{-8} = \\sqrt{16} = 4$.', right: 'Write each as $i\\sqrt2$ and $i\\sqrt8$; the product is $i^2\\cdot 4 = -4$.' },
+      { wrong: '$|3 + 4i| = 3 + 4 = 7$.', right: '$|3 + 4i| = \\sqrt{9 + 16} = 5$.' }
+    ],
+    examples: [
+      { question: 'Find the modulus and principal argument of $z = -1 + i\\sqrt3$.', steps: ['$r = \\sqrt{1 + 3} = 2$', 'Reference angle: $\\tan\\alpha = \\sqrt3$, so $\\alpha = \\pi/3$', 'The point $(-1, \\sqrt3)$ is in the second quadrant, so $\\theta = \\pi - \\pi/3$'], answer: '$|z| = 2$, $\\arg z = \\dfrac{2\\pi}{3}$', verify: { kind: 'values', pairs: [['sqrt((-1)^2+(sqrt(3))^2)', '2'], ['pi-atan(sqrt(3)/1)', '2pi/3']] } },
+      { question: 'Express $\\dfrac{5 + i}{2 - 3i}$ in the form $a + ib$.', steps: ['Multiply by $\\dfrac{2+3i}{2+3i}$', 'Numerator: $(5+i)(2+3i) = 10 + 15i + 2i + 3i^2 = 7 + 17i$', 'Denominator: $4 + 9 = 13$'], answer: '$\\dfrac{7}{13} + \\dfrac{17}{13}i$', verify: { kind: 'values', pairs: [['(5*2-1*3)/(2^2+3^2)', '7/13'], ['(5*3+1*2)/(2^2+3^2)', '17/13']] } }
+    ]
+  },
+
+  'c11-linear-inequalities': {
+    summary: 'A linear inequality compares two linear expressions with $<$, $>$, $\\le$ or $\\ge$. Solve it like an equation, but reverse the sign when multiplying or dividing by a negative. In two variables the solution is a half-plane, and a system is solved by overlapping half-planes.',
+    prereqs: ['c10-pair-linear-equations'],
+    concepts: [
+      { title: 'Allowed moves', body: 'You may add or subtract the same number on both sides, and multiply or divide by a positive number, without changing the sign. Multiplying or dividing by a negative number reverses it.' },
+      { title: 'Number-line graphs', body: 'A strict inequality uses an open circle at the boundary; $\\le$ or $\\ge$ uses a filled circle. Interval notation uses round brackets for excluded ends and square brackets for included ends.' },
+      { title: 'Systems in one variable', body: 'Solve each inequality separately and take the common part (intersection) of the solution sets.' },
+      { title: 'Two variables', body: 'Draw the line $ax + by = c$ (dashed if strict, solid otherwise), then test a point such as the origin to decide which side satisfies the inequality and shade it.' }
+    ],
+    definitions: [
+      { term: 'Solution set', meaning: 'All values of the variable that make the inequality true.' },
+      { term: 'Half-plane', meaning: 'The region on one side of a line, the solution set of a single linear inequality in two variables.' },
+      { term: 'Feasible region', meaning: 'The region common to all inequalities of a system.' }
+    ],
+    formulas: [
+      { label: 'Sign reversal', tex: 'a < b,\\ k < 0 \\Rightarrow ka > kb' },
+      { label: 'Modulus as a double inequality', tex: '|x - a| < r \\iff a - r < x < a + r' },
+      { label: 'Modulus outside', tex: '|x - a| > r \\iff x < a - r \\ \\text{or}\\ x > a + r' }
+    ],
+    points: [
+      { front: 'Dashed or solid boundary?', back: 'Dashed for $<$ or $>$; solid for $\\le$ or $\\ge$.' },
+      { front: 'Test point', back: 'Use $(0,0)$ unless the line passes through it; then use $(1,0)$ or $(0,1)$.' },
+      { front: 'Natural or integer solutions', back: 'If $x$ must be a natural number, list only the whole values inside the interval.' },
+      { front: 'Double inequality', back: 'Operate on all three parts at once: $-3 < 2x+1 \\le 7$ gives $-2 < x \\le 3$.' },
+      { front: 'Never multiply by an unknown sign', back: 'Multiplying by $x$ when its sign is unknown can reverse the inequality silently; move everything to one side instead.' }
+    ],
+    mistakes: [
+      { wrong: '$-3x > 9 \\Rightarrow x > -3$.', right: 'Dividing by $-3$ reverses the sign: $x < -3$.', misconception: 'inequality-not-reversed' },
+      { wrong: 'Shading the side that fails the test point.', right: 'Shade the side containing the test point only if the point satisfies the inequality.' },
+      { wrong: 'Writing $x \\le 4$ as $(-\\infty, 4)$.', right: 'The endpoint is included: $(-\\infty, 4]$.' }
+    ],
+    examples: [
+      { question: 'Solve $3x - 7 > 5x + 1$.', steps: ['$3x - 5x > 1 + 7$', '$-2x > 8$', 'Divide by $-2$ and reverse: $x < -4$'], answer: '$x < -4$', verify: { kind: 'roots', f: '3x-7-(5x+1)', answers: ['-4'], degree: 1 } },
+      { question: 'Find the largest integer $x$ with $\\dfrac{x}{2} + 3 \\le 7$.', steps: ['$\\dfrac{x}{2} \\le 4$', '$x \\le 8$'], answer: '8', verify: { kind: 'value', expr: '(7-3)*2', answer: '8' } }
+    ]
+  },
+
+  'c11-permutations-combinations': {
+    summary: 'Counting without listing. The multiplication principle builds every result: permutations count ordered arrangements, combinations count unordered selections, and restrictions are handled by grouping, gaps or complements.',
+    prereqs: ['c11-sets'],
+    concepts: [
+      { title: 'Fundamental principle', body: 'If one task can be done in $m$ ways and, after it, a second in $n$ ways, the pair can be done in $mn$ ways. For alternatives (either one or the other) add instead.' },
+      { title: 'Permutations', body: 'An arrangement where order matters. Choosing and ordering $r$ of $n$ distinct objects gives $^nP_r = \\dfrac{n!}{(n-r)!}$ ways.' },
+      { title: 'Repeated objects', body: 'Arranging $n$ objects where $p$ are alike of one kind, $q$ of another, gives $\\dfrac{n!}{p!\\,q!}$ — dividing out the swaps that change nothing.' },
+      { title: 'Combinations', body: 'A selection where order does not matter: $^nC_r = \\dfrac{n!}{r!(n-r)!}$. Each selection of $r$ can be ordered in $r!$ ways, so $^nP_r = r!\\,^nC_r$.' },
+      { title: 'Restrictions', body: 'Objects that must stay together: tie them into one block, then arrange inside the block. Objects that must not be together: arrange the others, then place them in the gaps, or subtract the together-cases from the total.' }
+    ],
+    definitions: [
+      { term: 'Factorial', meaning: '$n! = n(n-1)\\cdots 2\\cdot 1$, with $0! = 1$.' },
+      { term: 'Permutation', meaning: 'An ordered arrangement of objects.' },
+      { term: 'Combination', meaning: 'An unordered selection of objects.' }
+    ],
+    formulas: [
+      { label: 'Permutations', tex: '^nP_r = \\frac{n!}{(n-r)!},\\quad 0 \\le r \\le n' },
+      { label: 'With repetition allowed', tex: 'n^r' },
+      { label: 'Alike objects', tex: '\\frac{n!}{p_1!\\,p_2!\\cdots p_k!}' },
+      { label: 'Combinations', tex: '^nC_r = \\frac{n!}{r!\\,(n-r)!}' },
+      { label: 'Symmetry', tex: '^nC_r = {}^nC_{n-r}' },
+      { label: 'Pascal’s rule', tex: '^nC_r + {}^nC_{r-1} = {}^{n+1}C_r' },
+      { label: 'Link', tex: '^nP_r = r!\\cdot {}^nC_r' }
+    ],
+    points: [
+      { front: 'Order matters?', back: 'Arrangements, rankings, passwords, seating: permutation. Committees, teams, hands of cards: combination.' },
+      { front: '$^nC_a = {}^nC_b$', back: 'Then $a = b$ or $a + b = n$.' },
+      { front: 'Circular arrangements', back: '$n$ distinct people round a table: $(n-1)!$ ways (JEE; halve it for necklaces that can be flipped).' },
+      { front: '"At least one" problems', back: 'Total minus "none" is usually quickest.' },
+      { front: 'Digits and zero', back: 'For numbers, the leading digit cannot be 0; fill the restricted place first.' },
+      { front: 'Values worth knowing', back: '$0! = 1$, $^nC_0 = {}^nC_n = 1$, $^nC_1 = n$.' }
+    ],
+    mistakes: [
+      { wrong: 'Using $^nP_r$ to count committees.', right: 'A committee has no order: use $^nC_r$.' },
+      { wrong: 'Arranging the letters of APPLE in $5! = 120$ ways.', right: 'The two Ps are alike: $\\dfrac{5!}{2!} = 60$.' },
+      { wrong: '$0! = 0$.', right: '$0! = 1$, which keeps $^nC_0 = 1$ consistent.' }
+    ],
+    examples: [
+      { question: 'A committee of 3 is chosen from 7 men and 5 women so that it has exactly 2 women. In how many ways?', steps: ['Choose 2 women: $^5C_2 = 10$', 'Choose 1 man: $^7C_1 = 7$', 'Multiply: $10 \\times 7$'], answer: '70', verify: { kind: 'value', expr: '5C2*7C1', answer: '70' } },
+      { question: 'In how many ways can the letters of the word INDIA be arranged?', steps: ['5 letters with I repeated twice', '$\\dfrac{5!}{2!} = \\dfrac{120}{2}$'], answer: '60', verify: { kind: 'value', expr: '5!/2!', answer: '60' } }
+    ]
+  },
+
+  'c11-binomial-theorem': {
+    summary: 'The binomial theorem expands $(a + b)^n$ for a positive integer $n$ using the coefficients $^nC_r$. From it come the general term, the middle term(s), and the term free of $x$.',
+    prereqs: ['c11-permutations-combinations'],
+    concepts: [
+      { title: 'The expansion', body: '$(a+b)^n$ has $n+1$ terms. The power of $a$ falls from $n$ to $0$ while the power of $b$ rises from $0$ to $n$; in every term the powers add to $n$.' },
+      { title: 'Pascal’s triangle', body: 'Each row lists the coefficients for one $n$; each entry is the sum of the two above it, which is Pascal’s rule $^nC_{r-1} + {}^nC_r = {}^{n+1}C_r$.' },
+      { title: 'General term', body: 'The $(r+1)$th term is $T_{r+1} = {}^nC_r\\,a^{n-r}b^r$. Note the index shift: $r = 0$ gives the first term.' },
+      { title: 'Specific terms', body: 'For the term independent of $x$ (or containing $x^k$), simplify the power of $x$ in $T_{r+1}$, set it equal to $0$ (or $k$) and solve for $r$. A valid $r$ must be a whole number from $0$ to $n$.' }
+    ],
+    definitions: [
+      { term: 'Binomial coefficient', meaning: '$^nC_r$, the coefficient of $a^{n-r}b^r$ in $(a+b)^n$.' },
+      { term: 'Middle term', meaning: 'For even $n$, the single term $T_{n/2+1}$; for odd $n$, the two terms $T_{(n+1)/2}$ and $T_{(n+3)/2}$.' },
+      { term: 'Term independent of $x$', meaning: 'The term in which the power of $x$ is zero.' }
+    ],
+    formulas: [
+      { label: 'Binomial theorem', tex: '(a+b)^n = \\sum_{r=0}^{n} {}^nC_r\\,a^{n-r}b^r' },
+      { label: 'General term', tex: 'T_{r+1} = {}^nC_r\\,a^{n-r}\\,b^r' },
+      { label: 'Sum of coefficients', tex: '\\sum_{r=0}^{n} {}^nC_r = 2^n' },
+      { label: 'Alternating sum', tex: '{}^nC_0 - {}^nC_1 + {}^nC_2 - \\cdots = 0' },
+      { label: 'Odd and even coefficients', tex: '{}^nC_0 + {}^nC_2 + \\cdots = {}^nC_1 + {}^nC_3 + \\cdots = 2^{n-1}' }
+    ],
+    points: [
+      { front: 'Number of terms', back: '$(a+b)^n$ has $n+1$ terms.' },
+      { front: '$(a - b)^n$', back: 'Use $b \\to -b$: the general term is $(-1)^r\\,{}^nC_r\\,a^{n-r}b^r$.' },
+      { front: 'Coefficient vs term', back: 'The coefficient of $x^k$ is the number multiplying $x^k$, including signs and powers of constants.' },
+      { front: 'Sum of all coefficients', back: 'Put every variable equal to 1. For $(2x - 1)^5$ the sum is $1^5 = 1$.' },
+      { front: 'JEE tip: largest coefficient', back: '$^nC_r$ is greatest at the middle: $r = n/2$ for even $n$.' },
+      { front: 'Approximation', back: 'Use the first few terms of $(1 + x)^n$ when $x$ is small, e.g. $(1.01)^5 \\approx 1 + 5(0.01)$.' }
+    ],
+    mistakes: [
+      { wrong: '$(a + b)^3 = a^3 + b^3$.', right: '$(a+b)^3 = a^3 + 3a^2b + 3ab^2 + b^3$.', misconception: 'power-of-sum' },
+      { wrong: 'Calling $^nC_r a^{n-r}b^r$ the $r$th term.', right: 'It is the $(r+1)$th term.' },
+      { wrong: 'Dropping the minus sign in $(x - \\tfrac1x)^n$.', right: 'Keep $(-1)^r$ in the general term.' }
+    ],
+    examples: [
+      { question: 'Find the term independent of $x$ in $\\left(x^2 + \\dfrac{1}{x}\\right)^6$.', steps: ['$T_{r+1} = {}^6C_r (x^2)^{6-r} x^{-r} = {}^6C_r\\,x^{12-3r}$', 'Set $12 - 3r = 0$, so $r = 4$', '$T_5 = {}^6C_4 = 15$'], answer: '15', verify: { kind: 'value', expr: '6C4', answer: '15' } },
+      { question: 'Find the coefficient of $x^3$ in $(2 + x)^5$.', steps: ['$T_{r+1} = {}^5C_r\\,2^{5-r}x^r$; take $r = 3$', '${}^5C_3\\cdot 2^2 = 10 \\cdot 4$'], answer: '40', verify: { kind: 'value', expr: '5C3*2^2', answer: '40' } }
+    ]
+  },
+
+  'c11-sequences-series': {
+    summary: 'Arithmetic progressions add a fixed difference; geometric progressions multiply by a fixed ratio. The chapter gives their nth terms and sums (including the infinite GP), the arithmetic, geometric and harmonic means, and the standard sums of $k$, $k^2$, $k^3$.',
+    prereqs: ['c10-arithmetic-progressions'],
+    concepts: [
+      { title: 'Arithmetic progression', body: 'Each term is the previous plus a constant $d$. The sum of $n$ terms is the number of terms times the average of the first and last term.' },
+      { title: 'Geometric progression', body: 'Each term is the previous times a constant $r \\ne 0$. Terms grow or shrink exponentially, and a sum is found by subtracting $r$ times the series from itself.' },
+      { title: 'Infinite GP', body: 'When $|r| < 1$, the terms shrink to zero and the partial sums settle to $\\dfrac{a}{1-r}$. If $|r| \\ge 1$, the infinite sum does not exist.' },
+      { title: 'Means', body: 'Between $a$ and $b$: arithmetic mean $\\tfrac{a+b}{2}$, geometric mean $\\sqrt{ab}$ (for positive $a, b$), harmonic mean $\\tfrac{2ab}{a+b}$. For positive numbers, AM $\\ge$ GM $\\ge$ HM, with equality only when $a = b$.' },
+      { title: 'Standard sums', body: 'The sums of the first $n$ natural numbers, their squares and their cubes have closed forms, used to sum any series whose $n$th term is a polynomial in $n$.' }
+    ],
+    definitions: [
+      { term: 'Sequence', meaning: 'A list of numbers in a definite order, a function on the natural numbers.' },
+      { term: 'Series', meaning: 'The sum of the terms of a sequence.' },
+      { term: 'Common ratio', meaning: '$r = a_{n+1}/a_n$, constant for a GP.' },
+      { term: 'Harmonic progression', meaning: 'A sequence whose reciprocals form an AP.' }
+    ],
+    formulas: [
+      { label: 'AP nth term', tex: 'a_n = a + (n-1)d' },
+      { label: 'AP sum', tex: 'S_n = \\frac{n}{2}\\left[2a + (n-1)d\\right] = \\frac{n}{2}(a + l)' },
+      { label: 'GP nth term', tex: 'a_n = a\\,r^{n-1}' },
+      { label: 'GP sum', tex: 'S_n = \\frac{a(r^n - 1)}{r - 1},\\quad r \\ne 1', note: 'If $r = 1$, $S_n = na$.' },
+      { label: 'Infinite GP', tex: 'S_\\infty = \\frac{a}{1-r},\\quad |r| < 1' },
+      { label: 'Means', tex: 'A = \\frac{a+b}{2},\\quad G = \\sqrt{ab},\\quad H = \\frac{2ab}{a+b},\\quad G^2 = AH' },
+      { label: 'AM–GM', tex: '\\frac{a+b}{2} \\ge \\sqrt{ab}\\quad (a, b > 0)' },
+      { label: 'Standard sums', tex: '\\sum k = \\frac{n(n+1)}{2},\\quad \\sum k^2 = \\frac{n(n+1)(2n+1)}{6},\\quad \\sum k^3 = \\left(\\frac{n(n+1)}{2}\\right)^2' },
+      { label: 'Term from sums', tex: 'a_n = S_n - S_{n-1}' }
+    ],
+    points: [
+      { front: 'Three numbers in AP', back: 'Take $a - d, a, a + d$ so the sum gives $a$ at once.' },
+      { front: 'Three numbers in GP', back: 'Take $\\tfrac{a}{r}, a, ar$ so the product gives $a^3$.' },
+      { front: 'Test for AP / GP', back: '$a, b, c$ in AP iff $2b = a + c$; in GP iff $b^2 = ac$.' },
+      { front: 'AM–GM in JEE', back: 'The minimum of $x + \\tfrac{1}{x}$ for $x > 0$ is 2, at $x = 1$.' },
+      { front: 'Infinite GP condition', back: 'Always check $|r| < 1$ before using $\\tfrac{a}{1-r}$.' },
+      { front: 'Recurring decimals', back: '$0.\\overline{3} = \\tfrac{0.3}{1 - 0.1} = \\tfrac13$ — an infinite GP.' }
+    ],
+    mistakes: [
+      { wrong: 'Using $a_n = a + nd$.', right: 'The first term already counts: $a_n = a + (n-1)d$.' },
+      { wrong: 'Summing $1 + 2 + 4 + \\cdots$ to infinity as $\\tfrac{1}{1-2} = -1$.', right: 'Here $r = 2$, so $|r| \\ge 1$ and the infinite sum does not exist.' },
+      { wrong: 'Applying AM $\\ge$ GM to negative numbers.', right: 'The inequality needs non-negative numbers.' }
+    ],
+    examples: [
+      { question: 'Find the sum to infinity of $8 + 4 + 2 + 1 + \\cdots$.', steps: ['$a = 8$, $r = \\tfrac12$, and $|r| < 1$', '$S_\\infty = \\dfrac{8}{1 - 1/2}$'], answer: '16', verify: { kind: 'value', expr: '8/(1-1/2)', answer: '16' } },
+      { question: 'Find $1^2 + 2^2 + \\cdots + 10^2$.', steps: ['$\\dfrac{n(n+1)(2n+1)}{6}$ with $n = 10$', '$\\dfrac{10\\cdot 11\\cdot 21}{6}$'], answer: '385', verify: { kind: 'value', expr: '10*11*21/6', answer: '385' } }
+    ]
+  },
+
+  'c11-straight-lines': {
+    summary: 'A straight line is fixed by its slope and one point, or by two points. The chapter covers slope, every standard form of the equation, angles between lines, and distances from a point to a line and between parallel lines.',
+    prereqs: ['c10-coordinate-geometry'],
+    concepts: [
+      { title: 'Slope', body: 'The slope $m = \\tan\\theta$, where $\\theta$ is the angle the line makes with the positive $x$-axis. Through two points it is rise over run. Vertical lines have undefined slope.' },
+      { title: 'Forms of the equation', body: 'Point–slope, two-point, slope–intercept, intercept and normal forms all describe the same line; pick the one that matches the data given. Every line can be written as $Ax + By + C = 0$.' },
+      { title: 'Parallel and perpendicular', body: 'Non-vertical lines are parallel when their slopes are equal and perpendicular when the product of their slopes is $-1$.' },
+      { title: 'Angle between lines', body: 'The acute angle $\\theta$ between lines of slopes $m_1, m_2$ satisfies $\\tan\\theta = \\left|\\dfrac{m_1 - m_2}{1 + m_1m_2}\\right|$.' },
+      { title: 'Distances', body: 'The perpendicular distance from a point to a line uses the absolute value of the line’s expression at that point, divided by $\\sqrt{A^2 + B^2}$.' }
+    ],
+    definitions: [
+      { term: 'Inclination', meaning: 'The angle $\\theta \\in [0, \\pi)$ the line makes with the positive $x$-axis.' },
+      { term: 'Intercepts', meaning: 'Where the line cuts the axes: $x$-intercept $a$ (at $(a,0)$), $y$-intercept $b$ (at $(0,b)$).' },
+      { term: 'Collinear points', meaning: 'Points on one line; the slopes between any two pairs are equal.' }
+    ],
+    formulas: [
+      { label: 'Slope through two points', tex: 'm = \\frac{y_2 - y_1}{x_2 - x_1}' },
+      { label: 'Point–slope form', tex: 'y - y_1 = m(x - x_1)' },
+      { label: 'Two-point form', tex: 'y - y_1 = \\frac{y_2 - y_1}{x_2 - x_1}(x - x_1)' },
+      { label: 'Slope–intercept form', tex: 'y = mx + c' },
+      { label: 'Intercept form', tex: '\\frac{x}{a} + \\frac{y}{b} = 1' },
+      { label: 'Normal form', tex: 'x\\cos\\omega + y\\sin\\omega = p' },
+      { label: 'Slope of general form', tex: 'Ax + By + C = 0 \\Rightarrow m = -\\frac{A}{B}' },
+      { label: 'Angle between lines', tex: '\\tan\\theta = \\left|\\frac{m_1 - m_2}{1 + m_1m_2}\\right|' },
+      { label: 'Point to line', tex: 'd = \\frac{|Ax_1 + By_1 + C|}{\\sqrt{A^2 + B^2}}' },
+      { label: 'Parallel lines', tex: 'd = \\frac{|C_1 - C_2|}{\\sqrt{A^2+B^2}}', note: 'Both lines written as $Ax + By + C_i = 0$ with the same $A, B$.' }
+    ],
+    points: [
+      { front: 'Perpendicular slopes', back: '$m_1 m_2 = -1$, i.e. negative reciprocals. Horizontal and vertical lines are the exception.' },
+      { front: 'Line parallel to $Ax + By + C = 0$', back: '$Ax + By + k = 0$; perpendicular: $Bx - Ay + k = 0$.' },
+      { front: 'Collinearity test', back: 'Area of the triangle formed is zero, or slopes $AB$ and $BC$ are equal.' },
+      { front: 'Parallel-line distance trap', back: 'Make the $x$ and $y$ coefficients identical before using $|C_1 - C_2|$.' },
+      { front: 'JEE tip: foot of perpendicular', back: '$\\dfrac{x - x_1}{A} = \\dfrac{y - y_1}{B} = -\\dfrac{Ax_1 + By_1 + C}{A^2+B^2}$.' },
+      { front: 'Slope of a vertical line', back: 'Undefined; its equation is $x = k$.' }
+    ],
+    mistakes: [
+      { wrong: 'Perpendicular to slope $2$ has slope $-2$.', right: 'Take the negative reciprocal: $-\\tfrac12$.', misconception: 'perpendicular-gradient' },
+      { wrong: 'Leaving out the absolute value in the distance formula and reporting a negative distance.', right: 'Distance is $\\dfrac{|Ax_1+By_1+C|}{\\sqrt{A^2+B^2}} \\ge 0$.' },
+      { wrong: 'Slope of $2x + 3y = 6$ is $2$.', right: 'Rearrange: $y = -\\tfrac23x + 2$, so $m = -\\tfrac23$.' }
+    ],
+    examples: [
+      { question: 'Find the distance of the point $(3, -2)$ from the line $3x - 4y - 7 = 0$.', steps: ['$d = \\dfrac{|3(3) - 4(-2) - 7|}{\\sqrt{9 + 16}}$', '$= \\dfrac{|9 + 8 - 7|}{5} = \\dfrac{10}{5}$'], answer: '2', verify: { kind: 'value', expr: 'abs(3*3-4*(-2)-7)/sqrt(3^2+4^2)', answer: '2' } },
+      { question: 'Find the equation of the line through $(1, 2)$ with slope $3$, in the form $y = mx + c$.', steps: ['$y - 2 = 3(x - 1)$', '$y = 3x - 1$'], answer: '$y = 3x - 1$', verify: { kind: 'equivalent', a: '3(x-1)+2', b: '3x-1' } }
+    ]
+  },
+
+  'c11-conic-sections': {
+    summary: 'Circles, parabolas, ellipses and hyperbolas are the curves cut from a double cone by a plane. Each has a standard equation; from it read the centre or vertex, foci, directrices, axes, eccentricity and latus rectum.',
+    prereqs: ['c11-straight-lines'],
+    concepts: [
+      { title: 'Circle', body: 'All points at a fixed distance $r$ from a centre $(h, k)$: $(x-h)^2 + (y-k)^2 = r^2$. In general form $x^2 + y^2 + 2gx + 2fy + c = 0$ the centre is $(-g, -f)$ and the radius $\\sqrt{g^2 + f^2 - c}$.' },
+      { title: 'Focus–directrix idea', body: 'A conic is the path of a point whose distance from a fixed point (focus) is $e$ times its distance from a fixed line (directrix). $e = 1$: parabola; $e < 1$: ellipse; $e > 1$: hyperbola.' },
+      { title: 'Parabola $y^2 = 4ax$', body: 'Vertex at the origin, focus $(a, 0)$, directrix $x = -a$, axis the $x$-axis. Swapping $x$ and $y$ or the sign of $a$ turns it to face other directions.' },
+      { title: 'Ellipse $\\tfrac{x^2}{a^2} + \\tfrac{y^2}{b^2} = 1$, $a > b$', body: 'Foci $(\\pm c, 0)$ with $c^2 = a^2 - b^2$. The sum of distances from any point to the two foci is $2a$.' },
+      { title: 'Hyperbola $\\tfrac{x^2}{a^2} - \\tfrac{y^2}{b^2} = 1$', body: 'Foci $(\\pm c, 0)$ with $c^2 = a^2 + b^2$. The difference of distances to the foci is $2a$. Asymptotes are $y = \\pm\\tfrac{b}{a}x$.' }
+    ],
+    definitions: [
+      { term: 'Eccentricity', meaning: '$e = c/a$, the ratio that decides the type of conic.' },
+      { term: 'Latus rectum', meaning: 'The focal chord perpendicular to the main axis.' },
+      { term: 'Major / transverse axis', meaning: 'The axis through the foci: length $2a$ for an ellipse (major) and a hyperbola (transverse).' },
+      { term: 'Minor / conjugate axis', meaning: 'Length $2b$, perpendicular to the main axis through the centre.' }
+    ],
+    formulas: [
+      { label: 'Circle', tex: '(x-h)^2 + (y-k)^2 = r^2' },
+      { label: 'General circle', tex: 'x^2 + y^2 + 2gx + 2fy + c = 0,\\ \\text{centre } (-g,-f),\\ r = \\sqrt{g^2+f^2-c}' },
+      { label: 'Parabola', tex: 'y^2 = 4ax:\\ \\text{focus } (a,0),\\ \\text{directrix } x = -a,\\ \\text{latus rectum } 4a' },
+      { label: 'Ellipse', tex: '\\frac{x^2}{a^2} + \\frac{y^2}{b^2} = 1,\\ a > b,\\ c^2 = a^2 - b^2,\\ e = \\frac{c}{a} < 1' },
+      { label: 'Ellipse latus rectum', tex: '\\frac{2b^2}{a}' },
+      { label: 'Hyperbola', tex: '\\frac{x^2}{a^2} - \\frac{y^2}{b^2} = 1,\\ c^2 = a^2 + b^2,\\ e = \\frac{c}{a} > 1' },
+      { label: 'Hyperbola latus rectum', tex: '\\frac{2b^2}{a}' },
+      { label: 'Directrices (ellipse, hyperbola)', tex: 'x = \\pm\\frac{a}{e}' }
+    ],
+    points: [
+      { front: 'Which axis is major?', back: 'For an ellipse, the larger denominator sits under the major-axis variable. If it is under $y^2$, the foci are on the $y$-axis.' },
+      { front: 'Hyperbola orientation', back: 'The positive term decides the transverse axis: $\\tfrac{y^2}{a^2} - \\tfrac{x^2}{b^2} = 1$ has foci on the $y$-axis.' },
+      { front: '$c^2$ sign check', back: 'Ellipse: $c^2 = a^2 - b^2$. Hyperbola: $c^2 = a^2 + b^2$.' },
+      { front: 'Parabola facing', back: '$y^2 = 4ax$ right, $y^2 = -4ax$ left, $x^2 = 4ay$ up, $x^2 = -4ay$ down ($a > 0$).' },
+      { front: 'Rectangular hyperbola', back: '$a = b$ gives $e = \\sqrt2$ and perpendicular asymptotes.' },
+      { front: 'JEE tip: complete the square', back: 'Shifted conics like $(x-h)^2/a^2 + (y-k)^2/b^2 = 1$ have centre $(h,k)$; add $h, k$ to every standard point.' }
+    ],
+    mistakes: [
+      { wrong: 'For an ellipse, $c^2 = a^2 + b^2$.', right: 'That is the hyperbola. For an ellipse $c^2 = a^2 - b^2$.' },
+      { wrong: 'Focus of $y^2 = 12x$ is $(12, 0)$.', right: '$4a = 12$, so $a = 3$ and the focus is $(3, 0)$.' },
+      { wrong: 'Centre of $x^2 + y^2 - 4x + 6y = 0$ is $(-2, 3)$.', right: 'Centre is $(-g, -f) = (2, -3)$.' }
+    ],
+    examples: [
+      { question: 'Find the eccentricity and latus rectum length of $\\dfrac{x^2}{25} + \\dfrac{y^2}{9} = 1$.', steps: ['$a = 5$, $b = 3$, $c = \\sqrt{25 - 9} = 4$', '$e = \\dfrac{c}{a} = \\dfrac45$', 'Latus rectum $= \\dfrac{2b^2}{a} = \\dfrac{18}{5}$'], answer: '$e = \\dfrac45$, latus rectum $= \\dfrac{18}{5}$', verify: { kind: 'values', pairs: [['sqrt(25-9)/5', '4/5'], ['2*9/5', '18/5']] } },
+      { question: 'Find the radius of the circle $x^2 + y^2 - 6x + 8y - 11 = 0$.', steps: ['$g = -3$, $f = 4$, $c = -11$', '$r = \\sqrt{9 + 16 + 11} = \\sqrt{36}$'], answer: '6', verify: { kind: 'value', expr: 'sqrt((-3)^2+4^2-(-11))', answer: '6' } }
+    ]
+  },
+
+  'c11-3d-introduction': {
+    summary: 'Three mutually perpendicular axes locate every point in space by an ordered triple $(x, y, z)$. The chapter covers octants, the distance formula, and the section formula in three dimensions — direct extensions of the plane results.',
+    prereqs: ['c10-coordinate-geometry'],
+    concepts: [
+      { title: 'Axes and planes', body: 'The $x$, $y$ and $z$ axes meet at the origin. Pairs of axes span the three coordinate planes $XY$ ($z = 0$), $YZ$ ($x = 0$) and $ZX$ ($y = 0$).' },
+      { title: 'Octants', body: 'The coordinate planes split space into eight octants, identified by the signs of $x$, $y$, $z$. The first octant has all three positive.' },
+      { title: 'Distance', body: 'Apply Pythagoras twice: the distance between two points is the square root of the sum of the squared differences in all three coordinates.' },
+      { title: 'Section formula', body: 'The point dividing a segment in the ratio $m : n$ is found coordinate by coordinate, exactly as in two dimensions.' }
+    ],
+    definitions: [
+      { term: 'Coordinates of a point', meaning: 'Its signed perpendicular distances from the $YZ$, $ZX$ and $XY$ planes, in that order.' },
+      { term: 'Octant', meaning: 'One of the eight regions cut out by the coordinate planes.' },
+      { term: 'Centroid', meaning: 'For a triangle, the average of its three vertices.' }
+    ],
+    formulas: [
+      { label: 'Distance', tex: 'PQ = \\sqrt{(x_2-x_1)^2 + (y_2-y_1)^2 + (z_2-z_1)^2}' },
+      { label: 'Distance from origin', tex: 'OP = \\sqrt{x^2 + y^2 + z^2}' },
+      { label: 'Internal division', tex: '\\left(\\frac{mx_2 + nx_1}{m+n}, \\frac{my_2+ny_1}{m+n}, \\frac{mz_2+nz_1}{m+n}\\right)' },
+      { label: 'External division', tex: '\\left(\\frac{mx_2 - nx_1}{m-n}, \\frac{my_2-ny_1}{m-n}, \\frac{mz_2-nz_1}{m-n}\\right)' },
+      { label: 'Midpoint', tex: '\\left(\\frac{x_1+x_2}{2}, \\frac{y_1+y_2}{2}, \\frac{z_1+z_2}{2}\\right)' },
+      { label: 'Centroid', tex: '\\left(\\frac{x_1+x_2+x_3}{3}, \\frac{y_1+y_2+y_3}{3}, \\frac{z_1+z_2+z_3}{3}\\right)' }
+    ],
+    points: [
+      { front: 'Point on the $x$-axis', back: 'Has the form $(a, 0, 0)$; on the $XY$ plane, $(a, b, 0)$.' },
+      { front: 'Distance of $(x,y,z)$ from the $x$-axis', back: '$\\sqrt{y^2 + z^2}$.' },
+      { front: 'Ratio in which a plane divides a segment', back: 'Use the section formula with ratio $k : 1$ and set the relevant coordinate to zero.' },
+      { front: 'Collinearity in 3D', back: 'Three points are collinear if the sum of two distances equals the third.' },
+      { front: 'Octant signs', back: 'Read the signs of $(x, y, z)$; $(-1, 2, -3)$ lies in the octant with $x<0, y>0, z<0$.' }
+    ],
+    mistakes: [
+      { wrong: 'Forgetting the $z$ term in the distance formula.', right: 'Include all three squared differences.', misconception: 'term-dropped' },
+      { wrong: 'Swapping $m$ and $n$ in the section formula.', right: '$m$ multiplies the far endpoint $(x_2, y_2, z_2)$; $n$ multiplies $(x_1, y_1, z_1)$.' },
+      { wrong: 'Taking the distance from the $x$-axis as $|x|$.', right: 'It is $\\sqrt{y^2 + z^2}$; $|x|$ is the distance from the $YZ$ plane.' }
+    ],
+    examples: [
+      { question: 'Find the distance between $P(1, -2, 3)$ and $Q(3, 1, -3)$.', steps: ['Differences: $2, 3, -6$', '$PQ = \\sqrt{4 + 9 + 36} = \\sqrt{49}$'], answer: '7', verify: { kind: 'value', expr: 'sqrt((3-1)^2+(1+2)^2+(-3-3)^2)', answer: '7' } },
+      { question: 'Find the point dividing $A(2, 1, -3)$ and $B(5, -8, 3)$ internally in the ratio $2 : 1$.', steps: ['$x = \\dfrac{2(5) + 1(2)}{3} = 4$', '$y = \\dfrac{2(-8) + 1(1)}{3} = -5$', '$z = \\dfrac{2(3) + 1(-3)}{3} = 1$'], answer: '$(4, -5, 1)$', verify: { kind: 'values', pairs: [['(2*5+2)/3', '4'], ['(2*(-8)+1)/3', '-5'], ['(2*3-3)/3', '1']] } }
+    ]
+  },
+
+  'c11-limits-derivatives': {
+    summary: 'A limit describes the value a function approaches near a point. The derivative is the limit of the average rate of change, giving the slope of the tangent. The chapter covers algebraic and trigonometric limits, first principles, and the sum, product and quotient rules.',
+    prereqs: ['c11-relations-functions', 'c11-trig-functions'],
+    concepts: [
+      { title: 'Meaning of a limit', body: '$\\lim_{x\\to a} f(x) = L$ means $f(x)$ gets as close to $L$ as we like when $x$ is close enough to $a$ (but not equal to it). The left-hand and right-hand limits must agree.' },
+      { title: 'Evaluating limits', body: 'Try direct substitution first. If it gives $\\tfrac00$, factorise and cancel, rationalise, or use a standard limit.' },
+      { title: 'Standard limits', body: '$\\lim_{x\\to a}\\dfrac{x^n - a^n}{x - a} = na^{n-1}$ and, with $x$ in radians, $\\lim_{x\\to0}\\dfrac{\\sin x}{x} = 1$, $\\lim_{x\\to0}\\dfrac{1-\\cos x}{x} = 0$.' },
+      { title: 'Derivative from first principles', body: '$f’(x) = \\lim_{h\\to0}\\dfrac{f(x+h) - f(x)}{h}$: write the difference quotient, simplify until $h$ cancels, then let $h \\to 0$.' },
+      { title: 'Rules', body: 'Derivatives add, constants pull out, and products and quotients follow fixed rules. Combined with $\\tfrac{d}{dx}x^n = nx^{n-1}$ and the trig derivatives, these handle every Class 11 function.' }
+    ],
+    definitions: [
+      { term: 'Left-hand limit', meaning: '$\\lim_{x\\to a^-} f(x)$, approaching from values less than $a$.' },
+      { term: 'Derivative at a point', meaning: '$f’(a) = \\lim_{h\\to0}\\dfrac{f(a+h)-f(a)}{h}$, when the limit exists.' },
+      { term: 'Indeterminate form', meaning: 'An expression like $\\tfrac00$ that gives no answer on substitution and needs simplification.' }
+    ],
+    formulas: [
+      { label: 'Power limit', tex: '\\lim_{x\\to a}\\frac{x^n - a^n}{x-a} = na^{n-1}' },
+      { label: 'Trig limits', tex: '\\lim_{x\\to0}\\frac{\\sin x}{x} = 1,\\quad \\lim_{x\\to0}\\frac{1-\\cos x}{x} = 0' },
+      { label: 'First principles', tex: 'f’(x) = \\lim_{h\\to0}\\frac{f(x+h)-f(x)}{h}' },
+      { label: 'Power rule', tex: '\\frac{d}{dx}x^n = nx^{n-1}' },
+      { label: 'Trig derivatives', tex: '(\\sin x)’ = \\cos x,\\ (\\cos x)’ = -\\sin x,\\ (\\tan x)’ = \\sec^2 x' },
+      { label: 'Product rule', tex: '(uv)’ = u’v + uv’' },
+      { label: 'Quotient rule', tex: '\\left(\\frac{u}{v}\\right)’ = \\frac{u’v - uv’}{v^2},\\ v \\ne 0' }
+    ],
+    points: [
+      { front: 'Limit exists?', back: 'Only when the left-hand and right-hand limits are equal and finite.' },
+      { front: '$\\lim_{x\\to0}\\dfrac{\\sin kx}{x}$', back: 'Equals $k$ (rewrite as $k\\cdot\\tfrac{\\sin kx}{kx}$).' },
+      { front: 'Radians only', back: 'The $\\tfrac{\\sin x}{x} \\to 1$ result and all trig derivatives assume radians.' },
+      { front: 'Quotient rule order', back: '"Bottom times derivative of top, minus top times derivative of bottom, over bottom squared."' },
+      { front: 'JEE tip: $\\tan x / x$', back: '$\\lim_{x\\to0}\\dfrac{\\tan x}{x} = 1$ too.' },
+      { front: 'Limit vs value', back: 'The limit at $a$ does not depend on $f(a)$; the function need not even be defined there.' }
+    ],
+    mistakes: [
+      { wrong: '$(uv)’ = u’v’$.', right: 'Product rule: $(uv)’ = u’v + uv’$.' },
+      { wrong: 'Concluding $\\lim_{x\\to2}\\dfrac{x^2-4}{x-2}$ does not exist because substitution gives $\\tfrac00$.', right: 'Factorise and cancel: the limit is $x + 2 \\to 4$.' },
+      { wrong: 'Quotient rule with the numerator reversed: $\\dfrac{uv’ - u’v}{v^2}$.', right: 'It is $\\dfrac{u’v - uv’}{v^2}$; the reversed order gives the wrong sign.', misconception: 'sign-flipped' }
+    ],
+    examples: [
+      { question: 'Evaluate $\\lim_{x\\to 3}\\dfrac{x^2 - 9}{x - 3}$.', steps: ['$\\dfrac{(x-3)(x+3)}{x-3} = x + 3$ for $x \\ne 3$', 'Let $x \\to 3$: $6$'], answer: '6', verify: { kind: 'limit', f: '(x^2-9)/(x-3)', at: '3', answer: '6' } },
+      { question: 'Differentiate $f(x) = x^2\\sin x$.', steps: ['Product rule with $u = x^2$, $v = \\sin x$', '$f’(x) = 2x\\sin x + x^2\\cos x$'], answer: '$2x\\sin x + x^2\\cos x$', verify: { kind: 'derivative', f: 'x^2*sin(x)', answer: '2x*sin(x)+x^2*cos(x)' } }
+    ]
+  },
+
+  'c11-statistics': {
+    summary: 'Measures of dispersion describe how spread out data are. The chapter covers range, mean deviation about the mean and median, variance and standard deviation for ungrouped and grouped data, and the coefficient of variation for comparing variability.',
+    prereqs: ['c10-statistics'],
+    concepts: [
+      { title: 'Why dispersion', body: 'Two data sets can share a mean yet differ in spread. Dispersion measures quantify that spread.' },
+      { title: 'Mean deviation', body: 'The average absolute distance of observations from a central value (mean or median). Absolute values stop positive and negative deviations from cancelling.' },
+      { title: 'Variance and standard deviation', body: 'Variance is the mean of squared deviations from the mean; the standard deviation is its positive square root, in the same units as the data.' },
+      { title: 'Grouped data', body: 'Use class marks as representative values, weight each by its frequency, and divide by $N = \\sum f_i$. The step-deviation method $u_i = (x_i - A)/h$ simplifies arithmetic: $\\sigma = h\\,\\sigma_u$.' },
+      { title: 'Comparing series', body: 'The coefficient of variation expresses the standard deviation as a percentage of the mean. The series with the larger CV is more variable (less consistent).' }
+    ],
+    definitions: [
+      { term: 'Range', meaning: 'Largest value minus smallest value.' },
+      { term: 'Mean deviation', meaning: '$\\text{MD}(a) = \\dfrac{1}{N}\\sum f_i|x_i - a|$, where $a$ is the mean or median.' },
+      { term: 'Standard deviation', meaning: '$\\sigma = \\sqrt{\\text{variance}}$.' },
+      { term: 'Coefficient of variation', meaning: '$\\text{CV} = \\dfrac{\\sigma}{\\bar x}\\times100$.' }
+    ],
+    formulas: [
+      { label: 'Mean deviation (ungrouped)', tex: '\\text{MD}(a) = \\frac{1}{n}\\sum_{i=1}^{n}|x_i - a|' },
+      { label: 'Variance (ungrouped)', tex: '\\sigma^2 = \\frac{1}{n}\\sum (x_i - \\bar x)^2 = \\frac{1}{n}\\sum x_i^2 - \\bar x^2' },
+      { label: 'Variance (grouped)', tex: '\\sigma^2 = \\frac{1}{N}\\sum f_i(x_i - \\bar x)^2,\\quad N = \\sum f_i' },
+      { label: 'Step deviation', tex: '\\sigma = h\\sqrt{\\frac{1}{N}\\sum f_iu_i^2 - \\left(\\frac{1}{N}\\sum f_iu_i\\right)^2},\\quad u_i = \\frac{x_i - A}{h}' },
+      { label: 'Coefficient of variation', tex: '\\text{CV} = \\frac{\\sigma}{\\bar x}\\times 100' }
+    ],
+    points: [
+      { front: 'Effect of adding a constant', back: 'Adding $k$ to every value shifts the mean by $k$ but leaves the variance and SD unchanged.' },
+      { front: 'Effect of scaling', back: 'Multiplying every value by $k$ multiplies the SD by $|k|$ and the variance by $k^2$.' },
+      { front: 'Which is more consistent?', back: 'The series with the smaller coefficient of variation.' },
+      { front: 'Mean deviation about the median', back: 'It is the smallest mean deviation about any point.' },
+      { front: 'Shortcut', back: 'Variance $=$ mean of squares minus square of mean.' },
+      { front: 'Correcting a wrong entry (JEE)', back: 'Recompute $\\sum x$ and $\\sum x^2$ with the corrected value, then redo the variance.' }
+    ],
+    mistakes: [
+      { wrong: 'Variance $= \\frac{1}{n}\\sum x_i^2 - \\bar x$.', right: 'Subtract the square of the mean: $\\frac{1}{n}\\sum x_i^2 - \\bar x^2$.' },
+      { wrong: 'Dropping the absolute value in mean deviation.', right: 'Without it the deviations from the mean always sum to zero.' },
+      { wrong: 'Reporting the variance as the standard deviation.', right: 'Take the square root for the SD.' }
+    ],
+    examples: [
+      { question: 'Find the variance of $2, 4, 6, 8, 10$.', steps: ['Mean $= 30/5 = 6$', 'Squared deviations: $16, 4, 0, 4, 16$, total $40$', 'Variance $= 40/5$'], answer: '8', verify: { kind: 'value', expr: '((2-6)^2+(4-6)^2+(6-6)^2+(8-6)^2+(10-6)^2)/5', answer: '8' } },
+      { question: 'Find the mean deviation about the mean of $3, 7, 8, 10, 12$.', steps: ['Mean $= 40/5 = 8$', 'Absolute deviations: $5, 1, 0, 2, 4$, total $12$', 'MD $= 12/5$'], answer: '2.4', verify: { kind: 'value', expr: '(abs(3-8)+abs(7-8)+abs(8-8)+abs(10-8)+abs(12-8))/5', answer: '2.4' } }
+    ]
+  },
+
+  'c11-probability': {
+    summary: 'Probability is set up on a sample space of outcomes, with events as subsets. The axiomatic approach gives the rules: probabilities lie between 0 and 1, the whole space has probability 1, and mutually exclusive events add. The addition rule handles overlaps.',
+    prereqs: ['c10-probability', 'c11-sets', 'c11-permutations-combinations'],
+    concepts: [
+      { title: 'Sample space and events', body: 'The sample space $S$ lists every possible outcome of an experiment. An event is any subset of $S$; it occurs when the outcome lies in it.' },
+      { title: 'Axioms', body: 'For every event $P(E) \\ge 0$; $P(S) = 1$; and for mutually exclusive events $P(E\\cup F) = P(E) + P(F)$. All other rules follow from these.' },
+      { title: 'Equally likely outcomes', body: 'If all outcomes are equally likely, $P(E) = \\dfrac{n(E)}{n(S)}$. Counting is often done with combinations.' },
+      { title: 'Combining events', body: '"$A$ or $B$" is $A\\cup B$; "$A$ and $B$" is $A\\cap B$; "not $A$" is $A’$. The addition rule removes the double-counted overlap.' }
+    ],
+    definitions: [
+      { term: 'Mutually exclusive events', meaning: 'Events that cannot happen together: $A\\cap B = \\varnothing$.' },
+      { term: 'Exhaustive events', meaning: 'Events whose union is the whole sample space.' },
+      { term: 'Complementary event', meaning: '$A’$, the event that $A$ does not occur.' },
+      { term: 'Elementary event', meaning: 'An event with exactly one outcome.' }
+    ],
+    formulas: [
+      { label: 'Classical probability', tex: 'P(E) = \\frac{n(E)}{n(S)}' },
+      { label: 'Bounds', tex: '0 \\le P(E) \\le 1' },
+      { label: 'Complement', tex: 'P(A’) = 1 - P(A)' },
+      { label: 'Addition rule', tex: 'P(A\\cup B) = P(A) + P(B) - P(A\\cap B)' },
+      { label: 'Three events', tex: 'P(A\\cup B\\cup C) = \\sum P(A) - \\sum P(A\\cap B) + P(A\\cap B\\cap C)' },
+      { label: 'A but not B', tex: 'P(A\\cap B’) = P(A) - P(A\\cap B)' }
+    ],
+    points: [
+      { front: 'Mutually exclusive shortcut', back: 'Only then is $P(A\\cup B) = P(A) + P(B)$.' },
+      { front: '"At least one"', back: '$1 - P(\\text{none})$.' },
+      { front: 'Two dice', back: '36 equally likely ordered outcomes; a sum of 7 occurs in 6 of them.' },
+      { front: 'Cards', back: '52 cards, 4 suits of 13, 12 face cards, 4 aces.' },
+      { front: 'Odds in favour', back: '$n(E) : n(E’)$; odds $a:b$ give $P(E) = \\tfrac{a}{a+b}$.' },
+      { front: 'Sanity check', back: 'A probability above 1 or below 0 means a counting error.' }
+    ],
+    mistakes: [
+      { wrong: '$P(A\\cup B) = P(A) + P(B)$ for any events.', right: 'Subtract $P(A\\cap B)$ unless the events are mutually exclusive.' },
+      { wrong: 'Using 11 outcomes (sums 2 to 12) for two dice.', right: 'The 36 ordered pairs are equally likely; the sums are not.', misconception: 'probability-wrong-total' },
+      { wrong: 'Treating "mutually exclusive" and "exhaustive" as the same.', right: 'Exclusive: no overlap. Exhaustive: together they cover $S$.' }
+    ],
+    examples: [
+      { question: 'Two cards are drawn at random from a pack of 52. Find the probability that both are aces.', steps: ['$n(S) = {}^{52}C_2 = 1326$', '$n(E) = {}^4C_2 = 6$', '$P = \\dfrac{6}{1326} = \\dfrac{1}{221}$'], answer: '$\\dfrac{1}{221}$', verify: { kind: 'value', expr: '4C2/52C2', answer: '1/221' } },
+      { question: 'If $P(A) = 0.5$, $P(B) = 0.4$ and $P(A\\cap B) = 0.2$, find $P(A\\cup B)$.', steps: ['$P(A\\cup B) = 0.5 + 0.4 - 0.2$'], answer: '0.7', verify: { kind: 'value', expr: '0.5+0.4-0.2', answer: '0.7' } }
+    ]
+  }
+};

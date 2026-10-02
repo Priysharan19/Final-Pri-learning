@@ -37,7 +37,9 @@ function pricingText(config, t) {
   if (!config) return t('cloud.pricingOffline');
   const monthly = price(config.monthly, config.currency);
   const annual = price(config.annual, config.currency);
-  if (!monthly && !annual) return t('cloud.pricingUnset');
+  // Unconfigured pricing is an operator fact, not something a student can act
+  // on, so nothing is shown rather than a deployment note.
+  if (!monthly && !annual) return null;
   const prices = monthly && annual
     ? t('cloud.priceBoth', { monthly, annual })
     : monthly ? t('cloud.priceMonthly', { price: monthly }) : t('cloud.priceAnnual', { price: annual });
@@ -325,7 +327,12 @@ export default function CloudAccountPanel() {
         pulledEvents: result.pulledEvents || 0, pulledEntities: result.pulledEntities || 0
       }));
       await reload({ verify: false });
-    } catch (err) { setError(err.message || tLater('cloud.syncFailed')); }
+    } catch (err) {
+      // CP-11: below the server's minimum shell build. Say what to do; the
+      // outbox keeps every change on this device until the app is updated.
+      setError(err?.code === 'CLIENT_UPGRADE_REQUIRED' ? tLater('cloud.upgradeRequired') : (err.message || tLater('cloud.syncFailed')));
+      await reload({ verify: false }).catch(() => {});
+    }
     finally { setBusy(''); }
   }
 
@@ -519,7 +526,10 @@ export default function CloudAccountPanel() {
         <div className="grid cols-2" style={{ gap: 12 }}>
           {mode === 'register' && <div className="field">
             <label className="label" htmlFor="cloud-name">{t('cloud.yourName')}</label>
-            <input className="input" id="cloud-name" autoComplete="name" maxLength={80} value={form.name} onChange={e => setForm(v => ({ ...v, name: e.target.value }))} required />
+            <input className="input" id="cloud-name" autoComplete="name" maxLength={80} value={form.name} onChange={e => setForm(v => ({ ...v, name: e.target.value }))}
+              // Prefilled from the profile: focusing selects it, so typing a
+              // name replaces it instead of being appended to it.
+              onFocus={e => { if (e.target.value && e.target.value === (user?.name || '')) e.target.select(); }} required />
           </div>}
           <div className="field">
             <label className="label" htmlFor="cloud-email">{t('cloud.yourEmail')}</label>
@@ -670,7 +680,9 @@ export default function CloudAccountPanel() {
             <div className="sc-label">{t('cloud.syncStatus')}</div>
             <div style={{ fontWeight: 650, marginTop: 3 }}>{pending ? t('cloud.pendingChanges', { count: pending, n: pending }) : t('cloud.outboxClear')}</div>
             <div className="muted" style={{ fontSize: 12 }}>{t('cloud.lastSync', { when: when(status?.lastSyncAt, t) })}</div>
-            {status?.lastError && <div style={{ color: 'var(--bad)', fontSize: 12 }}>{t('cloud.lastError', { error: status.lastError })}</div>}
+            {status?.lastError === 'CLIENT_UPGRADE_REQUIRED'
+              ? <div role="status" data-cloud-upgrade style={{ color: 'var(--bad)', fontSize: 12 }}>{t('cloud.upgradeRequired')}</div>
+              : status?.lastError && <div style={{ color: 'var(--bad)', fontSize: 12 }}>{t('cloud.lastError', { error: status.lastError })}</div>}
           </div>
           <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
             <button className="btn btn-primary" type="button" onClick={doSync} disabled={!canSync || !!busy}>{busy === 'sync' ? t('cloud.syncing') : t('cloud.syncNow')}</button>
@@ -687,11 +699,12 @@ export default function CloudAccountPanel() {
         onDeleted={securityDisconnected}
       />}
 
-      <div className="muted" style={{ marginTop: 14, fontSize: 12.5 }}>
-        {nativeStoreKit && appleProducts.length
+      {(() => {
+        const note = nativeStoreKit && appleProducts.length
           ? t('cloud.appleAuthorityNote')
-          : pricingText(pricing, t)}
-      </div>
+          : pricingText(pricing, t);
+        return note ? <div className="muted" style={{ marginTop: 14, fontSize: 12.5 }}>{note}</div> : null;
+      })()}
 
       {message && <div role="status" style={{ marginTop: 12, color: 'var(--good)' }}>{message}</div>}
       {error && <div role="alert" style={{ marginTop: 12, color: 'var(--bad)' }}>{error}</div>}

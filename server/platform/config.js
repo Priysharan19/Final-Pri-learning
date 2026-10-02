@@ -1,4 +1,5 @@
 import { isAbsolute } from 'node:path';
+import { compatibilityConfigProblems } from './clientCompatibility.js';
 import { aiAllowanceConfigProblems } from './aiAllowance.js';
 import { googleBillingConfigStatus } from './googleBilling.js';
 import { spendCeilingMissing } from './spendCeiling.js';
@@ -291,6 +292,7 @@ export function platformConfigStatus() {
     if (!googleBilling.notificationsConfigured) missing.push('PRI_GOOGLE_RTDN_AUDIENCE and PRI_GOOGLE_RTDN_SERVICE_ACCOUNT');
   }
 
+  if (production) missing.push(...compatibilityConfigProblems());
   if (production) missing.push(...aiAllowanceConfigProblems());
 
   const uniqueMissing = [...new Set(missing)];
