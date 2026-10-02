@@ -1058,6 +1058,7 @@ export default {
 
   // Formal assessment — review, handwriting evidence
   'exam.qN': "प्र{n}",
+  'exam.draftNote': '{total} में से {answered} के उत्तर दिए',
   'exam.difficultyTag': "कठिनाई D{n}",
   'exam.allEarned': "सभी अंक मिले",
   'exam.partlyEarned': "कुछ अंक मिले",

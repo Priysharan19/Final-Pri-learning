@@ -89,7 +89,7 @@ export default function ExamRoom() {
   useEffect(() => {
     if (!exam || result || exam.finishedAt) return;
     const data = { answers, workings, cur, flagged, startedAt: startRef.current };
-    const meta = { label: exam.title, note: `${answeredCount} of ${exam.questions.length} answered`, path: `/exams/${id}` };
+    const meta = { label: exam.title, note: t('exam.draftNote', { answered: answeredCount, total: exam.questions.length }), path: `/exams/${id}` };
     queueDraft('exam', id, data, meta);
     // The status line reports the write it actually made, on this device only.
     const timer = setTimeout(() => setSaved(saveDraft('exam', id, data, meta) ? 'saved' : 'failed'), 500);

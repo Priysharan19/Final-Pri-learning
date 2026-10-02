@@ -167,7 +167,7 @@ Each entry lists what it is for and the states it must have. A component is not 
 
 **Menu and tooltip.** `.acct-menu`: floating surface, 140ms entrance. Tooltips are native `title` on pointer devices and never the only way to learn what a control does.
 
-**Dialog and sheet.** `.sheet` over `.sheet-scrim`: `role="dialog"`, focus trapped, Escape closes, the confirming action is the only primary. Destructive actions are confirmed and named ("Submit paper", not "OK").
+**Dialog and sheet.** `.sheet` over `.sheet-scrim`: `role="dialog"`, focus moved into it, Escape closes, the confirming action is the only primary. (Focus is moved, not yet trapped: Tab can still leave an open sheet. Deferred.) Destructive actions are confirmed and named ("Submit paper", not "OK").
 
 **Notice and banner.** `.notice` with `.success`, `.error`, `.offline`: an edged row with an icon, a sentence and at most one action. Offline is amber with a left rule and says what still works.
 
@@ -185,7 +185,7 @@ Each entry lists what it is for and the states it must have. A component is not 
 
 **Workspace (thinking mode).** `/practice` and `/exams/:id` remove the rail, bottom bar and account furniture. The action bar holds exactly one primary action: Submit answer → Check this reading first → Confirm reading → Submit again → Next question.
 
-**Handwriting.** Pen, Eraser, Undo, Redo, Clear, Page (up to four sheets on one coordinate space), Finger (browser, and hosts without a stylus). Ruled paper with a copper margin rule; ink is `--ink` in both themes. Unfinished ink is kept in the profile-scoped recovery store (`components/practiceRecovery.js`), restored on resume and cleared on resolution; the status line says "saved" only after the record is read back. Recognition is answer-blind. Engine names and fallback labels are developer-only.
+**Handwriting.** Pen, Eraser, Undo, Redo, Clear, Page (up to four sheets on one coordinate space) and Finger, which is always offered: Apple Pencil is never required. A tap-to-correct fix is dropped whenever strokes are undone, redone or cleared, so it can never land on a different symbol. Ruled paper with a copper margin rule; ink is `--ink` in both themes. Unfinished ink is kept in the profile-scoped recovery store (`components/practiceRecovery.js`), restored on resume and cleared on resolution; the status line says "saved" only after the record is read back. Recognition is answer-blind. Engine names and fallback labels are developer-only.
 
 **Reading and uncertainty.** The reading panel shows what Pri read, one line per row. The smallest doubtful region is offered for confirmation in place. Nothing is marked on an unconfirmed reading.
 
@@ -208,8 +208,8 @@ Each entry lists what it is for and the states it must have. A component is not 
 ## 12. Theme architecture
 
 - A profile's preference is `light` (paper, the default), `dark` (night) or `system` (match device). `client/src/lib/theme.js` resolves it to exactly `light` or `dark` on `<html data-theme>`, sets `color-scheme` and the browser `theme-color`, and follows the device live while the preference is `system`.
-- `client/public/theme-boot.js` runs from `<head>` before the stylesheet and paints the last preference used on this device, so there is no flash. It is an external file so a strict script policy allows it.
-- A change of theme cross-fades in 200ms (`html.theme-switching`); the first paint does not animate.
+- `client/public/theme-boot.js` runs from `<head>` before the stylesheet and paints the last preference used on this device, so a cold start does not flash the wrong paper. It is an external file so a strict script policy allows it. One exception: a night-mode profile created before this change has no device copy yet, so its first launch after the update paints paper and then changes to night; every launch after that is correct.
+- A change of theme cross-fades: 200ms transitions under `html.theme-switching`, a class held for 260ms. The first paint does not animate.
 - Components never branch on the theme. They use tokens.
 
 ## 13. Accessibility

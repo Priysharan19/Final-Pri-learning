@@ -998,6 +998,7 @@ export default {
 
   // Formal assessment — review, handwriting evidence
   'exam.qN': "Q{n}",
+  'exam.draftNote': '{answered} of {total} answered',
   'exam.difficultyTag': "D{n}",
   'exam.allEarned': "all earned",
   'exam.partlyEarned': "partly earned",

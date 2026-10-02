@@ -529,13 +529,21 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     queueDraft('question', question.id, { typed, working: wk }, meta);
     setSaveState('saving');
     typedSaveTimer.current = setTimeout(() => {
+      typedSaveTimer.current = null;
+      // Once the answer is marked its draft has been cleared on purpose; this
+      // late write must not put it back.
+      if (attemptRef.current) return;
       setSaveState(saveDraft('question', question.id, { typed, working: wk }, meta) ? 'saved' : 'failed');
     }, 450);
   };
   const editAnswer = (v) => { setAnswer(v); stash(v, working); };
   const editWorking = (v) => { setWorking(v); stash(answer, v); };
 
-  useEffect(() => { if (resolved) clearDraft('question', question.id); }, [resolved, question.id]);
+  useEffect(() => {
+    if (!resolved) return;
+    if (typedSaveTimer.current) { clearTimeout(typedSaveTimer.current); typedSaveTimer.current = null; }
+    clearDraft('question', question.id);
+  }, [resolved, question.id]);
 
   // ── Handwriting in progress ────────────────────────────────────────────────
   // Ink is kept in the profile-scoped recovery store (practiceRecovery.js) the
@@ -551,9 +559,11 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     setSaveState('saving');
     inkSaveTimer.current = setTimeout(() => {
       inkSaveTimer.current = null;
-      // A submission in flight or already marked has cleared the draft on
-      // purpose; its absence then is not a failed save.
-      if (inFlightRef.current || attemptRef.current) return;
+      // A marked question has had its draft cleared on purpose; its absence
+      // then is not a failed save. (While a submission is only in flight the
+      // draft is still there, so the read-back goes ahead and the status never
+      // stays on "Saving".)
+      if (attemptRef.current) return;
       const at = draftSavedAt('ink', question.id);
       setSaveState(at && at >= asked ? 'saved' : 'failed');
     }, 700);
@@ -813,6 +823,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         setAttempt(attemptRef.current);
         setState({ phase: 'resolved', res: r });
         celebrate(r); refreshUser(); refreshDue(); refreshRecent?.();
+        setSaveState(null);
       }
       onResolved?.(r);
     } catch (e) {

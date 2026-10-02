@@ -439,8 +439,12 @@ export default function InkAnswer({
       const before = strokesRef.current;
       if (!before.length) return;
       setCleared({ strokes: before, overrides });
-      setOverrides({});
     }
+    // A tap-to-correct fix is keyed by glyph position and carries full
+    // confidence. After undo or redo the glyph in that position can be a
+    // different one, so every fix is dropped with the stroke change: a stale
+    // "7" must never ride onto a new "3" and skip the reading check.
+    setOverrides({});
     canvasRef.current?.[fn]();
   };
   const undoClear = () => {
@@ -489,13 +493,12 @@ export default function InkAnswer({
           <Icon name="pageAdd" /><span className="ink-tool-label">{t('ink.addPage')}</span>
         </button>
         <span className="ink-pages" aria-live="polite">{t('ink.pageCount', { count: pages, n: pages })}</span>
-        {(!NATIVE_INK || fingerHost) && (
-          <button type="button" className={`ink-tool ${finger ? 'on' : ''}`} title={t('ink.fingerTitle')}
-            aria-label={t('ink.fingerLabel')} aria-pressed={finger}
-            onClick={() => setFinger(f => !f)}>
-            <Icon name="finger" /><span className="ink-tool-label">{t('ink.finger')}</span>
-          </button>
-        )}
+        {/* Always offered: an iPad without a Pencil can only write through this (CP-04). */}
+        <button type="button" className={`ink-tool ${finger ? 'on' : ''}`} title={t('ink.fingerTitle')}
+          aria-label={t('ink.fingerLabel')} aria-pressed={finger}
+          onClick={() => setFinger(f => !f)}>
+          <Icon name="finger" /><span className="ink-tool-label">{t('ink.finger')}</span>
+        </button>
         {cleared
           ? <button type="button" className="ink-tool on" onClick={undoClear} aria-live="polite">{t('ink.undoClear')}</button>
           : <span className="ink-hint">{t('ink.hint')}</span>}

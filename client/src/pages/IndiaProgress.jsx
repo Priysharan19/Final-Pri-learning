@@ -120,7 +120,7 @@ export default function IndiaProgress() {
                     </span>
                   </span>
                   {/* Whole marks: a tenth of a mark is precision the evidence does not have. */}
-                  <span className="set-v">+{Math.round(unit.atStake)}</span>
+                  <span className="set-v">{unit.atStake > 0 && unit.atStake < 0.5 ? '<1' : `+${Math.round(unit.atStake)}`}</span>
                 </div>
               ))}
               <p className="muted" style={{ fontSize: 12, marginTop: 8 }}>{t('progress.rankedByMarks')}</p>

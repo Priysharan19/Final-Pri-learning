@@ -223,7 +223,9 @@ check('status only claims what the device actually knows', () => {
   // Ink is reported saved only after the record is read back from the store.
   assert.match(card, /const at = draftSavedAt\('ink', question\.id\);\s*setSaveState\(at && at >= asked \? 'saved' : 'failed'\)/);
   // …and a draft cleared by marking is never reported as a failed save.
-  assert.match(card, /if \(inFlightRef\.current \|\| attemptRef\.current\) return;\s*const at = draftSavedAt/);
+  assert.match(card, /if \(attemptRef\.current\) return;\s*const at = draftSavedAt/);
+  // The same for a typed draft: a late timed write must not put back what marking cleared.
+  assert.match(card, /if \(attemptRef\.current\) return;\s*setSaveState\(saveDraft\('question'/);
   assert.match(card, /if \(!saveInkDraft\(question\.id, strokes, [^)]*\)\) \{ setSaveState\('failed'\); return; \}/);
 });
 
@@ -387,8 +389,20 @@ check('the result states the mark once and Progress shows whole marks, no percen
   const head = card.slice(card.indexOf('<span className="eval-marks">'), card.indexOf('</span>', card.indexOf('<span className="eval-marks">')));
   assert.doesNotMatch(head, /%/);
   assert.match(card, /boardAward\.rows\.length > 1 && <b/);
-  assert.match(progressJsx, /\+\{Math\.round\(unit\.atStake\)\}/);
+  assert.match(progressJsx, /Math\.round\(unit\.atStake\)/);
+  assert.doesNotMatch(progressJsx, /\+\{unit\.atStake\}/);
   assert.doesNotMatch(progressJsx, /className="card"[^>]*>\s*<div className="card-title"/);
+});
+
+check('a symbol correction never outlives the strokes it was made on, and finger writing is always offered', () => {
+  // Fixes are keyed by glyph position at full confidence: after undo/redo a
+  // stale fix would land on a different glyph and skip the reading check.
+  const act = ink.slice(ink.indexOf('const act = (fn) => () => {'), ink.indexOf('const undoClear'));
+  assert.match(act, /setOverrides\(\{\}\);\s*canvasRef\.current\?\.\[fn\]\(\);/);
+  assert.doesNotMatch(act, /if \(fn === 'clear'\) \{[^}]*setOverrides\(\{\}\);[^}]*\}\s*canvasRef/);
+  // CP-04: Apple Pencil is never required, so the toggle is not gated on the host.
+  assert.doesNotMatch(ink, /\(!NATIVE_INK \|\| fingerHost\) && \(\s*<button[^>]*ink-tool \$\{finger/);
+  assert.match(ink, /aria-pressed=\{finger\}/);
 });
 
 console.log('');
