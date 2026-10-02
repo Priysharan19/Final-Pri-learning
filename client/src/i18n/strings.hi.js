@@ -150,6 +150,7 @@ export default {
   'common.cancel': 'रद्द करें',
   'common.edit': 'संपादित करें',
   'common.continue': 'जारी रखें',
+  'home.needsConnection': 'इंटरनेट चाहिए',
   'common.tryAgain': 'फिर कोशिश करें',
   'common.checking': 'जाँचा जा रहा है…',
   'common.on': 'चालू',

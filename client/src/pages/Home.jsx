@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
 import { cloud } from '../platform/cloudTransport.js';
-import { resolveHomeRecommendation } from '../home/recommendation.js';
+import { resolveHomeRecommendation, actionOpenable } from '../home/recommendation.js';
 import { cacheAssignments, cachedAssignments, loadSavedFilters, saveFilters } from '../home/homeCache.js';
 import { useApp } from '../App.jsx';
 import { dotpointAvailable, practiceTargetAvailable, topicAvailability } from '../engine/curriculumAvailability.js';
@@ -238,7 +238,7 @@ export default function Home() {
           onSkip={() => { setPlacement(p => ({ ...p, status: 'skipped' })); api.post('/placement/skip', {}).catch(() => { }); }} />
         <GoalCard user={user} activity={stats?.activity || []} onGo={() => nav('/practice')} />
         {homeDecision.alternatives.map(item => (
-          <HomeAction key={item.kind + ':' + item.id} action={item} nav={nav} />
+          <HomeAction key={item.kind + ':' + item.id} action={item} nav={nav} online={online} />
         ))}
       </div>
 
@@ -456,11 +456,12 @@ function actionCopy(action, user, t) {
   return { title, reason: t(reason, { ...d, date: action.dueAt ? new Date(action.dueAt).toLocaleDateString() : '' }), cta: t(cta) };
 }
 
-function HomeAction({ action, nav, primary }) {
+function HomeAction({ action, nav, primary, online = true }) {
   const { user } = useApp();
   const t = useT();
   if (!action) return null;
   const copy = actionCopy(action, user, t);
+  const openable = actionOpenable(action, { online });
   if (!primary) {
     // Alternatives share CTA words ("Continue", "Practice"), so each button is
     // named by its own card title and described by its own reason.
@@ -473,7 +474,8 @@ function HomeAction({ action, nav, primary }) {
         <p id={reasonId}>{copy.reason}</p>
         <button className="btn btn-ghost btn-sm" aria-describedby={reasonId}
           aria-labelledby={`${titleId}-cta ${copy.title === copy.cta ? reasonId : titleId}`}
-          onClick={() => nav(action.destination)}><span id={`${titleId}-cta`}>{copy.cta}</span></button>
+          disabled={!openable} data-home-alt-offline={openable ? undefined : ''}
+          onClick={() => { if (openable) nav(action.destination); }}><span id={`${titleId}-cta`}>{openable ? copy.cta : t('home.needsConnection')}</span></button>
       </article>
     );
   }

@@ -137,3 +137,15 @@ export const HOME_RECOMMENDATION_POLICY = {
   duePersonalTask: 86, taskOrPracticeResume: 84, expiredExam: 81, dueReviews: 80, futureAssignment: 76,
   classTask: 75, partialDailyGoal: 70, personalTask: 68, adaptive: 60, firstPractice: 55, smartPractice: 50
 };
+
+/**
+ * A card that needs the cloud (a cached assignment shown while offline) can be
+ * read but not opened: the button is disabled and says why, instead of
+ * sending the student to a page that cannot load without a connection.
+ */
+export function actionOpenable(action, { online = true } = {}) {
+  if (!action) return false;
+  if (action.requiresNetwork && !online) return false;
+  if (action.data?.cached) return false;
+  return true;
+}

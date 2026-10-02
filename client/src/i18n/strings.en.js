@@ -109,6 +109,7 @@ export default {
   'common.cancel': 'Cancel',
   'common.edit': 'Edit',
   'common.continue': 'Continue',
+  'home.needsConnection': 'Needs a connection',
   'common.tryAgain': 'Try again',
   'common.checking': 'Checking…',
   'common.on': 'On',

@@ -23,7 +23,7 @@ const idb = await import('../src/local/idb.js');
 const { cloudLinkRowId } = await import('../src/platform/cloudAccount.js');
 const { loadAllBanks } = await import('../src/engine/generators/index.js');
 const { indiaPracticeScope, indiaScope, resolveIndiaTarget, indiaPyqAlternatives } = await import('../src/engine/indiaProduct.js');
-const { resolveHomeRecommendation, HOME_RECOMMENDATION_POLICY } = await import('../src/home/recommendation.js');
+const { resolveHomeRecommendation, HOME_RECOMMENDATION_POLICY, actionOpenable } = await import('../src/home/recommendation.js');
 const { loadSavedFilters, saveFilters, cacheAssignments, cachedAssignments } = await import('../src/home/homeCache.js');
 const { loadBanksForPaths, enumeratePaths } = await import('./content-certify.mjs');
 
@@ -222,6 +222,10 @@ const rowOf = async reply => reply?.question?.id ? idb.get('questions', reply.qu
   ok(offline.primary && offline.primary.kind !== 'assignment', 'a cached assignment is never the primary action while offline');
   const shown = offline.alternatives.find(x => x.kind === 'assignment');
   ok(shown && shown.data.cached === true && shown.offlineCaveat === true, 'it is still shown, marked cached and offline');
+  ok(actionOpenable(shown, { online: false }) === false, 'a cached assignment cannot be opened while offline (its button is disabled)');
+  ok(actionOpenable(shown, { online: true }) === false, 'a cached copy is never opened even if the connection returns before refresh');
+  ok(actionOpenable(onlineLive(), { online: true }) === true, 'a live assignment can be opened online');
+  function onlineLive() { return pick({ online: true, cloudReady: true, assignments: [due] }).primary; }
   const onlineNoCache = pick({ online: true, cloudReady: true, assignments: [due], cachedAssignments: [{ ...due, id: 'stale' }] });
   eq(onlineNoCache.primary?.id, 'a1', 'online, the live list is used and the cache ignored');
   ok(!onlineNoCache.alternatives.some(x => x.id === 'stale'), 'the cached copy never duplicates a live row');
