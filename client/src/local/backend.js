@@ -3828,14 +3828,15 @@ async function assertReviewableRow(row) {
 async function examFor(pid, examId) {
   const e = await get('exams', examId);
   if (!e || e.pid !== pid) return null;
-  if (ensureExamClock(e)) await put('exams', e);
+  const viewedAt = Date.now();
+  if (ensureExamClock(e, viewedAt)) await put('exams', e);
   const questions = [];
   for (const qid of e.questionIds) {
     const row = await get('questions', qid);
     if (!row) continue;
     questions.push(sanitize(row.payload, row));
   }
-  return { id: e.id, title: e.title, year: e.year, durationMin: e.durationMin, createdAt: e.createdAt, finishedAt: e.finishedAt, score: e.score, total: e.total, questions, detail: e.detail || null, session: examSessionView(e) };
+  return { id: e.id, title: e.title, year: e.year, durationMin: e.durationMin, createdAt: e.createdAt, finishedAt: e.finishedAt, score: e.score, total: e.total, questions, detail: e.detail || null, session: examSessionView(e, viewedAt) };
 }
 
 // ── Dispatcher (same contract as the old fetch layer) ────────────────────────

@@ -273,7 +273,10 @@ async function examView(profile, id) {
   const exam = await requireExam(profile, id);
   // A paper stored before the deadline was recorded gets one now, from when it
   // was created, and keeps it.
-  if (ensureExamClock(exam)) await put('exams', exam);
+  // One reading of the clock for the whole view, so what is stored and what
+  // the room is told are the same instant.
+  const viewedAt = Date.now();
+  if (ensureExamClock(exam, viewedAt)) await put('exams', exam);
   const questions = [];
   for (const qid of exam.questionIds || []) {
     const row = await get('questions', qid);
@@ -292,7 +295,7 @@ async function examView(profile, id) {
     detail: exam.detail || null,
     summary: exam.summary || null,
     analysis: exam.finishedAt && exam.detail ? analyseExam({ detail: exam.detail, indiaExam: exam.indiaExam }) : null,
-    session: examSessionView(exam),
+    session: examSessionView(exam, viewedAt),
     indiaExam: exam.indiaExam
   };
 }
