@@ -25,6 +25,10 @@
 //   F. Secrets: provider keys present in the environment never appear in any
 //      response body or header, /v1/health, an error body, or anything this
 //      suite's server wrote to stdout/stderr.
+//   H. AI tutor: dark 404 without PRI_FEATURE_TUTOR=1, exam context locked,
+//      non-maths / identifier-carrying / oversized bodies refused, and the
+//      reply cache keyed by content only — one account's request never reads
+//      a reply cached for different content, and no identity is stored.
 
 // Secret-shaped values are assembled at runtime so the repository secret scan
 // (tools/secret-scan.mjs) never sees one committed.
@@ -54,6 +58,10 @@ const providerUrl = `http://127.0.0.1:${provider.address().port}/v1/responses`;
 Object.assign(process.env, SECRETS, {
   PRI_HANDWRITING_ENDPOINT: providerUrl,
   PRI_WORKING_ENDPOINT: providerUrl,
+  PRI_TUTOR_ENDPOINT: providerUrl,
+  // The AI tutor ships dark; the sweeps run with it switched on so its real
+  // guards are what they meet. Section H also proves the dark 404.
+  PRI_FEATURE_TUTOR: '1',
   PRI_PAID_CALLS_PER_HOUR: '1000',
   PRI_PAID_CALLS_PER_DAY: '1000'
 });
@@ -749,6 +757,50 @@ try {
       await billed.close();
       for (const name of Object.keys(razorpayEnv)) delete process.env[name];
     }
+  }
+
+  // ══ H. AI tutor (#251) ════════════════════════════════════════════════════
+  {
+    const { tutorCacheKey, validateTutorRequest } = await import('../platform/tutor.js');
+    const first = await account({ name: 'Tutor One' });
+    const second = await account({ name: 'Tutor Two' });
+    const Q = {
+      prompt: 'Solve $2x + 3 = 11$.',
+      steps: [{ h: 'Subtract 3 from both sides', d: '$2x = 8$' }, { h: 'Divide both sides by 2', d: '$x = 4$' }],
+      answer: '4', hints: ['Undo the addition first.']
+    };
+    const body = (over = {}) => ({ context: 'practice', level: 'nudge', locale: 'en', questionId: 'q-acceptance-1', questionVersion: '1', question: Q, studentWork: { lines: ['2x + 3 = 11'] }, ...over });
+    const help = (who, payload) => h.request('/v1/tutor/help', { method: 'POST', jar: who.jar, body: payload });
+
+    process.env.PRI_FEATURE_TUTOR = '0';
+    const dark = await help(first, body());
+    c.deq([dark.status, dark.data?.error?.code], [404, 'NOT_FOUND'], 'tutor: dark without PRI_FEATURE_TUTOR=1, even for a verified account');
+    process.env.PRI_FEATURE_TUTOR = '1';
+
+    const exam = await help(first, body({ context: 'exam' }));
+    c.deq([exam.status, exam.data?.error?.code], [403, 'TUTOR_EXAM_LOCKED'], 'tutor: an exam context is locked');
+    const essay = await help(first, body({ question: { ...Q, prompt: 'Write an essay about the French Revolution please' } }));
+    c.deq([essay.status, essay.data?.error?.code], [400, 'TUTOR_NOT_MATHS'], 'tutor: a non-maths body is not proxied to the model');
+    const named = await help(first, body({ email: first.email }));
+    c.eq(named.status, 400, 'tutor: a body carrying an identifier is refused');
+    const huge = await help(first, body({ question: { ...Q, prompt: `Solve ${'x + '.repeat(15000)}1` } }));
+    c.deq([huge.status, huge.data?.error?.code], [413, 'TUTOR_REQUEST_TOO_LARGE'], 'tutor: an oversized body is refused with a code');
+
+    // Cache isolation: a reply cached for one request's exact content.
+    const key = tutorCacheKey(validateTutorRequest(body()).request);
+    const now = Date.now();
+    await db.run('INSERT INTO tutor_cache(cache_key,response_json,created_at,expires_at) VALUES (?,?,?,?)',
+      [key, JSON.stringify({ level: 'nudge', message: 'Seeded tutor reply.', referencesStepIndex: 0, source: 'model' }), now, now + 86400000]);
+    const before = providerCalls;
+    const different = await help(second, body({ question: { ...Q, answer: '5' } }));
+    c.ok(different.status >= 500 && different.data?.error?.code && !different.text.includes('Seeded tutor reply'),
+      `tutor: different content never reads another request's cached reply (${different.status} ${different.data?.error?.code})`);
+    c.ok(providerCalls > before, 'tutor: a cache miss really goes to the (hostile) provider, whose echo is not relayed');
+    const identical = await help(second, body());
+    c.deq([identical.status, identical.data?.tutor?.cached], [200, true], 'tutor: identical content is answered from the content-keyed cache');
+    const rows = await db.all('SELECT cache_key, response_json FROM tutor_cache');
+    const stored = JSON.stringify(rows);
+    c.ok(![first.id, second.id, first.email, second.email].some(value => stored.includes(value)), 'tutor: the cache stores no account id or email');
   }
 } finally {
   await h.close();

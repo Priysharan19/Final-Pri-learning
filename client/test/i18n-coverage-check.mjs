@@ -68,7 +68,7 @@ const eq = (a, b, label) => ok(JSON.stringify(a) === JSON.stringify(b), `${label
 
 // ── Which files ──────────────────────────────────────────────────────────────
 const jsxIn = dir => readdirSync(join(ROOT, dir)).filter(f => f.endsWith('.jsx')).map(f => `${dir}/${f}`);
-export const SCANNED = ['src/App.jsx', ...jsxIn('src/pages'), ...jsxIn('src/components')];
+export const SCANNED = ['src/App.jsx', ...jsxIn('src/pages'), ...jsxIn('src/components'), ...jsxIn('src/tutor')];
 
 // ── What reads as prose ──────────────────────────────────────────────────────
 // A capitalised word followed by at least one more token, or a phrase with a
