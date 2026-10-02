@@ -62,6 +62,10 @@
   --hairline: rgba(28, 27, 24, 0.10);
   --hairline-strong: rgba(28, 27, 24, 0.18);
   --hairline-faint: rgba(28, 27, 24, 0.055);
+  /* The edge of anything a student types, writes or picks in. Hairlines divide
+     content; this one has to be found, so it holds 3:1 against every paper
+     surface (WCAG 1.4.11). */
+  --control-border: #85827a;
 
   --ink: #1c1b18;
   --ink-2: #48463f;
@@ -70,6 +74,7 @@
   /* Pri teal — the only interaction colour */
   --accent: #0b6e69;
   --accent-hover: #095b57;
+  --accent-pressed: #074845;
   --accent-ink: #ffffff;
   --accent-soft: rgba(11, 110, 105, 0.08);
   --accent-line: rgba(11, 110, 105, 0.38);
@@ -154,6 +159,42 @@
   --ease-standard: cubic-bezier(0.2, 0, 0, 1);
   --ease-emphasized: cubic-bezier(0.3, 0, 0, 1);
   --ease-exit: cubic-bezier(0.3, 0, 1, 1);
+
+  /* Type roles. Hierarchy comes from size and space first, weight second:
+     nothing in the product is heavier than 620. */
+  --type-display: 620 clamp(26px, 2.6vw, 30px)/1.15 var(--font-display);
+  --type-title: 600 clamp(20px, 2.2vw, 24px)/1.2 var(--font-display);
+  --type-heading: 600 17px/1.3 var(--font);
+  --type-body: 400 15.5px/1.55 var(--font);
+  --type-compact: 400 13.5px/1.45 var(--font);
+  --type-label: 600 12px/1.3 var(--font);
+  --type-caption: 400 12px/1.4 var(--font);
+  --tracking-label: 0.08em;
+
+  /* Layout */
+  --reading-width: 68ch;
+  --canvas-width: 820px;
+  --page-width: 760px;
+  --rail-width: 178px;
+  --bar-height: 52px;
+
+  /* Semantic names (docs/design/PRI-DREAM-INTERFACE.md §Tokens). New screens
+     use these; they are aliases, so both themes follow automatically. */
+  --bg-base: var(--page);
+  --bg-subtle: var(--surface-2);
+  --surface-default: var(--surface);
+  --surface-sunken: var(--surface-2);
+  --surface-overlay: var(--surface-raised);
+  --text-primary: var(--ink);
+  --text-secondary: var(--ink-2);
+  --text-tertiary: var(--ink-3);
+  --text-disabled: var(--disabled);
+  --text-on-accent: var(--accent-ink);
+  --border-subtle: var(--hairline-faint);
+  --border-default: var(--hairline);
+  --border-strong: var(--hairline-strong);
+  --border-control: var(--control-border);
+  --accent-subtle: var(--accent-soft);
 }
 
 [data-theme="dark"] {
@@ -169,11 +210,13 @@
   --hairline: rgba(237, 235, 228, 0.10);
   --hairline-strong: rgba(237, 235, 228, 0.18);
   --hairline-faint: rgba(237, 235, 228, 0.055);
+  --control-border: #7b786f;
   --ink: #edebe4;
   --ink-2: #bebaaf;
   --ink-3: #969286;
   --accent: #5db8ad;
   --accent-hover: #74c5bb;
+  --accent-pressed: #8fd0c7;
   --accent-ink: #0a1f1d;
   --accent-soft: rgba(93, 184, 173, 0.11);
   --accent-line: rgba(93, 184, 173, 0.45);
@@ -1573,6 +1616,17 @@ h3 { font-size: 16.5px; line-height: 1.3; }
 .btn-ghost:hover:not(:disabled) { background: var(--surface-2); border-color: var(--ink-3); }
 .btn-quiet { background: none; color: var(--ink-2); border-color: transparent; }
 .btn-quiet:hover:not(:disabled) { color: var(--ink); background: var(--surface-2); }
+/* A disclosure in the flow of the page: it opens something here, it does not
+   go anywhere. The chevron says so; bold text alone read as a label. */
+.btn-disclose {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 8px 0 2px;
+  background: none; border: 0; border-radius: var(--radius-xs); cursor: pointer;
+  color: var(--ink-2); font: 500 14px/1.3 var(--font); text-align: left;
+}
+.btn-disclose:hover { color: var(--ink); }
+.btn-disclose svg { flex: none; color: var(--ink-3); transform: rotate(-90deg); transition: transform var(--motion-fast) var(--ease-standard); }
+.btn-disclose[aria-expanded="true"] svg { transform: none; }
+@media (pointer: coarse) { .btn-disclose { min-height: 44px; } }
 .btn-good { background: var(--good); border-color: var(--good); color: var(--surface); }
 .btn-danger { background: none; color: var(--bad); border-color: color-mix(in srgb, var(--bad) 45%, transparent); }
 .btn-danger:hover:not(:disabled) { background: var(--bad-soft); }
@@ -1583,7 +1637,7 @@ h3 { font-size: 16.5px; line-height: 1.3; }
 .input, select.input, textarea.input, .answer-input, .working-input {
   min-height: 44px;
   border-radius: var(--radius-sm);
-  border: 1px solid var(--hairline-strong);
+  border: 1px solid var(--control-border);
   background: var(--surface-raised);
   color: var(--ink);
   font-family: var(--font);
@@ -1746,16 +1800,12 @@ h3 { font-size: 16.5px; line-height: 1.3; }
   border: 1px solid var(--hairline); border-radius: var(--radius-lg);
   display: grid; gap: 6px; position: relative;
 }
-.home-next::before {
-  content: ''; position: absolute; left: 0; top: 26px; bottom: 26px; width: 2px;
-  background: var(--accent); border-radius: 0 2px 2px 0;
-}
 .home-next-kicker { font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
 .home-next-title { font-size: clamp(22px, 2.6vw, 30px); font-weight: 620; letter-spacing: -0.025em; line-height: 1.15; }
 .home-next-reason { color: var(--ink-2); font-size: 15.5px; max-width: 56ch; }
 .home-next-meta { color: var(--ink-3); font-size: 13.5px; font-variant-numeric: tabular-nums; }
 .home-next-cta { margin-top: 14px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
-.home-next-cta .btn-primary { min-width: 168px; }
+.home-next-cta .btn-primary { min-width: 148px; }
 .home-next[data-loading="true"] .home-next-title { color: var(--ink-3); }
 .home-section { margin-top: 40px; }
 .home-section-title {
@@ -1809,6 +1859,43 @@ h3 { font-size: 16.5px; line-height: 1.3; }
 .goal-ring-fill { stroke: var(--accent); }
 .goal-ring-fill.done { stroke: var(--accent); }
 
+/* ── Progress: one reading column, one sheet ──────────────────────────────── */
+.pg { width: min(900px, 100%); margin: 0 auto; display: grid; gap: 36px; }
+.pg-head h1 { font: var(--type-title); letter-spacing: -0.015em; }
+.pg-head .sub { margin: 6px 0 0; max-width: var(--reading-width); }
+.pg-sheet { background: var(--surface); border: 1px solid var(--hairline); border-radius: var(--radius-lg); padding: 24px 26px; }
+.pg-sentence { margin: 14px 0 0; max-width: var(--reading-width); font-size: 16px; }
+.pg-coverage { margin-top: 14px; }
+.pg-coverage-track { height: 6px; border-radius: 3px; background: var(--surface-3); overflow: hidden; }
+.pg-coverage-track > div { height: 100%; background: var(--accent); }
+.pg-coverage-note { font-size: 12.5px; margin-top: 6px; font-variant-numeric: tabular-nums; }
+.pg-priorities { margin-top: 22px; }
+.pg-priorities .sc-label { margin-bottom: 2px; }
+.pg-priorities .set-v { font-variant-numeric: tabular-nums; color: var(--ink); }
+/* Facts, not metric cards: four figures on one ruled line. */
+.pg-facts { gap: 0; border-top: 1px solid var(--hairline); border-bottom: 1px solid var(--hairline); }
+.pg-facts .card { background: none; border: 0; border-radius: 0; box-shadow: none; padding: 16px 18px 16px 0; }
+.pg-facts .card + .card { border-left: 1px solid var(--hairline); padding-left: 18px; }
+.pg-facts .big { font-size: 24px; font-weight: 560; font-variant-numeric: tabular-nums; margin-top: 4px; }
+.pg-facts .muted { font-size: 12.5px; }
+.pg-section-head { align-items: baseline; margin-bottom: 10px; }
+.pg-section-head .muted { font-size: 13px; }
+.pg-table th, .pg-table td { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pg-table th { padding: 9px 8px; font-weight: 600; font-size: 12px; }
+.pg-table th:first-child, .pg-table td:first-child { text-align: left; white-space: normal; padding-left: 12px; }
+.pg-table td:last-child { padding-right: 6px; }
+.pg-chapter { font-weight: 560; }
+.pg-notes { border-top: 1px solid var(--hairline); padding-top: 18px; display: grid; gap: 8px; max-width: var(--reading-width); }
+.pg-notes p { margin: 0; font-size: 13.5px; }
+.pg-notes b { color: var(--ink-2); font-weight: 600; }
+@media (max-width: 760px) {
+  .pg { gap: 28px; }
+  .pg-sheet { padding: 18px 16px; }
+  .pg-facts { grid-template-columns: 1fr 1fr; }
+  .pg-facts .card:nth-child(3) { border-left: 0; padding-left: 0; }
+  .pg-facts .card:nth-child(n+3) { border-top: 1px solid var(--hairline); }
+}
+
 /* ── The question workspace ──────────────────────────────────────────────── */
 .ws-page { min-height: 100vh; display: flex; flex-direction: column; background: var(--paper); }
 .ws-bar {
@@ -1825,6 +1912,8 @@ h3 { font-size: 16.5px; line-height: 1.3; }
 .ws-filter { font-size: 13px; }
 .ws-filter[aria-pressed="true"] { color: var(--accent); background: var(--accent-soft); }
 .ws-exit { color: var(--ink-2); }
+.ws-clear { font-size: 13px; gap: 4px; color: var(--ink-2); }
+.ws-clear svg { width: 14px; height: 14px; }
 .ctx-next {
   box-shadow: 0 1px 0 var(--hairline-strong);
   min-height: 36px; padding: 0 12px; border-radius: var(--radius-sm); border: 1px solid var(--hairline-strong);
@@ -1838,7 +1927,7 @@ h3 { font-size: 16.5px; line-height: 1.3; }
 
 .qpage.ws { max-width: none; margin: 0; position: relative; flex: 1; display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; }
 .ws-context { padding: 26px clamp(18px, 3vw, 40px) 18px; min-width: 0; }
-.ws-work { padding: 8px clamp(14px, 2.4vw, 32px) 0; min-width: 0; display: flex; flex-direction: column; gap: 14px; }
+.ws-work { --ws-pad: clamp(14px, 2.4vw, 32px); padding: 8px var(--ws-pad) 0; min-width: 0; display: flex; flex-direction: column; gap: 14px; }
 .ws-single .ws-context, .ws-single .ws-work { width: min(820px, 100%); margin: 0 auto; }
 .ws-single .ws-context { padding-bottom: 6px; }
 
@@ -1848,7 +1937,7 @@ h3 { font-size: 16.5px; line-height: 1.3; }
     position: sticky; top: 52px; max-height: calc(100vh - 52px); overflow-y: auto;
     border-right: 1px solid var(--hairline); padding: 28px 30px 32px 32px; overscroll-behavior: contain;
   }
-  .ws-split .ws-work { padding: 18px 24px 0 24px; }
+  .ws-split .ws-work { --ws-pad: 24px; padding: 18px var(--ws-pad) 0; }
   .ws-split .ws-qpeek { display: none !important; }
 }
 
@@ -1871,7 +1960,9 @@ h3 { font-size: 16.5px; line-height: 1.3; }
   color: var(--ink);
   margin: 0;
   max-width: var(--measure);
+  text-wrap: pretty;
 }
+@supports (text-wrap: balance) { .ws-split .q-prompt, .ws-single .q-prompt { text-wrap: balance; } }
 .q-prompt .katex-display { margin: 0.7em 0; overflow-x: auto; overflow-y: hidden; padding: 2px 0; }
 .q-prompt .katex-display > .katex { text-align: left; padding-left: 0.6em; }
 .q-figure { margin: 16px 0 0; max-width: 100%; overflow-x: auto; }
@@ -1889,7 +1980,7 @@ h3 { font-size: 16.5px; line-height: 1.3; }
 /* The question, recalled while the student is deep in the page */
 .ws-qpeek {
   position: sticky; top: 52px; z-index: 30; display: none; align-items: center; gap: 10px;
-  margin: 0 calc(-1 * clamp(14px, 2.4vw, 32px)); padding: 8px clamp(14px, 2.4vw, 32px);
+  margin: 0 calc(-1 * var(--ws-pad)); padding: 8px var(--ws-pad);
   background: color-mix(in srgb, var(--paper) 95%, transparent); backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--hairline); font-size: 13.5px; color: var(--ink-2);
 }
@@ -1897,7 +1988,7 @@ h3 { font-size: 16.5px; line-height: 1.3; }
 .ws-qpeek-text { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* Answering surfaces */
-.editor-shell { background: var(--surface-raised); border: 1px solid var(--hairline-strong); border-radius: var(--radius); box-shadow: none; overflow: hidden; }
+.editor-shell { background: var(--surface-raised); border: 1px solid var(--control-border); border-radius: var(--radius); box-shadow: none; overflow: hidden; }
 .editor-toolbar { background: var(--surface); border-bottom: 1px solid var(--hairline); }
 .editor-tool { border-radius: var(--radius-xs); background: none; border-color: var(--hairline); }
 .editor-tool.on { color: var(--accent); border-color: var(--accent-line); background: var(--accent-soft); }
@@ -1906,13 +1997,19 @@ h3 { font-size: 16.5px; line-height: 1.3; }
 .editor-body textarea, .editor-body .answer-input { font-size: 17px; }
 .editor-body textarea { min-height: 200px; }
 .editor-body input.answer-input { min-height: 44px; }
+/* The sheet is the field. An input inside it draws no second box; focus is
+   shown once, on the sheet (see .editor-shell:focus-within). */
+.editor-body .answer-input, .editor-body textarea, .editor-body .working-input {
+  border: 0; background: none; box-shadow: none; border-radius: 0; padding-left: 0; padding-right: 0;
+}
+.editor-body .answer-input:focus, .editor-body textarea:focus, .editor-body .working-input:focus { box-shadow: none; }
 .sym-key { border-radius: var(--radius-xs); background: var(--surface); }
 .sym-key:hover { border-color: var(--accent-line); color: var(--ink); }
 .typed-preview { border-radius: var(--radius-sm); background: var(--surface); border: 1px solid var(--hairline); color: var(--ink-2); }
 
 .mcq { gap: 8px; margin-top: 0; }
 .mcq-opt {
-  border-radius: var(--radius); border: 1px solid var(--hairline-strong); background: var(--surface-raised);
+  border-radius: var(--radius); border: 1px solid var(--control-border); background: var(--surface-raised);
   padding: 14px 16px; font-size: 16.5px; min-height: 56px;
   transition: border-color var(--motion-fast) var(--ease-standard), background var(--motion-fast) var(--ease-standard);
 }
@@ -1932,7 +2029,7 @@ h3 { font-size: 16.5px; line-height: 1.3; }
 /* The one dominant next move */
 .ws-actions {
   position: sticky; bottom: 0; z-index: 25; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-  margin: 6px calc(-1 * clamp(14px, 2.4vw, 32px)) 0; padding: 12px clamp(14px, 2.4vw, 32px) calc(12px + env(safe-area-inset-bottom));
+  margin: 6px calc(-1 * var(--ws-pad)) 0; padding: 12px var(--ws-pad) calc(12px + env(safe-area-inset-bottom));
   background: color-mix(in srgb, var(--paper) 96%, transparent); backdrop-filter: blur(10px);
   border-top: 1px solid var(--hairline);
 }
@@ -2260,7 +2357,6 @@ h3 { font-size: 16.5px; line-height: 1.3; }
   .content { padding: 18px var(--content-gutter) calc(92px + env(safe-area-inset-bottom)); }
   .home-wrap { padding-top: 4px; }
   .home-next { padding: 22px 18px 20px; }
-  .home-next::before { top: 22px; bottom: 22px; }
   .home-next-cta .btn-primary { width: 100%; }
   .gen-panel { max-height: none; }
   .gen-cats { width: 112px; }
@@ -2350,7 +2446,9 @@ h3 { font-size: 16.5px; line-height: 1.3; }
 .ws-filter-inline { display: none; }
 @media (max-width: 760px) {
   .ws-bar .ws-filter, .ws-bar .ws-clear { display: none; }
-  .ws-filter-inline { display: inline-flex; }
+  .ws-filter-inline { display: flex; flex-wrap: wrap; gap: 4px 8px; margin: -4px 0 0 -8px; }
+  .ws-filter-inline .icon-btn { font-size: 13px; white-space: nowrap; gap: 4px; }
+  .ws-filter-inline .icon-btn svg { width: 14px; height: 14px; }
 }
 
 /* Every control a finger presses in the workspace is at least 44px. */
@@ -2363,8 +2461,9 @@ h3 { font-size: 16.5px; line-height: 1.3; }
 .sidebar:focus-within .sidebar-inner { width: 224px; background: var(--surface); box-shadow: var(--shadow); }
 .sidebar:focus-within .nav-label, .sidebar:focus-within .nav-badge, .sidebar:focus-within .nav-hist { opacity: 1; }
 .sidebar:focus-within .nav-section-label { max-height: 22px; opacity: 1; padding-top: 4px; }
-/* A touch screen wider than a tablet (13" iPad landscape) has no hover either. */
-@media (hover: none) and (min-width: 1181px) {
+/* A touch screen has no hover to open the rail, and nine unlabelled icons are
+   a guessing game. From iPad landscape up the rail is shown with its words. */
+@media (hover: none) and (min-width: 1024px) {
   .sidebar { width: 178px; }
   .sidebar-inner, .sidebar:hover .sidebar-inner { width: 178px; box-shadow: none; }
   .nav-label, .nav-badge { opacity: 1; }

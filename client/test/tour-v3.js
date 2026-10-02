@@ -122,7 +122,7 @@ export const flow = {
     const marked = (await page.locator('.eval-card').innerText()).replace(/\s+/g, ' ');
     const marks = (await page.locator('.eval-marks').innerText()).replace(/\s+/g, ' ').trim();
     await check(`the answer the solution gave (${JSON.stringify(answer)}) is marked correct`,
-      /^(\d+(?:\.\d)?) \/ \1 marks \(100%\)/.test(marks), `marks read ${JSON.stringify(marks)}`);
+      /^(\d+(?:\.\d)?) \/ \1 marks\b/.test(marks), `marks read ${JSON.stringify(marks)}`);
     await check('a correct answer is not told what was expected instead',
       !/Expected:/.test(marked), `evaluation reads ${JSON.stringify(marked.slice(0, 160))}`);
     await check('the session counter agrees it was right',

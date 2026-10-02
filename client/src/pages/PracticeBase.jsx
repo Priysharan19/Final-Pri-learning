@@ -352,7 +352,7 @@ export default function Practice() {
           )}
           {(subtopic || taskId || difficulty || pyqOnly || assignmentMode) && (
             <button className="icon-btn ws-clear" title={t(assignmentMode ? 'assignment.leaveShort' : 'practice.clearFilters')}
-              aria-label={t(assignmentMode ? 'assignment.leaveShort' : 'practice.clearFilters')} onClick={() => setParams({})}><Icon name="close" /></button>
+              onClick={() => setParams({})}><Icon name="close" /><span>{t(assignmentMode ? 'assignment.leaveShort' : 'practice.clearShort')}</span></button>
           )}
           {!assignmentCompleteLocally && (
             <button className="ctx-next" title={t('practice.nextQuestion')} aria-label={t('practice.nextQuestion')} onClick={() => load({ fresh: true })}>
@@ -403,7 +403,7 @@ export default function Practice() {
               {t(pyqOnly ? 'practice.pyqOnlyLabelOn' : 'practice.pyqOnlyLabel')}
             </button>
             {(subtopic || difficulty || pyqOnly) && (
-              <button type="button" className="icon-btn" onClick={() => setParams({})}>{t('practice.clearFilters')}</button>
+              <button type="button" className="icon-btn" title={t('practice.clearFilters')} onClick={() => setParams({})}><Icon name="close" />{t('practice.clearShort')}</button>
             )}
           </div>
         )}

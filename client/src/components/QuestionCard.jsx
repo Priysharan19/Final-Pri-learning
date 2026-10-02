@@ -986,7 +986,6 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     ? (verdictGood ? totalMarks : (selfSaved ? Object.values(selfMarks).filter(Boolean).length : 0))
     : 0;
   const shownMarks = Math.round(earnedMarks * credit * 10) / 10;
-  const pct = totalMarks ? Math.round(100 * shownMarks / totalMarks) : 0;
 
   // The verdict lands in the middle of a long page. Spoken as one sentence, a
   // screen reader hears whether the answer was right without hunting for it.
@@ -1197,13 +1196,16 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
           </div>
         ) : mode !== 'write' ? (
           <div className={`editor-shell ${resolved ? 'ink-disabled' : ''}`}>
-            <div className="editor-toolbar">
-              <button className={`editor-tool ${showSyms ? 'on' : ''}`} title={t('verdict.symbolPalette')} aria-label={t('verdict.symbolPalette')} aria-pressed={showSyms} onClick={() => setShowSyms(s => !s)}>Σ</button>
-              <span className="editor-hint"><span className="kbd">{isWorking ? '⏎' : t('verdict.kbdType')}</span> {t(isWorking ? 'verdict.editorHintWorking' : 'verdict.editorHintType')}</span>
-              <span style={{ flex: 1 }} />
-              {question.answerSuffix && <span className="answer-suffix">{t('verdict.answerIn', { unit: question.answerSuffix })}</span>}
-            </div>
-            {showSyms && (
+            {/* Tools for writing an answer: gone once there is nothing left to write. */}
+            {!resolved && (
+              <div className="editor-toolbar">
+                <button className={`editor-tool ${showSyms ? 'on' : ''}`} title={t('verdict.symbolPalette')} aria-label={t('verdict.symbolPalette')} aria-pressed={showSyms} onClick={() => setShowSyms(s => !s)}>Σ</button>
+                <span className="editor-hint">{t(isWorking ? 'verdict.editorHintWorking' : 'verdict.editorHintType')}</span>
+                <span style={{ flex: 1 }} />
+                {question.answerSuffix && <span className="answer-suffix">{t('verdict.answerIn', { unit: question.answerSuffix })}</span>}
+              </div>
+            )}
+            {showSyms && !resolved && (
               <div className="sym-palette">
                 {SYMBOLS.map(([sym, nameKey]) => (
                   <button key={sym} className="sym-key" aria-label={t('verdict.insertSymbol', { name: t(nameKey) })} onClick={() => insertSym(sym)}>{sym}</button>
@@ -1290,8 +1292,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
               )}
               {question.supportsSteps && !resolved && !isWorking && mode === 'type' && (
                 <div style={{ marginTop: 14 }}>
-                  <button className="btn btn-quiet btn-sm" aria-expanded={showWorking} onClick={() => setShowWorking(s => !s)}>
-                    {t('verdict.showWorkingToggle')}
+                  <button className="btn-disclose" aria-expanded={showWorking} onClick={() => setShowWorking(s => !s)}>
+                    <Icon name="chevronDown" size={16} />{t('verdict.showWorkingToggle')}
                   </button>
                   {showWorking && (
                     <textarea
@@ -1465,7 +1467,6 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                 </span>
                 <span className="eval-marks">
                   {t('verdict.marksOutOf', { earned: verdictGood ? shownMarks : earnedMarks, total: totalMarks })}
-                  {' '}<small>({verdictGood ? pct : (selfSaved ? Math.round(100 * earnedMarks / totalMarks) : 0)}%)</small>
                   {hintsUsed > 0 && <small> · {t('verdict.afterHints', { count: hintsUsed, n: hintsUsed })}</small>}
                 </span>
               </div>
@@ -1481,9 +1482,11 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                 {res.stepReport && <StepReport report={res.stepReport} />}
                 {boardAward && (
                   <div className="board-award" style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid var(--hairline)' }}>
+                    {/* The header above already states the total. It is repeated here
+                        only when there is more than one step to add up. */}
                     <div className="spread" style={{ alignItems: 'baseline' }}>
                       <span className="sc-label" style={{ margin: 0 }}>{t('verdict.markedStepByStep')}</span>
-                      <b style={{ fontVariantNumeric: 'tabular-nums' }}>{boardAward.awarded} / {boardAward.total}</b>
+                      {boardAward.rows.length > 1 && <b style={{ fontVariantNumeric: 'tabular-nums' }}>{boardAward.awarded} / {boardAward.total}</b>}
                     </div>
                     {boardAward.rows.map((row, i) => (
                       <div key={i} className="set-row" style={{ paddingTop: 5, paddingBottom: 5 }}>
@@ -1532,8 +1535,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                   selfSaved={selfSaved} setSelfSaved={setSelfSaved}
                 />
                 {boardAward && !verdictGood && !selfSaved && !selfOpen && (
-                  <button type="button" className="btn btn-quiet btn-sm" style={{ marginTop: 8 }} onClick={() => setSelfOpen(true)}>
-                    {t('verdict.markItYourself')}
+                  <button type="button" className="btn-disclose" style={{ marginTop: 8 }} onClick={() => setSelfOpen(true)}>
+                    <Icon name="chevronDown" size={16} />{t('verdict.markItYourself')}
                   </button>
                 )}
               </div>

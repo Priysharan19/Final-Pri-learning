@@ -571,7 +571,7 @@ export default function InkAnswer({
             {t('ink.reading')}
             {/* The browser reader is a fallback, never production handwriting
                 evidence; it says so quietly rather than not at all. */}
-            {!NATIVE_INK && rec.cloud !== true && <span className="ink-status muted">{t('ink.webReader')}</span>}
+            {!NATIVE_INK && rec.cloud !== true && showEngineNotes() && <span className="ink-status muted">{t('ink.webReader')}</span>}
             {/* A student always learns when their writing was read on the server. */}
             {rec.cloud === true && <span className="ink-status muted">{t('verdict.readOnServer')}</span>}
             {cloudState === 'reading' && <span className="ink-status muted">{t('ink.readingAgain')}</span>}

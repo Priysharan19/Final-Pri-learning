@@ -523,11 +523,8 @@ export default function Login() {
 
           {stage === 'create' && (
             <div className="card auth-card slide-up" data-onboarding-step={createStep + 1}>
-              <div className="spread" style={{ alignItems: 'center', gap: 12, marginBottom: 8 }}>
-                <span className="prov-badge lg">{Marks.device}</span>
-                <span className="sc-label" role="status" aria-live="polite">
-                  {t('login.stepOf', { current: createStep + 1, total: ONBOARDING_STEPS })}
-                </span>
+              <div className="sc-label" role="status" aria-live="polite" style={{ marginBottom: 8 }}>
+                {t('login.stepOf', { current: createStep + 1, total: ONBOARDING_STEPS })}
               </div>
               <div className="goalbar" aria-hidden="true" style={{ marginBottom: 18 }}>
                 <i style={{ width: `${((createStep + 1) / ONBOARDING_STEPS) * 100}%` }} />
@@ -748,11 +745,12 @@ export default function Login() {
                   </button>
                 )}
               </div>
-              <p className="auth-note" style={{ marginTop: 14 }}>{t('login.createNote')}</p>
+              {/* What a local profile is and is not, said once, on the step it is about. */}
+              {createStep === 3 && <p className="auth-note" style={{ marginTop: 14 }}>{t('login.createNote')}</p>}
             </div>
           )}
 
-          <p className="muted auth-foot">{t('login.authFoot')}</p>
+          {stage !== 'create' && <p className="muted auth-foot">{t('login.authFoot')}</p>}
         </div>
       </div>
     </div>

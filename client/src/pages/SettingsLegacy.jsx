@@ -306,7 +306,7 @@ function SecuritySection({ toast }) {
           <span className="set-v" style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
             {user.email || <span className="muted">{t('settings.emailNotSet')}</span>}
             <button className="btn btn-quiet btn-sm" aria-label={t('settings.editEmail')}
-              onClick={() => { setEmail(user.email || ''); setEditEmail(true); }}>✎</button>
+              onClick={() => { setEmail(user.email || ''); setEditEmail(true); }}><Icon name="pen" size={15} /></button>
           </span>
         ) : (
           <span style={{ display: 'flex', gap: 8 }}>
@@ -510,7 +510,7 @@ export default function Settings() {
           <div className="card" ref={el => secRefs.current.profile = el}>
             <div className="spread">
               <h2>{t('settings.profileInfo')}</h2>
-              {!editing && <button className="btn btn-ghost btn-sm" onClick={() => setEditing(true)}>✎ {t('common.edit')}</button>}
+              {!editing && <button className="btn btn-ghost btn-sm" onClick={() => setEditing(true)}><Icon name="pen" size={15} />{t('common.edit')}</button>}
             </div>
             {!editing ? (
               <div style={{ marginTop: 8 }}>

@@ -195,7 +195,7 @@ export const flow = {
     const marked = (await page.locator('.eval-card').innerText()).replace(/\s+/g, ' ');
     const marks = (await page.locator('.eval-marks').innerText()).replace(/\s+/g, ' ').trim();
     await check('the handwritten answer is marked correct — every mark awarded',
-      /^(\d+(?:\.\d)?) \/ \1 marks \(100%\)/.test(marks), `marks read ${JSON.stringify(marks)}`);
+      /^(\d+(?:\.\d)?) \/ \1 marks\b/.test(marks), `marks read ${JSON.stringify(marks)}`);
     await check('and it is not told what was expected instead',
       !/Expected:/.test(marked), `evaluation reads ${JSON.stringify(marked.slice(0, 200))}`);
     await check('the ink is ticked on the page itself',

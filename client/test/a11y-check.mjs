@@ -743,7 +743,7 @@ async function run() {
       for (let attempt = 0; attempt < 2; attempt++) {
         if (await input.count()) await input.fill(`999${attempt}1`);
         else if (await mcq.count()) await mcq.click();
-        const submit = page.getByRole('button', { name: /Submit Answer/ });
+        const submit = page.getByRole('button', { name: /Submit answer/ });
         if (!(await submit.count())) break;
         await submit.click();
         await wait(page, 1200);
