@@ -61,6 +61,7 @@ import { featureEnabled } from '../platform/features.js';
 import { stageAttemptProgress } from '../platform/profileOutbox.js';
 import { requestTutorHelp } from './tutorBridge.js';
 import { tutorDisabledError, tutorFeatureEnabled } from '../tutor/flag.js';
+import { createTutorAskRoute } from '../tutor/askRoute.js';
 import { priNative } from '../platform/native/index.js';
 
 export const COURSES = {
@@ -3115,6 +3116,10 @@ const routes = {
       code: outcome?.error?.code || null
     };
   },
+  // The student's own question, between levels 1 and 3. Grounded and streamed
+  // here (client/src/tutor/askRoute.js); the panel never sees the solution.
+  'POST /practice/:id/tutor/ask': createTutorAskRoute({ requireProfile, get, assertPracticeRow, tutorRequest, tutorWork, displayAnswer, sanitizeText }),
+
 
   // A misconception the cloud working checker PROPOSED for a wrong answer the
   // on-device Step Check could not place. ADR-0001: the model proposes, the

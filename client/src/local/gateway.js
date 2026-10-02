@@ -208,6 +208,17 @@ const BODY_RULES = [
       optionalString(c, 'id', 40); optionalString(c, 'text', 700);
     }
   }],
+  // The student's own question for the tutor: bounded text and the recent
+  // exchange. The backend adds the verified solution; the UI never sends one.
+  [/^POST \/practice\/[A-Za-z0-9._-]+\/tutor\/ask$/, body => {
+    requireObject(body, 'tutor question'); optionalString(body, 'message', 1200); optionalString(body, 'locale', 5); optionalString(body, 'turnId', 40);
+    tutorWorkRule(body);
+    if (body.history !== undefined && (!Array.isArray(body.history) || body.history.length > 24)) throw apiError('history must be at most 24 turns.', 400, 'INVALID_FIELD');
+    for (const turn of body.history || []) {
+      if (!plainObject(turn)) throw apiError('history turns must be objects.', 400, 'INVALID_FIELD');
+      optionalString(turn, 'role', 10); optionalString(turn, 'text', 1200);
+    }
+  }],
   // A cloud-proposed misconception: the student's own working lines, the
   // proposed ontology ID and where the cloud check placed the break. The
   // backend re-decides it deterministically; this only bounds its shape.
