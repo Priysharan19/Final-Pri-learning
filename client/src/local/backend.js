@@ -13,6 +13,7 @@ import {
 } from './store.js';
 import { cleanTimezone, dayKey, defaultTimezone, timezoneOf, localeOf } from '../lib/locale.js';
 import { cleanLanguage } from '../i18n/languages.js';
+import { THEME_PREFS, cleanThemePref } from '../lib/theme.js';
 import {
   CURRICULUM, STREAM_CURRICULUM, PATHWAYS, streamSubtopics, SUBTOPIC_BY_ID, subtopicsForYear,
   scopeForYear, DIFF_LABELS, dotpointsFor, dotpointById, dotpointAt
@@ -741,7 +742,7 @@ async function publicUser(p, nowMs = Date.now()) {
   const tz = timezoneOf(p);
   const today = (await get('activity', `${p.id}:${dayKey(nowMs, tz)}`)) || { questions: 0, correct: 0, xp: 0 };
   return {
-    id: p.id, name: p.name, year: p.year, theme: p.theme === 'dark' ? 'dark' : 'light',
+    id: p.id, name: p.name, year: p.year, theme: cleanThemePref(p.theme),
     // The language the interface is drawn in. `locale` above is a different
     // thing and stays as it is: it decides how a date, a number and a price are
     // written for this student's region, and a Hindi-medium student in India
@@ -1832,7 +1833,7 @@ function packQuestion(cq) {
 const exportProfile = p => ({
   name: p.name, year: p.year, course: p.course || 'nsw', indiaTrack: p.indiaTrack || null, role: p.role || 'student',
   timezone: timezoneOf(p),
-  avatar: p.avatar || '🙂', theme: p.theme === 'dark' ? 'dark' : 'light', language: cleanLanguage(p.language),
+  avatar: p.avatar || '🙂', theme: cleanThemePref(p.theme), language: cleanLanguage(p.language),
   mathsGloss: p.mathsGloss === true, dailyGoal: p.dailyGoal || 10,
   xp: p.xp || 0, pathway: p.pathway ?? null, provider: p.provider || null,
   handwriting: p.handwriting !== false, isDemo: false,
@@ -1848,7 +1849,7 @@ function importProfile(src, id) {
     timezone: cleanTimezone(src.timezone) || defaultTimezone(COURSES[src.course] ? src.course : 'nsw'),
     role: src.role === 'teacher' ? 'teacher' : 'student',
     avatar: safeLabel(src.avatar, 4) || '🙂',
-    theme: src.theme === 'dark' ? 'dark' : 'light',
+    theme: cleanThemePref(src.theme),
     language: cleanLanguage(src.language),
     mathsGloss: src.mathsGloss === true,
     dailyGoal: safeInt(src.dailyGoal, 3, 60, 10),
@@ -2428,7 +2429,7 @@ const routes = {
     if (body.year !== undefined) p.year = Math.min(12, Math.max(7, Number(body.year) || p.year));
     if (body.pathway !== undefined && p.course === 'nsw') p.pathway = cleanPathway(body.pathway, p.year) || (p.year >= 11 ? 'advanced' : null);
     if (body.year !== undefined && body.pathway === undefined && p.course === 'nsw') p.pathway = cleanPathway(p.pathway, p.year) || (p.year >= 11 ? 'advanced' : null);
-    if (body.theme !== undefined && ['dark', 'light'].includes(body.theme)) p.theme = body.theme;
+    if (body.theme !== undefined && THEME_PREFS.includes(body.theme)) p.theme = body.theme;
     // Language is per profile, not per device: two siblings sharing one iPad
     // each get their own. An unrecognised id is cleaned to English rather than
     // rejected — a profile restored from a backup written by a build that had a

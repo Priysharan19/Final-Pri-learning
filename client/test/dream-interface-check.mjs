@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { HOME_RECOMMENDATION_POLICY, resolveHomeRecommendation } from '../src/home/recommendation.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -274,6 +274,49 @@ check('no effect shadows the translator it calls (the exam-timer crash)', () => 
   for (const [file, text] of [['ExamRoom.jsx', exam], ['QuestionCard.jsx', card], ['InkAnswer.jsx', ink], ['PracticeBase.jsx', practicePage], ['Home.jsx', home]]) {
     assert.doesNotMatch(text, /\bconst t = set(?:Timeout|Interval)\(/, `${file} declares a local \`t\` that is not the translator`);
   }
+});
+
+// ── Theme architecture ───────────────────────────────────────────────────────
+const themeLib = await import(pathToFileURL(join(ROOT, 'src/lib/theme.js')).href);
+const [indexHtml, themeBoot, themeCss, syncWorker] = await Promise.all(
+  ['index.html', 'public/theme-boot.js', 'src/theme.css', 'src/platform/syncWorker.js'].map(src)
+);
+
+check('a preference resolves to exactly light or dark; unknown values are paper', () => {
+  const dark = { matches: true }, light = { matches: false };
+  assert.equal(themeLib.resolveTheme('light', dark), 'light');
+  assert.equal(themeLib.resolveTheme('dark', light), 'dark');
+  assert.equal(themeLib.resolveTheme('system', dark), 'dark');
+  assert.equal(themeLib.resolveTheme('system', light), 'light');
+  assert.equal(themeLib.resolveTheme('system', null), 'light');
+  for (const junk of [undefined, null, '', 'blackboard', 'DARK', 7]) {
+    assert.equal(themeLib.cleanThemePref(junk), 'light');
+    assert.equal(themeLib.resolveTheme(junk, dark), 'light');
+  }
+});
+
+check('the theme is painted before the app loads, from a file a strict script policy allows', () => {
+  const boot = indexHtml.indexOf('<script src="/theme-boot.js"></script>');
+  assert.ok(boot > 0, 'index.html loads theme-boot.js');
+  assert.ok(boot < indexHtml.indexOf('type="module"'), 'theme-boot.js runs before the app bundle');
+  assert.doesNotMatch(indexHtml, /<script>(?!<)/, 'no inline script in index.html');
+  assert.match(themeBoot, new RegExp(`getItem\\('${themeLib.THEME_STORAGE_KEY}'\\)`));
+});
+
+check('browser chrome colour matches the desk of each theme', () => {
+  const page = block => (block.match(/--page:\s*(#[0-9a-f]{6})/i) || [])[1];
+  const lightPage = page(themeCss.slice(themeCss.indexOf(':root {')));
+  const darkPage = page(themeCss.slice(themeCss.indexOf('[data-theme="dark"] {')));
+  assert.equal(themeLib.THEME_CHROME.light, lightPage);
+  assert.equal(themeLib.THEME_CHROME.dark, darkPage);
+  assert.ok(themeBoot.includes(lightPage) && themeBoot.includes(darkPage), 'theme-boot.js paints the same two colours');
+});
+
+check('every layer that stores or syncs the preference accepts light, dark and system', () => {
+  assert.match(backend, /THEME_PREFS\.includes\(body\.theme\)/);
+  assert.doesNotMatch(backend, /theme === 'dark' \? 'dark' : 'light'/);
+  assert.match(syncWorker, /\['light', 'dark', 'system'\]\.includes\(row\.theme\) \? row\.theme : 'light'/);
+  assert.match(app, /return followSystemTheme\(pref, \(\) => applyTheme\(pref\)\)/);
 });
 
 console.log('');

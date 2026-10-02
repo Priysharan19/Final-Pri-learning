@@ -574,8 +574,11 @@ export default {
   'settings.cloudMarkingCopy': 'When an answer is wrong and Pri cannot tell you where, turn this on and your working is checked line by line. It says which line broke and what kind of mistake it was — and if you slipped once and then worked correctly from your own wrong number, it says that too, instead of marking you wrong five times for one mistake. Your question and your working are sent; the expected answer never is, and it will not tell you the answer. Your mark is decided on this device either way and does not change.',
 
   'settings.appearance': 'Appearance',
-  'settings.themeDark': 'Dark — blackboard',
-  'settings.themeLight': 'Light — paper',
+  'settings.themeDark': 'Night',
+  'settings.themeLight': 'Paper',
+  'settings.themeSystem': 'Match device',
+  'settings.themeNote': 'Paper is the default: dark ink on a light page is easiest to read for long sessions. Night is the same notebook with the lamp turned down.',
+  'settings.themeSystemNote': 'Pri follows this device: paper when the device is in light mode, night when it is in dark mode.',
 
   'settings.courses': 'Courses',
   'settings.enrolled': 'Enrolled',

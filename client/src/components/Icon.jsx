@@ -49,6 +49,7 @@ const PATHS = {
   offline: <><path d="M3 9a14 14 0 0 1 4.5-2.6M10.5 5.6A14 14 0 0 1 21 9" /><path d="M6.5 12.5a9 9 0 0 1 3-1.7M14 11a9 9 0 0 1 3.5 1.5" /><path d="M12 18v.1" /><path d="M3.5 3.5l17 17" /></>,
   sun: <><circle cx="12" cy="12" r="4" /><path d="M12 2.5v2M12 19.5v2M4.6 4.6l1.4 1.4M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4 6 18M18 6l1.4-1.4" /></>,
   moon: <><path d="M19.5 14.5A8 8 0 0 1 9.5 4.5a8 8 0 1 0 10 10Z" /></>,
+  device: <><rect x="3.5" y="5" width="17" height="11.5" rx="1.5" /><path d="M9 20h6M12 16.5V20" /></>,
   chevronDown: <><path d="m6 9 6 6 6-6" /></>,
   compare: <><rect x="3.5" y="4.5" width="7.5" height="15" rx="1" /><rect x="13" y="4.5" width="7.5" height="15" rx="1" /></>
 };

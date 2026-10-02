@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { api } from '../api.js';
 import { useApp } from '../App.jsx';
+import Icon from '../components/Icon.jsx';
 import { downloadJSON, readJSONFile, dateStamp } from '../lib/files.js';
 import Calibrate from '../ink/Calibrate.jsx';
 import { personalStats, clearPersonal, ensurePersonalLoaded } from '../ink/personal.js';
@@ -607,10 +608,13 @@ export default function Settings() {
           {/* ── Appearance ── */}
           <div className="card" ref={el => secRefs.current.appearance = el}>
             <h2 style={{ marginBottom: 12 }}>{t('settings.appearance')}</h2>
-            <div className="row">
-              <button className={`gen-opt ${user.theme !== 'light' ? 'on' : ''}`} aria-pressed={user.theme !== 'light'} style={{ width: 160 }} onClick={() => setTheme('dark')}>{t('settings.themeDark')}</button>
-              <button className={`gen-opt ${user.theme === 'light' ? 'on' : ''}`} aria-pressed={user.theme === 'light'} style={{ width: 160 }} onClick={() => setTheme('light')}>{t('settings.themeLight')}</button>
+            <div className="seg theme-seg" role="group" aria-label={t('settings.appearance')}>
+              {[['light', 'sun', 'settings.themeLight'], ['dark', 'moon', 'settings.themeDark'], ['system', 'device', 'settings.themeSystem']].map(([value, icon, label]) => (
+                <button key={value} type="button" className={user.theme === value ? 'on' : ''} aria-pressed={user.theme === value}
+                  onClick={() => setTheme(value)}><Icon name={icon} size={16} />{t(label)}</button>
+              ))}
             </div>
+            <p className="muted" style={{ marginTop: 10 }}>{t(user.theme === 'system' ? 'settings.themeSystemNote' : 'settings.themeNote')}</p>
           </div>
 
           {/* ── Courses ── */}

@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useEffect, useMemo, useState, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useState, useCallback, useRef, useSyncExternalStore } from 'react';
 import { Routes, Route, Link, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import { api } from './api.js';
+import { applyTheme, cleanThemePref, followSystemTheme, resolveTheme, storedThemePref } from './lib/theme.js';
 import { requestPersistentStorage } from './local/idb.js';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 import { setDraftProfile } from './components/drafts.js';
@@ -171,9 +172,14 @@ export default function App() {
     setDraftProfile(id);
   }, [user?.id]);
 
+  // The profile's preference is the authority once a profile is open. Before
+  // that (sign-in, onboarding) the screen keeps whatever theme-boot.js painted
+  // from the last preference used on this device.
   useEffect(() => {
-    document.documentElement.dataset.theme = user?.theme === 'dark' ? 'dark' : 'light';
-  }, [user?.theme]);
+    const pref = user ? cleanThemePref(user.theme) : (storedThemePref() || 'light');
+    applyTheme(pref);
+    return followSystemTheme(pref, () => applyTheme(pref));
+  }, [user?.id, user?.theme]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const pageTitle = useMemo(
     () => (TITLE_KEYS[loc.pathname] ? t(TITLE_KEYS[loc.pathname]) : loc.pathname.startsWith('/exams') ? t('nav.exam') : null),
@@ -581,19 +587,31 @@ function stripTex(s = '') {
   return s.replace(/\$[^$]*\$/g, m => m.slice(1, -1).replace(/\\[a-zA-Z]+/g, '').replace(/[{}^_]/g, '')).slice(0, 80);
 }
 
+/** The theme actually on screen for a preference; re-renders when the device flips. */
+function useResolvedTheme(pref) {
+  return useSyncExternalStore(
+    notify => followSystemTheme(pref, notify),
+    () => resolveTheme(pref),
+    () => (cleanThemePref(pref) === 'dark' ? 'dark' : 'light')
+  );
+}
+
 function ThemeToggle() {
   const { user, setUser } = useApp();
   const t = useT();
+  // What is on screen decides the direction, so a profile following the device
+  // still flips to the other paper in one press (and then stops following).
+  const shown = useResolvedTheme(user.theme);
   const flip = async () => {
-    const theme = user.theme === 'dark' ? 'light' : 'dark';
+    const theme = shown === 'dark' ? 'light' : 'dark';
     setUser({ ...user, theme });
     try { await api.patch('/me', { theme }); } catch { }
   };
   return (
     <button className="btn btn-quiet btn-sm" onClick={flip}
-      aria-label={user.theme === 'dark' ? t('app.themeToLight') : t('app.themeToDark')}
+      aria-label={shown === 'dark' ? t('app.themeToLight') : t('app.themeToDark')}
       style={{ minWidth: 44, minHeight: 44, padding: 0 }}>
-      <Icon name={user.theme === 'dark' ? 'sun' : 'moon'} size={17} />
+      <Icon name={shown === 'dark' ? 'sun' : 'moon'} size={17} />
     </button>
   );
 }
