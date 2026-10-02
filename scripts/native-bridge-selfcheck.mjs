@@ -104,7 +104,9 @@ const started = localStamp(new Date(Date.now() - 2000));
 launchApp(device, bundleId, ['--bridge-selfcheck']);
 
 let lines = [];
-for (let i = 0; i < 45; i++) {
+// A cold CI simulator can take minutes to start WebKit's processes on first launch.
+const polls = process.env.CI ? 120 : 45;
+for (let i = 0; i < polls; i++) {
   execSync('sleep 2');
   const log = run('xcrun', ['simctl', 'spawn', device, 'log', 'show', '--start', started,
     '--predicate', 'eventMessage CONTAINS "PRIBRIDGE"', '--style', 'compact']);
@@ -112,6 +114,15 @@ for (let i = 0; i < 45; i++) {
   const startAt = lines.lastIndexOf('PRIBRIDGE bridge self-check started');
   lines = startAt >= 0 ? lines.slice(startAt) : [];
   if (lines.some(l => l.startsWith('PRIBRIDGE summary'))) break;
+}
+// Without a summary, say why before tearing down: is the app alive, what did it
+// log, did it crash. Diagnostics only — they never change the verdict.
+if (!lines.some(l => l.startsWith('PRIBRIDGE summary'))) {
+  const show = (label, fn) => { try { console.log(`  [diag] ${label}:\n${fn().split('\n').slice(-60).map(l => `    ${l}`).join('\n')}`); } catch (e) { console.log(`  [diag] ${label}: ${String(e.message || e).split('\n')[0]}`); } };
+  show('app process', () => run('xcrun', ['simctl', 'spawn', device, 'launchctl', 'list']).split('\n').filter(l => l.includes(bundleId)).join('\n') || '(not running)');
+  show('app log', () => run('xcrun', ['simctl', 'spawn', device, 'log', 'show', '--start', started, '--style', 'compact',
+    '--predicate', `process CONTAINS "Pri" OR subsystem CONTAINS "${bundleId}" OR eventMessage CONTAINS "${bundleId}"`]));
+  show('crash reports', () => run('/bin/sh', ['-c', 'ls -t ~/Library/Logs/DiagnosticReports 2>/dev/null | grep -i pri | head -3 | while read f; do echo "== $f"; head -60 ~/Library/Logs/DiagnosticReports/"$f"; done']) || '(none)');
 }
 try { run('xcrun', ['simctl', 'terminate', device, bundleId]); } catch { /* already gone */ }
 for (const line of lines) console.log(`  ${line.replace(/^PRIBRIDGE\s*/, '')}`);
