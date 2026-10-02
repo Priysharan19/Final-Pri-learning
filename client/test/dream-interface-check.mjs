@@ -283,9 +283,11 @@ check('no effect shadows the translator it calls (the exam-timer crash)', () => 
 
 // ── Theme architecture ───────────────────────────────────────────────────────
 const themeLib = await import(pathToFileURL(join(ROOT, 'src/lib/theme.js')).href);
-const [indexHtml, themeBoot, themeCss, syncWorker] = await Promise.all(
-  ['index.html', 'public/theme-boot.js', 'src/theme.css', 'src/platform/syncWorker.js'].map(src)
+const [indexHtml, themeBoot, themeCssMain, workspaceCss, inkCss, syncWorker] = await Promise.all(
+  ['index.html', 'public/theme-boot.js', 'src/theme.css', 'src/workspace.css', 'src/ink/InkAnswer.css', 'src/platform/syncWorker.js'].map(src)
 );
+// Route-only styles load with their routes; the system is the three files in load order.
+const themeCss = themeCssMain + '\n' + workspaceCss + '\n' + inkCss;
 
 check('a preference resolves to exactly light or dark; unknown values are paper', () => {
   const dark = { matches: true }, light = { matches: false };
@@ -407,7 +409,9 @@ check('a symbol correction never outlives the strokes it was made on, and finger
 });
 
 check('no bar over scrolling content is blurred', () => {
-  assert.match(themeCss, /\.topbar, \.exam-head \{ background: var\(--page\); -webkit-backdrop-filter: none; backdrop-filter: none; \}/);
+  // The exam head's rule lives with the exam room's styles (workspace.css).
+  assert.match(themeCss, /\.topbar \{ background: var\(--page\); -webkit-backdrop-filter: none; backdrop-filter: none; \}/);
+  assert.match(themeCss, /\.exam-head \{ background: var\(--page\); -webkit-backdrop-filter: none; backdrop-filter: none; \}/);
   assert.match(themeCss, /\.mobilenav \{ background: var\(--page\); -webkit-backdrop-filter: none; backdrop-filter: none; \}/);
   for (const bar of ['ws-bar', 'ws-qpeek', 'ws-actions']) {
     const rule = themeCss.slice(themeCss.indexOf(`\n.${bar} {`), themeCss.indexOf('}', themeCss.indexOf(`\n.${bar} {`)));

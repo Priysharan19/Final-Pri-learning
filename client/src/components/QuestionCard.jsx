@@ -27,6 +27,7 @@ import { tLater, translate, useLanguage, useT, useTx } from '../i18n/index.js';
 import TermGloss from './TermGloss.jsx';
 import { useFormFactor } from '../platform/formFactor.js';
 import Icon from './Icon.jsx';
+import '../workspace.css';
 import { tutorFeatureEnabled } from '../tutor/flag.js';
 
 const DIFF_CLASS = { 1: 'tag-d1', 2: 'tag-d2', 3: 'tag-d3', 4: 'tag-d4' };

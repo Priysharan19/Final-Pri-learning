@@ -31,6 +31,7 @@ import ExamAnalysis from '../components/ExamAnalysis.jsx';
 import { compactStrokes, expandStrokes } from '../local/examSession.js';
 import { tLater, useT, useTx } from '../i18n/index.js';
 import Icon from '../components/Icon.jsx';
+import '../workspace.css';
 
 const SAVE_DEBOUNCE_MS = 600;
 const INK_POINTS_PER_SAVE = 9000;

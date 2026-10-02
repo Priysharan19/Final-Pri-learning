@@ -2,7 +2,11 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
-const theme = readFileSync(new URL('../src/theme.css', import.meta.url), 'utf8');
+// Route-only styles load with their routes (src/workspace.css, src/ink/InkAnswer.css);
+// the system is these files read together, in load order.
+const theme = readFileSync(new URL('../src/theme.css', import.meta.url), 'utf8')
+  + '\n' + readFileSync(new URL('../src/workspace.css', import.meta.url), 'utf8')
+  + '\n' + readFileSync(new URL('../src/ink/InkAnswer.css', import.meta.url), 'utf8');
 const app = readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8');
 
 const checks = [];
