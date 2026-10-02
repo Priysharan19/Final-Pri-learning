@@ -551,6 +551,9 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     setSaveState('saving');
     inkSaveTimer.current = setTimeout(() => {
       inkSaveTimer.current = null;
+      // A submission in flight or already marked has cleared the draft on
+      // purpose; its absence then is not a failed save.
+      if (inFlightRef.current || attemptRef.current) return;
       const at = draftSavedAt('ink', question.id);
       setSaveState(at && at >= asked ? 'saved' : 'failed');
     }, 700);
@@ -1221,7 +1224,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                   <input ref={photoInputRef} type="file" accept="image/*,application/pdf" style={{ display: 'none' }}
                     onChange={e => attachPhoto(e, setPhoto, decodePhoto, decodePdf, message => setPhotoOCR({ phase: 'failed', text: '', confidence: 0, engine: null, error: message }))} />
                   {!photo && photoOCR.phase === 'idle'
-                    ? <button className="btn btn-ghost" onClick={() => photoInputRef.current?.click()}>{t('verdict.photographWorking')}<span className="muted" style={{ display: 'block', fontSize: 11.5, marginTop: 2, fontWeight: 400 }}>{t('verdict.photoFormats', { pages: MAX_PDF_PAGES })}</span></button>
+                    ? <button className="btn btn-ghost" onClick={() => photoInputRef.current?.click()}>{t('verdict.photographWorking')}<span className="muted" style={{ display: 'block', fontSize: 12, marginTop: 2, fontWeight: 400 }}>{t('verdict.photoFormats', { pages: MAX_PDF_PAGES })}</span></button>
                     : (
                       <div className="photo-attach">
                         {/* A PDF sets no thumbnail until its pages render, and the whole
@@ -1497,7 +1500,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                             <Icon name={row.earned === row.outOf ? 'check' : 'correction'} size={14} />
                           </span>
                           {row.labelKey ? t(row.labelKey) : row.label}
-                          {row.why && <span className="muted" style={{ display: 'block', fontSize: 11.5, marginTop: 2, marginLeft: 20 }}>{row.whyKey ? t(row.whyKey, { unit: row.whyVars?.unit ?? '' }) : row.why}</span>}
+                          {row.why && <span className="muted" style={{ display: 'block', fontSize: 12, marginTop: 2, marginLeft: 20 }}>{row.whyKey ? t(row.whyKey, { unit: row.whyVars?.unit ?? '' }) : row.why}</span>}
                         </span>
                         <span className="set-v" style={{ fontVariantNumeric: 'tabular-nums' }}>
                           <span className="sr-only">{t('verdict.rowMarks', { earned: row.earned, total: row.outOf })} </span>{row.earned}/{row.outOf}
@@ -1508,7 +1511,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                       const line = marksSentenceKey(boardAward);
                       return line ? t(line.key, { awarded: line.vars.awarded, total: line.vars.total, count: line.vars.count, n: line.vars.n }) : null;
                     })()}</p>
-                    <p className="muted" style={{ fontSize: 11.5, marginTop: 6 }}>{t('verdict.boardStyleNote')}</p>
+                    <p className="muted" style={{ fontSize: 12, marginTop: 6 }}>{t('verdict.boardStyleNote')}</p>
                   </div>
                 )}
               </div>

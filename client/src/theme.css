@@ -1475,7 +1475,7 @@ h3 { font-size: 16.5px; line-height: 1.3; }
 
 .card-title, .sc-label, .label {
   font-family: var(--font);
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.08em;
   color: var(--ink-3);
@@ -1557,7 +1557,7 @@ h3 { font-size: 16.5px; line-height: 1.3; }
   opacity: 0;
   padding: 0 12px;
   color: var(--ink-3);
-  font-size: 10.5px;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -1854,7 +1854,7 @@ h3 { font-size: 16.5px; line-height: 1.3; }
 }
 .week-dot.hit { background: var(--ink); border-color: var(--ink); color: var(--surface); }
 .week-dot.today { box-shadow: 0 0 0 2px var(--surface), 0 0 0 3px var(--accent); }
-.week-lbl { font-size: 11px; color: var(--ink-3); }
+.week-lbl { font-size: 12px; color: var(--ink-3); }
 .goal-ring-track { stroke: var(--surface-3); }
 .goal-ring-fill { stroke: var(--accent); }
 .goal-ring-fill.done { stroke: var(--accent); }
@@ -2058,7 +2058,7 @@ h3 { font-size: 16.5px; line-height: 1.3; }
 .scratch-head { display: flex; align-items: center; gap: 10px; padding: 8px 10px 8px 14px; border-bottom: 1px dashed var(--hairline); }
 .scratch-title { font-weight: 600; font-size: 13.5px; }
 .scratch-tag {
-  font-size: 11.5px; font-weight: 600; letter-spacing: 0.04em; color: var(--ink-2);
+  font-size: 12px; font-weight: 600; letter-spacing: 0.04em; color: var(--ink-2);
   border: 1px solid var(--hairline-strong); border-radius: var(--radius-xs); padding: 1px 6px;
 }
 .scratch-note { color: var(--ink-3); font-size: 12.5px; }
@@ -2125,11 +2125,11 @@ html.theme-switching, html.theme-switching * {
 }
 .ink-page-break span {
   position: absolute; right: 10px; top: -10px; padding: 0 6px; background: var(--paper);
-  font-size: 11px; color: var(--ink-3); letter-spacing: 0.04em;
+  font-size: 12px; color: var(--ink-3); letter-spacing: 0.04em;
 }
 .ink-preview { border-top: 1px solid var(--hairline); padding: 10px 14px 12px; background: var(--surface); }
 .ink-preview-title {
-  font-size: 11.5px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-3);
+  font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-3);
   display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap;
 }
 .ink-preview-title .ink-status { text-transform: none; letter-spacing: 0; font-weight: 400; }
@@ -2140,7 +2140,7 @@ html.theme-switching, html.theme-switching * {
 .ink-sym.is-focus { outline: 2px dashed var(--uncertain); outline-offset: 2px; }
 .ink-pick { border-radius: var(--radius-sm); border-color: var(--uncertain-line); background: var(--uncertain-soft); }
 .ink-pick.tiny { border-color: var(--hairline); background: var(--surface); }
-.ink-dev { font-size: 11.5px; color: var(--ink-3); margin-top: 8px; }
+.ink-dev { font-size: 12px; color: var(--ink-3); margin-top: 8px; }
 .ink-cloud-offer { border: 1px dashed var(--uncertain-line); border-radius: var(--radius-sm); padding: 8px 10px; background: var(--uncertain-soft); }
 
 /* Feedback drawn on the student's own ink */
@@ -2353,7 +2353,7 @@ html.theme-switching, html.theme-switching * {
 .mnav-item { min-height: 50px; color: var(--ink-3); font-weight: 550; }
 .mnav-item.active { color: var(--ink); }
 .mnav-item.active .nav-ico { color: var(--accent); }
-.mnav-sheet-title { padding: 4px 10px 10px; color: var(--ink-3); font-size: 11.5px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
+.mnav-sheet-title { padding: 4px 10px 10px; color: var(--ink-3); font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
 .mnav-sheet-item.active { color: var(--ink); background: var(--surface-2); box-shadow: inset 2px 0 0 var(--accent); }
 
 .teacher-workspace-head { display: grid; gap: 6px; padding: 4px 2px 8px; }
@@ -2503,6 +2503,10 @@ html.theme-switching, html.theme-switching * {
   .nav-label, .nav-badge { opacity: 1; }
   .nav-section-label { max-height: 22px; opacity: 1; padding: 4px 12px 0; }
   .nav-hist { display: none; }
+}
+/* In a rail that is always open, a group name wraps instead of being cut off. */
+@media (pointer: coarse) and (min-width: 761px), (hover: none) and (min-width: 1024px) {
+  .nav-section-label, .sidebar:hover .nav-section-label { max-height: 40px; white-space: normal; line-height: 1.35; }
 }
 /* The answer surface shows focus as a ring on the whole sheet. */
 .editor-shell:focus-within { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-line); }

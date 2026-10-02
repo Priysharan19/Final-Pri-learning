@@ -60,6 +60,7 @@ export function applyTheme(pref) {
   }
   root.dataset.theme = resolved;
   root.dataset.themePref = clean;
+  root.style.colorScheme = resolved;
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', THEME_CHROME[resolved]);
   try { window.localStorage.setItem(THEME_STORAGE_KEY, clean); } catch { /* a display setting; safe to lose */ }
   return resolved;

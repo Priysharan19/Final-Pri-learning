@@ -16,6 +16,8 @@
   var root = document.documentElement;
   root.setAttribute('data-theme', dark ? 'dark' : 'light');
   root.setAttribute('data-theme-pref', pref);
+  // Native controls and the canvas follow before the stylesheet arrives.
+  root.style.colorScheme = dark ? 'dark' : 'light';
   var meta = document.querySelector('meta[name="theme-color"]');
   if (meta) meta.setAttribute('content', dark ? '#121210' : '#f2f0ea');
 })();

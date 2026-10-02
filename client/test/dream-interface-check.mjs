@@ -222,6 +222,8 @@ check('status only claims what the device actually knows', () => {
   assert.match(card, /saveDraft\('question', question\.id/);
   // Ink is reported saved only after the record is read back from the store.
   assert.match(card, /const at = draftSavedAt\('ink', question\.id\);\s*setSaveState\(at && at >= asked \? 'saved' : 'failed'\)/);
+  // …and a draft cleared by marking is never reported as a failed save.
+  assert.match(card, /if \(inFlightRef\.current \|\| attemptRef\.current\) return;\s*const at = draftSavedAt/);
   assert.match(card, /if \(!saveInkDraft\(question\.id, strokes, [^)]*\)\) \{ setSaveState\('failed'\); return; \}/);
 });
 
@@ -317,6 +319,76 @@ check('every layer that stores or syncs the preference accepts light, dark and s
   assert.doesNotMatch(backend, /theme === 'dark' \? 'dark' : 'light'/);
   assert.match(syncWorker, /\['light', 'dark', 'system'\]\.includes\(row\.theme\) \? row\.theme : 'light'/);
   assert.match(app, /return followSystemTheme\(pref, \(\) => applyTheme\(pref\)\)/);
+});
+
+// ── Contrast, measured from the tokens themselves ────────────────────────────
+const tokenBlock = (css, start) => css.slice(css.indexOf(start), css.indexOf('\n}', css.indexOf(start)));
+const hexToken = (block, name) => (block.match(new RegExp(`--${name}:\\s*(#[0-9a-fA-F]{6})`)) || [])[1];
+const luminance = hex => {
+  const [r, g, b] = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255)
+    .map(c => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+};
+const contrast = (a, b) => {
+  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  return (hi + 0.05) / (lo + 0.05);
+};
+const paperTokens = tokenBlock(themeCss, ':root {');
+const nightTokens = tokenBlock(themeCss, '[data-theme="dark"] {');
+const SURFACES = ['page', 'surface', 'surface-2', 'surface-raised', 'paper'];
+
+check('anything typed, written or picked in has an edge at 3:1 on every surface, in both themes', () => {
+  for (const [theme, block] of [['paper', paperTokens], ['night', nightTokens]]) {
+    const edge = hexToken(block, 'control-border');
+    assert.ok(edge, `${theme}: --control-border is a solid colour`);
+    for (const surface of SURFACES) {
+      const ratio = contrast(edge, hexToken(block, surface));
+      assert.ok(ratio >= 3, `${theme}: --control-border on --${surface} is ${ratio.toFixed(2)}:1`);
+    }
+  }
+  assert.match(themeCss, /\.input, select\.input, textarea\.input, \.answer-input, \.working-input \{[^}]*border: 1px solid var\(--control-border\)/);
+  assert.match(themeCss, /\.editor-shell \{[^}]*border: 1px solid var\(--control-border\)/);
+});
+
+check('every text and state colour reads at AA (4.5:1) on every surface, in both themes', () => {
+  for (const [theme, block] of [['paper', paperTokens], ['night', nightTokens]]) {
+    for (const token of ['ink', 'ink-2', 'ink-3', 'accent', 'correction', 'uncertain', 'good', 'bad', 'warn']) {
+      for (const surface of SURFACES) {
+        const ratio = contrast(hexToken(block, token), hexToken(block, surface));
+        assert.ok(ratio >= 4.5, `${theme}: --${token} on --${surface} is ${ratio.toFixed(2)}:1`);
+      }
+    }
+    assert.ok(contrast(hexToken(block, 'accent-ink'), hexToken(block, 'accent')) >= 4.5, `${theme}: primary button label`);
+  }
+});
+
+const [explainCss, explainJsx, progressJsx] = await Promise.all(
+  ['src/components/PriExplainInstrument.css', 'src/components/PriExplainV5.jsx', 'src/pages/IndiaProgress.jsx'].map(src)
+);
+
+check('the explanation player never case-transforms mathematics, and shows no engine version', () => {
+  // text-transform: uppercase on the question turned the variable x into X.
+  assert.match(explainCss, /\.pri-explain-question > span:not\(:first-child\) \{[^}]*text-transform: none/);
+  assert.match(explainCss, /\.pri-explain-question \{[^}]*text-transform: none/);
+  const imports = [...explainJsx.matchAll(/^import '\.\/(PriExplain\w+)\.css';$/gm)].map(m => m[1]);
+  assert.equal(imports.at(-1), 'PriExplainInstrument', 'the instrument layer is loaded last');
+  assert.doesNotMatch(en, /'explain\.kicker': '[^']*V\d/);
+  assert.match(explainJsx, /data-explain-engine="v8-adaptive"/);
+  assert.match(en, /'explain\.presentationOnly': 'This explanation cannot change your mark\./);
+});
+
+check('the reading line runs once, only on a page the engine marked, and not under reduced motion', () => {
+  assert.match(card, /data-marked=\{\(resolved && !res\?\.revealed\) \|\| \(state\.phase === 'retry' && !state\.res\?\.invalid\) \? 'yes' : undefined\}/);
+  assert.match(themeCss, /\.editor-shell\[data-marked="yes"\] \.ink-stage::after \{[^}]*animation: reading-sweep 640ms var\(--ease-standard\) 1;/);
+  assert.match(themeCss, /@media \(prefers-reduced-motion: reduce\) \{\s*\.editor-shell\[data-marked="yes"\] \.ink-stage::after \{ animation: none; display: none; \}/);
+});
+
+check('the result states the mark once and Progress shows whole marks, no percentile', () => {
+  const head = card.slice(card.indexOf('<span className="eval-marks">'), card.indexOf('</span>', card.indexOf('<span className="eval-marks">')));
+  assert.doesNotMatch(head, /%/);
+  assert.match(card, /boardAward\.rows\.length > 1 && <b/);
+  assert.match(progressJsx, /\+\{Math\.round\(unit\.atStake\)\}/);
+  assert.doesNotMatch(progressJsx, /className="card"[^>]*>\s*<div className="card-title"/);
 });
 
 console.log('');
