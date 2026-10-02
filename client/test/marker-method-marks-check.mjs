@@ -119,6 +119,46 @@ eq(methodMarks({ meta: linearMeta, working: 'qwerty\n???', marks: 3, prompt: lin
 ok(questionClaims(linearMeta, linearPrompt).length >= 1, 'questionClaims: the prompt equation is a claim');
 eq(questionClaims(null, 'Solve for $x$.').length, 0, 'questionClaims: a prompt with no relation states no claim');
 
+// ── 11. The per-line method-mark vector for a multi-line answer ──────────────
+{
+  const prompt = 'Solve $2x - 7 = -11$.';
+  const sumOf = r => r.lines.reduce((t, l) => t + l.mark, 0);
+  const perfect = methodMarks({ meta: linearMeta, working: '2x - 7 = -11\n2x = -4\nx = -2', marks: 3, prompt });
+  eq(perfect.lines.length, 3, 'vector: one entry per written line');
+  eq(perfect.lines.map(l => l.mark).join(','), '0,1,1', 'vector: the copied question earns nothing, each step earns one');
+  eq(perfect.lines[0].reason, 'restated', 'vector: the first line is marked as a restatement');
+  eq(sumOf(perfect), perfect.awarded, 'vector: marks sum to the award');
+
+  const repeated = methodMarks({ meta: linearMeta, working: '2x = -4\n2x = -4\nx = -2', marks: 4, prompt });
+  eq(repeated.lines.map(l => l.reason).join(','), 'progress,repeat,progress', 'vector: a repeated line earns nothing');
+  eq(sumOf(repeated), repeated.awarded, 'vector: repeats do not inflate the award');
+
+  const broken = methodMarks({ meta: linearMeta, working: '2x - 7 = -11\n2x = -18\nx = -9', marks: 3, prompt });
+  eq(broken.awarded, 0, 'vector: a break on the first step earns no method marks');
+  eq(broken.lines.map(l => l.mark).join(','), '0,0,0', 'vector: no line after a break is ticked');
+  eq(broken.lines[1].reason, 'break', 'vector: the broken line is named');
+
+  const capped = methodMarks({ meta: linearMeta, working: '2x = -4\nx = -4/2\nx = -2', marks: 2, prompt });
+  eq(capped.awarded, 1, 'vector: a two-mark question has one method mark');
+  eq(capped.lines.map(l => l.mark).join(','), '1,0,0', 'vector: lines beyond the method marks are not ticked');
+  eq(capped.lines.filter(l => l.reason === 'cap').length, 2, 'vector: lines beyond the cap say so');
+  eq(sumOf(capped), capped.awarded, 'vector: capped marks sum to the award');
+
+  const wrongEnd = methodMarks({ meta: linearMeta, working: '2x = -4\nx = -2\nx = 5', marks: 3, prompt });
+  eq(wrongEnd.lines[2].mark, 0, 'vector: a wrong final line is never ticked');
+  eq(sumOf(wrongEnd), wrongEnd.awarded, 'vector: sum matches with a wrong last line');
+}
+
+// ── 12. Companion suite: units, rounding and vectors (§10) ───────────────────
+{
+  const { execFileSync } = await import('node:child_process');
+  const { fileURLToPath } = await import('node:url');
+  let out = '';
+  try { out = execFileSync(process.execPath, [fileURLToPath(new URL('./marker-units-vectors-check.mjs', import.meta.url))], { encoding: 'utf8' }); }
+  catch (e) { out = String(e.stdout || e.message); }
+  ok(/UNITS, ROUNDING AND VECTORS: PASS/.test(out), `units/rounding/vectors suite: ${out.trim().split('\n').slice(0, 8).join(' | ')}`);
+}
+
 console.log(failures.length
   ? `METHOD MARKS: FAIL — ${failures.length} of ${pass + failures.length} checks failed\n  · ${failures.join('\n  · ')}`
   : `METHOD MARKS: PASS — ${pass}/${pass} checks — restatement is a copied line, not an equivalent one, and correct working earns its marks.`);

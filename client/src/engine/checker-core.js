@@ -13,6 +13,7 @@ import {
   parseMatrixInput, sameMatrix, transposeMatrix,
   parseVectorInput, sameVector
 } from './answer-forms.js';
+import { unitContradicts, withoutUnit } from './units.js';
 
 const UNIT_TAIL = /(cm³|m³|mm³|cm²|m²|mm²|km²|km\/h|m\/s|cm|mm|km|kg|ml|l\b|m\b|s\b|h\b|hours?|mins?|minutes?|seconds?|degrees?|deg|°|units?²?|sq units)\s*$/i;
 
@@ -204,6 +205,13 @@ export function checkAnswer(question, rawInput) {
       }
 
       case 'numeric': {
+        // A unit the student wrote that contradicts the question's unit is a
+        // wrong answer, never stripped and ignored: 12 cm is not 12 m.
+        if (question.answerSuffix && unitContradicts(question.answerSuffix, rawInput)) {
+          return { correct: false, feedback: `Check the unit — this question asks for the answer in ${String(question.answerSuffix).trim()}.` };
+        }
+        // the question's own unit in any spelling ("12 metres", "60 km/hr") is read off first
+        if (question.answerSuffix && typeof rawInput === 'string') rawInput = withoutUnit(rawInput);
         const { value, meta } = parseNumericInput(rawInput);
         let target = ans.value;
         let ok = numsClose(value, target, ans.tol);

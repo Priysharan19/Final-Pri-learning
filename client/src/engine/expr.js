@@ -565,9 +565,11 @@ const SAMPLE_SETS = [
 // The probe never reads e or π as a variable (e is Euler's number here even
 // though the tokenizer spells it as a one-letter name), and it reads a negative
 // base under an odd-denominator power as the real odd root, so x^(1/3) and
-// cbrt(x) share a domain. Residual limitation: a non-polynomial guard whose
-// only roots lie beyond |x| = 20 and are not whole numbers or sign changes on
-// the whole-number grid (a tangency far out) is not seen.
+// cbrt(x) share a domain. Beyond |x| = 20 the whole-number scan also refines
+// dips that touch zero (a far tangency such as cos(x/100) + 1 at 100π) and
+// ignores exact-zero plateaus from underflow (eˣ for x < −745). Residual
+// limitation: a far tangency of a guard that oscillates faster than the
+// whole-number grid can resolve, and every root past |x| = 1000, is not seen.
 
 // short local names: this section ships in the install bundle
 const fin = Number.isFinite, abs = Math.abs;
@@ -702,13 +704,29 @@ function polynomialOf(at) {
  */
 function gridRoots(at, lo, hi, N, skip) {
   const roots = [], xs = [], ys = [], cap = skip ? 16 : Infinity;
+  const h = (hi - lo) / N;
   for (let i = 0; i <= N; i++) { const x = lo + (i / N) * (hi - lo); xs.push(x); ys.push(at(x)); }
+  // An exact zero with an exact zero beside it is a plateau, not a root: e^x
+  // underflows to 0 for x < −745, which is not where ln(e^x) is undefined.
+  const zeroAt = x => at(x) === 0 && at(x - h) !== 0 && at(x + h) !== 0;
   // whole numbers and halves are where authored questions put their holes
-  if (!skip && hi - lo <= 200) for (let k = Math.ceil(lo * 2); k <= hi * 2; k++) if (at(k / 2) === 0) roots.push(k / 2);
+  if (!skip && hi - lo <= 200) for (let k = Math.ceil(lo * 2); k <= hi * 2; k++) if (zeroAt(k / 2)) roots.push(k / 2);
   for (let i = 0; i < N && roots.length < cap; i++) {
     const y0 = ys[i], y1 = ys[i + 1];
     if (!fin(y0) || !fin(y1) || (skip && xs[i] >= skip[0] && xs[i + 1] <= skip[1])) continue;
-    if (y0 === 0) { roots.push(xs[i]); continue; }
+    if (y0 === 0) { if (ys[i - 1] !== 0 && y1 !== 0) roots.push(xs[i]); continue; }
+    // far scan: a slowly varying guard that only touches zero between two
+    // grid points (cos(x/100) + 1 at x = 100π) shows as a dip whose parabola
+    // through the three samples bottoms out at zero; refine it and keep it
+    // only if |g| really vanishes there, relative to its neighbours
+    if (skip && i > 0 && fin(ys[i - 1]) && Math.sign(ys[i - 1]) === Math.sign(y0) && Math.sign(y1) === Math.sign(y0) &&
+        abs(y0) <= abs(ys[i - 1]) && abs(y0) <= abs(y1)) {
+      const c2 = (ys[i - 1] + y1 - 2 * y0) / 2, c1 = (y1 - ys[i - 1]) / 2, top = Math.max(abs(ys[i - 1]), abs(y1));
+      if (c2 > 0 === y0 > 0 && abs(y0 - c1 * c1 / (4 * c2)) <= 1e-3 * top) {
+        const m = ternaryMin(at, xs[i - 1], xs[i + 1]);
+        if (abs(at(m)) <= 1e-7 * top) { roots.push(m); continue; }
+      }
+    }
     const crosses = Math.sign(y0) !== Math.sign(y1) && y1 !== 0;
     if (crosses) {
       let a = xs[i], b = xs[i + 1];
@@ -723,7 +741,7 @@ function gridRoots(at, lo, hi, N, skip) {
       if (abs(at(m)) <= 1e-7) roots.push(m);
     }
   }
-  if (ys[N] === 0) roots.push(xs[N]);
+  if (ys[N] === 0 && ys[N - 1] !== 0) roots.push(xs[N]);
   return roots;
 }
 
@@ -840,6 +858,9 @@ function exprEquivalentUncached(a, b, opts) {
 
   const finalAnswer = Boolean(opts.strictDomain || opts.isolatedDomain);
   const vars = new Set([...variablesOf(astA), ...variablesOf(astB)]);
+  // e is Euler's number, never a sampled variable: sampling it made ln(eˣ)
+  // vs x (and even ln(e⁵) vs 5) disagree, a false negative on a correct answer
+  vars.delete('e');
   const names = [...vars];
   const integers = new Set([...integerVarsOf(astA), ...integerVarsOf(astB)]);
   const domain = opts.domain || [-3.5, 3.5];
