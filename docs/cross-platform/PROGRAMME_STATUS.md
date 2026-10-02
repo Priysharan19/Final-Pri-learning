@@ -21,7 +21,9 @@ This is the durable ledger for CP-02 → CP-12 and SEC-COMM-01. Each CP's own PR
 | CP-02 Platform Bridge Foundation | SOFTWARE IMPLEMENTATION: COMPLETE | `fa1c44df` | `f089d550` | [#253](https://github.com/Priysharan19/Final-Pri-learning/pull/253) | `2261f03b` | DEFERRED |
 | CP-03 Responsive Product Foundation | SOFTWARE IMPLEMENTATION: COMPLETE | `2261f03b` | `6b9235a0` | [#261](https://github.com/Priysharan19/Final-Pri-learning/pull/261) | `003cc053` | DEFERRED |
 | CP-04 iPhone Product | SOFTWARE IMPLEMENTATION: COMPLETE | `003cc053` | `09d868b6` | [#266](https://github.com/Priysharan19/Final-Pri-learning/pull/266) | `3ed4f9c4` | DEFERRED |
-| CP-05 iPhone Automated Certification | SOFTWARE IMPLEMENTATION: COMPLETE once merged | `3ed4f9c4` | recorded by the next CP | this PR | recorded by the next CP | DEFERRED |
+| CP-05 iPhone Automated Certification | SOFTWARE IMPLEMENTATION: COMPLETE | `3ed4f9c4` | `1820d32c` | [#273](https://github.com/Priysharan19/Final-Pri-learning/pull/273) | `247f12c2` | DEFERRED |
+| CP-06 Android Shell | SOFTWARE IMPLEMENTATION: COMPLETE | `247f12c2` | `353e3c2c` | [#275](https://github.com/Priysharan19/Final-Pri-learning/pull/275) | `a77f7369` | DEFERRED |
+| CP-07 Android Native Bridges | SOFTWARE IMPLEMENTATION: COMPLETE once merged | `a77f7369` | recorded by the next CP | this PR | recorded by the next CP | DEFERRED |
 
 ## CP-02 — Platform Bridge Foundation
 
@@ -201,3 +203,89 @@ This is the durable ledger for CP-02 → CP-12 and SEC-COMM-01. Each CP's own PR
 - Live ink placement at large text sizes.
 
 **Deferred (physical):** small, standard and large iPhones; finger writing feel; camera; keyboard; VoiceOver; Dynamic Type on hardware; StoreKit sandbox; process death under real memory pressure; launch performance.
+
+**CP-05 exact-head evidence (recorded by CP-06):**
+- Candidate `1820d32c`, after merging `main` (#262 observability and others). The account-state strings were moved into i18n (en + hi) during that merge.
+- Local: `npm test` exit 0 on the merged tree.
+- GitHub CI on `1820d32c`: all four required checks pass, with 19 checks passing in total.
+- Merged as `247f12c2` with `--match-head-commit`. The merge automation waits only for the required checks, so it merged while **Swift build, native benchmark and bridge smoke test** (macOS simulator, not required) was still running. Its result is recorded by CP-07. If it fails, it is fixed in a follow-up and not waived.
+
+
+## CP-06 — Android Shell
+
+**Delivered:** `android/`, a Kotlin shell around one WebView serving the **same** shared web build. [ANDROID_ARCHITECTURE.md](ANDROID_ARCHITECTURE.md) is the authority.
+- **Stable origin:** `https://appassets.androidplatform.net` through `WebViewAssetLoader` (HTTP disabled), with an SPA fallback and local 404s. `/v1/*` never maps to the SPA. Any other form of the bundled host (another port, userinfo, http) is answered locally, never by the network.
+- **Hardened WebView:** no file/content access, no mixed content, Safe Browsing, no multiple windows, no geolocation, debugging only in DEBUG, algorithmic darkening off. Fails closed below Chromium 91, or without `WEB_MESSAGE_LISTENER` / `DOCUMENT_START_SCRIPT`.
+- **Bridge:** `priBridge` is an origin-scoped `addWebMessageListener` with a main-frame check, never `addJavascriptInterface`. The deep-frozen, non-configurable `__PRI_HOST__` is installed at document start for the bundled origin only. It carries capabilities, never OS identity.
+- **Navigation:** only the exact bundled origin loads in-app. http(s)/mailto leave the app only for a main-frame navigation the person started; everything else is blocked.
+- **Back:** the page declares whether it wants Back: a visible sheet/dialog, or in-app history (`history.state.idx > 0`). The callback is enabled exactly then; otherwise the system default runs (predictive back-to-home). A press that finds a dialog open never also navigates. The role landing (`/`, `/teach`) is the first entry, so Back there leaves the app.
+- **Lifecycle and layout:** edge-to-edge letterbox insets with light bar icons. Rotation, fold and multi-window are handled without recreation. Lifecycle events go to the page.
+- **Renderer crashes:** recovery destroys the dead WebView, is rate-limited, and shows a native screen after repeated crashes.
+- **Dialogs and release identity:** `alert`/`confirm` get real native dialogs. The bundled release identity is exposed.
+- **Build:** Gradle 9.3.1 (pinned SHA-256), AGP 8.12.3, Kotlin 2.1.20, webkit 1.17.1, JDK 17. Release builds require `-Ppri.versionCode`. `pri.cloudOrigin` is validated at build time. `verifyPriWeb` cannot be skipped as NO-SOURCE.
+- **Embedded web:** `scripts/sync-android.mjs --check` proves the embedded web is exactly `client/dist`.
+
+**Evidence (S0/S2, synthetic):**
+- JVM: `ShellLogicTest` 10/10 (origin, SPA mapping, traversal, navigation policy incl. port/userinfo/gesture, WebView floor, envelope, descriptor).
+- Instrumented journey (`android/scripts/run-instrumented.sh`), with a **real process death** (`am force-stop`) between two runs. Covered:
+  - boot and handshake;
+  - onboarding into a local profile;
+  - SPA routing and history Back;
+  - Back closing the More sheet before navigating;
+  - rotation keeping a typed answer;
+  - blocked schemes;
+  - a tapped external link leaving the app while a scripted redirect launches nothing;
+  - Back on the landing entry leaving the app;
+  - after process death, the profile (IndexedDB) and localStorage survived.
+- Local: passed on the API 36 phone emulator (2026-10-02).
+- CI matrix (`android-shell.yml`): API 26 asserts the fail-closed floor screen (its factory WebView is below Chromium 91). API 33 and API 36 phone, and API 36 tablet, run the product journey.
+- Independent review requested changes; all were applied: the Back trap at `/teach`; the double action on a stubborn dialog; the skippable web check; API 26 evidence that overstated what it proved; process death not proven; renderer-crash loop; reset race; system Back; bar icons; navigation-policy gaps; observer cost.
+
+**Deferred (physical):** a low-end phone boot smoke test, real Back gestures and predictive animation, OEM WebView variants, and foldable posture changes.
+
+**CP-05 Swift job result (recorded by CP-07):** on CP-05's head, **Swift build, native benchmark and bridge smoke test** failed at the **iPhone** bridge self-check. The message was "0/8 on iPhone 16 Pro; no summary logged", the same signature as on CP-04's push run.
+- The iPad bridge self-check in the same job passed.
+- The iPhone self-check passes 8/8 locally (iPhone 18 Pro, iOS 27.0), but has **not yet passed on the CI runner's iPhone simulator**, so the iPhone CI lane has no green run yet. The iPhone journey steps after it did not run.
+- This is now treated as a real defect, not infrastructure. Branch `fix/cp-05-iphone-ci-selfcheck` adds a cold-simulator wait and failure diagnostics (process state, app log, crash report) to find the cause. The fix lands as its own PR.
+- No iPhone CI evidence is claimed until that lane is green.
+
+**CP-06 exact-head evidence (recorded by CP-07):**
+- Candidate `353e3c2c`. All four required checks pass.
+- **Android Shell** workflow (not required) on that head:
+  - Gradle build, lint, unit tests and web parity: ✅
+  - API 26 floor screen: ✅
+  - API 36 phone product journey: ✅
+  - API 36 tablet product journey: ✅
+  - **API 33 phone: ❌, infrastructure.** The emulator never accepted adb (`could not connect to TCP port 5554`). Re-run once under the infrastructure allowance; the result is recorded by CP-08.
+- Merged as `a77f7369` with `--match-head-commit`.
+
+
+## CP-07 — Android Native Bridges
+
+**Delivered** ([ANDROID_ARCHITECTURE.md](ANDROID_ARCHITECTURE.md) §5):
+- **Server:** `nativeNonBrowserRequest` accepts the closed exact-match set `{ios-native-v1, android-native-v1}` under the unchanged rule: no `Origin`, no `Sec-Fetch-Site/Mode`. CSRF is still required. Near-miss identities are browsers.
+- **Cloud transport:** `android/…/cloud/NativeCloud.kt` on `HttpURLConnection`. One build-time-validated HTTPS origin; the path rule is identical to `cloudTransport.js`; redirects are never followed; 1 MB / 2 MB caps; 32 in flight; cancellation; everything in flight is dropped on a new document.
+  - **Headers:** `X-Pri-Client: android-native-v1` and the CSRF token copied from the jar, never `Origin`.
+- **Session:** the cookie jar (`CookieJar.kt`: host-only, Secure only over HTTPS, strict cookie values, logout deletion) is persisted by `SecureStore.kt`: AES-256-GCM, Android Keystore, no-backup storage, process-wide lock, ordered writes. Transient Keystore errors keep the file.
+- **Disconnect:** forgets the native session even offline (`cloud.forgetSession`, Android and iOS).
+- **File exchange** (`io/FileExchange.kt`):
+  - share sheet via FileProvider, one folder per share, byte-capped names, written off the UI thread;
+  - `PrintManager` print (the Print / Save PDF buttons now use `printPage()`, because `window.print()` does nothing in a WebView);
+  - system document picker plus a camera offer with explicit per-camera URI grants, always answering the callback.
+- **Dialogs:** `alert`/`confirm` are real native dialogs.
+
+**Evidence (S0/S2, synthetic):**
+- JVM: 19 tests, including the transport against a local socket server (exact headers, CSRF copy, no redirects, caps, cancellation) and logout racing a refresh with disk and memory always equal.
+- Instrumented, on the emulator against the **real Pri server** (fixture harness, throwaway database):
+  - sign-in through the Settings UI, then Sync now;
+  - the session is only in the encrypted jar (not plaintext on disk);
+  - after `am force-stop` it is still valid on the server;
+  - Disconnect revokes it, and the old cookie gets 401 from the server.
+- `FileExchangeTest`:
+  - an export reaches the share sheet as a FileProvider URI holding the bytes;
+  - JSON and image inputs ask the picker for the right types;
+  - each camera app holds a write grant to exactly the capture URI;
+  - print opens.
+- Independent review approved. All five findings (jar persistence race, Keystore transient handling, camera grants, offline disconnect, vacuous assertions) and the low items are applied.
+
+**Deferred (physical):** a real camera capture, real share targets, a printer, a captive-portal network.
