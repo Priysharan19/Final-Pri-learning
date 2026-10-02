@@ -203,11 +203,16 @@ class ShellJourneyTest {
                 waitFor(s, "!document.querySelector('.mnav-sheet') && location.pathname === '/practice'")
             }
             pressBack()
-            waitFor(s, "location.pathname === '/'")
+            // The router must have rendered Home, not just the URL changed: a Link
+            // tapped while React still shows the old page is treated as a same-page
+            // REPLACE, which would overwrite the Home entry (Back would then leave the app).
+            waitFor(s, "location.pathname === '/' && !!document.querySelector('.home-greet') && !document.querySelector('.q-prompt')")
 
             Log.i("PRITEST", "rotation keeps an in-progress typed answer (no recreation)")
             click(s, "[].slice.call(document.querySelectorAll('a[href=\"/practice\"]')).find(function(a){return a.offsetParent;})")
             waitFor(s, "document.querySelector('.q-prompt')")
+            assertEquals("Practice is its own history entry after Home (Back returns Home)", "true",
+                eval(s, "!!history.state && history.state.idx > 0"))
             var typed = false
             for (i in 0 until 12) {
                 eval(s, "(function(){var t=($byLabel)('Answer by typing');if(t)t.click();return true;})()")
@@ -258,7 +263,10 @@ class ShellJourneyTest {
             Thread.sleep(400)
             awaitBackWanted(s, true)
             pressBack()
-            waitFor(s, "location.pathname === '/'")
+            // The router must have rendered Home, not just the URL changed: a Link
+            // tapped while React still shows the old page is treated as a same-page
+            // REPLACE, which would overwrite the Home entry (Back would then leave the app).
+            waitFor(s, "location.pathname === '/' && !!document.querySelector('.home-greet') && !document.querySelector('.q-prompt')")
 
             Log.i("PRITEST", "schemes outside the policy never navigate the app away")
             eval(s, "(function(){var a=document.createElement('a');a.href='intent://evil#Intent;end';document.body.appendChild(a);a.click();return true;})()")
