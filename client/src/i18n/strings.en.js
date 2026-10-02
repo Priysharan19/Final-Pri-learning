@@ -664,8 +664,8 @@ export default {
   'settings.reallyDelete': 'Really delete “{name}” and all its data',
 
   'settings.helpSafety': 'Help & Safety',
-  'settings.helpBodyIndia': 'Every chapter tracks a skill rating that moves with each answer — harder questions move it more. Smart Practice targets ~70% success and weaves in spaced reviews before topics fade. The mark estimate covers only the parts of the paper you have practised, and it never converts that into a CBSE percentage, a JEE percentile or a rank — none of those can be honestly derived from practice at home. Handwritten answers are recognised on this device — strokes → symbols → maths — then marked by the same engine as typed answers, line by line. Hints and retries still earn credit, just a little less.',
-  'settings.helpBody': 'Every subtopic tracks a skill rating that moves with each answer — harder questions move it more. Smart Practice targets ~70% success, weaves in spaced reviews before topics fade, and the mark predictor weighs mastery across the syllabus by exam weight. Handwritten answers are recognised entirely on-device — strokes → symbols → maths — then marked by the same engine as typed answers, line by line. Hints and retries still earn credit, just a little less.',
+  'settings.helpBodyIndia': 'Every chapter tracks a skill rating that moves with each answer — harder questions move it more. Smart Practice targets ~70% success and weaves in spaced reviews before topics fade. The mark estimate covers only the parts of the paper you have practised, and it never converts that into a CBSE percentage, a JEE percentile or a rank — none of those can be honestly derived from practice at home. Handwritten answers are read by Pri’s server reader when you are online, then marked by the same engine as typed answers, line by line. Hints and retries still earn credit, just a little less.',
+  'settings.helpBody': 'Every subtopic tracks a skill rating that moves with each answer — harder questions move it more. Smart Practice targets ~70% success, weaves in spaced reviews before topics fade, and the mark predictor weighs mastery across the syllabus by exam weight. Handwritten answers are read by Pri’s server reader when you are online, then marked by the same engine as typed answers, line by line. Hints and retries still earn credit, just a little less.',
   'settings.addToHomeScreen': ' For a full-screen app: use your browser’s “Add to Home Screen”.',
 
   // ── Sign-in and onboarding ─────────────────────────────────────────────────
@@ -674,7 +674,7 @@ export default {
   // buttons are load-bearing.
   'login.heroTitle': 'Write it by hand.{br}Get every step {marked}.',
   'login.heroMarked': 'marked',
-  'login.heroSub': 'Maths for NCERT Classes 7–12, JEE Main & Advanced and olympiad — questions generated on your device, your working marked line by line, with worked solutions. Works offline.',
+  'login.heroSub': 'Maths for NCERT Classes 7–12, JEE Main & Advanced and olympiad — questions generated on your device, your working marked line by line, with worked solutions. Typed practice works offline; handwriting needs a connection.',
   'login.getStarted': 'Get Started',
   'login.heroPrivacy': 'Offline-first and private: profiles, progress and handwriting are stored on this device. A Pri cloud account is optional, and handwriting is read on a server only if you switch that on. No ads.',
   'login.cloudSignIn': 'Sign in to your Pri cloud account',
@@ -1755,7 +1755,6 @@ export default {
   'cloud.priceAnnual': '{price}/year',
   'cloud.priceBoth': '{monthly}/month or {annual}/year',
   'cloud.pricingOffline': 'Storefront pricing is not available while the cloud service is offline.',
-  'cloud.pricingUnset': 'Public pricing has not been configured for this deployment yet. Store/provider pricing remains authoritative.',
   'cloud.pricingSummary': '{prices}. Display pricing is advisory; checkout/storefront pricing and server entitlements remain authoritative.',
   'cloud.pricingSummaryTrial': '{prices} with a {days}-day trial when eligible. Display pricing is advisory; checkout/storefront pricing and server entitlements remain authoritative.',
   'cloud.storefrontMissing': 'The configured Pri Learning subscription is not available in this App Store storefront.',
@@ -2140,6 +2139,7 @@ export default {
   'settings.pathwayExt2Desc': 'Year 12 only — proof, complex numbers, mechanics',
   'ink.mistakeHere': "Look here",
   'ink.serverReading': 'Reading your handwriting…',
+  'ink.serverStillReading': 'Still reading your handwriting — this can take a little longer. Keep going; nothing is lost.',
   'ink.serverEmpty': 'Nothing readable yet — keep writing, one step per line.',
   'ink.waitingTurnedOff': 'Handwriting is read by Pri’s server, and that is turned off in Settings → Handwriting. Turn it on to have this read, or type your answer.',
   'ink.waitingNotOnThisInstall': 'This version of Pri can’t read handwriting. Your working is kept here; type your answer to have it marked.',
@@ -2148,6 +2148,7 @@ export default {
   'ink.waitingGuardian': 'A parent or guardian needs to confirm your account before handwriting can be read. Your working is saved — type your answer for now.',
   'ink.waitingVerifyEmail': 'Verify your email address to have handwriting read. Your working is saved; it will be read once you have — or type your answer now.',
   'ink.waitingServiceDown': 'Pri’s handwriting reader isn’t answering right now. Your working is saved and will be tried again shortly — or type your answer now.',
+  'verdict.inkReadByServerPending': 'Handwriting is read by Pri’s server',
   'verdict.photoReadingTurnedOff': 'Reading photos on the server is turned off in Settings → Handwriting. Turn it back on to read photos, or type your answer.',
   'verdict.photoReadingNotOnThisInstall': 'This version of Pri can’t read photos of working. Type your answer instead.',
   'verdict.photoReadingOffline': 'You’re offline, so this photo can’t be read right now. Type your answer, or attach it again when you’re back online.',

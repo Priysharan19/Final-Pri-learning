@@ -47,6 +47,8 @@ const inkDiagnosticsVisible = () => {
 };
 /** How long the page must be still before it is worth sending. */
 const SETTLE_MS = 1100;
+// How long a server read runs before the note changes to "still reading".
+export const STILL_READING_MS = 5000;
 /** A reader that did not answer is tried again on its own, a few times. */
 // A focus or a return to the tab also tries again at once (see below).
 
@@ -283,6 +285,16 @@ export default function InkAnswer({ onRecognized, onStrokes = null, initialStrok
     abortRef.current?.abort?.();
   }, []);
 
+  // A server read can take a while. Past STILL_READING_MS the note says so
+  // calmly instead of looking stuck; nothing about the read itself changes.
+  const [slowRead, setSlowRead] = useState(false);
+  useEffect(() => {
+    setSlowRead(false);
+    if (status?.kind !== 'reading') return undefined;
+    const timer = setTimeout(() => setSlowRead(true), STILL_READING_MS);
+    return () => clearTimeout(timer);
+  }, [status]);
+
   useEffect(() => {
     if (!cleared) return;
     const gone = setTimeout(() => setCleared(null), 6000);
@@ -309,7 +321,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, initialStrok
   // i18n-exempt-end
   const shownEngineNote = diagnostics ? engineNote : (rec.cloud === true ? t('verdict.readOnServer') : null);
   const statusLine = status?.kind === 'reading'
-    ? t('ink.serverReading')
+    ? t(slowRead ? 'ink.serverStillReading' : 'ink.serverReading')
     : status?.kind === 'empty'
       ? t('ink.serverEmpty')
       : status?.kind === 'allowance'

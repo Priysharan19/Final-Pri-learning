@@ -174,7 +174,7 @@ export function ensureBuild(build) {
   // and tour-placement.js asserts that state when it meets such a build.
   const run = spawnSync('npm', ['run', 'build', '--prefix', 'client'], {
     cwd: ROOT, encoding: 'utf8', shell: process.platform === 'win32',
-    env: { ...process.env, PRI_FEATURE_PLACEMENT: '1' }
+    env: { ...process.env, PRI_FEATURE_PLACEMENT: '1', PRI_FEATURE_AUSTRALIA: '1' }
   });
   if (run.status !== 0) {
     const tail = `${run.stdout || ''}${run.stderr || ''}`.trim().split('\n').slice(-12).join('\n      ');

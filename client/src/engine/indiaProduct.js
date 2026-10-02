@@ -13,7 +13,7 @@ import {
   coversForDotpoint
 } from './curriculum-in.js';
 import { attachIndiaProductionStatus, indiaProductionStatus } from './indiaProductionMeta.js';
-import { hasJeePyqGenerator } from './generators/jee-pyq-runtime.js';
+import { hasJeePyqGenerator, hasJeePyqDifficulty } from './generators/jee-pyq-runtime.js';
 import { hasPyqGenerator, pyqCoverageOf, pyqGeneratorId } from './pyq/pyqCoverage.js';
 
 export const INDIA_COURSE = 'in';
@@ -246,7 +246,7 @@ export function resolveIndiaTarget(chapter, {
 
   if (ordinal == null && (track.id === 'jee-main' || track.id === 'jee-advanced')) {
     const pyqGenerator = `${track.id}-${chapter.id}`;
-    if (hasJeePyqGenerator(pyqGenerator)) {
+    if (hasJeePyqGenerator(pyqGenerator) && hasJeePyqDifficulty(pyqGenerator, want)) {
       return { generator: pyqGenerator, difficulty: want, dotpointIndex: null, pyq: true, pyqArchive: 'jee-question-department', windowed: true };
     }
   }

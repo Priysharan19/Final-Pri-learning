@@ -2035,6 +2035,13 @@ html.theme-switching, html.theme-switching * {
   .set-menu { position: static; background: var(--surface); }
 }
 
+/* Practice: the fixed context pill must never sit on the last control of the
+   page (the reading panel, Submit) at any width, iPad included. */
+.content:has(.ctx-pill) { padding-bottom: calc(120px + var(--pri-inset-bottom, 0px)); }
+/* Pri Explain's launcher floats above the pill (bottom 112px); the page gets
+   room to scroll the canvas and the reading panel clear of both. */
+.content:has(.pri-explain-launch) { padding-bottom: calc(200px + var(--pri-inset-bottom, 0px)); }
+
 /* Practice: the context pill (Next) sits above the bottom bar on a phone, so
    the page needs room beneath its last control, and Pri Explain's launcher is
    lifted clear of the pill instead of landing on Next. */

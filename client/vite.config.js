@@ -233,6 +233,14 @@ export const ON_DEMAND = [
   // not been downloaded yet; practice, which needs none of it, is unaffected.
   [/(^|\/)(Placement|placement|prerequisites|prerequisiteSkillsHi)-[^/]*\.js$/, 'placement check'],
 
+  // Reviewed JEE past-paper shards (tools/jee-question-department/pack.py).
+  // Only a JEE student opening a chapter that has reviewed past papers ever
+  // asks for one, and only for that chapter's part; generators/index.js reaches
+  // them by import() from jee-pyq-runtime.js. Exactly the placement argument:
+  // fetched on first open, kept by the runtime rule, and a first open with no
+  // connection is reported as a chapter not yet downloaded.
+  [/(^|\/)jee-pyq-[a-z-]+-\d\d-[^/]*\.js$/, 'reviewed JEE past-paper shard'],
+
   // Chapter notes: the Notes page and one chunk of original revision notes per
   // class (notes/notesIndex.js), about 60 kB each. They are reached only by
   // import() when a student opens Notes, so a student who never does pays
@@ -348,13 +356,17 @@ function releaseIdentityManifest(identity) {
 // Build-time feature flags (client/src/platform/features.js). A production
 // build is OFF unless its environment says PRI_FEATURE_<NAME>=1; development
 // (`vite` serve) is ON. Test harnesses that build set the variable themselves.
-export const FEATURE_FLAGS = Object.freeze(['PLACEMENT', 'TUTOR']);
+export const FEATURE_FLAGS = Object.freeze(['PLACEMENT', 'TUTOR', 'AUSTRALIA']);
 export function featureStates(command, env = process.env) {
   const on = name => (command === 'build' ? env[`PRI_FEATURE_${name}`] === '1' : env[`PRI_FEATURE_${name}`] !== '0');
   return Object.fromEntries(FEATURE_FLAGS.map(name => [name.toLowerCase(), on(name)]));
 }
 export function featureDefines(command, env = process.env) {
-  return { __PRI_FEATURE_PLACEMENT__: JSON.stringify(featureStates(command, env).placement) };
+  const states = featureStates(command, env);
+  return {
+    __PRI_FEATURE_PLACEMENT__: JSON.stringify(states.placement),
+    __PRI_FEATURE_AUSTRALIA__: JSON.stringify(states.australia)
+  };
 }
 
 // The flags a build was made with, written beside it as features.json so the
