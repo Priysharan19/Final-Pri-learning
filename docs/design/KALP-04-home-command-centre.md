@@ -31,7 +31,7 @@ Higher number wins. Same-priority ties use real due date first, then stable kind
 
 | Priority | Action |
 | ---: | --- |
-| 100 | active unfinished exam |
+| 100 | unfinished exam still inside its deadline |
 | 96 | teacher assignment returned for revision |
 | 95 | started teacher assignment due within 48h / overdue |
 | 94 | teacher assignment due within 24h / overdue |
@@ -41,6 +41,7 @@ Higher number wins. Same-priority ties use real due date first, then stable kind
 | 88 | local class task due within 48h |
 | 86 | personal task due within 48h |
 | 84 / 83 | exact unfinished task / ordinary Practice resume |
+| 81 | unfinished exam whose deadline has passed (within 14 days): "See result" |
 | 80 | due reviews |
 | 76 | teacher assignment due within seven days |
 | 75 | local class task |
@@ -54,7 +55,10 @@ Important semantics:
 - an active exam preserves exam continuity before lower-priority work;
 - returned/urgent teacher assignments beat ordinary resumes;
 - an assignment without a real due date is never treated as urgent;
-- cloud assignments are excluded when offline or when cloud assignment data is unavailable;
+- live cloud assignments are used only online with cloud data available; offline, the last list this profile fetched (≤ 14 days old, display fields only) is shown as a cached alternative, never as the primary action, because opening an assignment needs the cloud;
+- an exam is "in progress" only before its deadline (`deadline_at`, else `created_at + duration`); after it, the paper is a lower "see result" action, and after 14 days it is history, not a next action;
+- only a learner (role `student`, or a legacy profile with no role) gets a next action: teacher, guardian, staff, support, admin and unknown roles get none;
+- the resume item comes from unfinished rows the profile's *current* class and track still serve; its route names the row's own chapter (and `pyq=1` for a past paper), so it reopens exactly that question even when newer work exists under other filters;
 - a zero-history learner never receives an evidence-free weak-area/adaptive claim;
 - exact local Practice/task continuity is read, not manufactured;
 - no recommendation is persisted as truth.
@@ -64,14 +68,15 @@ Important semantics:
 | Action | Route |
 | --- | --- |
 | Practice / adaptive / reviews / first action | `/practice` |
+| Practice resume (India) | `/practice?subtopic=<chapterId>&track=<track>[&pyq=1]` |
 | local task | `/practice?task=<taskId>` |
 | cloud assignment | `/practice?classId=<classId>&assignment=<assignmentId>` |
-| active exam | `/exams/<examId>` |
+| active or expired exam | `/exams/<examId>` |
 | teacher profile | never enters student Home; App redirects `/` to `/teach` |
 
 ## Offline and cloud-unavailable behavior
 
-Local stats, reviews, tasks, exams and Practice continuity remain independently loadable. Cloud assignment failure does not fail Home. When the browser is offline, cloud assignments are not eligible. New offline learners receive a bounded statement that uncached content may need a connection once; the UI never labels a cloud-only assignment as offline-ready.
+Local stats, reviews, tasks, exams and Practice continuity remain independently loadable. Cloud assignment failure does not fail Home. When the browser is offline, live cloud assignments are not eligible; a cached copy may appear as a marked alternative. New offline learners receive a bounded statement that uncached content may need a connection once; the UI never labels a cloud-only assignment as offline-ready.
 
 ## Visual hierarchy
 
@@ -104,3 +109,7 @@ Responsive evidence covers phone, iPad portrait, iPad landscape and desktop. Lig
 - `client/test/kalp04-home-check.mjs` owns deterministic source and scenario checks.
 - `client/test/tour-kalp04-home.js` owns the real-browser journey and responsive screenshots.
 - `.github/workflows/kalp-04-home-command-centre.yml` runs KALP-04 plus KALP-01, KALP-02, KALP-03, accessibility, canonical browser and PRI-02 regressions.
+
+## Priority source of truth
+
+The numbers above are `HOME_RECOMMENDATION_POLICY` in `client/src/home/recommendation.js`. `client/test/kalp04-home-check.mjs` and `client/test/first-run-daily-use-check.mjs` pin the ordering, the expired-exam, role-guard and offline-cache rules.
