@@ -25,7 +25,8 @@ This is the durable ledger for CP-02 → CP-12 and SEC-COMM-01. Each CP's own PR
 | CP-06 Android Shell | SOFTWARE IMPLEMENTATION: COMPLETE | `247f12c2` | `353e3c2c` | [#275](https://github.com/Priysharan19/Final-Pri-learning/pull/275) | `a77f7369` | DEFERRED |
 | CP-07 Android Native Bridges | SOFTWARE IMPLEMENTATION: COMPLETE | `a77f7369` | `b7c9ba0e` | [#277](https://github.com/Priysharan19/Final-Pri-learning/pull/277) | `a069b16f` | DEFERRED |
 | CP-08 Google Play Billing | SOFTWARE IMPLEMENTATION: COMPLETE | `a069b16f` | `7ebfc88c` | [#279](https://github.com/Priysharan19/Final-Pri-learning/pull/279) | `e1236678` | DEFERRED |
-| CP-09 Android Handwriting Input | SOFTWARE IMPLEMENTATION: COMPLETE once merged | `e1236678` | recorded by the next CP | this PR | recorded by the next CP | DEFERRED |
+| CP-09 Android Handwriting Input | SOFTWARE IMPLEMENTATION: COMPLETE | `e1236678` | `9729b8db` | [#287](https://github.com/Priysharan19/Final-Pri-learning/pull/287) | `59f62144` | DEFERRED |
+| CP-10 Android Automated Product QA | SOFTWARE IMPLEMENTATION: COMPLETE once merged | `59f62144` | recorded by the next CP | this PR | recorded by the next CP | DEFERRED |
 
 ## CP-02 — Platform Bridge Foundation
 
@@ -389,3 +390,63 @@ Causes found:
 - Independent review requested changes; all were applied: metrics hardening, an honest latency definition, pixel-band assertions and the recognition check.
 
 **Deferred (physical):** the 4-device protocol (low-end finger phone, S Pen, USI 2.0, foldable): touch-to-ink latency against 50 ms with a high-speed camera, sample continuity, palm behaviour and real recognition accuracy. **No Android handwriting-quality claim is made.**
+
+**CP-09 exact-head evidence (recorded by CP-10):**
+- Candidate `9729b8db`. All four required checks pass.
+- Android Shell (not required) on that head:
+  - API 26 floor ✅.
+  - API 36 phone ❌: the activity closed on a Back race.
+  - API 36 tablet ❌: the ink submit hit the reading-confirmation step.
+  - API 33 ❌: emulator death.
+  - The API 36 failures are test defects, diagnosed and fixed in CP-10 below.
+- Merged as `59f62144` with `--match-head-commit`.
+
+## CP-10 — Android Automated Product QA
+
+**Delivered:** the results are in [CROSS_PLATFORM_TEST_MATRIX.md](CROSS_PLATFORM_TEST_MATRIX.md) §5.
+- `android/scripts/run-instrumented.sh` runs the full product journey with real process death between runs. The cloud steps run against the **real server** (`scripts/cloud-fixture-server.mjs`, shared with iOS). There is also an offline run (`priCloudOffline`) with the server stopped, then restarted on the same database.
+- **ShellJourneyTest:**
+  - a typed attempt is resolved (a first wrong answer opens "one more go", and a changed, readable answer resolves it);
+  - Progress counts it (0 before, at least 1 after);
+  - Next renders a new question by node identity.
+- **CloudJourneyTest:**
+  - sign-up, then delete, with server-side positive and negative controls (200 before, 401 after);
+  - sign-in and sync;
+  - offline learning continues and Sync is not offered;
+  - reconnect sync pushes the offline work;
+  - the session survives process death;
+  - disconnect;
+  - billing fails closed with a `PLAY_*` provider code when no Play Store is present.
+- **WebViewAccessibilityTest:** landmarks and accessible names on four screens. At system font scale 1.3, text is measurably larger.
+- **CI matrix:** API 26 floor screen; API 33 and 36 phone; API 36 tablet; API 36 foldable (`pixel_fold`).
+
+**Evidence (S2, synthetic, 2026-10-02 local, API 36 phone emulator):** `INSTRUMENTED: PASS`. It covered:
+- journey, process death and relaunch;
+- share, picker, camera and print;
+- finger and stylus ink;
+- the accessibility smoke check;
+- sign-up + delete and sign-in + sync against the real server;
+- an offline attempt, then reconnect, with the session surviving process death;
+- disconnect.
+
+**Defects found by running the suite repeatedly on API 33, API 36 phone and API 36 tablet:**
+
+*Product, fixed here:*
+1. **Touch targets fell below 44 px on touch WebViews that report a fine pointer.** Chromium 109 on Android 13 reports `pointer: fine`, 5 touch points and `hover: none`. Every 44 px rule now also applies when the primary input cannot hover, and so do `formFactor.js` touch detection and the write-first default. Regression checks are in `form-factor-check` (31/31).
+
+*Product, root cause found, fix tracked as a separate task:*
+2. **A nav tap in the frames after Back can overwrite the Home history entry.** React Router treats a `<Link>` to the router's current, still pre-render location as a REPLACE. After Back the URL changes at once but React renders later, so tapping Practice in that window replaced `/` with `/practice` at idx 0, and the next Back left the app. The journey now waits for Home to render and asserts Practice gets its own entry (10/10 runs). The product fix (decide push or replace from the real URL) is a separate task.
+
+*Test defects, fixed in the tests (none weaken an assertion):*
+- unreadable `x+7` answers on numeric questions never resolved;
+- a synthetic `history.pushState` bypassed the router index; Progress is now reached through the nav and the journey returns with the real Back key;
+- Back was pressed before the page re-armed it;
+- "Sync now" was clicked while the panel was busy; clicks now wait until it is enabled;
+- camera URI grants were read before the monitor callback recorded them; now a thread-safe list with a bounded wait;
+- ink submit ignored the answer-blind reading-confirmation step; a doubtful reading on the tablet canvas is now confirmed, as a student must.
+
+**Full product suite, local:**
+- `INSTRUMENTED: PASS` on API 36 phone, API 36 tablet (2560×1600) and API 33 phone (Chromium 109). This is the first complete API 33 pass.
+- The API 33 CI emulator still dies on GitHub's runners (also with 4 GB RAM and `guest` GPU). No API 33 **CI** evidence is claimed.
+
+**Not automated / deferred (physical):** real camera, S Pen / USI quality, a TalkBack walkthrough, a real Play purchase (**BLOCKED_EXTERNAL**: Play Console products and license testers), low-end performance, OEM WebView variants, and foldable posture changes.

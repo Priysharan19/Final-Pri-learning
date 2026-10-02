@@ -43,7 +43,10 @@ export function currentFormFactor(win = typeof window === 'undefined' ? null : w
   if (!win) return classify(1280, 900, false);
   const { width, height } = viewport(win);
   let coarse = false;
-  try { coarse = !!win.matchMedia?.('(pointer: coarse)').matches; } catch { coarse = false; }
+  // Touch-first = a coarse primary pointer, or a primary input that cannot
+  // hover. Some touch WebViews report the pointer as fine (Chromium 109 on
+  // Android 13 with a virtio input stack) while still answering hover: none.
+  try { coarse = !!(win.matchMedia?.('(pointer: coarse)').matches || win.matchMedia?.('(hover: none)').matches); } catch { coarse = false; }
   const c = classify(width, height, coarse);
   if (c.short && c.formFactor !== 'compact' && typingInEditable(win)) return Object.freeze({ ...c, short: false });
   return c;

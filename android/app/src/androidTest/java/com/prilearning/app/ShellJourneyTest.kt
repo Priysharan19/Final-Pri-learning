@@ -67,7 +67,8 @@ class ShellJourneyTest {
             if (last != "null" && last != "false" && last != "\"\"" && !last.startsWith("\"ERR")) return last
             Thread.sleep(250)
         }
-        throw AssertionError("timed out waiting for: $js (last=$last)")
+        val where = runCatching { eval(scenario, "location.pathname+' '+JSON.stringify(history.state)") }.getOrDefault("?")
+        throw AssertionError("timed out waiting for: $js (last=$last; page at $where)")
     }
 
     private fun click(scenario: ActivityScenario<MainActivity>, js: String) {
@@ -80,6 +81,8 @@ class ShellJourneyTest {
             Object.getOwnPropertyDescriptor(proto,'value').set.call(el,'$value');
             el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}));return true;})()""")
     }
+
+    private val ANSWERED = """(function(){var c=[].slice.call(document.querySelectorAll('.card')).find(function(x){var l=x.querySelector('.sc-label');return l&&/questions answered/i.test(l.textContent);});if(!c)return false;return String(parseInt((c.querySelector('.big')||{}).textContent||'NaN',10));})()"""
 
     private val byLabel = "function(l){return [].slice.call(document.querySelectorAll('button')).find(function(b){return (b.getAttribute('aria-label')||b.textContent.trim())===l;});}"
 
@@ -109,6 +112,19 @@ class ShellJourneyTest {
         val t = SystemClock.uptimeMillis()
         instrumentation.sendPointerSync(MotionEvent.obtain(t, t, MotionEvent.ACTION_DOWN, x, y, 0))
         instrumentation.sendPointerSync(MotionEvent.obtain(t, t + 60, MotionEvent.ACTION_UP, x, y, 0))
+    }
+
+    /** Reach Progress the way a student does: the visible nav link, or the
+     *  compact "More" sheet. (A synthetic history.pushState bypasses the router's
+     *  history index, which made Back depend on timing — not a product path.) */
+    private fun openProgress(s: ActivityScenario<MainActivity>) {
+        val link = "[].slice.call(document.querySelectorAll('a[href=\"/progress\"]')).find(function(a){return a.offsetParent;})"
+        if (eval(s, "!!($link)") != "true") {
+            click(s, "document.querySelector('.mobilenav button[aria-expanded]')")
+            waitFor(s, "!!($link)")
+        }
+        click(s, link)
+        waitFor(s, "location.pathname === '/progress'")
     }
 
     private fun backWanted(s: ActivityScenario<MainActivity>): Boolean {
@@ -166,6 +182,12 @@ class ShellJourneyTest {
             waitFor(s, "document.querySelector('[data-onboarding-step=\"5\"]')"); click(s, "document.querySelector('.auth-card .btn-primary')")
             waitFor(s, "document.querySelector('.home-greet')")
             eval(s, "localStorage.setItem('pri-android-marker','kept')")
+            // Progress before any attempt: nothing answered yet.
+            openProgress(s)
+            assertEquals("a new profile has answered nothing", "\"0\"", waitFor(s, ANSWERED))
+            awaitBackWanted(s, true)
+            pressBack()
+            waitFor(s, "location.pathname === '/' && document.querySelector('.home-greet')")
 
             Log.i("PRITEST", "SPA routing through the bundled origin, and history Back")
             val landingDepth = eval(s, "(history.state && history.state.idx) || 0")
@@ -181,11 +203,16 @@ class ShellJourneyTest {
                 waitFor(s, "!document.querySelector('.mnav-sheet') && location.pathname === '/practice'")
             }
             pressBack()
-            waitFor(s, "location.pathname === '/'")
+            // The router must have rendered Home, not just the URL changed: a Link
+            // tapped while React still shows the old page is treated as a same-page
+            // REPLACE, which would overwrite the Home entry (Back would then leave the app).
+            waitFor(s, "location.pathname === '/' && !!document.querySelector('.home-greet') && !document.querySelector('.q-prompt')")
 
             Log.i("PRITEST", "rotation keeps an in-progress typed answer (no recreation)")
             click(s, "[].slice.call(document.querySelectorAll('a[href=\"/practice\"]')).find(function(a){return a.offsetParent;})")
             waitFor(s, "document.querySelector('.q-prompt')")
+            assertEquals("Practice is its own history entry after Home (Back returns Home)", "true",
+                eval(s, "!!history.state && history.state.idx > 0"))
             var typed = false
             for (i in 0 until 12) {
                 eval(s, "(function(){var t=($byLabel)('Answer by typing');if(t)t.click();return true;})()")
@@ -195,14 +222,51 @@ class ShellJourneyTest {
                 Thread.sleep(900)
             }
             assertTrue("a question with a typed answer was found", typed)
-            setValue(s, ".editor-body input.answer-input", "x+7")
+            setValue(s, ".editor-body input.answer-input", "7")
             s.onActivity { it.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE }
             Thread.sleep(2500)
-            assertEquals("\"x+7\"", eval(s, "(document.querySelector('.editor-body input.answer-input')||{}).value"))
+            assertEquals("\"7\"", eval(s, "(document.querySelector('.editor-body input.answer-input')||{}).value"))
             s.onActivity { it.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT }
             Thread.sleep(1500)
+
+            Log.i("PRITEST", "a typed attempt is submitted and marked, feedback shown, next question, progress")
+            waitFor(s, "(function(){var b=[].slice.call(document.querySelectorAll('.editor-foot .btn-primary')).find(function(x){return x.offsetParent&&!x.disabled});if(!b)return false;b.click();return true;})()")
+            val feedback = waitFor(s, "(function(){var v=document.querySelector('.verdict')||document.querySelector('.your-answer');return v?(v.innerText||'marked').slice(0,60):false;})()")
+            assertTrue("the attempt was marked with feedback: $feedback", feedback.length > 2)
+            // A first wrong answer offers one more go; the attempt is resolved (and
+            // counted in Progress) once it is answered again.
+            for (i in 0 until 3) {
+                if (eval(s, "!!document.querySelector('.eval-card')") == "true") break
+                // One more go needs a changed answer before it can be submitted.
+                setValue(s, ".editor-body input.answer-input", "${8 + i}")
+                Thread.sleep(300)
+                eval(s, "(function(){var b=[].slice.call(document.querySelectorAll('.editor-foot .btn-primary')).find(function(x){return x.offsetParent&&!x.disabled});if(b)b.click();return true;})()")
+                Thread.sleep(1500)
+            }
+            Log.i("PRITEST", "after retries: " + eval(s, "(function(){var v=document.querySelector('.verdict');return (v?v.innerText:'no verdict').slice(0,120)+' · input='+((document.querySelector('.editor-body input.answer-input')||{}).value)+' · submit='+[].slice.call(document.querySelectorAll('.editor-foot .btn-primary')).map(function(b){return b.disabled?'off':'on'}).join(',');})()"))
+            assertEquals("the attempt is resolved with an evaluation", "true",
+                waitFor(s, "!!document.querySelector('.eval-card') || false"))
+            // Next: the same element is replaced by a new question (by identity of
+            // the rendered node, not prompt text, which can repeat).
+            assertEquals("a Next control is offered", "true", eval(s, "!!document.querySelector('.ctx-next')"))
+            eval(s, "(function(){window.__q=document.querySelector('.q-prompt');document.querySelector('.ctx-next').click();return true;})()")
+            waitFor(s, "document.querySelector('.q-prompt') && document.querySelector('.q-prompt') !== window.__q && !document.querySelector('.verdict')")
+            openProgress(s)
+            val answeredAfter = waitFor(s, ANSWERED).trim('"').toIntOrNull() ?: 0
+            assertTrue("Progress counts the attempt just marked ($answeredAfter answered)", answeredAfter >= 1)
+            // The real Back key walks the app's own history: Progress → Practice → Home.
+            awaitBackWanted(s, true)
             pressBack()
-            waitFor(s, "location.pathname === '/'")
+            // Settle on Practice (its own history entry) before the next press, as
+            // a person's second Back comes after the first page has appeared.
+            waitFor(s, "location.pathname === '/practice' && !!history.state && history.state.idx > 0 && !!document.querySelector('.q-prompt')")
+            Thread.sleep(400)
+            awaitBackWanted(s, true)
+            pressBack()
+            // The router must have rendered Home, not just the URL changed: a Link
+            // tapped while React still shows the old page is treated as a same-page
+            // REPLACE, which would overwrite the Home entry (Back would then leave the app).
+            waitFor(s, "location.pathname === '/' && !!document.querySelector('.home-greet') && !document.querySelector('.q-prompt')")
 
             Log.i("PRITEST", "schemes outside the policy never navigate the app away")
             eval(s, "(function(){var a=document.createElement('a');a.href='intent://evil#Intent;end';document.body.appendChild(a);a.click();return true;})()")

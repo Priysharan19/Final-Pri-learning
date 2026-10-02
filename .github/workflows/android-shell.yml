@@ -18,6 +18,11 @@ on:
       - 'server/app.js'
       - 'server/package-lock.json'
       - 'client/src/lib/files.js'
+      - 'client/src/components/CloudAccountPanel.jsx'
+      - 'client/src/components/CloudAccountSecurity.jsx'
+      - 'client/src/components/GooglePlayBilling.jsx'
+      - 'client/src/ink/**'
+      - 'scripts/cloud-fixture-server.mjs'
       - '.github/workflows/android-shell.yml'
   push:
     branches: [main]
@@ -82,6 +87,8 @@ jobs:
           - { api: 33, profile: pixel_6, expect: product }
           - { api: 36, profile: pixel_6, expect: product }
           - { api: 36, profile: pixel_tablet, expect: product }
+          # A foldable (inner display): MEDIUM/EXPANDED widths on a phone-class device.
+          - { api: 36, profile: pixel_fold, expect: product }
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -115,7 +122,7 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
           working-directory: android
           # One line: the runner executes each script line in its own shell.
-          script: node scripts/cloud-fixture-server.mjs --out /tmp/pri-cloud.env && set -a && . /tmp/pri-cloud.env && set +a && { ./scripts/run-instrumented.sh ${{ matrix.expect }}; rc=$?; kill "$PRI_CLOUD_SERVER_PID" 2>/dev/null; exit $rc; }
+          script: node ../scripts/cloud-fixture-server.mjs --out /tmp/pri-cloud.env && set -a && . /tmp/pri-cloud.env && set +a && { ./scripts/run-instrumented.sh ${{ matrix.expect }}; rc=$?; kill "$PRI_CLOUD_SERVER_PID" 2>/dev/null; exit $rc; }
       - uses: actions/upload-artifact@v4
         if: always()
         with:
