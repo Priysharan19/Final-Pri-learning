@@ -40,6 +40,8 @@ const Settings = React.lazy(() => import('./pages/Settings.jsx'));
 // prerequisite graph and engine behind it — is an on-demand chunk (see
 // ON_DEMAND in vite.config.js), not part of the install or the warm set.
 const Placement = React.lazy(() => import('./pages/Placement.jsx'));
+// Notes: the page and each class's notes are chunks of their own (notes/notesIndex.js).
+const Notes = React.lazy(() => import('./pages/Notes.jsx'));
 // Outside the frozen V1 scope: the route exists only where the build flag is on.
 const PLACEMENT_ON = featureEnabled('placement');
 
@@ -51,11 +53,11 @@ const I = {
   home: <Icon name="home" />, tasks: <Icon name="tasks" />, match: <Icon name="match" />,
   progress: <Icon name="progress" />, exams: <Icon name="exams" />, classes: <Icon name="classes" />,
   settings: <Icon name="settings" />, practice: <Icon name="practice" />, review: <Icon name="review" />,
-  rush: <Icon name="rush" />, teacher: <Icon name="teacher" />,
+  rush: <Icon name="rush" />, notes: <Icon name="notes" />, teacher: <Icon name="teacher" />,
 };
 
 const STUDENT_NAV = [
-  { label: 'nav.groupLearn', items: [{ to: '/', key: 'nav.home', ico: I.home }, { to: '/practice', key: 'nav.practice', ico: I.practice }] },
+  { label: 'nav.groupLearn', items: [{ to: '/', key: 'nav.home', ico: I.home }, { to: '/practice', key: 'nav.practice', ico: I.practice }, { to: '/notes', key: 'nav.notes', ico: I.notes }] },
   { label: 'nav.groupWork', items: [{ to: '/tasks', key: 'nav.tasks', ico: I.tasks }, { to: '/exams', key: 'nav.exams', ico: I.exams }, { to: '/classes', key: 'nav.classes', ico: I.classes }] },
   { label: 'nav.groupUnderstand', items: [{ to: '/progress', key: 'nav.progress', ico: I.progress }, { to: '/review?filter=wrong', key: 'nav.review', ico: I.review }] },
   { label: 'nav.groupPlay', items: [{ to: '/rush', key: 'nav.rush', ico: I.rush }, { to: '/match', key: 'nav.match', ico: I.match }] },
@@ -92,7 +94,7 @@ function isDestinationActive(location, to) {
 const TITLE_KEYS = {
   '/': 'nav.home', '/practice': 'nav.practice', '/progress': 'nav.progress', '/tasks': 'nav.tasks',
   '/exams': 'nav.exams', '/rush': 'nav.rush', '/match': 'nav.match', '/teach': 'nav.teacherWorkspace',
-  '/review': 'nav.review', '/history': 'nav.review', '/favorites': 'nav.review', '/classes': 'nav.classes', '/settings': 'nav.settings'
+  '/notes': 'nav.notes', '/review': 'nav.review', '/history': 'nav.review', '/favorites': 'nav.review', '/classes': 'nav.classes', '/settings': 'nav.settings'
 };
 
 // Shown for the moment a route's own chunk is arriving. It is announced rather
@@ -203,7 +205,7 @@ export default function App() {
   }, [user?.id, user?.theme]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const pageTitle = useMemo(
-    () => (TITLE_KEYS[loc.pathname] ? t(TITLE_KEYS[loc.pathname]) : loc.pathname.startsWith('/exams') ? t('nav.exam') : null),
+    () => (TITLE_KEYS[loc.pathname] ? t(TITLE_KEYS[loc.pathname]) : loc.pathname.startsWith('/exams') ? t('nav.exam') : loc.pathname.startsWith('/notes/') ? t('nav.notes') : null),
     [loc.pathname, t]
   );
 
@@ -395,6 +397,8 @@ export default function App() {
                     <Route path="/teach" element={teacherOnly(<Teach />)} />
                     <Route path="/exams" element={studentOnly(<Exams />)} />
                     <Route path="/exams/:id" element={studentOnly(<ExamRoom />)} />
+                    <Route path="/notes" element={studentOnly(<Notes />)} />
+                    <Route path="/notes/:chapterId" element={studentOnly(<Notes />)} />
                     <Route path="/rush" element={studentOnly(<Rush />)} />
                     <Route path="/match" element={studentOnly(<Match />)} />
                     <Route path="/review" element={studentOnly(<History />)} />

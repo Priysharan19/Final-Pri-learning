@@ -17,6 +17,7 @@ const PATHS = {
   rush: <><circle cx="12" cy="13.5" r="7" /><path d="M12 13.5V9.8" /><path d="M10 3h4" /><path d="M18.4 6.6l1.2-1.2" /></>,
   match: <><path d="M4 6h10" /><path d="M4 12h7" /><path d="M4 18h10" /><path d="m17 9 3 3-3 3" /></>,
   teacher: <><rect x="3.5" y="4" width="17" height="11.5" rx="1" /><path d="M8 20l4-4.5 4 4.5" /><path d="M7.5 8.5h6M7.5 11.5h9" /></>,
+  notes: <><path d="M6 3.5h10.5L19 6v14.5H6z" /><path d="M9 8.5h7M9 12h7M9 15.5h4.5" /></>,
   tasks: <><path d="M12 5.5C10 4 7.5 3.5 4 3.8V19c3.5-.3 6 .3 8 1.7 2-1.4 4.5-2 8-1.7V3.8c-3.5-.3-6 .2-8 1.7Z" /><path d="M12 5.5v15.2" /></>,
   progress: <><path d="M4 19.5h16" /><path d="M6.5 16V11" /><path d="M11 16V7.5" /><path d="M15.5 16v-5.5" /><path d="M20 16V4.5" /></>,
   exams: <><path d="M7 3.5h10a1 1 0 0 1 1 1v15a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1v-15a1 1 0 0 1 1-1Z" /><path d="M9 8h6M9 11.5h6M9 15h3.5" /></>,

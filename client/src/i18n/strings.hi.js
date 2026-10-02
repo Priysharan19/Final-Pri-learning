@@ -535,7 +535,6 @@ export default {
   'calibrate.done': 'हो गया',
   'calibrate.anotherRound': 'एक और बार',
   'verdict.removeAttachment': 'अटैचमेंट हटाएँ',
-  'verdict.readingWithVision': 'आपकी हैंडराइटिंग इसी डिवाइस पर Apple Vision से पढ़ी जा रही है…',
   'verdict.decodedOnDevice': 'इसी डिवाइस पर पढ़ा गया',
   'verdict.ocrConfidence': ' · {percent}% OCR भरोसा',
   'verdict.filledFromLastLine': 'Pri ने पहचानी गई आख़िरी पंक्ति से उत्तर का खाना भर दिया है। जाँच से पहले इसे देख लीजिए या बदल लीजिए।',
@@ -683,8 +682,8 @@ export default {
   'settings.passwordNote': 'कम से कम {min} अक्षर। इसे इसी डिवाइस के स्टोरेज में सॉल्ट लगे PBKDF2 हैश के रूप में रखा जाता है — यह आपकी प्रोफ़ाइल को इसी डिवाइस पर बंद रखता है, और कहीं भी अपलोड नहीं होता।',
 
   'settings.handwriting': 'हैंडराइटिंग',
-  'settings.handwritingNative': 'यह ऐप डिवाइस की अपनी लेखन सतह से आपकी लिखावट लेता है — स्टाइलस से या उंगली से। Pri इसे इसी डिवाइस पर पढ़ता है (जब तक आप नीचे सर्वर पर पढ़ना चालू न करें), आपके सुधारों से सीखता है, और वे सुधार इसी डिवाइस पर रहते हैं।',
-  'settings.handwritingBrowser': 'उंगली, स्टाइलस या माउस से लिखें। Pri आपकी लिखावट इसी डिवाइस पर पढ़ता है, और आपके सुधार उसे आपकी लिखावट सीखने में मदद करते हैं। आपके सुधार इसी डिवाइस पर रहते हैं।',
+  'settings.handwritingNative': 'यह ऐप डिवाइस की अपनी लेखन सतह से आपकी लिखावट लेता है — स्टाइलस से या उँगली से। आपकी लिखावट नीचे दिए Pri के सर्वर रीडर से पढ़ी जाती है, जिसके लिए इंटरनेट और साइन-इन खाता चाहिए; आपकी स्याही इसी डिवाइस पर रहती है।',
+  'settings.handwritingBrowser': 'उँगली, स्टाइलस या माउस से लिखें। आपकी लिखावट नीचे दिए Pri के सर्वर रीडर से पढ़ी जाती है, जिसके लिए इंटरनेट और साइन-इन खाता चाहिए; आपकी स्याही इसी डिवाइस पर रहती है।',
   'settings.templatesLearned': 'सीखे गए निजी नमूने',
   'settings.templatesNone': 'अभी कोई नहीं',
   'settings.templatesCount': '{symbols} चिह्नों में कुल {total}',
@@ -695,9 +694,9 @@ export default {
   'settings.cloudOffFor': '“{label}” बंद है — यह आपके डिवाइस पर ही रहेगा',
 
   // Consent copy — see the note at the head of this file. NOT legally reviewed.
-  'settings.cloudHandwritingLabel': 'मेरी हैंडराइटिंग सर्वर पर भी पढ़ी जाए',
-  'settings.cloudHandwritingUnavailable': 'इस इंस्टॉल पर सर्वर पर हैंडराइटिंग पढ़ने की सुविधा नहीं है, इसलिए हर पढ़ाई इसी डिवाइस पर होती है।',
-  'settings.cloudHandwritingCopy': 'इस डिवाइस पर चलने वाला पहचानकर्ता 58 चिह्न जानता है और उसमें अल्पविराम नहीं है, इसलिए −1, 0, 1, 2, 4 जैसी पंक्तियाँ उसके बस की नहीं हैं। साइन-इन किए गए खाते के लिए यह अपने-आप चालू रहता है, और आप इसे यहाँ बंद कर सकते हैं। चालू रहने पर आपकी स्ट्रोक से बनी एक तस्वीर या आपकी फ़ोटो Pri के सर्वर के रास्ते एक बाहरी AI पढ़ने वाली सेवा को पढ़ने के लिए भेजी जाती है। भेजी जाने वाली चीज़ केवल आपकी हैंडराइटिंग की तस्वीर है — न प्रश्न, न उत्तर, न आपका नाम। Pri उसकी कोई प्रति नहीं रखता; पढ़ने वाली सेवा से उसे न रखने को कहा जाता है, पर वह अपने सुरक्षा-निगरानी नियमों के तहत उसे कुछ समय तक रख सकती है। आपका काम इस डिवाइस की पढ़ाई से तुरंत दिखता रहेगा; सर्वर की पढ़ाई बाद में आती है, और आप हमेशा अपनी वाली रख सकते हैं।',
+  'settings.cloudHandwritingLabel': 'मेरी हैंडराइटिंग और फ़ोटो सर्वर पर पढ़ी जाएँ',
+  'settings.cloudHandwritingUnavailable': 'हैंडराइटिंग और फ़ोटो पढ़ने के लिए Pri का सर्वर चाहिए, जो अभी यहाँ उपलब्ध नहीं है, इसलिए अभी अपने उत्तर टाइप करें। आपकी स्याही इसी डिवाइस पर रखी रहती है।',
+  'settings.cloudHandwritingCopy': 'हैंडराइटिंग और फ़ोटो केवल इसी सर्वर रीडर से पढ़ी जाती हैं; डिवाइस पर चलने वाला पहचानकर्ता इतना सटीक नहीं है कि उससे जाँच हो सके। साइन-इन किए गए खाते के लिए यह अपने-आप चालू रहता है, और आप इसे यहाँ बंद कर सकते हैं — पर तब हैंडराइटिंग और फ़ोटो पढ़ी ही नहीं जाएँगी, और आप उत्तर टाइप करेंगे। चालू रहने पर आपकी स्ट्रोक से बनी एक तस्वीर या आपकी फ़ोटो Pri के सर्वर के रास्ते एक बाहरी AI पढ़ने वाली सेवा को पढ़ने के लिए भेजी जाती है। भेजी जाने वाली चीज़ केवल आपकी हैंडराइटिंग की तस्वीर है — न प्रश्न, न उत्तर, न आपका नाम। Pri उसकी कोई प्रति नहीं रखता; पढ़ने वाली सेवा से उसे न रखने को कहा जाता है, पर वह अपने सुरक्षा-निगरानी नियमों के तहत उसे कुछ समय तक रख सकती है। पढ़ाई केवल बताती है कि आपने क्या लिखा; अंक Pri का अपना जाँचक तय करता है।',
   'settings.cloudMarkingLabel': 'बताइए कि मेरा काम किस पंक्ति पर गलत हुआ',
   'settings.cloudMarkingUnavailable': 'इस इंस्टॉल पर सर्वर पर काम जाँचने की सुविधा नहीं है, इसलिए जाँच पूरी तरह इसी डिवाइस पर होती है।',
   'settings.cloudMarkingCopy': 'जब उत्तर गलत हो और Pri यह न बता पाए कि गलती कहाँ हुई, तब इसे चालू कीजिए और आपका काम पंक्ति दर पंक्ति जाँचा जाएगा। यह बताता है कि कौन-सी पंक्ति टूटी और गलती किस तरह की थी — और अगर आपसे एक बार चूक हुई और उसके बाद आपने अपनी ही गलत संख्या से आगे सही काम किया, तो यह वह भी बताता है, बजाय एक गलती के लिए आपको पाँच बार गलत ठहराने के। आपका प्रश्न और आपका काम भेजा जाता है; अपेक्षित उत्तर कभी नहीं भेजा जाता, और यह आपको उत्तर नहीं बताएगा। आपके अंक दोनों ही हालत में इसी डिवाइस पर तय होते हैं और बदलते नहीं।',
@@ -1074,19 +1073,7 @@ export default {
   'ink.lineBreaks': "इस पंक्ति पर गणित टूटता है",
   'ink.lineOkSpoken': "पंक्ति {n} सही है।",
   'ink.lineBreaksSpoken': "पंक्ति {n} पर गणित टूटता है।",
-  'ink.lookHere': "यहाँ देखें",
   'ink.reading': "पढ़ाई",
-  'ink.readingAgain': "यह पढ़ाई जाँची जा रही है",
-  'ink.readerUnreachable': "दूसरे रीडर तक नहीं पहुँच सके, इसलिए यह डिवाइस की पढ़ाई है",
-  'ink.otherReading': "इसी लिखावट की दूसरी पढ़ाई। अगर यह आपके लिखे के ज़्यादा क़रीब है तो इसे चुनें।",
-  'ink.useReading': "यह पढ़ाई लें",
-  'ink.keepMine': "मेरी रखें",
-  'ink.checkThisOne': "इसे जाँचें",
-  'ink.tapToCorrect': "सुधारने के लिए टैप करें",
-  'ink.symbolLabel': "पंक्ति {n}, चिह्न “{sym}” पढ़ा गया। बदलें",
-  'ink.symbolShakyLabel': "पंक्ति {n}, चिह्न “{sym}” पढ़ा गया, पढ़ाई पक्की नहीं। बदलें",
-  'ink.changeSymbol': "यह चिह्न बदलें",
-  'ink.changeTo': "इसे “{sym}” कर दें",
 
   // Home recommendation and practice session
   'home.cloudUnavailable': "कक्षा के असाइनमेंट अभी उपलब्ध नहीं हैं। इस डिवाइस पर सब कुछ चलता रहेगा।",
@@ -1164,15 +1151,12 @@ export default {
 
   // Formal assessment — review, handwriting evidence
   'ink.clear': "मिटाएँ",
-  'ink.evidence': "पहचान के प्रमाण",
-  'ink.noReading': "कोई पढ़ाई नहीं",
 
   // Formal assessment — structured
 
   // Review follow-ups
   'verdict.alreadyFinishedTitle': "यह प्रश्न पहले ही पूरा हो चुका है",
   'verdict.nextAfterConflict': "यह कहीं और पूरा हुआ, शायद दूसरे टैब में। अगले प्रश्न पर जाएँ।",
-  'ink.webReader': "इस ब्राउज़र में पढ़ा गया (वैकल्पिक रीडर)",
 
   // Guideline pass
   'verdict.showSolutionConfirm': "हल दिखाएँ: इस प्रयास पर अंक नहीं मिलेंगे",
@@ -2217,9 +2201,20 @@ export default {
   'settings.pathwayAdvancedDesc': 'फलन, कलन और सांख्यिकी — HSC का पारंपरिक कोर्स',
   'settings.pathwayExt1Desc': 'Advanced के साथ सदिश, गणितीय आगमन और आगे का कलन',
   'settings.pathwayExt2Desc': 'केवल वर्ष 12 — उपपत्ति, सम्मिश्र संख्याएँ, यांत्रिकी',
-  // NEEDS NATIVE REVIEW: the verdict.photoReading* and photoReadOnServerNotice
-  // strings below were written for this change and have not been reviewed by a
+  // NEEDS NATIVE REVIEW: the ink.server*, ink.waiting*, verdict.inkReadByServer,
+  // verdict.photoReading* and verdict.photoReadOnServerNotice strings below were
+  // written for the server-only reading change and have not been reviewed by a
   // native Hindi speaker.
+  'ink.mistakeHere': "यहाँ देखें",
+  'ink.serverReading': 'आपकी लिखावट पढ़ी जा रही है…',
+  'ink.serverEmpty': 'अभी कुछ पढ़ने लायक नहीं है — लिखते रहें, हर पंक्ति में एक चरण।',
+  'ink.waitingTurnedOff': 'हैंडराइटिंग Pri के सर्वर पर पढ़ी जाती है, और यह सेटिंग्स → हैंडराइटिंग में बंद है। इसे पढ़वाने के लिए चालू करें, या अपना उत्तर टाइप करें।',
+  'ink.waitingNotOnThisInstall': 'Pri का यह संस्करण हैंडराइटिंग नहीं पढ़ सकता। आपका हल यहीं रखा है; जाँच के लिए अपना उत्तर टाइप करें।',
+  'ink.waitingOffline': 'आपकी लिखावट पढ़ने के लिए इंटरनेट चाहिए। आपका हल सहेजा गया है और ऑनलाइन होते ही पढ़कर जाँचा जाएगा — या अभी अपना उत्तर टाइप करें।',
+  'ink.waitingSignIn': 'आपकी लिखावट पढ़ने के लिए Pri खाता चाहिए। आपका हल सहेजा गया है; साइन इन करते ही वह पढ़ा जाएगा — या अभी अपना उत्तर टाइप करें।',
+  'ink.waitingGuardian': 'हैंडराइटिंग पढ़ने से पहले किसी अभिभावक को आपके खाते की पुष्टि करनी होगी। आपका हल सहेजा गया है — अभी के लिए अपना उत्तर टाइप करें।',
+  'ink.waitingVerifyEmail': 'हैंडराइटिंग पढ़वाने के लिए अपना ईमेल पता सत्यापित करें। आपका हल सहेजा गया है; सत्यापन के बाद वह पढ़ा जाएगा — या अभी अपना उत्तर टाइप करें।',
+  'ink.waitingServiceDown': 'Pri का हैंडराइटिंग रीडर अभी जवाब नहीं दे रहा है। आपका हल सहेजा गया है और थोड़ी देर में फिर कोशिश होगी — या अभी अपना उत्तर टाइप करें।',
   'verdict.photoReadingTurnedOff': 'सर्वर पर फ़ोटो पढ़ना सेटिंग्स → हैंडराइटिंग में बंद है। फ़ोटो पढ़वाने के लिए इसे फिर चालू करें, या अपना उत्तर टाइप करें।',
   'verdict.photoReadingNotOnThisInstall': 'Pri का यह संस्करण हल की फ़ोटो नहीं पढ़ सकता। अपना उत्तर टाइप करें।',
   'verdict.photoReadingOffline': 'आप ऑफ़लाइन हैं, इसलिए यह फ़ोटो अभी नहीं पढ़ी जा सकती। अपना उत्तर टाइप करें, या ऑनलाइन होने पर फ़ोटो फिर से जोड़ें।',
@@ -2283,5 +2278,58 @@ export default {
   'board.sentenceUnitsMissing': '{awarded}/{total}। मान सही है; मात्रक छूट गया है, और परीक्षक वह अंक नहीं देता।',
   'board.sentenceFull': '{awarded}/{total}। पूरे अंक, और बोर्ड परीक्षा में भी यह हल ये अंक दिलाता।',
   'board.sentenceNone': '{awarded}/{total}। अभी यहाँ कोई अंक नहीं दिया जा सका — जिस सूत्र का उपयोग कर रहे हैं, उसे पहली पंक्ति में लिखिए; उत्तर गलत होने पर भी विधि का अंक मिल सकता है।',
-  'board.sentenceMethod': '{awarded}/{total}। उत्तर सही नहीं है, पर विधि सही है, और बोर्ड परीक्षक उसके अंक देता है।'
+  'board.sentenceMethod': '{awarded}/{total}। उत्तर सही नहीं है, पर विधि सही है, और बोर्ड परीक्षक उसके अंक देता है।',
+
+  // ── Notes ──
+  'nav.notes': 'नोट्स',
+  'notes.eyebrow': 'दोहराने की कॉपी',
+  'notes.title': 'नोट्स',
+  'notes.lede': 'हर अध्याय एक जगह: सरल शब्दों में मुख्य विचार, सूत्र, वे बिंदु जिन्हें परीक्षक देखते हैं, आम गलतियाँ, और हल किए गए उदाहरण जिनके उत्तर गणित इंजन ने जाँचे हैं।',
+  'notes.classLabel': 'कक्षा चुनिए',
+  'notes.searchLabel': 'सभी नोट्स में खोजिए',
+  'notes.searchPlaceholder': 'कोई सूत्र, पद या विचार खोजिए',
+  'notes.searchEmpty': 'नोट्स में “{q}” से मेल खाता कुछ नहीं मिला।',
+  'notes.searchCount': { one: '{count} अध्याय मेल खाता है', other: '{count} अध्याय मेल खाते हैं' },
+  'notes.mapTitle': 'अध्याय मानचित्र',
+  'notes.mapHint': 'पंक्तियाँ विषय-धाराएँ हैं। रेखा किसी अध्याय को उन अध्यायों से जोड़ती है जिन पर वह आधारित है।',
+  'notes.chapters': 'अध्याय',
+  'notes.bookmarkedOnly': 'केवल बुकमार्क किए गए',
+  'notes.noBookmarks': 'इस कक्षा में अभी कोई अध्याय बुकमार्क नहीं है।',
+  'notes.chapterNumber': 'अध्याय {n}',
+  'notes.formulaCount': { one: '{count} सूत्र', other: '{count} सूत्र' },
+  'notes.loading': 'नोट्स लोड हो रहे हैं…',
+  'notes.loadFailed': 'ये नोट्स डाउनलोड नहीं हो सके। एक बार इंटरनेट से जुड़िए, फिर ये ऑफ़लाइन भी उपलब्ध रहेंगे।',
+  'notes.retry': 'फिर से कोशिश करें',
+  'notes.back': 'सभी अध्याय',
+  'notes.practise': 'इसका अभ्यास करें',
+  'notes.revise': '5 मिनट में दोहराइए',
+  'notes.bookmark': 'बुकमार्क करें',
+  'notes.bookmarked': 'बुकमार्क किया गया',
+  'notes.bookmarkChapter': '{chapter} को बुकमार्क करें',
+  'notes.buildsOn': 'इन पर आधारित',
+  'notes.sectionIdeas': 'मुख्य विचार',
+  'notes.sectionDefinitions': 'परिभाषाएँ',
+  'notes.sectionFormulas': 'सूत्र',
+  'notes.sectionPoints': 'महत्वपूर्ण बिंदु',
+  'notes.sectionMistakes': 'आम गलतियाँ',
+  'notes.sectionExamples': 'हल किए गए उदाहरण',
+  'notes.unfoldAll': 'सब खोलिए',
+  'notes.foldAll': 'सब बंद कीजिए',
+  'notes.mistakeWrong': 'यह नहीं',
+  'notes.mistakeRight': 'बल्कि यह',
+  'notes.exampleNumber': 'उदाहरण {n}',
+  'notes.nextStep': 'अगला चरण दिखाइए',
+  'notes.allSteps': 'सभी चरण दिखाइए',
+  'notes.answer': 'उत्तर',
+  'notes.engineChecked': 'उत्तर गणित इंजन द्वारा जाँचा गया',
+  'notes.cardsTitle': 'दोहराइए: {chapter}',
+  'notes.cardProgress': 'कार्ड {n} / {total}',
+  'notes.flip': 'कार्ड पलटिए',
+  'notes.flipHint': 'दूसरी ओर देखने के लिए कार्ड पर टैप करें या स्पेस दबाएँ।',
+  'notes.prev': 'पिछला',
+  'notes.next': 'अगला',
+  'notes.close': 'बंद करें',
+  'notes.cardsDone': 'इस अध्याय के सभी महत्वपूर्ण बिंदु पूरे हुए।',
+  'notes.again': 'फिर से दोहराइए',
+  'notes.notFound': 'इस अध्याय के नोट्स अभी उपलब्ध नहीं हैं।'
 };

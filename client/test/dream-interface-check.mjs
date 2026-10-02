@@ -400,9 +400,15 @@ check('the result states the mark once and Progress shows whole marks, no percen
 check('a symbol correction never outlives the strokes it was made on, and finger writing is always offered', () => {
   // Fixes are keyed by glyph position at full confidence: after undo/redo a
   // stale fix would land on a different glyph and skip the reading check.
+  // Since server-only reading (#316) the page has no tap-to-correct fixes at
+  // all; if they ever return, every stroke change must drop them.
   const act = ink.slice(ink.indexOf('const act = (fn) => () => {'), ink.indexOf('const undoClear'));
-  assert.match(act, /setOverrides\(\{\}\);\s*canvasRef\.current\?\.\[fn\]\(\);/);
-  assert.doesNotMatch(act, /if \(fn === 'clear'\) \{[^}]*setOverrides\(\{\}\);[^}]*\}\s*canvasRef/);
+  if (/setOverrides|overridesRef/.test(ink)) {
+    assert.match(act, /setOverrides\(\{\}\);\s*canvasRef\.current\?\.\[fn\]\(\);/);
+    assert.doesNotMatch(act, /if \(fn === 'clear'\) \{[^}]*setOverrides\(\{\}\);[^}]*\}\s*canvasRef/);
+  } else {
+    assert.doesNotMatch(ink, /applyOverride|ink-picker/, 'no symbol picker survives without its reset');
+  }
   // CP-04: Apple Pencil is never required, so the toggle is not gated on the host.
   assert.doesNotMatch(ink, /\(!NATIVE_INK \|\| fingerHost\) && \(\s*<button[^>]*ink-tool \$\{finger/);
   assert.match(ink, /aria-pressed=\{finger\}/);
