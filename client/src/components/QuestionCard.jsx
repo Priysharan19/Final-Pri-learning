@@ -1156,6 +1156,12 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   ) : null;
 
   const firstBad = inkComments?.find(c => c.kind === 'bad') || null;
+  // Once submitted, the bar shows the answer the attempt was marked on; a
+  // reading that lands later can redraw the panel but never this line.
+  const boundLines = (state.phase !== 'answering' && attempt?.lines?.length) ? attempt.lines : null;
+  const shownAnswerLine = boundLines
+    ? boundLines[boundLines.length - 1]
+    : (inkResult?.answerLine ? (isWorking ? inkResult.lines[inkResult.lines.length - 1] : inkResult.answerLine) : '');
   const otherComments = (inkComments || []).filter(c => c !== firstBad && c.kind !== 'good');
 
   return (
@@ -1525,28 +1531,28 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
               <div className="ic-head">{t('verdict.lookHere')}<span className="ic-line">{t('verdict.onLine', { n: firstBad.line })}</span></div>
               {firstBad.text}
             </div>
-            {(otherComments.length > 0 || cloudWorkingNote) && (
+            {cloudWorkingNote && (
+              <div className={`ink-comment ${cloudWorkingNote.tone === 'break' ? 'bad' : 'note'}`}>
+                <div className="ic-head">{t(cloudWorkingNote.tone === 'break' ? 'verdict.whereItBreaks' : cloudWorkingNote.tone === 'maybe' ? 'verdict.possibly' : 'verdict.yourAlgebra')}</div>
+                {cloudWorkingNote.text}
+                {cloudMisconception && (
+                  <div className="diagnosis-named" data-misconception={cloudMisconception.named.id} data-status={cloudMisconception.status}>
+                    <b>{t(cloudMisconception.status === 'confirmed' ? 'verdict.lineMisconception' : 'verdict.possibleMisconception',
+                      { n: cloudMisconception.line, name: t(cloudMisconception.named.name) })}</b>
+                    <div>{t(cloudMisconception.named.explain)}</div>
+                  </div>
+                )}
+              </div>
+            )}
+            {otherComments.length > 0 && (
               <details className="ink-comments-more">
-                <summary>{t('verdict.moreNotes', { count: otherComments.length + (cloudWorkingNote ? 1 : 0), n: otherComments.length + (cloudWorkingNote ? 1 : 0) })}</summary>
+                <summary>{t('verdict.moreNotes', { count: otherComments.length, n: otherComments.length })}</summary>
                 {otherComments.map((c, i) => (
                   <div key={i} className={`ink-comment ${c.kind}`} style={{ marginTop: 8 }}>
                     <div className="ic-head">{t('verdict.mistake')}<span className="ic-line">{t('verdict.onLine', { n: c.line })}</span></div>
                     {c.text}
                   </div>
                 ))}
-                {cloudWorkingNote && (
-                  <div className={`ink-comment ${cloudWorkingNote.tone === 'break' ? 'bad' : 'note'}`} style={{ marginTop: 8 }}>
-                    <div className="ic-head">{t(cloudWorkingNote.tone === 'break' ? 'verdict.whereItBreaks' : cloudWorkingNote.tone === 'maybe' ? 'verdict.possibly' : 'verdict.yourAlgebra')}</div>
-                    {cloudWorkingNote.text}
-                    {cloudMisconception && (
-                      <div className="diagnosis-named" data-misconception={cloudMisconception.named.id} data-status={cloudMisconception.status}>
-                        <b>{t(cloudMisconception.status === 'confirmed' ? 'verdict.lineMisconception' : 'verdict.possibleMisconception',
-                          { n: cloudMisconception.line, name: t(cloudMisconception.named.name) })}</b>
-                        <div>{t(cloudMisconception.named.explain)}</div>
-                      </div>
-                    )}
-                  </div>
-                )}
               </details>
             )}
           </div>
@@ -1669,8 +1675,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         <div className="ws-actions editor-foot no-print">
           <span className="status-line" data-state={statusState} role="status" aria-live="polite">
             {statusState !== 'idle' && <span className="dot" aria-hidden="true" />}
-            {writeMode && inkResult?.answerLine && !needsCheck && !resolved
-              ? <span className="ws-answer-preview muted">{t('verdict.yourAnswerIs')} <MathText text={`$${texOf(isWorking ? inkResult.lines[inkResult.lines.length - 1] : inkResult.answerLine)}$`} /></span>
+            {writeMode && shownAnswerLine && !needsCheck
+              ? <span className="ws-answer-preview muted">{t('verdict.yourAnswerIs')} <MathText text={`$${texOf(shownAnswerLine)}$`} /></span>
               : statusText}
           </span>
           <div className="ws-actions-btns">
