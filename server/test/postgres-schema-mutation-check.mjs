@@ -25,6 +25,14 @@ function mutateBase(from, to) {
   return [{ name: base.name, sql: replaceOnce(base.sql, from, to) }, ...original.slice(1)];
 }
 
+// Mutate one named migration in place (not "the last one": later migrations
+// keep arriving after it).
+function mutateNamed(suffix, from, to) {
+  const index = original.findIndex(file => file.name.endsWith(suffix));
+  if (index === -1) throw new Error(`mutation target migration not found: ${suffix}`);
+  return original.map((file, i) => (i === index ? { ...file, sql: replaceOnce(file.sql, from, to) } : file));
+}
+
 function laterMigration(sql) {
   return [...original, { name: '99999999999999_mutation.sql', sql }];
 }
@@ -119,8 +127,23 @@ const MUTATIONS = [
   },
   {
     label: 'schema_version left at 7 by the tutor cache migration',
-    migrations: [...original.slice(0, -1), { ...original[original.length - 1], sql: replaceOnce(original[original.length - 1].sql, "update pri.platform_meta set value = '8' where key = 'schema_version';", '') }],
+    migrations: mutateNamed('_tutor_cache.sql', "update pri.platform_meta set value = '8' where key = 'schema_version';", ''),
     expect: /platform_meta\.schema_version is 8/
+  },
+  {
+    label: 'billing_schema_version left at 3 by the StoreKit entitlement migration',
+    migrations: mutateNamed('_storekit_entitlement_state.sql', "update pri.platform_meta set value = '4' where key = 'billing_schema_version';", ''),
+    expect: /platform_meta\.billing_schema_version is 4/
+  },
+  {
+    label: 'billing_subscriptions.state_plan added without its CHECK',
+    migrations: mutateNamed('_storekit_entitlement_state.sql', "add column state_plan text check (state_plan in ('free','premium') or state_plan is null);", 'add column state_plan text;'),
+    expect: /billing_subscriptions CHECK constraints: Postgres is missing state_plan/
+  },
+  {
+    label: 'billing_apple_signed_events left without row-level security',
+    migrations: mutateNamed('_storekit_entitlement_state.sql', 'alter table pri.billing_apple_signed_events enable row level security;', ''),
+    expect: /billing_apple_signed_events: row-level security is not enabled/
   },
   {
     label: 'the sync cursor sequence is dropped',
