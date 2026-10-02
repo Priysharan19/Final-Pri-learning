@@ -214,7 +214,11 @@ One transport and one dispatcher per host:
 - **`host.ready`.** JavaScript sends `host.ready` once its subscribers are installed. Native buffers `billing.*` events until then and delivers them in order. Ephemeral events (`ink.strokes`, `lifecycle.state`) are not buffered; their latest state can be re-queried.
 - **Reloads.** Any main-frame navigation or reload cancels every in-flight native request: native drops their replies. After the new document's `host.ready`, native re-delivers undelivered `billing.*` events.
 - **Lifecycle state.** A lifecycle `state` event (`active` | `inactive` | `background`) supplements, and never replaces, `visibilitychange`. The drafts flush in `client/src/components/drafts.js` keeps working in browsers.
-- **Native questions to JavaScript** (Android Back) use the native → JS *request* form above. If JavaScript does not reply within 300 ms, native treats the request as unhandled.
+- **Android Back (as implemented in CP-06): declared state, not a timed question.**
+  - The page keeps the shell told whether it wants the next Back press (`lifecycle.setBackHandled {handled}`): `true` when a sheet or dialog is visibly open, or when the page has in-app history to go back through (`history.state.idx > 0`). The role landing page is the first entry, so Back there leaves the app.
+  - On Back, the shell decides synchronously. If the page wants it, a one-way `lifecycle.back` event lets the page close the sheet or go back in its own history; otherwise the shell's callback is disabled and the system default runs. A press that finds a dialog open only closes it and never also navigates.
+  - An earlier design asked the page with a 300 ms reply window. On a slower emulator the reply arrived late, and the shell exited while the page also navigated, so it was replaced.
+  - The native → JS request form above remains in the contract for future questions that need an answer.
 
 ### 4.4 Security boundaries (non-negotiable)
 

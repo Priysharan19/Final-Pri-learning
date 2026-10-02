@@ -20,6 +20,7 @@ import { PriNativeError } from './errors.js';
 export { PriNativeError, CODES, isPriNativeError } from './errors.js';
 
 let runtime = null;
+const listenedBridges = new WeakSet();
 const LIFECYCLE_STATES = new Set(['active', 'inactive', 'background']);
 
 // In browsers and WebViews `window === globalThis`; Node tests stub `window`.
@@ -49,6 +50,12 @@ function getRuntime() {
   const host = discoverHost(scope);
   if (host.native && !host.legacy && scope && typeof scope === 'object') {
     scope.__priNativeReceive = raw => runtime?.bridge.receive(raw);
+    // Android WebMessageListener: replies arrive as `message` events on the
+    // injected priBridge object (JavaScriptReplyProxy.postMessage).
+    if (typeof scope.priBridge?.addEventListener === 'function' && !listenedBridges.has(scope.priBridge)) {
+      listenedBridges.add(scope.priBridge);
+      scope.priBridge.addEventListener('message', event => runtime?.bridge.receive(event?.data));
+    }
     runtime.readySent = true;
     // host.ready lets the shell flush buffered billing events; our own bus
     // buffers them again until a subscriber appears.
@@ -270,6 +277,20 @@ const lifecycle = Object.freeze({
       if (LIFECYCLE_STATES.has(payload?.state)) fn(payload.state);
     });
     return off;
+  },
+  /** True when the host has a hardware/gesture Back button (Android). */
+  hasBackButton: () => capOf('lifecycle')?.backButton === true,
+  /** Tell the shell whether the page wants the next Back (sheet open, or away
+   * from home). The shell decides synchronously from this — no timeout race. */
+  declareBack(wanted) {
+    const c = capOf('lifecycle');
+    if (!c || c.backButton !== true || c.transport === 'legacy') return Promise.resolve(false);
+    return viaBridge('lifecycle', 'setBackHandled', { handled: wanted === true }, { timeoutMs: 5_000 }).then(() => true);
+  },
+  /** The shell passed Back to the page (it declared it wanted it). */
+  onBack(fn) {
+    if (typeof fn !== 'function') return () => {};
+    return getRuntime().bus.on('lifecycle.back', () => fn());
   },
   /** Native → JS question, e.g. Android Back: handler returns { handled }. */
   onBackRequested(fn) {

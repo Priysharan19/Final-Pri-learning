@@ -1,0 +1,117 @@
+# Android shell (CP-06): Gradle build, lint, JVM unit tests, embedded-web parity,
+# the fail-closed floor screen on the minimum API, and the shell journey (with a
+# real process death) on a floor-meeting older API and the current API, phone + tablet.
+# SYNTHETIC / EMULATOR evidence only — never a physical-device result.
+name: Android Shell
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'android/**'
+      - 'client/src/platform/**'
+      - 'client/src/main.jsx'
+      - 'scripts/sync-android.mjs'
+      - '.github/workflows/android-shell.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'android/**'
+      - 'client/src/platform/**'
+      - 'scripts/sync-android.mjs'
+      - '.github/workflows/android-shell.yml'
+
+concurrency:
+  group: android-shell-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Gradle build, lint, unit tests and web parity
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Build the shared web product
+        run: npm ci --prefix client && npm run build
+      - name: Gradle build, lint and JVM unit tests
+        working-directory: android
+        run: ./gradlew --no-daemon assembleDebug lintDebug testDebugUnitTest
+      - name: Embedded web is exactly the shared build
+        run: node scripts/sync-android.mjs --check
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: android-reports
+          path: |
+            android/app/build/reports
+            android/app/build/test-results
+          if-no-files-found: warn
+
+  emulator:
+    name: Shell on emulator (API ${{ matrix.api }}, ${{ matrix.profile }}, ${{ matrix.expect }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # API 26 (minSdk) ships a factory WebView below the Chromium 91 floor:
+          # the correct, asserted result there is the fail-closed update screen.
+          - { api: 26, profile: pixel_6, expect: floor }
+          # The oldest image here whose factory WebView meets the floor runs the
+          # whole product journey; then the current API on phone and tablet.
+          - { api: 33, profile: pixel_6, expect: product }
+          - { api: 36, profile: pixel_6, expect: product }
+          - { api: 36, profile: pixel_tablet, expect: product }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Build the shared web product
+        run: npm ci --prefix client && npm run build
+      - name: Build the app and the instrumented tests
+        working-directory: android
+        run: ./gradlew --no-daemon assembleDebug assembleDebugAndroidTest
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Emulator journey with a real process death between runs
+        # ReactiveCircus/android-emulator-runner v2.38.0, pinned to its commit.
+        uses: ReactiveCircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d
+        with:
+          api-level: ${{ matrix.api }}
+          target: google_apis
+          arch: x86_64
+          profile: ${{ matrix.profile }}
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          working-directory: android
+          script: ./scripts/run-instrumented.sh ${{ matrix.expect }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: android-emulator-${{ matrix.api }}-${{ matrix.profile }}
+          path: android/app/build/outputs/pri-instrumented
+          if-no-files-found: warn

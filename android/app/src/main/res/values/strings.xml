@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Pri Learning</string>
+    <string name="webview_update_title">Update Android System WebView</string>
+    <string name="webview_update_body">Pri Learning needs a newer Android System WebView to run. Update it from Google Play, then open Pri Learning again.</string>
+    <string name="webview_update_button">Open Google Play</string>
+    <string name="webview_unsupported_body">This device\'s WebView does not support the secure features Pri Learning needs. Update Android System WebView from Google Play.</string>
+    <string name="renderer_crash_body">Pri Learning stopped unexpectedly a few times. Your saved work is kept on this device.</string>
+    <string name="renderer_crash_retry">Try again</string>
+</resources>
