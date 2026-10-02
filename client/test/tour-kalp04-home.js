@@ -110,7 +110,7 @@ export const flow = {
 
     // Appearance evidence uses the real Settings control.
     await goto('/settings');
-    await page.getByRole('button', { name: 'Light — paper', exact: true }).click();
+    await page.getByRole('button', { name: 'Paper', exact: true }).click();
     await page.waitForFunction(() => document.documentElement.dataset.theme === 'light', { timeout: 5000 });
     await page.waitForTimeout(120);
     await goto('/');
@@ -120,7 +120,7 @@ export const flow = {
     await snap(page, '05-new-student-desktop-light');
 
     await goto('/settings');
-    await page.getByRole('button', { name: 'Dark — blackboard', exact: true }).click();
+    await page.getByRole('button', { name: 'Night', exact: true }).click();
     await goto('/');
 
     // Offline is a real browser network state. No cloud-only assignment is

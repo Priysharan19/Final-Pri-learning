@@ -188,8 +188,14 @@ export const flow = {
         // Ink scaled past the foot is simply not painted, so "still visible" is
         // the test: the lowest stroke (drawn at 90% height) must still show
         // near the foot of the wider sheet.
+        // The notebook sheet is taller on a tablet than on a phone (up to 640px
+        // against 340px), so ink drawn near the phone sheet's foot no longer
+        // sits at the tablet sheet's foot. What must hold is unchanged: the ink
+        // is still there, it moved down with the widening, and none of it is
+        // cut off at an edge.
         await check(`${tag}: widening to a tablet keeps every stroke on the sheet`,
-          !!rotated && !rotated.empty && rotated.maxY >= rotated.h * 0.85 && rotated.maxY <= rotated.h - 4, JSON.stringify(rotated));
+          !!rotated && !rotated.empty && rotated.maxY >= rotated.h * 0.5 && rotated.maxY <= rotated.h - 4 && rotated.maxX < rotated.w - 1,
+          JSON.stringify(rotated));
         // (Ink pushed past the foot is painted up to the very edge and cut off;
         //  the clamp leaves the lowest point 8px above it.)
         await page.setViewportSize({ width: 360, height: 640 });
@@ -240,10 +246,10 @@ export const flow = {
       // The launcher is a row in the flow of the page under the marked work,
       // never a card floating over the student's reasoning: scroll to it, then
       // measure that it is on screen, within the width, and clear of Next.
-      await page.locator('.pri-explain-launch').first().scrollIntoViewIfNeeded({ timeout: 5000 }).catch(() => {});
-      await page.waitForTimeout(200);
       const launcher = await page.evaluate(() => {
         const l = document.querySelector('.pri-explain-launch');
+        // Instant, centred scroll: the measurement must not race a scroll animation.
+        l?.scrollIntoView({ block: 'center', behavior: 'instant' });
         const n = document.querySelector('.ctx-next');
         const bar = document.querySelector('.ws-actions');
         if (!l) return { present: false };

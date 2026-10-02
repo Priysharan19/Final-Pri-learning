@@ -62,8 +62,8 @@ jobs:
           grep -Fq 'CLOUD HANDWRITING CLIENT: PASS — 58/58 checks' suites.log
           grep -Fq 'CLOUD WORKING CLIENT: PASS — 47/47 checks' suites.log
           grep -Fq 'CLOUD PHOTO CLIENT: PASS — 28/28 checks' suites.log
-          grep -Fq 'I18N: PASS — 188/188 checks' suites.log
-          grep -Fq 'I18N COVERAGE: PASS — 88/88 checks — 41 files scanned, 0 hard-coded strings' suites.log
+          grep -Fq 'I18N: PASS — 186/186 checks' suites.log
+          grep -Fq 'I18N COVERAGE: PASS — 88/88 checks — 42 files scanned, 0 hard-coded strings' suites.log
           grep -Fq 'I18N VOICE: PASS — 92/92 checks' suites.log
           grep -Fq 'MISCONCEPTION ONTOLOGY: PASS — 99/99 checks' suites.log
           grep -Fq 'CLOUD HANDWRITING CLIENT: PASS — 58/58 checks' suites.log
@@ -296,7 +296,7 @@ jobs:
         run: |
           set -euo pipefail
           test -s browser.log
-          grep -Eq 'E2E SUITE.*247/247.*8 flows' browser.log
+          grep -Eq 'E2E SUITE.*257/257.*9 flows' browser.log
           grep -Fq 'Submission · interruption recovery and one attempt' browser.log
           grep -Fq 'Phone · every destination reachable at 390px' browser.log
           grep -Fq 'India · onboarding, class labels, demo, cloud entry' browser.log
@@ -311,7 +311,7 @@ jobs:
           grep -Eq 'ACCESSIBILITY SUITE.*38/38.*12 groups' browser.log
           grep -Fq 'E2E BROWSER: webkit' browser.log
           test "$(grep -c 'Responsive matrix · 6 viewports, critical routes, write/type, actions' browser.log)" -ge 2
-          test "$(grep -Ec 'E2E SUITE PASSED — 145/145 checks across 1 flows' browser.log)" -eq 2
+          test "$(grep -Ec 'E2E SUITE PASSED — 151/151 checks across 1 flows' browser.log)" -eq 2
           if grep -Fq 'not measured:' browser.log; then
             echo 'A browser suite reported skipped coverage.' >&2
             exit 1

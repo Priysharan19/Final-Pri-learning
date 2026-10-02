@@ -25,6 +25,7 @@ import { checkWorkingWithCloud, mergeVerdicts, misconceptionProposal, shouldChec
 import { misconceptionById } from '../engine/misconceptions.js';
 import { tLater, translate, useT, useTx } from '../i18n/index.js';
 import TermGloss from './TermGloss.jsx';
+import { useFormFactor } from '../platform/formFactor.js';
 import Icon from './Icon.jsx';
 
 const DIFF_CLASS = { 1: 'tag-d1', 2: 'tag-d2', 3: 'tag-d3', 4: 'tag-d4' };
@@ -606,9 +607,13 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     window.addEventListener('resize', onResize);
     return () => { window.removeEventListener('orientationchange', onResize); window.removeEventListener('resize', onResize); };
   }, []);
-  const inkPageHeight = typeof window === 'undefined' ? 420
-    : window.innerWidth <= 760 ? 340
-      : window.innerHeight > window.innerWidth ? Math.min(640, Math.round(window.innerHeight * 0.48)) : 420;
+  // One sheet of the notebook. Read from the form-factor hook, which follows
+  // the window, so the sheet is the same height however the window got to its
+  // size (it used to depend on whether something else happened to re-render).
+  const viewport = useFormFactor();
+  const inkPageHeight = !viewport.width ? 420
+    : viewport.width <= 760 ? 340
+      : viewport.height > viewport.width ? Math.min(640, Math.round(viewport.height * 0.48)) : 420;
 
   // Only handwriting is gated: typing and photo carry no reading to doubt.
   const doubt = useMemo(
