@@ -144,7 +144,7 @@
     "test:platform:handwriting": "node server/test/handwriting-transcription-check.mjs",
     "test:working:cloud": "node client/test/cloud-working-client-check.mjs",
     "test:platform:working": "node server/test/working-check-check.mjs",
-    "test:platform:tutor": "node server/test/tutor-help-check.mjs",
+    "test:platform:tutor": "node server/test/tutor-help-check.mjs && node server/test/tutor-device-journey-check.mjs",
     "test:photo:cloud": "node client/test/cloud-photo-client-check.mjs",
     "test:predictor": "node client/test/mark-predictor-check.mjs",
     "preflight": "node tools/production-preflight.mjs",
