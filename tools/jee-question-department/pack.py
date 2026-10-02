@@ -17,7 +17,48 @@ DEFAULT_MANIFEST = HERE / "source-manifest.json"
 DEFAULT_DEST = HERE.parents[1] / "client" / "src" / "engine" / "generators" / "jee-pyq-data"
 
 
+def compact_official(row):
+    src, routing, exam, review = row["source"], row["routing"], row["exam"], row["review"]
+    return {
+        "id": row["id"],
+        "chapterId": routing["targetChapter"],
+        "sourceChapter": None,
+        "sourceTopic": "",
+        "sourceTopicNumber": None,
+        "sourceQuestionNumber": src["questionNumber"],
+        "sourcePage": src["page"],
+        "sourcePdfPage": src["page"],
+        "examYear": exam.get("year"),
+        "examTrack": exam["track"],
+        "difficulty": row["difficulty"],
+        "answerType": row["answerType"],
+        "prompt": row["prompt"],
+        "answer": row.get("answer"),
+        "mcqOptions": row.get("mcqOptions"),
+        "hints": row.get("hints") or [],
+        "steps": row["steps"],
+        "official": {
+            "authority": src.get("authority"),
+            "documentId": src["documentId"],
+            "url": src["url"],
+            "archivedAt": src.get("archivedAt"),
+            "keyUrl": src.get("keyUrl"),
+            "paper": exam.get("paper"),
+            "session": exam.get("session"),
+            "shift": exam.get("shift"),
+            "section": src.get("section"),
+        },
+        "review": {
+            "reviewedBy": review["reviewedBy"],
+            "reviewedAt": review["reviewedAt"],
+            "tier": review.get("tier"),
+        },
+    }
+
+
 def compact_record(row):
+    if (row.get("source") or {}).get("kind") == "official":
+        return compact_official(row)
     src, routing, exam = row["source"], row["routing"], row["exam"]
     return {
         "id": row["id"],
@@ -120,6 +161,7 @@ def main():
         "parts": len(part_files),
         "sha256": sha.hexdigest(),
         "tracks": dict(Counter(r["examTrack"] for r in approved)),
+        "reviewTiers": dict(Counter((r.get("review") or {}).get("tier") or "human" for r in approved)),
         "answerTypes": dict(Counter(r["answerType"] for r in approved)),
     }
     coverage = {gid: sorted(parts) for gid, parts in sorted(chapter_to_parts.items())}

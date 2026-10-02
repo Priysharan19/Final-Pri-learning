@@ -32,12 +32,51 @@ const RATING_SUBTOPIC = Object.freeze({
   'c12-3d-geometry': 'c12-3d-geometry'
 });
 
+function officialLabel(rec) {
+  const o = rec.official;
+  const exam = rec.examTrack === 'jee-main' ? 'JEE Main' : 'JEE Advanced';
+  const sitting = rec.examTrack === 'jee-main'
+    ? [o.session ? `Session ${o.session}` : null, o.shift || null]
+    : [o.paper ? `Paper ${o.paper}` : null];
+  return [rec.examYear ? `${exam} ${rec.examYear}` : exam, ...sitting, `Q${rec.sourceQuestionNumber}`].filter(Boolean).join(' · ');
+}
+
 function sourceLabel(rec) {
+  if (rec.official) return officialLabel(rec);
   const exam = rec.examTrack === 'jee-main' ? 'JEE Main' : 'JEE Advanced / IIT-JEE';
   return [rec.examYear ? `${exam} ${rec.examYear}` : exam, rec.sourceChapter, rec.sourceTopic].filter(Boolean).join(' · ');
 }
 
+function officialArchiveMeta(rec) {
+  const o = rec.official;
+  const automated = rec.review?.tier === 'automated';
+  return {
+    id: rec.id,
+    authority: o.authority || null,
+    documentId: o.documentId,
+    url: o.url,
+    archivedAt: o.archivedAt || null,
+    keyUrl: o.keyUrl || null,
+    paper: o.paper || null,
+    session: o.session || null,
+    shift: o.shift || null,
+    questionNumber: rec.sourceQuestionNumber,
+    sourcePage: rec.sourcePage,
+    examYear: rec.examYear,
+    track: rec.examTrack,
+    reviewTier: rec.review?.tier || 'human',
+    reviewedBy: rec.review?.reviewedBy || null,
+    reviewedAt: rec.review?.reviewedAt || null,
+    // The question and its answer come from the exam authority. Who checked the
+    // transcription and wrote the worked solution is stated, never implied.
+    solutionAuthorship: automated
+      ? 'Official question and official answer key; transcription and worked solution checked by the automated key + engine + AI review tier, not by a person'
+      : 'Official question and official answer key; transcription and worked solution reviewed by a named person'
+  };
+}
+
 function archiveMeta(rec) {
+  if (rec.official) return officialArchiveMeta(rec);
   return {
     id: rec.id,
     book: '41 Years IIT JEE Mathematics',
@@ -78,6 +117,7 @@ export function asJeePyqPayload(rec) {
     pyqTrack: rec.examTrack,
     pyqYear: rec.examYear || null,
     pyqSource: sourceLabel(rec),
+    pyqReviewTier: rec.review?.tier || 'human',
     archive: archiveMeta(rec)
   };
 
@@ -111,7 +151,11 @@ export function asJeePyqPayload(rec) {
   if (rec.answerType === 'numeric') {
     const value = Number(rec.answer?.value);
     if (!Number.isFinite(value)) throw new Error(`Reviewed JEE numeric question ${rec.id} has an invalid answer.`);
-    return { ...base, answerType: 'numeric', answer: { value }, inputHint: 'Enter the numerical value' };
+    // An official key published as an accepted band carries its half-width as
+    // `tol`; dropping it would mark an answer the exam accepted as wrong.
+    const tol = Number(rec.answer?.tol);
+    const answer = Number.isFinite(tol) && tol > 0 ? { value, tol } : { value };
+    return { ...base, answerType: 'numeric', answer, inputHint: 'Enter the numerical value' };
   }
 
   if (rec.answerType === 'selfcheck') {
@@ -120,7 +164,7 @@ export function asJeePyqPayload(rec) {
     return {
       ...base,
       custom: true,
-      customName: `${rec.sourceChapter} · JEE PYQ`,
+      customName: `${rec.sourceChapter || sourceLabel(rec)} · JEE PYQ`,
       answerType: 'mcq',
       answer: { correctIndex: 0 },
       mcqOptions: ['I have finished — reveal and self-check'],
