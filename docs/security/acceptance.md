@@ -27,7 +27,7 @@ the bytes that ship.
 
 | File | Proves |
 |---|---|
-| `docs/security/route-inventory.json` | The reviewed list of all 78 `/v1` routes: method, path, auth kind, roles, verified-email and guardian-consent gates, ownership rule, rate limits, CSRF and Origin treatment, body limits. |
+| `docs/security/route-inventory.json` | The reviewed list of all 80 `/v1` routes: method, path, auth kind, roles, verified-email and guardian-consent gates, ownership rule, rate limits, CSRF and Origin treatment, body limits. |
 | `server/platform/routePolicy.js` | Reads the guards really mounted in front of each handler by walking the production router (the guard factories carry a `priPolicy` tag). Each rate limit records its `identity`: `account` when `requireSession` ran before it, `ip` otherwise; a role or verified-email gate before `requireSession` is reported as out of order. |
 | `server/test/route-inventory-check.mjs` | Mounted routes and inventory match exactly. A new route without an entry, a removed or changed guard (session, role, verified email, consent, rate limit, CSRF), a stale entry, or an incomplete entry fails. A session route whose limit is IP-keyed (limiter before `requireSession`) or whose role/verified gate precedes the session fails even if the inventory agrees. Self-tests prove an unlisted route, a role change, a dropped rate limit, a dropped `requireSession` and both ordering faults are each caught. |
 | `server/test/sql-parameterisation-check.mjs` | Static: every `${…}` inside a SQL template in `server/platform` is a reviewed constant fragment; no request value is interpolated. |
@@ -47,7 +47,7 @@ suites and `request-size-contract-check`.
 
 | Suite | SQLite | Postgres 17 |
 |---|---|---|
-| route-inventory-check | 31/31 (78 routes) | n/a (no database) |
+| route-inventory-check | 31/31 (80 routes) | n/a (no database) |
 | sql-parameterisation-check | 24 reviewed interpolations | n/a |
 | security-acceptance-check | 189/189 | 189/189 |
 | abuse-limits-check | 27/27 | 27/27 |
@@ -89,7 +89,7 @@ page does not accept them.
 
 | Field | Meaning |
 |---|---|
-| `auth` | `session` (cookie session via `requireSession`), `credentials` (email + password), `bearer-token` (one-time emailed token), `oidc-token` (Apple/Google identity token + issued nonce), `provider-signature` (payment webhook), `none` (public). Only `session` is machine-derived; the rest are reviewed. |
+| `auth` | `session` (cookie session via `requireSession`), `credentials` (email + password), `bearer-token` (one-time emailed token), `oidc-token` (Apple/Google identity token + issued nonce), `provider-signature` (payment webhook), `operator-token` (`Authorization: Bearer $PRI_METRICS_TOKEN`, `/v1/metrics` only), `none` (public). `session` and `operator-token` are machine-derived from the tagged guards; the rest are reviewed. |
 | `roles` | Roles that pass every `requireRole` gate on the route (intersection), or `null` for any signed-in role. |
 | `verifiedEmail`, `guardianConsent` | Whether `requireVerifiedEmail` / `requireGuardianConsent` sit in front of the handler. |
 | `ownership` | The object-level rule, in words: which rows the caller can reach and what answer anything else gets. |

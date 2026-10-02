@@ -17,6 +17,32 @@
       "bodyLimit": "no-body"
     },
     {
+      "method": "GET",
+      "path": "/v1/ready",
+      "auth": "none",
+      "roles": null,
+      "verifiedEmail": false,
+      "guardianConsent": false,
+      "ownership": "public by design for uptime checks and the Railway deploy healthcheck: one state and one code per dependency, schema versions and release SHA; no counts, configuration values, identifiers or secrets",
+      "rateLimits": [],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/metrics",
+      "auth": "operator-token",
+      "roles": null,
+      "verifiedEmail": false,
+      "guardianConsent": false,
+      "ownership": "operator only: Bearer PRI_METRICS_TOKEN (constant-time compare; closed with 503 in production when unset or shorter than 32 chars; loopback-only outside production when unset); aggregate counters with fixed-alphabet labels, no identifiers or paths",
+      "rateLimits": [],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
+    },
+    {
       "method": "POST",
       "path": "/v1/account/register",
       "auth": "none",

@@ -196,6 +196,13 @@ jobs:
           node server/test/entitlement-admin-grant-check.mjs
           node server/test/request-size-contract-check.mjs
           node server/test/content-index-exposure-check.mjs
+      - name: Structured logs, readiness, metrics, alert policy and failure drills (SQLite)
+        run: |
+          set -o pipefail
+          node server/test/observability-check.mjs 2>&1 | tee ops.log
+          node server/test/failure-drills-check.mjs 2>&1 | tee -a ops.log
+          grep -Fq 'OBSERVABILITY: PASS' ops.log
+          grep -Fq 'FAILURE DRILLS: PASS' ops.log
       # V1 blocker #14: every /v1 route is in the reviewed inventory with the
       # guards really mounted on it; every object-level route fails closed for
       # no session, revoked sessions, wrong account, wrong role, unverified
@@ -233,6 +240,7 @@ jobs:
           grep -Fq 'ACCOUNT LIFECYCLE JOURNEY: PASS' platform-postgres.log
           grep -Fq 'POSTGRES SCHEMA MUTATIONS: PASS — 23/23' platform-postgres.log
           grep -Fq 'PLATFORM SYNC BURST: PASS' platform-postgres.log
+          grep -Fq '✓ failure-drills-check.mjs' platform-postgres.log
       - name: Platform migration contract
         run: node server/test/platform-migration-check.mjs
       - name: Billing v3 to v4 payment-retention rebuild on a populated SQLite database
