@@ -1,6 +1,22 @@
 # Pri Learning production deployment contract
 
-Pri Learning's learning experience remains offline-first. This document covers the optional production cloud control plane in `server/`.
+This document covers the production `/v1` server and web client in `server/` and `client/`, served from one image. Under ADR-0001 (`docs/architecture/adr-0001-online-first-runtime.md`) the product is online-first: this server is hosted on Railway and, once the cutover in `docs/operations/postgres-cutover.md` has run, its records live in Supabase Postgres (Mumbai). The deterministic marking engine stays bundled in the client as the instant and connection-loss fallback.
+
+The step-by-step go-live sequence, with every owner-only action marked, is `docs/release/production-cutover-checklist.md`.
+
+## Railway
+
+`railway.json` at the repository root is the Railway config-as-code for the `/v1` service. It builds the root `Dockerfile` (no Nixpacks, no start-command override), uses `GET /v1/ready` as the deploy healthcheck so a replica that cannot serve (database unreachable, schema mismatch, verification email unconfigured) never takes traffic, restarts only on failure, and allows 20 s of draining, longer than the server's own 10 s shutdown deadline. Railway passes `RAILWAY_GIT_COMMIT_SHA` to the build, and the Dockerfile already turns that into the release identity that `/v1/health` and `/release.json` report (`.github/workflows/deployment-image.yml` proves the two agree).
+
+The production service's source must be the `main` branch of `Priysharan19/Final-Pri-learning`, with Railway's *Wait for CI* option on, so only a `main` SHA that passed its checks is built. Settings in the Railway dashboard override `railway.json`; leave the build, healthcheck and restart fields empty there.
+
+After every production deploy, verify the exact SHA from a checkout of that SHA:
+
+```bash
+npm run verify:deployment -- --origin https://<production origin> --sha <40-hex main SHA> --engine postgres
+```
+
+`tools/verify-deployment.mjs` sends three unauthenticated GETs and changes nothing. It prints `DEPLOYMENT VERIFIED: PASS` only when the server and the web bundle both report that SHA, storage is persistent, the database is reachable at the schema versions the checkout expects, verification email is configured and `/v1/ready` says the replica can serve. Use `--engine sqlite` while the service still runs on the volume.
 
 ## Immutable application image
 
@@ -21,7 +37,7 @@ Production configuration belongs in the deployment platform, not the image. Star
 
 ## Persistent storage is mandatory
 
-Production startup requires `PRI_PLATFORM_DB` to be an absolute path. Mount persistent storage at `/data` and use:
+Production runs on Supabase Postgres when `PRI_DATABASE_URL` is set; its TLS, role and pool requirements are in `docs/operations/postgres-cutover.md` §1. Without it, production startup requires `PRI_PLATFORM_DB` to be an absolute path. Mount persistent storage at `/data` and use:
 
 ```text
 PRI_PLATFORM_DB=/data/pri-learning-platform.db

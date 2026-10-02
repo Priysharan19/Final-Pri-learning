@@ -24,7 +24,7 @@ printed):
 | **Production:** verified TLS — `sslmode=verify-full` (preferred), or `sslmode=require` **with** `PRI_DATABASE_SSL_ROOT_CERT` | `config.js postgresConnectionSettings` | `PLATFORM_DB_TLS_REQUIRED` (no/weak sslmode) / `PLATFORM_DB_TLS_UNVERIFIED` (`require` without the CA) |
 | No `sslrootcert`/`sslcert`/`sslkey`/`ssl=` in the URL (CA goes in `PRI_DATABASE_SSL_ROOT_CERT`) | same | `PLATFORM_DB_TLS_INVALID` |
 | Reachable, migrated (`platform_meta.schema_version` present) | `store.js createPostgresStore` | `PLATFORM_DB_UNAVAILABLE` / `PLATFORM_DB_NOT_MIGRATED` |
-| `schema_version` = 8 and `billing_schema_version` = 4 exactly (`server/platform/schemaVersions.js`) | `store.js assertSchemaVersions` | `PLATFORM_DB_SCHEMA_MISMATCH` |
+| `schema_version` = 8 and `billing_schema_version` = 6 exactly (`server/platform/schemaVersions.js`) | `store.js assertSchemaVersions` | `PLATFORM_DB_SCHEMA_MISMATCH` |
 | `pri.sync_cursor_seq` exists (migration `20261002000000`) | same | `PLATFORM_DB_SCHEMA_MISMATCH` |
 | Timeouts, lock wait and pool size parse as whole numbers in range | `config.js postgresSessionLimits` | `PLATFORM_DB_CONFIG_INVALID` |
 
@@ -110,7 +110,9 @@ npx supabase@latest link --project-ref orudxrckgxyyraopyzmn
 #        20261001000000_platform_schema.sql
 #        20261002000000_sync_cursor_sequence.sql
 #        20261002010000_tutor_cache.sql   (additive: the AI tutor reply cache; schema_version 8)
-#        20261003000000_billing_payment_retention.sql
+#        20261003000000_billing_payment_retention.sql      (billing_schema_version 4)
+#        20261003010000_storekit_entitlement_state.sql     (billing_schema_version 5)
+#        20261004000000_google_play_billing.sql            (billing_schema_version 6)
 npx supabase@latest migration list
 npx supabase@latest db push --dry-run
 
@@ -193,7 +195,7 @@ unset PRI_DATABASE_URL PRI_DATABASE_SSL_ROOT_CERT
 `server/tools/postgres-target-check.mjs` connects exactly as the server does and changes nothing
 that persists. It must print `POSTGRES TARGET: PASS` with every line ticked:
 
-* boot checks (TLS policy, `schema_version` 8 / `billing_schema_version` 4, cursor sequence);
+* boot checks (TLS policy, `schema_version` 8 / `billing_schema_version` 6, cursor sequence);
 * TLS negotiated (`pg_stat_ssl`), `statement_timeout` / `idle_in_transaction_session_timeout` applied;
 * login role is a `pri_server` member, not superuser, not BYPASSRLS;
 * the live schema gate — every table, column type, key, CHECK expression, index, RLS policy
@@ -277,7 +279,7 @@ cutover do not exist in the SQLite file. So after real traffic:
   build disagree. Deploy the build that matches the database, or apply the missing migration —
   do not edit `platform_meta` by hand to make the error go away.
 * **Rolling back the application build** is safe only to a build with the same
-  `SCHEMA_VERSION` / `BILLING_SCHEMA_VERSION` (7 / 3). Builds with the version check refuse a
+  `SCHEMA_VERSION` / `BILLING_SCHEMA_VERSION` (8 / 6 at the time of writing; `server/platform/schemaVersions.js` is authoritative). Builds with the version check refuse a
   database at any other version. Builds from **before** that check (the #247-era driver) only
   check that a `schema_version` exists, so they **do boot** against this database — but they
   allocate sync cursors from `pri.sync_cursors`, on which `pri_server` no longer has `UPDATE`:
