@@ -449,3 +449,31 @@ export function takeCloudReadingNotice(user, storage = globalThis.localStorage) 
   } catch { /* show it; better twice than never */ }
   return true;
 }
+
+/**
+ * The same plain-language reasons for ink, phrased for working that stays on
+ * the page: it is saved, and it is read by itself once the reason goes away.
+ */
+const INK_BLOCKED = Object.freeze({
+  'verdict.photoReadingTurnedOff': 'ink.waitingTurnedOff',
+  'verdict.photoReadingNotOnThisInstall': 'ink.waitingNotOnThisInstall',
+  'verdict.photoReadingOffline': 'ink.waitingOffline',
+  'verdict.photoReadingSignIn': 'ink.waitingSignIn',
+  'verdict.photoReadingGuardian': 'ink.waitingGuardian',
+  'verdict.photoReadingVerifyEmail': 'ink.waitingVerifyEmail',
+  'verdict.photoReadingServiceDown': 'ink.waitingServiceDown'
+});
+export function inkReadingBlockedKey(user, options = {}) {
+  return INK_BLOCKED[photoReadingBlockedKey(user, options)] || 'ink.waitingServiceDown';
+}
+
+/**
+ * How long to wait before asking a reader that did not answer again: 20 s,
+ * then doubling, never more than five minutes apart, for as long as the page
+ * waits. Never gives up while the student's working is still on the page.
+ */
+export const RETRY_MS = 20_000;
+export const RETRY_CAP_MS = 5 * 60_000;
+export function retryDelayMs(attempt) {
+  return Math.min(RETRY_CAP_MS, RETRY_MS * 2 ** Math.max(0, Math.floor(Number(attempt) || 0)));
+}

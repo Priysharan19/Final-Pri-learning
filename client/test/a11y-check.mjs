@@ -712,14 +712,10 @@ async function run() {
       };
       await draw([[70, 50], [70, 105], [120, 105]]);
       await draw([[150, 50], [150, 105]]);
-      await page.waitForSelector('.ink-preview', { timeout: 20000 });
+      // Server-only reading (owner decision): with no reader in this harness
+      // the page shows the reading/waiting status rather than a local reading.
+      await page.waitForSelector('.ink-preview, .ink-status', { timeout: 20000 });
       await wait(page, 600);
-    });
-
-    await step('practice · handwriting · correcting a symbol', '/practice', async () => {
-      await click(page, '.ink-sym');
-      await page.waitForSelector('.ink-picker', { timeout: 15000 });
-      await wait(page, 400);
     });
 
     await step('practice · photo mode', '/practice', async () => {
