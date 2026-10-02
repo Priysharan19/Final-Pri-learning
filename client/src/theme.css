@@ -2114,8 +2114,7 @@ html.theme-switching, html.theme-switching * {
    · Labels above content are small tracked capitals in the quiet ink.
    ─────────────────────────────────────────────────────────────────────── */
 .home-greet, .pg-head h1, .home-next-title { font-weight: 400; letter-spacing: 0; }
-.hero-kicker, .eyebrow { font: var(--type-label); text-transform: uppercase; letter-spacing: var(--tracking-label); color: var(--ink-3); }
-.brand-wordmark, .brand-mark { display: block; flex: none; color: var(--ink); }
+.brand-wordmark { display: block; flex: none; color: var(--ink); }
 
 /* ── Motion system ────────────────────────────────────────────────────────
    Purposeful and quiet: motion explains where something came from or that
@@ -2131,7 +2130,6 @@ html.theme-switching, html.theme-switching * {
 }
 @keyframes pri-rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 @keyframes pri-pop { 0% { opacity: 0; transform: scale(0.6); } 70% { opacity: 1; transform: scale(1.08); } 100% { transform: scale(1); } }
-@keyframes pri-nudge { 0%, 100% { transform: none; } 30% { transform: translateX(-3px); } 65% { transform: translateX(2px); } }
 @keyframes pri-fill { from { transform: scale(0.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 
 /* Page and list reveals: a screen's blocks arrive in reading order. */
@@ -2144,17 +2142,15 @@ html.theme-switching, html.theme-switching * {
 /* Press physics: a short, firm give under the finger, released on a spring. */
 .btn:active:not(:disabled) { transform: scale(0.97); }
 
-/* Feedback: the verdict rises into place; a correct mark pops once; a
-   mistake gets one small, kind nudge — never a shake. */
+/* Feedback: the verdict rises into place; a correct mark pops once. */
 .verdict { animation: pri-rise 260ms var(--ease-emphasized) both; }
 .verdict-good .verdict-ico { animation: pri-pop 360ms var(--ease-spring) 90ms both; }
-.verdict-bad:not(.verdict-unsure) { animation: pri-rise 260ms var(--ease-emphasized) both, pri-nudge 300ms var(--ease-standard) 260ms; }
 
 /* Progress: this week's studied days fill in. */
 .week-dot.hit { animation: pri-fill 300ms var(--ease-spring) both; }
 
 @media (prefers-reduced-motion: reduce) {
-  .home-wrap > *, .verdict, .verdict-good .verdict-ico, .verdict-bad, .week-dot.hit {
+  .home-wrap > *, .verdict, .verdict-good .verdict-ico, .week-dot.hit {
     animation: none !important;
   }
   .btn, .btn:active:not(:disabled) { transform: none; transition: none; }
