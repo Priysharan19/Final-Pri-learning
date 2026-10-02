@@ -145,6 +145,7 @@ try {
     const r = await h.request(path, { method, body: method === 'POST' ? { events: [{ type: 'feature-used' }] } : undefined });
     c.ok(r.status === 401 || (r.status === 403 && r.data?.error?.code === 'CSRF_REJECTED'), `${method} ${path} with no session is an authentication failure, not a consent one (${r.status} ${r.data?.error?.code || ''})`);
   }
+  console.log(`engine: ${h.engine}`);
 } finally {
   await h.close();
 }
