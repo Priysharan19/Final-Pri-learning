@@ -25,6 +25,7 @@ import {
   markMultiCorrect
 } from '../engine/indiaExams.js';
 import { composeIndiaPaper, composerNotes, answerText } from '../engine/indiaExamComposer.js';
+import { stampExamItem } from '../engine/contentIdentity.js';
 import { examStepMeta, recordIndiaExamEvidence, finishIndiaExamEvidence } from './backend.js';
 import { assertExamAllowed, examAllowance, recordExamSimulation, requireCapability } from './entitlementGate.js';
 import { ENTITLEMENTS } from '../platform/entitlements.js';
@@ -180,7 +181,10 @@ async function createIndiaExam(profile, body = {}) {
   try {
     for (const q of paper.questions) {
       const row = {
-        id: uuid(), pid: profile.id, subtopic: q.payload.subtopic, difficulty: q.difficulty, payload: q.payload,
+        id: uuid(), pid: profile.id, subtopic: q.payload.subtopic, difficulty: q.difficulty,
+        // Every paper item is versioned like a practice question, so a sat
+        // paper stays interpretable after the banks behind it change.
+        payload: stampExamItem(q.payload, { blueprintId: spec.id, paperSeed: seed, order: q.order }),
         india: { chapterId: q.chapterId, track, dotpointIndex: null },
         mode: 'exam', examId, taskId: null, answered: 0, tries: 0, hintsUsed: 0, createdAt: now,
         indiaExamSection: q.section, indiaExamSectionLabel: q.sectionLabel, indiaExamItem: q.item, examOrder: q.order,
