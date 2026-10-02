@@ -17,6 +17,32 @@
       "bodyLimit": "no-body"
     },
     {
+      "method": "GET",
+      "path": "/v1/ready",
+      "auth": "none",
+      "roles": null,
+      "verifiedEmail": false,
+      "guardianConsent": false,
+      "ownership": "public by design for uptime checks and the Railway deploy healthcheck: one state and one code per dependency, schema versions and release SHA; no counts, configuration values, identifiers or secrets",
+      "rateLimits": [],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/metrics",
+      "auth": "operator-token",
+      "roles": null,
+      "verifiedEmail": false,
+      "guardianConsent": false,
+      "ownership": "operator only: Bearer PRI_METRICS_TOKEN (constant-time compare; closed with 503 in production when unset or shorter than 32 chars; loopback-only outside production when unset); aggregate counters with fixed-alphabet labels, no identifiers or paths",
+      "rateLimits": [],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
+    },
+    {
       "method": "POST",
       "path": "/v1/account/register",
       "auth": "none",
@@ -1242,6 +1268,39 @@
         {
           "key": "working-check",
           "limit": 120,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/tutor/status",
+      "auth": "session",
+      "roles": null,
+      "verifiedEmail": false,
+      "guardianConsent": true,
+      "ownership": "no per-account data; readiness only. 404 for every caller unless PRI_FEATURE_TUTOR=1 (ships dark, frozen V1 scope)",
+      "rateLimits": [],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/tutor/help",
+      "auth": "session",
+      "roles": null,
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "ownership": "stateless per account; replies cached by a SHA-256 of the request content only (no account id), so an account can read back only a reply to an identical request. 404 unless PRI_FEATURE_TUTOR=1; practice context only (TUTOR_EXAM_LOCKED); closed body ≤48 kB, maths-only (TUTOR_NOT_MATHS); per-account daily allowance (PRI_TUTOR_CALLS_PER_ACCOUNT_DAY, plan-aware) and one unit of the deployment paid-call ceiling per model call",
+      "rateLimits": [
+        {
+          "key": "tutor-help",
+          "limit": 60,
           "windowMs": 3600000,
           "identity": "account"
         }
