@@ -49,6 +49,18 @@ It runs in `ci.yml` (required: S0 + S1 + Apple bundle identity) and `android-she
 
 **Compatibility policy:**
 - **Server compatibility window.** The server must keep working with every shell build at or above the floor. Server changes are backward compatible with the oldest supported shell; a breaking `/v1` change needs a new route or field, never a silent change.
-- **Floor.** `PRI_MIN_IOS_BUILD` / `PRI_MIN_ANDROID_BUILD`, unset by default. A shell below the floor, or one that sends no build, gets `426 CLIENT_UPGRADE_REQUIRED {platform, minBuild, build}` on cloud routes. Health, logout, account export and account deletion stay reachable, so nobody is trapped with their data. Learning on the device is never affected. A malformed floor stops a production boot.
+- **Floor.** `PRI_MIN_IOS_BUILD` / `PRI_MIN_ANDROID_BUILD` are unset by default. A shell below the floor gets `426 CLIENT_UPGRADE_REQUIRED {platform, minBuild, build}` (with `Upgrade: pri-shell`, never cached) on sync, billing, recognition and every other non-exit route. So does a shell that sends no build. Learning on the device is never affected.
+  - **Exit routes stay open whatever the build**, so nobody is trapped with their data:
+    - health;
+    - password and Apple/Google sign-in, including the re-auth nonce;
+    - password recovery and email verification;
+    - the session check;
+    - devices (list and revoke);
+    - logout, export and account deletion.
+  - `server/test/client-compatibility-check.mjs` proves this against the real `/v1` router: an old shell signs in, gets 426 on sync, exports, deletes, and the deleted account cannot sign in.
+  - A malformed floor stops a production boot.
+  - `/v1/health` reports the active floors and how many requests they refused (`clientCompatibility`).
+- **The floor is an upgrade nudge, not a security control.** Any non-browser client can claim any build. Never raise it in place of a server-side fix.
+- **Only shells that send `X-Pri-Shell-Build` can pass a floor.** That means shells built from CP-11 onward. A floor therefore locks out every older shell regardless of its real build, which is intended. Never set a floor above a build that is live at 100% in the store; check `/v1/health` right after changing it.
 - **Shell ↔ web protocol.** The page negotiates per-capability versions with the host descriptor. A host advertising a newer envelope protocol than the page understands is treated as a browser (fail closed), and an older one is offered only the capabilities both understand (`client/src/platform/native/host.js`).
-- **Staged rollout.** Deploy the server first. Then roll the shell out in stages (Play staged rollout, App Store phased release). Raise the floor only after the new build has reached 100% of users and been out for long enough that stragglers have updated (start with 14 days), and only for a real incompatibility or security reason.
+- **Staged rollout.** Deploy the server first. Then roll the shell out in stages (Play staged rollout, App Store phased release). Raise the floor only after the new build has reached 100% of users and been out for long enough that stragglers have updated (start with 14 days), and only for a real incompatibility (a security fix belongs on the server, not in the floor).

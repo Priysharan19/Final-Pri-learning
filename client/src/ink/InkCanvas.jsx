@@ -22,8 +22,8 @@
 //   · stroke eraser, undo/redo, clear; serialisable strokes preserve
 //     {x,y,w,t,p,azimuth,altitude} when the browser exposes Pencil dynamics.
 // ─────────────────────────────────────────────────────────────────────────────
-import { strokeStarted, strokeMoved, strokeEnded, touchRejected } from './inputMetrics.js';
 import React, { useEffect, useImperativeHandle, useRef, useState, forwardRef, useCallback } from 'react';
+import { strokeStarted, strokeMoved, strokeEnded, touchRejected } from './inputMetrics.js';
 import { makePenFilter } from './smooth.js';
 
 const BASE_W = 3.05;          // resting ink width — strong, chalk-on-board
@@ -396,12 +396,13 @@ const InkCanvas = forwardRef(function InkCanvas({
       if (toolRef.current !== 'eraser' && currentRef.current) {
         const { points } = currentRef.current;
         currentRef.current = null;
-        strokeEnded(e, { cancelled: e.type === 'pointercancel', kept: points.length });
         if (points.length) {
           strokesRef.current = [...strokesRef.current, { points }];
           paintStroke(ctxRef.current.base, points, inkRef.current);
           notify();
         }
+        // Measured only after the stroke is safely committed.
+        strokeEnded(e, { cancelled: e.type === 'pointercancel', kept: points.length });
         clearLive();
         force(x => x + 1);
       }

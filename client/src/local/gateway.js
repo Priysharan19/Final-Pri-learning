@@ -80,6 +80,16 @@ function optionalId(body, key) {
   if (typeof body[key] !== 'string' || !ID.test(body[key])) throw apiError(`${key} is not a valid id.`, 400, 'INVALID_ID');
 }
 
+// A client idempotency key for one practice submission (§09): opaque, short,
+// URL-safe. Anything else is refused rather than silently treated as absent,
+// so a retry can never quietly lose its exactly-once protection.
+function optionalSubmissionId(body) {
+  if (body.submissionId === undefined || body.submissionId === null) return;
+  if (typeof body.submissionId !== 'string' || !/^[A-Za-z0-9_-]{8,80}$/.test(body.submissionId)) {
+    throw apiError('submissionId is not a valid submission id.', 400, 'INVALID_ID');
+  }
+}
+
 function optionalIdArray(body, key, max = 200) {
   if (body[key] === undefined || body[key] === null) return;
   if (!Array.isArray(body[key]) || body[key].length > max) throw apiError(`${key} must be an array of at most ${max} ids.`, 400, 'INVALID_FIELD');
@@ -167,12 +177,27 @@ const BODY_RULES = [
     // archive has nothing for the chapter, so the student is never told they
     // are sitting a past paper when they are not.
     optionalBoolean(body, 'pyqOnly'); optionalBoolean(body, 'resume');
+    // The question a submission was in flight on when the app went away (§09).
+    optionalId(body, 'pendingQuestionId');
   }],
   [/^POST \/practice\/[A-Za-z0-9._-]+\/(?:hint|reveal)$/, body => {
     requireObject(body, 'practice action'); optionalNumber(body, 'ms');
   }],
+  // A cloud-proposed misconception: the student's own working lines, the
+  // proposed ontology ID and where the cloud check placed the break. The
+  // backend re-decides it deterministically; this only bounds its shape.
+  [/^POST \/practice\/[A-Za-z0-9._-]+\/misconception$/, body => {
+    requireObject(body, 'practice misconception'); optionalString(body, 'misconceptionId', 64);
+    optionalNumber(body, 'firstBreak'); optionalBoolean(body, 'confident');
+    optionalSubmissionId(body);
+    if (body.lines !== undefined && (!Array.isArray(body.lines) || body.lines.length > 40
+      || body.lines.some(l => typeof l !== 'string' || l.length > 400))) {
+      throw apiError('lines must be at most 40 lines of working.', 400, 'INVALID_FIELD');
+    }
+  }],
   [/^POST \/practice\/[A-Za-z0-9._-]+\/submit$/, body => {
     requireObject(body, 'practice submit'); optionalNumber(body, 'ms'); optionalBoolean(body, 'viaInk');
+    optionalSubmissionId(body);
     if (body.steps !== undefined && typeof body.steps !== 'string' && !Array.isArray(body.steps)) throw apiError('steps must be text or an array.', 400, 'INVALID_FIELD');
     if (body.ink !== undefined && body.ink !== null && !plainObject(body.ink)) throw apiError('ink must be an object.', 400, 'INVALID_FIELD');
   }],

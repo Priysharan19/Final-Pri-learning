@@ -60,8 +60,8 @@ async function ensureClusterRoles(admin) {
 
 /**
  * A fresh database with the given migrations applied (default: the repository's
- * supabase/migrations, in filename order, each in its own transaction as the
- * Supabase CLI applies them). Returns a superuser client on it, its URL, and
+ * supabase/migrations, in filename order, each applied as-is: every file
+ * opens and commits its own transaction, because the Supabase CLI does not). Returns a superuser client on it, its URL, and
  * drop() to remove it.
  */
 export async function scratchDatabase(label, { migrations = migrationFiles() } = {}) {
@@ -82,10 +82,14 @@ export async function scratchDatabase(label, { migrations = migrationFiles() } =
   let applied = 0;
   try {
     for (const migration of migrations) {
-      await client.query('BEGIN');
+      // No wrapper: the Supabase CLI does not wrap a migration in a
+      // transaction, so each file carries its own begin/commit (enforced by
+      // migration-transaction-check.mjs). Sent as one simple query, a file
+      // still runs in an implicit transaction here, so this harness cannot
+      // reproduce the CLI's statement-by-statement behaviour — the static
+      // check is the gate for that.
       try {
         await client.query(migration.sql);
-        await client.query('COMMIT');
       } catch (error) {
         await client.query('ROLLBACK').catch(() => {});
         throw Object.assign(new Error(`migration ${migration.name} failed: ${error.message}`), { code: error.code, migration: migration.name });

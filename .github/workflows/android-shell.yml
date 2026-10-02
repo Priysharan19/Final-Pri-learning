@@ -18,6 +18,13 @@ on:
       - 'server/app.js'
       - 'server/package-lock.json'
       - 'client/src/lib/files.js'
+      - 'client/src/components/CloudAccountPanel.jsx'
+      - 'client/src/components/CloudAccountSecurity.jsx'
+      - 'client/src/components/GooglePlayBilling.jsx'
+      - 'client/src/ink/**'
+      - 'scripts/cloud-fixture-server.mjs'
+      - 'scripts/release-matrix.mjs'
+      - 'release/metadata.json'
       - '.github/workflows/android-shell.yml'
   push:
     branches: [main]
@@ -25,6 +32,8 @@ on:
       - 'android/**'
       - 'client/src/platform/**'
       - 'scripts/sync-android.mjs'
+      - 'scripts/release-matrix.mjs'
+      - 'release/metadata.json'
       - '.github/workflows/android-shell.yml'
 
 concurrency:

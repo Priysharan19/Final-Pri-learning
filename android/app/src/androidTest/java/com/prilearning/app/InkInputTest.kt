@@ -73,6 +73,13 @@ class InkInputTest {
     private fun inkPixels(s: ActivityScenario<MainActivity>): Int = eval(s, """(function(){var c=document.querySelector('.editor-shell .ink-canvas-base')||document.querySelector('.ink-canvas-base');
         if(!c||!c.width)return -1;var d=c.getContext('2d').getImageData(0,0,c.width,c.height).data;var n=0;for(var i=3;i<d.length;i+=4)if(d[i]>0)n++;return n;})()""").toIntOrNull() ?: -1
 
+    private fun canvasWidth(s: ActivityScenario<MainActivity>): Int =
+        eval(s, "(function(){var c=document.querySelector('.editor-shell .ink-canvas-base')||document.querySelector('.ink-canvas-base');return c?c.width:-1;})()").toIntOrNull() ?: -1
+
+    /** Ink pixels in a horizontal band of the committed canvas (fractions of its height). */
+    private fun bandPixels(s: ActivityScenario<MainActivity>, from: Float, to: Float): Int = eval(s, """(function(){var c=document.querySelector('.editor-shell .ink-canvas-base')||document.querySelector('.ink-canvas-base');
+        if(!c||!c.width)return -1;var y0=Math.floor(c.height*$from),y1=Math.ceil(c.height*$to);var d=c.getContext('2d').getImageData(0,y0,c.width,y1-y0).data;var n=0;for(var i=3;i<d.length;i+=4)if(d[i]>0)n++;return n;})()""").toIntOrNull() ?: -1
+
     private fun metrics(s: ActivityScenario<MainActivity>): JSONObject =
         JSONObject(eval(s, "JSON.stringify(window.__PRI_INK_METRICS__||{strokes:[],rejected:{touchAfterPen:0},cancels:0})").let { JSONTokener(it).nextValue() as String })
 
@@ -142,11 +149,15 @@ class InkInputTest {
             val afterFinger = inkPixels(s)
 
             // ── stylus ───────────────────────────────────────────────────────
+            eval(s, """(function(){window.__f0=null;priBridge.addEventListener('message',function(e){try{var x=JSON.parse(e.data);if(x.id==='t-facts0')window.__f0=x;}catch(_){}});
+                priBridge.postMessage(JSON.stringify({v:1,id:'t-facts0',cap:'device',op:'facts',payload:{}}));return true;})()""")
+            assertEquals("before any stylus event the shell has not seen a stylus", "\"false\"",
+                waitFor(s, "window.__f0 && window.__f0.ok && String(window.__f0.result.stylusSeen)"))
             stroke(s, MotionEvent.TOOL_TYPE_STYLUS, 0.55f)
             m = metrics(s)
             val pen = m.getJSONArray("strokes").getJSONObject(m.getJSONArray("strokes").length() - 1)
             assertEquals("a stylus arrives as pointerType pen", "pen", pen.getString("pointerType"))
-            assertTrue("the stylus carries pressure", pen.getBoolean("pressure"))
+            assertTrue("the stylus pressure varies along the stroke", pen.getBoolean("pressureVaried"))
             assertTrue("the stylus stroke is drawn", inkPixels(s) > afterFinger)
             assertTrue("no injected samples are lost before the canvas (${pen.getInt("samples")} samples, ${pen.getInt("keptPoints")} kept)",
                 pen.getInt("samples") >= 20 && pen.getInt("keptPoints") >= 12)
@@ -163,17 +174,22 @@ class InkInputTest {
             assertTrue("after a pen, a finger touch is rejected (palm) and draws nothing",
                 m.getJSONObject("rejected").getInt("touchAfterPen") >= 1 && m.getJSONArray("strokes").length() == strokesBefore && inkPixels(s) == pixelsBefore)
             eval(s, "[].slice.call(document.querySelectorAll('button.ink-tool')).find(function(b){return /Finger/.test(b.textContent)}).click()")
-            Thread.sleep(600)
-            val afterToggle = inkPixels(s)
-            assertTrue("turning Finger on keeps the ink on the sheet ($afterToggle px)", afterToggle > 0)
+            Thread.sleep(1000)
+            val widthBefore = canvasWidth(s)
+            val bandBefore = bandPixels(s, 0.7f, 0.9f)
             stroke(s, MotionEvent.TOOL_TYPE_FINGER, 0.8f)
+            Thread.sleep(1000)
             m = metrics(s)
-            // (The sheet may narrow as the reading panel appears; CP-03 then scales
-            // every stroke uniformly, so a pixel count is not a measure of ink.)
             val last = m.getJSONArray("strokes").getJSONObject(m.getJSONArray("strokes").length() - 1)
-            assertTrue("with Finger on, a finger writes again (strokes ${m.getJSONArray("strokes").length()} vs $strokesBefore, kept ${last.optInt("keptPoints")})",
-                m.getJSONArray("strokes").length() == strokesBefore + 1 && last.getString("pointerType") == "touch" &&
-                    last.getInt("keptPoints") >= 12 && inkPixels(s) > 0)
+            assertTrue("with Finger on, a finger stroke is captured (strokes ${m.getJSONArray("strokes").length()} vs $strokesBefore)",
+                m.getJSONArray("strokes").length() == strokesBefore + 1 && last.getString("pointerType") == "touch" && last.getInt("keptPoints") >= 12)
+            if (canvasWidth(s) == widthBefore) {
+                assertTrue("…and its ink appears where it was written (${bandPixels(s, 0.7f, 0.9f)} vs $bandBefore px in that band)", bandPixels(s, 0.7f, 0.9f) > bandBefore)
+            } else {
+                // The sheet resized under the stroke (the reading panel); CP-03 rescales
+                // every stroke uniformly, so only presence can be compared.
+                assertTrue("…and the sheet still holds ink after resizing", inkPixels(s) > 0)
+            }
 
             // ── rotation keeps the ink ───────────────────────────────────────
             val beforeRotation = inkPixels(s)
@@ -184,9 +200,13 @@ class InkInputTest {
             Thread.sleep(2000)
 
             // ── the shared recognizer reads it and the attempt is marked ─────
+            val lines = waitFor(s, "document.querySelectorAll('.ink-preview .ink-line').length || false", 30_000)
+            assertTrue("the shared recognizer produced a reading of the strokes ($lines line(s))", (lines.toIntOrNull() ?: 0) >= 1)
             waitFor(s, "(function(){var b=[].slice.call(document.querySelectorAll('.editor-foot .btn-primary')).find(function(x){return x.offsetParent&&!x.disabled});if(!b)return false;b.click();return true;})()")
-            val marked = waitFor(s, "(function(){var v=document.querySelector('.verdict')||document.querySelector('.your-answer')||document.querySelector('.ink-confirm');return v?(v.innerText||'read').slice(0,80):false;})()", 60_000)
-            assertTrue("the handwriting was read by the shared recognizer: $marked", marked.length > 2)
+            // The injected strokes are not a real answer: correct, incorrect or
+            // unreadable are all honest outcomes; what matters is that it is marked.
+            val marked = waitFor(s, "(function(){var v=document.querySelector('.verdict')||document.querySelector('.your-answer');return v?(v.innerText||'marked').slice(0,80):false;})()", 60_000)
+            assertTrue("the submitted handwriting was marked: $marked", marked.length > 2)
 
             m = metrics(s)
             Log.i("PRITEST", "ink metrics (SYNTHETIC / EMULATOR): " + m.toString())
