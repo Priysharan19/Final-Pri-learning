@@ -134,6 +134,17 @@ export function declaredNativeClient(req) {
   return NATIVE_CLIENTS.has(String(req?.get?.('x-pri-client') || ''));
 }
 
+/**
+ * The native shell a request declares itself to be (X-Pri-Client), from the
+ * closed set of known native clients, or null. This only identifies the shell
+ * (the compatibility floor uses it); it grants nothing — the CSRF/origin
+ * exemption additionally requires the absence of browser context below.
+ */
+export function declaredNativeClientId(req) {
+  const id = req.get('x-pri-client');
+  return NATIVE_CLIENTS.has(id) ? id : null;
+}
+
 function nativeNonBrowserRequest(req) {
   // URLSession does not have a browser Origin or Fetch Metadata context. A web
   // page cannot suppress Origin on a cross-origin mutation, and the custom

@@ -22,6 +22,8 @@
 // can claim any build. Never raise it as a substitute for a server-side fix.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { declaredNativeClientId } from './security.js';
+
 const FLOOR = Object.freeze({ 'ios-native-v1': ['ios', 'PRI_MIN_IOS_BUILD'], 'android-native-v1': ['android', 'PRI_MIN_ANDROID_BUILD'] });
 const EXEMPT = [
   ['GET', /^\/health\/?$/i],
@@ -72,8 +74,7 @@ export function compatibilityConfigProblems(env = process.env) {
 
 export function clientCompatibility(env = process.env) {
   return (req, res, next) => {
-    const client = req.get('x-pri-client');
-    const floor = FLOOR[client];
+    const floor = FLOOR[declaredNativeClientId(req)];
     if (!floor) return next();
     const [platform, name] = floor;
     const minBuild = positiveInt(env[name]);
