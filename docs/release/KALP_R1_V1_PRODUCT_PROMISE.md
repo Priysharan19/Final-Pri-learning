@@ -1,6 +1,6 @@
 # KALP-R1 — V1 Product Promise
 
-**Status:** KALP-R1 NOT YET COMPLETE  
+**Status:** KALP-R1 BLOCKED_EXTERNAL — PRODUCT/PROMISE REMEDIATION READY
 **Repository:** `Priysharan19/Final-Pri-learning`  
 **Product:** Dream Pri Learning  
 **Audit date:** 2026-10-02  
@@ -8,7 +8,7 @@
 **Binding PRI-R1 scope freeze:** `487cfac0c9743921602df6a8430ef57694888249`  
 **Purpose:** Freeze the truthful user-facing V1 product promise without expanding the accepted PRI-R1 release scope.
 
-> **Closure note:** The product promise is now unambiguous, but KALP-R1 cannot be declared complete while current public-facing onboarding, plan copy, README and policy wording contradict the frozen V1 boundary. The exact defects are recorded in §19 and GitHub issues #282, #283 and #284.
+> **Closure note:** The product promise is unambiguous and PR #285 now contains the bounded product-to-promise remediation for #282, #283 and the product-copy portion of #284. Live `main` remains unchanged until that PR is merged. KALP-R1 still cannot be declared COMPLETE because the repository does not contain authoritative legal-owner/contact inputs or qualified legal review for the public notices. Those facts must be supplied by the legal/release owner rather than guessed in R1.
 
 ---
 
@@ -437,65 +437,109 @@ Dream Pri Learning V1 is built for students in India studying CBSE/NCERT Mathema
 
 ---
 
-## 19. Known gaps or contradictions
+## 19. Closure re-audit and remaining blocker
 
-These are not hidden caveats. They are explicit KALP-R1 closure defects.
+The original three product-to-promise defects were re-audited on the KALP-R1 closure branch in PR #285 against unchanged live `main` `ddbeac700438108c8534b1caa8320b63bbc80e0a` and the binding PRI-R1 scope freeze `487cfac0c9743921602df6a8430ef57694888249`.
 
 ### KALP-R1-BLOCK-01 — Public onboarding exceeds frozen V1
 
 **Type:** SCOPE_CONTRADICTION / IMPLEMENTATION_MISMATCH  
 **Tracking:** GitHub issue #282
+**Closure-branch result:** **RESOLVED — PENDING MERGE**
 
-Current `client/src/pages/Login.jsx` publicly exposes:
+PR #285's production source now:
 
-- Teacher role/profile creation;
-- Australian curriculum selection;
-- Olympiad selection;
-- hero copy advertising Olympiad.
+- exposes Student as the only ordinary public V1 onboarding role;
+- exposes CBSE/NCERT Classes 7–12, JEE Main and JEE Advanced only;
+- removes public Australian-curriculum onboarding entry points;
+- removes public Olympiad onboarding/hero claims;
+- prevents Settings from becoming a second public route into Australian/Olympiad scope;
+- leaves legacy/private implementations in the repository without giving them an ordinary V1 entry point.
 
-This contradicts the frozen V1 public boundary.
-
-**Smallest required action:** Gate/remove those public V1 entry points in the production shipping build while preserving only the frozen student India choices. Do not expand V1.
+Production-browser evidence on the closure candidate includes the Login/India flows and the dedicated `V1 PRODUCT PROMISE` regression gate. Legacy Australian regression coverage remains test-only; no production back door was added merely to preserve tests.
 
 ### KALP-R1-BLOCK-02 — Free/Premium public copy contradicts entitlement logic
 
 **Type:** PRODUCT_COPY_CONTRADICTION  
 **Tracking:** GitHub issue #283
+**Closure-branch result:** **RESOLVED — PENDING MERGE**
 
-Current `SettingsLegacy.jsx` renders legacy copy that says:
+PR #285 now derives the public Free numeric limits from the existing entitlement authority and states the same capability boundary frozen in §§7–8:
 
-- the Free plan has 20 daily questions and “everything else unlimited”;
-- “All courses & pathways”;
-- “Hints, exams, match, analytics”.
+- Free: 20 practice questions/day, one exam simulation/30 days, basic Pri Explain, CBSE/NCERT + JEE Main;
+- Premium: uncapped practice/exam simulation access plus JEE Advanced, advanced Pri Explain and advanced progress/analytics;
+- existing local work/history/progress remains available when Premium is absent or expires;
+- `additional-ai-usage` is not advertised;
+- no price, trial, discount or launch offer was invented.
 
-The actual entitlement authority caps exam simulations and gates JEE Advanced, advanced Pri Explain and advanced analytics behind Premium.
+The stale README statement that Premium “buys nothing” is removed. The regression gate explicitly rejects the previous “everything else unlimited”, “all courses/pathways” and “all features” drift.
 
-The README is also stale and says “Premium buys nothing yet,” which is now false.
-
-**Smallest required action:** Update public/canonical product copy to the §7/§8 boundary, add drift tests, and do not invent KALP-R8 pricing.
-
-### KALP-R1-BLOCK-03 — Public privacy/product wording is broader than V1
+### KALP-R1-BLOCK-03 — Public privacy/product wording and legal publication
 
 **Type:** PRODUCT_COPY_CONTRADICTION / LEGAL-HANDOFF  
 **Tracking:** GitHub issue #284
+**Product-copy result:** **RESOLVED — PENDING MERGE**
+**Legal-publication result:** **BLOCKED_EXTERNAL**
 
-Current `docs/legal/privacy.md` says the “whole app” is usable without an account/network and describes a cloud account in terms of teacher-set work. That is broader than the current Premium/cloud boundary and the frozen student-only public V1. The file also contains unresolved legal placeholders.
+The closure branch corrects the English and Hindi privacy/product wording so it:
 
-**Smallest required action:** Reconcile product wording with the frozen V1 and current entitlement/cloud truth, then close owner/legal placeholders through the legal-release workstream. KALP-R1 does not make new legal conclusions.
+- describes the core local practice loop narrowly rather than claiming the whole app works without account/network;
+- makes no public teacher-work promise;
+- distinguishes local practice from account/server-dependent capabilities;
+- states server-authoritative paid access;
+- retains guardian-consent and optional server-reading disclosures;
+- carries a concrete 2 October 2026 revision date for the privacy notice.
+
+The remaining publication facts are not present anywhere authoritative in the repository. `node tools/legal-status.mjs` currently reports **7 distinct placeholders across 8 legal documents**:
+
+- `{{OWNER_LEGAL_NAME}}`;
+- `{{OWNER_ADDRESS}}`;
+- `{{SUPPORT_EMAIL}}`;
+- `{{GRIEVANCE_OFFICER_NAME}}`;
+- `{{GRIEVANCE_OFFICER_EMAIL}}`;
+- `{{JURISDICTION_CITY}}`;
+- `{{LAST_UPDATED}}` where still required by the other notices.
+
+The privacy notices themselves are narrowed to the four still-authoritative owner/contact fields, but Terms, Refunds and Grievances still require the wider legal inputs above. The repository also explicitly states that the notices require qualified review. KALP-R1 must not invent any of those values or silently declare legal adequacy.
+
+### Re-audit evidence on PR #285
+
+The closure candidate has been exercised with the relevant source, policy, entitlement, bundle and browser gates:
+
+- `V1 PRODUCT PROMISE: PASS — 41/41`;
+- `ENTITLEMENT ENFORCEMENT: PASS — 59/59`;
+- `JEE ADVANCED GATE: PASS — 27/27`;
+- `README TRUTH: PASS — 16/16`;
+- `LEGAL PAGES: PASS — 233/233` (the suite correctly continues to report unresolved legal-template status rather than hiding it);
+- `I18N: PASS — 189/189`;
+- `I18N COVERAGE: PASS — 88/88`;
+- `I18N VOICE: PASS — 92/92`;
+- canonical production build succeeds;
+- both tracked iPad web bundles pass canonical sync parity (`172 files` each at the sync check);
+- core production-browser E2E: `352/352` across 12 flows;
+- Explain: `16/16`;
+- Hindi: `57/57`;
+- cloud account: `18/18`;
+- admin CMS: `17/17`;
+- independent-review rejection: `8/8`;
+- progress truth: `20/20`;
+- AI-tutor production-off / flagged-on regression: `6/6` and `32/32`.
+
+These tests establish product/promise consistency for the closure candidate. They do not manufacture the missing legal identity/review evidence and do not turn an unmerged branch into live `main`.
 
 ### Important non-contradictions
 
-The following code on current main does **not** expand V1 because its own evidence preserves the scope boundary:
+The following code does **not** expand V1 because its public boundary remains constrained:
 
 - Android shell: explicitly post-V1.
 - placement diagnostic: production-off unless scope is changed.
 - three-level AI tutor: production-off unless scope is changed.
 - Hindi implementation: does not override English-sufficient initial V1.
-- teacher infrastructure: may remain in code, provided public V1 entry points are removed/gated.
+- teacher/Australian/Olympiad implementations: may remain private/legacy so long as ordinary V1 entry points stay absent.
 
 ### Release-readiness dependencies that are not redefined by KALP-R1
 
-KALP-R1 does not falsely convert scope into ship readiness. The exact release candidate must still satisfy the release programme's applicable real-device, App Store/StoreKit, security, privacy/legal, persistence, recovery, observability and zero-P0/P1 gates.
+KALP-R1 does not convert a truthful promise into general ship readiness. The exact release candidate must still satisfy the release programme's applicable real-device, App Store/StoreKit, security, privacy/legal, persistence, recovery, observability and zero-P0/P1 gates.
 
 ---
 
@@ -513,31 +557,39 @@ KALP-R1 does not falsely convert scope into ship readiness. The exact release ca
 | Parent expectations truthful | PASS | §9 consent lifecycle only |
 | Launch vs later distinguished | PASS | §§11–12 |
 | Every phrase in canonical promise maps to evidence | PASS | §18 |
-| No unsupported feature appears in canonical promise | PASS | diagnostic/AI tutor/AU/Olympiad removed |
+| No unsupported feature appears in canonical promise | PASS | diagnostic/AI tutor/AU/Olympiad excluded from the public promise |
 | Major frozen launch capabilities omitted | PASS | student, curriculum, handwriting, feedback, next action, progress, Free/Premium included |
 | Promise understandable without engineering knowledge | PASS | §§13–17 |
 | Student/parent/reviewer versions agree | PASS | Same product boundary across all versions |
 | Promise conflicts with accepted PRI-R1 scope | PASS — NO CONFLICT | PRI-R1 remains authority |
 | R8/commercial unknowns deferred rather than guessed | PASS | §8 |
-| Implementation mismatch clearly identified | PASS | #282/#283/#284 |
-| Current public product surfaces already match promise | **FAIL** | Teacher/Australia/Olympiad + entitlement/policy copy drift |
-| Student/parent/store reviewer could encounter exactly this product today | **FAIL** | Blocked by the same public-surface contradictions |
-| KALP-R1 can be declared fully closed | **FAIL** | Requires bounded consistency corrections and re-audit |
+| #282 public onboarding contradiction | PASS ON PR #285 — PENDING MERGE | Production UI/browser regression now enforces Student + India V1 only |
+| #283 Free/Premium contradiction | PASS ON PR #285 — PENDING MERGE | UI/README agree with entitlement authority; drift gate added |
+| #284 product-behaviour/privacy wording contradiction | PASS ON PR #285 — PENDING MERGE | English/Hindi wording now matches V1/account/cloud boundaries |
+| Public legal-owner/contact inputs present | **BLOCKED_EXTERNAL** | Authoritative identity/contact/jurisdiction values are absent; `legal:status` reports 7 placeholders |
+| Qualified legal review recorded | **BLOCKED_EXTERNAL** | Repository explicitly says the notices are not yet legally reviewed |
+| Live `main` already contains the remediation | **NO — MERGE PENDING** | Live `main` remains `ddbeac700438108c8534b1caa8320b63bbc80e0a`; fixes are on PR #285 |
+| KALP-R1 can be declared fully closed now | **NO — BLOCKED_EXTERNAL** | Do not invent legal facts or treat an unmerged candidate as live product |
 
 ---
 
 ## Final R1 determination
 
-**KALP-R1 NOT YET COMPLETE**
+**KALP-R1 BLOCKED_EXTERNAL — PRODUCT/PROMISE REMEDIATION READY**
 
-The product definition itself is now sufficiently frozen. Closure is withheld because current public-facing product surfaces do not yet consistently implement and describe that frozen promise.
+The product definition is frozen and the bounded repository-derived contradictions have been corrected and regression-tested on PR #285. No scope expansion, pricing decision or hidden production legacy switch was introduced.
 
-### Required closure actions
+KALP-R1 is **not** declared COMPLETE because two objective conditions remain outside this agent's evidence authority:
 
-1. Close #282 — gate public onboarding to the frozen student/India V1.
-2. Close #283 — align Free/Premium UI and README copy with actual entitlement authority.
-3. Close #284 — reconcile public privacy/product wording with V1 and hand legal placeholders/review to the legal-release owner.
-4. Re-audit the affected production-build surfaces against this artifact.
-5. Only then change the R1 status to **KALP-R1 COMPLETE — V1 PRODUCT PROMISE FROZEN** if no further contradiction remains.
+1. PR #285 has not yet been merged into live `main`.
+2. The legal/release owner must provide the authoritative legal identity/contact/jurisdiction values and record the required qualified review. Those values are not recoverable from the repository and must not be fabricated.
+
+### Remaining closure sequence
+
+1. Review/merge PR #285 through the normal repository governance path once CI is green.
+2. Legal/release owner supplies and approves the legal template values and review required by #284.
+3. Run `npm run legal:status`, the legal/public browser gate and the normal release checks on the resulting candidate.
+4. Close #282/#283 after the remediation is on `main`; close #284 only after the legal-publication gate is genuinely satisfied.
+5. Re-audit live `main`. Only if no new contradiction remains may the status change to **KALP-R1 COMPLETE — V1 PRODUCT PROMISE FROZEN**.
 
 No KALP-R2 work is authorised by this artifact.
