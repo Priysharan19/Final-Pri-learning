@@ -468,6 +468,20 @@ export function createPlatformDb(path = DEFAULT_PATH) {
   db.exec(`CREATE INDEX IF NOT EXISTS idx_guardian_consents_state
     ON guardian_consents(confirmed_at, withdrawn_at);`);
 
+  // Schema v9 — the age decision an account was created under. Before this the
+  // only record was a guardian_consents row for a child, so an account created
+  // without any declaration (provider sign-in did exactly that) read as "no row,
+  // not required" and passed the guardian gate. Now every account-creating path
+  // writes 'adult' or 'child', and NULL means nothing was decided: the gate
+  // refuses it. Accounts that existed before v9 are backfilled once — a
+  // consent row means 'child', anything else 'legacy' (passes as before) — so
+  // the migration locks nobody out.
+  if (addColumnIfMissing(db, 'accounts', 'age_basis', "age_basis TEXT CHECK(age_basis IN ('adult','child','legacy'))")) {
+    db.exec(`UPDATE accounts SET age_basis = CASE
+      WHEN EXISTS (SELECT 1 FROM guardian_consents g WHERE g.account_id = accounts.id) THEN 'child'
+      ELSE 'legacy' END WHERE age_basis IS NULL`);
+  }
+
   db.prepare("INSERT OR REPLACE INTO platform_meta(key,value) VALUES ('schema_version',?)").run(String(SCHEMA_VERSION));
   return db;
 }

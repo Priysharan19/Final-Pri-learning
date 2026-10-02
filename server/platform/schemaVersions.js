@@ -11,7 +11,10 @@
 // 8: tutor_cache, the 24-hour AI tutor reply cache
 //    (supabase/migrations/20261002010000_tutor_cache.sql). SQLite creates the
 //    same table in tutor.js, as it does every lazily built table.
-export const SCHEMA_VERSION = 8;
+// 9: accounts.age_basis — the age decision made at account creation
+//    ('adult' | 'child' | 'legacy'); NULL means none was recorded and the
+//    guardian gate fails closed (supabase/migrations/20261005000000).
+export const SCHEMA_VERSION = 9;
 // Billing 4: billing_payments keeps its row when the account is deleted
 //    (ON DELETE SET NULL, account_id nullable) — the payment ledger is retained
 //    pseudonymously (supabase/migrations/20261003000000, billingSchema.js).
