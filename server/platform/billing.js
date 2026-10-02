@@ -265,8 +265,12 @@ export function createBillingRouter(db, { verifiers = {}, checkout = {}, native 
       // event) — counted, never paged on, since anyone can send one. A 5xx is
       // a delivery it failed to apply, which the provider will retry and an
       // operator must hear about (WEBHOOK_FAILURES, docs/operations/alerts.md).
+      // A provider this deployment has not configured (a verifier that is
+      // installed but finds no config, e.g. Google RTDN) is a rejection like the
+      // missing-verifier case above: it must not be able to page an operator.
       const status = Number.isInteger(err?.status) ? err.status : 500;
-      recordWebhook(provider, status >= 500 ? 'failed' : 'rejected', err?.code);
+      const unconfigured = err?.code === 'BILLING_PROVIDER_NOT_CONFIGURED';
+      recordWebhook(provider, status >= 500 && !unconfigured ? 'failed' : 'rejected', err?.code);
       next(err);
     }
   });
