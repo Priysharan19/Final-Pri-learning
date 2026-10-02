@@ -840,6 +840,26 @@ async function run() {
       await wait(page, 700);
     });
 
+    await step('notes · index and chapter map', '/notes', async () => {
+      await goTo(page, BASE, '/notes?class=10');
+      await page.waitForSelector('.nt-map-node', { timeout: 20000 });
+      await wait(page, 1200);
+    });
+
+    await step('notes · a chapter read through', '/notes/:chapterId', async () => {
+      await goTo(page, BASE, '/notes/c10-quadratic-equations');
+      await page.waitForSelector('.nt-formula', { timeout: 20000 });
+      await page.evaluate(() => document.querySelectorAll('.nt-reveal').forEach(el => el.classList.add('is-in')));
+      await wait(page, 1600);
+    });
+
+    await step('notes · revision flashcards', '/notes/:chapterId', async () => {
+      await click(page, '[data-testid="notes-revise"]');
+      await page.waitForSelector('.nt-card', { timeout: 10000 });
+      await wait(page, 600);
+      await page.keyboard.press('Escape');
+    });
+
     await step('review · mistakes', '/review', async () => {
       await goTo(page, BASE, '/review?filter=wrong');
       await page.waitForSelector('.hist-row, .muted', { timeout: 20000 });
