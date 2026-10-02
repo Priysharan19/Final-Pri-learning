@@ -41,7 +41,13 @@ import androidx.webkit.WebSettingsCompat
 import androidx.webkit.WebViewAssetLoader
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
+import android.webkit.ValueCallback
 import com.prilearning.app.bridge.HostDescriptor
+import com.prilearning.app.cloud.CloudConfig
+import com.prilearning.app.cloud.CookieJar
+import com.prilearning.app.cloud.NativeCloud
+import com.prilearning.app.cloud.SecureStore
+import com.prilearning.app.io.FileExchange
 import com.prilearning.app.bridge.PriBridge
 import com.prilearning.app.release.ReleaseIdentity
 import com.prilearning.app.shell.AssetOrigin
@@ -63,12 +69,17 @@ class MainActivity : ComponentActivity() {
         private set
     private lateinit var root: FrameLayout
     private lateinit var assetLoader: WebViewAssetLoader
+    internal var cloud: NativeCloud? = null
+        private set
+    private lateinit var files: FileExchange
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // The shell paints a fixed dark background behind the bars, so the bar
         // icons are always light (auto would pick dark icons in light mode).
         enableEdgeToEdge(SystemBarStyle.dark(Color.TRANSPARENT), SystemBarStyle.dark(Color.TRANSPARENT))
         super.onCreate(savedInstanceState)
+        // Activity-result launchers must be registered before the activity starts.
+        files = FileExchange(this)
         root = FrameLayout(this).apply { setBackgroundColor(Color.rgb(10, 10, 9)) }
         setContentView(root)
         // Edge-to-edge (mandatory from API 35): the WebView is letterboxed inside
@@ -89,9 +100,20 @@ class MainActivity : ComponentActivity() {
         }
         assetLoader = AssetOrigin.loader(assets)
         val view = createWebView()
+        // The cloud origin comes from the signed build only; debug builds also
+        // accept a test override (an emulator-local server).
+        val origin = CloudConfig.validateOrigin(
+            if (BuildConfig.DEBUG) CloudConfig.debugOverride ?: BuildConfig.PRI_CLOUD_ORIGIN else BuildConfig.PRI_CLOUD_ORIGIN,
+            debug = BuildConfig.DEBUG,
+        )
+        val store = SecureStore(this)
+        val jar = CookieJar().apply { load(store.read()) }
+        val nativeCloud = NativeCloud(origin, jar, persist = { store.write(it) })
+        cloud = nativeCloud
         val descriptor = HostDescriptor.json(
             HostDescriptor.Shell(BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE.toString(), BuildConfig.APPLICATION_ID),
-            ReleaseIdentity.read(assets)
+            ReleaseIdentity.read(assets),
+            cloudConfigured = nativeCloud.configured,
         )
         // Back is enabled exactly while the page has declared it wants it (a
         // sheet is open or it has in-app history). Otherwise the system default
@@ -104,7 +126,7 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
-        val priBridge = PriBridge(view, descriptor) { wanted -> backCallback.isEnabled = wanted }
+        val priBridge = PriBridge(view, descriptor, { wanted -> backCallback.isEnabled = wanted }, nativeCloud, files)
         if (!priBridge.install()) {
             // Fail closed: without origin-scoped messaging the shell offers no
             // native capabilities, so it does not load the app half-working.
@@ -167,6 +189,7 @@ class MainActivity : ComponentActivity() {
             // that keeps dying gets a native screen instead of a recreate loop.
             root.removeView(view)
             view.destroy()
+            cloud?.cancelAll()
             webView = null
             bridge = null
             val now = SystemClock.elapsedRealtime()
@@ -185,6 +208,9 @@ class MainActivity : ComponentActivity() {
     /** window.alert/confirm get real native dialogs (the WebView default
      *  silently suppresses them, so a confirm() would always answer false). */
     private inner class ShellChrome : WebChromeClient() {
+        override fun onShowFileChooser(view: WebView, callback: ValueCallback<Array<Uri>>, params: FileChooserParams): Boolean =
+            files.showFileChooser(callback, params)
+
         override fun onJsAlert(view: WebView, url: String?, message: String?, result: JsResult): Boolean {
             AlertDialog.Builder(this@MainActivity).setMessage(message)
                 .setPositiveButton(android.R.string.ok) { _, _ -> result.confirm() }
@@ -234,6 +260,9 @@ class MainActivity : ComponentActivity() {
     override fun onDestroy() {
         webView?.let { root.removeView(it); it.destroy() }
         webView = null
+        cloud?.shutdown()
+        cloud = null
+        if (::files.isInitialized) files.dispose()
         super.onDestroy()
     }
 

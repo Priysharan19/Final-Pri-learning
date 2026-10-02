@@ -63,6 +63,10 @@ final class NativeCloudBridge {
             cancel(requestId)
             return
         }
+        if action == "forget" {
+            forgetSession()
+            return
+        }
         guard action == "request" else {
             respond(requestId, error: BridgeError.invalidRequest)
             return
@@ -146,6 +150,20 @@ final class NativeCloudBridge {
         }
         storeTask(task, id: requestId)
         task.resume()
+    }
+
+    /// Disconnect: drop the cloud cookies even when the server logout could not
+    /// be reached (offline). Cancels in-flight requests first so none re-adds them.
+    private func forgetSession() {
+        taskLock.lock()
+        let running = Array(tasks.values)
+        tasks.removeAll()
+        taskLock.unlock()
+        running.forEach { $0.cancel() }
+        guard let origin = Self.configuredOrigin else { return }
+        for cookie in cookieStorage.cookies(for: origin) ?? [] where cookie.name == "pri_csrf" || cookie.name == "pri_cloud_session" {
+            cookieStorage.deleteCookie(cookie)
+        }
     }
 
     private func csrfCookie(for origin: URL) -> String? {

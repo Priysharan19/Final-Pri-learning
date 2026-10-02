@@ -7,7 +7,7 @@
 // into IndexedDB by this module.
 
 import { get, put, del, uuid } from '../local/idb.js';
-import { cloud, cloudAvailable } from './cloudTransport.js';
+import { cloud, cloudAvailable, forgetNativeCloudSession } from './cloudTransport.js';
 import { announceCloudSessionChange, announceEntitlementChange } from './cloudSession.js';
 import { normalizeEntitlementSnapshot } from './entitlements.js';
 import { resetProfileOutboxForRelink } from './profileOutbox.js';
@@ -150,6 +150,9 @@ export async function markCloudSynced(pid, at = Date.now()) {
 
 export async function disconnectCloudAccount(pid) {
   try { if (cloudAvailable()) await cloud.logout(); } catch { /* local unlink must remain possible during a cloud outage */ }
+  // Offline, the logout above cannot reach the server; the device must still
+  // stop holding the session (the native shells keep it outside the page).
+  await forgetNativeCloudSession();
 
   // Fail closed locally: first remove account-specific replica metadata and put
   // the profile outbox back into its mandatory full-rescan state. Only after

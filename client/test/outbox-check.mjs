@@ -90,6 +90,9 @@ same('practice result maps by question id', classifyMutation('POST', '/practice/
   { kind: 'practice-progress', entityId: 'q-1', operation: 'upsert' });
 same('reveals also dirty progress', classifyMutation('POST', '/practice/q-2/reveal', {}),
   { kind: 'practice-progress', entityId: 'q-2', operation: 'upsert' });
+same('the tutor walkthrough resolves like a reveal and dirties progress', classifyMutation('POST', '/practice/q-3/tutor', { resolved: true, level: 3 }),
+  { kind: 'practice-progress', entityId: 'q-3', operation: 'upsert' });
+same('a tutor nudge resolves nothing and queues nothing', classifyMutation('POST', '/practice/q-3/tutor', { level: 1, message: 'hint' }), null);
 same('Rush answer dirties resolved progress by opaque question id',
   classifyMutation('POST', '/rush/answer', { correct: true }, { id: 'rush-q1', answer: 'SECRET STUDENT ANSWER' }),
   { kind: 'practice-progress', entityId: 'rush-q1', operation: 'upsert' });
