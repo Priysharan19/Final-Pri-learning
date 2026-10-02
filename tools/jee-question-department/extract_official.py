@@ -86,7 +86,7 @@ def open_documents(doc: dict, root: Path):
 
 # ── shared geometry ───────────────────────────────────────────────────────────
 
-def segments_between(pdf, start, end, *, top_margin=0.05, bottom_margin=0.95, x0=None, x1=None):
+def segments_between(pdf, start, end, *, top_margin=0.025, bottom_margin=0.985, x0=None, x1=None):
     """Crop segments from marker `start` (page, y) up to `end` (page, y) or page end."""
     segs = []
     sp, sy = start

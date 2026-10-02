@@ -100,7 +100,19 @@ def candidates(rows):
 
 # ── render ────────────────────────────────────────────────────────────────────
 
-def render(rows, crops: Path, cache: Path, zoom: float = 2.2):
+def answer_rects(page, clip):
+    """Rectangles of printed answer lines inside `clip`: a line whose first word starts
+    with a case-sensitive "Answer" (JAB answer documents print the key that way). Prose
+    that merely contains the word "answer" is not masked."""
+    import pymupdf as fitz
+    out = []
+    for w in page.get_text("words", clip=clip):
+        if w[7] == 0 and str(w[4]).startswith(("Answer", "ANSWER")):
+            out.append(fitz.Rect(clip.x0, w[1] - 3, clip.x1, w[3] + 3))
+    return out
+
+
+def render(rows, crops: Path, cache: Path, zoom: float = 2.2, blind: bool = False):
     import pymupdf as fitz
     crops.mkdir(parents=True, exist_ok=True)
     opened = {}
@@ -115,9 +127,18 @@ def render(rows, crops: Path, cache: Path, zoom: float = 2.2):
             out = crops / f"{row['id']}-s{n}.png"
             if not out.exists():
                 page = pdf[seg["page"] - 1]
-                page.get_pixmap(matrix=fitz.Matrix(zoom, zoom), clip=fitz.Rect(*seg["crop"])).save(out)
+                clip = fitz.Rect(*seg["crop"])
+                pix = page.get_pixmap(matrix=fitz.Matrix(zoom, zoom), clip=clip)
+                if blind:
+                    # White out every printed answer line so the reviewer cannot see the key.
+                    for r in answer_rects(page, clip):
+                        # a clipped pixmap keeps page coordinates (x zoom) as its origin
+                        box = fitz.IRect(int(r.x0 * zoom), int(r.y0 * zoom), int(r.x1 * zoom) + 1, int(r.y1 * zoom) + 1) & pix.irect
+                        if not box.is_empty:
+                            pix.set_rect(box, (255, 255, 255) if pix.n < 4 else (255, 255, 255, 255))
+                pix.save(out)
             files.append(str(out))
-        row.setdefault("review", {})["crops"] = files
+        row.setdefault("review", {})["blindCrops" if blind else "crops"] = files
     return rows
 
 
@@ -132,7 +153,7 @@ def batch_items(rows, *, with_key: bool):
             "session": row["exam"].get("session"), "shift": row["exam"].get("shift"),
             "questionNumber": row["source"]["questionNumber"], "section": row["source"].get("section"),
             "answerFormat": row.get("answerType"), "optionCount": key.get("optionCount"),
-            "crops": row["review"].get("crops", []),
+            "crops": row["review"].get("crops", []) if with_key else row["review"].get("blindCrops", []),
             "textLayer": (row.get("prompt") or "")[:3000],
         }
         if with_key:
@@ -149,7 +170,10 @@ def write_batches(rows, directory: Path, size: int, *, with_key: bool):
     n = 0
     for i in range(0, len(items), size):
         n += 1
-        (directory / f"batch-{n:03d}.json").write_text(json.dumps({"items": items[i:i + size]}, ensure_ascii=False, indent=1), encoding="utf-8")
+        body = {"items": items[i:i + size]}
+        if not with_key:
+            body["blind"] = True  # crops have printed answer lines masked; no key in the batch
+        (directory / f"batch-{n:03d}.json").write_text(json.dumps(body, ensure_ascii=False, indent=1), encoding="utf-8")
     return n, len(items)
 
 
@@ -183,7 +207,8 @@ def merge_transcriptions(rows, transcriptions, manifest):
             row["answerType"], row["answer"] = "numeric", answer
         row["review"]["transcriptionPassId"] = t.get("passId")
         for problem in t.get("problems") or []:
-            row["review"]["flags"].append(f"transcriber:{problem}")
+            if f"transcriber:{problem}" not in row["review"]["flags"]:
+                row["review"]["flags"].append(f"transcriber:{problem}")
         merged += 1
     return merged
 
@@ -207,6 +232,8 @@ def decide(rows, reviews, *, model: str, date: str):
     pending = []
     for row in rows:
         rev = reviews.get(row["id"])
+        if rev and (not rev.get("blind") or rev.get("answerVisible") is not False):
+            rev = None  # a review made from crops that showed the printed key is not independent
         if not rev or not row.get("transcription"):
             continue
         ai = {f: rev.get(f) is True for f in ("transcriptionMatches", "complete", "wellPosed", "labelsCorrect", "stepsCorrect")}
@@ -365,36 +392,65 @@ def stats(rows):
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = ap.add_subparsers(dest="cmd", required=True)
-    p = sub.add_parser("render"); p.add_argument("queue", type=Path); p.add_argument("--cache", type=Path, default=HERE / "cache" / "official"); p.add_argument("--crops", type=Path, default=WORK / "crops"); p.add_argument("--all", action="store_true")
-    p = sub.add_parser("batches"); p.add_argument("queue", type=Path); p.add_argument("--out", type=Path, required=True); p.add_argument("--size", type=int, default=8); p.add_argument("--pass", dest="which", choices=["transcribe", "review"], required=True)
+    p = sub.add_parser("render"); p.add_argument("queue", type=Path); p.add_argument("--cache", type=Path, default=HERE / "cache" / "official"); p.add_argument("--crops", type=Path); p.add_argument("--all", action="store_true"); p.add_argument("--blind", action="store_true", help="mask printed answer lines (crops for the blind reviewer)")
+    p = sub.add_parser("batches"); p.add_argument("queue", type=Path); p.add_argument("--out", type=Path, required=True); p.add_argument("--size", type=int, default=8); p.add_argument("--pass", dest="which", choices=["transcribe", "review"], required=True); p.add_argument("--skip-batched", type=Path, nargs="*", default=[], help="batch dirs whose items are already queued")
     p = sub.add_parser("merge-transcriptions"); p.add_argument("queue", type=Path); p.add_argument("--dir", type=Path, required=True)
-    p = sub.add_parser("decide"); p.add_argument("queue", type=Path); p.add_argument("--dir", type=Path, required=True); p.add_argument("--model", required=True); p.add_argument("--date", required=True)
+    p = sub.add_parser("decide"); p.add_argument("queue", type=Path); p.add_argument("--dir", type=Path, nargs="+", required=True); p.add_argument("--inputs", type=Path, nargs="+", required=True, help="the blind review-in batch directories"); p.add_argument("--model", required=True); p.add_argument("--date", required=True)
     p = sub.add_parser("serve"); p.add_argument("queue", type=Path); p.add_argument("--port", type=int, default=8765); p.add_argument("--crops", type=Path, default=WORK / "crops")
-    p = sub.add_parser("stats"); p.add_argument("queue", type=Path); p.add_argument("--out", type=Path)
+    p = sub.add_parser("stats"); p.add_argument("queue", type=Path, nargs="+"); p.add_argument("--out", type=Path); p.add_argument("--markdown", type=Path)
     p = sub.add_parser("publish-set"); p.add_argument("queue", type=Path); p.add_argument("--out", type=Path, required=True)
     args = ap.parse_args(argv)
 
     if args.cmd == "serve":
         return serve(args.queue, args.port, args.crops)
+    if args.cmd == "stats":
+        rows = [r for q in args.queue for r in load_jsonl(q)]
+        table = stats(rows)
+        if args.out:
+            args.out.write_text(json.dumps(table, indent=1) + "\n", encoding="utf-8")
+        if args.markdown:
+            cols = ["extracted", "keyMatched", "engineVerified", "aiReviewed", "aiReviewPassed", "published", "held", "disagreements", "imageOnlyDocuments"]
+            lines = ["| exam | year | " + " | ".join(cols) + " |", "|---|---|" + "---|" * len(cols)]
+            totals = Counter()
+            for t in table:
+                lines.append(f"| {t['exam']} | {t['year'] or '—'} | " + " | ".join(str(t.get(c, 0)) for c in cols) + " |")
+                totals.update({c: t.get(c, 0) for c in cols})
+            lines.append("| **total** | | " + " | ".join(f"**{totals[c]}**" for c in cols) + " |")
+            args.markdown.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        print(json.dumps(table, indent=1))
+        return 0
     rows = load_jsonl(args.queue)
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
     if args.cmd == "render":
         target = rows if args.all else list(candidates(rows))
-        render(target, args.crops, args.cache)
+        render(target, args.crops or (WORK / ("crops-blind" if args.blind else "crops")), args.cache, blind=args.blind)
         write_jsonl(args.queue, rows)
         print(json.dumps({"rendered": len(target)}))
     elif args.cmd == "batches":
         if args.which == "transcribe":
             target = [r for r in candidates(rows) if not r.get("transcription")]
         else:
-            target = [r for r in rows if r.get("transcription") and r["status"] == "draft" and not r["review"].get("ai") and not r["review"].get("flags")]
+            target = [r for r in rows if r.get("transcription") and r["status"] == "draft" and not r["review"].get("ai")
+                      and not r["review"].get("flags") and r["review"].get("blindCrops")]
+        queued = {item["id"] for d in args.skip_batched for p in d.glob("*.json") for item in json.loads(p.read_text(encoding="utf-8"))["items"]}
+        target = [r for r in target if r["id"] not in queued]
         print(json.dumps(dict(zip(("batches", "items"), write_batches(target, args.out, args.size, with_key=args.which == "transcribe")))))
     elif args.cmd == "merge-transcriptions":
         n = merge_transcriptions(rows, load_json_dir(args.dir), manifest)
         write_jsonl(args.queue, rows)
         print(json.dumps({"merged": n}))
     elif args.cmd == "decide":
-        done = decide(rows, load_json_dir(args.dir), model=args.model, date=args.date)
+        blind_ids = set()
+        for path in (p for d in args.inputs for p in d.glob("*.json")):
+            data = json.loads(path.read_text(encoding="utf-8"))
+            if data.get("blind") is True:
+                blind_ids.update(item["id"] for item in data["items"])
+        reviews = {}
+        for d in args.dir:
+            reviews.update(load_json_dir(d))
+        for rid, r in reviews.items():
+            r["blind"] = rid in blind_ids  # set by code from the inputs, never by the reviewer
+        done = decide(rows, reviews, model=args.model, date=args.date)
         write_jsonl(args.queue, rows)
         print(json.dumps({"reviewed": len(done), "approved": sum(r["status"] == "approved" for r in done)}))
     elif args.cmd == "stats":

@@ -222,7 +222,12 @@ def test_decide_automated_tier(rows):
     t3 = {**t, "mcqOptions": None, "prompt": "Find $7 \\times 13$."}
     rev.merge_transcriptions([q1, q3], {q1["id"]: t, q3["id"]: t3}, BOOK)
     assert q1["answer"] == {"correctIndex": 2} and q3["answer"] == {"value": 91}, "answer must come from the key"
-    ok = {"transcriptionMatches": True, "complete": True, "wellPosed": True, "labelsCorrect": True, "stepsCorrect": True, "passId": "r-1"}
+    ok = {"transcriptionMatches": True, "complete": True, "wellPosed": True, "labelsCorrect": True, "stepsCorrect": True, "passId": "r-1", "blind": True, "answerVisible": False}
+    # a review whose crops showed the printed key is ignored
+    q_seen = copy.deepcopy(next(r for r in rows if r["id"] == "t-nta-q01"))
+    rev.merge_transcriptions([q_seen], {q_seen["id"]: t}, BOOK)
+    rev.decide([q_seen], {q_seen["id"]: {**ok, "blind": False, "independentAnswer": {"kind": "option", "index": 2}}}, model="m", date="2026-10-02")
+    assert q_seen["status"] == "draft" and not q_seen["review"].get("ai")
     good_rev = {q1["id"]: {**ok, "independentAnswer": {"kind": "option", "index": 2}},
                 q3["id"]: {**ok, "independentAnswer": {"kind": "numeric", "expression": "7*13"}}}
     rev.decide([q1, q3], good_rev, model="test-model", date="2026-10-02")
