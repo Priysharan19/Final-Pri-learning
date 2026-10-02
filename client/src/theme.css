@@ -166,8 +166,8 @@
 
   /* Type roles. Hierarchy comes from size and space first, weight second:
      nothing in the product is heavier than 620. */
-  --type-display: 620 clamp(26px, 2.6vw, 30px)/1.15 var(--font-display);
-  --type-title: 600 clamp(20px, 2.2vw, 24px)/1.2 var(--font-display);
+  --type-display: 400 clamp(27px, 2.7vw, 32px)/1.15 var(--font-display);
+  --type-title: 400 clamp(22px, 2.3vw, 26px)/1.2 var(--font-display);
   --type-heading: 600 17px/1.3 var(--font);
   --type-body: 400 15.5px/1.55 var(--font);
   --type-compact: 400 13.5px/1.45 var(--font);
@@ -284,7 +284,7 @@ button { font-family: inherit; color: inherit; }
 .topbar h1 { display: none; }
 .top-stats { margin-left: auto; display: flex; align-items: center; gap: 9px; }
 
-.logo { display: flex; user-select: none; cursor: pointer; }
+.logo { display: inline-flex; align-items: center; color: var(--ink); user-select: none; cursor: pointer; }
 
 .user-chip { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; color: var(--ink-2); }
 .user-avatar {
@@ -1164,7 +1164,6 @@ h3 { font-size: 16.5px; line-height: 1.3; }
   border-bottom: 1px solid var(--hairline);
   background: color-mix(in srgb, var(--page) 94%, transparent);
   backdrop-filter: blur(12px)}
-.logo { gap: 9px; align-items: center; font-family: var(--font-display); }
 
 
 .sidebar { width: 58px; top: 56px; height: calc(100vh - 56px); }
@@ -1254,12 +1253,12 @@ h3 { font-size: 16.5px; line-height: 1.3; }
 .btn-sm { min-height: 36px; padding: 6px 12px; font-size: 13.5px; border-radius: var(--radius-sm); }
 .btn-lg { min-height: 50px; padding: 12px 24px; font-size: 16px; border-radius: var(--radius); }
 .btn-primary {
-  background: var(--accent);
-  color: var(--accent-ink);
-  border-color: var(--accent);
+  background: var(--ink);
+  color: var(--page);
+  border-color: var(--ink);
   box-shadow: none;
 }
-.btn-primary:hover:not(:disabled) { background: var(--accent-hover); border-color: var(--accent-hover); box-shadow: none; filter: none; }
+.btn-primary:hover:not(:disabled) { background: var(--ink-2); border-color: var(--ink-2); box-shadow: none; filter: none; }
 .btn-glow { box-shadow: none; }
 .btn-ghost { background: var(--surface); color: var(--ink); border-color: var(--hairline-strong); box-shadow: 0 1px 0 var(--hairline-strong); }
 .btn-ghost:active:not(:disabled), .ctx-next:active { box-shadow: none; transform: translateY(1px); }
@@ -2117,12 +2116,7 @@ html.theme-switching, html.theme-switching * {
 h1, h2, .hero-title, .home-greet, .pg-head h1, .home-next-title { font-weight: 400; letter-spacing: 0; }
 h3, h4 { font-family: var(--font); }
 .home-greet b { font-weight: 400; }
-:root { --type-display: 400 clamp(27px, 2.7vw, 32px)/1.15 var(--font-display); --type-title: 400 clamp(22px, 2.3vw, 26px)/1.2 var(--font-display); }
-.btn-primary { background: var(--ink); border-color: var(--ink); color: var(--page); }
-.btn-primary:hover:not(:disabled) { background: var(--ink-2); border-color: var(--ink-2); }
-.btn-primary:disabled { background: var(--surface-3); border-color: var(--surface-3); color: var(--ink-3); }
 .hero-kicker, .eyebrow { font: var(--type-label); text-transform: uppercase; letter-spacing: var(--tracking-label); color: var(--ink-3); }
-.logo { display: inline-flex; align-items: center; color: var(--ink); }
 .brand-wordmark, .brand-mark { display: block; flex: none; color: var(--ink); }
 
 /* ── Motion system ────────────────────────────────────────────────────────
@@ -2143,11 +2137,11 @@ h3, h4 { font-family: var(--font); }
 @keyframes pri-fill { from { transform: scale(0.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 
 /* Page and list reveals: a screen's blocks arrive in reading order. */
-.home-wrap > *, .eval-card > * { animation: pri-rise var(--motion-reveal) var(--ease-emphasized) both; }
-.home-wrap > *:nth-child(2), .eval-card > *:nth-child(2) { animation-delay: calc(var(--stagger) * 1); }
-.home-wrap > *:nth-child(3), .eval-card > *:nth-child(3) { animation-delay: calc(var(--stagger) * 2); }
-.home-wrap > *:nth-child(4), .eval-card > *:nth-child(4) { animation-delay: calc(var(--stagger) * 3); }
-.home-wrap > *:nth-child(n+5), .eval-card > *:nth-child(n+5) { animation-delay: calc(var(--stagger) * 4); }
+.home-wrap > * { animation: pri-rise var(--motion-reveal) var(--ease-emphasized) both; }
+.home-wrap > *:nth-child(2) { animation-delay: calc(var(--stagger) * 1); }
+.home-wrap > *:nth-child(3) { animation-delay: calc(var(--stagger) * 2); }
+.home-wrap > *:nth-child(4) { animation-delay: calc(var(--stagger) * 3); }
+.home-wrap > *:nth-child(n+5) { animation-delay: calc(var(--stagger) * 4); }
 
 /* Press physics: a short, firm give under the finger, released on a spring. */
 .btn { transition: background-color var(--motion-fast) var(--ease-standard), border-color var(--motion-fast) var(--ease-standard), color var(--motion-fast) var(--ease-standard), transform 220ms var(--ease-spring); }
@@ -2159,17 +2153,11 @@ h3, h4 { font-family: var(--font); }
 .verdict-good .verdict-ico { animation: pri-pop 360ms var(--ease-spring) 90ms both; }
 .verdict-bad:not(.verdict-unsure) { animation: pri-rise 260ms var(--ease-emphasized) both, pri-nudge 300ms var(--ease-standard) 260ms; }
 
-/* Progress: this week's studied days fill in, one after another. */
+/* Progress: this week's studied days fill in. */
 .week-dot.hit { animation: pri-fill 300ms var(--ease-spring) both; }
-.week-day:nth-child(2) .week-dot.hit { animation-delay: 40ms; }
-.week-day:nth-child(3) .week-dot.hit { animation-delay: 80ms; }
-.week-day:nth-child(4) .week-dot.hit { animation-delay: 120ms; }
-.week-day:nth-child(5) .week-dot.hit { animation-delay: 160ms; }
-.week-day:nth-child(6) .week-dot.hit { animation-delay: 200ms; }
-.week-day:nth-child(7) .week-dot.hit { animation-delay: 240ms; }
 
 @media (prefers-reduced-motion: reduce) {
-  .home-wrap > *, .eval-card > *, .verdict, .verdict-good .verdict-ico, .verdict-bad, .week-dot.hit {
+  .home-wrap > *, .verdict, .verdict-good .verdict-ico, .verdict-bad, .week-dot.hit {
     animation: none !important;
   }
   .btn, .btn:active:not(:disabled) { transform: none; transition: none; }
