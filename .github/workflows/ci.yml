@@ -313,6 +313,8 @@ jobs:
           grep -Fq 'AI tutor · three levels, in order, with fallback' browser.log
           grep -Eq 'E2E SUITE.*32/32.*2 flows' browser.log
           grep -Fq 'Hindi · Practice, Exams, exam room, Progress, Explain' browser.log
+          grep -Fq 'Progress truth · rendered numbers = attempt ledger' browser.log
+          grep -Eq 'E2E SUITE.*20/20.*1 flows' browser.log
           grep -Eq 'E2E SUITE.*36/36.*1 flows' browser.log
           grep -Eq 'ACCESSIBILITY SUITE.*38/38.*12 groups' browser.log
           grep -Fq 'E2E BROWSER: webkit' browser.log
