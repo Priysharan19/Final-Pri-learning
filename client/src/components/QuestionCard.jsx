@@ -15,7 +15,6 @@ import {
   clearInkDraft, clearPendingSubmission, newSubmissionId, readInkDraft, readPendingSubmission,
   saveInkDraft, savePendingSubmission, submissionContentKey
 } from './practiceRecovery.js';
-import { nativePhotoAvailable, recognizePhoto } from '../native/photo.js';
 import { cloudReadingEnabled, photoReadingBlockedKey, readPhotoWithCloud, takeCloudReadingNotice } from '../ink/cloudReader.js';
 import { MAX_PDF_PAGES, renderPdfPages } from '../ink/pdfPage.js';
 import PriPlot from './PriPlot.jsx';
@@ -337,46 +336,30 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   );
 
 
-  // A photo of paper working is read by whichever reader is actually good at
-  // it. The server reader first where the student has turned it on, because
-  // Apple Vision was built for printed text and a page of algebra is not that;
-  // then Vision, which needs no network and no account; then nothing, said
-  // plainly. Whatever reads it, the text lands in an editable box and is never
-  // submitted on the reader's word alone.
-  /**
-   * Read one image of working with whichever reader is actually good at it:
-   * the server reader where the student has switched it on, then Apple Vision,
-   * which needs no network and no account. Returns null when neither could.
-   */
+  // A photo of paper working is read only by Pri's server reader (owner
+  // decision: the on-device readers are not good enough to mark from). The
+  // text lands in an editable box and is never submitted on the reader's word
+  // alone; when the server cannot read it the student is told the real reason.
   const readOnePage = useCallback(async (dataURL) => {
     const lastLine = t => String(t || '').split(/\n+/).map(x => x.trim()).filter(Boolean).at(-1) || '';
     let cloudOutcome = null;
     if (cloudReadingEnabled(user)) {
       cloudOutcome = await readPhotoWithCloud(dataURL, { user });
-      if (cloudOutcome?.reason === 'allowance' && !nativePhotoAvailable()) return { allowance: true };
+      if (cloudOutcome?.reason === 'allowance') return { allowance: true };
       if (cloudOutcome && !cloudOutcome.error && !cloudOutcome.reason) {
         const text = String(cloudOutcome.transcription.text || '').trim();
         if (text) return { text, markable: lastLine(text), confidence: cloudOutcome.transcription.confidence, engine: cloudOutcome.transcription.engine };
       }
     }
-    if (!nativePhotoAvailable()) {
-      // The photo itself was the problem: say so. Anything else is the server
-      // route being unavailable, and the student is told the actual reason.
-      if (cloudOutcome && ['unreadable', 'empty'].includes(cloudOutcome.reason)) return null;
-      return { blocked: photoReadingBlockedKey(user, { outcome: cloudOutcome }) };
-    }
-    try {
-      const result = await recognizePhoto(dataURL);
-      const text = String(result?.text || '').trim();
-      const markable = String(result?.answer || '').trim() || lastLine(text);
-      if (!text && !markable) return null;
-      return { text, markable, confidence: result?.confidence, engine: result?.engine || 'apple-vision-photo-v1' };
-    } catch { return null; }
+    // The photo itself was the problem: say so. Anything else is the server
+    // route being unavailable, and the student is told the actual reason.
+    if (cloudOutcome && ['unreadable', 'empty'].includes(cloudOutcome.reason)) return null;
+    return { blocked: photoReadingBlockedKey(user, { outcome: cloudOutcome }) };
   }, [user]);
 
   const decodePhoto = useCallback(async (dataURL) => {
     if (!dataURL) return;
-    if (!cloudReadingEnabled(user) && !nativePhotoAvailable()) {
+    if (!cloudReadingEnabled(user)) {
       setPhotoOCR({
         phase: 'unavailable', text: '', confidence: 0, engine: null,
         error: tLater(photoReadingBlockedKey(user))
@@ -752,6 +735,22 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     if (inFlightRef.current || attemptRef.current) inkFrozenRef.current = true;
   }, []);
 
+  // Ink that waited for the reader (offline, signed out, reader down) is
+  // marked as soon as it is read: the student already wrote their answer and
+  // was told it would be. Once per reading; the deterministic engine decides
+  // the mark exactly as for a tap on Submit, and a doubtful reading still turns
+  // into the confirmation question instead of a mark.
+  const autoMarkedRef = useRef(null);
+  useEffect(() => {
+    if (!writeMode || !inkResult?.afterWait || !inkResult.readKey) return;
+    if (autoMarkedRef.current === inkResult.readKey || resolved) return;
+    // Busy (a submit or a hint in flight): wait — the effect runs again when
+    // the card is idle, and the reading is marked then, not dropped.
+    if (busy || inFlightRef.current) return;
+    autoMarkedRef.current = inkResult.readKey;
+    submit();
+  }, [inkResult, busy]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const onInkStrokes = useCallback((strokes) => {
     if (inFlightRef.current || attemptRef.current) return;
     saveInkDraft(question.id, strokes, { label: question.subtopicName });
@@ -1120,7 +1119,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                             : <div className="photo-thumb" aria-hidden="true" style={{ display: 'grid', placeItems: 'center', fontSize: 22 }}>▤<button aria-label={t('verdict.removeAttachment')} onClick={() => setPhotoOCR({ phase: 'idle', text: '', confidence: 0, error: '', engine: null })}>✕</button></div>}
                           <div style={{ flex: 1 }}>
                             {photoOCR.phase === 'reading' && (
-                              <span className="muted">{cloudReadingEnabled(user) ? t('verdict.readingWork') : t('verdict.readingWithVision')}</span>
+                              <span className="muted">{t('verdict.readingWork')}</span>
                             )}
                             {photoOCR.phase === 'done' && (
                               <>
@@ -1261,7 +1260,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                 )}
                 {InkAnswer && (
                   <div className="editor-foot no-print">
-                    <span className="editor-brand">{t('verdict.inkEngineOnDevice')}</span>
+                    <span className="editor-brand">{String(inkResult?.engine || '').startsWith('cloud') ? t('verdict.inkReadByServer') : t('verdict.inkEngine')}</span>
                     <span style={{ flex: 1 }} />
                     {inkResult?.answerLine && !needsCheck && (
                       <span className="muted" style={{ marginRight: 10 }}>
