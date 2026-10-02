@@ -320,7 +320,7 @@ const device = Object.freeze({
   /** Facts the page cannot measure itself. Never an OS or model name. */
   facts: () => {
     const c = capOf('device');
-    return { stylusSeen: c?.stylusSeen === true, safeAreaApplied: c?.safeAreaApplied === true };
+    return { stylusSeen: c?.stylusSeen === true, stylusCapable: c?.stylusCapable === true, safeAreaApplied: c?.safeAreaApplied === true };
   },
 });
 
