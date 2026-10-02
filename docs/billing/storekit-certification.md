@@ -12,7 +12,7 @@ This document separates what automated code evidence proves from what only real 
 
 All fixtures are real ES256/x5c JWS. They are signed by a throwaway root, intermediate and leaf chain that each test process generates (`server/test/support/apple-signing.mjs`) and trusts only through its own `PRI_APPLE_ROOT_CA_PEM`. Production trust roots are not touched and Apple is never contacted. **This is synthetic evidence. It is not App Store evidence.**
 
-`server/test/storekit-entitlement-state-machine-check.mjs` runs on SQLite (CI step "StoreKit entitlement state machine and reconciliation", pinned at 172/172) and on Postgres as the `pri_server` role (`PLATFORM ON POSTGRES`, 30/30 suites). Each scenario checks two things: the resulting entitlement, and its audit trail (`billing_events` row, verified signed-data ledger row, and a clean reconciliation from that ledger).
+`server/test/storekit-entitlement-state-machine-check.mjs` runs on SQLite (CI step "StoreKit entitlement state machine and reconciliation", pinned at 172/172) and on Postgres as the `pri_server` role (`PLATFORM ON POSTGRES`, 31/31 suites). Each scenario checks two things: the resulting entitlement, and its audit trail (`billing_events` row, verified signed-data ledger row, and a clean reconciliation from that ledger).
 
 | # | Scenario | Expected and proven |
 |---|---|---|
