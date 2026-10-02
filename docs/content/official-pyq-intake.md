@@ -48,6 +48,11 @@ Committed files: code, the manifest (URLs and hashes), tests and this note. PDFs
 - **Honest difficulty (fixed).** A department PYQ target claimed the requested difficulty, while the bank silently snapped to the nearest rung it had. The catalog now lists the difficulties each generator holds, and `indiaProduct` routes to the department only at one of those. Certification had reported this as a difficulty mismatch on 76 launch paths.
 - **Install budget.** Shards are a documented on-demand tier in `vite.config.js` (`jee-pyq-*`), like placement. Only a JEE student opening that chapter downloads them, and no ceiling was raised.
 - **`CONTENT_VERSION` 2026.10.0 → 2026.10.1.** New content was added, and routing for some JEE Advanced chapter/difficulty cells moved from the source-cited archive to the department. The archive generators themselves are unchanged and deterministic.
+- **Bare LaTeX and `$$` (fixed after independent review).** `MathText` renders only `$…$`. Published options such as `\frac{3}{5}` showed raw source, and `$$…$$` showed stray dollar signs. The fix has three parts:
+  - The certifier now fails on any LaTeX command outside `$…$`, and on `$$`, in prompts, options, steps and hints (with regression tests).
+  - `review_official.py fix-delimiters` repairs delimiters only.
+  - Seven Class 8 generator strings with the same defect (bare `\times`, `\div`, `\ne`) were wrapped.
+- **Binding enforced in `audit.py`.** An automated-tier row must carry `review.ai.reviewedTranscriptionSha` equal to the hash of its current transcription; the hash ignores only `$` and whitespace. Its published prompt, options, steps, hints, chapter and difficulty must equal that transcription, and the reviewer model must differ from the transcriber model. `CONTENT_VERSION` moves to 2026.10.2.
 - **Possible key errors are held, never corrected.** Transcribers judged two official JEE Main 2026 keys wrong (8 Apr shift 2, Q4 and Q16). Both are held.
 - **Image-only documents.** These have no text layer. They are recorded as document-level drafts and need page-level transcription. They are not guessed.
 

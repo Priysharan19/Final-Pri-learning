@@ -184,6 +184,30 @@ AI_REQUIRED_TRUE = ("transcriptionMatches", "complete", "wellPosed", "labelsCorr
 KEYED_KINDS = {"option", "options", "numeric"}
 
 
+TRANSCRIPTION_FIELDS = ("prompt", "mcqOptions", "targetChapter", "difficulty", "hints", "steps")
+
+
+def _canon(value):
+    """Mathematical content of a transcription field. Only `$` delimiters and
+    whitespace are ignored, so a rendering-only fix ($$..$$ -> $..$, wrapping a
+    bare formula in $..$) keeps a review bound to what it reviewed; any change
+    to a symbol, number, word or option breaks the binding."""
+    if isinstance(value, str):
+        return re.sub(r"\s+", " ", value.replace("$", "")).strip()
+    if isinstance(value, list):
+        return [_canon(v) for v in value]
+    if isinstance(value, dict):
+        return {k: _canon(v) for k, v in sorted(value.items())}
+    return value
+
+
+def transcription_sha(transcription):
+    import hashlib
+    t = transcription or {}
+    core = {k: _canon(t.get(k)) for k in TRANSCRIPTION_FIELDS}
+    return hashlib.sha256(json.dumps(core, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()
+
+
 def target_parts(manifest):
     """Pri chapter id -> data part, from the single-part chapters of the book manifest."""
     parts = {}
@@ -307,6 +331,17 @@ def audit_official(row, manifest, official, publish, errors):
         if not AUTOMATED_REVIEWER_RE.fullmatch(str(reviewer)):
             fail(errors, row, "automated tier reviewer must be 'automated:key+engine+ai-review/<model>/<YYYY-MM-DD>'")
         ai = review.get("ai") or {}
+        transcription = row.get("transcription") or {}
+        # The review is bound to the exact transcription it saw ...
+        if not ai.get("reviewedTranscriptionSha") or ai["reviewedTranscriptionSha"] != transcription_sha(transcription):
+            fail(errors, row, "automated tier: review is not bound to the current transcription (sha256 mismatch)")
+        # ... and what the student is shown is that transcription.
+        shown = {"prompt": row.get("prompt"), "mcqOptions": row.get("mcqOptions"), "hints": row.get("hints") or [],
+                 "steps": row.get("steps"), "targetChapter": routing.get("targetChapter"), "difficulty": row.get("difficulty")}
+        if any(_canon(shown[k]) != _canon(transcription.get(k) if k != "hints" else (transcription.get(k) or [])) for k in shown):
+            fail(errors, row, "automated tier: published fields differ from the reviewed transcription")
+        if not transcription.get("model") or not ai.get("reviewerModel") or transcription["model"] == ai["reviewerModel"]:
+            fail(errors, row, "automated tier: reviewer model must differ from the transcriber model")
         for field in AI_REQUIRED_TRUE:
             if ai.get(field) is not True:
                 fail(errors, row, f"automated tier: independent AI review did not confirm {field}")

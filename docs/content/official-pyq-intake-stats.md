@@ -30,7 +30,7 @@ Generated with `review_official.py stats` from the local `work/` queues. **Count
 | jee-advanced | 2021 | 38 | 0 | 0 | 0 | 0 | 0 | 38 | 0 | 0 |
 | jee-advanced | 2022 | 34 | 0 | 0 | 0 | 0 | 0 | 34 | 0 | 0 |
 | jee-advanced | 2023 | 34 | 18 | 18 | 18 | 17 | 17 | 17 | 0 | 0 |
-| jee-advanced | 2024 | 34 | 34 | 34 | 34 | 30 | 30 | 4 | 0 | 0 |
+| jee-advanced | 2024 | 34 | 34 | 34 | 34 | 30 | 28 | 6 | 2 | 0 |
 | jee-advanced | 2025 | 32 | 31 | 31 | 22 | 15 | 14 | 18 | 1 | 0 |
 | jee-advanced | 2026 | 34 | 34 | 34 | 24 | 20 | 20 | 14 | 2 | 0 |
 | jee-main | 2026 (Session 2, 9 shifts) | 225 | 224 | 224 | 176 | 164 | 161 | 64 | 31 | 0 |
@@ -40,11 +40,13 @@ Generated with `review_official.py stats` from the local `work/` queues. **Count
 | ncert-exemplar-class-10 | — | 15 | 6 | 6 | 0 | 0 | 0 | 15 | 0 | 0 |
 | ncert-exemplar-class-11 | — | 6 | 1 | 1 | 0 | 0 | 0 | 6 | 0 | 0 |
 | ncert-exemplar-class-12 | — | 35 | 5 | 5 | 0 | 0 | 0 | 35 | 0 | 0 |
-| **total** | | **1337** | **510** | **510** | **274** | **246** | **242** | **1095** | **34** | **12** |
+| **total** | | **1337** | **510** | **510** | **274** | **246** | **240** | **1097** | **36** | **12** |
 
-Published by track: JEE Main 161, JEE Advanced 81. By answer type: 158 single-correct, 28 multi-correct, 56 numeric.
+Published by track: JEE Main 161, JEE Advanced 79. By answer type: 158 single-correct, 27 multi-correct, 55 numeric.
 
-Four rows passed the AI review but were then held by the production content certifier (`certify_rows.mjs`): one prompt with an unbalanced `$` that KaTeX cannot render, and three whose text trips the certifier's template/`undefined` checks. They were held, not edited after review.
+Six rows passed the AI review but were then held by the production content certifier (`certify_rows.mjs`): one prompt with an unbalanced `$` that KaTeX cannot render, three whose text trips the certifier's template/`undefined` checks, and two with a bare LaTeX command inside a prose hint. They were held, not edited after review.
+
+After independent review of #310, 65 queued rows (41 published) received a **rendering-only** delimiter repair: `$$…$$` became `$…$`, and pure-formula strings with bare LaTeX (e.g. options `\frac{3}{5}`) were wrapped in `$…$`. The review binding (`reviewedTranscriptionSha`) ignores only `$` and whitespace, so every symbol, number and word is still exactly what the blind reviewer approved; strings mixing prose with bare LaTeX were held rather than guessed.
 
 ## Why JEE rows are held
 

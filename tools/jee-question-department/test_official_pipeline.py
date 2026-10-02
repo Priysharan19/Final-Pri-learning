@@ -158,10 +158,13 @@ def approved_official(row, *, tier="automated"):
         "steps": [{"h": "Isolate", "d": "Subtract 1 from both sides to get $x = 2$."}],
     })
     r["review"].update({"tier": tier, "reviewedAt": "2026-10-02T00:00:00Z", "transcriptionPassId": "t-1", "flags": []})
+    r["transcription"] = {"prompt": r["prompt"], "mcqOptions": r["mcqOptions"], "targetChapter": "c11-complex-numbers",
+                          "difficulty": 2, "hints": [], "steps": r["steps"], "model": "transcriber-model", "passId": "t-1"}
     if tier == "automated":
         r["review"]["reviewedBy"] = "automated:key+engine+ai-review/test-model/2026-10-02"
         r["review"]["ai"] = {"transcriptionMatches": True, "complete": True, "wellPosed": True, "labelsCorrect": True,
-                             "stepsCorrect": True, "independentAnswerAgrees": True, "reviewerModel": "test-model", "reviewPassId": "r-1"}
+                             "stepsCorrect": True, "independentAnswerAgrees": True, "reviewerModel": "test-model", "reviewPassId": "r-1",
+                             "reviewedTranscriptionSha": audit_mod.transcription_sha(r["transcription"])}
     else:
         r["review"]["reviewedBy"] = "A. Reviewer"
     return r
@@ -194,6 +197,20 @@ def test_audit_gates(rows, manifest):
     broken(lambda r: r["source"].update(sha256="0" * 64), "sha256")
     broken(lambda r: r["routing"].update(targetChapter="c09-unknown"), "known Pri JEE chapter")
     broken(lambda r: r.update(steps=[{"h": "Source solution", "d": "Review the printed solution."}]), "placeholder")
+    # the review is bound to the exact transcription it saw
+    broken(lambda r: r["transcription"].update(prompt="If $x + 1 = 4$, then $x$ equals"), "not bound to the current transcription")
+    # what the student is shown must be that transcription
+    broken(lambda r: r.update(mcqOptions=["1", "2", "3", "5"]), "differ from the reviewed transcription")
+    # the reviewer must be a different model from the transcriber
+    broken(lambda r: r["transcription"].update(model="test-model"), "reviewer model must differ")
+    # a rendering-only repair ($$..$$ -> $..$, wrapping a bare formula) keeps the binding
+    fixed = copy.deepcopy(good)
+    fixed["transcription"]["prompt"] = fixed["prompt"] = "If $$x + 1 = 3$$, then $x$ equals"
+    rev.fix_delimiters_row(fixed)
+    assert fixed["prompt"] == "If $x + 1 = 3$, then $x$ equals", fixed["prompt"]
+    assert not audit_mod.audit([fixed], BOOK, publish=True, official=manifest)[1]
+    assert rev.fix_delimiters_text("\\frac{3}{5}") == "$\\frac{3}{5}$"
+    assert rev.fix_delimiters_text("Powers of a+b\\sqrt2 stay") == "Powers of a+b\\sqrt2 stay", "prose is held, never guessed"
     hum = copy.deepcopy(human)
     hum["review"]["reviewedBy"] = "automated:key+engine+ai-review/x/2026-10-02"
     assert any("non-person" in e for e in audit_mod.audit([hum], BOOK, publish=True, official=manifest)[1])
@@ -204,6 +221,8 @@ def test_audit_gates(rows, manifest):
     q3 = next(r for r in rows if r["id"] == "t-nta-q03")
     num = approved_official(q3)
     num.update(answerType="numeric", answer={"value": 91}, mcqOptions=None, prompt="Find the value of $7 \\times 13$.")
+    num["transcription"].update(mcqOptions=None, prompt=num["prompt"])
+    num["review"]["ai"]["reviewedTranscriptionSha"] = audit_mod.transcription_sha(num["transcription"])
     assert any("re-solve" in e for e in audit_mod.audit([num], BOOK, publish=True, official=manifest)[1])
     num["engine"] = {**num["engine"], "engineSolve": {"expression": "7*13", "value": 91, "agrees": True}}
     assert not audit_mod.audit([num], BOOK, publish=True, official=manifest)[1]
@@ -218,7 +237,8 @@ def test_decide_automated_tier(rows):
     q1 = copy.deepcopy(next(r for r in rows if r["id"] == "t-nta-q01"))
     q3 = copy.deepcopy(next(r for r in rows if r["id"] == "t-nta-q03"))
     t = {"prompt": "If $x+1=3$ then x equals", "mcqOptions": ["1", "2", "3", "4"], "targetChapter": "c11-complex-numbers",
-         "difficulty": 1, "hints": ["Isolate x."], "steps": [{"h": "Isolate", "d": "x = 2"}], "passId": "t-1", "problems": []}
+         "difficulty": 1, "hints": ["Isolate x."], "steps": [{"h": "Isolate", "d": "x = 2"}], "passId": "t-1", "problems": [],
+         "model": "transcriber-model"}
     t3 = {**t, "mcqOptions": None, "prompt": "Find $7 \\times 13$."}
     rev.merge_transcriptions([q1, q3], {q1["id"]: t, q3["id"]: t3}, BOOK)
     assert q1["answer"] == {"correctIndex": 2} and q3["answer"] == {"value": 91}, "answer must come from the key"

@@ -44,7 +44,7 @@ HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[1]
 sys.path.insert(0, str(HERE))
 
-from audit import audit, load_jsonl, target_parts  # noqa: E402
+from audit import audit, load_jsonl, target_parts, transcription_sha  # noqa: E402
 
 WORK = HERE / "work"
 MANIFEST = HERE / "source-manifest.json"
@@ -160,11 +160,52 @@ def render(rows, crops: Path, cache: Path, zoom: float = 2.2, blind: bool = Fals
 
 # ── batches for the AI passes ────────────────────────────────────────────────
 
-def transcription_sha(row):
-    import hashlib
-    t = row.get("transcription") or {}
-    core = {k: t.get(k) for k in ("prompt", "mcqOptions", "targetChapter", "difficulty", "hints", "steps")}
-    return hashlib.sha256(json.dumps(core, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()
+import re as _re
+
+_DISPLAY = _re.compile(r"\$\$([\s\S]+?)\$\$")
+
+
+def fix_delimiters_text(text):
+    """Rendering-only repair. MathText renders $..$ only: $$..$$ leaves stray
+    dollar signs and a bare formula shows raw LaTeX. Returns the repaired text;
+    never changes a symbol, number or word (audit.transcription_sha ignores
+    only `$` and whitespace, so a review stays bound across this repair)."""
+    if not isinstance(text, str) or not text:
+        return text
+    out = _DISPLAY.sub(lambda m: "$" + m.group(1).strip() + "$", text)
+    if "$" not in out and _re.search(r"\\[A-Za-z]+", out):
+        prose = _re.sub(r"\\[A-Za-z]+", " ", out)
+        if not _re.search(r"[A-Za-z]{3,}", prose):
+            out = "$" + out.strip() + "$"  # a pure formula: wrap it whole
+    return out
+
+
+def fix_delimiters_row(row):
+    changed = False
+
+    def fix_fields(obj, keys):
+        nonlocal changed
+        for k in keys:
+            v = obj.get(k)
+            if isinstance(v, str):
+                nv = fix_delimiters_text(v)
+            elif isinstance(v, list):
+                nv = [({**s, "h": fix_delimiters_text(s.get("h")), "d": fix_delimiters_text(s.get("d"))} if isinstance(s, dict)
+                       else fix_delimiters_text(s)) for s in v]
+            else:
+                continue
+            if nv != v:
+                obj[k] = nv
+                changed = True
+
+    fix_fields(row, ("prompt", "mcqOptions", "hints", "steps"))
+    if row.get("transcription"):
+        fix_fields(row["transcription"], ("prompt", "mcqOptions", "hints", "steps"))
+    return changed
+
+
+def transcription_sha_of_row(row):
+    return transcription_sha(row.get("transcription"))
 
 
 def batch_items(rows, *, with_key: bool):
@@ -184,7 +225,7 @@ def batch_items(rows, *, with_key: bool):
         else:  # the blind reviewer gets the transcription, never the key
             t = row.get("transcription") or {}
             item["transcription"] = {k: t.get(k) for k in ("prompt", "mcqOptions", "targetChapter", "difficulty", "hints", "steps")}
-            item["transcriptionSha"] = transcription_sha(row)
+            item["transcriptionSha"] = transcription_sha_of_row(row)
         yield item
 
 
@@ -267,6 +308,7 @@ def decide(rows, reviews, *, model: str, date: str):
             row["engineSolve"] = expr if expr not in (None, "") else None
         ai["independentAnswerAgrees"] = agrees  # numeric resolved after the engine run
         ai["reviewerModel"] = rev.get("model") or model
+        ai["reviewedTranscriptionSha"] = transcription_sha_of_row(row)
         ai["reviewPassId"] = rev.get("passId")
         ai["notes"] = rev.get("notes")
         ai["independentAnswer"] = rev.get("independentAnswer")
@@ -422,6 +464,7 @@ def main(argv=None):
     p = sub.add_parser("decide"); p.add_argument("queue", type=Path); p.add_argument("--dir", type=Path, nargs="+", required=True); p.add_argument("--inputs", type=Path, nargs="+", required=True, help="the blind review-in batch directories"); p.add_argument("--model", required=True); p.add_argument("--date", required=True)
     p = sub.add_parser("serve"); p.add_argument("queue", type=Path); p.add_argument("--port", type=int, default=8765); p.add_argument("--crops", type=Path, default=WORK / "crops")
     p = sub.add_parser("stats"); p.add_argument("queue", type=Path, nargs="+"); p.add_argument("--out", type=Path); p.add_argument("--markdown", type=Path)
+    p = sub.add_parser("fix-delimiters"); p.add_argument("queue", type=Path)
     p = sub.add_parser("publish-set"); p.add_argument("queue", type=Path); p.add_argument("--out", type=Path, required=True)
     args = ap.parse_args(argv)
 
@@ -465,13 +508,14 @@ def main(argv=None):
         print(json.dumps({"merged": n}))
     elif args.cmd == "decide":
         blind_ids = set()
-        current = {r["id"]: transcription_sha(r) for r in rows if r.get("transcription")}
+        current = {r["id"]: transcription_sha_of_row(r) for r in rows if r.get("transcription")}
         for path in (p for d in args.inputs for p in d.glob("*.json")):
             data = json.loads(path.read_text(encoding="utf-8"))
             if data.get("blind") is True:
                 # a review counts only for the exact transcription it was shown
+                # recompute from the transcription the batch actually showed
                 blind_ids.update(item["id"] for item in data["items"]
-                                 if item.get("transcriptionSha") and item["transcriptionSha"] == current.get(item["id"]))
+                                 if transcription_sha(item.get("transcription")) == current.get(item["id"]))
         reviews = {}
         for d in args.dir:
             reviews.update(load_json_dir(d))
@@ -486,6 +530,10 @@ def main(argv=None):
         if args.out:
             args.out.write_text(text + "\n", encoding="utf-8")
         print(text)
+    elif args.cmd == "fix-delimiters":
+        changed = [r["id"] for r in rows if fix_delimiters_row(r)]
+        write_jsonl(args.queue, rows)
+        print(json.dumps({"changed": len(changed), "approvedChanged": sum(1 for r in rows if r["id"] in set(changed) and r.get("status") == "approved")}))
     elif args.cmd == "publish-set":
         verify_pins(rows)
         write_jsonl(args.queue, rows)
