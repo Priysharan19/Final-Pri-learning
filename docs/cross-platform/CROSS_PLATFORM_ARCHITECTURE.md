@@ -48,7 +48,7 @@ What this means in practice:
 | Claim in the brief | Verified? | Evidence |
 |---|---|---|
 | The product client is React/Vite | Yes | `client/package.json` (react 18, vite 8, react-router-dom 7), `client/vite.config.js` |
-| The native Apple package lives under `ios/` | Yes | `ios/PriLearning.swiftpm` is canonical. `ios/PriLearning 2.swiftpm` is a compatibility copy whose Swift, `Package.swift` and `Resources/Web` are identical (only `RELEASE.md` differs). `ios/PriLearning.swiftpm.zip` is a **stale** 2026-08-23 snapshot without the cloud, billing or photo bridges. |
+| The native Apple package lives under `ios/` | Yes | `ios/PriLearning.swiftpm` is canonical. `ios/PriLearning 2.swiftpm` is a compatibility copy whose Swift, `Package.swift` and `Resources/Web` are identical (only `RELEASE.md` differs). the former `PriLearning.swiftpm.zip` archive was a **stale** 2026-08-23 snapshot (removed in CP-04) without the cloud, billing or photo bridges. |
 | The Apple shell hosts the bundled client in WKWebView | Yes | `ios/PriLearning.swiftpm/WebShell.swift` loads `prilearning://app/` through `LocalSchemeHandler.swift`, using the persistent `WKWebsiteDataStore.default()` |
 | `Package.swift` declares `.pad` and `.phone` | Yes | `ios/PriLearning.swiftpm/Package.swift`, `supportedDeviceFamilies: [.pad, .phone]`, iOS 16.0 minimum. The CP-01 audit's one-off simulator build produced an `Info.plist` with `UIDeviceFamily = [1, 2]`; that is synthetic evidence, not in CI, and the source `Info.plist` does not set the key. |
 | Native bridges | Yes, five | `priInk` (PencilKit and the on-device recogniser), `priPhoto` (Vision OCR), `priBilling` (StoreKit 2), `priCloud` (URLSession `/v1` with a native cookie jar), `priShare` (UIActivityViewController). In addition, `<a download>`/blob navigations become a `WKDownload`, are written to a temp file and are opened in the share sheet (`WebShell.swift` download delegate). There are **no** lifecycle, storage, haptics or deep-link bridges. |
@@ -251,7 +251,7 @@ One transport and one dispatcher per host:
 | 6 | iPhone native ink defaults to Pencil-only (`ios/PriLearning.swiftpm/Ink/InkSurface.swift`), so an iPhone student cannot draw until they find the Finger toggle | Blocks iPhone | handwriting / CP-04 |
 | 7 | The CI native build targets only iPad simulators (`scripts/ink-native-check.mjs`) | iPhone regressions are invisible | ios-native / CP-04 |
 | 8 | Account export (`client/src/components/CloudAccountSecurity.jsx`) relies on the implicit `WKDownload` path and revokes its blob URL on the next tick (possible race; unverified on device) | Unverified | platform / CP-02 |
-| 9 | `ios/PriLearning.swiftpm.zip` is a stale snapshot without the cloud, billing or photo bridges | Confusing artefact | ios-native / CP-04 cleanup |
+| 9 | The former `PriLearning.swiftpm.zip` was a stale snapshot without the cloud, billing or photo bridges (removed in CP-04) | Resolved | ios-native / CP-04 cleanup |
 | 10 | Native package drift gate (`scripts/check-native-package-sync.mjs`) checks only Swift and `Package.swift`; `Info.plist` and `Resources/Models` are ungated (`Resources/Web` is gated by `npm run check:ios`) | Copies can diverge | ios-native / CP-04 |
 | 11 | No `android/` ownership rule in `.pri-os/fleet.json`, so Android paths would be unowned | Governance | qa-release / CP-06 |
 | 12 | The landing copy and README still describe "offline-first, cloud optional", which ADR-0001 supersedes | Copy accuracy | student-experience (out of CP scope) |

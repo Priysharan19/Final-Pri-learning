@@ -83,7 +83,7 @@ CP-03 and CP-06 can run in parallel after CP-02, with different owners. Under th
   - `ios/PriLearning.swiftpm/WebShell.swift` (share anchor, Dynamic Type → CSS, safe-area decision).
   - `scripts/ink-native-check.mjs` (add an iPhone destination), `.github/workflows/native-ink.yml`.
   - `scripts/check-native-package-sync.mjs` (also gate `Info.plist`).
-  - Remove or refresh the stale `ios/PriLearning.swiftpm.zip`.
+  - Remove or refresh the stale `PriLearning.swiftpm.zip` archive (removed in CP-04).
   - Universal Links: `onOpenURL` → route bridge, plus `apple-app-site-association` served by `server/`.
 - **Scope:** finger ink default, compact-friendly native surfaces, iPhone simulator build+launch+bridge self-check in CI, deep links for `/account-action`, account export via `share.file`.
 - **Non-goals:** iPhone landscape layouts, a new recogniser, StoreKit changes, App Store submission.
