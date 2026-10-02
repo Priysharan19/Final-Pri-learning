@@ -237,6 +237,7 @@ export default function InkAnswer({
       // while the server was reading it (§09: a late reading never rewrites
       // the reading a mark was given for).
       if (seq !== readSeqRef.current || disabledRef.current) return;
+      if (outcome?.reason === 'allowance') { setCloudState('allowance'); setCloudOffer(null); return; }
       if (!outcome || outcome.reason) { setCloudState(null); setCloudOffer(null); return; }
       if (outcome.error) { setCloudState('failed'); setCloudOffer(null); return; }
 
@@ -594,6 +595,7 @@ export default function InkAnswer({
             {rec.cloud === true && <span className="ink-status muted">{t('verdict.readOnServer')}</span>}
             {cloudState === 'reading' && <span className="ink-status muted">{t('ink.readingAgain')}</span>}
             {cloudState === 'failed' && <span className="ink-status muted">{t('ink.readerUnreachable')}</span>}
+            {cloudState === 'allowance' && <span className="ink-status muted">{t('ink.cloudAllowanceUsed')}</span>}
           </div>
           {cloudOffer && (
             <div className="ink-cloud-offer" style={{ margin: '6px 14px 2px', fontSize: 12.5 }}>

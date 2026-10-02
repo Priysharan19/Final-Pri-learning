@@ -6,7 +6,7 @@
 // Run on its own:  node client/test/form-factor-check.mjs
 // ─────────────────────────────────────────────────────────────────────────────
 import { readFileSync } from 'node:fs';
-import { BREAKPOINTS, classify, inkCanvasHeight } from '../src/platform/formFactor.js';
+import { BREAKPOINTS, classify, currentFormFactor, inkCanvasHeight } from '../src/platform/formFactor.js';
 
 let pass = 0;
 const failures = [];
@@ -42,6 +42,18 @@ ok(inkCanvasHeight(500, classify(1180, 820)) === 500, 'a larger requested height
 // No device sniffing anywhere in the module.
 const src = readFileSync(new URL('../src/platform/formFactor.js', import.meta.url), 'utf8');
 ok(!/userAgent|navigator\.platform|iPad|iPhone|Android/.test(src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')), 'the form-factor module never looks at device identity');
+
+// Touch-first detection (CP-10, found on Android 13 / Chromium 109): a touch
+// WebView may report a fine primary pointer yet answer hover: none. Either
+// signal makes the device touch-first; a hover-capable fine pointer does not.
+const winWith = media => ({ innerWidth: 412, innerHeight: 900, document: { activeElement: null },
+  matchMedia: q => ({ matches: !!media[q] }) });
+ok(currentFormFactor(winWith({ '(pointer: coarse)': true })).coarse === true, 'a coarse primary pointer is touch-first');
+ok(currentFormFactor(winWith({ '(hover: none)': true })).coarse === true, 'a fine-reporting pointer that cannot hover is touch-first (Chromium 109 WebView)');
+ok(currentFormFactor(winWith({})).coarse === false, 'a hover-capable fine pointer (desktop) is not touch-first');
+const css = readFileSync(new URL('../src/theme.css', import.meta.url), 'utf8');
+const coarseBlocks = css.match(/@media \(pointer: coarse\)[^{]*\{/g) || [];
+ok(coarseBlocks.length > 0 && coarseBlocks.every(b => /\(hover: none\)/.test(b)), 'every touch-target media block also applies when the primary input cannot hover');
 
 console.log(failures.length
   ? `FORM FACTOR: FAIL — ${failures.length} of ${pass + failures.length} checks failed\n  · ${failures.join('\n  · ')}`

@@ -502,6 +502,8 @@ export default {
   'verdict.thisLooksLikeTitle': 'यह ऐसा लगता है: {title}',
   'verdict.readingWork': 'आपकी लिखावट पढ़ी जा रही है…',
   'verdict.readOnServer': 'सर्वर पर पढ़ा गया',
+  'ink.cloudAllowanceUsed': 'आज की क्लाउड रीडिंग सीमा पूरी हो गई — यह डिवाइस पर पढ़ा गया उत्तर है',
+  'photo.cloudAllowanceUsed': 'आज की क्लाउड रीडिंग सीमा पूरी हो गई है, इसलिए यह फ़ोटो अभी नहीं पढ़ी जा सकती। अपना हल टाइप करें या बाद में फिर कोशिश करें।',
 
   // ── हैंडराइटिंग लिखने की जगह (ink/InkAnswer, InkCanvas, NativeInkCanvas) ──
   // Apple Pencil is the product's name and stays Latin; "Pencil" alone in the

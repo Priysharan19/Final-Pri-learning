@@ -825,7 +825,7 @@ select.input {
 }
 
 /* iPad & touch */
-@media (pointer: coarse) {
+@media (pointer: coarse), (hover: none) {
   .btn { min-height: 44px; }
   .btn-sm { min-height: 36px; }
   .nav-item { padding: 12px 13px; }
@@ -1103,7 +1103,7 @@ body { overscroll-behavior-y: none; }
    finger actually has to land in.
    ────────────────────────────────────────────────────────────────────────── */
 
-@media (pointer: coarse) and (max-width: 760px) {
+@media (pointer: coarse) and (max-width: 760px), (hover: none) and (max-width: 760px) {
   .mode-tab, .q-rail-btn, .hint-bulb { width: 44px; height: 44px; }
   .pill-opt, .set-menu-item, .acct-menu-item, .editor-tool, .user-chip { min-height: 44px; }
   .editor-tool { padding: 0 12px; }
@@ -1866,7 +1866,7 @@ html.theme-switching, html.theme-switching * {
 .teacher-anchor:focus-visible { outline: 3px solid var(--focus); outline-offset: 4px; }
 
 /* ── Tablet: persistent, touchable navigation rather than a hover-only rail ─ */
-@media (pointer: coarse) and (min-width: 761px) and (max-width: 1180px) {
+@media (pointer: coarse) and (min-width: 761px) and (max-width: 1180px), (hover: none) and (min-width: 761px) and (max-width: 1180px) {
   .sidebar { width: 178px; }
   .sidebar-inner { width: 178px; padding: 12px 9px; box-shadow: none; }
   .sidebar:hover .sidebar-inner { width: 178px; box-shadow: none; }
@@ -2077,12 +2077,12 @@ html.theme-switching, html.theme-switching * {
    rule, so primary buttons were 42px on touch screens. Restate it last. This
    intentionally applies to touch tablets too (iPad buttons become 44px, the
    size the original "iPad & touch" rule asked for). */
-@media (pointer: coarse) {
+@media (pointer: coarse), (hover: none) {
   .btn { min-height: var(--tap-min); }
 }
 
 /* Everything a finger presses is at least 44px on a coarse-pointer phone. */
-@media (pointer: coarse) and (max-width: 760px) {
+@media (pointer: coarse) and (max-width: 760px), (hover: none) and (max-width: 760px) {
   .btn-sm { min-height: var(--tap-min); }
   
   

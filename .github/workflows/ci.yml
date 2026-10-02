@@ -65,14 +65,14 @@ jobs:
           grep -Fq 'PLOTTING: PASS — 78/78 checks' suites.log
           grep -Fq 'README TRUTH: PASS — 16/16 checks' suites.log
           grep -Fq 'LEGAL PAGES: PASS — 233/233 checks' suites.log
-          grep -Fq 'CLOUD HANDWRITING CLIENT: PASS — 58/58 checks' suites.log
+          grep -Fq 'CLOUD HANDWRITING CLIENT: PASS — 62/62 checks' suites.log
           grep -Fq 'CLOUD WORKING CLIENT: PASS — 47/47 checks' suites.log
           grep -Fq 'CLOUD PHOTO CLIENT: PASS — 28/28 checks' suites.log
           grep -Fq 'I18N: PASS — 187/187 checks' suites.log
           grep -Fq 'I18N COVERAGE: PASS — 88/88 checks — 50 files scanned, 0 hard-coded strings' suites.log
           grep -Fq 'I18N VOICE: PASS — 92/92 checks' suites.log
           grep -Fq 'MISCONCEPTION ONTOLOGY: PASS — 99/99 checks' suites.log
-          grep -Fq 'CLOUD HANDWRITING CLIENT: PASS — 58/58 checks' suites.log
+          grep -Fq 'CLOUD HANDWRITING CLIENT: PASS — 62/62 checks' suites.log
           grep -Fq 'CLOUD WORKING CLIENT: PASS — 47/47 checks' suites.log
           grep -Fq 'CLOUD PHOTO CLIENT: PASS — 28/28 checks' suites.log
           grep -Fq 'MARK PREDICTOR: PASS — 39/39 checks' suites.log
@@ -283,6 +283,8 @@ jobs:
         run: node server/test/razorpay-billing-check.mjs
       - name: Apple billing lifecycle
         run: node server/test/apple-billing-check.mjs
+      - name: Server-paid operations obey the server's entitlement (SEC-COMM-01)
+        run: node server/test/premium-authority-check.mjs
       - name: Google Play billing verification
         run: node server/test/google-billing-check.mjs
       # §19 / V1 blocker #7 (code side): the StoreKit entitlement state machine
