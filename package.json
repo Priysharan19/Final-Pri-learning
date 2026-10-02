@@ -5,7 +5,7 @@
   "type": "module",
   "description": "Pri Learning — Classes/Years 7–12 maths practice with offline-first local learning, on-device handwriting recognition, and optional authenticated cloud sync.",
   "scripts": {
-    "setup": "npm install --prefix server && npm install --prefix client",
+    "setup": "npm ci --prefix server && npm ci --prefix client",
     "dev": "node scripts/dev.js",
     "build": "npm run build --prefix client",
     "start": "node server/index.js",
