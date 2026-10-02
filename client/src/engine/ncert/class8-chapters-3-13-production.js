@@ -186,7 +186,7 @@ const generators = {
   'c8-algebraic-identities-ncert-mastery': (rng, diff) => {
     if (diff === 1) {
       const a=ri(rng,2,9), b=ri(rng,2,9), c=a+b;
-      return qMcq(rng, `Simplify $${a}x+${b}x$.`, `$${c}x`, [
+      return qMcq(rng, `Simplify $${a}x+${b}x$.`, `$${c}x$`, [
         [`$${a*b}x^2$`,'That multiplies the terms instead of adding like coefficients.'],
         [`$${c}x^2$`,'Adding like terms does not change the exponent.'],
         [`$${a}x+${b}$`,'The second term still contains x.']
@@ -195,7 +195,7 @@ const generators = {
     }
     if (diff === 2) {
       const a=ri(rng,2,9), b=ri(rng,2,9), coef=a*b;
-      return qMcq(rng, `Multiply $${a}x^2$ by $${b}x^3$.`, `$${coef}x^5`, [
+      return qMcq(rng, `Multiply $${a}x^2$ by $${b}x^3$.`, `$${coef}x^5$`, [
         [`$${coef}x^6$`,'For the same base, exponents add; they do not multiply.'],
         [`$${a+b}x^5$`,'Coefficients multiply, not add.'],
         [`$${coef}x$`,'The powers of x must be combined.']
@@ -205,7 +205,7 @@ const generators = {
     if (diff === 3) {
       const a=ri(rng,2,6), b=ri(rng,2,8), c=ri(rng,1,6);
       const mid=a*c+b, con=b*c;
-      return qMcq(rng, `Expand $(x+${b})(${a}x+${c})$.`, `$${a}x^2+${mid}x+${con}`, [
+      return qMcq(rng, `Expand $(x+${b})(${a}x+${c})$.`, `$${a}x^2+${mid}x+${con}$`, [
         [`$${a}x^2+${b+c}x+${con}$`,'Both cross-products must be included.'],
         [`$${a}x^2+${con}$`,'The two cross-terms do not disappear.'],
         [`$${a+1}x^2+${con}$`,'The leading terms multiply to ax², not (a+1)x².']
@@ -252,7 +252,7 @@ const generators = {
     }
     if (diff === 2) {
       const a=pick(rng,[2,3,5]), m=ri(rng,-4,5), n=ri(rng,-4,5), exp=m+n;
-      return qMcq(rng, `Simplify $${a}^{${m}}\\times${a}^{${n}}$ in exponential form.`, `$${a}^{${exp}}`, [
+      return qMcq(rng, `Simplify $${a}^{${m}}\\times${a}^{${n}}$ in exponential form.`, `$${a}^{${exp}}$`, [
         [`$${a}^{${m*n}}$`,'Same-base multiplication adds exponents.'],
         [`$${a*2}^{${exp}}$`,'The base is not added.'],
         [`$${a}^{${m-n}}$`,'Subtracting exponents belongs to division.']
@@ -304,7 +304,7 @@ const generators = {
   'c8-factorisation-ncert-mastery': (rng, diff) => {
     if (diff === 1) {
       const g=ri(rng,2,9), a=ri(rng,2,8), b=ri(rng,2,8);
-      return qMcq(rng, `Factorise $${g*a}x+${g*b}$.`, `$${g}(${a}x+${b})`, [
+      return qMcq(rng, `Factorise $${g*a}x+${g*b}$.`, `$${g}(${a}x+${b})$`, [
         [`$${g*a}(x+${b})$`,'The common factor was taken inconsistently.'],
         [`$${g}x(${a}+${b})$`,'x is not a factor of the constant term.'],
         [`$(${g*a}x)(${g*b})$`,'This multiplies terms rather than factoring the sum.']
@@ -313,7 +313,7 @@ const generators = {
     }
     if (diff === 2) {
       const a=ri(rng,2,8), b=ri(rng,2,8);
-      return qMcq(rng, `Factorise $x^2+${a+b}x+${a*b}$.`, `$(x+${a})(x+${b})`, [
+      return qMcq(rng, `Factorise $x^2+${a+b}x+${a*b}$.`, `$(x+${a})(x+${b})$`, [
         [`$(x+${a+b})(x+${a*b})$`,'The two numbers must add to the middle coefficient and multiply to the constant.'],
         [`$(x-${a})(x-${b})$`,'Those factors give a positive middle coefficient only if signs are handled incorrectly.'],
         [`$x(x+${a+b})+${a*b}$`,'This is not fully factorised.']
@@ -322,7 +322,7 @@ const generators = {
     }
     if (diff === 3) {
       const g=ri(rng,2,7), a=ri(rng,2,6), b=ri(rng,1,5);
-      return qMcq(rng, `Simplify $\\dfrac{${g*a}x^2+${g*b}x}{${g}x}$.`, `$${a}x+${b}`, [
+      return qMcq(rng, `Simplify $\\dfrac{${g*a}x^2+${g*b}x}{${g}x}$.`, `$${a}x+${b}$`, [
         [`$${a}x^2+${b}x$`,'The denominator factor has not been cancelled.'],
         [`$${a+b}x$`,'The quotient terms are unlike and cannot be combined.'],
         [`$${a}x+${g*b}$`,'Both numerator terms must be divided by gx.']
@@ -330,7 +330,7 @@ const generators = {
       [['Divide first term',`$${a}x$`],['Divide second term',`${b}`],['Answer',`$${a}x+${b}$`]]);
     }
     const a=ri(rng,2,9), b=ri(rng,2,9);
-    return qMcq(rng, `Factorise $${a*a}x^2-${b*b}$.`, `$(${a}x-${b})(${a}x+${b})`, [
+    return qMcq(rng, `Factorise $${a*a}x^2-${b*b}$.`, `$(${a}x-${b})(${a}x+${b})$`, [
       [`$(${a}x-${b})^2$`,'That would produce a middle term.'],
       [`$(${a*a}x-${b})(${a}x+${b})$`,'The squared first term must be split as (ax)^2.'],
       [`$${a}x(${a}x-${b*b})$`,'The constant term has no factor x.']
