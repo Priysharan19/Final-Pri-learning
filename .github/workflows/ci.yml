@@ -60,12 +60,13 @@ jobs:
           grep -Fq 'ADAPTIVE SIMULATION: PASS — 77/77 checks' suites.log
           grep -Fq 'PROGRESS TRUTH: PASS — 74/74 checks' suites.log
           grep -Fq 'PLACEMENT: PASS — 268/268 checks' suites.log
-          grep -Fq 'IOS BUNDLE FEATURES: PASS — 16/16 checks' suites.log
+          grep -Fq 'IOS BUNDLE FEATURES: PASS — 20/20 checks' suites.log
           grep -Fq 'INDIA EXAM WEIGHT: PASS — 628/628 checks' suites.log
           grep -Fq 'PLOTTING: PASS — 78/78 checks' suites.log
           grep -Fq 'README TRUTH: PASS — 16/16 checks' suites.log
           grep -Fq 'LEGAL PAGES: PASS — 233/233 checks' suites.log
           grep -Fq 'CLOUD HANDWRITING CLIENT: PASS — 94/94 checks' suites.log
+          grep -Fq 'BROWSER RUN FIXES: PASS — 23/23 checks' suites.log
           grep -Fq 'CLOUD WORKING CLIENT: PASS — 47/47 checks' suites.log
           grep -Fq 'CLOUD PHOTO CLIENT: PASS — 65/65 checks' suites.log
           grep -Fq 'I18N: PASS — 189/189 checks' suites.log

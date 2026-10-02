@@ -355,13 +355,17 @@ function releaseIdentityManifest(identity) {
 // Build-time feature flags (client/src/platform/features.js). A production
 // build is OFF unless its environment says PRI_FEATURE_<NAME>=1; development
 // (`vite` serve) is ON. Test harnesses that build set the variable themselves.
-export const FEATURE_FLAGS = Object.freeze(['PLACEMENT', 'TUTOR']);
+export const FEATURE_FLAGS = Object.freeze(['PLACEMENT', 'TUTOR', 'AUSTRALIA']);
 export function featureStates(command, env = process.env) {
   const on = name => (command === 'build' ? env[`PRI_FEATURE_${name}`] === '1' : env[`PRI_FEATURE_${name}`] !== '0');
   return Object.fromEntries(FEATURE_FLAGS.map(name => [name.toLowerCase(), on(name)]));
 }
 export function featureDefines(command, env = process.env) {
-  return { __PRI_FEATURE_PLACEMENT__: JSON.stringify(featureStates(command, env).placement) };
+  const states = featureStates(command, env);
+  return {
+    __PRI_FEATURE_PLACEMENT__: JSON.stringify(states.placement),
+    __PRI_FEATURE_AUSTRALIA__: JSON.stringify(states.australia)
+  };
 }
 
 // The flags a build was made with, written beside it as features.json so the
