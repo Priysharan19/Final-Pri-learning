@@ -5,6 +5,7 @@
 import { purgeStaleLoginAttempts } from './loginLockout.js';
 import { purgeOidcNonces } from './oidcNonce.js';
 import { asStore } from './store.js';
+import { logEvent, safeCode } from './observability.js';
 
 export const HOUSEKEEPING_INTERVAL_MS = 6 * 60 * 60 * 1000;
 const REVOKED_SESSION_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
@@ -49,7 +50,7 @@ export function startHousekeeping(db, { intervalMs = HOUSEKEEPING_INTERVAL_MS, l
       log('housekeeping', record);
       return record;
     } catch (error) {
-      console.error('housekeeping_error', { code: error?.code || 'HOUSEKEEPING_ERROR' });
+      logEvent('error', 'housekeeping_error', { code: safeCode(error?.code, 'HOUSEKEEPING_ERROR') });
       return null;
     }
   };
