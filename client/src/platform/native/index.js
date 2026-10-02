@@ -324,6 +324,42 @@ const device = Object.freeze({
   },
 });
 
+// ── identity (Sign in with Apple) ────────────────────────────────────────────
+// The shell runs the system sign-in sheet and hands back Apple's identity
+// token; the Pri server (not the shell, not this page) verifies that token and
+// issues the session. The nonce the token must carry is issued by the server
+// and single-use, so a captured token cannot be replayed into a new session.
+const NONCE_HASH = /^[0-9a-f]{64}$/;
+const identity = Object.freeze({
+  available: () => !!capOf('identity'),
+  /** Which providers the shell can open a native sign-in sheet for. */
+  providers: () => {
+    const c = capOf('identity');
+    return { apple: !!c && c.transport !== 'legacy' && c.apple === true };
+  },
+  /**
+   * Open the shell's Sign in with Apple sheet. `nonceHash` is the lowercase
+   * hex SHA-256 of the server-issued nonce (Apple's documented pattern: the
+   * digest goes on the request and comes back in the token's `nonce` claim; the
+   * raw nonce goes to the server, which accepts either form). Resolves
+   * `{ identityToken, authorizationCode?, nonce, user? }`; the person dismissing
+   * the sheet rejects with USER_CANCELLED. The system sheet cannot be dismissed
+   * from JavaScript, so an abort only stops this page waiting.
+   */
+  appleSignIn({ nonceHash } = {}, { timeoutMs = 5 * 60_000, signal = null } = {}) {
+    const c = capOf('identity');
+    if (!c || c.apple !== true || c.transport === 'legacy') return unsupported('identity', 'appleSignIn');
+    const digest = String(nonceHash || '');
+    if (!NONCE_HASH.test(digest)) {
+      return Promise.reject(new PriNativeError('BAD_REQUEST', 'identity.appleSignIn needs the SHA-256 hex digest of a server-issued nonce'));
+    }
+    return viaBridge('identity', 'appleSignIn', { nonce: digest }, { timeoutMs, signal, cancellable: false }).then(result => {
+      if (result.nonce !== digest) throw new PriNativeError('INTERNAL', 'identity.appleSignIn answered for a different nonce');
+      return result;
+    });
+  },
+});
+
 export const priNative = Object.freeze({
   /** Deep-frozen host descriptor: capabilities and shell/release facts, no OS. */
   host: () => { getRuntime(); return discoverHost(scopeOf()); },
@@ -334,7 +370,7 @@ export const priNative = Object.freeze({
   has: cap => !!capOf(cap),
   version: cap => capOf(cap)?.version || 0,
   releaseIdentity: () => hostReleaseIdentity(scopeOf()),
-  ink, photo, billing, cloud, share, files, lifecycle, storage, device,
+  ink, photo, billing, cloud, share, files, lifecycle, storage, device, identity,
   /** Bridge counters for diagnostics (no user data). */
   stats: () => (runtime ? runtime.bridge.stats() : null),
   /** Cancel everything in flight (tests, explicit teardown). */

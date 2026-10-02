@@ -10,6 +10,14 @@ ARG GITHUB_SHA
 ARG VERCEL_GIT_COMMIT_SHA
 ARG PRI_BUILD_TIMESTAMP
 ARG SOURCE_DATE_EPOCH
+# Build-time product flags (client/src/platform/features.js). Unset = OFF.
+# Set a Railway build variable to "1" to ship the surface in production.
+ARG PRI_FEATURE_PLACEMENT
+ARG PRI_FEATURE_TUTOR
+ARG PRI_FEATURE_EXTENDED_TRACKS
+ENV PRI_FEATURE_PLACEMENT=${PRI_FEATURE_PLACEMENT} \
+    PRI_FEATURE_TUTOR=${PRI_FEATURE_TUTOR} \
+    PRI_FEATURE_EXTENDED_TRACKS=${PRI_FEATURE_EXTENDED_TRACKS}
 WORKDIR /app
 COPY client/package.json client/package-lock.json ./client/
 RUN npm ci --prefix client

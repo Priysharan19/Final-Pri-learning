@@ -4,7 +4,8 @@
 // The platform-neutral side of the shell, shared in shape with the Android
 // shell: one `priBridge` message handler speaking the versioned envelope in
 // docs/cross-platform/CROSS_PLATFORM_ARCHITECTURE.md §4.3. It serves the
-// handshake, sharing/printing, storage/device facts and app lifecycle events.
+// handshake, sharing/printing, storage/device facts, app lifecycle events and
+// Sign in with Apple (AppleSignInBridge, `identity.appleSignIn`).
 // Ink, photo, StoreKit and cloud keep their own handlers during the migration
 // window; the host descriptor tells the page which transport each one uses, so
 // an operation is never sent twice.
@@ -25,6 +26,7 @@ final class NativeHostBridge: NSObject {
     private var observers: [NSObjectProtocol] = []
     private var seq = 0
     private(set) var state = "active"
+    private let appleSignIn = AppleSignInBridge()
 
     // MARK: Host descriptor
 
@@ -53,7 +55,10 @@ final class NativeHostBridge: NSObject {
                 "files": ["versions": [1], "input": true],
                 "lifecycle": ["versions": [1], "backButton": false],
                 "storage": ["versions": [1], "durable": true],
-                "device": ["versions": [1], "safeAreaApplied": true, "stylusSeen": false]
+                "device": ["versions": [1], "safeAreaApplied": true, "stylusSeen": false],
+                // Sign in with Apple is only useful against a configured Pri
+                // cloud: the token is verified there, nowhere else.
+                "identity": ["versions": [1], "transport": "bridge", "apple": cloudConfigured]
             ]
         ]
         if let release = NativeReleaseIdentity.object { descriptor["release"] = release }
@@ -69,6 +74,7 @@ final class NativeHostBridge: NSObject {
 
     func attach(to webView: WKWebView) {
         self.webView = webView
+        appleSignIn.attach(to: webView)
         let center = NotificationCenter.default
         let transitions: [(Notification.Name, String)] = [
             (UIApplication.didBecomeActiveNotification, "active"),
@@ -86,6 +92,7 @@ final class NativeHostBridge: NSObject {
     func detach() {
         observers.forEach(NotificationCenter.default.removeObserver)
         observers.removeAll()
+        appleSignIn.detach()
         webView = nil
     }
 
@@ -134,7 +141,7 @@ final class NativeHostBridge: NSObject {
             return fail(id, "TOO_LARGE", "Request is too large.")
         }
         let payload = envelope["payload"] as? [String: Any] ?? [:]
-        if op == "cancel" { return } // share/print are not cancellable once presented
+        if op == "cancel" { return } // share/print/sign-in sheets are not cancellable once presented
 
         switch "\(cap).\(op)" {
         case "host.ready":
@@ -154,6 +161,10 @@ final class NativeHostBridge: NSObject {
             shareFile(id, payload)
         case "share.print":
             printPage(id)
+        case "identity.appleSignIn":
+            appleSignIn.signIn(id, payload,
+                               reply: { [weak self] result in self?.reply(id, result) },
+                               fail: { [weak self] code, message in self?.fail(id, code, message) })
         default:
             fail(id, "UNSUPPORTED", "\(cap).\(op) is not supported by this app version.")
         }

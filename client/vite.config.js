@@ -339,12 +339,24 @@ function releaseIdentityManifest(identity) {
 // build is OFF unless its environment says PRI_FEATURE_<NAME>=1; development
 // (`vite` serve) is ON. Test harnesses that build set the variable themselves.
 export const FEATURE_FLAGS = Object.freeze(['PLACEMENT', 'TUTOR']);
+// Flags built and recorded in features.json like the ones above, but not yet
+// asserted off in the tracked iPad bundles (client/test/ios-bundle-features-
+// check.mjs), because those bundles predate the flag and carry no record of
+// it. Move a name into FEATURE_FLAGS with the next `npm run sync:ios`.
+//   EXTENDED_TRACKS — Olympiad / Australian tracks and the Teacher role in
+//   onboarding, classroom panels for students (src/platform/features.js).
+export const PENDING_FEATURE_FLAGS = Object.freeze(['EXTENDED_TRACKS']);
+const flagKey = name => name.toLowerCase().replace(/_([a-z])/g, (_, c) => c.toUpperCase());
 export function featureStates(command, env = process.env) {
   const on = name => (command === 'build' ? env[`PRI_FEATURE_${name}`] === '1' : env[`PRI_FEATURE_${name}`] !== '0');
-  return Object.fromEntries(FEATURE_FLAGS.map(name => [name.toLowerCase(), on(name)]));
+  return Object.fromEntries([...FEATURE_FLAGS, ...PENDING_FEATURE_FLAGS].map(name => [flagKey(name), on(name)]));
 }
 export function featureDefines(command, env = process.env) {
-  return { __PRI_FEATURE_PLACEMENT__: JSON.stringify(featureStates(command, env).placement) };
+  const states = featureStates(command, env);
+  return {
+    __PRI_FEATURE_PLACEMENT__: JSON.stringify(states.placement),
+    __PRI_FEATURE_EXTENDED_TRACKS__: JSON.stringify(states.extendedTracks)
+  };
 }
 
 // The flags a build was made with, written beside it as features.json so the

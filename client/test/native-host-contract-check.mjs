@@ -521,7 +521,55 @@ ok(normalizeCode('SOMETHING_NEW_FROM_A_SHELL') === 'INTERNAL', 'unknown codes be
   delete globalThis.window;
 }
 
+// ── 14 · identity v1: Sign in with Apple through the envelope ────────────────
+// The shell only runs the sheet and returns Apple's token; the server verifies
+// it. The page sends the shell nothing but the SHA-256 digest of a server nonce,
+// and refuses a reply that is not a token for that digest.
+{
+  const digest = 'a'.repeat(64);
+  const token = 'eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiIxIn0.c2ln';
+  const noIdentity = createFakeHost({ capabilities: { cloud: { versions: [1], configured: true } } });
+  ok(priNative.identity.available() === false && priNative.identity.providers().apple === false, 'a host without the identity capability offers no provider');
+  await rejects(priNative.identity.appleSignIn({ nonceHash: digest }), 'UNSUPPORTED', 'and identity.appleSignIn is UNSUPPORTED there');
+  priNative.dispose(); noIdentity.uninstall();
+
+  const legacy = createFakeHost({ capabilities: { identity: { versions: [1], transport: 'legacy', apple: true } } });
+  ok(priNative.identity.providers().apple === false, 'identity is defined over the envelope only; a legacy transport offers nothing');
+  priNative.dispose(); legacy.uninstall();
+
+  const newer = createFakeHost({ capabilities: { identity: { versions: [2], apple: true } } });
+  ok(priNative.identity.available() === false, 'an identity version this build does not speak is unsupported, never a crash');
+  priNative.dispose(); newer.uninstall();
+
+  const h = createFakeHost({ capabilities: { identity: { versions: [1], apple: true } } });
+  ok(discoverHost(globalThis).capabilities.identity.version === 1 && discoverHost(globalThis).capabilities.identity.transport === 'bridge', 'identity v1 negotiates over the bridge transport');
+  ok(priNative.identity.available() === true && priNative.identity.providers().apple === true, 'and advertises Apple as a plain fact');
+  await rejects(priNative.identity.appleSignIn({ nonceHash: 'not-a-digest' }), 'BAD_REQUEST', 'anything but a 64-hex digest is refused before posting');
+  await rejects(priNative.identity.appleSignIn({}), 'BAD_REQUEST', 'as is a missing digest');
+  ok(h.sent.filter(e => e.cap === 'identity').length === 0, 'nothing reached the shell for a refused request');
+
+  h.on('identity.appleSignIn', payload => ({ identityToken: token, nonce: payload.nonce, authorizationCode: 'c', user: { email: 'a@b.test', fullName: 'A B' } }));
+  const result = await priNative.identity.appleSignIn({ nonceHash: digest });
+  const env = h.lastRequest('identity', 'appleSignIn');
+  ok(env.v === 1 && Object.keys(env.payload).join() === 'nonce' && env.payload.nonce === digest, 'the request carries the digest and nothing else');
+  ok(!h.sent.some(e => e.op === 'cancel'), 'a sign-in sheet is never sent a cancel');
+  ok(result.identityToken === token && result.nonce === digest && result.user.email === 'a@b.test', 'a conforming reply resolves with the token');
+
+  h.on('identity.appleSignIn', payload => ({ identityToken: token, nonce: 'b'.repeat(64) }));
+  await rejects(priNative.identity.appleSignIn({ nonceHash: digest }), 'INTERNAL', 'a token answered for another digest is refused');
+  h.on('identity.appleSignIn', payload => ({ identityToken: 'three.parts.missing-check-fails?', nonce: payload.nonce }));
+  await rejects(priNative.identity.appleSignIn({ nonceHash: digest }), 'INTERNAL', 'a token that is not a compact JWT fails the reply schema');
+  h.on('identity.appleSignIn', payload => ({ identityToken: token, nonce: payload.nonce, user: 'Asha' }));
+  await rejects(priNative.identity.appleSignIn({ nonceHash: digest }), 'INTERNAL', 'a user field that is not an object fails the reply schema');
+  h.on('identity.appleSignIn', () => { throw { code: 'USER_CANCELLED', message: 'cancelled' }; });
+  await rejects(priNative.identity.appleSignIn({ nonceHash: digest }), 'USER_CANCELLED', 'the person dismissing the sheet is USER_CANCELLED');
+  h.on('identity.appleSignIn', () => { throw { code: 'ASAuthorizationError.1000', message: 'unknown' }; });
+  const e = await (async () => { try { await priNative.identity.appleSignIn({ nonceHash: digest }); } catch (err) { return err; } })();
+  ok(e?.code === 'INTERNAL' && e?.detail?.providerCode === 'ASAuthorizationError.1000', 'a shell code outside the closed set becomes INTERNAL with the provider code kept');
+  priNative.dispose(); h.uninstall();
+}
+
 console.log(failures.length
   ? `NATIVE HOST CONTRACT: FAIL — ${failures.length} of ${pass + failures.length} checks failed\n  · ${failures.join('\n  · ')}`
-  : `NATIVE HOST CONTRACT: PASS — ${pass}/${pass} checks — envelope, negotiation, timeouts, cancellation, late/duplicate/malformed replies, limits, ordered buffered events, dispose, native requests, one transport per capability, answer-blind ink and recovered late purchases.`);
+  : `NATIVE HOST CONTRACT: PASS — ${pass}/${pass} checks — envelope, negotiation, timeouts, cancellation, late/duplicate/malformed replies, limits, ordered buffered events, dispose, native requests, one transport per capability, answer-blind ink, recovered late purchases and identity (Sign in with Apple) over the envelope.`);
 process.exit(failures.length ? 1 : 0);
