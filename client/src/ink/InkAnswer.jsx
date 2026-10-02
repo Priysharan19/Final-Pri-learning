@@ -122,11 +122,8 @@ function readingConfidence(result) {
  * ✓/✗ overlay on the ink itself and as badges in the reading panel.
  * focusSymbol: id of a glyph the caller wants checked.
  * recognitionContext: optional safe question context consumed by recognize().
- * initialStrokes: optional strokes to put back on the page when it mounts —
- *   the exam room restores a student's saved writing after a reload. They are
- *   re-read by the same answer-blind recognition path as fresh ink.
  */
-export default function InkAnswer({ onRecognized, height = 300, disabled, lineVerdicts = null, focusSymbol = null, recognitionContext = null, initialStrokes = null }) {
+export default function InkAnswer({ onRecognized, onStrokes = null, initialStrokes = null, height = 300, disabled, lineVerdicts = null, focusSymbol = null, recognitionContext = null }) {
   const [NATIVE_INK] = useState(nativeInkAvailable);
   const Surface = NATIVE_INK ? NativeInkCanvas : InkCanvas;
   const [diagnostics] = useState(inkDiagnosticsVisible);
@@ -162,6 +159,11 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
   const focusedRef = useRef(null);
 
   useEffect(() => { overridesRef.current = overrides; }, [overrides]);
+  // Read inside async reading passes: a pass that settles after the card was
+  // locked for marking belongs to writing that is no longer the answer.
+  const disabledRef = useRef(!!disabled);
+  const onStrokesRef = useRef(onStrokes);
+  useEffect(() => { onStrokesRef.current = onStrokes; }, [onStrokes]);
   useEffect(() => {
     recordLocalHandwritingDiagnostics({
       nativeAvailable: NATIVE_INK,
@@ -169,7 +171,9 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
     });
   }, []);
 
+  const publishedRef = useRef(false);
   const publish = useCallback((r, strokes) => {
+    publishedRef.current = true;
     recordLocalHandwritingDiagnostics({ engine: r?.engine || null });
     setRec(r);
     // A server reading has no per-glyph symbols, so readingConfidence would
@@ -201,15 +205,17 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
    * the student is offered the alternative.
    */
   const sendCloudPass = useCallback((strokes, seq, localReading) => {
-    if (!cloudReadingEnabled(user)) return;
+    if (!cloudReadingEnabled(user) || disabledRef.current) return;
     cloudAbortRef.current?.abort?.();
     const controller = typeof AbortController === 'function' ? new AbortController() : null;
     cloudAbortRef.current = controller;
     setCloudState('reading');
 
     readWithCloud(strokes, { user, signal: controller?.signal }).then(outcome => {
-      // Newer writing has already replaced this read.
-      if (seq !== readSeqRef.current) return;
+      // Newer writing has already replaced this read, or the page was submitted
+      // while the server was reading it (§09: a late reading never rewrites
+      // the reading a mark was given for).
+      if (seq !== readSeqRef.current || disabledRef.current) return;
       if (!outcome || outcome.reason) { setCloudState(null); setCloudOffer(null); return; }
       if (outcome.error) { setCloudState('failed'); setCloudOffer(null); return; }
 
@@ -232,11 +238,11 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
         setCloudOffer(null);
         setCloudState(null);
       }
-    }).catch(() => { if (seq === readSeqRef.current) { setCloudState('failed'); setCloudOffer(null); } });
+    }).catch(() => { if (seq === readSeqRef.current && !disabledRef.current) { setCloudState('failed'); setCloudOffer(null); } });
   }, [user, publish]);
 
   const runCloudPass = useCallback((strokes, seq, localReading) => {
-    if (!cloudReadingEnabled(user)) return;
+    if (!cloudReadingEnabled(user) || disabledRef.current) return;
     // A student writing five lines of working pauses past the browser's 240 ms
     // quiet window dozens of times, and each pause used to send the whole page
     // again. The previous request was aborted, but usually only after it had
@@ -321,6 +327,9 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
 
   const onStrokesChange = useCallback((strokes) => {
     strokesRef.current = strokes;
+    // Kept the moment the pen lifts, before any reading: a page written in the
+    // second before the app went away is still the student's page.
+    try { onStrokesRef.current?.(strokes); } catch { /* keeping ink is best-effort */ }
     if (timerRef.current) clearTimeout(timerRef.current);
     // Native whole-page recognition is intentionally a quiet-window operation.
     // A 240 ms debounce caused a recognition job after normal pauses between
@@ -331,12 +340,35 @@ export default function InkAnswer({ onRecognized, height = 300, disabled, lineVe
   }, [overrides, runRecognition]);
 
   useEffect(() => { ensurePersonalLoaded(); }, []);
-  // Saved writing goes back on the page once, on mount. setStrokes notifies the
-  // surface's onStrokesChange, so the restored page is read exactly as if it
-  // had just been written.
+
+  // Handwriting kept from before a reload comes back onto the page, and is read
+  // again the ordinary on-device way.
   useEffect(() => {
-    if (Array.isArray(initialStrokes) && initialStrokes.length) canvasRef.current?.setStrokes?.(initialStrokes);
+    if (!Array.isArray(initialStrokes) || !initialStrokes.length) return;
+    canvasRef.current?.setStrokes?.(initialStrokes);
+    // The native surface draws them without reporting back; the browser canvas
+    // reports through the same callback, and the debounce makes twice once.
+    onStrokesChange(initialStrokes);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Locking the page for marking invalidates every reading still in flight —
+  // local or server — so none of them can land after the submit (§09).
+  useEffect(() => {
+    const was = disabledRef.current;
+    disabledRef.current = !!disabled;
+    if (!disabled || was) return;
+    // A page restored from before a reload has not been read yet; that first
+    // on-device reading is still owed, and it reads the very strokes submitted.
+    if (publishedRef.current) {
+      readSeqRef.current += 1;
+      if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
+    }
+    if (cloudSettleRef.current) { clearTimeout(cloudSettleRef.current); cloudSettleRef.current = null; }
+    cloudAbortRef.current?.abort?.();
+    cloudSentRef.current = null;
+    setCloudState(null);
+    setCloudOffer(null);
+  }, [disabled]);
   useEffect(() => () => {
     readSeqRef.current += 1;
     if (timerRef.current) clearTimeout(timerRef.current);
