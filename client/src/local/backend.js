@@ -21,13 +21,14 @@ import {
   cleanIndiaTrack, indiaTrack, indiaCourseLabel, indiaScope, indiaChapter,
   indiaChapterGrade, indiaDotpointIndex, resolveIndiaTarget, indiaProductSections,
   indiaDotpointKey, indiaNameOf, indiaDifficultyWindow, clampToIndiaWindow,
-  indiaPracticeScope, indiaAheadUnlocked, indiaDotpointsInWindow
+  indiaPracticeScope, indiaAheadUnlocked, indiaDotpointsInWindow, indiaChaptersForGenerator
 } from '../engine/indiaProduct.js';
 import { indiaReasonLabel } from '../engine/indiaProgress.js';
 import { indiaExamBlueprint } from '../engine/indiaExams.js';
 import { predictExamMark } from '../engine/markPredictor.js';
 import { IN_CHAPTERS, OLYMPIAD_TOPICS } from '../engine/curriculum-in.js';
 import { generateQuestion } from '../engine/generators/index.js';
+import { CONTENT_VERSION, LEGACY_CONTENT_VERSION, contentRefOf, contentHashOf, drawDistinct } from '../engine/contentIdentity.js';
 import { checkAnswer, stepCheck, methodMarks } from '../engine/checker.js';
 import { authoredRegion, formatRegion, formatMatrix, formatVector } from '../engine/answer-forms.js';
 import {
@@ -197,6 +198,24 @@ function remember(map, pid, id) {
 }
 
 const noteServed = (pid, subtopicId) => remember(servedByPid, pid, subtopicId);
+
+// The questions themselves served this sitting, by content hash, so the same
+// item is not handed back while it is still fresh — whichever seed, cell or
+// generator would have produced it. Kept like the lists above: per profile,
+// bounded, never stored. A draw that collides is retried (re-resolving the
+// target where the caller can), and a pool too small to avoid a repeat is
+// served with `repeat: true` so the card can say so instead of looping.
+const CONTENT_WINDOW = 20;
+const CONTENT_DEDUP_TRIES = 32;
+const servedContentByPid = new Map();
+const recentlyServedContent = pid => servedContentByPid.get(pid) || [];
+function noteServedContent(pid, q) {
+  const hash = q?.contentHash || (q ? contentHashOf(q) : null);
+  if (!hash) return;
+  const list = [hash, ...recentlyServedContent(pid).filter(h => h !== hash)].slice(0, CONTENT_WINDOW);
+  servedContentByPid.set(pid, list);
+  while (servedContentByPid.size > SERVED_PROFILES) servedContentByPid.delete(servedContentByPid.keys().next().value);
+}
 const noteServedDotpoint = (pid, dotpointKey) => { if (dotpointKey) remember(servedDpByPid, pid, dotpointKey); };
 
 // ── Indian evidence keys ─────────────────────────────────────────────────────
@@ -865,31 +884,37 @@ function indiaDotpointStates(chapter, chapterRow, trackId, grade, ratings, now =
  * the same honesty the NSW path keeps, so a "same slip" question is one that
  * can actually spring the slip.
  */
-async function createIndiaQuestion(pid, chapter, target, mode, trackId, examId = null, taskId = null, trapKey = null) {
+async function createIndiaQuestion(pid, chapter, target, mode, trackId, examId = null, taskId = null, trapKey = null, retarget = null) {
   if (!chapter || !target) throw Object.assign(new Error('That India syllabus target has no authored question form yet.'), { status: 409, code: 'INDIA_TARGET_UNCOVERED' });
-  let q = null;
-  let delivered = null;
-  for (let i = 0; i < (trapKey ? TRAP_SEEK_TRIES : 1); i++) {
-    const cand = generateQuestion(target.generator, target.difficulty);
-    if (!q) q = cand;
-    if (!trapKey) break;
-    const probes = (Array.isArray(cand.traps) ? cand.traps : [])
-      .concat(Object.values(cand.answer?.optionTraps || {}).map(why => ({ why })));
-    if (probes.some(t => misconceptionIdForTrap(chapter.id, t.why) === trapKey)) { q = cand; delivered = trapKey; break; }
-  }
+  const springs = cand => (Array.isArray(cand.traps) ? cand.traps : [])
+    .concat(Object.values(cand.answer?.optionTraps || {}).map(why => ({ why })))
+    .some(t => misconceptionIdForTrap(chapter.id, t.why) === trapKey);
+  // Candidate 0 is the resolved target; later candidates re-resolve it when the
+  // caller can, so a chapter-level request is not stuck on one small cell.
+  const targetOf = new Map();
+  const picked = drawDistinct(k => {
+    const t = (k > 0 && typeof retarget === 'function' && retarget()) || target;
+    const cand = generateQuestion(t.generator, t.difficulty);
+    targetOf.set(cand, t);
+    return cand;
+  }, recentlyServedContent(pid), { tries: trapKey ? Math.max(TRAP_SEEK_TRIES, CONTENT_DEDUP_TRIES) : CONTENT_DEDUP_TRIES, accept: trapKey ? springs : null });
+  const q = picked.q;
+  const delivered = trapKey && picked.accepted && springs(q) ? trapKey : null;
+  const served = targetOf.get(q) || target;
   const row = {
-    id: uuid(), pid, subtopic: q.subtopic, difficulty: q.difficulty || target.difficulty, payload: q,
+    id: uuid(), pid, subtopic: q.subtopic, difficulty: q.difficulty || served.difficulty, payload: q,
     // The generator is stored alongside the subtopic because they are not
     // always the same id: a previous-year question's payload names the chapter
     // it belongs to, while the bank that produced it is the archive. Retry
     // regenerates from this, so "the same question again" really is the same
     // past-paper question rather than an authored one from the same chapter.
-    generator: target.generator,
-    india: { chapterId: chapter.id, track: trackId, dotpointIndex: target.dotpointIndex },
+    generator: served.generator,
+    india: { chapterId: chapter.id, track: trackId, dotpointIndex: served.dotpointIndex },
     mode, examId, taskId, answered: 0, tries: 0, hintsUsed: 0, createdAt: Date.now()
   };
   await put('questions', row);
-  return { row, payload: q, trapKey: delivered };
+  noteServedContent(pid, q);
+  return { row, payload: q, trapKey: delivered, target: served, repeat: picked.repeat };
 }
 
 // ── Indian smart practice ────────────────────────────────────────────────────
@@ -974,7 +999,21 @@ function indiaPool(trackId, grade, ratings, now) {
 function indiaPick(p, trackId, ratings, reviews, now, { chapter = null, dotpoint = null, difficulty = null, pyqOnly = false, rand = Math.random() } = {}) {
   const grade = p.year;
   const trackName = indiaTrack(trackId, grade).name;
-  const { pool, states, aheadIds, aheadUnlocked } = indiaPool(trackId, grade, ratings, now);
+  const scoped = indiaPool(trackId, grade, ratings, now);
+  const { states, aheadIds, aheadUnlocked } = scoped;
+  // Smart practice under "past papers only" chooses among the chapters an
+  // archive can actually serve; choosing over the whole track first refused
+  // most requests with INDIA_PYQ_UNAVAILABLE for a chapter the student never
+  // picked (content certification, §06).
+  const pool = pyqOnly && !chapter
+    ? scoped.pool.filter(c => resolveIndiaTarget(c, { track: trackId, grade, pyqOnly: true, random: () => 0 }))
+    : scoped.pool;
+  if (pyqOnly && !chapter && scoped.pool.length && !pool.length) {
+    throw Object.assign(
+      new Error(`Pri's previous-year archive has no ${trackName} past-paper question for your class yet. Turn the past-papers-only filter off to practise authored questions.`),
+      { status: 409, code: 'INDIA_PYQ_UNAVAILABLE' }
+    );
+  }
   let choice;
   if (chapter) {
     const st = states[chapter.id] || indiaState(chapter, ratings, now);
@@ -999,8 +1038,34 @@ function indiaPick(p, trackId, ratings, reviews, now, { chapter = null, dotpoint
   const chapterRow = ratings[c.id] || null;
   const asked = indiaDotpointIndex(c, dotpoint);
   let dp = null;
-  if (asked == null) {
-    const dpPool = indiaDotpointStates(c, chapterRow, trackId, grade, ratings, now);
+  // Past papers are filed by chapter, never by dot point (resolveIndiaTarget
+  // consults the archives only for a chapter-level request). Narrowing a
+  // "past papers only" request to a dot point the student never named sent
+  // every such request to the dot-point branch, so the filter refused even the
+  // chapters whose archive does hold questions (content certification, §06).
+  // A difficulty the student named on a chapter they chose (the Class X
+  // library's D1–D4 buttons, a ?difficulty= link) is held to the track window
+  // like every other request (adaptive-08) — and said so when it had to move —
+  // and the dot point is then chosen among those authored closest to it.
+  const namedDifficulty = choice.explicit && difficulty != null && difficulty !== '' && Number.isFinite(Number(difficulty));
+  const namedRung = namedDifficulty ? clampToIndiaWindow(Number(difficulty), trackId, grade) : null;
+  if (asked == null && !pyqOnly) {
+    let dpPool = indiaDotpointStates(c, chapterRow, trackId, grade, ratings, now);
+    // With a named difficulty, the dot point is chosen among those authored at
+    // that rung, so "this chapter at D3" is not answered with a D1 question
+    // because the picker landed on a dot point that has no D3 form.
+    if (namedRung != null) {
+      // Nearest authored rung per dot point; keep the dot points that get
+      // closest to the rung asked for (exactly it, when any has it).
+      const gapOf = i => Math.min(Infinity, ...(c.covers || []).filter(cv => cv.dp.includes(i)).flatMap(cv => cv.diff || []).map(r => Math.abs(r - namedRung)));
+      const gaps = c.dotpoints.map((_, i) => gapOf(i));
+      const best = Math.min(...gaps);
+      const atRung = c.dotpoints.map((_, i) => i).filter(i => Number.isFinite(best) && gaps[i] === best).map(ordinal => {
+        const key = indiaDotpointKey(c.id, ordinal);
+        return { id: key, index: ordinal, text: c.dotpoints[ordinal], ...indiaDotpointState(c, ordinal, chapterRow, ratings, now), traps: trapsForDotpoint(chapterRow?.traps, key) };
+      });
+      if (atRung.length) dpPool = atRung;
+    }
     // A misconception lives on a dot point: when one is being hunted, that dot
     // point is the place to hunt it.
     const preferred = choice.trap?.dotpoint ? dpPool.find(d => d.id === choice.trap.dotpoint) : null;
@@ -1037,10 +1102,48 @@ function indiaPick(p, trackId, ratings, reviews, now, { chapter = null, dotpoint
   if (target.pyq) why += ' This one is a real previous-year question.';
   if (target.dotpointIndex != null) why += ` Dot point: ${c.dotpoints[target.dotpointIndex]}`;
   if (target.windowed === false) why += ` (Served at D${target.difficulty} — this dot point has no authored form at ${trackName} depth yet.)`;
+  if (namedDifficulty && Math.round(Number(difficulty)) !== namedRung) {
+    const { floor, ceiling } = indiaDifficultyWindow(trackId, grade);
+    why += ` (You asked for D${Math.round(Number(difficulty))}; ${trackName} practice is held to D${floor}–D${ceiling}.)`;
+  }
   return {
     chapter: c, target, dotpointKey: target.dotpointIndex != null ? indiaDotpointKey(c.id, target.dotpointIndex) : null,
+    retarget: sameTerms(target, () => resolveIndiaTarget(c, { dotpoint: ordinal, difficulty: want, track: trackId, grade, pyqOnly })),
     reason: choice.reason, reasonTag: choice.reasonTag, why, nextUp: choice.nextUp, trap: choice.trap,
     successTarget: choice.target, mastery: st.mastery || 0, explicit: choice.explicit, aheadUnlocked
+  };
+}
+
+/**
+ * The India chapter a practice request names. A chapter id is taken as is. A
+ * generator id — what the Class X NCERT library's practice buttons and older
+ * bookmarks send — resolves to the chapter that draws on that generator,
+ * preferring one in the student's own track scope and class; before this,
+ * 8 of the library's 14 chapters answered INDIA_TOPIC_NOT_FOUND.
+ */
+function indiaChapterForRequest(subtopic, trackId, grade) {
+  const direct = indiaChapter(subtopic);
+  if (direct) return direct;
+  const users = indiaChaptersForGenerator(subtopic);
+  if (!users.length) return null;
+  const scope = new Set(indiaScope(trackId, grade).map(c => c.id));
+  return users.find(c => scope.has(c.id) && indiaChapterGrade(c) === Number(grade))
+    || users.find(c => scope.has(c.id))
+    || users.find(c => indiaChapterGrade(c) === Number(grade))
+    || users[0];
+}
+
+/**
+ * A re-resolver for the repeat window that only ever offers a target on the
+ * same terms as the one already explained to the student — same rung, same
+ * past-paper status, same window disclosure — so a retried draw can change
+ * which form serves the request but never what the reply said about it.
+ */
+function sameTerms(target, resolve) {
+  return () => {
+    const t = resolve();
+    return t && t.difficulty === target.difficulty && !!t.pyq === !!target.pyq
+      && (t.windowed !== false) === (target.windowed !== false) && t.dotpointIndex === target.dotpointIndex ? t : null;
   };
 }
 
@@ -1457,39 +1560,36 @@ const TRAP_SEEK_TRIES = 12;
  * Returns the payload and an honest account of what was actually honoured, so
  * a caller never claims a focus the generator did not deliver.
  */
-function generateFocused(subtopic, difficulty, { dotpointId = null, trapKey = null } = {}) {
+function generateFocused(subtopic, difficulty, { dotpointId = null, trapKey = null, recent = [] } = {}) {
   const want = dotpointIsGeneratable(dotpointOf(subtopic, dotpointId)) ? dotpointId : null;
   // `dotpointExact` is the bank's own word for whether the question it just
   // built really exercises what was asked for. It is the only thing allowed to
   // decide that a dot point was practised.
   const delivered = q => (want && q?.dotpointExact ? want : null);
   const gen = () => generateQuestion(subtopic, difficulty, undefined, want || undefined);
-  if (!trapKey) {
-    const q = gen();
-    return { q, dotpoint: delivered(q), trapKey: null };
-  }
-  let first = null;
-  for (let i = 0; i < TRAP_SEEK_TRIES; i++) {
-    const q = gen();
-    if (!first) first = q;
-    const probes = (Array.isArray(q.traps) ? q.traps : [])
-      .concat(Object.values(q.answer?.optionTraps || {}).map(why => ({ why })));
-    if (probes.some(t => misconceptionIdForTrap(subtopic, t.why) === trapKey)) {
-      return { q, dotpoint: delivered(q), trapKey };
-    }
-  }
-  return { q: first, dotpoint: delivered(first), trapKey: null };
+  const springs = q => (Array.isArray(q.traps) ? q.traps : [])
+    .concat(Object.values(q.answer?.optionTraps || {}).map(why => ({ why })))
+    .some(t => misconceptionIdForTrap(subtopic, t.why) === trapKey);
+  // Bounded either way: a trap the bank cannot produce, or a pool too small to
+  // avoid the repeat window, ends in the best candidate rather than a spin.
+  const picked = drawDistinct(gen, recent, {
+    tries: trapKey ? Math.max(TRAP_SEEK_TRIES, CONTENT_DEDUP_TRIES) : CONTENT_DEDUP_TRIES,
+    accept: trapKey ? springs : null
+  });
+  const q = picked.q;
+  return { q, dotpoint: delivered(q), trapKey: trapKey && picked.accepted && springs(q) ? trapKey : null, repeat: picked.repeat };
 }
 
 async function createQuestion(pid, subtopic, difficulty, mode, examId = null, taskId = null, customQ = null, focus = null) {
-  const made = customQ ? null : generateFocused(subtopic, difficulty, focus || {});
+  const made = customQ ? null : generateFocused(subtopic, difficulty, { ...(focus || {}), recent: recentlyServedContent(pid) });
   const q = customQ ? { ...customQ, custom: true } : made.q;
   const row = {
     id: uuid(), pid, subtopic: q.subtopic || 'custom', difficulty: q.difficulty || 2, payload: q,
     mode, examId, taskId, answered: 0, tries: 0, hintsUsed: 0, createdAt: Date.now()
   };
   await put('questions', row);
-  return { row, payload: q, dotpoint: made?.dotpoint || null, trapKey: made?.trapKey || null };
+  if (!customQ) noteServedContent(pid, q);
+  return { row, payload: q, dotpoint: made?.dotpoint || null, trapKey: made?.trapKey || null, repeat: !!made?.repeat };
 }
 
 function displayAnswer(q) {
@@ -1713,6 +1813,10 @@ async function resolve(profile, row, q, correct, answerGiven, ms, mode, viaInk =
   const attempt = {
     id: `${pid}:resolved:${claim}`,
     pid, questionId: row.id, subtopic: owner, generator: q.subtopic, difficulty: q.difficulty || 2,
+    // Which item, at which content version, this attempt was made on — so it
+    // stays interpretable after the bank changes. A row from before identity
+    // existed reads as the legacy version, never as current content.
+    ...attemptContentRef(q),
     correct: correct ? 1 : 0, answerGiven: String(answerGiven ?? '').slice(0, 300),
     ms: ms || 0, hintsUsed: row.hintsUsed || 0, mode, viaInk,
     // Learner-state evidence (§12): a success with hints, tutor help or a
@@ -1798,6 +1902,16 @@ async function resolve(profile, row, q, correct, answerGiven, ms, mode, viaInk =
 // reading a file written by a stranger.
 
 const CUSTOM_ANSWER_TYPES = new Set(['numeric', 'expression', 'mcq']);
+
+/** The content fields an attempt (or restored row) carries, migration-safe. */
+function attemptContentRef(src) {
+  const ref = contentRefOf(src);
+  const seed = Number(src?.seed);
+  return {
+    contentId: ref.contentId, contentVersion: ref.contentVersion, contentHash: ref.contentHash,
+    seed: Number.isSafeInteger(seed) && seed >= 0 ? seed : null
+  };
+}
 
 /** The one shape a custom question may take, wherever it came from. */
 function buildCustomQuestion(src, ownerPid, strict = false) {
@@ -1895,6 +2009,11 @@ function safePayload(src) {
   out.stem = sanitizeText(src.stem, 4000) || undefined;
   out.prompt = sanitizeText(src.prompt, 4000) || undefined;
   out.difficulty = safeInt(src.difficulty, 1, 4, 2);
+  // Content identity survives a restore only when well formed; a legacy row
+  // comes back without it, which contentRefOf reads as the legacy version.
+  const ref = contentRefOf(src);
+  if (ref.contentId) { out.contentId = ref.contentId; out.contentVersion = ref.contentVersion; }
+  if (ref.contentHash) out.contentHash = ref.contentHash;
   out.figure = safeFigure(src.figure);
   out.mcqOptions = src.mcqOptions === undefined ? undefined : safeOptions(src.mcqOptions);
   out.steps = safeSteps(src.steps);
@@ -2082,7 +2201,9 @@ const IMPORT_ROWS = {
     tutorLevel: safeInt(r.tutorLevel, 0, 3, 0),
     support: r.support === 'independent' ? 'independent' : (r.support === 'supported' ? 'supported' : undefined),
     viaInk: !!r.viaInk, ratingBefore: safeNum(r.ratingBefore, 0), ratingAfter: safeNum(r.ratingAfter, 0),
-    createdAt: safeTime(r.createdAt) || Date.now()
+    createdAt: safeTime(r.createdAt) || Date.now(),
+    // A backup written before content identity existed restores as legacy.
+    ...attemptContentRef(r)
   }),
   rushRuns: (r, pid) => ({
     pid, score: safeInt(r.score, 0, 100, 0), correct: safeInt(r.correct, 0, 100, 0),
@@ -2641,9 +2762,10 @@ const routes = {
         const state = indiaState(chapter, ratings, nowMs);
         const want = target.difficulty != null ? Number(target.difficulty) : pickDifficulty(state.rating, state.attempts, { state, nowMs });
         const resolved = resolveIndiaTarget(chapter, { dotpoint: target.dotpoint, difficulty: want, track: trackId, grade });
-        const { row, payload } = await createIndiaQuestion(p.id, chapter, resolved, 'task', trackId, null, taskId);
+        const retarget = resolved ? sameTerms(resolved, () => resolveIndiaTarget(chapter, { dotpoint: target.dotpoint, difficulty: want, track: trackId, grade })) : null;
+        const { row, payload, repeat } = await createIndiaQuestion(p.id, chapter, resolved, 'task', trackId, null, taskId, null, retarget);
         return {
-          question: sanitize(payload, row), reason: 'task',
+          question: sanitize(payload, row), reason: 'task', repeat: !!repeat,
           why: `Task: ${task.title} — question ${done + 1} of ${task.count}.`,
           dotpoint: resolved.dotpointIndex, target: state.mastery, misconception: null
         };
@@ -2660,15 +2782,15 @@ const routes = {
     if (p.course === 'in' && !taskId) {
       const trackId = cleanIndiaTrack(track || p.indiaTrack, p.year);
       const ratings = await ratingsFor(p.id);
-      const chapter = subtopic ? indiaChapter(subtopic) : null;
+      const chapter = subtopic ? indiaChapterForRequest(subtopic, trackId, p.year) : null;
       if (subtopic && !chapter) throw Object.assign(new Error('That topic is not part of the India syllabus.'), { status: 404, code: 'INDIA_TOPIC_NOT_FOUND' });
       const reviews = await byIndex('reviews', 'pid', p.id);
       const pick = indiaPick(p, trackId, ratings, reviews, now, {
         chapter, dotpoint, difficulty: difficulty != null && difficulty !== '' ? difficulty : null,
         pyqOnly: !!pyqOnly, rand: Math.random()
       });
-      const { row, payload, trapKey } = await createIndiaQuestion(
-        p.id, pick.chapter, pick.target, pick.reason === 'review' ? 'review' : 'practice', trackId, null, null, pick.trap?.key || null
+      const { row, payload, trapKey, repeat } = await createIndiaQuestion(
+        p.id, pick.chapter, pick.target, pick.reason === 'review' ? 'review' : 'practice', trackId, null, null, pick.trap?.key || null, pick.retarget
       );
       // Only what the optimiser chose feeds the interleaving memory: a chapter
       // the student asked for by name is their sitting, not the picker's.
@@ -2678,7 +2800,7 @@ const routes = {
         dotpoint: pick.target.dotpointIndex, target: pick.successTarget ?? null,
         misconception: trapKey ? pick.trap?.label || null : null,
         windowed: pick.target.windowed !== false, aheadUnlocked: pick.aheadUnlocked,
-        pyq: !!pick.target.pyq
+        pyq: !!pick.target.pyq, repeat: !!repeat
       };
     }
     let choice;
@@ -2750,11 +2872,11 @@ const routes = {
       noteServed(p.id, choice.subtopic);
     }
     const focus = { dotpointId: choice.dotpoint || null, trapKey: choice.trap?.key || null };
-    const { row, payload, dotpoint: served, trapKey } = await createQuestion(
+    const { row, payload, dotpoint: served, trapKey, repeat } = await createQuestion(
       p.id, choice.subtopic, choice.difficulty, choice.reason === 'review' ? 'review' : 'practice', null, null, null, focus
     );
     return {
-      question: sanitize(payload, row), reason: choice.reason,
+      question: sanitize(payload, row), reason: choice.reason, repeat,
       why: served || !choice.dotpoint ? choice.why : choice.whyPlain,
       dotpoint: served, target: choice.target ?? null,
       misconception: trapKey ? choice.trap?.label || null : null
@@ -3699,7 +3821,14 @@ const routes = {
     // question that is its subtopic; for a previous-year question it is the
     // archive, whose payload names the chapter instead.
     const generator = row.generator || row.subtopic;
-    const payload = generateQuestion(generator, row.difficulty, same ? q.seed : undefined);
+    // "The same question again" regenerates from the seed only while the bank
+    // is still the version that made it. A question stamped with an older
+    // content version is re-served from its stored payload, because
+    // regenerating it would hand the student a different question. A row from
+    // before versioning (no stamp) keeps the behaviour it always had.
+    const version = contentRefOf(q).contentVersion;
+    const reproducible = version === CONTENT_VERSION || version === LEGACY_CONTENT_VERSION;
+    const payload = same && !reproducible ? { ...q } : generateQuestion(generator, row.difficulty, same ? q.seed : undefined);
     // A retried Indian question keeps its chapter, or its evidence would fall
     // onto the generator id instead of the chapter the student is working on.
     const newRow = { id: uuid(), pid: p.id, subtopic: row.subtopic, difficulty: row.difficulty, payload, generator, india: row.india || undefined, mode: 'practice', examId: null, taskId: null, answered: 0, tries: 0, hintsUsed: 0, createdAt: Date.now() };
