@@ -815,7 +815,7 @@ select.input {
 .mnav-item span:first-child { font-size: 18px; }
 
 @media print {
-  .sidebar, .topbar, .mobilenav, .ctx-pill, .q-rail, .hint-rail, .no-print { display: none !important; }
+  .sidebar, .topbar, .mobilenav, .q-rail, .no-print { display: none !important; }
   body { background: #fff; color: #111; }
   .card { box-shadow: none; border-color: #ddd; }
 }
@@ -937,9 +937,9 @@ body { overscroll-behavior-y: none; }
 @keyframes page-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 
 .card { transition: border-color 0.18s ease, box-shadow 0.18s ease; }
-.home-card, .stat-card { transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease; }
+.home-card { transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease; }
 .home-card:hover { transform: translateY(-1.5px); box-shadow: var(--shadow); }
-.profile-tile, .gen-opt, .pathway-pick, .avatar-pick, .pill-opt, .seg-tab { transition: border-color 0.14s ease, box-shadow 0.14s ease, background 0.14s ease, color 0.14s ease; }
+.gen-opt, .pathway-pick, .avatar-pick, .pill-opt, .seg-tab { transition: border-color 0.14s ease, box-shadow 0.14s ease, background 0.14s ease, color 0.14s ease; }
 .skeleton { animation: shimmer 1.3s infinite linear; min-height: 14px}
 @keyframes shimmer { to { background-position: -200% 0; } }
 
@@ -1317,7 +1317,6 @@ h3 { font-size: 16.5px; line-height: 1.3; }
 .tag-brand { color: var(--accent); border-color: var(--accent-line); background: var(--accent-soft); }
 .tag-d1, .tag-d2, .tag-d3, .tag-d4 { color: var(--ink-2); }
 
-.chip .flame, .streak-flame { color: var(--ink-3); }
 
 /* Segmented control — one shared primitive for modes and filters */
 .seg {
