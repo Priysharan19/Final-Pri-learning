@@ -51,6 +51,7 @@ const { subtopicsForYear } = await import('../src/engine/curriculum.js');
 const YEAR10 = subtopicsForYear(10).map(t => t.id);
 let topicTurn = 0;
 const { classifyMutation } = await import('../src/local/outbox.js');
+const { recordProfileMutation } = await import('../src/platform/profileOutbox.js');
 const { submissionDigest, submissionIdOf } = await import('../src/local/backend.js');
 const recovery = await import('../src/components/practiceRecovery.js');
 const drafts = await import('../src/components/drafts.js');
@@ -200,9 +201,14 @@ await check('submissions without a key keep the exactly-once 409 contract', asyn
 });
 
 // ── 2 · Sync carries each attempt exactly once ──────────────────────────────
-await check('only a resolved, non-replayed submission queues a cloud practice-progress entry', async () => {
+await check('only a resolved submission queues a cloud practice-progress entry, exactly once', async () => {
   assert.equal(classifyMutation('POST', '/practice/q-1/submit', { resolved: false, correct: false }), null);
-  assert.equal(classifyMutation('POST', '/practice/q-1/submit', { resolved: true, replayed: true }), null);
+  // A replay still marks the question dirty in the install-wide journal
+  // (coalesced); the profile cloud queue refuses to queue it a second time.
+  assert.deepEqual(classifyMutation('POST', '/practice/q-1/submit', { resolved: true, replayed: true }),
+    { kind: 'practice-progress', entityId: 'q-1', operation: 'upsert' });
+  assert.equal(await recordProfileMutation(me.id, 'POST', '/practice/q-1/submit', { resolved: true, replayed: true }), null);
+  assert.equal(await recordProfileMutation(me.id, 'POST', '/practice/q-1/submit', { resolved: true, syncQueued: true }), null);
   assert.deepEqual(classifyMutation('POST', '/practice/q-1/submit', { resolved: true }),
     { kind: 'practice-progress', entityId: 'q-1', operation: 'upsert' });
   assert.deepEqual(classifyMutation('POST', '/practice/q-1/reveal', { resolved: true, revealed: true }),

@@ -780,7 +780,11 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   // deterministic engine and does not move when this arrives.
   const [cloudCheckFor, setCloudCheckFor] = useState(null);   // { submissionId, result }
   const cloudCheckRef = useRef(null);
+  const cloudCheckAbortRef = useRef(null);
   useEffect(() => { setCloudCheckFor(null); }, [question?.id]);
+  // The request belongs to the attempt, not to the render that sent it, so it
+  // is cancelled only when the card goes away.
+  useEffect(() => () => { cloudCheckAbortRef.current?.abort?.(); }, []);
   useEffect(() => {
     if (!writeMode || !resolved) return;
     // The lines checked are the lines that were submitted and marked — not
@@ -797,19 +801,23 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     if (cloudCheckRef.current === key) return;              // already asked for this attempt
     cloudCheckRef.current = key;
 
-    let live = true;
+    // No per-render cleanup here. Resolving refreshes the user, which re-runs
+    // this effect; a cleanup that aborted the request on that re-run, followed
+    // by the "already asked" guard above, meant the answer was thrown away and
+    // never asked for again — the working note almost never appeared.
     const controller = typeof AbortController === 'function' ? new AbortController() : null;
+    cloudCheckAbortRef.current = controller;
     checkWorkingWithCloud(lines, {
       user,
       prompt: question?.prompt || '',
       signal: controller?.signal
     }).then(result => {
-      // Dropped unless it still describes the attempt on screen.
-      if (!live || !result || result.error) return;
+      // Dropped unless the card is still up and still showing this attempt.
+      if (!mountedRef.current || controller?.signal?.aborted) return;
+      if (!result || result.error) return;
       if (attemptRef.current?.submissionId !== bound.submissionId) return;
       setCloudCheckFor({ submissionId: bound.submissionId, result });
     }).catch(() => { });
-    return () => { live = false; controller?.abort?.(); };
   }, [writeMode, resolved, res?.correct, res?.invalid, res?.revealed, attempt, activeReport, user, question?.id, question?.prompt]);
 
   const cloudCheck = cloudCheckFor && attempt?.submissionId && cloudCheckFor.submissionId === attempt.submissionId
