@@ -197,9 +197,96 @@ await check('an answered pending question is served as a result to see, not a qu
   assert.equal(resumed.why, 'Continuing your unfinished question.');
 });
 
+// ── Tutor level 3, Rush and India exam evidence: the same one-write rule ─────
+const { recordIndiaExamEvidence } = await import('../src/local/backend.js');
+const { setTutorTransportForTests } = await import('../src/local/tutorBridge.js');
+// the tutor is dark by default; on here, with a stub transport (no network)
+globalThis.__PRI_TUTOR_OVERRIDE__ = true;
+setTutorTransportForTests(async () => ({ tutor: { source: 'model', message: 'Look at the first step.', referencesStepIndex: 0 } }));
+
+await check('tutor level 3 queues its attempt in the attempt transaction, once', async () => {
+  const t = await markable();
+  await api.post(`/practice/${t.id}/tutor`, { level: 1 });
+  await api.post(`/practice/${t.id}/tutor`, { level: 2 });
+  const r = await dispatch('POST', `/practice/${t.id}/tutor`, { level: 3, ms: 100 });
+  assert.equal(r.resolved, true); assert.equal(r.syncQueued, true);
+  const attempts = await attemptsOf(me.id, t.id);
+  assert.equal(attempts.length, 1);
+  const q = await queued(me.id, t.id);
+  assert.equal(q.length, 1, 'queued by the backend alone'); assert.equal(q[0].sourceId, attempts[0].id);
+});
+
+await check('tutor level 3 through the API layer is not queued a second time', async () => {
+  const t = await markable();
+  await api.post(`/practice/${t.id}/tutor`, { level: 1 });
+  await api.post(`/practice/${t.id}/tutor`, { level: 2 });
+  await api.post(`/practice/${t.id}/tutor`, { level: 3 });
+  assert.equal((await queued(me.id, t.id)).length, 1);
+});
+
+async function rushQuestion() {
+  const start = await api.post('/rush/start', {});
+  for (const s of start.questions) {
+    const q = (await idb.get('questions', s.id)).payload;
+    const right = canonical(q);
+    if (right !== null && checkAnswer(q, right).correct) return { id: s.id, right };
+  }
+  throw new Error('no markable rush question');
+}
+
+await check('a Rush answer queues its attempt in the attempt transaction, once', async () => {
+  const t = await rushQuestion();
+  const r = await dispatch('POST', '/rush/answer', { id: t.id, answer: t.right });
+  assert.equal(r.correct, true); assert.equal(r.syncQueued, true);
+  const attempts = await attemptsOf(me.id, t.id);
+  const q = await queued(me.id, t.id);
+  assert.equal(attempts.length, 1); assert.equal(q.length, 1); assert.equal(q[0].sourceId, attempts[0].id);
+  const t2 = await rushQuestion();
+  await api.post('/rush/answer', { id: t2.id, answer: t2.right });
+  assert.equal((await queued(me.id, t2.id)).length, 1, 'the API layer does not queue it again');
+});
+
+await check('a crash inside a Rush commit leaves neither attempt nor queue entry', async () => {
+  const t = await rushQuestion();
+  crashQueueWrite = true;
+  await assert.rejects(api.post('/rush/answer', { id: t.id, answer: t.right }), /simulated crash/);
+  assert.equal(crashQueueWrite, false, 'the crash was injected into the attempt transaction');
+  assert.equal((await attemptsOf(me.id, t.id)).length, 0);
+  assert.equal((await queued(me.id, t.id)).length, 0);
+  assert.ok(!(await idb.get('questions', t.id)).answered, 'the Rush question is still open');
+  await api.post('/rush/answer', { id: t.id, answer: t.right });
+  assert.equal((await attemptsOf(me.id, t.id)).length, 1); assert.equal((await queued(me.id, t.id)).length, 1);
+});
+
+await check('India exam evidence queues each part in its own attempt transaction, and a replay adds nothing', async () => {
+  const t = await markable();
+  const row = await idb.get('questions', t.id);
+  await recordIndiaExamEvidence(row, t.q, { correct: true, given: t.right, ms: 10, evidenceKey: 'part:a' });
+  await recordIndiaExamEvidence(await idb.get('questions', t.id), t.q, { correct: false, given: t.wrong, ms: 10, evidenceKey: 'part:b' });
+  let attempts = await attemptsOf(me.id, t.id);
+  let q = await queued(me.id, t.id);
+  assert.equal(attempts.length, 2, 'one attempt per part');
+  assert.equal(q.length, 2, 'one queue entry per part');
+  assert.deepEqual(q.map(x => x.sourceId).sort(), attempts.map(a => a.id).sort());
+  const replay = await recordIndiaExamEvidence(row, t.q, { correct: true, given: t.right, ms: 10, evidenceKey: 'part:a' });
+  assert.equal(replay.idempotent, true);
+  assert.equal((await attemptsOf(me.id, t.id)).length, 2); assert.equal((await queued(me.id, t.id)).length, 2);
+});
+
+await check('a crash inside India exam evidence leaves neither attempt nor queue entry', async () => {
+  const t = await markable();
+  const row = await idb.get('questions', t.id);
+  crashQueueWrite = true;
+  await assert.rejects(recordIndiaExamEvidence(row, t.q, { correct: true, given: t.right, ms: 10, evidenceKey: 'question' }), /simulated crash/);
+  assert.equal((await attemptsOf(me.id, t.id)).length, 0);
+  assert.equal((await queued(me.id, t.id)).length, 0);
+  await recordIndiaExamEvidence(row, t.q, { correct: true, given: t.right, ms: 10, evidenceKey: 'question' });
+  assert.equal((await attemptsOf(me.id, t.id)).length, 1); assert.equal((await queued(me.id, t.id)).length, 1);
+});
+
 if (failures.length) {
   console.log(`\n✖ submission sync durability — ${failures.length} failed, ${passed} passed\n`);
   for (const f of failures) console.log('  ' + f + '\n');
   process.exit(1);
 }
-console.log(`PASS — §22 submission sync durability: ${passed} groups (attempt and cloud queue entry are one write, crash-injected; skipped tries stay skipped; replays return stored explanations).`);
+console.log(`PASS — §22 submission sync durability: ${passed} groups (attempt and cloud queue entry are one write for practice, reveal, tutor level 3, Rush and India exam evidence, crash-injected; skipped tries stay skipped; replays return stored explanations).`);

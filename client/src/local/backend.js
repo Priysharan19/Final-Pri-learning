@@ -3060,7 +3060,8 @@ const routes = {
       // A student cannot watch the answer and then submit it for credit.
       // Captions may be reworded afterwards through /tutor/captions; the
       // mathematics never changes.
-      const meta = await resolve(p, row, q, false, 'revealed', Math.max(0, Number(body?.ms) || 0), row.mode);
+      // The attempt and its cloud queue entry are one transaction (§22), as on Reveal.
+      const meta = await resolve(p, row, q, false, 'revealed', Math.max(0, Number(body?.ms) || 0), row.mode, false, { syncQueue: true });
       // `level` in the reply is the XP level from resolve(), as on Reveal; the
       // help level is `tutorLevel`.
       return {
@@ -3068,7 +3069,7 @@ const routes = {
         correct: false, resolved: true, revealed: true,
         walkthrough: { solution },
         solution: { steps: q.steps, answerText: displayAnswer(q), criteria: criteriaFor(q), solutionText: q.solutionText },
-        ...meta
+        ...meta, syncQueued: true
       };
     }
 
@@ -3539,8 +3540,10 @@ const routes = {
     if (row.answered) throw Object.assign(new Error('Already answered'), { status: 409 });
     const q = row.payload;
     const result = checkAnswer(q, body.answer);
-    await resolve(p, row, q, result.correct, body.answer, 0, row.mode);
-    return { correct: result.correct, answerText: displayAnswer(q) };
+    // Attempt and cloud queue entry in one transaction (§22): an app killed
+    // mid-Rush can no longer leave an attempt the cloud never hears about.
+    await resolve(p, row, q, result.correct, body.answer, 0, row.mode, false, { syncQueue: true });
+    return { correct: result.correct, answerText: displayAnswer(q), syncQueued: true };
   },
   'POST /rush/finish': async (body) => {
     const p = await requireProfile();
@@ -4534,7 +4537,8 @@ export async function recordIndiaExamEvidence(row, q, { correct, given, ms, feed
   try {
     return await resolve(
       p, row, q, !!correct, given ?? '', Math.max(0, Number(ms) || 0), 'exam', false,
-      { evidenceKey: evidenceKey || 'question' }
+      // each exam part's attempt is queued for the cloud in its own transaction (§22)
+      { evidenceKey: evidenceKey || 'question', syncQueue: true }
     );
   } catch (err) {
     // Exam submission is replayable after an ambiguous interruption. The same
