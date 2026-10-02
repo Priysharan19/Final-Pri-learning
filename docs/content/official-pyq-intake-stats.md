@@ -7,7 +7,7 @@ Generated with `review_official.py stats` from the local `work/` queues. **Count
 - **keyMatched:** paired automatically with the authority's own final key.
 - **engineVerified:** the bundled deterministic checker accepts the key (both edges for a band key) and rejects a wrong answer.
 - **aiReviewed / aiReviewPassed:** a blind AI review (crops with printed answers masked, no key in the inputs, a different model from the transcriber) confirmed the transcription, completeness, posedness, labels and steps, and its own answer matched the key. For numeric answers, the engine re-evaluated the reviewer's expression to the key.
-- **published:** passed `audit.py --publish` on the automated tier (`automated:key+engine+ai-review/claude-opus-5-5/2026-10-02`) and was packed into `jee-pyq-data`. No row is attributed to a person.
+- **published:** passed the production content certifier and `audit.py --publish` on the automated tier (`automated:key+engine+ai-review/claude-opus-5-5/2026-10-02`) and was packed into `jee-pyq-data`. No row is attributed to a person.
 - **held:** still a draft.
 
 | exam | year | extracted | keyMatched | engineVerified | aiReviewed | aiReviewPassed | published | held | disagreements | imageOnlyDocuments |
@@ -31,18 +31,20 @@ Generated with `review_official.py stats` from the local `work/` queues. **Count
 | jee-advanced | 2022 | 34 | 0 | 0 | 0 | 0 | 0 | 34 | 0 | 0 |
 | jee-advanced | 2023 | 34 | 18 | 18 | 18 | 17 | 17 | 17 | 0 | 0 |
 | jee-advanced | 2024 | 34 | 34 | 34 | 34 | 30 | 30 | 4 | 0 | 0 |
-| jee-advanced | 2025 | 32 | 31 | 31 | 22 | 15 | 15 | 17 | 0 | 0 |
+| jee-advanced | 2025 | 32 | 31 | 31 | 22 | 15 | 14 | 18 | 1 | 0 |
 | jee-advanced | 2026 | 34 | 34 | 34 | 24 | 20 | 20 | 14 | 2 | 0 |
-| jee-main | 2026 (Session 2, 9 shifts) | 225 | 224 | 224 | 176 | 164 | 164 | 61 | 28 | 0 |
+| jee-main | 2026 (Session 2, 9 shifts) | 225 | 224 | 224 | 176 | 164 | 161 | 64 | 31 | 0 |
 | ncert-exemplar-class-7 | — | 176 | 28 | 28 | 0 | 0 | 0 | 176 | 0 | 0 |
 | ncert-exemplar-class-8 | — | 290 | 11 | 11 | 0 | 0 | 0 | 290 | 0 | 0 |
 | ncert-exemplar-class-9 | — | 9 | 0 | 0 | 0 | 0 | 0 | 9 | 0 | 0 |
 | ncert-exemplar-class-10 | — | 15 | 6 | 6 | 0 | 0 | 0 | 15 | 0 | 0 |
 | ncert-exemplar-class-11 | — | 6 | 1 | 1 | 0 | 0 | 0 | 6 | 0 | 0 |
 | ncert-exemplar-class-12 | — | 35 | 5 | 5 | 0 | 0 | 0 | 35 | 0 | 0 |
-| **total** | | **1337** | **510** | **510** | **274** | **246** | **246** | **1091** | **30** | **12** |
+| **total** | | **1337** | **510** | **510** | **274** | **246** | **242** | **1095** | **34** | **12** |
 
-Published by track: JEE Main 164, JEE Advanced 82. By answer type: 160 single-correct, 28 multi-correct, 58 numeric.
+Published by track: JEE Main 161, JEE Advanced 81. By answer type: 158 single-correct, 28 multi-correct, 56 numeric.
+
+Four rows passed the AI review but were then held by the production content certifier (`certify_rows.mjs`): one prompt with an unbalanced `$` that KaTeX cannot render, and three whose text trips the certifier's template/`undefined` checks. They were held, not edited after review.
 
 ## Why JEE rows are held
 

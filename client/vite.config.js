@@ -230,7 +230,15 @@ export const ON_DEMAND = [
   // ADR-0001 makes the product online-first, and the one case this shows — a
   // first open with no connection — is reported by api.js as a chapter that has
   // not been downloaded yet; practice, which needs none of it, is unaffected.
-  [/(^|\/)(Placement|placement|prerequisites|prerequisiteSkillsHi)-[^/]*\.js$/, 'placement check']
+  [/(^|\/)(Placement|placement|prerequisites|prerequisiteSkillsHi)-[^/]*\.js$/, 'placement check'],
+
+  // Reviewed JEE past-paper shards (tools/jee-question-department/pack.py).
+  // Only a JEE student opening a chapter that has reviewed past papers ever
+  // asks for one, and only for that chapter's part; generators/index.js reaches
+  // them by import() from jee-pyq-runtime.js. Exactly the placement argument:
+  // fetched on first open, kept by the runtime rule, and a first open with no
+  // connection is reported as a chapter not yet downloaded.
+  [/(^|\/)jee-pyq-[a-z-]+-\d\d-[^/]*\.js$/, 'reviewed JEE past-paper shard']
 ];
 
 // The faces the first screens genuinely paint in: the Latin Inter subset for

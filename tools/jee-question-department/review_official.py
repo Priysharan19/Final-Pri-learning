@@ -491,11 +491,23 @@ def main(argv=None):
         write_jsonl(args.queue, rows)
         served = hand_archive_ids()
         approved = [r for r in rows if r.get("status") == "approved" and r["id"] not in served]
+        # The production content certifier (KaTeX, leaked templates, contract
+        # shape) runs over every approved row; a failing row goes back to draft.
+        proc = subprocess.run(["node", str(HERE / "certify_rows.mjs")], cwd=REPO, check=True, capture_output=True, text=True,
+                              input="".join(json.dumps(r, ensure_ascii=False) + "\n" for r in approved))
+        certified = {v["id"]: v["problems"] for v in map(json.loads, proc.stdout.splitlines())}
+        for r in approved:
+            if certified.get(r["id"]):
+                r["status"] = "draft"
+                r["review"]["flags"] = list(dict.fromkeys(r["review"]["flags"] + [f"certifier:{p}"[:160] for p in certified[r["id"]]]))
+        write_jsonl(args.queue, rows)
+        approved = [r for r in approved if r["status"] == "approved"]
         _, errors, _ = audit(approved, manifest, publish=True)
         bad = {e.split(":", 1)[0] for e in errors}
         keep = [r for r in approved if r["id"] not in bad]
         write_jsonl(args.out, keep)
-        print(json.dumps({"approved": len(approved), "passPublishAudit": len(keep), "auditErrors": errors[:50]}, indent=1))
+        held = sorted(i for i, p in certified.items() if p)
+        print(json.dumps({"approved": len(approved), "passPublishAudit": len(keep), "heldByCertifier": held, "auditErrors": errors[:50]}, indent=1))
     return 0
 
 

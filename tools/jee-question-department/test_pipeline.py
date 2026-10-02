@@ -118,9 +118,9 @@ def main():
         catalog = (dest / "catalog.js").read_text(encoding="utf-8")
         assert '"jee-main-c11-complex-numbers":["algebra","mixed"]' in catalog
         assert '"records":2' in catalog
-        shards = sorted(dest.glob("algebra-*.js"))
+        shards = sorted(dest.glob("jee-pyq-algebra-*.js"))
         assert shards
-        assert "import('./algebra-00.js')" in catalog and "?raw" not in catalog
+        assert "import('./jee-pyq-algebra-00.js')" in catalog and "?raw" not in catalog
         encoded = "".join(json.loads(p.read_text(encoding="ascii").split("export default ", 1)[1].rstrip().rstrip(";")) for p in shards)
         records = json.loads(gzip.decompress(base64.b64decode(encoded)).decode("utf-8"))
         assert len(records) == 1

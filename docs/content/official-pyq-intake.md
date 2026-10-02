@@ -44,6 +44,10 @@ Committed files: code, the manifest (URLs and hashes), tests and this note. PDFs
   All reviews from the non-blind first pass were discarded.
 - **Populated catalogs failed outside Vite (fixed).** Packed shards were `?raw` imports, which only Vite resolves. As soon as the catalog had records, plain-Node suites crashed loading a shard. Shards are now small ES modules exporting their base64 text. They are still lazy, local and network-free.
 - **Missing citations (fixed).** Official department records now carry `archive.citations` (the authority's paper and key URLs) and `stepsAuthorship`, the same shape the source-cited archive uses. A student can follow the link to the exam authority's own document.
+- **The production content certifier now runs before publishing.** `publish-set` runs `certify_rows.mjs` (the app's `certifyQuestion`) over every approved row and holds any failure. It caught one KaTeX-breaking prompt that the blind review missed.
+- **Honest difficulty (fixed).** A department PYQ target claimed the requested difficulty, while the bank silently snapped to the nearest rung it had. The catalog now lists the difficulties each generator holds, and `indiaProduct` routes to the department only at one of those. Certification had reported this as a difficulty mismatch on 76 launch paths.
+- **Install budget.** Shards are a documented on-demand tier in `vite.config.js` (`jee-pyq-*`), like placement. Only a JEE student opening that chapter downloads them, and no ceiling was raised.
+- **`CONTENT_VERSION` 2026.10.0 → 2026.10.1.** New content was added, and routing for some JEE Advanced chapter/difficulty cells moved from the source-cited archive to the department. The archive generators themselves are unchanged and deterministic.
 - **Possible key errors are held, never corrected.** Transcribers judged two official JEE Main 2026 keys wrong (8 Apr shift 2, Q4 and Q16). Both are held.
 - **Image-only documents.** These have no text layer. They are recorded as document-level drafts and need page-level transcription. They are not guessed.
 

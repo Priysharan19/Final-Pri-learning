@@ -4,7 +4,7 @@
 // output. Only records that passed tools/jee-question-department/audit.py
 // --publish are packed into the generated catalog. An empty catalog is a valid
 // production state and means "no reviewed PYQs are published yet".
-import { JEE_PYQ_PARTS, JEE_PYQ_COVERAGE, JEE_PYQ_META } from './jee-pyq-data/catalog.js';
+import { JEE_PYQ_PARTS, JEE_PYQ_COVERAGE, JEE_PYQ_META, JEE_PYQ_DIFFICULTIES } from './jee-pyq-data/catalog.js';
 
 const RATING_SUBTOPIC = Object.freeze({
   'c11-complex-numbers': 'mex-complex',
@@ -268,6 +268,16 @@ export function loadJeePyqPartRecords(part) {
 
 export async function loadJeePyqPart(part) {
   return buildJeePyqBank(await loadJeePyqPartRecords(part));
+}
+
+/**
+ * Whether the reviewed bank holds a record at exactly this difficulty. The bank
+ * would otherwise snap to the nearest rung it has, and a target that asked for
+ * D3 would be served a D1 labelled as D3.
+ */
+export function hasJeePyqDifficulty(generatorId, difficulty) {
+  const ds = JEE_PYQ_DIFFICULTIES?.[String(generatorId || '')];
+  return Array.isArray(ds) && ds.includes(Number(difficulty));
 }
 
 function coverageParts(generatorId) {

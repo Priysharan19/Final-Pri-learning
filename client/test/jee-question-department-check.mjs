@@ -6,6 +6,7 @@ import {
   asJeePyqPayload,
   buildJeePyqBank,
   hasJeePyqGenerator,
+  hasJeePyqDifficulty,
   jeePyqCatalogSnapshot
 } from '../src/engine/generators/jee-pyq-runtime.js';
 import { bankOf } from '../src/engine/generators/index.js';
@@ -144,7 +145,19 @@ assert.ok(chapter);
 const gid = 'jee-main-c11-complex-numbers';
 const chapterTarget = resolveIndiaTarget(chapter, { track: 'jee-main', difficulty: 3, random: () => 0 });
 assert.ok(chapterTarget);
-if (hasJeePyqGenerator(gid)) {
+// A department PYQ is offered only at a difficulty the reviewed bank really
+// holds; otherwise the bank would snap to another rung under a false label.
+for (const [g] of Object.entries(catalog.coverage)) {
+  const [track] = g.match(/^jee-(main|advanced)/);
+  const chId = g.replace(/^jee-(main|advanced)-/, '');
+  const ch = indiaChapter(chId);
+  if (!ch) continue;
+  for (const d of [1, 2, 3, 4]) {
+    const t = resolveIndiaTarget(ch, { track, difficulty: d, random: () => 0 });
+    if (t?.generator === g) assert.equal(hasJeePyqDifficulty(g, t.difficulty), true, `${g} offered at D${t.difficulty} it does not hold`);
+  }
+}
+if (hasJeePyqGenerator(gid) && hasJeePyqDifficulty(gid, chapterTarget.difficulty)) {
   assert.equal(chapterTarget.generator, gid);
   assert.equal(chapterTarget.pyq, true);
   assert.equal(chapterTarget.pyqArchive, 'jee-question-department');
