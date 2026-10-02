@@ -27,6 +27,7 @@ import { exprToLatex } from './inkLatex.js';
 import { cloudReadingEnabled, inkReadingBlockedKey, readWithCloud, recordLocalHandwritingDiagnostics, toReading } from './cloudReader.js';
 import { useApp } from '../App.jsx';
 import { feedbackGeometry } from './feedbackGeometry.js';
+import { segmentInkLines } from './inkLines.js';
 import { MathText } from '../lib/latex.jsx';
 import { currentReleaseIdentity } from '../platform/releaseIdentity.js';
 import { onCloudSessionChange } from '../platform/cloudSession.js';
@@ -83,6 +84,10 @@ export default function InkAnswer({ onRecognized, onStrokes = null, initialStrok
   const abortRef = useRef(null);
   const sentRef = useRef(null);
   const strokesRef = useRef([]);
+  // The page waited for the reader (offline, signed out, reader down). The
+  // reading that eventually arrives is handed on as such, so the card can mark
+  // it without a second tap — once.
+  const queuedRef = useRef(false);
   const disabledRef = useRef(!!disabled);
   const onStrokesRef = useRef(onStrokes);
   useEffect(() => { onStrokesRef.current = onStrokes; }, [onStrokes]);
@@ -93,7 +98,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, initialStrok
     });
   }, []);
 
-  const publish = useCallback((r, strokes) => {
+  const publish = useCallback((r, strokes, { afterWait = false } = {}) => {
     setRec(r);
     if (r.engine) recordLocalHandwritingDiagnostics({ engine: r.engine });
     // The server's own confidence is the number that means something here; it
@@ -110,6 +115,8 @@ export default function InkAnswer({ onRecognized, onStrokes = null, initialStrok
       engine: r.engine || null,
       researchOnly: false,
       productionReady: r.cloud === true,
+      afterWait: afterWait && r.lines.length > 0,
+      readKey: r.lines.length ? `${strokeSignature(strokes)}|${r.text}` : null,
       strokes
     });
   }, [onRecognized]);
@@ -124,6 +131,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, initialStrok
     // honest note, and the 'online' listener below reads the page later.
     const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
     if (offline || !cloudReadingEnabled(who)) {
+      queuedRef.current = true;
       setStatus({ kind: 'waiting', key: inkReadingBlockedKey(who) });
       return;
     }
@@ -139,16 +147,23 @@ export default function InkAnswer({ onRecognized, onStrokes = null, initialStrok
       if (seq !== readSeqRef.current || disabledRef.current) return;
       if (outcome?.reason === 'cancelled') return;
       if (outcome?.reason === 'allowance') { sentRef.current = null; setStatus({ kind: 'allowance' }); return; }
-      const reading = outcome?.transcription ? toReading(outcome.transcription, null) : null;
+      // Line geometry comes from the strokes themselves (no recognition), so
+      // the ✓/✗ can be drawn on the student's own lines when the counts agree.
+      let geometry = null;
+      try { geometry = { lines: segmentInkLines(strokes) }; } catch { geometry = null; }
+      const reading = outcome?.transcription ? toReading(outcome.transcription, geometry) : null;
       if (reading) {
         retriesRef.current = 0;
-        publish(reading, strokes);
+        const afterWait = queuedRef.current;
+        queuedRef.current = false;
+        publish(reading, strokes, { afterWait });
         setStatus(null);
         return;
       }
       if (outcome?.reason === 'empty') { setStatus({ kind: 'empty' }); return; }
       // Not read: say why, keep the ink, and try again by itself.
       sentRef.current = null;
+      queuedRef.current = true;
       setStatus({ kind: 'waiting', key: inkReadingBlockedKey(who, { outcome }) });
       clearRetry();
       if (retriesRef.current < MAX_RETRIES) {
@@ -160,6 +175,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, initialStrok
     }).catch(() => {
       if (seq !== readSeqRef.current || disabledRef.current) return;
       sentRef.current = null;
+      queuedRef.current = true;
       setStatus({ kind: 'waiting', key: inkReadingBlockedKey(who) });
     });
   }, [publish]);
@@ -284,20 +300,41 @@ export default function InkAnswer({ onRecognized, onStrokes = null, initialStrok
         />
         {lineVerdicts && rec.lines.some(l => l.box) && (
           <div className="ink-verdict-layer" aria-hidden="true">
-            {rec.lines.map((line, li) => {
-              const v = lineVerdicts[li];
-              if (!v || !line.box) return null;
-              const good = v.status === 'ok';
-              const bad = v.status === 'break' || v.status === 'wrong';
-              if (!good && !bad) return null;
-              const geometry = feedbackGeometry(line);
-              const b = geometry.anchor || line.box;
-              return (
-                <span key={li} className={`ink-verdict ${good ? 'good' : 'bad'}`}
-                  style={{ top: b.y + b.h / 2 - 14, left: b.x + b.w + 16 }}
-                  title={v.note || (good ? t('ink.lineChecksOut') : t('ink.lineBreaks'))}>{good ? '✓' : '✗'}</span>
-              );
-            })}
+            {(() => {
+              let noted = false;
+              return rec.lines.map((line, li) => {
+                const v = lineVerdicts[li];
+                if (!v || !line.box) return null;
+                const good = v.status === 'ok';
+                const bad = v.status === 'break' || v.status === 'wrong';
+                if (!good && !bad) return null;
+                const showNote = bad && !noted;
+                if (showNote) noted = true;
+                const geometry = feedbackGeometry(line);
+                const b = geometry.anchor || line.box;
+                const boxes = geometry.boxes.length ? geometry.boxes : [b];
+                return (
+                  <React.Fragment key={li}>
+                    {boxes.map((gb, gi) => (
+                      <span key={`box-${gi}`} className={`ink-linebox ${good ? 'good' : 'bad'}`}
+                        style={{ left: gb.x - 5, top: gb.y - 5, width: gb.w + 10, height: gb.h + 10 }} />
+                    ))}
+                    <span className={`ink-verdict ${good ? 'good' : 'bad'}`}
+                      style={{ top: b.y + b.h / 2 - 14, left: b.x + b.w + 16 }}
+                      title={v.note || (good ? t('ink.lineChecksOut') : t('ink.lineBreaks'))}>{good ? '✓' : '✗'}</span>
+                    {bad && boxes.map((gb, gi) => (
+                      <span key={`underline-${gi}`} className="ink-underline"
+                        style={{ left: gb.x - 3, top: gb.y + gb.h + 4, width: gb.w + 6 }} />
+                    ))}
+                    {showNote && (
+                      <span className="ink-note" style={{ left: Math.max(4, b.x - 2), top: b.y + b.h + 16 }}>
+                        <b>{t('ink.mistakeHere')}</b>{v.note ? <> — {v.note}</> : null}
+                      </span>
+                    )}
+                  </React.Fragment>
+                );
+              });
+            })()}
           </div>
         )}
       </div>

@@ -735,6 +735,19 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     if (inFlightRef.current || attemptRef.current) inkFrozenRef.current = true;
   }, []);
 
+  // Ink that waited for the reader (offline, signed out, reader down) is
+  // marked as soon as it is read: the student already wrote their answer and
+  // was told it would be. Once per reading; the deterministic engine decides
+  // the mark exactly as for a tap on Submit, and a doubtful reading still turns
+  // into the confirmation question instead of a mark.
+  const autoMarkedRef = useRef(null);
+  useEffect(() => {
+    if (!writeMode || !inkResult?.afterWait || !inkResult.readKey) return;
+    if (autoMarkedRef.current === inkResult.readKey || resolved || busy) return;
+    autoMarkedRef.current = inkResult.readKey;
+    submit();
+  }, [inkResult]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const onInkStrokes = useCallback((strokes) => {
     if (inFlightRef.current || attemptRef.current) return;
     saveInkDraft(question.id, strokes, { label: question.subtopicName });

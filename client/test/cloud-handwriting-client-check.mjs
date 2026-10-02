@@ -16,6 +16,7 @@
 import { inkBounds, rasterScale, paintInk, rasterizeInk, MAX_IMAGE_BYTES } from '../src/ink/cloudRaster.js';
 import { cloudAllowanceExhausted, clearCloudAllowanceExhausted, inkReadingBlockedKey } from '../src/ink/cloudReader.js';
 import { readFileSync } from 'node:fs';
+import { segmentInkLines } from '../src/ink/inkLines.js';
 import { announceEntitlementChange } from '../src/platform/cloudSession.js';
 import { UNAVAILABLE_READINESS_TTL_MS, cloudHandwritingReadiness, cloudReadingEnabled, handwritingDiagnostics, readWithCloud, recordLocalHandwritingDiagnostics, shouldSupersede, toReading } from '../src/ink/cloudReader.js';
 
@@ -300,6 +301,25 @@ ok(!shouldSupersede(null, local), 'no reading, no change');
   eq(args?.length, 2, 'the ink request is the picture and options only');
   eq(Object.keys(args?.[1] || {}), ['signal'], 'whose only option is the cancel signal');
   ok(!JSON.stringify(args).includes('integrate 2x') && !JSON.stringify(args).includes('"35"'), 'and no expected answer or solution travels with it');
+}
+
+// ── Line geometry without recognition: ✓/✗ on the student's own lines ───────
+{
+  const st = (x, y, w = 30, h = 40) => ({ points: [{ x, y }, { x: x + w, y: y + h }] });
+  const page = [st(10, 10), st(50, 14), st(90, 8), st(10, 120), st(60, 125), st(15, 230, 80, 4)];
+  const segs = segmentInkLines(page);
+  eq(segs.length, 3, 'three written lines are found from geometry alone');
+  eq(segs.map(l => l.strokeIdxs), [[0, 1, 2], [3, 4], [5]], 'each stroke belongs to its own line, top to bottom');
+  ok(segs.every(l => !('text' in l) && !('symbols' in l)), 'segmentation names no symbol — it reads nothing');
+  const tr = { lines: [{ text: '2x+3=11' }, { text: '2x=8' }, { text: 'x=4' }], text: '2x+3=11\n2x=8\nx=4', confidence: 0.95, engine: 'cloud-t' };
+  const placed = toReading(tr, { lines: segs });
+  ok(placed.alignedToLocalLines && placed.lines.every((l, i) => l.box === segs[i].box), 'when the counts agree, server line i is drawn on ink line i');
+  const unplaced = toReading({ ...tr, lines: tr.lines.slice(0, 2), text: '2x+3=11\n2x=8' }, { lines: segs });
+  ok(!unplaced.alignedToLocalLines && unplaced.lines.every(l => !l.box), 'when they differ, no box is guessed — panel badges only');
+  const inkSrc = readFileSync(new URL('../src/ink/InkAnswer.jsx', import.meta.url), 'utf8');
+  ok(/segmentInkLines\(strokes\)/.test(inkSrc) && /ink-linebox/.test(inkSrc) && /ink\.mistakeHere/.test(inkSrc), 'the ink surface draws line boxes and the mistake note again');
+  const qc = readFileSync(new URL('../src/components/QuestionCard.jsx', import.meta.url), 'utf8');
+  ok(/inkResult\?\.afterWait/.test(qc) && /autoMarkedRef\.current === inkResult\.readKey/.test(qc), 'ink read after waiting is marked once, by its reading key');
 }
 
 console.log(failures.length

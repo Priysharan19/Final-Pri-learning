@@ -136,6 +136,9 @@ export const flow = {
       !!sent && JSON.stringify(Object.keys(sent)) === '["image"]' && /^data:image\//.test(sent.image),
       `request keys ${JSON.stringify(sent && Object.keys(sent))}`);
 
+    await check('the footer says the server read it',
+      /Read by Pri’s server reader/.test(await page.locator('.editor-foot').innerText().catch(() => '')));
+
     await page.locator('.ink-tool[title="Clear"]').click();
     await settle();
     await check('Clear empties the canvas', await page.locator('.ink-preview').count() === 0,
@@ -166,20 +169,19 @@ export const flow = {
     const asMaths = await mathText('.ink-line-math');
     await check('the reading is set as maths, not as loose characters',
       !!asMaths && asMaths.length > 0, `reading panel renders ${JSON.stringify(asMaths)}`);
-    await check('the footer says the server read it',
-      /Read by Pri’s server reader/.test(await page.locator('.editor-foot').innerText().catch(() => '')));
 
-    // ── 5 · a handwritten answer is marked ───────────────────────────────────
-    // A reading the engine is unsure of turns the submit into a confirmation
-    // step instead. That is the designed behaviour, so it is walked, not
-    // side-stepped: the flow stands behind its reading and the submit goes.
+    // ── 5 · the kept answer is marked by itself once it is read ─────────────
+    // The student was told it "will be read and marked when you're back
+    // online": no second tap. A doubtful reading would still ask first.
     const confirm = page.getByRole('button', { name: 'That’s what I wrote' });
-    await page.locator('.editor-foot button.btn').last().click();
-    if (await confirm.count()) {
-      note('the engine was unsure enough of its reading to ask first, so the flow confirmed it — the designed path, walked rather than side-stepped');
-      await confirm.click();
-    }
-    await page.waitForSelector('.eval-card', { timeout: 20000 });
+    await page.waitForSelector('.eval-card', { timeout: 20000 }).catch(async () => {
+      if (await confirm.count()) {
+        note('the reading was doubtful enough to ask first, so the flow confirmed it — the designed path');
+        await confirm.click();
+        await page.waitForSelector('.eval-card', { timeout: 20000 });
+      }
+    });
+    await check('back online, the kept handwriting is marked without another tap', await page.locator('.eval-card').count() === 1);
     const marked = (await page.locator('.eval-card').innerText()).replace(/\s+/g, ' ');
     const marks = (await page.locator('.eval-marks').innerText()).replace(/\s+/g, ' ').trim();
     await check('the handwritten answer is marked correct — every mark awarded',
@@ -189,6 +191,9 @@ export const flow = {
     await check('the read line is ticked in the reading panel',
       await page.locator('.ink-line-verdict.good').count() >= 1,
       'the marker drew no ✓ beside the student’s reading');
+    await check('and on the ink itself — the server line is placed on the written line',
+      await page.locator('.ink-verdict.good').count() >= 1,
+      'no ✓ drawn on the student’s own writing');
 
     // ── 6 · the writing was kept with the attempt ────────────────────────────
     await page.goto(`${base}/history`, { waitUntil: 'domcontentloaded' });
