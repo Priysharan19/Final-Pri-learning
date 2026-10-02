@@ -2,15 +2,16 @@
   "schemaVersion": 1,
   "evidenceClass": "SYNTHETIC_SIMULATOR",
   "physicalDevice": false,
-  "sha": "34fbdb5d30147287dc9796059960e410ceeba3c1",
+  "sha": "7522379e8f97f0287f5500fbdf2c6b2b177450a3",
+  "dirtyWorkingTree": true,
   "simulator": {
     "name": "iPad Pro 13-inch (M5)",
     "udid": "D95B91A6-91AE-42D9-A0FA-8E8839998F46",
-    "runtime": "iOS 27.0 (27.0 - 24A434) - com.apple.CoreSimulator.SimRuntime.iOS-27-0"
+    "runtime": "iOS-27-0"
   },
   "workflow": "local",
   "run": null,
-  "timestamp": "2026-10-01T23:05:10.301Z",
+  "timestamp": "2026-10-01T23:33:35.378Z",
   "steps": {
     "launch": {
       "ok": true,
@@ -62,7 +63,7 @@
     },
     "dynamicTypeZoom": {
       "ok": true,
-      "detail": "cssWidth=688 screen=1032 rootFont=16"
+      "detail": "cssWidth=688 expected=688 scale=1.500 view=1032pt"
     },
     "dynamicTypeNoOverflow": {
       "ok": true,
@@ -70,7 +71,7 @@
     },
     "backgroundDraftKept": {
       "ok": true,
-      "detail": "lifecycle inactive>hidden>hidden>visible>inactive>visible, draft kept"
+      "detail": "lifecycle inactive>hidden>visible>visible>inactive>visible, draft kept"
     },
     "a11yAudit": {
       "ok": true,

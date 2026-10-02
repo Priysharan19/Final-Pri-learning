@@ -198,6 +198,9 @@ enum JourneySelfCheck {
     await step('cloudSync', async () => {
       (await waitFor(() => byText('Sync now'))).click();
       const done = await waitFor(() => { const t = q('section[aria-labelledby="cloud-account-title"]').innerText; const m = t.match(/Sync complete[^\\n]*/); return m && m[0]; }, 60000);
+      await sleep(800);
+      // Syncing must not drop a connected account back to "sign in" or "checking".
+      if (stateTag() !== 'Connected') throw new Error('after sync the account reads ' + stateTag());
       return done;
     });
     return JSON.stringify(steps);
@@ -220,17 +223,16 @@ enum JourneySelfCheck {
       const boxes = [...q('#cloud-email').form.querySelectorAll('input[type=checkbox]')];
       for (const b of boxes) if (!b.checked) { b.click(); await sleep(120); }
       q('#cloud-email').form.querySelector('button[type=submit]').click();
-      at = 'linked'; await waitFor(() => /^Connected$|sign-in required|offline/.test(stateTag()), 30000);
+      at = 'connected'; await waitFor(() => stateTag() === 'Connected', 30000);
       return stateTag();
     });
     await step('cloudLogin', async () => {
-      if (stateTag() !== 'Connected') {
-        (await waitFor(() => byText('Disconnect'))).click();
-        await waitFor(() => stateTag() === 'Not connected', 20000);
-        await signIn(newEmail, newPassword);
-        await waitFor(() => stateTag() === 'Connected', 30000);
-      }
-      return 'connected as the new account';
+      // Log out and sign the new account back in through the form.
+      (await waitFor(() => byText('Disconnect'))).click();
+      await waitFor(() => stateTag() === 'Not connected', 20000);
+      await signIn(newEmail, newPassword);
+      await waitFor(() => stateTag() === 'Connected', 30000);
+      return 'signed back in as the new account';
     });
     await step('cloudDeleteAccount', async () => {
       setValue(await waitFor(() => q('#cloud-delete-password')), newPassword);
@@ -350,6 +352,9 @@ enum JourneySelfCheck {
     await step('cloudReconnectSync', async () => {
       (await waitFor(() => byText('Sync now'))).click();
       const done = await waitFor(() => { const t = q('section[aria-labelledby="cloud-account-title"]').innerText; const m = t.match(/Sync complete[^\\n]*/); return m && m[0]; }, 60000);
+      await sleep(800);
+      // Syncing must not drop a connected account back to "sign in" or "checking".
+      if (stateTag() !== 'Connected') throw new Error('after sync the account reads ' + stateTag());
       return done;
     });
     await step('cloudDisconnect', async () => {
@@ -366,8 +371,15 @@ enum JourneySelfCheck {
     const overflow = () => Math.max(0, document.scrollingElement.scrollWidth - window.innerWidth);
     await step('dynamicTypeZoom', async () => {
       await home();
-      const base = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
-      return 'cssWidth=' + window.innerWidth + ' screen=' + screen.width + ' rootFont=' + base;
+      // The largest size scales the page: a CSS viewport narrower than the
+      // screen (never below 360), shown at the matching scale.
+      const scale = window.visualViewport ? visualViewport.scale : 1;
+      const viewWidth = Math.round(innerWidth * scale);            // the web view, in points
+      const expected = Math.floor(viewWidth / Math.min(1.5, viewWidth / 360));
+      const desc = 'cssWidth=' + innerWidth + ' expected=' + expected + ' scale=' + scale.toFixed(3) + ' view=' + viewWidth + 'pt';
+      if (!(scale > 1.05)) throw new Error('the page is not scaled: ' + desc);
+      if (Math.abs(innerWidth - expected) > 2) throw new Error('the scale is not the capped Dynamic Type scale: ' + desc);
+      return desc;
     });
     await step('dynamicTypeNoOverflow', async () => {
       const seen = [];

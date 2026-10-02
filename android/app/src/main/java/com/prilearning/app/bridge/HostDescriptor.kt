@@ -21,11 +21,11 @@ object HostDescriptor {
         for ((k, v) in facts) put(k, v)
     }
 
-    fun json(shell: Shell, release: JSONObject?, cloudConfigured: Boolean = false, extra: Map<String, JSONObject> = emptyMap(), stylusSeen: Boolean = false): JSONObject {
+    fun json(shell: Shell, release: JSONObject?, cloudConfigured: Boolean = false, extra: Map<String, JSONObject> = emptyMap(), stylusCapable: Boolean = false): JSONObject {
         val capabilities = JSONObject()
             .put("lifecycle", cap("backButton" to true))
             .put("storage", cap("durable" to true))
-            .put("device", cap("safeAreaApplied" to true, "stylusSeen" to stylusSeen))
+            .put("device", cap("safeAreaApplied" to true, "stylusSeen" to false, "stylusCapable" to stylusCapable))
             .put("cloud", cap("transport" to "bridge", "configured" to cloudConfigured))
             .put("share", cap("transport" to "bridge", "binary" to true, "print" to true))
             .put("billing", cap("transport" to "bridge", "store" to "google-play"))
