@@ -94,7 +94,7 @@ export const flow = {
         await alternatives.first().click();
         await page.waitForSelector('.q-prompt', { timeout: 30000 });
         await check('one tap serves a real previous-year question',
-          /Previous year question/.test(await page.locator('.qpage').first().innerText()));
+          await page.getByText('Previous year question', { exact: true }).count() > 0);
         await check('and the filter is still on', new URL(page.url()).searchParams.get('pyq') === '1');
       }
     } else {
