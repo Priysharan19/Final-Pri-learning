@@ -264,12 +264,52 @@ for (const copy of ['ios/PriLearning 2.swiftpm/WebShell.swift', 'ios/PriLearning
 
 // Android, once it exists, must use an origin-scoped bridge and a stable origin.
 if (existsSync(at('android'))) {
-  const kotlin = walk(at('android'), n => /\.(kt|kts|java)$/.test(n)).map(f => stripComments(readFileSync(f, 'utf8'))).join('\n');
+  // Production sources only: test code may mention anything.
+  const kotlin = walk(at('android'), n => /\.(kt|kts|java)$/.test(n))
+    .filter(f => !/\/src\/(test|androidTest)\//.test(posix(f)))
+    .map(f => stripComments(readFileSync(f, 'utf8'))).join('\n');
   ok(!/addJavascriptInterface\s*\(/.test(kotlin), 'the Android shell never uses addJavascriptInterface');
   ok(!/(allowUniversalAccessFromFileURLs|allowFileAccessFromFileURLs|setAllowUniversalAccessFromFileURLs|setAllowFileAccessFromFileURLs)\s*(=|\()\s*true/.test(kotlin),
     'nor grants file:// pages universal or file access');
   if (/\bWebView\b/.test(kotlin)) {
     ok(/["']https:\/\/appassets\.androidplatform\.net/.test(kotlin), 'the Android shell serves the app from appassets.androidplatform.net');
+  }
+  const assetOriginPath = 'android/app/src/main/java/com/prilearning/app/shell/AssetOrigin.kt';
+  if (existsSync(at(assetOriginPath))) {
+    const assetOrigin = stripComments(read(assetOriginPath));
+    ok(/const val DOMAIN = "appassets\.androidplatform\.net"/.test(assetOrigin) &&
+      /const val ORIGIN = "https:\/\/appassets\.androidplatform\.net"/.test(assetOrigin),
+      'the Android data origin is pinned — changing it would orphan every student\'s IndexedDB data');
+    ok(/addWebMessageListener\(webView, "priBridge", origins\)/.test(kotlin) && /if \(!isMainFrame \|\| sourceOrigin/.test(kotlin),
+      'the Android bridge is origin-scoped and refuses non-main-frame senders');
+    ok(/allowFileAccess = false/.test(kotlin) && /allowContentAccess = false/.test(kotlin) && /MIXED_CONTENT_NEVER_ALLOW/.test(kotlin),
+      'the Android WebView is hardened (no file/content access, no mixed content)');
+  }
+  // CP-07: the Android cloud transport keeps the session native and narrow.
+  const cloudPath = 'android/app/src/main/java/com/prilearning/app/cloud/NativeCloud.kt';
+  if (existsSync(at(cloudPath))) {
+    const cloudKt = read(cloudPath);
+    const cfg = read('android/app/src/main/java/com/prilearning/app/cloud/CloudConfig.kt');
+    ok(/const val CLIENT_ID = "android-native-v1"/.test(cfg) && /setRequestProperty\("X-Pri-Client", CloudConfig\.CLIENT_ID\)/.test(cloudKt),
+      'the Android cloud transport identifies itself as android-native-v1 (never as iOS)');
+    ok(!/ios-native-v1/.test(kotlin), 'no Android production code ever claims the iOS identity');
+    ok(/instanceFollowRedirects = false/.test(cloudKt), 'the Android cloud transport never follows a redirect (the session cannot be bounced to another host)');
+    ok(/private val PATH = Regex\("\^\/v1\/\[A-Za-z0-9\/_-\]\{1,180\}\$"\)/.test(cfg),
+      'Android accepts exactly the web transport\'s /v1 path rule — JavaScript never names a host');
+    ok(!/setRequestProperty\("(Origin|Sec-Fetch-[A-Za-z]+)"/.test(cloudKt), 'the Android cloud transport never sends Origin/Fetch Metadata');
+    ok(/if \(method != "GET"\) jar\.value\(host, "pri_csrf"\)/.test(cloudKt), 'every Android mutation carries the server-issued CSRF token');
+    ok(/AndroidKeyStore/.test(read('android/app/src/main/java/com/prilearning/app/cloud/SecureStore.kt')) &&
+      /noBackupFilesDir/.test(read('android/app/src/main/java/com/prilearning/app/cloud/SecureStore.kt')),
+      'the Android cookie jar is Keystore-encrypted in no-backup storage');
+    ok(!/networkSecurityConfig|cleartextTrafficPermitted="true"/.test(read('android/app/src/main/AndroidManifest.xml')) &&
+      /android:usesCleartextTraffic="false"/.test(read('android/app/src/main/AndroidManifest.xml')),
+      'release Android builds refuse cleartext (the local-server allowance exists only in src/debug)');
+    ok(/if \(BuildConfig\.DEBUG\) CloudConfig\.debugOverride \?: BuildConfig\.PRI_CLOUD_ORIGIN else BuildConfig\.PRI_CLOUD_ORIGIN/.test(read('android/app/src/main/java/com/prilearning/app/MainActivity.kt')) &&
+      /debug = BuildConfig\.DEBUG/.test(read('android/app/src/main/java/com/prilearning/app/MainActivity.kt')),
+      'the test cloud override is honoured only in debug builds (release reads the signed BuildConfig origin alone)');
+    ok(/android:exported="false"/.test(read('android/app/src/main/AndroidManifest.xml').split('<provider')[1] || '') &&
+      !/<(external|root|files)-path/.test(read('android/app/src/main/res/xml/file_paths.xml')),
+      'the FileProvider is private and exposes only two cache subdirectories');
   }
 }
 
@@ -314,8 +354,10 @@ if (exemption) {
   // Pin the exact reviewed predicate. CP-07 must change this pin together with
   // the regression test in server/test/native-origin-csrf-check.mjs.
   const norm = t => t.replace(/\s+/g, ' ').trim();
-  ok(norm(body) === "return req.get('x-pri-client') === 'ios-native-v1' && !req.get('origin') && !req.get('sec-fetch-site') && !req.get('sec-fetch-mode');",
+  ok(norm(body) === "return NATIVE_CLIENTS.has(req.get('x-pri-client')) && !req.get('origin') && !req.get('sec-fetch-site') && !req.get('sec-fetch-mode');",
     'and it is exactly the reviewed predicate');
+  ok(/const NATIVE_CLIENTS = new Set\(\['ios-native-v1', 'android-native-v1'\]\);/.test(security),
+    'the native identities are exactly iOS and Android (CP-07), as a closed exact-match set');
 }
 const callSites = [...security.matchAll(/nativeNonBrowserRequest\(/g)].length;
 ok(callSites === 2 && /if \(nativeNonBrowserRequest\(req\)\) return next\(\);/.test(security),

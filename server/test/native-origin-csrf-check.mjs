@@ -33,15 +33,25 @@ function runGuard(guard, req) {
   return { res, next };
 }
 
-{
-  const result = runGuard(originGuard, request({ headers: { 'x-pri-client': 'ios-native-v1' } }));
-  assert.equal(result.next, 1, 'URLSession-style native mutation should bypass browser Origin validation');
+for (const client of ['ios-native-v1', 'android-native-v1']) {
+  const result = runGuard(originGuard, request({ headers: { 'x-pri-client': client } }));
+  assert.equal(result.next, 1, `${client}: a native-stack mutation (no Origin/Fetch Metadata) bypasses browser Origin validation`);
 }
 
 for (const headers of [
   { 'x-pri-client': 'ios-native-v1', origin: 'https://evil.example' },
   { 'x-pri-client': 'ios-native-v1', 'sec-fetch-site': 'cross-site' },
   { 'x-pri-client': 'ios-native-v1', 'sec-fetch-mode': 'cors' },
+  { 'x-pri-client': 'android-native-v1', origin: 'https://evil.example' },
+  { 'x-pri-client': 'android-native-v1', origin: 'https://appassets.androidplatform.net' },
+  { 'x-pri-client': 'android-native-v1', 'sec-fetch-site': 'cross-site' },
+  { 'x-pri-client': 'android-native-v1', 'sec-fetch-mode': 'cors' },
+  // Near misses are browsers, not native clients.
+  { 'x-pri-client': 'android-native-v2' },
+  { 'x-pri-client': 'ANDROID-NATIVE-V1' },
+  { 'x-pri-client': 'android-native-v1 ' },
+  { 'x-pri-client': 'android-native' },
+  { 'x-pri-client': 'ios-native-v1,android-native-v1' },
   { 'x-pri-client': 'web-v1' },
   {}
 ]) {
@@ -64,22 +74,23 @@ for (const headers of [
 const session = 'native-session-secret';
 const csrf = csrfForSession(session);
 
-{
-  const result = runGuard(csrfGuard, request({
-    headers: { 'x-pri-client': 'ios-native-v1' },
-    cookies: { [SESSION_COOKIE]: session, [CSRF_COOKIE]: csrf }
-  }));
-  assert.equal(result.next, 0, 'native origin exception must not disable CSRF validation');
-  assert.equal(result.res.statusCode, 403);
-  assert.equal(result.res.body?.error?.code, 'CSRF_REJECTED');
+for (const client of ['ios-native-v1', 'android-native-v1']) {
+  {
+    const result = runGuard(csrfGuard, request({
+      headers: { 'x-pri-client': client },
+      cookies: { [SESSION_COOKIE]: session, [CSRF_COOKIE]: csrf }
+    }));
+    assert.equal(result.next, 0, `${client}: the native origin exception must not disable CSRF validation`);
+    assert.equal(result.res.statusCode, 403);
+    assert.equal(result.res.body?.error?.code, 'CSRF_REJECTED');
+  }
+  {
+    const result = runGuard(csrfGuard, request({
+      headers: { 'x-pri-client': client, 'x-pri-csrf': csrf },
+      cookies: { [SESSION_COOKIE]: session, [CSRF_COOKIE]: csrf }
+    }));
+    assert.equal(result.next, 1, `${client}: a mutation with the server-issued CSRF cookie/header pair passes`);
+  }
 }
 
-{
-  const result = runGuard(csrfGuard, request({
-    headers: { 'x-pri-client': 'ios-native-v1', 'x-pri-csrf': csrf },
-    cookies: { [SESSION_COOKIE]: session, [CSRF_COOKIE]: csrf }
-  }));
-  assert.equal(result.next, 1, 'native mutation with the server-issued CSRF cookie/header pair should pass');
-}
-
-console.log('PASS — native URLSession requests bypass only browser Origin checks; browser contexts remain blocked and authenticated mutations still require CSRF.');
+console.log('PASS — native iOS and Android HTTP stacks bypass only browser Origin checks; browser contexts and near-miss identities remain blocked, and authenticated mutations still require CSRF.');

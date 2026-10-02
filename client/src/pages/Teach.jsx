@@ -8,7 +8,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../api.js';
 import { useApp } from '../App.jsx';
-import { downloadJSON, readJSONFile, readTextFile, dateStamp } from '../lib/files.js';
+import { downloadJSON, readJSONFile, readTextFile, dateStamp, printPage } from '../lib/files.js';
 import { parseRoster } from '../lib/csv.js';
 import { MathText } from '../lib/latex.jsx';
 import { CURRICULUM } from '../engine/curriculum.js';
@@ -46,7 +46,7 @@ function PrintSheet({ title, subtitle, onClose, children }) {
     <div className="paper-overlay" role="dialog" aria-modal="true" aria-labelledby="teach-print-title">
       <div className="paper-sheet">
         <div className="row no-print" style={{ marginBottom: 14, gap: 8 }}>
-          <button className="btn btn-primary btn-sm" onClick={() => window.print()}>{t('teach.printSavePdf')}</button>
+          <button className="btn btn-primary btn-sm" onClick={() => { printPage().catch(() => {}); }}>{t('teach.printSavePdf')}</button>
           <button className="btn btn-ghost btn-sm" onClick={onClose}>{t('nav.close')}</button>
         </div>
         <h2 id="teach-print-title" style={{ margin: '0 0 4px', color: '#111' }}>{title}</h2>

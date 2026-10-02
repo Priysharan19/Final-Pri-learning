@@ -1,0 +1,1 @@
+import{s as e}from"./ink-personal-BkiVelv3.js";export{e as setPersonalProfile};
