@@ -21,7 +21,8 @@ import {
   cleanIndiaTrack, indiaTrack, indiaCourseLabel, indiaScope, indiaChapter,
   indiaChapterGrade, indiaDotpointIndex, resolveIndiaTarget, indiaProductSections,
   indiaDotpointKey, indiaNameOf, indiaDifficultyWindow, clampToIndiaWindow,
-  indiaPracticeScope, indiaAheadUnlocked, indiaDotpointsInWindow, indiaChaptersForGenerator
+  indiaPracticeScope, indiaAheadUnlocked, indiaDotpointsInWindow, indiaChaptersForGenerator,
+  indiaPyqAlternatives
 } from '../engine/indiaProduct.js';
 import { indiaReasonLabel } from '../engine/indiaProgress.js';
 import { attemptTotals } from '../engine/progressTruth.js';
@@ -1107,7 +1108,10 @@ function indiaPick(p, trackId, ratings, reviews, now, { chapter = null, dotpoint
   if (!target && pyqOnly) {
     throw Object.assign(
       new Error(`Pri's previous-year archive has no ${trackName} past-paper question for ${c.name} yet. Turn the past-papers-only filter off to practise authored questions on this chapter.`),
-      { status: 409, code: 'INDIA_PYQ_UNAVAILABLE' }
+      // The nearest chapters that DO have past papers, so the empty state can
+      // offer one tap to real exam questions instead of a dead end. Nothing is
+      // substituted here: the student chooses.
+      { status: 409, code: 'INDIA_PYQ_UNAVAILABLE', detail: { chapter: c.id, alternatives: indiaPyqAlternatives(c, { track: trackId, grade }) } }
     );
   }
   if (!target) {
@@ -2832,9 +2836,20 @@ const routes = {
     const p = await requireProfile();
     const row = (await byIndex('questions', 'pid', p.id))
       .filter(r => r && !r.answered && !r.discardedAt && !isExamRow(r) && r.mode !== 'rush' && r.mode !== 'match')
+      // Home's "continue" must be a promise /practice keeps: a row the current
+      // class/track no longer serves is not offered (resumeInScope). Task rows
+      // keep their own contract.
+      .filter(r => r.taskId || resumeInScope(p, r))
       .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))[0];
     if (!row) return { resume: null };
     const task = row.taskId ? await get('tasks', row.taskId) : null;
+    // The destination names the row's own chapter (and the past-papers filter
+    // when it is a previous-year question), so opening it resumes exactly this
+    // question even when a newer unfinished one exists under other filters.
+    const chapterId = row.india?.chapterId || null;
+    const exact = !row.taskId && chapterId
+      ? '/practice?' + new URLSearchParams({ subtopic: chapterId, ...(row.india?.track ? { track: row.india.track } : {}), ...(row.payload?.pyq ? { pyq: '1' } : {}) }).toString()
+      : null;
     return { resume: {
       kind: row.taskId ? 'task' : 'practice',
       questionId: row.id,
@@ -2843,7 +2858,7 @@ const routes = {
       subtopic: row.india?.chapterId || row.payload?.subtopic || row.subtopic || null,
       difficulty: row.difficulty || null,
       createdAt: row.createdAt || null,
-      destination: row.taskId ? '/practice?task=' + encodeURIComponent(row.taskId) : '/practice'
+      destination: row.taskId ? '/practice?task=' + encodeURIComponent(row.taskId) : (exact || '/practice')
     } };
   },
 
@@ -3064,7 +3079,8 @@ const routes = {
       // A student cannot watch the answer and then submit it for credit.
       // Captions may be reworded afterwards through /tutor/captions; the
       // mathematics never changes.
-      const meta = await resolve(p, row, q, false, 'revealed', Math.max(0, Number(body?.ms) || 0), row.mode);
+      // The attempt and its cloud queue entry are one transaction (§22), as on Reveal.
+      const meta = await resolve(p, row, q, false, 'revealed', Math.max(0, Number(body?.ms) || 0), row.mode, false, { syncQueue: true });
       // `level` in the reply is the XP level from resolve(), as on Reveal; the
       // help level is `tutorLevel`.
       return {
@@ -3072,7 +3088,7 @@ const routes = {
         correct: false, resolved: true, revealed: true,
         walkthrough: { solution },
         solution: { steps: q.steps, answerText: displayAnswer(q), criteria: criteriaFor(q), solutionText: q.solutionText },
-        ...meta
+        ...meta, syncQueued: true
       };
     }
 
@@ -3350,7 +3366,7 @@ const routes = {
   'GET /exams': async () => {
     const p = await requireProfile();
     const rows = (await byIndex('exams', 'pid', p.id)).sort((a, b) => b.createdAt - a.createdAt);
-    return { exams: rows.map(e => ({ id: e.id, title: e.title, year: e.year, duration_min: e.durationMin, created_at: e.createdAt, finished_at: e.finishedAt, score: e.score, total: e.total })) };
+    return { exams: rows.map(e => ({ id: e.id, title: e.title, year: e.year, duration_min: e.durationMin, created_at: e.createdAt, finished_at: e.finishedAt, deadline_at: Number.isFinite(e.deadlineAt) ? e.deadlineAt : null, score: e.score, total: e.total })) };
   },
   'GET /exams/:id': async (body, params) => {
     const p = await requireProfile();
@@ -3543,8 +3559,10 @@ const routes = {
     if (row.answered) throw Object.assign(new Error('Already answered'), { status: 409 });
     const q = row.payload;
     const result = checkAnswer(q, body.answer);
-    await resolve(p, row, q, result.correct, body.answer, 0, row.mode);
-    return { correct: result.correct, answerText: displayAnswer(q) };
+    // Attempt and cloud queue entry in one transaction (§22): an app killed
+    // mid-Rush can no longer leave an attempt the cloud never hears about.
+    await resolve(p, row, q, result.correct, body.answer, 0, row.mode, false, { syncQueue: true });
+    return { correct: result.correct, answerText: displayAnswer(q), syncQueued: true };
   },
   'POST /rush/finish': async (body) => {
     const p = await requireProfile();
@@ -4538,7 +4556,8 @@ export async function recordIndiaExamEvidence(row, q, { correct, given, ms, feed
   try {
     return await resolve(
       p, row, q, !!correct, given ?? '', Math.max(0, Number(ms) || 0), 'exam', false,
-      { evidenceKey: evidenceKey || 'question' }
+      // each exam part's attempt is queued for the cloud in its own transaction (§22)
+      { evidenceKey: evidenceKey || 'question', syncQueue: true }
     );
   } catch (err) {
     // Exam submission is replayable after an ambiguous interruption. The same
@@ -4559,6 +4578,30 @@ export async function finishIndiaExamEvidence(pct) {
  * unanswered questions can still ask for fresh rows, while the student UI never
  * silently throws away the question it was already working on.
  */
+/**
+ * Whether an unfinished practice row still answers the request being made, so
+ * "resume" never hands back a question the current filters would not serve:
+ *   · an Indian profile resumes only India rows on the requested track (a
+ *     Class 12 JEE question does not reappear after the student moves to Class
+ *     10 CBSE, nor an NSW row after a course change);
+ *   · smart practice (no chapter named) resumes only chapters inside the
+ *     profile's current class scope;
+ *   · "past papers only" resumes only a previous-year question, because the
+ *     filter claims every card under it came from a real exam.
+ * A row outside the scope is left untouched (not discarded): it is still the
+ * student's work and resumes when the matching filter is chosen again.
+ */
+function resumeInScope(profile, row, { track = null, pyqOnly = false, explicit = false } = {}) {
+  if (pyqOnly && !row?.payload?.pyq) return false;
+  if ((profile?.course || 'nsw') !== 'in') return !row?.india;
+  if (!row?.india?.chapterId) return false;
+  const trackId = cleanIndiaTrack(track || profile.indiaTrack, profile.year);
+  if ((row.india.track || 'cbse') !== trackId) return false;
+  if (explicit) return true;
+  const { own, ahead } = indiaPracticeScope(trackId, profile.year);
+  return [...own, ...ahead].some(c => c.id === row.india.chapterId);
+}
+
 async function resumableQuestion(profile, body = {}) {
   if (body?.resume !== true) return null;
   // A submission that was in flight when the app went away names its question.
@@ -4577,10 +4620,12 @@ async function resumableQuestion(profile, body = {}) {
   const difficulty = body.difficulty !== undefined && body.difficulty !== null && body.difficulty !== ''
     ? Math.min(4, Math.max(1, Number(body.difficulty))) : null;
 
+  const scope = { track: body.track, pyqOnly: body.pyqOnly === true, explicit: !!subtopic };
   const candidates = rows.filter(r => {
     if (!r || r.answered || r.discardedAt || r.examId || r.mode === 'rush' || r.mode === 'match') return false;
     if (taskId) return String(r.taskId || '') === taskId;
     if (r.taskId) return false;
+    if (!resumeInScope(profile, r, scope)) return false;
     if (!subtopic) return r.mode === 'practice' || r.mode === 'review';
     const actual = r.india?.chapterId || r.payload?.subtopic || r.subtopic;
     if (String(actual || '') !== subtopic) return false;

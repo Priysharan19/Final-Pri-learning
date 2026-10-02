@@ -9,6 +9,10 @@ on:
       - 'client/src/theme.css'
       - 'client/src/i18n/**'
       - 'client/test/kalp04-home-check.mjs'
+      - 'client/test/first-run-daily-use-check.mjs'
+      - 'client/test/tour-first-run-scope.js'
+      - 'client/src/pages/PracticeBase.jsx'
+      - 'client/src/engine/indiaProduct.js'
       - 'client/test/tour-kalp04-home.js'
       - 'client/test/e2e.mjs'
       - 'client/test/a11y-check.mjs'
@@ -44,6 +48,9 @@ jobs:
 
       - name: KALP-04 recommendation source and scenario gate
         run: node client/test/kalp04-home-check.mjs
+
+      - name: First run to daily use regression
+        run: node client/test/first-run-daily-use-check.mjs
 
       - name: KALP-01 visual-system source regression
         run: node client/test/design-system-check.mjs
@@ -83,6 +90,9 @@ jobs:
 
       - name: KALP-03 onboarding regression
         run: node client/test/tour-kalp03-onboarding.js --no-build
+
+      - name: First run scope journey
+        run: node client/test/tour-first-run-scope.js --no-build
 
       - name: PRI-02 golden student journey
         run: node client/test/golden-student-journey.mjs --no-build
