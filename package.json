@@ -54,7 +54,7 @@
     "test:ink:corpus:strict": "node client/test/ink-corpus-audit.mjs --strict",
     "test:ink:bridge": "node client/test/native-ink-check.mjs",
     "test:photo:bridge": "node client/test/photo-ocr-bridge-check.mjs",
-    "test:ink:interaction": "node client/test/ink-interaction-guard-check.mjs",
+    "test:ink:interaction": "node client/test/ink-interaction-guard-check.mjs && node client/test/ink-pen-buttons-check.mjs",
     "test:ink:personal": "node client/test/ink-personal-metric-check.mjs",
     "test:ink:hybrid": "node client/test/ink-hybrid-check.mjs",
     "test:ink:native": "node scripts/ink-native-check.mjs",
