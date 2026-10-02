@@ -240,6 +240,30 @@ section('anti-loop');
   const top = Math.max(...Object.values(lids.reduce((m, id) => ({ ...m, [id]: (m[id] || 0) + 1 }), {})));
   ok('a learner failing everything is spread across ideas (no idea above 40%)', top / lids.length <= 0.40, `top share ${(top / lids.length).toFixed(3)}`);
 
+  // The window-share cap, isolated from everything else that bounds a block.
+  // Acquiring state (1 correct, 3 attempts: under acquisitionAttempts), a run
+  // of three (under acquisitionRun), but four of the last six picks: only the
+  // window-share rule can say no here.
+  const acq = { rating: 1100, attempts: 3, correct: 1 };
+  const broken = ['ch-a', 'ch-a', 'ch-a', 'ch-x', 'ch-a', 'ch-y'];
+  ok('precondition: the idea is still acquiring', acq.correct < A.INTERLEAVE.acquisitionCorrect && acq.attempts < A.INTERLEAVE.acquisitionAttempts);
+  ok('precondition: the current run is under the acquisition run', broken.indexOf('ch-x') < A.INTERLEAVE.acquisitionRun);
+  eq('window share: an acquiring idea holding 4 of the last 6 picks is suppressed', A.interleavePenalty('ch-a', broken, acq), 0.04);
+  eq('window share: the same idea holding 2 of 6 is not', A.interleavePenalty('ch-a', ['ch-a', 'ch-a', 'ch-x', 'ch-y', 'ch-z', 'ch-w'], acq), 1);
+  // Settled state: alternate picks (never a run of two) but half the window.
+  const settled = { rating: 1300, attempts: 9, correct: 6 };
+  eq('window share: a settled idea served every other pick is suppressed', A.interleavePenalty('ch-a', ['ch-x', 'ch-a', 'ch-y', 'ch-a', 'ch-z', 'ch-a', 'ch-w', 'ch-a'], settled), 0.04);
+  // End to end with acquisition never expiring: the window rule alone must
+  // keep a failing idea at or under half of any recent window.
+  const savedAttempts = A.INTERLEAVE.acquisitionAttempts;
+  A.INTERLEAVE.acquisitionAttempts = Number.MAX_SAFE_INTEGER;
+  let capped;
+  try {
+    capped = simulate({ n: 120, seed: 7, outcome: (id, i, r) => (id === 'ch-a' ? false : r() < 0.8) }).trace.map(t => t.id);
+  } finally { A.INTERLEAVE.acquisitionAttempts = savedAttempts; }
+  ok('with acquisition never expiring, the window cap alone holds a failing idea to 4 of any 8 picks', maxInWindow(capped, 'ch-a', 8) <= 4, `max ${maxInWindow(capped, 'ch-a', 8)}`);
+  ok('…and to at most half of the session', capped.filter(id => id === 'ch-a').length / capped.length <= 0.5, `share ${(capped.filter(id => id === 'ch-a').length / capped.length).toFixed(3)}`);
+
   // Dot points: the same dot point is not served three times running.
   const dps = [0, 1, 2, 3].map(i => ({ id: `dp${i}`, index: i, rating: 1150, attempts: 0, correct: 0, last_at: 0 }));
   const rng = mulberry32(17);

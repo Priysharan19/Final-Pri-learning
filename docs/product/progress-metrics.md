@@ -1,9 +1,11 @@
 # Progress metrics — what every number means
 
 **Scope:** the student progress surfaces of the India V1 product — India Progress
-(`client/src/pages/IndiaProgress.jsx`), Home (`client/src/pages/Home.jsx`) and the
-routes that feed them (`GET /stats`, `GET /curriculum`, `GET /me`, `GET /reviews`,
-`GET /report` in `client/src/local/backend.js`).
+(`client/src/pages/IndiaProgress.jsx`) and Home (`client/src/pages/Home.jsx`) — and
+the routes that feed them (`GET /stats`, `GET /curriculum`, `GET /me`, `GET /reviews`
+in `client/src/local/backend.js`). The counts `GET /report` serves (totals, streak,
+active days, chapter attempts) are audited too, but see *Known limits* for its
+accuracy figures.
 
 **Code authority:** `client/src/engine/progressTruth.js` holds the definitions and
 thresholds below as code. Change one, change the other.
@@ -112,3 +114,9 @@ seven days.
 - Per-day activity rows are written in the answer's transaction rather than
   derived on read. The truth suite asserts they equal the ledger's per-day counts.
   A restored backup carries both from the same file.
+- `GET /report` and the NSW legacy progress page (`ProgressLegacy.jsx`, its only
+  student consumer, out of V1) still print accuracy without the sample floor or the
+  game exclusion: `/report`'s per-chapter `accuracy` (`indiaChapterRows`, also read
+  by teacher analytics) is a plain correct/attempts on rating rows. No India V1
+  student surface reads it; the truth suite audits `/report`'s counts, not those
+  percentages.
