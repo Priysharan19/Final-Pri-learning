@@ -48,12 +48,22 @@ const CHILD_CLASS = /^(7|8|9|10|11|12)$/;
 const clean = (value, max) => clipText(String(value ?? '').trim(), max);
 
 /** Is this learner a child, on what they told us at signup? */
-export function learnerIsChild({ isAdult, year } = {}) {
+export function learnerIsChild({ isAdult } = {}) {
   // An explicit "I am 18 or older" is taken at its word; that is the only
-  // declaration a service can make. Everything else — including saying nothing —
-  // is treated as a child, because the safe default is the protective one.
-  if (isAdult === true) return false;
-  if (isAdult === false) return true;
+  // declaration a service can make. Everything else — including saying nothing,
+  // or naming no class — is treated as a child, because the safe default is the
+  // protective one. (Failing open here once let a direct API call that sent
+  // neither field skip the guardian gate.)
+  return isAdult !== true;
+}
+
+/**
+ * Did the request make an age declaration at all? `isAdult` must be a real
+ * boolean, or the learner must name a school class (which makes them a child).
+ * A request that says nothing is refused rather than guessed about.
+ */
+export function hasAgeDeclaration({ isAdult, year } = {}) {
+  if (typeof isAdult === 'boolean') return true;
   return CHILD_CLASS.test(String(year ?? '').trim());
 }
 

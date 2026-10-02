@@ -70,7 +70,7 @@ async function runServerAndSignal(dbPath, signal) {
   assert.equal(health.status, 200);
   const registration = await fetch(`http://127.0.0.1:${port}/v1/account/register`, {
     method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ name: 'Shutdown', email: `shutdown-${signal.toLowerCase()}@example.test`, password: 'shutdown-pass-123', deviceId: 'ipad' })
+    body: JSON.stringify({ name: 'Shutdown', email: `shutdown-${signal.toLowerCase()}@example.test`, password: 'shutdown-pass-123', deviceId: 'ipad', isAdult: true })
   });
   assert.equal(registration.status, 201, await registration.text());
   const walBeforeSignal = existsSync(`${dbPath}-wal`) ? statSync(`${dbPath}-wal`).size : 0;

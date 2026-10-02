@@ -142,7 +142,7 @@ async function call(path, { method = 'GET', body, raw, jar = null, headers = {},
 const auditActions = async () => new Set((await db.all('SELECT action FROM audit_log')).map(row => row.action));
 const jars = { admin: {}, teacher: {}, support: {}, s1: {}, s2: {}, s3: {} };
 async function register(jar, name, email, deviceId, { verify = true } = {}) {
-  const response = await call('/account/register', { method: 'POST', jar, body: { name, email, password: 'journey-pass-123', deviceId } });
+  const response = await call('/account/register', { method: 'POST', jar, body: { name, email, password: 'journey-pass-123', deviceId, isAdult: true } });
   assert.equal(response.status, 201, JSON.stringify(response.data));
   const account = response.data.account;
   // Sync push, class create and join and paid checkout all require a verified

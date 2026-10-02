@@ -9,7 +9,7 @@ import { encryptDeliveryToken } from './deliveryCrypto.js';
 import { verifyIdentityToken } from './oidc.js';
 import { clearLoginFailures, loginLockStatus, recordLoginFailure } from './loginLockout.js';
 import {
-  confirmConsent, consentState, learnerIsChild, recordConsentRequest, validateGuardian, withdrawConsent
+  confirmConsent, consentState, hasAgeDeclaration, learnerIsChild, recordConsentRequest, validateGuardian, withdrawConsent
 } from './guardianConsent.js';
 import { consumeTeacherInvite, findLiveTeacherInvite } from './teacherInvites.js';
 import { maybeBootstrapAdmin } from './bootstrapAdmin.js';
@@ -176,7 +176,11 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
       if (!em || !name || !strongPassword(password)) {
         return res.status(400).json({ error: { code: 'INVALID_ACCOUNT', message: 'Use a valid name, email and password of at least 10 characters.' } });
       }
-      const child = learnerIsChild({ isAdult: req.body?.isAdult, year: req.body?.year });
+      const declaration = { isAdult: req.body?.isAdult, year: req.body?.year };
+      if (!hasAgeDeclaration(declaration)) {
+        return res.status(400).json({ error: { code: 'AGE_DECLARATION_REQUIRED', message: 'Say whether you are 18 or older, or which class you are in.' } });
+      }
+      const child = learnerIsChild(declaration);
       let guardian = null;
       if (child) {
         const checked = validateGuardian(req.body || {});

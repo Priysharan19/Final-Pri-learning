@@ -24,7 +24,7 @@ import cookieParser from 'cookie-parser';
 import { createPlatformDb } from '../platform/db.js';
 import {
   CONSENT_METHOD, CONSENT_NOTICE_VERSION, confirmConsent, consentState,
-  learnerIsChild, recordConsentRequest, requireGuardianConsent, validateGuardian, withdrawConsent
+  hasAgeDeclaration, learnerIsChild, recordConsentRequest, requireGuardianConsent, validateGuardian, withdrawConsent
 } from '../platform/guardianConsent.js';
 import { authEmailMessage, buildAuthActionUrl } from '../platform/authDelivery.js';
 import { SESSION_COOKIE, sha256 } from '../platform/security.js';
@@ -37,7 +37,15 @@ const eq = (a, b, label) => ok(JSON.stringify(a) === JSON.stringify(b), `${label
 // ── 1 · Silence means child ──────────────────────────────────────────────────
 eq(learnerIsChild({ year: 7 }), true, 'a Class 7 student is a child');
 eq(learnerIsChild({ year: 12 }), true, 'and so is a Class 12 student — the line is 18, not 13');
-eq(learnerIsChild({}), false, 'someone who names no class and claims nothing is not assumed to be a child');
+eq(learnerIsChild({}), true, 'someone who names no class and claims nothing is treated as a child — regression: this once failed open and skipped the guardian gate');
+eq(learnerIsChild({ year: '' }), true, 'an empty class is no declaration of adulthood');
+eq(learnerIsChild({ isAdult: 'true' }), true, 'only a real boolean true declares an adult, not a string');
+eq(learnerIsChild({ isAdult: true }), false, 'an explicit adult declaration is an adult');
+eq(hasAgeDeclaration({}), false, 'saying nothing is not an age declaration');
+eq(hasAgeDeclaration({ isAdult: 'yes' }), false, 'nor is a non-boolean isAdult');
+eq(hasAgeDeclaration({ isAdult: true }), true, 'isAdult true is a declaration');
+eq(hasAgeDeclaration({ isAdult: false }), true, 'so is isAdult false');
+eq(hasAgeDeclaration({ year: '9' }), true, 'and so is naming a school class');
 eq(learnerIsChild({ isAdult: false }), true, 'saying you are not an adult is taken at its word');
 eq(learnerIsChild({ isAdult: true, year: 8 }), false, 'and so is saying you are one, which is the only declaration a service can take');
 eq(learnerIsChild({ isAdult: undefined, year: 10 }), true, 'no declaration plus a school class is a child — the safe default is the protective one');
