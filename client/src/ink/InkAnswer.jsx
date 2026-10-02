@@ -478,6 +478,7 @@ export default function InkAnswer({
           : rec.disagreement
             ? `Native engines disagree · confirmation required · ${rec.engine}`
             : rec.engine ? `Native recognition path · ${rec.engine}` : null;
+  // i18n-exempt-end
   // One sheet is the fitted writing height (CP-03); added pages extend the same
   // coordinate space downward.
   const pageHeight = fittedHeight;
