@@ -52,6 +52,8 @@ jobs:
           grep -Fq 'INDIA NATIVE BANKS: PASS — 313/313 checks — 19 chapters rewired onto 20 NCERT-native generators' suites.log
           grep -Fq 'NCERT ANSWER FORMS: PASS — 373/373 checks' suites.log
           grep -Fq 'INDIA EXAM FLOW: PASS — 129/129 checks' suites.log
+          grep -Fq 'EXAM SESSION: PASS — 88/88 checks' suites.log
+          grep -Fq 'EXAM ANALYSIS: PASS — 29/29 checks' suites.log
           grep -Fq 'INDIA PYQ: PASS — 1079/1079 checks — 45 source-cited previous-year questions' suites.log
           grep -Fq '✔ INDIA IDENTITY SUITE PASSED — 102/102 checks across 5 groups' suites.log
           grep -Fq 'INDIA ADAPTIVE: PASS — 302/302 checks' suites.log
@@ -65,7 +67,7 @@ jobs:
           grep -Fq 'CLOUD WORKING CLIENT: PASS — 47/47 checks' suites.log
           grep -Fq 'CLOUD PHOTO CLIENT: PASS — 28/28 checks' suites.log
           grep -Fq 'I18N: PASS — 189/189 checks' suites.log
-          grep -Fq 'I18N COVERAGE: PASS — 88/88 checks — 47 files scanned, 0 hard-coded strings' suites.log
+          grep -Fq 'I18N COVERAGE: PASS — 88/88 checks — 48 files scanned, 0 hard-coded strings' suites.log
           grep -Fq 'I18N VOICE: PASS — 92/92 checks' suites.log
           grep -Fq 'MISCONCEPTION ONTOLOGY: PASS — 99/99 checks' suites.log
           grep -Fq 'CLOUD HANDWRITING CLIENT: PASS — 58/58 checks' suites.log
@@ -85,6 +87,7 @@ jobs:
           grep -Fq 'BAD INPUT: PASS — 38/38 checks' suites.log
           grep -Fq 'CLOUD SYNC ACK: PASS — 44/44 checks' suites.log
           grep -Fq 'PASS — §09 submission lifecycle: 13 groups' suites.log
+          grep -Fq 'PASS — §22 submission sync durability: 6 groups' suites.log
           grep -Fq 'PASS — Grade 9 Ganita Manjari: 1280 seeded forms (1000 numeric handwriting-ready, 280 conceptual).' suites.log
           grep -Fq 'PASS — 8/8 chapters, 200/200 uploaded pages, 42/42 formal exercise sections and 293/293 formal exercise prompts represented and verified.' suites.log
           # §06 content runtime certification: every V1 launch path (CBSE/NCERT
@@ -204,6 +207,7 @@ jobs:
         run: |
           node server/test/proxy-identity-contract-check.mjs
           node server/test/sync-idempotency-contract-check.mjs
+          node server/test/practice-attempt-sync-check.mjs
           node server/test/entitlement-admin-grant-check.mjs
           node server/test/request-size-contract-check.mjs
           node server/test/content-index-exposure-check.mjs
@@ -245,9 +249,10 @@ jobs:
         run: |
           set -o pipefail
           node scripts/with-postgres.mjs node server/test/run-platform-postgres.mjs 2>&1 | tee platform-postgres.log
-          grep -Fq 'PLATFORM ON POSTGRES: PASS — 29/29 suites' platform-postgres.log
+          grep -Fq 'PLATFORM ON POSTGRES: PASS — 30/30 suites' platform-postgres.log
           grep -Fq '✓ security-acceptance-check.mjs' platform-postgres.log
           grep -Fq '✓ abuse-limits-check.mjs' platform-postgres.log
+          grep -Fq '✓ practice-attempt-sync-check.mjs' platform-postgres.log
           grep -Fq 'ACCOUNT LIFECYCLE JOURNEY: PASS' platform-postgres.log
           grep -Fq 'POSTGRES SCHEMA MUTATIONS: PASS — 23/23' platform-postgres.log
           grep -Fq 'PLATFORM SYNC BURST: PASS' platform-postgres.log
@@ -312,8 +317,11 @@ jobs:
         run: |
           set -euo pipefail
           test -s browser.log
-          grep -Eq 'E2E SUITE.*280/280.*9 flows' browser.log
+          grep -Eq 'E2E SUITE.*XXE2E.*12 flows' browser.log
           grep -Fq 'Submission · interruption recovery and one attempt' browser.log
+          grep -Fq 'Cloud · late results never rewrite an attempt' browser.log
+          grep -Fq 'India exam · JEE Main handwritten, reloaded, analysed' browser.log
+          grep -Fq 'India exam · the clock runs out and the paper submits itself' browser.log
           grep -Fq 'Placement · onboarding → diagnostic → evidence map' browser.log
           grep -Fq 'Phone · every destination reachable at 390px' browser.log
           grep -Fq 'India · onboarding, class labels, demo, cloud entry' browser.log

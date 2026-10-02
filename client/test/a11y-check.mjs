@@ -948,6 +948,42 @@ async function run() {
       selfTest = { error: String(err.message || err) };
     }
 
+    // ── the India exam room: a JEE Main paper sat partly by hand ────────────
+    // The handwriting surface, the write/type switch, the multiple-choice
+    // options and the section analysis only exist on an India paper.
+    await step('india exam room · writing a numerical answer', '/exams/:id', async () => {
+      await goTo(page, BASE, '/');
+      await click(page, '.user-chip');
+      await click(page, '[role="menuitem"]', { text: 'Switch profile' });
+      await page.waitForSelector('.auth-wrap', { timeout: 15000 });
+      await click(page, 'button.btn-ghost', { text: 'Add another profile' });
+      await page.getByRole('button', { name: 'Student', exact: true }).click();
+      await click(page, '.auth-card .btn-primary');
+      await page.locator('#signup-track').selectOption('jee-main');
+      await page.locator('#signup-year').selectOption('12');
+      await click(page, '.auth-card .btn-primary');
+      await page.locator('#signup-name').fill('Accessibility JEE Student');
+      await click(page, '.auth-card .btn-primary');
+      await click(page, '.auth-card .btn-primary');
+      await page.waitForSelector('[data-onboarding-step="5"]');
+      await page.getByRole('button', { name: 'Start learning' }).click();
+      await page.waitForSelector('.shell', { timeout: 30000 });
+      await goTo(page, BASE, '/exams');
+      await page.getByRole('button', { name: 'Start JEE Main Mathematics simulation' }).click();
+      await page.waitForSelector('.exam-nav', { timeout: 60000 });
+      await click(page, '.mcq .mcq-opt');
+      await page.locator('.exam-dot').nth(20).click();
+      await page.getByRole('button', { name: '✍ Write by hand' }).click();
+      await page.waitForSelector('.ink-canvas-live', { timeout: 30000 });
+      await wait(page, 700);
+    });
+
+    await step('india exam room · section analysis', '/exams/:id', async () => {
+      await click(page, 'button.btn-primary', { text: 'Submit paper' });
+      await page.waitForSelector('.exam-analysis', { timeout: 60000 });
+      await wait(page, 700);
+    });
+
     // ── teacher-only workspace, exercised under a real teacher profile ──────
     await step('teacher studio', '/teach', async () => {
       await goTo(page, BASE, '/');
