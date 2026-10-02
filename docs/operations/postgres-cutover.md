@@ -24,7 +24,7 @@ printed):
 | **Production:** verified TLS — `sslmode=verify-full` (preferred), or `sslmode=require` **with** `PRI_DATABASE_SSL_ROOT_CERT` | `config.js postgresConnectionSettings` | `PLATFORM_DB_TLS_REQUIRED` (no/weak sslmode) / `PLATFORM_DB_TLS_UNVERIFIED` (`require` without the CA) |
 | No `sslrootcert`/`sslcert`/`sslkey`/`ssl=` in the URL (CA goes in `PRI_DATABASE_SSL_ROOT_CERT`) | same | `PLATFORM_DB_TLS_INVALID` |
 | Reachable, migrated (`platform_meta.schema_version` present) | `store.js createPostgresStore` | `PLATFORM_DB_UNAVAILABLE` / `PLATFORM_DB_NOT_MIGRATED` |
-| `schema_version` = 7 and `billing_schema_version` = 3 exactly (`server/platform/schemaVersions.js`) | `store.js assertSchemaVersions` | `PLATFORM_DB_SCHEMA_MISMATCH` |
+| `schema_version` = 8 and `billing_schema_version` = 4 exactly (`server/platform/schemaVersions.js`) | `store.js assertSchemaVersions` | `PLATFORM_DB_SCHEMA_MISMATCH` |
 | `pri.sync_cursor_seq` exists (migration `20261002000000`) | same | `PLATFORM_DB_SCHEMA_MISMATCH` |
 | Timeouts, lock wait and pool size parse as whole numbers in range | `config.js postgresSessionLimits` | `PLATFORM_DB_CONFIG_INVALID` |
 
@@ -109,6 +109,8 @@ npx supabase@latest link --project-ref orudxrckgxyyraopyzmn
 #      that are not yet in the remote history, in filename order:
 #        20261001000000_platform_schema.sql
 #        20261002000000_sync_cursor_sequence.sql
+#        20261002010000_tutor_cache.sql   (additive: the AI tutor reply cache; schema_version 8)
+#        20261003000000_billing_payment_retention.sql
 npx supabase@latest migration list
 npx supabase@latest db push --dry-run
 
@@ -191,7 +193,7 @@ unset PRI_DATABASE_URL PRI_DATABASE_SSL_ROOT_CERT
 `server/tools/postgres-target-check.mjs` connects exactly as the server does and changes nothing
 that persists. It must print `POSTGRES TARGET: PASS` with every line ticked:
 
-* boot checks (TLS policy, `schema_version` 7 / `billing_schema_version` 3, cursor sequence);
+* boot checks (TLS policy, `schema_version` 8 / `billing_schema_version` 4, cursor sequence);
 * TLS negotiated (`pg_stat_ssl`), `statement_timeout` / `idle_in_transaction_session_timeout` applied;
 * login role is a `pri_server` member, not superuser, not BYPASSRLS;
 * the live schema gate — every table, column type, key, CHECK expression, index, RLS policy
@@ -210,7 +212,7 @@ role, and therefore **cannot and must not be pointed at Supabase**. Run it on th
 being deployed and keep the output:
 
 ```bash
-npm run test:platform:pg   # expect: PLATFORM ON POSTGRES: PASS — 27/27 suites
+npm run test:platform:pg   # expect: PLATFORM ON POSTGRES: PASS — 29/29 suites
 ```
 
 Against staging itself, the equivalent evidence is §4.2 plus §4.4.
@@ -224,7 +226,7 @@ Against staging itself, the equivalent evidence is §4.2 plus §4.4.
 1. Redeploy the staging service. The boot log must show `platform_db_open { engine: 'postgres' }`;
    any `platform_db_unavailable {"code":…}` line means the variables or migrations are wrong —
    fix and redeploy, nothing has been written.
-2. `GET /v1/health` → `database.engine = "postgres"`, `schemaVersion = "7"`.
+2. `GET /v1/health` → `database.engine = "postgres"`, `schemaVersion = "8"`.
 3. **Once no instance of an older build is left** (after any overlapping deploy has drained),
    re-run the cursor lift. It only ever raises the sequence, so it is safe to repeat, and it
    covers a cursor an older build issued between its last read of `sync_cursors` and the
@@ -285,6 +287,20 @@ cutover do not exist in the SQLite file. So after real traffic:
 * **Restoring data** means restoring the Supabase backup (§6) or PITR to a point before the
   incident — a destructive, owner-approved operation that discards later writes.
 
+### 5.2a Undoing migration `20261002010000_tutor_cache`
+
+Only for a build that predates the AI tutor, and before undoing anything older (migrations come
+off newest first). The table holds only cached tutor replies keyed by a request digest — no
+account data — so dropping it loses nothing a student owns; the next request is simply paid for
+again. Owner approval is still required, as for every production schema change:
+
+```sql
+begin;
+drop table pri.tutor_cache;
+update pri.platform_meta set value = '7' where key = 'schema_version';
+commit;
+```
+
 ### 5.3 Undoing migration `20261002000000_sync_cursor_sequence`
 
 Only if a build that predates it must serve the database again — an owner-approved, deliberate
@@ -306,6 +322,19 @@ commit;
 Leave the sequence in place; the older build ignores it. Going forward again is a new migration
 (never an edit of `20261002000000`) that repeats its lock / lift / revoke / `schema_version = 7`
 steps, followed by the cursor lift in §4.4 step 3.
+
+### 5.3a Undoing migration `20261003000000_billing_payment_retention`
+
+Only to serve a build that expects `billing_schema_version` 3. `NOT NULL` cannot be restored once
+an account has been deleted under it (those payments have `account_id` NULL by design), so the
+rollback keeps the nullable column and the `ON DELETE SET NULL` key and only reverts the version a
+v3 build checks; the database keeps retaining payments either way. Owner-approved only:
+
+```sql
+begin;
+update pri.platform_meta set value = '3' where key = 'billing_schema_version';
+commit;
+```
 
 ### 5.4 Production
 
@@ -344,7 +373,7 @@ runs against an empty `pri` schema.
 | 2.4 `db push` | staging | | | | |
 | 3 login role created | staging | | | | (role name only) |
 | 4.2 target check | staging | | | | `POSTGRES TARGET: PASS — n/n` |
-| 4.3 `test:platform:pg` | local/CI | | | | `27/27 suites` |
+| 4.3 `test:platform:pg` | local/CI | | | | `29/29 suites` |
 | 4.4 smoke | staging | | | | |
 | 6 backup + restore drill | production | | | | |
 | 2–4 | production | | | | |
