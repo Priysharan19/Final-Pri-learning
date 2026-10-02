@@ -7,6 +7,7 @@ import { useApp } from '../App.jsx';
 import { dotpointAvailable, practiceTargetAvailable, topicAvailability } from '../engine/curriculumAvailability.js';
 import { dayKey, formatWeekday } from '../lib/locale.js';
 import { useT, useTx } from '../i18n/index.js';
+import { practiceDifficulties, practiceHref } from '../lib/practiceLinks.js';
 import { textMatches, useGlossary } from '../i18n/glossary.js';
 import TermGloss from '../components/TermGloss.jsx';
 import { featureEnabled } from '../platform/features.js';
@@ -137,6 +138,14 @@ export default function Home() {
     () => sections.find(s => s.key === sectionKey) || null,
     [sections, sectionKey]
   );
+  // The difficulty buttons this context may offer: never D4 to a CBSE student
+  // (CBSE practice is held to D1–D3), and never above the section's ceiling. A
+  // remembered D4 from an earlier filter is dropped rather than sent.
+  const offeredDifficulties = practiceDifficulties({
+    course: user.course, track: section?.track || (user.course === 'in' ? user.indiaTrack || 'cbse' : null),
+    grade: section?.year ?? user.year, ceiling: section?.difficultyCeiling || null
+  });
+  const chosenDifficulty = difficulty != null && offeredDifficulties.includes(difficulty) ? difficulty : null;
 
   // Indian students type Hindi words in Latin letters and English words in
   // half: "trikonmiti", "trig", "quadratic", "समुच्चय". The matcher folds all
@@ -195,16 +204,11 @@ export default function Home() {
   if (section) chips.push({ k: 'course', label: section.label, clear: () => { setSectionKey(null); setSubtopic(null); setDotpoint(null); } });
   if (selSub) chips.push({ k: 'topic', label: selSub.name, clear: () => { setSubtopic(null); setDotpoint(null); } });
   if (dotpoint != null && selSub) chips.push({ k: 'dp', label: t('home.dotpointChip', { n: dotpoint + 1 }), clear: () => setDotpoint(null) });
-  if (difficulty != null) chips.push({ k: 'diff', label: t('home.difficultyChip', { n: difficulty, label: t(DIFF_KEYS[difficulty]) }), clear: () => setDifficulty(null) });
+  if (chosenDifficulty != null) chips.push({ k: 'diff', label: t('home.difficultyChip', { n: chosenDifficulty, label: t(DIFF_KEYS[chosenDifficulty]) }), clear: () => setDifficulty(null) });
 
   const generate = () => {
     if (impossibleTarget) return;
-    const p = new URLSearchParams();
-    if (subtopic) p.set('subtopic', subtopic);
-    if (subtopic && dotpoint != null) p.set('dotpoint', String(dotpoint));
-    if (difficulty != null) p.set('difficulty', String(difficulty));
-    if (section?.track) p.set('track', section.track);
-    nav(`/practice${p.toString() ? `?${p}` : ''}`);
+    nav(practiceHref({ subtopic, dotpoint, difficulty: chosenDifficulty, track: section?.track || null }));
   };
 
   const resetAll = () => { setSectionKey(null); setSubtopic(null); setDotpoint(null); setDifficulty(null); setYear(user.year); };
@@ -279,7 +283,7 @@ export default function Home() {
                   onClick={() => setCat(k)}
                 >
                   {label}
-                  {((k === 'year') || (k === 'course' && section) || (k === 'topics' && selSub) || (k === 'dots' && dotpoint != null) || (k === 'difficulty' && difficulty != null)) && <span className="gen-cat-dot" />}
+                  {((k === 'year') || (k === 'course' && section) || (k === 'topics' && selSub) || (k === 'dots' && dotpoint != null) || (k === 'difficulty' && chosenDifficulty != null)) && <span className="gen-cat-dot" />}
                 </button>
               ))}
             </div>
@@ -369,7 +373,7 @@ export default function Home() {
                   <div className="gen-pane-note">{t('home.optional')}</div>
                   <div className="gen-pane-title">{t('home.pickDifficulty')}</div>
                   <div className="gen-opts">
-                    {[1, 2, 3, 4].filter(d => !section?.difficultyCeiling || d <= section.difficultyCeiling).map(d => (
+                    {offeredDifficulties.map(d => (
                       <button key={d} className={`gen-opt ${difficulty === d ? 'on' : ''}`}
                         onClick={() => setDifficulty(difficulty === d ? null : d)}>
                         {`D${d}`} · {t(DIFF_KEYS[d])}
@@ -411,7 +415,7 @@ function PlacementCard({ placement, onGo, onSkip }) {
         {placement.status === 'active' && <button className="btn btn-primary" onClick={() => onGo('/placement')}>{t('placement.resume')}</button>}
         {placement.status === 'finished' && (
           <>
-            {rootChapter && <button className="btn btn-primary" onClick={() => onGo(`/practice?subtopic=${encodeURIComponent(rootChapter.id)}&track=cbse`)}>{t('placement.practiseRoot', { chapter: rootChapter.name })}</button>}
+            {rootChapter && <button className="btn btn-primary" onClick={() => onGo(practiceHref({ subtopic: rootChapter.id, track: 'cbse' }))}>{t('placement.practiseRoot', { chapter: rootChapter.name })}</button>}
             <button className="btn btn-ghost" onClick={() => onGo('/placement')}>{t('placement.seeResult')}</button>
           </>
         )}

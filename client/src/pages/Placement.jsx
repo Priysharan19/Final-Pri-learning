@@ -17,6 +17,7 @@ import { api } from '../api.js';
 import { useApp } from '../App.jsx';
 import QuestionCard from '../components/QuestionCard.jsx';
 import TermGloss from '../components/TermGloss.jsx';
+import { practiceHref } from '../lib/practiceLinks.js';
 import { tLater, useT } from '../i18n/index.js';
 import { MAP_STRANDS, PREREQ_GRAPH_VERSION, mapStrandOf } from '../engine/prerequisites.js';
 import { PREREQ_SKILLS_HI } from '../engine/prerequisiteSkillsHi.js';
@@ -238,7 +239,7 @@ function PlacementResult({ view, user, busy, onRetake, error }) {
                 {g.belowFloor && <p className="muted" style={{ margin: '6px 0 0', fontSize: 13 }}>{t('placement.belowFloor')}</p>}
                 {g.contradicted && <p className="muted" style={{ margin: '6px 0 0', fontSize: 13 }}>{t('placement.contradicted')}</p>}
                 <button className="btn btn-ghost btn-sm" style={{ marginTop: 10 }}
-                  onClick={() => nav(`/practice?subtopic=${encodeURIComponent(g.chapterId)}&track=cbse`)}>
+                  onClick={() => nav(practiceHref({ subtopic: g.chapterId, track: 'cbse' }))}>
                   {t('placement.practiseRoot', { chapter: nameOf(g.chapterId) })}
                 </button>
               </div>

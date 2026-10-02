@@ -5,6 +5,7 @@ import { useApp } from '../App.jsx';
 import { predictionSentence } from '../engine/markPredictor.js';
 import { tLater, useT } from '../i18n/index.js';
 import TermGloss from '../components/TermGloss.jsx';
+import { indiaProgressPracticeHref } from '../lib/practiceLinks.js';
 import { featureEnabled } from '../platform/features.js';
 
 function pct(correct, attempts) {
@@ -174,7 +175,7 @@ export default function IndiaProgress() {
                     <td>{evidence.correct}</td>
                     <td>{evidence.accuracy == null ? t('common.none') : t('common.percent', { n: evidence.accuracy })}</td>
                     <td>
-                      <button className="btn btn-quiet btn-sm" onClick={() => nav(`/practice?subtopic=${encodeURIComponent(row.id)}&track=${encodeURIComponent(user.indiaTrack || 'cbse')}`)}>
+                      <button className="btn btn-quiet btn-sm" onClick={() => nav(indiaProgressPracticeHref(row, user.indiaTrack))}>
                         {t('progress.practise')}
                       </button>
                     </td>
