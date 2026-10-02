@@ -46,7 +46,7 @@ export const flow = {
     await check('the V8 adaptive board player opens',
       // The engine version is an attribute, not chrome a student has to read.
       await page.locator('.pri-explain-dialog').getAttribute('data-explain-engine') === 'v8-adaptive'
-        && /Pri Explain/.test(await page.locator('.pri-explain-kicker').innerText()),
+        && /Pri Explain/i.test(await page.locator('.pri-explain-kicker').innerText()),
       `engine ${await page.locator('.pri-explain-dialog').getAttribute('data-explain-engine')}, kicker reads ${JSON.stringify(await page.locator('.pri-explain-kicker').innerText())}`);
 
     const adaptive = page.locator('.pri-explain-adaptive');

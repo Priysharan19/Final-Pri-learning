@@ -405,6 +405,15 @@ check('a symbol correction never outlives the strokes it was made on, and finger
   assert.match(ink, /aria-pressed=\{finger\}/);
 });
 
+check('no bar over scrolling content is blurred', () => {
+  assert.match(themeCss, /\.topbar, \.exam-head \{ background: var\(--page\); -webkit-backdrop-filter: none; backdrop-filter: none; \}/);
+  assert.match(themeCss, /\.mobilenav \{ background: var\(--page\); -webkit-backdrop-filter: none; backdrop-filter: none; \}/);
+  for (const bar of ['ws-bar', 'ws-qpeek', 'ws-actions']) {
+    const rule = themeCss.slice(themeCss.indexOf(`\n.${bar} {`), themeCss.indexOf('}', themeCss.indexOf(`\n.${bar} {`)));
+    assert.doesNotMatch(rule, /backdrop-filter: blur/, `.${bar}`);
+  }
+});
+
 console.log('');
 console.log('DREAM INTERFACE CHECK — ' + passed + '/' + (passed + failures.length) + ' checks');
 if (failures.length) {

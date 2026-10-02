@@ -47,8 +47,10 @@ async function reachable(page, selector) {
 async function writableQuestion(page, settle) {
   for (let i = 0; i < 12; i++) {
     const ready = await page.evaluate(() => {
-      const tabs = [...document.querySelectorAll('.mode-tab')].map(t => t.getAttribute('aria-label') || '');
-      return tabs.includes('Answer by handwriting') && tabs.includes('Answer by typing');
+      // The accessible name leads with the visible word ("Write: answer by
+      // handwriting", WCAG 2.5.3), so match the phrase, not the whole name.
+      const tabs = [...document.querySelectorAll('.mode-tab')].map(t => (t.getAttribute('aria-label') || '').toLowerCase());
+      return tabs.some(n => n.includes('answer by handwriting')) && tabs.some(n => n.includes('answer by typing'));
     });
     if (ready) return true;
     const next = page.locator('.ctx-next');
@@ -83,8 +85,10 @@ export const flow = {
       }
 
       // ── 2 · form factor and navigation ───────────────────────────────────
-      await goto('/practice');
-      await page.waitForSelector('.q-prompt', { timeout: 30000 }).catch(() => null);
+      // Practice is a thinking-mode route (docs/design/PRI-DREAM-INTERFACE.md
+      // §10): it deliberately has no rail and no bottom bar. The shell is
+      // therefore measured on Home, and Practice is asserted to be free of it.
+      await goto('/');
       await settle();
       const shell = await page.evaluate(() => ({
         ff: document.documentElement.dataset.ff,
@@ -97,6 +101,22 @@ export const flow = {
       const phoneNav = vp.width <= 760;
       await check(`${tag}: ${phoneNav ? 'bottom bar, no sidebar' : 'sidebar, no bottom bar'}`,
         phoneNav ? shell.bar && !shell.side : shell.side && !shell.bar, JSON.stringify(shell));
+      // The top bar and sidebar line up (measured where the shell exists).
+      const align = vp.width > 760 ? await page.evaluate(() => {
+        const t = document.querySelector('.topbar')?.getBoundingClientRect();
+        const sb = document.querySelector('.sidebar')?.getBoundingClientRect();
+        return t && sb ? { topbarBottom: Math.round(t.bottom), sidebarTop: Math.round(sb.top) } : null;
+      }) : null;
+
+      await goto('/practice');
+      await page.waitForSelector('.q-prompt', { timeout: 30000 }).catch(() => null);
+      await settle();
+      const thinking = await page.evaluate(() => {
+        const shown = sel => { const el = document.querySelector(sel); return !!el && getComputedStyle(el).display !== 'none'; };
+        return { bar: shown('.mobilenav'), side: shown('.sidebar'), workspaceBar: shown('.ws-bar') };
+      });
+      await check(`${tag}: Practice is thinking mode — its own bar, no rail, no bottom bar`,
+        thinking.workspaceBar && !thinking.bar && !thinking.side, JSON.stringify(thinking));
       await check(`${tag}: a question renders`, await page.locator('.q-prompt').count() === 1);
       await check(`${tag}: a question with handwriting and typing is available`, await writableQuestion(page, settle));
 
@@ -109,7 +129,11 @@ export const flow = {
         return { h: Math.round(r.height), w: Math.round(r.width) };
       }) : null;
       if (vp.ff === 'expanded' && !vp.short || vp.id === 'tablet-portrait') {
-        await check(`${tag}: the writing area keeps the iPad height (${BASE_INK_HEIGHT}px)`, ink?.h === BASE_INK_HEIGHT, JSON.stringify(ink));
+        // One sheet of the notebook is at least the pre-CP-03 iPad height and
+        // never taller than the window less its bars (the redesign's page is
+        // 420px in landscape and up to 640px in portrait).
+        await check(`${tag}: the writing area is at least the iPad height (${BASE_INK_HEIGHT}px) and fits the window`,
+          !!ink && ink.h >= BASE_INK_HEIGHT && ink.h <= vp.height - 150, JSON.stringify(ink));
       } else {
         // Room must remain for the top bar, toolbar and the bottom bars: the
         // pre-CP-03 fixed 380px canvas fails this on a 640px-tall phone.
@@ -206,29 +230,38 @@ export const flow = {
       await check(`${tag}: after answering, Next is visible and not covered`, after.ok, JSON.stringify(after));
       // A worked solution is what offers Pri Explain; ask for it so the launcher
       // check always has something to measure.
+      // Showing the solution ends the attempt with no marks, so it takes two
+      // deliberate presses (the first arms it).
       const show = page.getByRole('button', { name: 'Show solution' });
-      if (await show.count()) { await show.first().click({ timeout: 5000 }).catch(() => {}); await page.waitForTimeout(1200); }
+      for (let press = 0; press < 2 && await show.count(); press++) {
+        await show.first().click({ timeout: 5000 }).catch(() => {});
+        await page.waitForTimeout(press ? 1200 : 250);
+      }
+      // The launcher is a row in the flow of the page under the marked work,
+      // never a card floating over the student's reasoning: scroll to it, then
+      // measure that it is on screen, within the width, and clear of Next.
+      await page.locator('.pri-explain-launch').first().scrollIntoViewIfNeeded({ timeout: 5000 }).catch(() => {});
+      await page.waitForTimeout(200);
       const launcher = await page.evaluate(() => {
         const l = document.querySelector('.pri-explain-launch');
         const n = document.querySelector('.ctx-next');
+        const bar = document.querySelector('.ws-actions');
         if (!l) return { present: false };
-        const a = l.getBoundingClientRect(), b = n?.getBoundingClientRect();
-        const overlap = !!b && !(a.right <= b.left || a.left >= b.right || a.bottom <= b.top || a.top >= b.bottom);
-        return { present: true, overlap, inside: a.left >= -1 && a.right <= innerWidth + 1 && a.bottom <= innerHeight + 1, widthShare: a.width / innerWidth };
+        const a = l.getBoundingClientRect(), b = n?.getBoundingClientRect(), c = bar?.getBoundingClientRect();
+        const hits = r => !!r && !(a.right <= r.left || a.left >= r.right || a.bottom <= r.top || a.top >= r.bottom);
+        const mid = document.elementFromPoint(a.left + a.width / 2, a.top + a.height / 2);
+        return {
+          present: true, overlap: hits(b), inside: a.left >= -1 && a.right <= innerWidth + 1 && a.top >= 0 && a.bottom <= innerHeight + 1,
+          pressable: !!mid && (mid === l || l.contains(mid)), position: getComputedStyle(l).position, underBar: hits(c)
+        };
       });
       await check(`${tag}: Pri Explain is offered once a worked solution exists`, launcher.present, JSON.stringify(launcher));
-      const compactPlacement = vp.width <= 760;
-      await check(`${tag}: its launcher sits clear of Next, inside the screen, ${compactPlacement ? 'as a full-width bar above the pill' : 'as a compact corner button'}`,
-        launcher.present && !launcher.overlap && launcher.inside && (compactPlacement ? launcher.widthShare > 0.85 : launcher.widthShare < 0.6),
+      await check(`${tag}: its launcher sits in the page flow, clear of Next, inside the screen and pressable`,
+        launcher.present && !launcher.overlap && launcher.inside && launcher.pressable && launcher.position === 'static',
         JSON.stringify(launcher));
 
       // ── iPad composition: the top bar and sidebar line up ─────────────────
       if (vp.width > 760) {
-        const align = await page.evaluate(() => {
-          const t = document.querySelector('.topbar')?.getBoundingClientRect();
-          const sb = document.querySelector('.sidebar')?.getBoundingClientRect();
-          return t && sb ? { topbarBottom: Math.round(t.bottom), sidebarTop: Math.round(sb.top) } : null;
-        });
         await check(`${tag}: the sidebar starts below the top bar`, !!align && align.sidebarTop >= align.topbarBottom - 1, JSON.stringify(align));
       } else {
         await check(`${tag}: (sidebar alignment applies above 760px)`, true);

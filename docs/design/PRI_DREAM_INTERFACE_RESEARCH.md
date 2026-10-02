@@ -183,4 +183,4 @@ Recommendations rejected, and why:
 - **Scroll choreography, bento grids and "perpetual micro-motion"** (taste skills): decorative motion has a measured cost to learning and repeats hundreds of times a day.
 - **A more characterful interface typeface than Inter** (first-round research suggested Instrument Sans and Geist Mono): deferred, not rejected. It needs self-hosted font files and a layout-shift check, and Inter is the existing canonical choice in KALP-01.
 - **APCA as the contrast gate** (Vercel guidelines): WCAG 2 AA is what the repository's accessibility suite measures; APCA remains a design aid.
-- **Glass on floating controls** (first-round research, following Apple): the workspace bars use a 94–96% opaque paper tint with a light blur; nothing else is translucent.
+- **Glass on floating controls** (first-round research, following Apple): the workspace bars are opaque paper. Blur over scrolling content was removed for scroll performance.

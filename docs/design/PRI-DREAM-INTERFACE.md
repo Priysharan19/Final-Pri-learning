@@ -69,7 +69,7 @@ All text colours meet WCAG AA on every surface they are used on (computed; see t
 
 Rules:
 
-- No literal colours outside the token block. No gradients. No glow. No translucent surfaces except the two workspace bars (94–96% paper with a light blur).
+- No literal colours outside the token block. No gradients. No glow. No translucent surfaces and no blur on anything that sits over scrolling content: every bar (top bar, bottom bar, exam head, workspace bars) is opaque.
 - Night is designed, not inverted: lightness rises with elevation (desk < paper < raised), accents are lighter and less saturated than on paper, nothing is pure black or pure white.
 - Colour is never the only carrier of meaning. Every state has an icon and a word; uncertainty is also dashed.
 - Learning-evidence fills use one sequential teal ramp (`--m0`…`--m5`), never traffic lights.
