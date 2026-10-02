@@ -24,7 +24,7 @@ printed):
 | **Production:** verified TLS — `sslmode=verify-full` (preferred), or `sslmode=require` **with** `PRI_DATABASE_SSL_ROOT_CERT` | `config.js postgresConnectionSettings` | `PLATFORM_DB_TLS_REQUIRED` (no/weak sslmode) / `PLATFORM_DB_TLS_UNVERIFIED` (`require` without the CA) |
 | No `sslrootcert`/`sslcert`/`sslkey`/`ssl=` in the URL (CA goes in `PRI_DATABASE_SSL_ROOT_CERT`) | same | `PLATFORM_DB_TLS_INVALID` |
 | Reachable, migrated (`platform_meta.schema_version` present) | `store.js createPostgresStore` | `PLATFORM_DB_UNAVAILABLE` / `PLATFORM_DB_NOT_MIGRATED` |
-| `schema_version` = 8 and `billing_schema_version` = 3 exactly (`server/platform/schemaVersions.js`) | `store.js assertSchemaVersions` | `PLATFORM_DB_SCHEMA_MISMATCH` |
+| `schema_version` = 8 and `billing_schema_version` = 4 exactly (`server/platform/schemaVersions.js`) | `store.js assertSchemaVersions` | `PLATFORM_DB_SCHEMA_MISMATCH` |
 | `pri.sync_cursor_seq` exists (migration `20261002000000`) | same | `PLATFORM_DB_SCHEMA_MISMATCH` |
 | Timeouts, lock wait and pool size parse as whole numbers in range | `config.js postgresSessionLimits` | `PLATFORM_DB_CONFIG_INVALID` |
 
@@ -110,6 +110,7 @@ npx supabase@latest link --project-ref orudxrckgxyyraopyzmn
 #        20261001000000_platform_schema.sql
 #        20261002000000_sync_cursor_sequence.sql
 #        20261002010000_tutor_cache.sql   (additive: the AI tutor reply cache; schema_version 8)
+#        20261003000000_billing_payment_retention.sql
 npx supabase@latest migration list
 npx supabase@latest db push --dry-run
 
@@ -192,7 +193,7 @@ unset PRI_DATABASE_URL PRI_DATABASE_SSL_ROOT_CERT
 `server/tools/postgres-target-check.mjs` connects exactly as the server does and changes nothing
 that persists. It must print `POSTGRES TARGET: PASS` with every line ticked:
 
-* boot checks (TLS policy, `schema_version` 8 / `billing_schema_version` 3, cursor sequence);
+* boot checks (TLS policy, `schema_version` 8 / `billing_schema_version` 4, cursor sequence);
 * TLS negotiated (`pg_stat_ssl`), `statement_timeout` / `idle_in_transaction_session_timeout` applied;
 * login role is a `pri_server` member, not superuser, not BYPASSRLS;
 * the live schema gate — every table, column type, key, CHECK expression, index, RLS policy
@@ -211,7 +212,7 @@ role, and therefore **cannot and must not be pointed at Supabase**. Run it on th
 being deployed and keep the output:
 
 ```bash
-npm run test:platform:pg   # expect: PLATFORM ON POSTGRES: PASS — 29/29 suites
+npm run test:platform:pg   # expect: PLATFORM ON POSTGRES: PASS — 30/30 suites
 ```
 
 Against staging itself, the equivalent evidence is §4.2 plus §4.4.
@@ -322,6 +323,19 @@ Leave the sequence in place; the older build ignores it. Going forward again is 
 (never an edit of `20261002000000`) that repeats its lock / lift / revoke / `schema_version = 7`
 steps, followed by the cursor lift in §4.4 step 3.
 
+### 5.3a Undoing migration `20261003000000_billing_payment_retention`
+
+Only to serve a build that expects `billing_schema_version` 3. `NOT NULL` cannot be restored once
+an account has been deleted under it (those payments have `account_id` NULL by design), so the
+rollback keeps the nullable column and the `ON DELETE SET NULL` key and only reverts the version a
+v3 build checks; the database keeps retaining payments either way. Owner-approved only:
+
+```sql
+begin;
+update pri.platform_meta set value = '3' where key = 'billing_schema_version';
+commit;
+```
+
 ### 5.4 Production
 
 Repeat §2–§4 against the production Supabase project and the Railway production environment
@@ -359,7 +373,7 @@ runs against an empty `pri` schema.
 | 2.4 `db push` | staging | | | | |
 | 3 login role created | staging | | | | (role name only) |
 | 4.2 target check | staging | | | | `POSTGRES TARGET: PASS — n/n` |
-| 4.3 `test:platform:pg` | local/CI | | | | `29/29 suites` |
+| 4.3 `test:platform:pg` | local/CI | | | | `30/30 suites` |
 | 4.4 smoke | staging | | | | |
 | 6 backup + restore drill | production | | | | |
 | 2–4 | production | | | | |

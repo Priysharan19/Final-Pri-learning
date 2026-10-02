@@ -50,7 +50,7 @@ Exit status: `0` means no drift, `2` means drift was found, `1` means the tool c
 | `entitlement-plan` | critical | The stored entitlement (premium or free) differs from what the signed evidence implies. | Repair (below). If `expected` is `premium`, a paying student is locked out: treat as P1. |
 | `signature-invalid` | critical | A stored payload no longer verifies. Either the row was edited or the trust configuration changed. | Check `PRI_APPLE_ROOT_CA_*` first. If that is correct, the row was tampered with: incident. |
 | `ledger-mismatch` | critical | A ledger row's `original_transaction_id` does not match its signed payload. | Tampering or a bug: incident. |
-| `no-signed-evidence` | critical if the stored state is paid, otherwise info | A bound subscription has no stored signed data. For example, it was bound before billing schema v4. | Fetch history (below) and run with `--evidence`. |
+| `no-signed-evidence` | critical if the stored state is paid, otherwise info | A bound subscription has no stored signed data. For example, it was bound before billing schema v5. | Fetch history (below) and run with `--evidence`. |
 | `subscription-state` | warning | The subscription's stored lifecycle differs from its replayed one. | Repair (below). |
 | `missing-subscription-binding` | warning | Signed data for this account names a subscription with no binding row. | Investigate. Binding happens in the same transaction as the ledger write. |
 | `unbound-notification-for-account` | warning | Apple sent a notification about one of this account's subscriptions while no account was bound to it. | Usually resolved once the device submits the transaction. Repair if the entitlement is wrong. |

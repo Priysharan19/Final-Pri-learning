@@ -65,6 +65,15 @@ for (const m of sql.matchAll(/alter table pri\.(\w+) add column (\w+) ([^;]*);/g
   cols.set(name, { notNull: /\bnot null\b/i.test(rest) || /\bprimary key\b/i.test(rest), pk: 0 });
 }
 
+// Later migrations change nullability with ALTER TABLE; apply them in file
+// order so the parsed schema is the one a fully migrated database has. (The
+// live suite proves the same against a real database.)
+for (const m of sql.matchAll(/alter table pri\.(\w+) alter column (\w+) (drop|set) not null/gi)) {
+  const column = pg.get(m[1])?.get(m[2]);
+  assert.ok(column, `migration alters unknown column pri.${m[1]}.${m[2]}`);
+  column.notNull = m[3].toLowerCase() === 'set';
+}
+
 let checks = 0;
 const failures = [];
 const check = (cond, label) => { checks++; if (!cond) failures.push(label); };
