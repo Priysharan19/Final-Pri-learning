@@ -22,12 +22,12 @@
 import { practiceHref } from '../lib/practiceLinks.js';
 
 const LOADERS = {
-  7: () => import('./data/class7.js'),
-  8: () => import('./data/class8.js'),
-  9: () => import('./data/class9.js'),
-  10: () => import('./data/class10.js'),
-  11: () => import('./data/class11.js'),
-  12: () => import('./data/class12.js')
+  7: () => import('./data/notes-class7.js'),
+  8: () => import('./data/notes-class8.js'),
+  9: () => import('./data/notes-class9.js'),
+  10: () => import('./data/notes-class10.js'),
+  11: () => import('./data/notes-class11.js'),
+  12: () => import('./data/notes-class12.js')
 };
 
 export const NOTES_GRADES = Object.freeze(Object.keys(LOADERS).map(Number));
