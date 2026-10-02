@@ -1,17 +1,5 @@
 // Paints the stored theme before first paint. Why and how: src/lib/theme.js.
-(function () {
-  var pref = 'light';
-  try {
-    var stored = window.localStorage.getItem('pri.theme');
-    if (stored === 'light' || stored === 'dark' || stored === 'system') pref = stored;
-  } catch (e) {}
-  var dark = pref === 'dark'
-    || (pref === 'system' && typeof window.matchMedia === 'function'
-      && window.matchMedia('(prefers-color-scheme: dark)').matches);
-  var root = document.documentElement;
-  root.setAttribute('data-theme', dark ? 'dark' : 'light');
-  root.setAttribute('data-theme-pref', pref);
-  root.style.colorScheme = dark ? 'dark' : 'light';
-  var meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.setAttribute('content', dark ? '#121210' : '#f2f0ea');
-})();
+(function(){var p='light',r=document.documentElement,m;try{var s=localStorage.getItem('pri.theme');if(s==='light'||s==='dark'||s==='system')p=s}catch(e){}
+var d=p==='dark'||(p==='system'&&!!window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches);
+r.setAttribute('data-theme',d?'dark':'light');r.setAttribute('data-theme-pref',p);r.style.colorScheme=d?'dark':'light';
+m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute('content',d?'#121210':'#f2f0ea')})();
