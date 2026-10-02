@@ -309,6 +309,7 @@ ok(!shouldSupersede(null, local), 'no reading, no change');
   const page = [st(10, 10), st(50, 14), st(90, 8), st(10, 120), st(60, 125), st(15, 230, 80, 4)];
   const segs = segmentInkLines(page);
   eq(segs.length, 3, 'three written lines are found from geometry alone');
+  eq(segmentInkLines([st(10, 40, 30, 1), st(50, 10, 30, 60)]).length, 1, 'a minus sign before a digit stays on the digit\'s line');
   eq(segs.map(l => l.strokeIdxs), [[0, 1, 2], [3, 4], [5]], 'each stroke belongs to its own line, top to bottom');
   ok(segs.every(l => !('text' in l) && !('symbols' in l)), 'segmentation names no symbol — it reads nothing');
   const tr = { lines: [{ text: '2x+3=11' }, { text: '2x=8' }, { text: 'x=4' }], text: '2x+3=11\n2x=8\nx=4', confidence: 0.95, engine: 'cloud-t' };

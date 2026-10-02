@@ -24,7 +24,13 @@ export function segmentInkLines(strokes) {
       const overlap = Math.min(line.y2, it.y2) - Math.max(line.y1, it.y1);
       // Same line when the stroke overlaps the line vertically, or its centre
       // sits within the line's band (a dot, a minus sign, a short stroke).
-      if (overlap > 0.2 * Math.min(h, Math.max(1, it.y2 - it.y1)) || (it.cy >= line.y1 - 0.15 * h && it.cy <= line.y2 + 0.15 * h)) {
+      // A flat stroke (a minus sign) can start a line before the digit beside
+      // it, so the test runs both ways: either centre inside the other's band.
+      const lineCy = (line.y1 + line.y2) / 2;
+      const itH = Math.max(1, it.y2 - it.y1);
+      if (overlap > 0.2 * Math.min(h, itH)
+        || (it.cy >= line.y1 - 0.15 * h && it.cy <= line.y2 + 0.15 * h)
+        || (lineCy >= it.y1 - 0.15 * itH && lineCy <= it.y2 + 0.15 * itH)) {
         line.y1 = Math.min(line.y1, it.y1); line.y2 = Math.max(line.y2, it.y2);
         line.x1 = Math.min(line.x1, it.x1); line.x2 = Math.max(line.x2, it.x2);
         line.strokeIdxs.push(it.i);
