@@ -283,6 +283,8 @@ jobs:
         run: node server/test/razorpay-billing-check.mjs
       - name: Apple billing lifecycle
         run: node server/test/apple-billing-check.mjs
+      - name: Client compatibility floor (CP-11)
+        run: node server/test/client-compatibility-check.mjs
       - name: Server-paid operations obey the server's entitlement (SEC-COMM-01)
         run: node server/test/premium-authority-check.mjs
       - name: Google Play billing verification
@@ -402,6 +404,8 @@ jobs:
         run: |
           node tools/secret-scan.test.mjs
           node tools/secret-scan.mjs
+      - name: Cross-platform release matrix (CP-11)
+        run: node scripts/release-matrix.mjs --require-native-apple
       - name: Built client loads no remote presentation assets
         run: |
           set -euo pipefail

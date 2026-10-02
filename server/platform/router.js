@@ -1,4 +1,5 @@
 import { asyncRouter } from './asyncRouter.js';
+import { clientCompatibility, compatibilityStatus } from './clientCompatibility.js';
 import { googleNotificationBacklog } from './googleBilling.js';
 import { asStore } from './store.js';
 import { createAccountRouter } from './accounts.js';
@@ -57,6 +58,9 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
     next();
   });
 
+  // Old native shells get a structured upgrade answer, not odd failures (CP-11).
+  router.use(clientCompatibility());
+
   // LIVENESS. Cheap, and up while the process is: a database outage is
   // reported here as a field, never as a failure of this endpoint, so an
   // orchestrator does not restart a healthy process in a loop. Readiness —
@@ -92,6 +96,8 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
     res.json({
       ok: true,
       service: 'pri-learning-platform',
+      // The active shell floors and how many requests they turned away (CP-11).
+      clientCompatibility: compatibilityStatus(),
       releaseIdentity,
       schemaVersion,
       billingSchemaVersion,

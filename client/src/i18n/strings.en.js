@@ -1778,6 +1778,7 @@ export default {
   'cloud.resetFailed': 'Could not request password recovery.',
   'cloud.syncComplete': 'Sync complete: {pushedEvents} learning event(s), {pushedEntities} record(s) pushed; {pulledEvents} event(s), {pulledEntities} record(s) received.',
   'cloud.syncFailed': 'Sync could not complete. Your local work is still safe on this device.',
+  'cloud.upgradeRequired': 'This version of Pri Learning is too old to sync. Update the app from the store — everything stays saved on this device, and you can still export or delete your account.',
   'cloud.checkoutFailed': 'Could not start subscription checkout.',
   'cloud.webRestored': 'Subscription status restored from the payment provider.',
   'cloud.webRestoreFailed': 'Could not restore the web subscription.',

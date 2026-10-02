@@ -23,6 +23,8 @@ on:
       - 'client/src/components/GooglePlayBilling.jsx'
       - 'client/src/ink/**'
       - 'scripts/cloud-fixture-server.mjs'
+      - 'scripts/release-matrix.mjs'
+      - 'release/metadata.json'
       - '.github/workflows/android-shell.yml'
   push:
     branches: [main]
@@ -30,6 +32,8 @@ on:
       - 'android/**'
       - 'client/src/platform/**'
       - 'scripts/sync-android.mjs'
+      - 'scripts/release-matrix.mjs'
+      - 'release/metadata.json'
       - '.github/workflows/android-shell.yml'
 
 concurrency:
@@ -62,6 +66,8 @@ jobs:
         run: ./gradlew --no-daemon assembleDebug lintDebug testDebugUnitTest
       - name: Embedded web is exactly the shared build
         run: node scripts/sync-android.mjs --check
+      - name: Cross-platform release matrix (CP-11)
+        run: node scripts/release-matrix.mjs --require-native-android
       - uses: actions/upload-artifact@v4
         if: always()
         with:
