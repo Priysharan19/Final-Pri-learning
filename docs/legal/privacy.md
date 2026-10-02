@@ -14,7 +14,7 @@ The person responsible for your data (the "data fiduciary") is
 Pri Learning is built to work without sending your work anywhere. Questions,
 handwriting recognition, marking and your progress all run on your own device.
 You can use the whole app without an account and without a network. Two
-settings send work off the device, and both are described below: reading your
+optional settings send work off the device, and both are described below: reading your
 handwriting and photos on a server, which is on by default once you sign in to
 an account and can be turned off, and checking your working, which is off
 unless you turn it on. Without an account, neither runs.
