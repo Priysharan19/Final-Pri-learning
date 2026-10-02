@@ -44,7 +44,7 @@ android/                                 # NEW (CP-06); fleet rule android/** �
       bridge/cloud/CloudBridge.kt        # OkHttp /v1 transport, X-Pri-Client: android-native-v1
       cloud/{CloudConfig,CookieJar,SecureStore,NativeCloud}.kt # cloud transport + Keystore-encrypted jar (CP-07)
       io/{FileRules,FileExchange}.kt     # share, print, file/photo chooser (CP-07)
-      bridge/billing/PlayBillingBridge.kt
+      billing/PlayBilling.kt              # Play Billing (CP-08): presents, never decides
       bridge/photo/FileChooser.kt        # onShowFileChooser → Photo Picker / camera / SAF
       bridge/share/ShareBridge.kt        # FileProvider + ACTION_SEND; ACTION_CREATE_DOCUMENT
       bridge/lifecycle/LifecycleBridge.kt
@@ -95,7 +95,7 @@ WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG)
 | `photo.ocr` | **Not provided.** Photo reading uses the shared cloud path (`readPhotoWithCloud`) or the JS fallback. ML Kit text recognition is a possible later accelerator (CP-09), only with measured evidence. | Keeps answer-blind behaviour. |
 | `share` / export | **As implemented (CP-07):** `share.file` writes text or base64 bytes (≤6 MB, sanitised name) into `cache/share/` and opens the `ACTION_SEND` chooser with a read grant for the chosen app only. One sheet at a time. Android's chooser usually reports "cancelled" even after a share; product code does not depend on `completed`. | A direct "Save to device" (`ACTION_CREATE_DOCUMENT`) is **not** implemented yet: on most devices the share sheet offers Files/Drive. Recorded as a CP-10 polish item. |
 | `print` | **As implemented (CP-07):** `PrintManager` + `webView.createPrintDocumentAdapter` via `share.print`. The three Print / Save PDF buttons call `printPage()` (`client/src/lib/files.js`), which uses `share.print` whenever the host can print and `window.print()` otherwise. | `window.print()` does nothing in an Android WebView. |
-| `billing` | Play Billing Library, current major version. See section 6. | |
+| `billing` | **As implemented (CP-08):** Play Billing Library 8 (`billing/PlayBilling.kt`), store `google-play`. See section 6. | The server decides entitlement and acknowledges. |
 | `lifecycle` | `onPause`/`onResume`/`onStop`/`onTrimMemory`, sent as a `lifecycle.state` event; `webView.onPause()`/`onResume()`. | JS flushes drafts on `background`. |
 | Back | **As implemented (CP-06):** the page declares whether it wants Back (`lifecycle.setBackHandled`): `true` while a sheet/dialog is visibly open or while it has in-app history (`history.state.idx > 0`, stamped by the router; the role landing — `/` or `/teach` — is the first entry). The activity's `OnBackPressedCallback` is enabled exactly while that is true. Enabled: a `lifecycle.back` event follows; the page closes the open sheet/dialog (that press never also navigates) or calls `history.back()`. Disabled: the system default runs — predictive back-to-home, and the task moves to the background. There is no timeout race and no `canGoBack()` fallback. The declared state resets on the first message from a new document's reply proxy. | JS must close sheets and dialogs first and must never lose an in-progress attempt. |
 | `ink` | **No native ink in v1.** The shared `client/src/ink/InkCanvas.jsx` handles finger and stylus via PointerEvents (`pointerType: 'pen'` for S Pen/USI, pressure, tilt; palm rejection once a pen is seen). `__PRI_HOST__.capabilities.ink` is **absent**, so `client/src/ink/InkAnswer.jsx` picks the canvas automatically. | A low-latency `androidx.ink` front-buffer surface is CP-09 scope **only** if latency is measured unacceptable on target tablets. It would capture strokes only; recognition stays shared. |
@@ -104,20 +104,37 @@ WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG)
 
 ## 6. Google Play Billing (CP-08)
 
-The client and server flow mirrors the existing Apple flow (`server/platform/appleBilling.js`):
+**As implemented (CP-08).** The device presents Google's sheet and reports what Google returned; the **server** decides Premium. Nothing on the device acknowledges, consumes or unlocks.
 
-1. `GET /v1/billing/google/bootstrap` (new) returns the Play product ids from server env (`server/platform/billing.js` already reads `googleMonthly`/`googleAnnual`) and a server-minted `obfuscatedAccountId` bound to the account. This is the Play analogue of `appAccountToken`.
-2. The shell calls `queryProductDetailsAsync`, then `launchBillingFlow(…setObfuscatedAccountId(…))`.
-3. `onPurchasesUpdated` returns `{purchaseToken, productId, orderId}` to JS. This is an **opaque proof**.
-4. JS calls `POST /v1/billing/google/purchase {purchaseToken, productId}` (new). The server calls the Play Developer API `purchases.subscriptionsv2.get` with a service-account credential held **only** in server env. It verifies package name, product, `obfuscatedExternalAccountId` and state, then calls `applyVerifiedEntitlement` (`server/platform/entitlements.js`), which is the same grant path Apple uses. Binding rules:
-   - **Fail closed** when `obfuscatedExternalAccountId` is missing or mismatched (purchases made outside the app or via promo-code redemption carry none). Those go through a separate, explicit, re-verified link flow, never an implicit grant.
-   - **One account per `purchaseToken`**: a token already bound to another account is refused.
-   - Upgrades and re-subscriptions follow `linkedPurchaseToken`, superseding the old token's entitlement so one payment never yields two grants.
-5. **Acknowledgement:** done by the server (`purchases.subscriptions.acknowledge`), or by the shell only after the server returns success, and always within Play's 3-day window. The shell **never** grants anything itself.
-6. Real-time developer notifications: Pub/Sub push to the existing `POST /v1/billing/webhook/google` route (which today returns `BILLING_PROVIDER_NOT_CONFIGURED`). Verify the Pub/Sub OIDC token, then re-fetch the purchase from the Play API before changing entitlement. Never trust the notification body alone.
-7. Restore: `queryPurchasesAsync(SUBS)`, then each token goes to `/v1/billing/restore/google` for server re-verification. **Pending-purchase recovery:** the shell also calls `queryPurchasesAsync(SUBS)` on every launch and `onResume`, and re-submits unacknowledged tokens to the server. Play does not replay purchases on its own, and refunds any purchase left unacknowledged for 3 days.
-8. `/v1/health` reports `google: true` only when the verifier is configured (today it is hard-coded `false` in `server/platform/router.js`).
-9. **UI:** the paywall chooses the store button from `__PRI_HOST__.capabilities.billing.store === 'play'`. Razorpay web checkout stays disabled inside any native shell. That rule already exists in `client/src/components/CloudAccountPanel.jsx` and is required by Play policy for digital goods.
+1. **Bootstrap.** `GET /v1/billing/google/bootstrap` returns the configured product and base plans (`PRI_GOOGLE_MONTHLY_PRODUCT_ID` / `PRI_GOOGLE_ANNUAL_PRODUCT_ID`, each `productId` or `productId:basePlanId`), the package name, and a server-minted **opaque** `obfuscatedAccountId` (24 random bytes, base64url; stored in `billing_google_accounts`; never an email or a Pri account id). It is the Play analogue of `appAccountToken`.
+2. **Products.** `android/…/billing/PlayBilling.kt` `products` → `queryProductDetailsAsync(SUBS)`. Only base plans (no promotional offers) are returned, with Google's localized price. The UI (`client/src/components/GooglePlayBilling.jsx`) shows them only when `capabilities.billing.store === 'google-play'`. Web checkout stays disabled inside any native shell.
+3. **Purchase.** `launchBillingFlow(…setObfuscatedAccountId(id))`. `onPurchasesUpdated` returns `{status, purchaseToken, productId, state, acknowledged}` to JS. A purchase that completes after JavaScript stopped waiting (a slow UPI or 3-D Secure payment) is recovered by the bridge's late-reply path (`status: 'purchased'`, like StoreKit's `'verified'`) and re-emitted as `billing.transactionUpdated`. Additional purchases in one Play callback are emitted as events too.
+4. **Verification.** JS posts the token to `POST /v1/billing/google/purchase`. `server/platform/googleBilling.js` refuses an account that was never bootstrapped, then re-fetches `purchases.subscriptionsv2.get` with the service account (JWT bearer to the pinned `https://oauth2.googleapis.com/token`; `redirect: 'error'`; never inside a DB transaction). It requires, from **Google's** record:
+   - a configured product and base plan;
+   - `obfuscatedExternalAccountId` equal (constant time) to the id issued to the signed-in account; a purchase without it fails closed;
+   - no `testPurchase` unless `PRI_GOOGLE_ALLOW_TEST_PURCHASES=true`.
+   Binding (`billing_google_purchases` + `billing_subscriptions`) is one transaction: one token, one account; a `linkedPurchaseToken` must belong to the same account and is marked **superseded**, so an old token can never downgrade or double-grant. A **pending** purchase grants and revokes nothing (`202 {pending:true}`).
+5. **States.** ACTIVE → active; CANCELED → active until the paid expiry; IN_GRACE_PERIOD → grace until expiry; ON_HOLD → past_due (free); PAUSED → paused (free); EXPIRED → expired. Applied through `applyVerifiedEntitlement`, the same path Apple and web use.
+   - **Ordering:** every event comes from a fresh fetch of Google's record and is timed when it was fetched (strictly increasing within a process). A recovery from hold or grace, or a Restore after a notification, is therefore never "stale". Event ids carry a fingerprint of state, order ids and expiry: a renewal is a new event, re-reporting the same state is a replay, even when Google omits the deprecated `latestOrderId`.
+   - **Refunds:** a voided order revokes only when it is the order paying for the current period, or when Google no longer entitles the subscription. A refunded *past* renewal leaves a live subscription alone.
+   - **Old tokens:** a non-Premium state for a token is not applied while the account holds a newer, non-superseded Google purchase. A resubscription after a lapse gets a new token, and Google does not always link the two.
+6. **Acknowledgement.** The server calls `purchases.subscriptions.acknowledge` after verification. A failed acknowledgement does not undo a verified purchase; the next report, restore or notification acknowledges it again (well inside Play's 3-day window).
+7. **Real-time developer notifications.** Pub/Sub push to `POST /v1/billing/webhook/google`. The route runs the provider's `authenticate` step **before** its transaction: the `Authorization` bearer must be a Google-signed OIDC token (RS256 over Google's published keys, cached for an hour and refetched once for an unknown `kid`) with issuer Google, audience `PRI_GOOGLE_RTDN_AUDIENCE`, and `email` = `PRI_GOOGLE_RTDN_SERVICE_ACCOUNT` with `email_verified`. Inside the transaction the push is only package-checked and queued (`billing_google_notifications`). Key refetches for unknown `kid`s are limited to one per minute. A worker (`startGoogleNotificationWorker`, started by `server/index.js` when configured and stopped on shutdown) re-fetches each token from Google and applies Google's current state. Retries:
+   - outages back off up to six hours, then retry daily, never silently dropped;
+   - a token nobody has claimed yet is retried every six hours for a week, then parked;
+   - tokens Google does not know, other products and refused test buys are closed at once.
+   Processed rows are purged after 30 days. `/v1/health` reports the queued and repeatedly-failing counts (no tokens). The notification body is never trusted for entitlement. In **production**, Google billing counts as configured only with notifications configured; Google product ids without a service account or notifications fail startup, the same rule as Apple.
+8. **Restore / recovery.** `restore` and `unfinished` → `queryPurchasesAsync(SUBS)`; tokens go to `/v1/billing/restore/google`, verified one by one, with other accounts' tokens skipped. When the subscription section loads, `GooglePlayBilling.jsx` calls `unfinished` and reports every purchased-but-unacknowledged token, so a purchase from a killed or offline session is verified and acknowledged inside Play's three days.
+9. **Health.** `/v1/health` reports `billingProviders.google` from real configuration (products + a parseable service account + package), never hard-coded.
+10. **Evidence.**
+    - `server/test/google-billing-check.mjs`: 100 checks, also run on real Postgres as `pri_server`. It covers hold → active, renewal without `latestOrderId`, Restore after a notification, voided past vs current order, old-token shadowing, retry/park/daily back-off, OIDC key-fetch flooring, and the backlog counts.
+    - `server/test/billing-webhook-router-check.mjs` Google cases: no OIDC → 401 with nothing queued; authenticate-before-transaction; the purchase route's session and Origin rules.
+    - The live Postgres schema gate and mutation gate (billing schema 4).
+    - `PlayBillingTest` (JVM).
+    - The native host contract (late Google purchase recovery).
+    - Guard pins: no acknowledge/consume in Kotlin, the obfuscated id on every purchase, the pinned Play client. **No purchase has been made against real Google Play**: that needs the Play Console items in [PROGRAMME_STATUS.md](PROGRAMME_STATUS.md) (BLOCKED_EXTERNAL).
+
+**Deviation from the CP-01 plan:** none in security. The device does not acknowledge at all (the plan allowed "server, or shell after server success"); the server always does.
 
 ## 7. Input, keyboard, insets, rotation
 

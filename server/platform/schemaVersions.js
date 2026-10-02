@@ -18,4 +18,6 @@ export const SCHEMA_VERSION = 8;
 // Billing 5: per-subscription lifecycle state on billing_subscriptions and the
 //    verified Apple signed-data ledger billing_apple_signed_events
 //    (supabase/migrations/20261003010000_storekit_entitlement_state.sql).
-export const BILLING_SCHEMA_VERSION = 5;
+// Billing 6: Google Play tables (billing_google_accounts, billing_google_purchases,
+//    billing_google_notifications) — supabase/migrations/20261004000000.
+export const BILLING_SCHEMA_VERSION = 6;

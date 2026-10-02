@@ -8,9 +8,10 @@ import {
 import { cloudSyncStatus, syncNow } from '../platform/syncWorker.js';
 import { normalizeCommercialDisplay } from '../platform/entitlements.js';
 import {
-  finishNativeTransaction, getNativeProducts, nativeBillingAvailable,
+  finishNativeTransaction, getNativeProducts, nativeBillingStore,
   acceptEachTransaction, onNativeBillingUpdate, purchaseNativeProduct, restoreNativePurchases
 } from '../platform/nativeBilling.js';
+import GooglePlayBilling from './GooglePlayBilling.jsx';
 import CloudAccountSecurity from './CloudAccountSecurity.jsx';
 import { tLater, useT, useTx } from '../i18n/index.js';
 import { priNative } from '../platform/native/index.js';
@@ -50,7 +51,11 @@ export default function CloudAccountPanel() {
   const tx = useTx();
   const enabled = cloudAvailable();
   const nativeShell = priNative.isNativeShell();
-  const nativeStoreKit = nativeBillingAvailable();
+  // The shell's store selects the purchase flow (StoreKit or Google Play); the
+  // server alone decides Premium either way.
+  const nativeStore = nativeBillingStore();
+  const nativeStoreKit = nativeStore === 'app-store';
+  const googlePlay = nativeStore === 'google-play';
   const [link, setLink] = useState(null);
   const [status, setStatus] = useState(null);
   const [session, setSession] = useState(null);
@@ -581,8 +586,11 @@ export default function CloudAccountPanel() {
             {appleStoreError && <div style={{ color: 'var(--bad)', fontSize: 12, marginTop: 7 }}>{appleStoreError}</div>}
           </div>}
 
-          {nativeShell && !nativeStoreKit && <div className="muted" style={{ fontSize: 12, marginTop: 8 }}>
-            {t('cloud.noStoreKit')}
+          {nativeShell && googlePlay && <GooglePlayBilling user={user} canSync={canSync} premium={premium}
+            onChanged={() => reload({ verify: false })} />}
+
+          {nativeShell && !nativeStore && <div className="muted" style={{ fontSize: 12, marginTop: 8 }}>
+            {t('cloud.noStoreBilling')}
           </div>}
         </div>
       </div>}

@@ -163,6 +163,39 @@ export function createBillingRouter(db, { verifiers = {}, checkout = {}, native 
     } catch (err) { next(err); }
   });
 
+  // Google Play: the server issues an opaque obfuscatedAccountId per account;
+  // the Android shell passes it to Play Billing, and Google echoes it back in
+  // the purchase the server re-fetches. Nothing the device says is trusted.
+  router.get('/google/bootstrap', requireSession(db), rateLimit(db, 'billing-google-bootstrap', { limit: 60, windowMs: 60 * 60 * 1000 }), async (req, res, next) => {
+    const bootstrap = native.google?.bootstrap;
+    if (typeof bootstrap !== 'function') return res.status(503).json({ error: { code: 'BILLING_PROVIDER_NOT_CONFIGURED', message: 'Google Play billing is not configured on this deployment.' } });
+    try {
+      res.json({ google: await bootstrap({ accountId: req.platformSession.account_id, request: req }) });
+    } catch (err) { next(err); }
+  });
+
+  // The device reports a purchase token. The server re-fetches the purchase from
+  // the Play Developer API (never inside a transaction), checks package,
+  // product, obfuscatedAccountId and one-account token binding, applies Google's
+  // answer, then acknowledges it. A pending purchase changes nothing.
+  router.post('/google/purchase', requireSession(db), rateLimit(db, 'billing-google-purchase', { limit: 30, windowMs: 60 * 60 * 1000 }), async (req, res, next) => {
+    const verify = native.google?.purchase;
+    if (typeof verify !== 'function') return res.status(503).json({ error: { code: 'BILLING_PROVIDER_NOT_CONFIGURED', message: 'Google Play purchase verification is not configured on this deployment.' } });
+    try {
+      const result = await verify({ accountId: req.platformSession.account_id, body: req.body || {}, request: req });
+      if (result.superseded) return res.json({ accepted: false, superseded: true });
+      if (result.shadowed) return res.json({ accepted: false, shadowed: true });
+      if (result.pending || !result.normalized) return res.status(202).json({ accepted: false, pending: true });
+      const event = validateVerifiedResult(result.normalized, 'google');
+      if (event.accountId !== req.platformSession.account_id) throw new Error('Google purchase account binding mismatch');
+      const applied = await applyVerifiedEntitlement(db, event);
+      // An acknowledgement failure does not undo a verified purchase: the next
+      // report, a restore or the notification worker acknowledges it again.
+      const acknowledged = await result.acknowledge().catch(() => false);
+      res.json({ accepted: true, acknowledged, ...applied });
+    } catch (err) { next(err); }
+  });
+
   // Web checkout is created server-side so API secrets and account binding never
   // enter the browser. The returned URL is a provider-hosted authorization page;
   // Premium still unlocks only after a verified webhook/restore updates the
@@ -219,6 +252,10 @@ export function createBillingRouter(db, { verifiers = {}, checkout = {}, native 
     if (typeof verifier !== 'function') recordWebhook(provider, 'rejected', 'BILLING_PROVIDER_NOT_CONFIGURED');
     if (typeof verifier !== 'function') return res.status(503).json({ error: { code: 'BILLING_PROVIDER_NOT_CONFIGURED', message: `${provider} webhook verification is not configured on this deployment.` } });
     try {
+      // A provider whose push authentication needs network I/O (Google's
+      // Pub/Sub OIDC keys) authenticates first, outside the transaction below.
+      const authenticate = verifiers[provider]?.authenticate;
+      if (typeof authenticate === 'function') await authenticate({ headers: req.headers, request: req });
       // A webhook verifier only checks a signature and reads/writes this
       // database (no provider call), so verification and application share one
       // transaction: two deliveries of one event id apply, ledger and audit it
@@ -252,8 +289,12 @@ export function createBillingRouter(db, { verifiers = {}, checkout = {}, native 
       // event) — counted, never paged on, since anyone can send one. A 5xx is
       // a delivery it failed to apply, which the provider will retry and an
       // operator must hear about (WEBHOOK_FAILURES, docs/operations/alerts.md).
+      // A provider this deployment has not configured (a verifier that is
+      // installed but finds no config, e.g. Google RTDN) is a rejection like the
+      // missing-verifier case above: it must not be able to page an operator.
       const status = Number.isInteger(err?.status) ? err.status : 500;
-      recordWebhook(provider, status >= 500 ? 'failed' : 'rejected', err?.code);
+      const unconfigured = err?.code === 'BILLING_PROVIDER_NOT_CONFIGURED';
+      recordWebhook(provider, status >= 500 && !unconfigured ? 'failed' : 'rejected', err?.code);
       next(err);
     }
   });

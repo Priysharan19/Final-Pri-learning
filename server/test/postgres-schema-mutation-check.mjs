@@ -165,6 +165,11 @@ const MUTATIONS = [
     expect: new RegExp(`platform_meta\\.billing_schema_version is ${LAST_BILLING_BUMP.version}\\b`)
   },
   {
+    label: 'UNIQUE dropped from billing_google_accounts.obfuscated_account_id',
+    migrations: mutateNamed('_google_play_billing.sql', '  obfuscated_account_id text not null unique,', '  obfuscated_account_id text not null,'),
+    expect: /billing_google_accounts unique keys: Postgres is missing obfuscated_account_id/
+  },
+  {
     label: 'billing_subscriptions.state_plan added without its CHECK',
     migrations: mutateNamed('_storekit_entitlement_state', "add column state_plan text check (state_plan in ('free','premium') or state_plan is null);", 'add column state_plan text;'),
     expect: /billing_subscriptions CHECK constraints: Postgres is missing state_plan/

@@ -146,6 +146,42 @@ export function ensureBillingSchema(db) {
 
   retainPaymentsAfterAccountDeletion(db);
 
+  // Billing schema v6 (CP-08): Google Play. The obfuscated account id is the
+  // opaque join Play echoes back (never an email or Pri account id); purchase
+  // tokens are bound to exactly one account, and a token replaced through
+  // linkedPurchaseToken is marked superseded. RTDN pushes are queued and
+  // re-fetched from Google outside any transaction.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS billing_google_accounts (
+      account_id TEXT PRIMARY KEY REFERENCES accounts(id) ON DELETE CASCADE,
+      obfuscated_account_id TEXT NOT NULL UNIQUE,
+      created_at INTEGER NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS billing_google_purchases (
+      purchase_token TEXT PRIMARY KEY,
+      account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+      product_id TEXT NOT NULL,
+      linked_purchase_token TEXT,
+      superseded_by TEXT,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_billing_google_purchases_account ON billing_google_purchases(account_id);
+    CREATE TABLE IF NOT EXISTS billing_google_notifications (
+      message_id TEXT PRIMARY KEY,
+      purchase_token TEXT NOT NULL,
+      kind TEXT NOT NULL CHECK(kind IN ('subscription','voided')),
+      order_id TEXT,
+      event_at INTEGER NOT NULL,
+      received_at INTEGER NOT NULL,
+      attempts INTEGER NOT NULL DEFAULT 0,
+      next_attempt_at INTEGER NOT NULL,
+      processed_at INTEGER,
+      last_error TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_billing_google_notifications_due ON billing_google_notifications(processed_at, next_attempt_at);
+  `);
+
   // Billing schema v5 (§19 StoreKit entitlement state machine). Each provider
   // subscription carries its own last-applied lifecycle so the account
   // entitlement is derived from every subscription the account holds — an

@@ -1,4 +1,5 @@
 import { asyncRouter } from './asyncRouter.js';
+import { googleNotificationBacklog } from './googleBilling.js';
 import { asStore } from './store.js';
 import { createAccountRouter } from './accounts.js';
 import { createAdminRouter } from './admin.js';
@@ -102,8 +103,11 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
       billingProviders: {
         web: config.webBillingProviderConfigured,
         apple: config.appleBillingProviderConfigured,
-        google: false
+        google: config.googleBillingProviderConfigured
       },
+      // Counts only (no tokens): queued Google notifications and the ones that
+      // keep failing, so a Play outage or a stuck refund is visible.
+      googleNotifications: config.googleBillingProviderConfigured ? await googleNotificationBacklog(db) : null,
       housekeeping,
       checkedAt: Date.now()
     });

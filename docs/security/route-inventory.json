@@ -603,6 +603,46 @@
       "bodyLimit": "1mb"
     },
     {
+      "method": "GET",
+      "path": "/v1/billing/google/bootstrap",
+      "auth": "session",
+      "roles": null,
+      "verifiedEmail": false,
+      "guardianConsent": true,
+      "ownership": "own account only: every query is keyed by the session account id; no id is taken from the request; obfuscatedAccountId is an opaque per-account value derived server-side",
+      "rateLimits": [
+        {
+          "key": "billing-google-bootstrap",
+          "limit": 60,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/billing/google/purchase",
+      "auth": "session",
+      "roles": null,
+      "verifiedEmail": false,
+      "guardianConsent": true,
+      "ownership": "own account only: every query is keyed by the session account id; the purchase token is re-fetched from Google and must carry this account's obfuscated id; a token bound to another account is refused",
+      "rateLimits": [
+        {
+          "key": "billing-google-purchase",
+          "limit": 30,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
       "method": "POST",
       "path": "/v1/billing/checkout/web",
       "auth": "session",
