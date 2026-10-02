@@ -2,6 +2,7 @@ import { asyncRouter } from './asyncRouter.js';
 import { asStore, isDatabaseOverload } from './store.js';
 import { nextSyncCursor, syncLockKey } from './db.js';
 import { id, rateLimit, requireSession, requireVerifiedEmail, sha256 } from './security.js';
+import { syncQuota } from './config.js';
 
 const SCHEMA = 1;
 const MAX_PUSH = 100;
@@ -84,6 +85,35 @@ function assertDistinctEventIds(events) {
   }
 }
 
+/**
+ * What this account already holds on the server: rows and bytes of stored
+ * JSON across learning events and sync entities. Read inside the push's own
+ * transaction (under the account lock), so two concurrent pushes cannot both
+ * squeeze under the cap.
+ */
+export async function syncUsage(db, accountId) {
+  db = asStore(db);
+  const events = await db.get('SELECT COUNT(*) AS n, COALESCE(SUM(OCTET_LENGTH(payload_json)), 0) AS b FROM learning_events WHERE account_id=?', [accountId]);
+  const entities = await db.get('SELECT COUNT(*) AS n, COALESCE(SUM(OCTET_LENGTH(body_json)), 0) AS b FROM sync_entities WHERE account_id=?', [accountId]);
+  return { rows: Number(events?.n || 0) + Number(entities?.n || 0), bytes: Number(events?.b || 0) + Number(entities?.b || 0) };
+}
+
+/**
+ * The per-account quota (config.js syncQuota) against what is stored plus what
+ * this push would add. A refusal is a 413 the device can show and act on; it
+ * carries the figures, never another account's.
+ */
+function assertWithinQuota(usage, incoming, quota) {
+  const rows = usage.rows + incoming.rows;
+  const bytes = usage.bytes + incoming.bytes;
+  if (rows > quota.maxEventsPerAccount || bytes > quota.maxBytesPerAccount) {
+    throw Object.assign(new Error('This account has reached its cloud storage quota. Free some space or contact support.'), {
+      status: 413, code: 'SYNC_QUOTA_EXCEEDED',
+      quota: { maxBytesPerAccount: quota.maxBytesPerAccount, maxEventsPerAccount: quota.maxEventsPerAccount, usedBytes: usage.bytes, usedRows: usage.rows, incomingBytes: incoming.bytes, incomingRows: incoming.rows }
+    });
+  }
+}
+
 function conflictPayload(row) {
   return row ? {
     kind: row.kind, entityId: row.entity_id, version: row.version, serverCursor: row.server_cursor,
@@ -124,7 +154,7 @@ export async function syncPullPage(db, accountId, cursor = 0, limit = MAX_PULL) 
   const hasMoreEvent = await db.get('SELECT 1 FROM learning_events WHERE account_id=? AND server_cursor>? LIMIT 1', [accountId, cutoff]);
   const hasMoreEntity = await db.get('SELECT 1 FROM sync_entities WHERE account_id=? AND server_cursor>? LIMIT 1', [accountId, cutoff]);
   return { schemaVersion: SCHEMA, cursor: cutoff, hasMore: !!(hasMoreEvent || hasMoreEntity), events, entities };
-  }, { readOnly: true });
+  }, { readOnly: true, accountScope: String(accountId) });
 }
 
 export function createSyncRouter(db) {
@@ -168,6 +198,14 @@ export function createSyncRouter(db) {
           }
           return parseJson(prior.response_json, { ok: true, replayed: true });
         }
+        // Quota: what is stored plus everything this batch could add (a
+        // replayed event adds nothing, but it is counted; the bound is a cap,
+        // not an invoice). Checked before any write so a refused push leaves
+        // the account exactly as it was.
+        assertWithinQuota(await syncUsage(db, accountId), {
+          rows: events.length + entities.length,
+          bytes: events.reduce((sum, event) => sum + Buffer.byteLength(event.payload), 0) + entities.reduce((sum, entity) => sum + (entity.body ? Buffer.byteLength(entity.body) : 0), 0)
+        }, syncQuota());
         const acceptedEvents = [];
         const acceptedEntities = [];
         for (const event of events) {
@@ -229,11 +267,11 @@ export function createSyncRouter(db) {
         // conflict, never an orphan; and housekeeping, which deletes only expired
         // keys this transaction ignores.) What SERIALIZABLE added was false
         // conflicts between DIFFERENT accounts that share a b-tree page.
-      }, { lock: syncLockKey(accountId), isolation: 'repeatable read' });
+      }, { lock: syncLockKey(accountId), isolation: 'repeatable read', accountScope: String(accountId) });
       res.json(response);
     } catch (err) {
       if (isDatabaseOverload(err)) throw err; // 503 + Retry-After from the /v1 error handler
-      if (err?.status) return res.status(err.status).json({ error: { code: err.code || 'SYNC_FAILED', message: err.message, conflict: err.conflict || undefined } });
+      if (err?.status) return res.status(err.status).json({ error: { code: err.code || 'SYNC_FAILED', message: err.message, conflict: err.conflict || undefined, quota: err.quota || undefined } });
       throw err;
     }
   });

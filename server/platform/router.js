@@ -1,6 +1,5 @@
 import { asyncRouter } from './asyncRouter.js';
-import { clientCompatibility, compatibilityStatus } from './clientCompatibility.js';
-import { googleNotificationBacklog } from './googleBilling.js';
+import { clientCompatibility } from './clientCompatibility.js';
 import { asStore } from './store.js';
 import { createAccountRouter } from './accounts.js';
 import { createAdminRouter } from './admin.js';
@@ -17,9 +16,10 @@ import { createWorkingRouter } from './working.js';
 import { createTutorRouter } from './tutor.js';
 import { requireGuardianConsent } from './guardianConsent.js';
 import { createTelemetryRouter } from './telemetry.js';
-import { assertPlatformConfig, platformConfigStatus } from './config.js';
+import { assertPlatformConfig, syncQuota } from './config.js';
 import { csrfGuard, originGuard } from './security.js';
 import { housekeepingStatus } from './housekeeping.js';
+import { operatorHealthDetail } from './operatorHealth.js';
 import { cachedServerReleaseIdentity, releaseShaForLogs } from './releaseIdentity.js';
 import { readinessReport } from './readiness.js';
 import { tagPolicy } from './routePolicy.js';
@@ -65,9 +65,17 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
   // reported here as a field, never as a failure of this endpoint, so an
   // orchestrator does not restart a healthy process in a loop. Readiness —
   // whether this replica can actually serve — is /v1/ready.
+  //
+  // EXPOSURE. Anonymous callers get the ok flag, the release identity, the
+  // schema versions, the engine name and whether the database answered — what
+  // an uptime check needs and nothing an attacker can act on. Which identity,
+  // email and billing providers are configured, the Google notification
+  // backlog and the housekeeping purge counts are operator detail: they are
+  // answered only to the holder of PRI_METRICS_TOKEN (the /v1/metrics gate),
+  // and to an admin session on /v1/admin/health.
   router.get('/health', async (req, res) => {
-    const config = platformConfigStatus();
     const releaseIdentity = cachedServerReleaseIdentity();
+    const operator = metricsAccess(req).ok;
     let schemaVersion = null;
     let billingSchemaVersion = null;
     let reachable = true;
@@ -81,7 +89,7 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
         (async () => {
           schemaVersion = (await db.get("SELECT value FROM platform_meta WHERE key='schema_version'"))?.value || null;
           billingSchemaVersion = (await db.get("SELECT value FROM platform_meta WHERE key='billing_schema_version'"))?.value || null;
-          housekeeping = await housekeepingStatus(db);
+          if (operator) housekeeping = await housekeepingStatus(db);
         })(),
         new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('health probe timeout')), HEALTH_DB_TIMEOUT_MS); })
       ]);
@@ -93,28 +101,19 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
     } finally {
       clearTimeout(timer);
     }
+    const quota = syncQuota();
     res.json({
       ok: true,
       service: 'pri-learning-platform',
-      // The active shell floors and how many requests they turned away (CP-11).
-      clientCompatibility: compatibilityStatus(),
       releaseIdentity,
       schemaVersion,
       billingSchemaVersion,
-      storage: { persistentDatabase: config.persistentDatabaseConfigured },
       // Which driver serves /v1 — never the URL, host, user or file path.
       database: { engine: db.dialect, reachable },
-      identityProviders: { google: config.googleConfigured, apple: config.appleConfigured },
-      authDelivery: { email: config.authEmailProviderConfigured },
-      billingProviders: {
-        web: config.webBillingProviderConfigured,
-        apple: config.appleBillingProviderConfigured,
-        google: config.googleBillingProviderConfigured
-      },
-      // Counts only (no tokens): queued Google notifications and the ones that
-      // keep failing, so a Play outage or a stuck refund is visible.
-      googleNotifications: config.googleBillingProviderConfigured ? await googleNotificationBacklog(db) : null,
-      housekeeping,
+      // The per-account storage cap every device is held to: two numbers a
+      // client may show, never a per-account figure.
+      syncQuota: { maxBytesPerAccount: quota.maxBytesPerAccount, maxEventsPerAccount: quota.maxEventsPerAccount },
+      ...(operator ? await operatorHealthDetail(db, { reachable, housekeeping }) : {}),
       checkedAt: Date.now()
     });
   });

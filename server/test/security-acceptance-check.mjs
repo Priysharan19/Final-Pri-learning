@@ -74,10 +74,11 @@ for (const stream of [process.stdout, process.stderr]) {
   stream.write = (chunk, ...rest) => { captured.push(String(chunk)); return original(chunk, ...rest); };
 }
 
-const { startApp, registerAccount, verifyEmail, checks, cookieHeader } = await import('./support/app-harness.mjs');
+const { startApp, registerAccount, verifyEmail, checks, cookieHeader, enrolMfa } = await import('./support/app-harness.mjs');
 const { requestedEngine } = await import('./support/engine.mjs');
 const { decryptDeliveryToken } = await import('../platform/deliveryCrypto.js');
 const { loadInventory } = await import('./support/route-inventory.mjs');
+const { decryptJoinCode } = await import('../platform/classes.js');
 const inventory = loadInventory();
 
 const c = checks();
@@ -126,7 +127,12 @@ async function account({ role = 'student', verified = true, name = 'Acceptance U
     if (v.status !== 200) throw new Error(`verify ${address}: ${v.status}`);
   }
   if (role !== 'student') await db.run('UPDATE accounts SET role=? WHERE id=?', [role, made.account.id]);
-  return { id: made.account.id, jar: made.jar, email: address, deviceId, password };
+  // Staff accounts enrol and verify their second factor, as the admin UI does,
+  // so the sweeps below meet the gates BEHIND it (role, ownership, input).
+  // The factor's own negatives are in mfa-check.mjs.
+  let mfa = null;
+  if (role === 'admin' || role === 'support') { await resetLimits(); mfa = await enrolMfa(h, made.jar); }
+  return { id: made.account.id, jar: made.jar, email: address, deviceId, password, mfa };
 }
 
 async function outboxToken(accountId, kind) {
@@ -568,7 +574,8 @@ try {
       c.eq(r.status, 404, `unrelated teacher: ${method} ${path.replace(classId, ':classId')} → 404`);
     }
     const intact = await db.get('SELECT name,archived_at,join_code FROM classes WHERE id=?', [classId]);
-    c.ok(intact.name === 'Class 10 A' && intact.archived_at === null && intact.join_code === joinCode, 'class unchanged by teacher two');
+    c.ok(intact.name === 'Class 10 A' && intact.archived_at === null && decryptJoinCode(intact.join_code, classId) === joinCode, 'class unchanged by teacher two');
+    c.ok(intact.join_code !== joinCode && !intact.join_code.includes(joinCode), 'the join code is never stored in clear beside its hash');
     c.eq((await db.get('SELECT removed_at FROM class_members WHERE class_id=? AND student_account_id=?', [classId, alice.id])).removed_at, null, 'Alice still enrolled');
     c.eq((await db.get('SELECT state FROM assignment_submissions WHERE assignment_id=? AND student_account_id=?', ['asn_acceptance_1', alice.id])).state, 'submitted', 'Alice\'s submission not returned by teacher two');
     c.eq((await db.get('SELECT COUNT(*) AS n FROM assignments WHERE class_id=?', [classId])).n, 1, 'no assignment injected');

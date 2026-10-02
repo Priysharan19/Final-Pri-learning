@@ -28,7 +28,7 @@ status notes are §18.1 there.
 ```bash
 npm test                                         # the suites CI pins (see .github/workflows/ci.yml)
 npm run test:platform                            # /v1 on SQLite
-npm run test:platform:pg                         # expect: PLATFORM ON POSTGRES: PASS — 32/32 suites
+npm run test:platform:pg                         # expect: PLATFORM ON POSTGRES: PASS — 35/35 suites
 npm run test:legal                               # LEGAL PAGES: PASS — 233/233 checks (placeholders still counted)
 npm run test:readme                              # README TRUTH: PASS — 16/16 checks
 node server/test/production-runtime-image-check.mjs   # PRODUCTION RUNTIME IMAGE — PASS — 85/85 checks

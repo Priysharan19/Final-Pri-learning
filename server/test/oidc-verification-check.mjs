@@ -108,7 +108,9 @@ const issueNonce = async () => {
   if (r.status !== 201) throw new Error(`nonce issue failed: ${r.status} ${r.text}`);
   return r.data;
 };
-const signIn = (provider, body, jar = {}) => h.request(`/v1/account/identity/${provider}/sign-in`, { method: 'POST', jar, body }).then(r => ({ ...r, jar }));
+// Every new account here is an adult's: the age declaration a NEW account owes
+// (and the child path) are covered by oidc-consent-check.mjs.
+const signIn = (provider, body, jar = {}) => h.request(`/v1/account/identity/${provider}/sign-in`, { method: 'POST', jar, body: { isAdult: true, ...body } }).then(r => ({ ...r, jar }));
 
 try {
   const noNonce = await signIn('google', { idToken: mintToken({}), deviceId: 'ipad-social' });

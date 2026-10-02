@@ -38,13 +38,15 @@ const [
   { default: cookieParser },
   { openTestStore },
   { createRazorpayBilling },
-  { createPlatformRouter }
+  { createPlatformRouter },
+  { base32Decode, totp }
 ] = await Promise.all([
   import('express'),
   import('cookie-parser'),
   import('./support/engine.mjs'),
   import('../platform/razorpay.js'),
-  import('../platform/router.js')
+  import('../platform/router.js'),
+  import('../platform/mfa.js')
 ]);
 
 let checks = 0;
@@ -140,6 +142,15 @@ async function call(path, { method = 'GET', body, raw, jar = null, headers = {},
   return { status: response.status, data, headers: response.headers };
 }
 const auditActions = async () => new Set((await db.all('SELECT action FROM audit_log')).map(row => row.action));
+// Staff accounts must enrol and verify a second factor before any staff route
+// answers (mfa.js); the journeys do what the admin UI does.
+async function enrolMfa(jar) {
+  const enrol = await call('/account/mfa/totp/enrol', { method: 'POST', jar, body: {} });
+  assert.equal(enrol.status, 201, JSON.stringify(enrol.data));
+  const confirm = await call('/account/mfa/totp/confirm', { method: 'POST', jar, body: { code: totp(base32Decode(enrol.data.secret)) } });
+  assert.equal(confirm.status, 200, JSON.stringify(confirm.data));
+  return confirm.data;
+}
 const jars = { admin: {}, teacher: {}, support: {}, s1: {}, s2: {}, s3: {} };
 async function register(jar, name, email, deviceId, { verify = true } = {}) {
   const response = await call('/account/register', { method: 'POST', jar, body: { name, email, password: 'journey-pass-123', deviceId } });
@@ -157,6 +168,9 @@ try {
   const admin = await register(jars.admin, 'Pri Admin', 'admin@example.test', 'admin-mac');
   // First-admin bootstrap is owned by wp/server-security; seed it directly here.
   await db.run("UPDATE accounts SET role='admin' WHERE id=?", [admin.id]);
+  check((await call('/admin/health', { jar: jars.admin })).data.error.code === 'MFA_ENROLMENT_REQUIRED', 'an admin without a second factor reaches no admin route');
+  const enrolled = await enrolMfa(jars.admin);
+  check(Array.isArray(enrolled.recoveryCodes) && enrolled.recoveryCodes.length === 8, 'enrolment hands over eight recovery codes once');
   const teacher = await register(jars.teacher, 'Meera Teacher', 'teacher@example.test', 'teacher-ipad');
   const support = await register(jars.support, 'Support Desk', 'support@example.test', 'support-mac');
   const s1 = await register(jars.s1, 'Asha', 's1@example.test', 'ipad-s1');
@@ -165,7 +179,7 @@ try {
 
   // ── Security floor on the real router ──────────────────────────────────
   const health = await call('/health');
-  check(health.status === 200 && health.data.ok === true && health.data.service === 'pri-learning-platform' && health.data.schemaVersion === '8', 'health reports the platform and schema version');
+  check(health.status === 200 && health.data.ok === true && health.data.service === 'pri-learning-platform' && health.data.schemaVersion === '9', 'health reports the platform and schema version');
   check(health.headers.get('x-content-type-options') === 'nosniff' && health.headers.get('cache-control') === 'no-store' && health.headers.get('x-frame-options') === 'DENY', 'security headers are applied to every /v1 response');
   check((await call('/does-not-exist')).status === 404 && (await call('/does-not-exist')).data.error.code === 'NOT_FOUND', 'unknown routes are a JSON 404');
   check((await call('/sync/pull/0')).status === 401 && (await call('/sync/pull/0')).data.error.code === 'AUTH_REQUIRED', 'session-gated routes reject anonymous callers');
@@ -182,6 +196,8 @@ try {
   check(promoted.status === 200 && promoted.data.role === 'teacher', 'admin promotes an account to teacher');
   check((await call('/account/me', { jar: jars.teacher })).data.account.role === 'teacher', 'the promoted session sees its new role immediately');
   check((await call(`/admin/users/${support.id}/role`, { method: 'PATCH', jar: jars.admin, body: { role: 'support' } })).status === 200, 'admin promotes an account to support');
+  check((await call('/reports/admin', { jar: jars.support })).data.error.code === 'MFA_ENROLMENT_REQUIRED', 'a newly promoted support account must enrol before it sees the triage queue');
+  await enrolMfa(jars.support);
   const selfDemotion = await call(`/admin/users/${admin.id}/role`, { method: 'PATCH', jar: jars.admin, body: { role: 'student' } });
   check(selfDemotion.status === 409 && selfDemotion.data.error.code === 'SELF_DEMOTION_BLOCKED', 'an admin cannot remove their own admin role');
   check((await call(`/admin/users/${s1.id}/role`, { method: 'PATCH', jar: jars.admin, body: { role: 'owner' } })).data.error.code === 'ROLE_INVALID', 'unknown roles are rejected');
@@ -256,11 +272,15 @@ try {
   check((await call(`/classes/${classId}`, { method: 'PATCH', jar: jars.teacher, body: { name: '' } })).data.error.code === 'CLASS_NAME_INVALID', 'an empty name is rejected');
   check((await call(`/classes/${classId}`, { method: 'PATCH', jar: jars.teacher, body: {} })).data.changed.length === 0, 'an empty patch changes nothing');
 
-  const assignment = await call(`/classes/${classId}/assignments`, { method: 'POST', jar: jars.teacher, body: { title: 'Quadratics drill', specification: { targetQuestions: 10, strand: 'algebra' }, dueAt: now + 86_400_000 } });
-  check(assignment.status === 201, 'teacher creates an assignment');
+  const assignment = await call(`/classes/${classId}/assignments`, { method: 'POST', jar: jars.teacher, body: { title: 'Quadratics drill', specification: { questionCount: 10, strand: 'algebra' }, dueAt: now + 86_400_000 } });
+  check(assignment.status === 201 && assignment.data.assignment.specification.strand === undefined, 'teacher creates an assignment; an unknown specification key is dropped');
   const assignmentId = assignment.data.assignment.id;
-  const edited = await call(`/classes/${classId}/assignments/${assignmentId}`, { method: 'PATCH', jar: jars.teacher, body: { title: 'Quadratics drill (revised)', dueAt: now + 2 * 86_400_000, specification: { targetQuestions: 12, strand: 'algebra' } } });
-  check(edited.status === 200 && edited.data.changed.join() === 'assignment.edit' && edited.data.assignment.title === 'Quadratics drill (revised)' && edited.data.assignment.specification.targetQuestions === 12, 'teacher edits title, due date and specification');
+  // An edit goes through the same curriculum validator as creation: unknown
+  // keys are dropped, an impossible target is refused, nothing unvalidated is stored.
+  const badEdit = await call(`/classes/${classId}/assignments/${assignmentId}`, { method: 'PATCH', jar: jars.teacher, body: { specification: { questionCount: 12, subtopics: ['no-such-chapter'] } } });
+  check(badEdit.status === 400 && badEdit.data.error.code === 'ASSIGNMENT_SPEC_INVALID', 'an edit pointing at a chapter that does not exist is refused');
+  const edited = await call(`/classes/${classId}/assignments/${assignmentId}`, { method: 'PATCH', jar: jars.teacher, body: { title: 'Quadratics drill (revised)', dueAt: now + 2 * 86_400_000, specification: { questionCount: 12, strand: 'algebra' } } });
+  check(edited.status === 200 && edited.data.changed.join() === 'assignment.edit' && edited.data.assignment.title === 'Quadratics drill (revised)' && edited.data.assignment.specification.questionCount === 12 && edited.data.assignment.specification.strand === undefined, 'teacher edits title, due date and specification; the stored specification is the validated one');
   check((await call(`/classes/${classId}/assignments/${assignmentId}`, { method: 'PATCH', jar: jars.teacher, body: { dueAt: 'soon' } })).status === 400, 'an invalid due date is rejected');
   check((await call('/assignments', { jar: jars.s1 })).data.assignments.length === 1, 'student inbox shows the live assignment');
   const archivedAssignment = await call(`/classes/${classId}/assignments/${assignmentId}`, { method: 'PATCH', jar: jars.teacher, body: { archived: true } });

@@ -39,7 +39,9 @@ Apple ID settings (residual risk, §6).
 | Event | Effect |
 | --- | --- |
 | Login / register | New opaque 32-byte token; only its SHA-256 is stored. |
-| Use | Sliding expiry: at most once a minute, `expires_at` moves to now + 30 days and the cookie is re-issued with the full lifetime. The token itself is not rotated on use. |
+| Use | Sliding expiry: at most once a minute, `expires_at` moves to now + 30 days (admin/support: now + 12 hours) and the cookie is re-issued with that lifetime. The token itself is not rotated on use. |
+| Absolute lifetime | A session is refused and revoked once it is `PRI_SESSION_MAX_AGE_DAYS` old (default 90) however recently it was used; the slide never passes that cap. Admin/support sessions are also refused after 12 idle hours. |
+| Staff second factor | Admin/support sessions record `mfa_verified_at` when a TOTP or recovery code is accepted; staff routes refuse a session without it, and role promotion / Premium grant need one inside 15 minutes. |
 | Logout | That session's row is revoked; cookies cleared. |
 | Logout-all (`POST /v1/account/logout-all`) | Every unrevoked session of the account is revoked, including the caller's. Needs a session, the CSRF pair and an allowed Origin; rate limited to 10 an hour per account; never touches another account's sessions. |
 | Password change | Every session revoked; the requesting device gets a fresh token. |
@@ -53,6 +55,14 @@ stored as a SHA-256 hash in `account_tokens`, delivered through `auth_delivery_o
 AES-GCM envelope bound to the token id, and spent with a compare-and-set so exactly one request
 can use it. Requesting a new link of the same kind supersedes (spends) the older one. Expired,
 superseded and replayed links all answer 400 `TOKEN_INVALID`.
+
+**The guardian's withdrawal link** (`guardian-withdraw`) is different by design: it is issued
+when a guardian confirms, emailed to the same address, and lives ten years (effectively the
+account's lifetime). It can only ever withdraw consent — it never confirms, verifies or resets
+anything — is revoked by the withdrawal it performs, is deleted with the account, and is the one
+token housekeeping never purges while it is unspent. Its delivered outbox row is removed as soon
+as the email has been sent (the address is already in `guardian_consents`). The one-hour
+confirmation link also withdraws, in any state, for as long as it survives housekeeping.
 
 ---
 
@@ -70,7 +80,9 @@ person. Location for every row is the platform database: SQLite on the Railway v
 | `accounts` | email, name, bcrypt password hash, role, timestamps |
 | `account_identities` | password / Apple / Google sign-in links (provider subject, email at link) |
 | `account_sessions` | session token hashes, device ids, user-agent hashes |
-| `account_tokens` | one-time link hashes |
+| `account_tokens` | one-time link hashes, including the guardian's long-lived withdrawal credential |
+| `account_mfa` | an admin/support account's TOTP secret, encrypted under `PRI_MFA_KEY` |
+| `account_mfa_recovery_codes` | SHA-256 hashes of the account's recovery codes |
 | `auth_delivery_outbox` | encrypted link envelopes and destination addresses (including a guardian's) |
 | `guardian_consents` | guardian name and email, notice version, confirmation/withdrawal times |
 | `learning_events` | synced attempts, progress and mastery events |
@@ -96,7 +108,7 @@ removes their students' memberships, submissions and feedback for those classes 
 | `billing_refunds` | provider refund id, payment id, amount, status | Same ledger. Never had an account column. | As `billing_payments`. |
 | `billing_events` | provider, event id, event type, verified flag, SHA-256 digest of the payload, timestamps. `account_id` → `NULL`. | Webhook idempotency (a replayed event must not re-apply) and an audit trail of what the provider told us. The payload itself is never stored. | As `billing_payments`. |
 | `issue_reports` | category, content/question id, app and curriculum version, status. `account_id` → `NULL`; **`note` and `context_json` are cleared in the deletion transaction** (they can hold free text the student typed). | Content-quality: a "wrong answer" report about a question stays useful after the reporter leaves. | Until resolved/dismissed and pruned (no automated purge yet). |
-| `audit_log` | action, target kind/id, non-personal metadata, timestamp. `actor_account_id` → `NULL`. One `account.delete` row whose `target_id` is the deleted (now unresolvable) account id and whose metadata is `{}`. | Security and billing audit trail; proof a deletion happened. Metadata never carries email, name or free text (checked by the PII scan). Some rows may carry the deleted account's opaque id as `target_id` or `studentId`; with the account row gone it resolves to nobody. | *Proposed:* 2 years. No automated purge yet. |
+| `audit_log` | action, target kind/id, non-personal metadata, timestamp. `actor_account_id` → `NULL`. One `account.delete` row whose `target_id` is the deleted (now unresolvable) account id and whose metadata is `{}`. | Security and billing audit trail; proof a deletion happened. Metadata never carries email, name or free text (checked by the PII scan). Some rows may carry the deleted account's opaque id as `target_id` or `studentId`; with the account row gone it resolves to nobody. **Append-only:** no server code updates or deletes a row, and on Postgres `pri_server` holds no UPDATE/DELETE on it (schema v9); the `SET NULL` on deletion is a referential action run as the table owner. | *Proposed:* 2 years. No automated purge yet (and a purge would need the migration owner, not the server role). |
 | `teacher_invites.used_by`, `content_revisions.author/reviewer_account_id`, `feature_flags.updated_by` | Set to `NULL`. | Staff tooling history. | Indefinite. |
 
 ### Short-lived rows keyed by a hash, not by the account

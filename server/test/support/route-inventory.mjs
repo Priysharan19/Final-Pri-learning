@@ -49,6 +49,9 @@ export function compareInventory(mounted, inventory) {
     // router.js (PRI_METRICS_TOKEN) must be mounted exactly where it is declared.
     if ((entry.auth === 'operator-token') !== !!p.operatorToken) problems.push(`${k}: inventory auth=${entry.auth} but the operator-token gate is ${p.operatorToken ? '' : 'not '}mounted`);
     if (entry.verifiedEmail !== p.verifiedEmail) problems.push(`${k}: inventory verifiedEmail=${entry.verifiedEmail} but mounted ${p.verifiedEmail}`);
+    // The second-factor gate (security.js requireMfa): false, true, or a
+    // step-up window. An inventory entry that omits it declares false.
+    if (JSON.stringify(entry.mfa ?? false) !== JSON.stringify(p.mfa)) problems.push(`${k}: inventory mfa=${JSON.stringify(entry.mfa ?? false)} but mounted ${JSON.stringify(p.mfa)}`);
     if (entry.guardianConsent !== p.guardianConsent) problems.push(`${k}: inventory guardianConsent=${entry.guardianConsent} but mounted ${p.guardianConsent}`);
     if (JSON.stringify(entry.rateLimits) !== JSON.stringify(p.rateLimits)) problems.push(`${k}: inventory rateLimits ${JSON.stringify(entry.rateLimits)} but mounted ${JSON.stringify(p.rateLimits)}`);
     for (const problem of p.outOfOrder || []) problems.push(`${k}: guard order — ${problem} (it would answer 403 where 401 is due, or read no session)`);
@@ -74,6 +77,11 @@ export function compareInventory(mounted, inventory) {
     if (entry.auth === 'none' && MUTATION.has(entry.method) && !entry.rateLimits.length && k !== 'POST /v1/account/logout') problems.push(`${k}: anonymous mutation without a rate limit`);
     if (['credentials', 'bearer-token', 'oidc-token'].includes(entry.auth) && !entry.rateLimits.length) problems.push(`${k}: credential/token route without a rate limit`);
     if (entry.roles?.includes('admin') && entry.roles.length === 1 && entry.auth !== 'session') problems.push(`${k}: admin route without a session`);
+    // Every route only staff can reach asks for their second factor, except the
+    // enrolment ceremony itself (which is what makes the factor exist).
+    const staffOnly = Array.isArray(entry.roles) && entry.roles.every(role => role === 'admin' || role === 'support');
+    if (staffOnly && !(entry.mfa ?? false) && !entry.path.startsWith('/v1/account/mfa/')) problems.push(`${k}: a staff-only route must require a second factor (mfa)`);
+    if ((entry.mfa ?? false) && entry.auth !== 'session') problems.push(`${k}: mfa requires a session`);
   }
   return problems;
 }

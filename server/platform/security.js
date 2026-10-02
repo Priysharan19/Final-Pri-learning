@@ -9,7 +9,39 @@ const SESSION_MS = 1000 * 60 * 60 * 24 * 30;
 // Idle timeout slides on use; a write at most once a minute per session keeps
 // the sliding window from turning every request into an UPDATE.
 const SESSION_SLIDE_MIN_MS = 60 * 1000;
+// Admin and support sessions reach every account's data, so they idle out in
+// hours, not weeks: a staff laptop left signed in overnight is signed out by
+// morning.
+export const PRIVILEGED_IDLE_MS = 12 * 60 * 60 * 1000;
+export const PRIVILEGED_ROLES = new Set(['admin', 'support']);
+const DEFAULT_SESSION_MAX_AGE_DAYS = 90;
+const MAX_SESSION_MAX_AGE_DAYS = 3650;
 const CSRF_SECRET = process.env.PRI_CSRF_SECRET || randomBytes(32).toString('hex');
+
+/**
+ * The absolute lifetime of a session, from PRI_SESSION_MAX_AGE_DAYS (default
+ * 90). The 30-day window slides on use; this cap does not, so a cookie that is
+ * used every day still has to be re-issued by a fresh sign-in eventually, and a
+ * copied cookie cannot be kept alive for ever by replaying it.
+ */
+export function sessionMaxAgeMs(env = process.env) {
+  const raw = String(env.PRI_SESSION_MAX_AGE_DAYS ?? '').trim();
+  if (!raw) return DEFAULT_SESSION_MAX_AGE_DAYS * 24 * 60 * 60 * 1000;
+  if (!/^\d+$/.test(raw) || Number(raw) < 1 || Number(raw) > MAX_SESSION_MAX_AGE_DAYS) {
+    throw Object.assign(new Error(`PRI_SESSION_MAX_AGE_DAYS must be a whole number of days between 1 and ${MAX_SESSION_MAX_AGE_DAYS}.`), { code: 'SESSION_MAX_AGE_INVALID' });
+  }
+  return Number(raw) * 24 * 60 * 60 * 1000;
+}
+
+/** The idle window a session of this role gets before it must sign in again. */
+export function sessionIdleMs(role) {
+  return PRIVILEGED_ROLES.has(role) ? PRIVILEGED_IDLE_MS : SESSION_MS;
+}
+
+/** When a session created at `createdAt` and last seen now must expire. */
+function sessionExpiry(role, createdAt, now) {
+  return Math.min(now + sessionIdleMs(role), createdAt + sessionMaxAgeMs());
+}
 
 export function id(prefix = 'id') {
   return `${prefix}_${randomUUID()}`;
@@ -49,10 +81,12 @@ export async function createSession(db, res, accountId, deviceId = 'web', userAg
   db = asStore(db);
   const raw = opaqueToken(32);
   const sessionId = id('ses');
+  const role = (await db.get('SELECT role FROM accounts WHERE id = ?', [accountId]))?.role || 'student';
+  const expiresAt = sessionExpiry(role, now, now);
   await db.run(`INSERT INTO account_sessions
     (id, account_id, token_hash, device_id, user_agent_hash, created_at, last_seen_at, expires_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, [sessionId, accountId, sha256(raw), String(deviceId).slice(0, 160), userAgent ? sha256(userAgent) : null, now, now, now + SESSION_MS]);
-  setSessionCookies(res, raw, SESSION_MS);
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, [sessionId, accountId, sha256(raw), String(deviceId).slice(0, 160), userAgent ? sha256(userAgent) : null, now, now, expiresAt]);
+  setSessionCookies(res, raw, expiresAt - now);
   return sessionId;
 }
 
@@ -64,9 +98,17 @@ export async function sessionFromRequest(db, req, now = Date.now()) {
     FROM account_sessions s JOIN accounts a ON a.id = s.account_id
     WHERE s.token_hash = ? AND s.revoked_at IS NULL AND s.expires_at > ? AND a.deleted_at IS NULL`, [sha256(raw), now]);
   if (!row) return null;
+  // The absolute cap and the role's idle limit are enforced here as well as
+  // through expires_at, so a row written before either rule existed — or an
+  // account promoted to admin after it signed in — is held to them too. A row
+  // that fails is revoked, so a copied cookie cannot be retried against it.
+  if (now - row.created_at >= sessionMaxAgeMs() || now - row.last_seen_at > sessionIdleMs(row.role)) {
+    await db.run('UPDATE account_sessions SET revoked_at = ? WHERE id = ? AND revoked_at IS NULL', [now, row.id]);
+    return null;
+  }
   let slid = false;
   if (now - row.last_seen_at >= SESSION_SLIDE_MIN_MS) {
-    const expiresAt = now + SESSION_MS;
+    const expiresAt = sessionExpiry(row.role, row.created_at, now);
     await db.run('UPDATE account_sessions SET last_seen_at = ?, expires_at = ? WHERE id = ?', [now, expiresAt, row.id]);
     row.last_seen_at = now;
     row.expires_at = expiresAt;
@@ -75,16 +117,64 @@ export async function sessionFromRequest(db, req, now = Date.now()) {
   return { ...row, rawToken: raw, slid };
 }
 
+// The only routes an admin or support account may use before it has enrolled
+// a second factor: finding out who it is, signing out, and enrolling. Matched on
+// the normalised path (no query string), anchored at the account router's
+// mount (/v1/account in production, /account in the focused contracts). Deny by default: anything else answers
+// MFA_ENROLMENT_REQUIRED until the enrolment is confirmed.
+const MFA_ENROLMENT_PATHS = /^(?:\/v1)?\/account\/(?:me|logout-all|mfa)(?:\/|$)/;
+
+/** Whether this privileged account has a confirmed second factor. */
+export async function mfaEnrolled(db, accountId) {
+  db = asStore(db);
+  return !!(await db.get('SELECT 1 FROM account_mfa WHERE account_id = ? AND confirmed_at IS NOT NULL', [accountId]));
+}
+
 export function requireSession(db) {
   db = asStore(db);
   return tagPolicy(asyncHandler(async (req, res, next) => {
-    const session = await sessionFromRequest(db, req);
+    const now = Date.now();
+    const session = await sessionFromRequest(db, req, now);
     if (!session) return res.status(401).json({ error: { code: 'AUTH_REQUIRED', message: 'Sign in is required.' } });
     // Keep the browser/native cookie lifetime in step with the slid server row.
-    if (session.slid) setSessionCookies(res, session.rawToken, SESSION_MS);
+    if (session.slid) setSessionCookies(res, session.rawToken, Math.max(1000, session.expires_at - now));
+    // Staff accounts carry their second-factor state on the session. One that
+    // has not enrolled may reach only the enrolment routes (and sign out).
+    if (PRIVILEGED_ROLES.has(session.role)) {
+      session.mfaEnrolled = await mfaEnrolled(db, session.account_id);
+      if (!session.mfaEnrolled && !MFA_ENROLMENT_PATHS.test(`${req.baseUrl || ''}${req.path || ''}`)) {
+        return res.status(403).json({ error: { code: 'MFA_ENROLMENT_REQUIRED', message: 'Staff accounts must set up an authenticator app before using this feature.' } });
+      }
+    }
     req.platformSession = session;
     next();
   }), { session: true });
+}
+
+/** How recently a second factor must have been presented for a step-up action. */
+export const MFA_STEP_UP_MS = 15 * 60 * 1000;
+
+/**
+ * A second factor on this session. Every staff route sits behind it: the
+ * account must have enrolled, and this session must have verified a code since
+ * it signed in (mfa_verified_at). With `stepUpMs`, the code must be fresher than
+ * that — role promotion and a Premium grant ask for it again inside 15 minutes.
+ * Mounted after requireRole on staff-only routes; any other role is refused
+ * outright, because a route that asks for a second factor is a staff route.
+ */
+export function requireMfa({ stepUpMs = null } = {}) {
+  const window = stepUpMs === null ? null : Math.max(1000, Math.floor(Number(stepUpMs)));
+  return tagPolicy((req, res, next) => {
+    const session = req.platformSession;
+    if (!session || !PRIVILEGED_ROLES.has(session.role)) return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'You do not have permission for this action.' } });
+    if (!session.mfaEnrolled) return res.status(403).json({ error: { code: 'MFA_ENROLMENT_REQUIRED', message: 'Set up an authenticator app before using this feature.' } });
+    const verifiedAt = Number(session.mfa_verified_at) || 0;
+    if (!verifiedAt) return res.status(403).json({ error: { code: 'MFA_REQUIRED', message: 'Enter the code from your authenticator app to continue.' } });
+    if (window !== null && Date.now() - verifiedAt > window) {
+      return res.status(403).json({ error: { code: 'MFA_STEP_UP_REQUIRED', message: 'Enter the code from your authenticator app again to confirm this action.', stepUpWindowMs: window } });
+    }
+    next();
+  }, { mfa: window === null ? true : { stepUpMs: window } });
 }
 
 export function requireVerifiedEmail(req, res, next) {

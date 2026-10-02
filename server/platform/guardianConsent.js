@@ -57,15 +57,32 @@ export function learnerIsChild({ isAdult, year } = {}) {
   return CHILD_CLASS.test(String(year ?? '').trim());
 }
 
-/** A guardian's details, or the reason they cannot be used. */
-export function validateGuardian({ guardianName, guardianEmail } = {}) {
+/**
+ * A guardian's details, or the reason they cannot be used. The guardian's
+ * address must be somebody else's: a child who names their own mailbox would be
+ * confirming their own account, which is no confirmation at all.
+ */
+export function validateGuardian({ guardianName, guardianEmail, studentEmail } = {}) {
   const name = clean(guardianName, 80);
   const email = clean(guardianEmail, 160).toLowerCase();
   if (!name) return { ok: false, code: 'GUARDIAN_NAME_REQUIRED', message: 'Enter a parent or guardian’s name.' };
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return { ok: false, code: 'GUARDIAN_EMAIL_REQUIRED', message: 'Enter a parent or guardian’s email address.' };
   }
+  if (studentEmail && email === String(studentEmail).trim().toLowerCase()) {
+    return { ok: false, code: 'GUARDIAN_EMAIL_SAME_AS_STUDENT', message: 'A parent or guardian’s email address must be different from the student’s own.' };
+  }
   return { ok: true, name, email };
+}
+
+/**
+ * Did the request say anything about the learner's age? A new account must
+ * declare it (an explicit adult, or a child with a class), so an identity
+ * provider sign-in cannot create an unconsented child account by saying
+ * nothing. Password registration asks the same question on its form.
+ */
+export function ageDeclared({ isAdult, year } = {}) {
+  return typeof isAdult === 'boolean' || CHILD_CLASS.test(String(year ?? '').trim());
 }
 
 /**

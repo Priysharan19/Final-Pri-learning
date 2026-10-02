@@ -13,6 +13,7 @@ import { createServerApp } from '../../app.js';
 import { createPlatformDb } from '../../platform/db.js';
 import { decryptDeliveryToken } from '../../platform/deliveryCrypto.js';
 import { asStore } from '../../platform/store.js';
+import { base32Decode, totp } from '../../platform/mfa.js';
 import { openTestStore } from './engine.mjs';
 
 export function cookieHeader(jar) {
@@ -124,6 +125,36 @@ export async function verifyEmail(harness, accountId) {
   const token = await pendingVerificationToken(harness.db, accountId);
   if (!token) throw new Error(`no pending verification token for ${accountId}`);
   return harness.request('/v1/account/email/verify', { method: 'POST', body: { token } });
+}
+
+/**
+ * Enrol and verify a staff account's second factor the way the admin UI does:
+ * enrol → code from the returned secret → confirm. Returns the secret and the
+ * recovery codes so a suite can present later codes or a recovery code.
+ */
+export async function enrolMfa(harness, jar, { now = Date.now() } = {}) {
+  const enrol = await harness.request('/v1/account/mfa/totp/enrol', { method: 'POST', jar, body: {} });
+  if (enrol.status !== 201) throw new Error(`mfa enrol: ${enrol.status} ${enrol.text}`);
+  const secret = base32Decode(enrol.data.secret);
+  const confirm = await harness.request('/v1/account/mfa/totp/confirm', { method: 'POST', jar, body: { code: totp(secret, now) } });
+  if (confirm.status !== 200) throw new Error(`mfa confirm: ${confirm.status} ${confirm.text}`);
+  return { secret, secretBase32: enrol.data.secret, otpauthUri: enrol.data.otpauthUri, recoveryCodes: confirm.data.recoveryCodes };
+}
+
+/** Present the current code for `secret` on this session (sign-in or step-up). */
+export async function verifyMfa(harness, jar, secret, { now = Date.now() } = {}) {
+  return harness.request('/v1/account/mfa/verify', { method: 'POST', jar, body: { code: totp(secret, now) } });
+}
+
+/**
+ * Give an account a role directly in the database, as the bootstrap/CLI would,
+ * and — for admin and support — enrol the second factor every staff route
+ * requires. Returns the enrolment (or null for other roles).
+ */
+export async function promoteRole(harness, jar, accountId, role) {
+  await asStore(harness.db).run('UPDATE accounts SET role=? WHERE id=?', [role, accountId]);
+  if (role !== 'admin' && role !== 'support') return null;
+  return enrolMfa(harness, jar);
 }
 
 /** Counted assertions so every suite can print an honest n/n line. */

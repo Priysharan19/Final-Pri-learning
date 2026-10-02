@@ -8,14 +8,16 @@ const [
   { openTestStore },
   { createAccountRouter },
   { decryptDeliveryToken },
-  { requireGuardianConsent }
+  { requireGuardianConsent },
+  { runHousekeeping }
 ] = await Promise.all([
   import('express'),
   import('cookie-parser'),
   import('./support/engine.mjs'),
   import('../platform/accounts.js'),
   import('../platform/deliveryCrypto.js'),
-  import('../platform/guardianConsent.js')
+  import('../platform/guardianConsent.js'),
+  import('../platform/housekeeping.js')
 ]);
 
 async function makeHarness() {
@@ -68,13 +70,13 @@ async function request(origin, path, { method = 'GET', body, jar = {} } = {}) {
   return { status: response.status, data: text ? JSON.parse(text) : null };
 }
 
-async function guardianBearer(db, accountId) {
+async function guardianBearer(db, accountId, kind = 'guardian-consent') {
   const row = await db.get(`SELECT o.token_id,o.token_ciphertext
     FROM auth_delivery_outbox o
-    WHERE o.account_id=? AND o.kind='guardian-consent'
-    ORDER BY o.created_at DESC LIMIT 1`, [accountId]);
-  assert.ok(row, 'guardian delivery envelope must exist');
-  return decryptDeliveryToken(row.token_ciphertext, `${accountId}:guardian-consent:${row.token_id}`);
+    WHERE o.account_id=? AND o.kind=?
+    ORDER BY o.created_at DESC LIMIT 1`, [accountId, kind]);
+  assert.ok(row, `${kind} delivery envelope must exist`);
+  return decryptDeliveryToken(row.token_ciphertext, `${accountId}:${kind}:${row.token_id}`);
 }
 
 async function registerChild(origin, email, guardianEmail, jar = {}) {
@@ -141,6 +143,29 @@ try {
   assert.equal((await db.get('SELECT withdrawn_at FROM guardian_consents WHERE account_id=?', [fourth.accountId])).withdrawn_at, null);
   assert.deepEqual((await request(origin, '/account/guardian/withdraw', { method: 'POST', body: { token: fourthBearer } })).data,
     { ok: true, withdrawn: true });
+
+  // The withdrawal link a guardian keeps: issued on confirmation, it outlives
+  // the one-hour confirmation token and every housekeeping pass, and works
+  // long after the confirmation link has been purged — then exactly once.
+  const fifth = await registerChild(origin, 'guardian-five@example.test', 'guardian5@example.test');
+  const fifthConfirm = await guardianBearer(db, fifth.accountId);
+  assert.equal((await request(origin, '/account/guardian/confirm', { method: 'POST', body: { token: fifthConfirm } })).data.confirmed, true);
+  const fifthWithdraw = await guardianBearer(db, fifth.accountId, 'guardian-withdraw');
+  assert.notEqual(fifthWithdraw, fifthConfirm, 'the withdrawal credential is a separate bearer');
+  const sixHoursOn = Date.now() + 6 * 60 * 60 * 1000 + 60_000;
+  const swept = await runHousekeeping(db, sixHoursOn);
+  assert.ok(swept.tokens >= 1, 'housekeeping purges the spent confirmation token');
+  assert.equal(await db.get("SELECT 1 FROM account_tokens WHERE account_id=? AND purpose='guardian-consent'", [fifth.accountId]), undefined, 'the confirmation token is gone');
+  assert.ok(await db.get("SELECT 1 FROM account_tokens WHERE account_id=? AND purpose='guardian-withdraw' AND consumed_at IS NULL", [fifth.accountId]), 'the withdrawal credential survives');
+  assert.equal((await request(origin, '/account/guardian/confirm', { method: 'POST', body: { token: fifthConfirm } })).status, 400, 'the confirmation link still dies after its hour');
+  assert.equal((await request(origin, '/protected', { jar: fifth.jar })).status, 200, 'consent stands meanwhile');
+  assert.deepEqual((await request(origin, '/account/guardian/withdraw', { method: 'POST', body: { token: fifthWithdraw } })).data,
+    { ok: true, withdrawn: true }, 'the kept link withdraws after housekeeping has run');
+  assert.equal((await request(origin, '/protected', { jar: fifth.jar })).data.error.code, 'GUARDIAN_CONSENT_WITHDRAWN');
+  assert.equal((await request(origin, '/account/guardian/withdraw', { method: 'POST', body: { token: fifthWithdraw } })).status, 400,
+    'the credential is revoked by the withdrawal it performed');
+  assert.equal((await request(origin, '/account/guardian/confirm', { method: 'POST', body: { token: fifthWithdraw } })).status, 400,
+    'and could never confirm');
 
   // Account deletion must revoke the guardian bearer by FK cascade.
   assert.equal((await request(origin, '/account/', {
