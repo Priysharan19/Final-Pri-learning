@@ -16,6 +16,8 @@ import android.content.Intent
 import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
+import android.view.InputDevice
+import android.view.MotionEvent
 import android.view.Gravity
 import android.view.ViewGroup
 import android.os.SystemClock
@@ -42,6 +44,7 @@ import androidx.webkit.WebViewAssetLoader
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
 import android.webkit.ValueCallback
+import com.prilearning.app.billing.PlayBilling
 import com.prilearning.app.bridge.HostDescriptor
 import com.prilearning.app.cloud.CloudConfig
 import com.prilearning.app.cloud.CookieJar
@@ -72,6 +75,7 @@ class MainActivity : ComponentActivity() {
     internal var cloud: NativeCloud? = null
         private set
     private lateinit var files: FileExchange
+    private var billing: PlayBilling? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // The shell paints a fixed dark background behind the bars, so the bar
@@ -93,6 +97,7 @@ class MainActivity : ComponentActivity() {
             WindowInsetsCompat.CONSUMED
         }
 
+        val stylusCapable = stylusDevicePresent()
         val webViewPackage = WebViewCompat.getCurrentWebViewPackage(this)
         if (!WebViewFloor.isSupported(webViewPackage?.versionName)) {
             showUpdateScreen(getString(R.string.webview_update_body))
@@ -114,6 +119,7 @@ class MainActivity : ComponentActivity() {
             HostDescriptor.Shell(BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE.toString(), BuildConfig.APPLICATION_ID),
             ReleaseIdentity.read(assets),
             cloudConfigured = nativeCloud.configured,
+            stylusCapable = stylusCapable,
         )
         // Back is enabled exactly while the page has declared it wants it (a
         // sheet is open or it has in-app history). Otherwise the system default
@@ -126,7 +132,10 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
-        val priBridge = PriBridge(view, descriptor, { wanted -> backCallback.isEnabled = wanted }, nativeCloud, files)
+        val playBilling = PlayBilling(this) { event, payload -> bridge?.emitEvent(event, payload) }
+        billing = playBilling
+        val priBridge = PriBridge(view, descriptor, { wanted -> backCallback.isEnabled = wanted }, nativeCloud, files, playBilling)
+        priBridge.stylusCapable = stylusCapable
         if (!priBridge.install()) {
             // Fail closed: without origin-scoped messaging the shell offers no
             // native capabilities, so it does not load the app half-working.
@@ -263,7 +272,25 @@ class MainActivity : ComponentActivity() {
         cloud?.shutdown()
         cloud = null
         if (::files.isInitialized) files.dispose()
+        billing?.dispose()
+        billing = null
         super.onDestroy()
+    }
+
+    /** Capability facts for the page, never a model name: a stylus-capable input device. */
+    private fun stylusDevicePresent(): Boolean = InputDevice.getDeviceIds().any { id ->
+        InputDevice.getDevice(id)?.supportsSource(InputDevice.SOURCE_STYLUS) == true
+    }
+
+    override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
+        val b = bridge
+        if (b != null && !b.stylusSeen) {
+            for (i in 0 until ev.pointerCount) {
+                val tool = ev.getToolType(i)
+                if (tool == MotionEvent.TOOL_TYPE_STYLUS || tool == MotionEvent.TOOL_TYPE_ERASER) { b.noteStylus(); break }
+            }
+        }
+        return super.dispatchTouchEvent(ev)
     }
 
     private fun WebView.restoreStateSafely(state: Bundle): Boolean =

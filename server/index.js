@@ -13,6 +13,8 @@ import { writeSync } from 'node:fs';
 import { closePlatformStore } from './platform/db.js';
 import { openPlatformStore } from './platform/store.js';
 import { startAuthDeliveryWorker } from './platform/authDelivery.js';
+import { startGoogleNotificationWorker } from './platform/googleBilling.js';
+import { applyVerifiedEntitlement } from './platform/entitlements.js';
 import { startHousekeeping } from './platform/housekeeping.js';
 import { createServerApp } from './app.js';
 
@@ -49,6 +51,10 @@ const deliveryWorker = startAuthDeliveryWorker(platformDb);
 // purged at startup and every six hours; /v1/health reports the last run.
 startHousekeeping(platformDb);
 
+// Google Play real-time notifications are queued by the webhook and re-fetched
+// from the Play Developer API here, outside any database transaction.
+const googleWorker = startGoogleNotificationWorker(platformDb, { apply: event => applyVerifiedEntitlement(platformDb, event) });
+
 const PORT = process.env.PORT || 4000;
 const server = app.listen(PORT, () => console.log(`Pri Learning server running on port ${server.address().port}`));
 
@@ -63,6 +69,7 @@ function shutdown(signal) {
   shuttingDown = true;
   console.log('platform_shutdown', { signal, deadlineMs: SHUTDOWN_DEADLINE_MS });
   deliveryWorker.stop();
+  googleWorker.stop();
   let finished = false;
   const finish = reason => {
     if (finished) return;

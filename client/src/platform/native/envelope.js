@@ -100,7 +100,7 @@ const REPLY_SCHEMAS = Object.freeze({
   'share.file': { completed: bool },
   'share.print': { completed: bool },
   'storage.status': { durable: bool },
-  'device.facts': { stylusSeen: optional(bool), safeAreaApplied: optional(bool) },
+  'device.facts': { stylusSeen: optional(bool), stylusCapable: optional(bool), safeAreaApplied: optional(bool) },
   'lifecycle.state': { state: v => ['active', 'inactive', 'background'].includes(v) },
   'billing.products': { products: arrayOf(v => isPlainObject(v), 24) },
   'billing.purchase': { status: str(32) },

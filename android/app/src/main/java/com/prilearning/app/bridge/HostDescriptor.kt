@@ -5,8 +5,8 @@
 // start for the bundled origin only. Capabilities, never OS identity: lifecycle
 // (with a hardware Back button), durable storage and device facts (CP-06);
 // cloud (configured only when the build carries a cloud origin) and share
-// (files, binary, print) over the envelope bridge (CP-07). Billing arrives in
-// CP-08. Ink and photo OCR are deliberately absent: Android writes on the
+// (files, binary, print) over the envelope bridge (CP-07), and billing with
+// store "google-play" (CP-08; the server decides entitlement). Ink and photo OCR are deliberately absent: Android writes on the
 // shared web canvas, and photos are attached through the system file picker.
 // ─────────────────────────────────────────────────────────────────────────────
 package com.prilearning.app.bridge
@@ -21,13 +21,14 @@ object HostDescriptor {
         for ((k, v) in facts) put(k, v)
     }
 
-    fun json(shell: Shell, release: JSONObject?, cloudConfigured: Boolean = false, extra: Map<String, JSONObject> = emptyMap()): JSONObject {
+    fun json(shell: Shell, release: JSONObject?, cloudConfigured: Boolean = false, extra: Map<String, JSONObject> = emptyMap(), stylusCapable: Boolean = false): JSONObject {
         val capabilities = JSONObject()
             .put("lifecycle", cap("backButton" to true))
             .put("storage", cap("durable" to true))
-            .put("device", cap("safeAreaApplied" to true, "stylusSeen" to false))
+            .put("device", cap("safeAreaApplied" to true, "stylusSeen" to false, "stylusCapable" to stylusCapable))
             .put("cloud", cap("transport" to "bridge", "configured" to cloudConfigured))
             .put("share", cap("transport" to "bridge", "binary" to true, "print" to true))
+            .put("billing", cap("transport" to "bridge", "store" to "google-play"))
         for ((name, value) in extra) capabilities.put(name, value)
         return JSONObject()
             .put("protocol", Envelope.PROTOCOL)

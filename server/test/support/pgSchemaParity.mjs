@@ -26,7 +26,7 @@ const POSTGRES_INTEGER = new Set([
   'auth_delivery_outbox.attempt_count', 'login_attempts.failures', 'content_revisions.revision',
   'entitlement_snapshots.source_version', 'billing_events.verified', 'billing_subscriptions.trial_claimed',
   'billing_subscriptions.last_event_rank', 'sync_cursors.id', 'sync_entities.version', 'sync_entities.tombstone',
-  'feature_flags.enabled', 'rate_limits.count'
+  'feature_flags.enabled', 'rate_limits.count', 'billing_google_notifications.attempts'
 ]);
 
 // Constraints Postgres carries that SQLite expresses another way. Each is
