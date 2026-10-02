@@ -48,13 +48,39 @@ const CHILD_CLASS = /^(7|8|9|10|11|12)$/;
 const clean = (value, max) => clipText(String(value ?? '').trim(), max);
 
 /** Is this learner a child, on what they told us at signup? */
-export function learnerIsChild({ isAdult, year } = {}) {
+export function learnerIsChild({ isAdult } = {}) {
   // An explicit "I am 18 or older" is taken at its word; that is the only
-  // declaration a service can make. Everything else — including saying nothing —
-  // is treated as a child, because the safe default is the protective one.
-  if (isAdult === true) return false;
-  if (isAdult === false) return true;
+  // declaration a service can make. Everything else — including saying nothing,
+  // or naming no class — is treated as a child, because the safe default is the
+  // protective one. (Failing open here once let a direct API call that sent
+  // neither field skip the guardian gate.)
+  return isAdult !== true;
+}
+
+/**
+ * Did the request make an age declaration at all? `isAdult` must be a real
+ * boolean, or the learner must name a school class (which makes them a child).
+ * A request that says nothing is refused rather than guessed about.
+ */
+export function hasAgeDeclaration({ isAdult, year } = {}) {
+  if (typeof isAdult === 'boolean') return true;
   return CHILD_CLASS.test(String(year ?? '').trim());
+}
+
+/**
+ * The one age rule every account-creating path applies (/register and provider
+ * sign-up): an explicit declaration is required, and a child must name a
+ * guardian. Returns { ok, basis: 'adult'|'child', guardian } or { ok:false, code, message }.
+ */
+export function ageDecision(body = {}) {
+  const declaration = { isAdult: body.isAdult, year: body.year };
+  if (!hasAgeDeclaration(declaration)) {
+    return { ok: false, code: 'AGE_DECLARATION_REQUIRED', message: 'Say whether you are 18 or older, or which class you are in.' };
+  }
+  if (!learnerIsChild(declaration)) return { ok: true, basis: 'adult', guardian: null };
+  const checked = validateGuardian(body);
+  if (!checked.ok) return { ok: false, code: checked.code, message: checked.message };
+  return { ok: true, basis: 'child', guardian: checked };
 }
 
 /** A guardian's details, or the reason they cannot be used. */
@@ -91,7 +117,16 @@ export async function recordConsentRequest(db, { accountId, name, email, tokenHa
 export async function consentState(db, accountId) {
   db = asStore(db);
   const row = await db.get('SELECT * FROM guardian_consents WHERE account_id = ?', [accountId]);
-  if (!row) return { required: false, state: 'not-required' };
+  if (!row) {
+    // No consent row is only "not required" for an account whose creation
+    // recorded an adult (or that predates the record, backfilled 'legacy').
+    // An account with no recorded age decision — or a child whose request row
+    // is somehow missing — fails closed.
+    const account = await db.get('SELECT age_basis FROM accounts WHERE id = ?', [accountId]);
+    const basis = account?.age_basis;
+    if (basis === 'adult' || basis === 'legacy') return { required: false, state: 'not-required' };
+    return { required: true, state: 'undeclared', row: null };
+  }
   if (row.withdrawn_at) return { required: true, state: 'withdrawn', row };
   if (row.confirmed_at) return { required: true, state: 'given', row };
   return { required: true, state: 'pending', row };
@@ -124,9 +159,9 @@ export async function withdrawConsent(db, accountId, now = Date.now()) {
  * Gate anything that sends a child's data to or from this server.
  *
  * Fail-closed: an account whose consent is pending or withdrawn is refused, and
- * so is one whose row cannot be read. An account with no row at all is an adult
- * or a pre-existing account and passes — the row is written at registration
- * precisely so that "no row" is unambiguous.
+ * so is one whose row cannot be read. An account with no row passes only if
+ * its creation recorded an adult (accounts.age_basis 'adult', or 'legacy' for
+ * accounts that predate the record); no recorded decision is refused.
  */
 export function requireGuardianConsent(db) {
   db = asStore(db);
@@ -157,6 +192,10 @@ export function requireGuardianConsent(db) {
       return refuse(res, 'GUARDIAN_CONSENT_UNAVAILABLE', 'This account cannot sync right now.');
     }
     if (!state.required || state.state === 'given') return next();
+    if (state.state === 'undeclared') {
+      return refuse(res, 'AGE_DECLARATION_REQUIRED',
+        'This account has no age on record, so it cannot sync until one is given. Your work stays on this device.');
+    }
     if (state.state === 'pending') {
       return refuse(res, 'GUARDIAN_CONSENT_PENDING',
         'A parent or guardian has been emailed to confirm this account. Until they do, your work stays on this device — nothing is lost.');

@@ -5,7 +5,7 @@ import { createSession, id, rateLimit, requireSession } from './security.js';
 import { verifyIdentityToken } from './oidc.js';
 import { consumeOidcNonce, issueOidcNonce } from './oidcNonce.js';
 import { maybeBootstrapAdmin } from './bootstrapAdmin.js';
-import { learnerIsChild, recordConsentRequest, validateGuardian } from './guardianConsent.js';
+import { ageDecision, recordConsentRequest } from './guardianConsent.js';
 import { queueAccountToken } from './accounts.js';
 import { clipText } from './text.js';
 
@@ -129,15 +129,14 @@ export function createIdentityRouter(db) {
       // subject with no account is reported, never silently given a new one
       // (that student has not seen the age question or the privacy notice).
       const mayCreate = req.body?.createAccount !== false;
-      // A new account made here is held to the same age rule as /register: a
+      // A new account made here is held to the same age rule as /register
+      // (one shared function): an explicit declaration is required, and a
       // child's account needs a guardian to ask, or it would sync with no
       // consent ever requested. Checked before the nonce is spent.
-      const child = learnerIsChild({ isAdult: req.body?.isAdult, year: req.body?.year });
-      let guardian = null;
-      if (mayCreate && child) {
-        const checked = validateGuardian(req.body || {});
-        if (!checked.ok) return res.status(400).json({ error: { code: checked.code, message: checked.message } });
-        guardian = checked;
+      let decision = null;
+      if (mayCreate) {
+        decision = ageDecision(req.body || {});
+        if (!decision.ok) return res.status(400).json({ error: { code: decision.code, message: decision.message } });
       }
       const nonce = await requireIssuedNonce(db, req, res);
       if (!nonce) return;
@@ -163,14 +162,15 @@ export function createIdentityRouter(db) {
         // Sign in using the existing method first, then use the authenticated link endpoint.
         return res.status(409).json({ error: { code: 'IDENTITY_LINK_REQUIRED', message: 'An account already uses this email. Sign in to that account first, then link this provider.' } });
       }
+      const { basis, guardian } = decision;
       const now = Date.now();
       const accountId = id('acct');
       // Apple sends no name in its token; the name the student typed is next.
       const name = identity.name || clipText(String(req.body?.name || '').trim(), 80) || identity.email.split('@')[0].slice(0, 80) || 'Pri Learning Student';
       try {
         await db.transaction(async () => {
-          await db.run(`INSERT INTO accounts(id,email,name,password_hash,email_verified_at,role,created_at,updated_at)
-            VALUES (?,?,?,NULL,?,'student',?,?)`, [accountId, identity.email, name, now, now, now]);
+          await db.run(`INSERT INTO accounts(id,email,name,password_hash,email_verified_at,role,age_basis,created_at,updated_at)
+            VALUES (?,?,?,NULL,?,'student',?,?,?)`, [accountId, identity.email, name, now, basis, now, now]);
           await db.run(`INSERT INTO account_identities(provider,provider_subject,account_id,email_at_link,linked_at)
             VALUES (?,?,?,?,?)`, [provider, identity.subject, accountId, identity.email, now]);
           await db.run(`INSERT INTO entitlement_snapshots(account_id,plan,status,provider,source_version,updated_at)
