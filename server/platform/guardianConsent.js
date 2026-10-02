@@ -67,6 +67,22 @@ export function hasAgeDeclaration({ isAdult, year } = {}) {
   return CHILD_CLASS.test(String(year ?? '').trim());
 }
 
+/**
+ * The one age rule every account-creating path applies (/register and provider
+ * sign-up): an explicit declaration is required, and a child must name a
+ * guardian. Returns { ok, basis: 'adult'|'child', guardian } or { ok:false, code, message }.
+ */
+export function ageDecision(body = {}) {
+  const declaration = { isAdult: body.isAdult, year: body.year };
+  if (!hasAgeDeclaration(declaration)) {
+    return { ok: false, code: 'AGE_DECLARATION_REQUIRED', message: 'Say whether you are 18 or older, or which class you are in.' };
+  }
+  if (!learnerIsChild(declaration)) return { ok: true, basis: 'adult', guardian: null };
+  const checked = validateGuardian(body);
+  if (!checked.ok) return { ok: false, code: checked.code, message: checked.message };
+  return { ok: true, basis: 'child', guardian: checked };
+}
+
 /** A guardian's details, or the reason they cannot be used. */
 export function validateGuardian({ guardianName, guardianEmail } = {}) {
   const name = clean(guardianName, 80);

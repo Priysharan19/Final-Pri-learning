@@ -5,7 +5,10 @@
 // real router: the nonce is server-issued (POST /v1/account/identity/nonce),
 // mandatory, single-use and expiring; tokens are checked for issuer, audience,
 // expiry, algorithm, key id and signature; sign-in, linking and social
-// re-authentication for deletion all go through the same gate.
+// re-authentication for deletion all go through the same gate. A child's
+// account made through a provider asks a guardian exactly as /register does,
+// "sign in" never creates an account, and Apple's form_post callback is only
+// relayed to the same-origin callback page.
 
 import { createHash, generateKeyPairSync, sign } from 'node:crypto';
 
@@ -108,7 +111,9 @@ const issueNonce = async () => {
   if (r.status !== 201) throw new Error(`nonce issue failed: ${r.status} ${r.text}`);
   return r.data;
 };
-const signIn = (provider, body, jar = {}) => h.request(`/v1/account/identity/${provider}/sign-in`, { method: 'POST', jar, body }).then(r => ({ ...r, jar }));
+// Bodies declare an adult unless a check is about the age rule itself; pass
+// `isAdult: undefined` to send no declaration at all.
+const signIn = (provider, body, jar = {}) => h.request(`/v1/account/identity/${provider}/sign-in`, { method: 'POST', jar, body: { isAdult: true, ...body } }).then(r => ({ ...r, jar }));
 
 try {
   const noNonce = await signIn('google', { idToken: mintToken({}), deviceId: 'ipad-social' });
@@ -130,7 +135,7 @@ try {
   // Regression: provider sign-up used to create an account with no age on
   // record, which the guardian gate read as "no consent needed".
   const silentNonce = await issueNonce();
-  const silent = await signIn('google', { idToken: mintToken({ claims: { nonce: silentNonce.nonce } }), nonce: silentNonce.nonce, deviceId: 'ipad-social' });
+  const silent = await signIn('google', { idToken: mintToken({ claims: { nonce: silentNonce.nonce } }), nonce: silentNonce.nonce, deviceId: 'ipad-social', isAdult: undefined });
   c.eq(silent.status, 400, 'a provider sign-up with no age declaration is refused');
   c.eq(silent.data.error.code, 'AGE_DECLARATION_REQUIRED', 'named AGE_DECLARATION_REQUIRED');
   c.eq((await db.get('SELECT COUNT(*) AS n FROM accounts')).n, 0, 'and creates no account');
@@ -144,7 +149,7 @@ try {
 
   const childNonce = await issueNonce();
   const child = await signIn('google', {
-    idToken: mintToken({ claims: { nonce: childNonce.nonce, sub: 'google-child', email: 'child.social@example.test' } }), nonce: childNonce.nonce,
+    idToken: mintToken({ claims: { nonce: childNonce.nonce, sub: 'google-child-social', email: 'child.social@example.test' } }), nonce: childNonce.nonce,
     deviceId: 'ipad-child', isAdult: false, year: '9', guardianName: 'Social Guardian', guardianEmail: 'social.guardian@example.test'
   });
   c.eq(child.status, 201, 'a child provider sign-up with a guardian creates the account');
@@ -217,6 +222,80 @@ try {
   c.eq((await db.get('SELECT 1 FROM accounts WHERE id=?', [created.data.account.id])), undefined, 'account row gone');
 
   c.eq((await signIn('facebook', { idToken: 'x', nonce: 'y' })).status, 404, 'unsupported provider over HTTP is 404');
+
+  // ── A child's account made through a provider asks a guardian, as /register does ──
+  const nonceUnspent = await issueNonce();
+  const noGuardian = await signIn('google', { idToken: mintToken({ claims: { nonce: nonceUnspent.nonce, sub: 'google-child', email: 'child@example.test' } }), nonce: nonceUnspent.nonce, year: '9', isAdult: false });
+  c.eq(noGuardian.status, 400, 'a child creating an account through Google without a guardian is refused');
+  c.eq(noGuardian.data.error.code, 'GUARDIAN_NAME_REQUIRED', 'named as the missing guardian');
+  c.eq((await db.get('SELECT consumed_at FROM oidc_nonces WHERE nonce_hash=?', [sha256(nonceUnspent.nonce)])).consumed_at, null, 'the refusal is decided before the nonce is spent');
+  c.eq((await db.get('SELECT COUNT(*) AS n FROM accounts WHERE email=?', ['child@example.test'])).n, 0, 'no account made for the refused child');
+
+  const childSignIn = await signIn('google', {
+    idToken: mintToken({ claims: { nonce: nonceUnspent.nonce, sub: 'google-child', email: 'child@example.test' } }), nonce: nonceUnspent.nonce,
+    year: '9', isAdult: false, guardianName: 'Asha Parent', guardianEmail: 'Parent@Example.test'
+  });
+  c.eq(childSignIn.status, 201, 'with a guardian named, the child account is created');
+  const consent = await db.get('SELECT * FROM guardian_consents WHERE account_id=?', [childSignIn.data.account.id]);
+  c.ok(consent && consent.confirmed_at === null && consent.guardian_email === 'parent@example.test', 'a pending guardian consent is recorded');
+  c.eq((await db.get(`SELECT COUNT(*) AS n FROM auth_delivery_outbox WHERE account_id=? AND kind='guardian-consent' AND destination=?`, [childSignIn.data.account.id, 'parent@example.test'])).n, 1, 'the guardian email is queued');
+  c.eq((await h.request('/v1/account/guardian/state', { jar: childSignIn.jar })).data.state, 'pending', 'the account reads as waiting for its guardian');
+  const childSync = await h.request('/v1/sync/pull/0', { jar: childSignIn.jar });
+  c.eq(childSync.status, 403, 'and cannot sync until the guardian confirms');
+
+  const adultNonce = await issueNonce();
+  const adult = await signIn('google', { idToken: mintToken({ claims: { nonce: adultNonce.nonce, sub: 'google-adult', email: 'adult@example.test' } }), nonce: adultNonce.nonce, year: '12', isAdult: true });
+  c.eq(adult.status, 201, 'a student who declares 18+ needs no guardian');
+  c.eq(await db.get('SELECT 1 AS x FROM guardian_consents WHERE account_id=?', [adult.data.account.id]), undefined, 'and no consent request is made');
+
+  // ── "Sign in" never creates an account ──
+  const unknownNonce = await issueNonce();
+  const unknown = await signIn('google', { idToken: mintToken({ claims: { nonce: unknownNonce.nonce, sub: 'google-stranger', email: 'stranger@example.test' } }), nonce: unknownNonce.nonce, createAccount: false, year: '9' });
+  c.eq(unknown.status, 404, 'sign-in only, for a subject with no account, is refused');
+  c.eq(unknown.data.error.code, 'IDENTITY_NOT_REGISTERED', 'named as not registered');
+  c.eq((await db.get('SELECT COUNT(*) AS n FROM accounts WHERE email=?', ['stranger@example.test'])).n, 0, 'no account made');
+  const knownNonce = await issueNonce();
+  const known = await signIn('google', { idToken: mintToken({ claims: { nonce: knownNonce.nonce, sub: 'google-child', email: 'child@example.test' } }), nonce: knownNonce.nonce, createAccount: false, year: '9' });
+  c.eq(known.status, 200, 'sign-in only, for a linked subject, signs in without guardian fields');
+  c.eq(known.data.account.id, childSignIn.data.account.id, 'to the linked account');
+
+  const appleNamed = await issueNonce();
+  const named = await signIn('apple', { idToken: mintToken({ provider: 'apple', claims: { nonce: appleNamed.nonce, sub: 'apple-named', email: 'named@example.test' } }), nonce: appleNamed.nonce, name: 'Meera Rao', isAdult: true });
+  c.eq(named.data.account.name, 'Meera Rao', 'Apple tokens carry no name, so the typed name is used');
+
+  // ── Which providers a browser may start ──
+  c.deq((await h.request('/v1/account/identity/providers')).data, { providers: { google: null, apple: null } }, 'no web client id configured: no provider is offered');
+  process.env.PRI_GOOGLE_WEB_CLIENT_ID = 'pri-google-client';
+  process.env.PRI_APPLE_WEB_CLIENT_ID = 'com.prilearning.web';
+  c.deq((await h.request('/v1/account/identity/providers')).data, { providers: { google: { clientId: 'pri-google-client' }, apple: null } }, 'a web id is offered only when the verifier accepts it as an audience');
+  process.env.PRI_APPLE_CLIENT_IDS = 'com.prilearning.app,com.prilearning.web';
+  c.deq((await h.request('/v1/account/identity/providers')).data.providers.apple, { clientId: 'com.prilearning.web' }, 'Apple web services id offered once it is an accepted audience');
+  delete process.env.PRI_GOOGLE_WEB_CLIENT_ID;
+  delete process.env.PRI_APPLE_WEB_CLIENT_ID;
+  process.env.PRI_APPLE_CLIENT_IDS = 'com.prilearning.app';
+
+  // ── Apple's form_post is answered with the callback page, never a redirect ──
+  const relayState = 'state_0123456789abcdef';
+  const relayToken = mintToken({ provider: 'apple', claims: { nonce: 'n' } });
+  const relayFields = r => new URLSearchParams((/<meta name="pri-oidc-callback" content="([^"]*)">/.exec(r.text) || [])[1] || '');
+  const form = new URLSearchParams({ state: relayState, code: 'c0de', id_token: relayToken, user: '{"name":{"firstName":"Meera"}}' }).toString();
+  const relayed = await h.request('/v1/account/identity/apple/callback', { method: 'POST', rawBody: form, headers: { 'Content-Type': 'application/x-www-form-urlencoded', Origin: 'https://appleid.apple.com' } });
+  c.eq(relayed.status, 200, 'Apple callback answers with a page, not a redirect');
+  c.eq(relayed.headers.get('location'), null, 'and no Location header');
+  c.ok(/text\/html/.test(relayed.headers.get('content-type') || ''), 'an HTML page');
+  c.ok(relayed.text.includes('<script src="/auth/callback.js"></script>') && !/<script>/.test(relayed.text), 'that loads the same-origin callback script and no inline script');
+  c.eq(relayed.headers.get('cache-control'), 'no-store', 'never cached');
+  const relayedFields = relayFields(relayed);
+  c.eq(relayedFields.get('provider'), 'apple', 'provider relayed');
+  c.eq(relayedFields.get('state'), relayState, 'state relayed');
+  c.eq(relayedFields.get('id_token'), relayToken, 'identity token relayed');
+  c.eq(relayedFields.get('user'), null, 'nothing else from the post is relayed');
+  const junk = await h.request('/v1/account/identity/apple/callback', { method: 'POST', rawBody: new URLSearchParams({ state: relayState, id_token: 'x"><script>alert(1)</script>' }).toString(), headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
+  c.eq(relayFields(junk).get('error'), 'invalid_response', 'a malformed token is replaced by an error');
+  c.ok(!junk.text.includes('alert(1)'), 'and none of it reaches the page');
+  const denied = await h.request('/v1/account/identity/apple/callback', { method: 'POST', rawBody: new URLSearchParams({ state: relayState, error: 'user_cancelled_authorize' }).toString(), headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
+  c.eq(relayFields(denied).get('error'), 'user_cancelled_authorize', 'a cancelled Apple sign-in is relayed as its error');
+  c.eq((await db.get('SELECT COUNT(*) AS n FROM accounts WHERE email=?', ['apple.student@example.test'])).n, 1, 'the relay creates and changes nothing');
 } finally {
   await h.close();
   globalThis.fetch = realFetch;
