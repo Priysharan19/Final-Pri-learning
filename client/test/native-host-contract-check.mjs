@@ -350,6 +350,9 @@ ok(normalizeCode('SOMETHING_NEW_FROM_A_SHELL') === 'INTERNAL', 'unknown codes be
   answer({ id: cloudPosts.filter(m => m.action === 'request').at(-1).id, status: 403, body: JSON.stringify({ error: { code: 'ORIGIN_REJECTED', message: 'no' } }) });
   try { await http; ok(false, 'http error resolved'); } catch (e) { ok(e.status === 403 && e.code === 'ORIGIN_REJECTED', 'HTTP errors keep status and server code'); }
 
+  ok(await priNative.cloud.forgetSession() === true && cloudPosts.some(m => m.action === 'forget'),
+    'the legacy Apple cloud bridge is told to forget the session on Disconnect');
+
   globalThis.window.__PRI_NATIVE_CLOUD_CONFIGURED__ = false;
   priNative.dispose();
   try { await cloudRequest('/v1/me'); ok(false, 'unconfigured resolved'); } catch (e) { ok(e.code === 'CLOUD_DISABLED', `an unconfigured native cloud fails closed as CLOUD_DISABLED (${e.code})`); }
@@ -389,6 +392,49 @@ ok(normalizeCode('SOMETHING_NEW_FROM_A_SHELL') === 'INTERNAL', 'unknown codes be
   priNative.dispose();
   unsupportedHost.uninstall();
   delete globalThis.document;
+}
+
+// ── 12c′ · Print goes to the native print dialog inside a shell ─────────────
+{
+  let printed = 0;
+  globalThis.window = globalThis;
+  globalThis.print = () => { printed += 1; };
+  const { printPage } = await import(`../src/lib/files.js?print=${Date.now()}`);
+  const host = createFakeHost({ capabilities: { share: { versions: [1], print: true } }, handlers: {
+    'host.ready': () => ({}), 'share.print': () => ({ completed: true }),
+  } });
+  priNative.dispose();
+  const result = await printPage();
+  ok(host.lastRequest('share', 'print') && result?.completed === true && printed === 0,
+    'inside a shell that can print, Print opens the native print dialog (window.print() is a no-op in Android WebView)');
+  priNative.dispose();
+  host.uninstall();
+  const noPrint = createFakeHost({ capabilities: { share: { versions: [1] } }, handlers: { 'host.ready': () => ({}) } });
+  priNative.dispose();
+  await printPage();
+  ok(printed === 1 && !noPrint.lastRequest('share', 'print'), 'a host without print (and every browser) uses window.print()');
+  priNative.dispose();
+  noPrint.uninstall();
+  delete globalThis.print;
+  delete globalThis.window;
+}
+
+// ── 12c″ · Disconnect forgets the native session even offline ───────────────
+{
+  const host = createFakeHost({ capabilities: { cloud: { versions: [1], configured: true } }, handlers: {
+    'host.ready': () => ({}), 'cloud.forgetSession': () => ({}),
+  } });
+  priNative.dispose();
+  ok(await priNative.cloud.forgetSession() === true && !!host.lastRequest('cloud', 'forgetSession'),
+    'an envelope host is asked to forget the cloud session');
+  priNative.dispose();
+  host.uninstall();
+  const failing = createFakeHost({ capabilities: { cloud: { versions: [1], configured: true } }, handlers: { 'host.ready': () => ({}) } });
+  priNative.dispose();
+  ok(await priNative.cloud.forgetSession() === false, 'a host that cannot forget answers false, never throws');
+  priNative.dispose();
+  failing.uninstall();
+  ok(await priNative.cloud.forgetSession() === false, 'with no cloud capability (a browser) there is nothing to forget');
 }
 
 // ── 12d · Android delivery: JSON strings out, `message` events back ──────────

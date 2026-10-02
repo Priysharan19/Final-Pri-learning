@@ -228,6 +228,13 @@ export function createLegacyApple({ scope = globalThis, emit = () => {}, now = (
         }
       });
     },
+    /** Drop the cloud cookies from the native jar (fire-and-forget). */
+    forget() {
+      const bridge = handler('priCloud');
+      if (!bridge) return Promise.resolve(false);
+      try { bridge.postMessage({ id: `native-${newRequestId()}`.slice(0, 120), action: 'forget' }); return Promise.resolve(true); }
+      catch { return Promise.resolve(false); }
+    },
   };
 
   // ── share (text only, fire-and-forget) ─────────────────────────────────────
