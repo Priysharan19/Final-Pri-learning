@@ -5,7 +5,6 @@
 .pri-v-flight-token{position:absolute;display:inline-grid;place-items:center;min-width:24px;min-height:25px;padding:2px 6px;border-radius:6px;border:1px solid var(--gold-border);background:var(--gold-faint);color:var(--ink);font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:.83rem;font-weight:760;box-shadow:0 8px 24px color-mix(in srgb,var(--gold) 16%,transparent);opacity:0;will-change:transform,opacity;animation:priV6TokenFlight .78s var(--flight-delay,460ms) cubic-bezier(.22,.72,.18,1) both}
 .pri-v-transform-v6.has-started .phase-depart>span.state-moving{animation:priV6SourceYield .25s .28s ease forwards}
 .pri-v-transform-v6.has-started .phase-arrive>span.state-moving{opacity:0;animation:priV6DestinationLand .24s var(--landing-delay,1.18s) ease forwards}
-.pri-v-transform-v6 .pri-v-motion-lane{display:none!important}
 .pri-v-position-note{display:flex;align-items:center;justify-content:center;gap:8px;min-height:24px;color:var(--ink-3);font-size:8px;font-weight:800;letter-spacing:.13em;text-transform:uppercase;opacity:0}
 .pri-v-transform-v6.has-started .pri-v-position-note{animation:priExplainVisualIn .22s .48s ease both}
 .pri-v-position-note:before,.pri-v-position-note:after{content:"";height:1px;flex:1;max-width:72px;background:linear-gradient(90deg,transparent,var(--hairline-strong))}
