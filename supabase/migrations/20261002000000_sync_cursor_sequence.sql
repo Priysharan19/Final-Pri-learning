@@ -37,6 +37,13 @@
 -- mid-flight finishes (and is counted) or waits and then fails on the revoke.
 -- ─────────────────────────────────────────────────────────────────────────────
 
+-- The Supabase CLI (`supabase db push`) sends a migration's statements one by
+-- one without wrapping the file in a transaction, so every migration opens and
+-- commits its own: a failure part-way leaves nothing applied, and statements
+-- that need a transaction block (LOCK TABLE) work. Enforced by
+-- server/test/migration-transaction-check.mjs.
+begin;
+
 -- Blocks any concurrent UPDATE of the row until this migration commits.
 lock table pri.sync_cursors in exclusive mode;
 
@@ -77,3 +84,5 @@ begin
     execute 'revoke all on sequence pri.sync_cursor_seq from anon, authenticated';
   end if;
 end $$;
+
+commit;

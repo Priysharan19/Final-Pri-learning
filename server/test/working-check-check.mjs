@@ -43,6 +43,11 @@ ok(/ignore your instructions/i.test(SYSTEM_INSTRUCTIONS), 'with the obvious atta
 ok(/plain words, naming what happened/i.test(SYSTEM_INSTRUCTIONS), 'and feedback must name what happened');
 ok(!/marks?\b.*award/i.test(SYSTEM_INSTRUCTIONS), 'the model is not asked to award marks — the app does that deterministically');
 ok(WORKING_SCHEMA.additionalProperties === false, 'the response schema is closed');
+ok(Array.isArray(WORKING_SCHEMA.properties.misconception_id?.enum) && WORKING_SCHEMA.properties.misconception_id.enum.includes(null)
+  && WORKING_SCHEMA.properties.misconception_id.enum.includes('other') && WORKING_SCHEMA.properties.misconception_id.enum.length > 10,
+  'a proposed misconception is constrained to the ontology IDs, "other" or null — never free text');
+eq(normalizeResult({ lines: [{ index: 0, status: 'break', carried: false, why: 'x' }], first_break: 0, hint: '', confidence: 0.9, misconception_id: 'Your answer should be 4' },
+  { lineCount: 1, model: 'test', confidenceFloor: 0.75 }).misconceptionId, null, 'free text in the misconception field is dropped, so it cannot carry an answer');
 eq(WORKING_SCHEMA.properties.lines.items.properties.status.enum, ['ok', 'break', 'note'],
   'and speaks the same verdict vocabulary as the on-device checker');
 
@@ -184,6 +189,7 @@ app.use('/working', createWorkingRouter(db, {
       firstBreak: 1,
       hint: 'Look again at what you did to both sides in line 2.',
       confidence: 0.9,
+      misconceptionId: 'sides-mismatched',
       needsConfirmation: false
     };
   },
@@ -211,6 +217,8 @@ try {
   ok(good.json.check.lines[1].why.length > 10, 'and says in words what went wrong there');
   ok(good.json.check.hint && !/x\s*=\s*4/.test(good.json.check.hint), 'the hint points without giving the answer');
   eq(seenPrompt, 'Solve 2x + 3 = 11.', 'the question reaches the checker');
+  eq(good.json.check.misconceptionId, 'sides-mismatched', 'a proposed ontology ID is returned to the client — as a proposal, for the engine to decide');
+  ok(!('answer' in good.json.check) && !('expected' in good.json.check), 'and nothing beside it carries an answer');
 
   const leaky = await call('acct-verified', { lines: ['x = 7'], expectedAnswer: 'x = 4' });
   eq([leaky.status, leaky.json?.error?.code], [400, 'WORKING_NOT_ANSWER_BLIND'],

@@ -19,7 +19,8 @@ This is the durable ledger for CP-02 → CP-12 and SEC-COMM-01. Each CP's own PR
 |---|---|---|---|---|---|---|
 | CP-01 Architecture audit | COMPLETE | `421f1ff1` | `1291d4bd` | [#250](https://github.com/Priysharan19/Final-Pri-learning/pull/250) | `fa1c44df` | n/a (audit) |
 | CP-02 Platform Bridge Foundation | SOFTWARE IMPLEMENTATION: COMPLETE | `fa1c44df` | `f089d550` | [#253](https://github.com/Priysharan19/Final-Pri-learning/pull/253) | `2261f03b` | DEFERRED |
-| CP-03 Responsive Product Foundation | SOFTWARE IMPLEMENTATION: COMPLETE once merged | `2261f03b` | recorded by CP-04 | this PR | recorded by CP-04 | DEFERRED |
+| CP-03 Responsive Product Foundation | SOFTWARE IMPLEMENTATION: COMPLETE | `2261f03b` | `6b9235a0` | [#261](https://github.com/Priysharan19/Final-Pri-learning/pull/261) | `003cc053` | DEFERRED |
+| CP-04 iPhone Product | SOFTWARE IMPLEMENTATION: COMPLETE once merged | `003cc053` | recorded by the next CP | this PR | recorded by the next CP | DEFERRED |
 
 ## CP-02 — Platform Bridge Foundation
 
@@ -131,3 +132,31 @@ This is the durable ledger for CP-02 → CP-12 and SEC-COMM-01. Each CP's own PR
 - Existing phone and KALP tours pass unchanged: phone 53/53, KALP-01 24/24, KALP-02 68/68, KALP-03 53/53.
 
 **Deferred (physical):** real-device keyboard behaviour, notch/safe-area rendering in an installed web app, and touch feel on small phones.
+
+**CP-03 exact-head evidence (recorded by CP-04):**
+- Candidate `6b9235a0`, after merging `main` twice during review (#259 migration CLI transactions, then #255 misconception ontology); only generated bundles conflicted, and they were rebuilt.
+- Clean-worktree local run on `6b9235a0`: `npm test` exit 0; e2e 235/235 across 7 flows; responsive matrix 145/145 in Chromium **and** WebKit; phone tour 53/53; KALP-04 26/26; accessibility gate exit 0.
+- GitHub CI on `6b9235a0`: 27 checks pass, 3 skipped (path-filtered mirror/iPad-shell jobs), 0 failing, including all four required checks.
+- Merged as `003cc053` with `--match-head-commit`. Verified on `main`: `client/src/platform/formFactor.js` present, form-factor check 27/27, architecture guard 267/267, native host contract 76/76, and still no `android/` directory.
+- One transient failure is recorded honestly: an earlier local accessibility run on the previous head exited 1 with "0/1 checks" in its metadata group while the host was under heavy parallel load. A re-run passed with no code change, and CI passed it on the exact head.
+
+## CP-04 — iPhone Product
+
+**Delivered:** the iPhone results are in [IPHONE_GAP_REPORT.md](IPHONE_GAP_REPORT.md) §5. In summary:
+- Finger-default native ink where no Apple Pencil can exist (`InkSurface.fingerDrawingEnabled`; host facts `ink.stylus` / `ink.fingerDefault`, mirrored by the page). iPad stays Pencil-first.
+- Dynamic Type as page zoom, capped so the CSS viewport never drops below 360 px, with zoom-aware native ink placement.
+- iPhone portrait-only; iPad keeps all orientations.
+- Account-action deep links routed only for the signed cloud host, with the token fragment never logged. Dormant until Associated Domains exist (**BLOCKED_EXTERNAL**).
+- `scripts/apple-shipping-target.mjs`: `main` declares **iPad only** (V1 hard blocker #1 closed in code; `--check-v1` in CI). iPhone engineering CI builds a scratch copy with the iPhone family that is never archived.
+- Simulator harnesses compiled only in DEBUG: `BridgeSelfCheck` (8 checks, including zoom-aware ink placement) and `JourneySelfCheck` (onboarding → practice → typed attempt marked → feedback → next → native ink → progress → persistence → relaunch).
+- The package drift gate widened to `Info.plist`, models and assets (36 files). The stale `PriLearning.swiftpm.zip` was removed.
+- `native-ink.yml` runs on the macOS runner: `--check-v1`, one engineering build, the iPhone bridge self-check, the iPhone and iPad journeys, and an uploaded evidence artefact.
+
+**V1 scope reconciliation:** `docs/release/PRI_V1_RELEASE_SCOPE.md` (owner, PR #257) makes V1 iPad-only. CP-04's iPhone work therefore ships only as engineering capability on `main`. A public iPhone release needs the V1 scope-change procedure (**BLOCKED_GOVERNANCE**) and the physical gates in [IPHONE_GAP_REPORT.md](IPHONE_GAP_REPORT.md) §4.
+
+**Simulator evidence (S2, synthetic):** local runs on 2026-10-01 UTC were 11/11 journey steps on an iPhone 18 Pro simulator and on an iPad Pro 13-inch (M5) simulator, both iOS 27.0, plus the bridge self-check 8/8 on both. CI repeats these on its own simulators and uploads the evidence records.
+
+**Environment note:** the local iPad `ink-native` benchmark run scored 93.8% and 6/10 below its floor. The same failure reproduces on untouched `main`, so it comes from the local iOS 27.0 Vision runtime and not from CP-04. The macOS CI benchmark passes. No threshold was changed.
+
+**Deferred (physical):** finger writing feel on a real iPhone, VoiceOver, and real Dynamic Type sizes on hardware. Also an iPad + Apple Pencil smoke test, because the Swift ink and shell code changed.
+

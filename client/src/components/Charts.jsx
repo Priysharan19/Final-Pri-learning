@@ -4,6 +4,7 @@
 // text in ink tokens (never series color), 4px rounded data ends.
 // ─────────────────────────────────────────────────────────────────────────────
 import React, { useState, useRef } from 'react';
+import { useT } from '../i18n/index.js';
 
 const SEQ = ['var(--seq-100)', 'var(--seq-200)', 'var(--seq-300)', 'var(--seq-400)', 'var(--seq-500)', 'var(--seq-600)', 'var(--seq-700)'];
 
@@ -23,10 +24,11 @@ function niceTicks(min, max, n = 4) {
 
 /** Single-series line with area wash, crosshair tooltip, end-dot + end label. */
 export function LineChart({ data, height = 210, yLabel = '', band = null, valueFmt = v => v }) {
+  const t = useT();
   const [hover, setHover] = useState(null);
   const wrapRef = useRef(null);
   const W = 640, H = height, padL = 34, padR = 46, padT = 14, padB = 26;
-  if (!data || data.length < 2) return <div className="muted" style={{ padding: 20 }}>Not enough history yet — keep practising and your trend will appear here.</div>;
+  if (!data || data.length < 2) return <div className="muted" style={{ padding: 20 }}>{t('charts.notEnoughHistory')}</div>;
 
   const ys = data.map(d => d.value);
   const yMinRaw = Math.min(...ys, band ? band.low : Infinity);
@@ -50,10 +52,10 @@ export function LineChart({ data, height = 210, yLabel = '', band = null, valueF
   return (
     <div ref={wrapRef} style={{ position: 'relative' }} onMouseMove={onMove} onMouseLeave={() => setHover(null)}>
       <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', display: 'block' }} role="img" aria-label={yLabel}>
-        {ticks.map(t => (
-          <g key={t}>
-            <line x1={padL} x2={W - padR} y1={y(t)} y2={y(t)} stroke="var(--grid)" strokeWidth="1" />
-            <text x={padL - 7} y={y(t) + 3.5} textAnchor="end" className="axis-text">{t}</text>
+        {ticks.map(tick => (
+          <g key={tick}>
+            <line x1={padL} x2={W - padR} y1={y(tick)} y2={y(tick)} stroke="var(--grid)" strokeWidth="1" />
+            <text x={padL - 7} y={y(tick) + 3.5} textAnchor="end" className="axis-text">{tick}</text>
           </g>
         ))}
         {band && (
@@ -113,6 +115,7 @@ export function HBars({ data, max = 100, valueFmt = v => `${v}%` }) {
 
 /** GitHub-style activity heatmap — sequential single hue. */
 export function Calendar({ days, weeks = 17 }) {
+  const t = useT();
   const [tip, setTip] = useState(null);
   const cell = 13, gap = 3;
   const byDate = Object.fromEntries((days || []).map(d => [d.date, d]));
@@ -148,13 +151,13 @@ export function Calendar({ days, weeks = 17 }) {
       {tip && (
         <div className="chart-tip" style={{ left: `${tip.x * 100}%`, top: `${tip.y * 100}%` }}>
           <div className="tip-label">{tip.c.key}</div>
-          <div className="tip-value">{tip.c.data ? `${tip.c.data.questions} questions · ${tip.c.data.correct} correct` : 'No practice'}</div>
+          <div className="tip-value">{tip.c.data ? t('charts.dayTip', { count: tip.c.data.questions, n: tip.c.data.questions, correct: tip.c.data.correct }) : t('charts.noPractice')}</div>
         </div>
       )}
       <div className="row" style={{ gap: 5, marginTop: 8, justifyContent: 'flex-end' }}>
-        <span className="muted" style={{ fontSize: 11 }}>Less</span>
+        <span className="muted" style={{ fontSize: 11 }}>{t('charts.less')}</span>
         {fills.map((f, i) => <span key={i} style={{ width: 11, height: 11, borderRadius: 3, background: f, display: 'inline-block' }} />)}
-        <span className="muted" style={{ fontSize: 11 }}>More</span>
+        <span className="muted" style={{ fontSize: 11 }}>{t('charts.more')}</span>
       </div>
     </div>
   );

@@ -16,17 +16,45 @@
  * The languages the app is actually translated into, with each one's name in
  * its own script. A language belongs here only once a catalogue exists for it:
  * an entry with no strings behind it would offer a student a setting that does
- * nothing, and the i18n contract suite fails a language that is listed without
+ * nothing, and the i18n contract suites fail a language that is listed without
  * a complete catalogue.
  *
- * `label` is what the student sees, and it is written in the language itself —
- * a Hindi reader looking for Hindi is looking for "हिन्दी", not for "Hindi".
- * `english` exists for the places that must name the language to a reader who
- * cannot yet read it (an aria-label on the switch itself, a log line, a test).
+ * THIS TABLE IS THE ONLY REGISTRATION. Adding Tamil or Marathi is a
+ * `strings.<id>.js` file with every English key, plus one entry here — the
+ * runtime, the build's chunking, the service worker's on-demand rule, the
+ * settings switch, `<html lang>`, the narration voice and the contract suites
+ * all read this table. docs/i18n.md walks through it.
+ *
+ *   id         the profile value, and the catalogue's file name
+ *   label      what the student sees, written in the language itself — a Hindi
+ *              reader looking for Hindi is looking for "हिन्दी", not "Hindi"
+ *   english    for the places that must name the language to a reader who
+ *              cannot yet read it (an aria-label on the switch, a log, a test)
+ *   htmlLang   the value for `<html lang>`
+ *   speech     BCP-47 tags for narration, best first. The runtime picks the
+ *              first installed voice matching any of them, then any voice of
+ *              the base language, then English — see explain/speech.js.
+ *   plural     the CLDR cardinal rule as a function of the count, returning
+ *              'one' or 'other'. Omit it to use Intl.PluralRules for the id.
+ *   load       how the catalogue is fetched. Written out as a literal import()
+ *              so the bundler can see it and emit the catalogue as its own
+ *              chunk; English has none because it is in the entry and can
+ *              never be missing.
  */
 export const LANGUAGES = [
-  { id: 'en', label: 'English', english: 'English', htmlLang: 'en' },
-  { id: 'hi', label: 'हिन्दी', english: 'Hindi', htmlLang: 'hi' }
+  {
+    id: 'en', label: 'English', english: 'English', htmlLang: 'en',
+    speech: ['en-IN', 'en-GB', 'en-AU', 'en-US'],
+    plural: n => (n === 1 ? 'one' : 'other')
+  },
+  {
+    id: 'hi', label: 'हिन्दी', english: 'Hindi', htmlLang: 'hi',
+    speech: ['hi-IN'],
+    // CLDR for Hindi is "i = 0 or n = 1": 0 and every fraction below one take
+    // the singular. See pluralCategory below for why that matters.
+    plural: n => (Math.floor(n) === 0 || n === 1 ? 'one' : 'other'),
+    load: () => import('./strings.hi.js').then(m => m.default)
+  }
 ];
 
 /**
@@ -75,6 +103,31 @@ export const htmlLangOf = raw => languageOf(raw).htmlLang;
 export function pluralCategory(count, language = DEFAULT_LANGUAGE) {
   const n = Math.abs(Number(count));
   if (!Number.isFinite(n)) return 'other';
-  if (cleanLanguage(language) === 'hi') return Math.floor(n) === 0 || n === 1 ? 'one' : 'other';
-  return n === 1 ? 'one' : 'other';
+  const lang = languageOf(language);
+  if (typeof lang.plural === 'function') return lang.plural(n) === 'one' ? 'one' : 'other';
+  // A language registered without its own rule gets the platform's CLDR data.
+  // Only 'one' and 'other' are honoured: every catalogue entry carries exactly
+  // those two forms, and a language that needs more (few, many) must say so
+  // in its own `plural` and grow the catalogue shape first.
+  try {
+    return new Intl.PluralRules(lang.htmlLang).select(n) === 'one' ? 'one' : 'other';
+  } catch {
+    return n === 1 ? 'one' : 'other';
+  }
 }
+
+/**
+ * Narration tags for a language, best first — never empty. With a `region`
+ * (the student's country, e.g. 'IN' or 'AU'), that region's tag moves to the
+ * front when the language registers one: English for an Indian course is
+ * en-IN first, for an Australian course en-AU first, and the rest of the list
+ * stays behind it as the fallback order.
+ */
+export const speechTagsOf = (raw, region) => {
+  const registered = languageOf(raw).speech;
+  const tags = Array.isArray(registered) && registered.length ? [...registered] : [languageOf(raw).htmlLang];
+  const wanted = typeof region === 'string' ? `${tags[0].split('-')[0]}-${region.toUpperCase()}` : null;
+  const at = wanted ? tags.indexOf(wanted) : -1;
+  if (at > 0) tags.unshift(...tags.splice(at, 1));
+  return tags;
+};

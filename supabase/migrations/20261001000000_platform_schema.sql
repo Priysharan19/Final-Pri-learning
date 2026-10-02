@@ -41,6 +41,13 @@
 -- and would only obstruct a supervised data repair.
 -- ─────────────────────────────────────────────────────────────────────────────
 
+-- The Supabase CLI (`supabase db push`) sends a migration's statements one by
+-- one without wrapping the file in a transaction, so every migration opens and
+-- commits its own: a failure part-way leaves nothing applied, and statements
+-- that need a transaction block (LOCK TABLE) work. Enforced by
+-- server/test/migration-transaction-check.mjs.
+begin;
+
 create schema if not exists pri;
 
 do $$
@@ -450,3 +457,5 @@ begin
     execute format('create policy pri_server_all on pri.%I as permissive for all to pri_server using (true) with check (true)', t.tablename);
   end loop;
 end $$;
+
+commit;
