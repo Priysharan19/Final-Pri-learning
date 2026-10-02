@@ -93,3 +93,30 @@ Run on at least one small iPhone (SE-class, 375×667 pt), one current standard i
 7. Background → foreground with an unsaved draft. Then a forced kill while backgrounded, and confirm the draft survives.
 8. VoiceOver pass of the critical journey, plus the largest Dynamic Type size.
 9. Offline: airplane mode during practice, then reconnect and sync.
+
+## 5. Status after CP-04 (iPhone Product)
+
+The rows below update §2 and §3 with what is implemented and automatically checked. Nothing here is physical evidence.
+
+| Gap (from §2) | CP-04 result |
+|---|---|
+| 1. Pencil-only native ink | **Fixed.** `InkSurface.fingerDrawingEnabled` defaults on where no Apple Pencil can exist (iPhone) and stays Pencil-first on iPad. The host reports `ink.stylus` / `ink.fingerDefault` as capability facts, and the page mirrors them; the toolbar toggle still switches either way. |
+| 3. "Apple Pencil" copy | **Fixed** (CP-03/CP-04). Copy is capability-neutral ("stylus or finger") and translated. |
+| 4. Typed path | **Fixed** (CP-03): `inputMode="text"` + `enterKeyHint`, 44 px palette keys. |
+| 6–8. Compact layouts | **Fixed** (CP-03). The writing area fits the screen, Next is unobscured, and Settings is uncovered. The suspected progress overflow did not reproduce. |
+| 9. Orientation | **Decided:** iPhone portrait-only (`Package.swift`); iPad keeps all four orientations. |
+| 13. No iPhone CI | **Fixed.** `native-ink.yml` runs the bridge self-check and the native student journey on an iPhone simulator, and the journey on an iPad simulator too. Evidence JSON is uploaded. |
+| 14. Lifecycle | **Fixed** (CP-02): `lifecycle.state` with a background grace period, and drafts flush on `inactive`/`background`. |
+| 15. Deep links | **Implemented but dormant.** Only `https://<signed cloud host>/account-action#…` is routed into the app, and the token fragment is never logged. It needs the Associated Domains entitlement plus `apple-app-site-association` on the production origin (**BLOCKED_EXTERNAL**, owner/Apple account). |
+| 16. Account export | **Fixed** (CP-02): the explicit `share.file` path. |
+| 2. Finger draw vs scroll | **Partly fixed.** On iPhone, fingers write on the canvas and scroll the page everywhere else. The canvas fits the screen (CP-03), so scrolling while writing is rarely needed. Two-finger scrolling over the canvas is **not** implemented (open). Real finger feel is a physical gate. |
+| 18. Accessibility | **Partly fixed.** Dynamic Type is applied as page zoom, capped so the CSS viewport never drops below 360 px: up to 1.5× on iPad, and about 1.08× (390 pt wide) to 1.22× (440 pt) on iPhone. The native ink surface is placed zoom-aware: it keeps CSS-pixel bounds and is scaled by the zoom, and the bridge self-check verifies the zoom 1 and 1.5× cases. VoiceOver remains a physical gate. |
+| Stale artefacts | `PriLearning.swiftpm.zip` removed. The package drift gate now covers `Info.plist`, assets and models. |
+
+**Simulator evidence (synthetic):** the evidence records come from the CI artefact `native-simulator-evidence` (workflow "Native Ink"). The local runs on 2026-10-01 UTC were:
+- `node scripts/iphone-journey.mjs --family iphone` gives **11/11** on an iPhone 18 Pro simulator (iOS 27.0): launch, onboarding, practice, a typed attempt marked with feedback ("Not quite…"), next question, native ink (`stylus=false fingerDefault=true`, a native reading returned), progress, a persistence marker, and the profile and marker surviving a relaunch.
+- The same journey gives 11/11 on an iPad Pro 13-inch (M5) simulator (`stylus=true fingerDefault=false`).
+- The bridge self-check is 8/8 on both, including zoom-aware ink placement.
+- The journey asserts hardware-correct ink facts. Finger *touch* input itself is not exercised by injected strokes; it remains a physical gate.
+
+**Scope note:** `docs/release/PRI_V1_RELEASE_SCOPE.md` makes V1 iPad-only, and the release policy ships only an exact `main` SHA. So `main` itself declares **iPad only**, which closes V1 hard blocker #1 in code, and `--check-v1` runs in CI. iPhone engineering builds a scratch copy that adds the iPhone family: `node scripts/apple-shipping-target.mjs --engineering-package <dir>`. That copy is used for simulator CI and is never archived. A public iPhone release needs the V1 scope-change procedure, then a reviewed change to `main`, **and** the §4 physical gates.

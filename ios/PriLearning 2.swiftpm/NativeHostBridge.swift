@@ -33,6 +33,9 @@ final class NativeHostBridge: NSObject {
     /// capabilities, never on the platform.
     static func hostScript(cloudConfigured: Bool) -> String {
         let info = Bundle.main.infoDictionary ?? [:]
+        // Hardware facts, not OS identity: an iPhone cannot pair an Apple
+        // Pencil, so its ink defaults to finger; an iPad keeps Pencil-first ink.
+        let stylusCapable = UIDevice.current.userInterfaceIdiom == .pad
         var descriptor: [String: Any] = [
             "protocol": protocolVersion,
             "bundledAssets": true,
@@ -42,7 +45,7 @@ final class NativeHostBridge: NSObject {
                 "id": Bundle.main.bundleIdentifier ?? ""
             ],
             "capabilities": [
-                "ink": ["versions": [1], "transport": "legacy", "stylus": true, "finger": true],
+                "ink": ["versions": [1], "transport": "legacy", "stylus": stylusCapable, "finger": true, "fingerDefault": !stylusCapable],
                 "photo": ["versions": [1], "transport": "legacy", "ocr": true],
                 "billing": ["versions": [1], "transport": "legacy", "store": "app-store"],
                 "cloud": ["versions": [1], "transport": "legacy", "configured": cloudConfigured],
