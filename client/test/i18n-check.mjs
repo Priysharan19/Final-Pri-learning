@@ -365,6 +365,10 @@ eq(leftInEnglish, [], 'no converted screen draws a literal English string a read
 for (const [text, reason] of LITERAL_ALLOWLIST) {
   ok(reason.length > 15, `the literal allowlist states a reason for “${text}”`);
 }
+// The wordmark is one literal, "Pri Learning": a split around the brand tile
+// read as "P ri Learning." on the standalone verify-email page.
+ok(!LITERAL_ALLOWLIST.has('ri Learning') && !LITERAL_ALLOWLIST.has('ri Learning.'),
+  'the wordmark is never allow-listed as a fragment split around the tile letter');
 
 // Every t('…') in the whole of src must name a key that exists, and every key
 // must be reached from somewhere. The first stops a typo shipping as a raw key
