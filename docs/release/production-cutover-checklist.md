@@ -45,8 +45,8 @@ Detailed procedures live elsewhere and are not repeated here:
 - [ ] Production service → Settings → Source: repository `Priysharan19/Final-Pri-learning`,
       branch **`main`** (not a feature branch), *Wait for CI* on.
 - [ ] Staging service: same repository; branch `main` too, or a deliberately named staging branch.
-- [ ] Build, healthcheck, restart and start-command fields in the dashboard are empty, so
-      `railway.json` decides them (Dockerfile build, `/v1/ready` healthcheck, 20 s draining).
+- [ ] The deploy log shows the Dockerfile build and the `/v1/ready` healthcheck from
+      `railway.json`, and no dashboard start command is set.
 - [ ] Production service has a public domain; decide the final origin (Railway domain or a
       custom domain with Railway-issued TLS). If a CDN such as Cloudflare sits in front, note it:
       it changes `PRI_TRUSTED_PROXY_HOPS` from `1` to `2`.

@@ -13,7 +13,7 @@ is the procedure and `docs/release/LAUNCH-RUNBOOK.md` the owner's ordered checkl
 
 `railway.json` at the repository root is the Railway config-as-code for the `/v1` service. It builds the root `Dockerfile` (no Nixpacks, no start-command override), uses `GET /v1/ready` as the deploy healthcheck so a replica that cannot serve (database unreachable, schema mismatch, verification email unconfigured) never takes traffic, restarts only on failure, and allows 20 s of draining, longer than the server's own 10 s shutdown deadline. Railway passes `RAILWAY_GIT_COMMIT_SHA` to the build, and the Dockerfile turns that into the release identity that `/v1/health` and `/release.json` report (`.github/workflows/deployment-image.yml` proves the two agree).
 
-The production service's source must be the `main` branch of `Priysharan19/Final-Pri-learning`, with Railway's *Wait for CI* option on, so only a `main` SHA that passed its checks is built. Settings in the Railway dashboard override `railway.json`; leave the build, healthcheck and restart fields empty there.
+The production service's source must be the `main` branch of `Priysharan19/Final-Pri-learning`, with Railway's *Wait for CI* option on, so only a `main` SHA that passed its checks is built. Values in `railway.json` take precedence over the same settings in the Railway dashboard, so change them here, through a reviewed PR, not in the dashboard.
 
 After every production deploy, verify the exact SHA from a checkout of that SHA:
 

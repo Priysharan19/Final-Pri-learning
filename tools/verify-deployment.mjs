@@ -24,6 +24,8 @@ import { isDeepStrictEqual } from 'node:util';
 import { BILLING_SCHEMA_VERSION, SCHEMA_VERSION } from '../server/platform/schemaVersions.js';
 
 const SHA = /^[0-9a-f]{40}$/;
+// A hanging origin fails the check rather than holding the operator's terminal.
+const REQUEST_TIMEOUT_MS = 15_000;
 
 export function parseArgs(argv) {
   const args = { origin: null, sha: null, engine: null, allowHttp: false };
@@ -53,7 +55,7 @@ function cleanOrigin(value, allowHttp) {
 }
 
 async function getJson(fetchImpl, url) {
-  const response = await fetchImpl(url, { headers: { accept: 'application/json' }, redirect: 'error' });
+  const response = await fetchImpl(url, { headers: { accept: 'application/json' }, redirect: 'error', signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
   let body = null;
   try { body = await response.json(); } catch { body = null; }
   return { status: response.status, body };
@@ -109,11 +111,16 @@ export async function verifyDeployment({ origin, sha, engine = null, allowHttp =
 
 async function main() {
   let args;
-  try { args = parseArgs(process.argv.slice(2)); } catch (error) {
-    console.error(`${error.message}\nUsage: node tools/verify-deployment.mjs --origin https://… --sha <40-hex> [--engine postgres|sqlite]`);
+  const usage = 'Usage: node tools/verify-deployment.mjs --origin https://… --sha <40-hex> [--engine postgres|sqlite]';
+  let report;
+  try {
+    args = parseArgs(process.argv.slice(2));
+    report = await verifyDeployment(args);
+  } catch (error) {
+    console.error(`${error.message}\n${usage}`);
     process.exit(2);
   }
-  const { ok, results } = await verifyDeployment(args);
+  const { ok, results } = report;
   for (const item of results) console.log(`  ${item.ok ? '✓' : '✗'} ${item.label}${item.detail ? `  (${item.detail})` : ''}`);
   const passed = results.filter(item => item.ok).length;
   console.log(`${ok ? 'DEPLOYMENT VERIFIED: PASS' : 'DEPLOYMENT VERIFIED: FAIL'} — ${passed}/${results.length}`);
