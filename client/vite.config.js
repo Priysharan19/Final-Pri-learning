@@ -230,7 +230,14 @@ export const ON_DEMAND = [
   // ADR-0001 makes the product online-first, and the one case this shows — a
   // first open with no connection — is reported by api.js as a chapter that has
   // not been downloaded yet; practice, which needs none of it, is unaffected.
-  [/(^|\/)(Placement|placement|prerequisites|prerequisiteSkillsHi)-[^/]*\.js$/, 'placement check']
+  [/(^|\/)(Placement|placement|prerequisites|prerequisiteSkillsHi)-[^/]*\.js$/, 'placement check'],
+
+  // "Practise this": photograph a question and practise its skill. The page
+  // cannot do anything without a connection — reading the photo is a server
+  // call — so installing it would only carry code that is useless offline. A
+  // first open with no connection shows the route's ordinary chunk-load
+  // failure; practice itself needs none of it.
+  [/(^|\/)(PractisePhoto|questionPhoto)-[^/]*\.js$/, '"Practise this" photo page']
 ];
 
 // The faces the first screens genuinely paint in: the Latin Inter subset for

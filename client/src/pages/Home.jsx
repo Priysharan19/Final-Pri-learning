@@ -241,6 +241,9 @@ export default function Home() {
 
       <section className="home-manual">
         <h2 id="home-manual-title">{t('nav.practice')}</h2>
+        <button className="btn btn-ghost btn-sm" data-home-photo-practise onClick={() => nav('/practise-photo')}>
+          {t('photoPractise.entry')}
+        </button>
       </section>
 
       {/* ── Manual practice configuration is deliberately secondary ── */}

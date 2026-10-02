@@ -20,7 +20,7 @@ import { asStore } from './store.js';
 // rate_limits rows older than 24 hours (housekeeping.js
 // RATE_BUCKET_MAX_WINDOW_MS); a longer window here would need that raised too.
 export const AI_WINDOW_MS = 24 * 60 * 60 * 1000;
-export const AI_KINDS = Object.freeze(['handwriting', 'working']);
+export const AI_KINDS = Object.freeze(['handwriting', 'working', 'question-photo']);
 // The unit is one REQUEST (one reading of the ink when the writing settles, or
 // one working check), not one provider call: a request that escalates to the
 // fallback model still costs one unit. The free figure leaves room for the
