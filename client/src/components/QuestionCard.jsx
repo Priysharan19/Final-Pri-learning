@@ -1184,7 +1184,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
           {/* Practice is untimed on screen: time on task is still measured for the
               marker, but a running clock is pressure, not information. */}
         </div>
-        {hintsUsed > 0 && !resolved && (
+        {helpUsed > 0 && !resolved && (
           <p className="q-credit">{t('verdict.creditAvailable', { percent: Math.round(credit * 100), marks: Math.round(totalMarks * credit * 10) / 10 })}</p>
         )}
 
@@ -1594,7 +1594,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                 </span>
                 <span className="eval-marks">
                   {t('verdict.marksOutOf', { earned: verdictGood ? shownMarks : earnedMarks, total: totalMarks })}
-                  {hintsUsed > 0 && <small> · {t('verdict.afterHints', { count: hintsUsed, n: hintsUsed })}</small>}
+                  {helpUsed > 0 && <small> · {t('verdict.afterHints', { count: helpUsed, n: helpUsed })}</small>}
                 </span>
               </div>
               <div className="eval-body">

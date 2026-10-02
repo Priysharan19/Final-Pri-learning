@@ -460,7 +460,7 @@ export default function Practice() {
           </div>
         )}
 
-        {serve?.repeat && !assignmentCompleteLocally && (
+        {serve && serve.repeat && !assignmentCompleteLocally && (
           <div className="notice" role="note">{t('practice.repeatNote')}</div>
         )}
 
