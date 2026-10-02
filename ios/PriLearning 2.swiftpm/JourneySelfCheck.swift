@@ -77,7 +77,7 @@ enum JourneySelfCheck {
     await step('practice', async () => { await nav('/practice'); await waitFor(() => q('.q-prompt')); return 'question shown'; });
     await step('typedAttempt', async () => {
       for (let i = 0; i < 12; i++) {
-        const typing = byLabel('Answer by typing');
+        const typing = byLabel('Type: answer by typing');
         if (typing) { typing.click(); await sleep(250); }
         const input = q('.editor-body input.answer-input');
         if (input) {
@@ -287,7 +287,7 @@ enum JourneySelfCheck {
       await waitFor(() => q('.q-prompt'));
       let input = null;
       for (let i = 0; i < 12 && !input; i++) {
-        const t = byLabel('Answer by typing'); if (t) { t.click(); await sleep(250); }
+        const t = byLabel('Type: answer by typing'); if (t) { t.click(); await sleep(250); }
         input = q('.editor-body input.answer-input');
         if (!input) { q('.ctx-next')?.click(); await sleep(900); }
       }

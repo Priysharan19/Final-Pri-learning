@@ -220,7 +220,7 @@ class ShellJourneyTest {
                 eval(s, "!!history.state && history.state.idx > 0"))
             var typed = false
             for (i in 0 until 12) {
-                eval(s, "(function(){var t=($byLabel)('Answer by typing');if(t)t.click();return true;})()")
+                eval(s, "(function(){var t=($byLabel)('Type: answer by typing');if(t)t.click();return true;})()")
                 Thread.sleep(400)
                 if (eval(s, "!!document.querySelector('.editor-body input.answer-input')") == "true") { typed = true; break }
                 eval(s, "(function(){var n=document.querySelector('.ctx-next');if(n)n.click();return true;})()")
