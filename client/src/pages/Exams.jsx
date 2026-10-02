@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { printPage } from '../lib/files.js';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
 import { useApp } from '../App.jsx';
@@ -209,7 +210,7 @@ export function PrintPaper({ paper, onClose }) {
   return (
     <div className="paper-overlay">
       <div className="row no-print" style={{ padding: 14, justifyContent: 'flex-end', gap: 10 }}>
-        <button className="btn btn-primary" onClick={() => window.print()}>{t('exams.printButton')}</button>
+        <button className="btn btn-primary" onClick={() => { printPage().catch(() => {}); }}>{t('exams.printButton')}</button>
         <button className="btn btn-ghost" onClick={onClose}>{t('nav.close')}</button>
       </div>
       <div className="paper-sheet">

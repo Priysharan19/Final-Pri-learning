@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Pri Learning · FileProvider roots (CP-07): exported files and camera captures only. -->
+<paths>
+    <cache-path name="share" path="share/" />
+    <cache-path name="capture" path="capture/" />
+</paths>
