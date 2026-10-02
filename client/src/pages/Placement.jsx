@@ -133,6 +133,7 @@ export default function Placement() {
           question={question}
           diagnostic={{ submitPath: `/placement/${question.id}/answer` }}
           onResolved={setAnswered}
+          onNext={refresh}
         />
         {answered && (
           <div className="row" style={{ justifyContent: 'flex-end' }}>

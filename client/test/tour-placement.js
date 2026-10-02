@@ -109,6 +109,8 @@ export const flow = {
       if (asked === 0) {
         await check('a marked answer shows the evaluation card', await page.locator('.eval-card').count() === 1);
         await check('and says the mark is diagnostic evidence only', /diagnostic evidence only/.test(await page.locator('.eval-card').innerText()));
+        await check('the answered card offers no dead "Next question" of its own (the placement page advances)',
+          await page.locator('.ws-actions .btn-primary').count() === 0 && await next.count() === 1);
         await check('no XP or mastery tags appear on a diagnostic item', await page.locator('.xp-pop').count() === 0 && !/Mastery/.test(await page.locator('.eval-card').innerText()));
       }
       const label = (await next.innerText()).trim();

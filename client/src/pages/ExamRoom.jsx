@@ -342,6 +342,7 @@ export default function ExamRoom() {
   // ── Finalise ───────────────────────────────────────────────────────────────
   async function finalise(reason = 'student') {
     if (phaseRef.current !== 'sitting') return;
+    setConfirming(false);
     setPhaseBoth('finalising');
     setSubmitError('');
     if (saveTimer.current) { clearTimeout(saveTimer.current); saveTimer.current = null; }

@@ -1676,7 +1676,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         <div className="ws-actions editor-foot no-print">
           <span className="status-line" data-state={statusState} role="status" aria-live="polite">
             {statusState !== 'idle' && <span className="dot" aria-hidden="true" />}
-            {writeMode && shownAnswerLine && !needsCheck
+            {writeMode && shownAnswerLine && !needsCheck && !cloudPending && !(resolved && !boundLines)
               ? <span className="ws-answer-preview muted">{t('verdict.yourAnswerIs')} <MathText text={`$${texOf(shownAnswerLine)}$`} /></span>
               : statusText}
           </span>
@@ -1690,9 +1690,12 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
               </button>
             )}
             {resolved && !diagnostic && <button className="btn btn-quiet redo-chip" onClick={() => onRedo ? onRedo() : onNext?.()}>{t('verdict.redoQuestion')}</button>}
-            <button className="btn btn-primary" onClick={primary.run} disabled={primary.disabled} aria-busy={busy || undefined}>
-              {primary.label}
-            </button>
+            {/* A placement answer is advanced by the placement page itself. */}
+            {!(diagnostic && resolved) && (
+              <button className="btn btn-primary" onClick={primary.run} disabled={primary.disabled} aria-busy={busy || undefined}>
+                {primary.label}
+              </button>
+            )}
           </div>
         </div>
       </section>

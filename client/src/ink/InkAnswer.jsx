@@ -346,8 +346,13 @@ export default function InkAnswer({
     });
   }, [publish, recognitionContext, runCloudPass]);
 
+  // A cleared page that can still be taken back (see act('clear') below).
+  const [cleared, setCleared] = useState(null);
   const onStrokesChange = useCallback((strokes) => {
     strokesRef.current = strokes;
+    // Writing on the cleared page means the student moved on: the old page
+    // must not come back over the new one.
+    if (strokes?.length) setCleared(null);
     // Kept the moment the pen lifts, before any reading: a page written in the
     // second before the app went away is still the student's page.
     try { onStrokesRef.current?.(strokes); } catch { /* keeping ink is best-effort */ }
@@ -430,7 +435,6 @@ export default function InkAnswer({
   // Undo and redo move strokes, not the student's tap-to-correct fixes; only
   // clearing the page starts the readings over. A clear can be taken back in
   // one tap for a few seconds, because it sits beside Undo where a Pencil slips.
-  const [cleared, setCleared] = useState(null);
   useEffect(() => {
     if (!cleared) return;
     const gone = setTimeout(() => setCleared(null), 6000);
