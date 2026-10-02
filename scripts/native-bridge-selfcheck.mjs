@@ -38,7 +38,7 @@ const run = (cmd, args, opts = {}) =>
 // ("denied by service delegate (SBMainWorkspace)"). Wait for the boot to finish,
 // then retry that specific refusal a few times; any other error is real.
 function launchApp(device, bundleId, args = [], opts = {}) {
-  try { run('xcrun', ['simctl', 'bootstatus', device, '-b']); } catch { /* best effort */ }
+  try { run('xcrun', ['simctl', 'bootstatus', device, '-b'], { timeout: 600_000 }); } catch { /* best effort */ }
   for (let attempt = 1; ; attempt++) {
     try { return run('xcrun', ['simctl', 'launch', device, bundleId, ...args], opts); }
     catch (error) {
@@ -67,9 +67,17 @@ function pickDevice() {
 function ensureBooted({ name, udid }) {
   const booted = () => run('xcrun', ['simctl', 'list', 'devices']).split('\n').some(l => l.includes(udid) && /\(Booted\)/.test(l));
   if (booted()) return;
+  // On a CI runner a second booted simulator (the iPad from earlier steps)
+  // starves this boot; a person's own simulators are never touched locally.
+  if (process.env.CI) {
+    for (const line of run('xcrun', ['simctl', 'list', 'devices']).split('\n')) {
+      const other = line.match(/\(([0-9A-F-]{36})\) \(Booted\)/i)?.[1];
+      if (other && other !== udid) { console.log(`  shutting down booted simulator ${other} (CI)`); try { run('xcrun', ['simctl', 'shutdown', other]); } catch { /* already down */ } }
+    }
+  }
   console.log(`Booting ${name}…`);
   try { run('xcrun', ['simctl', 'boot', udid]); } catch { /* already booting */ }
-  try { run('xcrun', ['simctl', 'bootstatus', udid, '-b']); } catch { /* fall back to polling */ }
+  try { run('xcrun', ['simctl', 'bootstatus', udid, '-b'], { timeout: 600_000 }); } catch { /* fall back to polling */ }
   for (let i = 0; i < 60 && !booted(); i++) execSync('sleep 2');
   if (!booted()) throw new Error(`${name} did not boot`);
 }
