@@ -2144,8 +2144,7 @@ h3, h4 { font-family: var(--font); }
 .home-wrap > *:nth-child(n+5) { animation-delay: calc(var(--stagger) * 4); }
 
 /* Press physics: a short, firm give under the finger, released on a spring. */
-.btn { transition: background-color var(--motion-fast) var(--ease-standard), border-color var(--motion-fast) var(--ease-standard), color var(--motion-fast) var(--ease-standard), transform 220ms var(--ease-spring); }
-.btn:active:not(:disabled) { transform: scale(0.97); transition-duration: 60ms; }
+.btn:active:not(:disabled) { transform: scale(0.97); }
 
 /* Feedback: the verdict rises into place; a correct mark pops once; a
    mistake gets one small, kind nudge — never a shake. */
