@@ -58,6 +58,8 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { platformDatabaseUrl, postgresConnectionSettings, validPostgresUrl } from './config.js';
 import { BILLING_SCHEMA_VERSION, SCHEMA_VERSION } from './schemaVersions.js';
+import { logEvent, safeCode } from './observability.js';
+import { recordDatabasePoolError } from './metrics.js';
 
 const txContext = new AsyncLocalStorage();
 const SAFE_IDENTIFIER = /^[a-z_][a-z0-9_]{0,62}$/;
@@ -129,20 +131,33 @@ function assertJoinableLock(joined, lock) {
  * answers with: 503, Retry-After, a stable code. The driver's code is kept for
  * the operator log only.
  */
+const OVERLOAD_MESSAGES = Object.freeze({
+  PLATFORM_DB_TIMEOUT: 'The database did not answer in time. Retry shortly.',
+  PLATFORM_DB_BUSY: 'The database is busy. Retry shortly.',
+  PLATFORM_DB_UNAVAILABLE: 'The database cannot be reached right now. Retry shortly.'
+});
+
 function overloaded(code, retryAfter, cause) {
-  return Object.assign(new Error(code === 'PLATFORM_DB_TIMEOUT'
-    ? 'The database did not answer in time. Retry shortly.'
-    : 'The database is busy. Retry shortly.'), {
+  return Object.assign(new Error(OVERLOAD_MESSAGES[code] || OVERLOAD_MESSAGES.PLATFORM_DB_BUSY), {
     code, status: 503, retryAfter, retryable: true, dbCode: String(cause?.code || '') || undefined
   });
 }
 
 const BUSY_CODES = new Set(['40001', '40P01', '55P03']);
 const TIMEOUT_CODES = new Set(['57014', '25P03']);
+// The database is not there: the socket was refused, reset or never resolved,
+// the server is shutting down or restarting (57P01-57P03), or the connection
+// class (08xxx) failed. A running server must answer these as a retryable 503
+// that names the condition — never a 500 INTERNAL — and recover by itself once
+// the database is back: the pool discards the dead client and the next request
+// opens a fresh connection.
+const UNAVAILABLE_ERRNO = new Set(['ECONNREFUSED', 'ECONNRESET', 'ENOTFOUND', 'EAI_AGAIN', 'ETIMEDOUT', 'EHOSTUNREACH', 'ENETUNREACH', 'EPIPE', 'ECONNABORTED']);
+const UNAVAILABLE_SQLSTATE = new Set(['57P01', '57P02', '57P03', '53300']);
+const UNAVAILABLE_MESSAGE = /^(Connection terminated( unexpectedly| due to connection timeout)?|Client has encountered a connection error and is not queryable|Connection ended unexpectedly)$/i;
 
-/** A retryable database overload (503 + Retry-After): handlers pass it on to the /v1 error handler untouched. */
+/** A retryable database overload or outage (503 + Retry-After): handlers pass it on to the /v1 error handler untouched. */
 export function isDatabaseOverload(error) {
-  return !!error?.retryable && error.status === 503 && /^PLATFORM_DB_(BUSY|TIMEOUT)$/.test(String(error.code || ''));
+  return !!error?.retryable && error.status === 503 && /^PLATFORM_DB_(BUSY|TIMEOUT|UNAVAILABLE)$/.test(String(error.code || ''));
 }
 
 /** Map an overload error from the driver to its retryable 503; anything else is returned as is. */
@@ -153,6 +168,8 @@ export function databaseOverload(error) {
   if (TIMEOUT_CODES.has(code)) return overloaded('PLATFORM_DB_TIMEOUT', 2, error);
   // pg-pool's acquisition timeout carries no code, only this message.
   if (!code && /timeout exceeded when trying to connect/i.test(String(error.message || ''))) return overloaded('PLATFORM_DB_BUSY', 2, { code: 'POOL_TIMEOUT' });
+  if (UNAVAILABLE_ERRNO.has(code) || UNAVAILABLE_SQLSTATE.has(code) || code.startsWith('08')) return overloaded('PLATFORM_DB_UNAVAILABLE', 5, error);
+  if (!code && UNAVAILABLE_MESSAGE.test(String(error.message || '').trim())) return overloaded('PLATFORM_DB_UNAVAILABLE', 5, { code: 'CONNECTION_TERMINATED' });
   return error;
 }
 
@@ -643,7 +660,7 @@ export class PostgresStore {
         await client.query(this.sessionSetup());
       } catch (error) {
         client.release(error);
-        throw error;
+        throw databaseOverload(error);
       }
       client.__priSchema = this.schema;
     }
@@ -830,7 +847,8 @@ export async function createPostgresPool(connectionString, { schema = 'pri', max
   // An idle client dropped by the server must not crash the process; the pool
   // discards it and the next query opens a fresh connection.
   pool.on('error', error => {
-    console.error('platform_db_pool_error', { code: error?.code || 'POOL_ERROR' });
+    recordDatabasePoolError();
+    logEvent('warn', 'platform_db_pool_error', { code: safeCode(error?.code, 'POOL_ERROR') });
   });
   return pool;
 }

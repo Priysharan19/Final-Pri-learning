@@ -196,6 +196,13 @@ jobs:
           node server/test/entitlement-admin-grant-check.mjs
           node server/test/request-size-contract-check.mjs
           node server/test/content-index-exposure-check.mjs
+      - name: Structured logs, readiness, metrics, alert policy and failure drills (SQLite)
+        run: |
+          set -o pipefail
+          node server/test/observability-check.mjs 2>&1 | tee ops.log
+          node server/test/failure-drills-check.mjs 2>&1 | tee -a ops.log
+          grep -Fq 'OBSERVABILITY: PASS' ops.log
+          grep -Fq 'FAILURE DRILLS: PASS' ops.log
       # V1 blocker #14: every /v1 route is in the reviewed inventory with the
       # guards really mounted on it; every object-level route fails closed for
       # no session, revoked sessions, wrong account, wrong role, unverified
@@ -227,11 +234,12 @@ jobs:
         run: |
           set -o pipefail
           node scripts/with-postgres.mjs node server/test/run-platform-postgres.mjs 2>&1 | tee platform-postgres.log
-          grep -Fq 'PLATFORM ON POSTGRES: PASS — 26/26 suites' platform-postgres.log
+          grep -Fq 'PLATFORM ON POSTGRES: PASS — 27/27 suites' platform-postgres.log
           grep -Fq '✓ security-acceptance-check.mjs' platform-postgres.log
           grep -Fq '✓ abuse-limits-check.mjs' platform-postgres.log
           grep -Fq 'POSTGRES SCHEMA MUTATIONS: PASS — 21/21' platform-postgres.log
           grep -Fq 'PLATFORM SYNC BURST: PASS' platform-postgres.log
+          grep -Fq '✓ failure-drills-check.mjs' platform-postgres.log
       - name: Platform migration contract
         run: node server/test/platform-migration-check.mjs
       - name: Cross-account sync pagination regression

@@ -2,6 +2,7 @@ import { asyncRouter } from './asyncRouter.js';
 import { asStore } from './store.js';
 import { applyVerifiedEntitlement } from './entitlements.js';
 import { rateLimit, requireSession, requireVerifiedEmail, sha256 } from './security.js';
+import { recordWebhook } from './metrics.js';
 
 const PROVIDERS = new Set(['apple', 'google', 'web']);
 // Lifecycle states in which a web (Razorpay) subscription still has a mandate
@@ -184,8 +185,14 @@ export function createBillingRouter(db, { verifiers = {}, checkout = {}, native 
   // never activate Premium.
   router.post('/webhook/:provider', rateLimit(db, 'billing-webhook', { limit: 600, windowMs: 60 * 1000 }), async (req, res, next) => {
     const provider = safeProvider(String(req.params.provider || ''));
-    if (!provider) return res.status(404).json({ error: { code: 'BILLING_PROVIDER_UNSUPPORTED', message: 'Billing provider is not supported.' } });
+    if (!provider) {
+      recordWebhook('unsupported', 'rejected', 'BILLING_PROVIDER_UNSUPPORTED');
+      return res.status(404).json({ error: { code: 'BILLING_PROVIDER_UNSUPPORTED', message: 'Billing provider is not supported.' } });
+    }
     const verifier = verifiers[provider]?.webhook;
+    // Anyone can POST here, so a delivery for a provider this deployment does
+    // not use is counted as rejected — it must not be able to page an operator.
+    if (typeof verifier !== 'function') recordWebhook(provider, 'rejected', 'BILLING_PROVIDER_NOT_CONFIGURED');
     if (typeof verifier !== 'function') return res.status(503).json({ error: { code: 'BILLING_PROVIDER_NOT_CONFIGURED', message: `${provider} webhook verification is not configured on this deployment.` } });
     try {
       // A webhook verifier only checks a signature and reads/writes this
@@ -214,8 +221,17 @@ export function createBillingRouter(db, { verifiers = {}, checkout = {}, native 
         }
         return applied;
       });
+      recordWebhook(provider, 'ok');
       res.json({ ok: true, applied: results.length, stale: results.filter(result => result?.stale).length });
-    } catch (err) { next(err); }
+    } catch (err) {
+      // A 4xx is a delivery this server refused (bad signature, malformed
+      // event) — counted, never paged on, since anyone can send one. A 5xx is
+      // a delivery it failed to apply, which the provider will retry and an
+      // operator must hear about (WEBHOOK_FAILURES, docs/operations/alerts.md).
+      const status = Number.isInteger(err?.status) ? err.status : 500;
+      recordWebhook(provider, status >= 500 ? 'failed' : 'rejected', err?.code);
+      next(err);
+    }
   });
 
   return router;
