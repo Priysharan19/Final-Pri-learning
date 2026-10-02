@@ -480,6 +480,56 @@ async function signInToDemo(page, base) {
   await wait(page, 900);
 }
 
+
+/**
+ * Seed a private/legacy profile directly into this test's isolated IndexedDB.
+ * Public V1 intentionally exposes no Australian or Teacher onboarding route;
+ * accessibility coverage of those retained private implementations must not
+ * create a production back door merely to reach them.
+ */
+async function seedPrivateProfile(page, {
+  name = 'Accessibility Private Profile', year = 9, course = 'nsw', role = 'student',
+  pathway = 'advanced', indiaTrack = null, language = 'en'
+} = {}) {
+  const id = `a11y-private-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+  await page.evaluate(async profile => {
+    const db = await new Promise((resolve, reject) => {
+      const req = indexedDB.open('pri-learning');
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+    const now = Date.now();
+    const row = {
+      id: profile.id,
+      name: profile.name,
+      year: profile.year,
+      course: profile.course,
+      role: profile.role,
+      avatar: '🙂',
+      theme: 'dark',
+      dailyGoal: 10,
+      xp: 0,
+      language: profile.language,
+      mathsGloss: false,
+      pathway: profile.course === 'nsw' ? profile.pathway : null,
+      indiaTrack: profile.course === 'in' ? (profile.indiaTrack || 'cbse') : null,
+      timezone: profile.course === 'nsw' ? 'Australia/Sydney' : 'Asia/Kolkata',
+      createdAt: now,
+      lastActiveAt: now
+    };
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction('profiles', 'readwrite');
+      tx.objectStore('profiles').put(row);
+      tx.oncomplete = resolve;
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error || new Error('private profile seed aborted'));
+    });
+    db.close();
+    localStorage.setItem('pri-current-profile', profile.id);
+  }, { id, name, year, course, role, pathway, indiaTrack, language });
+  return id;
+}
+
 async function goTo(page, base, path) {
   await page.goto(base + path, { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('.shell, .auth-wrap', { timeout: 20000 });
@@ -784,9 +834,10 @@ async function run() {
       await wait(page, 500);
     });
 
-    // This walk's profile is Australian, so the placement route renders its
-    // India-only notice; the India intro, question and map views are driven by
-    // tour-placement.js in the end-to-end suite.
+    // The primary accessibility profile follows public V1 (India / Student).
+    // Placement is feature-enabled in this test build so its India presentation
+    // remains part of the accessibility walk even though placement is not a
+    // public V1 launch promise.
     await step('placement', '/placement', async () => {
       await goTo(page, BASE, '/placement');
       await page.waitForSelector('.card', { timeout: 20000 });
@@ -802,6 +853,9 @@ async function run() {
     await step('exams', '/exams', async () => { await goTo(page, BASE, '/exams'); });
 
     await step('exam room · sitting a paper', '/exams/:id', async () => {
+      // The legacy generic-paper room remains regression-covered privately.
+      // Public V1 reaches exam simulation through the India-specific paths below.
+      await seedPrivateProfile(page, { name: 'Accessibility Legacy Student', year: 9, course: 'nsw' });
       await goTo(page, BASE, '/exams');
       await click(page, 'button.btn-primary', { text: 'Start practice paper' });
       await page.waitForSelector('.exam-nav', { timeout: 60000 });
@@ -982,22 +1036,14 @@ async function run() {
       await wait(page, 700);
     });
 
-    // ── teacher-only workspace, exercised under a real teacher profile ──────
+    // ── teacher-only workspace, private regression coverage ────────────────
+    // Teacher implementation remains in the repository but is not public V1.
+    // Seed the fixture directly rather than restoring public Teacher onboarding.
     await step('teacher studio', '/teach', async () => {
-      await goTo(page, BASE, '/');
-      await click(page, '.user-chip');
-      await click(page, '[role="menuitem"]', { text: 'Switch profile' });
-      await page.waitForSelector('.auth-wrap', { timeout: 15000 });
-      await click(page, 'button.btn-ghost', { text: 'Add another profile' });
-      await page.getByRole('button', { name: 'Teacher', exact: true }).click();
-      await click(page, '.auth-card .btn-primary');
-      await page.locator('#signup-track').selectOption('10');
-      await click(page, '.auth-card .btn-primary');
-      await page.locator('#signup-name').fill('Accessibility Teacher');
-      await click(page, '.auth-card .btn-primary');
-      await click(page, '.auth-card .btn-primary');
-      await page.waitForSelector('[data-onboarding-step="5"]');
-      await page.getByRole('button', { name: 'Open Teacher Workspace' }).click();
+      await seedPrivateProfile(page, {
+        name: 'Accessibility Private Teacher', year: 10, course: 'in', role: 'teacher', indiaTrack: 'cbse'
+      });
+      await goTo(page, BASE, '/teach');
       await page.waitForSelector('.teacher-workspace-head', { timeout: 30000 });
       await wait(page, 700);
     });
