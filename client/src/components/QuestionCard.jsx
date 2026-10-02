@@ -16,7 +16,7 @@ import {
   saveInkDraft, savePendingSubmission, submissionContentKey
 } from './practiceRecovery.js';
 import { nativePhotoAvailable, recognizePhoto } from '../native/photo.js';
-import { cloudReadingEnabled, readPhotoWithCloud } from '../ink/cloudReader.js';
+import { cloudReadingEnabled, photoReadingBlockedKey, readPhotoWithCloud, takeCloudReadingNotice } from '../ink/cloudReader.js';
 import { MAX_PDF_PAGES, renderPdfPages } from '../ink/pdfPage.js';
 import PriPlot from './PriPlot.jsx';
 import { plotSpecFor } from '../engine/plotSpec.js';
@@ -269,6 +269,9 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const [selfSaved, setSelfSaved] = useState(false);
   const [photo, setPhoto] = useState(null);
   const [photoOCR, setPhotoOCR] = useState({ phase: 'idle', text: '', confidence: 0, error: '', engine: null });
+  // One quiet line, once per device, the first time a photo is read on the
+  // server for a student who never chose either way in Settings.
+  const [cloudNotice, setCloudNotice] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [inkPhase, setInkPhase] = useState(() => (inkModule ? 'ready' : 'idle'));   // idle | loading | ready | failed
   const [inkTry, setInkTry] = useState(0);
@@ -347,15 +350,21 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
    */
   const readOnePage = useCallback(async (dataURL) => {
     const lastLine = t => String(t || '').split(/\n+/).map(x => x.trim()).filter(Boolean).at(-1) || '';
+    let cloudOutcome = null;
     if (cloudReadingEnabled(user)) {
-      const outcome = await readPhotoWithCloud(dataURL, { user });
-      if (outcome?.reason === 'allowance' && !nativePhotoAvailable()) return { allowance: true };
-      if (outcome && !outcome.error && !outcome.reason) {
-        const text = String(outcome.transcription.text || '').trim();
-        if (text) return { text, markable: lastLine(text), confidence: outcome.transcription.confidence, engine: outcome.transcription.engine };
+      cloudOutcome = await readPhotoWithCloud(dataURL, { user });
+      if (cloudOutcome?.reason === 'allowance' && !nativePhotoAvailable()) return { allowance: true };
+      if (cloudOutcome && !cloudOutcome.error && !cloudOutcome.reason) {
+        const text = String(cloudOutcome.transcription.text || '').trim();
+        if (text) return { text, markable: lastLine(text), confidence: cloudOutcome.transcription.confidence, engine: cloudOutcome.transcription.engine };
       }
     }
-    if (!nativePhotoAvailable()) return null;
+    if (!nativePhotoAvailable()) {
+      // The photo itself was the problem: say so. Anything else is the server
+      // route being unavailable, and the student is told the actual reason.
+      if (cloudOutcome && ['unreadable', 'empty'].includes(cloudOutcome.reason)) return null;
+      return { blocked: photoReadingBlockedKey(user, { outcome: cloudOutcome }) };
+    }
     try {
       const result = await recognizePhoto(dataURL);
       const text = String(result?.text || '').trim();
@@ -370,7 +379,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     if (!cloudReadingEnabled(user) && !nativePhotoAvailable()) {
       setPhotoOCR({
         phase: 'unavailable', text: '', confidence: 0, engine: null,
-        error: tLater('verdict.photoReadingUnavailable')
+        error: tLater(photoReadingBlockedKey(user))
       });
       return;
     }
@@ -383,6 +392,13 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       });
       return;
     }
+    if (page?.blocked) {
+      setPhotoOCR({
+        phase: 'unavailable', text: '', confidence: 0, engine: null,
+        error: tLater(page.blocked)
+      });
+      return;
+    }
     if (!page) {
       setPhotoOCR({
         phase: 'failed', text: '', confidence: 0, engine: null,
@@ -392,6 +408,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     }
     if (isWorking && page.text) { setWorking(page.text); setShowWorking(true); }
     if (page.markable) setAnswer(page.markable);
+    if (String(page.engine || '').startsWith('cloud') && takeCloudReadingNotice(user)) setCloudNotice(true);
     setPhotoOCR({ phase: 'done', text: page.text, confidence: Number(page.confidence || 0), error: '', engine: page.engine });
   }, [isWorking, user, readOnePage, t]);
 
@@ -1115,6 +1132,9 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                                 </div>
                                 <pre style={{ whiteSpace: 'pre-wrap', margin: 0, font: 'inherit', color: 'var(--ink)' }}>{photoOCR.text}</pre>
                                 <div className="muted" style={{ marginTop: 6 }}>{t('verdict.filledFromLastLine')}</div>
+                                {cloudNotice && String(photoOCR.engine || '').startsWith('cloud') && (
+                                  <div className="muted" style={{ marginTop: 6, fontSize: 12 }}>{t('verdict.photoReadOnServerNotice')}</div>
+                                )}
                               </>
                             )}
                             {(photoOCR.phase === 'failed' || photoOCR.phase === 'unavailable') && <span style={{ color: 'var(--warn)' }}>{photoOCR.error}</span>}
@@ -1380,7 +1400,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
 
           <div className="eval-card">
             <div className="eval-head">
-              <span className="logo-bb">P</span><span className="eval-title">ri Learning. <span style={{ color: 'var(--ink-2)' }}>{t('verdict.evaluation')}</span></span>
+              <span className="logo-bb" aria-hidden="true">P</span><span className="eval-title">Pri Learning. <span style={{ color: 'var(--ink-2)' }}>{t('verdict.evaluation')}</span></span>
               <span className="eval-marks">
                 {t('verdict.marksOutOf', { earned: verdictGood ? shownMarks : earnedMarks, total: totalMarks })}
                 {' '}<small>({verdictGood ? pct : (selfSaved ? Math.round(100 * earnedMarks / totalMarks) : 0)}%)</small>

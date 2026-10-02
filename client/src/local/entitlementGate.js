@@ -86,6 +86,12 @@ async function linkRow(pid) {
   return get('device', cloudLinkRowId(pid)).catch(() => null);
 }
 
+/** Whether this local profile is linked to a cloud account (read-only). */
+export async function profileCloudLinked(pid) {
+  if (!pid) return false;
+  return !!(await linkRow(pid))?.accountId;
+}
+
 async function usageRow(pid) {
   const row = await get('device', `${USAGE_PREFIX}${pid}`).catch(() => null);
   return row || { id: `${USAGE_PREFIX}${pid}`, pid, practice: null, exams: [] };

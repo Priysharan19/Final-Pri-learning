@@ -3,6 +3,7 @@ import React, { createContext, useContext, useEffect, useMemo, useState, useCall
 import { Routes, Route, Link, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import { api } from './api.js';
 import { requestPersistentStorage } from './local/idb.js';
+import { onCloudSessionChange } from './platform/cloudSession.js';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 import { setDraftProfile } from './components/drafts.js';
 import { setLanguage, signInLanguage, useT } from './i18n/index.js';
@@ -117,8 +118,8 @@ export function Logo({ large = false, onClick }) {
     : {};
   return (
     <Tag className={`logo ${large ? 'logo-lg' : ''}${onClick ? ' logo-btn' : ''}`} {...controlProps}>
-      <span className="logo-bb">P</span>
-      <span className="logo-name">ri Learning<span className="logo-dot">.</span></span>
+      <span className="logo-bb" aria-hidden="true">P</span>
+      <span className="logo-name">Pri Learning<span className="logo-dot">.</span></span>
     </Tag>
   );
 }
@@ -159,6 +160,19 @@ export default function App() {
   useEffect(() => {
     refreshUser().then(u => { if (u) { refreshDue(); refreshRecent(); } }).catch(() => { });
   }, [refreshUser, refreshDue, refreshRecent]);
+
+  // Signing in or out of a cloud account changes what the profile view reports
+  // (cloudLinked, which decides default server reading). A failed re-read here
+  // keeps the current profile rather than signing the student out.
+  useEffect(() => {
+    let stop = () => {};
+    try {
+      stop = onCloudSessionChange(() => {
+        api.get('/me').then(r => { if (r?.user) setUser(r.user); }).catch(() => { });
+      });
+    } catch { /* non-browser runtimes */ }
+    return () => { try { stop(); } catch { /* already gone */ } };
+  }, []);
 
   // Guard months of practice from storage eviction — ask the browser once per boot.
   useEffect(() => { requestPersistentStorage(); }, []);
