@@ -25,6 +25,7 @@
 import React, { useEffect, useImperativeHandle, useRef, useState, forwardRef, useCallback } from 'react';
 import { strokeStarted, strokeMoved, strokeEnded, touchRejected } from './inputMetrics.js';
 import { makePenFilter } from './smooth.js';
+import { useT } from '../i18n/index.js';
 
 const BASE_W = 3.05;          // resting ink width — strong, chalk-on-board
 const MIN_W = 1.5, MAX_W = 7.5;
@@ -32,8 +33,9 @@ const RAW_UPDATE = typeof window !== 'undefined' && 'onpointerrawupdate' in wind
 
 const InkCanvas = forwardRef(function InkCanvas({
   height = 260, guides = true, tool = 'pen', fingerMode = 'auto',
-  onStrokesChange, ariaLabel = 'Writing space', disabled = false
+  onStrokesChange, ariaLabel = null, disabled = false
 }, ref) {
+  const t = useT();
   const baseRef = useRef(null);        // committed ink
   const liveRef = useRef(null);        // in-progress stroke + prediction
   const wrapRef = useRef(null);
@@ -459,7 +461,7 @@ const InkCanvas = forwardRef(function InkCanvas({
       className={`ink-wrap ${guides ? 'ink-ruled' : ''}`}
       style={{ height }}
       role="img"
-      aria-label={ariaLabel}
+      aria-label={ariaLabel ?? t('ink.writingSpace')}
     >
       <canvas ref={baseRef} className="ink-canvas ink-canvas-base" aria-hidden="true" />
       <canvas

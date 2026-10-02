@@ -1459,6 +1459,11 @@ async function run() {
     ok('an unanswered paper is still worth marks', blank.total > 0, `total ${blank.total}`);
     eq('an unanswered paper is 0%', blank.pct, 0);
     eq('every unanswered question is marked wrong', blank.detail.filter(d => d.correct).length, 0);
+    // The exam room's autosave is refused once a paper is finalised: nothing
+    // written after the submit can reach the marked paper (exam-session-check
+    // drives the whole clock; this proves the legacy route shares the rule).
+    await rejects('a finalised paper refuses an autosave',
+      POST(`/exams/${blankExam.id}/responses`, { answers: { [blankExam.questions[0].id]: '1' } }), { status: 409 });
 
     const examList = (await GET('/exams')).exams;
     eq('both exams are listed', examList.length, 2);
@@ -2007,6 +2012,26 @@ async function run() {
     eq('so did the custom question', await idb.get('customQs', doomedCustom.id), undefined);
     ok('the other profiles are untouched', !!(await idb.get('profiles', ada.id)), 'the delete took another profile with it');
     eq('and so is their work', (await idb.byIndex('attempts', 'pid', ada.id)).length, backup.stores.attempts.length);
+  } catch (err) { crashed(err); }
+
+  // ── Placement check ────────────────────────────────────────────────────────
+  // The full behaviour is client/test/placement-check.mjs; here every route is
+  // driven once so the coverage figure stays whole, and the boundary that
+  // matters most is re-asserted: a diagnostic writes no attempt or rating.
+  section('placement');
+  try {
+    const before = await idb.get('profiles', ada.id);
+    const placed = (await POST('/profiles', { name: 'Placement Student', year: 10, course: 'in', indiaTrack: 'cbse' })).user;
+    eq('a new India profile has no placement yet', (await GET('/placement')).status, 'none');
+    const s = await POST('/placement/start', {});
+    ok('start serves a question without its answer', !!s.question?.id && !('answer' in s.question));
+    const a = await POST(`/placement/${s.question.id}/answer`, { skip: true });
+    ok('an answer is marked and the next question served', a.resolved === true && a.correct === false && (a.done || !!a.next?.id));
+    await POST('/placement/skip', {});
+    eq('no attempt rows were written by the diagnostic', (await idb.byIndex('attempts', 'pid', placed.id)).length, 0);
+    eq('no rating rows were written by the diagnostic', (await idb.byIndex('ratings', 'pid', placed.id)).length, 0);
+    await POST('/profiles/select', { id: ada.id });
+    eq('the other profile is untouched', (await idb.get('profiles', ada.id)).placement ?? null, before.placement ?? null);
   } catch (err) { crashed(err); }
 
   // ── Ownership of rows named by id ──────────────────────────────────────────
