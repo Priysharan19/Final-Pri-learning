@@ -273,7 +273,7 @@ jobs:
         run: |
           set -o pipefail
           node server/test/storekit-entitlement-state-machine-check.mjs 2>&1 | tee storekit.log
-          grep -Fq 'STOREKIT ENTITLEMENT STATE MACHINE: PASS — 155/155 checks' storekit.log
+          grep -Fq 'STOREKIT ENTITLEMENT STATE MACHINE: PASS — 172/172 checks' storekit.log
 
   browser:
     name: Browser suites (end-to-end and accessibility)

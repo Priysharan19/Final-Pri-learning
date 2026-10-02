@@ -13,6 +13,8 @@
 --     server/tools/billing-reconcile.mjs can recompute an account's
 --     entitlement from Apple's own signatures and report drift. account_id is
 --     NULL for a notification that names no Pri account.
+--   · entitlement_support_grants records each audited support grant as its own
+--     entitlement source, so no later billing event can erase it.
 --
 -- One transaction: the whole migration applies or none of it does. Additive
 -- only; billing_schema_version moves to 5 so a server build that expects these
@@ -55,6 +57,30 @@ end $$;
 
 alter table pri.billing_apple_signed_events enable row level security;
 create policy pri_server_all on pri.billing_apple_signed_events as permissive for all to pri_server using (true) with check (true);
+
+-- Audited support grants as their own entitlement source (a grant that lived
+-- only in entitlement_snapshots was erased by the next billing event).
+create table pri.entitlement_support_grants (
+  event_id text primary key,
+  account_id text not null references pri.accounts(id) on delete cascade,
+  product_id text,
+  period_end bigint not null,
+  created_at bigint not null
+);
+
+create index idx_entitlement_support_grants_account on pri.entitlement_support_grants (account_id, period_end);
+
+grant select, insert, update, delete on pri.entitlement_support_grants to pri_server;
+
+do $$
+begin
+  if exists (select 1 from pg_roles where rolname = 'anon') then
+    execute 'revoke all on pri.entitlement_support_grants from anon, authenticated';
+  end if;
+end $$;
+
+alter table pri.entitlement_support_grants enable row level security;
+create policy pri_server_all on pri.entitlement_support_grants as permissive for all to pri_server using (true) with check (true);
 
 update pri.platform_meta set value = '5' where key = 'billing_schema_version';
 

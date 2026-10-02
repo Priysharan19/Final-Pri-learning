@@ -11,7 +11,8 @@ This runbook covers how to check that one account's Premium entitlement still ma
 | `billing_apple_signed_events` | Every Apple-signed JWS the server verified, stored verbatim. That covers device transactions (purchase, restore, `Transaction.updates`) and App Store Server Notifications v2. `account_id` is NULL when a notification named no Pri account. | `server/platform/appleBilling.js` |
 | `billing_events` | One audit row per applied event (`provider`, `event_id`, `event_type`, `verified=1`, `applied_at`, payload digest). The same row is what makes a second delivery a no-op. | `applyVerifiedEntitlement` |
 | `billing_subscriptions` | The binding from `originalTransactionId` to an account, the ordering clock (`last_effective_at`, `last_event_rank`), and the lifecycle that subscription last applied (`state_plan`, `state_status`, `state_period_end`, `state_grace_until`). | `applyVerifiedEntitlement` |
-| `entitlement_snapshots` | The account's current entitlement. It is derived from every subscription the account holds plus any support grant. | `applyVerifiedEntitlement` |
+| `entitlement_support_grants` | One row per audited support grant (period end, product). A grant is its own entitlement source, so no billing event can erase it. | `applyVerifiedEntitlement` (provider `admin`) |
+| `entitlement_snapshots` | The account's current entitlement: the paid source with the latest end across every subscription and support grant the account holds. | `applyVerifiedEntitlement` |
 
 Nothing in these tables holds a card number, an Apple ID or an email address. The signed transactions do carry the opaque `appAccountToken`, the storefront, and the price and currency. All four tables are deleted with the account (`ON DELETE CASCADE`).
 
@@ -38,7 +39,7 @@ For the account, the tool:
    - a newer Apple `signedDate` wins;
    - when two events have the same `signedDate`, the higher rank wins (refund/revoke > expiry > billing failure > renewal);
    - an advisory event (a transaction whose own period has passed, or that an upgrade superseded) never ends a lifecycle that is still paid, and never moves the ordering clock.
-4. Derives the account entitlement from the replayed subscriptions. Stored web/Google subscriptions and a support grant are taken as they are.
+4. Derives the account entitlement from the replayed subscriptions. Stored web/Google subscriptions and support grants (`entitlement_support_grants`; a grant made before billing schema v5 exists only in the snapshot) are taken as they are.
 5. Compares the result with what is stored and prints a JSON report.
 
 Exit status: `0` means no drift, `2` means drift was found, `1` means the tool could not run (unknown account, unreadable database or bad trust configuration).

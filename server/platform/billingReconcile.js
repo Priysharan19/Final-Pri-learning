@@ -15,7 +15,7 @@
 // higher rank, and an advisory event (a transaction's own period lapsing)
 // never ends a paid lifecycle nor moves the ordering clock.
 import { appleBillingConfig, appleEventFromSigned } from './appleBilling.js';
-import { PAID, lifecycleEnd, paidAt, publicEntitlement, staleSubscriptionEvent } from './entitlements.js';
+import { PAID, lifecycleEnd, paidAt, publicEntitlement, staleSubscriptionEvent, supportGrantSources } from './entitlements.js';
 import { asStore } from './store.js';
 
 function appleTransactionToken(jws) {
@@ -173,7 +173,7 @@ export async function reconcileAppleAccount(db, accountId, { now = Date.now(), c
   }
 
   // The account entitlement the recomputed subscriptions imply, with the
-  // stored non-Apple sources (web/Google subscriptions, a support grant)
+  // stored non-Apple sources (web/Google subscriptions, support grants)
   // taken as they are.
   const snapshotRow = await db.get('SELECT * FROM entitlement_snapshots WHERE account_id=?', [accountId]);
   const candidates = [...recomputedStates.values()].filter(Boolean);
@@ -181,9 +181,8 @@ export async function reconcileAppleAccount(db, accountId, { now = Date.now(), c
     const state = stateFromRow(sub);
     if (state) candidates.push({ ...state, provider: sub.provider });
   }
-  if (snapshotRow?.provider === 'admin') {
-    candidates.push({ plan: snapshotRow.plan, status: snapshotRow.status, provider: 'admin', currentPeriodEnd: Number(snapshotRow.current_period_end) || null, graceUntil: Number(snapshotRow.grace_until) || null });
-  }
+  // Support grants are durable source rows (legacy grants: the snapshot).
+  candidates.push(...await supportGrantSources(db, accountId));
   const expectedPremium = candidates.some(candidate => paidAt(candidate, now));
   const storedPublic = publicEntitlement(snapshotRow || { plan: 'free', status: 'free', provider: 'none' }, now);
   // The offline window is a delivery bound, not entitlement truth: compare the

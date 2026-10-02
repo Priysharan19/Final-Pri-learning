@@ -181,6 +181,19 @@ export function ensureBillingSchema(db) {
       ON billing_apple_signed_events(original_transaction_id, signed_date);
     CREATE INDEX IF NOT EXISTS idx_billing_apple_signed_events_account
       ON billing_apple_signed_events(account_id, signed_date);
+
+    -- Audited support grants (POST /v1/entitlements/admin/grant) as their own
+    -- entitlement source. The snapshot is derived from every source; a grant
+    -- that lived only in the snapshot was erased by the next billing event.
+    CREATE TABLE IF NOT EXISTS entitlement_support_grants (
+      event_id TEXT PRIMARY KEY,
+      account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+      product_id TEXT,
+      period_end INTEGER NOT NULL,
+      created_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_entitlement_support_grants_account
+      ON entitlement_support_grants(account_id, period_end);
   `);
 
   db.prepare("INSERT OR REPLACE INTO platform_meta(key,value) VALUES ('billing_schema_version',?)").run(String(BILLING_SCHEMA_VERSION));

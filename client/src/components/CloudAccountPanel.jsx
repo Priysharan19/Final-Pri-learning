@@ -9,7 +9,7 @@ import { cloudSyncStatus, syncNow } from '../platform/syncWorker.js';
 import { normalizeCommercialDisplay } from '../platform/entitlements.js';
 import {
   finishNativeTransaction, getNativeProducts, nativeBillingAvailable,
-  onNativeBillingUpdate, purchaseNativeProduct, restoreNativePurchases
+  acceptEachTransaction, onNativeBillingUpdate, purchaseNativeProduct, restoreNativePurchases
 } from '../platform/nativeBilling.js';
 import CloudAccountSecurity from './CloudAccountSecurity.jsx';
 import { tLater, useT, useTx } from '../i18n/index.js';
@@ -371,16 +371,9 @@ export default function CloudAccountPanel() {
         setMessage(tLater('cloud.appleNoneFound'));
         return;
       }
-      let accepted = 0;
-      let lastError = null;
-      for (const transaction of transactions) {
-        // One Apple ID can hold a purchase bound to another Pri account on
-        // this iPad (APPLE_ACCOUNT_TOKEN_MISMATCH). That refusal must not stop
-        // this account's own transactions from being restored.
-        try {
-          if (await acceptAppleTransaction(transaction, { quiet: true })) accepted++;
-        } catch (err) { lastError = err; }
-      }
+      // A transaction bound to another Pri account on this Apple ID is refused
+      // by the server and must not stop this account's own from restoring.
+      const { accepted, lastError } = await acceptEachTransaction(transactions, transaction => acceptAppleTransaction(transaction, { quiet: true }));
       if (!accepted) throw lastError || new Error('No App Store transaction could be verified for this Pri Learning account.');
       setMessage(tLater('cloud.appleRestored', { count: accepted, n: accepted }));
     } catch (err) { setError(err.message || tLater('cloud.appleRestoreFailed')); }

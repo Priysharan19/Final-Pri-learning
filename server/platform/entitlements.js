@@ -85,21 +85,45 @@ function subscriptionRowState(row) {
 }
 
 /**
- * The account entitlement after one subscription's lifecycle changed.
+ * The account entitlement after any source changed.
  *
- * The event's own lifecycle wins when it is paid. When it is not (expiry,
- * refund, billing failure), Premium that the account still holds from another
- * source is kept: another subscription whose last verified lifecycle is still
- * paid, or a support grant already in the snapshot. Without this an expired
- * or refunded subscription on one Apple ID silently removed Premium that a
- * second, live subscription was paying for. Pure, so the reconciliation tool
- * derives the same answer from stored signed data.
+ * Premium comes from whichever source pays LONGEST right now: the event's own
+ * lifecycle, every other subscription's last verified lifecycle, and every
+ * support grant. Order of arrival never matters — a shorter paid source that
+ * arrives after a longer one (a monthly bought while an annual runs, a
+ * purchase made during a support grant) does not shorten Premium, and an
+ * expired or refunded source never removes Premium another source pays for.
+ * When nothing is paid, the event's own (unpaid) lifecycle is the answer.
+ * Pure, so the reconciliation tool derives the same answer from stored data.
  */
 export function selectEntitlementSource(eventState, alternatives, now) {
-  if (paidAt(eventState, now)) return eventState;
-  const live = alternatives.filter(candidate => paidAt(candidate, now))
-    .sort((a, b) => (lifecycleEnd(b) || 0) - (lifecycleEnd(a) || 0));
-  return live[0] || eventState;
+  let best = paidAt(eventState, now) ? eventState : null;
+  for (const candidate of alternatives) {
+    if (!paidAt(candidate, now)) continue;
+    if (!best || (lifecycleEnd(candidate) || 0) > (lifecycleEnd(best) || 0)) best = candidate;
+  }
+  return best || eventState;
+}
+
+/** Support grants as entitlement sources. Durable rows, not the snapshot. */
+export async function supportGrantSources(db, accountId) {
+  const rows = await db.all('SELECT product_id,period_end FROM entitlement_support_grants WHERE account_id=?', [accountId]);
+  const out = rows.map(row => ({
+    plan: 'premium', status: 'active', provider: 'admin', productId: row.product_id,
+    currentPeriodEnd: Number(row.period_end) || null, graceUntil: null, offlineUntil: null
+  }));
+  if (!out.length) {
+    // A grant made before billing schema v5 exists only in the snapshot.
+    const snapshot = await db.get('SELECT * FROM entitlement_snapshots WHERE account_id=?', [accountId]);
+    if (snapshot?.provider === 'admin') {
+      out.push({
+        plan: snapshot.plan, status: snapshot.status, provider: 'admin', productId: snapshot.product_id,
+        currentPeriodEnd: Number(snapshot.current_period_end) || null, graceUntil: Number(snapshot.grace_until) || null,
+        offlineUntil: Number(snapshot.offline_until) || null
+      });
+    }
+  }
+  return out;
 }
 
 async function alternativeSources(db, accountId, provider, providerSubscriptionId) {
@@ -111,16 +135,7 @@ async function alternativeSources(db, accountId, provider, providerSubscriptionI
     const state = subscriptionRowState(row);
     if (state) out.push({ ...state, provider: row.provider, productId: row.product_id, offlineUntil: null });
   }
-  // A support grant has no subscription row; the snapshot is its only record.
-  const snapshot = await db.get('SELECT * FROM entitlement_snapshots WHERE account_id=?', [accountId]);
-  if (snapshot?.provider === 'admin') {
-    out.push({
-      plan: snapshot.plan, status: snapshot.status, provider: 'admin', productId: snapshot.product_id,
-      currentPeriodEnd: Number(snapshot.current_period_end) || null, graceUntil: Number(snapshot.grace_until) || null,
-      offlineUntil: Number(snapshot.offline_until) || null
-    });
-  }
-  return out;
+  return [...out, ...await supportGrantSources(db, accountId)];
 }
 
 export async function applyVerifiedEntitlement(db, {
@@ -171,10 +186,15 @@ export async function applyVerifiedEntitlement(db, {
       }
     }
 
+    // A support grant is its own durable source row, so a later event from
+    // any provider can never erase it by overwriting the snapshot.
+    if (provider === 'admin' && plan === 'premium' && Number(currentPeriodEnd)) {
+      await db.run(`INSERT INTO entitlement_support_grants(event_id,account_id,product_id,period_end,created_at)
+        VALUES (?,?,?,?,?) ON CONFLICT(event_id) DO NOTHING`, [eventId, accountId, productId, Number(currentPeriodEnd), now]);
+    }
     const eventState = { plan, status, provider, productId, currentPeriodEnd, graceUntil, offlineUntil };
-    const source = subscription && providerSubscriptionId
-      ? selectEntitlementSource(eventState, await alternativeSources(db, accountId, provider, providerSubscriptionId), now)
-      : eventState;
+    const source = selectEntitlementSource(eventState,
+      await alternativeSources(db, accountId, provider, subscription ? providerSubscriptionId : null), now);
 
     const prior = await db.get('SELECT source_version FROM entitlement_snapshots WHERE account_id=?', [accountId]);
     const version = Math.max(0, Number(prior?.source_version) || 0) + 1;

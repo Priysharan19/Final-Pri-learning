@@ -92,8 +92,19 @@ ok('native shell: no checkout request left the device', !requested.includes('/v1
 delete scope.__PRI_NATIVE__;
 ok('browser: web checkout is still requested', await code(() => cloud.createWebBillingCheckout('monthly')) === null && requested.includes('/v1/billing/checkout/web'));
 
+// 6. Restore continues past a transaction bound to another Pri account (D12).
+const { acceptEachTransaction } = await import('../src/platform/nativeBilling.js');
+const mismatch = Object.assign(new Error('bound to another account'), { code: 'APPLE_ACCOUNT_TOKEN_MISMATCH' });
+const seen = [];
+const restored = await acceptEachTransaction([{ id: 'other' }, { id: 'mine' }], async t => { seen.push(t.id); if (t.id === 'other') throw mismatch; return true; });
+ok('restore: another account\'s transaction does not stop the loop', seen.join() === 'other,mine');
+ok('restore: this account\'s transaction is accepted', restored.accepted === 1);
+ok('restore: the refusal is still reported', restored.lastError === mismatch);
+const none = await acceptEachTransaction([{ id: 'other' }], async () => { throw mismatch; });
+ok('restore: when nothing is accepted the refusal is what the student sees', none.accepted === 0 && none.lastError === mismatch);
+
 if (failures.length) {
   console.error(`STOREKIT ENTITLEMENT CLIENT: FAIL — ${failures.length} of ${pass + failures.length} checks\n  · ${failures.join('\n  · ')}`);
   process.exit(1);
 }
-console.log(`STOREKIT ENTITLEMENT CLIENT: PASS — ${pass}/${pass} checks — another account's Premium is never filed under a profile, a stretched offline window lapses after seven days, a tampered cache is overwritten by the server, and web checkout never leaves a native shell.`);
+console.log(`STOREKIT ENTITLEMENT CLIENT: PASS — ${pass}/${pass} checks — another account's Premium is never filed under a profile, a stretched offline window lapses after seven days, a tampered cache is overwritten by the server, web checkout never leaves a native shell, and restore continues past another account's transaction.`);

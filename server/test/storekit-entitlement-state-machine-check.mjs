@@ -562,6 +562,87 @@ try {
     eq(exp.applied.snapshot.provider, 'admin', 'S14: the support grant is the source');
   }
 
+  // ── S17 the longest-paid source wins, whatever order events arrive in ─────
+  // Review finding on D6: a paid event used to win outright, so a SHORTER paid
+  // source arriving after a longer one became the entitlement and Premium
+  // ended at the shorter source's end while the longer one was still paid. A
+  // support grant lived only in the snapshot, so any later paid event erased it.
+  {
+    const grant = (account, until, at) => applyVerifiedEntitlement(db, {
+      verified: true, provider: 'admin', eventId: supportGrantEventId({ actorAccountId: 'support', accountId: account.id, now: at }),
+      accountId: account.id, eventType: 'support-grant', productId: 'pri-premium-support', plan: 'premium', status: 'active',
+      currentPeriodEnd: until, offlineUntil: at + 7 * DAY, now: at
+    });
+
+    // P2a: annual (to day 365) first, then a monthly on another Apple ID.
+    clock = T0;
+    const a = await newAccount('s17a');
+    await device(a, tx({ token: a.token, original: nextOriginal(), product: ANNUAL, signedDate: T0, expires: T0 + 365 * DAY }));
+    clock = T0 + DAY;
+    const monthly = await device(a, tx({ token: a.token, original: nextOriginal(), signedDate: clock, expires: T0 + 31 * DAY }));
+    eq(monthly.applied.snapshot.currentPeriodEnd, T0 + 365 * DAY, 'S17 P2a: a shorter monthly bought after the annual does not shorten Premium');
+    eq((await entitlement(a.id, T0 + 40 * DAY)).plan, 'premium', 'S17 P2a: Premium on day 40 (annual paid to day 365)');
+    await reconciled(a.id, 'S17 P2a', T0 + 40 * DAY);
+
+    // P2b: monthly first, annual second, then the monthly renews.
+    clock = T0;
+    const b = await newAccount('s17b');
+    const ob = nextOriginal();
+    await device(b, tx({ token: b.token, original: ob, signedDate: T0, expires: T0 + 30 * DAY }));
+    clock = T0 + 2 * DAY;
+    await device(b, tx({ token: b.token, original: nextOriginal(), product: ANNUAL, signedDate: clock, expires: T0 + 367 * DAY }));
+    clock = T0 + 30 * DAY - 1000;
+    const renewed = await deliver(notification({ type: 'DID_RENEW', signedDate: clock, transaction: tx({ token: b.token, original: ob, signedDate: clock, expires: T0 + 60 * DAY }) }).signedPayload);
+    eq(renewed.applied.snapshot.currentPeriodEnd, T0 + 367 * DAY, 'S17 P2b: a monthly renewal does not displace the longer annual');
+    eq((await entitlement(b.id, T0 + 70 * DAY)).plan, 'premium', 'S17 P2b: Premium on day 70');
+    await reconciled(b.id, 'S17 P2b', T0 + 70 * DAY);
+
+    // P1a: support grant to day 300, then an Apple purchase to day 30.
+    clock = T0;
+    const c = await newAccount('s17c');
+    await grant(c, T0 + 300 * DAY, T0);
+    const oc = nextOriginal();
+    const ct = tx({ token: c.token, original: oc, signedDate: T0 + 1000, expires: T0 + 30 * DAY });
+    clock = T0 + 1000;
+    const bought = await device(c, ct);
+    eq(bought.applied.snapshot.provider, 'admin', 'S17 P1a: a shorter Apple purchase does not erase a longer support grant');
+    eq((await entitlement(c.id, T0 + 40 * DAY)).plan, 'premium', 'S17 P1a: Premium on day 40 from the grant');
+    clock = T0 + 31 * DAY;
+    const lapsed = await deliver(notification({ type: 'EXPIRED', subtype: 'VOLUNTARY', signedDate: clock, transaction: { ...ct, signedDate: clock } }).signedPayload);
+    eq(lapsed.applied.snapshot.plan, 'premium', 'S17 P1a: the Apple expiry leaves the grant in force');
+    await reconciled(c.id, 'S17 P1a', T0 + 40 * DAY);
+
+    // P1b: Apple purchase first, grant second, then the Apple renewal.
+    clock = T0;
+    const d = await newAccount('s17d');
+    const od = nextOriginal();
+    await device(d, tx({ token: d.token, original: od, signedDate: T0, expires: T0 + 30 * DAY }));
+    await grant(d, T0 + 300 * DAY, T0 + 1000);
+    clock = T0 + 30 * DAY - 1000;
+    await deliver(notification({ type: 'DID_RENEW', signedDate: clock, transaction: tx({ token: d.token, original: od, signedDate: clock, expires: T0 + 60 * DAY }) }).signedPayload);
+    eq((await entitlement(d.id, T0 + 70 * DAY)).plan, 'premium', 'S17 P1b: an Apple renewal after a grant does not erase the grant');
+    await reconciled(d.id, 'S17 P1b', T0 + 70 * DAY);
+    // P1c: the grant is shorter than an Apple annual, so the snapshot names
+    // Apple; the annual is then refunded. The grant must still be there.
+    clock = T0;
+    const e = await newAccount('s17e');
+    await grant(e, T0 + 90 * DAY, T0);
+    const oe = nextOriginal();
+    const et = tx({ token: e.token, original: oe, product: ANNUAL, signedDate: T0 + 1000, expires: T0 + 365 * DAY });
+    clock = T0 + 1000;
+    eq((await device(e, et)).applied.snapshot.provider, 'apple', 'S17 P1c: the longer Apple annual is the source');
+    clock = T0 + 10 * DAY;
+    const refunded = await deliver(notification({ type: 'REFUND', signedDate: clock, transaction: { ...et, signedDate: clock, revocationDate: clock } }).signedPayload);
+    eq(refunded.applied.snapshot.provider, 'admin', 'S17 P1c: after the refund the support grant is the source again');
+    eq((await entitlement(e.id, T0 + 60 * DAY)).plan, 'premium', 'S17 P1c: Premium on day 60 from the grant');
+    await reconciled(e.id, 'S17 P1c', T0 + 60 * DAY);
+
+    // The reconciliation sees the grant too: a snapshot that lost it is drift.
+    await db.run("UPDATE entitlement_snapshots SET plan='free',status='expired',provider='apple' WHERE account_id=?", [d.id]);
+    const lost = await reconcileAppleAccount(db, d.id, { now: T0 + 70 * DAY });
+    ok(lost.drift.some(item => item.kind === 'entitlement-plan' && item.expected === 'premium'), 'S17 P1b: reconciliation reports a lost support grant');
+  }
+
   // ── S15 server-gated Premium reads only the server entitlement ─────────────
   {
     clock = T0;
