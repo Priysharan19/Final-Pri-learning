@@ -185,6 +185,8 @@ jobs:
         run: npm run test:ink:blind
       - name: Cloud reader evaluation tool self-test (fake provider, no spend)
         run: npm run test:ink:cloud-eval
+      - name: SQLite to Postgres export tool
+        run: node server/test/sqlite-to-postgres-export-check.mjs 2>&1 | tee pg-export.log && grep -Fq 'SQLITE TO POSTGRES EXPORT: PASS' pg-export.log
       - name: Server release identity
         run: node server/test/release-identity-check.mjs
       - name: Runtime dependency security floor

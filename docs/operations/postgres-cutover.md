@@ -1,6 +1,13 @@
 # Postgres cutover: Supabase (Mumbai) behind the Railway `/v1` server
 
-Status: **procedure only — nothing here has been run against Supabase or Railway.**
+Status: **procedure only — nothing here has been run against Supabase or Railway** (as of
+2026-10-02; the live service still logs `platform_db_open { engine: 'sqlite' }`, see
+`docs/release/PRI_R1_SCOPE_EVIDENCE.md` §2.10). The software side — migrations, driver, target
+check, the SQLite data export in §6a and its tests — is complete; every hosted step is
+`BLOCKED_EXTERNAL` on the owner and is listed in order in `docs/release/LAUNCH-RUNBOOK.md`.
+Schema version numbers in this document are those of `server/platform/schemaVersions.js`
+(`SCHEMA_VERSION`, `BILLING_SCHEMA_VERSION`) and the migrations under `supabase/migrations/`;
+if they ever disagree with that module, the module is right and this document is stale.
 Authority: ADR-0001 (`docs/architecture/adr-0001-online-first-runtime.md`). Every step that
 touches a hosted system needs the owner's explicit go-ahead at the time it is run; production
 steps additionally need the backup in §6 to exist first.
@@ -24,7 +31,7 @@ printed):
 | **Production:** verified TLS — `sslmode=verify-full` (preferred), or `sslmode=require` **with** `PRI_DATABASE_SSL_ROOT_CERT` | `config.js postgresConnectionSettings` | `PLATFORM_DB_TLS_REQUIRED` (no/weak sslmode) / `PLATFORM_DB_TLS_UNVERIFIED` (`require` without the CA) |
 | No `sslrootcert`/`sslcert`/`sslkey`/`ssl=` in the URL (CA goes in `PRI_DATABASE_SSL_ROOT_CERT`) | same | `PLATFORM_DB_TLS_INVALID` |
 | Reachable, migrated (`platform_meta.schema_version` present) | `store.js createPostgresStore` | `PLATFORM_DB_UNAVAILABLE` / `PLATFORM_DB_NOT_MIGRATED` |
-| `schema_version` = 8 and `billing_schema_version` = 4 exactly (`server/platform/schemaVersions.js`) | `store.js assertSchemaVersions` | `PLATFORM_DB_SCHEMA_MISMATCH` |
+| `schema_version` = **9** and `billing_schema_version` = **6** exactly (`server/platform/schemaVersions.js`) | `store.js assertSchemaVersions` | `PLATFORM_DB_SCHEMA_MISMATCH` |
 | `pri.sync_cursor_seq` exists (migration `20261002000000`) | same | `PLATFORM_DB_SCHEMA_MISMATCH` |
 | Timeouts, lock wait and pool size parse as whole numbers in range | `config.js postgresSessionLimits` | `PLATFORM_DB_CONFIG_INVALID` |
 
@@ -107,10 +114,15 @@ npx supabase@latest link --project-ref orudxrckgxyyraopyzmn
 
 # 2.3  See what would be applied. Expect exactly the files in supabase/migrations/
 #      that are not yet in the remote history, in filename order:
-#        20261001000000_platform_schema.sql
-#        20261002000000_sync_cursor_sequence.sql
-#        20261002010000_tutor_cache.sql   (additive: the AI tutor reply cache; schema_version 8)
-#        20261003000000_billing_payment_retention.sql
+#        20261001000000_platform_schema.sql              (schema 6, billing 3: every table, RLS, pri_server)
+#        20261002000000_sync_cursor_sequence.sql         (schema 7: pri.sync_cursor_seq; sync_cursors closed to pri_server)
+#        20261002010000_tutor_cache.sql                  (schema 8: the AI tutor reply cache)
+#        20261003000000_billing_payment_retention.sql    (billing 4: payments outlive their account)
+#        20261003010000_storekit_entitlement_state.sql   (billing 5: subscription lifecycle state, Apple signed-data ledger, support grants)
+#        20261004000000_google_play_billing.sql          (billing 6: Google Play tables)
+#        20261005000000_security_hardening.sql           (schema 9: staff MFA, guardian-withdraw credential, append-only audit_log, per-account RLS)
+#      The list must end at the versions schemaVersions.js states (schema 9 / billing 6);
+#      `ls supabase/migrations/` at the deployed commit is the authority if this comment lags.
 npx supabase@latest migration list
 npx supabase@latest db push --dry-run
 
@@ -193,7 +205,7 @@ unset PRI_DATABASE_URL PRI_DATABASE_SSL_ROOT_CERT
 `server/tools/postgres-target-check.mjs` connects exactly as the server does and changes nothing
 that persists. It must print `POSTGRES TARGET: PASS` with every line ticked:
 
-* boot checks (TLS policy, `schema_version` 8 / `billing_schema_version` 4, cursor sequence);
+* boot checks (TLS policy, `schema_version` 9 / `billing_schema_version` 6, cursor sequence);
 * TLS negotiated (`pg_stat_ssl`), `statement_timeout` / `idle_in_transaction_session_timeout` applied;
 * login role is a `pri_server` member, not superuser, not BYPASSRLS;
 * the live schema gate — every table, column type, key, CHECK expression, index, RLS policy
@@ -205,14 +217,14 @@ that persists. It must print `POSTGRES TARGET: PASS` with every line ticked:
 
 ### 4.3 What `npm run test:platform:pg` is — and is not — for
 
-`npm run test:platform:pg` is the **pre-merge** gate: it runs every migration and all 21
-engine-agnostic `/v1` suites on a throwaway Postgres (local `initdb`, or CI's `postgres:17`
+`npm run test:platform:pg` is the **pre-merge** gate: it runs every migration and every
+engine-agnostic `/v1` suite on a throwaway Postgres (local `initdb`, or CI's `postgres:17`
 service). It needs a superuser, creates and drops scratch databases and a passwordless login
 role, and therefore **cannot and must not be pointed at Supabase**. Run it on the exact commit
 being deployed and keep the output:
 
 ```bash
-npm run test:platform:pg   # expect: PLATFORM ON POSTGRES: PASS — 31/31 suites
+npm run test:platform:pg   # expect the exact line ci.yml pins: PLATFORM ON POSTGRES: PASS — 32/32 suites
 ```
 
 Against staging itself, the equivalent evidence is §4.2 plus §4.4.
@@ -226,7 +238,9 @@ Against staging itself, the equivalent evidence is §4.2 plus §4.4.
 1. Redeploy the staging service. The boot log must show `platform_db_open { engine: 'postgres' }`;
    any `platform_db_unavailable {"code":…}` line means the variables or migrations are wrong —
    fix and redeploy, nothing has been written.
-2. `GET /v1/health` → `database.engine = "postgres"`, `schemaVersion = "8"`.
+2. `GET /v1/health` → `database.engine = "postgres"`, `schemaVersion = "9"`, `billingSchemaVersion = "6"`;
+   `GET /v1/ready` → 200 with `database` reported ready (503 + `Retry-After` means the replica
+   cannot serve: read its coded state, not the logs' guesses).
 3. **Once no instance of an older build is left** (after any overlapping deploy has drained),
    re-run the cursor lift. It only ever raises the sequence, so it is safe to repeat, and it
    covers a cursor an older build issued between its last read of `sync_cursors` and the
@@ -277,8 +291,8 @@ cutover do not exist in the SQLite file. So after real traffic:
   build disagree. Deploy the build that matches the database, or apply the missing migration —
   do not edit `platform_meta` by hand to make the error go away.
 * **Rolling back the application build** is safe only to a build with the same
-  `SCHEMA_VERSION` / `BILLING_SCHEMA_VERSION` (7 / 3). Builds with the version check refuse a
-  database at any other version. Builds from **before** that check (the #247-era driver) only
+  `SCHEMA_VERSION` / `BILLING_SCHEMA_VERSION` as the database (today 9 / 6). Builds with the
+  version check refuse a database at any other version. Builds from **before** that check (the #247-era driver) only
   check that a `schema_version` exists, so they **do boot** against this database — but they
   allocate sync cursors from `pri.sync_cursors`, on which `pri_server` no longer has `UPDATE`:
   every sync push they attempt fails (500, nothing written). Do not roll back to such a build;
@@ -290,7 +304,10 @@ cutover do not exist in the SQLite file. So after real traffic:
 ### 5.2a Undoing migration `20261002010000_tutor_cache`
 
 Only for a build that predates the AI tutor, and before undoing anything older (migrations come
-off newest first). The table holds only cached tutor replies keyed by a request digest — no
+off newest first: `20261005000000_security_hardening` (schema 9), `20261004000000_google_play_billing`
+(billing 6) and `20261003010000_storekit_entitlement_state` (billing 5) each need their own
+owner-approved rollback written at the time, against the exact build being restored; none is
+written here because no build that predates them has ever served a Postgres database). The table holds only cached tutor replies keyed by a request digest — no
 account data — so dropping it loses nothing a student owns; the next request is simply paid for
 again. Owner approval is still required, as for every production schema change:
 
@@ -361,8 +378,71 @@ runs against an empty `pri` schema.
 3. **Restore drill:** restore that dump (or a PITR point) into a scratch Supabase project, run
    §4.2 against it, and record the result. A backup that has not been restored is not a backup.
 4. If SQLite held real data before cutover, keep the final SQLite file
-   (`server/tools/backup.mjs`) as the authoritative pre-cutover copy; importing it into Postgres
-   is a separate, reviewed data migration and is **not** part of this procedure.
+   (`server/tools/backup.mjs`) as the authoritative pre-cutover copy and carry it across with
+   §6a. ADR-0001 leaves "migrate or start empty" to the owner; §6a is the tooling for the
+   "migrate" answer and is **not run** unless the owner chooses it.
+
+## 6a. Carrying the SQLite data into Postgres (owner's decision; software complete)
+
+`server/tools/sqlite-to-postgres-export.mjs` turns a Pri SQLite platform database into a
+COPY-ready export for the `pri` schema. It reads the file **read-only**, connects to nothing,
+and writes only into the output directory. Its regression suite is
+`server/test/sqlite-to-postgres-export-check.mjs` (`npm run test:platform:export`), which also
+runs the import against a throwaway migrated Postgres under `node scripts/with-postgres.mjs`.
+
+What it exports: every table the migrations create in `pri`, in parent-before-child order
+(derived from the migrations' `references` clauses), each as `<table>.csv` — header row,
+strings always quoted, `NULL` as the empty unquoted field (Postgres CSV semantics, so `''`
+and `NULL` stay distinct). Account emails are lower-cased on the way out because the Postgres
+schema has `CHECK (email = lower(email))`; SQLite's `UNIQUE COLLATE NOCASE` means that cannot
+collide, and `manifest.json` records how many were changed. Not exported: `platform_meta`
+(the migrations seed it; the tool refuses a source whose versions are not this build's) and
+`sync_cursors` (`pri_server` cannot write it; the import lifts `pri.sync_cursor_seq` instead).
+
+It refuses, with a code on stderr and nothing written: a file that is not a platform database
+(`DB_NOT_PLATFORM`), one at another schema/billing version (`EXPORT_SCHEMA_MISMATCH` — start the
+current build once against a *copy* so SQLite migrates in place, then export the copy), a SQLite
+column the Postgres schema lacks (`EXPORT_COLUMN_UNKNOWN` — a migration is missing; fix that,
+never the data), a non-empty output directory, a missing source.
+
+```bash
+# 6a.1  Freeze the source. Stop the Railway service (or scale to 0) so no write is lost,
+#       then take the final backup — the export reads that copy, never the live file.
+node server/tools/backup.mjs --db /data/pri-learning-platform.db --out /data/backups
+#       → {"ok":true,"path":"/data/backups/pri-learning-platform-<ts>.db", ...}
+
+# 6a.2  Export (on the operator's machine, from the checkout at the deployed commit, after
+#       copying the backup file down). --inserts also writes a plain-SQL import for an SQL
+#       console without \copy.
+node server/tools/sqlite-to-postgres-export.mjs \
+  --db ./pri-learning-platform-<ts>.db --out ./pri-export-<ts> --inserts
+#       → {"ok":true,"rows":N,"tablesPresent":…,"tablesAbsent":[…],"syncCursorLiftTo":"…",
+#          "accountEmailsLowercased":n,"files":[…]}
+#       Read manifest.json: per-table sourceRows == exportedRows, the SHA-256 of every file,
+#       syncCursor.liftTo, auditLogMaxId. Keep it with the cutover log.
+
+# 6a.3  Import, as the migration owner (Supabase `postgres`), into the MIGRATED, EMPTY
+#       production schema — after §2 db push, before §4 points the service at it.
+#       The script is one transaction: its preflight raises IMPORT_SCHEMA_MISMATCH or
+#       IMPORT_TARGET_NOT_EMPTY and nothing is written; any later error rolls everything back.
+cd ./pri-export-<ts>
+read -rs PRI_IMPORT_URL && export PRI_IMPORT_URL      # postgres role, sslmode=verify-full
+psql "$PRI_IMPORT_URL" -v ON_ERROR_STOP=1 -f import-copy.sql
+
+# 6a.4  Verify. Query 1 must read `ok` on every row; queries 2–5 must return true.
+psql "$PRI_IMPORT_URL" -v ON_ERROR_STOP=1 -f verify.sql
+unset PRI_IMPORT_URL
+```
+
+The import ends by lifting `pri.sync_cursor_seq` above the SQLite allocator and every stored
+cursor, and the `audit_log` identity above every imported id, so the first Postgres push cannot
+reuse a cursor a device has already seen. Then run §4.2 (`verify:platform:pg-target`): its
+"sequence at or above every cursor" line must be ticked before the service is started on
+Postgres. The SQLite backup stays the authoritative pre-cutover copy until the owner retires it.
+
+If the owner chooses to start Postgres empty instead, skip 6a.2–6a.4 and record that decision
+in the cutover log; students then re-register and the SQLite backup is retained under
+`docs/privacy/data-retention.md`.
 
 ---
 
@@ -373,7 +453,8 @@ runs against an empty `pri` schema.
 | 2.4 `db push` | staging | | | | |
 | 3 login role created | staging | | | | (role name only) |
 | 4.2 target check | staging | | | | `POSTGRES TARGET: PASS — n/n` |
-| 4.3 `test:platform:pg` | local/CI | | | | `31/31 suites` |
+| 4.3 `test:platform:pg` | local/CI | | | | `32/32 suites` |
 | 4.4 smoke | staging | | | | |
 | 6 backup + restore drill | production | | | | |
+| 6a export + import + verify.sql | production (if SQLite held real data) | | | | `manifest.json` row totals; `verify.sql` all `ok`/`true` |
 | 2–4 | production | | | | |
