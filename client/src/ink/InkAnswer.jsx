@@ -219,6 +219,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, initialStrok
       // while the server was reading it (§09: a late reading never rewrites
       // the reading a mark was given for).
       if (seq !== readSeqRef.current || disabledRef.current) return;
+      if (outcome?.reason === 'allowance') { setCloudState('allowance'); setCloudOffer(null); return; }
       if (!outcome || outcome.reason) { setCloudState(null); setCloudOffer(null); return; }
       if (outcome.error) { setCloudState('failed'); setCloudOffer(null); return; }
 
@@ -528,6 +529,9 @@ export default function InkAnswer({ onRecognized, onStrokes = null, initialStrok
             {t('ink.reading')}{shownEngineNote && <span className="muted" style={{ marginLeft: 10, textTransform: 'none', letterSpacing: 0 }}>{shownEngineNote}</span>}
             {cloudState === 'reading' && (
               <span className="muted" style={{ marginLeft: 10, textTransform: 'none', letterSpacing: 0 }}>{t('ink.checkingReading')}</span>
+            )}
+            {cloudState === 'allowance' && (
+              <span className="muted" style={{ marginLeft: 10, textTransform: 'none', letterSpacing: 0 }}>· {t('ink.cloudAllowanceUsed')}</span>
             )}
             {cloudState === 'failed' && (
               <span className="muted" style={{ marginLeft: 10, textTransform: 'none', letterSpacing: 0 }}>{t('ink.readerUnreachable')}</span>

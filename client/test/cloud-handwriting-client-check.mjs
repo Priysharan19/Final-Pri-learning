@@ -14,6 +14,8 @@
 // The canvas is a recording stub, so this runs in bare Node with no browser.
 // ─────────────────────────────────────────────────────────────────────────────
 import { inkBounds, rasterScale, paintInk, rasterizeInk, MAX_IMAGE_BYTES } from '../src/ink/cloudRaster.js';
+import { cloudAllowanceExhausted, clearCloudAllowanceExhausted } from '../src/ink/cloudReader.js';
+import { announceEntitlementChange } from '../src/platform/cloudSession.js';
 import { UNAVAILABLE_READINESS_TTL_MS, cloudHandwritingReadiness, cloudReadingEnabled, handwritingDiagnostics, readWithCloud, recordLocalHandwritingDiagnostics, shouldSupersede, toReading } from '../src/ink/cloudReader.js';
 
 let pass = 0;
@@ -215,6 +217,29 @@ const cancelledOutcome = await readWithCloud(STROKES, {
   user: { cloudHandwriting: true }, transport: cancelledTransport, rasterize, available: there, readiness: ready
 });
 eq(cancelledOutcome?.error?.code, 'HANDWRITING_CANCELLED', 'client cancellation stays distinct from provider failure');
+
+// ── 5b · The server's daily allowance (SEC-COMM-01) ──────────────────────────
+{
+  if (typeof globalThis.addEventListener !== 'function') {
+    const target = new EventTarget();
+    globalThis.addEventListener = target.addEventListener.bind(target);
+    globalThis.removeEventListener = target.removeEventListener.bind(target);
+    globalThis.dispatchEvent = target.dispatchEvent.bind(target);
+  }
+  let sent = 0;
+  const resetAt = Date.now() + 2 * 60 * 60 * 1000;
+  const exhausted = { transcribeHandwriting: async () => { sent += 1; const e = new Error('used up'); e.code = 'AI_ALLOWANCE_EXHAUSTED'; e.status = 429; e.resetAt = resetAt; throw e; } };
+  const first = await readWithCloud(STROKES, { user: { cloudHandwriting: true }, transport: exhausted, rasterize, available: there, readiness: ready });
+  ok(first?.reason === 'allowance' && first.until === resetAt && !first.error, 'an exhausted allowance is a reason (the on-device reading stays), not a failure');
+  const second = await readWithCloud(STROKES, { user: { cloudHandwriting: true }, transport: exhausted, rasterize, available: there, readiness: ready });
+  ok(second?.reason === 'allowance' && sent === 1 && cloudAllowanceExhausted(), 'no doomed request is sent again until the allowance resets');
+  announceEntitlementChange({ localProfileId: 'p1', plan: 'premium', status: 'active', active: true });
+  ok(!cloudAllowanceExhausted(), 'an entitlement change (an upgrade) clears it at once');
+  const noReset = { transcribeHandwriting: async () => { const e = new Error('used up'); e.code = 'AI_ALLOWANCE_EXHAUSTED'; e.resetAt = Date.now() + 365 * 24 * 3600e3; throw e; } };
+  const capped = await readWithCloud(STROKES, { user: { cloudHandwriting: true }, transport: noReset, rasterize, available: there, readiness: ready });
+  ok(capped.until - Date.now() <= 31 * 60 * 1000, 'an implausible reset time falls back to a 30-minute back-off');
+  clearCloudAllowanceExhausted();
+}
 
 // ── 6 · Turning a transcription into a reading ───────────────────────────────
 const local = { lines: [{ text: '-1/0/1/2)4', box: { x: 1, y: 2 } }], text: '-1/0/1/2)4' };
