@@ -70,7 +70,7 @@ export const flow = {
   id: 'stale-cloud',
   name: 'Cloud · late results never rewrite an attempt',
 
-  async run({ page, ctx, base, check, goto, createProfile, mathText, settle }) {
+  async run({ page, ctx, base, check, goto, createProfile, settle }) {
     const stub = {
       transcribeDelay: 0, transcribed: 0, transcribeAnswered: 0,
       lastSentAt: 0, submittedAt: 0, answeredAfterSubmit: 0,
@@ -129,21 +129,20 @@ export const flow = {
     await check('both server features are switched on in Settings',
       await page.locator('.set-row button[aria-pressed="true"]').count() >= 2, 'the opt-in toggles did not stick');
 
-    // The prompt as a student reads it (KaTeX's MathML copy dropped).
-    const promptChangesFrom = (before) => page.waitForFunction(p => {
-      const el = document.querySelector('.q-prompt');
-      if (!el) return false;
-      const c = el.cloneNode(true);
-      for (const m of c.querySelectorAll('.katex-mathml')) m.remove();
-      return c.textContent.replace(/\s|\u00a0/g, ' ').replace(/ +/g, ' ').trim() !== p;
+    // Questions are told apart by their opaque id, never by prompt text: a
+    // generator can write the same prompt twice.
+    const shownId = () => page.locator('.qpage').first().getAttribute('data-question-id');
+    const questionChangesFrom = (before) => page.waitForFunction(id => {
+      const el = document.querySelector('.qpage[data-question-id]');
+      return el && el.getAttribute('data-question-id') !== id && el.querySelector('.q-prompt');
     }, before, { timeout: 30000 }).catch(() => null);
     // A fresh question each time, on a clean page.
     const openWriting = async (topic = TOPIC) => {
       await page.goto(`${base}/practice?subtopic=${topic}`, { waitUntil: 'domcontentloaded' });
-      await page.waitForSelector('.q-prompt', { timeout: 30000 });
-      const before = await mathText('.q-prompt');
+      await page.waitForSelector('.qpage[data-question-id] .q-prompt', { timeout: 30000 });
+      const before = await shownId();
       await page.locator('.ctx-next').click();
-      await promptChangesFrom(before);
+      await questionChangesFrom(before);
       await settle();
       await page.getByRole('button', { name: 'Answer by handwriting' }).click();
       await page.waitForSelector('.ink-canvas-live', { timeout: 30000 });
@@ -160,7 +159,6 @@ export const flow = {
     // ── 1 · control: an early server reading is applied ──────────────────────
     let box = await openWriting();
     stub.transcribeDelay = 100;
-    await page.waitForTimeout(600);
     await handwrite(page, box, '1');
     await readsAs(page, '7');
     const early = await reading(page);
@@ -203,6 +201,8 @@ export const flow = {
     const verdictBefore = (await page.locator('.eval-card').innerText()).replace(/\s+/g, ' ');
     const settled = Date.now() + 12000;
     while ((stub.transcribeAnswered < stub.transcribed || !stub.answeredAfterSubmit) && Date.now() < settled) await page.waitForTimeout(100);
+    // Negative checks below: give the page's own event loop a beat to apply
+    // whatever it was going to apply once the response was delivered.
     await page.waitForTimeout(800);
     await check('the late server reading did arrive after Submit (the case really happened)',
       stub.answeredAfterSubmit > 0 && stub.transcribeAnswered === stub.transcribed && stub.lastSentAt < stub.submittedAt, JSON.stringify(stub));
@@ -271,14 +271,14 @@ export const flow = {
       // A right answer asks for no check, so the delays still line up.
       if (!/\b(\d+) \/ \1 marks/.test(e)) evalA = e;
     }
-    const promptA = await mathText('.q-prompt');
+    const idA = await shownId();
     const aId = stub.checked;
     const waitAsk = Date.now() + 10000;
     while (stub.checked < aId && Date.now() < waitAsk) await page.waitForTimeout(50);
     await check('the slow working check for A was requested', !!evalA && aId > askedBeforeA, `checks ${stub.checked}`);
     await page.locator('.ctx-next').click();
-    await promptChangesFrom(promptA);
-    await check('the student is on question B', await mathText('.q-prompt') !== promptA, 'still on A');
+    await questionChangesFrom(idA);
+    await check('the student is on question B', !!idA && await shownId() !== idA, 'still on A');
     await writeTwoLinesAndResolve();
     const settleA = Date.now() + 15000;
     while (!stub.answeredChecks.includes(aId) && Date.now() < settleA) await page.waitForTimeout(100);
@@ -287,16 +287,15 @@ export const flow = {
     const onB = await page.locator('body').innerText();
     await check('A\u2019s late working check is not shown on B', !onB.includes(noteFor(aId)), 'the note for A appeared on B');
 
-    // A's row in History: found by its prompt, still marked wrong.
+    // A's row in History: found by its id, still marked wrong.
     await page.goto(`${base}/history`, { waitUntil: 'domcontentloaded' });
     await page.waitForSelector('.hist-row', { timeout: 30000 });
-    const rowA = await page.evaluate(prompt => {
-      const visual = el => { const c = el.cloneNode(true); for (const m of c.querySelectorAll('.katex-mathml')) m.remove(); return (c.textContent || '').replace(/\s+/g, ' ').trim(); };
-      const row = [...document.querySelectorAll('.hist-row')].find(r => visual(r.querySelector('.hist-prompt') || r) === prompt);
+    const rowA = await page.evaluate(id => {
+      const row = document.querySelector(`.hist-row[data-question-id="${CSS.escape(id)}"]`);
       if (!row) return null;
       const v = row.querySelector('.hist-verdict');
       return { bad: v?.classList.contains('bad') === true, good: v?.classList.contains('good') === true };
-    }, promptA);
+    }, idA);
     await check('A\u2019s recorded mark is unchanged in History: still wrong',
       !!rowA && rowA.bad && !rowA.good && /\b0 \/ \d+ marks/.test(evalA), `row ${JSON.stringify(rowA)}, evaluation ${JSON.stringify(evalA.slice(0, 80))}`);
   }

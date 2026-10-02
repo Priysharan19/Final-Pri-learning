@@ -923,7 +923,9 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       : [...(showWorking && working ? working.split('\n').filter(Boolean) : []), answer].filter(Boolean);
 
   return (
-    <div className="qpage">
+    // The opaque question id, so a test (or support) can tell two questions
+    // apart even when a generator happens to write the same prompt twice.
+    <div className="qpage" data-question-id={question.id}>
       {/* left action rail */}
       <div className="q-rail no-print">
         <button className={`q-rail-btn ${bookmarked ? 'on' : ''}`} title={t('verdict.favorite')} aria-label={t('verdict.favoriteThis')} aria-pressed={bookmarked} onClick={toggleBookmark}>☆</button>
