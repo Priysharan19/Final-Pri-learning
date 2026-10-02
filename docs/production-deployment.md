@@ -9,6 +9,20 @@ database in a SQLite file on a persistent `/data` volume (`platform_db_open { en
 selects which. Nothing here asserts that the cutover has happened; `docs/operations/postgres-cutover.md`
 is the procedure and `docs/release/LAUNCH-RUNBOOK.md` the owner's ordered checklist.
 
+## Railway
+
+`railway.json` at the repository root is the Railway config-as-code for the `/v1` service. It builds the root `Dockerfile` (no Nixpacks, no start-command override), uses `GET /v1/ready` as the deploy healthcheck so a replica that cannot serve (database unreachable, schema mismatch, verification email unconfigured) never takes traffic, restarts only on failure, and allows 20 s of draining, longer than the server's own 10 s shutdown deadline. Railway passes `RAILWAY_GIT_COMMIT_SHA` to the build, and the Dockerfile turns that into the release identity that `/v1/health` and `/release.json` report (`.github/workflows/deployment-image.yml` proves the two agree).
+
+The production service's source must be the `main` branch of `Priysharan19/Final-Pri-learning`, with Railway's *Wait for CI* option on, so only a `main` SHA that passed its checks is built. Settings in the Railway dashboard override `railway.json`; leave the build, healthcheck and restart fields empty there.
+
+After every production deploy, verify the exact SHA from a checkout of that SHA:
+
+```bash
+npm run verify:deployment -- --origin https://<production origin> --sha <40-hex main SHA> --engine postgres
+```
+
+`tools/verify-deployment.mjs` sends three unauthenticated GETs and changes nothing. It prints `DEPLOYMENT VERIFIED: PASS` only when the server and the web bundle both report that SHA, storage is persistent, the database is reachable at the schema versions the checkout expects, verification email is configured and `/v1/ready` says the replica can serve. Use `--engine sqlite` while the service still runs on the volume.
+
 `docs/architecture/authoritative-architecture.md` governs where this document and it disagree.
 
 ## 1. Runtime topology
