@@ -22,7 +22,9 @@ import { ensurePersonalLoaded, addPersonal } from './personal.js';
 import { MathText } from '../lib/latex.jsx';
 import { currentReleaseIdentity } from '../platform/releaseIdentity.js';
 import Icon from '../components/Icon.jsx';
+import { inkCanvasHeight, useFormFactor } from '../platform/formFactor.js';
 import { useT } from '../i18n/index.js';
+import { priNative } from '../platform/native/index.js';
 
 const NICE = { pi: 'π', theta: 'θ', sqrt: '√', percent: '%' };
 const showSym = s => NICE[s] || s;
@@ -39,6 +41,15 @@ const showSym = s => NICE[s] || s;
 // model without pretending it is a production/offline asset.
 // The surface is chosen per mount, not at import: a shell's capability can be
 // known only after this module first evaluates (CP-02).
+
+// Engine names and fallback warnings are for developers and evaluators, not
+// students: shown in dev builds, LAN research mode, or with ?inkdiag=1.
+const inkDiagnosticsVisible = () => {
+  if (import.meta.env?.DEV) return true;
+  if (typeof window === 'undefined') return false;
+  if (window.__PRI_LAN_DEV__ === true) return true;
+  try { return new URLSearchParams(window.location.search).has('inkdiag'); } catch { return false; }
+};
 /** How long the page must be still before it is worth sending. */
 const CLOUD_SETTLE_MS = 1800;
 
@@ -46,8 +57,8 @@ const EMPTY_READING = { lines: [], text: '', symbols: [], minConf: 1, margin: 1,
 // Engine provenance is evidence for whoever is testing recognition, not
 // something a student needs to read while solving. It is always on the element
 // as data-engine; it is spelled out on screen only in a developer session.
-const showEngineNotes = () => typeof window !== 'undefined'
-  && (window.__PRI_LAN_DEV__ === true || /[?&]inkDebug=1\b/.test(window.location?.search || ''));
+const showEngineNotes = () => inkDiagnosticsVisible()
+  || (typeof window !== 'undefined' && /[?&]inkDebug=1\b/.test(window.location?.search || ''));
 /** One page of paper. More pages extend the same sheet, so recognition, the
  *  stored strokes and History replay all keep one coordinate space. */
 const MAX_PAGES = 4;
@@ -126,15 +137,22 @@ export default function InkAnswer({
   onRecognized, height = 300, disabled, lineVerdicts = null, focusSymbol = null, recognitionContext = null,
   initialStrokes = null, onStrokes = null
 }) {
-  const t = useT();
   const [NATIVE_INK] = useState(nativeInkAvailable);
   const Surface = NATIVE_INK ? NativeInkCanvas : InkCanvas;
+  // EXPANDED (the iPad baseline) keeps the requested height; smaller windows get
+  // a writing area that fits the screen (CP-03, FORM_FACTOR_SPEC.md §3).
+  const t = useT();
+  const formFactor = useFormFactor();
+  const fittedHeight = inkCanvasHeight(height, formFactor);
   const canvasRef = useRef(null);
   // The signed-in profile carries the server-reading opt-in, which is off
   // unless the student turned it on.
   const { user } = useApp();
   const [tool, setTool] = useState('pen');
-  const [finger, setFinger] = useState(false);
+  // Where the host has no stylus (iPhone), finger writing is the default; the
+  // toolbar toggle still switches it either way (CP-04).
+  const [fingerHost] = useState(() => priNative.ink.facts()?.fingerDefault === true);
+  const [finger, setFinger] = useState(fingerHost);
   const [rec, setRec] = useState({ lines: [], text: '' });
   const [overrides, setOverrides] = useState({});
   const [picker, setPicker] = useState(null);
@@ -142,11 +160,8 @@ export default function InkAnswer({
   // the first sheet opens with enough sheets to show all of it.
   const [pages, setPages] = useState(() => {
     const bottom = Math.max(0, ...(initialStrokes || []).flatMap(st => (st?.points || []).map(p => Number(p?.y) || 0)));
-    return Math.min(MAX_PAGES, Math.max(1, Math.ceil((bottom + 24) / height)));
+    return Math.min(MAX_PAGES, Math.max(1, Math.ceil((bottom + 24) / fittedHeight)));
   });
-  const restoredRef = useRef(false);
-  const onStrokesRef = useRef(onStrokes);
-  useEffect(() => { onStrokesRef.current = onStrokes; }, [onStrokes]);
   const timerRef = useRef(null);
   const readSeqRef = useRef(0);
   const cloudAbortRef = useRef(null);
@@ -164,6 +179,11 @@ export default function InkAnswer({
   const focusedRef = useRef(null);
 
   useEffect(() => { overridesRef.current = overrides; }, [overrides]);
+  // Read inside async reading passes: a pass that settles after the card was
+  // locked for marking belongs to writing that is no longer the answer.
+  const disabledRef = useRef(!!disabled);
+  const onStrokesRef = useRef(onStrokes);
+  useEffect(() => { onStrokesRef.current = onStrokes; }, [onStrokes]);
   useEffect(() => {
     recordLocalHandwritingDiagnostics({
       nativeAvailable: NATIVE_INK,
@@ -171,7 +191,9 @@ export default function InkAnswer({
     });
   }, []);
 
+  const publishedRef = useRef(false);
   const publish = useCallback((r, strokes) => {
+    publishedRef.current = true;
     recordLocalHandwritingDiagnostics({ engine: r?.engine || null });
     setRec(r);
     // A server reading has no per-glyph symbols, so readingConfidence would
@@ -203,15 +225,17 @@ export default function InkAnswer({
    * the student is offered the alternative.
    */
   const sendCloudPass = useCallback((strokes, seq, localReading) => {
-    if (!cloudReadingEnabled(user)) return;
+    if (!cloudReadingEnabled(user) || disabledRef.current) return;
     cloudAbortRef.current?.abort?.();
     const controller = typeof AbortController === 'function' ? new AbortController() : null;
     cloudAbortRef.current = controller;
     setCloudState('reading');
 
     readWithCloud(strokes, { user, signal: controller?.signal }).then(outcome => {
-      // Newer writing has already replaced this read.
-      if (seq !== readSeqRef.current) return;
+      // Newer writing has already replaced this read, or the page was submitted
+      // while the server was reading it (§09: a late reading never rewrites
+      // the reading a mark was given for).
+      if (seq !== readSeqRef.current || disabledRef.current) return;
       if (!outcome || outcome.reason) { setCloudState(null); setCloudOffer(null); return; }
       if (outcome.error) { setCloudState('failed'); setCloudOffer(null); return; }
 
@@ -234,11 +258,11 @@ export default function InkAnswer({
         setCloudOffer(null);
         setCloudState(null);
       }
-    }).catch(() => { if (seq === readSeqRef.current) { setCloudState('failed'); setCloudOffer(null); } });
+    }).catch(() => { if (seq === readSeqRef.current && !disabledRef.current) { setCloudState('failed'); setCloudOffer(null); } });
   }, [user, publish]);
 
   const runCloudPass = useCallback((strokes, seq, localReading) => {
-    if (!cloudReadingEnabled(user)) return;
+    if (!cloudReadingEnabled(user) || disabledRef.current) return;
     // A student writing five lines of working pauses past the browser's 240 ms
     // quiet window dozens of times, and each pause used to send the whole page
     // again. The previous request was aborted, but usually only after it had
@@ -323,7 +347,9 @@ export default function InkAnswer({
 
   const onStrokesChange = useCallback((strokes) => {
     strokesRef.current = strokes;
-    onStrokesRef.current?.(strokes);
+    // Kept the moment the pen lifts, before any reading: a page written in the
+    // second before the app went away is still the student's page.
+    try { onStrokesRef.current?.(strokes); } catch { /* keeping ink is best-effort */ }
     if (timerRef.current) clearTimeout(timerRef.current);
     // Native whole-page recognition is intentionally a quiet-window operation.
     // A 240 ms debounce caused a recognition job after normal pauses between
@@ -334,13 +360,35 @@ export default function InkAnswer({
   }, [overrides, runRecognition]);
 
   useEffect(() => { ensurePersonalLoaded(); }, []);
-  // Put an unfinished page back exactly as it was left. Runs once: a later
-  // prop change must never overwrite what the student has written since.
+
+  // Handwriting kept from before a reload comes back onto the page, and is read
+  // again the ordinary on-device way.
   useEffect(() => {
-    if (restoredRef.current) return;
-    restoredRef.current = true;
-    if (Array.isArray(initialStrokes) && initialStrokes.length) canvasRef.current?.setStrokes?.(initialStrokes);
-  }, [initialStrokes]);
+    if (!Array.isArray(initialStrokes) || !initialStrokes.length) return;
+    canvasRef.current?.setStrokes?.(initialStrokes);
+    // The native surface draws them without reporting back; the browser canvas
+    // reports through the same callback, and the debounce makes twice once.
+    onStrokesChange(initialStrokes);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Locking the page for marking invalidates every reading still in flight —
+  // local or server — so none of them can land after the submit (§09).
+  useEffect(() => {
+    const was = disabledRef.current;
+    disabledRef.current = !!disabled;
+    if (!disabled || was) return;
+    // A page restored from before a reload has not been read yet; that first
+    // on-device reading is still owed, and it reads the very strokes submitted.
+    if (publishedRef.current) {
+      readSeqRef.current += 1;
+      if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
+    }
+    if (cloudSettleRef.current) { clearTimeout(cloudSettleRef.current); cloudSettleRef.current = null; }
+    cloudAbortRef.current?.abort?.();
+    cloudSentRef.current = null;
+    setCloudState(null);
+    setCloudOffer(null);
+  }, [disabled]);
   useEffect(() => () => {
     readSeqRef.current += 1;
     if (timerRef.current) clearTimeout(timerRef.current);
@@ -417,7 +465,9 @@ export default function InkAnswer({
           : rec.disagreement
             ? `Native engines disagree · confirmation required · ${rec.engine}`
             : rec.engine ? `Native recognition path · ${rec.engine}` : null;
-  const pageHeight = height;
+  // One sheet is the fitted writing height (CP-03); added pages extend the same
+  // coordinate space downward.
+  const pageHeight = fittedHeight;
 
   return (
     <div className={`ink-answer ${disabled ? 'ink-disabled' : ''}`} data-engine={rec.engine || undefined}>
@@ -439,7 +489,7 @@ export default function InkAnswer({
           <Icon name="pageAdd" /><span className="ink-tool-label">{t('ink.addPage')}</span>
         </button>
         <span className="ink-pages" aria-live="polite">{t('ink.pageCount', { count: pages, n: pages })}</span>
-        {!NATIVE_INK && (
+        {(!NATIVE_INK || fingerHost) && (
           <button type="button" className={`ink-tool ${finger ? 'on' : ''}`} title={t('ink.fingerTitle')}
             aria-label={t('ink.fingerLabel')} aria-pressed={finger}
             onClick={() => setFinger(f => !f)}>
@@ -522,6 +572,8 @@ export default function InkAnswer({
             {/* The browser reader is a fallback, never production handwriting
                 evidence; it says so quietly rather than not at all. */}
             {!NATIVE_INK && rec.cloud !== true && <span className="ink-status muted">{t('ink.webReader')}</span>}
+            {/* A student always learns when their writing was read on the server. */}
+            {rec.cloud === true && <span className="ink-status muted">{t('verdict.readOnServer')}</span>}
             {cloudState === 'reading' && <span className="ink-status muted">{t('ink.readingAgain')}</span>}
             {cloudState === 'failed' && <span className="ink-status muted">{t('ink.readerUnreachable')}</span>}
           </div>

@@ -92,6 +92,7 @@ struct WebShell: UIViewRepresentable {
         context.coordinator.attachHost(to: webView)
         container.onLayout = { [weak coordinator = context.coordinator] in
             coordinator?.ink.webViewDidResize()
+            coordinator?.applyTextSize()
         }
 
         webView.load(URLRequest(url: URL(string: "prilearning://app/")!))
@@ -172,11 +173,63 @@ struct WebShell: UIViewRepresentable {
             cloud.detach()
         }
 
+        private var openURLObserver: NSObjectProtocol?
+        private var contentSizeObserver: NSObjectProtocol?
+
         func attachHost(to webView: WKWebView) {
             host.attach(to: webView)
+            openURLObserver = NotificationCenter.default.addObserver(forName: .priOpenURL, object: nil, queue: .main) { [weak self] note in
+                guard let url = note.object as? URL else { return }
+                self?.route(deepLink: url)
+            }
+            contentSizeObserver = NotificationCenter.default.addObserver(
+                forName: UIContentSizeCategory.didChangeNotification, object: nil, queue: .main
+            ) { [weak self] _ in self?.applyTextSize() }
+            applyTextSize()
+        }
+
+        /// Only `https://<signed cloud host>/account-action#…` is accepted, and it
+        /// is loaded into the bundled app at the same route. The fragment carries
+        /// a one-time token: it is never logged and never becomes a query.
+        func route(deepLink url: URL) {
+            guard let webView = shellWebView,
+                  url.scheme?.lowercased() == "https",
+                  let host = url.host?.lowercased(), host == NativeCloudBridge.configuredHost,
+                  url.path == "/account-action",
+                  url.query == nil,
+                  let fragment = url.fragment, !fragment.isEmpty, fragment.count <= 1024,
+                  let target = URL(string: "prilearning://app/account-action#\(fragment)") else { return }
+            webView.load(URLRequest(url: target))
+        }
+
+        /// Dynamic Type: the page is laid out in CSS pixels, so the system text
+        /// size is applied as page zoom. It is capped so the CSS viewport never
+        /// drops below 360px wide (the narrowest layout the product is tested at).
+        func applyTextSize() {
+            guard let webView = shellWebView else { return }
+            let scale: CGFloat
+            switch UIApplication.shared.preferredContentSizeCategory {
+            case .extraSmall, .small, .medium, .large: scale = 1.0
+            case .extraLarge: scale = 1.1
+            case .extraExtraLarge: scale = 1.2
+            case .extraExtraExtraLarge: scale = 1.3
+            case .accessibilityMedium: scale = 1.4
+            case .accessibilityLarge, .accessibilityExtraLarge, .accessibilityExtraExtraLarge, .accessibilityExtraExtraExtraLarge: scale = 1.5
+            default: scale = 1.0
+            }
+            let width = max(webView.bounds.width, 1)
+            let capped = max(1.0, min(scale, width / 360))
+            if abs(webView.pageZoom - capped) > 0.01 {
+                webView.pageZoom = capped
+                ink.webViewDidResize() // re-place the native ink surface at the new zoom
+            }
         }
 
         func detachHost() {
+            if let openURLObserver { NotificationCenter.default.removeObserver(openURLObserver) }
+            if let contentSizeObserver { NotificationCenter.default.removeObserver(contentSizeObserver) }
+            openURLObserver = nil
+            contentSizeObserver = nil
             host.detach()
         }
 
@@ -238,9 +291,17 @@ struct WebShell: UIViewRepresentable {
         private var bridgeSelfCheckRan = false
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
             // Simulator/CI only: prove the bridge contract inside real WebKit.
-            guard BridgeSelfCheck.requested, !bridgeSelfCheckRan else { return }
-            bridgeSelfCheckRan = true
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2) { BridgeSelfCheck.run(in: webView) }
+            applyTextSize()
+            #if DEBUG
+            guard !bridgeSelfCheckRan else { return }
+            if BridgeSelfCheck.requested {
+                bridgeSelfCheckRan = true
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2) { BridgeSelfCheck.run(in: webView) }
+            } else if JourneySelfCheck.phase != nil {
+                bridgeSelfCheckRan = true
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2) { JourneySelfCheck.run(in: webView) }
+            }
+            #endif
         }
 
         // ── Navigation policy ──

@@ -9,7 +9,8 @@ import {
 import QuestionCard, { SR_ONLY } from '../components/QuestionCard.jsx';
 import PriExplain from '../components/PriExplain.jsx';
 import FreeCapNotice from '../components/FreeCapNotice.jsx';
-import { useT } from '../i18n/index.js';
+import { clearInkDraft, clearPendingSubmission, pendingSubmissionQuestionId, readPendingSubmission } from '../components/practiceRecovery.js';
+import { tLater, useT } from '../i18n/index.js';
 import Icon from '../components/Icon.jsx';
 
 const EMPTY_SESSION = Object.freeze({ answered: 0, correct: 0, xp: 0 });
@@ -69,7 +70,7 @@ export default function Practice() {
     replaceSession(EMPTY_SESSION);
     if (!assignmentMode) return () => { live = false; };
     if (!cloudAvailable()) {
-      setAssignmentError(t('assignment.needsCloud'));
+      setAssignmentError(tLater('assignment.needsCloud'));
       return () => { live = false; };
     }
 
@@ -114,7 +115,7 @@ export default function Practice() {
       setAssignmentContext(nextAssignment);
     })().catch(err => {
       if (!live) return;
-      setAssignmentError(err.message || t('assignment.couldNotOpen'));
+      setAssignmentError(err.message || tLater('assignment.couldNotOpen'));
     });
     return () => { live = false; };
   }, [assignmentMode, assignmentClassId, assignmentId, replaceSession]);
@@ -145,8 +146,12 @@ export default function Practice() {
       // discard before serving a fresh question. A resolved row returns 409
       // here and is already safe to move past.
       if (options?.fresh === true && currentQuestionRef.current && !assignmentMode) {
-        try { await api.post(`/practice/${currentQuestionRef.current}/discard`, {}); }
+        const leaving = currentQuestionRef.current;
+        // A submission still being marked is not abandoned by moving on: the
+        // card finishes it, and the discard below waits for it in the backend.
+        try { await api.post(`/practice/${leaving}/discard`, {}); }
         catch (e) { if (e?.status !== 409) throw e; }
+        if (!readPendingSubmission(leaving)) clearInkDraft(leaving);
       }
       const assignmentSpec = assignmentContext?.specification || {};
       const assignmentSubtopic = assignmentSpec.subtopic ? String(assignmentSpec.subtopic) : null;
@@ -168,7 +173,14 @@ export default function Practice() {
       // background termination or a duplicate Next request. Cloud assignments
       // manage their own session contract and are intentionally left alone.
       if (!assignmentMode || taskId) body.resume = options?.fresh !== true;
+      // A submission the app was killed in the middle of comes back first, so
+      // its card can replay it and show the one verdict it produced (§09).
+      const pendingQuestionId = body.resume === true ? pendingSubmissionQuestionId() : null;
+      if (pendingQuestionId) body.pendingQuestionId = pendingQuestionId;
       const r = await api.post('/practice/next', body);
+      // Not served back means there is nothing left to recover (skipped, or
+      // gone); a record that can never replay must not be sent forever.
+      if (pendingQuestionId && r?.question?.id !== pendingQuestionId) clearPendingSubmission(pendingQuestionId);
       setServe(r);
     } catch (e) {
       // A free-tier refusal is not a fault: it is the end of today's free
@@ -226,10 +238,10 @@ export default function Practice() {
         setAssignmentError('');
       })
       .catch(err => {
-        setAssignmentError(`Your maths work is safe on this device, but assignment progress could not sync: ${err.message || 'cloud unavailable'}`);
+        setAssignmentError(tLater('practice.assignmentSyncFailed', { reason: err.message || tLater('practice.cloudUnavailable') }));
       });
     return assignmentSync.current;
-  }, [assignmentMode, assignmentContext, assignmentClassId, assignmentId, assignmentTarget]);
+  }, [assignmentMode, assignmentContext, assignmentClassId, assignmentId, assignmentTarget, t]);
 
   const onResolved = res => {
     const goal = Math.max(1, Number(user.dailyGoal) || 10);

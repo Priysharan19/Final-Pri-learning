@@ -353,7 +353,7 @@ export default function Home() {
                       {[1, 2, 3, 4].filter(d => !section?.difficultyCeiling || d <= section.difficultyCeiling).map(d => (
                         <button key={d} className={`gen-opt ${difficulty === d ? 'on' : ''}`} aria-pressed={difficulty === d}
                           onClick={() => setDifficulty(difficulty === d ? null : d)}>
-                          D{d} · {t(DIFF_KEYS[d])}
+                          {`D${d}`} · {t(DIFF_KEYS[d])}
                         </button>
                       ))}
                     </div>

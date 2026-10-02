@@ -17,10 +17,14 @@ import { createRazorpayBilling } from './platform/razorpay.js';
 import { createPlatformRouter } from './platform/router.js';
 import { trustedProxyHops } from './platform/config.js';
 import { securityHeaders } from './platform/headers.js';
+import { asStore } from './platform/store.js';
+import { logEvent, requestContext, routeTemplate, safeCode, safeLogFields } from './platform/observability.js';
+import { recordHttpResponse } from './platform/metrics.js';
+import { releaseShaForLogs } from './platform/releaseIdentity.js';
+import { rejectUnsafeText } from './platform/text.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 export const DEFAULT_DIST = join(here, '..', 'client', 'dist');
-const REQUEST_ID = /^[A-Za-z0-9._:-]{1,80}$/;
 /**
  * The one transport limit every route lives inside. Anything that quotes a
  * larger ceiling of its own is quoting a limit the body parser will reach first
@@ -29,21 +33,43 @@ const REQUEST_ID = /^[A-Za-z0-9._:-]{1,80}$/;
 export const JSON_BODY_LIMIT = '1mb';
 export const JSON_BODY_LIMIT_BYTES = 1024 * 1024;
 
-export function requestLogger(log = line => console.log(JSON.stringify(line))) {
+const BODY_PARSER_ERRORS = Object.freeze({
+  'entity.parse.failed': { status: 400, code: 'MALFORMED_JSON', message: 'The request body is not a valid JSON object or array.' },
+  'charset.unsupported': { status: 415, code: 'UNSUPPORTED_CHARSET', message: 'The request body charset is not supported. Send UTF-8 JSON.' },
+  'encoding.unsupported': { status: 415, code: 'UNSUPPORTED_ENCODING', message: 'The request body content encoding is not supported.' },
+  'request.aborted': { status: 400, code: 'REQUEST_ABORTED', message: 'The request body was not received completely.' },
+  'request.size.invalid': { status: 400, code: 'REQUEST_SIZE_INVALID', message: 'The request body length does not match its Content-Length.' }
+});
+
+/**
+ * One structured JSON line per request (platform/observability.js): request
+ * id, method, route TEMPLATE, status, latency, the coded error when there was
+ * one, the release SHA and the database engine. Never a raw path, query
+ * string, body, cookie, header, IP, user agent or account identifier.
+ */
+export function requestLogger(log = null, { engine = null } = {}) {
+  // log: a function receives each line (tests); null writes the process log;
+  // false records metrics only.
+  const db = engine === 'postgres' || engine === 'sqlite' ? engine : undefined;
   return (req, res, next) => {
     const started = process.hrtime.bigint();
     res.on('finish', () => {
-      const requestId = req.get('x-pri-request-id');
-      // Method, route path, status and latency only: no query strings, bodies,
-      // cookies, IPs, user agents or account identifiers ever reach the log.
-      log({
-        ts: new Date().toISOString(),
+      const ms = Number(process.hrtime.bigint() - started) / 1e6;
+      recordHttpResponse(res.statusCode, ms);
+      if (log === false) return;
+      const fields = {
+        requestId: req.requestId,
         method: req.method,
-        path: String(req.originalUrl || req.url || '').split('?', 1)[0].slice(0, 200),
+        route: res.locals.route || routeTemplate(req),
         status: res.statusCode,
-        ms: Number(process.hrtime.bigint() - started) / 1e6,
-        ...(requestId && REQUEST_ID.test(requestId) ? { requestId } : {})
-      });
+        ms,
+        code: res.locals.errorCode || undefined,
+        release: releaseShaForLogs(),
+        db
+      };
+      const level = res.statusCode >= 500 ? 'error' : 'info';
+      if (typeof log === 'function') log(safeLogFields({ ts: new Date().toISOString(), level, event: 'http_request', ...fields }));
+      else logEvent(level, 'http_request', fields);
     });
     next();
   };
@@ -65,7 +91,10 @@ export async function createServerApp(db, {
   if (production) app.set('trust proxy', trustedProxyHops());
   app.disable('x-powered-by');
   app.use(securityHeaders({ production }));
-  if (requestLog) app.use(requestLogger(log));
+  // Before everything that can answer: every response, including the body
+  // parser's 413 and the legacy 410, carries a request id.
+  app.use(requestContext());
+  app.use(requestLogger(requestLog ? (log || null) : false, { engine: asStore(db).dialect }));
   app.use(compression());
   app.use(express.json({
     limit: JSON_BODY_LIMIT,
@@ -76,6 +105,14 @@ export async function createServerApp(db, {
     }
   }));
   app.use(cookieParser());
+  // A NUL never reaches a handler (platform/text.js): Postgres TEXT cannot hold
+  // one, so it used to surface as a 500 on the production engine. Two bodies are
+  // exempt. Sync push payloads are stored JSON-escaped, and refusing one would
+  // wedge a device's outbox. Signed provider webhooks are verified over the raw
+  // bytes and store only provider ids, statuses and digests; a 400 for a NUL in
+  // a customer-controlled field (subscription notes) would make the provider
+  // retry until it gives up, losing the entitlement change.
+  app.use('/v1', rejectUnsafeText({ exemptBody: [/^\/sync\/push\/?$/, /^\/billing\/webhook\/[^/]+\/?$/] }));
 
   ensureBillingSchema(db);
   const webBilling = createRazorpayBilling(db);
@@ -99,7 +136,13 @@ export async function createServerApp(db, {
   }
 
   app.use((err, req, res, next) => {
-    console.error('server_error', { method: req.method, path: req.path, status: err?.status || 500, code: err?.code || 'INTERNAL' });
+    const bodyError = BODY_PARSER_ERRORS[err?.type];
+    const status = bodyError ? bodyError.status
+      : Number.isInteger(err?.status) && err.status >= 400 && err.status <= 599 ? err.status : 500;
+    const code = err?.type === 'entity.too.large' ? 'REQUEST_BODY_TOO_LARGE' : bodyError ? bodyError.code : safeCode(err?.code);
+    logEvent(status >= 500 ? 'error' : 'warn', 'server_error', {
+      requestId: req.requestId, method: req.method, route: routeTemplate(req), status, code
+    });
     if (res.headersSent) return next(err);
     // An over-large body dies in the parser before any route sees it, so this is
     // the only place that can say so. It gets a real code: "shrink the picture
@@ -107,10 +150,19 @@ export async function createServerApp(db, {
     // instruction from "the server broke", which is what an uncoded 413 reads as.
     if (err?.type === 'entity.too.large') {
       return res.status(413).json({
-        error: { code: 'REQUEST_BODY_TOO_LARGE', message: `The request body is larger than the ${JSON_BODY_LIMIT} limit.` }
+        error: { code: 'REQUEST_BODY_TOO_LARGE', message: `The request body is larger than the ${JSON_BODY_LIMIT} limit.` },
+        requestId: req.requestId
       });
     }
-    res.status(err?.status || 500).json({ error: 'Something went wrong on the server.' });
+    // The other body-parser refusals are client mistakes with a definite fix,
+    // so they get codes too rather than the uncoded server-error string below
+    // (which they used to share, under a 4xx status).
+    if (bodyError) {
+      res.locals.errorCode = bodyError.code;
+      return res.status(bodyError.status).json({ error: { code: bodyError.code, message: bodyError.message }, requestId: req.requestId });
+    }
+    res.locals.errorCode = status >= 500 ? 'INTERNAL' : safeCode(err?.code, 'REQUEST_FAILED');
+    res.status(status).json({ error: 'Something went wrong on the server.', requestId: req.requestId });
   });
 
   if (dist && existsSync(dist)) {

@@ -174,9 +174,10 @@ check('unfinished task question keeps resume priority', () => {
 // Source-level guards for the paper/instrument workspace. Each one names a
 // behaviour a student relies on, so a refactor that drops it fails here first.
 const src = rel => readFile(join(ROOT, rel), 'utf8');
-const [backend, home, app, card, practicePage, ink, exam, en] = await Promise.all([
+const [backend, home, app, card, practicePage, ink, exam, en, recovery] = await Promise.all([
   'src/local/backend.js', 'src/pages/Home.jsx', 'src/App.jsx', 'src/components/QuestionCard.jsx',
-  'src/pages/PracticeBase.jsx', 'src/ink/InkAnswer.jsx', 'src/pages/ExamRoom.jsx', 'src/i18n/strings.en.js'
+  'src/pages/PracticeBase.jsx', 'src/ink/InkAnswer.jsx', 'src/pages/ExamRoom.jsx', 'src/i18n/strings.en.js',
+  'src/components/practiceRecovery.js'
 ].map(src));
 
 check('every component that calls t() first obtains it from useT() (the Diagnosis crash)', () => {
@@ -219,15 +220,20 @@ check('the action bar holds exactly one primary action', () => {
 check('status only claims what the device actually knows', () => {
   assert.doesNotMatch(en, /'verdict\.status[A-Za-z]*': '[^']*(synced|uploaded|cloud)/i);
   assert.match(card, /saveDraft\('question', question\.id/);
-  assert.match(card, /\.then\(\(\) => setSaveState\(s => \(s === 'saving' \? 'saved' : s\)\)\)/);
+  // Ink is reported saved only after the record is read back from the store.
+  assert.match(card, /const at = draftSavedAt\('ink', question\.id\);\s*setSaveState\(at && at >= asked \? 'saved' : 'failed'\)/);
+  assert.match(card, /if \(!saveInkDraft\(question\.id, strokes, [^)]*\)\) \{ setSaveState\('failed'\); return; \}/);
 });
 
-check('handwriting drafts persist on the question row and are restored, never marked', () => {
-  assert.match(backend, /'POST \/practice\/:id\/ink-draft'/);
-  assert.match(backend, /key === 'POST \/practice\/:id\/ink-draft'/);
-  assert.match(backend, /inkDraft: !row\.answered/);
-  assert.match(card, /initialStrokes=\{latestInk\.current \|\| question\.inkDraft \|\| null\}/);
+check('handwriting drafts live in one recovery store and are restored, never marked', () => {
+  // One store (components/practiceRecovery.js). A second copy on the question
+  // row would give a restored page two sources of truth.
+  assert.doesNotMatch(backend, /ink-draft|inkDraft/);
+  assert.match(card, /saveInkDraft\(question\.id, strokes/);
+  assert.match(card, /initialStrokes=\{latestInk\.current \|\| restoredInk \|\| null\}/);
+  assert.match(card, /clearInkDraft\(question\.id\)/);
   assert.match(ink, /canvasRef\.current\?\.setStrokes\?\.\(initialStrokes\)/);
+  assert.match(recovery, /Neither ever holds the expected answer, a solution or a mark/);
 });
 
 check('a reading in doubt is confirmed in place, not by rewriting', () => {

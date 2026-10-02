@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
 import { useApp } from '../App.jsx';
 import { predictionSentence } from '../engine/markPredictor.js';
-import { useT } from '../i18n/index.js';
+import { tLater, useT } from '../i18n/index.js';
 import TermGloss from '../components/TermGloss.jsx';
 
 function pct(correct, attempts) {
@@ -42,7 +42,7 @@ export default function IndiaProgress() {
   useEffect(() => {
     Promise.all([api.get('/curriculum'), api.get('/stats')])
       .then(([c, s]) => { setCurriculum(c); setStats(s); })
-      .catch(err => setError(err.message || t('progress.couldNotLoad')));
+      .catch(err => setError(err.message || tLater('progress.couldNotLoad')));
   }, [t]);
 
   const scope = useMemo(() => scopeFor(curriculum, user), [curriculum, user]);
@@ -153,8 +153,11 @@ export default function IndiaProgress() {
                 {chapterEvidence.map(({ row, evidence }) => (
                   <tr key={row.id || row.name}>
                     <td style={{ textAlign: 'left' }}>
-                      <div style={{ fontWeight: 640 }}><TermGloss text={row.name || row.title} /></div>
-                      {row.strand && <div className="muted" style={{ fontSize: 12 }}><TermGloss text={row.strand} /></div>}
+                      {/* Chapter and unit names are curriculum data and stay English by
+                          design; lang="en" lets a screen reader on a Hindi page voice them
+                          in English (TermGloss marks its Hindi terms lang="hi"). */}
+                      <div style={{ fontWeight: 640 }} lang="en"><TermGloss text={row.name || row.title} /></div>
+                      {row.strand && <div className="muted" lang="en" style={{ fontSize: 12 }}><TermGloss text={row.strand} /></div>}
                     </td>
                     <td>{evidence.attempts}</td>
                     <td>{evidence.correct}</td>

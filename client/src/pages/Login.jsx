@@ -23,7 +23,7 @@ const STUDY = [
   ...[7, 8, 9, 10, 11, 12].map(y => ({ key: String(y), classOf: y, year: y, track: 'cbse' })),
   { key: 'jee-main', label: 'JEE Main', year: 12, track: 'jee-main' },
   { key: 'jee-advanced', label: 'JEE Advanced', year: 12, track: 'jee-advanced' },
-  { key: 'olympiad', label: 'Olympiad (IOQM · RMO · INMO)', year: 10, track: 'olympiad' }
+  { key: 'olympiad', labelKey: 'login.olympiadTrack', year: 10, track: 'olympiad' }
 ];
 const STUDY_DEFAULT = STUDY.find(o => o.key === '10');
 const ONBOARDING_STEPS = 5;
@@ -241,7 +241,7 @@ export default function Login() {
     ? (selectedStudy?.track === 'cbse'
         ? t('common.classNumber', { n: form.year })
         : selectedStudy
-          ? selectedStudy.label + ' · ' + t('common.classNumber', { n: form.year })
+          ? (selectedStudy.labelKey ? t(selectedStudy.labelKey) : selectedStudy.label) + ' · ' + t('common.classNumber', { n: form.year })
           : t('login.notChosen'))
     : (selectedCourse?.[1] || form.course.toUpperCase()) + ' · ' + t('common.yearNumber', { n: form.year });
 
@@ -573,7 +573,7 @@ export default function Login() {
                       aria-describedby={error ? 'onboarding-error' : undefined}
                       onChange={e => { chooseStudy(e.target.value); setError(''); }}>
                       <option value="">{t('login.chooseClassTrack')}</option>
-                      {STUDY.map(o => <option key={o.key} value={o.key}>{o.label || t('common.classNumber', { n: o.classOf })}</option>)}
+                      {STUDY.map(o => <option key={o.key} value={o.key}>{o.labelKey ? t(o.labelKey) : (o.label || t('common.classNumber', { n: o.classOf }))}</option>)}
                     </select>
                     {selectedStudy && form.indiaTrack !== 'cbse' && (
                       <div style={{ marginTop: 10 }}>

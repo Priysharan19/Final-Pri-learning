@@ -14,7 +14,7 @@ import { MathText } from '../lib/latex.jsx';
 import { useApp } from '../App.jsx';
 import { clearDraft, queueDraft, readDraft, saveDraft } from '../components/drafts.js';
 import Icon from '../components/Icon.jsx';
-import { useT } from '../i18n/index.js';
+import { tLater, useT } from '../i18n/index.js';
 
 export default function ExamRoom() {
   const { id } = useParams();
@@ -70,7 +70,7 @@ export default function ExamRoom() {
     if (left === null || result) return;
     if (left <= 0) { submit(); return; }
     // Time warnings are words, announced once, never colour alone.
-    if (left === 600 || left === 300 || left === 60) setTimeNote(t('exam.timeLeftNote', { count: Math.round(left / 60), n: Math.round(left / 60) }));
+    if (left === 600 || left === 300 || left === 60) setTimeNote(tLater('exam.timeLeftNote', { count: Math.round(left / 60), n: Math.round(left / 60) }));
     // Not `t`: that name is the translator, and shadowing it here made the
     // warning ticks throw and the paper never auto-submit (tour-exam-timer.js).
     const tickTimer = setTimeout(() => setLeft(l => l - 1), 1000);
@@ -198,8 +198,8 @@ export default function ExamRoom() {
           <div className="card" key={d.id}>
             <div className="q-meta">
               <span className="tag">{t('exam.qN', { n: i + 1 })}</span>
-              <span className="tag">{d.subtopicName}</span>
-              <span className="tag">D{d.difficulty}</span>
+              <span className="tag" lang="en">{d.subtopicName}</span>
+              <span className="tag">{t('exam.difficultyTag', { n: d.difficulty })}</span>
               <span className="tag" style={{ color: d.correct ? 'var(--good)' : 'var(--correction)' }}>
                 {t('exam.marksOf', { awarded: d.awarded, marks: d.marks })}
               </span>
@@ -301,7 +301,7 @@ export default function ExamRoom() {
           <div className="exam-qhead q-meta">
             <b id="exam-q-title">{t('exam.questionOf', { n: cur + 1, total: exam.questions.length })}</b>
             <span>{q.multipart ? t('exam.marksN', { count: q.marks, n: q.marks }) : q.diffLabel}</span>
-            <span>{q.subtopicName}</span>
+            <span lang="en">{q.subtopicName}</span>
             {q.multipart && <span>{t('exam.structuredParts', { last: q.parts[q.parts.length - 1].key })}</span>}
             {/* A question that was actually set in an exam says which one. Every
                 other question in the paper is authored practice, and a student
@@ -337,7 +337,7 @@ export default function ExamRoom() {
                 ) : (
                   <div className="answer-row">
                     {pt.answerPrefix && <span className="answer-prefix"><MathText text={pt.answerPrefix} /></span>}
-                    <input className="input answer-input" placeholder={pt.inputHint || t('exam.answerPlaceholder')}
+                    <input className="input answer-input" inputMode="text" enterKeyHint="done" autoCapitalize="none" autoCorrect="off" spellCheck={false} placeholder={pt.inputHint || t('exam.answerPlaceholder')}
                       aria-label={t('exam.answerPart', { key: pt.key })}
                       value={answers[`${q.id}::${pt.key}`] || ''}
                       onChange={e => setAnswers(a => ({ ...a, [`${q.id}::${pt.key}`]: e.target.value }))} />
@@ -375,7 +375,7 @@ export default function ExamRoom() {
         ) : (
           <div className="answer-row">
             {q.answerPrefix && <span className="answer-prefix"><MathText text={q.answerPrefix} /></span>}
-            <input className="input answer-input" placeholder={q.inputHint || t('exam.answerPlaceholder')}
+            <input className="input answer-input" inputMode="text" enterKeyHint="done" autoCapitalize="none" autoCorrect="off" spellCheck={false} placeholder={q.inputHint || t('exam.answerPlaceholder')}
               aria-label={t('exam.answerQuestion', { n: cur + 1 })}
               value={answers[q.id] || ''}
               onChange={e => setAnswers(a => ({ ...a, [q.id]: e.target.value }))}

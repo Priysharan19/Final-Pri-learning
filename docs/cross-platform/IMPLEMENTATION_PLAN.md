@@ -58,7 +58,7 @@ CP-03 and CP-06 can run in parallel after CP-02, with different owners. Under th
 ## CP-03 — Responsive Product Foundation
 
 - **Goal:** semantic form factors (COMPACT/MEDIUM/EXPANDED + SHORT) and phone-quality layouts of the hard surfaces, in shared CSS/React.
-- **Files:** `client/src/theme.css`, `client/src/theme-state.css`, delete `client/src/theme-legacy.css`, `client/src/App.jsx`, `client/src/components/QuestionCard.jsx`, `client/src/ink/InkAnswer.jsx`, `client/src/ink/InkCanvas.jsx`, `client/src/components/PriExplainV5.jsx`/`client/src/components/PriExplainV5.css`, `client/src/pages/ProgressLegacy.jsx`, `client/src/pages/SettingsLegacy.jsx`, `client/src/pages/ExamRoom.jsx`, `client/src/pages/Login.jsx`, `client/index.html`; tests `client/test/responsive-matrix.mjs` (new Playwright helper over the S1 viewport rows, Chromium + WebKit) and `client/test/tour-phone.js` (extended).
+- **Files:** `client/src/theme.css`, `client/src/theme-state.css`, delete `client/src/theme-legacy.css`, `client/src/App.jsx`, `client/src/components/QuestionCard.jsx`, `client/src/ink/InkAnswer.jsx`, `client/src/ink/InkCanvas.jsx`, `client/src/components/PriExplainV5.jsx`/`client/src/components/PriExplainV5.css`, `client/src/pages/ProgressLegacy.jsx`, `client/src/pages/SettingsLegacy.jsx`, `client/src/pages/ExamRoom.jsx`, `client/src/pages/Login.jsx`, `client/index.html`; tests `client/test/tour-responsive-matrix.js` (the S1 viewport matrix, run in Chromium and WebKit via `client/test/e2e.mjs --browser=webkit`), `client/test/form-factor-check.mjs`, and `client/test/tour-phone.js`.
 - **Scope:**
   - Breakpoint tokens; migrate the ad hoc 720–1180 values.
   - `dvh`, four-sided insets, fixed bars sized *with* the inset.
@@ -83,7 +83,7 @@ CP-03 and CP-06 can run in parallel after CP-02, with different owners. Under th
   - `ios/PriLearning.swiftpm/WebShell.swift` (share anchor, Dynamic Type → CSS, safe-area decision).
   - `scripts/ink-native-check.mjs` (add an iPhone destination), `.github/workflows/native-ink.yml`.
   - `scripts/check-native-package-sync.mjs` (also gate `Info.plist`).
-  - Remove or refresh the stale `ios/PriLearning.swiftpm.zip`.
+  - Remove or refresh the stale `PriLearning.swiftpm.zip` archive (removed in CP-04).
   - Universal Links: `onOpenURL` → route bridge, plus `apple-app-site-association` served by `server/`.
 - **Scope:** finger ink default, compact-friendly native surfaces, iPhone simulator build+launch+bridge self-check in CI, deep links for `/account-action`, account export via `share.file`.
 - **Non-goals:** iPhone landscape layouts, a new recogniser, StoreKit changes, App Store submission.
