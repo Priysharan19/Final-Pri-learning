@@ -13,8 +13,9 @@
 //
 // Input policy is intentionally simple and stateless:
 //   • Apple Pencil always reaches PencilKit and writes.
-//   • Fingers fall through to the WKWebView and scroll by default.
-//   • The explicit Finger toolbar toggle lets fingers draw too.
+//   • On iPad, fingers fall through to the WKWebView and scroll by default.
+//   • On iPhone (no Pencil possible), fingers write by default (CP-04).
+//   • The explicit Finger toolbar toggle lets fingers draw (or not) anywhere.
 //
 // Do not derive this policy from "have we seen a Pencil yet". On modern iPadOS
 // Pencil hover / hit-testing can produce UIEvents whose allTouches collection is
@@ -35,8 +36,11 @@ final class InkSurfaceView: UIView, PKCanvasViewDelegate {
 
     let canvas = PKCanvasView()
 
-    /// Explicit "let me draw with a finger too" from the toolbar.
-    var fingerDrawingEnabled = false { didSet { applyDrawingPolicy() } }
+    /// Explicit "let me draw with a finger too" from the toolbar. Defaults on
+    /// where no Apple Pencil can exist (iPhone), so writing never needs one;
+    /// iPad stays Pencil-first. The page mirrors this default from the host
+    /// descriptor (`ink.fingerDefault`) and can still toggle it.
+    var fingerDrawingEnabled = UIDevice.current.userInterfaceIdiom != .pad { didSet { applyDrawingPolicy() } }
 
     var inkColor: UIColor = UIColor(red: 0.937, green: 0.925, blue: 0.882, alpha: 1) {
         didSet { applyTool() }
