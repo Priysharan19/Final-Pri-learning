@@ -157,6 +157,7 @@
     "check:apple:v1": "node scripts/apple-shipping-target.mjs --check-v1",
     "test:responsive": "node client/test/tour-responsive-matrix.js && node client/test/tour-responsive-matrix.js --no-build --browser=webkit",
     "test:native:contract": "node client/test/native-host-contract-check.mjs",
+    "test:back:race": "node client/test/back-link-race-check.mjs",
     "test:crossplatform": "node client/test/cross-platform-architecture-check.mjs",
     "test:platform:spend": "node server/test/spend-ceiling-check.mjs",
     "test:platform:guardian": "node server/test/guardian-consent-check.mjs",
