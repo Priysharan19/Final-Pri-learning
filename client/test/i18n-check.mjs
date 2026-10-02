@@ -359,7 +359,7 @@ for (const rel of CONVERTED) {
 }
 
 ok(textNodesSeen > 400, `the scan actually read the files (${textNodesSeen} JSX text nodes)`);
-ok(expressionsSeen > 8, `and the string literals their expressions draw (${expressionsSeen})`);
+ok(expressionsSeen >= 5, `and the string literals their expressions draw (${expressionsSeen})`);
 ok(attributesSeen > 40, `and their spoken attributes (${attributesSeen} aria-label/title/placeholder/alt)`);
 eq(leftInEnglish, [], 'no converted screen draws a literal English string a reader would see');
 

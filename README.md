@@ -1,14 +1,14 @@
 # Pri Learning
 
-**Maths practice for Indian students — NCERT Classes 7 to 12, JEE Main, JEE Advanced and the
-olympiad — that generates its own questions, reads Apple Pencil handwriting on the device, and
-marks the working line by line.**
+**Maths practice for Indian students — NCERT Classes 7 to 12, JEE Main and JEE Advanced — that
+generates its own questions, reads Apple Pencil handwriting on the device, and marks the working
+line by line.**
 
 Write your working with a Pencil or type it, and get it marked the way a teacher marks: not just
 right or wrong, but which line stopped being true and which mistake it was. The learning engine
-runs entirely on the device — questions, handwriting recognition and marking all work with the
-network off. A Pri cloud account is optional, and adds only what needs a server: sign-in across
-devices, classes and assignments, and a subscription.
+runs primarily on the device — questions, handwriting recognition and marking all work with the
+network off. A Pri cloud account is optional for core local practice and is used for account and
+cross-device services plus server-authoritative subscription verification.
 
 **Production authority:** this repository (`Priysharan19/Final-Pri-learning`) on `main`. See
 [`repository-authority.md`](docs/architecture/repository-authority.md),
@@ -17,10 +17,10 @@ devices, classes and assignments, and a subscription.
 
 ## What it is for
 
-An Indian student picks their class or track on the first screen — Class 7 to 12, JEE Main, JEE
-Advanced or the olympiad — and practises against the NCERT chapter list, with their day, streak
-and dates counted in their own timezone. Australian syllabuses (HSC, VCE, QCE and the rest)
-remain fully supported one link away; they are no longer the default.
+An Indian student picks their public V1 class or track on the first screen — Class 7 to 12, JEE
+Main or JEE Advanced — and practises against the NCERT/JEE curriculum, with their day, streak and
+dates counted in their own timezone. Australian curricula, Olympiad and the public teacher product
+remain post-V1/private implementation and are not ordinary V1 onboarding choices.
 
 Where the numbers below come from is stated beside each one. Where something is unmeasured, it
 says so: this project has a written rule against quoting a figure without the suite, the sample
@@ -41,10 +41,9 @@ form, and the n!, nCr, nPr, sec, cosec and cot vocabulary. Working is checked li
 first line that stops being true is named, and where a designed wrong answer matches, the
 misconception behind it is named too.
 
-**Exams.** Every track can sit a real paper: CBSE Class 10 Standard and Basic and Class 12 at 80
-marks across Sections A to E with internal choice, JEE Main's 20 multiple-choice plus 5 numerical
-at +4/−1/0, JEE Advanced Paper 1 with per-option partial marking, and the IOQM's 30
-integer-answer questions.
+**Exams.** Public V1 supports exam-style simulations for CBSE Class 10 Standard and Basic and
+Class 12 at 80 marks across Sections A to E with internal choice, JEE Main's 20 multiple-choice
+plus 5 numerical at +4/−1/0, and JEE Advanced Paper 1 with per-option partial marking.
 
 **Teaching.** A worked solution plays back as a narrated, step-by-step lesson, and where a
 question states a function, the graph is drawn on screen the way a teacher draws it at a board —
@@ -56,14 +55,14 @@ question or its verified solution actually states.
 mastery targeting choose the next question, and the student is told which of those reasons
 applied.
 
-**Teachers.** Classes, assignments targeted at a chapter, dot point and difficulty, class
-analytics without a fabricated predicted mark, and intervention flags with the reason spelled
-out. Both offline (AirDrop task packs) and cloud classrooms.
+**Post-V1/private infrastructure.** Teacher/classroom, Australian-curriculum and Olympiad code
+remains in the repository for future/private use, but none of it is part of public V1 onboarding or
+the V1 product promise.
 
-**The cloud, when you want it.** 71 handlers under `/v1`: accounts with verified email, Google
-and Apple sign-in, cross-device sync, Razorpay and Apple subscriptions with cancellation, classes
-and assignments, a content CMS with independent review, and an admin surface. It runs as one
-container against a persistent SQLite volume and fails closed without its configuration.
+**The cloud, when you want it.** The `/v1` control plane provides account identity, cross-device
+services, guardian-consent/account operations and server-authoritative subscription state. Public
+iPad V1 purchasing is StoreKit; web/Razorpay purchasing and public teacher/classroom workflows are
+not V1 product promises.
 
 
 ## Quick start
@@ -78,8 +77,8 @@ Open **http://localhost:4000** — create a profile or hit **“Try the demo”*
 days, just over six weeks, and builds every attempt on-device with the same engine that sets and
 marks your questions). It runs in the browser against IndexedDB, so nothing in this repo can time it
 from the command line and no timing is quoted for it. On an iPad, open it in Safari and use
-**Share → Add to Home Screen**: it installs as a full-screen app and works completely offline from
-then on. All data lives in the device's IndexedDB, protected from eviction via the Persistent
+**Share → Add to Home Screen**: it installs as a full-screen app; core local practice,
+handwriting recognition and marking continue without a network connection. All data lives in the device's IndexedDB, protected from eviction via the Persistent
 Storage API — and one tap exports a full backup file.
 
 > `npm start` runs `server/index.js`. It static-hosts `client/dist` and mounts the **`/v1` cloud
@@ -129,12 +128,12 @@ row is something the suites or the tools can speak to; the numbers are in
 | **Handwriting** | On-device recognition of Pencil ink: digits, letters, Greek, operators, fractions, roots, powers, multi-line working, ∫, !, ≡, ∞. Recognised working feeds Step Check, and ✓/✗ annotations land on the student's own ink. |
 | **Video-style solutions** | The worked solution plays back as a narrated, step-by-step lesson with play, pause and speed, built deterministically from the verified solution — no model writes the maths. |
 | **Animated graphs** | Where a question states a function, the curve is drawn on screen with its roots, turning points, tangent or shaded area. The curve must be one the question or its solution states. |
-| **Exams** | CBSE Class 10 Standard and Basic and Class 12 at 80 marks, Sections A–E with internal choice; JEE Main at +4/−1/0; JEE Advanced Paper 1 with partial marking; IOQM's 30 integer answers. |
+| **Exams** | Public V1: CBSE Class 10 Standard and Basic and Class 12 at 80 marks, Sections A–E with internal choice; JEE Main at +4/−1/0; JEE Advanced Paper 1 with partial marking. |
 | **Adaptation** | Elo mastery per chapter and dot point, FSRS-5 spaced review, misconception pressure, interleaving — and the reason this question came next, in words. |
 | **Progress** | Chapter mastery, priorities, activity and streaks in the student's own timezone. No invented board mark or percentile: the India product refuses to show one. |
-| **Teachers** | Classes and assignments targeted at a chapter, dot point and difficulty; class analytics; intervention flags with reasons; printable reports; offline task packs and cloud classrooms. |
-| **Offline** | The whole learning loop runs with the network off, installed as a PWA or as the native iPad app. |
-| **Cloud, optional** | Verified email accounts, Google and Apple sign-in, cross-device sync, Razorpay and Apple subscriptions with cancellation, a content CMS with independent review. |
+| **Post-V1/private code** | Teacher/classroom, Australian-curriculum and Olympiad implementations remain in the repository for future/private use; they are not public V1 entry points. |
+| **Offline** | Core local practice, on-device handwriting recognition, marking, history and progress continue with the network off; account/server and paid-entitlement operations still require their respective authority. |
+| **Cloud, optional** | Account and cross-device services plus server-authoritative entitlement state. Public iPad V1 purchase authority is StoreKit; web/Razorpay purchasing is outside V1. |
 
 
 ## The handwriting engine
@@ -611,10 +610,12 @@ what a reader would reasonably assume is here and is not. None of it is hidden a
   traps are not uploaded at all. Practise on an iPad and then on a phone and the second device
   still shows an empty history.
 
-- **Premium buys nothing yet.** Six premium capabilities are declared in
-  `client/src/platform/entitlements.js` and the billing lifecycle is implemented and tested end to
-  end, but nothing in the app is gated on them: there is no free-tier cap, no paywall, and no
-  configured price. Settings still tells the student everything is unlocked.
+- **Premium is implemented but not release-certified.** The Free gate currently allows 20 practice
+  questions per calendar day, one exam simulation every 30 days and basic Pri Explain. A
+  server-authoritative Premium entitlement removes the practice/exam caps and unlocks JEE Advanced,
+  advanced Pri Explain and advanced progress/analytics. Final StoreKit products/pricing and real
+  App Store + physical-iPad transaction certification are still external release work; the reserved
+  `additional-ai-usage` capability has no consuming V1 feature and is not advertised as a benefit.
 
 - **Guardian consent is an email confirmation, not verification.** India's Digital Personal Data
   Protection Act 2023 treats everyone under 18 as a child. A cloud account for someone under 18

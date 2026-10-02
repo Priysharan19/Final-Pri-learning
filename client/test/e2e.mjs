@@ -246,23 +246,19 @@ function helpers(page, base, flowId) {
    */
   const createProfile = async ({
     name = 'E2E Student', year = 9, email = null, password = null,
-    course = 'nsw', track = null, role = 'student', language = 'en',
+    course = 'in', track = null, role = 'student', language = 'en',
     avatar = null, cloud = false, fromPicker = false
   } = {}) => {
     await page.getByRole('button', { name: fromPicker ? 'Add another profile' : 'Get Started' }).click();
     await page.waitForSelector('[data-onboarding-step="1"]', { timeout: 15000 });
-    await page.getByRole('button', { name: role === 'teacher' ? 'Teacher' : 'Student', exact: true }).click();
+    if (role !== 'student') throw new Error('Public V1 onboarding creates Student profiles only.');
+    await page.getByRole('button', { name: 'Student', exact: true }).click();
     await page.locator('.auth-card .btn-primary').click();
 
     await page.waitForSelector('[data-onboarding-step="2"]', { timeout: 15000 });
-    if (course === 'in') {
-      await page.locator('#signup-track').selectOption(track || String(year));
-      if (track) await page.locator('#signup-year').selectOption(String(year));
-    } else {
-      await page.getByRole('button', { name: role === 'teacher' ? /Teaching in Australia/ : /Studying in Australia/ }).click();
-      await page.locator('#signup-course').selectOption(course);
-      await page.locator('#signup-year').selectOption(String(year));
-    }
+    if (course !== 'in') throw new Error(`Public V1 onboarding does not expose ${course}.`);
+    await page.locator('#signup-track').selectOption(track || String(year));
+    if (track) await page.locator('#signup-year').selectOption(String(year));
     await page.locator('.auth-card .btn-primary').click();
 
     await page.waitForSelector('[data-onboarding-step="3"]', { timeout: 15000 });
@@ -285,9 +281,6 @@ function helpers(page, base, flowId) {
     await page.locator('.auth-card .btn-primary').click();
     if (cloud) {
       await page.waitForSelector('#cloud-account-title', { timeout: 30000 });
-    } else if (role === 'teacher') {
-      await page.waitForURL(/\/teach(?:#.*)?$/, { timeout: 30000 });
-      await page.waitForSelector('.shell', { timeout: 30000 });
     } else {
       await page.waitForSelector('.home-greet', { timeout: 30000 });
     }
