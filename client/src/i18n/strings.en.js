@@ -2167,7 +2167,7 @@ export default {
   'notes.exampleNumber': 'Example {n}',
   'notes.nextStep': 'Show next step',
   'notes.allSteps': 'Show all steps',
-  'notes.answer': 'Answer',
+  'notes.answer': 'Final answer',
   'notes.engineChecked': 'Answer checked by the maths engine',
   'notes.cardsTitle': 'Revise: {chapter}',
   'notes.cardProgress': 'Card {n} of {total}',
