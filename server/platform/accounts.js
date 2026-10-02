@@ -14,6 +14,7 @@ import {
 import { consumeTeacherInvite, findLiveTeacherInvite } from './teacherInvites.js';
 import { maybeBootstrapAdmin } from './bootstrapAdmin.js';
 import { consumeOidcNonce } from './oidcNonce.js';
+import { publicEntitlement } from './entitlements.js';
 import { clipText } from './text.js';
 
 const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
@@ -257,6 +258,17 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
     res.json({ ok: true });
   });
 
+  // Sign out everywhere: every live session of this account, on every device,
+  // stops authenticating at once — including the one making the request. The
+  // per-device route above revokes one; password change and reset revoke all
+  // but are not something a student whose iPad was lost should have to invent.
+  router.post('/logout-all', requireSession(db), rateLimit(db, 'logout-all', { limit: 10, windowMs: 60 * 60 * 1000 }), async (req, res) => {
+    const info = await db.run('UPDATE account_sessions SET revoked_at = ? WHERE account_id = ? AND revoked_at IS NULL',
+      [Date.now(), req.platformSession.account_id]);
+    clearSessionCookies(res);
+    res.json({ ok: true, revoked: info.changes });
+  });
+
   router.post('/email/verification-request', requireSession(db), rateLimit(db, 'verify-email-request', { limit: 5, windowMs: 60 * 60 * 1000 }), async (req, res) => {
     const account = await db.get('SELECT id,email,email_verified_at FROM accounts WHERE id = ? AND deleted_at IS NULL', [req.platformSession.account_id]);
     if (!account) return res.status(404).json({ error: { code: 'ACCOUNT_NOT_FOUND', message: 'Account not found.' } });
@@ -429,17 +441,61 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
     res.json({ revoked: info.changes === 1, current });
   });
 
+  // Everything the server holds that is this account's own, and nothing that is
+  // a secret (password/token/session hashes, delivery envelopes) or another
+  // person's (a guardian's address is masked exactly as /guardian/state masks it;
+  // a class shows its name, never its teacher or classmates). See
+  // docs/privacy/data-retention.md for the table-by-table account.
   // Bounded so a stolen session cannot be used to pull the whole learning
   // history over and over, and one account cannot monopolise the database.
   router.get('/export', requireSession(db), rateLimit(db, 'account-export', { limit: 10, windowMs: 60 * 60 * 1000 }), async (req, res) => {
     const accountId = req.platformSession.account_id;
     const account = await db.get('SELECT id,email,name,role,email_verified_at,created_at,updated_at FROM accounts WHERE id = ?', [accountId]);
+    const identities = await db.all('SELECT provider,linked_at FROM account_identities WHERE account_id = ? ORDER BY linked_at', [accountId]);
     const events = await db.all('SELECT id,device_id,device_seq,kind,entity_id,occurred_at,payload_json,created_at FROM learning_events WHERE account_id = ? ORDER BY server_cursor', [accountId]);
     const entities = await db.all('SELECT kind,entity_id,version,body_json,tombstone,updated_at FROM sync_entities WHERE account_id = ?', [accountId]);
     const classes = await db.all(`SELECT c.id,c.name,cm.joined_at FROM class_members cm JOIN classes c ON c.id=cm.class_id
       WHERE cm.student_account_id=? AND cm.removed_at IS NULL`, [accountId]);
+    const submissions = await db.all(`SELECT assignment_id,state,summary_json,started_at,submitted_at,updated_at
+      FROM assignment_submissions WHERE student_account_id=? ORDER BY started_at`, [accountId]);
+    const reports = await db.all(`SELECT id,category,content_id,question_id,note,status,created_at,resolved_at
+      FROM issue_reports WHERE account_id=? ORDER BY created_at`, [accountId]);
+    // Feedback a teacher wrote on this student's work is about them, so it is
+    // theirs to see; the teacher's account id is not.
+    const feedback = await db.all(`SELECT assignment_id,feedback_json,returned_at,updated_at
+      FROM assignment_feedback WHERE student_account_id=? ORDER BY returned_at`, [accountId]);
+    // On SQLite the telemetry router creates its table lazily; a deployment
+    // that never mounted it has no telemetry to export. Postgres is migrated.
+    const raw = sqliteHandle(db);
+    const telemetryTable = !raw || !!raw.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='operational_events'").get();
+    const telemetry = telemetryTable ? await db.all(`SELECT event_type,surface,metadata_json,created_at
+      FROM operational_events WHERE account_id=? ORDER BY created_at`, [accountId]) : [];
+    const entitlementRow = await db.get('SELECT * FROM entitlement_snapshots WHERE account_id=?', [accountId]);
+    const entitlement = publicEntitlement(entitlementRow || { plan: 'free', status: 'free', provider: 'none' });
+    const consent = await consentState(db, accountId);
     res.set('Cache-Control', 'no-store');
-    res.json({ format: 'pri-account-export-v1', exportedAt: Date.now(), account, learningEvents: events, entities, classes });
+    res.json({
+      format: 'pri-account-export-v1',
+      exportedAt: Date.now(),
+      account,
+      identities: identities.map(row => ({ provider: row.provider, linkedAt: row.linked_at })),
+      learningEvents: events,
+      entities,
+      classes,
+      assignmentSubmissions: submissions,
+      assignmentFeedback: feedback,
+      telemetry,
+      issueReports: reports,
+      entitlement: {
+        plan: entitlement.plan,
+        status: entitlement.status,
+        provider: entitlement.provider,
+        currentPeriodEnd: entitlement.currentPeriodEnd ?? null
+      },
+      guardianConsent: consent.required
+        ? { state: consent.state, guardianEmail: consent.row ? maskEmail(consent.row.guardian_email) : null, noticeVersion: consent.row?.notice_version || null }
+        : null
+    });
   });
 
   router.delete('/', requireSession(db), rateLimit(db, 'account-delete', { limit: 3, windowMs: 24 * 60 * 60 * 1000 }), async (req, res, next) => {
@@ -451,7 +507,16 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
       await authorizeAccountDeletion(db, req.platformSession.account_id, body);
       const accountId = req.platformSession.account_id;
       if (typeof beforeDelete === 'function') await beforeDelete({ accountId, request: req });
-      await db.run('DELETE FROM accounts WHERE id = ?', [accountId]);
+      await db.transaction(async () => {
+        // Retained rows (docs/privacy/data-retention.md) lose the account link
+        // through ON DELETE SET NULL. An issue report is kept for content
+        // quality, so the free text a student typed into it goes first: after
+        // deletion it is a category and a question id, nothing they wrote.
+        await db.run("UPDATE issue_reports SET note = NULL, context_json = '{}' WHERE account_id = ?", [accountId]);
+        await db.run('DELETE FROM accounts WHERE id = ?', [accountId]);
+        // A receipt with no personal data: an opaque id that no longer resolves.
+        await audit(db, null, 'account.delete', 'account', accountId, {}, Date.now());
+      });
       clearSessionCookies(res);
       res.json({ deleted: true });
     } catch (error) {
