@@ -1,0 +1,58 @@
+# TEMPORARY diagnostic workflow for #278 (phone emulator dies). Not for merge.
+name: Android emulator diag
+on:
+  push:
+    branches: ['diag/android-emu']
+permissions:
+  contents: read
+jobs:
+  emu:
+    name: diag ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: baseline36, api: 36, target: google_apis, profile: pixel_6, gpu: swiftshader_indirect }
+          - { name: swangle36, api: 36, target: google_apis, profile: pixel_6, gpu: swangle_indirect }
+          - { name: atd34, api: 34, target: google_atd, profile: pixel_6, gpu: swiftshader_indirect }
+          - { name: tablet36, api: 36, target: google_apis, profile: pixel_tablet, gpu: swiftshader_indirect }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '24', cache: npm, cache-dependency-path: client/package-lock.json }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '17' }
+      - run: npm ci --prefix client && npm run build && npm ci --prefix server
+      - working-directory: android
+        run: ./gradlew --no-daemon assembleDebug assembleDebugAndroidTest
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: run
+        uses: ReactiveCircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d
+        with:
+          api-level: ${{ matrix.api }}
+          target: ${{ matrix.target }}
+          arch: x86_64
+          profile: ${{ matrix.profile }}
+          disable-animations: true
+          emulator-options: -no-window -gpu ${{ matrix.gpu }} -feature -Vulkan -no-snapshot -noaudio -no-boot-anim
+          working-directory: android
+          script: mkdir -p app/build/outputs/pri-instrumented && (adb logcat -v threadtime > app/build/outputs/pri-instrumented/full-logcat.txt 2>&1 &) && (while sleep 5; do echo "$(date +%T) $(free -m | sed -n 2p) qemu=$(pgrep -f qemu-system | head -1)"; done > app/build/outputs/pri-instrumented/host-mem.txt 2>&1 &) && node ../scripts/cloud-fixture-server.mjs --out /tmp/pri-cloud.env && set -a && . /tmp/pri-cloud.env && set +a && { ./scripts/run-instrumented.sh product; rc=$?; kill "$PRI_CLOUD_SERVER_PID" 2>/dev/null; exit $rc; }
+      - name: host diagnostics
+        if: always()
+        run: |
+          sudo dmesg -T | tail -60 || true
+          cat ~/.android/avd/*.avd/config.ini 2>/dev/null | grep -iE "ram|heap|gpu|lcd|disk" || true
+          tail -30 android/app/build/outputs/pri-instrumented/host-mem.txt || true
+          grep -E "PRITEST|FATAL|lowmemorykiller|lmkd|ANR in|Fatal signal|died|watchdog|Watchdog" android/app/build/outputs/pri-instrumented/full-logcat.txt | tail -150 || true
+          tail -60 android/app/build/outputs/pri-instrumented/full-logcat.txt || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: diag-${{ matrix.name }}
+          path: android/app/build/outputs/pri-instrumented
