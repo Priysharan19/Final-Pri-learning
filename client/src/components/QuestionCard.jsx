@@ -50,7 +50,8 @@ const SYMBOLS = [
 const preferMode = () => {
   const saved = localStorage.getItem('pri-input-mode');
   if (saved) return saved;
-  return (window.matchMedia?.('(pointer: coarse)').matches ?? false) ? 'write' : 'type';
+  // Touch-first devices write by default (coarse pointer, or no hover: see formFactor.js).
+  return (window.matchMedia?.('(pointer: coarse)').matches || window.matchMedia?.('(hover: none)').matches) ? 'write' : 'type';
 };
 
 /** Off-screen but spoken — for names and announcements the page shows visually. */
