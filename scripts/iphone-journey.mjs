@@ -170,7 +170,8 @@ for (const line of second) console.log(`  ${line.replace(/^PRIJOURNEY\s*/, '')}`
 function serverLogouts(fixture) {
   try {
     const log = readFileSync(fixture.PRI_CLOUD_SERVER_LOG, 'utf8');
-    return (log.match(/"path":"\/v1\/account\/logout","status":200/g) || []).length;
+    // Structured request logs name the route ("route", from #262) — older builds used "path".
+    return (log.match(/"(?:route|path)":"\/v1\/account\/logout","status":200/g) || []).length;
   } catch { return null; }
 }
 
