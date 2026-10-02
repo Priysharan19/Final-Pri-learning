@@ -72,11 +72,19 @@ function pickDevice() {
   const named = argOf('device');
   const family = (argOf('family') || 'iphone').toLowerCase();
   const pattern = family === 'ipad' ? /iPad/ : /iPhone/;
-  const rows = run('xcrun', ['simctl', 'list', 'devices', 'available']).split('\n')
-    .map(l => l.match(/^\s+(.+?) \(([0-9A-F-]{36})\) \((\w+)\)/i)).filter(Boolean)
-    .map(([, name, udid, state]) => ({ name, udid, state }))
-    .filter(d => (named ? d.name === named : pattern.test(d.name)));
-  const pick = rows.find(d => d.state === 'Booted') || rows[0];
+  // Devices are listed under runtime headers ("-- iOS 26.0 --"). Prefer the
+  // newest runtime: an older one can need a long first boot on a CI runner.
+  let runtime = [0];
+  const rows = [];
+  for (const l of run('xcrun', ['simctl', 'list', 'devices', 'available']).split('\n')) {
+    const header = l.match(/^-- iOS ([\d.]+) --/);
+    if (header) { runtime = header[1].split('.').map(Number); continue; }
+    const m = l.match(/^\s+(.+?) \(([0-9A-F-]{36})\) \((\w+)\)/i);
+    if (m && /^-- /.test(l) === false) rows.push({ name: m[1], udid: m[2], state: m[3], runtime });
+  }
+  const newer = (a, b) => { for (let i = 0; i < Math.max(a.length, b.length); i++) { const d = (b[i] || 0) - (a[i] || 0); if (d) return d; } return 0; };
+  const matching = rows.filter(d => (named ? d.name === named : pattern.test(d.name))).sort((a, b) => newer(a.runtime, b.runtime));
+  const pick = matching.find(d => d.state === 'Booted') || matching[0];
   if (!pick) throw new Error(`no ${named || family} simulator is available`);
   return pick;
 }
@@ -93,7 +101,8 @@ function ensureBooted({ name, udid }) {
     }
   }
   console.log(`Booting ${name}…`);
-  try { run('xcrun', ['simctl', 'boot', udid]); } catch { /* already booting */ }
+  if (process.env.CI) { try { console.log(run('xcrun', ['simctl', 'list', 'runtimes']).trim().split('\n').map(l => `  ${l}`).join('\n')); } catch { /* diagnostics only */ } }
+  try { run('xcrun', ['simctl', 'boot', udid], { timeout: 900_000 }); } catch { /* already booting */ }
   try { run('xcrun', ['simctl', 'bootstatus', udid, '-b'], { timeout: 600_000 }); } catch { /* poll below */ }
   for (let i = 0; i < 60 && !booted(); i++) execSync('sleep 2');
   if (!booted()) throw new Error(`${name} did not boot`);
