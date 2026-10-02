@@ -149,6 +149,16 @@ eq(questionClaims(null, 'Solve for $x$.').length, 0, 'questionClaims: a prompt w
   eq(sumOf(wrongEnd), wrongEnd.awarded, 'vector: sum matches with a wrong last line');
 }
 
+// ── 12. Companion suite: units, rounding and vectors (§10) ───────────────────
+{
+  const { execFileSync } = await import('node:child_process');
+  const { fileURLToPath } = await import('node:url');
+  let out = '';
+  try { out = execFileSync(process.execPath, [fileURLToPath(new URL('./marker-units-vectors-check.mjs', import.meta.url))], { encoding: 'utf8' }); }
+  catch (e) { out = String(e.stdout || e.message); }
+  ok(/UNITS, ROUNDING AND VECTORS: PASS/.test(out), `units/rounding/vectors suite: ${out.trim().split('\n').slice(0, 8).join(' | ')}`);
+}
+
 console.log(failures.length
   ? `METHOD MARKS: FAIL — ${failures.length} of ${pass + failures.length} checks failed\n  · ${failures.join('\n  · ')}`
   : `METHOD MARKS: PASS — ${pass}/${pass} checks — restatement is a copied line, not an equivalent one, and correct working earns its marks.`);
