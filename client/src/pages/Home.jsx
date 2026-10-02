@@ -2,7 +2,8 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
 import { cloud } from '../platform/cloudTransport.js';
-import { resolveHomeRecommendation } from '../home/recommendation.js';
+import { resolveHomeRecommendation, actionOpenable } from '../home/recommendation.js';
+import { cacheAssignments, cachedAssignments, loadSavedFilters, saveFilters } from '../home/homeCache.js';
 import Icon from '../components/Icon.jsx';
 import { useApp } from '../App.jsx';
 import { dotpointAvailable, practiceTargetAvailable, topicAvailability } from '../engine/curriculumAvailability.js';
@@ -15,9 +16,6 @@ import { featureEnabled } from '../platform/features.js';
 
 const DIFF_KEYS = { 1: 'difficulty.1', 2: 'difficulty.2', 3: 'difficulty.3', 4: 'difficulty.4' };
 
-function loadSaved() {
-  try { return JSON.parse(localStorage.getItem('pri-gen-filters')) || {}; } catch { return {}; }
-}
 
 export default function Home() {
   const { user, dueCount } = useApp();
@@ -31,7 +29,9 @@ export default function Home() {
   const [online, setOnline] = useState(() => typeof navigator === 'undefined' ? true : navigator.onLine !== false);
   const [open, setOpen] = useState(false);
   const [cat, setCat] = useState('year');
-  const saved = useRef(loadSaved());
+  // Filters are saved under the class/track they were chosen in (homeCache.js).
+  const filterOwner = useRef(user);
+  const saved = useRef(loadSavedFilters(user));
   const [year, setYear] = useState(saved.current.year ?? user.year);
   const [sectionKey, setSectionKey] = useState(saved.current.sectionKey ?? null);
   const [subtopic, setSubtopic] = useState(saved.current.subtopic ?? null);
@@ -80,7 +80,10 @@ export default function Home() {
       if (!online) { if (live) setAssignments(false); return; }
       try {
         const [me, result] = await Promise.all([cloud.me(), cloud.assignments()]);
-        if (live) setAssignments(me?.account?.role === 'student' && Array.isArray(result?.assignments) ? result.assignments : null);
+        if (!live) return;
+        const rows = me?.account?.role === 'student' && Array.isArray(result?.assignments) ? result.assignments : null;
+        if (rows) cacheAssignments(user, rows);
+        setAssignments(rows);
       } catch (err) {
         if (live) setAssignments(err?.status === 401 || err?.code === 'CLOUD_DISABLED' ? null : false);
       }
@@ -95,7 +98,7 @@ export default function Home() {
     api.get('/placement').then(setPlacement).catch(() => { });
   }, [user.course, user.role]);
   useEffect(() => {
-    localStorage.setItem('pri-gen-filters', JSON.stringify({ year, sectionKey, subtopic, dotpoint, difficulty }));
+    saveFilters(filterOwner.current, { year, sectionKey, subtopic, dotpoint, difficulty });
   }, [year, sectionKey, subtopic, dotpoint, difficulty]);
 
   const hour = new Date().getHours();
@@ -195,7 +198,8 @@ export default function Home() {
 
   const homeDecision = useMemo(() => local ? resolveHomeRecommendation({
     user, stats, dueCount, tasks: local.tasks, exams: local.exams, resume: local.resume,
-    assignments: Array.isArray(assignments) ? assignments : [], online, cloudReady: Array.isArray(assignments)
+    assignments: Array.isArray(assignments) ? assignments : [], online, cloudReady: Array.isArray(assignments),
+    cachedAssignments: assignments === false ? cachedAssignments(user) : []
   }) : { primary: null, alternatives: [] }, [local, user, stats, dueCount, assignments, online]);
   // A generic "practice" alternative under a practice recommendation says the
   // same thing twice; the manual chooser below already covers it.
@@ -229,7 +233,7 @@ export default function Home() {
         {alternatives.length > 0 && (
           <ul className="home-alts">
             {alternatives.map(item => (
-              <HomeAction key={item.kind + ':' + item.id} action={item} nav={nav} topicName={topicName} resume={local?.resume} />
+              <HomeAction key={item.kind + ':' + item.id} action={item} nav={nav} topicName={topicName} resume={local?.resume} online={online} />
             ))}
           </ul>
         )}
@@ -398,7 +402,7 @@ function actionCopy(action, user, t, topicName, resume) {
   const india = user.course === 'in';
   const resumeTopic = action.kind === 'practice-resume' ? topicName(resume?.subtopic) : null;
   const adaptiveTopic = action.kind === 'adaptive' ? (d.topic || null) : null;
-  const title = action.kind === 'exam' ? (d.title || t('home.next.exam'))
+  const title = action.kind === 'exam' || action.kind === 'exam-expired' ? (d.title || t('home.next.exam'))
     : action.kind === 'assignment' || action.kind === 'task' ? d.title
       : action.kind === 'task-resume' ? (d.title || t('home.next.resumePractice'))
         : action.kind === 'practice-resume' ? (resumeTopic || t('home.next.resumePractice'))
@@ -408,6 +412,8 @@ function actionCopy(action, user, t, topicName, resume) {
                 : adaptiveTopic ? adaptiveTopic
                   : t('home.next.smart');
   const reason = action.kind === 'exam' ? 'home.reason.examInProgress'
+    : action.kind === 'exam-expired' ? 'home.reason.examExpired'
+    : action.kind === 'assignment' && d.cached ? 'home.reason.assignmentCached'
     : action.kind === 'assignment' || action.kind === 'task' ? WORK_REASONS[d.status] || 'home.reason.ready'
       : action.kind.endsWith('resume') ? 'home.reason.resume'
         : action.kind === 'reviews' ? 'home.reviewDue'
@@ -415,12 +421,13 @@ function actionCopy(action, user, t, topicName, resume) {
             : action.kind === 'adaptive' ? 'home.reason.adaptive'
               : action.kind === 'first-practice' ? (action.offlineCaveat ? 'home.reason.practiceOffline' : 'home.reason.first')
                 : action.offlineCaveat ? 'home.reason.practiceOffline' : 'home.reason.practice';
-  const kicker = action.kind === 'exam' ? 'home.kicker.exam'
+  const kicker = action.kind === 'exam' || action.kind === 'exam-expired' ? 'home.kicker.exam'
     : action.kind === 'assignment' || action.kind === 'task' ? 'home.kicker.assigned'
       : action.kind.endsWith('resume') ? 'home.kicker.continue'
         : action.kind === 'reviews' ? 'home.kicker.review'
           : action.kind === 'first-practice' ? 'home.kicker.start' : 'home.kicker.next';
-  const cta = action.kind === 'exam' ? 'home.cta.exam'
+  const cta = action.kind === 'exam-expired' ? 'home.next.examResult'
+    : action.kind === 'exam' ? 'home.cta.exam'
     : action.kind.endsWith('resume') ? 'home.cta.resume'
       : action.kind === 'reviews' ? 'home.cta.review'
         : action.kind === 'assignment' || action.kind === 'task' ? (d.status === 'started' ? 'home.cta.resume' : 'home.cta.start')
@@ -433,7 +440,7 @@ function actionCopy(action, user, t, topicName, resume) {
   };
 }
 
-function HomeAction({ action, nav, primary, topicName, resume }) {
+function HomeAction({ action, nav, primary, topicName, resume, online = true }) {
   const { user } = useApp();
   const t = useT();
   if (!primary && !action) return null;
@@ -451,11 +458,15 @@ function HomeAction({ action, nav, primary, topicName, resume }) {
   const copy = actionCopy(action, user, t, topicName, resume);
   if (!primary) {
     const key = String(action.kind + '-' + action.id).replace(/[^A-Za-z0-9_-]/g, '-');
+    // Offline, an alternative that needs the network says so and stays shut
+    // rather than opening onto a failure.
+    const openable = actionOpenable(action, { online });
     return (
       <li className="home-alt" data-home-alt>
-        <button type="button" onClick={() => nav(action.destination)} aria-describedby={`home-alt-${key}`}>
+        <button type="button" disabled={!openable} data-home-alt-offline={openable ? undefined : ''}
+          onClick={() => { if (openable) nav(action.destination); }} aria-describedby={`home-alt-${key}`}>
           <span className="home-alt-title">{copy.title}</span>
-          <span className="home-alt-reason" id={`home-alt-${key}`}>{copy.reason}</span>
+          <span className="home-alt-reason" id={`home-alt-${key}`}>{openable ? copy.reason : t('home.needsConnection')}</span>
           <span className="home-alt-go" aria-hidden="true"><Icon name="next" /></span>
         </button>
       </li>

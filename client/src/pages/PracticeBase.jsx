@@ -13,7 +13,7 @@ import { clearInkDraft, clearPendingSubmission, pendingSubmissionQuestionId, rea
 import { tLater, useT } from '../i18n/index.js';
 import Icon from '../components/Icon.jsx';
 import { isContentEmpty, servable, contentEmptySignal } from '../lib/contentServe.js';
-import { practiceRequestFromQuery } from '../lib/practiceLinks.js';
+import { practiceHref, practiceRequestFromQuery } from '../lib/practiceLinks.js';
 import { queueTelemetry } from '../platform/telemetry.js';
 
 const EMPTY_SESSION = Object.freeze({ answered: 0, correct: 0, xp: 0 });
@@ -51,6 +51,7 @@ export default function Practice() {
   const handedRef = useRef(location.state?.serve || null);   // a retry handed over from History
   const [error, setError] = useState('');
   const [errorCode, setErrorCode] = useState('');
+  const [pyqAlternatives, setPyqAlternatives] = useState([]);
   const [capped, setCapped] = useState(null);
   const [session, setSession] = useState({ ...EMPTY_SESSION });
   const sessionRef = useRef({ ...EMPTY_SESSION });
@@ -155,6 +156,7 @@ export default function Practice() {
     loading.current = true;
     setError('');
     setErrorCode('');
+    setPyqAlternatives([]);
     setCapped(null);
     try {
       // Reload/restart resumes unfinished work. Pressing the explicit Next
@@ -205,6 +207,7 @@ export default function Practice() {
       else {
         if (isContentEmpty(e?.code)) noteEmpty(e.code);
         setError(e.message); setErrorCode(e?.code || '');
+        setPyqAlternatives(e?.code === 'INDIA_PYQ_UNAVAILABLE' && Array.isArray(e?.detail?.alternatives) ? e.detail.alternatives : []);
       }
     }
     finally { loading.current = false; }
@@ -451,9 +454,24 @@ export default function Practice() {
             <div>
               <div className="verdict-title">{t('practice.couldNotLoad')}</div>
               <div className="verdict-body">{error}</div>
+              {errorCode === 'INDIA_PYQ_UNAVAILABLE' && pyqAlternatives.length > 0 && (
+                // The nearest chapters whose archive does hold past papers. Each is
+                // a past-papers-only link, so the filter's claim stays true.
+                <div data-pyq-alternatives style={{ marginTop: 10 }}>
+                  <p className="muted" style={{ margin: '0 0 8px' }}>{t('practice.pyqNearestTitle')}</p>
+                  <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+                    {pyqAlternatives.map(alt => (
+                      <Link key={alt.subtopic} className="btn btn-ghost btn-sm"
+                        to={practiceHref({ subtopic: alt.subtopic, track: track || null, pyq: true })}>
+                        {t('practice.pyqNearestCta', { name: alt.name })}
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              )}
               <div style={{ marginTop: 10 }}>
                 {errorCode === 'INDIA_PYQ_UNAVAILABLE'
-                  ? <button className="btn btn-primary btn-sm" onClick={() => setPyqOnly(false)}>{t('practice.pyqFilterOff')}</button>
+                  ? <button className={`btn ${pyqAlternatives.length ? 'btn-quiet' : 'btn-primary'} btn-sm`} onClick={() => setPyqOnly(false)}>{t('practice.pyqFilterOff')}</button>
                   : <button className="btn btn-primary btn-sm" onClick={load}>{t('common.tryAgain')}</button>}
               </div>
             </div>
