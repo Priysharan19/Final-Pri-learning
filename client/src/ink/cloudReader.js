@@ -449,3 +449,20 @@ export function takeCloudReadingNotice(user, storage = globalThis.localStorage) 
   } catch { /* show it; better twice than never */ }
   return true;
 }
+
+/**
+ * The same plain-language reasons for ink, phrased for working that stays on
+ * the page: it is saved, and it is read by itself once the reason goes away.
+ */
+const INK_BLOCKED = Object.freeze({
+  'verdict.photoReadingTurnedOff': 'ink.waitingTurnedOff',
+  'verdict.photoReadingNotOnThisInstall': 'ink.waitingNotOnThisInstall',
+  'verdict.photoReadingOffline': 'ink.waitingOffline',
+  'verdict.photoReadingSignIn': 'ink.waitingSignIn',
+  'verdict.photoReadingGuardian': 'ink.waitingGuardian',
+  'verdict.photoReadingVerifyEmail': 'ink.waitingVerifyEmail',
+  'verdict.photoReadingServiceDown': 'ink.waitingServiceDown'
+});
+export function inkReadingBlockedKey(user, options = {}) {
+  return INK_BLOCKED[photoReadingBlockedKey(user, options)] || 'ink.waitingServiceDown';
+}

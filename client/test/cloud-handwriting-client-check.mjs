@@ -14,7 +14,8 @@
 // The canvas is a recording stub, so this runs in bare Node with no browser.
 // ─────────────────────────────────────────────────────────────────────────────
 import { inkBounds, rasterScale, paintInk, rasterizeInk, MAX_IMAGE_BYTES } from '../src/ink/cloudRaster.js';
-import { cloudAllowanceExhausted, clearCloudAllowanceExhausted } from '../src/ink/cloudReader.js';
+import { cloudAllowanceExhausted, clearCloudAllowanceExhausted, inkReadingBlockedKey } from '../src/ink/cloudReader.js';
+import { readFileSync } from 'node:fs';
 import { announceEntitlementChange } from '../src/platform/cloudSession.js';
 import { UNAVAILABLE_READINESS_TTL_MS, cloudHandwritingReadiness, cloudReadingEnabled, handwritingDiagnostics, readWithCloud, recordLocalHandwritingDiagnostics, shouldSupersede, toReading } from '../src/ink/cloudReader.js';
 
@@ -269,7 +270,39 @@ ok(!shouldSupersede({ text: '-1/0/1/2)4', needsConfirmation: false, alignedToLoc
 ok(!shouldSupersede({ text: '   ', needsConfirmation: false, alignedToLocalLines: true }, local), 'an empty reading never supersedes');
 ok(!shouldSupersede(null, local), 'no reading, no change');
 
+// ── Server-only reading of ink (owner decision, 2026-10) ────────────────────
+// "Pri Learning does not have the feature to mark handwriting or photo when
+// not online, since the local engine is just not good enough." The ink surface
+// must therefore never show or publish an on-device reading.
+{
+  const src = readFileSync(new URL('../src/ink/InkAnswer.jsx', import.meta.url), 'utf8')
+    .split('\n').filter(l => !l.trim().startsWith('//')).join('\n');
+  ok(!/from '\.\/recognizer\.js'/.test(src), 'the ink surface does not import the on-device recogniser');
+  ok(!/nativeInk\.(recognize|foundationRecognize)\(/.test(src), 'nor call the native on-device readers');
+  ok(!/recognizeWithStructuralDev|recognizeWithoutDetachedSideWork|chooseNativeConsensus/.test(src), 'nor any other local reading path');
+  ok(/readWithCloud\(/.test(src), 'it reads through the answer-blind server reader');
+  ok(/addEventListener\?\.\('online'/.test(src) && /onCloudSessionChange\(/.test(src),
+    'and kept working is read again when the connection or the sign-in comes back');
+  const there = () => true;
+  eq(inkReadingBlockedKey({ cloudLinked: true }, { online: () => false, available: there }), 'ink.waitingOffline', 'offline ink says it is saved and will be read when back online');
+  eq(inkReadingBlockedKey({ cloudHandwriting: null }, { online: () => true, available: there }), 'ink.waitingSignIn', 'signed out ink says sign in');
+  eq(inkReadingBlockedKey({ cloudLinked: true }, { online: () => true, available: there, outcome: { error: { code: 'HANDWRITING_UNAVAILABLE' } } }), 'ink.waitingServiceDown', 'a reader that is down says so');
+  eq(inkReadingBlockedKey({ cloudHandwriting: false, cloudLinked: true }, { online: () => true, available: there }), 'ink.waitingTurnedOff', 'only an explicit off points at Settings');
+
+  // Default-on ink path, answer-blind: a signed-in profile that never chose is
+  // read without visiting Settings, and the request carries the picture only.
+  let args = null;
+  const t2 = { transcribeHandwriting: async (...a) => { args = a; return { transcription: { lines: [{ text: '5+5+∫(0,5)2x dx', confidence: 0.95 }], text: '5+5+∫(0,5)2x dx', confidence: 0.95, needsConfirmation: false, engine: 'cloud-test' } }; } };
+  const readyNow = async () => ({ usable: true, available: true, state: 'ready', releaseSha: null });
+  const inkUser = { cloudHandwriting: null, cloudLinked: true, expectedAnswer: '35', solution: 'integrate 2x' };
+  const got = await readWithCloud(STROKES, { user: inkUser, transport: t2, rasterize, available: there, readiness: readyNow });
+  ok(got?.transcription?.text === '5+5+∫(0,5)2x dx', 'default-on ink is read by the server');
+  eq(args?.length, 2, 'the ink request is the picture and options only');
+  eq(Object.keys(args?.[1] || {}), ['signal'], 'whose only option is the cancel signal');
+  ok(!JSON.stringify(args).includes('integrate 2x') && !JSON.stringify(args).includes('"35"'), 'and no expected answer or solution travels with it');
+}
+
 console.log(failures.length
   ? `CLOUD HANDWRITING CLIENT: FAIL — ${failures.length} of ${pass + failures.length} checks failed\n  · ${failures.join('\n  · ')}`
-  : `CLOUD HANDWRITING CLIENT: PASS — ${pass}/${pass} checks — off by default, ink only, never over a hand correction, never on an unconfident read.`);
+  : `CLOUD HANDWRITING CLIENT: PASS — ${pass}/${pass} checks — on by default only for a signed-in account, server-only and answer-blind, never over a hand correction, never on an unconfident read.`);
 process.exit(failures.length ? 1 : 0);
