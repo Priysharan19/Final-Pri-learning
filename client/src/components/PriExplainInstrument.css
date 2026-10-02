@@ -22,7 +22,7 @@
 .pri-explain-head { padding: 20px 24px 12px; align-items: flex-start; }
 .pri-explain-head h2 { font: var(--type-title); letter-spacing: -0.015em; margin-top: 4px; }
 .pri-explain-kicker { color: var(--ink-3); }
-.pri-explain-kicker, .pri-explain-question > span, .pri-explain-final > span, .pri-explain-step-label {
+.pri-explain-kicker, .pri-explain-final > span, .pri-explain-step-label {
   font: var(--type-label); letter-spacing: var(--tracking-label);
 }
 
@@ -34,7 +34,11 @@
   text-transform: none; letter-spacing: 0;
   font-family: var(--font-prose-math); font-size: 18px; line-height: 1.5; color: var(--ink);
 }
-.pri-explain-question > span { font-family: var(--font); text-transform: uppercase; color: var(--ink-3); }
+.pri-explain-question > span:first-child { font: var(--type-label); letter-spacing: var(--tracking-label); text-transform: uppercase; color: var(--ink-3); }
+.pri-explain-question > span:not(:first-child) {
+  font-family: var(--font-prose-math); font-size: 18px; font-weight: 400; line-height: 1.5;
+  text-transform: none; letter-spacing: 0; color: var(--ink);
+}
 
 /* Why the explanation is shaped this way: one ruled note, no badge */
 .pri-explain-adaptive {
@@ -89,9 +93,11 @@
 
 /* The beat in focus is marked by its edge, not by a halo and a pill */
 .pri-explain-visual-beat.pending { filter: none; transform: none; }
-.pri-explain-visual-beat.active::before {
-  inset: -5px; border-radius: var(--radius-lg); border: 1px solid var(--accent-line); box-shadow: none;
-}
+.pri-explain-visual-beat.active::before { display: none; }
+.pri-explain-visual-beat.active > :not(.pri-explain-now) { border-color: var(--accent-line); }
+.pri-explain-board { margin-top: 14px; }
+.pri-explain-step-label { justify-content: flex-start; }
+.pri-explain-step-label em::before { content: '· '; }
 .pri-explain-now {
   padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; color: var(--accent);
   font: var(--type-label); letter-spacing: var(--tracking-label); right: 10px; top: 8px;

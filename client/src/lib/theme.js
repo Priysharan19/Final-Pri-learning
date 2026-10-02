@@ -18,6 +18,8 @@ export const THEME_STORAGE_KEY = 'pri.theme';
 // installed-app chrome are painted with it so the page has no visible frame.
 export const THEME_CHROME = { light: '#f2f0ea', dark: '#121210' };
 
+let switchTimer = null;
+
 /** Anything that is not a known preference is paper, the product default. */
 export const cleanThemePref = value => (THEME_PREFS.includes(value) ? value : 'light');
 
@@ -49,6 +51,13 @@ export function applyTheme(pref) {
   const clean = cleanThemePref(pref);
   const resolved = resolveTheme(clean);
   const root = document.documentElement;
+  // A change of paper cross-fades (theme.css .theme-switching); the first
+  // paint and a re-apply of the same theme do not animate.
+  if (root.dataset.theme && root.dataset.theme !== resolved) {
+    root.classList.add('theme-switching');
+    clearTimeout(switchTimer);
+    switchTimer = setTimeout(() => root.classList.remove('theme-switching'), 260);
+  }
   root.dataset.theme = resolved;
   root.dataset.themePref = clean;
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', THEME_CHROME[resolved]);

@@ -2089,6 +2089,30 @@ h3 { font-size: 16.5px; line-height: 1.3; }
 .ink-hint { margin-left: auto; font-size: 12px; color: var(--ink-3); }
 .ink-pages { font-size: 12.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; margin-left: 2px; }
 .ink-stage { position: relative; background: var(--paper); }
+/* Signature · the reading line. When the engine has marked the page, one teal
+   hairline passes down it once, the way an examiner's eye does, and the marks
+   are there behind it. It never delays the verdict (the result is already on
+   screen), never loops, and does not exist under reduced motion. */
+.editor-shell[data-marked="yes"] .ink-stage::after {
+  content: ''; position: absolute; inset: 0; border-top: 1px solid var(--accent);
+  pointer-events: none; opacity: 0; animation: reading-sweep 640ms var(--ease-standard) 1;
+}
+@keyframes reading-sweep {
+  0% { transform: translateY(0); opacity: 0.85; }
+  88% { opacity: 0.85; }
+  100% { transform: translateY(100%); opacity: 0; }
+}
+.eval-card { animation: anchorIn var(--motion-base) var(--ease-standard) both; }
+@media (prefers-reduced-motion: reduce) {
+  .editor-shell[data-marked="yes"] .ink-stage::after { animation: none; display: none; }
+  .eval-card { animation: none; }
+}
+/* Changing paper: surfaces cross-fade for a moment instead of snapping. */
+html.theme-switching, html.theme-switching * {
+  transition: background-color var(--motion-base) var(--ease-standard), color var(--motion-base) var(--ease-standard),
+    border-color var(--motion-base) var(--ease-standard), fill var(--motion-base) var(--ease-standard), stroke var(--motion-base) var(--ease-standard) !important;
+}
+@media (prefers-reduced-motion: reduce) { html.theme-switching, html.theme-switching * { transition: none !important; } }
 .ink-wrap.ink-ruled {
   background-color: var(--paper);
   background-image:

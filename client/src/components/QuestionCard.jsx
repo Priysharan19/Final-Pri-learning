@@ -1309,7 +1309,9 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
           </div>
         ) : (
           <div className="ink-row">
-            <div className="editor-shell">
+            {/* data-marked starts the reading sweep (theme.css): it appears only
+                when the deterministic engine has actually marked this page. */}
+            <div className="editor-shell" data-marked={(resolved && !res?.revealed) || (state.phase === 'retry' && !state.res?.invalid) ? 'yes' : undefined}>
               {InkAnswer && (
                 <InkAnswer onRecognized={onInkRecognized} height={inkPageHeight} lineVerdicts={lineVerdicts}
                   disabled={resolved || busy} focusSymbol={checkFocus} recognitionContext={recognitionContext}
