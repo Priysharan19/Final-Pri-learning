@@ -55,7 +55,7 @@ const run = (cmd, args, opts = {}) =>
 // ("denied by service delegate (SBMainWorkspace)"). Wait for the boot to finish,
 // then retry that specific refusal a few times; any other error is real.
 function launchApp(device, bundleId, args = [], opts = {}) {
-  try { run('xcrun', ['simctl', 'bootstatus', device, '-b']); } catch { /* best effort */ }
+  try { run('xcrun', ['simctl', 'bootstatus', device, '-b'], { timeout: 600_000 }); } catch { /* best effort */ }
   for (let attempt = 1; ; attempt++) {
     try { return run('xcrun', ['simctl', 'launch', device, bundleId, ...args], opts); }
     catch (error) {
@@ -72,11 +72,19 @@ function pickDevice() {
   const named = argOf('device');
   const family = (argOf('family') || 'iphone').toLowerCase();
   const pattern = family === 'ipad' ? /iPad/ : /iPhone/;
-  const rows = run('xcrun', ['simctl', 'list', 'devices', 'available']).split('\n')
-    .map(l => l.match(/^\s+(.+?) \(([0-9A-F-]{36})\) \((\w+)\)/i)).filter(Boolean)
-    .map(([, name, udid, state]) => ({ name, udid, state }))
-    .filter(d => (named ? d.name === named : pattern.test(d.name)));
-  const pick = rows.find(d => d.state === 'Booted') || rows[0];
+  // Devices are listed under runtime headers ("-- iOS 26.0 --"). Prefer the
+  // newest runtime: an older one can need a long first boot on a CI runner.
+  let runtime = [0];
+  const rows = [];
+  for (const l of run('xcrun', ['simctl', 'list', 'devices', 'available']).split('\n')) {
+    const header = l.match(/^-- iOS ([\d.]+) --/);
+    if (header) { runtime = header[1].split('.').map(Number); continue; }
+    const m = l.match(/^\s+(.+?) \(([0-9A-F-]{36})\) \((\w+)\)/i);
+    if (m && /^-- /.test(l) === false) rows.push({ name: m[1], udid: m[2], state: m[3], runtime });
+  }
+  const newer = (a, b) => { for (let i = 0; i < Math.max(a.length, b.length); i++) { const d = (b[i] || 0) - (a[i] || 0); if (d) return d; } return 0; };
+  const matching = rows.filter(d => (named ? d.name === named : pattern.test(d.name))).sort((a, b) => newer(a.runtime, b.runtime));
+  const pick = matching.find(d => d.state === 'Booted') || matching[0];
   if (!pick) throw new Error(`no ${named || family} simulator is available`);
   return pick;
 }
@@ -84,9 +92,18 @@ function pickDevice() {
 function ensureBooted({ name, udid }) {
   const booted = () => run('xcrun', ['simctl', 'list', 'devices']).split('\n').some(l => l.includes(udid) && /\(Booted\)/.test(l));
   if (booted()) return;
+  // On a CI runner a second booted simulator (the iPad from earlier steps)
+  // starves this boot; a person's own simulators are never touched locally.
+  if (process.env.CI) {
+    for (const line of run('xcrun', ['simctl', 'list', 'devices']).split('\n')) {
+      const other = line.match(/\(([0-9A-F-]{36})\) \(Booted\)/i)?.[1];
+      if (other && other !== udid) { console.log(`  shutting down booted simulator ${other} (CI)`); try { run('xcrun', ['simctl', 'shutdown', other]); } catch { /* already down */ } }
+    }
+  }
   console.log(`Booting ${name}…`);
-  try { run('xcrun', ['simctl', 'boot', udid]); } catch { /* already booting */ }
-  try { run('xcrun', ['simctl', 'bootstatus', udid, '-b']); } catch { /* poll below */ }
+  if (process.env.CI) { try { console.log(run('xcrun', ['simctl', 'list', 'runtimes']).trim().split('\n').map(l => `  ${l}`).join('\n')); } catch { /* diagnostics only */ } }
+  try { run('xcrun', ['simctl', 'boot', udid], { timeout: 900_000 }); } catch { /* already booting */ }
+  try { run('xcrun', ['simctl', 'bootstatus', udid, '-b'], { timeout: 600_000 }); } catch { /* poll below */ }
   for (let i = 0; i < 60 && !booted(); i++) execSync('sleep 2');
   if (!booted()) throw new Error(`${name} did not boot`);
 }
@@ -153,7 +170,8 @@ for (const line of second) console.log(`  ${line.replace(/^PRIJOURNEY\s*/, '')}`
 function serverLogouts(fixture) {
   try {
     const log = readFileSync(fixture.PRI_CLOUD_SERVER_LOG, 'utf8');
-    return (log.match(/"path":"\/v1\/account\/logout","status":200/g) || []).length;
+    // Structured request logs name the route ("route", from #262) — older builds used "path".
+    return (log.match(/"(?:route|path)":"\/v1\/account\/logout","status":200/g) || []).length;
   } catch { return null; }
 }
 

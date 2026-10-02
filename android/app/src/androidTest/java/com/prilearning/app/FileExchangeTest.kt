@@ -101,6 +101,20 @@ class FileExchangeTest {
         try { return block(monitor) } finally { instrumentation.removeMonitor(monitor) }
     }
 
+    /** Tap an element and wait for the system chooser; a freshly inserted
+     *  element on a slow emulator may not be laid out for the first tap, so the
+     *  tap is repeated (bounded) until the chooser is actually asked for. */
+    private fun tapUntilAsked(s: ActivityScenario<MainActivity>, selector: String, m: ChooserMonitor): Intent {
+        for (attempt in 1..4) {
+            waitFor(s, "(function(){var e=document.querySelector('$selector');if(!e)return false;var r=e.getBoundingClientRect();return r.width>0&&r.height>0;})()")
+            tap(s, selector)
+            val end = System.currentTimeMillis() + 4_000
+            while (m.asked == null && System.currentTimeMillis() < end) Thread.sleep(100)
+            m.asked?.let { return it }
+        }
+        throw AssertionError("the system chooser was never opened")
+    }
+
     private fun awaitAsked(m: ChooserMonitor): Intent {
         val end = System.currentTimeMillis() + 10_000
         while (m.asked == null && System.currentTimeMillis() < end) Thread.sleep(100)
@@ -151,8 +165,7 @@ class FileExchangeTest {
                 i.addEventListener('change',function(){var f=i.files[0];if(!f){window.__picked='none';return;}var r=new FileReader();r.onload=function(){window.__picked=f.name+'|'+r.result;};r.readAsText(f);});
                 document.body.appendChild(i);return true;})()""")
             withChooser({ Instrumentation.ActivityResult(Activity.RESULT_OK, Intent().setData(pickedUri).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)) }) { m ->
-                tap(s, "#pri-json")
-                val open = awaitAsked(m).extra<Intent>(Intent.EXTRA_INTENT)!!
+                val open = tapUntilAsked(s, "#pri-json", m).extra<Intent>(Intent.EXTRA_INTENT)!!
                 assertEquals(Intent.ACTION_OPEN_DOCUMENT, open.action)
                 val types = open.getStringArrayExtra(Intent.EXTRA_MIME_TYPES)?.toList() ?: listOf(open.type)
                 assertTrue("the picker is asked for JSON: $types", "application/json" in types)
@@ -167,7 +180,7 @@ class FileExchangeTest {
                 document.body.appendChild(i);return true;})()""")
             @Suppress("DEPRECATION")
             val cameras = context.packageManager.queryIntentActivities(Intent(MediaStore.ACTION_IMAGE_CAPTURE), PackageManager.MATCH_DEFAULT_ONLY)
-            var granted = mutableListOf<Boolean>()
+            val granted: MutableList<Boolean> = java.util.Collections.synchronizedList(mutableListOf())
             withChooser({ chooser ->
                 // Play the camera app: write the photo where the shell asked, then return OK.
                 @Suppress("DEPRECATION")
@@ -183,8 +196,7 @@ class FileExchangeTest {
                 }
                 Instrumentation.ActivityResult(Activity.RESULT_OK, null)
             }) { m ->
-                tap(s, "#pri-photo")
-                val chooser = awaitAsked(m)
+                val chooser = tapUntilAsked(s, "#pri-photo", m)
                 val open = chooser.extra<Intent>(Intent.EXTRA_INTENT)!!
                 val types = open.getStringArrayExtra(Intent.EXTRA_MIME_TYPES)?.toList() ?: listOf(open.type)
                 assertTrue("images and PDFs: $types", "image/*" in types && "application/pdf" in types)
@@ -196,7 +208,11 @@ class FileExchangeTest {
                     assertEquals(MediaStore.ACTION_IMAGE_CAPTURE, capture.action)
                     val out = capture.extra<Uri>(MediaStore.EXTRA_OUTPUT)!!
                     assertEquals("${context.packageName}.files", out.authority)
-                    assertTrue("each camera app was granted write access to the capture URI: $granted", granted.isNotEmpty() && granted.all { it })
+                    // The monitor's result callback (which checks the grants) can run just
+                    // after the chooser is observed; wait for it rather than racing it.
+                    val until = System.currentTimeMillis() + 10_000
+                    while (granted.size < cameras.size && System.currentTimeMillis() < until) Thread.sleep(100)
+                    assertTrue("each camera app was granted write access to the capture URI: $granted", granted.size == cameras.size && granted.all { it })
                     assertEquals("\"photo.jpg|2048\"", waitFor(s, "window.__photo"))
                 }
             }

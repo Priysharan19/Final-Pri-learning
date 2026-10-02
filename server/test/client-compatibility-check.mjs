@@ -37,7 +37,7 @@ try {
   ok((await call('POST', '/sync/push', { 'x-pri-client': 'android-native-v1', 'x-pri-shell-build': 'abc' })).status === 426, 'a malformed build is below the floor');
   ok((await call('POST', '/sync/push', { 'x-pri-client': 'android-native-v1', 'x-pri-shell-build': '1'.repeat(10) })).status === 426, 'an absurdly long build is below the floor, not a bypass');
   ok((await call('POST', '/sync/push', { 'x-pri-client': 'android-native-v1', 'x-pri-shell-build': '7' })).status === 200, 'Android at its own floor is served');
-  const exits = [['GET', '/health'], ['POST', '/account/login'], ['GET', '/account/me'], ['POST', '/account/logout'],
+  const exits = [['GET', '/health'], ['GET', '/ready'], ['POST', '/account/login'], ['GET', '/account/me'], ['POST', '/account/logout'],
     ['POST', '/account/identity/nonce'], ['POST', '/account/identity/apple/sign-in'], ['POST', '/account/identity/google/sign-in'],
     ['POST', '/account/password/reset-request'], ['POST', '/account/password/reset'],
     ['POST', '/account/email/verification-request'], ['POST', '/account/email/verify'],

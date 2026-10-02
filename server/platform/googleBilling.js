@@ -384,6 +384,12 @@ export function createGoogleBilling(db, { client = null, env = process.env, now 
         // The replaced purchase is history from now on (upgrade, downgrade or resubscribe).
         await db.run(`UPDATE billing_google_purchases SET superseded_by=?,updated_at=? WHERE purchase_token=? AND account_id=?`,
           [purchaseToken, t, linked, accountId]);
+        // Entitlements are derived from every subscription row an account holds
+        // (entitlements.js). The replaced token is the same Google subscription,
+        // not a second paid one, so it stops being an entitlement source; its
+        // successor's state is what counts from now on.
+        await db.run(`UPDATE billing_subscriptions SET state_plan=NULL,state_status=NULL,state_period_end=NULL,state_grace_until=NULL,updated_at=?
+          WHERE provider='google' AND provider_subscription_id=? AND account_id=?`, [t, linked, accountId]);
       }
       const self = await db.get('SELECT superseded_by FROM billing_google_purchases WHERE purchase_token=?', [purchaseToken]);
       return { accountId, superseded: !!self?.superseded_by };

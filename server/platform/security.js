@@ -123,6 +123,28 @@ tagPolicy(csrfGuard, { csrf: true });
 // CP-07 added Android under the identical rule — it never impersonates iOS.
 const NATIVE_CLIENTS = new Set(['ios-native-v1', 'android-native-v1']);
 
+/**
+ * The client declares itself one of the native shells (iPad/iPhone or
+ * Android). Self-declared, so it can only ever REMOVE an option for the
+ * caller — billing uses it to refuse web checkout to the native apps, where
+ * the storefront's own billing is the only permitted purchase path — never
+ * grant one.
+ */
+export function declaredNativeClient(req) {
+  return NATIVE_CLIENTS.has(String(req?.get?.('x-pri-client') || ''));
+}
+
+/**
+ * The native shell a request declares itself to be (X-Pri-Client), from the
+ * closed set of known native clients, or null. This only identifies the shell
+ * (the compatibility floor uses it); it grants nothing — the CSRF/origin
+ * exemption additionally requires the absence of browser context below.
+ */
+export function declaredNativeClientId(req) {
+  const id = req.get('x-pri-client');
+  return NATIVE_CLIENTS.has(id) ? id : null;
+}
+
 function nativeNonBrowserRequest(req) {
   // URLSession does not have a browser Origin or Fetch Metadata context. A web
   // page cannot suppress Origin on a cross-origin mutation, and the custom

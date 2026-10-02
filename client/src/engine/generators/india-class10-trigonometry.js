@@ -93,14 +93,14 @@ export function currentClass10Trigonometry(rng, diff) {
     const givenFn = giveSin ? 'sin' : 'cos';
     const wantFn = giveSin ? 'cos' : 'sin';
     return {
-      prompt: `For an acute angle $A$, $\\${givenFn}A=${given.latex()}$. Use $\\sin^2A+\\cos^2A=1$ to find $\\${wantFn}A$ exactly.`,
+      prompt: `For an acute angle $A$, $\\${givenFn} A=${given.latex()}$. Use $\\sin^2A+\\cos^2A=1$ to find $\\${wantFn} A$ exactly.`,
       ...exactFraction(want),
       traps: [{ value: 1 - given.value, why: 'The identity contains squares: first find the square of the missing ratio, then take the positive square root because A is acute.' }].filter(t => Math.abs(t.value - want.value) > 1e-9),
-      hints: ['$\\sin^2A+\\cos^2A=1$.', `Substitute $\\${givenFn}A=${given.latex()}$ and isolate $\\${wantFn}^2A$.`, 'Because A is acute, the required ratio is positive.'],
+      hints: ['$\\sin^2A+\\cos^2A=1$.', `Substitute $\\${givenFn} A=${given.latex()}$ and isolate $\\${wantFn}^2A$.`, 'Because A is acute, the required ratio is positive.'],
       steps: [
         { h: 'Start from the identity', d: '$\\sin^2A+\\cos^2A=1$' },
         { h: 'Substitute', d: `$\\${wantFn}^2A=1-\\left(${given.latex()}\\right)^2=\\frac{${want.n * want.n}}{${want.d * want.d}}$` },
-        { h: 'Take the positive root', d: `$\\${wantFn}A=${want.latex()}$` }
+        { h: 'Take the positive root', d: `$\\${wantFn} A=${want.latex()}$` }
       ],
       dotpoint: 3,
       trigSkill: 'pythagorean-identity-application'

@@ -110,6 +110,14 @@ export function recordProfileMutation(pid, method, path, result, body = null) {
   // deleting one profile on a shared iPad.
   if (classified.kind === 'profile' && classified.operation === 'delete') return Promise.resolve(null);
 
+  // A practice attempt whose queue entry was written in the same transaction
+  // as the attempt itself (stageAttemptProgress), or a replay of a submission
+  // that was already committed, is already queued. Queueing it here again
+  // would publish one attempt under two event ids (§09/§22).
+  if (classified.kind === 'practice-progress' && (result?.syncQueued === true || result?.replayed === true)) {
+    return Promise.resolve(null);
+  }
+
   return locked(async () => {
     const row = await load(id);
     const now = Date.now();
@@ -123,28 +131,57 @@ export function recordProfileMutation(pid, method, path, result, body = null) {
       return { ...RESCAN };
     }
 
-    const event = {
-      seq: row.nextSeq++, kind: classified.kind, entityId: classified.entityId,
-      operation: classified.operation,
-      sourceId: APPEND_KINDS.has(classified.kind) ? await newestSourceId(id, classified) : null,
-      firstAt: now, at: now
-    };
-
-    // Learning facts are append-only. Never coalesce two attempts at the same
-    // question into one marker; doing so would erase a real learning event before
-    // the cloud had a chance to see it. Mutable records still coalesce safely.
-    const next = APPEND_KINDS.has(classified.kind)
-      ? [...row.items, event]
-      : coalesce(row.items, event);
-
-    if (next.length > MAX_ITEMS || next.some(item => item.kind === 'full-rescan')) {
-      row.initialComplete = false;
-      row.items = [];
-    } else {
-      row.items = next;
-    }
+    const sourceId = APPEND_KINDS.has(classified.kind) ? await newestSourceId(id, classified) : null;
+    const event = appendItem(row, classified, sourceId, now);
     await save(row);
     return { ...event };
+  });
+}
+
+/** Append one entry to a loaded queue row in place; the one rule for both writers. */
+function appendItem(row, classified, sourceId, now) {
+  const event = {
+    seq: row.nextSeq++, kind: classified.kind, entityId: classified.entityId,
+    operation: classified.operation,
+    sourceId: sourceId ?? null,
+    firstAt: now, at: now
+  };
+
+  // Learning facts are append-only. Never coalesce two attempts at the same
+  // question into one marker; doing so would erase a real learning event before
+  // the cloud had a chance to see it. Mutable records still coalesce safely.
+  const next = APPEND_KINDS.has(classified.kind)
+    ? [...row.items, event]
+    : coalesce(row.items, event);
+
+  if (next.length > MAX_ITEMS || next.some(item => item.kind === 'full-rescan')) {
+    row.initialComplete = false;
+    row.items = [];
+  } else {
+    row.items = next;
+  }
+  return event;
+}
+
+/**
+ * Commit a practice attempt and its cloud queue entry as ONE write (§22).
+ *
+ * `commit(op)` receives the queue row's `put` operation and must include it in
+ * the same atomic batch as the attempt. Before this, the attempt committed and
+ * the queue was written afterwards by the API layer; an app killed between the
+ * two left an attempt the cloud would never hear about, and the replay that
+ * recovered it (correctly) did not queue it either. Runs under this queue's
+ * lock so no other queue write can interleave between the read and the batch.
+ */
+export function stageAttemptProgress(pid, questionId, attemptId, commit) {
+  const id = requirePid(pid);
+  return locked(async () => {
+    const row = await load(id);
+    const event = appendItem(row, {
+      kind: 'practice-progress', entityId: String(questionId), operation: 'upsert'
+    }, attemptId, Date.now());
+    const result = await commit({ type: 'put', store: 'device', value: row });
+    return { result, event: { ...event } };
   });
 }
 

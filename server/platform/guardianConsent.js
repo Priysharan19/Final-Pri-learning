@@ -26,7 +26,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { sessionFromRequest, sha256 } from './security.js';
 import { asyncHandler } from './asyncRouter.js';
-import { asStore } from './store.js';
+import { asStore, isDatabaseOverload } from './store.js';
 import { tagPolicy } from './routePolicy.js';
 import { clipText } from './text.js';
 
@@ -35,7 +35,9 @@ import { clipText } from './text.js';
  * notice changes in a way that alters what a guardian is agreeing to, so an old
  * consent is visibly an old consent rather than silently carried forward.
  */
-export const CONSENT_NOTICE_VERSION = '2026-09-07';
+// 2026-10-02: the notice's Children section now describes this flow (it said
+// no consent was recorded), and its retention section changed.
+export const CONSENT_NOTICE_VERSION = '2026-10-02';
 
 /** What was established. Deliberately not the words "verifiable consent". */
 export const CONSENT_METHOD = 'guardian-email-confirmation';
@@ -134,16 +136,26 @@ export function requireGuardianConsent(db) {
     // mounted in front of one runs before req.platformSession exists, and
     // reading it would silently let every request through. That is exactly
     // what this did until a test caught it.
+    //
+    // A lookup that FAILS is not "no session": it used to be caught and treated
+    // as one, which sent the request on to the sub-router — whose own session
+    // lookup could then succeed and run a child's sync with this gate skipped.
+    // It now propagates: a database outage is the coded, retryable 503, and
+    // anything else is a 500. Neither ever passes through.
     let accountId = req.platformSession?.account_id;
-    if (!accountId) {
-      try { accountId = (await sessionFromRequest(db, req))?.account_id; } catch { accountId = null; }
-    }
+    if (!accountId) accountId = (await sessionFromRequest(db, req))?.account_id;
     // No session at all: the sub-router's own requireSession will answer 401.
     // This gate is about consent, not authentication.
     if (!accountId) return next();
     let state;
     try { state = await consentState(db, accountId); }
-    catch { return refuse(res, 'GUARDIAN_CONSENT_UNAVAILABLE', 'This account cannot sync right now.'); }
+    catch (error) {
+      // A database outage or overload is not a refusal: answering it with a
+      // 403 told the device its sync was forbidden rather than "retry shortly".
+      // It goes to the /v1 error handler as the coded, retryable 503 it is.
+      if (isDatabaseOverload(error)) throw error;
+      return refuse(res, 'GUARDIAN_CONSENT_UNAVAILABLE', 'This account cannot sync right now.');
+    }
     if (!state.required || state.state === 'given') return next();
     if (state.state === 'pending') {
       return refuse(res, 'GUARDIAN_CONSENT_PENDING',

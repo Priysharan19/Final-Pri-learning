@@ -9,7 +9,7 @@ import { cloudSyncStatus, syncNow } from '../platform/syncWorker.js';
 import { normalizeCommercialDisplay } from '../platform/entitlements.js';
 import {
   finishNativeTransaction, getNativeProducts, nativeBillingStore,
-  onNativeBillingUpdate, purchaseNativeProduct, restoreNativePurchases
+  acceptEachTransaction, onNativeBillingUpdate, purchaseNativeProduct, restoreNativePurchases
 } from '../platform/nativeBilling.js';
 import GooglePlayBilling from './GooglePlayBilling.jsx';
 import CloudAccountSecurity from './CloudAccountSecurity.jsx';
@@ -381,11 +381,10 @@ export default function CloudAccountPanel() {
         setMessage(tLater('cloud.appleNoneFound'));
         return;
       }
-      let accepted = 0;
-      for (const transaction of transactions) {
-        if (await acceptAppleTransaction(transaction, { quiet: true })) accepted++;
-      }
-      if (!accepted) throw new Error('No App Store transaction could be verified for this Pri Learning account.');
+      // A transaction bound to another Pri account on this Apple ID is refused
+      // by the server and must not stop this account's own from restoring.
+      const { accepted, lastError } = await acceptEachTransaction(transactions, transaction => acceptAppleTransaction(transaction, { quiet: true }));
+      if (!accepted) throw lastError || new Error('No App Store transaction could be verified for this Pri Learning account.');
       setMessage(tLater('cloud.appleRestored', { count: accepted, n: accepted }));
     } catch (err) { setError(err.message || tLater('cloud.appleRestoreFailed')); }
     finally { setBusy(''); }

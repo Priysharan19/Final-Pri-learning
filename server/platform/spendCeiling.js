@@ -1,16 +1,18 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Pri Learning · a ceiling on what the paid reader can cost in a day
 //
-// Two routes call a metered third party: /v1/handwriting/transcribe and
-// /v1/working/check. Both are rate limited per account — 240 and 120 an hour —
-// and that is the wrong unit for the thing that actually hurts. Per-account
+// Three routes call a metered third party: /v1/handwriting/transcribe,
+// /v1/working/check and /v1/tutor/help (one unit per model call, a guarded
+// regeneration included; a cached tutor reply costs nothing). Each is rate
+// limited per account — 240, 120 and 60 an hour — and that is the wrong unit
+// for the thing that actually hurts. Per-account
 // limits bound one student. They do not bound the bill.
 //
 // A thousand accounts at those limits is 360,000 paid calls an hour. Nobody
 // running this is watching a dashboard at three in the morning, and the first
 // sign of trouble would be an invoice. So there is a second limit here, counted
-// across the whole deployment rather than per student, and the two routes share
-// it because they share one API key and one bill.
+// across the whole deployment rather than per student, and the routes share it
+// because they share one API key and one bill.
 //
 // It is required whenever a key is configured, with no default. A default is a
 // number somebody else guessed about somebody else's budget: too low and the
@@ -26,7 +28,7 @@
 import { consumeRateLimit } from './security.js';
 import { asStore } from './store.js';
 
-/** One budget for both routes: one key, one bill. */
+/** One budget for every paid route: one key, one bill. */
 export const PAID_BUDGET = 'paid-provider';
 
 const positiveInt = (value) => {
