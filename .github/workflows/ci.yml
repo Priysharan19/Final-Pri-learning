@@ -179,6 +179,7 @@ jobs:
         run: |
           node server/test/handwriting-transcription-check.mjs
           node server/test/working-check-check.mjs
+          node server/test/tutor-help-check.mjs
           node server/test/spend-ceiling-check.mjs
           node server/test/guardian-consent-check.mjs
       - name: Account, origin, CMS and classroom contracts
@@ -234,7 +235,7 @@ jobs:
         run: |
           set -o pipefail
           node scripts/with-postgres.mjs node server/test/run-platform-postgres.mjs 2>&1 | tee platform-postgres.log
-          grep -Fq 'PLATFORM ON POSTGRES: PASS — 28/28 suites' platform-postgres.log
+          grep -Fq 'PLATFORM ON POSTGRES: PASS — 29/29 suites' platform-postgres.log
           grep -Fq '✓ security-acceptance-check.mjs' platform-postgres.log
           grep -Fq '✓ abuse-limits-check.mjs' platform-postgres.log
           grep -Fq '✓ google-billing-check.mjs' platform-postgres.log
@@ -309,6 +310,9 @@ jobs:
           grep -Eq 'E2E SUITE.*17/17.*1 flows' browser.log
           grep -Fq 'Cloud admin · independent-review rejection' browser.log
           grep -Eq 'E2E SUITE.*8/8.*1 flows' browser.log
+          grep -Fq 'AI tutor · dark by default in a production build' browser.log
+          grep -Fq 'AI tutor · three levels, in order, with fallback' browser.log
+          grep -Eq 'E2E SUITE.*32/32.*2 flows' browser.log
           grep -Fq 'Hindi · Practice, Exams, exam room, Progress, Explain' browser.log
           grep -Eq 'E2E SUITE.*36/36.*1 flows' browser.log
           grep -Eq 'ACCESSIBILITY SUITE.*38/38.*12 groups' browser.log

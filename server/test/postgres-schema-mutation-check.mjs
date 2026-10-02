@@ -125,9 +125,9 @@ const MUTATIONS = [
     expect: /pri_server can UPDATE sync_cursors, which must be read-only to it/
   },
   {
-    label: 'schema_version left at 6 by the sequence migration',
-    migrations: mutateNamed('_sync_cursor_sequence.sql', "update pri.platform_meta set value = '7' where key = 'schema_version';", ''),
-    expect: /platform_meta\.schema_version is 7/
+    label: 'schema_version left at 7 by the tutor cache migration',
+    migrations: mutateNamed('_tutor_cache.sql', "update pri.platform_meta set value = '8' where key = 'schema_version';", ''),
+    expect: /platform_meta\.schema_version is 8/
   },
   {
     label: 'billing_schema_version left at 3 by the Google Play migration',

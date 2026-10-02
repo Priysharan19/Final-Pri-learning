@@ -304,6 +304,11 @@ export const cloud = Object.freeze({
   // a body that carries one.
   checkWorking: (prompt, lines, { signal = null, timeoutMs = 35000 } = {}) =>
     cloudRequest('/v1/working/check', { method: 'POST', body: { prompt, lines }, signal, timeoutMs }),
+  // The AI tutor is sent the verified solution it must stay grounded in — it
+  // is not a reader, and /v1/handwriting never receives one. Exam rows never
+  // reach here: the local backend refuses them first.
+  tutorHelp: (body, { signal = null, timeoutMs = 25000 } = {}) =>
+    cloudRequest('/v1/tutor/help', { method: 'POST', body, signal, timeoutMs }),
   deleteAccount: body => cloudRequest('/v1/account', { method: 'DELETE', body }),
   identities: () => cloudRequest('/v1/account/identity'),
   socialSignIn: (provider, body) => cloudRequest(`/v1/account/identity/${pathId(provider, 'provider')}/sign-in`, { method: 'POST', body }),
