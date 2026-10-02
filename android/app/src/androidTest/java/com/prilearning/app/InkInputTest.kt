@@ -192,14 +192,12 @@ class InkInputTest {
             }
 
             // ── rotation keeps the ink ───────────────────────────────────────
-            if (InstrumentationRegistry.getArguments().getString("priRotate", "true") != "false") {
-                val beforeRotation = inkPixels(s)
-                s.onActivity { it.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE }
-                Thread.sleep(2500)
-                assertTrue("rotation keeps the strokes (${inkPixels(s)} px)", inkPixels(s) > beforeRotation / 3)
-                s.onActivity { it.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT }
-                Thread.sleep(2000)
-            } else Log.i("PRITEST", "rotation SKIPPED on this image (priRotate=false): headless CI phone emulators crash on display rotation; rotation is required on the CI tablet and in every local run")
+            val beforeRotation = inkPixels(s)
+            s.onActivity { it.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE }
+            Thread.sleep(2500)
+            assertTrue("rotation keeps the strokes (${inkPixels(s)} px)", inkPixels(s) > beforeRotation / 3)
+            s.onActivity { it.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT }
+            Thread.sleep(2000)
 
             // ── the shared recognizer reads it and the attempt is marked ─────
             val lines = waitFor(s, "document.querySelectorAll('.ink-preview .ink-line').length || false", 30_000)

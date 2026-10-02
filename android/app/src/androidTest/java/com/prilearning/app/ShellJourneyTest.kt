@@ -88,8 +88,6 @@ class ShellJourneyTest {
 
     private val instrumentation: Instrumentation get() = InstrumentationRegistry.getInstrumentation()
     private val expect: String get() = InstrumentationRegistry.getArguments().getString("priExpect", "any")
-    /** Rotation is exercised unless the runner passes priRotate=false (headless CI phone images only). */
-    private val rotate: Boolean get() = InstrumentationRegistry.getArguments().getString("priRotate", "true") != "false"
 
     private fun belowFloor(): Boolean {
         var blocked = false
@@ -225,13 +223,11 @@ class ShellJourneyTest {
             }
             assertTrue("a question with a typed answer was found", typed)
             setValue(s, ".editor-body input.answer-input", "7")
-            if (rotate) {
-                s.onActivity { it.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE }
-                Thread.sleep(2500)
-                assertEquals("\"7\"", eval(s, "(document.querySelector('.editor-body input.answer-input')||{}).value"))
-                s.onActivity { it.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT }
-                Thread.sleep(1500)
-            } else Log.i("PRITEST", "rotation SKIPPED on this image (priRotate=false): headless CI phone emulators crash on display rotation; rotation is required on the CI tablet and in every local run")
+            s.onActivity { it.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE }
+            Thread.sleep(2500)
+            assertEquals("\"7\"", eval(s, "(document.querySelector('.editor-body input.answer-input')||{}).value"))
+            s.onActivity { it.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT }
+            Thread.sleep(1500)
 
             Log.i("PRITEST", "a typed attempt is submitted and marked, feedback shown, next question, progress")
             waitFor(s, "(function(){var b=[].slice.call(document.querySelectorAll('.editor-foot .btn-primary')).find(function(x){return x.offsetParent&&!x.disabled});if(!b)return false;b.click();return true;})()")
