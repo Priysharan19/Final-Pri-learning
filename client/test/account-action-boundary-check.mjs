@@ -34,9 +34,14 @@ assert.ok(page.includes('cloud.resetPassword({ token, password })'));
 assert.ok(/cloud\.me\(\)[\s\S]{0,120}emailVerified === true/.test(page),
   'a refused verify link falls back to the signed-in account\'s verified state');
 // The brand on standalone link pages reads "Pri Learning", never "P ri Learning".
-assert.ok(page.includes('<span className="logo-name">Pri Learning<'), 'the wordmark spells the full product name');
-assert.ok(page.includes('<span className="logo-bb" aria-hidden="true">P</span>'), 'the brand tile letter is decorative');
-for (const file of ['../src/pages/AccountAction.jsx', '../src/App.jsx', '../src/components/QuestionCard.jsx']) {
+// The brand is drawn through one slot (components/BrandMark.jsx): an outlined
+// wordmark whose accessible name is the full product name, and a mark that is
+// decorative — so no page can split the name across a tile and a text node.
+const brand = readFileSync(new URL('../src/components/BrandMark.jsx', import.meta.url), 'utf8');
+assert.ok(page.includes('<Wordmark') && page.includes("from '../components/BrandMark.jsx'"), 'the link page draws the brand through the BrandMark slot');
+assert.ok(/label = "Pri Learning"/.test(brand) && /role="img" aria-label=\{label\}/.test(brand), 'the wordmark spells the full product name');
+assert.ok(/className="brand-mark"[^>]*aria-hidden="true"/.test(brand), 'the brand mark is decorative');
+for (const file of ['../src/pages/AccountAction.jsx', '../src/App.jsx', '../src/components/QuestionCard.jsx', '../src/components/BrandMark.jsx']) {
   assert.ok(!/>ri Learning/.test(readFileSync(new URL(file, import.meta.url), 'utf8')),
     `${file}: no wordmark relies on the tile letter to complete the name`);
 }
