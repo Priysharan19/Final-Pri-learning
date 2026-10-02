@@ -10,7 +10,8 @@
 //   · a child's cloud account cannot sync, be billed, or use the paid readers
 //     until a guardian confirms, and CAN once they have;
 //   · withdrawal is as easy as consent was, and stops sync at once;
-//   · the app is not walled off meanwhile — only the routes that move data;
+//   · the app is not walled off meanwhile — only the routes that hold or move
+//     a child's data (guardian-consent-coverage-check.mjs drives each over HTTP);
 //   · nothing anywhere calls this "verifiable parental consent", because it is
 //     not: it establishes that somebody with the guardian's mailbox followed a
 //     link, and Rule 10 will want more than that from 14 May 2027;
@@ -104,9 +105,9 @@ try {
 
 // ── 5 · Only the routes that move data are gated ─────────────────────────────
 const routerSource = readFileSync(new URL('../platform/router.js', import.meta.url), 'utf8');
-for (const mounted of ['/sync', '/billing', '/handwriting', '/working']) {
+for (const mounted of ['/sync', '/billing', '/handwriting', '/working', '/telemetry', '/classes', '/assignments', '/reports']) {
   const line = routerSource.split('\n').find(l => l.includes(`router.use('${mounted}'`));
-  ok(line && line.includes('requireGuardianConsent'), `${mounted} is gated — it moves a child's work or takes money`);
+  ok(line && line.includes('requireGuardianConsent'), `${mounted} is gated — it stores or moves a child's data, or takes money`);
 }
 for (const open of ['/curriculum', '/content']) {
   const line = routerSource.split('\n').find(l => l.includes(`router.use('${open}'`));

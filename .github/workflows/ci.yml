@@ -44,6 +44,7 @@ jobs:
           grep -Fq 'NCERT ANSWER FORMS: PASS — 373/373 checks' suites.log
           grep -Fq 'METHOD MARKS: PASS — 37/37 checks' suites.log
           grep -Fq 'WORKING BRANCHES: PASS — 29/29 checks' suites.log
+          grep -Fq 'TELEMETRY CONSENT: PASS — 18/18 checks' suites.log
           grep -Fq 'Pri Reason V1 precision gate: PASS' suites.log
           grep -Fq 'Pri Reason V2 safety gate: PASS' suites.log
           grep -Fq 'Pri Reason V3 regression gate: PASS' suites.log
@@ -181,6 +182,7 @@ jobs:
           node server/test/working-check-check.mjs
           node server/test/spend-ceiling-check.mjs
           node server/test/guardian-consent-check.mjs
+          node server/test/guardian-consent-coverage-check.mjs
       - name: Account, origin, CMS and classroom contracts
         run: |
           node server/test/account-deletion-reauth-check.mjs
@@ -234,7 +236,7 @@ jobs:
         run: |
           set -o pipefail
           node scripts/with-postgres.mjs node server/test/run-platform-postgres.mjs 2>&1 | tee platform-postgres.log
-          grep -Fq 'PLATFORM ON POSTGRES: PASS — 27/27 suites' platform-postgres.log
+          grep -Fq 'PLATFORM ON POSTGRES: PASS — 28/28 suites' platform-postgres.log
           grep -Fq '✓ security-acceptance-check.mjs' platform-postgres.log
           grep -Fq '✓ abuse-limits-check.mjs' platform-postgres.log
           grep -Fq 'POSTGRES SCHEMA MUTATIONS: PASS — 21/21' platform-postgres.log

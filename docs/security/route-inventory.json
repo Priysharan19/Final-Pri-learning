@@ -648,7 +648,7 @@
       "auth": "session",
       "roles": null,
       "verifiedEmail": false,
-      "guardianConsent": false,
+      "guardianConsent": true,
       "ownership": "own account only: every query is keyed by the session account id; no id is taken from the request (teacher: classes they own; student: classes they are an active member of)",
       "rateLimits": [],
       "csrf": "not-applicable",
@@ -664,7 +664,7 @@
         "teacher"
       ],
       "verifiedEmail": true,
-      "guardianConsent": false,
+      "guardianConsent": true,
       "ownership": "class is owned by the creating teacher",
       "rateLimits": [
         {
@@ -687,7 +687,7 @@
         "teacher"
       ],
       "verifiedEmail": false,
-      "guardianConsent": false,
+      "guardianConsent": true,
       "ownership": "class owner (teacher) or admin; otherwise 404",
       "rateLimits": [],
       "csrf": "not-applicable",
@@ -703,7 +703,7 @@
         "teacher"
       ],
       "verifiedEmail": false,
-      "guardianConsent": false,
+      "guardianConsent": true,
       "ownership": "class owner (teacher) or admin; otherwise 404",
       "rateLimits": [
         {
@@ -726,7 +726,7 @@
         "teacher"
       ],
       "verifiedEmail": false,
-      "guardianConsent": false,
+      "guardianConsent": true,
       "ownership": "class owner (teacher) or admin; otherwise 404",
       "rateLimits": [],
       "csrf": "double-submit-when-session-cookie",
@@ -741,7 +741,7 @@
         "student"
       ],
       "verifiedEmail": false,
-      "guardianConsent": false,
+      "guardianConsent": true,
       "ownership": "student's own active membership only; otherwise 404",
       "rateLimits": [],
       "csrf": "double-submit-when-session-cookie",
@@ -756,7 +756,7 @@
         "student"
       ],
       "verifiedEmail": true,
-      "guardianConsent": false,
+      "guardianConsent": true,
       "ownership": "join code selects the class; membership written for the session student",
       "rateLimits": [
         {
@@ -776,7 +776,7 @@
       "auth": "session",
       "roles": null,
       "verifiedEmail": false,
-      "guardianConsent": false,
+      "guardianConsent": true,
       "ownership": "class owner, active member or admin; otherwise 404; a student sees only their own submission/feedback",
       "rateLimits": [],
       "csrf": "not-applicable",
@@ -792,7 +792,7 @@
         "teacher"
       ],
       "verifiedEmail": false,
-      "guardianConsent": false,
+      "guardianConsent": true,
       "ownership": "class owner (teacher) or admin; otherwise 404",
       "rateLimits": [],
       "csrf": "not-applicable",
@@ -808,7 +808,7 @@
         "teacher"
       ],
       "verifiedEmail": false,
-      "guardianConsent": false,
+      "guardianConsent": true,
       "ownership": "class owner (teacher) or admin; otherwise 404",
       "rateLimits": [],
       "csrf": "double-submit-when-session-cookie",
@@ -824,7 +824,7 @@
         "teacher"
       ],
       "verifiedEmail": false,
-      "guardianConsent": false,
+      "guardianConsent": true,
       "ownership": "class owner (teacher) or admin and assignment in that class; otherwise 404",
       "rateLimits": [],
       "csrf": "double-submit-when-session-cookie",
@@ -841,7 +841,7 @@
         "teacher"
       ],
       "verifiedEmail": false,
-      "guardianConsent": false,
+      "guardianConsent": true,
       "ownership": "class owner (teacher) or admin; otherwise 404",
       "rateLimits": [
         {
@@ -864,7 +864,7 @@
         "student"
       ],
       "verifiedEmail": false,
-      "guardianConsent": false,
+      "guardianConsent": true,
       "ownership": "active member of the class and assignment in that class; writes only the session student's row",
       "rateLimits": [],
       "csrf": "double-submit-when-session-cookie",
@@ -881,7 +881,7 @@
         "teacher"
       ],
       "verifiedEmail": false,
-      "guardianConsent": false,
+      "guardianConsent": true,
       "ownership": "class owner (teacher) or admin; student must be an active member; otherwise 404",
       "rateLimits": [],
       "csrf": "double-submit-when-session-cookie",
@@ -898,7 +898,7 @@
         "teacher"
       ],
       "verifiedEmail": false,
-      "guardianConsent": false,
+      "guardianConsent": true,
       "ownership": "class owner (teacher) or admin; otherwise 404",
       "rateLimits": [],
       "csrf": "not-applicable",
@@ -911,7 +911,7 @@
       "auth": "session",
       "roles": null,
       "verifiedEmail": false,
-      "guardianConsent": false,
+      "guardianConsent": true,
       "ownership": "own account only: every query is keyed by the session account id; no id is taken from the request (student: assignments of active memberships; teacher: own classes)",
       "rateLimits": [],
       "csrf": "not-applicable",
@@ -924,7 +924,7 @@
       "auth": "session",
       "roles": null,
       "verifiedEmail": false,
-      "guardianConsent": false,
+      "guardianConsent": true,
       "ownership": "class owner (teacher) or admin; otherwise 404",
       "rateLimits": [],
       "csrf": "not-applicable",
@@ -937,7 +937,7 @@
       "auth": "session",
       "roles": null,
       "verifiedEmail": false,
-      "guardianConsent": false,
+      "guardianConsent": true,
       "ownership": "class owner, active member or admin; student sees only their own submission",
       "rateLimits": [],
       "csrf": "not-applicable",
@@ -1102,7 +1102,7 @@
       "auth": "session",
       "roles": null,
       "verifiedEmail": false,
-      "guardianConsent": false,
+      "guardianConsent": true,
       "ownership": "report owned by the session account; forbidden context keys dropped",
       "rateLimits": [
         {
@@ -1123,7 +1123,7 @@
       "auth": "session",
       "roles": null,
       "verifiedEmail": false,
-      "guardianConsent": false,
+      "guardianConsent": true,
       "ownership": "own account only: every query is keyed by the session account id; no id is taken from the request",
       "rateLimits": [],
       "csrf": "not-applicable",
@@ -1139,7 +1139,7 @@
         "support"
       ],
       "verifiedEmail": false,
-      "guardianConsent": false,
+      "guardianConsent": true,
       "ownership": "support/admin",
       "rateLimits": [],
       "csrf": "not-applicable",
@@ -1155,7 +1155,7 @@
         "support"
       ],
       "verifiedEmail": false,
-      "guardianConsent": false,
+      "guardianConsent": true,
       "ownership": "support/admin; audited",
       "rateLimits": [],
       "csrf": "double-submit-when-session-cookie",
@@ -1242,7 +1242,7 @@
       "auth": "session",
       "roles": null,
       "verifiedEmail": false,
-      "guardianConsent": false,
+      "guardianConsent": true,
       "ownership": "events owned by the session account; allow-listed types and metadata keys",
       "rateLimits": [
         {

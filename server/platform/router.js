@@ -158,11 +158,19 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
   }));
   router.use('/account/identity', createIdentityRouter(db));
   // ── Nothing of a child's leaves or arrives without their guardian ────────
-  // These four are the only routes that move a student's own work off the
-  // device or take money for it. Practice, marking and handwriting all keep
-  // working while consent is pending, because they never left the device in the
-  // first place — which is what makes this a gate on syncing rather than a wall
-  // in front of the app.
+  // Every router that processes a student's own data on this server — their
+  // work (sync, handwriting, working), payment (billing), their class
+  // membership and submissions (classes, assignments), what they write to
+  // support (reports) and their account-linked operational events (telemetry)
+  // — sits behind the guardian's confirmation. Practice, marking and
+  // handwriting all keep working while consent is pending, because they never
+  // left the device in the first place — which is what makes this a gate on
+  // the cloud account rather than a wall in front of the app.
+  //
+  // Deliberately NOT gated: /account (registration, the consent ceremony
+  // itself, export and deletion — a data principal's rights cannot wait on the
+  // consent they concern), /entitlements (reads what the account may unlock,
+  // stores nothing of the child's), /content and /admin (staff only).
   router.use('/sync', requireGuardianConsent(db), createSyncRouter(db));
   router.use('/entitlements', createEntitlementRouter(db));
   router.use('/billing', requireGuardianConsent(db), createBillingRouter(db, {
@@ -171,13 +179,13 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
     native: billingNative,
     lifecycle: billingLifecycle
   }));
-  router.use('/classes', createClassRouter(db));
-  router.use('/assignments', createAssignmentExecutionRouter(db));
+  router.use('/classes', requireGuardianConsent(db), createClassRouter(db));
+  router.use('/assignments', requireGuardianConsent(db), createAssignmentExecutionRouter(db));
   router.use('/content', createContentRouter(db));
-  router.use('/reports', createReportRouter(db));
+  router.use('/reports', requireGuardianConsent(db), createReportRouter(db));
   router.use('/handwriting', requireGuardianConsent(db), createHandwritingRouter(db));
   router.use('/working', requireGuardianConsent(db), createWorkingRouter(db));
-  router.use('/telemetry', createTelemetryRouter(db));
+  router.use('/telemetry', requireGuardianConsent(db), createTelemetryRouter(db));
   router.use('/admin', createAdminRouter(db));
 
   router.use((req, res) => res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Platform endpoint not found.' } }));
