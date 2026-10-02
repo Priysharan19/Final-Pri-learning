@@ -73,7 +73,7 @@ try {
   const db = new Database(path);
   db.pragma('foreign_keys = ON');
   check(ensureBillingSchema(db) === BILLING_SCHEMA_VERSION && BILLING_SCHEMA_VERSION === 5, 'ensureBillingSchema reports billing schema 5 (payment retention 4, then Google Play 5)');
-  check(db.prepare("SELECT value FROM platform_meta WHERE key='billing_schema_version'").get().value === '4', 'platform_meta records billing schema 4');
+  check(db.prepare("SELECT value FROM platform_meta WHERE key='billing_schema_version'").get().value === String(BILLING_SCHEMA_VERSION), 'platform_meta records the current billing schema');
 
   const after = db.prepare('SELECT * FROM billing_payments ORDER BY provider, payment_id').all();
   check(after.length === before.length, `row count preserved (${after.length})`);
