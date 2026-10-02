@@ -19,6 +19,9 @@ import OtpInput, { OTP_LENGTH } from '../components/OtpInput.jsx';
 import { GUARDIAN_NOTICE_VERSION } from '../components/SignUpFlow.jsx';
 import '../components/SignUpFlow.css';
 
+// The wordmark after the P mark (allowlisted literal, as in App.jsx's Logo).
+const WORDMARK = 'ri Learning';
+
 function Notice({ t }) {
   return (
     <section className="signup-notice" aria-labelledby="guardian-notice-title">
@@ -39,7 +42,7 @@ function Page({ children }) {
     <div className="auth-wrap">
       <main className="auth-col signup-flow guardian-page">
         <div className="logo logo-lg" aria-label="Pri Learning">
-          <span className="logo-bb" aria-hidden="true">P</span><span className="logo-name">ri Learning<span className="logo-dot">.</span></span>
+          <span className="logo-bb" aria-hidden="true">P</span><span className="logo-name">{WORDMARK}<span className="logo-dot">.</span></span>
         </div>
         <div style={{ marginTop: 24 }}>{children}</div>
       </main>
