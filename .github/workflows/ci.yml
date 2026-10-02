@@ -57,6 +57,8 @@ jobs:
           grep -Fq 'INDIA PYQ: PASS — 1079/1079 checks — 45 source-cited previous-year questions' suites.log
           grep -Fq '✔ INDIA IDENTITY SUITE PASSED — 102/102 checks across 5 groups' suites.log
           grep -Fq 'INDIA ADAPTIVE: PASS — 302/302 checks' suites.log
+          grep -Fq 'ADAPTIVE SIMULATION: PASS — 77/77 checks' suites.log
+          grep -Fq 'PROGRESS TRUTH: PASS — 74/74 checks' suites.log
           grep -Fq 'PLACEMENT: PASS — 268/268 checks' suites.log
           grep -Fq 'IOS BUNDLE FEATURES: PASS — 16/16 checks' suites.log
           grep -Fq 'INDIA EXAM WEIGHT: PASS — 628/628 checks' suites.log
@@ -346,6 +348,8 @@ jobs:
           grep -Eq 'E2E SUITE.*32/32.*2 flows' browser.log
           grep -Fq 'Hindi · Practice, handwriting, Exams, exam room, Progress, Explain' browser.log
           grep -Eq 'E2E SUITE.*57/57.*1 flows' browser.log
+          grep -Fq 'Progress truth · rendered numbers = attempt ledger' browser.log
+          grep -Eq 'E2E SUITE.*20/20.*1 flows' browser.log
           grep -Eq 'ACCESSIBILITY SUITE.*38/38.*12 groups' browser.log
           grep -Fq 'E2E BROWSER: webkit' browser.log
           test "$(grep -c 'Responsive matrix · 6 viewports, critical routes, write/type, actions' browser.log)" -ge 2
