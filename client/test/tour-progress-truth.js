@@ -126,10 +126,13 @@ export const flow = {
         await check(`${label}: accuracy = correct / answers over the ledger`, Number(shown.accuracy) === L.accuracy, `${shown.accuracy} vs ${L.accuracy}`);
       }
       await page.goto(`${base}/`, { waitUntil: 'domcontentloaded' });
-      await page.waitForSelector('.goal-ring-num', { timeout: 30000 });
+      // Home's week card carries today's count (the goal ring it replaced was
+      // the same number drawn as a ring).
+      await page.waitForSelector('.goal-card[data-today]', { timeout: 30000 });
       await settle();
-      const ring = await page.locator('.goal-ring-num').innerText();
-      await check(`${label}: Home's goal ring counts today's answers`, parseInt(ring, 10) === L.today, `${JSON.stringify(ring)} vs ${L.today}`);
+      const ring = await page.locator('.goal-card').getAttribute('data-today');
+      await check(`${label}: Home's goal counts today's answers`, parseInt(ring, 10) === L.today, `${JSON.stringify(ring)} vs ${L.today}`);
+      await check(`${label}: …and says so in words`, (await page.locator('.goal-sub').innerText()).includes(String(L.today)), await page.locator('.goal-sub').innerText());
       const goalSub = await page.locator('.goal-sub').innerText();
       await check(`${label}: Home's streak is one day`, /\b1\b/.test(goalSub), JSON.stringify(goalSub));
       return L;

@@ -491,7 +491,7 @@ function GoalCard({ user, activity }) {
   });
   const studied = days.filter(d => d.hit).length;
   return (
-    <div className="home-week goal-card">
+    <div className="home-week goal-card" data-today={done}>
       <div className="goal-copy">
         <div className="goal-title">
           {done >= goal ? t('home.goalComplete')
