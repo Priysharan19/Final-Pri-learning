@@ -15,4 +15,7 @@ export const SCHEMA_VERSION = 8;
 // Billing 4: billing_payments keeps its row when the account is deleted
 //    (ON DELETE SET NULL, account_id nullable) — the payment ledger is retained
 //    pseudonymously (supabase/migrations/20261003000000, billingSchema.js).
-export const BILLING_SCHEMA_VERSION = 4;
+// Billing 5: per-subscription lifecycle state on billing_subscriptions and the
+//    verified Apple signed-data ledger billing_apple_signed_events
+//    (supabase/migrations/20261003010000_storekit_entitlement_state.sql).
+export const BILLING_SCHEMA_VERSION = 5;

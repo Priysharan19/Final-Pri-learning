@@ -1,7 +1,7 @@
 import { asyncRouter } from './asyncRouter.js';
 import { asStore } from './store.js';
 import { applyVerifiedEntitlement } from './entitlements.js';
-import { rateLimit, requireSession, requireVerifiedEmail, sha256 } from './security.js';
+import { declaredNativeClient, rateLimit, requireSession, requireVerifiedEmail, sha256 } from './security.js';
 import { recordWebhook } from './metrics.js';
 
 const PROVIDERS = new Set(['apple', 'google', 'web']);
@@ -87,7 +87,13 @@ export function createBillingRouter(db, { verifiers = {}, checkout = {}, native 
   db = asStore(db);
   const router = asyncRouter();
 
-  router.get('/config', (req, res) => res.json(commercialConfig()));
+  // A native shell is told web checkout does not exist: on the iPad the App
+  // Store is the only purchase path V1 permits (PRI_V1_RELEASE_SCOPE §12).
+  router.get('/config', (req, res) => {
+    const config = commercialConfig();
+    if (!declaredNativeClient(req)) return res.json(config);
+    res.json({ ...config, webCheckout: { ...config.webCheckout, configured: false, refusedForNativeClient: true } });
+  });
 
   // Where a student manages each provider's subscription. Apple subscriptions
   // are managed only through the App Store; web subscriptions cancel here.
@@ -144,9 +150,15 @@ export function createBillingRouter(db, { verifiers = {}, checkout = {}, native 
     const verify = native.apple?.transaction;
     if (typeof verify !== 'function') return res.status(503).json({ error: { code: 'BILLING_PROVIDER_NOT_CONFIGURED', message: 'App Store transaction verification is not configured on this deployment.' } });
     try {
-      const result = validateVerifiedResult(await verify({ accountId: req.platformSession.account_id, body: req.body || {}, request: req }), 'apple');
-      if (result.accountId !== req.platformSession.account_id) throw new Error('Apple transaction account binding mismatch');
-      const applied = await applyVerifiedEntitlement(db, result);
+      // Verification (which binds the subscription and writes the signed-data
+      // ledger row) and application are one transaction, as for the webhook:
+      // a failed apply leaves no orphan ledger row or binding behind. The Apple
+      // verifier only does crypto and database work (the webhook's contract).
+      const applied = await db.transaction(async () => {
+        const result = validateVerifiedResult(await verify({ accountId: req.platformSession.account_id, body: req.body || {}, request: req }), 'apple');
+        if (result.accountId !== req.platformSession.account_id) throw new Error('Apple transaction account binding mismatch');
+        return applyVerifiedEntitlement(db, result);
+      });
       res.json({ accepted: true, ...applied });
     } catch (err) { next(err); }
   });
@@ -156,6 +168,12 @@ export function createBillingRouter(db, { verifiers = {}, checkout = {}, native 
   // Premium still unlocks only after a verified webhook/restore updates the
   // server entitlement snapshot.
   router.post('/checkout/web', requireSession(db), requireVerifiedEmail, rateLimit(db, 'billing-checkout-web', { limit: 8, windowMs: 60 * 60 * 1000 }), async (req, res, next) => {
+    // Web (Razorpay) checkout is never reachable from a native app. The
+    // client hides it there too; this is the server half of the same rule, so
+    // an old or modified bundle cannot open a web purchase inside the iPad app.
+    if (declaredNativeClient(req)) {
+      return res.status(403).json({ error: { code: 'BILLING_WEB_CHECKOUT_NATIVE_REFUSED', message: 'Purchases in the app use the App Store. Web checkout is not available here.' } });
+    }
     const create = checkout.web?.create;
     if (typeof create !== 'function') return res.status(503).json({ error: { code: 'BILLING_PROVIDER_NOT_CONFIGURED', message: 'Web subscription checkout is not configured on this deployment.' } });
     try {
@@ -173,9 +191,15 @@ export function createBillingRouter(db, { verifiers = {}, checkout = {}, native 
     const verifier = verifiers[provider]?.restore;
     if (typeof verifier !== 'function') return res.status(503).json({ error: { code: 'BILLING_PROVIDER_NOT_CONFIGURED', message: `${provider} restore verification is not configured on this deployment.` } });
     try {
-      const result = validateVerifiedResult(await verifier({ accountId: req.platformSession.account_id, body: req.body || {}, request: req }), provider);
-      if (result.accountId !== req.platformSession.account_id) throw new Error('Billing restore account binding mismatch');
-      const applied = await applyVerifiedEntitlement(db, { ...result, payloadDigest: result.payloadDigest || sha256(JSON.stringify(req.body || {})) });
+      const verifyAndApply = async () => {
+        const result = validateVerifiedResult(await verifier({ accountId: req.platformSession.account_id, body: req.body || {}, request: req }), provider);
+        if (result.accountId !== req.platformSession.account_id) throw new Error('Billing restore account binding mismatch');
+        return applyVerifiedEntitlement(db, { ...result, payloadDigest: result.payloadDigest || sha256(JSON.stringify(req.body || {})) });
+      };
+      // Apple restore verifies signed data locally (no network), so its ledger
+      // rows and the entitlement change commit together. The web restore asks
+      // Razorpay over the network and must stay outside a transaction.
+      const applied = provider === 'apple' ? await db.transaction(verifyAndApply) : await verifyAndApply();
       res.json(applied);
     } catch (err) { next(err); }
   });

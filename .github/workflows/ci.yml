@@ -251,14 +251,15 @@ jobs:
         run: |
           set -o pipefail
           node scripts/with-postgres.mjs node server/test/run-platform-postgres.mjs 2>&1 | tee platform-postgres.log
-          grep -Fq 'PLATFORM ON POSTGRES: PASS — 30/30 suites' platform-postgres.log
+          grep -Fq 'PLATFORM ON POSTGRES: PASS — 31/31 suites' platform-postgres.log
           grep -Fq '✓ security-acceptance-check.mjs' platform-postgres.log
           grep -Fq '✓ abuse-limits-check.mjs' platform-postgres.log
           grep -Fq '✓ practice-attempt-sync-check.mjs' platform-postgres.log
           grep -Fq 'ACCOUNT LIFECYCLE JOURNEY: PASS' platform-postgres.log
-          grep -Fq 'POSTGRES SCHEMA MUTATIONS: PASS — 23/23' platform-postgres.log
+          grep -Fq 'POSTGRES SCHEMA MUTATIONS: PASS — 25/25' platform-postgres.log
           grep -Fq 'PLATFORM SYNC BURST: PASS' platform-postgres.log
           grep -Fq '✓ failure-drills-check.mjs' platform-postgres.log
+          grep -Fq '✓ storekit-entitlement-state-machine-check.mjs' platform-postgres.log
       - name: Platform migration contract
         run: node server/test/platform-migration-check.mjs
       - name: Billing v3 to v4 payment-retention rebuild on a populated SQLite database
@@ -281,6 +282,15 @@ jobs:
         run: node server/test/razorpay-billing-check.mjs
       - name: Apple billing lifecycle
         run: node server/test/apple-billing-check.mjs
+      # §19 / V1 blocker #7 (code side): the StoreKit entitlement state machine
+      # across renewal, grace, cancellation, expiry, refund, upgrade, restore,
+      # account switch, duplicate/out-of-order/replayed/forged notifications,
+      # plus the operator reconciliation CLI. Also runs on Postgres above.
+      - name: StoreKit entitlement state machine and reconciliation
+        run: |
+          set -o pipefail
+          node server/test/storekit-entitlement-state-machine-check.mjs 2>&1 | tee storekit.log
+          grep -Fq 'STOREKIT ENTITLEMENT STATE MACHINE: PASS — 172/172 checks' storekit.log
 
   browser:
     name: Browser suites (end-to-end and accessibility)
