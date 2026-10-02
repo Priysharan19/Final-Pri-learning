@@ -24,8 +24,8 @@ overrides the freeze.
 | Apple privacy manifest, copied to the app bundle root | `ios/PriLearning.swiftpm/PrivacyInfo.xcprivacy` (+ the `PriLearning 2` mirror), `.copy("PrivacyInfo.xcprivacy")` in both `Package.swift` | `store-readiness-check`, `check-native-package-sync` |
 | No tracking, no tracking domains | `NSPrivacyTracking = false`, empty `NSPrivacyTrackingDomains` | `store-readiness-check` |
 | Required-reason API declared | `UserDefaults` → `CA92.1` (the app's own settings) | `store-readiness-check` |
-| Android: INTERNET is the only permission; no backup; cleartext refused | `android/app/src/main/AndroidManifest.xml` | `store-readiness-check` |
-| Android: release upload signing only from CI environment variables; no keystore in git | `android/app/build.gradle.kts` (`PRI_ANDROID_UPLOAD_*`) | `store-readiness-check` (no `*.jks`/`*.keystore`/`*.p12` tracked) |
+| Android: the app's own manifest asks for INTERNET only; no backup; cleartext refused. Libraries merge in `com.android.vending.BILLING` (Play Billing), `ACCESS_NETWORK_STATE` and the AndroidX `DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION` | `android/app/src/main/AndroidManifest.xml`; the merged release manifest | `store-readiness-check` (source manifest, plus the merged manifest against that allow-list whenever a build exists) |
+| Android: release upload signing only from environment variables (all four or none; a partial set fails the build); never the debug key; no keystore in git | `android/app/build.gradle.kts` (`PRI_ANDROID_UPLOAD_*`) | `store-readiness-check` |
 | Android: release builds need an explicit `-Ppri.versionCode` | `android/app/build.gradle.kts` | Gradle refuses otherwise |
 | Release identity is one SHA across web, Apple and Android | `scripts/release-matrix.mjs` (CP-11) | `ci.yml`, `android-shell.yml` |
 | Minimum shell build can be raised without a store release | `PRI_MIN_IOS_BUILD` / `PRI_MIN_ANDROID_BUILD` → `426 CLIENT_UPGRADE_REQUIRED` (CP-11) | `client-compatibility-check` |
@@ -39,28 +39,44 @@ results are **SYNTHETIC / local build** evidence. No store has accepted either.
 
 ## 2. Privacy answers taken from the code
 
-**Data that never leaves the device without a cloud account:** profiles,
-attempts, progress and handwriting strokes live in the WebView's IndexedDB under
-the pinned origin. Without an account, nothing is sent anywhere.
+**Without a cloud account, nothing leaves the device.** Profiles, attempts,
+progress and handwriting strokes live in the WebView's IndexedDB under the pinned
+origin. Handwriting **strokes** never leave the device, with or without an
+account. Only a rasterised **image** can be sent, and only for cloud reading.
 
-**With a cloud account (optional)** the server receives the following, all for
-App Functionality, all linked to the account, none used for tracking:
+**With a cloud account (optional)** the server receives the data below. All of
+it is linked to the account, and none of it is used for tracking or advertising.
+The Apple column is exactly the set in `PrivacyInfo.xcprivacy`, and
+`store-readiness-check` holds the manifest to it.
 
-| Data | Why | Apple manifest type | Play Data safety |
-|---|---|---|---|
-| Email address | sign-in, account recovery | EmailAddress | Personal info → Email |
-| Display name | shown in the app | Name | Personal info → Name |
-| Account id | sync identity | UserID | Personal info → User IDs |
-| Subscription status / purchase token | server-verified Premium (never trusted from the client) | PurchaseHistory | Financial info → Purchase history |
-| Learning events (attempts, marks) | cross-device sync | ProductInteraction | App activity → Other actions |
-| Handwriting strokes / rasterised image for cloud recognition, when used | recognition (answer-blind) | OtherUserContent | App activity → Other user-generated content |
-| A photo of working, only when the student attaches one | marking that attempt | PhotosorVideos (not linked) | Photos and videos → Photos |
-| Diagnostics / performance (allow-listed telemetry, 90-day retention) | reliability | OtherDiagnosticData, PerformanceData | App info and performance → Diagnostics |
+| Data | Source in code | Why | Apple manifest type (purpose) | Play Data safety |
+|---|---|---|---|---|
+| Email address | `accounts.js` register/login | sign-in, recovery | EmailAddress (App Functionality) | Personal info → Email address |
+| Display name | `accounts.js` | shown in the app | Name (App Functionality) | Personal info → Name |
+| Account id | `accounts.js` | sync identity | UserID (App Functionality) | Personal info → User IDs |
+| Per-install device id | `cloudAccount.js` `deviceId` → `account_sessions.device_id`, `learning_events.device_id`, `GET /v1/account/devices` | sessions, per-device sync | DeviceID (App Functionality) | Device or other IDs |
+| Profile: class/year, course, track, avatar, daily goal, handwriting setting; settings, bookmarks, tasks, custom questions | `syncWorker.js` `safeProfile`, `sync.js` entities | cross-device sync | OtherDataTypes (App Functionality) | Personal info → Other info; App activity → Other user-generated content |
+| Learning records (attempts, marks) | `sync.js` | cross-device sync | OtherUserContent (App Functionality) | App activity → Other actions |
+| Handwriting **image** for cloud reading (rasterised; processed, not stored) | `/v1/handwriting/transcribe` | reading the written answer (answer-blind) | OtherUserContent (App Functionality) | App activity → Other user-generated content |
+| Lines of working and the question text for step checking (processed, not stored) | `/v1/working` | feedback on working steps (AI proposes, the deterministic engine decides marks) | OtherUserContent (App Functionality) | App activity → Other user-generated content |
+| Photo of written working, only with cloud reading turned on (processed, not stored) | `/v1/handwriting/transcribe` (same authenticated route as ink) | transcription of the photo | PhotosorVideos (App Functionality) | Photos and videos → Photos |
+| Subscription status / purchase token | `billing.js` (verified server-side; the client is never trusted) | Premium access | PurchaseHistory (App Functionality) | Financial info → Purchase history |
+| Allow-listed telemetry events (e.g. feature used, exam completed, trial started) | `telemetry.js` (90-day retention) | reliability and product analytics | ProductInteraction (App Functionality, Analytics) | App activity → App interactions (Analytics) |
+| Diagnostics / performance | `telemetry.js` | reliability | OtherDiagnosticData, PerformanceData (App Functionality) | App info and performance → Diagnostics |
 
-Data is encrypted in transit. Users can request deletion, and in-app deletion is
-available. A cloud processor (OpenAI) receives handwriting images only when
-cloud recognition is used. **Do not** declare that handwriting never leaves the
-device (`PRI_V1_RELEASE_SCOPE.md` §privacy).
+**Guardian name and email** (`guardianConsent.js`) are collected at
+registration for a learner in classes 7–12. They are a **third party's**
+personal data, used only to send the confirmation and withdrawal links. Declare
+them in Play Data safety (Personal info → Name, Email address; App
+functionality) and describe them in the privacy notice. Whether Apple's labels
+need a separate entry is an owner + legal question. The manifest already
+declares Name and EmailAddress.
+
+Data is encrypted in transit. In-app deletion exists, and deletion can be
+requested on the web (§4). A cloud processor (OpenAI) receives handwriting
+images and lines of working only when those cloud features are used. **Do not**
+declare that handwriting never leaves the device (`PRI_V1_RELEASE_SCOPE.md`
+§privacy).
 
 ## 3. Children, age rating and families — owner decision required
 
@@ -79,7 +95,8 @@ owner and legal action, so this PR does not change it. Agents must not describe
 the gate as verifiable consent.
 
 - **Apple:** the age rating questionnaire answers are "none" for every
-  objectionable-content category. That gives 4+. Do **not** choose the Kids
+  objectionable-content category, which is expected to give the lowest rating.
+  Apple's questionnaire changes, so the owner confirms the result. Do **not** choose the Kids
   category until verifiable parental consent exists (the email confirmation is
   not that). The Kids category brings
   parental-gate and data-minimisation duties the app does not yet meet.
@@ -121,12 +138,15 @@ authority.
 2. **Google**
    - Create the Play Console app, package `com.prilearning.app`.
    - Enrol in Play App Signing and generate the upload key. Keep it outside the
-     repo; CI reads it through `PRI_ANDROID_UPLOAD_*`.
+     repo. A release job can supply it through `PRI_ANDROID_UPLOAD_*`; no
+     workflow builds a signed release yet.
    - Create the subscription products and base plans
      (`PRI_GOOGLE_MONTHLY_PRODUCT_ID` / `PRI_GOOGLE_ANNUAL_PRODUCT_ID`).
    - Set up RTDN: a Pub/Sub topic plus a push subscription to `/v1/billing/webhook/google`
      with OIDC, using `PRI_GOOGLE_RTDN_AUDIENCE` and `PRI_GOOGLE_RTDN_SERVICE_ACCOUNT`.
-   - Grant the service account access to the Android Publisher API.
+   - Grant the service account access to the Android Publisher API, and supply the
+     service-account credentials (`PRI_GOOGLE_SERVICE_ACCOUNT_JSON` or `_FILE`).
+     `PRI_GOOGLE_PACKAGE_NAME` defaults to `com.prilearning.app`.
    - Fill in Data safety (from §2), the target audience (from §3), the content
      rating questionnaire and the account-deletion URL (from §4).
    - Use an internal testing track first, then a staged production rollout.

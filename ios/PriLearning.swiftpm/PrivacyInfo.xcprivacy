@@ -2,13 +2,17 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!--
   Pri Learning · App privacy manifest (CP-12). Copied to the app bundle root.
-  Only when a student creates a cloud account does anything leave the device:
-  account email/name/id, synced learning records (other user content),
-  subscription state (purchase history), and operational telemetry tied to the
-  account (product interaction, diagnostics, performance). Handwriting images
-  are sent to the cloud reader only when the student turns server reading on;
-  they are not stored and not linked. No tracking, no tracking domains.
-  docs/release/STORE_READINESS.md maps each entry to its source.
+  Without a cloud account nothing leaves the device. With one (optional), the
+  server receives, all linked to the account and none used for tracking:
+  email, name and account id; a per-install device id (sessions, sync); the
+  profile's class/year, course and settings (other data types); synced learning
+  records, handwriting images and lines of working sent for cloud reading or
+  step checking (other user content; images and working are processed, not
+  stored); a photo of working when cloud reading is on (photos); subscription
+  state (purchase history); allow-listed telemetry (product interaction for app
+  functionality and analytics; diagnostics; performance). No tracking, no
+  tracking domains. docs/release/STORE_READINESS.md maps each entry to its
+  source; scripts/store-readiness-check.mjs holds this file to that list.
 -->
 <plist version="1.0">
 <dict>
@@ -56,6 +60,30 @@
         </dict>
         <dict>
             <key>NSPrivacyCollectedDataType</key>
+            <string>NSPrivacyCollectedDataTypeDeviceID</string>
+            <key>NSPrivacyCollectedDataTypeLinked</key>
+            <true/>
+            <key>NSPrivacyCollectedDataTypeTracking</key>
+            <false/>
+            <key>NSPrivacyCollectedDataTypePurposes</key>
+            <array>
+                <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+            </array>
+        </dict>
+        <dict>
+            <key>NSPrivacyCollectedDataType</key>
+            <string>NSPrivacyCollectedDataTypeOtherDataTypes</string>
+            <key>NSPrivacyCollectedDataTypeLinked</key>
+            <true/>
+            <key>NSPrivacyCollectedDataTypeTracking</key>
+            <false/>
+            <key>NSPrivacyCollectedDataTypePurposes</key>
+            <array>
+                <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+            </array>
+        </dict>
+        <dict>
+            <key>NSPrivacyCollectedDataType</key>
             <string>NSPrivacyCollectedDataTypePurchaseHistory</string>
             <key>NSPrivacyCollectedDataTypeLinked</key>
             <true/>
@@ -82,7 +110,7 @@
             <key>NSPrivacyCollectedDataType</key>
             <string>NSPrivacyCollectedDataTypePhotosorVideos</string>
             <key>NSPrivacyCollectedDataTypeLinked</key>
-            <false/>
+            <true/>
             <key>NSPrivacyCollectedDataTypeTracking</key>
             <false/>
             <key>NSPrivacyCollectedDataTypePurposes</key>
