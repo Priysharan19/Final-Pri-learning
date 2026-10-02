@@ -65,7 +65,8 @@ async function answerCurrentQuestion(page) {
   if (await button.count()) { await button.click(); await page.waitForTimeout(200); }
   // A first wrong answer leaves the question open; Show solution closes it.
   const reveal = page.getByRole('button', { name: /Show solution/i }).first();
-  if (await reveal.isVisible().catch(() => false)) { await reveal.click(); await page.waitForTimeout(220); }
+  // Show solution forfeits the marks, so it takes a second, confirming press.
+  if (await reveal.isVisible().catch(() => false)) { await reveal.click(); await reveal.click(); await page.waitForTimeout(220); }
 }
 
 export const flow = {
