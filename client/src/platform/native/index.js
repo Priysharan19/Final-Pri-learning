@@ -115,7 +115,7 @@ const ink = Object.freeze({
   },
   facts: () => {
     const c = capOf('ink');
-    return c ? { stylus: c.stylus === true, finger: c.finger === true } : null;
+    return c ? { stylus: c.stylus === true, finger: c.finger === true, fingerDefault: c.fingerDefault === true } : null;
   },
   /** Fire-and-forget surface message (mount/layout/tool/...). Ink v1 is only
    * defined over the legacy Apple transport; no envelope host advertises it. */

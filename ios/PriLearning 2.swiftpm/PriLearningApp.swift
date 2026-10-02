@@ -39,5 +39,16 @@ struct ContentView: View {
             WebShell()
         }
         .persistentSystemOverlays(.hidden)
+        // Universal Links (account actions) reach the shell here. They need
+        // the Associated Domains entitlement + apple-app-site-association on
+        // the production origin, which are owner/Apple-account actions; until
+        // then this path is dormant, and links open the web app in Safari.
+        .onOpenURL { url in
+            NotificationCenter.default.post(name: .priOpenURL, object: url)
+        }
     }
+}
+
+extension Notification.Name {
+    static let priOpenURL = Notification.Name("pri.openURL")
 }
