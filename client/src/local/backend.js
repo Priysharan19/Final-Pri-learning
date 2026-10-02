@@ -857,7 +857,11 @@ function indiaState(chapter, ratings, now = Date.now()) {
 
 /** The rating state of one Indian dot point: its own row under the chapter, or the legacy generator aggregate. */
 function indiaDotpointState(chapter, ordinal, chapterRow, ratings, now = Date.now()) {
-  if (chapterRow) return dpStateOf(chapterRow, indiaDotpointKey(chapter.id, ordinal));
+  // A chapter row with dot-point states is the current shape. A row under the
+  // chapter's id WITHOUT them is a generator row that happens to share the
+  // chapter's id (an older device, the demo history), and reading it as a
+  // chapter row drew every dot point of a chapter with answers as untouched.
+  if (chapterRow && chapterRow.dp && typeof chapterRow.dp === 'object') return dpStateOf(chapterRow, indiaDotpointKey(chapter.id, ordinal));
   const ids = [...new Set((chapter.covers || []).filter(c => c.dp.includes(ordinal)).map(c => c.gen))];
   const rows = ids.map(id => ratings[id]).filter(Boolean);
   if (!rows.length) return EMPTY_DP();
@@ -1262,7 +1266,12 @@ async function indiaStats(p, ratings, now) {
     examPrediction: (() => {
       const blueprint = indiaExamBlueprint({ track: trackId, grade: p.year, variant: p.indiaVariant || 'standard' });
       if (!blueprint?.units?.length) return null;
-      try { return predictExamMark(blueprint, ratings, { nowMs: now }); } catch { return null; }
+      // Evidence is read per chapter the way every other India surface reads
+      // it: the chapter's own row, or the aggregate of the generator-keyed rows
+      // a device recorded before chapters had rows. Reading ratings[chapterId]
+      // alone called a chapter with forty legacy answers "nothing attempted".
+      const evidenceFor = id => { const c = indiaChapter(id); return c ? indiaState(c, ratings, now) : ratings[id]; };
+      try { return predictExamMark(blueprint, ratings, { nowMs: now, evidenceFor }); } catch { return null; }
     })(),
     priorities: prio, strands, misconceptions, recommendation, chapters, reviewsDue: due.size,
     activity: days.slice(-120), totals, byDiff,

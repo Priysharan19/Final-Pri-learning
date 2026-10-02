@@ -58,3 +58,8 @@ export function class10LibraryPracticeHref(chapter, difficulty) {
 export function indiaProgressPracticeHref(row, track) {
   return practiceHref({ subtopic: row?.id, track: track || 'cbse' });
 }
+
+/** The syllabus board's and Priorities' link to one dot point of an India chapter. */
+export function indiaDotpointPracticeHref(chapterId, dotpoint, track) {
+  return practiceHref({ subtopic: chapterId, dotpoint, track: track || 'cbse' });
+}

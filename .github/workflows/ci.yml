@@ -59,6 +59,7 @@ jobs:
           grep -Fq 'INDIA ADAPTIVE: PASS — 302/302 checks' suites.log
           grep -Fq 'ADAPTIVE SIMULATION: PASS — 77/77 checks' suites.log
           grep -Fq 'PROGRESS TRUTH: PASS — 74/74 checks' suites.log
+          grep -Fq 'SYLLABUS BOARD: PASS — 65/65 checks' suites.log
           grep -Fq 'PLACEMENT: PASS — 268/268 checks' suites.log
           grep -Fq 'IOS BUNDLE FEATURES: PASS — 16/16 checks' suites.log
           grep -Fq 'INDIA EXAM WEIGHT: PASS — 628/628 checks' suites.log
@@ -69,7 +70,7 @@ jobs:
           grep -Fq 'CLOUD WORKING CLIENT: PASS — 47/47 checks' suites.log
           grep -Fq 'CLOUD PHOTO CLIENT: PASS — 28/28 checks' suites.log
           grep -Fq 'I18N: PASS — 189/189 checks' suites.log
-          grep -Fq 'I18N COVERAGE: PASS — 88/88 checks — 49 files scanned, 0 hard-coded strings' suites.log
+          grep -Fq 'I18N COVERAGE: PASS — 88/88 checks — 50 files scanned, 0 hard-coded strings' suites.log
           grep -Fq 'I18N VOICE: PASS — 92/92 checks' suites.log
           grep -Fq 'MISCONCEPTION ONTOLOGY: PASS — 99/99 checks' suites.log
           grep -Fq 'CLOUD HANDWRITING CLIENT: PASS — 58/58 checks' suites.log
