@@ -11,7 +11,15 @@ assert.match(classes,/Class10NCERTLibrary/,'Classes routes Class 10 students to 
 assert.match(classes,/Number\(user\.year\) === 10/,'library is scoped to Class 10 profiles');
 assert.match(component,/class10-content\.js/,'library consumes bundled source content');
 assert.doesNotMatch(component,/fetch\s*\(|https?:\/\//,'NCERT library has no network dependency');
-assert.match(component,/\/practice\?subtopic=/,'D1-D4 buttons hand off to normal Practice');
+assert.match(component,/class10LibraryPracticeHref\(chapter,d\)/,'D1-D3 buttons hand off to normal Practice through the shared link builder');
+{
+  // The link names the curriculum chapter (which India practice resolves), the
+  // CBSE track and the difficulty — not a generator id the backend refused.
+  const { class10LibraryPracticeHref } = await import('../src/lib/practiceLinks.js');
+  assert.equal(class10LibraryPracticeHref({ id: 'c10-polynomials' }, 3), '/practice?subtopic=c10-polynomials&difficulty=3&track=cbse');
+  // CBSE practice is held to D1–D3, so the library never builds a D4 link.
+  assert.equal(class10LibraryPracticeHref({ id: 'c10-polynomials' }, 4), '/practice?subtopic=c10-polynomials&difficulty=3&track=cbse');
+}
 // The library's copy lives in the string catalogue, so the component must reach
 // for each key and the English catalogue must still say the right thing.
 const catalogue=en;

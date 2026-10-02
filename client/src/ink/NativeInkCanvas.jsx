@@ -14,11 +14,13 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useRef } from 'react';
 import { nativeInk } from './native.js';
+import { useT } from '../i18n/index.js';
 
 const NativeInkCanvas = forwardRef(function NativeInkCanvas({
   height = 260, guides = true, tool = 'pen', fingerMode = 'auto', disabled = false,
-  onStrokesChange, ariaLabel = 'Writing space'
+  onStrokesChange, ariaLabel = null
 }, ref) {
+  const t = useT();
   const wrapRef = useRef(null);
   const strokesRef = useRef([]);
   const onStrokesChangeRef = useRef(onStrokesChange);
@@ -100,7 +102,7 @@ const NativeInkCanvas = forwardRef(function NativeInkCanvas({
       className={`ink-wrap ${guides ? 'ink-ruled' : ''}`}
       style={{ height }}
       role="img"
-      aria-label={ariaLabel}
+      aria-label={ariaLabel ?? t('ink.writingSpace')}
     />
   );
 });

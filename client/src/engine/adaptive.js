@@ -406,14 +406,26 @@ export function trapPressureOf(traps, nowMs = Date.now()) {
 // in a block until it has been answered correctly twice, and is interleaved
 // hard from then on.
 
+//
+// Acquisition is bounded. An idea that is still short of two correct answers
+// after `acquisitionAttempts` tries is not being acquired by more of the same —
+// left alone, the rule above served a student who kept missing one idea four
+// questions in a row, broke the block with one other question, and went back
+// for four more, indefinitely: three questions in every four on the idea that
+// was going worst. Past that point it is interleaved like any other idea, and
+// no idea may take more than `windowShare` of the recent picks it is judged
+// against, whatever state it is in.
 export const INTERLEAVE = {
-  acquisitionCorrect: 2, // correct answers before an idea joins the interleave
-  acquisitionRun: 4,     // consecutive questions allowed while acquiring
-  settledRun: 2,         // consecutive questions allowed once acquired
-  window: 3              // how far back the recency penalty reaches
+  acquisitionCorrect: 2,  // correct answers before an idea joins the interleave
+  acquisitionAttempts: 6, // tries after which a still-failing idea is interleaved anyway
+  acquisitionRun: 4,      // consecutive questions allowed while acquiring
+  settledRun: 2,          // consecutive questions allowed once acquired
+  window: 3,              // how far back the recency penalty reaches
+  windowShare: 0.5        // most of the recent picks one idea may hold
 };
 
-const acquiring = st => (st?.correct || 0) < INTERLEAVE.acquisitionCorrect;
+const acquiring = st => (st?.correct || 0) < INTERLEAVE.acquisitionCorrect
+  && (st?.attempts || 0) < INTERLEAVE.acquisitionAttempts;
 
 /** How many of the most recent picks in a row were this subtopic. */
 function runLength(id, recent) {
@@ -432,6 +444,10 @@ export function interleavePenalty(id, recent, st) {
   const run = runLength(id, recent);
   const limit = acquiring(st) ? INTERLEAVE.acquisitionRun : INTERLEAVE.settledRun;
   if (run >= limit) return 0.04;
+  // Share of the window, not just the current run: a run broken by one other
+  // question is still a block.
+  const held = recent.filter(x => x === id).length;
+  if (recent.length >= 4 && held >= Math.ceil(recent.length * INTERLEAVE.windowShare)) return 0.04;
   if (acquiring(st)) return 1;
   const at = recent.indexOf(id);
   if (at === 0) return 0.18;
@@ -610,6 +626,9 @@ export function pickNextAmong({ candidates, ratings, reviewsDue, rand = Math.ran
     // 4. Coverage — unseen ground in the student's own year fills the syllabus in.
     if (!st.attempts) score += ownYear ? 0.80 : 0.30;
     else if (st.attempts < 3) score += 0.22;
+    // 5. A diagnostic prior (the placement check) on ground with no practice
+    //    evidence yet: bounded, and gone the moment the chapter is attempted.
+    if (!st.attempts && s.prior) score += Math.max(-0.4, Math.min(0.4, Number(s.prior) || 0));
 
     score *= interleavePenalty(s.id, seen, st);
     score *= 0.88 + 0.24 * jitterFor(s.id, rand);
@@ -625,7 +644,12 @@ export function pickNextAmong({ candidates, ratings, reviewsDue, rand = Math.ran
   }
 
   const target = targetSuccess({ ...best.st, trapPressure: best.pressure, recentWrong: recentWrongOf(best.st) }, nowMs);
-  const difficulty = pickDifficulty(best.st.rating, best.st.attempts, { target });
+  // The rung is drawn from the same `rand` the ranking used, not from a fresh
+  // Math.random(): the same learner state and the same `rand` must give the
+  // same question, or the "what next" preview on Progress (a fixed seed) could
+  // name a different difficulty on every refresh and no history could be
+  // replayed to the choice it produced.
+  const difficulty = pickDifficulty(best.st.rating, best.st.attempts, { target, rand: jitterFor(`${best.s.id}#difficulty`, rand) });
   const trap = activeTraps(best.st.traps, nowMs)[0] || null;
   const why = {
     review: 'Spaced review — your memory of this one is due to fade.',

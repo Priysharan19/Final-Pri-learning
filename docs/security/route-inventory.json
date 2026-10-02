@@ -649,7 +649,7 @@
       "roles": null,
       "verifiedEmail": true,
       "guardianConsent": true,
-      "ownership": "own account only: every query is keyed by the session account id; no id is taken from the request",
+      "ownership": "own account only: every query is keyed by the session account id; no id is taken from the request; refused (403 BILLING_WEB_CHECKOUT_NATIVE_REFUSED) for a native-shell client (X-Pri-Client ios-native-v1 / android-native-v1): web purchase is never reachable in the iPad app",
       "rateLimits": [
         {
           "key": "billing-checkout-web",

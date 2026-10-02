@@ -72,8 +72,13 @@ try {
   // ── Migrate (what boot does) ─────────────────────────────────────────────
   const db = new Database(path);
   db.pragma('foreign_keys = ON');
-  check(ensureBillingSchema(db) === BILLING_SCHEMA_VERSION && BILLING_SCHEMA_VERSION === 5, 'ensureBillingSchema reports billing schema 5 (payment retention 4, then Google Play 5)');
+  // v3 migrates straight to the current billing schema, which includes this
+  // v4 rebuild (v5 added the StoreKit entitlement state on top of it).
+  check(ensureBillingSchema(db) === BILLING_SCHEMA_VERSION && BILLING_SCHEMA_VERSION >= 4, `ensureBillingSchema reports the current billing schema (${BILLING_SCHEMA_VERSION}, at least 4)`);
   check(db.prepare("SELECT value FROM platform_meta WHERE key='billing_schema_version'").get().value === String(BILLING_SCHEMA_VERSION), 'platform_meta records the current billing schema');
+  const subscriptionColumns = new Set(db.pragma("table_info('billing_subscriptions')").map(c => c.name));
+  check(['state_plan', 'state_status', 'state_period_end', 'state_grace_until'].every(c => subscriptionColumns.has(c)), 'v5: billing_subscriptions gains its per-subscription lifecycle columns');
+  check(!!db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='billing_apple_signed_events'").get(), 'v5: the Apple signed-data ledger exists');
 
   const after = db.prepare('SELECT * FROM billing_payments ORDER BY provider, payment_id').all();
   check(after.length === before.length, `row count preserved (${after.length})`);

@@ -42,8 +42,7 @@ const LAST_SCHEMA_BUMP = (() => {
   throw new Error('no migration bumps schema_version');
 })();
 
-/** The last migration that sets billing_schema_version (CP-08's Google Play
- *  migration follows the payment-retention one), so the mutation stays real. */
+/** The last migration that sets billing_schema_version, and the statement that does it. */
 const LAST_BILLING_BUMP = (() => {
   const pattern = /update pri\.platform_meta set value = '(\d+)' where key = 'billing_schema_version';/;
   for (const m of [...original].reverse()) {
@@ -158,8 +157,9 @@ const MUTATIONS = [
     expect: /billing_payments foreign keys: Postgres is missing account_id->accounts\.id ON DELETE SET NULL/
   },
   {
-    // Always the LAST migration that moves billing_schema_version (payment
-    // retention: 4, then Google Play: 5), so no later migration makes it vacuous.
+    // Always the LAST migration that moves billing_schema_version (as for
+    // schema_version above): removing an earlier bump would be vacuous once a
+    // later migration sets a higher version.
     label: `billing_schema_version left behind by its last bump (${LAST_BILLING_BUMP.name})`,
     migrations: mutateNamed(LAST_BILLING_BUMP.name, LAST_BILLING_BUMP.statement, ''),
     expect: new RegExp(`platform_meta\\.billing_schema_version is ${LAST_BILLING_BUMP.version}\\b`)
@@ -168,6 +168,16 @@ const MUTATIONS = [
     label: 'UNIQUE dropped from billing_google_accounts.obfuscated_account_id',
     migrations: mutateNamed('_google_play_billing.sql', '  obfuscated_account_id text not null unique,', '  obfuscated_account_id text not null,'),
     expect: /billing_google_accounts unique keys: Postgres is missing obfuscated_account_id/
+  },
+  {
+    label: 'billing_subscriptions.state_plan added without its CHECK',
+    migrations: mutateNamed('_storekit_entitlement_state', "add column state_plan text check (state_plan in ('free','premium') or state_plan is null);", 'add column state_plan text;'),
+    expect: /billing_subscriptions CHECK constraints: Postgres is missing state_plan/
+  },
+  {
+    label: 'billing_apple_signed_events left without row-level security',
+    migrations: mutateNamed('_storekit_entitlement_state', 'alter table pri.billing_apple_signed_events enable row level security;', ''),
+    expect: /billing_apple_signed_events: row-level security is not enabled/
   },
   {
     label: 'the sync cursor sequence is dropped',
